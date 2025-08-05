@@ -55,7 +55,11 @@ public:
     static OP_Node* factory(OP_Network*, const char*, OP_Operator*);
 
     // The VDB port holds read-only VDBs.
-    int isRefInput(unsigned input) const override { return (input == 1); }
+    int isRefInput(OP_InputIdx input) const override
+    {
+        UT_ASSERT(input >= 0);
+        return (input == 1);
+    }
 
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
 };
@@ -218,7 +222,7 @@ private:
     warnOnExisting(const std::string& attributeName) const
     {
         for (const auto& pointGrid : mPointGrids) {
-            assert(pointGrid);
+            UT_ASSERT(pointGrid);
             const auto leaf = pointGrid->tree().cbeginLeaf();
             if (!leaf) continue;
             if (leaf->hasAttribute(attributeName)) {

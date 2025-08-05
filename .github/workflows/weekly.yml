@@ -61,7 +61,7 @@ jobs:
       (github.event_name != 'workflow_dispatch' ||
        github.event.inputs.type == 'all' ||
        github.event.inputs.type == 'houdini')
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-houdini:${{ matrix.config.hou_hash }}
     env:
       CXX: clang++
@@ -146,7 +146,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'extra'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-extra:${{ matrix.config.name }}
     container:
       image: aswf/ci-openvdb:2024
@@ -203,7 +203,7 @@ jobs:
       - name: install_deps
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev llvm-dev libgtest-dev libcppunit-dev
+            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev llvm-15-dev libgtest-dev libgmock-dev libcppunit-dev
             ./ci/install_nanobind.sh 2.0.0
           elif [ "$RUNNER_OS" == "macOS" ]; then
             ./ci/install_macos.sh 15
@@ -284,7 +284,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'ax'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-ax:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
@@ -295,8 +295,8 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2023-clang15', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
-          - { image: '2023-clang15', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
+          - { image: '2025-clang19', cxx: 'clang++', build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
+          - { image: '2025-clang19', cxx: 'g++',     build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -313,6 +313,7 @@ jobs:
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
           -DOPENVDB_CXX_STRICT=ON
+          -DOPENVDB_BUILD_VDB_TOOL=OFF
           \"
       - name: clean
         if: matrix.config.components == 'core'
@@ -328,6 +329,7 @@ jobs:
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
           -DOPENVDB_CXX_STRICT=ON
+          -DOPENVDB_BUILD_VDB_TOOL=OFF
           \"
       - name: test
         run: cd build && ctest -V
@@ -376,7 +378,7 @@ jobs:
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'ax'
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
-    name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
+    name: ${{ matrix.config.vc }}-${{ matrix.config.crt }}-${{ matrix.config.build }}-llvm${{ matrix.config.llvm }}
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
       # Export this with '' avoid bash treating \ as escape
@@ -390,17 +392,22 @@ jobs:
           # @todo  We don't currently run the axtests with shared builds of ax
           # due to symbol issues using LLVM as a static lib (which is the only
           # option on Windows).
-          - { vc: 'x64-windows',        crt: 'MD',  components: 'core,bin,axcore,axbin,python', build: 'Release', cmake: '-DOPENVDB_CORE_STATIC=OFF -DOPENVDB_AX_STATIC=OFF' }
-          - { vc: 'x64-windows-static', crt: 'MT',  components: 'core,bin,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
-          - { vc: 'x64-windows-static', crt: 'MTd', components: 'core,bin,axcore,axbin,axtest', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          # @note  currently only test static builds with MT as building LLVM as
+          # a shared lib on windows is a bit dicey
+          - { vc: 'x64-windows-static', llvm: '18.1.0', crt: 'MultiThreaded',      components: 'core,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows-static', llvm: '18.1.0', crt: 'MultiThreadedDebug', components: 'core,axcore,axbin,axtest', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows',        llvm: '18.1.0', crt: 'MultiThreadedDLL',   components: 'core,axcore,axbin',        build: 'Release', cmake: '-DOPENVDB_CORE_STATIC=OFF -DOPENVDB_AX_STATIC=OFF' }
+          - { vc: 'x64-windows-static', llvm: '15.0.0', crt: 'MultiThreaded',      components: 'core,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
     - name: llvm
-      run: ./ci/install_llvm_windows.sh ${{ matrix.config.crt }}
+      run: ./ci/install_llvm_windows.sh ${{ matrix.config.llvm }} ${{ matrix.config.crt }}
     - name: install
       shell: powershell
-      run: .\ci\install_windows.ps1
+      run: |
+        vcpkg update
+        vcpkg install tbb cppunit
     - name: build
       run: >
         ./ci/build.sh -v
@@ -408,10 +415,13 @@ jobs:
         --components="${{ matrix.config.components }}"
         --cargs=\'
         -A x64 -G \"Visual Studio 17 2022\"
+        -DOPENVDB_USE_DELAYED_LOADING=OFF
+        -DUSE_BLOSC=OFF \
+        -DUSE_ZLIB=OFF \
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
         -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
         -DMSVC_COMPRESS_PDB=ON
-        -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
+        -DOPENVDB_AX_TEST_CMD_DOWNLOADS=OFF
         -DUSE_EXPLICIT_INSTANTIATION=OFF
         -DLLVM_DIR=\"${HOME}\\llvm_install\\lib\\cmake\\llvm\"
         -DCMAKE_INSTALL_PREFIX=\"${VDB_INSTALL_PREFIX}\"
@@ -476,6 +486,7 @@ jobs:
         -DMSVC_COMPRESS_PDB=ON
         -DUSE_EXPLICIT_INSTANTIATION=OFF
         -DNANOVDB_USE_CUDA=ON
+        -DCMAKE_CUDA_ARCHITECTURES="80"
         -DNANOVDB_USE_OPENVDB=ON
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
         -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
@@ -493,7 +504,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'blosc'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-blosc:${{ matrix.blosc }}
     container:
       image: aswf/ci-base:2023

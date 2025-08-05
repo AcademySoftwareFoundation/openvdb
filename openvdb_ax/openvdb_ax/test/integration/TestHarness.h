@@ -70,7 +70,13 @@ struct AXTestHarness
       , mOpts(openvdb::ax::CompilerOptions())
       , mCustomData(openvdb::ax::CustomData::create())
       , mErrors()
-      , mLogger([this](const std::string& msg) { this->mErrors += msg; } )
+      , mLogger([this](const std::string& msg) {
+            std::cerr << msg << std::endl;
+            this->mErrors += msg;
+        }
+        /*[](const std::string& msg) {
+            std::cerr << "Test Codegen Message (Warn):\n" << msg << std::endl;
+        }*/)
     {
         reset();
     }

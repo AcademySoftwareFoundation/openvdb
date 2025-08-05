@@ -1,1 +1,3 @@
-added read and write support for OFF (Object File Format) files to vdb_tool
+1) Fixed bugs that prevented build with newer namespaces in nanovdb
+2) Improved read and write of PLY files so they support Vec3d and 64 bit attributes
+4) Changed version number from 10.6.1 to 10.7.0

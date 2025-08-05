@@ -16,7 +16,6 @@
 #include <GA/GA_Types.h>
 #include <GU/GU_ConvertParms.h>
 #include <GU/GU_PrimPoly.h>
-#include <OBJ/OBJ_Camera.h>
 #include <UT/UT_BoundingBox.h>
 #include <UT/UT_String.h>
 #include <UT/UT_UniquePtr.h>
@@ -196,7 +195,72 @@ drawFrustum(
 
 ////////////////////////////////////////
 
+#if SYS_VERSION_MAJOR_INT >= 21
+openvdb::math::Transform::Ptr
+frustumTransformFromCamera(
+    const OBJ_CameraParms& camparms,
+    const UT_Matrix4D &cameratosop,
+    float offset, float nearPlaneDist, float farPlaneDist,
+    float voxelDepthSize, int voxelCountX)
+{
+    // Eval camera parms
+    const fpreal camAspect = camparms.aspect;
+    const fpreal camFocal = camparms.focal;
+    const fpreal camAperture = camparms.aperture;
+    const fpreal camXRes = camparms.xres;
+    const fpreal camYRes = camparms.yres;
 
+    nearPlaneDist += offset;
+    farPlaneDist += offset;
+
+    const fpreal depth = farPlaneDist - nearPlaneDist;
+    const fpreal zoom = camAperture / camFocal;
+    const fpreal aspectRatio = camYRes / (camXRes * camAspect);
+
+    openvdb::Vec2d nearPlaneSize;
+    nearPlaneSize.x() = nearPlaneDist * zoom;
+    nearPlaneSize.y() = nearPlaneSize.x() * aspectRatio;
+
+    openvdb::Vec2d farPlaneSize;
+    farPlaneSize.x() = farPlaneDist * zoom;
+    farPlaneSize.y() = farPlaneSize.x() * aspectRatio;
+
+    // Create the linear map
+    openvdb::math::Mat4d xform(openvdb::math::Mat4d::identity());
+    xform.setToTranslation(openvdb::Vec3d(0, 0, -(nearPlaneDist - offset)));
+
+    /// this will be used to scale the frust to the correct size, and orient the
+    /// into the frustum as the negative z-direction
+    xform.preScale(openvdb::Vec3d(nearPlaneSize.x(), nearPlaneSize.x(), -nearPlaneSize.x()));
+
+    openvdb::math::Mat4d camxform(openvdb::math::Mat4d::identity());
+    for (unsigned i = 0; i < 4; ++i) {
+        for (unsigned j = 0; j < 4; ++j) {
+            camxform(i,j) = cameratosop(i,j);
+        }
+    }
+
+    openvdb::math::MapBase::Ptr linearMap(openvdb::math::simplify(
+        openvdb::math::AffineMap(xform * camxform).getAffineMap()));
+
+    // Create the non linear map
+    const int voxelCountY = int(std::ceil(float(voxelCountX) * aspectRatio));
+    const int voxelCountZ = int(std::ceil(depth / voxelDepthSize));
+
+    // the frustum will be the image of the coordinate in this bounding box
+    openvdb::BBoxd bbox(openvdb::Vec3d(0, 0, 0),
+        openvdb::Vec3d(voxelCountX, voxelCountY, voxelCountZ));
+    // define the taper
+    const fpreal taper = nearPlaneSize.x() / farPlaneSize.x();
+
+    // note that the depth is scaled on the nearPlaneSize.
+    // the linearMap will uniformly scale the frustum to the correct size
+    // and rotate to align with the camera
+    return openvdb::math::Transform::Ptr(new openvdb::math::Transform(
+        openvdb::math::MapBase::Ptr(new openvdb::math::NonlinearFrustumMap(
+            bbox, taper, depth/nearPlaneSize.x(), linearMap))));
+}
+#else
 openvdb::math::Transform::Ptr
 frustumTransformFromCamera(
     OP_Node& node, OP_Context& context, OBJ_Camera& cam,
@@ -281,7 +345,7 @@ frustumTransformFromCamera(
         openvdb::math::MapBase::Ptr(new openvdb::math::NonlinearFrustumMap(
             bbox, taper, depth/nearPlaneSize.x(), linearMap))));
 }
-
+#endif
 
 ////////////////////////////////////////
 

@@ -8,9 +8,14 @@
 
 #include <gtest/gtest.h>
 
-// namespace must be the same as where Logger is defined in order
-// to access private fields. See also
-//https://google.github.io/googletest/advanced.html#testing-private-code
+
+struct TestLoggerAcc
+{
+    TestLoggerAcc(const openvdb::ax::Logger& logger)
+        : mLogger(logger) {}
+    auto tree() const { return mLogger.mTreePtr; }
+    const openvdb::ax::Logger& mLogger;
+};
 
 namespace openvdb {
 namespace OPENVDB_VERSION_NAME {
@@ -50,11 +55,11 @@ TEST_F(TestLogger, testParseNewNode)
 TEST_F(TestLogger, testParseSetsTree)
 {
     openvdb::ax::Logger logger;
-    ASSERT_TRUE(!logger.mTreePtr);
+    ASSERT_TRUE(!TestLoggerAcc(logger).tree());
     std::string code("");
     openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse(code.c_str(), logger);
     ASSERT_TRUE(tree);
-    ASSERT_EQ(tree, logger.mTreePtr);
+    ASSERT_EQ(tree, TestLoggerAcc(logger).tree());
 }
 
 TEST_F(TestLogger, testAddError)
@@ -89,7 +94,7 @@ TEST_F(TestLogger, testAddError)
     ASSERT_EQ(logger.errors(), static_cast<size_t>(1));
     ASSERT_EQ(messages.size(), static_cast<size_t>(3));
 
-    ASSERT_TRUE(!logger.mTreePtr);
+    ASSERT_TRUE(!TestLoggerAcc(logger).tree());
     ASSERT_EQ(strcmp(messages.back().c_str(), "[1] error: test"), 0);
 
     logger.clear();
@@ -104,7 +109,7 @@ TEST_F(TestLogger, testAddError)
         logger.error(message, local);
         ASSERT_TRUE(logger.hasError());
         ASSERT_EQ(logger.errors(), static_cast<size_t>(1));
-        ASSERT_TRUE(logger.mTreePtr);
+        ASSERT_TRUE(TestLoggerAcc(logger).tree());
         ASSERT_EQ(strcmp(messages.back().c_str(), "[1] error: test 1:2"), 0);
     }
 
@@ -124,7 +129,7 @@ TEST_F(TestLogger, testAddError)
         ASSERT_EQ(logger.errors(), static_cast<size_t>(1));
         ASSERT_EQ(messages.size(), static_cast<size_t>(5));
 
-        ASSERT_TRUE(logger.mTreePtr);
+        ASSERT_TRUE(TestLoggerAcc(logger).tree());
         ASSERT_EQ(strcmp(messages.back().c_str(), "[1] error: test 1:1"), 0);
     }
 }
@@ -162,7 +167,7 @@ TEST_F(TestLogger, testAddWarning)
     ASSERT_EQ(logger.warnings(), static_cast<size_t>(1));
     ASSERT_EQ(messages.size(), static_cast<size_t>(3));
 
-    ASSERT_TRUE(!logger.mTreePtr);
+    ASSERT_TRUE(!TestLoggerAcc(logger).tree());
     ASSERT_EQ(strcmp(messages.back().c_str(), "[1] warning: test"), 0);
 
     logger.clear();
@@ -177,7 +182,7 @@ TEST_F(TestLogger, testAddWarning)
         logger.warning(message, local);
         ASSERT_TRUE(logger.hasWarning());
         ASSERT_EQ(logger.warnings(), static_cast<size_t>(1));
-        ASSERT_TRUE(logger.mTreePtr);
+        ASSERT_TRUE(TestLoggerAcc(logger).tree());
         ASSERT_EQ(strcmp(messages.back().c_str(), "[1] warning: test 1:2"), 0);
     }
 
@@ -197,7 +202,7 @@ TEST_F(TestLogger, testAddWarning)
         ASSERT_EQ(logger.warnings(), static_cast<size_t>(1));
         ASSERT_EQ(messages.size(), static_cast<size_t>(5));
 
-        ASSERT_TRUE(logger.mTreePtr);
+        ASSERT_TRUE(TestLoggerAcc(logger).tree());
         ASSERT_EQ(strcmp(messages.back().c_str(), "[1] warning: test 1:1"), 0);
     }
 }

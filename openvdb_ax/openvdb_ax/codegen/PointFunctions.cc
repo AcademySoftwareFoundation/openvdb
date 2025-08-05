@@ -113,7 +113,9 @@ inline FunctionGroup::UniquePtr ax_ingroup(const FunctionOptions& op)
         .addParameterAttribute(3, llvm::Attribute::NoAlias)
         .addParameterAttribute(4, llvm::Attribute::ReadOnly)
         .addParameterAttribute(4, llvm::Attribute::NoAlias)
+#if LLVM_VERSION_MAJOR <= 15
         .addFunctionAttribute(llvm::Attribute::ReadOnly)
+#endif
         .addFunctionAttribute(llvm::Attribute::NoRecurse)
         // @note  handle->get can throw, so no unwind. Maybe use getUnsafe?
         .setConstantFold(false)
@@ -125,8 +127,8 @@ inline FunctionGroup::UniquePtr ax_ingroup(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axingroup(const FunctionOptions& op)
 {
     static auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const Arguments& args,
+             llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
         // Pull out parent function arguments
@@ -140,11 +142,11 @@ inline FunctionGroup::UniquePtr axingroup(const FunctionOptions& op)
         OPENVDB_ASSERT(leaf_data);
         OPENVDB_ASSERT(attribute_set);
 
-        std::vector<llvm::Value*> input(args);
-        input.emplace_back(point_index);
-        input.emplace_back(group_handles);
-        input.emplace_back(leaf_data);
-        input.emplace_back(attribute_set);
+        Arguments input(args);
+        input.AddArg(point_index, ArgInfo(B.getInt64Ty()));
+        input.AddArg(group_handles, ArgInfo(B.getInt8Ty(), 2));
+        input.AddArg(leaf_data, ArgInfo(B.getInt8Ty(), 1));
+        input.AddArg(attribute_set, ArgInfo(B.getInt8Ty(), 1));
         return ax_ingroup(op)->execute(input, B);
     };
 
@@ -239,8 +241,8 @@ inline FunctionGroup::UniquePtr axeditgroup(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axaddtogroup(const FunctionOptions& op)
 {
     static auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const Arguments& args,
+             llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
         // Pull out parent function arguments
@@ -254,12 +256,14 @@ inline FunctionGroup::UniquePtr axaddtogroup(const FunctionOptions& op)
         OPENVDB_ASSERT(leaf_data);
         OPENVDB_ASSERT(attribute_set);
 
-        std::vector<llvm::Value*> input(args);
-        input.emplace_back(point_index);
-        input.emplace_back(group_handles);
-        input.emplace_back(leaf_data);
-        input.emplace_back(attribute_set);
-        input.emplace_back(llvm::ConstantInt::get(LLVMType<bool>::get(B.getContext()), true));
+        llvm::Type* boolT = LLVMType<bool>::get(B.getContext());
+
+        Arguments input(args);
+        input.AddArg(point_index, ArgInfo(B.getInt64Ty()));
+        input.AddArg(group_handles, ArgInfo(B.getInt8Ty(), 2));
+        input.AddArg(leaf_data, ArgInfo(B.getInt8Ty(), 1));
+        input.AddArg(attribute_set, ArgInfo(B.getInt8Ty(), 1));
+        input.AddArg(llvm::ConstantInt::get(boolT, true), ArgInfo(boolT));
         return axeditgroup(op)->execute(input, B);
     };
 
@@ -280,8 +284,8 @@ inline FunctionGroup::UniquePtr axaddtogroup(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axremovefromgroup(const FunctionOptions& op)
 {
     static auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const Arguments& args,
+             llvm::IRBuilder<>& B) -> Value
     {
         // Pull out parent function arguments
         OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
@@ -295,12 +299,14 @@ inline FunctionGroup::UniquePtr axremovefromgroup(const FunctionOptions& op)
         OPENVDB_ASSERT(leaf_data);
         OPENVDB_ASSERT(attribute_set);
 
-        std::vector<llvm::Value*> input(args);
-        input.emplace_back(point_index);
-        input.emplace_back(group_handles);
-        input.emplace_back(leaf_data);
-        input.emplace_back(attribute_set);
-        input.emplace_back(llvm::ConstantInt::get(LLVMType<bool>::get(B.getContext()), false));
+        llvm::Type* boolT = LLVMType<bool>::get(B.getContext());
+
+        Arguments input(args);
+        input.AddArg(point_index, ArgInfo(B.getInt64Ty()));
+        input.AddArg(group_handles, ArgInfo(B.getInt8Ty(), 2));
+        input.AddArg(leaf_data, ArgInfo(B.getInt8Ty(), 1));
+        input.AddArg(attribute_set, ArgInfo(B.getInt8Ty(), 1));
+        input.AddArg(llvm::ConstantInt::get(boolT, false), ArgInfo(boolT));
         return axeditgroup(op)->execute(input, B);
     };
 
@@ -319,13 +325,15 @@ inline FunctionGroup::UniquePtr axremovefromgroup(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axdeletepoint(const FunctionOptions& op)
 {
     static auto generate =
-        [op](const std::vector<llvm::Value*>&,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const Arguments&,
+             llvm::IRBuilder<>& B) -> Value
     {
         // args guaranteed to be empty
         const std::string deadGroup = "__ax_dead";
         llvm::Constant* loc = llvm::cast<llvm::Constant>(B.CreateGlobalStringPtr(deadGroup.c_str())); // char*
-        return axaddtogroup(op)->execute({loc}, B);
+        Arguments args;
+        args.AddArg(loc, ArgInfo(LLVMType<char>::get(B.getContext()), 1));
+        return axaddtogroup(op)->execute(args, B);
     };
 
     return FunctionBuilder("deletepoint")

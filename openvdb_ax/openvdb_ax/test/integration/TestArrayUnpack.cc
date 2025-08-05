@@ -139,15 +139,19 @@ mat4@test6[13] = mat4@test5[12];
 mat4@test5[14] = mat4@test6[5];
 mat4@test6[15] = mat4@test5[9];
 
-mat4@test7[0,0] = mat4@test8[3,3];
-mat4@test8[0,1] = mat4@test7[0,0];
-mat4@test7[0,2] = mat4@test8[2,3];
-mat4@test8[0,3] = mat4@test7[1,2];
-mat4@test7[1,0] = mat4@test8[3,1];
-mat4@test8[1,1] = mat4@test7[0,1];
-mat4@test7[1,2] = mat4@test8[2,2];
-mat4@test8[1,3] = mat4@test7[2,0];
-mat4@test7[2,0] = mat4@test8[0,2];
+int   a = 1;
+int32 b = 2;
+int64 c = 3;
+
+mat4@test7[0,0] = mat4@test8[c,c];
+mat4@test8[0,a] = mat4@test7[0,0];
+mat4@test7[0,b] = mat4@test8[b,c];
+mat4@test8[0,c] = mat4@test7[a,b];
+mat4@test7[a,0] = mat4@test8[c,a];
+mat4@test8[a,a] = mat4@test7[0,a];
+mat4@test7[a,b] = mat4@test8[b,b];
+mat4@test8[a,c] = mat4@test7[b,0];
+mat4@test7[b,0] = mat4@test8[0,b];
 mat4@test8[2,1] = mat4@test7[1,3];
 mat4@test7[2,2] = mat4@test8[3,2];
 mat4@test8[2,3] = mat4@test7[0,3];
@@ -236,5 +240,3 @@ mat4@test8[3,3] = mat4@test7[2,1];
     }
 
 }
-
-

@@ -319,7 +319,11 @@ public:
     static OP_Node* factoryReshape(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factoryNarrowBand(OP_Network*, const char* name, OP_Operator*);
 
-    int isRefInput(unsigned input) const override { return (input == 1); }
+    int isRefInput(OP_InputIdx input) const override
+    {
+        UT_ASSERT(input >= 0);
+        return (input == 1);
+    }
 
 protected:
     bool updateParmsFlags() override;

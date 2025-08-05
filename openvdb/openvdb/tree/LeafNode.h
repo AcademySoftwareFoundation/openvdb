@@ -219,31 +219,60 @@ protected:
         public SparseIteratorBase<
             MaskIterT, ValueIter<MaskIterT, NodeT, ValueT, TagT>, NodeT, ValueT>
     {
+        using ValueType = std::conditional_t<std::is_const_v<NodeT>, ValueT,
+            std::remove_const_t<ValueT>>;
         using BaseT = SparseIteratorBase<MaskIterT, ValueIter, NodeT, ValueT>;
 
         ValueIter() {}
-        ValueIter(const MaskIterT& iter, NodeT* parent): BaseT(iter, parent) {}
+        ValueIter(const MaskIterT& iter, NodeT* parent)
+            : BaseT(iter, parent)
+            // Unlike other value iterators, cache the buffer data as part of
+            // the iterators members to avoid the cost of going through the
+            // leaf buffer atomic/checking API
+            , mData([&]() { OPENVDB_ASSERT(parent); return parent->buffer().data(); }()) {}
 
-        ValueT& getItem(Index pos) const { return this->parent().getValue(pos); }
-        ValueT& getValue() const { return this->parent().getValue(this->pos()); }
+        ValueT& getItem(Index pos) const { return mData[pos]; }
+        ValueT& getValue() const { return this->getItem(this->pos()); }
 
         // Note: setItem() can't be called on const iterators.
         void setItem(Index pos, const ValueT& value) const
         {
-            this->parent().setValueOnly(pos, value);
+            if constexpr (std::is_const_v<NodeT>) {
+                static_assert(!std::is_const_v<NodeT>,
+                    "ValueIter::setItem cannot be called on const iterators");
+            }
+            else {
+                OPENVDB_ASSERT(pos < SIZE);
+                OPENVDB_ASSUME(pos < SIZE);
+                mData[pos] = value;
+            }
         }
         // Note: setValue() can't be called on const iterators.
-        void setValue(const ValueT& value) const
-        {
-            this->parent().setValueOnly(this->pos(), value);
-        }
+        void setValue(const ValueT& value) const { this->setItem(this->pos(), value); }
 
         // Note: modifyItem() can't be called on const iterators.
         template<typename ModifyOp>
-        void modifyItem(Index n, const ModifyOp& op) const { this->parent().modifyValue(n, op); }
+        void modifyItem(Index n, const ModifyOp& op) const
+        {
+            if constexpr (std::is_const_v<NodeT>) {
+                static_assert(!std::is_const_v<NodeT>,
+                    "ValueIter::modifyItem cannot be called on const iterators");
+            }
+            else {
+                OPENVDB_ASSERT(n < SIZE);
+                OPENVDB_ASSUME(n < SIZE);
+                op(mData[n]);
+                this->parent().setValueOn(n);
+            }
+        }
         // Note: modifyValue() can't be called on const iterators.
         template<typename ModifyOp>
-        void modifyValue(const ModifyOp& op) const { this->parent().modifyValue(this->pos(), op); }
+        void modifyValue(const ModifyOp& op) const
+        {
+            this->modifyItem(this->pos(), op);
+        }
+    private:
+        ValueType* mData;
     };
 
     /// Leaf nodes have no children, so their child iterators have no get/set accessors.

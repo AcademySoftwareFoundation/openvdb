@@ -341,8 +341,8 @@ TEST_F(TestVDBFunctions, ingroup)
 TEST_F(TestVDBFunctions, testValidContext)
 {
     std::shared_ptr<llvm::LLVMContext> C(new llvm::LLVMContext);
-#if LLVM_VERSION_MAJOR >= 15
-    // This will not work from LLVM 16. We'll need to fix this
+#if LLVM_VERSION_MAJOR == 15
+    // This will not work from LLVM 16
     // https://llvm.org/docs/OpaquePointers.html
     C->setOpaquePointers(false);
 #endif
@@ -355,7 +355,7 @@ TEST_F(TestVDBFunctions, testValidContext)
     auto generate = [&C](const openvdb::ax::codegen::Function::Ptr F,
                          const std::string& name) -> std::string
     {
-        std::vector<llvm::Type*> types;
+        openvdb::ax::codegen::ArgInfoVector types;
         F->types(types, *C);
 
         std::string code;
@@ -364,7 +364,7 @@ TEST_F(TestVDBFunctions, testValidContext)
         for (auto T : types) {
             const std::string axtype =
                 openvdb::ax::ast::tokens::typeStringFromToken(
-                    openvdb::ax::codegen::tokenFromLLVMType(T));
+                    openvdb::ax::codegen::tokenFromLLVMType(T.GetUnderlyingType()));
             code += axtype + " local" + std::to_string(idx) + ";\n";
             args += "local" + std::to_string(idx) + ",";
         }

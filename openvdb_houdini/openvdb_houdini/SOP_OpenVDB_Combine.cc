@@ -129,7 +129,6 @@ asResampleMode(exint i, ResampleMode defaultMode = RESAMPLE_B)
         ? static_cast<ResampleMode>(i) : defaultMode;
 }
 
-
 //
 // Collation options
 //

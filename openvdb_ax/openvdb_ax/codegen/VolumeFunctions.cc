@@ -63,36 +63,32 @@ inline FunctionGroup::UniquePtr axcoordtooffset(const FunctionOptions& op)
     ///   which identifies the node level and can thus be used to call the
     ///   appropriate offset logic.
 
-    static auto generate = [](const std::vector<llvm::Value*>& args,
-         llvm::IRBuilder<>& B) -> llvm::Value*
+    static auto generate = [](const NativeArguments& args,
+         llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 1);
+        OPENVDB_ASSERT(args[0].IsVector());
         OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
-        llvm::Value* x = ir_constgep2_64(B, args[0], 0, 0);
-        llvm::Value* y = ir_constgep2_64(B, args[0], 0, 1);
-        llvm::Value* z = ir_constgep2_64(B, args[0], 0, 2);
-        llvm::Value* dimmin1 = LLVMType<int32_t>::get(B.getContext(), int32_t(LeafNodeT::DIM-1u));
-        llvm::Value* l2d2 = LLVMType<int32_t>::get(B.getContext(), int32_t(2*LeafNodeT::LOG2DIM));
-        llvm::Value* l2d = LLVMType<int32_t>::get(B.getContext(), int32_t(LeafNodeT::LOG2DIM));
+
+        Value x = args[0].GetArrayElement(B, 0);
+        Value y = args[0].GetArrayElement(B, 1);
+        Value z = args[0].GetArrayElement(B, 2);
+        Value dimmin1 = Value::Create<int32_t>(B.getContext(), int32_t(LeafNodeT::DIM-1u));
+        Value l2d2 = Value::Create<int32_t>(B.getContext(), int32_t(2*LeafNodeT::LOG2DIM));
+        Value l2d = Value::Create<int32_t>(B.getContext(), int32_t(LeafNodeT::LOG2DIM));
 
         // ((xyz[0] & (DIM-1u)) << 2*Log2Dim)
-        x = ir_load(B, x);
-        x = binaryOperator(x, dimmin1, ast::tokens::BITAND, B);
-        x = binaryOperator(x, l2d2, ast::tokens::SHIFTLEFT, B);
+        x = x.BitAnd(B, dimmin1);
+        x = x.ShiftLeft(B, l2d2);
 
         // ((xyz[1] & (DIM-1u)) << Log2Dim)
-        y = ir_load(B, y);
-        y = binaryOperator(y, dimmin1, ast::tokens::BITAND, B);
-        y = binaryOperator(y, l2d, ast::tokens::SHIFTLEFT, B);
+        y = y.BitAnd(B, dimmin1);
+        y = y.ShiftLeft(B, l2d);
 
         // (xyz[2] & (DIM-1u))
-        z = ir_load(B, z);
-        z = binaryOperator(z, dimmin1, ast::tokens::BITAND, B);
+        z = z.BitAnd(B, dimmin1);
 
-        return
-            binaryOperator(z,
-                binaryOperator(x, y, ast::tokens::PLUS, B),
-                    ast::tokens::PLUS, B);
+        return z.Add(B, x.Add(B, y));
     };
 
     static auto coordtooffset =
@@ -106,10 +102,8 @@ inline FunctionGroup::UniquePtr axcoordtooffset(const FunctionOptions& op)
         .addSignature<int32_t(const openvdb::math::Vec3<int32_t>*)>(generate,
                 (int32_t(*)(const openvdb::math::Vec3<int32_t>*))(coordtooffset))
         .setArgumentNames({"coord"})
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Return the linear table offset of the given global or local coordinates.")
@@ -130,35 +124,35 @@ inline FunctionGroup::UniquePtr axoffsettocoord(const FunctionOptions& op)
     ///   which identifies the node level and can thus be used to call the
     ///   appropriate offset logic.
 
-    static auto generate = [](const std::vector<llvm::Value*>& args,
-         llvm::IRBuilder<>& B) -> llvm::Value*
+    static auto generate = [](const NativeArguments& args,
+         llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
         OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
 
-        llvm::Value* ijk = args[0];
-        llvm::Value* offset = args[1];
+        Value ijk = args[0];
+        Value offset = args[1];
 
-        llvm::Value* l2d2 = LLVMType<int32_t>::get(B.getContext(), int32_t(2*LeafNodeT::LOG2DIM));
-        llvm::Value* l2d = LLVMType<int32_t>::get(B.getContext(), int32_t(LeafNodeT::LOG2DIM));
+        Value l2d2 = Value::Create<int32_t>(B.getContext(), int32_t(2*LeafNodeT::LOG2DIM));
+        Value l2d = Value::Create<int32_t>(B.getContext(), int32_t(LeafNodeT::LOG2DIM));
 
         // (offset >> 2*Log2Dim)
-        llvm::Value* x = binaryOperator(offset, l2d2, ast::tokens::SHIFTRIGHT, B);
-        B.CreateStore(x, ir_constgep2_64(B, ijk, 0, 0));
+        Value x = offset.ShiftRight(B, l2d2);
+        ijk.GetArrayElement(B, 0).Assign(B, x);
 
         // (offset &= ((1<<2*Log2Dim)-1))
         static constexpr int32_t ymask = ((1<<2*LeafNodeT::LOG2DIM)-1);
-        offset = binaryOperator(offset, B.getInt32(ymask), ast::tokens::BITAND, B);
+        offset = offset.BitAnd(B, Value::Create<int32_t>(B.getContext(), ymask));
 
         // (n >> Log2Dim)
-        llvm::Value* y = binaryOperator(offset, l2d, ast::tokens::SHIFTRIGHT, B);
-        B.CreateStore(y, ir_constgep2_64(B, ijk, 0, 1));
+        Value y = offset.ShiftRight(B, l2d);
+        ijk.GetArrayElement(B, 1).Assign(B, y);
 
         // (n & ((1<<Log2Dim)-1))
         static constexpr int32_t zmask = ((1<<LeafNodeT::LOG2DIM)-1);
-        llvm::Value* z = binaryOperator(offset, B.getInt32(zmask), ast::tokens::BITAND, B);
-        B.CreateStore(z, ir_constgep2_64(B, ijk, 0, 2));
-        return nullptr;
+        Value z = offset.BitAnd(B, Value::Create<int32_t>(B.getContext(), zmask));
+        ijk.GetArrayElement(B, 2).Assign(B, z);
+        return Value::Invalid();
     };
 
     static auto offsetToCoord =
@@ -198,26 +192,27 @@ inline FunctionGroup::UniquePtr axoffsettoglobalcoord(const FunctionOptions& op)
     ///   which identifies the node level and can thus be used to call the
     ///   appropriate offset logic.
 
-    auto generate = [op](const std::vector<llvm::Value*>& args,
-         llvm::IRBuilder<>& B) -> llvm::Value*
+    auto generate = [op](const NativeArguments& args,
+         llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 3);
         OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
 
-        llvm::Value* result = args[0];
-        llvm::Value* offset = args[1];
-        llvm::Value* origin = args[2];
+        Value result = args[0];
+        Value offset = args[1];
+        Value origin = args[2];
 
-        llvm::Value* local = axoffsettocoord(op)->execute({offset}, B);
+        Value local = axoffsettocoord(op)->execute(NativeArguments{offset}, B);
 
-        for (size_t i = 0; i < 3; ++i){
-            llvm::Value* lx = ir_constgep2_64(B, local, 0, i);
-            llvm::Value* ox = ir_constgep2_64(B, origin, 0, i);
-            ox = binaryOperator(ir_load(B, ox), ir_load(B, lx), ast::tokens::PLUS, B);
-            B.CreateStore(ox, ir_constgep2_64(B, result, 0, i));
+        for (size_t i = 0; i < 3; ++i)
+        {
+            Value lx = local.GetArrayElement(B, i);
+            Value ox = origin.GetArrayElement(B, i);
+            ox = ox.Add(B, lx);
+            result.GetArrayElement(B, i).Assign(B, ox);
         }
 
-        return nullptr;
+        return Value::Invalid();
     };
 
     static auto offsetToGlobalCoord =
@@ -229,7 +224,7 @@ inline FunctionGroup::UniquePtr axoffsettoglobalcoord(const FunctionOptions& op)
         out->z() = coord.z() + in->z();
     };
 
-    using OffsetToGlobalCoordT = void(openvdb::math::Vec3<int32_t>*,const int32_t,const openvdb::math::Vec3<int32_t>*);
+    using OffsetToGlobalCoordT = void(openvdb::math::Vec3<int32_t>*, const int32_t, const openvdb::math::Vec3<int32_t>*);
 
     return FunctionBuilder("offsettoglobalcoord")
         .addSignature<OffsetToGlobalCoordT, true>(generate, (OffsetToGlobalCoordT*)(offsetToGlobalCoord))
@@ -278,15 +273,22 @@ inline FunctionGroup::UniquePtr axindextoworld(const FunctionOptions& op)
 
 inline FunctionGroup::UniquePtr axgetcoord(const FunctionOptions& op)
 {
-    auto generate = [op](const std::vector<llvm::Value*>&,
-         llvm::IRBuilder<>& B) -> llvm::Value*
+    auto generate = [op](const NativeArguments&,
+         llvm::IRBuilder<>& B) -> Value
     {
+        OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
         // Pull out parent function arguments
         llvm::Function* compute = B.GetInsertBlock()->getParent();
-        OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
-        llvm::Value* origin = extractArgument(compute, "origin");
-        llvm::Value* offset = extractArgument(compute, "offset");
-        return axoffsettoglobalcoord(op)->execute({offset, origin}, B);
+        llvm::Type* v3iT = LLVMType<openvdb::math::Vec3<int32_t>>::get(B.getContext());
+
+        Value origin(extractArgument(compute, "origin"), v3iT);
+        Value offset(extractArgument(compute, "offset"), B.getInt64Ty());
+        offset = offset.CastToPrecision(B, B.getInt32Ty());
+
+        NativeArguments args;
+        args.AddArg(offset);
+        args.AddArg(origin);
+        return axoffsettoglobalcoord(op)->execute(args, B);
     };
 
     return FunctionBuilder("getcoord")
@@ -304,11 +306,11 @@ inline FunctionGroup::UniquePtr axgetcoord(const FunctionOptions& op)
 {
     static_assert(Index <= 2, "Invalid index for axgetcoord");
 
-    auto generate = [op](const std::vector<llvm::Value*>&,
-         llvm::IRBuilder<>& B) -> llvm::Value*
+    auto generate = [op](const NativeArguments&,
+         llvm::IRBuilder<>& B) -> Value
     {
-        llvm::Value* coord = axgetcoord(op)->execute({}, B);
-        return ir_load(B, ir_constgep2_64(B, coord, 0, Index));
+        Value coord = axgetcoord(op)->execute(NativeArguments{}, B);
+        return coord.GetArrayElement(B, Index).LoadIfPtr(B);
     };
 
     return FunctionBuilder((Index == 0 ? "getcoordx" : Index == 1 ? "getcoordy" : "getcoordz"))
@@ -326,17 +328,24 @@ inline FunctionGroup::UniquePtr axgetcoord(const FunctionOptions& op)
 
 inline FunctionGroup::UniquePtr axgetvoxelpws(const FunctionOptions& op)
 {
-    auto generate = [op](const std::vector<llvm::Value*>&,
-         llvm::IRBuilder<>& B) -> llvm::Value*
+    auto generate = [op](const NativeArguments&,
+         llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
         llvm::Function* compute = B.GetInsertBlock()->getParent();
+        llvm::Type* voidstar = LLVMType<void*>::get(B.getContext());
         llvm::Value* transform = extractArgument(compute, "transforms");
         llvm::Value* wi = extractArgument(compute, "write_index");
-        transform = ir_gep(B, transform, wi);
-        transform = ir_load(B, transform);
-        llvm::Value* coord = axgetcoord(op)->execute({}, B);
-        return axindextoworld(op)->execute({coord, transform}, B);
+        OPENVDB_ASSERT(AssertOpaquePtrs(transform, voidstar));
+
+        transform = B.CreateGEP(voidstar, transform, wi);
+        transform = B.CreateLoad(voidstar, transform);
+        Value coord = axgetcoord(op)->execute(NativeArguments{}, B);
+
+        Arguments i2wargs;
+        i2wargs.AddArg(coord);
+        i2wargs.AddArg(transform, ArgInfo(LLVMType<int8_t>::get(B.getContext()), 1));
+        return axindextoworld(op)->execute(i2wargs, B);
     };
 
     return FunctionBuilder("getvoxelpws")
@@ -352,13 +361,14 @@ inline FunctionGroup::UniquePtr axgetvoxelpws(const FunctionOptions& op)
 
 inline FunctionGroup::UniquePtr axisactive(const FunctionOptions& op)
 {
-    static auto generate = [](const std::vector<llvm::Value*>&,
-         llvm::IRBuilder<>& B) -> llvm::Value*
+    static auto generate = [](const NativeArguments&,
+         llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
         // Pull out parent function arguments
         llvm::Function* compute = B.GetInsertBlock()->getParent();
-        return extractArgument(compute, "active");
+        llvm::Value* active = extractArgument(compute, "active");
+        return Value(active, B.getInt1Ty());
     };
 
     return FunctionBuilder("isactive")
@@ -565,7 +575,7 @@ inline FunctionGroup::UniquePtr axgetvoxel(const FunctionOptions& op)
            void* sourceTransform,
            void* targetTransform,
            const openvdb::math::Vec3<int32_t>* origin,
-           const int32_t offset,
+           const int64_t offset,
            auto value)
     {
         using ValueType = typename std::remove_pointer<decltype(value)>::type;
@@ -585,7 +595,7 @@ inline FunctionGroup::UniquePtr axgetvoxel(const FunctionOptions& op)
                 static_cast<const openvdb::math::Transform*>(targetTransform);
 
         const openvdb::Coord* ijk = reinterpret_cast<const openvdb::Coord*>(origin);
-        auto coord = *ijk + LeafNodeT::offsetToLocalCoord(offset);
+        auto coord = *ijk + LeafNodeT::offsetToLocalCoord(static_cast<int32_t>(offset));
         coord = targetTransformPtr->worldToIndexCellCentered(sourceTransformPtr->indexToWorld(coord));
         (*value) = accessorPtr->getValue(coord);
     };
@@ -595,7 +605,7 @@ inline FunctionGroup::UniquePtr axgetvoxel(const FunctionOptions& op)
            void* sourceTransform,
            void* targetTransform,
            const openvdb::math::Vec3<int32_t>* origin,
-           const int32_t offset,
+           const int64_t offset,
            codegen::String* value)
     {
         using GridType = typename openvdb::BoolGrid::ValueConverter<std::string>::Type;
@@ -614,33 +624,33 @@ inline FunctionGroup::UniquePtr axgetvoxel(const FunctionOptions& op)
                 static_cast<const openvdb::math::Transform*>(targetTransform);
 
         const openvdb::Coord* ijk = reinterpret_cast<const openvdb::Coord*>(origin);
-        auto coord = *ijk + LeafNodeT::offsetToLocalCoord(offset);
+        auto coord = *ijk + LeafNodeT::offsetToLocalCoord(static_cast<int32_t>(offset));
         coord = targetTransformPtr->worldToIndexCellCentered(sourceTransformPtr->indexToWorld(coord));
         const std::string& str = accessorPtr->getValue(coord);
         // Copy the string to AX's required representation
         *value = str;
     };
 
-    using GetVoxelS2T_D = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, double*);
-    using GetVoxelS2T_F = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, float*);
-    using GetVoxelS2T_I64 = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, int64_t*);
-    using GetVoxelS2T_I32 = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, int32_t*);
-    using GetVoxelS2T_I16 = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, int16_t*);
-    using GetVoxelS2T_B = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, bool*);
-    using GetVoxelS2T_V2D = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, openvdb::math::Vec2<double>*);
-    using GetVoxelS2T_V2F = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, openvdb::math::Vec2<float>*);
-    using GetVoxelS2T_V2I = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, openvdb::math::Vec2<int32_t>*);
-    using GetVoxelS2T_V3D = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, openvdb::math::Vec3<double>*);
-    using GetVoxelS2T_V3F = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, openvdb::math::Vec3<float>*);
-    using GetVoxelS2T_V3I = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, openvdb::math::Vec3<int32_t>*);
-    using GetVoxelS2T_V4D = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, openvdb::math::Vec4<double>*);
-    using GetVoxelS2T_V4F = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, openvdb::math::Vec4<float>*);
-    using GetVoxelS2T_V4I = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, openvdb::math::Vec4<int32_t>*);
-    using GetVoxelS2T_M3D = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, openvdb::math::Mat3<double>*);
-    using GetVoxelS2T_M3F = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, openvdb::math::Mat3<float>*);
-    using GetVoxelS2T_M4D = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, openvdb::math::Mat4<double>*);
-    using GetVoxelS2T_M4F = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, openvdb::math::Mat4<float>*);
-    using GetVoxelS2T_Str = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int32_t, codegen::String*);
+    using GetVoxelS2T_D = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, double*);
+    using GetVoxelS2T_F = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, float*);
+    using GetVoxelS2T_I64 = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, int64_t*);
+    using GetVoxelS2T_I32 = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, int32_t*);
+    using GetVoxelS2T_I16 = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, int16_t*);
+    using GetVoxelS2T_B = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, bool*);
+    using GetVoxelS2T_V2D = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, openvdb::math::Vec2<double>*);
+    using GetVoxelS2T_V2F = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, openvdb::math::Vec2<float>*);
+    using GetVoxelS2T_V2I = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, openvdb::math::Vec2<int32_t>*);
+    using GetVoxelS2T_V3D = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, openvdb::math::Vec3<double>*);
+    using GetVoxelS2T_V3F = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, openvdb::math::Vec3<float>*);
+    using GetVoxelS2T_V3I = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, openvdb::math::Vec3<int32_t>*);
+    using GetVoxelS2T_V4D = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, openvdb::math::Vec4<double>*);
+    using GetVoxelS2T_V4F = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, openvdb::math::Vec4<float>*);
+    using GetVoxelS2T_V4I = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, openvdb::math::Vec4<int32_t>*);
+    using GetVoxelS2T_M3D = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, openvdb::math::Mat3<double>*);
+    using GetVoxelS2T_M3F = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, openvdb::math::Mat3<float>*);
+    using GetVoxelS2T_M4D = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, openvdb::math::Mat4<double>*);
+    using GetVoxelS2T_M4F = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, openvdb::math::Mat4<float>*);
+    using GetVoxelS2T_Str = void(void*, void*, void*, const openvdb::math::Vec3<int32_t>*, int64_t, codegen::String*);
 
     using GetVoxelD = void(void*, const openvdb::math::Vec3<int32_t>*, double*);
     using GetVoxelF = void(void*, const openvdb::math::Vec3<int32_t>*, float*);

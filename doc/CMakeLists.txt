@@ -44,6 +44,7 @@ set(DOXY_FILES
   openvdb/openvdb/points/impl
   openvdb/openvdb/python/pyopenvdb.h
   openvdb/openvdb/tools
+  openvdb/openvdb/tools/impl
   openvdb/openvdb/tree
   openvdb/openvdb/util
   doc/build.txt

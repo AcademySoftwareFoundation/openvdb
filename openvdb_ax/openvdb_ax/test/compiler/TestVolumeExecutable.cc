@@ -9,9 +9,14 @@
 
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 
-// namespace must be the same as where VolumeExecutable is defined in order
-// to access private methods. See also
-//https://google.github.io/googletest/advanced.html#testing-private-code
+struct TestVolumeExecutableAcc
+{
+    template <typename ...Args>
+    static openvdb::ax::VolumeExecutable::Ptr make(Args&&... args) {
+        return openvdb::ax::VolumeExecutable::Ptr(new openvdb::ax::VolumeExecutable(args...));
+    }
+};
+
 namespace openvdb {
 namespace OPENVDB_VERSION_NAME {
 namespace ax {
@@ -28,6 +33,7 @@ class TestVolumeExecutable : public ::testing::Test
 
 TEST_F(TestVolumeExecutable, testConstructionDestruction)
 {
+#if LLVM_VERSION_MAJOR <= 15
     // Test the building and teardown of executable objects. This is primarily to test
     // the destruction of Context and ExecutionEngine LLVM objects. These must be destructed
     // in the correct order (ExecutionEngine, then Context) otherwise LLVM will crash
@@ -38,8 +44,8 @@ TEST_F(TestVolumeExecutable, testConstructionDestruction)
     ASSERT_TRUE(openvdb::ax::isInitialized());
 
     std::shared_ptr<llvm::LLVMContext> C(new llvm::LLVMContext);
-#if LLVM_VERSION_MAJOR >= 15
-    // This will not work from LLVM 16. We'll need to fix this
+#if LLVM_VERSION_MAJOR == 15
+    // This will not work from LLVM 16
     // https://llvm.org/docs/OpaquePointers.html
     C->setOpaquePointers(false);
 #endif
@@ -58,10 +64,11 @@ TEST_F(TestVolumeExecutable, testConstructionDestruction)
     // Basic construction
 
     openvdb::ax::ast::Tree tree;
+    std::unordered_map<std::string, uint64_t> fnmap;
     openvdb::ax::AttributeRegistry::ConstPtr emptyReg =
         openvdb::ax::AttributeRegistry::create(tree);
-    openvdb::ax::VolumeExecutable::Ptr volumeExecutable
-        (new openvdb::ax::VolumeExecutable(C, E, emptyReg, nullptr, {}, tree));
+    openvdb::ax::VolumeExecutable::Ptr volumeExecutable =
+        TestVolumeExecutableAcc::make(C, E, emptyReg, nullptr, fnmap, tree);
 
     ASSERT_EQ(2, int(wE.use_count()));
     ASSERT_EQ(2, int(wC.use_count()));
@@ -78,6 +85,7 @@ TEST_F(TestVolumeExecutable, testConstructionDestruction)
 
     ASSERT_EQ(0, int(wE.use_count()));
     ASSERT_EQ(0, int(wC.use_count()));
+#endif
 }
 
 TEST_F(TestVolumeExecutable, testCreateMissingGrids)
@@ -1066,8 +1074,8 @@ TEST_F(TestVolumeExecutable, testCLI)
         ASSERT_EQ(defaultMinLevel, min);
         ASSERT_EQ(defaultMaxLevel, max);
         ASSERT_EQ(defaultCreateMissing, exe->getCreateMissing());
-        ASSERT_EQ(defaultTileStream, exe->getActiveTileStreaming());
-        ASSERT_EQ(defaultValueIter, exe->getValueIterator());
+        ASSERT_TRUE(defaultTileStream == exe->getActiveTileStreaming());
+        ASSERT_TRUE(defaultValueIter == exe->getValueIterator());
         ASSERT_EQ(defaultGrain, exe->getGrainSize());
         ASSERT_EQ(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         ASSERT_EQ(defaultBindings, exe->getAttributeBindings());
@@ -1088,8 +1096,8 @@ TEST_F(TestVolumeExecutable, testCLI)
         ASSERT_EQ(defaultMinLevel, min);
         ASSERT_EQ(defaultMaxLevel, max);
         ASSERT_EQ(true, exe->getCreateMissing());
-        ASSERT_EQ(defaultTileStream, exe->getActiveTileStreaming());
-        ASSERT_EQ(defaultValueIter, exe->getValueIterator());
+        ASSERT_TRUE(defaultTileStream == exe->getActiveTileStreaming());
+        ASSERT_TRUE(defaultValueIter == exe->getValueIterator());
         ASSERT_EQ(defaultGrain, exe->getGrainSize());
         ASSERT_EQ(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         ASSERT_EQ(defaultBindings, exe->getAttributeBindings());
@@ -1110,8 +1118,8 @@ TEST_F(TestVolumeExecutable, testCLI)
         ASSERT_EQ(defaultMinLevel, min);
         ASSERT_EQ(defaultMaxLevel, max);
         ASSERT_EQ(defaultCreateMissing, exe->getCreateMissing());
-        ASSERT_EQ(openvdb::ax::VolumeExecutable::Streaming::ON, exe->getActiveTileStreaming());
-        ASSERT_EQ(defaultValueIter, exe->getValueIterator());
+        ASSERT_TRUE(openvdb::ax::VolumeExecutable::Streaming::ON == exe->getActiveTileStreaming());
+        ASSERT_TRUE(defaultValueIter == exe->getValueIterator());
         ASSERT_EQ(defaultGrain, exe->getGrainSize());
         ASSERT_EQ(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         ASSERT_EQ(defaultBindings, exe->getAttributeBindings());
@@ -1132,8 +1140,8 @@ TEST_F(TestVolumeExecutable, testCLI)
         ASSERT_EQ(defaultMinLevel, min);
         ASSERT_EQ(defaultMaxLevel, max);
         ASSERT_EQ(defaultCreateMissing, exe->getCreateMissing());
-        ASSERT_EQ(defaultTileStream, exe->getActiveTileStreaming());
-        ASSERT_EQ(openvdb::ax::VolumeExecutable::IterType::ALL, exe->getValueIterator());
+        ASSERT_TRUE(defaultTileStream == exe->getActiveTileStreaming());
+        ASSERT_TRUE(openvdb::ax::VolumeExecutable::IterType::ALL == exe->getValueIterator());
         ASSERT_EQ(defaultGrain, exe->getGrainSize());
         ASSERT_EQ(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         ASSERT_EQ(defaultBindings, exe->getAttributeBindings());
@@ -1154,8 +1162,8 @@ TEST_F(TestVolumeExecutable, testCLI)
         ASSERT_EQ(min, Index(0));
         ASSERT_EQ(defaultMaxLevel, max);
         ASSERT_EQ(defaultCreateMissing, exe->getCreateMissing());
-        ASSERT_EQ(defaultTileStream, exe->getActiveTileStreaming());
-        ASSERT_EQ(defaultValueIter, exe->getValueIterator());
+        ASSERT_TRUE(defaultTileStream == exe->getActiveTileStreaming());
+        ASSERT_TRUE(defaultValueIter == exe->getValueIterator());
         ASSERT_EQ(defaultGrain, exe->getGrainSize());
         ASSERT_EQ(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         ASSERT_EQ(defaultBindings, exe->getAttributeBindings());
@@ -1167,8 +1175,8 @@ TEST_F(TestVolumeExecutable, testCLI)
         ASSERT_EQ(min, Index(1));
         ASSERT_EQ(max, Index(2));
         ASSERT_EQ(defaultCreateMissing, exe->getCreateMissing());
-        ASSERT_EQ(defaultTileStream, exe->getActiveTileStreaming());
-        ASSERT_EQ(defaultValueIter, exe->getValueIterator());
+        ASSERT_TRUE(defaultTileStream == exe->getActiveTileStreaming());
+        ASSERT_TRUE(defaultValueIter == exe->getValueIterator());
         ASSERT_EQ(defaultGrain, exe->getGrainSize());
         ASSERT_EQ(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         ASSERT_EQ(defaultBindings, exe->getAttributeBindings());
@@ -1189,8 +1197,8 @@ TEST_F(TestVolumeExecutable, testCLI)
         ASSERT_EQ(defaultMinLevel, min);
         ASSERT_EQ(defaultMaxLevel, max);
         ASSERT_EQ(defaultCreateMissing, exe->getCreateMissing());
-        ASSERT_EQ(defaultTileStream, exe->getActiveTileStreaming());
-        ASSERT_EQ(defaultValueIter, exe->getValueIterator());
+        ASSERT_TRUE(defaultTileStream == exe->getActiveTileStreaming());
+        ASSERT_TRUE(defaultValueIter == exe->getValueIterator());
         ASSERT_EQ(size_t(0), exe->getGrainSize());
         ASSERT_EQ(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         ASSERT_EQ(defaultBindings, exe->getAttributeBindings());
@@ -1202,8 +1210,8 @@ TEST_F(TestVolumeExecutable, testCLI)
         ASSERT_EQ(defaultMinLevel, min);
         ASSERT_EQ(defaultMaxLevel, max);
         ASSERT_EQ(defaultCreateMissing, exe->getCreateMissing());
-        ASSERT_EQ(defaultTileStream, exe->getActiveTileStreaming());
-        ASSERT_EQ(defaultValueIter, exe->getValueIterator());
+        ASSERT_TRUE(defaultTileStream == exe->getActiveTileStreaming());
+        ASSERT_TRUE(defaultValueIter == exe->getValueIterator());
         ASSERT_EQ(size_t(1), exe->getGrainSize());
         ASSERT_EQ(size_t(2), exe->getActiveTileStreamingGrainSize());
         ASSERT_EQ(defaultBindings, exe->getAttributeBindings());
@@ -1234,8 +1242,8 @@ TEST_F(TestVolumeExecutable, testCLI)
         ASSERT_EQ(defaultMinLevel, min);
         ASSERT_EQ(defaultMaxLevel, max);
         ASSERT_EQ(defaultCreateMissing, exe->getCreateMissing());
-        ASSERT_EQ(defaultTileStream, exe->getActiveTileStreaming());
-        ASSERT_EQ(defaultValueIter, exe->getValueIterator());
+        ASSERT_TRUE(defaultTileStream == exe->getActiveTileStreaming());
+        ASSERT_TRUE(defaultValueIter == exe->getValueIterator());
         ASSERT_EQ(defaultGrain, exe->getGrainSize());
         ASSERT_EQ(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         ASSERT_EQ(bindings, exe->getAttributeBindings());
@@ -1252,8 +1260,8 @@ TEST_F(TestVolumeExecutable, testCLI)
         ASSERT_EQ(defaultMinLevel, min);
         ASSERT_EQ(defaultMaxLevel, max);
         ASSERT_EQ(false, exe->getCreateMissing());
-        ASSERT_EQ(defaultTileStream, exe->getActiveTileStreaming());
-        ASSERT_EQ(defaultValueIter, exe->getValueIterator());
+        ASSERT_TRUE(defaultTileStream == exe->getActiveTileStreaming());
+        ASSERT_TRUE(defaultValueIter == exe->getValueIterator());
         ASSERT_EQ(size_t(5), exe->getGrainSize());
         ASSERT_EQ(size_t(10), exe->getActiveTileStreamingGrainSize());
         ASSERT_EQ(defaultBindings, exe->getAttributeBindings());
@@ -1267,8 +1275,8 @@ TEST_F(TestVolumeExecutable, testCLI)
         ASSERT_EQ(Index(2), min);
         ASSERT_EQ(Index(3), max);
         ASSERT_EQ(true, exe->getCreateMissing());
-        ASSERT_EQ(openvdb::ax::VolumeExecutable::Streaming::ON, exe->getActiveTileStreaming());
-        ASSERT_EQ(openvdb::ax::VolumeExecutable::IterType::OFF, exe->getValueIterator());
+        ASSERT_TRUE(openvdb::ax::VolumeExecutable::Streaming::ON == exe->getActiveTileStreaming());
+        ASSERT_TRUE(openvdb::ax::VolumeExecutable::IterType::OFF == exe->getValueIterator());
         ASSERT_EQ(size_t(10), exe->getGrainSize());
         ASSERT_EQ(size_t(20), exe->getActiveTileStreamingGrainSize());
         ASSERT_EQ(bindings, exe->getAttributeBindings());

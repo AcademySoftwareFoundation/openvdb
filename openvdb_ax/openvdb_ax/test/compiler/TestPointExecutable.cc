@@ -14,6 +14,19 @@
 
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 
+struct TestPointExecutableAcc
+{
+    TestPointExecutableAcc(const openvdb::ax::PointExecutable& in) : a(in) {}
+    template <typename ...Args>
+    static openvdb::ax::PointExecutable::Ptr make(Args&&... args) {
+        return openvdb::ax::PointExecutable::Ptr(new openvdb::ax::PointExecutable(args...));
+    }
+    bool usesAcceleratedKernel(const openvdb::points::PointDataTree& tree) {
+        return a.usesAcceleratedKernel(tree);
+    }
+    const openvdb::ax::PointExecutable& a;
+};
+
 // namespace must be the same as where PointExecutable is defined in order
 // to access private methods. See also
 //https://google.github.io/googletest/advanced.html#testing-private-code
@@ -33,6 +46,7 @@ class TestPointExecutable : public ::testing::Test
 
 TEST_F(TestPointExecutable, testConstructionDestruction)
 {
+#if LLVM_VERSION_MAJOR <= 15
     // Test the building and teardown of executable objects. This is primarily to test
     // the destruction of Context and ExecutionEngine LLVM objects. These must be destructed
     // in the correct order (ExecutionEngine, then Context) otherwise LLVM will crash
@@ -57,10 +71,11 @@ TEST_F(TestPointExecutable, testConstructionDestruction)
     // Basic construction
 
     openvdb::ax::ast::Tree tree;
+    std::unordered_map<std::string, uint64_t> fnmap;
     openvdb::ax::AttributeRegistry::ConstPtr emptyReg =
         openvdb::ax::AttributeRegistry::create(tree);
-    openvdb::ax::PointExecutable::Ptr pointExecutable
-        (new openvdb::ax::PointExecutable(C, E, emptyReg, nullptr, {}, tree));
+    openvdb::ax::PointExecutable::Ptr pointExecutable =
+        TestPointExecutableAcc::make(C, E, emptyReg, nullptr, fnmap, tree);
 
     ASSERT_EQ(2, int(wE.use_count()));
     ASSERT_EQ(2, int(wC.use_count()));
@@ -77,6 +92,7 @@ TEST_F(TestPointExecutable, testConstructionDestruction)
 
     ASSERT_EQ(0, int(wE.use_count()));
     ASSERT_EQ(0, int(wC.use_count()));
+#endif
 }
 
 TEST_F(TestPointExecutable, testCreateMissingAttributes)
@@ -571,18 +587,20 @@ TEST_F(TestPointExecutable, testAttributeCodecs)
                  "if (v@P.x > 0.5) { v@vnu[0] = 7.135e-7f; v@vnu[1] = 200000.0f; v@vnu[2] = -5e-3f; }"
                  "else             { v@vnu[0] = -1.0f;     v@vnu[1] = 80123.14f; v@vnu[2] = 9019.53123f; }");
 
+    TestPointExecutableAcc acc(*executable);
+
 #if defined(__i386__) || defined(_M_IX86) || \
     defined(__x86_64__) || defined(_M_X64)
     if (openvdb::ax::x86::CheckX86Feature("f16c") ==
         openvdb::ax::x86::CpuFlagStatus::Unsupported)
     {
-        ASSERT_TRUE(!executable->usesAcceleratedKernel(points->tree()));
+        ASSERT_TRUE(!acc.usesAcceleratedKernel(points->tree()));
     }
     else {
-        ASSERT_TRUE(executable->usesAcceleratedKernel(points->tree()));
+        ASSERT_TRUE(acc.usesAcceleratedKernel(points->tree()));
     }
 #else
-        ASSERT_TRUE(executable->usesAcceleratedKernel(points->tree()));
+        ASSERT_TRUE(acc.usesAcceleratedKernel(points->tree()));
 #endif
 
         ASSERT_NO_THROW(executable->execute(*points));
@@ -671,7 +689,8 @@ TEST_F(TestPointExecutable, testAttributeCodecs)
                  "if (v@P.x > 0.5) { v@fpr16[0] = 7.135e-7f; v@fpr16[1] = 200000.0f; v@fpr16[2] = -5e-3f; }"
                  "else             { v@fpr16[0] = -0.5f;     v@fpr16[1] = 0.0f;      v@fpr16[2] = 0.5f; }");
 
-        ASSERT_TRUE(executable->usesAcceleratedKernel(points->tree()));
+        TestPointExecutableAcc acc(*executable);
+        ASSERT_TRUE(acc.usesAcceleratedKernel(points->tree()));
         ASSERT_NO_THROW(executable->execute(*points));
 
 
@@ -727,18 +746,20 @@ TEST_F(TestPointExecutable, testAttributeCodecs)
                  "v@P.y -= 1.0f;"
                  "v@P.z += 2.0f;");
 
+        TestPointExecutableAcc acc(*executable);
+
 #if defined(__i386__) || defined(_M_IX86) || \
     defined(__x86_64__) || defined(_M_X64)
     if (openvdb::ax::x86::CheckX86Feature("f16c") ==
         openvdb::ax::x86::CpuFlagStatus::Unsupported)
     {
-        ASSERT_TRUE(!executable->usesAcceleratedKernel(points->tree()));
+        ASSERT_TRUE(!acc.usesAcceleratedKernel(points->tree()));
     }
     else {
-        ASSERT_TRUE(executable->usesAcceleratedKernel(points->tree()));
+        ASSERT_TRUE(acc.usesAcceleratedKernel(points->tree()));
     }
 #else
-        ASSERT_TRUE(executable->usesAcceleratedKernel(points->tree()));
+        ASSERT_TRUE(acc.usesAcceleratedKernel(points->tree()));
 #endif
 
         ASSERT_NO_THROW(executable->execute(*points));

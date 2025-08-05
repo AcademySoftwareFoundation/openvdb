@@ -102,7 +102,9 @@ TEST_F(TestTypes, testTypes)
     // void
     ASSERT_EQ(llvm::cast<llvm::Type>(llvm::Type::getVoidTy(C)), LLVMType<void>::get(C));
     // some special cases we alias
+#if LLVM_VERSION_MAJOR <= 15
     ASSERT_EQ(llvm::Type::getInt8PtrTy(C), LLVMType<void*>::get(C));
+#endif
     ASSERT_EQ(llvm::cast<llvm::Type>(llvm::Type::getInt8Ty(C)), LLVMType<char>::get(C));
 }
 
@@ -152,14 +154,14 @@ TEST_F(TestTypes, testString)
     unittest_util::LLVMState state;
     llvm::LLVMContext& C = state.context();
 
-    llvm::Type* type = LLVMType<openvdb::ax::codegen::String>::get(C);
+    llvm::StructType* type = LLVMType<openvdb::ax::codegen::String>::get(C);
     ASSERT_TRUE(type->isAggregateType());
     ASSERT_EQ(llvm::Type::StructTyID, type->getTypeID());
     ASSERT_EQ(unsigned(3), type->getNumContainedTypes()); // char*, SSO, len
     ASSERT_EQ(unsigned(3), type->getStructNumElements()); // char*, SSO, len
 
     // Check members
-    ASSERT_EQ((llvm::Type*)LLVMType<char*>::get(C), type->getContainedType(0));
-    ASSERT_EQ(LLVMType<char[openvdb::ax::codegen::String::SSO_LENGTH]>::get(C), type->getContainedType(1));
-    ASSERT_EQ(LLVMType<int64_t>::get(C), type->getContainedType(2));
+    ASSERT_EQ((llvm::Type*)LLVMType<char*>::get(C), type->getTypeAtIndex(0u));
+    ASSERT_EQ(LLVMType<char[openvdb::ax::codegen::String::SSO_LENGTH]>::get(C), type->getTypeAtIndex(1));
+    ASSERT_EQ(LLVMType<int64_t>::get(C), type->getTypeAtIndex(2));
 }

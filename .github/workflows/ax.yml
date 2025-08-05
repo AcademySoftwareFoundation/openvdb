@@ -55,7 +55,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-ax:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
@@ -66,18 +66,21 @@ jobs:
     strategy:
       matrix:
         # Only test unified builds (core+ax). weekly CI should test standalone
+        # @note  LLVM 17 builds are incompatible with the vdb python plugin on linux
         config:
+          - { image: '2025-clang19', cxx: 'clang++', build: 'Release', cmake: '' }
+          - { image: '2025-clang19', cxx: 'g++',     build: 'Release', cmake: '' }
+          - { image: '2025-clang19', cxx: 'clang++', build: 'Debug',   cmake: '' }
+          - { image: '2025-clang18', cxx: 'clang++', build: 'Release', cmake: '' }
+          - { image: '2024-clang17', cxx: 'clang++', build: 'Release', cmake: '-DOPENVDB_PYTHON_USE_AX=OFF' }
+          - { image: '2024-clang16', cxx: 'clang++', build: 'Release', cmake: '' }
           - { image: '2023-clang15', cxx: 'clang++', build: 'Release', cmake: '' }
           - { image: '2023-clang15', cxx: 'g++',     build: 'Release', cmake: '' }
-          - { image: '2023-clang15', cxx: 'clang++', build: 'Debug',   cmake: '' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
       - name: nanobind
-        #if: contains(matrix.config.image, '2023') == false
         run: ./ci/install_nanobind.sh 2.0.0
-      - name: install_gtest
-        run: ./ci/install_gtest.sh 1.15.2
       - name: timestamp
         id: timestamp
         run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
@@ -94,12 +97,11 @@ jobs:
         run: >
           ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
-          --components='core,python,bin,axcore,axbin,axtest'
+          --components='core,python,axcore,axbin,axtest'
           --cargs=\"
           ${{ matrix.config.cmake }}
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
-          -DOPENVDB_CXX_STRICT=ON
           \"
       - name: test
         run: cd build && ctest -V
@@ -123,8 +125,12 @@ jobs:
       matrix:
         config:
           # Last macos runner before M1 (macos-14)
+          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '20' }
+          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '19' }
+          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '18' }
+          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '17' }
+          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '16' }
           - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '15' }
-          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '13' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -136,7 +142,7 @@ jobs:
         run: >
           ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
-          --components="core,python,bin,axcore,axbin,axtest"
+          --components="core,python,axcore,axbin,axtest"
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
@@ -152,7 +158,7 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' &&
       github.event.inputs.type == 'grammar'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     container:
       image: aswf/ci-openvdb:2023-clang15
     steps:

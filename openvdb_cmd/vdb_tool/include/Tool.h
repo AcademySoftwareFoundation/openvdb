@@ -120,8 +120,8 @@ public:
 private:
 
     static const int sMajor =10;// incremented for incompatible changes options or file.
-    static const int sMinor = 6;// incremented for new functionality that is backwards-compatible.
-    static const int sPatch = 1;// incremented for backwards-compatible bug fixes.
+    static const int sMinor = 7;// incremented for new functionality that is backwards-compatible.
+    static const int sPatch = 0;// incremented for backwards-compatible bug fixes.
 
     using GridT = FloatGrid;
     using FilterT = std::unique_ptr<tools::LevelSetFilter<GridT>>;

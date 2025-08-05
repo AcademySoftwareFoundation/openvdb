@@ -124,6 +124,23 @@ openToNanoVDB(const openvdb::GridBase::Ptr& base,
               StatsMode                     sMode = StatsMode::Default,
               CheckMode                     cMode = CheckMode::Default,
               int                           verbose = 0);
+
+/// @brief Forward declaration of free-standing function that converts an OpenVDB GridBase into a NanoVDB GridHandle with an IndexGrid
+/// @tparam DstBuildT Should be either nanovdb::ValueIndex or nanovdb::ValueOnIndex
+/// @tparam BufferT Type of the buffer used to allocate the destination grid
+/// @param base Shared pointer to a base openvdb grid to be converted
+/// @param channels Number of side-car channels with the values (active or all) in the source grid
+/// @param includeStats If true stats are also indexed
+/// @param includeTiles  If true tile values (active or all) are also indexed
+/// @param verbose Mode of verbosity
+/// @return Handle to the destination NanoGrid of type IndexGrid or OnIndexGrid
+template<typename DstBuildT = nanovdb::ValueOnIndex, typename BufferT = HostBuffer>
+typename util::enable_if<BuildTraits<DstBuildT>::is_index, GridHandle<BufferT>>::type
+openToIndexVDB(const openvdb::GridBase::Ptr& base,
+               uint32_t                      channels = 1u,
+               bool                          includeStats = true,
+               bool                          includeTiles = true,
+               int                           verbose = 0);
 #endif
 
 //================================================================================================
@@ -260,12 +277,6 @@ public:
     }
 };// AbsDiff
 
-inline std::ostream& operator<<(std::ostream& os, const AbsDiff& diff)
-{
-    os << "Absolute tolerance: " << diff.getTolerance();
-    return os;
-}
-
 //================================================================================================
 
 /// @brief Compression oracle based on relative difference
@@ -289,12 +300,6 @@ public:
         return  math::Abs(exact - approx)/math::Max(math::Abs(exact), math::Abs(approx)) <= mTolerance;
     }
 };// RelDiff
-
-inline std::ostream& operator<<(std::ostream& os, const RelDiff& diff)
-{
-    os << "Relative tolerance: " << diff.getTolerance();
-    return os;
-}
 
 //================================================================================================
 
@@ -769,8 +774,8 @@ private:
 
     std::unique_ptr<SrcNodeAccT> mSrcNodeAccPtr;// placeholder for potential local instance
     const SrcNodeAccT       &mSrcNodeAcc;
-    struct BlindMetaData; // forward declaration
-    std::set<BlindMetaData>  mBlindMetaData; // sorted according to BlindMetaData.order
+    struct OrderedBlindMetaData; // forward declaration
+    std::set<OrderedBlindMetaData>  mBlindMetaData; // sorted set of GridBlindMetaData
     struct Codec { float min, max; uint64_t offset; uint8_t log2; };// used for adaptive bit-rate quantization
     std::unique_ptr<Codec[]> mCodec;// defines a codec per leaf node when DstBuildT = FpN
     StatsMode                mStats;
@@ -812,47 +817,31 @@ CreateNanoGrid<SrcGridT>::CreateNanoGrid(const SrcNodeAccT &srcNodeAcc)
 //================================================================================================
 
 template <typename SrcGridT>
-struct CreateNanoGrid<SrcGridT>::BlindMetaData
+struct CreateNanoGrid<SrcGridT>::OrderedBlindMetaData
 {
-    BlindMetaData(const std::string& name,// name + used to derive GridBlindDataSemantic
-                  const std::string& type,// used to derive GridType of blind data
-                  GridBlindDataClass dataClass,
-                  size_t i, size_t valueCount, size_t valueSize)
-        : metaData(reinterpret_cast<GridBlindMetaData*>(new char[sizeof(GridBlindMetaData)]))
+    OrderedBlindMetaData(const std::string& name,// name + used to derive GridBlindDataSemantic
+                         const std::string& type,// used to derive GridType of blind data
+                         GridBlindDataClass dataClass,
+                         size_t i, size_t valueCount, size_t valueSize)
+        : metaData(new GridBlindMetaData(0, valueCount, valueSize, this->mapToSemantics(name), dataClass, this->mapToType(type)))
         , order(i)// sorted id of meta data
-        , size(math::AlignUp<NANOVDB_DATA_ALIGNMENT>(valueCount * valueSize))
     {
-        util::memzero(metaData, sizeof(GridBlindMetaData));// zero out all meta data
-        if (name.length()>=GridData::MaxNameSize) throw std::runtime_error("blind data name exceeds limit");
-        std::memcpy(metaData->mName, name.c_str(), name.length() + 1);
-        metaData->mValueCount = valueCount;
-        metaData->mSemantic = BlindMetaData::mapToSemantics(name);
-        metaData->mDataClass = dataClass;
-        metaData->mDataType = BlindMetaData::mapToType(type);
-        metaData->mValueSize = valueSize;
+        if (!metaData->setName(name.c_str())) throw std::runtime_error("blind data name exceeds character limit");
         NANOVDB_ASSERT(metaData->isValid());
     }
-    BlindMetaData(const std::string& name,// only name
-                  GridBlindDataSemantic dataSemantic,
-                  GridBlindDataClass dataClass,
-                  GridType dataType,
-                  size_t i, size_t valueCount, size_t valueSize)
-        : metaData(reinterpret_cast<GridBlindMetaData*>(new char[sizeof(GridBlindMetaData)]))
+    OrderedBlindMetaData(const std::string& name,// only name
+                         GridBlindDataSemantic dataSemantic,
+                         GridBlindDataClass dataClass,
+                         GridType dataType,
+                         size_t i, size_t valueCount, size_t valueSize)
+        : metaData(new GridBlindMetaData(0, valueCount, valueSize, dataSemantic, dataClass, dataType))
         , order(i)// sorted id of meta data
-        , size(math::AlignUp<NANOVDB_DATA_ALIGNMENT>(valueCount * valueSize))
     {
-        std::memset(metaData, 0, sizeof(GridBlindMetaData));// zero out all meta data
-        if (name.length()>=GridData::MaxNameSize) throw std::runtime_error("blind data name exceeds character limit");
-        std::memcpy(metaData->mName, name.c_str(), name.length() + 1);
-        metaData->mValueCount = valueCount;
-        metaData->mSemantic = dataSemantic;
-        metaData->mDataClass = dataClass;
-        metaData->mDataType = dataType;
-        metaData->mValueSize = valueSize;
+        if (!metaData->setName(name.c_str())) throw std::runtime_error("blind data name exceeds character limit");
         NANOVDB_ASSERT(metaData->isValid());
     }
-    ~BlindMetaData(){ delete [] reinterpret_cast<char*>(metaData); }
-    bool operator<(const BlindMetaData& other) const { return order < other.order; } // required by std::set
+    ~OrderedBlindMetaData(){ delete metaData; }
+    bool operator<(const OrderedBlindMetaData& other) const { return order < other.order; } // required by std::set
     static GridType mapToType(const std::string& name)
     {
         GridType type = GridType::Unknown;
@@ -885,9 +874,10 @@ struct CreateNanoGrid<SrcGridT>::BlindMetaData
         }
         return semantic;
     }
-    GridBlindMetaData *metaData;
-    const size_t       order, size;
-}; // CreateNanoGrid::BlindMetaData
+    size_t memUsage() const {return metaData->blindDataSize();}
+    GridBlindMetaData *metaData;// a pointer is preferred since it avoids deep copy during sorting
+    const size_t       order;// index used for sorting of the blind meta data
+}; // CreateNanoGrid::OrderedBlindMetaData
 
 //================================================================================================
 
@@ -949,7 +939,7 @@ GridHandle<BufferT> CreateNanoGrid<SrcGridT>::initHandle(const BufferT& pool)
     mOffset.meta  = mOffset.leaf  + mLeafNodeSize;// leaf nodes end and blind meta data begins
     mOffset.blind = mOffset.meta  + sizeof(GridBlindMetaData)*mBlindMetaData.size(); // meta data ends and blind data begins
     mOffset.size  = mOffset.blind;// end of buffer
-    for (const auto& b : mBlindMetaData) mOffset.size += b.size; // accumulate all the blind data
+    for (const auto& b : mBlindMetaData) mOffset.size += b.memUsage(); // accumulate all the blind data
 
     auto buffer = BufferT::create(mOffset.size, &pool);
     mBufferPtr = buffer.data();
@@ -1679,12 +1669,12 @@ void CreateNanoGrid<SrcGridT>::processTree()
     dstTree->mNodeCount[2] = static_cast<uint32_t>(nodeCount[2]);
 
     // Count number of active leaf level tiles
-    dstTree->mTileCount[0] = util::reduce(util::Range1D(0,nodeCount[1]), uint32_t(0), [&](util::Range1D &r, uint32_t sum){
+    dstTree->mTileCount[0] = util::reduce(util::Range1D(0,nodeCount[1]), uint32_t(0), [&](const util::Range1D &r, uint32_t sum){
         for (auto i=r.begin(); i!=r.end(); ++i) sum += mSrcNodeAcc.template node<1>(i).getValueMask().countOn();
         return sum;}, std::plus<uint32_t>());
 
     // Count number of active lower internal node tiles
-    dstTree->mTileCount[1] = util::reduce(util::Range1D(0,nodeCount[2]), uint32_t(0), [&](util::Range1D &r, uint32_t sum){
+    dstTree->mTileCount[1] = util::reduce(util::Range1D(0,nodeCount[2]), uint32_t(0), [&](const util::Range1D &r, uint32_t sum){
         for (auto i=r.begin(); i!=r.end(); ++i) sum += mSrcNodeAcc.template node<2>(i).getValueMask().countOn();
         return sum;}, std::plus<uint32_t>());
 
@@ -1693,7 +1683,7 @@ void CreateNanoGrid<SrcGridT>::processTree()
     for (auto it = mSrcNodeAcc.root().cbeginValueOn(); it; ++it) dstTree->mTileCount[2] += 1;
 
     // Count number of active voxels
-    dstTree->mVoxelCount = util::reduce(util::Range1D(0, nodeCount[0]), uint64_t(0), [&](util::Range1D &r, uint64_t sum){
+    dstTree->mVoxelCount = util::reduce(util::Range1D(0, nodeCount[0]), uint64_t(0), [&](const util::Range1D &r, uint64_t sum){
         for (auto i=r.begin(); i!=r.end(); ++i) sum += mSrcNodeAcc.template node<0>(i).getValueMask().countOn();
         return sum;}, std::plus<uint64_t>());
 
@@ -1715,16 +1705,6 @@ void CreateNanoGrid<SrcGridT>::processGrid()
     dstGrid->mBlindMetadataCount = static_cast<uint32_t>(mBlindMetaData.size());
     dstGrid->mData1 = this->valueCount();
 
-//    if (!isValid(dstGrid->mGridType, dstGrid->mGridClass)) {
-//#if 1
-//        char str[30];
-//        fprintf(stderr,"Warning: Strange combination of GridType(\"%s\") and GridClass(\"%s\"). Consider changing GridClass to \"Unknown\"\n",
-//                toStr(str, dstGrid->mGridType), toStr(str + 15, dstGrid->mGridClass));
-//#else
-//        throw std::runtime_error("Invalid combination of GridType("+std::to_string(int(dstGrid->mGridType))+
-//                                 ") and GridClass("+std::to_string(int(dstGrid->mGridClass))+"). See NanoVDB.h for details!");
-//#endif
-//    }
     util::memzero(dstGrid->mGridName, GridData::MaxNameSize);// initialize mGridName to zero
     strncpy(dstGrid->mGridName, mSrcNodeAcc.getName().c_str(), GridData::MaxNameSize-1);
     if (mSrcNodeAcc.hasLongGridName()) dstGrid->setLongGridNameOn();// grid name is long so store it as blind data
@@ -1740,7 +1720,7 @@ void CreateNanoGrid<SrcGridT>::processGrid()
             metaData->setBlindData(blindData);// sets metaData.mOffset
             if (metaData->mDataClass == GridBlindDataClass::GridName) strcpy(blindData, mSrcNodeAcc.getName().c_str());
             ++metaData;
-            blindData += b.size;
+            blindData += b.memUsage();
         }
         mBlindMetaData.clear();
     }
@@ -2024,7 +2004,7 @@ template<typename BufferT>
 GridHandle<BufferT>
 openToNanoVDB(const openvdb::GridBase::Ptr& base,
               StatsMode                     sMode,
-              CheckMode                  cMode,
+              CheckMode                     cMode,
               int                           verbose)
 {
     // We need to define these types because they are not defined in OpenVDB
@@ -2064,10 +2044,68 @@ openToNanoVDB(const openvdb::GridBase::Ptr& base,
         OPENVDB_THROW(openvdb::RuntimeError, "Unrecognized OpenVDB grid type");
     }
 }// openToNanoVDB
+
+template<typename DstBuildT, typename BufferT>
+typename util::enable_if<BuildTraits<DstBuildT>::is_index, GridHandle<BufferT>>::type
+openToIndexVDB(const openvdb::GridBase::Ptr& base,
+              uint32_t                       channels,
+              bool                           includeStats,
+              bool                           includeTiles,
+              int                            verbose)
+{
+    // We need to define these types because they are not defined in OpenVDB
+    using openvdb_Vec4fTree = typename openvdb::tree::Tree4<openvdb::Vec4f, 5, 4, 3>::Type;
+    using openvdb_Vec4dTree = typename openvdb::tree::Tree4<openvdb::Vec4d, 5, 4, 3>::Type;
+    using openvdb_Vec4fGrid = openvdb::Grid<openvdb_Vec4fTree>;
+    using openvdb_Vec4dGrid = openvdb::Grid<openvdb_Vec4dTree>;
+    using openvdb_UInt32Grid = openvdb::Grid<openvdb::UInt32Tree>;
+
+    if (auto grid = openvdb::GridBase::grid<openvdb::FloatGrid>(base)) {
+        return createNanoGrid<openvdb::FloatGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::DoubleGrid>(base)) {
+        return createNanoGrid<openvdb::DoubleGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::Int32Grid>(base)) {
+        return createNanoGrid<openvdb::Int32Grid, DstBuildT,BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::Int64Grid>(base)) {
+        return createNanoGrid<openvdb::Int64Grid, DstBuildT, BufferT>(*grid, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb_UInt32Grid>(base)) {
+        return createNanoGrid<openvdb_UInt32Grid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::Vec3fGrid>(base)) {
+        return createNanoGrid<openvdb::Vec3fGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::Vec3dGrid>(base)) {
+        return createNanoGrid<openvdb::Vec3dGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::tools::PointIndexGrid>(base)) {
+        return createNanoGrid<openvdb::tools::PointIndexGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::points::PointDataGrid>(base)) {
+        return createNanoGrid<openvdb::points::PointDataGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::MaskGrid>(base)) {
+        return createNanoGrid<openvdb::MaskGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::BoolGrid>(base)) {
+        return createNanoGrid<openvdb::BoolGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb_Vec4fGrid>(base)) {
+        return createNanoGrid<openvdb_Vec4fGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb_Vec4dGrid>(base)) {
+        return createNanoGrid<openvdb_Vec4dGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else {
+        OPENVDB_THROW(openvdb::RuntimeError, "Unrecognized OpenVDB grid type");
+    }
+}// openToIndexVDB
 #endif
 
 }// namespace tools ===============================================================================
 
 } // namespace nanovdb
+
+inline std::ostream& operator<<(std::ostream& os, const nanovdb::tools::AbsDiff& diff)
+{
+    os << "Absolute tolerance: " << diff.getTolerance();
+    return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const nanovdb::tools::RelDiff& diff)
+{
+    os << "Relative tolerance: " << diff.getTolerance();
+    return os;
+}
 
 #endif // NANOVDB_TOOLS_CREATENANOGRID_H_HAS_BEEN_INCLUDED

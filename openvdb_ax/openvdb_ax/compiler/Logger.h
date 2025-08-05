@@ -16,13 +16,11 @@
 
 #include <openvdb/version.h>
 
-#include <gtest/gtest.h> // FRIEND_TEST, see TestLogger.cc
-
 #include <functional>
 #include <string>
 #include <unordered_map>
 
-class TestLogger;
+struct TestLoggerAcc;
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -198,10 +196,7 @@ public:
     struct SourceCode;
 
 private:
-
-    FRIEND_TEST(TestLogger, testParseSetsTree);
-    FRIEND_TEST(TestLogger, testAddError);
-    FRIEND_TEST(TestLogger, testAddWarning);
+    friend struct ::TestLoggerAcc;
 
     OutputFunction mErrorOutput;
     OutputFunction mWarningOutput;

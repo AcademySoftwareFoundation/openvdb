@@ -3,6 +3,7 @@
 
 #include "util.h"
 
+#include <openvdb_ax/codegen/LegacyIR.h>
 #include <openvdb_ax/codegen/FunctionTypes.h>
 
 #include <gtest/gtest.h>
@@ -15,49 +16,78 @@
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 
-/// @brief  Dummy derived function which implemented types
-struct TestFunction : public openvdb::ax::codegen::Function
-{
-    static_assert(std::has_virtual_destructor
-        <openvdb::ax::codegen::Function>::value,
-        "Base class destructor is not virtual");
-    TestFunction(const std::vector<llvm::Type*>& types,
-          llvm::Type* ret,
-          const std::string& symbol)
-        : openvdb::ax::codegen::Function(types.size(), symbol)
-        , mTypes(types), mRet(ret) {}
-    ~TestFunction() override {}
-    llvm::Type* types(std::vector<llvm::Type*>& types,
-        llvm::LLVMContext&) const override {
-        types = mTypes;
-        return mRet;
-    }
-    const std::vector<llvm::Type*> mTypes;
-    llvm::Type* mRet;
-};
-
 /// @brief  Dummy derived IR function which implemented types and
 ///         forwards on the generator
+#if LLVM_VERSION_MAJOR <= 15
 struct TestIRFunction : public openvdb::ax::codegen::IRFunctionBase
 {
     static_assert(std::has_virtual_destructor
         <openvdb::ax::codegen::IRFunctionBase>::value,
         "Base class destructor is not virtual");
-    TestIRFunction(const std::vector<llvm::Type*>& types,
-          llvm::Type* ret,
+    TestIRFunction(const openvdb::ax::codegen::ArgInfoVector& types,
+          openvdb::ax::codegen::ArgInfo ret,
           const std::string& symbol,
-          const openvdb::ax::codegen::IRFunctionBase::GeneratorCb& gen)
+          const openvdb::ax::codegen::IRFunctionBase::GeneratorArgumentsCb& gen)
         : openvdb::ax::codegen::IRFunctionBase(symbol, gen, types.size())
-        , mTypes(types), mRet(ret) {}
-    ~TestIRFunction() override {}
-    llvm::Type* types(std::vector<llvm::Type*>& types,
-        llvm::LLVMContext&) const override {
+        , mTypes(types)
+        , mRet([&]() {
+            ret.SetIsReturn();
+            return ret;
+        }())
+        , mLLVMTypes([&]() {
+            std::vector<llvm::Type*> sig;
+            for (auto& type : types) sig.emplace_back(type.GetType());
+            return sig;
+        }())
+        , mLLVMRet(ret.GetType()) {}
+    ~TestIRFunction() override = default;
+
+    llvm::Type* types(std::vector<llvm::Type*>& types, llvm::LLVMContext&) const override
+    {
+        types = mLLVMTypes;
+        return mLLVMRet;
+    }
+    openvdb::ax::codegen::ArgInfo types(
+        openvdb::ax::codegen::ArgInfoVector& types,
+        llvm::LLVMContext&) const override
+    {
         types = mTypes;
         return mRet;
     }
-    const std::vector<llvm::Type*> mTypes;
-    llvm::Type* mRet;
+    const openvdb::ax::codegen::ArgInfoVector mTypes;
+    const openvdb::ax::codegen::ArgInfo mRet;
+    const std::vector<llvm::Type*> mLLVMTypes;
+    llvm::Type* mLLVMRet;
 };
+#else
+struct TestIRFunction final : public openvdb::ax::codegen::IRFunctionBase
+{
+    static_assert(std::has_virtual_destructor
+        <openvdb::ax::codegen::IRFunctionBase>::value,
+        "Base class destructor is not virtual");
+    TestIRFunction(const openvdb::ax::codegen::ArgInfoVector& types,
+          openvdb::ax::codegen::ArgInfo ret,
+          const std::string& symbol,
+          const openvdb::ax::codegen::IRFunctionBase::GeneratorArgumentsCb& gen)
+        : openvdb::ax::codegen::IRFunctionBase(symbol, gen, types.size())
+        , mTypes(types)
+        , mRet([&]() {
+            ret.SetIsReturn();
+            return ret;
+        }()) {}
+    ~TestIRFunction() override = default;
+    openvdb::ax::codegen::ArgInfo types(
+        openvdb::ax::codegen::ArgInfoVector& types,
+        llvm::LLVMContext&) const override
+    {
+        types = mTypes;
+        return mRet;
+    }
+    const openvdb::ax::codegen::ArgInfoVector mTypes;
+    const openvdb::ax::codegen::ArgInfo mRet;
+};
+#endif
+
 
 /// @brief  static function to test c binding addresses
 struct CBindings
@@ -157,12 +187,62 @@ TEST_F(TestFunctionTypes, testLLVMTypesFromSignature)
     ASSERT_TRUE(types[1]->isIntegerTy(64));
     ASSERT_TRUE(types[2]->isPointerTy());
 
+#if LLVM_VERSION_MAJOR <= 15
     type = types[2]->getPointerElementType();
     ASSERT_TRUE(type);
     ASSERT_TRUE(type->isArrayTy());
     type = type->getArrayElementType();
     ASSERT_TRUE(type);
     ASSERT_TRUE(type->isFloatTy());
+#endif
+}
+
+TEST_F(TestFunctionTypes, testArgInfoTypesFromSignature)
+{
+    using openvdb::ax::codegen::llvmArgTypesFromSignature;
+    using openvdb::ax::codegen::ArgInfo;
+    using openvdb::ax::codegen::ArgInfoVector;
+
+    unittest_util::LLVMState state;
+    ArgInfoVector types;
+
+    ArgInfo type = llvmArgTypesFromSignature<void()>(state.context());
+    ASSERT_TRUE(type.IsVoid());
+    ASSERT_TRUE(type.IsReturn());
+    ASSERT_TRUE(!type.IsPtr());
+
+    type = llvmArgTypesFromSignature<void()>(state.context(), &types);
+    ASSERT_TRUE(type.IsVoid());
+    ASSERT_TRUE(type.IsReturn());
+    ASSERT_TRUE(!type.IsPtr());
+    ASSERT_TRUE(types.empty());
+
+    type = llvmArgTypesFromSignature<float()>(state.context(), &types);
+    ASSERT_TRUE(type.IsNative());
+    ASSERT_TRUE(type.IsReturn());
+    ASSERT_TRUE(!type.IsPtr());
+    ASSERT_TRUE(type.GetType()->isFloatTy());
+    ASSERT_TRUE(types.empty());
+
+    type = llvmArgTypesFromSignature<float(double, int64_t, float(*)[3])>(state.context(), &types);
+
+    ASSERT_TRUE(type.IsNative());
+    ASSERT_TRUE(type.IsReturn());
+    ASSERT_TRUE(!type.IsPtr());
+    ASSERT_TRUE(type.GetType()->isFloatTy());
+    ASSERT_EQ(size_t(3), types.size());
+    ASSERT_TRUE(types[0].GetType()->isDoubleTy());
+    ASSERT_TRUE(types[0].IsNative());
+    ASSERT_TRUE(!types[0].IsPtr());
+    ASSERT_TRUE(types[1].GetType()->isIntegerTy(64));
+    ASSERT_TRUE(types[1].IsNative());
+    ASSERT_TRUE(!types[1].IsPtr());
+    ASSERT_TRUE(types[2].GetType()->isPointerTy());
+    ASSERT_TRUE(types[2].IsNative());
+    ASSERT_TRUE(types[2].IsPtr());
+    ASSERT_TRUE(types[2].NumPtrs() == 1);
+    ASSERT_TRUE(types[2].GetUnderlyingType()->isArrayTy());
+    ASSERT_TRUE(types[2].GetUnderlyingType()->getArrayElementType()->isFloatTy());
 }
 
 TEST_F(TestFunctionTypes, testLLVMFunctionTypeFromSignature)
@@ -171,13 +251,11 @@ TEST_F(TestFunctionTypes, testLLVMFunctionTypeFromSignature)
 
     unittest_util::LLVMState state;
     llvm::FunctionType* ftype = nullptr;
-    std::vector<llvm::Type*> types;
 
     ftype = llvmFunctionTypeFromSignature<void()>(state.context());
     ASSERT_TRUE(ftype);
     ASSERT_TRUE(ftype->getReturnType()->isVoidTy());
     ASSERT_EQ(0u, ftype->getNumParams());
-
 
     ftype = llvmFunctionTypeFromSignature<float(double, int64_t, float(*)[3])>(state.context());
 
@@ -188,22 +266,34 @@ TEST_F(TestFunctionTypes, testLLVMFunctionTypeFromSignature)
     ASSERT_TRUE(ftype->getParamType(1)->isIntegerTy(64));
     ASSERT_TRUE(ftype->getParamType(2)->isPointerTy());
 
+#if LLVM_VERSION_MAJOR <= 15
     llvm::Type* type = ftype->getParamType(2)->getPointerElementType();
     ASSERT_TRUE(type);
     ASSERT_TRUE(type->isArrayTy());
     type = type->getArrayElementType();
     ASSERT_TRUE(type);
     ASSERT_TRUE(type->isFloatTy());
+#endif
 }
 
 TEST_F(TestFunctionTypes, testPrintSignature)
 {
     using openvdb::ax::codegen::printSignature;
+    using openvdb::ax::codegen::ArgInfoVector;
+    using openvdb::ax::codegen::ArgInfo;
 
     unittest_util::LLVMState state;
     llvm::LLVMContext& C = state.context();
+
+#if LLVM_VERSION_MAJOR <= 15
     std::vector<llvm::Type*> types;
     const llvm::Type* vt = llvm::Type::getVoidTy(C);
+    const llvm::Type* int64t = llvm::Type::getInt64Ty(C);
+#else
+    ArgInfoVector types;
+    const ArgInfo vt(llvm::Type::getVoidTy(C));
+    const ArgInfo int64t(llvm::Type::getInt64Ty(C));
+#endif
 
     std::ostringstream os;
 
@@ -241,16 +331,24 @@ TEST_F(TestFunctionTypes, testPrintSignature)
     ASSERT_EQ(std::string("void 1(i32; i64 two)"), os.str());
     os.str("");
 
+#if LLVM_VERSION_MAJOR <= 15
     types.emplace_back(llvm::Type::getInt8PtrTy(C));
+#else
+    types.emplace_back(llvm::Type::getInt8Ty(C), 1);
+#endif
     types.emplace_back(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3));
 
-    printSignature(os, types, llvm::Type::getInt64Ty(C), "test", {"", "two"}, true);
+    printSignature(os, types, int64t, "test", {"", "two"}, true);
+#if LLVM_VERSION_MAJOR <= 15
     ASSERT_EQ(std::string("int64 test(int32; int64 two; i8*; vec3i)"), os.str());
+#else
+    ASSERT_EQ(std::string("int64 test(int32; int64 two; ptr; vec3i)"), os.str());
+#endif
     os.str("");
 
     types.clear();
 
-    printSignature(os, types, llvm::Type::getInt64Ty(C), "test", {"", "two"});
+    printSignature(os, types, int64t, "test", {"", "two"});
     ASSERT_EQ(std::string("i64 test()"), os.str());
     os.str("");
 }
@@ -259,23 +357,39 @@ TEST_F(TestFunctionTypes, testPrintSignature)
 TEST_F(TestFunctionTypes, testFunctionCreate)
 {
     using openvdb::ax::codegen::Function;
+    using openvdb::ax::codegen::ArgInfo;
+    using openvdb::ax::codegen::ArgInfoVector;
 
     unittest_util::LLVMState state;
     llvm::LLVMContext& C = state.context();
     llvm::Module& M = state.module();
+
+#if LLVM_VERSION_MAJOR <= 15
     std::vector<llvm::Type*> types;
-    llvm::Type* type = nullptr;
+#else
+    ArgInfoVector types;
+#endif
+
     std::ostringstream os;
 
-    Function::Ptr test(new TestFunction({llvm::Type::getInt32Ty(C)},
-        llvm::Type::getVoidTy(C), "ax.test"));
+    Function::Ptr test(new unittest_util::TestFunction({ ArgInfo(llvm::Type::getInt32Ty(C)) },
+        ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
 
     // test types
-    type = test->types(types, C);
+    auto type = test->types(types, C);
     ASSERT_EQ(size_t(1), types.size());
+#if LLVM_VERSION_MAJOR <= 15
     ASSERT_TRUE(types[0]->isIntegerTy(32));
     ASSERT_TRUE(type);
     ASSERT_TRUE(type->isVoidTy());
+#else
+    ASSERT_TRUE(types[0].GetType()->isIntegerTy(32));
+    ASSERT_TRUE(types[0].IsNative());
+    ASSERT_TRUE(!types[0].IsReturn());
+    ASSERT_TRUE(type.IsVoid());
+    ASSERT_TRUE(type.IsReturn());
+#endif
+
     // test various getters
     ASSERT_EQ(std::string("ax.test"), std::string(test->symbol()));
     ASSERT_EQ(size_t(1), test->size());
@@ -328,14 +442,18 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     //
     // Test empty signature
 
-    test.reset(new TestFunction({}, llvm::Type::getInt32Ty(C), "ax.empty.test"));
+    test.reset(new unittest_util::TestFunction({}, ArgInfo(llvm::Type::getInt32Ty(C)), "ax.empty.test"));
     types.clear();
 
     // test types
     type = test->types(types, C);
     ASSERT_EQ(size_t(0), types.size());
+#if LLVM_VERSION_MAJOR <= 15
     ASSERT_TRUE(type);
     ASSERT_TRUE(type->isIntegerTy(32));
+#else
+    ASSERT_TRUE(type.GetType()->isIntegerTy(32));
+#endif
     // test various getters
     ASSERT_EQ(std::string("ax.empty.test"), std::string(test->symbol()));
     ASSERT_EQ(size_t(0), test->size());
@@ -371,29 +489,39 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     //
     // Test scalar types
 
-    test.reset(new TestFunction({
-            llvm::Type::getInt1Ty(C),
-            llvm::Type::getInt16Ty(C),
-            llvm::Type::getInt32Ty(C),
-            llvm::Type::getInt64Ty(C),
-            llvm::Type::getFloatTy(C),
-            llvm::Type::getDoubleTy(C),
+    test.reset(new unittest_util::TestFunction({
+            ArgInfo(llvm::Type::getInt1Ty(C)),
+            ArgInfo(llvm::Type::getInt16Ty(C)),
+            ArgInfo(llvm::Type::getInt32Ty(C)),
+            ArgInfo(llvm::Type::getInt64Ty(C)),
+            ArgInfo(llvm::Type::getFloatTy(C)),
+            ArgInfo(llvm::Type::getDoubleTy(C)),
         },
-        llvm::Type::getInt16Ty(C), "ax.scalars.test"));
+        ArgInfo(llvm::Type::getInt16Ty(C)), "ax.scalars.test"));
     types.clear();
 
     ASSERT_EQ(std::string("ax.scalars.test"), std::string(test->symbol()));
 
     type = test->types(types, state.context());
+    ASSERT_EQ(size_t(6), types.size());
+#if LLVM_VERSION_MAJOR <= 15
     ASSERT_TRUE(type);
     ASSERT_TRUE(type->isIntegerTy(16));
-    ASSERT_EQ(size_t(6), types.size());
     ASSERT_TRUE(types[0]->isIntegerTy(1));
     ASSERT_TRUE(types[1]->isIntegerTy(16));
     ASSERT_TRUE(types[2]->isIntegerTy(32));
     ASSERT_TRUE(types[3]->isIntegerTy(64));
     ASSERT_TRUE(types[4]->isFloatTy());
     ASSERT_TRUE(types[5]->isDoubleTy());
+#else
+    ASSERT_TRUE(type.GetType()->isIntegerTy(16));
+    ASSERT_TRUE(types[0].GetType()->isIntegerTy(1));
+    ASSERT_TRUE(types[1].GetType()->isIntegerTy(16));
+    ASSERT_TRUE(types[2].GetType()->isIntegerTy(32));
+    ASSERT_TRUE(types[3].GetType()->isIntegerTy(64));
+    ASSERT_TRUE(types[4].GetType()->isFloatTy());
+    ASSERT_TRUE(types[5].GetType()->isDoubleTy());
+#endif
 
     // test create detached
     function = test->create(C);
@@ -428,31 +556,48 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     test->print(C, os, "name", /*axtypes=*/true);
     ASSERT_EQ(std::string("int16 name(bool; int16; int32; int64; float; double)"), os.str());
 
+    types.clear();
+
     //
     // Test scalar ptrs types
 
-    test.reset(new TestFunction({
-            llvm::Type::getInt1Ty(C)->getPointerTo(),
-            llvm::Type::getInt16Ty(C)->getPointerTo(),
-            llvm::Type::getInt32Ty(C)->getPointerTo(),
-            llvm::Type::getInt64Ty(C)->getPointerTo(),
-            llvm::Type::getFloatTy(C)->getPointerTo(),
-            llvm::Type::getDoubleTy(C)->getPointerTo()
+    test.reset(new unittest_util::TestFunction({
+            ArgInfo(llvm::Type::getInt1Ty(C), 1),
+            ArgInfo(llvm::Type::getInt16Ty(C), 1),
+            ArgInfo(llvm::Type::getInt32Ty(C), 1),
+            ArgInfo(llvm::Type::getInt64Ty(C), 1),
+            ArgInfo(llvm::Type::getFloatTy(C), 1),
+            ArgInfo(llvm::Type::getDoubleTy(C), 1)
         },
-        llvm::Type::getInt32Ty(C), "ax.scalarptrs.test"));
-    types.clear();
+        ArgInfo(llvm::Type::getInt32Ty(C)), "ax.scalarptrs.test"));
 
     ASSERT_EQ(std::string("ax.scalarptrs.test"), std::string(test->symbol()));
 
     type = test->types(types, C);
-    ASSERT_TRUE(type->isIntegerTy(32));
     ASSERT_EQ(size_t(6), types.size());
-    ASSERT_TRUE(types[0] == llvm::Type::getInt1Ty(C)->getPointerTo());
-    ASSERT_TRUE(types[1] == llvm::Type::getInt16Ty(C)->getPointerTo());
-    ASSERT_TRUE(types[2] == llvm::Type::getInt32Ty(C)->getPointerTo());
-    ASSERT_TRUE(types[3] == llvm::Type::getInt64Ty(C)->getPointerTo());
-    ASSERT_TRUE(types[4] == llvm::Type::getFloatTy(C)->getPointerTo());
-    ASSERT_TRUE(types[5] == llvm::Type::getDoubleTy(C)->getPointerTo());
+#if LLVM_VERSION_MAJOR <= 15
+    ASSERT_TRUE(type->isIntegerTy(32));
+    ASSERT_TRUE(types[0] == llvm::PointerType::get(llvm::Type::getInt1Ty(C), 0));
+    ASSERT_TRUE(types[1] == llvm::PointerType::get(llvm::Type::getInt16Ty(C), 0));
+    ASSERT_TRUE(types[2] == llvm::PointerType::get(llvm::Type::getInt32Ty(C), 0));
+    ASSERT_TRUE(types[3] == llvm::PointerType::get(llvm::Type::getInt64Ty(C), 0));
+    ASSERT_TRUE(types[4] == llvm::PointerType::get(llvm::Type::getFloatTy(C), 0));
+    ASSERT_TRUE(types[5] == llvm::PointerType::get(llvm::Type::getDoubleTy(C), 0));
+#else
+    ASSERT_TRUE(type.GetType()->isIntegerTy(32));
+    ASSERT_TRUE(types[0].GetUnderlyingType()->isIntegerTy(1));
+    ASSERT_TRUE(types[1].GetUnderlyingType()->isIntegerTy(16));
+    ASSERT_TRUE(types[2].GetUnderlyingType()->isIntegerTy(32));
+    ASSERT_TRUE(types[3].GetUnderlyingType()->isIntegerTy(64));
+    ASSERT_TRUE(types[4].GetUnderlyingType()->isFloatTy());
+    ASSERT_TRUE(types[5].GetUnderlyingType()->isDoubleTy());
+    ASSERT_TRUE(types[0].NumPtrs() == 1);
+    ASSERT_TRUE(types[1].NumPtrs() == 1);
+    ASSERT_TRUE(types[2].NumPtrs() == 1);
+    ASSERT_TRUE(types[3].NumPtrs() == 1);
+    ASSERT_TRUE(types[4].NumPtrs() == 1);
+    ASSERT_TRUE(types[5].NumPtrs() == 1);
+#endif
 
     // test create detached
     function = test->create(C);
@@ -465,12 +610,12 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     ASSERT_TRUE(ftype);
     ASSERT_TRUE(ftype->getReturnType()->isIntegerTy(32));
     ASSERT_EQ(6u, ftype->getNumParams());
-    ASSERT_TRUE(ftype->getParamType(0) == llvm::Type::getInt1Ty(C)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(1) == llvm::Type::getInt16Ty(C)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(2) == llvm::Type::getInt32Ty(C)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(3) == llvm::Type::getInt64Ty(C)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(4) == llvm::Type::getFloatTy(C)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(5) == llvm::Type::getDoubleTy(C)->getPointerTo());
+    ASSERT_TRUE(ftype->getParamType(0) == llvm::PointerType::get(llvm::Type::getInt1Ty(C), 0));
+    ASSERT_TRUE(ftype->getParamType(1) == llvm::PointerType::get(llvm::Type::getInt16Ty(C), 0));
+    ASSERT_TRUE(ftype->getParamType(2) == llvm::PointerType::get(llvm::Type::getInt32Ty(C), 0));
+    ASSERT_TRUE(ftype->getParamType(3) == llvm::PointerType::get(llvm::Type::getInt64Ty(C), 0));
+    ASSERT_TRUE(ftype->getParamType(4) == llvm::PointerType::get(llvm::Type::getFloatTy(C), 0));
+    ASSERT_TRUE(ftype->getParamType(5) == llvm::PointerType::get(llvm::Type::getDoubleTy(C), 0));
     ASSERT_TRUE(function->getAttributes().isEmpty());
     delete function;
 
@@ -485,29 +630,31 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     //
     // Test array ptrs types
 
-    test.reset(new TestFunction({
-            llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 2)->getPointerTo(),  // vec2i
-            llvm::ArrayType::get(llvm::Type::getFloatTy(C), 2)->getPointerTo(),  // vec2f
-            llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2)->getPointerTo(), // vec2d
-            llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3)->getPointerTo(),  // vec3i
-            llvm::ArrayType::get(llvm::Type::getFloatTy(C), 3)->getPointerTo(),  // vec3f
-            llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 3)->getPointerTo(), // vec3d
-            llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 4)->getPointerTo(),  // vec4i
-            llvm::ArrayType::get(llvm::Type::getFloatTy(C), 4)->getPointerTo(),  // vec4f
-            llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 4)->getPointerTo(), // vec4d
-            llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 9)->getPointerTo(),  // ix9 (not supported by ax)
-            llvm::ArrayType::get(llvm::Type::getFloatTy(C), 9)->getPointerTo(),  // mat3f
-            llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 9)->getPointerTo(), // mat3d
-            llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 16)->getPointerTo(),  // ix16 (not supported by ax)
-            llvm::ArrayType::get(llvm::Type::getFloatTy(C), 16)->getPointerTo(),  // mat3f
-            llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 16)->getPointerTo()  // mat3d
+    test.reset(new unittest_util::TestFunction({
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 2), 1),  // vec2i
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 2), 1),  // vec2f
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2), 1), // vec2d
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3), 1),  // vec3i
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 3), 1),  // vec3f
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 3), 1), // vec3d
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 4), 1),  // vec4i
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 4), 1),  // vec4f
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 4), 1), // vec4d
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 9), 1),  // ix9 (not supported by ax)
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 9), 1),  // mat3f
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 9), 1), // mat3d
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 16), 1),  // ix16 (not supported by ax)
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 16), 1),  // mat3f
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 16), 1)  // mat3d
         },
-        llvm::Type::getInt64Ty(C), "ax.arrayptrs.test"));
+        ArgInfo(llvm::Type::getInt64Ty(C)), "ax.arrayptrs.test"));
     types.clear();
 
     type = test->types(types, C);
-    ASSERT_TRUE(type->isIntegerTy(64));
     ASSERT_EQ(size_t(15), types.size());
+
+#if LLVM_VERSION_MAJOR <= 15
+    ASSERT_TRUE(type->isIntegerTy(64));
     ASSERT_TRUE(types[0] == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 2)->getPointerTo());
     ASSERT_TRUE(types[1] == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 2)->getPointerTo());
     ASSERT_TRUE(types[2] == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2)->getPointerTo());
@@ -523,6 +670,38 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     ASSERT_TRUE(types[12] == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 16)->getPointerTo());
     ASSERT_TRUE(types[13] == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 16)->getPointerTo());
     ASSERT_TRUE(types[14] == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 16)->getPointerTo());
+#else
+    ASSERT_TRUE(types[0].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 2));
+    ASSERT_TRUE(types[1].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 2));
+    ASSERT_TRUE(types[2].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2));
+    ASSERT_TRUE(types[3].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3));
+    ASSERT_TRUE(types[4].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 3));
+    ASSERT_TRUE(types[5].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 3));
+    ASSERT_TRUE(types[6].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 4));
+    ASSERT_TRUE(types[7].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 4));
+    ASSERT_TRUE(types[8].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 4));
+    ASSERT_TRUE(types[9].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 9));
+    ASSERT_TRUE(types[10].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 9));
+    ASSERT_TRUE(types[11].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 9));
+    ASSERT_TRUE(types[12].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 16));
+    ASSERT_TRUE(types[13].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 16));
+    ASSERT_TRUE(types[14].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 16));
+    ASSERT_TRUE(types[0].NumPtrs() == 1);
+    ASSERT_TRUE(types[1].NumPtrs() == 1);
+    ASSERT_TRUE(types[2].NumPtrs() == 1);
+    ASSERT_TRUE(types[3].NumPtrs() == 1);
+    ASSERT_TRUE(types[4].NumPtrs() == 1);
+    ASSERT_TRUE(types[5].NumPtrs() == 1);
+    ASSERT_TRUE(types[6].NumPtrs() == 1);
+    ASSERT_TRUE(types[7].NumPtrs() == 1);
+    ASSERT_TRUE(types[8].NumPtrs() == 1);
+    ASSERT_TRUE(types[9].NumPtrs() == 1);
+    ASSERT_TRUE(types[10].NumPtrs() == 1);
+    ASSERT_TRUE(types[11].NumPtrs() == 1);
+    ASSERT_TRUE(types[12].NumPtrs() == 1);
+    ASSERT_TRUE(types[13].NumPtrs() == 1);
+    ASSERT_TRUE(types[14].NumPtrs() == 1);
+#endif
 
     // test create detached
     function = test->create(C);
@@ -535,21 +714,21 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     ASSERT_TRUE(ftype);
     ASSERT_TRUE(ftype->getReturnType()->isIntegerTy(64));
     ASSERT_EQ(15u, ftype->getNumParams());
-    ASSERT_TRUE(ftype->getParamType(0) == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 2)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(1) == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 2)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(2) == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(3) == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(4) == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 3)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(5) == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 3)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(6) == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 4)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(7) == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 4)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(8) == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 4)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(9) == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 9)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(10) == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 9)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(11) == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 9)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(12) == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 16)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(13) == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 16)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(14) == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 16)->getPointerTo());
+    ASSERT_TRUE(ftype->getParamType(0)  == llvm::PointerType::get(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 2), 0));
+    ASSERT_TRUE(ftype->getParamType(1)  == llvm::PointerType::get(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 2), 0));
+    ASSERT_TRUE(ftype->getParamType(2)  == llvm::PointerType::get(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2), 0));
+    ASSERT_TRUE(ftype->getParamType(3)  == llvm::PointerType::get(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3), 0));
+    ASSERT_TRUE(ftype->getParamType(4)  == llvm::PointerType::get(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 3), 0));
+    ASSERT_TRUE(ftype->getParamType(5)  == llvm::PointerType::get(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 3), 0));
+    ASSERT_TRUE(ftype->getParamType(6)  == llvm::PointerType::get(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 4), 0));
+    ASSERT_TRUE(ftype->getParamType(7)  == llvm::PointerType::get(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 4), 0));
+    ASSERT_TRUE(ftype->getParamType(8)  == llvm::PointerType::get(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 4), 0));
+    ASSERT_TRUE(ftype->getParamType(9)  == llvm::PointerType::get(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 9), 0));
+    ASSERT_TRUE(ftype->getParamType(10) == llvm::PointerType::get(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 9), 0));
+    ASSERT_TRUE(ftype->getParamType(11) == llvm::PointerType::get(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 9), 0));
+    ASSERT_TRUE(ftype->getParamType(12) == llvm::PointerType::get(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 16), 0));
+    ASSERT_TRUE(ftype->getParamType(13) == llvm::PointerType::get(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 16), 0));
+    ASSERT_TRUE(ftype->getParamType(14) == llvm::PointerType::get(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 16), 0));
     ASSERT_TRUE(function->getAttributes().isEmpty());
     delete function;
 
@@ -564,36 +743,59 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     // test print - note mat/i types are not ax types
     os.str("");
     test->print(C, os, "name", /*axtypes=*/true);
+#if LLVM_VERSION_MAJOR <= 15
     ASSERT_EQ(std::string("int64 name(vec2i; vec2f; vec2d; vec3i; vec3f; vec3d;"
         " vec4i; vec4f; vec4d; [9 x i32]*; mat3f; mat3d; [16 x i32]*; mat4f; mat4d)"),
         os.str());
+#else
+    ASSERT_EQ(std::string("int64 name(vec2i; vec2f; vec2d; vec3i; vec3f; vec3d;"
+        " vec4i; vec4f; vec4d; ptr; mat3f; mat3d; ptr; mat4f; mat4d)"),
+        os.str());
+#endif
 
     //
     // Test void ptr arguments
 
-    test.reset(new TestFunction({
-            llvm::Type::getVoidTy(C)->getPointerTo(),
-            llvm::Type::getVoidTy(C)->getPointerTo()->getPointerTo(),
-            llvm::Type::getVoidTy(C)->getPointerTo()->getPointerTo()->getPointerTo(),
-            llvm::Type::getFloatTy(C)->getPointerTo(),
-            llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo(),
-            llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo()->getPointerTo()
+    test.reset(new unittest_util::TestFunction({
+            ArgInfo(llvm::Type::getInt8Ty(C), 1),
+            ArgInfo(llvm::Type::getInt8Ty(C), 2),
+            ArgInfo(llvm::Type::getInt8Ty(C), 3),
+            ArgInfo(llvm::Type::getFloatTy(C), 1),
+            ArgInfo(llvm::Type::getFloatTy(C), 2),
+            ArgInfo(llvm::Type::getFloatTy(C), 3)
         },
-        llvm::Type::getVoidTy(C), "ax.vptrs.test"));
+        ArgInfo(llvm::Type::getVoidTy(C)), "ax.vptrs.test"));
     types.clear();
 
     // Note that C++ bindings will convert void* to i8* but they should be
     // unmodified in this example where we use the derived TestFunction
 
     type = test->types(types, C);
-    ASSERT_TRUE(type->isVoidTy());
     ASSERT_EQ(size_t(6), types.size());
-    ASSERT_TRUE(types[0] == llvm::Type::getVoidTy(C)->getPointerTo());
-    ASSERT_TRUE(types[1] == llvm::Type::getVoidTy(C)->getPointerTo()->getPointerTo());
-    ASSERT_TRUE(types[2] == llvm::Type::getVoidTy(C)->getPointerTo()->getPointerTo()->getPointerTo());
+
+#if LLVM_VERSION_MAJOR <= 15
+    ASSERT_TRUE(type->isVoidTy());
+    ASSERT_TRUE(types[0] == llvm::Type::getInt8Ty(C)->getPointerTo());
+    ASSERT_TRUE(types[1] == llvm::Type::getInt8Ty(C)->getPointerTo()->getPointerTo());
+    ASSERT_TRUE(types[2] == llvm::Type::getInt8Ty(C)->getPointerTo()->getPointerTo()->getPointerTo());
     ASSERT_TRUE(types[3] == llvm::Type::getFloatTy(C)->getPointerTo());
     ASSERT_TRUE(types[4] == llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo());
     ASSERT_TRUE(types[5] == llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo()->getPointerTo());
+#else
+    ASSERT_TRUE(type.IsVoid());
+    ASSERT_TRUE(types[0].GetUnderlyingType() == llvm::Type::getInt8Ty(C));
+    ASSERT_TRUE(types[1].GetUnderlyingType() == llvm::Type::getInt8Ty(C));
+    ASSERT_TRUE(types[2].GetUnderlyingType() == llvm::Type::getInt8Ty(C));
+    ASSERT_TRUE(types[3].GetUnderlyingType() == llvm::Type::getFloatTy(C));
+    ASSERT_TRUE(types[4].GetUnderlyingType() == llvm::Type::getFloatTy(C));
+    ASSERT_TRUE(types[5].GetUnderlyingType() == llvm::Type::getFloatTy(C));
+    ASSERT_TRUE(types[0].NumPtrs() == 1);
+    ASSERT_TRUE(types[1].NumPtrs() == 2);
+    ASSERT_TRUE(types[2].NumPtrs() == 3);
+    ASSERT_TRUE(types[3].NumPtrs() == 1);
+    ASSERT_TRUE(types[4].NumPtrs() == 2);
+    ASSERT_TRUE(types[5].NumPtrs() == 3);
+#endif
 
     // test create detached
     function = test->create(C);
@@ -606,12 +808,12 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     ASSERT_TRUE(ftype);
     ASSERT_TRUE(ftype->getReturnType()->isVoidTy());
     ASSERT_EQ(6u, ftype->getNumParams());
-    ASSERT_TRUE(ftype->getParamType(0) == llvm::Type::getVoidTy(C)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(1) == llvm::Type::getVoidTy(C)->getPointerTo()->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(2) == llvm::Type::getVoidTy(C)->getPointerTo()->getPointerTo()->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(3) == llvm::Type::getFloatTy(C)->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(4) == llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(5) == llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo()->getPointerTo());
+    ASSERT_TRUE(ftype->getParamType(0) == llvm::PointerType::get(llvm::Type::getInt8Ty(C), 0));
+    ASSERT_TRUE(ftype->getParamType(1) == llvm::PointerType::get(llvm::PointerType::get(llvm::Type::getInt8Ty(C), 0), 0));
+    ASSERT_TRUE(ftype->getParamType(2) == llvm::PointerType::get(llvm::PointerType::get(llvm::PointerType::get(llvm::Type::getInt8Ty(C), 0), 0), 0));
+    ASSERT_TRUE(ftype->getParamType(3) == llvm::PointerType::get(llvm::Type::getFloatTy(C), 0));
+    ASSERT_TRUE(ftype->getParamType(4) == llvm::PointerType::get(llvm::PointerType::get(llvm::Type::getFloatTy(C), 0), 0));
+    ASSERT_TRUE(ftype->getParamType(5) == llvm::PointerType::get(llvm::PointerType::get(llvm::PointerType::get(llvm::Type::getFloatTy(C), 0), 0), 0));
     ASSERT_TRUE(function->getAttributes().isEmpty());
     delete function;
 
@@ -670,6 +872,11 @@ TEST_F(TestFunctionTypes, testFunctionCall)
 {
     using openvdb::ax::codegen::Function;
     using openvdb::ax::codegen::LLVMType;
+    using openvdb::ax::codegen::ArgInfo;
+    using openvdb::ax::codegen::ArgInfoVector;
+    using openvdb::ax::codegen::NativeArguments;
+    using openvdb::ax::codegen::Arguments;
+    using openvdb::ax::codegen::Value;
 
     //
 
@@ -680,12 +887,12 @@ TEST_F(TestFunctionTypes, testFunctionCall)
         llvm::IRBuilder<> B(state.scratchBlock());
         llvm::Function* BaseFunction = B.GetInsertBlock()->getParent();
 
-        Function::Ptr test(new TestFunction({llvm::Type::getInt32Ty(C)},
-            llvm::Type::getVoidTy(C), "ax.test"));
+        Function::Ptr test(new unittest_util::TestFunction({ArgInfo(llvm::Type::getInt32Ty(C))},
+            ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
 
         llvm::Function* function = test->create(M);
         llvm::Value* arg = B.getInt32(1);
-        llvm::Value* result = test->call({arg}, B, /*cast*/false);
+        llvm::Value* result = test->call({arg}, B);
         ASSERT_TRUE(result);
         llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(result);
         ASSERT_TRUE(call);
@@ -712,13 +919,13 @@ TEST_F(TestFunctionTypes, testFunctionCall)
         llvm::IRBuilder<> B(state.scratchBlock());
         llvm::Function* BaseFunction = B.GetInsertBlock()->getParent();
 
-        Function::Ptr test(new TestFunction({llvm::Type::getInt32Ty(C)},
-            llvm::Type::getVoidTy(C), "ax.test"));
+        Function::Ptr test(new unittest_util::TestFunction({ArgInfo(llvm::Type::getInt32Ty(C))},
+            ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
 
         // call first, then create
 
         llvm::Value* arg = B.getInt32(1);
-        llvm::Value* result = test->call({arg}, B, /*cast*/false);
+        llvm::Value* result = test->call({arg}, B);
         llvm::Function* function = test->create(M);
         ASSERT_TRUE(result);
         llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(result);
@@ -746,39 +953,20 @@ TEST_F(TestFunctionTypes, testFunctionCall)
     llvm::Module& M = state.module();
     llvm::IRBuilder<> B(state.scratchBlock());
 
-    Function::Ptr test(new TestFunction({
-            llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3)->getPointerTo(),   // vec3i
-            llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2)->getPointerTo(),  // vec2d
-            llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 9)->getPointerTo(),  // mat3d
-            llvm::Type::getInt32Ty(C), // int
-            llvm::Type::getInt64Ty(C), // int64
-            llvm::Type::getFloatTy(C)  // float
+    Function::Ptr test(new unittest_util::TestFunction({
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3), 1),   // vec3i
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2), 1),  // vec2d
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 9), 1),  // mat3d
+            ArgInfo(llvm::Type::getInt32Ty(C)), // int
+            ArgInfo(llvm::Type::getInt64Ty(C)), // int64
+            ArgInfo(llvm::Type::getFloatTy(C))  // float
         },
-        llvm::Type::getVoidTy(C),
+        ArgInfo(llvm::Type::getVoidTy(C)),
         "ax.test"));
-
-    std::vector<llvm::Type*> expected;
-    test->types(expected, C);
-
-    // default args
-
-    llvm::Value* f32c0 = LLVMType<float>::get(C, 0.0f); // float
-    llvm::Value* d64c0 = LLVMType<double>::get(C, 0.0); // double
-    llvm::Value* i32c1 = B.getInt32(1); // int
-    llvm::Value* i64c1 = B.getInt64(1); // int64
-    llvm::Value* vec3i = openvdb::ax::codegen::arrayPack({i32c1,i32c1,i32c1}, B); // vec3i
-    llvm::Value* vec2d = openvdb::ax::codegen::arrayPack({d64c0,d64c0},B); // vec2d
-    llvm::Value* mat3d = openvdb::ax::codegen::arrayPack({ d64c0,d64c0,d64c0,
-                                                            d64c0,d64c0,d64c0,
-                                                            d64c0,d64c0,d64c0
-                                                           }, B); // mat3d
-
-    std::vector<llvm::Value*> args{vec3i, vec2d, mat3d, i32c1, i64c1, f32c0};
 
     llvm::Function* function = test->create(M);
     finalizeFunction(B, function);
     VERIFY_FUNCTION_IR(function);
-
     // also finalize the current module function, but set the inset point
     // just above it so we can continue to verify IR during this test
     llvm::Value* inst = B.CreateRetVoid();
@@ -786,136 +974,280 @@ TEST_F(TestFunctionTypes, testFunctionCall)
     // the specified instruction.
     B.SetInsertPoint(llvm::cast<llvm::Instruction>(inst));
 
-    // test no casting needed for valid IR
+    // default args
 
-    llvm::Value* result = test->call(args, B, /*cast*/false);
-    ASSERT_TRUE(result);
-    llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(6u, getNumArgFromCallInst(call));
-    ASSERT_EQ(args[0], call->getArgOperand(0));
-    ASSERT_EQ(args[1], call->getArgOperand(1));
-    ASSERT_EQ(args[2], call->getArgOperand(2));
-    ASSERT_EQ(args[3], call->getArgOperand(3));
-    ASSERT_EQ(args[4], call->getArgOperand(4));
-    ASSERT_EQ(args[5], call->getArgOperand(5));
-    VERIFY_MODULE_IR(&M);
+    Value f32c0 = Value::Create<float>(C, 0);
+    Value d64c0 = Value::Create<double>(C, 0);
+    Value i32c1 = Value::Create<int32_t>(C, 0);
+    Value i64c1 = Value::Create<int64_t>(C, 0);
+    Value vec3i = Value::ScalarsToArray(B, {i32c1,i32c1,i32c1}); // vec3i
+    Value vec2d = Value::ScalarsToArray(B, {d64c0,d64c0}); // vec2d
+    Value mat3d = Value::ScalarsToArray(B, {
+        d64c0,d64c0,d64c0,
+        d64c0,d64c0,d64c0,
+        d64c0,d64c0,d64c0
+    }); // mat3d
 
-    // test no casting needed for valid IR, even with cast=true
+    {
+        // Different ways to provide the args
+        const NativeArguments nativeargs({vec3i, vec2d, mat3d, i32c1, i64c1, f32c0});
+        const Arguments args(nativeargs);
+        const std::vector<llvm::Value*> llvmargs = args.AsLLVMValues();
 
-    result = test->call(args, B, /*cast*/true);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(6u, getNumArgFromCallInst(call));
-    ASSERT_EQ(args[0], call->getArgOperand(0));
-    ASSERT_EQ(args[1], call->getArgOperand(1));
-    ASSERT_EQ(args[2], call->getArgOperand(2));
-    ASSERT_EQ(args[3], call->getArgOperand(3));
-    ASSERT_EQ(args[4], call->getArgOperand(4));
-    ASSERT_EQ(args[5], call->getArgOperand(5));
-    VERIFY_MODULE_IR(&M);
+        // test no casting needed for valid IR
+
+#if LLVM_VERSION_MAJOR <= 15
+        llvm::Value* llvmresult = test->call(llvmargs, B, /*cast*/false);
+#else
+        llvm::Value* llvmresult = test->call(llvmargs, B);
+#endif
+        ASSERT_TRUE(llvmresult);
+        llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(llvmresult);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(6u, getNumArgFromCallInst(call));
+        ASSERT_EQ(llvmargs[0], call->getArgOperand(0));
+        ASSERT_EQ(llvmargs[1], call->getArgOperand(1));
+        ASSERT_EQ(llvmargs[2], call->getArgOperand(2));
+        ASSERT_EQ(llvmargs[3], call->getArgOperand(3));
+        ASSERT_EQ(llvmargs[4], call->getArgOperand(4));
+        ASSERT_EQ(llvmargs[5], call->getArgOperand(5));
+        VERIFY_MODULE_IR(&M);
+
+        // test no casting needed for valid IR, even with cast=true
+
+#if LLVM_VERSION_MAJOR <= 15
+        llvmresult = test->call(llvmargs, B, /*cast*/true);
+        ASSERT_TRUE(llvmresult);
+        call = llvm::dyn_cast<llvm::CallInst>(llvmresult);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(6u, getNumArgFromCallInst(call));
+        ASSERT_EQ(llvmargs[0], call->getArgOperand(0));
+        ASSERT_EQ(llvmargs[1], call->getArgOperand(1));
+        ASSERT_EQ(llvmargs[2], call->getArgOperand(2));
+        ASSERT_EQ(llvmargs[3], call->getArgOperand(3));
+        ASSERT_EQ(llvmargs[4], call->getArgOperand(4));
+        ASSERT_EQ(llvmargs[5], call->getArgOperand(5));
+        VERIFY_MODULE_IR(&M);
+#endif
+
+        // Test using Argument containers
+
+        Value result = test->call(nativeargs, B);
+        ASSERT_TRUE(result);
+        call = llvm::dyn_cast<llvm::CallInst>(result.GetValue());
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(6u, getNumArgFromCallInst(call));
+        ASSERT_EQ(nativeargs[0].GetValue(), call->getArgOperand(0));
+        ASSERT_EQ(nativeargs[1].GetValue(), call->getArgOperand(1));
+        ASSERT_EQ(nativeargs[2].GetValue(), call->getArgOperand(2));
+        ASSERT_EQ(nativeargs[3].GetValue(), call->getArgOperand(3));
+        ASSERT_EQ(nativeargs[4].GetValue(), call->getArgOperand(4));
+        ASSERT_EQ(nativeargs[5].GetValue(), call->getArgOperand(5));
+        VERIFY_MODULE_IR(&M);
+
+
+        result = test->call(args, B);
+        ASSERT_TRUE(result);
+        call = llvm::dyn_cast<llvm::CallInst>(result.GetValue());
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(6u, getNumArgFromCallInst(call));
+        ASSERT_EQ(args[0], call->getArgOperand(0));
+        ASSERT_EQ(args[1], call->getArgOperand(1));
+        ASSERT_EQ(args[2], call->getArgOperand(2));
+        ASSERT_EQ(args[3], call->getArgOperand(3));
+        ASSERT_EQ(args[4], call->getArgOperand(4));
+        ASSERT_EQ(args[5], call->getArgOperand(5));
+        VERIFY_MODULE_IR(&M);
+    }
+
+#if LLVM_VERSION_MAJOR <= 15
+    std::vector<llvm::Type*> expected;
+    test->types(expected, C);
+#endif
+
+    ArgInfoVector arginfo;
+    test->types(arginfo, C);
 
     //
 
     // Test different types of valid casting
 
-    llvm::Value* i1c0 = LLVMType<bool>::get(C, true); // bool
-    llvm::Value* vec3f = openvdb::ax::codegen::arrayPack({f32c0,f32c0,f32c0}, B); // vec3f
-    llvm::Value* vec3d = openvdb::ax::codegen::arrayPack({d64c0,d64c0,d64c0}, B); // vec3d
-    llvm::Value* vec2f = openvdb::ax::codegen::arrayPack({f32c0,f32c0},B); // vec2f
-    llvm::Value* vec2i = openvdb::ax::codegen::arrayPack({i32c1,i32c1},B); // vecid
-    llvm::Value* mat3f = openvdb::ax::codegen::arrayPack({ f32c0,f32c0,f32c0,
-                                                            f32c0,f32c0,f32c0,
-                                                            f32c0,f32c0,f32c0
-                                                           }, B); // mat3f
+    Value i1c0  = Value::Create<bool>(C, true);
+    Value vec3f = Value::ScalarsToArray(B, {f32c0,f32c0,f32c0}); // vec3f
+    Value vec3d = Value::ScalarsToArray(B, {d64c0,d64c0,d64c0}); // vec3d
+    Value vec2f = Value::ScalarsToArray(B, {f32c0,f32c0}); // vec2f
+    Value vec2i = Value::ScalarsToArray(B, {i32c1,i32c1}); // vecid
+    Value mat3f = Value::ScalarsToArray(B, {
+        f32c0,f32c0,f32c0,
+        f32c0,f32c0,f32c0,
+        f32c0,f32c0,f32c0
+    }); // mat3f
     //
 
-    std::vector<llvm::Value*> argsToCast;
-    argsToCast.emplace_back(vec3f); // vec3f
-    argsToCast.emplace_back(vec2f); // vec2f
-    argsToCast.emplace_back(mat3f); // mat3f
-    argsToCast.emplace_back(i1c0); // bool
-    argsToCast.emplace_back(i1c0); // bool
-    argsToCast.emplace_back(i1c0); // bool
+    {
+        const NativeArguments nativeargs({vec3f, vec2f, mat3f, i1c0, i1c0, i1c0});
+        llvm::CallInst* call;
 
-    result = test->call(argsToCast, B, /*cast*/true);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(6u, getNumArgFromCallInst(call));
-    ASSERT_TRUE(argsToCast[0] != call->getArgOperand(0));
-    ASSERT_TRUE(argsToCast[1] != call->getArgOperand(1));
-    ASSERT_TRUE(argsToCast[2] != call->getArgOperand(2));
-    ASSERT_TRUE(argsToCast[3] != call->getArgOperand(3));
-    ASSERT_TRUE(argsToCast[4] != call->getArgOperand(4));
-    ASSERT_TRUE(argsToCast[5] != call->getArgOperand(5));
-    ASSERT_TRUE(expected[0] == call->getArgOperand(0)->getType());
-    ASSERT_TRUE(expected[1] == call->getArgOperand(1)->getType());
-    ASSERT_TRUE(expected[2] == call->getArgOperand(2)->getType());
-    ASSERT_TRUE(expected[3] == call->getArgOperand(3)->getType());
-    ASSERT_TRUE(expected[4] == call->getArgOperand(4)->getType());
-    ASSERT_TRUE(expected[5] == call->getArgOperand(5)->getType());
-    VERIFY_MODULE_IR(&M);
+#if LLVM_VERSION_MAJOR <= 15
+        const Arguments args(nativeargs);
+        const std::vector<llvm::Value*> llvmargs = args.AsLLVMValues();
+        llvm::Value* llvmresult = test->call(llvmargs, B, /*cast*/true);
+        ASSERT_TRUE(llvmresult);
+        call = llvm::dyn_cast<llvm::CallInst>(llvmresult);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(6u, getNumArgFromCallInst(call));
+        ASSERT_TRUE(llvmargs[0] != call->getArgOperand(0));
+        ASSERT_TRUE(llvmargs[1] != call->getArgOperand(1));
+        ASSERT_TRUE(llvmargs[2] != call->getArgOperand(2));
+        ASSERT_TRUE(llvmargs[3] != call->getArgOperand(3));
+        ASSERT_TRUE(llvmargs[4] != call->getArgOperand(4));
+        ASSERT_TRUE(llvmargs[5] != call->getArgOperand(5));
+        ASSERT_TRUE(expected[0] == call->getArgOperand(0)->getType());
+        ASSERT_TRUE(expected[1] == call->getArgOperand(1)->getType());
+        ASSERT_TRUE(expected[2] == call->getArgOperand(2)->getType());
+        ASSERT_TRUE(expected[3] == call->getArgOperand(3)->getType());
+        ASSERT_TRUE(expected[4] == call->getArgOperand(4)->getType());
+        ASSERT_TRUE(expected[5] == call->getArgOperand(5)->getType());
+        ASSERT_TRUE(arginfo[0].GetType() == call->getArgOperand(0)->getType());
+        ASSERT_TRUE(arginfo[1].GetType() == call->getArgOperand(1)->getType());
+        ASSERT_TRUE(arginfo[2].GetType() == call->getArgOperand(2)->getType());
+        ASSERT_TRUE(arginfo[3].GetType() == call->getArgOperand(3)->getType());
+        ASSERT_TRUE(arginfo[4].GetType() == call->getArgOperand(4)->getType());
+        ASSERT_TRUE(arginfo[5].GetType() == call->getArgOperand(5)->getType());
+        VERIFY_MODULE_IR(&M);
+#endif
 
-    //
-
-    argsToCast.clear();
-    argsToCast.emplace_back(vec3d); // vec3d
-    argsToCast.emplace_back(vec2i); // vec2i
-    argsToCast.emplace_back(mat3d); // mat3d - no cast required
-    argsToCast.emplace_back(f32c0); // float
-    argsToCast.emplace_back(f32c0); // float
-    argsToCast.emplace_back(f32c0); // float - no cast required
-
-    result = test->call(argsToCast, B, /*cast*/true);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(6u, getNumArgFromCallInst(call));
-    ASSERT_TRUE(argsToCast[0] != call->getArgOperand(0));
-    ASSERT_TRUE(argsToCast[1] != call->getArgOperand(1));
-    ASSERT_EQ(args[2], call->getArgOperand(2));
-    ASSERT_TRUE(argsToCast[3] != call->getArgOperand(3));
-    ASSERT_TRUE(argsToCast[4] != call->getArgOperand(4));
-    ASSERT_EQ(args[5], call->getArgOperand(5));
-    ASSERT_TRUE(expected[0] == call->getArgOperand(0)->getType());
-    ASSERT_TRUE(expected[1] == call->getArgOperand(1)->getType());
-    ASSERT_TRUE(expected[3] == call->getArgOperand(3)->getType());
-    ASSERT_TRUE(expected[4] == call->getArgOperand(4)->getType());
-    VERIFY_MODULE_IR(&M);
-
-    //
-
-    argsToCast.clear();
-    argsToCast.emplace_back(vec3i); // vec3i - no cast required
-    argsToCast.emplace_back(vec2d); // vec2d - no cast required
-    argsToCast.emplace_back(mat3d); // mat3d - no cast required
-    argsToCast.emplace_back(i64c1); // int64
-    argsToCast.emplace_back(i64c1); // int64 - no cast required
-    argsToCast.emplace_back(i64c1); // int64
-
-    result = test->call(argsToCast, B, /*cast*/true);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(6u, getNumArgFromCallInst(call));
-    ASSERT_EQ(args[0], call->getArgOperand(0));
-    ASSERT_EQ(args[1], call->getArgOperand(1));
-    ASSERT_EQ(args[2], call->getArgOperand(2));
-    ASSERT_TRUE(argsToCast[3] != call->getArgOperand(3));
-    ASSERT_EQ(args[4], call->getArgOperand(4));
-    ASSERT_TRUE(argsToCast[5] != call->getArgOperand(5));
-    ASSERT_TRUE(expected[3] == call->getArgOperand(3)->getType());
-    ASSERT_TRUE(expected[5] == call->getArgOperand(5)->getType());
-    VERIFY_MODULE_IR(&M);
+        Value result = test->call(nativeargs, B);
+        ASSERT_TRUE(result);
+        call = llvm::dyn_cast<llvm::CallInst>(result.GetValue());
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(6u, getNumArgFromCallInst(call));
+        ASSERT_TRUE(nativeargs[0].GetValue() != call->getArgOperand(0));
+        ASSERT_TRUE(nativeargs[1].GetValue() != call->getArgOperand(1));
+        ASSERT_TRUE(nativeargs[2].GetValue() != call->getArgOperand(2));
+        ASSERT_TRUE(nativeargs[3].GetValue() != call->getArgOperand(3));
+        ASSERT_TRUE(nativeargs[4].GetValue() != call->getArgOperand(4));
+        ASSERT_TRUE(nativeargs[5].GetValue() != call->getArgOperand(5));
+        ASSERT_TRUE(arginfo[0].GetType() == call->getArgOperand(0)->getType());
+        ASSERT_TRUE(arginfo[1].GetType() == call->getArgOperand(1)->getType());
+        ASSERT_TRUE(arginfo[2].GetType() == call->getArgOperand(2)->getType());
+        ASSERT_TRUE(arginfo[3].GetType() == call->getArgOperand(3)->getType());
+        ASSERT_TRUE(arginfo[4].GetType() == call->getArgOperand(4)->getType());
+        ASSERT_TRUE(arginfo[5].GetType() == call->getArgOperand(5)->getType());
+        VERIFY_MODULE_IR(&M);
+    }
 
     //
+
+    {
+        const NativeArguments nativeargs({
+            vec3d,
+            vec2i,
+            mat3d, // mat3d - no cast required
+            f32c0,
+            f32c0,
+            f32c0  // float - no cast required
+        });
+        llvm::CallInst* call;
+
+#if LLVM_VERSION_MAJOR <= 15
+        const Arguments args(nativeargs);
+        const std::vector<llvm::Value*> llvmargs = args.AsLLVMValues();
+        llvm::Value* llvmresult = test->call(llvmargs, B, /*cast*/true);
+        ASSERT_TRUE(llvmresult);
+        call = llvm::dyn_cast<llvm::CallInst>(llvmresult);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(6u, getNumArgFromCallInst(call));
+        ASSERT_TRUE(llvmargs[0] != call->getArgOperand(0));
+        ASSERT_TRUE(llvmargs[1] != call->getArgOperand(1));
+        ASSERT_EQ(llvmargs[2], call->getArgOperand(2)); // no cast
+        ASSERT_TRUE(llvmargs[3] != call->getArgOperand(3));
+        ASSERT_TRUE(llvmargs[4] != call->getArgOperand(4));
+        ASSERT_EQ(llvmargs[5], call->getArgOperand(5)); // no cast
+        ASSERT_TRUE(expected[0] == call->getArgOperand(0)->getType());
+        ASSERT_TRUE(expected[1] == call->getArgOperand(1)->getType());
+        ASSERT_TRUE(expected[3] == call->getArgOperand(3)->getType());
+        ASSERT_TRUE(expected[4] == call->getArgOperand(4)->getType());
+        ASSERT_TRUE(arginfo[0].GetType() == call->getArgOperand(0)->getType());
+        ASSERT_TRUE(arginfo[1].GetType() == call->getArgOperand(1)->getType());
+        ASSERT_TRUE(arginfo[3].GetType() == call->getArgOperand(3)->getType());
+        ASSERT_TRUE(arginfo[4].GetType() == call->getArgOperand(4)->getType());
+        VERIFY_MODULE_IR(&M);
+#endif
+
+        Value result = test->call(nativeargs, B);
+        ASSERT_TRUE(result);
+        call = llvm::dyn_cast<llvm::CallInst>(result.GetValue());
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(6u, getNumArgFromCallInst(call));
+        ASSERT_TRUE(nativeargs[0].GetValue() != call->getArgOperand(0));
+        ASSERT_TRUE(nativeargs[1].GetValue() != call->getArgOperand(1));
+        ASSERT_EQ(nativeargs[2].GetValue(), call->getArgOperand(2));
+        ASSERT_TRUE(nativeargs[3].GetValue() != call->getArgOperand(3));
+        ASSERT_TRUE(nativeargs[4].GetValue() != call->getArgOperand(4));
+        ASSERT_EQ(nativeargs[5].GetValue(), call->getArgOperand(5));
+        ASSERT_TRUE(arginfo[0].GetType() == call->getArgOperand(0)->getType());
+        ASSERT_TRUE(arginfo[1].GetType() == call->getArgOperand(1)->getType());
+        ASSERT_TRUE(arginfo[3].GetType() == call->getArgOperand(3)->getType());
+        ASSERT_TRUE(arginfo[4].GetType() == call->getArgOperand(4)->getType());
+        VERIFY_MODULE_IR(&M);
+    }
+
+    {
+        const NativeArguments nativeargs({
+            vec3i, // no cast required
+            vec2d, // no cast required
+            mat3d, // no cast required
+            i64c1, //
+            i64c1, // no cast required
+            i64c1  //
+        });
+        llvm::CallInst* call;
+
+#if LLVM_VERSION_MAJOR <= 15
+        const Arguments args(nativeargs);
+        const std::vector<llvm::Value*> llvmargs = args.AsLLVMValues();
+        llvm::Value* llvmresult = test->call(llvmargs, B, /*cast*/true);
+        ASSERT_TRUE(llvmresult);
+        call = llvm::dyn_cast<llvm::CallInst>(llvmresult);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(6u, getNumArgFromCallInst(call));
+        ASSERT_EQ(args[0], call->getArgOperand(0));
+        ASSERT_EQ(args[1], call->getArgOperand(1));
+        ASSERT_EQ(args[2], call->getArgOperand(2));
+        ASSERT_TRUE(args[3] != call->getArgOperand(3));
+        ASSERT_EQ(args[4], call->getArgOperand(4));
+        ASSERT_TRUE(args[5] != call->getArgOperand(5));
+        ASSERT_TRUE(expected[3] == call->getArgOperand(3)->getType());
+        ASSERT_TRUE(expected[5] == call->getArgOperand(5)->getType());
+        VERIFY_MODULE_IR(&M);
+#endif
+
+        Value result = test->call(nativeargs, B);
+        ASSERT_TRUE(result);
+        call = llvm::dyn_cast<llvm::CallInst>(result.GetValue());
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(6u, getNumArgFromCallInst(call));
+        ASSERT_EQ(nativeargs[0].GetValue(), call->getArgOperand(0));
+        ASSERT_EQ(nativeargs[1].GetValue(), call->getArgOperand(1));
+        ASSERT_EQ(nativeargs[2].GetValue(), call->getArgOperand(2));
+        ASSERT_TRUE(nativeargs[3].GetValue() != call->getArgOperand(3));
+        ASSERT_EQ(nativeargs[4].GetValue(), call->getArgOperand(4));
+        ASSERT_TRUE(nativeargs[5].GetValue() != call->getArgOperand(5));
+        ASSERT_TRUE(arginfo[3].GetType() == call->getArgOperand(3)->getType());
+        ASSERT_TRUE(arginfo[5].GetType() == call->getArgOperand(5)->getType());
+        VERIFY_MODULE_IR(&M);
+    }
 
     // Test that invalid IR is generated if casting cannot be performed.
     // This is just to test that call doesn't error or behave unexpectedly
@@ -923,253 +1255,313 @@ TEST_F(TestFunctionTypes, testFunctionCall)
     // Test called with castable arg but cast is false. Test arg is left
     // unchanged and IR is invalid due to signature size
 
-    result = test->call({vec3f}, B, /*cast*/false);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(1u, getNumArgFromCallInst(call));
-    // should be the same as cast is false
-    ASSERT_TRUE(vec3f == call->getArgOperand(0));
-    VERIFY_MODULE_IR_INVALID(&M);
+    {
+#ifdef OPENVDB_AX_NO_LLVM_ASSERTS // only test in release otherwise LLVM asserts
 
-    // Remove the bad instruction (and re-verify to double check)
-    call->eraseFromParent();
-    VERIFY_MODULE_IR(&M);
+        Arguments args;
+        args.AddArg(vec3f);
 
-    // Test called with castable arg with cast true. Test IR is invalid
-    // due to signature size
+#if LLVM_VERSION_MAJOR <= 15
+        llvm::Value* result = test->call(args.AsLLVMValues(), B, /*cast*/false);
+#else
+        llvm::Value* result = test->call(args, B).GetValue();
+#endif
+        ASSERT_TRUE(result);
+        auto call = llvm::dyn_cast<llvm::CallInst>(result);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(1u, getNumArgFromCallInst(call));
+        // should be the same as cast is false
+        ASSERT_TRUE(vec3f.GetValue() == call->getArgOperand(0));
+        VERIFY_MODULE_IR_INVALID(&M);
 
-    result = test->call({vec3f}, B, /*cast*/true);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(1u, getNumArgFromCallInst(call));
-    // shouldn't be the same as it should have been cast
-    ASSERT_TRUE(vec3f != call->getArgOperand(0));
-    ASSERT_TRUE(expected[0] == call->getArgOperand(0)->getType());
-    VERIFY_MODULE_IR_INVALID(&M);
+        // Remove the bad instruction (and re-verify to double check)
+        call->eraseFromParent();
+        VERIFY_MODULE_IR(&M);
 
-    // Remove the bad instruction (and re-verify to double check)
-    call->eraseFromParent();
-    VERIFY_MODULE_IR(&M);
+        // Test called with castable arg with cast true. Test IR is invalid
+        // due to signature size
 
-    // Test called with non castable args, but matchign signature size.
-    // Test IR is invalid due to cast being off
+#if LLVM_VERSION_MAJOR <= 15
+        result = test->call(args.AsLLVMValues(), B, /*cast*/true);
+#else
+        result = test->call(args, B).GetValue();
+#endif
+        ASSERT_TRUE(result);
+        call = llvm::dyn_cast<llvm::CallInst>(result);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(1u, getNumArgFromCallInst(call));
+#if LLVM_VERSION_MAJOR <= 15
+        // shouldn't be the same as it should have been cast
+        ASSERT_TRUE(vec3f.GetValue() != call->getArgOperand(0));
+        ASSERT_TRUE(expected[0] == call->getArgOperand(0)->getType());
+#endif
+        VERIFY_MODULE_IR_INVALID(&M);
 
-    result = test->call(argsToCast, B, /*cast*/false);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(6u, getNumArgFromCallInst(call));
-    // no casting, args should match operands
-    ASSERT_TRUE(argsToCast[0] == call->getArgOperand(0));
-    ASSERT_TRUE(argsToCast[1] == call->getArgOperand(1));
-    ASSERT_TRUE(argsToCast[2] == call->getArgOperand(2));
-    ASSERT_TRUE(argsToCast[3] == call->getArgOperand(3));
-    ASSERT_TRUE(argsToCast[4] == call->getArgOperand(4));
-    ASSERT_TRUE(argsToCast[5] == call->getArgOperand(5));
-    VERIFY_MODULE_IR_INVALID(&M);
+        // Remove the bad instruction (and re-verify to double check)
+        call->eraseFromParent();
+        VERIFY_MODULE_IR(&M);
 
-    // Remove the bad instruction (and re-verify to double check)
-    call->eraseFromParent();
-    VERIFY_MODULE_IR(&M);
+        // Test called with non castable args, but matching signature size.
+        // Test IR is invalid due to cast being off
+
+        const NativeArguments nativeargs({vec3i,vec2d,mat3d,i64c1,i64c1,i64c1});
+        args = Arguments(nativeargs);
+#if LLVM_VERSION_MAJOR <= 15
+        result = test->call(args.AsLLVMValues(), B, /*cast*/false);
+#else
+        result = test->call(args, B).GetValue();
+#endif
+        ASSERT_TRUE(result);
+        call = llvm::dyn_cast<llvm::CallInst>(result);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(6u, getNumArgFromCallInst(call));
+        // no casting, args should match operands
+        ASSERT_TRUE(args[0] == call->getArgOperand(0));
+        ASSERT_TRUE(args[1] == call->getArgOperand(1));
+        ASSERT_TRUE(args[2] == call->getArgOperand(2));
+        ASSERT_TRUE(args[3] == call->getArgOperand(3));
+        ASSERT_TRUE(args[4] == call->getArgOperand(4));
+        ASSERT_TRUE(args[5] == call->getArgOperand(5));
+        VERIFY_MODULE_IR_INVALID(&M);
+
+        // Remove the bad instruction (and re-verify to double check)
+        call->eraseFromParent();
+        VERIFY_MODULE_IR(&M);
+#endif
+    }
 
     //
     // Test strings
+    {
+        llvm::Type* axstr = LLVMType<openvdb::ax::codegen::String>::get(C);
+        llvm::Type* chars = LLVMType<char>::get(C);  // char
 
-    llvm::Type* axstr = LLVMType<openvdb::ax::codegen::String*>::get(C);  // str*
-    llvm::Type* chars = LLVMType<char*>::get(C);  // char*
+        // build values
 
-    // build values
+        llvm::Value* chararray = B.CreateGlobalStringPtr("tmp"); // char*
+        // @note  non-safer initialization of strings
+        llvm::Value* strptr = B.CreateAlloca(LLVMType<openvdb::ax::codegen::String>::get(C)); // str*
 
-    llvm::Value* chararray = B.CreateGlobalStringPtr("tmp"); // char*
-    // @note  non-safer initialization of strings
-    llvm::Value* strptr = B.CreateAlloca(LLVMType<openvdb::ax::codegen::String>::get(C)); // str*
+        // void ax.str.test(openvdb::ax::codegen::String*, char*)
+        test.reset(new unittest_util::TestFunction({
+                ArgInfo(axstr, 1),
+                ArgInfo(chars, 1)
+            },
+            ArgInfo(llvm::Type::getVoidTy(C)),
+            "ax.str.test"));
 
-    // void ax.str.test(openvdb::ax::codegen::String*, char*)
-    test.reset(new TestFunction({axstr, chars},
-        llvm::Type::getVoidTy(C),
-        "ax.str.test"));
+        Arguments args;
+        args.AddArg(strptr, ArgInfo(axstr, 1));
+        args.AddArg(chararray, ArgInfo(chars, 1));
 
-    std::vector<llvm::Value*> stringArgs{strptr, chararray};
+        function = test->create(M);
+        finalizeFunction(B, function);
+        VERIFY_FUNCTION_IR(function);
 
-    function = test->create(M);
-    finalizeFunction(B, function);
-    VERIFY_FUNCTION_IR(function);
+#if LLVM_VERSION_MAJOR <= 15
+        llvm::Value* result = test->call(args.AsLLVMValues(), B, /*cast*/false);
+#else
+        llvm::Value* result = test->call(args, B).GetValue();
+#endif
+        ASSERT_TRUE(result);
+        llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(result);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(2u, getNumArgFromCallInst(call));
+        ASSERT_TRUE(args[0] == call->getArgOperand(0));
+        ASSERT_TRUE(args[1] == call->getArgOperand(1));
 
-    result = test->call(stringArgs, B, /*cast*/false);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(2u, getNumArgFromCallInst(call));
-    ASSERT_TRUE(stringArgs[0] == call->getArgOperand(0));
-    ASSERT_TRUE(stringArgs[1] == call->getArgOperand(1));
+        //
 
-    //
+#if LLVM_VERSION_MAJOR <= 15
+        result = test->call(args.AsLLVMValues(), B, /*cast*/true);
+        ASSERT_TRUE(result);
+        call = llvm::dyn_cast<llvm::CallInst>(result);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(2u, getNumArgFromCallInst(call));
+        ASSERT_TRUE(args[0] == call->getArgOperand(0));
+        ASSERT_TRUE(args[1] == call->getArgOperand(1));
+#endif
 
-    result = test->call(stringArgs, B, /*cast*/true);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(2u, getNumArgFromCallInst(call));
-    ASSERT_TRUE(stringArgs[0] == call->getArgOperand(0));
-    ASSERT_TRUE(stringArgs[1] == call->getArgOperand(1));
+        // Test openvdb::ax::codegen::String -> char*
+        NativeArguments strargs;
+        strargs.AddArg(Value(strptr, axstr));
+        strargs.AddArg(Value(strptr, axstr));
 
-    // Test openvdb::ax::codegen::String -> char*
+#if LLVM_VERSION_MAJOR <= 15
+        result = test->call(Arguments(strargs).AsLLVMValues(), B, /*cast*/true);
+#else
+        result = test->call(strargs, B).GetValue();
+#endif
+        ASSERT_TRUE(result);
+        call = llvm::dyn_cast<llvm::CallInst>(result);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(2u, getNumArgFromCallInst(call));
+        ASSERT_TRUE(args[0] == call->getArgOperand(0));
+        ASSERT_TRUE(args[1] != call->getArgOperand(1));
+        VERIFY_MODULE_IR(&M);
 
-    stringArgs[0] = strptr;
-    stringArgs[1] = strptr;
+        // Test char* does not cast to openvdb::ax::codegen::String
 
-    result = test->call(stringArgs, B, /*cast*/true);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(2u, getNumArgFromCallInst(call));
-    ASSERT_TRUE(stringArgs[0] == call->getArgOperand(0));
-    ASSERT_TRUE(stringArgs[1] != call->getArgOperand(1));
-    ASSERT_TRUE(chars == call->getArgOperand(1)->getType());
+#ifdef OPENVDB_AX_NO_LLVM_ASSERTS // only test in release otherwise LLVM asserts
+        Arguments charargs;
+        charargs.AddArg(chararray, ArgInfo(chars, 1));
+        charargs.AddArg(chararray, ArgInfo(chars, 1));
 
-    VERIFY_MODULE_IR(&M);
+#if LLVM_VERSION_MAJOR <= 15
+        result = test->call(charargs.AsLLVMValues(), B, /*cast*/true);
+#else
+        result = test->call(charargs, B).GetValue();
+#endif
+        call = llvm::dyn_cast<llvm::CallInst>(result);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(2u, getNumArgFromCallInst(call));
+        // no valid casting
+        ASSERT_TRUE(charargs[0] == call->getArgOperand(0));
+        ASSERT_TRUE(charargs[1] == call->getArgOperand(1));
+        // The IR is actually valid from LLVM 16 as ptrs are opaque :|
+#if LLVM_VERSION_MAJOR <= 15
+        VERIFY_MODULE_IR_INVALID(&M);
+#endif
+        // Remove the bad instruction (and re-verify to double check)
+        call->eraseFromParent();
+        VERIFY_MODULE_IR(&M);
+#endif
+    }
 
-    // Test char* does not catch to openvdb::ax::codegen::String
-
-    stringArgs[0] = chararray;
-    stringArgs[1] = chararray;
-
-    result = test->call(stringArgs, B, /*cast*/true);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(2u, getNumArgFromCallInst(call));
-    // no valid casting
-    ASSERT_TRUE(stringArgs[0] == call->getArgOperand(0));
-    ASSERT_TRUE(stringArgs[1] == call->getArgOperand(1));
-
-    VERIFY_MODULE_IR_INVALID(&M);
-
-    // Remove the bad instruction (and re-verify to double check)
-    call->eraseFromParent();
-    VERIFY_MODULE_IR(&M);
-
-    //
     // Test ** pointers
 
-    test.reset(new TestFunction({
-            llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo(),
-            llvm::Type::getDoubleTy(C)->getPointerTo()->getPointerTo()
-        },
-        llvm::Type::getVoidTy(C),
-        "ax.ptrs.test"));
+    llvm::Value* fptr = B.CreateAlloca(llvm::PointerType::get(llvm::Type::getFloatTy(C), 0));
+    llvm::Value* dptr = B.CreateAlloca(llvm::PointerType::get(llvm::Type::getDoubleTy(C), 0));
 
-    function = test->create(M);
-    finalizeFunction(B, function);
-    VERIFY_FUNCTION_IR(function);
+    {
+        test.reset(new unittest_util::TestFunction({
+                ArgInfo(llvm::Type::getFloatTy(C), 2),
+                ArgInfo(llvm::Type::getDoubleTy(C), 2)
+            },
+            ArgInfo(llvm::Type::getVoidTy(C)),
+            "ax.ptrs.test"));
 
-    llvm::Value* fptr = B.CreateAlloca(llvm::Type::getFloatTy(C)->getPointerTo());
-    llvm::Value* dptr = B.CreateAlloca(llvm::Type::getDoubleTy(C)->getPointerTo());
+        function = test->create(M);
+        finalizeFunction(B, function);
+        VERIFY_FUNCTION_IR(function);
 
-    result = test->call({fptr, dptr}, B, /*cast*/false);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(2u, getNumArgFromCallInst(call));
-    ASSERT_TRUE(fptr == call->getArgOperand(0));
-    ASSERT_TRUE(dptr == call->getArgOperand(1));
+        Arguments args;
+        args.AddArg(fptr, ArgInfo(llvm::Type::getFloatTy(C), 1));
+        args.AddArg(dptr, ArgInfo(llvm::Type::getDoubleTy(C), 1));
 
-    VERIFY_MODULE_IR(&M);
+#if LLVM_VERSION_MAJOR <= 15
+        llvm::Value* result = test->call(Arguments(args).AsLLVMValues(), B, /*cast*/false);
+#else
+        llvm::Value* result = test->call(args, B).GetValue();
+#endif
+        ASSERT_TRUE(result);
+        llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(result);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(2u, getNumArgFromCallInst(call));
+        ASSERT_TRUE(fptr == call->getArgOperand(0));
+        ASSERT_TRUE(dptr == call->getArgOperand(1));
+        VERIFY_MODULE_IR(&M);
 
-    //
+        //
 
-    result = test->call({fptr, dptr}, B, /*cast*/true);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(2u, getNumArgFromCallInst(call));
-    ASSERT_TRUE(fptr == call->getArgOperand(0));
-    ASSERT_TRUE(dptr == call->getArgOperand(1));
+#if LLVM_VERSION_MAJOR <= 15 // non native ** args, no casting
+        result = test->call({fptr, dptr}, B, /*cast*/true);
+        ASSERT_TRUE(result);
+        call = llvm::dyn_cast<llvm::CallInst>(result);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(2u, getNumArgFromCallInst(call));
+        ASSERT_TRUE(fptr == call->getArgOperand(0));
+        ASSERT_TRUE(dptr == call->getArgOperand(1));
+        VERIFY_MODULE_IR(&M);
+#ifdef OPENVDB_AX_NO_LLVM_ASSERTS // only test in release otherwise LLVM asserts
+        // switch the points, check no valid casting
+        result = test->call({dptr, fptr}, B, /*cast*/true);
+        ASSERT_TRUE(result);
+        call = llvm::dyn_cast<llvm::CallInst>(result);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(2u, getNumArgFromCallInst(call));
+        // args unaltered as casting is invalid
+        ASSERT_TRUE(dptr == call->getArgOperand(0));
+        ASSERT_TRUE(fptr == call->getArgOperand(1));
 
-    VERIFY_MODULE_IR(&M);
+        VERIFY_MODULE_IR_INVALID(&M);
+        // Remove the bad instruction (and re-verify to double check)
+        call->eraseFromParent();
+        VERIFY_MODULE_IR(&M);
+#endif
+#endif
+    }
 
-    // switch the points, check no valid casting
+    {
+        // Test void pointers
 
-    result = test->call({dptr, fptr}, B, /*cast*/true);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(2u, getNumArgFromCallInst(call));
-    // args unaltered as casting is invalid
-    ASSERT_TRUE(dptr == call->getArgOperand(0));
-    ASSERT_TRUE(fptr == call->getArgOperand(1));
+        test.reset(new unittest_util::TestFunction({
+                ArgInfo(LLVMType<int8_t>::get(C), 1),
+            },
+            ArgInfo(llvm::Type::getVoidTy(C)),
+            "ax.void.test"));
 
-    VERIFY_MODULE_IR_INVALID(&M);
+        function = test->create(M);
+        finalizeFunction(B, function);
+        VERIFY_FUNCTION_IR(function);
 
-    // Remove the bad instruction (and re-verify to double check)
-    call->eraseFromParent();
-    VERIFY_MODULE_IR(&M);
+        llvm::Value* vptrptr = B.CreateAlloca(LLVMType<void*>::get(C));
+        llvm::Value* vptr = B.CreateLoad(LLVMType<void*>::get(C), vptrptr);
 
-    //
-    // Test void pointers
+        Arguments args;
+        args.AddArg(vptr, ArgInfo(LLVMType<int8_t>::get(C), 1));
 
-    test.reset(new TestFunction({
-            LLVMType<void*>::get(C),
-        },
-        llvm::Type::getVoidTy(C),
-        "ax.void.test"));
+#if LLVM_VERSION_MAJOR <= 15
+        llvm::Value* result = test->call(Arguments(args).AsLLVMValues(), B, /*cast*/false);
+#else
+        llvm::Value* result = test->call(args, B).GetValue();
+#endif
+        ASSERT_TRUE(result);
+        llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(result);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(1u, getNumArgFromCallInst(call));
+        ASSERT_TRUE(vptr == call->getArgOperand(0));
+        VERIFY_MODULE_IR(&M);
 
-    function = test->create(M);
-    finalizeFunction(B, function);
-    VERIFY_FUNCTION_IR(function);
+        //
 
-    llvm::Value* vptrptr = B.CreateAlloca(LLVMType<void*>::get(C));
-    llvm::Value* vptr = openvdb::ax::codegen::ir_load(B, vptrptr);
+#if LLVM_VERSION_MAJOR <= 15 // non native ** args, no casting
+        result = test->call({vptr}, B, /*cast*/true);
+        ASSERT_TRUE(result);
+        call = llvm::dyn_cast<llvm::CallInst>(result);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(1u, getNumArgFromCallInst(call));
+        ASSERT_TRUE(vptr == call->getArgOperand(0));
+        VERIFY_MODULE_IR(&M);
 
-    result = test->call({vptr}, B, /*cast*/false);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(1u, getNumArgFromCallInst(call));
-    ASSERT_TRUE(vptr == call->getArgOperand(0));
-
-    VERIFY_MODULE_IR(&M);
-
-    //
-
-    result = test->call({vptr}, B, /*cast*/true);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(1u, getNumArgFromCallInst(call));
-    ASSERT_TRUE(vptr == call->getArgOperand(0));
-
-    VERIFY_MODULE_IR(&M);
-
-    // verify no cast from other pointers to void*
-
-    result = test->call({fptr}, B, /*cast*/true);
-    ASSERT_TRUE(result);
-    call = llvm::dyn_cast<llvm::CallInst>(result);
-    ASSERT_TRUE(call);
-    ASSERT_EQ(function, call->getCalledFunction());
-    ASSERT_EQ(1u, getNumArgFromCallInst(call));
-    ASSERT_TRUE(fptr == call->getArgOperand(0));
-
-    VERIFY_MODULE_IR_INVALID(&M);
-
-    // Remove the bad instruction (and re-verify to double check)
-    call->eraseFromParent();
-    VERIFY_MODULE_IR(&M);
+#ifdef OPENVDB_AX_NO_LLVM_ASSERTS // only test in release otherwise LLVM asserts
+        // verify no cast from other pointers to void*
+        result = test->call({fptr}, B, /*cast*/true);
+        ASSERT_TRUE(result);
+        call = llvm::dyn_cast<llvm::CallInst>(result);
+        ASSERT_TRUE(call);
+        ASSERT_EQ(function, call->getCalledFunction());
+        ASSERT_EQ(1u, getNumArgFromCallInst(call));
+        ASSERT_TRUE(fptr == call->getArgOperand(0));
+        VERIFY_MODULE_IR_INVALID(&M);
+        // Remove the bad instruction (and re-verify to double check)
+        call->eraseFromParent();
+        VERIFY_MODULE_IR(&M);
+#endif
+#endif
+    }
 }
 
 // Test Function::match
@@ -1177,45 +1569,47 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
 {
     using openvdb::ax::codegen::Function;
     using openvdb::ax::codegen::LLVMType;
+    using openvdb::ax::codegen::ArgInfo;
+    using openvdb::ax::codegen::ArgInfoVector;
 
     unittest_util::LLVMState state;
     llvm::LLVMContext& C = state.context();
     Function::SignatureMatch match;
 
-    const std::vector<llvm::Type*> scalars {
-        llvm::Type::getInt1Ty(C),   // bool
-        llvm::Type::getInt16Ty(C),  // int16
-        llvm::Type::getInt32Ty(C),  // int
-        llvm::Type::getInt64Ty(C),  // int64
-        llvm::Type::getFloatTy(C),  // float
-        llvm::Type::getDoubleTy(C)  // double
+    const ArgInfoVector scalars {
+        ArgInfo(llvm::Type::getInt1Ty(C)),   // bool
+        ArgInfo(llvm::Type::getInt16Ty(C)),  // int16
+        ArgInfo(llvm::Type::getInt32Ty(C)),  // int
+        ArgInfo(llvm::Type::getInt64Ty(C)),  // int64
+        ArgInfo(llvm::Type::getFloatTy(C)),  // float
+        ArgInfo(llvm::Type::getDoubleTy(C))  // double
     };
-    const std::vector<llvm::Type*> array2 {
-        llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 2)->getPointerTo(),    // vec2i
-        llvm::ArrayType::get(llvm::Type::getFloatTy(C), 2)->getPointerTo(),    // vec2f
-        llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2)->getPointerTo()    // vec2d
+    const ArgInfoVector array2 {
+        ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 2), 1),    // vec2i
+        ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 2), 1),    // vec2f
+        ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2), 1)    // vec2d
     };
-    const std::vector<llvm::Type*> array3 {
-        llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3)->getPointerTo(),    // vec3i
-        llvm::ArrayType::get(llvm::Type::getFloatTy(C), 3)->getPointerTo(),    // vec3f
-        llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 3)->getPointerTo()    // vec3d
+    const ArgInfoVector array3 {
+        ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3), 1),    // vec3i
+        ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 3), 1),    // vec3f
+        ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 3), 1)    // vec3d
     };
-    const std::vector<llvm::Type*> array4 {
-        llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 4)->getPointerTo(),    // vec3i
-        llvm::ArrayType::get(llvm::Type::getFloatTy(C), 4)->getPointerTo(),    // vec3f
-        llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 4)->getPointerTo()    // vec3d
+    const ArgInfoVector array4 {
+        ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 4), 1),    // vec3i
+        ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 4), 1),    // vec3f
+        ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 4), 1)    // vec3d
     };
-    const std::vector<llvm::Type*> array9 {
-        llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 9)->getPointerTo(),    // ix9 (not supported by ax)
-        llvm::ArrayType::get(llvm::Type::getFloatTy(C), 9)->getPointerTo(),    // mat3f
-        llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 9)->getPointerTo()    // mat3d
+    const ArgInfoVector array9 {
+        ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 9), 1),    // ix9 (not supported by ax)
+        ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 9), 1),    // mat3f
+        ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 9), 1)    // mat3d
     };
-    const std::vector<llvm::Type*> array16 {
-        llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 16)->getPointerTo(),    // ix16 (not supported by ax)
-        llvm::ArrayType::get(llvm::Type::getFloatTy(C), 16)->getPointerTo(),    // mat3f
-        llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 16)->getPointerTo()    // mat3d
+    const ArgInfoVector array16 {
+        ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 16), 1),    // ix16 (not supported by ax)
+        ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 16), 1),    // mat3f
+        ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 16), 1)    // mat3d
     };
-    const std::vector<std::vector<llvm::Type*>> arrays {
+    const std::vector<ArgInfoVector> arrays {
         array2,
         array3,
         array4,
@@ -1225,52 +1619,61 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
 
     // test empty explicit match
 
-    Function::Ptr test(new TestFunction({},
-        llvm::Type::getVoidTy(C), "ax.test"));
-    match = test->match({}, C);
+    Function::Ptr test(new unittest_util::TestFunction({},
+        ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
+#if LLVM_VERSION_MAJOR <= 15
+    match = test->match(std::vector<llvm::Type*>{}, C);
+    ASSERT_EQ(match, Function::Explicit);
+#endif
+    match = test->match(ArgInfoVector{}, C);
     ASSERT_EQ(match, Function::Explicit);
 
     //
 
-    std::vector<llvm::Type*> types;
-    types.insert(types.end(), scalars.begin(), scalars.end());
-    types.insert(types.end(), array2.begin(), array2.end());
-    types.insert(types.end(), array3.begin(), array3.end());
-    types.insert(types.end(), array4.begin(), array4.end());
-    types.insert(types.end(), array9.begin(), array9.end());
-    types.insert(types.end(), array16.begin(), array16.end());
-    types.insert(types.end(), LLVMType<openvdb::ax::codegen::String*>::get(C));
+    ArgInfoVector types;
+    for (auto& info : scalars) types.emplace_back(info);
+    for (auto& info : array2)  types.emplace_back(info);
+    for (auto& info : array3)  types.emplace_back(info);
+    for (auto& info : array4)  types.emplace_back(info);
+    for (auto& info : array9)  types.emplace_back(info);
+    for (auto& info : array16) types.emplace_back(info);
+    types.emplace_back(ArgInfo(LLVMType<openvdb::ax::codegen::String>::get(C), 1));
 
+#if LLVM_VERSION_MAJOR <= 15
     // check types are unique
-    ASSERT_EQ(std::set<llvm::Type*>(types.begin(), types.end()).size(), types.size());
+    {
+        auto llvmtypes = types.AsLLVMTypes();
+        ASSERT_EQ(std::set<llvm::Type*>(llvmtypes.begin(), llvmtypes.end()).size(), llvmtypes.size());
+    }
+#endif
 
     //
 
-    test.reset(new TestFunction({
-            llvm::Type::getInt1Ty(C),   // bool
-            llvm::Type::getInt16Ty(C),  // int16
-            llvm::Type::getInt32Ty(C),  // int32
-            llvm::Type::getInt64Ty(C),  // int64
-            llvm::Type::getFloatTy(C),  // float
-            llvm::Type::getDoubleTy(C), // double
-            llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 2)->getPointerTo(),    // vec2i
-            llvm::ArrayType::get(llvm::Type::getFloatTy(C), 2)->getPointerTo(),    // vec2f
-            llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2)->getPointerTo(),   // vec2d
-            llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3)->getPointerTo(),    // vec3i
-            llvm::ArrayType::get(llvm::Type::getFloatTy(C), 3)->getPointerTo(),    // vec3f
-            llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 3)->getPointerTo(),   // vec3d
-            llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 4)->getPointerTo(),    // vec4i
-            llvm::ArrayType::get(llvm::Type::getFloatTy(C), 4)->getPointerTo(),    // vec4f
-            llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 4)->getPointerTo(),   // vec4d
-            llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 9)->getPointerTo(),    // ix9 (not supported by ax)
-            llvm::ArrayType::get(llvm::Type::getFloatTy(C), 9)->getPointerTo(),    // mat3f
-            llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 9)->getPointerTo(),   // mat3d
-            llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 16)->getPointerTo(),   // ix16 (not supported by ax)
-            llvm::ArrayType::get(llvm::Type::getFloatTy(C), 16)->getPointerTo(),   // mat4f
-            llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 16)->getPointerTo(),  // mat4d
-            LLVMType<openvdb::ax::codegen::String*>::get(C) // string
+    test.reset(new unittest_util::TestFunction({
+            ArgInfo(llvm::Type::getInt1Ty(C)),   // bool
+            ArgInfo(llvm::Type::getInt16Ty(C)),  // int16
+            ArgInfo(llvm::Type::getInt32Ty(C)),  // int32
+            ArgInfo(llvm::Type::getInt64Ty(C)),  // int64
+            ArgInfo(llvm::Type::getFloatTy(C)),  // float
+            ArgInfo(llvm::Type::getDoubleTy(C)), // double
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 2), 1),    // vec2i
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 2), 1),    // vec2f
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2), 1),   // vec2d
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3), 1),    // vec3i
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 3), 1),    // vec3f
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 3), 1),   // vec3d
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 4), 1),    // vec4i
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 4), 1),    // vec4f
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 4), 1),   // vec4d
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 9), 1),    // ix9 (not supported by ax)
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 9), 1),    // mat3f
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 9), 1),   // mat3d
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 16), 1),   // ix16 (not supported by ax)
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 16), 1),   // mat4f
+            ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 16), 1),  // mat4d
+            ArgInfo(LLVMType<openvdb::ax::codegen::String>::get(C), 1) // string
         },
-        llvm::Type::getVoidTy(C),
+        ArgInfo(llvm::Type::getVoidTy(C)),
         "ax.test"));
 
     match = test->match(types, C);
@@ -1279,26 +1682,41 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
     // test size match
 
     llvm::Type* i32t = llvm::Type::getInt32Ty(C);
-    test.reset(new TestFunction({i32t},
-        llvm::Type::getVoidTy(C), "ax.test"));
+    test.reset(new unittest_util::TestFunction({ArgInfo(i32t)},
+        ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
+#if LLVM_VERSION_MAJOR <= 15
     match = test->match({llvm::ArrayType::get(i32t, 1)->getPointerTo()}, C);
     ASSERT_EQ(match, Function::Size);
     match = test->match({i32t->getPointerTo()}, C);
     ASSERT_EQ(match, Function::Size);
+#endif
+
+    match = test->match({ArgInfo(llvm::ArrayType::get(i32t, 1))}, C);
+    ASSERT_EQ(match, Function::Size);
+    match = test->match({ArgInfo(llvm::ArrayType::get(i32t, 1), 1)}, C);
+    ASSERT_EQ(match, Function::Size);
+    match = test->match({ArgInfo(i32t, 1)}, C);
+    ASSERT_EQ(match, Function::Size);
 
     // test no match
 
-    match = test->match({}, C);
+#if LLVM_VERSION_MAJOR <= 15
+    match = test->match(std::vector<llvm::Type*>{}, C);
     ASSERT_EQ(Function::None, match);
     match = test->match({i32t, i32t}, C);
+    ASSERT_EQ(Function::None, match);
+#endif
+    match = test->match(ArgInfoVector{}, C);
+    ASSERT_EQ(Function::None, match);
+    match = test->match(ArgInfoVector{ArgInfo(i32t), ArgInfo(i32t)}, C);
     ASSERT_EQ(Function::None, match);
 
     // test scalar matches
 
    for (size_t i = 0; i < scalars.size(); ++i) {
-        test.reset(new TestFunction({scalars[i]}, llvm::Type::getVoidTy(C), "ax.test"));
-        std::vector<llvm::Type*> copy(scalars);
-        std::swap(copy[i], copy.back());
+        test.reset(new unittest_util::TestFunction({scalars[i]}, ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
+        ArgInfoVector copy(scalars);
+        copy[i] = copy.back();
         copy.pop_back();
         ASSERT_EQ(size_t(5), copy.size());
         ASSERT_EQ(Function::Explicit, test->match({scalars[i]}, C));
@@ -1312,12 +1730,12 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
    //
    // Test array matches - no implicit cast as operands are not marked as readonly
 
-   for (const std::vector<llvm::Type*>& types : arrays) {
+   for (const auto& types : arrays) {
         // test these array types
         for (size_t i = 0; i < types.size(); ++i) {
-            test.reset(new TestFunction({types[i]}, llvm::Type::getVoidTy(C), "ax.test"));
-            std::vector<llvm::Type*> copy(types);
-            std::swap(copy[i], copy.back());
+            test.reset(new unittest_util::TestFunction({types[i]}, ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
+            ArgInfoVector copy(types);
+            copy[i] = copy.back();
             copy.pop_back();
             ASSERT_EQ(size_t(2), copy.size());
             ASSERT_EQ(Function::Explicit, test->match({types[i]}, C));
@@ -1325,7 +1743,7 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
             ASSERT_EQ(Function::Size, test->match({copy[1]}, C));
 
             // test non matching size arrays
-            for (const std::vector<llvm::Type*>& inputs : arrays) {
+            for (const ArgInfoVector& inputs : arrays) {
                 if (&types == &inputs) continue;
                 for (size_t i = 0; i < inputs.size(); ++i) {
                     ASSERT_EQ(Function::Size, test->match({inputs[i]}, C));
@@ -1337,13 +1755,13 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
    //
    // Test array matches with readonly marking
 
-   for (const std::vector<llvm::Type*>& types : arrays) {
+   for (const ArgInfoVector& types : arrays) {
         // test these array types
         for (size_t i = 0; i < types.size(); ++i) {
-            test.reset(new TestFunction({types[i]}, llvm::Type::getVoidTy(C), "ax.test"));
+            test.reset(new unittest_util::TestFunction({types[i]}, ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
             test->setParamAttributes(0, {llvm::Attribute::ReadOnly});
-            std::vector<llvm::Type*> copy(types);
-            std::swap(copy[i], copy.back());
+            ArgInfoVector copy(types);
+            copy[i] = copy.back();
             copy.pop_back();
             ASSERT_EQ(size_t(2), copy.size());
             ASSERT_EQ(Function::Explicit, test->match({types[i]}, C));
@@ -1351,7 +1769,7 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
             ASSERT_EQ(Function::Implicit, test->match({copy[1]}, C));
 
             // test non matching size arrays
-            for (const std::vector<llvm::Type*>& inputs : arrays) {
+            for (const ArgInfoVector& inputs : arrays) {
                 if (&types == &inputs) continue;
                 for (size_t i = 0; i < inputs.size(); ++i) {
                     ASSERT_EQ(Function::Size, test->match({inputs[i]}, C));
@@ -1361,54 +1779,61 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
     }
 
     // test strings
+    {
+        test.reset(new unittest_util::TestFunction({ArgInfo(LLVMType<char>::get(C), 1)},
+            ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
+        ASSERT_EQ(Function::Size,
+            test->match({ArgInfo(LLVMType<openvdb::ax::codegen::String>::get(C), 1)}, C));
+        ASSERT_EQ(Function::Explicit,
+            test->match({ArgInfo(LLVMType<char>::get(C), 1)}, C));
 
-    test.reset(new TestFunction({LLVMType<char*>::get(C)},
-        llvm::Type::getVoidTy(C), "ax.test"));
-    ASSERT_EQ(Function::Size,
-        test->match({LLVMType<openvdb::ax::codegen::String*>::get(C)}, C));
-    ASSERT_EQ(Function::Explicit,
-        test->match({LLVMType<char*>::get(C)}, C));
+        test->setParamAttributes(0, {llvm::Attribute::ReadOnly});
+        ASSERT_EQ(Function::Implicit,
+            test->match({ArgInfo(LLVMType<openvdb::ax::codegen::String>::get(C), 1)}, C));
 
-    test->setParamAttributes(0, {llvm::Attribute::ReadOnly});
-    ASSERT_EQ(Function::Implicit,
-        test->match({LLVMType<openvdb::ax::codegen::String*>::get(C)}, C));
-
-    test.reset(new TestFunction({LLVMType<openvdb::ax::codegen::String*>::get(C)},
-        llvm::Type::getVoidTy(C), "ax.test"));
-    ASSERT_EQ(Function::Size,
-        test->match({LLVMType<char*>::get(C)}, C));
+        test.reset(new unittest_util::TestFunction({ArgInfo(LLVMType<openvdb::ax::codegen::String>::get(C), 1)},
+            ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
+        ASSERT_EQ(Function::Size,
+            test->match({ArgInfo(LLVMType<char>::get(C), 1)}, C));
+    }
 
     // test pointers
+    {
+        ArgInfo fss(llvm::Type::getFloatTy(C), 2);
+        ArgInfo dss(llvm::Type::getDoubleTy(C), 2);
 
-    llvm::Type* fss = llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo();
-    llvm::Type* dss = llvm::Type::getDoubleTy(C)->getPointerTo()->getPointerTo();
+        test.reset(new unittest_util::TestFunction({fss, dss},
+            ArgInfo(llvm::Type::getVoidTy(C)),
+            "ax.ptrs.test"));
 
-    test.reset(new TestFunction({fss, dss},
-        llvm::Type::getVoidTy(C),
-        "ax.ptrs.test"));
+        ASSERT_EQ(Function::Explicit,
+            test->match({fss, dss}, C));
+        ASSERT_EQ(Function::Size,
+            test->match({fss, fss}, C));
 
-    ASSERT_EQ(Function::Explicit,
-        test->match({fss, dss}, C));
-    ASSERT_EQ(Function::Size,
-        test->match({fss, fss}, C));
+        // Even if pointers are marked as readonly, casting is not supported
+        test->setParamAttributes(0, {llvm::Attribute::ReadOnly});
+        test->setParamAttributes(1, {llvm::Attribute::ReadOnly});
 
-    // Even if pointers are marked as readonly, casting is not supported
-    test->setParamAttributes(0, {llvm::Attribute::ReadOnly});
-    test->setParamAttributes(1, {llvm::Attribute::ReadOnly});
-
-    ASSERT_EQ(Function::Size,
-        test->match({fss, fss}, C));
+        ASSERT_EQ(Function::Size,
+            test->match({fss, fss}, C));
+    }
 }
 
 // Test derived CFunctions, mainly CFunction::create and CFunction::types
 TEST_F(TestFunctionTypes, testCFunctions)
 {
     using openvdb::ax::codegen::CFunction;
+    using openvdb::ax::codegen::ArgInfo;
+    using openvdb::ax::codegen::ArgInfoVector;
 
     unittest_util::LLVMState state;
     llvm::LLVMContext& C = state.context();
-    llvm::Type* returnType = nullptr;
+#if LLVM_VERSION_MAJOR <= 15
     std::vector<llvm::Type*> types;
+#else
+    ArgInfoVector types;
+#endif
 
     // test basic creation
 
@@ -1476,58 +1901,95 @@ TEST_F(TestFunctionTypes, testCFunctions)
 
     // test scalar arguments
 
-    returnType = scalars.types(types, C);
-    ASSERT_TRUE(returnType->isIntegerTy(16));
+    auto returnType = scalars.types(types, C);
     ASSERT_EQ(size_t(6), types.size());
+#if LLVM_VERSION_MAJOR <= 15
+    ASSERT_TRUE(returnType->isIntegerTy(16));
     ASSERT_TRUE(types[0]->isIntegerTy(1));
     ASSERT_TRUE(types[1]->isIntegerTy(16));
     ASSERT_TRUE(types[2]->isIntegerTy(32));
     ASSERT_TRUE(types[3]->isIntegerTy(64));
     ASSERT_TRUE(types[4]->isFloatTy());
     ASSERT_TRUE(types[5]->isDoubleTy());
-
+#else
+    ASSERT_TRUE(returnType.GetType()->isIntegerTy(16));
+    ASSERT_TRUE(types[0].GetType()->isIntegerTy(1));
+    ASSERT_TRUE(types[1].GetType()->isIntegerTy(16));
+    ASSERT_TRUE(types[2].GetType()->isIntegerTy(32));
+    ASSERT_TRUE(types[3].GetType()->isIntegerTy(64));
+    ASSERT_TRUE(types[4].GetType()->isFloatTy());
+    ASSERT_TRUE(types[5].GetType()->isDoubleTy());
+#endif
     types.clear();
 
     // test scalar ptr arguments
 
     returnType = scalarptrs.types(types, C);
-    ASSERT_TRUE(returnType->isIntegerTy(32));
     ASSERT_EQ(size_t(6), types.size());
+#if LLVM_VERSION_MAJOR <= 15
+    ASSERT_TRUE(returnType->isIntegerTy(32));
     ASSERT_TRUE(types[0] == llvm::Type::getInt1Ty(C)->getPointerTo());
     ASSERT_TRUE(types[1] == llvm::Type::getInt16Ty(C)->getPointerTo());
     ASSERT_TRUE(types[2] == llvm::Type::getInt32Ty(C)->getPointerTo());
     ASSERT_TRUE(types[3] == llvm::Type::getInt64Ty(C)->getPointerTo());
     ASSERT_TRUE(types[4] == llvm::Type::getFloatTy(C)->getPointerTo());
     ASSERT_TRUE(types[5] == llvm::Type::getDoubleTy(C)->getPointerTo());
-
+#else
+    ASSERT_TRUE(returnType.GetType()->isIntegerTy(32));
+    ASSERT_TRUE(types[0] == ArgInfo(llvm::Type::getInt1Ty(C), 1));
+    ASSERT_TRUE(types[1] == ArgInfo(llvm::Type::getInt16Ty(C), 1));
+    ASSERT_TRUE(types[2] == ArgInfo(llvm::Type::getInt32Ty(C), 1));
+    ASSERT_TRUE(types[3] == ArgInfo(llvm::Type::getInt64Ty(C), 1));
+    ASSERT_TRUE(types[4] == ArgInfo(llvm::Type::getFloatTy(C), 1));
+    ASSERT_TRUE(types[5] == ArgInfo(llvm::Type::getDoubleTy(C), 1));
+#endif
     types.clear();
 
     // test array ptr arguments
 
     returnType = arrayptrs.types(types, C);
-    ASSERT_TRUE(returnType->isIntegerTy(64));
     ASSERT_EQ(size_t(6), types.size());
+#if LLVM_VERSION_MAJOR <= 15
+    ASSERT_TRUE(returnType->isIntegerTy(64));
     ASSERT_TRUE(types[0] == llvm::ArrayType::get(llvm::Type::getInt1Ty(C), 1)->getPointerTo());
     ASSERT_TRUE(types[1] == llvm::ArrayType::get(llvm::Type::getInt16Ty(C), 2)->getPointerTo());
     ASSERT_TRUE(types[2] == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3)->getPointerTo());
     ASSERT_TRUE(types[3] == llvm::ArrayType::get(llvm::Type::getInt64Ty(C), 4)->getPointerTo());
     ASSERT_TRUE(types[4] == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 5)->getPointerTo());
     ASSERT_TRUE(types[5] == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 6)->getPointerTo());
-
+#else
+    ASSERT_TRUE(returnType.GetType()->isIntegerTy(64));
+    ASSERT_TRUE(types[0] == ArgInfo(llvm::ArrayType::get(llvm::Type::getInt1Ty(C), 1), 1));
+    ASSERT_TRUE(types[1] == ArgInfo(llvm::ArrayType::get(llvm::Type::getInt16Ty(C), 2), 1));
+    ASSERT_TRUE(types[2] == ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3), 1));
+    ASSERT_TRUE(types[3] == ArgInfo(llvm::ArrayType::get(llvm::Type::getInt64Ty(C), 4), 1));
+    ASSERT_TRUE(types[4] == ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 5), 1));
+    ASSERT_TRUE(types[5] == ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 6), 1));
+#endif
     types.clear();
 
     // test void ptr arguments
     // void* are inferred as int8_t* types
 
     returnType = mindirect.types(types, C);
-    ASSERT_TRUE(returnType->isVoidTy());
     ASSERT_EQ(size_t(6), types.size());
+#if LLVM_VERSION_MAJOR <= 15
+    ASSERT_TRUE(returnType->isVoidTy());
     ASSERT_TRUE(types[0] == llvm::Type::getInt8PtrTy(C));
     ASSERT_TRUE(types[1] == llvm::Type::getInt8PtrTy(C)->getPointerTo());
     ASSERT_TRUE(types[2] == llvm::Type::getInt8PtrTy(C)->getPointerTo()->getPointerTo());
     ASSERT_TRUE(types[3] == llvm::Type::getFloatTy(C)->getPointerTo());
     ASSERT_TRUE(types[4] == llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo());
     ASSERT_TRUE(types[5] == llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo()->getPointerTo());
+#else
+    ASSERT_TRUE(returnType.IsVoid());
+    ASSERT_TRUE(types[0] == ArgInfo(llvm::Type::getInt8Ty(C), 1));
+    ASSERT_TRUE(types[1] == ArgInfo(llvm::Type::getInt8Ty(C), 2));
+    ASSERT_TRUE(types[2] == ArgInfo(llvm::Type::getInt8Ty(C), 3));
+    ASSERT_TRUE(types[3] == ArgInfo(llvm::Type::getFloatTy(C), 1));
+    ASSERT_TRUE(types[4] == ArgInfo(llvm::Type::getFloatTy(C), 2));
+    ASSERT_TRUE(types[5] == ArgInfo(llvm::Type::getFloatTy(C), 3));
+#endif
 }
 
 // Test C constant folding
@@ -1535,6 +1997,7 @@ TEST_F(TestFunctionTypes, testCFunctionCF)
 {
     using openvdb::ax::codegen::CFunction;
     using openvdb::ax::codegen::LLVMType;
+    using openvdb::ax::codegen::ArgInfoVector;
 
     static auto cftest1 = []() -> int32_t { return 10; };
     static auto cftest2 = [](float a) -> float { return a; };
@@ -1590,12 +2053,23 @@ TEST_F(TestFunctionTypes, testCFunctionCF)
 
     CFunction<void(float*)> test4("ax.test4", cftest4);
     test4.setConstantFold(true);
+
     // constant arg (verify it would 100% match)
     llvm::Value* nullfloat = llvm::ConstantPointerNull::get(LLVMType<float*>::get(C));
+
+#if LLVM_VERSION_MAJOR <= 15
     std::vector<llvm::Type*> types;
+#else
+    ArgInfoVector types;
+#endif
     test4.types(types, C);
+
     ASSERT_EQ(size_t(1), types.size());
+#if LLVM_VERSION_MAJOR <= 15
     ASSERT_TRUE(nullfloat->getType() == types.front());
+#else
+    ASSERT_TRUE(nullfloat->getType() == types.front().GetType());
+#endif
     ASSERT_TRUE(test4.fold({nullfloat}, C) == nullptr);
 }
 
@@ -1605,6 +2079,10 @@ TEST_F(TestFunctionTypes, testIRFunctions)
     using openvdb::ax::codegen::LLVMType;
     using openvdb::ax::codegen::Function;
     using openvdb::ax::codegen::IRFunctionBase;
+    using openvdb::ax::codegen::Arguments;
+    using openvdb::ax::codegen::ArgInfoVector;
+    using openvdb::ax::codegen::ArgInfo;
+    using openvdb::ax::codegen::Value;
 
     unittest_util::LLVMState state;
     llvm::LLVMContext& C = state.context();
@@ -1615,9 +2093,9 @@ TEST_F(TestFunctionTypes, testIRFunctions)
         using openvdb::ax::codegen::IRFunction;
 
         static auto generate =
-            [](const std::vector<llvm::Value*>&,
-               llvm::IRBuilder<>&) -> llvm::Value*
-        { return nullptr; };
+            [](const Arguments&,
+               llvm::IRBuilder<>&) -> Value
+        { return Value::Invalid(); };
 
         IRFunction<double(bool,
                 int16_t*,
@@ -1630,16 +2108,16 @@ TEST_F(TestFunctionTypes, testIRFunctions)
         ASSERT_EQ(std::string("mix"),
             std::string(mix.symbol()));
 
-        std::vector<llvm::Type*> types;
-        llvm::Type* returnType = mix.types(types, C);
-        ASSERT_TRUE(returnType->isDoubleTy());
+        ArgInfoVector types;
+        ArgInfo returnType = mix.types(types, C);
+        ASSERT_TRUE(returnType.GetType()->isDoubleTy());
         ASSERT_EQ(size_t(6), types.size());
-        ASSERT_TRUE(types[0] == llvm::Type::getInt1Ty(C));
-        ASSERT_TRUE(types[1] == llvm::Type::getInt16Ty(C)->getPointerTo());
-        ASSERT_TRUE(types[2] == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 1)->getPointerTo());
-        ASSERT_TRUE(types[3] == llvm::Type::getInt64Ty(C));
-        ASSERT_TRUE(types[4] == llvm::Type::getFloatTy(C)->getPointerTo());
-        ASSERT_TRUE(types[5] == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2)->getPointerTo());
+        ASSERT_TRUE(types[0] == ArgInfo(llvm::Type::getInt1Ty(C)));
+        ASSERT_TRUE(types[1] == ArgInfo(llvm::Type::getInt16Ty(C), 1));
+        ASSERT_TRUE(types[2] == ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 1), 1));
+        ASSERT_TRUE(types[3] == ArgInfo(llvm::Type::getInt64Ty(C)));
+        ASSERT_TRUE(types[4] == ArgInfo(llvm::Type::getFloatTy(C), 1));
+        ASSERT_TRUE(types[5] == ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2), 1));
     }
 
     llvm::Module& M = state.module();
@@ -1659,19 +2137,19 @@ TEST_F(TestFunctionTypes, testIRFunctions)
 
     auto generate =
         [&B, &M, &termMode, &expectedName]
-        (const std::vector<llvm::Value*>& args,
-         llvm::IRBuilder<>& _B) -> llvm::Value*
+        (const Arguments& args,
+         llvm::IRBuilder<>& FunctionBB) -> Value
     {
         // NOTE: GTest's ASSERT_* macros create a 'return;' statement
         // which errors here. Exceptions are being used instead to
         // exit early.
 
         // test the builder is pointing to the correct location
-        if (&B == &_B)
+        if (&B == &FunctionBB)
         {
             throw std::runtime_error("Builder should be different");
         }
-        llvm::BasicBlock* Block = _B.GetInsertBlock();
+        llvm::BasicBlock* Block = FunctionBB.GetInsertBlock();
         if (!Block || !Block->empty())
         {
             throw std::runtime_error("Basic block should exist and be empty");
@@ -1694,21 +2172,24 @@ TEST_F(TestFunctionTypes, testIRFunctions)
         EXPECT_TRUE(args[0]->getType()->isFloatTy());
         EXPECT_TRUE(args[1]->getType()->isFloatTy());
 
-        llvm::Value* result = _B.CreateFAdd(args[0], args[1]);
-        if (termMode == 0) return _B.CreateRet(result);
-        if (termMode == 1) return result;
-        if (termMode == 2) return nullptr;
-        throw std::runtime_error("Should be unreachable");
+        llvm::Value* result = FunctionBB.CreateFAdd(args[0], args[1]);
+        Value val(result, result->getType());
+
+        if (termMode == 0) return Value::Return(FunctionBB, &val);
+        if (termMode == 1) return val;
+        if (termMode == 2) return Value::Invalid();
+        throw std::runtime_error("No valid test mode");
+        return Value::Invalid();
     };
 
     llvm::Function* function = nullptr;
 
     expectedName = "ax.ir.test";
     Function::Ptr test(new TestIRFunction({
-            llvm::Type::getFloatTy(C),
-            llvm::Type::getFloatTy(C)
+            ArgInfo(llvm::Type::getFloatTy(C)),
+            ArgInfo(llvm::Type::getFloatTy(C))
         },
-        llvm::Type::getFloatTy(C),
+        ArgInfo(llvm::Type::getFloatTy(C)),
         expectedName, generate));
 
     // Test function prototype creation
@@ -1772,7 +2253,7 @@ TEST_F(TestFunctionTypes, testIRFunctions)
 
     llvm::Value* fp1 = LLVMType<float>::get(C, 1.0f);
     llvm::Value* fp2 = LLVMType<float>::get(C, 2.0f);
-    llvm::Value* result = test->call({fp1, fp2}, B, /*cast*/false);
+    llvm::Value* result = test->call({fp1, fp2}, B);
     ASSERT_TRUE(result);
     llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(result);
     ASSERT_TRUE(call);
@@ -1798,14 +2279,14 @@ TEST_F(TestFunctionTypes, testIRFunctions)
     expectedName = "ax.ir.autoret.test";
     termMode = 1;
     test.reset(new TestIRFunction({
-            llvm::Type::getFloatTy(C),
-            llvm::Type::getFloatTy(C)
+            ArgInfo(llvm::Type::getFloatTy(C)),
+            ArgInfo(llvm::Type::getFloatTy(C))
         },
-        llvm::Type::getFloatTy(C),
+        ArgInfo(llvm::Type::getFloatTy(C)),
         expectedName, generate));
 
     ASSERT_TRUE(!M.getFunction("ax.ir.autoret.test"));
-    result = test->call({fp1, fp2}, B, /*cast*/false);
+    result = test->call({fp1, fp2}, B);
     ASSERT_TRUE(result);
     call = llvm::dyn_cast<llvm::CallInst>(result);
     ASSERT_TRUE(call);
@@ -1855,10 +2336,10 @@ TEST_F(TestFunctionTypes, testIRFunctions)
     expectedName = "ax.ir.retnull.test";
     termMode = 2;
     test.reset(new TestIRFunction({
-            llvm::Type::getFloatTy(C),
-            llvm::Type::getFloatTy(C)
+            ArgInfo(llvm::Type::getFloatTy(C)),
+            ArgInfo(llvm::Type::getFloatTy(C))
         },
-        llvm::Type::getFloatTy(C),
+        ArgInfo(llvm::Type::getFloatTy(C)),
         expectedName, generate));
 
     ASSERT_TRUE(!M.getFunction("ax.ir.retnull.test"));
@@ -1868,7 +2349,7 @@ TEST_F(TestFunctionTypes, testIRFunctions)
     function = M.getFunction("ax.ir.retnull.test");
     ASSERT_TRUE(function);
 
-    result = test->call({fp1, fp2}, B, /*cast*/false);
+    result = test->call({fp1, fp2}, B);
     ASSERT_TRUE(result);
     call = llvm::dyn_cast<llvm::CallInst>(result);
     ASSERT_TRUE(call);
@@ -1912,8 +2393,8 @@ TEST_F(TestFunctionTypes, testIRFunctions)
     // Test embedded IR
 
     auto embdedGen = [&B, &M]
-        (const std::vector<llvm::Value*>& args,
-         llvm::IRBuilder<>& _B) -> llvm::Value*
+        (const Arguments& args,
+         llvm::IRBuilder<>& FunctionBB) -> Value
     {
         // NOTE: GTest's ASSERT_* macros create a 'return;' statement
         // which errors here. Exceptions are being used instead to
@@ -1921,11 +2402,11 @@ TEST_F(TestFunctionTypes, testIRFunctions)
 
         // test the builder is pointing to the correct location
         // note, for embedded IR, the same builder will be used
-        if (&B != &_B)
+        if (&B != &FunctionBB)
         {
             throw std::runtime_error("Builders should be the same");
         }
-        llvm::BasicBlock* Block = _B.GetInsertBlock();
+        llvm::BasicBlock* Block = FunctionBB.GetInsertBlock();
         if (!Block || Block->empty())
         {
             throw std::runtime_error("Basic block should exist and be populated");
@@ -1946,16 +2427,17 @@ TEST_F(TestFunctionTypes, testIRFunctions)
         // Can't just do a CreateFAdd as the IR builder won't actually even
         // write the instruction as its const and unused - so store in a new
         // alloc
-        llvm::Value* alloc = _B.CreateAlloca(args[0]->getType());
-        _B.CreateStore(args[0], alloc);
-        return openvdb::ax::codegen::ir_load(_B, alloc);
+        llvm::Value* alloc = FunctionBB.CreateAlloca(args[0]->getType());
+        FunctionBB.CreateStore(args[0], alloc);
+        llvm::Value* result = FunctionBB.CreateLoad(args[0]->getType(), alloc);
+        return Value(result, args[0]->getType());
     };
 
     test.reset(new TestIRFunction({
-            llvm::Type::getFloatTy(C),
-            llvm::Type::getFloatTy(C)
+            ArgInfo(llvm::Type::getFloatTy(C)),
+            ArgInfo(llvm::Type::getFloatTy(C))
         },
-        llvm::Type::getFloatTy(C),
+        ArgInfo(llvm::Type::getFloatTy(C)),
         "ax.ir.embed.test", embdedGen));
     static_cast<IRFunctionBase&>(*test).setEmbedIR(true);
 
@@ -1965,7 +2447,7 @@ TEST_F(TestFunctionTypes, testIRFunctions)
 
     // test call
     ASSERT_TRUE(!M.getFunction("ax.ir.embed.test"));
-    result = test->call({fp1, fp2}, B, /*cast*/false);
+    result = test->call({fp1, fp2}, B);
     ASSERT_TRUE(result);
     ASSERT_TRUE(!M.getFunction("ax.ir.embed.test"));
     auto IP = B.GetInsertPoint();
@@ -1984,13 +2466,21 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
     using openvdb::ax::codegen::Function;
     using openvdb::ax::codegen::CFunctionSRet;
     using openvdb::ax::codegen::IRFunctionSRet;
+    using openvdb::ax::codegen::ArgInfo;
+    using openvdb::ax::codegen::ArgInfoVector;
+    using openvdb::ax::codegen::Arguments;
+    using openvdb::ax::codegen::Value;
 
     unittest_util::LLVMState state;
     llvm::LLVMContext& C = state.context();
     llvm::Module& M = state.module();
     llvm::IRBuilder<> B(state.scratchBlock());
+
+#if LLVM_VERSION_MAJOR <= 15
     std::vector<llvm::Type*> types;
-    llvm::Type* type = nullptr;
+#else
+    ArgInfoVector types;
+#endif
     llvm::Value* result = nullptr;
     llvm::Function* function = nullptr;
     llvm::FunctionType* ftype = nullptr;
@@ -2008,11 +2498,18 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
 
     // test types
     llvm::Type* vec3f = llvm::ArrayType::get(llvm::Type::getFloatTy(C), 3);
-    type = test->types(types, C);
+
+    auto type = test->types(types, C);
     ASSERT_EQ(size_t(1), types.size());
+#if LLVM_VERSION_MAJOR <= 15
     ASSERT_TRUE(types[0] == vec3f->getPointerTo(0));
     ASSERT_TRUE(type);
     ASSERT_TRUE(type->isVoidTy());
+#else
+    ASSERT_TRUE(types[0] == ArgInfo(vec3f, 1, true));
+    ASSERT_TRUE(type.IsVoid());
+    ASSERT_TRUE(type.IsReturn());
+#endif
     // test various getters
     ASSERT_EQ(std::string("ax.c.test"), std::string(test->symbol()));
     ASSERT_EQ(size_t(1), test->size());
@@ -2024,12 +2521,21 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
     ASSERT_EQ(std::string("vec3f name()"), os.str());
 
     // test match
+#if LLVM_VERSION_MAJOR <= 15
     match = test->match({vec3f->getPointerTo()}, C);
     ASSERT_EQ(match, Function::None);
-    match = test->match({}, C);
+    match = test->match(std::vector<llvm::Type*>{}, C);
     ASSERT_EQ(match, Function::Explicit);
     match = test->Function::match({vec3f->getPointerTo()}, C);
     ASSERT_EQ(match, Function::Explicit);
+#else
+    match = test->match({ArgInfo(vec3f, 1)}, C);
+    ASSERT_EQ(match, Function::None);
+    match = test->match(ArgInfoVector{}, C);
+    ASSERT_EQ(match, Function::Explicit);
+    match = test->Function::match({ArgInfo(vec3f, 1, true)}, C);
+    ASSERT_EQ(match, Function::Explicit);
+#endif
 
     // test create
     ASSERT_TRUE(!M.getFunction("ax.c.test"));
@@ -2045,13 +2551,13 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
     ASSERT_TRUE(ftype);
     ASSERT_TRUE(ftype->getReturnType()->isVoidTy());
     ASSERT_EQ(1u, ftype->getNumParams());
-    ASSERT_TRUE(ftype->getParamType(0) == vec3f->getPointerTo());
+    ASSERT_TRUE(ftype->getParamType(0) == llvm::PointerType::get(vec3f, 0));
 
     // test call - sret function do not return the CallInst as the value
-    result = test->call({}, B, /*cast*/false);
+    result = test->call(Arguments{}, B).GetValue();
     ASSERT_TRUE(result);
     ASSERT_TRUE(!llvm::dyn_cast<llvm::CallInst>(result));
-    ASSERT_TRUE(result->getType() == vec3f->getPointerTo());
+    ASSERT_TRUE(result->getType() == llvm::PointerType::get(vec3f, 0));
     ASSERT_EQ(&(BaseFunction->getEntryBlock()), B.GetInsertBlock());
 
     VERIFY_FUNCTION_IR(function);
@@ -2068,10 +2574,18 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
     // test types
     type = test->types(types, C);
     ASSERT_EQ(size_t(2), types.size());
+#if LLVM_VERSION_MAJOR <= 15
     ASSERT_TRUE(types[0] == vec3f->getPointerTo(0));
     ASSERT_TRUE(types[1] == vec3f->getPointerTo(0));
     ASSERT_TRUE(type);
     ASSERT_TRUE(type->isVoidTy());
+#else
+    ASSERT_TRUE(types[0] == ArgInfo(vec3f, 1, true));
+    ASSERT_TRUE(types[0].IsReturn());
+    ASSERT_TRUE(types[1] == ArgInfo(vec3f, 1));
+    ASSERT_TRUE(type.IsVoid());
+    ASSERT_TRUE(type.IsReturn());
+#endif
     // test various getters
     ASSERT_EQ(std::string("ax.c2.test"), std::string(test->symbol()));
     ASSERT_EQ(size_t(2), test->size());
@@ -2084,14 +2598,25 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
     ASSERT_EQ(std::string("vec3f name(vec3f)"), os.str());
 
     // test match
+#if LLVM_VERSION_MAJOR <= 15
     match = test->match({vec3f->getPointerTo(),vec3f->getPointerTo()}, C);
     ASSERT_EQ(match, Function::None);
     match = test->match({vec3f->getPointerTo()}, C);
     ASSERT_EQ(match, Function::Explicit);
-    match = test->match({}, C);
+    match = test->match(std::vector<llvm::Type*>{}, C);
     ASSERT_EQ(match, Function::None);
     match = test->Function::match({vec3f->getPointerTo(),vec3f->getPointerTo()}, C);
     ASSERT_EQ(match, Function::Explicit);
+#else
+    match = test->match({ArgInfo(vec3f, 1), ArgInfo(vec3f, 1)}, C);
+    ASSERT_EQ(match, Function::None);
+    match = test->match({ArgInfo(vec3f, 1)}, C);
+    ASSERT_EQ(match, Function::Explicit);
+    match = test->match(ArgInfoVector{}, C);
+    ASSERT_EQ(match, Function::None);
+    match = test->Function::match({ArgInfo(vec3f, 1, true), ArgInfo(vec3f, 1)}, C);
+    ASSERT_EQ(match, Function::Explicit);
+#endif
 
     // test create
     ASSERT_TRUE(!M.getFunction("ax.c2.test"));
@@ -2107,16 +2632,16 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
     ASSERT_TRUE(ftype);
     ASSERT_TRUE(ftype->getReturnType()->isVoidTy());
     ASSERT_EQ(2u, ftype->getNumParams());
-    ASSERT_TRUE(ftype->getParamType(0) == vec3f->getPointerTo());
-    ASSERT_TRUE(ftype->getParamType(1) == vec3f->getPointerTo());
+    ASSERT_TRUE(ftype->getParamType(0) == llvm::PointerType::get(vec3f, 0));
+    ASSERT_TRUE(ftype->getParamType(1) == llvm::PointerType::get(vec3f, 0));
 
     // test call - sret function do not return the CallInst as the value
-    llvm::Value* f32c0 = LLVMType<float>::get(C, 0.0f); // float
-    llvm::Value* vec3fv = openvdb::ax::codegen::arrayPack({f32c0,f32c0,f32c0}, B); // vec3f
-    result = test->call({vec3fv}, B, /*cast*/false);
+    Value f32c0 = Value::Create<float>(C, 0.0f); // float
+    llvm::Value* vec3fv = Value::ScalarsToArray(B, {f32c0,f32c0,f32c0}).GetValue(); // vec3f
+    result = test->call({vec3fv}, B);
     ASSERT_TRUE(result);
     ASSERT_TRUE(!llvm::dyn_cast<llvm::CallInst>(result));
-    ASSERT_TRUE(result->getType() == vec3f->getPointerTo());
+    ASSERT_TRUE(result->getType() == llvm::PointerType::get(vec3f, 0));
     ASSERT_EQ(&(BaseFunction->getEntryBlock()), B.GetInsertBlock());
 
     VERIFY_FUNCTION_IR(function);
@@ -2134,19 +2659,19 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
     //
 
     auto generate = [&B, &M]
-        (const std::vector<llvm::Value*>& args,
-         llvm::IRBuilder<>& _B) -> llvm::Value*
+        (const Arguments& args,
+         llvm::IRBuilder<>& FunctionBB) -> Value
     {
         // NOTE: GTest's ASSERT_* macros create a 'return;' statement
         // which errors here. Exceptions are being used instead to
         // exit early.
 
         // test the builder is pointing to the correct location
-        if (&B == &_B)
+        if (&B == &FunctionBB)
         {
             throw std::runtime_error("Builders should be different");
         }
-        llvm::BasicBlock* Block = _B.GetInsertBlock();
+        llvm::BasicBlock* Block = FunctionBB.GetInsertBlock();
         if (!Block || !Block->empty()) {
             throw std::runtime_error("Basic block should exist and be empty");
         }
@@ -2162,13 +2687,16 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
         if (args.size() != 1){
             throw std::runtime_error("Function should take one argument");
         }
-        EXPECT_TRUE(args[0] == llvm::cast<llvm::Value>(F->arg_begin()));
-        EXPECT_TRUE(args[0]->getType() ==
-            llvm::ArrayType::get(llvm::Type::getFloatTy(_B.getContext()), 3)->getPointerTo());
 
-        llvm::Value* e0 = openvdb::ax::codegen::ir_constgep2_64(_B, args[0], 0, 0);
-        _B.CreateStore(LLVMType<float>::get(_B.getContext(), 1.0f), e0);
-        return nullptr;
+        llvm::Type* arrayT = llvm::ArrayType::get(llvm::Type::getFloatTy(FunctionBB.getContext()), 3);
+        EXPECT_TRUE(args[0] == llvm::cast<llvm::Value>(F->arg_begin()));
+ #if LLVM_VERSION_MAJOR > 15
+        EXPECT_TRUE(args.GetArgInfo(0) == ArgInfo(arrayT, 1, true));
+ #endif
+
+        llvm::Value* e0 = FunctionBB.CreateConstGEP2_64(arrayT, args[0], 0, 0);
+        FunctionBB.CreateStore(LLVMType<float>::get(FunctionBB.getContext(), 1.0f), e0);
+        return Value::Invalid();
     };
 
     test.reset(new IRFunctionSRet<void(float(*)[3])>("ax.ir.test", generate));
@@ -2176,10 +2704,16 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
 
     // test types
     type = test->types(types, C);
+#if LLVM_VERSION_MAJOR <= 15
     ASSERT_EQ(size_t(1), types.size());
     ASSERT_TRUE(types[0] == vec3f->getPointerTo(0));
     ASSERT_TRUE(type);
     ASSERT_TRUE(type->isVoidTy());
+#else
+    ASSERT_EQ(size_t(1), types.size());
+    ASSERT_TRUE(types[0] == ArgInfo(vec3f, 1, true));
+    ASSERT_TRUE(type.IsVoid());
+#endif
     // test various getters
     ASSERT_EQ(std::string("ax.ir.test"), std::string(test->symbol()));
     ASSERT_EQ(size_t(1), test->size());
@@ -2191,12 +2725,21 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
     ASSERT_EQ(std::string("vec3f name()"), os.str());
 
     // test match
+#if LLVM_VERSION_MAJOR <= 15
     match = test->match({vec3f->getPointerTo()}, C);
     ASSERT_EQ(match, Function::None);
-    match = test->match({}, C);
+    match = test->match(std::vector<llvm::Type*>{}, C);
     ASSERT_EQ(match, Function::Explicit);
     match = test->Function::match({vec3f->getPointerTo()}, C);
     ASSERT_EQ(match, Function::Explicit);
+#else
+    match = test->match({ArgInfo(vec3f, 1)}, C);
+    ASSERT_EQ(match, Function::None);
+    match = test->match(ArgInfoVector{}, C);
+    ASSERT_EQ(match, Function::Explicit);
+    match = test->Function::match({ArgInfo(vec3f, 1, true)}, C);
+    ASSERT_EQ(match, Function::Explicit);
+#endif
 
     // test create
     ASSERT_TRUE(!M.getFunction("ax.ir.test"));
@@ -2225,16 +2768,15 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
     ASSERT_TRUE(ftype);
     ASSERT_TRUE(ftype->getReturnType()->isVoidTy());
     ASSERT_EQ(1u, ftype->getNumParams());
-    ASSERT_TRUE(ftype->getParamType(0) == vec3f->getPointerTo());
+    ASSERT_TRUE(ftype->getParamType(0) == llvm::PointerType::get(vec3f, 0));
 
     // test call - sret function do not return the CallInst as the value
-    result = test->call({}, B, /*cast*/false);
+    result = test->call(Arguments{}, B).GetValue();
     ASSERT_TRUE(result);
     ASSERT_TRUE(!llvm::dyn_cast<llvm::CallInst>(result));
-    ASSERT_TRUE(result->getType() == vec3f->getPointerTo());
+    ASSERT_TRUE(result->getType() == llvm::PointerType::get(vec3f, 0));
     ASSERT_EQ(&(BaseFunction->getEntryBlock()), B.GetInsertBlock());
 
     VERIFY_FUNCTION_IR(function);
     VERIFY_MODULE_IR(&M);
 }
-

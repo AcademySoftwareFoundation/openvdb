@@ -15,7 +15,7 @@
 #include <openvdb/version.h>
 #include <openvdb/util/Assert.h>
 
-#include <llvm/IR/Value.h>
+#include "Value.h"
 
 #include <string>
 #include <map>
@@ -33,22 +33,23 @@ namespace codegen {
 ///         llvm::Values
 /// @note   Consider using llvm's ValueSymbolTable
 ///
+template <typename T>
 struct SymbolTable
 {
-    using MapType = std::unordered_map<std::string, llvm::Value*>;
+    using MapType = std::unordered_map<std::string, T>;
 
     SymbolTable() : mMap() {}
     ~SymbolTable() = default;
 
-    /// @brief  Get a llvm::Value from this symbol table with the given name
+    /// @brief  Get a Value from this symbol table with the given name
     ///         mapping. It it does not exist, a nullptr is returned.
     /// @param  name  The name of the variable
     ///
-    inline llvm::Value* get(const std::string& name) const
+    inline const T* get(const std::string& name) const
     {
         const auto iter = mMap.find(name);
         if (iter == mMap.end()) return nullptr;
-        return iter->second;
+        return &(iter->second);
     }
 
     /// @brief  Returns true if a variable exists in this symbol table with the
@@ -67,11 +68,10 @@ struct SymbolTable
     /// @param  name   The name of the variable
     /// @param  value  The llvm::Value corresponding to this variable
     ///
-    inline bool insert(const std::string& name, llvm::Value* value)
+    inline bool insert(const std::string& name, const T& value)
     {
-        if (exists(name)) return false;
-        mMap[name] = value;
-        return true;
+        const auto iter = mMap.emplace(name, value);
+        return iter.second; // true if inserted, false otherwise
     }
 
     /// @brief  Replace a variable in this symbol table. Returns true if the variable
@@ -80,11 +80,12 @@ struct SymbolTable
     /// @param  name   The name of the variable
     /// @param  value  The llvm::Value corresponding to this variable
     ///
-    inline bool replace(const std::string& name, llvm::Value* value)
+    inline bool replace(const std::string& name, const T& value)
     {
-        const bool existed = exists(name);
-        mMap[name] = value;
-        return existed;
+        auto iter = mMap.emplace(name, value);
+        const bool inserted = iter.second;
+        if (!inserted) iter.first->second = value;
+        return !inserted;
     }
 
     /// @brief  Clear all symbols in this table
@@ -105,35 +106,33 @@ private:
 ///         and iterated through using find(). Find assumes that tables are added through
 ///         parented ascending ids.
 ///
-/// @note   The zero id is used to represent global variables
+/// @note   The zero id is used to represent the top block scope, but globals are stored
+///         separately.
 /// @note   The block symbol table is fairly simple and currently only supports insertion
 ///         by integer ids. Scopes that exist at the same level are expected to be built
 ///         in isolation and erase and re-create the desired ids where necessary.
 ///
 struct SymbolTableBlocks
 {
-    using MapType = std::map<size_t, SymbolTable>;
+    using MapType = std::map<size_t, SymbolTable<Value>>;
 
-    SymbolTableBlocks() : mTables({{0, SymbolTable()}}) {}
+    SymbolTableBlocks()
+        : mTables({{0, SymbolTable<Value>()}})
+        , mGlobals() {}
     ~SymbolTableBlocks() = default;
 
     /// @brief  Access to the list of global variables which are always accessible
     ///
-    inline SymbolTable& globals() { return mTables.at(0); }
-    inline const SymbolTable& globals() const { return mTables.at(0); }
+    inline SymbolTable<llvm::Value*>& globals() { return mGlobals; }
+    inline const SymbolTable<llvm::Value*>& globals() const { return mGlobals; }
 
     /// @brief  Erase a given scoped indexed SymbolTable from the list of held
     ///         SymbolTables. Returns true if the table previously existed.
-    /// @note   If the zero index is supplied, this function throws a runtime error
     ///
     /// @param  index  The SymbolTable index to erase
     ///
     inline bool erase(const size_t index)
     {
-        if (index == 0) {
-            throw std::runtime_error("Attempted to erase global variables which is disallowed.");
-        }
-
         const bool existed = (mTables.find(index) != mTables.end());
         mTables.erase(index);
         return existed;
@@ -143,7 +142,7 @@ struct SymbolTableBlocks
     ///
     /// @param  index  The SymbolTable index
     ///
-    inline SymbolTable* getOrInsert(const size_t index)
+    inline SymbolTable<Value>* getOrInsert(const size_t index)
     {
         return &(mTables[index]);
     }
@@ -152,7 +151,7 @@ struct SymbolTableBlocks
     ///
     /// @param  index  The SymbolTable index
     ///
-    inline SymbolTable* get(const size_t index)
+    inline SymbolTable<Value>* get(const size_t index)
     {
         auto iter = mTables.find(index);
         if (iter == mTables.end()) return nullptr;
@@ -167,11 +166,11 @@ struct SymbolTableBlocks
     /// @param  name        The variable name to find
     /// @param  startIndex  The start SymbolTable index
     ///
-    inline llvm::Value* find(const std::string& name, const size_t startIndex) const
+    inline const Value* find(const std::string& name, const size_t startIndex) const
     {
         // Find the lower bound start index and if necessary, decrement into
         // the first block where the search will be started. Note that this
-        // is safe as the global block 0 will always exist
+        // is safe as the top scope block 0 will always exist
 
         auto it = mTables.lower_bound(startIndex);
         if (it == mTables.end() || it->first != startIndex) --it;
@@ -183,7 +182,7 @@ struct SymbolTableBlocks
         MapType::const_reverse_iterator iter(++it);
 
         for (; iter != mTables.crend(); ++iter) {
-            llvm::Value* value = iter->second.get(name);
+            const Value* value = iter->second.get(name);
             if (value) return value;
         }
 
@@ -195,7 +194,7 @@ struct SymbolTableBlocks
     ///
     /// @param  name  The variable name to find
     ///
-    inline llvm::Value* find(const std::string& name) const
+    inline const Value* find(const std::string& name) const
     {
         return this->find(name, mTables.crbegin()->first);
     }
@@ -206,7 +205,7 @@ struct SymbolTableBlocks
     /// @param  name   The variable name to find and replace
     /// @param  value  The llvm::Value to replace
     ///
-    inline bool replace(const std::string& name, llvm::Value* value)
+    inline bool replace(const std::string& name, Value value)
     {
         for (auto it = mTables.rbegin(); it != mTables.rend(); ++it) {
             if (it->second.get(name)) {
@@ -214,12 +213,12 @@ struct SymbolTableBlocks
                 return true;
             }
         }
-
         return false;
     }
 
 private:
     MapType mTables;
+    SymbolTable<llvm::Value*> mGlobals;
 };
 
 } // namespace codegen

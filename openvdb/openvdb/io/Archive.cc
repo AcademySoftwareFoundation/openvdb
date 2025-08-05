@@ -465,8 +465,6 @@ public:
         , mRegion(mMap, boost::interprocess::read_only)
         , mAutoDelete(autoDelete)
     {
-        mLastWriteTime = this->getLastWriteTime();
-
         if (mAutoDelete) {
 #ifndef _WIN32
             // On Unix systems, unlink the file so that it gets deleted once it is closed.
@@ -493,37 +491,13 @@ public:
         }
     }
 
-    Index64 getLastWriteTime() const
-    {
-        Index64 result = 0;
-        const char* filename = mMap.get_name();
-
-#ifdef _WIN32
-        // boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
-        using namespace boost::interprocess::detail;
-        using namespace boost::interprocess::ipcdetail;
-
-        if (void* fh = open_existing_file(filename, boost::interprocess::read_only)) {
-            struct { unsigned long lo, hi; } mtime; // Windows FILETIME struct
-            if (GetFileTime(fh, nullptr, nullptr, &mtime)) {
-                result = (Index64(mtime.hi) << 32) | mtime.lo;
-            }
-            close_file(fh);
-        }
-#else
-        struct stat info;
-        if (0 == ::stat(filename, &info)) {
-            result = Index64(info.st_mtime);
-        }
-#endif
-        return result;
-    }
-
     boost::interprocess::file_mapping mMap;
     boost::interprocess::mapped_region mRegion;
     bool mAutoDelete;
     Notifier mNotifier;
+#if OPENVDB_ABI_VERSION_NUMBER <= 12
     mutable std::atomic<Index64> mLastWriteTime;
+#endif
 
 private:
     Impl(const Impl&); // not copyable
@@ -554,16 +528,6 @@ MappedFile::filename() const
 SharedPtr<std::streambuf>
 MappedFile::createBuffer() const
 {
-    if (!mImpl->mAutoDelete && mImpl->mLastWriteTime > 0) {
-        // Warn if the file has been modified since it was opened
-        // (but don't bother checking if it is a private, temporary file).
-        if (mImpl->getLastWriteTime() > mImpl->mLastWriteTime) {
-            OPENVDB_LOG_WARN("file " << this->filename() << " might have changed on disk"
-                << " since it was opened");
-            mImpl->mLastWriteTime = 0; // suppress further warnings
-        }
-    }
-
     return SharedPtr<std::streambuf>{
         new boost::iostreams::stream_buffer<boost::iostreams::array_source>{
             static_cast<const char*>(mImpl->mRegion.get_address()), mImpl->mRegion.get_size()}};

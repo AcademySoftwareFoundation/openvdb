@@ -1,5 +1,6 @@
-bool@test1 = bool(int32@testint32);
-bool@test2 = bool(int64@testint64);
-bool@test3 = bool(float@testfloat);
-bool@test4 = bool(double@testdouble);
+bool@test1 = bool(bool@testbool);
+bool@test2 = bool(int32@testint32);
+bool@test3 = bool(int64@testint64);
+bool@test4 = bool(float@testfloat);
+bool@test5 = bool(double@testdouble);
 

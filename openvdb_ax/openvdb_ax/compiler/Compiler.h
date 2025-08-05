@@ -28,10 +28,6 @@
 #include <memory>
 #include <sstream>
 
-// forward
-namespace llvm {
-class LLVMContext;
-}
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -44,21 +40,28 @@ namespace codegen {
 class FunctionRegistry;
 }
 
-/// @brief  The compiler class.  This holds an llvm context and set of compiler
-///   options, and constructs executable objects (e.g. PointExecutable or
-///   VolumeExecutable) from a syntax tree or snippet of code.
+/// @brief  The compiler class.  This holds a set of compiler options and
+///   constructs executable objects (e.g. PointExecutable or VolumeExecutable)
+///   from a syntax tree or snippet of code.
+/// @note  Compilers cannot be copied and it is _unsafe_ to call compile()
+///   methods concurrently on instances of the same compiler (due to access
+///   into the function registry currently not being thread safe). It is safe
+///   to create new instances of a Compiler to compile programs concurrently.
 class OPENVDB_AX_API Compiler
 {
 public:
-
     using Ptr = std::shared_ptr<Compiler>;
     using UniquePtr = std::unique_ptr<Compiler>;
 
     /// @brief Construct a compiler object with given settings
     /// @param options CompilerOptions object with various settings
     Compiler(const CompilerOptions& options = CompilerOptions());
+    ~Compiler();
 
-    ~Compiler() = default;
+    Compiler(const Compiler&) = delete;
+    Compiler& operator=(const Compiler&) = delete;
+    Compiler(Compiler&&);
+    Compiler& operator=(Compiler&&);
 
     /// @brief Static method for creating Compiler objects
     static UniquePtr create(const CompilerOptions& options = CompilerOptions());
@@ -188,9 +191,8 @@ private:
             Logger& logger);
 
 private:
-    std::shared_ptr<llvm::LLVMContext> mContext;
-    const CompilerOptions mCompilerOptions;
-    std::shared_ptr<codegen::FunctionRegistry> mFunctionRegistry;
+    CompilerOptions mCompilerOptions;
+    std::unique_ptr<codegen::FunctionRegistry> mFunctionRegistry;
 };
 
 

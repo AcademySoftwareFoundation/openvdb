@@ -1042,10 +1042,10 @@ struct BaseBBox
         return *this;
     }
 
-    //__hostdev__ BaseBBox expandBy(typename Vec3T::ValueType padding) const
-    //{
-    //    return BaseBBox(mCoord[0].offsetBy(-padding),mCoord[1].offsetBy(padding));
-    //}
+//    __hostdev__ BaseBBox expandBy(typename Vec3T::ValueType padding) const
+//    {
+//        return BaseBBox(mCoord[0].offsetBy(-padding),mCoord[1].offsetBy(padding));
+//    }
     __hostdev__ bool isInside(const Vec3T& xyz)
     {
         if (xyz[0] < mCoord[0][0] || xyz[1] < mCoord[0][1] || xyz[2] < mCoord[0][2])

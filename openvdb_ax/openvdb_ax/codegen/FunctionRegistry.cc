@@ -9,12 +9,59 @@
 
 #include "../Exceptions.h"
 
+#include <tbb/concurrent_hash_map.h>
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
 namespace ax {
 namespace codegen {
+
+///////////////////////////////////////////////////////////////////////////////
+
+namespace internal
+{
+
+using MappedFunctionRegistry =
+    tbb::concurrent_hash_map<llvm::LLVMContext*, std::pair<FunctionRegistry*, FunctionOptions>>;
+
+inline auto& GetGlobalFunctionRegistryMap()
+{
+    static MappedFunctionRegistry sMap;
+    return sMap;
+}
+
+void InsertMappedFunctionRegistry(llvm::LLVMContext* CPtr,
+    FunctionRegistry* reg,
+    const FunctionOptions& opts)
+{
+    auto& map = GetGlobalFunctionRegistryMap();
+    typename MappedFunctionRegistry::accessor acc;
+    std::pair<FunctionRegistry*, FunctionOptions> entry{reg, opts};
+    [[maybe_unused]] const bool created =
+        map.emplace(acc, CPtr, std::move(entry));
+    OPENVDB_ASSERT(created);
+}
+
+std::pair<FunctionRegistry*, FunctionOptions> GetMappedFunctionRegistry(llvm::LLVMContext* CPtr)
+{
+    auto& map = GetGlobalFunctionRegistryMap();
+    typename MappedFunctionRegistry::accessor acc;
+    const bool found = map.find(acc, CPtr);
+    if (found) return acc->second;
+    return {nullptr, FunctionOptions()};
+}
+
+bool RemoveMappedFunctionRegistry(llvm::LLVMContext* CPtr)
+{
+    auto& map = GetGlobalFunctionRegistryMap();
+    return map.erase(CPtr);
+}
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 void FunctionRegistry::insert(const std::string& identifier,
        const FunctionRegistry::ConstructorT creator, const bool internal)
@@ -59,7 +106,7 @@ const FunctionGroup* FunctionRegistry::getOrInsert(const std::string& identifier
 
     if (op.mLazyFunctions && function) {
         for (const auto& decl : function->list()) {
-            const std::vector<const char*>& deps = decl->dependencies();
+            const auto& deps = decl->dependencies();
             for (const auto& dep : deps) {
                 // if the function ptr doesn't exist, create it with getOrInsert.
                 // This provides internal access and ensures handling of cyclical
