@@ -538,9 +538,8 @@ public:
                 "The tapered capsule is degenerate, in this case it is a capsule. Consider using the CapsuleVoxelizer class instead.");
         }
 
-        initialize(pt1, pt2, radius1, radius2);
-
-        BaseT::iterate();
+        if (initialize(pt1, pt2, radius1, radius2))
+            BaseT::iterate();
     }
 
 private:
@@ -899,7 +898,7 @@ private:
     // world space points and radius inputs
     // initializes class members in index space
     template<typename ScalarType>
-    inline void
+    inline bool
     initialize(const math::Vec3<ScalarType>& pt1, const math::Vec3<ScalarType>& pt2,
                const ScalarType& r1, const ScalarType& r2)
     {
@@ -924,6 +923,25 @@ private:
         mORad2 = mRad2 + hw;
         mORad1Sqr = mORad1 * mORad1;
         mORad2Sqr = mORad2 * mORad2;
+
+        // all voxels outside the narrow band -- nothing to populate
+        if (mORad1 <= ScalarType(0)) // this implies mORad2 <= 0 too
+            return false;
+
+        // at this point we know mORad1 > 0
+        // but if mORad2 < 0, truncate the line segment to where radius equals 0
+        // this way things like pullyPoints make geometric sense.
+        if (mORad2 < ScalarType(0)){
+            const ScalarType t = (r2 <= r1 ? -mRad2 : mRad1)/(mRad1 - mRad2);
+
+            const math::Vec3<ScalarType> pt_0 = r2 <= r1 ? pt1 : pt2;
+            const ScalarType r_0 = r2 <= r1 ? r1 : r2;
+
+            const math::Vec3<ScalarType> pt_mid = t*pt1 + (ScalarType(1)-t)*pt2;
+            const ScalarType r_mid = ScalarType(0);
+
+            return initialize(pt_0, pt_mid, r_0, r_mid);
+        }
 
         mV = mPt2 - mPt1;
         mVLenSqr = mV.lengthSqr();
@@ -969,6 +987,8 @@ private:
         mC2Inv = mC2 != 0.0 ? 1.0/mC2 : 1.0;
 
         BaseT::bottomTop = taperedCapsuleBottomTop;
+
+        return true;
     }
 
     // ------------ private members ------------
