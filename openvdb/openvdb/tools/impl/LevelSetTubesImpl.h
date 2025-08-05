@@ -932,7 +932,7 @@ private:
         // but if mORad2 < 0, truncate the line segment to where radius equals 0
         // this way things like pullyPoints make geometric sense.
         if (mORad2 < ScalarType(0)){
-            const ScalarType t = (r2 <= r1 ? -mRad2 : mRad1)/(mRad1 - mRad2);
+            const ScalarType t = (r2 <= r1 ? r2/(r2 - r1) : r1/(r1 - r2));
 
             const math::Vec3<ScalarType> pt_0 = r2 <= r1 ? pt1 : pt2;
             const ScalarType r_0 = r2 <= r1 ? r1 : r2;
