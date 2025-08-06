@@ -716,8 +716,7 @@ pivot(int i, int j, Mat3<T>& S, Vec3<T>& D, Mat3<T>& Q)
         S(i,k) = T(cosin_of_theta * temp - sin_of_theta * S(j,k));
         S(j,k) = T(sin_of_theta * temp + cosin_of_theta * S(j,k));
     }
-    for (int k = 0; k < n; ++k)
-    {
+    for (int k = 0; k < n; ++k) {
         temp = Q(k,i);
         Q(k,i) = T(cosin_of_theta * temp - sin_of_theta * Q(k,j));
         Q(k,j) = T(sin_of_theta * temp + cosin_of_theta * Q(k,j));

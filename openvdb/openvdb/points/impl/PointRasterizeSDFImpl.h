@@ -1311,8 +1311,7 @@ rasterizeSpheres(const PointDataGridT& points,
     typename SdfT::Ptr surface;
     GridPtrVec grids;
 
-    if (settings.radius.empty())
-    {
+    if (settings.radius.empty()) {
         // search distance at the SDF transform, including its half band
         const Real radiusIndexSpace = settings.radiusScale / vs;
         const FixedBandRadius<Real> rad(radiusIndexSpace, float(halfband));
@@ -1422,8 +1421,7 @@ rasterizeSmoothSpheres(const PointDataGridT& points,
     typename SdfT::Ptr surface;
     GridPtrVec grids;
 
-    if (settings.radius.empty())
-    {
+    if (settings.radius.empty()) {
         // This is the max possible distance we need to activate, but we'll
         // clip this at the edges of the point bounds (as the ZB kernel will
         // only create positions in between points).
@@ -1445,8 +1443,7 @@ rasterizeSmoothSpheres(const PointDataGridT& points,
             (points, attributes, *surface,
                 width, rad, indexSpaceSearch, points.transform(), filter, interrupter, *surface); // args
     }
-    else
-    {
+    else {
         using RadiusT = typename SettingsT::RadiusAttributeType;
         using PointDataTreeT = typename PointDataGridT::TreeType;
         using RadTreeT = typename PointDataTreeT::template ValueConverter<RadiusT>::Type;

@@ -29,11 +29,14 @@
 ///     points which is ideal for generating a more artistically pleasant
 ///     surface directly from point distributions. It aims to avoid typical
 ///     post filtering operations used to smooth surface volumes. Note however
-///     that this method may not necessarily produce a *symmetrical* narrow
-///     band level set; the exterior band may be smaller than desired depending
-///     on the search radius - the surface can be rebuilt or resized if
-///     necessary. The same closet point algorithm is used to transfer
-///     attributes.
+///     that this method can be prone to temporal instabilities (that is, given
+///     a sequence of frames, consecutive frames may not generate surfaces that
+///     transition as smoothly) due to changes in point distributions resulting
+///     in more abrupt surface changes. It may also not necessarily produce a
+///     *symmetrical* narrow band level set; the exterior band may be smaller
+///     than desired depending on the search radius - the surface can be rebuilt
+///     or resized if necessary. The same closet point algorithm is used to
+///     transfer attributes.
 ///
 /// - Rasterize Ellipsoids.
 ///
@@ -298,7 +301,8 @@ struct EllipsoidSettings
     using BaseT::radius;
     using BaseT::radiusScale;
 
-    /// @param rotation  the attribute containing each points orientation
+    /// @param rotation  the attribute containing each points orthogonal
+    ///   rotation matrix.
     /// @details  This attribute must exist and represents the rotation of
     ///   each points ellipse. Must be a Mat3s type.
     std::string rotation = "rotation";

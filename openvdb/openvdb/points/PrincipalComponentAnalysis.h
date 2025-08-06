@@ -43,7 +43,7 @@ namespace points {
 struct PcaSettings;
 struct PcaAttributes;
 
-/// @brief  Calculate  Calculate ellipsoid transformations from the local point
+/// @brief  Calculate ellipsoid transformations from the local point
 ///   distributions as described in Yu and Turk's 'Reconstructing Fluid Surfaces
 ///   with Anisotropic Kernels'. The results are stored on the attributes
 ///   pointed to by the PcaAttributes. See the PcaSettings and PcaAttributes
@@ -161,8 +161,8 @@ struct PcaAttributes
     std::string stretch = "stretch";
 
     /// @brief  Settings for the "rotation" attribute, a floating point matrix
-    ///   attribute which represents the rotation of each points ellipse or
-    ///   the identity matrix for isolated points.
+    ///   attribute which represents the orthogonal rotation of each points
+    ///   ellipse or the identity matrix for isolated points.
     using RotationT = math::Mat3<float>;
     std::string rotation = "rotation";
 

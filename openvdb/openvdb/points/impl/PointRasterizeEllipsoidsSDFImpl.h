@@ -48,13 +48,13 @@ calcEllipsoidBoundMax(const math::Mat3s& ellipsoidTransform)
     return boundMax;
 }
 
-struct EllipsIndicies
+struct EllipseIndicies
 {
-    EllipsIndicies(const points::AttributeSet::Descriptor& desc,
+    EllipseIndicies(const points::AttributeSet::Descriptor& desc,
             const std::string& rotation,
             const std::string& pws)
-        : rotation(EllipsIndicies::getAttributeIndex<Mat3s>(desc, rotation, false))
-        , positionws(EllipsIndicies::getAttributeIndex<Vec3d>(desc, pws, true)) {}
+        : rotation(EllipseIndicies::getAttributeIndex<Mat3s>(desc, rotation, false))
+        , positionws(EllipseIndicies::getAttributeIndex<Vec3d>(desc, pws, true)) {}
 
     bool hasWorldSpacePosition() const { return positionws != std::numeric_limits<size_t>::max(); }
 
@@ -108,7 +108,7 @@ struct EllipsoidTransfer :
             const FilterT& filter,
             util::NullInterrupter* interrupt,
             SdfT& surface,
-            const EllipsIndicies& indices,
+            const EllipseIndicies& indices,
             Int64Tree* cpg = nullptr,
             const std::unordered_map<const PointDataTree::LeafNodeType*, Index>* ids = nullptr)
         : BaseT(pidx, width, rt, source, filter, interrupt, surface, cpg, ids)
@@ -253,27 +253,27 @@ struct EllipsoidTransfer :
                     //  the sqrts and projections when outside the half band
                     len = math::Sqrt(len);
                     if (OPENVDB_UNLIKELY(len == 0)) {
-                        // The minimum radius of this ellips in world space. Used only to store
+                        // The minimum radius of this ellipse in world space. Used only to store
                         // a distance when a given voxel's ijk coordinates overlaps exactly with
-                        // the center of an ellips
+                        // the center of an ellipse
                         d = -ValueT(std::min(radius.x(), std::min(radius.y(), radius.z()))) * ValueT(this->mDx);
                     }
                     else {
-                        Vec3d ellipsNormal = (ellipsoidInverse.transpose() * pointOnUnitSphere);
-                        ellipsNormal.normalize();
-                        // Project xyz onto the ellips normal, scale length by
+                        Vec3d ellipseNormal = (ellipsoidInverse.transpose() * pointOnUnitSphere);
+                        ellipseNormal.normalize();
+                        // Project xyz onto the ellipse normal, scale length by
                         // the offset correction based on the distance from the
                         // unit sphere surface and finally convert back to
                         // world space
                         //
                         // Invert the length to represent a proportional offset to
                         // the final distance when the above sphere point is
-                        // projected back onto the ellips. If the length iz zero,
-                        // then this voxel's ijk is the center of the ellips.
+                        // projected back onto the ellipse. If the length iz zero,
+                        // then this voxel's ijk is the center of the ellipse.
                         d = static_cast<ValueT>(
-                                ((x * ellipsNormal.x()) +
-                                 (y * ellipsNormal.y()) +
-                                 (z * ellipsNormal.z()))       // dot product
+                                ((x * ellipseNormal.x()) +
+                                 (y * ellipseNormal.y()) +
+                                 (z * ellipseNormal.z()))       // dot product
                                     * (1.0 - (RealT(1.0)/len)) // scale
                                     * this->mDx);              // world space
                     }
@@ -287,9 +287,9 @@ struct EllipsoidTransfer :
 #elif OPENVDB_ELLIPSOID_KERNEL_MODE == 2
                     const RealT k2 = (pointOnUnitSphere * radInv2).length();
                     if (OPENVDB_UNLIKELY(k2 == 0)) {
-                        // The minimum radius of this ellips in world space. Used only to store
+                        // The minimum radius of this ellipse in world space. Used only to store
                         // a distance when a given voxel's ijk coordinates overlaps exactly with
-                        // the center of an ellips
+                        // the center of an ellipse
                         d = -ValueT(std::min(radius.x(), std::min(radius.y(), radius.z()))) * ValueT(this->mDx);
                     }
                     else {
@@ -317,14 +317,14 @@ struct EllipsoidTransfer :
     }
 
 private:
-    const EllipsIndicies& mIndices;
+    const EllipseIndicies& mIndices;
     std::unique_ptr<RotationHandleT> mRotationHandle;
     std::unique_ptr<PwsHandleT> mPositionWSHandle;
 };
 
 
 template<typename RadiusType, typename MaskTreeT>
-struct EllipsSurfaceMaskOp
+struct EllipseSurfaceMaskOp
     : public rasterize_sdf_internal::SurfaceMaskOp<MaskTreeT>
 {
     using BaseT = rasterize_sdf_internal::SurfaceMaskOp<MaskTreeT>;
@@ -333,19 +333,19 @@ struct EllipsSurfaceMaskOp
     using RadiusT = typename RadiusType::ValueType;
     static const Index DIM = points::PointDataTree::LeafNodeType::DIM;
 
-    EllipsSurfaceMaskOp(
+    EllipseSurfaceMaskOp(
             const math::Transform& src,
             const math::Transform& trg,
             const RadiusType& rad,
             const Real halfband,
-            const EllipsIndicies& indices)
+            const EllipseIndicies& indices)
         : BaseT(src, trg, nullptr)
         , mRadius(rad)
         , mHalfband(halfband)
         , mIndices(indices)
         , mMaxDist(0) {}
 
-    EllipsSurfaceMaskOp(const EllipsSurfaceMaskOp& other, tbb::split)
+    EllipseSurfaceMaskOp(const EllipseSurfaceMaskOp& other, tbb::split)
         : BaseT(other)
         , mRadius(other.mRadius)
         , mHalfband(other.mHalfband)
@@ -354,7 +354,7 @@ struct EllipsSurfaceMaskOp
 
     Vec3i getMaxDist() const { return mMaxDist; }
 
-    void join(EllipsSurfaceMaskOp& other)
+    void join(EllipseSurfaceMaskOp& other)
     {
         mMaxDist = math::maxComponent(mMaxDist, other.mMaxDist);
         this->BaseT::join(other);
@@ -378,7 +378,7 @@ struct EllipsSurfaceMaskOp
         }
 
         // The max stretch coefficient. We can't analyze each xyz component
-        // individually as we don't take into account the ellips rotation, so
+        // individually as we don't take into account the ellipse rotation, so
         // have to expand the worst case uniformly
         const Real maxRadius = std::max(maxr.x(), std::max(maxr.y(), maxr.z()));
 
@@ -419,9 +419,9 @@ struct EllipsSurfaceMaskOp
         }
     }
 
-    /// @brief  Fill activity by analyzing the axis aligned ellips bounding
+    /// @brief  Fill activity by analyzing the axis aligned ellipse bounding
     ///   boxes on points in this leaf. Slightly slower than just looking at
-    ///   ellips stretches but produces a more accurate/tighter activation
+    ///   ellipse stretches but produces a more accurate/tighter activation
     ///   result
     void fillFromStretchAndRotation(const typename LeafManagerT::LeafNodeType& leaf)
     {
@@ -463,7 +463,7 @@ struct EllipsSurfaceMaskOp
             }
         }
 
-        // Compute max ellips bounds
+        // Compute max ellipse bounds
         points::AttributeHandle<math::Mat3s> rotHandle(leaf.constAttributeArray(mIndices.rotation));
         float maxUniformRadius(0);
         Vec3f r(radius0);
@@ -484,7 +484,7 @@ struct EllipsSurfaceMaskOp
                 }
             }
 
-            // compute AABB of ellips
+            // compute AABB of ellipse
             const math::Mat3s rotation = rotHandle.get(i);
             const math::Mat3s ellipsoidTransform = rotation.timesDiagonal(r);
             const Vec3d bounds = calcUnitEllipsoidBoundMaxSq(ellipsoidTransform);
@@ -494,7 +494,7 @@ struct EllipsSurfaceMaskOp
         for (size_t i = 0; i < 3; ++i) {
             // We don't do the sqrt per point so resolve the actual maxBounds now
             maxBounds[i] = std::sqrt(maxBounds[i]);
-            // Account for uniform stretch values - compare the ellips to isolated
+            // Account for uniform stretch values - compare the ellipse to isolated
             // points and choose the largest radius of the two
             maxBounds[i] = std::max(double(maxUniformRadius), maxBounds[i]);
         }
@@ -571,7 +571,7 @@ private:
 private:
     const RadiusType& mRadius;
     const Real mHalfband;
-    const EllipsIndicies& mIndices;
+    const EllipseIndicies& mIndices;
     Vec3i mMaxDist;
 };
 
@@ -614,20 +614,19 @@ rasterizeEllipsoids(const PointDataGridT& points,
     }
 
     // Get attributes
-    const EllipsIndicies indices(leaf->attributeSet().descriptor(),
+    const EllipseIndicies indices(leaf->attributeSet().descriptor(),
         settings.rotation,
         settings.pws); // pws is optional
 
     typename SdfT::Ptr surface;
     GridPtrVec grids;
 
-    if (settings.radius.empty())
-    {
+    if (settings.radius.empty()) {
         // Initial Index Space radius
         FixedBandRadius<Vec3f> rad(Vec3f(radiusScale / vs), float(halfband));
 
         // pre-compute ellipsoidal transform bounds and surface mask. Points that
-        // are not in the ellipse ellipses group are treated as spheres and follow
+        // are not in the ellipses group are treated as spheres and follow
         // the same logic as that of the Fixed/VaryingSurfaceMaskOps. Ellipsoids
         // instead compute the max axis-aligned bounding boxes. The maximum extents
         // of the spheres/ellipses in a leaf is used for the maximum mask/lookup.
@@ -640,7 +639,7 @@ rasterizeEllipsoids(const PointDataGridT& points,
             tree::LeafManager<const PointDataTreeT> manager(points.tree());
             // pass radius scale as index space
 
-            EllipsSurfaceMaskOp<FixedBandRadius<Vec3f>, MaskTreeT>
+            EllipseSurfaceMaskOp<FixedBandRadius<Vec3f>, MaskTreeT>
                 op(points.transform(), *transform, rad, halfband, indices);
             tbb::parallel_reduce(manager.leafRange(), op);
 
@@ -658,8 +657,7 @@ rasterizeEllipsoids(const PointDataGridT& points,
             (points, attributes, *surface,
                 width, rad, points.transform(), filter, interrupter, *surface, indices); // args
     }
-    else
-    {
+    else {
         using RadiusT = typename SettingsT::RadiusAttributeType;
 
         const size_t ridx = leaf->attributeSet().find(settings.radius);
@@ -671,7 +669,7 @@ rasterizeEllipsoids(const PointDataGridT& points,
         VaryingBandRadius<RadiusT, Vec3f> rad(ridx, float(halfband), Vec3f(radiusScale / vs));
 
         // pre-compute ellipsoidal transform bounds and surface mask. Points that
-        // are not in the ellipse ellipses group are treated as spheres and follow
+        // are not in the ellipse group are treated as spheres and follow
         // the same logic as that of the Fixed/VaryingSurfaceMaskOps. Ellipsoids
         // instead compute the max axis-aligned bounding boxes. The maximum extents
         // of the spheres/ellipses in a leaf is used for the maximum mask/lookup.
@@ -684,7 +682,7 @@ rasterizeEllipsoids(const PointDataGridT& points,
             tree::LeafManager<const PointDataTreeT> manager(points.tree());
 
             // pass radius scale as index space
-            EllipsSurfaceMaskOp<VaryingBandRadius<RadiusT, Vec3f>, MaskTreeT>
+            EllipseSurfaceMaskOp<VaryingBandRadius<RadiusT, Vec3f>, MaskTreeT>
                 op(points.transform(), *transform, rad, halfband, indices);
             tbb::parallel_reduce(manager.leafRange(), op);
 

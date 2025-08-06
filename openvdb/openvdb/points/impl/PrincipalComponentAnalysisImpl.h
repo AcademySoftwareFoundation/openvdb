@@ -238,8 +238,7 @@ struct WeightPosSumsTransfer
         const Coord& a(bounds.min());
         const Coord& b(bounds.max());
 
-        for (Index srcid = start; srcid < end; srcid += step)
-        {
+        for (Index srcid = start; srcid < end; srcid += step) {
             const Vec3d Psrc(this->mSourcePosition->get(srcid));
             const Vec3d PsrcIS = Psrc * this->mDxInv;
 
@@ -281,8 +280,7 @@ struct WeightPosSumsTransfer
                         ///   we get a self contribution, could guarantee this
                         ///   by enabling the OPENVDB_PCA_SELF_CONTRIBUTION == 0
                         ///   check and adding it afterwards.
-                        for (Index tgtid = targetStart; tgtid < targetEnd; tgtid += targetStep)
-                        {
+                        for (Index tgtid = targetStart; tgtid < targetEnd; tgtid += targetStep) {
 #if OPENVDB_PCA_SELF_CONTRIBUTION == 0
                             if (OPENVDB_UNLIKELY(this->mIsSameLeaf && tgtid == srcid)) continue;
 #endif
@@ -320,8 +318,7 @@ struct WeightPosSumsTransfer
         points::GroupWriteHandle group(leaf.groupWriteHandle(this->mIndices.mEllipsesGroupIndex));
 
         const int32_t threshold = int32_t(this->neighbourThreshold());
-        for (Index i = 0; i < this->mTargetPosition->size(); ++i)
-        {
+        for (Index i = 0; i < this->mTargetPosition->size(); ++i) {
             // turn points OFF if they are ON and don't meet max neighbour requirements
             if ((threshold == 0 || (mCounts[i] < threshold)) && group.getUnsafe(i)) {
                 group.setUnsafe(i, false);
@@ -395,8 +392,7 @@ struct CovarianceTransfer
         const Coord& a(bounds.min());
         const Coord& b(bounds.max());
 
-        for (Index srcid = start; srcid < end; srcid += step)
-        {
+        for (Index srcid = start; srcid < end; srcid += step) {
             const Vec3d Psrc(this->mSourcePosition->get(srcid));
             const Vec3d PsrcIS = Psrc * this->mDxInv;
 
@@ -433,8 +429,7 @@ struct CovarianceTransfer
                         const Index targetStep =
                             std::max(Index(1), Index((targetEnd - targetStart) / this->maxTargetPointsPerVoxel()));
 
-                        for (Index tgtid = targetStart; tgtid < targetEnd; tgtid += targetStep)
-                        {
+                        for (Index tgtid = targetStart; tgtid < targetEnd; tgtid += targetStep) {
                             if (!mInclusionGroupHandle->get(tgtid)) continue;
 #if OPENVDB_PCA_SELF_CONTRIBUTION == 0
                             if (OPENVDB_UNLIKELY(this->mIsSameLeaf && tgtid == srcid)) continue;
