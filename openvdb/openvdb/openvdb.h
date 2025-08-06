@@ -120,11 +120,12 @@ template <typename T> using ToTreeType = typename T::TreeType;
 }
 /// @name Lists of native Tree Types
 /// @{
-using RealTreeTypes    = RealGridTypes::Transform<internal::ToTreeType>;
-using IntegerTreeTypes = IntegerGridTypes::Transform<internal::ToTreeType>;
-using NumericTreeTypes = NumericGridTypes::Transform<internal::ToTreeType>;
-using Vec3TreeTypes    = Vec3GridTypes::Transform<internal::ToTreeType>;
-using TreeTypes        = GridTypes::Transform<internal::ToTreeType>;
+using RealTreeTypes            = RealGridTypes::Transform<internal::ToTreeType>;
+using ExtendedRealTreeTypes    = ExtendedRealGridTypes::Transform<internal::ToTreeType>;
+using IntegerTreeTypes         = IntegerGridTypes::Transform<internal::ToTreeType>;
+using NumericTreeTypes         = NumericGridTypes::Transform<internal::ToTreeType>;
+using Vec3TreeTypes            = Vec3GridTypes::Transform<internal::ToTreeType>;
+using TreeTypes                = GridTypes::Transform<internal::ToTreeType>;
 /// @}
 
 
