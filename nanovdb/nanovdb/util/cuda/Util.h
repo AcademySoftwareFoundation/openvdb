@@ -198,6 +198,43 @@ inline size_t blocksPerGrid(size_t numItems, size_t threadsPerBlock)
     return (numItems + threadsPerBlock - 1) / threadsPerBlock;
 }
 
+// CUDA 13.0 changes cudaMemPrefetchAsync and cudaMemPrefetch to use a cudaMemLocation as an argument as
+// opposed to an integer device id. This function provides compatibility by returning the corresponding
+// location in CUDA 13.0 and above while passing through the device in earlier versions.
+#if (CUDART_VERSION < 13000)
+/// @brief Compatbility wrapper for cudaMemAdvise/cudaMemAdvise
+inline cudaError_t memAdvise(const void* devPtr, size_t count, cudaMemoryAdvise advice, int device) {
+    return cudaMemAdvise(devPtr, count, advice, device);
+}
+
+/// @brief Compatbility wrapper for cudaMemPrefetchAsync/cudaMemPrefetchAsync
+inline cudaError_t memPrefetchAsync(const void* devPtr, size_t count, int dstDevice, cudaStream_t stream) {
+    return cudaMemPrefetchAsync(devPtr, count, dstDevice, stream);
+}
+#else
+/// @brief Helper function that converts a device id to a cudaMemLocation
+/// @param device Integer device id
+/// @return cudaMemLocation corresponding to the device id
+inline cudaMemLocation deviceToLocation(int device) {
+    if (device < cudaCpuDeviceId) {
+        return {cudaMemLocationTypeInvalid, device};
+    } else if (device == cudaCpuDeviceId) {
+        return {cudaMemLocationTypeHost, device};
+    } else {
+        return {cudaMemLocationTypeDevice, device};
+    }
+}
+
+/// @brief Compatbility wrapper for cudaMemAdvise/cudaMemAdvise
+inline cudaError_t memAdvise(const void* devPtr, size_t count, cudaMemoryAdvise advice, int device) {
+    return cudaMemAdvise(devPtr, count, advice, deviceToLocation(device));
+}
+
+/// @brief Compatbility wrapper for cudaMemPrefetchAsync/cudaMemPrefetchAsync
+inline cudaError_t memPrefetchAsync(const void* devPtr, size_t count, int dstDevice, cudaStream_t stream) {
+    return cudaMemPrefetchAsync(devPtr, count, deviceToLocation(dstDevice), 0u, stream);
+}
+#endif
 
 #if defined(__CUDACC__)// the following functions only run on the GPU!
 
@@ -221,6 +258,57 @@ __global__ void offsetLambdaKernel(size_t numItems, unsigned int offset, Func fu
     if (tid >= numItems) return;
     func(tid + offset, args...);
 }// util::cuda::offsetLambdaKernel
+
+/// @brief Cuda kernel that launches device operator functors with arbitrary arguments
+template<class Operator, typename... Args>
+__global__
+__launch_bounds__(Operator::MaxThreadsPerBlock, Operator::MinBlocksPerMultiprocessor)
+void operatorKernel(
+    Args... args)
+{
+    Operator op;
+    op( args... );
+}
+
+/// @brief Cuda kernel that launches device operator functors with arbitrary arguments, using dynamic shared memory
+template<class Operator, typename... Args>
+__global__
+__launch_bounds__(Operator::MaxThreadsPerBlock, Operator::MinBlocksPerMultiprocessor)
+void operatorKernelDynamic(Args... args)
+{
+    extern __shared__ char smem_buf[];
+    Operator op;
+    op( args..., smem_buf );
+}
+
+/// @brief Wrapper for launching a device operator that leverages dynamic shared memory, with a specified size
+/// @code
+/// struct MyFunctor
+/// {
+///     // These are passed to __launch_bounds__
+///     static constexpr int MaxThreadsPerBlock = <nThreads>
+///     static constexpr int MinBlocksPerMultiprocessor = 1;
+///
+///     struct SharedStorage {
+///         // Include whatever is needed in smem
+///     };
+///
+///     __device__
+///     void operator()(Args ... myArgs, char smem_buf[])
+///     { ... }
+/// };
+///
+/// dynamicSharedMemoryLauncher<MyFunctor>(nBlocks, sizeof(typename MyFunctor::SharedStorage), myArgs...);
+/// // smem_buff of size sizeof(MyFunctor::SharedStorage) will be automatically passed along
+/// @endcode
+template<class Operator, typename... Args>
+void dynamicSharedMemoryLauncher(const size_t numItems, const size_t smem_size, cudaStream_t stream, Args... args)
+{
+    cudaCheck(cudaFuncSetAttribute(operatorKernelDynamic<Operator, Args...>,
+        cudaFuncAttributeMaxDynamicSharedMemorySize,smem_size));
+    operatorKernelDynamic<Operator>
+        <<<numItems, Operator::MaxThreadsPerBlock, smem_size, stream>>>( args ... );
+}
 
 #endif// __CUDACC__
 

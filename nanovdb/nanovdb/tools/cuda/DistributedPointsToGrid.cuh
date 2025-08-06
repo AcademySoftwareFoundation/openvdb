@@ -11,12 +11,12 @@
              to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NVIDIA_TOOLS_CUDA_DISTRIBUTEDPOINTSTOGRID_CUH_HAS_BEEN_INCLUDED
-#define NVIDIA_TOOLS_CUDA_DISTRIBUTEDPOINTSTOGRID_CUH_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_TOOLS_CUDA_DISTRIBUTEDPOINTSTOGRID_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_TOOLS_CUDA_DISTRIBUTEDPOINTSTOGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/cuda/DeviceMesh.h>
-#include <nanovdb/cuda/TempDevicePool.h>
+#include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 #include <nanovdb/util/cuda/Util.h>
@@ -240,17 +240,21 @@ public:
     /// @brief Creates a handle to a grid with the specified build type from a list of points in index or world space
     /// @tparam BuildT Build type of the output grid, i.e NanoGrid<BuildT>
     /// @tparam PtrT Template type to a raw or fancy-pointer of point coordinates in world or index space.
+    /// @tparam BufferT Template type of buffer used for memory allocation on the device. Must support Unified Memory.
     /// @param points device pointer to an array of points or voxels
     /// @param pointCount number of input points or voxels
+    /// @param buffer Optional buffer to guide the allocation
     /// @return returns a handle with a grid of type NanoGrid<BuildT> in unified memory
-    template<typename PtrT>
-    GridHandle<nanovdb::cuda::UnifiedBuffer> getHandle(const PtrT points, size_t pointCount);
+    template <typename PtrT, typename BufferT = nanovdb::cuda::UnifiedBuffer>
+    GridHandle<BufferT> getHandle(const PtrT points,
+                                  size_t pointCount,
+                                  const BufferT &buffer = BufferT());
 
     template <typename PtrT>
     void countNodes(const PtrT coords, size_t coordCount);
 
-    template <typename PtrT>
-    nanovdb::cuda::UnifiedBuffer getBuffer(const PtrT, size_t pointCount);
+    template <typename PtrT, typename BufferT = nanovdb::cuda::UnifiedBuffer>
+    BufferT getBuffer(const PtrT, size_t pointCount, const BufferT &buffer);
 
     template <typename PtrT>
     void processGridTreeRoot(const PtrT points, size_t pointCount);
@@ -275,7 +279,7 @@ private:
 
     PointType mPointType;
     std::string mGridName;
-    typename PointsToGrid<BuildT>::Data *mData;
+    PointsToGridData<BuildT> *mData;
     CheckMode mChecksum{CheckMode::Disable};
 
     size_t* mStripeCounts;
@@ -300,7 +304,7 @@ DistributedPointsToGrid<BuildT>::DistributedPointsToGrid(const nanovdb::cuda::De
 {
     mTempDevicePools = new nanovdb::cuda::TempDevicePool[mDeviceMesh.deviceCount()];
 
-    cudaCheck(cudaMallocManaged(&mData, sizeof(typename PointsToGrid<BuildT>::Data)));
+    cudaCheck(cudaMallocManaged(&mData, sizeof(PointsToGridData<BuildT>)));
     mData->flags.initMask({GridFlags::HasBBox, GridFlags::IsBreadthFirst});
     mData->map = map;
 
@@ -346,13 +350,13 @@ DistributedPointsToGrid<BuildT>::~DistributedPointsToGrid()
 }
 
 template<typename BuildT>
-template<typename PtrT>
-inline GridHandle<nanovdb::cuda::UnifiedBuffer>
-DistributedPointsToGrid<BuildT>::getHandle(const PtrT points, size_t pointCount)
+template<typename PtrT, typename BufferT>
+inline GridHandle<BufferT>
+DistributedPointsToGrid<BuildT>::getHandle(const PtrT points, size_t pointCount, const BufferT &pool)
 {
     this->countNodes(points, pointCount);
 
-    auto buffer = this->getBuffer(points, pointCount);
+    auto buffer = this->getBuffer<PtrT, BufferT>(points, pointCount, pool);
 
     this->processGridTreeRoot(points, pointCount);
 
@@ -370,7 +374,7 @@ DistributedPointsToGrid<BuildT>::getHandle(const PtrT points, size_t pointCount)
         cudaCheck(cudaStreamSynchronize(stream));
     }
 
-    return GridHandle<nanovdb::cuda::UnifiedBuffer>(std::move(buffer));
+    return GridHandle<BufferT>(std::move(buffer));
 }// DistributedPointsToGrid<BuildT>::getHandle
 
 template <typename BuildT>
@@ -443,17 +447,17 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         uint64_t* deviceOutputKeys = mData->d_keys + deviceStripeOffset;
         uint32_t* deviceOutputIndices = mData->d_indx + deviceStripeOffset;
 
-        cudaMemAdvise(deviceCoords, deviceStripeCount * sizeof(nanovdb::Coord), cudaMemAdviseSetPreferredLocation, deviceId);
-        cudaMemAdvise(deviceCoords, deviceStripeCount * sizeof(nanovdb::Coord), cudaMemAdviseSetReadMostly, deviceId);
+        util::cuda::memAdvise(deviceCoords, deviceStripeCount * sizeof(nanovdb::Coord), cudaMemAdviseSetPreferredLocation, deviceId);
+        util::cuda::memAdvise(deviceCoords, deviceStripeCount * sizeof(nanovdb::Coord), cudaMemAdviseSetReadMostly, deviceId);
 
-        cudaMemAdvise(deviceInputKeys, deviceStripeCount * sizeof(uint64_t), cudaMemAdviseSetPreferredLocation, deviceId);
-        cudaMemAdvise(deviceInputIndices, deviceStripeCount * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
-        cudaMemAdvise(deviceOutputKeys, deviceStripeCount * sizeof(uint64_t), cudaMemAdviseSetPreferredLocation, deviceId);
-        cudaMemAdvise(deviceOutputIndices, deviceStripeCount * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
+        util::cuda::memAdvise(deviceInputKeys, deviceStripeCount * sizeof(uint64_t), cudaMemAdviseSetPreferredLocation, deviceId);
+        util::cuda::memAdvise(deviceInputIndices, deviceStripeCount * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
+        util::cuda::memAdvise(deviceOutputKeys, deviceStripeCount * sizeof(uint64_t), cudaMemAdviseSetPreferredLocation, deviceId);
+        util::cuda::memAdvise(deviceOutputIndices, deviceStripeCount * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
 
         uint32_t* devicePointsPerTile = mPointsPerTile + deviceStripeOffset;
-        cudaMemAdvise(devicePointsPerTile, deviceStripeCount * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
-        cudaMemAdvise(deviceNodeCount(deviceId), 3 * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
+        util::cuda::memAdvise(devicePointsPerTile, deviceStripeCount * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
+        util::cuda::memAdvise(deviceNodeCount(deviceId), 3 * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
     }
 
     // Radix sort the subset of keys assigned to each device in parallel
@@ -468,7 +472,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         uint64_t* deviceOutputKeys = mData->d_keys + deviceStripeOffset;
         uint32_t* deviceOutputIndices = mData->d_indx + deviceStripeOffset;
 
-        cudaMemPrefetchAsync(coords, coordCount * sizeof(nanovdb::Coord), deviceId, stream);
+        util::cuda::memPrefetchAsync(coords, coordCount * sizeof(nanovdb::Coord), deviceId, stream);
 
         nanovdb::util::cuda::offsetLambdaKernel<<<numBlocks(deviceStripeCount), mNumThreads, 0, stream>>>(deviceStripeCount, deviceStripeOffset, TileKeyFunctor<BuildT, PtrT>(), mData, coords, mKeys, mIndices);
 
@@ -484,9 +488,9 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
 
     std::vector<std::thread> threads;
     const size_t log2DeviceCount = log2(mDeviceMesh.deviceCount());
-    for (auto deviceExponent = 0; deviceExponent < log2DeviceCount; ++deviceExponent) {
+    for (size_t deviceExponent = 0; deviceExponent < log2DeviceCount; ++deviceExponent) {
         const size_t deviceGroupCount = mDeviceMesh.deviceCount() >> deviceExponent;
-        for (int deviceGroupId = 0; deviceGroupId < deviceGroupCount; deviceGroupId += 2) {
+        for (size_t deviceGroupId = 0; deviceGroupId < deviceGroupCount; deviceGroupId += 2) {
             threads.emplace_back([&, deviceGroupId]() {
                 const int leftDeviceGroupId = deviceGroupId;
                 const int rightDeviceGroupId = deviceGroupId + 1;
@@ -615,7 +619,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
             mRightIntervals[deviceId] = 0;
         }
 
-        if (deviceId < mDeviceMesh.deviceCount() - 1) {
+        if (deviceId < static_cast<int>(mDeviceMesh.deviceCount() - 1)) {
             cudaStreamWaitEvent(stream, sortEvents[deviceId + 1]);
             EqualityIndicator<uint64_t> indicator(deviceInputKeys + deviceStripeCount);
             CUB_LAUNCH(DeviceReduce::TransformReduce, mTempDevicePools[deviceId], stream, deviceInputKeys, mLeftIntervals + deviceId, deviceStripeCount, ::cuda::std::plus(), indicator, 0);
@@ -636,7 +640,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
             kernels::rightRebalanceKernel<<<1, 1, 0, stream>>>(mLeftIntervals + deviceId - 1, mRightIntervals + deviceId, mStripeCounts + deviceId, mStripeOffsets + deviceId);
         }
 
-        if (deviceId < mDeviceMesh.deviceCount() - 1)
+        if (deviceId < static_cast<int>(mDeviceMesh.deviceCount() - 1))
         {
             cudaStreamWaitEvent(stream, transformReduceEvents[deviceId + 1]);
             kernels::leftRebalanceKernel<<<1, 1, 0, stream>>>(mLeftIntervals + deviceId, mRightIntervals + deviceId + 1, mStripeCounts + deviceId, mStripeOffsets + deviceId);
@@ -657,7 +661,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         uint64_t* deviceOutputKeys = mData->d_keys + deviceStripeOffset;
         uint32_t* devicePointsPerTile = mPointsPerTile + deviceStripeOffset;
 
-        // cudaMemPrefetchAsync(deviceInputKeys, deviceStripeCount * sizeof(uint64_t), deviceId, stream);
+        // util::cuda::memPrefetchAsync(deviceInputKeys, deviceStripeCount * sizeof(uint64_t), deviceId, stream);
 
         CUB_LAUNCH(DeviceRunLengthEncode::Encode, mTempDevicePools[deviceId], stream, deviceInputKeys, deviceOutputKeys, devicePointsPerTile, deviceNodeCount(deviceId) + 2, deviceStripeCount);
         cudaCheck(cudaEventRecord(runLengthEncodeEvents[deviceId], stream));
@@ -675,7 +679,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     }
 
     // For each tile in parallel, we construct another set of keys for the lower nodes, leaf nodes, and voxels within that tile followed by a radix sort of these keys.
-    for (int deviceId = 0, id = 0; deviceId < mDeviceMesh.deviceCount(); ++deviceId) {
+    for (int deviceId = 0, id = 0; deviceId < static_cast<int>(mDeviceMesh.deviceCount()); ++deviceId) {
         auto stream = mDeviceMesh[deviceId].stream;
         cudaCheck(cudaSetDevice(deviceId));
 
@@ -737,7 +741,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
 
             cudaCheck(cudaEventSynchronize(voxelCountEvents[deviceId]));
             uint32_t deviceNumItems = mVoxelCounts[deviceId];
-            if (deviceId < (mDeviceMesh.deviceCount() - 1))
+            if (deviceId < static_cast<int>(mDeviceMesh.deviceCount() - 1))
                 ++deviceNumItems;
 
             if (deviceId == 0) {
@@ -765,7 +769,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
             // Required for the host to pass the correct value of counts[deviceId]
             cudaCheck(cudaEventSynchronize(leafCountEvents[deviceId]));
             uint32_t deviceNumItems = leafCountIterator[deviceId];
-            if (deviceId < (mDeviceMesh.deviceCount() - 1))
+            if (deviceId < static_cast<int>(mDeviceMesh.deviceCount() - 1))
                 ++deviceNumItems;
 
             if (deviceId == 0) {
@@ -839,8 +843,8 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
 } // DistributedPointsToGrid<BuildT>::countNodes
 
 template <typename BuildT>
-template <typename PtrT>
-inline nanovdb::cuda::UnifiedBuffer DistributedPointsToGrid<BuildT>::getBuffer(const PtrT, size_t pointCount)
+template <typename PtrT, typename BufferT>
+inline BufferT DistributedPointsToGrid<BuildT>::getBuffer(const PtrT, size_t pointCount, const BufferT &pool)
 {
     auto sizeofPoint = [&]()->size_t{
         switch (mPointType){
@@ -879,7 +883,7 @@ inline nanovdb::cuda::UnifiedBuffer DistributedPointsToGrid<BuildT>::getBuffer(c
     mData->blind = mData->meta  + sizeof(GridBlindMetaData)*int( mPointType!=PointType::Disable ); // meta data ends and blind data begins
     mData->size  = mData->blind + pointCount*sizeofPoint();// end of buffer
 
-    auto buffer = nanovdb::cuda::UnifiedBuffer::create(mData->size);
+    auto buffer = BufferT::create(mData->size, &pool);
     mData->d_bufferPtr = buffer.deviceData();
     if (!mData->d_bufferPtr)
         throw std::runtime_error("Failed to allocate grid buffer in Unified Memory");
@@ -1102,4 +1106,4 @@ inline void DistributedPointsToGrid<BuildT>::processBBox()
 
 } // namespace nanovdb
 
-#endif // NVIDIA_TOOLS_CUDA_DISTRIBUTEDPOINTSTOGRID_CUH_HAS_BEEN_INCLUDED
+#endif // NANOVDB_TOOLS_CUDA_DISTRIBUTEDPOINTSTOGRID_CUH_HAS_BEEN_INCLUDED

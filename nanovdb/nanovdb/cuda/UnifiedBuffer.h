@@ -62,8 +62,8 @@ public:
     {
         assert(mSize <= mCapacity);
         cudaCheck(cudaMallocManaged(&mPtr, mCapacity, cudaMemAttachGlobal));
-        cudaCheck(cudaMemAdvise(mPtr, size, cudaMemAdviseSetPreferredLocation, device));
-        cudaCheck(cudaMemPrefetchAsync(mPtr, size, device, stream));
+        cudaCheck(util::cuda::memAdvise(mPtr, size, cudaMemAdviseSetPreferredLocation, device));
+        cudaCheck(util::cuda::memPrefetchAsync(mPtr, size, device, stream));
     }
 
     /// @brief Constructor with a specified device
@@ -113,8 +113,8 @@ public:
     {
         const size_t capacity = (reference && reference->capacity()) ? reference->capacity() : size;
         UnifiedBuffer buffer(size, capacity);
-        cudaCheck(cudaMemAdvise(buffer.mPtr, size, cudaMemAdviseSetPreferredLocation, device));
-        cudaCheck(cudaMemPrefetchAsync(buffer.mPtr, size, device, stream));
+        cudaCheck(util::cuda::memAdvise(buffer.mPtr, size, cudaMemAdviseSetPreferredLocation, device));
+        cudaCheck(util::cuda::memPrefetchAsync(buffer.mPtr, size, device, stream));
         return buffer;
     }
 
@@ -184,7 +184,7 @@ public:
         } else {
             void *ptr = 0;
             cudaCheck(cudaMallocManaged(&ptr, size, cudaMemAttachGlobal));
-            if (dev > -2) for (auto a : list) cudaCheck(cudaMemAdvise(ptr, size, a, dev));
+            if (dev > -2) for (auto a : list) cudaCheck(util::cuda::memAdvise(ptr, size, a, dev));
             if (mSize > 0) {// copy over data from the old memory block
                 cudaCheck(cudaMemcpy(ptr, mPtr, std::min(mSize, size), cudaMemcpyDefault));
                 cudaCheck(cudaFree(mPtr));
@@ -201,7 +201,7 @@ public:
     /// @param adv advice to be applied to the resized range
     void advise(ptrdiff_t byteOffset, size_t size, int dev, cudaMemoryAdvise adv) const
     {
-        cudaCheck(cudaMemAdvise(util::PtrAdd(mPtr, byteOffset), size, adv, dev));
+        cudaCheck(util::cuda::memAdvise(util::PtrAdd(mPtr, byteOffset), size, adv, dev));
     }
 
     /// @brief Apply a list of advices to a memory block
@@ -212,7 +212,7 @@ public:
     void advise(ptrdiff_t byteOffset, size_t size, int dev, std::initializer_list<cudaMemoryAdvise> list) const
     {
         void *ptr = util::PtrAdd(mPtr, byteOffset);
-        for (auto a : list)  cudaCheck(cudaMemAdvise(ptr, size, a, dev));
+        for (auto a : list)  cudaCheck(util::cuda::memAdvise(ptr, size, a, dev));
     }
 
     /// @brief Prefetches data to the specified device, i.e. ensure the device has an up-to-date copy of the memory specified
@@ -222,7 +222,7 @@ public:
     /// @param stream  cuda stream
     void prefetch(ptrdiff_t byteOffset = 0, size_t size = 0, int dev = cudaCpuDeviceId, cudaStream_t stream = cudaStreamPerThread) const
     {
-        cudaCheck(cudaMemPrefetchAsync(util::PtrAdd(mPtr, byteOffset), size ? size : mSize, dev, stream));
+        cudaCheck(util::cuda::memPrefetchAsync(util::PtrAdd(mPtr, byteOffset), size ? size : mSize, dev, stream));
     }
 
     ///////////////////////////////////////////////////////////////////////
@@ -234,7 +234,7 @@ public:
     /// @note Legacy method included for compatibility with DeviceBuffer
     void deviceUpload(int device = 0, cudaStream_t stream = cudaStreamPerThread, bool sync = false) const
     {
-        cudaCheck(cudaMemPrefetchAsync(mPtr, mSize, device, stream));
+        cudaCheck(util::cuda::memPrefetchAsync(mPtr, mSize, device, stream));
         if (sync) cudaCheck(cudaStreamSynchronize(stream));
     }
     void deviceUpload(int device, void* stream, bool sync) const{this->deviceUpload(device, cudaStream_t(stream));}
@@ -256,7 +256,7 @@ public:
     /// @param sync if false the memory copy is asynchronous
     void deviceDownload(cudaStream_t stream = 0, bool sync = false) const
     {
-        cudaCheck(cudaMemPrefetchAsync(mPtr, mSize, cudaCpuDeviceId, stream));
+        cudaCheck(util::cuda::memPrefetchAsync(mPtr, mSize, cudaCpuDeviceId, stream));
         if (sync) cudaCheck(cudaStreamSynchronize(stream));
     }
 

@@ -9,6 +9,7 @@
 #include <nanovdb/tools/CreatePrimitives.h>
 #include <nanovdb/NodeManager.h>
 #include <nanovdb/util/cuda/Util.h>
+#include <nanovdb/tools/cuda/VoxelBlockManager.cuh>
 #include <nanovdb/tools/cuda/SignedFloodFill.cuh>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 #include <nanovdb/tools/cuda/IndexToGrid.cuh>
@@ -54,6 +55,44 @@ void device2host(size_t count)
     float *array = reinterpret_cast<float*>(buffer.data());
     for (size_t i=0; i<count; ++i) EXPECT_EQ(array[i], float(i));
 }// device2host
+void host2device(size_t count)
+{
+    const size_t size = count * sizeof(float);
+    auto hostBuffer = nanovdb::HostBuffer(size);
+    for (size_t i=0; i<count; ++i) *hostBuffer.data<float>(i) = float(i);
+
+    int dev;
+    cudaError_t err = cudaGetDevice(&dev);
+    if (err != cudaSuccess) printf("kernel cuda error: %d\n", (int)err);
+
+    auto devBuffer = nanovdb::cuda::DeviceBuffer::create(hostBuffer, dev);// on device only
+    EXPECT_EQ(size, devBuffer.size());
+    EXPECT_FALSE(devBuffer.data());
+    EXPECT_TRUE(devBuffer.deviceData());
+    float *d_array = reinterpret_cast<float*>(devBuffer.deviceData());
+    constexpr unsigned int num_threads = 256;
+    unsigned int num_blocks = num_blocks = (static_cast<unsigned int>(count) + num_threads - 1) / num_threads;
+
+    bool *test, *d_test;
+    cudaCheck(cudaMallocHost((void**)&test, sizeof(bool)));
+    cudaCheck(cudaMalloc((void**)&d_test, sizeof(bool)));
+    *test = true;
+    cudaCheck(cudaMemcpyAsync(d_test, test, sizeof(bool), cudaMemcpyHostToDevice));// on host only
+
+    nanovdb::util::cuda::lambdaKernel<<<num_blocks, num_threads>>>(count, [=] __device__ (size_t i) {
+        if (d_array[i] != float(i)) *d_test = false;
+        d_array[i] = float(i) + 1.0f;
+    });
+    cudaCheck(cudaMemcpy(test, d_test, sizeof(bool), cudaMemcpyDeviceToHost));
+    EXPECT_TRUE(*test);
+    cudaCheck(cudaFreeHost(test));
+    cudaCheck(cudaFree(d_test));
+    devBuffer.deviceDownload();// copy device -> host
+    EXPECT_EQ(size, devBuffer.size());
+    EXPECT_TRUE(devBuffer.data());
+    EXPECT_TRUE(devBuffer.deviceData());
+    for (size_t i=0; i<count; ++i) EXPECT_EQ(*hostBuffer.data<float>(i) + 1.0f, *devBuffer.data<float>(i));
+}// host2device
 // used for testing cuda::DeviceBuffer
 void host2device2host(size_t count)
 {
@@ -155,6 +194,7 @@ TEST(TestNanoVDBCUDA, CudaDeviceBuffer)
         EXPECT_FALSE(buffer.empty());
     }
     nanovdb::test::device2host(1000);
+    nanovdb::test::host2device(1000);
     nanovdb::test::host2device2host(1000);
 }
 
@@ -3494,3 +3534,139 @@ TEST(TestNanoVDBCUDA, UnifiedBuffer_createLevelSetSphere)
     EXPECT_EQ(nanovdb::Coord(center - radius - 2), dstGrid->indexBBox()[0]);
     EXPECT_EQ(nanovdb::Coord(center + radius + 2), dstGrid->indexBBox()[1]);
 } // UnifiedBuffer_createLevelSetSphere
+
+template<class BuildT>
+__global__ void testComputeStencilNeighborsKernel(
+    nanovdb::NanoGrid<BuildT> *grid,
+    uint32_t *firstLeafIDArray,
+    uint64_t *jumpMapArray,
+    uint64_t *stencilNeighborsArray)
+{
+    static constexpr int BlockWidth = 128;
+    static constexpr int JumpMapLength = BlockWidth >> 6;
+    int bID = blockIdx.x;
+    int tID = threadIdx.x;
+
+    uint32_t &firstLeafID = firstLeafIDArray[bID];
+    uint64_t *jumpMap = jumpMapArray + JumpMapLength * bID;
+    int firstOffset = 1;
+    int blockFirstOffset = firstOffset + bID * BlockWidth;
+    __shared__ uint32_t leafIndex[BlockWidth];
+    __shared__ uint16_t voxelOffset[BlockWidth];
+
+    nanovdb::tools::cuda::VoxelBlockManager<BlockWidth>::decodeInverseMaps(
+        grid, firstLeafID, jumpMap, blockFirstOffset, &leafIndex[0], &voxelOffset[0]);
+
+    uint64_t localNeighbors[27] = {};
+    nanovdb::tools::cuda::VoxelBlockManager<BlockWidth>::computeBoxStencil(
+        grid, &leafIndex[0], &voxelOffset[0], localNeighbors);
+    __syncthreads();
+
+    using StencilNeighborsType = uint64_t (*)[27];
+    auto stencilNeighbors = reinterpret_cast<StencilNeighborsType>(stencilNeighborsArray+27*BlockWidth*bID);
+    for (int i = 0; i < 27; i++)
+        stencilNeighbors[tID][i] = localNeighbors[i];
+}
+
+TEST(TestNanoVDBCUDA, VoxelBlockManager_ValueOnIndex)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+
+    // Create a test domain (21^3 box)
+    std::vector<nanovdb::Coord> voxels;
+    nanovdb::CoordBBox bbox = nanovdb::CoordBBox::createCube(125,145); // Coordinates chosen to span more than 1 lower node
+    for (auto it = bbox.begin(); it; it++) voxels.push_back(*it);
+    constexpr std::size_t BlockWidthLog2 = 7;
+    constexpr std::size_t BlockWidth = 1 << BlockWidthLog2; // 128
+    constexpr std::size_t JumpMapLength = BlockWidth >> 6; // 2
+    const std::size_t nVoxels = voxels.size();
+    const std::size_t nBlocks = (nVoxels + BlockWidth - 1) >> BlockWidthLog2;
+    nanovdb::Coord *deviceVoxels;
+    cudaCheck(cudaMalloc(&deviceVoxels, nVoxels * sizeof(nanovdb::Coord)));
+    cudaCheck(cudaMemcpy(deviceVoxels, voxels.data(), nVoxels * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice)); // CPU -> GPU
+    auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(deviceVoxels, nVoxels);
+    cudaCheck(cudaFree(deviceVoxels));
+    EXPECT_TRUE((handle.deviceData())); // grid only exists on the GPU
+    auto deviceGrid = handle.deviceGrid<BuildT>();
+    EXPECT_FALSE(handle.data()); // no grid was yet allocated on the CPU
+    handle.deviceDownload();
+    EXPECT_TRUE(handle.data()); // no grid was yet allocated on the CPU
+    auto grid = handle.grid<BuildT>();
+    EXPECT_TRUE(grid);
+    std::size_t nLowerNodes = grid->tree().nodeCount(1);
+
+    // Build VBM structures (firstLeafID and jumpMap)
+    uint32_t *deviceFirstLeafID;
+    uint64_t *deviceJumpMap;
+    cudaCheck(cudaMalloc(&deviceFirstLeafID, nBlocks * sizeof(uint32_t)));
+    cudaCheck(cudaMemset(deviceFirstLeafID, 0, nBlocks * sizeof(uint32_t)));
+    cudaCheck(cudaMalloc(&deviceJumpMap, nBlocks * JumpMapLength * sizeof(uint64_t)));
+    cudaCheck(cudaMemset(deviceJumpMap, 0, nBlocks * JumpMapLength * sizeof(uint64_t)));
+    nanovdb::tools::cuda::buildVoxelBlockManager<BlockWidthLog2>( 1, nVoxels, nBlocks, nLowerNodes,
+        deviceGrid, deviceFirstLeafID, deviceJumpMap );
+
+    // Compute stencil neighbors
+    const size_t neighborStencilSize = nBlocks * BlockWidth * 27 * sizeof(uint64_t);
+    auto neighborStencilBuffer = nanovdb::cuda::DeviceBuffer::create(neighborStencilSize, nullptr, false);
+    EXPECT_TRUE(neighborStencilBuffer.deviceData());
+    testComputeStencilNeighborsKernel<<<nBlocks,BlockWidth>>>(deviceGrid, deviceFirstLeafID, deviceJumpMap,
+        reinterpret_cast<uint64_t*>(neighborStencilBuffer.deviceData()));
+    cudaCheck(cudaGetLastError());
+
+    // Verify stencil neighbors against results of standard accessors
+    neighborStencilBuffer.deviceDownload();
+    EXPECT_TRUE(neighborStencilBuffer.data());
+    using StencilNeighborsType = uint64_t (*)[27];
+    auto stencilNeighbors = reinterpret_cast<StencilNeighborsType>(neighborStencilBuffer.data());
+    auto acc = grid->getAccessor();
+    for (int i = 0; i < voxels.size(); ++i) {
+        const auto& coord = voxels[i];
+        const auto index = acc.getValue(coord);
+        for (int di = -1; di <= 1; di++)
+        for (int dj = -1; dj <= 1; dj++)
+        for (int dk = -1; dk <= 1; dk++) {
+            int spokeID = ( di + 1 ) * 9 + ( dj + 1 ) * 3 + dk + 1;
+            const auto neighbor = coord.offsetBy( di, dj, dk );
+            const auto neighborIndex = acc.getValue(neighbor);
+            EXPECT_EQ( neighborIndex, stencilNeighbors[index-1][spokeID] ); } }
+    cudaCheck(cudaFree(deviceFirstLeafID));
+    cudaCheck(cudaFree(deviceJumpMap));
+}// VoxelBlockManager_ValueOnIndex
+
+TEST(TestNanoVDBCUDA, GridHandle_from_HostBuffer)
+{
+    using namespace nanovdb;
+    using BufferT = nanovdb::cuda::DeviceBuffer;
+    auto hostHandle = tools::createLevelSetSphere<float>(100, Vec3d(0),1,3, Vec3d(0), "test");
+
+    int dev;
+    cudaError_t err = cudaGetDevice(&dev);
+    EXPECT_EQ(err, cudaSuccess);
+    cudaStream_t stream;
+    cudaCheck(cudaStreamCreate(&stream));
+
+    {// longer version
+        auto devBuffer = BufferT::create(hostHandle.buffer(), dev, stream);
+        EXPECT_EQ(hostHandle.bufferSize(), devBuffer.size());
+        auto devHandle = GridHandle<BufferT>(std::move(devBuffer));
+
+        // testing
+        EXPECT_EQ(hostHandle.bufferSize(), devHandle.bufferSize());
+        EXPECT_EQ(devBuffer.size(), 0);
+        devHandle.deviceDownload(stream);
+        for (uint64_t i=0; i<hostHandle.bufferSize(); ++i) {
+            EXPECT_EQ(*hostHandle.buffer().data<char>(i), *devHandle.buffer().data<char>(i));
+        }
+    }
+    {// compact version
+        auto devHandle = GridHandle<BufferT>(BufferT::create(hostHandle.buffer(), dev, stream));
+
+        // testing
+        EXPECT_EQ(hostHandle.bufferSize(), devHandle.bufferSize());
+        devHandle.deviceDownload(stream);
+        for (uint64_t i=0; i<hostHandle.bufferSize(); ++i) {
+            EXPECT_EQ(*hostHandle.buffer().data<char>(i), *devHandle.buffer().data<char>(i));
+        }
+    }
+}
+
