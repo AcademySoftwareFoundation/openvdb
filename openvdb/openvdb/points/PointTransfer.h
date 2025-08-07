@@ -36,9 +36,24 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace points {
 
-/// @par A transfer scheme must be configured to call the provided
-///   rasterize methods. See below for an example or
-///   PointRasterizeSDF.h/PointRasterizeTrilinear.h for implementations.
+/// @brief Perform potentially complex rasterization from a user defined
+///  transfer scheme. See below comments for the transfer scheme API.
+/// @details The method works by looping over a single Tree topology, looking
+///   up point data at a position relative to that topology and passing that
+///   data to a transfer scheme TransferT.
+/// @note  Each thread receives a copy of the transfer scheme object.
+/// @param points       the point data grid or tree to rasterize
+/// @param transfer     the transfer scheme
+template <typename PointDataTreeOrGridT, typename TransferT>
+inline void
+rasterize(const PointDataTreeOrGridT& points, TransferT& transfer);
+
+/// @par A transfer scheme must be configured to call the provided rasterize
+///   methods. See below for an example, or the various native VDB files which
+///   implement schemes e.g.:
+///     - PointRasterizeSDF.h
+///     - PointRasterizeTrilinear.h
+///     - PrincipalComponentAnalysisImpl.h
 /// @code
 /// struct Transfer
 /// {
@@ -68,6 +83,12 @@ namespace points {
 ///     ///   and skip the current leaf's contribution to the destination volume.
 ///     inline bool startPointLeaf(const PointDataTree::LeafNodeType& leaf);
 ///
+///     ///////////////////////////////////////////////////////////////////////
+///
+///     // Transfer scheme must implement either:
+///     //   - rasterizePoint(Coord, Index, CoordBBox) OR
+///     //   - rasterizePoints(Coord, Index, Index, CoordBBox)
+///
 ///     /// @brief  The point stamp function. Each point which contributes to
 ///     ///  the current leaf will call this function exactly once.
 ///     /// @param ijk  The current voxel containing the point being rasterized.
@@ -75,8 +96,22 @@ namespace points {
 ///     /// @param id   The point index being rasterized
 ///     /// @param bounds  The active bounds of the leaf node.
 ///     void rasterizePoint(const Coord& ijk,
-///                     const Index id,
-///                     const CoordBBox& bounds);
+///         const Index id,
+///         const CoordBBox& bounds);
+///
+///     /// @brief  Same as above, except this is passed a range of points
+///     ///   that all belong to the same voxel
+///     /// @param ijk  The current voxel containing the point being rasterized.
+///     ///   May be outside the destination leaf node depending on the range()
+///     /// @param start   The start point index being rasterized
+///     /// @param end     The end point index being rasterized
+///     /// @param bounds  The active bounds of the leaf node.
+///     void rasterizePoints(const Coord& ijk,
+///          const Index start,
+///          const Index end,
+///          const CoordBBox& bounds);
+///
+///     ///////////////////////////////////////////////////////////////////////
 ///
 ///     /// @brief  Run each time a point leaf is finished with.
 ///     /// @param leaf  The PointDataLeafNode which was being accessed.
@@ -105,22 +140,22 @@ namespace points {
 /// {
 ///     MyTransfer(FloatGrid& dest, const PointDataGrid& source)
 ///         : TransformTransfer(source.transform(), dest.transform())
-///         , VolumeTransfer(dest.tree())
-///         , mHandle(nullptr) {}
+///         , VolumeTransfer(dest.tree()) {}
 ///
 ///     MyTransfer(const MyTransfer& other)
 ///         : TransformTransfer(other)
-///         , VolumeTransfer(other)
-///         , mHandle(nullptr) {}
+///         , VolumeTransfer(other) {}
 ///
 ///     /// @brief Range in index space of the source points
-///     Int32 range(const Coord&, size_t) const { return Int32(1); }
+///     Vec3i range(const Coord&, size_t) const { return Vec3i(1); }
 ///
 ///     /// @brief Every time we start a new point leaf, init the position array.
 ///     ///   Always return true as we don't skip any leaf nodes.
 ///     bool startPointLeaf(const PointDataTree::LeafNodeType& leaf)
 ///     {
-///         mHandle.reset(new AttributeHandle<Vec3f>(leaf.constAttributeArray("P"));
+///         // @note consider caching the indices to "P" and "mygroup" for faster lookups
+///         mHandle = std::make_unique<AttributeHandle<Vec3f>>(leaf.constAttributeArray("P"));
+///         mFilter = std::make_unique<GroupFilter>("mygroup", leaf.attributeSet());
 ///         return true;
 ///     }
 ///
@@ -128,6 +163,8 @@ namespace points {
 ///     ///   the destination tree and sum the length of its distance
 ///     void rasterizePoint(const Coord& ijk, const Index id, const CoordBBox& bounds)
 ///     {
+///         // skip points not in "mygroup"
+///         if (!mFilter->valid(&id)) return;
 ///         Vec3d P = ijk.asVec3d() + Vec3d(this->mHandle->get(id));
 ///         P = this->transformSourceToTarget(P); // TransformTransfer::transformSourceToTarget
 ///         // for each active voxel, accumulate distance
@@ -146,32 +183,13 @@ namespace points {
 ///     bool finalize(const Coord&, size_t) { return false; }
 ///
 /// private:
-///     std::unique_ptr<AttributeHandle<Vec3f>> mHandle;
+///     std::unique_ptr<AttributeHandle<Vec3f>> mHandle {nullptr};
+///     std::unique_ptr<GroupFilter> mFilter {nullptr};
 /// };
 /// @endcode
 
 
-/// @brief Perform potentially complex rasterization from a user defined
-///  transfer scheme.
-/// @details The method works by looping over a single Tree topology, looking
-///   up point data at a position relative to that topology and passing that
-///   data to a transfer scheme TransferT.
-/// @note  Each thread receives a copy of the transfer scheme object.
-/// @param points       the point data grid to rasterize
-/// @param transfer     the transfer scheme
-/// @param filter       optional point filter
-/// @param interrupter  optional interrupter
-template <typename PointDataTreeOrGridT,
-    typename TransferT,
-    typename FilterT = NullFilter,
-    typename InterrupterT = util::NullInterrupter>
-inline void
-rasterize(const PointDataTreeOrGridT& points,
-          TransferT& transfer,
-          const FilterT& filter = NullFilter(),
-          InterrupterT* interrupter = nullptr);
-
-
+///////////////////////////////////////////////////
 ///////////////////////////////////////////////////
 
 /// @brief  The TransformTransfer module should be used if the source transform
@@ -205,6 +223,69 @@ struct TransformTransfer
 private:
     const math::Transform& mSourceTransform;
     const math::Transform& mTargetTransform;
+};
+
+/// @brief  InterruptableTransfer module, when derived from allows for schemes
+///    to callback into a interrupter, derived from util::NullInterrupter.
+struct InterruptableTransfer
+{
+    InterruptableTransfer(util::NullInterrupter* const interrupt)
+        : mInterrupt(interrupt) {}
+    inline bool interrupted() const
+    {
+        if (!util::wasInterrupted(mInterrupt)) return false;
+        thread::cancelGroupExecution();
+        return true;
+    }
+private:
+    util::NullInterrupter* const mInterrupt;
+};
+
+/// @brief  FilteredTransfer module, when derived from allows for schemes
+///    to apply point filtering. Note that this module handles the thread safe
+///    intialization and storage of the filter, but derived schemes must call
+///    FilteredTransfer::filter() per point id and handle the result.
+template <typename FilterT>
+struct FilteredTransfer
+{
+    FilteredTransfer(const FilterT& filter)
+        : mFilter(filter)
+        , mLocalFilter(nullptr) {}
+    FilteredTransfer(const FilteredTransfer& other)
+        : mFilter(other.mFilter)
+        , mLocalFilter(nullptr) {}
+
+    inline void initialize(const Coord&, const size_t, const CoordBBox&)
+    {
+        mLocalFilter = std::make_unique<FilterT>(mFilter);
+    }
+
+    inline bool startPointLeaf(const PointDataTree::LeafNodeType& leaf)
+    {
+        mLocalFilter->reset(leaf);
+        return true;
+    }
+
+    inline bool filter(const Index id) const
+    {
+        return mLocalFilter->valid(&id);
+    }
+
+private:
+    const FilterT& mFilter;
+    /// @note  Not all of the filters are assignable (e.g. GroupFilter).
+    ///   should really fix this and make this stack allocated.
+    std::unique_ptr<FilterT> mLocalFilter;
+};
+
+/// @brief  Specialization of FilteredTransfer for NullFilters which do nothing
+template <>
+struct FilteredTransfer<NullFilter>
+{
+    FilteredTransfer(const NullFilter&) {}
+    inline void initialize(const Coord&, const size_t, const CoordBBox&) {}
+    inline bool startPointLeaf(const PointDataTree::LeafNodeType&) { return true; }
+    inline bool filter(const Index) const { return true; }
 };
 
 /// @brief  The VolumeTransfer module provides methods to automatically setup
@@ -402,6 +483,10 @@ inline void VolumeTransfer<TreeTypes...>::foreach(const FunctorT& functor)
 
 namespace transfer_internal
 {
+
+OPENVDB_INIT_INVOKABLE_MEMBER_FUNCTION(rasterizePoint)
+OPENVDB_INIT_INVOKABLE_MEMBER_FUNCTION(rasterizePoints)
+
 template <typename TransferT,
           typename TopologyT,
           typename PointFilterT = points::NullFilter,
@@ -411,25 +496,31 @@ struct RasterizePoints
     using LeafManagerT = tree::LeafManager<TopologyT>;
     using LeafNodeT = typename LeafManagerT::LeafNodeType;
 
+    using RasterizePointSignature  = void(const Coord&, const Index, const CoordBBox&);
+    using RasterizePointsSignature = void(const Coord&, const Index, const Index, const CoordBBox&);
+
     static const Index DIM = TopologyT::LeafNodeType::DIM;
     static const Int32 DIM32 = static_cast<Int32>(DIM);
     static const Index LOG2DIM = TopologyT::LeafNodeType::LOG2DIM;
+    static constexpr bool UseRasterizePoints =
+        OPENVDB_HAS_INVOKABLE_MEMBER_FUNCTION(TransferT, rasterizePoints, Coord, Index, Index, CoordBBox);
+    static constexpr bool UseRasterizePoint =
+        OPENVDB_HAS_INVOKABLE_MEMBER_FUNCTION(TransferT, rasterizePoint, Coord, Index, CoordBBox);
 
     RasterizePoints(const points::PointDataTree& tree,
                     const TransferT& transfer,
+                    const CoordBBox& pointBounds,
                     const PointFilterT& filter = PointFilterT(),
                     InterrupterT* interrupter = nullptr)
         : mPointAccessor(tree)
         , mTransfer(transfer)
+        , mPointBounds(pointBounds)
         , mFilter(filter)
         , mInterrupter(interrupter) {}
 
     void operator()(LeafNodeT& leaf, const size_t idx) const
     {
-        if (util::wasInterrupted(mInterrupter)) {
-            thread::cancelGroupExecution();
-            return;
-        }
+        if (this->interrupted()) return;
 
         const Coord& origin = leaf.origin();
         auto& mask = leaf.getValueMask();
@@ -450,12 +541,20 @@ struct RasterizePoints
 
         mTransfer.initialize(origin, idx, bounds);
 
-        CoordBBox search = bounds.expandBy(mTransfer.range(origin, idx));
+        CoordBBox search = bounds;
+        const Vec3i range(mTransfer.range(origin, idx));
+        search.min() -= Coord(range);
+        search.max() += Coord(range);
         this->transform<>(search);
+        search.intersect(mPointBounds);
 
         // start the iteration from a leaf origin
         const Coord min = (search.min() & ~(DIM-1));
         const Coord& max = search.max();
+
+        /// @todo  remove this - with the introduction of rasterizePoints we no
+        ///   longer accept a filter at this level (it's expected to be handled)
+        ///   in the transfer scheme
         PointFilterT localFilter(mFilter);
 
         // loop over overlapping leaf nodes
@@ -475,6 +574,16 @@ struct RasterizePoints
                     if (!mTransfer.startPointLeaf(*pointLeaf)) continue;
                     localFilter.reset(*pointLeaf);
 
+                    if (this->interrupted()) return;
+
+                    // It's actually faster to go through the ValueIter API than
+                    // the leaf API as the value iterators cache the value buffer
+                    // ptrs (the leaf buffer API has to check the ptr on every
+                    // access).
+                    // @todo  Once we've improved the leaf buffer impl this
+                    //   should be removed
+                    const auto valiter = pointLeaf->cbeginValueAll();
+
                     // loop over point voxels which contribute to this leaf
                     const Coord& pmin(pbox.min());
                     const Coord& pmax(pbox.max());
@@ -486,12 +595,26 @@ struct RasterizePoints
                                 // voxel should be in this points leaf
                                 OPENVDB_ASSERT((ijk & ~(DIM-1u)) == leafOrigin);
                                 const Index index = ij + /*k*/(ijk.z() & (DIM-1u));
-                                const Index end = pointLeaf->getValue(index);
-                                Index id = (index == 0) ? 0 : Index(pointLeaf->getValue(index - 1));
-                                for (; id < end; ++id) {
-                                    if (!localFilter.valid(&id)) continue;
-                                    mTransfer.rasterizePoint(ijk, id, bounds);
-                                } //point idx
+                                const Index end = valiter.getItem(index);
+                                Index id = (index == 0) ? 0 : Index(valiter.getItem(index - 1));
+                                if (this->interrupted()) return;
+
+                                if constexpr (UseRasterizePoints)
+                                {
+                                    // No filter support here, must be on the transfer scheme
+                                    mTransfer.rasterizePoints(ijk, id, end, bounds);
+                                }
+                                else if constexpr (UseRasterizePoint)
+                                {
+                                    for (; id < end; ++id) {
+                                        if (!localFilter.valid(&id)) continue;
+                                        mTransfer.rasterizePoint(ijk, id, bounds);
+                                    } //point idx
+                                }
+                                else {
+                                    static_assert(UseRasterizePoints || UseRasterizePoint,
+                                        "Invalid transfer scheme in openvdb::tools::rasterize. Must correctly Implement rasterizePoints or rasterizePoint.");
+                                }
                             }
                         }
                     } // outer point voxel
@@ -537,11 +660,34 @@ private:
     typename std::enable_if<!std::is_base_of<TransformTransfer, EnableT>::value>::type
     transform(CoordBBox&) const {}
 
+    template <typename EnableT = TransferT>
+    typename std::enable_if<std::is_base_of<InterruptableTransfer, EnableT>::value, bool>::type
+    interrupted() const
+    {
+        return mTransfer.interrupted();
+    }
+
+    template <typename EnableT = TransferT>
+    constexpr typename std::enable_if<!std::is_base_of<InterruptableTransfer, EnableT>::value, bool>::type
+    interrupted() const
+    {
+        // @todo  This method should just return false once the old rasterize signature is deprecated
+        if constexpr (std::is_same<InterrupterT, util::NullInterrupter>::value) return false;
+        else {
+            if (util::wasInterrupted(mInterrupter)) {
+                thread::cancelGroupExecution();
+                return true;
+            }
+            return false;
+        }
+    }
+
 private:
     const PointDataGrid::ConstAccessor mPointAccessor;
     mutable TransferT mTransfer;
-    const PointFilterT& mFilter;
-    InterrupterT* mInterrupter;
+    const CoordBBox& mPointBounds;
+    const PointFilterT& mFilter; // @todo remove
+    InterrupterT* mInterrupter; // @todo remove
 };
 
 } // namespace transfer_internal
@@ -549,15 +695,48 @@ private:
 ///////////////////////////////////////////////////
 ///////////////////////////////////////////////////
 
+template <typename PointDataTreeOrGridT, typename TransferT>
+inline void
+rasterize(const PointDataTreeOrGridT& points, TransferT& transfer)
+{
+    using PointTreeT = typename TreeAdapter<PointDataTreeOrGridT>::TreeType;
+    static_assert(std::is_base_of<TreeBase, PointTreeT>::value,
+        "Provided points to rasterize is not a derived TreeBase type.");
+
+    const auto& tree = TreeAdapter<PointDataTreeOrGridT>::tree(points);
+    auto& topology = transfer.topology();
+    using TreeT = typename std::decay<decltype(topology)>::type;
+
+    // Compute max search bounds
+    CoordBBox bounds;
+    tree.evalLeafBoundingBox(bounds);
+
+    tree::LeafManager<TreeT> manager(topology);
+    transfer_internal::RasterizePoints<TransferT, TreeT> raster(tree, transfer, bounds);
+    manager.foreach(raster);
+}
+
+/// @brief Perform potentially complex rasterization from a user defined
+///  transfer scheme.
+/// @details The method works by looping over a single Tree topology, looking
+///   up point data at a position relative to that topology and passing that
+///   data to a transfer scheme TransferT.
+/// @note  Each thread receives a copy of the transfer scheme object.
+/// @param points       the point data grid to rasterize
+/// @param transfer     the transfer scheme
+/// @param filter       optional point filter
+/// @param interrupter  optional interrupter
 template <typename PointDataTreeOrGridT,
     typename TransferT,
     typename FilterT,
-    typename InterrupterT>
+    typename InterrupterT = util::NullInterrupter>
+OPENVDB_DEPRECATED_MESSAGE("openvdb::tools::rasterize no longer takes a filter or "
+"interrupter. Implement this on your transfer scheme (see PointTransfer.h for an example).")
 inline void
 rasterize(const PointDataTreeOrGridT& points,
           TransferT& transfer,
           const FilterT& filter,
-          InterrupterT* interrupter)
+          InterrupterT* interrupter = nullptr)
 {
     using PointTreeT = typename TreeAdapter<PointDataTreeOrGridT>::TreeType;
     static_assert(std::is_base_of<TreeBase, PointTreeT>::value,
@@ -567,9 +746,14 @@ rasterize(const PointDataTreeOrGridT& points,
 
     auto& topology = transfer.topology();
     using TreeT = typename std::decay<decltype(topology)>::type;
+
+    // Compute max search bounds
+    CoordBBox bounds;
+    tree.evalLeafBoundingBox(bounds);
+
     tree::LeafManager<TreeT> manager(topology);
     transfer_internal::RasterizePoints<TransferT, TreeT, FilterT, InterrupterT>
-        raster(tree, transfer, filter, interrupter);
+        raster(tree, transfer, bounds, filter, interrupter);
     manager.foreach(raster);
 }
 

@@ -94,15 +94,28 @@ TEST_F(TestPointRasterize, testRasterizeWithFilter)
     struct CountPointsTransferScheme
         : public DefaultTransfer
         , public points::VolumeTransfer<Int32Tree>
+        , public points::FilteredTransfer<points::GroupFilter>
     {
-        CountPointsTransferScheme(Int32Tree& tree)
-            : points::VolumeTransfer<Int32Tree>(&tree) {}
+        using FilterT = points::FilteredTransfer<points::GroupFilter>;
+        using FilterT::startPointLeaf;
+
+        CountPointsTransferScheme(Int32Tree& tree, const points::GroupFilter& filter)
+            : points::VolumeTransfer<Int32Tree>(&tree)
+            , points::FilteredTransfer<points::GroupFilter>(filter) {}
+
+        inline void initialize(const Coord& origin, const size_t idx, const CoordBBox& bounds)
+        {
+            points::VolumeTransfer<Int32Tree>::initialize(origin, idx, bounds);
+            points::FilteredTransfer<points::GroupFilter>::initialize(origin, idx, bounds);
+        }
 
         inline Int32 range(const Coord&, size_t) const { return 0; }
+
         inline void rasterizePoint(const Coord& ijk,
-                        const Index,
+                        const Index id,
                         const CoordBBox&)
         {
+            if (!this->FilterT::filter(id)) return;
             const Index offset = points::PointDataTree::LeafNodeType::coordToOffset(ijk);
             auto* const data = this->template buffer<0>();
             data[offset] += 1;
@@ -135,10 +148,10 @@ TEST_F(TestPointRasterize, testRasterizeWithFilter)
     Int32Tree::Ptr intTree(new Int32Tree);
     intTree->setValueOn(Coord(0,0,0));
 
-    CountPointsTransferScheme transfer(*intTree);
     points::GroupFilter filter("test", tree.cbeginLeaf()->attributeSet());
+    CountPointsTransferScheme transfer(*intTree, filter);
 
-    points::rasterize(*points, transfer, filter);
+    points::rasterize(*points, transfer);
     const int count = intTree->getValue(Coord(0,0,0));
     EXPECT_EQ(2, count);
 }

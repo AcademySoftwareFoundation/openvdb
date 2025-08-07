@@ -23,6 +23,9 @@ namespace rasterize_sdf_internal
 template <typename ValueT>
 struct FixedRadius
 {
+    static constexpr bool Fixed = true;
+    using ValueType = ValueT;
+
     FixedRadius(const ValueT ris) : mR(ris) {}
     inline void reset(const PointDataTree::LeafNodeType&) const {}
     inline const FixedRadius& eval(const Index) const { return *this; }
@@ -38,15 +41,28 @@ private:
 template <typename ValueT>
 struct FixedBandRadius : public FixedRadius<ValueT>
 {
-    FixedBandRadius(const ValueT ris, const ValueT hb)
+    static constexpr bool Fixed = true;
+    using ValueType = ValueT;
+
+    FixedBandRadius(const ValueT ris, const float hb)
         : FixedRadius<ValueT>(ris)
-        , mMinSearchIS(math::Max(ValueT(0.0), ris - hb))
-        , mMaxSearchIS(ris + hb)
+        , mMinSearchIS(math::Max(ValueT(0.0), ris - ValueT(hb)))
+        , mMaxSearchIS(ris + ValueT(hb))
         , mMinSearchSqIS(mMinSearchIS*mMinSearchIS)
-        , mMaxSearchSqIS(mMaxSearchIS*mMaxSearchIS) {}
+        , mMaxSearchSqIS(mMaxSearchIS*mMaxSearchIS)
+        , mHalfBand(hb) {}
 
     inline void reset(const PointDataTree::LeafNodeType&) const {}
+
+    inline const FixedBandRadius eval(const Index, const ValueT scale) const
+    {
+        if (scale == 1.0) return *this;
+        return FixedBandRadius(this->get() * scale, this->halfband());
+    }
+
     inline const FixedBandRadius& eval(const Index) const { return *this; }
+    inline float halfband() const { return mHalfBand; }
+
     inline ValueT min() const { return mMinSearchIS; }
     inline ValueT minSq() const { return mMinSearchSqIS; }
     inline ValueT max() const { return mMaxSearchIS; }
@@ -54,17 +70,42 @@ struct FixedBandRadius : public FixedRadius<ValueT>
 private:
     const ValueT mMinSearchIS, mMaxSearchIS;
     const ValueT mMinSearchSqIS, mMaxSearchSqIS;
+    // @note  Could technically recompute this value from the rest here
+    //   but storing it alleviates any potential precision issues
+    const float mHalfBand;
+};
+
+/// @brief  A vector varying per point radius (used for the ellipsoid
+///   rasterizer).
+template <>
+struct FixedBandRadius<Vec3f> : public FixedRadius<Vec3f>
+{
+    static constexpr bool Fixed = true;
+    using ValueType = Vec3f;
+    FixedBandRadius(const Vec3f ris, const float hb)
+        : FixedRadius<Vec3f>(ris)
+        , mHalfBand(hb) {}
+    inline void reset(const PointDataTree::LeafNodeType&) const {}
+    inline const FixedBandRadius& eval(const Index) const { return *this; }
+    inline float halfband() const { return mHalfBand; }
+private:
+    const float mHalfBand;
 };
 
 /// @brief  A varying per point radius with an optional scale
-template <typename ValueT, typename CodecT = UnknownCodec>
+template <typename ValueT, typename ScaleT = ValueT, typename CodecT = UnknownCodec>
 struct VaryingRadius
 {
+    static constexpr bool Fixed = false;
+    using ValueType = ValueT;
+
     using RadiusHandleT = AttributeHandle<ValueT, CodecT>;
-    VaryingRadius(const size_t ridx, const ValueT scale = 1.0)
+    VaryingRadius(const size_t ridx, const ScaleT scale = ScaleT(1.0))
         : mRIdx(ridx), mRHandle(), mScale(scale) {}
     VaryingRadius(const VaryingRadius& other)
         : mRIdx(other.mRIdx), mRHandle(), mScale(other.mScale) {}
+
+    inline size_t size() const { return mRHandle->size(); }
 
     inline void reset(const PointDataTree::LeafNodeType& leaf)
     {
@@ -72,48 +113,54 @@ struct VaryingRadius
     }
 
     /// @brief  Compute a fixed radius for a specific point
-    inline const FixedRadius<ValueT> eval(const Index id) const
+    inline auto eval(const Index id, const ScaleT scale = ScaleT(1.0)) const
     {
         OPENVDB_ASSERT(mRHandle);
-        return FixedRadius<ValueT>(mRHandle->get(id) * mScale);
+        auto x = mRHandle->get(id) * mScale * scale;
+        return FixedRadius<decltype(x)>(x);
     }
 
 private:
     const size_t mRIdx;
     typename RadiusHandleT::UniquePtr mRHandle;
-    const ValueT mScale;
+    const ScaleT mScale;
 };
 
 /// @brief  A varying per point narrow band radius with an optional scale
-template <typename ValueT, typename CodecT = UnknownCodec>
-struct VaryingBandRadius : public VaryingRadius<ValueT, CodecT>
+template <typename ValueT, typename ScaleT = ValueT, typename CodecT = UnknownCodec>
+struct VaryingBandRadius : public VaryingRadius<ValueT, ScaleT, CodecT>
 {
-    using BaseT = VaryingRadius<ValueT, CodecT>;
-    VaryingBandRadius(const size_t ridx, const ValueT halfband,
-        const ValueT scale = 1.0)
+    static constexpr bool Fixed = false;
+    using ValueType = ValueT;
+
+    using BaseT = VaryingRadius<ValueT, ScaleT, CodecT>;
+    VaryingBandRadius(const size_t ridx, const float halfband,
+        const ScaleT scale = ScaleT(1.0))
         : BaseT(ridx, scale), mHalfBand(halfband) {}
 
-    inline const FixedBandRadius<ValueT> eval(const Index id) const
+    inline float halfband() const { return mHalfBand; }
+    inline auto eval(const Index id, const ScaleT scale = ScaleT(1.0)) const
     {
-        const auto r = this->BaseT::eval(id).get();
-        return FixedBandRadius<ValueT>(ValueT(r), mHalfBand);
+        auto r = this->BaseT::eval(id, scale).get();
+        return FixedBandRadius<decltype(r)>(r, mHalfBand);
     }
 
 private:
-    const ValueT mHalfBand;
+    const float mHalfBand;
 };
 
 /// @brief  Base class for SDF transfers which consolidates member data and
 ///  some required interface methods.
-/// @note   Derives from TransformTransfer for automatic transformation support
-///   and VolumeTransfer<...T> for automatic buffer setup
 template <typename SdfT,
     typename PositionCodecT,
     typename RadiusType,
+    typename FilterT,
     bool CPG>
 struct SignedDistanceFieldTransfer :
-    public TransformTransfer,
-    public std::conditional<CPG,
+    public TransformTransfer, //  for transformation support
+    public FilteredTransfer<FilterT>, // for point filtering
+    public InterruptableTransfer, // for interrupt-ability
+    public std::conditional<CPG, // for automatic buffer setup
         VolumeTransfer<typename SdfT::TreeType, Int64Tree>,
         VolumeTransfer<typename SdfT::TreeType>>::type
 {
@@ -127,15 +174,22 @@ struct SignedDistanceFieldTransfer :
     using VolumeTransferT = typename std::conditional<CPG,
         VolumeTransfer<TreeT, Int64Tree>,
         VolumeTransfer<TreeT>>::type;
-
+    using FilteredTransferT = FilteredTransfer<FilterT>;
     using PositionHandleT = AttributeHandle<Vec3f, PositionCodecT>;
 
     // typically the max radius of all points rounded up
-    inline Int32 range(const Coord&, size_t) const { return Int32(mMaxKernelWidth); }
+    inline Vec3i range(const Coord&, size_t) const { return mMaxKernelWidth; }
+
+    inline void initialize(const Coord& origin, const size_t idx, const CoordBBox& bounds)
+    {
+        VolumeTransferT::initialize(origin, idx, bounds);
+        FilteredTransferT::initialize(origin, idx, bounds);
+    }
 
     inline bool startPointLeaf(const PointDataTree::LeafNodeType& leaf)
     {
-        mPosition.reset(new PositionHandleT(leaf.constAttributeArray(mPIdx)));
+        FilteredTransferT::startPointLeaf(leaf);
+        mPosition = std::make_unique<PositionHandleT>(leaf.constAttributeArray(mPIdx));
         mRadius.reset(leaf);
         // if CPG, store leaf id in upper 32 bits of mask
         if (CPG) mPLeafMask = (Index64(mIds->find(&leaf)->second) << 32);
@@ -146,14 +200,18 @@ protected:
     /// @brief Constructor to use when a closet point grid is not in use
     template <bool EnableT = CPG>
     SignedDistanceFieldTransfer(const size_t pidx,
-            const size_t width,
+            const Vec3i width,
             const RadiusType& rt,
             const math::Transform& source,
+            const FilterT& filter,
+            util::NullInterrupter* interrupt,
             SdfT& surface,
             Int64Tree* cpg,
             const std::unordered_map<const PointDataTree::LeafNodeType*, Index>* ids,
             typename std::enable_if<EnableT>::type* = 0)
         : TransformTransfer(source, surface.transform())
+        , FilteredTransferT(filter)
+        , InterruptableTransfer(interrupt)
         , VolumeTransferT(&(surface.tree()), cpg)
         , mPIdx(pidx)
         , mPosition()
@@ -169,14 +227,18 @@ protected:
     /// @brief Constructor to use when a closet point grid is in use
     template <bool EnableT = CPG>
     SignedDistanceFieldTransfer(const size_t pidx,
-            const size_t width,
+            const Vec3i width,
             const RadiusType& rt,
             const math::Transform& source,
+            const FilterT& filter,
+            util::NullInterrupter* interrupt,
             SdfT& surface,
             Int64Tree*,
             const std::unordered_map<const PointDataTree::LeafNodeType*, Index>*,
             typename std::enable_if<!EnableT>::type* = 0)
         : TransformTransfer(source, surface.transform())
+        , FilteredTransferT(filter)
+        , InterruptableTransfer(interrupt)
         , VolumeTransferT(surface.tree())
         , mPIdx(pidx)
         , mPosition()
@@ -189,6 +251,8 @@ protected:
 
     SignedDistanceFieldTransfer(const SignedDistanceFieldTransfer& other)
         : TransformTransfer(other)
+        , FilteredTransferT(other)
+        , InterruptableTransfer(other)
         , VolumeTransferT(other)
         , mPIdx(other.mPIdx)
         , mPosition()
@@ -202,7 +266,7 @@ protected:
 protected:
     const size_t mPIdx;
     typename PositionHandleT::UniquePtr mPosition;
-    const size_t mMaxKernelWidth;
+    const Vec3i mMaxKernelWidth;
     RadiusType mRadius;
     const ValueT mBackground;
     const double mDx;
@@ -215,11 +279,12 @@ protected:
 template <typename SdfT,
     typename PositionCodecT,
     typename RadiusType,
+    typename FilterT,
     bool CPG>
 struct SphericalTransfer :
-    public SignedDistanceFieldTransfer<SdfT, PositionCodecT, RadiusType, CPG>
+    public SignedDistanceFieldTransfer<SdfT, PositionCodecT, RadiusType, FilterT, CPG>
 {
-    using BaseT = SignedDistanceFieldTransfer<SdfT, PositionCodecT, RadiusType, CPG>;
+    using BaseT = SignedDistanceFieldTransfer<SdfT, PositionCodecT, RadiusType, FilterT, CPG>;
     using typename BaseT::TreeT;
     using typename BaseT::ValueT;
     static const Index DIM = TreeT::LeafNodeType::DIM;
@@ -227,14 +292,18 @@ struct SphericalTransfer :
     // The precision of the kernel arithmetic
     using RealT = double;
 
+    using ElemT = typename VecTraits<typename RadiusType::ValueType>::ElementType;
+
     SphericalTransfer(const size_t pidx,
             const size_t width,
             const RadiusType& rt,
             const math::Transform& source,
+            const FilterT& filter,
+            util::NullInterrupter* interrupt,
             SdfT& surface,
             Int64Tree* cpg = nullptr,
             const std::unordered_map<const PointDataTree::LeafNodeType*, Index>* ids = nullptr)
-        : BaseT(pidx, width, rt, source, surface, cpg, ids) {}
+        : SphericalTransfer(pidx, Vec3i(width), rt, source, filter, interrupt, surface, cpg, ids) {}
 
     /// @brief  For each point, stamp a sphere with a given radius by running
     ///   over all intersecting voxels and calculating if this point is closer
@@ -244,6 +313,8 @@ struct SphericalTransfer :
                     const Index id,
                     const CoordBBox& bounds)
     {
+        if (!BaseT::filter(id)) return;
+
         // @note  GCC 6.3 warns here in optimised builds
 #if defined(__GNUC__)  && !defined(__clang__)
 #pragma GCC diagnostic push
@@ -254,11 +325,62 @@ struct SphericalTransfer :
 #pragma GCC diagnostic pop
 #endif
         P = this->transformSourceToTarget(P);
+        this->rasterizePoint(P, id, bounds, this->mRadius.eval(id));
+    }
 
-        const auto& r = this->mRadius.eval(id);
+    /// @brief Allow early termination if all voxels in the surface have been
+    ///   deactivated (all interior)
+    inline bool endPointLeaf(const PointDataTree::LeafNodeType&)
+    {
+        // If the mask is off, terminate rasterization
+        return !(this->template mask<0>()->isOff());
+    }
+
+    inline bool finalize(const Coord&, const size_t)
+    {
+        // loop over voxels in the outer cube diagonals which won't have been
+        // hit by point rasterizations - these will be on because of the mask
+        // fill technique and need to be turned off.
+        auto& mask = *(this->template mask<0>());
+        auto* const data = this->template buffer<0>();
+        for (auto iter = mask.beginOn(); iter; ++iter) {
+            if (data[iter.pos()] == this->mBackground) mask.setOff(iter.pos());
+        }
+        // apply sdf mask to other grids
+        if (CPG) *(this->template mask<CPG ? 1 : 0>()) = mask;
+        return true;
+    }
+
+protected:
+    /// @brief  Allow derived transfer schemes to override the width with a
+    ///   varying component (this transfer is explicitly for spheres so it
+    ///   doesn't make sense to construct it directly, but derived transfers
+    ///   may be utilizing this logic with other kernels).
+    SphericalTransfer(const size_t pidx,
+            const Vec3i width,
+            const RadiusType& rt,
+            const math::Transform& source,
+            const FilterT& filter,
+            util::NullInterrupter* interrupt,
+            SdfT& surface,
+            Int64Tree* cpg = nullptr,
+            const std::unordered_map<const PointDataTree::LeafNodeType*, Index>* ids = nullptr)
+        : BaseT(pidx, width, rt, source, filter, interrupt, surface, cpg, ids) {}
+
+    /// @brief  This hook simply exists for the Ellipsoid transfer to allow it
+    ///   to pass a different P and scaled FixedBandRadius from its ellipsoid
+    ///   path (as isolated points are stamped as spheres with a different
+    ///   scale and positions may have been smoothed).
+    /// @todo   I would prefer this second function wasn't necessary but there
+    ///   is no easy way to allow differently scaled radii to exist in a more
+    ///   efficient manner, nor use a different P.
+    inline void rasterizePoint(const Vec3d& P,
+                    const Index id,
+                    const CoordBBox& bounds,
+                    const FixedBandRadius<ElemT>& r)
+    {
         const RealT max = r.max();
-
-        CoordBBox intersectBox(Coord::floor(P - max), Coord::ceil(P + max));
+        CoordBBox intersectBox(Coord::round(P - max), Coord::round(P + max));
         intersectBox.intersect(bounds);
         if (intersectBox.empty()) return;
 
@@ -319,29 +441,6 @@ struct SphericalTransfer :
             }
         } // outer sdf voxel
     } // point idx
-
-    /// @brief Allow early termination if all voxels in the surface have been
-    ///   deactivated (all interior)
-    inline bool endPointLeaf(const PointDataTree::LeafNodeType&)
-    {
-        // If the mask is off, terminate rasterization
-        return !(this->template mask<0>()->isOff());
-    }
-
-    inline bool finalize(const Coord&, const size_t)
-    {
-        // loop over voxels in the outer cube diagonals which won't have been
-        // hit by point rasterizations - these will be on because of the mask
-        // fill technique and need to be turned off.
-        auto& mask = *(this->template mask<0>());
-        auto* const data = this->template buffer<0>();
-        for (auto iter = mask.beginOn(); iter; ++iter) {
-            if (data[iter.pos()] == this->mBackground) mask.setOff(iter.pos());
-        }
-        // apply sdf mask to other grids
-        if (CPG) *(this->template mask<CPG ? 1 : 0>()) = mask;
-        return true;
-    }
 };
 
 /// @brief  The transfer implementation for averaging of positions followed by
@@ -349,11 +448,12 @@ struct SphericalTransfer :
 template <typename SdfT,
     typename PositionCodecT,
     typename RadiusType,
+    typename FilterT,
     bool CPG>
 struct AveragePositionTransfer :
-    public SignedDistanceFieldTransfer<SdfT, PositionCodecT, RadiusType, CPG>
+    public SignedDistanceFieldTransfer<SdfT, PositionCodecT, RadiusType, FilterT, CPG>
 {
-    using BaseT = SignedDistanceFieldTransfer<SdfT, PositionCodecT, RadiusType, CPG>;
+    using BaseT = SignedDistanceFieldTransfer<SdfT, PositionCodecT, RadiusType, FilterT, CPG>;
     using typename BaseT::TreeT;
     using typename BaseT::ValueT;
 
@@ -383,14 +483,12 @@ struct AveragePositionTransfer :
             const RadiusType& rt,
             const RealT search,
             const math::Transform& source,
+            const FilterT& filter,
+            util::NullInterrupter* interrupt,
             SdfT& surface,
             Int64Tree* cpg = nullptr,
             const std::unordered_map<const PointDataTree::LeafNodeType*, Index>* ids = nullptr)
-        : BaseT(pidx, width, rt, source, surface, cpg, ids)
-        , mMaxSearchIS(search)
-        , mMaxSearchSqIS(search*search)
-        , mWeights()
-        , mDist() {}
+        : AveragePositionTransfer(pidx, Vec3i(width), rt, search, source, filter, interrupt, surface, cpg, ids) {}
 
     AveragePositionTransfer(const AveragePositionTransfer& other)
         : BaseT(other)
@@ -426,6 +524,8 @@ struct AveragePositionTransfer :
                     const Index id,
                     const CoordBBox& bounds)
     {
+        if (!BaseT::filter(id)) return;
+
 #if defined(__GNUC__)  && !defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
@@ -436,8 +536,7 @@ struct AveragePositionTransfer :
 #endif
         const Vec3d P = this->targetTransform().worldToIndex(PWS);
 
-        CoordBBox intersectBox(Coord::floor(P - mMaxSearchIS),
-            Coord::ceil(P + mMaxSearchIS));
+        CoordBBox intersectBox(Coord::round(P - mMaxSearchIS), Coord::round(P + mMaxSearchIS));
         intersectBox.intersect(bounds);
         if (intersectBox.empty()) return;
 
@@ -539,6 +638,27 @@ struct AveragePositionTransfer :
         return true;
     }
 
+protected:
+    /// @brief  Allow derived transfer schemes to override the width with a
+    ///   varying component (this transfer is explicitly for spheres so it
+    ///   doesn't make sense to construct it directly, but derived transfers
+    ///   may be utilizing this logic with other kernels).
+    AveragePositionTransfer(const size_t pidx,
+            const Vec3i width,
+            const RadiusType& rt,
+            const RealT search,
+            const math::Transform& source,
+            const FilterT& filter,
+            util::NullInterrupter* interrupt,
+            SdfT& surface,
+            Int64Tree* cpg = nullptr,
+            const std::unordered_map<const PointDataTree::LeafNodeType*, Index>* ids = nullptr)
+        : BaseT(pidx, width, rt, source, filter, interrupt, surface, cpg, ids)
+        , mMaxSearchIS(search)
+        , mMaxSearchSqIS(search*search)
+        , mWeights()
+        , mDist() {}
+
 private:
     const RealT mMaxSearchIS, mMaxSearchSqIS;
     std::vector<PosRadPair> mWeights;
@@ -546,10 +666,10 @@ private:
 };
 
 /// @brief  Base class for surfacing mask initialization
-template <typename MaskTreeT = MaskTree,
-    typename InterrupterT = util::NullInterrupter>
+template <typename MaskTreeT = MaskTree>
 struct SurfaceMaskOp
 {
+public:
     inline void join(SurfaceMaskOp& other)
     {
         if (mMask->leafCount() > other.mMask->leafCount()) {
@@ -577,54 +697,75 @@ struct SurfaceMaskOp
 protected:
     SurfaceMaskOp(const math::Transform& points,
                   const math::Transform& surface,
-                  InterrupterT* interrupter = nullptr)
+                   // Clip the surface to this bounds. Only used for the smooth
+                   // raster workflow to limit to search radii topology init
+                   const CoordBBox* const maxClipBounds = nullptr,
+                   util::NullInterrupter* interrupter = nullptr)
         : mMask(new MaskTreeT)
         , mMaskOff(new MaskTreeT)
         , mPointsTransform(points)
         , mSurfaceTransform(surface)
-        , mInterrupter(interrupter)
-        , mVoxelOffset(static_cast<int>(math::RoundUp(points.voxelSize()[0] /
-            surface.voxelSize()[0]))) {}
+        , mMaxClipBounds(maxClipBounds ? this->toSurfaceBounds(*maxClipBounds) : CoordBBox::inf())
+        , mInterrupter(interrupter) {}
 
     SurfaceMaskOp(const SurfaceMaskOp& other)
         : mMask(new MaskTreeT)
         , mMaskOff(new MaskTreeT)
         , mPointsTransform(other.mPointsTransform)
         , mSurfaceTransform(other.mSurfaceTransform)
-        , mInterrupter(other.mInterrupter)
-        , mVoxelOffset(other.mVoxelOffset) {}
+        , mMaxClipBounds(other.mMaxClipBounds)
+        , mInterrupter(other.mInterrupter) {}
 
     // @brief  Sparse fill a tree with activated bounding boxes expanded from
     //   each active voxel.
     // @note  This method used to fill from each individual voxel. Whilst more
     //   accurate, this was slower in comparison to using the active node bounds.
     //   As the rasterization is so fast (discarding of voxels out of range)
-    //   this overzealous activation results in far superior performance here.
+    //   this overzealous activation results in far superior performance overall.
     template <typename LeafT>
-    inline void fill(const LeafT& leaf, const int dist, const bool active)
+    inline bool activate(const LeafT& leaf, const int32_t dist)
     {
-        auto doFill = [&](CoordBBox b) {
-            b = mSurfaceTransform.worldToIndexCellCentered(
-                    mPointsTransform.indexToWorld(b));
-            b.expand(dist);
-            if (active) mMask->sparseFill(b, true, true);
-            else        mMaskOff->sparseFill(b, true, true);
-        };
+        CoordBBox bounds = this->toSurfaceBounds(this->getActiveBoundingBox(leaf));
+        if (bounds.empty()) return false;
+        // Expand by the desired surface index space distance
+        bounds.expand(dist);
+        this->activate(bounds);
+        return true;
+    }
 
-        const auto& mask = leaf.getValueMask();
-        if (mask.isOn()) {
-            doFill(leaf.getNodeBoundingBox());
-        }
-        else {
-            CoordBBox bounds;
-            for (auto iter = mask.beginOn(); iter; ++iter) {
-                bounds.expand(leaf.offsetToLocalCoord(iter.pos()));
-            }
-            if (!bounds.empty()) {
-                bounds.translate(leaf.origin());
-                doFill(bounds);
-            }
-        }
+    template <typename LeafT>
+    inline bool activate(const LeafT& leaf, const Vec3i dist)
+    {
+        CoordBBox bounds = this->toSurfaceBounds(this->getActiveBoundingBox(leaf));
+        if (bounds.empty()) return false;
+        // Expand by the desired surface index space distance
+        bounds.min() -= Coord(dist);
+        bounds.max() += Coord(dist);
+        this->activate(bounds);
+        return true;
+    }
+
+    template <typename LeafT>
+    inline void deactivate(const LeafT& leaf, const int32_t dist)
+    {
+        OPENVDB_ASSERT((dist % MaskTreeT::LeafNodeType::DIM) == 0);
+        // We only deactivate in incrementd of leaf nodes, so as long as
+        // dist >= 0 we don't need a tight bounding box
+        CoordBBox bounds = this->toSurfaceBounds(leaf.getNodeBoundingBox());
+        // Expand by the desired surface index space distance
+        bounds.expand(dist);
+        this->deactivate(bounds);
+    }
+
+    inline void activate(CoordBBox& bounds)
+    {
+        bounds.intersect(mMaxClipBounds);
+        mMask->sparseFill(bounds, true, true);
+    }
+
+    inline void deactivate(const CoordBBox& bounds)
+    {
+        mMaskOff->sparseFill(bounds, true, true);
     }
 
     inline bool interrupted()
@@ -636,48 +777,93 @@ protected:
         return false;
     }
 
+    //
+
+    template <typename LeafT>
+    inline CoordBBox getActiveBoundingBox(const LeafT& leaf) const
+    {
+        CoordBBox bounds;
+        const auto& mask = leaf.getValueMask();
+        if (mask.isOn()) {
+            // includes translation to leaf origin
+            bounds = leaf.getNodeBoundingBox();
+        }
+        else {
+            for (auto iter = mask.beginOn(); iter; ++iter) {
+                bounds.expand(leaf.offsetToLocalCoord(iter.pos()));
+            }
+            if (bounds.empty()) return bounds;
+            bounds.translate(leaf.origin());
+        }
+        return bounds;
+    }
+
+    /// @brief  Given a leaf node (and assuming the coordinate bounds of the
+    ///   leaf come from the PointDataGrid in use), find the bounds of its
+    ///   index space activity and return these bounds at the index space of
+    ///   the target surface grid
+    inline CoordBBox toSurfaceBounds(const CoordBBox& bounds) const
+    {
+        if (bounds.empty()) return bounds;
+        // Offset the point leaf bounds to the actual position of this node's
+        // faces in index space (of the points), then convert this to the
+        // corresponding index space of the cloest node bounds in the target
+        // surface grid
+        const BBoxd wsbounds(
+            bounds.min().asVec3d() - 0.5,
+            bounds.max().asVec3d() + 0.5);
+        return mSurfaceTransform.worldToIndexCellCentered(
+            mPointsTransform.indexToWorld(wsbounds));
+    }
+
 protected:
     std::unique_ptr<MaskTreeT> mMask;
     std::unique_ptr<MaskTreeT> mMaskOff;
     const math::Transform& mPointsTransform;
     const math::Transform& mSurfaceTransform;
-    InterrupterT* mInterrupter;
-    // add the size of a single points voxel at the surface resolution
-    // to the distance limits - this is becasue we don't query exact point
-    // positions in SurfaceMaskOp, which means we have to
-    // actviate the "worst case scenario" bounds. The closer the points
-    // voxel size is to the target sdf voxel size the better the topology
-    // estimate
-    const int mVoxelOffset;
+    const CoordBBox mMaxClipBounds;
+    util::NullInterrupter* mInterrupter;
 };
 
 /// @brief Initializes a fixed activity mask
-template <typename MaskTreeT,
-    typename InterrupterT = util::NullInterrupter>
+template <typename MaskTreeT>
 struct FixedSurfaceMaskOp
-    : public SurfaceMaskOp<MaskTreeT, InterrupterT>
+    : public SurfaceMaskOp<MaskTreeT>
 {
-    using BaseT = SurfaceMaskOp<MaskTreeT, InterrupterT>;
+    using BaseT = SurfaceMaskOp<MaskTreeT>;
     using LeafManagerT =
         tree::LeafManager<const points::PointDataTree>;
 
     FixedSurfaceMaskOp(const math::Transform& points,
                    const math::Transform& surface,
-                   const double minBandRadius,
-                   const double maxBandRadius,
-                   InterrupterT* interrupter = nullptr)
-        : BaseT(points, surface, interrupter)
-        , mMin(), mMax() {
-            // calculate the min interior cube area of activity. this is the side
-            // of the largest possible cube that fits into the radius "min":
-            //   d = 2r -> 2r = 3x^2 -> x = 2r / sqrt(3)
-            // finally half it to the new radius
-            const Real min = ((2.0 * minBandRadius) / std::sqrt(3.0)) / 2.0;
-            const int d = static_cast<int>(math::RoundDown(min)) - this->mVoxelOffset;
-            mMin = math::Max(0, d);
-            mMax = static_cast<int>(math::RoundUp(maxBandRadius));
-            mMax += this->mVoxelOffset;
-        }
+                   const double minBandRadius, // sdf index space
+                   const double maxBandRadius, // sdf index space
+                   const CoordBBox* const maxClipBounds,
+                   util::NullInterrupter* interrupter = nullptr)
+        : BaseT(points, surface, maxClipBounds, interrupter)
+        , mMin(), mMax()
+    {
+        // calculate the min interior cube area of activity. this is the side
+        // of the largest possible cube that fits into the radius "min":
+        //   d = 2r -> 2r = 3x^2 -> x = 2r / sqrt(3)
+        // Half side of the cube which fits into the sphere with radius minBandRadius
+        const Real halfside = ((2.0 * minBandRadius) / std::sqrt(3.0)) / 2.0;
+        OPENVDB_ASSERT(halfside >= 0.0); // minBandRadius shouldn't be negative
+        // Round down to avoid deactivating partially occluded voxels
+        const int32_t min = static_cast<int32_t>(std::max(0.0, halfside));
+        // mMin is the distance from the nodes bounding box that we can
+        // deactivate. Because we don't know the point positions here, we
+        // can only deactivate based on the worst scenario (that is, we can
+        // only deactivate entire leaf nodes, and we can only do so if we are
+        // sure they are going to be encompassed by any single sphere). So take
+        // the min distance and see how many leaf nodes the half distance
+        // encompasses entirely.
+        const int32_t nodes = min / MaskTreeT::LeafNodeType::DIM;
+        OPENVDB_ASSERT(nodes >= 0);
+        // Back to voxel dim (minus 1 as we expand out from a leaf node)
+        mMin = (nodes-1) * MaskTreeT::LeafNodeType::DIM;
+        mMax = static_cast<int32_t>(math::Round(maxBandRadius)); // furthest voxel
+    }
 
     FixedSurfaceMaskOp(const FixedSurfaceMaskOp& other, tbb::split)
         : BaseT(other), mMin(other.mMin), mMax(other.mMax) {}
@@ -685,123 +871,119 @@ struct FixedSurfaceMaskOp
     void operator()(const typename LeafManagerT::LeafRange& range)
     {
         if (this->interrupted()) return;
-        for (auto leafIter = range.begin(); leafIter; ++leafIter) {
-            this->fill(*leafIter, mMax, true);
+        for (auto leaf = range.begin(); leaf; ++leaf) {
+            this->activate(*leaf, mMax);
         }
-        if (mMin <= 0) return;
-        for (auto leafIter = range.begin(); leafIter; ++leafIter) {
-            this->fill(*leafIter, mMin, false);
+        if (mMin < 0) return;
+        for (auto leaf = range.begin(); leaf; ++leaf) {
+            this->deactivate(*leaf, mMin);
         }
     }
 
 private:
-    int mMin, mMax;
+    int32_t mMin, mMax;
 };
 
 /// @brief Initializes a variable activity mask
-template <typename RadiusTreeT,
-    typename MaskTreeT,
-    typename InterrupterT = util::NullInterrupter>
+template <typename RadiusTreeT, typename MaskTreeT>
 struct VariableSurfaceMaskOp
-    : public SurfaceMaskOp<MaskTreeT, InterrupterT>
+    : public SurfaceMaskOp<MaskTreeT>
 {
-    using BaseT = SurfaceMaskOp<MaskTreeT, InterrupterT>;
+    using BaseT = SurfaceMaskOp<MaskTreeT>;
     using LeafManagerT =
         tree::LeafManager<const points::PointDataTree>;
 
     VariableSurfaceMaskOp(const math::Transform& pointsTransform,
                          const math::Transform& surfaceTransform,
-                         const RadiusTreeT& min,
+                         const RadiusTreeT* const min,
                          const RadiusTreeT& max,
-                         const Real scale,
+                         const Real minScale,
+                         const Real maxScale,
                          const Real halfband,
-                         InterrupterT* interrupter = nullptr)
-        : BaseT(pointsTransform, surfaceTransform, interrupter)
-        , mMin(min), mMax(max), mScale(scale), mHalfband(halfband) {}
+                         const CoordBBox* const maxClipBounds,
+                         util::NullInterrupter* interrupter = nullptr)
+        : BaseT(pointsTransform, surfaceTransform, maxClipBounds, interrupter)
+        , mMin(min), mMax(max), mMinScale(minScale), mMaxScale(maxScale)
+        , mHalfband(halfband) {}
 
+    VariableSurfaceMaskOp(const VariableSurfaceMaskOp&) = default;
     VariableSurfaceMaskOp(const VariableSurfaceMaskOp& other, tbb::split)
-        : BaseT(other), mMin(other.mMin), mMax(other.mMax)
-        , mScale(other.mScale), mHalfband(other.mHalfband) {}
+        : VariableSurfaceMaskOp(other) {}
 
     void operator()(const typename LeafManagerT::LeafRange& range)
     {
         if (this->interrupted()) return;
         const tree::ValueAccessor<const RadiusTreeT> maxacc(mMax);
         for (auto leafIter = range.begin(); leafIter; ++leafIter) {
-            const int max = this->maxDist(maxacc.getValue(leafIter->origin()));
-            this->fill(*leafIter, max, true);
+            const int32_t max = this->maxDist(maxacc.getValue(leafIter->origin()));
+            this->activate(*leafIter, max);
         }
-        const tree::ValueAccessor<const RadiusTreeT> minacc(mMin);
+
+        if (!mMin) return;
+        const tree::ValueAccessor<const RadiusTreeT> minacc(*mMin);
         for (auto leafIter = range.begin(); leafIter; ++leafIter) {
-            const int min = this->minDist(minacc.getValue(leafIter->origin()));
-            if (min <= 0) continue;
-            this->fill(*leafIter, min, false);
+            const int32_t min = this->minDist(minacc.getValue(leafIter->origin()));
+            if (min < 0) continue;
+            this->deactivate(*leafIter, min);
         }
     }
 
 private:
-    inline int maxDist(const typename RadiusTreeT::ValueType& max) const
+    inline int32_t maxDist(const typename RadiusTreeT::ValueType& maxRadiusWs) const
     {
         // max radius in index space
-        const Real v = (Real(max) * mScale) + mHalfband;
-        int d = int(math::RoundUp(v)); // next voxel
-        d += this->mVoxelOffset; // final offset
-        return d;
+        const Real maxBandRadius = (Real(maxRadiusWs) * mMaxScale) + mHalfband;
+        return static_cast<int32_t>(math::Round(maxBandRadius)); // furthest voxel
     }
 
-    inline int minDist(const typename RadiusTreeT::ValueType& min) const
+    inline int32_t minDist(const typename RadiusTreeT::ValueType& minRadiusWs) const
     {
         // min radius in index space
-        Real v = math::Max(0.0, (Real(min) * mScale) - mHalfband);
-        v = math::Max(0.0, Real(v - this->mVoxelOffset)); // final offset
+        Real minBandRadius = math::Max(0.0, (Real(minRadiusWs) * mMinScale) - mHalfband);
         // calculate the min interior cube area of activity. this is the side
-        // of the largest possible cube that fits into the radius "v":
+        // of the largest possible cube that fits into the radius "min":
         //   d = 2r -> 2r = 3x^2 -> x = 2r / sqrt(3)
-        // finally half it to the new radius
-        v = ((2.0 * v) / std::sqrt(3.0)) / 2.0;
-        return static_cast<int>(v); // round down (v is always >= 0)
+        // Half side of the cube which fits into the sphere with radius minBandRadius
+        const Real halfside = ((2.0 * minBandRadius) / std::sqrt(3.0)) / 2.0;
+        OPENVDB_ASSERT(halfside >= 0.0); // minBandRadius shouldn't be negative
+        // Round down to avoid deactivating partially occluded voxels
+        const int32_t min = static_cast<int32_t>(std::max(0.0, halfside));
+        // mMin is the distance from the nodes bounding box that we can
+        // deactivate. Because we don't know the point positions here, we
+        // can only deactivate based on the worst scenario (that is, we can
+        // only deactivate entire leaf nodes if we are sure they are going
+        // to be encompassed by any single sphere). So take the min distance
+        // and see how many leaf nodes the half distance encompasses entirely.
+        const int32_t nodes = min / MaskTreeT::LeafNodeType::DIM;
+        OPENVDB_ASSERT(nodes >= 0);
+        // Back to voxel dim (minus 1 as we expand out from a leaf node)
+        return (nodes-1) * MaskTreeT::LeafNodeType::DIM;
     }
 
 private:
-    const RadiusTreeT& mMin;
+    const RadiusTreeT* const mMin;
     const RadiusTreeT& mMax;
-    const Real mScale, mHalfband;
+    const Real mMinScale, mMaxScale, mHalfband;
 };
 
-template <typename SdfT, typename InterrupterT, typename PointDataGridT>
+template <typename SdfT, typename MaskTreeT>
 inline typename SdfT::Ptr
-initFixedSdf(const PointDataGridT& points,
-        math::Transform::Ptr transform,
+initSdfFromMasks(math::Transform::Ptr& transform,
         const typename SdfT::ValueType bg,
-        const double minBandRadius,
-        const double maxBandRadius,
-        InterrupterT* interrupter)
+        std::unique_ptr<MaskTreeT> on,
+        std::unique_ptr<MaskTreeT> off)
 {
-    using LeafManagerT = tree::LeafManager<const typename PointDataGridT::TreeType>;
-    using MaskTreeT = typename SdfT::TreeType::template ValueConverter<ValueMask>::Type;
-
     typename SdfT::Ptr surface = SdfT::create(bg);
     surface->setTransform(transform);
     surface->setGridClass(GRID_LEVEL_SET);
 
-    FixedSurfaceMaskOp<MaskTreeT, InterrupterT> op(points.transform(),
-       *transform, minBandRadius, maxBandRadius, interrupter);
-
-    if (interrupter) interrupter->start("Generating uniform surface topology");
-
-    LeafManagerT leafManager(points.tree());
-    tbb::parallel_reduce(leafManager.leafRange(), op);
-    auto mask = op.mask();
-
-    if (minBandRadius > 0.0) {
-        auto maskoff = op.maskoff();
-        mask->topologyDifference(*maskoff);
+    if (!off->empty()) {
+        on->topologyDifference(*off);
         // union will copy empty nodes so prune them
-        tools::pruneInactive(*mask);
-        surface->tree().topologyUnion(*mask);
-        mask.reset();
-        // set maskoff values to -background
-        tree::ValueAccessor<const MaskTreeT> acc(*maskoff);
+        tools::pruneInactive(*on);
+        surface->tree().topologyUnion(*on);
+        // set off values to -background
+        tree::ValueAccessor<const MaskTreeT> acc(*off);
         auto setOffOp = [acc](auto& iter) {
             if (acc.isValueOn(iter.getCoord())) {
                 iter.modifyValue([](auto& v) { v = -v; });
@@ -809,20 +991,45 @@ initFixedSdf(const PointDataGridT& points,
         };
         tools::foreach(surface->beginValueOff(), setOffOp,
             /*thread=*/true, /*shared=*/false);
-        maskoff.reset();
     }
     else {
-        surface->tree().topologyUnion(*mask);
-        mask.reset();
+        surface->tree().topologyUnion(*on);
     }
 
+    on.reset();
+    off.reset();
     surface->tree().voxelizeActiveTiles();
+    return surface;
+}
+
+template <typename SdfT, typename PointDataGridT>
+inline typename SdfT::Ptr
+initFixedSdf(const PointDataGridT& points,
+        math::Transform::Ptr transform,
+        const typename SdfT::ValueType bg,
+        const double minBandRadius,
+        const double maxBandRadius,
+        util::NullInterrupter* interrupter)
+{
+    using LeafManagerT = tree::LeafManager<const typename PointDataGridT::TreeType>;
+    using MaskTreeT = typename SdfT::TreeType::template ValueConverter<ValueMask>::Type;
+
+    if (interrupter) interrupter->start("Generating uniform surface topology");
+
+    FixedSurfaceMaskOp<MaskTreeT> op(points.transform(),
+       *transform, minBandRadius, maxBandRadius, /*clipbounds=*/nullptr, interrupter);
+
+    LeafManagerT manager(points.tree());
+    tbb::parallel_reduce(manager.leafRange(), op);
+
+    typename SdfT::Ptr surface =
+        initSdfFromMasks<SdfT, MaskTreeT>(transform, bg, op.mask(), op.maskoff());
+
     if (interrupter) interrupter->end();
     return surface;
 }
 
 template <typename SdfT,
-    typename InterrupterT,
     typename PointDataGridT,
     typename RadiusTreeT>
 inline typename SdfT::Ptr
@@ -833,47 +1040,86 @@ initVariableSdf(const PointDataGridT& points,
         const RadiusTreeT& max,
         const Real scale,
         const Real halfband,
-        InterrupterT* interrupter)
+        util::NullInterrupter* interrupter)
 {
     using LeafManagerT = tree::LeafManager<const typename PointDataGridT::TreeType>;
     using MaskTreeT = typename SdfT::TreeType::template ValueConverter<ValueMask>::Type;
 
-    typename SdfT::Ptr surface = SdfT::create(bg);
-    surface->setTransform(transform);
-    surface->setGridClass(GRID_LEVEL_SET);
+    if (interrupter) interrupter->start("Generating variable surface topology");
 
-    VariableSurfaceMaskOp<RadiusTreeT, MaskTreeT, InterrupterT>
-        op(points.transform(), *transform, min, max, scale, halfband, interrupter);
+    VariableSurfaceMaskOp<RadiusTreeT, MaskTreeT>
+        op(points.transform(), *transform, &min, max, scale, scale, halfband,
+            /*clipbounds=*/nullptr, interrupter);
+
+    LeafManagerT manager(points.tree());
+    tbb::parallel_reduce(manager.leafRange(), op);
+
+    typename SdfT::Ptr surface =
+        initSdfFromMasks<SdfT, MaskTreeT>(transform, bg, op.mask(), op.maskoff());
+
+    if (interrupter) interrupter->end();
+    return surface;
+}
+
+template <typename SdfT, typename PointDataGridT>
+inline typename SdfT::Ptr
+initFixedSmoothSdf(const PointDataGridT& points,
+        math::Transform::Ptr transform,
+        const typename SdfT::ValueType bg,
+        const Real maxBandRadius,
+        const CoordBBox& bounds,
+        util::NullInterrupter* interrupter)
+{
+    using LeafManagerT = tree::LeafManager<const typename PointDataGridT::TreeType>;
+    using MaskTreeT = typename SdfT::TreeType::template ValueConverter<ValueMask>::Type;
+
+    if (interrupter) interrupter->start("Generating uniform surface topology");
+
+    // @note Currently don't use min radii to deactivate, can't compute
+    //   this with the ZB kernel
+    FixedSurfaceMaskOp<MaskTreeT> op(points.transform(),
+       *transform, /*minBandRadius=*/0.0, maxBandRadius, &bounds, interrupter);
+
+    LeafManagerT manager(points.tree());
+    tbb::parallel_reduce(manager.leafRange(), op);
+
+    typename SdfT::Ptr surface =
+        initSdfFromMasks<SdfT, MaskTreeT>(transform, bg, op.mask(), op.maskoff());
+
+    if (interrupter) interrupter->end();
+    return surface;
+}
+
+template <typename SdfT,
+    typename PointDataGridT,
+    typename RadiusTreeT>
+inline typename SdfT::Ptr
+initVariableSmoothSdf(const PointDataGridT& points,
+        math::Transform::Ptr transform,
+        const typename SdfT::ValueType bg,
+        const RadiusTreeT& maxTree,
+        const Real scale,
+        const Real halfband,
+        const CoordBBox& bounds,
+        util::NullInterrupter* interrupter)
+{
+    using LeafManagerT = tree::LeafManager<const typename PointDataGridT::TreeType>;
+    using MaskTreeT = typename SdfT::TreeType::template ValueConverter<ValueMask>::Type;
 
     if (interrupter) interrupter->start("Generating variable surface topology");
 
-    LeafManagerT leafManager(points.tree());
-    tbb::parallel_reduce(leafManager.leafRange(), op);
-    auto mask = op.mask();
-    auto maskoff = op.maskoff();
+    // @note Currently don't use min radii/tree to deactivate, can't
+    //   compute this with the ZB kernel
+    VariableSurfaceMaskOp<RadiusTreeT, MaskTreeT>
+        op(points.transform(), *transform, nullptr, maxTree, /*minscale=*/1.0,
+           scale, halfband, &bounds, interrupter);
 
-    if (!maskoff->empty()) {
-        mask->topologyDifference(*maskoff);
-        // union will copy empty nodes so prune them
-        tools::pruneInactive(*mask);
-        surface->tree().topologyUnion(*mask);
-        // set maskoff values to -background
-        tree::ValueAccessor<const MaskTreeT> acc(*maskoff);
-        auto setOffOp = [acc](auto& iter) {
-            if (acc.isValueOn(iter.getCoord())) {
-                iter.modifyValue([](auto& v) { v = -v; });
-            }
-        };
-        tools::foreach(surface->beginValueOff(), setOffOp,
-            /*thread=*/true, /*shared=*/false);
-    }
-    else {
-        surface->tree().topologyUnion(*mask);
-    }
+    LeafManagerT manager(points.tree());
+    tbb::parallel_reduce(manager.leafRange(), op);
 
-    mask.reset();
-    maskoff.reset();
-    surface->tree().voxelizeActiveTiles();
+    typename SdfT::Ptr surface =
+        initSdfFromMasks<SdfT, MaskTreeT>(transform, bg, op.mask(), op.maskoff());
+
     if (interrupter) interrupter->end();
     return surface;
 }
@@ -913,15 +1159,15 @@ transferAttributes(const tree::LeafManager<const PointDataTreeT>& manager,
             auto* data = leaf.buffer().data();
             const Int64* ids = cpmanager.leaf(idx).buffer().data();
             Index prev = Index(ids[voxel.pos()] >> 32);
-            typename HandleT::UniquePtr handle(
-                new HandleT(manager.leaf(prev).constAttributeArray(attrIdx)));
+            typename HandleT::UniquePtr handle =
+                std::make_unique<HandleT>(manager.leaf(prev).constAttributeArray(attrIdx));
 
             for (; voxel; ++voxel) {
                 const Int64 hash = ids[voxel.pos()];
                 const Index lfid = Index(hash >> 32); // upper 32 bits to leaf id
                 const Index ptid = static_cast<Index>(hash); // lower
                 if (lfid != prev) {
-                    handle.reset(new HandleT(manager.leaf(lfid).constAttributeArray(attrIdx)));
+                    handle = std::make_unique<HandleT>(manager.leaf(lfid).constAttributeArray(attrIdx));
                     prev = lfid;
                 }
                 data[voxel.pos()] = handle->get(ptid);
@@ -968,25 +1214,22 @@ transferAttributes(const tree::LeafManager<const PointDataTreeT>& manager,
 }
 
 template <typename SdfT,
-    template <typename, typename, typename, bool> class TransferInterfaceT,
+    template <typename, typename, typename, typename, bool> class TransferInterfaceT,
     typename AttributeTypes,
-    typename InterrupterT,
-    typename PointDataGridT,
     typename FilterT,
+    typename PointDataGridT,
     typename ...Args>
 inline GridPtrVec
-rasterizeSurface(const PointDataGridT& points,
+doRasterizeSurface(const PointDataGridT& points,
     const std::vector<std::string>& attributes,
-    const FilterT& filter,
     SdfT& surface,
-    InterrupterT* interrupter,
     Args&&... args)
 {
     using RadRefT = typename std::tuple_element<1, std::tuple<Args...>>::type;
     using RadT = typename std::remove_reference<RadRefT>::type;
 
     GridPtrVec grids;
-    auto leaf = points.constTree().cbeginLeaf();
+    const auto leaf = points.constTree().cbeginLeaf();
     if (!leaf) return grids;
 
     const size_t pidx = leaf->attributeSet().find("P");
@@ -1000,16 +1243,14 @@ rasterizeSurface(const PointDataGridT& points,
 
     if (attributes.empty()) {
         if (ptype.second == NullCodec::name()) {
-            using TransferT = TransferInterfaceT<SdfT, NullCodec, RadT, false>;
+            using TransferT = TransferInterfaceT<SdfT, NullCodec, RadT, FilterT, false>;
             TransferT transfer(pidx, args...);
-            rasterize<PointDataGridT, TransferT, FilterT, InterrupterT>
-                (points, transfer, filter, interrupter);
+            rasterize<PointDataGridT, TransferT>(points, transfer);
         }
         else {
-            using TransferT = TransferInterfaceT<SdfT, UnknownCodec, RadT, false>;
+            using TransferT = TransferInterfaceT<SdfT, UnknownCodec, RadT, FilterT, false>;
             TransferT transfer(pidx, args...);
-            rasterize<PointDataGridT, TransferT, FilterT, InterrupterT>
-                (points, transfer, filter, interrupter);
+            rasterize<PointDataGridT, TransferT>(points, transfer);
         }
     }
     else {
@@ -1019,19 +1260,17 @@ rasterizeSurface(const PointDataGridT& points,
         // map point leaf nodes to their linear id
         // @todo sorted vector of leaf ptr-> index pair then lookup with binary search?
         std::unordered_map<const PointDataTree::LeafNodeType*, Index> ids;
-        manager.foreach([&](auto& leaf, size_t idx) { ids[&leaf] = Index(idx); }, false);
+        manager.foreach([&](auto& leafnode, size_t idx) { ids[&leafnode] = Index(idx); }, false);
 
         if (ptype.second == NullCodec::name()) {
-            using TransferT = TransferInterfaceT<SdfT, NullCodec, RadT, true>;
+            using TransferT = TransferInterfaceT<SdfT, NullCodec, RadT, FilterT, true>;
             TransferT transfer(pidx, args..., &cpg, &ids);
-            rasterize<PointDataGridT, TransferT, FilterT, InterrupterT>
-                (points, transfer, filter, interrupter);
+            rasterize<PointDataGridT, TransferT>(points, transfer);
         }
         else {
-            using TransferT = TransferInterfaceT<SdfT, UnknownCodec, RadT, true>;
+            using TransferT = TransferInterfaceT<SdfT, UnknownCodec, RadT, FilterT, true>;
             TransferT transfer(pidx, args..., &cpg, &ids);
-            rasterize<PointDataGridT, TransferT, FilterT, InterrupterT>
-                (points, transfer, filter, interrupter);
+            rasterize<PointDataGridT, TransferT>(points, transfer);
         }
 
         ids.clear();
@@ -1045,6 +1284,233 @@ rasterizeSurface(const PointDataGridT& points,
     return grids;
 }
 
+template <typename PointDataGridT,
+    typename SdfT,
+    typename SettingsT>
+GridPtrVec
+rasterizeSpheres(const PointDataGridT& points,
+                 const SettingsT& settings,
+                 const typename SettingsT::FilterType& filter)
+{
+    static_assert(IsSpecializationOf<PointDataGridT, Grid>::value);
+    static_assert(IsSpecializationOf<SettingsT, SphereSettings>::value);
+
+    using AttributeTypes = typename SettingsT::AttributeTypes;
+    using FilterT = typename SettingsT::FilterType;
+
+    const std::vector<std::string>& attributes = settings.attributes;
+    const Real halfband = settings.halfband;
+    auto* interrupter = settings.interrupter;
+
+    math::Transform::Ptr transform = settings.transform;
+    if (!transform) transform = points.transform().copy();
+    const Real vs = transform->voxelSize()[0];
+    const typename SdfT::ValueType background =
+        static_cast<typename SdfT::ValueType>(vs * halfband);
+
+    typename SdfT::Ptr surface;
+    GridPtrVec grids;
+
+    if (settings.radius.empty()) {
+        // search distance at the SDF transform, including its half band
+        const Real radiusIndexSpace = settings.radiusScale / vs;
+        const FixedBandRadius<Real> rad(radiusIndexSpace, float(halfband));
+        const Real minBandRadius = rad.min();
+        const Real maxBandRadius = rad.max();
+        const size_t width = static_cast<size_t>(math::RoundUp(maxBandRadius));
+
+        surface = initFixedSdf<SdfT>
+            (points, transform, background, minBandRadius, maxBandRadius, interrupter);
+
+        if (interrupter) interrupter->start("Rasterizing particles to level set using constant Spheres");
+
+        grids = doRasterizeSurface<SdfT, SphericalTransfer, AttributeTypes, FilterT>
+            (points, attributes, *surface,
+                width, rad, points.transform(), filter, interrupter, *surface); // args
+    }
+    else {
+        using RadiusT = typename SettingsT::RadiusAttributeType;
+        using PointDataTreeT = typename PointDataGridT::TreeType;
+        using RadTreeT = typename PointDataTreeT::template ValueConverter<RadiusT>::Type;
+
+        RadiusT min(0), max(0);
+        typename RadTreeT::Ptr mintree(new RadTreeT), maxtree(new RadTreeT);
+        points::evalMinMax<RadiusT, UnknownCodec>
+            (points.tree(), settings.radius, min, max, filter, mintree.get(), maxtree.get());
+
+        // search distance at the SDF transform
+        const RadiusT indexSpaceScale = RadiusT(settings.radiusScale / vs);
+        surface = initVariableSdf<SdfT>
+            (points, transform, background, *mintree, *maxtree,
+                indexSpaceScale, halfband, interrupter);
+        mintree.reset();
+        maxtree.reset();
+
+        const auto leaf = points.constTree().cbeginLeaf();
+        if (!leaf) return GridPtrVec(1, surface);
+
+        // max possible index space radius
+        const size_t width = static_cast<size_t>
+            (math::RoundUp((Real(max) * indexSpaceScale) + Real(halfband)));
+
+        const size_t ridx = leaf->attributeSet().find(settings.radius);
+        if (ridx == AttributeSet::INVALID_POS) {
+            OPENVDB_THROW(RuntimeError, "Failed to find radius attribute \"" + settings.radius + "\"");
+        }
+        VaryingBandRadius<RadiusT> rad(ridx, RadiusT(halfband), indexSpaceScale);
+
+        if (interrupter) interrupter->start("Rasterizing particles to level set using variable Spheres");
+
+        grids = doRasterizeSurface<SdfT, SphericalTransfer, AttributeTypes, FilterT>
+            (points, attributes, *surface,
+                width, rad, points.transform(), filter, interrupter, *surface); // args
+    }
+
+    if (interrupter) interrupter->end();
+
+    tools::pruneLevelSet(surface->tree());
+    grids.insert(grids.begin(), surface);
+    return grids;
+}
+
+
+template <typename PointDataGridT,
+    typename SdfT,
+    typename SettingsT>
+GridPtrVec
+rasterizeSmoothSpheres(const PointDataGridT& points,
+                       const SettingsT& settings,
+                       const typename SettingsT::FilterType& filter)
+{
+    static_assert(IsSpecializationOf<PointDataGridT, Grid>::value);
+    static_assert(IsSpecializationOf<SettingsT, SmoothSphereSettings>::value);
+
+    using AttributeTypes = typename SettingsT::AttributeTypes;
+    using FilterT = typename SettingsT::FilterType;
+
+    const std::vector<std::string>& attributes = settings.attributes;
+    const Real halfband = settings.halfband;
+    auto* interrupter = settings.interrupter;
+
+    math::Transform::Ptr transform = settings.transform;
+    if (!transform) transform = points.transform().copy();
+    const Real vs = transform->voxelSize()[0];
+    const typename SdfT::ValueType background =
+        static_cast<typename SdfT::ValueType>(vs * halfband);
+
+    const Real indexSpaceSearch = settings.searchRadius / vs;
+    // max possible index space search radius
+    const size_t width = static_cast<size_t>(math::RoundUp(indexSpaceSearch));
+
+    // The topology we need to activate is at a distance based on the maximum
+    // radii of each point and the uniform search radius. Even though we're
+    // guaranteed to be generating new positions within the distribution of
+    // point neighbours, these positions may end up outside of active topology
+    // were we _only_ to use the radius of the particles for topology
+    // activation.
+    const Real maxActivationRadius = std::max(settings.searchRadius, settings.radiusScale) / vs;
+    const auto leaf = points.constTree().cbeginLeaf();
+
+    // Compute estimated max bounds for clipping. This is used if the search
+    // radius is larger than the max particle radius (as we don't need to
+    // activate topology further outside the bounds of the point data grid).
+    // This bounds is expanded by the halfband + max radii
+    CoordBBox bounds;
+    points.tree().evalLeafBoundingBox(bounds);
+
+    typename SdfT::Ptr surface;
+    GridPtrVec grids;
+
+    if (settings.radius.empty()) {
+        // This is the max possible distance we need to activate, but we'll
+        // clip this at the edges of the point bounds (as the ZB kernel will
+        // only create positions in between points).
+        const FixedBandRadius<Real> bands(maxActivationRadius, float(halfband));
+        const Real max = bands.max();
+
+        // Compute max radius in index space and expand bounds
+        bounds.expand(static_cast<Coord::ValueType>(halfband + math::Round(settings.radiusScale / vs)));
+        // init surface
+        surface = initFixedSmoothSdf<SdfT>
+            (points, transform, background, max, bounds, interrupter);
+
+        if (!leaf) return GridPtrVec(1, surface);
+
+        const FixedRadius<Real> rad(settings.radiusScale / vs);
+        if (interrupter) interrupter->start("Rasterizing particles to level set using constant Zhu-Bridson");
+
+        grids = doRasterizeSurface<SdfT, AveragePositionTransfer, AttributeTypes, FilterT>
+            (points, attributes, *surface,
+                width, rad, indexSpaceSearch, points.transform(), filter, interrupter, *surface); // args
+    }
+    else {
+        using RadiusT = typename SettingsT::RadiusAttributeType;
+        using PointDataTreeT = typename PointDataGridT::TreeType;
+        using RadTreeT = typename PointDataTreeT::template ValueConverter<RadiusT>::Type;
+
+        // We currently don't use the min values for the ZB kernel topology
+        // activation.
+        // @todo  We should be able to deactivate on some metric
+        RadiusT min(0), max(0);
+        typename RadTreeT::Ptr maxtree(new RadTreeT);
+        points::evalMinMax<RadiusT, UnknownCodec>
+            (points.tree(), settings.radius, min, max, filter, nullptr, maxtree.get());
+
+        if ((settings.searchRadius > settings.radiusScale) && (min < settings.searchRadius)) {
+            // set radius tree values to search distances if they are less,
+            // just for the surface topology initialization. This is the max
+            // possible distance we need to activate, but we'll clip this at
+            // the edges of the point bounds (as the ZB kernel will only
+            // create positions in-between points).
+            tools::foreach(maxtree->beginValueOn(),
+                [&](auto& iter) {
+                    iter.modifyValue([&](auto& r) {
+                        if (r < settings.searchRadius) {
+                            // initVariableSmoothSdf scales radii by (settings.radiusScale/vs).
+                            // We don't want to scale the search radii by the radius scale, so
+                            // cancel it out here.
+                            r = static_cast<RadiusT>(settings.searchRadius / settings.radiusScale);
+                        }
+                    });
+                }, /*thread=*/true, /*shared=*/true);
+        }
+
+        const RadiusT indexSpaceScale = RadiusT(settings.radiusScale / vs);
+        // Compute max radius in index space and expand bounds
+        bounds.expand(static_cast<Coord::ValueType>(halfband + math::Round(max * indexSpaceScale)));
+
+        // init surface
+        surface = initVariableSmoothSdf<SdfT>
+            (points, transform, background, *maxtree,
+                indexSpaceScale, halfband, bounds, interrupter);
+        maxtree.reset();
+
+        if (!leaf) return GridPtrVec(1, surface);
+
+        const size_t ridx = leaf->attributeSet().find(settings.radius);
+        if (ridx == AttributeSet::INVALID_POS) {
+            OPENVDB_THROW(RuntimeError, "Failed to find radius attribute");
+        }
+
+        VaryingRadius<RadiusT> rad(ridx, indexSpaceScale);
+        if (interrupter) interrupter->start("Rasterizing particles to level set using variable Zhu-Bridson");
+
+        grids = doRasterizeSurface<SdfT, AveragePositionTransfer, AttributeTypes, FilterT>
+            (points, attributes, *surface,
+                width, rad, indexSpaceSearch, points.transform(), filter, interrupter, *surface); // args
+    }
+
+    if (interrupter) interrupter->end();
+
+    tools::pruneInactive(surface->tree());
+    grids.insert(grids.begin(), surface);
+    return grids;
+}
+
+/// @brief  prototype - definition lives in impl/PointRasterizeEllipsoidsSDF.h
+template <typename PointDataGridT, typename SdfT, typename SettingsT>
+GridPtrVec rasterizeEllipsoids(const PointDataGridT&, const SettingsT&, const typename SettingsT::FilterType&);
+
 } // namespace rasterize_sdf_internal
 
 /// @endcond
@@ -1052,307 +1518,255 @@ rasterizeSurface(const PointDataGridT& points,
 ///////////////////////////////////////////////////
 ///////////////////////////////////////////////////
 
-
 template <typename PointDataGridT,
     typename SdfT,
-    typename FilterT,
-    typename InterrupterT>
+    typename SettingsT>
+GridPtrVec
+rasterizeSdf(const PointDataGridT& points, const SettingsT& settings)
+{
+    const typename SettingsT::FilterType* filter = settings.filter;
+
+    if constexpr (!std::is_same<typename SettingsT::FilterType, NullFilter>::value) {
+        // To avoid rasterizeSdf invoking (at compile time) its sub methods for
+        // both NullFilter and a custom filter, disallow the filter value on the
+        // settings structs to be a nullptr. We allow it for NullFilters where
+        // we can create a trivial static instance below and use that instead.
+        if (!filter) {
+            OPENVDB_THROW(RuntimeError,
+                "A nullptr for a custom point-filter cannot be passed to rasterizeSdf().");
+        }
+    }
+    else {
+        if (!filter) {
+            // We create a dummy static instance for NullFilters if none has
+            // been provided
+            static const NullFilter sNullFilter;
+            filter = &sNullFilter;
+        }
+    }
+    OPENVDB_ASSERT(filter);
+
+    if constexpr(IsSpecializationOf<SettingsT, SphereSettings>::value) {
+        return rasterize_sdf_internal::rasterizeSpheres<PointDataGridT, SdfT, SettingsT>(points, settings, *filter);
+    }
+    else if constexpr(IsSpecializationOf<SettingsT, SmoothSphereSettings>::value) {
+        return rasterize_sdf_internal::rasterizeSmoothSpheres<PointDataGridT, SdfT, SettingsT>(points, settings, *filter);
+    }
+    else if constexpr(IsSpecializationOf<SettingsT, EllipsoidSettings>::value) {
+        return rasterize_sdf_internal::rasterizeEllipsoids<PointDataGridT, SdfT, SettingsT>(points, settings, *filter);
+    }
+    else {
+        static_assert(!sizeof(SettingsT),
+            "No valid implementation for provided rasterization settings exists.");
+        return GridPtrVec(); // silences irrelevant compiler warnings
+    }
+}
+
+///////////////////////////////////////////////////
+///////////////////////////////////////////////////
+
+/// @deprecated  The following API calls are deprecated in favour of the more
+///   general rasterizeSdf<>() method which determines its behaviour based on
+///   the passed settings struct. These methods were introduced in VDB 9.1.
+///   so are not currently marked as deprecated but should be marked as such
+///   from the first minor release after OpenVDB 11.0.0.
+
+template <typename PointDataGridT,
+    typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
+    typename FilterT = NullFilter>
 typename SdfT::Ptr
 rasterizeSpheres(const PointDataGridT& points,
-                 const Real radius,
-                 const Real halfband,
-                 math::Transform::Ptr transform,
-                 const FilterT& filter,
-                 InterrupterT* interrupter)
+             const Real radius,
+             const Real halfband = LEVEL_SET_HALF_WIDTH,
+             math::Transform::Ptr transform = nullptr,
+             const FilterT& filter = NullFilter(),
+             util::NullInterrupter* interrupter = nullptr)
 {
     auto grids =
-        rasterizeSpheres<PointDataGridT, TypeList<>, SdfT, FilterT, InterrupterT>
+        rasterizeSpheres<PointDataGridT, TypeList<>, SdfT, FilterT>
             (points, radius, {}, halfband, transform, filter, interrupter);
     return StaticPtrCast<SdfT>(grids.front());
 }
 
 template <typename PointDataGridT,
-    typename RadiusT,
-    typename SdfT,
-    typename FilterT,
-    typename InterrupterT>
+    typename RadiusT = float,
+    typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
+    typename FilterT = NullFilter>
 typename SdfT::Ptr
 rasterizeSpheres(const PointDataGridT& points,
-                 const std::string& radius,
-                 const Real scale,
-                 const Real halfband,
-                 math::Transform::Ptr transform,
-                 const FilterT& filter,
-                 InterrupterT* interrupter)
+             const std::string& radius,
+             const Real scale = 1.0,
+             const Real halfband = LEVEL_SET_HALF_WIDTH,
+             math::Transform::Ptr transform = nullptr,
+             const FilterT& filter = NullFilter(),
+             util::NullInterrupter* interrupter = nullptr)
 {
     auto grids =
-        rasterizeSpheres<PointDataGridT, TypeList<>, RadiusT, SdfT, FilterT, InterrupterT>
+        rasterizeSpheres<PointDataGridT, TypeList<>, RadiusT, SdfT, FilterT>
             (points, radius, {}, scale, halfband, transform, filter, interrupter);
     return StaticPtrCast<SdfT>(grids.front());
 }
 
 template <typename PointDataGridT,
     typename AttributeTypes,
-    typename SdfT,
-    typename FilterT,
-    typename InterrupterT>
+    typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
+    typename FilterT = NullFilter>
 GridPtrVec
 rasterizeSpheres(const PointDataGridT& points,
-                 const Real radius,
-                 const std::vector<std::string>& attributes,
-                 const Real halfband,
-                 math::Transform::Ptr transform,
-                 const FilterT& filter,
-                 InterrupterT* interrupter)
+             const Real radius,
+             const std::vector<std::string>& attributes,
+             const Real halfband = LEVEL_SET_HALF_WIDTH,
+             math::Transform::Ptr transform = nullptr,
+             const FilterT& filter = NullFilter(),
+             util::NullInterrupter* interrupter = nullptr)
 {
-    using namespace rasterize_sdf_internal;
-
-    if (!transform) transform = points.transform().copy();
-    const Real vs = transform->voxelSize()[0];
-    const float background = static_cast<float>(vs * halfband);
-
-    // search distance at the SDF transform, including its half band
-    const Real radiusIndexSpace = radius / vs;
-    const FixedBandRadius<Real> rad(radiusIndexSpace, halfband);
-    const Real minBandRadius = rad.min();
-    const Real maxBandRadius = rad.max();
-    const size_t width = static_cast<size_t>(math::RoundUp(maxBandRadius));
-
-    typename SdfT::Ptr surface =
-        initFixedSdf<SdfT, InterrupterT>
-            (points, transform, background, minBandRadius, maxBandRadius, interrupter);
-
-    if (interrupter) interrupter->start("Rasterizing particles to level set using constant Spheres");
-
-    GridPtrVec grids =
-        rasterizeSurface<SdfT, SphericalTransfer, AttributeTypes, InterrupterT>
-            (points, attributes, filter, *surface, interrupter,
-                width, rad, points.transform(), *surface); // args
-
-    tools::pruneLevelSet(surface->tree());
-    if (interrupter) interrupter->end();
-    grids.insert(grids.begin(), surface);
-    return grids;
+    SphereSettings<AttributeTypes, float, FilterT> s;
+    s.radius = "";
+    s.radiusScale = radius;
+    s.halfband = halfband;
+    s.attributes = attributes;
+    s.transform = transform;
+    s.filter = &filter;
+    s.interrupter = interrupter;
+    return rasterizeSdf<PointDataGridT, SdfT>(points, s);
 }
 
 template <typename PointDataGridT,
     typename AttributeTypes,
-    typename RadiusT,
-    typename SdfT,
-    typename FilterT,
-    typename InterrupterT>
+    typename RadiusT = float,
+    typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
+    typename FilterT = NullFilter>
 GridPtrVec
 rasterizeSpheres(const PointDataGridT& points,
-                 const std::string& radius,
-                 const std::vector<std::string>& attributes,
-                 const Real scale,
-                 const Real halfband,
-                 math::Transform::Ptr transform,
-                 const FilterT& filter,
-                 InterrupterT* interrupter)
+             const std::string& radius,
+             const std::vector<std::string>& attributes,
+             const Real scale = 1.0,
+             const Real halfband = LEVEL_SET_HALF_WIDTH,
+             math::Transform::Ptr transform = nullptr,
+             const FilterT& filter = NullFilter(),
+             util::NullInterrupter* interrupter = nullptr)
 {
-    using namespace rasterize_sdf_internal;
-    using PointDataTreeT = typename PointDataGridT::TreeType;
-    using RadTreeT = typename PointDataTreeT::template ValueConverter<RadiusT>::Type;
-
-    if (!transform) transform = points.transform().copy();
-    const Real vs = transform->voxelSize()[0];
-    const float background = static_cast<float>(vs * halfband);
-
-    RadiusT min(0), max(0);
-    typename RadTreeT::Ptr mintree(new RadTreeT), maxtree(new RadTreeT);
-    points::evalMinMax<RadiusT, UnknownCodec>
-        (points.tree(), radius, min, max, filter, mintree.get(), maxtree.get());
-
-    // search distance at the SDF transform
-    const RadiusT indexSpaceScale = RadiusT(scale / vs);
-    typename SdfT::Ptr surface =
-        initVariableSdf<SdfT, InterrupterT>
-            (points, transform, background, *mintree, *maxtree,
-                indexSpaceScale, halfband, interrupter);
-    mintree.reset();
-    maxtree.reset();
-
-    auto leaf = points.constTree().cbeginLeaf();
-    if (!leaf) return GridPtrVec(1, surface);
-
-    // max possible index space radius
-    const size_t width = static_cast<size_t>
-        (math::RoundUp((Real(max) * indexSpaceScale) + Real(halfband)));
-
-    const size_t ridx = leaf->attributeSet().find(radius);
-    if (ridx == AttributeSet::INVALID_POS) {
-        OPENVDB_THROW(RuntimeError, "Failed to find radius attribute \"" + radius + "\"");
+    // mimics old behaviour - rasterize_sdf_internal::rasterizeSmoothSpheres
+    // will fall back to uniform rasterization if the attribute doesn't exist.
+    if (auto leaf = points.constTree().cbeginLeaf()) {
+        const size_t ridx = leaf->attributeSet().find(radius);
+        if (ridx == AttributeSet::INVALID_POS) {
+            OPENVDB_THROW(RuntimeError, "Failed to find radius attribute \"" + radius + "\"");
+        }
     }
-
-    VaryingBandRadius<RadiusT> rad(ridx, RadiusT(halfband), indexSpaceScale);
-    if (interrupter) interrupter->start("Rasterizing particles to level set using variable Spheres");
-
-    GridPtrVec grids =
-        rasterizeSurface<SdfT, SphericalTransfer, AttributeTypes, InterrupterT>
-            (points, attributes, filter, *surface, interrupter,
-                width, rad, points.transform(), *surface); // args
-
-    if (interrupter) interrupter->end();
-    tools::pruneLevelSet(surface->tree());
-    grids.insert(grids.begin(), surface);
-    return grids;
+    SphereSettings<AttributeTypes, RadiusT, FilterT> s;
+    s.radius = radius;
+    s.radiusScale = scale;
+    s.halfband = halfband;
+    s.attributes = attributes;
+    s.transform = transform;
+    s.filter = &filter;
+    s.interrupter = interrupter;
+    return rasterizeSdf<PointDataGridT, SdfT>(points, s);
 }
 
 ///////////////////////////////////////////////////
 
 template <typename PointDataGridT,
-    typename SdfT,
-    typename FilterT,
-    typename InterrupterT>
+    typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
+    typename FilterT = NullFilter>
 typename SdfT::Ptr
 rasterizeSmoothSpheres(const PointDataGridT& points,
              const Real radius,
              const Real searchRadius,
-             const Real halfband,
-             math::Transform::Ptr transform,
-             const FilterT& filter,
-             InterrupterT* interrupter)
+             const Real halfband = LEVEL_SET_HALF_WIDTH,
+             math::Transform::Ptr transform = nullptr,
+             const FilterT& filter = NullFilter(),
+             util::NullInterrupter* interrupter = nullptr)
 {
     auto grids =
-        rasterizeSmoothSpheres<PointDataGridT, TypeList<>, SdfT, FilterT, InterrupterT>
+        rasterizeSmoothSpheres<PointDataGridT, TypeList<>, SdfT, FilterT>
             (points, radius, searchRadius, {}, halfband, transform, filter, interrupter);
     return StaticPtrCast<SdfT>(grids.front());
 }
 
 template <typename PointDataGridT,
-    typename RadiusT,
-    typename SdfT,
-    typename FilterT,
-    typename InterrupterT>
+    typename RadiusT = float,
+    typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
+    typename FilterT = NullFilter>
 typename SdfT::Ptr
 rasterizeSmoothSpheres(const PointDataGridT& points,
                  const std::string& radius,
                  const Real radiusScale,
                  const Real searchRadius,
-                 const Real halfband,
-                 math::Transform::Ptr transform,
-                 const FilterT& filter,
-                 InterrupterT* interrupter)
+                 const Real halfband = LEVEL_SET_HALF_WIDTH,
+                 math::Transform::Ptr transform = nullptr,
+                 const FilterT& filter = NullFilter(),
+                 util::NullInterrupter* interrupter = nullptr)
 {
     auto grids =
-        rasterizeSmoothSpheres<PointDataGridT, TypeList<>, RadiusT, SdfT, FilterT, InterrupterT>
+        rasterizeSmoothSpheres<PointDataGridT, TypeList<>, RadiusT, SdfT, FilterT>
             (points, radius, radiusScale, searchRadius, {}, halfband, transform, filter, interrupter);
     return StaticPtrCast<SdfT>(grids.front());
 }
 
 template <typename PointDataGridT,
     typename AttributeTypes,
-    typename SdfT,
-    typename FilterT,
-    typename InterrupterT>
+    typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
+    typename FilterT = NullFilter>
 GridPtrVec
 rasterizeSmoothSpheres(const PointDataGridT& points,
                  const Real radius,
                  const Real searchRadius,
                  const std::vector<std::string>& attributes,
-                 const Real halfband,
-                 math::Transform::Ptr transform,
-                 const FilterT& filter,
-                 InterrupterT* interrupter)
+                 const Real halfband = LEVEL_SET_HALF_WIDTH,
+                 math::Transform::Ptr transform = nullptr,
+                 const FilterT& filter = NullFilter(),
+                 util::NullInterrupter* interrupter = nullptr)
 {
-    using namespace rasterize_sdf_internal;
-
-    if (!transform) transform = points.transform().copy();
-    const Real vs = transform->voxelSize()[0];
-    const float background = static_cast<float>(vs * halfband);
-    const Real indexSpaceSearch = searchRadius / vs;
-    const FixedBandRadius<Real> bands(radius / vs, halfband);
-    const Real max = bands.max();
-
-    typename SdfT::Ptr surface =
-        initFixedSdf<SdfT, InterrupterT>
-            (points, transform, background, /*min*/0.0, max, interrupter);
-
-    auto leaf = points.constTree().cbeginLeaf();
-    if (!leaf) return GridPtrVec(1, surface);
-
-    // max possible index space search radius
-    const size_t width = static_cast<size_t>(math::RoundUp(indexSpaceSearch));
-
-    const FixedRadius<Real> rad(radius / vs);
-    if (interrupter) interrupter->start("Rasterizing particles to level set using constant Zhu-Bridson");
-
-    GridPtrVec grids =
-        rasterizeSurface<SdfT, AveragePositionTransfer, AttributeTypes, InterrupterT>
-            (points, attributes, filter, *surface, interrupter,
-                width, rad, indexSpaceSearch, points.transform(), *surface); // args
-
-    tools::pruneInactive(surface->tree());
-    if (interrupter) interrupter->end();
-    grids.insert(grids.begin(), surface);
-    return grids;
+    SmoothSphereSettings<AttributeTypes, float, FilterT> s;
+    s.radius = "";
+    s.radiusScale = radius;
+    s.halfband = halfband;
+    s.attributes = attributes;
+    s.transform = transform;
+    s.filter = &filter;
+    s.interrupter = interrupter;
+    s.searchRadius = searchRadius;
+    return rasterizeSdf<PointDataGridT, SdfT>(points, s);
 }
 
 template <typename PointDataGridT,
     typename AttributeTypes,
-    typename RadiusT,
-    typename SdfT,
-    typename FilterT,
-    typename InterrupterT>
+    typename RadiusT = float,
+    typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
+    typename FilterT = NullFilter>
 GridPtrVec
 rasterizeSmoothSpheres(const PointDataGridT& points,
                  const std::string& radius,
                  const Real radiusScale,
                  const Real searchRadius,
                  const std::vector<std::string>& attributes,
-                 const Real halfband,
-                 math::Transform::Ptr transform,
-                 const FilterT& filter,
-                 InterrupterT* interrupter)
+                 const Real halfband = LEVEL_SET_HALF_WIDTH,
+                 math::Transform::Ptr transform = nullptr,
+                 const FilterT& filter = NullFilter(),
+                 util::NullInterrupter* interrupter = nullptr)
 {
-    using namespace rasterize_sdf_internal;
-    using PointDataTreeT = typename PointDataGridT::TreeType;
-    using RadTreeT = typename PointDataTreeT::template ValueConverter<RadiusT>::Type;
-
-    if (!transform) transform = points.transform().copy();
-    const Real vs = transform->voxelSize()[0];
-    const float background = static_cast<float>(vs * halfband);
-    const Real indexSpaceSearch = searchRadius / vs;
-
-    RadiusT min(0), max(0);
-    typename RadTreeT::Ptr mintree(new RadTreeT), maxtree(new RadTreeT);
-    points::evalMinMax<RadiusT, UnknownCodec>
-        (points.tree(), radius, min, max, filter, mintree.get(), maxtree.get());
-
-    // search distance at the SDF transform
-    const RadiusT indexSpaceScale = RadiusT(radiusScale / vs);
-    typename SdfT::Ptr surface =
-        initVariableSdf<SdfT, InterrupterT>
-            (points, transform, background, *mintree, *maxtree,
-                indexSpaceScale, halfband, interrupter);
-    mintree.reset();
-    maxtree.reset();
-
-    auto leaf = points.constTree().cbeginLeaf();
-    if (!leaf) return GridPtrVec(1, surface);
-
-    // max possible index space search radius
-    const size_t width = static_cast<size_t>(math::RoundUp(indexSpaceSearch));
-
-    const size_t ridx = leaf->attributeSet().find(radius);
-    if (ridx == AttributeSet::INVALID_POS) {
-        OPENVDB_THROW(RuntimeError, "Failed to find radius attribute");
+    // mimics old behaviour - rasterize_sdf_internal::rasterizeSmoothSpheres
+    // will fall back to uniform rasterization if the attribute doesn't exist.
+    if (auto leaf = points.constTree().cbeginLeaf()) {
+        const size_t ridx = leaf->attributeSet().find(radius);
+        if (ridx == AttributeSet::INVALID_POS) {
+            OPENVDB_THROW(RuntimeError, "Failed to find radius attribute \"" + radius + "\"");
+        }
     }
-
-    VaryingRadius<RadiusT> rad(ridx, indexSpaceScale);
-    if (interrupter) interrupter->start("Rasterizing particles to level set using variable Zhu-Bridson");
-
-    GridPtrVec grids =
-        rasterizeSurface<SdfT, AveragePositionTransfer, AttributeTypes, InterrupterT>
-            (points, attributes, filter, *surface, interrupter,
-                width, rad, indexSpaceSearch, points.transform(), *surface); // args
-
-    tools::pruneInactive(surface->tree());
-    if (interrupter) interrupter->end();
-    grids.insert(grids.begin(), surface);
-    return grids;
+    SmoothSphereSettings<AttributeTypes, RadiusT, FilterT> s;
+    s.radius = radius;
+    s.radiusScale = radiusScale;
+    s.halfband = halfband;
+    s.attributes = attributes;
+    s.transform = transform;
+    s.filter = &filter;
+    s.interrupter = interrupter;
+    s.searchRadius = searchRadius;
+    return rasterizeSdf<PointDataGridT, SdfT>(points, s);
 }
+
 
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME
