@@ -881,7 +881,7 @@ private:
                 Op(TreeT &tree) : mDelete(false), mTree(&tree) {}
                 Op(const Op& other, tbb::split) : mDelete(true), mTree(new TreeT(other.mTree->background())) {}
                 ~Op() { if (mDelete) delete mTree; }
-                void operator()(RangeT &r) { for (auto i=r.begin(); i!=r.end(); ++i) this->merge(*i);}
+                void operator()(const RangeT &r) { for (auto i=r.begin(); i!=r.end(); ++i) this->merge(*i);}
                 void join(Op &other) { this->merge(*(other.mTree)); }
                 void merge(TreeT &tree) { mTree->merge(tree, MERGE_ACTIVE_STATES); }
             } op( getTree() );
