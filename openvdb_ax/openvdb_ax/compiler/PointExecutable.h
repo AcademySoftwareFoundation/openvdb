@@ -24,7 +24,7 @@
 
 #include <unordered_map>
 
-class TestPointExecutable;
+struct TestPointExecutableAcc;
 
 namespace llvm {
 class ExecutionEngine;
@@ -172,7 +172,7 @@ public:
 
 private:
     friend class Compiler;
-    friend class ::TestPointExecutable;
+    friend struct ::TestPointExecutableAcc;
 
     /// @brief  Private method used in the unit tests
     bool usesAcceleratedKernel(const points::PointDataTree& tree) const;

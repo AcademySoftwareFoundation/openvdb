@@ -23,7 +23,7 @@
 
 #include <unordered_map>
 
-class TestVolumeExecutable;
+struct TestVolumeExecutableAcc;
 
 namespace llvm {
 class ExecutionEngine;
@@ -298,7 +298,7 @@ public:
 
 private:
     friend class Compiler;
-    friend class ::TestVolumeExecutable;
+    friend struct ::TestVolumeExecutableAcc;
 
     /// @brief Constructor, expected to be invoked by the compiler. Should not
     ///   be invoked directly.

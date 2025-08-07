@@ -45,9 +45,7 @@ LLVM_VERSION=$1
 if [ ! -z "$LLVM_VERSION" ]; then
     if [ "$LLVM_VERSION" == "latest" ]; then
         brew install llvm
-        brew install cppunit
     else
         brew install llvm@$LLVM_VERSION
-        brew install cppunit
     fi
 fi

@@ -10,8 +10,6 @@
 #include <openvdb_ax/compiler/CustomData.h>
 #include <openvdb_ax/Exceptions.h>
 
-#include <cppunit/extensions/HelperMacros.h>
-
 using namespace openvdb::points;
 
 class TestExternals : public unittest_util::AXTestCase
@@ -19,18 +17,10 @@ class TestExternals : public unittest_util::AXTestCase
 public:
 
     std::string dir() const override { return GET_TEST_DIRECTORY(); }
-
-    CPPUNIT_TEST_SUITE(TestExternals);
-    CPPUNIT_TEST(assignFrom);
-    CPPUNIT_TEST_SUITE_END();
-
-    void assignFrom();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestExternals);
 
-void
-TestExternals::assignFrom()
+TEST_F(TestExternals, assignFrom)
 {
     const std::string code = R"(
 _T1_@test1 = _T1_$ext1;)";

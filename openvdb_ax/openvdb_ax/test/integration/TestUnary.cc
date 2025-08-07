@@ -4,29 +4,13 @@
 #include "TestHarness.h"
 #include "../util.h"
 
-#include <cppunit/extensions/HelperMacros.h>
-
 
 class TestUnary : public unittest_util::AXTestCase
 {
-public:
-    CPPUNIT_TEST_SUITE(TestUnary);
-    CPPUNIT_TEST(testBitwiseNot);
-    CPPUNIT_TEST(testNegate);
-    CPPUNIT_TEST(testNot);
-    CPPUNIT_TEST(testUnaryVector);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testBitwiseNot();
-    void testNegate();
-    void testNot();
-    void testUnaryVector();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestUnary);
 
-void
-TestUnary::testBitwiseNot()
+TEST_F(TestUnary, testBitwiseNot)
 {
     mHarness.addAttributes<int>({"int_test", "int_test2"}, {-9, -8});
 
@@ -35,8 +19,7 @@ TestUnary::testBitwiseNot()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestUnary::testNegate()
+TEST_F(TestUnary, testNegate)
 {
     mHarness.addAttribute<int>("int_test", -3);
     mHarness.addAttribute<float>("float_test", -5.5f);
@@ -46,8 +29,7 @@ TestUnary::testNegate()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestUnary::testNot()
+TEST_F(TestUnary, testNot)
 {
     mHarness.addAttributes<bool>({"bool_test", "bool_test2"}, {false, true});
 
@@ -56,8 +38,7 @@ TestUnary::testNot()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestUnary::testUnaryVector()
+TEST_F(TestUnary, testUnaryVector)
 {
     // vec3
 

@@ -11,7 +11,7 @@
 #include <openvdb_ax/codegen/ComputeGenerator.h>
 #include <openvdb_ax/ast/AST.h>
 
-#include <cppunit/extensions/HelperMacros.h>
+#include <gtest/gtest.h>
 
 static const std::vector<std::string> tests {
     //  codegen errors
@@ -333,22 +333,11 @@ static const std::vector<std::string> tests {
     "vec2i v; 1, v++;"
 };
 
-class TestComputeGeneratorFailures : public CppUnit::TestCase
+class TestComputeGeneratorFailures : public ::testing::Test
 {
-public:
-
-    CPPUNIT_TEST_SUITE(TestComputeGeneratorFailures);
-    CPPUNIT_TEST(testFailures);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testFailures();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestComputeGeneratorFailures);
-
-
-void
-TestComputeGeneratorFailures::testFailures()
+TEST_F(TestComputeGeneratorFailures, testFailures)
 {
     openvdb::ax::FunctionOptions opts;
     openvdb::ax::codegen::FunctionRegistry::UniquePtr reg =
@@ -361,14 +350,14 @@ TestComputeGeneratorFailures::testFailures()
     for (const auto& code : tests) {
         const openvdb::ax::ast::Tree::ConstPtr ast =
             openvdb::ax::ast::parse(code.c_str(), logger);
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Unable to parse", code), ast.get());
-        CPPUNIT_ASSERT(!logger.hasError());
+        ASSERT_TRUE(ast.get()) << ERROR_MSG("Unable to parse", code);
+        ASSERT_TRUE(!logger.hasError());
 
         unittest_util::LLVMState state;
         openvdb::ax::codegen::codegen_internal::ComputeGenerator gen(state.module(), opts, *reg, logger);
         gen.generate(*ast);
 
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Expected Compiler Error", code), logger.hasError());
+        ASSERT_TRUE(logger.hasError()) << ERROR_MSG("Expected Compiler Error", code);
         logger.clear();
     }
 }

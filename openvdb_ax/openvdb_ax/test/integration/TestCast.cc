@@ -5,27 +5,16 @@
 
 #include "../util.h"
 
-#include <cppunit/extensions/HelperMacros.h>
-
 using namespace openvdb::points;
 
 class TestCast : public unittest_util::AXTestCase
 {
 public:
     std::string dir() const override { return GET_TEST_DIRECTORY(); }
-
-    CPPUNIT_TEST_SUITE(TestCast);
-    CPPUNIT_TEST(explicitScalar);
-    CPPUNIT_TEST_SUITE_END();
-
-    void explicitScalar();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestCast);
 
-
-void
-TestCast::explicitScalar()
+TEST_F(TestCast, explicitScalar)
 {
     auto generate = [this](const auto& types) {
         for (const auto& t1 : types) {

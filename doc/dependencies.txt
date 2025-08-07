@@ -44,11 +44,10 @@ OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW* | -
 OpenVDB Python          | Core Library dependencies, Python, nanobind     | NumPy
 OpenVDB AX              | Core Library dependencies, LLVM                 | Bison, Flex
 NanoVDB                 | -                                               | Core Library, CUDA, TBB, Blosc, ZLib
-OpenVDB UnitTests       | Core Library dependencies, GoogleTest           | CppUnit**
+OpenVDB UnitTests       | Core Library dependencies, GoogleTest           | -
 OpenVDB Documentation   | Doxygen                                         | -
 
  - @b * GLEW is only required for building the vdb_view binary on Windows.
- - @b ** CppUnit is only required for building the AX unit tests.
  - @b Note - Bison and Flex are only required for re-generation of the AX
  grammar which is not typically necessary for the majority of users.
 
@@ -73,7 +72,6 @@ Python         | 3.10    | 3.11        | The python interpreter and libraries   
 nanobind       | 2.0.0   | 2.1.0       | C++/python bindings                                               | Y       | Y        | https://nanobind.readthedocs.io
 NumPy          | 1.23.0  | 1.26.0      | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
 GoogleTest     | 1.10    | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
-CppUnit        | 1.10    | Latest      | A unit testing framework module for C++                           | N       | Y        | https://freedesktop.org/wiki/Software/cppunit
 Blosc          | 1.17.0* | 1.17.0      | Recommended dependency for improved disk compression              | Y       | Y        | https://github.com/Blosc/c-blosc/releases
 Log4cplus      | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus
 libpng         | -       | Latest      | Library for manipulating PNG images                               | Y       | Y        | http://www.libpng.org/pub/png/libpng.html
@@ -154,7 +152,6 @@ apt-get install libpng-dev              # libpng
 apt-get install libopenexr-dev          # OpenEXR
 apt-get install liblog4cplus-dev        # Log4cplus
 apt-get install googletest              # GoogleTest
-apt-get install libcppunit-dev          # CppUnit
 # vdb_view
 apt-get install libglfw3-dev            # GLFW
 # Documentation
@@ -184,7 +181,6 @@ brew install numpy                     # NumPy
 brew install nanobind                  # nanobind
 # Unit Tests
 brew install gtest                     # GoogleTest
-brew install cppunit                   # CppUnit
 # vdb_view
 brew install glfw                      # GLFW
 # vdb_render

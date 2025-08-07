@@ -7,46 +7,13 @@
 
 #include <openvdb/Exceptions.h>
 
-#include <cppunit/extensions/HelperMacros.h>
-
 using namespace openvdb::points;
 
 class TestDeclare : public unittest_util::AXTestCase
 {
-public:
-    CPPUNIT_TEST_SUITE(TestDeclare);
-    CPPUNIT_TEST(testLocalVariables);
-    CPPUNIT_TEST(testLocalVectorVariables);
-    CPPUNIT_TEST(testAttributes);
-    CPPUNIT_TEST(testVectorAttributes);
-    CPPUNIT_TEST(testNewAttributes);
-    CPPUNIT_TEST(testNewVectorAttributes);
-    CPPUNIT_TEST(testVectorAttributeImplicit);
-    CPPUNIT_TEST(testAmbiguousScalarAttributes);
-    CPPUNIT_TEST(testAmbiguousVectorAttributes);
-    CPPUNIT_TEST(testAmbiguousScalarExternals);
-    CPPUNIT_TEST(testAmbiguousVectorExternals);
-    CPPUNIT_TEST(testAttributesVolume);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testLocalVariables();
-    void testAttributes();
-    void testNewAttributes();
-    void testNewVectorAttributes();
-    void testLocalVectorVariables();
-    void testVectorAttributes();
-    void testVectorAttributeImplicit();
-    void testAmbiguousScalarAttributes();
-    void testAmbiguousVectorAttributes();
-    void testAmbiguousScalarExternals();
-    void testAmbiguousVectorExternals();
-    void testAttributesVolume();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestDeclare);
-
-void
-TestDeclare::testLocalVariables()
+TEST_F(TestDeclare, testLocalVariables)
 {
     mHarness.executeCode("test/snippets/declare/declareLocalVariables");
 
@@ -54,16 +21,14 @@ TestDeclare::testLocalVariables()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestDeclare::testLocalVectorVariables()
+TEST_F(TestDeclare, testLocalVectorVariables)
 {
     mHarness.executeCode("test/snippets/declare/declareLocalVectorVariables");
 
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestDeclare::testAttributes()
+TEST_F(TestDeclare, testAttributes)
 {
     mHarness.addAttributes<float>(unittest_util::nameSequence("float_test", 4),
         {0.0f, 0.2f, 10.0f, 10.0f});
@@ -79,8 +44,7 @@ TestDeclare::testAttributes()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestDeclare::testAttributesVolume()
+TEST_F(TestDeclare, testAttributesVolume)
 {
     mHarness.addAttributes<float>(unittest_util::nameSequence("float_test", 4),
         {0.0f, 0.2f, 10.0f, 10.0f});
@@ -95,8 +59,7 @@ TestDeclare::testAttributesVolume()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestDeclare::testNewAttributes()
+TEST_F(TestDeclare, testNewAttributes)
 {
     mHarness.addExpectedAttributes<float>(unittest_util::nameSequence("float_test", 4),
         {0.0f, 0.2f, 10.0f, 10.0f});
@@ -121,8 +84,7 @@ TestDeclare::testNewAttributes()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestDeclare::testNewVectorAttributes()
+TEST_F(TestDeclare, testNewVectorAttributes)
 {
     mHarness.addExpectedAttributes<openvdb::Vec3f>({"vec_float_test", "vec_float_test2"},
         {openvdb::Vec3f::zero(), openvdb::Vec3f(0.2f, 0.3f, 0.4f)});
@@ -142,8 +104,7 @@ TestDeclare::testNewVectorAttributes()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestDeclare::testVectorAttributes()
+TEST_F(TestDeclare, testVectorAttributes)
 {
     mHarness.addAttribute<openvdb::Vec3d>("vec_double_test", openvdb::Vec3d(0.3, 0.4, 0.5));
     mHarness.addAttributes<openvdb::Vec3f>({"vec_float_test", "vec_float_test2"},
@@ -156,8 +117,7 @@ TestDeclare::testVectorAttributes()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestDeclare::testVectorAttributeImplicit()
+TEST_F(TestDeclare, testVectorAttributeImplicit)
 {
     mHarness.addAttribute<openvdb::Vec3d>("vec_double_test", openvdb::Vec3d(1.0, 0.3, 0.4));
     mHarness.executeCode("test/snippets/declare/declareVectorAttributeImplicit");
@@ -165,31 +125,27 @@ TestDeclare::testVectorAttributeImplicit()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestDeclare::testAmbiguousScalarAttributes()
+TEST_F(TestDeclare, testAmbiguousScalarAttributes)
 {
     const bool success = mHarness.executeCode("test/snippets/declare/declareAmbiguousScalarAttributes");
-    CPPUNIT_ASSERT(!success);
+    ASSERT_TRUE(!success);
 }
 
-void
-TestDeclare::testAmbiguousVectorAttributes()
+TEST_F(TestDeclare, testAmbiguousVectorAttributes)
 {
     const bool success = mHarness.executeCode("test/snippets/declare/declareAmbiguousVectorAttributes");
-    CPPUNIT_ASSERT(!success);
+    ASSERT_TRUE(!success);
 }
 
-void
-TestDeclare::testAmbiguousScalarExternals()
+TEST_F(TestDeclare, testAmbiguousScalarExternals)
 {
     const bool success = mHarness.executeCode("test/snippets/declare/declareAmbiguousScalarExternals");
-    CPPUNIT_ASSERT(!success);
+    ASSERT_TRUE(!success);
 }
 
-void
-TestDeclare::testAmbiguousVectorExternals()
+TEST_F(TestDeclare, testAmbiguousVectorExternals)
 {
     const bool success = mHarness.executeCode("test/snippets/declare/declareAmbiguousVectorExternals");
-    CPPUNIT_ASSERT(!success);
+    ASSERT_TRUE(!success);
 }
 

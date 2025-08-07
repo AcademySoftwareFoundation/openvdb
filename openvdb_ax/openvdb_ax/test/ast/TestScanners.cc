@@ -6,7 +6,7 @@
 #include <openvdb_ax/ast/AST.h>
 #include <openvdb_ax/ast/Scanners.h>
 
-#include <cppunit/extensions/HelperMacros.h>
+#include <gtest/gtest.h>
 
 #include <string>
 
@@ -98,26 +98,11 @@ const std::vector<std::string> indirect = {
 
 }
 
-class TestScanners : public CppUnit::TestCase
+class TestScanners : public ::testing::Test
 {
-public:
-
-    CPPUNIT_TEST_SUITE(TestScanners);
-    CPPUNIT_TEST(testVisitNodeType);
-    CPPUNIT_TEST(testFirstLastLocation);
-    CPPUNIT_TEST(testAttributeDependencyTokens);
-    // CPPUNIT_TEST(testVariableDependencies);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testVisitNodeType();
-    void testFirstLastLocation();
-    void testAttributeDependencyTokens();
-    // void testVariableDependencies();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestScanners);
-
-void TestScanners::testVisitNodeType()
+TEST_F(TestScanners, testVisitNodeType)
 {
     size_t count = 0;
     auto counter = [&](const Node&) -> bool {
@@ -128,19 +113,19 @@ void TestScanners::testVisitNodeType()
     Node::Ptr node(new Attribute("a", CoreType::INT64));
 
     visitNodeType<Node>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(1), count);
+    ASSERT_EQ(size_t(1), count);
 
     count = 0;
     visitNodeType<Local>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(0), count);
+    ASSERT_EQ(size_t(0), count);
 
     count = 0;
     visitNodeType<Variable>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(1), count);
+    ASSERT_EQ(size_t(1), count);
 
     count = 0;
     visitNodeType<Attribute>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(1), count);
+    ASSERT_EQ(size_t(1), count);
 
     // "{1.0f, 2.0, 3};"
     node.reset(new ArrayPack( {
@@ -151,27 +136,27 @@ void TestScanners::testVisitNodeType()
 
     count = 0;
     visitNodeType<Node>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(4), count);
+    ASSERT_EQ(size_t(4), count);
 
     count = 0;
     visitNodeType<Local>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(0), count);
+    ASSERT_EQ(size_t(0), count);
 
     count = 0;
     visitNodeType<ValueBase>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(3), count);
+    ASSERT_EQ(size_t(3), count);
 
     count = 0;
     visitNodeType<ArrayPack>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(1), count);
+    ASSERT_EQ(size_t(1), count);
 
     count = 0;
     visitNodeType<Expression>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(4), count);
+    ASSERT_EQ(size_t(4), count);
 
     count = 0;
     visitNodeType<Statement>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(4), count);
+    ASSERT_EQ(size_t(4), count);
 
     // "@a += v@b.x = x %= 1;"
     // @note 9 explicit nodes
@@ -193,34 +178,34 @@ void TestScanners::testVisitNodeType()
 
     count = 0;
     visitNodeType<Node>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(9), count);
+    ASSERT_EQ(size_t(9), count);
 
     count = 0;
     visitNodeType<Local>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(1), count);
+    ASSERT_EQ(size_t(1), count);
 
     count = 0;
     visitNodeType<Attribute>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(2), count);
+    ASSERT_EQ(size_t(2), count);
 
     count = 0;
     visitNodeType<Value<int>>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(2), count);
+    ASSERT_EQ(size_t(2), count);
 
     count = 0;
     visitNodeType<ArrayUnpack>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(1), count);
+    ASSERT_EQ(size_t(1), count);
 
     count = 0;
     visitNodeType<AssignExpression>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(3), count);
+    ASSERT_EQ(size_t(3), count);
 
     count = 0;
     visitNodeType<Expression>(*node, counter);
-    CPPUNIT_ASSERT_EQUAL(size_t(9), count);
+    ASSERT_EQ(size_t(9), count);
 }
 
-void TestScanners::testFirstLastLocation()
+TEST_F(TestScanners, testFirstLastLocation)
 {
     // The list of above code sets which are expected to have the same
     // first and last use of @a.
@@ -233,13 +218,12 @@ void TestScanners::testFirstLastLocation()
     for (const auto& samples : snippets) {
         for (const std::string& code : *samples) {
             const Tree::ConstPtr tree = parse(code.c_str());
-            CPPUNIT_ASSERT(tree);
+            ASSERT_TRUE(tree);
             const Variable* first = firstUse(*tree, "@a");
             const Variable* last = lastUse(*tree, "@a");
-            CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Unable to locate first @a AST node", code), first);
-            CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Unable to locate last @a AST node", code), last);
-            CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Invalid first/last AST node comparison", code),
-                first == last);
+            ASSERT_TRUE(first) << ERROR_MSG("Unable to locate first @a AST node", code);
+            ASSERT_TRUE(last) << ERROR_MSG("Unable to locate last @a AST node", code);
+            ASSERT_TRUE(first == last) << ERROR_MSG("Invalid first/last AST node comparison", code);
         }
     }
 
@@ -254,15 +238,13 @@ void TestScanners::testFirstLastLocation()
         static_cast<AssignExpression*>(node.get())->lhs();
     const Node* expectedLast =
         static_cast<AssignExpression*>(node.get())->rhs();
-    CPPUNIT_ASSERT(expectedFirst != expectedLast);
+    ASSERT_TRUE(expectedFirst != expectedLast);
 
     const Node* first = firstUse(*node, "@a");
     const Node* last = lastUse(*node, "@a");
 
-    CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Unexpected location of @a AST node", "@a=@a"),
-        first, expectedFirst);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Unexpected location of @a AST node", "@a=@a"),
-        last, expectedLast);
+    ASSERT_EQ(first, expectedFirst) << ERROR_MSG("Unexpected location of @a AST node", "@a=@a");
+    ASSERT_EQ(last, expectedLast) << ERROR_MSG("Unexpected location of @a AST node", "@a=@a");
 
     // for(@a;@a;@a) { @a; }
     node.reset(new Loop(
@@ -275,15 +257,13 @@ void TestScanners::testFirstLastLocation()
 
     expectedFirst = static_cast<Loop*>(node.get())->initial();
     expectedLast = static_cast<Loop*>(node.get())->body()->child(0);
-    CPPUNIT_ASSERT(expectedFirst != expectedLast);
+    ASSERT_TRUE(expectedFirst != expectedLast);
 
     first = firstUse(*node, "@a");
     last = lastUse(*node, "@a");
 
-    CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Unexpected location of @a AST node",
-        "for(@a;@a;@a) { @a; }"), first, expectedFirst);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Unexpected location of @a AST node",
-        "for(@a;@a;@a) { @a; }"), last, expectedLast);
+    ASSERT_EQ(first, expectedFirst) << ERROR_MSG("Unexpected location of @a AST node", "for(@a;@a;@a) { @a; }");
+    ASSERT_EQ(last, expectedLast) << ERROR_MSG("Unexpected location of @a AST node", "for(@a;@a;@a) { @a; }");
 
     // do { @a; } while(@a);
     node.reset(new Loop(
@@ -296,15 +276,13 @@ void TestScanners::testFirstLastLocation()
 
     expectedFirst = static_cast<Loop*>(node.get())->body()->child(0);
     expectedLast = static_cast<Loop*>(node.get())->condition();
-    CPPUNIT_ASSERT(expectedFirst != expectedLast);
+    ASSERT_TRUE(expectedFirst != expectedLast);
 
     first = firstUse(*node, "@a");
     last = lastUse(*node, "@a");
 
-    CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Unexpected location of @a AST node",
-        "do { @a; } while(@a);"), first, expectedFirst);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Unexpected location of @a AST node",
-        "do { @a; } while(@a);"), last, expectedLast);
+    ASSERT_EQ(first, expectedFirst) << ERROR_MSG("Unexpected location of @a AST node", "do { @a; } while(@a);");
+    ASSERT_EQ(last, expectedLast) << ERROR_MSG("Unexpected location of @a AST node", "do { @a; } while(@a);");
 
     // if (@a) {} else if (@a) {} else { @a; }
     node.reset(new ConditionalStatement(
@@ -326,67 +304,60 @@ void TestScanners::testFirstLastLocation()
                 ->falseBranch()->child(0))
                     ->falseBranch()->child(0);
 
-    CPPUNIT_ASSERT(expectedFirst != expectedLast);
+    ASSERT_TRUE(expectedFirst != expectedLast);
 
     first = firstUse(*node, "@a");
     last = lastUse(*node, "@a");
 
-    CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Unexpected location of @a AST node",
-        "if (@a) {} else if (1) {} else { @a; }"), first, expectedFirst);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Unexpected location of @a AST node",
-        "if (@a) {} else if (1) {} else { @a; }"), last, expectedLast);
+    ASSERT_EQ(first, expectedFirst) << ERROR_MSG("Unexpected location of @a AST node", "if (@a) {} else if (1) {} else { @a; }");
+    ASSERT_EQ(last, expectedLast) << ERROR_MSG("Unexpected location of @a AST node", "if (@a) {} else if (1) {} else { @a; }");
 }
 
-void TestScanners::testAttributeDependencyTokens()
+TEST_F(TestScanners, testAttributeDependencyTokens)
 {
     for (const std::string& code : none) {
         const Tree::ConstPtr tree = parse(code.c_str());
-        CPPUNIT_ASSERT(tree);
+        ASSERT_TRUE(tree);
         std::vector<std::string> dependencies;
         attributeDependencyTokens(*tree, "a", tokens::CoreType::FLOAT, dependencies);
 
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Expected 0 deps", code),
-            dependencies.empty());
+        ASSERT_TRUE(dependencies.empty()) << ERROR_MSG("Expected 0 deps", code);
     }
 
     for (const std::string& code : self) {
         const Tree::ConstPtr tree = parse(code.c_str());
-        CPPUNIT_ASSERT(tree);
+        ASSERT_TRUE(tree);
         std::vector<std::string> dependencies;
         attributeDependencyTokens(*tree, "a", tokens::CoreType::FLOAT, dependencies);
-        CPPUNIT_ASSERT(!dependencies.empty());
-        CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Invalid variable dependency", code),
-            dependencies.front(), std::string("float@a"));
+        ASSERT_TRUE(!dependencies.empty());
+        ASSERT_EQ(dependencies.front(), std::string("float@a")) << ERROR_MSG("Invalid variable dependency", code);
     }
 
     for (const std::string& code : direct) {
         const Tree::ConstPtr tree = parse(code.c_str());
-        CPPUNIT_ASSERT(tree);
+        ASSERT_TRUE(tree);
         std::vector<std::string> dependencies;
         attributeDependencyTokens(*tree, "a", tokens::CoreType::FLOAT, dependencies);
-        CPPUNIT_ASSERT(!dependencies.empty());
-        CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Invalid variable dependency", code),
-            dependencies.front(), std::string("float@b"));
+        ASSERT_TRUE(!dependencies.empty());
+        ASSERT_EQ(dependencies.front(), std::string("float@b")) << ERROR_MSG("Invalid variable dependency", code);
     }
 
     for (const std::string& code : directvec) {
         const Tree::ConstPtr tree = parse(code.c_str());
-        CPPUNIT_ASSERT(tree);
+        ASSERT_TRUE(tree);
         std::vector<std::string> dependencies;
         attributeDependencyTokens(*tree, "a", tokens::CoreType::FLOAT, dependencies);
-        CPPUNIT_ASSERT(!dependencies.empty());
-        CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Invalid variable dependency", code),
-            dependencies.front(), std::string("vec3f@b"));
+        ASSERT_TRUE(!dependencies.empty());
+        ASSERT_EQ(dependencies.front(), std::string("vec3f@b")) << ERROR_MSG("Invalid variable dependency", code);
     }
 
     for (const std::string& code : indirect) {
         const Tree::ConstPtr tree = parse(code.c_str());
-        CPPUNIT_ASSERT(tree);
+        ASSERT_TRUE(tree);
         std::vector<std::string> dependencies;
         attributeDependencyTokens(*tree, "a", tokens::CoreType::FLOAT, dependencies);
-        CPPUNIT_ASSERT(!dependencies.empty());
-        CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Invalid variable dependency", code),
-            dependencies.front(), std::string("float@b"));
+        ASSERT_TRUE(!dependencies.empty());
+        ASSERT_EQ(dependencies.front(), std::string("float@b")) << ERROR_MSG("Invalid variable dependency", code);
     }
 
     // Test a more complicated code snippet. Note that this also checks the
@@ -413,121 +384,112 @@ void TestScanners::testAttributeDependencyTokens()
         "}";
 
     const Tree::ConstPtr tree = parse(complex.c_str());
-    CPPUNIT_ASSERT(tree);
+    ASSERT_TRUE(tree);
     std::vector<std::string> dependencies;
     attributeDependencyTokens(*tree, "b", tokens::CoreType::FLOAT, dependencies);
     // @b should depend on: @a, @e, @f, v@v
-    CPPUNIT_ASSERT_EQUAL(size_t(4), dependencies.size());
-    CPPUNIT_ASSERT_EQUAL(dependencies[0], std::string("float@a"));
-    CPPUNIT_ASSERT_EQUAL(dependencies[1], std::string("float@e"));
-    CPPUNIT_ASSERT_EQUAL(dependencies[2], std::string("float@f"));
-    CPPUNIT_ASSERT_EQUAL(dependencies[3], std::string("vec3f@v"));
+    ASSERT_EQ(size_t(4), dependencies.size());
+    ASSERT_EQ(dependencies[0], std::string("float@a"));
+    ASSERT_EQ(dependencies[1], std::string("float@e"));
+    ASSERT_EQ(dependencies[2], std::string("float@f"));
+    ASSERT_EQ(dependencies[3], std::string("vec3f@v"));
 
     // @c should depend on: @a, @c, @d, @e, @f
     dependencies.clear();
     attributeDependencyTokens(*tree, "c", tokens::CoreType::FLOAT, dependencies);
-    CPPUNIT_ASSERT_EQUAL(size_t(5), dependencies.size());
-    CPPUNIT_ASSERT_EQUAL(dependencies[0], std::string("float@a"));
-    CPPUNIT_ASSERT_EQUAL(dependencies[1], std::string("float@c"));
-    CPPUNIT_ASSERT_EQUAL(dependencies[2], std::string("float@d"));
-    CPPUNIT_ASSERT_EQUAL(dependencies[3], std::string("float@e"));
-    CPPUNIT_ASSERT_EQUAL(dependencies[4], std::string("float@f"));
+    ASSERT_EQ(size_t(5), dependencies.size());
+    ASSERT_EQ(dependencies[0], std::string("float@a"));
+    ASSERT_EQ(dependencies[1], std::string("float@c"));
+    ASSERT_EQ(dependencies[2], std::string("float@d"));
+    ASSERT_EQ(dependencies[3], std::string("float@e"));
+    ASSERT_EQ(dependencies[4], std::string("float@f"));
 
 
     // @d should depend on: @d, @e
     dependencies.clear();
     attributeDependencyTokens(*tree, "d", tokens::CoreType::FLOAT, dependencies);
-    CPPUNIT_ASSERT_EQUAL(size_t(2), dependencies.size());
-    CPPUNIT_ASSERT_EQUAL(dependencies[0], std::string("float@d"));
-    CPPUNIT_ASSERT_EQUAL(dependencies[1], std::string("float@e"));
+    ASSERT_EQ(size_t(2), dependencies.size());
+    ASSERT_EQ(dependencies[0], std::string("float@d"));
+    ASSERT_EQ(dependencies[1], std::string("float@e"));
 
     // @e should depend on itself
     dependencies.clear();
     attributeDependencyTokens(*tree, "e", tokens::CoreType::FLOAT, dependencies);
-    CPPUNIT_ASSERT_EQUAL(size_t(1), dependencies.size());
-    CPPUNIT_ASSERT_EQUAL(dependencies[0], std::string("float@e"));
+    ASSERT_EQ(size_t(1), dependencies.size());
+    ASSERT_EQ(dependencies[0], std::string("float@e"));
 
     // @f should depend on nothing
     dependencies.clear();
     attributeDependencyTokens(*tree, "f", tokens::CoreType::FLOAT, dependencies);
-    CPPUNIT_ASSERT(dependencies.empty());
+    ASSERT_TRUE(dependencies.empty());
 
     // @v should depend on: v@v
     dependencies.clear();
     attributeDependencyTokens(*tree, "v", tokens::CoreType::VEC3F, dependencies);
-    CPPUNIT_ASSERT_EQUAL(size_t(1), dependencies.size());
-    CPPUNIT_ASSERT_EQUAL(dependencies[0], std::string("vec3f@v"));
+    ASSERT_EQ(size_t(1), dependencies.size());
+    ASSERT_EQ(dependencies[0], std::string("vec3f@v"));
 }
 
 /*
-void TestScanners::testVariableDependencies()
+TEST_F(TestScanners, testVariableDependencies)
 {
     for (const std::string& code : none) {
         const Tree::ConstPtr tree = parse(code.c_str());
-        CPPUNIT_ASSERT(tree);
+        ASSERT_TRUE(tree);
         const Variable* last = lastUse(*tree, "@a");
-        CPPUNIT_ASSERT(last);
+        ASSERT_TRUE(last);
 
         std::vector<const Variable*> vars;
         variableDependencies(*last, vars);
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Expected 0 deps", code),
-            vars.empty());
+        ASSERT_TRUE(vars.empty()) << ERROR_MSG("Expected 0 deps", code);
     }
 
     for (const std::string& code : self) {
         const Tree::ConstPtr tree = parse(code.c_str());
-        CPPUNIT_ASSERT(tree);
+        ASSERT_TRUE(tree);
         const Variable* last = lastUse(*tree, "@a");
-        CPPUNIT_ASSERT(last);
+        ASSERT_TRUE(last);
 
         std::vector<const Variable*> vars;
         variableDependencies(*last, vars);
         const Variable* var = vars.front();
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Invalid variable dependency", code),
-            var->isType<Attribute>());
+        ASSERT_TRUE(var->isType<Attribute>()) << ERROR_MSG("Invalid variable dependency", code);
         const Attribute* attrib = static_cast<const Attribute*>(var);
-        CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Invalid variable dependency", code),
-            std::string("float@a"), attrib->tokenname());
+        ASSERT_EQ(std::string("float@a"), attrib->tokenname()) << ERROR_MSG("Invalid variable dependency", code);
     }
 
     for (const std::string& code : direct) {
         const Tree::ConstPtr tree = parse(code.c_str());
-        CPPUNIT_ASSERT(tree);
+        ASSERT_TRUE(tree);
         const Variable* last = lastUse(*tree, "@a");
-        CPPUNIT_ASSERT(last);
+        ASSERT_TRUE(last);
 
         std::vector<const Variable*> vars;
         variableDependencies(*last, vars);
 
         const Variable* var = vars.front();
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Invalid variable dependency", code),
-            var->isType<Attribute>());
-        CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Invalid variable dependency", code),
-            std::string("b"), var->name());
+        ASSERT_TRUE(var->isType<Attribute>()) << ERROR_MSG("Invalid variable dependency", code);
+        ASSERT_EQ(std::string("b"), var->name()) << ERROR_MSG("Invalid variable dependency", code);
     }
 
     for (const std::string& code : indirect) {
         const Tree::ConstPtr tree = parse(code.c_str());
-        CPPUNIT_ASSERT(tree);
+        ASSERT_TRUE(tree);
         const Variable* last = lastUse(*tree, "@a");
-        CPPUNIT_ASSERT(last);
+        ASSERT_TRUE(last);
 
         std::vector<const Variable*> vars;
         variableDependencies(*last, vars);
 
         // check c
         const Variable* var = vars[0];
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Invalid variable dependency", code),
-            var->isType<Local>());
-        CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Invalid variable dependency", code),
-            std::string("c"), var->name());
+        ASSERT_TRUE(var->isType<Local>()) << ERROR_MSG("Invalid variable dependency", code);
+        ASSERT_EQ(std::string("c"), var->name()) << ERROR_MSG("Invalid variable dependency", code);
 
         // check @b
         var = vars[1];
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Invalid variable dependency", code),
-            var->isType<Attribute>());
-        CPPUNIT_ASSERT_EQUAL_MESSAGE(ERROR_MSG("Invalid variable dependency", code),
-            std::string("b"), var->name());
+        ASSERT_TRUE(var->isType<Attribute>()) << ERROR_MSG("Invalid variable dependency", code);
+        ASSERT_EQ(std::string("b"), var->name()) << ERROR_MSG("Invalid variable dependency", code);
     }
 
     // Test a more complicated code snippet. Note that this also checks the
@@ -554,7 +516,7 @@ void TestScanners::testVariableDependencies()
         "}";
 
     const Tree::ConstPtr tree = parse(complex.c_str());
-    CPPUNIT_ASSERT(tree);
+    ASSERT_TRUE(tree);
     const Variable* lasta = lastUse(*tree, "@a");
     const Variable* lastb = lastUse(*tree, "@b");
     const Variable* lastc = lastUse(*tree, "@c");
@@ -562,100 +524,100 @@ void TestScanners::testVariableDependencies()
     const Variable* laste = lastUse(*tree, "@e");
     const Variable* lastf = lastUse(*tree, "@f");
     const Variable* lastv = lastUse(*tree, "vec3f@v");
-    CPPUNIT_ASSERT(lasta);
-    CPPUNIT_ASSERT(lastb);
-    CPPUNIT_ASSERT(lastc);
-    CPPUNIT_ASSERT(lastd);
-    CPPUNIT_ASSERT(laste);
-    CPPUNIT_ASSERT(lastf);
-    CPPUNIT_ASSERT(lastv);
+    ASSERT_TRUE(lasta);
+    ASSERT_TRUE(lastb);
+    ASSERT_TRUE(lastc);
+    ASSERT_TRUE(lastd);
+    ASSERT_TRUE(laste);
+    ASSERT_TRUE(lastf);
+    ASSERT_TRUE(lastv);
 
     std::vector<const Variable*> vars;
     variableDependencies(*lasta, vars);
-    CPPUNIT_ASSERT(vars.empty());
+    ASSERT_TRUE(vars.empty());
 
     // @b should depend on: m, m, v@v, @a, @e, @e, f1, f2, f3, @f
     variableDependencies(*lastb, vars);
-    CPPUNIT_ASSERT_EQUAL(10ul, vars.size());
-    CPPUNIT_ASSERT(vars[0]->isType<Local>());
-    CPPUNIT_ASSERT(vars[0]->name() == "m");
-    CPPUNIT_ASSERT(vars[1]->isType<Local>());
-    CPPUNIT_ASSERT(vars[1]->name() == "m");
-    CPPUNIT_ASSERT(vars[2]->isType<Attribute>());
-    CPPUNIT_ASSERT(static_cast<const Attribute*>(vars[2])->tokenname() == "vec3f@v");
-    CPPUNIT_ASSERT(vars[3]->isType<Attribute>());
-    CPPUNIT_ASSERT(static_cast<const Attribute*>(vars[3])->tokenname() == "float@a");
-    CPPUNIT_ASSERT(vars[4]->isType<Attribute>());
-    CPPUNIT_ASSERT(static_cast<const Attribute*>(vars[4])->tokenname() == "float@e");
-    CPPUNIT_ASSERT(vars[5]->isType<Attribute>());
-    CPPUNIT_ASSERT(static_cast<const Attribute*>(vars[5])->tokenname() == "float@e");
-    CPPUNIT_ASSERT(vars[6]->isType<Local>());
-    CPPUNIT_ASSERT(vars[6]->name() == "f1");
-    CPPUNIT_ASSERT(vars[7]->isType<Local>());
-    CPPUNIT_ASSERT(vars[7]->name() == "f2");
-    CPPUNIT_ASSERT(vars[8]->isType<Local>());
-    CPPUNIT_ASSERT(vars[8]->name() == "f3");
-    CPPUNIT_ASSERT(vars[9]->isType<Attribute>());
-    CPPUNIT_ASSERT(static_cast<const Attribute*>(vars[9])->tokenname() == "float@f");
+    ASSERT_EQ(10ul, vars.size());
+    ASSERT_TRUE(vars[0]->isType<Local>());
+    ASSERT_TRUE(vars[0]->name() == "m");
+    ASSERT_TRUE(vars[1]->isType<Local>());
+    ASSERT_TRUE(vars[1]->name() == "m");
+    ASSERT_TRUE(vars[2]->isType<Attribute>());
+    ASSERT_TRUE(static_cast<const Attribute*>(vars[2])->tokenname() == "vec3f@v");
+    ASSERT_TRUE(vars[3]->isType<Attribute>());
+    ASSERT_TRUE(static_cast<const Attribute*>(vars[3])->tokenname() == "float@a");
+    ASSERT_TRUE(vars[4]->isType<Attribute>());
+    ASSERT_TRUE(static_cast<const Attribute*>(vars[4])->tokenname() == "float@e");
+    ASSERT_TRUE(vars[5]->isType<Attribute>());
+    ASSERT_TRUE(static_cast<const Attribute*>(vars[5])->tokenname() == "float@e");
+    ASSERT_TRUE(vars[6]->isType<Local>());
+    ASSERT_TRUE(vars[6]->name() == "f1");
+    ASSERT_TRUE(vars[7]->isType<Local>());
+    ASSERT_TRUE(vars[7]->name() == "f2");
+    ASSERT_TRUE(vars[8]->isType<Local>());
+    ASSERT_TRUE(vars[8]->name() == "f3");
+    ASSERT_TRUE(vars[9]->isType<Attribute>());
+    ASSERT_TRUE(static_cast<const Attribute*>(vars[9])->tokenname() == "float@f");
 
     // @c should depend on: @c, a, @e, @d, a, @e, @a, @e, f1, f2, f3, @f
     vars.clear();
     variableDependencies(*lastc, vars);
-    CPPUNIT_ASSERT_EQUAL(11ul, vars.size());
-    CPPUNIT_ASSERT(vars[0]->isType<Attribute>());
-    CPPUNIT_ASSERT(static_cast<const Attribute*>(vars[0])->tokenname() == "float@c");
-    CPPUNIT_ASSERT(vars[1]->isType<Local>());
-    CPPUNIT_ASSERT(vars[1]->name() == "a");
-    CPPUNIT_ASSERT(vars[2]->isType<Attribute>());
-    CPPUNIT_ASSERT(static_cast<const Attribute*>(vars[2])->tokenname() == "float@e");
-    CPPUNIT_ASSERT(vars[3]->isType<Attribute>());
-    CPPUNIT_ASSERT(static_cast<const Attribute*>(vars[3])->tokenname() == "float@d");
-    CPPUNIT_ASSERT(vars[4]->isType<Local>());
-    CPPUNIT_ASSERT(vars[4]->name() == "a");
-    CPPUNIT_ASSERT(vars[5]->isType<Attribute>());
-    CPPUNIT_ASSERT(static_cast<const Attribute*>(vars[5])->tokenname() == "float@a");
-    CPPUNIT_ASSERT(vars[6]->isType<Attribute>());
-    CPPUNIT_ASSERT(static_cast<const Attribute*>(vars[6])->tokenname() == "float@e");
-    CPPUNIT_ASSERT(vars[7]->isType<Local>());
-    CPPUNIT_ASSERT(vars[7]->name() == "f1");
-    CPPUNIT_ASSERT(vars[8]->isType<Local>());
-    CPPUNIT_ASSERT(vars[8]->name() == "f2");
-    CPPUNIT_ASSERT(vars[9]->isType<Local>());
-    CPPUNIT_ASSERT(vars[9]->name() == "f3");
-    CPPUNIT_ASSERT(vars[10]->isType<Attribute>());
-    CPPUNIT_ASSERT(static_cast<const Attribute*>(vars[10])->tokenname() == "float@f");
+    ASSERT_EQ(11ul, vars.size());
+    ASSERT_TRUE(vars[0]->isType<Attribute>());
+    ASSERT_TRUE(static_cast<const Attribute*>(vars[0])->tokenname() == "float@c");
+    ASSERT_TRUE(vars[1]->isType<Local>());
+    ASSERT_TRUE(vars[1]->name() == "a");
+    ASSERT_TRUE(vars[2]->isType<Attribute>());
+    ASSERT_TRUE(static_cast<const Attribute*>(vars[2])->tokenname() == "float@e");
+    ASSERT_TRUE(vars[3]->isType<Attribute>());
+    ASSERT_TRUE(static_cast<const Attribute*>(vars[3])->tokenname() == "float@d");
+    ASSERT_TRUE(vars[4]->isType<Local>());
+    ASSERT_TRUE(vars[4]->name() == "a");
+    ASSERT_TRUE(vars[5]->isType<Attribute>());
+    ASSERT_TRUE(static_cast<const Attribute*>(vars[5])->tokenname() == "float@a");
+    ASSERT_TRUE(vars[6]->isType<Attribute>());
+    ASSERT_TRUE(static_cast<const Attribute*>(vars[6])->tokenname() == "float@e");
+    ASSERT_TRUE(vars[7]->isType<Local>());
+    ASSERT_TRUE(vars[7]->name() == "f1");
+    ASSERT_TRUE(vars[8]->isType<Local>());
+    ASSERT_TRUE(vars[8]->name() == "f2");
+    ASSERT_TRUE(vars[9]->isType<Local>());
+    ASSERT_TRUE(vars[9]->name() == "f3");
+    ASSERT_TRUE(vars[10]->isType<Attribute>());
+    ASSERT_TRUE(static_cast<const Attribute*>(vars[10])->tokenname() == "float@f");
 
     // @d should depend on: @d, a, @e
     vars.clear();
     variableDependencies(*lastd, vars);
-    CPPUNIT_ASSERT_EQUAL(3ul, vars.size());
-    CPPUNIT_ASSERT(vars[0]->isType<Attribute>());
-    CPPUNIT_ASSERT(static_cast<const Attribute*>(vars[0])->tokenname() == "float@d");
-    CPPUNIT_ASSERT(vars[1]->isType<Local>());
-    CPPUNIT_ASSERT(vars[1]->name() == "a");
-    CPPUNIT_ASSERT(vars[2]->isType<Attribute>());
-    CPPUNIT_ASSERT(static_cast<const Attribute*>(vars[2])->tokenname() == "float@e");
+    ASSERT_EQ(3ul, vars.size());
+    ASSERT_TRUE(vars[0]->isType<Attribute>());
+    ASSERT_TRUE(static_cast<const Attribute*>(vars[0])->tokenname() == "float@d");
+    ASSERT_TRUE(vars[1]->isType<Local>());
+    ASSERT_TRUE(vars[1]->name() == "a");
+    ASSERT_TRUE(vars[2]->isType<Attribute>());
+    ASSERT_TRUE(static_cast<const Attribute*>(vars[2])->tokenname() == "float@e");
 
     // @e should depend on itself
     vars.clear();
     variableDependencies(*laste, vars);
-    CPPUNIT_ASSERT_EQUAL(1ul, vars.size());
-    CPPUNIT_ASSERT(vars[0]->isType<Attribute>());
-    CPPUNIT_ASSERT(static_cast<const Attribute*>(vars[0])->tokenname() == "float@e");
+    ASSERT_EQ(1ul, vars.size());
+    ASSERT_TRUE(vars[0]->isType<Attribute>());
+    ASSERT_TRUE(static_cast<const Attribute*>(vars[0])->tokenname() == "float@e");
 
     // @f should depend on nothing
     vars.clear();
     variableDependencies(*lastf, vars);
-    CPPUNIT_ASSERT(vars.empty());
+    ASSERT_TRUE(vars.empty());
 
     // @v should depend on: m, v@v
     vars.clear();
     variableDependencies(*lastv, vars);
-    CPPUNIT_ASSERT_EQUAL(2ul, vars.size());
-    CPPUNIT_ASSERT(vars[0]->isType<Local>());
-    CPPUNIT_ASSERT(vars[0]->name() == "m");
-    CPPUNIT_ASSERT(vars[1]->isType<Attribute>());
-    CPPUNIT_ASSERT(static_cast<const Attribute*>(vars[1])->tokenname() == "vec3f@v");
+    ASSERT_EQ(2ul, vars.size());
+    ASSERT_TRUE(vars[0]->isType<Local>());
+    ASSERT_TRUE(vars[0]->name() == "m");
+    ASSERT_TRUE(vars[1]->isType<Attribute>());
+    ASSERT_TRUE(static_cast<const Attribute*>(vars[1])->tokenname() == "vec3f@v");
 }
 */
 

@@ -5,8 +5,6 @@
 
 #include "../util.h"
 
-#include <cppunit/extensions/HelperMacros.h>
-
 using namespace openvdb::points;
 
 // Configuration values for binary code
@@ -69,53 +67,10 @@ class TestBinary : public unittest_util::AXTestCase
 public:
 
     std::string dir() const override { return GET_TEST_DIRECTORY(); }
-
-    CPPUNIT_TEST_SUITE(TestBinary);
-    CPPUNIT_TEST(plus);
-    CPPUNIT_TEST(minus);
-    CPPUNIT_TEST(mult);
-    CPPUNIT_TEST(div);
-    CPPUNIT_TEST(mod);
-    CPPUNIT_TEST(btand);
-    CPPUNIT_TEST(btor);
-    CPPUNIT_TEST(btxor);
-    CPPUNIT_TEST(logicaland);
-    CPPUNIT_TEST(logicalor);
-    CPPUNIT_TEST(equalsequals);
-    CPPUNIT_TEST(notequals);
-    CPPUNIT_TEST(greaterthan);
-    CPPUNIT_TEST(lessthan);
-    CPPUNIT_TEST(greaterthanequals);
-    CPPUNIT_TEST(lessthanequals);
-    CPPUNIT_TEST(shiftleft);
-    CPPUNIT_TEST(shiftright);
-    CPPUNIT_TEST_SUITE_END();
-
-    void plus();
-    void minus();
-    void mult();
-    void div();
-    void mod();
-    void btand();
-    void btor();
-    void btxor();
-    void logicaland();
-    void logicalor();
-    void equalsequals();
-    void notequals();
-    void greaterthan();
-    void lessthan();
-    void greaterthanequals();
-    void lessthanequals();
-    void shiftleft();
-    void shiftright();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestBinary);
 
-
-void
-TestBinary::plus()
+TEST_F(TestBinary, plus)
 {
     const std::string code = R"(
 _T1_@_A1_ = _L1_ + _L2_;)";
@@ -185,8 +140,7 @@ _T1_@_A1_ = _L1_ + _L2_;)";
 }
 
 
-void
-TestBinary::minus()
+TEST_F(TestBinary, minus)
 {
     const std::string code = R"(
 _T1_@_A1_ = _L1_ - _L2_;)";
@@ -253,8 +207,7 @@ _T1_@_A1_ = _L1_ - _L2_;)";
     this->execute("binary_minus.ax");
 }
 
-void
-TestBinary::mult()
+TEST_F(TestBinary, mult)
 {
     const std::string code = R"(
 _T1_@_A1_ = _L1_ * _L2_;)";
@@ -322,8 +275,7 @@ _T1_@_A1_ = _L1_ * _L2_;)";
 }
 
 
-void
-TestBinary::div()
+TEST_F(TestBinary, div)
 {
     // @note  reverses L1 and L2 as L2 is usually larger
     const std::string code = R"(
@@ -374,8 +326,7 @@ _T1_@_A1_ = _L2_ / _L1_;)";
 }
 
 
-void
-TestBinary::mod()
+TEST_F(TestBinary, mod)
 {
     // @note  reverses L1 and L2 as L2 is usually larger
     const std::string code = R"(
@@ -426,8 +377,7 @@ _T1_@_A1_ = _L2_ % _L1_;)";
 }
 
 
-void
-TestBinary::btand()
+TEST_F(TestBinary, btand)
 {
     const std::string code = R"(
 _T1_@_A1_ = _L1_ & _L2_;)";
@@ -462,8 +412,7 @@ _T1_@_A1_ = _L1_ & _L2_;)";
 }
 
 
-void
-TestBinary::btor()
+TEST_F(TestBinary, btor)
 {
     const std::string code = R"(
 _T1_@_A1_ = _L1_ | _L2_;)";
@@ -498,8 +447,7 @@ _T1_@_A1_ = _L1_ | _L2_;)";
 }
 
 
-void
-TestBinary::btxor()
+TEST_F(TestBinary, btxor)
 {
     const std::string code = R"(
 _T1_@_A1_ = _L1_ ^ _L2_;)";
@@ -534,8 +482,7 @@ _T1_@_A1_ = _L1_ ^ _L2_;)";
 }
 
 
-void
-TestBinary::logicaland()
+TEST_F(TestBinary, logicaland)
 {
     const std::string code = R"(
 _T1_@_A1_ = _L1_ && _L2_;)";
@@ -591,8 +538,7 @@ false && int@scircuit5 = 2;)",
 }
 
 
-void
-TestBinary::logicalor()
+TEST_F(TestBinary, logicalor)
 {
     const std::string code = R"(
 _T1_@_A1_ = _L1_ || _L2_;)";
@@ -648,8 +594,7 @@ false || int@scircuit5 = 2;)",
 }
 
 
-void
-TestBinary::equalsequals()
+TEST_F(TestBinary, equalsequals)
 {
     const std::string code = R"(
 bool@_A1_ = _L1_ == _L2_;
@@ -678,7 +623,7 @@ bool@_A2_ = _L2_ == _L2_;)";
     generate(mat4);
     this->registerTest(repl, "binary_relational_equalsequals.ax");
 
-    CPPUNIT_ASSERT(idx != 0);
+    ASSERT_TRUE(idx != 0);
 
     const auto names = unittest_util::nameSequence("test", idx-1);
     std::vector<bool> results;
@@ -691,8 +636,7 @@ bool@_A2_ = _L2_ == _L2_;)";
 }
 
 
-void
-TestBinary::notequals()
+TEST_F(TestBinary, notequals)
 {
     const std::string code = R"(
 bool@_A1_ = _L1_ != _L2_;
@@ -721,7 +665,7 @@ bool@_A2_ = _L2_ != _L2_;)";
     generate(mat4);
     this->registerTest(repl, "binary_relational_notequals.ax");
 
-    CPPUNIT_ASSERT(idx != 0);
+    ASSERT_TRUE(idx != 0);
 
     const auto names = unittest_util::nameSequence("test", idx-1);
     std::vector<bool> results;
@@ -734,8 +678,7 @@ bool@_A2_ = _L2_ != _L2_;)";
 }
 
 
-void
-TestBinary::greaterthan()
+TEST_F(TestBinary, greaterthan)
 {
     const std::string code = R"(
 bool@_A1_ = _L1_ > _L2_;
@@ -761,7 +704,7 @@ bool@_A3_ = _L2_ > _L2_;)";
     generate(floating);
     this->registerTest(repl, "binary_relational_greaterthan.ax");
 
-    CPPUNIT_ASSERT(idx != 0);
+    ASSERT_TRUE(idx != 0);
 
     const auto names = unittest_util::nameSequence("test", idx-1);
 
@@ -792,8 +735,7 @@ bool@_A3_ = _L2_ > _L2_;)";
 }
 
 
-void
-TestBinary::lessthan()
+TEST_F(TestBinary, lessthan)
 {
     const std::string code = R"(
 bool@_A1_ = _L1_ < _L2_;
@@ -819,7 +761,7 @@ bool@_A3_ = _L2_ < _L2_;)";
     generate(floating);
     this->registerTest(repl, "binary_relational_lessthan.ax");
 
-    CPPUNIT_ASSERT(idx != 0);
+    ASSERT_TRUE(idx != 0);
 
     const auto names = unittest_util::nameSequence("test", idx-1);
 
@@ -851,8 +793,7 @@ bool@_A3_ = _L2_ < _L2_;)";
 
 
 
-void
-TestBinary::greaterthanequals()
+TEST_F(TestBinary, greaterthanequals)
 {
     const std::string code = R"(
 bool@_A1_ = _L1_ >= _L2_;
@@ -878,7 +819,7 @@ bool@_A3_ = _L2_ >= _L2_;)";
     generate(floating);
     this->registerTest(repl, "binary_relational_greaterthanequals.ax");
 
-    CPPUNIT_ASSERT(idx != 0);
+    ASSERT_TRUE(idx != 0);
 
     const auto names = unittest_util::nameSequence("test", idx-1);
 
@@ -909,8 +850,7 @@ bool@_A3_ = _L2_ >= _L2_;)";
 }
 
 
-void
-TestBinary::lessthanequals()
+TEST_F(TestBinary, lessthanequals)
 {
     const std::string code = R"(
 bool@_A1_ = _L1_ <= _L2_;
@@ -936,7 +876,7 @@ bool@_A3_ = _L2_ <= _L2_;)";
     generate(floating);
     this->registerTest(repl, "binary_relational_lessthanequals.ax");
 
-    CPPUNIT_ASSERT(idx != 0);
+    ASSERT_TRUE(idx != 0);
 
     const auto names = unittest_util::nameSequence("test", idx-1);
 
@@ -967,8 +907,7 @@ bool@_A3_ = _L2_ <= _L2_;)";
 }
 
 
-void
-TestBinary::shiftleft()
+TEST_F(TestBinary, shiftleft)
 {
     const std::string code = R"(
 _T1_@_A1_ = _L1_ << _L2_;
@@ -1021,8 +960,7 @@ _T1_@_A2_ = _L2_ << _L1_;)";
 }
 
 
-void
-TestBinary::shiftright()
+TEST_F(TestBinary, shiftright)
 {
     const std::string code = R"(
 _T1_@_A1_ = _L1_ >> _L2_;

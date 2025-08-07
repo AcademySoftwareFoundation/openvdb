@@ -5,28 +5,16 @@
 
 #include <openvdb_ax/codegen/SymbolTable.h>
 
-#include <cppunit/extensions/HelperMacros.h>
+#include <gtest/gtest.h>
 
 template <typename T>
 using LLVMType = openvdb::ax::codegen::LLVMType<T>;
 
-class TestSymbolTable : public CppUnit::TestCase
+class TestSymbolTable : public ::testing::Test
 {
-public:
-
-    CPPUNIT_TEST_SUITE(TestSymbolTable);
-    CPPUNIT_TEST(testSingleTable);
-    CPPUNIT_TEST(testTableBlocks);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testSingleTable();
-    void testTableBlocks();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestSymbolTable);
-
-void
-TestSymbolTable::testSingleTable()
+TEST_F(TestSymbolTable, testSingleTable)
 {
     unittest_util::LLVMState state;
     llvm::IRBuilder<> builder(state.scratchBlock());
@@ -35,34 +23,33 @@ TestSymbolTable::testSingleTable()
 
     llvm::Value* value1 = builder.CreateAlloca(type);
     llvm::Value* value2 = builder.CreateAlloca(type);
-    CPPUNIT_ASSERT(value1);
-    CPPUNIT_ASSERT(value2);
+    ASSERT_TRUE(value1);
+    ASSERT_TRUE(value2);
 
     openvdb::ax::codegen::SymbolTable<llvm::Value*> table;
-    CPPUNIT_ASSERT(table.map().empty());
+    ASSERT_TRUE(table.map().empty());
 
-    CPPUNIT_ASSERT(table.insert("test", value1));
-    CPPUNIT_ASSERT(!table.insert("test", nullptr));
-    CPPUNIT_ASSERT(table.exists("test"));
-    CPPUNIT_ASSERT_EQUAL(value1, *table.get("test"));
+    ASSERT_TRUE(table.insert("test", value1));
+    ASSERT_TRUE(!table.insert("test", nullptr));
+    ASSERT_TRUE(table.exists("test"));
+    ASSERT_EQ(value1, *table.get("test"));
 
     table.clear();
-    CPPUNIT_ASSERT(table.map().empty());
-    CPPUNIT_ASSERT(!table.exists("test"));
+    ASSERT_TRUE(table.map().empty());
+    ASSERT_TRUE(!table.exists("test"));
 
-    CPPUNIT_ASSERT(table.insert("test", value1));
-    CPPUNIT_ASSERT(table.replace("test", value2));
-    CPPUNIT_ASSERT(!table.replace("other", value2));
+    ASSERT_TRUE(table.insert("test", value1));
+    ASSERT_TRUE(table.replace("test", value2));
+    ASSERT_TRUE(!table.replace("other", value2));
 
-    CPPUNIT_ASSERT(table.exists("test"));
-    CPPUNIT_ASSERT(table.exists("other"));
+    ASSERT_TRUE(table.exists("test"));
+    ASSERT_TRUE(table.exists("other"));
 
-    CPPUNIT_ASSERT_EQUAL(value2, *table.get("test"));
-    CPPUNIT_ASSERT_EQUAL(value2, *table.get("other"));
+    ASSERT_EQ(value2, *table.get("test"));
+    ASSERT_EQ(value2, *table.get("other"));
 }
 
-void
-TestSymbolTable::testTableBlocks()
+TEST_F(TestSymbolTable, testTableBlocks)
 {
     unittest_util::LLVMState state;
     llvm::IRBuilder<> builder(state.scratchBlock());
@@ -73,10 +60,10 @@ TestSymbolTable::testTableBlocks()
     openvdb::ax::codegen::Value value2 = openvdb::ax::codegen::Value::Alloc(builder, type);
     openvdb::ax::codegen::Value value3 = openvdb::ax::codegen::Value::Alloc(builder, type);
     openvdb::ax::codegen::Value value4 = openvdb::ax::codegen::Value::Alloc(builder, type);
-    CPPUNIT_ASSERT(value1);
-    CPPUNIT_ASSERT(value2);
-    CPPUNIT_ASSERT(value3);
-    CPPUNIT_ASSERT(value4);
+    ASSERT_TRUE(value1);
+    ASSERT_TRUE(value2);
+    ASSERT_TRUE(value3);
+    ASSERT_TRUE(value4);
 
     // test table insertion and erase
 
@@ -84,17 +71,17 @@ TestSymbolTable::testTableBlocks()
     openvdb::ax::codegen::SymbolTable<openvdb::ax::codegen::Value>* table1 = tables.getOrInsert(0);
     openvdb::ax::codegen::SymbolTable<openvdb::ax::codegen::Value>* table2 = tables.getOrInsert(1);
 
-    CPPUNIT_ASSERT_EQUAL(table1, tables.get(0));
-    CPPUNIT_ASSERT_EQUAL(table2, tables.get(1));
+    ASSERT_EQ(table1, tables.get(0));
+    ASSERT_EQ(table2, tables.get(1));
 
     tables.getOrInsert(2);
     tables.getOrInsert(3);
     tables.getOrInsert(5);
 
-    CPPUNIT_ASSERT(tables.get(4) == nullptr);
-    CPPUNIT_ASSERT(tables.erase(5));
-    CPPUNIT_ASSERT(tables.erase(3));
-    CPPUNIT_ASSERT(tables.erase(2));
+    ASSERT_TRUE(tables.get(4) == nullptr);
+    ASSERT_TRUE(tables.erase(5));
+    ASSERT_TRUE(tables.erase(3));
+    ASSERT_TRUE(tables.erase(2));
 
     table1->insert("top1", value1);
     table1->insert("top2", value2);
@@ -102,9 +89,9 @@ TestSymbolTable::testTableBlocks()
     // test find methods
 
     const openvdb::ax::codegen::Value* result = tables.find("top1");
-    CPPUNIT_ASSERT_EQUAL(value1, *result);
+    ASSERT_EQ(value1, *result);
     result = tables.find("top2");
-    CPPUNIT_ASSERT_EQUAL(value2, *result);
+    ASSERT_EQ(value2, *result);
 
     table1 = tables.getOrInsert(3);
     table2 = tables.getOrInsert(5);
@@ -118,49 +105,49 @@ TestSymbolTable::testTableBlocks()
     // test find second nested value
 
     result = tables.find("table_level_2", 1);
-    CPPUNIT_ASSERT(!result);
+    ASSERT_TRUE(!result);
     result = tables.find("table_level_2", 2);
-    CPPUNIT_ASSERT(!result);
+    ASSERT_TRUE(!result);
     result = tables.find("table_level_2", 3);
-    CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL(value3, *result);
+    ASSERT_TRUE(result);
+    ASSERT_EQ(value3, *result);
 
     // test find fourth nested value
 
     result = tables.find("table_level_4", 1);
-    CPPUNIT_ASSERT(!result);
+    ASSERT_TRUE(!result);
     result = tables.find("table_level_4", 4);
-    CPPUNIT_ASSERT(!result);
+    ASSERT_TRUE(!result);
     result = tables.find("table_level_4", 5);
-    CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL(value4, *result);
+    ASSERT_TRUE(result);
+    ASSERT_EQ(value4, *result);
 
     result = tables.find("table_level_4", 10000);
-    CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL(value4, *result);
+    ASSERT_TRUE(result);
+    ASSERT_EQ(value4, *result);
 
     // test find fourth nested value with matching name
 
     table1->insert("table_level_4", value1);
 
     result = tables.find("table_level_4");
-    CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL(value4, *result);
+    ASSERT_TRUE(result);
+    ASSERT_EQ(value4, *result);
 
     result = tables.find("table_level_4", 5);
-    CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL(value4, *result);
+    ASSERT_TRUE(result);
+    ASSERT_EQ(value4, *result);
 
     result = tables.find("table_level_4", 4);
-    CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL(value1, *result);
+    ASSERT_TRUE(result);
+    ASSERT_EQ(value1, *result);
 
     // test replace
 
-    CPPUNIT_ASSERT(tables.replace("table_level_4", value2));
+    ASSERT_TRUE(tables.replace("table_level_4", value2));
     result = tables.find("table_level_4");
-    CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL(value2, *result);
+    ASSERT_TRUE(result);
+    ASSERT_EQ(value2, *result);
 
-    CPPUNIT_ASSERT(!tables.replace("empty", openvdb::ax::codegen::Value::Invalid()));
+    ASSERT_TRUE(!tables.replace("empty", openvdb::ax::codegen::Value::Invalid()));
 }
