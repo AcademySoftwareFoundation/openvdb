@@ -1,8 +1,0 @@
-OpenVDB:
-  Improvements:
-    Significant performance improvement to delay loaded files - the warning logic
-    which checks the underlying mapped file for the last modified time has been
-    removed, resulting in performance gains upwards of 10x when loading in node 
-    data buffers. Note that the check that was removed is entirely redundant on
-    Windows and would only print a warning on other system.
-    [Contributed by jjtParadox]
