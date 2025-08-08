@@ -2,9 +2,140 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v12_0_2_changes"></a>@endhtmlonly
+@htmlonly <a name="v12_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 12.0.2</B> - <I>In development</I>
+<B>Version 12.1.0</B> - <I>August 8, 2025</I>
+
+@par
+OpenVDB:
+- New features:
+  - New level set constructor tools::createLevelSetCapsule creates a grid
+    containing a narrow-band level set representation of a capsule (tube
+    with constant radius and sphere caps).
+  - New level set constructor tools::createLevelSetTaperedCapsule creates a
+    grid containing a narrow-band level set representation of a tapered
+    capsule (tube with sphere caps and different radii at both ends, or
+    equivalently the convex hull of two spheres with possibly different
+    centers and radii).
+  - New level set constructor tools::createLevelSetTubeComplex creates a grid
+    containing a narrow-band level set representation of a tube complex (a
+    collection of capsules or tapered capsules defined by endpoint coordinates
+    and segment indices).
+  - New level set constructor tools::createLevelSetDilatedMesh creates a grid
+    containing a narrow-band level set representation of a dilated surface
+    mesh (dilated by a radius in all directions).
+  - New class tools::ConvexVoxelizer, used by the above methods, which can be
+    inherited to implement a convex level set constructor.
+  - Introduced anisotropic surfacing tools in points/PointRasterizeSDF.h and
+    principal component analysis (PCA) methods in points/PrincipalComponentAnalysis.h.
+    The latter tool analyses point neighborhoods and computes affine
+    transformations representing elliptical distributions. The prior tool
+    takes rotational and stretch point attributes (optionally computed from
+      the prior PCA methods) and generates anisotropic surfaces.
+
+- Improvements:
+  - Significantly improved the performance of all LeafNode ValueIterators,
+    up to 5x on some platforms and up to 10x when delay loading is enabled.
+    Construction of a ValueIterator from a leaf node now requests the leaf
+    buffers ahead of iteration to avoid potentially expensive API calls.
+  - Improved the performance of PointRasterizeSDF.h tools with larger radii
+    with better bound computation approximations.
+  - Significant performance improvement to delay loaded files - the warning
+    logic which checks the underlying mapped file for the last modified time
+    has been removed, resulting in performance gains upwards of 10x when
+    loading in node data buffers. Note that the check that was removed is
+    entirely redundant on Windows and would only print a warning on other
+    system.
+    [Contributed by jjtParadox]
+  - Added OPENVDB_HAS_INVOKABLE_MEMBER_FUNCTION and OPENVDB_HAS_MEMBER_FUNCTION
+    macros to help determine the presence and compatibility of interface
+    member functions at compile time.
+  - Added OPENVDB_ASSUME macros to mimic builtin assume and C++23 assume
+    attributes.
+  - Improved read and write of PLY files with vdb_tool so they support Vec3d
+    and 64 bit attributes. Changed vdb_tool version number from 10.6.1 to
+    10.7.0.
+
+- API Changes:
+  - Mat3 and Mat4 functions have been marked [[nodiscard]] where it may be
+    confusing if they are operating in place or returning a result, in
+    particular tranpose, invert, adjoint, and timesDiagonal.
+  - Re-worked the API in PointRasterizeSDF.h with the addition of anisotropic
+    surfacing kernels. The new API exposes more concise free functions which
+    take structs of parameters. The old API remains supported but is
+    deprecated.
+  - Deprecated providing a filter or interrupter as arguments to
+    points::rasterize. These can instead be implemented on user transfer
+    schemes.
+  - Transfer schemes provided to points::rasterize can now optionally
+    implement a rasterizePoints callback that takes a range of points per
+    voxel.
+
+- Fixes:
+  - Fixed a bug in points::rasterizeSpheres and points::rasterizeSmoothSpheres
+    which could cause sections of the generated surface to incorrectly be
+    marked as negative interior values.
+  - Fixed a bug in points::rasterizeSmoothSpheres which could result in
+    incomplete surface reconstruction with significantly larger search
+    distances.
+  - Fixed some precision issues in various Matrix methods.
+  - Fixed bugs in vdb_tool that prevented build with newer namespaces in
+    nanovdb.
+
+@par
+OpenVDB AX:
+- Improvements:
+  - Added support for LLVM versions greater than 15. Upgraded CI to test with
+    LLVM versions 16, 17, 18, 19 and 20.
+  - As of this release, LLVM 15 is the minimum required version for OpenVDB
+    AX. Note that there is an issue with LLVM 17 symbols which makes it
+    incompatible with the OpenVDB Python plugin. AS such, LLVM version 18 and
+    greater are the recommended LLVM versions to use, with LLVM 18 being the
+    new future minimum version.
+  - Significant performance improvement to the compilation of AX kernels when
+    using LLVM 18 and greater.
+  - Significant backend refactoring to AX IR generation to support newer
+    versions of LLVM. In particular, parts of the codegen::Function and
+    codegen::FunctionBuilder API require new usage from LLVM 16 due to
+    the LLVM opaque pointer changes. If you're not using the OpenVDB AX
+    Function codegen API then no client changes should be necessary.
+  - Migrated OpenVDB AX unit tests from cppunit to gtest
+    [Contributed by Tim Straubinger]
+
+- Fixes:
+  - Fixed a case of undefined behaviour when explicitly casting variables to
+    the same type as their storage type e.g:
+      double a; double b = double(a);
+  - Fixed an AX compiler error which would produce invalid IR when using 64bit
+    integer variables for matrix array offsetting e.g:
+      int64 a = 0; mat4f b = 1; float c = b[a,a];
+
+@par
+NanoVDB:
+  - Added nanovdb::openToIndexVDB, which can convert an OpenVDB grid into a
+    NanoVDB IndexGrid.
+  - Added new options "--index" and "--onIndex" to the command-line tool
+    nanovdb_convert so it can produce IndexGrids.
+  - Fixed memory leak in DeviceBuffer.
+  - Added constructor for DeviceBuffer from an existing HostBuffer.
+  - Added VoxelBlockManager, an acceleration structure for sequential access
+    and stencil ops over active voxels.
+  - Added helper functions for kernel launches with shared memory.
+  - Added support for CUDA 13.0.
+  - Fix warnings and compilation errors for GCC and Clang.
+  - Fixed inconsistent usage of util::cuda::mallocAsync/freeAsync that
+    affected vGPUs.
+  - Added support for custom memory resources in PointsToGrid.
+  - Fixed race condition in split/mergeGridHandles.
+  - Fixed offset bug in nanovdb::tools::cuda::IndexToGrid related to non-POD
+    build types.
+    [Contributed by Andreas Henne]
+
+@par
+Houdini:
+  - Define OP_InputIdx and OP_OutputIdx for Houdini 21.0 compatibility
+  - Add Houdini 21 style camera interface to support LOP cameras
+  - Include env flag for avoiding stream writing (was backported to 19.5)
 
 
 @htmlonly <a name="v12_0_1_changes"></a>@endhtmlonly

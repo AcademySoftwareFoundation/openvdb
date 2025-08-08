@@ -192,21 +192,21 @@ jobs:
     strategy:
       matrix:
         config:
-          - { runson: ubuntu-latest, cxx: g++,     cmake: '' }
+          - { runson: ubuntu-latest, cxx: g++, cmake: '' }
           # Disable the clang job for now. See https://github.com/actions/runner-images/issues/8659
           # - { runson: ubuntu-latest, cxx: clang++, cmake: '' }
           # @todo gcc on macos
-          - { runson: macos-latest,  cxx: '',      cmake: '-DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm@15/bin/clang++ -DLLVM_DIR=/opt/homebrew/opt/llvm@15/lib/cmake/llvm' }
+          - { runson: macos-latest, cxx: '', cmake: '-DLLVM_DIR=/opt/homebrew/opt/llvm@20/lib/cmake/llvm' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
       - name: install_deps
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev llvm-15-dev libgtest-dev libgmock-dev libcppunit-dev
+            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev llvm-dev libgtest-dev libgmock-dev libcppunit-dev
             ./ci/install_nanobind.sh 2.0.0
           elif [ "$RUNNER_OS" == "macOS" ]; then
-            ./ci/install_macos.sh 15
+            ./ci/install_macos.sh 20
             ./ci/install_tbb_macos.sh
           else
             echo "$RUNNER_OS not supported"; exit 1
