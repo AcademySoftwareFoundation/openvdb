@@ -61,10 +61,10 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: g++,     image: '2024', build: 'Release' }
-          - { cxx: g++,     image: '2024', build: 'Debug' }
-          - { cxx: clang++, image: '2024', build: 'Release' }
-          - { cxx: clang++, image: '2024', build: 'Debug' }
+          - { cxx: g++,     image: '2024-clang17.2', build: 'Release' }
+          - { cxx: g++,     image: '2024-clang17.2', build: 'Debug' }
+          - { cxx: clang++, image: '2024-clang17.2', build: 'Release' }
+          - { cxx: clang++, image: '2024-clang17.2', build: 'Debug' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
