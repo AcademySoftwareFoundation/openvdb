@@ -862,6 +862,54 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_UnifiedBuffer)
     cudaCheck(cudaFree(d_coords));
 }// Large_CudaPointsToGrid_UnifiedBuffer
 
+TEST(TestNanoVDBCUDA, DenseLeaf_DistributedCudaPointsToGrid_UnifiedBuffer)
+{
+    int current = 0;
+    cudaCheck(cudaGetDevice(&current));
+
+    using BufferT = nanovdb::cuda::UnifiedBuffer;
+    using BuildT = nanovdb::ValueOnIndex;
+    // Initialize coordinates corresponding to a single dense leaf. In
+    // DistributedPointsToGrid, individual leaf nodes are resident and
+    // processed entirely on a single GPU. Thus, the single leaf case results
+    // in the edge case where one GPU constructs a leaf while the others idle.
+    const size_t voxelCount = 8 * 8 * 8;
+    nanovdb::Coord* voxels =  nullptr;
+    const size_t voxelSize = voxelCount * sizeof(nanovdb::Coord);
+    cudaCheck(cudaMallocManaged(&voxels, voxelSize));
+    for (int32_t i = 0; i < 8; ++i)
+        for (int32_t j = 0; j < 8; ++j)
+            for (int32_t k = 0; k < 8; ++k)
+                voxels[i * 8 * 8 + j * 8 + k] = nanovdb::Coord(i, j, k);
+
+    nanovdb::cuda::DeviceMesh deviceMesh;
+    nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
+    auto handle = converter.getHandle(voxels, voxelCount);
+
+    EXPECT_TRUE(handle.deviceData());// grid exists on the GPU
+    EXPECT_TRUE(handle.deviceGrid<BuildT>());
+    EXPECT_FALSE(handle.deviceGrid<int>(0));
+    EXPECT_TRUE(handle.deviceGrid<BuildT>(0));
+    EXPECT_FALSE(handle.deviceGrid<BuildT>(1));
+    EXPECT_TRUE(handle.data());// grid also exists on the CPU
+
+    //timer.start("Allocating and copying grid from GPU to CPU");
+    auto *grid = handle.grid<BuildT>();// grid also exists on the CPU
+    EXPECT_TRUE(grid);
+    handle.deviceDownload();// creates a copy on the CPU
+    EXPECT_TRUE(handle.deviceData());
+    EXPECT_TRUE(handle.data());
+    auto *data = handle.gridData();
+    EXPECT_TRUE(data);
+    grid = handle.grid<BuildT>();
+    EXPECT_TRUE(grid);
+    EXPECT_TRUE(grid->activeVoxelCount() == 512);
+    EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
+
+    cudaCheck(cudaFree(voxels));
+    cudaSetDevice(current); // restore device so subsequent tests don't fail
+}// Large_DistributedCudaPointsToGrid_UnifiedBuffer
+
 TEST(TestNanoVDBCUDA, Large_DistributedCudaPointsToGrid_UnifiedBuffer)
 {
     int current = 0;
