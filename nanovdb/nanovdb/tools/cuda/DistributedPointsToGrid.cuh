@@ -206,6 +206,7 @@ void inclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cud
         uint32_t deviceNumItems = counts[deviceId];
 
         if (deviceId == 0) {
+            NANOVDB_ASSERT(deviceNumItems > 0);
             CUB_LAUNCH(DeviceScan::InclusiveScanInit, pools[deviceId], stream, deviceIn, deviceOut, ::cuda::std::plus(), 0, deviceNumItems);
         }
         else {
@@ -709,7 +710,6 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     // Based on profiling, we launch the per-device kernels for steps 1 through 3 in a single loop, followed by launching the per-device kernels for step 4 in a separate loop.
     // This can be improved when/if CUB implements cub::FutureValue support for size parameters.
     {
-        LeafCountIterator leafCountIterator(mNodeCounts);
         uint32_t* devicePointsPerVoxel = mData->pointsPerVoxel;
         uint32_t* devicePointsPerLeaf = mData->pointsPerLeaf;
         uint32_t* devicePointsPerVoxelPrefix = mData->pointsPerVoxelPrefix;
@@ -717,7 +717,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
             cudaCheck(cudaSetDevice(deviceId));
 
             uint64_t* deviceInputKeys = mKeys + mStripeOffsets[deviceId];
-            uint64_t* deviceOutputKeys = mData->d_keys + mStripeOffsets[deviceId];
+            const uint64_t* deviceOutputKeys = mData->d_keys + mStripeOffsets[deviceId];
 
             if (deviceId == 0) {
                 CUB_LAUNCH(DeviceRunLengthEncode::Encode, mTempDevicePools[deviceId], stream, deviceOutputKeys, deviceInputKeys, devicePointsPerVoxel, mVoxelCounts + deviceId, mStripeCounts[deviceId]);
@@ -738,10 +738,27 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
                 CUB_LAUNCH(DeviceRunLengthEncode::Encode, mTempDevicePools[deviceId], stream, thrust::make_transform_iterator(deviceOutputKeys, ShiftRight<9>()), deviceInputKeys, devicePointsPerLeaf, deviceNodeCount(deviceId), mStripeCounts[deviceId]);
                 cudaCheck(cudaEventRecord(leafCountEvents[deviceId], stream));
             }
+        }
+        cudaCheck(cudaEventSynchronize(voxelCountEvents.back()));
+        cudaCheck(cudaEventSynchronize(leafCountEvents.back()));
+    }
 
-            cudaCheck(cudaEventSynchronize(voxelCountEvents[deviceId]));
+    uint32_t voxelCount = 0;
+    uint32_t leafCount = 0;
+    for (const auto& [deviceId, stream] : mDeviceMesh) {
+        voxelCount += mVoxelCounts[deviceId];
+        leafCount += deviceNodeCount(deviceId)[0];
+    }
+
+    {
+        uint32_t* devicePointsPerVoxel = mData->pointsPerVoxel;
+        uint32_t* devicePointsPerVoxelPrefix = mData->pointsPerVoxelPrefix;
+        uint32_t voxelOffset = 0;
+        for (const auto& [deviceId, stream] : mDeviceMesh) {
+            cudaCheck(cudaSetDevice(deviceId));
+
             uint32_t deviceNumItems = mVoxelCounts[deviceId];
-            if (deviceId < static_cast<int>(mDeviceMesh.deviceCount() - 1))
+            if (voxelOffset + deviceNumItems < voxelCount - 1)
                 ++deviceNumItems;
 
             if (deviceId == 0) {
@@ -749,13 +766,13 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
             }
             else {
                 cudaCheck(cudaStreamWaitEvent(stream, voxelPrefixSumEvents[deviceId - 1]));
+                devicePointsPerVoxel += mVoxelCounts[deviceId - 1];
                 devicePointsPerVoxelPrefix += mVoxelCounts[deviceId - 1];
                 cub::FutureValue<uint32_t> futureValue(devicePointsPerVoxelPrefix);
                 CUB_LAUNCH(DeviceScan::ExclusiveScan, mTempDevicePools[deviceId], stream, devicePointsPerVoxel, devicePointsPerVoxelPrefix, ::cuda::std::plus(), futureValue, deviceNumItems);
             }
-
             cudaCheck(cudaEventRecord(voxelPrefixSumEvents[deviceId], stream));
-
+            voxelOffset += mVoxelCounts[deviceId];
         }
     }
 
@@ -763,13 +780,12 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         LeafCountIterator leafCountIterator(mNodeCounts);
         uint32_t* devicePointsPerLeaf = mData->pointsPerLeaf;
         uint32_t* devicePointsPerLeafPrefix = mData->pointsPerLeafPrefix;
+        uint32_t leafOffset = 0;
         for (const auto& [deviceId, stream] : mDeviceMesh) {
             cudaCheck(cudaSetDevice(deviceId));
 
-            // Required for the host to pass the correct value of counts[deviceId]
-            cudaCheck(cudaEventSynchronize(leafCountEvents[deviceId]));
             uint32_t deviceNumItems = leafCountIterator[deviceId];
-            if (deviceId < static_cast<int>(mDeviceMesh.deviceCount() - 1))
+            if (leafOffset + deviceNumItems < leafCount - 1)
                 ++deviceNumItems;
 
             if (deviceId == 0) {
@@ -783,6 +799,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
                 CUB_LAUNCH(DeviceScan::ExclusiveScan, mTempDevicePools[deviceId], stream, devicePointsPerLeaf, devicePointsPerLeafPrefix, ::cuda::std::plus(), futureValue, deviceNumItems);
             }
             cudaCheck(cudaEventRecord(leafPrefixSumEvents[deviceId], stream));
+            leafOffset += leafCountIterator[deviceId];
         }
     }
 
