@@ -164,7 +164,7 @@ void rightRebalanceKernel(DistanceIteratorIn leftDistance, DistanceIteratorIn ri
 #endif// ifndef CUB_LAUNCH
 
 /// @brief Launches an async exclusive sum operation across multiple devices. The operator waits on the per-device preEvents[deviceId] before summing over that device's contributions and records postEvents[deviceId] when the device's contribution is summed.
-template<typename InputIteratorT, typename OutputIteratorT, typename CountIteratorT>
+template<typename InputIteratorT, typename OutputIteratorT, typename CountIteratorT, int NumThreads = 128>
 void exclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cuda::TempDevicePool* pools, InputIteratorT in, OutputIteratorT out, CountIteratorT counts, cudaEvent_t* preEvents, cudaEvent_t* postEvents)
 {
     InputIteratorT deviceIn = in;
@@ -175,25 +175,37 @@ void exclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cud
         // Required for the host to pass the correct value of counts[deviceId]
         cudaCheck(cudaEventSynchronize(preEvents[deviceId]));
         uint32_t deviceNumItems = counts[deviceId];
-        if (deviceId < (deviceMesh.deviceCount() - 1))
-            ++deviceNumItems;
+        CUB_LAUNCH(DeviceScan::ExclusiveSum, pools[deviceId], stream, deviceIn, deviceOut, deviceNumItems);
+        cudaCheck(cudaEventRecord(preEvents[deviceId], stream));
+        deviceIn += counts[deviceId];
+        deviceOut += counts[deviceId];
+    }
 
-        if (deviceId == 0) {
-            CUB_LAUNCH(DeviceScan::ExclusiveScan, pools[deviceId], stream, deviceIn, deviceOut, ::cuda::std::plus(), 0, deviceNumItems);
-        }
-        else {
-            cudaCheck(cudaStreamWaitEvent(stream, postEvents[deviceId - 1]));
-            deviceIn += counts[deviceId - 1];
-            deviceOut += counts[deviceId - 1];
-            cub::FutureValue<uint32_t> futureValue(deviceOut);
-            CUB_LAUNCH(DeviceScan::ExclusiveScan, pools[deviceId], stream, deviceIn, deviceOut, ::cuda::std::plus(), futureValue, deviceNumItems);
+    deviceIn = in;
+    deviceOut = out;
+    auto partialExclusiveSum = 0;
+    for (const auto& [deviceId, stream] : deviceMesh) {
+        cudaCheck(cudaSetDevice(deviceId));
+
+        // Required for the host to read-back the per-segment inclusive sum
+        cudaCheck(cudaEventSynchronize(preEvents[deviceId]));
+        if (counts[deviceId]) {
+            auto segmentExclusiveSum = deviceOut[counts[deviceId] - 1] + deviceIn[counts[deviceId] - 1];
+
+            unsigned int numBlocks = (counts[deviceId] + NumThreads - 1) / NumThreads;
+            util::cuda::lambdaKernel<<<numBlocks, NumThreads, 0, stream>>>(counts[deviceId], [=] __device__ (size_t tid) { deviceOut[tid] += partialExclusiveSum; });
+            cudaCheckError();
+
+            partialExclusiveSum += segmentExclusiveSum;
         }
         cudaCheck(cudaEventRecord(postEvents[deviceId], stream));
+        deviceIn += counts[deviceId];
+        deviceOut += counts[deviceId];
     }
 }
 
 /// @brief Launches an async inclusive sum operation across multiple devices. The operator waits on the per-device preEvents[deviceId] before summing over that device's contributions and records postEvents[deviceId] when the device's contribution is summed.
-template<typename InputIteratorT, typename OutputIteratorT, typename CountIteratorT>
+template<typename InputIteratorT, typename OutputIteratorT, typename CountIteratorT, int NumThreads = 128>
 void inclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cuda::TempDevicePool* pools, InputIteratorT in, OutputIteratorT out, CountIteratorT counts, cudaEvent_t* preEvents, cudaEvent_t* postEvents)
 {
     InputIteratorT deviceIn = in;
@@ -204,19 +216,32 @@ void inclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cud
         // Required for the host to pass the correct value of counts[deviceId]
         cudaCheck(cudaEventSynchronize(preEvents[deviceId]));
         uint32_t deviceNumItems = counts[deviceId];
+        CUB_LAUNCH(DeviceScan::InclusiveSum, pools[deviceId], stream, deviceIn, deviceOut, deviceNumItems);
+        cudaCheck(cudaEventRecord(preEvents[deviceId], stream));
+        deviceIn += counts[deviceId];
+        deviceOut += counts[deviceId];
+    }
 
-        if (deviceId == 0) {
-            NANOVDB_ASSERT(deviceNumItems > 0);
-            CUB_LAUNCH(DeviceScan::InclusiveScanInit, pools[deviceId], stream, deviceIn, deviceOut, ::cuda::std::plus(), 0, deviceNumItems);
-        }
-        else {
-            cudaCheck(cudaStreamWaitEvent(stream, postEvents[deviceId - 1]));
-            deviceIn += counts[deviceId - 1];
-            deviceOut += counts[deviceId - 1];
-            cub::FutureValue<uint64_t> futureValue(deviceOut - 1);
-            CUB_LAUNCH(DeviceScan::InclusiveScanInit, pools[deviceId], stream, deviceIn, deviceOut, ::cuda::std::plus(), futureValue, deviceNumItems);
+    deviceIn = in;
+    deviceOut = out;
+    auto partialInclusiveSum = 0;
+    for (const auto& [deviceId, stream] : deviceMesh) {
+        cudaCheck(cudaSetDevice(deviceId));
+
+        // Required for the host to read-back the per-segment inclusive sum
+        cudaCheck(cudaEventSynchronize(preEvents[deviceId]));
+        if (counts[deviceId]) {
+            auto segmentInclusiveSum = deviceOut[counts[deviceId] - 1];
+
+            unsigned int numBlocks = (counts[deviceId] + NumThreads - 1) / NumThreads;
+            util::cuda::lambdaKernel<<<numBlocks, NumThreads, 0, stream>>>(counts[deviceId], [=] __device__ (size_t tid) { deviceOut[tid] += partialInclusiveSum; });
+            cudaCheckError();
+
+            partialInclusiveSum += segmentInclusiveSum;
         }
         cudaCheck(cudaEventRecord(postEvents[deviceId], stream));
+        deviceIn += counts[deviceId];
+        deviceOut += counts[deviceId];
     }
 }
 
@@ -704,11 +729,8 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     // For each of the following operations, the input on the current device depends on the output of the prior device. Thus, for maximum throughput, we pipeline these operations.
     // 1) RLE for pointsPerLeaf
     // 2) RLE for pointsPerVoxel
-    // 3) Prefix sum over pointsPerLeaf
-    // 4) Prefix sum over pointsPerVoxel
     // Without this pipelining, each operation would have to wait until ALL devices to finish their prior operation instead of just the previous device which significantly degrades scaling.
-    // Based on profiling, we launch the per-device kernels for steps 1 through 3 in a single loop, followed by launching the per-device kernels for step 4 in a separate loop.
-    // This can be improved when/if CUB implements cub::FutureValue support for size parameters.
+    // Based on profiling, we launch the per-device kernels for steps 1 and 2 in a single loop.
     {
         uint32_t* devicePointsPerVoxel = mData->pointsPerVoxel;
         uint32_t* devicePointsPerLeaf = mData->pointsPerLeaf;
@@ -739,69 +761,11 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
                 cudaCheck(cudaEventRecord(leafCountEvents[deviceId], stream));
             }
         }
-        cudaCheck(cudaEventSynchronize(voxelCountEvents.back()));
-        cudaCheck(cudaEventSynchronize(leafCountEvents.back()));
     }
 
-    uint32_t voxelCount = 0;
-    uint32_t leafCount = 0;
-    for (const auto& [deviceId, stream] : mDeviceMesh) {
-        voxelCount += mVoxelCounts[deviceId];
-        leafCount += deviceNodeCount(deviceId)[0];
-    }
-
-    {
-        uint32_t* devicePointsPerVoxel = mData->pointsPerVoxel;
-        uint32_t* devicePointsPerVoxelPrefix = mData->pointsPerVoxelPrefix;
-        uint32_t voxelOffset = 0;
-        for (const auto& [deviceId, stream] : mDeviceMesh) {
-            cudaCheck(cudaSetDevice(deviceId));
-
-            uint32_t deviceNumItems = mVoxelCounts[deviceId];
-            if (voxelOffset + deviceNumItems < voxelCount - 1)
-                ++deviceNumItems;
-
-            if (deviceId == 0) {
-                CUB_LAUNCH(DeviceScan::ExclusiveScan, mTempDevicePools[deviceId], stream, devicePointsPerVoxel, devicePointsPerVoxelPrefix, ::cuda::std::plus(), 0, deviceNumItems);
-            }
-            else {
-                cudaCheck(cudaStreamWaitEvent(stream, voxelPrefixSumEvents[deviceId - 1]));
-                devicePointsPerVoxel += mVoxelCounts[deviceId - 1];
-                devicePointsPerVoxelPrefix += mVoxelCounts[deviceId - 1];
-                cub::FutureValue<uint32_t> futureValue(devicePointsPerVoxelPrefix);
-                CUB_LAUNCH(DeviceScan::ExclusiveScan, mTempDevicePools[deviceId], stream, devicePointsPerVoxel, devicePointsPerVoxelPrefix, ::cuda::std::plus(), futureValue, deviceNumItems);
-            }
-            cudaCheck(cudaEventRecord(voxelPrefixSumEvents[deviceId], stream));
-            voxelOffset += mVoxelCounts[deviceId];
-        }
-    }
-
-    {
-        LeafCountIterator leafCountIterator(mNodeCounts);
-        uint32_t* devicePointsPerLeaf = mData->pointsPerLeaf;
-        uint32_t* devicePointsPerLeafPrefix = mData->pointsPerLeafPrefix;
-        uint32_t leafOffset = 0;
-        for (const auto& [deviceId, stream] : mDeviceMesh) {
-            cudaCheck(cudaSetDevice(deviceId));
-
-            uint32_t deviceNumItems = leafCountIterator[deviceId];
-            if (leafOffset + deviceNumItems < leafCount - 1)
-                ++deviceNumItems;
-
-            if (deviceId == 0) {
-                CUB_LAUNCH(DeviceScan::ExclusiveScan, mTempDevicePools[deviceId], stream, devicePointsPerLeaf, devicePointsPerLeafPrefix, ::cuda::std::plus(), 0, deviceNumItems);
-            }
-            else {
-                cudaCheck(cudaStreamWaitEvent(stream, leafPrefixSumEvents[deviceId - 1]));
-                devicePointsPerLeaf += leafCountIterator[deviceId - 1];
-                devicePointsPerLeafPrefix += leafCountIterator[deviceId - 1];
-                cub::FutureValue<uint32_t> futureValue(devicePointsPerLeafPrefix);
-                CUB_LAUNCH(DeviceScan::ExclusiveScan, mTempDevicePools[deviceId], stream, devicePointsPerLeaf, devicePointsPerLeafPrefix, ::cuda::std::plus(), futureValue, deviceNumItems);
-            }
-            cudaCheck(cudaEventRecord(leafPrefixSumEvents[deviceId], stream));
-            leafOffset += leafCountIterator[deviceId];
-        }
-    }
+    exclusiveSumAsync(mDeviceMesh, mTempDevicePools, mData->pointsPerVoxel, mData->pointsPerVoxelPrefix, mVoxelCounts, voxelCountEvents.data(), voxelPrefixSumEvents.data());
+    LeafCountIterator leafCountIterator(mNodeCounts);
+    exclusiveSumAsync(mDeviceMesh, mTempDevicePools, mData->pointsPerLeaf, mData->pointsPerLeafPrefix, leafCountIterator, leafCountEvents.data(), leafPrefixSumEvents.data());
 
     uint32_t leafOffset = 0;
     for (const auto& [deviceId, stream] : mDeviceMesh) {
