@@ -28,7 +28,7 @@ TEST(TestNanoVDBMultiGPU, ExclusiveSum)
     thrust::universal_vector<int> input(937);
     thrust::universal_vector<int> output(input.size());
 
-    parallelForEach(deviceMesh, [&](int deviceId, cudaStream_t stream) {
+    for (const auto& [deviceId, stream] : deviceMesh) {
         cudaSetDevice(deviceId);
         cudaEventCreateWithFlags(&preEvents[deviceId], cudaEventDisableTiming);
         cudaEventCreateWithFlags(&postEvents[deviceId], cudaEventDisableTiming);
@@ -39,8 +39,14 @@ TEST(TestNanoVDBMultiGPU, ExclusiveSum)
 
         thrust::fill(thrust::cuda::par.on(stream), input.begin() + deviceOffset, input.begin() + deviceOffset + deviceSizes[deviceId], 0);
         thrust::fill(thrust::cuda::par.on(stream), output.begin() + deviceOffset, output.begin() + deviceOffset + deviceSizes[deviceId], 0);
-        cudaStreamSynchronize(stream);
+    }
 
+    for (const auto& [deviceId, stream] : deviceMesh) {
+        cudaSetDevice(deviceId);
+        cudaStreamSynchronize(stream);
+    }
+
+    {
         // Set the input indices corresponding to the Fibbonacci sequence to be 1, rest 0
         input[0] = 1;
         int i = 0;
@@ -52,14 +58,14 @@ TEST(TestNanoVDBMultiGPU, ExclusiveSum)
             j = k;
             k = (i + j);
         }
-    });
+    }
 
     nanovdb::tools::cuda::exclusiveSumAsync(deviceMesh, tempDevicePools.data(), input.data(), output.data(), deviceSizes.begin(), preEvents.data(), postEvents.data());
 
-    parallelForEach(deviceMesh, [&](int deviceId, cudaStream_t stream) {
+    for (const auto& [deviceId, stream] : deviceMesh) {
         cudaSetDevice(deviceId);
         cudaStreamSynchronize(stream);
-    });
+    }
 
     int accumulator = 0;
     for (auto i = 0; i < output.size(); ++i) {
@@ -67,12 +73,11 @@ TEST(TestNanoVDBMultiGPU, ExclusiveSum)
         accumulator += input[i];
     }
 
-    parallelForEach(deviceMesh, [&](int deviceId, cudaStream_t stream) {
+    for (const auto& [deviceId, stream] : deviceMesh) {
         cudaSetDevice(deviceId);
         cudaEventDestroy(postEvents[deviceId]);
         cudaEventDestroy(preEvents[deviceId]);
-    });
-
+    }
 }
 
 /// @brief Tests the correctness of multi-GPU inclusive sums against an equivalent CPU implementation
@@ -88,7 +93,7 @@ TEST(TestNanoVDBMultiGPU, InclusiveSum)
     thrust::universal_vector<int> input(937);
     thrust::universal_vector<int> output(input.size());
 
-    parallelForEach(deviceMesh, [&](int deviceId, cudaStream_t stream) {
+    for (const auto& [deviceId, stream] : deviceMesh) {
         cudaSetDevice(deviceId);
         cudaEventCreateWithFlags(&preEvents[deviceId], cudaEventDisableTiming);
         cudaEventCreateWithFlags(&postEvents[deviceId], cudaEventDisableTiming);
@@ -99,8 +104,14 @@ TEST(TestNanoVDBMultiGPU, InclusiveSum)
 
         thrust::fill(thrust::cuda::par.on(stream), input.begin() + deviceOffset, input.begin() + deviceOffset + deviceSizes[deviceId], 0);
         thrust::fill(thrust::cuda::par.on(stream), output.begin() + deviceOffset, output.begin() + deviceOffset + deviceSizes[deviceId], 0);
-        cudaStreamSynchronize(stream);
+    }
 
+    for (const auto& [deviceId, stream] : deviceMesh) {
+        cudaSetDevice(deviceId);
+        cudaStreamSynchronize(stream);
+    }
+
+    {
         // Set the input indices corresponding to the Fibbonacci sequence to be 1, rest 0
         input[0] = 1;
         int i = 0;
@@ -112,14 +123,14 @@ TEST(TestNanoVDBMultiGPU, InclusiveSum)
             j = k;
             k = (i + j);
         }
-    });
+    }
 
     nanovdb::tools::cuda::inclusiveSumAsync(deviceMesh, tempDevicePools.data(), input.data(), output.data(), deviceSizes.begin(), preEvents.data(), postEvents.data());
 
-    parallelForEach(deviceMesh, [&](int deviceId, cudaStream_t stream) {
+    for (const auto& [deviceId, stream] : deviceMesh) {
         cudaSetDevice(deviceId);
         cudaStreamSynchronize(stream);
-    });
+    }
 
     int accumulator = 0;
     for (auto i = 0; i < output.size(); ++i) {
@@ -127,11 +138,11 @@ TEST(TestNanoVDBMultiGPU, InclusiveSum)
         EXPECT_EQ(output[i], accumulator);
     }
 
-    parallelForEach(deviceMesh, [&](int deviceId, cudaStream_t stream) {
+    for (const auto& [deviceId, stream] : deviceMesh) {
         cudaSetDevice(deviceId);
         cudaEventDestroy(postEvents[deviceId]);
         cudaEventDestroy(preEvents[deviceId]);
-    });
+    }
 }
 
 /// @brief Tests multi-GPU creation of grids for a single dense leaf
