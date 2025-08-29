@@ -443,7 +443,9 @@ initializeExecutionEngine(Logger& logger)
     return std::move(*LLJIT);
 }
 
-void LLVMoptimise(llvm::Module& M, const llvm::OptimizationLevel opt)
+void LLVMoptimise(llvm::Module& M,
+    const llvm::OptimizationLevel opt,
+    llvm::TargetMachine* TM)
 {
     // Create the analysis managers.
     // These must be declared in this order so that they are destroyed in the
@@ -457,7 +459,7 @@ void LLVMoptimise(llvm::Module& M, const llvm::OptimizationLevel opt)
     // Take a look at the PassBuilder constructor parameters for more
     // customization, e.g. specifying a TargetMachine or various debugging
     // options.
-    llvm::PassBuilder PB;
+    llvm::PassBuilder PB(TM);
 
     // Register all the basic analyses with the managers.
     PB.registerModuleAnalyses(MAM);
@@ -472,31 +474,33 @@ void LLVMoptimise(llvm::Module& M, const llvm::OptimizationLevel opt)
     MPM.run(M, MAM);
 }
 
-void optimise(llvm::Module& module, const CompilerOptions::OptLevel optLevel)
+void optimise(llvm::Module& module,
+    const CompilerOptions::OptLevel optLevel,
+    llvm::TargetMachine* TM)
 {
     switch (optLevel) {
         case CompilerOptions::OptLevel::O0 : {
-            LLVMoptimise(module, llvm::OptimizationLevel::O0);
+            LLVMoptimise(module, llvm::OptimizationLevel::O0, TM);
             break;
         }
         case CompilerOptions::OptLevel::O1 : {
-            LLVMoptimise(module, llvm::OptimizationLevel::O1);
+            LLVMoptimise(module, llvm::OptimizationLevel::O1, TM);
             break;
         }
         case CompilerOptions::OptLevel::O2 : {
-            LLVMoptimise(module, llvm::OptimizationLevel::O2);
+            LLVMoptimise(module, llvm::OptimizationLevel::O2, TM);
             break;
         }
         case CompilerOptions::OptLevel::Os : {
-            LLVMoptimise(module, llvm::OptimizationLevel::Os);
+            LLVMoptimise(module, llvm::OptimizationLevel::Os, TM);
             break;
         }
         case CompilerOptions::OptLevel::Oz : {
-            LLVMoptimise(module, llvm::OptimizationLevel::Oz);
+            LLVMoptimise(module, llvm::OptimizationLevel::Oz, TM);
             break;
         }
         case CompilerOptions::OptLevel::O3 : {
-            LLVMoptimise(module, llvm::OptimizationLevel::O3);
+            LLVMoptimise(module, llvm::OptimizationLevel::O3, TM);
             break;
         }
         case CompilerOptions::OptLevel::NONE :
@@ -953,10 +957,24 @@ Compiler::compile(const ast::Tree& tree,
         return nullptr;
     }
 
+    // create the target machine for optimization passes in the new PM.
+    // The LLJIT engine creates this in the same way (there doesn't seem to be
+    // an easy way to retrieve the TM from the EE - could instead pass out JITTM
+    // to the EE to be clearer that these are expected to match).
+
+    std::unique_ptr<llvm::TargetMachine> TM{nullptr};
+    if (auto JITTM = llvm::orc::JITTargetMachineBuilder::detectHost()) {
+        llvm::Expected<std::unique_ptr<llvm::TargetMachine>> result = JITTM->createTargetMachine();
+        if (result) TM = std::move(*result);
+    }
+    if (!TM) {
+        logger.warning("Unable to determine CPU host features");
+    }
+
     // optimise and verify
 
     if (mCompilerOptions.mVerify && !verify(M, logger)) return nullptr;
-    optimise(M, mCompilerOptions.mOptLevel);
+    optimise(M, mCompilerOptions.mOptLevel, TM.get());
     if (mCompilerOptions.mOptLevel != CompilerOptions::OptLevel::NONE) {
         if (mCompilerOptions.mVerify && !verify(M, logger)) return nullptr;
     }
