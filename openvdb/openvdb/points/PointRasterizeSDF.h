@@ -45,18 +45,18 @@
 ///       [Reconstructing Surfaces of Particle-Based Fluids Using Anisotropic
 ///        Kernel - Yu Turk 2010].
 ///
-///     This method uses the rotation and affine matrix attributes built from
-///     the points::pca() method which model these elliptical distributions
-///     using principal component analysis. The ellipses create a much tighter,
-///     more fitted surface that better represents the convex hull of the point
-///     set. This technique also allows point to smoothly blend from their
-///     computed ellipse back to a canonical sphere, as well as allowing
-///     isolated points to be rasterized with their own radius scale. Although
-///     the rasterization step of this pipeline is relatively fast, it is still
-///     the slowest of all three methods and depends on the somewhat expensive
-///     points::pca() method. Still, this technique can be far superior at
-///     producing fluid surfaces where thin sheets (waterfalls) or sharp edges
-///     (wave breaks) are desirable.
+///     This method uses the affine matrix attributes from the points::pca()
+///     method which model these elliptical distributions using principal
+///     component analysis. The ellipses create a much tighter, more fitted
+///     surface that better represents the convex hull of the point set. This
+///     technique also allows point to smoothly blend from their computed
+///     ellipse back to a canonical sphere, as well as allowing isolated points
+///     to be rasterized with their own radius. Although the rasterization step
+///     of this pipeline is relatively fast, it is still the slowest of all
+///     three methods, and depends on the somewhat expensive points::pca()
+///     method if you're not providing your own transformations. Still, this
+///     technique can be far superior at producing fluid surfaces where thin
+///     sheets (waterfalls) or sharp edges (wave breaks) are desirable.
 ///
 ///
 ///  In general, it is recommended to consider post rebuilding/renormalizing
@@ -126,10 +126,11 @@ namespace points {
 ///    points::pca(g, settings, attribs);
 ///
 ///    EllipsoidSettings<TypeList<int32_t, Vec3f>> ellips;
-///    s.pca = attribs;
-///    s.attributes.emplace_back("id");
-///    s.attributes.emplace_back("v");
-///    GridPtrVec grids = points::rasterizeSdf(g, s);
+///    ellips.xform = attribs.xform;
+///    ellips.radius = attribs.stretch;
+///    ellips.attributes.emplace_back("id");
+///    ellips.attributes.emplace_back("v");
+///    GridPtrVec grids = points::rasterizeSdf(g, ellips);
 ///    FloatGrid::Ptr sdf = StaticPtrCast<FloatGrid>(grids[0]);
 ///    Int32Grid::Ptr id  = StaticPtrCast<Int32Grid>(grids[1]);
 ///    Vec3fGrid::Ptr vel = StaticPtrCast<Vec3fGrid>(grids[2]);
@@ -301,17 +302,24 @@ struct EllipsoidSettings
     using BaseT::radius;
     using BaseT::radiusScale;
 
-    /// @param rotation  the attribute containing each points orthogonal
-    ///   rotation matrix.
-    /// @details  This attribute must exist and represents the rotation of
-    ///   each points ellipse. Must be a Mat3s type.
-    std::string rotation = "rotation";
+    /// @param xform  the attribute containing each points transformation
+    /// @details  This attribute must exist and represents the xform of
+    ///   each points ellipse. Must be a Mat3s (float) or Quatf type. Note
+    ///   that if it is a matrix type, any scale represented by the matrix
+    ///   is combined with the radius and radiusScale values (and is
+    ///   interpreted in world space).
+    std::string xform = "xform";
 
     /// @param pws  An optional attribute which represents the world space
     ///   position of a point.
     /// @details  This can be useful to override the position of a point in
     ///   index space. If it exists, it must be a Vec3d type.
     std::string pws = "";
+
+    /// Old style "xform" attribute which has since been renamed and ONLY
+    /// supported rotation. If set, will be prioritised and infered to only
+    /// hold a rotation. This will be removed and should not be used.
+    OPENVDB_DEPRECATED_MESSAGE("Use EllipsoidSettings::xform") std::string rotation = "";
 };
 
 } // namespace points

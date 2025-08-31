@@ -73,6 +73,10 @@ struct PcaSettings
     ///   values will cause the PCA calculation to become exponentially more
     ///   expensive and should be used in conjunction with the max point per
     ///   voxel settings below.
+    /// @note  This value is used to normalize, so you should not use maximum
+    ///   limit values to try and include all points. If, for example, you
+    ///   want include every point against eachother, consider computing the
+    ///   extents of the grid and using that as the searchRadius.
     /// @warning  Valid range is [0, inf). Behaviour is undefined when outside
     ///   this range.
     float searchRadius = 1.0f;
@@ -154,17 +158,41 @@ struct PcaSettings
 ///   EllipsoidSettings to perform ellipsoidal surface construction.
 struct PcaAttributes
 {
+    enum class AttributeOutput
+    {
+        // When selected, the "stretch" output attribute won't be created.
+        // Instead, only a 3x3 affine unitary "xform" attribute will be
+        // created with the combined stretch and rotational transformations
+        COMBINED_TRANSFORM,
+        // When selected, both the "stretch" vector and "xform" output
+        // attributes will be created. The xform will take the form of a
+        // quaternion representing the rotation.
+        STRETCH_AND_QUATERNION,
+        // When selected, both the "stretch" vector and "xform" output
+        // attributes will be created. The xform will take the form of an
+        // orthogonal 3x3 matrix representing the rotation OR a pure
+        // reflection.
+        STRETCH_AND_ROTATION_MATRIX
+    };
+
+    AttributeOutput format = AttributeOutput::STRETCH_AND_ROTATION_MATRIX;
+
     /// @brief  Settings for the "stretch" attribute, a floating point vector
     ///   attribute which represents the scaling components of each points
     ///   ellipse or (1.0,1.0,1.0) for isolated points.
+    /// @note   This will only be created if the AttributeOutput is set to
+    ///   STRETCH_AND_QUATERNION or STRETCH_AND_ROTATION_MATRIX.
     using StretchT = math::Vec3<float>;
     std::string stretch = "stretch";
 
-    /// @brief  Settings for the "rotation" attribute, a floating point matrix
-    ///   attribute which represents the orthogonal rotation of each points
-    ///   ellipse or the identity matrix for isolated points.
+    /// @brief  Settings for the "rotation" attribute, either a floating point
+    ///   matrix or quaternion attribute which represents the orthogonal rotation
+    ///   of each points ellipse or the identity matrix for isolated points.
+    /// @note   When AttributeOutput is STRETCH_AND_QUATERNION, this will take
+    ///   the form of a Quaternion of type QuatT. Otherwise, it will be a Mat3s.
     using RotationT = math::Mat3<float>;
-    std::string rotation = "rotation";
+    using QuatT = math::Quat<float>;
+    std::string xform = "xform";
 
     /// @brief  Settings for the world space position of every point. This may
     ///   end up being different to their actual position if the
@@ -183,6 +211,12 @@ struct PcaAttributes
     ///   have their world space position deformed in relation to their
     ///   neighboring points.
     std::string ellipses = "ellipsoids";
+
+    /// Old style "xform" attribute which has since been renamed and ONLY
+    /// supported rotation. If set, both the above "xform" and this attribute
+    /// will be created. This attribute only ever holds rotation, regardless
+    /// of the format specified. This will be removed and should not be used.
+    OPENVDB_DEPRECATED_MESSAGE("Use PcaAttributes::xform") std::string rotation = "";
 };
 
 }
