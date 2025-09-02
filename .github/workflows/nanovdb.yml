@@ -61,10 +61,10 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: g++,     image: '2024', build: 'Release' }
-          - { cxx: g++,     image: '2024', build: 'Debug' }
-          - { cxx: clang++, image: '2024', build: 'Release' }
-          - { cxx: clang++, image: '2024', build: 'Debug' }
+          - { cxx: g++,     image: '2024-clang17.2', build: 'Release' }
+          - { cxx: g++,     image: '2024-clang17.2', build: 'Debug' }
+          - { cxx: clang++, image: '2024-clang17.2', build: 'Release' }
+          - { cxx: clang++, image: '2024-clang17.2', build: 'Debug' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -175,7 +175,7 @@ jobs:
       github.event.inputs.type == 'linux'
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     container:
-      image: aswf/ci-openvdb:2024
+      image: aswf/ci-openvdb:2024-clang17.2
     steps:
       - uses: actions/checkout@v3
       - name: install_gtest

@@ -33,11 +33,8 @@ on:
       - 'pendingchanges/**'
       - '**.md'
   schedule:
-    # run this workflow every day at 7am UTC except Monday
-    - cron:  '0 7 * * 0,2-6'
-    # run this workflow Monday 7am UTC
-    # warning: This pattern is checked in various places below
-    - cron:  '0 7 * * 1'
+    # run this workflow every day 7am UTC
+    - cron:  '0 7 * * *'
   workflow_dispatch:
     inputs:
       type:
@@ -64,10 +61,7 @@ jobs:
       github.event.inputs.type == 'linux'
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
-      linux-vfx:${{ matrix.config.image }}-
-      abi:${{ matrix.config.abi }}-
-      cxx:${{ matrix.config.cxx }}-
-      type:${{ matrix.config.build }}
+      linux:${{ matrix.config.image }}-abi:${{ matrix.config.abi }}-cxx:${{ matrix.config.cxx }}-type:${{ matrix.config.build }}
     container:
       image: aswf/ci-openvdb:${{ matrix.config.image }}
     env:
@@ -76,21 +70,16 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2024', abi: '12', build: 'Release', cmake: '' }
-          - { cxx: g++,     image: '2024', abi: '12', build: 'Release', cmake: '' }
-          - { cxx: clang++, image: '2024', abi: '12', build: 'Debug',   cmake: '' }
-          - { cxx: clang++, image: '2023', abi: '11', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
-          - { cxx: g++,     image: '2023', abi: '11', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+          - { cxx: clang++, image: '2025-clang19.1', abi: '12', build: 'Release', cmake: '' }
+          - { cxx: g++,     image: '2025-clang19.1', abi: '12', build: 'Release', cmake: '' }
+          - { cxx: clang++, image: '2025-clang19.1', abi: '12', build: 'Debug',   cmake: '' }
+          - { cxx: clang++, image: '2024-clang17.2', abi: '11', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+          - { cxx: g++,     image: '2024-clang17.2', abi: '11', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
     - name: nanobind
       run: ./ci/install_nanobind.sh 2.0.0
-    - name: glfw
-      if: contains(matrix.config.image, '2023') == true
-      run: ./ci/install_glfw.sh 3.3.10
-    - name: install_gtest
-      run: ./ci/install_gtest.sh 1.15.2
     - name: timestamp
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
@@ -114,9 +103,8 @@ jobs:
         -DOPENVDB_ABI_VERSION_NUMBER=${{ matrix.config.abi }}
         \"
     - name: test
-      # Always run tests on weekly builds but skip Debug on commits as they take a while.
-      # https://github.community/t/distinct-job-for-each-schedule/17811/2
-      if: contains(github.event.schedule, '0 7 * * 1') || matrix.config.build == 'Release'
+      # Skip Debug on commits as they take a while.
+      if: github.event_name == 'schedule'|| matrix.config.build == 'Release'
       run: |
         cd build && ctest -V
         cd - && ./ci/test_install.sh
@@ -172,9 +160,16 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'mac'
-    runs-on: macos-13 # Last macos runner befor M1 (macos-14)
+    runs-on: ${{ matrix.config.image }}
+    name: ${{ matrix.config.image }}
     env:
       CXX: clang++
+    strategy:
+      matrix:
+        config:
+          - { image: macos-13 } # Last macos runner befor M1 (macos-14)
+          - { image: macos-14 }
+          - { image: macos-15 }
     steps:
     - uses: actions/checkout@v3
     - name: install
@@ -191,3 +186,4 @@ jobs:
         \'
     - name: test
       run: cd build && ctest -V
+
