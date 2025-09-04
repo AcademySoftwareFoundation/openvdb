@@ -7,9 +7,9 @@
 #include <nanovdb/tools/GridBuilder.h>
 #include <nanovdb/tools/CreateNanoGrid.h>
 #include <nanovdb/tools/CreatePrimitives.h>
+#include <nanovdb/tools/VoxelBlockManager.h>
 #include <nanovdb/NodeManager.h>
 #include <nanovdb/util/cuda/Util.h>
-#include <nanovdb/tools/cuda/VoxelBlockManager.cuh>
 #include <nanovdb/tools/cuda/SignedFloodFill.cuh>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 #include <nanovdb/tools/cuda/IndexToGrid.cuh>
@@ -206,7 +206,7 @@ __global__ void testKernel(int device)
 {
     int dev;
     cudaError_t err = cudaGetDevice(&dev);
-    if (err != cudaSuccess) printf("kernel cuda error: %d\n", (int)err);
+    //if (err != cudaSuccess) printf("kernel cuda error: %d\n", (int)err);
     if (dev != device) printf("Error: expected device ID = %i but was called with %i\n", dev, device);
 }
 
@@ -3504,17 +3504,15 @@ __global__ void testComputeStencilNeighborsKernel(
         stencilNeighbors[tID][i] = localNeighbors[i];
 }
 
-TEST(TestNanoVDBCUDA, VoxelBlockManager_ValueOnIndex)
+template<class BuildT, class BufferT>
+void testVoxelBlockManager()
 {
-    using BuildT = nanovdb::ValueOnIndex;
-
     // Create a test domain (21^3 box)
     std::vector<nanovdb::Coord> voxels;
     nanovdb::CoordBBox bbox = nanovdb::CoordBBox::createCube(125,145); // Coordinates chosen to span more than 1 lower node
     for (auto it = bbox.begin(); it; it++) voxels.push_back(*it);
     constexpr std::size_t BlockWidthLog2 = 7;
     constexpr std::size_t BlockWidth = 1 << BlockWidthLog2; // 128
-    constexpr std::size_t JumpMapLength = BlockWidth >> 6; // 2
     const std::size_t nVoxels = voxels.size();
     const std::size_t nBlocks = (nVoxels + BlockWidth - 1) >> BlockWidthLog2;
     nanovdb::Coord *deviceVoxels;
@@ -3523,29 +3521,31 @@ TEST(TestNanoVDBCUDA, VoxelBlockManager_ValueOnIndex)
     auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(deviceVoxels, nVoxels);
     cudaCheck(cudaFree(deviceVoxels));
     EXPECT_TRUE((handle.deviceData())); // grid only exists on the GPU
-    auto deviceGrid = handle.deviceGrid<BuildT>();
+    auto deviceGrid = handle.template deviceGrid<BuildT>();
     EXPECT_FALSE(handle.data()); // no grid was yet allocated on the CPU
     handle.deviceDownload();
     EXPECT_TRUE(handle.data()); // no grid was yet allocated on the CPU
-    auto grid = handle.grid<BuildT>();
+    auto grid = handle.template grid<BuildT>();
     EXPECT_TRUE(grid);
     std::size_t nLowerNodes = grid->tree().nodeCount(1);
 
-    // Build VBM structures (firstLeafID and jumpMap)
-    uint32_t *deviceFirstLeafID;
-    uint64_t *deviceJumpMap;
-    cudaCheck(cudaMalloc(&deviceFirstLeafID, nBlocks * sizeof(uint32_t)));
-    cudaCheck(cudaMemset(deviceFirstLeafID, 0, nBlocks * sizeof(uint32_t)));
-    cudaCheck(cudaMalloc(&deviceJumpMap, nBlocks * JumpMapLength * sizeof(uint64_t)));
-    cudaCheck(cudaMemset(deviceJumpMap, 0, nBlocks * JumpMapLength * sizeof(uint64_t)));
-    nanovdb::tools::cuda::buildVoxelBlockManager<BlockWidthLog2>( 1, nVoxels, nBlocks, nLowerNodes,
-        deviceGrid, deviceFirstLeafID, deviceJumpMap );
+    // Construct VBM structure
+    nanovdb::tools::VoxelBlockManagerHandle<BufferT> vbmHandle;
+    vbmHandle.template deviceResize<BlockWidthLog2>(nBlocks);
+    vbmHandle.setOffsets(1, nVoxels);
+    vbmHandle.setLowerCount(nLowerNodes);
+
+    nanovdb::tools::cuda::buildVoxelBlockManager<BlockWidthLog2>(
+        vbmHandle.firstOffset(), vbmHandle.lastOffset(),
+        vbmHandle.blockCount(), vbmHandle.lowerCount(),
+        deviceGrid, vbmHandle.deviceFirstLeafID(), vbmHandle.deviceJumpMap() );
 
     // Compute stencil neighbors
     const size_t neighborStencilSize = nBlocks * BlockWidth * 27 * sizeof(uint64_t);
     auto neighborStencilBuffer = nanovdb::cuda::DeviceBuffer::create(neighborStencilSize, nullptr, false);
     EXPECT_TRUE(neighborStencilBuffer.deviceData());
-    testComputeStencilNeighborsKernel<<<nBlocks,BlockWidth>>>(deviceGrid, deviceFirstLeafID, deviceJumpMap,
+    testComputeStencilNeighborsKernel<<<nBlocks,BlockWidth>>>(deviceGrid,
+        vbmHandle.deviceFirstLeafID(), vbmHandle.deviceJumpMap(),
         reinterpret_cast<uint64_t*>(neighborStencilBuffer.deviceData()));
     cudaCheck(cudaGetLastError());
 
@@ -3564,9 +3564,17 @@ TEST(TestNanoVDBCUDA, VoxelBlockManager_ValueOnIndex)
             const auto neighbor = coord.offsetBy( di, dj, dk );
             const auto neighborIndex = acc.getValue(neighbor);
             EXPECT_EQ( neighborIndex, stencilNeighbors[index-1][spokeID] ); } }
-    cudaCheck(cudaFree(deviceFirstLeafID));
-    cudaCheck(cudaFree(deviceJumpMap));
+}
+
+TEST(TestNanoVDBCUDA, VoxelBlockManager_ValueOnIndex)
+{
+    testVoxelBlockManager<nanovdb::ValueOnIndex,nanovdb::cuda::DeviceBuffer>();
 }// VoxelBlockManager_ValueOnIndex
+
+TEST(TestNanoVDBCUDA, VoxelBlockManager_ValueOnIndex_UnifiedBuffer)
+{
+    testVoxelBlockManager<nanovdb::ValueOnIndex,nanovdb::cuda::UnifiedBuffer>();
+}// VoxelBlockManager_ValueOnIndex_UnifiedBuffer
 
 TEST(TestNanoVDBCUDA, GridHandle_from_HostBuffer)
 {
