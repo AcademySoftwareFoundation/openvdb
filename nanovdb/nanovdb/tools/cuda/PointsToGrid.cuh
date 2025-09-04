@@ -798,9 +798,12 @@ struct BuildGridTreeRootFunctor
         tree.setFirstNode(&d_data->getUpper(0));
         tree.setFirstNode(&d_data->getLower(0));
         tree.setFirstNode(&d_data->getLeaf(0));
-        tree.mNodeCount[2] = tree.mTileCount[2] = d_data->nodeCount[2];
-        tree.mNodeCount[1] = tree.mTileCount[1] = d_data->nodeCount[1];
-        tree.mNodeCount[0] = tree.mTileCount[0] = d_data->nodeCount[0];
+        tree.mNodeCount[2] = d_data->nodeCount[2];
+        tree.mNodeCount[1] = d_data->nodeCount[1];
+        tree.mNodeCount[0] = d_data->nodeCount[0];
+        tree.mTileCount[2] = 0;
+        tree.mTileCount[1] = 0;
+        tree.mTileCount[0] = 0;
         tree.mVoxelCount = d_data->voxelCount;
 
         // process Grid
