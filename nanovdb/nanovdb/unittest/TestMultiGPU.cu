@@ -49,9 +49,9 @@ TEST(TestNanoVDBMultiGPU, ExclusiveSum)
     {
         // Set the input indices corresponding to the Fibbonacci sequence to be 1, rest 0
         input[0] = 1;
-        int i = 0;
-        int j = 1;
-        int k = i + j;
+        size_t i = 0;
+        size_t j = 1;
+        size_t k = i + j;
         while(k < input.size()) {
             input[k] = 1;
             i = j;
@@ -68,7 +68,7 @@ TEST(TestNanoVDBMultiGPU, ExclusiveSum)
     }
 
     int accumulator = 0;
-    for (auto i = 0; i < output.size(); ++i) {
+    for (size_t i = 0; i < output.size(); ++i) {
         EXPECT_EQ(output[i], accumulator);
         accumulator += input[i];
     }
@@ -114,9 +114,9 @@ TEST(TestNanoVDBMultiGPU, InclusiveSum)
     {
         // Set the input indices corresponding to the Fibbonacci sequence to be 1, rest 0
         input[0] = 1;
-        int i = 0;
-        int j = 1;
-        int k = i + j;
+        size_t i = 0;
+        size_t j = 1;
+        size_t k = i + j;
         while(k < input.size()) {
             input[k] = 1;
             i = j;
@@ -133,7 +133,7 @@ TEST(TestNanoVDBMultiGPU, InclusiveSum)
     }
 
     int accumulator = 0;
-    for (auto i = 0; i < output.size(); ++i) {
+    for (size_t i = 0; i < output.size(); ++i) {
         accumulator += input[i];
         EXPECT_EQ(output[i], accumulator);
     }

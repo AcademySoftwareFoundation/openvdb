@@ -45,7 +45,7 @@ void device2host(size_t count)
     EXPECT_TRUE(buffer.deviceData());
     float *d_array = reinterpret_cast<float*>(buffer.deviceData());
     constexpr unsigned int num_threads = 256;
-    unsigned int num_blocks = num_blocks = (static_cast<unsigned int>(count) + num_threads - 1) / num_threads;
+    unsigned int num_blocks = (static_cast<unsigned int>(count) + num_threads - 1) / num_threads;
     nanovdb::util::cuda::lambdaKernel<<<num_blocks, num_threads>>>(count, [=] __device__ (size_t i) {d_array[i] = float(i);});
     buffer.deviceDownload();// copy device -> host
     EXPECT_EQ(size, buffer.size());
@@ -70,7 +70,7 @@ void host2device(size_t count)
     EXPECT_TRUE(devBuffer.deviceData());
     float *d_array = reinterpret_cast<float*>(devBuffer.deviceData());
     constexpr unsigned int num_threads = 256;
-    unsigned int num_blocks = num_blocks = (static_cast<unsigned int>(count) + num_threads - 1) / num_threads;
+    unsigned int num_blocks = (static_cast<unsigned int>(count) + num_threads - 1) / num_threads;
 
     bool *test, *d_test;
     cudaCheck(cudaMallocHost((void**)&test, sizeof(bool)));
@@ -114,7 +114,7 @@ void host2device2host(size_t count)
     EXPECT_TRUE(buffer.deviceData());
     float *d_array = reinterpret_cast<float*>(buffer.deviceData());
     constexpr unsigned int num_threads = 256;
-    unsigned int num_blocks = num_blocks = (static_cast<unsigned int>(count) + num_threads - 1) / num_threads;
+    unsigned int num_blocks = (static_cast<unsigned int>(count) + num_threads - 1) / num_threads;
     nanovdb::util::cuda::lambdaKernel<<<num_blocks, num_threads>>>(count, [=] __device__ (size_t i) {
         if (d_array[i] != float(i)) *d_test = false;
         d_array[i] = float(i) + 1.0f;
@@ -295,7 +295,7 @@ TEST(TestNanoVDBCUDA, DeviceMesh)
         testKernel<<<1, 1, 0, stream>>>(device);
     }
     // Wait on each kernel to finish using indexing operation
-    for (int i = 0; i < serialMesh.deviceCount(); ++i) {
+    for (size_t i = 0; i < serialMesh.deviceCount(); ++i) {
         cudaSetDevice(serialMesh[i].id);
         cudaStreamSynchronize(serialMesh[i].stream);
     }
@@ -2747,7 +2747,7 @@ TEST(TestNanoVDBCUDA, compareNodeOrdering)
         auto *upper1 = grid1->tree().getFirstUpper(), *upper2 = grid2->tree().getFirstUpper();
         EXPECT_TRUE(upper1);
         EXPECT_TRUE(upper2);
-        for (int i=0; i<grid1->tree().nodeCount(2); ++i) {
+        for (uint32_t i=0; i<grid1->tree().nodeCount(2); ++i) {
             //std::cerr << "#" << i << " origin(CPU)=" << upper1[i].origin() << " origin(GPU)=" << upper2[i].origin() << std::endl;
             EXPECT_EQ(upper1[i].origin(),    upper2[i].origin());
             EXPECT_EQ(upper1[i].valueMask(), upper2[i].valueMask());
@@ -2759,7 +2759,7 @@ TEST(TestNanoVDBCUDA, compareNodeOrdering)
         auto *lower1 = grid1->tree().getFirstLower(), *lower2 = grid2->tree().getFirstLower();
         EXPECT_TRUE(lower1);
         EXPECT_TRUE(lower2);
-        for (int i=0; i<grid1->tree().nodeCount(1); ++i) {
+        for (uint32_t i=0; i<grid1->tree().nodeCount(1); ++i) {
             EXPECT_EQ(lower1[i].origin(),    lower2[i].origin());
             EXPECT_EQ(lower1[i].valueMask(), lower2[i].valueMask());
             EXPECT_EQ(lower1[i].childMask(), lower2[i].childMask());
@@ -2770,7 +2770,7 @@ TEST(TestNanoVDBCUDA, compareNodeOrdering)
         auto *leaf1 = grid1->tree().getFirstLeaf(), *leaf2 = grid2->tree().getFirstLeaf();
         EXPECT_TRUE(leaf1);
         EXPECT_TRUE(leaf2);
-        for (int i=0; i<grid1->tree().nodeCount(0); ++i) {
+        for (uint32_t i=0; i<grid1->tree().nodeCount(0); ++i) {
             EXPECT_EQ(leaf1[i].origin(),    leaf2[i].origin());
             EXPECT_EQ(leaf1[i].valueMask(), leaf2[i].valueMask());
         }
@@ -3362,7 +3362,8 @@ TEST(TestNanoVDBCUDA, UnifiedBuffer_basic)
         //buffer.deviceDownload(stream);
         buffer.prefetch(0, size, cudaCpuDeviceId, stream);
         nanovdb::util::Timer timer("Setting values on CPU with unified memory");
-        for (int i = 0, *x = buffer.data<int>(); i < N; i++) *x++ = 1;
+        int *x = buffer.data<int>();
+        for (size_t i = 0; i < N; i++) *x++ = 1;
         timer.stop();
     }
     {// resize unified buffers
@@ -3383,13 +3384,13 @@ TEST(TestNanoVDBCUDA, UnifiedBuffer_basic)
 
     EXPECT_EQ(CUDA_SUCCESS, cudaStreamSynchronize(stream));
     int *x = buffer.data<int>();
-    for (int i = 0; i < N; ++i) EXPECT_EQ(1, *x++);
-    for (int i = 0; i < N; ++i) EXPECT_EQ(2, *x++);
+    for (size_t i = 0; i < N; ++i) EXPECT_EQ(1, *x++);
+    for (size_t i = 0; i < N; ++i) EXPECT_EQ(2, *x++);
 
     nanovdb::cuda::UnifiedBuffer otherBuffer(std::move(buffer));
     int *y = otherBuffer.data<int>();
-    for (int i = 0; i < N; ++i) EXPECT_EQ(1, *y++);
-    for (int i = 0; i < N; ++i) EXPECT_EQ(2, *y++);
+    for (size_t i = 0; i < N; ++i) EXPECT_EQ(1, *y++);
+    for (size_t i = 0; i < N; ++i) EXPECT_EQ(2, *y++);
 }// UnifiedBuffer_basic
 
 TEST(TestNanoVDBCUDA, UnifiedBuffer_IO)
@@ -3554,8 +3555,7 @@ TEST(TestNanoVDBCUDA, VoxelBlockManager_ValueOnIndex)
     using StencilNeighborsType = uint64_t (*)[27];
     auto stencilNeighbors = reinterpret_cast<StencilNeighborsType>(neighborStencilBuffer.data());
     auto acc = grid->getAccessor();
-    for (int i = 0; i < voxels.size(); ++i) {
-        const auto& coord = voxels[i];
+    for (const auto& coord : voxels) {
         const auto index = acc.getValue(coord);
         for (int di = -1; di <= 1; di++)
         for (int dj = -1; dj <= 1; dj++)
