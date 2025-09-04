@@ -69,7 +69,7 @@ splitGridHandles(const GridHandle<BufferT> &handle, const BufferT* other = nullp
         ptr = util::PtrAdd(ptr, handle.gridSize(n));
     }
     cudaCheck(util::cuda::freeAsync(d_dirty, stream));
-    return std::move(handles);
+    return handles;
 }// cuda::splitGridHandles
 
 template<typename BufferT, template <class, class...> class VectorT>
