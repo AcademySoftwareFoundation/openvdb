@@ -15,6 +15,62 @@
 #include <thrust/universal_vector.h>
 #include <thrust/execution_policy.h>
 
+/// @brief Tests the correctness of multi-GPU radix sort
+TEST(TestNanoVDBMultiGPU, RadixSort)
+{
+    nanovdb::cuda::DeviceMesh deviceMesh;
+
+    std::vector<cudaEvent_t> preEvents(deviceMesh.deviceCount());
+    std::vector<cudaEvent_t> postEvents(deviceMesh.deviceCount());
+    std::vector<nanovdb::cuda::TempDevicePool> tempDevicePools(deviceMesh.deviceCount());
+    std::vector<ptrdiff_t> deviceOffsets(deviceMesh.deviceCount());
+    std::vector<size_t> deviceSizes(deviceMesh.deviceCount());
+
+    using KeyT = int;
+    using ValueT = double;
+
+    std::srand(444);
+    const size_t numItems = 1571;
+    thrust::universal_vector<KeyT> keysIn(numItems);
+    thrust::universal_vector<ValueT> valuesIn(numItems);
+    for (size_t i = 0; i < numItems; ++i)
+    {
+        keysIn[i] = rand();
+        valuesIn[i] = -static_cast<ValueT>(keysIn[i]);
+    }
+
+    thrust::universal_vector<KeyT> keysOut(numItems);
+    thrust::universal_vector<ValueT> valuesOut(numItems);
+
+    for (const auto& [deviceId, stream] : deviceMesh) {
+        cudaSetDevice(deviceId);
+        cudaEventCreateWithFlags(&preEvents[deviceId], cudaEventDisableTiming);
+        cudaEventCreateWithFlags(&postEvents[deviceId], cudaEventDisableTiming);
+
+        auto deviceSize = (numItems + deviceMesh.deviceCount() - 1) / deviceMesh.deviceCount();
+        deviceOffsets[deviceId] = deviceSize * deviceId;
+        deviceSizes[deviceId] = std::min(deviceSize, numItems - deviceOffsets[deviceId]);
+    }
+
+    nanovdb::tools::cuda::radixSortAsync(deviceMesh, tempDevicePools.data(), keysIn.data().get(), keysOut.data().get(), valuesIn.data().get(), valuesOut.data().get(), numItems, deviceOffsets.data(), deviceSizes.data(), preEvents.data(), postEvents.data());
+
+    for (const auto& [deviceId, stream] : deviceMesh) {
+        cudaSetDevice(deviceId);
+        cudaEventSynchronize(postEvents[deviceId]);
+    }
+
+    for (size_t i = 0; i < numItems -1; ++i) {
+        EXPECT_LE(keysOut[i], keysOut[i + 1]);
+        EXPECT_GE(valuesOut[i], valuesOut[i + 1]);
+    }
+
+    for (const auto& [deviceId, stream] : deviceMesh) {
+        cudaSetDevice(deviceId);
+        cudaEventDestroy(postEvents[deviceId]);
+        cudaEventDestroy(preEvents[deviceId]);
+    }
+}
+
 /// @brief Tests the correctness of multi-GPU exclusive sums against an equivalent CPU implementation
 TEST(TestNanoVDBMultiGPU, ExclusiveSum)
 {
