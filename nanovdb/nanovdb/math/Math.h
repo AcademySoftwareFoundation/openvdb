@@ -1033,40 +1033,40 @@ public:
     template<typename Source>
     __hostdev__ Mat2(Source* array) : Base(array) {}
 
-    __hostdev__ Mat2  operator-() const { return Mat2(-this[0][0], -this[0][1], -this[1][0], -this[1][1]); }
+    __hostdev__ Mat2  operator-() const { return Mat2(-(*this)[0][0], -(*this)[0][1], -(*this)[1][0], -(*this)[1][1]); }
 
     /// @brief Multiply by 2x2 matrix @a m and return the resulting matrix.
     __hostdev__ Mat2<T> operator*(const Mat2<T>& m) const {
         return Mat2<T>(
-            this[0][0] * m[0][0] + this[0][1] * m[1][0],
-            this[0][0] * m[0][1] + this[0][1] * m[1][1],
-            this[1][0] * m[0][0] + this[1][1] * m[1][0],
-            this[1][0] * m[0][1] + this[1][1] * m[1][1]
+            (*this)[0][0] * m[0][0] + (*this)[0][1] * m[1][0],
+            (*this)[0][0] * m[0][1] + (*this)[0][1] * m[1][1],
+            (*this)[1][0] * m[0][0] + (*this)[1][1] * m[1][0],
+            (*this)[1][0] * m[0][1] + (*this)[1][1] * m[1][1]
         );
     }
 
     /// @brief Add each element of the given matrix to the corresponding element of this matrix.
     __hostdev__ Mat2<T>& operator+=(const Mat2<T>& m) {
-        this[0][0] += m[0][0];
-        this[0][1] += m[0][1];
-        this[1][0] += m[1][0];
-        this[1][1] += m[1][1];
+        (*this)[0][0] += m[0][0];
+        (*this)[0][1] += m[0][1];
+        (*this)[1][0] += m[1][0];
+        (*this)[1][1] += m[1][1];
         return *this;
     }
 
     /// @brief returns transpose of this
     __hostdev__ Mat2<T> transpose() const {
-        return Mat2<T>(this[0][0], this[1][0], this[0][1], this[1][1]);
+        return Mat2<T>((*this)[0][0], (*this)[1][0], (*this)[0][1], (*this)[1][1]);
     }
 
     /// @brief returns inverse of this
     __hostdev__ Mat2<T> inverse() const {
-        T det = this[0][0] * this[1][1] - this[0][1] * this[1][0];
+        T det = (*this)[0][0] * (*this)[1][1] - (*this)[0][1] * (*this)[1][0];
         if (isApproxZero(det)) {
             return Mat2<T>();
         }
         T invDet   = 1.f / det;
-        return Mat2<T>(this[1][1] * invDet, -this[0][1] * invDet, -this[1][0] * invDet, this[0][0] * invDet);
+        return Mat2<T>((*this)[1][1] * invDet, -(*this)[0][1] * invDet, -(*this)[1][0] * invDet, (*this)[0][0] * invDet);
     }
 };
 
@@ -1093,24 +1093,24 @@ public:
     /// @brief Add two matrices and return the resulting matrix.
     __hostdev__ Mat2x3<T> operator+(const Mat2x3<T>& m) const {
         return Mat2x3<T>(
-            this[0][0] + m[0][0], this[0][1] + m[0][1], this[0][2] + m[0][2],
-            this[1][0] + m[1][0], this[1][1] + m[1][1], this[1][2] + m[1][2]
+            (*this)[0][0] + m[0][0], (*this)[0][1] + m[0][1], (*this)[0][2] + m[0][2],
+            (*this)[1][0] + m[1][0], (*this)[1][1] + m[1][1], (*this)[1][2] + m[1][2]
         );
     }
 
     /// @brief Add a 2x3 matrix to this matrix.
     __hostdev__ Mat2x3<T>& operator+=(const Mat2x3<T>& m) {
-        this[0][0] += m[0][0]; this[0][1] += m[0][1]; this[0][2] += m[0][2];
-        this[1][0] += m[1][0]; this[1][1] += m[1][1]; this[1][2] += m[1][2];
+        (*this)[0][0] += m[0][0]; (*this)[0][1] += m[0][1]; (*this)[0][2] += m[0][2];
+        (*this)[1][0] += m[1][0]; (*this)[1][1] += m[1][1]; (*this)[1][2] += m[1][2];
         return *this;
     }
 
     /// @brief returns transpose of this
     __hostdev__ Mat3x2<T> transpose() const {
         return Mat3x2<T>(
-            this[0][0], this[1][0],  // First row
-            this[0][1], this[1][1],  // Second row
-            this[0][2], this[1][2]   // Third row
+            (*this)[0][0], (*this)[1][0],  // First row
+            (*this)[0][1], (*this)[1][1],  // Second row
+            (*this)[0][2], (*this)[1][2]   // Third row
         );
     }
 };
@@ -1141,8 +1141,8 @@ public:
 
     /// @brief returns transpose of this
     __hostdev__ Mat2x3<T> transpose() const {
-        return Mat2x3<T>(this[0][0], this[1][0], this[2][0], // First row
-                   this[0][1], this[1][1], this[2][1]); // Second row
+        return Mat2x3<T>((*this)[0][0], (*this)[1][0], (*this)[2][0], // First row
+                   (*this)[0][1], (*this)[1][1], (*this)[2][1]); // Second row
     }
 
 };
@@ -1177,49 +1177,49 @@ public:
     /// @brief Add two matrices and return the resulting matrix.
     __hostdev__ Mat3<T> operator+(const Mat3<T>& m) const {
         return Mat3<T>(
-            this[0][0] + m[0][0], this[0][1] + m[0][1], this[0][2] + m[0][2],
-            this[1][0] + m[1][0], this[1][1] + m[1][1], this[1][2] + m[1][2],
-            this[2][0] + m[2][0], this[2][1] + m[2][1], this[2][2] + m[2][2]
+            (*this)[0][0] + m[0][0], (*this)[0][1] + m[0][1], (*this)[0][2] + m[0][2],
+            (*this)[1][0] + m[1][0], (*this)[1][1] + m[1][1], (*this)[1][2] + m[1][2],
+            (*this)[2][0] + m[2][0], (*this)[2][1] + m[2][1], (*this)[2][2] + m[2][2]
         );
     }
 
     /// @brief Multiply by @a v and return the resulting vector.
     __hostdev__ Vec3<T> operator*(const Vec3<T>& v) const {
         return Vec3<T>(
-            this[0][0] * v[0] + this[0][1] * v[1] + this[0][2] * v[2],
-            this[1][0] * v[0] + this[1][1] * v[1] + this[1][2] * v[2],
-            this[2][0] * v[0] + this[2][1] * v[1] + this[2][2] * v[2]
+            (*this)[0][0] * v[0] + (*this)[0][1] * v[1] + (*this)[0][2] * v[2],
+            (*this)[1][0] * v[0] + (*this)[1][1] * v[1] + (*this)[1][2] * v[2],
+            (*this)[2][0] * v[0] + (*this)[2][1] * v[1] + (*this)[2][2] * v[2]
         );
     }
 
     /// @brief Multiply by 3x3 matrix @a m and return the resulting matrix.
     __hostdev__ Mat3<T> operator*(const Mat3<T>& m) const {
         return Mat3<T>(
-            this[0][0] * m[0][0] + this[0][1] * m[1][0] + this[0][2] * m[2][0],
-            this[0][0] * m[0][1] + this[0][1] * m[1][1] + this[0][2] * m[2][1],
-            this[0][0] * m[0][2] + this[0][1] * m[1][2] + this[0][2] * m[2][2],
-            this[1][0] * m[0][0] + this[1][1] * m[1][0] + this[1][2] * m[2][0],
-            this[1][0] * m[0][1] + this[1][1] * m[1][1] + this[1][2] * m[2][1],
-            this[1][0] * m[0][2] + this[1][1] * m[1][2] + this[1][2] * m[2][2],
-            this[2][0] * m[0][0] + this[2][1] * m[1][0] + this[2][2] * m[2][0],
-            this[2][0] * m[0][1] + this[2][1] * m[1][1] + this[2][2] * m[2][1],
-            this[2][0] * m[0][2] + this[2][1] * m[1][2] + this[2][2] * m[2][2]
+            (*this)[0][0] * m[0][0] + (*this)[0][1] * m[1][0] + (*this)[0][2] * m[2][0],
+            (*this)[0][0] * m[0][1] + (*this)[0][1] * m[1][1] + (*this)[0][2] * m[2][1],
+            (*this)[0][0] * m[0][2] + (*this)[0][1] * m[1][2] + (*this)[0][2] * m[2][2],
+            (*this)[1][0] * m[0][0] + (*this)[1][1] * m[1][0] + (*this)[1][2] * m[2][0],
+            (*this)[1][0] * m[0][1] + (*this)[1][1] * m[1][1] + (*this)[1][2] * m[2][1],
+            (*this)[1][0] * m[0][2] + (*this)[1][1] * m[1][2] + (*this)[1][2] * m[2][2],
+            (*this)[2][0] * m[0][0] + (*this)[2][1] * m[1][0] + (*this)[2][2] * m[2][0],
+            (*this)[2][0] * m[0][1] + (*this)[2][1] * m[1][1] + (*this)[2][2] * m[2][1],
+            (*this)[2][0] * m[0][2] + (*this)[2][1] * m[1][2] + (*this)[2][2] * m[2][2]
         );
     }
 
     /// @brief Add each element of the given matrix to the corresponding element of this matrix.
     __hostdev__ Mat3<T>& operator+=(const Mat3<T>& m) {
-        this[0][0] += m[0][0]; this[0][1] += m[0][1]; this[0][2] += m[0][2];
-        this[1][0] += m[1][0]; this[1][1] += m[1][1]; this[1][2] += m[1][2];
-        this[2][0] += m[2][0]; this[2][1] += m[2][1]; this[2][2] += m[2][2];
+        (*this)[0][0] += m[0][0]; (*this)[0][1] += m[0][1]; (*this)[0][2] += m[0][2];
+        (*this)[1][0] += m[1][0]; (*this)[1][1] += m[1][1]; (*this)[1][2] += m[1][2];
+        (*this)[2][0] += m[2][0]; (*this)[2][1] += m[2][1]; (*this)[2][2] += m[2][2];
         return *this;
     }
 
     /// @brief returns transpose of this
     __hostdev__ Mat3 transpose() const {
-        return Mat3(this[0][0], this[1][0], this[2][0],
-                   this[0][1], this[1][1], this[2][1],
-                   this[0][2], this[1][2], this[2][2]);
+        return Mat3((*this)[0][0], (*this)[1][0], (*this)[2][0],
+                   (*this)[0][1], (*this)[1][1], (*this)[2][1],
+                   (*this)[0][2], (*this)[1][2], (*this)[2][2]);
     }
 };
 
@@ -1254,10 +1254,10 @@ public:
 
     /// @brief returns transpose of this
     __hostdev__ Mat4 transpose() const {
-        return Mat4(this[0][0], this[1][0], this[2][0], this[3][0],
-                   this[0][1], this[1][1], this[2][1], this[3][1],
-                   this[0][2], this[1][2], this[2][2], this[3][2],
-                   this[0][3], this[1][3], this[2][3], this[3][3]);
+        return Mat4((*this)[0][0], (*this)[1][0], (*this)[2][0], (*this)[3][0],
+                   (*this)[0][1], (*this)[1][1], (*this)[2][1], (*this)[3][1],
+                   (*this)[0][2], (*this)[1][2], (*this)[2][2], (*this)[3][2],
+                   (*this)[0][3], (*this)[1][3], (*this)[2][3], (*this)[3][3]);
     }
 };
 
