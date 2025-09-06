@@ -148,6 +148,10 @@ its default system search routine if it cannot find a dependency with the provid
 paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
 list will be searched.]=] OFF)
 
+option(USE_PIC_IN_STATIC_LIBS "Use position-independent code in static libs. This allows sharing of the
+object files with both static and shared libs to accelerate compilation times at the cost of potentially
+slower performance in the static library at runtime." OFF)
+
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])
 set(MSVC_MP_THREAD_COUNT "" CACHE STRING [=[

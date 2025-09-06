@@ -619,31 +619,6 @@ endif()
 
 ##########################################################################
 
-# @todo CMake >= 3.12, use an object library to consolidate shared/static
-# builds. There are limitations with earlier versions of CMake when used with
-# imported targets.
-
-if(OPENVDB_CORE_SHARED)
-  add_library(openvdb_shared SHARED ${OPENVDB_LIBRARY_SOURCE_FILES})
-endif()
-
-if(OPENVDB_CORE_STATIC)
-  add_library(openvdb_static STATIC ${OPENVDB_LIBRARY_SOURCE_FILES})
-endif()
-
-# Alias either the shared or static library to the generic OpenVDB
-# target. Dependent components should use this target to build against
-# such that they are always able to find a valid build of OpenVDB
-
-if(OPENVDB_CORE_SHARED)
-  add_library(openvdb ALIAS openvdb_shared)
-else()
-  add_library(openvdb ALIAS openvdb_static)
-endif()
-
-
-##########################################################################
-
 # Configure (static and shared lib) C flags
 
 # Private defines (not inherited by dependent projects)
@@ -662,54 +637,43 @@ endif()
 
 ##########################################################################
 
-# Configure static build
+# Configure object library
 
-if(OPENVDB_CORE_STATIC)
-  target_include_directories(openvdb_static
-    PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/openvdb
-    PRIVATE .
-  )
+add_library(openvdb_obj OBJECT ${OPENVDB_LIBRARY_SOURCE_FILES})
 
-  target_compile_definitions(openvdb_static
-    PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES} -DOPENVDB_STATICLIB
-    PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES}
-  )
+target_include_directories(openvdb_obj
+  PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/openvdb
+  PRIVATE .
+)
 
-  target_link_libraries(openvdb_static
-    PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
-  )
+target_compile_definitions(openvdb_obj
+  PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES} -DOPENVDB_DLL
+  PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES}
+)
 
-  set_target_properties(openvdb_static
-    PROPERTIES OUTPUT_NAME ${OPENVDB_STATIC_LIBRARY_NAME})
+target_link_libraries(openvdb_obj
+  PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
+)
 
-  if(MSVC)
-    if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
-      # NOTE: MSVC_RUNTIME_LIBRARY does not propagate to targets, so
-      # also add it explicitly as a compile option
-      set_target_properties(openvdb_static PROPERTIES
-        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-      target_compile_options(openvdb_static PUBLIC
-        "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/MT$<$<CONFIG:Debug>:d>>")
-    endif()
-    set_target_properties(openvdb_static PROPERTIES PREFIX "lib")
-  endif()
-endif()
+set_target_properties(openvdb_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-# Configure shared build
+##########################################################################
+
+# Configure shared library
 
 if(OPENVDB_CORE_SHARED)
+  add_library(openvdb_shared SHARED $<TARGET_OBJECTS:openvdb_obj>)
+
+  # Alias the shared library to the generic OpenVDB target. Dependent components
+  # should use this target to build against such that they are always able to find
+  # a valid build of OpenVDB
+  add_library(openvdb ALIAS openvdb_shared)
+
   target_include_directories(openvdb_shared
-    PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/openvdb
-    PRIVATE .
+    PUBLIC $<TARGET_PROPERTY:openvdb_obj,INCLUDE_DIRECTORIES>
   )
-
-  target_compile_definitions(openvdb_shared
-    PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES} -DOPENVDB_DLL
-    PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES}
-  )
-
   target_link_libraries(openvdb_shared
-    PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
+    PUBLIC $<TARGET_PROPERTY:openvdb_obj,LINK_LIBRARIES>
   )
 
   set_target_properties(openvdb_shared
@@ -727,6 +691,80 @@ if(OPENVDB_CORE_SHARED)
       target_compile_options(openvdb_shared PUBLIC
         "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/MD$<$<CONFIG:Debug>:d>>")
     endif()
+  endif()
+endif()
+
+##########################################################################
+
+# Configure static library
+
+if(OPENVDB_CORE_STATIC)
+  if(NOT USE_PIC_IN_STATIC_LIBS OR WIN32)
+    # configure static library object library for non-PIC or Windows
+    add_library(openvdb_obj_static OBJECT ${OPENVDB_LIBRARY_SOURCE_FILES})
+
+    target_include_directories(openvdb_obj_static
+      PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/openvdb
+      PRIVATE .
+    )
+
+    target_compile_definitions(openvdb_obj_static
+      PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES} -DOPENVDB_STATICLIB
+      PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES}
+    )
+
+    target_link_libraries(openvdb_obj_static
+      PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
+    )
+
+    add_library(openvdb_static STATIC $<TARGET_OBJECTS:openvdb_obj_static>)
+
+    if(NOT OPENVDB_CORE_SHARED)
+      # Alias the static library to the generic OpenVDB target. Dependent components
+      # should use this target to build against such that they are always able to find
+      # a valid build of OpenVDB
+      add_library(openvdb ALIAS openvdb_static)
+    endif()
+
+    target_include_directories(openvdb_static
+      PUBLIC $<TARGET_PROPERTY:openvdb_obj_static,INCLUDE_DIRECTORIES>
+    )
+    target_link_libraries(openvdb_static
+      PUBLIC $<TARGET_PROPERTY:openvdb_obj_static,LINK_LIBRARIES>
+    )
+  else()
+    # NOTE: this may result in slower performance due to using position-independent code
+    # in the static library.
+    add_library(openvdb_static STATIC $<TARGET_OBJECTS:openvdb_obj>)
+
+    if(NOT OPENVDB_CORE_SHARED)
+      # Alias the static library to the generic OpenVDB target. Dependent components
+      # should use this target to build against such that they are always able to find
+      # a valid build of OpenVDB
+      add_library(openvdb ALIAS openvdb_static)
+    endif()
+
+    target_include_directories(openvdb_static
+      PUBLIC $<TARGET_PROPERTY:openvdb_obj,INCLUDE_DIRECTORIES>
+    )
+    target_link_libraries(openvdb_static
+      PUBLIC $<TARGET_PROPERTY:openvdb_obj,LINK_LIBRARIES>
+    )
+  endif()
+
+  set_target_properties(openvdb_static
+    PROPERTIES OUTPUT_NAME ${OPENVDB_STATIC_LIBRARY_NAME})
+
+  if(MSVC)
+    if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
+      # NOTE: MSVC_RUNTIME_LIBRARY does not propagate to targets, so
+      # also add it explicitly as a compile option
+      set_target_properties(openvdb_static PROPERTIES
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+      target_compile_options(openvdb_static PUBLIC
+        "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/MT$<$<CONFIG:Debug>:d>>")
+    endif()
+    set_target_properties(openvdb_static PROPERTIES PREFIX "lib")
   endif()
 endif()
 
