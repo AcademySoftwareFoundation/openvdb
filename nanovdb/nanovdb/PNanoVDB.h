@@ -200,21 +200,13 @@ typedef uint32_t pnanovdb_grid_type_t;
 #elif defined(PNANOVDB_BUF_HLSL)
 #if defined(PNANOVDB_BUF_HLSL_RW)
 #if defined(PNANOVDB_BUF_HLSL_64)
-#if defined(PNANOVDB_ADDRESS_64)
-#define pnanovdb_buf_t RWStructuredBuffer<uint64_t>
-#else
 #define pnanovdb_buf_t RWStructuredBuffer<uint2>
-#endif
 #else
 #define pnanovdb_buf_t RWStructuredBuffer<uint>
 #endif
 #else
 #if defined(PNANOVDB_BUF_HLSL_64)
-#if defined(PNANOVDB_ADDRESS_64)
-#define pnanovdb_buf_t StructuredBuffer<uint64_t>
-#else
 #define pnanovdb_buf_t StructuredBuffer<uint2>
-#endif
 #else
 #define pnanovdb_buf_t StructuredBuffer<uint>
 #endif
@@ -268,8 +260,8 @@ void pnanovdb_buf_write_uint64(pnanovdb_buf_t buf, uint byte_offset, uint2 value
 uint pnanovdb_buf_read_uint32(pnanovdb_buf_t buf, uint64_t byte_offset)
 {
 #if defined(PNANOVDB_BUF_HLSL_64)
-    uint64_t val64 = buf[uint(byte_offset >> 3u)];
-    return ((uint(byte_offset) & 4u) == 0u) ? uint(val64) : uint(val64 >> 32u);
+    uint2 val = buf[uint(byte_offset >> 3u)];
+    return ((uint(byte_offset) & 4u) == 0u) ? val.x : val.y;
 #else
     return buf[uint(byte_offset >> 2u)];
 #endif
@@ -278,10 +270,11 @@ uint64_t pnanovdb_buf_read_uint64(pnanovdb_buf_t buf, uint64_t byte_offset)
 {
     uint64_t ret;
 #if defined(PNANOVDB_BUF_HLSL_64)
-    ret = buf[uint(byte_offset >> 3u)];
+    uint2 raw = buf[uint(byte_offset >> 3u)];
+    ret = uint64_t(raw.x) | (uint64_t(raw.y) << 32u);
 #else
     ret = pnanovdb_buf_read_uint32(buf, byte_offset + 0u);
-    ret = ret + (uint64_t(pnanovdb_buf_read_uint32(buf, byte_offset + 4u)) << 32u);
+    ret = ret | (uint64_t(pnanovdb_buf_read_uint32(buf, byte_offset + 4u)) << 32u);
 #endif
     return ret;
 }
@@ -290,9 +283,8 @@ void pnanovdb_buf_write_uint32(pnanovdb_buf_t buf, uint64_t byte_offset, uint va
     // NOP, by default no write in HLSL
 #if defined(PNANOVDB_BUF_HLSL_RW)
 #if defined(PNANOVDB_BUF_HLSL_64)
-    uint shift = (uint(byte_offset) & 4u) == 0u ? 0u : 32u;
-    InterlockedAnd(buf[uint(byte_offset >> 3u)], ~(0xFFFFFFFFllu << shift));
-    InterlockedOr(buf[uint(byte_offset >> 3u)], uint64_t(value) << shift);
+    if ((byte_offset & 4u) == 0u) {buf[uint(byte_offset >> 3u)].x = value;}
+    else {buf[uint(byte_offset >> 3u)].y = value;}
 #else
     buf[uint(byte_offset >> 2u)] = value;
 #endif
@@ -303,7 +295,8 @@ void pnanovdb_buf_write_uint64(pnanovdb_buf_t buf, uint64_t byte_offset, uint64_
     // NOP, by default no write in HLSL
 #if defined(PNANOVDB_BUF_HLSL_RW)
 #if defined(PNANOVDB_BUF_HLSL_64)
-    buf[uint(byte_offset >> 3u)] = value;
+    uint2 raw = uint2(uint(value), uint(value >> 32u));
+    buf[uint(byte_offset >> 3u)] = raw;
 #else
     pnanovdb_buf_write_uint32(buf, byte_offset + 0u, uint(value));
     pnanovdb_buf_write_uint32(buf, byte_offset + 4u, uint(value >> 32u));
