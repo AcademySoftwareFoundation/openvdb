@@ -440,6 +440,13 @@ inline void TopologyBuilder<BuildT>::processLeafOffsets(cudaStream_t stream)
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+// Undefine utility macro for cub functions
+#ifdef CALL_CUBS
+#undef CALL_CUBS
+#endif
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 namespace topology::detail {
 
 template <typename BuildT>

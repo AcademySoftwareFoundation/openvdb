@@ -1139,6 +1139,13 @@ inline void PointsToGrid<BuildT, ResourceT>::processLeafNodes(size_t pointCount)
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+// Undefine utility macro for cub functions
+#ifdef CALL_CUBS
+#undef CALL_CUBS
+#endif
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 template<typename BuildT, typename ResourceT>
 template<typename PtrT>
 inline void PointsToGrid<BuildT, ResourceT>::processPoints(const PtrT, size_t pointCount)
