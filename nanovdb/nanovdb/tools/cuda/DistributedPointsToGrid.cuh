@@ -461,7 +461,6 @@ DistributedPointsToGrid<BuildT>::DistributedPointsToGrid(const nanovdb::cuda::De
     mTempDevicePools = new nanovdb::cuda::TempDevicePool[mDeviceMesh.deviceCount()];
 
     cudaCheck(cudaMallocManaged(&mData, sizeof(PointsToGridData<BuildT>)));
-    mData->flags.initMask({GridFlags::HasBBox, GridFlags::IsBreadthFirst});
     mData->map = map;
 
     mStripeCounts = nullptr;
@@ -906,7 +905,7 @@ template <typename BuildT>
 inline void DistributedPointsToGrid<BuildT>::processNodes()
 {
     // Parallel construction of upper, lower, and leaf nodes
-    const uint8_t flags = static_cast<uint8_t>(mData->flags.data());// mIncludeStats ? 16u : 0u;// 4th bit indicates stats
+    const uint8_t flags = (uint8_t) GridFlags::HasBBox;
 
     for (const auto& [deviceId, stream] : mDeviceMesh) {
         cudaCheck(cudaSetDevice(deviceId));
@@ -1002,58 +1001,56 @@ inline void DistributedPointsToGrid<BuildT>::processPoints(const PtrT, size_t)
 template <typename BuildT>
 inline void DistributedPointsToGrid<BuildT>::processBBox()
 {
-    if (mData->flags.isMaskOn(GridFlags::HasBBox)) {
-        // Compute and propagate bounding boxes for the upper nodes and their descendents belonging to each device in parallel.
-        std::vector<cudaEvent_t> propagateLowerBBoxEvents(mDeviceMesh.deviceCount());
-        for (const auto& [deviceId, stream] : mDeviceMesh) {
-            cudaCheck(cudaSetDevice(deviceId));
-            // reset bbox in lower nodes
-            if (deviceNodeCount(deviceId)[1]) {
-                util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[1]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[1], deviceNodeOffset(deviceId)[1], ResetLowerNodeBBoxFunctor<BuildT>(), mData);
-                cudaCheckError();
-            }
-
-            // update and propagate bbox from leaf -> lower/parent nodes
-            if (deviceNodeCount(deviceId)[0]) {
-                util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], UpdateAndPropagateLeafBBoxFunctor<BuildT>(), mData);
-                cudaCheckError();
-            }
-
-            // reset bbox in upper nodes
-            if (deviceNodeCount(deviceId)[2]) {
-                util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[2]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[2], deviceNodeOffset(deviceId)[2], ResetUpperNodeBBoxFunctor<BuildT>(), mData);
-                cudaCheckError();
-            }
-
-            // propagate bbox from lower -> upper/parent node
-            if (deviceNodeCount(deviceId)[1]) {
-                util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[1]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[1], deviceNodeOffset(deviceId)[1], PropagateLowerBBoxFunctor<BuildT>(), mData);
-                cudaCheckError();
-            }
-
-            cudaEventCreate(&propagateLowerBBoxEvents[deviceId]);
-            cudaEventRecord(propagateLowerBBoxEvents[deviceId], stream);
+    // Compute and propagate bounding boxes for the upper nodes and their descendents belonging to each device in parallel.
+    std::vector<cudaEvent_t> propagateLowerBBoxEvents(mDeviceMesh.deviceCount());
+    for (const auto& [deviceId, stream] : mDeviceMesh) {
+        cudaCheck(cudaSetDevice(deviceId));
+        // reset bbox in lower nodes
+        if (deviceNodeCount(deviceId)[1]) {
+            util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[1]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[1], deviceNodeOffset(deviceId)[1], ResetLowerNodeBBoxFunctor<BuildT>(), mData);
+            cudaCheckError();
         }
 
-        // Wait until bounding boxes are computed for each upper node and then compute the root bounding box on the zeroth device
+        // update and propagate bbox from leaf -> lower/parent nodes
+        if (deviceNodeCount(deviceId)[0]) {
+            util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], UpdateAndPropagateLeafBBoxFunctor<BuildT>(), mData);
+            cudaCheckError();
+        }
+
+        // reset bbox in upper nodes
+        if (deviceNodeCount(deviceId)[2]) {
+            util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[2]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[2], deviceNodeOffset(deviceId)[2], ResetUpperNodeBBoxFunctor<BuildT>(), mData);
+            cudaCheckError();
+        }
+
+        // propagate bbox from lower -> upper/parent node
+        if (deviceNodeCount(deviceId)[1]) {
+            util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[1]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[1], deviceNodeOffset(deviceId)[1], PropagateLowerBBoxFunctor<BuildT>(), mData);
+            cudaCheckError();
+        }
+
+        cudaEventCreate(&propagateLowerBBoxEvents[deviceId]);
+        cudaEventRecord(propagateLowerBBoxEvents[deviceId], stream);
+    }
+
+    // Wait until bounding boxes are computed for each upper node and then compute the root bounding box on the zeroth device
+    {
+        int deviceId = 0;
+        auto stream = mDeviceMesh[deviceId].stream;
+        cudaCheck(cudaSetDevice(deviceId));
+        for (const auto& propagateLowerBBoxEvent : propagateLowerBBoxEvents)
         {
-            int deviceId = 0;
-            auto stream = mDeviceMesh[deviceId].stream;
-            cudaCheck(cudaSetDevice(deviceId));
-            for (const auto& propagateLowerBBoxEvent : propagateLowerBBoxEvents)
-            {
-                cudaStreamWaitEvent(stream, propagateLowerBBoxEvent);
-            }
-            // propagate bbox from upper -> root/parent node
-            util::cuda::lambdaKernel<<<numBlocks(mData->nodeCount[2]), mNumThreads, 0, stream>>>(mData->nodeCount[2], PropagateUpperBBoxFunctor<BuildT>(), mData);
-            cudaCheckError();
-
-            // update the world-bbox in the root node
-            util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, UpdateRootWorldBBoxFunctor<BuildT>(), mData);
-            cudaCheckError();
-
-            cudaCheck(cudaEventDestroy(propagateLowerBBoxEvents[deviceId]));
+            cudaStreamWaitEvent(stream, propagateLowerBBoxEvent);
         }
+        // propagate bbox from upper -> root/parent node
+        util::cuda::lambdaKernel<<<numBlocks(mData->nodeCount[2]), mNumThreads, 0, stream>>>(mData->nodeCount[2], PropagateUpperBBoxFunctor<BuildT>(), mData);
+        cudaCheckError();
+
+        // update the world-bbox in the root node
+        util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, UpdateRootWorldBBoxFunctor<BuildT>(), mData);
+        cudaCheckError();
+
+        cudaCheck(cudaEventDestroy(propagateLowerBBoxEvents[deviceId]));
     }
 
     // Explicitly synchronize so that move constructor in getHandle doesn't fail
