@@ -106,7 +106,7 @@ jobs:
       github.event.inputs.deploy == 'coverage'
     runs-on: ubuntu-latest
     container:
-      image: aswf/ci-openvdb:2023
+      image: aswf/ci-openvdb:2025-clang19.1
     env:
       CXX: g++
     steps:

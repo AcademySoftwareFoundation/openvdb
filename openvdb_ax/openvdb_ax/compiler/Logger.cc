@@ -194,7 +194,7 @@ bool Logger::error(const std::string& message,
     // Always increment the error counter
     ++mNumErrors;
     if (limit) return false;
-    mErrorOutput(format(this->getErrorPrefix() + message,
+    mErrorOutput(ax::format(this->getErrorPrefix() + message,
                         lineCol,
                         this->errors(),
                         this->getNumberedOutput(),
@@ -218,7 +218,7 @@ bool Logger::warning(const std::string& message,
     }
     else {
         ++mNumWarnings;
-        mWarningOutput(format(this->getWarningPrefix() + message,
+        mWarningOutput(ax::format(this->getWarningPrefix() + message,
                               lineCol,
                               this->warnings(),
                               this->getNumberedOutput(),
