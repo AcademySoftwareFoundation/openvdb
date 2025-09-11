@@ -75,22 +75,18 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test' }
-          - { cxx: clang++, image: '2023', hou_hash: '20_5', build: 'Debug',   components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
-          - { cxx: g++,     image: '2023', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
-          - { cxx: clang++, image: '2023', hou_hash: '20_0-newabi', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
-          - { cxx: g++,     image: '2023', hou_hash: '20_0-newabi', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: clang++, image: '2025', hou_hash: '21_0', build: 'Release', components: 'core,hou,bin,view,render,python,test' }
+          - { cxx: clang++, image: '2024', hou_hash: '21_0', build: 'Debug',   components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: g++,     image: '2024', hou_hash: '21_0', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: clang++, image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: g++,     image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
       fail-fast: false
     steps:
     - name: remove zstd
       run: yum -y remove zstd
     - uses: actions/checkout@v3
     - name: nanobind
-      #if: contains(matrix.config.image, '2023') == false
       run: ./ci/install_nanobind.sh 2.0.0
-    - name: glfw
-      if: contains(matrix.config.image, '2023') == true
-      run: ./ci/install_glfw.sh 3.3.10
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.15.2
     - name: timestamp
