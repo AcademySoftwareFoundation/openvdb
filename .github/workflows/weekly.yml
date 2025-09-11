@@ -70,7 +70,7 @@ jobs:
     strategy:
       matrix:
         config:
-          - { houdini_version: '20.0', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_0-newabi' }
+          - { houdini_version: '21.0', platform: 'linux_x86_64_gcc11.2', hou_hash: '21_0' }
           - { houdini_version: '20.5', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_5' }
       fail-fast: false
     container:
@@ -113,7 +113,7 @@ jobs:
     # Note that macos-14 (current macos-latest) switches to M1. We could instead test
     # the arm build here instead of the x86 one.
     runs-on: macos-latest
-    name: macos-houdini-20
+    name: macos-houdini
     env:
       HOUDINI_CLIENT_ID: ${{ secrets.HOUDINI_CLIENT_ID }}
       HOUDINI_SECRET_KEY: ${{ secrets.HOUDINI_SECRET_KEY }}
@@ -123,7 +123,7 @@ jobs:
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
     - name: download_houdini
-      run: ./ci/download_houdini.sh 20.0 macosx_arm64_clang14.0_13 --prod
+      run: ./ci/download_houdini.sh 21.0 macosx_arm64_clang15.0_14 --prod
     - name: install_houdini
       run: |
         mkdir $HOME/houdini_install
