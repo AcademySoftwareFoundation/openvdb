@@ -17,7 +17,10 @@
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
 #include <nanovdb/tools/cuda/GridValidator.cuh>
 #include <nanovdb/tools/cuda/GridStats.cuh>
-//#include <nanovdb/tools/cuda/DilateVoxels.cuh>
+#include <nanovdb/tools/cuda/DilateGrid.cuh>
+#include <nanovdb/tools/cuda/MergeGrids.cuh>
+#include <nanovdb/tools/cuda/PruneGrid.cuh>
+#include <nanovdb/util/cuda/Injection.cuh>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/Timer.h>
 #include <nanovdb/io/IO.h>
@@ -3575,6 +3578,115 @@ TEST(TestNanoVDBCUDA, VoxelBlockManager_ValueOnIndex_UnifiedBuffer)
 {
     testVoxelBlockManager<nanovdb::ValueOnIndex,nanovdb::cuda::UnifiedBuffer>();
 }// VoxelBlockManager_ValueOnIndex_UnifiedBuffer
+
+TEST(TestNanoVDBCUDA, DilateInjectPrune_ValueOnIndex)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+
+    // Create an input (original) grid to use as input to dilation op
+    std::vector<nanovdb::Coord> inputPoints;
+    inputPoints.emplace_back(nanovdb::Coord{1,0,0}); // Added nodes after dilation: 3 root, 3 upper, 3 lower, 3 leaf
+    inputPoints.emplace_back(nanovdb::Coord{0,1,1}); // Added nodes after dilation: 1 root, 1 upper, 1 lower, 1 leaf
+    inputPoints.emplace_back(nanovdb::Coord{127,127,127}); // Added nodes after dilation: 7 lower, 7 leaf
+    auto inputBuffer = nanovdb::cuda::DeviceBuffer::create( inputPoints.size() * sizeof(nanovdb::Coord), nullptr, false);
+    EXPECT_FALSE(inputBuffer.data());
+    EXPECT_TRUE(inputBuffer.deviceData());
+    cudaCheck(cudaMemcpy(inputBuffer.deviceData(), inputPoints.data(), inputPoints.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    nanovdb::tools::cuda::PointsToGrid<BuildT> converter;
+    converter.setChecksum(nanovdb::CheckMode::Default);
+    auto inputHandle = converter.getHandle(static_cast<nanovdb::Coord*>(inputBuffer.deviceData()), inputPoints.size());
+    EXPECT_TRUE(inputHandle.deviceGrid<BuildT>());
+    auto inputGrid = inputHandle.deviceGrid<BuildT>();
+    EXPECT_FALSE(inputHandle.grid<BuildT>());
+
+    // Perform dilation
+    nanovdb::tools::cuda::DilateGrid<BuildT> dilator( inputGrid );
+    dilator.setOperation(nanovdb::tools::morphology::NN_FACE_EDGE_VERTEX);
+    dilator.setChecksum(nanovdb::CheckMode::Default);
+    dilator.setVerbose(0);
+    auto dilatedHandle = dilator.getHandle();
+    auto dilatedGrid = dilatedHandle.deviceGrid<BuildT>();
+    EXPECT_TRUE(dilatedGrid);
+    auto dilatedTreeData = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(dilatedGrid);
+    EXPECT_EQ(dilatedTreeData.mNodeCount[0], 13);
+    EXPECT_EQ(dilatedTreeData.mNodeCount[1], 12);
+    EXPECT_EQ(dilatedTreeData.mNodeCount[2], 5);
+    EXPECT_EQ(dilatedTreeData.mVoxelCount, 73);
+
+    // Create a prune mask (set bits correspond to retained voxels) from the occupancy of the original grid
+    auto maskBuffer = nanovdb::cuda::DeviceBuffer::create( dilatedTreeData.mNodeCount[0] * sizeof(nanovdb::Mask<3>), nullptr, false);
+    EXPECT_TRUE(maskBuffer.deviceData());
+    auto leafMasks = static_cast<nanovdb::Mask<3>*>(maskBuffer.deviceData());
+    constexpr unsigned int num_threads = 128;
+    unsigned int num_blocks = (static_cast<unsigned int>(dilatedTreeData.mNodeCount[0]) + num_threads - 1) / num_threads;
+    nanovdb::util::cuda::lambdaKernel<<<num_blocks, num_threads>>>(dilatedTreeData.mNodeCount[0],
+        nanovdb::util::cuda::InjectGridMaskFunctor<BuildT>(),
+        inputGrid, dilatedGrid, leafMasks);
+
+    // Prune with computed mask
+    nanovdb::tools::cuda::PruneGrid<BuildT> pruner( dilatedGrid, leafMasks );
+    pruner.setChecksum(nanovdb::CheckMode::Default);
+    pruner.setVerbose(0);
+    auto prunedHandle = pruner.getHandle();
+    auto prunedGrid = prunedHandle.deviceGrid<BuildT>();
+    EXPECT_TRUE(prunedGrid);
+
+    // The pruned grid should be identical to the original input
+    EXPECT_FALSE(prunedHandle.grid<BuildT>());
+    inputHandle.deviceDownload();
+    prunedHandle.deviceDownload();
+    EXPECT_TRUE(inputHandle.grid<BuildT>());
+    EXPECT_TRUE(prunedHandle.grid<BuildT>());
+    EXPECT_EQ(inputHandle.grid<BuildT>()->mChecksum.full(), prunedHandle.grid<BuildT>()->mChecksum.full());
+}// DilateInjectPrune_ValueOnIndex
+
+TEST(TestNanoVDBCUDA, MergeGrids_ValueOnIndex)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+
+    // Create the first input grid for the merge op
+    std::vector<nanovdb::Coord> inputPointsA;
+    for (int i = 0; i <= 2; i++)
+        for (int j = 0; j <= 2; j++)
+            for (int k = 0; k <= 2; k++)
+                inputPointsA.emplace_back(nanovdb::Coord{i-1, j*8-1, k*128}); // 4 upper, 12 lower, 18 leaf nodes
+    auto inputBufferA = nanovdb::cuda::DeviceBuffer::create( inputPointsA.size() * sizeof(nanovdb::Coord), nullptr, false);
+    EXPECT_FALSE(inputBufferA.data());
+    EXPECT_TRUE(inputBufferA.deviceData());
+    cudaCheck(cudaMemcpy(inputBufferA.deviceData(), inputPointsA.data(), inputPointsA.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    auto inputHandleA = nanovdb::tools::cuda::voxelsToGrid<BuildT>(static_cast<nanovdb::Coord*>(inputBufferA.deviceData()), inputPointsA.size());
+    EXPECT_TRUE(inputHandleA.deviceGrid<BuildT>());
+    auto inputGridA = inputHandleA.deviceGrid<BuildT>();
+    EXPECT_FALSE(inputHandleA.grid<BuildT>());
+
+    // Create the second input grid for the merge op
+    std::vector<nanovdb::Coord> inputPointsB;
+    for (int i = 0; i <= 2; i++)
+        for (int j = 0; j <= 2; j++)
+            for (int k = 0; k <= 2; k++)
+                inputPointsB.emplace_back(nanovdb::Coord{i, j*8-1, (k-1)*128}); // 4 upper, 6 lower, 9 leaf nodes
+    auto inputBufferB = nanovdb::cuda::DeviceBuffer::create( inputPointsB.size() * sizeof(nanovdb::Coord), nullptr, false);
+    EXPECT_FALSE(inputBufferB.data());
+    EXPECT_TRUE(inputBufferB.deviceData());
+    cudaCheck(cudaMemcpy(inputBufferB.deviceData(), inputPointsB.data(), inputPointsB.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    auto inputHandleB = nanovdb::tools::cuda::voxelsToGrid<BuildT>(static_cast<nanovdb::Coord*>(inputBufferB.deviceData()), inputPointsB.size());
+    EXPECT_TRUE(inputHandleB.deviceGrid<BuildT>());
+    auto inputGridB = inputHandleB.deviceGrid<BuildT>();
+    EXPECT_FALSE(inputHandleB.grid<BuildT>());
+
+    // Perform the merge operation
+    nanovdb::tools::cuda::MergeGrids<BuildT> merger( inputGridA, inputGridB );
+    merger.setChecksum(nanovdb::CheckMode::Disable);
+    merger.setVerbose(0);
+    auto mergedHandle = merger.getHandle();
+    auto mergedGrid = mergedHandle.deviceGrid<BuildT>();
+    EXPECT_TRUE(mergedGrid);
+    auto mergedTreeData = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(mergedGrid);
+    EXPECT_EQ(mergedTreeData.mNodeCount[0], 21);
+    EXPECT_EQ(mergedTreeData.mNodeCount[1], 14);
+    EXPECT_EQ(mergedTreeData.mNodeCount[2], 6);
+    EXPECT_EQ(mergedTreeData.mVoxelCount, 42); // Each input grid has 27 active voxels, 12 shared between the two
+}// DilateInjectPrune_ValueOnIndex
 
 TEST(TestNanoVDBCUDA, GridHandle_from_HostBuffer)
 {
