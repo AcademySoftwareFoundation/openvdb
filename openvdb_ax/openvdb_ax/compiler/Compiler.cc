@@ -1010,7 +1010,9 @@ Compiler::compile(const ast::Tree& tree,
     {
         auto Generator = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
             EE->getDataLayout().getGlobalPrefix());
-        EE->getMainJITDylib().addGenerator(std::move(*Generator));
+        if (Generator) {
+            EE->getMainJITDylib().addGenerator(std::move(*Generator));
+        }
     }
 #endif
 
