@@ -74,9 +74,23 @@ public:
     {
         if (mDim == dim)
             return false;
+
+        // compute valid voxel range
+        Coord voxelMax = (mVoxel + Coord(mDim - 1)) & (~(dim - 1));
+        Coord voxelMin = mVoxel & (~(dim - 1));
+
         mDim = dim;
         const Vec3T &pos = ray(mT0), &inv = ray.invDir();
         mVoxel = RoundDown<CoordT>(pos) & (~(dim - 1));
+
+        // clamp mVoxel to valid range
+        mVoxel[0] = nanovdb::math::Min(mVoxel[0], voxelMax[0]);
+        mVoxel[1] = nanovdb::math::Min(mVoxel[1], voxelMax[1]);
+        mVoxel[2] = nanovdb::math::Min(mVoxel[2], voxelMax[2]);
+        mVoxel[0] = nanovdb::math::Max(mVoxel[0], voxelMin[0]);
+        mVoxel[1] = nanovdb::math::Max(mVoxel[1], voxelMin[1]);
+        mVoxel[2] = nanovdb::math::Max(mVoxel[2], voxelMin[2]);
+
         for (int axis = 0; axis < 3; ++axis) {
             if (mStep[axis] == 0)
                 continue;

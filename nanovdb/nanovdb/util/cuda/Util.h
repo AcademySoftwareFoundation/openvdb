@@ -121,8 +121,9 @@ inline int ptrToDevice(void *ptr)
 /// @brief Returns the ID of the current device
 inline int currentDevice()
 {
-    int current = 0;
+    int current = cudaInvalidDeviceId;
     cudaCheck(cudaGetDevice(&current));
+    assert(current != cudaInvalidDeviceId);
     return current;
 }
 
