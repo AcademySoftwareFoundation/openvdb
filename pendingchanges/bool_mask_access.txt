@@ -1,0 +1,3 @@
+API changes:
+- Add LeafBuffer<bool, Log2Dim>::storage() for direct const access to the
+  raw data buffer when using the bool LeafNode.
