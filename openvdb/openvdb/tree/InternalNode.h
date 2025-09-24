@@ -2419,49 +2419,30 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
     mChildMask.load(is);
     mValueMask.load(is);
 
-    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_INTERNALNODE_COMPRESSION) {
-        for (Index i = 0; i < NUM_VALUES; ++i) {
-            if (this->isChildMaskOn(i)) {
-                ChildNodeType* child =
-                    new ChildNodeType(PartialCreate(), offsetToGlobalCoord(i), background);
-                mNodes[i].setChild(child);
-                child->readTopology(is);
-            } else {
-                ValueType value;
-                is.read(reinterpret_cast<char*>(&value), sizeof(ValueType));
-                mNodes[i].setValue(value);
-            }
-        }
-    } else {
-        const bool oldVersion =
-            (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION);
-        const Index numValues = (oldVersion ? mChildMask.countOff() : NUM_VALUES);
-        {
-            // Read in (and uncompress, if necessary) all of this node's values
-            // into a contiguous array.
-            std::unique_ptr<ValueType[]> valuePtr(new ValueType[numValues]);
-            ValueType* values = valuePtr.get();
-            io::readCompressedValues(is, values, numValues, mValueMask, fromHalf);
+    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
+    }
 
-            // Copy values from the array into this node's table.
-            if (oldVersion) {
-                Index n = 0;
-                for (ValueAllIter iter = this->beginValueAll(); iter; ++iter) {
-                    mNodes[iter.pos()].setValue(values[n++]);
-                }
-                OPENVDB_ASSERT(n == numValues);
-            } else {
-                for (ValueAllIter iter = this->beginValueAll(); iter; ++iter) {
-                    mNodes[iter.pos()].setValue(values[iter.pos()]);
-                }
-            }
+    const Index numValues = NUM_VALUES;
+    {
+        // Read in (and uncompress, if necessary) all of this node's values
+        // into a contiguous array.
+        std::unique_ptr<ValueType[]> valuePtr(new ValueType[numValues]);
+        ValueType* values = valuePtr.get();
+        io::readCompressedValues(is, values, numValues, mValueMask, fromHalf);
+
+        // Copy values from the array into this node's table.
+        for (ValueAllIter iter = this->beginValueAll(); iter; ++iter) {
+            mNodes[iter.pos()].setValue(values[iter.pos()]);
         }
-        // Read in all child nodes and insert them into the table at their proper locations.
-        for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
-            ChildNodeType* child = new ChildNodeType(PartialCreate(), iter.getCoord(), background);
-            mNodes[iter.pos()].setChild(child);
-            child->readTopology(is, fromHalf);
-        }
+    }
+
+    // Read in all child nodes and insert them into the table at their proper locations.
+    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
+        ChildNodeType* child = new ChildNodeType(PartialCreate(), iter.getCoord(), background);
+        mNodes[iter.pos()].setChild(child);
+        child->readTopology(is, fromHalf);
     }
 }
 
