@@ -389,7 +389,10 @@ protected:
     circleBottom(const ValueT& x0, const ValueT& y0,
                  const ValueT& r, const ValueT& x)
     {
-        return y0 - math::Sqrt(math::Pow2(r) - math::Pow2(x-x0));
+        const ValueT base = math::Pow2(r) - math::Pow2(x-x0);
+        return base <= 0
+            ? y0
+            : y0 - math::Sqrt(base);
     }
 
     /// @brief Computes the top y-coordinate of a circle at a given x position.
@@ -402,7 +405,10 @@ protected:
     circleTop(const ValueT& x0, const ValueT& y0,
               const ValueT& r, const ValueT& x)
     {
-        return y0 + math::Sqrt(math::Pow2(r) - math::Pow2(x-x0));
+        const ValueT base = math::Pow2(r) - math::Pow2(x-x0);
+        return base <= 0
+            ? y0
+            : y0 + math::Sqrt(base);
     }
 
     /// @brief Computes the bottom z-coordinate of a sphere at a given (x, y) position.
@@ -417,7 +423,10 @@ protected:
     sphereBottom(const ValueT& x0, const ValueT& y0, const ValueT& z0,
                  const ValueT& r, const ValueT& x, const ValueT& y)
     {
-        return z0 - math::Sqrt(math::Pow2(r) - math::Pow2(x-x0) - math::Pow2(y-y0));
+        const ValueT base = math::Pow2(r) - math::Pow2(x-x0) - math::Pow2(y-y0);
+        return base <= 0 // Do not take square root of negative numbers.
+            ? z0
+            : z0 - math::Sqrt(base);
     }
 
     /// @brief Computes the top z-coordinate of a sphere at a given (x, y) position.
@@ -432,7 +441,10 @@ protected:
     sphereTop(const ValueT& x0, const ValueT& y0, const ValueT& z0,
               const ValueT& r, const ValueT& x, const ValueT& y)
     {
-        return z0 + math::Sqrt(math::Pow2(r) - math::Pow2(x-x0) - math::Pow2(y-y0));
+        const ValueT base = math::Pow2(r) - math::Pow2(x-x0) - math::Pow2(y-y0);
+        return base <= 0 // Do not take square root of negative numbers.
+            ? z0
+            : z0 + math::Sqrt(base);
     }
 
     // ------------ nested classes ------------
