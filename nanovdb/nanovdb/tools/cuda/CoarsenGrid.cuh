@@ -2,18 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /*!
-    \file nanovdb/tools/cuda/PruneGrid.cuh
+    \file nanovdb/tools/cuda/CoarsenGrid.cuh
 
     \authors Efty Sifakis
 
-    \brief Morphological pruning of NanoVDB indexGrids using leaf-indexed mask
+    \brief 2x Coarsening/Downsampling of NanoVDB indexGrids on the device
 
     \warning The header file contains cuda device code so be sure
              to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NVIDIA_TOOLS_CUDA_PRUNEGRID_CUH_HAS_BEEN_INCLUDED
-#define NVIDIA_TOOLS_CUDA_PRUNEGRID_CUH_HAS_BEEN_INCLUDED
+#ifndef NVIDIA_TOOLS_CUDA_COARSENGRID_CUH_HAS_BEEN_INCLUDED
+#define NVIDIA_TOOLS_CUDA_COARSENGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <cub/cub.cuh>
 
@@ -31,7 +31,7 @@ namespace nanovdb {
 namespace tools::cuda {
 
 template <typename BuildT>
-class PruneGrid
+class CoarsenGrid
 {
     using GridT  = NanoGrid<BuildT>;
     using TreeT  = NanoTree<BuildT>;
@@ -41,11 +41,10 @@ class PruneGrid
 public:
 
     /// @brief Constructor
-    /// @param d_srcGrid source device grid to be pruned
-    /// @param d_srcLeafMask sidecar array of leaf masks for voxels to retain
+    /// @param deviceGrid source device grid to be coarsened
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    PruneGrid(const GridT* d_srcGrid, const Mask<3>* d_srcLeafMask, cudaStream_t stream = 0)
-        : mBuilder(stream), mStream(stream), mTimer(stream), mDeviceSrcGrid(d_srcGrid), mDeviceSrcLeafMask(d_srcLeafMask) {}
+    CoarsenGrid(const GridT* d_srcGrid, cudaStream_t stream = 0)
+        : mBuilder(stream), mStream(stream), mTimer(stream), mDeviceSrcGrid(d_srcGrid) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -55,7 +54,7 @@ public:
     /// @param mode Mode of checksum computation
     void setChecksum(CheckMode mode = CheckMode::Disable){mBuilder.mChecksum = mode;}
 
-    /// @brief Creates a handle to the pruned grid
+    /// @brief Creates a handle to the coarsened grid
     /// @tparam BufferT Buffer type used for allocation of the grid handle
     /// @param buffer optional buffer (currently ignored)
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
@@ -63,13 +62,13 @@ public:
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
 
-    void pruneRoot();
+    void coarsenRoot();
 
-    void pruneInternalNodes();
+    void coarsenInternalNodes();
 
     void processGridTreeRoot();
 
-    void pruneLeafNodes();
+    void coarsenLeafNodes();
 
 private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
@@ -80,19 +79,18 @@ private:
     util::cuda::Timer       mTimer;
     int                     mVerbose{0};
     const GridT             *mDeviceSrcGrid;
-    const Mask<3>           *mDeviceSrcLeafMask;
     TreeData                mSrcTreeData;
 
 public:
     const GridT* deviceSrcGrid() const { return mDeviceSrcGrid; }
-};// tools::cuda::PruneGrid<BuildT>
+};// tools::cuda::CoarsenGrid<BuildT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT>
 template<typename BufferT>
 GridHandle<BufferT>
-PruneGrid<BuildT>::getHandle(const BufferT &pool)
+CoarsenGrid<BuildT>::getHandle(const BufferT &pool)
 {
     // Copy TreeData from GPU -> CPU
     cudaStreamSynchronize(mStream);
@@ -102,44 +100,43 @@ PruneGrid<BuildT>::getHandle(const BufferT &pool)
     if (mSrcTreeData.mTileCount[2] || mSrcTreeData.mTileCount[1] || mSrcTreeData.mTileCount[0])
         throw std::runtime_error("Topological operations not supported on grids with value tiles");
 
+    // Coarsen root node
+    if (mVerbose==1) mTimer.start("\nCoarsening root node");
+    coarsenRoot();
 
-    // Speculatively prune root node
-    if (mVerbose==1) mTimer.start("\nPrune root node");
-    pruneRoot();
-
-    // Allocate memory for pruned upper/lower masks
+    // Allocate memory for coarsened upper/lower masks
     if (mVerbose==1) mTimer.restart("Allocating internal node mask buffers");
     mBuilder.allocateInternalMaskBuffers(mStream);
 
-    // Prune masks of upper/lower nodes
-    if (mVerbose==1) mTimer.restart("Prune internal nodes");
-    pruneInternalNodes();
+    // Coarsen masks of upper/lower nodes
+    if (mVerbose==1) mTimer.restart("Coarsening internal nodes");
+    coarsenInternalNodes();
 
     // Enumerate tree nodes
-    if (mVerbose==1) mTimer.restart("Count pruned tree nodes");
+    if (mVerbose==1) mTimer.restart("Count coarsened tree nodes");
     mBuilder.countNodes(mStream);
 
     cudaStreamSynchronize(mStream);
 
-    // Allocate new device grid buffer for pruned result
-    if (mVerbose==1) mTimer.restart("Allocating pruned grid buffer");
+    // Allocate new device grid buffer for coarsened result
+    if (mVerbose==1) mTimer.restart("Allocating coarsened grid buffer");
     auto buffer = mBuilder.getBuffer(pool, mStream);
 
-    // Process GridData/TreeData/RootData of pruned result
+    // Process GridData/TreeData/RootData of coarsened result
     if (mVerbose==1) mTimer.restart("Processing grid/tree/root");
     processGridTreeRoot();
 
-    // Process upper nodes of pruned result
+    // Process upper nodes of coarsened result
     if (mVerbose==1) mTimer.restart("Processing upper nodes");
     mBuilder.processUpperNodes(mStream);
 
-    // Process lower nodes of pruned result
+    // Process lower nodes of coarsened result
     if (mVerbose==1) mTimer.restart("Processing lower nodes");
     mBuilder.processLowerNodes(mStream);
 
-    // Prune active masks of leaf nodes and rebuild offsets
-    if (mVerbose==1) mTimer.restart("Pruning leaf nodes");
-    pruneLeafNodes();
+    // Coarsen leaf node active masks into new topology
+    if (mVerbose==1) mTimer.restart("Coarsen leaf nodes");
+    coarsenLeafNodes();
 
     // Process bounding boxes
     if (mVerbose==1) mTimer.restart("Processing bounding boxes");
@@ -153,21 +150,19 @@ PruneGrid<BuildT>::getHandle(const BufferT &pool)
     cudaStreamSynchronize(mStream);
 
     return GridHandle<BufferT>(std::move(buffer));
-}// PruneGrid<BuildT>::getHandle
+}// CoarsenGrid<BuildT>::getHandle
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT>
-void PruneGrid<BuildT>::pruneRoot()
+void CoarsenGrid<BuildT>::coarsenRoot()
 {
-    // This method conservatively (and trivially) prunes the root tile table.
-    // For this simple approximation, it is assumed that all root tiles currently present will presist,
-    // and they will be pruned at a later stage if deemed empty.
+    // This method coarsens the root tiles, to accommodate for the overall downsamping operation.
 
     int device = 0;
     cudaGetDevice(&device);
 
-    std::map<uint64_t, typename RootT::DataType::Tile> prunedTiles;
+    std::map<uint64_t, typename RootT::DataType::Tile> coarsenedTiles;
 
     // This encoding scheme mirrors the one used in PointsToGrid; note that it is different from Tile::key
     auto coordToKey = [](const Coord &ijk)->uint64_t{
@@ -179,7 +174,7 @@ void PruneGrid<BuildT>::pruneRoot()
     };// coordToKey lambda functor
 
     if (mSrcTreeData.mVoxelCount) { // If the input grid is not empty
-        // Make a host copy of the source topology RootNode
+        // Make a host copy of the Root topology
         auto deviceSrcRoot = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid, GridT::memUsage() + mSrcTreeData.mNodeOffset[3]));
         uint64_t rootSize = mSrcTreeData.mNodeOffset[2] - mSrcTreeData.mNodeOffset[3];
         auto srcRootBuffer = nanovdb::HostBuffer::create(rootSize);
@@ -188,66 +183,68 @@ void PruneGrid<BuildT>::pruneRoot()
 
         // Add all root tiles, reordering if necessary
         for (uint32_t t = 0; t < srcRoot->tileCount(); t++) {
-            auto tile = srcRoot->tile(t);
-            auto sortKey = coordToKey(tile->origin());
-            prunedTiles.emplace(sortKey, *tile);
+            auto coarsenedOrigin = util::morphology::coarsenCoord(srcRoot->tile(t)->origin());
+            auto sortKey = coordToKey(coarsenedOrigin); // key used in the radix sort, in accordance with PointsToGrid
+            auto tileKey = RootT::CoordToKey(coarsenedOrigin); // encoding used in the NanoVDB tile
+            typename RootT::Tile coarsenedTile{tileKey}; // Only the key value is needed; child pointer & value will be unused
+            coarsenedTiles.emplace(sortKey, coarsenedTile);
         }
     }
 
-    // Package the duplicated root topology into a RootNode plus Tile list; upload to the GPU
-    uint64_t rootSize = RootT::memUsage(prunedTiles.size());
+    // Package the new root topology into a RootNode plus Tile list; upload to the GPU
+    uint64_t rootSize = RootT::memUsage(coarsenedTiles.size());
     mBuilder.mProcessedRoot = nanovdb::cuda::DeviceBuffer::create(rootSize);
-    auto prunedRootPtr = static_cast<RootT*>(mBuilder.mProcessedRoot.data());
-    prunedRootPtr->mTableSize = prunedTiles.size();
+    auto coarsenedRootPtr = static_cast<RootT*>(mBuilder.mProcessedRoot.data());
+    coarsenedRootPtr->mTableSize = coarsenedTiles.size();
     uint32_t t = 0;
-    for (const auto& [key, tile] : prunedTiles)
-        *prunedRootPtr->tile(t++) = tile;
+    for (const auto& [key, tile] : coarsenedTiles)
+        *coarsenedRootPtr->tile(t++) = tile;
     mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
-}// PruneGrid<BuildT>::pruneRoot
+}// CoarsenGrid<BuildT>::coarsenRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT>
-void PruneGrid<BuildT>::pruneInternalNodes()
+void CoarsenGrid<BuildT>::coarsenInternalNodes()
 {
-    // Computes the masks of upper and (densified) lower internal nodes, as a result of the pruning operation
+    // Computes the masks of upper and (densified) lower internal nodes, as a result of the coarsening operation
     // Masks of lower internal nodes are densified in the sense that a serialized array of them is allocated,
     // as if every upper node had a full set of 32^3 lower children
     if (auto srcLeafCount = mSrcTreeData.mNodeCount[0]) { // Unless it's an empty grid
         util::cuda::lambdaKernel<<<numBlocks(srcLeafCount), mNumThreads, 0, mStream>>>(
-            srcLeafCount, util::morphology::cuda::PruneInternalNodesFunctor<BuildT>(),
-            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mDeviceSrcLeafMask, mBuilder.mUpperMasks.deviceData(), mBuilder.mLowerMasks.deviceData() );
+            srcLeafCount, util::morphology::cuda::CoarsenInternalNodesFunctor<BuildT>(),
+            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.mUpperMasks.deviceData(), mBuilder.mLowerMasks.deviceData() );
     }
-}// PruneGrid<BuildT>::pruneInternalNodes
+}// CoarsenGrid<BuildT>::coarsenInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template <typename BuildT>
-void PruneGrid<BuildT>::processGridTreeRoot()
+void CoarsenGrid<BuildT>::processGridTreeRoot()
 {
     // Copy GridData from source grid
     // By convention: this will duplicate grid name and map. Others will be reset later
     cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), deviceSrcGrid()->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
     cudaCheckError();
-}// PruneGrid<BuildT>::processGridTreeRoot
+}// CoarsenGrid<BuildT>::processGridTreeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT>
-void PruneGrid<BuildT>::pruneLeafNodes()
+void CoarsenGrid<BuildT>::coarsenLeafNodes()
 {
-    // Prunes the active masks of the source grid to the intersection with the leaf-mask sidecar
-    // followed by rebuilding the leaf offsets
+    // Coarsens the active masks of the source grid (as indicated at the leaf level), into a new grid that
+    // has been already topologically coarsened to include all necessary leaf nodes.
     auto srcLeafCount = mSrcTreeData.mNodeCount[0];
     if (srcLeafCount) { // Unless grid is empty
         util::cuda::lambdaKernel<<<numBlocks(srcLeafCount), mNumThreads, 0, mStream>>>(
-            srcLeafCount, util::morphology::cuda::PruneLeafMasksFunctor<BuildT>(), mDeviceSrcGrid, &mBuilder.data()->getGrid(), mDeviceSrcLeafMask);
+            srcLeafCount, util::morphology::cuda::CoarsenLeafMasksFunctor<BuildT>(), mDeviceSrcGrid, &mBuilder.data()->getGrid());
     }
 
     // Update leaf offsets and prefix sums
     mBuilder.processLeafOffsets(mStream);
-}// PruneGrid<BuildT>::pruneLeafNodes
+}// CoarsenGrid<BuildT>::coarsenLeafNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -255,4 +252,4 @@ void PruneGrid<BuildT>::pruneLeafNodes()
 
 }// namespace nanovdb
 
-#endif // NVIDIA_TOOLS_CUDA_PRUNEGRID_CUH_HAS_BEEN_INCLUDED
+#endif // NVIDIA_TOOLS_CUDA_COARSENGRID_CUH_HAS_BEEN_INCLUDED
