@@ -277,7 +277,6 @@ struct PointsToGridData {
     uint32_t *d_indx;// device pointer to point indices (or IDs)
     uint32_t  nodeCount[3], *pointsPerLeafPrefix, *pointsPerLeaf;// 0=leaf,1=lower, 2=upper
     uint32_t  voxelCount,  *pointsPerVoxelPrefix, *pointsPerVoxel;
-    BitFlags<16> flags;
     __hostdev__ NanoGrid<BuildT>&  getGrid() const {return *util::PtrAdd<NanoGrid<BuildT>>(d_bufferPtr, grid);}
     __hostdev__ NanoTree<BuildT>&  getTree() const {return *util::PtrAdd<NanoTree<BuildT>>(d_bufferPtr, tree);}
     __hostdev__ NanoRoot<BuildT>&  getRoot() const {return *util::PtrAdd<NanoRoot<BuildT>>(d_bufferPtr, root);}
@@ -303,7 +302,6 @@ public:
         , mPointType(util::is_same<BuildT,Point>::value ? PointType::Default : PointType::Disable)
     {
         mData.map = map;
-        mData.flags.initMask({GridFlags::HasBBox, GridFlags::IsBreadthFirst});
         mDeviceData = static_cast<PointsToGridData<BuildT>*>(ResourceT::allocateAsync(sizeof(PointsToGridData<BuildT>), ResourceT::DEFAULT_ALIGNMENT, mStream));
     }
 
@@ -334,10 +332,6 @@ public:
     /// @brief Set the mode for checksum computation, which is disabled by default
     /// @param mode Mode of checksum computation
     void setChecksum(CheckMode mode = CheckMode::Disable){mChecksum = mode;}
-
-    /// @brief Toggle on and off the computation of a bounding-box
-    /// @param on If true bbox will be computed
-    void includeBBox(bool on = true) { mData.flags.setMask(GridFlags::HasBBox, on); }
 
     /// @brief Set the name of the output grid
     /// @param name name of the output grid
@@ -798,9 +792,12 @@ struct BuildGridTreeRootFunctor
         tree.setFirstNode(&d_data->getUpper(0));
         tree.setFirstNode(&d_data->getLower(0));
         tree.setFirstNode(&d_data->getLeaf(0));
-        tree.mNodeCount[2] = tree.mTileCount[2] = d_data->nodeCount[2];
-        tree.mNodeCount[1] = tree.mTileCount[1] = d_data->nodeCount[1];
-        tree.mNodeCount[0] = tree.mTileCount[0] = d_data->nodeCount[0];
+        tree.mNodeCount[2] = d_data->nodeCount[2];
+        tree.mNodeCount[1] = d_data->nodeCount[1];
+        tree.mNodeCount[0] = d_data->nodeCount[0];
+        tree.mTileCount[2] = 0;
+        tree.mTileCount[1] = 0;
+        tree.mTileCount[0] = 0;
         tree.mVoxelCount = d_data->voxelCount;
 
         // process Grid
@@ -898,6 +895,8 @@ struct BuildGridTreeRootFunctor
             default:
                 printf("Error in PointsToGrid<BuildT, ResourceT>::processGridTreeRoot: invalid pointType\n");
             }
+        } else if constexpr(BuildTraits<BuildT>::is_onindex) {
+            grid.mGridClass = GridClass::IndexGrid;
         } else if constexpr(BuildTraits<BuildT>::is_offindex) {
             grid.mData1 = 1u + 512u*d_data->nodeCount[0];
             grid.mGridClass = GridClass::IndexGrid;
@@ -943,7 +942,7 @@ struct BuildUpperNodesFunctor
 #endif
         root.tile(tid)->setChild(ijk, &upper, &root);
         upper.mBBox[0] = ijk;
-        upper.mFlags = 0;
+        upper.mFlags = (uint64_t) GridFlags::HasBBox;
         upper.mValueMask.setOff();
         upper.mChildMask.setOff();
         upper.mMinimum = upper.mMaximum = typename NanoLower<BuildT>::ValueType(0);
@@ -989,7 +988,7 @@ struct BuildLowerNodesFunctor
         auto &lower = d_data->getLower(tid);
         upper.setChild(upperOffset, &lower);
         lower.mBBox[0] = upper.offsetToGlobalCoord(upperOffset);
-        lower.mFlags = 0;
+        lower.mFlags = (uint64_t) GridFlags::HasBBox;
         lower.mValueMask.setOff();
         lower.mChildMask.setOff();
         lower.mMinimum = lower.mMaximum = typename NanoLower<BuildT>::ValueType(0);// background;
@@ -1090,7 +1089,7 @@ struct SetLeafInactiveVoxelValuesFunctor
 template<typename BuildT, typename ResourceT>
 inline void PointsToGrid<BuildT, ResourceT>::processLeafNodes(size_t pointCount)
 {
-    const uint8_t flags = static_cast<uint8_t>(mData.flags.data());// mIncludeStats ? 16u : 0u;// 4th bit indicates stats
+    const uint8_t flags = (uint8_t) GridFlags::HasBBox;
 
     if (mVerbose==2) mTimer.start("process leaf meta data");
     // loop over leaf nodes and add it to its parent node
@@ -1133,6 +1132,13 @@ inline void PointsToGrid<BuildT, ResourceT>::processLeafNodes(size_t pointCount)
     }
     if (mVerbose==2) mTimer.stop();
 }// PointsToGrid<BuildT, ResourceT>::processLeafNodes
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// Undefine utility macro for cub functions
+#ifdef CALL_CUBS
+#undef CALL_CUBS
+#endif
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1264,19 +1270,16 @@ struct UpdateRootWorldBBoxFunctor
 {
     __device__
     void operator()(size_t tid, PointsToGridData<BuildT> *d_data) {
-        d_data->getGrid().mWorldBBox = d_data->getRoot().mBBox.transform(d_data->map);
+        auto BBox = d_data->getRoot().mBBox;
+        BBox.max() += 1;
+        d_data->getGrid().mFlags.setMaskOn(GridFlags::HasBBox);
+        d_data->getGrid().mWorldBBox = BBox.transform(d_data->map);
     }
 };
 
 template<typename BuildT, typename ResourceT>
 inline void PointsToGrid<BuildT, ResourceT>::processBBox()
 {
-    if (mData.flags.isMaskOff(GridFlags::HasBBox)) {
-        ResourceT::deallocateAsync(mData.d_leaf_keys, mData.nodeCount[0]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-        ResourceT::deallocateAsync(mData.d_lower_keys, mData.nodeCount[1]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-        return;
-    }
-
     // reset bbox in lower nodes
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[1]), mNumThreads, 0, mStream>>>(mData.nodeCount[1], ResetLowerNodeBBoxFunctor<BuildT>(), mDeviceData);
     cudaCheckError();
