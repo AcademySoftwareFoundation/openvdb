@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "Transform.h"
-#include "LegacyFrustum.h"
 
 #include <openvdb/version.h>
 #include <sstream>
