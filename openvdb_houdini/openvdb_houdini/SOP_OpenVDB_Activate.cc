@@ -1294,7 +1294,7 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
 }
 
 const char *
-SOP_VDBActivate::inputLabel(unsigned index) const
+SOP_VDBActivate::inputLabel(OP_InputIdx index) const
 {
     switch (index)
     {
@@ -1307,7 +1307,7 @@ SOP_VDBActivate::inputLabel(unsigned index) const
 }
 
 int
-SOP_VDBActivate::isRefInput(unsigned i) const
+SOP_VDBActivate::isRefInput(OP_InputIdx i) const
 {
     switch (i)
     {

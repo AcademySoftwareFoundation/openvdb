@@ -1,0 +1,3 @@
+Houdini:
+  - Fixed a compilation issue with the OpenVDB Activate SOP with Houdini 21
+  [Reported by @callen128]

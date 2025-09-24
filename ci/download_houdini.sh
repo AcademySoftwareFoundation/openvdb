@@ -8,8 +8,14 @@ HOUDINI_MAJOR="$1"
 PLATFORM="$2"
 OTHER_ARGS="$3"
 
-pip install --user requests
-python ci/download_houdini.py $HOUDINI_MAJOR $PLATFORM $OTHER_ARGS
+if [[ $PLATFORM =~ "linux" ]]; then
+    pip3 install --user requests
+elif [[ $PLATFORM =~ "macos" ]]; then
+    # Tell the homebrew install of pip3 that we don't care about installing directly through pip3
+    pip3 install --user requests --break-system-packages
+fi
+
+python3 ci/download_houdini.py $HOUDINI_MAJOR $PLATFORM $OTHER_ARGS
 
 if [[ $PLATFORM =~ "linux" ]]; then
     # create dir hierarchy
