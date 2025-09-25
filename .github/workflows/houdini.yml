@@ -77,7 +77,7 @@ jobs:
         config:
           - { cxx: clang++, image: '2026', hou_hash: '21_0', build: 'Release', components: 'core,hou,bin,view,render,python,test' }
           - { cxx: clang++, image: '2026', hou_hash: '21_0', build: 'Debug',   components: 'core,hou,bin,view,render,python,axcore,axbin' }
-          - { cxx: g++,     image: '2026', hou_hash: '21_0', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: g++,     image: '2026', hou_hash: '21_0', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin' }
           - { cxx: clang++, image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
           - { cxx: g++,     image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
       fail-fast: false
