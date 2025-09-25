@@ -545,6 +545,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/Statistics.h
   tools/TopologyToLevelSet.h
   tools/ValueTransformer.h
+  tools/VectorMerge.h
   tools/VectorTransformer.h
   tools/VelocityFields.h
   tools/VolumeAdvect.h
