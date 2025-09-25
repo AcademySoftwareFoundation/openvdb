@@ -8,8 +8,8 @@
 ///
 /// @author Tim Straubigner
 
-#ifndef OPENVDB_TOOLS_VECTOR_MERGE_HAS_BEEN_INCLUDED
-#define OPENVDB_TOOLS_VECTOR_MERGE_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_TOOLS_VECTOR_FROM_SCALAR_HAS_BEEN_INCLUDED
+#define OPENVDB_TOOLS_VECTOR_FROM_SCALAR_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
@@ -35,7 +35,7 @@ namespace tools {
 /// @param z                    Grid to use as the third vector component.
 template<typename ScalarGridT>
 typename ScalarGridT::template ValueConverter<math::Vec3<typename ScalarGridT::ValueType>>::Type::Ptr
-vectorMerge(const ScalarGridT& x, const ScalarGridT& y, const ScalarGridT& z)
+vectorFromScalar(const ScalarGridT& x, const ScalarGridT& y, const ScalarGridT& z)
 {
     // TODO
     throw std::runtime_error("not implemented");
@@ -48,4 +48,4 @@ vectorMerge(const ScalarGridT& x, const ScalarGridT& y, const ScalarGridT& z)
 
 
 
-#endif // OPENVDB_TOOLS_VECTOR_MERGE_HAS_BEEN_INCLUDED
+#endif // OPENVDB_TOOLS_VECTOR_FROM_SCALAR_HAS_BEEN_INCLUDED
