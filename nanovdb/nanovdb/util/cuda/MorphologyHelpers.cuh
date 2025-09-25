@@ -11,10 +11,10 @@
     \brief This file implements helper methods used in morphology operations
 */
 
-#ifndef NANOVDB_TOOLS_MORPHOLOGY_CUDA_MORPHOLOGYHELPERS_CUH_HAS_BEEN_INCLUDED
-#define NANOVDB_TOOLS_MORPHOLOGY_CUDA_MORPHOLOGYHELPERS_CUH_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_UTIL_MORPHOLOGY_CUDA_MORPHOLOGYHELPERS_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_UTIL_MORPHOLOGY_CUDA_MORPHOLOGYHELPERS_CUH_HAS_BEEN_INCLUDED
 
-namespace nanovdb::tools {
+namespace nanovdb::util {
 
 namespace morphology {
 
@@ -123,6 +123,6 @@ void MaskShift( const nanovdb::Mask<4>& inMaskQ, nanovdb::Mask<4>& outMaskQ )
 
 } // namespace morphology
 
-} // namespace nanovdb::tools
+} // namespace nanovdb::util
 
-#endif // NANOVDB_TOOLS_MORPHOLOGY_CUDA_MORPHOLOGYHELPERS_CUH_HAS_BEEN_INCLUDED
+#endif // NANOVDB_UTIL_MORPHOLOGY_CUDA_MORPHOLOGYHELPERS_CUH_HAS_BEEN_INCLUDED

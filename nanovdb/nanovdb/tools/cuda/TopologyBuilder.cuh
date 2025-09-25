@@ -165,7 +165,7 @@ void TopologyBuilder<BuildT>::countNodes(cudaStream_t stream)
     auto lowerCounts = reinterpret_cast<CountType>( lowerCountsBuffer.deviceData() );
     auto leafCounts = reinterpret_cast<CountType>( leafCountsBuffer.deviceData() );
 
-    using Op = morphology::cuda::EnumerateNodesFunctor;
+    using Op = util::morphology::cuda::EnumerateNodesFunctor;
     util::cuda::operatorKernel<Op>
         <<<dim3(processedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock, 0, stream>>>
         (deviceUpperMasks(), deviceLowerMasks(), lowerCounts, leafCounts);
@@ -364,7 +364,7 @@ inline void TopologyBuilder<BuildT>::processLowerNodes(cudaStream_t stream)
         std::size_t leafCount = data()->nodeCount[0];
         mLeafParents = nanovdb::cuda::DeviceBuffer::create(leafCount*sizeof(uint32_t), nullptr, device, stream);
 
-        using Op = morphology::cuda::ProcessLowerNodesFunctor<BuildT>;
+        using Op = util::morphology::cuda::ProcessLowerNodesFunctor<BuildT>;
         util::cuda::operatorKernel<Op>
             <<<dim3(processedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock, 0, stream>>>(
                 deviceUpperMasks(),
