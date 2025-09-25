@@ -37,20 +37,20 @@ if [[ $PLATFORM =~ "linux" ]]; then
     ls -al dsolib/
 
     # copy required libraries
-    cp -r toolkit/cmake ../hou/toolkit/.
-    cp -r toolkit/include ../hou/toolkit/.
-    cp -r dsolib/libHoudini* ../hou/dsolib/.
-    cp -r dsolib/libopenvdb_sesi* ../hou/dsolib/.
-    cp -r dsolib/libblosc* ../hou/dsolib/.
-    cp -r dsolib/libhboost* ../hou/dsolib/.
-    cp -r dsolib/libz* ../hou/dsolib/.
-    cp -r dsolib/libbz2* ../hou/dsolib/.
-    cp -r dsolib/libtbb* ../hou/dsolib/.
-    cp -r dsolib/libjemalloc* ../hou/dsolib/.
-    cp -r dsolib/liblzma* ../hou/dsolib/.
-    cp -r dsolib/libIex* ../hou/dsolib/.
-    cp -r dsolib/libImath* ../hou/dsolib/.
-    cp -r dsolib/libIlmThread* ../hou/dsolib/.
+    mv toolkit/cmake ../hou/toolkit/.
+    mv toolkit/include ../hou/toolkit/.
+    mv dsolib/libHoudini* ../hou/dsolib/.
+    mv dsolib/libopenvdb_sesi* ../hou/dsolib/.
+    mv dsolib/libblosc* ../hou/dsolib/.
+    mv dsolib/libhboost* ../hou/dsolib/.
+    mv dsolib/libz* ../hou/dsolib/.
+    mv dsolib/libbz2* ../hou/dsolib/.
+    mv dsolib/libtbb* ../hou/dsolib/.
+    mv dsolib/libjemalloc* ../hou/dsolib/.
+    mv dsolib/liblzma* ../hou/dsolib/.
+    mv dsolib/libIex* ../hou/dsolib/.
+    mv dsolib/libImath* ../hou/dsolib/.
+    mv dsolib/libIlmThread* ../hou/dsolib/.
     cd ..
 
 elif [[ $PLATFORM =~ "macos" ]]; then
