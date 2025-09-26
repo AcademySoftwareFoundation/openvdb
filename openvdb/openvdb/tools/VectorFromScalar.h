@@ -14,11 +14,68 @@
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/GridOperators.h> // for ScalarToVectorConverter
+#include <openvdb/tree/NodeManager.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
+
+template<typename ScalarTreeT>
+struct VectorFromScalarOp
+{
+    using ScalarT = typename ScalarTreeT::ValueType;
+    using VectorT = math::Vec3<ScalarT>;
+    using VectorTreeT = typename ScalarTreeT::ValueConverter<VectorT>::Type;
+
+    using VectorRootT = typename VectorTreeT::RootNodeType;
+    using VectorLeafT = typename VectorTreeT::LeafNodeType;
+
+    VectorFromScalarOp(const ScalarTreeT* x, const ScalarTreeT* y, const ScalarTreeT* z)
+        : mXTree(x)
+        , mYTree(y)
+        , mZTree(z)
+    {}
+
+    void operator()(VectorRootT& root) const {
+        for (auto i = root.beginValueOn(); i; ++i)
+        {
+            i.setValue(VectorT(
+                mXTree->getValue(i.getCoord()),
+                mYTree->getValue(i.getCoord()),
+                mZTree->getValue(i.getCoord())
+            ));
+        }
+    }
+
+    // void operator()(VectorLeafT& leaf) const {
+    //     // TODO
+    // }
+
+    template<typename VectorNodeT>
+    void operator()(VectorNodeT& node) const {
+        using ScalarNodeT = typename VectorNodeT::ValueConverter<ScalarT>::Type;
+
+        const ScalarNodeT* xNode = mXTree->template probeNode<ScalarNodeT>(node.origin());
+        const ScalarNodeT* yNode = mYTree->template probeNode<ScalarNodeT>(node.origin());
+        const ScalarNodeT* zNode = mZTree->template probeNode<ScalarNodeT>(node.origin());
+
+        for (auto i = node.beginValueOn(); i; ++i)
+        {
+            i.setValue(VectorT(
+                xNode ? xNode->getValueUnsafe(i.offset()) : mXTree->background(),
+                yNode ? yNode->getValueUnsafe(i.offset()) : mYTree->background(),
+                zNode ? zNode->getValueUnsafe(i.offset()) : mZTree->background()
+            ));
+        }
+    }
+
+private:
+    const ScalarTreeT* mXTree;
+    const ScalarTreeT* mYTree;
+    const ScalarTreeT* mZTree;
+};
 
 /// @brief Threaded method to convert three scalar-valued grids into a single vector-valued grid.
 ///        The transforms and resolutions of the three input grids must be equal. The new vector
@@ -34,11 +91,34 @@ namespace tools {
 /// @param y                    Grid to use as the second vector component.
 /// @param z                    Grid to use as the third vector component.
 template<typename ScalarGridT>
-typename ScalarGridT::template ValueConverter<math::Vec3<typename ScalarGridT::ValueType>>::Type::Ptr
+typename ScalarToVectorConverter<ScalarGridT>::Type::Ptr
 vectorFromScalar(const ScalarGridT& x, const ScalarGridT& y, const ScalarGridT& z)
 {
-    // TODO
-    throw std::runtime_error("not implemented");
+    using ScalarT = typename ScalarGridT::ValueType;
+    using VectorT = math::Vec3<ScalarT>;
+    using ScalarTreeT = typename ScalarGridT::TreeType;
+    using VectorGridT = typename ScalarToVectorConverter<ScalarGridT>::Type;
+    using VectorTreeT = typename VectorGridT::TreeType;
+
+    math::Transform transform = x.transform();
+    if (transform != y.transform() || transform != z.transform())
+    {
+        OPENVDB_THROW(ValueError, "vectorFromScalar: all input grids must have the same transform");
+    }
+
+    auto background = VectorT(x.background(), y.background(), z.background());
+
+    auto vectorGrid = createGrid<VectorGridT>(background);
+
+    vectorGrid->topologyUnion(x);
+    vectorGrid->topologyUnion(y);
+    vectorGrid->topologyUnion(z);
+
+    auto nodeManager = tree::NodeManager<VectorTreeT>(vectorGrid->tree());
+    auto op = VectorFromScalarOp<ScalarTreeT>(&x.tree(), &y.tree(), &z.tree());
+    nodeManager.foreachTopDown(op);
+
+    return vectorGrid;
 }
 
 
