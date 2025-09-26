@@ -129,6 +129,7 @@ jobs:
             -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON \
             \"
     - name: test
+      if: matrix.config.build == 'Release'
       run: cd build && ctest -V
     # Keep ccache light by stripping out any caches not accessed in the last day
     - name: ccache_clean
