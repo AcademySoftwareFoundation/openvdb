@@ -1054,35 +1054,13 @@ LeafNode<bool, Log2Dim>::readBuffers(std::istream& is, bool /*fromHalf*/)
     // Read in the origin.
     is.read(reinterpret_cast<char*>(&mOrigin), sizeof(Coord::ValueType) * 3);
 
-    if (io::getFormatVersion(is) >= OPENVDB_FILE_VERSION_BOOL_LEAF_OPTIMIZATION) {
-        // Read in the mask for the voxel values.
-        mBuffer.mData.load(is);
-    } else {
-        // Older files stored one or more bool arrays.
-
-        // Read in the number of buffers, which should now always be one.
-        int8_t numBuffers = 0;
-        is.read(reinterpret_cast<char*>(&numBuffers), sizeof(int8_t));
-
-        // Read in the buffer.
-        // (Note: prior to the bool leaf optimization, buffers were always compressed.)
-        std::unique_ptr<bool[]> buf{new bool[SIZE]};
-        io::readData<bool>(is, buf.get(), SIZE, /*isCompressed=*/true);
-
-        // Transfer values to mBuffer.
-        mBuffer.mData.setOff();
-        for (Index i = 0; i < SIZE; ++i) {
-            if (buf[i]) mBuffer.mData.setOn(i);
-        }
-
-        if (numBuffers > 1) {
-            // Read in and discard auxiliary buffers that were created with
-            // earlier versions of the library.
-            for (int i = 1; i < numBuffers; ++i) {
-                io::readData<bool>(is, buf.get(), SIZE, /*isCompressed=*/true);
-            }
-        }
+    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_BOOL_LEAF_OPTIMIZATION) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 217 (BOOL_LEAF_OPTIMIZATION) is no longer supported.");
     }
+
+    // Read in the mask for the voxel values.
+    mBuffer.mData.load(is);
 }
 
 

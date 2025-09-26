@@ -485,17 +485,20 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     }
 
     int8_t metadata = NO_MASK_AND_ALL_VALS;
-    if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
-        // Read the flag that specifies what, if any, additional metadata
-        // (selection mask and/or inactive value(s)) is saved.
-        if (seek && !maskCompressed) {
-            is.seekg(/*bytes=*/1, std::ios_base::cur);
-        } else if (seek && delayLoadMeta) {
-            metadata = delayLoadMeta->getMask(leafIndex);
-            is.seekg(/*bytes=*/1, std::ios_base::cur);
-        } else {
-            is.read(reinterpret_cast<char*>(&metadata), /*bytes=*/1);
-        }
+    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
+    }
+
+    // Read the flag that specifies what, if any, additional metadata
+    // (selection mask and/or inactive value(s)) is saved.
+    if (seek && !maskCompressed) {
+        is.seekg(/*bytes=*/1, std::ios_base::cur);
+    } else if (seek && delayLoadMeta) {
+        metadata = delayLoadMeta->getMask(leafIndex);
+        is.seekg(/*bytes=*/1, std::ios_base::cur);
+    } else {
+        is.read(reinterpret_cast<char*>(&metadata), /*bytes=*/1);
     }
 
     ValueT background = zeroVal<ValueT>();
@@ -545,8 +548,12 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
 
     Index tempCount = destCount;
 
-    if (maskCompressed && metadata != NO_MASK_AND_ALL_VALS
-        && getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION)
+    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
+    }
+
+    if (maskCompressed && metadata != NO_MASK_AND_ALL_VALS)
     {
         tempCount = valueMask.countOn();
         if (!seek && tempCount != destCount) {

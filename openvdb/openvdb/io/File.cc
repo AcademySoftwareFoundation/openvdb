@@ -822,16 +822,14 @@ File::readGridPartial(GridBase::Ptr grid, std::istream& is,
         grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
     }
 
-    if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_GRID_INSTANCING) {
-        grid->readTransform(is);
-        if (!isInstance && readTopology) {
-            grid->readTopology(is);
-        }
-    } else {
-        if (readTopology) {
-            grid->readTopology(is);
-            grid->readTransform(is);
-        }
+    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_GRID_INSTANCING) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 216 (GRID_INSTANCING) is no longer supported.");
+    }
+
+    grid->readTransform(is);
+    if (!isInstance && readTopology) {
+        grid->readTopology(is);
     }
 }
 
