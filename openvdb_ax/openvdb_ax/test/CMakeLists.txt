@@ -35,6 +35,12 @@ endif()
 
 if(NOT OPENVDB_BUILD_AX)
   set(OPENVDBAX_LIB OpenVDB::openvdb_ax)
+elseif(TARGET openvdb_ax_static)
+  # Prefer the static lib when building the tests, as this should work with both
+  # static and shared builds of LLVM. Unfortunately, if LLVM was linked statically,
+  # we can get symbol conflicts with openvdbax.so exporting stuff.
+  # https://github.com/AcademySoftwareFoundation/openvdb/pull/2088#issuecomment-3337141828
+  set(OPENVDBAX_LIB openvdb_ax_static)
 else()
   set(OPENVDBAX_LIB openvdb_ax)
 endif()
