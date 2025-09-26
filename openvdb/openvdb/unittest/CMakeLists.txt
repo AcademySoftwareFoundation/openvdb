@@ -196,6 +196,10 @@ else()
   )
 endif()
 
+if (OPENVDB_TESTS_FPE)
+  add_compile_definitions(OPENVDB_TESTS_FPE)
+endif()
+
 add_executable(vdb_test ${UNITTEST_SOURCE_FILES})
 
 # Blosc and ZLib are hidden dependencies for the core library

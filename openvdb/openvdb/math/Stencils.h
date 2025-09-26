@@ -1627,7 +1627,9 @@ public:
         Real alphaM, alphaG, normGrad;
         if (this->curvatures(alphaM, alphaG, normGrad)) {
           const Real mean = alphaM*mInv2Dx/math::Pow3(normGrad);
-          const Real tmp = std::sqrt(mean*mean - alphaG*mInvDx2/math::Pow4(normGrad));
+          const Real base = mean*mean - alphaG*mInvDx2/math::Pow4(normGrad);
+          const Real clampVal = 0;
+          const Real tmp = std::sqrt(std::max(base, clampVal));
           pair.first  = ValueType(mean - tmp);
           pair.second = ValueType(mean + tmp);
         }
