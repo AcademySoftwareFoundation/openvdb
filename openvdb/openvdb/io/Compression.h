@@ -643,7 +643,7 @@ writeCompressedValuesSize(ValueT* srcBuf, Index srcCount,
 /// @param toHalf     if true, convert floating-point values to 16-bit half floats
 template<typename ValueT, typename MaskT>
 inline void
-writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
+writeCompressedValues(std::ostream& os, const ValueT* srcBuf, Index srcCount,
     const MaskT& valueMask, const MaskT& childMask, bool toHalf)
 {
     // Get the stream's compression settings.
@@ -651,7 +651,7 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
     const bool maskCompress = compress & COMPRESS_ACTIVE_MASK;
 
     Index tempCount = srcCount;
-    ValueT* tempBuf = srcBuf;
+    ValueT* tempBuf = nullptr;
     std::unique_ptr<ValueT[]> scopedTempBuf;
 
     int8_t metadata = NO_MASK_AND_ALL_VALS;
@@ -743,9 +743,10 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
 
     // Write out the buffer.
     if (toHalf) {
-        HalfWriter<RealToHalf<ValueT>::isReal, ValueT>::write(os, tempBuf, tempCount, compress);
+        HalfWriter<RealToHalf<ValueT>::isReal, ValueT>::write(os,
+            bool(tempBuf) ? tempBuf : srcBuf, tempCount, compress);
     } else {
-        writeData(os, tempBuf, tempCount, compress);
+        writeData(os, bool(tempBuf) ? tempBuf : srcBuf, tempCount, compress);
     }
 }
 
