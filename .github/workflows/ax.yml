@@ -68,14 +68,14 @@ jobs:
         # Only test unified builds (core+ax). weekly CI should test standalone
         # @note  LLVM 17 builds are incompatible with the vdb python plugin on linux
         config:
-          - { image: '2025-clang19', cxx: 'clang++', build: 'Release', cmake: '' }
-          - { image: '2025-clang19', cxx: 'g++',     build: 'Release', cmake: '' }
-          - { image: '2025-clang19', cxx: 'clang++', build: 'Debug',   cmake: '' }
-          - { image: '2025-clang18', cxx: 'clang++', build: 'Release', cmake: '' }
-          - { image: '2024-clang17', cxx: 'clang++', build: 'Release', cmake: '-DOPENVDB_PYTHON_USE_AX=OFF' }
-          - { image: '2024-clang16', cxx: 'clang++', build: 'Release', cmake: '' }
-          - { image: '2023-clang15', cxx: 'clang++', build: 'Release', cmake: '' }
-          - { image: '2023-clang15', cxx: 'g++',     build: 'Release', cmake: '' }
+          - { image: '2025-clang19.1', cxx: 'clang++', build: 'Release', cmake: '' }
+          - { image: '2025-clang19.1', cxx: 'g++',     build: 'Release', cmake: '' }
+          - { image: '2025-clang19.1', cxx: 'clang++', build: 'Debug',   cmake: '' }
+          - { image: '2025-clang18.1', cxx: 'clang++', build: 'Release', cmake: '' }
+          - { image: '2024-clang17.2', cxx: 'clang++', build: 'Release', cmake: '-DOPENVDB_PYTHON_USE_AX=OFF' }
+          - { image: '2024-clang16.2', cxx: 'clang++', build: 'Release', cmake: '' }
+          - { image: '2023-clang15',   cxx: 'clang++', build: 'Release', cmake: '' }
+          - { image: '2023-clang15',   cxx: 'g++',     build: 'Release', cmake: '' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -160,7 +160,7 @@ jobs:
       github.event.inputs.type == 'grammar'
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     container:
-      image: aswf/ci-openvdb:2023-clang15
+      image: aswf/ci-openvdb:2025-clang19.1
     steps:
     - uses: actions/checkout@v3
     - name: build

@@ -490,7 +490,7 @@ splitGrids(const GridHandle<BufferT> &handle, const BufferT* other = nullptr)
         h = HandleT(std::move(buffer));
         ptr = util::PtrAdd(ptr, src->mGridSize);
     }
-    return std::move(handles);
+    return handles;
 }// splitGrids
 
 /// @brief Combines (or merges) multiple GridHandles into a single GridHandle containing all grids

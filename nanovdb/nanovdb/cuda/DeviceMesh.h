@@ -222,18 +222,6 @@ inline size_t minDevicePageSize(const DeviceMesh& mesh)
     return minGranularity;
 }// minDevicePageSize
 
-/// @brief Launches a function for each node in the device mesh in parallel and blocks until the have all completed
-template<typename Func, typename... Args>
-void parallelForEach(const nanovdb::cuda::DeviceMesh& mesh, Func func, Args... args)
-{
-    std::vector<std::thread> threads;
-    for (const auto& [device, stream] : mesh) {
-        threads.emplace_back(func, device, stream, args...);
-    }
-    std::for_each(threads.begin(), threads.end(), [](std::thread& t) { t.join(); });
-    threads.clear();
-}// parallelForEach
-
 } // namespace cuda
 
 } // namespace nanovdb
