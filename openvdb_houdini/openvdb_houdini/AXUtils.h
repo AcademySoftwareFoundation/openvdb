@@ -398,8 +398,8 @@ hax_chramp(const openvdb::ax::FunctionOptions& op)
         const std::string nameString(name);
 
         const openvdb::Metadata::ConstPtr& meta = customData->getData(nameString);
-        assert(meta.get());
-        assert(dynamic_cast<const RampDataCache*>(meta.get()));
+        OPENVDB_ASSERT(meta.get());
+        OPENVDB_ASSERT(dynamic_cast<const RampDataCache*>(meta.get()));
         const RampDataCache* const rampdata =
             static_cast<const RampDataCache*>(meta.get());
 
@@ -429,22 +429,22 @@ inline openvdb::ax::codegen::FunctionGroup::UniquePtr
 haxchramp(const openvdb::ax::FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const openvdb::ax::codegen::Arguments& args,
+             llvm::IRBuilder<>& B) -> openvdb::ax::codegen::Value
     {
         // Pull out the custom data from the parent function
         llvm::Function* compute = B.GetInsertBlock()->getParent();
-        assert(compute);
+        OPENVDB_ASSERT(compute);
         llvm::Value* arg = openvdb::ax::codegen::extractArgument(compute, 0);
-        assert(arg);
-        assert(arg->getName() == "custom_data");
+        OPENVDB_ASSERT(arg);
+        OPENVDB_ASSERT(arg->getName() == "custom_data");
 
-        std::vector<llvm::Value*> inputs(args);
-        inputs.emplace_back(arg);
+        openvdb::ax::codegen::Arguments inputs(args);
+        inputs.AddArg(arg, openvdb::ax::codegen::ArgInfo(B.getInt8Ty(), 1));
 
         // call
         hax_chramp(op)->execute(inputs, B);
-        return nullptr;
+        return openvdb::ax::codegen::Value::Invalid();
     };
 
     return openvdb::ax::codegen::FunctionBuilder("chramp")

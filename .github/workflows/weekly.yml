@@ -70,7 +70,7 @@ jobs:
     strategy:
       matrix:
         config:
-          - { houdini_version: '20.0', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_0-newabi' }
+          - { houdini_version: '21.0', platform: 'linux_x86_64_gcc11.2', hou_hash: '21_0' }
           - { houdini_version: '20.5', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_5' }
       fail-fast: false
     container:
@@ -113,7 +113,7 @@ jobs:
     # Note that macos-14 (current macos-latest) switches to M1. We could instead test
     # the arm build here instead of the x86 one.
     runs-on: macos-latest
-    name: macos-houdini-20
+    name: macos-houdini
     env:
       HOUDINI_CLIENT_ID: ${{ secrets.HOUDINI_CLIENT_ID }}
       HOUDINI_SECRET_KEY: ${{ secrets.HOUDINI_SECRET_KEY }}
@@ -123,7 +123,7 @@ jobs:
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
     - name: download_houdini
-      run: ./ci/download_houdini.sh 20.0 macosx_arm64_clang14.0_13 --prod
+      run: ./ci/download_houdini.sh 21.0 macosx_arm64_clang15.0_14 --prod
     - name: install_houdini
       run: |
         mkdir $HOME/houdini_install
@@ -149,7 +149,7 @@ jobs:
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-extra:${{ matrix.config.name }}
     container:
-      image: aswf/ci-openvdb:2024
+      image: aswf/ci-openvdb:2024-clang17.2
     env:
       CXX: clang++
     strategy:
@@ -192,7 +192,8 @@ jobs:
     strategy:
       matrix:
         config:
-          - { runson: ubuntu-latest, cxx: g++, cmake: '' }
+          # llvm-17 is currently the default which has symbol issues with the python module
+          - { runson: ubuntu-latest, cxx: g++, cmake: '-DOPENVDB_PYTHON_USE_AX=OFF' }
           # Disable the clang job for now. See https://github.com/actions/runner-images/issues/8659
           # - { runson: ubuntu-latest, cxx: clang++, cmake: '' }
           # @todo gcc on macos
@@ -203,7 +204,7 @@ jobs:
       - name: install_deps
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev llvm-dev libgtest-dev libgmock-dev libcppunit-dev
+            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev libgtest-dev libgmock-dev libcppunit-dev
             ./ci/install_nanobind.sh 2.0.0
           elif [ "$RUNNER_OS" == "macOS" ]; then
             ./ci/install_macos.sh 20
@@ -216,7 +217,12 @@ jobs:
           ./ci/build.sh -v
           --build-type=Release
           --components=\"core,axcore,python,bin,render,test,axbin\"
-          --cargs=\"-DCMAKE_CXX_STANDARD=20 -DOPENVDB_USE_DELAYED_LOADING=OFF -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install ${{ matrix.config.cmake }}\"
+          --cargs=\'
+          -DCMAKE_CXX_STANDARD=20
+          -DOPENVDB_USE_DELAYED_LOADING=OFF
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
+          ${{ matrix.config.cmake }}
+          \'
       - name: test
         run: cd build && ctest -V
 
@@ -295,8 +301,8 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2025-clang19', cxx: 'clang++', build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
-          - { image: '2025-clang19', cxx: 'g++',     build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
+          - { image: '2025-clang19.1', cxx: 'clang++', build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
+          - { image: '2025-clang19.1', cxx: 'g++',     build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -507,7 +513,7 @@ jobs:
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-blosc:${{ matrix.blosc }}
     container:
-      image: aswf/ci-base:2023
+      image: aswf/ci-openvdb:2025-clang19.1
     strategy:
       matrix:
         blosc: ['1.18.0','1.19.0','1.20.0','1.21.0']

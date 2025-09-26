@@ -66,7 +66,7 @@ jobs:
       ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
           github.repository_owner == 'AcademySoftwareFoundation' }}
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
-    name: hou:${{ matrix.config.hou_hash }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
+    name: hou:${{ matrix.config.hou_hash }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-build:${{ matrix.config.build }}
     container:
       image: aswf/ci-base:${{ matrix.config.image }}
     env:
@@ -75,22 +75,18 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test' }
-          - { cxx: clang++, image: '2023', hou_hash: '20_5', build: 'Debug',   components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
-          - { cxx: g++,     image: '2023', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
-          - { cxx: clang++, image: '2023', hou_hash: '20_0-newabi', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
-          - { cxx: g++,     image: '2023', hou_hash: '20_0-newabi', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: clang++, image: '2026', hou_hash: '21_0', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: clang++, image: '2026', hou_hash: '21_0', build: 'Debug',   components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: g++,     image: '2026', hou_hash: '21_0', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: clang++, image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: g++,     image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
       fail-fast: false
     steps:
     - name: remove zstd
       run: yum -y remove zstd
     - uses: actions/checkout@v3
     - name: nanobind
-      #if: contains(matrix.config.image, '2023') == false
       run: ./ci/install_nanobind.sh 2.0.0
-    - name: glfw
-      if: contains(matrix.config.image, '2023') == true
-      run: ./ci/install_glfw.sh 3.3.10
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.15.2
     - name: timestamp
@@ -123,7 +119,7 @@ jobs:
     - name: build
       run: |
         ./ci/build.sh -v \
-          --build-type=Release \
+          --build-type="${{ matrix.config.build }}" \
           --components="${{ matrix.config.components }}" \
           --cargs=\" \
             -DHOUDINI_ROOT=$HOME/houdini_install/hou \
@@ -133,6 +129,7 @@ jobs:
             -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON \
             \"
     - name: test
+      if: matrix.config.build == 'Release'
       run: cd build && ctest -V
     # Keep ccache light by stripping out any caches not accessed in the last day
     - name: ccache_clean
@@ -163,7 +160,7 @@ jobs:
         cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
         cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
     - name: install_deps
-      run: ./ci/install_macos.sh 15
+      run: ./ci/install_macos.sh 20
     - name: build
       run: |
         ./ci/build.sh -v \
@@ -177,7 +174,7 @@ jobs:
             -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON \
             -DUSE_EXPLICIT_INSTANTIATION=OFF \
             -DTbb_INCLUDE_DIR=$HOME/houdini_install/hou/Frameworks/Houdini.framework/Versions/Current/Resources/toolkit/include/tbb \
-            -DLLVM_DIR=/opt/homebrew/opt/llvm@15/lib/cmake/llvm \
+            -DLLVM_DIR=/opt/homebrew/opt/llvm@20/lib/cmake/llvm \
             -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
             \"
     - name: test
