@@ -33,8 +33,13 @@ PARMS[--target]=install
 PARMS[--build-dir]=build
 
 if [[ $RUNNER_NAME == *"8c-32g-300h"* ]]; then
-    # ASWF github actions runners have 8 threads
-    PARMS[-j]=8
+    if [[ $CXX == "g++" ]]; then
+        # GCC hits memory limits on runners, reduce threads
+        PARMS[-j]=6
+    else
+        # ASWF github actions runners have 8 threads
+        PARMS[-j]=8
+    fi
 else
     # Github actions runners have 2 threads
     # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners

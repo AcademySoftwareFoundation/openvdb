@@ -66,7 +66,7 @@ jobs:
       ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
           github.repository_owner == 'AcademySoftwareFoundation' }}
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
-    name: hou:${{ matrix.config.hou_hash }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
+    name: hou:${{ matrix.config.hou_hash }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-build:${{ matrix.config.build }}
     container:
       image: aswf/ci-base:${{ matrix.config.image }}
     env:
@@ -75,9 +75,9 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2025', hou_hash: '21_0', build: 'Release', components: 'core,hou,bin,view,render,python,test' }
-          - { cxx: clang++, image: '2024', hou_hash: '21_0', build: 'Debug',   components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
-          - { cxx: g++,     image: '2024', hou_hash: '21_0', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: clang++, image: '2026', hou_hash: '21_0', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: clang++, image: '2026', hou_hash: '21_0', build: 'Debug',   components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: g++,     image: '2026', hou_hash: '21_0', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
           - { cxx: clang++, image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
           - { cxx: g++,     image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
       fail-fast: false
@@ -119,7 +119,7 @@ jobs:
     - name: build
       run: |
         ./ci/build.sh -v \
-          --build-type=Release \
+          --build-type="${{ matrix.config.build }}" \
           --components="${{ matrix.config.components }}" \
           --cargs=\" \
             -DHOUDINI_ROOT=$HOME/houdini_install/hou \
@@ -129,6 +129,7 @@ jobs:
             -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON \
             \"
     - name: test
+      if: matrix.config.build == 'Release'
       run: cd build && ctest -V
     # Keep ccache light by stripping out any caches not accessed in the last day
     - name: ccache_clean
