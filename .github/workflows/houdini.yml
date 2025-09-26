@@ -66,7 +66,7 @@ jobs:
       ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
           github.repository_owner == 'AcademySoftwareFoundation' }}
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
-    name: hou:${{ matrix.config.hou_hash }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
+    name: hou:${{ matrix.config.hou_hash }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-build:${{ matrix.config.build }}
     container:
       image: aswf/ci-base:${{ matrix.config.image }}
     env:
