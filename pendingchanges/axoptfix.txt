@@ -1,4 +1,0 @@
-OpenVDB AX:
-  Fixes:
-  - Fixed an issue which was causing host specific optimization passes to be 
-  	omitted when using LLVM 16 and higher.
