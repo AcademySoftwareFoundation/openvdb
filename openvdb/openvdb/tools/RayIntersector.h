@@ -129,8 +129,9 @@ public:
     bool intersectsIS(const RayType& iRay, RealType &iTime) const
     {
         if (!mTester.setIndexRay(iRay)) return false;//missed bbox
+        if (!math::LevelSetHDDA<TreeT, NodeLevel>::test(mTester)) return false;//missed level set
         iTime = mTester.getIndexTime();
-        return math::LevelSetHDDA<TreeT, NodeLevel>::test(mTester);
+        return true;
     }
 
     /// @brief Return @c true if the index-space ray intersects the level set.
@@ -175,8 +176,9 @@ public:
     bool intersectsWS(const RayType& wRay, RealType &wTime) const
     {
         if (!mTester.setWorldRay(wRay)) return false;//missed bbox
+        if (!math::LevelSetHDDA<TreeT, NodeLevel>::test(mTester)) return false;//missed level set
         wTime = mTester.getWorldTime();
-        return math::LevelSetHDDA<TreeT, NodeLevel>::test(mTester);
+        return true;
     }
 
     /// @brief Return @c true if the world-space ray intersects the level set.
