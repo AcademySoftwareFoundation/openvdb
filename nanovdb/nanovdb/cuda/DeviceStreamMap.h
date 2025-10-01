@@ -77,7 +77,11 @@ DeviceStreamMap::DeviceStreamMap(DeviceType t, std::vector<int> exclude, int ver
     cudaCheck(cudaSetDevice(current));// reset to the previous device
 
     void* entryPoint = nullptr;
-#if CUDART_VERSION >= 12000// queryResult argument was added in CUDA 12
+#if CUDART_VERSION >= 13000
+    cudaDriverEntryPointQueryResult queryResult;
+    cudaCheck(cudaGetDriverEntryPointByVersion("cuMemGetAllocationGranularity", &entryPoint, 13000, cudaEnableDefault, &queryResult));
+    NANOVDB_ASSERT(queryResult == cudaDriverEntryPointSuccess);
+#elif CUDART_VERSION >= 12000// queryResult argument was added in CUDA 12
     cudaDriverEntryPointQueryResult queryResult;
     cudaCheck(cudaGetDriverEntryPoint("cuMemGetAllocationGranularity", &entryPoint, cudaEnableDefault, &queryResult));
     NANOVDB_ASSERT(queryResult == cudaDriverEntryPointSuccess);
