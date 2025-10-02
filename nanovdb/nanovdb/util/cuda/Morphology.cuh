@@ -15,16 +15,16 @@
 
 #include <nanovdb/util/MorphologyHelpers.h>
 
-#ifndef NANOVDB_TOOLS_MORPHOLOGY_CUDA_MORPHOLOGY_CUH_HAS_BEEN_INCLUDED
-#define NANOVDB_TOOLS_MORPHOLOGY_CUDA_MORPHOLOGY_CUH_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_UTIL_MORPHOLOGY_CUDA_MORPHOLOGY_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_UTIL_MORPHOLOGY_CUDA_MORPHOLOGY_CUH_HAS_BEEN_INCLUDED
 
-namespace nanovdb::tools {
+namespace nanovdb::util {
 
 namespace morphology {
 
 namespace cuda {
 
-template<class BuildT, NearestNeighbors nnType>
+template<class BuildT, tools::morphology::NearestNeighbors nnType>
 struct DilateInternalNodesFunctor
 {
     // Intended to be called via nanovdb::util::cuda::operatorKernel
@@ -36,8 +36,8 @@ struct DilateInternalNodesFunctor
 
     void __device__
     operator()(
-        NanoGrid<BuildT> *srcGrid,
-        NanoRoot<BuildT> *dilatedRoot,
+        const NanoGrid<BuildT> *srcGrid,
+        const NanoRoot<BuildT> *dilatedRoot,
         void *upperMasks_,
         void *lowerMasks_)
     {
@@ -328,8 +328,8 @@ struct MergeInternalNodesFunctor
 
     void __device__
     operator()(
-        NanoGrid<BuildT> *srcGrid,
-        NanoRoot<BuildT> *mergedRoot,
+        const NanoGrid<BuildT> *srcGrid,
+        const NanoRoot<BuildT> *mergedRoot,
         void *upperMasks_,
         void *lowerMasks_)
     {
@@ -367,10 +367,11 @@ struct PruneInternalNodesFunctor
 {
     // Intended to be called via nanovdb::util::cuda::lambdaKernel
     __device__
-    void operator()(size_t srcLeafID,
-        NanoGrid<BuildT>* srcGrid,
-        NanoRoot<BuildT>* prunedRoot,
-        Mask<3>* srcLeafMask,
+    void operator()(
+        size_t srcLeafID,
+        const NanoGrid<BuildT>* srcGrid,
+        const NanoRoot<BuildT>* prunedRoot,
+        const Mask<3>* srcLeafMask,
         void *upperMasks_,
         void *lowerMasks_)
     {
@@ -399,6 +400,86 @@ struct PruneInternalNodesFunctor
     }
 };
 
+template <typename BuildT>
+struct RefineInternalNodesFunctor
+{
+    // Intended to be called via nanovdb::util::cuda::lambdaKernel
+    __device__
+    void operator()(
+        size_t srcLeafID,
+        const NanoGrid<BuildT>* srcGrid,
+        const NanoRoot<BuildT>* prunedRoot,
+        void *upperMasks_,
+        void *lowerMasks_)
+    {
+        using UpperMaskArrayT = Mask<5>*;
+        using LowerMaskArrayT = Mask<4>(*)[Mask<5>::SIZE];
+        auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
+        auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
+
+        const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
+        uint64_t octantPresent[2][2][2] = {};
+        const auto words = srcLeaf.valueMask().words();
+        for (int w = 0; w < 8; w++) {
+            octantPresent[w>>2][0][0] |= ( words[w] & 0x000000000f0f0f0fUL );
+            octantPresent[w>>2][0][1] |= ( words[w] & 0x00000000f0f0f0f0UL );
+            octantPresent[w>>2][1][0] |= ( words[w] & 0x0f0f0f0f00000000UL );
+            octantPresent[w>>2][1][1] |= ( words[w] & 0xf0f0f0f000000000UL );
+        }
+        for (int di = 0; di < 2; di++)
+        for (int dj = 0; dj < 2; dj++)
+        for (int dk = 0; dk < 2; dk++) {
+            if (octantPresent[di][dj][dk]) {
+                const auto refinedOrigin = refineCoord(srcLeaf.origin()+nanovdb::Coord(di*4,dj*4,dk*4));
+                auto upperChildIndex = NanoUpper<BuildT>::CoordToOffset(refinedOrigin);
+                auto lowerChildIndex = NanoLower<BuildT>::CoordToOffset(refinedOrigin);
+                auto prunedTile = prunedRoot->probeTile(refinedOrigin);
+                uint64_t tileChildIndex =
+                    util::PtrDiff(prunedTile, prunedRoot->tile(0))
+                    / sizeof(NanoRoot<BuildT>::Tile); // TODO: consider some faster integer division? or a way to avoid
+                auto& outputUpperMask = upperMasks[tileChildIndex];
+                outputUpperMask.setOnAtomic(upperChildIndex);
+                auto& outputLowerMask = lowerMasks[tileChildIndex][upperChildIndex];
+                outputLowerMask.setOnAtomic(lowerChildIndex);
+            }
+        }
+    }
+};
+
+template <typename BuildT>
+struct CoarsenInternalNodesFunctor
+{
+    // Intended to be called via nanovdb::util::cuda::lambdaKernel
+    __device__
+    void operator()(
+        size_t srcLeafID,
+        const NanoGrid<BuildT>* srcGrid,
+        const NanoRoot<BuildT>* prunedRoot,
+        void *upperMasks_,
+        void *lowerMasks_)
+    {
+        using UpperMaskArrayT = Mask<5>*;
+        using LowerMaskArrayT = Mask<4>(*)[Mask<5>::SIZE];
+        auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
+        auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
+
+        const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
+        if (!srcLeaf.valueMask().isOff()) { // Gratuitous check; leaf should have at least one active voxel
+            auto coarsenedOrigin = coarsenCoord(srcLeaf.origin()); // it's ok if this is not a multiple of 8
+            auto upperChildIndex = NanoUpper<BuildT>::CoordToOffset(coarsenedOrigin);
+            auto lowerChildIndex = NanoLower<BuildT>::CoordToOffset(coarsenedOrigin);
+            auto prunedTile = prunedRoot->probeTile(coarsenedOrigin);
+            uint64_t tileChildIndex =
+                util::PtrDiff(prunedTile, prunedRoot->tile(0))
+                / sizeof(NanoRoot<BuildT>::Tile); // TODO: consider some faster integer division? or a way to avoid
+            auto& outputUpperMask = upperMasks[tileChildIndex];
+            outputUpperMask.setOnAtomic(upperChildIndex);
+            auto& outputLowerMask = lowerMasks[tileChildIndex][upperChildIndex];
+            outputLowerMask.setOnAtomic(lowerChildIndex);
+        }
+    }
+};
+
 struct EnumerateNodesFunctor
 {
     // Intended to be called via nanovdb::util::cuda::operatorKernel
@@ -410,8 +491,8 @@ struct EnumerateNodesFunctor
 
     void __device__
     operator()(
-        void *upperMasks_,
-        void *lowerMasks_,
+        const void *upperMasks_,
+        const void *lowerMasks_,
         uint32_t (*lowerCounts)[Mask<5>::SIZE],
         uint32_t (*leafCounts)[Mask<5>::SIZE] )
     {
@@ -420,8 +501,8 @@ struct EnumerateNodesFunctor
         int threadInWarpID = threadIdx.x & 0x1f;
         int warpID = threadIdx.x >> 5;
 
-        using UpperMaskArrayT = Mask<5>*;
-        using LowerMaskArrayT = Mask<4>(*)[Mask<5>::SIZE];
+        using UpperMaskArrayT = const Mask<5>*;
+        using LowerMaskArrayT = const Mask<4>(*)[Mask<5>::SIZE];
         auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
         auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
 
@@ -454,11 +535,11 @@ struct ProcessLowerNodesFunctor
 
     void __device__
     operator()(
-        void *upperMasks_,
-        void *lowerMasks_,
-        uint32_t *upperOffsets,
-        uint32_t (*lowerOffsets)[Mask<5>::SIZE],
-        uint32_t (*leafOffsets)[Mask<5>::SIZE],
+        const void *upperMasks_,
+        const void *lowerMasks_,
+        const uint32_t *upperOffsets,
+        const uint32_t (*lowerOffsets)[Mask<5>::SIZE],
+        const uint32_t (*leafOffsets)[Mask<5>::SIZE],
         NanoGrid<BuildT> *dstGrid,
         uint32_t *lowerParents,
         uint32_t *leafParents)
@@ -469,8 +550,8 @@ struct ProcessLowerNodesFunctor
         int threadInWarpID = threadIdx.x & 0x1f;
         int warpID = threadIdx.x >> 5;
 
-        using UpperMaskArrayT = Mask<5>*;
-        using LowerMaskArrayT = Mask<4>(*)[Mask<5>::SIZE];
+        using UpperMaskArrayT = const Mask<5>*;
+        using LowerMaskArrayT = const Mask<4>(*)[Mask<5>::SIZE];
         auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
         auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
 
@@ -518,11 +599,11 @@ struct ProcessLowerNodesFunctor
     }
 };
 
-template<class BuildT, NearestNeighbors nnType>
+template<class BuildT, tools::morphology::NearestNeighbors nnType>
 struct DilateLeafNodesFunctor;
 
 template<class BuildT>
-struct DilateLeafNodesFunctor<BuildT, NN_FACE>
+struct DilateLeafNodesFunctor<BuildT, tools::morphology::NN_FACE>
 {
     // Intended to be called via nanovdb::util::cuda::operatorKernel
     static constexpr int MaxThreadsPerBlock = 128;
@@ -532,7 +613,7 @@ struct DilateLeafNodesFunctor<BuildT, NN_FACE>
 
     __device__
     void operator()(
-        NanoGrid<BuildT> *srcGrid,
+        const NanoGrid<BuildT> *srcGrid,
         NanoGrid<BuildT> *dstGrid )
     {
         int tID = threadIdx.x;
@@ -611,7 +692,7 @@ struct DilateLeafNodesFunctor<BuildT, NN_FACE>
 };
 
 template<class BuildT>
-struct DilateLeafNodesFunctor<BuildT, NN_FACE_EDGE_VERTEX>
+struct DilateLeafNodesFunctor<BuildT, tools::morphology::NN_FACE_EDGE_VERTEX>
 {
     // Intended to be called via nanovdb::util::cuda::operatorKernel
     static constexpr int MaxThreadsPerBlock = 128;
@@ -620,7 +701,9 @@ struct DilateLeafNodesFunctor<BuildT, NN_FACE_EDGE_VERTEX>
     static constexpr int LeafNodesPerSlice = 4096 / SlicesPerLowerNode;
 
     __device__
-    void operator()(NanoGrid<BuildT> *srcGrid, NanoGrid<BuildT> *dstGrid )
+    void operator()(
+        const NanoGrid<BuildT> *srcGrid,
+        NanoGrid<BuildT> *dstGrid)
     {
         int tID = threadIdx.x;
         int lowerID = blockIdx.x;
@@ -697,7 +780,9 @@ struct MergeLeafNodesFunctor
     static constexpr int LeafNodesPerSlice = 4096 / SlicesPerLowerNode;
 
     __device__
-    void operator()(NanoGrid<BuildT> *srcGrid, NanoGrid<BuildT> *dstGrid )
+    void operator()(
+        const NanoGrid<BuildT> *srcGrid,
+        NanoGrid<BuildT> *dstGrid)
     {
         int tID = threadIdx.x;
         int lowerID = blockIdx.x;
@@ -726,9 +811,9 @@ struct PruneLeafMasksFunctor
     __device__
     void operator()(
         size_t srcLeafID,
-        NanoGrid<BuildT>* srcGrid,
+        const NanoGrid<BuildT>* srcGrid,
         NanoGrid<BuildT>* dstGrid,
-        Mask<3>* srcLeafMask)
+        const Mask<3>* srcLeafMask)
     {
         const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
         auto leafPtr = dstGrid->tree().root().probeLeaf(srcLeaf.origin());
@@ -738,10 +823,113 @@ struct PruneLeafMasksFunctor
     }
 };
 
+template <typename BuildT>
+struct RefineLeafMasksFunctor
+{
+    __device__
+    static inline void refineMask(Mask<3>& mask)
+    {
+        for (int w = 0; w < 4; w++) {
+            auto& word = mask.words()[w];
+            // Refine and duplicate along z-axis
+            word &= 0x000000000f0f0f0fUL;
+            word |= (word << 2);
+            word &= 0x0000000033333333UL;
+            word |= (word << 1);
+            word &= 0x0000000055555555UL;
+            word |= (word << 1);
+            // Refine and duplicate along y-axis
+            word |= (word << 16);
+            word &= 0x0000ffff0000ffffUL;
+            word |= (word << 8);
+            word &= 0x00ff00ff00ff00ffUL;
+            word |= (word << 8);
+        }
+        // Refine and duplicate along x-axis
+        for (int w = 7; w > 0; w--)
+            mask.words()[w] = mask.words()[w>>1];
+    }
+
+    // Intended to be called via nanovdb::util::cuda::lambdaKernel
+    __device__
+    void operator()(
+        size_t srcLeafID,
+        const NanoGrid<BuildT>* srcGrid,
+        NanoGrid<BuildT>* dstGrid)
+    {
+        const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
+        const auto refinedBaseOrigin = srcLeaf.origin()+srcLeaf.origin();
+        for (int bi = 0; bi < 2; bi++)
+        for (int bj = 0; bj < 2; bj++)
+        for (int bk = 0; bk < 2; bk++) {
+            auto dstLeafPtr = dstGrid->tree().root().probeLeaf(refinedBaseOrigin.offsetBy(8*bi,8*bj,8*bk));
+            if (dstLeafPtr != nullptr) {
+                auto& refinedMask = const_cast<Mask<3>&>(dstLeafPtr->valueMask());
+                for (int w = 0; w < 4; w++)
+                    refinedMask.words()[w] = srcLeaf.valueMask().words()[w+bi*4] >> (4*bk+32*bj);
+                refineMask(refinedMask);
+            }
+        }
+    }
+};
+
+template <typename BuildT>
+struct CoarsenLeafMasksFunctor
+{
+    __device__
+    static inline void coarsenMask(Mask<3>& mask)
+    {
+        // Coarsen along x-axis
+        mask.words()[0] |= mask.words()[1];
+        mask.words()[1] = mask.words()[2] | mask.words()[3];
+        mask.words()[2] = mask.words()[4] | mask.words()[5];
+        mask.words()[3] = mask.words()[6] | mask.words()[7];
+        mask.words()[4] = mask.words()[5] = mask.words()[6] = mask.words()[7] = 0UL;
+
+        for (int w = 0; w < 4; w++) {
+            auto& word = mask.words()[w];
+            // Coarsen along y-axis
+            word |= (word >> 8);
+            word &= 0x00ff00ff00ff00ffUL;
+            word |= (word >> 8);
+            word &= 0x0000ffff0000ffffUL;
+            word |= (word >> 16);
+            word &= 0x00000000ffffffffUL;
+            // Coarsen along z-axis
+            word |= (word >> 1);
+            word &= 0x0000000055555555UL;
+            word |= (word >> 1);
+            word &= 0x0000000033333333UL;
+            word |= (word >> 2);
+            word &= 0x000000000f0f0f0fUL;
+        }
+    }
+
+    // Intended to be called via nanovdb::util::cuda::lambdaKernel
+    __device__
+    void operator()(
+        size_t srcLeafID,
+        const NanoGrid<BuildT>* srcGrid,
+        NanoGrid<BuildT>* dstGrid)
+    {
+        const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
+        const auto coarsenedOrigin = coarsenCoord(srcLeaf.origin());
+        auto coarsenedMask = srcLeaf.valueMask();
+        coarsenMask(coarsenedMask);
+        int bi = (coarsenedOrigin[0] % 8 != 0);
+        int bj = (coarsenedOrigin[1] % 8 != 0);
+        int bk = (coarsenedOrigin[2] % 8 != 0);
+        auto dstLeafPtr = dstGrid->tree().root().probeLeaf(coarsenedOrigin);
+        auto& dstMask = const_cast<Mask<3>&>(dstLeafPtr->valueMask());
+        for (int w = 0; w < 4; w++)
+            atomicOr( (unsigned long long*)&dstMask.words()[w+4*bi], coarsenedMask.words()[w] << (4*bk+32*bj));
+    }
+};
+
 } // namespace cuda
 
 } // namespace morphology
 
-} // namespace nanovdb::tools
+} // namespace nanovdb::util
 
-#endif // NANOVDB_TOOLS_MORPHOLOGY_CUDA_MORPHOLOGY_CUH_HAS_BEEN_INCLUDED
+#endif // NANOVDB_UTIL_MORPHOLOGY_CUDA_MORPHOLOGY_CUH_HAS_BEEN_INCLUDED

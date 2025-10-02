@@ -12,16 +12,20 @@
 
 */
 
-#ifndef NANOVDB_TOOLS_CUDA_MORPHOLOGYHELPERS_H_HAS_BEEN_INCLUDED
-#define NANOVDB_TOOLS_CUDA_MORPHOLOGYHELPERS_H_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_UTIL_MORPHOLOGYHELPERS_H_HAS_BEEN_INCLUDED
+#define NANOVDB_UTIL_MORPHOLOGYHELPERS_H_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>
 
-namespace nanovdb::tools {
-
-namespace morphology {
+namespace nanovdb::tools::morphology {
 
 enum NearestNeighbors { NN_FACE = 6, NN_FACE_EDGE = 18, NN_FACE_EDGE_VERTEX = 26 };
+
+} // namespace nanovdb::tools::morphology
+
+namespace nanovdb::util {
+
+namespace morphology {
 
 template<int di, int dj, int dk>
 struct NearestNeighborBitMask {
@@ -29,10 +33,14 @@ struct NearestNeighborBitMask {
     static constexpr uint32_t value = 1u << (di+1)*9+(dj+1)*3+dk+1;
 };
 
-template<NearestNeighbors nnType>
+template<tools::morphology::NearestNeighbors nnType>
 __hostdev__
 uint32_t neighborMaskStencil(const nanovdb::Mask<3>& mask)
 {
+    using tools::morphology::NN_FACE;
+    using tools::morphology::NN_FACE_EDGE;
+    using tools::morphology::NN_FACE_EDGE_VERTEX;
+
     uint32_t result = 0;
     auto words = mask.words();
     uint64_t allWordsOr = 0;
@@ -75,13 +83,45 @@ uint32_t neighborMaskStencil(const nanovdb::Mask<3>& mask)
     return result;
 }
 
+__hostdev__
+inline Coord::ValueType
+coarsenComponent(const Coord::ValueType n)
+{return (n>=0) ? (n>>1) : -((-n+1)>>1);} // Round down for negative integers
+
+__hostdev__
+inline Coord
+coarsenCoord(const Coord& coord)
+{
+    Coord result;
+    result[0] = coarsenComponent(coord[0]);
+    result[1] = coarsenComponent(coord[1]);
+    result[2] = coarsenComponent(coord[2]);
+    return result;
+}
+
+__hostdev__
+inline Coord::ValueType
+refineComponent(const Coord::ValueType n)
+{return (n>=0) ? (n<<1) : -((-n)<<1);}
+
+__hostdev__
+inline Coord
+refineCoord(const Coord& coord)
+{
+    Coord result;
+    result[0] = refineComponent(coord[0]);
+    result[1] = refineComponent(coord[1]);
+    result[2] = refineComponent(coord[2]);
+    return result;
+}
+
 } // namespace morphology
 
-} // namespace nanovdb::tools
+} // namespace nanovdb::util
 
 #if defined(__CUDACC__)
 #include <nanovdb/util/cuda/MorphologyHelpers.cuh>
 #endif // defined(__CUDACC__)
 
-#endif // NANOVDB_TOOLS_CUDA_MORPHOLOGYHELPERS_H_HAS_BEEN_INCLUDED
+#endif // NANOVDB_UTIL_MORPHOLOGYHELPERS_H_HAS_BEEN_INCLUDED
 

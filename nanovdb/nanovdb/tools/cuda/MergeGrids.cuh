@@ -44,18 +44,8 @@ public:
     /// @param d_srcGrid1 first source device grid to be merged
     /// @param d_srcGrid2 second source device grid to be merged
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    MergeGrids(GridT* d_srcGrid1, GridT* d_srcGrid2, cudaStream_t stream = 0)
-        : mBuilder(stream), mStream(stream), mTimer(stream)
-    {
-        mDeviceSrcGrid1 = d_srcGrid1;
-        mDeviceSrcGrid2 = d_srcGrid2;
-        // TODO: Should this be moved in one of the process functions?
-        cudaStreamSynchronize(mStream);
-        cudaCheck(cudaMemcpy(&mSrcTreeData1, util::PtrAdd(mDeviceSrcGrid1, GridT::memUsage()),
-            TreeT::memUsage(), cudaMemcpyDeviceToHost));// copy TreeData from GPU -> CPU
-        cudaCheck(cudaMemcpy(&mSrcTreeData2, util::PtrAdd(mDeviceSrcGrid2, GridT::memUsage()),
-            TreeT::memUsage(), cudaMemcpyDeviceToHost));// copy TreeData from GPU -> CPU
-    }
+    MergeGrids(const GridT* d_srcGrid1, const GridT* d_srcGrid2, cudaStream_t stream = 0)
+        : mBuilder(stream), mStream(stream), mTimer(stream), mDeviceSrcGrid1(d_srcGrid1), mDeviceSrcGrid2(d_srcGrid2) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -85,19 +75,18 @@ private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
-    TopologyBuilder<BuildT>      mBuilder;
-    cudaStream_t                 mStream{0};
-    util::cuda::Timer            mTimer;
-    int                          mVerbose{0};
-    GridT                        *mDeviceSrcGrid1;
-    GridT                        *mDeviceSrcGrid2;
-    GridT                        *mDeviceSrcGrid;
-    TreeData                     mSrcTreeData1;
-    TreeData                     mSrcTreeData2;
+    TopologyBuilder<BuildT> mBuilder;
+    cudaStream_t            mStream{0};
+    util::cuda::Timer       mTimer;
+    int                     mVerbose{0};
+    const GridT             *mDeviceSrcGrid1;
+    const GridT             *mDeviceSrcGrid2;
+    TreeData                mSrcTreeData1;
+    TreeData                mSrcTreeData2;
 
 public:
-    GridT* deviceSrcGrid1()   { return mDeviceSrcGrid1; }
-    GridT* deviceSrcGrid2()   { return mDeviceSrcGrid2; }
+    const GridT* deviceSrcGrid1() const { return mDeviceSrcGrid1; }
+    const GridT* deviceSrcGrid2() const { return mDeviceSrcGrid2; }
 };// tools::cuda::MergeGrids<BuildT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -107,6 +96,11 @@ template<typename BufferT>
 GridHandle<BufferT>
 MergeGrids<BuildT>::getHandle(const BufferT &pool)
 {
+    // Copy TreeData from GPU -> CPU
+    cudaStreamSynchronize(mStream);
+    mSrcTreeData1 = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid1);
+    mSrcTreeData2 = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid2);
+
     // Ensure that the input grid contains no tile values
     if (mSrcTreeData1.mTileCount[2] || mSrcTreeData1.mTileCount[1] || mSrcTreeData1.mTileCount[0] ||
         mSrcTreeData2.mTileCount[2] || mSrcTreeData2.mTileCount[1] || mSrcTreeData2.mTileCount[0])
@@ -190,7 +184,7 @@ void MergeGrids<BuildT>::mergeRoot()
 
     if (mSrcTreeData1.mVoxelCount) { // If the first input is not a null grid
         // Make a host copy of the Root topology
-        auto deviceSrcRoot1 = static_cast<RootT*>(util::PtrAdd(mDeviceSrcGrid1, GridT::memUsage() + mSrcTreeData1.mNodeOffset[3]));
+        auto deviceSrcRoot1 = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid1, GridT::memUsage() + mSrcTreeData1.mNodeOffset[3]));
         uint64_t rootSize1 = mSrcTreeData1.mNodeOffset[2] - mSrcTreeData1.mNodeOffset[3];
         auto srcRootBuffer1 = nanovdb::HostBuffer::create(rootSize1);
         cudaCheck(cudaMemcpyAsync(srcRootBuffer1.data(), deviceSrcRoot1, rootSize1, cudaMemcpyDeviceToHost, mStream));
@@ -206,7 +200,7 @@ void MergeGrids<BuildT>::mergeRoot()
 
     if (mSrcTreeData2.mVoxelCount) { // If the first input is not a null grid
         // Make a host copy of the Root topology
-        auto deviceSrcRoot2 = static_cast<RootT*>(util::PtrAdd(mDeviceSrcGrid2, GridT::memUsage() + mSrcTreeData2.mNodeOffset[3]));
+        auto deviceSrcRoot2 = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid2, GridT::memUsage() + mSrcTreeData2.mNodeOffset[3]));
         uint64_t rootSize2 = mSrcTreeData2.mNodeOffset[2] - mSrcTreeData2.mNodeOffset[3];
         auto srcRootBuffer2 = nanovdb::HostBuffer::create(rootSize2);
         cudaCheck(cudaMemcpyAsync(srcRootBuffer2.data(), deviceSrcRoot2, rootSize2, cudaMemcpyDeviceToHost, mStream));
@@ -238,7 +232,7 @@ void MergeGrids<BuildT>::mergeInternalNodes()
 {
     // Merges the masks of upper and lower nodes from both input topologies into the
     // densified, pre-allocated mask arrays of the merged result
-    using Op = morphology::cuda::MergeInternalNodesFunctor<BuildT>;
+    using Op = util::morphology::cuda::MergeInternalNodesFunctor<BuildT>;
     if (mSrcTreeData1.mNodeCount[1]) { // Unless the first grid to merge is empty
         util::cuda::operatorKernel<Op>
             <<<mSrcTreeData1.mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
@@ -269,21 +263,21 @@ void MergeGrids<BuildT>::processGridTreeRoot()
 template<typename BuildT>
 void MergeGrids<BuildT>::mergeLeafNodes()
 {
-    using Op = morphology::cuda::MergeLeafNodesFunctor<BuildT>;
+    using Op = util::morphology::cuda::MergeLeafNodesFunctor<BuildT>;
     if (mSrcTreeData1.mNodeCount[1]) { // Unless first input grid is empty
-        nanovdb::util::cuda::operatorKernel<Op>
+        util::cuda::operatorKernel<Op>
             <<<dim3(mSrcTreeData1.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
             (deviceSrcGrid1(), static_cast<GridT*>(mBuilder.data()->d_bufferPtr));
     }
     if (mSrcTreeData2.mNodeCount[1]) { // Unless second input grid is empty
-        nanovdb::util::cuda::operatorKernel<Op>
+        util::cuda::operatorKernel<Op>
             <<<dim3(mSrcTreeData2.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
             (deviceSrcGrid2(), static_cast<GridT*>(mBuilder.data()->d_bufferPtr));
     }
 
     // Update leaf offsets and prefix sums
     mBuilder.processLeafOffsets(mStream);
-}
+}// MergeGrids<BuildT>::mergeLeafNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 

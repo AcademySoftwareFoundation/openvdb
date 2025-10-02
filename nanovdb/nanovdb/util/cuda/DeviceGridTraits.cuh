@@ -32,7 +32,7 @@ struct DeviceGridTraits
     using RootT = typename nanovdb::NanoRoot<BuildT>;
     using TreeDataT = typename TreeT::DataType;
 
-    static TreeDataT getTreeData(GridT *d_grid)
+    static TreeDataT getTreeData(const GridT *d_grid)
     {
         TreeDataT treeData;
         std::size_t offset = GridT::memUsage();
@@ -40,7 +40,7 @@ struct DeviceGridTraits
         return treeData;
     }
 
-    static uint64_t getActiveVoxelCount(GridT *d_grid)
+    static uint64_t getActiveVoxelCount(const GridT *d_grid)
     {
         uint64_t activeVoxelCount = 0;
         std::size_t offset = GridT::memUsage() + offsetof(TreeT, mVoxelCount);
@@ -48,7 +48,7 @@ struct DeviceGridTraits
         return activeVoxelCount;
     }
 
-    static uint64_t getValueCount(GridT *d_grid)
+    static uint64_t getValueCount(const GridT *d_grid)
     {
         uint64_t valueCount = 0;
         std::size_t offset = offsetof(GridT, mData1);
@@ -56,7 +56,7 @@ struct DeviceGridTraits
         return valueCount;
     }
 
-    static uint64_t getGridSize(GridT *d_grid)
+    static uint64_t getGridSize(const GridT *d_grid)
     {
         uint64_t gridSize = 0;
         std::size_t offset = offsetof(GridT, mGridSize);
@@ -64,7 +64,7 @@ struct DeviceGridTraits
         return gridSize;
     }
 
-    static CoordBBox getIndexBBox(GridT *d_grid, const TreeDataT &h_treeData)
+    static CoordBBox getIndexBBox(const GridT *d_grid, const TreeDataT &h_treeData)
     {
         CoordBBox box;
         std::size_t offset = GridT::memUsage() + h_treeData.mNodeOffset[3] + offsetof(RootT, mBBox);
@@ -72,7 +72,7 @@ struct DeviceGridTraits
         return box;
     }
 
-    static uint32_t getRootTableSize(GridT *d_grid, const TreeDataT &h_treeData)
+    static uint32_t getRootTableSize(const GridT *d_grid, const TreeDataT &h_treeData)
     {
         uint32_t tableSize;
         std::size_t offset = GridT::memUsage() + h_treeData.mNodeOffset[3] + offsetof(RootT, mTableSize);
