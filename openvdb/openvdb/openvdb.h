@@ -98,7 +98,7 @@ using IntegerGridTypes = TypeList<Int32Grid, Int64Grid>;
 /// The scalar Grid types which OpenVDB will register by default. This is a
 /// combination of native floating point and integer grid types. Note that
 /// this list does not include Bool or Mask Grids.
-using NumericGridTypes  = RealGridTypes::Append<IntegerGridTypes>;
+using NumericGridTypes  = ExtendedRealGridTypes::Append<IntegerGridTypes>;
 /// The Vec3 Grid types which OpenVDB will register by default.
 using Vec3GridTypes     = TypeList<Vec3IGrid, Vec3SGrid, Vec3DGrid>;
 
