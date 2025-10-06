@@ -104,7 +104,7 @@ readCompressedValues(   std::istream& is, PointDataIndex32* destBuf, Index destC
 /// ignore the value mask, use a larger block size and use 16-bit size instead of 64-bit
 template<>
 inline void
-writeCompressedValues(  std::ostream& os, PointDataIndex32* srcBuf, Index srcCount,
+writeCompressedValues(  std::ostream& os, const PointDataIndex32* srcBuf, Index srcCount,
                         const util::NodeMask<3>& /*valueMask*/,
                         const util::NodeMask<3>& /*childMask*/, bool /*toHalf*/)
 {
