@@ -84,6 +84,20 @@ struct is_arithmetic<math::half> : std::true_type {};
 template<typename T>
 inline constexpr bool is_arithmetic_v = is_arithmetic<T>::value;
 
+/// @note Extends the implementation of std::common_type to support math::half
+template<typename S, typename T>
+struct common_type : std::common_type<S, T> {};
+
+// Specialize for half
+template<> struct common_type<math::half, float> { using type = float; };
+template<> struct common_type<float, math::half> { using type = float; };
+template<> struct common_type<math::half, double> { using type = double; };
+template<> struct common_type<double, math::half> { using type = double; };
+template<> struct common_type<math::half, math::half> { using type = math::half; };
+
+template<typename S, typename T>
+using common_type_t = typename common_type<S, T>::type;
+
 namespace math {
 
 /// @todo These won't be needed if we eliminate StringGrids.
@@ -993,7 +1007,7 @@ enum RotationOrder {
 
 template <typename S, typename T, typename = std::enable_if_t<openvdb::is_arithmetic_v<S>&& openvdb::is_arithmetic_v<T>>>
 struct promote {
-    using type = typename std::common_type_t<S,T>;
+    using type = typename openvdb::common_type_t<S,T>;
 };
 
 
