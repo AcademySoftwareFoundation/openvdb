@@ -69,9 +69,9 @@ Transform::read(std::istream& is)
     // Read the type name.
     Name type = readString(is);
 
-    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NEW_TRANSFORM) {
+    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION ) {
         OPENVDB_THROW(IoError,
-            "VDB file version < 219 (NEW_TRANSFORM) is no longer supported.");
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
     }
 
     // Check if the map has been registered.

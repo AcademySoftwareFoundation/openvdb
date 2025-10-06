@@ -1370,6 +1370,11 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool fromHalf)
 {
+    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION ) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
+    }
+
     SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
     const bool seekable = meta && meta->seekable();
 
@@ -1386,10 +1391,6 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
     }
 
     int8_t numBuffers = 1;
-    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
-    }
 
     CoordBBox nodeBBox = this->getNodeBoundingBox();
     if (!clipBBox.hasOverlap(nodeBBox)) {

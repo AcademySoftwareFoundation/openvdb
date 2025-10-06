@@ -466,6 +466,11 @@ inline void
 readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     const MaskT& valueMask, bool fromHalf)
 {
+    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
+    }
+
     // Get the stream's compression settings.
     auto meta = getStreamMetadataPtr(is);
     const uint32_t compression = getDataCompression(is);
@@ -485,10 +490,6 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     }
 
     int8_t metadata = NO_MASK_AND_ALL_VALS;
-    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
-    }
 
     // Read the flag that specifies what, if any, additional metadata
     // (selection mask and/or inactive value(s)) is saved.
@@ -547,11 +548,6 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     std::unique_ptr<ValueT[]> scopedTempBuf;
 
     Index tempCount = destCount;
-
-    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
-    }
 
     if (maskCompressed && metadata != NO_MASK_AND_ALL_VALS)
     {

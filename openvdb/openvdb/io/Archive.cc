@@ -786,7 +786,7 @@ Archive::setGridCompression(std::ostream& os, const GridBase& grid) const
 void
 Archive::readGridCompression(std::istream& is)
 {
-    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_GRID_INSTANCING) {
+    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
         OPENVDB_THROW(IoError,
             "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
     }
@@ -942,9 +942,9 @@ Archive::readHeader(std::istream& is)
     if (mFileVersion > OPENVDB_FILE_VERSION) {
         OPENVDB_LOG_WARN("unsupported VDB file format (expected version "
             << OPENVDB_FILE_VERSION << " or earlier, got version " << mFileVersion << ")");
-    } else if (mFileVersion < 212) {
+    } else if (mFileVersion < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
         OPENVDB_THROW(IoError,
-            "VDB file version < 212 is no longer supported.");
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
     }
 
     // 3) Read the library version numbers (not stored prior to file format version 211).
@@ -968,11 +968,6 @@ Archive::readHeader(std::istream& is)
     if (mFileVersion < OPENVDB_FILE_VERSION_BLOSC_COMPRESSION) {
         // Prior to the introduction of Blosc, ZLIB was the default compression scheme.
         mCompression = (COMPRESS_ZIP | COMPRESS_ACTIVE_MASK);
-    }
-
-    if (mFileVersion < OPENVDB_FILE_VERSION_BOOL_LEAF_OPTIMIZATION) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 217 (BOOL_LEAF_OPTIMIZATION) is no longer supported.");
     }
 
     // 6) Read the 16-byte (128-bit) uuid.
@@ -1203,20 +1198,10 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
         }
     }
 
-    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_GRID_INSTANCING) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 216 (GRID_INSTANCING) is no longer supported.");
-    }
-
     grid->readTransform(is);
     if (!gd.isInstance()) {
         grid->readTopology(is);
         Local::readBuffers(*grid, is, bbox);
-    }
-
-    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NO_GRIDMAP) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 219 (NO_GRIDMAP) is no longer supported.");
     }
 }
 

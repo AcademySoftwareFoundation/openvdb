@@ -72,6 +72,11 @@ GridDescriptor::writeStreamPos(std::ostream &os) const
 GridBase::Ptr
 GridDescriptor::read(std::istream &is)
 {
+    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
+    }
+
     // Read in the name.
     mUniqueName = readString(is);
     mGridName = stripSuffix(mUniqueName);
@@ -81,11 +86,6 @@ GridDescriptor::read(std::istream &is)
     if (openvdb::string::ends_with(mGridType, HALF_FLOAT_TYPENAME_SUFFIX)) {
         mSaveFloatAsHalf = true;
         mGridType.resize(mGridType.size() - std::strlen(HALF_FLOAT_TYPENAME_SUFFIX));
-    }
-
-    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_GRID_INSTANCING) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 216 (GRID_INSTANCING) is no longer supported.");
     }
 
     mInstanceParentName = readString(is);

@@ -523,6 +523,11 @@ File::readAllGridMetadata()
         OPENVDB_THROW(IoError, filename() << " is not open for reading");
     }
 
+    if (fileVersion() < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
+    }
+
     GridPtrVecPtr ret(new GridPtrVec);
 
     if (!inputHasGridOffsets()) {
@@ -553,6 +558,11 @@ File::readGridMetadata(const Name& name)
 {
     if (!isOpen()) {
         OPENVDB_THROW(IoError, filename() << " is not open for reading.");
+    }
+
+    if (fileVersion() < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
     }
 
     GridBase::ConstPtr ret;
@@ -820,11 +830,6 @@ File::readGridPartial(GridBase::Ptr grid, std::istream& is,
     // drop DelayedLoadMetadata from the grid as it is only useful for IO
     if ((*grid)[GridBase::META_FILE_DELAYED_LOAD]) {
         grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
-    }
-
-    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_GRID_INSTANCING) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 216 (GRID_INSTANCING) is no longer supported.");
     }
 
     grid->readTransform(is);

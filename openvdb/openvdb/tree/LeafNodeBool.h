@@ -1049,15 +1049,15 @@ template<Index Log2Dim>
 inline void
 LeafNode<bool, Log2Dim>::readBuffers(std::istream& is, bool /*fromHalf*/)
 {
+    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION ) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
+    }
+
     // Read in the value mask.
     mValueMask.load(is);
     // Read in the origin.
     is.read(reinterpret_cast<char*>(&mOrigin), sizeof(Coord::ValueType) * 3);
-
-    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_BOOL_LEAF_OPTIMIZATION) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 217 (BOOL_LEAF_OPTIMIZATION) is no longer supported.");
-    }
 
     // Read in the mask for the voxel values.
     mBuffer.mData.load(is);
