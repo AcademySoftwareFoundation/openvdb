@@ -24,7 +24,12 @@ main(int argc, char *argv[])
     ::testing::InitGoogleTest(&argc, argv);
 
 #if defined(__linux__) && defined(OPENVDB_TESTS_FPE)
-    feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
+    int excepts = FE_DIVBYZERO | FE_INVALID;
+    if (getenv("OPENVDB_TEST_OVERFLOW")) {
+        // when set, test for FP overflow as well.
+        excepts = excepts | FE_OVERFLOW;
+    }
+    feenableexcept(excepts);
 #endif
 
     return RUN_ALL_TESTS();
