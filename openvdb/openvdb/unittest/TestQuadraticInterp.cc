@@ -16,7 +16,7 @@ namespace {
 template<typename T> inline const T Tolerance;
 template<> inline const float Tolerance<float> = 1.e-5f;
 template<> inline const double Tolerance<double> = 1.e-5f;
-template<> inline const typename openvdb::Half Tolerance<openvdb::Half> = 0.00097656;
+template<> inline const typename openvdb::Half Tolerance<openvdb::Half> = static_cast<typename openvdb::Half>(0.00097656f);
 
 }
 
@@ -41,7 +41,16 @@ protected:
     static void executeTest(const GridPtr&, const TestVal*, size_t numVals);
 
     /// Initialize an arbitrary ValueType from a scalar.
-    static inline ValueT constValue(double d) { return ValueT(d); }
+    static inline ValueT constValue(double d) {
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wimplicit-float-conversion"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wfloat-conversion"
+#endif
+        return static_cast<ValueT>(d);
+#pragma GCC diagnostic pop
+    }
 
     /// Compare two numeric values for equality within an absolute tolerance.
     static inline bool relEq(const ValueT& v1, const ValueT& v2)

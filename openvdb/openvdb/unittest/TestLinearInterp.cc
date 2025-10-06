@@ -14,7 +14,7 @@ const double TOLERANCE = 1.e-6;
 template<typename T> inline const T Tolerance;
 template<> inline const float Tolerance<float> = 1.e-6f;
 template<> inline const double Tolerance<double> = 1.e-6f;
-template<> inline const typename openvdb::Half Tolerance<openvdb::Half> = 0.00097656;
+template<> inline const typename openvdb::Half Tolerance<openvdb::Half> = openvdb::math::half(0.00097656f);
 
 }
 
@@ -42,7 +42,6 @@ template<typename GridType>
 void
 TestLinearInterp::test()
 {
-    using TreeType = typename GridType::TreeType;
     using ValueType = typename GridType::ValueType;
     float fillValue = 256.0f;
 

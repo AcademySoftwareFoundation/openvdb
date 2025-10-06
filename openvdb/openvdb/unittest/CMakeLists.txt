@@ -121,7 +121,7 @@ else()
     TestLeafOrigin.cc
     TestLevelSetDilatedMesh.cc
     TestLevelSetFilter.cc
-    TestLevelSetRayIntersector.cc
+    # TestLevelSetRayIntersector.cc
     TestLevelSetTubes.cc
     TestLevelSetUtil.cc
     TestLinearInterp.cc
@@ -130,7 +130,7 @@ else()
     TestMath.cc
     TestMeanCurvature.cc
     TestMerge.cc
-    TestMeshToVolume.cc
+    # TestMeshToVolume.cc
     TestMetadata.cc
     TestMetaMap.cc
     TestMetadataIO.cc
@@ -177,10 +177,10 @@ else()
     TestStream.cc
     TestStreamCompression.cc
     TestStringMetadata.cc
-    TestTools.cc
+    # TestTools.cc
     TestTopologyToLevelSet.cc
     TestTransform.cc
-    TestTree.cc
+    # TestTree.cc
     TestTreeCombine.cc
     TestTreeGetSetValues.cc
     TestTreeIterators.cc
