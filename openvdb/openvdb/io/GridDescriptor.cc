@@ -72,10 +72,7 @@ GridDescriptor::writeStreamPos(std::ostream &os) const
 GridBase::Ptr
 GridDescriptor::read(std::istream &is)
 {
-    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
-    }
+    checkFormatVersion(is);
 
     // Read in the name.
     mUniqueName = readString(is);

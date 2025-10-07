@@ -1639,10 +1639,7 @@ template<typename TreeT>
 inline void
 Grid<TreeT>::readBuffers(std::istream& is)
 {
-    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION ) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
-    }
+    io::checkFormatVersion(is);
 
     if (!hasMultiPassIO()) {
         tree().readBuffers(is, saveFloatAsHalf());
@@ -1666,10 +1663,7 @@ template<typename TreeT>
 inline void
 Grid<TreeT>::readBuffers(std::istream& is, const CoordBBox& bbox)
 {
-    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION ) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
-    }
+    io::checkFormatVersion(is);
 
     if (!hasMultiPassIO()) {
         tree().readBuffers(is, bbox, saveFloatAsHalf());

@@ -2413,10 +2413,7 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
 {
-    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION ) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
-    }
+    io::checkFormatVersion(is);
 
     const ValueType background = (!io::getGridBackgroundValuePtr(is) ? zeroVal<ValueType>()
         : *static_cast<const ValueType*>(io::getGridBackgroundValuePtr(is)));

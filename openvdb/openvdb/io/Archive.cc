@@ -628,6 +628,16 @@ getFormatVersion(std::ios_base& is)
 
 
 void
+checkFormatVersion(std::ios_base& is)
+{
+    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION ) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
+    }
+}
+
+
+void
 Archive::setFormatVersion(std::istream& is)
 {
     is.iword(GetSteamState().fileVersion) = mFileVersion; ///< @todo remove
@@ -786,10 +796,7 @@ Archive::setGridCompression(std::ostream& os, const GridBase& grid) const
 void
 Archive::readGridCompression(std::istream& is)
 {
-    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
-    }
+    checkFormatVersion(is);
 
     uint32_t c = COMPRESS_NONE;
     is.read(reinterpret_cast<char*>(&c), sizeof(uint32_t));

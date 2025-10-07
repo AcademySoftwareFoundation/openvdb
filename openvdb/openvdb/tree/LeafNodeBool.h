@@ -1049,10 +1049,7 @@ template<Index Log2Dim>
 inline void
 LeafNode<bool, Log2Dim>::readBuffers(std::istream& is, bool /*fromHalf*/)
 {
-    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION ) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
-    }
+    io::checkFormatVersion(is);
 
     // Read in the value mask.
     mValueMask.load(is);

@@ -2383,10 +2383,7 @@ template<typename ChildT>
 inline bool
 RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
 {
-    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION ) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
-    }
+    io::checkFormatVersion(is);
 
     // Delete the existing tree.
     this->clear();

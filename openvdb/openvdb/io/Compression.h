@@ -466,10 +466,7 @@ inline void
 readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     const MaskT& valueMask, bool fromHalf)
 {
-    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
-        OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
-    }
+    checkFormatVersion(is);
 
     // Get the stream's compression settings.
     auto meta = getStreamMetadataPtr(is);

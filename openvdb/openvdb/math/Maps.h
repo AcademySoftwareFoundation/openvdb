@@ -2374,10 +2374,7 @@ public:
     /// read serialization
     void read(std::istream& is) override
     {
-        if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION ) {
-            OPENVDB_THROW(IoError,
-                "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
-        }
+        io::checkFormatVersion(is);
 
         mBBox.read(is);
 
