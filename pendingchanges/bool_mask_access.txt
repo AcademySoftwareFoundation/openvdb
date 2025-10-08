@@ -1,0 +1,3 @@
+API changes:
+- Add LeafBuffer<bool, Log2Dim>::mask() for direct const access to the
+  mask when using the bool LeafNode.
