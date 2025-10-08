@@ -402,9 +402,7 @@ TEST_F(TestLeafBool, testConstructors)
             coords.insert(xyz);
         }
 
-OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-        LeafType leaf(fleaf, openvdb::TopologyCopy());
-OPENVDB_NO_DEPRECATION_WARNING_END
+        LeafType leaf(fleaf, /*background*/true, openvdb::TopologyCopy());
 
         EXPECT_EQ(fleaf.onVoxelCount(), leaf.onVoxelCount());
         EXPECT_TRUE(leaf.hasSameTopology(&fleaf));

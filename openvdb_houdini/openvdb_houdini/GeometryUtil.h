@@ -88,12 +88,6 @@ std::unique_ptr<GU_Detail>
 convertGeometry(const GU_Detail&, std::string& warning, openvdb::util::NullInterrupter*);
 
 
-OPENVDB_DEPRECATED_MESSAGE("openvdb_houdini::Interrupter has been deprecated, use openvdb_houdini::HoudiniInterrupter")
-OPENVDB_HOUDINI_API
-std::unique_ptr<GU_Detail>
-convertGeometry(const GU_Detail& detail, std::string& warning, Interrupter* boss);
-
-
 ////////////////////////////////////////
 
 
