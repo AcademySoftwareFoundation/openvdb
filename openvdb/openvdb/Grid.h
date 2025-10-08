@@ -873,10 +873,6 @@ public:
     CoordBBox evalActiveVoxelBoundingBox() const override;
     /// Return the dimensions of the axis-aligned bounding box of all active voxels.
     Coord evalActiveVoxelDim() const override;
-    /// Return the minimum and maximum active values in this grid.
-    OPENVDB_DEPRECATED_MESSAGE("Switch from grid->evalMinMax(minVal, maxVal) to \
-tools::minMax(grid->tree()). Use threaded = false for serial execution")
-    void evalMinMax(ValueType& minVal, ValueType& maxVal) const;
 
     /// Return the number of bytes of memory used by this grid.
     /// @todo Add transform().memUsage()
@@ -1581,16 +1577,6 @@ Grid<TreeT>::topologyDifference(const Grid<OtherTreeType>& other)
 
 
 ////////////////////////////////////////
-
-
-template<typename TreeT>
-inline void
-Grid<TreeT>::evalMinMax(ValueType& minVal, ValueType& maxVal) const
-{
-    OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-    tree().evalMinMax(minVal, maxVal);
-    OPENVDB_NO_DEPRECATION_WARNING_END
-}
 
 
 template<typename TreeT>

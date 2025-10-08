@@ -80,23 +80,6 @@ public:
     template<typename OtherValueType>
     explicit LeafNode(const LeafNode<OtherValueType, Log2Dim>& other);
 
-    /// @brief Deprecated topology copy constructor
-    /// @note  This constructor initialises the bool buffer to the ValueMask
-    ///   states (i.e. value will be true if the active state is on and
-    ///   vice-versa). This is not really a "TopologyCopy" and is therefor
-    ///   deprecated. Use the explicit mask/buffer constructor instead:
-    /// @code
-    ///    // build new leaf node with the mask of 'a', but with the mask of
-    ///    // 'b' as the the new value buffer.
-    ///    const LeafNode a = ... ;
-    ///    const LeafNode b = ... ;
-    ///    const LeafNode copy(a.origin(), /*mask=*/a.getValueMask(),
-    ///      /*buff=*/b.getValueMask());
-    /// @endcode
-    template<typename ValueType>
-    OPENVDB_DEPRECATED_MESSAGE("Use LeafNodeBool component constructor.")
-    LeafNode(const LeafNode<ValueType, Log2Dim>& other, TopologyCopy);
-
     /// @brief Construct a LeafNodeBool with its individual components
     /// @param xyz  Leaf origin
     /// @param mask  The ValueMask to copy
@@ -863,17 +846,6 @@ LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
 {
 }
 
-
-template<Index Log2Dim>
-template<typename ValueT>
-inline
-LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other, TopologyCopy)
-    : mValueMask(other.valueMask())
-    , mBuffer(other.valueMask())// value = active state
-    , mOrigin(other.origin())
-    , mTransientData(other.mTransientData)
-{
-}
 
 template<Index Log2Dim>
 inline

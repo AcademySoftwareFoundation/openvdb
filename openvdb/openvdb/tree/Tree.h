@@ -401,10 +401,6 @@ public:
     /// Return the total number of active tiles.
     Index64 activeTileCount() const override { return tools::countActiveTiles(*this); }
 
-    /// Return the minimum and maximum active values in this tree.
-    OPENVDB_DEPRECATED_MESSAGE("Switch to tools::minMax. Use threaded = false for serial execution")
-    void evalMinMax(ValueType &min, ValueType &max) const;
-
     Index64 memUsage() const override { return tools::memUsage(*this); }
 
 
@@ -2011,22 +2007,6 @@ Tree<RootNodeType>::evalLeafDim(Coord& dim) const
     bool notEmpty = this->evalLeafBoundingBox(bbox);
     dim = bbox.extents();
     return notEmpty;
-}
-
-
-template<typename RootNodeType>
-inline void
-Tree<RootNodeType>::evalMinMax(ValueType& minVal, ValueType& maxVal) const
-{
-    minVal = maxVal = zeroVal<ValueType>();
-    if (ValueOnCIter iter = this->cbeginValueOn()) {
-        minVal = maxVal = *iter;
-        for (++iter; iter; ++iter) {
-            const ValueType& val = *iter;
-            if (math::cwiseLessThan(val, minVal)) minVal = val;
-            if (math::cwiseGreaterThan(val, maxVal)) maxVal = val;
-        }
-    }
 }
 
 

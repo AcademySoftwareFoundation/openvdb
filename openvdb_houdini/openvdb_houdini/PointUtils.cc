@@ -891,19 +891,6 @@ computeVoxelSizeFromHoudini(const GU_Detail& detail,
 }
 
 
-// deprecated
-float
-computeVoxelSizeFromHoudini(const GU_Detail& detail,
-                            const openvdb::Index pointsPerVoxel,
-                            const openvdb::math::Mat4d& matrix,
-                            const openvdb::Index decimalPlaces,
-                            Interrupter& interrupter)
-{
-    return computeVoxelSizeFromHoudini(detail, pointsPerVoxel, matrix, decimalPlaces,
-        interrupter.interrupter());
-}
-
-
 PointDataGrid::Ptr
 convertHoudiniToPointDataGrid(const GU_Detail& ptGeo,
                               const int compression,

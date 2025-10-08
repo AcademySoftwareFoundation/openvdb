@@ -716,46 +716,6 @@ rasterize(const PointDataTreeOrGridT& points, TransferT& transfer)
     manager.foreach(raster);
 }
 
-/// @brief Perform potentially complex rasterization from a user defined
-///  transfer scheme.
-/// @details The method works by looping over a single Tree topology, looking
-///   up point data at a position relative to that topology and passing that
-///   data to a transfer scheme TransferT.
-/// @note  Each thread receives a copy of the transfer scheme object.
-/// @param points       the point data grid to rasterize
-/// @param transfer     the transfer scheme
-/// @param filter       optional point filter
-/// @param interrupter  optional interrupter
-template <typename PointDataTreeOrGridT,
-    typename TransferT,
-    typename FilterT,
-    typename InterrupterT = util::NullInterrupter>
-OPENVDB_DEPRECATED_MESSAGE("openvdb::tools::rasterize no longer takes a filter or "
-"interrupter. Implement this on your transfer scheme (see PointTransfer.h for an example).")
-inline void
-rasterize(const PointDataTreeOrGridT& points,
-          TransferT& transfer,
-          const FilterT& filter,
-          InterrupterT* interrupter = nullptr)
-{
-    using PointTreeT = typename TreeAdapter<PointDataTreeOrGridT>::TreeType;
-    static_assert(std::is_base_of<TreeBase, PointTreeT>::value,
-        "Provided points to rasterize is not a derived TreeBase type.");
-
-    const auto& tree = TreeAdapter<PointDataTreeOrGridT>::tree(points);
-
-    auto& topology = transfer.topology();
-    using TreeT = typename std::decay<decltype(topology)>::type;
-
-    // Compute max search bounds
-    CoordBBox bounds;
-    tree.evalLeafBoundingBox(bounds);
-
-    tree::LeafManager<TreeT> manager(topology);
-    transfer_internal::RasterizePoints<TransferT, TreeT, FilterT, InterrupterT>
-        raster(tree, transfer, bounds, filter, interrupter);
-    manager.foreach(raster);
-}
 
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME
