@@ -11,6 +11,7 @@ exportIntGrid(nb::module_ m)
 {
     pyGrid::exportScalarGrid<BoolGrid>(m);
 #ifdef PY_OPENVDB_WRAP_ALL_GRID_TYPES
+    pyGrid::exportScalarGrid<Int8Grid>(m);
     pyGrid::exportScalarGrid<Int32Grid>(m);
     pyGrid::exportScalarGrid<Int64Grid>(m);
 #endif
