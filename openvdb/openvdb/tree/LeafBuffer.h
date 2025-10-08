@@ -514,6 +514,9 @@ public:
     /// @warning This method should only be used by experts seeking low-level optimizations.
     const WordType* data() const { return const_cast<LeafBuffer*>(this)->data(); }
 
+    /// @brief Return LeafBuffer value mask
+    const NodeMaskType& mask() const { return mData; }
+
 private:
     // Allow the parent LeafNode to access this buffer's data.
     template<typename, Index> friend class LeafNode;
