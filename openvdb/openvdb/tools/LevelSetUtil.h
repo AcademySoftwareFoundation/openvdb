@@ -461,7 +461,8 @@ struct SDFVoxelsToFogVolume {
 
             ValueType* values = node.buffer().data();
             for (Index i = 0; i < LeafNodeType::SIZE; ++i) {
-                values[i] = values[i] > ValueType(0.0) ? ValueType(0.0) : values[i] * mWeight;
+                values[i] = values[i] > ValueType(0.0) ?
+                    ValueType(0.0) : ValueType(values[i] * mWeight);
                 if (values[i] > ValueType(0.0)) node.setValueOn(i);
             }
 

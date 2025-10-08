@@ -4621,7 +4621,7 @@ doVolumeToMesh(
     double adaptivity,
     bool relaxDisorientedTriangles)
 {
-    static_assert(std::is_scalar<typename GridType::ValueType>::value,
+    static_assert(openvdb::is_arithmetic<typename GridType::ValueType>::value,
         "volume to mesh conversion is supported only for scalar grids");
 
     VolumeToMesh mesher(isovalue, adaptivity, relaxDisorientedTriangles);

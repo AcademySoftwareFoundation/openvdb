@@ -17,8 +17,9 @@
 #define OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 
 #include <openvdb/Platform.h>
-#include <openvdb/Types.h>
+#include <openvdb/Types.h> // for ComputeTypeFor
 #include <openvdb/math/FiniteDifference.h> // for GodunovsNormSqrd
+#include <openvdb/math/Math.h> // for isFinite(), isNan()
 #include <openvdb/math/Proximity.h> // for closestPointOnTriangleToPoint
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
@@ -39,7 +40,6 @@
 #include <tbb/task_arena.h>
 
 #include <algorithm> // for std::sort()
-#include <cmath> // for std::isfinite(), std::isnan()
 #include <deque>
 #include <limits>
 #include <memory>
@@ -2942,27 +2942,28 @@ template<typename TreeType>
 struct Renormalize
 {
     using LeafNodeType = typename TreeType::LeafNodeType;
-    using ValueType = typename TreeType::ValueType;
+    using ValueType    = typename TreeType::ValueType;
+    using ComputeType  = typename ComputeTypeFor<ValueType>::type;
 
     Renormalize(const TreeType& tree, const std::vector<LeafNodeType*>& nodes,
         ValueType* buffer, ValueType voxelSize)
         : mTree(&tree)
         , mNodes(nodes.empty() ? nullptr : &nodes[0])
         , mBuffer(buffer)
-        , mVoxelSize(voxelSize)
+        , mVoxelSize(static_cast<ComputeType>(voxelSize))
     {
     }
 
     void operator()(const tbb::blocked_range<size_t>& range) const
     {
-        using Vec3Type = math::Vec3<ValueType>;
+        using Vec3Type = math::Vec3<ComputeType>;
 
         tree::ValueAccessor<const TreeType> acc(*mTree);
 
         Coord ijk;
         Vec3Type up, down;
 
-        const ValueType dx = mVoxelSize, invDx = ValueType(1.0) / mVoxelSize;
+        const ComputeType dx = mVoxelSize, invDx = ComputeType(1.0) / mVoxelSize;
 
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
@@ -2971,24 +2972,24 @@ struct Renormalize
             typename LeafNodeType::ValueOnCIter iter = mNodes[n]->cbeginValueOn();
             for (; iter; ++iter) {
 
-                const ValueType phi0 = *iter;
+                const ComputeType phi0 = static_cast<ComputeType>(*iter);
 
                 ijk = iter.getCoord();
 
-                up[0] = acc.getValue(ijk.offsetBy(1, 0, 0)) - phi0;
-                up[1] = acc.getValue(ijk.offsetBy(0, 1, 0)) - phi0;
-                up[2] = acc.getValue(ijk.offsetBy(0, 0, 1)) - phi0;
+                up[0] = static_cast<ComputeType>(acc.getValue(ijk.offsetBy(1, 0, 0))) - phi0;
+                up[1] = static_cast<ComputeType>(acc.getValue(ijk.offsetBy(0, 1, 0))) - phi0;
+                up[2] = static_cast<ComputeType>(acc.getValue(ijk.offsetBy(0, 0, 1))) - phi0;
 
-                down[0] = phi0 - acc.getValue(ijk.offsetBy(-1, 0, 0));
-                down[1] = phi0 - acc.getValue(ijk.offsetBy(0, -1, 0));
-                down[2] = phi0 - acc.getValue(ijk.offsetBy(0, 0, -1));
+                down[0] = phi0 - static_cast<ComputeType>(acc.getValue(ijk.offsetBy(-1, 0, 0)));
+                down[1] = phi0 - static_cast<ComputeType>(acc.getValue(ijk.offsetBy(0, -1, 0)));
+                down[2] = phi0 - static_cast<ComputeType>(acc.getValue(ijk.offsetBy(0, 0, -1)));
 
-                const ValueType normSqGradPhi = math::GodunovsNormSqrd(phi0 > 0.0, down, up);
+                const ComputeType normSqGradPhi = math::GodunovsNormSqrd(phi0 > 0.0, down, up);
 
-                const ValueType diff = math::Sqrt(normSqGradPhi) * invDx - ValueType(1.0);
-                const ValueType S = phi0 / (math::Sqrt(math::Pow2(phi0) + normSqGradPhi));
+                const ComputeType diff = math::Sqrt(normSqGradPhi) * invDx - ValueType(1.0);
+                const ComputeType S = phi0 / (math::Sqrt(math::Pow2(phi0) + normSqGradPhi));
 
-                bufferData[iter.pos()] = phi0 - dx * S * diff;
+                bufferData[iter.pos()] = static_cast<ValueType>(phi0 - dx * S * diff);
             }
         }
     }
@@ -2998,7 +2999,7 @@ private:
     LeafNodeType const * const * const mNodes;
     ValueType                  * const mBuffer;
 
-    const ValueType mVoxelSize;
+    const ComputeType mVoxelSize;
 };
 
 
@@ -3023,7 +3024,7 @@ struct MinCombine
 
             for (; iter; ++iter) {
                 ValueType& val = const_cast<ValueType&>(iter.getValue());
-                val = std::min(val, bufferData[iter.pos()]);
+                val = math::Min(val, bufferData[iter.pos()]);
             }
         }
     }
@@ -3348,7 +3349,7 @@ meshToVolume(
 
     // Note: inf interior width is all right, this value makes the converter fill
     // interior regions with distance values.
-    if (!std::isfinite(exteriorWidth) || std::isnan(interiorWidth)) {
+    if (!math::isFinite(exteriorWidth) || math::isNan(interiorWidth)) {
         std::stringstream msg;
         msg << "Illegal narrow band width: exterior = " << exteriorWidth
             << ", interior = " << interiorWidth;
@@ -3358,7 +3359,7 @@ meshToVolume(
 
     const ValueType voxelSize = ValueType(transform.voxelSize()[0]);
 
-    if (!std::isfinite(voxelSize) || math::isZero(voxelSize)) {
+    if (!math::isFinite(voxelSize) || math::isZero(voxelSize)) {
         std::stringstream msg;
         msg << "Illegal transform, voxel size = " << voxelSize;
         OPENVDB_LOG_DEBUG(msg.str());
@@ -3429,7 +3430,6 @@ meshToVolume(
     // The progress estimates are based on the observed average time for a few different
     // test cases and is only intended to provide some rough progression feedback to the user.
     if (interrupter.wasInterrupted(30)) return distGrid;
-
 
     //////////
 
@@ -3659,7 +3659,7 @@ meshToVolume(
 
 /// @internal This overload is enabled only for grids with a scalar, floating-point ValueType.
 template<typename GridType, typename Interrupter>
-inline typename std::enable_if<std::is_floating_point<typename GridType::ValueType>::value,
+inline typename std::enable_if<openvdb::is_floating_point<typename GridType::ValueType>::value,
     typename GridType::Ptr>::type
 doMeshConversion(
     Interrupter& interrupter,
@@ -3732,7 +3732,7 @@ doMeshConversion(
 /// @internal This overload is enabled only for grids that do not have a scalar,
 /// floating-point ValueType.
 template<typename GridType, typename Interrupter>
-inline typename std::enable_if<!std::is_floating_point<typename GridType::ValueType>::value,
+inline typename std::enable_if<!openvdb::is_floating_point<typename GridType::ValueType>::value,
     typename GridType::Ptr>::type
 doMeshConversion(
     Interrupter&,
