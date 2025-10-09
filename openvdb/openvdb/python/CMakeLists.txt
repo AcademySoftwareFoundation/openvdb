@@ -14,7 +14,6 @@ include(GNUInstallDirs)
 
 ###### OpenVDB Python Options
 
-option(USE_NUMPY "Build the python library with numpy support." OFF)
 option(OPENVDB_PYTHON_USE_AX [=[
 Build the python library with AX support. Defaults to ON when OpenVDB AX is enabled."]=] ${USE_AX})
 option(OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES [=[
@@ -75,9 +74,6 @@ nanobind_add_module(openvdb_python NB_STATIC
 target_link_libraries(openvdb_python PUBLIC ${OPENVDB_LIB})
 if(OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES)
   target_compile_definitions(openvdb_python PRIVATE "-DPY_OPENVDB_WRAP_ALL_GRID_TYPES")
-endif()
-if(USE_NUMPY)
-  target_compile_definitions(openvdb_python PUBLIC "-DPY_OPENVDB_USE_NUMPY")
 endif()
 if(OPENVDB_PYTHON_USE_AX)
   target_link_libraries(openvdb_python PUBLIC ${OPENVDB_AX_LIB})

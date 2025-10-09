@@ -478,13 +478,24 @@ endif()
 # Locate Python and nanobind if necessary
 if(OPENVDB_BUILD_PYTHON_MODULE OR (OPENVDB_BUILD_NANOVDB AND NANOVDB_BUILD_PYTHON_MODULE))
 
-  # Call find_package(Python ...)
   find_package(Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Development Interpreter)
-  find_package(nanobind ${MINIMUM_NANOBIND_VERSION} REQUIRED)
-
   if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_PYTHON_VERSION)
     if(Python_VERSION VERSION_LESS ${FUTURE_MINIMUM_PYTHON_VERSION})
       message(DEPRECATION "Support for Python versions < ${FUTURE_MINIMUM_GLFW_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
+  endif()
+
+  find_package(nanobind REQUIRED CONFIG)
+  include(FindPackageHandleStandardArgs)
+  find_package_handle_standard_args(nanobind
+    FOUND_VAR nanobind_FOUND
+    REQUIRED_VARS nanobind_ROOT
+    VERSION_VAR nanobind_VERSION)
+
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_NANOBIND_VERSION)
+    if(nanobind_VERSION VERSION_LESS ${FUTURE_MINIMUM_NANOBIND_VERSION})
+      message(DEPRECATION "Support for nanobind versions < ${FUTURE_MINIMUM_NANOBIND_VERSION} "
         "is deprecated and will be removed.")
     endif()
   endif()
