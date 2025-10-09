@@ -413,7 +413,6 @@ set(OPENVDB_LIBRARY_MATH_INCLUDE_FILES
   math/DDA.h
   math/FiniteDifference.h
   math/Half.h
-  math/LegacyFrustum.h
   math/Maps.h
   math/Mat.h
   math/Mat3.h

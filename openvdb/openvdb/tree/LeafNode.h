@@ -1370,6 +1370,8 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool fromHalf)
 {
+    io::checkFormatVersion(is);
+
     SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
     const bool seekable = meta && meta->seekable();
 
@@ -1386,13 +1388,6 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
     }
 
     int8_t numBuffers = 1;
-    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
-        // Read in the origin.
-        is.read(reinterpret_cast<char*>(&mOrigin), sizeof(Coord::ValueType) * 3);
-
-        // Read in the number of buffers, which should now always be one.
-        is.read(reinterpret_cast<char*>(&numBuffers), sizeof(int8_t));
-    }
 
     CoordBBox nodeBBox = this->getNodeBoundingBox();
     if (!clipBBox.hasOverlap(nodeBBox)) {

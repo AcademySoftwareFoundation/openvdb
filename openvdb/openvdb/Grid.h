@@ -1639,7 +1639,9 @@ template<typename TreeT>
 inline void
 Grid<TreeT>::readBuffers(std::istream& is)
 {
-    if (!hasMultiPassIO() || (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_MULTIPASS_IO)) {
+    io::checkFormatVersion(is);
+
+    if (!hasMultiPassIO()) {
         tree().readBuffers(is, saveFloatAsHalf());
     } else {
         uint16_t numPasses = 1;
@@ -1661,7 +1663,9 @@ template<typename TreeT>
 inline void
 Grid<TreeT>::readBuffers(std::istream& is, const CoordBBox& bbox)
 {
-    if (!hasMultiPassIO() || (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_MULTIPASS_IO)) {
+    io::checkFormatVersion(is);
+
+    if (!hasMultiPassIO()) {
         tree().readBuffers(is, bbox, saveFloatAsHalf());
     } else {
         uint16_t numPasses = 1;

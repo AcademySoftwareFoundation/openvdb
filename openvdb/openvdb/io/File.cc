@@ -523,6 +523,11 @@ File::readAllGridMetadata()
         OPENVDB_THROW(IoError, filename() << " is not open for reading");
     }
 
+    if (fileVersion() < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
+    }
+
     GridPtrVecPtr ret(new GridPtrVec);
 
     if (!inputHasGridOffsets()) {
@@ -553,6 +558,11 @@ File::readGridMetadata(const Name& name)
 {
     if (!isOpen()) {
         OPENVDB_THROW(IoError, filename() << " is not open for reading.");
+    }
+
+    if (fileVersion() < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
     }
 
     GridBase::ConstPtr ret;
@@ -822,16 +832,9 @@ File::readGridPartial(GridBase::Ptr grid, std::istream& is,
         grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
     }
 
-    if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_GRID_INSTANCING) {
-        grid->readTransform(is);
-        if (!isInstance && readTopology) {
-            grid->readTopology(is);
-        }
-    } else {
-        if (readTopology) {
-            grid->readTopology(is);
-            grid->readTransform(is);
-        }
+    grid->readTransform(is);
+    if (!isInstance && readTopology) {
+        grid->readTopology(is);
     }
 }
 
