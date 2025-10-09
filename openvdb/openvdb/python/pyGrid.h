@@ -15,12 +15,10 @@
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/tuple.h>
-#ifdef PY_OPENVDB_USE_NUMPY
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/optional.h>
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/tools/VolumeToMesh.h> // for tools::volumeToMesh()
-#endif
 #include <openvdb/openvdb.h>
 #include <openvdb/io/Stream.h>
 #include <openvdb/math/Math.h> // for math::isExactlyEqual()
@@ -308,42 +306,6 @@ signedFloodFill(GridType& grid)
 ////////////////////////////////////////
 
 
-#ifndef PY_OPENVDB_USE_NUMPY
-
-template<typename GridType>
-inline void
-copyFromArrayScalar(GridType&, const nb::object&, nb::object, nb::object)
-{
-    PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    throw nb::python_error();
-}
-
-template<typename GridType>
-inline void
-copyFromArrayVector(GridType&, const nb::object&, nb::object, nb::object)
-{
-    PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    throw nb::python_error();
-}
-
-template<typename GridType>
-inline void
-copyToArrayScalar(GridType&, const nb::object&, nb::object)
-{
-    PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    throw nb::python_error();
-}
-
-template<typename GridType>
-inline void
-copyToArrayVector(GridType&, const nb::object&, nb::object)
-{
-    PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    throw nb::python_error();
-}
-
-#else // if defined(PY_OPENVDB_USE_NUMPY)
-
 template<typename GridType>
 inline void
 copyFromArrayScalar(GridType& grid, nb::ndarray<nb::numpy> array, const Coord& origin, const typename GridType::ValueType& tolerance)
@@ -516,51 +478,9 @@ copyToArrayVector(GridType& grid, nb::ndarray<nb::numpy> array, const Coord& ori
     }
 }
 
-#endif // defined(PY_OPENVDB_USE_NUMPY)
-
 
 ////////////////////////////////////////
 
-
-#ifndef PY_OPENVDB_USE_NUMPY
-
-template<typename GridType>
-inline typename GridType::Ptr
-meshToLevelSet(nb::object, nb::object, nb::object, nb::object, nb::object)
-{
-    PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    throw nb::python_error();
-    return typename GridType::Ptr();
-}
-
-template<typename GridType>
-inline typename GridType::Ptr
-meshToSignedDistanceField(nb::object, nb::object, nb::object, nb::object, nb::object, nb::object)
-{
-    PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    throw nb::python_error();
-    return typename GridType::Ptr();
-}
-
-template<typename GridType>
-inline nb::object
-volumeToQuadMesh(const GridType&, nb::object)
-{
-    PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    throw nb::python_error();
-    return nb::object();
-}
-
-template<typename GridType>
-inline nb::object
-volumeToMesh(const GridType&, nb::object, nb::object)
-{
-    PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    throw nb::python_error();
-    return nb::object();
-}
-
-#else // if defined(PY_OPENVDB_USE_NUMPY)
 
 /// @brief Given NumPy arrays of points, triangle indices, and quad indices,
 /// call tools::meshToLevelSet() to generate a level set grid.
@@ -707,8 +627,6 @@ volumeToMesh(const GridType& grid, double isovalue, double adaptivity)
 
     return std::make_tuple(pointArray, triangleArray, quadArray);
 }
-
-#endif // defined(PY_OPENVDB_USE_NUMPY)
 
 
 ////////////////////////////////////////
@@ -1342,13 +1260,8 @@ exportGrid(nb::module_ m)
         .def_static("createLevelSetFromPolygons",
             &pyGrid::meshToLevelSet<GridType>,
             nb::arg("points"),
-#ifdef PY_OPENVDB_USE_NUMPY
             nb::arg("triangles")=nb::none(),
             nb::arg("quads")=nb::none(),
-#else
-            nb::arg("triangles")=std::vector<Index32>(),
-            nb::arg("quads")=std::vector<Index32>(),
-#endif
             nb::arg("transform")=openvdb::math::Transform(),
             nb::arg("halfWidth")=openvdb::LEVEL_SET_HALF_WIDTH,
              "Convert a triangle and/or quad mesh to a narrow-band level set volume.\n"
@@ -1364,13 +1277,8 @@ exportGrid(nb::module_ m)
         .def_static("createLevelSetFromPolygons",
             &pyGrid::meshToSignedDistanceField<GridType>,
             nb::arg("points"),
-#ifdef PY_OPENVDB_USE_NUMPY
             nb::arg("triangles")=nb::none(),
             nb::arg("quads")=nb::none(),
-#else
-            nb::arg("triangles")=std::vector<Index32>(),
-            nb::arg("quads")=std::vector<Index32>(),
-#endif
             nb::arg("transform")=openvdb::math::Transform(),
             nb::arg("exBandWidth")=openvdb::LEVEL_SET_HALF_WIDTH,
             nb::arg("inBandWidth")=openvdb::LEVEL_SET_HALF_WIDTH,

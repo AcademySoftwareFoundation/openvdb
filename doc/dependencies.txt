@@ -41,7 +41,7 @@ OpenVDB Print           | Core Library dependencies                       | -
 OpenVDB LOD             | Core Library dependencies                       | -
 OpenVDB Render          | Core Library dependencies                       | OpenEXR, Imath::Imath, libpng
 OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW* | -
-OpenVDB Python          | Core Library dependencies, Python, nanobind     | NumPy
+OpenVDB Python          | Core Library dependencies, Python, nanobind     | -
 OpenVDB AX              | Core Library dependencies, LLVM                 | Bison, Flex
 NanoVDB                 | -                                               | Core Library, CUDA, TBB, Blosc, ZLib
 OpenVDB UnitTests       | Core Library dependencies, GoogleTest           | -
@@ -69,8 +69,7 @@ LLVM           | 15.0.0* | 18.0.0      | Target-independent code generation     
 Bison          | 3.7.0   | 3.7.0       | General-purpose parser generator                                  | Y       | Y        | https://www.gnu.org/software/gcc
 Flex           | 2.6.4   | 2.6.4       | Fast lexical analyzer generator                                   | Y       | Y        | https://github.com/westes/flex
 Python         | 3.10    | 3.11        | The python interpreter and libraries                              | Y       | Y        | https://www.python.org
-nanobind       | 2.0.0   | 2.1.0       | C++/python bindings                                               | Y       | Y        | https://nanobind.readthedocs.io
-NumPy          | 1.23.0  | 1.26.0      | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
+nanobind**     | 2.0.0   | Latest      | C++/python bindings                                               | Y       | Y        | https://nanobind.readthedocs.io
 GoogleTest     | 1.10    | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
 Blosc          | 1.17.0* | 1.17.0      | Recommended dependency for improved disk compression              | Y       | Y        | https://github.com/Blosc/c-blosc/releases
 Log4cplus      | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus
@@ -81,7 +80,8 @@ GLEW           | 1.0.0   | Latest      | A cross-platform OpenGL extension loadi
 CUDA           | -       | Latest      | Parallel computing platform for graphical processing units.       | Y       | N        | https://developer.nvidia.com/cuda-downloads
 Doxygen        | 1.8.8   | 1.8.11      | Documentation generation from C++                                 | Y       | Y        | http://www.doxygen.nl
 
- - @b * See the note in [known issues](@ref depKnownIssues) regarding supported blosc/llvm versions.
+ - @b *  See the note in [known issues](@ref depKnownIssues) regarding supported blosc/llvm versions.
+ - @b ** See the note in [known issues](@ref depKnownIssues) regarding supported nanobind build issues.
 
 @subsection depKnownIssues Known Issues
 
@@ -108,6 +108,11 @@ Doxygen        | 1.8.8   | 1.8.11      | Documentation generation from C++      
  - https://www.blosc.org/posts/new-forward-compat-policy/
  - https://github.com/Blosc/c-blosc/issues/260
  - https://github.com/Blosc/c-blosc/issues/261
+
+ - @b nanobind: Nanobind requires a fast-hash-map implementation library called
+ tsl-robin-map. If you're installing nanobind through homebrew, this library
+ may not be installed correctly and OpenVDB's CMake will only produce a warning.
+ Make sure to also: `brew install robin-map`.
 
 @section depInstallingDependencies Installing Dependencies
 
@@ -145,7 +150,6 @@ apt-get install libblosc-dev            # Blosc
 apt-get install llvm-15-dev             # LLVM
 # Python
 apt-get install python-dev              # Python
-apt-get install python-numpy            # NumPy
 pip install nanobind                    # nanobind
 # Optional
 apt-get install libpng-dev              # libpng
@@ -177,8 +181,7 @@ brew install c-blosc                   # blosc
 brew install llvm                      # LLVM
 # Python
 brew install python                    # Python
-brew install numpy                     # NumPy
-brew install nanobind                  # nanobind
+brew install nanobind robin-map        # nanobind
 # Unit Tests
 brew install gtest                     # GoogleTest
 # vdb_view
