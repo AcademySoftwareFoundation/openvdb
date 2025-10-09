@@ -931,16 +931,10 @@ Compiler::compile(const ast::Tree& tree,
         return nullptr;
     }
 
-    llvm::orc::ThreadSafeModule module = [&moduleName]() {
-        llvm::orc::ThreadSafeContext C(std::make_unique<llvm::LLVMContext>());
-        auto M = std::make_unique<llvm::Module>(moduleName, *(C.getContext()));
-        return llvm::orc::ThreadSafeModule(std::move(M), std::move(C));
-    }();
+    auto C = std::make_unique<llvm::LLVMContext>();
+    auto M = std::make_unique<llvm::Module>(moduleName, *C);
 
-    llvm::Module& M = *(module.getModuleUnlocked());
-    llvm::LLVMContext& C = *(module.getContext().getContext());
-
-    GenT codeGenerator(M, mCompilerOptions.mFunctionOptions, *mFunctionRegistry, logger);
+    GenT codeGenerator(*M, mCompilerOptions.mFunctionOptions, *mFunctionRegistry, logger);
     AttributeRegistry::Ptr attributes = codeGenerator.generate(tree);
 
     // if there has been a compilation error through user error, exit
@@ -953,7 +947,7 @@ Compiler::compile(const ast::Tree& tree,
 
     registerAccesses(codeGenerator.globals(), *attributes);
 
-    if (!registerExternalGlobals(codeGenerator.globals(), data, C, logger)) {
+    if (!registerExternalGlobals(codeGenerator.globals(), data, *C, logger)) {
         return nullptr;
     }
 
@@ -973,10 +967,10 @@ Compiler::compile(const ast::Tree& tree,
 
     // optimise and verify
 
-    if (mCompilerOptions.mVerify && !verify(M, logger)) return nullptr;
-    optimise(M, mCompilerOptions.mOptLevel, TM.get());
+    if (mCompilerOptions.mVerify && !verify(*M, logger)) return nullptr;
+    optimise(*M, mCompilerOptions.mOptLevel, TM.get());
     if (mCompilerOptions.mOptLevel != CompilerOptions::OptLevel::NONE) {
-        if (mCompilerOptions.mVerify && !verify(M, logger)) return nullptr;
+        if (mCompilerOptions.mVerify && !verify(*M, logger)) return nullptr;
     }
 
     // @todo re-constant fold!! although constant folding will work with constant
@@ -1016,10 +1010,11 @@ Compiler::compile(const ast::Tree& tree,
     }
 #endif
 
-    if (!initializeGlobalFunctions(*mFunctionRegistry, *EE, M, logger)) {
+    if (!initializeGlobalFunctions(*mFunctionRegistry, *EE, *M, logger)) {
         return nullptr;
     }
 
+    llvm::orc::ThreadSafeModule module(std::move(M), std::move(C));
     if (auto Err = EE->addIRModule(std::move(module))) {
         logger.error("Fatal AX Compiler error; the LLVM Execution Engine could "
             "not be initialized\n");
