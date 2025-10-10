@@ -160,7 +160,7 @@ jobs:
           - { name: 'half',  build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
           - { name: 'sse',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_SIMD=SSE42' }
           - { name: 'avx',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_SIMD=AVX' }
-          - { name: 'numpy', build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_NUMPY=ON -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
+          - { name: 'pygrd', build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
           - { name: 'asan',  build: 'asan',    components: 'core,test',                                      cmake: '-DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF -DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
           - { name: 'ubsan', build: 'ubsan',   components: 'core,test',                                      cmake: '-DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" ' }
           - { name: 'c++20', build: 'Release', components: 'core,test',                                      cmake: '-DCMAKE_CXX_STANDARD=20' }
