@@ -858,12 +858,18 @@ protected:
 private:
     friend FunctionBuilder;
 
+    enum class Type {
+        kNormal,
+        kBuiltin,
+        kKernel
+    };
+
     struct Attributes
     {
         SmallArgumentVector<llvm::Attribute::AttrKind> mFnAttrs, mRetAttrs;
         std::map<size_t, SmallArgumentVector<llvm::Attribute::AttrKind>> mParamAttrs;
         bool mReadOnly {false};
-        bool mBuiltin {false};
+        Type mType {Type::kNormal};
     };
 
     inline Attributes& attrs()
@@ -1519,8 +1525,9 @@ struct FunctionBuilder
         inline bool isDefault() const
         {
             if (mNames) return false;
+            if (mType != Function::Type::kNormal) return false;
             if (!mDeps.empty()) return false;
-            if (mConstantFold || mEmbedIR || mReadOnly || mBuiltin) return false;
+            if (mConstantFold || mEmbedIR || mReadOnly) return false;
             if (!mFnAttrs.empty()) return false;
             if (!mRetAttrs.empty()) return false;
             if (!mParamAttrs.empty()) return false;
@@ -1532,7 +1539,7 @@ struct FunctionBuilder
         bool mConstantFold = false;
         bool mEmbedIR = false;
         bool mReadOnly = false;
-        bool mBuiltin = false;
+        Function::Type mType = Function::Type::kNormal;
         SmallArgumentVector<llvm::Attribute::AttrKind> mFnAttrs = {};
         SmallArgumentVector<llvm::Attribute::AttrKind> mRetAttrs = {};
         std::map<size_t, SmallArgumentVector<llvm::Attribute::AttrKind>> mParamAttrs = {};
@@ -1701,17 +1708,28 @@ struct FunctionBuilder
     ///        llvm::Attribute::NonNull
     ///        llvm::Attribute::NoUndef
     ///        llvm::Attribute::NoFree
+    ///        llvm::Attribute::NoCapture / (llvm::CaptureInfo::none() from LLVM 21)
     ///
     /// @warning Attributes in this method may be extended - as such, you
     ///   should mark external function with individual attributes instead of
     ///   calling this.
     inline FunctionBuilder&
-    setBuiltin(const bool on)
+    setBuiltin()
     {
         // note that we have to defer the attribute setting to compile time as
         // various attributes need to know the function types. Would be nice if
         // we could do it all in the builder.
-        mCurrentSettings->mBuiltin = on;
+        mCurrentSettings->mType = Function::Type::kBuiltin;
+        return *this;
+    }
+
+    /// @brief  Mark this function as an external kernel entry point. Should
+    ///   only be used by the ComputeGenerators. Results in a number of function
+    ///   attributes/parameters being set.
+    inline FunctionBuilder&
+    setExternalKernel()
+    {
+        mCurrentSettings->mType = Function::Type::kKernel;
         return *this;
     }
 
@@ -1744,7 +1762,9 @@ struct FunctionBuilder
                 }
             }
             if (s->mReadOnly) decl->attrs().mReadOnly = true;
-            if (s->mBuiltin)  decl->attrs().mBuiltin = true;
+            if (s->mType != Function::Type::kNormal) {
+                decl->attrs().mType = s->mType;
+            }
         }
 
         for (auto& decl : mIRFunctions)
@@ -1762,7 +1782,9 @@ struct FunctionBuilder
                 }
             }
             if (s->mReadOnly) decl->attrs().mReadOnly = true;
-            if (s->mBuiltin)  decl->attrs().mBuiltin = true;
+            if (s->mType != Function::Type::kNormal) {
+                decl->attrs().mType = s->mType;
+            }
         }
 
         FunctionGroup::FunctionList functions;

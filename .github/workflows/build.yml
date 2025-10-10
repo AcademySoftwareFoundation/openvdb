@@ -167,7 +167,6 @@ jobs:
     strategy:
       matrix:
         config:
-          - { image: macos-13 } # Last macos runner befor M1 (macos-14)
           - { image: macos-14 }
           - { image: macos-15 }
     steps:

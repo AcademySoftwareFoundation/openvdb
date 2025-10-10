@@ -206,7 +206,7 @@ bool AXTestHarness::checkAgainstExpected(std::ostream& sstream)
             const auto& input = mInputPointGrids[i];
             const auto& expected = mOutputPointGrids[i];
             const bool pass =
-                unittest_util::compareGrids(result, *expected, *input, settings, nullptr);
+                unittest_util::compareGrids(result, *expected, *input, settings, nullptr, mUseTolerance);
             if (!pass) sstream << resultStream.str() << std::endl;
             success &= pass;
         }
@@ -218,7 +218,7 @@ bool AXTestHarness::checkAgainstExpected(std::ostream& sstream)
             unittest_util::ComparisonResult result(resultStream);
             const bool volumeSuccess =
                 unittest_util::compareUntypedGrids(result, *mOutputDenseVolumeGrids[i],
-                    *mInputDenseVolumeGrids[i], settings, nullptr);
+                    *mInputDenseVolumeGrids[i], settings, nullptr, mUseTolerance);
             success &= volumeSuccess;
             if (!volumeSuccess)  sstream << resultStream.str() << std::endl;
         }
@@ -230,7 +230,7 @@ bool AXTestHarness::checkAgainstExpected(std::ostream& sstream)
             unittest_util::ComparisonResult result(resultStream);
             const bool volumeSuccess =
                 unittest_util::compareUntypedGrids(result, *mOutputSparseVolumeGrids[i],
-                    *mInputSparseVolumeGrids[i], settings, nullptr);
+                    *mInputSparseVolumeGrids[i], settings, nullptr, mUseTolerance);
             success &= volumeSuccess;
             if (!volumeSuccess)  sstream << resultStream.str() << std::endl;
         }

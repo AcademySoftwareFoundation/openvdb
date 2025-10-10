@@ -124,13 +124,13 @@ jobs:
     strategy:
       matrix:
         config:
-          # Last macos runner before M1 (macos-14)
-          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '20' }
-          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '19' }
-          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '18' }
-          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '17' }
-          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '16' }
-          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '15' }
+          - { runner: 'macos-15', cxx: 'clang++', build: 'Release', llvm: '21' }
+          - { runner: 'macos-14', cxx: 'clang++', build: 'Release', llvm: '21' }
+          - { runner: 'macos-14', cxx: 'clang++', build: 'Release', llvm: '20' }
+          - { runner: 'macos-14', cxx: 'clang++', build: 'Release', llvm: '19' }
+          - { runner: 'macos-14', cxx: 'clang++', build: 'Release', llvm: '18' }
+          - { runner: 'macos-14', cxx: 'clang++', build: 'Release', llvm: '17' }
+          - { runner: 'macos-14', cxx: 'clang++', build: 'Release', llvm: '16' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3

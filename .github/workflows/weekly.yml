@@ -347,14 +347,14 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'ax'
-    runs-on: macos-13
+    runs-on: ${{ matrix.config.runner }}
     name: macos-cxx:${{ matrix.config.cxx }}-llvm:${{ matrix.config.llvm }}-${{ matrix.config.build }}
     env:
       CXX: ${{ matrix.config.cxx }}
     strategy:
       matrix:
         config:
-          - { cxx: 'clang++', build: 'Release', llvm: '15' }
+          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '20' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3

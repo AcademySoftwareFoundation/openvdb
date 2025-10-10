@@ -127,21 +127,9 @@ inline void VolumeComputeGenerator::computek2(llvm::Function* compute, const Att
         .addSignature<VolumeKernelBuffer::Signature>(generate, VolumeKernelBuffer::getDefaultName())
         .setConstantFold(false)
         .setEmbedIR(false)
+        .setExternalKernel()
         .addParameterAttribute(0, llvm::Attribute::ReadOnly)
-        .addParameterAttribute(0, llvm::Attribute::NoCapture)
-        .addParameterAttribute(0, llvm::Attribute::NoAlias)
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
-        .addParameterAttribute(1, llvm::Attribute::NoCapture)
-        .addParameterAttribute(1, llvm::Attribute::NoAlias)
-        .addParameterAttribute(2, llvm::Attribute::NoCapture)
-        .addParameterAttribute(2, llvm::Attribute::NoAlias)
-        .addParameterAttribute(3, llvm::Attribute::NoCapture)
-        .addParameterAttribute(3, llvm::Attribute::NoAlias)
-        .addParameterAttribute(6, llvm::Attribute::NoCapture)
-        .addParameterAttribute(6, llvm::Attribute::NoAlias)
-        .addParameterAttribute(7, llvm::Attribute::NoCapture)
-        .addParameterAttribute(7, llvm::Attribute::NoAlias)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
         .get();
 
     k2->list()[0]->create(mContext, &mModule);
@@ -238,19 +226,9 @@ inline void VolumeComputeGenerator::computek3(llvm::Function* compute, const Att
         .addSignature<VolumeKernelNode::Signature>(generate, VolumeKernelNode::getDefaultName())
         .setConstantFold(false)
         .setEmbedIR(false)
+        .setExternalKernel()
         .addParameterAttribute(0, llvm::Attribute::ReadOnly)
-        .addParameterAttribute(0, llvm::Attribute::NoCapture)
-        .addParameterAttribute(0, llvm::Attribute::NoAlias)
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
-        .addParameterAttribute(1, llvm::Attribute::NoCapture)
-        .addParameterAttribute(1, llvm::Attribute::NoAlias)
-        .addParameterAttribute(2, llvm::Attribute::NoCapture)
-        .addParameterAttribute(2, llvm::Attribute::NoAlias)
-        .addParameterAttribute(3, llvm::Attribute::NoCapture)
-        .addParameterAttribute(3, llvm::Attribute::NoAlias)
-        .addParameterAttribute(5, llvm::Attribute::NoCapture)
-        .addParameterAttribute(5, llvm::Attribute::NoAlias)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
         .get();
 
     k3->list()[0]->create(mContext, &mModule);
