@@ -41,7 +41,6 @@
 #define OPENVDB_TOOLS_INTERPOLATION_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h> // for OPENVDB_VERSION_NAME
-#include <openvdb/Types.h> // for ComputeTypeFor
 #include <openvdb/Platform.h> // for round()
 #include <openvdb/math/Math.h>// for SmoothUnitStep
 #include <openvdb/math/Transform.h> // for Transform
@@ -315,7 +314,7 @@ public:
     /// @brief Sample value in integer index space
     /// @param i Integer x-coordinate in index space
     /// @param j Integer y-coordinate in index space
-    /// @param k Integer z-coordinate in index space
+    /// @param k Integer x-coordinate in index space
     ValueType sampleVoxel(typename Coord::ValueType i,
                           typename Coord::ValueType j,
                           typename Coord::ValueType k) const
@@ -351,7 +350,7 @@ private:
 }; // class GridSampler
 
 
-/// @brief Specialization of GridSampler for construction from a ValueAccessor type.
+/// @brief Specialization of GridSampler for construction from a ValueAccessor type
 ///
 /// @note This version should normally be favored over the one above
 /// that takes a Grid or Tree. The reason is this version uses a
@@ -394,7 +393,7 @@ public:
     /// @brief Sample value in integer index space
     /// @param i Integer x-coordinate in index space
     /// @param j Integer y-coordinate in index space
-    /// @param k Integer z-coordinate in index space
+    /// @param k Integer x-coordinate in index space
     ValueType sampleVoxel(typename Coord::ValueType i,
                           typename Coord::ValueType j,
                           typename Coord::ValueType k) const
@@ -443,8 +442,7 @@ private:
 /// @warning For performance reasons the check for alignment of the
 /// two grids is only performed at construction time!
 template<typename GridOrTreeT,
-         typename SamplerT,
-         typename ComputeT = typename ComputeTypeFor<typename GridOrTreeT::ValueType>::type>
+         typename SamplerT>
 class DualGridSampler
 {
 public:
@@ -483,7 +481,7 @@ public:
     {
         if (mAligned) return mSourceTree->getValue(ijk);
         const Vec3R world = mTargetXform->indexToWorld(ijk);
-        return SamplerT::template sample<TreeType, ComputeT>(*mSourceTree, mSourceXform->worldToIndex(world));
+        return SamplerT::sample(*mSourceTree, mSourceXform->worldToIndex(world));
     }
     /// @brief Return true if the two grids are aligned.
     inline bool isAligned() const { return mAligned; }
@@ -495,7 +493,8 @@ private:
 };// DualGridSampler
 
 /// @brief Specialization of DualGridSampler for construction from a ValueAccessor type.
-template<typename TreeT, typename SamplerT>
+template<typename TreeT,
+         typename SamplerT>
 class DualGridSampler<tree::ValueAccessor<TreeT>, SamplerT>
 {
     public:
@@ -746,31 +745,17 @@ BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
                    typename TreeT::ValueType& result)
 {
     using ValueT = typename TreeT::ValueType;
-    using ComputeT = typename ComputeTypeFor<ValueT>::type;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord);
     const Vec3R uvw = inCoord - inIdx;
 
     // Retrieve the values of the eight voxels surrounding the
     // fractional source coordinates.
-    ValueT probeData[2][2][2];
-    ComputeT computeData[2][2][2];
-    bool hasActiveValues;
+    ValueT data[2][2][2];
 
-    if constexpr(std::is_same_v<ValueT, ComputeT>) {
-        hasActiveValues = BoxSampler::probeValues(computeData, inTree, Coord(inIdx));
-    } else {
-        hasActiveValues = BoxSampler::probeValues(probeData, inTree, Coord(inIdx));
-        for (int dx = 0; dx < 2; ++dx) {
-            for (int dy = 0; dy < 2; ++dy) {
-                for (int dz = 0; dz < 2; ++dz) {
-                    computeData[dx][dy][dz] = probeData[dx][dy][dz];
-                }
-            }
-        }
-    }
+    const bool hasActiveValues = BoxSampler::probeValues(data, inTree, Coord(inIdx));
 
-    result = ValueT(BoxSampler::trilinearInterpolation(computeData, uvw));
+    result = BoxSampler::trilinearInterpolation(data, uvw);
 
     return hasActiveValues;
 }
@@ -781,18 +766,17 @@ inline typename TreeT::ValueType
 BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
     using ValueT = typename TreeT::ValueType;
-    using ComputeT = typename ComputeTypeFor<ValueT>::type;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord);
     const Vec3R uvw = inCoord - inIdx;
 
     // Retrieve the values of the eight voxels surrounding the
     // fractional source coordinates.
-    ComputeT data[2][2][2];
+    ValueT data[2][2][2];
 
     BoxSampler::getValues(data, inTree, Coord(inIdx));
 
-    return ValueT(BoxSampler::trilinearInterpolation(data, uvw));
+    return BoxSampler::trilinearInterpolation(data, uvw);
 }
 
 
@@ -848,7 +832,6 @@ QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     typename TreeT::ValueType& result)
 {
     using ValueT = typename TreeT::ValueType;
-    using ComputeT = typename ComputeTypeFor<ValueT>::type;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord), inLoIdx = inIdx - Vec3i(1, 1, 1);
     const Vec3R uvw = inCoord - inIdx;
@@ -857,17 +840,15 @@ QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     // fractional source coordinates.
     bool active = false;
     ValueT data[3][3][3];
-    ComputeT computeData[3][3][3];
     for (int dx = 0, ix = inLoIdx.x(); dx < 3; ++dx, ++ix) {
         for (int dy = 0, iy = inLoIdx.y(); dy < 3; ++dy, ++iy) {
             for (int dz = 0, iz = inLoIdx.z(); dz < 3; ++dz, ++iz) {
                 if (inTree.probeValue(Coord(ix, iy, iz), data[dx][dy][dz])) active = true;
-                computeData[dx][dy][dz] = data[dx][dy][dz];
             }
         }
     }
 
-    result = ValueT(QuadraticSampler::triquadraticInterpolation(computeData, uvw));
+    result = QuadraticSampler::triquadraticInterpolation(data, uvw);
 
     return active;
 }
@@ -877,14 +858,13 @@ inline typename TreeT::ValueType
 QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
     using ValueT = typename TreeT::ValueType;
-    using ComputeT = typename ComputeTypeFor<ValueT>::type;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord), inLoIdx = inIdx - Vec3i(1, 1, 1);
     const Vec3R uvw = inCoord - inIdx;
 
     // Retrieve the values of the 27 voxels surrounding the
     // fractional source coordinates.
-    ComputeT data[3][3][3];
+    ValueT data[3][3][3];
     for (int dx = 0, ix = inLoIdx.x(); dx < 3; ++dx, ++ix) {
         for (int dy = 0, iy = inLoIdx.y(); dy < 3; ++dy, ++iy) {
             for (int dz = 0, iz = inLoIdx.z(); dz < 3; ++dz, ++iz) {
@@ -893,7 +873,7 @@ QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
         }
     }
 
-    return ValueT(QuadraticSampler::triquadraticInterpolation(data, uvw));
+    return QuadraticSampler::triquadraticInterpolation(data, uvw);
 }
 
 

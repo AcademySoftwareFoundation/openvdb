@@ -1004,7 +1004,6 @@ ClosestSurfacePoint<GridT>::searchAndReplace(std::vector<Vec3R>& points,
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
-OPENVDB_INSTANTIATE_CLASS ClosestSurfacePoint<HalfGrid>;
 OPENVDB_INSTANTIATE_CLASS ClosestSurfacePoint<FloatGrid>;
 OPENVDB_INSTANTIATE_CLASS ClosestSurfacePoint<DoubleGrid>;
 

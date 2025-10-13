@@ -91,7 +91,7 @@ public:
     using TreeT = typename GridT::TreeType;
 
     static_assert(NodeLevel >= -1 && NodeLevel < int(TreeT::DEPTH)-1, "NodeLevel out of range");
-    static_assert(openvdb::is_floating_point<ValueT>::value,
+    static_assert(std::is_floating_point<ValueT>::value,
         "level set grids must have scalar, floating-point value types");
 
     /// @brief Constructor

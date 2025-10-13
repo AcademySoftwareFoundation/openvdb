@@ -12,7 +12,7 @@
 #ifndef OPENVDB_TOOLS_LEVEL_SET_TRACKER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVEL_SET_TRACKER_HAS_BEEN_INCLUDED
 
-#include <openvdb/Types.h> // for ComputeTypeFor
+#include <openvdb/Types.h>
 #include <openvdb/Grid.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/FiniteDifference.h>
@@ -53,8 +53,7 @@ enum class TrimMode {
 
 
 /// @brief Performs multi-threaded interface tracking of narrow band level sets
-template<typename GridT,
-         typename InterruptT = util::NullInterrupter>
+template<typename GridT, typename InterruptT = util::NullInterrupter>
 class LevelSetTracker
 {
 public:
@@ -64,13 +63,11 @@ public:
     using TreeType = typename GridT::TreeType;
     using LeafType = typename TreeType::LeafNodeType;
     using ValueType = typename TreeType::ValueType;
-    using ComputeType = typename ComputeTypeFor<ValueType>::type;
     using LeafManagerType = typename tree::LeafManager<TreeType>; // leafs + buffers
     using LeafRange = typename LeafManagerType::LeafRange;
     using BufferType = typename LeafManagerType::BufferType;
     using MaskTreeType = typename TreeType::template ValueConverter<ValueMask>::Type;
-    static_assert(openvdb::is_floating_point<ValueType>::value
-               && openvdb::is_floating_point<ComputeType>::value,
+    static_assert(std::is_floating_point<ValueType>::value,
         "LevelSetTracker requires a level set grid with floating-point values");
 
     /// Lightweight struct that stores the state of the LevelSetTracker
@@ -135,7 +132,7 @@ public:
     bool resize(Index halfWidth = static_cast<Index>(LEVEL_SET_HALF_WIDTH));
 
     /// @brief Return the half width of the narrow band in floating-point voxel units.
-    ValueType getHalfWidth() const { return ComputeType(mGrid->background())/mDx; }
+    ValueType getHalfWidth() const { return mGrid->background()/mDx; }
 
     /// @brief Return the state of the tracker (see struct defined above)
     State getState() const { return mState; }
@@ -235,7 +232,7 @@ private:
         void eval(StencilT& stencil, const ValueType* phi, ValueType* result, Index n) const;
         LevelSetTracker& mTracker;
         const MaskT*     mMask;
-        const ComputeType  mDt, mInvDx;
+        const ValueType  mDt, mInvDx;
         typename std::function<void (Normalizer*, const LeafRange&)> mTask;
     }; // Normalizer struct
 
@@ -250,12 +247,12 @@ private:
     // a list of the current LeafNodes! The auxiliary buffers on the
     // other hand always have to be allocated locally, since some
     // methods need them and others don't!
-    GridType*          mGrid;
-    LeafManagerType*   mLeafs;
-    InterruptT*        mInterrupter;
-    const ComputeType  mDx;
-    State              mState;
-    TrimMode           mTrimMode = TrimMode::kAll;
+    GridType*        mGrid;
+    LeafManagerType* mLeafs;
+    InterruptT*      mInterrupter;
+    const ValueType  mDx;
+    State            mState;
+    TrimMode         mTrimMode = TrimMode::kAll;
 }; // end of LevelSetTracker class
 
 template<typename GridT, typename InterruptT>
@@ -264,7 +261,7 @@ LevelSetTracker(GridT& grid, InterruptT* interrupt):
     mGrid(&grid),
     mLeafs(new LeafManagerType(grid.tree())),
     mInterrupter(interrupt),
-    mDx(static_cast<ComputeType>(grid.voxelSize()[0])),
+    mDx(static_cast<ValueType>(grid.voxelSize()[0])),
     mState()
 {
     if ( !grid.hasUniformVoxels() ) {
@@ -331,8 +328,7 @@ dilate(int iterations)
         for (int i=0; i < iterations; ++i) {
             MaskTreeType mask0(mGrid->tree(), false, TopologyCopy());
             tools::dilateActiveValues( *mLeafs, 1, tools::NN_FACE, tools::IGNORE_TILES);
-            tools::changeLevelSetBackground(this->leafs(),
-                                            ValueType(mDx + ComputeType(mGrid->background())));
+            tools::changeLevelSetBackground(this->leafs(), mDx + mGrid->background());
             MaskTreeType mask(mGrid->tree(), false, TopologyCopy());
             mask.topologyDifference(mask0);
             this->normalize(&mask);
@@ -348,7 +344,7 @@ erode(int iterations)
     tools::erodeActiveValues(*mLeafs, iterations, tools::NN_FACE, tools::IGNORE_TILES);
     tools::pruneLevelSet(mLeafs->tree());
     mLeafs->rebuildLeafArray();
-    const ValueType background = ComputeType(mGrid->background()) - ComputeType(iterations) * mDx;
+    const ValueType background = mGrid->background() - ValueType(iterations) * mDx;
     tools::changeLevelSetBackground(this->leafs(), background);
 }
 
@@ -477,8 +473,7 @@ LevelSetTracker<GridT, InterruptT>::Trim<Trimming>::trim()
 template<typename GridT, typename InterruptT>
 template<lstrack::TrimMode Trimming>
 inline void
-LevelSetTracker<GridT, InterruptT>::
-Trim<Trimming>::operator()(const LeafRange& range) const
+LevelSetTracker<GridT, InterruptT>::Trim<Trimming>::operator()(const LeafRange& range) const
 {
     mTracker.checkInterrupter();
     const ValueType gamma = mTracker.mGrid->background();
@@ -523,10 +518,9 @@ Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 Normalizer(LevelSetTracker& tracker, const MaskT* mask)
     : mTracker(tracker)
     , mMask(mask)
-    , mDt(ComputeType(tracker.grid().voxelSize()[0]) *
-                              (TemporalScheme == math::TVD_RK1 ? 0.3f :
+    , mDt(tracker.voxelSize()*(TemporalScheme == math::TVD_RK1 ? 0.3f :
                                TemporalScheme == math::TVD_RK2 ? 0.9f : 1.0f))
-    , mInvDx(1.0f/ComputeType(tracker.grid().voxelSize()[0]))
+    , mInvDx(1.0f/tracker.voxelSize())
     , mTask(nullptr)
 {
 }
@@ -637,15 +631,15 @@ Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 eval(StencilT& stencil, const ValueType* phi, ValueType* result, Index n) const
 {
     using GradientT = typename math::ISGradientNormSqrd<SpatialScheme>;
-    static const ComputeType alpha = ComputeType(Nominator)/ComputeType(Denominator);
-    static const ComputeType beta  = ComputeType(1) - alpha;
+    static const ValueType alpha = ValueType(Nominator)/ValueType(Denominator);
+    static const ValueType beta  = ValueType(1) - alpha;
 
-    const ComputeType normSqGradPhi = GradientT::result(stencil);
-    const ComputeType phi0 = stencil.getValue();
-    ComputeType v = phi0 / ( math::Sqrt(math::Pow2(phi0) + normSqGradPhi) +
-                             math::Tolerance<ComputeType>::value() );
-    v = phi0 - mDt * v * (math::Sqrt(normSqGradPhi) * mInvDx - ComputeType(1));
-    result[n] = Nominator ? ComputeType(alpha * ComputeType(phi[n]) + beta * v) : v;
+    const ValueType normSqGradPhi = GradientT::result(stencil);
+    const ValueType phi0 = stencil.getValue();
+    ValueType v = phi0 / ( math::Sqrt(math::Pow2(phi0) + normSqGradPhi) +
+                           math::Tolerance<ValueType>::value() );
+    v = phi0 - mDt * v * (math::Sqrt(normSqGradPhi) * mInvDx - 1.0f);
+    result[n] = Nominator ? alpha * phi[n] + beta * v : v;
 }
 
 template<typename GridT, typename InterruptT>
@@ -654,7 +648,7 @@ template<math::BiasedGradientScheme      SpatialScheme,
          typename MaskT>
 template <int Nominator, int Denominator>
 inline void
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT,InterruptT>::
 Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
 {
@@ -693,7 +687,6 @@ euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
-OPENVDB_INSTANTIATE_CLASS LevelSetTracker<HalfGrid, util::NullInterrupter>;
 OPENVDB_INSTANTIATE_CLASS LevelSetTracker<FloatGrid, util::NullInterrupter>;
 OPENVDB_INSTANTIATE_CLASS LevelSetTracker<DoubleGrid, util::NullInterrupter>;
 
