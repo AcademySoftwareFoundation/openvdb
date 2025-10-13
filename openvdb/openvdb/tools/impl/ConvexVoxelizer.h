@@ -80,9 +80,8 @@ private:
 ///     using BaseT::mXYData;
 ///     using BaseT::tileCeil;
 ///
-///     using ValueT   = typename BaseT::ValueT;
-///     using Vec3T    = typename BaseT::Vec3T;
-///     using ComputeT = typename BaseT::ComputeT;
+///     using ValueT = typename BaseT::ValueT;
+///     using Vec3T  = typename BaseT::Vec3T;
 ///
 /// public:
 ///
@@ -109,7 +108,7 @@ private:
 ///
 /// private:
 ///
-///     inline ComputeT
+///     inline ValueT
 ///     signedDistance(const Vec3T& p) const
 ///     {
 ///         return (p - mPt).length() - mRad;
@@ -120,30 +119,30 @@ private:
 ///     {
 ///         mXYData.reset(mX - mORad, mX + mORad, step);
 ///
-///         for (ComputeT x = tileCeil(mX - mORad, step); x <= mX + mORad; x += step)
+///         for (ValueT x = tileCeil(mX - mORad, step); x <= mX + mORad; x += step)
 ///             mXYData.expandYRange(x, BaseT::circleBottom(mX, mY, mORad, x),
 ///                 BaseT::circleTop(mX, mY, mORad, x));
 ///     }
 ///
-///     std::function<bool(ComputeT&, ComputeT&, const ComputeT&, const ComputeT&)> sphereBottomTop =
-///     [this](ComputeT& zb, ComputeT& zt, const ComputeT& x, const ComputeT& y)
+///     std::function<bool(ValueT&, ValueT&, const ValueT&, const ValueT&)> sphereBottomTop =
+///     [this](ValueT& zb, ValueT& zt, const ValueT& x, const ValueT& y)
 ///     {
 ///         zb = BaseT::sphereBottom(mX, mY, mZ, mORad, x, y);
 ///         zt = BaseT::sphereTop(mX, mY, mZ, mORad, x, y);
 ///
-///         return math::isFinite(zb) && math::isFinite(zt);
+///         return std::isfinite(zb) && std::isfinite(zt);
 ///     };
 ///
 ///     template <typename ScalarT>
 ///     inline void
 ///     initialize(const math::Vec3<ScalarT>& pt, const ScalarT& r)
 ///     {
-///         const ComputeT vx = BaseT::voxelSize(),
-///                        hw = BaseT::halfWidth();
+///         const ValueT vx = BaseT::voxelSize(),
+///                      hw = BaseT::halfWidth();
 ///
 ///         // sphere data in index space
 ///         mPt = Vec3T(pt)/vx;
-///         mRad = ComputeT(r)/vx;
+///         mRad = ValueT(r)/vx;
 ///
 ///         mX = mPt.x(); mY = mPt.y(); mZ = mPt.z();
 ///
@@ -154,7 +153,7 @@ private:
 ///     }
 ///
 ///     Vec3T mPt;
-///     ComputeT mRad, mORad, mX, mY, mZ;
+///     ValueT mRad, mORad, mX, mY, mZ;
 /// };
 ///
 /// // usage:
@@ -182,14 +181,11 @@ class ConvexVoxelizer
 
 protected:
 
-    using ValueT   = typename GridType::ValueType;
-    using ComputeT = typename ComputeTypeFor<ValueT>::type;
-    using Vec3T    = math::Vec3<ComputeT>;
-    using Vec2T    = math::Vec2<ComputeT>;
+    using ValueT = typename GridType::ValueType;
+    using Vec3T  = math::Vec3<ValueT>;
+    using Vec2T  = math::Vec2<ValueT>;
 
-    static_assert(openvdb::is_floating_point<ValueT>::value
-               && openvdb::is_floating_point<ComputeT>::value,
-        "level set grids must have scalar, floating-point value types");
+    static_assert(std::is_floating_point<ValueT>::value);
 
 public:
 
@@ -204,10 +200,10 @@ public:
     /// meaning the voxel size and background value need to be set prior to voxelization
     ConvexVoxelizer(GridPtr& grid, const bool& threaded = false, InterruptType* interrupter = nullptr)
     : mGrid(grid)
-    , mVox(ComputeT((grid->voxelSize())[0]))
-    , mHw(ComputeT(grid->background())/ComputeT((grid->voxelSize())[0]))
-    , mBg(ComputeT(grid->background()))
-    , mNegBg(ComputeT(-(grid->background())))
+    , mVox(ValueT((grid->voxelSize())[0]))
+    , mHw(ValueT(grid->background()/(grid->voxelSize())[0]))
+    , mBg(grid->background())
+    , mNegBg(-(grid->background()))
     , mSerial(!threaded)
     , mInterrupter(interrupter)
     {
@@ -216,10 +212,10 @@ public:
     virtual ~ConvexVoxelizer() = default;
 
     /// @brief Return the voxel size of the grid.
-    inline ComputeT voxelSize() const { return mVox; }
+    inline ValueT voxelSize() const { return mVox; }
 
     /// @brief Return the half width of the narrow-band level set.
-    inline ComputeT halfWidth() const { return mHw; }
+    inline ValueT halfWidth() const { return mHw; }
 
 private:
 
@@ -291,7 +287,7 @@ protected:
     /// @brief Computes the signed distance from a point to the convex region in index space.
     ///
     /// @param p The point in 3D space for which to compute the signed distance.
-    inline ComputeT signedDistance(const Vec3T&) const { return ComputeT(0); }
+    inline ValueT signedDistance(const Vec3T&) const { return ValueT(0); }
 
     /// @brief Computes the signed distance for tiles in index space,
     /// considering the center of the tile.
@@ -303,7 +299,7 @@ protected:
     /// A tile might not fully fit in an open prism but might fit in the union of a prism and wedge,
     /// and so in this case it might make sense to use the sdf for an offset triangle on tiles
     /// during the open prism scan.
-    inline ComputeT
+    inline ValueT
     tilePointSignedDistance(const Vec3T& p) const
     {
         return static_cast<const Derived*>(this)->signedDistance(p);
@@ -318,8 +314,8 @@ protected:
     /// @param[in] y The y ordinate of the infinte line.
     /// @return true if an intersection occurs; otherwise false.
     /// @note The derived class can override this lambda to implement different behavior for degenerate cases.
-    std::function<bool(ComputeT&, ComputeT&, const ComputeT&, const ComputeT&)> bottomTop =
-        [](ComputeT&, ComputeT&, const ComputeT&, const ComputeT&) { return false; };
+    std::function<bool(ValueT&, ValueT&, const ValueT&, const ValueT&)> bottomTop =
+        [](ValueT&, ValueT&, const ValueT&, const ValueT&) { return false; };
 
     // ------------ utilities ------------
 
@@ -327,14 +323,14 @@ protected:
     /// @param x Input value.
     /// @param step Tile step size.
     /// @return The ceiling of the value based on the tile size.
-    inline static ComputeT
-    tileCeil(const ComputeT& x, const ComputeT& step)
+    inline static ValueT
+    tileCeil(const ValueT& x, const ValueT& step)
     {
-        const ValueT offset = ComputeT(0.5) * (step - ComputeT(1));
+        const ValueT offset = ValueT(0.5) * (step - ValueT(1));
 
-        return step == ComputeT(1)
-            ? static_cast<ComputeT>(math::Ceil(perturbDown(x)))
-            : step * static_cast<ComputeT>(math::Ceil(perturbDown((x - offset)/step))) + offset;
+        return step == ValueT(1)
+            ? static_cast<ValueT>(math::Ceil(perturbDown(x)))
+            : step * static_cast<ValueT>(math::Ceil(perturbDown((x - offset)/step))) + offset;
     }
 
     /// @brief Rounds an input scalar up to the nearest valid ordinate of tile of a specified size.
@@ -343,12 +339,12 @@ protected:
     /// @param step Tile step size.
     /// @return The ceiling of the value based on the tile size.
     template <typename T>
-    inline static ComputeT
-    tileCeil(const ComputeT& x, const T& step)
+    inline static ValueT
+    tileCeil(const ValueT& x, const T& step)
     {
         static_assert(std::is_integral<T>::value, "Index must be an integral type");
 
-        const ComputeT s = static_cast<ComputeT>(step);
+        const ValueT s = static_cast<ValueT>(step);
 
         return tileCeil(x, s);
     }
@@ -357,14 +353,14 @@ protected:
     /// @param x Input value.
     /// @param step Tile step size.
     /// @return The ceiling of the value based on the tile size.
-    inline static ComputeT
-    tileFloor(const ComputeT& x, const ComputeT& step)
+    inline static ValueT
+    tileFloor(const ValueT& x, const ValueT& step)
     {
-        const ValueT offset = ComputeT(0.5) * (step - ComputeT(1));
+        const ValueT offset = ValueT(0.5) * (step - ValueT(1));
 
-        return step == ComputeT(1)
-            ? static_cast<ComputeT>(math::Floor(perturbUp(x)))
-            : step * static_cast<ComputeT>(math::Floor(perturbUp((x - offset)/step))) + offset;
+        return step == ValueT(1)
+            ? static_cast<ValueT>(math::Floor(perturbUp(x)))
+            : step * static_cast<ValueT>(math::Floor(perturbUp((x - offset)/step))) + offset;
     }
 
     /// @brief Rounds an input scalar down to the nearest valid ordinate of tile of a specified size.
@@ -373,12 +369,12 @@ protected:
     /// @param step Tile step size.
     /// @return The ceiling of the value based on the tile size.
     template <typename T>
-    inline static ComputeT
-    tileFloor(const ComputeT& x, const T& step)
+    inline static ValueT
+    tileFloor(const ValueT& x, const T& step)
     {
         static_assert(std::is_integral<T>::value, "Index must be an integral type");
 
-        const ComputeT s = static_cast<ComputeT>(step);
+        const ValueT s = static_cast<ValueT>(step);
 
         return tileFloor(x, s);
     }
@@ -389,9 +385,9 @@ protected:
     /// @param r Radius of the circle.
     /// @param x X-coordinate for which to compute the bottom y-coordinate.
     /// @return The y-coordinate at the bottom of the circle for the given x position.
-    inline static ComputeT
-    circleBottom(const ComputeT& x0, const ComputeT& y0,
-                 const ComputeT& r, const ComputeT& x)
+    inline static ValueT
+    circleBottom(const ValueT& x0, const ValueT& y0,
+                 const ValueT& r, const ValueT& x)
     {
         return y0 - math::Sqrt(math::Pow2(r) - math::Pow2(x-x0));
     }
@@ -402,9 +398,9 @@ protected:
     /// @param r Radius of the circle.
     /// @param x X-coordinate for which to compute the top y-coordinate.
     /// @return The y-coordinate at the top of the circle for the given x position.
-    inline static ComputeT
-    circleTop(const ComputeT& x0, const ComputeT& y0,
-              const ComputeT& r, const ComputeT& x)
+    inline static ValueT
+    circleTop(const ValueT& x0, const ValueT& y0,
+              const ValueT& r, const ValueT& x)
     {
         return y0 + math::Sqrt(math::Pow2(r) - math::Pow2(x-x0));
     }
@@ -417,9 +413,9 @@ protected:
     /// @param x X-coordinate for which to compute the bottom z-coordinate.
     /// @param y Y-coordinate for which to compute the bottom z-coordinate.
     /// @return The z-coordinate at the bottom of the sphere for the given (x, y) position.
-    inline static ComputeT
-    sphereBottom(const ComputeT& x0, const ComputeT& y0, const ComputeT& z0,
-                 const ComputeT& r, const ComputeT& x, const ComputeT& y)
+    inline static ValueT
+    sphereBottom(const ValueT& x0, const ValueT& y0, const ValueT& z0,
+                 const ValueT& r, const ValueT& x, const ValueT& y)
     {
         return z0 - math::Sqrt(math::Pow2(r) - math::Pow2(x-x0) - math::Pow2(y-y0));
     }
@@ -432,9 +428,9 @@ protected:
     /// @param x X-coordinate for which to compute the top z-coordinate.
     /// @param y Y-coordinate for which to compute the top z-coordinate.
     /// @return The z-coordinate at the top of the sphere for the given (x, y) position.
-    inline static ComputeT
-    sphereTop(const ComputeT& x0, const ComputeT& y0, const ComputeT& z0,
-              const ComputeT& r, const ComputeT& x, const ComputeT& y)
+    inline static ValueT
+    sphereTop(const ValueT& x0, const ValueT& y0, const ValueT& z0,
+              const ValueT& r, const ValueT& x, const ValueT& y)
     {
         return z0 + math::Sqrt(math::Pow2(r) - math::Pow2(x-x0) - math::Pow2(y-y0));
     }
@@ -458,7 +454,7 @@ protected:
         /// @param xmin The lower bound of the x range.
         /// @param xmax The upper bound of the x range.
         /// @param step The step size between x values. Defaults to 1.
-        XYRangeData(const ComputeT& xmin, const ComputeT& xmax, const Index& step = 1)
+        XYRangeData(const ValueT& xmin, const ValueT& xmax, const Index& step = 1)
         {
             reset(xmin, xmax, step);
         }
@@ -471,7 +467,7 @@ protected:
         /// @param ymax The new maximum y value to compare with and possibly update
         /// the current maximum at x.
         inline void
-        expandYRange(const ComputeT& x, const ComputeT& ymin, const ComputeT& ymax)
+        expandYRange(const ValueT& x, const ValueT& ymin, const ValueT& ymax)
         {
             expandYMin(x, ymin);
             expandYMax(x, ymax);
@@ -482,11 +478,11 @@ protected:
         /// @param x The x value.
         /// @param ymin The minimum y value to possibly be set.
         inline void
-        expandYMin(const ComputeT& x, const ComputeT& ymin)
+        expandYMin(const ValueT& x, const ValueT& ymin)
         {
             const Index i = worldToIndex(x);
 
-            if (math::isFinite(ymin) && ymin < mYMins[i])
+            if (std::isfinite(ymin) && ymin < mYMins[i])
                 mYMins[i] = ymin;
         }
 
@@ -495,11 +491,11 @@ protected:
         /// @param x The x value.
         /// @param ymax The maximum y value to possibly be set.
         inline void
-        expandYMax(const ComputeT& x, const ComputeT& ymax)
+        expandYMax(const ValueT& x, const ValueT& ymax)
         {
             const Index i = worldToIndex(x);
 
-            if (math::isFinite(ymax) && ymax > mYMaxs[i])
+            if (std::isfinite(ymax) && ymax > mYMaxs[i])
                 mYMaxs[i] = ymax;
         }
 
@@ -508,9 +504,9 @@ protected:
         /// @param x The x value.
         /// @param y The y value to use for expanding the range.
         inline void
-        expandYRange(const ComputeT& x, const ComputeT& y)
+        expandYRange(const ValueT& x, const ValueT& y)
         {
-            if (math::isFinite(y)) {
+            if (std::isfinite(y)) {
                 const Index i = worldToIndex(x);
 
                 if (y < mYMins[i])
@@ -526,7 +522,7 @@ protected:
         /// @param x The x value.
         /// @param ymin The minimum y value to reset.
         inline void
-        setYMin(const ComputeT& x, const ComputeT& ymin)
+        setYMin(const ValueT& x, const ValueT& ymin)
         {
             const Index i = worldToIndex(x);
 
@@ -538,7 +534,7 @@ protected:
         /// @param x The x value.
         /// @param ymax The maximum y value to reset.
         inline void
-        setYMax(const ComputeT& x, const ComputeT& ymax)
+        setYMax(const ValueT& x, const ValueT& ymax)
         {
             const Index i = worldToIndex(x);
 
@@ -548,7 +544,7 @@ protected:
         /// @brief Clears the y range for a given x value, setting it to an empty interval.
         /// @param x The x value.
         inline void
-        clearYRange(const ComputeT& x)
+        clearYRange(const ValueT& x)
         {
             const Index i = worldToIndex(x);
 
@@ -578,12 +574,12 @@ protected:
         /// @param xmax The upper bound of the x range.
         /// @param step The step size between x values. Defaults to 1.
         inline void
-        reset(const ComputeT& xmin, const ComputeT& xmax, const Index& step = 1)
+        reset(const ValueT& xmin, const ValueT& xmax, const Index& step = 1)
         {
             assert(step != 0);
 
             mStep = step;
-            mStepInv = ComputeT(1)/static_cast<ComputeT>(mStep);
+            mStepInv = ValueT(1)/static_cast<ValueT>(mStep);
 
             mXStart = tileCeil(xmin, mStep);
             mXEnd = tileFloor(xmax, mStep);
@@ -604,38 +600,38 @@ protected:
 
         /// @brief Retrieves the starting x value in the range.
         /// @return The start of the x range.
-        inline ComputeT start() const { return mXStart; }
+        inline ValueT start() const { return mXStart; }
 
         /// @brief Retrieves the ending x value in the range.
         /// @return The end of the x range.
-        inline ComputeT end() const { return mXEnd; }
+        inline ValueT end() const { return mXEnd; }
 
         /// @brief Converts an index to its corresponding x value.
         /// @param i The index value.
         /// @return The corresponding x value.
-        inline ComputeT getX(const Index& i) const { return indexToWorld(i); }
+        inline ValueT getX(const Index& i) const { return indexToWorld(i); }
 
         /// @brief Gets the minimum y value for a given index.
         /// @param i The index value.
         /// @return The minimum y value.
-        inline ComputeT getYMin(const Index& i) const { assert(i < mSize); return mYMins[i]; }
+        inline ValueT getYMin(const Index& i) const { assert(i < mSize); return mYMins[i]; }
 
         /// @brief Gets the maximum y value for a given index.
         /// @param i The index value.
         /// @return The maximum y value.
-        inline ComputeT getYMax(const Index& i) const { assert(i < mSize); return mYMaxs[i]; }
+        inline ValueT getYMax(const Index& i) const { assert(i < mSize); return mYMaxs[i]; }
 
         /// @brief Gets the minimum y value for a given x value.
         /// @param x The x value.
         /// @return The minimum y value at the given x.
         /// @note @c x is rounded to the nearest value in the x range.
-        inline ComputeT getYMin(const ValueT& x) const { return mYMins[worldToIndex(x)]; }
+        inline ValueT getYMin(const ValueT& x) const { return mYMins[worldToIndex(x)]; }
 
         /// @brief Gets the maximum y value for a given x value.
         /// @param x The x value.
         /// @return The maximum y value at the given x.
         /// @note @c x is rounded to the nearest value in the x range.
-        inline ComputeT getYMax(const ValueT& x) const { return mYMaxs[worldToIndex(x)]; }
+        inline ValueT getYMax(const ValueT& x) const { return mYMaxs[worldToIndex(x)]; }
 
         /// @brief Retrieves the x, ymin, and ymax values for a given index.
         /// @param x Output parameter for the x value.
@@ -643,7 +639,7 @@ protected:
         /// @param ymax Output parameter for the maximum y value.
         /// @param i The index to query.
         inline void
-        XYData(ComputeT& x, ComputeT& ymin, ComputeT& ymax, const Index& i) const
+        XYData(ValueT& x, ValueT& ymin, ValueT& ymax, const Index& i) const
         {
             x = indexToWorld(i);
             ymin = mYMins[i];
@@ -672,10 +668,10 @@ protected:
         {
             assert(mStep == xydata.step());
 
-            const ComputeT start = xydata.start(), end = xydata.end();
+            const ValueT start = xydata.start(), end = xydata.end();
 
-            const std::vector<ComputeT>& ymins = xydata.mYMins;
-            const std::vector<ComputeT>& ymaxs = xydata.mYMaxs;
+            const std::vector<ValueT>& ymins = xydata.mYMins;
+            const std::vector<ValueT>& ymaxs = xydata.mYMaxs;
 
             if (start < mXStart) {
                 const Index n = indexDistance(mXStart, start);
@@ -712,7 +708,7 @@ protected:
             }
 
             if (i == mSize) {
-                mSize = 0; mXStart = ComputeT(0); mXEnd = ComputeT(0);
+                mSize = 0; mXStart = ValueT(0); mXEnd = ValueT(0);
                 mYMins.clear(); mYMaxs.clear();
                 return;
             }
@@ -728,8 +724,8 @@ protected:
                 return;
 
             mSize -= i + j;
-            mXStart += ComputeT(i * mStep);
-            mXEnd -= ComputeT(j * mStep);
+            mXStart += ValueT(i * mStep);
+            mXEnd -= ValueT(j * mStep);
 
             if (i > 0) {
                 mYMins.erase(mYMins.begin(), mYMins.begin() + i);
@@ -744,18 +740,18 @@ protected:
 
     private:
 
-        inline static const ComputeT
-            MINVALUE = std::numeric_limits<ComputeT>::lowest(),
-            MAXVALUE = std::numeric_limits<ComputeT>::max();
+        inline static const ValueT
+            MINVALUE = std::numeric_limits<ValueT>::lowest(),
+            MAXVALUE = std::numeric_limits<ValueT>::max();
 
         inline Index
-        indexDistance(const ComputeT& a, const ComputeT& b)
+        indexDistance(const ValueT& a, const ValueT& b)
         {
             return Index(math::Round(mStepInv*math::Abs(a - b)));
         }
 
         inline Index
-        worldToIndex(const ComputeT& x) const
+        worldToIndex(const ValueT& x) const
         {
             const Index i = Index(math::Round(mStepInv*(x - mXStart)));
             assert(i < mSize);
@@ -763,19 +759,19 @@ protected:
             return i;
         }
 
-        inline ComputeT
+        inline ValueT
         indexToWorld(const Index i) const
         {
             assert(i < mSize);
 
-            return mXStart + ComputeT(i * mStep);
+            return mXStart + ValueT(i * mStep);
         }
 
         Index mStep, mSize;
 
-        ComputeT mStepInv, mXStart, mXEnd;
+        ValueT mStepInv, mXStart, mXEnd;
 
-        std::vector<ComputeT> mYMins, mYMaxs;
+        std::vector<ValueT> mYMins, mYMaxs;
 
     }; // class XYRangeData
 
@@ -786,20 +782,20 @@ protected:
 private:
 
 #define EPS 0.0005f
-    inline static ComputeT perturbDown(const ComputeT& x) { return x - ComputeT(EPS); }
-    inline static ComputeT perturbUp(const ComputeT& x) { return x + ComputeT(EPS); }
+    inline static ValueT perturbDown(const ValueT& x) { return x - ValueT(EPS); }
+    inline static ValueT perturbUp(const ValueT& x) { return x + ValueT(EPS); }
 #undef EPS
 
-    inline static ComputeT
-    voxelCeil(const ComputeT& x)
+    inline static ValueT
+    voxelCeil(const ValueT& x)
     {
-        return static_cast<ComputeT>(math::Ceil(perturbDown(x)));
+        return static_cast<ValueT>(math::Ceil(perturbDown(x)));
     }
 
-    inline static ComputeT
-    voxelFloor(const ComputeT& x)
+    inline static ValueT
+    voxelFloor(const ValueT& x)
     {
-        return static_cast<ComputeT>(math::Floor(perturbUp(x)));
+        return static_cast<ValueT>(math::Floor(perturbUp(x)));
     }
 
     // skips the need for negative tile population and internal leap frogging
@@ -904,27 +900,27 @@ private:
     iterateYZ(const Index& i, CacheLastLeafAccessor& acc)
     {
         // initialize x value and y-range
-        ComputeT x, yb, yt;
+        ValueT x, yb, yt;
         mXYData.XYData(x, yb, yt, i);
 
-        if (!math::isFinite(yb) || !math::isFinite(yt))
+        if (!std::isfinite(yb) || !std::isfinite(yt))
             return;
 
-        ComputeT zb, zt;
+        ValueT zb, zt;
 
-        for (ComputeT y = voxelCeil(yb); y <= perturbUp(yt); ++y) {
+        for (ValueT y = voxelCeil(yb); y <= perturbUp(yt); ++y) {
             if (!bottomTop(zb, zt, x, y))
                 continue;
 
             Coord ijk(Int32(x), Int32(y), Int32(0));
-            Vec3T p(x, y, ComputeT(0));
+            Vec3T p(x, y, ValueT(0));
 
             ijk[2] = Int32(voxelCeil(zb))-1;
             acc.reset(ijk);
 
-            for (ComputeT z = voxelCeil(zb); z <= perturbUp(zt); ++z) {
+            for (ValueT z = voxelCeil(zb); z <= perturbUp(zt); ++z) {
                 ijk[2] = Int32(z);
-                const ComputeT val = ComputeT(acc.template getValue<1>(ijk));
+                const ValueT val = acc.template getValue<1>(ijk);
 
                 if (val == mNegBg) {
                     if constexpr (LeapFrog) acc.template leapUp<false>(ijk, z);
@@ -932,12 +928,12 @@ private:
                 }
 
                 p[2] = z;
-                const ComputeT dist = mVox * invokeSignedDistance(p);
+                const ValueT dist = mVox * invokeSignedDistance(p);
 
                 if (dist <= mNegBg) {
-                    acc.template setValueOff<1,false>(ijk, ValueT(mNegBg));
+                    acc.template setValueOff<1,false>(ijk, mNegBg);
                 } else if (dist < val) {
-                    acc.template setValueOn<1,false>(ijk, ValueT(dist));
+                    acc.template setValueOn<1,false>(ijk, dist);
                 } else { // dist >= val
                     acc.template checkReset<1>(ijk);
                 }
@@ -952,37 +948,37 @@ private:
     iterateNoTilesYZ(const Index& i, CacheLastLeafAccessor& acc)
     {
         // initialize x value and y-range
-        ComputeT x, yb, yt;
+        ValueT x, yb, yt;
         mXYData.XYData(x, yb, yt, i);
 
-        if (!math::isFinite(yb) || !math::isFinite(yt))
+        if (!std::isfinite(yb) || !std::isfinite(yt))
             return;
 
-        ComputeT zb, zt;
+        ValueT zb, zt;
 
-        for (ComputeT y = voxelCeil(yb); y <= perturbUp(yt); ++y) {
+        for (ValueT y = voxelCeil(yb); y <= perturbUp(yt); ++y) {
             if (!bottomTop(zb, zt, x, y))
                 continue;
 
             Coord ijk(Int32(x), Int32(y), Int32(0));
-            Vec3T p(x, y, ComputeT(0));
+            Vec3T p(x, y, ValueT(0));
 
             bool early_break = false;
-            ComputeT z_stop;
+            ValueT z_stop;
 
             ijk[2] = Int32(voxelCeil(zb))-1;
             acc.reset(ijk);
-            for (ComputeT z = voxelCeil(zb); z <= perturbUp(zt); ++z) {
+            for (ValueT z = voxelCeil(zb); z <= perturbUp(zt); ++z) {
                 ijk[2] = Int32(z);
                 p[2] = z;
-                const ComputeT dist = mVox * invokeSignedDistance(p);
+                const ValueT dist = mVox * invokeSignedDistance(p);
 
                 if (dist <= mNegBg) {
                     early_break = true;
                     z_stop = z;
                     break;
                 } else if (dist < mBg) {
-                    acc.template setValueOn<1>(ijk, ValueT(dist));
+                    acc.template setValueOn<1>(ijk, dist);
                 } else { // dist >= mBg
                     acc.template checkReset<1>(ijk);
                 }
@@ -990,15 +986,15 @@ private:
             if (early_break) {
                 ijk[2] = Int32(voxelFloor(zt))+1;
                 acc.reset(ijk);
-                for (ComputeT z = voxelFloor(zt); z > z_stop; --z) {
+                for (ValueT z = voxelFloor(zt); z > z_stop; --z) {
                     ijk[2] = Int32(z);
                     p[2] = z;
-                    const ComputeT dist = mVox * invokeSignedDistance(p);
+                    const ValueT dist = mVox * invokeSignedDistance(p);
 
                     if (dist <= mNegBg) {
                         break;
                     } else if (dist < mBg) {
-                        acc.template setValueOn<-1>(ijk, ValueT(dist));
+                        acc.template setValueOn<-1>(ijk, dist);
                     } else { // dist >= mBg
                         acc.template checkReset<-1>(ijk);
                     }
@@ -1028,25 +1024,25 @@ private:
     tileIterateYZ(const Index& i, AccessorT& acc)
     {
         // initialize x value and y-range
-        ComputeT x, yb, yt;
+        ValueT x, yb, yt;
         mXYData.XYData(x, yb, yt, i);
 
-        if (!math::isFinite(yb) || !math::isFinite(yt))
+        if (!std::isfinite(yb) || !std::isfinite(yt))
             return;
 
         static const Index TILESIZE = NodeT::DIM;
 
-        ComputeT zb, zt;
+        ValueT zb, zt;
 
-        for (ComputeT y = tileCeil(yb, TILESIZE); y <= perturbUp(yt); y += TILESIZE) {
+        for (ValueT y = tileCeil(yb, TILESIZE); y <= perturbUp(yt); y += TILESIZE) {
             if (!bottomTop(zb, zt, x, y))
                 continue;
 
             Coord ijk(Int32(x), Int32(y), Int32(0));
-            Vec3T p(x, y, ComputeT(0));
+            Vec3T p(x, y, ValueT(0));
 
             bool tiles_added = false;
-            ComputeT z = tileCeil(zb, TILESIZE) - 2*TILESIZE;
+            ValueT z = tileCeil(zb, TILESIZE) - 2*TILESIZE;
             while (z <= tileFloor(zt, TILESIZE) + TILESIZE) {
                 ijk[2] = Int32(z);
                 p[2] = z;
@@ -1062,13 +1058,13 @@ private:
 
     template <typename NodeT, int dir>
     inline bool
-    leapFrogToNextTile(const Coord& ijk, ComputeT& z, AccessorT& acc) const
+    leapFrogToNextTile(const Coord& ijk, ValueT& z, AccessorT& acc) const
     {
         static const int offset  = NodeT::DIM;
         static const int nodeDepth = int(TreeT::DEPTH - NodeT::LEVEL - 1);
 
         // we have not encountered an already populated tile
-        if (ComputeT(acc.getValue(ijk)) != mNegBg) {
+        if (acc.getValue(ijk) != mNegBg) {
             z += dir*offset;
             return false;
         }
@@ -1081,11 +1077,11 @@ private:
             return false;
         }
 
-        const ComputeT sz = ComputeT(mTileSizes[depth]);
+        const ValueT sz = ValueT(mTileSizes[depth]);
 
         z = dir > 0
-            ? sz * ComputeT(math::Ceil(z/sz)) + ComputeT(0.5)*(offset-1)
-            : sz * ComputeT(math::Floor(z/sz)) - ComputeT(0.5)*(offset+1);
+            ? sz * ValueT(math::Ceil(z/sz)) + ValueT(0.5)*(offset-1)
+            : sz * ValueT(math::Floor(z/sz)) - ValueT(0.5)*(offset+1);
 
         return true;
     }
@@ -1111,10 +1107,10 @@ private:
     {
         static const Index TILESIZE = NodeT::DIM;
 
-        static const ComputeT R1 = ComputeT(0.500)*(TILESIZE-1),
-                              R2 = ComputeT(0.866)*(TILESIZE-1);
+        static const ValueT R1 = ValueT(0.500)*(TILESIZE-1),
+                            R2 = ValueT(0.866)*(TILESIZE-1);
 
-        const ComputeT dist = invokeTilePointSignedDistance(p);
+        const ValueT dist = invokeTilePointSignedDistance(p);
 
         // fast positive criterion: circumsribed ball is in the object
         if (dist <= -R2-mHw)
@@ -1383,7 +1379,7 @@ private:
 
     const std::vector<int> mTileSizes = treeTileSizes();
 
-    const ComputeT mVox, mHw, mBg, mNegBg;
+    const ValueT mVox, mHw, mBg, mNegBg;
 
     // misc
 

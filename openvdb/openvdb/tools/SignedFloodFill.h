@@ -85,7 +85,7 @@ public:
     using ValueT = typename TreeOrLeafManagerT::ValueType;
     using RootT = typename TreeOrLeafManagerT::RootNodeType;
     using LeafT = typename TreeOrLeafManagerT::LeafNodeType;
-    static_assert(openvdb::is_signed<ValueT>::value,
+    static_assert(std::is_signed<ValueT>::value,
         "signed flood fill is supported only for signed value grids");
 
     SignedFloodFillOp(const TreeOrLeafManagerT& tree, Index minLevel = 0)
@@ -215,7 +215,7 @@ private:
 
 template<typename TreeOrLeafManagerT>
 inline
-typename std::enable_if_t<openvdb::is_signed<typename TreeOrLeafManagerT::ValueType>::value, void>
+typename std::enable_if<std::is_signed<typename TreeOrLeafManagerT::ValueType>::value, void>::type
 doSignedFloodFill(TreeOrLeafManagerT& tree,
                   typename TreeOrLeafManagerT::ValueType outsideValue,
                   typename TreeOrLeafManagerT::ValueType insideValue,
@@ -231,7 +231,7 @@ doSignedFloodFill(TreeOrLeafManagerT& tree,
 // Dummy (no-op) implementation for unsigned types
 template <typename TreeOrLeafManagerT>
 inline
-typename std::enable_if_t<!openvdb::is_signed<typename TreeOrLeafManagerT::ValueType>::value, void>
+typename std::enable_if<!std::is_signed<typename TreeOrLeafManagerT::ValueType>::value, void>::type
 doSignedFloodFill(TreeOrLeafManagerT&,
                   const typename TreeOrLeafManagerT::ValueType&,
                   const typename TreeOrLeafManagerT::ValueType&,

@@ -16,7 +16,7 @@
 #include <algorithm>
 #include <vector>                          // for std::vector
 #include <bitset>                          // for std::bitset
-#include <openvdb/Types.h>                 // for Real and ComputeTypeFor
+#include <openvdb/Types.h>                 // for Real
 #include <openvdb/tree/ValueAccessor.h>
 
 #include "Math.h"             // for Pow2, needed by WENO and Godunov
@@ -35,11 +35,9 @@ template<typename DerivedType, typename GridT, bool IsSafe>
 class BaseStencil
 {
 public:
-    typedef GridT                    GridType;
-    typedef typename GridT::TreeType TreeType;
-
-    typedef typename ComputeTypeFor<typename GridT::ValueType>::type ValueType;
-
+    typedef GridT                                       GridType;
+    typedef typename GridT::TreeType                    TreeType;
+    typedef typename GridT::ValueType                   ValueType;
     typedef tree::ValueAccessor<const TreeType, IsSafe> AccessorType;
     typedef std::vector<ValueType>                      BufferType;
 
@@ -245,16 +243,14 @@ namespace { // anonymous namespace for stencil-layout map
 
 
 template<typename GridT, bool IsSafe = true>
-class SevenPointStencil
-    : public BaseStencil<SevenPointStencil<GridT, IsSafe>, GridT, IsSafe>
+class SevenPointStencil: public BaseStencil<SevenPointStencil<GridT, IsSafe>, GridT, IsSafe>
 {
     typedef SevenPointStencil<GridT, IsSafe>  SelfT;
     typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
 public:
-    typedef GridT                    GridType;
-    typedef typename GridT::TreeType TreeType;
-
-    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
+    typedef GridT                             GridType;
+    typedef typename GridT::TreeType          TreeType;
+    typedef typename GridT::ValueType         ValueType;
 
     static const int SIZE = 7;
 
@@ -301,16 +297,14 @@ namespace { // anonymous namespace for stencil-layout map
 }
 
 template<typename GridT, bool IsSafe = true>
-class BoxStencil
-    : public BaseStencil<BoxStencil<GridT, IsSafe>, GridT, IsSafe>
+class BoxStencil: public BaseStencil<BoxStencil<GridT, IsSafe>, GridT, IsSafe>
 {
     typedef BoxStencil<GridT, IsSafe>         SelfT;
     typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
 public:
-    typedef GridT                    GridType;
-    typedef typename GridT::TreeType TreeType;
-
-    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
+    typedef GridT                             GridType;
+    typedef typename GridT::TreeType          TreeType;
+    typedef typename GridT::ValueType         ValueType;
 
     static const int SIZE = 8;
 
@@ -474,15 +468,14 @@ namespace { // anonymous namespace for stencil-layout map
 
 template<typename GridT, bool IsSafe = true>
 class SecondOrderDenseStencil
-    : public BaseStencil<SecondOrderDenseStencil<GridT, IsSafe>, GridT, IsSafe>
+    : public BaseStencil<SecondOrderDenseStencil<GridT, IsSafe>, GridT, IsSafe >
 {
     typedef SecondOrderDenseStencil<GridT, IsSafe> SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe>      BaseType;
+    typedef BaseStencil<SelfT, GridT, IsSafe >     BaseType;
 public:
-    typedef GridT                    GridType;
-    typedef typename GridT::TreeType TreeType;
-
-    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
+    typedef GridT                                  GridType;
+    typedef typename GridT::TreeType               TreeType;
+    typedef typename GridType::ValueType           ValueType;
 
     static const int SIZE = 19;
 
@@ -558,12 +551,11 @@ class ThirteenPointStencil
     : public BaseStencil<ThirteenPointStencil<GridT, IsSafe>, GridT, IsSafe>
 {
     typedef ThirteenPointStencil<GridT, IsSafe> SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe>   BaseType;
+    typedef BaseStencil<SelfT, GridT, IsSafe >  BaseType;
 public:
-    typedef GridT                    GridType;
-    typedef typename GridT::TreeType TreeType;
-
-    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
+    typedef GridT                               GridType;
+    typedef typename GridT::TreeType            TreeType;
+    typedef typename GridType::ValueType        ValueType;
 
     static const int SIZE = 13;
 
@@ -690,12 +682,11 @@ class FourthOrderDenseStencil
     : public BaseStencil<FourthOrderDenseStencil<GridT, IsSafe>, GridT, IsSafe>
 {
     typedef FourthOrderDenseStencil<GridT, IsSafe> SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe>      BaseType;
+    typedef BaseStencil<SelfT, GridT, IsSafe >     BaseType;
 public:
-    typedef GridT                    GridType;
-    typedef typename GridT::TreeType TreeType;
-
-    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
+    typedef GridT                                  GridType;
+    typedef typename GridT::TreeType               TreeType;
+    typedef typename GridType::ValueType           ValueType;
 
     static const int SIZE = 61;
 
@@ -830,12 +821,11 @@ class NineteenPointStencil
     : public BaseStencil<NineteenPointStencil<GridT, IsSafe>, GridT, IsSafe>
 {
     typedef NineteenPointStencil<GridT, IsSafe> SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe>   BaseType;
+    typedef BaseStencil<SelfT, GridT, IsSafe >  BaseType;
 public:
-    typedef GridT                    GridType;
-    typedef typename GridT::TreeType TreeType;
-
-    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
+    typedef GridT                               GridType;
+    typedef typename GridT::TreeType            TreeType;
+    typedef typename GridType::ValueType        ValueType;
 
     static const int SIZE = 19;
 
@@ -1047,12 +1037,11 @@ class SixthOrderDenseStencil
     : public BaseStencil<SixthOrderDenseStencil<GridT, IsSafe>, GridT, IsSafe>
 {
     typedef SixthOrderDenseStencil<GridT, IsSafe> SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe>     BaseType;
+    typedef BaseStencil<SelfT, GridT, IsSafe >    BaseType;
 public:
-    typedef GridT                    GridType;
-    typedef typename GridT::TreeType TreeType;
-
-    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
+    typedef GridT                                 GridType;
+    typedef typename GridT::TreeType              TreeType;
+    typedef typename GridType::ValueType          ValueType;
 
     static const int SIZE = 127;
 
@@ -1239,16 +1228,14 @@ namespace { // anonymous namespace for stencil-layout map
 /// @note For optimal random access performance this class
 /// includes its own grid accessor.
 template<typename GridT, bool IsSafe = true>
-class GradStencil
-    : public BaseStencil<GradStencil<GridT, IsSafe>, GridT, IsSafe>
+class GradStencil : public BaseStencil<GradStencil<GridT, IsSafe>, GridT, IsSafe>
 {
-    typedef GradStencil<GridT, IsSafe>        SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
+    typedef GradStencil<GridT, IsSafe>         SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe > BaseType;
 public:
-    typedef GridT                    GridType;
-    typedef typename GridT::TreeType TreeType;
-
-    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
+    typedef GridT                              GridType;
+    typedef typename GridT::TreeType           TreeType;
+    typedef typename GridType::ValueType       ValueType;
 
     static const int SIZE = 7;
 
@@ -1375,16 +1362,14 @@ private:
 /// @note For optimal random access performance this class
 /// includes its own grid accessor.
 template<typename GridT, bool IsSafe = true>
-class WenoStencil
-    : public BaseStencil<WenoStencil<GridT, IsSafe>, GridT, IsSafe>
+class WenoStencil: public BaseStencil<WenoStencil<GridT, IsSafe>, GridT, IsSafe>
 {
-    typedef WenoStencil<GridT, IsSafe>        SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
+    typedef WenoStencil<GridT, IsSafe>         SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe > BaseType;
 public:
-    typedef GridT                    GridType;
-    typedef typename GridT::TreeType TreeType;
-
-    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
+    typedef GridT                              GridType;
+    typedef typename GridT::TreeType           TreeType;
+    typedef typename GridType::ValueType       ValueType;
 
     static const int SIZE = 19;
 
@@ -1527,16 +1512,14 @@ private:
 
 
 template<typename GridT, bool IsSafe = true>
-class CurvatureStencil
-    : public BaseStencil<CurvatureStencil<GridT, IsSafe>, GridT, IsSafe>
+class CurvatureStencil: public BaseStencil<CurvatureStencil<GridT, IsSafe>, GridT, IsSafe>
 {
     typedef CurvatureStencil<GridT, IsSafe>   SelfT;
     typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
 public:
-    typedef GridT                    GridType;
-    typedef typename GridT::TreeType TreeType;
-
-    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
+    typedef GridT                             GridType;
+    typedef typename GridT::TreeType          TreeType;
+    typedef typename GridT::ValueType         ValueType;
 
      static const int SIZE = 19;
 
@@ -1562,7 +1545,7 @@ public:
     {
         Real alpha, normGrad;
         return this->meanCurvature(alpha, normGrad) ?
-               ValueType(alpha*mInv2Dx/math::Pow3(normGrad)) : ValueType(0);
+               ValueType(alpha*mInv2Dx/math::Pow3(normGrad)) : 0;
     }
 
     /// @brief Return the Gaussian curvature at the previously buffered location.
@@ -1573,7 +1556,7 @@ public:
     {
         Real alpha, normGrad;
         return this->gaussianCurvature(alpha, normGrad) ?
-               ValueType(alpha*mInvDx2/math::Pow4(normGrad)) : ValueType(0);
+               ValueType(alpha*mInvDx2/math::Pow4(normGrad)) : 0;
     }
 
     /// @brief Return both the mean and the Gaussian curvature at the
@@ -1588,7 +1571,7 @@ public:
           mean  = ValueType(alphaM*mInv2Dx/math::Pow3(normGrad));
           gauss = ValueType(alphaG*mInvDx2/math::Pow4(normGrad));
         } else {
-          mean = gauss = ValueType(0);
+          mean = gauss = 0;
         }
     }
 
@@ -1602,7 +1585,7 @@ public:
     {
         Real alpha, normGrad;
         return this->meanCurvature(alpha, normGrad) ?
-               ValueType(alpha*mInvDx2/(2*math::Pow2(normGrad))) : ValueType(0);
+               ValueType(alpha*mInvDx2/(2*math::Pow2(normGrad))) : 0;
     }
 
     /// Return the mean Gaussian multiplied by the norm of the
@@ -1614,7 +1597,7 @@ public:
     {
         Real alpha, normGrad;
         return this->gaussianCurvature(alpha, normGrad) ?
-               ValueType(2*alpha*mInv2Dx*mInvDx2/math::Pow3(normGrad)) : ValueType(0);
+               ValueType(2*alpha*mInv2Dx*mInvDx2/math::Pow3(normGrad)) : 0;
     }
 
     /// @brief Return both the mean and the Gaussian curvature at the
@@ -1644,7 +1627,7 @@ public:
         Real alphaM, alphaG, normGrad;
         if (this->curvatures(alphaM, alphaG, normGrad)) {
           const Real mean = alphaM*mInv2Dx/math::Pow3(normGrad);
-          const Real tmp = math::Sqrt(mean*mean - alphaG*mInvDx2/math::Pow4(normGrad));
+          const Real tmp = std::sqrt(mean*mean - alphaG*mInvDx2/math::Pow4(normGrad));
           pair.first  = ValueType(mean - tmp);
           pair.second = ValueType(mean + tmp);
         }
@@ -1778,16 +1761,14 @@ private:
 
 /// @brief Dense stencil of a given width
 template<typename GridT, bool IsSafe = true>
-class DenseStencil
-    : public BaseStencil<DenseStencil<GridT, IsSafe>, GridT, IsSafe>
+class DenseStencil: public BaseStencil<DenseStencil<GridT, IsSafe>, GridT, IsSafe>
 {
     typedef DenseStencil<GridT, IsSafe>       SelfT;
     typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
 public:
-    typedef GridT                    GridType;
-    typedef typename GridT::TreeType TreeType;
-
-    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
+    typedef GridT                             GridType;
+    typedef typename GridT::TreeType          TreeType;
+    typedef typename GridType::ValueType      ValueType;
 
     DenseStencil(const GridType& grid, int halfWidth)
         : BaseType(grid, /*size=*/math::Pow3(2 * halfWidth + 1))
