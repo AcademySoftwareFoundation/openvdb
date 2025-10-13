@@ -480,54 +480,6 @@ struct CanConvertType<ValueMask, T> { enum {value = CanConvertType<bool, T>::val
 ////////////////////////////////////////
 
 
-/// @brief Maps low precision floating point types to a floating-point type suitable for computation.
-///
-/// Selectively promotes low-precision types (e.g., `math::half`) to a higher-precision
-/// type (e.g., `float`) to balance numerical accuracy and performance in
-/// compute-intensive code.
-///
-/// Types already suitable for computation, float precision and higher, are left unchanged.
-///
-/// This trait is useful when intermediate compute precision must differ from storage
-/// precision to prevent precision loss or instability.
-///
-/// @tparam T The input type to be mapped to a compute-appropriate floating-point type.
-template <typename T>
-struct ComputeTypeFor
-{
-    using type = T;
-};
-
-// Specialization for half -> float
-template <>
-struct ComputeTypeFor<Half>
-{
-    using type = float;
-};
-
-// Specialization for Vec<half> -> Vec<float>
-template <>
-struct ComputeTypeFor<Vec2H>
-{
-    using type = Vec2s;
-};
-
-template <>
-struct ComputeTypeFor<Vec3H>
-{
-    using type = Vec3s;
-};
-
-template <>
-struct ComputeTypeFor<Vec4H>
-{
-    using type = Vec4s;
-};
-
-
-////////////////////////////////////////
-
-
 /// @brief CopyConstness<T1, T2>::Type is either <tt>const T2</tt>
 /// or @c T2 with no @c const qualifier, depending on whether @c T1 is @c const.
 /// @details For example,
