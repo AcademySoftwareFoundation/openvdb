@@ -7704,7 +7704,7 @@ TEST_F(TestNanoVDB, ChannelIndexGridBuilder)
         EXPECT_EQ(idxGrid->valueCount(), idxGrid->blindMetaData(i).mValueCount);
         EXPECT_EQ(nanovdb::GridType::Float, idxGrid->blindMetaData(i).mDataType);
         EXPECT_EQ(nanovdb::GridBlindDataClass::ChannelArray, idxGrid->blindMetaData(i).mDataClass);
-        EXPECT_EQ(nanovdb::GridBlindDataSemantic::Unknown, idxGrid->blindMetaData(i).mSemantic);
+        EXPECT_EQ(nanovdb::GridBlindDataSemantic::LevelSet, idxGrid->blindMetaData(i).mSemantic);
         const std::string name = std::string("channel_") + std::to_string(i);
         EXPECT_EQ(0, std::strcmp(idxGrid->blindMetaData(i).mName, name.c_str() ));
         //mTimer.start("Parallel leaf iterator test of active voxels in channel");
@@ -7725,7 +7725,7 @@ TEST_F(TestNanoVDB, ChannelIndexGridBuilder)
         EXPECT_EQ(idxGrid->valueCount(), idxGrid->blindMetaData(i).mValueCount);
         EXPECT_EQ(nanovdb::GridType::Float, idxGrid->blindMetaData(i).mDataType);
         EXPECT_EQ(nanovdb::GridBlindDataClass::ChannelArray, idxGrid->blindMetaData(i).mDataClass);
-        EXPECT_EQ(nanovdb::GridBlindDataSemantic::Unknown, idxGrid->blindMetaData(i).mSemantic);
+        EXPECT_EQ(nanovdb::GridBlindDataSemantic::LevelSet, idxGrid->blindMetaData(i).mSemantic);
         const std::string name = std::string("channel_") + std::to_string(i);
         EXPECT_EQ(0, std::strcmp(idxGrid->blindMetaData(i).mName, name.c_str() ));
         //mTimer.start("Parallel leaf iterator test of active voxels in channel");

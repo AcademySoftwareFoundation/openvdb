@@ -409,24 +409,81 @@ enum class PointType : uint32_t { Disable = 0,// no point information e.g. when 
 
 /// @brief Blind-data Classes that are currently supported by NanoVDB
 enum class GridBlindDataClass : uint32_t { Unknown = 0,
-                                           IndexArray = 1,
-                                           AttributeArray = 2,
-                                           GridName = 3,
-                                           ChannelArray = 4,
+                                           IndexArray = 1,// indices typically used for mapping into other arrays
+                                           AttributeArray = 2,// attributes typically associated with points
+                                           GridName = 3,// grid names of length longer than 256 characters
+                                           ChannelArray = 4,// channel of values typically used by index grids
                                            End = 5 };
 
 /// @brief Blind-data Semantics that are currently understood by NanoVDB
 enum class GridBlindDataSemantic : uint32_t { Unknown = 0,
                                               PointPosition = 1, // 3D coordinates in an unknown space
-                                              PointColor = 2,
-                                              PointNormal = 3,
-                                              PointRadius = 4,
-                                              PointVelocity = 5,
-                                              PointId = 6,
+                                              PointColor = 2, // color associated with point
+                                              PointNormal = 3,// normal associated with point
+                                              PointRadius = 4,// radius of point
+                                              PointVelocity = 5,// velocity associated with point
+                                              PointId = 6,// integer ID of point
                                               WorldCoords = 7, // 3D coordinates in world space, e.g. (0.056, 0.8, 1,8)
                                               GridCoords = 8, // 3D coordinates in grid space, e.g. (1.2, 4.0, 5.7), aka index-space
                                               VoxelCoords = 9, // 3D coordinates in voxel space, e.g. (0.2, 0.0, 0.7)
-                                              End = 10 };
+                                              LevelSet = 10, // narrow band level set, e.g. SDF
+                                              FogVolume = 11, // fog volume, e.g. density
+                                              Staggered = 12, // staggered MAC grid, e.g. velocity
+                                              End = 13 };
+
+/// @brief Maps from GridBlindDataSemantic to GridClass
+/// @note Useful when converting an IndexGrid with blind data of type T into a Grid<T>
+/// @param semantics GridBlindDataSemantic
+/// @param defaultClass Default return type used for no match
+/// @return GridClass
+__hostdev__ inline GridClass toGridClass(GridBlindDataSemantic semantics,
+                                         GridClass defaultClass = GridClass::Unknown)
+{
+    switch (semantics){
+    case GridBlindDataSemantic::PointPosition:
+        return GridClass::PointData;
+    case GridBlindDataSemantic::PointColor:
+        return GridClass::PointData;
+    case GridBlindDataSemantic::PointNormal:
+        return GridClass::PointData;
+    case GridBlindDataSemantic::PointRadius:
+        return GridClass::PointData;
+    case GridBlindDataSemantic::PointVelocity:
+        return GridClass::PointData;
+    case GridBlindDataSemantic::PointId:
+        return GridClass::PointIndex;
+    case GridBlindDataSemantic::LevelSet:
+        return GridClass::LevelSet;
+    case GridBlindDataSemantic::FogVolume:
+        return GridClass::FogVolume;
+    case GridBlindDataSemantic::Staggered:
+        return GridClass::Staggered;
+    default:
+        return defaultClass;
+    }
+}
+
+/// @brief Maps from GridClass to GridBlindDataSemantic.
+/// @note Useful when converting a Grid<T> into an IndexGrid with blind data of type T.
+/// @param gridClass GridClass
+/// @param defaultSemantic Default return type used for no match
+/// @return GridBlindDataSemantic
+__hostdev__ inline GridBlindDataSemantic toSemantic(GridClass gridClass,
+                                                    GridBlindDataSemantic defaultSemantic = GridBlindDataSemantic::Unknown)
+{
+    switch (gridClass){
+    case GridClass::PointIndex:
+        return GridBlindDataSemantic::PointId;
+    case GridClass::LevelSet:
+        return GridBlindDataSemantic::LevelSet;
+    case GridClass::FogVolume:
+        return GridBlindDataSemantic::FogVolume;
+    case GridClass::Staggered:
+        return GridBlindDataSemantic::Staggered;
+    default:
+        return defaultSemantic;
+    }
+}
 
 // --------------------------> BuildTraits <------------------------------------
 
@@ -5904,7 +5961,76 @@ void writeUncompressedGrid(StreamT& os, const GridData* gridData, bool raw = fal
         os.write((const char*)&meta, sizeof(FileMetaData)); // write meta data
         os.write(gridName, nameSize); // write grid name
     }
-    os.write((const char*)gridData, gridData->mGridSize);// write the grid
+    if (gridData->mGridCount!=1 || gridData->mGridIndex != 0) {
+        GridData data;
+        data = *gridData;// deep copy
+        data.mGridIndex = 0;
+        data.mGridCount = 1;
+        os.write((const char*)&data, sizeof(GridData));
+        os.write((const char*)gridData + sizeof(GridData), gridData->mGridSize - sizeof(GridData));
+    } else {
+        os.write((const char*)gridData, gridData->mGridSize);// write the grid
+    }
+}// writeUncompressedGrid
+
+/// @brief Write an IndexGrid to a stream and append blind data
+/// @tparam StreamT Type of stream to write the IndexGrid and blind data to
+/// @tparam ValueT Type of the blind data
+/// @param os  Output stream to write to
+/// @param gridData GridData containing an IndexGrid WITHOUT existing blind data
+/// @param blindData Raw point to array of blind data
+/// @param semantic GridBlindDataSemantic of the blind data
+/// @param raw If true the IndexGrid and blind data are streamed raw, i.e. without a file header.
+template<typename StreamT, typename ValueT> // StreamT class must support: "void write(const char*, size_t)"
+void writeUncompressedGrid(StreamT& os, const GridData* gridData, const ValueT *blindData,
+                           GridBlindDataSemantic semantic = GridBlindDataSemantic::Unknown, bool raw = false)
+{
+    NANOVDB_ASSERT(gridData->mMagic == NANOVDB_MAGIC_NUMB || gridData->mMagic == NANOVDB_MAGIC_GRID);
+    NANOVDB_ASSERT(gridData->mVersion.isCompatible());
+    NANOVDB_ASSERT(blindData);
+
+    char str[256];
+    if (gridData->mGridClass != GridClass::IndexGrid) {
+        fprintf(stderr, "nanovdb::writeUncompressedGrid: expected an IndexGrid but got \"%s\"\n", toStr(str, gridData->mGridClass));
+        exit(EXIT_FAILURE);
+    } else if (gridData->mBlindMetadataCount != 0u) {
+        fprintf(stderr, "nanovdb::writeUncompressedGrid: index grid already has \"%i\" blind data\n", gridData->mBlindMetadataCount);
+        exit(EXIT_FAILURE);
+    }
+    const size_t gridSize = gridData->mGridSize + sizeof(GridBlindMetaData) + gridData->mData1*sizeof(ValueT);
+    if (!raw) {// segment with a single grid:  FileHeader, FileMetaData, gridName, Grid
+#ifdef NANOVDB_USE_NEW_MAGIC_NUMBERS
+        FileHeader head{NANOVDB_MAGIC_FILE, gridData->mVersion, 1u/*grid count*/, Codec::NONE};
+#else
+        FileHeader head{NANOVDB_MAGIC_NUMB, gridData->mVersion, 1u/*grid count*/, Codec::NONE};
+#endif
+        const char* gridName = gridData->gridName();
+        const uint32_t nameSize = util::strlen(gridName) + 1;// include '\0'
+        const TreeData* treeData = (const TreeData*)(gridData->treePtr());
+        FileMetaData meta{gridSize, gridSize, 0u, treeData->mVoxelCount,
+                          gridData->mGridType, gridData->mGridClass, gridData->mWorldBBox,
+                          treeData->bbox(), gridData->mVoxelSize, nameSize,
+                          {treeData->mNodeCount[0], treeData->mNodeCount[1], treeData->mNodeCount[2], 1u},
+                          {treeData->mTileCount[0], treeData->mTileCount[1], treeData->mTileCount[2]},
+                          Codec::NONE, 0u, gridData->mVersion }; // FileMetaData
+        os.write((const char*)&head, sizeof(FileHeader)); // write header
+        os.write((const char*)&meta, sizeof(FileMetaData)); // write meta data
+        os.write(gridName, nameSize); // write grid name
+    }// if (!raw)
+    GridData data;
+    data = *gridData;// deep copy
+    data.mGridIndex = 0;
+    data.mGridCount = 1;
+    data.mGridSize  = gridSize;// increment by blind data + meta data
+    data.mBlindMetadataCount = 1u;
+    data.mBlindMetadataOffset = gridData->mGridSize;
+    os.write((const char*)&data, sizeof(GridData));
+    os.write((const char*)gridData + sizeof(GridData), gridData->mGridSize - sizeof(GridData));// write the IndexGrid
+    GridBlindMetaData meta(sizeof(GridBlindMetaData), gridData->mData1, sizeof(ValueT),
+                           semantic, GridBlindDataClass::ChannelArray, toGridType<ValueT>());
+    meta.setName("channel_0");
+    os.write((const char*)&meta, sizeof(GridBlindMetaData));
+    os.write((const char*)blindData, gridData->mData1*sizeof(ValueT));
 }// writeUncompressedGrid
 
 /// @brief  write multiple NanoVDB grids to a single file, without compression.

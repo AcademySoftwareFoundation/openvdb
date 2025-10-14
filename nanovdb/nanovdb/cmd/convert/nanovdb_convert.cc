@@ -288,7 +288,7 @@ int main(int argc, char* argv[])
                     for (auto &h : handles) {
                         for (uint32_t i = 0; i < h.gridCount(); ++i) {
                             if (verbose) std::cout << "Converting NanoVDB grid named \"" << h.gridMetaData(i)->shortGridName() << "\" to OpenVDB" << std::endl;
-                            grids->push_back(nanovdb::tools::nanoToOpenVDB(h, 0, i));
+                            grids->push_back(nanovdb::tools::nanoToOpenVDB(h, i));
                         }
                     }
                 } else {
