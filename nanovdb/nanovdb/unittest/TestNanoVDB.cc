@@ -374,7 +374,7 @@ TEST_F(TestNanoVDB, toStr)
 {
     {// toStr(GridType)
         EXPECT_EQ(12, nanovdb::strlen<nanovdb::GridType>());
-        EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::Unknown ), "?"), 0 );
+        EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::Unknown ), "Unknown"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::Float ), "float"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::Double ), "double"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::Int16 ), "int16"), 0 );
@@ -2200,7 +2200,8 @@ TEST_F(TestNanoVDB, RootNode)
 TEST_F(TestNanoVDB, GridBlindMetaData)
 {
     nanovdb::GridBlindMetaData meta0;
-    EXPECT_FALSE(meta0.isValid());
+    EXPECT_TRUE(meta0.isValid());
+    EXPECT_EQ(0u, meta0.mDataOffset);
     EXPECT_TRUE(std::string(meta0.mName).empty());
     EXPECT_EQ(nullptr, meta0.getBlindData<float>());
     EXPECT_EQ(nullptr, meta0.getBlindData<int>());

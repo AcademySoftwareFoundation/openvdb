@@ -53,7 +53,7 @@
     auto dstGrid = handle.grid<float>();// get a pointer to the destination grid
     \endcode
 
-    \brief Convert a base-pointer to an openvdb grid, denoted srcGrid, to a  nanovdb
+    \brief Convert a base-pointer to an openvdb grid, denoted srcGrid, to a nanovdb
            grid of the same type, e.g. float -> float or openvdb::Vec3f -> nanovdb::Vec3f
     \code
     auto handle = nanovdb::openToNanoVDB(*srcGrid);// convert source grid to a grid handle

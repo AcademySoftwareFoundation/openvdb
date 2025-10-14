@@ -254,7 +254,7 @@ enum class GridType : uint32_t { Unknown = 0, //  unknown value type - should ra
 __hostdev__ inline char* toStr(char *dst, GridType gridType)
 {
     switch (gridType){
-        case GridType::Unknown:     return util::strcpy(dst, "?");
+        case GridType::Unknown:     return util::strcpy(dst, "Unknown");
         case GridType::Float:       return util::strcpy(dst, "float");
         case GridType::Double:      return util::strcpy(dst, "double");
         case GridType::Int16:       return util::strcpy(dst, "int16");
@@ -1693,13 +1693,14 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
         return mDataOffset && (mDataType == toGridType<BlindDataT>()) ? util::PtrAdd<BlindDataT>(this, mDataOffset) : nullptr;
     }
 
-    /// @brief return true if this meta data has a valid combination of semantic, class and value tags
-    /// @note this does not check if the mDataOffset has been set!
+    /// @brief return true if this meta data has a valid combination of semantic, class and value tags.
+    /// @note this does not check if the mDataOffset has been set! It is intended to catch invalid combinations
+    ///       of semantic, class and value tags.
     __hostdev__ bool isValid() const
     {
         auto check = [&]()->bool{
             switch (mDataType){
-            case GridType::Unknown: return mValueSize==1u;// i.e. we encode data as mValueCount chars
+            //case GridType::Unknown: return mValueSize==1u;// i.e. we encode data as mValueCount chars
             case GridType::Float:   return mValueSize==4u;
             case GridType::Double:  return mValueSize==8u;
             case GridType::Int16:   return mValueSize==2u;
@@ -1717,6 +1718,10 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
             case GridType::Vec3u16: return mValueSize==6u;
             default: return true;}// all other combinations are valid
         };
+        //if (!check()) {
+        //    char str[20];
+        //    printf("Inconsistent blind data properties: size=%u, GridType=\"%s\"\n",(uint32_t)mValueSize, toStr(str, mDataType) );
+        //}
         return nanovdb::isValid(mDataClass, mSemantic, mDataType) && check();
     }
 
