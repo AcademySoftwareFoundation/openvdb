@@ -298,7 +298,7 @@ public:
     } // opEqualToTest
 
     /// Return @c true if this matrix is equivalent to @a m within a tolerance of @a eps.
-    bool eq(const Mat3 &m, T eps=1.0e-8) const
+    bool eq(const Mat3 &m, T eps=T(1.0e-8)) const
     {
         return (isApproxEqual(MyBase::mm[0],m.mm[0],eps) &&
                 isApproxEqual(MyBase::mm[1],m.mm[1],eps) &&

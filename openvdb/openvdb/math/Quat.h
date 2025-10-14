@@ -153,8 +153,8 @@ public:
         T trace(rot.trace());
         if (trace > 0) {
 
-            T q_w = 0.5 * std::sqrt(trace+1);
-            T factor = 0.25 / q_w;
+            T q_w = T(0.5) * std::sqrt(trace+1);
+            T factor = T(0.25) / q_w;
 
             mm[0] = factor * (rot(1,2) - rot(2,1));
             mm[1] = factor * (rot(2,0) - rot(0,2));
@@ -162,8 +162,8 @@ public:
             mm[3] = q_w;
         }  else if (rot(0,0) > rot(1,1) && rot(0,0) > rot(2,2)) {
 
-            T q_x = 0.5 * sqrt(rot(0,0)- rot(1,1)-rot(2,2)+1);
-            T factor = 0.25 / q_x;
+            T q_x = T(0.5) * std::sqrt(rot(0,0)- rot(1,1)-rot(2,2)+1);
+            T factor = T(0.25) / q_x;
 
             mm[0] = q_x;
             mm[1] = factor * (rot(0,1) + rot(1,0));
@@ -171,8 +171,8 @@ public:
             mm[3] = factor * (rot(1,2) - rot(2,1));
         } else if (rot(1,1) > rot(2,2)) {
 
-            T q_y = 0.5 * sqrt(rot(1,1)-rot(0,0)-rot(2,2)+1);
-            T factor = 0.25 / q_y;
+            T q_y = T(0.5) * std::sqrt(rot(1,1)-rot(0,0)-rot(2,2)+1);
+            T factor = T(0.25) / q_y;
 
             mm[0] =  factor * (rot(0,1) + rot(1,0));
             mm[1] = q_y;
@@ -180,8 +180,8 @@ public:
             mm[3] = factor * (rot(2,0) - rot(0,2));
         } else {
 
-            T q_z = 0.5 * sqrt(rot(2,2)-rot(0,0)-rot(1,1)+1);
-            T factor = 0.25 / q_z;
+            T q_z = T(0.5) * std::sqrt(rot(2,2)-rot(0,0)-rot(1,1)+1);
+            T factor = T(0.25) / q_z;
 
             mm[0] = factor * (rot(2,0) + rot(0,2));
             mm[1] = factor * (rot(1,2) + rot(2,1));
