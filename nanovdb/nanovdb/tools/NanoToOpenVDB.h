@@ -426,7 +426,7 @@ NanoToOpenVDB::process(typename trait::OpenNode<NanoBuildT, LEVEL>::type *dstLea
     }
 }// NanoToOpenVDB::process(const NanoLeaf<NanoBuildT>* srcLeaf)
 
- template<int LEVEL, typename NanoIndexT, typename NanoValueT>
+template<int LEVEL, typename NanoIndexT, typename NanoValueT>
 typename std::enable_if<BuildTraits<NanoIndexT>::is_index && LEVEL == 0>::type
 NanoToOpenVDB::process(typename trait::OpenNode<NanoValueT, LEVEL>::type *dstLeaf,
                        const typename NanoNode<NanoIndexT, LEVEL>::type   *srcLeaf,

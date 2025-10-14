@@ -2065,7 +2065,7 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_float_SideCar_writeUncompressedGrid)
         EXPECT_EQ(0.0f, sideCar[idxAcc.getValue(nanovdb::Coord(0,  0, 0))]);
         EXPECT_EQ(1.0f, sideCar[idxAcc.getValue(nanovdb::Coord(1,  2, 3))]);
         EXPECT_EQ(2.0f, sideCar[idxAcc.getValue(nanovdb::Coord(2, -2, 9))]);
-        
+
         // writeIndexGrid and sidecar to file
         std::ofstream os("data/sideCar_raw.nvdb", std::ios::out | std::ios::binary | std::ios::trunc);
         nanovdb::io::writeUncompressedGrid(os, idxGrid, sideCar, nanovdb::GridBlindDataSemantic::FogVolume);
@@ -2198,7 +2198,7 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_float_SideCar_benchmark)
 
 TEST_F(TestOpenVDB, NanoToOpenVDB_ValueOnIndex_Vec3f_SideCar)
 {
-    nanovdb::tools::build::Grid<nanovdb::Vec3f> buildGrid(nanovdb::Vec3f(0.0f), "test", nanovdb::GridClass::IndexGrid);
+    nanovdb::tools::build::Grid<nanovdb::Vec3f> buildGrid(nanovdb::Vec3f(0.0f), "test", nanovdb::GridClass::Staggered);
     auto buildAcc = buildGrid.getAccessor();
     buildAcc.setValue(nanovdb::Coord(1,  2, 3), nanovdb::Vec3f(1.0f));
     buildAcc.setValue(nanovdb::Coord(2, -2, 9), nanovdb::Vec3f(2.0f));
@@ -2223,7 +2223,7 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_ValueOnIndex_Vec3f_SideCar)
     EXPECT_EQ(idxGrid->valueCount(), metaData.mValueCount);// active + background
     EXPECT_EQ(nanovdb::GridType::Vec3f, metaData.mDataType);
     EXPECT_EQ(nanovdb::GridBlindDataClass::ChannelArray, metaData.mDataClass);
-    EXPECT_EQ(nanovdb::GridBlindDataSemantic::Unknown, metaData.mSemantic);
+    EXPECT_EQ(nanovdb::GridBlindDataSemantic::Staggered, metaData.mSemantic);
     EXPECT_EQ(sizeof(nanovdb::Vec3f), metaData.mValueSize);
     const nanovdb::Vec3f *sideCar = idxGrid->getBlindData<nanovdb::Vec3f>(0);
     EXPECT_TRUE(sideCar);
@@ -2238,7 +2238,7 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_ValueOnIndex_Vec3f_SideCar)
         EXPECT_TRUE(openBase);
         auto openGrid = openvdb::GridBase::grid<openvdb::Vec3fGrid>(openBase);// GridBase -> FloatGrid
         EXPECT_TRUE(openGrid);
-        EXPECT_EQ(openvdb::GridClass::GRID_UNKNOWN, openGrid->getGridClass());
+        EXPECT_EQ(openvdb::GridClass::GRID_STAGGERED, openGrid->getGridClass());
         EXPECT_EQ("", openGrid->getName());
         EXPECT_EQ("vec3s", openGrid->valueType());
         EXPECT_EQ(2u, openGrid->activeVoxelCount());
