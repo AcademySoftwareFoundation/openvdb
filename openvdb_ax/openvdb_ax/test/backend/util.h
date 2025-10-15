@@ -167,15 +167,12 @@ private:
 struct LLVMState
 {
     LLVMState(const std::string& name = "__test_module")
-        : mModule(), mEE(nullptr)
-    {
-        llvm::orc::ThreadSafeContext ctx(std::make_unique<llvm::LLVMContext>());
-        auto module = std::make_unique<llvm::Module>(name, *(ctx.getContext()));
-        mModule = llvm::orc::ThreadSafeModule(std::move(module), std::move(ctx));
-    }
+        : mCtx(std::make_unique<llvm::LLVMContext>())
+        , mModule(std::make_unique<llvm::Module>(name, *mCtx))
+        , mEE(nullptr) {}
 
-    llvm::LLVMContext& context() { OPENVDB_ASSERT(mModule); return *(mModule.getContext().getContext()); }
-    llvm::Module& module() { OPENVDB_ASSERT(mModule); return *mModule.getModuleUnlocked(); }
+    llvm::LLVMContext& context() { OPENVDB_ASSERT(mCtx); return *mCtx; }
+    llvm::Module& module() { OPENVDB_ASSERT(mModule); return *mModule; }
 
     inline llvm::BasicBlock*
     scratchBlock(const std::string& functionName = "TestFunction",
@@ -191,7 +188,10 @@ struct LLVMState
 
     inline void CreateEE()
     {
+        OPENVDB_ASSERT(mCtx);
         OPENVDB_ASSERT(mModule);
+        llvm::orc::ThreadSafeModule module(std::move(mModule), std::move(mCtx));
+
         auto EE = llvm::orc::LLJITBuilder().create();
         if (!EE) llvm::report_fatal_error(EE.takeError());
 
@@ -219,16 +219,17 @@ struct LLVMState
         }
 #endif
 
-        if (auto Err = (*EE)->addIRModule(std::move(mModule))) {
+        if (auto Err = (*EE)->addIRModule(std::move(module))) {
             llvm::report_fatal_error(std::move(Err));
         }
-        mModule = llvm::orc::ThreadSafeModule(); // empty
+        module = llvm::orc::ThreadSafeModule(); // empty
         mEE = std::move(*EE);
         //mEE->getMainJITDylib().dump(llvm::errs());
     }
 
     uint64_t GetGlobalAddress(const std::string& name)
     {
+        OPENVDB_ASSERT(!mCtx);
         OPENVDB_ASSERT(!mModule);
         OPENVDB_ASSERT(mEE);
         auto EntrySym = mEE->lookup(name);
@@ -237,7 +238,8 @@ struct LLVMState
     }
 
 private:
-    llvm::orc::ThreadSafeModule mModule;
+    std::unique_ptr<llvm::LLVMContext> mCtx;
+    std::unique_ptr<llvm::Module> mModule;
     std::unique_ptr<llvm::orc::LLJIT> mEE;
 };
 

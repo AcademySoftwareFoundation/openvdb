@@ -450,12 +450,16 @@ Function::flattenAttrs(llvm::Function* F) const
 #endif
     }
     // If you change this list, updated the FunctionBuilder::setBuiltin docs
-    if (mAttributes->mBuiltin) {
+    if (mAttributes->mType == Function::Type::kBuiltin) {
         AB.addAttribute(llvm::Attribute::NoFree);
         AB.addAttribute(llvm::Attribute::WillReturn);
         AB.addAttribute(llvm::Attribute::NoRecurse);
         AB.addAttribute(llvm::Attribute::NoUnwind);
         AB.addAttribute(llvm::Attribute::AlwaysInline);
+    }
+    else if (mAttributes->mType == Function::Type::kKernel) {
+        AB.addAttribute(llvm::Attribute::NoRecurse);
+        AB.addAttribute(llvm::Attribute::WillReturn);
     }
     const llvm::AttributeSet FnAttrs = llvm::AttributeSet::get(C, AB);
 
@@ -484,13 +488,29 @@ Function::flattenAttrs(llvm::Function* F) const
                 AB.addAttribute(llvm::Attribute::ReadOnly);
             }
             // If you change this list, updated the FunctionBuilder::setBuiltin docs
-            if (mAttributes->mBuiltin) {
+            if (mAttributes->mType == Function::Type::kBuiltin) {
                 // @todo mark attributes as dereferencable i.e:
                 //     AB.addDereferenceableAttr()
-                // @todo mark sret param[0] args as NoAlias
+                // @todo mark sret param[0] args as NoAlias - can't assume for
+                //   other arguments e.g. dot(a,a);
                 AB.addAttribute(llvm::Attribute::NonNull);
                 AB.addAttribute(llvm::Attribute::NoUndef);
                 AB.addAttribute(llvm::Attribute::NoFree);
+#if LLVM_VERSION_MAJOR < 21
+                AB.addAttribute(llvm::Attribute::NoCapture);
+#else
+                AB.addCapturesAttr(llvm::CaptureInfo::none());
+#endif
+            }
+            else if (mAttributes->mType == Function::Type::kKernel) {
+                AB.addAttribute(llvm::Attribute::NoFree);
+                AB.addAttribute(llvm::Attribute::NoAlias);
+                AB.addAttribute(llvm::Attribute::NoUndef);
+#if LLVM_VERSION_MAJOR < 21
+                AB.addAttribute(llvm::Attribute::NoCapture);
+#else
+                AB.addCapturesAttr(llvm::CaptureInfo::none());
+#endif
             }
         }
 
