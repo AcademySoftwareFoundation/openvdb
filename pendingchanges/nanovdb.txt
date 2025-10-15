@@ -1,5 +1,14 @@
-Bug Fixes:
+NanoVDB:
+
+Improvements:
+- Improvements and bugfixes to PNanoVDB
+- Add Mat classes and other math types to NanoVDB
+- Add support for morphology operators in NanoVDB
+- Improvements to mGPU grid building and introduction of a separate test executable for mGPU tests
 - Major rewrite of nanovdb::NanoToOpenVDB, which now allows nanovdb::IndexGrids and blind (or side-car) data to be converted into ian openvdb grid.
 - Added stand-alone function nanovd::writeUncompressedGrid that allows nanovdb::IndexGrids and blind (or side-car) data to be written directly to a stream.
-- Extended nanovdb::GridBlindDataSemantic with nanovdb::GridClass types to support conversion between IndexGrid and regular grids. 
 - nanovdb_print now (optionally) prints the blind data count per grid.
+- Extended nanovdb::GridBlindDataSemantic with nanovdb::GridClass types to support conversion between IndexGrid and regular grids. 
+
+Bug Fixes:
+- Several fixes for compiler warnings
