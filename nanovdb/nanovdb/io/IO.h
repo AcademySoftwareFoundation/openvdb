@@ -332,10 +332,11 @@ inline FileGridMetaData::FileGridMetaData(uint64_t size, Codec c, const GridData
                    {0, 0, 0, 1}, // nodeCount[4]
                    {0, 0, 0}, // tileCount[3]
                    c, // codec
-                   0, // padding
+                   uint16_t(gridData.mBlindMetadataCount), // number of blind meta data
                    Version()}// version
     , gridName(gridData.gridName())
 {
+    NANOVDB_ASSERT(gridData.mBlindMetadataCount <= uint32_t(1 << 16));// due to uint32_t -> uin16_t conversion
     auto &treeData = *reinterpret_cast<const TreeData*>(gridData.treePtr());
     nameKey = stringHash(gridName);
     voxelCount = treeData.mVoxelCount;

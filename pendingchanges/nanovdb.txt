@@ -2,3 +2,4 @@ Bug Fixes:
 - Major rewrite of nanovdb::NanoToOpenVDB, which now allows nanovdb::IndexGrids and blind (or side-car) data to be converted into ian openvdb grid.
 - Added stand-alone function nanovd::writeUncompressedGrid that allows nanovdb::IndexGrids and blind (or side-car) data to be written directly to a stream.
 - Extended nanovdb::GridBlindDataSemantic with nanovdb::GridClass types to support conversion between IndexGrid and regular grids. 
+- nanovdb_print now (optionally) prints the blind data count per grid.

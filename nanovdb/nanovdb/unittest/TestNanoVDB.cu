@@ -38,6 +38,7 @@
 namespace nanovdb {// this namespace is required by gtest
 
 namespace test {
+
 // used for testing cuda::DeviceBuffer
 void device2host(size_t count)
 {
@@ -57,6 +58,7 @@ void device2host(size_t count)
     float *array = reinterpret_cast<float*>(buffer.data());
     for (size_t i=0; i<count; ++i) EXPECT_EQ(array[i], float(i));
 }// device2host
+
 void host2device(size_t count)
 {
     const size_t size = count * sizeof(float);
@@ -95,6 +97,7 @@ void host2device(size_t count)
     EXPECT_TRUE(devBuffer.deviceData());
     for (size_t i=0; i<count; ++i) EXPECT_EQ(*hostBuffer.data<float>(i) + 1.0f, *devBuffer.data<float>(i));
 }// host2device
+
 // used for testing cuda::DeviceBuffer
 void host2device2host(size_t count)
 {
@@ -132,11 +135,13 @@ void host2device2host(size_t count)
     EXPECT_TRUE(buffer.deviceData());
     for (size_t i=0; i<count; ++i) EXPECT_EQ(array[i], float(i) + 1.0f);
 }// host2device2host
+
 // used to test cudaStr methods
 int signum(int val)
 {
     return (0 < val) - (val < 0);
 }// signum
+
 void cudaStr()
 {
     const size_t size = 50;
@@ -174,7 +179,9 @@ void cudaStr()
     cudaCheck(cudaFree(d_n));
     cudaCheck(cudaFree(d_str));
 }// cudaStr
+
 }// namespace test
+
 }// namespace nanovdb
 
 TEST(TestNanoVDBCUDA, CudaDeviceBuffer)

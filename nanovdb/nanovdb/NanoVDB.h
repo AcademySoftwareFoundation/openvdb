@@ -5587,15 +5587,15 @@ public:
     __hostdev__ const Map&       map() const { return mGridData.mMap; }
     __hostdev__ const Vec3dBBox& worldBBox() const { return mGridData.mWorldBBox; }
     __hostdev__ const CoordBBox& indexBBox() const { return mIndexBBox; }
-    __hostdev__ Vec3d              voxelSize() const { return mGridData.mVoxelSize; }
-    __hostdev__ int                blindDataCount() const { return mGridData.mBlindMetadataCount; }
-    __hostdev__ uint64_t        activeVoxelCount() const { return mTreeData.mVoxelCount; }
-    __hostdev__ const uint32_t& activeTileCount(uint32_t level) const { return mTreeData.mTileCount[level - 1]; }
-    __hostdev__ uint32_t        nodeCount(uint32_t level) const { return mTreeData.mNodeCount[level]; }
-    __hostdev__ const Checksum& checksum() const { return mGridData.mChecksum; }
-    __hostdev__ uint32_t        rootTableSize() const { return mRootTableSize; }
-    __hostdev__ bool            isEmpty() const { return mRootTableSize == 0; }
-    __hostdev__ Version         version() const { return mGridData.mVersion; }
+    __hostdev__ Vec3d            voxelSize() const { return mGridData.mVoxelSize; }
+    __hostdev__ uint32_t         blindDataCount() const { return mGridData.mBlindMetadataCount; }
+    __hostdev__ uint64_t         activeVoxelCount() const { return mTreeData.mVoxelCount; }
+    __hostdev__ const uint32_t&  activeTileCount(uint32_t level) const { return mTreeData.mTileCount[level - 1]; }
+    __hostdev__ uint32_t         nodeCount(uint32_t level) const { return mTreeData.mNodeCount[level]; }
+    __hostdev__ const Checksum&  checksum() const { return mGridData.mChecksum; }
+    __hostdev__ uint32_t         rootTableSize() const { return mRootTableSize; }
+    __hostdev__ bool             isEmpty() const { return mRootTableSize == 0; }
+    __hostdev__ Version          version() const { return mGridData.mVersion; }
 }; // GridMetaData
 
 /// @brief Class to access points at a specific voxel location
@@ -5914,7 +5914,7 @@ struct FileMetaData
     uint32_t    nodeCount[4]; //4 x 4 = 16B
     uint32_t    tileCount[3];// 3 x 4 = 12B
     Codec       codec;  // 2B
-    uint16_t    padding;// 2B, due to 8B alignment from uint64_t
+    uint16_t    blindDataCount;// 2B
     Version     version;// 4B
 }; // FileMetaData
 
@@ -5956,12 +5956,13 @@ void writeUncompressedGrid(StreamT& os, const GridData* gridData, bool raw = fal
         const char* gridName = gridData->gridName();
         const uint32_t nameSize = util::strlen(gridName) + 1;// include '\0'
         const TreeData* treeData = (const TreeData*)(gridData->treePtr());
+        NANOVDB_ASSERT(gridData->mBlindMetadataCount <= uint32_t( 1u << 16 ));// due to uint32_t -> uin16_t conversion
         FileMetaData meta{gridData->mGridSize, gridData->mGridSize, 0u, treeData->mVoxelCount,
                           gridData->mGridType, gridData->mGridClass, gridData->mWorldBBox,
                           treeData->bbox(), gridData->mVoxelSize, nameSize,
                           {treeData->mNodeCount[0], treeData->mNodeCount[1], treeData->mNodeCount[2], 1u},
                           {treeData->mTileCount[0], treeData->mTileCount[1], treeData->mTileCount[2]},
-                          Codec::NONE, 0u, gridData->mVersion }; // FileMetaData
+                          Codec::NONE, uint16_t(gridData->mBlindMetadataCount), gridData->mVersion }; // FileMetaData
         os.write((const char*)&head, sizeof(FileHeader)); // write header
         os.write((const char*)&meta, sizeof(FileMetaData)); // write meta data
         os.write(gridName, nameSize); // write grid name
@@ -5998,7 +5999,7 @@ void writeUncompressedGrid(StreamT& os, const GridData* gridData, const ValueT *
     if (gridData->mGridClass != GridClass::IndexGrid) {
         fprintf(stderr, "nanovdb::writeUncompressedGrid: expected an IndexGrid but got \"%s\"\n", toStr(str, gridData->mGridClass));
         exit(EXIT_FAILURE);
-    } else if (gridData->mBlindMetadataCount != 0u) {
+    } else if (gridData->mBlindMetadataCount != 0u) {// to-do: allow for existing blind data in grid
         fprintf(stderr, "nanovdb::writeUncompressedGrid: index grid already has \"%i\" blind data\n", gridData->mBlindMetadataCount);
         exit(EXIT_FAILURE);
     }
@@ -6017,7 +6018,7 @@ void writeUncompressedGrid(StreamT& os, const GridData* gridData, const ValueT *
                           treeData->bbox(), gridData->mVoxelSize, nameSize,
                           {treeData->mNodeCount[0], treeData->mNodeCount[1], treeData->mNodeCount[2], 1u},
                           {treeData->mTileCount[0], treeData->mTileCount[1], treeData->mTileCount[2]},
-                          Codec::NONE, 0u, gridData->mVersion }; // FileMetaData
+                          Codec::NONE, 1u, gridData->mVersion }; // FileMetaData
         os.write((const char*)&head, sizeof(FileHeader)); // write header
         os.write((const char*)&meta, sizeof(FileMetaData)); // write meta data
         os.write(gridName, nameSize); // write grid name

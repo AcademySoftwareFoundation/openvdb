@@ -166,7 +166,7 @@ int main(int argc, char* argv[])
             auto       classWidth = std::string("Class").length() + padding;
             auto       codecWidth = std::string("Codec").length() + padding;
             auto       ibboxWidth = std::string("Index Bounding Box").length() + padding;
-            auto       wbboxWidth = std::string("World BBox").length() + padding;
+            auto       wbboxWidth = std::string("World Bounding Box").length() + padding;
             auto       sizeWidth = std::string("Size").length() + padding;
             auto       fileWidth = std::string("File").length() + padding;
             auto       voxelsWidth = std::string("# Voxels").length() + padding;
@@ -175,6 +175,7 @@ int main(int argc, char* argv[])
             auto       configWidth = std::string("32^3->16^3->8^3").length() + padding;
             auto       tileWidth = std::string("# Active tiles").length() + padding;
             auto       resWidth = std::string("Resolution").length() + padding;
+            auto       blindWidth = std::string("Blind data count").length() + padding;
             for (auto& m : list) {
                 width(nameWidth, m.gridName);
                 width(typeWidth, nanovdb::toStr(str, m.gridType));
@@ -190,6 +191,7 @@ int main(int argc, char* argv[])
                 width(tileWidth, nodesToStr(m.tileCount));
                 width(voxelsWidth, std::to_string(m.voxelCount));
                 width(voxelSizeWidth, Vec3dToStr(m.voxelSize));
+                width(blindWidth, std::to_string(m.blindDataCount));
             }
             std::cout << "\nThe file \"" << file << "\" contains the following ";
             if (list.size()>1) {
@@ -214,7 +216,8 @@ int main(int argc, char* argv[])
                 std::cout << std::left << std::setw(configWidth) << "32^3->16^3->8^3"
                           << std::left << std::setw(tileWidth)   << "# Active tiles"
                           << std::left << std::setw(ibboxWidth)  << "Index Bounding Box"
-                          << std::left << std::setw(wbboxWidth)  << "World Bounding Box";
+                          << std::left << std::setw(wbboxWidth)  << "World Bounding Box"
+                          << std::left << std::setw(blindWidth)  << "Blind data count";
             }
             std::cout << std::endl;
             int n = 0;
@@ -238,11 +241,13 @@ int main(int argc, char* argv[])
                     std::cout << std::left << std::setw(configWidth) << nodesToStr(m.nodeCount)
                               << std::left << std::setw(tileWidth)   << nodesToStr(m.tileCount)
                               << std::left << std::setw(ibboxWidth)  << ibboxToStr(m.indexBBox)
-                              << std::left << std::setw(wbboxWidth)  << wbboxToStr(m.worldBBox);
+                              << std::left << std::setw(wbboxWidth)  << wbboxToStr(m.worldBBox)
+                              << std::left << std::setw(blindWidth)  << m.blindDataCount;
                 }
                 std::cout << std::endl;
-            }
-        }
+                //for (int i = 0; i< )
+            }// loop over FileGridMetaData in list from a single file
+        }// loop over files
         if (verbose) {
             size_t w = 0;
             switch (mode) {
