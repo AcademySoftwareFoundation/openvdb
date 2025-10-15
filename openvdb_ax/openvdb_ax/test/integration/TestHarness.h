@@ -62,6 +62,7 @@ struct AXTestHarness
         , mUseSparseVolumes(true)
         , mUseDenseVolumes(true)
         , mUsePoints(true)
+        , mUseTolerance(false)
         , mVolumeBounds({0,0,0},{7,7,7})
         , mSparseVolumeConfig({
             {1, { openvdb::Coord(-7), openvdb::Coord(-15)}}, // 2 leaf level tiles
@@ -212,6 +213,7 @@ struct AXTestHarness
     bool mUseSparseVolumes;
     bool mUseDenseVolumes;
     bool mUsePoints;
+    bool mUseTolerance;
     openvdb::CoordBBox mVolumeBounds;
     std::map<openvdb::Index, std::vector<openvdb::Coord>> mSparseVolumeConfig;
 

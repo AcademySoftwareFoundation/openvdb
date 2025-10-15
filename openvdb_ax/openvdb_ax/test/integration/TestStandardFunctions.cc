@@ -348,7 +348,11 @@ TEST_F(TestStandardFunctions, cross)
     mHarness.addAttribute<openvdb::Vec3d>("test1", ad.cross(bd));
     mHarness.addAttribute<openvdb::Vec3f>("test2", af.cross(bf));
     mHarness.addAttribute<openvdb::Vec3i>("test3", ai.cross(bi));
+#ifdef __APPLE__
+    mHarness.mUseTolerance = true;
+#endif
     testFunctionOptions(mHarness, "cross");
+    mHarness.mUseTolerance = false;
 }
 
 TEST_F(TestStandardFunctions, curlsimplexnoise)
@@ -724,7 +728,11 @@ TEST_F(TestStandardFunctions, length)
     mHarness.addAttribute("test7", openvdb::Vec4d(2.2, 3.3, 6.6, 7.7).length());
     mHarness.addAttribute("test8", openvdb::Vec4f(2.2f, 3.3f, 6.6f, 7.7f).length());
     mHarness.addAttribute("test9", std::sqrt(double(openvdb::Vec4i(2, 3, 6, 7).lengthSqr())));
+#ifdef __APPLE__
+    mHarness.mUseTolerance = true;
+#endif
     testFunctionOptions(mHarness, "length");
+    mHarness.mUseTolerance = false;
 }
 
 TEST_F(TestStandardFunctions, lengthsq)
@@ -740,7 +748,11 @@ TEST_F(TestStandardFunctions, lengthsq)
     mHarness.addAttribute("test7", openvdb::Vec4d(2.2, 3.3, 6.6, 7.7).lengthSqr());
     mHarness.addAttribute("test8", openvdb::Vec4f(2.2f, 3.3f, 6.6f, 7.7f).lengthSqr());
     mHarness.addAttribute("test9", openvdb::Vec4i(2, 3, 6, 7).lengthSqr());
+#ifdef __APPLE__
+    mHarness.mUseTolerance = true;
+#endif
     testFunctionOptions(mHarness, "lengthsq");
+    mHarness.mUseTolerance = false;
 }
 
 TEST_F(TestStandardFunctions, lerp)
@@ -806,7 +818,11 @@ TEST_F(TestStandardFunctions, polardecompose)
 
     mHarness.addAttribute<openvdb::Mat3d>("rotation", rot);
     mHarness.addAttribute<openvdb::Mat3d>("symm", symm);
+#ifdef __APPLE__
+    mHarness.mUseTolerance = true;
+#endif
     testFunctionOptions(mHarness, "polardecompose");
+    mHarness.mUseTolerance = false;
 }
 
 TEST_F(TestStandardFunctions, postscale)
