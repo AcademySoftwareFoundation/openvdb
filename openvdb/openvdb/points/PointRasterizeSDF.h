@@ -267,6 +267,10 @@ struct SmoothSphereSettings
     Real searchRadius = 1.0;
 };
 
+// Suppress spurious warnings on compiler emitted methods (constructors, etc)
+// due to deprecated members. Accessing said members still generates the warning.
+OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+
 /// @brief  Anisotropic point rasterization based on the principal component
 ///   analysis of point neighbours. See the struct member documentation for
 ///   detailed behavior.
@@ -321,6 +325,8 @@ struct EllipsoidSettings
     /// hold a rotation. This will be removed and should not be used.
     OPENVDB_DEPRECATED_MESSAGE("Use EllipsoidSettings::xform") std::string rotation = "";
 };
+
+OPENVDB_NO_DEPRECATION_WARNING_END
 
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME

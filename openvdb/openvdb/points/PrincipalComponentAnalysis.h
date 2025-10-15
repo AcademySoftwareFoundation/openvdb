@@ -153,6 +153,10 @@ struct PcaSettings
     util::NullInterrupter* interrupter = nullptr;
 };
 
+// Suppress spurious warnings on compiler emitted methods (constructors, etc)
+// due to deprecated members. Accessing said members still generates the warning.
+OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+
 /// @brief  The persistent attributes created by the PCA methods.
 /// @note   These can be passed to points::rasterizeSdf with the
 ///   EllipsoidSettings to perform ellipsoidal surface construction.
@@ -218,6 +222,8 @@ struct PcaAttributes
     /// of the format specified. This will be removed and should not be used.
     OPENVDB_DEPRECATED_MESSAGE("Use PcaAttributes::xform") std::string rotation = "";
 };
+
+OPENVDB_NO_DEPRECATION_WARNING_END
 
 }
 }
