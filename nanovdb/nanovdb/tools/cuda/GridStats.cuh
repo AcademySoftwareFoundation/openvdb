@@ -84,7 +84,7 @@ template<typename BuildT, typename StatsT, int LEVEL>
 __global__ void processInternal(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
 {
     using ChildT = typename NanoNode<BuildT,LEVEL-1>::type;
-    uint32_t childID = blockIdx.x * blockDim.x + threadIdx.x;// thead id
+    uint32_t childID = blockIdx.x * blockDim.x + threadIdx.x;// thread id (reused below to avoid compiler warning)
     if (childID >= d_nodeMgr->nodeCount(LEVEL)) return;
     auto &d_node = d_nodeMgr->template node<LEVEL>(tid);
     auto &bbox   = d_node.mBBox;
