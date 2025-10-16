@@ -164,12 +164,7 @@ jobs:
           ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
           --components=core,nano,nanotest,nanoexam,nanobench,nanotool
-          --cargs=\"
-              -DUSE_EXPLICIT_INSTANTIATION=OFF
-              -DNANOVDB_USE_CUDA=OFF
-              -DNANOVDB_USE_OPENVDB=ON
-              -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
-              \"
+          --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_USE_CUDA=OFF -DNANOVDB_USE_OPENVDB=ON -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \'
       - name: test
         run: cd build && ctest -V -E ".*cuda.*|.*mgpu.*"
 
