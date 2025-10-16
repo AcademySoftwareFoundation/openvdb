@@ -593,11 +593,14 @@ pca(PointDataGridT& points,
         descriptor.uniqueName("_inv_weightssum")
     };
 
-    // If we're storing the rotational component as a quaternion, we also remove
-    // the temporary covariance output. If we're storing a combined transform,
-    // we remove the individual stretch component
+    // Separate rotation (Mat3) and stretch (Vec3f) are always required in the
+    // below calculations. If we're outputting rotation as a quarternion we
+    // must create a temporary covariance matrix attribute. Otherwise we reuse
+    // output xform matrix attribute for the intermediate convariance
+    // representation. Same applies for the stretch; if we're outputting a
+    // combined transform, we must create temporary stretch storage.
     const std::string covAttribName = [&]() {
-        if (attrs.format == PcaAttributes::AttributeOutput::STRETCH_AND_QUATERNION) {
+        if (attrs.xformOutput == PcaAttributes::XformOutput::STRETCH_AND_QUATERNION) {
             temps.emplace_back(descriptor.uniqueName("_covariance"));
             return temps.back();
         }
@@ -605,8 +608,8 @@ pca(PointDataGridT& points,
     }();
 
     const std::string stretchAttribName = [&]() {
-        if (attrs.format == PcaAttributes::AttributeOutput::COMBINED_TRANSFORM)  {
-            temps.emplace_back(descriptor.uniqueName("_stetch"));
+        if (attrs.xformOutput == PcaAttributes::XformOutput::COMBINED_TRANSFORM)  {
+            temps.emplace_back(descriptor.uniqueName("_stretch"));
             return temps.back();
         }
         return attrs.stretch;
@@ -616,7 +619,7 @@ pca(PointDataGridT& points,
     const size_t pwsIdx = initAttribute(attrs.positionWS, zeroVal<PcaAttributes::PosWsT>());
     const size_t rotIdx = initAttribute(covAttribName, zeroVal<Mat3T>());
     const size_t qutIdx =
-        attrs.format == PcaAttributes::AttributeOutput::STRETCH_AND_QUATERNION ?
+        attrs.xformOutput == PcaAttributes::XformOutput::STRETCH_AND_QUATERNION ?
             initAttribute(attrs.xform, zeroVal<PcaAttributes::QuatT>()) :
             INVALID_IDX;
     const size_t strIdx = initAttribute(stretchAttribName, PcaAttributes::StretchT(settings.nonAnisotropicStretch));
@@ -800,7 +803,7 @@ OPENVDB_NO_DEPRECATION_WARNING_END
     ///   which will require a separate step. For now, this step is relatively
     ///   cheap.
     timer.start("Coverting attributes");
-    if (attrs.format == PcaAttributes::AttributeOutput::STRETCH_AND_QUATERNION)
+    if (attrs.xformOutput == PcaAttributes::XformOutput::STRETCH_AND_QUATERNION)
     {
         manager.foreach([&](LeafNodeT& leafnode, size_t) {
             AttributeWriteHandle<Mat3T, NullCodec> rotHandle(leafnode.attributeArray(rotIdx));
@@ -838,7 +841,7 @@ OPENVDB_NO_DEPRECATION_WARNING_END
             rotHandle.collapse();
         });
     }
-    else if (attrs.format == PcaAttributes::AttributeOutput::COMBINED_TRANSFORM)
+    else if (attrs.xformOutput == PcaAttributes::XformOutput::COMBINED_TRANSFORM)
     {
         manager.foreach([&](LeafNodeT& leafnode, size_t) {
             AttributeWriteHandle<Vec3T, NullCodec> stretchHandle(leafnode.attributeArray(strIdx));

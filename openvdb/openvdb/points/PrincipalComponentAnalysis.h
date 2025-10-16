@@ -48,7 +48,7 @@ struct PcaAttributes;
 ///   with Anisotropic Kernels'. The results are stored on the attributes
 ///   pointed to by the PcaAttributes. See the PcaSettings and PcaAttributes
 ///   structs for more details.
-/// @warning  This method will throw if the 'strech', 'rotation' or 'pws'
+/// @warning  This method will throw if the 'strech', 'xform' or 'pws'
 ///   attributes already exist on this input point set.
 /// @param points   The point data grid to analyses
 /// @param settings The PCA settings for controlling the behavior of the
@@ -105,7 +105,7 @@ struct PcaSettings
     ///   that target points must have to be classified as having an elliptical
     ///   distribution. Points with less neighbours than this will end up with
     ///   uniform stretch values of nonAnisotropicStretch and an identity
-    ///   rotation matrix.
+    ///   transformation.
     /// @note  This number can include the target point itself.
     /// @warning  Changing this value does not change the size or number of
     ///   point neighborhood lookups. As such, increasing this value only
@@ -130,7 +130,7 @@ struct PcaSettings
     ///   are trivially stepped over, with the step size calculated as:
     ///      max(1, ppv / maxTargetPointsPerVoxel).
     ///   default behaviour is to compute for all points. Any points skipped
-    ///   will be treated as being isolated and receive an identity rotation
+    ///   will be treated as being isolated and receive an identity transform
     ///   and nonAnisotropicStretch.
     /// @note  When using in conjuction with rasterizeSdf for ellipsoids,
     ///   consider choosing a lower value (e.g. same value as
@@ -162,7 +162,7 @@ OPENVDB_NO_DEPRECATION_WARNING_BEGIN
 ///   EllipsoidSettings to perform ellipsoidal surface construction.
 struct PcaAttributes
 {
-    enum class AttributeOutput
+    enum class XformOutput
     {
         // When selected, the "stretch" output attribute won't be created.
         // Instead, only a 3x3 affine unitary "xform" attribute will be
@@ -179,21 +179,19 @@ struct PcaAttributes
         STRETCH_AND_ROTATION_MATRIX
     };
 
-    AttributeOutput format = AttributeOutput::STRETCH_AND_ROTATION_MATRIX;
+    XformOutput xformOutput = XformOutput::STRETCH_AND_ROTATION_MATRIX;
 
     /// @brief  Settings for the "stretch" attribute, a floating point vector
     ///   attribute which represents the scaling components of each points
     ///   ellipse or (1.0,1.0,1.0) for isolated points.
-    /// @note   This will only be created if the AttributeOutput is set to
+    /// @note   This will only be created if the XformOutput is set to
     ///   STRETCH_AND_QUATERNION or STRETCH_AND_ROTATION_MATRIX.
     using StretchT = math::Vec3<float>;
     std::string stretch = "stretch";
 
-    /// @brief  Settings for the "rotation" attribute, either a floating point
-    ///   matrix or quaternion attribute which represents the orthogonal rotation
-    ///   of each points ellipse or the identity matrix for isolated points.
-    /// @note   When AttributeOutput is STRETCH_AND_QUATERNION, this will take
-    ///   the form of a Quaternion of type QuatT. Otherwise, it will be a Mat3s.
+    /// @brief  Settings for the "xform" attribute, either a floating point
+    ///   matrix or quaternion attribute. See the `xformOutput` setting and
+    ///   XformOutput enum above for details.
     using RotationT = math::Mat3<float>;
     using QuatT = math::Quat<float>;
     std::string xform = "xform";
@@ -209,17 +207,17 @@ struct PcaAttributes
 
     /// @brief A point group to create that represents points which have valid
     ///   ellipsoidal neighborhood. Points outside of this group will have
-    ///   their stretch and rotation attributes set to describe a canonical
-    ///   sphere. Note however that all points, regardless of this groups
-    ///   membership flag, will still contribute to their neighbours and may
-    ///   have their world space position deformed in relation to their
-    ///   neighboring points.
+    ///   their stretch and xform attributes set to describe a canonical sphere
+    ///   Note however that all points, regardless of this groups membership
+    ///   flag, will still contribute to their neighbours and may have their
+    ///   world space position deformed in relation to their neighboring points.
     std::string ellipses = "ellipsoids";
 
     /// Old style "xform" attribute which has since been renamed and ONLY
     /// supported rotation. If set, both the above "xform" and this attribute
     /// will be created. This attribute only ever holds rotation, regardless
-    /// of the format specified. This will be removed and should not be used.
+    /// of the xformOutput specified. This will be removed and should not be
+    /// used.
     OPENVDB_DEPRECATED_MESSAGE("Use PcaAttributes::xform") std::string rotation = "";
 };
 

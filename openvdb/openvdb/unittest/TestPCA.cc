@@ -516,13 +516,13 @@ TEST_F(TestPCA, testPCAxforms)
     s.nonAnisotropicStretch = 1.0f;
 
     points::PcaAttributes a;
-    a.format = points::PcaAttributes::AttributeOutput::STRETCH_AND_ROTATION_MATRIX;
+    a.xformOutput = points::PcaAttributes::XformOutput::STRETCH_AND_ROTATION_MATRIX;
     points::pca(*points1, s, a);
 
-    a.format = points::PcaAttributes::AttributeOutput::COMBINED_TRANSFORM;
+    a.xformOutput = points::PcaAttributes::XformOutput::COMBINED_TRANSFORM;
     points::pca(*points2, s, a);
 
-    a.format = points::PcaAttributes::AttributeOutput::STRETCH_AND_QUATERNION;
+    a.xformOutput = points::PcaAttributes::XformOutput::STRETCH_AND_QUATERNION;
     points::pca(*points3, s, a);
 
     // Check attributes of each
