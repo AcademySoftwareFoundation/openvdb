@@ -223,7 +223,7 @@ fileSize_t Internal::write(std::ostream& os, const GridHandle<BufferT>& handle, 
         uLongf                   size = compressBound(static_cast<uLongf>(residual)); // Get an upper bound on the size of the compressed data.
         std::unique_ptr<Bytef[]> tmp(new Bytef[size]);
         const int                status = compress(tmp.get(), &size, reinterpret_cast<const Bytef*>(data), static_cast<uLongf>(residual));
-        if (status != Z_OK) std::runtime_error("Internal write error in ZIP");
+        if (status != Z_OK) throw std::runtime_error("Internal write error in ZIP");
         if (size > residual) std::cerr << "\nWarning: Unexpected ZIP compression from " << residual << " to " << size << " bytes\n";
         const fileSize_t outBytes = size;
         os.write(reinterpret_cast<const char*>(&outBytes), sizeof(fileSize_t));
@@ -240,7 +240,7 @@ fileSize_t Internal::write(std::ostream& os, const GridHandle<BufferT>& handle, 
             fileSize_t              chunk = residual < MAX_SIZE ? residual : MAX_SIZE, size = chunk + BLOSC_MAX_OVERHEAD;
             std::unique_ptr<char[]> tmp(new char[size]);
             const int               count = blosc_compress_ctx(9, 1, sizeof(float), chunk, data, tmp.get(), size, BLOSC_LZ4_COMPNAME, 1 << 18, 1);
-            if (count <= 0) std::runtime_error("Internal write error in BLOSC");
+            if (count <= 0) throw std::runtime_error("Internal write error in BLOSC");
             const fileSize_t outBytes = count;
             os.write(reinterpret_cast<const char*>(&outBytes), sizeof(fileSize_t));
             os.write(reinterpret_cast<const char*>(tmp.get()), outBytes);
@@ -284,7 +284,7 @@ void Internal::read(std::istream& is, char* data, fileSize_t residual, Codec cod
         is.read(reinterpret_cast<char*>(tmp.get()), size);
         uLongf numBytes = static_cast<uLongf>(residual);
         int status = uncompress(reinterpret_cast<Bytef*>(data), &numBytes, tmp.get(), static_cast<uLongf>(size));
-        if (status != Z_OK) std::runtime_error("Internal read error in ZIP");
+        if (status != Z_OK) throw std::runtime_error("Internal read error in ZIP");
         if (fileSize_t(numBytes) != residual) throw std::runtime_error("UNZIP failed on byte size");
 #else
         throw std::runtime_error("ZIP compression codec was disabled during build");
@@ -300,7 +300,7 @@ void Internal::read(std::istream& is, char* data, fileSize_t residual, Codec cod
             is.read(reinterpret_cast<char*>(tmp.get()), size);
             const fileSize_t chunk = residual < MAX_SIZE ? residual : MAX_SIZE;
             const int        count = blosc_decompress_ctx(tmp.get(), data, size_t(chunk), 1); //fails with more threads :(
-            if (count < 1) std::runtime_error("Internal read error in BLOSC");
+            if (count < 1) throw std::runtime_error("Internal read error in BLOSC");
             if (count != int(chunk)) throw std::runtime_error("BLOSC failed on byte size");
             data += size_t(chunk);
             residual -= chunk;
