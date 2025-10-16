@@ -84,9 +84,9 @@ template<typename BuildT, typename StatsT, int LEVEL>
 __global__ void processInternal(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
 {
     using ChildT = typename NanoNode<BuildT,LEVEL-1>::type;
-    uint32_t childID = blockIdx.x * blockDim.x + threadIdx.x;// thread id (reused below to avoid compiler warning)
-    if (childID >= d_nodeMgr->nodeCount(LEVEL)) return;
-    auto &d_node = d_nodeMgr->template node<LEVEL>(childID);
+    uint32_t nodeID = blockIdx.x * blockDim.x + threadIdx.x;// thread id (reused below to avoid compiler warning)
+    if (nodeID >= d_nodeMgr->nodeCount(LEVEL)) return;
+    auto &d_node = d_nodeMgr->template node<LEVEL>(nodeID);
     auto &bbox   = d_node.mBBox;
     bbox         = CoordBBox();// empty bbox
     StatsT stats;
@@ -95,8 +95,8 @@ __global__ void processInternal(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
         auto &child = *it;
         bbox.expand( child.bbox() );
         if constexpr(StatsT::hasAverage()) {
-            childID = *reinterpret_cast<uint32_t*>(&child.mMinimum);
-            StatsT &s = d_stats[childID];
+            nodeID = *reinterpret_cast<uint32_t*>(&child.mMinimum);
+            StatsT &s = d_stats[nodeID];
             s.setStats(child);
             stats.add(s);
         } else if constexpr(StatsT::hasMinMax()) {
@@ -111,8 +111,8 @@ __global__ void processInternal(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
         if constexpr(StatsT::hasStats()) stats.add(*it, ChildT::NUM_VALUES);
     }
     if constexpr(StatsT::hasAverage()) {
-        d_stats[childID] = stats;
-        *reinterpret_cast<uint32_t*>(&d_node.mMinimum) = childID;
+        d_stats[nodeID] = stats;
+        *reinterpret_cast<uint32_t*>(&d_node.mMinimum) = nodeID;
     } else if constexpr(StatsT::hasMinMax()) {
         stats.setStats(d_node);
     }
