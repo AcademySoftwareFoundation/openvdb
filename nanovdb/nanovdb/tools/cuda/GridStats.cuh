@@ -84,13 +84,12 @@ template<typename BuildT, typename StatsT, int LEVEL>
 __global__ void processInternal(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
 {
     using ChildT = typename NanoNode<BuildT,LEVEL-1>::type;
-    const uint32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid >= d_nodeMgr->nodeCount(LEVEL)) return;
+    uint32_t childID = blockIdx.x * blockDim.x + threadIdx.x;// thead id
+    if (childID >= d_nodeMgr->nodeCount(LEVEL)) return;
     auto &d_node = d_nodeMgr->template node<LEVEL>(tid);
     auto &bbox   = d_node.mBBox;
     bbox         = CoordBBox();// empty bbox
     StatsT stats;
-    uint32_t childID = 0u;
 
     for (auto it = d_node.beginChild(); it; ++it) {
         auto &child = *it;
