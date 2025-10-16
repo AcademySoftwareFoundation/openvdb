@@ -804,38 +804,31 @@ OPENVDB_NO_DEPRECATION_WARNING_END
     {
         manager.foreach([&](LeafNodeT& leafnode, size_t) {
             AttributeWriteHandle<Mat3T, NullCodec> rotHandle(leafnode.attributeArray(rotIdx));
-            AttributeWriteHandle<Vec3T, NullCodec> stretchHandle(leafnode.attributeArray(strIdx));
             PcaAttributes::QuatT* Q = initPcaArrayAttribute<PcaAttributes::QuatT>(leafnode, qutIdx, /*fill=*/false);
             for (Index idx = 0; idx < rotHandle.size(); ++idx) {
-                const auto& rot = rotHandle.get(idx);
+                Mat3T rot = rotHandle.get(idx);
                 // If we're a pure reflection (partial or global, det of -1),
-                // we need to convert to a rotation for quat support. Could just
-                // negate the entire matrix for "global" reflections, but have to
-                // handle partial (specific axis) anyway, so scan each col for the
-                // elements to flip
-                // @todo  Consider never outputing reflection? Handle this in
-                //   the svd result?
+                // we need to convert to a rotation for quat support. Just flip
+                // the sign of one of the columns (axis) to change the
+                // "handedness" of the basis
+                // @todo  Consider never outputing reflection/always preserve
+                //   orientation? Handle this in the svd result?
                 if (math::isApproxEqual(rot.det(), -1.0f))
                 {
-                    for (int col = 0; col < 3; ++col) {
-                        auto tmp = rot;
-                        for (int row = 0; row < 3; ++row) {
-                            tmp(row, col) *= -1.0f;
-                        }
-
-                        if (std::abs(tmp.det() - 1.0f) < 1e-5f) {
-                            Q[idx] = PcaAttributes::QuatT(tmp);
-                            // also adjust corresponding stretch
-                            auto stretch = stretchHandle.get(idx);
-                            stretch[col] *= -1.0f;
-                            stretchHandle.set(idx, stretch);
-                            break;
-                        }
-                        OPENVDB_ASSERT_MESSAGE(false,
-                            "Unable to convert reflection to valid rotation matrix");
-                        // shouldn't be possible but fall back to ident
-                        Q[idx].setIdentity();
+                    // Choosing to apply to last column
+                    rot(0,2) *= -1.0f;
+                    rot(1,2) *= -1.0f;
+                    rot(2,2) *= -1.0f;
+                    // Quat construtor throws so guard with our own check
+                    // @todo  Re-write quat class...
+                    if (math::isApproxEqual(rot.det(), 1.0f)) {
+                        Q[idx] = PcaAttributes::QuatT(rot);
+                        continue;
                     }
+                    OPENVDB_ASSERT_MESSAGE(false,
+                        "Unable to convert reflection to valid rotation matrix");
+                    // shouldn't be possible but fall back to ident
+                    Q[idx].setIdentity();
                 }
                 else {
                     Q[idx] = PcaAttributes::QuatT(rot);

@@ -577,19 +577,10 @@ TEST_F(TestPCA, testPCAxforms)
         math::Vec3<float> str3 = stretch3.get(i);
         const bool rot1IsReflection = math::isApproxEqual(rot1.det(), -1.0f);
         if (rot1IsReflection) {
-            // find which column was flipped
-            int j = 0;
-            for (; j < 3; ++j) {
-                if ((str1[j] * str3[j]) < 0.0f) break;
-            }
-            ASSERT_TRUE(i < 3);
-            // flip our stretch/"rotations" from the first grid to the
-            // expected match of our stretch/quat (and subsequent rebuilt
-            // rotation) from our third grid
-            str1[j] *= -1.0f;
-            rot1(0, j) *= -1.0f;
-            rot1(1, j) *= -1.0f;
-            rot1(2, j) *= -1.0f;
+            // flip last column (the same as the internal behaviour of pca)
+            rot1(0, 2) *= -1.0f;
+            rot1(1, 2) *= -1.0f;
+            rot1(2, 2) *= -1.0f;
         }
         EXPECT_EQ(rot1, rot3);
         EXPECT_EQ(str1, str3);
