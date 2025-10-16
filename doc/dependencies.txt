@@ -44,10 +44,11 @@ OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW* | -
 OpenVDB Python          | Core Library dependencies, Python, nanobind     | -
 OpenVDB AX              | Core Library dependencies, LLVM                 | Bison, Flex
 NanoVDB                 | -                                               | Core Library, CUDA, TBB, Blosc, ZLib
-OpenVDB UnitTests       | Core Library dependencies, GoogleTest           | -
+OpenVDB UnitTests       | Core Library dependencies, GoogleTest, numpy*   | -
 OpenVDB Documentation   | Doxygen                                         | -
 
  - @b * GLEW is only required for building the vdb_view binary on Windows.
+ - @b * numpy only required for python binding unit tests
  - @b Note - Bison and Flex are only required for re-generation of the AX
  grammar which is not typically necessary for the majority of users.
 

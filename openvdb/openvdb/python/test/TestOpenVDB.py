@@ -12,6 +12,9 @@ C++-to-Python bindings, not the OpenVDB library itself.
 import os, os.path
 import sys
 import unittest
+import numpy as np
+import random
+import time
 
 # If on Windows, add required dll directories from our binary build tree
 if 'add_dll_directory' in dir(os):
@@ -541,10 +544,6 @@ class TestOpenVDB(unittest.TestCase):
 
 
     def testCopyFromArray(self):
-        import random
-        import time
-        import numpy as np
-
         arr = np.zeros((1, 2, 1))
         grid = openvdb.FloatGrid()
         grid.copyFromArray(arr)
@@ -631,10 +630,6 @@ class TestOpenVDB(unittest.TestCase):
 
 
     def testCopyToArray(self):
-        import random
-        import time
-        import numpy as np
-
         arr = np.zeros((1, 2, 1))
         grid = openvdb.FloatGrid()
         grid.copyFromArray(arr)
@@ -717,9 +712,6 @@ class TestOpenVDB(unittest.TestCase):
 
 
     def testMeshConversion(self):
-        import time
-        import numpy as np
-
         # Test mesh to volume conversion.
 
         # Generate the vertices of a cube.

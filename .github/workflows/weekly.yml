@@ -155,16 +155,16 @@ jobs:
     strategy:
       matrix:
         config:
-          - { name: 'all',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
-          - { name: 'lite',  build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF -DOPENVDB_USE_DELAYED_LOADING=OFF' }
-          - { name: 'half',  build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
-          - { name: 'sse',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_SIMD=SSE42' }
-          - { name: 'avx',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_SIMD=AVX' }
-          - { name: 'pygrd', build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
-          - { name: 'asan',  build: 'asan',    components: 'core,test',                                      cmake: '-DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF -DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
-          - { name: 'ubsan', build: 'ubsan',   components: 'core,test',                                      cmake: '-DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" ' }
-          - { name: 'c++20', build: 'Release', components: 'core,test',                                      cmake: '-DCMAKE_CXX_STANDARD=20' }
-          - { name: 'conf',  build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON' }
+          - { name: 'all',    build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
+          - { name: 'lite',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF -DOPENVDB_USE_DELAYED_LOADING=OFF' }
+          - { name: 'half',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
+          - { name: 'sse',    build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_SIMD=SSE42' }
+          - { name: 'avx',    build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_SIMD=AVX' }
+          - { name: 'pygrid', build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
+          - { name: 'asan',   build: 'asan',    components: 'core,test',                                      cmake: '-DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF -DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
+          - { name: 'ubsan',  build: 'ubsan',   components: 'core,test',                                      cmake: '-DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" ' }
+          - { name: 'c++20',  build: 'Release', components: 'core,test',                                      cmake: '-DCMAKE_CXX_STANDARD=20' }
+          - { name: 'conf',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
