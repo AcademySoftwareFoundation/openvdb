@@ -162,11 +162,13 @@ public:
 
     /// @brief Converts nanovdb::Grid<Index> + blind data  -> openvdb::GridBase::Ptr
     /// @param idxGrid NanoVDB IndexGrid with blind data to be converted
+    /// @param blindDataID Id of the bind data to be used as the side-car. A negative values means
+    ///        pick the first available (relevant) blind data.
     /// @return shared pointer to an OpenVDB GridBase
     template<typename NanoIndexT>
     typename std::enable_if<BuildTraits<NanoIndexT>::is_index,
                             openvdb::GridBase::Ptr>::type
-    operator()(const NanoGrid<NanoIndexT>& idxGrid);
+    operator()(const NanoGrid<NanoIndexT>& idxGrid, int blindDataID = -1);
 
     /// @brief Converts nanovdb::Grid<NanoIndexT> + NanoValueT[]  -> openvdb::Grid<NanoValueT>::Ptr
     /// @tparam NanoValueT Template to of the side car data
@@ -275,16 +277,19 @@ NanoToOpenVDB::operator()(const NanoGrid<NanoIndexT>& indexGrid,
         }
     }
 
-    if (std::is_same<NanoIndexT, ValueOnIndex>::value && gridClass == GridClass::LevelSet) openvdb::tools::signedFloodFill(dstGrid->tree());
+    if constexpr(std::is_same<NanoIndexT, ValueOnIndex>::value) {
+        if (gridClass == GridClass::LevelSet) openvdb::tools::signedFloodFill(dstGrid->tree());
+    }
 
     return dstGrid;
 }// NanoToOpenVDB::operator()(const NanoGrid<ValueIndex>& grid, const NanoValueT*)
 
 template<typename NanoIndexT>
 typename std::enable_if<BuildTraits<NanoIndexT>::is_index, openvdb::GridBase::Ptr>::type
-NanoToOpenVDB::operator()(const NanoGrid<NanoIndexT>& idxGrid)
+NanoToOpenVDB::operator()(const NanoGrid<NanoIndexT>& idxGrid, int blindDataID)
 {
     for (uint32_t i=0; i<idxGrid.blindDataCount(); ++i) {
+        if (blindDataID >= 0 && int(i) != blindDataID) continue;
         const auto &metaData = idxGrid.blindMetaData(i);
         if (metaData.mDataClass != GridBlindDataClass::ChannelArray ||
             idxGrid.valueCount() != metaData.mValueCount) continue;
