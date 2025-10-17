@@ -30,7 +30,7 @@ namespace tools {
 
 namespace trait {
 
-/// @brief Struct that maps all nanovdb types to corresponding openvdb types. 
+/// @brief Struct that maps all nanovdb types to corresponding openvdb types.
 /// @tparam T NanoVDB build type, e.g. nanovdb::ValueMask -> openvdb::ValueMask
 ///         nanovdb::Fp8 -> float, nanovdb::ValueIndex -> uin64_t, float -> float
 /// @note Since Windows appears to always template instantiate the return_type in
