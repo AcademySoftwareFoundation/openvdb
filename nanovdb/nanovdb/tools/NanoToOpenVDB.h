@@ -57,8 +57,8 @@ auto nanoToOpenVDB(const NanoGrid<NanoBuildT>& grid);
 /// @param gridName Name of the output grid
 /// @return Shared pointer to an OpenVDB Grid of a matching type (trait::OpenGrid<NanoValueT>::type::Ptr)
 template<typename NanoBuildT, typename NanoValueT>
-typename std::enable_if<BuildTraits<NanoBuildT>::is_index,
-                        typename trait::OpenGrid<NanoValueT>::Ptr>::type
+typename util::enable_if<BuildTraits<NanoBuildT>::is_index,
+                         typename trait::OpenGrid<NanoValueT>::Ptr>::type
 nanoToOpenVDB(const NanoGrid<NanoBuildT>& grid,
               const NanoValueT *sideCar,
               GridClass gridClass = GridClass::Unknown,
@@ -81,15 +81,6 @@ namespace trait {
 template<>
 struct MapToOpen<ValueMask> {using type = openvdb::ValueMask;};
 
-template<>
-struct MapToOpen<ValueIndex> {using type = int;};// dummy
-template<>
-struct MapToOpen<ValueOnIndex> {using type = int;};// dummy
-template<>
-struct MapToOpen<ValueIndexMask> {using type = int;};// dummy
-template<>
-struct MapToOpen<ValueOnIndexMask> {using type = int;};// dummy
-
 template<typename T>
 struct MapToOpen<math::Vec3<T>>{using type = openvdb::math::Vec3<T>;};
 
@@ -107,6 +98,20 @@ struct MapToOpen<Fp16> {using type = float;};
 
 template<>
 struct MapToOpen<FpN> {using type = float;};
+
+/*
+// Windows appears to template instantiate the return type in std::enable_if
+#ifdef _WIN32
+template<>
+struct MapToOpen<ValueIndex> {using type = int;};// dummy
+template<>
+struct MapToOpen<ValueOnIndex> {using type = int;};// dummy
+template<>
+struct MapToOpen<ValueIndexMask> {using type = int;};// dummy
+template<>
+struct MapToOpen<ValueOnIndexMask> {using type = int;};// dummy
+#endif
+*/
 
 template<typename T, uint32_t LEVEL>
 struct OpenNode;
@@ -165,8 +170,8 @@ public:
     /// @param grid NanoVDB grid to be converted
     /// @return Shared pointer to an OpenVDB grid of matching type
     template<typename NanoBuildT>
-    typename std::enable_if<!BuildTraits<NanoBuildT>::is_index,
-                            typename trait::OpenGrid<NanoBuildT>::Ptr>::type
+    typename util::enable_if<!BuildTraits<NanoBuildT>::is_index,
+                             typename trait::OpenGrid<NanoBuildT>::Ptr>::type
     operator()(const NanoGrid<NanoBuildT>& grid);
 
     /// @brief Converts nanovdb::Grid<Index> + blind data  -> openvdb::GridBase::Ptr
@@ -175,8 +180,8 @@ public:
     ///        pick the first available (relevant) blind data.
     /// @return shared pointer to an OpenVDB GridBase
     template<typename NanoIndexT>
-    typename std::enable_if<BuildTraits<NanoIndexT>::is_index,
-                            openvdb::GridBase::Ptr>::type
+    typename util::enable_if<BuildTraits<NanoIndexT>::is_index,
+                             openvdb::GridBase::Ptr>::type
     operator()(const NanoGrid<NanoIndexT>& idxGrid, int blindDataID = -1);
 
     /// @brief Converts nanovdb::Grid<NanoIndexT> + NanoValueT[]  -> openvdb::Grid<NanoValueT>::Ptr
@@ -187,8 +192,8 @@ public:
     /// @param name Name of the output grid
     /// @return Shared pointer to an OpenVDB grid of matching type
     template<typename NanoIndexT, typename NanoValueT>
-    typename std::enable_if<BuildTraits<NanoIndexT>::is_index,
-                            typename trait::OpenGrid<NanoValueT>::Ptr>::type
+    typename util::enable_if<BuildTraits<NanoIndexT>::is_index,
+                             typename trait::OpenGrid<NanoValueT>::Ptr>::type
     operator()(const NanoGrid<NanoIndexT>& grid,
                const NanoValueT *sideCar,
                GridClass gridClass = GridClass::Unknown,
@@ -197,19 +202,19 @@ public:
 private:
 
     template<int LEVEL, typename NanoBuildT>
-    typename std::enable_if<!BuildTraits<NanoBuildT>::is_index && (LEVEL == 1 || LEVEL == 2)>::type
+    typename util::enable_if<!BuildTraits<NanoBuildT>::is_index && (LEVEL == 1 || LEVEL == 2)>::type
     process(typename trait::OpenNode<NanoBuildT, LEVEL>::type*, const typename NanoNode<NanoBuildT, LEVEL>::type*);
 
     template<int LEVEL, typename NanoIndexT, typename NanoValueT>
-    typename std::enable_if<BuildTraits<NanoIndexT>::is_index && (LEVEL == 1 || LEVEL == 2)>::type
+    typename util::enable_if<BuildTraits<NanoIndexT>::is_index && (LEVEL == 1 || LEVEL == 2)>::type
     process(typename trait::OpenNode<NanoValueT, LEVEL>::type*, const typename NanoNode<NanoIndexT, LEVEL>::type*, const NanoValueT*);
 
     template<int LEVEL, typename NanoBuildT>
-    typename std::enable_if<!BuildTraits<NanoBuildT>::is_index && LEVEL == 0>::type
+    typename util::enable_if<!BuildTraits<NanoBuildT>::is_index && LEVEL == 0>::type
     process(typename trait::OpenNode<NanoBuildT, LEVEL>::type*, const typename NanoNode<NanoBuildT, LEVEL>::type*);
 
     template<int LEVEL, typename NanoIndexT, typename NanoValueT>
-    typename std::enable_if<BuildTraits<NanoIndexT>::is_index && LEVEL == 0>::type
+    typename util::enable_if<BuildTraits<NanoIndexT>::is_index && LEVEL == 0>::type
     process(typename trait::OpenNode<NanoValueT, LEVEL>::type*, const typename NanoNode<NanoIndexT, LEVEL>::type*, const NanoValueT*);
 
 }; // NanoToOpenVDB class
@@ -217,8 +222,8 @@ private:
 // ================================================================================================
 
 template<typename NanoBuildT>
-typename std::enable_if<!BuildTraits<NanoBuildT>::is_index,
-                        typename trait::OpenGrid<NanoBuildT>::Ptr>::type
+typename util::enable_if<!BuildTraits<NanoBuildT>::is_index,
+                         typename trait::OpenGrid<NanoBuildT>::Ptr>::type
 NanoToOpenVDB::operator()(const NanoGrid<NanoBuildT>& srcGrid)
 {
     // Create an empty OpenVDB destination grid
@@ -252,8 +257,8 @@ NanoToOpenVDB::operator()(const NanoGrid<NanoBuildT>& srcGrid)
 }// NanoToOpenVDB::operator()(const NanoGrid<NanoBuildT>& grid)
 
 template<typename NanoIndexT, typename NanoValueT>
-typename std::enable_if<BuildTraits<NanoIndexT>::is_index,
-                        typename trait::OpenGrid<NanoValueT>::Ptr>::type
+typename util::enable_if<BuildTraits<NanoIndexT>::is_index,
+                         typename trait::OpenGrid<NanoValueT>::Ptr>::type
 NanoToOpenVDB::operator()(const NanoGrid<NanoIndexT>& indexGrid,
                           const NanoValueT *sideCar,
                           GridClass gridClass,
@@ -294,7 +299,7 @@ NanoToOpenVDB::operator()(const NanoGrid<NanoIndexT>& indexGrid,
 }// NanoToOpenVDB::operator()(const NanoGrid<ValueIndex>& grid, const NanoValueT*)
 
 template<typename NanoIndexT>
-typename std::enable_if<BuildTraits<NanoIndexT>::is_index, openvdb::GridBase::Ptr>::type
+typename util::enable_if<BuildTraits<NanoIndexT>::is_index, openvdb::GridBase::Ptr>::type
 NanoToOpenVDB::operator()(const NanoGrid<NanoIndexT>& idxGrid, int blindDataID)
 {
     for (uint32_t i=0; i<idxGrid.blindDataCount(); ++i) {
@@ -327,7 +332,7 @@ NanoToOpenVDB::operator()(const NanoGrid<NanoIndexT>& idxGrid, int blindDataID)
 // ================================================================================================
 
 template<int LEVEL, typename NanoBuildT>
-typename std::enable_if<!BuildTraits<NanoBuildT>::is_index && (LEVEL == 1 || LEVEL == 2)>::type
+typename util::enable_if<!BuildTraits<NanoBuildT>::is_index && (LEVEL == 1 || LEVEL == 2)>::type
 NanoToOpenVDB::process(typename trait::OpenNode<NanoBuildT, LEVEL>::type *dstNode,
                        const typename NanoNode<NanoBuildT, LEVEL>::type   *srcNode)
 {
@@ -367,7 +372,7 @@ NanoToOpenVDB::process(typename trait::OpenNode<NanoBuildT, LEVEL>::type *dstNod
 } // NanoToOpenVDB::process(const SrcNodeT *srcNode, DstNodeT *dstNode)
 
 template<int LEVEL, typename NanoIndexT, typename NanoValueT>
-typename std::enable_if<BuildTraits<NanoIndexT>::is_index && (LEVEL == 1 || LEVEL == 2)>::type
+typename util::enable_if<BuildTraits<NanoIndexT>::is_index && (LEVEL == 1 || LEVEL == 2)>::type
 NanoToOpenVDB::process(typename trait::OpenNode<NanoValueT, LEVEL>::type *dstNode,
                        const typename NanoNode<NanoIndexT, LEVEL>::type   *srcNode,
                        const NanoValueT* sideCar)
@@ -410,7 +415,7 @@ NanoToOpenVDB::process(typename trait::OpenNode<NanoValueT, LEVEL>::type *dstNod
 // ================================================================================================
 
 template<int LEVEL, typename NanoBuildT>
-typename std::enable_if<!BuildTraits<NanoBuildT>::is_index && LEVEL == 0>::type
+typename util::enable_if<!BuildTraits<NanoBuildT>::is_index && LEVEL == 0>::type
 NanoToOpenVDB::process(typename trait::OpenNode<NanoBuildT, LEVEL>::type *dstLeaf,
                        const typename NanoNode<NanoBuildT, LEVEL>::type   *srcLeaf)
 {
@@ -441,7 +446,7 @@ NanoToOpenVDB::process(typename trait::OpenNode<NanoBuildT, LEVEL>::type *dstLea
 }// NanoToOpenVDB::process(const NanoLeaf<NanoBuildT>* srcLeaf)
 
 template<int LEVEL, typename NanoIndexT, typename NanoValueT>
-typename std::enable_if<BuildTraits<NanoIndexT>::is_index && LEVEL == 0>::type
+typename util::enable_if<BuildTraits<NanoIndexT>::is_index && LEVEL == 0>::type
 NanoToOpenVDB::process(typename trait::OpenNode<NanoValueT, LEVEL>::type *dstLeaf,
                        const typename NanoNode<NanoIndexT, LEVEL>::type   *srcLeaf,
                        const NanoValueT *sideCar)
@@ -483,8 +488,8 @@ auto nanoToOpenVDB(const NanoGrid<NanoBuildT>& grid)
 }
 
 template<typename NanoBuildT, typename NanoValueT>
-typename std::enable_if<BuildTraits<NanoBuildT>::is_index,
-                        typename trait::OpenGrid<NanoValueT>::Ptr>::type
+typename util::enable_if<BuildTraits<NanoBuildT>::is_index,
+                         typename trait::OpenGrid<NanoValueT>::Ptr>::type
 nanoToOpenVDB(const NanoGrid<NanoBuildT>& grid,
               const NanoValueT *sideCar,
               GridClass gridClass,
