@@ -245,7 +245,6 @@ int main(int argc, char* argv[])
                               << std::left << std::setw(blindWidth)  << m.blindDataCount;
                 }
                 std::cout << std::endl;
-                //for (int i = 0; i< )
             }// loop over FileGridMetaData in list from a single file
         }// loop over files
         if (verbose) {

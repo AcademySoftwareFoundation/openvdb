@@ -734,7 +734,6 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     {
         uint32_t* devicePointsPerVoxel = mData->pointsPerVoxel;
         uint32_t* devicePointsPerLeaf = mData->pointsPerLeaf;
-        //uint32_t* devicePointsPerVoxelPrefix = mData->pointsPerVoxelPrefix;
         for (const auto& [deviceId, stream] : mDeviceMesh) {
             cudaCheck(cudaSetDevice(deviceId));
 

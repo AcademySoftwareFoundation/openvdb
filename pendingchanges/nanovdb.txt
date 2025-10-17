@@ -11,4 +11,5 @@ Improvements:
 - Extended nanovdb::GridBlindDataSemantic with nanovdb::GridClass types to support conversion between IndexGrid and regular grids. 
 
 Bug Fixes:
-- Several fixes for compiler warnings
+- Several fixes for compiler warnings.
+- Fixed error in nanovdb/io/IO.h related to missing throws.
