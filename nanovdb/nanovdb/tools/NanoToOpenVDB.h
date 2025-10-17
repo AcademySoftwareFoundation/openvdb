@@ -99,8 +99,7 @@ struct MapToOpen<Fp16> {using type = float;};
 template<>
 struct MapToOpen<FpN> {using type = float;};
 
-/*
-// Windows appears to template instantiate the return type in std::enable_if
+// Windows appears to always template instantiate the return type in enable_if
 #ifdef _WIN32
 template<>
 struct MapToOpen<ValueIndex> {using type = int;};// dummy
@@ -111,7 +110,6 @@ struct MapToOpen<ValueIndexMask> {using type = int;};// dummy
 template<>
 struct MapToOpen<ValueOnIndexMask> {using type = int;};// dummy
 #endif
-*/
 
 template<typename T, uint32_t LEVEL>
 struct OpenNode;
