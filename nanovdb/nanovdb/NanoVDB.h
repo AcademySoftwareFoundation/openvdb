@@ -4706,6 +4706,9 @@ struct NanoNode<BuildT, 3>
     using type = NanoRoot<BuildT>;
 };
 
+template<typename BuildT, int LEVEL>
+using NanoNodeT = typename NanoNode<BuildT, LEVEL>::type;
+
 using FloatTree = NanoTree<float>;
 using Fp4Tree = NanoTree<Fp4>;
 using Fp8Tree = NanoTree<Fp8>;

@@ -322,11 +322,17 @@ struct is_same<T0, T1> {static constexpr bool value = false;};
 template<typename T>
 struct is_same<T, T> {static constexpr bool value = true;};
 
+template<typename T0, typename T1, typename ...T>
+static constexpr bool is_same_v = is_same<T0, T1, T...>::value;
+
 // --------------------------> util::is_floating_point <------------------------------------
 
 /// @brief C++11 implementation of std::is_floating_point
 template<typename T>
 struct is_floating_point {static constexpr bool value = is_same<T, float, double>::value;};
+
+template<typename T>
+static constexpr bool is_floating_point_v = is_floating_point<T>::value;
 
 // --------------------------> util::enable_if <------------------------------------
 
@@ -348,6 +354,9 @@ struct disable_if {using type = T;};
 template<typename T>
 struct disable_if<true, T> {};
 
+template<bool Test, typename T = void>
+using disable_if_t = typename disable_if<Test, T>::type;
+
 // --------------------------> util::is_const <------------------------------------
 
 template<typename T>
@@ -355,6 +364,9 @@ struct is_const {static constexpr bool value = false;};
 
 template<typename T>
 struct is_const<const T> {static constexpr bool value = true;};
+
+template<typename T>
+static constexpr bool is_const_v = is_const<T>::value;
 
 // --------------------------> util::is_pointer <------------------------------------
 
@@ -369,6 +381,9 @@ struct is_pointer {static constexpr bool value = false;};
 template<class T>
 struct is_pointer<T*> {static constexpr bool value = true;};
 
+template<typename T>
+static constexpr bool is_pointer_v = is_pointer<T>::value;
+
 // --------------------------> util::conditional <------------------------------------
 
 /// @brief C++11 implementation of std::conditional
@@ -380,6 +395,9 @@ struct conditional { using type = TrueT; };
 /// @tparam TrueT Type used when boolean is true
 template<class TrueT, class FalseT>
 struct conditional<false, TrueT, FalseT> { using type = FalseT; };
+
+template<bool Test, class TrueT, class FalseT>
+using conditional_t = typename conditional<Test, TrueT, FalseT>::type;
 
 // --------------------------> util::remove_const <------------------------------------
 
@@ -395,6 +413,9 @@ struct remove_const {using type = T;};
 template<typename T>
 struct remove_const<const T> {using type = T;};
 
+template<typename T>
+using remove_const_t = typename remove_const<T>::type;
+
 // --------------------------> util::remove_reference <------------------------------------
 
 /// @brief Trait use to remove reference, i.e. "&", qualifier from a type. Default implementation is just a pass-through
@@ -409,6 +430,9 @@ struct remove_reference {using type = T;};
 template <typename T>
 struct remove_reference<T&> {using type = T;};
 
+template <typename T>
+using remove_reference_t = typename remove_const<T>::type;
+
 // --------------------------> util::remove_pointer <------------------------------------
 
 /// @brief Trait use to remove pointer, i.e. "*", qualifier from a type. Default implementation is just a pass-through
@@ -422,6 +446,9 @@ struct remove_pointer {using type = T;};
 /// @details remove_pointer<float*>::type = float
 template <typename T>
 struct remove_pointer<T*> {using type = T;};
+
+template <typename T>
+using remove_pointer_t = typename remove_pointer<T>::type;
 
 // --------------------------> util::match_const <------------------------------------
 
@@ -441,6 +468,9 @@ struct match_const {using type = typename remove_const<T>::type;};
 template<typename T, typename ReferenceT>
 struct match_const<T, const ReferenceT> {using type = const typename remove_const<T>::type;};
 
+template<typename T, typename ReferenceT>
+using match_const_t = typename match_const<T, ReferenceT>::type;
+
 // --------------------------> util::is_specialization <------------------------------------
 
 /// @brief Metafunction used to determine if the first template
@@ -452,6 +482,7 @@ struct match_const<T, const ReferenceT> {using type = const typename remove_cons
 ///          is_specialization<std::vector<float>, std::vector>::value == true;
 template<typename AnyType, template<typename...> class TemplateType>
 struct is_specialization {static const bool value = false;};
+
 template<typename... Args, template<typename...> class TemplateType>
 struct is_specialization<TemplateType<Args...>, TemplateType>
 {
