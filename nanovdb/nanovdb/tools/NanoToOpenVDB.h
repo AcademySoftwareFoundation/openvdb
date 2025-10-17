@@ -81,6 +81,15 @@ namespace trait {
 template<>
 struct MapToOpen<ValueMask> {using type = openvdb::ValueMask;};
 
+template<>
+struct MapToOpen<ValueIndex> {using type = int;};// dummy
+template<>
+struct MapToOpen<ValueOnIndex> {using type = int;};// dummy
+template<>
+struct MapToOpen<ValueIndexMask> {using type = int;};// dummy
+template<>
+struct MapToOpen<ValueOnIndexMask> {using type = int;};// dummy
+
 template<typename T>
 struct MapToOpen<math::Vec3<T>>{using type = openvdb::math::Vec3<T>;};
 
