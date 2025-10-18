@@ -648,3 +648,27 @@ TEST_F(TestGrid, testAdapter)
         AdapterConstT::constTree(constFloatGrid);
     }
 }
+
+TEST_F(TestGrid, testPopulateHalfGridWithAccessor)
+{
+    using namespace openvdb;
+    HalfGrid::Ptr grid = HalfGrid::create();
+    HalfGrid::Accessor acc = grid->getAccessor();
+
+    Coord xyz(1000, -200000000, 30000000);
+    acc.setValue(xyz, Half(1.0));
+    EXPECT_EQ(Half(1.0), acc.getValue(xyz));
+
+    xyz.reset(1000, 200000000, -30000000);
+    acc.setValue(xyz, Half(2.0));
+    EXPECT_EQ(Half(2.0), acc.getValue(xyz));
+
+    acc.setValue(openvdb::Coord::min(), Half(3.0));
+    acc.setValue(openvdb::Coord::max(), Half(4.0));
+    EXPECT_EQ(Half(3.0), acc.getValue(openvdb::Coord::min()));
+    EXPECT_EQ(Half(4.0), acc.getValue(openvdb::Coord::max()));
+
+    for (HalfGrid::ValueOnCIter iter = grid->cbeginValueOn(); iter; ++iter) {
+        EXPECT_EQ(Half(iter.getValue()), *iter);
+    }
+}
