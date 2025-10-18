@@ -161,11 +161,24 @@ TEST_F(TestGrid, testGetGrid)
 
     EXPECT_TRUE(grid->baseTreePtr());
 
-    EXPECT_TRUE(!gridPtrCast<DoubleGrid>(grid));
+    EXPECT_TRUE(gridPtrCast<FloatGrid>(grid));
     EXPECT_TRUE(!gridPtrCast<DoubleGrid>(grid));
 
     EXPECT_TRUE(gridConstPtrCast<FloatGrid>(constGrid));
     EXPECT_TRUE(!gridConstPtrCast<DoubleGrid>(constGrid));
+
+    GridBase::Ptr halfGrid = HalfGrid::create(/*bg=*/Half(0.0));
+    GridBase::ConstPtr constHalfGrid = halfGrid;
+
+    EXPECT_TRUE(halfGrid->baseTreePtr());
+
+    EXPECT_TRUE(gridPtrCast<HalfGrid>(halfGrid));
+    EXPECT_TRUE(!gridPtrCast<FloatGrid>(halfGrid));
+    EXPECT_TRUE(!gridPtrCast<DoubleGrid>(halfGrid));
+
+    EXPECT_TRUE(gridConstPtrCast<HalfGrid>(constHalfGrid));
+    EXPECT_TRUE(!gridConstPtrCast<FloatGrid>(constHalfGrid));
+    EXPECT_TRUE(!gridConstPtrCast<DoubleGrid>(constHalfGrid));
 }
 
 
@@ -176,6 +189,11 @@ TEST_F(TestGrid, testIsType)
     GridBase::Ptr grid = FloatGrid::create();
     EXPECT_TRUE(grid->isType<FloatGrid>());
     EXPECT_TRUE(!grid->isType<DoubleGrid>());
+
+    GridBase::Ptr halfGrid = HalfGrid::create();
+    EXPECT_TRUE(halfGrid->isType<HalfGrid>());
+    EXPECT_TRUE(!halfGrid->isType<FloatGrid>());
+    EXPECT_TRUE(!halfGrid->isType<DoubleGrid>());
 }
 
 
