@@ -25,6 +25,7 @@ public:
 
 protected:
     template<typename GridType> void readAllTest();
+    void testCreateWriteReadHalf();
 };
 
 
@@ -190,7 +191,92 @@ TestGridIO::readAllTest()
     ::remove("something.vdb2");
 }
 
+void TestGridIO::testCreateWriteReadHalf() {
+    using namespace openvdb;
+
+    // Create an empty half-precision grid with background value 0.
+    HalfGrid::Ptr hg = HalfGrid::create();
+    hg->setName("HalfGrid");
+    HalfGrid::Accessor hAcc = hg->getAccessor();
+    FloatGrid::Ptr fg = FloatGrid::create();
+    fg->setName("FloatGrid");
+    FloatGrid::Accessor fAcc = fg->getAccessor();
+
+    Coord xyz(1000, -200000000, 30000000);
+    hAcc.setValue(xyz, Half(1.0));
+    fAcc.setValue(xyz, 1.0f);
+
+    MetaMap::Ptr meta(new MetaMap);
+    meta->insertMeta("author", StringMetadata("Einstein"));
+    meta->insertMeta("year", Int32Metadata(1905));
+
+    GridPtrVecPtr grids(new GridPtrVec);
+    grids->push_back(hg);
+    grids->push_back(fg);
+
+    // Write grids and metadata out to a file.
+    {
+        io::File vdbfile("something.vdb2");
+        vdbfile.write(*grids, *meta);
+    }
+    meta.reset();
+    grids.reset();
+
+    io::File vdbfile("something.vdb2");
+    EXPECT_THROW(vdbfile.getGrids(), openvdb::IoError); // file has not been opened
+
+    // Read the grids back in.
+    vdbfile.open();
+    EXPECT_TRUE(vdbfile.isOpen());
+
+    grids = vdbfile.getGrids();
+    meta = vdbfile.getMetadata();
+
+    // Ensure we have the metadata.
+    EXPECT_TRUE(meta.get() != NULL);
+    EXPECT_EQ(2, int(meta->metaCount()));
+    EXPECT_EQ(std::string("Einstein"), meta->metaValue<std::string>("author"));
+    EXPECT_EQ(1905, meta->metaValue<int32_t>("year"));
+
+    // Ensure we got both grids.
+    EXPECT_TRUE(grids.get() != NULL);
+
+    GridBase::Ptr baseGrid;
+    HalfGrid::Ptr hgRead;
+    FloatGrid::Ptr fgRead;
+    for (io::File::NameIterator nameIter = vdbfile.beginName();
+        nameIter != vdbfile.endName(); ++nameIter)
+    {
+        // Read in only the grid we are interested in.
+        if (nameIter.gridName() == "HalfGrid") {
+            baseGrid = vdbfile.readGrid(nameIter.gridName());
+            hgRead = gridPtrCast<HalfGrid>(baseGrid);
+            EXPECT_TRUE(baseGrid->isType<HalfGrid>());
+            EXPECT_TRUE(gridPtrCast<HalfGrid>(baseGrid));
+            EXPECT_FALSE(gridPtrCast<FloatGrid>(baseGrid));
+        } else if (nameIter.gridName() == "FloatGrid") {
+            baseGrid = vdbfile.readGrid(nameIter.gridName());
+            fgRead = gridPtrCast<FloatGrid>(baseGrid);
+            EXPECT_TRUE(baseGrid->isType<FloatGrid>());
+            EXPECT_TRUE(gridPtrCast<FloatGrid>(baseGrid));
+            EXPECT_FALSE(gridPtrCast<HalfGrid>(baseGrid));
+        }
+    }
+
+    HalfGrid::Accessor hAccRead = hgRead->getAccessor();
+    EXPECT_EQ(Half(1.0), hAcc.getValue(xyz));
+
+    FloatGrid::Accessor fAccRead = fgRead->getAccessor();
+    EXPECT_EQ(1.0f, fAcc.getValue(xyz));
+
+    vdbfile.close();
+
+    ::remove("something.vdb2");
+}
+
 TEST_F(TestGridIO, testReadAllBool) { readAllTest<openvdb::BoolGrid>(); }
 TEST_F(TestGridIO, testReadAllFloat) { readAllTest<openvdb::FloatGrid>(); }
+TEST_F(TestGridIO, testReadAllHalf) { readAllTest<openvdb::HalfGrid>(); }
 TEST_F(TestGridIO, testReadAllVec3S) { readAllTest<openvdb::Vec3SGrid>(); }
 TEST_F(TestGridIO, testReadAllFloat5432) { Float5432Grid::registerGrid(); readAllTest<Float5432Grid>(); }
+TEST_F(TestGridIO, testCreateWriteReadHalf) { testCreateWriteReadHalf(); }
