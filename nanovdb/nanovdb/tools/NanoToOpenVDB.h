@@ -39,8 +39,11 @@ namespace trait {
 template<typename T>// see below for more template specializations
 struct MapToOpen { using type = typename BuildToValueMap<T>::type; };
 
+template<typename T>
+using MapToOpenT = typename MapToOpen<T>::type;
+
 template <typename T>
-using OpenTree = typename openvdb::tree::Tree4<typename trait::MapToOpen<T>::type, 5, 4, 3>::Type;
+using OpenTree = typename openvdb::tree::Tree4<trait::MapToOpenT<T>, 5, 4, 3>::Type;
 
 template <typename T>
 using OpenGrid = openvdb::Grid< OpenTree<T> >;
@@ -101,7 +104,7 @@ struct OpenNode;
 
 // Partial template specialization of the OpenNode struct
 template<typename T>
-struct OpenNode<T, 0> {using type = openvdb::tree::LeafNode<typename MapToOpen<T>::type, 3>;};
+struct OpenNode<T, 0> {using type = openvdb::tree::LeafNode<MapToOpenT<T>, 3>;};
 
 template<typename T>
 struct OpenNode<T, 1> {using type = openvdb::tree::InternalNode<typename OpenNode<T, 0>::type, 4>;};
@@ -404,13 +407,17 @@ NanoToOpenVDB::process(trait::OpenNodeT<NanoBuildT, LEVEL> *dstLeaf,
     dstLeaf->setValueMask(trait::mapMask(srcLeaf->valueMask()));
 
     if constexpr(!BuildTraits<NanoBuildT>::is_special) {
-        const auto* src = trait::mapPtr(srcLeaf->data()->mValues);// doesn't work for compressed data, bool or ValueMask
+        const auto *src = trait::mapPtr(srcLeaf->data()->mValues);// doesn't work for compressed data, bool or ValueMask
+#if 1
+        std::copy(src, src + 512, dstLeaf->buffer().data());
+#else
         for (auto *dst = dstLeaf->buffer().data(), *end = dst + 512; dst != end; dst += 4, src += 4) {
             dst[0] = src[0];
             dst[1] = src[1];
             dst[2] = src[2];
             dst[3] = src[3];
         }
+#endif
     } else if constexpr(BuildTraits<NanoBuildT>::is_Fp) {
         float *dst = dstLeaf->buffer().data();
         for (int i=0; i!=512; i+=4) {
@@ -437,13 +444,17 @@ NanoToOpenVDB::process(trait::OpenNodeT<NanoValueT, LEVEL> *dstLeaf,
 
     if constexpr(!BuildTraits<NanoValueT>::is_special) {
         if constexpr(util::is_same_v<NanoIndexT, ValueIndex>) {
-            const auto* src = trait::mapPtr(sideCar + srcLeaf->data()->mOffset);
+            const auto *src = trait::mapPtr(sideCar + srcLeaf->data()->mOffset);
+#if 1
+            std::copy(src, src + 512, dstLeaf->buffer().data());
+#else
             for (auto *dst = dstLeaf->buffer().data(), *end = dst + 512; dst != end; dst += 4, src += 4) {
                 dst[0] = src[0];
                 dst[1] = src[1];
                 dst[2] = src[2];
                 dst[3] = src[3];
             }
+#endif
         } else {
             const auto* src = trait::mapPtr(sideCar);
             auto *dst = dstLeaf->buffer().data();
