@@ -31,7 +31,7 @@ namespace tools::cuda {// ======================================================
 /// @tparam DstBuildT Build time of the destination/output Grid
 /// @tparam SrcBuildT  Build type of the source/input IndexGrid
 /// @tparam BufferT Type of the buffer used for allocation of the destination Grid
-/// @param d_srcGrid Device pointer to source/input IndexGrid, i.e. SrcBuildT={ValueIndex,ValueOnIndex,ValueIndexMask,ValueOnIndexMask}
+/// @param d_srcGrid Device pointer to source/input IndexGrid, i.e. SrcBuildT={ValueIndex,ValueOnIndex}
 /// @param d_srcValues Device pointer to an array of values
 /// @param pool Memory pool used to create a buffer for the destination/output Grid
 /// @param stream optional CUDA stream (defaults to CUDA stream 0

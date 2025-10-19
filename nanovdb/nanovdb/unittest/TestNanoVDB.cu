@@ -407,29 +407,6 @@ struct ProbeValueNew {
     }
 };// ProbeValueNew<BuildT>
 
-/*
-template <typename BuildT>
-struct AccessLeafMask;
-
-// template specialization of AccessLeafMask wrt ValueOnIndexMask
-template <>
-struct AccessLeafMask<ValueOnIndexMask>
-{
-    using Type = bool;
-    static constexpr int LEVEL = 0;// minimum level for the descent during top-down traversal
-    __hostdev__ static bool get(const NanoRoot<ValueOnIndexMask>&) {return false;}
-    __hostdev__ static bool get(const typename NanoRoot<ValueOnIndexMask>::Tile&) {return false;}
-    __hostdev__ static bool get(const NanoUpper<ValueOnIndexMask>&, uint32_t) {return false;}
-    __hostdev__ static bool get(const NanoLower<ValueOnIndexMask>&, uint32_t) {return false;}
-    __hostdev__ static bool get(const NanoLeaf<ValueOnIndexMask> &leaf, uint32_t n) {return leaf.mMask.isOn(n);}
-    __hostdev__ static void set(NanoRoot<ValueOnIndexMask>&) {}
-    __hostdev__ static void set(typename NanoRoot<ValueOnIndexMask>::Tile&) {}
-    __hostdev__ static void set(NanoUpper<ValueOnIndexMask>&, uint32_t) {}
-    __hostdev__ static void set(NanoLower<ValueOnIndexMask>&, uint32_t) {}
-    __hostdev__ static void set(NanoLeaf<ValueOnIndexMask> &leaf, uint32_t n) {leaf.mMask.setOn(n);}
-};// AccessLeafMask<BuildT>
-*/
-
 }// end of test namespace
 }// end of nanovdb namespace
 

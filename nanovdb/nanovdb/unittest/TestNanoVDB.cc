@@ -2558,8 +2558,6 @@ TYPED_TEST(TestOffsets, NanoVDB)
         LeafData<Mask> is padded: no
         LeafData<Index> is padded: no
         LeafData<OnIndex> is padded: no
-        LeafData<IndexMask> is padded: no
-        LeafData<OnIndexMask> is padded: no
         LeafData<bool> is padded: no
         LeafData<PointIndex> is padded: no
         LeafData<Vec3u8> is padded: yes
