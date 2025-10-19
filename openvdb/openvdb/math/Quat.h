@@ -136,20 +136,12 @@ public:
         mm[3] = T(cos(angle*T(0.5)));
     }
 
-    /// Constructor given a rotation matrix
+    /// Constructor given a rotation matrix without checking if the matrix is
+    /// a unitarty rotation (assumes that is it)
+    struct UnsafeConstruct {};
     template<typename T1>
-    Quat(const Mat3<T1> &rot) {
-
-        // verify that the matrix is really a rotation
-        if(!isUnitary(rot)) {  // unitary is reflection or rotation
-             OPENVDB_THROW(ArithmeticError,
-                "A non-rotation matrix can not be used to construct a quaternion");
-        }
-        if (!isApproxEqual(rot.det(), T1(1))) { // rule out reflection
-             OPENVDB_THROW(ArithmeticError,
-                "A reflection matrix can not be used to construct a quaternion");
-        }
-
+    Quat(const Mat3<T1> &rot, UnsafeConstruct)
+    {
         T trace(rot.trace());
         if (trace > 0) {
 
@@ -188,6 +180,24 @@ public:
             mm[2] = q_z;
             mm[3] = factor * (rot(0,1) - rot(1,0));
         }
+    }
+
+    /// Constructor given a rotation matrix
+    template<typename T1>
+    Quat(const Mat3<T1> &rot)
+        : Quat([&](){
+            // verify that the matrix is really a rotation
+            if(!isUnitary(rot)) {  // unitary is reflection or rotation
+                 OPENVDB_THROW(ArithmeticError,
+                    "A non-rotation matrix can not be used to construct a quaternion");
+            }
+            if (!isApproxEqual(rot.det(), T1(1))) { // rule out reflection
+                 OPENVDB_THROW(ArithmeticError,
+                    "A reflection matrix can not be used to construct a quaternion");
+            }
+            return rot;
+        }(), UnsafeConstruct{})
+    {
     }
 
     /// Reference to the component, e.g.   q.x() = 4.5f;

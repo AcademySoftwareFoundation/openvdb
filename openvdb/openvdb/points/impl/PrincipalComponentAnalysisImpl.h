@@ -810,13 +810,20 @@ OPENVDB_NO_DEPRECATION_WARNING_END
             PcaAttributes::QuatT* Q = initPcaArrayAttribute<PcaAttributes::QuatT>(leafnode, qutIdx, /*fill=*/false);
             for (Index idx = 0; idx < rotHandle.size(); ++idx) {
                 Mat3T rot = rotHandle.get(idx);
+                // Tolerance for quaternion construction - can be pretty low as
+                // we assume our mats to be fully unitary (det of +/-1) at this
+                // point, but may have precision issues when checking it - also
+                // the quat class will try to perform a (mat * mat^t) to check
+                // unitary which is suseptible to small fp values causing
+                // drifts, so construct with UnsafeConstruct{}
+                constexpr float tolerance = 1e-3f;
                 // If we're a pure reflection (partial or global, det of -1),
                 // we need to convert to a rotation for quat support. Just flip
                 // the sign of one of the columns (axis) to change the
                 // "handedness" of the basis
                 // @todo  Consider never outputing reflection/always preserve
                 //   orientation? Handle this in the svd result?
-                if (math::isApproxEqual(rot.det(), -1.0f))
+                if (math::isApproxEqual(rot.det(), -1.0f, tolerance))
                 {
                     // Choosing to apply to last column
                     rot(0,2) *= -1.0f;
@@ -824,8 +831,8 @@ OPENVDB_NO_DEPRECATION_WARNING_END
                     rot(2,2) *= -1.0f;
                     // Quat construtor throws so guard with our own check
                     // @todo  Re-write quat class...
-                    if (math::isApproxEqual(rot.det(), 1.0f)) {
-                        Q[idx] = PcaAttributes::QuatT(rot);
+                    if (math::isApproxEqual(rot.det(), 1.0f, tolerance)) {
+                        Q[idx] = PcaAttributes::QuatT(rot, PcaAttributes::QuatT::UnsafeConstruct{});
                         continue;
                     }
                     OPENVDB_ASSERT_MESSAGE(false,
@@ -834,7 +841,7 @@ OPENVDB_NO_DEPRECATION_WARNING_END
                     Q[idx].setIdentity();
                 }
                 else {
-                    Q[idx] = PcaAttributes::QuatT(rot);
+                    Q[idx] = PcaAttributes::QuatT(rot, PcaAttributes::QuatT::UnsafeConstruct{});
                 }
             }
             // remove matrix representation as we've covered it to a quaternion
