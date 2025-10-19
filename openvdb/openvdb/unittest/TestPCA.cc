@@ -516,7 +516,7 @@ TEST_F(TestPCA, testPCAxforms)
     s.nonAnisotropicStretch = 1.0f;
 
     points::PcaAttributes a;
-    a.xformOutput = points::PcaAttributes::XformOutput::STRETCH_AND_ROTATION_MATRIX;
+    a.xformOutput = points::PcaAttributes::XformOutput::STRETCH_AND_UNITARY_MATRIX;
     points::pca(*points1, s, a);
 
     a.xformOutput = points::PcaAttributes::XformOutput::COMBINED_TRANSFORM;

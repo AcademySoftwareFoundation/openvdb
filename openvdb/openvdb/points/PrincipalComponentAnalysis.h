@@ -176,16 +176,16 @@ struct PcaAttributes
         // attributes will be created. The xform will take the form of an
         // orthogonal 3x3 matrix representing the rotation OR a pure
         // reflection.
-        STRETCH_AND_ROTATION_MATRIX
+        STRETCH_AND_UNITARY_MATRIX
     };
 
-    XformOutput xformOutput = XformOutput::STRETCH_AND_ROTATION_MATRIX;
+    XformOutput xformOutput = XformOutput::STRETCH_AND_UNITARY_MATRIX;
 
     /// @brief  Settings for the "stretch" attribute, a floating point vector
     ///   attribute which represents the scaling components of each points
     ///   ellipse or (1.0,1.0,1.0) for isolated points.
     /// @note   This will only be created if the XformOutput is set to
-    ///   STRETCH_AND_QUATERNION or STRETCH_AND_ROTATION_MATRIX.
+    ///   STRETCH_AND_QUATERNION or STRETCH_AND_UNITARY_MATRIX.
     using StretchT = math::Vec3<float>;
     std::string stretch = "stretch";
 
