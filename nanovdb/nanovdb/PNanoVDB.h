@@ -1088,7 +1088,7 @@ PNANOVDB_FORCE_INLINE void pnanovdb_write_vec3(pnanovdb_buf_t buf, pnanovdb_addr
 
 #define PNANOVDB_MAJOR_VERSION_NUMBER 32// reflects changes to the ABI
 #define PNANOVDB_MINOR_VERSION_NUMBER  8// reflects changes to the API but not ABI
-#define PNANOVDB_PATCH_VERSION_NUMBER  0// reflects bug-fixes with no ABI or API changes
+#define PNANOVDB_PATCH_VERSION_NUMBER  1// reflects bug-fixes with no ABI or API changes
 
 #define PNANOVDB_GRID_TYPE_UNKNOWN 0
 #define PNANOVDB_GRID_TYPE_FLOAT 1

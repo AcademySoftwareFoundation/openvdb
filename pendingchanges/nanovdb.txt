@@ -1,14 +1,16 @@
 NanoVDB:
 
 Improvements:
-- Improvements and bugfixes to PNanoVDB
-- Add Mat classes and other math types to NanoVDB
-- Add support for morphology operators in NanoVDB
+- Added nanovdb/tools/cuda/DilateGrid.cuh which performs topology dilation on the GPU.
+- Added nanovdb/tools/cuda/MergeGrids.cuh which merges the topology of two grids on the GPU.
+- Added Mat classes and other math types to NanoVDB
 - Improvements to mGPU grid building and introduction of a separate test executable for mGPU tests
-- Major rewrite of nanovdb::NanoToOpenVDB, which now allows nanovdb::IndexGrids and blind (or side-car) data to be converted into ian openvdb grid.
+- Major rewrite of nanovdb::NanoToOpenVDB, which now allows nanovdb::IndexGrids and blind (or side-car) data to be converted into an openvdb grid.
 - Added stand-alone function nanovd::writeUncompressedGrid that allows nanovdb::IndexGrids and blind (or side-car) data to be written directly to a stream.
 - nanovdb_print now (optionally) prints the blind data count per grid.
 - Extended nanovdb::GridBlindDataSemantic with nanovdb::GridClass types to support conversion between IndexGrid and regular grids. 
+- Improvements and bugfixes to PNanoVDB.
+- NanoVDB version is now 32.8.1, so both ABI and API are preserved.
 
 Bug Fixes:
 - Several fixes for compiler warnings.

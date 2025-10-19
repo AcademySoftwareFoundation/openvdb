@@ -144,8 +144,8 @@
 #define NANOVDB_USE_NEW_MAGIC_NUMBERS// enables use of the new magic numbers described above
 
 #define NANOVDB_MAJOR_VERSION_NUMBER 32 // reflects changes to the ABI and hence also the file format
-#define NANOVDB_MINOR_VERSION_NUMBER 8 //  reflects changes to the API but not ABI
-#define NANOVDB_PATCH_VERSION_NUMBER 0 //  reflects changes that does not affect the ABI or API
+#define NANOVDB_MINOR_VERSION_NUMBER  8 // reflects changes to the API but not ABI
+#define NANOVDB_PATCH_VERSION_NUMBER  1 // reflects changes that does not affect the ABI or API
 
 #define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
 
@@ -592,6 +592,9 @@ struct BuildToValueMap<Point>
     using Type = uint64_t;
     using type = uint64_t;
 };
+
+template<typename T>
+using BuildToValueMapT = typename BuildToValueMap<T>::type;
 
 // --------------------------> utility functions related to alignment <------------------------------------
 
@@ -1801,6 +1804,9 @@ struct NodeTrait<const GridOrTreeOrRootT, 3>
     using type = const typename GridOrTreeOrRootT::RootNodeType;
 };
 
+template<typename GridOrTreeOrRootT, int LEVEL>
+using NodeTraitT = typename NodeTrait<GridOrTreeOrRootT, LEVEL>::type;
+
 // ------------> Froward decelerations of accelerated random access methods <---------------
 
 template<typename BuildT>
@@ -2449,6 +2455,9 @@ struct GridTree<const GridT>
     using type = const typename GridT::TreeType;
 };
 
+template<typename GridT>
+using GridTreeT = typename GridTree<GridT>::type;
+
 // ----------------------------> Tree <--------------------------------------
 
 /// @brief VDB Tree, which is a thin wrapper around a RootNode.
@@ -2651,7 +2660,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
         static constexpr uint64_t MASK = (1u << 21) - 1; // used to mask out 21 lower bits
         return CoordT(((key >> 42) & MASK) << ChildT::TOTAL, // x are the upper 21 bits
                       ((key >> 21) & MASK) << ChildT::TOTAL, // y are the middle 21 bits
-                      (key & MASK) << ChildT::TOTAL); // z are the lower 21 bits
+                      ( key        & MASK) << ChildT::TOTAL); // z are the lower 21 bits
     }
 #else
     using KeyT = CoordT;
@@ -3569,7 +3578,7 @@ public:
     {
         return (((ijk[0] & MASK) >> ChildT::TOTAL) << (2 * LOG2DIM)) | // note, we're using bitwise OR instead of +
                (((ijk[1] & MASK) >> ChildT::TOTAL) << (LOG2DIM)) |
-               ((ijk[2] & MASK) >> ChildT::TOTAL);
+                ((ijk[2] & MASK) >> ChildT::TOTAL);
     }
 
     /// @return the local coordinate of the n'th tile or child node
