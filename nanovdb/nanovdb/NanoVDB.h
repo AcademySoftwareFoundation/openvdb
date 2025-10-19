@@ -144,8 +144,8 @@
 #define NANOVDB_USE_NEW_MAGIC_NUMBERS// enables use of the new magic numbers described above
 
 #define NANOVDB_MAJOR_VERSION_NUMBER 32 // reflects changes to the ABI and hence also the file format
-#define NANOVDB_MINOR_VERSION_NUMBER  8 // reflects changes to the API but not ABI
-#define NANOVDB_PATCH_VERSION_NUMBER  1 // reflects changes that does not affect the ABI or API
+#define NANOVDB_MINOR_VERSION_NUMBER  9 // reflects changes to the API but not ABI
+#define NANOVDB_PATCH_VERSION_NUMBER  0 // reflects changes that does not affect the ABI or API
 
 #define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
 
@@ -173,12 +173,6 @@ class ValueIndex{};
 
 /// @brief Dummy type for a voxel whose value equals an offset into an external value array of active values
 class ValueOnIndex{};
-
-/// @brief Like @c ValueIndex but with a mutable mask
-class ValueIndexMask{};
-
-/// @brief Like @c ValueOnIndex but with a mutable mask
-class ValueOnIndexMask{};
 
 /// @brief Dummy type for a voxel whose value equals its binary active state
 class ValueMask{};
@@ -238,14 +232,14 @@ enum class GridType : uint32_t { Unknown = 0, //  unknown value type - should ra
                                  Vec4d = 18, // double precision floating 4D vector
                                  Index = 19, // index into an external array of active and inactive values
                                  OnIndex = 20, // index into an external array of active values
-                                 IndexMask = 21, // like Index but with a mutable mask
-                                 OnIndexMask = 22, // like OnIndex but with a mutable mask
+                                 //IndexMask = 21, // retired ValueIndexMask - available for future use
+                                 //OnIndexMask = 22, // retired ValueOnIndexMask - available for future use
                                  PointIndex = 23, // voxels encode indices to co-located points
                                  Vec3u8 = 24, // 8bit quantization of floating point 3D vector (only as blind data)
                                  Vec3u16 = 25, // 16bit quantization of floating point 3D vector (only as blind data)
                                  UInt8 = 26, // 8 bit unsigned integer values (eg 0 -> 255 gray scale)
                                  End = 27,// total number of types in this enum (excluding StrLen since it's not a type)
-                                 StrLen = End + 12};// this entry is used to determine the minimum size of c-string
+                                 StrLen = End + 11};// this entry is used to determine the minimum size of c-string
 
 /// @brief Maps a GridType to a c-string
 /// @param dst destination string of size 12 or larger
@@ -275,9 +269,7 @@ __hostdev__ inline char* toStr(char *dst, GridType gridType)
         case GridType::Vec4d:       return util::strcpy(dst, "Vec4d");
         case GridType::Index:       return util::strcpy(dst, "Index");
         case GridType::OnIndex:     return util::strcpy(dst, "OnIndex");
-        case GridType::IndexMask:   return util::strcpy(dst, "IndexMask");
-        case GridType::OnIndexMask: return util::strcpy(dst, "OnIndexMask");// StrLen = 11 + 1 + End
-        case GridType::PointIndex:  return util::strcpy(dst, "PointIndex");
+        case GridType::PointIndex:  return util::strcpy(dst, "PointIndex");// StrLen = 10 + 1 + End
         case GridType::Vec3u8:      return util::strcpy(dst, "Vec3u8");
         case GridType::Vec3u16:     return util::strcpy(dst, "Vec3u16");
         case GridType::UInt8:       return util::strcpy(dst, "uint8");
@@ -492,10 +484,9 @@ template<typename T>
 struct BuildTraits
 {
     // check if T is an index type
-    static constexpr bool is_index     = util::is_same<T, ValueIndex, ValueIndexMask, ValueOnIndex, ValueOnIndexMask>::value;
-    static constexpr bool is_onindex   = util::is_same<T, ValueOnIndex, ValueOnIndexMask>::value;
-    static constexpr bool is_offindex  = util::is_same<T, ValueIndex, ValueIndexMask>::value;
-    static constexpr bool is_indexmask = util::is_same<T, ValueIndexMask, ValueOnIndexMask>::value;
+    static constexpr bool is_index     = util::is_same<T, ValueIndex, ValueOnIndex>::value;
+    static constexpr bool is_onindex   = util::is_same<T, ValueOnIndex>::value;
+    static constexpr bool is_offindex  = util::is_same<T, ValueIndex>::value;
     // check if T is a compressed float type with fixed bit precision
     static constexpr bool is_FpX = util::is_same<T, Fp4, Fp8, Fp16>::value;
     // check if T is a compressed float type with fixed or variable bit precision
@@ -525,20 +516,6 @@ struct BuildToValueMap<ValueIndex>
 
 template<>
 struct BuildToValueMap<ValueOnIndex>
-{
-    using Type = uint64_t;
-    using type = uint64_t;
-};
-
-template<>
-struct BuildToValueMap<ValueIndexMask>
-{
-    using Type = uint64_t;
-    using type = uint64_t;
-};
-
-template<>
-struct BuildToValueMap<ValueOnIndexMask>
 {
     using Type = uint64_t;
     using type = uint64_t;
@@ -657,9 +634,7 @@ __hostdev__ inline bool isInteger(GridType gridType)
 __hostdev__ inline bool isIndex(GridType gridType)
 {
     return gridType == GridType::Index ||// index both active and inactive values
-           gridType == GridType::OnIndex ||// index active values only
-           gridType == GridType::IndexMask ||// as Index, but with an additional mask
-           gridType == GridType::OnIndexMask;// as OnIndex, but with an additional mask
+           gridType == GridType::OnIndex;// index active values only
 }
 
 // --------------------------> isValue(GridType, GridClass) <------------------------------------
@@ -831,19 +806,7 @@ struct FloatTraits<ValueIndex, 1> // size of empty class in C++ is 1 byte and no
 };
 
 template<>
-struct FloatTraits<ValueIndexMask, 1> // size of empty class in C++ is 1 byte and not 0 byte
-{
-    using FloatType = uint64_t;
-};
-
-template<>
 struct FloatTraits<ValueOnIndex, 1> // size of empty class in C++ is 1 byte and not 0 byte
-{
-    using FloatType = uint64_t;
-};
-
-template<>
-struct FloatTraits<ValueOnIndexMask, 1> // size of empty class in C++ is 1 byte and not 0 byte
 {
     using FloatType = uint64_t;
 };
@@ -890,10 +853,6 @@ __hostdev__ inline GridType toGridType()
         return GridType::Index;
     } else if constexpr(util::is_same<BuildT, ValueOnIndex>::value) {
         return GridType::OnIndex;
-    } else if constexpr(util::is_same<BuildT, ValueIndexMask>::value) {
-        return GridType::IndexMask;
-    } else if constexpr(util::is_same<BuildT, ValueOnIndexMask>::value) {
-        return GridType::OnIndexMask;
     } else if constexpr(util::is_same<BuildT, bool>::value) {
         return GridType::Boolean;
     } else if constexpr(util::is_same<BuildT, math::Rgba8>::value) {
@@ -2206,7 +2165,7 @@ public:
 
     /// @brief  @brief Return the total number of values indexed by this IndexGrid
     ///
-    /// @note This method is only defined for IndexGrid = NanoGrid<ValueIndex || ValueOnIndex || ValueIndexMask || ValueOnIndexMask>
+    /// @note This method is only defined for IndexGrid = NanoGrid<ValueIndex || ValueOnIndex >
     template<typename T = BuildType>
     __hostdev__ typename util::enable_if<BuildTraits<T>::is_index, const uint64_t&>::type
     valueCount() const { return DataType::mData1; }
@@ -4187,30 +4146,6 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueOnIndex, CoordT, Mask
     }
 }; // LeafData<ValueOnIndex>
 
-// --------------------------> LeafData<ValueIndexMask> <------------------------------------
-
-template<typename CoordT, template<uint32_t> class MaskT, uint32_t LOG2DIM>
-struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueIndexMask, CoordT, MaskT, LOG2DIM>
-    : public LeafData<ValueIndex, CoordT, MaskT, LOG2DIM>
-{
-    using BuildType = ValueIndexMask;
-    MaskT<LOG2DIM>              mMask;
-    __hostdev__ static uint64_t memUsage() { return sizeof(LeafData); }
-    __hostdev__ bool            isMaskOn(uint32_t offset) const { return mMask.isOn(offset); }
-    __hostdev__ void            setMask(uint32_t offset, bool v) { mMask.set(offset, v); }
-}; // LeafData<ValueIndexMask>
-
-template<typename CoordT, template<uint32_t> class MaskT, uint32_t LOG2DIM>
-struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueOnIndexMask, CoordT, MaskT, LOG2DIM>
-    : public LeafData<ValueOnIndex, CoordT, MaskT, LOG2DIM>
-{
-    using BuildType = ValueOnIndexMask;
-    MaskT<LOG2DIM>              mMask;
-    __hostdev__ static uint64_t memUsage() { return sizeof(LeafData); }
-    __hostdev__ bool            isMaskOn(uint32_t offset) const { return mMask.isOn(offset); }
-    __hostdev__ void            setMask(uint32_t offset, bool v) { mMask.set(offset, v); }
-}; // LeafData<ValueOnIndexMask>
-
 // --------------------------> LeafData<Point> <------------------------------------
 
 template<typename CoordT, template<uint32_t> class MaskT, uint32_t LOG2DIM>
@@ -4736,8 +4671,6 @@ using MaskTree = NanoTree<ValueMask>;
 using BoolTree = NanoTree<bool>;
 using IndexTree = NanoTree<ValueIndex>;
 using OnIndexTree = NanoTree<ValueOnIndex>;
-using IndexMaskTree = NanoTree<ValueIndexMask>;
-using OnIndexMaskTree = NanoTree<ValueOnIndexMask>;
 
 using FloatGrid = Grid<FloatTree>;
 using Fp4Grid = Grid<Fp4Tree>;
@@ -4758,8 +4691,6 @@ using BoolGrid = Grid<BoolTree>;
 using PointGrid = Grid<Point>;
 using IndexGrid = Grid<IndexTree>;
 using OnIndexGrid = Grid<OnIndexTree>;
-using IndexMaskGrid = Grid<IndexMaskTree>;
-using OnIndexMaskGrid = Grid<OnIndexMaskTree>;
 
 // --------------------------> callNanoGrid <------------------------------------
 
@@ -4817,10 +4748,6 @@ auto callNanoGrid(GridDataT *gridData, ArgsT&&... args)
             return OpT::template known<ValueIndex>(gridData, args...);
         case GridType::OnIndex:
             return OpT::template known<ValueOnIndex>(gridData, args...);
-        case GridType::IndexMask:
-            return OpT::template known<ValueIndexMask>(gridData, args...);
-        case GridType::OnIndexMask:
-            return OpT::template known<ValueOnIndexMask>(gridData, args...);
         case GridType::Boolean:
             return OpT::template known<bool>(gridData, args...);
         case GridType::RGBA8:

@@ -407,6 +407,7 @@ struct ProbeValueNew {
     }
 };// ProbeValueNew<BuildT>
 
+/*
 template <typename BuildT>
 struct AccessLeafMask;
 
@@ -427,6 +428,7 @@ struct AccessLeafMask<ValueOnIndexMask>
     __hostdev__ static void set(NanoLower<ValueOnIndexMask>&, uint32_t) {}
     __hostdev__ static void set(NanoLeaf<ValueOnIndexMask> &leaf, uint32_t n) {leaf.mMask.setOn(n);}
 };// AccessLeafMask<BuildT>
+*/
 
 }// end of test namespace
 }// end of nanovdb namespace
@@ -507,7 +509,6 @@ TEST(TestNanoVDBCUDA, Basic_CudaPointsToGrid_ValueOnIndex)
     using BuildT = nanovdb::ValueOnIndex;
     using GridT = nanovdb::NanoGrid<BuildT>;
     EXPECT_TRUE(nanovdb::BuildTraits<BuildT>::is_index);
-    EXPECT_FALSE(nanovdb::BuildTraits<BuildT>::is_indexmask);
     EXPECT_TRUE(nanovdb::BuildTraits<BuildT>::is_onindex);
     EXPECT_FALSE(nanovdb::BuildTraits<BuildT>::is_offindex);
     const size_t num_points = 3;
@@ -599,117 +600,6 @@ TEST(TestNanoVDBCUDA, Basic_CudaPointsToGrid_ValueOnIndex)
         EXPECT_EQ(ijk, leaf->offsetToGlobalCoord(offset));
     }
 }// Basic_CudaPointsToGrid_ValueOnIndex
-
-TEST(TestNanoVDBCUDA, Basic_CudaPointsToGrid_ValueOnIndexMask)
-{
-    using BuildT = nanovdb::ValueOnIndexMask;
-    using GridT = nanovdb::NanoGrid<BuildT>;
-    EXPECT_TRUE(nanovdb::BuildTraits<BuildT>::is_index);
-    EXPECT_TRUE(nanovdb::BuildTraits<BuildT>::is_indexmask);
-    EXPECT_TRUE(nanovdb::BuildTraits<BuildT>::is_onindex);
-    EXPECT_FALSE(nanovdb::BuildTraits<BuildT>::is_offindex);
-    const size_t num_points = 3;
-    nanovdb::Coord coords[num_points] = {nanovdb::Coord(1, 2, 3),
-                                         nanovdb::Coord(1, 2, 4),
-                                         nanovdb::Coord(8, 2, 3)}, *d_coords = nullptr;
-    cudaCheck(cudaMalloc(&d_coords, num_points * sizeof(nanovdb::Coord)));
-    cudaCheck(cudaMemcpy(d_coords, coords, num_points * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));// CPU -> GPU
-
-#if 0
-    nanovdb::tools::cuda::PointsToGrid converter;
-    auto handle = converter.getHandle<BuildT>(d_coords, num_points);
-#else
-    auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_coords, num_points);
-#endif
-
-    cudaCheck(cudaFree(d_coords));
-    EXPECT_TRUE(handle.deviceData());// grid only exists on the GPU
-    EXPECT_FALSE(handle.data());// no grid was yet allocated on the CPU
-
-    const uint64_t size = sizeof(GridT) +
-                          sizeof(GridT::TreeType) +
-                          GridT::RootType::memUsage(1) +
-                          sizeof(GridT::UpperNodeType) +
-                          sizeof(GridT::LowerNodeType) +
-                          2*sizeof(GridT::LeafNodeType);
-    EXPECT_EQ(handle.size(), size);
-
-    GridT *grid = handle.grid<BuildT>();// no grid on the CPU
-    EXPECT_FALSE(grid);
-    handle.deviceDownload();// creates a copy up the CPU
-    EXPECT_TRUE(handle.deviceData());
-    EXPECT_TRUE(handle.data());
-    auto *data = handle.gridData();
-    EXPECT_TRUE(data);
-    grid = handle.grid<BuildT>();
-    EXPECT_TRUE(grid);
-    EXPECT_EQ(4u, grid->valueCount());
-
-    auto acc = grid->getAccessor();
-    EXPECT_FALSE( acc.isActive(nanovdb::Coord(0,2,3)));
-    EXPECT_TRUE(  acc.isActive(nanovdb::Coord(1,2,3)));
-    EXPECT_TRUE(  acc.isActive(nanovdb::Coord(1,2,4)));
-    EXPECT_TRUE(  acc.isActive(nanovdb::Coord(8,2,3)));
-    EXPECT_EQ(0u, acc.getValue(nanovdb::Coord(0,2,3)));
-    EXPECT_EQ(1u, acc.getValue(nanovdb::Coord(1,2,3)));
-    EXPECT_EQ(2u, acc.getValue(nanovdb::Coord(1,2,4)));
-    EXPECT_EQ(3u, acc.getValue(nanovdb::Coord(8,2,3)));
-
-    using GetT = nanovdb::GetValue<BuildT>;
-    EXPECT_EQ(0u, acc.get<GetT>(nanovdb::Coord(0,2,3)));
-    EXPECT_EQ(1u, acc.get<GetT>(nanovdb::Coord(1,2,3)));
-    EXPECT_EQ(2u, acc.get<GetT>(nanovdb::Coord(1,2,4)));
-    EXPECT_EQ(3u, acc.get<GetT>(nanovdb::Coord(8,2,3)));
-
-    using OpT = nanovdb::test::AccessLeafMask<BuildT>;
-    EXPECT_EQ(false, acc.get<OpT>(nanovdb::Coord(0,2,3)));
-    EXPECT_EQ(true,  acc.get<OpT>(nanovdb::Coord(1,2,3)));
-    EXPECT_EQ(true,  acc.get<OpT>(nanovdb::Coord(1,2,4)));
-    EXPECT_EQ(true,  acc.get<OpT>(nanovdb::Coord(8,2,3)));
-
-    acc.set<OpT>(nanovdb::Coord(1,2,3));
-    acc.set<OpT>(nanovdb::Coord(8,2,3));
-
-    EXPECT_EQ(false, acc.get<OpT>(nanovdb::Coord(0,2,3)));
-    EXPECT_EQ(true , acc.get<OpT>(nanovdb::Coord(1,2,3)));
-    EXPECT_EQ(true,  acc.get<OpT>(nanovdb::Coord(1,2,4)));
-    EXPECT_EQ(true,  acc.get<OpT>(nanovdb::Coord(8,2,3)));
-
-    {
-        using T = nanovdb::ProbeValue<BuildT>;
-        uint64_t value = 0;
-        EXPECT_EQ(false, acc.get<T>(nanovdb::Coord(0,2,3), value) );
-        EXPECT_EQ(0u,    value);
-        EXPECT_EQ(true,  acc.get<T>(nanovdb::Coord(1,2,3), value) );
-        EXPECT_EQ(1u,    value);
-        EXPECT_EQ(true,  acc.get<T>(nanovdb::Coord(1,2,4), value) );
-        EXPECT_EQ(2u,    value);
-        EXPECT_EQ(true,  acc.get<T>(nanovdb::Coord(8,2,3), value) );
-        EXPECT_EQ(3u,    value);
-        EXPECT_EQ(false, acc.get<T>(nanovdb::Coord(-18,2,3), value) );
-        EXPECT_EQ(0u,    value);
-
-        EXPECT_EQ(false, grid->tree().get<T>(nanovdb::Coord(0,2,3), value) );
-        EXPECT_EQ(0u,    value);
-        EXPECT_EQ(true,  grid->tree().get<T>(nanovdb::Coord(1,2,3), value) );
-        EXPECT_EQ(1u,    value);
-        EXPECT_EQ(true,  grid->tree().get<T>(nanovdb::Coord(1,2,4), value) );
-        EXPECT_EQ(2u,    value);
-        EXPECT_EQ(true,  grid->tree().get<T>(nanovdb::Coord(8,2,3), value) );
-        EXPECT_EQ(3u,    value);
-        EXPECT_EQ(false, grid->tree().get<T>(nanovdb::Coord(-18,2,3), value) );
-        EXPECT_EQ(0u,    value);
-    }
-
-    for (size_t i=0; i<num_points; ++i)  {
-        const nanovdb::Coord ijk = coords[i];
-        const auto *leaf = acc.get<nanovdb::GetLeaf<BuildT>>(ijk);
-        EXPECT_TRUE(leaf);
-        const auto offset = leaf->CoordToOffset(ijk);
-        EXPECT_EQ(ijk, leaf->offsetToGlobalCoord(offset));
-        EXPECT_EQ(leaf->mValueMask, leaf->mMask);
-    }
-}// Basic_CudaPointsToGrid_ValueOnIndexMask
 
 TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_DeviceBuffer)
 {

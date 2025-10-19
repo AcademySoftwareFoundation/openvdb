@@ -9,8 +9,9 @@ Improvements:
 - Added stand-alone function nanovd::writeUncompressedGrid that allows nanovdb::IndexGrids and blind (or side-car) data to be written directly to a stream.
 - nanovdb_print now (optionally) prints the blind data count per grid.
 - Extended nanovdb::GridBlindDataSemantic with nanovdb::GridClass types to support conversion between IndexGrid and regular grids. 
+- Removed nanovdb::ValueIndexMask and nanovdb::ValueOnIndexMask since they are no longer used by fVDB (or elsewhere).
 - Improvements and bugfixes to PNanoVDB.
-- NanoVDB version is now 32.8.1, so both ABI and API are preserved.
+- NanoVDB version is now 32.9.0, so the ABI of the grid is preserved but not the API. However, the API changes are very minor!
 
 Bug Fixes:
 - Several fixes for compiler warnings.

@@ -436,7 +436,7 @@ NanoToOpenVDB::process(trait::OpenNodeT<NanoValueT, LEVEL> *dstLeaf,
     dstLeaf->setValueMask(trait::mapMask(srcLeaf->valueMask()));
 
     if constexpr(!BuildTraits<NanoValueT>::is_special) {
-        if constexpr(util::is_same_v<NanoIndexT, ValueIndex, ValueIndexMask>) {
+        if constexpr(util::is_same_v<NanoIndexT, ValueIndex>) {
             const auto* src = trait::mapPtr(sideCar + srcLeaf->data()->mOffset);
             for (auto *dst = dstLeaf->buffer().data(), *end = dst + 512; dst != end; dst += 4, src += 4) {
                 dst[0] = src[0];
@@ -513,11 +513,7 @@ nanoToOpenVDB(const GridHandle<BufferT>& handle, uint32_t n)
         return tools::nanoToOpenVDB(*grid);
     } else if (auto grid = handle.template grid<ValueOnIndex>(n)) {
         return tools::nanoToOpenVDB(*grid);
-    } else if (auto grid = handle.template grid<ValueOnIndexMask>(n)) {
-        return tools::nanoToOpenVDB(*grid);
     } else if (auto grid = handle.template grid<ValueIndex>(n)) {
-        return tools::nanoToOpenVDB(*grid);
-    } else if (auto grid = handle.template grid<ValueIndexMask>(n)) {
         return tools::nanoToOpenVDB(*grid);
     } else {
         OPENVDB_THROW(openvdb::RuntimeError, "Unsupported NanoVDB grid type!");

@@ -1262,7 +1262,6 @@ CreateNanoGrid<SrcGridT>::processLeafs()
             } else {
                 dstLeaf->mPrefixSum = 0u;
             }
-            if constexpr(BuildTraits<DstBuildT>::is_indexmask) dstLeaf->mMask = dstLeaf->mValueMask;
         }
     });
 } // CreateNanoGrid::processLeafs<ValueIndex or ValueOnIndex>

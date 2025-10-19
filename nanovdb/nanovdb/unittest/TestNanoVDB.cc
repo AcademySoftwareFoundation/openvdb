@@ -232,8 +232,8 @@ using MyTypes = ::testing::Types<float,//                     GridType::Float = 
                                  //                           GridType::Vec4d = 18
                                  nanovdb::ValueIndex,//       GridType::Index = 19
                                  nanovdb::ValueOnIndex,//     GridType::OnIndex = 20
-                                 nanovdb::ValueIndexMask,//   GridType::IndexMask = 21
-                                 nanovdb::ValueOnIndexMask,// GridType::OnIndexMask = 22
+                                // nanovdb::ValueIndexMask,//   GridType::IndexMask = 21
+                                // nanovdb::ValueOnIndexMask,// GridType::OnIndexMask = 22
                                  nanovdb::Point,//            GridType::PointIndex = 23
                                  nanovdb::Vec3u8,//           GridType::Vec3u8 = 24
                                  nanovdb::Vec3u16,//          GridType::Vec3u16 = 25
@@ -373,7 +373,7 @@ TEST_F(TestNanoVDB, Basic)
 TEST_F(TestNanoVDB, toStr)
 {
     {// toStr(GridType)
-        EXPECT_EQ(12, nanovdb::strlen<nanovdb::GridType>());
+        EXPECT_EQ(11, nanovdb::strlen<nanovdb::GridType>());
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::Unknown ), "Unknown"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::Float ), "float"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::Double ), "double"), 0 );
@@ -395,8 +395,6 @@ TEST_F(TestNanoVDB, toStr)
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::Vec4d ), "Vec4d"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::Index ), "Index"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::OnIndex ), "OnIndex"), 0 );
-        EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::IndexMask ), "IndexMask"), 0 );
-        EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::OnIndexMask ), "OnIndexMask"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::PointIndex ), "PointIndex"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::Vec3u8 ), "Vec3u8"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::GridType::Vec3u16 ), "Vec3u16"), 0 );
@@ -919,11 +917,7 @@ TEST_F(TestNanoVDB, Traits)
         EXPECT_FALSE(test);
         test = nanovdb::BuildTraits<nanovdb::ValueIndex>::is_index;
         EXPECT_TRUE(test);
-        test = nanovdb::BuildTraits<nanovdb::ValueIndexMask>::is_index;
-        EXPECT_TRUE(test);
         test = nanovdb::BuildTraits<nanovdb::ValueOnIndex>::is_index;
-        EXPECT_TRUE(test);
-        test = nanovdb::BuildTraits<nanovdb::ValueOnIndexMask>::is_index;
         EXPECT_TRUE(test);
         test = nanovdb::BuildTraits<nanovdb::Fp4>::is_Fp;
         EXPECT_TRUE(test);
@@ -2628,18 +2622,6 @@ void checkLeaf<nanovdb::ValueIndex>(int &offset)
 }
 
 template<>
-void checkLeaf<nanovdb::ValueIndexMask>(int &offset)
-{
-    using DataT = typename nanovdb::LeafNode<nanovdb::ValueIndexMask>::DataType;
-    EXPECT_EQ(NANOVDB_OFFSETOF(DataT, mOffset), offset);
-    offset += 8;
-    EXPECT_EQ(NANOVDB_OFFSETOF(DataT, mPrefixSum), offset);
-    offset += 8;
-    EXPECT_EQ(NANOVDB_OFFSETOF(DataT, mMask), offset);
-    offset += 64;
-}
-
-template<>
 void checkLeaf<nanovdb::ValueOnIndex>(int &offset)
 {
     using DataT = typename nanovdb::LeafNode<nanovdb::ValueOnIndex>::DataType;
@@ -2647,18 +2629,6 @@ void checkLeaf<nanovdb::ValueOnIndex>(int &offset)
     offset += 8;
     EXPECT_EQ(NANOVDB_OFFSETOF(DataT, mPrefixSum), offset);
     offset += 8;
-}
-
-template<>
-void checkLeaf<nanovdb::ValueOnIndexMask>(int &offset)
-{
-    using DataT = typename nanovdb::LeafNode<nanovdb::ValueOnIndexMask>::DataType;
-    EXPECT_EQ(NANOVDB_OFFSETOF(DataT, mOffset), offset);
-    offset += 8;
-    EXPECT_EQ(NANOVDB_OFFSETOF(DataT, mPrefixSum), offset);
-    offset += 8;
-    EXPECT_EQ(NANOVDB_OFFSETOF(DataT, mMask), offset);
-    offset += 64;
 }
 
 template<>
@@ -4995,8 +4965,6 @@ TEST_F(TestNanoVDB, PNanoVDB_Basic)
     EXPECT_EQ((int)nanovdb::GridType::Vec4d,   PNANOVDB_GRID_TYPE_VEC4D);
     EXPECT_EQ((int)nanovdb::GridType::Index,   PNANOVDB_GRID_TYPE_INDEX);
     EXPECT_EQ((int)nanovdb::GridType::OnIndex, PNANOVDB_GRID_TYPE_ONINDEX);
-    EXPECT_EQ((int)nanovdb::GridType::IndexMask,   PNANOVDB_GRID_TYPE_INDEXMASK);
-    EXPECT_EQ((int)nanovdb::GridType::OnIndexMask, PNANOVDB_GRID_TYPE_ONINDEXMASK);
     EXPECT_EQ((int)nanovdb::GridType::PointIndex, PNANOVDB_GRID_TYPE_POINTINDEX);
     EXPECT_EQ((int)nanovdb::GridType::End,     PNANOVDB_GRID_TYPE_END);
 
@@ -5120,17 +5088,6 @@ void validateLeaf<nanovdb::ValueIndex>(pnanovdb_grid_type_t grid_type)
     EXPECT_EQ(NANOVDB_OFFSETOF(leaf_t, mPrefixSum), PNANOVDB_LEAF_OFF_VALUE_MASK + 64 + 8);
 }
 
-// template specializations for nanovdb::ValueIndexMask types
-template <>
-void validateLeaf<nanovdb::ValueIndexMask>(pnanovdb_grid_type_t grid_type)
-{
-    using leaf_t = typename nanovdb::LeafNode<nanovdb::ValueIndexMask>;
-    EXPECT_EQ(sizeof(leaf_t), (pnanovdb_grid_type_constants[grid_type].leaf_size));
-    EXPECT_EQ(NANOVDB_OFFSETOF(leaf_t, mOffset), PNANOVDB_LEAF_OFF_VALUE_MASK + 64);
-    EXPECT_EQ(NANOVDB_OFFSETOF(leaf_t, mPrefixSum), PNANOVDB_LEAF_OFF_VALUE_MASK + 64 + 8);
-    EXPECT_EQ(NANOVDB_OFFSETOF(leaf_t, mMask), PNANOVDB_LEAF_OFF_VALUE_MASK + 64 + 8 + 8);
-}
-
 // template specializations for nanovdb::ValueOnIndex types
 template <>
 void validateLeaf<nanovdb::ValueOnIndex>(pnanovdb_grid_type_t grid_type)
@@ -5139,17 +5096,6 @@ void validateLeaf<nanovdb::ValueOnIndex>(pnanovdb_grid_type_t grid_type)
     EXPECT_EQ(NANOVDB_OFFSETOF(leaf_t, mOffset), PNANOVDB_LEAF_OFF_VALUE_MASK + 64);
     EXPECT_EQ(NANOVDB_OFFSETOF(leaf_t, mPrefixSum), PNANOVDB_LEAF_OFF_VALUE_MASK + 64 + 8);
     EXPECT_EQ(sizeof(leaf_t), (pnanovdb_grid_type_constants[grid_type].leaf_size));
-}
-
-// template specializations for nanovdb::ValueOnIndexMask types
-template <>
-void validateLeaf<nanovdb::ValueOnIndexMask>(pnanovdb_grid_type_t grid_type)
-{
-    using leaf_t = typename nanovdb::LeafNode<nanovdb::ValueOnIndexMask>;
-    EXPECT_EQ(sizeof(leaf_t), (pnanovdb_grid_type_constants[grid_type].leaf_size));
-    EXPECT_EQ(NANOVDB_OFFSETOF(leaf_t, mOffset), PNANOVDB_LEAF_OFF_VALUE_MASK + 64);
-    EXPECT_EQ(NANOVDB_OFFSETOF(leaf_t, mPrefixSum), PNANOVDB_LEAF_OFF_VALUE_MASK + 64 + 8);
-    EXPECT_EQ(NANOVDB_OFFSETOF(leaf_t, mMask), PNANOVDB_LEAF_OFF_VALUE_MASK + 64 + 8 + 8);
 }
 
 // template specializations for nanovdb::Point types
@@ -5189,10 +5135,6 @@ TYPED_TEST(TestOffsets, PNanoVDB)
         grid_type = PNANOVDB_GRID_TYPE_INDEX;
     } else if (std::is_same<nanovdb::ValueOnIndex, TypeParam>::value) {
         grid_type = PNANOVDB_GRID_TYPE_ONINDEX;
-    } else if (std::is_same<nanovdb::ValueIndexMask, TypeParam>::value) {
-        grid_type = PNANOVDB_GRID_TYPE_INDEXMASK;
-    } else if (std::is_same<nanovdb::ValueOnIndexMask, TypeParam>::value) {
-        grid_type = PNANOVDB_GRID_TYPE_ONINDEXMASK;
     } else if (std::is_same<bool, TypeParam>::value) {
         grid_type = PNANOVDB_GRID_TYPE_BOOLEAN;
     } else if (std::is_same<nanovdb::Fp4, TypeParam>::value) {
@@ -6892,19 +6834,10 @@ TEST_F(TestNanoVDB, BasicValueIndexStats)
 {
     {
         using ValueIndexT = typename nanovdb::NanoLeaf<nanovdb::ValueIndex>::DataType;
-        using ValueIndexMaskT = typename nanovdb::NanoLeaf<nanovdb::ValueIndexMask>::DataType;
         using ValueOnIndexT = typename nanovdb::NanoLeaf<nanovdb::ValueOnIndex>::DataType;
-        using ValueOnIndexMaskT = typename nanovdb::NanoLeaf<nanovdb::ValueOnIndexMask>::DataType;
-        const size_t size1 = sizeof(ValueOnIndexT),
-                     size2 = sizeof(ValueOnIndexMaskT),
-                     size3 = sizeof(ValueIndexT),
-                     size4 = sizeof(ValueIndexMaskT);
+        const size_t size1 = sizeof(ValueOnIndexT), size2 = sizeof(ValueIndexT);
         EXPECT_EQ(size1, ValueOnIndexT::memUsage());
-        EXPECT_EQ(size2, ValueOnIndexMaskT::memUsage());
-        EXPECT_EQ(size3, ValueIndexT::memUsage());
-        EXPECT_EQ(size4, ValueIndexMaskT::memUsage());
-        EXPECT_EQ(64u, size2 - size1);// 512 bits = 64 bytes
-        EXPECT_EQ(64u, size4 - size3);// 512 bits = 64 bytes
+        EXPECT_EQ(size2, ValueIndexT::memUsage());
     }
     EXPECT_TRUE(nanovdb::Version() >= nanovdb::Version(32,3,4));
     using SrcGridT = nanovdb::tools::build::Grid<float>;
