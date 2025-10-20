@@ -1960,7 +1960,7 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_float_SideCar)
     EXPECT_EQ(1.0f, buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
     EXPECT_EQ(2.0f, buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
 
-    // create an IndexGrid with a side-car from the FloatGrid
+    // create an IndexGrid with a sidecar from the FloatGrid
     auto handle = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<float>, nanovdb::ValueOnIndex>(buildGrid, 1u, false, false);
     auto *idxGrid = handle.grid<nanovdb::ValueOnIndex>();
     EXPECT_TRUE(idxGrid);
@@ -2041,7 +2041,7 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_float_SideCar_writeUncompressedGrid)
         EXPECT_EQ(1.0f, buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
         EXPECT_EQ(2.0f, buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
 
-        // create an IndexGrid without a side-car from the FloatGrid
+        // create an IndexGrid without a sidecar from the FloatGrid
         auto handle = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<float>, nanovdb::ValueOnIndex>(buildGrid, 0u, false, false);
         auto *idxGrid = handle.grid<nanovdb::ValueOnIndex>();
         EXPECT_TRUE(idxGrid);
@@ -2053,7 +2053,7 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_float_SideCar_writeUncompressedGrid)
         EXPECT_EQ(3u, idxGrid->valueCount());// active + background
         EXPECT_EQ(0, idxGrid->blindDataCount());
 
-        // create a seperate side car and copy values
+        // create a seperate sidecar and copy values
         float sideCar[3];
         EXPECT_TRUE(sideCar);
         auto idxAcc = idxGrid->getAccessor();
@@ -2148,7 +2148,7 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_float_SideCar_benchmark)
     EXPECT_EQ(openvdb::GridClass::GRID_LEVEL_SET, openGrid1->getGridClass());
     const auto openBBox = openGrid1->evalActiveVoxelBoundingBox();
 
-    if constexpr(verbose) mTimer.start("create a nanovdb::IndexGrid with a side-car from the openvdb::FloatGrid");
+    if constexpr(verbose) mTimer.start("create a nanovdb::IndexGrid with a sidecar from the openvdb::FloatGrid");
     auto handle = nanovdb::tools::createNanoGrid<openvdb::FloatGrid, nanovdb::ValueOnIndex>(*openGrid1, 1u, false, false);
     if constexpr(verbose) mTimer.stop();
     auto *nanoGrid = handle.grid<nanovdb::ValueOnIndex>();
@@ -2157,7 +2157,7 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_float_SideCar_benchmark)
     EXPECT_EQ(reinterpret_cast<const nanovdb::Coord&>(openBBox.min()), nanoBBox.min());
     EXPECT_EQ(reinterpret_cast<const nanovdb::Coord&>(openBBox.max()), nanoBBox.max());
 
-    if constexpr(verbose) mTimer.start("create an openvdb::FloatGrid for a nanovdb::IndexGrid with a side-car");
+    if constexpr(verbose) mTimer.start("create an openvdb::FloatGrid for a nanovdb::IndexGrid with a sidecar");
 #if 1
     auto base = nanovdb::tools::nanoToOpenVDB(handle);
     //auto base = nanovdb::tools::nanoToOpenVDB(*nanoGrid);
@@ -2206,7 +2206,7 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_ValueOnIndex_Vec3f_SideCar)
     EXPECT_EQ(nanovdb::Vec3f(1.0f), buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
     EXPECT_EQ(nanovdb::Vec3f(2.0f), buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
 
-    // create an IndexGrid with a side-car from the FloatGrid
+    // create an IndexGrid with a sidecar from the FloatGrid
     auto handle = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<nanovdb::Vec3f>, nanovdb::ValueOnIndex>(buildGrid, 1u, false, false);
     auto *idxGrid = handle.grid<nanovdb::ValueOnIndex>();
     EXPECT_TRUE(idxGrid);
@@ -2286,7 +2286,7 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_ValueIndex_Vec3f_SideCar)
     EXPECT_EQ(nanovdb::Vec3f(1.0f), buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
     EXPECT_EQ(nanovdb::Vec3f(2.0f), buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
 
-    // create an IndexGrid with a side-car from the FloatGrid
+    // create an IndexGrid with a sidecar from the FloatGrid
     auto handle = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<nanovdb::Vec3f>, nanovdb::ValueIndex>(buildGrid, 1u, false, false);
     auto *idxGrid = handle.grid<nanovdb::ValueIndex>();
     EXPECT_TRUE(idxGrid);

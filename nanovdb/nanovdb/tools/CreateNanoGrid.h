@@ -129,7 +129,7 @@ openToNanoVDB(const openvdb::GridBase::Ptr& base,
 /// @tparam DstBuildT Should be either nanovdb::ValueIndex or nanovdb::ValueOnIndex
 /// @tparam BufferT Type of the buffer used to allocate the destination grid
 /// @param base Shared pointer to a base openvdb grid to be converted
-/// @param channels Number of side-car channels with the values (active or all) in the source grid
+/// @param channels Number of sidecar channels with the values (active or all) in the source grid
 /// @param includeStats If true stats are also indexed
 /// @param includeTiles  If true tile values (active or all) are also indexed
 /// @param verbose Mode of verbosity

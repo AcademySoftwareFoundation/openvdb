@@ -63,10 +63,10 @@ template<typename NanoBuildT>
 auto nanoToOpenVDB(const NanoGrid<NanoBuildT>& grid);
 
 /// @brief Free-standing function that de-serializes an IndexGrid with a sidecar into an OpenVDB Grid
-/// @tparam NanoValueT Template type of the side car data accompanying the index @c grid
-/// @param grid IndexGrid into the side car data
-/// @param sideCar Linear array of side car data
-/// @param gridClass GridClass corresponding to the side car data
+/// @tparam NanoValueT Template type of the sidecar data accompanying the index @c grid
+/// @param grid IndexGrid into the sidecar data
+/// @param sideCar Linear array of sidecar data
+/// @param gridClass GridClass corresponding to the sidecar data
 /// @param gridName Name of the output grid
 /// @return Shared pointer to an OpenVDB Grid of a matching type (trait::OpenGridPtr<NanoValueT>)
 template<typename NanoBuildT, typename NanoValueT>
@@ -81,7 +81,7 @@ nanoToOpenVDB(const NanoGrid<NanoBuildT>& grid,
 /// @param handle Handle for the input grid to be converted
 /// @param gridID ID of the grid in the GridHandle to be converted (defaults to first grid)
 /// @return Shared pointer to an OpenVDB BaseGrid
-/// @note If grid number @c gridID in @c handle has GridType IndexGrid, then the first suitable blind data is used as the side-car data
+/// @note If grid number @c gridID in @c handle has GridType IndexGrid, then the first suitable blind data is used as the sidecar data
 template<typename BufferT>
 openvdb::GridBase::Ptr
 nanoToOpenVDB(const GridHandle<BufferT>& handle, uint32_t gridID = 0);
@@ -164,7 +164,7 @@ public:
 
     /// @brief Converts nanovdb::Grid<Index> + blind data  -> openvdb::GridBase::Ptr
     /// @param idxGrid NanoVDB IndexGrid with blind data to be converted
-    /// @param blindDataID Id of the bind data to be used as the side-car. A negative values means
+    /// @param blindDataID Id of the bind data to be used as the sidecar. A negative values means
     ///        pick the first available (relevant) blind data.
     /// @return shared pointer to an OpenVDB GridBase
     template<typename NanoIndexT>
@@ -172,9 +172,9 @@ public:
     operator()(const NanoGrid<NanoIndexT>& idxGrid, int blindDataID = -1);
 
     /// @brief Converts nanovdb::Grid<NanoIndexT> + NanoValueT[]  -> openvdb::Grid<NanoValueT>::Ptr
-    /// @tparam NanoValueT Template to of the side car data
+    /// @tparam NanoValueT Template to of the sidecar data
     /// @param grid NanoVDB IndexGrid
-    /// @param sideCar Linear array of side car data
+    /// @param sideCar Linear array of sidecar data
     /// @param gridClass GridClass of the @c sideCar data
     /// @param name Name of the output grid
     /// @return Shared pointer to an OpenVDB grid of matching type
@@ -310,7 +310,7 @@ NanoToOpenVDB::operator()(const NanoGrid<NanoIndexT>& idxGrid, int blindDataID)
             break;
         }
     }
-    OPENVDB_THROW(openvdb::RuntimeError, "No valid side car located in the blind data!");
+    OPENVDB_THROW(openvdb::RuntimeError, "No valid sidecar located in the blind data!");
 }// NanoToOpenVDB::operator()(const NanoGrid<NanoIndexT>& idxGrid)
 
 // ================================================================================================

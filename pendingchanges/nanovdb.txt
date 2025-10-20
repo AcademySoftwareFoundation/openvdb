@@ -3,15 +3,15 @@ NanoVDB:
 Highlights:
 - NanoVDB should no longer be considered a static grid, since we keep adding more tools that support dynamic topology.
   In other words, the feature gap between OpenVDB and NanoVDB is closing, and the main distinguishing characteristic is
-  the fact that only NanoVDB runs on the GPU. However, OpenVDB of course ontinues to have a much larger tooldbox.
+  the fact that only NanoVDB runs on the GPU. However, OpenVDB of course continues to have a much larger toolbox.
 
 Improvements:
 - Added nanovdb/tools/cuda/DilateGrid.cuh which performs topology dilation on the GPU.
 - Added nanovdb/tools/cuda/MergeGrids.cuh which merges the topology of two grids on the GPU.
 - Added Mat classes and other math types to NanoVDB
 - Improvements to mGPU grid building and introduction of a separate test executable for mGPU tests
-- Major rewrite of nanovdb::NanoToOpenVDB, which now allows nanovdb::IndexGrids and blind (or side-car) data to be converted into an openvdb grid.
-- Added stand-alone function nanovdb::writeUncompressedGrid that allows nanovdb::IndexGrids and blind (or side-car) data to be written directly to a stream.
+- Major rewrite of nanovdb::NanoToOpenVDB, which now allows nanovdb::IndexGrids and blind (or sidecar) data to be converted into an openvdb grid.
+- Added stand-alone function nanovdb::writeUncompressedGrid that allows nanovdb::IndexGrids and blind (or sidecar) data to be written directly to a stream.
 - nanovdb_print now (optionally) prints the blind data count per grid.
 - Extended nanovdb::GridBlindDataSemantic with nanovdb::GridClass types to support conversion between IndexGrid and regular grids. 
 - Removed nanovdb::ValueIndexMask and nanovdb::ValueOnIndexMask since they are no longer used by fVDB (or elsewhere).
