@@ -66,6 +66,7 @@ public:
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
 
+private:
     void dilateRoot();
 
     void dilateInternalNodes();
@@ -74,7 +75,6 @@ public:
 
     void dilateLeafNodes();
 
-private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
@@ -85,9 +85,6 @@ private:
     const GridT                  *mDeviceSrcGrid;
     morphology::NearestNeighbors mOp{morphology::NN_FACE_EDGE_VERTEX};
     TreeData                     mSrcTreeData;
-
-public:
-    const GridT* deviceSrcGrid() const { return mDeviceSrcGrid; }
 };// tools::cuda::DilateGrid<BuildT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -238,17 +235,17 @@ void DilateGrid<BuildT>::dilateInternalNodes()
             using Op = util::morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE>;
             util::cuda::operatorKernel<Op>
                 <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-                (deviceSrcGrid(), mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
+                (mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
         else if (mOp == morphology::NN_FACE_EDGE) {
             using Op = util::morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE_EDGE>;
             util::cuda::operatorKernel<Op>
                 <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-                (deviceSrcGrid(), mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
+                (mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
         else if (mOp == morphology::NN_FACE_EDGE_VERTEX) {
             using Op = util::morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE_EDGE_VERTEX>;
             util::cuda::operatorKernel<Op>
                 <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-                (deviceSrcGrid(), mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
+                (mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
     }
 }// DilateGrid<BuildT>::dilateInternalNodes
 
@@ -259,7 +256,7 @@ void DilateGrid<BuildT>::processGridTreeRoot()
 {
     // Copy GridData from source grid
     // By convention: this will duplicate grid name and map. Others will be reset later
-    cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), deviceSrcGrid()->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
+    cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrid->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
     cudaCheckError();
 }// DilateGrid<BuildT>::processGridTreeRoot
@@ -276,14 +273,14 @@ void DilateGrid<BuildT>::dilateLeafNodes()
             using Op = util::morphology::cuda::DilateLeafNodesFunctor<BuildT, morphology::NN_FACE>;
             util::cuda::operatorKernel<Op>
                 <<<dim3(mBuilder.data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-                (deviceSrcGrid(), static_cast<GridT*>(mBuilder.data()->d_bufferPtr)); }
+                (mDeviceSrcGrid, static_cast<GridT*>(mBuilder.data()->d_bufferPtr)); }
         else if (mOp == morphology::NN_FACE_EDGE)
             throw std::runtime_error("dilateLeafNodes() not implemented for NN_FACE_EDGE stencil");
         else if (mOp == morphology::NN_FACE_EDGE_VERTEX) {
             using Op = util::morphology::cuda::DilateLeafNodesFunctor<BuildT, morphology::NN_FACE_EDGE_VERTEX>;
             util::cuda::operatorKernel<Op>
                 <<<dim3(mBuilder.data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock>>>
-                (deviceSrcGrid(), static_cast<GridT*>(mBuilder.data()->d_bufferPtr)); }
+                (mDeviceSrcGrid, static_cast<GridT*>(mBuilder.data()->d_bufferPtr)); }
     }
 
     // Update leaf offsets and prefix sums

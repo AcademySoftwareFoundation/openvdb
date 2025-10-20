@@ -63,6 +63,7 @@ public:
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
 
+private:
     void mergeRoot();
 
     void mergeInternalNodes();
@@ -71,7 +72,6 @@ public:
 
     void mergeLeafNodes();
 
-private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
@@ -83,10 +83,6 @@ private:
     const GridT             *mDeviceSrcGrid2;
     TreeData                mSrcTreeData1;
     TreeData                mSrcTreeData2;
-
-public:
-    const GridT* deviceSrcGrid1() const { return mDeviceSrcGrid1; }
-    const GridT* deviceSrcGrid2() const { return mDeviceSrcGrid2; }
 };// tools::cuda::MergeGrids<BuildT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -236,12 +232,12 @@ void MergeGrids<BuildT>::mergeInternalNodes()
     if (mSrcTreeData1.mNodeCount[1]) { // Unless the first grid to merge is empty
         util::cuda::operatorKernel<Op>
             <<<mSrcTreeData1.mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
-            (deviceSrcGrid1(), mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks());
+            (mDeviceSrcGrid1, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks());
     }
     if (mSrcTreeData2.mNodeCount[1]) { // Unless the second grid to merge is empty
         util::cuda::operatorKernel<Op>
             <<<mSrcTreeData2.mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
-            (deviceSrcGrid2(), mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks());
+            (mDeviceSrcGrid2, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks());
     }
 }// MergeGrids<BuildT>::mergeInternalNodes
 
@@ -250,10 +246,10 @@ void MergeGrids<BuildT>::mergeInternalNodes()
 template <typename BuildT>
 void MergeGrids<BuildT>::processGridTreeRoot()
 {
-    // Copy GridData from source grid
+    // Copy GridData from first source grid
     // TODO: Check for instances where extra processing is needed
     // TODO: check that the second grid input has consistent GridData, too
-    cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), deviceSrcGrid1()->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
+    cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrid1->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
     cudaCheckError();
 }// MergeGrids<BuildT>::processGridTreeRoot
@@ -267,12 +263,12 @@ void MergeGrids<BuildT>::mergeLeafNodes()
     if (mSrcTreeData1.mNodeCount[1]) { // Unless first input grid is empty
         util::cuda::operatorKernel<Op>
             <<<dim3(mSrcTreeData1.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-            (deviceSrcGrid1(), static_cast<GridT*>(mBuilder.data()->d_bufferPtr));
+            (mDeviceSrcGrid1, static_cast<GridT*>(mBuilder.data()->d_bufferPtr));
     }
     if (mSrcTreeData2.mNodeCount[1]) { // Unless second input grid is empty
         util::cuda::operatorKernel<Op>
             <<<dim3(mSrcTreeData2.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-            (deviceSrcGrid2(), static_cast<GridT*>(mBuilder.data()->d_bufferPtr));
+            (mDeviceSrcGrid2, static_cast<GridT*>(mBuilder.data()->d_bufferPtr));
     }
 
     // Update leaf offsets and prefix sums

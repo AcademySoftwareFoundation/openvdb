@@ -6,7 +6,7 @@
 
     \authors Efty Sifakis
 
-    \brief 2x Subdivision/Upsampling of NanoVDB indexGrids on the device
+    \brief 2x Topological refinement of NanoVDB indexGrids on the device
 
     \warning The header file contains cuda device code so be sure
              to only include it in .cu files (or other .cuh files)
@@ -62,6 +62,7 @@ public:
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
 
+private:
     void refineRoot();
 
     void refineInternalNodes();
@@ -70,7 +71,6 @@ public:
 
     void refineLeafNodes();
 
-private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
@@ -80,9 +80,6 @@ private:
     int                     mVerbose{0};
     const GridT             *mDeviceSrcGrid;
     TreeData                mSrcTreeData;
-
-public:
-    const GridT* deviceSrcGrid() const { return mDeviceSrcGrid; }
 };// tools::cuda::RefineGrid<BuildT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -239,7 +236,7 @@ void RefineGrid<BuildT>::processGridTreeRoot()
 {
     // Copy GridData from source grid
     // By convention: this will duplicate grid name and map. Others will be reset later
-    cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), deviceSrcGrid()->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
+    cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrid->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
     cudaCheckError();
 }// RefineGrid<BuildT>::processGridTreeRoot
