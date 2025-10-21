@@ -1,7 +1,19 @@
 OpenVDB Version History
 =======================
 
-Version 12.1.1 - In development
+Version 12.1.2 - In development
+
+
+Version 12.1.1 - September 30, 2025
+
+  OpenVDB AX:
+    Fixes:
+    - Fixed an issue which was causing host specific optimization passes to be
+      omitted when using LLVM 16 and higher.
+
+  Houdini:
+    - Fixed a compilation issue with the OpenVDB Activate SOP with Houdini 21
+    [Reported by @callen128]
 
 
 Version 12.1.0 - August 8, 2025
