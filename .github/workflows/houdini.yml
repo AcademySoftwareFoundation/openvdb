@@ -82,8 +82,6 @@ jobs:
           - { cxx: g++,     image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
       fail-fast: false
     steps:
-    - name: remove zstd
-      run: yum -y remove zstd
     - uses: actions/checkout@v3
     - name: nanobind
       run: ./ci/install_nanobind.sh 2.0.0
