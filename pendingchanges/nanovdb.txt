@@ -6,8 +6,10 @@ Highlights:
   the fact that only NanoVDB runs on the GPU. However, OpenVDB of course continues to have a much larger toolbox.
 
 Improvements:
-- Added nanovdb/tools/cuda/DilateGrid.cuh which performs topology dilation on the GPU.
-- Added nanovdb/tools/cuda/MergeGrids.cuh which merges the topology of two grids on the GPU.
+- Added nanovdb/tools/cuda/DilateGrid.cuh, which performs topology dilation on the GPU.
+- Added nanovdb/tools/cuda/MergeGrids.cuh, which merges the topology of two grids on the GPU.
+- Added nanovdb/tools/cuda/CoarsenGrid.cuh, which performs topological coarsening of grids on the GPU.
+- Added nanovdb/tools/cuda/RefineGrid.cuh, which performs topological refinement of grids on the GPU.
 - Added Mat classes and other math types to NanoVDB
 - Improvements to mGPU grid building and introduction of a separate test executable for mGPU tests
 - Major rewrite of nanovdb::NanoToOpenVDB, which now allows nanovdb::IndexGrids and blind (or sidecar) data to be converted into an openvdb grid.
