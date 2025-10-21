@@ -121,7 +121,7 @@ private:
     //
     //
     // This routine projects the tube on the xy-plane, giving a stadium shape.
-    // It detemines the x-scan range, and the y-range for each x-value.
+    // It determines the x-scan range, and the y-range for each x-value.
     // The x-range is divided into intervals depending on if each y endpoint hits a circle or line.
     //
     // The x-range is partitioned by ordinates a0, a1, a2, a3, a4, a5
