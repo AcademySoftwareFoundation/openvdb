@@ -20,6 +20,8 @@
 #include <nanovdb/tools/cuda/DilateGrid.cuh>
 #include <nanovdb/tools/cuda/MergeGrids.cuh>
 #include <nanovdb/tools/cuda/PruneGrid.cuh>
+#include <nanovdb/tools/cuda/CoarsenGrid.cuh>
+#include <nanovdb/tools/cuda/RefineGrid.cuh>
 #include <nanovdb/util/cuda/Injection.cuh>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/Timer.h>
@@ -3585,9 +3587,9 @@ TEST(TestNanoVDBCUDA, DilateInjectPrune_ValueOnIndex)
 
     // Create an input (original) grid to use as input to dilation op
     std::vector<nanovdb::Coord> inputPoints;
-    inputPoints.emplace_back(nanovdb::Coord{1,0,0}); // Added nodes after dilation: 3 root, 3 upper, 3 lower, 3 leaf
-    inputPoints.emplace_back(nanovdb::Coord{0,1,1}); // Added nodes after dilation: 1 root, 1 upper, 1 lower, 1 leaf
-    inputPoints.emplace_back(nanovdb::Coord{127,127,127}); // Added nodes after dilation: 7 lower, 7 leaf
+    inputPoints.emplace_back(1,0,0); // Added nodes after dilation: 3 root, 3 upper, 3 lower, 3 leaf
+    inputPoints.emplace_back(0,1,1); // Added nodes after dilation: 1 root, 1 upper, 1 lower, 1 leaf
+    inputPoints.emplace_back(127,127,127); // Added nodes after dilation: 7 lower, 7 leaf
     auto inputBuffer = nanovdb::cuda::DeviceBuffer::create( inputPoints.size() * sizeof(nanovdb::Coord), nullptr, false);
     EXPECT_FALSE(inputBuffer.data());
     EXPECT_TRUE(inputBuffer.deviceData());
@@ -3640,6 +3642,57 @@ TEST(TestNanoVDBCUDA, DilateInjectPrune_ValueOnIndex)
     EXPECT_EQ(inputHandle.grid<BuildT>()->mChecksum.full(), prunedHandle.grid<BuildT>()->mChecksum.full());
 }// DilateInjectPrune_ValueOnIndex
 
+TEST(TestNanoVDBCUDA, RefineCoarsen_ValueOnIndex)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+
+    // Create an input (original) grid to use as input to refinement op
+    std::vector<nanovdb::Coord> inputPoints;
+    inputPoints.emplace_back(0,0,0); // Refinement doesn't introduce extra nodes
+    inputPoints.emplace_back(4,0,0); // Refinement will introduce extra leaf
+    inputPoints.emplace_back(0,64,0); // Refinement will introduce extra lower node
+    inputPoints.emplace_back(0,0,2048); // Refinement will introduce extra upper node (and root tile)
+    auto inputBuffer = nanovdb::cuda::DeviceBuffer::create( inputPoints.size() * sizeof(nanovdb::Coord), nullptr, false);
+    EXPECT_FALSE(inputBuffer.data());
+    EXPECT_TRUE(inputBuffer.deviceData());
+    cudaCheck(cudaMemcpy(inputBuffer.deviceData(), inputPoints.data(), inputPoints.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    nanovdb::tools::cuda::PointsToGrid<BuildT> converter;
+    converter.setChecksum(nanovdb::CheckMode::Default);
+    auto inputHandle = converter.getHandle(static_cast<nanovdb::Coord*>(inputBuffer.deviceData()), inputPoints.size());
+    EXPECT_TRUE(inputHandle.deviceGrid<BuildT>());
+    auto inputGrid = inputHandle.deviceGrid<BuildT>();
+    EXPECT_FALSE(inputHandle.grid<BuildT>());
+
+    // Perform refinement
+    nanovdb::tools::cuda::RefineGrid<BuildT> refiner( inputGrid );
+    refiner.setChecksum(nanovdb::CheckMode::Default);
+    refiner.setVerbose(0);
+    auto refinedHandle = refiner.getHandle();
+    auto refinedGrid = refinedHandle.deviceGrid<BuildT>();
+    EXPECT_TRUE(refinedGrid);
+    auto refinedTreeData = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(refinedGrid);
+    EXPECT_EQ(refinedTreeData.mNodeCount[0], 4);
+    EXPECT_EQ(refinedTreeData.mNodeCount[1], 3);
+    EXPECT_EQ(refinedTreeData.mNodeCount[2], 2);
+    EXPECT_EQ(refinedTreeData.mVoxelCount, 32);
+
+    // Coarsen back to original
+    nanovdb::tools::cuda::CoarsenGrid<BuildT> coarsener( refinedGrid );
+    coarsener.setChecksum(nanovdb::CheckMode::Default);
+    coarsener.setVerbose(0);
+    auto coarsenedHandle = coarsener.getHandle();
+    auto coarsenedGrid = coarsenedHandle.deviceGrid<BuildT>();
+    EXPECT_TRUE(coarsenedGrid);
+
+    // The coarsened grid should be identical to the original input
+    EXPECT_FALSE(coarsenedHandle.grid<BuildT>());
+    inputHandle.deviceDownload();
+    coarsenedHandle.deviceDownload();
+    EXPECT_TRUE(inputHandle.grid<BuildT>());
+    EXPECT_TRUE(coarsenedHandle.grid<BuildT>());
+    EXPECT_EQ(inputHandle.grid<BuildT>()->mChecksum.full(), coarsenedHandle.grid<BuildT>()->mChecksum.full());
+}// RefineCoarsen_ValueOnIndex
+
 TEST(TestNanoVDBCUDA, MergeGrids_ValueOnIndex)
 {
     using BuildT = nanovdb::ValueOnIndex;
@@ -3649,7 +3702,7 @@ TEST(TestNanoVDBCUDA, MergeGrids_ValueOnIndex)
     for (int i = 0; i <= 2; i++)
         for (int j = 0; j <= 2; j++)
             for (int k = 0; k <= 2; k++)
-                inputPointsA.emplace_back(nanovdb::Coord{i-1, j*8-1, k*128}); // 4 upper, 12 lower, 18 leaf nodes
+                inputPointsA.emplace_back(i-1, j*8-1, k*128); // 4 upper, 12 lower, 18 leaf nodes
     auto inputBufferA = nanovdb::cuda::DeviceBuffer::create( inputPointsA.size() * sizeof(nanovdb::Coord), nullptr, false);
     EXPECT_FALSE(inputBufferA.data());
     EXPECT_TRUE(inputBufferA.deviceData());
@@ -3664,7 +3717,7 @@ TEST(TestNanoVDBCUDA, MergeGrids_ValueOnIndex)
     for (int i = 0; i <= 2; i++)
         for (int j = 0; j <= 2; j++)
             for (int k = 0; k <= 2; k++)
-                inputPointsB.emplace_back(nanovdb::Coord{i, j*8-1, (k-1)*128}); // 4 upper, 6 lower, 9 leaf nodes
+                inputPointsB.emplace_back(i, j*8-1, (k-1)*128); // 4 upper, 6 lower, 9 leaf nodes
     auto inputBufferB = nanovdb::cuda::DeviceBuffer::create( inputPointsB.size() * sizeof(nanovdb::Coord), nullptr, false);
     EXPECT_FALSE(inputBufferB.data());
     EXPECT_TRUE(inputBufferB.deviceData());
