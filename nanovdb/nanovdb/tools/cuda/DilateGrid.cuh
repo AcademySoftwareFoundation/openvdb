@@ -43,15 +43,8 @@ public:
     /// @brief Constructor
     /// @param deviceGrid source device grid to be dilated
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    DilateGrid(GridT* d_srcGrid, cudaStream_t stream = 0)
-        : mBuilder(stream), mStream(stream), mTimer(stream)
-    {
-        mDeviceSrcGrid = d_srcGrid;
-        // TODO: Should this be moved in one of the process functions?
-        cudaStreamSynchronize(mStream);
-        cudaCheck(cudaMemcpy(&mSrcTreeData, util::PtrAdd(mDeviceSrcGrid, GridT::memUsage()),
-            TreeT::memUsage(), cudaMemcpyDeviceToHost));// copy TreeData from GPU -> CPU
-    }
+    DilateGrid(const GridT* d_srcGrid, cudaStream_t stream = 0)
+        : mBuilder(stream), mStream(stream), mTimer(stream), mDeviceSrcGrid(d_srcGrid) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -73,6 +66,7 @@ public:
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
 
+private:
     void dilateRoot();
 
     void dilateInternalNodes();
@@ -81,7 +75,6 @@ public:
 
     void dilateLeafNodes();
 
-private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
@@ -89,12 +82,9 @@ private:
     cudaStream_t                 mStream{0};
     util::cuda::Timer            mTimer;
     int                          mVerbose{0};
-    GridT                        *mDeviceSrcGrid;
+    const GridT                  *mDeviceSrcGrid;
     morphology::NearestNeighbors mOp{morphology::NN_FACE_EDGE_VERTEX};
     TreeData                     mSrcTreeData;
-
-public:
-    GridT* deviceSrcGrid()   { return mDeviceSrcGrid; }
 };// tools::cuda::DilateGrid<BuildT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -104,6 +94,10 @@ template<typename BufferT>
 GridHandle<BufferT>
 DilateGrid<BuildT>::getHandle(const BufferT &pool)
 {
+    // Copy TreeData from GPU -> CPU
+    cudaStreamSynchronize(mStream);
+    mSrcTreeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid);
+
     // Ensure that the input grid contains no tile values
     if (mSrcTreeData.mTileCount[2] || mSrcTreeData.mTileCount[1] || mSrcTreeData.mTileCount[0])
         throw std::runtime_error("Topological operations not supported on grids with value tiles");
@@ -191,14 +185,13 @@ void DilateGrid<BuildT>::dilateRoot()
     if (mSrcTreeData.mVoxelCount) { // If the input grid is not empty
         // Make a host copy of the source topology RootNode *and* the Upper Nodes (needed for BBox'es)
         // TODO: Consider avoiding to copy the entire set of upper nodes
-        auto deviceSrcRoot = static_cast<RootT*>(util::PtrAdd(mDeviceSrcGrid, GridT::memUsage() + mSrcTreeData.mNodeOffset[3]));
+        auto deviceSrcRoot = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid, GridT::memUsage() + mSrcTreeData.mNodeOffset[3]));
         uint64_t rootAndUpperSize = mSrcTreeData.mNodeOffset[1] - mSrcTreeData.mNodeOffset[3];
         auto srcRootAndUpperBuffer = nanovdb::HostBuffer::create(rootAndUpperSize);
         cudaCheck(cudaMemcpyAsync(srcRootAndUpperBuffer.data(), deviceSrcRoot, rootAndUpperSize, cudaMemcpyDeviceToHost, mStream));
         auto srcRootAndUpper = static_cast<RootT*>(srcRootAndUpperBuffer.data());
 
         // For each original root tile, consider adding those tiles in its 26-connected neighborhood
-        std::set<nanovdb::Coord> dilatedTileOrigins;
         for (uint32_t t = 0; t < srcRootAndUpper->tileCount(); t++) {
             auto srcUpper = srcRootAndUpper->getChild(srcRootAndUpper->tile(t));
             const auto dilatedBBox = srcUpper->bbox().expandBy(1); // TODO: update/specialize if larger dilation neighborhoods are used
@@ -239,20 +232,20 @@ void DilateGrid<BuildT>::dilateInternalNodes()
     // as if every upper node had a full set of 32^3 lower children
     if (mSrcTreeData.mNodeCount[1]) { // Unless it's an empty grid
         if (mOp == morphology::NN_FACE) {
-            using Op = morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE>;
+            using Op = util::morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE>;
             util::cuda::operatorKernel<Op>
                 <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-                (deviceSrcGrid(), mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
+                (mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
         else if (mOp == morphology::NN_FACE_EDGE) {
-            using Op = morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE_EDGE>;
+            using Op = util::morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE_EDGE>;
             util::cuda::operatorKernel<Op>
                 <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-                (deviceSrcGrid(), mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
+                (mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
         else if (mOp == morphology::NN_FACE_EDGE_VERTEX) {
-            using Op = morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE_EDGE_VERTEX>;
+            using Op = util::morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE_EDGE_VERTEX>;
             util::cuda::operatorKernel<Op>
                 <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-                (deviceSrcGrid(), mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
+                (mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
     }
 }// DilateGrid<BuildT>::dilateInternalNodes
 
@@ -263,7 +256,7 @@ void DilateGrid<BuildT>::processGridTreeRoot()
 {
     // Copy GridData from source grid
     // By convention: this will duplicate grid name and map. Others will be reset later
-    cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), deviceSrcGrid()->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
+    cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrid->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
     cudaCheckError();
 }// DilateGrid<BuildT>::processGridTreeRoot
@@ -277,22 +270,22 @@ void DilateGrid<BuildT>::dilateLeafNodes()
     // has been already topologically dilated to include all necessary leaf nodes.
     if (mBuilder.data()->nodeCount[1]) { // Unless output grid is empty
         if (mOp == morphology::NN_FACE) {
-            using Op = morphology::cuda::DilateLeafNodesFunctor<BuildT, morphology::NN_FACE>;
-            nanovdb::util::cuda::operatorKernel<Op>
+            using Op = util::morphology::cuda::DilateLeafNodesFunctor<BuildT, morphology::NN_FACE>;
+            util::cuda::operatorKernel<Op>
                 <<<dim3(mBuilder.data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-                (deviceSrcGrid(), static_cast<GridT*>(mBuilder.data()->d_bufferPtr)); }
+                (mDeviceSrcGrid, static_cast<GridT*>(mBuilder.data()->d_bufferPtr)); }
         else if (mOp == morphology::NN_FACE_EDGE)
             throw std::runtime_error("dilateLeafNodes() not implemented for NN_FACE_EDGE stencil");
         else if (mOp == morphology::NN_FACE_EDGE_VERTEX) {
-            using Op = morphology::cuda::DilateLeafNodesFunctor<BuildT, morphology::NN_FACE_EDGE_VERTEX>;
-            nanovdb::util::cuda::operatorKernel<Op>
+            using Op = util::morphology::cuda::DilateLeafNodesFunctor<BuildT, morphology::NN_FACE_EDGE_VERTEX>;
+            util::cuda::operatorKernel<Op>
                 <<<dim3(mBuilder.data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock>>>
-                (deviceSrcGrid(), static_cast<GridT*>(mBuilder.data()->d_bufferPtr)); }
+                (mDeviceSrcGrid, static_cast<GridT*>(mBuilder.data()->d_bufferPtr)); }
     }
 
     // Update leaf offsets and prefix sums
     mBuilder.processLeafOffsets(mStream);
-}
+}// DilateGrid<BuildT>::dilateLeafNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
