@@ -632,7 +632,9 @@ checkFormatVersion(std::ios_base& is)
 {
     if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION ) {
         OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported. "
+            "To read older VDB files, please use VDB 12.x or older and then write "
+            "them out again to produce files that are compatible with 13.0 and above.");
     }
 }
 
