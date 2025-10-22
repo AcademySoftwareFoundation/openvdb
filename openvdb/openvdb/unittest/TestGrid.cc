@@ -161,11 +161,24 @@ TEST_F(TestGrid, testGetGrid)
 
     EXPECT_TRUE(grid->baseTreePtr());
 
-    EXPECT_TRUE(!gridPtrCast<DoubleGrid>(grid));
+    EXPECT_TRUE(gridPtrCast<FloatGrid>(grid));
     EXPECT_TRUE(!gridPtrCast<DoubleGrid>(grid));
 
     EXPECT_TRUE(gridConstPtrCast<FloatGrid>(constGrid));
     EXPECT_TRUE(!gridConstPtrCast<DoubleGrid>(constGrid));
+
+    GridBase::Ptr halfGrid = HalfGrid::create(/*bg=*/Half(0.0));
+    GridBase::ConstPtr constHalfGrid = halfGrid;
+
+    EXPECT_TRUE(halfGrid->baseTreePtr());
+
+    EXPECT_TRUE(gridPtrCast<HalfGrid>(halfGrid));
+    EXPECT_TRUE(!gridPtrCast<FloatGrid>(halfGrid));
+    EXPECT_TRUE(!gridPtrCast<DoubleGrid>(halfGrid));
+
+    EXPECT_TRUE(gridConstPtrCast<HalfGrid>(constHalfGrid));
+    EXPECT_TRUE(!gridConstPtrCast<FloatGrid>(constHalfGrid));
+    EXPECT_TRUE(!gridConstPtrCast<DoubleGrid>(constHalfGrid));
 }
 
 
@@ -176,6 +189,11 @@ TEST_F(TestGrid, testIsType)
     GridBase::Ptr grid = FloatGrid::create();
     EXPECT_TRUE(grid->isType<FloatGrid>());
     EXPECT_TRUE(!grid->isType<DoubleGrid>());
+
+    GridBase::Ptr halfGrid = HalfGrid::create();
+    EXPECT_TRUE(halfGrid->isType<HalfGrid>());
+    EXPECT_TRUE(!halfGrid->isType<FloatGrid>());
+    EXPECT_TRUE(!halfGrid->isType<DoubleGrid>());
 }
 
 
@@ -628,5 +646,29 @@ TEST_F(TestGrid, testAdapter)
         AdapterConstT::constTree(constFloatAcc);
         AdapterConstT::constTree(constFloatTree);
         AdapterConstT::constTree(constFloatGrid);
+    }
+}
+
+TEST_F(TestGrid, testPopulateHalfGridWithAccessor)
+{
+    using namespace openvdb;
+    HalfGrid::Ptr grid = HalfGrid::create();
+    HalfGrid::Accessor acc = grid->getAccessor();
+
+    Coord xyz(1000, -200000000, 30000000);
+    acc.setValue(xyz, Half(1.0));
+    EXPECT_EQ(Half(1.0), acc.getValue(xyz));
+
+    xyz.reset(1000, 200000000, -30000000);
+    acc.setValue(xyz, Half(2.0));
+    EXPECT_EQ(Half(2.0), acc.getValue(xyz));
+
+    acc.setValue(openvdb::Coord::min(), Half(3.0));
+    acc.setValue(openvdb::Coord::max(), Half(4.0));
+    EXPECT_EQ(Half(3.0), acc.getValue(openvdb::Coord::min()));
+    EXPECT_EQ(Half(4.0), acc.getValue(openvdb::Coord::max()));
+
+    for (HalfGrid::ValueOnCIter iter = grid->cbeginValueOn(); iter; ++iter) {
+        EXPECT_EQ(Half(iter.getValue()), *iter);
     }
 }
