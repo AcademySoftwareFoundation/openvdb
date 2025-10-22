@@ -63,9 +63,6 @@ enum POINT_COMPRESSION_TYPE
 };
 
 
-// forward declaration
-class Interrupter;
-
 
 /// @brief Compute a voxel size from a Houdini detail
 ///

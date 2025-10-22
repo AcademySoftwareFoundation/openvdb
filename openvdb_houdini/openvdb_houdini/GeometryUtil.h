@@ -40,8 +40,6 @@ class OP_Node;
 
 namespace openvdb_houdini {
 
-class Interrupter;
-
 
 /// Add geometry to the given detail to indicate the extents of a frustum transform.
 OPENVDB_HOUDINI_API
