@@ -261,7 +261,6 @@ GLFW           | Simple API for OpenGL development                              
 Doxygen        | Documentation generation from C++                               | Documentation      |
 Log4cplus      | An optional dependency for improved OpenVDB Logging             | Optional (All)     |
 nanobind       | C++/python bindings                                             | Optional (Python)  |
-NumPy          | Scientific computing with Python                                | Optional (Python)  |
 LLVM           | Target-independent code generation                              | OpenVDB AX         |
 
 At a minimum a matching C++17 compiler and CMake will be required. See
@@ -354,7 +353,6 @@ OpenEXR        | EXR serialization support                                      
 Imath          | Used half precision floating points and EXR serialization support | Optional (All)                   |
 Log4cplus      | An optional dependency for improved OpenVDB Logging               | Optional (All)                   |
 nanobind       | C++/python bindings                                               | Optional (Python)                |
-NumPy          | Scientific computing with Python                                  | Optional (Python)                |
 LLVM           | Target-independent code generation                                | OpenVDB AX                       |
 
 

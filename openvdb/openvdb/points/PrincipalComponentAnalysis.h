@@ -48,7 +48,7 @@ struct PcaAttributes;
 ///   with Anisotropic Kernels'. The results are stored on the attributes
 ///   pointed to by the PcaAttributes. See the PcaSettings and PcaAttributes
 ///   structs for more details.
-/// @warning  This method will throw if the 'strech', 'rotation' or 'pws'
+/// @warning  This method will throw if the 'strech', 'xform' or 'pws'
 ///   attributes already exist on this input point set.
 /// @param points   The point data grid to analyses
 /// @param settings The PCA settings for controlling the behavior of the
@@ -73,6 +73,10 @@ struct PcaSettings
     ///   values will cause the PCA calculation to become exponentially more
     ///   expensive and should be used in conjunction with the max point per
     ///   voxel settings below.
+    /// @note  This value is used to normalize, so you should not use maximum
+    ///   limit values to try and include all points. If, for example, you
+    ///   want include every point against eachother, consider computing the
+    ///   extents of the grid and using that as the searchRadius.
     /// @warning  Valid range is [0, inf). Behaviour is undefined when outside
     ///   this range.
     float searchRadius = 1.0f;
@@ -101,7 +105,7 @@ struct PcaSettings
     ///   that target points must have to be classified as having an elliptical
     ///   distribution. Points with less neighbours than this will end up with
     ///   uniform stretch values of nonAnisotropicStretch and an identity
-    ///   rotation matrix.
+    ///   transformation.
     /// @note  This number can include the target point itself.
     /// @warning  Changing this value does not change the size or number of
     ///   point neighborhood lookups. As such, increasing this value only
@@ -126,7 +130,7 @@ struct PcaSettings
     ///   are trivially stepped over, with the step size calculated as:
     ///      max(1, ppv / maxTargetPointsPerVoxel).
     ///   default behaviour is to compute for all points. Any points skipped
-    ///   will be treated as being isolated and receive an identity rotation
+    ///   will be treated as being isolated and receive an identity transform
     ///   and nonAnisotropicStretch.
     /// @note  When using in conjuction with rasterizeSdf for ellipsoids,
     ///   consider choosing a lower value (e.g. same value as
@@ -149,22 +153,48 @@ struct PcaSettings
     util::NullInterrupter* interrupter = nullptr;
 };
 
+// Suppress spurious warnings on compiler emitted methods (constructors, etc)
+// due to deprecated members. Accessing said members still generates the warning.
+OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+
 /// @brief  The persistent attributes created by the PCA methods.
 /// @note   These can be passed to points::rasterizeSdf with the
 ///   EllipsoidSettings to perform ellipsoidal surface construction.
 struct PcaAttributes
 {
+    enum class XformOutput
+    {
+        // When selected, the "stretch" output attribute won't be created.
+        // Instead, only a 3x3 affine unitary "xform" attribute will be
+        // created with the combined stretch and rotational transformations
+        COMBINED_TRANSFORM,
+        // When selected, both the "stretch" vector and "xform" output
+        // attributes will be created. The xform will take the form of a
+        // quaternion representing the rotation.
+        STRETCH_AND_QUATERNION,
+        // When selected, both the "stretch" vector and "xform" output
+        // attributes will be created. The xform will take the form of an
+        // orthogonal 3x3 matrix representing the rotation OR a pure
+        // reflection.
+        STRETCH_AND_UNITARY_MATRIX
+    };
+
+    XformOutput xformOutput = XformOutput::STRETCH_AND_UNITARY_MATRIX;
+
     /// @brief  Settings for the "stretch" attribute, a floating point vector
     ///   attribute which represents the scaling components of each points
     ///   ellipse or (1.0,1.0,1.0) for isolated points.
+    /// @note   This will only be created if the XformOutput is set to
+    ///   STRETCH_AND_QUATERNION or STRETCH_AND_UNITARY_MATRIX.
     using StretchT = math::Vec3<float>;
     std::string stretch = "stretch";
 
-    /// @brief  Settings for the "rotation" attribute, a floating point matrix
-    ///   attribute which represents the orthogonal rotation of each points
-    ///   ellipse or the identity matrix for isolated points.
+    /// @brief  Settings for the "xform" attribute, either a floating point
+    ///   matrix or quaternion attribute. See the `xformOutput` setting and
+    ///   XformOutput enum above for details.
     using RotationT = math::Mat3<float>;
-    std::string rotation = "rotation";
+    using QuatT = math::Quat<float>;
+    std::string xform = "xform";
 
     /// @brief  Settings for the world space position of every point. This may
     ///   end up being different to their actual position if the
@@ -177,13 +207,21 @@ struct PcaAttributes
 
     /// @brief A point group to create that represents points which have valid
     ///   ellipsoidal neighborhood. Points outside of this group will have
-    ///   their stretch and rotation attributes set to describe a canonical
-    ///   sphere. Note however that all points, regardless of this groups
-    ///   membership flag, will still contribute to their neighbours and may
-    ///   have their world space position deformed in relation to their
-    ///   neighboring points.
+    ///   their stretch and xform attributes set to describe a canonical sphere
+    ///   Note however that all points, regardless of this groups membership
+    ///   flag, will still contribute to their neighbours and may have their
+    ///   world space position deformed in relation to their neighboring points.
     std::string ellipses = "ellipsoids";
+
+    /// Old style "xform" attribute which has since been renamed and ONLY
+    /// supported rotation. If set, both the above "xform" and this attribute
+    /// will be created. This attribute only ever holds rotation, regardless
+    /// of the xformOutput specified. This will be removed and should not be
+    /// used.
+    OPENVDB_DEPRECATED_MESSAGE("Use PcaAttributes::xform") std::string rotation = "";
 };
+
+OPENVDB_NO_DEPRECATION_WARNING_END
 
 }
 }
