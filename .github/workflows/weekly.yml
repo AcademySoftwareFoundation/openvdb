@@ -77,16 +77,6 @@ jobs:
       image: aswf/ci-base:2024
     steps:
     - uses: actions/checkout@v3
-    # We bumped from the 2021 CI image to 2023 here to fix some OpenSSL issues
-    # with the Houdini download script. In so doing we broke some of the caching
-    # between this job and the jobs in houdini.yml which _don't_ use the 2023
-    # image yet. The issue is that the cache action will use zstd if it's
-    # available to zip the cache and this causes it to be inserted with a unique
-    # hash which images without zstd (i.e. the 2021/2022 images don't have
-    # access to). For now, uninstall zstd here instead of installing it
-    # everywhere and ask the LF to add zstd to the older base images.
-    - name: remove zstd
-      run: yum -y remove zstd
     - name: timestamp
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
