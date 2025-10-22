@@ -1029,14 +1029,14 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         s.halfband = 3;
         s.transform = nullptr;
         s.radius = pcaAttrs.stretch;
-        s.rotation = pcaAttrs.rotation;
+        s.xform = pcaAttrs.xform;
         s.pws = pcaAttrs.positionWS;
 
         /// 1) test with a single point with uniform stretch
         auto points = PointBuilder({Vec3f(0)})
             .voxelsize(0.1)
             .attribute(points::PcaAttributes::StretchT(1.0), pcaAttrs.stretch) // uniform stretch
-            .attribute(points::PcaAttributes::RotationT::identity(), pcaAttrs.rotation)
+            .attribute(points::PcaAttributes::RotationT::identity(), pcaAttrs.xform)
             .attribute(points::PcaAttributes::PosWsT(0.0), pcaAttrs.positionWS)
             .get();
 
@@ -1074,7 +1074,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         points = PointBuilder({Vec3f(0)})
             .voxelsize(0.5)
             .attribute(points::PcaAttributes::StretchT(stretch), pcaAttrs.stretch) // uniform stretch
-            .attribute(points::PcaAttributes::RotationT::identity(), pcaAttrs.rotation)
+            .attribute(points::PcaAttributes::RotationT::identity(), pcaAttrs.xform)
             .attribute(points::PcaAttributes::PosWsT(0.0), pcaAttrs.positionWS)
             .get();
 
@@ -1124,7 +1124,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         points = PointBuilder({Vec3f(center)})
             .voxelsize(0.1)
             .attribute(points::PcaAttributes::StretchT(stretch), pcaAttrs.stretch)
-            .attribute(rot, pcaAttrs.rotation)
+            .attribute(rot, pcaAttrs.xform)
             .attribute(points::PcaAttributes::PosWsT(center), pcaAttrs.positionWS)
             .get();
 
@@ -1172,7 +1172,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         s.halfband = 3;
         s.transform = nullptr;
         s.radius = pcaAttrs.stretch;
-        s.rotation = pcaAttrs.rotation;
+        s.xform = pcaAttrs.xform;
         s.pws = pcaAttrs.positionWS;
 
         // Design an ellips that is squashed in XYZ and then rotated
@@ -1185,7 +1185,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         auto points = PointBuilder({Vec3f(0)})
             .voxelsize(0.1)
             .attribute(stretch, pcaAttrs.stretch)
-            .attribute(rot, pcaAttrs.rotation)
+            .attribute(rot, pcaAttrs.xform)
             .attribute(points::PcaAttributes::PosWsT(0.0), pcaAttrs.positionWS)
             .get();
 
@@ -1228,7 +1228,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
             .voxelsize(0.1)
             .group({1}, pcaAttrs.ellipses) // surface as an ellips
             .attribute(stretch, pcaAttrs.stretch)
-            .attribute(rot, pcaAttrs.rotation)
+            .attribute(rot, pcaAttrs.xform)
             .attribute(points::PcaAttributes::PosWsT(0.0), pcaAttrs.positionWS)
             .get();
 
@@ -1251,7 +1251,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         points::EllipsoidSettings<> s;
         s.halfband = 5;
         s.radius = pcaAttrs.stretch;
-        s.rotation = pcaAttrs.rotation;
+        s.xform = pcaAttrs.xform;
         s.pws = pcaAttrs.positionWS;
 
         // Design an ellips that is squashed in XYZ and then rotated
@@ -1269,7 +1269,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         auto points = PointBuilder({center})
             .voxelsize(0.2)
             .attribute(stretch, pcaAttrs.stretch)
-            .attribute(rot, pcaAttrs.rotation)
+            .attribute(rot, pcaAttrs.xform)
             .attribute(points::PcaAttributes::PosWsT(center), pcaAttrs.positionWS)
             .get();
 
@@ -1553,5 +1553,87 @@ TEST_F(TestPointRasterizeSDF, testVariableAttrTransfer)
                 EXPECT_EQ(zeroVal<double>(), *iter);
             });
         }
+    }
+}
+
+
+TEST_F(TestPointRasterizeSDF, testEllipsXforms)
+{
+    // Test single point which is treated as an ellips with different transforms
+
+    const math::Vec3<double> center(-1.2, 3.4f,-5.6f);
+    const math::Vec3<float> stretch(0.3f, 0.6f, 1.8f);
+
+    auto points1 = PointBuilder({center})
+        .voxelsize(0.2)
+        .attribute(stretch, "radius")
+        .attribute(center, "pws")
+        .get();
+    auto points2 = PointBuilder({center})
+        .voxelsize(0.2)
+        .attribute(stretch, "radius")
+        .attribute(center, "pws")
+        .get();
+    // unform radius, this one has the stretch embed into the xform
+    auto points3 = PointBuilder({center})
+        .voxelsize(0.2)
+        .attribute(center, "pws")
+        .get();
+
+    points::EllipsoidSettings<> s;
+    s.radius = "radius";
+    s.xform = "xform";
+    s.pws = "pws";
+
+    // Design an ellips that is squashed in XYZ and then rotated
+    math::Quat<float> a({1,0,0}, 20);
+    math::Quat<float> b({0,1,0}, 45);
+    math::Quat<float> c({0,0,1}, 66);
+    math::Quat<float> qrot = a * b * c;
+    math::Mat3<float> rot(qrot);
+
+    // First grid gets a rotation
+    points::appendAttribute<math::Mat3<float>>(points1->tree(), "xform", rot);
+    // Second gets rotation as a quaternion
+    points::appendAttribute<math::Quat<float>>(points2->tree(), "xform", qrot);
+    // Third gets a combined xform
+    points::appendAttribute<math::Mat3<float>>(points3->tree(), "xform", rot * math::scale<math::Mat3s>(stretch));
+
+    auto grids1 = points::rasterizeSdf(*points1, s);
+    auto grids2 = points::rasterizeSdf(*points2, s);
+    s.radius = ""; // no radius for this one
+    auto grids3 = points::rasterizeSdf(*points3, s);
+
+    FloatGrid::Ptr sdf1 = StaticPtrCast<FloatGrid>(grids1.front());
+    FloatGrid::Ptr sdf2 = StaticPtrCast<FloatGrid>(grids2.front());
+    FloatGrid::Ptr sdf3 = StaticPtrCast<FloatGrid>(grids3.front());
+    EXPECT_TRUE(sdf1);
+    EXPECT_TRUE(sdf2);
+    EXPECT_TRUE(sdf3);
+    EXPECT_TRUE(sdf1->transform() == points1->transform());
+    EXPECT_TRUE(sdf2->transform() == points2->transform());
+    EXPECT_TRUE(sdf3->transform() == points3->transform());
+    EXPECT_EQ(GRID_LEVEL_SET, sdf1->getGridClass());
+    EXPECT_EQ(GRID_LEVEL_SET, sdf2->getGridClass());
+    EXPECT_EQ(GRID_LEVEL_SET, sdf3->getGridClass());
+    EXPECT_EQ(float(s.halfband * points1->voxelSize()[0]), sdf1->background());
+    EXPECT_EQ(float(s.halfband * points2->voxelSize()[0]), sdf2->background());
+    EXPECT_EQ(float(s.halfband * points3->voxelSize()[0]), sdf3->background());
+
+    EXPECT_EQ(Index32(20), sdf1->tree().leafCount());
+    EXPECT_EQ(Index64(0), sdf1->tree().activeTileCount());
+    EXPECT_EQ(Index64(1921), sdf1->tree().activeVoxelCount());
+
+    EXPECT_TRUE(sdf1->tree().hasSameTopology(sdf2->tree()));
+    EXPECT_TRUE(sdf1->tree().hasSameTopology(sdf3->tree()));
+
+    // All grid should match
+    for (auto iter = sdf1->cbeginValueAll(); iter; ++iter)
+    {
+        auto val1 = *iter;
+        auto val2 = sdf2->tree().getValue(iter.getCoord());
+        auto val3 = sdf3->tree().getValue(iter.getCoord());
+        ASSERT_NEAR(val1, val2, 1e-6f) << iter.getCoord();
+        ASSERT_NEAR(val1, val3, 1e-6f) << iter.getCoord();
     }
 }
