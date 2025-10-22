@@ -8,7 +8,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 
 ###############################################################################
 
@@ -27,7 +27,9 @@ set(OPENVDB_DEPRECATED_ABI_LIST ${MINIMUM_OPENVDB_ABI_VERSION} ${_PREV_ABI})
 unset(_PREV_ABI)
 
 if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
-  # @note  Currently tracking CY2022 of the VFX platform where available
+  # @note  Currently tracking CY2024 of the VFX platform where available
+  # (that is, our minimum requirements are for the current VFX platform)
+  # minus 2 years to be able to build with legacy ABI)
 
   # @Note  Compiler versions are not really a hard and fast rule, you just need
   # a compiler with complete support for our MINIMUM_CXX_STANDARD (currently 17).
@@ -39,19 +41,19 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_ICC_VERSION 19)
   set(MINIMUM_MSVC_VERSION 19.30) # 1928 (Visual Studio 2019 Version 16.8 + 16.9)
 
-  set(MINIMUM_BOOST_VERSION 1.80)
-  set(MINIMUM_IMATH_VERSION 3.1)
-  set(MINIMUM_OPENEXR_VERSION 3.1)
+  set(MINIMUM_BOOST_VERSION 1.82)
+  set(MINIMUM_OPENEXR_VERSION 3.2)
+  set(MINIMUM_IMATH_VERSION 3.2)
   set(MINIMUM_ZLIB_VERSION 1.2.7)
   set(MINIMUM_TBB_VERSION 2020.3)
   set(MINIMUM_LLVM_VERSION 15.0.0)
   set(MINIMUM_BLOSC_VERSION 1.17.0)
-  set(MINIMUM_GLFW_VERSION 3.1)
+  set(MINIMUM_GLFW_VERSION 3.3)
 
-  set(MINIMUM_PYTHON_VERSION 3.10)
+  set(MINIMUM_PYTHON_VERSION 3.11)
 
   set(MINIMUM_GOOGLETEST_VERSION 1.10)
-  set(MINIMUM_LOG4CPLUS_VERSION 1.1.2)
+  set(MINIMUM_LOG4CPLUS_VERSION 2.0)
   set(MINIMUM_HOUDINI_VERSION 19.5)
 
   # These always promote warnings rather than errors
@@ -59,7 +61,7 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_DOXYGEN_VERSION 1.8.8)
 endif()
 
-# VFX 23 deprecations to transition to MINIMUM_* variables in OpenVDB 12.0.0
+# VFX 24 deprecations to transition to MINIMUM_* variables in OpenVDB 14.0.0
 # @note  At the time of writing, any variables that are commented out don't
 #   have target transitional versions.
 
@@ -68,15 +70,16 @@ endif()
 # set(FUTURE_MINIMUM_ICC_VERSION 19)
 
 # set(FUTURE_MINIMUM_CXX_STANDARD 20)
-set(FUTURE_MINIMUM_CMAKE_VERSION 3.24)
-set(FUTURE_MINIMUM_OPENEXR_VERSION 3.2)
-set(FUTURE_MINIMUM_BOOST_VERSION 1.82)
-set(FUTURE_MINIMUM_GLFW_VERSION 3.3)
-set(FUTURE_MINIMUM_LOG4CPLUS_VERSION 2.0)
+set(FUTURE_MINIMUM_CMAKE_VERSION 4.0)
+set(FUTURE_MINIMUM_OPENEXR_VERSION 3.3)
+set(FUTURE_MINIMUM_IMATH_VERSION 3.3)
+set(FUTURE_MINIMUM_TBB_VERSION 2021)
+set(FUTURE_MINIMUM_BOOST_VERSION 1.85)
+#set(FUTURE_MINIMUM_GLFW_VERSION 3.3)
+#set(FUTURE_MINIMUM_LOG4CPLUS_VERSION 2.0)
 set(FUTURE_MINIMUM_NANOBIND_VERSION 2.1.0)
 
 # set(FUTURE_MINIMUM_BLOSC_VERSION 1.17.0)
-# set(FUTURE_MINIMUM_TBB_VERSION 2020.3)
-set(FUTURE_MINIMUM_PYTHON_VERSION 3.11)
+# set(FUTURE_MINIMUM_PYTHON_VERSION 3.11)
 # set(FUTURE_MINIMUM_HOUDINI_VERSION 20.0)
 set(FUTURE_MINIMUM_LLVM_VERSION 18.0.0)
