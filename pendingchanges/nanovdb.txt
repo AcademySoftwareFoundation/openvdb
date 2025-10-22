@@ -10,6 +10,8 @@ Improvements:
 - Added nanovdb/tools/cuda/MergeGrids.cuh, which merges the topology of two grids on the GPU.
 - Added nanovdb/tools/cuda/CoarsenGrid.cuh, which performs topological coarsening of grids on the GPU.
 - Added nanovdb/tools/cuda/RefineGrid.cuh, which performs topological refinement of grids on the GPU.
+- Added nanovdb/tools/cuda/PruneGrid.cuh, which prunes the topology of a grid using a sidecar mask on the GPU.
+- Added nanovdb/util/cuda/Injection.cuh, which facilitates sidecar data copying - on the GPU - in the overlap of two grids with different topology.
 - Added Mat classes and other math types to NanoVDB
 - Improvements to mGPU grid building and introduction of a separate test executable for mGPU tests
 - Major rewrite of nanovdb::NanoToOpenVDB, which now allows nanovdb::IndexGrids and blind (or sidecar) data to be converted into an openvdb grid.

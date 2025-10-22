@@ -22,7 +22,7 @@ public:
 
     /// @brief Default c-tor of an empty memory pool.
     TempPool() : mData(nullptr), mSize(0), mRequestedSize(0) {}
-    
+
     /// @brief Destructor
     ~TempPool() {
         mRequestedSize = 0;
