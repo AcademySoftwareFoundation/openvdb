@@ -22,6 +22,7 @@ brew install jq # for trivial parsing of brew json
 brew install openexr
 brew install nanobind # also installs the dependent python version
 brew install robin-map # required for nanobind
+brew install numpy # only for python tests
 brew install zlib
 brew install jemalloc
 
