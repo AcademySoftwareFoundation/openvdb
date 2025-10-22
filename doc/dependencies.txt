@@ -70,7 +70,7 @@ LLVM           | 15.0.0* | 18.0.0      | Target-independent code generation     
 Bison          | 3.7.0   | 3.7.0       | General-purpose parser generator                                  | Y       | Y        | https://www.gnu.org/software/gcc
 Flex           | 2.6.4   | 2.6.4       | Fast lexical analyzer generator                                   | Y       | Y        | https://github.com/westes/flex
 Python         | 3.10    | 3.11        | The python interpreter and libraries                              | Y       | Y        | https://www.python.org
-nanobind**     | 2.0.0   | >= 2.1.0    | C++/python bindings                                               | Y       | Y        | https://nanobind.readthedocs.io
+nanobind**     | 2.0.0   | >= 2.5.0    | C++/python bindings                                               | Y       | Y        | https://nanobind.readthedocs.io
 GoogleTest     | 1.10    | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
 Blosc          | 1.17.0* | Latest      | Recommended dependency for improved disk compression              | Y       | Y        | https://github.com/Blosc/c-blosc/releases
 Log4cplus      | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus

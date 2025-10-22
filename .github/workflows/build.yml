@@ -70,19 +70,22 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2026',           abi: '13', build: 'Release', cmake: '' }
-          - { cxx: g++,     image: '2026',           abi: '13', build: 'Release', cmake: '' }
-          - { cxx: clang++, image: '2026',           abi: '12', build: 'Debug',   cmake: '' }
+          - { cxx: clang++, image: '2026',           abi: '13', build: 'Release', cmake: '-DOPENVDB_USE_FUTURE_ABI_13=ON' }
+          - { cxx: g++,     image: '2026',           abi: '13', build: 'Release', cmake: '-DOPENVDB_USE_FUTURE_ABI_13=ON' }
+          - { cxx: clang++, image: '2026',           abi: '13', build: 'Debug',   cmake: '-DOPENVDB_USE_FUTURE_ABI_13=ON' }
           - { cxx: clang++, image: '2025-clang19.1', abi: '12', build: 'Release', cmake: '' }
-          - { cxx: g++,     image: '2025-clang19.1', abi: '12', build: 'Release', cmake: '' }
-          - { cxx: clang++, image: '2025-clang19.1', abi: '12', build: 'Debug',   cmake: '' }
           - { cxx: clang++, image: '2024-clang17.2', abi: '11', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
-          - { cxx: g++,     image: '2024-clang17.2', abi: '11', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
     - name: nanobind
-      run: ./ci/install_nanobind.sh 2.0.0
+      run: ./ci/install_nanobind.sh 2.5.0
+      # 2026 images are broken with gtest/glfw installs
+    - name: deps
+      if: contains(matrix.config.image, '2026')
+      run: |
+        ./ci/install_gtest.sh latest
+        ./ci/install_glfw.sh latest
     - name: timestamp
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT

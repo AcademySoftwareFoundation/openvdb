@@ -60,7 +60,12 @@ endif()
 
 ##########################################################################
 
-nanobind_add_module(openvdb_python NB_STATIC
+set(NANOBIND_MODULE_ARGS "")
+if(${nanobind_VERSION} GREATER_EQUAL 2.5.0)
+  # Suppress nanobind warnings (which can be treated as errors)
+  set(NANOBIND_MODULE_ARGS NB_SUPPRESS_WARNINGS)
+endif()
+nanobind_add_module(openvdb_python ${NANOBIND_MODULE_ARGS} NB_STATIC
   pyFloatGrid.cc
   pyGridBase.cc
   pyIntGrid.cc
@@ -68,8 +73,8 @@ nanobind_add_module(openvdb_python NB_STATIC
   pyOpenVDBModule.cc
   pyPointGrid.cc
   pyTransform.cc
-  pyVec3Grid.cc
-)
+  pyVec3Grid.cc)
+unset(NANOBIND_MODULE_ARGS)
 
 target_link_libraries(openvdb_python PUBLIC ${OPENVDB_LIB})
 if(OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES)

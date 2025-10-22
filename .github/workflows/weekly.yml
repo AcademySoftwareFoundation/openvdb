@@ -159,7 +159,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: nanobind
-      run: ./ci/install_nanobind.sh 2.0.0
+      run: ./ci/install_nanobind.sh 2.5.0
     - name: build
       run: >
         ./ci/build.sh -v
@@ -194,7 +194,7 @@ jobs:
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
             sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev libgtest-dev libgmock-dev libcppunit-dev
-            ./ci/install_nanobind.sh 2.0.0
+            ./ci/install_nanobind.sh 2.5.0
           elif [ "$RUNNER_OS" == "macOS" ]; then
             ./ci/install_macos.sh 20
             ./ci/install_tbb_macos.sh
@@ -289,14 +289,14 @@ jobs:
     strategy:
       matrix:
         config:
-          # Unified
-          - { image: '2025-clang19.1', cxx: 'clang++', build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
-          - { image: '2025-clang19.1', cxx: 'g++',     build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
+          - { image: '2025-clang18.1', cxx: 'clang++', build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
+          # @note  LLVM 17 builds are incompatible with the vdb python plugin on linux
+          - { image: '2024-clang17.2', cxx: 'clang++', build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '-DOPENVDB_PYTHON_USE_AX=OFF' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
       - name: nanobind
-        run: ./ci/install_nanobind.sh 2.0.0
+        run: ./ci/install_nanobind.sh 2.5.0
       - name: build
         run: >
           ./ci/build.sh -v
@@ -504,7 +504,7 @@ jobs:
       image: aswf/ci-openvdb:2026
     strategy:
       matrix:
-        blosc: ['1.18.0','1.19.0','1.20.0','1.21.0', 'latest']
+        blosc: ['1.21.0', 'latest']
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
