@@ -520,6 +520,11 @@ public:
     /// @warning This method should only be used by experts seeking low-level optimizations.
     void setValueOffUnsafe(Index offset, const ValueType& value);
 
+    /// @brief Set the active/inactive value mask.
+    /// @note Use setValueOn(const Coord&)/setValueOff(const Coord&) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    void setValueMaskUnsafe(const NodeMaskType& mask);
+
     /// @brief Replace a tile at offset with the given child node.
     /// @note Use addChild(ChildNodeType*) for a safer alternative.
     /// @warning This method should only be used by experts seeking low-level optimizations.
@@ -2587,6 +2592,14 @@ InternalNode<ChildT, Log2Dim>::setValueOffUnsafe(Index n, const ValueType& value
     OPENVDB_ASSERT(mChildMask.isOff(n));
     mNodes[n].setValue(value);
     mValueMask.setOff(n);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::setValueMaskUnsafe(const NodeMaskType& mask)
+{
+    OPENVDB_ASSERT(mChildMask.isOff());
+    mValueMask = mask;
 }
 
 template<typename ChildT, Index Log2Dim>
