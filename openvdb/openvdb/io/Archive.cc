@@ -628,6 +628,18 @@ getFormatVersion(std::ios_base& is)
 
 
 void
+checkFormatVersion(std::ios_base& is)
+{
+    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION ) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported. "
+            "To read older VDB files, please use VDB 12.x or older and then write "
+            "them out again to produce files that are compatible with 13.0 and above.");
+    }
+}
+
+
+void
 Archive::setFormatVersion(std::istream& is)
 {
     is.iword(GetSteamState().fileVersion) = mFileVersion; ///< @todo remove
@@ -786,11 +798,11 @@ Archive::setGridCompression(std::ostream& os, const GridBase& grid) const
 void
 Archive::readGridCompression(std::istream& is)
 {
-    if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
-        uint32_t c = COMPRESS_NONE;
-        is.read(reinterpret_cast<char*>(&c), sizeof(uint32_t));
-        io::setDataCompression(is, c);
-    }
+    checkFormatVersion(is);
+
+    uint32_t c = COMPRESS_NONE;
+    is.read(reinterpret_cast<char*>(&c), sizeof(uint32_t));
+    io::setDataCompression(is, c);
 }
 
 
@@ -939,33 +951,25 @@ Archive::readHeader(std::istream& is)
     if (mFileVersion > OPENVDB_FILE_VERSION) {
         OPENVDB_LOG_WARN("unsupported VDB file format (expected version "
             << OPENVDB_FILE_VERSION << " or earlier, got version " << mFileVersion << ")");
-    } else if (mFileVersion < 211) {
-        // Versions prior to 211 stored separate major, minor and patch numbers.
-        uint32_t version;
-        is.read(reinterpret_cast<char*>(&version), sizeof(uint32_t));
-        mFileVersion = 100 * mFileVersion + 10 * version;
-        is.read(reinterpret_cast<char*>(&version), sizeof(uint32_t));
-        mFileVersion += version;
+    } else if (mFileVersion < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+        OPENVDB_THROW(IoError,
+            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
     }
 
     // 3) Read the library version numbers (not stored prior to file format version 211).
     mLibraryVersion.first = mLibraryVersion.second = 0;
-    if (mFileVersion >= 211) {
-        uint32_t version;
-        is.read(reinterpret_cast<char*>(&version), sizeof(uint32_t));
-        mLibraryVersion.first = version; // major version
-        is.read(reinterpret_cast<char*>(&version), sizeof(uint32_t));
-        mLibraryVersion.second = version; // minor version
-    }
+    uint32_t version;
+    is.read(reinterpret_cast<char*>(&version), sizeof(uint32_t));
+    mLibraryVersion.first = version; // major version
+    is.read(reinterpret_cast<char*>(&version), sizeof(uint32_t));
+    mLibraryVersion.second = version; // minor version
 
     // 4) Read the flag indicating whether the stream supports partial reading.
     //    (Versions prior to 212 have no flag because they always supported partial reading.)
     mInputHasGridOffsets = true;
-    if (mFileVersion >= 212) {
-        char hasGridOffsets;
-        is.read(&hasGridOffsets, sizeof(char));
-        mInputHasGridOffsets = hasGridOffsets;
-    }
+    char hasGridOffsets;
+    is.read(&hasGridOffsets, sizeof(char));
+    mInputHasGridOffsets = hasGridOffsets;
 
     // 5) Read the flag that indicates whether data is compressed.
     //    (From version 222 on, compression information is stored per grid.)
@@ -974,42 +978,16 @@ Archive::readHeader(std::istream& is)
         // Prior to the introduction of Blosc, ZLIB was the default compression scheme.
         mCompression = (COMPRESS_ZIP | COMPRESS_ACTIVE_MASK);
     }
-    if (mFileVersion >= OPENVDB_FILE_VERSION_SELECTIVE_COMPRESSION &&
-        mFileVersion < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION)
-    {
-        char isCompressed;
-        is.read(&isCompressed, sizeof(char));
-        mCompression = (isCompressed != 0 ? COMPRESS_ZIP : COMPRESS_NONE);
-    }
 
     // 6) Read the 16-byte (128-bit) uuid.
     std::string oldUuid = mUuid;
-    if (mFileVersion >= OPENVDB_FILE_VERSION_BOOST_UUID) {
-        // UUID is stored as fixed-length ASCII string
-        // The extra 4 bytes are for the hyphens.
-        char uuidValues[16*2+4+1];
-        is.read(uuidValues, 16*2+4);
-        uuidValues[16*2+4] = 0;
-        mUuid = uuidValues;
-    } else {
-        // Older versions stored the UUID as a byte string.
-        char uuidBytes[16];
-        is.read(uuidBytes, 16);
-        char uuidStr[33];
-        auto to_hex = [](unsigned int c) -> char
-        {
-            c &= 0xf;
-            if (c < 10) return (char)('0' + c);
-            return (char)(c - 10 + 'A');
-        };
-        for (int i = 0; i < 16; i++)
-        {
-            uuidStr[i*2] = to_hex(uuidBytes[i] >> 4);
-            uuidStr[i*2+1] = to_hex(uuidBytes[i]);
-        }
-        uuidStr[32] = 0;
-        mUuid = uuidStr;
-    }
+
+    // UUID is stored as fixed-length ASCII string
+    // The extra 4 bytes are for the hyphens.
+    char uuidValues[16*2+4+1];
+    is.read(uuidValues, 16*2+4);
+    uuidValues[16*2+4] = 0;
+    mUuid = uuidValues;
 
     // CHeck if new and old uuid differ.  If either are blank, they
     // differ because an error occurred.
@@ -1229,25 +1207,10 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
         }
     }
 
-    if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_GRID_INSTANCING) {
-        grid->readTransform(is);
-        if (!gd.isInstance()) {
-            grid->readTopology(is);
-            Local::readBuffers(*grid, is, bbox);
-        }
-    } else {
-        // Older versions of the library stored the transform after the topology.
+    grid->readTransform(is);
+    if (!gd.isInstance()) {
         grid->readTopology(is);
-        grid->readTransform(is);
         Local::readBuffers(*grid, is, bbox);
-    }
-    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NO_GRIDMAP) {
-        // Older versions of the library didn't store grid names as metadata,
-        // so when reading older files, copy the grid name from the descriptor
-        // to the grid's metadata.
-        if (grid->getName().empty()) {
-            grid->setName(gd.gridName());
-        }
     }
 }
 

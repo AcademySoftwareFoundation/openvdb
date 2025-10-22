@@ -192,6 +192,9 @@ std::string getErrorString();
 /// @sa File::setFormatVersion()
 OPENVDB_API uint32_t getFormatVersion(std::ios_base&);
 
+/// @brief Throws an IoError if the file format version number is not supported.
+OPENVDB_API void checkFormatVersion(std::ios_base&);
+
 /// @brief Return the (major, minor) library version number associated with the given input stream.
 /// @sa File::setLibraryVersion()
 OPENVDB_API VersionId getLibraryVersion(std::ios_base&);
