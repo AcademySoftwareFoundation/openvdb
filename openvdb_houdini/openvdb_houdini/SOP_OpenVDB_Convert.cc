@@ -1259,7 +1259,7 @@ SOP_OpenVDB_Convert::Cache::referenceMeshing(
 
     // Transfer Primitive Attributes
     if (!boss.wasInterrupted() && transferAttributes && refGeo && indexGrid) {
-        hvdb::transferPrimitiveAttributes(*refGeo, *gdp, *indexGrid, boss.interrupter(), surfaceGroup);
+        hvdb::transferPrimitiveAttributes(*refGeo, *gdp, *indexGrid, boss, surfaceGroup);
     }
 
 

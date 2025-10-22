@@ -63,9 +63,6 @@ enum POINT_COMPRESSION_TYPE
 };
 
 
-// forward declaration
-class Interrupter;
-
 
 /// @brief Compute a voxel size from a Houdini detail
 ///
@@ -82,16 +79,6 @@ computeVoxelSizeFromHoudini(
     const openvdb::math::Mat4d& matrix,
     const openvdb::Index decimalPlaces,
     openvdb::util::NullInterrupter& interrupter);
-
-OPENVDB_DEPRECATED_MESSAGE("openvdb_houdini::Interrupter has been deprecated, use openvdb_houdini::HoudiniInterrupter")
-OPENVDB_HOUDINI_API
-float
-computeVoxelSizeFromHoudini(
-    const GU_Detail& detail,
-    const openvdb::Index pointsPerVoxel,
-    const openvdb::math::Mat4d& matrix,
-    const openvdb::Index decimalPlaces,
-    Interrupter& interrupter);
 
 
 /// @brief Convert a Houdini detail into a VDB Points grid
