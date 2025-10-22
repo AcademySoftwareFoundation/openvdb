@@ -1,0 +1,24 @@
+# TODO
+Tests:
+[X] LevelSetAdvect
+[X] Interpolation
+[X] TestMorphology
+[X] TestGrid
+[X] LevelSetAdvect
+[X] LevelSetMeasure - Written, but not passing
+[X] LevelSetMorph
+[X] LevelSetSphere
+[X] LevelSetUtil
+[X] RayIntersector
+[X] RayTracer
+[X] SignedFloodFill
+[X] VolumeAdvect
+[X] VolumeToSpheres
+[-] LevelSetFilter - doesn't have any
+[-] LevelSetTracker
+[-] MeshToVolume
+[ ] FastSweeping
+[ ] Test explicit template instantiation
+
+# TODO, but will be addressed later:
+[ ] Add support for csgUnion for HalfGrid.

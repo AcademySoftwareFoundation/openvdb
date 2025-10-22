@@ -22,6 +22,9 @@ public:
 using TDFF = TestMorphologyInternal<openvdb::FloatTree, openvdb::tools::NN_FACE>;
 using TDFE = TestMorphologyInternal<openvdb::FloatTree, openvdb::tools::NN_FACE_EDGE>;
 using TDFV = TestMorphologyInternal<openvdb::FloatTree, openvdb::tools::NN_FACE_EDGE_VERTEX>;
+using TDHF = TestMorphologyInternal<openvdb::HalfTree, openvdb::tools::NN_FACE>;
+using TDHE = TestMorphologyInternal<openvdb::HalfTree, openvdb::tools::NN_FACE_EDGE>;
+using TDHV = TestMorphologyInternal<openvdb::HalfTree, openvdb::tools::NN_FACE_EDGE_VERTEX>;
 using TDMF = TestMorphologyInternal<openvdb::MaskTree, openvdb::tools::NN_FACE>;
 using TDME = TestMorphologyInternal<openvdb::MaskTree, openvdb::tools::NN_FACE_EDGE>;
 using TDMV = TestMorphologyInternal<openvdb::MaskTree, openvdb::tools::NN_FACE_EDGE_VERTEX>;
@@ -36,6 +39,15 @@ TEST_F(TestMorphology, testFloatEdgeActiveValues) { TDFE::testMorphActiveValues(
 
 TEST_F(TestMorphology, testFloatVertexActiveLeafValues) { TDFV::testMorphActiveLeafValues(); }
 TEST_F(TestMorphology, testFloatVertexActiveValues) { TDFV::testMorphActiveValues(); }
+
+TEST_F(TestMorphology, testHalfFaceActiveLeafValues) { TDHF::testMorphActiveLeafValues(); }
+TEST_F(TestMorphology, testHalfFaceActiveValues) { TDHF::testMorphActiveValues(); }
+
+TEST_F(TestMorphology, testHalfEdgeActiveLeafValues) { TDHE::testMorphActiveLeafValues(); }
+TEST_F(TestMorphology, testHalfEdgeActiveValues) { TDHE::testMorphActiveValues(); }
+
+TEST_F(TestMorphology, testHalfVertexActiveLeafValues) { TDHV::testMorphActiveLeafValues(); }
+TEST_F(TestMorphology, testHalfVertexActiveValues) { TDHV::testMorphActiveValues(); }
 
 TEST_F(TestMorphology, testMaskFaceActiveLeafValues) { TDMF::testMorphActiveLeafValues(); }
 TEST_F(TestMorphology, testMaskFaceActiveValues) { TDMF::testMorphActiveValues(); }

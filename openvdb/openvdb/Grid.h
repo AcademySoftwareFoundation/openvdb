@@ -1770,11 +1770,18 @@ createLevelSet(Real voxelSize, Real halfWidth)
     using ValueType = typename GridType::ValueType;
 
     // GridType::ValueType is required to be a floating-point scalar.
-    static_assert(std::is_floating_point<ValueType>::value,
+    static_assert(openvdb::is_floating_point<ValueType>::value,
         "level-set grids must be floating-point-valued");
-
+    // turn-off implicit float conversion warning for clang and gcc
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wimplicit-float-conversion"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wfloat-conversion"
+#endif
     typename GridType::Ptr grid = GridType::create(
         /*background=*/static_cast<ValueType>(voxelSize * halfWidth));
+#pragma GCC diagnostic pop
     grid->setTransform(math::Transform::createLinearTransform(voxelSize));
     grid->setGridClass(GRID_LEVEL_SET);
     return grid;

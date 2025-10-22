@@ -19,23 +19,37 @@ class TestLevelSetUtil: public ::testing::Test
 
 ////////////////////////////////////////
 
-TEST_F(TestLevelSetUtil, testSDFToFogVolume)
+template<typename GridT>
+void
+testSDFToFogVolumeImpl()
 {
-    openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(10.0);
+    using ValueT = typename GridT::ValueType;
 
-    grid->fill(openvdb::CoordBBox(openvdb::Coord(-100), openvdb::Coord(100)), 9.0);
-    grid->fill(openvdb::CoordBBox(openvdb::Coord(-50), openvdb::Coord(50)), -9.0);
+    typename GridT::Ptr grid = GridT::create(ValueT(10.0));
+
+    grid->fill(openvdb::CoordBBox(openvdb::Coord(-100), openvdb::Coord(100)), ValueT(9.0));
+    grid->fill(openvdb::CoordBBox(openvdb::Coord(-50), openvdb::Coord(50)), ValueT(-9.0));
 
 
     openvdb::tools::sdfToFogVolume(*grid);
 
     EXPECT_TRUE(grid->background() < 1e-7);
 
-    openvdb::FloatGrid::ValueOnIter iter = grid->beginValueOn();
+    typename GridT::ValueOnIter iter = grid->beginValueOn();
     for (; iter; ++iter) {
         EXPECT_TRUE(iter.getValue() > 0.0);
         EXPECT_TRUE(std::abs(iter.getValue() - 1.0) < 1e-7);
     }
+}
+
+TEST_F(TestLevelSetUtil, testSDFToFogVolumeFloat)
+{
+    testSDFToFogVolumeImpl<openvdb::FloatGrid>();
+}
+
+TEST_F(TestLevelSetUtil, testSDFToFogVolumeHalf)
+{
+    testSDFToFogVolumeImpl<openvdb::HalfGrid>();
 }
 
 

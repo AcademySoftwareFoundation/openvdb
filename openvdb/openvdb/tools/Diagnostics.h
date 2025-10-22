@@ -12,6 +12,7 @@
 #define OPENVDB_TOOLS_DIAGNOSTICS_HAS_BEEN_INCLUDED
 
 #include <openvdb/Grid.h>
+#include <openvdb/Types.h> // for openvdb::is_floating_point
 #include <openvdb/math/Math.h>
 #include <openvdb/math/Vec3.h>
 #include <openvdb/math/Stencils.h>
@@ -428,7 +429,7 @@ template<typename GridT,
 struct CheckNormGrad
 {
     using ValueType = typename GridT::ValueType;
-    static_assert(std::is_floating_point<ValueType>::value,
+    static_assert(openvdb::is_floating_point<ValueType>::value,
         "openvdb::tools::CheckNormGrad requires a scalar, floating-point grid");
     using TileIterT = TreeIterT;
     using VoxelIterT = typename tree::IterTraits<typename TreeIterT::NodeT,
@@ -436,10 +437,22 @@ struct CheckNormGrad
             typename GridT::TreeType::LeafNodeType>::Type;
     using AccT = typename GridT::ConstAccessor;
 
+    /// @brief Helper function to compute invdx2 with warning suppression
+    static ValueType computeInvDx2(const GridT& grid) {
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wimplicit-float-conversion"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wfloat-conversion"
+#endif
+        return ValueType(1.0/math::Pow2(grid.voxelSize()[0]));
+#pragma GCC diagnostic pop
+    }
+
     /// @brief Constructor taking a grid and a range to be tested against.
     CheckNormGrad(const GridT&  grid, const ValueType& _min, const ValueType& _max)
         : acc(grid.getConstAccessor())
-        , invdx2(ValueType(1.0/math::Pow2(grid.voxelSize()[0])))
+        , invdx2(computeInvDx2(grid))
         , minVal2(_min*_min)
         , maxVal2(_max*_max)
     {

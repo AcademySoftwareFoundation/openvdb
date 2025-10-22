@@ -13,7 +13,11 @@
 
 namespace {
 // Absolute tolerance for floating-point equality comparisons
-const double TOLERANCE = 1.0e-5;
+template<typename T> inline const T Tolerance;
+template<> inline const float Tolerance<float> = 1.e-5f;
+template<> inline const double Tolerance<double> = 1.e-5f;
+template<> inline const typename openvdb::Half Tolerance<openvdb::Half> = static_cast<typename openvdb::Half>(0.00097656f);
+
 }
 
 
@@ -37,11 +41,20 @@ protected:
     static void executeTest(const GridPtr&, const TestVal*, size_t numVals);
 
     /// Initialize an arbitrary ValueType from a scalar.
-    static inline ValueT constValue(double d) { return ValueT(d); }
+    static inline ValueT constValue(double d) {
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wimplicit-float-conversion"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wfloat-conversion"
+#endif
+        return static_cast<ValueT>(d);
+#pragma GCC diagnostic pop
+    }
 
     /// Compare two numeric values for equality within an absolute tolerance.
     static inline bool relEq(const ValueT& v1, const ValueT& v2)
-        { return fabs(v1 - v2) <= TOLERANCE; }
+        { return fabs(v1 - v2) <= Tolerance<ValueT>; }
 };
 
 
@@ -67,7 +80,7 @@ inline bool
 TestQuadraticInterp<openvdb::Vec3SGrid>::relEq(
     const openvdb::Vec3s& v1, const openvdb::Vec3s& v2)
 {
-    return v1.eq(v2, float(TOLERANCE));
+    return v1.eq(v2, Tolerance<float>);
 }
 
 
@@ -161,6 +174,7 @@ TestQuadraticInterp<GridType>::test()
 }
 TEST_F(TestQuadraticInterpTest, testFloat) { TestQuadraticInterp<openvdb::FloatGrid>::test(); }
 TEST_F(TestQuadraticInterpTest, testDouble) { TestQuadraticInterp<openvdb::DoubleGrid>::test(); }
+TEST_F(TestQuadraticInterpTest, testHalf) { TestQuadraticInterp<openvdb::HalfGrid>::test(); }
 TEST_F(TestQuadraticInterpTest, testVec3S) { TestQuadraticInterp<openvdb::Vec3SGrid>::test(); }
 
 
@@ -222,6 +236,7 @@ TestQuadraticInterp<GridType>::testConstantValues()
 }
 TEST_F(TestQuadraticInterpTest, testConstantValuesFloat) { TestQuadraticInterp<openvdb::FloatGrid>::testConstantValues(); }
 TEST_F(TestQuadraticInterpTest, testConstantValuesDouble) { TestQuadraticInterp<openvdb::DoubleGrid>::testConstantValues(); }
+TEST_F(TestQuadraticInterpTest, testConstantValuesHalf) { TestQuadraticInterp<openvdb::HalfGrid>::testConstantValues(); }
 TEST_F(TestQuadraticInterpTest, testConstantValuesVec3S) { TestQuadraticInterp<openvdb::Vec3SGrid>::testConstantValues(); }
 
 
@@ -249,6 +264,7 @@ TestQuadraticInterp<GridType>::testFillValues()
 }
 TEST_F(TestQuadraticInterpTest, testFillValuesFloat) { TestQuadraticInterp<openvdb::FloatGrid>::testFillValues(); }
 TEST_F(TestQuadraticInterpTest, testFillValuesDouble) { TestQuadraticInterp<openvdb::DoubleGrid>::testFillValues(); }
+TEST_F(TestQuadraticInterpTest, testFillValuesHalf) { TestQuadraticInterp<openvdb::HalfGrid>::testFillValues(); }
 TEST_F(TestQuadraticInterpTest, testFillValuesVec3S) { TestQuadraticInterp<openvdb::Vec3SGrid>::testFillValues(); }
 
 
@@ -318,4 +334,5 @@ TestQuadraticInterp<GridType>::testNegativeIndices()
 }
 TEST_F(TestQuadraticInterpTest, testNegativeIndicesFloat) { TestQuadraticInterp<openvdb::FloatGrid>::testNegativeIndices(); }
 TEST_F(TestQuadraticInterpTest, testNegativeIndicesDouble) { TestQuadraticInterp<openvdb::DoubleGrid>::testNegativeIndices(); }
+TEST_F(TestQuadraticInterpTest, testNegativeIndicesHalf) { TestQuadraticInterp<openvdb::HalfGrid>::testNegativeIndices(); }
 TEST_F(TestQuadraticInterpTest, testNegativeIndicesVec3S) { TestQuadraticInterp<openvdb::Vec3SGrid>::testNegativeIndices(); }

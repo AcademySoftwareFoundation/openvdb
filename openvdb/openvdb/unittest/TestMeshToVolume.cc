@@ -8,6 +8,7 @@
 
 #include <gtest/gtest.h>
 #include <vector>
+#include <type_traits>
 
 class TestMeshToVolume: public ::testing::Test
 {
@@ -57,9 +58,12 @@ TEST_F(TestMeshToVolume, testUtils)
     EXPECT_TRUE( mZ == 9);
 }
 
-TEST_F(TestMeshToVolume, testConversion)
+template<typename GridT>
+void
+testConversionImpl()
 {
     using namespace openvdb;
+    using ValueT = typename GridT::ValueType;
 
     std::vector<Vec3s> points;
     std::vector<Vec4I> quads;
@@ -86,37 +90,44 @@ TEST_F(TestMeshToVolume, testConversion)
 
     tools::QuadAndTriangleDataAdapter<Vec3s, Vec4I> mesh(points, quads);
 
-    FloatGrid::Ptr grid = tools::meshToVolume<FloatGrid>(mesh, *xform);
+    typename GridT::Ptr grid = tools::meshToVolume<GridT>(mesh, *xform);
 
     EXPECT_TRUE(grid.get() != NULL);
     EXPECT_EQ(int(GRID_LEVEL_SET), int(grid->getGridClass()));
     EXPECT_EQ(1, int(grid->baseTree().leafCount()));
 
-    grid = tools::meshToLevelSet<FloatGrid>(*xform, points, quads);
+    grid = tools::meshToLevelSet<GridT>(*xform, points, quads);
 
     EXPECT_TRUE(grid.get() != NULL);
     EXPECT_EQ(int(GRID_LEVEL_SET), int(grid->getGridClass()));
     EXPECT_EQ(1, int(grid->baseTree().leafCount()));
 }
 
+TEST_F(TestMeshToVolume, testConversionFloat) {
+    testConversionImpl<openvdb::FloatGrid>();
+}
 
-TEST_F(TestMeshToVolume, testCreateLevelSetBox)
+template<typename GridT>
+void
+testCreateLevelSetBoxImpl()
 {
-    typedef openvdb::FloatGrid          FloatGrid;
-    typedef openvdb::Vec3s              Vec3s;
-    typedef openvdb::math::BBox<Vec3s>  BBoxs;
-    typedef openvdb::math::Transform    Transform;
+    // typedef openvdb::FloatGrid          FloatGrid;
+    using namespace openvdb;
+    using ValueT = typename GridT::ValueType;
+    using Vec3T = typename openvdb::math::Vec3<ValueT>;
+    using BBoxs = typename math::BBox<Vec3T>;
 
-    BBoxs bbox(Vec3s(0.0, 0.0, 0.0), Vec3s(1.0, 1.0, 1.0));
+    BBoxs bbox(Vec3T(0.0, 0.0, 0.0), Vec3T(1.0, 1.0, 1.0));
 
-    Transform::Ptr transform = Transform::createLinearTransform(0.1);
+    math::Transform::Ptr transform = math::Transform::createLinearTransform(0.1);
 
-    FloatGrid::Ptr grid = openvdb::tools::createLevelSetBox<FloatGrid>(bbox, *transform);
+    typename GridT::Ptr grid = openvdb::tools::createLevelSetBox<GridT>(bbox, *transform);
 
     double gridBackground = grid->background();
     double expectedBackground = transform->voxelSize().x() * double(openvdb::LEVEL_SET_HALF_WIDTH);
+    constexpr double tolerance = std::is_floating_point_v<typename GridT::ValueType> ? 1e-6 : 2e-4;
 
-    EXPECT_NEAR(expectedBackground, gridBackground, 1e-6);
+    EXPECT_NEAR(expectedBackground, gridBackground, tolerance);
 
     EXPECT_TRUE(grid->tree().leafCount() > 0);
 
@@ -129,3 +140,13 @@ TEST_F(TestMeshToVolume, testCreateLevelSetBox)
     EXPECT_TRUE(grid->tree().getValue(ijk) > 0.0f);
 }
 
+
+TEST_F(TestMeshToVolume, testCreateLevelSetBoxFloat)
+{
+    testCreateLevelSetBoxImpl<openvdb::FloatGrid>();
+}
+
+TEST_F(TestMeshToVolume, testCreateLevelSetBoxHalf)
+{
+    testCreateLevelSetBoxImpl<openvdb::HalfGrid>();
+}
