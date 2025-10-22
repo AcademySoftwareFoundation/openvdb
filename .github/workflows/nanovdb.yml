@@ -70,7 +70,6 @@ jobs:
       - uses: actions/checkout@v3
       - name: setup_cuda_12
         run: |
-          yum -y install yum-utils
           echo "/usr/local/cuda-12/bin" >> $GITHUB_PATH
           echo "LD_LIBRARY_PATH=/usr/local/cuda-12/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
       - name: build
