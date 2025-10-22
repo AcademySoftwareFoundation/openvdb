@@ -1,0 +1,54 @@
+
+name: HoudiniCache
+
+on:
+  push:
+    paths-ignore:
+      - 'pendingchanges/**'
+      - 'tsc/meetings/**'
+  pull_request:
+    paths-ignore:
+      - 'pendingchanges/**'
+      - 'tsc/meetings/**'
+
+jobs:
+  houdini-cache-linux:
+    if: ${{ github.repository_owner == 'AcademySoftwareFoundation' }}
+    runs-on: ubuntu-latest
+    name: houcache:${{ matrix.config.image }}:${{ matrix.config.hou_hash }}
+    container:
+      image: aswf/ci-base:${{ matrix.config.image }}
+    strategy:
+      matrix:
+        config:
+          - { image: '2026', hou_hash: '21_0' }
+          - { image: '2024', hou_hash: '20_5' }
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v3
+    - name: timestamp
+      id: timestamp
+      run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+    - name: fetch_houdini
+      uses: actions/cache/restore@v3
+      with:
+        path: hou
+        key: dummy-houdini${{ matrix.config.hou_hash }}-${{ steps.timestamp.outputs.timestamp }}
+        restore-keys: vdb-v5-houdini${{ matrix.config.hou_hash }}-
+    - name: validate_houdini
+      run: test -f "hou/hou.tar.gz"
+
+  houdini-cache-mac:
+    if: ${{ github.repository_owner == 'AcademySoftwareFoundation' }}
+    runs-on: macos-latest
+    name: houcache:macos:latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: fetch_houdini
+      uses: actions/cache/restore@v3
+      with:
+        path: hou
+        key: dummy-houdini
+        restore-keys: vdb-v5-houdini-macos-
+    - name: validate_houdini
+      run: test -f "hou/hou.tar.gz"
