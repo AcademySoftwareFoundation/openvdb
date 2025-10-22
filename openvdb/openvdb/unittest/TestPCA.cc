@@ -27,7 +27,7 @@ TEST_F(TestPCA, testPCA)
     {
         const auto& desc = leaf.attributeSet().descriptor();
         ASSERT_EQ(NamePair((typeNameAsString<math::Vec3<float>>()), points::NullCodec::name()), desc.type(desc.find(a.stretch))) << "line: "<< line;
-        ASSERT_EQ(NamePair((typeNameAsString<math::Mat3<float>>()), points::NullCodec::name()), desc.type(desc.find(a.rotation))) << "line: "<< line;
+        ASSERT_EQ(NamePair((typeNameAsString<math::Mat3<float>>()), points::NullCodec::name()), desc.type(desc.find(a.xform))) << "line: "<< line;
         ASSERT_EQ(NamePair((typeNameAsString<math::Vec3<double>>()), points::NullCodec::name()), desc.type(desc.find(a.positionWS))) << "line: "<< line;
         ASSERT_TRUE(desc.hasGroup(a.ellipses)) << "line: "<< line;
     };
@@ -35,7 +35,7 @@ TEST_F(TestPCA, testPCA)
     const auto CheckPCAAttributeValues = [&](
         const std::vector<math::Vec3<float>>& p,
         const std::vector<math::Vec3<float>>& stretches,
-        const std::vector<math::Mat3<float>>& rotations,
+        const std::vector<math::Mat3<float>>& xforms,
         const std::vector<math::Vec3<double>>& ws,
         const std::vector<bool>& memberships,
         const points::PointDataTree::LeafNodeType& leaf,
@@ -48,7 +48,7 @@ TEST_F(TestPCA, testPCA)
         const auto& desc = leaf.attributeSet().descriptor();
         points::AttributeHandle<math::Vec3<float>> pHandle(leaf.attributeArray(desc.find("P")));
         points::AttributeHandle<math::Vec3<float>> sHandle(leaf.attributeArray(desc.find(a.stretch)));
-        points::AttributeHandle<math::Mat3<float>> rHandle(leaf.attributeArray(desc.find(a.rotation)));
+        points::AttributeHandle<math::Mat3<float>> rHandle(leaf.attributeArray(desc.find(a.xform)));
         points::AttributeHandle<math::Vec3<double>> pwsHandle(leaf.attributeArray(desc.find(a.positionWS)));
         points::GroupHandle gHandle(leaf.groupHandle(a.ellipses));
         EXPECT_EQ(pHandle.size(), p.size());
@@ -62,7 +62,7 @@ TEST_F(TestPCA, testPCA)
                     << "line: "<< line << " index: " << i << " component " << j;
 
             for (size_t j = 0; j < 9; ++j)
-                EXPECT_NEAR(rHandle.get(i).asPointer()[j], rotations[i].asPointer()[j], tolerance)
+                EXPECT_NEAR(rHandle.get(i).asPointer()[j], xforms[i].asPointer()[j], tolerance)
                     << "line: "<< line << " index: " << i << " component " << j;
 
             for (size_t j = 0; j < 3; ++j)
@@ -117,7 +117,7 @@ TEST_F(TestPCA, testPCA)
         points::PcaAttributes a;
         points::PcaSettings s;
         a.stretch = "test1";
-        a.rotation = "test2";
+        a.xform = "test2";
         a.positionWS = "test3";
         a.ellipses = "test4";
 
@@ -131,7 +131,7 @@ TEST_F(TestPCA, testPCA)
             const auto& desc = leaf.attributeSet().descriptor();
             EXPECT_EQ(desc.find("P"), size_t(0));
             EXPECT_TRUE(leaf.hasAttribute(a.stretch));
-            EXPECT_TRUE(leaf.hasAttribute(a.rotation));
+            EXPECT_TRUE(leaf.hasAttribute(a.xform));
             EXPECT_TRUE(leaf.hasAttribute(a.positionWS));
             EXPECT_TRUE(leaf.attributeSet().descriptor().hasGroup(a.ellipses));
             EXPECT_EQ(desc.size(), size_t(5));
@@ -265,7 +265,7 @@ TEST_F(TestPCA, testPCA)
 
         points::PcaAttributes a;
         points::PcaSettings s;
-        s.searchRadius = std::numeric_limits<float>::max();
+        s.searchRadius = 1.0f;
         s.averagePositions = 0.0f; // disable position smoothing
         s.neighbourThreshold = 4; // more than 3, points should end up as spheres
         s.nonAnisotropicStretch = 2.0f;
@@ -290,7 +290,7 @@ TEST_F(TestPCA, testPCA)
 
         // Test points don't get classified if they are out of range
 
-        points::dropAttributes(points->tree(), {a.stretch, a.rotation, a.positionWS});
+        points::dropAttributes(points->tree(), {a.stretch, a.xform, a.positionWS});
         points::dropGroup(points->tree(), a.ellipses);
 
         s.searchRadius = 0.001f;
@@ -317,7 +317,7 @@ TEST_F(TestPCA, testPCA)
 
         // Test only the center point is classified as an ellips
 
-        points::dropAttributes(points->tree(), {a.stretch, a.rotation, a.positionWS});
+        points::dropAttributes(points->tree(), {a.stretch, a.xform, a.positionWS});
         points::dropGroup(points->tree(), a.ellipses);
 
         // each point is 0.01 distance away from the next, so setting to 0.01
@@ -350,7 +350,7 @@ TEST_F(TestPCA, testPCA)
         // ellips' with no rotation and simply stretched along their principal
         // axis (in this case Y) and squashed in the others
 
-        points::dropAttributes(points->tree(), {a.stretch, a.rotation, a.positionWS});
+        points::dropAttributes(points->tree(), {a.stretch, a.xform, a.positionWS});
         points::dropGroup(points->tree(), a.ellipses);
 
         // each point is 0.01 distance away from the next, so make sure
@@ -375,7 +375,7 @@ TEST_F(TestPCA, testPCA)
 
         pHandle = points::AttributeHandle<math::Vec3<float>>(leaf.attributeArray(desc->find("P")));
         points::AttributeHandle<math::Vec3<float>> sHandle(leaf.attributeArray(desc->find(a.stretch)));
-        points::AttributeHandle<math::Mat3<float>> rHandle(leaf.attributeArray(desc->find(a.rotation)));
+        points::AttributeHandle<math::Mat3<float>> rHandle(leaf.attributeArray(desc->find(a.xform)));
         points::AttributeHandle<math::Vec3<double>> pwsHandle(leaf.attributeArray(desc->find(a.positionWS)));
         points::GroupHandle::UniquePtr gHandle(new points::GroupHandle(leaf.groupHandle(a.ellipses)));
         EXPECT_EQ(pHandle.size(), posistions.size());
@@ -420,7 +420,7 @@ TEST_F(TestPCA, testPCA)
         // Test with greater allows anisotropy (i.e. lower ratio). Should get
         // more stretch and squashes. Compare these to the previous test
 
-        points::dropAttributes(points->tree(), {a.stretch, a.rotation, a.positionWS});
+        points::dropAttributes(points->tree(), {a.stretch, a.xform, a.positionWS});
         points::dropGroup(points->tree(), a.ellipses);
 
         s.allowedAnisotropyRatio = 0.0625f; // 4x more than 0.25
@@ -439,7 +439,7 @@ TEST_F(TestPCA, testPCA)
 
         pHandle = points::AttributeHandle<math::Vec3<float>>(leaf.attributeArray(desc->find("P")));
         sHandle = points::AttributeHandle<math::Vec3<float>>(leaf.attributeArray(desc->find(a.stretch)));
-        rHandle = points::AttributeHandle<math::Mat3<float>>(leaf.attributeArray(desc->find(a.rotation)));
+        rHandle = points::AttributeHandle<math::Mat3<float>>(leaf.attributeArray(desc->find(a.xform)));
         pwsHandle = points::AttributeHandle<math::Vec3<double>>(leaf.attributeArray(desc->find(a.positionWS)));
         gHandle = points::GroupHandle::UniquePtr(new points::GroupHandle(leaf.groupHandle(a.ellipses)));
         EXPECT_EQ(pHandle.size(), posistions.size());
@@ -479,5 +479,110 @@ TEST_F(TestPCA, testPCA)
         }
 
         EXPECT_EQ(i, 3);
+    }
+}
+
+
+TEST_F(TestPCA, testPCAxforms)
+{
+    // Create three grids:
+    //   points1 - stretch and rot
+    //   points2 - combined xform
+    //   points3 - stretch and quat
+
+    auto points1 = PointBuilder({
+            Vec3f(0.0f, 0.02f, 0.0f),
+            Vec3f(0.0f, 0.01f, 0.0f),
+            Vec3f(0.0f,  0.0f, 0.0f)
+        }).voxelsize(0.1).get();
+    auto points2 = PointBuilder({
+            Vec3f(0.0f, 0.02f, 0.0f),
+            Vec3f(0.0f, 0.01f, 0.0f),
+            Vec3f(0.0f,  0.0f, 0.0f)
+        }).voxelsize(0.1).get();
+    auto points3 = PointBuilder({
+            Vec3f(0.0f, 0.02f, 0.0f),
+            Vec3f(0.0f, 0.01f, 0.0f),
+            Vec3f(0.0f,  0.0f, 0.0f)
+        }).voxelsize(0.1).get();
+
+    points::PcaSettings s;
+    // each point is 0.01 distance away from the next, so make sure
+    // they all find each other i.e. min dist as 0.02
+    s.searchRadius = std::nextafter(0.02f, 1.0f);
+    s.neighbourThreshold = 2; // make sure they get classified
+    s.averagePositions = 0.0f; // disable position smoothing
+    s.allowedAnisotropyRatio = 0.25f;
+    s.nonAnisotropicStretch = 1.0f;
+
+    points::PcaAttributes a;
+    a.xformOutput = points::PcaAttributes::XformOutput::STRETCH_AND_UNITARY_MATRIX;
+    points::pca(*points1, s, a);
+
+    a.xformOutput = points::PcaAttributes::XformOutput::COMBINED_TRANSFORM;
+    points::pca(*points2, s, a);
+
+    a.xformOutput = points::PcaAttributes::XformOutput::STRETCH_AND_QUATERNION;
+    points::pca(*points3, s, a);
+
+    // Check attributes of each
+    const auto& desc1 = points1->tree().cbeginLeaf()->attributeSet().descriptor();
+    EXPECT_TRUE(points1->tree().cbeginLeaf()->hasAttribute("P"));
+    EXPECT_TRUE(points1->tree().cbeginLeaf()->hasAttribute("pws"));
+    EXPECT_TRUE(points1->tree().cbeginLeaf()->hasAttribute("stretch"));
+    EXPECT_TRUE(points1->tree().cbeginLeaf()->hasAttribute("xform"));
+    EXPECT_TRUE(points1->tree().cbeginLeaf()->attributeSet().descriptor().hasGroup("ellipsoids"));
+    EXPECT_EQ(desc1.size(), 5);
+    EXPECT_EQ(desc1.valueType(desc1.find("stretch")), std::string(typeNameAsString<math::Vec3<float>>()));
+    EXPECT_EQ(desc1.valueType(desc1.find("xform")),   std::string(typeNameAsString<math::Mat3<float>>()));
+
+    const auto& desc2 = points2->tree().cbeginLeaf()->attributeSet().descriptor();
+    EXPECT_TRUE(points2->tree().cbeginLeaf()->hasAttribute("P"));
+    EXPECT_TRUE(points2->tree().cbeginLeaf()->hasAttribute("pws"));
+    EXPECT_TRUE(points2->tree().cbeginLeaf()->hasAttribute("xform"));
+    EXPECT_TRUE(points2->tree().cbeginLeaf()->attributeSet().descriptor().hasGroup("ellipsoids"));
+    EXPECT_EQ(desc2.size(), 4);
+    EXPECT_EQ(desc2.valueType(desc2.find("xform")), std::string(typeNameAsString<math::Mat3<float>>()));
+
+    const auto& desc3 = points3->tree().cbeginLeaf()->attributeSet().descriptor();
+    EXPECT_TRUE(points3->tree().cbeginLeaf()->hasAttribute("P"));
+    EXPECT_TRUE(points3->tree().cbeginLeaf()->hasAttribute("pws"));
+    EXPECT_TRUE(points3->tree().cbeginLeaf()->hasAttribute("stretch"));
+    EXPECT_TRUE(points3->tree().cbeginLeaf()->hasAttribute("xform"));
+    EXPECT_TRUE(points3->tree().cbeginLeaf()->attributeSet().descriptor().hasGroup("ellipsoids"));
+    EXPECT_EQ(desc3.size(), 5);
+    EXPECT_EQ(desc3.valueType(desc3.find("stretch")), std::string(typeNameAsString<math::Vec3<float>>()));
+    EXPECT_EQ(desc3.valueType(desc3.find("xform")),   std::string(typeNameAsString<math::Quat<float>>()));
+
+    points::AttributeHandle<math::Vec3<float>> stretch1(points1->tree().cbeginLeaf()->attributeArray(desc1.find("stretch")));
+    points::AttributeHandle<math::Vec3<float>> stretch3(points3->tree().cbeginLeaf()->attributeArray(desc3.find("stretch")));
+    points::AttributeHandle<math::Mat3<float>> xform1(points1->tree().cbeginLeaf()->attributeArray(desc1.find("xform")));
+    points::AttributeHandle<math::Mat3<float>> xform2(points2->tree().cbeginLeaf()->attributeArray(desc2.find("xform")));
+    points::AttributeHandle<math::Quat<float>> xform3(points3->tree().cbeginLeaf()->attributeArray(desc3.find("xform")));
+
+    for (Index i = 0; i < 3; ++i)
+    {
+        // Check rot matrix is represented by quat output
+        math::Mat3<float> rot1 = xform1.get(i);
+        math::Vec3<float> str1 = stretch1.get(i);
+        math::Mat3<float> rot3(xform3.get(i)); // construct from quat
+
+        // Combined xform - decompose and check
+        math::Mat3<float> rot2, str2;
+        math::polarDecomposition(xform2.get(i), rot2, str2);
+        EXPECT_EQ(rot1, rot2);
+        EXPECT_EQ(str1, math::Vec3<float>(str2(0,0), str2(1,1), str2(2,2)));
+
+        // Check stretch+rot against stretch+quat
+        math::Vec3<float> str3 = stretch3.get(i);
+        const bool rot1IsReflection = math::isApproxEqual(rot1.det(), -1.0f);
+        if (rot1IsReflection) {
+            // flip last column (the same as the internal behaviour of pca)
+            rot1(0, 2) *= -1.0f;
+            rot1(1, 2) *= -1.0f;
+            rot1(2, 2) *= -1.0f;
+        }
+        EXPECT_EQ(rot1, rot3);
+        EXPECT_EQ(str1, str3);
     }
 }

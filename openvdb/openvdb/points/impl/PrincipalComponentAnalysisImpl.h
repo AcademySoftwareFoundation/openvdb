@@ -550,12 +550,15 @@ pca(PointDataGridT& points,
     const PcaAttributes& attrs)
 {
     static_assert(IsSpecializationOf<PointDataGridT, Grid>::value);
+    static constexpr size_t INVALID_IDX = std::numeric_limits<size_t>::max();
 
     using namespace pca_internal;
 
     using PointDataTreeT = typename PointDataGridT::TreeType;
     using LeafManagerT = tree::LeafManager<PointDataTreeT>;
     using LeafNodeT = typename PointDataTreeT::LeafNodeType;
+    using Vec3T = PcaAttributes::StretchT;
+    using Mat3T = PcaAttributes::RotationT;
 
     auto& tree = points.tree();
     const auto leaf = tree.cbeginLeaf();
@@ -583,20 +586,55 @@ pca(PointDataGridT& points,
     const double vs = xform.voxelSize()[0];
     LeafManagerT manager(tree);
 
-    // 1) Create persisting attributes
-    const size_t pwsIdx = initAttribute(attrs.positionWS, zeroVal<PcaAttributes::PosWsT>());
-    const size_t rotIdx = initAttribute(attrs.rotation, zeroVal<PcaAttributes::RotationT>());
-    const size_t strIdx = initAttribute(attrs.stretch, PcaAttributes::StretchT(settings.nonAnisotropicStretch));
-
-    // 2) Create temporary attributes
+    // Configure attributes names
     const auto& descriptor = leaf->attributeSet().descriptor();
-    const std::vector<std::string> temps {
+    std::vector<std::string> temps {
         descriptor.uniqueName("_weightedpositionsums"),
         descriptor.uniqueName("_inv_weightssum")
     };
 
+    // Separate rotation (Mat3) and stretch (Vec3f) are always required in the
+    // below calculations. If we're outputting rotation as a quarternion we
+    // must create a temporary covariance matrix attribute. Otherwise we reuse
+    // output xform matrix attribute for the intermediate convariance
+    // representation. Same applies for the stretch; if we're outputting a
+    // combined transform, we must create temporary stretch storage.
+    const std::string covAttribName = [&]() {
+        if (attrs.xformOutput == PcaAttributes::XformOutput::STRETCH_AND_QUATERNION) {
+            temps.emplace_back(descriptor.uniqueName("_covariance"));
+            return temps.back();
+        }
+        return attrs.xform;
+    }();
+
+    const std::string stretchAttribName = [&]() {
+        if (attrs.xformOutput == PcaAttributes::XformOutput::COMBINED_TRANSFORM)  {
+            temps.emplace_back(descriptor.uniqueName("_stretch"));
+            return temps.back();
+        }
+        return attrs.stretch;
+    }();
+
+    // 1) Create persisting attributes
+    const size_t pwsIdx = initAttribute(attrs.positionWS, zeroVal<PcaAttributes::PosWsT>());
+    const size_t rotIdx = initAttribute(covAttribName, zeroVal<Mat3T>());
+    const size_t qutIdx =
+        attrs.xformOutput == PcaAttributes::XformOutput::STRETCH_AND_QUATERNION ?
+            initAttribute(attrs.xform, zeroVal<PcaAttributes::QuatT>()) :
+            INVALID_IDX;
+    const size_t strIdx = initAttribute(stretchAttribName, PcaAttributes::StretchT(settings.nonAnisotropicStretch));
+
+    // 2) Create temporary attributes
     const size_t posSumIndex = initAttribute(temps[0], zeroVal<WeightedPositionSumT>());
     const size_t weightSumIndex = initAttribute(temps[1], zeroVal<WeightSumT>());
+
+OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+    // DEPRECATED, TO REMOVE
+    size_t oldRotAttr = INVALID_IDX;
+    if (!attrs.rotation.empty()) {
+        oldRotAttr = initAttribute(attrs.rotation, zeroVal<Mat3T>());
+    }
+OPENVDB_NO_DEPRECATION_WARNING_END
 
     // 3) Create ellipses group
     if (!leaf->attributeSet().descriptor().hasGroup(attrs.ellipses)) {
@@ -677,18 +715,22 @@ pca(PointDataGridT& points,
     timer.start("Decompose covariance matrices");
     manager.foreach([&](LeafNodeT& leafnode, size_t)
     {
-        AttributeWriteHandle<Vec3f, NullCodec> stretchHandle(leafnode.attributeArray(strIdx));
-        AttributeWriteHandle<math::Mat3s, NullCodec> rotHandle(leafnode.attributeArray(rotIdx));
+        AttributeWriteHandle<Vec3T, NullCodec> stretchHandle(leafnode.attributeArray(strIdx));
+        AttributeWriteHandle<Mat3T, NullCodec> rotHandle(leafnode.attributeArray(rotIdx));
+
+        // we don't use a group filter here since we need to set the rotation
+        // matrix for excluded points - the handle handles the potential array
+        // expansion
         GroupHandle ellipsesGroupHandle(leafnode.groupHandle(ellipsesIdx));
 
         for (Index idx = 0; idx < stretchHandle.size(); ++idx) {
             if (!ellipsesGroupHandle.get(idx)) {
-                rotHandle.set(idx, math::Mat3s::identity());
+                rotHandle.set(idx, Mat3T::identity());
                 continue;
             }
 
             // get singular values of the covariance matrix
-            math::Mat3s u;
+            Mat3T u;
             Vec3s sigma;
             decomposeSymmetricMatrix(rotHandle.get(idx), u, sigma);
 
@@ -704,9 +746,9 @@ pca(PointDataGridT& points,
             //   flexibility here, we can deal with smaller values, common for
             //   the case where a point only has one neighbour
             // @todo  have to manually construct the tolerance because
-            //   math::Tolerance<Vec3f> resolves to 0.0. fix this in the math lib
-            if (math::isApproxZero(sigma, Vec3f(1e-11f))) {
-                sigma = Vec3f::ones();
+            //   math::Tolerance<Vec3T> resolves to 0.0. fix this in the math lib
+            if (math::isApproxZero(sigma, Vec3T(1e-11f))) {
+                sigma = Vec3T::ones();
             }
 
             stretchHandle.set(idx, sigma);
@@ -729,22 +771,100 @@ pca(PointDataGridT& points,
     {
         points::GroupFilter filter(ellipsesIdx);
         filter.reset(leafnode);
-        AttributeWriteHandle<Vec3f, NullCodec> stretchHandle(leafnode.attributeArray(strIdx));
+        AttributeWriteHandle<Vec3T, NullCodec> stretchHandle(leafnode.attributeArray(strIdx));
 
         for (Index i = 0; i < stretchHandle.size(); ++i)
         {
             if (!filter.valid(&i)) continue;
-            const Vec3f stretch = stretchHandle.get(i);
-            OPENVDB_ASSERT(stretch != Vec3f::zero());
+            const Vec3T stretch = stretchHandle.get(i);
+            OPENVDB_ASSERT(stretch != Vec3T::zero());
             const float stretchScale = 1.0f / std::cbrt(stretch.product());
             stretchHandle.set(i, stretchScale * stretch);
         }
     });
 
+    // DEPRECATED, TO REMOVE
+    if (oldRotAttr != INVALID_IDX) {
+        // Copy xform to "rotation"
+        manager.foreach([&](LeafNodeT& leafnode, size_t) {
+            // pretty inefficient way to do this, but its deprecated behaviour
+            AttributeWriteHandle<Mat3T, NullCodec> oldRotHandle(leafnode.attributeArray(oldRotAttr));
+            Mat3T* R = initPcaArrayAttribute<Mat3T>(leafnode, rotIdx, /*fill=*/false);
+            for (Index idx = 0; idx < oldRotHandle.size(); ++idx) {
+                R[idx] = oldRotHandle.get(idx);
+            }
+        });
+    }
+
+    /// 8) Covert attributes to desired format
+    /// @note  We could consolidate this method into the parallel operators above,
+    ///   but in the future we may want to do more post-processing with these
+    ///   attributes (such as monitor and manipulate volume preservation, etc)
+    ///   which will require a separate step. For now, this step is relatively
+    ///   cheap.
+    timer.start("Coverting attributes");
+    if (attrs.xformOutput == PcaAttributes::XformOutput::STRETCH_AND_QUATERNION)
+    {
+        manager.foreach([&](LeafNodeT& leafnode, size_t) {
+            AttributeWriteHandle<Mat3T, NullCodec> rotHandle(leafnode.attributeArray(rotIdx));
+            PcaAttributes::QuatT* Q = initPcaArrayAttribute<PcaAttributes::QuatT>(leafnode, qutIdx, /*fill=*/false);
+            for (Index idx = 0; idx < rotHandle.size(); ++idx) {
+                Mat3T rot = rotHandle.get(idx);
+                // Tolerance for quaternion construction - can be pretty low as
+                // we assume our mats to be fully unitary (det of +/-1) at this
+                // point, but may have precision issues when checking it - also
+                // the quat class will try to perform a (mat * mat^t) to check
+                // unitary which is suseptible to small fp values causing
+                // drifts, so construct with UnsafeConstruct{}
+                constexpr float tolerance = 1e-3f;
+                // If we're a pure reflection (partial or global, det of -1),
+                // we need to convert to a rotation for quat support. Just flip
+                // the sign of one of the columns (axis) to change the
+                // "handedness" of the basis
+                // @todo  Consider never outputing reflection/always preserve
+                //   orientation? Handle this in the svd result?
+                if (math::isApproxEqual(rot.det(), -1.0f, tolerance))
+                {
+                    // Choosing to apply to last column
+                    rot(0,2) *= -1.0f;
+                    rot(1,2) *= -1.0f;
+                    rot(2,2) *= -1.0f;
+                    // Quat construtor throws so guard with our own check
+                    // @todo  Re-write quat class...
+                    if (math::isApproxEqual(rot.det(), 1.0f, tolerance)) {
+                        Q[idx] = PcaAttributes::QuatT(rot, PcaAttributes::QuatT::UnsafeConstruct{});
+                        continue;
+                    }
+                    OPENVDB_ASSERT_MESSAGE(false,
+                        "Unable to convert reflection to valid rotation matrix");
+                    // shouldn't be possible but fall back to ident
+                    Q[idx].setIdentity();
+                }
+                else {
+                    Q[idx] = PcaAttributes::QuatT(rot, PcaAttributes::QuatT::UnsafeConstruct{});
+                }
+            }
+            // remove matrix representation as we've covered it to a quaternion
+            rotHandle.collapse();
+        });
+    }
+    else if (attrs.xformOutput == PcaAttributes::XformOutput::COMBINED_TRANSFORM)
+    {
+        manager.foreach([&](LeafNodeT& leafnode, size_t) {
+            AttributeWriteHandle<Vec3T, NullCodec> stretchHandle(leafnode.attributeArray(strIdx));
+            Mat3T* R = initPcaArrayAttribute<Mat3T>(leafnode, rotIdx, /*fill=*/false);
+            for (Index idx = 0; idx < stretchHandle.size(); ++idx) {
+                R[idx] = R[idx].timesDiagonal(stretchHandle.get(idx));
+            }
+            // Remove individual scale components which have now been combined
+            stretchHandle.collapse();
+        });
+    }
+
     timer.stop();
     if (util::wasInterrupted(settings.interrupter)) return;
 
-    // 8) do laplacian position smoothing here as we have the weights already
+    /// 9) do laplacian position smoothing here as we have the weights already
     ///   calculated (calculates the smoothed kernel origins as described in
     ///   the paper). averagePositions value biases the smoothed positions
     ///   towards the weighted mean positions. 1.0  will use the weighted means
