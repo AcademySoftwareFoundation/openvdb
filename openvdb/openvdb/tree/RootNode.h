@@ -2383,70 +2383,10 @@ template<typename ChildT>
 inline bool
 RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
 {
+    io::checkFormatVersion(is);
+
     // Delete the existing tree.
     this->clear();
-
-    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_ROOTNODE_MAP) {
-        // Read and convert an older-format RootNode.
-
-        // For backward compatibility with older file formats, read both
-        // outside and inside background values.
-        is.read(reinterpret_cast<char*>(&mBackground), sizeof(ValueType));
-        ValueType inside;
-        is.read(reinterpret_cast<char*>(&inside), sizeof(ValueType));
-
-        io::setGridBackgroundValuePtr(is, &mBackground);
-
-        // Read the index range.
-        Coord rangeMin, rangeMax;
-        is.read(reinterpret_cast<char*>(rangeMin.asPointer()), 3 * sizeof(Int32));
-        is.read(reinterpret_cast<char*>(rangeMax.asPointer()), 3 * sizeof(Int32));
-
-        Index tableSize = 0, log2Dim[4] = { 0, 0, 0, 0 };
-        Int32 offset[3];
-        for (int i = 0; i < 3; ++i) {
-            offset[i] = rangeMin[i] >> ChildT::TOTAL;
-            rangeMin[i] = offset[i] << ChildT::TOTAL;
-            log2Dim[i] = 1 + util::FindHighestOn((rangeMax[i] >> ChildT::TOTAL) - offset[i]);
-            tableSize += log2Dim[i];
-            rangeMax[i] = (((1 << log2Dim[i]) + offset[i]) << ChildT::TOTAL) - 1;
-        }
-        log2Dim[3] = log2Dim[1] + log2Dim[2];
-        tableSize = 1U << tableSize;
-
-        // Read masks.
-        util::RootNodeMask childMask(tableSize), valueMask(tableSize);
-        childMask.load(is);
-        valueMask.load(is);
-
-        // Read child nodes/values.
-        for (Index i = 0; i < tableSize; ++i) {
-            // Compute origin = offset2coord(i).
-            Index n = i;
-            Coord origin;
-            origin[0] = (n >> log2Dim[3]) + offset[0];
-            n &= (1U << log2Dim[3]) - 1;
-            origin[1] = (n >> log2Dim[2]) + offset[1];
-            origin[2] = (n & ((1U << log2Dim[2]) - 1)) + offset[1];
-            origin <<= ChildT::TOTAL;
-
-            if (childMask.isOn(i)) {
-                // Read in and insert a child node.
-                ChildT* child = new ChildT(PartialCreate(), origin, mBackground);
-                child->readTopology(is);
-                mTable.emplace(origin, *child);
-            } else {
-                // Read in a tile value and insert a tile, but only if the value
-                // is either active or non-background.
-                ValueType value;
-                is.read(reinterpret_cast<char*>(&value), sizeof(ValueType));
-                if (valueMask.isOn(i) || (!math::isApproxEqual(value, mBackground))) {
-                    mTable.emplace(origin, Tile(value, valueMask.isOn(i)));
-                }
-            }
-        }
-        return true;
-    }
 
     // Read a RootNode that was stored in the current format.
 
