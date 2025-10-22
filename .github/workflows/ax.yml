@@ -68,14 +68,17 @@ jobs:
         # Only test unified builds (core+ax). weekly CI should test standalone
         # @note  LLVM 17 builds are incompatible with the vdb python plugin on linux
         config:
+          - { image: '2026',           cxx: 'clang++', build: 'Release', cmake: '' }
+          - { image: '2026',           cxx: 'g++',     build: 'Release', cmake: '' }
           - { image: '2025-clang19.1', cxx: 'clang++', build: 'Release', cmake: '' }
           - { image: '2025-clang19.1', cxx: 'g++',     build: 'Release', cmake: '' }
           - { image: '2025-clang19.1', cxx: 'clang++', build: 'Debug',   cmake: '' }
           - { image: '2025-clang18.1', cxx: 'clang++', build: 'Release', cmake: '' }
           - { image: '2024-clang17.2', cxx: 'clang++', build: 'Release', cmake: '-DOPENVDB_PYTHON_USE_AX=OFF' }
           - { image: '2024-clang16.2', cxx: 'clang++', build: 'Release', cmake: '' }
-          - { image: '2023-clang15',   cxx: 'clang++', build: 'Release', cmake: '' }
-          - { image: '2023-clang15',   cxx: 'g++',     build: 'Release', cmake: '' }
+          # Needed to test LLVM 15.X
+          - { image: '2023-clang15',   cxx: 'clang++', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+          - { image: '2023-clang15',   cxx: 'g++',     build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3

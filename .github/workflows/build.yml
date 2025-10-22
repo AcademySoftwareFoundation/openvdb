@@ -70,6 +70,9 @@ jobs:
     strategy:
       matrix:
         config:
+          - { cxx: clang++, image: '2026',           abi: '13', build: 'Release', cmake: '' }
+          - { cxx: g++,     image: '2026',           abi: '13', build: 'Release', cmake: '' }
+          - { cxx: clang++, image: '2026',           abi: '12', build: 'Debug',   cmake: '' }
           - { cxx: clang++, image: '2025-clang19.1', abi: '12', build: 'Release', cmake: '' }
           - { cxx: g++,     image: '2025-clang19.1', abi: '12', build: 'Release', cmake: '' }
           - { cxx: clang++, image: '2025-clang19.1', abi: '12', build: 'Debug',   cmake: '' }
