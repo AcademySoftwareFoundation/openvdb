@@ -47,7 +47,8 @@ jobs:
       run: ./ci/install_nanobind.sh 2.0.0
     - name: install_latex
       run: |
-        yum -y install texlive-latex-bin texlive-dvips texlive-collection-fontsrecommended texlive-collection-latexrecommended
+        dnf install -y epel-release
+        dnf install -y texlive-latex-bin texlive-dvips texlive-collection-fontsrecommended texlive-collection-latexrecommended
     - name: build
       run: >
         ./ci/build.sh -v
