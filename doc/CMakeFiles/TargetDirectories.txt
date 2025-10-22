@@ -1,0 +1,6 @@
+/home/sa3022/lib/openvdb/doc/CMakeFiles/doc.dir
+/home/sa3022/lib/openvdb/doc/CMakeFiles/edit_cache.dir
+/home/sa3022/lib/openvdb/doc/CMakeFiles/rebuild_cache.dir
+/home/sa3022/lib/openvdb/doc/CMakeFiles/list_install_components.dir
+/home/sa3022/lib/openvdb/doc/CMakeFiles/install.dir
+/home/sa3022/lib/openvdb/doc/CMakeFiles/install/local.dir
