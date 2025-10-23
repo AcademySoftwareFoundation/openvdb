@@ -1,2 +1,0 @@
-Added nanovdb::openToIndexVDB, which can convert an OpenVDB grid into a NanoVDB IndexGrid.
-Added new options "--index" and "--onIndex" to the command-line tool nanovdb_convert so it can produce IndexGrids 

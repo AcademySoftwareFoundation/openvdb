@@ -1,2 +1,0 @@
-WARNING: position arguments [input.vdb <output.vdb>] are deprecated. use -i and -o
-WARNING: no output VDB File specified - nothing will be written to disk

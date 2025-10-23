@@ -1,8 +1,0 @@
-OpenVDB:
-  New Features:
-    - Various level set constructors.
-      - tools::createLevelSetCapsule creates a grid containing a narrow-band level set representation of a capsule (tube with constant radius and sphere caps).
-      - tools::createLevelSetTaperedCapsule creates a grid containing a narrow-band level set representation of a tapered capsule (tube with sphere caps and different radii at both ends, or equivalently the convex hull of two spheres with possibly different centers and radii).
-      - tools::createLevelSetTubeComplex creates a grid containing a narrow-band level set representation of a tube complex (a collection of capsules or tapered capsules defined by endpoint coordinates and segment indices).
-      - tools::createLevelSetDilatedMesh creates a grid containing a narrow-band level set representation of a dilated surface mesh (dilated by a radius in all directions).
-    - Base class tools::ConvexVoxelizer, which can be inherited to implement a convex level set constructor.

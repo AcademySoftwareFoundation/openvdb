@@ -1,3 +1,0 @@
-
-bool b = false;
-b ? removefromgroup("notdead") : addtogroup("notdead");

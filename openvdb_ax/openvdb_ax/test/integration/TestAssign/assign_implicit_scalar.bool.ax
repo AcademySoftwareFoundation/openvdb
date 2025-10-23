@@ -1,6 +1,0 @@
-bool local = true;
-int32@testint32 = local;
-int64@testint64 = local;
-double@testdouble = local;
-float@testfloat = local;
-

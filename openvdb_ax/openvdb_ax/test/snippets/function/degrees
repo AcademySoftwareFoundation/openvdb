@@ -1,2 +1,0 @@
-double@test1 = degrees(1.5708);
-float@test2 = degrees(-1.1344f);

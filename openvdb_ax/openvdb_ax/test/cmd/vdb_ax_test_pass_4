@@ -1,3 +1,0 @@
-{
-    float@a += float@b;
-}

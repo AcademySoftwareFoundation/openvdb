@@ -1,8 +1,0 @@
-name: nanovdb_editor_env
-channels:
-  - conda-forge
-  - defaults
-dependencies:
-  - python=3.9
-  - pip
-  - numpy

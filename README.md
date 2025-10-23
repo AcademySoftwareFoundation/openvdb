@@ -1,127 +1,28 @@
-![OpenVDB](doc/img/banner.png)
+# *ƒ*(VDB)
 
-| OpenVDB |   AX   |  Nano  | Houdini | License | CII |
-| :----:  | :----: | :----: |  :----: | :-----: | :-: |
-| [![core](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/build.yml/badge.svg)](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/build.yml) | [![ax](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/ax.yml/badge.svg)](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/ax.yml) | [![nano](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/nanovdb.yml/badge.svg)](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/nanovdb.yml) | [![hou](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/houdini.yml/badge.svg)](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/houdini.yml) | [![License](https://img.shields.io/github/license/AcademySoftwareFoundation/openvdb)](LICENSE) | [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2774/badge)](https://bestpractices.coreinfrastructure.org/projects/2774) |
+## A New Home for ƒVDB
 
--------------------------------------------------------------------------------
+:warning: The public home for fVDB development is now located in the Academy Software Foundation OpenVDB Github Organization [https://github.com/openvdb](https://github.com/openvdb). :warning:
 
-[Website](https://www.openvdb.org) |
-[Discussion Forum](https://github.com/AcademySoftwareFoundation/openvdb/discussions) |
-[Documentation](https://www.openvdb.org/documentation/doxygen) |
-[Releases](https://github.com/AcademySoftwareFoundation/openvdb/releases) |
-[License](https://www.apache.org/licenses/LICENSE-2.0) |
-[Slack](https://slack.aswf.io/)
+All of the code and history for fVDB on the OpenVDB `feature/fvdb` branch has been moved to repositories in the OpenVDB Github Organization. In order to encourage movement to fVDB's new home in the OpenVDB Github Organization, we have removed the code from the head of this branch but the history remains.
 
-OpenVDB is an open source C++ library comprising a novel hierarchical data
-structure and a large suite of tools for the efficient storage and manipulation
-of sparse volumetric data discretized on three-dimensional grids. It was
-developed by DreamWorks Animation for use in volumetric applications typically
-encountered in feature film production.
+The components of fVDB have been split into the following repositories:
 
-### Development Repository
+### [fvdb-core](https://github.com/openvdb/fvdb-core)
 
-This GitHub repository hosts the trunk of the OpenVDB development. This implies
-that it is the newest public version with the latest features and bug fixes.
-However, it also means that it has not undergone a lot of testing and is
-generally less stable than the [production releases](https://github.com/AcademySoftwareFoundation/openvdb/releases).
+The fvdb-core repository houses the core library and PyTorch extension for ƒVDB. ƒVDB is a framework that provides differentiable, sparse volumetric operators built on top of NanoVDB and enables PyTorch users to utilize the NanoVDB data structure to build powerful and scalable spatial intelligence applications.
 
-### License
 
-OpenVDB is released under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0),
-which is a free, open source software license developed and maintained by the
-Apache Software Foundation.
+### [fvdb-examples](https://github.com/openvdb/fvdb-examples)
 
-The trademarks of any contributor to this project may not be used in
-association with the project without the contributor's express permission.
+The fvdb-examples repository contains examples of how to use the ƒVDB library to build spatial intelligence networks or pipelines. These are provided as reference for how to implement interesting or well-known methods and networks on top of ƒVDB including examples of pipelines that perform panoptic segmentation and depth reconstruction.
 
-NOTE: OpenVDB has completed re-licensing from [Mozilla Public License Version 2.0](https://www.mozilla.org/MPL/2.0/) to [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0). Please see the file RE-LICENSE_NOTE.txt for more details.
 
-### Contributing
+### [fvdb-reality-capture](https://github.com/openvdb/fvdb-reality-capture)
 
-OpenVDB welcomes contributions to the OpenVDB project. Please refer to the
-[contribution guidelines](CONTRIBUTING.md) for details on how to make a
-contribution.
+The fvdb-reality-capture repository contains examples of how to use the ƒVDB library to build reality capture pipelines centered on ƒVDB's 3D Gaussian splatting methods. This repository houses utilities and examples that illustrate how to train and render 3D Gaussian splatting models using ƒVDB as well as interesting methods that build upon the 3D Gaussian scene representation such as meshing.
 
--------------------------------------------------------------------------------
 
-### Developer Quick Start
+### [nanovdb-editor](https://github.com/openvdb/nanovdb-editor)
 
-The following provides basic installation examples for the core OpenVDB library.
-Other components, such as the python module, OpenVDB AX, NanoVDB and various
-executables, may require additional dependencies. See the
-[build documentation](https://www.openvdb.org/documentation/doxygen/build.html)
-for help with installations.
-
-##### Linux/MacOS
-
-```bash
-# Linux
-# @note If your distribution does not have required versions, consider using
-#   apt pinning. See the dependency documentation for more details.
-apt-get install -y libboost-iostreams-dev
-apt-get install -y libtbb-dev
-apt-get install -y libblosc-dev
-
-# MacOS
-# @note We are using homebrew in this example to install requried dependencies
-#  https://brew.sh/
-brew install boost
-brew install tbb
-brew install c-blosc
-```
-
-```bash
-git clone git@github.com:AcademySoftwareFoundation/openvdb.git
-cd openvdb
-mkdir build
-cd build
-cmake ..
-make -j4 && make install
-```
-
-##### Windows
-
-Note that the following commands have only been tested for 64bit systems/libraries.
-It is recommended to set the `VCPKG_DEFAULT_TRIPLET` environment variable to
-`x64-windows` to use 64-bit libraries by default. You will also require
-[Visual Studio](https://visualstudio.microsoft.com/downloads/) (for the MSVC C++
-runtime and compiler toolchains), [CMake](https://cmake.org/download/) and optionally
-[vcpkg](https://github.com/microsoft/vcpkg) for the installation of OpenVDB's
-dependencies.
-
-```bash
-vcpkg install zlib:x64-windows
-vcpkg install blosc:x64-windows
-vcpkg install tbb:x64-windows
-vcpkg install boost-iostreams:x64-windows
-vcpkg install boost-any:x64-windows
-vcpkg install boost-algorithm:x64-windows
-vcpkg install boost-interprocess:x64-windows
-```
-
-```bash
-git clone git@github.com:AcademySoftwareFoundation/openvdb.git
-cd openvdb
-mkdir build
-cd build
-cmake -DCMAKE_TOOLCHAIN_FILE=<PATH_TO_VCPKG>\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -A x64 ..
-cmake --build . --parallel 4 --config Release --target install
-```
-
-#### Building OpenVDB AX and NanoVDB
-
-OpenVDB AX depends on the core OpenVDB library. NanoVDB can be built with and
-without OpenVDB support. Note that NanoVDB has its own build instructions, see
-the [NanoVDB build documentation](https://www.openvdb.org/documentation/doxygen/NanoVDB_HowToBuild.html)
-for details.
-
-The following variables can be passed to the `cmake` configure command. There
-are more optional VDB components, see the [build documentation](https://www.openvdb.org/documentation/doxygen/build.html)
-for a complete list.
-
-| Option | Details |
-| :----  | :-----  |
-| `-D OPENVDB_BUILD_AX=ON`      | to enable OpenVDB AX |
-| `-D OPENVDB_BUILD_NANOVDB=ON` | to enable NanoVDB |
-| `-D NANOVDB_USE_OPENVDB=ON`   | to use OpenVDB in NanoVDB |
+The nanovdb-editor repository contains a library, python bindings and a standalone GUI application that allows you to view and edit NanoVDB.  nanovdb-editor also provides viewer functionality for fVDB.

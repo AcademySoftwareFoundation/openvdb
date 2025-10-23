@@ -1,9 +1,0 @@
-pip >= 23.3.1
-scikit_build_core
-wheel
-GitPython
-ninja
-nvidia-cudnn-cu12
-tqdm
-numpy
-torch
