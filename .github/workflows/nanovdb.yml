@@ -178,7 +178,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: install_gtest
-        run: ./ci/install_gtest.sh 1.15.2
+        run: ./ci/install_gtest.sh latest
       - name: build_and_test
         run: |
           cd nanovdb/nanovdb

@@ -238,8 +238,8 @@ it's a good idea to read the above section on
 
 DCC      | Supported Version | OpenVDB ABI |
 -------- | ----------------- | ----------- |
-Houdini  | 20.0              | 10          |
 Houdini  | 20.5              | 11          |
+Houdini  | 21.0              | 12          |
 
 @subsection buildBuildHou Building Against Houdini
 
@@ -508,7 +508,7 @@ You can add the below CMake snippet to your main `CMakeLists.txt` to bring in
 OpenVDB as a dependency:
 
 @code{.cmake}
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 list(APPEND CMAKE_MODULE_PATH "/location/of/openvdb/install/lib/cmake/OpenVDB")
 find_package(OpenVDB REQUIRED)
 target_link_libraries(myapp OpenVDB::openvdb)
@@ -601,10 +601,12 @@ OpenVDB uses [imported targets](https://cmake.org/cmake/help/latest/command/add_
 for all its dependencies. For imported Boost compatibility, the following
 versions of CMake are required:
 
-  - Boost 1.80 requires CMake 3.24.2 or newer.
-  - Boost 1.81 requires CMake 3.25.2 or newer.
   - Boost 1.82 requires CMake 3.27.0 or newer.
   - Boost 1.83 requires CMake 3.27.4 or newer.
+  - Boost 1.84 requires CMake 3.28.2 or newer.
+  - Boost 1.85 requires CMake 3.29.3 or newer.
+  - Boost 1.86 requires CMake 3.30.6, 3.31.1, or newer.
+  - Boost 1.87 requires CMake 3.31.4 or newer.
 
 Use the above list to identify the version of CMake you require for your version
 of Boost. Note that this may be implemented into the OpenVDB CMake in the future.

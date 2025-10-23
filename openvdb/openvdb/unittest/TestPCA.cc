@@ -568,7 +568,8 @@ TEST_F(TestPCA, testPCAxforms)
         math::Mat3<float> rot3(xform3.get(i)); // construct from quat
 
         // Combined xform - decompose and check
-        math::Mat3<float> rot2, str2;
+        math::Mat3<float> rot2 = math::Mat3<float>::zero();
+        math::Mat3<float> str2 = math::Mat3<float>::zero();
         math::polarDecomposition(xform2.get(i), rot2, str2);
         EXPECT_EQ(rot1, rot2);
         EXPECT_EQ(str1, math::Vec3<float>(str2(0,0), str2(1,1), str2(2,2)));
