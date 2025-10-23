@@ -1563,33 +1563,36 @@ TEST_F(TestOpenVDB, CNanoVDBTrilinearStencil)
 
 #endif
 
-TEST_F(TestOpenVDB, NanoToOpenVDB_BuildGrid)
+TEST_F(TestOpenVDB, NanoToOpenVDB_float)
 {// test build::Grid -> NanoVDB -> OpenVDB
-    nanovdb::tools::build::Grid<float> buildGrid(0.0f, "test", nanovdb::GridClass::LevelSet);
+    nanovdb::tools::build::Grid<float> buildGrid(0.0f, "test", nanovdb::GridClass::FogVolume);
     auto buildAcc = buildGrid.getAccessor();
     buildAcc.setValue(nanovdb::Coord(1,  2, 3), 1.0f);
     buildAcc.setValue(nanovdb::Coord(2, -2, 9), 2.0f);
+    EXPECT_EQ(0.0f, buildAcc.getValue(nanovdb::Coord(0,  0, 0)));
     EXPECT_EQ(1.0f, buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
     EXPECT_EQ(2.0f, buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
     auto handle = nanovdb::tools::createNanoGrid(buildGrid);
     EXPECT_TRUE(handle);
-    auto* meta = handle.gridMetaData();
-    EXPECT_TRUE(meta);
-    EXPECT_FALSE(meta->isEmpty());
-    EXPECT_EQ("test", std::string(meta->shortGridName()));
-    EXPECT_EQ(nanovdb::GridType::Float, meta->gridType());
-    EXPECT_EQ(nanovdb::GridClass::LevelSet, meta->gridClass());
-
     auto* nanoGrid = handle.grid<float>();
     EXPECT_TRUE(nanoGrid);
+    EXPECT_EQ(nanovdb::GridType::Float, nanoGrid->gridType());
+    EXPECT_EQ(nanovdb::GridClass::FogVolume, nanoGrid->gridClass());
     EXPECT_EQ("test", std::string(nanoGrid->gridName()));
+    EXPECT_EQ("float", std::string(nanovdb::toStr(mStr, nanoGrid->gridType())));
     auto nanoAcc = nanoGrid->getAccessor();
+    EXPECT_EQ(0.0f, nanoAcc.getValue(nanovdb::Coord(1,  0, 0)));
     EXPECT_EQ(1.0f, nanoAcc.getValue(nanovdb::Coord(1,  2, 3)));
     EXPECT_EQ(2.0f, nanoAcc.getValue(nanovdb::Coord(2, -2, 9)));
 
     auto openGrid = nanovdb::tools::nanoToOpenVDB(*nanoGrid);
     EXPECT_TRUE(openGrid);
+    EXPECT_EQ("test", openGrid->getName());
+    EXPECT_EQ("float", openGrid->valueType());
+    EXPECT_EQ(openvdb::GridClass::GRID_FOG_VOLUME, openGrid->getGridClass());
     auto openAcc = openGrid->getAccessor();
+    EXPECT_EQ(0.0f, openAcc.getValue(openvdb::Coord(0,  0, 0)));
     EXPECT_EQ(1.0f, openAcc.getValue(openvdb::Coord(1,  2, 3)));
     EXPECT_EQ(2.0f, openAcc.getValue(openvdb::Coord(2, -2, 9)));
 
@@ -1601,7 +1604,757 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_BuildGrid)
     EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
     EXPECT_EQ(2u, nanoGrid->activeVoxelCount());
     EXPECT_EQ(2u, openGrid->activeVoxelCount());
-} // NanoToOpenVDB_Basic
+}// NanoToOpenVDB_float
+
+TEST_F(TestOpenVDB, NanoToOpenVDB_double)
+{// test build::Grid -> NanoVDB -> OpenVDB
+    nanovdb::tools::build::Grid<double> buildGrid(0.0, "test", nanovdb::GridClass::FogVolume);
+    auto buildAcc = buildGrid.getAccessor();
+    buildAcc.setValue(nanovdb::Coord(1,  2, 3), 1.0);
+    buildAcc.setValue(nanovdb::Coord(2, -2, 9), 2.0);
+    EXPECT_EQ(0.0, buildAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1.0, buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0, buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto handle = nanovdb::tools::createNanoGrid(buildGrid);
+    EXPECT_TRUE(handle);
+    auto* nanoGrid = handle.grid<double>();
+    EXPECT_TRUE(nanoGrid);
+    EXPECT_EQ(nanovdb::GridType::Double, nanoGrid->gridType());
+    EXPECT_EQ(nanovdb::GridClass::FogVolume, nanoGrid->gridClass());
+    EXPECT_EQ("test", std::string(nanoGrid->gridName()));
+    EXPECT_EQ("double", std::string(nanovdb::toStr(mStr, nanoGrid->gridType())));
+    auto nanoAcc = nanoGrid->getAccessor();
+    EXPECT_EQ(0.0, nanoAcc.getValue(nanovdb::Coord(1,  0, 0)));
+    EXPECT_EQ(1.0, nanoAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0, nanoAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto openGrid = nanovdb::tools::nanoToOpenVDB(*nanoGrid);
+    EXPECT_TRUE(openGrid);
+    EXPECT_EQ("test", openGrid->getName());
+    EXPECT_EQ("double", openGrid->valueType());
+    EXPECT_EQ(openvdb::GridClass::GRID_FOG_VOLUME, openGrid->getGridClass());
+    auto openAcc = openGrid->getAccessor();
+    EXPECT_EQ(0.0, openAcc.getValue(openvdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1.0, openAcc.getValue(openvdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0, openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+    const auto nanoBBox = nanoGrid->indexBBox();
+    const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+    EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+    EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+    EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+    EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    EXPECT_EQ(2u, nanoGrid->activeVoxelCount());
+    EXPECT_EQ(2u, openGrid->activeVoxelCount());
+}// NanoToOpenVDB_double
+
+TEST_F(TestOpenVDB, NanoToOpenVDB_int32)
+{// test build::Grid -> NanoVDB -> OpenVDB
+    nanovdb::tools::build::Grid<int> buildGrid(0, "test", nanovdb::GridClass::Unknown);
+    auto buildAcc = buildGrid.getAccessor();
+    buildAcc.setValue(nanovdb::Coord(1,  2, 3), 1);
+    buildAcc.setValue(nanovdb::Coord(2, -2, 9), 2);
+    EXPECT_EQ(0, buildAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1, buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2, buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto handle = nanovdb::tools::createNanoGrid(buildGrid);
+    EXPECT_TRUE(handle);
+    auto* nanoGrid = handle.grid<int>();
+    EXPECT_TRUE(nanoGrid);
+    EXPECT_EQ(nanovdb::GridType::Int32, nanoGrid->gridType());
+    EXPECT_EQ(nanovdb::GridClass::Unknown, nanoGrid->gridClass());
+    EXPECT_EQ("test", std::string(nanoGrid->gridName()));
+    EXPECT_EQ("int32", std::string(nanovdb::toStr(mStr, nanoGrid->gridType())));
+    auto nanoAcc = nanoGrid->getAccessor();
+    EXPECT_EQ(0, nanoAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1, nanoAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2, nanoAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto openGrid = nanovdb::tools::nanoToOpenVDB(*nanoGrid);
+    EXPECT_TRUE(openGrid);
+    EXPECT_EQ("test", openGrid->getName());
+    EXPECT_EQ("int32", openGrid->valueType());
+    EXPECT_EQ(openvdb::GridClass::GRID_UNKNOWN, openGrid->getGridClass());
+    auto openAcc = openGrid->getAccessor();
+    EXPECT_EQ(0, openAcc.getValue(openvdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1, openAcc.getValue(openvdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2, openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+    const auto nanoBBox = nanoGrid->indexBBox();
+    const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+    EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+    EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+    EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+    EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    EXPECT_EQ(2u, nanoGrid->activeVoxelCount());
+    EXPECT_EQ(2u, openGrid->activeVoxelCount());
+}// NanoToOpenVDB_int32
+
+TEST_F(TestOpenVDB, NanoToOpenVDB_Vec3f)
+{// test build::Grid -> NanoVDB -> OpenVDB
+    nanovdb::tools::build::Grid<nanovdb::Vec3f> buildGrid(nanovdb::Vec3f(0), "test", nanovdb::GridClass::Staggered);
+    auto buildAcc = buildGrid.getAccessor();
+    buildAcc.setValue(nanovdb::Coord(1,  2, 3), nanovdb::Vec3f(1));
+    buildAcc.setValue(nanovdb::Coord(2, -2, 9), nanovdb::Vec3f(2));
+    EXPECT_EQ(nanovdb::Vec3f(0), buildAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(nanovdb::Vec3f(1), buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(nanovdb::Vec3f(2), buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto handle = nanovdb::tools::createNanoGrid(buildGrid);
+    EXPECT_TRUE(handle);
+    auto* nanoGrid = handle.grid<nanovdb::Vec3f>();
+    EXPECT_TRUE(nanoGrid);
+    EXPECT_EQ(nanovdb::GridType::Vec3f, nanoGrid->gridType());
+    EXPECT_EQ(nanovdb::GridClass::Staggered, nanoGrid->gridClass());
+    EXPECT_EQ("test", std::string(nanoGrid->gridName()));
+    EXPECT_EQ("Vec3f", std::string(nanovdb::toStr(mStr, nanoGrid->gridType())));
+    auto nanoAcc = nanoGrid->getAccessor();
+    EXPECT_EQ(nanovdb::Vec3f(0), nanoAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(nanovdb::Vec3f(1), nanoAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(nanovdb::Vec3f(2), nanoAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto openGrid = nanovdb::tools::nanoToOpenVDB(*nanoGrid);
+    EXPECT_TRUE(openGrid);
+    EXPECT_EQ("test", openGrid->getName());
+    EXPECT_EQ("vec3s", openGrid->valueType());
+    EXPECT_EQ(openvdb::GridClass::GRID_STAGGERED, openGrid->getGridClass());
+    auto openAcc = openGrid->getAccessor();
+    EXPECT_EQ(openvdb::Vec3f(0), openAcc.getValue(openvdb::Coord(0,  0, 0)));
+    EXPECT_EQ(openvdb::Vec3f(1), openAcc.getValue(openvdb::Coord(1,  2, 3)));
+    EXPECT_EQ(openvdb::Vec3f(2), openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+    const auto nanoBBox = nanoGrid->indexBBox();
+    const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+    EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+    EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+    EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+    EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    EXPECT_EQ(2u, nanoGrid->activeVoxelCount());
+    EXPECT_EQ(2u, openGrid->activeVoxelCount());
+}// NanoToOpenVDB_Vec3f
+
+TEST_F(TestOpenVDB, NanoToOpenVDB_Vec4f)
+{// test build::Grid -> NanoVDB -> OpenVDB
+    nanovdb::tools::build::Grid<nanovdb::Vec4d> buildGrid(nanovdb::Vec4d(0), "test", nanovdb::GridClass::Staggered);
+    auto buildAcc = buildGrid.getAccessor();
+    buildAcc.setValue(nanovdb::Coord(1,  2, 3), nanovdb::Vec4d(1));
+    buildAcc.setValue(nanovdb::Coord(2, -2, 9), nanovdb::Vec4d(2));
+    EXPECT_EQ(nanovdb::Vec4d(0), buildAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(nanovdb::Vec4d(1), buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(nanovdb::Vec4d(2), buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto handle = nanovdb::tools::createNanoGrid(buildGrid);
+    EXPECT_TRUE(handle);
+    auto* nanoGrid = handle.grid<nanovdb::Vec4d>();
+    EXPECT_TRUE(nanoGrid);
+    EXPECT_EQ(nanovdb::GridType::Vec4d, nanoGrid->gridType());
+    EXPECT_EQ(nanovdb::GridClass::Staggered, nanoGrid->gridClass());
+    EXPECT_EQ("test", std::string(nanoGrid->gridName()));
+    EXPECT_EQ("Vec4d", std::string(nanovdb::toStr(mStr, nanoGrid->gridType())));
+    auto nanoAcc = nanoGrid->getAccessor();
+    EXPECT_EQ(nanovdb::Vec4d(0), nanoAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(nanovdb::Vec4d(1), nanoAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(nanovdb::Vec4d(2), nanoAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto openGrid = nanovdb::tools::nanoToOpenVDB(*nanoGrid);
+    EXPECT_TRUE(openGrid);
+    EXPECT_EQ("test", openGrid->getName());
+    EXPECT_EQ("vec4d", openGrid->valueType());
+    EXPECT_EQ(openvdb::GridClass::GRID_STAGGERED, openGrid->getGridClass());
+    auto openAcc = openGrid->getAccessor();
+    EXPECT_EQ(openvdb::Vec4d(0), openAcc.getValue(openvdb::Coord(0,  0, 0)));
+    EXPECT_EQ(openvdb::Vec4d(1), openAcc.getValue(openvdb::Coord(1,  2, 3)));
+    EXPECT_EQ(openvdb::Vec4d(2), openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+    const auto nanoBBox = nanoGrid->indexBBox();
+    const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+    EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+    EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+    EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+    EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    EXPECT_EQ(2u, nanoGrid->activeVoxelCount());
+    EXPECT_EQ(2u, openGrid->activeVoxelCount());
+}// NanoToOpenVDB_Vec4d
+
+TEST_F(TestOpenVDB, NanoToOpenVDB_Fp4)
+{// test build::Grid -> NanoVDB -> OpenVDB
+    nanovdb::tools::build::Grid<nanovdb::Fp4> buildGrid(0.0f, "test", nanovdb::GridClass::FogVolume);// uses float for storage
+    auto buildAcc = buildGrid.getAccessor();
+    buildAcc.setValue(nanovdb::Coord(1,  2, 3), 1.0f);
+    buildAcc.setValue(nanovdb::Coord(2, -2, 9), 2.0f);
+    EXPECT_EQ(0.0f, buildAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1.0f, buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0f, buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto handle = nanovdb::tools::createNanoGrid(buildGrid);
+    EXPECT_TRUE(handle);
+    auto* nanoGrid = handle.grid<nanovdb::Fp4>();// uses Fp4 for storage
+    EXPECT_TRUE(nanoGrid);
+    EXPECT_EQ(nanovdb::GridType::Fp4, nanoGrid->gridType());
+    EXPECT_EQ(nanovdb::GridClass::FogVolume, nanoGrid->gridClass());
+    EXPECT_EQ("test", std::string(nanoGrid->gridName()));
+    EXPECT_EQ("Float4", std::string(nanovdb::toStr(mStr, nanoGrid->gridType())));
+    auto nanoAcc = nanoGrid->getAccessor();
+    EXPECT_EQ(0.0f, nanoAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1.0f, nanoAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0f, nanoAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto openGrid = nanovdb::tools::nanoToOpenVDB(*nanoGrid);
+    EXPECT_TRUE(openGrid);
+    EXPECT_EQ("test", openGrid->getName());
+    EXPECT_EQ("float", openGrid->valueType());
+    EXPECT_EQ(openvdb::GridClass::GRID_FOG_VOLUME, openGrid->getGridClass());
+    auto openAcc = openGrid->getAccessor();
+    EXPECT_EQ(0.0f, openAcc.getValue(openvdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1.0f, openAcc.getValue(openvdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0f, openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+    const auto nanoBBox = nanoGrid->indexBBox();
+    const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+    EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+    EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+    EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+    EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    EXPECT_EQ(2u, nanoGrid->activeVoxelCount());
+    EXPECT_EQ(2u, openGrid->activeVoxelCount());
+}// NanoToOpenVDB_Fp4
+
+TEST_F(TestOpenVDB, NanoToOpenVDB_Fp8)
+{// test build::Grid -> NanoVDB -> OpenVDB
+    nanovdb::tools::build::Grid<nanovdb::Fp8> buildGrid(0.0f, "test", nanovdb::GridClass::FogVolume);// uses float for storage
+    auto buildAcc = buildGrid.getAccessor();
+    buildAcc.setValue(nanovdb::Coord(1,  2, 3), 1.0f);
+    buildAcc.setValue(nanovdb::Coord(2, -2, 9), 2.0f);
+    EXPECT_EQ(0.0f, buildAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1.0f, buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0f, buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto handle = nanovdb::tools::createNanoGrid(buildGrid);
+    EXPECT_TRUE(handle);
+    auto* nanoGrid = handle.grid<nanovdb::Fp8>();// uses Fp8 for storage
+    EXPECT_TRUE(nanoGrid);
+    EXPECT_EQ(nanovdb::GridType::Fp8, nanoGrid->gridType());
+    EXPECT_EQ(nanovdb::GridClass::FogVolume, nanoGrid->gridClass());
+    EXPECT_EQ("test", std::string(nanoGrid->gridName()));
+    EXPECT_EQ("Float8", std::string(nanovdb::toStr(mStr, nanoGrid->gridType())));
+    auto nanoAcc = nanoGrid->getAccessor();
+    EXPECT_EQ(0.0f, nanoAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1.0f, nanoAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0f, nanoAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto openGrid = nanovdb::tools::nanoToOpenVDB(*nanoGrid);
+    EXPECT_TRUE(openGrid);
+    EXPECT_EQ("test", openGrid->getName());
+    EXPECT_EQ("float", openGrid->valueType());
+    EXPECT_EQ(openvdb::GridClass::GRID_FOG_VOLUME, openGrid->getGridClass());
+    auto openAcc = openGrid->getAccessor();
+    EXPECT_EQ(0.0f, openAcc.getValue(openvdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1.0f, openAcc.getValue(openvdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0f, openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+    const auto nanoBBox = nanoGrid->indexBBox();
+    const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+    EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+    EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+    EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+    EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    EXPECT_EQ(2u, nanoGrid->activeVoxelCount());
+    EXPECT_EQ(2u, openGrid->activeVoxelCount());
+}// NanoToOpenVDB_Fp8
+
+TEST_F(TestOpenVDB, NanoToOpenVDB_Fp16)
+{// test build::Grid -> NanoVDB -> OpenVDB
+    nanovdb::tools::build::Grid<nanovdb::Fp16> buildGrid(0.0f, "test", nanovdb::GridClass::FogVolume);// uses float for storage
+    auto buildAcc = buildGrid.getAccessor();
+    buildAcc.setValue(nanovdb::Coord(1,  2, 3), 1.0f);
+    buildAcc.setValue(nanovdb::Coord(2, -2, 9), 2.0f);
+    EXPECT_EQ(0.0f, buildAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1.0f, buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0f, buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto handle = nanovdb::tools::createNanoGrid(buildGrid);
+    EXPECT_TRUE(handle);
+    auto* nanoGrid = handle.grid<nanovdb::Fp16>();// uses Fp16 for storage
+    EXPECT_TRUE(nanoGrid);
+    EXPECT_EQ(nanovdb::GridType::Fp16, nanoGrid->gridType());
+    EXPECT_EQ(nanovdb::GridClass::FogVolume, nanoGrid->gridClass());
+    EXPECT_EQ("test", std::string(nanoGrid->gridName()));
+    EXPECT_EQ("Float16", std::string(nanovdb::toStr(mStr, nanoGrid->gridType())));
+    auto nanoAcc = nanoGrid->getAccessor();
+    EXPECT_EQ(0.0f, nanoAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1.0f, nanoAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0f, nanoAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto openGrid = nanovdb::tools::nanoToOpenVDB(*nanoGrid);
+    EXPECT_TRUE(openGrid);
+    EXPECT_EQ("test", openGrid->getName());
+    EXPECT_EQ("float", openGrid->valueType());
+    EXPECT_EQ(openvdb::GridClass::GRID_FOG_VOLUME, openGrid->getGridClass());
+    auto openAcc = openGrid->getAccessor();
+    EXPECT_EQ(0.0f, openAcc.getValue(openvdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1.0f, openAcc.getValue(openvdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0f, openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+    const auto nanoBBox = nanoGrid->indexBBox();
+    const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+    EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+    EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+    EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+    EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    EXPECT_EQ(2u, nanoGrid->activeVoxelCount());
+    EXPECT_EQ(2u, openGrid->activeVoxelCount());
+}// NanoToOpenVDB_Fp16
+
+TEST_F(TestOpenVDB, NanoToOpenVDB_FpN)
+{// test build::Grid -> NanoVDB -> OpenVDB
+    nanovdb::tools::build::Grid<nanovdb::FpN> buildGrid(0.0f, "test", nanovdb::GridClass::FogVolume);// uses float for storage
+    auto buildAcc = buildGrid.getAccessor();
+    buildAcc.setValue(nanovdb::Coord(1,  2, 3), 1.0f);
+    buildAcc.setValue(nanovdb::Coord(2, -2, 9), 2.0f);
+    EXPECT_EQ(0.0f, buildAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1.0f, buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0f, buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto handle = nanovdb::tools::createNanoGrid(buildGrid);
+    EXPECT_TRUE(handle);
+    auto* nanoGrid = handle.grid<nanovdb::FpN>();// uses FpN for storage
+    EXPECT_TRUE(nanoGrid);
+    EXPECT_EQ(nanovdb::GridType::FpN, nanoGrid->gridType());
+    EXPECT_EQ(nanovdb::GridClass::FogVolume, nanoGrid->gridClass());
+    EXPECT_EQ("test", std::string(nanoGrid->gridName()));
+    EXPECT_EQ("FloatN", std::string(nanovdb::toStr(mStr, nanoGrid->gridType())));
+    auto nanoAcc = nanoGrid->getAccessor();
+    EXPECT_EQ(0.0f, nanoAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1.0f, nanoAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0f, nanoAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    auto openGrid = nanovdb::tools::nanoToOpenVDB(*nanoGrid);
+    EXPECT_TRUE(openGrid);
+    EXPECT_EQ("test", openGrid->getName());
+    EXPECT_EQ("float", openGrid->valueType());
+    EXPECT_EQ(openvdb::GridClass::GRID_FOG_VOLUME, openGrid->getGridClass());
+    auto openAcc = openGrid->getAccessor();
+    EXPECT_EQ(0.0f, openAcc.getValue(openvdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1.0f, openAcc.getValue(openvdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0f, openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+    const auto nanoBBox = nanoGrid->indexBBox();
+    const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+    EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+    EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+    EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+    EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    EXPECT_EQ(2u, nanoGrid->activeVoxelCount());
+    EXPECT_EQ(2u, openGrid->activeVoxelCount());
+}// NanoToOpenVDB_FpN
+
+TEST_F(TestOpenVDB, NanoToOpenVDB_float_SideCar)
+{
+    nanovdb::tools::build::Grid<float> buildGrid(0.0f, "test", nanovdb::GridClass::LevelSet);
+    auto buildAcc = buildGrid.getAccessor();
+    buildAcc.setValue(nanovdb::Coord(1,  2, 3), 1.0f);
+    buildAcc.setValue(nanovdb::Coord(2, -2, 9), 2.0f);
+    EXPECT_EQ(0.0f, buildAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(1.0f, buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(2.0f, buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    // create an IndexGrid with a sidecar from the FloatGrid
+    auto handle = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<float>, nanovdb::ValueOnIndex>(buildGrid, 1u, false, false);
+    auto *idxGrid = handle.grid<nanovdb::ValueOnIndex>();
+    EXPECT_TRUE(idxGrid);
+    EXPECT_EQ(nanovdb::GridType::OnIndex, idxGrid->gridType());
+    EXPECT_EQ(nanovdb::GridClass::IndexGrid, idxGrid->gridClass());
+    EXPECT_EQ("test", std::string(idxGrid->gridName()));
+    EXPECT_EQ("OnIndex", std::string(nanovdb::toStr(mStr, idxGrid->gridType())));
+    EXPECT_EQ(2u, idxGrid->activeVoxelCount());
+    EXPECT_EQ(3u, idxGrid->valueCount());// active + background
+    EXPECT_EQ(1, idxGrid->blindDataCount());
+    const auto &metaData = idxGrid->blindMetaData(0);
+    EXPECT_TRUE(metaData.isValid());
+    EXPECT_EQ(std::string("channel_0"), std::string(metaData.mName));
+    EXPECT_EQ(idxGrid->valueCount(), metaData.mValueCount);// active + background
+    EXPECT_EQ(nanovdb::GridType::Float, metaData.mDataType);
+    EXPECT_EQ(nanovdb::GridBlindDataClass::ChannelArray, metaData.mDataClass);
+    EXPECT_EQ(nanovdb::GridBlindDataSemantic::LevelSet, metaData.mSemantic);
+    EXPECT_EQ(sizeof(float), metaData.mValueSize);
+    const float *sideCar = idxGrid->getBlindData<float>(0);
+    EXPECT_TRUE(sideCar);
+    auto idxAcc = idxGrid->getAccessor();
+    EXPECT_EQ(0u, idxAcc.getValue(nanovdb::Coord(0,  0, 0)));// background
+    EXPECT_EQ(0.0f, sideCar[idxAcc.getValue(nanovdb::Coord(0,  0, 0))]);
+    EXPECT_EQ(1.0f, sideCar[idxAcc.getValue(nanovdb::Coord(1,  2, 3))]);
+    EXPECT_EQ(2.0f, sideCar[idxAcc.getValue(nanovdb::Coord(2, -2, 9))]);
+
+    {// check nanoToOpenVDB(handle);
+        auto openBase = nanovdb::tools::nanoToOpenVDB(handle);// returns a GridBase
+        EXPECT_TRUE(openBase);
+        auto openGrid = openvdb::GridBase::grid<openvdb::FloatGrid>(openBase);// GridBase -> FloatGrid
+        EXPECT_TRUE(openGrid);
+        EXPECT_EQ(openvdb::GridClass::GRID_LEVEL_SET, openGrid->getGridClass());
+        EXPECT_EQ("", openGrid->getName());
+        EXPECT_EQ("float", openGrid->valueType());
+        EXPECT_EQ(2u, openGrid->activeVoxelCount());
+        auto openAcc = openGrid->getAccessor();
+        EXPECT_EQ(0.0f, openAcc.getValue(openvdb::Coord(0,  0, 0)));
+        EXPECT_EQ(1.0f, openAcc.getValue(openvdb::Coord(1,  2, 3)));
+        EXPECT_EQ(2.0f, openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+        const auto nanoBBox = idxGrid->indexBBox();
+        const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+        EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+        EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+        EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+        EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    }
+
+    {// check nanoToOpenVDB(*idxGrid, sideCar, nanovdb::GridClass::LevelSet, "test")
+        auto openGrid = nanovdb::tools::nanoToOpenVDB(*idxGrid, sideCar, nanovdb::GridClass::LevelSet, "test");
+        EXPECT_TRUE(openGrid);
+        EXPECT_EQ(openvdb::GridClass::GRID_LEVEL_SET, openGrid->getGridClass());
+        EXPECT_EQ("test", openGrid->getName());
+        EXPECT_EQ("float", openGrid->valueType());
+        EXPECT_EQ(2u, openGrid->activeVoxelCount());
+        auto openAcc = openGrid->getAccessor();
+        EXPECT_EQ(0.0f, openAcc.getValue(openvdb::Coord(0,  0, 0)));
+        EXPECT_EQ(1.0f, openAcc.getValue(openvdb::Coord(1,  2, 3)));
+        EXPECT_EQ(2.0f, openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+        const auto nanoBBox = idxGrid->indexBBox();
+        const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+        EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+        EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+        EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+        EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    }
+}// NanoToOpenVDB_float_SideCar
+
+TEST_F(TestOpenVDB, NanoToOpenVDB_float_SideCar_writeUncompressedGrid)
+{
+    {
+        nanovdb::tools::build::Grid<float> buildGrid(0.0f, "test", nanovdb::GridClass::FogVolume);
+        auto buildAcc = buildGrid.getAccessor();
+        buildAcc.setValue(nanovdb::Coord(1,  2, 3), 1.0f);
+        buildAcc.setValue(nanovdb::Coord(2, -2, 9), 2.0f);
+        EXPECT_EQ(0.0f, buildAcc.getValue(nanovdb::Coord(0,  0, 0)));
+        EXPECT_EQ(1.0f, buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
+        EXPECT_EQ(2.0f, buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+        // create an IndexGrid without a sidecar from the FloatGrid
+        auto handle = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<float>, nanovdb::ValueOnIndex>(buildGrid, 0u, false, false);
+        auto *idxGrid = handle.grid<nanovdb::ValueOnIndex>();
+        EXPECT_TRUE(idxGrid);
+        EXPECT_EQ(nanovdb::GridType::OnIndex, idxGrid->gridType());
+        EXPECT_EQ(nanovdb::GridClass::IndexGrid, idxGrid->gridClass());
+        EXPECT_EQ("test", std::string(idxGrid->gridName()));
+        EXPECT_EQ("OnIndex", std::string(nanovdb::toStr(mStr, idxGrid->gridType())));
+        EXPECT_EQ(2u, idxGrid->activeVoxelCount());
+        EXPECT_EQ(3u, idxGrid->valueCount());// active + background
+        EXPECT_EQ(0, idxGrid->blindDataCount());
+
+        // create a seperate sidecar and copy values
+        float sideCar[3];
+        EXPECT_TRUE(sideCar);
+        auto idxAcc = idxGrid->getAccessor();
+        sideCar[idxAcc.getValue(nanovdb::Coord(0,  0, 0))] = 0.0f;
+        sideCar[idxAcc.getValue(nanovdb::Coord(1,  2, 3))] = 1.0f;
+        sideCar[idxAcc.getValue(nanovdb::Coord(2, -2, 9))] = 2.0f;
+
+        EXPECT_EQ(0u, idxAcc.getValue(nanovdb::Coord(0,  0, 0)));// background
+        EXPECT_EQ(0.0f, sideCar[idxAcc.getValue(nanovdb::Coord(0,  0, 0))]);
+        EXPECT_EQ(1.0f, sideCar[idxAcc.getValue(nanovdb::Coord(1,  2, 3))]);
+        EXPECT_EQ(2.0f, sideCar[idxAcc.getValue(nanovdb::Coord(2, -2, 9))]);
+
+        // writeIndexGrid and sidecar to file
+        std::ofstream os("data/sideCar_raw.nvdb", std::ios::out | std::ios::binary | std::ios::trunc);
+        nanovdb::io::writeUncompressedGrid(os, idxGrid, sideCar, nanovdb::GridBlindDataSemantic::FogVolume);
+    }
+
+    using GridHandleT = nanovdb::GridHandle<nanovdb::HostBuffer>;
+    auto handles = nanovdb::io::readUncompressedGrids<GridHandleT, std::vector>("data/sideCar_raw.nvdb");
+    EXPECT_EQ(1u, handles.size());
+    auto *idxGrid = handles[0].grid<nanovdb::ValueOnIndex>();
+    EXPECT_TRUE(idxGrid);
+    EXPECT_EQ(nanovdb::GridType::OnIndex, idxGrid->gridType());
+    EXPECT_EQ(nanovdb::GridClass::IndexGrid, idxGrid->gridClass());
+    EXPECT_EQ("test", std::string(idxGrid->gridName()));
+    EXPECT_EQ("OnIndex", std::string(nanovdb::toStr(mStr, idxGrid->gridType())));
+    EXPECT_EQ(2u, idxGrid->activeVoxelCount());
+    EXPECT_EQ(3u, idxGrid->valueCount());// active + background
+    EXPECT_EQ(1u, idxGrid->blindDataCount());
+    const auto &metaData = idxGrid->blindMetaData(0);
+    EXPECT_TRUE(metaData.isValid());
+    EXPECT_EQ(std::string("channel_0"), std::string(metaData.mName));
+    EXPECT_EQ(idxGrid->valueCount(), metaData.mValueCount);// active + background
+    EXPECT_EQ(nanovdb::GridType::Float, metaData.mDataType);
+    EXPECT_EQ(nanovdb::GridBlindDataClass::ChannelArray, metaData.mDataClass);
+    EXPECT_EQ(nanovdb::GridBlindDataSemantic::FogVolume, metaData.mSemantic);
+    EXPECT_EQ(sizeof(float), metaData.mValueSize);
+    const float *sideCar = idxGrid->getBlindData<float>(0);
+    auto idxAcc = idxGrid->getAccessor();
+    EXPECT_EQ(0.0f, sideCar[idxAcc.getValue(nanovdb::Coord(0,  0, 0))]);
+    EXPECT_EQ(1.0f, sideCar[idxAcc.getValue(nanovdb::Coord(1,  2, 3))]);
+    EXPECT_EQ(2.0f, sideCar[idxAcc.getValue(nanovdb::Coord(2, -2, 9))]);
+
+    {// check nanoToOpenVDB(handle2);
+        auto openBase = nanovdb::tools::nanoToOpenVDB(handles[0]);// returns a GridBase
+        EXPECT_TRUE(openBase);
+        auto openGrid = openvdb::GridBase::grid<openvdb::FloatGrid>(openBase);// GridBase -> FloatGrid
+        EXPECT_TRUE(openGrid);
+        EXPECT_EQ(openvdb::GridClass::GRID_FOG_VOLUME, openGrid->getGridClass());
+        EXPECT_EQ("", openGrid->getName());
+        EXPECT_EQ("float", openGrid->valueType());
+        EXPECT_EQ(2u, openGrid->activeVoxelCount());
+        auto openAcc = openGrid->getAccessor();
+        EXPECT_EQ(0.0f, openAcc.getValue(openvdb::Coord(0,  0, 0)));
+        EXPECT_EQ(1.0f, openAcc.getValue(openvdb::Coord(1,  2, 3)));
+        EXPECT_EQ(2.0f, openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+        const auto nanoBBox = idxGrid->indexBBox();
+        const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+        EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+        EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+        EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+        EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    }
+
+    {// check nanoToOpenVDB(*idxGrid2, sideCar2, nanovdb::GridClass::LevelSet, "test")
+        auto openGrid = nanovdb::tools::nanoToOpenVDB(*idxGrid, sideCar, nanovdb::GridClass::LevelSet, "test");
+        EXPECT_TRUE(openGrid);
+        EXPECT_EQ(openvdb::GridClass::GRID_LEVEL_SET, openGrid->getGridClass());
+        EXPECT_EQ("test", openGrid->getName());
+        EXPECT_EQ("float", openGrid->valueType());
+        EXPECT_EQ(2u, openGrid->activeVoxelCount());
+        auto openAcc = openGrid->getAccessor();
+        EXPECT_EQ(0.0f, openAcc.getValue(openvdb::Coord(0,  0, 0)));
+        EXPECT_EQ(1.0f, openAcc.getValue(openvdb::Coord(1,  2, 3)));
+        EXPECT_EQ(2.0f, openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+        const auto nanoBBox = idxGrid->indexBBox();
+        const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+        EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+        EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+        EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+        EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    }
+}// NanoToOpenVDB_float_SideCar_writeUncompressedGrid
+
+#if 0// used to disable benchmark test
+TEST_F(TestOpenVDB, NanoToOpenVDB_float_SideCar_benchmark)
+{
+    static constexpr bool verbose = true;
+    auto openGrid1 = this->getSrcGrid(verbose, 0, 3);// level set of a bunny if available, else an octahedron
+    EXPECT_EQ(openvdb::GridClass::GRID_LEVEL_SET, openGrid1->getGridClass());
+    const auto openBBox = openGrid1->evalActiveVoxelBoundingBox();
+
+    if constexpr(verbose) mTimer.start("create a nanovdb::IndexGrid with a sidecar from the openvdb::FloatGrid");
+    auto handle = nanovdb::tools::createNanoGrid<openvdb::FloatGrid, nanovdb::ValueOnIndex>(*openGrid1, 1u, false, false);
+    if constexpr(verbose) mTimer.stop();
+    auto *nanoGrid = handle.grid<nanovdb::ValueOnIndex>();
+    const float *sideCar = nanoGrid->getBlindData<float>(0);
+    const auto nanoBBox = nanoGrid->indexBBox();
+    EXPECT_EQ(reinterpret_cast<const nanovdb::Coord&>(openBBox.min()), nanoBBox.min());
+    EXPECT_EQ(reinterpret_cast<const nanovdb::Coord&>(openBBox.max()), nanoBBox.max());
+
+    if constexpr(verbose) mTimer.start("create an openvdb::FloatGrid for a nanovdb::IndexGrid with a sidecar");
+#if 1
+    auto base = nanovdb::tools::nanoToOpenVDB(handle);
+    //auto base = nanovdb::tools::nanoToOpenVDB(*nanoGrid);
+    auto openGrid2 = openvdb::GridBase::grid<openvdb::FloatGrid>(base);
+#else
+    auto openGrid2 = nanovdb::tools::nanoToOpenVDB(*nanoGrid, sideCar, nanovdb::GridClass::LevelSet, "test");
+#endif
+    EXPECT_TRUE(openGrid2);
+    EXPECT_EQ(openvdb::GridClass::GRID_LEVEL_SET, openGrid2->getGridClass());
+    EXPECT_EQ(openBBox, openGrid2->evalActiveVoxelBoundingBox());
+    if constexpr(verbose) mTimer.stop();
+
+    auto kernel1 = [&](const openvdb::CoordBBox& bbox) {
+        auto nanoAcc = nanoGrid->getAccessor();
+        auto openAcc = openGrid1->getAccessor();
+        for (auto it = openBBox.begin(); it; ++it) {
+            if (!openAcc.isValueOn(*it)) continue;// ignore inactive values
+            EXPECT_EQ(sideCar[nanoAcc.getValue(reinterpret_cast<const nanovdb::Coord&>(*it))], openAcc.getValue(*it));
+        }
+    };
+
+    auto kernel2 = [&](const openvdb::CoordBBox& bbox) {
+        auto openAcc1 = openGrid1->getAccessor();
+        auto openAcc2 = openGrid2->getAccessor();
+        for (auto it = openBBox.begin(); it; ++it) {
+            EXPECT_EQ(openAcc1.getValue(*it), openAcc2.getValue(*it));
+        }
+    };
+
+    if constexpr(verbose) mTimer.start("Parallel unit test of openvdb and nanovdb grids");
+    tbb::parallel_for(openBBox, kernel1);
+
+    if constexpr(verbose) mTimer.restart("Parallel unit test of two openvdb grids");
+    tbb::parallel_for(openBBox, kernel2);
+    if constexpr(verbose) mTimer.stop();
+}// NanoToOpenVDB_float_SideCar_benchmark
+#endif
+
+TEST_F(TestOpenVDB, NanoToOpenVDB_ValueOnIndex_Vec3f_SideCar)
+{
+    nanovdb::tools::build::Grid<nanovdb::Vec3f> buildGrid(nanovdb::Vec3f(0.0f), "test", nanovdb::GridClass::Staggered);
+    auto buildAcc = buildGrid.getAccessor();
+    buildAcc.setValue(nanovdb::Coord(1,  2, 3), nanovdb::Vec3f(1.0f));
+    buildAcc.setValue(nanovdb::Coord(2, -2, 9), nanovdb::Vec3f(2.0f));
+    EXPECT_EQ(nanovdb::Vec3f(0.0f), buildAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(nanovdb::Vec3f(1.0f), buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(nanovdb::Vec3f(2.0f), buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    // create an IndexGrid with a sidecar from the FloatGrid
+    auto handle = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<nanovdb::Vec3f>, nanovdb::ValueOnIndex>(buildGrid, 1u, false, false);
+    auto *idxGrid = handle.grid<nanovdb::ValueOnIndex>();
+    EXPECT_TRUE(idxGrid);
+    EXPECT_EQ(nanovdb::GridType::OnIndex, idxGrid->gridType());
+    EXPECT_EQ(nanovdb::GridClass::IndexGrid, idxGrid->gridClass());
+    EXPECT_EQ("test", std::string(idxGrid->gridName()));
+    EXPECT_EQ("OnIndex", std::string(nanovdb::toStr(mStr, idxGrid->gridType())));
+    EXPECT_EQ(2u, idxGrid->activeVoxelCount());
+    EXPECT_EQ(3u, idxGrid->valueCount());// active + background
+    EXPECT_EQ(1, idxGrid->blindDataCount());
+    const auto &metaData = idxGrid->blindMetaData(0);
+    EXPECT_TRUE(metaData.isValid());
+    EXPECT_EQ(std::string("channel_0"), std::string(metaData.mName));
+    EXPECT_EQ(idxGrid->valueCount(), metaData.mValueCount);// active + background
+    EXPECT_EQ(nanovdb::GridType::Vec3f, metaData.mDataType);
+    EXPECT_EQ(nanovdb::GridBlindDataClass::ChannelArray, metaData.mDataClass);
+    EXPECT_EQ(nanovdb::GridBlindDataSemantic::Staggered, metaData.mSemantic);
+    EXPECT_EQ(sizeof(nanovdb::Vec3f), metaData.mValueSize);
+    const nanovdb::Vec3f *sideCar = idxGrid->getBlindData<nanovdb::Vec3f>(0);
+    EXPECT_TRUE(sideCar);
+    auto idxAcc = idxGrid->getAccessor();
+    EXPECT_EQ(0u, idxAcc.getValue(nanovdb::Coord(0, 0, 0)));// background
+    EXPECT_EQ(nanovdb::Vec3f(0.0f), sideCar[idxAcc.getValue(nanovdb::Coord(0,  0, 0))]);
+    EXPECT_EQ(nanovdb::Vec3f(1.0f), sideCar[idxAcc.getValue(nanovdb::Coord(1,  2, 3))]);
+    EXPECT_EQ(nanovdb::Vec3f(2.0f), sideCar[idxAcc.getValue(nanovdb::Coord(2, -2, 9))]);
+
+    {// check nanoToOpenVDB(handle);
+        auto openBase = nanovdb::tools::nanoToOpenVDB(handle);// returns a GridBase
+        EXPECT_TRUE(openBase);
+        auto openGrid = openvdb::GridBase::grid<openvdb::Vec3fGrid>(openBase);// GridBase -> FloatGrid
+        EXPECT_TRUE(openGrid);
+        EXPECT_EQ(openvdb::GridClass::GRID_STAGGERED, openGrid->getGridClass());
+        EXPECT_EQ("", openGrid->getName());
+        EXPECT_EQ("vec3s", openGrid->valueType());
+        EXPECT_EQ(2u, openGrid->activeVoxelCount());
+        auto openAcc = openGrid->getAccessor();
+        EXPECT_EQ(nanovdb::Vec3f(0.0f), openAcc.getValue(openvdb::Coord(0,  0, 0)));
+        EXPECT_EQ(nanovdb::Vec3f(1.0f), openAcc.getValue(openvdb::Coord(1,  2, 3)));
+        EXPECT_EQ(nanovdb::Vec3f(2.0f), openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+        const auto nanoBBox = idxGrid->indexBBox();
+        const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+        EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+        EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+        EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+        EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    }
+
+    {// check nanoToOpenVDB(*idxGrid, sideCar, nanovdb::GridClass::LevelSet, "test")
+        auto openGrid = nanovdb::tools::nanoToOpenVDB(*idxGrid, sideCar, nanovdb::GridClass::Staggered, "test");
+        EXPECT_TRUE(openGrid);
+        EXPECT_EQ(openvdb::GridClass::GRID_STAGGERED, openGrid->getGridClass());
+        EXPECT_EQ("test", openGrid->getName());
+        EXPECT_EQ("vec3s", openGrid->valueType());
+        EXPECT_EQ(2u, openGrid->activeVoxelCount());
+        auto openAcc = openGrid->getAccessor();
+        EXPECT_EQ(nanovdb::Vec3f(0.0f), openAcc.getValue(openvdb::Coord(0,  0, 0)));
+        EXPECT_EQ(nanovdb::Vec3f(1.0f), openAcc.getValue(openvdb::Coord(1,  2, 3)));
+        EXPECT_EQ(nanovdb::Vec3f(2.0f), openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+        const auto nanoBBox = idxGrid->indexBBox();
+        const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+        EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+        EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+        EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+        EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    }
+}// NanoToOpenVDB_ValueOnIndex_Vec3f_SideCar
+
+TEST_F(TestOpenVDB, NanoToOpenVDB_ValueIndex_Vec3f_SideCar)
+{
+    nanovdb::tools::build::Grid<nanovdb::Vec3f> buildGrid(nanovdb::Vec3f(0.0f), "test", nanovdb::GridClass::IndexGrid);
+    auto buildAcc = buildGrid.getAccessor();
+    buildAcc.setValue(nanovdb::Coord(1,  2, 3), nanovdb::Vec3f(1.0f));
+    buildAcc.setValue(nanovdb::Coord(2, -2, 9), nanovdb::Vec3f(2.0f));
+    EXPECT_EQ(nanovdb::Vec3f(0.0f), buildAcc.getValue(nanovdb::Coord(0,  0, 0)));
+    EXPECT_EQ(nanovdb::Vec3f(1.0f), buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
+    EXPECT_EQ(nanovdb::Vec3f(2.0f), buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
+
+    // create an IndexGrid with a sidecar from the FloatGrid
+    auto handle = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<nanovdb::Vec3f>, nanovdb::ValueIndex>(buildGrid, 1u, false, false);
+    auto *idxGrid = handle.grid<nanovdb::ValueIndex>();
+    EXPECT_TRUE(idxGrid);
+    EXPECT_EQ(nanovdb::GridType::Index, idxGrid->gridType());
+    EXPECT_EQ(nanovdb::GridClass::IndexGrid, idxGrid->gridClass());
+    EXPECT_EQ("test", std::string(idxGrid->gridName()));
+    EXPECT_EQ("Index", std::string(nanovdb::toStr(mStr, idxGrid->gridType())));
+    EXPECT_EQ(2u, idxGrid->activeVoxelCount());
+    EXPECT_EQ(1 + 2*512, idxGrid->valueCount());// 2 leaf nodes + background
+    EXPECT_EQ(1, idxGrid->blindDataCount());
+    const auto &metaData = idxGrid->blindMetaData(0);
+    EXPECT_TRUE(metaData.isValid());
+    EXPECT_EQ(std::string("channel_0"), std::string(metaData.mName));
+    EXPECT_EQ(idxGrid->valueCount(), metaData.mValueCount);// active + background
+    EXPECT_EQ(nanovdb::GridType::Vec3f, metaData.mDataType);
+    EXPECT_EQ(nanovdb::GridBlindDataClass::ChannelArray, metaData.mDataClass);
+    EXPECT_EQ(nanovdb::GridBlindDataSemantic::Unknown, metaData.mSemantic);
+    EXPECT_EQ(sizeof(nanovdb::Vec3f), metaData.mValueSize);
+    const nanovdb::Vec3f *sideCar = idxGrid->getBlindData<nanovdb::Vec3f>(0);
+    EXPECT_TRUE(sideCar);
+    auto idxAcc = idxGrid->getAccessor();
+    EXPECT_EQ(0u, idxAcc.getValue(nanovdb::Coord(-10,-10,-10)));// background
+    EXPECT_EQ(nanovdb::Vec3f(0.0f), sideCar[idxAcc.getValue(nanovdb::Coord(0,  0, 0))]);
+    EXPECT_EQ(nanovdb::Vec3f(1.0f), sideCar[idxAcc.getValue(nanovdb::Coord(1,  2, 3))]);
+    EXPECT_EQ(nanovdb::Vec3f(2.0f), sideCar[idxAcc.getValue(nanovdb::Coord(2, -2, 9))]);
+
+    {// check nanoToOpenVDB(handle);
+        auto openBase = nanovdb::tools::nanoToOpenVDB(handle);// returns a GridBase
+        EXPECT_TRUE(openBase);
+        auto openGrid = openvdb::GridBase::grid<openvdb::Vec3fGrid>(openBase);// GridBase -> FloatGrid
+        EXPECT_TRUE(openGrid);
+        EXPECT_EQ(openvdb::GridClass::GRID_UNKNOWN, openGrid->getGridClass());
+        EXPECT_EQ("", openGrid->getName());
+        EXPECT_EQ("vec3s", openGrid->valueType());
+        EXPECT_EQ(2u, openGrid->activeVoxelCount());
+        auto openAcc = openGrid->getAccessor();
+        EXPECT_EQ(nanovdb::Vec3f(0.0f), openAcc.getValue(openvdb::Coord(0,  0, 0)));
+        EXPECT_EQ(nanovdb::Vec3f(1.0f), openAcc.getValue(openvdb::Coord(1,  2, 3)));
+        EXPECT_EQ(nanovdb::Vec3f(2.0f), openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+        const auto nanoBBox = idxGrid->indexBBox();
+        const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+        EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+        EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+        EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+        EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    }
+
+    {// check nanoToOpenVDB(*idxGrid, sideCar, nanovdb::GridClass::LevelSet, "test")
+        auto openGrid = nanovdb::tools::nanoToOpenVDB(*idxGrid, sideCar, nanovdb::GridClass::Staggered, "test");
+        EXPECT_TRUE(openGrid);
+        EXPECT_EQ(openvdb::GridClass::GRID_STAGGERED, openGrid->getGridClass());
+        EXPECT_EQ("test", openGrid->getName());
+        EXPECT_EQ("vec3s", openGrid->valueType());
+        EXPECT_EQ(2u, openGrid->activeVoxelCount());
+        auto openAcc = openGrid->getAccessor();
+        EXPECT_EQ(nanovdb::Vec3f(0.0f), openAcc.getValue(openvdb::Coord(0,  0, 0)));
+        EXPECT_EQ(nanovdb::Vec3f(1.0f), openAcc.getValue(openvdb::Coord(1,  2, 3)));
+        EXPECT_EQ(nanovdb::Vec3f(2.0f), openAcc.getValue(openvdb::Coord(2, -2, 9)));
+
+        const auto nanoBBox = idxGrid->indexBBox();
+        const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
+        EXPECT_EQ(nanovdb::Coord(1,-2,3), nanoBBox.min());
+        EXPECT_EQ(openvdb::Coord(1,-2,3), openBBox.min());
+        EXPECT_EQ(nanovdb::Coord(2, 2,9), nanoBBox.max());
+        EXPECT_EQ(openvdb::Coord(2, 2,9), openBBox.max());
+    }
+}// NanoToOpenVDB_ValueIndex_Vec3f_SideCar
 
 TEST_F(TestOpenVDB, NanoToOpenVDB)
 {
@@ -2764,7 +3517,7 @@ TEST_F(TestOpenVDB, Benchmark_OpenVDB_PointDataGrid)
     EXPECT_TRUE(end);
     EXPECT_LT(begin, end);
 
-    // construct data structure
+    // construct data structureGridBlindDataSemantic
     timer.start("Building openvdb::PointDataGrid on CPU from "+std::to_string(pointCount)+" points");
     using PointIndexGrid = openvdb::tools::PointIndexGrid;
     const auto transform = openvdb::math::Transform::createLinearTransform(voxelSize);
