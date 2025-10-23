@@ -16,6 +16,7 @@ New features:
 - Added nanovdb/util/cuda/Injection.cuh, which facilitates sidecar data copying - on the GPU - in the overlap of two grids with different topology.
 - Added Mat classes and other math types to NanoVDB.
 - Major rewrite of nanovdb::NanoToOpenVDB, which now allows nanovdb::IndexGrids and blind (or sidecar) data to be converted into an openvdb grid.
+- Added support for LevelSet, FogVolume, and Staggered grid semantics. Added toGridClass and toSemantic to map Grid Blind data semantic to Grid class and vice versa.
 
 Improvements:
 - Improvements to mGPU grid building and introduction of a separate test executable for mGPU tests
