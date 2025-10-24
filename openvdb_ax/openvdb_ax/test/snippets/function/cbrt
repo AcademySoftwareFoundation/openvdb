@@ -1,2 +1,0 @@
-double@test1 = cbrt(729.0);
-float@test2 = cbrt(729.0f);

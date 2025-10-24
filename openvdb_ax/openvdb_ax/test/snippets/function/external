@@ -1,2 +1,0 @@
-@foo = external("float1");
-v@v = externalv("vector1");

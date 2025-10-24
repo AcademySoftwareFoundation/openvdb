@@ -1,5 +1,0 @@
-
-bool@testbool = true | false;
-int16@testint16 = 2 | 3;
-int32@testint32 = 2 | 3;
-int64@testint64 = 2l | 3l;

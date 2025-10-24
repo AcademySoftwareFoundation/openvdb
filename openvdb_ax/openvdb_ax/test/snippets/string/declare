@@ -1,2 +1,0 @@
-string test = "test";
-string@string_test = test;
