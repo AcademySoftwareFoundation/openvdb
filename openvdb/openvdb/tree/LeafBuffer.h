@@ -82,6 +82,12 @@ public:
     /// Allocate memory for this buffer if it has not already been allocated.
     bool allocate() { if (mData == nullptr) mData = new ValueType[SIZE]; return true; }
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
+    /// Enable out-of-core in the LeafBuffer.
+    void enableOutOfCore(SharedPtr<io::StreamMetadata>& meta, const std::streamoff& bufpos,
+        io::MappedFile::Ptr& mappedFile, const std::streamoff& maskpos);
+#endif
+
     /// Populate this buffer with a constant value.
     inline void fill(const ValueType&);
 
@@ -269,6 +275,20 @@ LeafBuffer<T, Log2Dim>::operator=(const LeafBuffer& other)
     return *this;
 }
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
+template<typename T, Index Log2Dim>
+void LeafBuffer<T, Log2Dim>::enableOutOfCore(
+    SharedPtr<io::StreamMetadata>& meta, const std::streamoff& bufpos,
+    io::MappedFile::Ptr& mappedFile, const std::streamoff& maskpos)
+{
+    this->setOutOfCore(true);
+    mFileInfo = new FileInfo;
+    mFileInfo->meta = meta;
+    mFileInfo->bufpos = bufpos;
+    mFileInfo->mapping = mappedFile;
+    mFileInfo->maskpos = maskpos;
+}
+#endif
 
 template<typename T, Index Log2Dim>
 inline void
