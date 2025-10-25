@@ -294,6 +294,15 @@ TEST_F(TestInternalNode, testUnsafe)
         internalNode.setValueOffUnsafe(33, 6.0f);
         EXPECT_TRUE(internalNode.isValueOff(33));
         EXPECT_EQ(internalNode.getValueUnsafe(33), 6.0f);
+
+        InternalNode::NodeMaskType tmpMask;
+        tmpMask.setOn(34);
+        tmpMask.setOn(36);
+        internalNode.setValueMaskUnsafe(tmpMask);
+        EXPECT_TRUE(internalNode.isValueOff(33));
+        EXPECT_TRUE(internalNode.isValueOn(34));
+        EXPECT_TRUE(internalNode.isValueOff(35));
+        EXPECT_TRUE(internalNode.isValueOn(36));
     }
 
     { // get child

@@ -1,0 +1,2 @@
+API changes:
+- Add InternalNode::setValueMaskUnsafe() to write a value mask directly.
