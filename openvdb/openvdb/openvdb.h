@@ -91,14 +91,12 @@ using VectorGrid   = Vec3fGrid;
 /// @{
 /// The floating point Grid types which OpenVDB will register by default.
 using RealGridTypes   = TypeList<FloatGrid, DoubleGrid>;
-/// The extended floating point Grid types which OpenVDB will register by default.
-using ExtendedRealGridTypes = RealGridTypes::Append<HalfGrid>;
 /// The integer Grid types which OpenVDB will register by default.
 using IntegerGridTypes = TypeList<Int32Grid, Int64Grid>;
 /// The scalar Grid types which OpenVDB will register by default. This is a
 /// combination of native floating point and integer grid types. Note that
 /// this list does not include Bool or Mask Grids.
-using NumericGridTypes  = ExtendedRealGridTypes::Append<IntegerGridTypes>;
+using NumericGridTypes  = RealGridTypes::Append<IntegerGridTypes>::Append<HalfGrid>;
 /// The Vec3 Grid types which OpenVDB will register by default.
 using Vec3GridTypes     = TypeList<Vec3IGrid, Vec3SGrid, Vec3DGrid>;
 
@@ -121,7 +119,6 @@ template <typename T> using ToTreeType = typename T::TreeType;
 /// @name Lists of native Tree Types
 /// @{
 using RealTreeTypes            = RealGridTypes::Transform<internal::ToTreeType>;
-using ExtendedRealTreeTypes    = ExtendedRealGridTypes::Transform<internal::ToTreeType>;
 using IntegerTreeTypes         = IntegerGridTypes::Transform<internal::ToTreeType>;
 using NumericTreeTypes         = NumericGridTypes::Transform<internal::ToTreeType>;
 using Vec3TreeTypes            = Vec3GridTypes::Transform<internal::ToTreeType>;
