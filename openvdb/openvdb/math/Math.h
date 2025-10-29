@@ -375,10 +375,6 @@ isApproxZero(const Type& x, const Type& tolerance)
 
 
 /// Return @c true if @a x is less than zero.
-inline bool
-isNegative(math::half& x) { return x.isNegative(); }
-
-/// Return @c true if @a x is less than zero.
 template<typename Type>
 inline bool
 isNegative(const Type& x) { return x < zeroVal<Type>(); }
