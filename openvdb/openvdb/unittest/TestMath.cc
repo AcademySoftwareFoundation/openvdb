@@ -240,12 +240,15 @@ TEST_F(TestMath, testAll)
         EXPECT_TRUE(!math::isNegative(1u));
         EXPECT_TRUE( math::isNegative(-1));
         EXPECT_TRUE(!math::isNegative( 1));
+        EXPECT_TRUE( math::isNegative(static_cast<Half>(-1.0)));
+        EXPECT_TRUE(!math::isNegative(static_cast<Half>(1.0)));
     }
     {// zeroVal
         EXPECT_EQ(zeroVal<bool>(), false);
         EXPECT_EQ(zeroVal<int>(), int(0));
         EXPECT_EQ(zeroVal<float>(), 0.0f);
         EXPECT_EQ(zeroVal<double>(), 0.0);
+        EXPECT_EQ(zeroVal<Half>(), static_cast<Half>(0.0));
         EXPECT_EQ(zeroVal<Vec3i>(), Vec3i(0,0,0));
         EXPECT_EQ(zeroVal<Vec3s>(), Vec3s(0,0,0));
         EXPECT_EQ(zeroVal<Vec3d>(), Vec3d(0,0,0));
@@ -383,4 +386,79 @@ TEST_F(TestMath, testMinMaxIndex)
     const openvdb::Vec3R j(1, 1, 1);
     EXPECT_EQ(size_t(2), openvdb::math::MinIndex(j));
     EXPECT_EQ(size_t(2), openvdb::math::MaxIndex(j));
+}
+
+TEST_F(TestMath, testMinMaxImpl)
+{
+    using namespace openvdb;
+    { // Test equality
+        const float a = 3.14;
+        const float b = 3.14;
+        const Half c = static_cast<Half>(a);
+        const Half d = static_cast<Half>(b);
+        EXPECT_EQ(&std::max(a, b), &math::internal::max_impl(a, b));
+        EXPECT_EQ(&std::max(a, b), &math::Max(a, b));
+        EXPECT_EQ(&std::max(c, d), &math::internal::max_impl(c, d));
+        EXPECT_EQ(&std::max(c, d), &math::Max(c, d));
+        EXPECT_EQ(&std::min(a, b), &math::internal::min_impl(a, b));
+        EXPECT_EQ(&std::min(a, b), &math::Min(a, b));
+        EXPECT_EQ(&std::min(c, d), &math::internal::min_impl(c, d));
+        EXPECT_EQ(&std::min(c, d), &math::Min(c, d));
+    }
+    { // Test float: a > b
+        const float a = 5.67f;
+        const float b = 2.34f;
+        const Half c = static_cast<Half>(a);
+        const Half d = static_cast<Half>(b);
+        EXPECT_EQ(math::Max(a, b), a);
+        EXPECT_EQ(&math::Max(a, b), &a);
+        EXPECT_EQ(math::Min(a, b), b);
+        EXPECT_EQ(&math::Min(a, b), &b);
+        EXPECT_EQ(math::Max(c, d), c);
+        EXPECT_EQ(&math::Max(c, d), &c);
+        EXPECT_EQ(math::Min(c, d), d);
+        EXPECT_EQ(&math::Min(c, d), &d);
+    }
+    { // Test float: b > a
+        const float a = 1.23f;
+        const float b = 9.87f;
+        const Half c = static_cast<Half>(a);
+        const Half d = static_cast<Half>(b);
+        EXPECT_EQ(math::Max(a, b), b);
+        EXPECT_EQ(&math::Max(a, b), &b);
+        EXPECT_EQ(math::Min(a, b), a);
+        EXPECT_EQ(&math::Min(a, b), &a);
+        EXPECT_EQ(math::Max(c, d), d);
+        EXPECT_EQ(&math::Max(c, d), &d);
+        EXPECT_EQ(math::Min(c, d), c);
+        EXPECT_EQ(&math::Min(c, d), &c);
+    }
+    { // Test with negative values
+        const float a = -2.5f;
+        const float b = -7.3f;
+        const Half c = static_cast<Half>(a);
+        const Half d = static_cast<Half>(b);
+        EXPECT_EQ(math::Max(a, b), a);
+        EXPECT_EQ(&math::Max(a, b), &a);
+        EXPECT_EQ(math::Min(a, b), b);
+        EXPECT_EQ(&math::Min(a, b), &b);
+        EXPECT_EQ(math::Max(c, d), c);
+        EXPECT_EQ(&math::Max(c, d), &c);
+        EXPECT_EQ(math::Min(c, d), d);
+        EXPECT_EQ(&math::Min(c, d), &d);
+    }
+    { // Test with mixed signs
+        const float a = -3.14f;
+        const float b = 2.71f;
+        const Half c = static_cast<Half>(a);
+        const Half d = static_cast<Half>(b);
+        EXPECT_EQ(math::Max(a, b), b);
+        EXPECT_EQ(&math::Max(a, b), &b);
+        EXPECT_EQ(math::Min(a, b), a);
+        EXPECT_EQ(&math::Min(a, b), &a);
+        EXPECT_EQ(math::Max(c, d), d);
+        EXPECT_EQ(&math::Max(c, d), &d);
+        EXPECT_EQ(math::Min(c, d), c);
+        EXPECT_EQ(&math::Min(c, d), &c);
+    }
 }

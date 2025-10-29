@@ -628,7 +628,7 @@ namespace internal {
 inline const math::half&
 max_impl(const math::half& a, const math::half& b)
 {
-    return a > b ? a : b;
+    return a < b ? b : a;
 }
 
 template<typename Type>
@@ -706,7 +706,7 @@ namespace internal {
 inline const math::half&
 min_impl(const math::half& a, const math::half& b)
 {
-    return a < b ? a : b;
+    return b < a ? b : a;
 }
 
 template<typename Type>
