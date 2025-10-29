@@ -52,24 +52,27 @@ struct EllipseIndicies
 {
     EllipseIndicies(const points::AttributeSet::Descriptor& desc,
             const std::string& rotation,
-            const std::string& pws)
-        : rotation(EllipseIndicies::getAttributeIndex<Mat3s>(desc, rotation, false))
+            const std::string& pws,
+            const bool xformIsQuat)
+        : xform(xformIsQuat ?
+            EllipseIndicies::getAttributeIndex<Quats>(desc, rotation, false) :
+            EllipseIndicies::getAttributeIndex<Mat3s>(desc, rotation, false))
         , positionws(EllipseIndicies::getAttributeIndex<Vec3d>(desc, pws, true)) {}
 
     bool hasWorldSpacePosition() const { return positionws != std::numeric_limits<size_t>::max(); }
 
-    const size_t rotation, positionws;
+    const size_t xform, positionws;
 
 private:
     template<typename ValueT>
     static inline size_t
     getAttributeIndex(const points::AttributeSet::Descriptor& desc,
                       const std::string& name,
-                      const bool allowMissing)
+                      const bool optional)
     {
         const size_t idx = desc.find(name);
         if (idx == points::AttributeSet::INVALID_POS) {
-            if (allowMissing) return std::numeric_limits<size_t>::max();
+            if (optional) return std::numeric_limits<size_t>::max();
             throw std::runtime_error("Missing attribute - " + name);
         }
         if (typeNameAsString<ValueT>() != desc.valueType(idx)) {
@@ -97,7 +100,6 @@ struct EllipsoidTransfer :
     // The precision of the kernel arithmetic
     using RealT = double;
 
-    using RotationHandleT = points::AttributeHandle<math::Mat3s>;
     using PHandleT   = points::AttributeHandle<Vec3f>;
     using PwsHandleT = points::AttributeHandle<Vec3d>;
 
@@ -113,19 +115,16 @@ struct EllipsoidTransfer :
             const std::unordered_map<const PointDataTree::LeafNodeType*, Index>* ids = nullptr)
         : BaseT(pidx, width, rt, source, filter, interrupt, surface, cpg, ids)
         , mIndices(indices)
-        , mRotationHandle()
         , mPositionWSHandle() {}
 
     EllipsoidTransfer(const EllipsoidTransfer& other)
         : BaseT(other)
         , mIndices(other.mIndices)
-        , mRotationHandle()
         , mPositionWSHandle() {}
 
     inline bool startPointLeaf(const PointDataTree::LeafNodeType& leaf)
     {
         const bool ret = this->BaseT::startPointLeaf(leaf);
-        mRotationHandle = std::make_unique<RotationHandleT>(leaf.constAttributeArray(mIndices.rotation));
         if (mIndices.hasWorldSpacePosition()) {
             mPositionWSHandle = std::make_unique<PwsHandleT>(leaf.constAttributeArray(mIndices.positionws));
         }
@@ -134,7 +133,8 @@ struct EllipsoidTransfer :
 
     inline void rasterizePoint(const Coord& ijk,
                     const Index id,
-                    const CoordBBox& bounds)
+                    const CoordBBox& bounds,
+                    const Mat3s& xform)
     {
         if (!BaseT::filter(id)) return;
 
@@ -148,8 +148,33 @@ struct EllipsoidTransfer :
             P = this->targetTransform().worldToIndex(PWS);
         }
 
+        // Evaluate any provided radius and apply it as a scale (in world space)
+        // to the current xform (which will also be in world space). We can
+        // skip this step if the xform is unitary, but we have to check every
+        // xform anyway.
         const auto& r = this->mRadius.eval(id);
-        Vec3f radius = r.get(); // index space radius
+        math::Mat3s xformws = xform.timesDiagonal(r.get() * this->mDx);
+
+        // Extract the final world space radius from the scale xform which
+        // takes into account any scale on the xform
+        Vec3f radius {
+            xformws.col(0).length(),
+            xformws.col(1).length(),
+            xformws.col(2).length()
+        };
+
+        // Normalize out the scale from out transform (i.e. make it unitary)
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                xformws(i,j) /= radius[j];
+            }
+        }
+
+        // finally put the combined radius back into index space
+        radius /= float(this->mDx);
+        OPENVDB_ASSERT(std::isfinite(radius.x()));
+        OPENVDB_ASSERT(std::isfinite(radius.y()));
+        OPENVDB_ASSERT(std::isfinite(radius.z()));
 
         // If we have a uniform radius, treat as a sphere
         // @todo  worth using a tolerance here in relation to the voxel size?
@@ -172,15 +197,13 @@ struct EllipsoidTransfer :
         const RealT min2 = fbr.minSq() == 0.0 ? -1.0 : fbr.minSq();
         const RealT max2 = fbr.maxSq();
 #endif
-
-        const math::Mat3s rotation = mRotationHandle->get(id);
-        const math::Mat3s ellipsoidTransform = rotation.timesDiagonal(radius);
         // @note  Extending the search by the halfband in this way will produce
         //  the desired halfband width, but will not necessarily mean that
         //  the ON values will be levelset up to positive (exterior) background
         //  value due to elliptical coordinates not being a constant distance
         //  apart
-        const Vec3d max = calcEllipsoidBoundMax(ellipsoidTransform) + r.halfband();
+        const math::Mat3s xformis = xform.timesDiagonal(r.get());
+        const Vec3d max = calcEllipsoidBoundMax(xformis) + r.halfband();
         CoordBBox intersectBox(Coord::round(P - max), Coord::round(P + max));
         intersectBox.intersect(bounds);
         if (intersectBox.empty()) return;
@@ -199,14 +222,14 @@ struct EllipsoidTransfer :
         // it back to our normal coordinate system.
         math::Mat3s invDiag;
         invDiag.setSymmetric(radInv, Vec3f(0));
-        const math::Mat3s ellipsoidInverse = invDiag * rotation.transpose();
+        const math::Mat3s ellipsoidInverse = invDiag * xformws.transpose();
 #else
         // Instead of trying to compute the distance from a point to a rotated
         // ellipse, stamp the ellipsoid by deforming the distance to the
-        // iterated voxel by the inverse rotation. Then calculate the distance
+        // iterated voxel by the inverse xform. Then calculate the distance
         // to the axis-aligned ellipse.
         const Vec3d radInv2 = 1.0f / math::Pow2(radius);
-        const math::Mat3s ellipsoidInverse = rotation.transpose();
+        const math::Mat3s ellipsoidInverse = xformws.transpose();
 #endif
 
         // We cache the multiples matrix for each axis component but essentially
@@ -316,21 +339,126 @@ struct EllipsoidTransfer :
         }
     }
 
-private:
+protected:
     const EllipseIndicies& mIndices;
-    std::unique_ptr<RotationHandleT> mRotationHandle;
+private:
     std::unique_ptr<PwsHandleT> mPositionWSHandle;
 };
 
+/// @brief  Specializations of the EllipsoidTransfer for different Xform
+///   attribute types.
+/// @todo This is a bit silly and is only required because doRasterizeSurface
+///   was designed for a specific templated transfer interface. This can easily
+///   be extended; instead of taking a specific set of template parameters on
+///   the TransferInterfaceT, it could append a variable <typename ...TArgsT>
+///   or simply take a typename ResolverT which resolved to the final transfer
+///   scheme type.
+template <typename SdfT,
+    typename PositionCodecT,
+    typename RadiusType,
+    typename FilterType,
+    bool CPG>
+struct EllipsoidTransferQuat final :
+    public EllipsoidTransfer<SdfT, PositionCodecT, RadiusType, FilterType, CPG>
+{
+    using BaseT = EllipsoidTransfer<SdfT, PositionCodecT, RadiusType, FilterType, CPG>;
+    using QuatHandleT = points::AttributeHandle<math::Quats>;
 
-template<typename RadiusType, typename MaskTreeT>
-struct EllipseSurfaceMaskOp
+    EllipsoidTransferQuat(const size_t pidx,
+            const Vec3i width,
+            const RadiusType& rt,
+            const math::Transform& source,
+            const FilterType& filter,
+            util::NullInterrupter* interrupt,
+            SdfT& surface,
+            const EllipseIndicies& indices,
+            Int64Tree* cpg = nullptr,
+            const std::unordered_map<const PointDataTree::LeafNodeType*, Index>* ids = nullptr)
+        : BaseT(pidx, width, rt, source, filter, interrupt, surface, indices, cpg, ids)
+        , mRotationHandle() {}
+
+    EllipsoidTransferQuat(const EllipsoidTransferQuat& other)
+        : BaseT(other)
+        , mRotationHandle() {}
+
+    inline bool startPointLeaf(const PointDataTree::LeafNodeType& leaf)
+    {
+        const bool ret = this->BaseT::startPointLeaf(leaf);
+        mRotationHandle = std::make_unique<QuatHandleT>(leaf.constAttributeArray(this->BaseT::mIndices.xform));
+        return ret;
+    }
+
+    inline void rasterizePoint(const Coord& ijk,
+                    const Index id,
+                    const CoordBBox& bounds)
+    {
+        Mat3s R;
+        R.setToRotation(mRotationHandle->get(id));
+        this->BaseT::rasterizePoint(ijk, id, bounds, R);
+    }
+
+private:
+    std::unique_ptr<QuatHandleT> mRotationHandle;
+};
+
+/// @brief  Specialization for mat3 types (see above comment)
+template <typename SdfT,
+    typename PositionCodecT,
+    typename RadiusType,
+    typename FilterType,
+    bool CPG>
+struct EllipsoidTransferMat3 final :
+    public EllipsoidTransfer<SdfT, PositionCodecT, RadiusType, FilterType, CPG>
+{
+    using BaseT = EllipsoidTransfer<SdfT, PositionCodecT, RadiusType, FilterType, CPG>;
+    using XformHandleT = points::AttributeHandle<math::Mat3s>;
+
+    EllipsoidTransferMat3(const size_t pidx,
+            const Vec3i width,
+            const RadiusType& rt,
+            const math::Transform& source,
+            const FilterType& filter,
+            util::NullInterrupter* interrupt,
+            SdfT& surface,
+            const EllipseIndicies& indices,
+            Int64Tree* cpg = nullptr,
+            const std::unordered_map<const PointDataTree::LeafNodeType*, Index>* ids = nullptr)
+        : BaseT(pidx, width, rt, source, filter, interrupt, surface, indices, cpg, ids)
+        , mXformHandle() {}
+
+    EllipsoidTransferMat3(const EllipsoidTransferMat3& other)
+        : BaseT(other)
+        , mXformHandle() {}
+
+    inline bool startPointLeaf(const PointDataTree::LeafNodeType& leaf)
+    {
+        const bool ret = this->BaseT::startPointLeaf(leaf);
+        mXformHandle.reset(new XformHandleT(leaf.constAttributeArray(this->BaseT::mIndices.xform)));
+        return ret;
+    }
+
+    inline void rasterizePoint(const Coord& ijk,
+                    const Index id,
+                    const CoordBBox& bounds)
+    {
+        this->BaseT::rasterizePoint(ijk, id, bounds, mXformHandle->get(id));
+    }
+
+private:
+    std::unique_ptr<XformHandleT> mXformHandle;
+};
+
+template<typename RadiusType,
+     typename XformT,
+     typename MaskTreeT>
+struct EllipseSurfaceMaskOp final
     : public rasterize_sdf_internal::SurfaceMaskOp<MaskTreeT>
 {
     using BaseT = rasterize_sdf_internal::SurfaceMaskOp<MaskTreeT>;
     using PointDataLeaf = points::PointDataTree::LeafNodeType;
     using LeafManagerT = tree::LeafManager<const points::PointDataTree>;
     using RadiusT = typename RadiusType::ValueType;
+    using RotationHandleT = points::AttributeHandle<XformT>;
     static const Index DIM = points::PointDataTree::LeafNodeType::DIM;
 
     EllipseSurfaceMaskOp(
@@ -360,65 +488,6 @@ struct EllipseSurfaceMaskOp
         this->BaseT::join(other);
     }
 
-    /// @brief  Fill activity by analyzing the radius values on points in this
-    ///   leaf. Ignored ellipsoid rotations which results in faster but over
-    ///   zealous activation region.
-    void fillFromStretch(const typename LeafManagerT::LeafNodeType& leaf)
-    {
-        Vec3f maxr(0);
-        RadiusType rad(mRadius);
-        rad.reset(leaf);
-        if constexpr(RadiusType::Fixed) {
-            maxr = rad.eval(0).get();
-        }
-        else {
-            for (Index i = 0; i < Index(rad.size()); ++i) {
-                maxr = math::maxComponent(maxr, rad.eval(i).get());
-            }
-        }
-
-        // The max stretch coefficient. We can't analyze each xyz component
-        // individually as we don't take into account the ellipse rotation, so
-        // have to expand the worst case uniformly
-        const Real maxRadius = std::max(maxr.x(), std::max(maxr.y(), maxr.z()));
-
-        // @note  This addition of the halfband here doesn't take into account
-        //   the squash on the halfband itself. The subsequent rasterizer
-        //   squashes the halfband but probably shouldn't, so although this
-        //   expansion is more then necessary, I'm leaving the logic here for
-        //   now. We ignore stretches as these are capped to the half band
-        //   length anyway
-        const Vec3i dist = Vec3i(static_cast<int32_t>(math::Round(maxRadius + mHalfband)));
-        if (!mIndices.hasWorldSpacePosition()) {
-            if (!this->activate(leaf, dist)) return; // empty node
-            /// @todo deactivate min
-            mMaxDist = math::maxComponent(mMaxDist, dist);
-        }
-        else {
-            // Positions may have been smoothed, so we need to account for that
-            points::AttributeHandle<Vec3d> pwsHandle(leaf.constAttributeArray(mIndices.positionws));
-            if (pwsHandle.size() == 0) return; // no positions?
-            Vec3d maxPos(std::numeric_limits<Real>::lowest()),
-                  minPos(std::numeric_limits<Real>::max());
-            for (Index i = 0; i < Index(pwsHandle.size()); ++i)
-            {
-                const Vec3d Pws = pwsHandle.get(i);
-                minPos = math::minComponent(minPos, Pws);
-                maxPos = math::maxComponent(maxPos, Pws);
-            }
-
-            // Convert point bounds to surface transform, expand and fill
-            CoordBBox surfaceBounds(
-                Coord::round(this->mSurfaceTransform.worldToIndex(minPos)),
-                Coord::round(this->mSurfaceTransform.worldToIndex(maxPos)));
-            surfaceBounds.min() -= Coord(dist);
-            surfaceBounds.max() += Coord(dist);
-            this->activate(surfaceBounds);
-            /// @todo deactivate min
-            this->updateMaxLookup(minPos, maxPos, dist, leaf);
-        }
-    }
-
     /// @brief  Fill activity by analyzing the axis aligned ellipse bounding
     ///   boxes on points in this leaf. Slightly slower than just looking at
     ///   ellipse stretches but produces a more accurate/tighter activation
@@ -427,23 +496,12 @@ struct EllipseSurfaceMaskOp
     {
         RadiusType rad(mRadius);
         rad.reset(leaf);
-        const Vec3f radius0 = rad.eval(0).get();
-
-        if constexpr(RadiusType::Fixed) {
-            // If the radius is fixed and uniform, don't bother evaluating the
-            // rotations (we could just fall back to the spherical transfer...)
-            const bool isSphere = (radius0.x() == radius0.y()) && (radius0.x() == radius0.z());
-            if (isSphere) {
-                this->fillFromStretch(leaf);
-                return;
-            }
-        }
 
         Vec3d maxPos(std::numeric_limits<Real>::lowest()),
               minPos(std::numeric_limits<Real>::max());
 
         // Compute min/max point leaf positions
-        if (!mIndices.hasWorldSpacePosition())
+        if (mIndices.positionws == std::numeric_limits<size_t>::max())
         {
             const CoordBBox box = this->getActiveBoundingBox(leaf);
             if (box.empty()) return;
@@ -463,40 +521,32 @@ struct EllipseSurfaceMaskOp
             }
         }
 
-        // Compute max ellipse bounds
-        points::AttributeHandle<math::Mat3s> rotHandle(leaf.constAttributeArray(mIndices.rotation));
-        float maxUniformRadius(0);
-        Vec3f r(radius0);
+        // Compute max ellips bounds
         Vec3d maxBounds(0);
+        RotationHandleT xformHandle(leaf.constAttributeArray(mIndices.xform));
 
-        for (Index i = 0; i < rotHandle.size(); ++i)
+        for (Index i = 0; i < xformHandle.size(); ++i)
         {
-            // If the radius is Fixed, we know we have non-uniform components
-            // If the radius isn't fixed, check uniformity
-            if constexpr(!RadiusType::Fixed)
-            {
-                r = rad.eval(i).get();
-                const bool isSphere = (r.x() == r.y()) && (r.x() == r.z());
-                if (isSphere) {
-                    // If this point is a sphere, we don't need to look at the rotations
-                    maxUniformRadius = std::max(maxUniformRadius, float(r.x()));
-                    continue;
-                }
+            math::Mat3s xform;
+            if constexpr (std::is_same_v<XformT, math::Mat3s>) {
+                xform = xformHandle.get(i);
             }
-
-            // compute AABB of ellipse
-            const math::Mat3s rotation = rotHandle.get(i);
-            const math::Mat3s ellipsoidTransform = rotation.timesDiagonal(r);
-            const Vec3d bounds = calcUnitEllipsoidBoundMaxSq(ellipsoidTransform);
+            else {
+                // expected quaternion
+                xform.setToRotation(xformHandle.get(i));
+            }
+            // We used to optimize for uniform radius here, but since the xform
+            // is now allowed to contain scale (i.e. not necessarily unitary),
+            // its simpler to just compute the AABB of the ellipse (in index
+            // space) than to figure out if it contains scale and normalize it
+            const math::Mat3s xformis = xform.timesDiagonal(rad.eval(i).get());
+            const Vec3d bounds = calcUnitEllipsoidBoundMaxSq(xformis);
             maxBounds = math::maxComponent(maxBounds, bounds);
         }
 
         for (size_t i = 0; i < 3; ++i) {
             // We don't do the sqrt per point so resolve the actual maxBounds now
             maxBounds[i] = std::sqrt(maxBounds[i]);
-            // Account for uniform stretch values - compare the ellipse to isolated
-            // points and choose the largest radius of the two
-            maxBounds[i] = std::max(double(maxUniformRadius), maxBounds[i]);
         }
 
         // @note  This addition of the halfband here doesn't take into account
@@ -577,13 +627,15 @@ private:
 
 template <typename PointDataGridT,
     typename SdfT,
-    typename SettingsT>
+    typename SettingsT,
+    typename XformT>
 GridPtrVec
 rasterizeEllipsoids(const PointDataGridT& points,
                     const SettingsT& settings,
                     const typename SettingsT::FilterType& filter)
 {
     static_assert(IsSpecializationOf<PointDataGridT, Grid>::value);
+    static_assert(std::is_same_v<XformT, Quats> || std::is_same_v<XformT, Mat3s>);
     static_assert(IsSpecializationOf<SettingsT, EllipsoidSettings>::value);
 
     using namespace rasterize_sdf_internal;
@@ -592,6 +644,8 @@ rasterizeEllipsoids(const PointDataGridT& points,
     using MaskTreeT = typename SdfT::TreeType::template ValueConverter<ValueMask>::Type;
     using AttributeTypes = typename SettingsT::AttributeTypes;
     using FilterT = typename SettingsT::FilterType;
+
+    constexpr bool XformIsQuat = std::is_same_v<XformT, math::Quats>;
 
     const std::vector<std::string>& attributes = settings.attributes;
     const Real halfband = settings.halfband;
@@ -613,10 +667,16 @@ rasterizeEllipsoids(const PointDataGridT& points,
         return GridPtrVec(1, surface);
     }
 
+    // deprecated, to remove, should always use xform
+OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+    const auto& attr = settings.rotation.empty() ? settings.xform : settings.rotation;
+OPENVDB_NO_DEPRECATION_WARNING_END
+
     // Get attributes
     const EllipseIndicies indices(leaf->attributeSet().descriptor(),
-        settings.rotation,
-        settings.pws); // pws is optional
+        attr,
+        settings.pws, // pws is optional
+        XformIsQuat);
 
     typename SdfT::Ptr surface;
     GridPtrVec grids;
@@ -639,7 +699,7 @@ rasterizeEllipsoids(const PointDataGridT& points,
             tree::LeafManager<const PointDataTreeT> manager(points.tree());
             // pass radius scale as index space
 
-            EllipseSurfaceMaskOp<FixedBandRadius<Vec3f>, MaskTreeT>
+            EllipseSurfaceMaskOp<FixedBandRadius<Vec3f>, XformT, MaskTreeT>
                 op(points.transform(), *transform, rad, halfband, indices);
             tbb::parallel_reduce(manager.leafRange(), op);
 
@@ -653,9 +713,16 @@ rasterizeEllipsoids(const PointDataGridT& points,
 
         if (interrupter) interrupter->start("Rasterizing particles to level set using ellipses and fixed spheres");
 
-        grids = doRasterizeSurface<SdfT, EllipsoidTransfer, AttributeTypes, FilterT>
-            (points, attributes, *surface,
-                width, rad, points.transform(), filter, interrupter, *surface, indices); // args
+        if constexpr (std::is_same_v<XformT, math::Mat3s>) {
+            grids = doRasterizeSurface<SdfT, EllipsoidTransferMat3, AttributeTypes, FilterT>
+                (points, attributes, *surface,
+                    width, rad, points.transform(), filter, interrupter, *surface, indices); // args
+        }
+        else {
+            grids = doRasterizeSurface<SdfT, EllipsoidTransferQuat, AttributeTypes, FilterT>
+                (points, attributes, *surface,
+                    width, rad, points.transform(), filter, interrupter, *surface, indices); // args
+        }
     }
     else {
         using RadiusT = typename SettingsT::RadiusAttributeType;
@@ -682,7 +749,7 @@ rasterizeEllipsoids(const PointDataGridT& points,
             tree::LeafManager<const PointDataTreeT> manager(points.tree());
 
             // pass radius scale as index space
-            EllipseSurfaceMaskOp<VaryingBandRadius<RadiusT, Vec3f>, MaskTreeT>
+            EllipseSurfaceMaskOp<VaryingBandRadius<RadiusT, Vec3f>, XformT, MaskTreeT>
                 op(points.transform(), *transform, rad, halfband, indices);
             tbb::parallel_reduce(manager.leafRange(), op);
 
@@ -696,15 +763,56 @@ rasterizeEllipsoids(const PointDataGridT& points,
 
         if (interrupter) interrupter->start("Rasterizing particles to level set using variable ellipses");
 
-        grids = doRasterizeSurface<SdfT, EllipsoidTransfer, AttributeTypes, FilterT>
-            (points, attributes, *surface,
+        if constexpr (std::is_same_v<XformT, math::Mat3s>) {
+            grids = doRasterizeSurface<SdfT, EllipsoidTransferMat3, AttributeTypes, FilterT>
+                (points, attributes, *surface,
                     width, rad, points.transform(), filter, interrupter, *surface, indices); // args
+        }
+        else {
+            grids = doRasterizeSurface<SdfT, EllipsoidTransferQuat, AttributeTypes, FilterT>
+                (points, attributes, *surface,
+                    width, rad, points.transform(), filter, interrupter, *surface, indices); // args
+        }
     }
 
     if (interrupter) interrupter->end();
     tools::pruneLevelSet(surface->tree());
     grids.insert(grids.begin(), surface);
     return grids;
+}
+
+template <typename PointDataGridT,
+    typename SdfT,
+    typename SettingsT>
+GridPtrVec
+rasterizeEllipsoids(const PointDataGridT& points,
+                    const SettingsT& settings,
+                    const typename SettingsT::FilterType& filter)
+{
+    if (const auto leaf = points.constTree().cbeginLeaf()) {
+        const auto& desc = leaf->attributeSet().descriptor();
+        // deprecated, to remove, should always use xform
+OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+        const auto& attr = settings.rotation.empty() ? settings.xform : settings.rotation;
+OPENVDB_NO_DEPRECATION_WARNING_END
+        const size_t idx = desc.find(attr);
+        if (idx != points::AttributeSet::INVALID_POS) {
+            if (typeNameAsString<math::Mat3s>() == desc.valueType(idx)) {
+                return rasterizeEllipsoids<PointDataGridT, SdfT, SettingsT, math::Mat3s>(points, settings, filter);
+            }
+            if (typeNameAsString<math::Quats>() == desc.valueType(idx)) {
+                return rasterizeEllipsoids<PointDataGridT, SdfT, SettingsT, math::Quats>(points, settings, filter);
+            }
+            throw std::runtime_error("Wrong attribute type for attribute " +
+                attr + ", expected " +
+                typeNameAsString<math::Mat3s>() + " or " +
+                typeNameAsString<math::Quats>());
+        }
+    }
+
+    // If we're here, either the point grid is empty or the xform attribute didn't exist.
+    // Run a default instantiation which will elevate the correct runtime error.
+    return rasterizeEllipsoids<PointDataGridT, SdfT, SettingsT, math::Mat3s>(points, settings, filter);
 }
 
 } // namespace rasterize_sdf_internal

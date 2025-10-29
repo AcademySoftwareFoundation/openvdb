@@ -70,7 +70,6 @@ jobs:
       - uses: actions/checkout@v3
       - name: setup_cuda_12
         run: |
-          yum -y install yum-utils
           echo "/usr/local/cuda-12/bin" >> $GITHUB_PATH
           echo "LD_LIBRARY_PATH=/usr/local/cuda-12/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
       - name: build
@@ -150,8 +149,8 @@ jobs:
     strategy:
       matrix:
         config:
-          - { runner: 'macos-13', cxx: 'clang++', build: 'Release' }
-          - { runner: 'macos-13', cxx: 'clang++', build: 'Debug'   }
+          - { runner: 'macos-14', cxx: 'clang++', build: 'Release' }
+          - { runner: 'macos-14', cxx: 'clang++', build: 'Debug'   }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -164,7 +163,7 @@ jobs:
           ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
           --components=core,nano,nanotest,nanoexam,nanobench,nanotool
-          --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_USE_CUDA=OFF -DNANOVDB_USE_OPENVDB=ON\'
+          --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_USE_CUDA=OFF -DNANOVDB_USE_OPENVDB=ON -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \'
       - name: test
         run: cd build && ctest -V -E ".*cuda.*|.*mgpu.*"
 
@@ -179,7 +178,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: install_gtest
-        run: ./ci/install_gtest.sh 1.15.2
+        run: ./ci/install_gtest.sh latest
       - name: build_and_test
         run: |
           cd nanovdb/nanovdb

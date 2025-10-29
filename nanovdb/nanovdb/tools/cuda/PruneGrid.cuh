@@ -44,16 +44,8 @@ public:
     /// @param d_srcGrid source device grid to be pruned
     /// @param d_srcLeafMask sidecar array of leaf masks for voxels to retain
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    PruneGrid(GridT* d_srcGrid, Mask<3>* d_srcLeafMask, cudaStream_t stream = 0)
-        : mBuilder(stream), mStream(stream), mTimer(stream)
-    {
-        mDeviceSrcGrid = d_srcGrid;
-        mDeviceSrcLeafMask = d_srcLeafMask;
-        // TODO: Should this be moved in one of the process functions?
-        cudaStreamSynchronize(mStream);
-        cudaCheck(cudaMemcpy(&mSrcTreeData, util::PtrAdd(mDeviceSrcGrid, GridT::memUsage()),
-            TreeT::memUsage(), cudaMemcpyDeviceToHost));// copy TreeData from GPU -> CPU
-    }
+    PruneGrid(const GridT* d_srcGrid, const Mask<3>* d_srcLeafMask, cudaStream_t stream = 0)
+        : mBuilder(stream), mStream(stream), mTimer(stream), mDeviceSrcGrid(d_srcGrid), mDeviceSrcLeafMask(d_srcLeafMask) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -71,6 +63,7 @@ public:
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
 
+private:
     void pruneRoot();
 
     void pruneInternalNodes();
@@ -79,20 +72,16 @@ public:
 
     void pruneLeafNodes();
 
-private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
-    TopologyBuilder<BuildT>      mBuilder;
-    cudaStream_t                 mStream{0};
-    util::cuda::Timer            mTimer;
-    int                          mVerbose{0};
-    GridT                        *mDeviceSrcGrid;
-    Mask<3>                      *mDeviceSrcLeafMask;
-    TreeData                     mSrcTreeData;
-
-public:
-    GridT* deviceSrcGrid()   { return mDeviceSrcGrid; }
+    TopologyBuilder<BuildT> mBuilder;
+    cudaStream_t            mStream{0};
+    util::cuda::Timer       mTimer;
+    int                     mVerbose{0};
+    const GridT             *mDeviceSrcGrid;
+    const Mask<3>           *mDeviceSrcLeafMask;
+    TreeData                mSrcTreeData;
 };// tools::cuda::PruneGrid<BuildT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -102,6 +91,10 @@ template<typename BufferT>
 GridHandle<BufferT>
 PruneGrid<BuildT>::getHandle(const BufferT &pool)
 {
+    // Copy TreeData from GPU -> CPU
+    cudaStreamSynchronize(mStream);
+    mSrcTreeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid);
+
     // Ensure that the input grid contains no tile values
     if (mSrcTreeData.mTileCount[2] || mSrcTreeData.mTileCount[1] || mSrcTreeData.mTileCount[0])
         throw std::runtime_error("Topological operations not supported on grids with value tiles");
@@ -184,7 +177,7 @@ void PruneGrid<BuildT>::pruneRoot()
 
     if (mSrcTreeData.mVoxelCount) { // If the input grid is not empty
         // Make a host copy of the source topology RootNode
-        auto deviceSrcRoot = static_cast<RootT*>(util::PtrAdd(mDeviceSrcGrid, GridT::memUsage() + mSrcTreeData.mNodeOffset[3]));
+        auto deviceSrcRoot = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid, GridT::memUsage() + mSrcTreeData.mNodeOffset[3]));
         uint64_t rootSize = mSrcTreeData.mNodeOffset[2] - mSrcTreeData.mNodeOffset[3];
         auto srcRootBuffer = nanovdb::HostBuffer::create(rootSize);
         cudaCheck(cudaMemcpyAsync(srcRootBuffer.data(), deviceSrcRoot, rootSize, cudaMemcpyDeviceToHost, mStream));
@@ -219,7 +212,7 @@ void PruneGrid<BuildT>::pruneInternalNodes()
     // as if every upper node had a full set of 32^3 lower children
     if (auto srcLeafCount = mSrcTreeData.mNodeCount[0]) { // Unless it's an empty grid
         util::cuda::lambdaKernel<<<numBlocks(srcLeafCount), mNumThreads, 0, mStream>>>(
-            srcLeafCount, morphology::cuda::PruneInternalNodesFunctor<BuildT>(),
+            srcLeafCount, util::morphology::cuda::PruneInternalNodesFunctor<BuildT>(),
             mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mDeviceSrcLeafMask, mBuilder.mUpperMasks.deviceData(), mBuilder.mLowerMasks.deviceData() );
     }
 }// PruneGrid<BuildT>::pruneInternalNodes
@@ -231,7 +224,7 @@ void PruneGrid<BuildT>::processGridTreeRoot()
 {
     // Copy GridData from source grid
     // By convention: this will duplicate grid name and map. Others will be reset later
-    cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), deviceSrcGrid()->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
+    cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrid->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
     cudaCheckError();
 }// PruneGrid<BuildT>::processGridTreeRoot
@@ -246,12 +239,12 @@ void PruneGrid<BuildT>::pruneLeafNodes()
     auto srcLeafCount = mSrcTreeData.mNodeCount[0];
     if (srcLeafCount) { // Unless grid is empty
         util::cuda::lambdaKernel<<<numBlocks(srcLeafCount), mNumThreads, 0, mStream>>>(
-            srcLeafCount, morphology::cuda::PruneLeafMasksFunctor<BuildT>(), mDeviceSrcGrid, &mBuilder.data()->getGrid(), mDeviceSrcLeafMask);
+            srcLeafCount, util::morphology::cuda::PruneLeafMasksFunctor<BuildT>(), mDeviceSrcGrid, &mBuilder.data()->getGrid(), mDeviceSrcLeafMask);
     }
 
     // Update leaf offsets and prefix sums
     mBuilder.processLeafOffsets(mStream);
-}
+}// PruneGrid<BuildT>::pruneLeafNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 

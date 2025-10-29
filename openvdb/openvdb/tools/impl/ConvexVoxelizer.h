@@ -310,8 +310,8 @@ protected:
     ///
     /// @param[out] zb Reference to the z ordinate where the bottom intersection occurs.
     /// @param[out] zt Reference to the z ordinate where the top intersection occurs.
-    /// @param[in] x The x ordinate of the infinte line.
-    /// @param[in] y The y ordinate of the infinte line.
+    /// @param[in] x The x ordinate of the infinite line.
+    /// @param[in] y The y ordinate of the infinite line.
     /// @return true if an intersection occurs; otherwise false.
     /// @note The derived class can override this lambda to implement different behavior for degenerate cases.
     std::function<bool(ValueT&, ValueT&, const ValueT&, const ValueT&)> bottomTop =
@@ -1112,7 +1112,7 @@ private:
 
         const ValueT dist = invokeTilePointSignedDistance(p);
 
-        // fast positive criterion: circumsribed ball is in the object
+        // fast positive criterion: circumscribed ball is in the object
         if (dist <= -R2-mHw)
             return true;
 

@@ -441,11 +441,9 @@ not on their active states or other attributes.
 
 Large data sets are often handled in Python using
 <a href="http://www.numpy.org/">NumPy</a>.
-The OpenVDB Python module can optionally be compiled with NumPy support.
-With NumPy enabled, the @b copyFromArray and @b copyToArray grid methods
-can be used to exchange data efficiently between scalar-valued grids
-and three-dimensional NumPy arrays and between vector-valued grids and
-four-dimensional NumPy arrays.
+The @b copyFromArray and @b copyToArray grid methods can be used to exchange
+data efficiently between scalar-valued grids and three-dimensional NumPy
+arrays and between vector-valued grids and four-dimensional NumPy arrays.
 @code{.py}
 >>> import pyopenvdb as vdb
 >>> import numpy

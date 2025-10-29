@@ -1574,18 +1574,6 @@ transferPrimitiveAttributes(
     }
 }
 
-template<class GridType>
-void
-transferPrimitiveAttributes(
-    const GU_Detail& sourceGeo,
-    GU_Detail& targetGeo,
-    GridType& indexGrid,
-    Interrupter& boss,
-    const GA_PrimitiveGroup* primitives = nullptr)
-{
-    transferPrimitiveAttributes(sourceGeo, targetGeo, indexGrid, boss.interrupter(), primitives);
-}
-
 } // namespace openvdb_houdini
 
 #endif // OPENVDB_HOUDINI_ATTRIBUTE_TRANSFER_UTIL_HAS_BEEN_INCLUDED

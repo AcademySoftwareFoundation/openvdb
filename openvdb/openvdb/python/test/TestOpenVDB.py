@@ -12,6 +12,9 @@ C++-to-Python bindings, not the OpenVDB library itself.
 import os, os.path
 import sys
 import unittest
+import numpy as np
+import random
+import time
 
 # If on Windows, add required dll directories from our binary build tree
 if 'add_dll_directory' in dir(os):
@@ -284,6 +287,10 @@ class TestOpenVDB(unittest.TestCase):
         onCoords = set([(-10, -10, -10), (0, 0, 0), (1, 1, 1)])
 
         for factory in openvdb.GridTypes:
+            # Skip for PDGs - can't set or fill
+            if factory.valueTypeName.startswith('ptdataidx'):
+                continue
+
             grid = factory()
             acc = grid.getAccessor()
             for c in onCoords:
@@ -464,6 +471,10 @@ class TestOpenVDB(unittest.TestCase):
 
         # Test pickling of grids of various types.
         for factory in openvdb.GridTypes:
+            # skip test for PointDataGrids
+            # @todo  add back in, cant use fill on PDG
+            if factory.valueTypeName.startswith('ptdataidx'):
+                continue
 
             # Construct a grid.
             grid = factory()
@@ -533,22 +544,9 @@ class TestOpenVDB(unittest.TestCase):
 
 
     def testCopyFromArray(self):
-        import random
-        import time
-
-        # Skip this test if NumPy is not available.
-        try:
-            import numpy as np
-        except ImportError:
-            return
-
-        # Skip this test if the OpenVDB module was built without NumPy support.
         arr = np.zeros((1, 2, 1))
         grid = openvdb.FloatGrid()
-        try:
-            grid.copyFromArray(arr)
-        except NotImplementedError:
-            return
+        grid.copyFromArray(arr)
 
         # Verify that a non-three-dimensional array can't be copied into a grid.
         grid = openvdb.FloatGrid()
@@ -632,22 +630,9 @@ class TestOpenVDB(unittest.TestCase):
 
 
     def testCopyToArray(self):
-        import random
-        import time
-
-        # Skip this test if NumPy is not available.
-        try:
-            import numpy as np
-        except ImportError:
-            return
-
-        # Skip this test if the OpenVDB module was built without NumPy support.
         arr = np.zeros((1, 2, 1))
         grid = openvdb.FloatGrid()
-        try:
-            grid.copyFromArray(arr)
-        except NotImplementedError:
-            return
+        grid.copyFromArray(arr)
 
         # Verify that a grid can't be copied into a non-three-dimensional array.
         grid = openvdb.FloatGrid()
@@ -727,14 +712,6 @@ class TestOpenVDB(unittest.TestCase):
 
 
     def testMeshConversion(self):
-        import time
-
-        # Skip this test if NumPy is not available.
-        try:
-            import numpy as np
-        except ImportError:
-            return
-
         # Test mesh to volume conversion.
 
         # Generate the vertices of a cube.
@@ -761,12 +738,8 @@ class TestOpenVDB(unittest.TestCase):
         for gridType in [n for n in openvdb.GridTypes
             if n.__name__ in ('FloatGrid', 'DoubleGrid')]:
 
-            # Skip this test if the OpenVDB module was built without NumPy support.
-            try:
-                grid = gridType.createLevelSetFromPolygons(
-                    cubePoints, quads=cubeQuads, transform=xform, halfWidth=halfWidth)
-            except NotImplementedError:
-                return
+            grid = gridType.createLevelSetFromPolygons(
+                cubePoints, quads=cubeQuads, transform=xform, halfWidth=halfWidth)
 
             #openvdb.write('/tmp/testMeshConversion.vdb', grid)
 

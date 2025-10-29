@@ -466,6 +466,8 @@ inline void
 readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     const MaskT& valueMask, bool fromHalf)
 {
+    checkFormatVersion(is);
+
     // Get the stream's compression settings.
     auto meta = getStreamMetadataPtr(is);
     const uint32_t compression = getDataCompression(is);
@@ -485,17 +487,16 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     }
 
     int8_t metadata = NO_MASK_AND_ALL_VALS;
-    if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
-        // Read the flag that specifies what, if any, additional metadata
-        // (selection mask and/or inactive value(s)) is saved.
-        if (seek && !maskCompressed) {
-            is.seekg(/*bytes=*/1, std::ios_base::cur);
-        } else if (seek && delayLoadMeta) {
-            metadata = delayLoadMeta->getMask(leafIndex);
-            is.seekg(/*bytes=*/1, std::ios_base::cur);
-        } else {
-            is.read(reinterpret_cast<char*>(&metadata), /*bytes=*/1);
-        }
+
+    // Read the flag that specifies what, if any, additional metadata
+    // (selection mask and/or inactive value(s)) is saved.
+    if (seek && !maskCompressed) {
+        is.seekg(/*bytes=*/1, std::ios_base::cur);
+    } else if (seek && delayLoadMeta) {
+        metadata = delayLoadMeta->getMask(leafIndex);
+        is.seekg(/*bytes=*/1, std::ios_base::cur);
+    } else {
+        is.read(reinterpret_cast<char*>(&metadata), /*bytes=*/1);
     }
 
     ValueT background = zeroVal<ValueT>();
@@ -545,8 +546,7 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
 
     Index tempCount = destCount;
 
-    if (maskCompressed && metadata != NO_MASK_AND_ALL_VALS
-        && getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION)
+    if (maskCompressed && metadata != NO_MASK_AND_ALL_VALS)
     {
         tempCount = valueMask.countOn();
         if (!seek && tempCount != destCount) {
@@ -643,7 +643,7 @@ writeCompressedValuesSize(ValueT* srcBuf, Index srcCount,
 /// @param toHalf     if true, convert floating-point values to 16-bit half floats
 template<typename ValueT, typename MaskT>
 inline void
-writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
+writeCompressedValues(std::ostream& os, const ValueT* srcBuf, Index srcCount,
     const MaskT& valueMask, const MaskT& childMask, bool toHalf)
 {
     // Get the stream's compression settings.
@@ -651,7 +651,7 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
     const bool maskCompress = compress & COMPRESS_ACTIVE_MASK;
 
     Index tempCount = srcCount;
-    ValueT* tempBuf = srcBuf;
+    ValueT* tempBuf = nullptr;
     std::unique_ptr<ValueT[]> scopedTempBuf;
 
     int8_t metadata = NO_MASK_AND_ALL_VALS;
@@ -743,9 +743,10 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
 
     // Write out the buffer.
     if (toHalf) {
-        HalfWriter<RealToHalf<ValueT>::isReal, ValueT>::write(os, tempBuf, tempCount, compress);
+        HalfWriter<RealToHalf<ValueT>::isReal, ValueT>::write(os,
+            bool(tempBuf) ? tempBuf : srcBuf, tempCount, compress);
     } else {
-        writeData(os, tempBuf, tempCount, compress);
+        writeData(os, bool(tempBuf) ? tempBuf : srcBuf, tempCount, compress);
     }
 }
 

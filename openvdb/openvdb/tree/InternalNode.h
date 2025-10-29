@@ -520,6 +520,11 @@ public:
     /// @warning This method should only be used by experts seeking low-level optimizations.
     void setValueOffUnsafe(Index offset, const ValueType& value);
 
+    /// @brief Set the active/inactive value mask.
+    /// @note Use setValueOn(const Coord&)/setValueOff(const Coord&) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    void setValueMaskUnsafe(const NodeMaskType& mask);
+
     /// @brief Replace a tile at offset with the given child node.
     /// @note Use addChild(ChildNodeType*) for a safer alternative.
     /// @warning This method should only be used by experts seeking low-level optimizations.
@@ -2413,55 +2418,33 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
 {
+    io::checkFormatVersion(is);
+
     const ValueType background = (!io::getGridBackgroundValuePtr(is) ? zeroVal<ValueType>()
         : *static_cast<const ValueType*>(io::getGridBackgroundValuePtr(is)));
 
     mChildMask.load(is);
     mValueMask.load(is);
 
-    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_INTERNALNODE_COMPRESSION) {
-        for (Index i = 0; i < NUM_VALUES; ++i) {
-            if (this->isChildMaskOn(i)) {
-                ChildNodeType* child =
-                    new ChildNodeType(PartialCreate(), offsetToGlobalCoord(i), background);
-                mNodes[i].setChild(child);
-                child->readTopology(is);
-            } else {
-                ValueType value;
-                is.read(reinterpret_cast<char*>(&value), sizeof(ValueType));
-                mNodes[i].setValue(value);
-            }
-        }
-    } else {
-        const bool oldVersion =
-            (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION);
-        const Index numValues = (oldVersion ? mChildMask.countOff() : NUM_VALUES);
-        {
-            // Read in (and uncompress, if necessary) all of this node's values
-            // into a contiguous array.
-            std::unique_ptr<ValueType[]> valuePtr(new ValueType[numValues]);
-            ValueType* values = valuePtr.get();
-            io::readCompressedValues(is, values, numValues, mValueMask, fromHalf);
+    const Index numValues = NUM_VALUES;
+    {
+        // Read in (and uncompress, if necessary) all of this node's values
+        // into a contiguous array.
+        std::unique_ptr<ValueType[]> valuePtr(new ValueType[numValues]);
+        ValueType* values = valuePtr.get();
+        io::readCompressedValues(is, values, numValues, mValueMask, fromHalf);
 
-            // Copy values from the array into this node's table.
-            if (oldVersion) {
-                Index n = 0;
-                for (ValueAllIter iter = this->beginValueAll(); iter; ++iter) {
-                    mNodes[iter.pos()].setValue(values[n++]);
-                }
-                OPENVDB_ASSERT(n == numValues);
-            } else {
-                for (ValueAllIter iter = this->beginValueAll(); iter; ++iter) {
-                    mNodes[iter.pos()].setValue(values[iter.pos()]);
-                }
-            }
+        // Copy values from the array into this node's table.
+        for (ValueAllIter iter = this->beginValueAll(); iter; ++iter) {
+            mNodes[iter.pos()].setValue(values[iter.pos()]);
         }
-        // Read in all child nodes and insert them into the table at their proper locations.
-        for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
-            ChildNodeType* child = new ChildNodeType(PartialCreate(), iter.getCoord(), background);
-            mNodes[iter.pos()].setChild(child);
-            child->readTopology(is, fromHalf);
-        }
+    }
+
+    // Read in all child nodes and insert them into the table at their proper locations.
+    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
+        ChildNodeType* child = new ChildNodeType(PartialCreate(), iter.getCoord(), background);
+        mNodes[iter.pos()].setChild(child);
+        child->readTopology(is, fromHalf);
     }
 }
 
@@ -2587,6 +2570,14 @@ InternalNode<ChildT, Log2Dim>::setValueOffUnsafe(Index n, const ValueType& value
     OPENVDB_ASSERT(mChildMask.isOff(n));
     mNodes[n].setValue(value);
     mValueMask.setOff(n);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::setValueMaskUnsafe(const NodeMaskType& mask)
+{
+    OPENVDB_ASSERT(mChildMask.isOff());
+    mValueMask = mask;
 }
 
 template<typename ChildT, Index Log2Dim>

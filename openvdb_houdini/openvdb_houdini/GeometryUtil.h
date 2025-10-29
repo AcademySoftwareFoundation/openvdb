@@ -40,8 +40,6 @@ class OP_Node;
 
 namespace openvdb_houdini {
 
-class Interrupter;
-
 
 /// Add geometry to the given detail to indicate the extents of a frustum transform.
 OPENVDB_HOUDINI_API
@@ -86,12 +84,6 @@ pointInPrimGroup(GA_Offset ptnOffset, GU_Detail&, const GA_PrimitiveGroup&);
 OPENVDB_HOUDINI_API
 std::unique_ptr<GU_Detail>
 convertGeometry(const GU_Detail&, std::string& warning, openvdb::util::NullInterrupter*);
-
-
-OPENVDB_DEPRECATED_MESSAGE("openvdb_houdini::Interrupter has been deprecated, use openvdb_houdini::HoudiniInterrupter")
-OPENVDB_HOUDINI_API
-std::unique_ptr<GU_Detail>
-convertGeometry(const GU_Detail& detail, std::string& warning, Interrupter* boss);
 
 
 ////////////////////////////////////////

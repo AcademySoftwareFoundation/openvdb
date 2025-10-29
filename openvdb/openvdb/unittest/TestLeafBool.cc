@@ -55,6 +55,15 @@ TEST_F(TestLeafBool, testGetValue)
             EXPECT_EQ(~LeafType::Buffer::WordType(0), w[n]);
         }
     }
+    {// test const Buffer::mask()
+        LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
+        leaf.fill(true);
+        const LeafType& cleaf = leaf;
+        const LeafType::Buffer::NodeMaskType& storage = cleaf.buffer().storage();
+        for (openvdb::Index n = 0; n < LeafType::Buffer::WORD_COUNT; ++n) {
+            EXPECT_EQ(~LeafType::Buffer::WordType(0), storage.template getWord<LeafType::Buffer::WordType>(n));
+        }
+    }
 }
 
 
@@ -402,9 +411,7 @@ TEST_F(TestLeafBool, testConstructors)
             coords.insert(xyz);
         }
 
-OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-        LeafType leaf(fleaf, openvdb::TopologyCopy());
-OPENVDB_NO_DEPRECATION_WARNING_END
+        LeafType leaf(fleaf, /*background*/true, openvdb::TopologyCopy());
 
         EXPECT_EQ(fleaf.onVoxelCount(), leaf.onVoxelCount());
         EXPECT_TRUE(leaf.hasSameTopology(&fleaf));

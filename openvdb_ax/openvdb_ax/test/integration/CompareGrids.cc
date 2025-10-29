@@ -5,6 +5,7 @@
 
 #include "CompareGrids.h"
 
+#include <openvdb/math/Math.h>
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/util/Assert.h>
 
@@ -12,6 +13,23 @@
 
 namespace unittest_util
 {
+
+template <typename T>
+inline T GetTolerance()
+{
+    using TraitsT = openvdb::ValueTraits<T>;
+    auto elem = openvdb::math::Delta<typename TraitsT::ElementType>::value();
+    if constexpr (TraitsT::IsVec) return T(elem);
+    else if constexpr (TraitsT::IsMat)
+    {
+        T mat;
+        for (unsigned i = 0; i < mat.numElements(); ++i) (*mat[i]) = elem;
+        return mat;
+    }
+    else {
+        return elem;
+    }
+}
 
 using TypeList = openvdb::TypeList<
     double,
@@ -213,12 +231,17 @@ inline bool compareNodes(const NodeT& firstLeaf,
                          const typename NodeT::NodeMaskType& mask,
                          NodeDD<NodeT>& data,
                          const ComparisonSettings& settings,
-                         const typename NodeT::ValueType& tolerance)
+                         const bool usetolerance)
 {
     using BufferT = typename NodeT::Buffer;
+    using ValueT = typename NodeT::ValueType;
 
     const BufferT& firstBuffer = firstLeaf.buffer();
     const BufferT& secondBuffer = secondLeaf.buffer();
+
+    const auto tolerance = usetolerance ?
+        GetTolerance<ValueT>() :
+        openvdb::zeroVal<ValueT>();
 
     // if the buffers are not the same size the buffer most likely isn't
     // loaded or allocated
@@ -258,8 +281,14 @@ inline bool compareNodes(const NodeT& n1,
                          const typename NodeT::NodeMaskType& mask,
                          NodeDD<NodeT>& data,
                          const ComparisonSettings& settings,
-                         const typename NodeT::ValueType& tolerance)
+                         const bool usetolerance)
 {
+    using ValueT = typename NodeT::ValueType;
+
+    const auto tolerance = usetolerance ?
+        GetTolerance<ValueT>() :
+        openvdb::zeroVal<ValueT>();
+
     const auto& vmask1 = n1.getValueMask();
     const auto& vmask2 = n2.getValueMask();
     const auto& cmask1 = n1.getChildMask();
@@ -331,9 +360,14 @@ inline void compareArrays(const openvdb::points::AttributeArray& a1,
                           const openvdb::points::AttributeArray& a2,
                           const openvdb::points::PointDataTree::LeafNodeType& leaf,
                           const std::string& name,
+                          const bool usetolerance,
                           NodeDD<openvdb::points::PointDataTree::LeafNodeType>& data)
 {
     using LeafNodeT = openvdb::points::PointDataTree::LeafNodeType;
+
+    const auto tolerance = usetolerance ?
+        GetTolerance<ValueType>() :
+        openvdb::zeroVal<ValueType>();
 
     if (a1.size() != a2.size()) {
         auto& arrayData = data.getDiagnosticArrayData(name);
@@ -344,14 +378,14 @@ inline void compareArrays(const openvdb::points::AttributeArray& a1,
     auto iter = leaf.beginIndexAll();
 
     for (; iter; ++iter) {
-        if (h1.get(*iter) != h2.get(*iter)) break;
+        if (!openvdb::math::isApproxEqual(h1.get(*iter), h2.get(*iter), tolerance)) break;
     }
 
     if (iter) {
         auto& arrayData = data.getDiagnosticArrayData(name);
         for (; iter; ++iter) {
             const openvdb::Index i = *iter;
-            if (h1.get(i) != h2.get(i)) {
+            if (!openvdb::math::isApproxEqual(h1.get(i), h2.get(i), tolerance)) {
                 arrayData.flagArrayValue(i);
                 data.flagVoxelValue(static_cast<int16_t>(LeafNodeT::coordToOffset(iter.getCoord())));
             }
@@ -364,7 +398,8 @@ inline bool
 compareAttributes(const LeafNodeType&,
                   const LeafNodeType&,
                   NodeDD<LeafNodeType>&,
-                  const ComparisonSettings&) {
+                  const ComparisonSettings&,
+                  const bool) {
     return true;
 }
 
@@ -374,7 +409,8 @@ compareAttributes<openvdb::points::PointDataTree::LeafNodeType>
     (const openvdb::points::PointDataTree::LeafNodeType& firstLeaf,
      const openvdb::points::PointDataTree::LeafNodeType& secondLeaf,
      NodeDD<openvdb::points::PointDataTree::LeafNodeType>& data,
-     const ComparisonSettings& settings)
+     const ComparisonSettings& settings,
+     const bool usetolerance)
 {
     using Descriptor = openvdb::points::AttributeSet::Descriptor;
 
@@ -432,7 +468,7 @@ compareAttributes<openvdb::points::PointDataTree::LeafNodeType>
                 // Remove string types but add uint8_t types (used by group arrays)
                 TypeList::Remove<std::string>::Append<uint8_t>::foreach([&](auto x) {
                     if (type == openvdb::typeNameAsString<decltype(x)>()) {
-                        compareArrays<decltype(x)>(array1, array2, firstLeaf, name, data);
+                        compareArrays<decltype(x)>(array1, array2, firstLeaf, name, usetolerance, data);
                         success = true;
                     }
                 });
@@ -457,13 +493,13 @@ struct CompareNodes
     CompareNodes(tbb::concurrent_vector<DiagnosticData::Ptr>& data,
                      const TreeType& firstTree,
                      const TreeType& secondTree,
-                     const typename TreeType::ValueType tolerance,
+                     const bool usetolerance,
                      const ComparisonSettings& settings,
                      const bool useVoxelMask = true)
         : mDiagnosticData(data)
         , mFirst(firstTree)
         , mSecond(secondTree)
-        , mTolerance(tolerance)
+        , mUseTolerance(usetolerance)
         , mSettings(settings)
         , mUseVoxelMask(useVoxelMask) {}
 
@@ -488,8 +524,8 @@ struct CompareNodes
             OPENVDB_ASSERT(n1 && n2);
             const typename MaskNodeT::NodeMaskType
                 mask(mUseVoxelMask ? node.getValueMask() : true);
-            if (compareNodes(*n1, *n2, mask, *data, mSettings, mTolerance) &&
-                compareAttributes(*n1, *n2, *data, mSettings)) {
+            if (compareNodes(*n1, *n2, mask, *data, mSettings, mUseTolerance) &&
+                compareAttributes(*n1, *n2, *data, mSettings, mUseTolerance)) {
                 data.reset();
             }
         }
@@ -501,7 +537,7 @@ private:
     tbb::concurrent_vector<DiagnosticData::Ptr>&   mDiagnosticData;
     const ConstGridAccessor             mFirst;
     const ConstGridAccessor             mSecond;
-    const typename TreeType::ValueType  mTolerance;
+    const bool                          mUseTolerance;
     const ComparisonSettings&           mSettings;
     const bool                          mUseVoxelMask;
 };
@@ -512,7 +548,7 @@ bool compareGrids(ComparisonResult& resultData,
              const GridType& secondGrid,
              const ComparisonSettings& settings,
              const openvdb::MaskGrid::ConstPtr maskGrid,
-             const typename GridType::ValueType tolerance)
+             const bool usetolerance)
 {
     using TreeType = typename GridType::TreeType;
     using NodeManager = openvdb::tree::NodeManager<const openvdb::MaskTree,
@@ -581,7 +617,7 @@ bool compareGrids(ComparisonResult& resultData,
         op(data,
            firstGrid.constTree(),
            secondGrid.constTree(),
-           tolerance,
+           usetolerance,
            settings);
 
     manager.foreachBottomUp(op);
@@ -623,7 +659,8 @@ bool compareUntypedGrids(ComparisonResult &resultData,
                          const openvdb::GridBase &firstGrid,
                          const openvdb::GridBase &secondGrid,
                          const ComparisonSettings &settings,
-                         const openvdb::MaskGrid::ConstPtr maskGrid)
+                         const openvdb::MaskGrid::ConstPtr maskGrid,
+                         const bool usetolerance)
 {
     bool result = false, valid = false;;
     TypeList::foreach([&](auto x) {
@@ -632,7 +669,7 @@ bool compareUntypedGrids(ComparisonResult &resultData,
             valid = true;
             const GridT& firstGridTyped = static_cast<const GridT&>(firstGrid);
             const GridT& secondGridTyped = static_cast<const GridT&>(secondGrid);
-            result = compareGrids(resultData, firstGridTyped, secondGridTyped, settings, maskGrid);
+            result = compareGrids(resultData, firstGridTyped, secondGridTyped, settings, maskGrid, usetolerance);
         }
     });
 
@@ -643,7 +680,7 @@ bool compareUntypedGrids(ComparisonResult &resultData,
                 static_cast<const openvdb::points::PointDataGrid&>(firstGrid);
             const openvdb::points::PointDataGrid& secondGridTyped =
                 static_cast<const openvdb::points::PointDataGrid&>(secondGrid);
-            result = compareGrids(resultData, firstGridTyped, secondGridTyped, settings, maskGrid);
+            result = compareGrids(resultData, firstGridTyped, secondGridTyped, settings, maskGrid, usetolerance);
         }
     }
 

@@ -59,35 +59,6 @@ TEST_F(TestLeafIOTest, testBufferDouble) { TestLeafIO<double>::testBuffer(); }
 TEST_F(TestLeafIOTest, testBufferBool) { TestLeafIO<bool>::testBuffer(); }
 TEST_F(TestLeafIOTest, testBufferByte) { TestLeafIO<openvdb::Byte>::testBuffer(); }
 
-TEST_F(TestLeafIOTest, testBufferString)
-{
-    openvdb::tree::LeafNode<std::string, 3>
-        leaf(openvdb::Coord(0, 0, 0), std::string());
-
-    leaf.setValueOn(openvdb::Coord(0, 1, 0), std::string("test"));
-    leaf.setValueOn(openvdb::Coord(1, 0, 0), std::string("test"));
-
-    std::ostringstream ostr(std::ios_base::binary);
-
-    leaf.writeBuffers(ostr);
-
-    leaf.setValueOn(openvdb::Coord(0, 1, 0), std::string("douche"));
-    leaf.setValueOn(openvdb::Coord(0, 1, 1), std::string("douche"));
-
-    std::istringstream istr(ostr.str(), std::ios_base::binary);
-
-    // Since the input stream doesn't include a VDB header with file format version info,
-    // tag the input stream explicitly with the current version number.
-    openvdb::io::setCurrentVersion(istr);
-
-    leaf.readBuffers(istr);
-
-    EXPECT_EQ(std::string("test"), leaf.getValue(openvdb::Coord(0, 1, 0)));
-    EXPECT_EQ(std::string("test"), leaf.getValue(openvdb::Coord(1, 0, 0)));
-
-    EXPECT_TRUE(leaf.onVoxelCount() == 2);
-}
-
 
 TEST_F(TestLeafIOTest, testBufferVec3R)
 {

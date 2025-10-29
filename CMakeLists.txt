@@ -42,7 +42,7 @@
 
 # note: cmake_minimum_required must be called before project commands to
 #  ensure policy scope is set up correctly
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 
 # CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
 # from CMake 3.15 and above. Must come before project().
@@ -54,7 +54,7 @@ endif()
 
 set(OpenVDB_MAJOR_VERSION 12)
 set(OpenVDB_MINOR_VERSION 1)
-set(OpenVDB_PATCH_VERSION 1)
+set(OpenVDB_PATCH_VERSION 2)
 set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}")
 
 project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
@@ -268,6 +268,13 @@ mark_as_advanced(
 
 include(cmake/config/OpenVDBVersions.cmake)
 
+if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_CMAKE_VERSION)
+  if(CMAKE_VERSION VERSION_LESS ${FUTURE_MINIMUM_CMAKE_VERSION})
+    message(DEPRECATION "Support for CMake versions < ${FUTURE_MINIMUM_CMAKE_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
+endif()
+
 foreach(DEPRECATED_ABI ${OPENVDB_DEPRECATED_ABI_LIST})
   option(OPENVDB_USE_DEPRECATED_ABI_${DEPRECATED_ABI} "Bypass minimum ABI requirement checks" OFF)
   mark_as_advanced(OPENVDB_USE_DEPRECATED_ABI_${DEPRECATED_ABI})
@@ -478,13 +485,24 @@ endif()
 # Locate Python and nanobind if necessary
 if(OPENVDB_BUILD_PYTHON_MODULE OR (OPENVDB_BUILD_NANOVDB AND NANOVDB_BUILD_PYTHON_MODULE))
 
-  # Call find_package(Python ...)
   find_package(Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Development Interpreter)
-  find_package(nanobind ${MINIMUM_NANOBIND_VERSION} REQUIRED)
-
   if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_PYTHON_VERSION)
     if(Python_VERSION VERSION_LESS ${FUTURE_MINIMUM_PYTHON_VERSION})
       message(DEPRECATION "Support for Python versions < ${FUTURE_MINIMUM_GLFW_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
+  endif()
+
+  find_package(nanobind REQUIRED CONFIG)
+  include(FindPackageHandleStandardArgs)
+  find_package_handle_standard_args(nanobind
+    FOUND_VAR nanobind_FOUND
+    REQUIRED_VARS NB_DIR
+    VERSION_VAR nanobind_VERSION)
+
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_NANOBIND_VERSION)
+    if(nanobind_VERSION VERSION_LESS ${FUTURE_MINIMUM_NANOBIND_VERSION})
+      message(DEPRECATION "Support for nanobind versions < ${FUTURE_MINIMUM_NANOBIND_VERSION} "
         "is deprecated and will be removed.")
     endif()
   endif()

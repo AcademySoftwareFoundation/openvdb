@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 project(OpenVDBAXUnitTests LANGUAGES CXX)
 
 option(OPENVDB_AX_TEST_PROFILE "Switch on profiling for some of the unit tests." OFF)

@@ -82,13 +82,11 @@ jobs:
           - { cxx: g++,     image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
       fail-fast: false
     steps:
-    - name: remove zstd
-      run: yum -y remove zstd
     - uses: actions/checkout@v3
     - name: nanobind
-      run: ./ci/install_nanobind.sh 2.0.0
+      run: ./ci/install_nanobind.sh 2.5.0
     - name: install_gtest
-      run: ./ci/install_gtest.sh 1.15.2
+      run: ./ci/install_gtest.sh latest
     - name: timestamp
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
@@ -173,7 +171,6 @@ jobs:
             -DDISABLE_CMAKE_SEARCH_PATHS=ON \
             -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON \
             -DUSE_EXPLICIT_INSTANTIATION=OFF \
-            -DTbb_INCLUDE_DIR=$HOME/houdini_install/hou/Frameworks/Houdini.framework/Versions/Current/Resources/toolkit/include/tbb \
             -DLLVM_DIR=/opt/homebrew/opt/llvm@20/lib/cmake/llvm \
             -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
             \"

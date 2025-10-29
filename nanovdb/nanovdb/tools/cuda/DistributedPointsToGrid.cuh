@@ -621,7 +621,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
 
         util::cuda::memPrefetchAsync(coords, coordCount * sizeof(nanovdb::Coord), deviceId, stream);
 
-        nanovdb::util::cuda::offsetLambdaKernel<<<numBlocks(deviceStripeCount), mNumThreads, 0, stream>>>(deviceStripeCount, deviceStripeOffset, TileKeyFunctor<BuildT, PtrT>(), mData, coords, mData->d_keys, mData->d_indx);
+        util::cuda::offsetLambdaKernel<<<numBlocks(deviceStripeCount), mNumThreads, 0, stream>>>(deviceStripeCount, deviceStripeOffset, TileKeyFunctor<BuildT, PtrT>(), mData, coords, mData->d_keys, mData->d_indx);
     }
 
     radixSortAsync(mDeviceMesh, mTempDevicePools, mData->d_keys, mKeys, mData->d_indx, mIndices, coordCount, mIntervals, mStripeOffsets, mStripeCounts, sortEvents.data(), sortEvents.data());
@@ -713,7 +713,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         for (uint32_t i = 0, tileOffset = 0; i < deviceNodeCount(deviceId)[2]; ++i) {
             if (!devicePointsPerTile[i]) continue;
 
-            nanovdb::util::cuda::offsetLambdaKernel<<<numBlocks(devicePointsPerTile[i]), mNumThreads, 0, stream>>>(devicePointsPerTile[i], tileOffset + mStripeOffsets[deviceId], VoxelKeyFunctor<BuildT, PtrT>(), mData, coords, id, mKeys, mIndices);
+            util::cuda::offsetLambdaKernel<<<numBlocks(devicePointsPerTile[i]), mNumThreads, 0, stream>>>(devicePointsPerTile[i], tileOffset + mStripeOffsets[deviceId], VoxelKeyFunctor<BuildT, PtrT>(), mData, coords, id, mKeys, mIndices);
 
             uint64_t* tileInputKeys = mKeys + tileOffset + mStripeOffsets[deviceId];
             uint32_t* tileInputIndices = mIndices + tileOffset + mStripeOffsets[deviceId];
@@ -734,7 +734,6 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     {
         uint32_t* devicePointsPerVoxel = mData->pointsPerVoxel;
         uint32_t* devicePointsPerLeaf = mData->pointsPerLeaf;
-        uint32_t* devicePointsPerVoxelPrefix = mData->pointsPerVoxelPrefix;
         for (const auto& [deviceId, stream] : mDeviceMesh) {
             cudaCheck(cudaSetDevice(deviceId));
 
@@ -981,15 +980,6 @@ inline void DistributedPointsToGrid<BuildT>::processNodes()
         }
     }
 
-    if constexpr(BuildTraits<BuildT>::is_indexmask) {
-        for (const auto& [deviceId, stream] : mDeviceMesh) {
-            cudaCheck(cudaSetDevice(deviceId));
-            if (deviceNodeCount(deviceId)[0]) {
-                kernels::setMaskEqValMaskKernel<BuildT><<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], mData);
-                cudaCheckError();
-            }
-        }
-    }
 }// DistributedPointsToGrid<BuildT>::processNodes
 
 template <typename BuildT>

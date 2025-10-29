@@ -2,6 +2,11 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v12_1_2_changes"></a>@endhtmlonly
+@par
+<B>Version 12.1.2</B> - <I>In development</I>
+
+
 @htmlonly <a name="v12_1_1_changes"></a>@endhtmlonly
 @par
 <B>Version 12.1.1</B> - <I>September 30, 2025</I>

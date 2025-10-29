@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 project(NanoVDB LANGUAGES C CXX)
 
 include(GNUInstallDirs)
@@ -217,6 +217,7 @@ set(NANOVDB_INCLUDE_TOOLS_FILES
   tools/GridStats.h
   tools/GridValidator.h
   tools/NanoToOpenVDB.h
+  tools/VoxelBlockManager.h
 )
 
 # NanoVDB tools/cuda header files
@@ -228,6 +229,14 @@ set(NANOVDB_INCLUDE_TOOLS_CUDA_FILES
   tools/cuda/IndexToGrid.cuh
   tools/cuda/PointsToGrid.cuh
   tools/cuda/SignedFloodFill.cuh
+  tools/cuda/MergeGrids.cuh
+  tools/cuda/TopologyBuilder.cuh
+  tools/cuda/RefineGrid.cuh
+  tools/cuda/PruneGrid.cuh
+  tools/cuda/DistributedPointsToGrid.cuh
+  tools/cuda/DilateGrid.cuh
+  tools/cuda/CoarsenGrid.cuh
+  tools/cuda/VoxelBlockManager.cuh
 )
 
 # NanoVDB util header files
@@ -256,6 +265,7 @@ set(NANOVDB_INCLUDE_UTIL_FILES
   util/Stencils.h
   util/Timer.h
   util/Util.h
+  util/MorphologyHelpers.h
 )
 
 # NanoVDB util/cuda header files
@@ -274,6 +284,10 @@ set(NANOVDB_INCLUDE_UTIL_CUDA_FILES
   util/cuda/CudaGridValidator.cuh
   util/cuda/CudaPointsToGrid.cuh
   util/cuda/GpuTimer.h
+  util/cuda/Morphology.cuh
+  util/cuda/MorphologyHelpers.cuh
+  util/cuda/DeviceGridTraits.cuh
+  util/cuda/Injection.cuh
 )
 
 add_library(nanovdb INTERFACE)

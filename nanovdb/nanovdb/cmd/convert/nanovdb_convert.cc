@@ -35,8 +35,8 @@ void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAIL
               << "--fp8\tQuantize float grids to 8 bits\n"
               << "--fp16\tQuantize float grids to 16 bits\n"
               << "--fpN\tQuantize float grids to variable bit depth (use -a or -r to specify a tolerance)\n"
-              << "--index\tProduce an IndexGrid where all float values are encoded as side-car data\n"
-              << "--onIndex\tProduce an IndexGrid where active float values are encoded as side-car data\n"
+              << "--index\tProduce an IndexGrid where all float values are encoded as sidecar data\n"
+              << "--onIndex\tProduce an IndexGrid where active float values are encoded as sidecar data\n"
               << "-g,--grid name\tConvert all grids matching the specified string name\n"
               << "-h,--help\tPrints this message\n"
               << "-r,--rel-error float\t Relative error tolerance used for variable bit depth quantization\n"
@@ -288,7 +288,7 @@ int main(int argc, char* argv[])
                     for (auto &h : handles) {
                         for (uint32_t i = 0; i < h.gridCount(); ++i) {
                             if (verbose) std::cout << "Converting NanoVDB grid named \"" << h.gridMetaData(i)->shortGridName() << "\" to OpenVDB" << std::endl;
-                            grids->push_back(nanovdb::tools::nanoToOpenVDB(h, 0, i));
+                            grids->push_back(nanovdb::tools::nanoToOpenVDB(h, i));
                         }
                     }
                 } else {

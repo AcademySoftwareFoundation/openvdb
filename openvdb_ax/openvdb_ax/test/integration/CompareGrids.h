@@ -55,14 +55,14 @@ bool compareGrids(ComparisonResult& resultData,
                   const GridType& secondGrid,
                   const ComparisonSettings& settings,
                   const openvdb::MaskGrid::ConstPtr maskGrid,
-                  const typename GridType::ValueType tolerance =
-                    openvdb::zeroVal<typename GridType::ValueType>());
+                  const bool usetolerance = false);
 
 bool compareUntypedGrids(ComparisonResult& resultData,
                          const openvdb::GridBase& firstGrid,
                          const openvdb::GridBase& secondGrid,
                          const ComparisonSettings& settings,
-                         const openvdb::MaskGrid::ConstPtr maskGrid);
+                         const openvdb::MaskGrid::ConstPtr maskGrid,
+                         const bool usetolerance = false);
 
 } // namespace unittest_util
 

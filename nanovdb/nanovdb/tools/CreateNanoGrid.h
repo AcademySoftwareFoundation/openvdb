@@ -53,7 +53,7 @@
     auto dstGrid = handle.grid<float>();// get a pointer to the destination grid
     \endcode
 
-    \brief Convert a base-pointer to an openvdb grid, denoted srcGrid, to a  nanovdb
+    \brief Convert a base-pointer to an openvdb grid, denoted srcGrid, to a nanovdb
            grid of the same type, e.g. float -> float or openvdb::Vec3f -> nanovdb::Vec3f
     \code
     auto handle = nanovdb::openToNanoVDB(*srcGrid);// convert source grid to a grid handle
@@ -129,7 +129,7 @@ openToNanoVDB(const openvdb::GridBase::Ptr& base,
 /// @tparam DstBuildT Should be either nanovdb::ValueIndex or nanovdb::ValueOnIndex
 /// @tparam BufferT Type of the buffer used to allocate the destination grid
 /// @param base Shared pointer to a base openvdb grid to be converted
-/// @param channels Number of side-car channels with the values (active or all) in the source grid
+/// @param channels Number of sidecar channels with the values (active or all) in the source grid
 /// @param includeStats If true stats are also indexed
 /// @param includeTiles  If true tile values (active or all) are also indexed
 /// @param verbose Mode of verbosity
@@ -303,7 +303,7 @@ public:
 
 //================================================================================================
 
-/// @brief The NodeAccessor provides a uniform API for accessing nodes got NanoVDB, OpenVDB and build Grids
+/// @brief The NodeAccessor provides a uniform API for accessing nodes in NanoVDB, OpenVDB and build Grids
 ///
 /// @note General implementation that works with nanovdb::tools::build::Grid
 template <typename GridT>
@@ -819,7 +819,7 @@ CreateNanoGrid<SrcGridT>::CreateNanoGrid(const SrcNodeAccT &srcNodeAcc)
 template <typename SrcGridT>
 struct CreateNanoGrid<SrcGridT>::OrderedBlindMetaData
 {
-    OrderedBlindMetaData(const std::string& name,// name + used to derive GridBlindDataSemantic
+    OrderedBlindMetaData(const std::string& name,// name, also used to derive GridBlindDataSemantic
                          const std::string& type,// used to derive GridType of blind data
                          GridBlindDataClass dataClass,
                          size_t i, size_t valueCount, size_t valueSize)
@@ -829,7 +829,7 @@ struct CreateNanoGrid<SrcGridT>::OrderedBlindMetaData
         if (!metaData->setName(name.c_str())) throw std::runtime_error("blind data name exceeds character limit");
         NANOVDB_ASSERT(metaData->isValid());
     }
-    OrderedBlindMetaData(const std::string& name,// only name
+    OrderedBlindMetaData(const std::string& name,// only used to name blind data
                          GridBlindDataSemantic dataSemantic,
                          GridBlindDataClass dataClass,
                          GridType dataType,
@@ -858,6 +858,9 @@ struct CreateNanoGrid<SrcGridT>::OrderedBlindMetaData
         }
         return type;
     }
+    /// @brief Maps from string names of point attributes in openvdb to GridBlindDataSemantic
+    /// @param String name, typically used for point attributes in OpenVDB
+    /// @return GridBlindDataSemantic
     static GridBlindDataSemantic mapToSemantics(const std::string& name)
     {
         GridBlindDataSemantic semantic = GridBlindDataSemantic::Unknown;
@@ -1161,7 +1164,7 @@ CreateNanoGrid<SrcGridT>::preProcess(uint32_t channels)
     uint32_t order = mBlindMetaData.size();
     char str[16];
     for (uint32_t i=0; i<channels; ++i) {
-        mBlindMetaData.emplace("channel_"+std::to_string(i),
+        mBlindMetaData.emplace("channel_" + std::to_string(i),
                                toStr(str, toGridType<SrcValueT>()),
                                GridBlindDataClass::AttributeArray,
                                order++,
@@ -1259,7 +1262,6 @@ CreateNanoGrid<SrcGridT>::processLeafs()
             } else {
                 dstLeaf->mPrefixSum = 0u;
             }
-            if constexpr(BuildTraits<DstBuildT>::is_indexmask) dstLeaf->mMask = dstLeaf->mValueMask;
         }
     });
 } // CreateNanoGrid::processLeafs<ValueIndex or ValueOnIndex>
@@ -1800,10 +1802,13 @@ CreateNanoGrid<SrcGridT>::postProcess(uint32_t channels)
     for (uint32_t i=0; i<channels; ++i) {
         const std::string name = "channel_"+std::to_string(i);
         int j = dstGrid->findBlindData(name.c_str());
-        if (j<0) throw std::runtime_error("missing " + name);
+        if (j<0) throw std::runtime_error("CreateNanoGrid::postProcess: missing " + name);
         auto *metaData = this->dstMeta(j);// partially set in processGrid
         metaData->mDataClass = GridBlindDataClass::ChannelArray;
         metaData->mDataType  = toGridType<SrcValueT>();
+        if (metaData->mSemantic == GridBlindDataSemantic::Unknown) {// try to derive it from the source grid
+            metaData->mSemantic = toSemantic( mSrcNodeAcc.gridClass());
+        }
         SrcValueT *blindData = const_cast<SrcValueT*>(metaData->template getBlindData<SrcValueT>());
         if (i>0) {// concurrent copy from previous channel
             util::forEach(0,valueCount,1024,[&](const util::Range1D &r){

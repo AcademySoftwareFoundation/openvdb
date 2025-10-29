@@ -144,8 +144,8 @@
 #define NANOVDB_USE_NEW_MAGIC_NUMBERS// enables use of the new magic numbers described above
 
 #define NANOVDB_MAJOR_VERSION_NUMBER 32 // reflects changes to the ABI and hence also the file format
-#define NANOVDB_MINOR_VERSION_NUMBER 8 //  reflects changes to the API but not ABI
-#define NANOVDB_PATCH_VERSION_NUMBER 0 //  reflects changes that does not affect the ABI or API
+#define NANOVDB_MINOR_VERSION_NUMBER  9 // reflects changes to the API but not ABI
+#define NANOVDB_PATCH_VERSION_NUMBER  0 // reflects changes that does not affect the ABI or API
 
 #define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
 
@@ -173,12 +173,6 @@ class ValueIndex{};
 
 /// @brief Dummy type for a voxel whose value equals an offset into an external value array of active values
 class ValueOnIndex{};
-
-/// @brief Like @c ValueIndex but with a mutable mask
-class ValueIndexMask{};
-
-/// @brief Like @c ValueOnIndex but with a mutable mask
-class ValueOnIndexMask{};
 
 /// @brief Dummy type for a voxel whose value equals its binary active state
 class ValueMask{};
@@ -238,14 +232,14 @@ enum class GridType : uint32_t { Unknown = 0, //  unknown value type - should ra
                                  Vec4d = 18, // double precision floating 4D vector
                                  Index = 19, // index into an external array of active and inactive values
                                  OnIndex = 20, // index into an external array of active values
-                                 IndexMask = 21, // like Index but with a mutable mask
-                                 OnIndexMask = 22, // like OnIndex but with a mutable mask
+                                 //IndexMask = 21, // retired ValueIndexMask - available for future use
+                                 //OnIndexMask = 22, // retired ValueOnIndexMask - available for future use
                                  PointIndex = 23, // voxels encode indices to co-located points
                                  Vec3u8 = 24, // 8bit quantization of floating point 3D vector (only as blind data)
                                  Vec3u16 = 25, // 16bit quantization of floating point 3D vector (only as blind data)
                                  UInt8 = 26, // 8 bit unsigned integer values (eg 0 -> 255 gray scale)
                                  End = 27,// total number of types in this enum (excluding StrLen since it's not a type)
-                                 StrLen = End + 12};// this entry is used to determine the minimum size of c-string
+                                 StrLen = End + 11};// this entry is used to determine the minimum size of c-string
 
 /// @brief Maps a GridType to a c-string
 /// @param dst destination string of size 12 or larger
@@ -254,7 +248,7 @@ enum class GridType : uint32_t { Unknown = 0, //  unknown value type - should ra
 __hostdev__ inline char* toStr(char *dst, GridType gridType)
 {
     switch (gridType){
-        case GridType::Unknown:     return util::strcpy(dst, "?");
+        case GridType::Unknown:     return util::strcpy(dst, "Unknown");
         case GridType::Float:       return util::strcpy(dst, "float");
         case GridType::Double:      return util::strcpy(dst, "double");
         case GridType::Int16:       return util::strcpy(dst, "int16");
@@ -275,9 +269,7 @@ __hostdev__ inline char* toStr(char *dst, GridType gridType)
         case GridType::Vec4d:       return util::strcpy(dst, "Vec4d");
         case GridType::Index:       return util::strcpy(dst, "Index");
         case GridType::OnIndex:     return util::strcpy(dst, "OnIndex");
-        case GridType::IndexMask:   return util::strcpy(dst, "IndexMask");
-        case GridType::OnIndexMask: return util::strcpy(dst, "OnIndexMask");// StrLen = 11 + 1 + End
-        case GridType::PointIndex:  return util::strcpy(dst, "PointIndex");
+        case GridType::PointIndex:  return util::strcpy(dst, "PointIndex");// StrLen = 10 + 1 + End
         case GridType::Vec3u8:      return util::strcpy(dst, "Vec3u8");
         case GridType::Vec3u16:     return util::strcpy(dst, "Vec3u16");
         case GridType::UInt8:       return util::strcpy(dst, "uint8");
@@ -409,24 +401,81 @@ enum class PointType : uint32_t { Disable = 0,// no point information e.g. when 
 
 /// @brief Blind-data Classes that are currently supported by NanoVDB
 enum class GridBlindDataClass : uint32_t { Unknown = 0,
-                                           IndexArray = 1,
-                                           AttributeArray = 2,
-                                           GridName = 3,
-                                           ChannelArray = 4,
+                                           IndexArray = 1,// indices typically used for mapping into other arrays
+                                           AttributeArray = 2,// attributes typically associated with points
+                                           GridName = 3,// grid names of length longer than 256 characters
+                                           ChannelArray = 4,// channel of values typically used by index grids
                                            End = 5 };
 
 /// @brief Blind-data Semantics that are currently understood by NanoVDB
 enum class GridBlindDataSemantic : uint32_t { Unknown = 0,
                                               PointPosition = 1, // 3D coordinates in an unknown space
-                                              PointColor = 2,
-                                              PointNormal = 3,
-                                              PointRadius = 4,
-                                              PointVelocity = 5,
-                                              PointId = 6,
+                                              PointColor = 2, // color associated with point
+                                              PointNormal = 3,// normal associated with point
+                                              PointRadius = 4,// radius of point
+                                              PointVelocity = 5,// velocity associated with point
+                                              PointId = 6,// integer ID of point
                                               WorldCoords = 7, // 3D coordinates in world space, e.g. (0.056, 0.8, 1,8)
                                               GridCoords = 8, // 3D coordinates in grid space, e.g. (1.2, 4.0, 5.7), aka index-space
                                               VoxelCoords = 9, // 3D coordinates in voxel space, e.g. (0.2, 0.0, 0.7)
-                                              End = 10 };
+                                              LevelSet = 10, // narrow band level set, e.g. SDF
+                                              FogVolume = 11, // fog volume, e.g. density
+                                              Staggered = 12, // staggered MAC grid, e.g. velocity
+                                              End = 13 };
+
+/// @brief Maps from GridBlindDataSemantic to GridClass
+/// @note Useful when converting an IndexGrid with blind data of type T into a Grid<T>
+/// @param semantics GridBlindDataSemantic
+/// @param defaultClass Default return type used for no match
+/// @return GridClass
+__hostdev__ inline GridClass toGridClass(GridBlindDataSemantic semantics,
+                                         GridClass defaultClass = GridClass::Unknown)
+{
+    switch (semantics){
+    case GridBlindDataSemantic::PointPosition:
+        return GridClass::PointData;
+    case GridBlindDataSemantic::PointColor:
+        return GridClass::PointData;
+    case GridBlindDataSemantic::PointNormal:
+        return GridClass::PointData;
+    case GridBlindDataSemantic::PointRadius:
+        return GridClass::PointData;
+    case GridBlindDataSemantic::PointVelocity:
+        return GridClass::PointData;
+    case GridBlindDataSemantic::PointId:
+        return GridClass::PointIndex;
+    case GridBlindDataSemantic::LevelSet:
+        return GridClass::LevelSet;
+    case GridBlindDataSemantic::FogVolume:
+        return GridClass::FogVolume;
+    case GridBlindDataSemantic::Staggered:
+        return GridClass::Staggered;
+    default:
+        return defaultClass;
+    }
+}
+
+/// @brief Maps from GridClass to GridBlindDataSemantic.
+/// @note Useful when converting a Grid<T> into an IndexGrid with blind data of type T.
+/// @param gridClass GridClass
+/// @param defaultSemantic Default return type used for no match
+/// @return GridBlindDataSemantic
+__hostdev__ inline GridBlindDataSemantic toSemantic(GridClass gridClass,
+                                                    GridBlindDataSemantic defaultSemantic = GridBlindDataSemantic::Unknown)
+{
+    switch (gridClass){
+    case GridClass::PointIndex:
+        return GridBlindDataSemantic::PointId;
+    case GridClass::LevelSet:
+        return GridBlindDataSemantic::LevelSet;
+    case GridClass::FogVolume:
+        return GridBlindDataSemantic::FogVolume;
+    case GridClass::Staggered:
+        return GridBlindDataSemantic::Staggered;
+    default:
+        return defaultSemantic;
+    }
+}
 
 // --------------------------> BuildTraits <------------------------------------
 
@@ -435,10 +484,9 @@ template<typename T>
 struct BuildTraits
 {
     // check if T is an index type
-    static constexpr bool is_index     = util::is_same<T, ValueIndex, ValueIndexMask, ValueOnIndex, ValueOnIndexMask>::value;
-    static constexpr bool is_onindex   = util::is_same<T, ValueOnIndex, ValueOnIndexMask>::value;
-    static constexpr bool is_offindex  = util::is_same<T, ValueIndex, ValueIndexMask>::value;
-    static constexpr bool is_indexmask = util::is_same<T, ValueIndexMask, ValueOnIndexMask>::value;
+    static constexpr bool is_index     = util::is_same<T, ValueIndex, ValueOnIndex>::value;
+    static constexpr bool is_onindex   = util::is_same<T, ValueOnIndex>::value;
+    static constexpr bool is_offindex  = util::is_same<T, ValueIndex>::value;
     // check if T is a compressed float type with fixed bit precision
     static constexpr bool is_FpX = util::is_same<T, Fp4, Fp8, Fp16>::value;
     // check if T is a compressed float type with fixed or variable bit precision
@@ -468,20 +516,6 @@ struct BuildToValueMap<ValueIndex>
 
 template<>
 struct BuildToValueMap<ValueOnIndex>
-{
-    using Type = uint64_t;
-    using type = uint64_t;
-};
-
-template<>
-struct BuildToValueMap<ValueIndexMask>
-{
-    using Type = uint64_t;
-    using type = uint64_t;
-};
-
-template<>
-struct BuildToValueMap<ValueOnIndexMask>
 {
     using Type = uint64_t;
     using type = uint64_t;
@@ -535,6 +569,9 @@ struct BuildToValueMap<Point>
     using Type = uint64_t;
     using type = uint64_t;
 };
+
+template<typename T>
+using BuildToValueMapT = typename BuildToValueMap<T>::type;
 
 // --------------------------> utility functions related to alignment <------------------------------------
 
@@ -597,9 +634,7 @@ __hostdev__ inline bool isInteger(GridType gridType)
 __hostdev__ inline bool isIndex(GridType gridType)
 {
     return gridType == GridType::Index ||// index both active and inactive values
-           gridType == GridType::OnIndex ||// index active values only
-           gridType == GridType::IndexMask ||// as Index, but with an additional mask
-           gridType == GridType::OnIndexMask;// as OnIndex, but with an additional mask
+           gridType == GridType::OnIndex;// index active values only
 }
 
 // --------------------------> isValue(GridType, GridClass) <------------------------------------
@@ -771,19 +806,7 @@ struct FloatTraits<ValueIndex, 1> // size of empty class in C++ is 1 byte and no
 };
 
 template<>
-struct FloatTraits<ValueIndexMask, 1> // size of empty class in C++ is 1 byte and not 0 byte
-{
-    using FloatType = uint64_t;
-};
-
-template<>
 struct FloatTraits<ValueOnIndex, 1> // size of empty class in C++ is 1 byte and not 0 byte
-{
-    using FloatType = uint64_t;
-};
-
-template<>
-struct FloatTraits<ValueOnIndexMask, 1> // size of empty class in C++ is 1 byte and not 0 byte
 {
     using FloatType = uint64_t;
 };
@@ -830,10 +853,6 @@ __hostdev__ inline GridType toGridType()
         return GridType::Index;
     } else if constexpr(util::is_same<BuildT, ValueOnIndex>::value) {
         return GridType::OnIndex;
-    } else if constexpr(util::is_same<BuildT, ValueIndexMask>::value) {
-        return GridType::IndexMask;
-    } else if constexpr(util::is_same<BuildT, ValueOnIndexMask>::value) {
-        return GridType::OnIndexMask;
     } else if constexpr(util::is_same<BuildT, bool>::value) {
         return GridType::Boolean;
     } else if constexpr(util::is_same<BuildT, math::Rgba8>::value) {
@@ -1636,13 +1655,14 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
         return mDataOffset && (mDataType == toGridType<BlindDataT>()) ? util::PtrAdd<BlindDataT>(this, mDataOffset) : nullptr;
     }
 
-    /// @brief return true if this meta data has a valid combination of semantic, class and value tags
-    /// @note this does not check if the mDataOffset has been set!
+    /// @brief return true if this meta data has a valid combination of semantic, class and value tags.
+    /// @note this does not check if the mDataOffset has been set! It is intended to catch invalid combinations
+    ///       of semantic, class and value tags.
     __hostdev__ bool isValid() const
     {
         auto check = [&]()->bool{
             switch (mDataType){
-            case GridType::Unknown: return mValueSize==1u;// i.e. we encode data as mValueCount chars
+            //case GridType::Unknown: return mValueSize==1u;// i.e. we encode data as mValueCount chars
             case GridType::Float:   return mValueSize==4u;
             case GridType::Double:  return mValueSize==8u;
             case GridType::Int16:   return mValueSize==2u;
@@ -1660,6 +1680,10 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
             case GridType::Vec3u16: return mValueSize==6u;
             default: return true;}// all other combinations are valid
         };
+        //if (!check()) {
+        //    char str[20];
+        //    printf("Inconsistent blind data properties: size=%u, GridType=\"%s\"\n",(uint32_t)mValueSize, toStr(str, mDataType) );
+        //}
         return nanovdb::isValid(mDataClass, mSemantic, mDataType) && check();
     }
 
@@ -1738,6 +1762,9 @@ struct NodeTrait<const GridOrTreeOrRootT, 3>
     using Type = const typename GridOrTreeOrRootT::RootNodeType;
     using type = const typename GridOrTreeOrRootT::RootNodeType;
 };
+
+template<typename GridOrTreeOrRootT, int LEVEL>
+using NodeTraitT = typename NodeTrait<GridOrTreeOrRootT, LEVEL>::type;
 
 // ------------> Froward decelerations of accelerated random access methods <---------------
 
@@ -2138,7 +2165,7 @@ public:
 
     /// @brief  @brief Return the total number of values indexed by this IndexGrid
     ///
-    /// @note This method is only defined for IndexGrid = NanoGrid<ValueIndex || ValueOnIndex || ValueIndexMask || ValueOnIndexMask>
+    /// @note This method is only defined for IndexGrid = NanoGrid<ValueIndex || ValueOnIndex >
     template<typename T = BuildType>
     __hostdev__ typename util::enable_if<BuildTraits<T>::is_index, const uint64_t&>::type
     valueCount() const { return DataType::mData1; }
@@ -2387,6 +2414,9 @@ struct GridTree<const GridT>
     using type = const typename GridT::TreeType;
 };
 
+template<typename GridT>
+using GridTreeT = typename GridTree<GridT>::type;
+
 // ----------------------------> Tree <--------------------------------------
 
 /// @brief VDB Tree, which is a thin wrapper around a RootNode.
@@ -2589,7 +2619,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
         static constexpr uint64_t MASK = (1u << 21) - 1; // used to mask out 21 lower bits
         return CoordT(((key >> 42) & MASK) << ChildT::TOTAL, // x are the upper 21 bits
                       ((key >> 21) & MASK) << ChildT::TOTAL, // y are the middle 21 bits
-                      (key & MASK) << ChildT::TOTAL); // z are the lower 21 bits
+                      ( key        & MASK) << ChildT::TOTAL); // z are the lower 21 bits
     }
 #else
     using KeyT = CoordT;
@@ -3507,7 +3537,7 @@ public:
     {
         return (((ijk[0] & MASK) >> ChildT::TOTAL) << (2 * LOG2DIM)) | // note, we're using bitwise OR instead of +
                (((ijk[1] & MASK) >> ChildT::TOTAL) << (LOG2DIM)) |
-               ((ijk[2] & MASK) >> ChildT::TOTAL);
+                ((ijk[2] & MASK) >> ChildT::TOTAL);
     }
 
     /// @return the local coordinate of the n'th tile or child node
@@ -4116,30 +4146,6 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueOnIndex, CoordT, Mask
     }
 }; // LeafData<ValueOnIndex>
 
-// --------------------------> LeafData<ValueIndexMask> <------------------------------------
-
-template<typename CoordT, template<uint32_t> class MaskT, uint32_t LOG2DIM>
-struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueIndexMask, CoordT, MaskT, LOG2DIM>
-    : public LeafData<ValueIndex, CoordT, MaskT, LOG2DIM>
-{
-    using BuildType = ValueIndexMask;
-    MaskT<LOG2DIM>              mMask;
-    __hostdev__ static uint64_t memUsage() { return sizeof(LeafData); }
-    __hostdev__ bool            isMaskOn(uint32_t offset) const { return mMask.isOn(offset); }
-    __hostdev__ void            setMask(uint32_t offset, bool v) { mMask.set(offset, v); }
-}; // LeafData<ValueIndexMask>
-
-template<typename CoordT, template<uint32_t> class MaskT, uint32_t LOG2DIM>
-struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueOnIndexMask, CoordT, MaskT, LOG2DIM>
-    : public LeafData<ValueOnIndex, CoordT, MaskT, LOG2DIM>
-{
-    using BuildType = ValueOnIndexMask;
-    MaskT<LOG2DIM>              mMask;
-    __hostdev__ static uint64_t memUsage() { return sizeof(LeafData); }
-    __hostdev__ bool            isMaskOn(uint32_t offset) const { return mMask.isOn(offset); }
-    __hostdev__ void            setMask(uint32_t offset, bool v) { mMask.set(offset, v); }
-}; // LeafData<ValueOnIndexMask>
-
 // --------------------------> LeafData<Point> <------------------------------------
 
 template<typename CoordT, template<uint32_t> class MaskT, uint32_t LOG2DIM>
@@ -4644,6 +4650,9 @@ struct NanoNode<BuildT, 3>
     using type = NanoRoot<BuildT>;
 };
 
+template<typename BuildT, int LEVEL>
+using NanoNodeT = typename NanoNode<BuildT, LEVEL>::type;
+
 using FloatTree = NanoTree<float>;
 using Fp4Tree = NanoTree<Fp4>;
 using Fp8Tree = NanoTree<Fp8>;
@@ -4662,8 +4671,6 @@ using MaskTree = NanoTree<ValueMask>;
 using BoolTree = NanoTree<bool>;
 using IndexTree = NanoTree<ValueIndex>;
 using OnIndexTree = NanoTree<ValueOnIndex>;
-using IndexMaskTree = NanoTree<ValueIndexMask>;
-using OnIndexMaskTree = NanoTree<ValueOnIndexMask>;
 
 using FloatGrid = Grid<FloatTree>;
 using Fp4Grid = Grid<Fp4Tree>;
@@ -4684,8 +4691,6 @@ using BoolGrid = Grid<BoolTree>;
 using PointGrid = Grid<Point>;
 using IndexGrid = Grid<IndexTree>;
 using OnIndexGrid = Grid<OnIndexTree>;
-using IndexMaskGrid = Grid<IndexMaskTree>;
-using OnIndexMaskGrid = Grid<OnIndexMaskTree>;
 
 // --------------------------> callNanoGrid <------------------------------------
 
@@ -4743,10 +4748,6 @@ auto callNanoGrid(GridDataT *gridData, ArgsT&&... args)
             return OpT::template known<ValueIndex>(gridData, args...);
         case GridType::OnIndex:
             return OpT::template known<ValueOnIndex>(gridData, args...);
-        case GridType::IndexMask:
-            return OpT::template known<ValueIndexMask>(gridData, args...);
-        case GridType::OnIndexMask:
-            return OpT::template known<ValueOnIndexMask>(gridData, args...);
         case GridType::Boolean:
             return OpT::template known<bool>(gridData, args...);
         case GridType::RGBA8:
@@ -5525,15 +5526,15 @@ public:
     __hostdev__ const Map&       map() const { return mGridData.mMap; }
     __hostdev__ const Vec3dBBox& worldBBox() const { return mGridData.mWorldBBox; }
     __hostdev__ const CoordBBox& indexBBox() const { return mIndexBBox; }
-    __hostdev__ Vec3d              voxelSize() const { return mGridData.mVoxelSize; }
-    __hostdev__ int                blindDataCount() const { return mGridData.mBlindMetadataCount; }
-    __hostdev__ uint64_t        activeVoxelCount() const { return mTreeData.mVoxelCount; }
-    __hostdev__ const uint32_t& activeTileCount(uint32_t level) const { return mTreeData.mTileCount[level - 1]; }
-    __hostdev__ uint32_t        nodeCount(uint32_t level) const { return mTreeData.mNodeCount[level]; }
-    __hostdev__ const Checksum& checksum() const { return mGridData.mChecksum; }
-    __hostdev__ uint32_t        rootTableSize() const { return mRootTableSize; }
-    __hostdev__ bool            isEmpty() const { return mRootTableSize == 0; }
-    __hostdev__ Version         version() const { return mGridData.mVersion; }
+    __hostdev__ Vec3d            voxelSize() const { return mGridData.mVoxelSize; }
+    __hostdev__ uint32_t         blindDataCount() const { return mGridData.mBlindMetadataCount; }
+    __hostdev__ uint64_t         activeVoxelCount() const { return mTreeData.mVoxelCount; }
+    __hostdev__ const uint32_t&  activeTileCount(uint32_t level) const { return mTreeData.mTileCount[level - 1]; }
+    __hostdev__ uint32_t         nodeCount(uint32_t level) const { return mTreeData.mNodeCount[level]; }
+    __hostdev__ const Checksum&  checksum() const { return mGridData.mChecksum; }
+    __hostdev__ uint32_t         rootTableSize() const { return mRootTableSize; }
+    __hostdev__ bool             isEmpty() const { return mRootTableSize == 0; }
+    __hostdev__ Version          version() const { return mGridData.mVersion; }
 }; // GridMetaData
 
 /// @brief Class to access points at a specific voxel location
@@ -5852,7 +5853,7 @@ struct FileMetaData
     uint32_t    nodeCount[4]; //4 x 4 = 16B
     uint32_t    tileCount[3];// 3 x 4 = 12B
     Codec       codec;  // 2B
-    uint16_t    padding;// 2B, due to 8B alignment from uint64_t
+    uint16_t    blindDataCount;// 2B
     Version     version;// 4B
 }; // FileMetaData
 
@@ -5894,17 +5895,87 @@ void writeUncompressedGrid(StreamT& os, const GridData* gridData, bool raw = fal
         const char* gridName = gridData->gridName();
         const uint32_t nameSize = util::strlen(gridName) + 1;// include '\0'
         const TreeData* treeData = (const TreeData*)(gridData->treePtr());
+        NANOVDB_ASSERT(gridData->mBlindMetadataCount <= uint32_t( 1u << 16 ));// due to uint32_t -> uin16_t conversion
         FileMetaData meta{gridData->mGridSize, gridData->mGridSize, 0u, treeData->mVoxelCount,
                           gridData->mGridType, gridData->mGridClass, gridData->mWorldBBox,
                           treeData->bbox(), gridData->mVoxelSize, nameSize,
                           {treeData->mNodeCount[0], treeData->mNodeCount[1], treeData->mNodeCount[2], 1u},
                           {treeData->mTileCount[0], treeData->mTileCount[1], treeData->mTileCount[2]},
-                          Codec::NONE, 0u, gridData->mVersion }; // FileMetaData
+                          Codec::NONE, uint16_t(gridData->mBlindMetadataCount), gridData->mVersion }; // FileMetaData
         os.write((const char*)&head, sizeof(FileHeader)); // write header
         os.write((const char*)&meta, sizeof(FileMetaData)); // write meta data
         os.write(gridName, nameSize); // write grid name
     }
-    os.write((const char*)gridData, gridData->mGridSize);// write the grid
+    if (gridData->mGridCount!=1 || gridData->mGridIndex != 0) {
+        GridData data;
+        data = *gridData;// deep copy
+        data.mGridIndex = 0;
+        data.mGridCount = 1;
+        os.write((const char*)&data, sizeof(GridData));
+        os.write((const char*)gridData + sizeof(GridData), gridData->mGridSize - sizeof(GridData));
+    } else {
+        os.write((const char*)gridData, gridData->mGridSize);// write the grid
+    }
+}// writeUncompressedGrid
+
+/// @brief Write an IndexGrid to a stream and append blind data
+/// @tparam StreamT Type of stream to write the IndexGrid and blind data to
+/// @tparam ValueT Type of the blind data
+/// @param os  Output stream to write to
+/// @param gridData GridData containing an IndexGrid WITHOUT existing blind data
+/// @param blindData Raw point to array of blind data
+/// @param semantic GridBlindDataSemantic of the blind data
+/// @param raw If true the IndexGrid and blind data are streamed raw, i.e. without a file header.
+template<typename StreamT, typename ValueT> // StreamT class must support: "void write(const char*, size_t)"
+void writeUncompressedGrid(StreamT& os, const GridData* gridData, const ValueT *blindData,
+                           GridBlindDataSemantic semantic = GridBlindDataSemantic::Unknown, bool raw = false)
+{
+    NANOVDB_ASSERT(gridData->mMagic == NANOVDB_MAGIC_NUMB || gridData->mMagic == NANOVDB_MAGIC_GRID);
+    NANOVDB_ASSERT(gridData->mVersion.isCompatible());
+    NANOVDB_ASSERT(blindData);
+
+    char str[256];
+    if (gridData->mGridClass != GridClass::IndexGrid) {
+        fprintf(stderr, "nanovdb::writeUncompressedGrid: expected an IndexGrid but got \"%s\"\n", toStr(str, gridData->mGridClass));
+        exit(EXIT_FAILURE);
+    } else if (gridData->mBlindMetadataCount != 0u) {// to-do: allow for existing blind data in grid
+        fprintf(stderr, "nanovdb::writeUncompressedGrid: index grid already has \"%i\" blind data\n", gridData->mBlindMetadataCount);
+        exit(EXIT_FAILURE);
+    }
+    const size_t gridSize = gridData->mGridSize + sizeof(GridBlindMetaData) + gridData->mData1*sizeof(ValueT);
+    if (!raw) {// segment with a single grid:  FileHeader, FileMetaData, gridName, Grid
+#ifdef NANOVDB_USE_NEW_MAGIC_NUMBERS
+        FileHeader head{NANOVDB_MAGIC_FILE, gridData->mVersion, 1u/*grid count*/, Codec::NONE};
+#else
+        FileHeader head{NANOVDB_MAGIC_NUMB, gridData->mVersion, 1u/*grid count*/, Codec::NONE};
+#endif
+        const char* gridName = gridData->gridName();
+        const uint32_t nameSize = util::strlen(gridName) + 1;// include '\0'
+        const TreeData* treeData = (const TreeData*)(gridData->treePtr());
+        FileMetaData meta{gridSize, gridSize, 0u, treeData->mVoxelCount,
+                          gridData->mGridType, gridData->mGridClass, gridData->mWorldBBox,
+                          treeData->bbox(), gridData->mVoxelSize, nameSize,
+                          {treeData->mNodeCount[0], treeData->mNodeCount[1], treeData->mNodeCount[2], 1u},
+                          {treeData->mTileCount[0], treeData->mTileCount[1], treeData->mTileCount[2]},
+                          Codec::NONE, 1u, gridData->mVersion }; // FileMetaData
+        os.write((const char*)&head, sizeof(FileHeader)); // write header
+        os.write((const char*)&meta, sizeof(FileMetaData)); // write meta data
+        os.write(gridName, nameSize); // write grid name
+    }// if (!raw)
+    GridData data;
+    data = *gridData;// deep copy
+    data.mGridIndex = 0;
+    data.mGridCount = 1;
+    data.mGridSize  = gridSize;// increment by blind data + meta data
+    data.mBlindMetadataCount = 1u;
+    data.mBlindMetadataOffset = gridData->mGridSize;
+    os.write((const char*)&data, sizeof(GridData));
+    os.write((const char*)gridData + sizeof(GridData), gridData->mGridSize - sizeof(GridData));// write the IndexGrid
+    GridBlindMetaData meta(sizeof(GridBlindMetaData), gridData->mData1, sizeof(ValueT),
+                           semantic, GridBlindDataClass::ChannelArray, toGridType<ValueT>());
+    meta.setName("channel_0");
+    os.write((const char*)&meta, sizeof(GridBlindMetaData));
+    os.write((const char*)blindData, gridData->mData1*sizeof(ValueT));
 }// writeUncompressedGrid
 
 /// @brief  write multiple NanoVDB grids to a single file, without compression.

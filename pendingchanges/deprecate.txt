@@ -1,0 +1,13 @@
+API changes:
+- Removed Grid::evalMinMax(), use tools::minMax for superior threaded performance.
+- Removed points::rasterize() that took a custom filter and interrupter.
+- Removed LeafNode<bool, ...>() TopologyCopy constructor in favor of using explicit
+  mask/buffer constructors.
+- Removed ValueAccessor NodeT0, NodeT1, NodeT2 aliases, use NodeTypeAtLevel instead.
+
+Houdini:
+  Improvements:
+    - Remove support for openvdb_houdini::Interrupter, use
+      openvdb_houdini::HoudiniInterrupter instead.
+    - Remove input-stealing via duplicateSourceStealable(), SideFX have since
+      introduced verbification and compiled SOPs to provide zero-copy node evaluation.

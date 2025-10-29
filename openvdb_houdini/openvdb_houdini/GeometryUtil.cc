@@ -476,14 +476,6 @@ convertGeometry(const GU_Detail& geometry, std::string& warning, openvdb::util::
 }
 
 
-// deprecated
-std::unique_ptr<GU_Detail>
-convertGeometry(const GU_Detail& detail, std::string& warning, Interrupter* boss)
-{
-    return convertGeometry(detail, warning, &boss->interrupter());
-}
-
-
 ////////////////////////////////////////
 
 
