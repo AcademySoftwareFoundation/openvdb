@@ -72,6 +72,8 @@ GridDescriptor::writeStreamPos(std::ostream &os) const
 GridBase::Ptr
 GridDescriptor::read(std::istream &is)
 {
+    checkFormatVersion(is);
+
     // Read in the name.
     mUniqueName = readString(is);
     mGridName = stripSuffix(mUniqueName);
@@ -83,9 +85,7 @@ GridDescriptor::read(std::istream &is)
         mGridType.resize(mGridType.size() - std::strlen(HALF_FLOAT_TYPENAME_SUFFIX));
     }
 
-    if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_GRID_INSTANCING) {
-        mInstanceParentName = readString(is);
-    }
+    mInstanceParentName = readString(is);
 
     // Create the grid of the type if it has been registered.
     if (!GridBase::isRegistered(mGridType)) {

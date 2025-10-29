@@ -44,10 +44,9 @@ jobs:
     - name: install_doxygen
       run: ./ci/install_doxygen.sh 1_8_11
     - name: nanobind
-      run: ./ci/install_nanobind.sh 2.0.0
+      run: ./ci/install_nanobind.sh 2.5.0
     - name: install_latex
-      run: |
-        yum -y install texlive-latex-bin texlive-dvips texlive-collection-fontsrecommended texlive-collection-latexrecommended
+      run: ./ci/install_texlive.sh
     - name: build
       run: >
         ./ci/build.sh -v

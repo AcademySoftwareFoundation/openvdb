@@ -56,26 +56,26 @@ OpenVDB Documentation   | Doxygen                                         | -
 
 Package        | Minimum | Recommended | Description                                                       | apt-get | Homebrew | Source
 -------------- | ------- | ----------- | ----------------------------------------------------------------- | ------- | -------- | ------
-CMake          | 3.20    | Latest      | Cross-platform family of tools designed to help build software    | Y       | Y        | https://cmake.org
+CMake          | 3.24    | Latest      | Cross-platform family of tools designed to help build software    | Y       | Y        | https://cmake.org
 GCC            | 11.2.1  | 11.2.1      | C++ 17 Compiler: The GNU Compiler Collection                      | Y       | Y        | https://www.gnu.org/software/gcc
 Clang          | 5.0     | Latest      | C++ 17 Compiler: A C language family frontend for LLVM            | Y       | Y        | https://clang.llvm.org
 Intel ICC      | 19      | Latest      | C++ 17 Compiler: Intels C++ Compiler                              | Y       | Y        | https://software.intel.com/en-us/c-compilers
 MSVC           | 19.30   | 19.30       | C++ 17 Compiler: Microsoft Visual C++ Compiler                    | Y       | Y        | https://visualstudio.microsoft.com/vs
-Imath          | 3.1     | Latest      | Half precision floating points                                    | Y       | Y        | http://www.openexr.com
-OpenEXR        | 3.1     | Latest      | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
-TBB            | 2020.3  | 2020.3      | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
+Imath          | 3.2     | >= 3.3      | Half precision floating points                                    | Y       | Y        | http://www.openexr.com
+OpenEXR        | 3.2     | >= 3.3      | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
+TBB            | 2020.3  | >= 2021     | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
 ZLIB           | 1.2.7   | Latest      | Compression library for disk serialization compression            | Y       | Y        | https://www.zlib.net
-Boost          | 1.80    | 1.82        | Components: iostreams                                             | Y       | Y        | https://www.boost.org
+Boost          | 1.82    | >= 1.85     | Components: iostreams                                             | Y       | Y        | https://www.boost.org
 LLVM           | 15.0.0* | 18.0.0      | Target-independent code generation                                | Y       | Y        | https://llvm.org/
 Bison          | 3.7.0   | 3.7.0       | General-purpose parser generator                                  | Y       | Y        | https://www.gnu.org/software/gcc
 Flex           | 2.6.4   | 2.6.4       | Fast lexical analyzer generator                                   | Y       | Y        | https://github.com/westes/flex
 Python         | 3.10    | 3.11        | The python interpreter and libraries                              | Y       | Y        | https://www.python.org
-nanobind**     | 2.0.0   | Latest      | C++/python bindings                                               | Y       | Y        | https://nanobind.readthedocs.io
+nanobind**     | 2.0.0   | >= 2.5.0    | C++/python bindings                                               | Y       | Y        | https://nanobind.readthedocs.io
 GoogleTest     | 1.10    | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
-Blosc          | 1.17.0* | 1.17.0      | Recommended dependency for improved disk compression              | Y       | Y        | https://github.com/Blosc/c-blosc/releases
+Blosc          | 1.17.0* | Latest      | Recommended dependency for improved disk compression              | Y       | Y        | https://github.com/Blosc/c-blosc/releases
 Log4cplus      | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus
 libpng         | -       | Latest      | Library for manipulating PNG images                               | Y       | Y        | http://www.libpng.org/pub/png/libpng.html
-GLFW           | 3.1     | > 3.3       | Simple API for OpenGL development                                 | Y       | Y        | https://www.glfw.org
+GLFW           | 3.3     | Latest      | Simple API for OpenGL development                                 | Y       | Y        | https://www.glfw.org
 OpenGL         | 3.2     | Latest      | Environment for developing portable graphics applications         | Y       | Y        | https://www.opengl.org
 GLEW           | 1.0.0   | Latest      | A cross-platform OpenGL extension loading library.                | Y       | Y        | http://glew.sourceforge.net
 CUDA           | -       | Latest      | Parallel computing platform for graphical processing units.       | Y       | N        | https://developer.nvidia.com/cuda-downloads

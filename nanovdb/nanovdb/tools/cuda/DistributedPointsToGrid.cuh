@@ -734,7 +734,6 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     {
         uint32_t* devicePointsPerVoxel = mData->pointsPerVoxel;
         uint32_t* devicePointsPerLeaf = mData->pointsPerLeaf;
-        uint32_t* devicePointsPerVoxelPrefix = mData->pointsPerVoxelPrefix;
         for (const auto& [deviceId, stream] : mDeviceMesh) {
             cudaCheck(cudaSetDevice(deviceId));
 
@@ -981,15 +980,6 @@ inline void DistributedPointsToGrid<BuildT>::processNodes()
         }
     }
 
-    if constexpr(BuildTraits<BuildT>::is_indexmask) {
-        for (const auto& [deviceId, stream] : mDeviceMesh) {
-            cudaCheck(cudaSetDevice(deviceId));
-            if (deviceNodeCount(deviceId)[0]) {
-                kernels::setMaskEqValMaskKernel<BuildT><<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], mData);
-                cudaCheckError();
-            }
-        }
-    }
 }// DistributedPointsToGrid<BuildT>::processNodes
 
 template <typename BuildT>

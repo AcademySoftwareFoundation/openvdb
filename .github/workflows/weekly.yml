@@ -139,28 +139,35 @@ jobs:
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-extra:${{ matrix.config.name }}
     container:
-      image: aswf/ci-openvdb:2024-clang17.2
+      image: aswf/ci-openvdb:${{ matrix.config.image }}
     env:
       CXX: clang++
     strategy:
       matrix:
         config:
-          - { name: 'all',    build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
-          - { name: 'lite',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF -DOPENVDB_USE_DELAYED_LOADING=OFF' }
-          - { name: 'half',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
-          - { name: 'sse',    build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_SIMD=SSE42' }
-          - { name: 'avx',    build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_SIMD=AVX' }
-          - { name: 'pygrid', build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
-          - { name: 'asan',   build: 'asan',    components: 'core,test',                                      cmake: '-DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF -DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
-          - { name: 'ubsan',  build: 'ubsan',   components: 'core,test',                                      cmake: '-DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" ' }
-          - { name: 'c++20',  build: 'Release', components: 'core,test',                                      cmake: '-DCMAKE_CXX_STANDARD=20' }
-          - { name: 'conf',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON' }
+          - { name: 'all',    image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
+          - { name: 'lite',   image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF -DOPENVDB_USE_DELAYED_LOADING=OFF' }
+          - { name: 'half',   image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
+          - { name: 'sse',    image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_SIMD=SSE42' }
+          - { name: 'avx',    image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_SIMD=AVX' }
+          - { name: 'pygrid', image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
+          - { name: 'asan',   image: '2025-clang19.1', build: 'asan',    components: 'core,test',                        cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF -DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
+          - { name: 'ubsan',  image: '2025-clang19.1', build: 'ubsan',   components: 'core,test',                        cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" ' }
+          - { name: 'c++20',  image: '2026',           build: 'Release', components: 'core,test',                        cmake: '-DCMAKE_CXX_STANDARD=20' }
+          - { name: 'conf',   image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
     - name: nanobind
-      #if: contains(container.image, '2023') == false
-      run: ./ci/install_nanobind.sh 2.0.0
+      run: ./ci/install_nanobind.sh 2.5.0
+      # 2026 images are broken with gtest/glfw/exr installs
+    - name: deps
+      if: contains(matrix.config.image, '2026')
+      run: |
+        ./ci/install_gtest.sh latest
+        ./ci/install_glfw.sh latest
+        ./ci/install_imath.sh v3.2.2
+        ./ci/install_exr.sh v3.2.2
     - name: build
       run: >
         ./ci/build.sh -v
@@ -194,8 +201,8 @@ jobs:
       - name: install_deps
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev libgtest-dev libgmock-dev libcppunit-dev
-            ./ci/install_nanobind.sh 2.0.0
+            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev libgtest-dev libgmock-dev python3-numpy
+            ./ci/install_nanobind.sh 2.5.0
           elif [ "$RUNNER_OS" == "macOS" ]; then
             ./ci/install_macos.sh 20
             ./ci/install_tbb_macos.sh
@@ -290,15 +297,14 @@ jobs:
     strategy:
       matrix:
         config:
-          # Unified
-          - { image: '2025-clang19.1', cxx: 'clang++', build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
-          - { image: '2025-clang19.1', cxx: 'g++',     build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
+          - { image: '2025-clang18.1', cxx: 'clang++', build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
+          # @note  LLVM 17 builds are incompatible with the vdb python plugin on linux
+          - { image: '2024-clang17.2', cxx: 'clang++', build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '-DOPENVDB_PYTHON_USE_AX=OFF' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
       - name: nanobind
-        #f: contains(matrix.config.image, '2023') == false
-        run: ./ci/install_nanobind.sh 2.0.0
+        run: ./ci/install_nanobind.sh 2.5.0
       - name: build
         run: >
           ./ci/build.sh -v
@@ -506,7 +512,7 @@ jobs:
       image: aswf/ci-openvdb:2025-clang19.1
     strategy:
       matrix:
-        blosc: ['1.18.0','1.19.0','1.20.0','1.21.0']
+        blosc: ['1.21.0', 'latest']
       fail-fast: false
     steps:
     - uses: actions/checkout@v3

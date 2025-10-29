@@ -440,18 +440,6 @@ __global__ void leafPrefixSumKernel(const size_t numItems, unsigned int offset, 
     }
 }
 
-/// @details Used by PointsToGrid<BuildT, ResourceT>::processLeafNodes to make sure leaf.mMask - leaf.mValueMask.
-/// Moving this away from an implementation using the lambdaKernel wrapper
-/// to fix the following on Windows platform:
-/// error : For this host platform/dialect, an extended lambda cannot be defined inside the 'if'
-/// or 'else' block of a constexpr if statement.
-template<typename BuildT>
-__global__ void setMaskEqValMaskKernel(const size_t numItems, unsigned int offset, PointsToGridData<BuildT>* d_data) {
-    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid >= numItems) return;
-    auto &leaf = d_data->getLeaf(tid + offset);
-    leaf.mMask = leaf.mValueMask;
-}
 } // namespace kernels
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1125,11 +1113,6 @@ inline void PointsToGrid<BuildT, ResourceT>::processLeafNodes(size_t pointCount)
         ResourceT::deallocateAsync(devValueIndexPrefix, mData.nodeCount[0]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
     }
 
-    if constexpr(BuildTraits<BuildT>::is_indexmask) {
-        if (mVerbose==2) mTimer.restart("leaf.mMask = leaf.mValueMask");
-        kernels::setMaskEqValMaskKernel<BuildT><<<numBlocks(mData.nodeCount[0]), mNumThreads, 0, mStream>>>(mData.nodeCount[0], 0, mDeviceData);
-        cudaCheckError();
-    }
     if (mVerbose==2) mTimer.stop();
 }// PointsToGrid<BuildT, ResourceT>::processLeafNodes
 

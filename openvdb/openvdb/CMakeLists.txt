@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 
 # CMP0167 skips the (deprecated) FindBoost.cmake module included with CMake
 # and instead uses the BoostConfig.cmake configuration file (included in
@@ -143,6 +143,12 @@ if(USE_IMATH_HALF)
   message(STATUS "Found Imath: ${openvdb_imath_includes} (found suitable version \"${Imath_VERSION}\", "
     "minimum required is \"${MINIMUM_IMATH_VERSION}\")")
   unset(openvdb_imath_includes)
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_IMATH_VERSION)
+    if(${Imath_VERSION} VERSION_LESS FUTURE_MINIMUM_IMATH_VERSION)
+      message(DEPRECATION "Support for Imath versions < ${FUTURE_MINIMUM_IMATH_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
+  endif()
 endif()
 
 if(USE_LOG4CPLUS)
@@ -413,7 +419,6 @@ set(OPENVDB_LIBRARY_MATH_INCLUDE_FILES
   math/DDA.h
   math/FiniteDifference.h
   math/Half.h
-  math/LegacyFrustum.h
   math/Maps.h
   math/Mat.h
   math/Mat3.h

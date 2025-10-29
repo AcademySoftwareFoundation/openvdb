@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "Transform.h"
-#include "LegacyFrustum.h"
 
 #include <openvdb/version.h>
 #include <sstream>
@@ -67,83 +66,19 @@ Transform::createFrustumTransform(const BBoxd& bbox, double taper,
 void
 Transform::read(std::istream& is)
 {
+    io::checkFormatVersion(is);
+
     // Read the type name.
     Name type = readString(is);
 
-    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NEW_TRANSFORM) {
-        // Handle old-style transforms.
-
-        if (type == "LinearTransform") {
-            // First read in the old transform's base class.
-            Coord tmpMin, tmpMax;
-            is.read(reinterpret_cast<char*>(&tmpMin), sizeof(Coord::ValueType) * 3);
-            is.read(reinterpret_cast<char*>(&tmpMax), sizeof(Coord::ValueType) * 3);
-
-            // Second read in the old linear transform
-            Mat4d tmpLocalToWorld, tmpWorldToLocal, tmpVoxelToLocal, tmpLocalToVoxel;
-
-            tmpLocalToWorld.read(is);
-            tmpWorldToLocal.read(is);
-            tmpVoxelToLocal.read(is);
-            tmpLocalToVoxel.read(is);
-
-            // Convert and simplify
-            AffineMap::Ptr affineMap(new AffineMap(tmpVoxelToLocal*tmpLocalToWorld));
-            mMap = simplify(affineMap);
-
-        } else if (type == "FrustumTransform") {
-
-            internal::LegacyFrustum legacyFrustum(is);
-
-            CoordBBox bb      = legacyFrustum.getBBox();
-            BBoxd   bbox(bb.min().asVec3d(), bb.max().asVec3d()
-                         /* -Vec3d(1,1,1) */
-                         );
-            double  taper     = legacyFrustum.getTaper();
-            double  depth     = legacyFrustum.getDepth();
-
-            double nearPlaneWidth = legacyFrustum.getNearPlaneWidth();
-            double nearPlaneDist  = legacyFrustum.getNearPlaneDist();
-            const Mat4d& camxform        = legacyFrustum.getCamXForm();
-
-            // create the new frustum with these parameters
-            Mat4d xform(Mat4d::identity());
-            xform.setToTranslation(Vec3d(0,0, -nearPlaneDist));
-            xform.preScale(Vec3d(nearPlaneWidth, nearPlaneWidth, -nearPlaneWidth));
-
-            // create the linear part of the frustum (the second map)
-            Mat4d second = xform * camxform;
-
-            // we might have precision problems, the constructor for the
-            // affine map is not forgiving (so we fix here).
-            const Vec4d col3 = second.col(3);
-            const Vec4d ref(0, 0, 0, 1);
-
-            if (ref.eq(col3) ) {
-                second.setCol(3, ref);
-            }
-
-            MapBase::Ptr linearMap(simplify(AffineMap(second).getAffineMap()));
-
-            // note that the depth is scaled on the nearPlaneSize.
-            // the linearMap will uniformly scale the frustum to the correct size
-            // and rotate to align with the camera
-            mMap = MapBase::Ptr(new NonlinearFrustumMap(
-                bbox, taper, depth/nearPlaneWidth, linearMap));
-
-        } else {
-            OPENVDB_THROW(IoError, "Transforms of type " + type + " are no longer supported");
-        }
-    } else {
-        // Check if the map has been registered.
-        if (!MapRegistry::isRegistered(type)) {
-            OPENVDB_THROW(KeyError, "Map " << type << " is not registered");
-        }
-
-        // Create the map of the type and then read it in.
-        mMap = math::MapRegistry::createMap(type);
-        mMap->read(is);
+    // Check if the map has been registered.
+    if (!MapRegistry::isRegistered(type)) {
+        OPENVDB_THROW(KeyError, "Map " << type << " is not registered");
     }
+
+    // Create the map of the type and then read it in.
+    mMap = math::MapRegistry::createMap(type);
+    mMap->read(is);
 }
 
 

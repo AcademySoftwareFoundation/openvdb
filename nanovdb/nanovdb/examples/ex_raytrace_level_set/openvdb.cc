@@ -11,12 +11,12 @@
 #include <openvdb/math/Ray.h>
 #include <openvdb/tools/RayIntersector.h>
 
-#include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/tools/NanoToOpenVDB.h>
 
 #include "common.h"
 
 #if defined(NANOVDB_USE_CUDA)
+#include <nanovdb/cuda/DeviceBuffer.h>
 using BufferT = nanovdb::cuda::DeviceBuffer;
 #else
 using BufferT = nanovdb::HostBuffer;
@@ -31,7 +31,7 @@ void runOpenVDB(nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer>& handle, int nu
     using RayT = openvdb::math::Ray<RealT>;
 
 #if 1
-    auto srcGrid = nanovdb::tools::nanoToOpenVDB(handle);
+    openvdb::GridBase::Ptr srcGrid = nanovdb::tools::nanoToOpenVDB(handle);
     std::cout << "Exporting to OpenVDB grid[" << srcGrid->getName() << "]...\n";
 #else
     openvdb::initialize();
@@ -42,7 +42,7 @@ void runOpenVDB(nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer>& handle, int nu
     std::cout << "Loading OpenVDB grid[" << srcGrid->getName() << "]...\n";
 #endif
 
-    auto h_grid = (GridT*)srcGrid.get();
+    GridT::Ptr h_grid = openvdb::GridBase::grid<GridT>(srcGrid);
 
     float* h_outImage = reinterpret_cast<float*>(imageBuffer.data());
 
@@ -85,7 +85,7 @@ void runOpenVDB(nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer>& handle, int nu
     {
         float durationAvg = 0;
         for (int i = 0; i < numIterations; ++i) {
-            float duration = renderImage(false, renderOp, width, height, h_outImage, h_grid);
+            float duration = renderImage(false, renderOp, width, height, h_outImage, h_grid.get());
             //std::cout << "Duration(OpenVDB-Host) = " << duration << " ms" << std::endl;
             durationAvg += duration;
         }

@@ -1087,7 +1087,7 @@ PNANOVDB_FORCE_INLINE void pnanovdb_write_vec3(pnanovdb_buf_t buf, pnanovdb_addr
 #define PNANOVDB_MAGIC_FILE   0x324244566f6e614eUL// "NanoVDB2" in hex - little endian (uint64_t)
 
 #define PNANOVDB_MAJOR_VERSION_NUMBER 32// reflects changes to the ABI
-#define PNANOVDB_MINOR_VERSION_NUMBER  8// reflects changes to the API but not ABI
+#define PNANOVDB_MINOR_VERSION_NUMBER  9// reflects changes to the API but not ABI
 #define PNANOVDB_PATCH_VERSION_NUMBER  0// reflects bug-fixes with no ABI or API changes
 
 #define PNANOVDB_GRID_TYPE_UNKNOWN 0
@@ -1111,8 +1111,8 @@ PNANOVDB_FORCE_INLINE void pnanovdb_write_vec3(pnanovdb_buf_t buf, pnanovdb_addr
 #define PNANOVDB_GRID_TYPE_VEC4D 18
 #define PNANOVDB_GRID_TYPE_INDEX 19
 #define PNANOVDB_GRID_TYPE_ONINDEX 20
-#define PNANOVDB_GRID_TYPE_INDEXMASK 21
-#define PNANOVDB_GRID_TYPE_ONINDEXMASK 22
+//#define PNANOVDB_GRID_TYPE_INDEXMASK 21   // retired - available for future use
+//#define PNANOVDB_GRID_TYPE_ONINDEXMASK 22 // retired - available for future use
 #define PNANOVDB_GRID_TYPE_POINTINDEX 23
 #define PNANOVDB_GRID_TYPE_VEC3U8 24
 #define PNANOVDB_GRID_TYPE_VEC3U16 25
@@ -1145,7 +1145,7 @@ PNANOVDB_FORCE_INLINE void pnanovdb_write_vec3(pnanovdb_buf_t buf, pnanovdb_addr
 #define PNANOVDB_LEAF_TYPE_LITE 1
 #define PNANOVDB_LEAF_TYPE_FP 2
 #define PNANOVDB_LEAF_TYPE_INDEX 3
-#define PNANOVDB_LEAF_TYPE_INDEXMASK 4
+//#define PNANOVDB_LEAF_TYPE_INDEXMASK 4 // retired - available for future use
 #define PNANOVDB_LEAF_TYPE_POINTINDEX 5
 
 // BuildType = Unknown, float, double, int16_t, int32_t, int64_t, Vec3f, Vec3d, Mask, ...
@@ -1154,13 +1154,13 @@ PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_value_strides_bits[PN
 // bit count of the Tile union in InternalNodes, i.e. 8*sizeof(nanovdb::InternalData::Tile)
 PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_table_strides_bits[PNANOVDB_GRID_TYPE_CAP]  = { 64, 64, 64, 64, 64, 64, 128, 192, 64, 64, 64, 64, 64, 64, 64, 64, 64, 128, 256, 64, 64, 64, 64, 64, 64, 64, 64, 64 };
 // bit count of min/max values, i.e. 8*sizeof(nanovdb::LeafData::mMinimum) or zero if no min/max exists
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_minmax_strides_bits[PNANOVDB_GRID_TYPE_CAP] = {  0, 32, 64, 16, 32, 64,  96, 192,  8, 16, 32,  8, 32, 32, 32, 32, 32, 128, 256, 64, 64, 64, 64, 64, 24, 48,  8,  0 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_minmax_strides_bits[PNANOVDB_GRID_TYPE_CAP] = {  0, 32, 64, 16, 32, 64,  96, 192,  8, 16, 32,  8, 32, 32, 32, 32, 32, 128, 256, 64, 64,  0,  0, 64, 24, 48,  8,  0 };
 // bit alignment of the value type, controlled by the smallest native type, which is why it is always 0, 8, 16, 32, or 64, e.g. for Vec3f it is 32
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_minmax_aligns_bits[PNANOVDB_GRID_TYPE_CAP]  = {  0, 32, 64, 16, 32, 64,  32,  64,  8, 16, 32,  8, 32, 32, 32, 32, 32,  32,  64, 64, 64, 64, 64, 64,  8, 16,  8,  0 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_minmax_aligns_bits[PNANOVDB_GRID_TYPE_CAP]  = {  0, 32, 64, 16, 32, 64,  32,  64,  8, 16, 32,  8, 32, 32, 32, 32, 32,  32,  64, 64, 64,  0,  0, 64,  8, 16,  8,  0 };
 // bit alignment of the stats (avg/std-dev) types, e.g. 8*sizeof(nanovdb::LeafData::mAverage)
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_stat_strides_bits[PNANOVDB_GRID_TYPE_CAP]   = {  0, 32, 64, 32, 32, 64,  32,  64,  8, 32, 32,  8, 32, 32, 32, 32, 32,  32,  64, 64, 64, 64, 64, 64, 32, 32, 32,  0 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_stat_strides_bits[PNANOVDB_GRID_TYPE_CAP]   = {  0, 32, 64, 32, 32, 64,  32,  64,  8, 32, 32,  8, 32, 32, 32, 32, 32,  32,  64, 64, 64,  0,  0, 64, 32, 32, 32,  0 };
 // one of the 4 leaf types defined above, e.g. PNANOVDB_LEAF_TYPE_INDEX = 3
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_leaf_type[PNANOVDB_GRID_TYPE_CAP]           = {  0,  0,  0,  0,  0,  0,  0,    0,  1,  0,  0,  1,  0,  2,  2,  2,  2,   0,   0,  3,  3,  4,  4,  5,  0,  0,  0,  0 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_leaf_type[PNANOVDB_GRID_TYPE_CAP]           = {  0,  0,  0,  0,  0,  0,  0,    0,  1,  0,  0,  1,  0,  2,  2,  2,  2,   0,   0,  3,  3,  0,  0,  5,  0,  0,  0,  0 };
 
 struct pnanovdb_map_t
 {
@@ -1903,8 +1903,8 @@ PNANOVDB_STATIC_CONST pnanovdb_grid_type_constants_t pnanovdb_grid_type_constant
 {32, 64, 96, 128, 136, 160,  256, 32, 24, 64,  8224, 8256, 8288, 8296, 8320, 1056896,  1056, 1088, 1120, 1128, 1152, 132224,  80, 112, 144, 152, 160, 16544},
 {32, 40, 48, 56, 64, 96,  0, 8, 24, 32,  8224, 8232, 8240, 8248, 8256, 270400,  1056, 1064, 1072, 1080, 1088, 33856,  80, 80, 80, 80, 80, 96},
 {32, 40, 48, 56, 64, 96,  0, 8, 24, 32,  8224, 8232, 8240, 8248, 8256, 270400,  1056, 1064, 1072, 1080, 1088, 33856,  80, 80, 80, 80, 80, 96},
-{32, 40, 48, 56, 64, 96,  0, 8, 24, 32,  8224, 8232, 8240, 8248, 8256, 270400,  1056, 1064, 1072, 1080, 1088, 33856,  80, 80, 80, 80, 80, 160},
-{32, 40, 48, 56, 64, 96,  0, 8, 24, 32,  8224, 8232, 8240, 8248, 8256, 270400,  1056, 1064, 1072, 1080, 1088, 33856,  80, 80, 80, 80, 80, 160},
+{28, 28, 28, 28, 28, 32,  0, 8, 20, 32,  8224, 8224, 8224, 8224, 8224, 270368,  1056, 1056, 1056, 1056, 1056, 33824,  80, 80, 80, 80, 96, 96},
+{28, 28, 28, 28, 28, 32,  0, 8, 20, 32,  8224, 8224, 8224, 8224, 8224, 270368,  1056, 1056, 1056, 1056, 1056, 33824,  80, 80, 80, 80, 96, 96},
 {32, 40, 48, 56, 64, 96,  16, 8, 24, 32,  8224, 8232, 8240, 8248, 8256, 270400,  1056, 1064, 1072, 1080, 1088, 33856,  80, 88, 96, 96, 96, 1120},
 {28, 31, 34, 40, 44, 64,  24, 8, 20, 32,  8224, 8227, 8232, 8236, 8256, 270400,  1056, 1059, 1064, 1068, 1088, 33856,  80, 83, 88, 92, 96, 1632},
 {28, 34, 40, 48, 52, 64,  48, 8, 20, 32,  8224, 8230, 8236, 8240, 8256, 270400,  1056, 1062, 1068, 1072, 1088, 33856,  80, 86, 92, 96, 128, 3200},
@@ -2153,57 +2153,6 @@ PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_index_get_value_index(pnan
     return pnanovdb_uint64_offset(offset, n);
 }
 
-// ----------------------------- Leaf IndexMask Specialization ---------------------------------------
-
-PNANOVDB_FORCE_INLINE pnanovdb_bool_t pnanovdb_leaf_indexmask_has_stats(pnanovdb_buf_t buf, pnanovdb_leaf_handle_t leaf)
-{
-    return pnanovdb_leaf_index_has_stats(buf, leaf);
-}
-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_indexmask_get_min_index(pnanovdb_buf_t buf, pnanovdb_address_t min_address)
-{
-    return pnanovdb_leaf_index_get_min_index(buf, min_address);
-}
-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_indexmask_get_max_index(pnanovdb_buf_t buf, pnanovdb_address_t max_address)
-{
-    return pnanovdb_leaf_index_get_max_index(buf, max_address);
-}
-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_indexmask_get_ave_index(pnanovdb_buf_t buf, pnanovdb_address_t ave_address)
-{
-    return pnanovdb_leaf_index_get_ave_index(buf, ave_address);
-}
-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_indexmask_get_dev_index(pnanovdb_buf_t buf, pnanovdb_address_t dev_address)
-{
-    return pnanovdb_leaf_index_get_dev_index(buf, dev_address);
-}
-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_indexmask_get_value_index(pnanovdb_buf_t buf, pnanovdb_address_t value_address, PNANOVDB_IN(pnanovdb_coord_t) ijk)
-{
-    return pnanovdb_leaf_index_get_value_index(buf, value_address, ijk);
-}
-PNANOVDB_FORCE_INLINE pnanovdb_bool_t pnanovdb_leaf_indexmask_get_mask_bit(pnanovdb_buf_t buf, pnanovdb_leaf_handle_t leaf, pnanovdb_uint32_t n)
-{
-    pnanovdb_uint32_t word_idx = n >> 5;
-    pnanovdb_uint32_t bit_idx = n & 31;
-    pnanovdb_uint32_t val_mask =
-        pnanovdb_read_uint32(buf, pnanovdb_address_offset(leaf.address, 96u + 4u * word_idx));
-    return (val_mask & (1u << bit_idx)) != 0u;
-}
-PNANOVDB_FORCE_INLINE void pnanovdb_leaf_indexmask_set_mask_bit(pnanovdb_buf_t buf, pnanovdb_leaf_handle_t leaf, pnanovdb_uint32_t n, pnanovdb_bool_t v)
-{
-    pnanovdb_uint32_t word_idx = n >> 5;
-    pnanovdb_uint32_t bit_idx = n & 31;
-    pnanovdb_uint32_t val_mask =
-        pnanovdb_read_uint32(buf, pnanovdb_address_offset(leaf.address, 96u + 4u * word_idx));
-    if (v)
-    {
-        val_mask = val_mask | (1u << bit_idx);
-    }
-    else
-    {
-        val_mask = val_mask & ~(1u << bit_idx);
-    }
-    pnanovdb_write_uint32(buf, pnanovdb_address_offset(leaf.address, 96u + 4u * word_idx), val_mask);
-}
-
 // ----------------------------- Leaf OnIndex Specialization ---------------------------------------
 
 PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_leaf_onindex_get_value_count(pnanovdb_buf_t buf, pnanovdb_leaf_handle_t leaf)
@@ -2293,65 +2242,6 @@ PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_onindex_get_value_index(pn
         value_index = pnanovdb_uint64_offset(offset, sum);
     }
     return value_index;
-}
-
-// ----------------------------- Leaf OnIndexMask Specialization ---------------------------------------
-
-PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_leaf_onindexmask_get_value_count(pnanovdb_buf_t buf, pnanovdb_leaf_handle_t leaf)
-{
-    return pnanovdb_leaf_onindex_get_value_count(buf, leaf);
-}
-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_onindexmask_get_last_offset(pnanovdb_buf_t buf, pnanovdb_leaf_handle_t leaf)
-{
-    return pnanovdb_leaf_onindex_get_last_offset(buf, leaf);
-}
-PNANOVDB_FORCE_INLINE pnanovdb_bool_t pnanovdb_leaf_onindexmask_has_stats(pnanovdb_buf_t buf, pnanovdb_leaf_handle_t leaf)
-{
-    return pnanovdb_leaf_onindex_has_stats(buf, leaf);
-}
-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_onindexmask_get_min_index(pnanovdb_buf_t buf, pnanovdb_address_t min_address)
-{
-    return pnanovdb_leaf_onindex_get_min_index(buf, min_address);
-}
-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_onindexmask_get_max_index(pnanovdb_buf_t buf, pnanovdb_address_t max_address)
-{
-    return pnanovdb_leaf_onindex_get_max_index(buf, max_address);
-}
-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_onindexmask_get_ave_index(pnanovdb_buf_t buf, pnanovdb_address_t ave_address)
-{
-    return pnanovdb_leaf_onindex_get_ave_index(buf, ave_address);
-}
-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_onindexmask_get_dev_index(pnanovdb_buf_t buf, pnanovdb_address_t dev_address)
-{
-    return pnanovdb_leaf_onindex_get_dev_index(buf, dev_address);
-}
-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_onindexmask_get_value_index(pnanovdb_buf_t buf, pnanovdb_address_t value_address, PNANOVDB_IN(pnanovdb_coord_t) ijk)
-{
-    return pnanovdb_leaf_onindex_get_value_index(buf, value_address, ijk);
-}
-PNANOVDB_FORCE_INLINE pnanovdb_bool_t pnanovdb_leaf_onindexmask_get_mask_bit(pnanovdb_buf_t buf, pnanovdb_leaf_handle_t leaf, pnanovdb_uint32_t n)
-{
-    pnanovdb_uint32_t word_idx = n >> 5;
-    pnanovdb_uint32_t bit_idx = n & 31;
-    pnanovdb_uint32_t val_mask =
-        pnanovdb_read_uint32(buf, pnanovdb_address_offset(leaf.address, 96u + 4u * word_idx));
-    return (val_mask & (1u << bit_idx)) != 0u;
-}
-PNANOVDB_FORCE_INLINE void pnanovdb_leaf_onindexmask_set_mask_bit(pnanovdb_buf_t buf, pnanovdb_leaf_handle_t leaf, pnanovdb_uint32_t n, pnanovdb_bool_t v)
-{
-    pnanovdb_uint32_t word_idx = n >> 5;
-    pnanovdb_uint32_t bit_idx = n & 31;
-    pnanovdb_uint32_t val_mask =
-        pnanovdb_read_uint32(buf, pnanovdb_address_offset(leaf.address, 96u + 4u * word_idx));
-    if (v)
-    {
-        val_mask = val_mask | (1u << bit_idx);
-    }
-    else
-    {
-        val_mask = val_mask & ~(1u << bit_idx);
-    }
-    pnanovdb_write_uint32(buf, pnanovdb_address_offset(leaf.address, 96u + 4u * word_idx), val_mask);
 }
 
 // ----------------------------- Leaf PointIndex Specialization ---------------------------------------
