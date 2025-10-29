@@ -46,9 +46,7 @@ jobs:
     - name: nanobind
       run: ./ci/install_nanobind.sh 2.5.0
     - name: install_latex
-      run: |
-        dnf install -y epel-release
-        dnf install -y texlive-latex-bin texlive-dvips texlive-collection-fontsrecommended texlive-collection-latexrecommended
+      run: ./ci/install_texlive.sh
     - name: build
       run: >
         ./ci/build.sh -v
