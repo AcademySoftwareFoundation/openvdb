@@ -1405,14 +1405,9 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
         const bool delayLoad = ((mappedFile.get() != nullptr) && clipBBox.isInside(nodeBBox));
 
         if (delayLoad) {
-            mBuffer.setOutOfCore(true);
-            mBuffer.mFileInfo = new typename Buffer::FileInfo;
-            mBuffer.mFileInfo->meta = meta;
-            mBuffer.mFileInfo->bufpos = is.tellg();
-            mBuffer.mFileInfo->mapping = mappedFile;
-            // Save the offset to the value mask, because the in-memory copy
+            // Save the offset to the value mask (maskpos), because the in-memory copy
             // might change before the value buffer gets read.
-            mBuffer.mFileInfo->maskpos = maskpos;
+            mBuffer.enableOutOfCore(meta, is.tellg(), mappedFile, maskpos);
             // Skip over voxel values.
             skipCompressedValues(seekable, is, fromHalf);
         } else {
