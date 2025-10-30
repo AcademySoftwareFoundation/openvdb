@@ -322,7 +322,7 @@ TEST_F(TestLevelSetRayIntersector, testMissedIntersections)
     tools::LevelSetRayIntersector<FloatGrid> lsri(*ls);
 
     // Create a ray that misses the sphere, but intersects the bounding box
-    const Vec3T dir(-2.0, -2.0, 3.0); // Ray crossing the sphere
+    const Vec3T dir = Vec3T(-2.0, -2.0, 3.0).unit(); // Ray crossing the sphere
     const Vec3T eye(12.0, 12.0, 12.0); // Starting point
     const RayT ray(eye, dir);
 
