@@ -330,6 +330,7 @@ if(USE_EXPLICIT_INSTANTIATION)
 
   set(OPENVDB_LIBRARY_INSTANTIATION_ALL_TREES
     MaskTree
+    HalfTree
     points::PointDataTree
     ${OPENVDB_LIBRARY_INSTANTIATION_VOLUME_TREES}
   )
@@ -419,6 +420,7 @@ set(OPENVDB_LIBRARY_MATH_INCLUDE_FILES
   math/DDA.h
   math/FiniteDifference.h
   math/Half.h
+  math/HalfDecl.h
   math/Maps.h
   math/Mat.h
   math/Mat3.h

@@ -10,6 +10,7 @@
 
 #include <openvdb/Platform.h>
 #include <openvdb/version.h>
+#include <openvdb/math/HalfDecl.h>
 #include <openvdb/util/Assert.h>
 #include <algorithm> // for std::max()
 #include <cassert>
@@ -72,6 +73,16 @@ template<typename T> inline constexpr T zeroVal() { return T(0); }
 template<> inline std::string zeroVal<std::string>() { return ""; }
 /// Return the @c bool value that corresponds to zero.
 template<> inline constexpr bool zeroVal<bool>() { return false; }
+
+
+/// @note Extends the implementation of std::is_arithmetic to support math::half
+template<typename T>
+struct is_arithmetic : std::is_arithmetic<T> {};
+template<>
+struct is_arithmetic<math::half> : std::true_type {};
+// Helper variable template (equivalent to std::is_arithmetic_v)
+template<typename T>
+inline constexpr bool is_arithmetic_v = is_arithmetic<T>::value;
 
 namespace math {
 
@@ -145,16 +156,18 @@ template<> inline std::string negative(const std::string& val) { return val; }
 
 //@{
 /// Tolerance for floating-point comparison
-template<typename T> struct Tolerance { static T value() { return zeroVal<T>(); } };
-template<> struct Tolerance<float>    { static float value() { return 1e-8f; } };
-template<> struct Tolerance<double>   { static double value() { return 1e-15; } };
+template<typename T> struct Tolerance   { static T value() { return zeroVal<T>(); } };
+template<> struct Tolerance<math::half> { static math::half value() { return math::half(0.00097656f); } };
+template<> struct Tolerance<float>      { static float value() { return 1e-8f; } };
+template<> struct Tolerance<double>     { static double value() { return 1e-15; } };
 //@}
 
 //@{
 /// Delta for small floating-point offsets
-template<typename T> struct Delta { static T value() { return zeroVal<T>(); } };
-template<> struct Delta<float>    { static float value() { return  1e-5f; } };
-template<> struct Delta<double>   { static double value() { return 1e-9; } };
+template<typename T> struct Delta   { static T value() { return zeroVal<T>(); } };
+template<> struct Delta<math::half> { static math::half value() { return math::half(0.00390625f); } };
+template<> struct Delta<float>      { static float value() { return  1e-5f; } };
+template<> struct Delta<double>     { static double value() { return 1e-9; } };
 //@}
 
 
@@ -375,6 +388,10 @@ inline bool
 isFinite(const float x) { return std::isfinite(x); }
 
 /// Return @c true if @a x is finite.
+inline bool
+isFinite(const math::half x) { return x.isFinite(); }
+
+/// Return @c true if @a x is finite.
 template<typename Type, typename std::enable_if<std::is_arithmetic<Type>::value, int>::type = 0>
 inline bool
 isFinite(const Type& x) { return std::isfinite(static_cast<double>(x)); }
@@ -385,6 +402,10 @@ inline bool
 isInfinite(const float x) { return std::isinf(x); }
 
 /// Return @c true if @a x is an infinity value (either positive infinity or negative infinity).
+inline bool
+isInfinite(const math::half x) { return x.isInfinity(); }
+
+/// Return @c true if @a x is an infinity value (either positive infinity or negative infinity).
 template<typename Type, typename std::enable_if<std::is_arithmetic<Type>::value, int>::type = 0>
 inline bool
 isInfinite(const Type& x) { return std::isinf(static_cast<double>(x)); }
@@ -393,6 +414,10 @@ isInfinite(const Type& x) { return std::isinf(static_cast<double>(x)); }
 /// Return @c true if @a x is a NaN (Not-A-Number) value.
 inline bool
 isNan(const float x) { return std::isnan(x); }
+
+/// Return @c true if @a x is a NaN (Not-A-Number) value.
+inline bool
+isNan(const math::half x) { return x.isNan(); }
 
 /// Return @c true if @a x is a NaN (Not-A-Number) value.
 template<typename Type, typename std::enable_if<std::is_arithmetic<Type>::value, int>::type = 0>
@@ -571,6 +596,15 @@ Pow(Type x, int n)
 
 //@{
 /// Return @a b<sup>e</sup>.
+inline math::half
+Pow(math::half b, math::half e)
+{
+    OPENVDB_ASSERT( b >= 0.0f && "Pow(half,half): base is negative" );
+    return math::half(powf(float(b),float(e)));
+}
+
+//@{
+/// Return @a b<sup>e</sup>.
 inline float
 Pow(float b, float e)
 {
@@ -589,12 +623,29 @@ Pow(double b, double e)
 
 // ==========> Max <==================
 
+namespace internal {
+
+inline const math::half&
+max_impl(const math::half& a, const math::half& b)
+{
+    return a < b ? b : a;
+}
+
+template<typename Type>
+inline const Type&
+max_impl(const Type& a, const Type& b)
+{
+    return std::max(a,b);
+}
+
+} // namespace internal
+
 /// Return the maximum of two values
 template<typename Type>
 inline const Type&
 Max(const Type& a, const Type& b)
 {
-    return std::max(a,b);
+    return internal::max_impl(a,b);
 }
 
 /// Return the maximum of three values
@@ -602,7 +653,7 @@ template<typename Type>
 inline const Type&
 Max(const Type& a, const Type& b, const Type& c)
 {
-    return std::max(std::max(a,b), c);
+    return internal::max_impl(internal::max_impl(a,b), c);
 }
 
 /// Return the maximum of four values
@@ -610,7 +661,7 @@ template<typename Type>
 inline const Type&
 Max(const Type& a, const Type& b, const Type& c, const Type& d)
 {
-    return std::max(std::max(a,b), std::max(c,d));
+    return internal::max_impl(internal::max_impl(a,b), internal::max_impl(c,d));
 }
 
 /// Return the maximum of five values
@@ -618,7 +669,7 @@ template<typename Type>
 inline const Type&
 Max(const Type& a, const Type& b, const Type& c, const Type& d, const Type& e)
 {
-    return std::max(std::max(a,b), Max(c,d,e));
+    return internal::max_impl(internal::max_impl(a,b), Max(c,d,e));
 }
 
 /// Return the maximum of six values
@@ -626,7 +677,7 @@ template<typename Type>
 inline const Type&
 Max(const Type& a, const Type& b, const Type& c, const Type& d, const Type& e, const Type& f)
 {
-    return std::max(Max(a,b,c), Max(d,e,f));
+    return internal::max_impl(Max(a,b,c), Max(d,e,f));
 }
 
 /// Return the maximum of seven values
@@ -635,7 +686,7 @@ inline const Type&
 Max(const Type& a, const Type& b, const Type& c, const Type& d,
     const Type& e, const Type& f, const Type& g)
 {
-    return std::max(Max(a,b,c,d), Max(e,f,g));
+    return internal::max_impl(Max(a,b,c,d), Max(e,f,g));
 }
 
 /// Return the maximum of eight values
@@ -644,28 +695,48 @@ inline const Type&
 Max(const Type& a, const Type& b, const Type& c, const Type& d,
     const Type& e, const Type& f, const Type& g, const Type& h)
 {
-    return std::max(Max(a,b,c,d), Max(e,f,g,h));
+    return internal::max_impl(Max(a,b,c,d), Max(e,f,g,h));
 }
 
 
 // ==========> Min <==================
 
+namespace internal {
+
+inline const math::half&
+min_impl(const math::half& a, const math::half& b)
+{
+    return b < a ? b : a;
+}
+
+template<typename Type>
+inline const Type&
+min_impl(const Type& a, const Type& b)
+{
+    return std::min(a,b);
+}
+
+} // namespace internal
+
 /// Return the minimum of two values
 template<typename Type>
 inline const Type&
-Min(const Type& a, const Type& b) { return std::min(a, b); }
+Min(const Type& a, const Type& b) { return internal::min_impl(a, b); }
 
 /// Return the minimum of three values
 template<typename Type>
 inline const Type&
-Min(const Type& a, const Type& b, const Type& c) { return std::min(std::min(a, b), c); }
+Min(const Type& a, const Type& b, const Type& c)
+{
+    return internal::min_impl(internal::min_impl(a, b), c);
+}
 
 /// Return the minimum of four values
 template<typename Type>
 inline const Type&
 Min(const Type& a, const Type& b, const Type& c, const Type& d)
 {
-    return std::min(std::min(a, b), std::min(c, d));
+    return internal::min_impl(internal::min_impl(a, b), internal::min_impl(c, d));
 }
 
 /// Return the minimum of five values
@@ -673,7 +744,7 @@ template<typename Type>
 inline const Type&
 Min(const Type& a, const Type& b, const Type& c, const Type& d, const Type& e)
 {
-    return std::min(std::min(a,b), Min(c,d,e));
+    return internal::min_impl(internal::min_impl(a,b), Min(c,d,e));
 }
 
 /// Return the minimum of six values
@@ -681,7 +752,7 @@ template<typename Type>
 inline const Type&
 Min(const Type& a, const Type& b, const Type& c, const Type& d, const Type& e, const Type& f)
 {
-    return std::min(Min(a,b,c), Min(d,e,f));
+    return internal::min_impl(Min(a,b,c), Min(d,e,f));
 }
 
 /// Return the minimum of seven values
@@ -690,7 +761,7 @@ inline const Type&
 Min(const Type& a, const Type& b, const Type& c, const Type& d,
     const Type& e, const Type& f, const Type& g)
 {
-    return std::min(Min(a,b,c,d), Min(e,f,g));
+    return internal::min_impl(Min(a,b,c,d), Min(e,f,g));
 }
 
 /// Return the minimum of eight values
@@ -699,7 +770,7 @@ inline const Type&
 Min(const Type& a, const Type& b, const Type& c, const Type& d,
     const Type& e, const Type& f, const Type& g, const Type& h)
 {
-    return std::min(Min(a,b,c,d), Min(e,f,g,h));
+    return internal::min_impl(Min(a,b,c,d), Min(e,f,g,h));
 }
 
 
@@ -916,10 +987,11 @@ enum RotationOrder {
     ZXZ_ROTATION
 };
 
-template <typename S, typename T, typename = std::enable_if_t<std::is_arithmetic_v<S>&& std::is_arithmetic_v<T>>>
+template <typename S, typename T, typename = std::enable_if_t<openvdb::is_arithmetic_v<S>&& openvdb::is_arithmetic_v<T>>>
 struct promote {
     using type = typename std::common_type_t<S,T>;
 };
+
 
 /// @brief Return the index [0,1,2] of the smallest value in a 3D vector.
 /// @note This methods assumes operator[] exists.

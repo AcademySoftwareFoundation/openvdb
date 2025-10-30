@@ -53,6 +53,7 @@ namespace io { class DelayedLoadMetadata; }
 using BoolTree     = tree::Tree4<bool,        5, 4, 3>::Type;
 using DoubleTree   = tree::Tree4<double,      5, 4, 3>::Type;
 using FloatTree    = tree::Tree4<float,       5, 4, 3>::Type;
+using HalfTree     = tree::Tree4<Half,        5, 4, 3>::Type;
 using Int32Tree    = tree::Tree4<int32_t,     5, 4, 3>::Type;
 using Int64Tree    = tree::Tree4<int64_t,     5, 4, 3>::Type;
 using MaskTree     = tree::Tree4<ValueMask,   5, 4, 3>::Type;
@@ -73,6 +74,7 @@ using VectorTree   = Vec3fTree;
 using BoolGrid     = Grid<BoolTree>;
 using DoubleGrid   = Grid<DoubleTree>;
 using FloatGrid    = Grid<FloatTree>;
+using HalfGrid     = Grid<HalfTree>;
 using Int32Grid    = Grid<Int32Tree>;
 using Int64Grid    = Grid<Int64Tree>;
 using MaskGrid     = Grid<MaskTree>;
@@ -94,7 +96,7 @@ using IntegerGridTypes = TypeList<Int32Grid, Int64Grid>;
 /// The scalar Grid types which OpenVDB will register by default. This is a
 /// combination of native floating point and integer grid types. Note that
 /// this list does not include Bool or Mask Grids.
-using NumericGridTypes  = RealGridTypes::Append<IntegerGridTypes>;
+using NumericGridTypes  = RealGridTypes::Append<IntegerGridTypes>::Append<HalfGrid>;
 /// The Vec3 Grid types which OpenVDB will register by default.
 using Vec3GridTypes     = TypeList<Vec3IGrid, Vec3SGrid, Vec3DGrid>;
 
@@ -116,11 +118,11 @@ template <typename T> using ToTreeType = typename T::TreeType;
 }
 /// @name Lists of native Tree Types
 /// @{
-using RealTreeTypes    = RealGridTypes::Transform<internal::ToTreeType>;
-using IntegerTreeTypes = IntegerGridTypes::Transform<internal::ToTreeType>;
-using NumericTreeTypes = NumericGridTypes::Transform<internal::ToTreeType>;
-using Vec3TreeTypes    = Vec3GridTypes::Transform<internal::ToTreeType>;
-using TreeTypes        = GridTypes::Transform<internal::ToTreeType>;
+using RealTreeTypes            = RealGridTypes::Transform<internal::ToTreeType>;
+using IntegerTreeTypes         = IntegerGridTypes::Transform<internal::ToTreeType>;
+using NumericTreeTypes         = NumericGridTypes::Transform<internal::ToTreeType>;
+using Vec3TreeTypes            = Vec3GridTypes::Transform<internal::ToTreeType>;
+using TreeTypes                = GridTypes::Transform<internal::ToTreeType>;
 /// @}
 
 
@@ -204,6 +206,7 @@ using MetaTypes = TypeList<
     BoolMetadata,
     DoubleMetadata,
     FloatMetadata,
+    HalfMetadata,
     Int32Metadata,
     Int64Metadata,
     StringMetadata,
