@@ -392,8 +392,8 @@ TEST_F(TestMath, testMinMaxImpl)
 {
     using namespace openvdb;
     { // Test equality
-        const float a = 3.14;
-        const float b = 3.14;
+        const float a = 3.14f;
+        const float b = 3.14f;
         const Half c = static_cast<Half>(a);
         const Half d = static_cast<Half>(b);
         EXPECT_EQ(&std::max(a, b), &math::internal::max_impl(a, b));
