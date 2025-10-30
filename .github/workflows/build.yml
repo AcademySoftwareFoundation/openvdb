@@ -142,6 +142,9 @@ jobs:
     - name: install
       shell: powershell
       run: .\ci\install_windows.ps1
+    - name: install_numpy
+      shell: powershell
+      run: .\ci\install_windows_numpy.ps1
     - name: build
       run: >
         ./ci/build.sh -v
