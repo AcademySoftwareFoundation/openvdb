@@ -24,6 +24,7 @@
 #include <tbb/parallel_reduce.h>
 
 #include <cmath> // for std::isnan(), std::isfinite()
+#include <limits>
 #include <set>
 #include <sstream>
 #include <string>
@@ -441,7 +442,7 @@ struct CheckNormGrad
         : acc(grid.getConstAccessor())
         , invdx2(ValueType(1.0/math::Pow2(grid.voxelSize()[0])))
         , minVal2(_min*_min)
-        , maxVal2(_max*_max)
+        , maxVal2(_max < std::numeric_limits<ValueType>::max() ? _max*_max : _max)
     {
         if ( !grid.hasUniformVoxels() ) {
             OPENVDB_THROW(ValueError, "CheckNormGrad: The transform must have uniform scale");
