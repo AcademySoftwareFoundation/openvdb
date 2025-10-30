@@ -110,7 +110,7 @@ jobs:
         \"
     - name: test
       # Skip Debug on commits as they take a while.
-      if: github.event_name == 'schedule'|| matrix.config.build == 'Release'
+      if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || matrix.config.build == 'Release'
       run: |
         cd build && ctest -V
         cd - && ./ci/test_install.sh
