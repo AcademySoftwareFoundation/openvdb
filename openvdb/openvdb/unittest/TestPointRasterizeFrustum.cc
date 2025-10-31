@@ -1794,9 +1794,10 @@ struct HaltOnSecondInterrupt : public util::NullInterrupter
     inline bool wasInterrupted(int percent = -1) override
     {
         (void)percent;
-        if (mInterrupt)     return true;
-        mInterrupt = true;
-        return false;
+        bool expected = false;
+        // Atomically: if mInterrupt is false, set it to true and return false
+        //             if mInterrupt is true, return true
+        return !mInterrupt.compare_exchange_strong(expected, true);
     }
     std::atomic<bool> mInterrupt{false};
 };
