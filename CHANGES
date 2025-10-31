@@ -1,7 +1,129 @@
 OpenVDB Version History
 =======================
 
-Version 12.1.2 - In development
+Version 13.0.0 - October 31, 2025
+
+      This version introduces ABI changes relative to older major releases,
+      so to preserve ABI compatibility it might be necessary to define the
+      macro OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 11 for
+      Houdini 20.5 and 12 for Houdini 21.0.
+
+      Support for reading .vdb files written prior to VDB 1.0 has been removed.
+      To read older .vdb files, please use VDB 12.x or older and re-write them,
+      so that they use the newer file format and can be read in VDB 13+.
+
+  OpenVDB:
+    New features:
+    - Added customization of the output transformation attribute for
+      points::pca(). Can be output as a quaternion or as a combined affine
+      transform with the scale/stretch ommitted.
+    - Added support for input quaternions attributes and affine
+      transformations (that include scale) in points::rasterizeSdf() for
+      ellipsoidal rasterizations.
+
+    API Changes:
+    - Added LeafBuffer<bool, Log2Dim>::storage() for direct const access to the
+      raw data buffer when using the bool LeafNode.
+    - Removed Grid::evalMinMax(), use tools::minMax for superior threaded
+      performance.
+    - Removed points::rasterize() that took a custom filter and interrupter.
+    - Removed LeafNode<bool, ...>() TopologyCopy constructor in favor of using
+      explicit mask/buffer constructors.
+    - Removed ValueAccessor NodeT0, NodeT1, NodeT2 aliases, use NodeTypeAtLevel
+      instead.
+    - Add InternalNode::setValueMaskUnsafe() to write a value mask directly.
+    - LegacyFrustum and RootNodeMask have been removed. These classes were only
+      used for reading old .vdb files, which is no longer supported.
+    - io::writeCompressedValues() now takes a const ValueT* source buffer for
+      improved const-correctness.
+
+    Bug Fixes:
+    - Fix a bug in the LevelSetRayIntersector class where two of the methods
+      were incorrectly adjusting the time even when an intersection was not
+      found.
+
+    Build:
+    - Removed the unnecessary USE_NUMPY build option for the OpenVDB Python
+      module. All functions which take numpy arrays are now always generated
+      (numpy is not required at compile time for this support).
+    - Bumped minimum supported CMake version to 3.24, and new future minimum
+      to 4.0.0.
+    - Bumped minimum supported OpenEXR and Imath versions to 3.2, and new
+      future minimum to 3.3.
+    - Bumped minimum supported Boost version to 1.82, and new future minimum
+      to 1.85.
+    - Bumped minimum supported Python version to 3.11
+    - Bumped minimum supported Log4cplus version to 2.0
+    - Bumped minimum supported Houdini version to 20.5
+    - Bumped minimum supported GLFW version to 3.3
+    - Bumped future minimum for TBB to 2021 (oneapi).
+    - Bumped future minimum for nanobind to 2.5.0.
+
+  OpenVDB AX:
+    New:
+    - Added support for LLVM 21.
+
+  NanoVDB:
+    Highlights:
+    - NanoVDB is no longer limited to static applications, such as rendering,
+      but can increasingly be applied to problems that involve dynamic
+      topology, such as level set tracking, grid building, morphology
+      operations and merging of grids. This is due to the fact that we keep
+      adding more and more tools to NanoVDB that facilitates tree modification.
+      However, unlike OpenVDB, these operations generate new NanoVDB grids (as
+      oppose to in-palace modifications in OpenVDB), yet are typically much
+      faster since they are performed on the GPU. Many of these exciting new
+      features are the foundation of fVDB.
+
+    New features:
+    - Added nanovdb/tools/cuda/DilateGrid.cuh, which performs topology dilation
+      on the GPU.
+    - Added nanovdb/tools/cuda/MergeGrids.cuh, which merges the topology of two
+      grids on the GPU.
+    - Added nanovdb/tools/cuda/CoarsenGrid.cuh, which performs topological
+      coarsening of grids on the GPU.
+    - Added nanovdb/tools/cuda/RefineGrid.cuh, which performs topological
+      refinement of grids on the GPU.
+    - Added nanovdb/tools/cuda/PruneGrid.cuh, which prunes the topology of a
+      grid using a sidecar mask on the GPU.
+    - Added nanovdb/util/cuda/Injection.cuh, which facilitates sidecar data
+      copying - on the GPU - in the overlap of two grids with different
+      topology.
+    - Added Mat classes and other math types to NanoVDB.
+    - Major rewrite of nanovdb::NanoToOpenVDB, which now allows
+      nanovdb::IndexGrids and blind (or sidecar) data to be converted into an
+      openvdb grid.
+    - Added support for LevelSet, FogVolume, and Staggered grid semantics.
+      Added toGridClass and toSemantic to map Grid Blind data semantic to Grid
+      class and vice versa.
+
+    Improvements:
+    - Improvements to mGPU grid building and introduction of a separate test
+      executable for mGPU tests
+    - Added stand-alone function nanovdb::writeUncompressedGrid that allows
+      nanovdb::IndexGrids and blind (or sidecar) data to be written directly to
+      a stream.
+    - nanovdb_print now (optionally) prints the blind data count per grid.
+    - Extended nanovdb::GridBlindDataSemantic with nanovdb::GridClass types to
+      support conversion between IndexGrid and regular grids.
+    - Improvements and bugfixes to PNanoVDB.
+
+    API Changes:
+    - Removed nanovdb::ValueIndexMask and nanovdb::ValueOnIndexMask since they
+      are no longer used by fVDB (or elsewhere).
+    - NanoVDB version is now 32.9.0, so the ABI of the grid is preserved but
+      not the API. However, the API changes are very minor!
+
+    Bug Fixes:
+    - Several fixes for compiler warnings.
+    - Fixed error in nanovdb/io/IO.h related to missing throws.
+
+  Houdini:
+  - Remove support for openvdb_houdini::Interrupter, use
+    openvdb_houdini::HoudiniInterrupter instead.
+  - Remove input-stealing via duplicateSourceStealable(), SideFX have since
+    introduced verbification and compiled SOPs to provide zero-copy node
+    evaluation.
 
 
 Version 12.1.1 - September 30, 2025
