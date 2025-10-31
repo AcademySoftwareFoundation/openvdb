@@ -14,6 +14,7 @@ Version 13.0.0 - October 31, 2025
 
   OpenVDB:
     New features:
+    - Added native registration of HalfGrid type.
     - Added customization of the output transformation attribute for
       points::pca(). Can be output as a quaternion or as a combined affine
       transform with the scale/stretch ommitted.
