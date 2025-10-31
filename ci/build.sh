@@ -196,8 +196,8 @@ set -x
 # - always enabled the python tests with OPENVDB_BUILD_PYTHON_UNITTESTS if the python module is in use,
 #   regardless of the 'test' component being enabled or not (see the OPENVDB_BUILD_PYTHON_UNITTESTS option).
 cmake \
-    -DOPENVDB_USE_DEPRECATED_ABI_10=ON \
     -DOPENVDB_USE_DEPRECATED_ABI_11=ON \
+    -DOPENVDB_USE_DEPRECATED_ABI_12=ON \
     -DOPENVDB_TOOL_USE_NANO=OFF \
     -DOPENVDB_BUILD_BINARIES=ON \
     -DOPENVDB_BUILD_PYTHON_UNITTESTS=ON \
