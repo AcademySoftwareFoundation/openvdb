@@ -339,10 +339,12 @@ NanoToOpenVDB::process(trait::OpenNodeT<NanoBuildT, LEVEL> *dstNode,
             dstTable[n].setValue(*trait::mapPtr(&srcData->mTable[n].value));
         }
     }
+    // Extract type alias before lambda for MSVC compatibility
+    using DstChildNodeType = typename DstNodeT::ChildNodeType;
     auto kernel = [&](const auto& r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
             auto &p = childNodes[i];
-            auto* dstChild = new typename DstNodeT::ChildNodeType();// un-initialized
+            auto* dstChild = new DstChildNodeType();// un-initialized
             this->template process<LEVEL-1, NanoBuildT>(dstChild, p.second);
             dstTable[p.first].setChild( dstChild );
         }
@@ -380,10 +382,12 @@ NanoToOpenVDB::process(trait::OpenNodeT<NanoValueT, LEVEL> *dstNode,
             dstTable[n].setValue(*trait::mapPtr(sideCar + srcData->mTable[n].value));
         }
     }
+    // Extract type alias before lambda for MSVC compatibility
+    using DstChildNodeType = typename DstNodeT::ChildNodeType;
     auto kernel = [&](const auto& r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
             auto &p = childNodes[i];
-            auto *dstChild = new typename DstNodeT::ChildNodeType();// un-initialized
+            auto *dstChild = new DstChildNodeType();// un-initialized
             this->template process<LEVEL-1, NanoIndexT, NanoValueT>(dstChild, p.second, sideCar);
             dstTable[p.first].setChild( dstChild );
         }
