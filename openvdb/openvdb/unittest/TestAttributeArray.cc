@@ -314,7 +314,8 @@ TEST_F(TestAttributeArray, testAttributeArray)
         EXPECT_EQ(4.6, attr2.get(9));
     }
 
-#ifdef NDEBUG
+    // the following tests are not run when asserts are enabled
+#ifndef OPENVDB_ENABLE_ASSERTS
     { // test setUnsafe and getUnsafe on uniform arrays
         AttributeArrayD::Ptr attr(new AttributeArrayD(50));
 

@@ -112,7 +112,7 @@ public:
     /// unit vector
     Quat(const Vec3<T> &axis, T angle)
     {
-        OPENVDB_ASSERT(isApproxEqual(axis.length(), T(1)));
+        OPENVDB_ASSERT(isApproxEqual(axis.length(), T(1), T(1.0e-7)));
 
         T s = T(sin(angle*T(0.5)));
 

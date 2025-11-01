@@ -383,8 +383,8 @@ TEST_F(TestPointDataLeaf, testOffsets)
 
 TEST_F(TestPointDataLeaf, testSetValue)
 {
-    // the following tests are not run when in debug mode due to assertions firing
-#ifdef NDEBUG
+    // the following tests are not run when asserts are enabled
+#ifndef OPENVDB_ENABLE_ASSERTS
     LeafType leaf(openvdb::Coord(0, 0, 0));
 
     openvdb::Coord xyz(0, 0, 0);
