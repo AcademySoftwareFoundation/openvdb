@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 13.0.0 - October 31, 2025
+Version 13.0.0 - November 2, 2025
 
       This version introduces ABI changes relative to older major releases,
       so to preserve ABI compatibility it might be necessary to define the
