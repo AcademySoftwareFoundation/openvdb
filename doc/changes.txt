@@ -2,9 +2,154 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v12_1_2_changes"></a>@endhtmlonly
+@htmlonly <a name="v13_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 12.1.2</B> - <I>In development</I>
+<B>Version 13.0.0</B> - <I>November 2, 2025</I>
+
+@par
+<BLOCKQUOTE>
+This version introduces ABI changes relative to older major releases, so to
+preserve ABI compatibility it might be necessary to define the macro
+<TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>, where, for example,
+<I>N</I> is 11 for Houdini&nbsp;20.5 and 12 for Houdini&nbsp;21.0.
+</BLOCKQUOTE>
+
+@par
+<BLOCKQUOTE>
+Support for reading <TT>.vdb</TT> files written prior to VDB&nbsp;1.0 has been
+removed. To read older <TT>.vdb</TT> files, please use VDB&nbsp;12.x or older
+and re-write them, so that they use the newer file format and can be read in
+VDB&nbsp;13+.
+</BLOCKQUOTE>
+
+@par
+OpenVDB:
+- New features:
+  - Added native registration of HalfGrid type.
+  - Added customization of the output transformation attribute for
+    @vdblink::points::pca points::pca@endlink. Can be output as a quaternion
+    or as a combined affine transform with the scale/stretch ommitted.
+  - Added support for input quaternions attributes and affine transformations
+    (that include scale) in
+    @vdblink::points::rasterizeSdf points::rasterizeSdf@endlink for
+    ellipsoidal rasterizations.
+
+- API Changes:
+  - Added @vdblink::tree::LeafNode LeafNode@endlink<TT>bool</TT>,
+    @vdblink::Index Index@endlink>::storage() for direct const access to the
+    raw data buffer when using the bool LeafNode.
+  - Removed @vdblink::Grid Grid@endlink::evalMinMax(), use
+    @vdblink::tools::minMax tools::minMax@endlink for superior threaded
+    performance.
+  - Removed @vdblink::points points@endlink::rasterize() that took a custom
+    filter and interrupter.
+  - Removed @vdblink::tree::LeafNode LeafNode@endlink<TT>bool</TT>, ...>()
+    TopologyCopy constructor in favor of using explicit mask/buffer
+    constructors.
+  - Removed @vdblink::tree::ValueAccessor ValueAccessor@endlink NodeT0,
+    NodeT1, NodeT2 aliases, use NodeTypeAtLevel instead.
+  - Add @vdblink::tree::InternalNode InternalNode@endlink::setValueMaskUnsafe()
+    to write a value mask directly.
+  - LegacyFrustum and RootNodeMask have been removed. These classes were
+    only used for reading old .vdb files, which is no longer supported.
+  - @vdblink::io io@endlink::writeCompressedValues() now takes a const ValueT*
+    source buffer for improved const-correctness.
+
+- Bug Fixes:
+  - Fix a bug in the
+    @vdblink::tools::LevelSetRayIntersector LevelSetRayIntersector@endlink class
+    where two of the methods were incorrectly adjusting the time even when an
+    intersection was not found.
+  - Fixed an assertion in @vdblink::math::Quat math::Quat@endlink where a
+    vector length check was using too small a tolerance.
+  - Fixed a bug in the unit tests where detecting if assertions were enabled
+    was using @c NDEBUG rather than OpenVDB assertions.
+
+- Build:
+  - Removed the unnecessary @c USE_NUMPY build option for the OpenVDB Python
+    module. All functions which take numpy arrays are now always generated
+    (numpy is not required at compile time for this support).
+  - Bumped minimum supported CMake version to 3.24, and new future minimum to
+    4.0.0.
+  - Bumped minimum supported OpenEXR and Imath versions to 3.2, and new
+    future minimum to 3.3.
+  - Bumped minimum supported Boost version to 1.82, and new future minimum to
+    1.85.
+  - Bumped minimum supported Python version to 3.11
+  - Bumped minimum supported Log4cplus version to 2.0
+  - Bumped minimum supported Houdini version to 20.5
+  - Bumped minimum supported GLFW version to 3.3
+  - Bumped future minimum for TBB to 2021 (oneapi).
+  - Bumped future minimum for nanobind to 2.5.0.
+
+@par
+OpenVDB AX:
+- New:
+  - Added support for LLVM 21.
+
+@par
+NanoVDB:
+- Highlights:
+  - NanoVDB is no longer limited to static applications, such as rendering,
+    but can increasingly be applied to problems that involve dynamic topology,
+    such as level set tracking, grid building, morphology operations and
+    merging of grids. This is due to the fact that we keep adding more and
+    more tools to NanoVDB that facilitates tree modification. However, unlike
+    OpenVDB, these operations generate new NanoVDB grids (as oppose to
+    in-palace modifications in OpenVDB), yet are typically much faster since
+    they are performed on the GPU. Many of these exciting new features are the
+    foundation of fVDB.
+
+- New features:
+  - Added <TT>nanovdb/tools/cuda/DilateGrid.cuh</TT>, which performs topology
+    dilation on the GPU.
+  - Added <TT>nanovdb/tools/cuda/MergeGrids.cuh</TT>, which merges the topology
+    of two grids on the GPU.
+  - Added <TT>nanovdb/tools/cuda/CoarsenGrid.cuh</TT>, which performs topological
+    coarsening of grids on the GPU.
+  - Added <TT>nanovdb/tools/cuda/RefineGrid.cuh</TT>, which performs topological
+    refinement of grids on the GPU.
+  - Added <TT>nanovdb/tools/cuda/PruneGrid.cuh</TT>, which prunes the topology of
+    a grid using a sidecar mask on the GPU.
+  - Added <TT>nanovdb/util/cuda/Injection.cuh</TT>, which facilitates sidecar
+    data copying - on the GPU - in the overlap of two grids with different
+    topology.
+  - Added Mat classes and other math types to NanoVDB.
+  - Major rewrite of nanovdb::NanoToOpenVDB, which now allows
+    nanovdb::IndexGrids and blind (or sidecar) data to be converted into
+    an openvdb grid.
+  - Added support for LevelSet, FogVolume, and Staggered grid semantics.
+    Added toGridClass and toSemantic to map Grid Blind data semantic to
+    Grid class and vice versa.
+
+- Improvements:
+  - Improvements to mGPU grid building and introduction of a separate test
+    executable for mGPU tests
+  - Added stand-alone function nanovdb::writeUncompressedGrid that allows
+    nanovdb::IndexGrids and blind (or sidecar) data to be written directly
+    to a stream.
+  - @c nanovdb_print now (optionally) prints the blind data count per grid.
+  - Extended nanovdb::GridBlindDataSemantic with nanovdb::GridClass types
+    to support conversion between IndexGrid and regular grids.
+  - Improvements and bugfixes to PNanoVDB.
+
+- API Changes:
+  - Removed nanovdb::ValueIndexMask and nanovdb::ValueOnIndexMask since
+    they are no longer used by fVDB (or elsewhere).
+  - NanoVDB version is now 32.9.0, so the ABI of the grid is preserved
+    but not the API. However, the API changes are very minor!
+
+- Bug Fixes:
+  - Several fixes for compiler warnings.
+  - Fixed error in <TT>nanovdb/io/IO.h</TT> related to missing throws.
+
+@par
+Houdini:
+- Remove support for openvdb_houdini::Interrupter, use
+  openvdb_houdini::HoudiniInterrupter instead.
+- Remove input-stealing via duplicateSourceStealable(), SideFX have since
+  introduced verbification and compiled SOPs to provide zero-copy node
+  evaluation.
 
 
 @htmlonly <a name="v12_1_1_changes"></a>@endhtmlonly
@@ -190,7 +335,7 @@ NanoVDB:
   - Fixed a call to a non-existent method in GridBuild.h
 
 
-@htmlonly <a name="v1_changes"></a>@endhtmlonly
+@htmlonly <a name="v12_0_0_changes"></a>@endhtmlonly
 @par
 <B>Version 12.0.0</B> - <I>October 31, 2024</I>
 
