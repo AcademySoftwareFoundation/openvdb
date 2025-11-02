@@ -1,7 +1,0 @@
-- Support for reading .vdb files written prior to VDB 1.0 has been removed.
-  To read older .vdb files, please use VDB 12.x or older and re-write them,
-  so that they use the newer file format and can be read in VDB 13+.
-
-API changes:
- - LegacyFrustum and RootNodeMask have been removed. These classes were only
-   used for reading old .vdb files, which is no longer supported.

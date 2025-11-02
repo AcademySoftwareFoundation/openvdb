@@ -1,7 +1,0 @@
-OpenVDB:
-  New features:
-    - Added customization of the output transformation attribute for points::pca(). 
-      Can be output as a quaternion or as a combined affine transform with the 
-      scale/stretch ommitted.
-    - Added support for input quaternions attributes and affine transformations
-      (that include scale) in points::rasterizeSdf() for ellipsoidal rasterizations.
