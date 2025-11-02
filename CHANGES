@@ -42,6 +42,10 @@ Version 13.0.0 - October 31, 2025
     - Fix a bug in the LevelSetRayIntersector class where two of the methods
       were incorrectly adjusting the time even when an intersection was not
       found.
+    - Fixed an assertion in math::Quat where a vector length check was using
+      too small a tolerance.
+    - Fixed a bug in the unit tests where detecting if assertions were enabled
+      was using NDEBUG rather than OpenVDB assertions.
 
     Build:
     - Removed the unnecessary USE_NUMPY build option for the OpenVDB Python
