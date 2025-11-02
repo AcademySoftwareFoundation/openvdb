@@ -167,7 +167,7 @@ meshToVolume(
     int flags = 0,
     typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid = nullptr,
     InteriorTest interiorTest = nullptr,
-    InteriorTestStrategy interiorTestStrategy = EVAL_EVERY_VOXEL);
+    InteriorTestStrategy interiorTestStrat = EVAL_EVERY_VOXEL);
 
 
 ////////////////////////////////////////

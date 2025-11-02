@@ -25,6 +25,7 @@
 
 struct TestVolumeExecutableAcc;
 
+/// @cond OPENVDB_DOCS_INTERNAL
 namespace llvm {
 class ExecutionEngine;
 class LLVMContext;
@@ -32,6 +33,7 @@ namespace orc {
 class LLJIT;
 }
 }
+/// @endcond
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

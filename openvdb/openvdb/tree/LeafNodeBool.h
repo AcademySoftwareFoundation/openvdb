@@ -419,7 +419,7 @@ public:
     /// it should not be converted to a non-const pointer!
     const bool& getLastValue() const { if (mValueMask.isOn(SIZE-1)) return Buffer::sOn; else return Buffer::sOff; }
 
-    /// Return @c true if all of this node's voxels have the same active state
+    /// @brief Return @c true if all of this node's voxels have the same active state
     /// and are equal to within the given tolerance, and return the value in
     /// @a constValue and the active state in @a state.
     bool isConstant(bool& constValue, bool& state, bool tolerance = 0) const;
@@ -771,6 +771,7 @@ private:
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 template<Index Log2Dim>
 inline
@@ -1068,7 +1069,6 @@ LeafNode<bool, Log2Dim>::operator!=(const LeafNode& other) const
 
 
 ////////////////////////////////////////
-
 
 template<Index Log2Dim>
 inline bool
@@ -1595,6 +1595,8 @@ LeafNode<bool, Log2Dim>::combine2(const LeafNode& b0, const OtherNodeT& b1, Comb
         mBuffer.mData.set(i, result);
     }
 }
+
+/// @endcond
 
 
 } // namespace tree

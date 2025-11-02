@@ -181,7 +181,7 @@ OpenVDB AX:
 @par
 Houdini:
   - Fixed a compilation issue with the OpenVDB Activate SOP with Houdini 21
-  [Reported by @callen128]
+  [Reported by \@callen128]
 
 
 @htmlonly <a name="v12_1_0_changes"></a>@endhtmlonly
@@ -740,10 +740,10 @@ OpenVDB:
   - Fixed a bug with LeafManager which wouldn't correctly
     initialize its LeafNode array for single level Tree configurations
     i.e. RootNode<LeafNode> (bug introduced in 7.2.0).
-    [Reported by @lanwatch]
+    [Reported by \@lanwatch]
   - Fixed a bug with LeafNodeBool Topology constructor with designated
     on/off values which wouldn't apply them correctly.
-    [Reported by @hozhaoea]
+    [Reported by \@hozhaoea]
 
 @par
 OpenVDB AX:
@@ -2802,7 +2802,7 @@ Improvements:
   util::PagedArray@endlink.
 - Added an @c install_lib build target to the Makefile.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
-- Added @subpage points "documentation" and Cookbook
+- Added @ref points "documentation" and Cookbook
   @ref openvdbPointsHelloWorld "examples" for OpenVDB&nbsp;Points.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 - Registration of OpenVDB&nbsp;Points grid and attribute types is now

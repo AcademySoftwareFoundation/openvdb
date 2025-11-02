@@ -1,0 +1,16 @@
+
+html {
+    /* override light-mode variables here */
+}
+
+html.dark-mode {
+    /* define dark-mode variable overrides here */
+    --openvdb-group-header-override: white;
+}
+
+/* Fix @name group sections in dark theme appearing strangely */
+div.groupHeader
+{
+    box-shadow: none;
+    color: var(--openvdb-group-header-override);
+}

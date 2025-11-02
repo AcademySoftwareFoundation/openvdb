@@ -1,6 +1,6 @@
 /**
 
-@page python Using OpenVDB in Python
+@page python OpenVDB Python
 
 This section describes the OpenVDB Python module and includes Python code
 snippets and some complete programs that illustrate how to perform common tasks.

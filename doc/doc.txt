@@ -22,43 +22,29 @@ primarily by
 - Mihai Ald&eacute;n
 - David Hill
 
-See the @subpage changes "Release Notes" for what&rsquo;s new in this version
-of @b OpenVDB.
-
-See the @subpage dependencies "Dependencies" page for @b OpenVDB requirements.
-
-See @subpage build "Building OpenVDB" for information on building @b OpenVDB.
-
-See the @subpage overview "Overview" for an introduction to the library.
-
-See @subpage transformsAndMaps "Transforms and Maps" for more
-discussion of the transforms used in @b OpenVDB.
-
-See the @subpage faq "FAQ" for frequently asked questions about @b OpenVDB.
-
-See the @subpage codeExamples "Cookbook" to get started using @b OpenVDB.
-
-See @subpage points "OpenVDB Points" to store point data using @b OpenVDB.
-
-See @subpage python "Using OpenVDB in Python" to get started with the
-@b OpenVDB Python module.
-
+@par Quick Links
+- @subpage changes "Release Notes"
+- @subpage dependencies "Dependencies"
+- @subpage build "Building OpenVDB"
+- @subpage overview "Overview"
+    - @ref transformsAndMaps "Transforms and Maps"
+    - @ref codeExamples "Cookbook"
+    - @ref faq "FAQ"
+- @subpage python "OpenVDB Python"
+- @subpage points "OpenVDB Points"
 @if OPENVDB_AX
-See @subpage openvdbax "OpenVDB AX" for the AX documentation.
+- @subpage openvdbax "OpenVDB AX"
 @endif
-
 @if OPENVDB_HOUDINI
-See the @subpage houdini "Houdini Cookbook" for help on implementing Houdini nodes.
+- @subpage houdini "Houdini Cookbook"
 @endif
-
 @if NANOVDB
-See @subpage NanoVDB_MainPage "NanoVDB" for the NanoVDB documentation.
+- @subpage NanoVDB_MainPage "NanoVDB"
 @endif
+- <a href="../code_coverage/index.html">Code Coverage</a>
 
 Contributors, please familiarize yourselves with our
 @subpage codingStyle "coding standards".
-
-<a href="../code_coverage/index.html">Code Coverage</a>
 
 
 @page overview OpenVDB Overview
@@ -81,6 +67,9 @@ Contributors, please familiarize yourselves with our
   - @ref subsecNodeIter
   - @ref subsecValueAccessor
   - @ref subsecTraversal
+- @subpage transformsAndMaps "Transforms and Maps"
+
+
 <!-- - @ref secRegistry -->
 
 
@@ -320,7 +309,7 @@ as level sets.
 (The lower-level @vdblink::tools::GridResampler GridResampler@endlink does not,
 but it is optimized for level set grids in that it transforms only voxels
 in the narrow band and relies on
-@vdblink::Grid::signedFloodFill() signed flood fill@endlink to reconstruct
+@vdblink::tools::signedFloodFill() signed flood fill@endlink to reconstruct
 the inside and outside regions.)
 Other tools whose behavior is affected by the grid class include the
 @vdblink::tools::divergence() divergence@endlink operator (which has an

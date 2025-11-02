@@ -24,6 +24,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace points {
 
+/// @cond OPENVDB_DOCS_INTERNAL
+
 namespace point_attribute_internal {
 
 template <typename ValueType>
@@ -34,6 +36,7 @@ struct Default
 
 } // namespace point_attribute_internal
 
+/// @endcond
 
 /// @brief Appends a new attribute to the VDB tree
 /// (this method does not require a templated AttributeType)

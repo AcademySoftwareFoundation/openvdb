@@ -269,7 +269,7 @@ protected:
     /// @param step The step size for setting the XY range data, defaults to 1.
     /// @note Function to be implemented by derived classes to set XY range data.
     /// This function is called at most 4 times within @c iterate().
-    void setXYRangeData(const Index&) {}
+    void setXYRangeData([[maybe_unused]] const Index& step) {}
 
     /// @brief Checks if the tile of a given dimension can possibly fit within the region.
     ///
@@ -281,13 +281,13 @@ protected:
     /// can't fit then @c iterate will not try to populate the level set with background
     /// tiles of this dimension.
     /// @return true if the tile can possibly fit; otherwise false.
-    inline bool tileCanFit(const Index&) const { return true; }
+    inline bool tileCanFit([[maybe_unused]] const Index& dim) const { return true; }
 
     // distance in index space
     /// @brief Computes the signed distance from a point to the convex region in index space.
     ///
     /// @param p The point in 3D space for which to compute the signed distance.
-    inline ValueT signedDistance(const Vec3T&) const { return ValueT(0); }
+    inline ValueT signedDistance([[maybe_unused]] const Vec3T& p) const { return ValueT(0); }
 
     /// @brief Computes the signed distance for tiles in index space,
     /// considering the center of the tile.

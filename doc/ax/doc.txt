@@ -1,5 +1,4 @@
 /**
-<div style="width:800px;text-align:justify;">
 
 @page openvdbax OpenVDB AX
 
@@ -41,7 +40,7 @@ provided:
 @par
  - @subpage axexamples "Code Examples" for examples of OpenVDB AX in action.
  - @subpage axfunctionlist "AX Functions" for a list of all available AX functions.
- - @subpage build "Building OpenVDB" and @subpage dependencies "OpenVDB Dependencies" for information on building OpenVDB and <b>OpenVDB AX</b>.
+ - @ref build "Building OpenVDB" and @ref dependencies "OpenVDB Dependencies" for information on building OpenVDB and <b>OpenVDB AX</b>.
 
 </div>
 */

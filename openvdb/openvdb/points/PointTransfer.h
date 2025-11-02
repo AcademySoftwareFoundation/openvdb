@@ -410,6 +410,8 @@ private:
     NodeMaskT* mMask;
 };
 
+/// @cond OPENVDB_DOCS_INTERNAL
+
 namespace transfer_internal
 {
 template<typename T, typename F, size_t... Is>
@@ -437,6 +439,8 @@ void foreach(void** buffers, const F& func, std::integer_sequence<size_t, Is...>
     };
 }
 }
+
+/// @endcond
 
 template <typename ...TreeTypes>
 VolumeTransfer<TreeTypes...>::VolumeTransfer(TreeTypes*... trees)
@@ -480,6 +484,8 @@ inline void VolumeTransfer<TreeTypes...>::foreach(const FunctorT& functor)
     transfer_internal::foreach<TreeTupleT, TypeResolver>(mBuffers.data(), functor,
         std::make_integer_sequence<size_t, Size>());
 }
+
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace transfer_internal
 {
@@ -691,6 +697,8 @@ private:
 };
 
 } // namespace transfer_internal
+
+/// @endcond
 
 ///////////////////////////////////////////////////
 ///////////////////////////////////////////////////

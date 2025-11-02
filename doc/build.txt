@@ -288,7 +288,7 @@ Required:
 
 Optional:
 
-  - @b [CMAKE_INSTALL_PREFIX](https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html)
+  - [CMAKE_INSTALL_PREFIX](https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html)
   =`/path/to/install/dir` # The location you wish to install OpenVDB to. See
  the link for default values.
   - @b OPENVDB_HOUDINI_INSTALL_PREFIX =`/path/to/install/dir` # The location to
@@ -381,7 +381,7 @@ Required:
 
 Optional:
 
-  - @b [CMAKE_INSTALL_PREFIX](https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html)
+  - [CMAKE_INSTALL_PREFIX](https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html)
   =`/path/to/install/dir` # The location you wish to install OpenVDB to. See
  the link for default values.
   - @b OPENVDB_MAYA_INSTALL_PREFIX =`/path/to/install/dir` # The location to
@@ -449,7 +449,7 @@ Now you can call CMake by providing the absolute or relative path to the root
 of the OpenVDB source tree. Below are some common options you may want to
 provide:
 
-- @b [CMAKE_INSTALL_PREFIX](https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html)
+- [CMAKE_INSTALL_PREFIX](https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html)
 =`/path/to/install/dir` # The location you wish to install OpenVDB to. See
 the link for default values.
 - @b Xxx_ROOT =`/path/to/Xxx/` # Give CMake a path to where a package has been
@@ -579,8 +579,7 @@ bypass these checks with `-D DISABLE_DEPENDENCY_VERSION_CHECKS=ON` if necessary.
 Note that using older or untested dependencies may produce undesired behavior.
 Older versions in particular are not supported by OpenVDB.
 
-@b Note: Boost will produce a version error in the format `Detected version of
-Boost is too old.`
+@b Note: Boost will produce a version error in the format: `Detected version of Boost is too old.`
 
 @subsection troubleshoot3 CMake warnings/errors in FindBoost.cmake
 
@@ -632,9 +631,9 @@ Note that you can provide a value for `CMAKE_MSVC_RUNTIME_LIBRARY` which is a
 native CMake variable to override any CRT selection done by OpenVDB.
 
 For more information, see the following articles:
-Description of CRT selection: https://docs.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library
-In depth descriptopn of the CRT on Windows: https://docs.microsoft.com/en-us/cpp/c-runtime-library/crt-library-features
-Related errors: https://docs.microsoft.com/en-us/cpp/error-messages/tool-errors/linker-tools-error-lnk2038
+- Description of CRT selection: https://docs.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library
+- In depth descriptopn of the CRT on Windows: https://docs.microsoft.com/en-us/cpp/c-runtime-library/crt-library-features
+- Related errors: https://docs.microsoft.com/en-us/cpp/error-messages/tool-errors/linker-tools-error-lnk2038
 `CMAKE_MSVC_RUNTIME_LIBRARY` docs: https://cmake.org/cmake/help/latest/variable/CMAKE_MSVC_RUNTIME_LIBRARY.html
 
 @subsection troubleshoot5 Unexpected value for the Windows CRT with target build artifacts.
@@ -656,9 +655,9 @@ usage, it is strongly encouraged to match the selection against your desired
 build type.
 
 For more information, see the following articles:
-Description of CRT selection: https://docs.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library
-In depth descriptopn of the CRT on Windows: https://docs.microsoft.com/en-us/cpp/c-runtime-library/crt-library-features
-Related errors: https://docs.microsoft.com/en-us/cpp/error-messages/tool-errors/linker-tools-error-lnk2038
+- Description of CRT selection: https://docs.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library
+- In depth descriptopn of the CRT on Windows: https://docs.microsoft.com/en-us/cpp/c-runtime-library/crt-library-features
+- Related errors: https://docs.microsoft.com/en-us/cpp/error-messages/tool-errors/linker-tools-error-lnk2038
 `CMAKE_MSVC_RUNTIME_LIBRARY` docs: https://cmake.org/cmake/help/latest/variable/CMAKE_MSVC_RUNTIME_LIBRARY.html
 
 @subsection troubleshoot6 error LNK2038: mismatch detected for 'RuntimeLibrary'

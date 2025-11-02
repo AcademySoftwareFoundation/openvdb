@@ -1,5 +1,4 @@
 /**
-<div style="width:800px;text-align:justify;">
 
 @page axfunctionlist AX Supported Functions
 
@@ -721,7 +720,7 @@ double(int64 seed);
 @anchor axrand32
 @par rand32
 Creates a random number based on the provided 32 bit seed. The number will be in the range of 0 to
-1. The same number is produced for the same seed. NOTE: This function does not share the same
+1\. The same number is produced for the same seed. NOTE: This function does not share the same
 random number generator as rand(). rand32() may provide a higher throughput on some
 architectures, but will produce different results to rand(). NOTE: If rand32 is called without
 a seed the previous state of the random number generator is advanced for the currently
@@ -881,6 +880,4 @@ int64(int64 dividend; int64 divisor);
 int32(int32 dividend; int32 divisor);
 @endcode
 
-
-</div>
 */

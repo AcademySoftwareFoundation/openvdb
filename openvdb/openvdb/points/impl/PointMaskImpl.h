@@ -291,7 +291,6 @@ inline typename GridT::Ptr convertPointsToScalar(
 
 } // namespace point_mask_internal
 
-/// @endcond
 
 ////////////////////////////////////////
 
@@ -347,6 +346,7 @@ convertPointsToMask(
         nonConstPoints, transform, filter, deformer, threaded);
 }
 
+/// @endcond
 
 ////////////////////////////////////////
 
