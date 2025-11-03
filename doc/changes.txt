@@ -4,7 +4,7 @@
 
 @htmlonly <a name="v13_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 13.0.0</B> - <I>November 2, 2025</I>
+<B>Version 13.0.0</B> - <I>November 3, 2025</I>
 
 @par
 <BLOCKQUOTE>
@@ -50,25 +50,22 @@ OpenVDB:
     ellipsoidal rasterizations.
 
 - API Changes:
-  - Added @vdblink::tree::LeafNode LeafNode@endlink<TT>bool</TT>,
-    @vdblink::Index Index@endlink>::storage() for direct const access to the
-    raw data buffer when using the bool LeafNode.
-  - Removed @vdblink::Grid Grid@endlink::evalMinMax(), use
+  - Added @vdblink::tree::LeafBuffer::storage() LeafBuffer::storage()@endlink
+    for direct const access to the raw data buffer when using the bool LeafNode.
+  - Removed Grid::evalMinMax(), use
     @vdblink::tools::minMax tools::minMax@endlink for superior threaded
     performance.
-  - Removed @vdblink::points points@endlink::rasterize() that took a custom
-    filter and interrupter.
-  - Removed @vdblink::tree::LeafNode LeafNode@endlink<TT>bool</TT>, ...>()
-    TopologyCopy constructor in favor of using explicit mask/buffer
-    constructors.
+  - Removed points::rasterize() that took a custom filter and interrupter.
+  - Removed LeafNodeBool TopologyCopy constructor in favor of using explicit
+    mask/buffer constructors.
   - Removed @vdblink::tree::ValueAccessor ValueAccessor@endlink NodeT0,
     NodeT1, NodeT2 aliases, use NodeTypeAtLevel instead.
-  - Add @vdblink::tree::InternalNode InternalNode@endlink::setValueMaskUnsafe()
+  - Add @vdblink::tree::InternalNode::setValueMaskUnsafe() InternalNode::setValueMaskUnsafe()@endlink
     to write a value mask directly.
   - LegacyFrustum and RootNodeMask have been removed. These classes were
     only used for reading old .vdb files, which is no longer supported.
-  - @vdblink::io io@endlink::writeCompressedValues() now takes a const ValueT*
-    source buffer for improved const-correctness.
+  - @vdblink::io::writeCompressedValues() io::writeCompressedValues()@endlink
+    now takes a const ValueT* source buffer for improved const-correctness.
 
 - Bug Fixes:
   - Fix a bug in the

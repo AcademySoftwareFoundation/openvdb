@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 13.0.0 - November 2, 2025
+Version 13.0.0 - November 3, 2025
 
       This version introduces ABI changes relative to older major releases,
       so to preserve ABI compatibility it might be necessary to define the
@@ -37,8 +37,8 @@ Version 13.0.0 - November 2, 2025
       ellipsoidal rasterizations.
 
     API Changes:
-    - Added LeafBuffer<bool, Log2Dim>::storage() for direct const access to the
-      raw data buffer when using the bool LeafNode.
+    - Added LeafBuffer::storage() for direct const access to the raw data
+      buffer when using the bool LeafNode.
     - Removed Grid::evalMinMax(), use tools::minMax for superior threaded
       performance.
     - Removed points::rasterize() that took a custom filter and interrupter.
