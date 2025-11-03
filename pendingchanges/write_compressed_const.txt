@@ -1,3 +1,0 @@
-API Changes:
-  - io::writeCompressedValues() now takes a const ValueT* source buffer for
-    improved const-correctness.

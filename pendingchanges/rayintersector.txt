@@ -1,3 +1,0 @@
-Bug Fixes:
-- Fix a bug in the LevelSetRayIntersector class where two of the methods
-  were incorrectly adjusting the time even when an intersection was not found.
