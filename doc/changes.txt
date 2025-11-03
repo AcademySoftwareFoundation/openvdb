@@ -23,6 +23,21 @@ VDB&nbsp;13+.
 </BLOCKQUOTE>
 
 @par
+Highlights:
+- OpenVDB now includes in-memory support for Half Grids and the file format
+  has been extended to add I/O serialization for half grids. More work is
+  planned on adapting algorithms when using Half Grids for better performance
+  and improved precision.
+- NanoVDB is no longer limited to static applications, such as rendering, but
+  can increasingly be applied to problems that involve dynamic topology, such
+  as level set tracking, grid building, morphology operations and merging of
+  grids. This is due to the fact that we keep adding more and more tools to
+  NanoVDB that facilitates tree modification. However, unlike OpenVDB, these
+  operations generate new NanoVDB grids (as oppose to in-palace modifications
+  in OpenVDB), yet are typically much faster since they are performed on the
+  GPU. Many of these exciting new features are the foundation of fVDB.
+
+@par
 OpenVDB:
 - New features:
   - Added native registration of HalfGrid type.
