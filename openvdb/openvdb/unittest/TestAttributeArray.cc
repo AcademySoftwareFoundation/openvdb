@@ -8,6 +8,8 @@
 #include <openvdb/io/File.h>
 #include <openvdb/util/Assert.h>
 
+#include "util.h"
+
 #include <gtest/gtest.h>
 
 #ifdef OPENVDB_USE_DELAYED_LOADING
@@ -42,20 +44,6 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <fstream>
 #include <sstream>
 #include <iostream>
-
-
-#ifdef OPENVDB_USE_DELAYED_LOADING
-/// @brief io::MappedFile has a private constructor, so declare a class that acts as the friend
-class TestMappedFile
-{
-public:
-    static openvdb::io::MappedFile::Ptr create(const std::string& filename)
-    {
-        return openvdb::SharedPtr<openvdb::io::MappedFile>(new openvdb::io::MappedFile(filename));
-    }
-};
-#endif
-
 
 /// @brief Functionality similar to openvdb::util::CpuTimer except with prefix padding and no decimals.
 ///

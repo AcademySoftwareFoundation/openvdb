@@ -1,0 +1,3 @@
+OpenVDB AX:
+  Fixes:
+  - Fixed a unit-test, TestStreamCompression, that could fail when building with ABI=13. Note that core library functionality was unaffected.
