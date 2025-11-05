@@ -1,5 +1,0 @@
-OpenVDB:
-  Build:
-  - Removed the unnecessary USE_NUMPY build option for the OpenVDB Python module.
-    All functions which take numpy arrays are now always generated (numpy is not
-    required at compile time for this support).

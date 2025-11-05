@@ -1,3 +1,0 @@
-OpenVDB AX:
-  New:
-  - Added support for LLVM 21.
