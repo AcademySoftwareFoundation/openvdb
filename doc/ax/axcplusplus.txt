@@ -1,9 +1,8 @@
 /**
-<div style="width:800px;text-align:justify;">
 
-@page axcplusplus OpenVDB AX
+@page axcplusplus AX C++ Documentation
 
-@section axcdocs AX C++ Documentation
+@section axcdocs Intro
 @par
 The following documentation focuses on the C++ design and API of OpenVDB AX,
 @b not the front end AX language. For the latter, see the
@@ -27,7 +26,6 @@ API doxygen comments or contact us for more information.
         - @ref vdbaxcompiler
     - @ref vdbaxbinary
 - @ref vdbaxtoaxtypes
-- @ref vdbaxextend
 
 <hr>
 
@@ -118,7 +116,7 @@ parser is accessed through the @b ast module.
 @par
 The @b ast module provides:
  - The complete implemenation of an @ref AST.h "AX abstract syntax tree"
- - The openvdb::ax::ast::parse() method
+ - The @vdblink::ax::ast::parse ax::ast::parse()@endlink method
  - The @vdblink::ax::ast::Visitor AST Visitor@endlink
  - AST scanners and tools
 @par
@@ -128,7 +126,7 @@ The complete AST hierarchy is visualized by the @vdblink::ax::ast::Node doxygen
 class graph for an openvdb::ax::ast::Node@endlink, which represents the top most
 node in the AST. The AST API exists in a nested namespace (`openvdb::ax::ast`)
 and can be used by clients for more granular control and modifications to an AST.
-Importantly, the AST API contains the openvdb::ax::ast::parse() method, which
+Importantly, the AST API contains the `openvdb::ax::ast::parse()` method, which
 invokes the C/C++ functions built by the grammar to iteratively construct an
 AST from a provided character string.
 @par
@@ -139,7 +137,7 @@ branches. All these methods use the @vdblink::ax::ast::Visitor AX visitor
 framework@endlink, a visitor pattern traversal class strongly influenced by
 <A HREF="https://clang.llvm.org/doxygen/classclang_1_1RecursiveASTVisitor.html">
 Clang's RecursiveVisitor</A>. Clients can use the AX visitor to implement their
-own AST analysis or modifications (see @ref vdbaxextend).
+own AST analysis or modifications.
 
 @subsubsection vdbaxastscanners Scanners
 @par
@@ -285,11 +283,11 @@ AX ASTs to verify access patterns of your data.
 @subsubsection vdbaxcompilercustomdata Custom Data
 @par
 The AX language provides two main tokens to access memory which has not been
-allocated by AX itself. The first token, @b \@ (the "at" symbol), is designed to
+allocated by AX itself. The first token, `@` (the "at" symbol), is designed to
 provide read/write access to geometry attributes. The second token is the dollar
-character @b $. This allows <b>read only</b> access to custom data that can be
+character `$`. This allows <b>read only</b> access to custom data that can be
 modified in C++ i.e. outside the scope of an AX program. In the same way as the
-@b \@attribute syntax, the value of this data can change without the need for AX
+`@attribute` syntax, the value of this data can change without the need for AX
 to re-compile the program. It is, however, solely on the C++ clients of AX to
 make sure that this data is setup correctly when integrating AX into their
 applications.
@@ -487,10 +485,9 @@ Vec4IGrid::registerGrid();
 @endcode
 
 <hr>
-@section vdbaxextend Extending OpenVDB AX
+<!--@section vdbaxextend Extending OpenVDB AX-->
 <!--@subsection vdbaxcustomtraversal Custom AST Traversal-->
 <!--@subsection vdbaxcustomtraversal Designing an Executable-->
 <!--@subsection vdbaxcustomtraversal Geometry Callbacks-->
 <!--@subsection vdbaxcustomtraversal Custom Code Generation-->
-</div>
 */

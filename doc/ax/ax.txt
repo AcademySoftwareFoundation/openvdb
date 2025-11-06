@@ -1,14 +1,13 @@
 /**
-<div style="width:800px;text-align:justify;">
 
-@page ax AX
+@page ax AX Language Documentation
 
-@section axlanguage AX Language Documentation
+@section axlanguage Intro
 @par
 Welcome to the AX Language documentation. These docs provide detailed
 information on the AX language including syntax, data types, available
 functionality (including OpenVDB specific methods) execution structure and
-control flow. See the @subpage axcplusplus documentation for the C++ developer
+control flow. See the @ref axcplusplus documentation for the C++ developer
 documentation.
 @note
 Some sections of this document are still to be completed. Please get in touch
@@ -108,8 +107,8 @@ function (see @ref axprogramexample) and whilst there are ways to achieve
 reductions, it is an example which would be better suited to a custom C++
 implementation.
 @par
-For details of extending AX for custom geometry, see the @subpage axcplusplus
-developer documentation. Note that custom geometry support requires C++ extension.
+For details of extending AX for custom geometry, see the @ref axcplusplus
+developer documentation. Note that custom geometry support requires `C++` extension.
 
 
 @subsection axprogramexample A Program Example
@@ -133,20 +132,20 @@ The following explains the above example in relation to OpenVDB data; OpenVDB
 points and OpenVDB volumes. The example demonstrates reading from a value on
 some input, either a point attribute or a voxel value, and storing the
 result in a @ref axdecls "local variable". Importantly, the attribute being
-accessed has the name @b `myattribute` and the type @b `float`. The first statement:
+accessed has the name `myattribute` and the type `float`. The first statement:
 <!-- A -->@code{.c}
 float temp = float@myattribute;
 @endcode
 Invokes a @b read from this attribute (see @ref axattribaccess), retrieving the
-value from the geometry and storing it in the variable @b `temp` to be used in
+value from the geometry and storing it in the variable `temp` to be used in
 the AX program. The second statement:
 @code{.c}
 if (temp > 0.0f) float@myattribute = 0.0f;
 @endcode
-Performs a comparison of this value with @b `0.0f` and, if the value is greater
-than @b `0.0f`, performs a @b write to the geometry in the form of
-<b>`float@myattribute = 0.0f;`</b> which sets the value of this attribute on the
-geometry to @b `0.0f`.
+Performs a comparison of this value with `0.0f` and, if the value is greater
+than `0.0f`, performs a @b write to the geometry in the form of
+`float@myattribute = 0.0f;` which sets the value of this attribute on the
+geometry to `0.0f`.
 @par
 For OpenVDB Points, this kernel is run over every point in an OpenVDB Points
 Grid. In simple pseudo code:
@@ -155,7 +154,7 @@ foreach(point in pointgrid)
     run_ax_kernel(point)
 done()
 @endcode
-Where @b `pointgrid` is a single Point Data Grid. For OpenVDB volumes the kernel
+Where `pointgrid` is a single Point Data Grid. For OpenVDB volumes the kernel
 is run over each voxel in a provided grid:
 @code{.unparsed}
 foreach(grid in grids)
@@ -165,8 +164,8 @@ foreach(grid in grids)
 done()
 @endcode
 @par
-Where @b `grids` can comprise of any number of OpenVDB volumes. In this program,
-only a floating point grid with the name @b `myattribute` will be updated. Each
+Where `grids` can comprise of any number of OpenVDB volumes. In this program,
+only a floating point grid with the name `myattribute` will be updated. Each
 voxel in this grid will have it's value compared in the same way as the points
 example given above.
 
@@ -282,9 +281,9 @@ missing types from OpenVDB.
 
 @subsection axscalars Scalars
 @par
-AX Supports boolean, integer and floating point scalar types. @b `int` and
-@b `int32` represent 32-bit integer values and @b `int64` represents a 64-bit
-value. @b `float` and @b `double` represent 32-bit and 64-bit floating point
+AX Supports boolean, integer and floating point scalar types. `int` and
+`int32` represent 32-bit integer values and `int64` represents a 64-bit
+value. `float` and `double` represent 32-bit and 64-bit floating point
 values respectively. All scalars, excluding bools, are signed; there are no
 other unsigned scalar types in AX.
 @par Integer Overflow and Floating Point Truncation
@@ -309,10 +308,10 @@ int64 a = 2147483648l; // one more than can be held in an int (note the last let
 int b = a; // implicit conversion. "b" is set to -2147483648
 @endcode
 @par Infinite and NaN values
-Floating point values have two additional intrinsic states; @b `inf` and @b `nan`.
+Floating point values have two additional intrinsic states; `inf` and `nan`.
 These states can occur during invalid floating point arithmetic. AX performs no
-checks on arithmetic to catch these values. A typical example of both @b `inf`
-and @b `nan` values are division by zero expressions:
+checks on arithmetic to catch these values. A typical example of both `inf`
+and `nan` values are division by zero expressions:
 @code
 float a = 1.0f/0.0f;
 print(a); // prints "inf"
@@ -337,16 +336,16 @@ There is currently support for vectors of sizes 2, 3 and 4 elements. The suffix
 letter on the vector types denotes the contained elements precision, with the
 number corresponding to the vector size. For example, @b `vec2i` denotes a vector
 of two 32-bit integer elements. There are no native types for vectors with
-@b `bool`, @b `int16` or @b `int64` elements, so these are not supported.
+`bool`, `int16` or `int64` elements, so these are not supported.
 @par Matrices
 Matrices are stored in row major layout (lexographical access order) which
 matches the representation of a matrix in OpenVDB. Matrix support consists of
-@b `float` and @b `double` precision elements with dimensions either @b `3x3` or
-@b `4x4` (total size of 9 and 16 elements respectively). There are no integer or
+`float` and `double` precision elements with dimensions either `3x3` or
+`4x4` (total size of 9 and 16 elements respectively). There are no integer or
 boolean matrix types. Similiar to vectors, the suffix letter on the type denotes
 the contained elements precision, with the number corresponding to the matrix
-dimension. A matrix of type @b `mat3d` therefor corresponds to a @b `3x3` matrix
-(9 elements) with @b `double` precision elements.
+dimension. A matrix of type `mat3d` therefor corresponds to a `3x3` matrix
+(9 elements) with `double` precision elements.
 @par Element Access
 As elements of all matrix and vector types are stored contiguously, they can be
 accessed by the @ref axvecaccessop "[]&nbsp;operator". Vector elements can also be
@@ -370,10 +369,10 @@ performing matrix projections (transformations) on vector arguments.
 Strings are an array of characters stored in a unique AX type which is
 incompatible with @ref axopaccess "container accesses". As such, string support
 is currently fairly limited. Characters themselves (users may know this as a
-@b `char` type) have no frontend type, so a @b `string` type must be used for
+`char` type) have no frontend type, so a `string` type must be used for
 any number of characters (including the empty string). String literals are
 represented by enclosing any number of @ref axtokens "supported AX characters"
-by quotes <b>\"&nbsp;\"</b>.
+by quotes&nbsp;`" "`.
 
 @subsection axtypeprecedence Implicit conversion / type precedence
 @par
@@ -441,9 +440,9 @@ depending on the operand types.
 <th colspan="9"> Operators
 </th></tr>
 <tr style="text-align:center">
-<td bgcolor="#ffc4c4" style="border-right-width: thick" colspan="4"> @ref axopbinary </td>
-<td bgcolor="#ffc4c4" style="border-right-width: thick" colspan="3"> @ref axopunary </td>
-<td bgcolor="#ffc4c4" colspan="2"> Other </td></tr>
+<td style="border-right-width: thick" colspan="4"> @ref axopbinary </td>
+<td style="border-right-width: thick" colspan="3"> @ref axopunary </td>
+<td colspan="2"> Other </td></tr>
 <tr style="text-align:center">
 <td> @ref axopassignment </td>
 <td> @ref axopbinarithmetic </td>
@@ -456,50 +455,33 @@ depending on the operand types.
 <td> @ref axopother </td></tr>
 <tr style="text-align:center">
 <td><p> <!-- *********************** COLUMN ASSIGNMENT *********************** -->
-<code>
-a = b<br/>a += b<br/>a -= b<br/>a *= b<br/>a /= b<br/>a %= b<br/>
-a &amp;= b<br/>a |= b<br/>a ^= b<br/>a &lt;&lt;= b<br/>a &gt;&gt;= b
-</code>
+`a = b`<br/>`a += b`<br/>`a -= b`<br/>`a *= b`<br/>`a /= b`<br/>`a %= b`<br/>
+`a &= b`<br/>`a |= b`<br/>`a ^= b`<br/>`a <<= b`<br/>`a >>= b`
 </p></td>
 <td><p> <!-- *********************** COLUMN ARITH *********************** -->
-<code>
-a + b<br/>a - b<br/>a * b<br/>a / b<br/>a % b<br/>a &amp; b<br/>a | b<br/>
-a ^ b<br/>a &lt;&lt; b<br/>a &gt;&gt; b
-</code></p></td>
+`a + b`<br/>`a - b`<br/>`a * b`<br/>`a / b`<br/>`a % b`<br/>`a & b`<br/>`a | b`<br/>
+`a ^ b`<br/>`a << b`<br/>`a >> b`
+</p></td>
 <td><p> <!-- *********************** COLUMN COMP *********************** -->
-<code>
-a == b<br/>a != b<br/>a &lt; b<br/>a &gt; b<br/>a &lt;= b<br/>a &gt;= b
-</code>
+`a == b`<br/>`a != b`<br/>`a < b`<br/>`a > b`<br/>`a <= b`<br/>`a >= b`
 </p></td>
 <td style="border-right-width: thick"><p> <!-- *********************** COLUMN LOGICAL *********************** -->
-<code>
-a&nbsp;&amp;&amp;&nbsp;b<br/>a&nbsp;||&nbsp;b
-</code>
+`a && b`<br/>`a || b`
 </p></td>
 <td><p> <!-- *********************** COLUMN ARITH *********************** -->
-<code>
-+a<br/>-a<br/>~a
-</code>
+`+a`<br/>`-a`<br/>`~a`
 </p></td>
 <td><p> <!-- *********************** COLUMN LOGICAL *********************** -->
-<code>
-!a
-</code>
+`!a`
 </p></td>
 <td style="border-right-width: thick"><p> <!-- *********************** COLUMN INC/DEC *********************** -->
-<code>
-++a<br/>\-\-a<br/>a++<br/>a\-\-
-</code>
+`++a`<br/>`--a`<br/>`a++`<br/>`a--`
 </p></td>
 <td><p> <!-- *********************** COLUMN OTHER *********************** -->
-<code>
-a[]<br/>a[,]<br/>a.b
-</code>
+`a[]`<br/>`a[,]`<br/>`a.b`
 </p></td>
 <td><p> <!-- *********************** COLUMN OTHER *********************** -->
-<code>
-a(...)<br/>a, b<br/>a ? b : c<br/>{&nbsp;a,b&nbsp;...&nbsp;}
-</code>
+`a(...)`<br/>`a, b`<br/>`a ? b : c`<br/>`a ?: c`<br/>`{ a,b ... }`
 </p></td>
 </tr>
 </table>
@@ -522,34 +504,34 @@ assignment operators have the following forms:
 @par
 <table>
 <tr><th>Operator Name</th><th>Operator Syntax</th><th>Returns</th></tr>
-<tr><td>Simple assignment</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`=`</b> @a `rhs` </td><td>Reference to @a `lhs`</td></tr>
-<tr><td>Addition assignment</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`+=`</b> @a `rhs` </td><td>Reference to @a `lhs`</td></tr>
-<tr><td>Subtraction assignment</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`-=`</b> @a `rhs` </td><td>Reference to @a `lhs`</td></tr>
-<tr><td>Multiplication assignment</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`*=`</b> @a `rhs` </td><td>Reference to @a `lhs`</td></tr>
-<tr><td>Division assignment</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`/=`</b> @a `rhs` </td><td>Reference to @a `lhs`</td></tr>
-<tr><td>Modulo assignment</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`%=`</b> @a `rhs` </td><td>Reference to @a `lhs`</td></tr>
-<tr><td>Bitwise AND assignment</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`&amp;=`</b> @a `rhs` </td><td>Reference to @a `lhs`</td></tr>
-<tr><td>Bitwise OR assignment</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`|=`</b> @a `rhs` </td><td>Reference to @a `lhs`</td></tr>
-<tr><td>Bitwise XOR assignment</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`^=`</b> @a `rhs` </td><td>Reference to @a `lhs`</td></tr>
-<tr><td>Bitwise shift left assignment</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`&lt;&lt;=`</b> @a `rhs` </td><td>Reference to @a `lhs`</td></tr>
-<tr><td>Bitwise shift right assignment</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`&gt;&gt;=`</b> @a `rhs` </td><td>Reference to @a `lhs`</td></tr>
+<tr><td>Simple assignment</td><td> @a lhs <b>`=`</b> @a rhs </td>
+<td rowspan="11">Reference to @a lhs</td></tr>
+<tr><td>Addition assignment</td><td> @a lhs <b>`+=`</b> @a rhs </td></tr>
+<tr><td>Subtraction assignment</td><td> @a lhs <b>`-=`</b> @a rhs </td></tr>
+<tr><td>Multiplication assignment</td><td> @a lhs <b>`*=`</b> @a rhs </td></tr>
+<tr><td>Division assignment</td><td> @a lhs <b>`/=`</b> @a rhs </td></tr>
+<tr><td>Modulo assignment</td><td> @a lhs <b>`%=`</b> @a rhs </td></tr>
+<tr><td>Bitwise AND assignment</td><td> @a lhs <b>`&=`</b> @a rhs </td></tr>
+<tr><td>Bitwise OR assignment</td><td> @a lhs <b>`|=`</b> @a rhs </td></tr>
+<tr><td>Bitwise XOR assignment</td><td> @a lhs <b>`^=`</b> @a rhs </td></tr>
+<tr><td>Bitwise shift left assignment</td><td> @a lhs <b>`<<=`</b> @a rhs </td></tr>
+<tr><td>Bitwise shift right assignment</td><td> @a lhs <b>`>>=`</b> @a rhs </td></tr>
 </table>
 @par
 These can be further categorised into two types; direct assignment, which is
 comprised only of the <b>simple assignment</b> operator, and compound assignments,
 which is the set of all other assignment operators.
 @par Direct Assignment
-Direct assignments replace the contents of the @b `lhs` with a copy of the @b
-`rhs`:
+Direct assignments replace the contents of the `lhs` with a copy of the `rhs`:
 @par
 <table><tr>
-<td bgcolor="#ffc4c4"> @a `lhs` <b>= </b> @a `rhs` </td>
+<td> @a lhs <b>=</b> @a rhs </td>
 </tr></table>
 @par
-The @b `rhs` side is not modified and the @b `lhs` is not read - only written
-to. If the @b `rhs` type does not match the @b `lhs` type, the @b `rhs` is first
-implicitly converted into a new temporary with the @b `lhs` type before being
-copied into the @b `lhs`. The following combination of AX type categories are
+The `rhs` side is not modified and the `lhs` is not read - only written
+to. If the `rhs` type does not match the `lhs` type, the `rhs` is first
+implicitly converted into a new temporary with the `lhs` type before being
+copied into the `lhs`. The following combination of AX type categories are
 supported for direct assignment  (if an operation is not listed, it is not
 supported):
 @par
@@ -569,15 +551,14 @@ supported):
 <td style="border-top-width: thick">@ref axscalars "scalar"</td>
 <td style="border-top-width:thick;text-align:left">
 Each element of the vector is set to the right hand side scalar. i.e.
-<br/> `a[0]&nbsp;=&nbsp;b;&nbsp;...&nbsp;a[n-1]&nbsp;=&nbsp;b;` <br/>
-where `n` is the size of the vector. If the scalar type does not match
-element type of vector, the scalar is copied and @ref axtypeprecedence
-"implicitly cast" to that type.</td>
+`a[0] = b; ... a[n-1] = b;` where `n` is the size of the vector. If the
+scalar type does not match element type of vector, the scalar is copied and
+@ref axtypeprecedence "implicitly cast" to that type.</td>
 </tr>
 <tr style="text-align:center"><td>@ref axvecmats "vector"</td>
-<td style="text-align:left">Component wise assignment i.e.
-<br/> `a[0]&nbsp;=&nbsp;b;&nbsp;...&nbsp;a[n-1]&nbsp;=&nbsp;b;` <br/>
-where `n` is the size of the vector.
+<td style="text-align:left">
+Component wise assignment i.e. `a[0] = b; ... a[n-1] = b;` where `n` is the size
+of the vector.
 <!-- A -->@code{.c}
 vec3f a = 0, b = 1;
 a = b;
@@ -612,7 +593,7 @@ of matrix, the scalar is copied and @ref axtypeprecedence "implicitly cast" to
 that type.</td>
 <tr style="text-align:center"><td>@ref axvecmats "matrix"</td>
 <td style="text-align:left">Component wise assignment i.e.
-<br/> `a[0]&nbsp;=&nbsp;b[0];&nbsp;...&nbsp;a[n-1]&nbsp;=&nbsp;b[n-1];` <br/>
+<br/> `a[0] = b[0]; ... a[n-1] = b[n-1];` <br/>
 where `n` is the @b total size of the matrix.
 <!-- A -->@code{.c}
 mat4f a = 0, b = 1;
@@ -645,25 +626,27 @@ int a = 1; // assign a from an integer literal of value 1
 c = a; // assign components of c (x/y/z) to the result of float(a)
 @endcode
 @par Compound Assignment
-Compound assignments replace the the contents of the @b `lhs` with the result of
-a @ref axopbinarithmetic "binary arithmetic" operation of the @b `lhs` with the
-@b `rhs`:
+Compound assignments replace the the contents of the `lhs` with the result of
+a @ref axopbinarithmetic "binary arithmetic" operation of the `lhs` with the
+`rhs`:
 @par
 <table>
-<tr><td bgcolor="#ffc4c4"> @a `lhs` @b op @a `rhs` </td></tr>
+<tr><td> @a lhs @b op @a rhs </td></tr>
 </table>
-Where @b op is one of :
+
+Where @b op is one of:
+
 <table><tr>
-<td bgcolor="#ffc4c4"> <b>`+=`</b></td>
-<td bgcolor="#ffc4c4"> <b>`-=`</b></td>
-<td bgcolor="#ffc4c4"> <b>`*=`</b></td>
-<td bgcolor="#ffc4c4"> <b>`/=`</b></td>
-<td bgcolor="#ffc4c4"> <b>`%=`</b></td>
-<td bgcolor="#ffc4c4"> <b>`&amp;=`</b></td>
-<td bgcolor="#ffc4c4"> <b>`|=`</b></td>
-<td bgcolor="#ffc4c4"> <b>`^=`</b></td>
-<td bgcolor="#ffc4c4"> <b>`&lt;&lt;=`</b></td>
-<td bgcolor="#ffc4c4"> <b>`&gt;&gt;= `</b></td>
+<td> <b>`+=`</b></td>
+<td> <b>`-=`</b></td>
+<td> <b>`*=`</b></td>
+<td> <b>`/=`</b></td>
+<td> <b>`%=`</b></td>
+<td> <b>`&=`</b></td>
+<td> <b>`|=`</b></td>
+<td> <b>`^=`</b></td>
+<td> <b>`<<=`</b></td>
+<td> <b>`>>= `</b></td>
 </tr></table>
 @par
 The behaviour of a given compound assignment (for example `a += b`) is similar
@@ -680,8 +663,8 @@ int a = 1;
 ++a += 1; // equal to a = ++a + 1 which is equal to 3
 @endcode
 @par
-The @b `rhs` side is not modified, however the @b `lhs` is both read from and
-written to. Note that the arithmetic operation may cast either @b `lhs` or @b
+The `rhs` side is not modified, however the `lhs` is both read from and
+written to. Note that the arithmetic operation may cast either `lhs` or
 `rhs` following the rules of AX's @ref axopbinarithmetic
 "arithmetic type precedence". See the @ref axopbinarithmetic
 "arithmetic operations" section for more information on arithmetic type
@@ -720,7 +703,7 @@ b = c;    // b becomes 4
 a = b;    // a becomes float(4)
 @endcode
 @par
-Importantly, @b `a` receives the result of any previous implicit casts to the
+Importantly, `a` receives the result of any previous implicit casts to the
 right hand side of its binary assignment.
 
 
@@ -737,20 +720,20 @@ container types). Binary arithmetic operations have the following forms:
 @par
 <table>
 <tr><th>Operator&nbsp;Name</th><th>Operator&nbsp;Syntax</th><th>Returns</th></tr>
-<tr><td>Addition</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`+`</b> @a `rhs` </td><td>The sum of both operands</td></tr>
-<tr><td>Subtraction</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`-`</b> @a `rhs` </td><td>The first operand minus the second operand</td></tr>
-<tr><td>Multiplication</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`*`</b> @a `rhs` </td><td>The product of both operands</td></tr>
-<tr><td>Division</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`/`</b> @a `rhs` </td><td>The first operand divided by the second operand</td></tr>
-<tr><td>Modulo</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`%`</b> @a `rhs` </td><td>The @b floored modulo operator. See @ref axbinmultop "Multiplicative operands"</td></tr>
-<tr><td>Bitwise AND</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`&amp;`</b> @a `rhs` </td>
+<tr><td>Addition</td><td> @a lhs <b>`+`</b> @a rhs </td><td>The sum of both operands</td></tr>
+<tr><td>Subtraction</td><td> @a lhs <b>`-`</b> @a rhs </td><td>The first operand minus the second operand</td></tr>
+<tr><td>Multiplication</td><td> @a lhs <b>`*`</b> @a rhs </td><td>The product of both operands</td></tr>
+<tr><td>Division</td><td> @a lhs <b>`/`</b> @a rhs </td><td>The first operand divided by the second operand</td></tr>
+<tr><td>Modulo</td><td> @a lhs <b>`%`</b> @a rhs </td><td>The @b floored modulo operator. See @ref axbinmultop "Multiplicative operands"</td></tr>
+<tr><td>Bitwise AND</td><td> @a lhs <b>`&`</b> @a rhs </td>
 <td>The @b integral bitwise AND result of each bit in the first operand applied to the bit at the same location in the second operand</td></tr>
-<tr><td>Bitwise OR</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`|`</b> @a `rhs` </td>
+<tr><td>Bitwise OR</td><td> @a lhs <b>`|`</b> @a rhs </td>
 <td>The @b integral bitwise OR result of each bit in the first operand applied to the bit at the same location in the second operand</td></tr>
-<tr><td>Bitwise XOR</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`^`</b> @a `rhs` </td>
+<tr><td>Bitwise XOR</td><td> @a lhs <b>`^`</b> @a rhs </td>
 <td>The @b integral bitwise XOR result of each bit in the first operand applied to the bit at the same location in the second operand</td></tr>
-<tr><td>Bitwise shift left</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`&lt;&lt;`</b> @a `rhs` </td>
+<tr><td>Bitwise shift left</td><td> @a lhs <b>`<<`</b> @a rhs </td>
 <td>The @b integral bitwise left shift of the first operand by the second operand</td></tr>
-<tr><td>Bitwise shift right</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`&gt;&gt;`</b> @a `rhs` </td>
+<tr><td>Bitwise shift right</td><td> @a lhs <b>`>>`</b> @a rhs </td>
 <td>The @b integral bitwise right shift of the first operand by the second operand</td></tr>
 </table>
 @anchor axbinadditiveop
@@ -759,13 +742,13 @@ Binary additive operations perform summations on the input arguments. They have
 the following forms:
 @par
 <table>
-<tr><td bgcolor="#ffc4c4"> @a `lhs` @b `+` @a `rhs` </td></tr>
-<tr><td bgcolor="#ffc4c4"> @a `lhs` @b `-` @a `rhs` </td></tr>
+<tr><td> @a lhs @b + @a rhs </td></tr>
+<tr><td> @a lhs @b - @a rhs </td></tr>
 </table>
 @par
 After @ref axtypeprecedence "implicit conversion", the result of the binary
-operation with the arithmetic @b `+` (@ref axtokens "plus token") is the sum of
-the operands, and the result of the binary operation with the arithmetic @b `-`
+operation with the arithmetic `+` (@ref axtokens "plus token") is the sum of
+the operands, and the result of the binary operation with the arithmetic `-`
 (@ref axtokens "minus token") token is the second operand subtracted from the
 first operand. The following combination of AX type categories are supported for
 additive operations (if an operation is not listed, it is not supported):
@@ -870,19 +853,19 @@ c - b; // valid vec - scalar
 The binary multiplicative operands have the following forms:
 @par
 <table>
-<tr><td bgcolor="#ffc4c4"> @a `lhs` @b `*` @a `rhs` </td></tr>
-<tr><td bgcolor="#ffc4c4"> @a `lhs` @b `/` @a `rhs` </td></tr>
-<tr><td bgcolor="#ffc4c4"> @a `lhs` @b `%` @a `rhs` </td></tr>
+<tr><td> @a lhs `*` @a rhs </td></tr>
+<tr><td> @a lhs `/` @a rhs </td></tr>
+<tr><td> @a lhs `%` @a rhs </td></tr>
 </table>
 @par
 After @ref axtypeprecedence "implicit conversion", the result of the binary
 operation:
- - with the arithmetic @b `*` (@ref axtokens "asterisk token") is:
+ - with the arithmetic `*` (@ref axtokens "asterisk token") is:
     - the product of the operands
     - @b OR performs matrix multiplication for vector and matrix types.
- - with the arithmetic @b `/` (@ref axtokens "forward slash token") is the first
+ - with the arithmetic `/` (@ref axtokens "forward slash token") is the first
  operand divided by the second operand.
- - with the arithmetic @b `%` (@ref axtokens "percentage token") is the
+ - with the arithmetic `%` (@ref axtokens "percentage token") is the
  @b floored modulo operations .i.e. the expression `d % D` returns the result
  `D - d * floor(D/d)`. This is in contrast to truncated modulo operations
  `D - d * (D/d)` where the division is truncated.
@@ -894,7 +877,7 @@ mean that the relationship properties between `%` and `/` differ when either
 @b `d` or @b `D` is negative. i.e.:
 `(d/D)*D + (d%D) != d`
 @note
-The multiplicative operation @b `*` has important behaviour for vectors and
+The multiplicative operation `*` has important behaviour for vectors and
 matrix types.
 @par
 The following combination of AX type categories are supported for multiplicative
@@ -907,7 +890,7 @@ operations (if an operation is not listed, it is not supported):
 <tr style="text-align:center"><td rowspan="3">@ref axscalars "scalar"</td><td rowspan="2">`* / %`</td><td rowspan="1">@ref axscalars "scalar"</td>
 <td style="text-align:left">Returns the result of the scalar multiplication, division or remainder of the division respectively. </td>
 </tr>
-<tr style="text-align:center"><td>@ref axvecmats "vector"</td></td>
+<tr style="text-align:center"><td>@ref axvecmats "vector"</td>
 <td style="text-align:left" rowspan="1">
 Performs per component binary operations (after
 @ref axtypeprecedence "implicit conversion") with the left hand side scalar to
@@ -1096,27 +1079,27 @@ Floating point multiplication is communicative (`a * b = b * a`) but is not
 Binary bitwise operations have the following forms:
 @par
 <table>
-<tr><td bgcolor="#ffc4c4"> @a `lhs` @b `&` @a `rhs` </td></tr>
-<tr><td bgcolor="#ffc4c4"> @a `lhs` <b> `|` </b> @a `rhs` </td></tr>
-<tr><td bgcolor="#ffc4c4"> @a `lhs` @b `^` @a `rhs` </td></tr>
-<tr><td bgcolor="#ffc4c4"> @a `lhs` @b `<<` @a `rhs` </td></tr>
-<tr><td bgcolor="#ffc4c4"> @a `lhs` @b `>>` @a `rhs` </td></tr>
+<tr><td> @a lhs <b> `&` </b> @a rhs </td></tr>
+<tr><td> @a lhs <b> `|` </b> @a rhs </td></tr>
+<tr><td> @a lhs <b> `^` </b> @a rhs </td></tr>
+<tr><td> @a lhs <b> `<<` </b> @a rhs </td></tr>
+<tr><td> @a lhs <b> `>>` </b> @a rhs </td></tr>
 </table>
 @par
 These operations only run on @b integral operands. After @ref axtypeprecedence
 "implicit conversion", the result of the binary operation:
- - with the @b `&` (@ref axtokens "ampersand token") is the result of the
+ - with the @b & (@ref axtokens "ampersand token") is the result of the
   logical AND operation on each pair of the corresponding bits of the input
   operands.
- - with the <b> `|` </b> (@ref axtokens "pipe token") is the result of the
+ - with the <b> | </b> (@ref axtokens "pipe token") is the result of the
   logical OR operation on each pair of the corresponding bits of the input
   operands.
- - with the @b `^` (@ref axtokens "hat token") is the result of the
+ - with the @b ^ (@ref axtokens "hat token") is the result of the
   logical XOR operation on each pair of the corresponding bits of the input
   operands.
- - with the @b `<<` (@ref axtokens "less than tokens") is the value shifted left
+ - with the @b << (@ref axtokens "less than tokens") is the value shifted left
  with zeros shifted in on the right.
- - with the @b `>>` (@ref axtokens "greater than tokens") is the value shifted
+ - with the @b >> (@ref axtokens "greater than tokens") is the value shifted
  right with zeros shifted in on the left.
 @par
 <table>
@@ -1144,17 +1127,17 @@ is of type @b `bool`. Binary comparison operations have the following forms:
 @par
 <table>
 <tr><th>Operator&nbsp;Name</th><th>Operator&nbsp;Syntax</th><th>Returns</th></tr>
-<tr><td>Equal to</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`==`</b> @a `rhs` </td>
+<tr><td>Equal to</td><td> @a lhs <b>`==`</b> @a rhs </td>
 <td>Returns `true` if both operands are equal</td></tr>
-<tr><td>Not equal to</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`!=`</b> @a `rhs` </td>
+<tr><td>Not equal to</td><td> @a lhs <b>`!=`</b> @a rhs </td>
 <td>Returns `true` if operands are not equal</td></tr>
-<tr><td>Less than</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`<`</b> @a `rhs` </td>
+<tr><td>Less than</td><td> @a lhs <b>`<`</b> @a rhs </td>
 <td>Returns `true` the left hand side value is less than the right hand side</td></tr>
-<tr><td>Greater than</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`>`</b> @a `rhs` </td>
+<tr><td>Greater than</td><td> @a lhs <b>`>`</b> @a rhs </td>
 <td>Returns `true` the left hand side value is greater than the right hand side</td></tr>
-<tr><td>Less than or equal to</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`<=`</b> @a `rhs` </td>
+<tr><td>Less than or equal to</td><td> @a lhs <b>`<=`</b> @a rhs </td>
 <td>Returns `true` the left hand side value is less than or equal to the right hand side</td></tr>
-<tr><td>Greater than or equal to</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`>=`</b> @a `rhs` </td>
+<tr><td>Greater than or equal to</td><td> @a lhs <b>`>=`</b> @a rhs </td>
 <td>Returns `true` the left hand side value is greater than  or equal to the right hand side</td></tr>
 </table>
 @par
@@ -1264,10 +1247,10 @@ They have the following forms:
 @par
 <table>
 <tr><th>Operator&nbsp;Name</th><th>Operator&nbsp;Syntax</th><th>Returns</th></tr>
-<tr><td>AND</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`&&`</b> @a `rhs` </td>
+<tr><td>AND</td><td> @a lhs <b>`&&`</b> @a rhs </td>
 <td>Returns true if both operands are true. Otherwise, the result is false. This
 operator is short-circuiting.</td></tr>
-<tr><td>Inclusive OR</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`||`</b> @a `rhs` </td>
+<tr><td>Inclusive OR</td><td> @a lhs <b>`||`</b> @a rhs </td>
 <td>Returns true if either the first or the second operand is true. This operator
 is short-circuiting.</td></tr>
 </table>
@@ -1300,14 +1283,14 @@ Arithmetic unary operators are comprised of arithemtic and bitwise operators.
 @par
 <table>
 <tr><th>Operator Name</th><th>Operator Syntax</th><th>Returns</th></tr>
-<tr><td>Unary plus</td><td bgcolor="#ffc4c4"> <b>`+`</b>@a `a` </td>
-<td>Returns the value of its operand, @b `a`</td>
+<tr><td>Unary plus</td><td> `+a` </td>
+<td>Returns the value of its operand, `a`</td>
 </tr>
-<tr><td>Unary minus</td><td bgcolor="#ffc4c4"> <b>`-`</b>@a `a` </td>
-<td>Returns the negative representation of @b `a`</td>
+<tr><td>Unary minus</td><td> `-a` </td>
+<td>Returns the negative representation of `a`</td>
 </tr>
-<tr><td>Bitwise NOT</td><td bgcolor="#ffc4c4"> <b>`~`</b>@a `a` </td>
-<td>Returns the bitwise NOT (one's complement) value of @b `a`. This operator
+<tr><td>Bitwise NOT</td><td> `~a` </td>
+<td>Returns the bitwise NOT (one's complement) value of `a`. This operator
 is only valid on integral element types.</td>
 </tr>
 </table>
@@ -1365,7 +1348,7 @@ Logical unary operators consist of a single operand.
 @par
 <table>
 <tr><th>Operator Name</th><th>Operator Syntax</th><th>Returns</th></tr>
-<tr><td>Logical NOT</td><td bgcolor="#ffc4c4"> <b>`!`</b>@a `a` </td>
+<tr><td>Logical NOT</td><td> `!a` </td>
 <td>Returns true if the operand is false. Otherwise, returns false.</td>
 </tr>
 </table>
@@ -1409,10 +1392,10 @@ each component of a vector or matrix. They have the following forms:
 @par
 <table>
 <tr><th>Operator Name</th><th>Operator Syntax</th><th>Returns</th></tr>
-<tr><td>Pre-increment</td><td bgcolor="#ffc4c4"> <b>`++`</b>@a `a` </td><td>Returns a reference to the incremented result.</td>
-<tr><td>Post-increment</td><td bgcolor="#ffc4c4">@a `a`<b>`++`</b> </td><td>Returns a copy of the incremented result.</td>
-<tr><td>Pre-decrement</td><td bgcolor="#ffc4c4"> <b>`--`</b>@a `a` </td><td>Returns a reference to the decremented result.</td>
-<tr><td>Post-decrement</td><td bgcolor="#ffc4c4"> @a `a`<b>`--`</b> </td><td>Returns a copy of the decremented result.</td>
+<tr><td>Pre-increment</td><td> `++a` </td><td>Returns a reference to the incremented result.</td>
+<tr><td>Post-increment</td><td> `a++` </td><td>Returns a copy of the incremented result.</td>
+<tr><td>Pre-decrement</td><td> `--a` </td><td>Returns a reference to the decremented result.</td>
+<tr><td>Post-decrement</td><td> `a--` </td><td>Returns a copy of the decremented result.</td>
 </tr>
 </table>
 @par
@@ -1444,20 +1427,20 @@ the following forms:
 <tr><th>Operator Name</th><th>Operator Syntax</th><th>Returns</th></tr>
 <tr style="text-align:left">
 <td>Dot&nbsp;Component&nbsp;Access</td>
-<td bgcolor="#ffc4c4"> <em>`vector`</em>&nbsp;<b>.</b>&nbsp;@a `component` </td>
-<td>Reference to component @a `component` of @a `vector`</td>
+<td> <em>`vector`</em>&nbsp;<b>.</b>&nbsp;`component` </td>
+<td>Reference to component `component` of `vector`</td>
 </tr>
 <tr style="text-align:left">
 <td>Container&nbsp;Component&nbsp;Access</td>
-<td bgcolor="#ffc4c4"> <em>`container`</em>&nbsp;<b>[</b>&nbsp;@a `exp` <b>]</b> </td>
-<td>Reference to component at index @a `exp` of @a `container`</td>
+<td> <em>`container`</em>&nbsp;<b>[</b>&nbsp;`exp` <b>]</b> </td>
+<td>Reference to component at index `exp` of `container`</td>
 </tr>
 <tr style="text-align:left">
 <td>Matrix&nbsp;Component&nbsp;Access</td>
-<td bgcolor="#ffc4c4"> <em>`matrix`</em>&nbsp;<b>[</b>&nbsp;@a `exp1`,&nbsp;<em>`exp2`</em>&nbsp;<b>]</b> </td>
+<td> <em>`matrix`</em>&nbsp;<b>[</b>&nbsp;`exp1`,&nbsp;<em>`exp2`</em>&nbsp;<b>]</b> </td>
 <td>Reference to component in row <b><em>`exp1`</em></b>, column <b><em>`exp2`</em></b>.
-Also equal to returning a reference to component at index: <b><em> `[exp1&nbsp;*&nbsp;dimension&nbsp;+&nbsp;exp2]` </em></b>
-of @a `matrix` where @a `dimension` is the the size of the matrix</td>
+Also equal to returning a reference to component at index: <b><em> `[exp1 * dimension + exp2]` </em></b>
+of `matrix` where `dimension` is the the size of the matrix</td>
 </tr>
 </table>
 @par
@@ -1471,11 +1454,11 @@ container.
 The dot operator <b>.</b> is only valid for vector types. It has the form:
 @par
 <table><tr>
-<td bgcolor="#ffc4c4">  @a `vector` <b>.</b> @a `component` </td>
+<td>  `vector` <b>.</b> `component` </td>
 </tr></table>
 @par
 Where component is one of the below supported component letters. It only provides
-access for the first three elements of any vector (for @b `vec2` types, only the
+access for the first three elements of any vector (for `vec2` types, only the
 first 2 components are accessible). Accessing a vector using the dot operator is
 fundamentally the same as using the <b>`[]`</b> operator with the corresponding
 integer index.
@@ -1492,12 +1475,12 @@ a_{0}\quad a_{1}\quad a_{2}
 @f]
 | Component   | Access Index   | Result        |
 |:-----------:|:--------------:|:-------------:|
-|  @b `A.x`   |       0        | @f$ a_{0} @f$ |
-|  @b `A.r`   |       0        | @f$ a_{0} @f$ |
-|  @b `A.y`   |       1        | @f$ a_{1} @f$ |
-|  @b `A.g`   |       1        | @f$ a_{1} @f$ |
-|  @b `A.z`   |       2        | @f$ a_{2} @f$ |
-|  @b `A.b`   |       2        | @f$ a_{2} @f$ |
+|     `A.x`   |       0        | @f$ a_{0} @f$ |
+|     `A.r`   |       0        | @f$ a_{0} @f$ |
+|     `A.y`   |       1        | @f$ a_{1} @f$ |
+|     `A.g`   |       1        | @f$ a_{1} @f$ |
+|     `A.z`   |       2        | @f$ a_{2} @f$ |
+|     `A.b`   |       2        | @f$ a_{2} @f$ |
 </center>
 @par
 This operator can provide more immediately readability when working with
@@ -1507,12 +1490,12 @@ expressions that focus on colour or Cartesian coordinate systems.
 The <b>`[]`</b> operator is valid for both vectors and matrices. It has the form:
 @par
 <table><tr>
-<td bgcolor="#ffc4c4"> @a `container` <b>[</b><em>`exp`</em><b>]</b> </td>
+<td> `container` <b>[</b><em>`exp`</em><b>]</b> </td>
 </tr></table>
 @par
-@a `exp` is expected to evaluate to a value which is castable to an integer
+`exp` is expected to evaluate to a value which is castable to an integer
 following the @ref axopassignment "assignment casting" rules and falls within
-the valid size of the @a `container`. <b>No bounds checking is performed</b>.
+the valid size of the `container`. <b>No bounds checking is performed</b>.
 @par
 As matrices are also an array of contigous values, they can be accessed in the
 same way. This can make some operations much simplier; a typical example being
@@ -1533,16 +1516,16 @@ for (int i = 0; i < 16; ++i) b[i] = i;
 The <b>`[,]`</b> operator is only valid for matrices. It has the form:
 @par
 <table><tr>
-<td bgcolor="#ffc4c4"> @a `matrix` <b>[</b><em>`exp1`</em>, <em>`exp2`</em><b>]</b> </td>
+<td> `matrix` <b>[</b><em>`exp1`</em>, <em>`exp2`</em><b>]</b> </td>
 </tr></table>
 @par
-@a `exp1` and @a `exp2` are expected to evaluate to a value which is castable to
+`exp1` and `exp2` are expected to evaluate to a value which is castable to
 an integer following the @ref axopassignment "assignment casting" rules and
-falls within the valid size of the @a `matrix` dimensions. <b>No bounds checking
+falls within the valid size of the `matrix` dimensions. <b>No bounds checking
 is performed</b>. In general it is more readable to use this operator when
-accessing specific elements, where @b `exp1` is the row index and @b `exp2` is
+accessing specific elements, where `exp1` is the row index and `exp2` is
 the column index. The tables below show the different access patterns for
-@b `3x3` and @b `4x4` matrices.
+`3x3` and `4x4` matrices.
 @par
 <!-- A -->@code{.c}
 mat3f a;
@@ -1555,22 +1538,26 @@ for (int i = 0; i < 3; ++i)
 <tr style="text-align:center">
 <td style="border:none" colspan=3>
 @f[
+{
 A=\begin{bmatrix}
 a_{00}\quad a_{01}\quad a_{02}\\
 a_{10}\quad a_{11}\quad a_{12}\\
 a_{20}\quad a_{21}\quad a_{22}\\
 \end{bmatrix}
+}
 @f]
 </td>
 <td style="border:none"></td>
 <td style="border:none" colspan=3>
 @f[
+{
 A=\begin{bmatrix}
 a_{00}\quad a_{01}\quad a_{02}\quad a_{03}\\
 a_{10}\quad a_{11}\quad a_{12}\quad a_{13}\\
 a_{20}\quad a_{21}\quad a_{22}\quad a_{23}\\
 a_{30}\quad a_{31}\quad a_{32}\quad a_{33}\\
 \end{bmatrix}
+}
 @f]
 </td>
 </tr>
@@ -1584,112 +1571,62 @@ a_{30}\quad a_{31}\quad a_{32}\quad a_{33}\\
 <th>Result</th>
 </tr>
 <tr style="text-align:center">
-<td><code>A[0]</code></td>
-<td><code>A[0,0]</code></td>
-<td>@f$ a_{00} @f$</td>
-<td><code>A[0]</code></td>
-<td><code>A[0,0]</code></td>
-<td>@f$ a_{00} @f$</td>
+<td>`A[0]`</td><td>`A[0,0]`</td><td>@f$ a_{00} @f$</td>
+<td>`A[0]`</td><td>`A[0,0]`</td><td>@f$ a_{00} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td><code>A[1]</code></td>
-<td><code>A[0,1]</code></td>
-<td>@f$ a_{01} @f$</td>
-<td><code>A[1]</code></td>
-<td><code>A[0,1]</code></td>
-<td>@f$ a_{01} @f$</td>
+<td>`A[1]`</td><td>`A[0,1]`</td><td>@f$ a_{01} @f$</td>
+<td>`A[1]`</td><td>`A[0,1]`</td><td>@f$ a_{01} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td><code>A[2]</code></td>
-<td><code>A[0,2]</code></td>
-<td>@f$ a_{02} @f$</td>
-<td><code>A[2]</code></td>
-<td><code>A[0,2]</code></td>
-<td>@f$ a_{02} @f$</td>
+<td>`A[2]`</td><td>`A[0,2]`</td><td>@f$ a_{02} @f$</td>
+<td>`A[2]`</td><td>`A[0,2]`</td><td>@f$ a_{02} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td><code>A[3]</code></td>
-<td><code>A[1,0]</code></td>
-<td>@f$ a_{10} @f$</td>
-<td><code>A[3]</code></td>
-<td><code>A[0,3]</code></td>
-<td>@f$ a_{03} @f$</td>
+<td>`A[3]`</td><td>`A[1,0]`</td><td>@f$ a_{10} @f$</td>
+<td>`A[3]`</td><td>`A[0,3]`</td><td>@f$ a_{03} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td><code>A[4]</code></td>
-<td><code>A[1,1]</code></td>
-<td>@f$ a_{10} @f$</td>
-<td><code>A[4]</code></td>
-<td><code>A[1,0]</code></td>
-<td>@f$ a_{10} @f$</td>
+<td>`A[4]`</td><td>`A[1,1]`</td><td>@f$ a_{10} @f$</td>
+<td>`A[4]`</td><td>`A[1,0]`</td><td>@f$ a_{10} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td><code>A[5]</code></td>
-<td><code>A[1,2]</code></td>
-<td>@f$ a_{12} @f$</td>
-<td><code>A[5]</code></td>
-<td><code>A[1,1]</code></td>
-<td>@f$ a_{11} @f$</td>
+<td>`A[5]`</td><td>`A[1,2]`</td><td>@f$ a_{12} @f$</td>
+<td>`A[5]`</td><td>`A[1,1]`</td><td>@f$ a_{11} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td><code>A[6]</code></td>
-<td><code>A[2,0]</code></td>
-<td>@f$ a_{20} @f$</td>
-<td><code>A[6]</code></td>
-<td><code>A[1,2]</code></td>
-<td>@f$ a_{12} @f$</td>
+<td>`A[6]`</td><td>`A[2,0]`</td><td>@f$ a_{20} @f$</td>
+<td>`A[6]`</td><td>`A[1,2]`</td><td>@f$ a_{12} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td><code>A[7]</code></td>
-<td><code>A[2,1]</code></td>
-<td>@f$ a_{21} @f$</td>
-<td><code>A[7]</code></td>
-<td><code>A[1,3]</code></td>
-<td>@f$ a_{13} @f$</td>
+<td>`A[7]`</td><td>`A[2,1]`</td><td>@f$ a_{21} @f$</td>
+<td>`A[7]`</td><td>`A[1,3]`</td><td>@f$ a_{13} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td><code>A[8]</code></td>
-<td><code>A[2,2]</code></td>
-<td>@f$ a_{22} @f$</td>
-<td><code>A[8]</code></td>
-<td><code>A[2,0]</code></td>
-<td>@f$ a_{20} @f$</td>
+<td>`A[8]`</td><td>`A[2,2]`</td><td>@f$ a_{22} @f$</td>
+<td>`A[8]`</td><td>`A[2,0]`</td><td>@f$ a_{20} @f$</td>
 </tr> <!-- ******************** MAT4 DATA ONLY ******************** -->
 <tr style="text-align:center">
-<td style="border:none;" colspan="3" rowspan="7"></td>
-<td><code>A[9]</code></td>
-<td><code>A[2,1]</code></td>
-<td>@f$ a_{21} @f$</td>
+<td style="border:right;" colspan="4" rowspan="7"></td>
+<td>`A[9]`</td><td>`A[2,1]`</td><td>@f$ a_{21} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td><code>A[10]</code></td>
-<td><code>A[2,2]</code></td>
-<td>@f$ a_{22} @f$</td>
+<td>`A[10]`</td><td>`A[2,2]`</td><td>@f$ a_{22} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td><code>A[11]</code></td>
-<td><code>A[2,3]</code></td>
-<td>@f$ a_{23} @f$</td>
+<td>`A[11]`</td><td>`A[2,3]`</td><td>@f$ a_{23} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td><code>A[12]</code></td>
-<td><code>A[3,0]</code></td>
-<td>@f$ a_{30} @f$</td>
+<td>`A[12]`</td><td>`A[3,0]`</td><td>@f$ a_{30} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td><code>A[13]</code></td>
-<td><code>A[3,1]</code></td>
-<td>@f$ a_{31} @f$</td>
+<td>`A[13]`</td><td>`A[3,1]`</td><td>@f$ a_{31} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td><code>A[14]</code></td>
-<td><code>A[3,2]</code></td>
-<td>@f$ a_{32} @f$</td>
+<td>`A[14]`</td><td>`A[3,2]`</td><td>@f$ a_{32} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td><code>A[15]</code></td>
-<td><code>A[3,3]</code></td>
-<td>@f$ a_{33} @f$</td>
+<td>`A[15]`</td><td>`A[3,3]`</td><td>@f$ a_{33} @f$</td>
 </tr>
 </table>
 
@@ -1703,22 +1640,27 @@ section. They have the following forms:
 <tr><th>Operator Name</th><th>Operator Syntax</th><th>Returns</th></tr>
 <tr style="text-align:left">
 <td>Call / Explicit Cast</td>
-<td bgcolor="#ffc4c4"> <em>`a`</em><b>`(...)`</b></td>
+<td> `a(...)` </td>
 <td>Returns the result of a function call or inbuilt explicit cast</td>
 </tr>
 <tr style="text-align:left">
 <td>Comma</td>
-<td bgcolor="#ffc4c4"> <em>`a`</em><b>,</b>&nbsp; <em>`b`</em></td>
-<td>Returns the value of @b `b` after chained evaluation</td>
+<td> `a, b, ...` </td>
+<td>Returns the value of the last expression after chained evaluation</td>
 </tr>
 <tr style="text-align:left">
 <td>Ternary Conditional</td>
-<td bgcolor="#ffc4c4"> <em>`a`</em>&nbsp;<b>`?`</b>&nbsp;<em>`b`</em>&nbsp;<b>`:`</b><em>`c`</em></td>
-<td>@b `b` if @b `a` is @b true, @b `c` otherwise.</td>
+<td> `a ? b : c` </td>
+<td> `b` if `a` is true, `c` otherwise.</td>
+</tr>
+<tr style="text-align:left">
+<td>Ternary Conditional</td>
+<td> `a ? : c` </td>
+<td> `a` if `a` is true, `c` otherwise.</td>
 </tr>
 <tr>
 <td>Vector/Matrix Initializer</td>
-<td bgcolor="#ffc4c4"> <b>`{`</b>&nbsp;<em> `a,&nbsp; `</em> `b&nbsp; `<b>`...&nbsp;}`</b> </td>
+<td>`{ a, b, ... }`</td>
 <td>Returns a temporary vector or matrix</td>
 </tr>
 </table>
@@ -1728,10 +1670,10 @@ The function call operator provides the ability to invoke functions @b or invoke
 a supported explicit cast. It has the form:
 @par
 <table><tr>
-<td bgcolor="#ffc4c4"> <em> `func(a, b, c, ...)` </em></td>
+<td> `func(a, b, c, ...)` </td>
 </tr></table>
 @par
-Where @b `func` is a function name @b or a valid explicit cast typename. Explicit
+Where `func` is a function name @b or a valid explicit cast typename. Explicit
 casts are only supported for @ref axscalars "scalar types". For example:
 <!-- A -->@code{.c}
 int a = int(1.1f);
@@ -1740,7 +1682,7 @@ a = int(b.x);
 @endcode
 @par
 Whilst explicit casts take only a single argument, the operator itself supports
-multiple or empty arguments for function calls. Whe multiple arguments are
+multiple or empty arguments for function calls. When multiple arguments are
 provided, they are parsed from first to last and processed in reverse order.
 @b However, the order of runtime evaluation is @b unspecified i.e. they may
 evaluate in any order. Each function parameter is initialized with its
@@ -1753,10 +1695,10 @@ functions.
 The Comma operator has the form:
 @par
 <table><tr>
-<td bgcolor="#ffc4c4"><em>`a`</em><b>`,` </b><em>`b`</em></td>
+<td>`a, b, ...`</td>
 </tr></table>
 @par
-Where @b `a` and @b `b` are expressions. Chained expressions evaluate each
+Where `a` and `b` are expressions. Chained expressions evaluate each
 expression in syntactical order (first to last), discarding any return value
 except for the last expression, which is returned from the entire list. Note that
 although return values for any expression but the last are discarded, their side
@@ -1780,32 +1722,33 @@ The ternary conditional operator can be thought of as an in-line @ref axbranchin
 a single expression that will be returned. It has the form:
 @par
 <table><tr>
-<td bgcolor="#ffc4c4"><em>`a`</em>&nbsp;<b>`?`</b>&nbsp;<em>`b`</em>&nbsp;<b>`:`</b><em>`c`</em></td>
+<td>`a ? b : c`</td>
 </tr></table>
-Where @b `a` is the condition, evaluated and converted to @b bool, and @b `b` and @b
-`c` are expressions of the same or implicit-castable types. @b `b` is evaluated and
-returned if the condition is @b true, @b `c` is evaluated and returned if the
-condition is @b false. Only the expression out of @b `b` and @b `c` that is
-returned will be evaluated. Expressions with no return value (a.k.a @b `void`)
-are supported as long as @b `b` and @b `c` are both of this type.
 @par
-Also supported is the 'Elvis' operator, <b>`a` `?` `:` `c`</b> (or `?:`).
-Here, @b `a` is evaluated once, and if when converted to @b bool is @b true, @b `a` is
-returned, otherwise @b `c` is evaluated and returned. In this case, @b `a` and @b
+Where `a` is the condition, evaluated and converted to @b bool, and `b` and
+`c` are expressions of the same or implicit-castable types. `b` is evaluated and
+returned if the condition is @b true, `c` is evaluated and returned if the
+condition is @b false. Only the expression out of `b` and `c` that is
+returned will be evaluated. Expressions with no return value (a.k.a `void`)
+are supported as long as `b` and `c` are both of this type.
+@par
+Also supported is the 'Elvis' operator, `a ? : c` (or `?:`).
+Here, `a` is evaluated once, and if when converted to @b bool is @b true, `a` is
+returned, otherwise `c` is evaluated and returned. In this case, `a` and
 `c` must be the same or implicit-castable types, and both implicit-castable to @b bool.
 
 @anchor axvecmatinit
 @par Vector/Matrix Initializer
 @ref axvecmats "Vectors and matrices" can be represented as local variables (e.g.
-@b `vec3f`), external attributes or parameters (e.g. @b `vec3f\@attrib`) or as
+`vec3f`), external attributes or parameters (e.g. `vec3f@attrib`) or as
 temporary values using the vector/matrix initializer syntax. This operator has
 the form:
 @par
 <table><tr>
-<td bgcolor="#ffc4c4"> <b>`{`</b>&nbsp; <em>`a,&nbsp; b&nbsp; `</em><b>`...&nbsp;}`</b> </td>
+<td> `{ a, b, ... }`</td>
 </tr></table>
 @par
-Where @b `a` and @b `b` are expressions returning a scalar value. When this
+Where `a` and `b` are expressions returning a scalar value. When this
 operator is invoked with a specific number of arguments, a vector or matrix is
 implicitly created with a copy of those arguments which can be assigned to an
 existing container of matching size. Expression in the operator are evaluated
@@ -1833,7 +1776,7 @@ The temporary container evaluates all expressions and uses the @b highest rankin
 type (as defined by @ref axtypeprecedence "arithmetic type precedence") to infer
 the element type of the container, implicitly casting all other types to that
 type where necessary. In the above example, the temporary created forms a
-@b `mat3d`, before being implicitly cast to a @b `mat3f` due to the assignment.
+`mat3d`, before being implicitly cast to a `mat3f` due to the assignment.
 
 
 @subsection axopprecedence Operator Precedence
@@ -2004,10 +1947,10 @@ can be used to assign any scalar a value.
 @par
 <table>
 <tr><th>Type</th><th>Literal Tokens</th></tr>
-<tr><td>`bool`</td><td>Tokens @b `true` and @b `false`</td></tr>
+<tr><td>`bool`</td><td>Tokens `true` and `false`</td></tr>
 <tr><td>`int32`</td><td>No suffix, automatically infered from integral literals</td></tr>
-<tr><td>`int64`</td><td>The letter @b `l` e.g. @code int64 a = 10l; @endcode</td></tr>
-<tr><td>`float`</td><td>The letter @b `f` e.g. @code float a = 0.0f; @endcode</td></tr>
+<tr><td>`int64`</td><td>The letter `l` e.g. @code int64 a = 10l; @endcode</td></tr>
+<tr><td>`float`</td><td>The letter `f` e.g. @code float a = 0.0f; @endcode</td></tr>
 <tr><td>`double`</td><td>No suffix, automatically infered from floating point literals.</td></tr>
 <tr><td>`string`</td><td>Character strings wrapped in double quotes @b \" @b \"</td></tr>
 </table>
@@ -2025,7 +1968,6 @@ can be used to assign any scalar a value.
 @subsection axattribaccess Attribute Access
 <!-- codecs not supported, how are points and volumes sampled (point vs volume) -->
 
-<!--
 Further, the active states of
 OpenVDB voxels change which voxels AX will process. The defined behavior for all
 cases is shown below.
@@ -2064,8 +2006,6 @@ foreach(ActiveVoxel in surface)
     DensityIndexSpaceCoord = density.transformToIndex(SurfaceWorldSpaceCoord);
     ActiveVoxel = density.getValue(DensityIndexSpaceCoord);
 @endcode
-done()
--->
 
 
 @subsection axexternalaccess External Parameter Access
@@ -2107,7 +2047,5 @@ AX Roadmap as a near future feature.
 
 
 @section axvexsupport AX VEX Support
-
-</div>
 
 */

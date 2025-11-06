@@ -774,6 +774,7 @@ private:
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 template<Index Log2Dim>
 inline
@@ -1522,6 +1523,7 @@ LeafNode<ValueMask, Log2Dim>::combine2(const LeafNode& b0, const OtherNodeT& b1,
     }
 }
 
+/// @endcond
 
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME

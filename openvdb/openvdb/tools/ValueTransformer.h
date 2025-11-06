@@ -42,7 +42,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-/// Iterate over a grid and at each step call @c op(iter).
+/// @brief Iterate over a grid and at each step call @c op(iter).
 /// @param iter      an iterator over a grid or its tree (@c Grid::ValueOnCIter,
 ///                  @c Tree::NodeIter, etc.)
 /// @param op        a functor of the form <tt>void op(const IterT&)</tt>, where @c IterT is
@@ -94,7 +94,7 @@ inline void foreach(const IterT& iter, const XformOp& op,
     bool threaded = true, bool shareOp = true);
 
 
-/// Iterate over a grid and at each step call <tt>op(iter, accessor)</tt> to
+/// @brief Iterate over a grid and at each step call <tt>op(iter, accessor)</tt> to
 /// populate (via the accessor) the given output grid, whose @c ValueType
 /// need not be the same as the input grid's.
 /// @param inIter    a non-<tt>const</tt> or (preferably) @c const iterator over an

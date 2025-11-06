@@ -16,9 +16,12 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace points {
 
+/// @cond OPENVDB_DOCS_INTERNAL
+
 // define leaf index in use as 32-bit
 namespace point_move_internal { using LeafIndex = Index32; }
 
+/// @endcond
 
 /// @brief A Deformer that caches the resulting positions from evaluating another Deformer
 template <typename T>
@@ -82,6 +85,7 @@ private:
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_move_internal {
 
@@ -448,6 +452,7 @@ private:
 
 } // namespace point_move_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

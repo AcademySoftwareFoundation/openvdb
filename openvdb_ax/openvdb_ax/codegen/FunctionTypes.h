@@ -382,7 +382,7 @@ struct Arguments
 {
     Arguments() = default;
 
-    /// @biref  Create a set of arguments from native arguments. The function
+    /// @brief  Create a set of arguments from native arguments. The function
     ///   framework typically works on generic arguments types.
     explicit Arguments(const NativeArguments& args) {
         mArgs.reserve(args.size());
@@ -1409,7 +1409,7 @@ struct OPENVDB_AX_API FunctionGroup
     /// @brief  Verify the function signatures in this group.
     bool HasUniqueTypeSignatures(llvm::LLVMContext& C) const;
 
-    /// @brief  Given a vector of llvm types, automatically returns the best
+    /// @brief  Given a vector of args, automatically returns the best
     ///         possible function declaration from the stored function list. The
     ///         'best' declaration is determined by the provided types
     ///         compatibility to each functions signature.
@@ -1425,9 +1425,8 @@ struct OPENVDB_AX_API FunctionGroup
     ///         virtual function, which is optional in LLVM 15 but required from
     ///         LLVM 16.
     ///
-    /// @param types  A vector of types representing the function argument types
-    /// @param C      The llvm context
-    /// @param type   If provided, type is set to the type of match that occurred
+    /// @param args  Args representing the function argument types
+    /// @param C     The llvm context
     std::pair<const Function*, Function::SignatureMatch>
     match(const ArgInfoVector& args, llvm::LLVMContext& C) const;
 

@@ -196,7 +196,7 @@ For multithreaded insertion operations we typically assign a separate grid
 to each thread and then merge the grids as threads terminate.
 This technique works remarkably well: because OpenVDB
 is sparse and hierarchical, merging is very efficient.
-For more details, please consult the @subpage codeExamples and
+For more details, please consult the @ref codeExamples and
 Appendix&nbsp;B in the <i>Transactions on Graphics</i> paper.
 
 @section sMaxRes Is OpenVDB unbounded?

@@ -1,0 +1,26 @@
+
+html {
+    /* override light-mode variables here */
+}
+
+html.dark-mode {
+    /* define dark-mode variable overrides here */
+    --openvdb-group-header-override: white;
+}
+
+/* Fix @name group sections in dark theme appearing strangely */
+div.groupHeader
+{
+    box-shadow: none;
+    color: var(--openvdb-group-header-override);
+}
+
+/* Apply invert to all images in tables, regardless of nesting, required to
+   properly handle latex formulas in dark theme (for some reason
+   doxygen-awesome only applies this to the first level of nested tables via:
+     html.dark-mode div.contents > table img)
+*/
+html.dark-mode div.contents table img
+{
+    filter: brightness(89%) hue-rotate(180deg) invert();
+}

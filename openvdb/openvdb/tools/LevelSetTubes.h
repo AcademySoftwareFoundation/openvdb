@@ -156,7 +156,7 @@ createLevelSetTubeComplex(const std::vector<math::Vec3<ScalarType>>& vertices,
 /// @param radii    Radii specification for all tubes in world units.
 /// @param voxelSize    Voxel size in world units.
 /// @param halfWidth    Half the width of the narrow band, in voxel units.
-/// @param TubeRadiiPolicy    Policies: per-segment, per-vertex, or automatic (default).
+/// @param radii_policy    Policies: per-segment, per-vertex, or automatic (default).
 /// @param interrupter    Interrupter adhering to the util::NullInterrupter interface.
 ///
 /// @note @c GridType::ValueType must be a floating-point scalar.

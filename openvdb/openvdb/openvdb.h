@@ -87,7 +87,7 @@ using Vec3dGrid    = Vec3DGrid;
 using Vec3fGrid    = Vec3SGrid;
 using VectorGrid   = Vec3fGrid;
 
-/// @name Lists of native Grid Types
+/** @name Lists of native Grid Types */
 /// @{
 /// The floating point Grid types which OpenVDB will register by default.
 using RealGridTypes   = TypeList<FloatGrid, DoubleGrid>;
@@ -112,10 +112,12 @@ using GridTypes =
         Append<BoolGrid, MaskGrid>;
 /// @}
 
-
+/// @cond OPENVDB_DOCS_INTERNAL
 namespace internal {
 template <typename T> using ToTreeType = typename T::TreeType;
 }
+/// @endcond
+
 /// @name Lists of native Tree Types
 /// @{
 using RealTreeTypes            = RealGridTypes::Transform<internal::ToTreeType>;
@@ -126,7 +128,7 @@ using TreeTypes                = GridTypes::Transform<internal::ToTreeType>;
 /// @}
 
 
-/// @name Lists of native TypedAttributeArray Types (for PointDataGrids)
+/** @name Lists of native TypedAttributeArray Types (for PointDataGrids) */
 /// @{
 /// The floating point attribute array types which OpenVDB will register by default.
 using RealAttributeTypes = TypeList<

@@ -136,6 +136,7 @@ private:
     bool mInvert = false;
 }; // struct FrustumRasterizerMask
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_rasterize_internal {
 
@@ -144,6 +145,7 @@ class GridToRasterize;
 
 } // namespace point_rasterize_internal
 
+/// @endcond
 
 /// @brief  Efficient rasterization of one or more VDB Points grids into a linear
 /// or frustum volume with the option to bake in camera or geometry motion blur.

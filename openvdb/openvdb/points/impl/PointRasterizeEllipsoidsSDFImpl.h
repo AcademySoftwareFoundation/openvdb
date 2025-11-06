@@ -20,6 +20,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace points {
 
+/// @cond OPENVDB_DOCS_INTERNAL
+
 namespace rasterize_sdf_internal
 {
 
@@ -816,6 +818,8 @@ OPENVDB_NO_DEPRECATION_WARNING_END
 }
 
 } // namespace rasterize_sdf_internal
+
+/// @endcond
 
 }
 }

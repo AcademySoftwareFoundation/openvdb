@@ -93,7 +93,7 @@ public:
     ///
     /// @param pt1    first endpoint of the capsule in world units
     /// @param pt2    second endpoint of the capsule in world units
-    /// @param radius    radius of the capsule in world units
+    /// @param r      radius of the capsule in world units
     template<typename ScalarType>
     void
     operator()(const math::Vec3<ScalarType>& pt1,
@@ -1043,7 +1043,7 @@ public:
     /// @param segments    segment indices in the tube complex
     /// @param radius    radius of all tubes in world units
     /// @param voxelSize    voxel size in world units
-    /// @param background    background value in voxel units
+    /// @param halfWidth    half-width value in voxel units
     /// @param interrupter pointer to optional interrupter. Use template
     /// argument util::NullInterrupter if no interruption is desired.
     TubeComplexVoxelizer(const std::vector<Vec3T>& vertices, const std::vector<Vec2I>& segments,

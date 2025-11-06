@@ -21,7 +21,6 @@
   - @ref secPtIndexFilters
 - @ref secPtSpaceAndTrans
 
-
 @section secPtOverview Introduction
 @anchor openvdbPointsOverview
 

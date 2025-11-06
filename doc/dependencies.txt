@@ -79,7 +79,7 @@ GLFW           | 3.3     | Latest      | Simple API for OpenGL development      
 OpenGL         | 3.2     | Latest      | Environment for developing portable graphics applications         | Y       | Y        | https://www.opengl.org
 GLEW           | 1.0.0   | Latest      | A cross-platform OpenGL extension loading library.                | Y       | Y        | http://glew.sourceforge.net
 CUDA           | -       | Latest      | Parallel computing platform for graphical processing units.       | Y       | N        | https://developer.nvidia.com/cuda-downloads
-Doxygen        | 1.8.8   | 1.8.11      | Documentation generation from C++                                 | Y       | Y        | http://www.doxygen.nl
+Doxygen        | 1.8.8   | <= 1.14.0   | Documentation generation from C++                                 | Y       | Y        | http://www.doxygen.nl
 
  - @b *  See the note in [known issues](@ref depKnownIssues) regarding supported blosc/llvm versions.
  - @b ** See the note in [known issues](@ref depKnownIssues) regarding supported nanobind build issues.
@@ -100,15 +100,13 @@ Doxygen        | 1.8.8   | 1.8.11      | Documentation generation from C++      
  Additionally these versions of blosc may generally not be compatible with OpenVDB
  itself. Avoid using these versions and upgrade to the new minimum of 1.17.0 where
  possible.
-
- - All versions from 1.11.0 through to, but excluding, 1.14.0.
- - Versions 1.16.0 and 1.16.1.
-
+  - All versions from 1.11.0 through to, but excluding, 1.14.0.
+  - Versions 1.16.0 and 1.16.1.
+  .
  For more information see:
-
- - https://www.blosc.org/posts/new-forward-compat-policy/
- - https://github.com/Blosc/c-blosc/issues/260
- - https://github.com/Blosc/c-blosc/issues/261
+  - https://www.blosc.org/posts/new-forward-compat-policy/
+  - https://github.com/Blosc/c-blosc/issues/260
+  - https://github.com/Blosc/c-blosc/issues/261
 
  - @b nanobind: Nanobind requires a fast-hash-map implementation library called
  tsl-robin-map. If you're installing nanobind through homebrew, this library

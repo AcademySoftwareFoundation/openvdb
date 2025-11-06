@@ -1,0 +1,7 @@
+OpenVDB:
+  New features:
+  - Incorporated doxygen-awesome to OpenVDB's doxygen builds to modernise and improve the html output.
+
+  Improvements:
+  - Added a new root ext/ folder to house imported third-party tools, along with a THIRD-PARTY.md
+    document detailing all imported licenses.

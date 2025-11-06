@@ -378,6 +378,8 @@ template<typename T, typename SubT> struct ConvertElementType<math::Mat3<T>, Sub
 template<typename T, typename SubT> struct ConvertElementType<math::Mat4<T>, SubT> { using Type = math::Mat4<SubT>; };
 /// @}
 
+/// @cond OPENVDB_DOCS_INTERNAL
+
 namespace types_internal
 {
 template <size_t Bits, bool Signed> struct int_t;
@@ -395,6 +397,8 @@ template <> struct flt_t<16ul> { using type = math::half; };
 template <> struct flt_t<32ul> { using type = float; };
 template <> struct flt_t<64ul> { using type = double; };
 }
+
+/// @endcond
 
 /// @brief Promotion classes which provide an interface for elevating and
 ///   demoting a scalar or VDB type to a higher or lower precision. Integer

@@ -91,7 +91,7 @@ namespace OPENVDB_VERSION_NAME {
 namespace points {
 
 /// @brief  Perform point rasterzation to produce a signed distance field.
-/// @param point     the point data grid to rasterize
+/// @param points    the point data grid to rasterize
 /// @param settings  one of the available transfer setting schemes found below
 ///   in this file.
 /// @return A vector of grids. The signed distance field is guaranteed to be

@@ -554,8 +554,6 @@ RetT TSEvalFirstPredImpl(
 
 /// @endcond
 
-
-/// @brief
 template<size_t Start, size_t End, typename OpT>
 OPENVDB_TYPELIST_FORCE_INLINE auto foreachIndex(OpT op)
 {

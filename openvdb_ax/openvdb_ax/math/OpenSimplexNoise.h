@@ -73,6 +73,8 @@ void curlnoise(double (*out)[3], double x, double y, double z)
 }
 }
 
+/// @cond OPENVDB_DOCS_INTERNAL
+
 namespace OSN
 {
 
@@ -144,6 +146,8 @@ private:
     // into the perm array. Pre-calculate and store the indices instead.
     int mPermGradIndex [256];
 };
+
+/// @endcond
 
 }
 

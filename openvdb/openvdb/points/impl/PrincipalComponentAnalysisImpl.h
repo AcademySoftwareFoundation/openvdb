@@ -20,6 +20,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace points {
 
+/// @cond OPENVDB_DOCS_INTERNAL
+
 namespace pca_internal {
 
 #ifdef OPENVDB_PROFILE_PCA
@@ -542,6 +544,7 @@ decomposeSymmetricMatrix(const math::Mat3<Scalar>& mat,
 
 } // namespace pca_internal
 
+/// @endcond
 
 template <typename PointDataGridT>
 inline void

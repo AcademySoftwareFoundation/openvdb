@@ -20,9 +20,11 @@
 
 #include <unordered_map>
 
+/// @cond OPENVDB_DOCS_INTERNAL
 namespace llvm {
 class LLVMContext;
 }
+/// @endcond
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

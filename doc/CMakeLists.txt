@@ -26,7 +26,7 @@ option(OPENVDB_DOXYGEN_INTERNAL [=[
 Enable documentation of methods and classes which have been explicitly marked as internal
 ]=] OFF)
 
-find_package(Doxygen REQUIRED doxygen)
+find_package(Doxygen 1.0...<1.15.0 REQUIRED doxygen)
 if(MINIMUM_DOXYGEN_VERSION)
   if(DOXYGEN_VERSION VERSION_LESS MINIMUM_DOXYGEN_VERSION)
     message(WARNING "The doxygen-config doxyfile has been generated with version "
@@ -41,12 +41,11 @@ set(DOXY_FILES
   openvdb/openvdb/io
   openvdb/openvdb/math
   openvdb/openvdb/points
-  openvdb/openvdb/points/impl
-  openvdb/openvdb/python/pyopenvdb.h
+  openvdb/openvdb/thread
   openvdb/openvdb/tools
-  openvdb/openvdb/tools/impl
   openvdb/openvdb/tree
   openvdb/openvdb/util
+  ext/imath/openvdb/math
   doc/build.txt
   doc/changes.txt
   doc/codingstyle.txt
@@ -58,27 +57,61 @@ set(DOXY_FILES
   doc/points.txt
   doc/python.txt)
 
+if(OPENVDB_DOXYGEN_INTERNAL)
+  list(APPEND
+    openvdb/openvdb/points/impl
+    openvdb/openvdb/tools/impl)
+endif()
+
+if(NOT OPENVDB_DOXYGEN_INTERNAL)
+  set(DOXYGEN_EXCLUDE_SYMBOLS
+    "*internal*"
+    "*Internal*")
+endif()
+
 set(DOXYGEN_PROJECT_NAME "OpenVDB")
+set(DOXYGEN_PROJECT_LOGO "${CMAKE_CURRENT_SOURCE_DIR}/img/openvdb_logo.png")
 set(DOXYGEN_PROJECT_NUMBER "${OpenVDB_VERSION}")
 set(DOXYGEN_PROJECT_BRIEF "")
 set(DOXYGEN_FILE_PATTERNS *.h *h.in) # headers only
 set(DOXYGEN_EXTENSION_MAPPING .in=C) # parse CMake config headers as C
-set(DOXYGEN_IMAGE_PATH "doc/img")
+set(DOXYGEN_IMAGE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/img")
 set(DOXYGEN_RECURSIVE NO)
 set(DOXYGEN_QUIET YES)
+set(DOXYGEN_NUM_PROC_THREADS 0) # detects from system
 
 set(DOXYGEN_GENERATE_HTML YES)
 set(DOXYGEN_GENERATE_MAN NO)
 set(DOXYGEN_GENERATE_LATEX NO)
 set(DOXYGEN_GENERATE_TODOLIST NO)
-
-set(DOXYGEN_HTML_COLORSTYLE_HUE 4)
-set(DOXYGEN_HTML_COLORSTYLE_SAT 222)
 set(DOXYGEN_HTML_TIMESTAMP NO) # for simpler website diffs
 
 set(DOXYGEN_EXTRACT_ALL YES)
 set(DOXYGEN_EXTRACT_STATIC YES)
 set(DOXYGEN_EXTRACT_LOCAL_CLASSES NO)
+
+# Configuration for doxygen-awesome-css
+# {
+set(DOXYGEN_HTML_COLORSTYLE_HUE 209)
+set(DOXYGEN_HTML_COLORSTYLE_SAT 255)
+set(DOXYGEN_HTML_COLORSTYLE_GAMMA 113)
+set(DOXYGEN_GENERATE_TREEVIEW YES)
+set(DOXYGEN_DISABLE_INDEX NO)
+set(DOXYGEN_FULL_SIDEBAR NO)
+set(DOXYGEN_HTML_HEADER
+  "${CMAKE_CURRENT_SOURCE_DIR}/header.html")
+set(DOXYGEN_HTML_EXTRA_STYLESHEET
+  "${CMAKE_SOURCE_DIR}/ext/doxygen-awesome/doxygen-awesome.css"
+  "${CMAKE_SOURCE_DIR}/ext/doxygen-awesome/doxygen-awesome-sidebar-only.css"
+  "${CMAKE_SOURCE_DIR}/ext/doxygen-awesome/doxygen-awesome-sidebar-only-darkmode-toggle.css"
+  "${CMAKE_CURRENT_SOURCE_DIR}/openvdb.css")
+set(DOXYGEN_HTML_EXTRA_FILES
+  "${CMAKE_SOURCE_DIR}/ext/doxygen-awesome/doxygen-awesome-paragraph-link.js"
+  "${CMAKE_SOURCE_DIR}/ext/doxygen-awesome/doxygen-awesome-fragment-copy-button.js"
+  "${CMAKE_SOURCE_DIR}/ext/doxygen-awesome/doxygen-awesome-darkmode-toggle.js")
+set(DOXYGEN_HTML_COPY_CLIPBOARD NO) # required with Doxygen >= 1.10.0
+set(DOXYGEN_HTML_COLORSTYLE LIGHT) # required with Doxygen >= 1.9.5
+# }
 
 # Allow for root directory paths to be listed (e.g. openvdb/io/File.h)
 # Rather than just the file names (e.g. File.h). This makes it far
@@ -110,12 +143,13 @@ set(DOXYGEN_HIDE_SCOPE_NAMES YES)
 set(DOXYGEN_INLINE_INHERITED_MEMB YES)
 set(DOXYGEN_MACRO_EXPANSION YES)
 # @todo use dot with class diagrams for relevant classes
+set(DOXYGEN_HAVE_DOT NO)
+set(DOXYGEN_CLASS_GRAPH NO)
 set(DOXYGEN_CLASS_DIAGRAMS NO)
 
-
 set(DOXYGEN_ALIASES
-  [[ijk="(<i>i</i>,&nbsp;<i>j</i>,&nbsp;<i>k</i>)"]]
-  [[xyz="(<i>x</i>,&nbsp;<i>y</i>,&nbsp;<i>z</i>)"]]
+  [[ijk="(<i>i</i>,&nbsp\;<i>j</i>,&nbsp\;<i>k</i>)"]]
+  [[xyz="(<i>x</i>,&nbsp\;<i>y</i>,&nbsp\;<i>z</i>)"]]
   [[const="<tt>const</tt>"]]
   "\"vdbnamespace=openvdb::v${OpenVDB_MAJOR_VERSION}_${OpenVDB_MINOR_VERSION}\""
   [["hunamespace=houdini_utils"]]
@@ -148,7 +182,8 @@ set(DOXYGEN_PREDEFINED
   # even if it was not properly tagged
   [["OPENVDB_DEPRECATED=/** \deprecated */"]]
   [["OPENVDB_DEPRECATED_MESSAGE(x)=/** \deprecated x */"]]
-  "OPENVDB_USE_LOG4CPLUS=")
+  "OPENVDB_USE_LOG4CPLUS="
+  "OPENVDB_UBSAN_SUPPRESS=")
 
 set(DOXYGEN_ENABLED_SECTIONS "")
 
@@ -190,9 +225,9 @@ if(OPENVDB_DOXYGEN_HOUDINI)
   list(APPEND DOXY_FILES
     doc/houdini.txt
     openvdb_houdini/openvdb_houdini/AttributeTransferUtil.h
-    openvdb_houdini/openvdb_houdini/GEO_PrimVDB.h
+    openvdb_houdini/openvdb_houdini/reference/GEO_PrimVDB.h
+    openvdb_houdini/openvdb_houdini/reference/GU_PrimVDB.h
     openvdb_houdini/openvdb_houdini/GT_GEOPrimCollectVDB.h
-    openvdb_houdini/openvdb_houdini/GU_PrimVDB.h
     openvdb_houdini/openvdb_houdini/GU_VDBPointTools.h
     openvdb_houdini/openvdb_houdini/GeometryUtil.h
     openvdb_houdini/openvdb_houdini/ParmFactory.h
@@ -221,8 +256,7 @@ if(OPENVDB_DOXYGEN_AX)
     openvdb_ax/openvdb_ax/compiler
     openvdb_ax/openvdb_ax/grammar
     openvdb_ax/openvdb_ax/grammar/generated
-    openvdb_ax/openvdb_ax/math
-    openvdb_ax/openvdb_ax/test)
+    openvdb_ax/openvdb_ax/math)
 endif()
 
 if(OPENVDB_DOXYGEN_NANOVDB)
@@ -236,7 +270,6 @@ if(OPENVDB_DOXYGEN_NANOVDB)
     doc/nanovdb/HelloWorld.md
     nanovdb/nanovdb
     nanovdb/nanovdb/util
-    nanovdb/nanovdb/examples/benchmark
     nanovdb/nanovdb/examples/ex_bump_pool_buffer
     nanovdb/nanovdb/examples/ex_collide_level_set
     nanovdb/nanovdb/examples/ex_make_custom_nanovdb
@@ -255,8 +288,7 @@ if(OPENVDB_DOXYGEN_NANOVDB)
     nanovdb/nanovdb/examples/ex_read_nanovdb_sphere_accessor_cuda
     nanovdb/nanovdb/examples/ex_util
     nanovdb/nanovdb/examples/ex_vox_to_nanovdb
-    nanovdb/nanovdb/examples/ex_write_nanovdb_grids
-    nanovdb/nanovdb/unittest)
+    nanovdb/nanovdb/examples/ex_write_nanovdb_grids)
 endif()
 
 set(DOXYGEN_VERBATIM_VARS DOXYGEN_ALIASES DOXYGEN_PREDEFINED)
