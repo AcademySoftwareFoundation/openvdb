@@ -1538,7 +1538,7 @@ for (int i = 0; i < 3; ++i)
 <tr style="text-align:center">
 <td style="border:none" colspan=3>
 @f[
-{\color{white}
+{
 A=\begin{bmatrix}
 a_{00}\quad a_{01}\quad a_{02}\\
 a_{10}\quad a_{11}\quad a_{12}\\
@@ -1550,7 +1550,7 @@ a_{20}\quad a_{21}\quad a_{22}\\
 <td style="border:none"></td>
 <td style="border:none" colspan=3>
 @f[
-{\color{white}
+{
 A=\begin{bmatrix}
 a_{00}\quad a_{01}\quad a_{02}\quad a_{03}\\
 a_{10}\quad a_{11}\quad a_{12}\quad a_{13}\\
@@ -1571,62 +1571,62 @@ a_{30}\quad a_{31}\quad a_{32}\quad a_{33}\\
 <th>Result</th>
 </tr>
 <tr style="text-align:center">
-<td>`A[0]`</td><td>`A[0,0]`</td><td>@f$\color{white} a_{00} @f$</td>
-<td>`A[0]`</td><td>`A[0,0]`</td><td>@f$\color{white} a_{00} @f$</td>
+<td>`A[0]`</td><td>`A[0,0]`</td><td>@f$ a_{00} @f$</td>
+<td>`A[0]`</td><td>`A[0,0]`</td><td>@f$ a_{00} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td>`A[1]`</td><td>`A[0,1]`</td><td>@f$\color{white} a_{01} @f$</td>
-<td>`A[1]`</td><td>`A[0,1]`</td><td>@f$\color{white} a_{01} @f$</td>
+<td>`A[1]`</td><td>`A[0,1]`</td><td>@f$ a_{01} @f$</td>
+<td>`A[1]`</td><td>`A[0,1]`</td><td>@f$ a_{01} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td>`A[2]`</td><td>`A[0,2]`</td><td>@f$\color{white} a_{02} @f$</td>
-<td>`A[2]`</td><td>`A[0,2]`</td><td>@f$\color{white} a_{02} @f$</td>
+<td>`A[2]`</td><td>`A[0,2]`</td><td>@f$ a_{02} @f$</td>
+<td>`A[2]`</td><td>`A[0,2]`</td><td>@f$ a_{02} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td>`A[3]`</td><td>`A[1,0]`</td><td>@f$\color{white} a_{10} @f$</td>
-<td>`A[3]`</td><td>`A[0,3]`</td><td>@f$\color{white} a_{03} @f$</td>
+<td>`A[3]`</td><td>`A[1,0]`</td><td>@f$ a_{10} @f$</td>
+<td>`A[3]`</td><td>`A[0,3]`</td><td>@f$ a_{03} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td>`A[4]`</td><td>`A[1,1]`</td><td>@f$\color{white} a_{10} @f$</td>
-<td>`A[4]`</td><td>`A[1,0]`</td><td>@f$\color{white} a_{10} @f$</td>
+<td>`A[4]`</td><td>`A[1,1]`</td><td>@f$ a_{10} @f$</td>
+<td>`A[4]`</td><td>`A[1,0]`</td><td>@f$ a_{10} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td>`A[5]`</td><td>`A[1,2]`</td><td>@f$\color{white} a_{12} @f$</td>
-<td>`A[5]`</td><td>`A[1,1]`</td><td>@f$\color{white} a_{11} @f$</td>
+<td>`A[5]`</td><td>`A[1,2]`</td><td>@f$ a_{12} @f$</td>
+<td>`A[5]`</td><td>`A[1,1]`</td><td>@f$ a_{11} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td>`A[6]`</td><td>`A[2,0]`</td><td>@f$\color{white} a_{20} @f$</td>
-<td>`A[6]`</td><td>`A[1,2]`</td><td>@f$\color{white} a_{12} @f$</td>
+<td>`A[6]`</td><td>`A[2,0]`</td><td>@f$ a_{20} @f$</td>
+<td>`A[6]`</td><td>`A[1,2]`</td><td>@f$ a_{12} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td>`A[7]`</td><td>`A[2,1]`</td><td>@f$\color{white} a_{21} @f$</td>
-<td>`A[7]`</td><td>`A[1,3]`</td><td>@f$\color{white} a_{13} @f$</td>
+<td>`A[7]`</td><td>`A[2,1]`</td><td>@f$ a_{21} @f$</td>
+<td>`A[7]`</td><td>`A[1,3]`</td><td>@f$ a_{13} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td>`A[8]`</td><td>`A[2,2]`</td><td>@f$\color{white} a_{22} @f$</td>
-<td>`A[8]`</td><td>`A[2,0]`</td><td>@f$\color{white} a_{20} @f$</td>
+<td>`A[8]`</td><td>`A[2,2]`</td><td>@f$ a_{22} @f$</td>
+<td>`A[8]`</td><td>`A[2,0]`</td><td>@f$ a_{20} @f$</td>
 </tr> <!-- ******************** MAT4 DATA ONLY ******************** -->
 <tr style="text-align:center">
 <td style="border:right;" colspan="4" rowspan="7"></td>
-<td>`A[9]`</td><td>`A[2,1]`</td><td>@f$\color{white} a_{21} @f$</td>
+<td>`A[9]`</td><td>`A[2,1]`</td><td>@f$ a_{21} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td>`A[10]`</td><td>`A[2,2]`</td><td>@f$\color{white} a_{22} @f$</td>
+<td>`A[10]`</td><td>`A[2,2]`</td><td>@f$ a_{22} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td>`A[11]`</td><td>`A[2,3]`</td><td>@f$\color{white} a_{23} @f$</td>
+<td>`A[11]`</td><td>`A[2,3]`</td><td>@f$ a_{23} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td>`A[12]`</td><td>`A[3,0]`</td><td>@f$\color{white} a_{30} @f$</td>
+<td>`A[12]`</td><td>`A[3,0]`</td><td>@f$ a_{30} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td>`A[13]`</td><td>`A[3,1]`</td><td>@f$\color{white} a_{31} @f$</td>
+<td>`A[13]`</td><td>`A[3,1]`</td><td>@f$ a_{31} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td>`A[14]`</td><td>`A[3,2]`</td><td>@f$\color{white} a_{32} @f$</td>
+<td>`A[14]`</td><td>`A[3,2]`</td><td>@f$ a_{32} @f$</td>
 </tr>
 <tr style="text-align:center">
-<td>`A[15]`</td><td>`A[3,3]`</td><td>@f$\color{white} a_{33} @f$</td>
+<td>`A[15]`</td><td>`A[3,3]`</td><td>@f$ a_{33} @f$</td>
 </tr>
 </table>
 
