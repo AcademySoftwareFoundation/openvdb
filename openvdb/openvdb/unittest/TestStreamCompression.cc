@@ -4,6 +4,8 @@
 #include <openvdb/points/StreamCompression.h>
 #include <openvdb/io/Compression.h> // io::COMPRESS_BLOSC
 
+#include "util.h"
+
 #include <gtest/gtest.h>
 
 #ifdef OPENVDB_USE_DELAYED_LOADING
@@ -38,54 +40,6 @@
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
 #endif
-
-#ifdef OPENVDB_USE_DELAYED_LOADING
-/// @brief io::MappedFile has a private constructor, so this unit tests uses a matching proxy
-class ProxyMappedFile
-{
-public:
-    explicit ProxyMappedFile(const std::string& filename)
-        : mImpl(new Impl(filename)) { }
-
-private:
-    class Impl
-    {
-    public:
-        Impl(const std::string& filename)
-            : mMap(filename.c_str(), boost::interprocess::read_only)
-            , mRegion(mMap, boost::interprocess::read_only)
-        {
-            mLastWriteTime = 0;
-            const char* regionFilename = mMap.get_name();
-#ifdef _WIN32
-            using namespace boost::interprocess::ipcdetail;
-            using openvdb::Index64;
-
-            if (void* fh = open_existing_file(regionFilename, boost::interprocess::read_only)) {
-                FILETIME mtime;
-                if (GetFileTime(fh, nullptr, nullptr, &mtime)) {
-                    mLastWriteTime = (Index64(mtime.dwHighDateTime) << 32) | mtime.dwLowDateTime;
-                }
-                close_file(fh);
-            }
-#else
-            struct stat info;
-            if (0 == ::stat(regionFilename, &info)) {
-                mLastWriteTime = openvdb::Index64(info.st_mtime);
-            }
-#endif
-        }
-
-        using Notifier = std::function<void(std::string /*filename*/)>;
-        boost::interprocess::file_mapping mMap;
-        boost::interprocess::mapped_region mRegion;
-        bool mAutoDelete = false;
-        Notifier mNotifier;
-        mutable std::atomic<openvdb::Index64> mLastWriteTime;
-    }; // class Impl
-    std::unique_ptr<Impl> mImpl;
-}; // class ProxyMappedFile
-#endif // OPENVDB_USE_DELAYED_LOADING
 
 using namespace openvdb;
 using namespace openvdb::compression;
@@ -515,12 +469,9 @@ TestStreamCompression::testPagedStreams()
 
 
 #ifdef OPENVDB_USE_DELAYED_LOADING
-            // abuse File being a friend of MappedFile to get around the private constructor
-            ProxyMappedFile* proxy = new ProxyMappedFile(filename);
-            SharedPtr<io::MappedFile> mappedFile(reinterpret_cast<io::MappedFile*>(proxy));
+            auto mappedFile = TestMappedFile::create(filename);
 
             // read
-
             std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
             io::setStreamMetadataPtr(filein, streamMetadata);
             io::setMappedFilePtr(filein, mappedFile);
@@ -612,4 +563,5 @@ TestStreamCompression::testPagedStreams()
         std::remove(filename.c_str());
     }
 }
+
 TEST_F(TestStreamCompression, testPagedStreams) { testPagedStreams(); }
