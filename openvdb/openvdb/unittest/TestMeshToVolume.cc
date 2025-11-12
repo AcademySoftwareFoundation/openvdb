@@ -5,9 +5,12 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/util/Util.h>
+#include <openvdb/util/NullInterrupter.h>
 
 #include <gtest/gtest.h>
 #include <vector>
+#include <thread>
+#include <chrono>
 
 class TestMeshToVolume: public ::testing::Test
 {
@@ -127,5 +130,89 @@ TEST_F(TestMeshToVolume, testCreateLevelSetBox)
     // test outside coord value
     ijk = transform->worldToIndexNodeCentered(openvdb::Vec3d(1.5, 1.5, 1.5));
     EXPECT_TRUE(grid->tree().getValue(ijk) > 0.0f);
+}
+
+
+TEST_F(TestMeshToVolume, testInterrupt)
+{
+    using namespace openvdb;
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    struct Interrupter final : util::NullInterrupter
+    {
+        bool wasInterrupted(int percent = -1) override { (void)percent; return interrupted.load(); }
+        void interrupt() { interrupted.store(true); }
+        std::atomic<bool> interrupted = false;
+    };
+
+    struct MeshAdapter
+    {
+        MeshAdapter(const std::vector<Vec3d>& vertices, const std::vector<Vec3d>& triangles)
+            : vertices(vertices), triangles(triangles), positionsRequested(false) {}
+        size_t polygonCount() const { return triangles.size(); }
+        size_t pointCount() const { return vertices.size(); }
+        size_t vertexCount(size_t) const { return 3; }
+        void getIndexSpacePoint(size_t n, size_t v, Vec3d &pos) const
+        {
+            // Mark that positions have been accessed
+            positionsRequested = true;
+            pos = vertices[size_t(triangles[n][v])];
+        }
+        const std::vector<Vec3d>& vertices;
+        const std::vector<Vec3d>& triangles;
+        // Flag to check that meshToVolume has started accessing positions
+        mutable std::atomic<bool> positionsRequested;
+    };
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    Interrupter interrupter;
+
+    // define geo for a box
+    const Vec3d size = {100000, 100000, 100000};
+    const double hx = size.x() / 2.0;
+    const double hy = size.y() / 2.0;
+    const double z  = size.z();
+
+    const std::vector<Vec3d> vertices = {
+        {-hx, -hy, 0.0}, {+hx, -hy, 0.0}, {+hx, -hy, z}, {-hx, -hy, z},
+        {-hx, +hy, 0.0}, {+hx, +hy, 0.0}, {+hx, +hy, z}, {-hx, +hy, z},
+    };
+
+    const std::vector<Vec3d> triangles = {
+        {0, 1, 2}, {0, 2, 3}, {1, 0, 4}, {1, 4, 5}, {1, 5, 6}, {1, 6, 2},
+        {3, 2, 6}, {3, 6, 7}, {4, 0, 3}, {4, 3, 7}, {4, 6, 5}, {4, 7, 6},
+    };
+
+    const MeshAdapter adapter(vertices, triangles);
+    const auto transform = math::Transform::createLinearTransform(1.0);
+    FloatGrid::Ptr grid;
+
+    std::chrono::steady_clock::time_point start, end;
+
+    // Start volume generation
+    std::thread m2vThread([&]() {
+        grid = tools::meshToVolume<FloatGrid>(interrupter, adapter, *transform);
+        // assign end here to avoid waiting for thread sync (we only care about
+        // meshToVolume returning).
+        end = std::chrono::steady_clock::now();
+    });
+
+    // Wait for method to start before interrupting
+    while (!adapter.positionsRequested) {} // loop until positions have been accessed
+    std::this_thread::sleep_for(std::chrono::milliseconds(100)); // sleep for a bit longer
+
+    start = std::chrono::steady_clock::now();
+    // interrupt
+    interrupter.interrupt();
+    m2vThread.join();
+
+    // Should have returned _something_
+    EXPECT_TRUE(grid);
+
+    // Expect to interrupt in under a second
+    const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    EXPECT_LT(duration.count(), 1000);
 }
 

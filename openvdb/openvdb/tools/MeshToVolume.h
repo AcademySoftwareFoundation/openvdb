@@ -2169,22 +2169,31 @@ private:
         unsigned char primId = data.getNewPrimId();
         data.primIdAcc.setValueOnly(ijk, primId);
 
-        while (!coordList.empty()) {
-            if (interrupter && interrupter->wasInterrupted()) {
-                thread::cancelGroupExecution();
-                break;
-            }
-            for (Int32 pass = 0; pass < 1048576 && !coordList.empty(); ++pass) {
+        // iteration number to check for an interrupt
+        constexpr Int32 freq = 2<<12;
+        // Arbitrarily chosen 2^19 as a cutoff to avoid any infinite loops
+        constexpr Int32 maxiter = 2<<19;
+
+        for (Int32 k = 0; k < (maxiter/freq) && !coordList.empty(); ++k)
+        {
+            for (Int32 pass = 0; pass < freq && !coordList.empty(); ++pass)
+            {
                 ijk = coordList.back();
                 coordList.pop_back();
-
                 for (Int32 i = 0; i < 26; ++i) {
                     nijk = ijk + util::COORD_OFFSETS[i];
                     if (primId != data.primIdAcc.getValue(nijk)) {
                         data.primIdAcc.setValueOnly(nijk, primId);
-                        if(updateDistance(nijk, prim, data)) coordList.push_back(nijk);
+                        if (updateDistance(nijk, prim, data)) {
+                            coordList.push_back(nijk);
+                        }
                     }
                 }
+            }
+
+            if (interrupter && interrupter->wasInterrupted()) {
+                thread::cancelGroupExecution();
+                return;
             }
         }
     }
