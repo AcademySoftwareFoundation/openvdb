@@ -20,6 +20,10 @@ project(OpenVDBCore LANGUAGES CXX)
 
 include(GNUInstallDirs)
 
+if (POLICY CMP0072)
+  cmake_policy(SET CMP0072 NEW) # OpenGL policy
+endif()
+
 ###### OpenVDB Core Options
 
 option(OPENVDB_CORE_SHARED "Build dynamically linked version of the core library." ON)
@@ -129,7 +133,12 @@ if(OPENVDB_USE_DELAYED_LOADING)
   endif()
 endif()
 
-find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
+
+if (NOT OPENVDB_BUILDS_DEPS)
+  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
+endif()
+
+
 if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_TBB_VERSION)
   if(${TBB_VERSION} VERSION_LESS FUTURE_MINIMUM_TBB_VERSION)
     message(DEPRECATION "Support for TBB versions < ${FUTURE_MINIMUM_TBB_VERSION} "
@@ -164,7 +173,9 @@ endif()
 
 if(USE_BLOSC)
   # Find Blosc libraries
-  find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
+  if (NOT OPENVDB_BUILDS_DEPS)
+    find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
+  endif()
   if(Blosc_VERSION)
     if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BLOSC_VERSION)
       if(${Blosc_VERSION} VERSION_LESS FUTURE_MINIMUM_BLOSC_VERSION)
@@ -191,7 +202,7 @@ else()
   )
 endif()
 
-if(USE_BLOSC OR USE_ZLIB)
+if(USE_BLOSC OR USE_ZLIB AND NOT OPENVDB_BUILDS_DEPS)
   if(USE_STATIC_DEPENDENCIES)
     set(_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
     if(MSVC)
