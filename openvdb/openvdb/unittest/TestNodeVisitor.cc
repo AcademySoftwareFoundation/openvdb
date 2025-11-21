@@ -286,3 +286,46 @@ TEST_F(TestNodeVisitor, testOffset)
     OffsetByLevelOp<FloatTree> byLevelOp(3.0f);
     tools::visitNodesDepthFirst(grid->tree(), byLevelOp);
 }
+
+
+struct RecordLevelOrderOp
+{
+    template <typename NodeT>
+    void operator()(const NodeT&, size_t)
+    {
+        const openvdb::Index level = NodeT::LEVEL;
+        levels.push_back(level);
+    }
+
+    std::vector<openvdb::Index> levels;
+}; // struct RecordLevelOrderOp
+
+
+TEST_F(TestNodeVisitor, testTopDownBottomUp)
+{
+    using namespace openvdb;
+
+    FloatGrid::Ptr grid = tools::createLevelSetCube<FloatGrid>(/*scale=*/10.0f);
+
+    // Visit with topDown=true (pre-order: parent before children)
+    RecordLevelOrderOp topDownOp;
+    tools::visitNodesDepthFirst(grid->tree(), topDownOp, 0, true);
+
+    // Visit with topDown=false (post-order: children before parent)
+    RecordLevelOrderOp bottomUpOp;
+    tools::visitNodesDepthFirst(grid->tree(), bottomUpOp, 0, false);
+
+    // Both should visit the same number of nodes
+    EXPECT_EQ(topDownOp.levels.size(), bottomUpOp.levels.size());
+    EXPECT_GT(topDownOp.levels.size(), size_t(0));
+
+    // Top-down: first element should be the root (highest level)
+    const Index rootLevel = FloatTree::RootNodeType::LEVEL;
+    EXPECT_EQ(topDownOp.levels.front(), rootLevel);
+
+    // Bottom-up: last element should be the root (highest level)
+    EXPECT_EQ(bottomUpOp.levels.back(), rootLevel);
+
+    // The two sequences should not be identical (different traversal order)
+    EXPECT_NE(topDownOp.levels, bottomUpOp.levels);
+}
