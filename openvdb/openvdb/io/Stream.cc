@@ -71,7 +71,7 @@ removeTempFile(const std::string expectedFilename, const std::string& filename)
 #endif // OPENVDB_USE_DELAYED_LOADING
 
 
-Stream::Stream(std::istream& is, bool delayLoad): mImpl(new Impl)
+Stream::Stream(std::istream& is, bool delayLoad, ScalarConversion conversion): mImpl(new Impl)
 {
     if (!is) return;
 
@@ -97,7 +97,8 @@ Stream::Stream(std::istream& is, bool delayLoad): mImpl(new Impl)
             mImpl->mFile->setCopyMaxBytes(0); // don't make a copy of the temporary file
             /// @todo Need to pass auto-deletion flag to MappedFile.
             mImpl->mFile->open(delayLoad,
-                std::bind(&removeTempFile, filename, std::placeholders::_1));
+                std::bind(&removeTempFile, filename, std::placeholders::_1),
+                conversion);
         }
     }
 #endif // OPENVDB_USE_DELAYED_LOADING
@@ -111,6 +112,7 @@ Stream::Stream(std::istream& is, bool delayLoad): mImpl(new Impl)
         io::setStreamMetadataPtr(is, streamMetadata, /*transfer=*/false);
         io::setVersion(is, libraryVersion(), fileVersion());
         io::setDataCompression(is, compression());
+        streamMetadata->setDesiredScalarType(conversionToString(conversion));
 
         // Read in the VDB metadata.
         mImpl->mMeta.reset(new MetaMap);

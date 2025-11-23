@@ -2388,9 +2388,11 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
     // Delete the existing tree.
     this->clear();
 
-    // Read a RootNode that was stored in the current format.
+    // converting reader for reading grid values
+    auto& convertingReader = io::ConvertingReader<ValueType>::get(is);
 
-    is.read(reinterpret_cast<char*>(&mBackground), sizeof(ValueType));
+    // Read a RootNode that was stored in the current format.
+    convertingReader.read(is, mBackground);
     io::setGridBackgroundValuePtr(is, &mBackground);
 
     Index numTiles = 0, numChildren = 0;
@@ -2406,7 +2408,7 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
     // Read tiles.
     for (Index n = 0; n < numTiles; ++n) {
         is.read(reinterpret_cast<char*>(vec), 3 * sizeof(Int32));
-        is.read(reinterpret_cast<char*>(&value), sizeof(ValueType));
+        convertingReader.read(is, value);
         is.read(reinterpret_cast<char*>(&active), sizeof(bool));
         mTable.emplace(Coord(vec), Tile(value, active));
     }
