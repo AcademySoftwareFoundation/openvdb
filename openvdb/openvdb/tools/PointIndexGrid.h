@@ -1728,6 +1728,10 @@ PointIndexLeafNode<T, Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
 
     mIndices.resize(size_t(numIndices));
     is.read(reinterpret_cast<char*>(mIndices.data()), numIndices * sizeof(T));
+
+    // Reserved for future use
+    Index64 auxDataBytes = Index64(0);
+    is.read(reinterpret_cast<char*>(&auxDataBytes), sizeof(Index64));
 }
 
 
