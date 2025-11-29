@@ -975,7 +975,7 @@ void Parser::parse(int argc, char *argv[])
 {
     OPENVDB_ASSERT(!hashMap.empty());
     if (argc <= 1) throw std::invalid_argument("Parser: No arguments provided, try " + getFile(argv[0]) + " -help\"");
-    counter = 0;// reset to check for matching {for,each}/end loops
+    counter = 0;// reset to check for matching {for,each,if}/end loops
     for (int i=1; i<argc; ++i) {
         const std::string str = argv[i];
         size_t pos = str.find_first_not_of("-");
@@ -989,7 +989,7 @@ void Parser::parse(int argc, char *argv[])
         } else {
             std::stringstream ss;
             ss << "Parser: unsupported action \"" << str << "\"\n";
-            for (auto &match : this->closeMatches(str)) ss << "Did you mean: \"" << match.second << "\"\n";
+            for (auto &match : this->closeMatches(str)) ss << "Did you mean the action: \"-" << match.second << "\"?\n";
             throw std::invalid_argument(ss.str());
         }
     }// loop over all input arguments
