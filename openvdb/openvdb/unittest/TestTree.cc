@@ -731,37 +731,44 @@ TEST_F(TestTree, testIterators)
 
 TEST_F(TestTree, testIO)
 {
-    const char* filename = "testIO.dbg";
+    using TreeType = openvdb::tree::Tree<RootNodeType>;
+    using GridType = openvdb::Grid<TreeType>;
+
+    const char* filename = "testIO.vdb";
     openvdb::SharedPtr<const char> scopedFile(filename, ::remove);
     {
         ValueType background=5.0f;
-        RootNodeType root_node(background);
-        root_node.setValueOn(openvdb::Coord(5,10,20),0.234f);
-        root_node.setValueOn(openvdb::Coord(50000,20000,30000),4.5678f);
+        GridType::Ptr grid = GridType::create(background);
+        grid->setName("test_grid");
+        grid->tree().setValueOn(openvdb::Coord(5,10,20),0.234f);
+        grid->tree().setValueOn(openvdb::Coord(50000,20000,30000),4.5678f);
 
-        std::ofstream os(filename, std::ios_base::binary);
-        root_node.writeTopology(os);
-        root_node.writeBuffers(os);
-        EXPECT_TRUE(!os.fail());
+        openvdb::GridCPtrVec grids;
+        grids.push_back(grid);
+
+        openvdb::io::File file(filename);
+        file.write(grids);
+        file.close();
     }
     {
         ValueType background=2.0f;
-        RootNodeType root_node(background);
-        ASSERT_DOUBLES_EXACTLY_EQUAL(background, root_node.getValue(openvdb::Coord(5,10,20)));
+        GridType::Ptr grid = GridType::create(background);
+        ASSERT_DOUBLES_EXACTLY_EQUAL(background, grid->tree().getValue(openvdb::Coord(5,10,20)));
+
         {
-            std::ifstream is(filename, std::ios_base::binary);
-            // Since the test file doesn't include a VDB header with file format version info,
-            // tag the input stream explicitly with the current version number.
-            openvdb::io::setCurrentVersion(is);
-            root_node.readTopology(is);
-            root_node.readBuffers(is);
-            EXPECT_TRUE(!is.fail());
+            openvdb::io::File file(filename);
+            file.open();
+            openvdb::GridBase::Ptr baseGrid = file.readGrid("test_grid");
+            file.close();
+
+            grid = openvdb::gridPtrCast<GridType>(baseGrid);
+            EXPECT_TRUE(grid.get() != nullptr);
         }
 
-        ASSERT_DOUBLES_EXACTLY_EQUAL(0.234f, root_node.getValue(openvdb::Coord(5,10,20)));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(5.0f, root_node.getValue(openvdb::Coord(5,11,20)));
+        ASSERT_DOUBLES_EXACTLY_EQUAL(0.234f, grid->tree().getValue(openvdb::Coord(5,10,20)));
+        ASSERT_DOUBLES_EXACTLY_EQUAL(5.0f, grid->tree().getValue(openvdb::Coord(5,11,20)));
         ValueType sum=0.0f;
-        for (RootNodeType::ChildOnIter root_iter = root_node.beginChildOn();
+        for (RootNodeType::ChildOnIter root_iter = grid->tree().root().beginChildOn();
             root_iter.test(); ++root_iter)
         {
             for (InternalNodeType2::ChildOnIter internal_iter2 = root_iter->beginChildOn();

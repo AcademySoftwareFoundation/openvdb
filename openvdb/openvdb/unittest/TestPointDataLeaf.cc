@@ -1058,76 +1058,93 @@ TEST_F(TestPointDataLeaf, testIO)
     // read and write topology to disk
 
     {
-        LeafType leaf2(openvdb::Coord(0, 0, 0));
+        // create a grid with the leaf for topology testing
+        PointDataGrid::Ptr grid = PointDataGrid::create();
+        grid->setName("points");
+        grid->tree().addLeaf(new LeafType(leaf));
 
-        std::ostringstream ostr(std::ios_base::binary);
-        leaf.writeTopology(ostr);
+        openvdb::GridCPtrVec grids;
+        grids.push_back(grid);
 
-        std::istringstream istr(ostr.str(), std::ios_base::binary);
-        leaf2.readTopology(istr);
+        // write to file
+        {
+            io::File file("leaf_topology.vdb");
+            file.write(grids);
+            file.close();
+        }
+
+        // read grid from file
+        PointDataGrid::Ptr gridFromDisk;
+        {
+            io::File file("leaf_topology.vdb");
+            file.open();
+            openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
+            file.close();
+
+            gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
+        }
+
+        LeafType* leaf2 = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
+        EXPECT_TRUE(leaf2);
 
         // check topology matches
 
-        EXPECT_EQ(leaf.onVoxelCount(), leaf2.onVoxelCount());
-        EXPECT_TRUE(leaf2.isValueOn(4));
-        EXPECT_TRUE(!leaf2.isValueOn(5));
+        EXPECT_EQ(leaf.onVoxelCount(), leaf2->onVoxelCount());
+        EXPECT_TRUE(leaf2->isValueOn(4));
+        EXPECT_TRUE(!leaf2->isValueOn(5));
 
-        // check only topology (values and attributes still empty)
+        // check that values and attributes are correctly read
 
-        EXPECT_EQ(leaf2.getValue(4), ValueType(0));
-        EXPECT_EQ(leaf2.attributeSet().size(), size_t(0));
+        EXPECT_EQ(leaf2->getValue(4), ValueType(20));
+        EXPECT_EQ(leaf2->attributeSet().size(), size_t(2));
+
+        remove("leaf_topology.vdb");
     }
 
     // read and write buffers to disk
 
     {
-        LeafType leaf2(openvdb::Coord(0, 0, 0));
+        // create a grid with the leaf for buffer testing
+        PointDataGrid::Ptr grid = PointDataGrid::create();
+        grid->setName("points");
+        grid->tree().addLeaf(new LeafType(leaf));
 
-        io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
+        openvdb::GridCPtrVec grids;
+        grids.push_back(grid);
 
-        std::ostringstream ostr(std::ios_base::binary);
-        io::setStreamMetadataPtr(ostr, streamMetadata);
-        io::setDataCompression(ostr, io::COMPRESS_BLOSC);
-        leaf.writeTopology(ostr);
-        for (Index b = 0; b < leaf.buffers(); b++) {
-            uint32_t pass = (uint32_t(leaf.buffers()) << 16) | uint32_t(b);
-            streamMetadata->setPass(pass);
-            leaf.writeBuffers(ostr);
-        }
-        { // error checking
-            streamMetadata->setPass(1000);
-            leaf.writeBuffers(ostr);
-
-            io::StreamMetadata::Ptr meta;
-            io::setStreamMetadataPtr(ostr, meta);
-            EXPECT_THROW(leaf.writeBuffers(ostr), openvdb::IoError);
+        // write to file
+        {
+            io::File file("leaf_buffers.vdb");
+            file.write(grids);
+            file.close();
         }
 
-        std::istringstream istr(ostr.str(), std::ios_base::binary);
-        io::setStreamMetadataPtr(istr, streamMetadata);
-        io::setDataCompression(istr, io::COMPRESS_BLOSC);
+        // read grid from file
+        PointDataGrid::Ptr gridFromDisk;
+        {
+            io::File file("leaf_buffers.vdb");
+            file.open();
+            openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
+            file.close();
 
-        // Since the input stream doesn't include a VDB header with file format version info,
-        // tag the input stream explicitly with the current version number.
-        io::setCurrentVersion(istr);
-
-        leaf2.readTopology(istr);
-        for (Index b = 0; b < leaf.buffers(); b++) {
-            uint32_t pass = (uint32_t(leaf.buffers()) << 16) | uint32_t(b);
-            streamMetadata->setPass(pass);
-            leaf2.readBuffers(istr);
+            gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
         }
+
+        LeafType* leaf2 = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
+        EXPECT_TRUE(leaf2);
 
         // check topology matches
 
-        EXPECT_EQ(leaf.onVoxelCount(), leaf2.onVoxelCount());
-        EXPECT_TRUE(leaf2.isValueOn(4));
-        EXPECT_TRUE(!leaf2.isValueOn(5));
+        EXPECT_EQ(leaf.onVoxelCount(), leaf2->onVoxelCount());
+        EXPECT_TRUE(leaf2->isValueOn(4));
+        EXPECT_TRUE(!leaf2->isValueOn(5));
 
-        // check only topology (values and attributes still empty)
+        // check values and attributes are correctly read
 
-        EXPECT_EQ(leaf2.getValue(4), ValueType(20));
-        EXPECT_EQ(leaf2.attributeSet().size(), size_t(2));
+        EXPECT_EQ(leaf2->getValue(4), ValueType(20));
+        EXPECT_EQ(leaf2->attributeSet().size(), size_t(2));
+
+        remove("leaf_buffers.vdb");
     }
 
     { // test multi-buffer IO
