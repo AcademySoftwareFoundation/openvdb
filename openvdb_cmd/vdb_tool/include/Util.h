@@ -120,7 +120,7 @@ inline std::string toUpperCase(const std::string &str)
     return toUpperCase(tmp);
 }
 
-/// @brief return the 1-based index of the first matching word in a string-vector with comma-seperated words.
+/// @brief return the 1-based index of the first matching word in a string-vector with comma-separated words.
 /// @details findMatch("ba", {"abc,a", "aab,c,ba"}) returns 2 since "ba" is a word in the second entry of vec
 inline int findMatch(const std::string &word, const std::vector<std::string> &vec)
 {
@@ -177,7 +177,7 @@ inline bool endsWith(const std::string &str, const std::string &pattern)
 inline bool isInt(float x) {return floorf(x) == x;}
 
 /// @brief Returns true if the string contains an integer, in which case @b i contains the value.
-/// @note Leading and trailing whilespaces in the input string are not allowed
+/// @note Leading and trailing whitespaces in the input string are not allowed
 inline bool isInt(const std::string &s, int &i)
 {
     size_t pos = 0;
@@ -253,7 +253,7 @@ template <>
 inline bool strTo<bool>(const std::string &str){return strToBool(str);}
 
 /// @brief Returns true if the string contains a float, in which case @b v contains the value.
-/// @note Leading and trailing whilespaces in the input string are not allowed
+/// @note Leading and trailing whitespaces in the input string are not allowed
 /// @warning In this context integers are a subset of floats so be sure to test for integers first!
 inline bool isFloat(const std::string &s, float &v)
 {
@@ -268,7 +268,7 @@ inline bool isFloat(const std::string &s, float &v)
 
 /// @brief Returns 1 if the string is an integer, 2 if it's a float and otherwise 0. In the first two cases
 ///        the respective values are updated.
-/// @note Leading and trailing whilespaces in the input string are not allowed
+/// @note Leading and trailing whitespaces in the input string are not allowed
 inline int isNumber(const std::string &s, int &i, float &v)
 {
     if (isInt(s, i)) {

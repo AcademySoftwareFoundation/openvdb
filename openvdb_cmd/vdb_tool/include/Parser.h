@@ -105,7 +105,7 @@ public:
             } else if (name=="e") {
                 return std::to_string(2.718281828459);
             } else {
-                throw std::invalid_argument("Storrage::get: undefined variable \""+name+"\"");
+                throw std::invalid_argument("Storage::get: undefined variable \""+name+"\"");
             }
         }
         return it->second;
@@ -242,17 +242,17 @@ public:
             [&](){mCallStack.top()=getExt(mCallStack.top());});
 
         // boolean operations
-        add("==","returns true if the two top enteries on the stack compare equal, e.g. {1:2:==} -> {0}",
+        add("==","returns true if the two top entries on the stack compare equal, e.g. {1:2:==} -> {0}",
             [&](){this->boolean(std::equal_to<>());});
-        add("!=","returns true if the two top enteries on the stack are not equal, e.g. {1:2:!=} -> {1}",
+        add("!=","returns true if the two top entries on the stack are not equal, e.g. {1:2:!=} -> {1}",
             [&](){this->boolean(std::not_equal_to<>());});
-        add("<=","returns true if the two top enteries on the stack are less than or equal, e.g. {1:2:<=} -> {1}",
+        add("<=","returns true if the two top entries on the stack are less than or equal, e.g. {1:2:<=} -> {1}",
             [&](){this->boolean(std::less_equal<>());});
-        add(">=","returns true if the two top enteries on the stack are greater than or equal, e.g. {1:2:>=} -> {0}",
+        add(">=","returns true if the two top entries on the stack are greater than or equal, e.g. {1:2:>=} -> {0}",
             [&](){this->boolean(std::greater_equal<>());});
-        add("<","returns true if the two top enteries on the stack are less than, e.g. {1:2:<} -> {1}",
+        add("<","returns true if the two top entries on the stack are less than, e.g. {1:2:<} -> {1}",
             [&](){this->boolean(std::less<>());});
-        add(">","returns true if the two top enteries on the stack are less than or equal, e.g. {1:2:<=} -> {1}",
+        add(">","returns true if the two top entries on the stack are less than or equal, e.g. {1:2:<=} -> {1}",
             [&](){this->boolean(std::greater<>());});
         add("!","logical negation, e.g. {1:!} -> {0}",
             [&](){this->set(!strToBool(mCallStack.top()));});
@@ -695,6 +695,7 @@ struct Parser {
     Action& getAction() {return *iter;}
     const Action& getAction() const {return *iter;}
     void printAction() const {if (verbose>1) iter->print();}
+    std::vector<std::string> closeMatches(const std::string &str) const;// returns available actions that contain str
 
     ActListT            available, actions;
     ActIterT            iter;// iterator pointing to the current actions being processed
@@ -752,6 +753,20 @@ math::Vec3<T> Parser::getVec3(const std::string &name, const char* delimiters) c
     if (v.size()!=3) throw std::invalid_argument(iter->name+": Parser::getVec3: not a valid input "+name);
     return math::Vec3<T>(strTo<T>(v[0]), strTo<T>(v[1]), strTo<T>(v[2]));
 }// Parser::getVec3
+
+// ==============================================================================================================
+
+std::vector<std::string> Parser::closeMatches(const std::string &str) const
+{//returns vector of available actions that contain str, while ignoring character case and leading '-'
+    std::vector<std::string> match;
+    size_t pos = str.find_first_not_of("-");
+    if (pos==std::string::npos) return match;
+    std::string pattern = toLowerCase(str.substr(pos));//remove all leading "-" and convert to lower case
+    for (auto it = available.begin(); it != available.end(); ++it) {
+        if (it->name.find(pattern) != std::string::npos) match.push_back(it->name);
+    }
+    return match;
+}
 
 // ==============================================================================================================
 
@@ -970,7 +985,10 @@ void Parser::parse(int argc, char *argv[])
             while(i+1<argc && argv[i+1][0] != '-') iter->setOption(argv[++i]);
             iter->init();// optional callback function unique to action
         } else {
-            throw std::invalid_argument("Parser: unsupported action \""+str+"\"\n");
+            std::stringstream ss;
+            ss << "Parser: unsupported action \"" << str << "\"\n";
+            for (const std::string &action : this->closeMatches(str)) ss << "Did you mean: \"" << action << "\"\n";
+            throw std::invalid_argument(ss.str());
         }
     }// loop over all input arguments
     if (counter!=0) throw std::invalid_argument("Parser: Unmatched pairing of {-for,-each,-if} and -end");
@@ -995,7 +1013,7 @@ std::string Parser::usage(const Action &action, bool brief) const
     const static int w = 17;
     auto op = [&](std::string line, size_t width, bool isSentence) {
         if (isSentence) {
-            line[0] = static_cast<char>(std::toupper(line[0]));// capitalizestd::string name, value, example, documentation;');// punctuate
+            line[0] = static_cast<char>(std::toupper(line[0]));// capitalize std::string name, value, example, documentation;');// punctuate
         }
         width += w;
         const VecS words = tokenize(line, " ");
