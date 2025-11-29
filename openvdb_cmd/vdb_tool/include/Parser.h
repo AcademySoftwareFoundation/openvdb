@@ -22,6 +22,7 @@
 #include <random>
 #include <functional>
 #include <vector>
+#include <map>
 #include <list>
 #include <set>
 #include <time.h>
@@ -695,7 +696,7 @@ struct Parser {
     Action& getAction() {return *iter;}
     const Action& getAction() const {return *iter;}
     void printAction() const {if (verbose>1) iter->print();}
-    std::vector<std::string> closeMatches(const std::string &str) const;// returns available actions that contain str
+    std::map<size_t, std::string> closeMatches(const std::string &str) const;// returns available actions that contain str
 
     ActListT            available, actions;
     ActIterT            iter;// iterator pointing to the current actions being processed
@@ -756,16 +757,17 @@ math::Vec3<T> Parser::getVec3(const std::string &name, const char* delimiters) c
 
 // ==============================================================================================================
 
-std::vector<std::string> Parser::closeMatches(const std::string &str) const
-{//returns vector of available actions that contain str, while ignoring character case and leading '-'
-    std::vector<std::string> match;
+std::map<size_t, std::string> Parser::closeMatches(const std::string &str) const
+{//returns sorted map of available actions that contain str, while ignoring character case and leading '-'
+    std::map<size_t, std::string> matches;
     size_t pos = str.find_first_not_of("-");
-    if (pos==std::string::npos) return match;
+    if (pos==std::string::npos) return matches;// special case when str only contains one or more '-'
     std::string pattern = toLowerCase(str.substr(pos));//remove all leading "-" and convert to lower case
     for (auto it = available.begin(); it != available.end(); ++it) {
-        if (it->name.find(pattern) != std::string::npos) match.push_back(it->name);
+        pos = it->name.find(pattern);
+        if (pos != std::string::npos) matches.emplace(pos, it->name);
     }
-    return match;
+    return matches;
 }
 
 // ==============================================================================================================
@@ -987,7 +989,7 @@ void Parser::parse(int argc, char *argv[])
         } else {
             std::stringstream ss;
             ss << "Parser: unsupported action \"" << str << "\"\n";
-            for (const std::string &action : this->closeMatches(str)) ss << "Did you mean: \"" << action << "\"\n";
+            for (auto &match : this->closeMatches(str)) ss << "Did you mean: \"" << match.second << "\"\n";
             throw std::invalid_argument(ss.str());
         }
     }// loop over all input arguments
