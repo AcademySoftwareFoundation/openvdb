@@ -760,7 +760,7 @@ void Geometry::readPLY(std::istream &is)
         for (auto &v : mVtx) {
             tokens = tokenize_line();
             if (int(tokens.size()) != vtxProps) error("vdb_tool::readPLY: error reading ascii vertex coordinates");
-            for (int i = 0; i<3; ++i) v[i] = std::stof(tokens[xyz[0].id]);
+            for (int i = 0; i<3; ++i) v[i] = std::stof(tokens[xyz[i].id]);
         }// loop over vertices
     }
 

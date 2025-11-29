@@ -437,7 +437,7 @@ void Tool::init()
 
   mParser.addAction(
       "points2ls", "p2l", "Convert geometry points into a narrow-band level set",
-    {{"dim", "", "256", "largest dimension in voxel units of the bbox of all the points (defaults to 256). In \"voxel\" is defined \"dim\" is ignored"},
+    {{"dim", "", "256", "largest dimension in voxel units of the bbox of all the points (defaults to 256). If \"voxel\" is defined \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
      {"radius", "2.0", "2.0", "radius in voxel units of the input points"},
