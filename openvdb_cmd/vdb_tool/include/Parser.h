@@ -768,7 +768,7 @@ std::map<size_t, std::string> Parser::closeMatches(const std::string &str) const
         if (pos != std::string::npos) matches.emplace(pos, it->name);
     }
     return matches;
-}
+}// Parser::closeMatches
 
 // ==============================================================================================================
 
@@ -792,7 +792,14 @@ void Action::setOption(const std::string &str)
             opt.value = str.substr(pos+1);
             return;// done
         }
-        throw std::invalid_argument(name + ": invalid option \"" + str + "\"");
+        std::stringstream ss;
+        ss << name << ": Invalid option: \"" << str << "\"\n";
+        for (auto it = options.begin(); it != options.end();) {
+            ss << "Valid options: \"" << it->name << "=" << (it++)->example << "\"";
+            while (it != options.end()) ss << " or \"" << it->name << "=" << (it++)->example << "\"";
+            ss << "\n";
+        }
+        throw std::invalid_argument(ss.str());
     }
 }// Action::setOption
 
@@ -974,7 +981,7 @@ void Parser::finalize()
 void Parser::parse(int argc, char *argv[])
 {
     OPENVDB_ASSERT(!hashMap.empty());
-    if (argc <= 1) throw std::invalid_argument("Parser: No arguments provided, try " + getFile(argv[0]) + " -help\"");
+    if (argc <= 1) throw std::invalid_argument("Parser: No arguments provided, try \"" + getFile(argv[0]) + " -help\"");
     counter = 0;// reset to check for matching {for,each,if}/end loops
     for (int i=1; i<argc; ++i) {
         const std::string str = argv[i];
@@ -988,8 +995,13 @@ void Parser::parse(int argc, char *argv[])
             iter->init();// optional callback function unique to action
         } else {
             std::stringstream ss;
-            ss << "Parser: unsupported action \"" << str << "\"\n";
-            for (auto &match : this->closeMatches(str)) ss << "Did you mean the action: \"-" << match.second << "\"?\n";
+            ss << "Parser: Unsupported action: \"" << str << "\"\n";
+            auto matches = this->closeMatches(str);
+            for (auto it = matches.begin(); it != matches.end();) {
+                ss << "Did you mean: \"-" << (it++)->second << "\"";
+                while (it != matches.end()) ss << " or \"-" << (it++)->second << "\"";
+                ss << "?\n";
+            }
             throw std::invalid_argument(ss.str());
         }
     }// loop over all input arguments
