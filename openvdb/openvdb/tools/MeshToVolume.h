@@ -2169,12 +2169,15 @@ private:
         unsigned char primId = data.getNewPrimId();
         data.primIdAcc.setValueOnly(ijk, primId);
 
+        // iteration number to check for an interrupt
+        constexpr Int32 freq = 2<<12;
+
         while (!coordList.empty()) {
             if (interrupter && interrupter->wasInterrupted()) {
                 thread::cancelGroupExecution();
                 break;
             }
-            for (Int32 pass = 0; pass < 1048576 && !coordList.empty(); ++pass) {
+            for (Int32 pass = 0; pass < freq && !coordList.empty(); ++pass) {
                 ijk = coordList.back();
                 coordList.pop_back();
 
@@ -2182,7 +2185,7 @@ private:
                     nijk = ijk + util::COORD_OFFSETS[i];
                     if (primId != data.primIdAcc.getValue(nijk)) {
                         data.primIdAcc.setValueOnly(nijk, primId);
-                        if(updateDistance(nijk, prim, data)) coordList.push_back(nijk);
+                        if (updateDistance(nijk, prim, data)) coordList.push_back(nijk);
                     }
                 }
             }
