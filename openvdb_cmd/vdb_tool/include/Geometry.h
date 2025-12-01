@@ -125,7 +125,7 @@ public:
     void readPTS(const std::string &fileName);
     void readGEO(const std::string &fileName);
     void readABC(const std::string &fileName);
-    void readPDAL(const std::string &fileName);
+    bool readPDAL(const std::string &fileName);
     void readVDB(const std::string &fileName);
     void readNVDB(const std::string &fileName);
 
@@ -428,16 +428,10 @@ void Geometry::read(const std::string &fileName)
         break;
     default:
 #if VDB_TOOL_USE_PDAL
-        pdal::StageFactory factory;
-        const std::string driver = factory.inferReaderDriver(fileName);
-        if (driver != "") {
-            this->readPDAL(fileName);
-            break;
-        }
+        if (this->readPDAL(fileName)) break;// note, this only reads vertices
 #endif
         throw std::invalid_argument("Geometry::read: File \""+fileName+"\" has an invalid extension");
-        break;
-    }
+    }// end switch over file extensions
 }// Geometry::read
 
 void Geometry::readOBJ(const std::string &fileName)
@@ -484,14 +478,20 @@ void Geometry::readOBJ(std::istream &is)
     mBBox = BBoxT();//invalidate BBox
 }// Geometry::readOBJ
 
-void Geometry::readPDAL(const std::string &fileName)
+// Works with multiple file formats, e.g. ply, obj, stl, hdf, matlab, numpy, pts, ptx, e57, las, laz
+// Note, currently it only reads vertices and optionally colors
+bool Geometry::readPDAL(const std::string &fileName)
 {
  #if VDB_TOOL_USE_PDAL
-    if (!pdal::FileUtils::fileExists(fileName)) throw std::invalid_argument("Error opening file \""+fileName+"\"  - it doesn't exist!");
+    if (!pdal::FileUtils::fileExists(fileName)) {
+        throw std::invalid_argument("Geometry: Error opening file \""+fileName+"\"!");
+    }
 
     pdal::StageFactory factory;
-    std::string type = factory.inferReaderDriver(fileName);
-    std::string pipelineJson = R"({
+    const std::string type = factory.inferReaderDriver(fileName);
+    if (type.empty()) return false;// PDAL cannot read this file
+    std::cerr << "Using PDAL to read \"" << fileName << "\"\n";
+    const std::string pipelineJson = R"({
         "pipeline" : [
             {
                 "type" : ")" + type + R"(",
@@ -507,11 +507,10 @@ void Geometry::readPDAL(const std::string &fileName)
         std::stringstream s(pipelineJson);
         manager.readPipeline(s);
         manager.execute(pdal::ExecMode::Standard);
-
         for (const std::shared_ptr<pdal::PointView>& view : manager.views()) {
-            bool hasColor = false;
-            if (view->hasDim(pdal::Dimension::Id::Red) && view->hasDim(pdal::Dimension::Id::Green) && view->hasDim(pdal::Dimension::Id::Blue))
-                hasColor = true;
+            const bool hasColor = view->hasDim(pdal::Dimension::Id::Red) &&
+                                  view->hasDim(pdal::Dimension::Id::Green) &&
+                                  view->hasDim(pdal::Dimension::Id::Blue);
             for (const pdal::PointRef& point : *view) {
                 p[0] = point.getFieldAs<float>(pdal::Dimension::Id::X);
                 p[1] = point.getFieldAs<float>(pdal::Dimension::Id::Y);
@@ -524,8 +523,7 @@ void Geometry::readPDAL(const std::string &fileName)
                     mRGB.push_back(rgb);
                 }
             }
-        }
-
+        }// loop over point views
     }
     catch (const pdal::pdal_error& e) {
         throw std::runtime_error("PDAL failed: " + std::string(e.what()));
@@ -533,10 +531,11 @@ void Geometry::readPDAL(const std::string &fileName)
     catch (const std::exception& e) {
         throw std::runtime_error("Reading file failed: " + std::string(e.what()));
     }
+    mBBox = BBoxT(); //invalidate BBox
 #else
     throw std::runtime_error("Cannot read file \"" + fileName + "\".  PDAL support is not enabled in this build, please recompile with PDAL support");
 #endif
-    mBBox = BBoxT(); //invalidate BBox
+    return true;
 }// Geometry::readPDAL
 
 void Geometry::readOFF(const std::string &fileName)
@@ -986,13 +985,12 @@ void Geometry::readNVDB(const std::string &fileName)
     mVtx.resize(n + count);
     for (size_t i=n; i<mVtx.size(); ++i) mVtx[i] = *p++;// loop over points
     mBBox = BBoxT();//invalidate BBox
-}// Geometry::readNVDB
 #else
 void Geometry::readNVDB(const std::string&)
 {
     throw std::runtime_error("NanoVDB support was disabled during compilation!");
-}// Geometry::readNVDB
 #endif
+}// Geometry::readNVDB
 
 void Geometry::print(size_t n, std::ostream& os) const
 {
