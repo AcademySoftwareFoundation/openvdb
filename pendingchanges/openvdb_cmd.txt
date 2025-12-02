@@ -1,6 +1,7 @@
 vdb_tool:
   Improvements:
   - Improved error reporting when using unsupported actions and options
+  - Added read support for xyz files
   Fixes:
   - Fixed bug when reading ascii ply files
   - Fixed several typos in vdb_tool
