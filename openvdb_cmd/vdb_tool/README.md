@@ -10,7 +10,7 @@ This command-line tool, dubbed vdb_tool, can combine any number of the of high-l
 | **eval** | Evaluate an expression written in our Reverse Polish Notation (see below) |
 | **config** | Load a configuration file and add the actions for processing |
 | **default** | Set default values used by all subsequent actions |
-| **read** | Read mesh, points and level sets as obj, ply, abc, stl, off, pts, vdb or nvdb files |
+| **read** | Read mesh, points and level sets as obj, ply, abc, stl, off, pts, xyz, e57, vdb or nvdb files |
 | **write** | Write a polygon mesh, points or level set as a obj, ply, stl, off, abc or vdb file |
 | **vdb2points** | Extracts points from a VDB grid |
 | **mesh2ls** | Convert a polygon mesh to a narrow-band level set |

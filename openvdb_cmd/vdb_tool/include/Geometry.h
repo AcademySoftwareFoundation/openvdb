@@ -126,12 +126,14 @@ public:
     void readGEO(const std::string &fileName);
     void readABC(const std::string &fileName);
     bool readPDAL(const std::string &fileName);
+    void readXYZ(const std::string &fileName);
     void readVDB(const std::string &fileName);
     void readNVDB(const std::string &fileName);
 
     void readOBJ(std::istream &is);
     void readOFF(std::istream &is);
     void readPLY(std::istream &is);
+    void readXYZ(std::istream &is);
 
     size_t vtxCount() const { return mVtx.size(); }
     size_t triCount() const { return mTri.size(); }
@@ -157,7 +159,7 @@ private:
     std::vector<PosT>  mVtx;
     std::vector<Vec3I> mTri;
     std::vector<Vec4I> mQuad;
-    std::vector<Vec3s> mRGB;
+    std::vector<Vec3s> mRGB;// optional vertex colors
     mutable BBoxT      mBBox;
     std::string        mName;
 
@@ -255,7 +257,7 @@ void Geometry::write(const std::string &fileName) const
         this->writeOFF(fileName);
         break;
     default:
-        throw std::invalid_argument("Geometry file \"" + fileName + "\" has an invalid extension");
+        throw std::invalid_argument("Geometry::write: file \"" + fileName + "\" has an invalid extension");
     }
 }// Geometry::write
 
@@ -398,7 +400,7 @@ void Geometry::writeGEO(const std::string &fileName) const
 
 void Geometry::read(const std::string &fileName)
 {
-    switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "vdb", "nvdb", "geo", "off"})) {
+    switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "vdb", "nvdb", "geo", "off", "xyz"})) {
     case 1:
         this->readOBJ(fileName);
         break;
@@ -426,6 +428,9 @@ void Geometry::read(const std::string &fileName)
     case 9:
         this->readOFF(fileName);
         break;
+    case 10:
+        this->readXYZ(fileName);
+        break;
     default:
 #if VDB_TOOL_USE_PDAL
         if (this->readPDAL(fileName)) break;// note, this only reads vertices
@@ -448,15 +453,17 @@ void Geometry::readOBJ(const std::string &fileName)
 
 void Geometry::readOBJ(std::istream &is)
 {
-    Vec3f p;
+    Vec3f p;// coordinates
+    Vec3s c;// color
     std::string line;
     while (std::getline(is, line)) {
         std::istringstream iss(line);
         std::string str;
-        iss >> str;
+        iss >> str;// "v", "vn" or "f"
         if (str == "v") {
             iss >> p[0] >> p[1] >> p[2];
             mVtx.push_back(p);
+            if (iss >> c[0] >> c[1] >> c[2]) mRGB.push_back(c);
         } else if (str == "f") {
             std::vector<int> v;
             while (iss >> str) {
@@ -490,7 +497,6 @@ bool Geometry::readPDAL(const std::string &fileName)
     pdal::StageFactory factory;
     const std::string type = factory.inferReaderDriver(fileName);
     if (type.empty()) return false;// PDAL cannot read this file
-    std::cerr << "Using PDAL to read \"" << fileName << "\"\n";
     const std::string pipelineJson = R"({
         "pipeline" : [
             {
@@ -594,6 +600,33 @@ void Geometry::readOFF(std::istream &is)
     }
     mBBox = BBoxT();//invalidate BBox
 }// Geometry::readOFF
+
+void Geometry::readXYZ(const std::string &fileName)
+{
+    if (fileName == "stdin.xyz") {
+        this->readXYZ(std::cin);
+    } else {
+        std::ifstream infile(fileName);
+        if (!infile.is_open()) throw std::invalid_argument("Error opening Geometry file \""+fileName+"\"");
+        this->readXYZ(infile);
+    }
+}// Geometry::readXYZ
+
+void Geometry::readXYZ(std::istream &is)
+{
+    std::string line;
+    Vec3f p;
+    while (std::getline(is, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        std::istringstream iss(line);
+        if (iss >> p[0] >> p[1] >> p[2]) {
+            mVtx.push_back(p);
+        } else {
+            throw std::invalid_argument("Error reading coordinates in xyz file from line \"" + line + "\"");
+        }
+    }
+    mBBox = BBoxT();//invalidate BBox
+}// Geometry::readXYZ
 
 void Geometry::readPLY(const std::string &fileName)
 {
@@ -871,7 +904,7 @@ void Geometry::readPTS(const std::string &fileName)
     if (!infile.is_open()) throw std::runtime_error("Error opening particle file \""+fileName+"\"");
     std::string line;
     std::istringstream iss;
-    bool readColor = false;
+    bool readColor = true;
     Vec3s rgb;
     while(std::getline(infile, line)) {
         const size_t n = mVtx.size(), m = std::stoi(line);
@@ -885,15 +918,12 @@ void Geometry::readPTS(const std::string &fileName)
                 throw std::invalid_argument("Geometry::readPTS: error parsing line: \""+line+"\"");
             }
             if (readColor) {
-                if (!(iss >> i) ) { // converting intensity to a multiplier on rgb might be appropriate, but i can't find a good spec for it
+                int dummy;// intensity which is currently ignored
+                if (iss >> dummy >> rgb[0] >> rgb[1] >> rgb[2]) {
+                    mRGB.push_back(rgb/255.0);
+                } else {
                     readColor = false;
-                    continue;
                 }
-                if (!(iss >> rgb[0] >> rgb[1] >> rgb[2])) {
-                    readColor = false;
-                    continue;
-                }
-                mRGB.push_back(rgb/255.0);
             }
 
         }// loop over points
@@ -994,11 +1024,17 @@ void Geometry::readNVDB(const std::string&)
 
 void Geometry::print(size_t n, std::ostream& os) const
 {
-    os << "vtx = " << mVtx.size() << ", tri = " << mTri.size() << ", quad = " << mQuad.size()<< ", bbox=" << this->bbox();
+    os << "vtx = " << mVtx.size() << ", rbg = " << mRGB.size() << ", tri = " << mTri.size() << ", quad = " << mQuad.size()<< ", bbox=" << this->bbox();
     if (size_t m = std::min(n, mVtx.size())) {
         os << std::endl;
         for (size_t i=0; i<m; ++i) {
             os << "vtx[" << i << "] = " << mVtx[i] << std::endl;
+        }
+    }
+    if (size_t m = std::min(n, mRGB.size())) {
+        os << std::endl;
+        for (size_t i=0; i<m; ++i) {
+            os << "rgb[" << i << "] = " << mRGB[i] << std::endl;
         }
     }
     if (size_t m = std::min(n, mTri.size())) {

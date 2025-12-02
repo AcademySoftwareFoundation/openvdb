@@ -369,7 +369,7 @@ void Tool::init()
 
   mParser.addAction(
       "read", "i", "Read one or more geometry or VDB files from disk or STDIN.",
-    {{"files", "", "{file|stdin}.{abc|obj|ply|stl|off|vdb}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
+    {{"files", "", "{file|stdin}.{abc|obj|ply|stl|off|xyx|vdb}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
      {"grids", "*", "*|grid_name,...", "list of VDB grids name to be imported (defaults to \"*\", i.e. import all available grids)"},
      {"delayed", "true", "1|0|true|false", "toggle delayed loading of VDB grids (enabled by default). This option is ignored by other file types"}},
      [](){}, [&](){this->read();}, 0);//  anonymous options are treated as to the first option,i.e. "files"
@@ -963,7 +963,7 @@ void Tool::read()
 {
   OPENVDB_ASSERT(mParser.getAction().name == "read");
   for (auto &fileName : mParser.getVec<std::string>("files")) {
-    switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,off,stl", "vdb", "nvdb"})) {
+    switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,off,stl,xyz", "vdb", "nvdb"})) {
     case 1:
       this->readGeo(fileName);
       break;
@@ -975,17 +975,15 @@ void Tool::read()
       break;
     default:
 #if VDB_TOOL_USE_PDAL
-    pdal::StageFactory factory;
-    if (factory.inferReaderDriver(fileName) != "")
-    {
-      this->readGeo(fileName);
-      break;
-    }
+      pdal::StageFactory factory;
+      if (factory.inferReaderDriver(fileName) != "") {
+        this->readGeo(fileName);
+        break;
+      }
 #endif
       throw std::invalid_argument("File \""+fileName+"\" has an invalid extension");
-      break;
-    }
-  }
+    }// end switch
+  }// end for loop over files
 }
 
 // ==============================================================================================================
