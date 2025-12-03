@@ -18,6 +18,8 @@ set(OPENVDB_TESTS "" CACHE STRING [=[
   \"Activate;NodeManager\" would build just the TestActivate.cc and TestNodeManager.cc
   unit tests.]=])
 
+option(OPENVDB_TESTS_FPE "Enable FP exceptions in unit tests (linux only)" FALSE)
+
 ##########################################################################
 
 message(STATUS "----------------------------------------------------")
@@ -194,6 +196,10 @@ else()
     TestVolumeToMesh.cc
     TestVolumeToSpheres.cc
   )
+endif()
+
+if (OPENVDB_TESTS_FPE)
+  add_compile_definitions(OPENVDB_TESTS_FPE)
 endif()
 
 add_executable(vdb_test ${UNITTEST_SOURCE_FILES})

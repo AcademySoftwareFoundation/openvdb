@@ -240,7 +240,8 @@ public:
             currentPoints += iter->pointCount();
         }
 
-        const float factor = targetPoints > currentPoints ? 1.0f : float(targetPoints) / float(currentPoints);
+        const float denom = currentPoints > 0 ? float(currentPoints) : 1.0f; // Do not divide by zero.
+        const float factor = targetPoints > currentPoints ? 1.0f : float(targetPoints) / denom;
 
         std::mt19937 generator(seed);
         std::uniform_int_distribution<unsigned int> dist(0, std::numeric_limits<unsigned int>::max() - 1);
