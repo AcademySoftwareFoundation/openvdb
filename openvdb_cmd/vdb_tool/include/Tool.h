@@ -184,8 +184,11 @@ private:
     /// @brief Converts a level set VDB into a VDB with a fog volume, i.e. normalized density
     void levelSetToFog();
 
-    /// @brief Converts a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh
+    /// @brief Converts a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh
     void meshToLevelSet();
+
+    /// @brief Converts a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh
+    void soupToLevelSet();
 
     /// @brief construct a LoD sequences of VDB trees with powers of two refinements
     void multires();
@@ -248,6 +251,8 @@ private:
 
     inline auto getGrid(size_t age) const;
     inline auto getGeom(size_t age) const;
+
+    Geometry::Ptr mesherToGeometry(tools::VolumeToMesh&) const;
 
 };// Tool class
 
@@ -418,6 +423,17 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
 
   mParser.addAction(
+      "soup2ls", "s2ls", "Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+    {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
+     {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
+     {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
+     {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
+     {"vdb", "-1", "0", "age (i.e. stack index) of reference grid used to define the transform. Defaults to -1, i.e. disabled. If specified this option takes precedence over \"dim\" and \"voxel\"!"},
+     {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
+     {"name", "", "soup2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
+     [&](){mParser.setDefaults();}, [&](){this->soupToLevelSet();});
+
+  mParser.addAction(
       "ls2mesh", "l2m", "Convert a level set to an adaptive polygon mesh",
     {{"adapt", "0.0", "0.9", "normalized metric for the adaptive meshing. 0 is uniform and 1 is fully adaptive mesh. Defaults to 0."},
      {"iso", "0.0", "0.1", "iso-value used to define the implicit surface. Defaults to zero."},
@@ -503,7 +519,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->enright();});
 
   mParser.addAction(
-      "dilate", "", "erode level set surface by a fixed radius",
+      "dilate", "", "dilate level set surface by a fixed radius",
     {{"radius", "1.0", "1.0", "radius in voxel units by which the surface is dilated"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -1671,6 +1687,81 @@ void Tool::meshToLevelSet()
 
 // ==============================================================================================================
 
+void Tool::soupToLevelSet()
+{
+  const std::string &name = mParser.getAction().name;
+  OPENVDB_ASSERT(name == "soup2ls");
+  try {
+    mParser.printAction();
+    const int dim = mParser.get<int>("dim");// initial dimension
+    float voxel = mParser.get<float>("voxel");// initial voxel size 
+    const float width = mParser.get<float>("width");
+    const int geo_age = mParser.get<int>("geo");
+    //const int vdb_age = mParser.get<int>("vdb");// reference grid used to
+    const bool keep = mParser.get<bool>("keep");
+    std::string grid_name = mParser.get<std::string>("name");
+    if (voxel == 0.0f) voxel = this->estimateVoxelSize(dim, width, geo_age);
+    auto it = this->getGeom(geo_age);
+    const Geometry &mesh = **it;
+    if (mesh.isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
+
+    auto myUpsample = [&](const GridT &grid)->GridT::Ptr{
+      const float dx = grid.voxelSize()[0];
+      auto xform = math::Transform::createLinearTransform(dx/2);// upsample
+      return tools::levelSetRebuild(grid, dx, width, xform.get());
+    };// myUpsample
+
+    //auto myOffsetUpsample = [&](const Geometry &geom, float dx)->GridT::Ptr{
+    //  auto xform = math::Transform::createLinearTransform(dx);
+    //  auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, geom.vtx(), geom.tri(), geom.quad(), width);
+    //  return myUpsample(*udf);
+    //};// myOffsetUpsample
+
+    auto myOffset = [&](float dx)->GridT::Ptr{
+      auto xform = math::Transform::createLinearTransform(dx);
+      auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
+      return tools::levelSetRebuild(*udf, /*iso-value=*/dx, width);
+    };// muOffset
+
+    auto myErode = [&](GridT &grid, float voxelOffset)->void{
+      const int space = 1, time = 1;
+      auto filter = this->createFilter(grid, space, time);
+      filter->offset(voxelOffset*grid.voxelSize()[0]);
+    };// myErode
+
+    auto myUnion = [&](GridT &gridA, GridT &gridB)->void{
+      tools::csgUnion(gridA, gridB, true);// overwrites A and cannibalizes B, and prune
+      tools::sdfToSdf(gridA);// re-normalize
+    };// myUnion
+
+    if (mParser.verbose) mTimer.start("Soup -> SDF");
+
+    // Main algorithm
+    const int nLOD = 2, nErosion = 2;
+    float dx = voxel;// lets use the same notation for the voxel size as the paper
+    auto gridL = myOffset(dx);
+    // while loop
+    gridL = myUpsample(*gridL);
+    auto gridH = myOffset(dx/2);
+    // while loop
+    myErode(*gridL, dx/2);
+    myUnion(*gridL, *gridH);
+    // end while loop
+    dx *= 0.5f;
+    // end while loop
+
+    if (grid_name.empty()) grid_name = "soup2ls_" + mesh.getName();
+    gridL->setName(grid_name);
+    mGrid.push_back(gridL);
+    if (!keep) mGeom.erase(std::next(it).base());
+    if (mParser.verbose) mTimer.stop();
+  } catch (const std::exception& e) {
+    throw std::invalid_argument(name+": "+e.what());
+  }
+}// Tool::soupToLevelSet
+
+// ==============================================================================================================
+
 void Tool::particlesToLevelSet()
 {
   const std::string &name = mParser.getAction().name;
@@ -2093,36 +2184,7 @@ void Tool::levelSetToMesh()
       }
     }
     mesher(*grid);
-
-    Geometry::Ptr geom(new Geometry());
-
-    {// allocate and copy vertices
-      auto &vtx = geom->vtx();
-      vtx.resize(mesher.pointListSize());
-      tools::volume_to_mesh_internal::PointListCopy ptnCpy(mesher.pointList(), vtx);
-      tbb::parallel_for(tbb::blocked_range<size_t>(0, vtx.size()), ptnCpy);
-      mesher.pointList().reset(nullptr);
-    }
-
-    {// allocate and copy polygons
-      auto& polygonPoolList = mesher.polygonPoolList();
-      size_t numQuad = 0, numTri = 0;
-      for (size_t i = 0, N = mesher.polygonPoolListSize(); i < N; ++i) {
-        auto &polygons = polygonPoolList[i];
-        numTri  += polygons.numTriangles();
-        numQuad += polygons.numQuads();
-      }
-      auto &tri  = geom->tri();
-      auto &quad = geom->quad();
-      tri.resize(numTri);
-      quad.resize(numQuad);
-      size_t qIdx = 0, tIdx = 0;
-      for (size_t n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
-        auto &poly = polygonPoolList[n];
-        for (size_t i = 0, I = poly.numQuads(); i < I; ++i) quad[qIdx++] = poly.quad(i);
-        for (size_t i = 0, I = poly.numTriangles(); i < I; ++i) tri[tIdx++] = poly.triangle(i);
-      }
-    }
+    Geometry::Ptr geom = this->mesherToGeometry(mesher);
 
     if (!keep) mGrid.erase(std::next(it).base());
     if (grid_name.empty()) grid_name = "ls2mesh_"+grid->getName();
@@ -2890,6 +2952,42 @@ void Tool::print(std::ostream& os) const
 
   }
 }// Tool::print
+
+// ==============================================================================================================
+
+Geometry::Ptr Tool::mesherToGeometry(tools::VolumeToMesh &mesher) const
+{
+  Geometry::Ptr geom(new Geometry());
+
+  {// allocate and copy vertices
+    auto &vtx = geom->vtx();
+    vtx.resize(mesher.pointListSize());
+    tools::volume_to_mesh_internal::PointListCopy ptnCpy(mesher.pointList(), vtx);
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, vtx.size()), ptnCpy);
+    mesher.pointList().reset(nullptr);
+  }
+
+  {// allocate and copy polygons
+    auto& polygonPoolList = mesher.polygonPoolList();
+    size_t numQuad = 0, numTri = 0;
+    for (size_t i = 0, N = mesher.polygonPoolListSize(); i < N; ++i) {
+      auto &polygons = polygonPoolList[i];
+      numTri  += polygons.numTriangles();
+      numQuad += polygons.numQuads();
+    }
+    auto &tri  = geom->tri();
+    auto &quad = geom->quad();
+    tri.resize(numTri);
+    quad.resize(numQuad);
+    size_t qIdx = 0, tIdx = 0;
+    for (size_t n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
+      auto &poly = polygonPoolList[n];
+      for (size_t i = 0, I = poly.numQuads(); i < I; ++i) quad[qIdx++] = poly.quad(i);
+      for (size_t i = 0, I = poly.numTriangles(); i < I; ++i) tri[tIdx++] = poly.triangle(i);
+    }
+  }
+  return geom;
+}// Tool::mesherToGeometry
 
 } // namespace vdb_tool
 } // namespace OPENVDB_VERSION_NAME

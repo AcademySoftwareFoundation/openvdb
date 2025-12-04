@@ -612,6 +612,10 @@ void Geometry::readXYZ(const std::string &fileName)
     }
 }// Geometry::readXYZ
 
+/*
+xyz files are loosely defined as ascii files with x y z coordinates, possibly followed by rgb or normals
+Empty lines and lines beginning with # ignored
+*/
 void Geometry::readXYZ(std::istream &is)
 {
     std::string line;
