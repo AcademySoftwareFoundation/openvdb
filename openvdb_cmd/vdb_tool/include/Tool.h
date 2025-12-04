@@ -358,6 +358,9 @@ void Tool::init()
 {
   // note, the following actions were added when mParser was constructed: -quiet,-verbose,-debug,-default,-for,-each,-end
 
+  //  mParser.addAction("name", "alias", "documentation of action",
+  //                    {{"option name", "default value", "expected values", "documentation of option"}},
+  //                     {more options}...});
   mParser.addAction(
       "config", "c", "Import and process one or more configuration files",
     {{"files", "",  "config1.txt,config2.txt...", "list of configuration files to load and execute"},
@@ -428,7 +431,8 @@ void Tool::init()
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
-     {"vdb", "-1", "0", "age (i.e. stack index) of reference grid used to define the transform. Defaults to -1, i.e. disabled. If specified this option takes precedence over \"dim\" and \"voxel\"!"},
+     {"lod", "2", "2", "number of LOD level. Defaults to 2."},
+     {"erode", "2", "2", "number of iterations of constrained erosion. Defaults to 2."},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
      {"name", "", "soup2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
      [&](){mParser.setDefaults();}, [&](){this->soupToLevelSet();});
@@ -1687,6 +1691,7 @@ void Tool::meshToLevelSet()
 
 // ==============================================================================================================
 
+// vdb_tool -read ~/dev/data/ply/cube.ply -soup2ls dim=64 lod=4 erode=5 -o vdb="*" stdout.vdb | vdb_view
 void Tool::soupToLevelSet()
 {
   const std::string &name = mParser.getAction().name;
@@ -1697,7 +1702,8 @@ void Tool::soupToLevelSet()
     float voxel = mParser.get<float>("voxel");// initial voxel size 
     const float width = mParser.get<float>("width");
     const int geo_age = mParser.get<int>("geo");
-    //const int vdb_age = mParser.get<int>("vdb");// reference grid used to
+    const int nErode = mParser.get<int>("erode");
+    const int nLOD = mParser.get<int>("lod");
     const bool keep = mParser.get<bool>("keep");
     std::string grid_name = mParser.get<std::string>("name");
     if (voxel == 0.0f) voxel = this->estimateVoxelSize(dim, width, geo_age);
@@ -1706,28 +1712,29 @@ void Tool::soupToLevelSet()
     if (mesh.isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
 
     auto myUpsample = [&](const GridT &grid)->GridT::Ptr{
-      if (mParser.verbose) mTimer.restart("upsample");
       const float dx = grid.voxelSize()[0];
+      if (mParser.verbose) mTimer.restart("upsample("+std::to_string(dx)+")");
       auto xform = math::Transform::createLinearTransform(dx/2);// upsample
       return tools::levelSetRebuild(grid, dx, width, xform.get());
     };// myUpsample
 
     auto myOffset = [&](float dx)->GridT::Ptr{
-      if (mParser.verbose) mTimer.restart("offset");
+      if (mParser.verbose) mTimer.restart("offset("+std::to_string(dx)+")");
       auto xform = math::Transform::createLinearTransform(dx);
       auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
       return tools::levelSetRebuild(*udf, /*iso-value=*/dx, width);
     };// muOffset
 
     auto myErode = [&](GridT &grid)->void{
-      if (mParser.verbose) mTimer.restart("erode");
+      const float dx = grid.voxelSize()[0];
+      if (mParser.verbose) mTimer.restart("erode("+std::to_string(dx)+")");
       const int space = 1, time = 1;
       auto filter = this->createFilter(grid, space, time);
-      filter->offset(grid.voxelSize()[0]);// erode by dx
+      filter->offset(dx);// erode by dx
     };// myErode
 
     auto myUnion = [&](GridT &gridA, GridT &gridB)->void{
-      if (mParser.verbose) mTimer.restart("union");
+      if (mParser.verbose) mTimer.restart("union("+std::to_string(gridA.voxelSize()[0])+")");
       tools::csgUnion(gridA, gridB, true);// overwrites A and cannibalizes B, and prune
       tools::sdfToSdf(gridA);// re-normalize
     };// myUnion
@@ -1735,7 +1742,6 @@ void Tool::soupToLevelSet()
     if (mParser.verbose) mTimer.start("Soup -> SDF");
 
     // Main algorithm
-    const int nLOD = 4, nErode = 4;
     float dx = voxel;// lets use the same notation for the voxel size as the paper
     auto grid = myOffset(dx);
     grid->setName("soup2ls_"+std::to_string(dx));
@@ -1744,7 +1750,7 @@ void Tool::soupToLevelSet()
       dx *= 0.5f;
       grid = myUpsample(*grid);
       auto base = myOffset(dx);
-      for (int j = 0; j<nErode; ++j) {
+      for (int j = 0; j<nErode; ++j) {// constrained erosion
         myErode(*grid);
         myUnion(*grid, *base);
       }
