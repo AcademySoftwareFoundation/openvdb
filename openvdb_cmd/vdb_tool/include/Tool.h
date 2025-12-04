@@ -1706,30 +1706,28 @@ void Tool::soupToLevelSet()
     if (mesh.isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
 
     auto myUpsample = [&](const GridT &grid)->GridT::Ptr{
+      if (mParser.verbose) mTimer.restart("upsample");
       const float dx = grid.voxelSize()[0];
       auto xform = math::Transform::createLinearTransform(dx/2);// upsample
       return tools::levelSetRebuild(grid, dx, width, xform.get());
     };// myUpsample
 
-    //auto myOffsetUpsample = [&](const Geometry &geom, float dx)->GridT::Ptr{
-    //  auto xform = math::Transform::createLinearTransform(dx);
-    //  auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, geom.vtx(), geom.tri(), geom.quad(), width);
-    //  return myUpsample(*udf);
-    //};// myOffsetUpsample
-
     auto myOffset = [&](float dx)->GridT::Ptr{
+      if (mParser.verbose) mTimer.restart("offset");
       auto xform = math::Transform::createLinearTransform(dx);
       auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
       return tools::levelSetRebuild(*udf, /*iso-value=*/dx, width);
     };// muOffset
 
-    auto myErode = [&](GridT &grid, float voxelOffset)->void{
+    auto myErode = [&](GridT &grid)->void{
+      if (mParser.verbose) mTimer.restart("erode");
       const int space = 1, time = 1;
       auto filter = this->createFilter(grid, space, time);
-      filter->offset(voxelOffset*grid.voxelSize()[0]);
+      filter->offset(grid.voxelSize()[0]);// erode by dx
     };// myErode
 
     auto myUnion = [&](GridT &gridA, GridT &gridB)->void{
+      if (mParser.verbose) mTimer.restart("union");
       tools::csgUnion(gridA, gridB, true);// overwrites A and cannibalizes B, and prune
       tools::sdfToSdf(gridA);// re-normalize
     };// myUnion
@@ -1737,22 +1735,26 @@ void Tool::soupToLevelSet()
     if (mParser.verbose) mTimer.start("Soup -> SDF");
 
     // Main algorithm
-    const int nLOD = 2, nErosion = 2;
+    const int nLOD = 4, nErode = 4;
     float dx = voxel;// lets use the same notation for the voxel size as the paper
-    auto gridL = myOffset(dx);
-    // while loop
-    gridL = myUpsample(*gridL);
-    auto gridH = myOffset(dx/2);
-    // while loop
-    myErode(*gridL, dx/2);
-    myUnion(*gridL, *gridH);
-    // end while loop
-    dx *= 0.5f;
-    // end while loop
+    auto grid = myOffset(dx);
+    grid->setName("soup2ls_"+std::to_string(dx));
+    mGrid.push_back(grid);
+    for (int i=0; i<nLOD; ++i){
+      dx *= 0.5f;
+      grid = myUpsample(*grid);
+      auto base = myOffset(dx);
+      for (int j = 0; j<nErode; ++j) {
+        myErode(*grid);
+        myUnion(*grid, *base);
+      }
+      grid->setName("soup2ls_"+std::to_string(dx));
+      mGrid.push_back(grid);
+    }
 
-    if (grid_name.empty()) grid_name = "soup2ls_" + mesh.getName();
-    gridL->setName(grid_name);
-    mGrid.push_back(gridL);
+    //if (grid_name.empty()) grid_name = "soup2ls_" + mesh.getName();
+    //grid->setName(grid_name);
+    //mGrid.push_back(grid);
     if (!keep) mGeom.erase(std::next(it).base());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
