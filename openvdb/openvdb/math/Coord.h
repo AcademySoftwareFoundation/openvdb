@@ -33,18 +33,18 @@ public:
     using ValueType = Int32;
     using Limits = std::numeric_limits<ValueType>;
 
-    Coord(): mVec{{0, 0, 0}} {}
-    constexpr explicit Coord(Int32 xyz): mVec{{xyz, xyz, xyz}} {}
-    constexpr Coord(Int32 x, Int32 y, Int32 z): mVec{{x, y, z}} {}
-    explicit Coord(const Vec3i& v): mVec{{v[0], v[1], v[2]}} {}
-    explicit Coord(const Vec3I& v): mVec{{Int32(v[0]), Int32(v[1]), Int32(v[2])}} {}
-    explicit Coord(const Int32* v): mVec{{v[0], v[1], v[2]}} {}
+    constexpr Coord() : mVec{0, 0, 0} {}
+    constexpr explicit Coord(Int32 xyz) : mVec{xyz, xyz, xyz} {}
+    constexpr Coord(Int32 x, Int32 y, Int32 z) : mVec{x, y, z} {}
+    explicit Coord(const Vec3i& v): mVec{v[0], v[1], v[2]} {}
+    explicit Coord(const Vec3I& v): mVec{Int32(v[0]), Int32(v[1]), Int32(v[2])} {}
+    explicit Coord(const Int32* v): mVec{v[0], v[1], v[2]} {}
 
     /// @brief Return the smallest possible coordinate
-    static Coord min() { return Coord(Limits::min()); }
+    static constexpr Coord min() { return Coord(Limits::min()); }
 
     /// @brief Return the largest possible coordinate
-    static Coord max() { return Coord(Limits::max()); }
+    static constexpr Coord max() { return Coord(Limits::max()); }
 
     /// @brief Return @a xyz rounded to the closest integer coordinates
     /// (cell centered conversion).
@@ -89,7 +89,7 @@ public:
         return *this;
     }
     Coord& offset(Int32 n) { return this->offset(n, n, n); }
-    Coord offsetBy(Int32 dx, Int32 dy, Int32 dz) const
+    constexpr Coord offsetBy(Int32 dx, Int32 dy, Int32 dz) const
     {
         return Coord(mVec[0] + dx, mVec[1] + dy, mVec[2] + dz);
     }
@@ -128,9 +128,9 @@ public:
     Coord& operator&= (Int32 n) { mVec[0]&=n; mVec[1]&=n; mVec[2]&=n; return *this; }
     Coord& operator|= (Int32 n) { mVec[0]|=n; mVec[1]|=n; mVec[2]|=n; return *this; }
 
-    Int32 x() const { return mVec[0]; }
-    Int32 y() const { return mVec[1]; }
-    Int32 z() const { return mVec[2]; }
+    constexpr Int32 x() const { return std::get<0>(mVec); }
+    constexpr Int32 y() const { return std::get<1>(mVec); }
+    constexpr Int32 z() const { return std::get<2>(mVec); }
     Int32 operator[](size_t i) const { OPENVDB_ASSERT(i < 3); return mVec[i]; }
     Int32& x() { return mVec[0]; }
     Int32& y() { return mVec[1]; }
@@ -147,30 +147,30 @@ public:
     Vec3I asVec3I() const { return Vec3I(Index32(mVec[0]), Index32(mVec[1]), Index32(mVec[2])); }
     void asXYZ(Int32& x, Int32& y, Int32& z) const { x = mVec[0]; y = mVec[1]; z = mVec[2]; }
 
-    bool operator==(const Coord& rhs) const
+    constexpr bool operator==(const Coord& rhs) const
     {
         return (mVec[0] == rhs.mVec[0] && mVec[1] == rhs.mVec[1] && mVec[2] == rhs.mVec[2]);
     }
-    bool operator!=(const Coord& rhs) const { return !(*this == rhs); }
+    constexpr bool operator!=(const Coord& rhs) const { return !(*this == rhs); }
 
     /// Lexicographic less than
-    bool operator<(const Coord& rhs) const
+    constexpr bool operator<(const Coord& rhs) const
     {
         return this->x() < rhs.x() ? true : this->x() > rhs.x() ? false
              : this->y() < rhs.y() ? true : this->y() > rhs.y() ? false
              : this->z() < rhs.z() ? true : false;
     }
     /// Lexicographic less than or equal to
-    bool operator<=(const Coord& rhs) const
+    constexpr bool operator<=(const Coord& rhs) const
     {
         return this->x() < rhs.x() ? true : this->x() > rhs.x() ? false
              : this->y() < rhs.y() ? true : this->y() > rhs.y() ? false
              : this->z() <=rhs.z() ? true : false;
     }
     /// Lexicographic greater than
-    bool operator>(const Coord& rhs) const { return !(*this <= rhs); }
+    constexpr bool operator>(const Coord& rhs) const { return !(*this <= rhs); }
     /// Lexicographic greater than or equal to
-    bool operator>=(const Coord& rhs) const { return !(*this < rhs); }
+    constexpr bool operator>=(const Coord& rhs) const { return !(*this < rhs); }
 
     /// Perform a component-wise minimum with the other Coord.
     void minComponent(const Coord& other)
