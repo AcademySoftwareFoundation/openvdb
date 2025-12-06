@@ -1710,33 +1710,43 @@ void Tool::soupToLevelSet()
     auto it = this->getGeom(geo_age);
     const Geometry &mesh = **it;
     if (mesh.isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
+    bool isSDF = false;
 
     auto myUpsample = [&](const GridT &grid)->GridT::Ptr{
       const float dx = grid.voxelSize()[0];
-      if (mParser.verbose) mTimer.restart("upsample("+std::to_string(dx)+")");
+      //if (mParser.verbose) mTimer.restart("upsample("+std::to_string(dx)+")");
       auto xform = math::Transform::createLinearTransform(dx/2);// upsample
-      return tools::levelSetRebuild(grid, dx, width, xform.get());
+      isSDF = true;
+      return tools::levelSetRebuild(grid, dx, width, xform.get());// SDF -> mesh -> SDF
     };// myUpsample
 
     auto myOffset = [&](float dx)->GridT::Ptr{
-      if (mParser.verbose) mTimer.restart("offset("+std::to_string(dx)+")");
+      //if (mParser.verbose) mTimer.restart("offset("+std::to_string(dx)+")");
       auto xform = math::Transform::createLinearTransform(dx);
       auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
-      return tools::levelSetRebuild(*udf, /*iso-value=*/dx, width);
+      isSDF = true;
+      return tools::levelSetRebuild(*udf, /*iso-value=*/dx, width);// UDF -> mesh -> SDF
     };// muOffset
 
     auto myErode = [&](GridT &grid)->void{
       const float dx = grid.voxelSize()[0];
-      if (mParser.verbose) mTimer.restart("erode("+std::to_string(dx)+")");
+      //if (mParser.verbose) mTimer.restart("erode("+std::to_string(dx)+")");
       const int space = 1, time = 1;
       auto filter = this->createFilter(grid, space, time);
+      //if (isSDF == false) filter->normalize();
       filter->offset(dx);// erode by dx
+      isSDF = true;
     };// myErode
 
-    auto myUnion = [&](GridT &gridA, GridT &gridB)->void{
-      if (mParser.verbose) mTimer.restart("union("+std::to_string(gridA.voxelSize()[0])+")");
+    auto myUnion = [&](GridT &gridA, GridT &gridB){
+      //if (mParser.verbose) mTimer.restart("union("+std::to_string(gridA.voxelSize()[0])+")");
       tools::csgUnion(gridA, gridB, true);// overwrites A and cannibalizes B, and prune
-      tools::sdfToSdf(gridA);// re-normalize
+      return tools::sdfToSdf(gridA);// re-normalize using fast sweeping
+      //return tools::levelSetRebuild(gridA, 0.0f, width);// SDF -> mesh -> SDF
+      //const int space = 1, time = 1;
+      //auto filter = this->createFilter(gridA, space, time);
+      //filter->normalize();// fast
+      isSDF = false;
     };// myUnion
 
     if (mParser.verbose) mTimer.start("Soup -> SDF");
@@ -1745,22 +1755,24 @@ void Tool::soupToLevelSet()
     float dx = voxel;// lets use the same notation for the voxel size as the paper
     auto grid = myOffset(dx);
     grid->setName("soup2ls_"+std::to_string(dx));
-    mGrid.push_back(grid);
+    //mGrid.push_back(grid);
     for (int i=0; i<nLOD; ++i){
       dx *= 0.5f;
       grid = myUpsample(*grid);
       auto base = myOffset(dx);
       for (int j = 0; j<nErode; ++j) {// constrained erosion
         myErode(*grid);
-        myUnion(*grid, *base);
+        //myUnion(*grid, *base);
+        grid = myUnion(*grid, *base);
       }
-      grid->setName("soup2ls_"+std::to_string(dx));
-      mGrid.push_back(grid);
+      //grid->setName("soup2ls_"+std::to_string(dx));
+      //mGrid.push_back(grid);
     }
+    //grid = tools::levelSetRebuild(*grid, /*iso-value=*/0.0f, width);// SDF -> mesh -> SDF
 
-    //if (grid_name.empty()) grid_name = "soup2ls_" + mesh.getName();
-    //grid->setName(grid_name);
-    //mGrid.push_back(grid);
+    if (grid_name.empty()) grid_name = "soup2ls_" + mesh.getName();
+    grid->setName(grid_name);
+    mGrid.push_back(grid);
     if (!keep) mGeom.erase(std::next(it).base());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
@@ -2115,36 +2127,36 @@ void Tool::csg()
       if (mParser.verbose) mTimer.start("Union");
       if (keep) {
         GridT::Ptr grid = tools::csgUnionCopy(*gridA, *gridB);
-        if (rebuild) tools::sdfToSdf(*grid);
+        if (rebuild) grid = tools::sdfToSdf(*grid);
         grid->setName("union_"+gridA->getName());
         mGrid.push_back(grid);// A and B are unchanged!
       } else {
         tools::csgUnion(*gridA, *gridB, prune);// overwrites A and cannibalizes B
-        if (rebuild) tools::sdfToSdf(*gridA);
+        if (rebuild) gridA = tools::sdfToSdf(*gridA);
         gridA->setName("union_"+gridA->getName());
       }
     } else if (name == "intersection") {
       if (mParser.verbose) mTimer.start("Intersection");
       if (keep) {
         GridT::Ptr grid = tools::csgIntersectionCopy(*gridA, *gridB);
-        if (rebuild) tools::sdfToSdf(*grid);
+        if (rebuild) grid = tools::sdfToSdf(*grid);
         grid->setName("intersection_"+gridA->getName());
         mGrid.push_back(grid);// A and B are unchanged!
       } else {
         tools::csgIntersection(*gridA, *gridB, prune);// overwrites A and cannibalizes B
-        if (rebuild) tools::sdfToSdf(*gridA);
+        if (rebuild) gridA = tools::sdfToSdf(*gridA);
         gridA->setName("intersection_"+gridA->getName());
       }
     } else if (name == "difference") {
       if (mParser.verbose) mTimer.start("Difference");
       if (keep) {
         GridT::Ptr grid = tools::csgDifferenceCopy(*gridA, *gridB);
-        if (rebuild) tools::sdfToSdf(*grid);
+        if (rebuild) grid = tools::sdfToSdf(*grid);
         grid->setName("difference_"+gridA->getName());
         mGrid.push_back(grid);// A and B are unchanged!
       } else {
         tools::csgDifference(*gridA, *gridB, prune);// overwrites A and deletes B
-        if (rebuild) tools::sdfToSdf(*gridA);
+        if (rebuild) gridA = tools::sdfToSdf(*gridA);
         gridA->setName("difference_"+gridA->getName());
       }
     } else {
