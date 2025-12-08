@@ -1714,40 +1714,64 @@ void Tool::soupToLevelSet()
 
     auto myUpsample = [&](const GridT &grid)->GridT::Ptr{
       const float dx = grid.voxelSize()[0];
-      //if (mParser.verbose) mTimer.restart("upsample("+std::to_string(dx)+")");
-      auto xform = math::Transform::createLinearTransform(dx/2);// upsample
       isSDF = true;
-      return tools::levelSetRebuild(grid, dx, width, xform.get());// SDF -> mesh -> SDF
+      //if (mParser.verbose) mTimer.restart("upsample("+std::to_string(dx)+")");
+#if 0
+      auto xform = math::Transform::createLinearTransform(dx/2);// upsample
+      return tools::levelSetRebuild(grid, 0.0f, width, xform.get());// SDF -> mesh -> SDF
+#else
+      GridT::Ptr outGrid = createLevelSet<GridT>(dx/2, width);
+      tools::resampleToMatch<tools::BoxSampler>(grid, *outGrid);
+      return outGrid;
+#endif
     };// myUpsample
 
     auto myOffset = [&](float dx)->GridT::Ptr{
       //if (mParser.verbose) mTimer.restart("offset("+std::to_string(dx)+")");
       auto xform = math::Transform::createLinearTransform(dx);
       auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
-      isSDF = true;
       return tools::levelSetRebuild(*udf, /*iso-value=*/dx, width);// UDF -> mesh -> SDF
     };// muOffset
 
+    /*
     auto myErode = [&](GridT &grid)->void{
       const float dx = grid.voxelSize()[0];
       //if (mParser.verbose) mTimer.restart("erode("+std::to_string(dx)+")");
       const int space = 1, time = 1;
       auto filter = this->createFilter(grid, space, time);
-      //if (isSDF == false) filter->normalize();
+      if (isSDF == false) {
+        filter->normalize();
+        isSDF = true;
+      }
       filter->offset(dx);// erode by dx
-      isSDF = true;
     };// myErode
 
     auto myUnion = [&](GridT &gridA, GridT &gridB){
       //if (mParser.verbose) mTimer.restart("union("+std::to_string(gridA.voxelSize()[0])+")");
-      tools::csgUnion(gridA, gridB, true);// overwrites A and cannibalizes B, and prune
-      return tools::sdfToSdf(gridA);// re-normalize using fast sweeping
+      //tools::csgUnion(gridA, gridB, true);// overwrites A and cannibalizes B, and prune
+      //return tools::sdfToSdf(gridA);// re-normalize using fast sweeping
       //return tools::levelSetRebuild(gridA, 0.0f, width);// SDF -> mesh -> SDF
       //const int space = 1, time = 1;
       //auto filter = this->createFilter(gridA, space, time);
       //filter->normalize();// fast
       isSDF = false;
+      return tools::csgUnionCopy(gridA, gridB);
     };// myUnion
+    */
+
+    auto myConstrainedErosion = [&](GridT &grid, const GridT &gridB)->GridT::Ptr{
+      const float dx = grid.voxelSize()[0];
+      //if (mParser.verbose) mTimer.restart("erode("+std::to_string(dx)+")");
+      const int space = 1, time = 1;
+      auto filter = this->createFilter(grid, space, time);
+      if (isSDF == false) {
+        filter->normalize();
+        isSDF = true;
+      }
+      filter->offset(dx);// erode by dx
+      isSDF = false;// the next CSG operation will mess up the SDF
+      return tools::csgUnionCopy(grid, gridB);
+    };// myConstrainedErosion
 
     if (mParser.verbose) mTimer.start("Soup -> SDF");
 
@@ -1757,14 +1781,10 @@ void Tool::soupToLevelSet()
     grid->setName("soup2ls_"+std::to_string(dx));
     //mGrid.push_back(grid);
     for (int i=0; i<nLOD; ++i){
-      dx *= 0.5f;
+      dx *= 0.5f;// refinement
       grid = myUpsample(*grid);
       auto base = myOffset(dx);
-      for (int j = 0; j<nErode; ++j) {// constrained erosion
-        myErode(*grid);
-        //myUnion(*grid, *base);
-        grid = myUnion(*grid, *base);
-      }
+      for (int j = 0; j<nErode; ++j) grid = myConstrainedErosion(*grid, *base);
       //grid->setName("soup2ls_"+std::to_string(dx));
       //mGrid.push_back(grid);
     }
