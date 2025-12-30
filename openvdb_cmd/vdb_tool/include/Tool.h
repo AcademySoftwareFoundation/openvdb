@@ -1692,6 +1692,7 @@ void Tool::meshToLevelSet()
 // ==============================================================================================================
 
 // vdb_tool -read ~/dev/data/ply/cube.ply -soup2ls dim=64 lod=4 erode=5 -o vdb="*" stdout.vdb | vdb_view
+// ./openvdb_cmd/vdb_tool/vdb_tool -i ~/dev/data/obj/Robot_arm.obj -soup2ls voxel=51.2 lod=8 erode=16 -print -o codec=blosc openvdb_10.vdb
 void Tool::soupToLevelSet()
 {
   const std::string &name = mParser.getAction().name;
@@ -1711,8 +1712,11 @@ void Tool::soupToLevelSet()
     const Geometry &mesh = **it;
     if (mesh.isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
     bool isSDF = false;
+    util::CpuTimer timer;
+    double t_offset = 0.0, t_erode = 0.0, t_upsample = 0.0;// all in milliseconds
 
     auto myUpsample = [&](const GridT &grid)->GridT::Ptr{
+      timer.start();
       const float dx = grid.voxelSize()[0];
       isSDF = true;
       //if (mParser.verbose) mTimer.restart("upsample("+std::to_string(dx)+")");
@@ -1722,15 +1726,19 @@ void Tool::soupToLevelSet()
 #else
       GridT::Ptr outGrid = createLevelSet<GridT>(dx/2, width);
       tools::resampleToMatch<tools::BoxSampler>(grid, *outGrid);
+      t_upsample += timer.milliseconds();
       return outGrid;
 #endif
     };// myUpsample
 
     auto myOffset = [&](float dx)->GridT::Ptr{
+      timer.start();
       //if (mParser.verbose) mTimer.restart("offset("+std::to_string(dx)+")");
       auto xform = math::Transform::createLinearTransform(dx);
-      auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
-      return tools::levelSetRebuild(*udf, /*iso-value=*/dx, width);// UDF -> mesh -> SDF
+      auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);// mesh -> UDF
+      auto tmp = tools::levelSetRebuild(*udf, /*iso-value=*/dx, width);// UDF -> mesh -> SDF
+      t_offset += timer.milliseconds();
+      return tmp;
     };// muOffset
 
     /*
@@ -1759,7 +1767,8 @@ void Tool::soupToLevelSet()
     };// myUnion
     */
 
-    auto myConstrainedErosion = [&](GridT &grid, const GridT &gridB)->GridT::Ptr{
+    auto myLevelSetDeform = [&](GridT &grid, const GridT &gridB)->GridT::Ptr{
+      timer.start();
       const float dx = grid.voxelSize()[0];
       //if (mParser.verbose) mTimer.restart("erode("+std::to_string(dx)+")");
       const int space = 1, time = 1;
@@ -1770,25 +1779,35 @@ void Tool::soupToLevelSet()
       }
       filter->offset(dx);// erode by dx
       isSDF = false;// the next CSG operation will mess up the SDF
-      return tools::csgUnionCopy(grid, gridB);
-    };// myConstrainedErosion
+      auto tmp = tools::csgUnionCopy(grid, gridB);
+      t_erode += timer.milliseconds();
+      return tmp;
+    };// myLevelSetDeform
 
     if (mParser.verbose) mTimer.start("Soup -> SDF");
 
     // Main algorithm
-    float dx = voxel;// lets use the same notation for the voxel size as the paper
+    float dx = voxel, target_dx = dx / pow(2, nLOD) ;// lets use the same notation for the voxel size as the paper
     auto grid = myOffset(dx);
-    grid->setName("soup2ls_"+std::to_string(dx));
+    //grid->setName("soup2ls_"+std::to_string(dx));
     //mGrid.push_back(grid);
-    for (int i=0; i<nLOD; ++i){
+    while(dx > target_dx) {
       dx *= 0.5f;// refinement
       grid = myUpsample(*grid);
       auto base = myOffset(dx);
-      for (int j = 0; j<nErode; ++j) grid = myConstrainedErosion(*grid, *base);
+      for (int j = 0; j<nErode; ++j) grid = myLevelSetDeform(*grid, *base);
       //grid->setName("soup2ls_"+std::to_string(dx));
       //mGrid.push_back(grid);
     }
     //grid = tools::levelSetRebuild(*grid, /*iso-value=*/0.0f, width);// SDF -> mesh -> SDF
+    if (dx!=target_dx) std::cerr << "dx = " << dx << ", target_dx = " << target_dx << std::endl;
+    t_offset   /= 1000.0;
+    t_erode    /= 1000.0;
+    t_upsample /= 1000.0;
+    std::cerr << "offset = " << t_offset
+              << "s, erode = " << t_erode
+              << "s, upsample = " << t_upsample
+              << "s, total = " << (t_offset + t_erode + t_upsample) << "s\n";
 
     if (grid_name.empty()) grid_name = "soup2ls_" + mesh.getName();
     grid->setName(grid_name);
