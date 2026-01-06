@@ -1807,7 +1807,7 @@ void Tool::soupToLevelSet()
     t_offset  /= 1000.0;
     t_deform  /= 1000.0;
     t_upscale /= 1000.0;
-    std::cerr << "upsample = " << t_upscale
+    std::cerr << "\nupsample = " << t_upscale
               << "s, offset = " << t_offset
               << "s, deform = " << t_deform
               << "s, total = " << (t_offset + t_deform + t_upscale) << "s\n";
