@@ -13,7 +13,8 @@ This command-line tool, dubbed vdb_tool, can combine any number of the of high-l
 | **read** | Read mesh, points and level sets as obj, ply, abc, stl, off, pts, xyz, e57, vdb or nvdb files |
 | **write** | Write a polygon mesh, points or level set as a obj, ply, stl, off, abc or vdb file |
 | **vdb2points** | Extracts points from a VDB grid |
-| **mesh2ls** | Convert a polygon mesh to a narrow-band level set |
+| **mesh2ls** | Convert a (water-tight) polygon mesh to a narrow-band level set |
+| **soup2ls** | Convert an arbitrary polygon soup to a narrow-band level set |
 | **points2ls** | Convert points into a narrow-band level set |
 | **points2vdb** | Converts points into a VDB PointDataGrid |
 | **iso2ls** | Convert an iso-surface of a scalar field into a level set |
