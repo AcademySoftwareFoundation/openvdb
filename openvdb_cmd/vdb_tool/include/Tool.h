@@ -1736,7 +1736,6 @@ void Tool::soupToLevelSet()
 
     auto myOffset = [&](float dx)->GridT::Ptr{
       timer.start();
-      //if (mParser.verbose) mTimer.restart("offset("+std::to_string(dx)+")");
       auto xform = math::Transform::createLinearTransform(dx);
       auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);// mesh -> UDF
       auto tmp = tools::levelSetRebuild(*udf, /*iso-value=*/dx, width);// UDF -> mesh -> SDF
@@ -1744,79 +1743,55 @@ void Tool::soupToLevelSet()
       return tmp;
     };// muOffset
 
-    /*
-    auto myErode = [&](GridT &grid)->void{
-      const float dx = grid.voxelSize()[0];
-      //if (mParser.verbose) mTimer.restart("erode("+std::to_string(dx)+")");
-      const int space = 1, time = 1;
-      auto filter = this->createFilter(grid, space, time);
-      if (isSDF == false) {
-        filter->normalize();
-        isSDF = true;
-      }
-      filter->offset(dx);// erode by dx
-    };// myErode
-
-    auto myUnion = [&](GridT &gridA, GridT &gridB){
-      //if (mParser.verbose) mTimer.restart("union("+std::to_string(gridA.voxelSize()[0])+")");
-      //tools::csgUnion(gridA, gridB, true);// overwrites A and cannibalizes B, and prune
-      //return tools::sdfToSdf(gridA);// re-normalize using fast sweeping
-      //return tools::levelSetRebuild(gridA, 0.0f, width);// SDF -> mesh -> SDF
-      //const int space = 1, time = 1;
-      //auto filter = this->createFilter(gridA, space, time);
-      //filter->normalize();// fast
-      isSDF = false;
-      return tools::csgUnionCopy(gridA, gridB);
-    };// myUnion
-    */
-
     auto myLevelSetDeform = [&](GridT &grid, const GridT &gridB)->GridT::Ptr{
       timer.start();
       const float dx = grid.voxelSize()[0];
-      //if (mParser.verbose) mTimer.restart("erode("+std::to_string(dx)+")");
       const int space = 1, time = 1;
       auto filter = this->createFilter(grid, space, time);
+#if 1
       if (isSDF == false) {
         filter->normalize();
         isSDF = true;
       }
       filter->offset(dx);// erode by dx
-      isSDF = false;// the next CSG operation will mess up the SDF
       auto tmp = tools::csgUnionCopy(grid, gridB);
+      isSDF = false;// the CSG operation messed up the SDF
+#else
+      filter->offset(dx);// erode by dx
+      auto tmp = tools::csgUnionCopy(grid, gridB);
+      filter = this->createFilter(*tmp, space, time);
+      filter->normalize();
+#endif
       t_deform += timer.milliseconds();
       return tmp;
     };// myLevelSetDeform
 
-    if (mParser.verbose) mTimer.start("Soup -> SDF");
+    //if (mParser.verbose) mTimer.start("Soup -> SDF");
 
     // Main algorithm
     float dx = voxel * pow(2, nLOD);
     auto grid = myOffset(dx);
-    //grid->setName("soup2ls_"+std::to_string(dx));
-    //mGrid.push_back(grid);
     while(dx > voxel) {
       dx *= 0.5f;// refinement
       grid = myUpsample(*grid);
       auto base = myOffset(dx);
       for (int j = 0; j<nErode; ++j) grid = myLevelSetDeform(*grid, *base);
-      //grid->setName("soup2ls_"+std::to_string(dx));
-      //mGrid.push_back(grid);
     }
     //grid = tools::levelSetRebuild(*grid, /*iso-value=*/0.0f, width);// SDF -> mesh -> SDF
     if (dx!=voxel) std::cerr << "dx = " << dx << ", expected dx = " << voxel << std::endl;
     t_offset  /= 1000.0;
     t_deform  /= 1000.0;
     t_upscale /= 1000.0;
-    std::cerr << "\nupsample = " << t_upscale
-              << "s, offset = " << t_offset
-              << "s, deform = " << t_deform
-              << "s, total = " << (t_offset + t_deform + t_upscale) << "s\n";
+    std::cerr <<    "upscale:\t" << t_upscale
+              << "s\noffset: \t" << t_offset
+              << "s\ndeform: \t" << t_deform
+              << "s\ntotal:  \t" << (t_offset + t_deform + t_upscale) << "s\n";
 
     if (grid_name.empty()) grid_name = "soup2ls_" + mesh.getName();
     grid->setName(grid_name);
     mGrid.push_back(grid);
     if (!keep) mGeom.erase(std::next(it).base());
-    if (mParser.verbose) mTimer.stop();
+    //if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
     throw std::invalid_argument(name+": "+e.what());
   }

@@ -1028,7 +1028,11 @@ void Geometry::readNVDB(const std::string&)
 
 void Geometry::print(size_t n, std::ostream& os) const
 {
-    os << "vtx = " << mVtx.size() << ", rbg = " << mRGB.size() << ", tri = " << mTri.size() << ", quad = " << mQuad.size()<< ", bbox=" << this->bbox();
+    os << "vtx = " << mVtx.size();
+    if (auto n = mRGB.size())  os << ", rbg = " << n;
+    if (auto n = mTri.size())  os << ", tri = " << n;
+    if (auto n = mQuad.size()) os << ", quad = " << n;
+    os << ", bbox=" << this->bbox();
     if (size_t m = std::min(n, mVtx.size())) {
         os << std::endl;
         for (size_t i=0; i<m; ++i) {
