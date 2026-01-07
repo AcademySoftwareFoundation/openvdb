@@ -1714,15 +1714,13 @@ void Tool::soupToLevelSet()
     auto it = this->getGeom(geo_age);
     const Geometry &mesh = **it;
     if (mesh.isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
-    bool isSDF = false;
     util::CpuTimer timer;
     double t_offset = 0.0, t_deform = 0.0, t_upscale = 0.0;// all in milliseconds
+    bool isGridSDF = true;
 
     auto myUpsample = [&](const GridT &grid)->GridT::Ptr{
       timer.start();
       const float dx = grid.voxelSize()[0];
-      isSDF = true;
-      //if (mParser.verbose) mTimer.restart("upsample("+std::to_string(dx)+")");
 #if 0
       auto xform = math::Transform::createLinearTransform(dx/2);// upsample
       return tools::levelSetRebuild(grid, 0.0f, width, xform.get());// SDF -> mesh -> SDF
@@ -1730,6 +1728,7 @@ void Tool::soupToLevelSet()
       GridT::Ptr outGrid = createLevelSet<GridT>(dx/2, width);
       tools::resampleToMatch<tools::BoxSampler>(grid, *outGrid);
       t_upscale += timer.milliseconds();
+      //isGridSDF = true;
       return outGrid;
 #endif
     };// myUpsample
@@ -1749,13 +1748,9 @@ void Tool::soupToLevelSet()
       const int space = 1, time = 1;
       auto filter = this->createFilter(grid, space, time);
 #if 1
-      if (isSDF == false) {
-        filter->normalize();
-        isSDF = true;
-      }
+      if (isGridSDF == false) filter->normalize();
       filter->offset(dx);// erode by dx
       auto tmp = tools::csgUnionCopy(grid, gridB);
-      isSDF = false;// the CSG operation messed up the SDF
 #else
       filter->offset(dx);// erode by dx
       auto tmp = tools::csgUnionCopy(grid, gridB);
@@ -1763,6 +1758,7 @@ void Tool::soupToLevelSet()
       filter->normalize();
 #endif
       t_deform += timer.milliseconds();
+      isGridSDF = false;// the CSG operation messed up the SDF
       return tmp;
     };// myLevelSetDeform
 
@@ -1770,12 +1766,16 @@ void Tool::soupToLevelSet()
 
     // Main algorithm
     float dx = voxel * pow(2, nLOD);
+    const float factor = float(nErode-1)/(nLOD-1);
     auto grid = myOffset(dx);
-    while(dx > voxel) {
+    for (int i=0; i<nLOD; ++i) {
+    //while(dx > voxel) {
       dx *= 0.5f;// refinement
       grid = myUpsample(*grid);
       auto base = myOffset(dx);
-      for (int j = 0; j<nErode; ++j) grid = myLevelSetDeform(*grid, *base);
+      const int end = nErode - int(i*factor);
+      std::cerr << "Level: " << i << ", erosions: " << end << std::endl;
+      for (int j = 0; j<end; ++j) grid = myLevelSetDeform(*grid, *base);
     }
     //grid = tools::levelSetRebuild(*grid, /*iso-value=*/0.0f, width);// SDF -> mesh -> SDF
     if (dx!=voxel) std::cerr << "dx = " << dx << ", expected dx = " << voxel << std::endl;
