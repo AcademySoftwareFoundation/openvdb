@@ -1715,7 +1715,7 @@ void Tool::soupToLevelSet()
     const Geometry &mesh = **it;
     if (mesh.isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
     util::CpuTimer timer;
-    double t_offset = 0.0, t_deform = 0.0, t_upscale = 0.0;// all in milliseconds
+    double t_offset = 0.0, t_deform = 0.0, t_upscale = 0.0, t_multigrid = 0.0;// all in milliseconds
     bool isGridSDF = true;
 
     auto myUpsample = [&](const GridT &grid)->GridT::Ptr{
@@ -1728,7 +1728,7 @@ void Tool::soupToLevelSet()
       GridT::Ptr outGrid = createLevelSet<GridT>(dx/2, width);
       tools::resampleToMatch<tools::BoxSampler>(grid, *outGrid);
       t_upscale += timer.milliseconds();
-      //isGridSDF = true;
+      isGridSDF = true;
       return outGrid;
 #endif
     };// myUpsample
@@ -1767,16 +1767,34 @@ void Tool::soupToLevelSet()
     // Main algorithm
     float dx = voxel * pow(2, nLOD);
     const float factor = float(nErode-1)/(nLOD-1);
+
+#if 0// old method
+
     auto grid = myOffset(dx);
     for (int i=0; i<nLOD; ++i) {
     //while(dx > voxel) {
       dx *= 0.5f;// refinement
       grid = myUpsample(*grid);
       auto base = myOffset(dx);
-      const int end = nErode - int(i*factor);
+      const int end = nErode;// - int(i*factor);
       std::cerr << "Level: " << i << ", erosions: " << end << std::endl;
       for (int j = 0; j<end; ++j) grid = myLevelSetDeform(*grid, *base);
     }
+#else// new algorithm
+
+    timer.start();
+    tools::MultiResGrid<GridT::TreeType> ms(nLOD, myOffset(voxel));
+    t_offset = timer.milliseconds();
+    auto grid = ms.grid(nLOD-1);
+    for (int i=0; i<nLOD; ++i) {
+      grid = myUpsample(*grid);
+      auto base = ms.grid(nLOD - 1 - i);
+      const int end = nErode;// - int(i*factor);
+      std::cerr << "Level: " << i << ", erosions: " << end << std::endl;
+      for (int j = 0; j<end; ++j) grid = myLevelSetDeform(*grid, *base);
+    }
+#endif
+
     //grid = tools::levelSetRebuild(*grid, /*iso-value=*/0.0f, width);// SDF -> mesh -> SDF
     if (dx!=voxel) std::cerr << "dx = " << dx << ", expected dx = " << voxel << std::endl;
     t_offset  /= 1000.0;
