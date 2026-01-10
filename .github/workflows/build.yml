@@ -32,9 +32,6 @@ on:
       - 'fvdb/**'
       - 'pendingchanges/**'
       - '**.md'
-  schedule:
-    # run this workflow every day 7am UTC
-    - cron:  '0 7 * * *'
   workflow_dispatch:
     inputs:
       type:
@@ -70,7 +67,7 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2026',           abi: '13', build: 'Release', cmake: '-DOPENVDB_USE_FUTURE_ABI_13=ON' }
+          - { cxx: clang++, image: '2026',           abi: '13', build: 'Release', cmake: '-DOPENVDB_USE_FUTURE_ABI_13=ON -DOPENVDB_ENABLE_ASSERTS=ON' }
           - { cxx: g++,     image: '2026',           abi: '13', build: 'Release', cmake: '-DOPENVDB_USE_FUTURE_ABI_13=ON' }
           - { cxx: clang++, image: '2026',           abi: '13', build: 'Debug',   cmake: '-DOPENVDB_USE_FUTURE_ABI_13=ON' }
           - { cxx: clang++, image: '2025-clang19.1', abi: '12', build: 'Release', cmake: '' }
@@ -110,7 +107,7 @@ jobs:
         \"
     - name: test
       # Skip Debug on commits as they take a while.
-      if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || matrix.config.build == 'Release'
+      if: github.event_name == 'workflow_dispatch' || matrix.config.build == 'Release'
       run: |
         cd build && ctest -V
         cd - && ./ci/test_install.sh
