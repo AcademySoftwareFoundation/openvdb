@@ -6,6 +6,8 @@
 #include <gtest/gtest.h>
 
 #include <cstdio> // for remove()
+#include <sstream>
+#include <unistd.h> // for getpid()
 
 
 class TestGridIO: public ::testing::Test
@@ -24,7 +26,14 @@ public:
     void TearDown() override { openvdb::uninitialize(); }
 
 protected:
-    template<typename GridType> void readAllTest();
+    // Generate a unique temporary filename to avoid conflicts when running tests in parallel
+    static std::string uniqueFilename(const std::string& suffix = "") {
+        std::ostringstream ss;
+        ss << "test_gridio_" << getpid() << "_" << suffix << ".vdb2";
+        return ss.str();
+    }
+
+    template<typename GridType> void readAllTest(const std::string& testName);
     void testCreateWriteReadHalf();
 };
 
@@ -34,9 +43,10 @@ protected:
 
 template<typename GridType>
 void
-TestGridIO::readAllTest()
+TestGridIO::readAllTest(const std::string& testName)
 {
     using namespace openvdb;
+    const std::string filename = uniqueFilename(testName);
 
     typedef typename GridType::TreeType TreeType;
     typedef typename TreeType::Ptr TreePtr;
@@ -125,13 +135,13 @@ TestGridIO::readAllTest()
 
     // Write grids and metadata out to a file.
     {
-        io::File vdbfile("something.vdb2");
+        io::File vdbfile(filename);
         vdbfile.write(*grids, *meta);
     }
     meta.reset();
     grids.reset();
 
-    io::File vdbfile("something.vdb2");
+    io::File vdbfile(filename);
     EXPECT_THROW(vdbfile.getGrids(), openvdb::IoError); // file has not been opened
 
     // Read the grids back in.
@@ -188,11 +198,12 @@ TestGridIO::readAllTest()
 
     vdbfile.close();
 
-    ::remove("something.vdb2");
+    ::remove(filename.c_str());
 }
 
 void TestGridIO::testCreateWriteReadHalf() {
     using namespace openvdb;
+    const std::string filename = uniqueFilename("half");
 
     // Create an empty half-precision grid with background value 0.
     HalfGrid::Ptr hg = HalfGrid::create();
@@ -216,13 +227,13 @@ void TestGridIO::testCreateWriteReadHalf() {
 
     // Write grids and metadata out to a file.
     {
-        io::File vdbfile("something.vdb2");
+        io::File vdbfile(filename);
         vdbfile.write(*grids, *meta);
     }
     meta.reset();
     grids.reset();
 
-    io::File vdbfile("something.vdb2");
+    io::File vdbfile(filename);
     EXPECT_THROW(vdbfile.getGrids(), openvdb::IoError); // file has not been opened
 
     // Read the grids back in.
@@ -271,12 +282,12 @@ void TestGridIO::testCreateWriteReadHalf() {
 
     vdbfile.close();
 
-    ::remove("something.vdb2");
+    ::remove(filename.c_str());
 }
 
-TEST_F(TestGridIO, testReadAllBool) { readAllTest<openvdb::BoolGrid>(); }
-TEST_F(TestGridIO, testReadAllFloat) { readAllTest<openvdb::FloatGrid>(); }
-TEST_F(TestGridIO, testReadAllHalf) { readAllTest<openvdb::HalfGrid>(); }
-TEST_F(TestGridIO, testReadAllVec3S) { readAllTest<openvdb::Vec3SGrid>(); }
-TEST_F(TestGridIO, testReadAllFloat5432) { Float5432Grid::registerGrid(); readAllTest<Float5432Grid>(); }
+TEST_F(TestGridIO, testReadAllBool) { readAllTest<openvdb::BoolGrid>("bool"); }
+TEST_F(TestGridIO, testReadAllFloat) { readAllTest<openvdb::FloatGrid>("float"); }
+TEST_F(TestGridIO, testReadAllHalf) { readAllTest<openvdb::HalfGrid>("half"); }
+TEST_F(TestGridIO, testReadAllVec3S) { readAllTest<openvdb::Vec3SGrid>("vec3s"); }
+TEST_F(TestGridIO, testReadAllFloat5432) { Float5432Grid::registerGrid(); readAllTest<Float5432Grid>("float5432"); }
 TEST_F(TestGridIO, testCreateWriteReadHalf) { testCreateWriteReadHalf(); }
