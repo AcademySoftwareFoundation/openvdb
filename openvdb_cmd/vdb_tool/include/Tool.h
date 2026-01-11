@@ -1808,7 +1808,7 @@ void Tool::soupToLevelSet()
     for (int level = 0; level <= nLOD; ++level) {// both inclusive
       std::cerr << "Generating offset at level " << level << " with dx = " << dx << std::endl;
       auto grid = myOffset(*mesh, dx);
-      grid->setName("offset_level_" + std::to_string(level));
+      grid->setName("old_offset_level_" + std::to_string(level));
       offsets.push_back(grid);
       dx *= 2.0f;
     }// loop from fine to coarse voxel sizes
@@ -1820,7 +1820,7 @@ void Tool::soupToLevelSet()
       std::cerr << "Generating offset at level " << level << " with dx = " << dx << std::endl;
       if (level) mesh = this->volumeToGeometry(*offsets.back());
       auto grid = myOffset(*mesh, dx);
-      grid->setName("offset_level_" + std::to_string(level));
+      grid->setName("new_offset_level_" + std::to_string(level));
       offsets.push_back(grid);
       dx *= 2.0f;
     }// loop from fine to coarse voxel sizes
