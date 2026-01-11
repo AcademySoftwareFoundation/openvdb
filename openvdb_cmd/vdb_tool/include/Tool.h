@@ -253,6 +253,7 @@ private:
     inline auto getGeom(size_t age) const;
 
     Geometry::Ptr mesherToGeometry(tools::VolumeToMesh&) const;
+    Geometry::Ptr volumeToGeometry(const GridT &grid, float isoValue=0.0f, float adaptivity=0.0f) const;
 
 };// Tool class
 
@@ -1712,8 +1713,9 @@ void Tool::soupToLevelSet()
       std::cerr << "estimated voxel size = " << voxel << " from dim = " << dim << std::endl;
     }
     auto it = this->getGeom(geo_age);
-    const Geometry &mesh = **it;
-    if (mesh.isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
+    //const Geometry &mesh = **it;
+    Geometry::Ptr mesh = *it;
+    if (mesh->isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
     util::CpuTimer timer;
     double t_offset = 0.0, t_deform = 0.0, t_upscale = 0.0, t_multigrid = 0.0;// all in milliseconds
     bool isGridSDF = true;
@@ -1733,14 +1735,14 @@ void Tool::soupToLevelSet()
 #endif
     };// myUpsample
 
-    auto myOffset = [&](float dx)->GridT::Ptr{
+    auto myOffset = [&](const Geometry &mesh, float dx)->GridT::Ptr{
       timer.start();
       auto xform = math::Transform::createLinearTransform(dx);
       auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);// mesh -> UDF
       auto tmp = tools::levelSetRebuild(*udf, /*iso-value=*/dx, width);// UDF -> mesh -> SDF
       t_offset += timer.milliseconds();
       return tmp;
-    };// muOffset
+    };// myOffset
 
     auto myLevelSetDeform = [&](GridT &grid, const GridT &gridB)->GridT::Ptr{
       timer.start();
@@ -1762,7 +1764,7 @@ void Tool::soupToLevelSet()
       return tmp;
     };// myLevelSetDeform
 
-    //if (mParser.verbose) mTimer.start("Soup -> SDF");
+    if (mParser.verbose) mTimer.start("Soup -> SDF");
 
     // Main algorithm
     float dx = voxel * pow(2, nLOD);
@@ -1781,17 +1783,50 @@ void Tool::soupToLevelSet()
       for (int j = 0; j<end; ++j) grid = myLevelSetDeform(*grid, *base);
     }
 #else// new algorithm
-
+    /*
     timer.start();
     tools::MultiResGrid<GridT::TreeType> ms(nLOD, myOffset(voxel));
-    t_offset = timer.milliseconds();
     auto grid = ms.grid(nLOD-1);
-    for (int i=0; i<nLOD; ++i) {
+    dx = grid->voxelSize()[0];
+    std::cerr << "dx = " << dx << std::endl;
+    for (int i=0; i<nLOD; ++i) std::cerr << "Level: " << i << ", dx = " << ms.grid(i)->voxelSize()[0] << std::endl;
+    //ms.print();
+    t_offset = timer.milliseconds();
+    for (int level = nLOD - 2; level >= 0; --level) {
+      dx *= 0.5f;// refinement
       grid = myUpsample(*grid);
-      auto base = ms.grid(nLOD - 1 - i);
-      const int end = nErode;// - int(i*factor);
-      std::cerr << "Level: " << i << ", erosions: " << end << std::endl;
-      for (int j = 0; j<end; ++j) grid = myLevelSetDeform(*grid, *base);
+      GridT::Ptr base = ms.grid(level);
+      std::cerr << "Level: " << level << ", dx = " << dx << " base = " << base->voxelSize()[0] << " grid = " << grid->voxelSize()[0] << std::endl;
+      for (int iter = 0; iter < nErode; ++iter) grid = myLevelSetDeform(*grid, *base);
+    }
+    */
+    timer.start();
+    auto grid = myOffset(*mesh, voxel);
+    grid->setName("offset_level_0");
+    std::vector<GridT::Ptr> offsets = {grid};// finest grid
+    mGrid.push_back(grid);
+    //std::cerr << "final voxel size: " << voxel << " at level 0" << std::endl;
+    //dx = offsets.back()->voxelSize()[0];
+    for (int level = 1; level <= nLOD; ++level) {
+      mesh = this->volumeToGeometry(*offsets.back());
+      grid = myOffset(*mesh, 2*offsets.back()->voxelSize()[0]);
+      grid->setName("offset_level_" + std::to_string(level));
+      //dx *= 2;
+      //std::cerr << "generating offset grid with voxel size: " << dx << " at level: " << level << std::endl;
+      offsets.push_back(grid);
+      mGrid.push_back(grid);
+    }
+    grid = offsets.back();// coarse grid
+    dx = grid->voxelSize()[0];
+    std::cerr << "dx = " << dx << std::endl;
+    for (int i=0; i<=nLOD; ++i) std::cerr << "Level: " << i << ", dx = " << offsets[i]->voxelSize()[0] << std::endl;
+    //ms.print();
+    t_offset = timer.milliseconds();
+    for (int level = nLOD - 1; level >= 0; --level) {
+      //dx *= 0.5f;// refinement
+      grid = myUpsample(*grid);
+      std::cerr << "Level: " << level << " offset = " << offsets[level]->voxelSize()[0] << " grid = " << grid->voxelSize()[0] << std::endl;
+      for (int iter = 0; iter < nErode; ++iter) grid = myLevelSetDeform(*grid, *offsets[level]);
     }
 #endif
 
@@ -1805,11 +1840,11 @@ void Tool::soupToLevelSet()
               << "s\ndeform: \t" << t_deform
               << "s\ntotal:  \t" << (t_offset + t_deform + t_upscale) << "s\n";
 
-    if (grid_name.empty()) grid_name = "soup2ls_" + mesh.getName();
+    if (grid_name.empty()) grid_name = "soup2ls_" + mesh->getName();
     grid->setName(grid_name);
     mGrid.push_back(grid);
     if (!keep) mGeom.erase(std::next(it).base());
-    //if (mParser.verbose) mTimer.stop();
+    if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
     throw std::invalid_argument(name+": "+e.what());
   }
@@ -3043,6 +3078,15 @@ Geometry::Ptr Tool::mesherToGeometry(tools::VolumeToMesh &mesher) const
   }
   return geom;
 }// Tool::mesherToGeometry
+
+// ==============================================================================================================
+
+Geometry::Ptr Tool::volumeToGeometry(const GridT &grid, float isoValue, float adaptivity) const
+{
+  tools::VolumeToMesh mesher(isoValue, adaptivity, /*relaxDisorientedTriangles*/true);
+  mesher(grid);
+  return this->mesherToGeometry(mesher);
+}
 
 } // namespace vdb_tool
 } // namespace OPENVDB_VERSION_NAME
