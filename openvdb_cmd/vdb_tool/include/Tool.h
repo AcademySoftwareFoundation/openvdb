@@ -1802,9 +1802,11 @@ void Tool::soupToLevelSet()
     */
     timer.start();
 
-    std::vector<GridT::Ptr> offsets;// = {grid};// finest grid 
+    std::vector<GridT::Ptr> offsets;// = {grid};// finest grid
+    /*
     std::cerr << std::endl;
     dx = voxel;// final desired voxel size
+    mTimer.start("old offset");
     for (int level = 0; level <= nLOD; ++level) {// both inclusive
       std::cerr << "Generating offset at level " << level << " with dx = " << dx << std::endl;
       auto grid = myOffset(*mesh, dx);
@@ -1812,9 +1814,10 @@ void Tool::soupToLevelSet()
       offsets.push_back(grid);
       dx *= 2.0f;
     }// loop from fine to coarse voxel sizes
-  
     offsets.clear();
+    */
     std::cerr << std::endl;
+    mTimer.restart("new offset");
     dx = voxel;// final desired voxel size
     for (int level = 0; level <= nLOD; ++level) {// both inclusive
       std::cerr << "Generating offset at level " << level << " with dx = " << dx << std::endl;
@@ -1824,7 +1827,9 @@ void Tool::soupToLevelSet()
       offsets.push_back(grid);
       dx *= 2.0f;
     }// loop from fine to coarse voxel sizes
+    mTimer.stop();
     //for (auto p : offsets) mGrid.push_back(p);// cache offset grid for debugging
+    //return;
     auto grid = offsets.back();// coarse grid
     t_offset = timer.milliseconds();
     for (int level = nLOD-1; level >= 0; --level) {
