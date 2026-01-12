@@ -1735,11 +1735,11 @@ void Tool::soupToLevelSet()
 #endif
     };// myUpsample
 
-    auto myOffset = [&](const Geometry &mesh, float dx)->GridT::Ptr{
+    auto myOffset = [&](const Geometry &mesh, float dx, float isoValue)->GridT::Ptr{
       timer.start();
       auto xform = math::Transform::createLinearTransform(dx);
       auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);// mesh -> UDF
-      auto tmp = tools::levelSetRebuild(*udf, /*iso-value=*/dx, width);// UDF -> mesh -> SDF
+      auto tmp = tools::levelSetRebuild(*udf, isoValue, width);// UDF -> mesh -> SDF
       t_offset += timer.milliseconds();
       return tmp;
     };// myOffset
@@ -1803,33 +1803,36 @@ void Tool::soupToLevelSet()
     timer.start();
 
     std::vector<GridT::Ptr> offsets;// = {grid};// finest grid
-    /*
+
     std::cerr << std::endl;
     dx = voxel;// final desired voxel size
     mTimer.start("old offset");
     for (int level = 0; level <= nLOD; ++level) {// both inclusive
       std::cerr << "Generating offset at level " << level << " with dx = " << dx << std::endl;
-      auto grid = myOffset(*mesh, dx);
+      auto grid = myOffset(*mesh, dx, dx);
       grid->setName("old_offset_level_" + std::to_string(level));
       offsets.push_back(grid);
       dx *= 2.0f;
     }// loop from fine to coarse voxel sizes
-    offsets.clear();
-    */
+    //offsets.clear();
+    /*
     std::cerr << std::endl;
     mTimer.restart("new offset");
     dx = voxel;// final desired voxel size
+    float prev = 0.0f;
     for (int level = 0; level <= nLOD; ++level) {// both inclusive
       std::cerr << "Generating offset at level " << level << " with dx = " << dx << std::endl;
-      if (level) mesh = this->volumeToGeometry(*offsets.back());
-      auto grid = myOffset(*mesh, dx);
+      if (level) mesh = this->volumeToGeometry(*offsets.back(), 0.0f);
+      auto grid = myOffset(*mesh, dx, dx - prev);
       grid->setName("new_offset_level_" + std::to_string(level));
       offsets.push_back(grid);
+      prev = dx;
       dx *= 2.0f;
     }// loop from fine to coarse voxel sizes
+    for (auto p : offsets) mGrid.push_back(p);// cache offset grid for debugging
+    return;
+    */
     mTimer.stop();
-    //for (auto p : offsets) mGrid.push_back(p);// cache offset grid for debugging
-    //return;
     auto grid = offsets.back();// coarse grid
     t_offset = timer.milliseconds();
     for (int level = nLOD-1; level >= 0; --level) {
