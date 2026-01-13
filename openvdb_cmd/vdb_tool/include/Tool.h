@@ -28,6 +28,7 @@
 #include <openvdb/tools/LevelSetAdvect.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/LevelSetFilter.h>
+#include <openvdb/tools/LevelSetMeasure.h>
 #include <openvdb/tools/LevelSetPlatonic.h>
 #include <openvdb/tools/LevelSetRebuild.h>
 #include <openvdb/tools/LevelSetUtil.h>
@@ -1739,9 +1740,9 @@ void Tool::soupToLevelSet()
       timer.start();
       auto xform = math::Transform::createLinearTransform(dx);
       auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);// mesh -> UDF
-      auto tmp = tools::levelSetRebuild(*udf, isoValue, width);// UDF -> mesh -> SDF
+      auto sdf = tools::levelSetRebuild(*udf, isoValue, width);// UDF -> mesh -> SDF
       t_offset += timer.milliseconds();
-      return tmp;
+      return sdf;
     };// myOffset
 
     auto myLevelSetDeform = [&](GridT &grid, const GridT &gridB)->GridT::Ptr{
@@ -1812,8 +1813,11 @@ void Tool::soupToLevelSet()
       auto grid = myOffset(*mesh, dx, dx);
       grid->setName("old_offset_level_" + std::to_string(level));
       offsets.push_back(grid);
+      //mGrid.push_back(grid);return;
       dx *= 2.0f;
     }// loop from fine to coarse voxel sizes
+    for (auto p : offsets) mGrid.push_back(p);// cache offset grid for debugging
+    //return;
     //offsets.clear();
     /*
     std::cerr << std::endl;
@@ -1835,10 +1839,19 @@ void Tool::soupToLevelSet()
     mTimer.stop();
     auto grid = offsets.back();// coarse grid
     t_offset = timer.milliseconds();
+    float vol[2];
     for (int level = nLOD-1; level >= 0; --level) {
       grid = myUpsample(*grid);
       std::cerr << "Level: " << level << " dx of offset = " << offsets[level]->voxelSize()[0] << " dx of grid = " << grid->voxelSize()[0] << std::endl;
-      for (int iter = 0; iter < nErode; ++iter) grid = myLevelSetDeform(*grid, *offsets[level]);
+      for (int iter = 0; iter < nErode; ++iter) {
+        grid = myLevelSetDeform(*grid, *offsets[level]);
+        vol[1] = tools::levelSetVolume(*grid);
+        if (iter && math::Abs(vol[0]-vol[1]) == 0.0f ) {
+          std::cerr << "iter = " << iter << " old = " << vol[0] << ", new = " << vol[1] << std::endl;
+          break;
+        }
+        vol[0] = vol[1];
+      }
     }// loop from coarse to fine voxel sizes
 #endif
 
