@@ -358,7 +358,7 @@ class TestReadWriteGrids(unittest.TestCase):
             self.assertIsInstance(metadata.nodeCount, tuple)
             self.assertIsInstance(metadata.tileCount, tuple)
             self.assertEqual(metadata.codec, nanovdb.io.Codec.NONE)
-            self.assertEqual(metadata.padding, 0)
+            self.assertEqual(metadata.blindDataCount, 0)
             self.assertEqual(metadata.version, nanovdb.Version())
 
     def test_read_write_grid(self):
@@ -428,7 +428,7 @@ class TestDeviceReadWriteGrids(unittest.TestCase):
             self.assertIsInstance(metadata.nodeCount, tuple)
             self.assertIsInstance(metadata.tileCount, tuple)
             self.assertEqual(metadata.codec, nanovdb.io.Codec.NONE)
-            self.assertEqual(metadata.padding, 0)
+            self.assertEqual(metadata.blindDataCount, 0)
             self.assertEqual(metadata.version, nanovdb.Version())
 
     def test_read_write_grid(self):
