@@ -1753,7 +1753,7 @@ void Tool::soupToLevelSet()
       auto filter = this->createFilter(grid, space, time);
 #if 1
       if (isGridSDF == false) filter->normalize();
-      filter->offset(dx);// erode by dx
+      filter->offset(6*dx);// erode by dx
       auto tmp = tools::csgUnionCopy(grid, gridB);
 #else
       filter->offset(dx);// erode by dx
