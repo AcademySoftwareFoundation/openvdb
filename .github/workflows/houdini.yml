@@ -28,9 +28,6 @@ on:
       - 'fvdb/**'
       - 'pendingchanges/**'
       - '**.md'
-  schedule:
-    # run this workflow every day 7am UTC
-    - cron:  '0 7 * * *'
   workflow_dispatch:
 
 # Allow subsequent pushes to the same PR or REF to cancel any previous jobs.
