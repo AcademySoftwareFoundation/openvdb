@@ -1745,7 +1745,7 @@ void Tool::soupToLevelSet()
       return sdf;
     };// myOffset
 
-    auto myLevelSetDeform = [&](GridT &grid, const GridT &gridB)->GridT::Ptr{
+    auto myShrinkWrap = [&](GridT &grid, const GridT &gridB)->GridT::Ptr{
       timer.start();
       const float dx = grid.voxelSize()[0];
       const int space = 1, time = 1;
@@ -1763,7 +1763,17 @@ void Tool::soupToLevelSet()
       t_deform += timer.milliseconds();
       isGridSDF = false;// the CSG operation messed up the SDF
       return tmp;
-    };// myLevelSetDeform
+    };// myShrinkWrap
+
+    auto myLevelSetErode = [&](GridT &grid, const GridT &gridB){
+      timer.start();
+      const float dx = grid.voxelSize()[0];
+      const int space = 1, time = 1;
+      auto filter = this->createFilter(grid, space, time);
+      filter->setMaskRange(0.0f, gridB.background());
+      filter->offset(nErode*dx, &gridB);// erode by dx
+      t_deform += timer.milliseconds();
+    };// myLevelSetErode
 
     if (mParser.verbose) mTimer.start("Soup -> SDF");
 
@@ -1781,7 +1791,7 @@ void Tool::soupToLevelSet()
       auto base = myOffset(dx);
       const int end = nErode;// - int(i*factor);
       std::cerr << "Level: " << i << ", erosions: " << end << std::endl;
-      for (int j = 0; j<end; ++j) grid = myLevelSetDeform(*grid, *base);
+      for (int j = 0; j<end; ++j) grid = myShrinkWrap(*grid, *base);
     }
 #else// new algorithm
     /*
@@ -1798,53 +1808,54 @@ void Tool::soupToLevelSet()
       grid = myUpsample(*grid);
       GridT::Ptr base = ms.grid(level);
       std::cerr << "Level: " << level << ", dx = " << dx << " base = " << base->voxelSize()[0] << " grid = " << grid->voxelSize()[0] << std::endl;
-      for (int iter = 0; iter < nErode; ++iter) grid = myLevelSetDeform(*grid, *base);
+      for (int iter = 0; iter < nErode; ++iter) grid = myShrinkWrap(*grid, *base);
     }
     */
     timer.start();
 
     std::vector<GridT::Ptr> offsets;// = {grid};// finest grid
-
+    /*
     std::cerr << std::endl;
     dx = voxel;// final desired voxel size
     mTimer.start("old offset");
     for (int level = 0; level <= nLOD; ++level) {// both inclusive
       std::cerr << "Generating offset at level " << level << " with dx = " << dx << std::endl;
       auto grid = myOffset(*mesh, dx, dx);
-      grid->setName("old_offset_level_" + std::to_string(level));
+      //grid->setName("old_offset_level_" + std::to_string(level));
       offsets.push_back(grid);
       //mGrid.push_back(grid);return;
       dx *= 2.0f;
     }// loop from fine to coarse voxel sizes
-    for (auto p : offsets) mGrid.push_back(p);// cache offset grid for debugging
+    */
+    //for (auto p : offsets) mGrid.push_back(p);// cache offset grid for debugging
     //return;
     //offsets.clear();
-    /*
+    
     std::cerr << std::endl;
     mTimer.restart("new offset");
     dx = voxel;// final desired voxel size
-    float prev = 0.0f;
+    //float prev = 0.0f;
     for (int level = 0; level <= nLOD; ++level) {// both inclusive
       std::cerr << "Generating offset at level " << level << " with dx = " << dx << std::endl;
       if (level) mesh = this->volumeToGeometry(*offsets.back(), 0.0f);
-      auto grid = myOffset(*mesh, dx, dx - prev);
+      auto grid = myOffset(*mesh, dx, dx );//- prev);
       grid->setName("new_offset_level_" + std::to_string(level));
       offsets.push_back(grid);
-      prev = dx;
+      //prev = dx;
       dx *= 2.0f;
     }// loop from fine to coarse voxel sizes
-    for (auto p : offsets) mGrid.push_back(p);// cache offset grid for debugging
-    return;
-    */
+    //for (auto p : offsets) mGrid.push_back(p);// cache offset grid for debugging
     mTimer.stop();
+    
     auto grid = offsets.back();// coarse grid
     t_offset = timer.milliseconds();
     float vol[2];
     for (int level = nLOD-1; level >= 0; --level) {
       grid = myUpsample(*grid);
       std::cerr << "Level: " << level << " dx of offset = " << offsets[level]->voxelSize()[0] << " dx of grid = " << grid->voxelSize()[0] << std::endl;
+      //myLevelSetErode(*grid, *offsets[level]);
       for (int iter = 0; iter < nErode; ++iter) {
-        grid = myLevelSetDeform(*grid, *offsets[level]);
+        grid = myShrinkWrap(*grid, *offsets[level]);
         vol[1] = tools::levelSetVolume(*grid);
         if (iter && math::Abs(vol[0]-vol[1]) == 0.0f ) {
           std::cerr << "iter = " << iter << " old = " << vol[0] << ", new = " << vol[1] << std::endl;
