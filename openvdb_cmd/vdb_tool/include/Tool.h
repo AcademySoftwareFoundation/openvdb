@@ -29,6 +29,7 @@
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/LevelSetFilter.h>
 #include <openvdb/tools/LevelSetMeasure.h>
+#include <openvdb/tools/LevelSetMorph.h>
 #include <openvdb/tools/LevelSetPlatonic.h>
 #include <openvdb/tools/LevelSetRebuild.h>
 #include <openvdb/tools/LevelSetUtil.h>
@@ -1775,6 +1776,16 @@ void Tool::soupToLevelSet()
       t_deform += timer.milliseconds();
     };// myLevelSetErode
 
+    auto myLevelSetMorph = [&](GridT &srcGrid, const GridT &targetGrid){
+      timer.start();
+      //tools::LevelSetMorphing
+      tools::LevelSetMorphing<GridT> morph(srcGrid, targetGrid);
+      morph.setSpatialScheme(math::FIRST_BIAS);
+      morph.setTemporalScheme(math::TVD_RK1);
+      morph.advect(0, nErode*srcGrid.voxelSize()[0]);
+      t_deform += timer.milliseconds();
+    };// myLevelSetMorph
+
     if (mParser.verbose) mTimer.start("Soup -> SDF");
 
     // Main algorithm
@@ -1832,7 +1843,7 @@ void Tool::soupToLevelSet()
     //offsets.clear();
     
     std::cerr << std::endl;
-    mTimer.restart("new offset");
+    //mTimer.restart("new offset");
     dx = voxel;// final desired voxel size
     //float prev = 0.0f;
     for (int level = 0; level <= nLOD; ++level) {// both inclusive
