@@ -432,15 +432,23 @@ TestValueAccessor::multithreadedAccessorTest()
 }
 
 /// Static assert class sizes
-template <typename Type, size_t Expect, size_t Actual = sizeof(Type)>
-struct CheckClassSize { static_assert(Expect == Actual); };
+/// Note: Expected sizes differ between 32-bit and 64-bit due to pointer size.
+/// 64-bit: Accessor with leaf cache = 96 bytes, without = 88 bytes
+/// 32-bit: Accessor with leaf cache = 56 bytes, without = 52 bytes
+template <typename Type, size_t Expect64, size_t Expect32, size_t Actual = sizeof(Type)>
+struct CheckClassSize {
+    static_assert(
+        (sizeof(void*) == 8 && Expect64 == Actual) ||
+        (sizeof(void*) == 4 && Expect32 == Actual),
+        "Unexpected accessor class size - check accessor layout");
+};
 
 // Build a type list of all accessor types and make sure they are all the
-// expected size.
+// expected size. First template arg is 64-bit size, second is 32-bit size.
 template <typename GridT> using GridToAccCheckA =
-    CheckClassSize<typename GridT::Accessor, 96ul>;
+    CheckClassSize<typename GridT::Accessor, 96ul, 56ul>;
 template <typename GridT> using GridToAccCheckB =
-    CheckClassSize<typename GridT::Accessor, 88ul>;
+    CheckClassSize<typename GridT::Accessor, 88ul, 52ul>;
 
 void StaticAsssertVASizes()
 {
