@@ -1715,11 +1715,10 @@ void Tool::soupToLevelSet()
       std::cerr << "estimated voxel size = " << voxel << " from dim = " << dim << std::endl;
     }
     auto it = this->getGeom(geo_age);
-    //const Geometry &mesh = **it;
     Geometry::Ptr mesh = *it;
     if (mesh->isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
     util::CpuTimer timer;
-    double t_offset = 0.0, t_deform = 0.0, t_upscale = 0.0, t_multigrid = 0.0;// all in milliseconds
+    double t_offset = 0.0, t_deform = 0.0, t_upscale = 0.0;// all in milliseconds
     bool isGridSDF = true;
 
     auto myUpsample = [&](const GridT &grid)->GridT::Ptr{
@@ -1753,7 +1752,7 @@ void Tool::soupToLevelSet()
       auto filter = this->createFilter(grid, space, time);
 #if 1
       if (isGridSDF == false) filter->normalize();
-      filter->offset(6*dx);// erode by dx
+      filter->offset(2.0f*dx);// erode by dx
       auto tmp = tools::csgUnionCopy(grid, gridB);
 #else
       filter->offset(dx);// erode by dx
@@ -1778,7 +1777,6 @@ void Tool::soupToLevelSet()
 
     auto myLevelSetMorph = [&](GridT &srcGrid, const GridT &targetGrid){
       timer.start();
-      //tools::LevelSetMorphing
       tools::LevelSetMorphing<GridT> morph(srcGrid, targetGrid);
       morph.setSpatialScheme(math::FIRST_BIAS);
       morph.setTemporalScheme(math::TVD_RK1);
@@ -1822,44 +1820,22 @@ void Tool::soupToLevelSet()
       for (int iter = 0; iter < nErode; ++iter) grid = myShrinkWrap(*grid, *base);
     }
     */
-    timer.start();
+    //timer.start();
 
     std::vector<GridT::Ptr> offsets;// = {grid};// finest grid
-    /*
     std::cerr << std::endl;
     dx = voxel;// final desired voxel size
-    mTimer.start("old offset");
+
     for (int level = 0; level <= nLOD; ++level) {// both inclusive
       std::cerr << "Generating offset at level " << level << " with dx = " << dx << std::endl;
-      auto grid = myOffset(*mesh, dx, dx);
-      //grid->setName("old_offset_level_" + std::to_string(level));
+      if (level) mesh = this->volumeToGeometry(*offsets.back(), 0.0f);// uncomment for optimization
+      auto grid = myOffset(*mesh, dx, dx );
+      //grid->setName("offset_level_" + std::to_string(level));
       offsets.push_back(grid);
-      //mGrid.push_back(grid);return;
       dx *= 2.0f;
     }// loop from fine to coarse voxel sizes
-    */
-    //for (auto p : offsets) mGrid.push_back(p);// cache offset grid for debugging
-    //return;
-    //offsets.clear();
-    
-    std::cerr << std::endl;
-    //mTimer.restart("new offset");
-    dx = voxel;// final desired voxel size
-    //float prev = 0.0f;
-    for (int level = 0; level <= nLOD; ++level) {// both inclusive
-      std::cerr << "Generating offset at level " << level << " with dx = " << dx << std::endl;
-      if (level) mesh = this->volumeToGeometry(*offsets.back(), 0.0f);
-      auto grid = myOffset(*mesh, dx, dx );//- prev);
-      grid->setName("new_offset_level_" + std::to_string(level));
-      offsets.push_back(grid);
-      //prev = dx;
-      dx *= 2.0f;
-    }// loop from fine to coarse voxel sizes
-    //for (auto p : offsets) mGrid.push_back(p);// cache offset grid for debugging
-    mTimer.stop();
     
     auto grid = offsets.back();// coarse grid
-    t_offset = timer.milliseconds();
     float vol[2];
     for (int level = nLOD-1; level >= 0; --level) {
       grid = myUpsample(*grid);
@@ -1867,17 +1843,21 @@ void Tool::soupToLevelSet()
       //myLevelSetErode(*grid, *offsets[level]);
       for (int iter = 0; iter < nErode; ++iter) {
         grid = myShrinkWrap(*grid, *offsets[level]);
-        vol[1] = tools::levelSetVolume(*grid);
-        if (iter && math::Abs(vol[0]-vol[1]) == 0.0f ) {
-          std::cerr << "iter = " << iter << " old = " << vol[0] << ", new = " << vol[1] << std::endl;
-          break;
-        }
-        vol[0] = vol[1];
+        //vol[1] = tools::levelSetVolume(*grid);
+        //if (iter && math::Abs(vol[0]-vol[1]) == 0.0f ) {
+        //  std::cerr << "iter = " << iter << " old = " << vol[0] << ", new = " << vol[1] << std::endl;
+        //  break;
+        //}
+        //vol[0] = vol[1];
       }
     }// loop from coarse to fine voxel sizes
 #endif
 
-    //grid = tools::levelSetRebuild(*grid, /*iso-value=*/0.0f, width);// SDF -> mesh -> SDF
+    if (grid_name.empty()) grid_name = "soup2ls_" + mesh->getName();
+    grid->setName(grid_name);
+    mGrid.push_back(grid);
+    if (!keep) mGeom.erase(std::next(it).base());
+    if (mParser.verbose) mTimer.stop();
     t_offset  /= 1000.0;
     t_deform  /= 1000.0;
     t_upscale /= 1000.0;
@@ -1885,12 +1865,6 @@ void Tool::soupToLevelSet()
               << "s\noffset: \t" << t_offset
               << "s\ndeform: \t" << t_deform
               << "s\ntotal:  \t" << (t_offset + t_deform + t_upscale) << "s\n";
-
-    if (grid_name.empty()) grid_name = "soup2ls_" + mesh->getName();
-    grid->setName(grid_name);
-    mGrid.push_back(grid);
-    if (!keep) mGeom.erase(std::next(it).base());
-    if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
     throw std::invalid_argument(name+": "+e.what());
   }
