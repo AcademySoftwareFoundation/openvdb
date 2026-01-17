@@ -1725,6 +1725,7 @@ void Tool::soupToLevelSet()
       const auto maxLength =  bbox.extents()[bbox.maxExtent()];// max length of bbox
       nLOD = int(std::log2(maxLength/(2.0*voxel)));
       std::cerr <<  "Max size = " << maxLength << ", nLOD = " << nLOD << std::endl;
+      if (nLOD <= 1) throw std::invalid_argument(name+": nLOD="+std::to_string(nLOD)+" is too small!");
     }
 
     if (mParser.verbose) mTimer.start("Soup -> SDF");
