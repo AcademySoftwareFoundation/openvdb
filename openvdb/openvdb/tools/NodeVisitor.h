@@ -30,6 +30,9 @@ namespace tools {
 /// @param op        user-supplied functor, see examples for interface details.
 /// @param idx       optional offset to start sequential node indexing from a
 ///                  non-zero index.
+/// @param topDown   if true, visit parent nodes before their children
+///                  (pre-order traversal). If false, visit children before
+///                  their parent nodes (post-order traversal). Defaults to true.
 ///
 /// @warning This method is single-threaded. Use the NodeManager or
 ///  DynamicNodeManager for much greater threaded performance.
@@ -173,7 +176,7 @@ namespace tools {
 ///
 /// @endcode
 template <typename TreeT, typename OpT>
-size_t visitNodesDepthFirst(TreeT& tree, OpT& op, size_t idx = 0);
+size_t visitNodesDepthFirst(TreeT& tree, OpT& op, size_t idx = 0, bool topDown = true);
 
 
 /// @brief Visit all nodes that are downstream of a specific node in
@@ -199,14 +202,15 @@ struct DepthFirstNodeVisitor
     using ChildNodeType = typename CopyConstness<NodeT, NonConstChildType>::Type;
 
     template <typename OpT>
-    static size_t visit(NodeT& node, OpT& op, size_t idx = 0)
+    static size_t visit(NodeT& node, OpT& op, size_t idx = 0, bool topDown = true)
     {
         size_t offset = 0;
-        op(node, idx + offset++);
+        if (topDown)    op(node, idx + offset++);
         for (auto iter = node.beginChildOn(); iter; ++iter) {
             offset += DepthFirstNodeVisitor<ChildNodeType>::visit(
-                *iter, op, idx + offset);
+                *iter, op, idx + offset, topDown);
         }
+        if (!topDown)    op(node, idx + offset++);
         return offset;
     }
 };
@@ -217,7 +221,7 @@ template <typename NodeT>
 struct DepthFirstNodeVisitor<NodeT, 0>
 {
     template <typename OpT>
-    static size_t visit(NodeT& node, OpT& op, size_t idx = 0)
+    static size_t visit(NodeT& node, OpT& op, size_t idx = 0, bool /*topDown*/ = true)
     {
         op(node, idx);
         return size_t(1);
@@ -226,12 +230,12 @@ struct DepthFirstNodeVisitor<NodeT, 0>
 
 
 template <typename TreeT, typename OpT>
-size_t visitNodesDepthFirst(TreeT& tree, OpT& op, size_t idx)
+size_t visitNodesDepthFirst(TreeT& tree, OpT& op, size_t idx, bool topDown)
 {
     using NonConstRootNodeType = typename TreeT::RootNodeType;
     using RootNodeType = typename CopyConstness<TreeT, NonConstRootNodeType>::Type;
 
-    return DepthFirstNodeVisitor<RootNodeType>::visit(tree.root(), op, idx);
+    return DepthFirstNodeVisitor<RootNodeType>::visit(tree.root(), op, idx, topDown);
 }
 
 

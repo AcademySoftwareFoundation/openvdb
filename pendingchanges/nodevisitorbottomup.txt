@@ -1,0 +1,3 @@
+OpenVDB:
+  Improvements:
+  - Extend tools::visitNodesDepthFirst() to be able to perform bottom-up traversal in addition to top-down traversal.
