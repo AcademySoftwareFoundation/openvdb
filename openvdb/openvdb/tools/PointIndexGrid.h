@@ -1732,6 +1732,11 @@ PointIndexLeafNode<T, Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
     // Reserved for future use
     Index64 auxDataBytes = Index64(0);
     is.read(reinterpret_cast<char*>(&auxDataBytes), sizeof(Index64));
+    if (auxDataBytes > 0) {
+        // For now, read and discard any auxiliary data.
+        std::unique_ptr<char[]> auxData{new char[auxDataBytes]};
+        is.read(auxData.get(), auxDataBytes);
+    }
 }
 
 
