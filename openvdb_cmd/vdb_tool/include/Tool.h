@@ -434,7 +434,7 @@ void Tool::init()
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
-     {"lod", "2", "2", "number of LOD level. Defaults to 2."},
+     {"lod", "0", "2", "number of LOD level. Defaults to 0, i.e. will be derived form the mesh size."},
      {"erode", "2", "2", "number of iterations of constrained erosion. Defaults to 2."},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
      {"name", "", "soup2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
@@ -1707,19 +1707,25 @@ void Tool::soupToLevelSet()
     const float width = mParser.get<float>("width");
     const int geo_age = mParser.get<int>("geo");
     const int nErode = mParser.get<int>("erode");
-    const int nLOD = mParser.get<int>("lod");
+    int nLOD = mParser.get<int>("lod");
     const bool keep = mParser.get<bool>("keep");
+
+    auto it = this->getGeom(geo_age);
+    Geometry::Ptr mesh = *it;
+    if (mesh->isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
+    bool isGridSDF = true;
+
     std::string grid_name = mParser.get<std::string>("name");
     if (voxel == 0.0f) {
       voxel = this->estimateVoxelSize(dim, width, geo_age);
       std::cerr << "estimated voxel size = " << voxel << " from dim = " << dim << std::endl;
     }
-    auto it = this->getGeom(geo_age);
-    Geometry::Ptr mesh = *it;
-    if (mesh->isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
-    //util::CpuTimer timer;
-    //double t_offset = 0.0, t_deform = 0.0, t_upscale = 0.0;// all in milliseconds
-    bool isGridSDF = true;
+    if (nLOD == 0) {
+      const auto &bbox = mesh->bbox();// bbox size with max extend
+      const auto maxLength =  bbox.extents()[bbox.maxExtent()];// max length of bbox
+      nLOD = int(std::log2(maxLength/(2.0*voxel)));
+      std::cerr <<  "Max size = " << maxLength << ", nLOD = " << nLOD << std::endl;
+    }
 
     if (mParser.verbose) mTimer.start("Soup -> SDF");
 
