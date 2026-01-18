@@ -443,7 +443,7 @@ void Tool::init()
 
   mParser.addAction(
       "ls2mesh", "l2m", "Convert a level set to an adaptive polygon mesh",
-    {{"adapt", "0.0", "0.9", "normalized metric for the adaptive meshing. 0 is uniform and 1 is fully adaptive mesh. Defaults to 0."},
+    {{"adapt", "0.0", "0.005", "normalized metric for the adaptive meshing. 0 is uniform and 1 is extreme adaptivity. Defaults to 0."},
      {"iso", "0.0", "0.1", "iso-value used to define the implicit surface. Defaults to zero."},
      {"vdb", "0", "0", "age (i.e. stack index) of the level set VDB grid to be meshed. Defaults to 0, i.e. most recently inserted VDB."},
      {"mask","-1", "1", "age (i.e. stack index) of the level set VDB grid used as a surface mask during meshing. Defaults to -1, i.e. it's disabled."},
