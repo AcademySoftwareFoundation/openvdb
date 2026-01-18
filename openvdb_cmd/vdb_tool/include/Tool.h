@@ -436,6 +436,7 @@ void Tool::init()
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"lod", "0", "2", "number of LOD level. Defaults to 0, i.e. will be derived form the mesh size."},
      {"erode", "8", "2", "number of iterations of constrained erosion. Defaults to 8."},
+     {"thres", "0", "0.01", "engineering threshold. Defaults to 0."},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
      {"name", "", "soup2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
      [&](){mParser.setDefaults();}, [&](){this->soupToLevelSet();});
@@ -1708,6 +1709,7 @@ void Tool::soupToLevelSet()
     const int geo_age = mParser.get<int>("geo");
     const int nErode = mParser.get<int>("erode");
     int nLOD = mParser.get<int>("lod");
+    float thres = mParser.get<float>("thres");
     const bool keep = mParser.get<bool>("keep");
 
     auto it = this->getGeom(geo_age);
@@ -1727,8 +1729,16 @@ void Tool::soupToLevelSet()
       std::cerr <<  "Max size of bbox = " << maxLength << ", LOD levels = " << nLOD << std::endl;
       if (nLOD <= 1) throw std::invalid_argument(name+": nLOD="+std::to_string(nLOD)+" is too small!");
     }
+    if (thres == 0.0f) std::cerr << "Disabled engineering threshold\n";
+ 
+    auto myErode = [&](float dx)->int{
+      if (dx >= 2*thres) return nErode;// if thres == 0 this is aways true 
+      if (dx <=   thres) return 1;
+      return 1 + int((nErode-1)*(dx-thres)/thres);
+    };
 
     if (mParser.verbose) mTimer.start("Soup -> SDF");
+    std::cerr << std::endl;
 
     auto myUpsample = [&](const GridT &grid)->GridT::Ptr{
       const float dx = grid.voxelSize()[0];
@@ -1769,59 +1779,45 @@ void Tool::soupToLevelSet()
     };// myLevelSetErode
 
     auto myLevelSetMorph = [&](GridT &srcGrid, const GridT &targetGrid){
-      //timer.start();
       tools::LevelSetMorphing<GridT> morph(srcGrid, targetGrid);
       morph.setSpatialScheme(math::FIRST_BIAS);
       morph.setTemporalScheme(math::TVD_RK1);
       morph.advect(0, nErode*srcGrid.voxelSize()[0]);
-      //t_deform += timer.milliseconds();
     };// myLevelSetMorph
 
     // Main algorithm
     float dx = voxel * pow(2, nLOD);
     const float factor = float(nErode-1)/(nLOD-1);
 
-#if 0// old method
-
-    auto grid = myOffset(dx);
-    for (int i=0; i<nLOD; ++i) {
-    while(dx > voxel) {
-      dx *= 0.5f;// refinement
-      grid = myUpsample(*grid);
-      auto base = myOffset(dx);
-      const int end = nErode;// - int(i*factor);
-      std::cerr << "Level: " << i << ", erosions: " << end << std::endl;
-      for (int j = 0; j<end; ++j) grid = myShrinkWrap(*grid, *base);
-    }
-#else// new algorithm
     std::vector<GridT::Ptr> offsets(nLOD+1);// = {grid};// finest grid
     dx = voxel;// final desired voxel size
     for (int level = 0; level <= nLOD; ++level) {// both inclusive
-      //std::cerr << "Generating offset at level " << level << " with dx = " << dx << std::endl;
+      std::cerr << "Generating offset at level " << level << " with dx = " << dx << std::endl;
       if (level) mesh = this->volumeToGeometry(*offsets[level-1], 0.0f);// uncomment for optimization
-      auto grid = myOffset(*mesh, dx, dx );
+      auto grid = myOffset(*mesh, dx, dx);
       //grid->setName("offset_level_" + std::to_string(level));
       offsets[level] = grid;
       dx *= 2.0f;
     }// loop from fine to coarse voxel sizes
     
     auto grid = offsets[nLOD];// coarse grid
-    //float vol[2];
-    std::cerr << std::endl;
+    float vol[2];
     for (int level = nLOD-1; level >= 0; --level) {
       grid = myUpsample(*grid);
-      std::cerr << "Level: " << level << ", dx of offset = " << offsets[level]->voxelSize()[0] << ", dx of grid = " << grid->voxelSize()[0] << std::endl;
-      for (int iter = 0; iter < nErode;) {
+      dx = grid->voxelSize()[0];
+      OPENVDB_ASSERT(dx == offsets[level]->voxelSize()[0]);
+      int iter = 0, end = myErode(dx);
+      std::cerr << "Level: " << level << ", dx = " << dx << ", D(dx) = " << end << std::endl;
+      while (iter < end) {
         grid = myShrinkWrap(*grid, *offsets[level], iter);
-        //vol[1] = tools::levelSetVolume(*grid);
-        //if (iter && math::Abs(vol[0]-vol[1]) == 0.0f ) {
-        //  std::cerr << "iter = " << iter << " old = " << vol[0] << ", new = " << vol[1] << std::endl;
-        //  break;
-        //}
-        //vol[0] = vol[1];
+        vol[1] = tools::levelSetVolume(*grid);
+        if (iter && math::Abs(vol[0]-vol[1]) == 0.0f ) {
+          std::cerr << "\tTermination after " << iter << " steps, vol = " << vol[0] << std::endl;
+          break;
+        }
+        vol[0] = vol[1];
       }
     }// loop from coarse to fine voxel sizes
-#endif
 
     if (mParser.verbose) mTimer.stop();
 
