@@ -938,29 +938,21 @@ void Geometry::readPTS(const std::string &fileName)
 // Reading ASCII or binary STL file
 void Geometry::readSTL(const std::string &fileName)
 {
-    //std::cerr << "entering readSTL\n";
     std::ifstream infile(fileName, std::ios::in | std::ios::binary);
     if (!infile.is_open()) throw std::runtime_error("Geometry::readSTL: Error opening STL file \""+fileName+"\"");
     PosT xyz;
-    char buffer[80] = "";// small fixed stack allocated buffer
-    if (!infile.read(buffer, 5)) throw std::invalid_argument("Geometry::readSTL: Failed to head header");
-
-    auto isAscii = [&]()->bool{
-        if (strcmp(buffer, "solid") != 0) return false;// binary
-        std::string line;
-        while (std::getline(infile, line)) {
-            std::string tmp = trim(line, " ");// remove leading (and trailing) white spaces
-            if (tmp.compare(0, 5, "facet")==0) return true;// ascii
-        }
-        return false;
-    };
-    const bool test = isAscii();
+    std::array<char, 256> buffer{};
+    if (!infile.read(buffer.data(), buffer.size())) throw std::invalid_argument("Geometry::readSTL: Failed to head header");
     infile.clear();
-    infile.seekg(5);
-    if (test) {//ASCII file
-        //std::cerr << "ASCII: buffer: " << buffer << std::endl;
+    infile.seekg(0, std::ios_base::beg);// rewind
+    auto isAscii = [&]()->bool{
+        std::string str(buffer.data(), infile.gcount());
+        toLowerCase(str);
+        return contains(str, "solid") && contains(str, '\n') && contains(str, "facet") && contains(str, "normal");
+    };
+    if (isAscii()) {//ASCII file
         std::string line;
-        std::getline(infile, line);// read rest of the first line, which completes the header
+        std::getline(infile, line);// read the first line, which completes the header
         std::istringstream iss;
         while(std::getline(infile, line)) {
             std::string tmp = trim(line, " ");// remove leading (and trailing) white spaces
@@ -994,9 +986,8 @@ void Geometry::readSTL(const std::string &fileName)
             }
         }// loop over lines in file
     } else {// binary file
-        //std::cerr << "binary STL\n";
         if (!isLittleEndian()) throw std::invalid_argument("Geometry::readSTL binary: STL file only supports little endian, but this system is big endian");
-        if (!infile.read(buffer, 80 - 5)) throw std::invalid_argument("Geometry::readSTL binary: Failed to head header");
+        if (!infile.read(buffer.data(), 80)) throw std::invalid_argument("Geometry::readSTL binary: Failed to head header");
         uint32_t numTri;
         if (!infile.read((char*)&numTri, sizeof(numTri))) throw std::invalid_argument("Geometry::readSTL binary: Failed to read triangle count");
         infile.seekg (0, infile.end);
@@ -1008,8 +999,8 @@ void Geometry::readSTL(const std::string &fileName)
         Vec3f *pV = mVtx.data() + vtxBegin;
         Vec3I *pT = mTri.data() + triBegin;
         for (uint32_t i = 0; i < numTri; ++i) {// loop over triangles
-            if (!infile.read(buffer, 50)) throw std::invalid_argument("Geometry::readSTL binary: error reading triangle #"+std::to_string(i));
-            const float *p = 3 + reinterpret_cast<const float*>(buffer);// ignore 3 vector components of normal
+            if (!infile.read(buffer.data(), 50)) throw std::invalid_argument("Geometry::readSTL binary: error reading triangle #"+std::to_string(i));
+            const float *p = 3 + reinterpret_cast<const float*>(buffer.data());// ignore 3 vector components of normal
             for (int j=0; j<3; ++j) {// loop over vertices of triangle
                 for (int k=0; k<3; ++k) xyz[k] = *p++;//loop over coordinates of vertex
                 *pV++ = xyz;
