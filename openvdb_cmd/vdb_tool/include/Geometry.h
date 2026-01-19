@@ -938,12 +938,27 @@ void Geometry::readPTS(const std::string &fileName)
 // Reading ASCII or binary STL file
 void Geometry::readSTL(const std::string &fileName)
 {
+    //std::cerr << "entering readSTL\n";
     std::ifstream infile(fileName, std::ios::in | std::ios::binary);
     if (!infile.is_open()) throw std::runtime_error("Geometry::readSTL: Error opening STL file \""+fileName+"\"");
     PosT xyz;
     char buffer[80] = "";// small fixed stack allocated buffer
     if (!infile.read(buffer, 5)) throw std::invalid_argument("Geometry::readSTL: Failed to head header");
-    if (strcmp(buffer, "solid") == 0) {//ASCII file
+
+    auto isAscii = [&]()->bool{
+        if (strcmp(buffer, "solid") != 0) return false;// binary
+        std::string line;
+        while (std::getline(infile, line)) {
+            std::string tmp = trim(line, " ");// remove leading (and trailing) white spaces
+            if (tmp.compare(0, 5, "facet")==0) return true;// ascii
+        }
+        return false;
+    };
+    const bool test = isAscii();
+    infile.clear();
+    infile.seekg(5);
+    if (test) {//ASCII file
+        //std::cerr << "ASCII: buffer: " << buffer << std::endl;
         std::string line;
         std::getline(infile, line);// read rest of the first line, which completes the header
         std::istringstream iss;
@@ -979,6 +994,7 @@ void Geometry::readSTL(const std::string &fileName)
             }
         }// loop over lines in file
     } else {// binary file
+        //std::cerr << "binary STL\n";
         if (!isLittleEndian()) throw std::invalid_argument("Geometry::readSTL binary: STL file only supports little endian, but this system is big endian");
         if (!infile.read(buffer, 80 - 5)) throw std::invalid_argument("Geometry::readSTL binary: Failed to head header");
         uint32_t numTri;
