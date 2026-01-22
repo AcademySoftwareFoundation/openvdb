@@ -431,7 +431,7 @@ TEST_F(TestFile, testWriteFloatAsHalf)
     grids.push_back(grid1);
     grids.push_back(grid2);
 
-    const char* filename = "something.vdb2";
+    const char* filename = "testWriteFloatAsHalf.vdb2";
     {
         // Write both grids to a file.
         File vdbFile(filename);
@@ -466,11 +466,11 @@ TEST_F(TestFile, testWriteInstancedGrids)
     // Register data types.
     openvdb::initialize();
 
-    // Remove something.vdb2 when done. We must declare this here before the
+    // Remove test file when done. We must declare this here before the
     // other grid smart_ptr's because we re-use them in the test several times.
-    // We will not be able to remove something.vdb2 on Windows if the pointers
+    // We will not be able to remove the file on Windows if the pointers
     // are still referencing data opened by the "file" variable.
-    const char* filename = "something.vdb2";
+    const char* filename = "testWriteInstancedGrids.vdb2";
     SharedPtr<const char> scopedFile(filename, ::remove);
 
     // Create grids.
