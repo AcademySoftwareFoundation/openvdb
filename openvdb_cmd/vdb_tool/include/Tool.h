@@ -13,7 +13,7 @@
 ///        generate adaptive polygon meshes from level sets, render images and write particles,
 ///        meshes or VDBs them to disk.
 ///
-/// @todo use LevelSetMeasure, write binary/ascii
+/// @todo expose LevelSetMeasure, write binary/ascii
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -193,6 +193,9 @@ private:
 
     /// @brief Converts a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh
     void soupToLevelSet();
+
+    /// @brief Converts all quads into triangles
+    void quadsToTriangles();
 
     /// @brief construct a LoD sequences of VDB trees with powers of two refinements
     void multires();
@@ -419,6 +422,11 @@ void Tool::init()
      {"name", "sphere", "sphere", "name assigned to the level set sphere"}},
      [&](){mParser.setDefaults();}, [&](){this->levelSetSphere();});
 
+  mParser.addAction(
+      "quad2tri", "q2t", "Convert all quads in mesh to triangles, assuming they are both planar and convex",
+    {{"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."}},
+     [&](){mParser.setDefaults();}, [&](){this->quadsToTriangles();});
+   
   mParser.addAction(
       "mesh2ls", "m2ls", "Convert a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
@@ -1655,6 +1663,27 @@ float Tool::estimateVoxelSize(int maxDim,  float halfWidth, int geo_age)
   const auto d = bbox.extents()[bbox.maxExtent()];// longest extent of bbox along any coordinate axis
   return static_cast<float>(static_cast<double>(d)/static_cast<double>(maxDim - static_cast<int>(2.f * halfWidth)));
 }// Tool::estimateVoxelSize
+
+// ==============================================================================================================
+
+void Tool::quadsToTriangles()
+{
+  const std::string &name = mParser.getAction().name;
+  OPENVDB_ASSERT(name == "quad2tri");
+  try {
+    mParser.printAction();
+    const int geo_age = mParser.get<int>("geo");
+    auto it = this->getGeom(geo_age);
+    Geometry &mesh = **it;
+
+    if (mesh.isPoints()) this->warning("Warning: -quad2tri was called on points, not a mesh!");
+    if (mParser.verbose) mTimer.start("Quads -> Triangles");
+    mesh.triangulateQuads();
+    if (mParser.verbose) mTimer.stop();
+  } catch (const std::exception& e) {
+    throw std::invalid_argument(name+": "+e.what());
+  }
+}// Tool::quadsToTriangles
 
 // ==============================================================================================================
 

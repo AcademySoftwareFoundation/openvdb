@@ -959,7 +959,10 @@ void Geometry::readSTL(const std::string &fileName)
     if (!infile.is_open()) throw std::runtime_error("Geometry::readSTL: Error opening STL file \""+fileName+"\"");
     PosT xyz;
     std::array<char, 256> buffer{};
-    if (!infile.read(buffer.data(), buffer.size())) throw std::invalid_argument("Geometry::readSTL: Failed to read header in \""+fileName+"\"");
+    if (!infile.read(buffer.data(), buffer.size())) {
+        std::cerr << "Geometry::readSTL: Failed to read 256B in \""+fileName+"\" so this must be an empty STL file\n";
+        return;
+    }
     infile.clear();
     infile.seekg(0, std::ios_base::beg);// rewind
     auto isAscii = [&]()->bool{
