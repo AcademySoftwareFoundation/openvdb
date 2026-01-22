@@ -1171,7 +1171,8 @@ TEST_F(TestFile, testGetMetadata)
     Int32Metadata::registerType();
 
     // Write the vdb out to a file.
-    io::File vdbfile("something.vdb2");
+    const char* filename = "testGetMetadata.vdb2";
+    io::File vdbfile(filename);
     vdbfile.write(grids, meta);
 
     // Check if reading without opening the file
@@ -1189,7 +1190,7 @@ TEST_F(TestFile, testGetMetadata)
     // Clear registry.
     Metadata::clearRegistry();
 
-    remove("something.vdb2");
+    remove(filename);
 }
 
 
@@ -1237,10 +1238,11 @@ TEST_F(TestFile, testReadAll)
     openvdb::initialize();
 
     // Write the vdb out to a file.
-    io::File vdbfile("something.vdb2");
+    const char* filename = "testReadAll.vdb2";
+    io::File vdbfile(filename);
     vdbfile.write(grids, meta);
 
-    io::File vdbfile2("something.vdb2");
+    io::File vdbfile2(filename);
     EXPECT_THROW(vdbfile2.getGrids(), openvdb::IoError);
 
     vdbfile2.open();
@@ -1282,7 +1284,7 @@ TEST_F(TestFile, testReadAll)
 
     vdbfile2.close();
 
-    remove("something.vdb2");
+    remove(filename);
 }
 
 
@@ -1300,10 +1302,11 @@ TEST_F(TestFile, testWriteOpenFile)
     Int32Metadata::registerType();
 
     // Write the metadata out to a file.
-    io::File vdbfile("something.vdb2");
+    const char* filename = "testWriteOpenFile.vdb2";
+    io::File vdbfile(filename);
     vdbfile.write(GridPtrVec(), *meta);
 
-    io::File vdbfile2("something.vdb2");
+    io::File vdbfile2(filename);
     EXPECT_THROW(vdbfile2.getGrids(), openvdb::IoError);
 
     vdbfile2.open();
@@ -1332,7 +1335,7 @@ TEST_F(TestFile, testWriteOpenFile)
     // Clear registries.
     Metadata::clearRegistry();
 
-    remove("something.vdb2");
+    remove(filename);
 }
 
 
