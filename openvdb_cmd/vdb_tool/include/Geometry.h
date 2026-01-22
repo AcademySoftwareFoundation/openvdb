@@ -142,6 +142,11 @@ public:
 
     inline void transform(const math::Transform &xform);
 
+    /// @brief Triangulates each quad into two triangles, using the shortest diagonal
+    /// @return number of new triangles appended
+    /// @note The quads are removed while the vertex list is unchanged
+    size_t triangulateQuads();
+
     bool isEmpty() const { return mVtx.empty() && mTri.empty() && mQuad.empty(); }
     bool isPoints() const { return !mVtx.empty() && mTri.empty() && mQuad.empty(); }
     bool isMesh() const { return !mVtx.empty() && (!mTri.empty() || !mQuad.empty()); }
@@ -153,6 +158,8 @@ public:
 
     size_t write(std::ostream &os) const;
     size_t read(std::istream &is);
+
+    static std::vector<Vec3I> triangulate(const std::vector<int> &nGon);
 
 private:
 
@@ -368,7 +375,7 @@ void Geometry::writeSTL(const std::string &fileName) const
 void Geometry::writeSTL(std::ostream &os) const
 {
     if (!isLittleEndian()) throw std::invalid_argument("STL file only supports little endian, but this system is big endian");
-    if (!mQuad.empty()) throw std::invalid_argument("STL file only supports triangles");
+    if (!mQuad.empty()) throw std::invalid_argument("Binary STL files only supports triangles, but the mesh contains quads");
     uint8_t buffer[80] = {0};// fixed-sized buffer initiated with zeros!
     os.write((const char*)buffer, 80);// write header as zeros
     const uint32_t nTri = static_cast<uint32_t>(mTri.size());
@@ -477,7 +484,9 @@ void Geometry::readOBJ(std::istream &is)
                 mQuad.emplace_back(v[0] - 1, v[1] - 1, v[2] - 1, v[3] - 1);// obj is 1-based
                 break;
             default:
-                throw std::invalid_argument("Geometry::readOBJ: " + std::to_string(v.size()) + "-gons are not supported");
+                std::cerr << "Geometry::readOBJ: triangulating " << v.size() << "-gon\n";
+                for (size_t i = 0; i < v.size()-2; ++i) mTri.emplace_back(v[0] - 1, v[i+1] - 1, v[i+2] - 1);// obj is 1-based
+                //throw std::invalid_argument("Geometry::readOBJ: " + std::to_string(v.size()) + "-gons are not supported");
                 break;
             }
         }
@@ -801,7 +810,8 @@ void Geometry::readPLY(std::istream &is)
     }
 
     // read polygon vertex lists
-    uint32_t vtx[4];
+    static const int nGon = 10;// maximum allowed nGon
+    uint32_t vtx[nGon];
     if (format) {// binary
         char *buffer = static_cast<char*>(std::malloc(faceSkip[0].bytes + 1));// uninitialized
         if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate buffer");
@@ -820,7 +830,11 @@ void Geometry::readPLY(std::istream &is)
                 mQuad.emplace_back(vtx);
                 break;
             default:
-                throw std::invalid_argument("Geometry::readPLY: binary " + std::to_string(n) + "-gons are not supported");
+                if (n > nGon) throw std::invalid_argument("Geometry::readPLY: binary " + std::to_string(n) + "-gons are not supported");
+                std::cerr << "Geometry::readPLY: binary triangulating " << n << "-gon\n";
+                is.read((char*)vtx, n*sizeof(uint32_t));
+                if (reverseBytes) swapBytes(vtx, n);
+                for (int i = 0; i < n-2; ++i) mTri.emplace_back(vtx[0], vtx[i+1], vtx[i+2]);
                 break;
             }
             is.ignore(faceSkip[1].bytes);
@@ -831,12 +845,15 @@ void Geometry::readPLY(std::istream &is)
             tokens = tokenize_line();
             const std::string polySize = tokens[faceSkip[0].count];
             const int n = std::stoi(polySize);
-            if (n!=3 && n!=4) throw std::invalid_argument("Geometry::readPLY: ascii " + polySize + "-gons are not supported");
+            if ( n < 3 || n > nGon) throw std::invalid_argument("Geometry::readPLY: ascii " + polySize + "-gons are not supported");
             for (int i = 0, j=1+faceSkip[0].count; i<n; ++i, ++j) vtx[i] = static_cast<uint32_t>(std::stoll(tokens[j]));
             if (n==3) {
                 mTri.emplace_back(vtx);
-            } else {
+            } else if (n==4) {
                 mQuad.emplace_back(vtx);
+            } else {
+                std::cerr << "Geometry::readPLY: ascii triangulating " << n << "-gon\n";
+                for (int i = 0; i < n - 2; ++i) mTri.emplace_back(vtx[0], vtx[i+1], vtx[i+2]);
             }
         }// loop over polygons
     }
@@ -942,7 +959,7 @@ void Geometry::readSTL(const std::string &fileName)
     if (!infile.is_open()) throw std::runtime_error("Geometry::readSTL: Error opening STL file \""+fileName+"\"");
     PosT xyz;
     std::array<char, 256> buffer{};
-    if (!infile.read(buffer.data(), buffer.size())) throw std::invalid_argument("Geometry::readSTL: Failed to head header");
+    if (!infile.read(buffer.data(), buffer.size())) throw std::invalid_argument("Geometry::readSTL: Failed to read header in \""+fileName+"\"");
     infile.clear();
     infile.seekg(0, std::ios_base::beg);// rewind
     auto isAscii = [&]()->bool{
@@ -965,11 +982,12 @@ void Geometry::readSTL(const std::string &fileName)
                     OPENVDB_ASSERT(tmp.compare(0, 6, "vertex")==0);
                     iss.clear();
                     iss.str(tmp.substr(6));
-                    if (iss >> xyz[0] >> xyz[1] >> xyz[2]) {
-                        mVtx.push_back(xyz);
+                    double p[3];// more robust to read ascii coordinates as double than float
+                    if (iss >> p[0] >> p[1] >> p[2]) {
+                        mVtx.emplace_back(float(p[0]), float(p[1]), float(p[2]));
                         ++nGone;
                     } else {
-                        throw std::invalid_argument("Geometry::readSTL ASCII: error parsing line: \""+line+"\"");
+                        throw std::invalid_argument("Geometry::readSTL ASCII: error parsing line: \""+line+"\" in \""+fileName+"\"");
                     }
                 }// endloop
                 const int vtx = static_cast<int>(mVtx.size()) - 1;
@@ -981,17 +999,18 @@ void Geometry::readSTL(const std::string &fileName)
                     mQuad.emplace_back(vtx - 3, vtx - 2, vtx - 1, vtx);
                     break;
                 default:
+                    // could be fixed as in readOBJ!
                     throw std::invalid_argument("Geometry::readSTL ASCII: " + std::to_string(nGone)+"-gons are not supported");
                 }
             }
         }// loop over lines in file
     } else {// binary file
         if (!isLittleEndian()) throw std::invalid_argument("Geometry::readSTL binary: STL file only supports little endian, but this system is big endian");
-        if (!infile.read(buffer.data(), 80)) throw std::invalid_argument("Geometry::readSTL binary: Failed to head header");
+        if (!infile.read(buffer.data(), 80)) throw std::invalid_argument("Geometry::readSTL binary: Failed to read header in \""+fileName+"\"");
         uint32_t numTri;
-        if (!infile.read((char*)&numTri, sizeof(numTri))) throw std::invalid_argument("Geometry::readSTL binary: Failed to read triangle count");
+        if (!infile.read((char*)&numTri, sizeof(numTri))) throw std::invalid_argument("Geometry::readSTL binary: Failed to read triangle count in \""+fileName+"\"");
         infile.seekg (0, infile.end);
-        if (infile.tellg() != 80 + 4 + 50*numTri) throw std::invalid_argument("Geometry::readSTL binary: Unexpected file size");
+        if (infile.tellg() != 80 + 4 + 50*numTri) throw std::invalid_argument("Geometry::readSTL binary: Unexpected file size in \""+fileName+"\"");
         infile.seekg(80 + 4, infile.beg);
         uint32_t vtxBegin = static_cast<uint32_t>(mVtx.size()), triBegin = static_cast<uint32_t>(mTri.size());
         mVtx.resize(vtxBegin + 3*numTri);
@@ -999,7 +1018,7 @@ void Geometry::readSTL(const std::string &fileName)
         Vec3f *pV = mVtx.data() + vtxBegin;
         Vec3I *pT = mTri.data() + triBegin;
         for (uint32_t i = 0; i < numTri; ++i) {// loop over triangles
-            if (!infile.read(buffer.data(), 50)) throw std::invalid_argument("Geometry::readSTL binary: error reading triangle #"+std::to_string(i));
+            if (!infile.read(buffer.data(), 50)) throw std::invalid_argument("Geometry::readSTL binary: error reading triangle #"+std::to_string(i)+" in \""+fileName+"\"");
             const float *p = 3 + reinterpret_cast<const float*>(buffer.data());// ignore 3 vector components of normal
             for (int j=0; j<3; ++j) {// loop over vertices of triangle
                 for (int k=0; k<3; ++k) xyz[k] = *p++;//loop over coordinates of vertex
@@ -1305,6 +1324,41 @@ void Geometry::transform(const math::Transform &xform)
     });
     mBBox = BBoxT();//invalidate BBox
 }// Geometry::transform
+
+size_t Geometry::triangulateQuads()
+{
+    const size_t quadCount = mQuad.size();
+    if (quadCount == 0) return 0;
+    const size_t triCount = mTri.size();
+    mTri.resize(triCount + 2*quadCount);
+    using RangeT = tbb::blocked_range<size_t>;
+    tbb::parallel_for(RangeT(0, quadCount), [&](RangeT r){
+        for (size_t i=r.begin(); i<r.end(); ++i){
+            const auto &quad = mQuad[i];
+            const float d02 = (mVtx[quad[0]]-mVtx[quad[2]]).lengthSqr();
+            const float d13 = (mVtx[quad[1]]-mVtx[quad[3]]).lengthSqr();
+            Vec3I *tri = mTri.data() + triCount + 2*i;
+            if (d02 < d13) {
+                tri[0] = Vec3I(quad[0], quad[1], quad[2]);
+                tri[1] = Vec3I(quad[0], quad[2], quad[3]);
+            } else {
+                tri[0] = Vec3I(quad[0], quad[1], quad[3]);
+                tri[1] = Vec3I(quad[1], quad[2], quad[3]);
+            }
+        }
+    });
+    
+    mQuad.clear();
+    return 2*quadCount;// number of triangles added
+}// Geometry::triangulateQuads
+
+std::vector<Vec3I> Geometry::triangulate(const std::vector<int> &nGon)
+{
+    OPENVDB_ASSERT(nGon.size()>=3);
+    std::vector<Vec3I> tri(nGon.size() - 2);
+    for (size_t i = 0; i < tri.size(); ++i) tri[i] = Vec3I(nGon[0], nGon[i + 1], nGon[i + 2]);
+    return tri;
+};
 
 } // namespace vdb_tool
 } // namespace OPENVDB_VERSION_NAME

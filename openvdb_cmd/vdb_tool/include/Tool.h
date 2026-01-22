@@ -13,6 +13,8 @@
 ///        generate adaptive polygon meshes from level sets, render images and write particles,
 ///        meshes or VDBs them to disk.
 ///
+/// @todo use LevelSetMeasure, write binary/ascii
+///
 ////////////////////////////////////////////////////////////////////////////////
 
 #ifndef VDB_TOOL_HAS_BEEN_INCLUDED
