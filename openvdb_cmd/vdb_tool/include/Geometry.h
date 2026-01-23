@@ -473,21 +473,19 @@ void Geometry::readOBJ(std::istream &is)
             if (iss >> c[0] >> c[1] >> c[2]) mRGB.push_back(c);
         } else if (str == "f") {
             std::vector<int> v;
-            while (iss >> str) {
-                v.push_back(std::stoi(str.substr(0, str.find_first_of("/"))));
-            }
-            switch (v.size()) {
-            case 3:
+            while (iss >> str) v.push_back(std::stoi(str.substr(0, str.find_first_of("/"))));
+            const size_t nGon = v.size();
+            if (nGon == 1) {
+                std::cerr << "Geometry::readOBJ: ignoring point, i.e. a face with with a single vertex\n";
+            } else if (nGon == 2) {
+                std::cerr << "Geometry::readOBJ: ignoring line, i.e. a face with two vertices\n";
+            } else if (nGon == 3) {
                 mTri.emplace_back(v[0] - 1, v[1] - 1, v[2] - 1);// obj is 1-based
-                break;
-            case 4:
+            } else if (nGon == 4) {
                 mQuad.emplace_back(v[0] - 1, v[1] - 1, v[2] - 1, v[3] - 1);// obj is 1-based
-                break;
-            default:
-                std::cerr << "Geometry::readOBJ: triangulating " << v.size() << "-gon\n";
-                for (size_t i = 0; i < v.size()-2; ++i) mTri.emplace_back(v[0] - 1, v[i+1] - 1, v[i+2] - 1);// obj is 1-based
-                //throw std::invalid_argument("Geometry::readOBJ: " + std::to_string(v.size()) + "-gons are not supported");
-                break;
+            } else {
+                std::cerr << "Geometry::readOBJ: triangulating " << nGon << "-gon\n";
+                for (size_t i = 0; i < nGon - 2; ++i) mTri.emplace_back(v[0] - 1, v[i+1] - 1, v[i+2] - 1);// obj is 1-based
             }
         }
     }
@@ -978,7 +976,7 @@ void Geometry::readSTL(const std::string &fileName)
             std::string tmp = trim(line, " ");// remove leading (and trailing) white spaces
             if (tmp.compare(0, 5, "facet")==0) {
                 while (std::getline(infile, line) && trim(line, " ").compare(0, 10, "outer loop"));
-                int nGone = 0;
+                int nGon = 0;
                 while(std::getline(infile, line)) {// loop over vertices of the facet
                     tmp = trim(line, " ");
                     if (tmp.compare(0, 7, "endloop")==0) break;
@@ -988,13 +986,13 @@ void Geometry::readSTL(const std::string &fileName)
                     double p[3];// more robust to read ascii coordinates as double than float
                     if (iss >> p[0] >> p[1] >> p[2]) {
                         mVtx.emplace_back(float(p[0]), float(p[1]), float(p[2]));
-                        ++nGone;
+                        ++nGon;
                     } else {
                         throw std::invalid_argument("Geometry::readSTL ASCII: error parsing line: \""+line+"\" in \""+fileName+"\"");
                     }
                 }// endloop
                 const int vtx = static_cast<int>(mVtx.size()) - 1;
-                switch (nGone){
+                switch (nGon){
                 case 3:
                     mTri.emplace_back(vtx - 2, vtx - 1, vtx);
                     break;
@@ -1003,7 +1001,7 @@ void Geometry::readSTL(const std::string &fileName)
                     break;
                 default:
                     // could be fixed as in readOBJ!
-                    throw std::invalid_argument("Geometry::readSTL ASCII: " + std::to_string(nGone)+"-gons are not supported");
+                    throw std::invalid_argument("Geometry::readSTL ASCII: " + std::to_string(nGon)+"-gons are not supported");
                 }
             }
         }// loop over lines in file

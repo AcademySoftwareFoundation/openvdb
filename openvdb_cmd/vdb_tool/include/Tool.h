@@ -424,7 +424,8 @@ void Tool::init()
 
   mParser.addAction(
       "quad2tri", "q2t", "Convert all quads in mesh to triangles, assuming they are both planar and convex",
-    {{"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."}},
+    {{"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
+     {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"}},
      [&](){mParser.setDefaults();}, [&](){this->quadsToTriangles();});
    
   mParser.addAction(
@@ -1673,12 +1674,19 @@ void Tool::quadsToTriangles()
   try {
     mParser.printAction();
     const int geo_age = mParser.get<int>("geo");
-    auto it = this->getGeom(geo_age);
-    Geometry &mesh = **it;
-
-    if (mesh.isPoints()) this->warning("Warning: -quad2tri was called on points, not a mesh!");
+    const bool keep = mParser.get<bool>("keep");
+    Geometry::Ptr mesh = *this->getGeom(geo_age);
+    if (mesh->isPoints()) {
+      this->warning("Warning: -quad2tri was called on points, i.e. no quads!");
+      return;
+    }
+    if (keep) {
+      Geometry::Ptr meshCopy = mesh->copyGeom();
+      mGeom.push_back(meshCopy);
+      mesh = meshCopy;
+    }
     if (mParser.verbose) mTimer.start("Quads -> Triangles");
-    mesh.triangulateQuads();
+    mesh->triangulateQuads();
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
     throw std::invalid_argument(name+": "+e.what());
