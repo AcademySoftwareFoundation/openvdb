@@ -1838,7 +1838,7 @@ void Tool::soupToLevelSet()
       dx = grid->voxelSize()[0];
       OPENVDB_ASSERT(dx == offsets[level]->voxelSize()[0]);
       int iter = 0, end = myErode(dx);
-      std::cerr << "Level: " << level << ", dx = " << dx << ", D(dx) = " << end << std::endl;
+      std::cerr << "Level: " << level << ", D(" << dx << ") = " << end << std::endl;
       while (iter < end) {
         grid = myShrinkWrap(*grid, *offsets[level], iter);
         vol[1] = tools::levelSetVolume(*grid);
