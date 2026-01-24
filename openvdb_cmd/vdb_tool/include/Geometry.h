@@ -1355,9 +1355,11 @@ size_t Geometry::triangulateQuads()
 
 std::vector<Vec3I> Geometry::triangulate(const std::vector<int> &nGon)
 {
-    OPENVDB_ASSERT(nGon.size()>=3);
-    std::vector<Vec3I> tri(nGon.size() - 2);
-    for (size_t i = 0; i < tri.size(); ++i) tri[i] = Vec3I(nGon[0], nGon[i + 1], nGon[i + 2]);
+    std::vector<Vec3I> tri;
+    if (mGon.size()>=3) {
+        tri.resize(nGon.size() - 2);
+        for (size_t i = 0; i < tri.size(); ++i) tri[i] = Vec3I(nGon[0], nGon[i + 1], nGon[i + 2]);
+    }
     return tri;
 };
 
