@@ -19,6 +19,7 @@ This command-line tool, dubbed vdb_tool, can combine any number of the of high-l
 | **points2vdb** | Converts points into a VDB PointDataGrid |
 | **iso2ls** | Convert an iso-surface of a scalar field into a level set |
 | **ls2fog** | Convert a level set into a fog volume |
+| **quad2tri** | Convert all quads in a mesh to triangles |
 | **segment** | Segment level set and float grids into its disconnected parts |
 | **sphere** | Create a narrow-band level set of a sphere |
 | **platonic** | Create a narrow-band level set of a tetrahedron(4), cube(6), octahedron(8), dodecahedron(12) or icosahedron(2) |
@@ -191,6 +192,12 @@ vdb_tool -sphere -write bits=16 sphere.vdb
 Convert a polygon mesh file into a narrow-band level and save it to a file
 ```
 vdb_tool -read mesh.obj -mesh2ls -write level_set.vdb
+```
+
+## Converting all quads in a mesh into triangles
+Convert an obj file with n-gons into a ply file with only triangles
+```
+vdb_tool -read mesh.obj -quad2tri -write mesh.ply
 ```
 
 ## Read multiple files
