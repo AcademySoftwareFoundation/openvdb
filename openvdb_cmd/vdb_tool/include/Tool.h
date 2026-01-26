@@ -366,32 +366,32 @@ void Tool::init()
 {
   // note, the following actions were added when mParser was constructed: -quiet,-verbose,-debug,-default,-for,-each,-end
 
-  //  mParser.addAction("name", "alias", "documentation of action",
+  //  mParser.addAction({"name",.. "alias"}, "documentation of action",
   //                    {{"option name", "default value", "expected values", "documentation of option"}},
   //                     {more options}...});
   mParser.addAction(
-      "config", "c", "Import and process one or more configuration files",
+     {"config", "c"}, "Import and process one or more configuration files",
     {{"files", "",  "config1.txt,config2.txt...", "list of configuration files to load and execute"},
      {"execute", "true", "1|0|true|false", "toggle wether to execute the actions in the config file"},
      {"update", "false", "1|0|true|false", "toggle wether to update the version number of the config file"}},
      [&](){this->config();}, [](){}, 0); // anonymous options are appended to "files"
 
   mParser.addAction(
-      "help", "h", "Print documentation for one, multiple or all available actions",
+     {"help", "h"}, "Print documentation for one, multiple or all available actions",
     {{"actions", "", "read,write,...", "list of actions to document. If the list is empty documentation is printed for all available actions and if other actions proceed this action, documentation is printed for those actions only"},
      {"exit", "true", "1|0|true|false", "toggle wether to terminate after this action or not"},
      {"brief", "false", "1|0|true|false", "toggle brief or detailed documentation"}},
      [](){}, [&](){this->help();}, 0); // anonymous options are appended to "actions"
 
   mParser.addAction(
-      "read", "i", "Read one or more geometry or VDB files from disk or STDIN.",
+     {"read", "import", "load", "i"}, "Read one or more geometry or VDB files from disk or STDIN.",
     {{"files", "", "{file|stdin}.{abc|obj|ply|stl|off|xyx|vdb}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
      {"grids", "*", "*|grid_name,...", "list of VDB grids name to be imported (defaults to \"*\", i.e. import all available grids)"},
      {"delayed", "true", "1|0|true|false", "toggle delayed loading of VDB grids (enabled by default). This option is ignored by other file types"}},
      [](){}, [&](){this->read();}, 0);//  anonymous options are treated as to the first option,i.e. "files"
 
   mParser.addAction(
-      "write", "o", "Write list of geometry, VDB or config files to disk or STDOUT",
+     {"write", "export", "save", "o"}, "Write list of geometry, VDB or config files to disk or STDOUT",
     {{"files", "", "{file|stdout}.{obj|ply|stl|off|vdb|nvdb}", "list of files or the output stream, e.g. file.vdb or stdin.vdb. Note that \"files=\" is optional since any argument without the \"=\" character is intrepreted as a file and appended to \"files\"."},
      {"geo", "0", "0|1...", "geometry to write (defaults to \"0\" which is the latest)."},
      {"vdb", "*", "0,1,...", "list of VDB grids to write (defaults to \"*\", i.e. all available grids)."},
@@ -406,14 +406,14 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->write();}, 0);// anonymous options are treated as to the first option,i.e. "files"
 
   mParser.addAction(
-     "clear", "", "Deletes geometry, VDB grids and local variables",
+     {"clear"}, "Deletes geometry, VDB grids and local variables",
     {{"geo", "*", "*|0,1,...", "list of geometries to delete (defaults to all)"},
      {"vdb", "*", "*|0,1,...", "list of VDB grids to delete (defaults to all)"},
      {"variables", "0", "1|0|true|false", "clear all the local variables (defaults to off)"}},
      [](){}, [&](){this->clear();});
 
   mParser.addAction(
-      "sphere", "", "Create a level set sphere, i.e. a narrow-band signed distance to a sphere",
+     {"sphere"}, "Create a level set sphere, i.e. a narrow-band signed distance to a sphere",
     {{"dim", "", "256", "largest dimension in voxel units of the sphere (defaults to 256). If \"voxel\" is defined \"dim\" is ignored"},
      {"voxel", "", "0.0", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\". Defaults to 0.0, i.e. this option is disabled"},
      {"radius", "1.0", "1.0", "radius of sphere in world units"},
@@ -423,13 +423,13 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->levelSetSphere();});
 
   mParser.addAction(
-      "quad2tri", "q2t", "Convert all quads in mesh to triangles, assuming they are both planar and convex",
+     {"quad2tri", "q2t"}, "Convert all quads in mesh to triangles, assuming they are both planar and convex",
     {{"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"}},
      [&](){mParser.setDefaults();}, [&](){this->quadsToTriangles();});
    
   mParser.addAction(
-      "mesh2ls", "m2ls", "Convert a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+     {"mesh2ls", "mesh2sdf", "m2ls"}, "Convert a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
@@ -440,20 +440,20 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
 
   mParser.addAction(
-      "soup2ls", "s2ls", "Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+     {"soup2ls", "soup2sdf", "s2ls"}, "Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"lod", "0", "2", "number of LOD level. Defaults to 0, i.e. will be derived form the mesh size."},
      {"erode", "8", "2", "number of iterations of constrained erosion. Defaults to 8."},
-     {"thres", "0", "0.01", "engineering threshold. Defaults to 0."},
+     {"thres", "0", "0.01", "closing (or engineering) threshold. Defaults to 0, i.e. it\'s diabled."},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
      {"name", "", "soup2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
      [&](){mParser.setDefaults();}, [&](){this->soupToLevelSet();});
 
   mParser.addAction(
-      "ls2mesh", "l2m", "Convert a level set to an adaptive polygon mesh",
+     {"ls2mesh", "l2m"}, "Convert a level set to an adaptive polygon mesh",
     {{"adapt", "0.0", "0.005", "normalized metric for the adaptive meshing. 0 is uniform and 1 is extreme adaptivity. Defaults to 0."},
      {"iso", "0.0", "0.1", "iso-value used to define the implicit surface. Defaults to zero."},
      {"vdb", "0", "0", "age (i.e. stack index) of the level set VDB grid to be meshed. Defaults to 0, i.e. most recently inserted VDB."},
@@ -464,14 +464,14 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->levelSetToMesh();});
 
   mParser.addAction(
-      "ls2fog", "l2f", "Convert a level set VDB into a VDB with a fog volume, i.e. normalized density.",
+     {"ls2fog", "l2f"}, "Convert a level set VDB into a VDB with a fog volume, i.e. normalized density.",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"name", "", "ls2fog_input", "specify the name of the resulting VDB (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->levelSetToFog();});
 
   mParser.addAction(
-      "points2ls", "p2l", "Convert geometry points into a narrow-band level set",
+      {"points2ls", "p2l"}, "Convert geometry points into a narrow-band level set",
     {{"dim", "", "256", "largest dimension in voxel units of the bbox of all the points (defaults to 256). If \"voxel\" is defined \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
@@ -482,7 +482,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->particlesToLevelSet();});
 
   mParser.addAction(
-      "iso2ls", "i2l", "Convert an iso-surface of a scalar field into a level set (i.e. SDF)",
+      {"iso2ls", "i2l"}, "Convert an iso-surface of a scalar field into a level set (i.e. SDF)",
     {{"vdb", "0", "0,1", "age (i.e. stack index) of the VDB grid to be processed and an optional reference grid. Defaults to 0, i.e. most recently inserted VDB."},
      {"iso", "0.0", "0.0", "value of the iso-surface from which to compute the level set"},
      {"voxel", "", "0.0", "voxel size in world units (defaults to zero, i.e the transform out the output matches the input)"},
@@ -492,7 +492,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->isoToLevelSet();});
 
   mParser.addAction(
-      "points2vdb", "p2v", "Encode geometry points into a VDB grid",
+      {"points2vdb", "p2v"}, "Encode geometry points into a VDB grid",
     {{"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"keep", "", "1|0|true|false", "toggle wether the input points are preserved or deleted after the processing"},
      {"ppv", "8", "8", "the number of points per voxel in the output VDB grid (defaults to 8)"},
@@ -501,14 +501,14 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->pointsToVdb();});
 
   mParser.addAction(
-      "vdb2points", "v2p", "Extract points encoded in a VDB to points in a geometry format",
+      {"vdb2points", "v2p"}, "Extract points encoded in a VDB to points in a geometry format",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"name", "", "vdb2points_input", "specify the name of the resulting points (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->vdbToPoints();});
 
   mParser.addAction(
-      "scatter", "", "Scatter point into the active values of an input VDB grid",
+      {"scatter"}, "Scatter point into the active values of an input VDB grid",
     {{"count", "0", "0", "fixed number of points to randomly scatter (disabled by default)"},
      {"density", "0.0", "0.0", "uniform density of points per active voxel (disabled by default)"},
      {"ppv", "8", "8", "number of points per active voxel (defaults to 8)"},
@@ -518,7 +518,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->scatter();});
 
   mParser.addAction(
-      "platonic", "", "Create a level set shape with the specified number of polygon faces",
+      {"platonic"}, "Create a level set shape with the specified number of polygon faces",
     {{"dim", "", "256", "largest dimension in voxel units of the bbox of all the shape (defaults to 256). In \"voxel\" is defined \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"faces", "4", "{4|6|8|12|20}", "number of polygon faces of the shape to generate the level set VDB from"},
@@ -529,7 +529,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->levelSetPlatonic();});
 
   mParser.addAction(
-      "enright", "", "Performs Enright advection benchmark test on a level set",
+      {"enright"}, "Performs Enright advection benchmark test on a level set",
     {{"translate", "(0,0,0)", "(0.0,0.0,0.0)", "defines the origin of the Enright velocity field"},
      {"scale", "1.0", "1.0", "defined the scale of the Enright velocity field"},
      {"dt", "0.05", "0.05", "time-step the input level set is advected"},
@@ -538,7 +538,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->enright();});
 
   mParser.addAction(
-      "dilate", "", "dilate level set surface by a fixed radius",
+      {"dilate"}, "dilate level set surface by a fixed radius",
     {{"radius", "1.0", "1.0", "radius in voxel units by which the surface is dilated"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -546,7 +546,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->offsetLevelSet();});
 
   mParser.addAction(
-      "erode", "", "erode level set surface by a fixed radius",
+      {"erode"}, "erode level set surface by a fixed radius",
     {{"radius", "1.0", "1.0", "radius in voxel units by which the surface is eroded"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -554,7 +554,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->offsetLevelSet();});
 
   mParser.addAction(
-      "open", "", "morphological opening, i.e. erosion followed by dilation, of a level set surface by a fixed radius",
+      {"open"}, "morphological opening, i.e. erosion followed by dilation, of a level set surface by a fixed radius",
     {{"radius", "1.0", "1.0", "radius in voxel units by which the surface is opened"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -562,7 +562,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->offsetLevelSet();});
 
   mParser.addAction(
-      "close", "", "morphological closing, i.e. dilation followed by erosion, of level set surface by a fixed radius",
+      {"close"}, "morphological closing, i.e. dilation followed by erosion, of level set surface by a fixed radius",
     {{"radius", "1.0", "1.0", "radius in voxel units by which the surface is closed"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -570,7 +570,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->offsetLevelSet();});
 
   mParser.addAction(
-      "gauss", "", "gaussian convolution of a level set surface",
+      {"gauss"}, "gaussian convolution of a level set surface",
     {{"iter",  "1", "1", "number of iterations are that the filter is applied"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},

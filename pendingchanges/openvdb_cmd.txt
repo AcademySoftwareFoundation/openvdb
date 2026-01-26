@@ -1,7 +1,12 @@
 vdb_tool:
   Improvements:
+  - Added action -soup2ls, which generates a level set from a soup of polygons.
+  - Added action -quat2tri, which triangulates all quads in a mesh.
+  - Added triangulation of N-gons to readOBJ and readSTL.
   - Improved error reporting when using unsupported actions and options
   - Added read support for xyz files
+  - Actions can now have multiple names, e.g. "-read", "-import, "-load", "-i"
   Fixes:
+  - Fixed issues in readSTL so it works on all files in Thingi10K
   - Fixed bug when reading ascii ply files
   - Fixed several typos in vdb_tool
