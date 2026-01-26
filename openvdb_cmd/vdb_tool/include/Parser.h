@@ -22,7 +22,7 @@
 #include <random>
 #include <functional>
 #include <vector>
-#include <map>
+#include <map>// for map and multimap
 #include <list>
 #include <set>
 #include <time.h>
@@ -54,35 +54,18 @@ struct Option {
 // ==============================================================================================================
 struct Action {
     /// @brief c-tor
-    Action(std::vector<std::string> _names,
+    Action(std::vector<std::string> &&_names,
            std::string _doc,
            std::vector<Option> &&_options,
            std::function<void()> &&_init,
            std::function<void()> &&_run,
            size_t _anonymous = -1)
       : names(std::move(_names))
-      , name(names[0])
       , documentation(std::move(_doc))
       , anonymous(_anonymous)
       , options(std::move(_options))
       , init(std::move(_init))
       , run(std::move(_run)) {}
-
-    /// @brief c-tor
-    Action(std::string _name,
-           std::string _alias,
-           std::string _doc,
-           std::vector<Option> &&_options,
-           std::function<void()> &&_init,
-           std::function<void()> &&_run,
-           size_t _anonymous = -1)
-      : names{std::move(_name)}
-      , name(names[0])
-      , documentation(std::move(_doc))
-      , anonymous(_anonymous)
-      , options(std::move(_options))
-      , init(std::move(_init))
-      , run(std::move(_run)) {if (_alias!="") names.push_back(_alias);}
 
     /// @brief default copy constructor
     Action(const Action&) = default;
@@ -91,7 +74,6 @@ struct Action {
     void print(std::ostream& os = std::cerr) const;
 
     std::vector<std::string> names;// list of names of action, e.g. {"read", "import", "load", "i"}
-    std::string              name;// primary name of action, eg "read"
     std::string              documentation;// documentation e.g. "read", "i", "files", "read files"
     size_t                   anonymous;// index of the option to which the value of un-named option will be appended, e.g. files
     std::vector<Option>      options;// e.g. {{"grids", "density,sphere"}, {"files", "path/base.ext"}}
@@ -709,21 +691,10 @@ struct Parser {
                              std::move(parse), std::move(run), anonymous);
     }
 
-    void addAction(std::string &&name, // primary name of the action
-                   std::string &&alias, // brief alternative name for action
-                   std::string &&doc, // documentation of action
-                   std::vector<Option>   &&options, // list of options for the action
-                   std::function<void()> &&parse, // callback function called during parsing
-                   std::function<void()> &&run,  // callback function to perform the action
-                   size_t anonymous = -1)//defines if un-named options are allowed
-    {
-      available.emplace_back(std::move(name),    std::move(alias), std::move(doc),
-                             std::move(options), std::move(parse), std::move(run), anonymous);
-    }
     Action& getAction() {return *iter;}
     const Action& getAction() const {return *iter;}
     void printAction() const {if (verbose>1) iter->print();}
-    std::map<size_t, std::string> closeMatches(const std::string &str) const;// returns available actions that contain str
+    std::multimap<size_t, std::string> closeMatches(const std::string &str) const;// returns available actions that contain str
 
     ActListT            available, actions;
     ActIterT            iter;// iterator pointing to the current actions being processed
@@ -745,7 +716,7 @@ std::string Parser::getStr(const std::string &name) const
       processor(str);
       return str;
   }
-  throw std::invalid_argument(iter->name+": Parser::getStr: no option named \""+name+"\"");
+  throw std::invalid_argument(iter->names[0]+": Parser::getStr: no option named \""+name+"\"");
 }// Parser::getStr
 
 // ==============================================================================================================
@@ -778,15 +749,15 @@ template <typename T>
 math::Vec3<T> Parser::getVec3(const std::string &name, const char* delimiters) const
 {
     VecS v = this->getVec<std::string>(name, delimiters);
-    if (v.size()!=3) throw std::invalid_argument(iter->name+": Parser::getVec3: not a valid input "+name);
+    if (v.size()!=3) throw std::invalid_argument(iter->names[0]+": Parser::getVec3: not a valid input "+name);
     return math::Vec3<T>(strTo<T>(v[0]), strTo<T>(v[1]), strTo<T>(v[2]));
 }// Parser::getVec3
 
 // ==============================================================================================================
 
-std::map<size_t, std::string> Parser::closeMatches(const std::string &str) const
+std::multimap<size_t, std::string> Parser::closeMatches(const std::string &str) const
 {//returns sorted map of available actions that contain str, while ignoring character case and leading '-'
-    std::map<size_t, std::string> matches;
+    std::multimap<size_t, std::string> matches;
     size_t pos = str.find_first_not_of("-");
     if (pos==std::string::npos) return matches;// special case when str only contains one or more '-'
     std::string pattern = toLowerCase(str.substr(pos));//remove all leading "-" and convert to lower case
@@ -805,7 +776,7 @@ void Action::setOption(const std::string &str)
 {
     const size_t pos = str.find_first_of("={");// since expressions are only evaluated for values and not for names of values, we only search for '=' before expressions, which start with '{'
     if (pos == std::string::npos || str[pos]=='{') {// str has no "=" or it's an expression so append it to the value of the anonymous option
-        if (anonymous>=options.size()) throw std::invalid_argument(name+": does not support un-named option \""+str+"\"");
+        if (anonymous>=options.size()) throw std::invalid_argument(names[0]+": does not support un-named option \""+str+"\"");
         options[anonymous].append(str);
     } else if (anonymous<options.size() && str.compare(0, pos, options[anonymous].name) == 0) {
         options[anonymous].append(str.substr(pos+1));
@@ -822,7 +793,7 @@ void Action::setOption(const std::string &str)
             return;// done
         }
         std::stringstream ss;
-        ss << name << ": Invalid option: \"" << str << "\"\n";
+        ss << names[0] << ": Invalid option: \"" << str << "\"\n";
         for (auto it = options.begin(); it != options.end();) {
             ss << "Valid options: \"" << it->name << "=" << (it++)->example << "\"";
             while (it != options.end()) ss << " or \"" << it->name << "=" << (it++)->example << "\"";
@@ -836,7 +807,7 @@ void Action::setOption(const std::string &str)
 
 void Action::print(std::ostream& os) const
 {
-    os << "-" << name;
+    os << "-" << names[0];
     for (auto &a : options) os << " " << a.name << "=" << a.value;
     os << std::endl;
 }// Action::print
@@ -904,14 +875,14 @@ Parser::Parser(std::vector<Option> &&def)
     // that it never becomes negative and always ends up with a value of zero.
     auto skipToEnd = [](auto &it){
         for (int i = 1; i > 0;) {
-            const std::string &name = (++it)->name;
+            const std::string &name = (++it)->names[0];
             if (name == "end") {
                 i -= 1;
             } else if (name == "for" || name == "each" || name == "if") {
                 i += 1;
             }
         }
-        OPENVDB_ASSERT(it->name == "end");
+        OPENVDB_ASSERT(it->names[0] == "end");
     };
 
     this->addAction(
@@ -995,10 +966,8 @@ void Parser::run()
 
 void Parser::finalize()
 {
-    // sort available actions according to their name
-    available.sort([](const Action &a, const Action &b){
-        return a.names[0] < b.names[0];
-    });
+    // sort available actions according to their primary name
+    available.sort([](const Action &a, const Action &b){return a.names[0] < b.names[0];});
 
     // build hash table for accelerated random lookup
     for (auto it = available.begin(); it != available.end(); ++it) {
@@ -1044,7 +1013,7 @@ void Parser::usage(const VecS &actions, bool brief) const
 {
     for (const std::string &str : actions) {
         auto search = hashMap.find(str);
-        if (search == hashMap.end()) throw std::invalid_argument(iter->name+": Parser:::usage: unsupported action \""+str+"\"\n");
+        if (search == hashMap.end()) throw std::invalid_argument(iter->names[0]+": Parser:::usage: unsupported action \""+str+"\"\n");
         std::cerr << this->usage(*search->second, brief);
     }
 }// Parser::usage
@@ -1071,9 +1040,7 @@ std::string Parser::usage(const Action &action, bool brief) const
         }
         ss << std::endl;
     };
-    std::string name = "-" + action.names[0];
-    for (int i=1; i<action.names.size(); ++i) name += ",-" + action.names[i];
-    ss << std::endl << std::left << std::setw(w) << name;
+    for (const auto &name : action.names) ss << std::endl << std::left << std::setw(w) << "-" + name;
     std::string line;
     if (brief) {
         for (auto &opt : action.options) line+=opt.name+(opt.name!=""?"=":"")+opt.example+" ";

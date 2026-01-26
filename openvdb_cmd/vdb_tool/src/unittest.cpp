@@ -867,19 +867,19 @@ TEST_F(Test_vdb_tool, ToolParser)
     std::string path, base, ext;
 
     Parser p({{"alpha", "64", "", ""}, {"beta", "4.56", "", ""}});
-    p.addAction("process_a", "a", "docs",
+    p.addAction({"process_a", "a"}, "docs",
               {{"alpha", "", "", ""},{"beta", "", "", ""}},
                [&](){p.setDefaults();},
                [&](){alpha = p.get<int>("alpha");
                      beta  = p.get<float>("beta");}
                );
-    p.addAction("process_b", "b", "docs",
+    p.addAction({"process_b", "b"}, "docs",
               {{"alpha", "", "", ""},{"beta", "", "", ""}},
                [&](){p.setDefaults();},
                [&](){alpha_sum += p.get<int>("alpha");
                      beta_sum  += p.get<float>("beta");}
                );
-    p.addAction("process_c", "c", "docs",
+    p.addAction({"process_c", "c"}, "docs",
               {{"alpha", "", "", ""},{"beta", "", "", ""},{"gamma", "", "", ""}},
                [&](){p.setDefaults();},
                [&](){path += (path.empty()?"":",") + p.getStr("alpha");

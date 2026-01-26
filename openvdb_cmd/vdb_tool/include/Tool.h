@@ -124,7 +124,7 @@ public:
 private:
 
     static const int sMajor =10;// incremented for incompatible changes options or file.
-    static const int sMinor = 7;// incremented for new functionality that is backwards-compatible.
+    static const int sMinor = 8;// incremented for new functionality that is backwards-compatible.
     static const int sPatch = 0;// incremented for backwards-compatible bug fixes.
 
     using GridT = FloatGrid;
@@ -286,7 +286,7 @@ Tool::Tool(int argc, char *argv[])
 
 auto Tool::getGrid(size_t age) const
 {
-    if (age>=mGrid.size()) throw std::invalid_argument("-"+mParser.getAction().name+" called getGrid("+std::to_string(age)+"), but grid count = "+std::to_string(mGrid.size()));
+    if (age>=mGrid.size()) throw std::invalid_argument("-"+mParser.getAction().names[0]+" called getGrid("+std::to_string(age)+"), but grid count = "+std::to_string(mGrid.size()));
     auto it = mGrid.crbegin();
     std::advance(it, age);
     return it;
@@ -296,7 +296,7 @@ auto Tool::getGrid(size_t age) const
 
 auto Tool::getGeom(size_t age) const
 {
-    if (age>=mGeom.size()) throw std::invalid_argument("-"+mParser.getAction().name+" called getGeom("+std::to_string(age)+"), but geometry count = "+std::to_string(mGeom.size()));
+    if (age>=mGeom.size()) throw std::invalid_argument("-"+mParser.getAction().names[0]+" called getGeom("+std::to_string(age)+"), but geometry count = "+std::to_string(mGeom.size()));
     auto it = mGeom.crbegin();
     std::advance(it, age);
     return it;
@@ -579,7 +579,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->filterLevelSet();});
 
   mParser.addAction(
-      "mean", "", "mean value filtering of a level set surface",
+      {"mean"}, "mean value filtering of a level set surface",
     {{"iter",  "1",  "1", "number of iterations are that the filter is applied"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -588,7 +588,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->filterLevelSet();});
 
   mParser.addAction(
-      "median", "", "median value filtering of a level set surface",
+      {"median"}, "median value filtering of a level set surface",
     {{"iter",  "1",  "1", "number of iterations are that the filter is applied"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -597,43 +597,43 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->filterLevelSet();});
 
   mParser.addAction(
-      "cpt", "", "generate a vector grid with the closest-point-transform to a level set surface",
+      {"cpt"}, "generate a vector grid with the closest-point-transform to a level set surface",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
-      "div", "", "generate a scalar grid with the divergence of a vector grid",
+      {"div"}, "generate a scalar grid with the divergence of a vector grid",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
-      "curl", "", "generate a vector grid with the curl of another vector grid",
+      {"curl"}, "generate a vector grid with the curl of another vector grid",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
-      "grad", "", "generate a vector grid with the gradient of a scalar grid",
+      {"grad"}, "generate a vector grid with the gradient of a scalar grid",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
-      "curvature", "", "generate scalar grid with the mean curvature of a level set surface",
+      {"curvature"}, "generate scalar grid with the mean curvature of a level set surface",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
-      "length", "", "generate a scalar grid with the magnitude of a vector grid",
+      {"length"}, "generate a scalar grid with the magnitude of a vector grid",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
-      "union", "", "CSG union of two level sets surfaces",
+      {"union"}, "CSG union of two level sets surfaces",
     {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to union. Defaults to 0,1, i.e. two most recently inserted VDBs."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"prune", "true", "true", "toggle wether to prune the tree after the boolean operation (enabled by default)"},
@@ -641,7 +641,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->csg();});
 
   mParser.addAction(
-      "intersection", "", "CSG intersection of two level sets surfaces",
+      {"intersection"}, "CSG intersection of two level sets surfaces",
     {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to intersect. Defaults to 0,1, i.e. two most recently inserted VDBs."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"prune", "true", "true", "toggle wether to prune the tree after the boolean operation (enabled by default)"},
@@ -649,7 +649,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->csg();});
 
   mParser.addAction(
-      "difference", "", "CSG difference of two level sets surfaces",
+      {"difference"}, "CSG difference of two level sets surfaces",
     {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to difference. Defaults to 0,1, i.e. two most recently inserted VDBs."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"prune", "true", "true", "toggle wether to prune the tree after the boolean operation (enabled by default)"},
@@ -657,32 +657,32 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->csg();});
 
   mParser.addAction(
-      "min", "", "Given grids A and B, compute min(a, b) per voxel",
+      {"min"}, "Given grids A and B, compute min(a, b) per voxel",
     {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->composite();});
 
   mParser.addAction(
-      "max", "", "Given grids A and B, compute max(a, b) per voxel",
+      {"max"}, "Given grids A and B, compute max(a, b) per voxel",
     {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->composite();});
 
   mParser.addAction(
-      "sum", "", "Given grids A and B, compute sum(a, b) per voxel",
+      {"sum"}, "Given grids A and B, compute sum(a, b) per voxel",
     {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->composite();});
 
   mParser.addAction(
-      "multires", "", "construct a LoD sequences of VDB trees with powers of two refinements",
+      {"multires"}, "construct a LoD sequences of VDB trees with powers of two refinements",
     {{"levels", "2", "2", "number of multi-resolution grids in the output LoD sequence"},
      {"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->multires();});
 
   mParser.addAction(
-      "resample", "", "resample one VDB grid into another VDB grid or a transformation of the input grid",
+      {"resample"}, "resample one VDB grid into another VDB grid or a transformation of the input grid",
     {{"vdb", "0,1", "0,1", "pair of input and optional output grids (i.e. stack index) to be processed. Defaults to 0,1, i.e. most recent VDB is resampled to match the transform of the second to most recent VDB."},
      {"scale", "0", "0", "scale use to transform the input grid (ignored if two grids are specified with vdb)"},
      {"translate", "(0,0,0)", "(0,0,0)", "translation use to transform the input grid (ignored if two grids are specified with vdb)"},
@@ -691,7 +691,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->resample();});
 
   mParser.addAction(
-      "clip", "", "Clip a VDB grid against another grid, a bbox or frustum",
+    {"clip"}, "Clip a VDB grid against another grid, a bbox or frustum",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"bbox", "", "(0,0,0),(1,1,1)", "min and max of the world-space bounding-box used for clipping. Defaults to empty, i.e. disabled"},
@@ -701,17 +701,17 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->clip();});
 
   mParser.addAction(
-      "prune", "", "prune away inactive values in a VDB grid",
+      {"prune"}, "prune away inactive values in a VDB grid",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB"}},
      [](){},[&](){this->pruneLevelSet();});
 
   mParser.addAction(
-      "flood", "", "signed-flood filling of a level set VDB",
+      {"flood"}, "signed-flood filling of a level set VDB",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB"}},
      [](){},[&](){this->floodLevelSet();});
 
   mParser.addAction(
-      "expand", "", "expand narrow band of level set",
+      {"expand"}, "expand narrow band of level set",
     {{"dilate", "1", "1", "number of integer voxels that the narrow band of the input SDF will be dilated"},
      {"iter", "1", "1", "number of iterations of the fast sweeping algorithm (each using 8 sweeps)"},
      {"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
@@ -719,13 +719,13 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->expandLevelSet();});
 
   mParser.addAction(
-      "segment", "", "segment an input VDB into a list if topologically disconnected VDB grids",
+      {"segment"}, "segment an input VDB into a list if topologically disconnected VDB grids",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->segment();});
 
   mParser.addAction(
-      "transform", "", "apply affine transformations (uniform scale -> rotation -> translation) to a VDB grids and geometry",
+      {"transform"}, "apply affine transformations (uniform scale -> rotation -> translation) to a VDB grids and geometry",
     {{"rotate", "(0.0,0.0,0.0)", "(0.0,0.0,0.0)", "rotation in radians around x,y,z axis"},
      {"translate", "(0.0,0.0,0.0)", "(0.0,0.0,0.0)", "translation in world units along x,y,z axis"},
      {"scale", "1.0", "1.0", "uniform scaling in world units"},
@@ -735,7 +735,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->transform();});
 
   mParser.addAction(
-      "render", "", "ray-tracing of level set surfaces and volume rendering of fog volumes",
+      {"render"}, "ray-tracing of level set surfaces and volume rendering of fog volumes",
     {{"files", "", "output.{jpg|png|ppm|exr}", "file used to save the rendered image to disk"},
      {"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the rendering"},
@@ -764,18 +764,18 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->render();}, 0);
 
   mParser.addAction(
-      "print", "p", "prints information to the terminal about the current stack of VDB grids and Geometry",
+      {"print", "p"}, "prints information to the terminal about the current stack of VDB grids and Geometry",
       {{"vdb", "*", "*", "print information about VDB grids"},
        {"geo", "*", "*", "print information about geometries"},
        {"mem", "0", "0|1|false|true", "print a list of all stored variables"}},
       [](){}, [&](){this->print();});
 
   mParser.addAction(
-      "version", "", "write timing information to the terminal", {},
+      {"version"}, "write timing information to the terminal", {},
       [&](){std::cerr << mCmdName << ": version " << Tool::version() << std::endl;std::exit(EXIT_SUCCESS);}, [](){});
 
   mParser.addAction(
-      "examples", "", "print examples to the terminal and terminate", {},
+      {"examples"}, "print examples to the terminal and terminate", {},
       [&](){std::cerr << this->examples() << std::endl; std::exit(EXIT_SUCCESS);}, [](){});
 
   Processor &proc = mParser.processor;
@@ -908,7 +908,7 @@ void Tool::init()
 
 void Tool::help()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "help");
   try {
     mParser.printAction();
@@ -970,7 +970,7 @@ std::string Tool::examples() const
 
 void Tool::clear()
 {
-  OPENVDB_ASSERT(mParser.getAction().name == "clear");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "clear");
   if (mParser.get<std::string>("geo") == "*") {
     mGeom.clear();
   } else {
@@ -996,7 +996,7 @@ void Tool::clear()
 
 void Tool::read()
 {
-  OPENVDB_ASSERT(mParser.getAction().name == "read");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
   for (auto &fileName : mParser.getVec<std::string>("files")) {
     switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,off,stl,xyz", "vdb", "nvdb"})) {
     case 1:
@@ -1025,7 +1025,7 @@ void Tool::read()
 
 void Tool::readGeo(const std::string &fileName)
 {
-  OPENVDB_ASSERT(mParser.getAction().name == "read");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
   if (mParser.verbose>1) std::cerr << "Reading geometry from \"" << fileName << "\"\n";
   if (mParser.verbose) mTimer.start("Read geometry");
   Geometry::Ptr geom(new Geometry());
@@ -1044,7 +1044,7 @@ void Tool::readGeo(const std::string &fileName)
 
 void Tool::readVDB(const std::string &fileName)
 {
-  OPENVDB_ASSERT(mParser.getAction().name == "read");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
   const VecS gridNames = mParser.getVec<std::string>("grids");
   if (gridNames.empty()) throw std::invalid_argument("readVDB: no grids names specified");
   GridPtrVecPtr grids;
@@ -1079,7 +1079,7 @@ void Tool::readVDB(const std::string &fileName)
 #ifdef VDB_TOOL_USE_NANO
 void Tool::readNVDB(const std::string &fileName)
 {
-  OPENVDB_ASSERT(mParser.getAction().name == "read");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
   const VecS gridNames = mParser.getVec<std::string>("grids");
   if (gridNames.empty()) throw std::invalid_argument("readNVDB: no grids names specified");
   std::vector<nanovdb::GridHandle<>> grids;
@@ -1117,7 +1117,7 @@ void Tool::readNVDB(const std::string&)
 
 void Tool::config()
 {
-    OPENVDB_ASSERT(mParser.getAction().name == "config");
+    OPENVDB_ASSERT(mParser.getAction().names[0] == "config");
     const bool update  = mParser.get<bool>("update");
     const bool execute = mParser.get<bool>("execute");
     std::string line;
@@ -1166,7 +1166,7 @@ void Tool::config()
 
 void Tool::write()
 {
-  OPENVDB_ASSERT(mParser.getAction().name == "write");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
   for (std::string &fileName : mParser.getVec<std::string>("files")) {
     switch (findFileExt(fileName, {"geo,obj,ply,stl,off,abc", "vdb", "nvdb", "txt"})) {
     case 1:
@@ -1192,7 +1192,7 @@ void Tool::write()
 
 void Tool::writeVDB(const std::string &fileName)
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "write");
   try {
     mParser.printAction();
@@ -1258,7 +1258,7 @@ void Tool::writeVDB(const std::string &fileName)
 #ifdef VDB_TOOL_USE_NANO
 void Tool::writeNVDB(const std::string &fileName)
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "write");
   try {
     mParser.printAction();
@@ -1383,7 +1383,7 @@ void Tool::writeNVDB(const std::string&)
 
 void Tool::writeGeo(const std::string &fileName)
 {
-  OPENVDB_ASSERT(mParser.getAction().name == "write");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
   const int age = mParser.get<int>("geo");
   const bool keep = mParser.get<bool>("keep");
   if (mParser.verbose>1) std::cerr << "Writing geometry to \"" << fileName << "\"\n";
@@ -1399,14 +1399,14 @@ void Tool::writeGeo(const std::string &fileName)
 
 void Tool::writeConf(const std::string &fileName)
 {
-  OPENVDB_ASSERT(mParser.getAction().name == "write");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
   if (mParser.verbose>1) std::cerr << "Writing configuration to \"" << fileName << "\"\n";
   std::ofstream file(fileName);
   if (!file.is_open()) throw std::invalid_argument("writeConf: unable to open \""+fileName+"\"");
   if (mParser.verbose) mTimer.start("Write config");
   const Header header;
   file << header.str() << std::endl;
-  for (auto &a : mParser.actions) if (a.name != "config") a.print(file);// exclude "-config" to avoid infinite loop
+  for (auto &a : mParser.actions) if (a.names[0] != "config") a.print(file);// exclude "-config" to avoid infinite loop
   file.close();
   if (mParser.verbose) mTimer.stop();
 }// Tool::writeConf
@@ -1415,7 +1415,7 @@ void Tool::writeConf(const std::string &fileName)
 
 void Tool::vdbToPoints()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "vdb2points");
   try {
     mParser.printAction();
@@ -1457,7 +1457,7 @@ void Tool::vdbToPoints()
 
 void Tool::pointsToVdb()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "points2vdb");
   try {
     mParser.printAction();
@@ -1531,7 +1531,7 @@ void Tool::pointsToVdb()
 
 void Tool::transform()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "transform");
   try {
     mParser.printAction();
@@ -1590,7 +1590,7 @@ void Tool::transform()
 
 void Tool::levelSetToFog()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "ls2fog");
   try {
     mParser.printAction();
@@ -1617,7 +1617,7 @@ void Tool::levelSetToFog()
 
 void Tool::isoToLevelSet()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "iso2ls");
   try {
     mParser.printAction();
@@ -1669,7 +1669,7 @@ float Tool::estimateVoxelSize(int maxDim,  float halfWidth, int geo_age)
 
 void Tool::quadsToTriangles()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "quad2tri");
   try {
     mParser.printAction();
@@ -1697,7 +1697,7 @@ void Tool::quadsToTriangles()
 
 void Tool::meshToLevelSet()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "mesh2ls");
   try {
     mParser.printAction();
@@ -1738,7 +1738,7 @@ void Tool::meshToLevelSet()
 // ./openvdb_cmd/vdb_tool/vdb_tool -i ~/dev/data/obj/Robot_arm.obj -soup2ls voxel=0.2 erode=16 -print -o codec=blosc openvdb_10.vdb
 void Tool::soupToLevelSet()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "soup2ls");
   try {
     mParser.printAction();
@@ -1874,7 +1874,7 @@ void Tool::soupToLevelSet()
 
 void Tool::particlesToLevelSet()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "points2ls");
   try {
     mParser.printAction();
@@ -1949,7 +1949,7 @@ typename Tool::FilterT Tool::createFilter(GridT &grid, int space, int time)
 
 void Tool::offsetLevelSet()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(findMatch(name, {"dilate", "erode", "open", "close"}));
   try {
     mParser.printAction();
@@ -1992,7 +1992,7 @@ void Tool::offsetLevelSet()
 
 void Tool::filterLevelSet()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(findMatch(name, {"gauss", "mean", "median"}));
   try {
     mParser.printAction();
@@ -2031,7 +2031,7 @@ void Tool::filterLevelSet()
 
 void Tool::pruneLevelSet()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "prune");
   try {
     mParser.printAction();
@@ -2052,7 +2052,7 @@ void Tool::pruneLevelSet()
 
 void Tool::floodLevelSet()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "flood");
   try {
     mParser.printAction();
@@ -2073,7 +2073,7 @@ void Tool::floodLevelSet()
 
 void Tool::compute()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(findMatch(name, {"cpt","div","curl","length","grad","curvature"}));
   try {
     mParser.printAction();
@@ -2141,7 +2141,7 @@ void Tool::compute()
 
 void Tool::composite()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(findMatch(name, {"min","max","sum"}));
   try {
     mParser.printAction();
@@ -2186,7 +2186,7 @@ void Tool::composite()
 
 void Tool::csg()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(findMatch(name, {"union", "intersection", "difference"}));
   try {
     mParser.printAction();
@@ -2263,7 +2263,7 @@ void Tool::csg()
 
 void Tool::levelSetToMesh()
 {
-  const std::string &action_name = mParser.getAction().name;
+  const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "ls2mesh");
   try {
     mParser.printAction();
@@ -2311,7 +2311,7 @@ void Tool::levelSetToMesh()
 
 void Tool::levelSetSphere()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "sphere");
   try {
     mParser.printAction();
@@ -2336,7 +2336,7 @@ void Tool::levelSetSphere()
 
 void Tool::levelSetPlatonic()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "platonic");
   try {
     mParser.printAction();
@@ -2375,7 +2375,7 @@ void Tool::levelSetPlatonic()
 
 void Tool::multires()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "multires");
   try {
     mParser.printAction();
@@ -2404,7 +2404,7 @@ void Tool::multires()
 
 void Tool::expandLevelSet()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "expand");
   try {
     mParser.printAction();
@@ -2430,7 +2430,7 @@ void Tool::expandLevelSet()
 
 void Tool::segment()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "segment");
   try {
     mParser.printAction();
@@ -2463,7 +2463,7 @@ void Tool::segment()
 // for simplicity we are restricting this resampler to only work on float grids!
 void Tool::resample()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "resample");
   try {
     mParser.printAction();
@@ -2516,7 +2516,7 @@ void Tool::resample()
 
 void Tool::scatter()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "scatter");
   try {
     mParser.printAction();
@@ -2568,7 +2568,7 @@ void Tool::scatter()
 // https://faculty.washington.edu/rjl/pubs/hiresadv/0733033.pdf
 void Tool::enright()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "enright");
   try {
     mParser.printAction();
@@ -2660,7 +2660,7 @@ GridBase::Ptr Tool::clip(const VecF &v, int age, const GridType &input)
 
 void Tool::clip()
 {
-  const std::string &name = mParser.getAction().name;
+  const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "clip");
   try {
     mParser.printAction();
@@ -2835,7 +2835,7 @@ void saveEXR(const std::string&, const tools::Film&, const std::string& = "zip")
 
 void Tool::render()
 {
-  OPENVDB_ASSERT(mParser.getAction().name == "render");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "render");
   const VecS fileNames = mParser.getVec<std::string>("files");
   const int age = mParser.get<int>("vdb");
   const bool keep = mParser.get<bool>("keep");
@@ -2997,7 +2997,7 @@ void Tool::print_args(std::ostream& os) const
 
 void Tool::print(std::ostream& os) const
 {
-  OPENVDB_ASSERT(mParser.getAction().name == "print");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "print");
 
   if (mParser.verbose>1) {
     os << "\n" << std::setw(40) << std::setfill('=') << "> Actions <" << std::setw(40) << "\n";
