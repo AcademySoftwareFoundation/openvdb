@@ -13,7 +13,7 @@
 ///        generate adaptive polygon meshes from level sets, render images and write particles,
 ///        meshes or VDBs them to disk.
 ///
-/// @todo expose LevelSetMeasure, write binary/ascii, mesh2sdf, mesh2udf, mesh2offset
+/// @todo expose LevelSetMeasure, write binary/ascii, mesh2offset
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -188,8 +188,11 @@ private:
     /// @brief Converts a level set VDB into a VDB with a fog volume, i.e. normalized density
     void levelSetToFog();
 
-    /// @brief Converts a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh
+    /// @brief Converts a polygon soup into a symmetric or asymmetric narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh
     void meshToLevelSet();
+
+    /// @brief Converts a polygon soup into a symmetric narrow-band unsigned distance to a polygon mesh
+    void meshToUnsignedDistanceField();
 
     /// @brief Converts a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh
     void soupToLevelSet();
@@ -244,7 +247,8 @@ private:
     void writeConf(const std::string &fileName);
 
     /// @brief return the voxel-size of  a LS estimated from a desired grid dimension of a specific geometry
-    float estimateVoxelSize(int maxDimension,  float halfWidth, int geo_age);
+    float estimateVoxelSize(int maxDimension, float exWidth, float inWidth, int geo_age);
+    float estimateVoxelSize(int maxDim,  float halfWidth, int geo_age) {return this->estimateVoxelSize(maxDim, halfWidth, halfWidth, geo_age);}
 
     FilterT createFilter(GridT &grid,  int space, int time);
 
@@ -429,41 +433,28 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->quadsToTriangles();});
    
   mParser.addAction(
-     {"mesh2ls", "m2ls"}, "Convert a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+     {"mesh2ls", "mesh2sdf", "m2ls"}, "Convert a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
-  //   {"exWidth", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
-  //   {"inWidth", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
+     {"exWidth", "0.0", "3.0", "half-width in voxel units of the output narrow-band level set (disabled by default)"},
+     {"inWidth", "0.0", "3.0", "half-width in voxel units of the input narrow-band level set (disabled by default)"},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"vdb", "-1", "0", "age (i.e. stack index) of reference grid used to define the transform. Defaults to -1, i.e. disabled. If specified this option takes precedence over \"dim\" and \"voxel\"!"},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
      {"name", "", "mesh2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
      [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
-  
+
   mParser.addAction(
-     {"mesh2sdf", "m2sdf"}, "Convert a polygon mesh into a to a signed distance field with an asymmetrical narrow band",
+     {"mesh2udf", "m2udf"}, "Convert a polygon mesh into a to a unsigned distance field with an symmetrical narrow band",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
-     {"exWidth", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
-     {"inWidth", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
+     {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"vdb", "-1", "0", "age (i.e. stack index) of reference grid used to define the transform. Defaults to -1, i.e. disabled. If specified this option takes precedence over \"dim\" and \"voxel\"!"},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
      {"name", "", "mesh2sdf_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
-     [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
-  
-  mParser.addAction(
-     {"mesh2udf", "m2udf"}, "Convert a polygon mesh into a to a unsigned distance field with an asymmetrical narrow band",
-    {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
-     {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
-     {"exWidth", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
-     {"inWidth", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
-     {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
-     {"vdb", "-1", "0", "age (i.e. stack index) of reference grid used to define the transform. Defaults to -1, i.e. disabled. If specified this option takes precedence over \"dim\" and \"voxel\"!"},
-     {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
-     {"name", "", "mesh2sdf_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
-     [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
+     [&](){mParser.setDefaults();}, [&](){this->meshToUnsignedDistanceField();});
 
   mParser.addAction(
      {"soup2ls", "soup2sdf", "s2ls"}, "Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
@@ -1678,7 +1669,7 @@ void Tool::isoToLevelSet()
 
 // ==============================================================================================================
 
-float Tool::estimateVoxelSize(int maxDim,  float halfWidth, int geo_age)
+float Tool::estimateVoxelSize(int maxDim,  float exWidth, float inWidth, int geo_age)
 {
   auto it = this->getGeom(geo_age);
   const auto bbox = (*it)->bbox();
@@ -1688,7 +1679,7 @@ float Tool::estimateVoxelSize(int maxDim,  float halfWidth, int geo_age)
     throw std::invalid_argument("estimateVoxelSize: invalid maxDim");
   }
   const auto d = bbox.extents()[bbox.maxExtent()];// longest extent of bbox along any coordinate axis
-  return static_cast<float>(static_cast<double>(d)/static_cast<double>(maxDim - static_cast<int>(2.f * halfWidth)));
+  return static_cast<float>(static_cast<double>(d)/static_cast<double>(maxDim - static_cast<int>(exWidth + inWidth)));
 }// Tool::estimateVoxelSize
 
 // ==============================================================================================================
@@ -1730,9 +1721,58 @@ void Tool::meshToLevelSet()
     const int dim = mParser.get<int>("dim");
     float voxel = mParser.get<float>("voxel");
     const float width = mParser.get<float>("width");
-    //const float exWidth = mParser.get<float>("exWidth");
-    //const float inWidth = mParser.get<float>("inWidth");
-    //std::cerr << "width = " << width << ", exWidth = " << exWidth << ", inWidth = " << inWidth << std::endl;
+    const float exWidth = mParser.get<float>("exWidth");
+    const float inWidth = mParser.get<float>("inWidth");
+    const int geo_age = mParser.get<int>("geo");
+    const int vdb_age = mParser.get<int>("vdb");
+    const bool keep = mParser.get<bool>("keep");
+    std::string grid_name = mParser.get<std::string>("name");
+
+    math::Transform::Ptr xform(nullptr);
+    if (vdb_age>=0) {// use xform from reference VDB
+      auto it = this->getGrid(vdb_age);
+      xform = (*it)->transform().copy();
+    } else if (exWidth <= 0.0 || inWidth <= 0.0) {
+      if (voxel == 0.0f) voxel = this->estimateVoxelSize(dim, width, geo_age);
+      xform = math::Transform::createLinearTransform(voxel);
+    } else {
+      if (voxel == 0.0f) voxel = this->estimateVoxelSize(dim, exWidth, inWidth, geo_age);
+      xform = math::Transform::createLinearTransform(voxel);
+    }
+    auto it = this->getGeom(geo_age);
+    const Geometry &mesh = **it;
+    if (mesh.isPoints()) this->warning("Warning: -mesh2ls/mesh2sdf was called on points, not a mesh! Hint: use -points2ls instead!");
+    if (exWidth <= 0.0 || inWidth <= 0.0) {// symmetric narrow-band
+        if (mParser.verbose) mTimer.start("Mesh -> LS");
+        auto grid  = tools::meshToLevelSet<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
+        if (grid_name.empty()) grid_name = "mesh2ls_" + mesh.getName();
+        grid->setName(grid_name);
+        mGrid.push_back(grid);
+    } else {// asymmetric narrow-band
+        if (mParser.verbose) mTimer.start("Mesh -> SDF");
+        auto grid  = tools::meshToSignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), exWidth, inWidth);
+        if (grid_name.empty()) grid_name = "mesh2sdf_" + mesh.getName();
+        grid->setName(grid_name);
+        mGrid.push_back(grid);
+    }
+    if (!keep) mGeom.erase(std::next(it).base());
+    if (mParser.verbose) mTimer.stop();
+  } catch (const std::exception& e) {
+    throw std::invalid_argument(name+": "+e.what());
+  }
+}// Tool::meshToLevelSet
+
+// ==============================================================================================================
+
+void Tool::meshToUnsignedDistanceField()
+{
+  const std::string &name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(name == "mesh2udf");
+  try {
+    mParser.printAction();
+    const int dim = mParser.get<int>("dim");
+    float voxel = mParser.get<float>("voxel");
+    const float width = mParser.get<float>("width");
     const int geo_age = mParser.get<int>("geo");
     const int vdb_age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
@@ -1748,10 +1788,10 @@ void Tool::meshToLevelSet()
     }
     auto it = this->getGeom(geo_age);
     const Geometry &mesh = **it;
-    if (mesh.isPoints()) this->warning("Warning: -mesh2ls was called on points, not a mesh! Hint: use -points2ls instead!");
-    if (mParser.verbose) mTimer.start("Mesh -> SDF");
-    auto grid  = tools::meshToLevelSet<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
-    if (grid_name.empty()) grid_name = "mesh2ls_" + mesh.getName();
+    if (mesh.isPoints()) this->warning("Warning: -mesh2udf was called on points, not a mesh! Hint: use -points2ls instead!");
+    if (mParser.verbose) mTimer.start("Mesh -> UDF");
+    auto grid  = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
+    if (grid_name.empty()) grid_name = "mesh2udf_" + mesh.getName();
     grid->setName(grid_name);
     mGrid.push_back(grid);
     if (!keep) mGeom.erase(std::next(it).base());
@@ -1759,7 +1799,7 @@ void Tool::meshToLevelSet()
   } catch (const std::exception& e) {
     throw std::invalid_argument(name+": "+e.what());
   }
-}// Tool::meshToLevelSet
+}// Tool::meshToUnsignedDistanceField
 
 // ==============================================================================================================
 

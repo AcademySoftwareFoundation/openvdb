@@ -1,6 +1,8 @@
 vdb_tool:
   Improvements:
-  - Added action -soup2ls/soup2sdf, which generates a level set from a soup of polygons.
+  - Added action soup2ls/soup2sdf, which generates a level set from a soup of polygons.
+  - Added action mesh2udf, which generates a symmetric narrow band of unsigned distances to a mesh.
+  - Action mesh2ls/mesh2sdf now supports generation of asymmetric narrow bands.
   - Added action -quat2tri/q2t, which triangulates all quads in a mesh.
   - Added triangulation of N-gons to readOBJ and readSTL, assuming they are convex.
   - Improved error reporting when using unsupported actions and options
