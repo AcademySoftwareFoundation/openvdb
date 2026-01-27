@@ -13,7 +13,7 @@
 ///        generate adaptive polygon meshes from level sets, render images and write particles,
 ///        meshes or VDBs them to disk.
 ///
-/// @todo expose LevelSetMeasure, write binary/ascii
+/// @todo expose LevelSetMeasure, write binary/ascii, mesh2sdf, mesh2udf, mesh2offset
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -429,14 +429,40 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->quadsToTriangles();});
    
   mParser.addAction(
-     {"mesh2ls", "mesh2sdf", "m2ls"}, "Convert a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+     {"mesh2ls", "m2ls"}, "Convert a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
+  //   {"exWidth", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
+  //   {"inWidth", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"vdb", "-1", "0", "age (i.e. stack index) of reference grid used to define the transform. Defaults to -1, i.e. disabled. If specified this option takes precedence over \"dim\" and \"voxel\"!"},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
      {"name", "", "mesh2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
+     [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
+  
+  mParser.addAction(
+     {"mesh2sdf", "m2sdf"}, "Convert a polygon mesh into a to a signed distance field with an asymmetrical narrow band",
+    {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
+     {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
+     {"exWidth", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
+     {"inWidth", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
+     {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
+     {"vdb", "-1", "0", "age (i.e. stack index) of reference grid used to define the transform. Defaults to -1, i.e. disabled. If specified this option takes precedence over \"dim\" and \"voxel\"!"},
+     {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
+     {"name", "", "mesh2sdf_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
+     [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
+  
+  mParser.addAction(
+     {"mesh2udf", "m2udf"}, "Convert a polygon mesh into a to a unsigned distance field with an asymmetrical narrow band",
+    {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
+     {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
+     {"exWidth", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
+     {"inWidth", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
+     {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
+     {"vdb", "-1", "0", "age (i.e. stack index) of reference grid used to define the transform. Defaults to -1, i.e. disabled. If specified this option takes precedence over \"dim\" and \"voxel\"!"},
+     {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
+     {"name", "", "mesh2sdf_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
      [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
 
   mParser.addAction(
@@ -1704,13 +1730,16 @@ void Tool::meshToLevelSet()
     const int dim = mParser.get<int>("dim");
     float voxel = mParser.get<float>("voxel");
     const float width = mParser.get<float>("width");
+    //const float exWidth = mParser.get<float>("exWidth");
+    //const float inWidth = mParser.get<float>("inWidth");
+    //std::cerr << "width = " << width << ", exWidth = " << exWidth << ", inWidth = " << inWidth << std::endl;
     const int geo_age = mParser.get<int>("geo");
     const int vdb_age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
     std::string grid_name = mParser.get<std::string>("name");
 
     math::Transform::Ptr xform(nullptr);
-    if (vdb_age>=0) {
+    if (vdb_age>=0) {// use xform from reference VDB
       auto it = this->getGrid(vdb_age);
       xform = (*it)->transform().copy();
     } else {
