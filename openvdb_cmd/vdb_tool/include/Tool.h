@@ -28,6 +28,7 @@
 #include <openvdb/tools/Composite.h>
 #include <openvdb/tools/FastSweeping.h>
 #include <openvdb/tools/LevelSetAdvect.h>
+#include <openvdb/tools/LevelSetDilatedMesh.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/LevelSetFilter.h>
 #include <openvdb/tools/LevelSetMeasure.h>
@@ -499,7 +500,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->particlesToLevelSet();});
 
   mParser.addAction(
-      {"iso2ls", "i2l"}, "Convert an iso-surface of a scalar field into a level set (i.e. SDF)",
+      {"iso2ls", "lsRebuild", "i2l"}, "Convert an iso-surface of a scalar field into a level set (i.e. SDF)",
     {{"vdb", "0", "0,1", "age (i.e. stack index) of the VDB grid to be processed and an optional reference grid. Defaults to 0, i.e. most recently inserted VDB."},
      {"iso", "0.0", "0.0", "value of the iso-surface from which to compute the level set"},
      {"voxel", "", "0.0", "voxel size in world units (defaults to zero, i.e the transform out the output matches the input)"},
@@ -1862,9 +1863,15 @@ void Tool::soupToLevelSet()
     };// myUpsample
 
     auto myOffset = [&](const Geometry &mesh, float dx, float isoValue)->GridT::Ptr{
+      util::CpuTimer timer("myOffset");
+#if 1
+      auto sdf = tools::createLevelSetDilatedMesh<GridT, float>(mesh.vtx(), mesh.tri(), mesh.quad(), dx, dx, width);// faster
+#else      
       auto xform = math::Transform::createLinearTransform(dx);
       auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);// mesh -> UDF
       auto sdf = tools::levelSetRebuild(*udf, isoValue, width);// UDF -> mesh -> SDF
+#endif
+      timer.stop();
       return sdf;
     };// myOffset
 
@@ -1877,7 +1884,7 @@ void Tool::soupToLevelSet()
       iter += steps;
       return tools::csgUnionCopy(grid, gridB);
     };// myShrinkWrap
-
+/*
     auto myLevelSetErode = [&](GridT &grid, const GridT &gridB){
       const float dx = grid.voxelSize()[0];
       const int space = 1, time = 1;
@@ -1892,7 +1899,7 @@ void Tool::soupToLevelSet()
       morph.setTemporalScheme(math::TVD_RK1);
       morph.advect(0, nErode*srcGrid.voxelSize()[0]);
     };// myLevelSetMorph
-
+*/
     // Main algorithm
     float dx = voxel * pow(2, nLOD);
     const float factor = float(nErode-1)/(nLOD-1);
@@ -1902,9 +1909,7 @@ void Tool::soupToLevelSet()
     for (int level = 0; level <= nLOD; ++level) {// both inclusive
       std::cerr << "Generating offset at level " << level << " with dx = " << dx << std::endl;
       if (level) mesh = this->volumeToGeometry(*offsets[level-1], 0.0f);// uncomment for optimization
-      auto grid = myOffset(*mesh, dx, dx);
-      //grid->setName("offset_level_" + std::to_string(level));
-      offsets[level] = grid;
+      offsets[level] = myOffset(*mesh, dx, dx);
       dx *= 2.0f;
     }// loop from fine to coarse voxel sizes
     
