@@ -213,7 +213,7 @@ vdb_tool -for n=1,6 -read mesh_'{$n:3:pad0}'.obj -mesh2ls -write level_set_'{$n:
 ```
 
 ## Loop over specific files
-Convert 5 polygon mesh files, "bunny.obj,teapot.ply,car.stl", into the Alembic files "mesh_0{1,2,3,4,5}.vdb". Note that all loop variables have a matching counter defined with a preceding "#" character.
+Convert 3 polygon mesh files, "bunny.obj,teapot.ply,car.stl", into the Alembic files "mesh_0{1,2,3}.vdb". Note that all loop variables have a matching counter defined with a preceding "#" character.
 ```
 vdb_tool -each file=bunny.obj,teapot.ply,car.stl -read '{$file}' -write mesh_'{$#file:1:+:2:pad0}'.abc -end
 ```

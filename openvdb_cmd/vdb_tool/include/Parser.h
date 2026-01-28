@@ -648,6 +648,39 @@ private:
 
 // ==============================================================================================================
 
+struct FilesLoop : public BaseLoop
+{
+public:
+
+    FilesLoop(Memory &s, ActIterT i, const std::string &n, const std::string &_path, const std::vector<std::string> &patters) 
+        : BaseLoop(s, i, n)
+        , path{_path}
+        , iter(path)
+        , end(std::filesystem::end(iter))
+    {
+        if (iter != end) this->set(iter->path().string());
+    }
+    virtual ~FilesLoop() {}
+    bool valid() override {return iter != end;}
+    bool next() override {
+        ++pos;
+        if (++iter != end) this->set(iter->path().string());
+        return iter != end;
+    }
+
+private:
+ 
+    using BaseLoop::pos;
+    //union {
+    std::filesystem::directory_iterator iter, end;
+    //    std::filesystem::recursive_directory_iterator b;
+    //} iter;
+    const std::filesystem::path path;
+    std::string patterns;
+};// FilesLoop struct
+
+// ==============================================================================================================
+
 class IfLoop : public BaseLoop
 {
 public:
