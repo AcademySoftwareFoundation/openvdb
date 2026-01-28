@@ -648,15 +648,15 @@ private:
 };// EachLoop class
 
 // ==============================================================================================================
-
-struct FilesLoop : public BaseLoop
+/*
+struct FileLoop : public BaseLoop
 {
 public:
 
-    FilesLoop(Memory &s, ActIterT i, const std::string &n,
-              const std::string &_path,
-              const std::string &_extension,
-              const std::string &_pattern) 
+    FileLoop(Memory &s, ActIterT i, const std::string &n,
+             const std::string &_path,
+             const std::string &_extension,
+             const std::string &_pattern) 
         : BaseLoop(s, i, n)
         , path{_path}
         , extension(_extension)
@@ -664,10 +664,13 @@ public:
         , iter(path)
         , end(std::filesystem::end(iter))
     {
+        std::cerr << "Constructed FileLoop .. ";
+        OPENVDB_ASSERT(std::filesystem::is_directory(path));
         while (!this->match() && iter != end) ++iter;
         if (iter != end) this->set(iter->path().string());
+        std::cerr << "done\n";
     }
-    virtual ~FilesLoop() {}
+    virtual ~FileLoop() {}
     bool match() const {
         if (!extension.empty() && iter->path().extension() != extension) return false;
         if (!pattern.empty() && iter->path().filename().string().find(pattern) == std::string::npos) return false;
@@ -690,8 +693,8 @@ private:
     std::filesystem::directory_iterator iter, end;
     //    std::filesystem::recursive_directory_iterator b;
     //} iter;
-};// FilesLoop struct
-
+};// FileLoop struct
+*/
 // ==============================================================================================================
 
 class IfLoop : public BaseLoop
@@ -952,7 +955,29 @@ Parser::Parser(std::vector<Option> &&def)
             }
         }
     );
-
+/*
+    this->addAction(
+        {"files"}, "start of files-loop over a user-defined loop variable and range.",
+        {{"path", ".", "\"/path_to_directory_with_files\"", "define name of loop variable and its range."},
+         {"extension", "", "\"obj\"", "define name of loop variable and its range."},
+         {"pattern", "", "\"output_\"", "define name of loop variable and its range."}},
+        [&](){++counter;},
+        [&](){
+            OPENVDB_ASSERT(iter->names[0] == "files");
+            const std::string &path    = iter->options[0].value;
+            const std::string &ext     = iter->options[1].value;
+            const std::string &pattern = iter->options[2].value;
+            std::cerr << "path="<<path << ", ext=" << ext << ", pattern=" << pattern << std::endl;
+            auto loop = std::make_shared<FileLoop>(processor.memory(), iter, "file", path, ext, pattern);
+            if (loop->valid()) {
+                loops.push_back(loop);
+                if (verbose) loop->print();
+            } else {
+                skipToEnd(iter);// skip to matching -end
+            }
+        }
+    );
+*/
     this->addAction(
         {"each"}, "start of each-loop over a user-defined loop variable and list of values.",
         {{"", "", "s=sphere,bunny,...", "defined name of loop variable and list of its values."}},
