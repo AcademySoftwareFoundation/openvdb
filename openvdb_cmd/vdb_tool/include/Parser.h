@@ -19,6 +19,7 @@
 #include <sstream>
 #include <string> // for std::string, std::stof and std::stoi
 #include <algorithm> // std::sort
+#include <filesystem>
 #include <random>
 #include <functional>
 #include <vector>
@@ -648,7 +649,6 @@ private:
 
 // ==============================================================================================================
 
-#if 0
 struct FilesLoop : public BaseLoop
 {
 public:
@@ -691,8 +691,6 @@ private:
     //    std::filesystem::recursive_directory_iterator b;
     //} iter;
 };// FilesLoop struct
-
-#endif
 
 // ==============================================================================================================
 
