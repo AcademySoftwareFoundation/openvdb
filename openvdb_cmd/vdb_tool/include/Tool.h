@@ -1863,15 +1863,15 @@ void Tool::soupToLevelSet()
     };// myUpsample
 
     auto myOffset = [&](const Geometry &mesh, float dx, float isoValue)->GridT::Ptr{
-      util::CpuTimer timer("myOffset");
-#if 1
+      //util::CpuTimer timer("myOffset");
+#if 0
       auto sdf = tools::createLevelSetDilatedMesh<GridT, float>(mesh.vtx(), mesh.tri(), mesh.quad(), dx, dx, width);// faster
 #else      
       auto xform = math::Transform::createLinearTransform(dx);
       auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);// mesh -> UDF
       auto sdf = tools::levelSetRebuild(*udf, isoValue, width);// UDF -> mesh -> SDF
 #endif
-      timer.stop();
+      //timer.stop();
       return sdf;
     };// myOffset
 

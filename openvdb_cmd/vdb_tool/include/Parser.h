@@ -654,7 +654,7 @@ public:
 
     FilesLoop(Memory &s, ActIterT i, const std::string &n,
               const std::string &_path,
-              const std::string &_extension
+              const std::string &_extension,
               const std::string &_pattern) 
         : BaseLoop(s, i, n)
         , path{_path}
@@ -667,7 +667,7 @@ public:
         if (iter != end) this->set(iter->path().string());
     }
     virtual ~FilesLoop() {}
-    bool match() override {
+    bool match() const {
         if (!extension.empty() && iter->path().extension() != extension) return false;
         if (!pattern.empty() && iter->path().filename().string().find(pattern) == std::string::npos) return false;
         return true;
