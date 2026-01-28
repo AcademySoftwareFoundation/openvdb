@@ -652,31 +652,43 @@ struct FilesLoop : public BaseLoop
 {
 public:
 
-    FilesLoop(Memory &s, ActIterT i, const std::string &n, const std::string &_path, const std::vector<std::string> &patters) 
+    FilesLoop(Memory &s, ActIterT i, const std::string &n,
+              const std::string &_path,
+              const std::string &_extension
+              const std::string &_pattern) 
         : BaseLoop(s, i, n)
         , path{_path}
+        , extension(_extension)
+        , pattern(_pattern)
         , iter(path)
         , end(std::filesystem::end(iter))
     {
+        while (!this->match() && iter != end) ++iter;
         if (iter != end) this->set(iter->path().string());
     }
     virtual ~FilesLoop() {}
-    bool valid() override {return iter != end;}
+    bool match() override {
+        if (!extension.empty() && iter->path().extension() != extension) return false;
+        if (!pattern.empty() && iter->path().filename().string().find(pattern) == std::string::npos) return false;
+        return true;
+    }
+    bool valid() override {return this->match() && iter != end;}
     bool next() override {
         ++pos;
-        if (++iter != end) this->set(iter->path().string());
+        while (!this->match() && iter != end) ++iter;
+        if (iter != end) this->set(iter->path().string());
         return iter != end;
     }
 
 private:
  
     using BaseLoop::pos;
+    const std::filesystem::path path, extension;
+    const std::string pattern;
     //union {
     std::filesystem::directory_iterator iter, end;
     //    std::filesystem::recursive_directory_iterator b;
     //} iter;
-    const std::filesystem::path path;
-    std::string patterns;
 };// FilesLoop struct
 
 // ==============================================================================================================
