@@ -1,10 +1,10 @@
 vdb_tool:
 
   New Features:
-  - Added action "soup2ls/soup2sdf", which generates a level set from a soup of polygons.
-  - Added action "files" that visits files in a directory structure which matches extensions or patterns
-  - Added action "mesh2udf", which generates a symmetric narrow band of unsigned distances to a mesh.
-  - Added action -quat2tri/q2t, which triangulates all quads in a mesh.
+  - Added new action "soup2ls/soup2sdf", which generates a level set from a soup of polygons.
+  - Added new action "files" that visits files in a directory structure which matches extensions or patterns
+  - Added new action "mesh2udf", which generates a symmetric narrow band of unsigned distances to a mesh.
+  - Added new action -quat2tri/q2t, which triangulates all quads in a mesh.
   - Added triangulation of N-gons to readOBJ and readSTL, assuming they are convex.
   - Added read support for xyz files.
 
