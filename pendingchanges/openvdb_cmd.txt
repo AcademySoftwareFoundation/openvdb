@@ -1,13 +1,18 @@
 vdb_tool:
-  Improvements:
-  - Added action soup2ls/soup2sdf, which generates a level set from a soup of polygons.
-  - Added action mesh2udf, which generates a symmetric narrow band of unsigned distances to a mesh.
-  - Action mesh2ls/mesh2sdf now supports generation of asymmetric narrow bands.
+
+  New Features:
+  - Added action "soup2ls/soup2sdf", which generates a level set from a soup of polygons.
+  - Added action "files" that visits files in a directory structure which matches extensions or patterns
+  - Added action "mesh2udf", which generates a symmetric narrow band of unsigned distances to a mesh.
   - Added action -quat2tri/q2t, which triangulates all quads in a mesh.
   - Added triangulation of N-gons to readOBJ and readSTL, assuming they are convex.
-  - Improved error reporting when using unsupported actions and options
-  - Added read support for xyz files
-  - Actions can now have multiple names, e.g. "-read", "-import, "-load", "-i"
+  - Added read support for xyz files.
+
+  Improvements:
+  - Action "mesh2ls/mesh2sdf" now supports generation of asymmetric narrow bands.
+  - Improved error reporting when using unsupported actions and options.
+  - Actions can now have multiple names, e.g. "-read", "-import, "-load", "-i".
+
   Fixes:
   - Fixed issues in readSTL so it works on all files in Thingi10K
   - Fixed bug when reading ascii ply files and off files with normals
