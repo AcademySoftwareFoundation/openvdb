@@ -648,38 +648,59 @@ private:
 };// EachLoop class
 
 // ==============================================================================================================
-/*
-struct FileLoop : public BaseLoop
+
+template <typename IterT> 
+struct FilesLoop : public BaseLoop
 {
 public:
 
-    FileLoop(Memory &s, ActIterT i, const std::string &n,
-             const std::string &_path,
-             const std::string &_extension,
-             const std::string &_pattern) 
-        : BaseLoop(s, i, n)
+    FilesLoop(Memory &s, ActIterT i, const std::string &name
+             , const std::string &_path
+             , std::vector<std::string> &&_extensions
+             , std::vector<std::string> &&_patterns)
+        : BaseLoop(s, i, name)
         , path{_path}
-        , extension(_extension)
-        , pattern(_pattern)
+        , extensions(std::move(_extensions))
+        , patterns(std::move(_patterns))
         , iter(path)
         , end(std::filesystem::end(iter))
     {
-        std::cerr << "Constructed FileLoop .. ";
         OPENVDB_ASSERT(std::filesystem::is_directory(path));
-        while (!this->match() && iter != end) ++iter;
+        while (!this->valid()) {
+            if (iter == end) break;
+            ++iter;
+        }
         if (iter != end) this->set(iter->path().string());
-        std::cerr << "done\n";
     }
-    virtual ~FileLoop() {}
-    bool match() const {
-        if (!extension.empty() && iter->path().extension() != extension) return false;
-        if (!pattern.empty() && iter->path().filename().string().find(pattern) == std::string::npos) return false;
-        return true;
+    virtual ~FilesLoop() {}
+    bool matchExtensions() const {
+        OPENVDB_ASSERT(iter != end && !extensions.empty());
+        std::string ext = iter->path().extension().string();// ".obj"
+        if (ext.empty()) return false;// files has no extension
+        ext = ext.substr(ext.find_first_not_of("."));// "obj"
+        for (const auto &e : extensions) if (e == ext) return true;
+        return false;
     }
-    bool valid() override {return this->match() && iter != end;}
+    bool matchPatterns() const {
+        OPENVDB_ASSERT(iter != end && !patterns.empty());
+        const std::string name = iter->path().filename().string();// "file.obj"
+        for (const auto &p : patterns) if (name.find(p) != std::string::npos) return true;
+        return false;
+    }
+    bool valid() override {
+        if (iter == end) return false;
+        if (!extensions.empty() && !this->matchExtensions()) return false;
+        if (!patterns.empty()   && !this->matchPatterns())   return false;
+        return std::filesystem::is_regular_file(iter->path());
+    }
     bool next() override {
+        if (iter == end) return false;
         ++pos;
-        while (!this->match() && iter != end) ++iter;
+        ++iter;
+        while (!this->valid()) {
+            if (iter == end) return false;
+            ++iter;
+        }
         if (iter != end) this->set(iter->path().string());
         return iter != end;
     }
@@ -687,14 +708,11 @@ public:
 private:
  
     using BaseLoop::pos;
-    const std::filesystem::path path, extension;
-    const std::string pattern;
-    //union {
-    std::filesystem::directory_iterator iter, end;
-    //    std::filesystem::recursive_directory_iterator b;
-    //} iter;
-};// FileLoop struct
-*/
+    const std::filesystem::path path;
+    const std::vector<std::string> extensions, patterns;
+    IterT iter, end;
+};// FilesLoop struct
+
 // ==============================================================================================================
 
 class IfLoop : public BaseLoop
@@ -927,7 +945,7 @@ Parser::Parser(std::vector<Option> &&def)
             const std::string &name = (++it)->names[0];
             if (name == "end") {
                 i -= 1;
-            } else if (name == "for" || name == "each" || name == "if") {
+            } else if (name == "for" || name == "each" || name == "if" || name == "files") {
                 i += 1;
             }
         }
@@ -955,20 +973,28 @@ Parser::Parser(std::vector<Option> &&def)
             }
         }
     );
-/*
+
+    // vdb_tool -quiet -files path="./dir" pattern="_1" ext="obj,ply,vdb" recur=1 -eval '{$file}'  -end
+    // vdb_tool -files path=$HOME/dev/data recur=1 ext="obj,stl" -read '{$file}' -print -clear -end
     this->addAction(
-        {"files"}, "start of files-loop over a user-defined loop variable and range.",
-        {{"path", ".", "\"/path_to_directory_with_files\"", "define name of loop variable and its range."},
-         {"extension", "", "\"obj\"", "define name of loop variable and its range."},
-         {"pattern", "", "\"output_\"", "define name of loop variable and its range."}},
+        {"files"}, "start of files-loop in a directory.",
+        {{"path", ".", "path=/dir", "directory where file search is initiated"},
+         {"extension", "", "\"obj,ply\"", "files must have one or more extensions"},
+         {"pattern", "", "\"file1,file2\"", "files must contain one or more patterns"},
+         {"recursive", "0", "0|1|false|true", "recursive search of files into sub-directories."}},
         [&](){++counter;},
         [&](){
             OPENVDB_ASSERT(iter->names[0] == "files");
-            const std::string &path    = iter->options[0].value;
-            const std::string &ext     = iter->options[1].value;
-            const std::string &pattern = iter->options[2].value;
-            std::cerr << "path="<<path << ", ext=" << ext << ", pattern=" << pattern << std::endl;
-            auto loop = std::make_shared<FileLoop>(processor.memory(), iter, "file", path, ext, pattern);
+            std::shared_ptr<BaseLoop> loop;
+            if (this->get<bool>("recursive")) {
+                using LoopT = FilesLoop<std::filesystem::recursive_directory_iterator>;
+                loop = std::make_shared<LoopT>(processor.memory(), iter, "file", iter->options[0].value, 
+                                               this->getVec<std::string>("extension",","), this->getVec<std::string>("pattern",","));
+            } else {
+                using LoopT = FilesLoop<std::filesystem::directory_iterator>;
+                loop = std::make_shared<LoopT>(processor.memory(), iter, "file", iter->options[0].value,
+                                               this->getVec<std::string>("extension",","), this->getVec<std::string>("pattern",","));
+            }
             if (loop->valid()) {
                 loops.push_back(loop);
                 if (verbose) loop->print();
@@ -977,7 +1003,7 @@ Parser::Parser(std::vector<Option> &&def)
             }
         }
     );
-*/
+
     this->addAction(
         {"each"}, "start of each-loop over a user-defined loop variable and list of values.",
         {{"", "", "s=sphere,bunny,...", "defined name of loop variable and list of its values."}},
