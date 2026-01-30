@@ -80,7 +80,6 @@ option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library. Turns ON if USE_NANOVDB
 # Global options
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_ENABLE_ASSERTS "Build with asserts in OpenVDB code enabled" OFF)
-option(OPENVDB_USE_DELAYED_LOADING "Build the core OpenVDB library with delayed-loading." ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
@@ -249,7 +248,6 @@ mark_as_advanced(
   OPENVDB_BUILD_HOUDINI_ABITESTS
   OPENVDB_CXX_STRICT
   OPENVDB_ENABLE_RPATH
-  OPENVDB_USE_DELAYED_LOADING
   OPENVDB_FUTURE_DEPRECATION
   OPENVDB_SIMD
   SYSTEM_LIBRARY_PATHS

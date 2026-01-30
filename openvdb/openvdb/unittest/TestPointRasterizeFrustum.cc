@@ -2154,9 +2154,6 @@ TEST_F(TestPointRasterizeFrustum, testStreaming)
 
     auto leaf = points->tree().cbeginLeaf();
     EXPECT_TRUE(leaf);
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    EXPECT_TRUE(leaf->buffer().isOutOfCore());
-#endif
 
     using Rasterizer = FrustumRasterizer<PointDataGrid>;
     using Settings = FrustumRasterizerSettings;
@@ -2327,17 +2324,10 @@ TEST_F(TestPointRasterizeFrustum, testStreaming)
     auto points2 = points->deepCopy();
     points2->setTransform(transform);
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    // verify both grids are out-of-core
-
-    EXPECT_TRUE(points->tree().cbeginLeaf()->buffer().isOutOfCore());
-    EXPECT_TRUE(points2->tree().cbeginLeaf()->buffer().isOutOfCore());
-#endif
-
 #ifndef ONLY_RASTER_FLOAT
     // memory tests
 
-    if (io::Archive::isDelayedLoadingEnabled() && io::Archive::hasBloscCompression()) {
+    if (io::Archive::hasBloscCompression()) {
 
         FloatGrid::Ptr density1, density2, density3;
         Vec3SGrid::Ptr velocity1, velocity2, velocity3;
@@ -2345,121 +2335,30 @@ TEST_F(TestPointRasterizeFrustum, testStreaming)
         const size_t mb = 1024*1024;
         const size_t tinyMemory = static_cast<size_t>(0.1*mb);
 
-        size_t initialMemory;
-
         { // memory test 1 - retain caches and streaming disabled
             Rasterizer rasterizer(settings);
 
             rasterizer.addPoints(points, /*stream=*/false);
             rasterizer.addPoints(points2, /*stream=*/false);
 
-            initialMemory = rasterizer.memUsage();
+            // memory usage should be around 80-100MB throughout rasterization
 
-            EXPECT_TRUE(initialMemory > size_t(4*mb) && initialMemory < size_t(16*mb));
+            EXPECT_TRUE(rasterizer.memUsage() > size_t(80*mb) &&
+                rasterizer.memUsage() < size_t(100*mb));
 
             EXPECT_EQ(size_t(2), rasterizer.size());
 
             velocity1 = rasterizer.rasterizeAttribute<Vec3SGrid, Vec3s>("v");
             EXPECT_EQ(Index64(219780), velocity1->activeVoxelCount());
 
-            EXPECT_TRUE(rasterizer.memUsage() > size_t(71*mb) &&
-                rasterizer.memUsage() < size_t(91*mb));
+            EXPECT_TRUE(rasterizer.memUsage() > size_t(80*mb) &&
+                rasterizer.memUsage() < size_t(100*mb));
 
             density1 = rasterizer.rasterizeDensity("density");
             EXPECT_EQ(Index64(219780), density1->activeVoxelCount());
 
-            // no data is discarded so expect a fairly high memory footprint
-
             EXPECT_TRUE(rasterizer.memUsage() > size_t(80*mb) &&
                 rasterizer.memUsage() < size_t(100*mb));
-        }
-
-        { // memory test 2 - retain caches and streaming enabled
-
-            { // reopen file and deep copy while setting transform
-                io::File file(filename);
-                file.open();
-                openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
-                file.close();
-
-                points = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
-                points2 = points->deepCopy();
-                points2->setTransform(transform);
-            }
-
-            Rasterizer rasterizer(settings);
-
-            rasterizer.addPoints(points, /*stream=*/true);
-            rasterizer.addPoints(points2, /*stream=*/true);
-
-            EXPECT_EQ(initialMemory, rasterizer.memUsage());
-
-            EXPECT_EQ(size_t(2), rasterizer.size());
-
-            velocity2 = rasterizer.rasterizeAttribute<Vec3SGrid, Vec3s>("v");
-            EXPECT_EQ(Index64(219780), velocity2->activeVoxelCount());
-
-            size_t postRasterMemory = rasterizer.memUsage();
-
-            EXPECT_TRUE(postRasterMemory > size_t(70*mb) && postRasterMemory < size_t(85*mb));
-
-            density2 = rasterizer.rasterizeDensity("density");
-            EXPECT_EQ(Index64(219780), density2->activeVoxelCount());
-
-            // as data is being streamed, second attribute shouldn't change memory usage very much
-
-            EXPECT_TRUE(rasterizer.memUsage() < (postRasterMemory + tinyMemory));
-        }
-
-        { // memory test 3 - release caches and streaming enabled
-
-            { // reopen file and deep copy while setting transform
-                io::File file(filename);
-                file.open();
-                openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
-                file.close();
-
-                points = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
-                points2 = points->deepCopy();
-                points2->setTransform(transform);
-            }
-
-            auto points3 = points->deepCopy();
-            auto points4 = points2->deepCopy();
-
-            Settings settings2(*frustum);
-            settings2.threshold = 0.0f;
-
-            Mask mask2(*frustum, nullptr, BBoxd(), /*clipToFrustum=*/false);
-
-            Rasterizer rasterizer(settings2, mask2);
-
-            rasterizer.addPoints(points, /*stream=*/true);
-            rasterizer.addPoints(points2, /*stream=*/true);
-
-            EXPECT_EQ(initialMemory, rasterizer.memUsage());
-            EXPECT_EQ(size_t(2), rasterizer.size());
-
-            density3 = rasterizer.rasterizeDensity("density", RasterMode::ACCUMULATE, true);
-            EXPECT_EQ(Index64(219780), density3->activeVoxelCount());
-
-            // all voxel data, attribute data and caches are being discarded,
-            // so memory after rasterizing shouldn't change very much
-
-            EXPECT_TRUE(rasterizer.memUsage() < (initialMemory + tinyMemory));
-
-            // deep-copies of delay-loaded point grids need to be used for repeat rasterization
-
-            rasterizer.clear();
-            rasterizer.addPoints(points3, /*stream=*/true);
-            rasterizer.addPoints(points4, /*stream=*/true);
-
-            EXPECT_EQ(size_t(2), rasterizer.size());
-
-            EXPECT_TRUE(rasterizer.memUsage() < (initialMemory + tinyMemory));
-
-            velocity3 = rasterizer.rasterizeAttribute<Vec3SGrid, Vec3s>("v", RasterMode::ACCUMULATE, true);
-            EXPECT_EQ(Index64(219780), velocity3->activeVoxelCount());
         }
     }
 #endif

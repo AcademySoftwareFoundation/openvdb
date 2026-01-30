@@ -8,7 +8,6 @@
 #include <openvdb/tools/LevelSetSphere.h> // tools::createLevelSetSphere
 #include <openvdb/tools/LevelSetUtil.h> // tools::sdfToFogVolume
 #include <openvdb/tree/ValueAccessor.h>
-#include <openvdb/io/TempFile.h>
 
 
 class TestCount: public ::testing::Test
@@ -238,49 +237,6 @@ TEST_F(TestCount, testMemUsage)
 
     EXPECT_EQ(expectedMaxMem, inCoreMemUsage);
     EXPECT_EQ(expectedMaxMem, memUsageIfLoaded);
-
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    // Write out the grid and read it in with delay-loading. Check the
-    // expected memory usage values.]
-
-    openvdb::initialize();
-
-    std::string filename;
-
-    // write out grid to a temp file
-    {
-        io::TempFile file;
-        filename = file.filename();
-        io::File fileOut(filename);
-        fileOut.write({grid});
-    }
-
-    io::File fileIn(filename);
-    fileIn.open(true); // delay-load
-    auto grids = fileIn.getGrids();
-    fileIn.close();
-
-    grid = GridBase::grid<FloatGrid>((*grids)[0]);
-    EXPECT_TRUE(grid);
-
-    inCoreMemUsage = tools::memUsage(grid->tree());
-    memUsageIfLoaded = tools::memUsageIfLoaded(grid->tree());
-
-    EXPECT_EQ(expectedMaxMem, memUsageIfLoaded);
-    EXPECT_TRUE(inCoreMemUsage < expectedMaxMem);
-
-    // in core memory should be the max memory without the leaf buffers but
-    // with the FileInfo
-
-    const Index64 leafBuffers = sizeof(FloatGrid::ValueType) * FloatTree::LeafNodeType::SIZE;
-    const Index64 fileInfo = sizeof(FloatTree::LeafNodeType::Buffer::FileInfo);
-    const Index64 expectedInCoreMemUsage = expectedMaxMem + (leafCount * (-leafBuffers + fileInfo));
-    EXPECT_EQ(expectedInCoreMemUsage, inCoreMemUsage);
-
-    std::remove(filename.c_str());
-
-    openvdb::uninitialize();
-#endif
 }
 
 

@@ -297,10 +297,6 @@ Page::uncompressedBytes() const
 const char*
 Page::buffer(const int index) const
 {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    if (this->isOutOfCore())   this->load();
-#endif
-
     return mData.get() + index;
 }
 
@@ -336,51 +332,23 @@ Page::readBuffers(std::istream&is, bool delayed)
 
     bool isCompressed = mInfo->compressedBytes > 0;
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    io::MappedFile::Ptr mappedFile = io::getMappedFilePtr(is);
+    std::unique_ptr<char[]> buffer(new char[
+        (isCompressed ? mInfo->compressedBytes : -mInfo->compressedBytes)]);
+    is.read(buffer.get(), (isCompressed ? mInfo->compressedBytes : -mInfo->compressedBytes));
 
-    if (delayed && mappedFile) {
-        SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
-        OPENVDB_ASSERT(meta);
-
-        std::streamoff filepos = is.tellg();
-
-        // seek over the page
-        is.seekg((isCompressed ? mInfo->compressedBytes : -mInfo->compressedBytes),
-            std::ios_base::cur);
-
-        mInfo->mappedFile = mappedFile;
-        mInfo->meta = meta;
-        mInfo->filepos = filepos;
-
-        OPENVDB_ASSERT(mInfo->mappedFile);
+    if (mInfo->compressedBytes > 0) {
+        this->decompress(buffer);
+    } else {
+        this->copy(buffer, -static_cast<int>(mInfo->compressedBytes));
     }
-    else {
-#endif
-        std::unique_ptr<char[]> buffer(new char[
-            (isCompressed ? mInfo->compressedBytes : -mInfo->compressedBytes)]);
-        is.read(buffer.get(), (isCompressed ? mInfo->compressedBytes : -mInfo->compressedBytes));
-
-        if (mInfo->compressedBytes > 0) {
-            this->decompress(buffer);
-        } else {
-            this->copy(buffer, -static_cast<int>(mInfo->compressedBytes));
-        }
-        mInfo.reset();
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    }
-#endif
+    mInfo.reset();
 }
 
 
 bool
 Page::isOutOfCore() const
 {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    return bool(mInfo);
-#else
     return false;
-#endif
 }
 
 
@@ -409,41 +377,6 @@ Page::decompress(const std::unique_ptr<char[]>& temp)
 void
 Page::doLoad() const
 {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    if (!this->isOutOfCore())  return;
-
-    Page* self = const_cast<Page*>(this);
-
-    // This lock will be contended at most once, after which this buffer
-    // will no longer be out-of-core.
-    tbb::spin_mutex::scoped_lock lock(self->mMutex);
-    if (!this->isOutOfCore()) return;
-
-    OPENVDB_ASSERT(self->mInfo);
-
-    int compressedBytes = static_cast<int>(self->mInfo->compressedBytes);
-    bool compressed = compressedBytes > 0;
-    if (!compressed) compressedBytes = -compressedBytes;
-
-    OPENVDB_ASSERT(compressedBytes);
-
-    std::unique_ptr<char[]> temp(new char[compressedBytes]);
-
-    OPENVDB_ASSERT(self->mInfo->mappedFile);
-    SharedPtr<std::streambuf> buf = self->mInfo->mappedFile->createBuffer();
-    OPENVDB_ASSERT(buf);
-
-    std::istream is(buf.get());
-    io::setStreamMetadataPtr(is, self->mInfo->meta, /*transfer=*/true);
-    is.seekg(self->mInfo->filepos);
-
-    is.read(temp.get(), compressedBytes);
-
-    if (compressed)     self->decompress(temp);
-    else                self->copy(temp, compressedBytes);
-
-    self->mInfo.reset();
-#endif
 }
 
 

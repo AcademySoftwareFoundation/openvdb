@@ -36,23 +36,9 @@ public:
     using NodeMaskType = util::NodeMask<Log2Dim>;
     static const Index SIZE = 1 << 3 * Log2Dim;
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    struct FileInfo
-    {
-        FileInfo(): bufpos(0) , maskpos(0) {}
-        std::streamoff bufpos;
-        std::streamoff maskpos;
-        io::MappedFile::Ptr mapping;
-        SharedPtr<io::StreamMetadata> meta;
-    };
-#endif
-
     /// Default constructor
     inline LeafBuffer(): mData(new ValueType[SIZE])
     {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-        mOutOfCore = 0;
-#endif
     }
     /// Construct a buffer populated with the specified value.
     explicit inline LeafBuffer(const ValueType&);
@@ -61,9 +47,6 @@ public:
     /// Construct a buffer but don't allocate memory for the full array of values.
     LeafBuffer(PartialCreate, const ValueType&): mData(nullptr)
     {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-        mOutOfCore = 0;
-#endif
     }
     /// Destructor
     inline ~LeafBuffer();
@@ -71,22 +54,12 @@ public:
     /// Return @c true if this buffer's values have not yet been read from disk.
     bool isOutOfCore() const
     {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-        return bool(mOutOfCore);
-#else
         return false;
-#endif
     }
     /// Return @c true if memory for this buffer has not yet been allocated.
     bool empty() const { return !mData || this->isOutOfCore(); }
     /// Allocate memory for this buffer if it has not already been allocated.
     bool allocate() { if (mData == nullptr) mData = new ValueType[SIZE]; return true; }
-
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    /// Enable out-of-core in the LeafBuffer.
-    void enableOutOfCore(SharedPtr<io::StreamMetadata>& meta, const std::streamoff& bufpos,
-        io::MappedFile::Ptr& mappedFile, const std::streamoff& maskpos);
-#endif
 
     /// Populate this buffer with a constant value.
     inline void fill(const ValueType&);
@@ -142,31 +115,18 @@ private:
     inline void setOutOfCore(bool b)
     {
         (void) b;
-#ifdef OPENVDB_USE_DELAYED_LOADING
-        mOutOfCore = b;
-#endif
     }
     // To facilitate inlining in the common case in which the buffer is in-core,
     // the loading logic is split into a separate function, doLoad().
     inline void loadValues() const
     {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-        if (this->isOutOfCore()) this->doLoad();
-#endif
     }
     inline void doLoad() const;
     inline bool detachFromFile();
 
     using FlagsType = std::atomic<Index32>;
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    union {
-        ValueType* mData;
-        FileInfo*  mFileInfo;
-    };
-#else
     ValueType* mData;
-#endif
     FlagsType mOutOfCore; // interpreted as bool; extra bits reserved for future use
     tbb::spin_mutex mMutex; // 1 byte
     //int8_t mReserved[3]; // padding for alignment
@@ -185,9 +145,6 @@ inline
 LeafBuffer<T, Log2Dim>::LeafBuffer(const ValueType& val)
     : mData(new ValueType[SIZE])
 {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    mOutOfCore = 0;
-#endif
     this->fill(val);
 }
 
@@ -196,15 +153,7 @@ template<typename T, Index Log2Dim>
 inline
 LeafBuffer<T, Log2Dim>::~LeafBuffer()
 {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    if (this->isOutOfCore()) {
-        this->detachFromFile();
-    } else {
-        this->deallocate();
-    }
-#else
     this->deallocate();
-#endif
 }
 
 
@@ -212,25 +161,14 @@ template<typename T, Index Log2Dim>
 inline
 LeafBuffer<T, Log2Dim>::LeafBuffer(const LeafBuffer& other)
     : mData(nullptr)
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    , mOutOfCore(other.mOutOfCore.load())
-#endif
 {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    if (other.isOutOfCore()) {
-        mFileInfo = new FileInfo(*other.mFileInfo);
-    } else {
-#endif
-        if (other.mData != nullptr) {
-            this->allocate();
-            ValueType* target = mData;
-            const ValueType* source = other.mData;
-            Index n = SIZE;
-            while (n--) *target++ = *source++;
-        }
-#ifdef OPENVDB_USE_DELAYED_LOADING
+    if (other.mData != nullptr) {
+        this->allocate();
+        ValueType* target = mData;
+        const ValueType* source = other.mData;
+        Index n = SIZE;
+        while (n--) *target++ = *source++;
     }
-#endif
 }
 
 
@@ -249,46 +187,16 @@ inline LeafBuffer<T, Log2Dim>&
 LeafBuffer<T, Log2Dim>::operator=(const LeafBuffer& other)
 {
     if (&other != this) {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-        if (this->isOutOfCore()) {
-            this->detachFromFile();
-        } else {
-            if (other.isOutOfCore()) this->deallocate();
+        if (other.mData != nullptr) {
+            this->allocate();
+            ValueType* target = mData;
+            const ValueType* source = other.mData;
+            Index n = SIZE;
+            while (n--) *target++ = *source++;
         }
-        if (other.isOutOfCore()) {
-            mOutOfCore.store(other.mOutOfCore.load(std::memory_order_acquire),
-                             std::memory_order_release);
-            mFileInfo = new FileInfo(*other.mFileInfo);
-        } else {
-#endif
-            if (other.mData != nullptr) {
-                this->allocate();
-                ValueType* target = mData;
-                const ValueType* source = other.mData;
-                Index n = SIZE;
-                while (n--) *target++ = *source++;
-            }
-#ifdef OPENVDB_USE_DELAYED_LOADING
-        }
-#endif
     }
     return *this;
 }
-
-#ifdef OPENVDB_USE_DELAYED_LOADING
-template<typename T, Index Log2Dim>
-void LeafBuffer<T, Log2Dim>::enableOutOfCore(
-    SharedPtr<io::StreamMetadata>& meta, const std::streamoff& bufpos,
-    io::MappedFile::Ptr& mappedFile, const std::streamoff& maskpos)
-{
-    this->setOutOfCore(true);
-    mFileInfo = new FileInfo;
-    mFileInfo->meta = meta;
-    mFileInfo->bufpos = bufpos;
-    mFileInfo->mapping = mappedFile;
-    mFileInfo->maskpos = maskpos;
-}
-#endif
 
 template<typename T, Index Log2Dim>
 inline void
@@ -323,15 +231,6 @@ inline void
 LeafBuffer<T, Log2Dim>::swap(LeafBuffer& other)
 {
     std::swap(mData, other.mData);
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    // Two atomics can't be swapped because it would require hardware support:
-    // https://en.wikipedia.org/wiki/Double_compare-and-swap
-    // Note that there's a window in which other.mOutOfCore could be written
-    // between our load from it and our store to it.
-    auto tmp = other.mOutOfCore.load(std::memory_order_acquire);
-    tmp = mOutOfCore.exchange(std::move(tmp));
-    other.mOutOfCore.store(std::move(tmp), std::memory_order_release);
-#endif
 }
 
 
@@ -340,14 +239,7 @@ inline Index
 LeafBuffer<T, Log2Dim>::memUsage() const
 {
     size_t n = sizeof(*this);
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    if (this->isOutOfCore()) n += sizeof(FileInfo);
-    else {
-#endif
-        if (mData) n += SIZE * sizeof(ValueType);
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    }
-#endif
+    if (mData) n += SIZE * sizeof(ValueType);
     return static_cast<Index>(n);
 }
 
@@ -369,10 +261,6 @@ LeafBuffer<T, Log2Dim>::data() const
     this->loadValues();
     if (mData == nullptr) {
         LeafBuffer* self = const_cast<LeafBuffer*>(this);
-#ifdef OPENVDB_USE_DELAYED_LOADING
-        // This lock will be contended at most once.
-        tbb::spin_mutex::scoped_lock lock(self->mMutex);
-#endif
         if (mData == nullptr) self->mData = new ValueType[SIZE];
     }
     return mData;
@@ -384,10 +272,6 @@ LeafBuffer<T, Log2Dim>::data()
 {
     this->loadValues();
     if (mData == nullptr) {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-        // This lock will be contended at most once.
-        tbb::spin_mutex::scoped_lock lock(mMutex);
-#endif
         if (mData == nullptr) mData = new ValueType[SIZE];
     }
     return mData;
@@ -413,9 +297,6 @@ LeafBuffer<T, Log2Dim>::deallocate()
 {
 
     if (mData != nullptr) {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-        if (this->isOutOfCore())    return false;
-#endif
         delete[] mData;
         mData = nullptr;
         return true;
@@ -428,39 +309,6 @@ template<typename T, Index Log2Dim>
 inline void
 LeafBuffer<T, Log2Dim>::doLoad() const
 {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    if (!this->isOutOfCore()) return;
-
-    LeafBuffer<T, Log2Dim>* self = const_cast<LeafBuffer<T, Log2Dim>*>(this);
-
-    // This lock will be contended at most once, after which this buffer
-    // will no longer be out-of-core.
-    tbb::spin_mutex::scoped_lock lock(self->mMutex);
-    if (!this->isOutOfCore()) return;
-
-    std::unique_ptr<FileInfo> info(self->mFileInfo);
-    OPENVDB_ASSERT(info.get() != nullptr);
-    OPENVDB_ASSERT(info->mapping.get() != nullptr);
-    OPENVDB_ASSERT(info->meta.get() != nullptr);
-
-    /// @todo For now, we have to clear the mData pointer in order for allocate() to take effect.
-    self->mData = nullptr;
-    self->allocate();
-
-    SharedPtr<std::streambuf> buf = info->mapping->createBuffer();
-    std::istream is(buf.get());
-
-    io::setStreamMetadataPtr(is, info->meta, /*transfer=*/true);
-
-    NodeMaskType mask;
-    is.seekg(info->maskpos);
-    mask.load(is);
-
-    is.seekg(info->bufpos);
-    io::readCompressedValues(is, self->mData, SIZE, mask, io::getHalfFloat(is));
-
-    self->setOutOfCore(false);
-#endif
 }
 
 
@@ -468,14 +316,6 @@ template<typename T, Index Log2Dim>
 inline bool
 LeafBuffer<T, Log2Dim>::detachFromFile()
 {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    if (this->isOutOfCore()) {
-        delete mFileInfo;
-        mFileInfo = nullptr;
-        this->setOutOfCore(false);
-        return true;
-    }
-#endif
     return false;
 }
 

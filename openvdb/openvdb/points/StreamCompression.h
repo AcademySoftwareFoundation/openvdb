@@ -114,9 +114,6 @@ class OPENVDB_API Page
 private:
     struct Info
     {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-        io::MappedFile::Ptr mappedFile;
-#endif
         SharedPtr<io::StreamMetadata> meta;
         std::streamoff filepos;
         long compressedBytes;

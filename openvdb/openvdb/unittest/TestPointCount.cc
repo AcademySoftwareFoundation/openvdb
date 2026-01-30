@@ -3,7 +3,6 @@
 
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/openvdb.h>
-#include <openvdb/io/TempFile.h>
 #include <openvdb/math/Math.h>
 
 #include <openvdb/points/PointGroup.h>
@@ -315,19 +314,6 @@ TEST_F(TestPointCount, testGroup)
             GroupFilter groupFilter("test", attributeSet);
 
             bool inCoreOnly;
-#ifdef OPENVDB_USE_DELAYED_LOADING
-            inCoreOnly = true;
-
-            EXPECT_EQ(pointCount(inputTree, NullFilter(), inCoreOnly), Index64(0));
-            EXPECT_EQ(pointCount(inputTree, ActiveFilter(), inCoreOnly), Index64(0));
-            EXPECT_EQ(pointCount(inputTree, InactiveFilter(), inCoreOnly), Index64(0));
-            EXPECT_EQ(pointCount(inputTree, groupFilter, inCoreOnly), Index64(0));
-            EXPECT_EQ(pointCount(inputTree, BinaryFilter<GroupFilter, ActiveFilter>(
-                groupFilter, ActiveFilter()), inCoreOnly), Index64(0));
-            EXPECT_EQ(pointCount(inputTree, BinaryFilter<GroupFilter, InactiveFilter>(
-                groupFilter, InactiveFilter()), inCoreOnly), Index64(0));
-#endif
-
             inCoreOnly = false;
 
             EXPECT_EQ(pointCount(inputTree, NullFilter(), inCoreOnly), Index64(4));
@@ -528,51 +514,6 @@ TEST_F(TestPointCount, testOffsets)
         GridCPtrVec grids{grid};
         fileOut.write(grids);
     }
-
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    // test point offsets for a delay-loaded grid
-    {
-        io::File fileIn(filename);
-        fileIn.open();
-
-        GridPtrVecPtr grids = fileIn.getGrids();
-
-        fileIn.close();
-
-        EXPECT_EQ(grids->size(), size_t(1));
-
-        PointDataGrid::Ptr inputGrid = GridBase::grid<PointDataGrid>((*grids)[0]);
-
-        EXPECT_TRUE(inputGrid);
-
-        PointDataTree& inputTree = inputGrid->tree();
-
-        std::vector<Index64> offsets;
-        std::vector<Name> includeGroups;
-        std::vector<Name> excludeGroups;
-
-        MultiGroupFilter filter(includeGroups, excludeGroups, inputTree.cbeginLeaf()->attributeSet());
-        Index64 total = pointOffsets(offsets, inputTree, filter, /*inCoreOnly=*/true);
-
-        EXPECT_EQ(offsets.size(), size_t(4));
-        EXPECT_EQ(offsets[0], Index64(0));
-        EXPECT_EQ(offsets[1], Index64(0));
-        EXPECT_EQ(offsets[2], Index64(0));
-        EXPECT_EQ(offsets[3], Index64(0));
-        EXPECT_EQ(total, Index64(0));
-
-        offsets.clear();
-
-        total = pointOffsets(offsets, inputTree, filter, /*inCoreOnly=*/false);
-
-        EXPECT_EQ(offsets.size(), size_t(4));
-        EXPECT_EQ(offsets[0], Index64(1));
-        EXPECT_EQ(offsets[1], Index64(3));
-        EXPECT_EQ(offsets[2], Index64(4));
-        EXPECT_EQ(offsets[3], Index64(5));
-        EXPECT_EQ(total, Index64(5));
-    }
-#endif
 
     std::remove(filename.c_str());
 }

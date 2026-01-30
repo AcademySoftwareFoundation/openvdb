@@ -5,13 +5,8 @@
 
 #include "File.h" ///< @todo refactor
 #include "GridDescriptor.h"
-#include "TempFile.h"
 #include <openvdb/Exceptions.h>
 #include <cstdint>
-
-#ifdef OPENVDB_USE_DELAYED_LOADING
-#include <boost/iostreams/copy.hpp>
-#endif
 
 #include <cstdio> // for remove()
 #include <functional> // for std::bind()
@@ -49,58 +44,11 @@ struct Stream::Impl
 ////////////////////////////////////////
 
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
-
-namespace {
-
-/// @todo Use MappedFile auto-deletion instead.
-void
-removeTempFile(const std::string expectedFilename, const std::string& filename)
-{
-    if (filename == expectedFilename) {
-        if (0 != std::remove(filename.c_str())) {
-            std::string mesg = getErrorString();
-            if (!mesg.empty()) mesg = " (" + mesg + ")";
-            OPENVDB_LOG_WARN("failed to remove temporary file " << filename << mesg);
-        }
-    }
-}
-
-}
-
-#endif // OPENVDB_USE_DELAYED_LOADING
-
-
 Stream::Stream(std::istream& is, bool delayLoad): mImpl(new Impl)
 {
     if (!is) return;
 
     (void) delayLoad;
-
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    if (delayLoad && Archive::isDelayedLoadingEnabled()) {
-        // Copy the contents of the stream to a temporary private file
-        // and open the file instead.
-        std::unique_ptr<TempFile> tempFile;
-        try {
-            tempFile.reset(new TempFile);
-        } catch (std::exception& e) {
-            std::string mesg;
-            if (e.what()) mesg = std::string(" (") + e.what() + ")";
-            OPENVDB_LOG_WARN("failed to create a temporary file for delayed loading" << mesg
-                << "; will read directly from the input stream instead");
-        }
-        if (tempFile) {
-            boost::iostreams::copy(is, *tempFile);
-            const std::string& filename = tempFile->filename();
-            mImpl->mFile.reset(new File(filename));
-            mImpl->mFile->setCopyMaxBytes(0); // don't make a copy of the temporary file
-            /// @todo Need to pass auto-deletion flag to MappedFile.
-            mImpl->mFile->open(delayLoad,
-                std::bind(&removeTempFile, filename, std::placeholders::_1));
-        }
-    }
-#endif // OPENVDB_USE_DELAYED_LOADING
 
     if (!mImpl->mFile) {
         readHeader(is);

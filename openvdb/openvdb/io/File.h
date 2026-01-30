@@ -54,20 +54,11 @@ public:
     /// @details The file does not necessarily exist on disk yet.
     const std::string& filename() const;
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
     /// @brief Open the file, read the file header and the file-level metadata,
     /// and populate the grid descriptors, but do not load any grids into memory.
-    /// @details If @a delayLoad is true, map the file into memory and enable delayed loading
-    /// of grids, and if a notifier is provided, call it when the file gets unmapped.
-    /// @note Define the environment variable @c OPENVDB_DISABLE_DELAYED_LOAD to disable
-    /// delayed loading unconditionally.
     /// @throw IoError if the file is not a valid VDB file.
     /// @return @c true if the file's UUID has changed since it was last read.
-    /// @see setCopyMaxBytes
-    bool open(bool delayLoad = true, const MappedFile::Notifier& = MappedFile::Notifier());
-#else
-    bool open(bool /*delayLoad*/ = false);
-#endif
+    bool open();
 
     /// Return @c true if the file has been opened for reading.
     bool isOpen() const;
@@ -78,24 +69,6 @@ public:
     /// @brief Return this file's current size on disk in bytes.
     /// @throw IoError if the file size cannot be determined.
     Index64 getSize() const;
-
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    /// @brief Return the size in bytes above which this file will not be
-    /// automatically copied during delayed loading.
-    Index64 copyMaxBytes() const;
-    /// @brief If this file is opened with delayed loading enabled, make a private copy
-    /// of the file if its size in bytes is less than the specified value.
-    /// @details Making a private copy ensures that the file can't change on disk
-    /// before it has been fully read.
-    /// @warning If the file is larger than this size, it is the user's responsibility
-    /// to ensure that it does not change on disk before it has been fully read.
-    /// Undefined behavior and/or a crash might result otherwise.
-    /// @note Copying is enabled by default, but it can be disabled for individual files
-    /// by setting the maximum size to zero bytes.  A default size limit can be specified
-    /// by setting the environment variable @c OPENVDB_DELAYED_LOAD_COPY_MAX_BYTES
-    /// to the desired number of bytes.
-    void setCopyMaxBytes(Index64 bytes);
-#endif
 
     /// Return @c true if a grid of the given name exists in this file.
     bool hasGrid(const Name&) const;

@@ -13,35 +13,6 @@
 #include <openvdb/util/logging.h>
 #include <openvdb/openvdb.h>
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
-// Boost.Interprocess uses a header-only portion of Boost.DateTime
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-macros"
-#endif
-#define BOOST_DATE_TIME_NO_LIB
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
-#include <boost/interprocess/file_mapping.hpp>
-#include <boost/interprocess/mapped_region.hpp>
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
-
-#ifdef _WIN32
-#include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
-extern "C" __declspec(dllimport) bool __stdcall GetFileTime(
-    void* fh, void* ctime, void* atime, void* mtime);
-// boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
-// Ensure that both namespaces exist.
-namespace boost { namespace interprocess { namespace detail {} namespace ipcdetail {} } }
-#else
-#include <sys/types.h> // for struct stat
-#include <sys/stat.h> // for stat()
-#include <unistd.h> // for unlink()
-#endif
-#endif // OPENVDB_USE_DELAYED_LOADING
-
 #include <atomic>
 
 #include <algorithm> // for std::find_if()
@@ -443,117 +414,6 @@ operator<<(std::ostream& os, const StreamMetadata::AuxDataMap& auxData)
 ////////////////////////////////////////
 
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
-
-
-// Memory-mapping a VDB file permits threaded input (and output, potentially,
-// though that might not be practical for compressed files or files containing
-// multiple grids).  In particular, a memory-mapped file can be loaded lazily,
-// meaning that the voxel buffers of the leaf nodes of a grid's tree are not allocated
-// until they are actually accessed.  When access to its buffer is requested,
-// a leaf node allocates memory for the buffer and then streams in (and decompresses)
-// its contents from the memory map, starting from a stream offset that was recorded
-// at the time the node was constructed.  The memory map must persist as long as
-// there are unloaded leaf nodes; this is ensured by storing a shared pointer
-// to the map in each unloaded node.
-
-class MappedFile::Impl
-{
-public:
-    Impl(const std::string& filename, bool autoDelete)
-        : mMap(filename.c_str(), boost::interprocess::read_only)
-        , mRegion(mMap, boost::interprocess::read_only)
-        , mAutoDelete(autoDelete)
-    {
-        if (mAutoDelete) {
-#ifndef _WIN32
-            // On Unix systems, unlink the file so that it gets deleted once it is closed.
-            ::unlink(mMap.get_name());
-#endif
-        }
-    }
-
-    ~Impl()
-    {
-        std::string filename;
-        if (const char* s = mMap.get_name()) filename = s;
-        OPENVDB_LOG_DEBUG_RUNTIME("closing memory-mapped file " << filename);
-        if (mNotifier) mNotifier(filename);
-        if (mAutoDelete) {
-            if (!boost::interprocess::file_mapping::remove(filename.c_str())) {
-                if (errno != ENOENT) {
-                    // Warn if the file exists but couldn't be removed.
-                    std::string mesg = getErrorString();
-                    if (!mesg.empty()) mesg = " (" + mesg + ")";
-                    OPENVDB_LOG_WARN("failed to remove temporary file " << filename << mesg);
-                }
-            }
-        }
-    }
-
-    boost::interprocess::file_mapping mMap;
-    boost::interprocess::mapped_region mRegion;
-    bool mAutoDelete;
-    Notifier mNotifier;
-#if OPENVDB_ABI_VERSION_NUMBER <= 12
-    mutable std::atomic<Index64> mLastWriteTime;
-#endif
-
-private:
-    Impl(const Impl&); // not copyable
-    Impl& operator=(const Impl&); // not copyable
-};
-
-
-MappedFile::MappedFile(const std::string& filename, bool autoDelete):
-    mImpl(new Impl(filename, autoDelete))
-{
-}
-
-
-MappedFile::~MappedFile()
-{
-}
-
-
-std::string
-MappedFile::filename() const
-{
-    std::string result;
-    if (const char* s = mImpl->mMap.get_name()) result = s;
-    return result;
-}
-
-
-SharedPtr<std::streambuf>
-MappedFile::createBuffer() const
-{
-    return SharedPtr<std::streambuf>{
-        new boost::iostreams::stream_buffer<boost::iostreams::array_source>{
-            static_cast<const char*>(mImpl->mRegion.get_address()), mImpl->mRegion.get_size()}};
-}
-
-
-void
-MappedFile::setNotifier(const Notifier& notifier)
-{
-    mImpl->mNotifier = notifier;
-}
-
-
-void
-MappedFile::clearNotifier()
-{
-    mImpl->mNotifier = nullptr;
-}
-
-
-#endif // OPENVDB_USE_DELAYED_LOADING
-
-
-////////////////////////////////////////
-
-
 std::string
 getErrorString(int errorNum)
 {
@@ -886,25 +746,6 @@ setGridBackgroundValuePtr(std::ios_base& strm, const void* background)
 }
 
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
-MappedFile::Ptr
-getMappedFilePtr(std::ios_base& strm)
-{
-    if (const void* ptr = strm.pword(GetSteamState().mappedFile)) {
-        return *static_cast<const MappedFile::Ptr*>(ptr);
-    }
-    return MappedFile::Ptr();
-}
-
-
-void
-setMappedFilePtr(std::ios_base& strm, io::MappedFile::Ptr& mappedFile)
-{
-    strm.pword(GetSteamState().mappedFile) = &mappedFile;
-}
-#endif // OPENVDB_USE_DELAYED_LOADING
-
-
 StreamMetadata::Ptr
 getStreamMetadataPtr(std::ios_base& strm)
 {
@@ -1120,12 +961,9 @@ Archive::connectInstance(const GridDescriptor& gd, const NamedGridMap& grids) co
 bool
 Archive::isDelayedLoadingEnabled()
 {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    return (nullptr == std::getenv("OPENVDB_DISABLE_DELAYED_LOAD"));
-#else
     return false;
-#endif
 }
+
 
 
 namespace {

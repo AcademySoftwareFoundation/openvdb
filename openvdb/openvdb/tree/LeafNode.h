@@ -1375,10 +1375,6 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
     SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
     const bool seekable = meta && meta->seekable();
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    std::streamoff maskpos = is.tellg();
-#endif
-
     if (seekable) {
         // Seek over the value mask.
         mValueMask.seek(is);
@@ -1396,35 +1392,16 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
         mValueMask.setOff();
         mBuffer.setOutOfCore(false);
     } else {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-        // If this node lies completely inside the clipping region and it is being read
-        // from a memory-mapped file, delay loading of its buffer until the buffer
-        // is actually accessed.  (If this node requires clipping, its buffer
-        // must be accessed and therefore must be loaded.)
-        io::MappedFile::Ptr mappedFile = io::getMappedFilePtr(is);
-        const bool delayLoad = ((mappedFile.get() != nullptr) && clipBBox.isInside(nodeBBox));
+        mBuffer.allocate();
+        io::readCompressedValues(is, mBuffer.mData, SIZE, mValueMask, fromHalf);
+        mBuffer.setOutOfCore(false);
 
-        if (delayLoad) {
-            // Save the offset to the value mask (maskpos), because the in-memory copy
-            // might change before the value buffer gets read.
-            mBuffer.enableOutOfCore(meta, is.tellg(), mappedFile, maskpos);
-            // Skip over voxel values.
-            skipCompressedValues(seekable, is, fromHalf);
-        } else {
-#endif
-            mBuffer.allocate();
-            io::readCompressedValues(is, mBuffer.mData, SIZE, mValueMask, fromHalf);
-            mBuffer.setOutOfCore(false);
-
-            // Get this tree's background value.
-            T background = zeroVal<T>();
-            if (const void* bgPtr = io::getGridBackgroundValuePtr(is)) {
-                background = *static_cast<const T*>(bgPtr);
-            }
-            this->clip(clipBBox, background);
-#ifdef OPENVDB_USE_DELAYED_LOADING
+        // Get this tree's background value.
+        T background = zeroVal<T>();
+        if (const void* bgPtr = io::getGridBackgroundValuePtr(is)) {
+            background = *static_cast<const T*>(bgPtr);
         }
-#endif
+        this->clip(clipBBox, background);
     }
 
     if (numBuffers > 1) {
