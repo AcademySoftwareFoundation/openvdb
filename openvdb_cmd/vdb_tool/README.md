@@ -5,6 +5,7 @@ This command-line tool, dubbed vdb_tool, can combine any number of the of high-l
 | Action | Description |
 |-------|-------|
 | **for/end** | Defines the scope of a for-loop with a range for a loop-variable |
+| **files/end** | Defines the scope of loop over all files in a specific directory structure |
 | **each/end** | Defines the scope of an each-loop with a list for a loop-variable |
 | **if/end** | If-statement used to enable/disable actions |
 | **eval** | Evaluate an expression written in our Reverse Polish Notation (see below) |
@@ -13,8 +14,9 @@ This command-line tool, dubbed vdb_tool, can combine any number of the of high-l
 | **read** | Read mesh, points and level sets as obj, ply, abc, stl, off, pts, xyz, e57, vdb or nvdb files |
 | **write** | Write a polygon mesh, points or level set as a obj, ply, stl, off, abc or vdb file |
 | **vdb2points** | Extracts points from a VDB grid |
-| **mesh2ls** | Convert a (water-tight) polygon mesh to a narrow-band level set |
-| **soup2ls** | Convert an arbitrary polygon soup to a narrow-band level set |
+| **mesh2ls** | Convert a (water-tight) polygon mesh to a narrow-band signed distance field |
+| **mesh2udf** | Convert an arbitrary polygon mesh to a narrow-band unsigned distance field |
+| **soup2ls** | Convert an arbitrary polygon soup to a narrow-band signed distance field |
 | **points2ls** | Convert points into a narrow-band level set |
 | **points2vdb** | Converts points into a VDB PointDataGrid |
 | **iso2ls** | Convert an iso-surface of a scalar field into a level set |
@@ -65,6 +67,7 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 | ply | read and write | Binary and ASCII PLY mesh files with triangles, quads or points |
 | stl | read and write | Binary STL mesh files with triangles |
 | off | read and write | ASCI OFF mesh files with triangles, quads or points |
+| xyz | read and write | ASCI XYZ files with x y z coordinates, |
 | pts | read | ASCII PTS points files with one or more point clouds |
 | abc | optional read and write | Alembic binary mesh files |
 | nvdb| optional read and write | NanoVDB file with voxels or points |
