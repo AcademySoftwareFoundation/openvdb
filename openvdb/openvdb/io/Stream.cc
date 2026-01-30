@@ -170,9 +170,7 @@ MetaMap::Ptr
 Stream::getMetadata() const
 {
     MetaMap::Ptr result;
-    if (mImpl->mFile) {
-        result = mImpl->mFile->getMetadata();
-    } else if (mImpl->mMeta) {
+    if (mImpl->mMeta) {
         // Return a deep copy of the file-level metadata
         // that was read when this object was constructed.
         result.reset(new MetaMap(*mImpl->mMeta));
@@ -184,9 +182,6 @@ Stream::getMetadata() const
 GridPtrVecPtr
 Stream::getGrids()
 {
-    if (mImpl->mFile) {
-        return mImpl->mFile->getGrids();
-    }
     return mImpl->mGrids;
 }
 

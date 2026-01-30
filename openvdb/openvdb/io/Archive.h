@@ -91,12 +91,8 @@ public:
     /// @brief Write the grids in the given container to this archive's output stream.
     virtual void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const {}
 
-    /// @brief Return @c true if delayed loading is enabled.
-    /// @details If enabled, delayed loading can be disabled for individual files,
-    /// but not vice-versa.
-    /// @note Define the environment variable @c OPENVDB_DISABLE_DELAYED_LOAD
-    /// to disable delayed loading unconditionally.
-    static bool isDelayedLoadingEnabled();
+    /// @brief Return @c false (delayed loading has been removed).
+    static bool isDelayedLoadingEnabled() { return false; }
 
 protected:
     /// @brief Return @c true if the input stream contains grid offsets

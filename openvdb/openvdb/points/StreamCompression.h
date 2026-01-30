@@ -114,7 +114,6 @@ class OPENVDB_API Page
 private:
     struct Info
     {
-        SharedPtr<io::StreamMetadata> meta;
         std::streamoff filepos;
         long compressedBytes;
         long uncompressedBytes;
@@ -125,8 +124,8 @@ public:
 
     Page() = default;
 
-    /// @brief load the Page into memory
-    void load() const;
+    OPENVDB_DEPRECATED_MESSAGE("Always returns false. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    void load() const { }
 
     /// @brief Uncompressed bytes of the Paged data, available
     /// when the header has been read.
@@ -143,8 +142,8 @@ public:
     /// pointers will be stored to load the data lazily.
     void readBuffers(std::istream&, bool delayed);
 
-    /// @brief Test if the data is out-of-core
-    bool isOutOfCore() const;
+    OPENVDB_DEPRECATED_MESSAGE("Always returns false. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    bool isOutOfCore() const { return false; }
 
 private:
     /// @brief Convenience method to store a copy of the supplied buffer
@@ -152,9 +151,6 @@ private:
 
     /// @brief Decompress and store the supplied data
     void decompress(const std::unique_ptr<char[]>& temp);
-
-    /// @brief Thread-safe loading of the data
-    void doLoad() const;
 
     std::unique_ptr<Info> mInfo = std::unique_ptr<Info>(new Info);
     std::unique_ptr<char[]> mData;

@@ -2333,7 +2333,6 @@ TEST_F(TestPointRasterizeFrustum, testStreaming)
         Vec3SGrid::Ptr velocity1, velocity2, velocity3;
 
         const size_t mb = 1024*1024;
-        const size_t tinyMemory = static_cast<size_t>(0.1*mb);
 
         { // memory test 1 - retain caches and streaming disabled
             Rasterizer rasterizer(settings);

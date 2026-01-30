@@ -244,7 +244,6 @@ bool            StreamMetadata::seekable() const        { return mImpl->mSeekabl
 bool            StreamMetadata::delayedLoadMeta() const { return mImpl->mDelayedLoadMeta; }
 bool            StreamMetadata::countingPasses() const  { return mImpl->mCountingPasses; }
 uint32_t        StreamMetadata::pass() const            { return mImpl->mPass; }
-uint64_t        StreamMetadata::leaf() const            { return mImpl->mLeaf; }
 MetaMap&        StreamMetadata::gridMetadata()          { return mImpl->mGridMetadata; }
 const MetaMap&  StreamMetadata::gridMetadata() const    { return mImpl->mGridMetadata; }
 uint32_t        StreamMetadata::__test() const          { return mImpl->mTest; }
@@ -262,7 +261,6 @@ void StreamMetadata::setWriteGridStats(bool b)          { mImpl->mWriteGridStats
 void StreamMetadata::setSeekable(bool b)                { mImpl->mSeekable = b; }
 void StreamMetadata::setCountingPasses(bool b)          { mImpl->mCountingPasses = b; }
 void StreamMetadata::setPass(uint32_t i)                { mImpl->mPass = i; }
-void StreamMetadata::setLeaf(uint64_t i)                { mImpl->mLeaf = i; }
 void StreamMetadata::__setTest(uint32_t t)              { mImpl->mTest = t; }
 
 std::string
@@ -888,15 +886,6 @@ Archive::connectInstance(const GridDescriptor& gd, const NamedGridMap& grids) co
 ////////////////////////////////////////
 
 
-//static
-bool
-Archive::isDelayedLoadingEnabled()
-{
-    return false;
-}
-
-
-
 namespace {
 
 struct NoBBox {};
@@ -941,12 +930,6 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
 
     grid->readMeta(is);
 
-    // Add a description of the compression settings to the grid as metadata.
-    /// @todo Would this be useful?
-    //const uint32_t c = getDataCompression(is);
-    //grid->insertMeta(GridBase::META_FILE_COMPRESSION,
-    //    StringMetadata(compressionToString(c)));
-
     // Delayed loading is no longer supported - always remove metadata related to delayed loading if it exists
     if ((*grid)[GridBase::META_FILE_DELAYED_LOAD]) {
         grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
@@ -955,9 +938,6 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
     streamMetadata->gridMetadata() = static_cast<MetaMap&>(*grid);
     const GridClass gridClass = grid->getGridClass();
     io::setGridClass(is, gridClass);
-
-    // reset leaf value to zero
-    streamMetadata->setLeaf(0);
 
     grid->readTransform(is);
     if (!gd.isInstance()) {

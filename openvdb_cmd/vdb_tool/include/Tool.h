@@ -127,7 +127,7 @@ private:
     using FilterT = std::unique_ptr<tools::LevelSetFilter<GridT>>;
     struct Points;// defined below
     struct Header;// defined below
- 
+
     mutable util::CpuTimer   mTimer;
     std::string              mCmdName;// name of this command-line tool
     std::list<Geometry::Ptr> mGeom;// list of geometries owned by this tool

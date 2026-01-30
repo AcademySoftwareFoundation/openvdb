@@ -190,9 +190,6 @@ AttributeArray::setConstantStride(bool state)
 bool
 AttributeArray::operator==(const AttributeArray& other) const
 {
-    this->loadData();
-    other.loadData();
-
     if (this->mUsePagedRead != other.mUsePagedRead ||
         this->mFlags != other.mFlags) return false;
     return this->isEqual(other);

@@ -152,13 +152,14 @@ public:
     /// Return @c true if this node contains only active voxels.
     bool isDense() const { return mValueMask.isOn(); }
     /// Return @c true if memory for this node's buffer has been allocated.
-    bool isAllocated() const { return !mBuffer.isOutOfCore() && !mBuffer.empty(); }
+    bool isAllocated() const { return !mBuffer.empty(); }
     /// Allocate memory for this node's buffer if it has not already been allocated.
     bool allocate() { return mBuffer.allocate(); }
 
     /// Return the memory in bytes occupied by this node.
     Index64 memUsage() const;
-    Index64 memUsageIfLoaded() const;
+    OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    Index64 memUsageIfLoaded() const { return memUsage(); }
 
     /// Expand the given bounding box so that it includes this leaf node's active voxels.
     /// If visitVoxels is false this LeafNode will be approximated as dense, i.e. with all
@@ -466,7 +467,6 @@ public:
     template<typename ModifyOp>
     void modifyValue(Index offset, const ModifyOp& op)
     {
-        mBuffer.loadValues();
         if (!mBuffer.empty()) {
             // in-place modify value
             ValueType& val = const_cast<ValueType&>(mBuffer[offset]);
@@ -487,7 +487,6 @@ public:
     template<typename ModifyOp>
     void modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op)
     {
-        mBuffer.loadValues();
         if (!mBuffer.empty()) {
             const Index offset = this->coordToOffset(xyz);
             bool state = mValueMask.isOn(offset);
@@ -1262,8 +1261,6 @@ template<typename DenseT>
 inline void
 LeafNode<T, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
 {
-    mBuffer.loadValues();
-
     using DenseValueType = typename DenseT::ValueType;
 
     const size_t xStride = dense.xStride(), yStride = dense.yStride(), zStride = dense.zStride();
@@ -1390,11 +1387,9 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
         // This node lies completely outside the clipping region.
         skipCompressedValues(seekable, is, fromHalf);
         mValueMask.setOff();
-        mBuffer.setOutOfCore(false);
     } else {
         mBuffer.allocate();
         io::readCompressedValues(is, mBuffer.mData, SIZE, mValueMask, fromHalf);
-        mBuffer.setOutOfCore(false);
 
         // Get this tree's background value.
         T background = zeroVal<T>();
@@ -1417,9 +1412,6 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
             }
         }
     }
-
-    // increment the leaf number
-    if (meta)   meta->setLeaf(meta->leaf() + 1);
 }
 
 
@@ -1429,8 +1421,6 @@ LeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
 {
     // Write out the value mask.
     mValueMask.save(os);
-
-    mBuffer.loadValues();
 
     io::writeCompressedValues(os, mBuffer.mData, SIZE,
         mValueMask, /*childMask=*/NodeMaskType(), toHalf);
@@ -1457,16 +1447,6 @@ LeafNode<T, Log2Dim>::memUsage() const
     // Use sizeof(*this) to capture alignment-related padding
     // (but note that sizeof(*this) includes sizeof(mBuffer)).
     return sizeof(*this) + mBuffer.memUsage() - sizeof(mBuffer);
-}
-
-
-template<typename T, Index Log2Dim>
-inline Index64
-LeafNode<T, Log2Dim>::memUsageIfLoaded() const
-{
-    // Use sizeof(*this) to capture alignment-related padding
-    // (but note that sizeof(*this) includes sizeof(mBuffer)).
-    return sizeof(*this) + mBuffer.memUsageIfLoaded() - sizeof(mBuffer);
 }
 
 

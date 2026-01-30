@@ -693,22 +693,9 @@ SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
                 // all attributes should be converted
                 const std::vector<std::string> emptyNameVector;
 
-                // if all point data is being converted, sequentially pre-fetch any out-of-core
-                // data for faster performance when using delayed-loading
-
-                const bool allData =    emptyNameVector.empty() &&
-                                        includeGroups.empty() &&
-                                        excludeGroups.empty();
-
                 for (const PointDataGrid::ConstPtr &grid : pointGrids) {
 
                     GU_Detail geo;
-
-                    // if all the data is being loaded, prefetch it for faster load performance
-
-                    if (allData) {
-                        prefetch(grid->tree());
-                    }
 
                     // perform conversion
 

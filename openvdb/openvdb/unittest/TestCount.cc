@@ -223,8 +223,7 @@ TEST_F(TestCount, testMemUsage)
             internalNodeMemUsage += sizeof(Coord);
 
             for (auto leafIter = internal2Iter->cbeginChildOn(); leafIter; ++leafIter) {
-                EXPECT_EQ(leafIter->memUsage(), leafIter->memUsageIfLoaded());
-                expectedMaxMem += leafIter->memUsageIfLoaded();
+                expectedMaxMem += leafIter->memUsage();
                 ++leafCount;
             }
         }
@@ -232,11 +231,9 @@ TEST_F(TestCount, testMemUsage)
 
     expectedMaxMem += internalNodeMemUsage;
 
-    Index64 inCoreMemUsage = tools::memUsage(grid->tree());
-    Index64 memUsageIfLoaded = tools::memUsageIfLoaded(grid->tree());
+    Index64 memUsage = tools::memUsage(grid->tree());
 
-    EXPECT_EQ(expectedMaxMem, inCoreMemUsage);
-    EXPECT_EQ(expectedMaxMem, memUsageIfLoaded);
+    EXPECT_EQ(expectedMaxMem, memUsage);
 }
 
 

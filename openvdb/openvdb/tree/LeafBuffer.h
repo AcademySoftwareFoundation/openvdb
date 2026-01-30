@@ -37,27 +37,20 @@ public:
     static const Index SIZE = 1 << 3 * Log2Dim;
 
     /// Default constructor
-    inline LeafBuffer(): mData(new ValueType[SIZE])
-    {
-    }
+    inline LeafBuffer(): mData(new ValueType[SIZE]) {}
     /// Construct a buffer populated with the specified value.
     explicit inline LeafBuffer(const ValueType&);
     /// Copy constructor
     inline LeafBuffer(const LeafBuffer&);
     /// Construct a buffer but don't allocate memory for the full array of values.
-    LeafBuffer(PartialCreate, const ValueType&): mData(nullptr)
-    {
-    }
+    LeafBuffer(PartialCreate, const ValueType&): mData(nullptr) {}
     /// Destructor
     inline ~LeafBuffer();
 
-    /// Return @c true if this buffer's values have not yet been read from disk.
-    bool isOutOfCore() const
-    {
-        return false;
-    }
+    OPENVDB_DEPRECATED_MESSAGE("Always returns false. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    bool isOutOfCore() const { return false; }
     /// Return @c true if memory for this buffer has not yet been allocated.
-    bool empty() const { return !mData || this->isOutOfCore(); }
+    bool empty() const { return !mData; }
     /// Allocate memory for this buffer if it has not already been allocated.
     bool allocate() { if (mData == nullptr) mData = new ValueType[SIZE]; return true; }
 
@@ -86,7 +79,8 @@ public:
 
     /// Return the memory footprint of this buffer in bytes.
     inline Index memUsage() const;
-    inline Index memUsageIfLoaded() const;
+    OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    inline Index memUsageIfLoaded() const { return memUsage(); }
     /// Return the number of values contained in this buffer.
     static Index size() { return SIZE; }
 
@@ -112,24 +106,10 @@ private:
 
     bool deallocate();
 
-    inline void setOutOfCore(bool b)
-    {
-        (void) b;
-    }
-    // To facilitate inlining in the common case in which the buffer is in-core,
-    // the loading logic is split into a separate function, doLoad().
-    inline void loadValues() const
-    {
-    }
-    inline void doLoad() const;
-    inline bool detachFromFile();
-
-    using FlagsType = std::atomic<Index32>;
-
-    ValueType* mData;
-    FlagsType mOutOfCore; // interpreted as bool; extra bits reserved for future use
-    tbb::spin_mutex mMutex; // 1 byte
-    //int8_t mReserved[3]; // padding for alignment
+    ValueType* mData = nullptr;
+    // Deprecated members kept for ABI compatibility
+    std::atomic<Index32> mDeprecatedAtomic{0};
+    tbb::spin_mutex mDeprecatedSpinMutex;
 
     friend class ::TestLeaf;
     // Allow the parent LeafNode to access this buffer's data pointer.
@@ -177,7 +157,6 @@ inline void
 LeafBuffer<T, Log2Dim>::setValue(Index i, const ValueType& val)
 {
     OPENVDB_ASSERT(i < SIZE);
-    this->loadValues();
     if (mData) mData[i] = val;
 }
 
@@ -198,11 +177,11 @@ LeafBuffer<T, Log2Dim>::operator=(const LeafBuffer& other)
     return *this;
 }
 
+
 template<typename T, Index Log2Dim>
 inline void
 LeafBuffer<T, Log2Dim>::fill(const ValueType& val)
 {
-    this->detachFromFile();
     if (mData != nullptr) {
         ValueType* target = mData;
         Index n = SIZE;
@@ -215,8 +194,6 @@ template<typename T, Index Log2Dim>
 inline bool
 LeafBuffer<T, Log2Dim>::operator==(const LeafBuffer& other) const
 {
-    this->loadValues();
-    other.loadValues();
     const ValueType *target = mData, *source = other.mData;
     if (!target && !source) return true;
     if (!target || !source) return false;
@@ -245,20 +222,9 @@ LeafBuffer<T, Log2Dim>::memUsage() const
 
 
 template<typename T, Index Log2Dim>
-inline Index
-LeafBuffer<T, Log2Dim>::memUsageIfLoaded() const
-{
-    size_t n = sizeof(*this);
-    n += SIZE * sizeof(ValueType);
-    return static_cast<Index>(n);
-}
-
-
-template<typename T, Index Log2Dim>
 inline const typename LeafBuffer<T, Log2Dim>::ValueType*
 LeafBuffer<T, Log2Dim>::data() const
 {
-    this->loadValues();
     if (mData == nullptr) {
         LeafBuffer* self = const_cast<LeafBuffer*>(this);
         if (mData == nullptr) self->mData = new ValueType[SIZE];
@@ -270,7 +236,6 @@ template<typename T, Index Log2Dim>
 inline typename LeafBuffer<T, Log2Dim>::ValueType*
 LeafBuffer<T, Log2Dim>::data()
 {
-    this->loadValues();
     if (mData == nullptr) {
         if (mData == nullptr) mData = new ValueType[SIZE];
     }
@@ -284,7 +249,6 @@ LeafBuffer<T, Log2Dim>::at(Index i) const
 {
     static const ValueType sZero = zeroVal<T>();
     OPENVDB_ASSERT(i < SIZE);
-    this->loadValues();
     // We can't use the ternary operator here, otherwise Visual C++ returns
     // a reference to a temporary.
     if (mData) return mData[i]; else return sZero;
@@ -295,27 +259,11 @@ template<typename T, Index Log2Dim>
 inline bool
 LeafBuffer<T, Log2Dim>::deallocate()
 {
-
     if (mData != nullptr) {
         delete[] mData;
         mData = nullptr;
         return true;
     }
-    return false;
-}
-
-
-template<typename T, Index Log2Dim>
-inline void
-LeafBuffer<T, Log2Dim>::doLoad() const
-{
-}
-
-
-template<typename T, Index Log2Dim>
-inline bool
-LeafBuffer<T, Log2Dim>::detachFromFile()
-{
     return false;
 }
 
@@ -364,7 +312,8 @@ public:
     void swap(LeafBuffer& other) { if (&other != this) std::swap(mData, other.mData); }
 
     Index memUsage() const { return sizeof(*this); }
-    Index memUsageIfLoaded() const { return sizeof(*this); }
+    OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    Index memUsageIfLoaded() const { return memUsage(); }
     static Index size() { return SIZE; }
 
     /// @brief Return a pointer to the C-style array of words encoding the bits.

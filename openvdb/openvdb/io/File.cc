@@ -28,8 +28,6 @@ namespace io {
 // Implementation details of the File class
 struct File::Impl
 {
-    enum { DEFAULT_COPY_MAX_BYTES = 500000000 }; // 500 MB
-
     struct NoBBox {};
 
     // Common implementation of the various File::readGrid() overloads,
@@ -62,16 +60,6 @@ struct File::Impl
         const GridDescriptor& gd, const BBoxd& worldBBox)
     {
         file.Archive::readGrid(grid, gd, file.inputStream(), worldBBox);
-    }
-
-    static Index64 getDefaultCopyMaxBytes()
-    {
-        Index64 result = DEFAULT_COPY_MAX_BYTES;
-        if (const char* s = std::getenv("OPENVDB_DELAYED_LOAD_COPY_MAX_BYTES")) {
-            char* endptr = nullptr;
-            result = std::strtoul(s, &endptr, /*base=*/10);
-        }
-        return result;
     }
 
     std::string mFilename;
@@ -247,7 +235,7 @@ File::open()
     }
     mImpl->mInStream.reset();
 
-    // Open the file.
+    // Open the file using standard I/O (delayed loading has been removed)
     std::unique_ptr<std::istream> newStream;
     newStream.reset(new std::ifstream(
         filename().c_str(), std::ios_base::in | std::ios_base::binary));

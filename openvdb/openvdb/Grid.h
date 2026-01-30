@@ -457,12 +457,10 @@ public:
     virtual void readBuffers(std::istream&) = 0;
     /// Read all of this grid's data buffers that intersect the given index-space bounding box.
     virtual void readBuffers(std::istream&, const CoordBBox&) = 0;
-    /// @brief Read all of this grid's data buffers that are not yet resident in memory
-    /// (because delayed loading is in effect).
-    /// @details If this grid was read from a memory-mapped file, this operation
-    /// disconnects the grid from the file.
-    /// @sa io::File::open, io::MappedFile
+
+    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     virtual void readNonresidentBuffers() const = 0;
+
     /// Write out all data buffers for this grid.
     virtual void writeBuffers(std::ostream&) const = 0;
 
@@ -939,12 +937,10 @@ public:
     void readBuffers(std::istream&) override;
     /// Read all of this grid's data buffers that intersect the given index-space bounding box.
     void readBuffers(std::istream&, const CoordBBox&) override;
-    /// @brief Read all of this grid's data buffers that are not yet resident in memory
-    /// (because delayed loading is in effect).
-    /// @details If this grid was read from a memory-mapped file, this operation
-    /// disconnects the grid from the file.
-    /// @sa io::File::open, io::MappedFile
-    void readNonresidentBuffers() const override;
+
+    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    void readNonresidentBuffers() const override { }
+
     /// Write out all data buffers for this grid.
     void writeBuffers(std::ostream&) const override;
 
@@ -1667,14 +1663,6 @@ Grid<TreeT>::readBuffers(std::istream& is, const CoordBBox& bbox)
         // so instead clip afterwards.
         tree().clip(bbox);
     }
-}
-
-
-template<typename TreeT>
-inline void
-Grid<TreeT>::readNonresidentBuffers() const
-{
-    tree().readNonresidentBuffers();
 }
 
 

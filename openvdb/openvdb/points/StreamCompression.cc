@@ -279,13 +279,6 @@ bloscDecompress(const char*, const size_t, const bool)
 ////////////////////////////////////////
 
 
-void
-Page::load() const
-{
-    this->doLoad();
-}
-
-
 long
 Page::uncompressedBytes() const
 {
@@ -345,13 +338,6 @@ Page::readBuffers(std::istream&is, bool delayed)
 }
 
 
-bool
-Page::isOutOfCore() const
-{
-    return false;
-}
-
-
 void
 Page::copy(const std::unique_ptr<char[]>& temp, int pageSize)
 {
@@ -371,12 +357,6 @@ Page::decompress(const std::unique_ptr<char[]>& temp)
     mData.reset(new char[tempBytes]);
 
     bloscDecompress(mData.get(), uncompressedBytes, tempBytes, temp.get());
-}
-
-
-void
-Page::doLoad() const
-{
 }
 
 

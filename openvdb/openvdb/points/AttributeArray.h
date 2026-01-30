@@ -130,7 +130,7 @@ public:
 
     template <typename ValueType, typename CodecType> friend class AttributeHandle;
 
-    AttributeArray(): mPageHandle() { mOutOfCore = 0; }
+    AttributeArray(): mPageHandle() { }
     virtual ~AttributeArray()
     {
         // if this AttributeArray has been partially read, zero the compressed bytes,
@@ -189,10 +189,7 @@ public:
     /// Return the number of bytes of memory used by this attribute.
     virtual size_t memUsage() const = 0;
 
-    /// Return the number of bytes of memory used by this attribute array once it
-    /// has been deserialized (this may be different to memUsage() if delay-loading
-    /// is in use). Note that this method does NOT consider the fact that a
-    /// uniform attribute could be expanded and only deals with delay-loading.
+    OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
     virtual size_t memUsageIfLoaded() const = 0;
 
     /// Create a new attribute array of the given (registered) type, length and stride.
@@ -315,10 +312,10 @@ public:
     /// @param outputTransient if true, write out transient attributes
     virtual void writePagedBuffers(compression::PagedOutputStream&, bool outputTransient) const = 0;
 
-    /// Ensures all data is in-core
+    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     virtual void loadData() const = 0;
 
-    /// Return @c true if all data has been loaded
+    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     virtual bool isDataLoaded() const = 0;
 
     /// Check the compressed bytes and flags. If they are equal, perform a deeper
@@ -366,7 +363,7 @@ protected:
     mutable tbb::spin_mutex mMutex;
     uint8_t mFlags = 0;
     uint8_t mUsePagedRead = 0;
-    std::atomic<Index32> mOutOfCore; // interpreted as bool
+    std::atomic<Index32> mOutOfCore{0}; // interpreted as bool
     /// used for out-of-core, paged reading
     union {
         compression::PageHandle::Ptr mPageHandle;
@@ -611,11 +608,8 @@ public:
     /// Return the number of bytes of memory used by this attribute.
     size_t memUsage() const override;
 
-    /// Return the number of bytes of memory used by this attribute array once it
-    /// has been deserialized (this may be different to memUsage() if delay-loading
-    /// is in use). Note that this method does NOT consider the fact that a
-    /// uniform attribute could be expanded and only deals with delay-loading.
-    size_t memUsageIfLoaded() const override;
+    OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    size_t memUsageIfLoaded() const override { return memUsage(); }
 
     /// Return the value at index @a n (assumes in-core)
     ValueType getUnsafe(Index n) const;
@@ -696,14 +690,14 @@ public:
     /// @param outputTransient if true, write out transient attributes
     void writePagedBuffers(compression::PagedOutputStream& os, bool outputTransient) const override;
 
-    /// Return @c true if this buffer's values have not yet been read from disk.
-    inline bool isOutOfCore() const;
+    OPENVDB_DEPRECATED_MESSAGE("Always returns false. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    bool isOutOfCore() const { return false; }
 
-    /// Ensures all data is in-core
-    void loadData() const override;
+    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    void loadData() const override { }
 
-    /// Return @c true if all data has been loaded
-    bool isDataLoaded() const override;
+    OPENVDB_DEPRECATED_MESSAGE("Always returns true. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    bool isDataLoaded() const override { return true; }
 
     /// Return the raw data buffer
     inline const StorageType* constData() const { return this->data(); }
@@ -716,17 +710,12 @@ protected:
     inline const StorageType* data() const { OPENVDB_ASSERT(validData()); return mData.get(); }
 
     /// Verify that data is not out-of-core or in a partially-read state
-    inline bool validData() const { return !(isOutOfCore() || (flags() & PARTIALREAD)); }
+    inline bool validData() const { return !((flags() & PARTIALREAD)); }
 
 private:
     friend class ::TestAttributeArray;
 
     TypedAttributeArray(const TypedAttributeArray&, const tbb::spin_mutex::scoped_lock&);
-
-    /// Load data from memory-mapped file.
-    inline void doLoad() const;
-    /// Load data from memory-mapped file (unsafe as this function is not protected by a mutex).
-    inline void doLoadUnsafe() const;
 
     /// Toggle out-of-core state
     inline void setOutOfCore(const bool);
@@ -962,8 +951,6 @@ void AttributeArray::doCopyValues(const AttributeArray& sourceArray, const IterT
 {
     // ensure both arrays have float-float or integer-integer value types
     OPENVDB_ASSERT(sourceArray.valueTypeIsFloatingPoint() == this->valueTypeIsFloatingPoint());
-    // ensure both arrays have been loaded from disk (if delay-loaded)
-    OPENVDB_ASSERT(sourceArray.isDataLoaded() && this->isDataLoaded());
     // ensure storage size * stride matches on both arrays
     OPENVDB_ASSERT(this->storageTypeSize()*this->stride() ==
         sourceArray.storageTypeSize()*sourceArray.stride());
@@ -1023,10 +1010,6 @@ void AttributeArray::copyValues(const AttributeArray& sourceArray, const IterT& 
     if (bytes != this->storageTypeSize()) {
         OPENVDB_THROW(TypeError, "Cannot copy array data due to mis-match in storage type sizes.");
     }
-
-    // ensure both arrays have been loaded from disk
-    sourceArray.loadData();
-    this->loadData();
 
     // if the target array is uniform, expand it first
     this->expand();
@@ -1206,8 +1189,6 @@ template<typename ValueType_, typename Codec_>
 size_t
 TypedAttributeArray<ValueType_, Codec_>::arrayMemUsage() const
 {
-    if (this->isOutOfCore())        return 0;
-
     return (mIsUniform ? 1 : this->dataSize()) * sizeof(StorageType);
 }
 
@@ -1232,11 +1213,6 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::deallocate()
 {
-    // detach from file if delay-loaded
-    if (this->isOutOfCore()) {
-        this->setOutOfCore(false);
-        this->mPageHandle.reset();
-    }
     if (mData)      mData.reset();
 }
 
@@ -1305,14 +1281,6 @@ TypedAttributeArray<ValueType_, Codec_>::memUsage() const
 
 
 template<typename ValueType_, typename Codec_>
-size_t
-TypedAttributeArray<ValueType_, Codec_>::memUsageIfLoaded() const
-{
-    return sizeof(*this) + (mIsUniform ? 1 : this->dataSize()) * sizeof(StorageType);
-}
-
-
-template<typename ValueType_, typename Codec_>
 typename TypedAttributeArray<ValueType_, Codec_>::ValueType
 TypedAttributeArray<ValueType_, Codec_>::getUnsafe(Index n) const
 {
@@ -1329,7 +1297,6 @@ typename TypedAttributeArray<ValueType_, Codec_>::ValueType
 TypedAttributeArray<ValueType_, Codec_>::get(Index n) const
 {
     if (n >= this->dataSize())           OPENVDB_THROW(IndexError, "Out-of-range access.");
-    if (this->isOutOfCore())            this->doLoad();
 
     return this->getUnsafe(n);
 }
@@ -1366,7 +1333,6 @@ void
 TypedAttributeArray<ValueType_, Codec_>::setUnsafe(Index n, const ValueType& val)
 {
     OPENVDB_ASSERT(n < this->dataSize());
-    OPENVDB_ASSERT(!this->isOutOfCore());
     OPENVDB_ASSERT(!this->isUniform());
 
     // this unsafe method assumes the data is not uniform, however if it is, this redirects the index
@@ -1381,7 +1347,6 @@ void
 TypedAttributeArray<ValueType_, Codec_>::set(Index n, const ValueType& val)
 {
     if (n >= this->dataSize())           OPENVDB_THROW(IndexError, "Out-of-range access.");
-    if (this->isOutOfCore())            this->doLoad();
     if (this->isUniform())              this->expand();
 
     this->setUnsafe(n, val);
@@ -1486,12 +1451,6 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::fill(const ValueType& value)
 {
-    if (this->isOutOfCore()) {
-        tbb::spin_mutex::scoped_lock lock(mMutex);
-        this->deallocate();
-        this->allocate();
-    }
-
     const Index size = mIsUniform ? 1 : this->dataSize();
     for (Index i = 0; i < size; ++i)  {
         Codec::encode(value, this->data()[i]);
@@ -1504,54 +1463,6 @@ void
 TypedAttributeArray<ValueType_, Codec_>::fill(AttributeArray* array, const ValueType& value)
 {
     static_cast<TypedAttributeArray<ValueType, Codec>*>(array)->fill(value);
-}
-
-
-template<typename ValueType_, typename Codec_>
-bool
-TypedAttributeArray<ValueType_, Codec_>::isOutOfCore() const
-{
-    return mOutOfCore;
-}
-
-
-template<typename ValueType_, typename Codec_>
-void
-TypedAttributeArray<ValueType_, Codec_>::setOutOfCore(const bool b)
-{
-    mOutOfCore = b;
-}
-
-
-template<typename ValueType_, typename Codec_>
-void
-TypedAttributeArray<ValueType_, Codec_>::doLoad() const
-{
-    if (!(this->isOutOfCore()))     return;
-
-    TypedAttributeArray<ValueType_, Codec_>* self =
-        const_cast<TypedAttributeArray<ValueType_, Codec_>*>(this);
-
-    // This lock will be contended at most once, after which this buffer
-    // will no longer be out-of-core.
-    tbb::spin_mutex::scoped_lock lock(self->mMutex);
-    this->doLoadUnsafe();
-}
-
-
-template<typename ValueType_, typename Codec_>
-void
-TypedAttributeArray<ValueType_, Codec_>::loadData() const
-{
-    this->doLoad();
-}
-
-
-template<typename ValueType_, typename Codec_>
-bool
-TypedAttributeArray<ValueType_, Codec_>::isDataLoaded() const
-{
-    return !this->isOutOfCore();
 }
 
 
@@ -1679,9 +1590,7 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
 
     this->deallocate();
 
-    this->setOutOfCore(false);
     is.read(mPageHandle, std::streamsize(mPageHandle->size()), false);
-
     std::unique_ptr<char[]> buffer = mPageHandle->read();
     mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
     mPageHandle.reset();
@@ -1726,9 +1635,6 @@ TypedAttributeArray<ValueType_, Codec_>::writeMetadata(std::ostream& os, bool ou
     bool strideOfOne(this->stride() == 1);
 
     bool bloscCompression = io::getDataCompression(os) & io::COMPRESS_BLOSC;
-
-    // any compressed data needs to be loaded if out-of-core
-    if (bloscCompression)    this->doLoad();
 
     size_t compressedBytes = 0;
 
@@ -1778,8 +1684,6 @@ TypedAttributeArray<ValueType_, Codec_>::writeBuffers(std::ostream& os, bool out
         OPENVDB_THROW(IoError, "Cannot write out a partially-read AttributeArray.");
     }
 
-    this->doLoad();
-
     if (this->isUniform()) {
         os.write(reinterpret_cast<const char*>(this->data()), sizeof(StorageType));
     }
@@ -1827,34 +1731,7 @@ TypedAttributeArray<ValueType_, Codec_>::writePagedBuffers(compression::PagedOut
         OPENVDB_THROW(IoError, "Cannot write out a partially-read AttributeArray.");
     }
 
-    this->doLoad();
-
     os.write(reinterpret_cast<const char*>(this->data()), this->arrayMemUsage());
-}
-
-
-template<typename ValueType_, typename Codec_>
-void
-TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe() const
-{
-    if (!(this->isOutOfCore())) return;
-
-    // this function expects the mutex to already be locked
-
-    auto* self = const_cast<TypedAttributeArray<ValueType_, Codec_>*>(this);
-
-    OPENVDB_ASSERT(self->mPageHandle);
-    OPENVDB_ASSERT(!(self->mFlags & PARTIALREAD));
-
-    std::unique_ptr<char[]> buffer = self->mPageHandle->read();
-
-    self->mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
-
-    self->mPageHandle.reset();
-
-    // clear all write and out-of-core flags
-
-    self->mOutOfCore = false;
 }
 
 
@@ -1883,9 +1760,6 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
        this->mStrideOrTotalSize != otherT->mStrideOrTotalSize ||
        this->mIsUniform != otherT->mIsUniform ||
        this->attributeType() != this->attributeType()) return false;
-
-    this->doLoad();
-    otherT->doLoad();
 
     const StorageType *target = this->data(), *source = otherT->data();
     if (!target && !source) return true;
@@ -1977,10 +1851,6 @@ AttributeHandle<ValueType, CodecType>::AttributeHandle(const AttributeArray& arr
     if (!this->compatibleType<std::is_same<CodecType, UnknownCodec>::value>()) {
         OPENVDB_THROW(TypeError, "Cannot bind handle due to incompatible type of AttributeArray.");
     }
-
-    // load data if delay-loaded
-
-    mArray->loadData();
 
     // bind getter and setter methods
 

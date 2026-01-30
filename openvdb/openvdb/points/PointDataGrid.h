@@ -218,19 +218,15 @@ makeDescriptorUnique(PointDataTreeT& tree);
 ///
 /// @note   Multiple threads cannot safely access the same AttributeArray when using streaming.
 template <typename PointDataTreeT>
+OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
 inline void
-setStreamingMode(PointDataTreeT& tree, bool on = true);
+setStreamingMode(PointDataTreeT&, bool /*on*/ = true) { }
 
 
-/// @brief  Sequentially pre-fetch all delayed-load voxel and attribute data from disk in order
-///         to accelerate subsequent random access.
-///
-/// @param  tree                the PointDataTree.
-/// @param  position            if enabled, prefetch the position attribute (default is on)
-/// @param  otherAttributes     if enabled, prefetch all other attributes (default is on)
 template <typename PointDataTreeT>
+OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
 inline void
-prefetch(PointDataTreeT& tree, bool position = true, bool otherAttributes = true);
+prefetch(PointDataTreeT&, bool /*position*/ = true, bool /*otherAttributes*/ = true) { }
 
 
 ////////////////////////////////////////
@@ -504,7 +500,8 @@ public:
 
 
     Index64 memUsage() const;
-    Index64 memUsageIfLoaded() const;
+    OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    Index64 memUsageIfLoaded() const { return memUsage(); }
 
     void evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels = true) const;
 
@@ -1523,13 +1520,6 @@ PointDataLeafNode<T, Log2Dim>::memUsage() const
 }
 
 template<typename T, Index Log2Dim>
-inline Index64
-PointDataLeafNode<T, Log2Dim>::memUsageIfLoaded() const
-{
-    return BaseLeaf::memUsageIfLoaded() + mAttributeSet->memUsageIfLoaded();
-}
-
-template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
 {
@@ -1595,63 +1585,6 @@ makeDescriptorUnique(PointDataTreeT& tree)
     }
 
     return newDescriptor;
-}
-
-
-template <typename PointDataTreeT>
-inline void
-setStreamingMode(PointDataTreeT& tree, bool on)
-{
-    auto leafIter = tree.beginLeaf();
-    for (; leafIter; ++leafIter) {
-        for (size_t i = 0; i < leafIter->attributeSet().size(); i++) {
-            leafIter->attributeArray(i).setStreaming(on);
-        }
-    }
-}
-
-
-template <typename PointDataTreeT>
-inline void
-prefetch(PointDataTreeT& tree, bool position, bool otherAttributes)
-{
-    // NOTE: the following is intentionally not multi-threaded, as the I/O
-    // is faster if done in the order in which it is stored in the file
-
-    auto leaf = tree.cbeginLeaf();
-    if (!leaf)  return;
-
-    const auto& attributeSet = leaf->attributeSet();
-
-    // pre-fetch leaf data
-
-    for ( ; leaf; ++leaf) {
-        leaf->buffer().data();
-    }
-
-    // pre-fetch position attribute data (position will typically have index 0)
-
-    size_t positionIndex = attributeSet.find("P");
-
-    if (position && positionIndex != AttributeSet::INVALID_POS) {
-        for (leaf = tree.cbeginLeaf(); leaf; ++leaf) {
-            OPENVDB_ASSERT(leaf->hasAttribute(positionIndex));
-            leaf->constAttributeArray(positionIndex).loadData();
-        }
-    }
-
-    // pre-fetch other attribute data
-
-    if (otherAttributes) {
-        const size_t attributes = attributeSet.size();
-        for (size_t attributeIndex = 0; attributeIndex < attributes; attributeIndex++) {
-            if (attributeIndex == positionIndex)     continue;
-            for (leaf = tree.cbeginLeaf(); leaf; ++leaf) {
-                OPENVDB_ASSERT(leaf->hasAttribute(attributeIndex));
-                leaf->constAttributeArray(attributeIndex).loadData();
-            }
-        }
-    }
 }
 
 

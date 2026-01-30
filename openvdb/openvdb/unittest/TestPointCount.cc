@@ -313,17 +313,14 @@ TEST_F(TestPointCount, testGroup)
 
             GroupFilter groupFilter("test", attributeSet);
 
-            bool inCoreOnly;
-            inCoreOnly = false;
-
-            EXPECT_EQ(pointCount(inputTree, NullFilter(), inCoreOnly), Index64(4));
-            EXPECT_EQ(pointCount(inputTree, ActiveFilter(), inCoreOnly), Index64(3));
-            EXPECT_EQ(pointCount(inputTree, InactiveFilter(), inCoreOnly), Index64(1));
-            EXPECT_EQ(pointCount(inputTree, groupFilter, inCoreOnly), Index64(2));
+            EXPECT_EQ(pointCount(inputTree, NullFilter()), Index64(4));
+            EXPECT_EQ(pointCount(inputTree, ActiveFilter()), Index64(3));
+            EXPECT_EQ(pointCount(inputTree, InactiveFilter()), Index64(1));
+            EXPECT_EQ(pointCount(inputTree, groupFilter), Index64(2));
             EXPECT_EQ(pointCount(inputTree, BinaryFilter<GroupFilter, ActiveFilter>(
-                groupFilter, ActiveFilter()), inCoreOnly), Index64(1));
+                groupFilter, ActiveFilter())), Index64(1));
             EXPECT_EQ(pointCount(inputTree, BinaryFilter<GroupFilter, InactiveFilter>(
-                groupFilter, InactiveFilter()), inCoreOnly), Index64(1));
+                groupFilter, InactiveFilter())), Index64(1));
         }
 
         std::remove(filename.c_str());
