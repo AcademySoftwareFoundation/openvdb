@@ -3112,7 +3112,7 @@ GEO_PrimVDB::loadVDB(UT_JSONParser &p, bool as_shmem)
             try
             {
                 SYS_SharedMemoryInputStream     is_shm(*shmem);
-                openvdb::io::Stream             vis(is_shm, /*delayLoad*/false);
+                openvdb::io::Stream             vis(is_shm);
                 openvdb::GridPtrVecPtr          grids = vis.getGrids();
 
                 int count = (grids ? grids->size() : 0);
@@ -3152,7 +3152,7 @@ GEO_PrimVDB::loadVDB(UT_JSONParser &p, bool as_shmem)
         {
             UT_JSONParser::TiledStream  is(p);
 
-            openvdb::io::Stream         vis(is, /*delayLoad*/false);
+            openvdb::io::Stream         vis(is);
 
             openvdb::GridPtrVecPtr      grids = vis.getGrids();
 

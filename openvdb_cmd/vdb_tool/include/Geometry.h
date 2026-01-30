@@ -824,7 +824,7 @@ void Geometry::readVDB(const std::string &fileName)
 {
     initialize();
     io::File file(fileName);
-    file.open();// enables delayed loading by default
+    file.open();
     GridPtrVecPtr meta = file.readAllGridMetadata();
     for (auto m : *meta) {
         if (m->isType<points::PointDataGrid>()) {

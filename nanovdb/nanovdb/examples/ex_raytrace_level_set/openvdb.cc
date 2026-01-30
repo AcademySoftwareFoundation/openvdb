@@ -37,7 +37,7 @@ void runOpenVDB(nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer>& handle, int nu
     openvdb::initialize();
     std::string       filename = "C:/Users/william/Downloads/dragon.vdb";
     openvdb::io::File file(filename);
-    file.open(false); //disable delayed loading
+    file.open();
     auto srcGrid = file.readGrid<BufferT>("ls_dragon");
     std::cout << "Loading OpenVDB grid[" << srcGrid->getName() << "]...\n";
 #endif

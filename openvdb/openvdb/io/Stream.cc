@@ -44,47 +44,44 @@ struct Stream::Impl
 ////////////////////////////////////////
 
 
-Stream::Stream(std::istream& is, bool delayLoad): mImpl(new Impl)
+Stream::Stream(std::istream& is): mImpl(new Impl)
 {
     if (!is) return;
 
-    (void) delayLoad;
+    // Delayed loading has been removed - always read directly from the stream
+    readHeader(is);
 
-    if (!mImpl->mFile) {
-        readHeader(is);
+    // Tag the input stream with the library and file format version numbers
+    // and the compression options specified in the header.
+    StreamMetadata::Ptr streamMetadata(new StreamMetadata);
+    io::setStreamMetadataPtr(is, streamMetadata, /*transfer=*/false);
+    io::setVersion(is, libraryVersion(), fileVersion());
+    io::setDataCompression(is, compression());
 
-        // Tag the input stream with the library and file format version numbers
-        // and the compression options specified in the header.
-        StreamMetadata::Ptr streamMetadata(new StreamMetadata);
-        io::setStreamMetadataPtr(is, streamMetadata, /*transfer=*/false);
-        io::setVersion(is, libraryVersion(), fileVersion());
-        io::setDataCompression(is, compression());
+    // Read in the VDB metadata.
+    mImpl->mMeta.reset(new MetaMap);
+    mImpl->mMeta->readMeta(is);
 
-        // Read in the VDB metadata.
-        mImpl->mMeta.reset(new MetaMap);
-        mImpl->mMeta->readMeta(is);
+    // Read in the number of grids.
+    const int32_t gridCount = readGridCount(is);
 
-        // Read in the number of grids.
-        const int32_t gridCount = readGridCount(is);
+    // Read in all grids and insert them into mGrids.
+    mImpl->mGrids.reset(new GridPtrVec);
+    std::vector<GridDescriptor> descriptors;
+    descriptors.reserve(gridCount);
+    Archive::NamedGridMap namedGrids;
+    for (int32_t i = 0; i < gridCount; ++i) {
+        GridDescriptor gd;
+        gd.read(is);
+        descriptors.push_back(gd);
+        GridBase::Ptr grid = readGrid(gd, is);
+        mImpl->mGrids->push_back(grid);
+        namedGrids[gd.uniqueName()] = grid;
+    }
 
-        // Read in all grids and insert them into mGrids.
-        mImpl->mGrids.reset(new GridPtrVec);
-        std::vector<GridDescriptor> descriptors;
-        descriptors.reserve(gridCount);
-        Archive::NamedGridMap namedGrids;
-        for (int32_t i = 0; i < gridCount; ++i) {
-            GridDescriptor gd;
-            gd.read(is);
-            descriptors.push_back(gd);
-            GridBase::Ptr grid = readGrid(gd, is);
-            mImpl->mGrids->push_back(grid);
-            namedGrids[gd.uniqueName()] = grid;
-        }
-
-        // Connect instances (grids that share trees with other grids).
-        for (size_t i = 0, N = descriptors.size(); i < N; ++i) {
-            Archive::connectInstance(descriptors[i], namedGrids);
-        }
+    // Connect instances (grids that share trees with other grids).
+    for (size_t i = 0, N = descriptors.size(); i < N; ++i) {
+        Archive::connectInstance(descriptors[i], namedGrids);
     }
 }
 

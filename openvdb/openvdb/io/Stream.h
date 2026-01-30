@@ -22,11 +22,11 @@ class OPENVDB_API Stream: public Archive
 {
 public:
     /// @brief Read grids from an input stream.
-    /// @details If @a delayLoad is true, map the contents of the input stream
-    /// into memory and enable delayed loading of grids.
-    /// @note Define the environment variable @c OPENVDB_DISABLE_DELAYED_LOAD
-    /// to disable delayed loading unconditionally.
-    explicit Stream(std::istream&, bool delayLoad = true);
+    /// @param is The input stream to read from
+    explicit Stream(std::istream&);
+
+    OPENVDB_DEPRECATED_MESSAGE("Use Stream(std::istream&) instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    Stream(std::istream& is, bool /*delayLoad*/) : Stream(is) { }
 
     /// Construct an archive for stream output.
     Stream();

@@ -370,8 +370,7 @@ void Tool::init()
   mParser.addAction(
       "read", "i", "Read one or more geometry or VDB files from disk or STDIN.",
     {{"files", "", "{file|stdin}.{abc|obj|ply|stl|off|vdb}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
-     {"grids", "*", "*|grid_name,...", "list of VDB grids name to be imported (defaults to \"*\", i.e. import all available grids)"},
-     {"delayed", "true", "1|0|true|false", "toggle delayed loading of VDB grids (enabled by default). This option is ignored by other file types"}},
+     {"grids", "*", "*|grid_name,...", "list of VDB grids name to be imported (defaults to \"*\", i.e. import all available grids)"}},
      [](){}, [&](){this->read();}, 0);//  anonymous options are treated as to the first option,i.e. "files"
 
   mParser.addAction(
@@ -1023,7 +1022,7 @@ void Tool::readVDB(const std::string &fileName)
   } else {
     if (mParser.verbose) mTimer.start("Reading VDB grid(s) from file named \""+fileName+"\"");
     io::File file(fileName);
-    file.open(mParser.get<bool>("delayed"));
+    file.open();
     grids = file.getGrids();
   }
   const size_t count = mGrid.size();

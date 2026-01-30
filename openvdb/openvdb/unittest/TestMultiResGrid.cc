@@ -280,7 +280,7 @@ TEST_F(TestMultiResGrid, testModels)
             << "\" =====================" << std::endl;
         std::cerr << "Reading \"" << filenames[i] << "\" ...";
         io::File file( path + filenames[i] );
-        file.open(false);//disable delayed loading
+        file.open();
         FloatGrid::Ptr model = gridPtrCast<FloatGrid>(file.getGrids()->at(0));
         std::cerr << " done\nProcessing \"" << filenames[i] << "\" ...";
         timer.start("\nMultiResGrid processing");

@@ -257,7 +257,7 @@ int main(int argc, char* argv[])
                 }
                 if (verbose) std::cout << "Opening OpenVDB file named \"" << inputFile << "\"" << std::endl;
                 openvdb::io::File file(inputFile);
-                file.open(false); //disable delayed loading
+                file.open();
                 if (gridName.empty()) {// convert all grid in the file
                     auto grids = file.getGrids();
                     std::vector<nanovdb::GridHandle<nanovdb::HostBuffer> > handles;

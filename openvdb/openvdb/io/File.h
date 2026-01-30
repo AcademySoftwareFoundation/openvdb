@@ -60,6 +60,11 @@ public:
     /// @return @c true if the file's UUID has changed since it was last read.
     bool open();
 
+    OPENVDB_DEPRECATED_MESSAGE("Use File::open() instead.This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    bool open(bool /*delayLoad*/) { return open(); }
+    OPENVDB_DEPRECATED_MESSAGE("Use File::open() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    bool open(bool /*delayLoad*/, const MappedFile::Notifier& /*notifier*/) { return open(); }
+
     /// Return @c true if the file has been opened for reading.
     bool isOpen() const;
 
@@ -69,6 +74,11 @@ public:
     /// @brief Return this file's current size on disk in bytes.
     /// @throw IoError if the file size cannot be determined.
     Index64 getSize() const;
+
+    OPENVDB_DEPRECATED_MESSAGE("Always returns 0. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    Index64 copyMaxBytes() const { return 0; }
+    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    void setCopyMaxBytes(Index64 /*bytes*/) { }
 
     /// Return @c true if a grid of the given name exists in this file.
     bool hasGrid(const Name&) const;
