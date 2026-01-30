@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "openvdb.h"
-#include "io/DelayedLoadMetadata.h"
 #include "points/PointDataGrid.h"
 #include "tools/PointIndexGrid.h"
 #include "util/logging.h"

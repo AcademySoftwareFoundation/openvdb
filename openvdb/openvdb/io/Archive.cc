@@ -4,7 +4,6 @@
 #include "Archive.h"
 
 #include "GridDescriptor.h"
-#include "DelayedLoadMetadata.h"
 #include "io.h"
 
 #include <openvdb/Exceptions.h>
@@ -180,7 +179,7 @@ struct StreamMetadata::Impl
     uint32_t mPass = 0;
     MetaMap mGridMetadata;
     AuxDataMap mAuxData;
-    bool mDelayedLoadMeta = DelayedLoadMetadata::isRegisteredType();
+    bool mDelayedLoadMeta = false;
     uint64_t mLeaf = 0;
     uint32_t mTest = 0; // for testing only
 }; // struct StreamMetadata
@@ -277,7 +276,6 @@ StreamMetadata::str() const
     ostr << "compression: " << compressionToString(compression()) << "\n";
     ostr << "half_float: " << halfFloat() << "\n";
     ostr << "seekable: " << seekable() << "\n";
-    ostr << "delayed_load_meta: " << delayedLoadMeta() << "\n";
     ostr << "pass: " << pass() << "\n";
     ostr << "counting_passes: " << countingPasses() << "\n";
     ostr << "write_grid_stats_metadata: " << writeGridStats() << "\n";
@@ -308,73 +306,6 @@ writeAsType(std::ostream& os, const std::any& val)
         return true;
     }
     return false;
-}
-
-struct PopulateDelayedLoadMetadataOp
-{
-    DelayedLoadMetadata& metadata;
-    uint32_t compression;
-
-    PopulateDelayedLoadMetadataOp(DelayedLoadMetadata& _metadata, uint32_t _compression)
-        : metadata(_metadata)
-        , compression(_compression) { }
-
-    template<typename GridT>
-    void operator()(const GridT& grid) const
-    {
-        using TreeT = typename GridT::TreeType;
-        using ValueT = typename TreeT::ValueType;
-        using LeafT = typename TreeT::LeafNodeType;
-        using MaskT = typename LeafT::NodeMaskType;
-
-        const TreeT& tree = grid.constTree();
-        const Index64 leafCount = tree.leafCount();
-
-        // early exit if not leaf nodes
-        if (leafCount == Index64(0))    return;
-
-        metadata.resizeMask(leafCount);
-
-        if (compression & (COMPRESS_BLOSC | COMPRESS_ZIP)) {
-            metadata.resizeCompressedSize(leafCount);
-        }
-
-        const auto background = tree.background();
-        const bool saveFloatAsHalf = grid.saveFloatAsHalf();
-
-        tree::LeafManager<const TreeT> leafManager(tree);
-
-        leafManager.foreach(
-            [&](const LeafT& leaf, size_t idx) {
-                // set mask value
-                MaskCompress<ValueT, MaskT> maskCompressData(
-                    leaf.valueMask(), /*childMask=*/MaskT(), leaf.buffer().data(), background);
-                metadata.setMask(idx, maskCompressData.metadata);
-
-                if (compression & (COMPRESS_BLOSC | COMPRESS_ZIP)) {
-                    // set compressed size value
-                    size_t sizeBytes(8);
-                    size_t compressedSize = io::writeCompressedValuesSize(
-                        leaf.buffer().data(), LeafT::SIZE,
-                        leaf.valueMask(), maskCompressData.metadata, saveFloatAsHalf, compression);
-                    metadata.setCompressedSize(idx, compressedSize+sizeBytes);
-                }
-            }
-        );
-    }
-};
-
-bool populateDelayedLoadMetadata(DelayedLoadMetadata& metadata,
-    const GridBase& gridBase, uint32_t compression)
-{
-    PopulateDelayedLoadMetadataOp op(metadata, compression);
-
-    using AllowedTypes = TypeList<
-        Int32Grid, Int64Grid,
-        FloatGrid, DoubleGrid,
-        Vec3IGrid, Vec3SGrid, Vec3DGrid>;
-
-    return gridBase.apply<AllowedTypes>(op);
 }
 
 } // unnamed namespace
@@ -1016,17 +947,9 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
     //grid->insertMeta(GridBase::META_FILE_COMPRESSION,
     //    StringMetadata(compressionToString(c)));
 
-    const VersionId version = getLibraryVersion(is);
-    if (version.first < 6 || (version.first == 6 && version.second <= 1)) {
-        // If delay load metadata exists, but the file format version does not support
-        // delay load metadata, this likely means the original grid was read and then
-        // written using a prior version of OpenVDB and ABI>=5 where unknown metadata
-        // can be blindly copied. This means that it is possible for the metadata to
-        // no longer be in sync with the grid, so we remove it to ensure correctness.
-
-        if ((*grid)[GridBase::META_FILE_DELAYED_LOAD]) {
-            grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
-        }
+    // Delayed loading is no longer supported - always remove metadata related to delayed loading if it exists
+    if ((*grid)[GridBase::META_FILE_DELAYED_LOAD]) {
+        grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
     }
 
     streamMetadata->gridMetadata() = static_cast<MetaMap&>(*grid);
@@ -1035,15 +958,6 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
 
     // reset leaf value to zero
     streamMetadata->setLeaf(0);
-
-    // drop DelayedLoadMetadata from the grid as it is only useful for IO
-    // a stream metadata non-zero value disables this behaviour for testing
-
-    if (streamMetadata->__test() == uint32_t(0)) {
-        if ((*grid)[GridBase::META_FILE_DELAYED_LOAD]) {
-            grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
-        }
-    }
 
     grid->readTransform(is);
     if (!gd.isInstance()) {
@@ -1231,25 +1145,18 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     // Save the compression settings for this grid.
     setGridCompression(os, *grid);
 
-    // copy grid and add delay load metadata
-    const auto copyOfGrid = grid->copyGrid(); // shallow copy
-    const auto nonConstCopyOfGrid = ConstPtrCast<GridBase>(copyOfGrid);
-    nonConstCopyOfGrid->insertMeta(GridBase::META_FILE_DELAYED_LOAD,
-        DelayedLoadMetadata());
-    DelayedLoadMetadata::Ptr delayLoadMeta =
-        nonConstCopyOfGrid->getMetadata<DelayedLoadMetadata>(GridBase::META_FILE_DELAYED_LOAD);
-    if (!populateDelayedLoadMetadata(*delayLoadMeta, *grid, compression())) {
-        nonConstCopyOfGrid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
-    }
-
     // Save the grid's metadata and transform.
     if (getWriteGridStatsMetadata(os)) {
         // Compute and add grid statistics metadata.
+        const auto copyOfGrid = grid->copyGrid(); // shallow copy
+        const auto nonConstCopyOfGrid = ConstPtrCast<GridBase>(copyOfGrid);
         nonConstCopyOfGrid->addStatsMetadata();
         nonConstCopyOfGrid->insertMeta(GridBase::META_FILE_COMPRESSION,
             StringMetadata(compressionToString(getDataCompression(os))));
+        copyOfGrid->writeMeta(os);
+    } else {
+        grid->writeMeta(os);
     }
-    copyOfGrid->writeMeta(os);
     grid->writeTransform(os);
 
     // Save the grid's structure.

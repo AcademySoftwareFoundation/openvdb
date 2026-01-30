@@ -727,7 +727,7 @@ File::readGridPartial(GridBase::Ptr grid, std::istream& is,
     readGridCompression(is);
     grid->readMeta(is);
 
-    // drop DelayedLoadMetadata from the grid as it is only useful for IO
+    // Delayed loading is no longer supported - always remove metadata related to delayed loading if it exists
     if ((*grid)[GridBase::META_FILE_DELAYED_LOAD]) {
         grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
     }
