@@ -1862,17 +1862,10 @@ void Tool::soupToLevelSet()
 #endif
     };// myUpsample
 
-    auto myOffset = [&](const Geometry &mesh, float dx, float isoValue)->GridT::Ptr{
-      //util::CpuTimer timer("myOffset");
-#if 0
-      auto sdf = tools::createLevelSetDilatedMesh<GridT, float>(mesh.vtx(), mesh.tri(), mesh.quad(), dx, dx, width);// faster but buggy
-#else      
+    auto myOffset = [&](const Geometry &mesh, float dx, float isoValue)->GridT::Ptr{  
       auto xform = math::Transform::createLinearTransform(dx);
       auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);// mesh -> UDF
-      auto sdf = tools::levelSetRebuild(*udf, isoValue, width);// UDF -> mesh -> SDF
-#endif
-      //timer.stop();
-      return sdf;
+      return tools::levelSetRebuild(*udf, isoValue, width);// UDF -> mesh -> SDF
     };// myOffset
 
     auto myShrinkWrap = [&](GridT &grid, const GridT &gridB, int &iter)->GridT::Ptr{
@@ -1915,15 +1908,15 @@ void Tool::soupToLevelSet()
     
     auto grid = offsets[nLOD];// coarse grid
     float vol[2];
-    vdb_tool::Spinner s;
+    vdb_tool::Spinner spin;
     for (int level = nLOD-1; level >= 0; --level) {
-      grid = myUpsample(*grid);
+      grid = myUpsample(*grid);// dx -> dx/2
       dx = grid->voxelSize()[0];
       OPENVDB_ASSERT(dx == offsets[level]->voxelSize()[0]);
       int iter = 0, end = myErode(dx);
       std::cout << "Level: " << level << ", D(" << dx << ") = " << end << "\n" << std::flush;
       while (iter < end) {
-        s("Shrink wrap");
+        spin("Shrink wrap #"+std::to_string(iter)+" of "+std::to_string(end));
         grid = myShrinkWrap(*grid, *offsets[level], iter);
         vol[1] = tools::levelSetVolume(*grid);
         if (iter && math::Abs(vol[0]-vol[1]) == 0.0f ) {
