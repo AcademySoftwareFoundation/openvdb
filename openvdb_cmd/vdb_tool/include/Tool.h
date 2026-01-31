@@ -1862,17 +1862,10 @@ void Tool::soupToLevelSet()
 #endif
     };// myUpsample
 
-    auto myOffset = [&](const Geometry &mesh, float dx, float isoValue)->GridT::Ptr{
-      //util::CpuTimer timer("myOffset");
-#if 0
-      auto sdf = tools::createLevelSetDilatedMesh<GridT, float>(mesh.vtx(), mesh.tri(), mesh.quad(), dx, dx, width);// faster but buggy
-#else      
+    auto myOffset = [&](const Geometry &mesh, float dx, float isoValue)->GridT::Ptr{  
       auto xform = math::Transform::createLinearTransform(dx);
       auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);// mesh -> UDF
-      auto sdf = tools::levelSetRebuild(*udf, isoValue, width);// UDF -> mesh -> SDF
-#endif
-      //timer.stop();
-      return sdf;
+      return tools::levelSetRebuild(*udf, isoValue, width);// UDF -> mesh -> SDF
     };// myOffset
 
     auto myShrinkWrap = [&](GridT &grid, const GridT &gridB, int &iter)->GridT::Ptr{
@@ -1907,7 +1900,7 @@ void Tool::soupToLevelSet()
     std::vector<GridT::Ptr> offsets(nLOD+1);// = {grid};// finest grid
     dx = voxel;// final desired voxel size
     for (int level = 0; level <= nLOD; ++level) {// both inclusive
-      std::cerr << "Generating offset at level " << level << " with dx = " << dx << std::endl;
+      std::cout << "Generating offset at level " << level << " with dx = " << dx << "\n" << std::flush;
       if (level) mesh = this->volumeToGeometry(*offsets[level-1], 0.0f);// uncomment for optimization
       offsets[level] = myOffset(*mesh, dx, dx);
       dx *= 2.0f;
@@ -1915,17 +1908,19 @@ void Tool::soupToLevelSet()
     
     auto grid = offsets[nLOD];// coarse grid
     float vol[2];
+    vdb_tool::Spinner spin;
     for (int level = nLOD-1; level >= 0; --level) {
-      grid = myUpsample(*grid);
+      grid = myUpsample(*grid);// dx -> dx/2
       dx = grid->voxelSize()[0];
       OPENVDB_ASSERT(dx == offsets[level]->voxelSize()[0]);
       int iter = 0, end = myErode(dx);
-      std::cerr << "Level: " << level << ", D(" << dx << ") = " << end << std::endl;
+      std::cout << "Level: " << level << ", D(" << dx << ") = " << end << "\n" << std::flush;
       while (iter < end) {
+        spin("Shrink wrap #"+std::to_string(iter)+" of "+std::to_string(end));
         grid = myShrinkWrap(*grid, *offsets[level], iter);
         vol[1] = tools::levelSetVolume(*grid);
         if (iter && math::Abs(vol[0]-vol[1]) == 0.0f ) {
-          std::cerr << "\tTermination after " << iter << " steps, vol = " << vol[0] << std::endl;
+          std::cout << "    Termination after " << iter << " steps, vol = " << vol[0] << "\n" << std::flush;
           break;
         }
         vol[0] = vol[1];
