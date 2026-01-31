@@ -1907,7 +1907,7 @@ void Tool::soupToLevelSet()
     std::vector<GridT::Ptr> offsets(nLOD+1);// = {grid};// finest grid
     dx = voxel;// final desired voxel size
     for (int level = 0; level <= nLOD; ++level) {// both inclusive
-      std::cerr << "Generating offset at level " << level << " with dx = " << dx << std::endl;
+      std::cout << "Generating offset at level " << level << " with dx = " << dx << "\n" << std::flush;
       if (level) mesh = this->volumeToGeometry(*offsets[level-1], 0.0f);// uncomment for optimization
       offsets[level] = myOffset(*mesh, dx, dx);
       dx *= 2.0f;
@@ -1915,17 +1915,19 @@ void Tool::soupToLevelSet()
     
     auto grid = offsets[nLOD];// coarse grid
     float vol[2];
+    vdb_tool::Spinner s;
     for (int level = nLOD-1; level >= 0; --level) {
       grid = myUpsample(*grid);
       dx = grid->voxelSize()[0];
       OPENVDB_ASSERT(dx == offsets[level]->voxelSize()[0]);
       int iter = 0, end = myErode(dx);
-      std::cerr << "Level: " << level << ", D(" << dx << ") = " << end << std::endl;
+      std::cout << "Level: " << level << ", D(" << dx << ") = " << end << "\n" << std::flush;
       while (iter < end) {
+        s("Shrink wrap");
         grid = myShrinkWrap(*grid, *offsets[level], iter);
         vol[1] = tools::levelSetVolume(*grid);
         if (iter && math::Abs(vol[0]-vol[1]) == 0.0f ) {
-          std::cerr << "\tTermination after " << iter << " steps, vol = " << vol[0] << std::endl;
+          std::cout << "    Termination after " << iter << " steps, vol = " << vol[0] << "\n" << std::flush;
           break;
         }
         vol[0] = vol[1];

@@ -424,6 +424,17 @@ inline std::string uuid()
     return ss.str().insert(8,"-").insert(13,"-4").insert(23,"-");//hardcode version 4
 }
 
+class Spinner {
+    const char* mBuffer = "|/-\\";
+    int mOffset = 0;
+public:
+    Spinner() = default;
+    void operator()(const std::string &msg){
+        std::cout << msg << ": " << mBuffer[mOffset] << "\r" << std::flush;
+        mOffset = (mOffset + 1) % 4;
+    }
+};// Spinner
+
 } // namespace vdb_tool
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
