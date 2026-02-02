@@ -463,7 +463,6 @@ void Tool::init()
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
-     {"lod", "0", "2", "number of LOD level. Defaults to 0, i.e. will be derived form the mesh size."},
      {"erode", "8", "2", "number of iterations of constrained erosion. Defaults to 8."},
      {"thres", "0", "0.01", "closing (or engineering) threshold. Defaults to 0, i.e. it\'s diabled."},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
@@ -1817,8 +1816,7 @@ void Tool::soupToLevelSet()
     const float width = mParser.get<float>("width");
     const int geo_age = mParser.get<int>("geo");
     const int nErode = mParser.get<int>("erode");
-    int nLOD = mParser.get<int>("lod");
-    float thres = mParser.get<float>("thres");
+    const float thres = mParser.get<float>("thres");
     const bool keep = mParser.get<bool>("keep");
 
     auto it = this->getGeom(geo_age);
@@ -1831,16 +1829,15 @@ void Tool::soupToLevelSet()
       voxel = this->estimateVoxelSize(dim, width, geo_age);
       std::cerr << "estimated voxel size = " << voxel << " from dim = " << dim << std::endl;
     }
-    if (nLOD == 0) {
-      const auto &bbox = mesh->bbox();// bbox size with max extend
-      const auto maxLength =  bbox.extents()[bbox.maxExtent()];// max length of bbox
-      nLOD = int(std::log2(maxLength/(2.0*voxel)));
-      std::cerr <<  "Max size of bbox = " << maxLength << ", LOD levels = " << nLOD << std::endl;
-      if (nLOD <= 1) throw std::invalid_argument(name+": nLOD="+std::to_string(nLOD)+" is too small!");
-    }
-    if (thres == 0.0f) std::cerr << "Disabled engineering threshold\n";
- 
-    auto myErode = [&](float dx)->int{
+
+    const auto &bbox = mesh->bbox();// bbox of the input mesh
+    const auto maxLength =  bbox.extents()[bbox.maxExtent()];// max length of bbox
+    const int nLOD = int(std::log2(maxLength/(2.0*voxel)));// number of LOD levels
+    std::cerr <<  "Max size of bbox = " << maxLength << ", LOD levels = " << nLOD << std::endl;
+    if (nLOD <= 1) throw std::invalid_argument(name+": nLOD="+std::to_string(nLOD)+" is too small!");
+    //if (thres == 0.0f) std::cerr << "Disabled engineering threshold\n";
+
+    auto D = [&](float dx)->int{
       if (dx >= 2*thres) return nErode;// if thres == 0 this is aways true 
       if (dx <=   thres) return 1;
       return 1 + int((nErode-1)*(dx-thres)/thres);
@@ -1868,13 +1865,14 @@ void Tool::soupToLevelSet()
       return tools::levelSetRebuild(*udf, isoValue, width);// UDF -> mesh -> SDF
     };// myOffset
 
-    auto myShrinkWrap = [&](GridT &grid, const GridT &gridB, int &iter)->GridT::Ptr{
-      const int space = 1, time = 1, steps = 2;
+    auto myShrinkWrap = [&](GridT &grid, const GridT &gridB, float &d)->GridT::Ptr{
+      const int space = 1, time = 1;
+      const float maxDist = 2.0f;
       auto filter = this->createFilter(grid, space, time);
       if (isGridSDF == false) filter->normalize();
-      filter->offset(steps*grid.voxelSize()[0]);// erode by steps * dx
+      filter->offset(maxDist * grid.voxelSize()[0]);// erode by maxDist * dx
       isGridSDF = false;// the CSG operation messed up the SDF
-      iter += steps;
+      d += maxDist;
       return tools::csgUnionCopy(grid, gridB);
     };// myShrinkWrap
 /*
@@ -1893,12 +1891,10 @@ void Tool::soupToLevelSet()
       morph.advect(0, nErode*srcGrid.voxelSize()[0]);
     };// myLevelSetMorph
 */
-    // Main algorithm
-    float dx = voxel * pow(2, nLOD);
-    const float factor = float(nErode-1)/(nLOD-1);
 
-    std::vector<GridT::Ptr> offsets(nLOD+1);// = {grid};// finest grid
-    dx = voxel;// final desired voxel size
+    // Fine to coarse offset generation
+    std::vector<GridT::Ptr> offsets(nLOD+1);
+    float dx = voxel;// final desired voxel size
     for (int level = 0; level <= nLOD; ++level) {// both inclusive
       std::cout << "Generating offset at level " << level << " with dx = " << dx << "\n" << std::flush;
       if (level) mesh = this->volumeToGeometry(*offsets[level-1], 0.0f);// uncomment for optimization
@@ -1906,24 +1902,23 @@ void Tool::soupToLevelSet()
       dx *= 2.0f;
     }// loop from fine to coarse voxel sizes
     
+    // Coarse to fine shrink wrap algorithm
     auto grid = offsets[nLOD];// coarse grid
     float vol[2];
-    vdb_tool::Spinner spin;
+    vdb_tool::Spinner spin(std::cout);
     for (int level = nLOD-1; level >= 0; --level) {
-      grid = myUpsample(*grid);// dx -> dx/2
+      grid = myUpsample(*grid);// grid(dx) -> grid(dx/2)
       dx = grid->voxelSize()[0];
       OPENVDB_ASSERT(dx == offsets[level]->voxelSize()[0]);
-      int iter = 0, end = myErode(dx);
-      std::cout << "Level: " << level << ", D(" << dx << ") = " << end << "\n" << std::flush;
-      while (iter < end) {
-        spin("Shrink wrap #"+std::to_string(iter)+" of "+std::to_string(end));
-        grid = myShrinkWrap(*grid, *offsets[level], iter);
+      std::cout << "Level: " << level << ", D(" << dx << ") = " << D(dx) << "                  \n" << std::flush;
+      for (float d = 0.0f, end = D(dx); d < end; vol[0] = vol[1]) {
+        spin("Shrink wrap d="+std::to_string(d)+", D("+std::to_string(dx)+")="+std::to_string(end));
+        grid = myShrinkWrap(*grid, *offsets[level], d);
         vol[1] = tools::levelSetVolume(*grid);
-        if (iter && math::Abs(vol[0]-vol[1]) == 0.0f ) {
-          std::cout << "    Termination after " << iter << " steps, vol = " << vol[0] << "\n" << std::flush;
+        if (d>0.0f && math::Abs(vol[0]-vol[1]) == 0.0f ) {
+          std::cout << "    Terminated when d = " << d << " and vol = " << vol[0] << "\n" << std::flush;
           break;
         }
-        vol[0] = vol[1];
       }
     }// loop from coarse to fine voxel sizes
 

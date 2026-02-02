@@ -424,13 +424,15 @@ inline std::string uuid()
     return ss.str().insert(8,"-").insert(13,"-4").insert(23,"-");//hardcode version 4
 }
 
+/// @brief Spinning wheel used to indicate progress
 class Spinner {
-    const char* mBuffer = "|/-\\";
-    int mOffset = 0;
+    std::ostream& mOutStream;
+    const char* mBuffer;
+    int mOffset;
 public:
-    Spinner() = default;
+    Spinner(std::ostream& os = std::cout) : mOutStream(os), mBuffer{"|/-\\"}, mOffset{0} {}
     void operator()(const std::string &msg){
-        std::cout << msg << ": " << mBuffer[mOffset] << "\r" << std::flush;
+        mOutStream << msg << ": " << mBuffer[mOffset] << "\r" << std::flush;
         mOffset = (mOffset + 1) % 4;
     }
 };// Spinner
