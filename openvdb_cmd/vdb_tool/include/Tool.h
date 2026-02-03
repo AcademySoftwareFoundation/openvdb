@@ -470,7 +470,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->soupToLevelSet();});
 
   mParser.addAction(
-     {"ls2mesh", "l2m"}, "Convert a level set to an adaptive polygon mesh",
+     {"ls2mesh", "sdf2mesh", "l2m"}, "Convert a level set to an adaptive polygon mesh",
     {{"adapt", "0.0", "0.005", "normalized metric for the adaptive meshing. 0 is uniform and 1 is extreme adaptivity. Defaults to 0."},
      {"iso", "0.0", "0.1", "iso-value used to define the implicit surface. Defaults to zero."},
      {"vdb", "0", "0", "age (i.e. stack index) of the level set VDB grid to be meshed. Defaults to 0, i.e. most recently inserted VDB."},
@@ -1803,8 +1803,6 @@ void Tool::meshToUnsignedDistanceField()
 
 // ==============================================================================================================
 
-// vdb_tool -read ~/dev/data/ply/cube.ply -soup2ls dim=64 lod=4 erode=5 -o vdb="*" stdout.vdb | vdb_view
-// ./openvdb_cmd/vdb_tool/vdb_tool -i ~/dev/data/obj/Robot_arm.obj -soup2ls voxel=0.2 erode=16 -print -o codec=blosc openvdb_10.vdb
 void Tool::soupToLevelSet()
 {
   const std::string &name = mParser.getAction().names[0];
@@ -1859,10 +1857,21 @@ void Tool::soupToLevelSet()
 #endif
     };// myUpsample
 
-    auto myOffset = [&](const Geometry &mesh, float dx, float isoValue)->GridT::Ptr{  
+    auto myOffset = [&](Geometry &mesh, float dx, float isoValue)->GridT::Ptr{
+      //util::CpuTimer   timer("\nmesh -> UDF");
       auto xform = math::Transform::createLinearTransform(dx);
       auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);// mesh -> UDF
-      return tools::levelSetRebuild(*udf, isoValue, width);// UDF -> mesh -> SDF
+#if 1
+      //timer.restart("volumeToMesh: UDF -> mesh");
+      tools::volumeToMesh<GridT>(*udf, mesh.vtx(), mesh.tri(), mesh.quad(), isoValue, 0.0);// updates the mesh
+      //timer.restart("meshToLevelSet: mesh -> SDF");
+      auto sdf = tools::meshToLevelSet<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
+#else
+      timer.restart("levelSetRebuild: UDF -> mesh -> SDF");
+      auto sdf = tools::levelSetRebuild(*udf, isoValue, width);// UDF -> mesh -> SDF
+#endif
+      //timer.stop();
+      return sdf;
     };// myOffset
 
     auto myShrinkWrap = [&](GridT &grid, const GridT &gridB, float &d)->GridT::Ptr{
@@ -1893,22 +1902,31 @@ void Tool::soupToLevelSet()
 */
 
     // Fine to coarse offset generation
+#if 1
+    std::vector<GridT::Ptr> offsets;
+    for (float dx = voxel, dx_max = std::pow(2,nLOD)*dx; dx <= dx_max; dx *= 2.0f) {// fine -> coarse
+      std::cout << "Generating offset with dx = " << dx << "\n" << std::flush;
+      offsets.push_back(myOffset(*mesh, dx, dx));
+    }// loop from fine to coarse voxel sizes
+#else
     std::vector<GridT::Ptr> offsets(nLOD+1);
     float dx = voxel;// final desired voxel size
     for (int level = 0; level <= nLOD; ++level) {// both inclusive
       std::cout << "Generating offset at level " << level << " with dx = " << dx << "\n" << std::flush;
+      util::CpuTimer   timer("\nUpdating mesh");
       if (level) mesh = this->volumeToGeometry(*offsets[level-1], 0.0f);// uncomment for optimization
+      timer.stop();
       offsets[level] = myOffset(*mesh, dx, dx);
       dx *= 2.0f;
     }// loop from fine to coarse voxel sizes
-    
+#endif    
     // Coarse to fine shrink wrap algorithm
     auto grid = offsets[nLOD];// coarse grid
     float vol[2];
     vdb_tool::Spinner spin(std::cout);
-    for (int level = nLOD-1; level >= 0; --level) {
+    for (int level = nLOD-1; level >= 0; --level) {// coarse -> fine
       grid = myUpsample(*grid);// grid(dx) -> grid(dx/2)
-      dx = grid->voxelSize()[0];
+      const float dx = grid->voxelSize()[0];
       OPENVDB_ASSERT(dx == offsets[level]->voxelSize()[0]);
       std::cout << "Level: " << level << ", D(" << dx << ") = " << D(dx) << std::setfill(' ') << std::setw(80) << "\n" << std::flush;
       for (float d = 0.0f, end = D(dx); d < end; vol[0] = vol[1]) {
