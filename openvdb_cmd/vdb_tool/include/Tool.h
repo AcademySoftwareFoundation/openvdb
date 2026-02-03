@@ -1910,13 +1910,13 @@ void Tool::soupToLevelSet()
       grid = myUpsample(*grid);// grid(dx) -> grid(dx/2)
       dx = grid->voxelSize()[0];
       OPENVDB_ASSERT(dx == offsets[level]->voxelSize()[0]);
-      std::cout << "Level: " << level << ", D(" << dx << ") = " << D(dx) << "                  \n" << std::flush;
+      std::cout << "Level: " << level << ", D(" << dx << ") = " << D(dx) << std::setfill(' ') << std::setw(80) << "\n" << std::flush;
       for (float d = 0.0f, end = D(dx); d < end; vol[0] = vol[1]) {
         spin("Shrink wrap d=" + std::to_string(d) + ", D("+std::to_string(dx) + ")=" + std::to_string(end));
         grid = myShrinkWrap(*grid, *offsets[level], d);
         vol[1] = tools::levelSetVolume(*grid);
         if (d>0.0f && math::Abs(vol[0]-vol[1]) == 0.0f ) {
-          std::cout << "    Terminated when d = " << d << " and vol = " << vol[0] << "               \n" << std::flush;
+          std::cout << "    Terminated when d = " << d << " and vol = " << vol[0] << std::setfill(' ') << std::setw(80) << "\n" << std::flush;
           break;
         }
       }
