@@ -1820,38 +1820,34 @@ void Tool::soupToLevelSet()
     auto it = this->getGeom(geo_age);
     Geometry::Ptr mesh = *it;
     if (mesh->isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
-    if (keep) mesh = mesh->copyGeom();// deep copy since mesh will be modified
+    if (keep) mesh = mesh->copyGeom();// deep copy since mesh will be modified below
+    const auto &meshBbox = mesh->bbox();// bbox of the input mesh
+    const float maxLength =  meshBbox.extents()[meshBbox.maxExtent()];// max length of bbox
     bool isGridSDF = true;
 
     std::string grid_name = mParser.get<std::string>("name");
     if (voxel == 0.0f) {
-      voxel = this->estimateVoxelSize(dim, width, geo_age);
-      std::cerr << "estimated voxel size = " << voxel << " from dim = " << dim << std::endl;
+      voxel = maxLength/(dim - 2.0f*(width + 1.0f));// +1 since final surface is dilated by dx
+      if (mParser.verbose>1) std::cerr << "Estimated voxel size = " << voxel << " from dim = " << dim << std::endl;
     }
 
-    const auto &bbox = mesh->bbox();// bbox of the input mesh
-    const auto maxLength =  bbox.extents()[bbox.maxExtent()];// max length of bbox
-    const int nLOD = int(std::log2(maxLength/(2.0*voxel)));// number of LOD levels
-    std::cerr <<  "Max size of bbox = " << maxLength << ", LOD levels = " << nLOD << std::endl;
-    if (nLOD <= 1) throw std::invalid_argument(name+": nLOD="+std::to_string(nLOD)+" is too small!");
-    //if (thres == 0.0f) std::cerr << "Disabled engineering threshold\n";
+    if (mParser.verbose>1 && thres == 0.0f) std::cerr << "Disabled engineering threshold\n";
 
-    auto D = [&](float dx)->int{
+    auto D = [&](float dx)->float{
       if (dx >= 2*thres) return nErode;// if thres == 0 this is aways true 
-      if (dx <=   thres) return 1;
-      return 1 + int((nErode-1)*(dx-thres)/thres);
+      if (dx <=   thres) return 1.0f;
+      return 1.0f + (nErode-1.0f)*(dx-thres)/thres;
     };
 
     if (mParser.verbose) mTimer.start("Soup -> SDF");
-    std::cerr << std::endl;
+    if (mParser.verbose>1) std::cerr << std::endl;
 
     auto myUpsample = [&](const GridT &grid)->GridT::Ptr{
-      const float dx = grid.voxelSize()[0];
 #if 0
-      auto xform = math::Transform::createLinearTransform(dx/2);// upsample
+      auto xform = math::Transform::createLinearTransform(grid.voxelSize()[0]/2);// upsample
       return tools::levelSetRebuild(grid, 0.0f, width, xform.get());// SDF -> mesh -> SDF
 #else
-      GridT::Ptr outGrid = createLevelSet<GridT>(dx/2, width);
+      GridT::Ptr outGrid = createLevelSet<GridT>(grid.voxelSize()[0]/2, width);
       tools::resampleToMatch<tools::BoxSampler>(grid, *outGrid);
       isGridSDF = true;
       return outGrid;
@@ -1859,21 +1855,15 @@ void Tool::soupToLevelSet()
     };// myUpsample
 
     auto myOffset = [&](Geometry &mesh, float dx)->GridT::Ptr{
-      std::cout << "Generating offset with dx = " << dx << "\n" << std::flush;
-      //util::CpuTimer   timer("\nmesh -> UDF");
+      if (mParser.verbose>1) std::cout << "Generating offset with dx = " << dx << "\n" << std::flush;
       auto xform = math::Transform::createLinearTransform(dx);
       auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);// mesh -> UDF
 #if 1
-      //timer.restart("volumeToMesh: UDF -> mesh");
       tools::volumeToMesh<GridT>(*udf, mesh.vtx(), mesh.tri(), mesh.quad(), dx, 0.0);// updates the mesh
-      //timer.restart("meshToLevelSet: mesh -> SDF");
-      auto sdf = tools::meshToLevelSet<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
+      return tools::meshToLevelSet<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
 #else
-      timer.restart("levelSetRebuild: UDF -> mesh -> SDF");
-      auto sdf = tools::levelSetRebuild(*udf, dx, width);// UDF -> mesh -> SDF
+      return tools::levelSetRebuild(*udf, dx, width);// UDF -> mesh -> SDF
 #endif
-      //timer.stop();
-      return sdf;
     };// myOffset
 
     auto myShrinkWrap = [&](GridT &grid, const GridT &gridB, float &d)->GridT::Ptr{
@@ -1888,39 +1878,22 @@ void Tool::soupToLevelSet()
     };// myShrinkWrap
 
     // Fine to coarse offset generation
-#if 1
     std::vector<GridT::Ptr> offsets;
-    //for (float dx = voxel; 2*dx <= maxlength; dx *= 2.0f) {// fine -> coarse
-    for (float dx = voxel, max = std::pow(2,nLOD)*dx; dx <= max; dx *= 2.0f) {// fine -> coarse
-      offsets.push_back(myOffset(*mesh, dx));
-    }// loop from fine to coarse voxel sizes
-#else
-    std::vector<GridT::Ptr> offsets(nLOD+1);
-    float dx = voxel;// final desired voxel size
-    for (int level = 0; level <= nLOD; ++level) {// both inclusive
-      std::cout << "Generating offset at level " << level << " with dx = " << dx << "\n" << std::flush;
-      //util::CpuTimer   timer("\nUpdating mesh");
-      if (level) mesh = this->volumeToGeometry(*offsets[level-1], 0.0f);// uncomment for optimization
-      //timer.stop();
-      offsets[level] = myOffset(*mesh, dx);
-      dx *= 2.0f;
-    }// loop from fine to coarse voxel sizes
-#endif
+    for (float dx = voxel; 2*dx <= maxLength; dx *= 2.0f) offsets.push_back(myOffset(*mesh, dx));
+    if (offsets.size() <= 1) throw std::invalid_argument(name+": nLOD="+std::to_string(offsets.size())+" is too small!");
+
     // Coarse to fine shrink wrap algorithm
-    auto grid = offsets[nLOD];// coarse grid
     float vol[2];
     vdb_tool::Spinner spin(std::cout);
-    for (int level = nLOD-1; level >= 0; --level) {// coarse -> fine
+    auto grid = offsets.back();// coarset grid
+    for (auto iter = ++offsets.rbegin(), end = offsets.rend(); iter != end; ++iter) {// coarse -> fine
       grid = myUpsample(*grid);// grid(dx) -> grid(dx/2)
-      const float dx = grid->voxelSize()[0];
-      OPENVDB_ASSERT(dx == offsets[level]->voxelSize()[0]);
-      std::cout << "Level: " << level << ", D(" << dx << ") = " << D(dx) << std::setfill(' ') << std::setw(80) << "\n" << std::flush;
-      for (float d = 0.0f, end = D(dx); d < end; vol[0] = vol[1]) {
-        spin("Shrink wrap d=" + std::to_string(d) + ", D("+std::to_string(dx) + ")=" + std::to_string(end));
-        grid = myShrinkWrap(*grid, *offsets[level], d);
+      for (float d = 0.0f, dx = grid->voxelSize()[0], Ddx = D(dx); d < Ddx; vol[0] = vol[1]) {
+        if (mParser.verbose>1) spin("Shrink wrap d=" + std::to_string(d) + ", D("+std::to_string(dx) + ")=" + std::to_string(Ddx));
+        grid = myShrinkWrap(*grid, **iter, d);
         vol[1] = tools::levelSetVolume(*grid);
         if (d>0.0f && math::Abs(vol[0]-vol[1]) == 0.0f ) {
-          std::cout << "    Terminated when d = " << d << " and vol = " << vol[0] << std::setfill(' ') << std::setw(80) << "\n" << std::flush;
+          if (mParser.verbose>1) std::cout << "    Terminated when d = " << d << " and vol = " << vol[0] << std::setfill(' ') << std::setw(80) << "\n" << std::flush;
           break;
         }
       }
