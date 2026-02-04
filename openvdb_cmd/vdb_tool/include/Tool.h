@@ -1890,6 +1890,7 @@ void Tool::soupToLevelSet()
     // Fine to coarse offset generation
 #if 1
     std::vector<GridT::Ptr> offsets;
+    //for (float dx = voxel; 2*dx <= maxlength; dx *= 2.0f) {// fine -> coarse
     for (float dx = voxel, max = std::pow(2,nLOD)*dx; dx <= max; dx *= 2.0f) {// fine -> coarse
       offsets.push_back(myOffset(*mesh, dx));
     }// loop from fine to coarse voxel sizes
