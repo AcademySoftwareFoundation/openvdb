@@ -318,7 +318,6 @@ void Tool::run()
         std::cerr << "Fatal error in Tool::run: " << e.what() << std::endl;
         std::exit(EXIT_FAILURE);
     }
-    if (mParser.verbose>1) this->print();
 }// Tool::run
 
 // ==============================================================================================================
@@ -3049,7 +3048,7 @@ void Tool::print(std::ostream& os) const
     os << std::setw(80) << std::setfill('=') << "\n" << std::endl;
   }
 
-  if (mParser.iter != mParser.actions.end() && mParser.verbose>0) {
+  if (mParser.verbose>0) {
     os << "\n" << std::setw(40) << std::setfill('=') << "> Primitives <" << std::setw(39) << "\n";
     if (mParser.getStr("geo")=="*") {
       for (auto begin = mGeom.crbegin(), it = begin, end = mGeom.crend(); it != end; ++it) {
