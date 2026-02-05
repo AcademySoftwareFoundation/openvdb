@@ -416,7 +416,7 @@ public:
     }
 
     /// @brief performs syntax analysis on the specified str. Implements control-flows like for- and each-loops, if- and switch-statements,
-    ///        and calls the lambda functions associated with the instructions.
+    ///        and calls the lambda functions associated with the actions.
     void operator()(std::string &str)
     {
         try {
@@ -777,6 +777,7 @@ struct Parser {
 
 std::string Parser::getStr(const std::string &name) const
 {
+  OPENVDB_ASSERT(iter != actions.end());
   for (auto &opt : iter->options) {
       if (opt.name != name) continue;// linear search
       std::string str = opt.value;// deep copy since it might get modified by map
@@ -1056,7 +1057,7 @@ Parser::Parser(std::vector<Option> &&def)
 
 void Parser::run()
 {
-    for (iter=actions.begin();iter!=actions.end();++iter) iter->run();
+    for (iter=actions.begin(); iter!=actions.end(); ++iter) iter->run();
 }// Parser::run(
 
 // ==============================================================================================================

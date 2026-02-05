@@ -1886,7 +1886,7 @@ void Tool::soupToLevelSet()
     float vol[2];
     vdb_tool::Spinner spin(std::cout);
     auto grid = offsets.back();// coarset grid
-    for (auto iter = ++offsets.rbegin(), end = offsets.rend(); iter != end; ++iter) {// coarse -> fine
+    for (auto iter = std::next(offsets.rbegin()), end = offsets.rend(); iter != end; ++iter) {// coarse -> fine
       grid = myUpsample(*grid);// grid(dx) -> grid(dx/2)
       for (float d = 0.0f, dx = grid->voxelSize()[0], Ddx = D(dx); d < Ddx; vol[0] = vol[1]) {
         if (mParser.verbose>1) spin("Shrink wrap d=" + std::to_string(d) + ", D("+std::to_string(dx) + ")=" + std::to_string(Ddx));
@@ -3049,9 +3049,8 @@ void Tool::print(std::ostream& os) const
     os << std::setw(80) << std::setfill('=') << "\n" << std::endl;
   }
 
-  if (mParser.verbose>0) {
+  if (mParser.iter != mParser.actions.end() && mParser.verbose>0) {
     os << "\n" << std::setw(40) << std::setfill('=') << "> Primitives <" << std::setw(39) << "\n";
-
     if (mParser.getStr("geo")=="*") {
       for (auto begin = mGeom.crbegin(), it = begin, end = mGeom.crend(); it != end; ++it) {
         const Geometry &geom = **it;
@@ -3069,7 +3068,6 @@ void Tool::print(std::ostream& os) const
         os << "\n";
       }
     }
-
     if (mParser.getStr("vdb")=="*") {
       for (auto begin = mGrid.crbegin(), it = begin, end = mGrid.crend(); it != end; ++it) {
         const auto &grid = **it;
