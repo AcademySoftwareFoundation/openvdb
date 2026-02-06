@@ -1821,8 +1821,7 @@ void Tool::soupToLevelSet()
     Geometry::Ptr mesh = *it;
     if (mesh->isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
     if (keep) mesh = mesh->copyGeom();// deep copy since mesh will be modified below
-    const auto &meshBbox = mesh->bbox();// bbox of the input mesh
-    const float maxLength =  meshBbox.extents()[meshBbox.maxExtent()];// max length of bbox
+    const float maxLength =  mesh->maxLength();
     bool isGridSDF = true;
 
     std::string grid_name = mParser.get<std::string>("name");

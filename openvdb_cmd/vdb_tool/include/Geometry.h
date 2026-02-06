@@ -101,6 +101,9 @@ public:
 
     const BBoxT& bbox() const;
 
+    /// @brief Returns the maximum length of the bbox of this mesh
+    float maxLength() const;
+
     void clear();
 
     // Reads all the vertices in the file and treats them as Geometry
@@ -242,6 +245,12 @@ const math::BBox<Vec3s>& Geometry::bbox() const
     return mBBox;
 }// Geometry::bbox
 
+float Geometry::maxLength() const
+{
+    const math::BBox<Vec3s>& bbox = this->bbox();
+    return bbox.extents()[bbox.maxExtent()];
+}
+
 void Geometry::write(const std::string &fileName) const
 {
     switch (findFileExt(fileName, {"geo", "obj", "ply", "stl", "abc", "off"})) {
@@ -375,7 +384,7 @@ void Geometry::writeSTL(const std::string &fileName) const
 void Geometry::writeSTL(std::ostream &os) const
 {
     if (!isLittleEndian()) throw std::invalid_argument("STL file only supports little endian, but this system is big endian");
-    if (!mQuad.empty()) throw std::invalid_argument("Binary STL files only supports triangles, but the mesh contains quads");
+    if (!mQuad.empty()) throw std::invalid_argument("Binary STL files only supports triangles, but the mesh contains quads:. Hint: call quad2tri");
     uint8_t buffer[80] = {0};// fixed-sized buffer initiated with zeros!
     os.write((const char*)buffer, 80);// write header as zeros
     const uint32_t nTri = static_cast<uint32_t>(mTri.size());
