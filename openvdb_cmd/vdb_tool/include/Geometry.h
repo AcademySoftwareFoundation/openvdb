@@ -66,8 +66,6 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace vdb_tool {
 
-#define MY_CLEAN_VERSION
-
 /// @brief Class that encapsulates (explicit) geometry, i.e. vertices/points,
 ///        triangles and quads. It is used to represent points and polygon meshes
 class Geometry
@@ -101,7 +99,7 @@ public:
 
     const BBoxT& bbox() const;
 
-    /// @brief Returns the maximum length of the bbox of this mesh
+    /// @brief Returns the maximum length of the bbox for the vertices in this Geometry
     float maxLength() const;
 
     void clear();
@@ -165,6 +163,16 @@ public:
     static std::vector<Vec3I> triangulate(const std::vector<int> &nGon);
 
 private:
+
+    /// @brief Use AD dot (AB cross AC) = 0 to test if all points of a quad are
+    ///        in the same plane.
+    /// @param quad quad to be tested
+    /// @return true if all the point of the quat are in the same plane
+    bool isPlanar(const Vec4I &quad) const {
+        auto q = [&](int i)->const PosT&{ return mVtx[quad[i]]; };
+        const float d = (q(0)-q(3)).dot((q(0)-q(1)).cross(q(0)-q(2)));
+        return math::isApproxZero(d, 1e-5f);
+    }
 
     std::vector<PosT>  mVtx;
     std::vector<Vec3I> mTri;
