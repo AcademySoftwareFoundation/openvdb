@@ -649,7 +649,7 @@ private:
 
 // ==============================================================================================================
 
-template <typename IterT> 
+template <typename IterT>
 struct FilesLoop : public BaseLoop
 {
 public:
@@ -989,7 +989,7 @@ Parser::Parser(std::vector<Option> &&def)
             std::shared_ptr<BaseLoop> loop;
             if (this->get<bool>("recursive")) {
                 using LoopT = FilesLoop<std::filesystem::recursive_directory_iterator>;
-                loop = std::make_shared<LoopT>(processor.memory(), iter, "file", iter->options[0].value, 
+                loop = std::make_shared<LoopT>(processor.memory(), iter, "file", iter->options[0].value,
                                                this->getVec<std::string>("extension",","), this->getVec<std::string>("pattern",","));
             } else {
                 using LoopT = FilesLoop<std::filesystem::directory_iterator>;

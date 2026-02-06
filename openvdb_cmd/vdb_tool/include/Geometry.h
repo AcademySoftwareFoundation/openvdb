@@ -1359,7 +1359,7 @@ size_t Geometry::triangulateQuads()
             }
         }
     });
-    
+
     mQuad.clear();
     return 2*quadCount;// number of triangles added
 }// Geometry::triangulateQuads

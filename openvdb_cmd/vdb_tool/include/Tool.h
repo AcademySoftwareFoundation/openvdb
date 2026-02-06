@@ -431,7 +431,7 @@ void Tool::init()
     {{"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"}},
      [&](){mParser.setDefaults();}, [&](){this->quadsToTriangles();});
-   
+
   mParser.addAction(
      {"mesh2ls", "mesh2sdf", "m2ls"}, "Convert a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
@@ -1809,7 +1809,7 @@ void Tool::soupToLevelSet()
   try {
     mParser.printAction();
     const int dim = mParser.get<int>("dim");// final dimension
-    float voxel = mParser.get<float>("voxel");// final voxel size 
+    float voxel = mParser.get<float>("voxel");// final voxel size
     const float width = mParser.get<float>("width");
     const int geo_age = mParser.get<int>("geo");
     const int nErode = mParser.get<int>("erode");
@@ -1832,7 +1832,7 @@ void Tool::soupToLevelSet()
     if (mParser.verbose>1 && thres == 0.0f) std::cerr << "Disabled engineering threshold\n";
 
     auto D = [&](float dx)->float{
-      if (dx >= 2*thres) return nErode;// if thres == 0 this is aways true 
+      if (dx >= 2*thres) return nErode;// if thres == 0 this is aways true
       if (dx <=   thres) return 1.0f;
       return 1.0f + (nErode-1.0f)*(dx-thres)/thres;
     };
