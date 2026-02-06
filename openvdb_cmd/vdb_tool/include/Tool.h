@@ -40,6 +40,7 @@
 #include <openvdb/tools/RayTracer.h>
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/tools/ParticlesToLevelSet.h>
+#include <openvdb/tools/PolySoupToLevelSet.h>
 #include <openvdb/tools/PointScatter.h>
 #include <openvdb/tools/PointsToMask.h>
 #include <openvdb/tools/Composite.h>
