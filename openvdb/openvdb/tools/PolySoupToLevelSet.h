@@ -9,6 +9,9 @@
 ///        a soup of polygons.
 ///
 /// @details The details of this algorithm given in an upcoming publication
+///
+/// @todo 1) estimate maxVoxelSize from bbox of mesh
+///       2) allow for const math::Transform& transform
 
 #ifndef OPENVDB_TOOLS_POLYSOUP_TO_LEVELSET_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POLYSOUP_TO_LEVELSET_HAS_BEEN_INCLUDED
@@ -33,6 +36,17 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
+class ShrinkWrapLimit {
+    const float nErode, threshold;
+public:
+    ShrinkWrapLimit(float erode = 8.0f, float thres = 0.0f) : nErode(erode), threshold(thres) {} 
+    float operator()(float dx) const {// if threshold == 0 this always returns nErode
+        if (dx >= 2*threshold) return nErode;
+        if (dx <=   threshold) return 1.0f;
+        return 1.0f + (nErode-1.0f)*(dx-threshold)/threshold;
+    }
+};// ShrinkWrapLimit
+
 /// @brief Convert a triangle and quad mesh to a level set volume.
 ///
 /// @return a grid of type @c GridType containing a narrow-band level set
@@ -49,7 +63,7 @@ namespace tools {
 /// @param triangles    triangle index list
 /// @param quads        quad index list
 /// @param halfWidth    half the width of the narrow band, in voxel units
-template<typename GridType>
+template<typename GridType, class ShrinkWrapT>
 std::vector<typename GridType::Ptr>
 polySoupToLevelSet(
     float minVoxelSize,// output voxel size
@@ -57,16 +71,9 @@ polySoupToLevelSet(
     std::vector<Vec3s>& vtx,
     std::vector<Vec3I>& tri,
     std::vector<Vec4I>& quad,
-    float nErode = 8.0f,
-    float thres = 0.0f,
+    const ShrinkWrapT &D = ShrinkWrapLimit(),
     float halfWidth = float(LEVEL_SET_HALF_WIDTH))
 {
-    auto D = [&](float dx)->float{
-      if (dx >= 2*thres) return nErode;// if thres == 0 this is aways true
-      if (dx <=   thres) return 1.0f;
-      return 1.0f + (nErode-1.0f)*(dx-thres)/thres;
-    };
-
     bool isGridSDF = true;
     auto myUpsample = [&](const GridType &grid){
       auto outGrid = createLevelSet<GridType>(grid.voxelSize()[0]/2, halfWidth);
@@ -100,7 +107,7 @@ polySoupToLevelSet(
 
     // Coarse to fine shrink wrap algorithm
     float vol[2];
-    auto g = grids.back();// coarset grid
+    auto g = grids.back();// coarsest grid
     grids.pop_back();
     for (auto iter = grids.rbegin(), end = grids.rend(); iter != end; ++iter) {// coarse -> fine
       g = myUpsample(*g);// g(dx) -> g(dx/2)
