@@ -8,7 +8,7 @@
 /// @brief Generates a LOD family of watertight shrink wrap surfaces from a
 ///        a soup of polygons.
 ///
-/// @details The details of this algorithm given in an upcoming publication
+/// @details Details of this algorithm are given in an upcoming publication.
 
 #ifndef OPENVDB_TOOLS_POLYSOUP_TO_LEVELSET_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POLYSOUP_TO_LEVELSET_HAS_BEEN_INCLUDED
@@ -201,12 +201,14 @@ polySoupToLevelSet(
     return grids;
 }// tools::polySoupToLevelSet
 
+//////////////////////////////////////////////////////////////////////////
+
 class ShrinkWrapLimit {
     const float mErode, mThres;
 public:
     ShrinkWrapLimit(float erode = 8.0f, float thres = 0.0f) : mErode(erode), mThres(thres) {} 
     float operator()(float dx) const {// if mThres == 0 this always returns mErode
-        return dx >= 2*mThres ? mErode : dx <= mThres ? 1.0f : 1.0f + (mErode-1.0f)*(dx-mThres)/mThres;
+        return dx>=2*mThres ? mErode : dx<=mThres ? 1.0f : 1.0f + (mErode-1.0f)*(dx-mThres)/mThres;
     }
 };// ShrinkWrapLimit
 
