@@ -1816,15 +1816,27 @@ void Tool::soupToLevelSet()
     const int nErode = mParser.get<int>("erode");
     const float thres = mParser.get<float>("thres");
     const bool keep = mParser.get<bool>("keep");
+    std::string grid_name = mParser.get<std::string>("name");
 
     auto it = this->getGeom(geo_age);
     Geometry::Ptr mesh = *it;
     if (mesh->isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
     if (keep) mesh = mesh->deepCopy();// deep copy since mesh will be modified below
+
+#if 1
+    const tools::ShrinkWrapLimit D(nErode, thres);
+    std::vector<GridT::Ptr> grids;
+    if (voxel == 0.0f) {
+        grids = tools::polySoupToLevelSet<GridT>(dim,   mesh->bbox(), mesh->vtx(), mesh->tri(), mesh->quad(), D, width);
+    } else {
+        grids = tools::polySoupToLevelSet<GridT>(voxel, mesh->bbox(), mesh->vtx(), mesh->tri(), mesh->quad(), D, width);
+    }
+    auto grid = grids[0];
+#else
+    
     const float maxLength =  mesh->maxLength();
     bool isGridSDF = true;
-
-    std::string grid_name = mParser.get<std::string>("name");
+    
     if (voxel == 0.0f) {
       voxel = maxLength/(dim - 2.0f*(width + 1.0f));// +1 since final surface is dilated by dx
       if (mParser.verbose>1) std::cerr << "Estimated voxel size = " << voxel << " from dim = " << dim << std::endl;
@@ -1897,6 +1909,7 @@ void Tool::soupToLevelSet()
         }
       }
     }// loop from coarse to fine voxel sizes
+#endif
 
     if (mParser.verbose) mTimer.stop();
 

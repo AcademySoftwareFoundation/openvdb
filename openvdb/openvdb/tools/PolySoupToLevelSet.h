@@ -98,7 +98,7 @@ polySoupToLevelSet(
     const float maxLength = bbox.extents()[bbox.maxExtent()];
     const float minVoxelSize = maxLength/(dim - 2.0f*(halfWidth + 1.0f));// +1 since final surface is dilated by dx
     const float maxVoxelSize = maxLength / 2.0f;
-    return polySoupToLevelSet(minVoxelSize, maxVoxelSize, vtx, tri, quad, D, halfWidth);
+    return polySoupToLevelSet<GridType, ShrinkWrapT>(minVoxelSize, maxVoxelSize, vtx, tri, quad, D, halfWidth);
 }
 
 /// @brief Convert a soup of polygons to a LOD sequence of shrink wrapped level set volumes.
@@ -133,7 +133,7 @@ polySoupToLevelSet(
 {
     const float maxLength = bbox.extents()[bbox.maxExtent()];
     const float maxVoxelSize = maxLength / 2.0f;
-    return polySoupToLevelSet(minVoxelSize, maxVoxelSize, vtx, tri, quad, D, halfWidth);
+    return polySoupToLevelSet<GridType, ShrinkWrapT>(minVoxelSize, maxVoxelSize, vtx, tri, quad, D, halfWidth);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -191,6 +191,7 @@ polySoupToLevelSet(
     for (auto iter = grids.rbegin(), end = grids.rend(); iter != end; ++iter) {// coarse -> fine
       g = myUpsample(*g);// g(dx) -> g(dx/2)
       for (float d = 0.0f, dx = g->voxelSize()[0], Ddx = D(dx); d < Ddx; vol[0] = vol[1]) {
+        //std::cerr << "D(" << dx << ")=" << Ddx << std::endl;
         g = myShrinkWrap(*g, **iter, d);
         vol[1] = levelSetVolume(*g);
         if (d>0.0f && math::isApproxZero(vol[0]-vol[1])) break;
