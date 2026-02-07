@@ -9,9 +9,6 @@
 ///        a soup of polygons.
 ///
 /// @details The details of this algorithm given in an upcoming publication
-///
-/// @todo 1) estimate maxVoxelSize from bbox of mesh
-///       2) allow for const math::Transform& transform
 
 #ifndef OPENVDB_TOOLS_POLYSOUP_TO_LEVELSET_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POLYSOUP_TO_LEVELSET_HAS_BEEN_INCLUDED
@@ -36,34 +33,28 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-class ShrinkWrapLimit {
-    const float nErode, threshold;
-public:
-    ShrinkWrapLimit(float erode = 8.0f, float thres = 0.0f) : nErode(erode), threshold(thres) {} 
-    float operator()(float dx) const {// if threshold == 0 this always returns nErode
-        if (dx >= 2*threshold) return nErode;
-        if (dx <=   threshold) return 1.0f;
-        return 1.0f + (nErode-1.0f)*(dx-threshold)/threshold;
-    }
-};// ShrinkWrapLimit
+class ShrinkWrapLimit;// ShrinkWrapLimit
 
-/// @brief Convert a triangle and quad mesh to a level set volume.
+/// @brief Convert a soup of polygons to a LOD sequence of shrink wrapped level set volumes.
 ///
-/// @return a grid of type @c GridType containing a narrow-band level set
-///         representation of the input mesh.
+/// @return a vector of grids of type @c GridType containing a narrow-band level set
+///         at various resolution shrink wrapping the input polygon mesh. The first
+///         element in this vector has the highest resolution.
 ///
 /// @throw  TypeError if @c GridType is not scalar or not floating-point
 ///
-/// @note   Requires a closed surface but not necessarily a manifold surface.
-///         Supports surfaces with self intersections and degenerate faces
-///         and is independent of mesh surface normals.
+/// @note   Unlike tools::meshToLevelSet this method works for any polygons,
+///         and does not require a closed surface.
 ///
-/// @param xform        transform for the output grid
-/// @param points       list of world space vertex positions
-/// @param triangles    triangle index list
-/// @param quads        quad index list
+/// @param minVoxelSize finst/smallest voxel size of the output grids
+/// @param maxVoxelSize coarsest/largest voxel size of the output grids
+/// @param vtx          vector of world space vertex positions
+/// @param tri          vector of triangle indies
+/// @param quads        vector of quad indices
+/// @param D            functor mapping voxel size to maximum allowed surface deformation
+///                     allowed by shrink wrapping as a function of the voxel size
 /// @param halfWidth    half the width of the narrow band, in voxel units
-template<typename GridType, class ShrinkWrapT>
+template<typename GridType, class ShrinkWrapT = ShrinkWrapLimit>
 std::vector<typename GridType::Ptr>
 polySoupToLevelSet(
     float minVoxelSize,// output voxel size
@@ -71,9 +62,97 @@ polySoupToLevelSet(
     std::vector<Vec3s>& vtx,
     std::vector<Vec3I>& tri,
     std::vector<Vec4I>& quad,
-    const ShrinkWrapT &D = ShrinkWrapLimit(),
-    float halfWidth = float(LEVEL_SET_HALF_WIDTH))
+    const ShrinkWrapT &D = ShrinkWrapT(),
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH));
+
+/// @brief Convert a soup of polygons to a LOD sequence of shrink wrapped level set volumes.
+///
+/// @return a vector of grids of type @c GridType containing a narrow-band level set
+///         at various resolution shrink wrapping the input polygon mesh. The first
+///         element in this vector has the highest resolution.
+///
+/// @throw  TypeError if @c GridType is not scalar or not floating-point
+///
+/// @note   Unlike tools::meshToLevelSet this method works for any polygons,
+///         and does not require a closed surface.
+///
+/// @param dim          Largest voxel dimension of the finest output grid
+/// @param bbox         bounding box of the vertices of the polygon mesh
+/// @param vtx          vector of world space vertex positions
+/// @param tri          vector of triangle indies
+/// @param quads        vector of quad indices
+/// @param D            functor mapping voxel size to maximum allowed surface deformation
+///                     allowed by shrink wrapping as a function of the voxel size
+/// @param halfWidth    half the width of the narrow band, in voxel units
+template<typename GridType, class ShrinkWrapT = ShrinkWrapLimit>
+std::vector<typename GridType::Ptr>
+polySoupToLevelSet(
+    int dim,
+    const math::BBox<Vec3f> &bbox,
+    std::vector<Vec3s>& vtx,
+    std::vector<Vec3I>& tri,
+    std::vector<Vec4I>& quad,
+    const ShrinkWrapT &D = ShrinkWrapT(),
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH))    
 {
+    const float maxLength = bbox.extents()[bbox.maxExtent()];
+    const float minVoxelSize = maxLength/(dim - 2.0f*(halfWidth + 1.0f));// +1 since final surface is dilated by dx
+    const float maxVoxelSize = maxLength / 2.0f;
+    return polySoupToLevelSet(minVoxelSize, maxVoxelSize, vtx, tri, quad, D, halfWidth);
+}
+
+/// @brief Convert a soup of polygons to a LOD sequence of shrink wrapped level set volumes.
+///
+/// @return a vector of grids of type @c GridType containing a narrow-band level set
+///         at various resolution shrink wrapping the input polygon mesh. The first
+///         element in this vector has the highest resolution.
+///
+/// @throw  TypeError if @c GridType is not scalar or not floating-point
+///
+/// @note   Unlike tools::meshToLevelSet this method works for any polygons,
+///         and does not require a closed surface.
+///
+/// @param minVoxelSize finst/smallest voxel size of the output grids
+/// @param bbox         bounding box of the vertices of the polygon mesh
+/// @param vtx          vector of world space vertex positions
+/// @param tri          vector of triangle indies
+/// @param quads        vector of quad indices
+/// @param D            functor mapping voxel size to maximum allowed surface deformation
+///                     allowed by shrink wrapping as a function of the voxel size
+/// @param halfWidth    half the width of the narrow band, in voxel units
+template<typename GridType, class ShrinkWrapT = ShrinkWrapLimit>
+std::vector<typename GridType::Ptr>
+polySoupToLevelSet(
+    float minVoxelSize,
+    const math::BBox<Vec3f> &bbox,
+    std::vector<Vec3s>& vtx,
+    std::vector<Vec3I>& tri,
+    std::vector<Vec4I>& quad,
+    const ShrinkWrapT &D = ShrinkWrapT(),
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH))    
+{
+    const float maxLength = bbox.extents()[bbox.maxExtent()];
+    const float maxVoxelSize = maxLength / 2.0f;
+    return polySoupToLevelSet(minVoxelSize, maxVoxelSize, vtx, tri, quad, D, halfWidth);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+template<typename GridType, class ShrinkWrapT>
+std::vector<typename GridType::Ptr>
+polySoupToLevelSet(
+    float minVoxelSize,
+    float maxVoxelSize,
+    std::vector<Vec3s>& vtx,
+    std::vector<Vec3I>& tri,
+    std::vector<Vec4I>& quad,
+    const ShrinkWrapT &D,
+    float halfWidth)    
+{
+    if constexpr(!std::is_floating_point<typename GridType::ValueType>::value) {
+        OPENVDB_THROW(TypeError, "polySoupToLevelSet: supported only for scalar floating-point grids");
+    }
+    OPENVDB_ASSERT(2*minVoxelSize <= maxVoxelSize);
     bool isGridSDF = true;
     auto myUpsample = [&](const GridType &grid){
       auto outGrid = createLevelSet<GridType>(grid.voxelSize()[0]/2, halfWidth);
@@ -102,7 +181,7 @@ polySoupToLevelSet(
     };// myShrinkWrap
 
     // Fine to coarse offset generation
-    std::vector<typename GridType::Ptr> grids;// level-of-detail grids
+    std::vector<typename GridType::Ptr> grids;// fine -> coarse grids
     for (float dx = minVoxelSize; dx <= maxVoxelSize; dx *= 2.0f) grids.push_back(myOffset(dx));
 
     // Coarse to fine shrink wrap algorithm
@@ -114,13 +193,22 @@ polySoupToLevelSet(
       for (float d = 0.0f, dx = g->voxelSize()[0], Ddx = D(dx); d < Ddx; vol[0] = vol[1]) {
         g = myShrinkWrap(*g, **iter, d);
         vol[1] = levelSetVolume(*g);
-        if (d>0.0f && math::Abs(vol[0]-vol[1]) == 0.0f ) break;
+        if (d>0.0f && math::isApproxZero(vol[0]-vol[1])) break;
       }
       *iter = g;
     }// loop from coarse to fine voxel sizes
 
     return grids;
 }// tools::polySoupToLevelSet
+
+class ShrinkWrapLimit {
+    const float mErode, mThres;
+public:
+    ShrinkWrapLimit(float erode = 8.0f, float thres = 0.0f) : mErode(erode), mThres(thres) {} 
+    float operator()(float dx) const {// if mThres == 0 this always returns mErode
+        return dx >= 2*mThres ? mErode : dx <= mThres ? 1.0f : 1.0f + (mErode-1.0f)*(dx-mThres)/mThres;
+    }
+};// ShrinkWrapLimit
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

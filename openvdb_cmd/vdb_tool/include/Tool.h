@@ -1590,7 +1590,7 @@ void Tool::transform()
       auto it = this->getGeom(age);
       Geometry::Ptr geom(nullptr);
       if (keep) {
-        geom = (*it)->copyGeom();
+        geom = (*it)->deepCopy();
         if (!geom->getName().empty()) geom->setName("xform_"+geom->getName());
         mGeom.push_back(geom);
       } else {
@@ -1698,7 +1698,7 @@ void Tool::quadsToTriangles()
       return;
     }
     if (keep) {
-      Geometry::Ptr meshCopy = mesh->copyGeom();
+      Geometry::Ptr meshCopy = mesh->deepCopy();
       mGeom.push_back(meshCopy);
       mesh = meshCopy;
     }
@@ -1820,7 +1820,7 @@ void Tool::soupToLevelSet()
     auto it = this->getGeom(geo_age);
     Geometry::Ptr mesh = *it;
     if (mesh->isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
-    if (keep) mesh = mesh->copyGeom();// deep copy since mesh will be modified below
+    if (keep) mesh = mesh->deepCopy();// deep copy since mesh will be modified below
     const float maxLength =  mesh->maxLength();
     bool isGridSDF = true;
 

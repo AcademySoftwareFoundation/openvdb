@@ -85,7 +85,7 @@ public:
     Geometry& operator=(const Geometry&) = delete;// disallow assignment
     Geometry& operator=(Geometry&&) = delete;// disallow move assignment
 
-    inline Ptr copyGeom() const;
+    inline Ptr deepCopy() const;// explicit deep copy method
 
     const std::vector<Vec3s>& vtx() const  { return mVtx; }
     const std::vector<Vec3I>& tri() const  { return mTri; }
@@ -1322,7 +1322,7 @@ void Geometry::writeABC(const std::string&) const
 
 #endif// VDB_TOOL_USE_ABC
 
-Geometry::Ptr Geometry::copyGeom() const
+Geometry::Ptr Geometry::deepCopy() const
 {
     Ptr other = std::make_shared<Geometry>();
     other->mVtx = mVtx;
