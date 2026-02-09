@@ -325,7 +325,7 @@ void Tool::run()
 
 void Tool::warning(const std::string &msg, std::ostream& os) const
 {
-    if (mParser.verbose>0) {
+    if (mParser.verbose) {
         os << "\n" << std::setw(static_cast<int>(msg.size())) << std::setfill('*') << "\n" << msg
            << "\n" << std::setw(static_cast<int>(msg.size())) << std::setfill('*') << "\n";
     }
@@ -434,7 +434,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->quadsToTriangles();});
 
   mParser.addAction(
-     {"mesh2ls", "mesh2sdf", "m2ls"}, "Convert a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+     {"mesh2ls", "mesh2sdf", "m2ls"}, "Convert a watertight polygon surface into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
@@ -447,7 +447,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
 
   mParser.addAction(
-     {"mesh2udf", "m2udf"}, "Convert a polygon mesh into a to a unsigned distance field with an symmetrical narrow band",
+     {"soup2udf", "mesh2udf", "m2udf"}, "Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
@@ -1081,7 +1081,7 @@ void Tool::readVDB(const std::string &fileName)
     for (GridBase::Ptr grid : *grids) {
       if (gridNames[0]=="*" || findMatch(grid->getName(), gridNames)) mGrid.push_back(grid);
     }
-  } else if (mParser.verbose>0) {
+  } else if (mParser.verbose) {
     std::cerr << "readVDB: no vdb grids in \"" << fileName << "\"";
   }
   if (mParser.verbose) {

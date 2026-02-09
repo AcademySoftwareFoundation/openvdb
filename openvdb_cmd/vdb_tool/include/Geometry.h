@@ -155,7 +155,7 @@ public:
     const std::string getName() const { return mName; }
     void setName(const std::string &name) { mName = name; }
 
-    void print(size_t n = 0, std::ostream& os = std::cout) const;
+    void print(size_t n = 0, std::ostream& os = std::cerr) const;
 
     size_t write(std::ostream &os) const;
     size_t read(std::istream &is);
