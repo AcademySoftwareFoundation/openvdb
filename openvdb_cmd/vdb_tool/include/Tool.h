@@ -13,6 +13,8 @@
 ///        generate adaptive polygon meshes from level sets, render images and write particles,
 ///        meshes or VDBs them to disk.
 ///
+/// @warning All prints are directed to cerr since cout is used for piping!
+///
 /// @todo expose LevelSetMeasure, write binary/ascii, mesh2offset
 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -1822,6 +1824,7 @@ void Tool::soupToLevelSet()
     Geometry::Ptr mesh = *it;
     if (mesh->isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
     if (keep) mesh = mesh->deepCopy();// deep copy since mesh will be modified below
+    if (mParser.verbose) mTimer.start("Soup -> SDF");
 
 #if 1
     const tools::ShrinkWrapLimit D(nErode, thres);
@@ -1850,7 +1853,6 @@ void Tool::soupToLevelSet()
       return 1.0f + (nErode-1.0f)*(dx-thres)/thres;
     };
 
-    if (mParser.verbose) mTimer.start("Soup -> SDF");
     if (mParser.verbose>1) std::cerr << std::endl;
 
     auto myUpsample = [&](const GridT &grid)->GridT::Ptr{

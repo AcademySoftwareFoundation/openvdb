@@ -10,6 +10,8 @@
 /// @brief Defines various classes (Processor, Parser, Option, Action, Loop)
 ///        for processing of command-line arguments.
 ///
+/// @warning All prints are directed to cerr since cout is used for piping!
+///
 ////////////////////////////////////////////////////////////////////////////////
 
 #ifndef VDB_TOOL_PARSER_HAS_BEEN_INCLUDED
