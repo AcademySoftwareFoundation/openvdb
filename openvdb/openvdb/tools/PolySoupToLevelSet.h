@@ -149,6 +149,7 @@ polySoupToLevelSet(
     const ShrinkWrapT &D,
     float halfWidth)
 {
+  const static bool verbose = true;
     if constexpr(!std::is_floating_point<typename GridType::ValueType>::value) {
         OPENVDB_THROW(TypeError, "polySoupToLevelSet: supported only for scalar floating-point grids");
     }
@@ -180,9 +181,20 @@ polySoupToLevelSet(
       return csgUnionCopy(grid, gridB);
     };// myShrinkWrap
 
+    const char buffer[] = {"|/-\\"};
+    int offset{0};
+    auto mySpinner = [&](const std::string &msg){
+        if (verbose) std::cerr << msg << ": " << buffer[offset] << "\r" << std::flush;
+        offset = (offset + 1) % 4;
+    };
+    if (verbose) std::cerr << std::endl;
+
     // Fine to coarse offset generation
     std::vector<typename GridType::Ptr> grids;// fine -> coarse grids
-    for (float dx = minVoxelSize; dx <= maxVoxelSize; dx *= 2.0f) grids.push_back(myOffset(dx));
+    for (float dx = minVoxelSize; dx <= maxVoxelSize; dx *= 2.0f) {
+      mySpinner("Offset dx = " + std::to_string(dx)+", "+std::to_string(minVoxelSize)+" -> "+std::to_string(maxVoxelSize));
+      grids.push_back(myOffset(dx));
+    }
 
     // Coarse to fine shrink wrap algorithm
     float vol[2];
@@ -191,7 +203,7 @@ polySoupToLevelSet(
     for (auto iter = grids.rbegin(), end = grids.rend(); iter != end; ++iter) {// coarse -> fine
       grid = myUpsample(*grid);// g(dx) -> g(dx/2)
       for (float d = 0.0f, dx = grid->voxelSize()[0], Ddx = D(dx); d < Ddx; vol[0] = vol[1]) {
-        //std::cerr << "D(" << dx << ")=" << Ddx << std::endl;
+        mySpinner("Shrink wrap d=" + std::to_string(d) + ", D("+std::to_string(dx) + ")=" + std::to_string(Ddx));
         grid = myShrinkWrap(*grid, **iter, d);
         vol[1] = levelSetVolume(*grid);
         if (d>0.0f && math::isApproxZero(vol[0]-vol[1])) break;

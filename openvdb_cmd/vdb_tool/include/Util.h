@@ -430,7 +430,7 @@ class Spinner {
     const char* mBuffer;
     int mOffset;
 public:
-    Spinner(std::ostream& os = std::cout) : mOutStream(os), mBuffer{"|/-\\"}, mOffset{0} {}
+    Spinner(std::ostream& os = std::cerr) : mOutStream(os), mBuffer{"|/-\\"}, mOffset{0} {}
     void operator()(const std::string &msg){
         mOutStream << msg << ": " << mBuffer[mOffset] << "\r" << std::flush;
         mOffset = (mOffset + 1) % 4;
