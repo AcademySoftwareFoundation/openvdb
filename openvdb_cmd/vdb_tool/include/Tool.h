@@ -1836,10 +1836,10 @@ void Tool::soupToLevelSet()
     }
     auto grid = grids[0];
 #else
-    
+
     const float maxLength =  mesh->maxLength();
     bool isGridSDF = true;
-    
+
     if (voxel == 0.0f) {
       voxel = maxLength/(dim - 2.0f*(width + 1.0f));// +1 since final surface is dilated by dx
       if (mParser.verbose>1) std::cerr << "Estimated voxel size = " << voxel << " from dim = " << dim << std::endl;

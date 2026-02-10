@@ -93,7 +93,7 @@ polySoupToLevelSet(
     std::vector<Vec3I>& tri,
     std::vector<Vec4I>& quad,
     const ShrinkWrapT &D = ShrinkWrapT(),
-    float halfWidth = float(LEVEL_SET_HALF_WIDTH))    
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH))
 {
     const float maxLength = bbox.extents()[bbox.maxExtent()];
     const float minVoxelSize = maxLength/(dim - 2.0f*(halfWidth + 1.0f));// +1 since final surface is dilated by dx
@@ -129,7 +129,7 @@ polySoupToLevelSet(
     std::vector<Vec3I>& tri,
     std::vector<Vec4I>& quad,
     const ShrinkWrapT &D = ShrinkWrapT(),
-    float halfWidth = float(LEVEL_SET_HALF_WIDTH))    
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH))
 {
     const float maxLength = bbox.extents()[bbox.maxExtent()];
     const float maxVoxelSize = maxLength / 2.0f;
@@ -147,16 +147,16 @@ polySoupToLevelSet(
     std::vector<Vec3I>& tri,
     std::vector<Vec4I>& quad,
     const ShrinkWrapT &D,
-    float halfWidth)    
+    float halfWidth)
 {
     if constexpr(!std::is_floating_point<typename GridType::ValueType>::value) {
         OPENVDB_THROW(TypeError, "polySoupToLevelSet: supported only for scalar floating-point grids");
     }
     OPENVDB_ASSERT(2*minVoxelSize <= maxVoxelSize);
     bool isGridSDF = true;
-    auto myUpsample = [&](const GridType &grid){
-      auto outGrid = createLevelSet<GridType>(grid.voxelSize()[0]/2, halfWidth);
-      resampleToMatch<BoxSampler>(grid, *outGrid);
+    auto myUpsample = [&](const GridType &inGrid){
+      auto outGrid = createLevelSet<GridType>(inGrid.voxelSize()[0]/2, halfWidth);
+      resampleToMatch<BoxSampler>(inGrid, *outGrid);
       isGridSDF = true;
       return outGrid;
     };// myUpsample
@@ -164,8 +164,8 @@ polySoupToLevelSet(
     auto myOffset = [&](float dx){
       auto xform = math::Transform::createLinearTransform(dx);
       auto udf = meshToUnsignedDistanceField<GridType>(*xform, vtx, tri, quad, halfWidth);// mesh -> UDF
-      volumeToMesh<GridType>(*udf, vtx, tri, quad, dx, 0.0);// updates the mesh
-      return meshToLevelSet<GridType>(*xform, vtx, tri, quad, halfWidth);
+      volumeToMesh<GridType>(*udf, vtx, tri, quad, dx, 0.0);// UDF -> mesh
+      return meshToLevelSet<GridType>(*xform, vtx, tri, quad, halfWidth);// mesh -> SDF
     };// myOffset
 
     auto myShrinkWrap = [&](GridType &grid, const GridType &gridB, float &d){
@@ -186,17 +186,17 @@ polySoupToLevelSet(
 
     // Coarse to fine shrink wrap algorithm
     float vol[2];
-    auto g = grids.back();// coarsest grid
+    auto grid = grids.back();// coarsest grid
     grids.pop_back();
     for (auto iter = grids.rbegin(), end = grids.rend(); iter != end; ++iter) {// coarse -> fine
-      g = myUpsample(*g);// g(dx) -> g(dx/2)
-      for (float d = 0.0f, dx = g->voxelSize()[0], Ddx = D(dx); d < Ddx; vol[0] = vol[1]) {
+      grid = myUpsample(*grid);// g(dx) -> g(dx/2)
+      for (float d = 0.0f, dx = grid->voxelSize()[0], Ddx = D(dx); d < Ddx; vol[0] = vol[1]) {
         //std::cerr << "D(" << dx << ")=" << Ddx << std::endl;
-        g = myShrinkWrap(*g, **iter, d);
-        vol[1] = levelSetVolume(*g);
+        grid = myShrinkWrap(*grid, **iter, d);
+        vol[1] = levelSetVolume(*grid);
         if (d>0.0f && math::isApproxZero(vol[0]-vol[1])) break;
       }
-      *iter = g;
+      *iter = grid;
     }// loop from coarse to fine voxel sizes
 
     return grids;
@@ -207,7 +207,7 @@ polySoupToLevelSet(
 class ShrinkWrapLimit {
     const float mErode, mThres;
 public:
-    ShrinkWrapLimit(float erode = 8.0f, float thres = 0.0f) : mErode(erode), mThres(thres) {} 
+    ShrinkWrapLimit(float erode = 8.0f, float thres = 0.0f) : mErode(erode), mThres(thres) {}
     float operator()(float dx) const {// if mThres == 0 this always returns mErode
         return dx>=2*mThres ? mErode : dx<=mThres ? 1.0f : 1.0f + (mErode-1.0f)*(dx-mThres)/mThres;
     }
