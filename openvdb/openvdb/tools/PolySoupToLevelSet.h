@@ -184,7 +184,7 @@ polySoupToLevelSet(
     const char buffer[] = {"|/-\\"};
     int offset{0};
     auto mySpinner = [&](const std::string &msg){
-        if (verbose) std::cerr << msg << ": " << buffer[offset] << "\r" << std::flush;
+        if (verbose) std::cerr << msg << ": " << buffer[offset] << std::setfill(' ') << std::setw(80) << "\r" << std::flush;
         offset = (offset + 1) % 4;
     };
     if (verbose) std::cerr << std::endl;
@@ -192,7 +192,7 @@ polySoupToLevelSet(
     // Fine to coarse offset generation
     std::vector<typename GridType::Ptr> grids;// fine -> coarse grids
     for (float dx = minVoxelSize; dx <= maxVoxelSize; dx *= 2.0f) {
-      mySpinner("Offset dx = " + std::to_string(dx)+", "+std::to_string(minVoxelSize)+" -> "+std::to_string(maxVoxelSize));
+      mySpinner("Offset: dx=" + std::to_string(dx)+", range: "+std::to_string(minVoxelSize)+" -> "+std::to_string(maxVoxelSize));
       grids.push_back(myOffset(dx));
     }
 
