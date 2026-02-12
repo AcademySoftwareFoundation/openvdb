@@ -246,10 +246,15 @@ bool patchShader(RE_Render* r, RE_ShaderHandle& shader, RE_ShaderType type,
     shader->getShaderSource(r, source, type);
     const int version = shader->getCodeVersion();
 
+    // normalize whitespace (collapse tabs and runs of spaces to single space)
+
+    source.substitute("\t", " ");
+    while (source.substitute("  ", " ")) {}
+
     // patch the shader to replace the strings
 
     for (const auto& stringPair : stringReplacements) {
-        source.substitute(stringPair.first.c_str(), stringPair.second.c_str(), /*all=*/true);
+        source.substitute(stringPair.first.c_str(), stringPair.second.c_str());
     }
 
     // patch the shader to insert the strings
@@ -306,9 +311,6 @@ void patchShaderNoRedeclarations(RE_Render* r, RE_ShaderHandle& shader)
 {
     static const std::vector<StringPair> stringReplacements
     {
-        StringPair("\t", " "),
-        StringPair("  ", " "),
-        StringPair("  ", " "),
         StringPair("uniform vec2 glH_DepthProject;", "//uniform vec2 glH_DepthProject;"),
         StringPair("uniform vec2 glH_ScreenSize", "//uniform vec2 glH_ScreenSize")
     };
