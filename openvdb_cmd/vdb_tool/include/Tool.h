@@ -1827,12 +1827,13 @@ void Tool::soupToLevelSet()
     if (mParser.verbose) mTimer.start("Soup -> SDF");
 
 #if 1
+    Spinner spin, *progress = mParser.verbose ? &spin : nullptr;
     const tools::ShrinkWrapLimit D(nErode, thres);
     std::vector<GridT::Ptr> grids;
     if (voxel == 0.0f) {
-        grids = tools::polySoupToLevelSet<GridT>(dim,   mesh->bbox(), mesh->vtx(), mesh->tri(), mesh->quad(), D, width);
+        grids = tools::polySoupToLevelSet<GridT>(dim,   mesh->bbox(), mesh->vtx(), mesh->tri(), mesh->quad(), D, width, progress);
     } else {
-        grids = tools::polySoupToLevelSet<GridT>(voxel, mesh->bbox(), mesh->vtx(), mesh->tri(), mesh->quad(), D, width);
+        grids = tools::polySoupToLevelSet<GridT>(voxel, mesh->bbox(), mesh->vtx(), mesh->tri(), mesh->quad(), D, width, progress);
     }
     auto grid = grids[0];
 #else
