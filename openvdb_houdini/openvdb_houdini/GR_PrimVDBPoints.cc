@@ -48,7 +48,6 @@
 static RE_ShaderHandle theMarkerDecorShader("decor/GL32/point_marker.prog");
 static RE_ShaderHandle theNormalDecorShader("decor/GL32/point_normal.prog");
 static RE_ShaderHandle theVelocityDecorShader("decor/GL32/user_point_vector3.prog");
-static RE_ShaderHandle theLineShader("basic/GL32/wire_color.prog");
 static RE_ShaderHandle thePixelShader("particle/GL32/pixel.prog");
 static RE_ShaderHandle thePointShader("particle/GL32/point.prog");
 
@@ -145,10 +144,6 @@ protected:
                          const openvdb::points::PointDataGrid& grid,
                          const RE_CacheVersion& version);
 
-    void updateWireBuffer(RE_Render* r,
-                          const openvdb::points::PointDataGrid& grid,
-                          const RE_CacheVersion& version);
-
     bool updateVec3Buffer(RE_Render* r,
                           const openvdb::points::PointDataGrid& grid,
                           const std::string& attributeName,
@@ -164,7 +159,6 @@ protected:
 
 private:
     UT_UniquePtr<RE_Geometry> myGeo;
-    UT_UniquePtr<RE_Geometry> myWire;
     bool mDefaultPointColor = true;
     openvdb::Vec3f mCentroid{0, 0, 0};
     openvdb::BBoxd mBbox;
@@ -353,84 +347,6 @@ GR_PrimVDBPoints::acceptPrimitive(GT_PrimitiveType,
 
     return GR_NOT_PROCESSED;
 }
-
-namespace gr_primitive_internal
-{
-
-struct FillGPUBuffersLeafBoxes
-{
-    FillGPUBuffersLeafBoxes(UT_Vector3H* buffer,
-                         const std::vector<openvdb::Coord>& coords,
-                         const openvdb::math::Transform& transform,
-                         const openvdb::Vec3f& positionOffset)
-        : mBuffer(buffer)
-        , mCoords(coords)
-        , mTransform(transform)
-        , mPositionOffset(positionOffset) { }
-
-    void operator()(const tbb::blocked_range<size_t>& range) const
-    {
-        std::vector<UT_Vector3H> corners;
-        corners.reserve(8);
-
-        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
-            const openvdb::Coord& origin = mCoords[n];
-
-            // define 8 corners
-
-            corners.clear();
-
-            const openvdb::Vec3f pos000 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 0.0)) - mPositionOffset;
-            corners.emplace_back(pos000.x(), pos000.y(), pos000.z());
-            const openvdb::Vec3f pos001 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 8.0)) - mPositionOffset;
-            corners.emplace_back(pos001.x(), pos001.y(), pos001.z());
-            const openvdb::Vec3f pos010 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 8.0, 0.0)) - mPositionOffset;
-            corners.emplace_back(pos010.x(), pos010.y(), pos010.z());
-            const openvdb::Vec3f pos011 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 8.0, 8.0)) - mPositionOffset;
-            corners.emplace_back(pos011.x(), pos011.y(), pos011.z());
-            const openvdb::Vec3f pos100 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 0.0, 0.0)) - mPositionOffset;
-            corners.emplace_back(pos100.x(), pos100.y(), pos100.z());
-            const openvdb::Vec3f pos101 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 0.0, 8.0)) - mPositionOffset;
-            corners.emplace_back(pos101.x(), pos101.y(), pos101.z());
-            const openvdb::Vec3f pos110 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 8.0, 0.0)) - mPositionOffset;
-            corners.emplace_back(pos110.x(), pos110.y(), pos110.z());
-            const openvdb::Vec3f pos111 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 8.0, 8.0)) - mPositionOffset;
-            corners.emplace_back(pos111.x(), pos111.y(), pos111.z());
-
-            openvdb::Index64 offset = n*8*3;
-
-            // Z axis
-
-            mBuffer[offset++] = corners[0]; mBuffer[offset++] = corners[1];
-            mBuffer[offset++] = corners[2]; mBuffer[offset++] = corners[3];
-            mBuffer[offset++] = corners[4]; mBuffer[offset++] = corners[5];
-            mBuffer[offset++] = corners[6]; mBuffer[offset++] = corners[7];
-
-            // Y axis
-
-            mBuffer[offset++] = corners[0]; mBuffer[offset++] = corners[2];
-            mBuffer[offset++] = corners[1]; mBuffer[offset++] = corners[3];
-            mBuffer[offset++] = corners[4]; mBuffer[offset++] = corners[6];
-            mBuffer[offset++] = corners[5]; mBuffer[offset++] = corners[7];
-
-            // X axis
-
-            mBuffer[offset++] = corners[0]; mBuffer[offset++] = corners[4];
-            mBuffer[offset++] = corners[1]; mBuffer[offset++] = corners[5];
-            mBuffer[offset++] = corners[2]; mBuffer[offset++] = corners[6];
-            mBuffer[offset++] = corners[3]; mBuffer[offset++] = corners[7];
-        }
-    }
-
-    //////////
-
-    UT_Vector3H*                        mBuffer;
-    const std::vector<openvdb::Coord>&  mCoords;
-    const openvdb::math::Transform&     mTransform;
-    const openvdb::Vec3f                mPositionOffset;
-}; // class FillGPUBuffersLeafBoxes
-
-} // namespace gr_primitive_internal
 
 void
 GR_PrimVDBPoints::computeCentroid(const openvdb::points::PointDataGrid& grid)
@@ -632,85 +548,12 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
 }
 
 void
-GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
-             const openvdb::points::PointDataGrid& grid,
-             const RE_CacheVersion& version)
-{
-    const bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
-
-    // Initialize the geometry with the proper name for the GL cache
-    if (!myWire) myWire.reset(new RE_Geometry);
-    myWire->cacheBuffers(getCacheName());
-
-    using GridType = openvdb::points::PointDataGrid;
-    using TreeType = GridType::TreeType;
-    using LeafNode = TreeType::LeafNodeType;
-
-    const TreeType& tree = grid.tree();
-    size_t leafCount = tree.leafCount();
-    if (tree.leafCount() == 0)  return;
-
-    // Initialize the number of points for the wireframe box per leaf.
-
-    int numPoints = static_cast<int>(leafCount*8*3);
-    myWire->setNumPoints(numPoints);
-
-    // fetch wireframe position, if its cache version matches, no upload is required.
-
-    RE_VertexArray* posWire = myWire->findCachedAttrib(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
-
-    if (posWire->getCacheVersion() != version)
-    {
-        using gr_primitive_internal::FillGPUBuffersLeafBoxes;
-
-        // fill the wire data
-
-        UT_UniquePtr<UT_Vector3H[]> data(new UT_Vector3H[numPoints]);
-
-        std::vector<openvdb::Coord> coords;
-
-        for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
-            const LeafNode& leaf = *iter;
-
-            coords.push_back(leaf.origin());
-        }
-
-        FillGPUBuffersLeafBoxes fill(data.get(), coords, grid.transform(), mCentroid);
-        const tbb::blocked_range<size_t> range(0, coords.size());
-        tbb::parallel_for(range, fill);
-
-        posWire->setArray(r, data.get());
-        posWire->setCacheVersion(version);
-    }
-
-    if (gl3)
-    {
-        // Extra constant inputs for the GL3 default shaders we are using.
-
-        fpreal32 uv[2]  = { 0.0, 0.0 };
-        fpreal32 alpha  = 1.0;
-        fpreal32 pnt    = 0.0;
-        UT_Matrix4F instance;
-        instance.identity();
-
-        myWire->createConstAttribute(r, "uv",    RE_GPU_FLOAT32, 2, uv);
-        myWire->createConstAttribute(r, "Alpha", RE_GPU_FLOAT32, 1, &alpha);
-        myWire->createConstAttribute(r, "pointSelection", RE_GPU_FLOAT32, 1,&pnt);
-        myWire->createConstAttribute(r, "instmat", RE_GPU_MATRIX4, 1,
-                    instance.data());
-    }
-
-    myWire->connectAllPrims(r, RE_GEO_WIRE_IDX, RE_PRIM_LINES, nullptr, true);
-}
-
-void
 GR_PrimVDBPoints::update(RE_RenderContext r,
              const GT_PrimitiveHandle &primh,
              const GR_UpdateParms &p)
 {
     // patch the point shaders at run-time to add an offset (does nothing if already patched)
 
-    patchShaderVertexOffset(r, theLineShader);
     patchShaderVertexOffset(r, thePixelShader);
     patchShaderVertexOffset(r, thePointShader);
 
@@ -738,7 +581,6 @@ GR_PrimVDBPoints::update(RE_RenderContext r,
         computeCentroid(pointDataGrid);
         computeBbox(pointDataGrid);
         updatePosBuffer(r, pointDataGrid, p.geo_version);
-        updateWireBuffer(r, pointDataGrid, p.geo_version);
 
         mDefaultPointColor = !updateVec3Buffer(r, pointDataGrid, "Cd", "Cd", p.geo_version);
     }
@@ -856,7 +698,7 @@ GR_PrimVDBPoints::removeBuffer(const std::string& name)
 void
 GR_PrimVDBPoints::render(RE_RenderContext r, GR_RenderMode, GR_RenderFlags, GR_DrawParms dp)
 {
-    if (!myGeo && !myWire)  return;
+    if (!myGeo)  return;
 
     const bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
 
@@ -898,29 +740,6 @@ GR_PrimVDBPoints::render(RE_RenderContext r, GR_RenderMode, GR_RenderFlags, GR_D
 
         if (pointDisplay)      r->popPointSize();
 
-        r->popShader();
-    }
-
-    // draw leaf bboxes
-
-    if (myWire && myWire->getNumPoints() > 0) {
-
-        // bind the shader
-
-        r->pushShader();
-        r->bindShader(theLineShader);
-
-        // bind the position offset
-
-        UT_Vector3F positionOffset(mCentroid.x(), mCentroid.y(), mCentroid.z());
-        theLineShader->bindVector(r, "offset", positionOffset);
-
-        fpreal32 constcol[3] = { 0.6f, 0.6f, 0.6f };
-        myWire->createConstAttribute(r, "Cd", RE_GPU_FLOAT32, 3, constcol);
-
-        r->pushLineWidth(commonOpts.wireWidth());
-        myWire->draw(r, RE_GEO_WIRE_IDX);
-        r->popLineWidth();
         r->popShader();
     }
 }
