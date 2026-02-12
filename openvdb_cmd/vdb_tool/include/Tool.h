@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 ////////////////////////////////////////////////////////////////////////////////
-///
+///ƒ
 /// @author Ken Museth
 ///
 /// @file Tool.h
@@ -1048,7 +1048,7 @@ void Tool::readGeo(const std::string &fileName)
   if (mParser.verbose>1) std::cerr << "Reading geometry from \"" << fileName << "\"\n";
   if (mParser.verbose) mTimer.start("Read geometry");
   Geometry::Ptr geom(new Geometry());
-  geom->read(fileName);
+  geom->read(fileName, mParser.verbose);
   if (geom->vtxCount()) {
     geom->setName(getBase(fileName));
     mGeom.push_back(geom);

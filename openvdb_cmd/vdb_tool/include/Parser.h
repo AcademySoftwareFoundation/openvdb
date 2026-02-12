@@ -1104,7 +1104,7 @@ void Parser::parse(int argc, char *argv[])
             throw std::invalid_argument(ss.str());
         }
     }// loop over all input arguments
-    if (counter!=0) throw std::invalid_argument("Parser: Unmatched pairing of {-for,-each,-if} and -end");
+    if (counter!=0) throw std::invalid_argument("Parser: Unmatched pairing of {-for,-files,-each,-if} and -end");
 }// Parser::parse
 
 // ==============================================================================================================

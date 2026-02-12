@@ -118,7 +118,7 @@ public:
     void writePLY(std::ostream &os, bool binary = true) const;
     void writeSTL(std::ostream &os) const;
 
-    void read(const std::string &fileName);
+    void read(const std::string &fileName, int verbose = 0);
     void readOBJ(const std::string &fileName);
     void readOFF(const std::string &fileName);
     void readPLY(const std::string &fileName);
@@ -167,19 +167,19 @@ private:
     /// @brief Use AD dot (AB cross AC) = 0 to test if all points of a quad are
     ///        in the same plane.
     /// @param quad quad to be tested
-    /// @return true if all the point of the quat are in the same plane
+    /// @return true if all the points of the quad are in the same plane
     bool isPlanar(const Vec4I &quad) const {
         auto q = [&](int i)->const PosT&{ return mVtx[quad[i]]; };
-        const float d = (q(0)-q(3)).dot((q(0)-q(1)).cross(q(0)-q(2)));
-        return math::isApproxZero(d, 1e-5f);
+        return math::isApproxZero((q(0)-q(3)).dot((q(0)-q(1)).cross(q(0)-q(2))), 1e-5f);
     }
 
     std::vector<PosT>  mVtx;
     std::vector<Vec3I> mTri;
     std::vector<Vec4I> mQuad;
-    std::vector<Vec3s> mRGB;// optional vertex colors
-    mutable BBoxT      mBBox;
+    std::vector<Vec3s> mRGB;// optional vertex colors (not written to file)
+    mutable BBoxT      mBBox;// not written to file
     std::string        mName;
+    int                mVerbose;// not written to file
 
 };// Geometry class
 
@@ -422,8 +422,9 @@ void Geometry::writeGEO(const std::string &fileName) const
     }
 }// Geometry::writeGEO
 
-void Geometry::read(const std::string &fileName)
+void Geometry::read(const std::string &fileName, int verbose)
 {
+    mVerbose = verbose;
     switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "vdb", "nvdb", "geo", "off", "xyz"})) {
     case 1:
         this->readOBJ(fileName);
@@ -477,7 +478,6 @@ void Geometry::readOBJ(const std::string &fileName)
 
 void Geometry::readOBJ(std::istream &is)
 {
-    const bool debug = false;
     Vec3f p;// coordinates
     Vec3s c;// color
     std::string line;
@@ -494,15 +494,15 @@ void Geometry::readOBJ(std::istream &is)
             while (iss >> str) v.push_back(std::stoi(str.substr(0, str.find_first_of("/"))));
             const size_t nGon = v.size();
             if (nGon == 1) {
-                if (debug) std::cerr << "Geometry::readOBJ: ignoring point, i.e. a face with with a single vertex\n";
+                if (mVerbose) std::cerr << "Geometry::readOBJ: ignoring point, i.e. a face with with a single vertex\n";
             } else if (nGon == 2) {
-                if (debug) std::cerr << "Geometry::readOBJ: ignoring line, i.e. a face with two vertices\n";
+                if (mVerbose) std::cerr << "Geometry::readOBJ: ignoring line, i.e. a face with two vertices\n";
             } else if (nGon == 3) {
                 mTri.emplace_back(v[0] - 1, v[1] - 1, v[2] - 1);// obj is 1-based
             } else if (nGon == 4) {
                 mQuad.emplace_back(v[0] - 1, v[1] - 1, v[2] - 1, v[3] - 1);// obj is 1-based
             } else {
-                if (debug) std::cerr << "Geometry::readOBJ: triangulating " << nGon << "-gon\n";
+                if (mVerbose) std::cerr << "Geometry::readOBJ: triangulating " << nGon << "-gon\n";
                 for (size_t i = 0; i < nGon - 2; ++i) mTri.emplace_back(v[0] - 1, v[i+1] - 1, v[i+2] - 1);// obj is 1-based
             }
         }
@@ -671,7 +671,6 @@ void Geometry::readPLY(const std::string &fileName)
 
 void Geometry::readPLY(std::istream &is)
 {
-    const bool debug = false;
     auto tokenize_line = [&is]() {
         std::string line, token;
         std::getline(is, line);
@@ -848,7 +847,7 @@ void Geometry::readPLY(std::istream &is)
                 break;
             default:
                 if (n > nGon) throw std::invalid_argument("Geometry::readPLY: binary " + std::to_string(n) + "-gons are not supported");
-                if (debug) std::cerr << "Geometry::readPLY: binary triangulating " << n << "-gon\n";
+                if (mVerbose) std::cerr << "Geometry::readPLY: binary triangulating " << n << "-gon\n";
                 is.read((char*)vtx, n*sizeof(uint32_t));
                 if (reverseBytes) swapBytes(vtx, n);
                 for (int i = 0; i < n-2; ++i) mTri.emplace_back(vtx[0], vtx[i+1], vtx[i+2]);
@@ -869,7 +868,7 @@ void Geometry::readPLY(std::istream &is)
             } else if (n==4) {
                 mQuad.emplace_back(vtx);
             } else {
-                if (debug) std::cerr << "Geometry::readPLY: ascii triangulating " << n << "-gon\n";
+                if (mVerbose) std::cerr << "Geometry::readPLY: ascii triangulating " << n << "-gon\n";
                 for (int i = 0; i < n - 2; ++i) mTri.emplace_back(vtx[0], vtx[i+1], vtx[i+2]);
             }
         }// loop over polygons

@@ -981,6 +981,36 @@ TEST_F(Test_vdb_tool, ToolForLoop)
     EXPECT_TRUE(fileExists("data/test.vdb"));
 }// ToolForLoop
 
+TEST_F(Test_vdb_tool, ToolFilesLoop)
+{
+    using namespace openvdb::vdb_tool;
+    auto myRemove = [](const std::string &file){
+      std::remove(file.c_str());
+      EXPECT_FALSE(fileExists(file));
+    };
+
+    // test single for-loop
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -for i=0,3 -sphere r=1.{$i} dim=128 name=sphere_{$i} -write data/sphere_{$#i}.vdb -end");
+      Tool vdb_tool(int(args.size()), args.data());
+      vdb_tool.run();
+    });
+
+    for (int i=0; i<3; ++i) EXPECT_TRUE(fileExists("data/sphere_"+std::to_string(i)+".vdb"));
+
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -files path=data patt=sphere_ ext=vdb -read {$file} -ls2mesh -write {$file:path}/{$file:name}.obj -end");
+      Tool vdb_tool(int(args.size()), args.data());
+      vdb_tool.run();
+    });
+
+    for (int i=0; i<3; ++i) {
+      EXPECT_TRUE(fileExists("data/sphere_"+std::to_string(i)+".obj"));
+      myRemove("data/sphere_"+std::to_string(i)+".vdb");
+      myRemove("data/sphere_"+std::to_string(i)+".obj");
+    }
+}// ToolFilesLoop
+
 TEST_F(Test_vdb_tool, ToolError)
 {
     using namespace openvdb::vdb_tool;
