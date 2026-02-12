@@ -9,7 +9,6 @@
 #include <openvdb/math/Math.h> // for negative()
 #include <openvdb/util/Assert.h>
 #include "io.h" // for getDataCompression(), etc.
-#include "DelayedLoadMetadata.h"
 #include <algorithm>
 #include <iostream>
 #include <memory>
@@ -236,28 +235,20 @@ OPENVDB_API void bloscFromStream(std::istream&, char* data, size_t numBytes);
 /// @param count        the number of elements to read in
 /// @param compression  whether and how the data is compressed (either COMPRESS_NONE,
 ///                     COMPRESS_ZIP, COMPRESS_ACTIVE_MASK or COMPRESS_BLOSC)
-/// @param metadata     optional pointer to a DelayedLoadMetadata object that stores
-///                     the size of the compressed buffer
-/// @param metadataOffset offset into DelayedLoadMetadata, ignored if pointer is null
 /// @throw IoError if @a compression is COMPRESS_BLOSC but OpenVDB was compiled
 /// without Blosc support.
 /// @details This default implementation is instantiated only for types
 /// whose size can be determined by the sizeof() operator.
 template<typename T>
 inline void
-readData(std::istream& is, T* data, Index count, uint32_t compression,
-    DelayedLoadMetadata* metadata = nullptr, size_t metadataOffset = size_t(0))
+readData(std::istream& is, T* data, Index count, uint32_t compression)
 {
     const bool seek = data == nullptr;
     if (seek) {
         OPENVDB_ASSERT(!getStreamMetadataPtr(is) || getStreamMetadataPtr(is)->seekable());
     }
-    const bool hasCompression = compression & (COMPRESS_BLOSC | COMPRESS_ZIP);
 
-    if (metadata && seek && hasCompression) {
-        size_t compressedSize = metadata->getCompressedSize(metadataOffset);
-        is.seekg(compressedSize, std::ios_base::cur);
-    } else if (compression & COMPRESS_BLOSC) {
+    if (compression & COMPRESS_BLOSC) {
         bloscFromStream(is, reinterpret_cast<char*>(data), sizeof(T) * count);
     } else if (compression & COMPRESS_ZIP) {
         unzipFromStream(is, reinterpret_cast<char*>(data), sizeof(T) * count);
@@ -271,8 +262,7 @@ readData(std::istream& is, T* data, Index count, uint32_t compression,
 /// Specialization for std::string input
 template<>
 inline void
-readData<std::string>(std::istream& is, std::string* data, Index count, uint32_t /*compression*/,
-    DelayedLoadMetadata* /*metadata*/, size_t /*metadataOffset*/)
+readData<std::string>(std::istream& is, std::string* data, Index count, uint32_t /*compression*/)
 {
     for (Index i = 0; i < count; ++i) {
         size_t len = 0;
@@ -294,25 +284,22 @@ template<bool IsReal, typename T> struct HalfReader;
 /// Partial specialization for non-floating-point types (no half to float promotion)
 template<typename T>
 struct HalfReader</*IsReal=*/false, T> {
-    static inline void read(std::istream& is, T* data, Index count, uint32_t compression,
-        DelayedLoadMetadata* metadata = nullptr, size_t metadataOffset = size_t(0)) {
-        readData(is, data, count, compression, metadata, metadataOffset);
+    static inline void read(std::istream& is, T* data, Index count, uint32_t compression) {
+        readData(is, data, count, compression);
     }
 };
 /// Partial specialization for floating-point types
 template<typename T>
 struct HalfReader</*IsReal=*/true, T> {
     using HalfT = typename RealToHalf<T>::HalfT;
-    static inline void read(std::istream& is, T* data, Index count, uint32_t compression,
-        DelayedLoadMetadata* metadata = nullptr, size_t metadataOffset = size_t(0)) {
+    static inline void read(std::istream& is, T* data, Index count, uint32_t compression) {
         if (count < 1) return;
         if (data == nullptr) {
             // seek mode - pass through null pointer
-            readData<HalfT>(is, nullptr, count, compression, metadata, metadataOffset);
+            readData<HalfT>(is, nullptr, count, compression);
         } else {
             std::vector<HalfT> halfData(count); // temp buffer into which to read half float values
-            readData<HalfT>(is, reinterpret_cast<HalfT*>(&halfData[0]), count, compression,
-                metadata, metadataOffset);
+            readData<HalfT>(is, reinterpret_cast<HalfT*>(&halfData[0]), count, compression);
             // Copy half float values from the temporary buffer to the full float output array.
             std::copy(halfData.begin(), halfData.end(), data);
         }
@@ -476,24 +463,11 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     const bool seek = (destBuf == nullptr);
     OPENVDB_ASSERT(!seek || (!meta || meta->seekable()));
 
-    // Get delayed load metadata if it exists
-
-    DelayedLoadMetadata::Ptr delayLoadMeta;
-    uint64_t leafIndex(0);
-    if (seek && meta && meta->delayedLoadMeta()) {
-        delayLoadMeta =
-            meta->gridMetadata().getMetadata<DelayedLoadMetadata>("file_delayed_load");
-        leafIndex = meta->leaf();
-    }
-
     int8_t metadata = NO_MASK_AND_ALL_VALS;
 
     // Read the flag that specifies what, if any, additional metadata
     // (selection mask and/or inactive value(s)) is saved.
     if (seek && !maskCompressed) {
-        is.seekg(/*bytes=*/1, std::ios_base::cur);
-    } else if (seek && delayLoadMeta) {
-        metadata = delayLoadMeta->getMask(leafIndex);
         is.seekg(/*bytes=*/1, std::ios_base::cur);
     } else {
         is.read(reinterpret_cast<char*>(&metadata), /*bytes=*/1);
@@ -560,10 +534,10 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     // Read in the buffer.
     if (fromHalf) {
         HalfReader<RealToHalf<ValueT>::isReal, ValueT>::read(
-            is, (seek ? nullptr : tempBuf), tempCount, compression, delayLoadMeta.get(), leafIndex);
+            is, (seek ? nullptr : tempBuf), tempCount, compression);
     } else {
         readData<ValueT>(
-            is, (seek ? nullptr : tempBuf), tempCount, compression, delayLoadMeta.get(), leafIndex);
+            is, (seek ? nullptr : tempBuf), tempCount, compression);
     }
 
     // If mask compression is enabled and the number of active values read into

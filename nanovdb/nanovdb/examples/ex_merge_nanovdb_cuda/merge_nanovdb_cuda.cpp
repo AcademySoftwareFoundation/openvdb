@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
         cpuTimer.start("Read first input VDB file");
         openvdb::initialize();
         openvdb::io::File inFile1(argv[1]);
-        inFile1.open(false); // disable delayed loading
+        inFile1.open();
         auto baseGrids1 = inFile1.getGrids();
         inFile1.close();
         auto grid1 = openvdb::gridPtrCast<GridT>(baseGrids1->at(0));
@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
         cpuTimer.start("Read second input VDB file");
         openvdb::initialize();
         openvdb::io::File inFile2(argv[2]);
-        inFile2.open(false); // disable delayed loading
+        inFile2.open();
         auto baseGrids2 = inFile2.getGrids();
         inFile2.close();
         auto grid2 = openvdb::gridPtrCast<GridT>(baseGrids2->at(0));

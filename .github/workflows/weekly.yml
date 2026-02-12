@@ -146,7 +146,7 @@ jobs:
       matrix:
         config:
           - { name: 'all',    image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
-          - { name: 'lite',   image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF -DOPENVDB_USE_DELAYED_LOADING=OFF' }
+          - { name: 'lite',   image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF' }
           - { name: 'half',   image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
           - { name: 'sse',    image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_SIMD=SSE42' }
           - { name: 'avx',    image: '2026',           build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_SIMD=AVX' }
@@ -216,7 +216,6 @@ jobs:
           --components=\"core,axcore,python,bin,render,test,axbin\"
           --cargs=\'
           -DCMAKE_CXX_STANDARD=20
-          -DOPENVDB_USE_DELAYED_LOADING=OFF
           -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
           ${{ matrix.config.cmake }}
           \'
@@ -421,7 +420,6 @@ jobs:
         --components="${{ matrix.config.components }}"
         --cargs=\'
         -A x64 -G \"Visual Studio 17 2022\"
-        -DOPENVDB_USE_DELAYED_LOADING=OFF
         -DUSE_BLOSC=OFF \
         -DUSE_ZLIB=OFF \
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}

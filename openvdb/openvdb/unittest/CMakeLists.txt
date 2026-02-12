@@ -87,7 +87,6 @@ else()
     TestCount.cc
     TestCpt.cc
     TestCurl.cc
-    TestDelayedLoadMetadata.cc
     TestDense.cc
     TestDenseSparseTools.cc
     TestDiagnostics.cc

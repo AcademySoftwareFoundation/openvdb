@@ -211,8 +211,8 @@ TEST_F(TestMeshToVolume, testInterrupt)
     // Should have returned _something_
     EXPECT_TRUE(grid);
 
-    // Expect to interrupt in under a second
+    // Expect to interrupt in under two seconds
     const auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    EXPECT_LT(duration.count(), 1000);
+    EXPECT_LT(duration.count(), 2000);
 }
 

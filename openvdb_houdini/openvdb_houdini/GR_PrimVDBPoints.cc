@@ -563,10 +563,10 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
     int numPoints = 0;
     if (useGroup) {
         GroupFilter filter(groupName, iter->attributeSet());
-        numPoints = static_cast<int>(pointCount(tree, filter, /*inCoreOnly=*/true));
+        numPoints = static_cast<int>(pointCount(tree, filter));
     } else {
         NullFilter filter;
-        numPoints = static_cast<int>(pointCount(tree, filter, /*inCoreOnly=*/true));
+        numPoints = static_cast<int>(pointCount(tree, filter));
     }
 
     if (numPoints == 0) return;
@@ -596,13 +596,13 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
         MultiGroupFilter filter(includeGroups, excludeGroups, iter->attributeSet());
 
         std::vector<Index64> offsets;
-        pointOffsets(offsets, grid.tree(), filter, /*inCoreOnly=*/true);
+        pointOffsets(offsets, grid.tree(), filter);
 
         UT_UniquePtr<UT_Vector3F[]> pdata(new UT_Vector3F[numPoints]);
 
         PositionAttribute positionAttribute(pdata.get(), mCentroid);
         convertPointDataGridPosition(positionAttribute, grid, offsets,
-                                    /*startOffset=*/ 0, filter, /*inCoreOnly=*/true);
+                                    /*startOffset=*/ 0, filter);
 
         posGeo->setArray(r, pdata.get());
         posGeo->setCacheVersion(version);
@@ -647,20 +647,12 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
     using LeafNode = TreeType::LeafNodeType;
 
     const TreeType& tree = grid.tree();
+    size_t leafCount = tree.leafCount();
     if (tree.leafCount() == 0)  return;
-
-    // count up total points ignoring any leaf nodes that are out of core
-
-    size_t outOfCoreLeaves = 0;
-    for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
-        if (iter->buffer().isOutOfCore()) outOfCoreLeaves++;
-    }
-
-    if (outOfCoreLeaves == 0) return;
 
     // Initialize the number of points for the wireframe box per leaf.
 
-    int numPoints = static_cast<int>(outOfCoreLeaves*8*3);
+    int numPoints = static_cast<int>(leafCount*8*3);
     myWire->setNumPoints(numPoints);
 
     // fetch wireframe position, if its cache version matches, no upload is required.
@@ -679,9 +671,6 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
 
         for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
             const LeafNode& leaf = *iter;
-
-            // skip in-core leaf nodes (for use when delay loading VDBs)
-            if (!leaf.buffer().isOutOfCore()) continue;
 
             coords.push_back(leaf.origin());
         }
@@ -826,12 +815,12 @@ GR_PrimVDBPoints::updateVec3Buffer(RE_Render* r,
             MultiGroupFilter filter(includeGroups, excludeGroups, iter->attributeSet());
 
             std::vector<Index64> offsets;
-            pointOffsets(offsets, grid.tree(), filter, /*inCoreOnly=*/true);
+            pointOffsets(offsets, grid.tree(), filter);
 
             VectorAttribute<Vec3f> typedAttribute(data.get());
             convertPointDataGridAttribute(typedAttribute, grid.tree(), offsets,
                 /*startOffset=*/ 0, static_cast<unsigned>(index), /*stride=*/1,
-                filter, /*inCoreOnly=*/true);
+                filter);
         }
 
         bufferGeo->setArray(r, data.get());

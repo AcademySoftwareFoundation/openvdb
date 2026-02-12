@@ -76,9 +76,6 @@ public:
     uint32_t pass() const;
     void setPass(uint32_t);
 
-    uint64_t leaf() const;
-    void setLeaf(uint64_t);
-
     //@{
     /// @brief Return a (reference to a) copy of the metadata of the grid
     /// currently being read or written.
@@ -129,50 +126,37 @@ struct MultiPass {};
 
 class File;
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
 
-/// @brief Handle to control the lifetime of a memory-mapped .vdb file
+// This class is deprecated and will be removed. Delayed loading is no longer supported.
+// It is retained for API backwards compatibility only, but all methods are no-ops.
 class OPENVDB_API MappedFile
 {
 public:
     using Ptr = SharedPtr<MappedFile>;
+    using Notifier = std::function<void(std::string /*filename*/)>;
 
-    ~MappedFile();
-    MappedFile(const MappedFile&) = delete; // not copyable
+    OPENVDB_DEPRECATED_MESSAGE("This class is deprecated and will be removed. Delayed loading is no longer supported.")
+    explicit MappedFile(const std::string& /*filename*/, bool /*autoDelete*/ = false) {}
+
+    /// @brief Destructor
+    ~MappedFile() = default;
+
+    MappedFile(const MappedFile&) = delete;
     MappedFile& operator=(const MappedFile&) = delete;
 
-    /// Return the filename of the mapped file.
-    std::string filename() const;
+    OPENVDB_DEPRECATED_MESSAGE("Always returns an empty string. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    std::string filename() const { return std::string(); }
 
-    /// @brief Return a new stream buffer for the mapped file.
-    /// @details Typical usage is
-    /// @code
-    /// openvdb::io::MappedFile::Ptr mappedFile = ...;
-    /// auto buf = mappedFile->createBuffer();
-    /// std::istream istrm{buf.get()};
-    /// // Read from istrm...
-    /// @endcode
-    /// The buffer must persist as long as the stream is open.
-    SharedPtr<std::streambuf> createBuffer() const;
+    OPENVDB_DEPRECATED_MESSAGE("Always returns a null stream buffer pointer. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    SharedPtr<std::streambuf> createBuffer() const { return SharedPtr<std::streambuf>(); }
 
-    using Notifier = std::function<void(std::string /*filename*/)>;
-    /// @brief Register a function that will be called with this file's name
-    /// when the file is unmapped.
-    void setNotifier(const Notifier&);
-    /// Deregister the notifier.
-    void clearNotifier();
+    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    void setNotifier(const Notifier&) {}
 
-private:
-    friend class File;
-    friend class ::TestMappedFile;
-
-    explicit MappedFile(const std::string& filename, bool autoDelete = false);
-
-    class Impl;
-    std::unique_ptr<Impl> mImpl;
+    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    void clearNotifier() {}
 }; // class MappedFile
 
-#endif // OPENVDB_USE_DELAYED_LOADING
 
 ////////////////////////////////////////
 
@@ -249,15 +233,10 @@ OPENVDB_API bool getWriteGridStatsMetadata(std::ios_base&);
 /// and store them as grid metadata when writing to the given stream.
 OPENVDB_API void setWriteGridStatsMetadata(std::ios_base&, bool writeGridStats);
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
-/// @brief Return a shared pointer to the memory-mapped file with which the given stream
-/// is associated, or a null pointer if the stream is not associated with a memory-mapped file.
-OPENVDB_API SharedPtr<MappedFile> getMappedFilePtr(std::ios_base&);
-/// @brief Associate the given stream with (a shared pointer to) a memory-mapped file.
-/// @note The shared pointer object (not just the io::MappedFile object to which it points)
-/// must remain valid until the file is closed.
-OPENVDB_API void setMappedFilePtr(std::ios_base&, SharedPtr<MappedFile>&);
-#endif // OPENVDB_USE_DELAYED_LOADING
+OPENVDB_DEPRECATED_MESSAGE("Always returns a null pointer. This function is deprecated and will be removed. Delayed loading is no longer supported.")
+inline SharedPtr<MappedFile> getMappedFilePtr(std::ios_base&) { return SharedPtr<MappedFile>(); }
+OPENVDB_DEPRECATED_MESSAGE("This function is deprecated and will be removed. Delayed loading is no longer supported.")
+inline void setMappedFilePtr(std::ios_base&, SharedPtr<MappedFile>&) { }
 
 /// @brief Return a shared pointer to an object that stores metadata (file format,
 /// compression scheme, etc.) for use when reading from or writing to the given stream.

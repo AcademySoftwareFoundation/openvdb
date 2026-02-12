@@ -4,7 +4,6 @@
 #include "Archive.h"
 
 #include "GridDescriptor.h"
-#include "DelayedLoadMetadata.h"
 #include "io.h"
 
 #include <openvdb/Exceptions.h>
@@ -12,35 +11,6 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/openvdb.h>
-
-#ifdef OPENVDB_USE_DELAYED_LOADING
-// Boost.Interprocess uses a header-only portion of Boost.DateTime
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-macros"
-#endif
-#define BOOST_DATE_TIME_NO_LIB
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
-#include <boost/interprocess/file_mapping.hpp>
-#include <boost/interprocess/mapped_region.hpp>
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
-
-#ifdef _WIN32
-#include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
-extern "C" __declspec(dllimport) bool __stdcall GetFileTime(
-    void* fh, void* ctime, void* atime, void* mtime);
-// boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
-// Ensure that both namespaces exist.
-namespace boost { namespace interprocess { namespace detail {} namespace ipcdetail {} } }
-#else
-#include <sys/types.h> // for struct stat
-#include <sys/stat.h> // for stat()
-#include <unistd.h> // for unlink()
-#endif
-#endif // OPENVDB_USE_DELAYED_LOADING
 
 #include <atomic>
 
@@ -209,7 +179,7 @@ struct StreamMetadata::Impl
     uint32_t mPass = 0;
     MetaMap mGridMetadata;
     AuxDataMap mAuxData;
-    bool mDelayedLoadMeta = DelayedLoadMetadata::isRegisteredType();
+    bool mDelayedLoadMeta = false;
     uint64_t mLeaf = 0;
     uint32_t mTest = 0; // for testing only
 }; // struct StreamMetadata
@@ -274,7 +244,6 @@ bool            StreamMetadata::seekable() const        { return mImpl->mSeekabl
 bool            StreamMetadata::delayedLoadMeta() const { return mImpl->mDelayedLoadMeta; }
 bool            StreamMetadata::countingPasses() const  { return mImpl->mCountingPasses; }
 uint32_t        StreamMetadata::pass() const            { return mImpl->mPass; }
-uint64_t        StreamMetadata::leaf() const            { return mImpl->mLeaf; }
 MetaMap&        StreamMetadata::gridMetadata()          { return mImpl->mGridMetadata; }
 const MetaMap&  StreamMetadata::gridMetadata() const    { return mImpl->mGridMetadata; }
 uint32_t        StreamMetadata::__test() const          { return mImpl->mTest; }
@@ -292,7 +261,6 @@ void StreamMetadata::setWriteGridStats(bool b)          { mImpl->mWriteGridStats
 void StreamMetadata::setSeekable(bool b)                { mImpl->mSeekable = b; }
 void StreamMetadata::setCountingPasses(bool b)          { mImpl->mCountingPasses = b; }
 void StreamMetadata::setPass(uint32_t i)                { mImpl->mPass = i; }
-void StreamMetadata::setLeaf(uint64_t i)                { mImpl->mLeaf = i; }
 void StreamMetadata::__setTest(uint32_t t)              { mImpl->mTest = t; }
 
 std::string
@@ -306,7 +274,6 @@ StreamMetadata::str() const
     ostr << "compression: " << compressionToString(compression()) << "\n";
     ostr << "half_float: " << halfFloat() << "\n";
     ostr << "seekable: " << seekable() << "\n";
-    ostr << "delayed_load_meta: " << delayedLoadMeta() << "\n";
     ostr << "pass: " << pass() << "\n";
     ostr << "counting_passes: " << countingPasses() << "\n";
     ostr << "write_grid_stats_metadata: " << writeGridStats() << "\n";
@@ -337,73 +304,6 @@ writeAsType(std::ostream& os, const std::any& val)
         return true;
     }
     return false;
-}
-
-struct PopulateDelayedLoadMetadataOp
-{
-    DelayedLoadMetadata& metadata;
-    uint32_t compression;
-
-    PopulateDelayedLoadMetadataOp(DelayedLoadMetadata& _metadata, uint32_t _compression)
-        : metadata(_metadata)
-        , compression(_compression) { }
-
-    template<typename GridT>
-    void operator()(const GridT& grid) const
-    {
-        using TreeT = typename GridT::TreeType;
-        using ValueT = typename TreeT::ValueType;
-        using LeafT = typename TreeT::LeafNodeType;
-        using MaskT = typename LeafT::NodeMaskType;
-
-        const TreeT& tree = grid.constTree();
-        const Index64 leafCount = tree.leafCount();
-
-        // early exit if not leaf nodes
-        if (leafCount == Index64(0))    return;
-
-        metadata.resizeMask(leafCount);
-
-        if (compression & (COMPRESS_BLOSC | COMPRESS_ZIP)) {
-            metadata.resizeCompressedSize(leafCount);
-        }
-
-        const auto background = tree.background();
-        const bool saveFloatAsHalf = grid.saveFloatAsHalf();
-
-        tree::LeafManager<const TreeT> leafManager(tree);
-
-        leafManager.foreach(
-            [&](const LeafT& leaf, size_t idx) {
-                // set mask value
-                MaskCompress<ValueT, MaskT> maskCompressData(
-                    leaf.valueMask(), /*childMask=*/MaskT(), leaf.buffer().data(), background);
-                metadata.setMask(idx, maskCompressData.metadata);
-
-                if (compression & (COMPRESS_BLOSC | COMPRESS_ZIP)) {
-                    // set compressed size value
-                    size_t sizeBytes(8);
-                    size_t compressedSize = io::writeCompressedValuesSize(
-                        leaf.buffer().data(), LeafT::SIZE,
-                        leaf.valueMask(), maskCompressData.metadata, saveFloatAsHalf, compression);
-                    metadata.setCompressedSize(idx, compressedSize+sizeBytes);
-                }
-            }
-        );
-    }
-};
-
-bool populateDelayedLoadMetadata(DelayedLoadMetadata& metadata,
-    const GridBase& gridBase, uint32_t compression)
-{
-    PopulateDelayedLoadMetadataOp op(metadata, compression);
-
-    using AllowedTypes = TypeList<
-        Int32Grid, Int64Grid,
-        FloatGrid, DoubleGrid,
-        Vec3IGrid, Vec3SGrid, Vec3DGrid>;
-
-    return gridBase.apply<AllowedTypes>(op);
 }
 
 } // unnamed namespace
@@ -438,117 +338,6 @@ operator<<(std::ostream& os, const StreamMetadata::AuxDataMap& auxData)
     }
     return os;
 }
-
-
-////////////////////////////////////////
-
-
-#ifdef OPENVDB_USE_DELAYED_LOADING
-
-
-// Memory-mapping a VDB file permits threaded input (and output, potentially,
-// though that might not be practical for compressed files or files containing
-// multiple grids).  In particular, a memory-mapped file can be loaded lazily,
-// meaning that the voxel buffers of the leaf nodes of a grid's tree are not allocated
-// until they are actually accessed.  When access to its buffer is requested,
-// a leaf node allocates memory for the buffer and then streams in (and decompresses)
-// its contents from the memory map, starting from a stream offset that was recorded
-// at the time the node was constructed.  The memory map must persist as long as
-// there are unloaded leaf nodes; this is ensured by storing a shared pointer
-// to the map in each unloaded node.
-
-class MappedFile::Impl
-{
-public:
-    Impl(const std::string& filename, bool autoDelete)
-        : mMap(filename.c_str(), boost::interprocess::read_only)
-        , mRegion(mMap, boost::interprocess::read_only)
-        , mAutoDelete(autoDelete)
-    {
-        if (mAutoDelete) {
-#ifndef _WIN32
-            // On Unix systems, unlink the file so that it gets deleted once it is closed.
-            ::unlink(mMap.get_name());
-#endif
-        }
-    }
-
-    ~Impl()
-    {
-        std::string filename;
-        if (const char* s = mMap.get_name()) filename = s;
-        OPENVDB_LOG_DEBUG_RUNTIME("closing memory-mapped file " << filename);
-        if (mNotifier) mNotifier(filename);
-        if (mAutoDelete) {
-            if (!boost::interprocess::file_mapping::remove(filename.c_str())) {
-                if (errno != ENOENT) {
-                    // Warn if the file exists but couldn't be removed.
-                    std::string mesg = getErrorString();
-                    if (!mesg.empty()) mesg = " (" + mesg + ")";
-                    OPENVDB_LOG_WARN("failed to remove temporary file " << filename << mesg);
-                }
-            }
-        }
-    }
-
-    boost::interprocess::file_mapping mMap;
-    boost::interprocess::mapped_region mRegion;
-    bool mAutoDelete;
-    Notifier mNotifier;
-#if OPENVDB_ABI_VERSION_NUMBER <= 12
-    mutable std::atomic<Index64> mLastWriteTime;
-#endif
-
-private:
-    Impl(const Impl&); // not copyable
-    Impl& operator=(const Impl&); // not copyable
-};
-
-
-MappedFile::MappedFile(const std::string& filename, bool autoDelete):
-    mImpl(new Impl(filename, autoDelete))
-{
-}
-
-
-MappedFile::~MappedFile()
-{
-}
-
-
-std::string
-MappedFile::filename() const
-{
-    std::string result;
-    if (const char* s = mImpl->mMap.get_name()) result = s;
-    return result;
-}
-
-
-SharedPtr<std::streambuf>
-MappedFile::createBuffer() const
-{
-    return SharedPtr<std::streambuf>{
-        new boost::iostreams::stream_buffer<boost::iostreams::array_source>{
-            static_cast<const char*>(mImpl->mRegion.get_address()), mImpl->mRegion.get_size()}};
-}
-
-
-void
-MappedFile::setNotifier(const Notifier& notifier)
-{
-    mImpl->mNotifier = notifier;
-}
-
-
-void
-MappedFile::clearNotifier()
-{
-    mImpl->mNotifier = nullptr;
-}
-
-
-#endif // OPENVDB_USE_DELAYED_LOADING
 
 
 ////////////////////////////////////////
@@ -886,25 +675,6 @@ setGridBackgroundValuePtr(std::ios_base& strm, const void* background)
 }
 
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
-MappedFile::Ptr
-getMappedFilePtr(std::ios_base& strm)
-{
-    if (const void* ptr = strm.pword(GetSteamState().mappedFile)) {
-        return *static_cast<const MappedFile::Ptr*>(ptr);
-    }
-    return MappedFile::Ptr();
-}
-
-
-void
-setMappedFilePtr(std::ios_base& strm, io::MappedFile::Ptr& mappedFile)
-{
-    strm.pword(GetSteamState().mappedFile) = &mappedFile;
-}
-#endif // OPENVDB_USE_DELAYED_LOADING
-
-
 StreamMetadata::Ptr
 getStreamMetadataPtr(std::ios_base& strm)
 {
@@ -1116,18 +886,6 @@ Archive::connectInstance(const GridDescriptor& gd, const NamedGridMap& grids) co
 ////////////////////////////////////////
 
 
-//static
-bool
-Archive::isDelayedLoadingEnabled()
-{
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    return (nullptr == std::getenv("OPENVDB_DISABLE_DELAYED_LOAD"));
-#else
-    return false;
-#endif
-}
-
-
 namespace {
 
 struct NoBBox {};
@@ -1172,40 +930,14 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
 
     grid->readMeta(is);
 
-    // Add a description of the compression settings to the grid as metadata.
-    /// @todo Would this be useful?
-    //const uint32_t c = getDataCompression(is);
-    //grid->insertMeta(GridBase::META_FILE_COMPRESSION,
-    //    StringMetadata(compressionToString(c)));
-
-    const VersionId version = getLibraryVersion(is);
-    if (version.first < 6 || (version.first == 6 && version.second <= 1)) {
-        // If delay load metadata exists, but the file format version does not support
-        // delay load metadata, this likely means the original grid was read and then
-        // written using a prior version of OpenVDB and ABI>=5 where unknown metadata
-        // can be blindly copied. This means that it is possible for the metadata to
-        // no longer be in sync with the grid, so we remove it to ensure correctness.
-
-        if ((*grid)[GridBase::META_FILE_DELAYED_LOAD]) {
-            grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
-        }
+    // Delayed loading is no longer supported - always remove metadata related to delayed loading if it exists
+    if ((*grid)[GridBase::META_FILE_DELAYED_LOAD]) {
+        grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
     }
 
     streamMetadata->gridMetadata() = static_cast<MetaMap&>(*grid);
     const GridClass gridClass = grid->getGridClass();
     io::setGridClass(is, gridClass);
-
-    // reset leaf value to zero
-    streamMetadata->setLeaf(0);
-
-    // drop DelayedLoadMetadata from the grid as it is only useful for IO
-    // a stream metadata non-zero value disables this behaviour for testing
-
-    if (streamMetadata->__test() == uint32_t(0)) {
-        if ((*grid)[GridBase::META_FILE_DELAYED_LOAD]) {
-            grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
-        }
-    }
 
     grid->readTransform(is);
     if (!gd.isInstance()) {
@@ -1393,25 +1125,18 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     // Save the compression settings for this grid.
     setGridCompression(os, *grid);
 
-    // copy grid and add delay load metadata
-    const auto copyOfGrid = grid->copyGrid(); // shallow copy
-    const auto nonConstCopyOfGrid = ConstPtrCast<GridBase>(copyOfGrid);
-    nonConstCopyOfGrid->insertMeta(GridBase::META_FILE_DELAYED_LOAD,
-        DelayedLoadMetadata());
-    DelayedLoadMetadata::Ptr delayLoadMeta =
-        nonConstCopyOfGrid->getMetadata<DelayedLoadMetadata>(GridBase::META_FILE_DELAYED_LOAD);
-    if (!populateDelayedLoadMetadata(*delayLoadMeta, *grid, compression())) {
-        nonConstCopyOfGrid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
-    }
-
     // Save the grid's metadata and transform.
     if (getWriteGridStatsMetadata(os)) {
         // Compute and add grid statistics metadata.
+        const auto copyOfGrid = grid->copyGrid(); // shallow copy
+        const auto nonConstCopyOfGrid = ConstPtrCast<GridBase>(copyOfGrid);
         nonConstCopyOfGrid->addStatsMetadata();
         nonConstCopyOfGrid->insertMeta(GridBase::META_FILE_COMPRESSION,
             StringMetadata(compressionToString(getDataCompression(os))));
+        copyOfGrid->writeMeta(os);
+    } else {
+        grid->writeMeta(os);
     }
-    copyOfGrid->writeMeta(os);
     grid->writeTransform(os);
 
     // Save the grid's structure.

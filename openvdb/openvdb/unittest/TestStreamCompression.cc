@@ -8,37 +8,16 @@
 
 #include <gtest/gtest.h>
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
-#ifdef __clang__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-macros"
-#endif
-// Boost.Interprocess uses a header-only portion of Boost.DateTime
-#define BOOST_DATE_TIME_NO_LIB
-#ifdef __clang__
-#pragma GCC diagnostic pop
-#endif
-#include <boost/interprocess/file_mapping.hpp>
-#include <boost/interprocess/mapped_region.hpp>
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
-
-#ifdef _WIN32
-#include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
-#include <windows.h>
-#else
-#include <sys/types.h> // for struct stat
-#include <sys/stat.h> // for stat()
-#include <unistd.h> // for unlink()
-#endif
-#endif // OPENVDB_USE_DELAYED_LOADING
-
 #include <atomic>
 #include <fstream>
 #include <numeric> // for std::iota()
 
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
+#endif
+
+#ifdef _WIN32
+#include <windows.h>
 #endif
 
 using namespace openvdb;
@@ -467,98 +446,6 @@ TestStreamCompression::testPagedStreams()
             EXPECT_EQ(fileout.tellp(), std::streampos(values.size()+sizeof(int)*pages));
 #endif
 
-
-#ifdef OPENVDB_USE_DELAYED_LOADING
-            auto mappedFile = TestMappedFile::create(filename);
-
-            // read
-            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
-            io::setStreamMetadataPtr(filein, streamMetadata);
-            io::setMappedFilePtr(filein, mappedFile);
-
-            EXPECT_EQ(filein.tellg(), std::streampos(0));
-
-            PagedInputStream istreamSizeOnly(filein);
-            istreamSizeOnly.setSizeOnly(true);
-
-            std::vector<PageHandle::Ptr> handles;
-
-            for (size_t i = 0; i < values.size(); i += increment) {
-                if (size_t(i+increment) > values.size()) {
-                    handles.push_back(istreamSizeOnly.createHandle(values.size() - i));
-                }
-                else {
-                    handles.push_back(istreamSizeOnly.createHandle(increment));
-                }
-            }
-
-#ifdef OPENVDB_USE_BLOSC
-            // two integers - compressed size and uncompressed size
-            EXPECT_EQ(filein.tellg(), std::streampos(pages*sizeof(int)*2));
-#else
-            // one integer - uncompressed size
-            EXPECT_EQ(filein.tellg(), std::streampos(pages*sizeof(int)));
-#endif
-
-            PagedInputStream istream(filein);
-
-            int pageHandle = 0;
-
-            for (size_t i = 0; i < values.size(); i += increment) {
-                if (size_t(i+increment) > values.size()) {
-                    istream.read(handles[pageHandle++], values.size() - i);
-                }
-                else {
-                    istream.read(handles[pageHandle++], increment);
-                }
-            }
-
-            // first three handles live in the same page
-
-            Page& page0 = handles[0]->page();
-            Page& page1 = handles[1]->page();
-            Page& page2 = handles[2]->page();
-            Page& page3 = handles[3]->page();
-
-            EXPECT_TRUE(page0.isOutOfCore());
-            EXPECT_TRUE(page1.isOutOfCore());
-            EXPECT_TRUE(page2.isOutOfCore());
-            EXPECT_TRUE(page3.isOutOfCore());
-
-            handles[0]->read();
-
-            // store the Page shared_ptr
-
-            Page::Ptr page = handles[0]->mPage;
-
-            // verify use count is four (one plus three handles)
-
-            EXPECT_EQ(page.use_count(), long(4));
-
-            // on reading from the first handle, all pages referenced
-            // in the first three handles are in-core
-
-            EXPECT_TRUE(!page0.isOutOfCore());
-            EXPECT_TRUE(!page1.isOutOfCore());
-            EXPECT_TRUE(!page2.isOutOfCore());
-            EXPECT_TRUE(page3.isOutOfCore());
-
-            handles[1]->read();
-
-            EXPECT_TRUE(handles[0]->mPage);
-
-            handles[2]->read();
-
-            handles.erase(handles.begin());
-            handles.erase(handles.begin());
-            handles.erase(handles.begin());
-
-            // after all three handles have been read,
-            // page should have just one use count (itself)
-
-            EXPECT_EQ(page.use_count(), long(1));
-
-#endif // OPENVDB_USE_DELAYED_LOADING
         }
         std::remove(filename.c_str());
     }

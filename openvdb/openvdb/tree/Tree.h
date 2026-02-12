@@ -95,13 +95,7 @@ public:
 
     virtual void getIndexRange(CoordBBox& bbox) const = 0;
 
-    /// @brief Replace with background tiles any nodes whose voxel buffers
-    /// have not yet been allocated.
-    /// @details Typically, unallocated nodes are leaf nodes whose voxel buffers
-    /// are not yet resident in memory because delayed loading is in effect.
-    /// @sa readNonresidentBuffers, io::File::open
     virtual void clipUnallocatedNodes() = 0;
-    /// Return the total number of unallocated leaf nodes residing in this tree.
 #if OPENVDB_ABI_VERSION_NUMBER >= 12
     virtual Index64 unallocatedLeafCount() const = 0;
 #else
@@ -167,11 +161,8 @@ public:
     virtual void readBuffers(std::istream&, bool saveFloatAsHalf = false) = 0;
     /// Read all of this tree's data buffers that intersect the given bounding box.
     virtual void readBuffers(std::istream&, const CoordBBox&, bool saveFloatAsHalf = false) = 0;
-    /// @brief Read all of this tree's data buffers that are not yet resident in memory
-    /// (because delayed loading is in effect).
-    /// @details If this tree was read from a memory-mapped file, this operation
-    /// disconnects the tree from the file.
-    /// @sa clipUnallocatedNodes, io::File::open, io::MappedFile
+
+    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     virtual void readNonresidentBuffers() const = 0;
     /// Write out all the data buffers for this tree.
     virtual void writeBuffers(std::ostream&, bool saveFloatAsHalf = false) const = 0;
@@ -339,12 +330,10 @@ public:
     void readBuffers(std::istream&, bool saveFloatAsHalf = false) override;
     /// Read all of this tree's data buffers that intersect the given bounding box.
     void readBuffers(std::istream&, const CoordBBox&, bool saveFloatAsHalf = false) override;
-    /// @brief Read all of this tree's data buffers that are not yet resident in memory
-    /// (because delayed loading is in effect).
-    /// @details If this tree was read from a memory-mapped file, this operation
-    /// disconnects the tree from the file.
-    /// @sa clipUnallocatedNodes, io::File::open, io::MappedFile
-    void readNonresidentBuffers() const override;
+
+    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    void readNonresidentBuffers() const override { }
+
     /// Write out all data buffers for this tree.
     void writeBuffers(std::ostream&, bool saveFloatAsHalf = false) const override;
 
@@ -494,9 +483,6 @@ public:
     void clip(const CoordBBox&);
     /// @brief Replace with background tiles any nodes whose voxel buffers
     /// have not yet been allocated.
-    /// @details Typically, unallocated nodes are leaf nodes whose voxel buffers
-    /// are not yet resident in memory because delayed loading is in effect.
-    /// @sa readNonresidentBuffers, io::File::open
     void clipUnallocatedNodes() override;
 
     /// Return the total number of unallocated leaf nodes residing in this tree.
@@ -1312,17 +1298,6 @@ Tree<RootNodeType>::readBuffers(std::istream &is, const CoordBBox& bbox, bool sa
 {
     this->clearAllAccessors();
     mRoot.readBuffers(is, bbox, saveFloatAsHalf);
-}
-
-
-template<typename RootNodeType>
-inline void
-Tree<RootNodeType>::readNonresidentBuffers() const
-{
-    for (LeafCIter it = this->cbeginLeaf(); it; ++it) {
-        // Retrieving the value of a leaf voxel forces loading of the leaf node's voxel buffer.
-        it->getValue(Index(0));
-    }
 }
 
 
