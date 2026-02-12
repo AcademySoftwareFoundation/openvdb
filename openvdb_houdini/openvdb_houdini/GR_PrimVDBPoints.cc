@@ -7,8 +7,6 @@
 ///
 /// @brief GR Render Hook and Primitive for VDB PointDataGrid
 
-#include <UT/UT_Version.h>
-
 #include <openvdb/Grid.h>
 #include <openvdb/Platform.h>
 #include <openvdb/Types.h>
@@ -38,10 +36,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-
-#if UT_VERSION_INT < 0x14000000 // Below 20.0, there is no RE_RenderContext
-#define RE_RenderContext  RE_Render *
-#endif
 
 ////////////////////////////////////////
 
@@ -119,11 +113,8 @@ public:
 
     /// return true if the primitive is in or overlaps the view frustum.
     /// always returning true will effectively disable frustum culling.
-    bool inViewFrustum(const UT_Matrix4D &objviewproj
-#if (UT_VERSION_INT >= 0x1105014e) // 17.5.334 or later
-                       , const UT_BoundingBoxD *bbox
-#endif
-                       ) override;
+    bool inViewFrustum(const UT_Matrix4D &objviewproj,
+                       const UT_BoundingBoxD *bbox) override;
 
     /// Called whenever the primitive is required to render, which may be more
     /// than one time per viewport redraw (beauty, shadow passes, wireframe-over)
@@ -589,20 +580,13 @@ GR_PrimVDBPoints::update(RE_RenderContext r,
 }
 
 bool
-GR_PrimVDBPoints::inViewFrustum(const UT_Matrix4D& objviewproj
-#if (UT_VERSION_INT >= 0x1105014e) // 17.5.334 or later
-                                , const UT_BoundingBoxD *passed_bbox
-#endif
-                                )
+GR_PrimVDBPoints::inViewFrustum(const UT_Matrix4D& objviewproj,
+                                const UT_BoundingBoxD *passed_bbox)
 {
     const UT_BoundingBoxD bbox( mBbox.min().x(), mBbox.min().y(), mBbox.min().z(),
                                 mBbox.max().x(), mBbox.max().y(), mBbox.max().z());
-#if (UT_VERSION_INT >= 0x1105014e) // 17.5.334 or later
-    return GR_Utils::inViewFrustum(passed_bbox ? *passed_bbox :bbox,
+    return GR_Utils::inViewFrustum(passed_bbox ? *passed_bbox : bbox,
                                    objviewproj);
-#else
-    return GR_Utils::inViewFrustum(bbox, objviewproj);
-#endif
 }
 
 bool
