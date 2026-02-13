@@ -8,9 +8,11 @@
 #include <openvdb/io/Compression.h> // for io::readCompressedValues(), etc
 #include <openvdb/util/NodeMasks.h>
 #include <openvdb/util/Assert.h>
+#if OPENVDB_ABI_VERSION_NUMBER < 14
 #include <tbb/spin_mutex.h>
-#include <algorithm> // for std::swap
 #include <atomic>
+#endif
+#include <algorithm> // for std::swap
 #include <cstddef> // for offsetof()
 #include <iostream>
 #include <memory>
@@ -107,9 +109,11 @@ private:
     bool deallocate();
 
     ValueType* mData = nullptr;
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     // Deprecated members kept for ABI compatibility
     std::atomic<Index32> mDeprecatedAtomic{0};
     tbb::spin_mutex mDeprecatedSpinMutex;
+#endif
 
     friend class ::TestLeaf;
     // Allow the parent LeafNode to access this buffer's data pointer.
