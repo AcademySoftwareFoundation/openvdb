@@ -30,7 +30,7 @@
 #include <UT/UT_UniquePtr.h>
 #include <UT/UT_Version.h>
 
-#if UT_VERSION_INT >= 0x15000000 // 21.0 or later - Vulkan support
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
 #include <GR/GR_Uniforms.h>
 #include <RV/RV_Geometry.h>
 #include <RV/RV_Render.h>
@@ -57,7 +57,7 @@ static RE_ShaderHandle theVelocityDecorShader("decor/GL32/user_point_vector3.pro
 static RE_ShaderHandle thePixelShader("particle/GL32/pixel.prog");
 static RE_ShaderHandle thePointShader("particle/GL32/point.prog");
 
-#if UT_VERSION_INT >= 0x15000000 // 21.0 or later - Vulkan support
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
 static RV_ShaderProgram* theVkPointShader = nullptr;
 static RV_ShaderProgram* theVkVelocityShader = nullptr;
 #endif
@@ -165,7 +165,7 @@ protected:
 
     void removeBuffer(const std::string& name);
 
-#if UT_VERSION_INT >= 0x15000000 // 21.0 or later - Vulkan support
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
     void updatePosBufferVk(RV_Render* r,
                            const openvdb::points::PointDataGrid& grid,
                            const RE_CacheVersion& version);
@@ -182,7 +182,7 @@ private:
     bool mDefaultPointColor = true;
     openvdb::Vec3f mCentroid{0, 0, 0};
     openvdb::BBoxd mBbox;
-#if UT_VERSION_INT >= 0x15000000 // 21.0 or later - Vulkan support
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
     UT_UniquePtr<RV_Geometry> myGeoVk;
     UT_UniquePtr<RV_ShaderVariableSet> myVkObjectSet;
     UT_UniquePtr<RV_ShaderBlock> myVkObjectBlock;
@@ -623,7 +623,7 @@ GR_PrimVDBPoints::update(RE_RenderContext r,
              const GT_PrimitiveHandle &primh,
              const GR_UpdateParms &p)
 {
-#if UT_VERSION_INT >= 0x15000000 // 21.0 or later - Vulkan support
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
     if (r.isVulkan())
     {
         if (p.reason & (GR_GEO_CHANGED | GR_GEO_TOPOLOGY_CHANGED))
@@ -790,7 +790,7 @@ GR_PrimVDBPoints::removeBuffer(const std::string& name)
 }
 
 
-#if UT_VERSION_INT >= 0x15000000 // 21.0 or later - Vulkan support
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
 
 void
 GR_PrimVDBPoints::updatePosBufferVk(RV_Render* r,
@@ -962,13 +962,13 @@ GR_PrimVDBPoints::updateVec3BufferVk(RV_Render* r,
     return true;
 }
 
-#endif // UT_VERSION_INT >= 0x15000000
+#endif // UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN)
 
 
 void
 GR_PrimVDBPoints::render(RE_RenderContext r, GR_RenderMode, GR_RenderFlags, GR_DrawParms dp)
 {
-#if UT_VERSION_INT >= 0x15000000 // 21.0 or later - Vulkan support
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
     if (r.isVulkan())
     {
         if (!myGeoVk)  return;
@@ -1122,7 +1122,7 @@ GR_PrimVDBPoints::render(RE_RenderContext r, GR_RenderMode, GR_RenderFlags, GR_D
 void
 GR_PrimVDBPoints::renderDecoration(RE_RenderContext r, GR_Decoration decor, const GR_DecorationParms& p)
 {
-#if UT_VERSION_INT >= 0x15000000 // 21.0 or later - Vulkan support
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
     if (r.isVulkan())
     {
         if (!myGeoVk) return;
