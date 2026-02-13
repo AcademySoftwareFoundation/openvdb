@@ -312,7 +312,7 @@ template<typename LeafNodeType>
 struct LabelBoundaryVoxels {
 
     using ValueType = typename LeafNodeType::ValueType;
-    using CharLeafNodeType = tree::LeafNode<char, LeafNodeType::LOG2DIM>;
+    using CharLeafNodeType = tree::LeafNode<signed char, LeafNodeType::LOG2DIM>;
 
     LabelBoundaryVoxels(
         ValueType isovalue, const LeafNodeType ** nodes, CharLeafNodeType ** maskNodes)
@@ -948,7 +948,7 @@ private:
 /// @brief Constructs a memory light char tree that represents the exterior region with @c +1
 ///        and the interior regions with @c -1.
 template <class TreeType>
-typename TreeType::template ValueConverter<char>::Type::Ptr
+typename TreeType::template ValueConverter<signed char>::Type::Ptr
 computeEnclosedRegionMask(const TreeType& tree, typename TreeType::ValueType isovalue,
     const typename TreeType::template ValueConverter<bool>::Type* fillMask)
 {
@@ -957,7 +957,7 @@ computeEnclosedRegionMask(const TreeType& tree, typename TreeType::ValueType iso
     using NodeChainType = typename RootNodeType::NodeChainType;
     using InternalNodeType = typename NodeChainType::template Get<1>;
 
-    using CharTreeType = typename TreeType::template ValueConverter<char>::Type;
+    using CharTreeType = typename TreeType::template ValueConverter<signed char>::Type;
     using CharLeafNodeType = typename CharTreeType::LeafNodeType;
 
     using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
@@ -1036,7 +1036,7 @@ computeEnclosedRegionMask(const TreeType& tree, typename TreeType::ValueType iso
                 extraMaskNodes.push_back(maskNodePt);
             }
 
-            char* data = maskNodePt->buffer().data();
+            signed char* data = maskNodePt->buffer().data();
 
             typename BoolLeafNodeType::ValueOnCIter it = boundaryNode.cbeginValueOn();
             for (; it; ++it) {
@@ -2295,7 +2295,7 @@ extractEnclosedRegion(const GridOrTreeType& volume,
     using TreeType = typename TreeAdapter<GridOrTreeType>::TreeType;
     const TreeType& tree = TreeAdapter<GridOrTreeType>::tree(volume);
 
-    using CharTreePtrType = typename TreeType::template ValueConverter<char>::Type::Ptr;
+    using CharTreePtrType = typename TreeType::template ValueConverter<signed char>::Type::Ptr;
     CharTreePtrType regionMask = level_set_util_internal::computeEnclosedRegionMask(
         tree, isovalue, fillMask);
 

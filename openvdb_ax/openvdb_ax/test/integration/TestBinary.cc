@@ -271,6 +271,9 @@ _T1_@_A1_ = _L1_ * _L2_;)";
     for (const auto& expc : expected) {
         expc.second.operator()();
     }
+    // Matrix multiply may produce small floating-point differences
+    // across architectures (e.g. x86_64 vs aarch64 FMA patterns).
+    mHarness.mUseTolerance = true;
     this->execute("binary_mult.ax");
 }
 
