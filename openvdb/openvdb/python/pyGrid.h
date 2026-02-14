@@ -19,6 +19,7 @@
 #include <nanobind/stl/optional.h>
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/tools/VolumeToMesh.h> // for tools::volumeToMesh()
+#include <openvdb/tools/PolySoupToLevelSet.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/io/Stream.h>
 #include <openvdb/math/Math.h> // for math::isExactlyEqual()
@@ -562,6 +563,116 @@ meshToSignedDistanceField(
         math::Transform::Ptr identity = math::Transform::createLinearTransform();
         return tools::meshToSignedDistanceField<GridType>(*identity, points, triangles, quads, exBandWidth, inBandWidth);
     }
+}
+
+/// @brief Call tools::polySoupToLevelSet() with dimension and bounding box
+template<typename GridType>
+inline nb::list
+polySoupToLevelSetFromDimension(
+    int dim,
+    const Vec3f& bboxMin,
+    const Vec3f& bboxMax,
+    nb::ndarray<float, nb::shape<-1, 3>, nb::device::cpu> pointsObj,
+    std::optional<nb::ndarray<Index32, nb::shape<-1, 3>, nb::device::cpu>>& trianglesObj,
+    std::optional<nb::ndarray<Index32, nb::shape<-1, 4>, nb::device::cpu>>& quadsObj,
+    float erode,
+    float thres,
+    float halfWidth)
+{
+    // Extract vertices
+    std::vector<Vec3s> points(pointsObj.shape(0));
+    for (size_t i = 0; i < pointsObj.shape(0); ++i)
+        points[i] = Vec3s(pointsObj(i, 0), pointsObj(i, 1), pointsObj(i, 2));
+
+    // Extract triangles
+    std::vector<Vec3I> triangles;
+    if (trianglesObj) {
+        triangles.resize(trianglesObj->shape(0));
+        for (size_t i = 0; i < trianglesObj->shape(0); ++i)
+            triangles[i] = Vec3I((*trianglesObj)(i, 0), (*trianglesObj)(i, 1), (*trianglesObj)(i, 2));
+    }
+
+    // Extract quads
+    std::vector<Vec4I> quads;
+    if (quadsObj) {
+        quads.resize(quadsObj->shape(0));
+        for (size_t i = 0; i < quadsObj->shape(0); ++i)
+            quads[i] = Vec4I((*quadsObj)(i, 0), (*quadsObj)(i, 1), (*quadsObj)(i, 2), (*quadsObj)(i, 3));
+    }
+
+    // Construct BBox internally from min/max parameters
+    math::BBox<Vec3f> bbox(bboxMin, bboxMax);
+
+    // Create ShrinkWrapLimit functor with user parameters
+    tools::ShrinkWrapLimit shrinkWrap(erode, thres);
+
+    // Call C++ function with dimension overload
+    std::vector<typename GridType::Ptr> grids =
+        tools::polySoupToLevelSet<GridType>(
+            dim, bbox, points, triangles, quads,
+            shrinkWrap, halfWidth);
+
+    // Convert to Python list
+    nb::list result;
+    for (const auto& grid : grids) {
+        result.append(grid);
+    }
+    return result;
+}
+
+/// @brief Call tools::polySoupToLevelSet() with minVoxelSize and bounding box
+template<typename GridType>
+inline nb::list
+polySoupToLevelSetFromMinVoxelSize(
+    float minVoxelSize,
+    const Vec3f& bboxMin,
+    const Vec3f& bboxMax,
+    nb::ndarray<float, nb::shape<-1, 3>, nb::device::cpu> pointsObj,
+    std::optional<nb::ndarray<Index32, nb::shape<-1, 3>, nb::device::cpu>>& trianglesObj,
+    std::optional<nb::ndarray<Index32, nb::shape<-1, 4>, nb::device::cpu>>& quadsObj,
+    float erode,
+    float thres,
+    float halfWidth)
+{
+    // Extract vertices
+    std::vector<Vec3s> points(pointsObj.shape(0));
+    for (size_t i = 0; i < pointsObj.shape(0); ++i)
+        points[i] = Vec3s(pointsObj(i, 0), pointsObj(i, 1), pointsObj(i, 2));
+
+    // Extract triangles
+    std::vector<Vec3I> triangles;
+    if (trianglesObj) {
+        triangles.resize(trianglesObj->shape(0));
+        for (size_t i = 0; i < trianglesObj->shape(0); ++i)
+            triangles[i] = Vec3I((*trianglesObj)(i, 0), (*trianglesObj)(i, 1), (*trianglesObj)(i, 2));
+    }
+
+    // Extract quads
+    std::vector<Vec4I> quads;
+    if (quadsObj) {
+        quads.resize(quadsObj->shape(0));
+        for (size_t i = 0; i < quadsObj->shape(0); ++i)
+            quads[i] = Vec4I((*quadsObj)(i, 0), (*quadsObj)(i, 1), (*quadsObj)(i, 2), (*quadsObj)(i, 3));
+    }
+
+    // Construct BBox internally from min/max parameters
+    math::BBox<Vec3f> bbox(bboxMin, bboxMax);
+
+    // Create ShrinkWrapLimit functor with user parameters
+    tools::ShrinkWrapLimit shrinkWrap(erode, thres);
+
+    // Call C++ function with minVoxelSize + bbox overload
+    std::vector<typename GridType::Ptr> grids =
+        tools::polySoupToLevelSet<GridType>(
+            minVoxelSize, bbox, points, triangles, quads,
+            shrinkWrap, halfWidth);
+
+    // Convert to Python list
+    nb::list result;
+    for (const auto& grid : grids) {
+        result.append(grid);
+    }
+    return result;
 }
 
 template<typename GridType, typename std::enable_if_t<!std::is_scalar<typename GridType::ValueType>::value>* = nullptr>
@@ -1291,10 +1402,62 @@ exportGrid(nb::module_ m)
              "Either the triangle or the quad array may be empty or None.\n"
              "The resulting volume will have the given transform (or the identity\n"
              "transform if no transform is given) and a narrow band width of\n"
-             "exBandWidth exterior voxels and inBandWidth interior voxels.")
+             "exBandWidth exterior voxels and inBandWidth interior voxels.");
 
+    // Add polySoupToLevelSet methods only for floating-point grids
+    if constexpr (std::is_floating_point<typename GridType::ValueType>::value) {
+        typedGridClass
+            .def_static("convertPolygonSoupToLevelSet",
+                &pyGrid::polySoupToLevelSetFromDimension<GridType>,
+                nb::arg("dim"),
+                nb::arg("bboxMin"),
+                nb::arg("bboxMax"),
+                nb::arg("points"),
+                nb::arg("triangles") = nb::none(),
+                nb::arg("quads") = nb::none(),
+                nb::arg("erode") = 8.0f,
+                nb::arg("thres") = 0.0f,
+                nb::arg("halfWidth") = float(LEVEL_SET_HALF_WIDTH),
+                "Generate LOD family from dimension and bounding box.\n\n"
+                "Args:\n"
+                "    dim: Largest voxel dimension for finest grid\n"
+                "    bboxMin: Minimum corner of bounding box (tuple or Vec3)\n"
+                "    bboxMax: Maximum corner of bounding box (tuple or Vec3)\n"
+                "    points: Nx3 array of vertex positions\n"
+                "    triangles: Mx3 array of triangle indices (optional)\n"
+                "    quads: Kx4 array of quad indices (optional)\n"
+                "    erode: Maximum deformation allowed (default: 8.0)\n"
+                "    thres: Engineering threshold (default: 0.0)\n"
+                "    halfWidth: Half-width of narrow band (default: 3.0)\n\n"
+                "Returns:\n"
+                "    List of grids from finest to coarsest resolution")
+            .def_static("convertPolygonSoupToLevelSet",
+                &pyGrid::polySoupToLevelSetFromMinVoxelSize<GridType>,
+                nb::arg("minVoxelSize"),
+                nb::arg("bboxMin"),
+                nb::arg("bboxMax"),
+                nb::arg("points"),
+                nb::arg("triangles") = nb::none(),
+                nb::arg("quads") = nb::none(),
+                nb::arg("erode") = 8.0f,
+                nb::arg("thres") = 0.0f,
+                nb::arg("halfWidth") = float(LEVEL_SET_HALF_WIDTH),
+                "Generate LOD family from minVoxelSize and bounding box.\n\n"
+                "Args:\n"
+                "    minVoxelSize: Smallest voxel size for finest grid\n"
+                "    bboxMin: Minimum corner of bounding box (tuple or Vec3)\n"
+                "    bboxMax: Maximum corner of bounding box (tuple or Vec3)\n"
+                "    points: Nx3 array of vertex positions\n"
+                "    triangles: Mx3 array of triangle indices (optional)\n"
+                "    quads: Kx4 array of quad indices (optional)\n"
+                "    erode: Maximum deformation allowed (default: 8.0)\n"
+                "    thres: Engineering threshold (default: 0.0)\n"
+                "    halfWidth: Half-width of narrow band (default: 3.0)\n\n"
+                "Returns:\n"
+                "    List of grids from finest to coarsest resolution");
+    }
 
-        .def("prune", &pyGrid::prune<GridType>,
+    typedGridClass.def("prune", &pyGrid::prune<GridType>,
             nb::arg("tolerance") = 0,
             "Remove nodes whose values all have the same active state and are equal to within a given tolerance.")
         .def("pruneInactive", &pyGrid::pruneInactive<GridType>,
