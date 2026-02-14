@@ -33,6 +33,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
+/// @brief Simple structure for a polygon soup
+/// @details bbox is allowed to be invalid, in which case it will be derived from vtx
 struct PolySoup {
     std::vector<Vec3s> vtx;
     std::vector<Vec3I> tri;
@@ -40,9 +42,13 @@ struct PolySoup {
     math::BBox<Vec3f>  bbox;
 };
 
+/// @brief Class used to define and controle the shrink wrap behaviour
+/// @details See D(dx) in our paper for details on the closing threshold.
 class ShrinkWrapLimit;// ShrinkWrapLimit
 
-template <typename GridType>
+/// @brief Class that implements the actual shrink wrap algorithm
+/// @tparam GridType Template parameter of the desired shrink wrap grids
+template <typename GridType = FloatGrid>
 class PolySoupToLevelSet;
 
 /// @brief Convert a soup of polygons to a shrink wrapped level set volume. This version
@@ -141,11 +147,18 @@ polySoupToLevelSet(
 
 /////////////////////////////////////////////////////////////////////////////////////
 
+/// @brief This class implements our shrink wrap algorithm. Normally the free-standing
+///.       function called above should we used instead of this class.
+/// @tparam GridType Grid type of the generated level set surfaces (defaults to FloatGrid)
 template<typename GridType>
 class PolySoupToLevelSet
 {
 public:
 
+    /// @brief Constructor from a desired voxel dimension.
+    /// @param poly Polygon soup that will be moved to this instance.
+    /// @param dim  desired voxel dimension of the output level set.
+    /// @param width half-width of the output narrow-band level set, in voxel units.
     PolySoupToLevelSet(PolySoup &&poly, int dim, float width = float(LEVEL_SET_HALF_WIDTH))
       : mPoly(poly), mHalfWidth(width)
     {
@@ -158,6 +171,11 @@ public:
         mMaxVoxelSize = maxLength / 2.0f;
         OPENVDB_ASSERT(2*mMinVoxelSize <= mMaxVoxelSize);
     }
+
+    /// @brief Constructor from a desired voxel size.
+    /// @param poly Polygon soup that will be moved to this instance.
+    /// @param voxelSize  desired voxel size of the output level set in world units.
+    /// @param width half-width of the output narrow-band level set, in voxel units.
     PolySoupToLevelSet(PolySoup &&poly, float voxelSize, float width = float(LEVEL_SET_HALF_WIDTH))
       : mPoly(poly), mMinVoxelSize(voxelSize), mHalfWidth(width)
     {
@@ -170,21 +188,43 @@ public:
         OPENVDB_ASSERT(2*mMinVoxelSize <= mMaxVoxelSize);
     }
 
+    /// @brief Performs the actual processing to generate the shrink wrap surfaces.
+    /// @tparam ShrinkWrapT Optional template parameter of the functor controlling
+    //          the number of constrained erosion steps (see our paper).
+    /// @tparam ProgressT Template parameter of the optional progress bar.
+    /// @param D ShrinkWrapT Optional functor controlling the number of constrained
+    ///          erosion steps, and the closing threshold (see our paper).
+    /// @param progress Optional pointer to a progress bar.
     template<class ShrinkWrapT, class ProgressT>
     void process(const ShrinkWrapT &D, ProgressT *progress);
 
+    /// @brief Number of shrink wrap grids generated, i.e. depth of the LOD hierarchy. 
     size_t gridCount() const {return mGrids.size();}
 
+    /// @brief returns a shared point to a particular shrink wrap grid
+    /// @param n number of the shrink wrap grid, where n = 0 has the finest sampling and
+    ///          n = gridCount-1 is the coarsest voxel sampling.
     typename GridType::Ptr grid(int n = 0) const {return mGrids[n];}
 
+    /// @brief vector with shared pointers to all the shrink wrap grids
+    /// @note the grids are arrange fine to coarse, grids()[0] is the finest. 
     std::vector<typename GridType::Ptr> grids() const {return mGrids;}
 
+    /// @brief Generate an adaptive polygon mesh from a particular shrink wrap SDF
+    /// @param n number of the shrink wrap grid, where n = 0 has the finest sampling and
+    ///          n = gridCount-1 is the coarsest voxel sampling.
+    /// @param adaptivity optional adaptivity parameter used for meshing. a value of zero
+    ///                   means adaptivity is disables, i.e. uniform quads are produced 
+    /// @param isoValue iso-value used for the mesh generation.
+    /// @return 
     const PolySoup& mesh(int n = 0, float adaptivity = 0.005f, float isoValue = 0.0f)
     {
         volumeToMesh(*mGrids[n], mPoly.vtx, mPoly.tri, mPoly.quad, isoValue, adaptivity);
         return mPoly;
     }
 
+    /// @brief Static method that computes the bounding box of a list of vertex coordinates.
+    /// @param vtx vector of vertex coordinates.
     static math::BBox<Vec3f> getBBox(const std::vector<Vec3s> &vtx)
     {
         using RangeT = tbb::blocked_range<std::vector<Vec3s>::const_iterator>;
@@ -210,6 +250,7 @@ private:
     std::vector<typename GridType::Ptr> mGrids;// fine(0) -> coarse grids(size-1)    
     bool mIsGridSDF;
 
+    /// @brief private method that generates a dx offset level set surface from mPoly, while also updating mPoly
     auto offset(float dx){
         auto xform = math::Transform::createLinearTransform(dx);
         auto udf = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> UDF
@@ -217,6 +258,7 @@ private:
         return meshToLevelSet<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> SDF
     }
 
+    /// @brief private method that resamples inGrid(dx) to outGrid(dx/2)
     auto upsample(const GridType &inGrid){
         auto outGrid = createLevelSet<GridType>(inGrid.voxelSize()[0]/2, mHalfWidth);
         resampleToMatch<BoxSampler>(inGrid, *outGrid);
@@ -224,6 +266,7 @@ private:
         return outGrid;
     }
 
+    /// @brief performs the shrink wrap operation as a constrained level set erosion
     auto shrinkWrap(GridType &grid, const GridType &gridB, float &d){
         const float maxDist = 2.0f;
         LevelSetFilter<GridType> filter(grid);
