@@ -1826,93 +1826,10 @@ void Tool::soupToLevelSet()
     if (keep) mesh = mesh->deepCopy();// deep copy since mesh will be modified below
     if (mParser.verbose) mTimer.start("Soup -> SDF");
 
-#if 1
     Spinner spin, *progress = mParser.verbose ? &spin : nullptr;
     const tools::ShrinkWrapLimit D(nErode, thres);
-    std::vector<GridT::Ptr> grids;
-    if (voxel == 0.0f) {
-        grids = tools::polySoupToLevelSet<GridT>(dim,   mesh->bbox(), mesh->vtx(), mesh->tri(), mesh->quad(), D, width, progress);
-    } else {
-        grids = tools::polySoupToLevelSet<GridT>(voxel, mesh->bbox(), mesh->vtx(), mesh->tri(), mesh->quad(), D, width, progress);
-    }
-    auto grid = grids[0];
-#else
-
-    const float maxLength =  mesh->maxLength();
-    bool isGridSDF = true;
-
-    if (voxel == 0.0f) {
-      voxel = maxLength/(dim - 2.0f*(width + 1.0f));// +1 since final surface is dilated by dx
-      if (mParser.verbose>1) std::cerr << "Estimated voxel size = " << voxel << " from dim = " << dim << std::endl;
-    }
-
-    if (mParser.verbose>1 && thres == 0.0f) std::cerr << "Disabled engineering threshold\n";
-
-    auto D = [&](float dx)->float{
-      if (dx >= 2*thres) return nErode;// if thres == 0 this is aways true
-      if (dx <=   thres) return 1.0f;
-      return 1.0f + (nErode-1.0f)*(dx-thres)/thres;
-    };
-
-    if (mParser.verbose>1) std::cerr << std::endl;
-
-    auto myUpsample = [&](const GridT &grid)->GridT::Ptr{
-#if 0
-      auto xform = math::Transform::createLinearTransform(grid.voxelSize()[0]/2);// upsample
-      return tools::levelSetRebuild(grid, 0.0f, width, xform.get());// SDF -> mesh -> SDF
-#else
-      GridT::Ptr outGrid = createLevelSet<GridT>(grid.voxelSize()[0]/2, width);
-      tools::resampleToMatch<tools::BoxSampler>(grid, *outGrid);
-      isGridSDF = true;
-      return outGrid;
-#endif
-    };// myUpsample
-
-    auto myOffset = [&](Geometry &mesh, float dx)->GridT::Ptr{
-      if (mParser.verbose>1) std::cout << "Generating offset with dx = " << dx << "\n" << std::flush;
-      auto xform = math::Transform::createLinearTransform(dx);
-      auto udf = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);// mesh -> UDF
-#if 1
-      tools::volumeToMesh<GridT>(*udf, mesh.vtx(), mesh.tri(), mesh.quad(), dx, 0.0);// updates the mesh
-      return tools::meshToLevelSet<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
-#else
-      return tools::levelSetRebuild(*udf, dx, width);// UDF -> mesh -> SDF
-#endif
-    };// myOffset
-
-    auto myShrinkWrap = [&](GridT &grid, const GridT &gridB, float &d)->GridT::Ptr{
-      const int space = 1, time = 1;
-      const float maxDist = 2.0f;
-      auto filter = this->createFilter(grid, space, time);
-      if (isGridSDF == false) filter->normalize();
-      filter->offset(maxDist * grid.voxelSize()[0]);// erode by maxDist * dx
-      isGridSDF = false;// the CSG operation messed up the SDF
-      d += maxDist;
-      return tools::csgUnionCopy(grid, gridB);
-    };// myShrinkWrap
-
-    // Fine to coarse offset generation
-    std::vector<GridT::Ptr> offsets;
-    for (float dx = voxel; 2*dx <= maxLength; dx *= 2.0f) offsets.push_back(myOffset(*mesh, dx));
-    if (offsets.size() <= 1) throw std::invalid_argument(name+": nLOD="+std::to_string(offsets.size())+" is too small!");
-
-    // Coarse to fine shrink wrap algorithm
-    float vol[2];
-    vdb_tool::Spinner spin(std::cout);
-    auto grid = offsets.back();// coarset grid
-    for (auto iter = std::next(offsets.rbegin()), end = offsets.rend(); iter != end; ++iter) {// coarse -> fine
-      grid = myUpsample(*grid);// grid(dx) -> grid(dx/2)
-      for (float d = 0.0f, dx = grid->voxelSize()[0], Ddx = D(dx); d < Ddx; vol[0] = vol[1]) {
-        if (mParser.verbose>1) spin("Shrink wrap d=" + std::to_string(d) + ", D("+std::to_string(dx) + ")=" + std::to_string(Ddx));
-        grid = myShrinkWrap(*grid, **iter, d);
-        vol[1] = tools::levelSetVolume(*grid);
-        if (d>0.0f && math::Abs(vol[0]-vol[1]) == 0.0f ) {
-          if (mParser.verbose>1) std::cout << "    Terminated when d = " << d << " and vol = " << vol[0] << std::setfill(' ') << std::setw(80) << "\n" << std::flush;
-          break;
-        }
-      }
-    }// loop from coarse to fine voxel sizes
-#endif
+    tools::PolySoup poly{std::move(mesh->vtx()), std::move(mesh->tri()), std::move(mesh->quad()), mesh->bbox()};
+    auto grid = tools::polySoupToLevelSet<GridT>(std::move(poly), dim, voxel, D, width, progress);
 
     if (mParser.verbose) mTimer.stop();
 

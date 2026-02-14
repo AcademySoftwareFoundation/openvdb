@@ -1,3 +1,9 @@
+tools:
+
+  New Features:
+  - Added a new tool PolySoupToLevelSet that generates a LOD family of watertight shrink wrap
+    surfaces from a soup of polygons.  
+
 vdb_tool:
 
   New Features:
