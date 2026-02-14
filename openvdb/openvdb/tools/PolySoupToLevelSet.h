@@ -45,9 +45,12 @@ class ShrinkWrapLimit;// ShrinkWrapLimit
 template <typename GridType>
 class PolySoupToLevelSet;
 
-/// @brief Convert a soup of polygons to a shrink wrapped level set volume.
+/// @brief Convert a soup of polygons to a shrink wrapped level set volume. This version
+///        takes a PolySoup struct and optional voxel dimension and/or voxel size. If the
+///        the voxel size is invalue, i.e. not positive, the dimension and bbox of the PolySoup
+///        is used to derive the voxel size.
 ///
-/// @return a grid of type @c GridType containing a narrow-band level set
+/// @return A shared pointer to grid of type @c GridType containing a narrow-band level set
 ///         that shrink wraps the input polygons.
 ///
 /// @throw  TypeError if @c GridType is not scalar or not floating-point
@@ -319,7 +322,7 @@ polySoupToLevelSet(
     static_assert(std::is_floating_point<typename GridType::ValueType>::value,
         "polySoupToLevelSet requires an SDF grid with floating-point values");
     PolySoup poly{std::move(vtx), std::move(tri), std::move(quad), bbox};
-    PolySoupToLevelSet<GridType> tmp(poly, dim, bbox, halfWidth);
+    PolySoupToLevelSet<GridType> tmp(std::move(poly), dim, halfWidth);
     tmp.process(D, progress);
     return tmp.grids();
 }
@@ -341,7 +344,7 @@ polySoupToLevelSet(
     static_assert(std::is_floating_point<typename GridType::ValueType>::value,
         "polySoupToLevelSet requires an SDF grid with floating-point values");
     PolySoup poly{std::move(vtx), std::move(tri), std::move(quad), bbox};
-    PolySoupToLevelSet<GridType> tmp(poly, minVoxelSize, halfWidth);
+    PolySoupToLevelSet<GridType> tmp(std::move(poly), minVoxelSize, halfWidth);
     tmp.process(D, progress);
     return tmp.grids();
 }
