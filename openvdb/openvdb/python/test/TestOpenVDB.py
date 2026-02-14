@@ -814,7 +814,6 @@ class TestOpenVDB(unittest.TestCase):
         ], dtype=np.uint32)
 
         minVoxelSize = 2.0
-        maxVoxelSize = 8.0
         halfWidth = 3.0
 
         # Only scalar, floating-point grids support convertPolygonSoupToLevelSet()
