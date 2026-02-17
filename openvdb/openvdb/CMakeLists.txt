@@ -412,6 +412,7 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
   points/PointConversion.h
   points/PointCount.h
   points/PointDataGrid.h
+  points/PointDataIO.h
   points/PointDelete.h
   points/PointGroup.h
   points/PointMask.h
