@@ -151,11 +151,11 @@ public:
     /// @brief Read the tree topology from a stream.
     ///
     /// This will read the tree structure and tile values, but not voxel data.
-    virtual void readTopology(std::istream&, bool saveFloatAsHalf = false);
+    virtual void readTopology(std::istream&, bool saveFloatAsHalf = false) = 0;
     /// @brief Write the tree topology to a stream.
     ///
     /// This will write the tree structure and tile values, but not voxel data.
-    virtual void writeTopology(std::ostream&, bool saveFloatAsHalf = false) const;
+    virtual void writeTopology(std::ostream&, bool saveFloatAsHalf = false) const = 0;
 
     /// Read all data buffers for this tree.
     virtual void readBuffers(std::istream&, bool saveFloatAsHalf = false) = 0;
@@ -1131,23 +1131,6 @@ struct Tree5 {
 
 
 inline void
-TreeBase::readTopology(std::istream& is, bool /*saveFloatAsHalf*/)
-{
-    int32_t bufferCount;
-    is.read(reinterpret_cast<char*>(&bufferCount), sizeof(int32_t));
-    if (bufferCount != 1) OPENVDB_LOG_WARN("multi-buffer trees are no longer supported");
-}
-
-
-inline void
-TreeBase::writeTopology(std::ostream& os, bool /*saveFloatAsHalf*/) const
-{
-    int32_t bufferCount = 1;
-    os.write(reinterpret_cast<char*>(&bufferCount), sizeof(int32_t));
-}
-
-
-inline void
 TreeBase::print(std::ostream& os, int /*verboseLevel*/) const
 {
     os << "    Tree Type: " << type()
@@ -1273,7 +1256,9 @@ void
 Tree<RootNodeType>::readTopology(std::istream& is, bool saveFloatAsHalf)
 {
     this->clearAllAccessors();
-    TreeBase::readTopology(is, saveFloatAsHalf);
+    int32_t bufferCount;
+    is.read(reinterpret_cast<char*>(&bufferCount), sizeof(int32_t));
+    if (bufferCount != 1) OPENVDB_LOG_WARN("multi-buffer trees are no longer supported");
     mRoot.readTopology(is, saveFloatAsHalf);
 }
 
@@ -1282,7 +1267,8 @@ template<typename RootNodeType>
 void
 Tree<RootNodeType>::writeTopology(std::ostream& os, bool saveFloatAsHalf) const
 {
-    TreeBase::writeTopology(os, saveFloatAsHalf);
+    int32_t bufferCount = 1;
+    os.write(reinterpret_cast<char*>(&bufferCount), sizeof(int32_t));
     mRoot.writeTopology(os, saveFloatAsHalf);
 }
 
