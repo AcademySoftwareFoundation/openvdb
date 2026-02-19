@@ -170,12 +170,12 @@ vdb_tool -help
 vdb_tool -help read write
 ```
 
-## Getting help on all instructions
+## Getting help on all actions
 ```
 vdb_tool -eval help="*"
 ```
 
-## Getting help on specific instructions
+## Getting help on specific actions
 ```
 vdb_tool -eval help=if,switch
 ```
@@ -203,7 +203,7 @@ Convert an obj file with n-gons into a ply file with only triangles
 vdb_tool -read mesh.obj -quad2tri -write mesh.ply
 ```
 
-## Read multiple files
+## Read multiple specific files
 Convert a polygon mesh file into a narrow-band level with a transform that matches a reference vdb
 ```
 vdb_tool -read mesh.obj,reference.vdb -mesh2ls vdb=0 -write level_set.vdb
@@ -286,6 +286,7 @@ vdb_tool -i stdin.vdb -print < bunny.vdb
 cat bunny.vdb | vdb_tool -i stdin.vdb -print
 vdb_tool -sphere -o stdout.vdb | gzip > sphere.vdb.gz
 gzip -dc sphere.vdb.gz | vdb_tool -i stdin.vdb -print
+vdb_tool -sphere -o stdout.vdb | vdb_view
 ```
 
 ## Pipelining multiple instances of vdb_tool

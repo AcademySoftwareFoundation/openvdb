@@ -483,14 +483,14 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->levelSetToMesh();});
 
   mParser.addAction(
-     {"ls2fog", "l2f"}, "Convert a level set VDB into a VDB with a fog volume, i.e. normalized density.",
+     {"ls2fog", "l2f", "sdf2fog"}, "Convert a level set VDB into a VDB with a fog volume, i.e. normalized density.",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"name", "", "ls2fog_input", "specify the name of the resulting VDB (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->levelSetToFog();});
 
   mParser.addAction(
-      {"points2ls", "p2l"}, "Convert geometry points into a narrow-band level set",
+      {"points2ls", "p2l", "pts2sdf"}, "Convert geometry points into a narrow-band level set",
     {{"dim", "", "256", "largest dimension in voxel units of the bbox of all the points (defaults to 256). If \"voxel\" is defined \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
@@ -557,7 +557,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->enright();});
 
   mParser.addAction(
-      {"dilate"}, "dilate level set surface by a fixed radius",
+      {"dilate", "dilateLS"}, "dilate level set surface by a fixed radius",
     {{"radius", "1.0", "1.0", "radius in voxel units by which the surface is dilated"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -565,7 +565,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->offsetLevelSet();});
 
   mParser.addAction(
-      {"erode"}, "erode level set surface by a fixed radius",
+      {"erode", "erodeLS"}, "erode level set surface by a fixed radius",
     {{"radius", "1.0", "1.0", "radius in voxel units by which the surface is eroded"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -573,7 +573,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->offsetLevelSet();});
 
   mParser.addAction(
-      {"open"}, "morphological opening, i.e. erosion followed by dilation, of a level set surface by a fixed radius",
+      {"open", "openLS"}, "morphological opening, i.e. erosion followed by dilation, of a level set surface by a fixed radius",
     {{"radius", "1.0", "1.0", "radius in voxel units by which the surface is opened"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -581,7 +581,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->offsetLevelSet();});
 
   mParser.addAction(
-      {"close"}, "morphological closing, i.e. dilation followed by erosion, of level set surface by a fixed radius",
+      {"close", "closeLS"}, "morphological closing, i.e. dilation followed by erosion, of level set surface by a fixed radius",
     {{"radius", "1.0", "1.0", "radius in voxel units by which the surface is closed"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -589,7 +589,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->offsetLevelSet();});
 
   mParser.addAction(
-      {"gauss"}, "gaussian convolution of a level set surface",
+      {"gauss", "gaussLS"}, "gaussian convolution of a level set surface",
     {{"iter",  "1", "1", "number of iterations are that the filter is applied"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -598,7 +598,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->filterLevelSet();});
 
   mParser.addAction(
-      {"mean"}, "mean value filtering of a level set surface",
+      {"mean", "meanLS"}, "mean value filtering of a level set surface",
     {{"iter",  "1",  "1", "number of iterations are that the filter is applied"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -607,7 +607,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->filterLevelSet();});
 
   mParser.addAction(
-      {"median"}, "median value filtering of a level set surface",
+      {"median", "medianLS"}, "median value filtering of a level set surface",
     {{"iter",  "1",  "1", "number of iterations are that the filter is applied"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
