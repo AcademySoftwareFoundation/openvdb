@@ -436,7 +436,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->quadsToTriangles();});
 
   mParser.addAction(
-     {"mesh2ls", "mesh2sdf", "m2ls"}, "Convert a watertight polygon surface into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+     {"mesh2ls", "mesh2sdf"}, "Convert a watertight polygon surface into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
@@ -449,7 +449,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
 
   mParser.addAction(
-     {"soup2udf", "mesh2udf", "m2udf"}, "Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band",
+     {"soup2udf", "mesh2udf"}, "Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
@@ -460,7 +460,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->meshToUnsignedDistanceField();});
 
   mParser.addAction(
-     {"soup2ls", "soup2sdf", "s2ls"}, "Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+     {"soup2ls", "soup2sdf"}, "Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
@@ -472,7 +472,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->soupToLevelSet();});
 
   mParser.addAction(
-     {"ls2mesh", "sdf2mesh", "l2m"}, "Convert a level set to an adaptive polygon mesh",
+     {"ls2mesh", "sdf2mesh"}, "Convert a level set to an adaptive polygon mesh",
     {{"adapt", "0.0", "0.005", "normalized metric for the adaptive meshing. 0 is uniform and 1 is extreme adaptivity. Defaults to 0."},
      {"iso", "0.0", "0.1", "iso-value used to define the implicit surface. Defaults to zero."},
      {"vdb", "0", "0", "age (i.e. stack index) of the level set VDB grid to be meshed. Defaults to 0, i.e. most recently inserted VDB."},
@@ -485,6 +485,7 @@ void Tool::init()
   mParser.addAction(
      {"ls2fog", "l2f", "sdf2fog"}, "Convert a level set VDB into a VDB with a fog volume, i.e. normalized density.",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
+     {"cutoff", "0.0", "3.0", "cut-off in voxel units so fog = sdf >=0 ? 0 : -sdf/|cutoff|*dx (defaults to 0, i.e. cutoff = max for smoothest ramp"},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"name", "", "ls2fog_input", "specify the name of the resulting VDB (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->levelSetToFog();});
@@ -1615,13 +1616,15 @@ void Tool::levelSetToFog()
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
+    const float cutoff = mParser.get<float>("cutoff");
     std::string grid_name = mParser.get<std::string>("name");
     auto it = this->getGrid(age);
     auto sdf = gridPtrCast<FloatGrid>(*it);
     if (!sdf || sdf->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("levelSetToFog: no Level Set with age "+std::to_string(age));
     if (mParser.verbose) mTimer.start("SDF to FOG");
     FloatGrid::Ptr fog = keep ? sdf->deepCopy() : sdf;
-    tools::sdfToFogVolume(*fog);
+    const float cutoffDistance = cutoff <= 0.0f ? sdf->background() : cutoff * sdf->voxelSize()[0];
+    tools::sdfToFogVolume(*fog, cutoffDistance);// fog <- sdf > 0 ? 0 : -sdf / |cutoffDistance|
     if (!keep) mGrid.erase(std::next(it).base());
     if (grid_name.empty()) grid_name = "ls2fog_"+sdf->getName();
     fog->setName(grid_name);
