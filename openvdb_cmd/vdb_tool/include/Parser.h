@@ -7,7 +7,7 @@
 ///
 /// @file Parser.h
 ///
-/// @brief Defines various classes (Processor, Parser, Option, Action, Loop)
+/// @brief Defines various classes (Processor, Memory, Parser, Option, Action, Loop)
 ///        for processing of command-line arguments.
 ///
 /// @warning All prints are directed to cerr since cout is used for piping!

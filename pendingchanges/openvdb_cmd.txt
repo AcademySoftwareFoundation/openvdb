@@ -1,9 +1,3 @@
-tools:
-
-  New Features:
-  - Added a new tool PolySoupToLevelSet that generates a LOD family of watertight shrink wrap
-    surfaces from a soup of polygons.  
-
 vdb_tool:
 
   New Features:
@@ -23,6 +17,6 @@ vdb_tool:
   - Added cutoff option to existing ls2fog action.
 
   Fixes:
-  - Fixed issues in readSTL so it works on all files in Thingi10K
-  - Fixed bug when reading ascii ply files and off files with normals
-  - Fixed several typos in vdb_tool
+  - Fixed issues in readSTL so it works on all files in Thingi10K.
+  - Fixed bug when reading ascii ply files and off files with normals.
+  - Fixed several typos in vdb_tool.

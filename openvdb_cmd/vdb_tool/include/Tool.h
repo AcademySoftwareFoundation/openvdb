@@ -183,12 +183,6 @@ private:
     /// @brief Convert a volume to an adaptive polygon mesh
     void volumeToMesh();
 
-    /// @brief Convert a level set to an adaptive polygon mesh
-    void levelSetToMesh();
-
-    /// @brief Convert a fog volume to an adaptive polygon mesh
-    void fogToMesh();
-
     /// @brief Create a level set sphere, i.e. a narrow-band signed distance to a sphere
     void levelSetSphere();
 
@@ -462,7 +456,7 @@ void Tool::init()
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"vdb", "-1", "0", "age (i.e. stack index) of reference grid used to define the transform. Defaults to -1, i.e. disabled. If specified this option takes precedence over \"dim\" and \"voxel\"!"},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
-     {"name", "", "mesh2sdf_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
+     {"name", "", "mesh2udf_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
      [&](){mParser.setDefaults();}, [&](){this->meshToUnsignedDistanceField();});
 
   mParser.addAction(
@@ -485,7 +479,7 @@ void Tool::init()
      {"mask","-1", "1", "age (i.e. stack index) of the level set VDB grid used as a surface mask during meshing. Defaults to -1, i.e. it's disabled."},
      {"invert", "false", "1|0|true|false", "boolean toggle to mesh the complement of the mask. Defaults to false and ignored if no mask is specified."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing. The mask is never removed!"},
-     {"name", "", "ls2mesh_input", "specify the name of the resulting vdb (by default it's derived from the input VDB)"}},
+     {"name", "", "vol2mesh_input", "specify the name of the resulting vdb (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->volumeToMesh();});
 
   mParser.addAction(
@@ -497,7 +491,7 @@ void Tool::init()
      {"invert", "false", "1|0|true|false", "boolean toggle to mesh the complement of the mask. Defaults to false and ignored if no mask is specified."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing. The mask is never removed!"},
      {"name", "", "ls2mesh_input", "specify the name of the resulting vdb (by default it's derived from the input VDB)"}},
-     [&](){mParser.setDefaults();}, [&](){this->levelSetToMesh();});
+     [&](){mParser.setDefaults();}, [&](){this->volumeToMesh();});
 
   mParser.addAction(
      {"fog2mesh"}, "Convert a fog volume to an adaptive polygon mesh",
@@ -507,8 +501,8 @@ void Tool::init()
      {"mask","-1", "1", "age (i.e. stack index) of the level set VDB grid used as a surface mask during meshing. Defaults to -1, i.e. it's disabled."},
      {"invert", "false", "1|0|true|false", "boolean toggle to mesh the complement of the mask. Defaults to false and ignored if no mask is specified."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing. The mask is never removed!"},
-     {"name", "", "ls2mesh_input", "specify the name of the resulting vdb (by default it's derived from the input VDB)"}},
-     [&](){mParser.setDefaults();}, [&](){this->fogToMesh();});
+     {"name", "", "fog2mesh_input", "specify the name of the resulting vdb (by default it's derived from the input VDB)"}},
+     [&](){mParser.setDefaults();}, [&](){this->volumeToMesh();});
 
   mParser.addAction(
      {"ls2fog", "l2f", "sdf2fog"}, "Convert a level set VDB into a VDB with a fog volume, i.e. normalized density.",
@@ -2268,7 +2262,8 @@ void Tool::csg()
 void Tool::volumeToMesh()
 {
   const std::string &action_name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(action_name == "vol2mesh");
+  const int mode = findMatch(action_name, {"ls2mesh", "fog2mesh", "vol2mesh"});// 1-based index
+  OPENVDB_ASSERT(mode);// mode = 0 for no match
   try {
     mParser.printAction();
     const double adaptivity = mParser.get<float>("adapt");
@@ -2281,7 +2276,14 @@ void Tool::volumeToMesh()
 
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (mParser.verbose) mTimer.start("vol -> mesh");
+    if (!grid) throw std::invalid_argument(action_name+": no VDB with age "+std::to_string(age));
+    if (mode==1 && grid->getGridClass() != GRID_LEVEL_SET) {
+      throw std::invalid_argument(action_name+": no level set with age "+std::to_string(age));
+    } else if (mode==2 && grid->getGridClass() != GRID_FOG_VOLUME) {
+      throw std::invalid_argument(action_name+": no fog volume with age "+std::to_string(age));
+    }
+    
+    if (mParser.verbose) mTimer.start(action_name);
 
     tools::VolumeToMesh mesher(iso, adaptivity, /*relaxDisorientedTriangles*/true);
     if (mask >= 0) {
@@ -2300,7 +2302,7 @@ void Tool::volumeToMesh()
     Geometry::Ptr geom = this->mesherToGeometry(mesher);
 
     if (!keep) mGrid.erase(std::next(it).base());
-    if (grid_name.empty()) grid_name = "vol2mesh_"+grid->getName();
+    if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
     geom->setName(grid_name);
     mGeom.push_back(geom);
 
@@ -2309,104 +2311,6 @@ void Tool::volumeToMesh()
     throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::volumeToMesh
-
-// ==============================================================================================================
-
-void Tool::levelSetToMesh()
-{
-  const std::string &action_name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(action_name == "ls2mesh");
-  try {
-    mParser.printAction();
-    const double adaptivity = mParser.get<float>("adapt");
-    const double iso = mParser.get<float>("iso");
-    const int age = mParser.get<int>("vdb");
-    const int mask = mParser.get<int>("mask");
-    const bool invert = mParser.get<bool>("invert");
-    const bool keep = mParser.get<bool>("keep");
-    std::string grid_name = mParser.get<std::string>("name");
-
-    auto it = this->getGrid(age);
-    GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("levelSetToMesh: no level set with age "+std::to_string(age));
-    if (mParser.verbose) mTimer.start("VDB -> mesh");
-
-    tools::VolumeToMesh mesher(iso, adaptivity, /*relaxDisorientedTriangles*/true);
-
-    if (mask >= 0) {
-      auto base = *this->getGrid(mask);// might throw
-      if (base->isType<BoolGrid>()) {
-        mesher.setSurfaceMask(base, invert);
-      } else if (base->isType<FloatGrid>()) {
-        mesher.setSurfaceMask(tools::interiorMask(*gridPtrCast<FloatGrid>(base), 0.0), invert);
-      } else if (base->isType<Vec3fGrid>()) {
-        mesher.setSurfaceMask(tools::interiorMask(*gridPtrCast<Vec3fGrid>(base)), invert);
-      } else {
-        throw std::invalid_argument("levelSetToMesh: unsupported mask type with age "+std::to_string(mask));
-      }
-    }
-    mesher(*grid);
-    Geometry::Ptr geom = this->mesherToGeometry(mesher);
-
-    if (!keep) mGrid.erase(std::next(it).base());
-    if (grid_name.empty()) grid_name = "ls2mesh_"+grid->getName();
-    geom->setName(grid_name);
-    mGeom.push_back(geom);
-
-    if (mParser.verbose) mTimer.stop();
-  } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
-  }
-}// Tool::levelSetToMesh
-
-// ==============================================================================================================
-
-void Tool::fogToMesh()
-{
-  const std::string &action_name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(action_name == "fog2mesh");
-  try {
-    mParser.printAction();
-    const double adaptivity = mParser.get<float>("adapt");
-    const double iso = mParser.get<float>("iso");
-    const int age = mParser.get<int>("vdb");
-    const int mask = mParser.get<int>("mask");
-    const bool invert = mParser.get<bool>("invert");
-    const bool keep = mParser.get<bool>("keep");
-    std::string grid_name = mParser.get<std::string>("name");
-
-    auto it = this->getGrid(age);
-    GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid || grid->getGridClass() != GRID_FOG_VOLUME) throw std::invalid_argument("fogToMesh: no level set with age "+std::to_string(age));
-    if (mParser.verbose) mTimer.start("VDB -> mesh");
-
-    tools::VolumeToMesh mesher(iso, adaptivity, /*relaxDisorientedTriangles*/true);
-
-    if (mask >= 0) {
-      auto base = *this->getGrid(mask);// might throw
-      if (base->isType<BoolGrid>()) {
-        mesher.setSurfaceMask(base, invert);
-      } else if (base->isType<FloatGrid>()) {
-        mesher.setSurfaceMask(tools::interiorMask(*gridPtrCast<FloatGrid>(base), 0.0), invert);
-      } else if (base->isType<Vec3fGrid>()) {
-        mesher.setSurfaceMask(tools::interiorMask(*gridPtrCast<Vec3fGrid>(base)), invert);
-      } else {
-        throw std::invalid_argument("fogToMesh: unsupported mask type with age "+std::to_string(mask));
-      }
-    }
-    mesher(*grid);
-    Geometry::Ptr geom = this->mesherToGeometry(mesher);
-
-    if (!keep) mGrid.erase(std::next(it).base());
-    if (grid_name.empty()) grid_name = "fog2mesh_"+grid->getName();
-    geom->setName(grid_name);
-    mGeom.push_back(geom);
-
-    if (mParser.verbose) mTimer.stop();
-  } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
-  }
-}// Tool::folToMesh
 
 // ==============================================================================================================
 
