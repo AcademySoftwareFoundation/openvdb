@@ -11,6 +11,8 @@ vdb_tool:
   - Added new action "files" that visits files in a directory structure which matches extensions or patterns
   - Added new action "mesh2udf", which generates a symmetric narrow band of unsigned distances to a mesh.
   - Added new action -quat2tri/q2t, which triangulates all quads in a mesh.
+  - Added new action -vol2mesh, which converts s scalar volumes into an adaptive polygon mesh.
+  - Added new action -fog2vol, which converts a fog volumes into an adaptive polygon mesh.
   - Added triangulation of N-gons to readOBJ and readSTL, assuming they are convex.
   - Added read support for xyz files.
 
@@ -18,6 +20,7 @@ vdb_tool:
   - Action "mesh2ls/mesh2sdf" now supports generation of asymmetric narrow bands.
   - Improved error reporting when using unsupported actions and options.
   - Actions can now have multiple names, e.g. "-read", "-import, "-load", "-i".
+  - Added cutoff option to existing ls2fog action.
 
   Fixes:
   - Fixed issues in readSTL so it works on all files in Thingi10K

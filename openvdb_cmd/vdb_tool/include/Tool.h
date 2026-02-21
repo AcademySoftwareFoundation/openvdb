@@ -180,8 +180,14 @@ private:
     /// @brief Converts an iso-surface of a scalar field into a level set (i.e. SDF)
     void isoToLevelSet();
 
+    /// @brief Convert a volume to an adaptive polygon mesh
+    void volumeToMesh();
+
     /// @brief Convert a level set to an adaptive polygon mesh
     void levelSetToMesh();
+
+    /// @brief Convert a fog volume to an adaptive polygon mesh
+    void fogToMesh();
 
     /// @brief Create a level set sphere, i.e. a narrow-band signed distance to a sphere
     void levelSetSphere();
@@ -472,6 +478,17 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->soupToLevelSet();});
 
   mParser.addAction(
+     {"vol2mesh", "vdb2mesh"}, "Convert a scalar volume to an adaptive polygon mesh",
+    {{"adapt", "0.0", "0.005", "normalized metric for the adaptive meshing. 0 is uniform and 1 is extreme adaptivity. Defaults to 0."},
+     {"iso", "0.0", "0.1", "iso-value used to define the implicit surface. Defaults to zero."},
+     {"vdb", "0", "0", "age (i.e. stack index) of the level set VDB grid to be meshed. Defaults to 0, i.e. most recently inserted VDB."},
+     {"mask","-1", "1", "age (i.e. stack index) of the level set VDB grid used as a surface mask during meshing. Defaults to -1, i.e. it's disabled."},
+     {"invert", "false", "1|0|true|false", "boolean toggle to mesh the complement of the mask. Defaults to false and ignored if no mask is specified."},
+     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing. The mask is never removed!"},
+     {"name", "", "ls2mesh_input", "specify the name of the resulting vdb (by default it's derived from the input VDB)"}},
+     [&](){mParser.setDefaults();}, [&](){this->volumeToMesh();});
+
+  mParser.addAction(
      {"ls2mesh", "sdf2mesh"}, "Convert a level set to an adaptive polygon mesh",
     {{"adapt", "0.0", "0.005", "normalized metric for the adaptive meshing. 0 is uniform and 1 is extreme adaptivity. Defaults to 0."},
      {"iso", "0.0", "0.1", "iso-value used to define the implicit surface. Defaults to zero."},
@@ -481,6 +498,17 @@ void Tool::init()
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing. The mask is never removed!"},
      {"name", "", "ls2mesh_input", "specify the name of the resulting vdb (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->levelSetToMesh();});
+
+  mParser.addAction(
+     {"fog2mesh"}, "Convert a fog volume to an adaptive polygon mesh",
+    {{"adapt", "0.0", "0.005", "normalized metric for the adaptive meshing. 0 is uniform and 1 is extreme adaptivity. Defaults to 0."},
+     {"iso", "0.5", "0.5", "iso-value used to define the implicit surface. Defaults to zero."},
+     {"vdb", "0", "0", "age (i.e. stack index) of the level set VDB grid to be meshed. Defaults to 0, i.e. most recently inserted VDB."},
+     {"mask","-1", "1", "age (i.e. stack index) of the level set VDB grid used as a surface mask during meshing. Defaults to -1, i.e. it's disabled."},
+     {"invert", "false", "1|0|true|false", "boolean toggle to mesh the complement of the mask. Defaults to false and ignored if no mask is specified."},
+     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing. The mask is never removed!"},
+     {"name", "", "ls2mesh_input", "specify the name of the resulting vdb (by default it's derived from the input VDB)"}},
+     [&](){mParser.setDefaults();}, [&](){this->fogToMesh();});
 
   mParser.addAction(
      {"ls2fog", "l2f", "sdf2fog"}, "Convert a level set VDB into a VDB with a fog volume, i.e. normalized density.",
@@ -2237,6 +2265,53 @@ void Tool::csg()
 
 // ==============================================================================================================
 
+void Tool::volumeToMesh()
+{
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "vol2mesh");
+  try {
+    mParser.printAction();
+    const double adaptivity = mParser.get<float>("adapt");
+    const double iso = mParser.get<float>("iso");
+    const int age = mParser.get<int>("vdb");
+    const int mask = mParser.get<int>("mask");
+    const bool invert = mParser.get<bool>("invert");
+    const bool keep = mParser.get<bool>("keep");
+    std::string grid_name = mParser.get<std::string>("name");
+
+    auto it = this->getGrid(age);
+    GridT::Ptr grid = gridPtrCast<GridT>(*it);
+    if (mParser.verbose) mTimer.start("vol -> mesh");
+
+    tools::VolumeToMesh mesher(iso, adaptivity, /*relaxDisorientedTriangles*/true);
+    if (mask >= 0) {
+      auto base = *this->getGrid(mask);// might throw
+      if (base->isType<BoolGrid>()) {
+        mesher.setSurfaceMask(base, invert);
+      } else if (base->isType<FloatGrid>()) {
+        mesher.setSurfaceMask(tools::interiorMask(*gridPtrCast<FloatGrid>(base), 0.0), invert);
+      } else if (base->isType<Vec3fGrid>()) {
+        mesher.setSurfaceMask(tools::interiorMask(*gridPtrCast<Vec3fGrid>(base)), invert);
+      } else {
+        throw std::invalid_argument("volumeToMesh: unsupported mask type with age "+std::to_string(mask));
+      }
+    }
+    mesher(*grid);
+    Geometry::Ptr geom = this->mesherToGeometry(mesher);
+
+    if (!keep) mGrid.erase(std::next(it).base());
+    if (grid_name.empty()) grid_name = "vol2mesh_"+grid->getName();
+    geom->setName(grid_name);
+    mGeom.push_back(geom);
+
+    if (mParser.verbose) mTimer.stop();
+  } catch (const std::exception& e) {
+    throw std::invalid_argument(action_name+": "+e.what());
+  }
+}// Tool::volumeToMesh
+
+// ==============================================================================================================
+
 void Tool::levelSetToMesh()
 {
   const std::string &action_name = mParser.getAction().names[0];
@@ -2253,10 +2328,11 @@ void Tool::levelSetToMesh()
 
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("levelSetToMesh: no level set grid with age "+std::to_string(age));
-    if (mParser.verbose) mTimer.start("SDF -> mesh");
+    if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("levelSetToMesh: no level set with age "+std::to_string(age));
+    if (mParser.verbose) mTimer.start("VDB -> mesh");
 
     tools::VolumeToMesh mesher(iso, adaptivity, /*relaxDisorientedTriangles*/true);
+
     if (mask >= 0) {
       auto base = *this->getGrid(mask);// might throw
       if (base->isType<BoolGrid>()) {
@@ -2282,6 +2358,55 @@ void Tool::levelSetToMesh()
     throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::levelSetToMesh
+
+// ==============================================================================================================
+
+void Tool::fogToMesh()
+{
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "fog2mesh");
+  try {
+    mParser.printAction();
+    const double adaptivity = mParser.get<float>("adapt");
+    const double iso = mParser.get<float>("iso");
+    const int age = mParser.get<int>("vdb");
+    const int mask = mParser.get<int>("mask");
+    const bool invert = mParser.get<bool>("invert");
+    const bool keep = mParser.get<bool>("keep");
+    std::string grid_name = mParser.get<std::string>("name");
+
+    auto it = this->getGrid(age);
+    GridT::Ptr grid = gridPtrCast<GridT>(*it);
+    if (!grid || grid->getGridClass() != GRID_FOG_VOLUME) throw std::invalid_argument("fogToMesh: no level set with age "+std::to_string(age));
+    if (mParser.verbose) mTimer.start("VDB -> mesh");
+
+    tools::VolumeToMesh mesher(iso, adaptivity, /*relaxDisorientedTriangles*/true);
+
+    if (mask >= 0) {
+      auto base = *this->getGrid(mask);// might throw
+      if (base->isType<BoolGrid>()) {
+        mesher.setSurfaceMask(base, invert);
+      } else if (base->isType<FloatGrid>()) {
+        mesher.setSurfaceMask(tools::interiorMask(*gridPtrCast<FloatGrid>(base), 0.0), invert);
+      } else if (base->isType<Vec3fGrid>()) {
+        mesher.setSurfaceMask(tools::interiorMask(*gridPtrCast<Vec3fGrid>(base)), invert);
+      } else {
+        throw std::invalid_argument("fogToMesh: unsupported mask type with age "+std::to_string(mask));
+      }
+    }
+    mesher(*grid);
+    Geometry::Ptr geom = this->mesherToGeometry(mesher);
+
+    if (!keep) mGrid.erase(std::next(it).base());
+    if (grid_name.empty()) grid_name = "fog2mesh_"+grid->getName();
+    geom->setName(grid_name);
+    mGeom.push_back(geom);
+
+    if (mParser.verbose) mTimer.stop();
+  } catch (const std::exception& e) {
+    throw std::invalid_argument(action_name+": "+e.what());
+  }
+}// Tool::folToMesh
 
 // ==============================================================================================================
 
