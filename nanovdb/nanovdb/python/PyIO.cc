@@ -39,7 +39,7 @@ void defineFileGridMetaData(nb::module_& m)
         .def_prop_ro("tileCount",
                      [](io::FileMetaData& metaData) { return std::make_tuple(metaData.tileCount[0], metaData.tileCount[1], metaData.tileCount[2]); })
         .def_ro("codec", &io::FileMetaData::codec)
-        .def_ro("padding", &io::FileMetaData::padding)
+        .def_ro("blindDataCount", &io::FileMetaData::blindDataCount)
         .def_ro("version", &io::FileMetaData::version);
 
     nb::bind_vector<std::vector<io::FileMetaData>>(m, "FileMetaDataVector");

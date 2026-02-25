@@ -20,9 +20,9 @@ template<typename BufferT> void defineNanoToOpenVDB(nb::module_& m)
 #ifdef NANOVDB_USE_OPENVDB
     // Wrap nanoToOpenVDB into a lambda to workaround an MSVC compiler bug
     m.def(
-        "nanoToOpenVDB", [](GridHandle<BufferT>& handle, int verbose, uint32_t n){
-            return tools::nanoToOpenVDB<BufferT>(handle, verbose, n);
-        }, "handle"_a, "verbose"_a = 0, "n"_a = 0);
+        "nanoToOpenVDB", [](GridHandle<BufferT>& handle, uint32_t n){
+            return tools::nanoToOpenVDB<BufferT>(handle, n);
+        }, "handle"_a, "n"_a = 0);
 #endif
 }
 
