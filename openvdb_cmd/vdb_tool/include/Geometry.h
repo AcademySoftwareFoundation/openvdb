@@ -105,18 +105,20 @@ public:
     void clear();
 
     // Reads all the vertices in the file and treats them as Geometry
-    void write(const std::string &fileName) const;
+    void write(const std::string &fileName, bool ascii = false) const;
     void writeOBJ(const std::string &fileName) const;
     void writeOFF(const std::string &fileName) const;
-    void writePLY(const std::string &fileName, bool binary = true) const;
+    void writePLY(const std::string &fileName, bool ascii = false) const;
     void writeSTL(const std::string &fileName) const;
     void writeGEO(const std::string &fileName) const;
     void writeABC(const std::string &fileName) const;
 
-    void writeOBJ(std::ostream &os) const;
-    void writeOFF(std::ostream &os) const;
-    void writePLY(std::ostream &os, bool binary = true) const;
-    void writeSTL(std::ostream &os) const;
+    size_t writeGEO(std::ostream &os) const;
+    OPENVDB_DEPRECATED size_t write(std::ostream &os) {return this->writeGEO(os);}
+    void   writeOBJ(std::ostream &os) const;
+    void   writeOFF(std::ostream &os) const;
+    void   writePLY(std::ostream &os, bool ascii = false) const;
+    void   writeSTL(std::ostream &os) const;
 
     void read(const std::string &fileName, int verbose = 0);
     void readOBJ(const std::string &fileName);
@@ -131,10 +133,12 @@ public:
     void readVDB(const std::string &fileName);
     void readNVDB(const std::string &fileName);
 
-    void readOBJ(std::istream &is);
-    void readOFF(std::istream &is);
-    void readPLY(std::istream &is);
-    void readXYZ(std::istream &is);
+    size_t readGEO(std::istream &is);
+    OPENVDB_DEPRECATED size_t read(std::istream &is) {return this->readGEO(is);}
+    void   readOBJ(std::istream &is);
+    void   readOFF(std::istream &is);
+    void   readPLY(std::istream &is);
+    void   readXYZ(std::istream &is);
 
     size_t vtxCount() const { return mVtx.size(); }
     size_t triCount() const { return mTri.size(); }
@@ -156,9 +160,6 @@ public:
     void setName(const std::string &name) { mName = name; }
 
     void print(size_t n = 0, std::ostream& os = std::cerr) const;
-
-    size_t write(std::ostream &os) const;
-    size_t read(std::istream &is);
 
     static std::vector<Vec3I> triangulate(const std::vector<int> &nGon);
 
@@ -192,7 +193,7 @@ struct Geometry::Header
     uint64_t size() const { return sizeof(*this) + name + sizeof(BBoxT) + sizeof(PosT)*vtx + sizeof(Vec3I)*tri + sizeof(Vec4I)*quad;}
 };// Geometry::Header
 
-size_t Geometry::write(std::ostream &os) const
+size_t Geometry::writeGEO(std::ostream &os) const
 {
     Header header(*this);// followed by name, bbox, vtx, tri, quad
     os.write((const char*)&header, sizeof(Header));
@@ -204,7 +205,7 @@ size_t Geometry::write(std::ostream &os) const
     return header.size();
 }// Geometry::write
 
-size_t Geometry::read(std::istream &is)
+size_t Geometry::readGEO(std::istream &is)
 {
     Header header;
     if (!is.read((char*)&header, sizeof(Header)) || header.magic != Header::sMagic) {
@@ -259,7 +260,7 @@ float Geometry::maxLength() const
     return bbox.extents()[bbox.maxExtent()];
 }
 
-void Geometry::write(const std::string &fileName) const
+void Geometry::write(const std::string &fileName, bool ascii) const
 {
     switch (findFileExt(fileName, {"geo", "obj", "ply", "stl", "abc", "off"})) {
     case 1:
@@ -269,7 +270,7 @@ void Geometry::write(const std::string &fileName) const
         this->writeOBJ(fileName);
         break;
     case 3:
-        this->writePLY(fileName);
+        this->writePLY(fileName, ascii);
         break;
     case 4:
         this->writeSTL(fileName);
@@ -285,25 +286,25 @@ void Geometry::write(const std::string &fileName) const
     }
 }// Geometry::write
 
-void Geometry::writePLY(const std::string &fileName, bool binary) const
+void Geometry::writePLY(const std::string &fileName, bool ascii) const
 {
     if (fileName == "stdout.ply") {
         //if (isatty(fileno(stdout))) throw std::invalid_argument("writePLY: stdout is not connected to the terminal!");
-        this->writePLY(std::cout, binary);
+        this->writePLY(std::cout, ascii);
     } else {
         std::ofstream outfile(fileName, std::ios_base::binary);
         if (!outfile.is_open()) throw std::invalid_argument("Error writing to ply file \""+fileName+"\"");
-        this->writePLY(outfile, binary);
+        this->writePLY(outfile, ascii);
     }
 }// Geometry::writePLY
 
-void Geometry::writePLY(std::ostream &os, bool binary) const
+void Geometry::writePLY(std::ostream &os, bool ascii) const
 {
     os << "ply\nformat ";
-    if (binary) {
-        os << "binary_" << (isLittleEndian() ? "little" : "big") << "_endian 1.0\n";
-    } else {
+    if (ascii) {
         os << "ascii 1.0\n";
+    } else {
+        os << "binary_" << (isLittleEndian() ? "little" : "big") << "_endian 1.0\n";
     }
     os << "comment created by vdb_tool" << std::endl;
     os << "element vertex " << mVtx.size() << std::endl;
@@ -314,7 +315,11 @@ void Geometry::writePLY(std::ostream &os, bool binary) const
     os << "property list uchar int vertex_index\n";
     os << "end_header\n";
     static_assert(sizeof(Vec3s) == 3 * sizeof(float), "Unexpected sizeof(Vec3s)");
-    if (binary) {
+    if (ascii) {
+        for (auto &v : mVtx)  os << v[0] << " " << v[1] << " " << v[2] << "\n";
+        for (auto &t : mTri)  os << "3 " << t[0] << " " << t[1] << " " << t[2] << "\n";
+        for (auto &q : mQuad) os << "4 " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << "\n";
+    } else {// binary
         os.write((const char *)mVtx.data(), mVtx.size() * 3 * sizeof(float));// write x,y,z vertex coordinates
         auto writeFaces = [](std::ostream &os, const uint32_t *faces, size_t count, uint8_t n) {
             if (count==0) return;
@@ -330,10 +335,6 @@ void Geometry::writePLY(std::ostream &os, bool binary) const
         };
         writeFaces(os, (const uint32_t*)mTri.data(),  mTri.size(),  3);
         writeFaces(os, (const uint32_t*)mQuad.data(), mQuad.size(), 4);
-    } else {// ascii
-        for (auto &v : mVtx)  os << v[0] << " " << v[1] << " " << v[2] << "\n";
-        for (auto &t : mTri)  os << "3 " << t[0] << " " << t[1] << " " << t[2] << "\n";
-        for (auto &q : mQuad) os << "4 " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << "\n";
     }
 }// Geometry::writePLY
 
@@ -414,11 +415,11 @@ void Geometry::writeGEO(const std::string &fileName) const
 {
     if (fileName == "stdout.geo") {
         //if (isatty(fileno(stdout))) throw std::invalid_argument("writeGEO: stdout is not connected to the terminal!");
-        this->write(std::cout);
+        this->writeGEO(std::cout);
     } else {
         std::ofstream outfile(fileName, std::ios::out | std::ios_base::binary);
         if (!outfile.is_open()) throw std::invalid_argument("Error writing to geo file \""+fileName+"\"");
-        this->write(outfile);
+        this->writeGEO(outfile);
     }
 }// Geometry::writeGEO
 
@@ -880,11 +881,11 @@ void Geometry::readGEO(const std::string &fileName)
 {
     if (fileName == "stdin.geo") {
         //if (isatty(fileno(stdin))) throw std::invalid_argument("readGEO: stdin is not connected to the terminal!");
-        this->read(std::cin);
+        this->readGEO(std::cin);
     } else {
         std::ifstream infile(fileName, std::ios::in | std::ios_base::binary);
         if (!infile.is_open()) throw std::invalid_argument("Error opening geo file \""+fileName+"\"");
-        this->read(infile);
+        this->readGEO(infile);
     }
 }//  Geometry::readGEO
 

@@ -15,7 +15,7 @@
 ///
 /// @warning All prints are directed to cerr since cout is used for piping!
 ///
-/// @todo expose LevelSetMeasure, write binary/ascii, mesh2offset
+/// @todo expose LevelSetMeasure and add mesh2offset
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -413,6 +413,7 @@ void Tool::init()
      {"absolute", "true", "1|0|true|false", "toggle absolute or relative error tolerance during quantization of NanoVDBs. Only used if bits=N. Defaults to absolute"},// absolute or relative error for N bits in NVDB
      {"tolerance", "-1", "1.0", "absolute or relative error tolerance used during quantization of NanoVDBs. Only used if bits=N."},// error tolerance for N bits in NVDB
      {"stats", "", "none|bbox|extrema|all", "specify the statistics to compute for NanoVDBs."},
+     {"ascii", "false", "1|0|true|false", "for ascii vs binary output format when available (e.g. for ply files). Defaults to false, i.e. binary is preferred over ascii when available"},
      {"checksum", "", "none|partial|full", "specify the type of checksum to compute for NanoVDBs"}},
      [&](){mParser.setDefaults();}, [&](){this->write();}, 0);// anonymous options are treated as to the first option,i.e. "files"
 
@@ -1443,11 +1444,12 @@ void Tool::writeGeo(const std::string &fileName)
   OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
   const int age = mParser.get<int>("geo");
   const bool keep = mParser.get<bool>("keep");
+  const bool ascii = mParser.get<bool>("ascii");
   if (mParser.verbose>1) std::cerr << "Writing geometry to \"" << fileName << "\"\n";
   auto it = this->getGeom(age);
   const Geometry &mesh = **it;
   if (mParser.verbose) mTimer.start("Write geometry");
-  mesh.write(fileName);
+  mesh.write(fileName, ascii);
   if (!keep) mGeom.erase(std::next(it).base());
   if (mParser.verbose) mTimer.stop();
 }// Tool::writeGeo

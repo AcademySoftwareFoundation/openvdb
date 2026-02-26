@@ -1,9 +1,9 @@
 vdb_tool:
 
   New Features:
-  - Added new action "soup2ls/soup2sdf", which generates a level set from a soup of polygons.
-  - Added new action "files" that visits files in a directory structure which matches extensions or patterns
-  - Added new action "mesh2udf", which generates a symmetric narrow band of unsigned distances to a mesh.
+  - Added new action "-soup2ls/soup2sdf", which generates a level set from a soup of polygons.
+  - Added new action "-files" that visits files in a directory structure which matches extensions or patterns
+  - Added new action "-mesh2udf", which generates a symmetric narrow band of unsigned distances to a mesh.
   - Added new action -quat2tri/q2t, which triangulates all quads in a mesh.
   - Added new action -vol2mesh, which converts s scalar volumes into an adaptive polygon mesh.
   - Added new action -fog2vol, which converts a fog volumes into an adaptive polygon mesh.

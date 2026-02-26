@@ -405,7 +405,7 @@ TEST_F(Test_vdb_tool, Geometry)
   std::string buffer;
   {// test streaming to buffer
     std::ostringstream os(std::ios_base::binary);
-    const size_t size = geo.write(os);
+    const size_t size = geo.writeGEO(os);
     EXPECT_TRUE(size>0);
     buffer = os.str();
     EXPECT_EQ(size, buffer.size());
@@ -413,7 +413,7 @@ TEST_F(Test_vdb_tool, Geometry)
   {// test streaming from buffer
     std::istringstream is(buffer, std::ios_base::binary);
     openvdb::vdb_tool::Geometry geo2;
-    EXPECT_EQ(buffer.size(), geo2.read(is));
+    EXPECT_EQ(buffer.size(), geo2.readGEO(is));
     EXPECT_EQ(4, geo2.vtxCount());
     EXPECT_EQ(2, geo2.triCount());
     EXPECT_EQ(1, geo2.quadCount());
@@ -432,12 +432,12 @@ TEST_F(Test_vdb_tool, Geometry)
   }
   {// write to file
     std::ofstream os("data/test.geo", std::ios_base::binary);
-    EXPECT_TRUE(geo.write(os));
+    EXPECT_TRUE(geo.writeGEO(os));
   }
   {// read from file
     std::ifstream is("data/test.geo", std::ios_base::binary);
     openvdb::vdb_tool::Geometry geo2;
-    EXPECT_TRUE(geo2.read(is));
+    EXPECT_TRUE(geo2.readGEO(is));
     EXPECT_EQ(4, geo2.vtxCount());
     EXPECT_EQ(2, geo2.triCount());
     EXPECT_EQ(1, geo2.quadCount());
