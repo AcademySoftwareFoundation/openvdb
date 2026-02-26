@@ -339,8 +339,12 @@ class TestGridHandleExchange(unittest.TestCase):
         self.assertEqual(handle.gridCount(), 1)
         self.assertIsNotNone(handle.doubleGrid())
         handles = [handle, handle]
-        dstFile = tempfile.NamedTemporaryFile()
-        nanovdb.io.writeGrids(dstFile.name, handles)
+        dstFile = tempfile.NamedTemporaryFile(delete=False)
+        dstFile.close()
+        try:
+            nanovdb.io.writeGrids(dstFile.name, handles)
+        finally:
+            os.unlink(dstFile.name)
 
 
 class TestReadWriteGrids(unittest.TestCase):
@@ -349,10 +353,16 @@ class TestReadWriteGrids(unittest.TestCase):
         sphereHandle = nanovdb.tools.createLevelSetSphere(
             nanovdb.GridType.Float, name=self.gridName
         )
-        self.srcFile = tempfile.NamedTemporaryFile()
+        self.srcFile = tempfile.NamedTemporaryFile(delete=False)
+        self.srcFile.close()
         nanovdb.io.writeGrid(self.srcFile.name, sphereHandle)
         nanovdb.io.writeGrid(self.srcFile.name, sphereHandle)
-        self.dstFile = tempfile.NamedTemporaryFile()
+        self.dstFile = tempfile.NamedTemporaryFile(delete=False)
+        self.dstFile.close()
+
+    def tearDown(self):
+        os.unlink(self.srcFile.name)
+        os.unlink(self.dstFile.name)
 
     def test_metadata(self):
         metadataList = nanovdb.io.readGridMetaData(self.srcFile.name)
@@ -371,7 +381,7 @@ class TestReadWriteGrids(unittest.TestCase):
             self.assertIsInstance(metadata.nodeCount, tuple)
             self.assertIsInstance(metadata.tileCount, tuple)
             self.assertEqual(metadata.codec, nanovdb.io.Codec.NONE)
-            self.assertEqual(metadata.padding, 0)
+            self.assertEqual(metadata.blindDataCount, 0)
             self.assertEqual(metadata.version, nanovdb.Version())
 
     def test_read_write_grid(self):
@@ -422,10 +432,16 @@ class TestDeviceReadWriteGrids(unittest.TestCase):
         sphereHandle = nanovdb.tools.cuda.createLevelSetSphere(
             nanovdb.GridType.Float, name=self.gridName
         )
-        self.srcFile = tempfile.NamedTemporaryFile()
+        self.srcFile = tempfile.NamedTemporaryFile(delete=False)
+        self.srcFile.close()
         nanovdb.io.deviceWriteGrid(self.srcFile.name, sphereHandle)
         nanovdb.io.deviceWriteGrid(self.srcFile.name, sphereHandle)
-        self.dstFile = tempfile.NamedTemporaryFile()
+        self.dstFile = tempfile.NamedTemporaryFile(delete=False)
+        self.dstFile.close()
+
+    def tearDown(self):
+        os.unlink(self.srcFile.name)
+        os.unlink(self.dstFile.name)
 
     def test_metadata(self):
         metadataList = nanovdb.io.readGridMetaData(self.srcFile.name)
@@ -444,7 +460,7 @@ class TestDeviceReadWriteGrids(unittest.TestCase):
             self.assertIsInstance(metadata.nodeCount, tuple)
             self.assertIsInstance(metadata.tileCount, tuple)
             self.assertEqual(metadata.codec, nanovdb.io.Codec.NONE)
-            self.assertEqual(metadata.padding, 0)
+            self.assertEqual(metadata.blindDataCount, 0)
             self.assertEqual(metadata.version, nanovdb.Version())
 
     def test_read_write_grid(self):
