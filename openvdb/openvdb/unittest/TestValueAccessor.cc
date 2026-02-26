@@ -432,29 +432,29 @@ TestValueAccessor::multithreadedAccessorTest()
 }
 
 /// Static assert class sizes
-template <typename Type, size_t Expect, size_t Actual = sizeof(Type)>
-struct CheckClassSize { static_assert(Expect == Actual); };
+template <typename Type, bool Flag>
+struct CheckBypassLeafAPI { static_assert(Type::BypassLeafAPI == Flag); };
 
 // Build a type list of all accessor types and make sure they are all the
 // expected size.
-template <typename GridT> using GridToAccCheckA =
-    CheckClassSize<typename GridT::Accessor, 96ul>;
-template <typename GridT> using GridToAccCheckB =
-    CheckClassSize<typename GridT::Accessor, 88ul>;
+template <typename GridT> using GridAccBypasses =
+    CheckBypassLeafAPI<typename GridT::Accessor, true>;
+template <typename GridT> using GridAccDoesNotBypasses =
+    CheckBypassLeafAPI<typename GridT::Accessor, false>;
 
 void StaticAsssertVASizes()
 {
-    // Accessors with a leaf buffer cache have an extra pointer
+    // Accessors with a leaf buffer cache
     using AccessorsWithLeafCache =
         openvdb::GridTypes
             ::Remove<openvdb::BoolGrid>
             ::Remove<openvdb::MaskGrid>
-            ::Transform<GridToAccCheckA>;
+            ::Transform<GridAccBypasses>;
 
     // Accessors without a leaf buffer cache
     using AccessorsWithoutLeafCache =
         openvdb::TypeList<openvdb::BoolGrid, openvdb::MaskGrid>
-            ::Transform<GridToAccCheckB>;
+            ::Transform<GridAccDoesNotBypasses>;
 
     // instantiate these types to force the static check
     [[maybe_unused]] AccessorsWithLeafCache::AsTupleList test;
