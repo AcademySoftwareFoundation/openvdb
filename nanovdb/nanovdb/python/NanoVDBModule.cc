@@ -296,10 +296,26 @@ bool isCudaAvailable()
 #endif
 }
 
+bool isGpuAvailable()
+{
+#ifdef NANOVDB_USE_CUDA
+    int deviceCount = 0;
+    cudaError_t err = cudaGetDeviceCount(&deviceCount);
+    if (err != cudaSuccess) {
+        cudaGetLastError();
+        return false;
+    }
+    return deviceCount > 0;
+#else
+    return false;
+#endif
+}
+
 NB_MODULE(nanovdb, m)
 {
     m.doc() = "Python module for NanoVDB";
     m.def("isCudaAvailable", &isCudaAvailable, "Returns whether or not the module was compiled with CUDA support");
+    m.def("isGpuAvailable", &isGpuAvailable, "Returns whether a CUDA-capable GPU is available at runtime");
 
     nb::enum_<GridType>(m, "GridType")
         .value("Unknown", GridType::Unknown)

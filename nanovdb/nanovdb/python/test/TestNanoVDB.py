@@ -400,6 +400,9 @@ class TestReadWriteGrids(unittest.TestCase):
 @unittest.skipIf(
     not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
 )
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
+)
 class TestDeviceReadWriteGrids(unittest.TestCase):
     def setUp(self):
         self.gridName = "sphere_ls"
@@ -482,6 +485,9 @@ class TestDeviceReadWriteGrids(unittest.TestCase):
 @unittest.skipIf(
     not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
 )
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
+)
 class TestPointsToGrid(unittest.TestCase):
     def test_points_to_grid(self):
         try:
@@ -505,6 +511,9 @@ class TestPointsToGrid(unittest.TestCase):
 
 @unittest.skipIf(
     not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
+)
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
 )
 class TestSignedFloodFill(unittest.TestCase):
     def test_signed_flood_fill_float(self):
@@ -570,6 +579,9 @@ class TestSignedFloodFill(unittest.TestCase):
 
 @unittest.skipIf(
     not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
+)
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
 )
 class TestSampleFromPoints(unittest.TestCase):
     def test_sample_from_points_float(self):
