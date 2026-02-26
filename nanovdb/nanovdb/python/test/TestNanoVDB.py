@@ -8,6 +8,12 @@ import os
 if 'add_dll_directory' in dir(os):
     config = os.path.basename(os.getcwd())
     os.add_dll_directory(os.getcwd() + '\\..\\..\\..\\..\\openvdb\\openvdb\\' + config)
+    for p in os.environ.get('PATH', '').split(os.pathsep):
+        if os.path.isdir(p):
+            try:
+                os.add_dll_directory(p)
+            except OSError:
+                pass
 
 import nanovdb
 import unittest
