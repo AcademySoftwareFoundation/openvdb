@@ -2,6 +2,13 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: Apache-2.0
 
+import os
+
+# If on Windows, add required dll directories from our binary build tree
+if 'add_dll_directory' in dir(os):
+    config = os.path.basename(os.getcwd())
+    os.add_dll_directory(os.getcwd() + '\\..\\..\\..\\..\\openvdb\\openvdb\\' + config)
+
 import nanovdb
 import unittest
 import tempfile
