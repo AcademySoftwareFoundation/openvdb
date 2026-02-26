@@ -138,7 +138,7 @@ jobs:
         \'
     - name: test
       shell: bash
-      run: cd build && ctest -V -E ".*cuda.*|.*mgpu.*"
+      run: cd build && ctest -V -C Release -E ".*cuda.*|.*mgpu.*"
 
   macos-nanovdb:
     if: |
