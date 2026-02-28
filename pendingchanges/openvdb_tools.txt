@@ -1,5 +1,5 @@
 tools:
 
   New Features:
-  - Added a new tool PolySoupToLevelSet that generates a LOD family of watertight shrink wrap
+  - Added a new tool PolySoupToLevelSet, which generates a LOD family of watertight shrink wrap
     surfaces from a soup of polygons.

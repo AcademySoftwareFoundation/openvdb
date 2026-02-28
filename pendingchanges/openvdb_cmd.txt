@@ -2,22 +2,22 @@ vdb_tool:
 
   New Features:
   - Added new action "-soup2ls/soup2sdf", which generates a level set from a soup of polygons.
-  - Added new action "-files" that visits files in a directory structure which matches extensions or patterns
+  - Added new action "-files", which (recursively) visits files in a directory structure that matches extensions or patterns
   - Added new action "-mesh2udf", which generates a symmetric narrow band of unsigned distances to a mesh.
-  - Added new action -quat2tri/q2t, which triangulates all quads in a mesh.
-  - Added new action -vol2mesh, which converts s scalar volumes into an adaptive polygon mesh.
-  - Added new action -fog2vol, which converts a fog volumes into an adaptive polygon mesh.
-  - Added new action -slice, which generates one or more images of axis-aligned slices through a scalar grid.
-  - Added triangulation of N-gons to readOBJ and readSTL, assuming they are convex.
+  - Added new action "-quat2tri/q2t", which triangulates all quads in a mesh.
+  - Added new action "-vol2mesh", which converts a scalar volume into an adaptive polygon mesh.
+  - Added new action "-fog2vol", which converts a fog volume into an adaptive polygon mesh.
+  - Added new action "-slice", which generates one or more images of axis-aligned slices through a scalar grid.
+  - Added triangulation of N-gons to Geometry::readOBJ and Geometry::readSTL, assuming they are convex.
   - Added read support for xyz files.
 
   Improvements:
-  - Action "mesh2ls/mesh2sdf" now supports generation of asymmetric narrow bands.
+  - Action "-mesh2ls/mesh2sdf" now supports generation of asymmetric narrow bands.
   - Improved error reporting when using unsupported actions and options.
   - Actions can now have multiple names, e.g. "-read", "-import, "-load", "-i".
-  - Added cutoff option to existing ls2fog action.
+  - Added cutoff option to "-ls2fog" action.
 
   Fixes:
-  - Fixed issues in readSTL so it works on all files in Thingi10K.
+  - Fixed issues in Geometry::readSTL so it works on all files in Thingi10K.
   - Fixed bug when reading ascii ply files and off files with normals.
-  - Fixed several typos in vdb_tool.
+  - Fixed several typos in the documentation of vdb_tool.
