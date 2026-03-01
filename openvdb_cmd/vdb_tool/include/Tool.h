@@ -2624,57 +2624,39 @@ void Tool::slice()
     }
 
     tools::Film film(image[0], image[1]);
-    const float s = 1.0f/255.0f;
-
     const tbb::blocked_range2d<int> range(0, image[0], 0 , image[1]);
-    for (float x : X) {
-      tbb::parallel_for(range, [&](const auto &r){
-        Vec3R ijk(x*(dim[0]+1) + bbox.min()[0], 0, 0);
-        auto acc = grid->getAccessor();
-        for (auto i=r.rows().begin(); i!=r.rows().end(); ++i) {
-          ijk[1] = i/float(image[0])*(dim[1]+1) + bbox.min()[1];
-          for (int j=r.cols().begin(); j<r.cols().end(); ++j) {
-            ijk[2] = j/float(image[1])*(dim[2]+1) + bbox.min()[2];
-            const float v = tools::BoxSampler::sample(acc, ijk);
-            const uint8_t n = uint8_t(255.0f*(v - ex.min())/(ex.max() - ex.min()));
-            film.pixel(i,j) = tools::Film::RGBA(s*LUT[n][0], s*LUT[n][1], s*LUT[n][2]);
-          }
+    Vec3R xyz;
+
+    auto mySample = [&](const auto &r, int a, int b) {
+      const float s = 1.0f/255.0f;
+      Vec3R ijk = xyz;// thread local copy
+      auto acc = grid->getAccessor();// thread local copy
+      for (auto i=r.rows().begin(); i!=r.rows().end(); ++i) {
+        ijk[a] = i/float(image[0])*(dim[a]+1) + bbox.min()[a];
+        for (int j=r.cols().begin(); j<r.cols().end(); ++j) {
+          ijk[b] = j/float(image[1])*(dim[b]+1) + bbox.min()[b];
+          const float v = tools::BoxSampler::sample(acc, ijk);
+          const uint8_t n = uint8_t(255.0f*(v - ex.min())/(ex.max() - ex.min()));
+          film.pixel(i,j) = tools::Film::RGBA(s*LUT[n][0], s*LUT[n][1], s*LUT[n][2]);
         }
-      });
+      }
+    };// mySample
+
+    for (float x : X) {
+      xyz[0] = x*(dim[0]+1) + bbox.min()[0];
+      tbb::parallel_for(range, [&](const auto &r){mySample(r, 1, 2);});
       film.savePPM(file + "_X_" + std::to_string(x)+ ".ppm");
     }
 
     for (float y : Y) {
-      tbb::parallel_for(range, [&](const auto &r){
-        Vec3R ijk(0, y*(dim[1]+1) + bbox.min()[1], 0);
-        auto acc = grid->getAccessor();
-        for (auto i=r.rows().begin(); i!=r.rows().end(); ++i) {
-          ijk[0] = i/float(image[0])*(dim[0]+1) + bbox.min()[0];
-          for (int j=r.cols().begin(); j<r.cols().end(); ++j) {
-            ijk[2] = j/float(image[1])*(dim[2]+1) + bbox.min()[2];
-            const float v = tools::BoxSampler::sample(acc, ijk);
-            const uint8_t n = uint8_t(255.0f*(v - ex.min())/(ex.max() - ex.min()));
-            film.pixel(i,j) = tools::Film::RGBA(s*LUT[n][0], s*LUT[n][1], s*LUT[n][2]);
-          }
-        }
-      });
+      xyz[1] = y*(dim[1]+1) + bbox.min()[1];
+      tbb::parallel_for(range, [&](const auto &r){mySample(r, 0, 2);});
       film.savePPM(file + "_Y_" + std::to_string(y)+ ".ppm");
     }
 
     for (float z : Z) {
-      tbb::parallel_for(range, [&](const auto &r){
-        Vec3R ijk(0, 0, z*(dim[2]+1) + bbox.min()[2]);
-        auto acc = grid->getAccessor();
-        for (auto i=r.rows().begin(); i!=r.rows().end(); ++i) {
-          ijk[0] = i/float(image[0])*(dim[0]+1) + bbox.min()[0];
-          for (int j=r.cols().begin(); j<r.cols().end(); ++j) {
-            ijk[1] = j/float(image[1])*(dim[1]+1) + bbox.min()[1];
-            const float v = tools::BoxSampler::sample(acc, ijk);
-            const uint8_t n = uint8_t(255.0f*(v - ex.min())/(ex.max() - ex.min()));
-            film.pixel(i,j) = tools::Film::RGBA(s*LUT[n][0], s*LUT[n][1], s*LUT[n][2]);
-          }
-        }
-      });
+      xyz[2] = z*(dim[2]+1) + bbox.min()[2];
+      tbb::parallel_for(range, [&](const auto &r){mySample(r, 0, 1);});
       film.savePPM(file + "_Z_" + std::to_string(z)+ ".ppm");
     }
 
