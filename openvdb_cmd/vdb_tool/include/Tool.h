@@ -2589,11 +2589,12 @@ void Tool::scatter()
 
 void Tool::slice()
 {
-  struct Slices {
+  using RangeT = tbb::blocked_range2d<int>;
+  struct Axis {
     const std::string label;
-    const VecF        frac;
-    const Vec3I       axis;
-    Slices(const Parser &p, std::string s, int i, int j, int k) : label(s), frac(p.getVec<float>(s)), axis(i,j,k) {}
+    const VecF        slices;
+    const Vec3I       abc;// indics of the three axis
+    Axis(const Parser &p, std::string s, int i, int j, int k) : label(s), slices(p.getVec<float>(s)), abc(i,j,k) {}
   };
   const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "slice");
@@ -2603,7 +2604,8 @@ void Tool::slice()
     const bool keep = mParser.get<bool>("keep");
     const std::string file = mParser.get<std::string>("file");
     const VecI image = mParser.getVec<int>("image", "x");
-    std::vector<Slices> slices = {{mParser, "X", 0, 1, 2}, {mParser, "Y", 1, 0, 2}, {mParser, "Z", 2, 0, 1}};
+    std::vector<Axis> axes = {{mParser, "X", 0, 1, 2}, {mParser, "Y", 1, 0, 2}, {mParser, "Z", 2, 0, 1}};
+
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid) throw std::invalid_argument("slice: no float grid with age "+std::to_string(age));
@@ -2627,31 +2629,26 @@ void Tool::slice()
     }
 
     tools::Film film(image[0], image[1]);
-    const tbb::blocked_range2d<int> range(0, image[0], 0 , image[1]);
-    Vec3R xyz;
-
-    auto mySample = [&](const auto &r, int a, int b) {
-      constexpr float s = 1.0f/255.0f;
-      Vec3R ijk = xyz;// thread local copy
-      auto acc = grid->getAccessor();// thread local copy
-      for (auto i=r.rows().begin(); i!=r.rows().end(); ++i) {
-        ijk[a] = i/float(image[0])*(dim[a]+1) + bbox.min()[a];
-        for (int j=r.cols().begin(); j<r.cols().end(); ++j) {
-          ijk[b] = j/float(image[1])*(dim[b]+1) + bbox.min()[b];
-          const float v = tools::BoxSampler::sample(acc, ijk);
-          const uint8_t n = uint8_t(255.0f*(v - ex.min())/(ex.max() - ex.min()));
-          film.pixel(i,j) = tools::Film::RGBA(s*LUT[n][0], s*LUT[n][1], s*LUT[n][2]);
-        }
-      }
-    };// mySample
-
-    for (const Slices &s : slices) {
-      for (float d : s.frac) {
-        xyz[s.axis[0]] = d*(dim[s.axis[0]]+1) + bbox.min()[s.axis[0]];
-        tbb::parallel_for(range, [&](const auto &r){mySample(r, s.axis[1], s.axis[2]);});
-        film.savePPM(file + s.label + std::to_string(d)+ ".ppm");
-      }
-    }
+    for (const Axis &axis : axes) {
+      for (const float slice : axis.slices) {
+        tbb::parallel_for(RangeT(0, image[0], 0, image[1]), [&](const auto &range){
+          const int a = axis.abc[0], b = axis.abc[1], c = axis.abc[2];
+          Vec3R xyz;
+          xyz[a] = slice * (dim[a]+1) + bbox.min()[a];
+          auto acc = grid->getAccessor();// thread local copy
+          for (auto row=range.rows().begin(); row!=range.rows().end(); ++row) {
+            xyz[b] = row/float(image[0])*(dim[b]+1) + bbox.min()[b];
+            for (int col=range.cols().begin(); col<range.cols().end(); ++col) {
+              xyz[c] = col/float(image[1])*(dim[c]+1) + bbox.min()[c];
+              const float v = tools::BoxSampler::sample(acc, xyz);
+              const unsigned char *p = LUT[uint8_t(255.0f*(v - ex.min())/(ex.max() - ex.min()))];
+              film.pixel(row,col) = tools::Film::RGBA(p[0]/255.0f, p[1]/255.0f, p[2]/255.0f);
+            }// loop over colums in image
+          }// loop over rows in image
+        });// end parallel_for
+        film.savePPM(file + axis.label + std::to_string(slice)+ ".ppm");
+      }// loop over slices withing an axis (singular)
+    }// loop over axes (plural)
 
     if (!keep) mGrid.erase(std::next(it).base());
     if (mParser.verbose) mTimer.stop();
