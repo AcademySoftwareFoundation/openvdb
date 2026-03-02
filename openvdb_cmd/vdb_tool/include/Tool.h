@@ -2589,6 +2589,12 @@ void Tool::scatter()
 
 void Tool::slice()
 {
+  struct Slices {
+    const std::string label;
+    const VecF        frac;
+    const Vec3I       axis;
+    Slices(const Parser &p, std::string s, int i, int j, int k) : label(s), frac(p.getVec<float>(s)), axis(i,j,k) {}
+  };
   const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "slice");
   try {
@@ -2597,10 +2603,7 @@ void Tool::slice()
     const bool keep = mParser.get<bool>("keep");
     const std::string file = mParser.get<std::string>("file");
     const VecI image = mParser.getVec<int>("image", "x");
-    const VecF X = mParser.getVec<float>("X");
-    const VecF Y = mParser.getVec<float>("Y");
-    const VecF Z = mParser.getVec<float>("Z");
-
+    std::vector<Slices> slices = {{mParser, "X", 0, 1, 2}, {mParser, "Y", 1, 0, 2}, {mParser, "Z", 2, 0, 1}};
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid) throw std::invalid_argument("slice: no float grid with age "+std::to_string(age));
@@ -2628,7 +2631,7 @@ void Tool::slice()
     Vec3R xyz;
 
     auto mySample = [&](const auto &r, int a, int b) {
-      const float s = 1.0f/255.0f;
+      constexpr float s = 1.0f/255.0f;
       Vec3R ijk = xyz;// thread local copy
       auto acc = grid->getAccessor();// thread local copy
       for (auto i=r.rows().begin(); i!=r.rows().end(); ++i) {
@@ -2642,22 +2645,12 @@ void Tool::slice()
       }
     };// mySample
 
-    for (float x : X) {
-      xyz[0] = x*(dim[0]+1) + bbox.min()[0];
-      tbb::parallel_for(range, [&](const auto &r){mySample(r, 1, 2);});
-      film.savePPM(file + "_X_" + std::to_string(x)+ ".ppm");
-    }
-
-    for (float y : Y) {
-      xyz[1] = y*(dim[1]+1) + bbox.min()[1];
-      tbb::parallel_for(range, [&](const auto &r){mySample(r, 0, 2);});
-      film.savePPM(file + "_Y_" + std::to_string(y)+ ".ppm");
-    }
-
-    for (float z : Z) {
-      xyz[2] = z*(dim[2]+1) + bbox.min()[2];
-      tbb::parallel_for(range, [&](const auto &r){mySample(r, 0, 1);});
-      film.savePPM(file + "_Z_" + std::to_string(z)+ ".ppm");
+    for (const Slices &s : slices) {
+      for (float d : s.frac) {
+        xyz[s.axis[0]] = d*(dim[s.axis[0]]+1) + bbox.min()[s.axis[0]];
+        tbb::parallel_for(range, [&](const auto &r){mySample(r, s.axis[1], s.axis[2]);});
+        film.savePPM(file + s.label + std::to_string(d)+ ".ppm");
+      }
     }
 
     if (!keep) mGrid.erase(std::next(it).base());
