@@ -1333,7 +1333,7 @@ AttributeSet::Descriptor::write(std::ostream& os) const
 
     for (auto it = mNameMap.begin(), endIt = mNameMap.end(); it != endIt; ++it) {
         writeString(os, it->first);
-        os.write(reinterpret_cast<const char*>(&it->second), sizeof(Index64));
+        os.write(reinterpret_cast<const char*>(&it->second), sizeof(it->second));
     }
 
     const Index64 grouplength = Index64(mGroupMap.size());
@@ -1341,7 +1341,7 @@ AttributeSet::Descriptor::write(std::ostream& os) const
 
     for (auto groupIt = mGroupMap.cbegin(), endGroupIt = mGroupMap.cend(); groupIt != endGroupIt; ++groupIt) {
         writeString(os, groupIt->first);
-        os.write(reinterpret_cast<const char*>(&groupIt->second), sizeof(Index64));
+        os.write(reinterpret_cast<const char*>(&groupIt->second), sizeof(groupIt->second));
     }
 
     mMetadata.writeMeta(os);
@@ -1367,7 +1367,7 @@ AttributeSet::Descriptor::read(std::istream& is)
     for (Index64 n = 0; n < arraylength; ++n) {
         nameAndOffset.first = readString(is);
         if (!validName(nameAndOffset.first))  throw IoError("Attribute name contains invalid characters - " + nameAndOffset.first);
-        is.read(reinterpret_cast<char*>(&nameAndOffset.second), sizeof(Index64));
+        is.read(reinterpret_cast<char*>(&nameAndOffset.second), sizeof(nameAndOffset.second));
         mNameMap.insert(nameAndOffset);
     }
 
@@ -1377,7 +1377,7 @@ AttributeSet::Descriptor::read(std::istream& is)
     for (Index64 n = 0; n < grouplength; ++n) {
         nameAndOffset.first = readString(is);
         if (!validName(nameAndOffset.first))  throw IoError("Group name contains invalid characters - " + nameAndOffset.first);
-        is.read(reinterpret_cast<char*>(&nameAndOffset.second), sizeof(Index64));
+        is.read(reinterpret_cast<char*>(&nameAndOffset.second), sizeof(nameAndOffset.second));
         mGroupMap.insert(nameAndOffset);
     }
 
