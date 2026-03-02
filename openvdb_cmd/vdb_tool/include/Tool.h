@@ -239,6 +239,7 @@ private:
     /// @brief Scatters point into the active values of an input VDB grid
     void scatter();
 
+    /// @brief generates images of volume slices
     void slice();
 
     /// @brief apply affine transformations (uniform scale -> rotation -> translation) to a VDB grids and geometry
@@ -518,7 +519,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->levelSetToFog();});
 
   mParser.addAction(
-      {"points2ls", "p2l", "pts2sdf"}, "Convert geometry points into a narrow-band level set",
+     {"points2ls", "p2l", "pts2sdf"}, "Convert geometry points into a narrow-band level set",
     {{"dim", "", "256", "largest dimension in voxel units of the bbox of all the points (defaults to 256). If \"voxel\" is defined \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
@@ -529,7 +530,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->particlesToLevelSet();});
 
   mParser.addAction(
-      {"iso2ls", "lsRebuild", "i2l"}, "Convert an iso-surface of a scalar field into a level set (i.e. SDF)",
+     {"iso2ls", "lsRebuild", "i2l"}, "Convert an iso-surface of a scalar field into a level set (i.e. SDF)",
     {{"vdb", "0", "0,1", "age (i.e. stack index) of the VDB grid to be processed and an optional reference grid. Defaults to 0, i.e. most recently inserted VDB."},
      {"iso", "0.0", "0.0", "value of the iso-surface from which to compute the level set"},
      {"voxel", "", "0.0", "voxel size in world units (defaults to zero, i.e the transform out the output matches the input)"},
@@ -539,7 +540,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->isoToLevelSet();});
 
   mParser.addAction(
-      {"points2vdb", "p2v"}, "Encode geometry points into a VDB grid",
+     {"points2vdb", "p2v"}, "Encode geometry points into a VDB grid",
     {{"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"keep", "", "1|0|true|false", "toggle wether the input points are preserved or deleted after the processing"},
      {"ppv", "8", "8", "the number of points per voxel in the output VDB grid (defaults to 8)"},
@@ -548,14 +549,14 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->pointsToVdb();});
 
   mParser.addAction(
-      {"vdb2points", "v2p"}, "Extract points encoded in a VDB to points in a geometry format",
+     {"vdb2points", "v2p"}, "Extract points encoded in a VDB to points in a geometry format",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"name", "", "vdb2points_input", "specify the name of the resulting points (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->vdbToPoints();});
 
   mParser.addAction(
-      {"scatter"}, "Scatter point into the active values of an input VDB grid",
+     {"scatter"}, "Scatter point into the active values of an input VDB grid",
     {{"count", "0", "0", "fixed number of points to randomly scatter (disabled by default)"},
      {"density", "0.0", "0.0", "uniform density of points per active voxel (disabled by default)"},
      {"ppv", "8", "8", "number of points per active voxel (defaults to 8)"},
@@ -565,7 +566,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->scatter();});
 
   mParser.addAction(
-      {"platonic"}, "Create a level set shape with the specified number of polygon faces",
+     {"platonic"}, "Create a level set shape with the specified number of polygon faces",
     {{"dim", "", "256", "largest dimension in voxel units of the bbox of all the shape (defaults to 256). In \"voxel\" is defined \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"faces", "4", "{4|6|8|12|20}", "number of polygon faces of the shape to generate the level set VDB from"},
@@ -576,7 +577,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->levelSetPlatonic();});
 
   mParser.addAction(
-      {"enright"}, "Performs Enright advection benchmark test on a level set",
+     {"enright"}, "Performs Enright advection benchmark test on a level set",
     {{"translate", "(0,0,0)", "(0.0,0.0,0.0)", "defines the origin of the Enright velocity field"},
      {"scale", "1.0", "1.0", "defined the scale of the Enright velocity field"},
      {"dt", "0.05", "0.05", "time-step the input level set is advected"},
@@ -585,7 +586,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->enright();});
 
   mParser.addAction(
-      {"dilate", "dilateLS"}, "dilate level set surface by a fixed radius",
+     {"dilate", "dilateLS"}, "dilate level set surface by a fixed radius",
     {{"radius", "1.0", "1.0", "radius in voxel units by which the surface is dilated"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -593,7 +594,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->offsetLevelSet();});
 
   mParser.addAction(
-      {"erode", "erodeLS"}, "erode level set surface by a fixed radius",
+     {"erode", "erodeLS"}, "erode level set surface by a fixed radius",
     {{"radius", "1.0", "1.0", "radius in voxel units by which the surface is eroded"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -601,7 +602,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->offsetLevelSet();});
 
   mParser.addAction(
-      {"open", "openLS"}, "morphological opening, i.e. erosion followed by dilation, of a level set surface by a fixed radius",
+     {"open", "openLS"}, "morphological opening, i.e. erosion followed by dilation, of a level set surface by a fixed radius",
     {{"radius", "1.0", "1.0", "radius in voxel units by which the surface is opened"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -609,7 +610,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->offsetLevelSet();});
 
   mParser.addAction(
-      {"close", "closeLS"}, "morphological closing, i.e. dilation followed by erosion, of level set surface by a fixed radius",
+     {"close", "closeLS"}, "morphological closing, i.e. dilation followed by erosion, of level set surface by a fixed radius",
     {{"radius", "1.0", "1.0", "radius in voxel units by which the surface is closed"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -617,7 +618,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->offsetLevelSet();});
 
   mParser.addAction(
-      {"gauss", "gaussLS"}, "gaussian convolution of a level set surface",
+     {"gauss", "gaussLS"}, "gaussian convolution of a level set surface",
     {{"iter",  "1", "1", "number of iterations are that the filter is applied"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -626,7 +627,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->filterLevelSet();});
 
   mParser.addAction(
-      {"mean", "meanLS"}, "mean value filtering of a level set surface",
+     {"mean", "meanLS"}, "mean value filtering of a level set surface",
     {{"iter",  "1",  "1", "number of iterations are that the filter is applied"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -635,7 +636,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->filterLevelSet();});
 
   mParser.addAction(
-      {"median", "medianLS"}, "median value filtering of a level set surface",
+     {"median", "medianLS"}, "median value filtering of a level set surface",
     {{"iter",  "1",  "1", "number of iterations are that the filter is applied"},
      {"space", "", "1|2|3|5", "order of the spatial discretization (defaults to 5, i.e. WENO)"},
      {"time", "", "1|2|3", "order of the temporal discretization (defaults to 1, i.e. explicit Euler)"},
@@ -644,43 +645,43 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->filterLevelSet();});
 
   mParser.addAction(
-      {"cpt"}, "generate a vector grid with the closest-point-transform to a level set surface",
+     {"cpt"}, "generate a vector grid with the closest-point-transform to a level set surface",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
-      {"div"}, "generate a scalar grid with the divergence of a vector grid",
+     {"div"}, "generate a scalar grid with the divergence of a vector grid",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
-      {"curl"}, "generate a vector grid with the curl of another vector grid",
+     {"curl"}, "generate a vector grid with the curl of another vector grid",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
-      {"grad"}, "generate a vector grid with the gradient of a scalar grid",
+     {"grad"}, "generate a vector grid with the gradient of a scalar grid",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
-      {"curvature"}, "generate scalar grid with the mean curvature of a level set surface",
+     {"curvature"}, "generate scalar grid with the mean curvature of a level set surface",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
-      {"length"}, "generate a scalar grid with the magnitude of a vector grid",
+     {"length"}, "generate a scalar grid with the magnitude of a vector grid",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
-      {"union"}, "CSG union of two level sets surfaces",
+     {"union"}, "CSG union of two level sets surfaces",
     {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to union. Defaults to 0,1, i.e. two most recently inserted VDBs."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"prune", "true", "true", "toggle wether to prune the tree after the boolean operation (enabled by default)"},
@@ -688,7 +689,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->csg();});
 
   mParser.addAction(
-      {"intersection"}, "CSG intersection of two level sets surfaces",
+     {"intersection"}, "CSG intersection of two level sets surfaces",
     {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to intersect. Defaults to 0,1, i.e. two most recently inserted VDBs."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"prune", "true", "true", "toggle wether to prune the tree after the boolean operation (enabled by default)"},
@@ -696,7 +697,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->csg();});
 
   mParser.addAction(
-      {"difference"}, "CSG difference of two level sets surfaces",
+     {"difference"}, "CSG difference of two level sets surfaces",
     {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to difference. Defaults to 0,1, i.e. two most recently inserted VDBs."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"prune", "true", "true", "toggle wether to prune the tree after the boolean operation (enabled by default)"},
@@ -704,32 +705,32 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->csg();});
 
   mParser.addAction(
-      {"min"}, "Given grids A and B, compute min(a, b) per voxel",
+     {"min"}, "Given grids A and B, compute min(a, b) per voxel",
     {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->composite();});
 
   mParser.addAction(
-      {"max"}, "Given grids A and B, compute max(a, b) per voxel",
+     {"max"}, "Given grids A and B, compute max(a, b) per voxel",
     {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->composite();});
 
   mParser.addAction(
-      {"sum"}, "Given grids A and B, compute sum(a, b) per voxel",
+     {"sum"}, "Given grids A and B, compute sum(a, b) per voxel",
     {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->composite();});
 
   mParser.addAction(
-      {"multires"}, "construct a LoD sequences of VDB trees with powers of two refinements",
+     {"multires"}, "construct a LoD sequences of VDB trees with powers of two refinements",
     {{"levels", "2", "2", "number of multi-resolution grids in the output LoD sequence"},
      {"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->multires();});
 
   mParser.addAction(
-      {"resample"}, "resample one VDB grid into another VDB grid or a transformation of the input grid",
+     {"resample"}, "resample one VDB grid into another VDB grid or a transformation of the input grid",
     {{"vdb", "0,1", "0,1", "pair of input and optional output grids (i.e. stack index) to be processed. Defaults to 0,1, i.e. most recent VDB is resampled to match the transform of the second to most recent VDB."},
      {"scale", "0", "0", "scale use to transform the input grid (ignored if two grids are specified with vdb)"},
      {"translate", "(0,0,0)", "(0,0,0)", "translation use to transform the input grid (ignored if two grids are specified with vdb)"},
@@ -738,7 +739,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->resample();});
 
   mParser.addAction(
-    {"clip"}, "Clip a VDB grid against another grid, a bbox or frustum",
+     {"clip"}, "Clip a VDB grid against another grid, a bbox or frustum",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"bbox", "", "(0,0,0),(1,1,1)", "min and max of the world-space bounding-box used for clipping. Defaults to empty, i.e. disabled"},
@@ -748,10 +749,11 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->clip();});
 
   mParser.addAction(
-    {"slice"}, "Generate images of slices of a VDB grid",
+     {"slice"}, "Generate images of slices of a VDB grid",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"file", "slice", "slice", "name of ppm file(s) of slices"},
+     {"force", "0", "1|0|true|false", "force computations of min/max, else use expected values for LS and FOG volumes (default)"},
      {"image", "512x512", "1920x1080", "image size defined in terms of pixel resolution"},
      {"X", "0.5", "1", "One or more X-slices in range 0 -> 1. Defaults to 0.5, i.e. mid-point"},
      {"Y", "0.5", "1", "One or more Y-slices in range 0 -> 1. Defaults to 0.5, i.e. mid-point"},
@@ -759,17 +761,17 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->slice();});
 
   mParser.addAction(
-      {"prune"}, "prune away inactive values in a VDB grid",
-    {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB"}},
+    {"prune"}, "prune away inactive values in a VDB grid",
+   {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB"}},
      [](){},[&](){this->pruneLevelSet();});
 
   mParser.addAction(
-      {"flood"}, "signed-flood filling of a level set VDB",
+     {"flood"}, "signed-flood filling of a level set VDB",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB"}},
      [](){},[&](){this->floodLevelSet();});
 
   mParser.addAction(
-      {"expand"}, "expand narrow band of level set",
+     {"expand"}, "expand narrow band of level set",
     {{"dilate", "1", "1", "number of integer voxels that the narrow band of the input SDF will be dilated"},
      {"iter", "1", "1", "number of iterations of the fast sweeping algorithm (each using 8 sweeps)"},
      {"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
@@ -777,13 +779,13 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->expandLevelSet();});
 
   mParser.addAction(
-      {"segment"}, "segment an input VDB into a list if topologically disconnected VDB grids",
+     {"segment"}, "segment an input VDB into a list if topologically disconnected VDB grids",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->segment();});
 
   mParser.addAction(
-      {"transform"}, "apply affine transformations (uniform scale -> rotation -> translation) to a VDB grids and geometry",
+     {"transform"}, "apply affine transformations (uniform scale -> rotation -> translation) to a VDB grids and geometry",
     {{"rotate", "(0.0,0.0,0.0)", "(0.0,0.0,0.0)", "rotation in radians around x,y,z axis"},
      {"translate", "(0.0,0.0,0.0)", "(0.0,0.0,0.0)", "translation in world units along x,y,z axis"},
      {"scale", "1.0", "1.0", "uniform scaling in world units"},
@@ -793,7 +795,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->transform();});
 
   mParser.addAction(
-      {"render"}, "ray-tracing of level set surfaces and volume rendering of fog volumes",
+     {"render"}, "ray-tracing of level set surfaces and volume rendering of fog volumes",
     {{"files", "", "output.{jpg|png|ppm|exr}", "file used to save the rendered image to disk"},
      {"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the rendering"},
@@ -822,7 +824,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->render();}, 0);
 
   mParser.addAction(
-      {"print", "p"}, "prints information to the terminal about the current stack of VDB grids and Geometry",
+       {"print", "p"}, "prints information to the terminal about the current stack of VDB grids and Geometry",
       {{"vdb", "*", "*", "print information about VDB grids"},
        {"geo", "*", "*", "print information about geometries"},
        {"mem", "0", "0|1|false|true", "print a list of all stored variables"}},
@@ -2594,7 +2596,7 @@ void Tool::slice()
     const std::string label;// string name of this axis
     const VecF        slices;// fractional slices along the current axis
     const Vec3I       abc;// indics of the three axis
-    Axis(const Parser &p, std::string s, int i, int j, int k) : label(s), slices(p.getVec<float>(s)), abc(i,j,k) {}
+    Axis(const Parser &p, char c, int i, int j, int k) : label(1,c), slices(p.getVec<float>(label)), abc(i,j,k) {}
   };
   const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "slice");
@@ -2602,9 +2604,10 @@ void Tool::slice()
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
+    const bool force = mParser.get<bool>("force");
     const std::string file = mParser.get<std::string>("file");
     const VecI image = mParser.getVec<int>("image", "x");
-    std::vector<Axis> axes = {{mParser, "X", 0, 1, 2}, {mParser, "Y", 1, 0, 2}, {mParser, "Z", 2, 0, 1}};
+    std::vector<Axis> axes = {{mParser, 'X', 0, 1, 2}, {mParser, 'Y', 1, 0, 2}, {mParser, 'Z', 2, 0, 1}};
 
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
@@ -2618,10 +2621,10 @@ void Tool::slice()
     const CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
     const Coord dim = bbox.dim();
     math::Extrema ex;
-    if (grid->getGridClass() == GRID_LEVEL_SET) {
+    if (!force && grid->getGridClass() == GRID_LEVEL_SET) {
       ex.add( tree.background());
       ex.add(-tree.background());
-    } else if (grid->getGridClass() == GRID_FOG_VOLUME) {
+    } else if (!force && grid->getGridClass() == GRID_FOG_VOLUME) {
       ex.add(0.0f);
       ex.add(1.0f);
     } else {
@@ -2646,14 +2649,14 @@ void Tool::slice()
             }// loop over colums in image
           }// loop over rows in image
         });// end parallel_for
-        film.savePPM(file + axis.label + std::to_string(slice)+ ".ppm");
-      }// loop over slices withing an axis (singular)
+        film.savePPM(file + "_" + axis.label + "_" + std::to_string(slice)+ ".ppm");
+      }// loop over slices within an axis (singular)
     }// loop over axes (plural)
 
     if (!keep) mGrid.erase(std::next(it).base());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(name + ": " + e.what());
   }
 }// Tool::slice
 
