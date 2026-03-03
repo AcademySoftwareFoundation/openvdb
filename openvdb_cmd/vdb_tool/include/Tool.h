@@ -2598,6 +2598,7 @@ void Tool::slice()
     const Vec3I       abc;// indics of the three axis
     Axis(const Parser &p, char c, int i, int j, int k) : label(1,c), slices(p.getVec<float>(label)), abc(i,j,k) {}
   };
+
   const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "slice");
   try {
@@ -2607,7 +2608,7 @@ void Tool::slice()
     const bool force = mParser.get<bool>("force");
     const std::string file = mParser.get<std::string>("file");
     const VecI image = mParser.getVec<int>("image", "x");
-    std::vector<Axis> axes = {{mParser, 'X', 0, 1, 2}, {mParser, 'Y', 1, 0, 2}, {mParser, 'Z', 2, 0, 1}};
+    const std::vector<Axis> axes = {{mParser, 'X', 0, 1, 2}, {mParser, 'Y', 1, 0, 2}, {mParser, 'Z', 2, 0, 1}};
 
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
@@ -2634,7 +2635,7 @@ void Tool::slice()
     tools::Film film(image[0], image[1]);
     for (const Axis &axis : axes) {
       for (const float slice : axis.slices) {
-        tbb::parallel_for(RangeT(0, image[0], 0, image[1]), [&](const auto &range){
+        tbb::parallel_for(RangeT(0, image[0], 0, image[1]), [&](const RangeT &range){
           const int a = axis.abc[0], b = axis.abc[1], c = axis.abc[2];
           Vec3R xyz;
           xyz[a] = slice * (dim[a]+1) + bbox.min()[a];
