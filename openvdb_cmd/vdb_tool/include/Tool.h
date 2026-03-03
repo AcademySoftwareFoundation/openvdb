@@ -152,7 +152,7 @@ private:
     GridBase::Ptr clip(const VecF &v, int age, const GridType &input);
     void clip();
 
-    /// @brief composit two grids, e.g. min, max, sum
+    /// @brief composite two grids, e.g. min, max, sum
     void composite();
 
     /// @brief generate a grid of selected properties from another grid
