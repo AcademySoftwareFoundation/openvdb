@@ -945,6 +945,7 @@ public:
     using Type = decltype(mFlags);
     BitFlags() {}
     BitFlags(Type mask) : BitArray<N>{mask} {}
+#if !defined(__HIPCC_RTC__)
     BitFlags(std::initializer_list<uint8_t> list)
     {
         for (auto bit : list) mFlags |= static_cast<Type>(1 << bit);
@@ -954,8 +955,10 @@ public:
     {
         for (auto mask : list) mFlags |= static_cast<Type>(mask);
     }
+#endif
     __hostdev__ Type  data() const { return mFlags; }
     __hostdev__ Type& data() { return mFlags; }
+#if !defined(__HIPCC_RTC__)
     __hostdev__ void  initBit(std::initializer_list<uint8_t> list)
     {
         mFlags = 0u;
@@ -967,6 +970,7 @@ public:
         mFlags = 0u;
         for (auto mask : list) mFlags |= static_cast<Type>(mask);
     }
+#endif
     __hostdev__ Type getFlags() const { return mFlags & (static_cast<Type>(GridFlags::End) - 1u); } // mask out everything except relevant bits
 
     __hostdev__ void setOn() { mFlags = ~Type(0u); }
@@ -975,6 +979,7 @@ public:
     __hostdev__ void setBitOn(uint8_t bit) { mFlags |= static_cast<Type>(1 << bit); }
     __hostdev__ void setBitOff(uint8_t bit) { mFlags &= ~static_cast<Type>(1 << bit); }
 
+#if !defined(__HIPCC_RTC__)
     __hostdev__ void setBitOn(std::initializer_list<uint8_t> list)
     {
         for (auto bit : list) mFlags |= static_cast<Type>(1 << bit);
@@ -983,12 +988,14 @@ public:
     {
         for (auto bit : list) mFlags &= ~static_cast<Type>(1 << bit);
     }
+#endif
 
     template<typename MaskT>
     __hostdev__ void setMaskOn(MaskT mask) { mFlags |= static_cast<Type>(mask); }
     template<typename MaskT>
     __hostdev__ void setMaskOff(MaskT mask) { mFlags &= ~static_cast<Type>(mask); }
 
+#if !defined(__HIPCC_RTC__)
     template<typename MaskT>
     __hostdev__ void setMaskOn(std::initializer_list<MaskT> list)
     {
@@ -999,6 +1006,7 @@ public:
     {
         for (auto mask : list) mFlags &= ~static_cast<Type>(mask);
     }
+#endif
 
     __hostdev__ void setBit(uint8_t bit, bool on) { on ? this->setBitOn(bit) : this->setBitOff(bit); }
     template<typename MaskT>
@@ -1013,6 +1021,7 @@ public:
     template<typename MaskT>
     __hostdev__ bool isMaskOff(MaskT mask) const { return 0 == (mFlags & static_cast<Type>(mask)); }
     /// @brief return true if any of the masks in the list are on
+#if !defined(__HIPCC_RTC__)
     template<typename MaskT>
     __hostdev__ bool isMaskOn(std::initializer_list<MaskT> list) const
     {
@@ -1031,6 +1040,7 @@ public:
         return false;
     }
     /// @brief required for backwards compatibility
+#endif
     __hostdev__ BitFlags& operator=(Type n)
     {
         mFlags = n;
@@ -1942,6 +1952,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
     /// @brief Use this method to initiate most member data
     GridData& operator=(const GridData&) = default;
     //__hostdev__ GridData& operator=(const GridData& other){return *util::memcpy(this, &other);}
+#if !defined(__HIPCC_RTC__)
     __hostdev__ void init(std::initializer_list<GridFlags> list = {GridFlags::IsBreadthFirst},
                           uint64_t                         gridSize = 0u,
                           const Map&                       map = Map(),
@@ -1975,6 +1986,43 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
         mData2 = NANOVDB_MAGIC_GRID; // since version 32.6.0 (will change in the future)
 #endif
     }
+#else
+    __hostdev__ void init(uint64_t gridSize = 0u,
+                      const Map& map = Map(),
+                      GridType gridType = GridType::Unknown,
+                      GridClass gridClass = GridClass::Unknown)
+{
+#ifdef NANOVDB_USE_NEW_MAGIC_NUMBERS
+        mMagic = NANOVDB_MAGIC_GRID;
+#else
+        mMagic = NANOVDB_MAGIC_NUMB;
+#endif
+        mChecksum.disable();
+        mVersion = Version();
+
+        // Default flags explicitly encoded (no initializer_list)
+        mFlags = static_cast<typename decltype(mFlags)::Type>(GridFlags::IsBreadthFirst);
+
+        mGridIndex = 0u;
+        mGridCount = 1u;
+        mGridSize = gridSize;
+        mGridName[0] = '\0';
+        mMap = map;
+        mWorldBBox = Vec3dBBox();
+        mVoxelSize = map.getVoxelSize();
+        mGridClass = gridClass;
+        mGridType = gridType;
+        mBlindMetadataOffset = mGridSize;
+        mBlindMetadataCount = 0u;
+        mData0 = 0u;
+        mData1 = 0u;
+#ifdef NANOVDB_USE_NEW_MAGIC_NUMBERS
+        mData2 = 0u;
+#else
+        mData2 = NANOVDB_MAGIC_GRID;
+#endif
+}
+#endif
     /// @brief return true if the magic number and the version are both valid
     __hostdev__ bool isValid() const {
         // Before v32.6.0: toMagic(mMagic) = MagicType::NanoVDB  and mData2 was undefined
