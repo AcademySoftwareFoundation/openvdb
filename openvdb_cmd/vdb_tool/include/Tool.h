@@ -97,6 +97,12 @@
 #include <unistd.h>
 #endif
 
+//#define VDB_TOOL_USE_IMG_TO_MPEG
+
+#ifdef VDB_TOOL_USE_IMG_TO_MPEG
+#include <cstdlib>
+#endif
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -205,6 +211,21 @@ private:
 
     /// @brief Converts all quads into triangles
     void quadsToTriangles();
+
+    #ifdef VDB_TOOL_USE_IMG_TO_MPEG
+    /// @brief Convert multiple image files to a mpeg movie file
+    void imgToMpeg() {
+      std::string cmd("ffmpeg -loglevel error -framerate 30 -i slice_%03d.ppm dragon_30fps_v2.mp4"), logFile("log.txt");
+      cmd += " > " + logFile + " 2>&1";
+      const int code = std::system(cmd.c_str());
+      if (code != 0) {
+        std::stringstream ss;
+        ss << "\nFatal error in Tool::imgToMpeg: " << code << "\n\"" << cmd << "\"\n" << std::ifstream(logFile).rdbuf();
+        throw std::runtime_error(ss.str());
+      }
+      std::system(("rm " + logFile).c_str());
+    }
+  #endif
 
     /// @brief construct a LoD sequences of VDB trees with powers of two refinements
     void multires();
@@ -440,6 +461,14 @@ void Tool::init()
     {{"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"}},
      [&](){mParser.setDefaults();}, [&](){this->quadsToTriangles();});
+
+ #ifdef VDB_TOOL_USE_IMG_TO_MPEG
+  mParser.addAction(
+     {"img2mpeg"}, "Convert all quads in mesh to triangles, assuming they are both planar and convex",
+    {{"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
+     {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"}},
+     [&](){mParser.setDefaults();}, [&](){this->imgToMpeg();});
+#endif
 
   mParser.addAction(
      {"mesh2ls", "mesh2sdf"}, "Convert a watertight polygon surface into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
