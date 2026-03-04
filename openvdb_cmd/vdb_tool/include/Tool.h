@@ -212,18 +212,42 @@ private:
     /// @brief Converts all quads into triangles
     void quadsToTriangles();
 
-    #ifdef VDB_TOOL_USE_IMG_TO_MPEG
+#ifdef VDB_TOOL_USE_IMG_TO_MPEG
     /// @brief Convert multiple image files to a mpeg movie file
+    // vdb_tool -sphere -for x=0,1,0.01 -slice X='{$x}' -end -img2mpeg input="slice_*.ppm" output=slices.mp4
+    // vdb_tool -sphere -for x=0,1,0.01 -slice X='{$x}' -end -img2mpeg && open slices.mp4
     void imgToMpeg() {
-      std::string cmd("ffmpeg -loglevel error -framerate 30 -i slice_%03d.ppm dragon_30fps_v2.mp4"), logFile("log.txt");
-      cmd += " > " + logFile + " 2>&1";
+      const int framerate = mParser.get<int>("framerate");
+      const std::string input = mParser.get<std::string>("input");
+      const std::string output = mParser.get<std::string>("output");
+      const bool keep = mParser.get<bool>("keep");
+      const std::string flip = mParser.get<std::string>("flip");
+
+      std::string cmd("ffmpeg"), log("log.txt");
+      cmd += " -loglevel error";// only log error messages
+      cmd += " -pattern_type glob";// support expanding shell-like wildcard patterns (globbing)
+      cmd += " -framerate " + std::to_string(framerate);// specify frame rate
+
+      cmd += " -i \'" + input + "\'";// specify multiple input files as "input_*.ppm"
+      if (flip=="vertical") {
+        cmd += " -vf \"vflip\"";// flip vertical (up/down)
+      } else if (flip=="horizontal") {
+        cmd += " -vf \"hflip\"";// flip horizontal (left/right)
+      } else if (flip=="180") {
+        cmd += " -vf \"vflip,hflip\"";// rotate 180
+      } else if (flip!="") {
+        throw std::invalid_argument("Tool::imgToMpeg: invalid flip argument: \""+flip+"\", expected \"vertical\", \"horizontal\" or \"180\"");
+      }
+      cmd += " -y " + output;// overwrite output files without asking
+      cmd += " > " + log + " 2>&1";// redirect stdout and stderr to log file
+
       const int code = std::system(cmd.c_str());
       if (code != 0) {
         std::stringstream ss;
-        ss << "\nFatal error in Tool::imgToMpeg: " << code << "\n\"" << cmd << "\"\n" << std::ifstream(logFile).rdbuf();
+        ss << "\nFatal error in Tool::imgToMpeg: " << code << "\n\"" << cmd << "\"\n" << std::ifstream(log).rdbuf();
         throw std::runtime_error(ss.str());
       }
-      std::system(("rm " + logFile).c_str());
+      std::system(("rm " + log).c_str());
     }
   #endif
 
@@ -464,9 +488,12 @@ void Tool::init()
 
  #ifdef VDB_TOOL_USE_IMG_TO_MPEG
   mParser.addAction(
-     {"img2mpeg"}, "Convert all quads in mesh to triangles, assuming they are both planar and convex",
-    {{"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
-     {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"}},
+     {"img2mpeg"}, "Convert multiple images to an mpeg file",
+    {{"framerate", "24", "30", "desired frame rate of mpeg movie"},
+     {"input", "slice_*.ppm", "input.avi", "input image files"},
+     {"output", "slices.mp4", "output.mp4", "name out output mpeg file."},
+     {"flip", "", "vertical|horizontal|180", "flip output video vertical or horizontal or rotate it by 180"},
+     {"keep", "true", "1|0|true|false", "toggle wether the input images are preserved or deleted after the conversion"}},
      [&](){mParser.setDefaults();}, [&](){this->imgToMpeg();});
 #endif
 
@@ -780,13 +807,13 @@ void Tool::init()
   mParser.addAction(
      {"slice"}, "Generate images of slices of a VDB grid",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
+     {"keep", "true", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"file", "slice", "slice", "name of ppm file(s) of slices"},
      {"force", "0", "1|0|true|false", "force computations of min/max, else use expected values for LS and FOG volumes (default)"},
      {"image", "512x512", "1920x1080", "image size defined in terms of pixel resolution"},
      {"X", "0.5", "1", "One or more X-slices in range 0 -> 1. Defaults to 0.5, i.e. mid-point"},
-     {"Y", "0.5", "1", "One or more Y-slices in range 0 -> 1. Defaults to 0.5, i.e. mid-point"},
-     {"Z", "0.5", "1", "One or more Z-slices in range 0 -> 1. Defaults to 0.5, i.e. mid-point"}},
+     {"Y", "", "1", "One or more Y-slices in range 0 -> 1. Defaults to 0.5, i.e. mid-point"},
+     {"Z", "", "1", "One or more Z-slices in range 0 -> 1. Defaults to 0.5, i.e. mid-point"}},
      [&](){mParser.setDefaults();}, [&](){this->slice();});
 
   mParser.addAction(

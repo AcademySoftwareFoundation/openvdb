@@ -852,6 +852,7 @@ TEST_F(Test_vdb_tool, Processor)
     EXPECT_EQ("foo bar bla", proc("{foo_bar_bla:_: :replace}"));
     EXPECT_EQ("foo_bar_bla", proc("{foo bar bla: :_:replace}"));
     EXPECT_EQ("a b c d", proc("{a,b,c,d:,: :replace}"));
+    //EXPECT_EQ("a,b,c,d", proc("{a_b_c_d:_:,:replace}"));
     EXPECT_EQ("a b c d", proc("{a:b:c:d:squash:,: :replace}"));
 
     EXPECT_EQ("_bar", proc("{foo_bar:foo:erase}"));
