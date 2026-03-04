@@ -97,10 +97,8 @@
 #include <unistd.h>
 #endif
 
-//#define VDB_TOOL_USE_IMG_TO_MPEG
-
-#ifdef VDB_TOOL_USE_IMG_TO_MPEG
-#include <cstdlib>
+#ifdef VDB_TOOL_USE_MPEG
+#include <cstdlib>// for std::system
 #endif
 
 namespace openvdb {
@@ -212,44 +210,8 @@ private:
     /// @brief Converts all quads into triangles
     void quadsToTriangles();
 
-#ifdef VDB_TOOL_USE_IMG_TO_MPEG
     /// @brief Convert multiple image files to a mpeg movie file
-    // vdb_tool -sphere -for x=0,1,0.01 -slice X='{$x}' -end -img2mpeg input="slice_*.ppm" output=slices.mp4
-    // vdb_tool -sphere -for x=0,1,0.01 -slice X='{$x}' -end -img2mpeg && open slices.mp4
-    void imgToMpeg() {
-      const int framerate = mParser.get<int>("framerate");
-      const std::string input = mParser.get<std::string>("input");
-      const std::string output = mParser.get<std::string>("output");
-      const bool keep = mParser.get<bool>("keep");
-      const std::string flip = mParser.get<std::string>("flip");
-
-      std::string cmd("ffmpeg"), log("log.txt");
-      cmd += " -loglevel error";// only log error messages
-      cmd += " -pattern_type glob";// support expanding shell-like wildcard patterns (globbing)
-      cmd += " -framerate " + std::to_string(framerate);// specify frame rate
-
-      cmd += " -i \'" + input + "\'";// specify multiple input files as "input_*.ppm"
-      if (flip=="vertical") {
-        cmd += " -vf \"vflip\"";// flip vertical (up/down)
-      } else if (flip=="horizontal") {
-        cmd += " -vf \"hflip\"";// flip horizontal (left/right)
-      } else if (flip=="180") {
-        cmd += " -vf \"vflip,hflip\"";// rotate 180
-      } else if (flip!="") {
-        throw std::invalid_argument("Tool::imgToMpeg: invalid flip argument: \""+flip+"\", expected \"vertical\", \"horizontal\" or \"180\"");
-      }
-      cmd += " -y " + output;// overwrite output files without asking
-      cmd += " > " + log + " 2>&1";// redirect stdout and stderr to log file
-
-      const int code = std::system(cmd.c_str());
-      if (code != 0) {
-        std::stringstream ss;
-        ss << "\nFatal error in Tool::imgToMpeg: " << code << "\n\"" << cmd << "\"\n" << std::ifstream(log).rdbuf();
-        throw std::runtime_error(ss.str());
-      }
-      std::system(("rm " + log).c_str());
-    }
-  #endif
+    void imgToMpeg();
 
     /// @brief construct a LoD sequences of VDB trees with powers of two refinements
     void multires();
@@ -486,7 +448,6 @@ void Tool::init()
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"}},
      [&](){mParser.setDefaults();}, [&](){this->quadsToTriangles();});
 
- #ifdef VDB_TOOL_USE_IMG_TO_MPEG
   mParser.addAction(
      {"img2mpeg"}, "Convert multiple images to an mpeg file",
     {{"framerate", "24", "30", "desired frame rate of mpeg movie"},
@@ -495,7 +456,6 @@ void Tool::init()
      {"flip", "", "vertical|horizontal|180", "flip output video vertical or horizontal or rotate it by 180"},
      {"keep", "true", "1|0|true|false", "toggle wether the input images are preserved or deleted after the conversion"}},
      [&](){mParser.setDefaults();}, [&](){this->imgToMpeg();});
-#endif
 
   mParser.addAction(
      {"mesh2ls", "mesh2sdf"}, "Convert a watertight polygon surface into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
@@ -2716,6 +2676,52 @@ void Tool::slice()
     throw std::invalid_argument(name + ": " + e.what());
   }
 }// Tool::slice
+
+// ==============================================================================================================
+
+#ifdef VDB_TOOL_USE_MPEG
+/// @brief Convert multiple image files to a mpeg movie file
+// vdb_tool -sphere -for x=0,1,0.01 -slice X='{$x}' -end -img2mpeg input="slice_*.ppm" output=slices.mp4
+// vdb_tool -sphere -for x=0,1,0.01 -slice X='{$x}' -end -img2mpeg && open slices.mp4
+void Tool::imgToMpeg()
+{
+  const int framerate = mParser.get<int>("framerate");
+  const std::string input = mParser.get<std::string>("input");
+  const std::string output = mParser.get<std::string>("output");
+  const bool keep = mParser.get<bool>("keep");
+  const std::string flip = mParser.get<std::string>("flip");
+
+  std::string cmd("ffmpeg"), log("log.txt");
+  cmd += " -loglevel error";// only log error messages
+  cmd += " -pattern_type glob";// support expanding shell-like wildcard patterns (globbing)
+  cmd += " -framerate " + std::to_string(framerate);// specify frame rate
+  cmd += " -i \'" + input + "\'";// specify multiple input files as "input_*.ppm"
+  if (flip=="vertical") {
+    cmd += " -vf \"vflip\"";// flip vertical (up/down)
+  } else if (flip=="horizontal") {
+    cmd += " -vf \"hflip\"";// flip horizontal (left/right)
+  } else if (flip=="180") {
+    cmd += " -vf \"vflip,hflip\"";// rotate 180
+  } else if (flip!="") {
+    throw std::invalid_argument("Tool::imgToMpeg: invalid flip argument: \""+flip+"\", expected \"vertical\", \"horizontal\" or \"180\"");
+  }
+  cmd += " -y " + output;// overwrite output files without asking
+  cmd += " > " + log + " 2>&1";// redirect stdout and stderr to log file
+
+  const int code = std::system(cmd.c_str());
+  if (code != 0) {
+    std::stringstream ss;
+    ss << "\nFatal error in Tool::imgToMpeg: " << code << "\n\"" << cmd << "\"\n" << std::ifstream(log).rdbuf();
+    throw std::runtime_error(ss.str());
+  }
+  std::system(("rm " + log).c_str());
+}// Tool::imgToMpeg
+#else
+void Tool::imgToMpeg()
+{
+  throw std::runtime_error("MPEG support was disabled during compilation!");
+}// Tool::imgToMpeg
+#endif
 
 // ==============================================================================================================
 // LeVeque, R., High-Resolution Conservative Algorithms For Advection In Incompressible Flow, SIAM J. Numer. Anal. 33, 627–665 (1996)
