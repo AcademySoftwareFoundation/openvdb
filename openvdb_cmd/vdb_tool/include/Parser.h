@@ -910,7 +910,8 @@ Parser::Parser(std::vector<Option> &&def)
             }
             std::string str = iter->options[0].value;// copy
             processor(str);// <- evaluate string
-            for (auto s : tokenize(str, ",")) std::cerr << s << std::endl;// split and print
+            if (!str.empty()) std::cerr << str << std::endl;
+            //for (auto s : tokenize(str, ",")) std::cerr << s << std::endl;// split and print
         }, 0
     );
 
