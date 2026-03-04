@@ -958,7 +958,7 @@ public:
 #endif
     __hostdev__ Type  data() const { return mFlags; }
     __hostdev__ Type& data() { return mFlags; }
-#if !defined(__HIPCC_RTC__)
+#if !defined(__HIPCC_RTC__) 
     __hostdev__ void  initBit(std::initializer_list<uint8_t> list)
     {
         mFlags = 0u;
