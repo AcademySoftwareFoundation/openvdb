@@ -145,7 +145,7 @@
 
 #define NANOVDB_MAJOR_VERSION_NUMBER 32 // reflects changes to the ABI and hence also the file format
 #define NANOVDB_MINOR_VERSION_NUMBER  9 // reflects changes to the API but not ABI
-#define NANOVDB_PATCH_VERSION_NUMBER  0 // reflects changes that does not affect the ABI or API
+#define NANOVDB_PATCH_VERSION_NUMBER  1 // reflects changes that does not affect the ABI or API
 
 #define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
 
