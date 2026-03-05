@@ -211,7 +211,7 @@ private:
     void quadsToTriangles();
 
     /// @brief Convert multiple image files to a mpeg movie file
-    void imgToMpeg();
+    void movie();
 
     /// @brief construct a LoD sequences of VDB trees with powers of two refinements
     void multires();
@@ -449,13 +449,14 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->quadsToTriangles();});
 
   mParser.addAction(
-     {"img2mpeg"}, "Convert multiple images to an mpeg file",
-    {{"framerate", "24", "30", "desired frame rate of mpeg movie"},
-     {"input", "slice_*.ppm", "input.avi", "input image files"},
-     {"output", "slices.mp4", "output.mp4", "name out output mpeg file."},
+     {"movie", "img2mpeg", "mov2mpeg", "mov2gif", "img2gif"}, "Convert image and movie files to mpeg or animated gif files",
+    {{"fps", "24", "24", "desired frame rate of mpeg movie"},
+     {"input", "slice_*.ppm", "slice_*.ppm|input.avi", "input image files or movie file to get converted"},
+     {"output", "slices.mp4", "output.mp4|output.gif", "name of output mpeg or gif file"},
+     {"scale", "", "1280x720|640", "scale of the output movie or gif."},
      {"flip", "", "vertical|horizontal|180", "flip output video vertical or horizontal or rotate it by 180"},
      {"keep", "true", "1|0|true|false", "toggle wether the input images are preserved or deleted after the conversion"}},
-     [&](){mParser.setDefaults();}, [&](){this->imgToMpeg();});
+     [&](){mParser.setDefaults();}, [&](){this->movie();});
 
   mParser.addAction(
      {"mesh2ls", "mesh2sdf"}, "Convert a watertight polygon surface into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
@@ -2679,49 +2680,48 @@ void Tool::slice()
 
 // ==============================================================================================================
 
-#ifdef VDB_TOOL_USE_MPEG
 /// @brief Convert multiple image files to a mpeg movie file
 // vdb_tool -sphere -for x=0,1,0.01 -slice X='{$x}' -end -img2mpeg input="slice_*.ppm" output=slices.mp4
 // vdb_tool -sphere -for x=0,1,0.01 -slice X='{$x}' -end -img2mpeg && open slices.mp4
-void Tool::imgToMpeg()
+void Tool::movie()
 {
-  const int framerate = mParser.get<int>("framerate");
+#ifdef VDB_TOOL_USE_MPEG
+  const int fps = mParser.get<int>("fps");
   const std::string input = mParser.get<std::string>("input");
   const std::string output = mParser.get<std::string>("output");
+  const VecI scale = mParser.getVec<int>("scale", "x");
   const bool keep = mParser.get<bool>("keep");
   const std::string flip = mParser.get<std::string>("flip");
 
   std::string cmd("ffmpeg"), log("log.txt");
   cmd += " -loglevel error";// only log error messages
-  cmd += " -pattern_type glob";// support expanding shell-like wildcard patterns (globbing)
-  cmd += " -framerate " + std::to_string(framerate);// specify frame rate
+  if (contains(input, '*')) cmd += " -pattern_type glob";// support expanding shell-like wildcard patterns (globbing)
   cmd += " -i \'" + input + "\'";// specify multiple input files as "input_*.ppm"
-  if (flip=="vertical") {
-    cmd += " -vf \"vflip\"";// flip vertical (up/down)
-  } else if (flip=="horizontal") {
-    cmd += " -vf \"hflip\"";// flip horizontal (left/right)
-  } else if (flip=="180") {
-    cmd += " -vf \"vflip,hflip\"";// rotate 180
-  } else if (flip!="") {
-    throw std::invalid_argument("Tool::imgToMpeg: invalid flip argument: \""+flip+"\", expected \"vertical\", \"horizontal\" or \"180\"");
+  cmd += " -vf \"fps=" + std::to_string(fps);
+  if (findMatch(flip,{"vertical",  "180"})) cmd += ",vflip";// flip vertical (up/down)
+  if (findMatch(flip,{"horizontal","180"})) cmd += ",hflip";// flip horizontal (left/right)
+  if (flip!="" && !contains(cmd,"flip")) throw std::invalid_argument("Tool::movie: invalid argument flip=\""+flip+"\", expected \"vertical\", \"horizontal\" or \"180\"");
+  if (scale.size()==2) {
+    cmd += ",scale=" + std::to_string(scale[0]) + ":" + std::to_string(scale[1]) + ":flags=lanczos";
+  } else if (scale.size()==1) {
+    cmd += ",scale=" + std::to_string(scale[0]) + ":-1:flags=lanczos";
   }
+  cmd += "\"";// end "-vf \"fps=..."
+  if (getExt(output) == "gif") cmd += " -c:v gif";// create animated gif
   cmd += " -y " + output;// overwrite output files without asking
   cmd += " > " + log + " 2>&1";// redirect stdout and stderr to log file
-
+  if (mParser.verbose) std::cerr << cmd << std::endl;
   const int code = std::system(cmd.c_str());
   if (code != 0) {
     std::stringstream ss;
-    ss << "\nFatal error in Tool::imgToMpeg: " << code << "\n\"" << cmd << "\"\n" << std::ifstream(log).rdbuf();
+    ss << "\nFatal error in Tool::movie: " << code << "\n\"" << cmd << "\"\n" << std::ifstream(log).rdbuf();
     throw std::runtime_error(ss.str());
   }
   std::system(("rm " + log).c_str());
-}// Tool::imgToMpeg
 #else
-void Tool::imgToMpeg()
-{
   throw std::runtime_error("MPEG support was disabled during compilation!");
-}// Tool::imgToMpeg
 #endif
+}// Tool::movie
 
 // ==============================================================================================================
 // LeVeque, R., High-Resolution Conservative Algorithms For Advection In Incompressible Flow, SIAM J. Numer. Anal. 33, 627–665 (1996)

@@ -111,6 +111,7 @@ endif()
 
 if(OPENVDB_TOOL_USE_MPEG)
   target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_MPEG")
+  find_program(FFMPEG_PATH NAMES ffmpeg REQUIRED)
 endif()
 
 if(OPENVDB_TOOL_USE_EXR)
