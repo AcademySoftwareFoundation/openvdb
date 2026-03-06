@@ -771,7 +771,7 @@ void Tool::init()
      {"keep", "true", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"file", "slice", "slice", "name of ppm file(s) of slices"},
      {"force", "0", "1|0|true|false", "force computations of min/max, else use expected values for LS and FOG volumes (default)"},
-     {"image", "512x512", "1920x1080", "image size defined in terms of pixel resolution"},
+     {"scale", "512", "1920x1080", "pixel size of image (aspect ratio is derived from the vdb unless both dimensions are given)"},
      {"X", "0.5", "1", "One or more X-slices in range 0 -> 1. Defaults to 0.5, i.e. mid-point"},
      {"Y", "", "1", "One or more Y-slices in range 0 -> 1. Defaults to 0.5, i.e. mid-point"},
      {"Z", "", "1", "One or more Z-slices in range 0 -> 1. Defaults to 0.5, i.e. mid-point"}},
@@ -2624,7 +2624,7 @@ void Tool::slice()
     const bool keep = mParser.get<bool>("keep");
     const bool force = mParser.get<bool>("force");
     const std::string file = mParser.get<std::string>("file");
-    const VecI image = mParser.getVec<int>("image", "x");
+    const VecI scale = mParser.getVec<int>("scale", "x");
     const std::vector<Axis> axes = {{mParser, 'X', 0, 1, 2}, {mParser, 'Y', 1, 0, 2}, {mParser, 'Z', 2, 0, 1}};
 
     auto it = this->getGrid(age);
@@ -2649,25 +2649,25 @@ void Tool::slice()
       ex = tools::extrema(grid->cbeginValueOn());
     }
 
-    tools::Film film(image[0], image[1]);
     for (const Axis &axis : axes) {
+      tools::Film image(scale[0], scale.size()==2 ? scale[1] : int(scale[0]*dim[axis.abc[2]]/float(dim[axis.abc[1]])));
       for (const float slice : axis.slices) {
-        tbb::parallel_for(RangeT(0, image[0], 0, image[1]), [&](const RangeT &range){
+        tbb::parallel_for(RangeT(0, image.width(), 0, image.height()), [&](const RangeT &range){
           const int a = axis.abc[0], b = axis.abc[1], c = axis.abc[2];
           Vec3R xyz;
           xyz[a] = slice * (dim[a]+1) + bbox.min()[a];
           auto acc = grid->getAccessor();// thread local copy
           for (auto row=range.rows().begin(); row!=range.rows().end(); ++row) {
-            xyz[b] = row/float(image[0])*(dim[b]+1) + bbox.min()[b];
+            xyz[b] = row/float(image.width())*(dim[b]+1) + bbox.min()[b];
             for (int col=range.cols().begin(); col<range.cols().end(); ++col) {
-              xyz[c] = col/float(image[1])*(dim[c]+1) + bbox.min()[c];
+              xyz[c] = col/float(image.height())*(dim[c]+1) + bbox.min()[c];
               const float v = tools::BoxSampler::sample(acc, xyz);
               const unsigned char *p = LUT[uint8_t(255.0f*(v - ex.min())/(ex.max() - ex.min()))];
-              film.pixel(row,col) = tools::Film::RGBA(p[0]/255.0f, p[1]/255.0f, p[2]/255.0f);
+              image.pixel(row,col) = tools::Film::RGBA(p[0]/255.0f, p[1]/255.0f, p[2]/255.0f);
             }// loop over colums in image
           }// loop over rows in image
         });// end parallel_for
-        film.savePPM(file + "_" + axis.label + "_" + std::to_string(slice)+ ".ppm");
+        image.savePPM(file + "_" + axis.label + "_" + std::to_string(slice)+ ".ppm");
       }// loop over slices within an axis (singular)
     }// loop over axes (plural)
 
