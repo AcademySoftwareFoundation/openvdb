@@ -2650,7 +2650,7 @@ void Tool::slice()
     }
 
     for (const Axis &axis : axes) {
-      tools::Film image(scale[0], scale.size()==2 ? scale[1] : int(scale[0]*dim[axis.abc[2]]/float(dim[axis.abc[1]])));
+      tools::Film image(scale[0], scale.size()==2 ? scale[1] : scale[0]*dim[axis.abc[2]]/dim[axis.abc[1]]);
       for (const float slice : axis.slices) {
         tbb::parallel_for(RangeT(0, image.width(), 0, image.height()), [&](const RangeT &range){
           const int a = axis.abc[0], b = axis.abc[1], c = axis.abc[2];
