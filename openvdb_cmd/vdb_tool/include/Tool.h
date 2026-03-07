@@ -2711,13 +2711,18 @@ void Tool::movie()
   cmd += " -y " + output;// overwrite output files without asking
   cmd += " > " + log + " 2>&1";// redirect stdout and stderr to log file
   if (mParser.verbose) std::cerr << cmd << std::endl;
-  const int code = std::system(cmd.c_str());
+  int code = std::system(cmd.c_str());
   if (code != 0) {
     std::stringstream ss;
     ss << "\nFatal error in Tool::movie: " << code << "\n\"" << cmd << "\"\n" << std::ifstream(log).rdbuf();
     throw std::runtime_error(ss.str());
   }
-  std::system(("rm " + log).c_str());
+  code = std::system(("rm " + log).c_str());
+  if (code != 0) {
+    std::stringstream ss;
+    ss << "\nFatal error in Tool::movie: " << code << "\n\"" << ("rm " + log) << "\"\n" << std::ifstream(log).rdbuf();
+    throw std::runtime_error(ss.str());
+  }
 #else
   throw std::runtime_error("MPEG support was disabled during compilation!");
 #endif

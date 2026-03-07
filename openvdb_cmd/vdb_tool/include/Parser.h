@@ -234,7 +234,7 @@ public:
             [&](){mCallStack.top()=getPath(mCallStack.top());});
         add("file","extract file name from string, e.g. {path/base0123.ext:file} -> {base0123.ext}",
             [&](){mCallStack.top()=getFile(mCallStack.top());});
-        add("name","extract file name without extension from string, e.g. {path/base0123:name} -> {extbase0123}",
+        add("name","extract file name without extension from string, e.g. {path/base0123.ext:name} -> {base0123}",
             [&](){mCallStack.top()=getName(mCallStack.top());});
         add("base","extract file base name from string, e.g. {path/base0123.ext:base -> {base}",
             [&](){mCallStack.top()=getBase(mCallStack.top());});
@@ -242,6 +242,12 @@ public:
             [&](){mCallStack.top()=getNumber(mCallStack.top());});
         add("ext","extract file extension from string, e.g. {path/base0123.ext:ext} -> {ext}",
             [&](){mCallStack.top()=getExt(mCallStack.top());});
+        add("replaceExt","replace file extension from string, e.g. {path/base0123.vdb:jpg:replaceExt} -> {path/base0123.jpg}",
+            [&](){
+                auto ext = mCallStack.top();
+                auto cpy = mCallStack.top();
+                mCallStack.top()= getPath(cpy) + getFile(cpy) + ext;
+            });
 
         // boolean operations
         add("==","returns true if the two top entries on the stack compare equal, e.g. {1:2:==} -> {0}",
