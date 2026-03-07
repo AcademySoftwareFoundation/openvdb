@@ -124,7 +124,14 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_EQ("", openvdb::vdb_tool::getExt("path/file_100."));
       EXPECT_EQ("", openvdb::vdb_tool::getExt("path/file_100"));
     }
-     {// findFileExt
+    {// replaceExt
+      EXPECT_EQ("path/file_100.abc", openvdb::vdb_tool::replaceExt("path/file_100.ext", "abc"));
+      EXPECT_EQ("path/file.100.abc", openvdb::vdb_tool::replaceExt("path/file.100.ext", "abc"));
+      EXPECT_EQ("path/file_100.abc", openvdb::vdb_tool::replaceExt("path/file_100.e", "abc"));
+      EXPECT_EQ("path/file_100.abc", openvdb::vdb_tool::replaceExt("path/file_100.", "abc"));
+      EXPECT_EQ("path/file_100.abc", openvdb::vdb_tool::replaceExt("path/file_100", "abc"));
+    }
+    {// findFileExt
       EXPECT_EQ(0, openvdb::vdb_tool::findFileExt("path/file_002.eXt", {"ext", "abs", "ab"}, false));
       EXPECT_EQ(1, openvdb::vdb_tool::findFileExt("path/file_002.eXt", {"ext", "abs", "ab"}));
       EXPECT_EQ(1, openvdb::vdb_tool::findFileExt("path/file_002.EXT", {"ext", "ext", "ab"}));

@@ -92,6 +92,13 @@ inline std::string getExt(const std::string &str)
     return pos >= str.length() ? "" : str.substr(pos + 1);
 }
 
+/// @return the file name with a new extension, i.e. "path/base0123.abc" if input is "path/base0123.ext", "abc"
+inline std::string replaceExt(const std::string &str, const std::string &ext)
+{
+    const size_t pos = str.find_last_of('.');
+    return (pos >= str.length() ? str + "." : str.substr(0, pos + 1)) + ext;
+}
+
 /// @brief Turns all characters in a string into lower case
 inline std::string &toLowerCase(std::string &str)
 {
