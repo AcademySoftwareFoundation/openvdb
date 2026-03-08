@@ -63,6 +63,12 @@ inline std::string getPath(const std::string &str)
     return pos >= str.length() ? "." : str.substr(0,pos);
 }
 
+/// @return the file name with new path, i.e. "path/base0123.ext" if input is "tmp/base0123.ext"
+inline std::string replacePath(const std::string &str, const std::string &path)
+{
+    return path + "/" + getFile(str);
+}
+
 /// @return the name, i.e. "base0123" if input is "path/base0123.ext"
 inline std::string getName(const std::string &str)
 {
@@ -70,7 +76,7 @@ inline std::string getName(const std::string &str)
     return str.substr(start, str.find_last_of(".") - start);
 }
 
-/// @return the base, i.e. "base0123.ext" if input is "path/base0123.ext"
+/// @return the base, i.e. "base" if input is "path/base0123.ext"
 inline std::string getBase(const std::string &str)
 {
     const std::string name = getName(str);

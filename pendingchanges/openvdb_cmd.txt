@@ -17,6 +17,7 @@ vdb_tool:
   - Improved error reporting when using unsupported actions and options.
   - Actions can now have multiple names, e.g. "-read", "-import, "-load", "-i".
   - Added cutoff option to "-ls2fog" action.
+  - Improved error handling in vdb_tool (will recover from many non-fatal errors)
 
   Fixes:
   - Fixed issues in Geometry::readSTL so it works on all files in Thingi10K.

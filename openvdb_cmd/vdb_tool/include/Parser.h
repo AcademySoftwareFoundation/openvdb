@@ -243,11 +243,9 @@ public:
         add("ext","extract file extension from string, e.g. {path/base0123.ext:ext} -> {ext}",
             [&](){mCallStack.top()=getExt(mCallStack.top());});
         add("replaceExt","replace file extension from string, e.g. {path/base0123.vdb:jpg:replaceExt} -> {path/base0123.jpg}",
-            [&](){
-                auto ext = mCallStack.top();
-                auto cpy = mCallStack.top();
-                mCallStack.top()= getPath(cpy) + getFile(cpy) + ext;
-            });
+            [&](){std::string ext = mCallStack.pop(), &file = mCallStack.top(); file = replaceExt(file, ext);});
+        add("replacePath","replace file path from string, e.g. {tmp/base0123.vdb:path:replacePath} -> {path/base0123.vdb}",
+            [&](){std::string path = mCallStack.pop(), &file = mCallStack.top(); file = replacePath(file, path);});
 
         // boolean operations
         add("==","returns true if the two top entries on the stack compare equal, e.g. {1:2:==} -> {0}",

@@ -977,8 +977,7 @@ void Geometry::readSTL(const std::string &fileName)
     PosT xyz;
     std::array<char, 256> buffer{};
     if (!infile.read(buffer.data(), buffer.size())) {
-        std::cerr << "Geometry::readSTL: Failed to read 256B in \""+fileName+"\" so this must be an empty STL file\n";
-        return;
+        throw std::runtime_error("Geometry::readSTL: Failed to read 256B in \""+fileName+"\" so this must be an empty STL file");
     }
     infile.clear();
     infile.seekg(0, std::ios_base::beg);// rewind

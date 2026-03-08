@@ -147,6 +147,7 @@ private:
     std::list<Geometry::Ptr> mGeom;// list of geometries owned by this tool
     std::list<GridBase::Ptr> mGrid;// list of based grids owned by this tool
     Parser                   mParser;
+    bool                     mStopOnError{false};
 
     /// @brief Deletes geometry, VDB grids and local variables
     void clear();
@@ -306,7 +307,9 @@ Tool::Tool(int argc, char *argv[])
 
 auto Tool::getGrid(size_t age) const
 {
-    if (age>=mGrid.size()) throw std::invalid_argument("-"+mParser.getAction().names[0]+" called getGrid("+std::to_string(age)+"), but grid count = "+std::to_string(mGrid.size()));
+    if (age>=mGrid.size()) {
+      throw std::invalid_argument("-"+mParser.getAction().names[0]+" called getGrid("+std::to_string(age)+"), but grid count = "+std::to_string(mGrid.size()));
+    }
     auto it = mGrid.crbegin();
     std::advance(it, age);
     return it;
@@ -316,7 +319,9 @@ auto Tool::getGrid(size_t age) const
 
 auto Tool::getGeom(size_t age) const
 {
-    if (age>=mGeom.size()) throw std::invalid_argument("-"+mParser.getAction().names[0]+" called getGeom("+std::to_string(age)+"), but geometry count = "+std::to_string(mGeom.size()));
+    if (age>=mGeom.size()) {
+      throw std::invalid_argument("-"+mParser.getAction().names[0]+" called getGeom("+std::to_string(age)+"), but geometry count = "+std::to_string(mGeom.size()));
+    }
     auto it = mGeom.crbegin();
     std::advance(it, age);
     return it;
@@ -985,8 +990,8 @@ void Tool::init()
 
 void Tool::help()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "help");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "help");
   try {
     mParser.printAction();
     const VecS actions = mParser.getVec<std::string>("actions");
@@ -1027,7 +1032,7 @@ void Tool::help()
 
     if (stop) std::exit(EXIT_SUCCESS);
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::help()
 
@@ -1073,30 +1078,39 @@ void Tool::clear()
 
 void Tool::read()
 {
-  OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
-  for (auto &fileName : mParser.getVec<std::string>("files")) {
-    switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,off,stl,xyz", "vdb", "nvdb"})) {
-    case 1:
-      this->readGeo(fileName);
-      break;
-    case 2:
-      this->readVDB(fileName);
-      break;
-    case 3:
-      this->readNVDB(fileName);
-      break;
-    default:
-#if VDB_TOOL_USE_PDAL
-      pdal::StageFactory factory;
-      if (factory.inferReaderDriver(fileName) != "") {
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "read");
+  try {
+    for (auto &fileName : mParser.getVec<std::string>("files")) {
+      switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,off,stl,xyz", "vdb", "nvdb"})) {
+      case 1:
         this->readGeo(fileName);
         break;
-      }
+      case 2:
+        this->readVDB(fileName);
+        break;
+      case 3:
+        this->readNVDB(fileName);
+        break;
+      default:
+#if VDB_TOOL_USE_PDAL
+        pdal::StageFactory factory;
+        if (factory.inferReaderDriver(fileName) != "") {
+          this->readGeo(fileName);
+          break;
+        }
 #endif
-      throw std::invalid_argument("File \""+fileName+"\" has an invalid extension");
-    }// end switch
-  }// end for loop over files
-}
+        throw std::invalid_argument("File \""+fileName+"\" has an invalid extension");
+      }// end switch
+    }// end for loop over files
+  } catch (const std::exception& e) {
+    if (mStopOnError) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::cerr << action_name << ": skipping do to " << e.what() << std::endl;
+    }
+  }
+}// Tool::read
 
 // ==============================================================================================================
 
@@ -1243,24 +1257,33 @@ void Tool::config()
 
 void Tool::write()
 {
-  OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
-  for (std::string &fileName : mParser.getVec<std::string>("files")) {
-    switch (findFileExt(fileName, {"geo,obj,ply,stl,off,abc", "vdb", "nvdb", "txt"})) {
-    case 1:
-      this->writeGeo(fileName);
-      break;
-    case 2:
-      this->writeVDB(fileName);
-      break;
-    case 3:
-      this->writeNVDB(fileName);
-      break;
-    case 4:
-      this->writeConf(fileName);
-      break;
-    default:
-      throw std::invalid_argument("File \""+fileName+"\" has an invalid extension");
-      break;
+  const std::string &action_name = mParser.getAction().names[0]; 
+  OPENVDB_ASSERT(action_name == "write");
+  try {
+    for (std::string &fileName : mParser.getVec<std::string>("files")) {
+      switch (findFileExt(fileName, {"geo,obj,ply,stl,off,abc", "vdb", "nvdb", "txt"})) {
+      case 1:
+        this->writeGeo(fileName);
+        break;
+      case 2:
+        this->writeVDB(fileName);
+        break;
+      case 3:
+        this->writeNVDB(fileName);
+        break;
+      case 4:
+        this->writeConf(fileName);
+        break;
+      default:
+        throw std::invalid_argument("File \""+fileName+"\" has an invalid extension");
+        break;
+      }
+    }
+  } catch (const std::exception& e) {
+    if (mStopOnError) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
     }
   }
 }// Tool::write
@@ -1269,8 +1292,8 @@ void Tool::write()
 
 void Tool::writeVDB(const std::string &fileName)
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "write");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "write");
   try {
     mParser.printAction();
     const std::string age = mParser.get<std::string>("vdb");
@@ -1294,7 +1317,7 @@ void Tool::writeVDB(const std::string &fileName)
       if (!keep) for (auto &g : grids) mGrid.remove(g);
     }
 
-    if (grids.empty()) throw std::invalid_argument("writeVDB: no vdb grids to write");
+    if (grids.empty()) throw std::invalid_argument("no vdb grids to write");
 
     auto setCodec = [&](io::Archive &a) {
       if (codec=="zip") {
@@ -1326,7 +1349,7 @@ void Tool::writeVDB(const std::string &fileName)
     for (size_t i=0; half && i<grids.size(); ++i) grids[i]->setSaveFloatAsHalf(false);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(std::string("writeVDB: ") + e.what());// catch in Tool::write
   }
 }// Tool::writeVDB
 
@@ -1335,8 +1358,8 @@ void Tool::writeVDB(const std::string &fileName)
 #ifdef VDB_TOOL_USE_NANO
 void Tool::writeNVDB(const std::string &fileName)
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "write");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "write");
   try {
     mParser.printAction();
     const std::string age = mParser.get<std::string>("vdb");
@@ -1405,7 +1428,7 @@ void Tool::writeNVDB(const std::string &fileName)
       if (!keep) for (auto &g : grids) mGrid.remove(g);
     }
 
-    if (grids.empty()) throw std::invalid_argument("writeNVDB: no vdb grids to write");
+    if (grids.empty()) return this->warning(action_name+": no vdb grids to write");
 
     auto openToNano = [&](const GridBase::Ptr& base) {
       if (auto floatGrid = GridBase::grid<FloatGrid>(base)) {
@@ -1446,7 +1469,7 @@ void Tool::writeNVDB(const std::string &fileName)
     }
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::writeNVDB
 #else
@@ -1460,15 +1483,15 @@ void Tool::writeNVDB(const std::string&)
 
 void Tool::writeGeo(const std::string &fileName)
 {
-  OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "write");
   const int age = mParser.get<int>("geo");
   const bool keep = mParser.get<bool>("keep");
   const bool ascii = mParser.get<bool>("ascii");
   if (mParser.verbose>1) std::cerr << "Writing geometry to \"" << fileName << "\"\n";
   auto it = this->getGeom(age);
-  const Geometry &mesh = **it;
   if (mParser.verbose) mTimer.start("Write geometry");
-  mesh.write(fileName, ascii);
+  (*it)->write(fileName, ascii);
   if (!keep) mGeom.erase(std::next(it).base());
   if (mParser.verbose) mTimer.stop();
 }// Tool::writeGeo
@@ -1493,8 +1516,8 @@ void Tool::writeConf(const std::string &fileName)
 
 void Tool::vdbToPoints()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "vdb2points");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "vdb2points");
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
@@ -1502,10 +1525,12 @@ void Tool::vdbToPoints()
     std::string grid_name = mParser.get<std::string>("name");
     auto it = this->getGrid(age);
     auto grid = gridPtrCast<points::PointDataGrid>(*it);
-    if (!grid || grid->getGridClass() != GRID_UNKNOWN) throw std::invalid_argument("vdbToPoints: no PointDataGrid with age "+std::to_string(age));
+    if (!grid || grid->getGridClass() != GRID_UNKNOWN) {
+      throw std::invalid_argument("no PointDataGrid with age " + std::to_string(age));
+    }
     if (mParser.verbose) mTimer.start("VDB to points");
     const size_t count = points::pointCount(grid->tree());
-    if (count==0) throw std::invalid_argument("vdbToPoints: empty PointDataGrid with age "+std::to_string(age));
+    if (count==0) throw std::invalid_argument("empty PointDataGrid with age "+std::to_string(age));
     Geometry::Ptr geom(new Geometry());
     geom->vtx().resize(count);
     Vec3s *points = geom->vtx().data();
@@ -1527,7 +1552,7 @@ void Tool::vdbToPoints()
     }
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::vdbToPoints
 
@@ -1668,8 +1693,8 @@ void Tool::transform()
 
 void Tool::levelSetToFog()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "ls2fog");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "ls2fog");
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
@@ -1678,7 +1703,9 @@ void Tool::levelSetToFog()
     std::string grid_name = mParser.get<std::string>("name");
     auto it = this->getGrid(age);
     auto sdf = gridPtrCast<FloatGrid>(*it);
-    if (!sdf || sdf->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("levelSetToFog: no Level Set with age "+std::to_string(age));
+    if (!sdf || sdf->getGridClass() != GRID_LEVEL_SET) {
+      throw std::invalid_argument("no Level Set with age " + std::to_string(age));
+    }
     if (mParser.verbose) mTimer.start("SDF to FOG");
     FloatGrid::Ptr fog = keep ? sdf->deepCopy() : sdf;
     const float cutoffDistance = cutoff <= 0.0f ? sdf->background() : cutoff * sdf->voxelSize()[0];
@@ -1689,7 +1716,7 @@ void Tool::levelSetToFog()
     mGrid.push_back(fog);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::levelSetToFog
 
@@ -1697,12 +1724,12 @@ void Tool::levelSetToFog()
 
 void Tool::isoToLevelSet()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "iso2ls");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "iso2ls");
   try {
     mParser.printAction();
     const VecI age = mParser.getVec<int>("vdb");
-    if (age.size()!=1 && age.size()!=2) throw std::invalid_argument(name+": expected one or two vdb grids, not "+std::to_string(age.size()));
+    if (age.size()!=1 && age.size()!=2) throw std::invalid_argument(action_name+": expected one or two vdb grids, not "+std::to_string(age.size()));
     const float isoValue = mParser.get<float>("iso");
     const float voxel = mParser.get<float>("voxel");
     const float width = mParser.get<float>("width");
@@ -1710,7 +1737,7 @@ void Tool::isoToLevelSet()
     std::string grid_name = mParser.get<std::string>("name");
     auto it = this->getGrid(age[0]);
     auto grid = gridPtrCast<FloatGrid>(*it);
-    if (!grid) throw std::invalid_argument(name+": no FloatGrid with age "+std::to_string(age[0]));
+    if (!grid) throw std::invalid_argument("no VDB with age " + std::to_string(age[0]));
     if (mParser.verbose) mTimer.start("Iso to SDF");
     math::Transform::Ptr xform(nullptr);
     if (age.size()==2) {
@@ -1726,7 +1753,7 @@ void Tool::isoToLevelSet()
     mGrid.push_back(sdf);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name + ": " + e.what());
   }
 }// Tool::isoToLevelSet
 
@@ -1749,17 +1776,14 @@ float Tool::estimateVoxelSize(int maxDim,  float exWidth, float inWidth, int geo
 
 void Tool::quadsToTriangles()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "quad2tri");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "quad2tri");
   try {
     mParser.printAction();
     const int geo_age = mParser.get<int>("geo");
     const bool keep = mParser.get<bool>("keep");
     Geometry::Ptr mesh = *this->getGeom(geo_age);
-    if (mesh->isPoints()) {
-      this->warning("Warning: -quad2tri was called on points, i.e. no quads!");
-      return;
-    }
+    if (mesh->isPoints()) throw std::invalid_argument("called on points, i.e. no quads!");
     if (keep) {
       Geometry::Ptr meshCopy = mesh->deepCopy();
       mGeom.push_back(meshCopy);
@@ -1769,7 +1793,7 @@ void Tool::quadsToTriangles()
     mesh->triangulateQuads();
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name + ": " + e.what());
   }
 }// Tool::quadsToTriangles
 
@@ -1868,8 +1892,8 @@ void Tool::meshToUnsignedDistanceField()
 
 void Tool::soupToLevelSet()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "soup2ls");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "soup2ls");
   try {
     mParser.printAction();
     const int dim = mParser.get<int>("dim");// final dimension
@@ -1883,7 +1907,10 @@ void Tool::soupToLevelSet()
 
     auto it = this->getGeom(geo_age);
     Geometry::Ptr mesh = *it;
-    if (mesh->isPoints()) this->warning("Warning: -soup2ls was called on points, not a mesh! Hint: use -points2ls instead!");
+    if (mesh->isPoints()) {
+      if (!keep) mGeom.erase(std::next(it).base());
+      throw std::invalid_argument("only points, expected mesh! Hint: use -points2ls instead!");
+    }
     if (keep) mesh = mesh->deepCopy();// deep copy since mesh will be modified below
     if (mParser.verbose) mTimer.start("Soup -> SDF");
 
@@ -1900,7 +1927,11 @@ void Tool::soupToLevelSet()
     if (!keep) mGeom.erase(std::next(it).base());
 
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    if (mStopOnError) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl; 
+    }
   }
 }// Tool::soupToLevelSet
 
@@ -1983,8 +2014,8 @@ typename Tool::FilterT Tool::createFilter(GridT &grid, int space, int time)
 
 void Tool::offsetLevelSet()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(findMatch(name, {"dilate", "erode", "open", "close"}));
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(findMatch(action_name, {"dilate", "erode", "open", "close"}));
   try {
     mParser.printAction();
     float radius = mParser.get<float>("radius");
@@ -1995,30 +2026,32 @@ void Tool::offsetLevelSet()
     if (radius==0) return;
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("offsetLevelSet: no level set with age "+std::to_string(age));
+    if (!grid || grid->getGridClass() != GRID_LEVEL_SET) {
+      throw std::invalid_argument("no level set with age " + std::to_string(age));
+    }
     auto filter = this->createFilter(*grid, space, time);
     radius *= static_cast<float>((*it)->voxelSize()[0]);// voxel to world units
-    if (name == "dilate") {
+    if (action_name == "dilate") {
       if (mParser.verbose) mTimer.start("Dilate  SDF");
       filter->offset(-radius);
-    } else if (name == "erode") {
+    } else if (action_name == "erode") {
       if (mParser.verbose) mTimer.start("Erode   SDF");
       filter->offset( radius);
-    } else if (name == "open") {
+    } else if (action_name == "open") {
       if (mParser.verbose) mTimer.start("Open   SDF");
       filter->offset( radius);
       filter->offset(-radius);
-    } else if (name == "close") {
+    } else if (action_name == "close") {
       if (mParser.verbose) mTimer.start("Close   SDF");
       filter->offset(-radius);
       filter->offset( radius);
     } else {
       throw std::invalid_argument("offsetLevelSet: invalid operation type");
     }
-    grid->setName(name + "_" + grid->getName());
+    grid->setName(action_name + "_" + grid->getName());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name + ": " + e.what());
   }
 }// Tool::offsetLevelSet
 
@@ -2026,8 +2059,8 @@ void Tool::offsetLevelSet()
 
 void Tool::filterLevelSet()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(findMatch(name, {"gauss", "mean", "median"}));
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(findMatch(action_name, {"gauss", "mean", "median"}));
   try {
     mParser.printAction();
     const int nIter = mParser.get<int>("iter");
@@ -2039,25 +2072,27 @@ void Tool::filterLevelSet()
     if (size==0) return;
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("filterLevelSet: no level set with age "+std::to_string(age));
+    if (!grid || grid->getGridClass() != GRID_LEVEL_SET) {
+      return this->warning(action_name + ": no level set with age " + std::to_string(age));
+    }
     auto filter = this->createFilter(*grid, space, time);
 
-    if (name == "gauss") {
+    if (action_name == "gauss") {
       if (mParser.verbose) mTimer.start("Gauss   SDF");
       for (int i=0; i<nIter; ++i) filter->gaussian(size);
-    } else if (name == "mean") {
+    } else if (action_name == "mean") {
       if (mParser.verbose) mTimer.start("Mean SDF ");
       for (int i=0; i<nIter; ++i) filter->mean(size);
-    } else if (name == "median") {
+    } else if (action_name == "median") {
       if (mParser.verbose) mTimer.start("Median SDF");
       for (int i=0; i<nIter; ++i) filter->median(size);
     } else {
       throw std::invalid_argument("filterLevelSet: invalid filter type");
     }
-    grid->setName(name + "_" + grid->getName());
+    grid->setName(action_name + "_" + grid->getName());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::filterLevelSet
 
@@ -2065,20 +2100,22 @@ void Tool::filterLevelSet()
 
 void Tool::pruneLevelSet()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "prune");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "prune");
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("pruneLevelSet: no level set with age "+std::to_string(age));
+    if (!grid || grid->getGridClass() != GRID_LEVEL_SET) {
+      return this->warning(action_name + ": no level set with age " + std::to_string(age));
+    }
     if (mParser.verbose) mTimer.start("Prune   SDF");
     tools::pruneLevelSet(grid->tree());
     grid->setName("prune_"+grid->getName());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::pruneLevelSet
 
@@ -2086,20 +2123,22 @@ void Tool::pruneLevelSet()
 
 void Tool::floodLevelSet()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "flood");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "flood");
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("floodLevelSet: no level set with age "+std::to_string(age));
+    if (!grid || grid->getGridClass() != GRID_LEVEL_SET) {
+      return this->warning(action_name + ": no level set with age " + std::to_string(age));
+    }
     if (mParser.verbose) mTimer.start("Flood   SDF");
     tools::signedFloodFill(grid->tree());
     grid->setName("flood_"+grid->getName());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::floodLevelSet
 
@@ -2175,20 +2214,20 @@ void Tool::compute()
 
 void Tool::composite()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(findMatch(name, {"min","max","sum"}));
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(findMatch(action_name, {"min","max","sum"}));
   try {
     mParser.printAction();
     const VecI ij = mParser.getVec<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
-    if (ij.size()!=2) throw std::invalid_argument(name+": expected two vdb ages, but got "+std::to_string(ij.size()));
-    if (ij[0] == ij[1]) throw std::invalid_argument(name+": identical inputs: volume1=volume2="+std::to_string(ij[0]));
+    if (ij.size()!=2) throw std::invalid_argument(action_name+": expected two vdb ages, but got "+std::to_string(ij.size()));
+    if (ij[0] == ij[1]) throw std::invalid_argument(action_name+": identical inputs: volume1=volume2="+std::to_string(ij[0]));
     auto itA = this->getGrid(ij[0]), itB = this->getGrid(ij[1]);
     GridT::Ptr gridA = gridPtrCast<GridT>(*itA);
-    if (!gridA) throw std::invalid_argument(name+": no float grid with age "+std::to_string(ij[0]));
+    if (!gridA) return this->warning(action_name + ": no float grid with age " + std::to_string(ij[0]));
     GridT::Ptr gridB = gridPtrCast<GridT>(*itB);
-    if (!gridB) throw std::invalid_argument(name+": no float grid with age "+std::to_string(ij[1]));
-    if (gridA->transform() != gridB->transform()) this->warning(name+": grids have different transforms");
+    if (!gridB) return this->warning(action_name + ": no float grid with age " + std::to_string(ij[1]));
+    if (gridA->transform() != gridB->transform()) this->warning(action_name+": grids have different transforms");
     GridT::Ptr tmpA, tmpB;
     if (keep) {
       tmpA = gridA->deepCopy();
@@ -2199,20 +2238,20 @@ void Tool::composite()
       tmpB = gridB;
       mGrid.erase(std::next(itB).base());// remove B from mGrids since it will be destroyed
     }
-    tmpA->setName(name+"_"+tmpA->getName());
-    if (mParser.verbose) mTimer.start(name);
-    if (name == "min") {
+    tmpA->setName(action_name+"_"+tmpA->getName());
+    if (mParser.verbose) mTimer.start(action_name);
+    if (action_name == "min") {
       tools::compMin(*tmpA, *tmpB);// Store the result in the A grid and leave the B grid empty.
-    } else if (name == "max") {
+    } else if (action_name == "max") {
       tools::compMax(*tmpA, *tmpB);// Store the result in the A grid and leave the B grid empty.
-    } else if (name == "sum") {
+    } else if (action_name == "sum") {
       tools::compSum(*tmpA, *tmpB);// Store the result in the A grid and leave the B grid empty.
     } else {
-      throw std::invalid_argument(name+": invalid operation");
+      throw std::invalid_argument(action_name+": invalid operation");
     }
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::composite
 
@@ -2220,8 +2259,8 @@ void Tool::composite()
 
 void Tool::csg()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(findMatch(name, {"union", "intersection", "difference"}));
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(findMatch(action_name, {"union", "intersection", "difference"}));
   try {
     mParser.printAction();
     const VecI ij = mParser.getVec<int>("vdb");
@@ -2232,9 +2271,13 @@ void Tool::csg()
     if (ij[0] == ij[1]) throw std::invalid_argument("csg: identical inputs: volume1=volume2="+std::to_string(ij[0]));
     auto itA = this->getGrid(ij[0]), itB = this->getGrid(ij[1]);
     GridT::Ptr gridA = gridPtrCast<GridT>(*itA);
-    if (!gridA || gridA->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("floodLevelSet: no level set with age "+std::to_string(ij[0]));
+    if (!gridA || gridA->getGridClass() != GRID_LEVEL_SET) {
+      return this->warning(action_name + ": no level set with age " + std::to_string(ij[0]));
+    }
     GridT::Ptr gridB = gridPtrCast<GridT>(*itB);
-    if (!gridB || gridB->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("floodLevelSet: no level set with age "+std::to_string(ij[1]));
+    if (!gridB || gridB->getGridClass() != GRID_LEVEL_SET) {
+      return this->warning(action_name + ": no level set with age " + std::to_string(ij[1]));
+    }
     if (gridA->transform() != gridB->transform()) {
       if (gridA->voxelSize()[0]<gridB->voxelSize()[0]) {// use the smallest voxel size
         const float halfWidth = static_cast<float>(gridA->background()/gridA->voxelSize()[0]);
@@ -2247,7 +2290,7 @@ void Tool::csg()
       }
       if (mParser.verbose) mTimer.stop();
     }
-    if (name == "union") {
+    if (action_name == "union") {
       if (mParser.verbose) mTimer.start("Union");
       if (keep) {
         GridT::Ptr grid = tools::csgUnionCopy(*gridA, *gridB);
@@ -2259,7 +2302,7 @@ void Tool::csg()
         if (rebuild) gridA = tools::sdfToSdf(*gridA);
         gridA->setName("union_"+gridA->getName());
       }
-    } else if (name == "intersection") {
+    } else if (action_name == "intersection") {
       if (mParser.verbose) mTimer.start("Intersection");
       if (keep) {
         GridT::Ptr grid = tools::csgIntersectionCopy(*gridA, *gridB);
@@ -2271,7 +2314,7 @@ void Tool::csg()
         if (rebuild) gridA = tools::sdfToSdf(*gridA);
         gridA->setName("intersection_"+gridA->getName());
       }
-    } else if (name == "difference") {
+    } else if (action_name == "difference") {
       if (mParser.verbose) mTimer.start("Difference");
       if (keep) {
         GridT::Ptr grid = tools::csgDifferenceCopy(*gridA, *gridB);
@@ -2289,7 +2332,7 @@ void Tool::csg()
     if (!keep) mGrid.erase(std::next(itB).base());// remove B since it was corrupted
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::csg
 
@@ -2310,13 +2353,13 @@ void Tool::volumeToMesh()
     const bool keep = mParser.get<bool>("keep");
     std::string grid_name = mParser.get<std::string>("name");
 
-    auto it = this->getGrid(age);
+    auto it = this->getGrid(age);// will throw if grid doesn't exist
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid) throw std::invalid_argument(action_name+": no VDB with age "+std::to_string(age));
+    if (!grid) throw std::invalid_argument("no FloatGrid with age " + std::to_string(age));
     if (mode==1 && grid->getGridClass() != GRID_LEVEL_SET) {
-      throw std::invalid_argument(action_name+": no level set with age "+std::to_string(age));
+      throw std::invalid_argument("no level set with age "+std::to_string(age));
     } else if (mode==2 && grid->getGridClass() != GRID_FOG_VOLUME) {
-      throw std::invalid_argument(action_name+": no fog volume with age "+std::to_string(age));
+      throw std::invalid_argument("no fog volume with age "+std::to_string(age));
     }
     
     if (mParser.verbose) mTimer.start(action_name);
@@ -2331,7 +2374,7 @@ void Tool::volumeToMesh()
       } else if (base->isType<Vec3fGrid>()) {
         mesher.setSurfaceMask(tools::interiorMask(*gridPtrCast<Vec3fGrid>(base)), invert);
       } else {
-        throw std::invalid_argument("volumeToMesh: unsupported mask type with age "+std::to_string(mask));
+        throw std::invalid_argument("unsupported mask type with age "+std::to_string(mask));
       }
     }
     mesher(*grid);
@@ -2344,7 +2387,11 @@ void Tool::volumeToMesh()
 
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mStopOnError) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+    }
   }
 }// Tool::volumeToMesh
 
@@ -2352,8 +2399,8 @@ void Tool::volumeToMesh()
 
 void Tool::levelSetSphere()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "sphere");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "sphere");
   try {
     mParser.printAction();
     const int dim = mParser.get<int>("dim");
@@ -2369,7 +2416,7 @@ void Tool::levelSetSphere()
     grid->setName(grid_name);
     mGrid.push_back(grid);
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::levelSetSphere
 
@@ -2377,8 +2424,8 @@ void Tool::levelSetSphere()
 
 void Tool::levelSetPlatonic()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "platonic");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "platonic");
   try {
     mParser.printAction();
     const int dim = mParser.get<int>("dim");
@@ -2408,7 +2455,7 @@ void Tool::levelSetPlatonic()
     }
     mGrid.push_back(grid);
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::levelSetPlatonic
 
@@ -2416,8 +2463,8 @@ void Tool::levelSetPlatonic()
 
 void Tool::multires()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "multires");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "multires");
   try {
     mParser.printAction();
     const int levels = mParser.get<int>("levels");
@@ -2425,7 +2472,7 @@ void Tool::multires()
     const bool keep = mParser.get<bool>("keep");
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid) throw std::invalid_argument("multires: no FloatGrid with age "+std::to_string(age));
+    if (!grid) return this->warning(action_name + ": no VDB with age " + std::to_string(age));
     if (mParser.verbose) mTimer.start("MultiResGrid");
     if (keep) {
       tools::MultiResGrid<GridT::TreeType> mrg(levels+1, *grid);
@@ -2437,7 +2484,7 @@ void Tool::multires()
     }
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::multires
 
@@ -2445,8 +2492,8 @@ void Tool::multires()
 
 void Tool::expandLevelSet()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "expand");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "expand");
   try {
     mParser.printAction();
     const int dilate = mParser.get<int>("dilate");
@@ -2455,7 +2502,9 @@ void Tool::expandLevelSet()
     const bool keep = mParser.get<bool>("keep");
     auto it = this->getGrid(age);
     GridT::Ptr sdf = gridPtrCast<GridT>(*it);
-    if (!sdf || sdf->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("expandLevelSet: no level set with age "+std::to_string(age));
+    if (!sdf || sdf->getGridClass() != GRID_LEVEL_SET) {
+      return this->warning(action_name + ": no level set with age " + std::to_string(age));
+    }
     if (mParser.verbose) mTimer.start("Expand SDF");
     auto grid = tools::dilateSdf(*sdf, dilate, tools::NN_FACE, iter);
     if (!keep) mGrid.erase(std::next(it).base());
@@ -2463,7 +2512,7 @@ void Tool::expandLevelSet()
     mGrid.push_back(grid);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::expandLevelSet
 
@@ -2471,8 +2520,8 @@ void Tool::expandLevelSet()
 
 void Tool::segment()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "segment");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "segment");
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
@@ -2489,13 +2538,13 @@ void Tool::segment()
       }
       for (auto g : segments) grids.push_back(g);
     } else {
-      throw std::invalid_argument("segment: grid with age "+std::to_string(age)+" is not a float grid");
+      return this->warning(action_name + ": no VDB with age " + std::to_string(age));
     }
     if (!keep) mGrid.erase(std::next(it).base());
     for (auto g : grids) mGrid.push_back(g);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::segment
 
@@ -2504,8 +2553,8 @@ void Tool::segment()
 // for simplicity we are restricting this resampler to only work on float grids!
 void Tool::resample()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "resample");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "resample");
   try {
     mParser.printAction();
     const VecI age = mParser.getVec<int>("vdb");
@@ -2520,7 +2569,7 @@ void Tool::resample()
     if (age.size()==2) {
       auto itOut = this->getGrid(age[1]);
       outGrid = gridPtrCast<FloatGrid>(*itOut);
-      if (!outGrid) throw std::invalid_argument("resample: no reference grid of type float with age "+std::to_string(age[1]));
+      if (!outGrid) return this->warning(action_name+": no reference grid of type float with age "+std::to_string(age[1]));
     } else {
       if (scale<=0.0f) throw std::invalid_argument("resample: invalid scale: "+std::to_string(scale));
       auto map = math::MapBase::Ptr(new math::UniformScaleTranslateMap(scale, translate));
@@ -2529,7 +2578,7 @@ void Tool::resample()
       outGrid->setTransform(xform);
     }
 
-    if (!inGrid) throw std::invalid_argument("resample: no grid of type float with age "+std::to_string(age[0]));
+    if (!inGrid) return this->warning(action_name+": no grid of type float with age "+std::to_string(age[0]));
 
     if (mParser.verbose) mTimer.start("Resampling VDB");
     switch (order) {
@@ -2549,7 +2598,7 @@ void Tool::resample()
     if (age.size()==1) mGrid.push_back(outGrid);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::resample
 
@@ -2557,8 +2606,8 @@ void Tool::resample()
 
 void Tool::scatter()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "scatter");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "scatter");
   try {
     mParser.printAction();
     const Index64 count = mParser.get<int>("count");
@@ -2569,7 +2618,7 @@ void Tool::scatter()
     std::string grid_name = mParser.get<std::string>("name");
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid) throw std::invalid_argument("scatter: no float grid with age "+std::to_string(age));
+    if (!grid) return this->warning(action_name + ": no VDB with age " + std::to_string(age));
     if (mParser.verbose) mTimer.start("SDF -> mesh");
     Geometry::Ptr geom(new Geometry());
     struct PointWrapper {
@@ -2600,7 +2649,7 @@ void Tool::scatter()
     mGeom.push_back(geom);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::scatter
 
@@ -2616,8 +2665,8 @@ void Tool::slice()
     Axis(const Parser &p, char c, int i, int j, int k) : label(1,c), slices(p.getVec<float>(label)), abc(i,j,k) {}
   };
 
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "slice");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "slice");
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
@@ -2629,9 +2678,9 @@ void Tool::slice()
 
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid) throw std::invalid_argument("slice: no float grid with age "+std::to_string(age));
+    if (!grid) return this->warning(action_name + ": no VDB with age " + std::to_string(age));
     const auto &tree = grid->tree();
-    if (mParser.verbose) mTimer.start(name);
+    if (mParser.verbose) mTimer.start(action_name);
 
     // color LUT from https://gist.github.com/mikhailov-work/6a308c20e494d9e0ccc29036b28faa7a (Apache-2.0)
     const unsigned char LUT[256][3] = {{48,18,59},{50,21,67},{51,24,74},{52,27,81},{53,30,88},{54,33,95},{55,36,102},{56,39,109},{57,42,115},{58,45,121},{59,47,128},{60,50,134},{61,53,139},{62,56,145},{63,59,151},{63,62,156},{64,64,162},{65,67,167},{65,70,172},{66,73,177},{66,75,181},{67,78,186},{68,81,191},{68,84,195},{68,86,199},{69,89,203},{69,92,207},{69,94,211},{70,97,214},{70,100,218},{70,102,221},{70,105,224},{70,107,227},{71,110,230},{71,113,233},{71,115,235},{71,118,238},{71,120,240},{71,123,242},{70,125,244},{70,128,246},{70,130,248},{70,133,250},{70,135,251},{69,138,252},{69,140,253},{68,143,254},{67,145,254},{66,148,255},{65,150,255},{64,153,255},{62,155,254},{61,158,254},{59,160,253},{58,163,252},{56,165,251},{55,168,250},{53,171,248},{51,173,247},{49,175,245},{47,178,244},{46,180,242},{44,183,240},{42,185,238},{40,188,235},{39,190,233},{37,192,231},{35,195,228},{34,197,226},{32,199,223},{31,201,221},{30,203,218},{28,205,216},{27,208,213},{26,210,210},{26,212,208},{25,213,205},{24,215,202},{24,217,200},{24,219,197},{24,221,194},{24,222,192},{24,224,189},{25,226,187},{25,227,185},{26,228,182},{28,230,180},{29,231,178},{31,233,175},{32,234,172},{34,235,170},{37,236,167},{39,238,164},{42,239,161},{44,240,158},{47,241,155},{50,242,152},{53,243,148},{56,244,145},{60,245,142},{63,246,138},{67,247,135},{70,248,132},{74,248,128},{78,249,125},{82,250,122},{85,250,118},{89,251,115},{93,252,111},{97,252,108},{101,253,105},{105,253,102},{109,254,98},{113,254,95},{117,254,92},{121,254,89},{125,255,86},{128,255,83},{132,255,81},{136,255,78},{139,255,75},{143,255,73},{146,255,71},{150,254,68},{153,254,66},{156,254,64},{159,253,63},{161,253,61},{164,252,60},{167,252,58},{169,251,57},{172,251,56},{175,250,55},{177,249,54},{180,248,54},{183,247,53},{185,246,53},{188,245,52},{190,244,52},{193,243,52},{195,241,52},{198,240,52},{200,239,52},{203,237,52},{205,236,52},{208,234,52},{210,233,53},{212,231,53},{215,229,53},{217,228,54},{219,226,54},{221,224,55},{223,223,55},{225,221,55},{227,219,56},{229,217,56},{231,215,57},{233,213,57},{235,211,57},{236,209,58},{238,207,58},{239,205,58},{241,203,58},{242,201,58},{244,199,58},{245,197,58},{246,195,58},{247,193,58},{248,190,57},{249,188,57},{250,186,57},{251,184,56},{251,182,55},{252,179,54},{252,177,54},{253,174,53},{253,172,52},{254,169,51},{254,167,50},{254,164,49},{254,161,48},{254,158,47},{254,155,45},{254,153,44},{254,150,43},{254,147,42},{254,144,41},{253,141,39},{253,138,38},{252,135,37},{252,132,35},{251,129,34},{251,126,33},{250,123,31},{249,120,30},{249,117,29},{248,114,28},{247,111,26},{246,108,25},{245,105,24},{244,102,23},{243,99,21},{242,96,20},{241,93,19},{240,91,18},{239,88,17},{237,85,16},{236,83,15},{235,80,14},{234,78,13},{232,75,12},{231,73,12},{229,71,11},{228,69,10},{226,67,10},{225,65,9},{223,63,8},{221,61,8},{220,59,7},{218,57,7},{216,55,6},{214,53,6},{212,51,5},{210,49,5},{208,47,5},{206,45,4},{204,43,4},{202,42,4},{200,40,3},{197,38,3},{195,37,3},{193,35,2},{190,33,2},{188,32,2},{185,30,2},{183,29,2},{180,27,1},{178,26,1},{175,24,1},{172,23,1},{169,22,1},{167,20,1},{164,19,1},{161,18,1},{158,16,1},{155,15,1},{152,14,1},{149,13,1},{146,11,1},{142,10,1},{139,9,2},{136,8,2},{133,7,2},{129,6,2},{126,5,2},{122,4,3}};
@@ -2674,7 +2723,7 @@ void Tool::slice()
     if (!keep) mGrid.erase(std::next(it).base());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name + ": " + e.what());
+    throw std::invalid_argument(action_name + ": " + e.what());
   }
 }// Tool::slice
 
@@ -2733,8 +2782,8 @@ void Tool::movie()
 // https://faculty.washington.edu/rjl/pubs/hiresadv/0733033.pdf
 void Tool::enright()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "enright");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "enright");
   try {
     mParser.printAction();
     const Vec3d translate = mParser.getVec3<double>("translate");
@@ -2770,7 +2819,9 @@ void Tool::enright()
       mGrid.push_back(tmp);
       grid = tmp;
     }
-    if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("enright: no level set with age "+std::to_string(age));
+    if (!grid || grid->getGridClass() != GRID_LEVEL_SET) {
+      return this->warning(action_name + ": no level set with age " + std::to_string(age));
+    }
     if (mParser.verbose) mTimer.start("Enright SDF");
     tools::LevelSetAdvection<GridT, LeVequeField> advect(*grid, field);
     advect.setSpatialScheme(math::HJWENO5_BIAS);
@@ -2780,7 +2831,7 @@ void Tool::enright()
     advect.advect(0.0f, dt);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::enright
 
@@ -2825,8 +2876,8 @@ GridBase::Ptr Tool::clip(const VecF &v, int age, const GridType &input)
 
 void Tool::clip()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "clip");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "clip");
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
@@ -2844,14 +2895,14 @@ void Tool::clip()
     } else if (auto vec3Grid = gridPtrCast<Vec3fGrid>(*it)) {
       grid = this->clip(vec, mask, *vec3Grid);
     } else {
-      throw std::invalid_argument("clip: unsupported grid type with "+std::to_string(age));
+      return this->warning(action_name + ": unsupported grid type with " + std::to_string(age));
     }
     if (!(*it)->getName().empty()) grid->setName("clip_"+(*it)->getName());
     if (!keep) mGrid.erase(std::next(it).base());
     mGrid.push_back(grid);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }
 
@@ -3000,7 +3051,8 @@ void saveEXR(const std::string&, const tools::Film&, const std::string& = "zip")
 
 void Tool::render()
 {
-  OPENVDB_ASSERT(mParser.getAction().names[0] == "render");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "render");
   const VecS fileNames = mParser.getVec<std::string>("files");
   const int age = mParser.get<int>("vdb");
   const bool keep = mParser.get<bool>("keep");
@@ -3035,7 +3087,9 @@ void Tool::render()
   if (image.size()!=2) throw std::invalid_argument("render: expected width and height,  e.g. image=1920x1080");
   auto it = this->getGrid(age);
   GridT::Ptr grid = gridPtrCast<GridT>(*it);
-  if (!grid) throw std::invalid_argument("render: no float with age "+std::to_string(age));
+  if (!grid || grid->getGridClass() != GRID_LEVEL_SET) {
+    return this->warning(action_name + ": no level set with age " + std::to_string(age));
+  }
   if (step.size()!=2) throw std::invalid_argument("render: \"step\" option expected 2 values, but got "+std::to_string(step.size()));
 
   tools::Film film(image[0], image[1]);
