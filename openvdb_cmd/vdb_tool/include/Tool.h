@@ -147,7 +147,7 @@ private:
     std::list<Geometry::Ptr> mGeom;// list of geometries owned by this tool
     std::list<GridBase::Ptr> mGrid;// list of based grids owned by this tool
     Parser                   mParser;
-    bool                     mStopOnError{false};
+    bool                     mErrorOnWarning{false};
 
     /// @brief Deletes geometry, VDB grids and local variables
     void clear();
@@ -860,6 +860,10 @@ void Tool::init()
       {"examples"}, "print examples to the terminal and terminate", {},
       [&](){std::cerr << this->examples() << std::endl; std::exit(EXIT_SUCCESS);}, [](){});
 
+  mParser.addAction(
+      {"errorOnWarning", "stopOnWarning"}, "stop on warnings, i.e. treat warnings as errors", {},
+      [&](){mErrorOnWarning = true;}, [](){});
+
   Processor &proc = mParser.processor;
 
   // operations related to VDB grids
@@ -1104,7 +1108,7 @@ void Tool::read()
       }// end switch
     }// end for loop over files
   } catch (const std::exception& e) {
-    if (mStopOnError) {
+    if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
       std::cerr << action_name << ": skipping do to " << e.what() << std::endl;
@@ -1280,7 +1284,7 @@ void Tool::write()
       }
     }
   } catch (const std::exception& e) {
-    if (mStopOnError) {
+    if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
       std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
@@ -1716,7 +1720,11 @@ void Tool::levelSetToFog()
     mGrid.push_back(fog);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+    }
   }
 }// Tool::levelSetToFog
 
@@ -1753,7 +1761,11 @@ void Tool::isoToLevelSet()
     mGrid.push_back(sdf);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name + ": " + e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+    }
   }
 }// Tool::isoToLevelSet
 
@@ -1793,7 +1805,11 @@ void Tool::quadsToTriangles()
     mesh->triangulateQuads();
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name + ": " + e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+    }
   }
 }// Tool::quadsToTriangles
 
@@ -1801,8 +1817,8 @@ void Tool::quadsToTriangles()
 
 void Tool::meshToLevelSet()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "mesh2ls");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "mesh2ls");
   try {
     mParser.printAction();
     const int dim = mParser.get<int>("dim");
@@ -1845,7 +1861,11 @@ void Tool::meshToLevelSet()
     if (!keep) mGeom.erase(std::next(it).base());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+    }
   }
 }// Tool::meshToLevelSet
 
@@ -1853,8 +1873,8 @@ void Tool::meshToLevelSet()
 
 void Tool::meshToUnsignedDistanceField()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "mesh2udf");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "mesh2udf");
   try {
     mParser.printAction();
     const int dim = mParser.get<int>("dim");
@@ -1875,16 +1895,20 @@ void Tool::meshToUnsignedDistanceField()
     }
     auto it = this->getGeom(geo_age);
     const Geometry &mesh = **it;
-    if (mesh.isPoints()) this->warning("Warning: -mesh2udf was called on points, not a mesh! Hint: use -points2ls instead!");
+    if (mesh.isPoints()) throw std::invalid_argument("only points, expected mesh! Hint: use -points2ls instead!");
     if (mParser.verbose) mTimer.start("Mesh -> UDF");
-    auto grid  = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
-    if (grid_name.empty()) grid_name = "mesh2udf_" + mesh.getName();
+    auto grid = tools::meshToUnsignedDistanceField<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
+    if (grid_name.empty()) grid_name = action_name + "_" + mesh.getName();
     grid->setName(grid_name);
     mGrid.push_back(grid);
     if (!keep) mGeom.erase(std::next(it).base());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+    }
   }
 }// Tool::meshToUnsignedDistanceField
 
@@ -1909,7 +1933,7 @@ void Tool::soupToLevelSet()
     Geometry::Ptr mesh = *it;
     if (mesh->isPoints()) {
       if (!keep) mGeom.erase(std::next(it).base());
-      throw std::invalid_argument("only points, expected mesh! Hint: use -points2ls instead!");
+      throw std::invalid_argument("got points, expected mesh! Hint: use -points2ls instead!");
     }
     if (keep) mesh = mesh->deepCopy();// deep copy since mesh will be modified below
     if (mParser.verbose) mTimer.start("Soup -> SDF");
@@ -1927,10 +1951,10 @@ void Tool::soupToLevelSet()
     if (!keep) mGeom.erase(std::next(it).base());
 
   } catch (const std::exception& e) {
-    if (mStopOnError) {
+    if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
-      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl; 
+      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
     }
   }
 }// Tool::soupToLevelSet
@@ -1939,8 +1963,8 @@ void Tool::soupToLevelSet()
 
 void Tool::particlesToLevelSet()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(name == "points2ls");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "points2ls");
   try {
     mParser.printAction();
     const int dim = mParser.get<int>("dim");
@@ -1953,17 +1977,21 @@ void Tool::particlesToLevelSet()
     if (voxel == 0.0f) voxel = this->estimateVoxelSize(dim, width, age);
     auto it = this->getGeom(age);
     const Geometry &points = **it;
-    if (points.isMesh()) this->warning("Warning: -points2ls was called on a mesh, not points! Hint: use -mesh2ls instead!");
+    if (points.isMesh()) throw std::invalid_argument("got mesh, expected points! Hint: use -mesh2ls instead!");
     if (mParser.verbose) mTimer.start("Points->SDF");
     GridT::Ptr grid = createLevelSet<GridT>(voxel, width);
-    if (grid_name.empty()) grid_name = "points2ls_"+points.getName();
+    if (grid_name.empty()) grid_name = action_name + "_"+points.getName();
     grid->setName(grid_name);
     tools::particlesToSdf(Points(points.vtx()), *grid, voxel*radius);
     mGrid.push_back(grid);
     if (!keep) mGeom.erase(std::next(it).base());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+    }
   }
 }// Tool::particlesToLevelSet
 
@@ -2051,7 +2079,11 @@ void Tool::offsetLevelSet()
     grid->setName(action_name + "_" + grid->getName());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name + ": " + e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+    }
   }
 }// Tool::offsetLevelSet
 
@@ -2092,7 +2124,11 @@ void Tool::filterLevelSet()
     grid->setName(action_name + "_" + grid->getName());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+    }
   }
 }// Tool::filterLevelSet
 
@@ -2115,7 +2151,11 @@ void Tool::pruneLevelSet()
     grid->setName("prune_"+grid->getName());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+    }
   }
 }// Tool::pruneLevelSet
 
@@ -2138,7 +2178,11 @@ void Tool::floodLevelSet()
     grid->setName("flood_"+grid->getName());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+    }
   }
 }// Tool::floodLevelSet
 
@@ -2146,14 +2190,14 @@ void Tool::floodLevelSet()
 
 void Tool::compute()
 {
-  const std::string &name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(findMatch(name, {"cpt","div","curl","length","grad","curvature"}));
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(findMatch(action_name, {"cpt","div","curl","length","grad","curvature"}));
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
     auto it = this->getGrid(age);
-    if (name == "cpt") {
+    if (action_name == "cpt") {
       if (mParser.verbose) mTimer.start("CPT of SDF");
       auto sdf = gridPtrCast<FloatGrid>(*it);
       if (!sdf || sdf->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("cpt: no level set with age "+std::to_string(age));
@@ -2161,7 +2205,7 @@ void Tool::compute()
       grid->setName("cpt_"+sdf->getName());
       if (!keep) mGrid.erase(std::next(it).base());
       mGrid.push_back(grid);
-    } else if (name == "div") {
+    } else if (action_name == "div") {
       if (mParser.verbose) mTimer.start("Divergence");
       auto vec = gridPtrCast<Vec3fGrid>(*it);
       if (!vec) throw std::invalid_argument("div: no vec3f grid with age "+std::to_string(age));
@@ -2169,7 +2213,7 @@ void Tool::compute()
       grid->setName("div_"+vec->getName());
       if (!keep) mGrid.erase(std::next(it).base());
       mGrid.push_back(grid);
-    } else if (name == "curl") {
+    } else if (action_name == "curl") {
       if (mParser.verbose) mTimer.start("Curl of Vec3");
       auto vec = gridPtrCast<Vec3fGrid>(*it);
       if (!vec) throw std::invalid_argument("curl: no vec3f grid with age "+std::to_string(age));
@@ -2177,7 +2221,7 @@ void Tool::compute()
       grid->setName("curl_"+vec->getName());
       if (!keep) mGrid.erase(std::next(it).base());
       mGrid.push_back(grid);
-    } else if (name == "length") {
+    } else if (action_name == "length") {
       if (mParser.verbose) mTimer.start("Length of Vec3");
       auto vec = gridPtrCast<Vec3fGrid>(*it);
       if (!vec) throw std::invalid_argument("length: no vec3f grid with age "+std::to_string(age));
@@ -2185,7 +2229,7 @@ void Tool::compute()
       grid->setName("length_"+vec->getName());
       if (!keep) mGrid.erase(std::next(it).base());
       mGrid.push_back(grid);
-    } else if (name == "grad") {
+    } else if (action_name == "grad") {
       if (mParser.verbose) mTimer.start("Gradient");
       auto scalar = gridPtrCast<FloatGrid>(*it);
       if (!scalar) throw std::invalid_argument("grad: no float grid with age "+std::to_string(age));
@@ -2193,7 +2237,7 @@ void Tool::compute()
       grid->setName("grad_"+scalar->getName());
       if (!keep) mGrid.erase(std::next(it).base());
       mGrid.push_back(grid);
-    } else if (name == "curvature") {
+    } else if (action_name == "curvature") {
       if (mParser.verbose) mTimer.start("Curvature");
       auto scalar = gridPtrCast<FloatGrid>(*it);
       if (!scalar) throw std::invalid_argument("curv: no float grid with age "+std::to_string(age));
@@ -2206,7 +2250,11 @@ void Tool::compute()
     }
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+    }
   }
 }// Tool::compute
 
@@ -2251,7 +2299,11 @@ void Tool::composite()
     }
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::cerr << action_name << ": skipping do to " << e.what() << std::endl;
+    }
   }
 }// Tool::composite
 
@@ -2387,7 +2439,7 @@ void Tool::volumeToMesh()
 
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    if (mStopOnError) {
+    if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
       std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
@@ -2735,42 +2787,45 @@ void Tool::slice()
 void Tool::movie()
 {
 #ifdef VDB_TOOL_USE_MPEG
-  const int fps = mParser.get<int>("fps");
-  const std::string input = mParser.get<std::string>("input");
-  const std::string output = mParser.get<std::string>("output");
-  const VecI scale = mParser.getVec<int>("scale", "x");
-  const bool keep = mParser.get<bool>("keep");
-  const std::string flip = mParser.get<std::string>("flip");
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "movie");
+  try {
+    const int fps = mParser.get<int>("fps");
+    const std::string input = mParser.get<std::string>("input");
+    const std::string output = mParser.get<std::string>("output");
+    const VecI scale = mParser.getVec<int>("scale", "x");
+    const bool keep = mParser.get<bool>("keep");
+    const std::string flip = mParser.get<std::string>("flip");
 
-  std::string cmd("ffmpeg"), log("log.txt");
-  cmd += " -loglevel error";// only log error messages
-  if (contains(input, '*')) cmd += " -pattern_type glob";// support expanding shell-like wildcard patterns (globbing)
-  cmd += " -i \'" + input + "\'";// specify multiple input files as "input_*.ppm"
-  cmd += " -vf \"fps=" + std::to_string(fps);
-  if (findMatch(flip,{"vertical",  "180"})) cmd += ",vflip";// flip vertical (up/down)
-  if (findMatch(flip,{"horizontal","180"})) cmd += ",hflip";// flip horizontal (left/right)
-  if (flip!="" && !contains(cmd,"flip")) throw std::invalid_argument("Tool::movie: invalid argument flip=\""+flip+"\", expected \"vertical\", \"horizontal\" or \"180\"");
-  if (scale.size()==2) {
-    cmd += ",scale=" + std::to_string(scale[0]) + ":" + std::to_string(scale[1]) + ":flags=lanczos";
-  } else if (scale.size()==1) {
-    cmd += ",scale=" + std::to_string(scale[0]) + ":-1:flags=lanczos";
-  }
-  cmd += "\"";// end "-vf \"fps=..."
-  if (getExt(output) == "gif") cmd += " -c:v gif";// create animated gif
-  cmd += " -y " + output;// overwrite output files without asking
-  cmd += " > " + log + " 2>&1";// redirect stdout and stderr to log file
-  if (mParser.verbose) std::cerr << cmd << std::endl;
-  int code = std::system(cmd.c_str());
-  if (code != 0) {
-    std::stringstream ss;
-    ss << "\nFatal error in Tool::movie: " << code << "\n\"" << cmd << "\"\n" << std::ifstream(log).rdbuf();
-    throw std::runtime_error(ss.str());
-  }
-  code = std::system(("rm " + log).c_str());
-  if (code != 0) {
-    std::stringstream ss;
-    ss << "\nFatal error in Tool::movie: " << code << "\n\"" << ("rm " + log) << "\"\n" << std::ifstream(log).rdbuf();
-    throw std::runtime_error(ss.str());
+    std::string cmd("ffmpeg"), log("log.txt");
+    cmd += " -loglevel error";// only log error messages
+    if (contains(input, '*')) cmd += " -pattern_type glob";// support expanding shell-like wildcard patterns (globbing)
+    cmd += " -i \'" + input + "\'";// specify multiple input files as "input_*.ppm"
+    cmd += " -vf \"fps=" + std::to_string(fps);
+    if (findMatch(flip,{"vertical",  "180"})) cmd += ",vflip";// flip vertical (up/down)
+    if (findMatch(flip,{"horizontal","180"})) cmd += ",hflip";// flip horizontal (left/right)
+    if (flip!="" && !contains(cmd,"flip")) throw std::invalid_argument("Tool::movie: invalid argument flip=\""+flip+"\", expected \"vertical\", \"horizontal\" or \"180\"");
+    if (scale.size()==2) {
+      cmd += ",scale=" + std::to_string(scale[0]) + ":" + std::to_string(scale[1]) + ":flags=lanczos";
+    } else if (scale.size()==1) {
+      cmd += ",scale=" + std::to_string(scale[0]) + ":-1:flags=lanczos";
+    }
+    cmd += "\"";// end "-vf \"fps=..."
+    if (getExt(output) == "gif") cmd += " -c:v gif";// create animated gif
+    cmd += " -y " + output;// overwrite output files without asking
+    cmd += " > " + log + " 2>&1";// redirect stdout and stderr to log file
+    if (mParser.verbose) std::cerr << cmd << std::endl;
+    auto mySystem = [&](const std::string &cmd){
+      if (int code = std::system(cmd.c_str())) {
+        std::stringstream ss;
+        ss << code << "\n\"" << cmd << "\"\n" << std::ifstream(log).rdbuf();
+        throw std::runtime_error(ss.str());
+      }
+    };
+    mySystem(cmd);
+    mySystem("rm " + log);
+  } catch (const std::exception& e) {
+    throw std::invalid_argument(action_name + ": " + e.what());
   }
 #else
   throw std::runtime_error("MPEG support was disabled during compilation!");
