@@ -2384,7 +2384,11 @@ void Tool::csg()
     if (!keep) mGrid.erase(std::next(itB).base());// remove B since it was corrupted
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+    }
   }
 }// Tool::csg
 
@@ -2468,7 +2472,11 @@ void Tool::levelSetSphere()
     grid->setName(grid_name);
     mGrid.push_back(grid);
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+    }
   }
 }// Tool::levelSetSphere
 
@@ -2507,7 +2515,11 @@ void Tool::levelSetPlatonic()
     }
     mGrid.push_back(grid);
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+    }
   }
 }// Tool::levelSetPlatonic
 
@@ -2536,7 +2548,11 @@ void Tool::multires()
     }
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+    }
   }
 }// Tool::multires
 
@@ -2564,7 +2580,11 @@ void Tool::expandLevelSet()
     mGrid.push_back(grid);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+    }
   }
 }// Tool::expandLevelSet
 
@@ -2596,7 +2616,11 @@ void Tool::segment()
     for (auto g : grids) mGrid.push_back(g);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+    }
   }
 }// Tool::segment
 
@@ -2650,7 +2674,11 @@ void Tool::resample()
     if (age.size()==1) mGrid.push_back(outGrid);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+    }
   }
 }// Tool::resample
 
@@ -2701,7 +2729,11 @@ void Tool::scatter()
     mGeom.push_back(geom);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+    }
   }
 }// Tool::scatter
 
@@ -2775,7 +2807,11 @@ void Tool::slice()
     if (!keep) mGrid.erase(std::next(it).base());
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name + ": " + e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+    }
   }
 }// Tool::slice
 
@@ -2825,7 +2861,11 @@ void Tool::movie()
     mySystem(cmd);
     mySystem("rm " + log);
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name + ": " + e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+    }
   }
 #else
   throw std::runtime_error("MPEG support was disabled during compilation!");
@@ -2886,7 +2926,11 @@ void Tool::enright()
     advect.advect(0.0f, dt);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+    }
   }
 }// Tool::enright
 
@@ -2957,7 +3001,11 @@ void Tool::clip()
     mGrid.push_back(grid);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(action_name+": "+e.what());
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+    }
   }
 }
 
