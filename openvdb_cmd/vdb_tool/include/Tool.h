@@ -15,7 +15,7 @@
 ///
 /// @warning All prints are directed to cerr since cout is used for piping!
 ///
-/// @todo expose LevelSetMeasure and add mesh2offset
+/// @todo add logging, expose LevelSetMeasure and add mesh2offset
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1432,7 +1432,7 @@ void Tool::writeNVDB(const std::string &fileName)
       if (!keep) for (auto &g : grids) mGrid.remove(g);
     }
 
-    if (grids.empty()) return this->warning(action_name+": no vdb grids to write");
+    if (grids.empty()) throw std::invalid_argument(action_name+": no vdb grids to write");
 
     auto openToNano = [&](const GridBase::Ptr& base) {
       if (auto floatGrid = GridBase::grid<FloatGrid>(base)) {
@@ -1844,7 +1844,7 @@ void Tool::meshToLevelSet()
     }
     auto it = this->getGeom(geo_age);
     const Geometry &mesh = **it;
-    if (mesh.isPoints()) this->warning("Warning: -mesh2ls/mesh2sdf was called on points, not a mesh! Hint: use -points2ls instead!");
+    if (mesh.isPoints()) throw std::invalid_argument("Warning: -mesh2ls/mesh2sdf was called on points, not a mesh! Hint: use -points2ls instead!");
     if (exWidth <= 0.0 || inWidth <= 0.0) {// symmetric narrow-band
         if (mParser.verbose) mTimer.start("Mesh -> LS");
         auto grid  = tools::meshToLevelSet<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
@@ -2105,7 +2105,7 @@ void Tool::filterLevelSet()
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid || grid->getGridClass() != GRID_LEVEL_SET) {
-      return this->warning(action_name + ": no level set with age " + std::to_string(age));
+      throw std::invalid_argument(action_name + ": no level set with age " + std::to_string(age));
     }
     auto filter = this->createFilter(*grid, space, time);
 
@@ -2144,7 +2144,7 @@ void Tool::pruneLevelSet()
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid || grid->getGridClass() != GRID_LEVEL_SET) {
-      return this->warning(action_name + ": no level set with age " + std::to_string(age));
+      throw std::invalid_argument(action_name + ": no level set with age " + std::to_string(age));
     }
     if (mParser.verbose) mTimer.start("Prune   SDF");
     tools::pruneLevelSet(grid->tree());
@@ -2171,7 +2171,7 @@ void Tool::floodLevelSet()
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid || grid->getGridClass() != GRID_LEVEL_SET) {
-      return this->warning(action_name + ": no level set with age " + std::to_string(age));
+      throw std::invalid_argument(action_name + ": no level set with age " + std::to_string(age));
     }
     if (mParser.verbose) mTimer.start("Flood   SDF");
     tools::signedFloodFill(grid->tree());
@@ -2272,10 +2272,10 @@ void Tool::composite()
     if (ij[0] == ij[1]) throw std::invalid_argument(action_name+": identical inputs: volume1=volume2="+std::to_string(ij[0]));
     auto itA = this->getGrid(ij[0]), itB = this->getGrid(ij[1]);
     GridT::Ptr gridA = gridPtrCast<GridT>(*itA);
-    if (!gridA) return this->warning(action_name + ": no float grid with age " + std::to_string(ij[0]));
+    if (!gridA) throw std::invalid_argument(action_name + ": no float grid with age " + std::to_string(ij[0]));
     GridT::Ptr gridB = gridPtrCast<GridT>(*itB);
-    if (!gridB) return this->warning(action_name + ": no float grid with age " + std::to_string(ij[1]));
-    if (gridA->transform() != gridB->transform()) this->warning(action_name+": grids have different transforms");
+    if (!gridB) throw std::invalid_argument(action_name + ": no float grid with age " + std::to_string(ij[1]));
+    if (gridA->transform() != gridB->transform()) throw std::invalid_argument(action_name+": grids have different transforms");
     GridT::Ptr tmpA, tmpB;
     if (keep) {
       tmpA = gridA->deepCopy();
@@ -2324,11 +2324,11 @@ void Tool::csg()
     auto itA = this->getGrid(ij[0]), itB = this->getGrid(ij[1]);
     GridT::Ptr gridA = gridPtrCast<GridT>(*itA);
     if (!gridA || gridA->getGridClass() != GRID_LEVEL_SET) {
-      return this->warning(action_name + ": no level set with age " + std::to_string(ij[0]));
+      throw std::invalid_argument(action_name + ": no level set with age " + std::to_string(ij[0]));
     }
     GridT::Ptr gridB = gridPtrCast<GridT>(*itB);
     if (!gridB || gridB->getGridClass() != GRID_LEVEL_SET) {
-      return this->warning(action_name + ": no level set with age " + std::to_string(ij[1]));
+      throw std::invalid_argument(action_name + ": no level set with age " + std::to_string(ij[1]));
     }
     if (gridA->transform() != gridB->transform()) {
       if (gridA->voxelSize()[0]<gridB->voxelSize()[0]) {// use the smallest voxel size
@@ -2536,7 +2536,7 @@ void Tool::multires()
     const bool keep = mParser.get<bool>("keep");
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid) return this->warning(action_name + ": no VDB with age " + std::to_string(age));
+    if (!grid) throw std::invalid_argument(action_name + ": no VDB with age " + std::to_string(age));
     if (mParser.verbose) mTimer.start("MultiResGrid");
     if (keep) {
       tools::MultiResGrid<GridT::TreeType> mrg(levels+1, *grid);
@@ -2571,7 +2571,7 @@ void Tool::expandLevelSet()
     auto it = this->getGrid(age);
     GridT::Ptr sdf = gridPtrCast<GridT>(*it);
     if (!sdf || sdf->getGridClass() != GRID_LEVEL_SET) {
-      return this->warning(action_name + ": no level set with age " + std::to_string(age));
+      throw std::invalid_argument(action_name + ": no level set with age " + std::to_string(age));
     }
     if (mParser.verbose) mTimer.start("Expand SDF");
     auto grid = tools::dilateSdf(*sdf, dilate, tools::NN_FACE, iter);
@@ -2610,7 +2610,7 @@ void Tool::segment()
       }
       for (auto g : segments) grids.push_back(g);
     } else {
-      return this->warning(action_name + ": no VDB with age " + std::to_string(age));
+      throw std::invalid_argument(action_name + ": no VDB with age " + std::to_string(age));
     }
     if (!keep) mGrid.erase(std::next(it).base());
     for (auto g : grids) mGrid.push_back(g);
@@ -2645,7 +2645,7 @@ void Tool::resample()
     if (age.size()==2) {
       auto itOut = this->getGrid(age[1]);
       outGrid = gridPtrCast<FloatGrid>(*itOut);
-      if (!outGrid) return this->warning(action_name+": no reference grid of type float with age "+std::to_string(age[1]));
+      if (!outGrid) throw std::invalid_argument(action_name+": no reference grid of type float with age "+std::to_string(age[1]));
     } else {
       if (scale<=0.0f) throw std::invalid_argument("resample: invalid scale: "+std::to_string(scale));
       auto map = math::MapBase::Ptr(new math::UniformScaleTranslateMap(scale, translate));
@@ -2654,7 +2654,7 @@ void Tool::resample()
       outGrid->setTransform(xform);
     }
 
-    if (!inGrid) return this->warning(action_name+": no grid of type float with age "+std::to_string(age[0]));
+    if (!inGrid) throw std::invalid_argument(action_name+": no grid of type float with age "+std::to_string(age[0]));
 
     if (mParser.verbose) mTimer.start("Resampling VDB");
     switch (order) {
@@ -2698,7 +2698,7 @@ void Tool::scatter()
     std::string grid_name = mParser.get<std::string>("name");
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid) return this->warning(action_name + ": no VDB with age " + std::to_string(age));
+    if (!grid) throw std::invalid_argument(action_name + ": no VDB with age " + std::to_string(age));
     if (mParser.verbose) mTimer.start("SDF -> mesh");
     Geometry::Ptr geom(new Geometry());
     struct PointWrapper {
@@ -2762,7 +2762,7 @@ void Tool::slice()
 
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid) return this->warning(action_name + ": no VDB with age " + std::to_string(age));
+    if (!grid) throw std::invalid_argument(action_name + ": no VDB with age " + std::to_string(age));
     const auto &tree = grid->tree();
     if (mParser.verbose) mTimer.start(action_name);
 
@@ -2832,6 +2832,7 @@ void Tool::movie()
     const VecI scale = mParser.getVec<int>("scale", "x");
     const bool keep = mParser.get<bool>("keep");
     const std::string flip = mParser.get<std::string>("flip");
+    if (mParser.verbose) mTimer.start(action_name);
 
     std::string cmd("ffmpeg"), log("log.txt");
     cmd += " -loglevel error";// only log error messages
@@ -2850,7 +2851,7 @@ void Tool::movie()
     if (getExt(output) == "gif") cmd += " -c:v gif";// create animated gif
     cmd += " -y " + output;// overwrite output files without asking
     cmd += " > " + log + " 2>&1";// redirect stdout and stderr to log file
-    if (mParser.verbose) std::cerr << cmd << std::endl;
+    if (mParser.verbose>1) std::cerr << cmd << std::endl;
     auto mySystem = [&](const std::string &cmd){
       if (int code = std::system(cmd.c_str())) {
         std::stringstream ss;
@@ -2860,6 +2861,7 @@ void Tool::movie()
     };
     mySystem(cmd);
     mySystem("rm " + log);
+    if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
@@ -2915,7 +2917,7 @@ void Tool::enright()
       grid = tmp;
     }
     if (!grid || grid->getGridClass() != GRID_LEVEL_SET) {
-      return this->warning(action_name + ": no level set with age " + std::to_string(age));
+      throw std::invalid_argument(action_name + ": no level set with age " + std::to_string(age));
     }
     if (mParser.verbose) mTimer.start("Enright SDF");
     tools::LevelSetAdvection<GridT, LeVequeField> advect(*grid, field);
@@ -2969,7 +2971,7 @@ GridBase::Ptr Tool::clip(const VecF &v, int age, const GridType &input)
     throw std::invalid_argument("clip: expected either a mask, bbox or frustum");
   }
   return output;
-}
+}// Tool::clip
 
 // ==============================================================================================================
 
@@ -2994,7 +2996,7 @@ void Tool::clip()
     } else if (auto vec3Grid = gridPtrCast<Vec3fGrid>(*it)) {
       grid = this->clip(vec, mask, *vec3Grid);
     } else {
-      return this->warning(action_name + ": unsupported grid type with " + std::to_string(age));
+      throw std::invalid_argument(action_name + ": unsupported grid type with " + std::to_string(age));
     }
     if (!(*it)->getName().empty()) grid->setName("clip_"+(*it)->getName());
     if (!keep) mGrid.erase(std::next(it).base());
@@ -3191,7 +3193,7 @@ void Tool::render()
   auto it = this->getGrid(age);
   GridT::Ptr grid = gridPtrCast<GridT>(*it);
   if (!grid || grid->getGridClass() != GRID_LEVEL_SET) {
-    return this->warning(action_name + ": no level set with age " + std::to_string(age));
+    throw std::invalid_argument(action_name + ": no level set with age " + std::to_string(age));
   }
   if (step.size()!=2) throw std::invalid_argument("render: \"step\" option expected 2 values, but got "+std::to_string(step.size()));
 

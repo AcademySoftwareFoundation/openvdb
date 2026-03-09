@@ -660,63 +660,72 @@ struct FilesLoop : public BaseLoop
 {
 public:
 
-    FilesLoop(Memory &s, ActIterT i, const std::string &name
-             , const std::string &_path
-             , std::vector<std::string> &&_extensions
-             , std::vector<std::string> &&_patterns)
+    FilesLoop(Memory &s, ActIterT i, const std::string &name,
+              const std::string &pathString,
+              std::vector<std::string> &&fileExt,
+              std::vector<std::string> &&includePattern,
+              std::vector<std::string> &&excludePattern)
         : BaseLoop(s, i, name)
-        , path{_path}
-        , extensions(std::move(_extensions))
-        , patterns(std::move(_patterns))
-        , iter(path)
-        , end(std::filesystem::end(iter))
+        , mFilePath{pathString}
+        , mFileExt(std::move(fileExt))
+        , mInclude(std::move(includePattern))
+        , mExclude(std::move(excludePattern))
+        , mIter(mFilePath)
+        , mEnd(std::filesystem::end(mIter))
     {
-        OPENVDB_ASSERT(std::filesystem::is_directory(path));
+        OPENVDB_ASSERT(std::filesystem::is_directory(mFilePath));
         while (!this->valid()) {
-            if (iter == end) break;
-            ++iter;
+            if (mIter == mEnd) break;
+            ++mIter;
         }
-        if (iter != end) this->set(iter->path().string());
+        if (mIter != mEnd) this->set(mIter->path().string());
     }
     virtual ~FilesLoop() {}
     bool matchExtensions() const {
-        OPENVDB_ASSERT(iter != end && !extensions.empty());
-        std::string ext = iter->path().extension().string();// ".obj"
+        OPENVDB_ASSERT(mIter != mEnd && !mFileExt.empty());
+        std::string ext = mIter->path().extension().string();// ".obj"
         if (ext.empty()) return false;// files has no extension
         ext = ext.substr(ext.find_first_not_of("."));// "obj"
-        for (const auto &e : extensions) if (e == ext) return true;
+        for (const auto &e : mFileExt) if (e == ext) return true;
         return false;
     }
-    bool matchPatterns() const {
-        OPENVDB_ASSERT(iter != end && !patterns.empty());
-        const std::string name = iter->path().filename().string();// "file.obj"
-        for (const auto &p : patterns) if (name.find(p) != std::string::npos) return true;
+    bool includePatterns() const {
+        OPENVDB_ASSERT(mIter != mEnd && !mInclude.empty());
+        const std::string name = mIter->path().filename().string();// "file.obj"
+        for (const auto &p : mInclude) if (name.find(p) != std::string::npos) return true;
         return false;
+    }
+    bool excludePatterns() const {
+        OPENVDB_ASSERT(mIter != mEnd && !mExclude.empty());
+        const std::string name = mIter->path().filename().string();// "file.obj"
+        for (const auto &p : mExclude) if (name.find(p) != std::string::npos) return false;
+        return true;
     }
     bool valid() override {
-        if (iter == end) return false;
-        if (!extensions.empty() && !this->matchExtensions()) return false;
-        if (!patterns.empty()   && !this->matchPatterns())   return false;
-        return std::filesystem::is_regular_file(iter->path());
+        if (mIter == mEnd) return false;
+        if (!mFileExt.empty() && !this->matchExtensions()) return false;
+        if (!mInclude.empty() && !this->includePatterns()) return false;
+        if (!mExclude.empty() && !this->excludePatterns()) return false;
+        return std::filesystem::is_regular_file(mIter->path());
     }
     bool next() override {
-        if (iter == end) return false;
+        if (mIter == mEnd) return false;
         ++pos;
-        ++iter;
+        ++mIter;
         while (!this->valid()) {
-            if (iter == end) return false;
-            ++iter;
+            if (mIter == mEnd) return false;
+            ++mIter;
         }
-        if (iter != end) this->set(iter->path().string());
-        return iter != end;
+        if (mIter != mEnd) this->set(mIter->path().string());
+        return mIter != mEnd;
     }
 
 private:
  
     using BaseLoop::pos;
-    const std::filesystem::path path;
-    const std::vector<std::string> extensions, patterns;
-    IterT iter, end;
+    const std::filesystem::path mFilePath;
+    const std::vector<std::string> mFileExt, mInclude, mExclude;
+    IterT mIter, mEnd;
 };// FilesLoop struct
 
 // ==============================================================================================================
@@ -988,7 +997,8 @@ Parser::Parser(std::vector<Option> &&def)
         {"files"}, "start of files-loop in a directory.",
         {{"path", ".", "path=/dir", "directory where file search is initiated"},
          {"extension", "", "\"obj,ply\"", "files must have one or more extensions"},
-         {"pattern", "", "\"file1,file2\"", "files must contain one or more patterns"},
+         {"include", "", "\"file1,file2\"", "include files that match one or more patterns"},
+         {"exclude", "", "\"file1,file2\"", "exclude files that match one or more patterns"},
          {"recursive", "0", "0|1|false|true", "recursive search of files into sub-directories."}},
         [&](){++counter;},
         [&](){
@@ -997,11 +1007,15 @@ Parser::Parser(std::vector<Option> &&def)
             if (this->get<bool>("recursive")) {
                 using LoopT = FilesLoop<std::filesystem::recursive_directory_iterator>;
                 loop = std::make_shared<LoopT>(processor.memory(), iter, "file", iter->options[0].value,
-                                               this->getVec<std::string>("extension",","), this->getVec<std::string>("pattern",","));
+                                               this->getVec<std::string>("extension",","),
+                                               this->getVec<std::string>("include",","),
+                                               this->getVec<std::string>("exclude",","));
             } else {
                 using LoopT = FilesLoop<std::filesystem::directory_iterator>;
                 loop = std::make_shared<LoopT>(processor.memory(), iter, "file", iter->options[0].value,
-                                               this->getVec<std::string>("extension",","), this->getVec<std::string>("pattern",","));
+                                               this->getVec<std::string>("extension",","), 
+                                               this->getVec<std::string>("include",","),
+                                               this->getVec<std::string>("exclude",","));
             }
             if (loop->valid()) {
                 loops.push_back(loop);
