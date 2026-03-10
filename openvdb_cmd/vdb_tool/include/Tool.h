@@ -112,10 +112,7 @@ public:
 
     /// @brief Constructor from command-line arguments
     Tool(int argc, char *argv[]);
-    ~Tool() {
-      this->clear();
-      this->endLog();
-    }
+    ~Tool() {this->endLog();}
 
     Tool(const Tool&) = delete;// disallow copy construction
     Tool(Tool&&) = delete;// disallow move construction
@@ -320,7 +317,6 @@ Tool::Tool(int argc, char *argv[])
         mParser.finalize();
         mParser.parse(argc, argv);// extremely fast, but might throw
     } catch (const std::exception& e) {
-        this->clear();
         this->endLog();
         throw std::invalid_argument(e.what());
     }
