@@ -122,7 +122,7 @@ public:
     /// @brief Executes all the actions defined during construction
     void run();
 
-    void startLog(std::string logFile);
+    int startLog(std::string logFile);
 
     void endLog() {
       if (mOldClogBuffer) std::clog.rdbuf(mOldClogBuffer);
@@ -324,14 +324,22 @@ Tool::Tool(int argc, char *argv[])
 
 // ==============================================================================================================
 
-void Tool::startLog(std::string logFile)
+int Tool::startLog(std::string logFile)
 {
-    if (mOldClogBuffer) return;
+    if (mOldClogBuffer != nullptr) return 0;
     if (logFile.empty()) logFile = "vdb_tool_" + dateStamp() + ".log";
     mLogFile = std::ofstream(logFile);
+    if (!mLogFile.is_open()) {
+        std::cerr << "Failed to open log file!" << std::endl;
+        return 1;
+    }
     mOldClogBuffer = std::clog.rdbuf();
+    if (mOldClogBuffer == nullptr) {
+        std::cerr << "Failed to cache clog pointer!" << std::endl;
+        return 2;
+    }
     std::clog.rdbuf(mLogFile.rdbuf());
-    OPENVDB_ASSERT(mOldClogBuffer);
+    return 0;
 }
 
 // ==============================================================================================================
