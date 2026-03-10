@@ -159,7 +159,7 @@ public:
     const std::string getName() const { return mName; }
     void setName(const std::string &name) { mName = name; }
 
-    void print(size_t n = 0, std::ostream& os = std::cerr) const;
+    void print(size_t n = 0, std::ostream& os = std::clog) const;
 
     static std::vector<Vec3I> triangulate(const std::vector<int> &nGon);
 
@@ -495,15 +495,15 @@ void Geometry::readOBJ(std::istream &is)
             while (iss >> str) v.push_back(std::stoi(str.substr(0, str.find_first_of("/"))));
             const size_t nGon = v.size();
             if (nGon == 1) {
-                if (mVerbose) std::cerr << "Geometry::readOBJ: ignoring point, i.e. a face with with a single vertex\n";
+                if (mVerbose) std::clog << "Geometry::readOBJ: ignoring point, i.e. a face with with a single vertex\n";
             } else if (nGon == 2) {
-                if (mVerbose) std::cerr << "Geometry::readOBJ: ignoring line, i.e. a face with two vertices\n";
+                if (mVerbose) std::clog << "Geometry::readOBJ: ignoring line, i.e. a face with two vertices\n";
             } else if (nGon == 3) {
                 mTri.emplace_back(v[0] - 1, v[1] - 1, v[2] - 1);// obj is 1-based
             } else if (nGon == 4) {
                 mQuad.emplace_back(v[0] - 1, v[1] - 1, v[2] - 1, v[3] - 1);// obj is 1-based
             } else {
-                if (mVerbose) std::cerr << "Geometry::readOBJ: triangulating " << nGon << "-gon\n";
+                if (mVerbose) std::clog << "Geometry::readOBJ: triangulating " << nGon << "-gon\n";
                 for (size_t i = 0; i < nGon - 2; ++i) mTri.emplace_back(v[0] - 1, v[i+1] - 1, v[i+2] - 1);// obj is 1-based
             }
         }
@@ -688,9 +688,9 @@ void Geometry::readPLY(std::istream &is)
         return false;
     };
     auto error = [&tokens](const std::string &msg){
-        std::cerr << "Tokens: \"";
-        for (auto &t : tokens) std::cerr << t << " ";
-        std::cerr << "\"\n";
+        std::clog << "Tokens: \"";
+        for (auto &t : tokens) std::clog << t << " ";
+        std::clog << "\"\n";
         throw std::invalid_argument(msg);
     };
     auto sizeOf = [test, error](int i){
@@ -848,7 +848,7 @@ void Geometry::readPLY(std::istream &is)
                 break;
             default:
                 if (n > nGon) throw std::invalid_argument("Geometry::readPLY: binary " + std::to_string(n) + "-gons are not supported");
-                if (mVerbose) std::cerr << "Geometry::readPLY: binary triangulating " << n << "-gon\n";
+                if (mVerbose) std::clog << "Geometry::readPLY: binary triangulating " << n << "-gon\n";
                 is.read((char*)vtx, n*sizeof(uint32_t));
                 if (reverseBytes) swapBytes(vtx, n);
                 for (int i = 0; i < n-2; ++i) mTri.emplace_back(vtx[0], vtx[i+1], vtx[i+2]);
@@ -869,7 +869,7 @@ void Geometry::readPLY(std::istream &is)
             } else if (n==4) {
                 mQuad.emplace_back(vtx);
             } else {
-                if (mVerbose) std::cerr << "Geometry::readPLY: ascii triangulating " << n << "-gon\n";
+                if (mVerbose) std::clog << "Geometry::readPLY: ascii triangulating " << n << "-gon\n";
                 for (int i = 0; i < n - 2; ++i) mTri.emplace_back(vtx[0], vtx[i+1], vtx[i+2]);
             }
         }// loop over polygons

@@ -905,7 +905,7 @@ void Tool::init()
 
   mParser.addAction(
       {"log"}, "enable logging to file",
-      {{"file", "",  "vdb_tool.log", "file used for logging"}},
+      {{"file", "",  "vdb_tool.log", "file used for logging. Use \"watch -n 0.5 vdb_tool.log\" to see updates in real-time."}},
       [&](){this->startLog(mParser.get<std::string>("file"));}, [](){}, 0);
 
   Processor &proc = mParser.processor;
