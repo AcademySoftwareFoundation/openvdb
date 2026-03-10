@@ -995,7 +995,7 @@ Parser::Parser(std::vector<Option> &&def)
     // vdb_tool -files path=$HOME/dev/data recur=1 ext="obj,stl" -read '{$file}' -print -clear -end
     this->addAction(
         {"files"}, "start of files-loop in a directory.",
-        {{"path", ".", "path=/dir", "directory where file search is initiated"},
+        {{"path", "", "/dir|path=/dir", "directory where file search is initiated (mandatory)"},
          {"extension", "", "\"obj,ply\"", "files must have one or more extensions"},
          {"include", "", "\"file1,file2\"", "include files that match one or more patterns"},
          {"exclude", "", "\"file1,file2\"", "exclude files that match one or more patterns"},
@@ -1023,7 +1023,7 @@ Parser::Parser(std::vector<Option> &&def)
             } else {
                 skipToEnd(iter);// skip to matching -end
             }
-        }
+        }, 0
     );
 
     this->addAction(
