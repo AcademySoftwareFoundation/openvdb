@@ -74,7 +74,7 @@ struct Action {
     Action(const Action&) = default;
     /// @brief Sets the options of this actions
     void setOption(const std::string &str);
-    void print(std::ostream& os = std::cerr) const;
+    void print(std::ostream& os = std::clog) const;
 
     std::vector<std::string> names;// list of names of action, e.g. {"read", "import", "load", "i"}
     std::string              documentation;// documentation e.g. "read", "i", "files", "read files"
@@ -118,7 +118,7 @@ public:
     void set(const std::string &name, const char *value) {mData[name]=value;}
     template <typename T>
     void set(const std::string &name, const T &value) {mData[name]=std::to_string(value);}
-    void print(std::ostream& os = std::cerr) const {
+    void print(std::ostream& os = std::clog) const {
         std::map<std::string, std::string> tmp(mData.begin(),mData.end());// sort output
         for (auto &d : tmp) os << d.first <<"="<<d.second<<std::endl;
     }
@@ -193,7 +193,7 @@ public:
         std::swap(mData[n-2], mData[n]);
         std::swap(mData[n-1], mData[n]);
     }
-    void print(std::ostream& os = std::cerr) const {
+    void print(std::ostream& os = std::clog) const {
         if (mData.empty()) return;
         os << mData[0];
         for (size_t i=1; i<mData.size(); ++i) os << "," << mData[i];
@@ -502,14 +502,14 @@ public:
         (*this)(tmp);
         return tmp;
     }
-    void help(std::ostream& os = std::cerr) const
+    void help(std::ostream& os = std::clog) const
     {
         std::set<std::string> vec;// print help in lexicographic order
         for (auto it=mInstructions.begin(); it!=mInstructions.end(); ++it) vec.insert(it->first);
         this->help(vec, os);
     }
     template <typename VecT>
-    void help(const VecT &vec, std::ostream& os = std::cerr) const
+    void help(const VecT &vec, std::ostream& os = std::clog) const
     {
         size_t w = 0;
         for (auto &s : vec) w = std::max(w, s.size());
@@ -594,7 +594,7 @@ struct BaseLoop
         memory.set(name, v);
         memory.set("#"+name, pos);
     }
-    void print(std::ostream& os = std::cerr) const {
+    void print(std::ostream& os = std::clog) const {
         os << "Processing: " << name << " = " << memory.get(name) << ", counter #" << name << " = " << pos <<std::endl;
     }
 
@@ -748,7 +748,7 @@ struct Parser {
     inline void finalize();
     inline void run();
     inline void setDefaults();
-    void print(std::ostream& os = std::cerr) const {for (auto &a : actions) a.print(os);}
+    void print(std::ostream& os = std::clog) const {for (auto &a : actions) a.print(os);}
 
     inline std::string getStr(const std::string &name) const;
     template <typename T>
@@ -759,8 +759,8 @@ struct Parser {
     inline std::vector<T> getVec(const std::string &name, const char* delimiters = "(),") const;
 
     void usage(const VecS &actions, bool brief) const;
-    void usage(bool brief) const {for (auto i = std::next(iter);i!=actions.end(); ++i) std::cerr << this->usage(*i, brief);}
-    void usage_all(bool brief) const {for (const auto &a : available) std::cerr << this->usage(a, brief);}
+    void usage(bool brief) const {for (auto i = std::next(iter);i!=actions.end(); ++i) std::clog << this->usage(*i, brief);}
+    void usage_all(bool brief) const {for (const auto &a : available) std::clog << this->usage(a, brief);}
     std::string usage(const Action &action, bool brief) const;
     void addAction(std::vector<std::string> &&names, // primary name of the action
                    std::string &&doc, // documentation of action
@@ -923,8 +923,8 @@ Parser::Parser(std::vector<Option> &&def)
             }
             std::string str = iter->options[0].value;// copy
             processor(str);// <- evaluate string
-            if (!str.empty()) std::cerr << str << std::endl;
-            //for (auto s : tokenize(str, ",")) std::cerr << s << std::endl;// split and print
+            if (!str.empty()) std::clog << str << std::endl;
+            //for (auto s : tokenize(str, ",")) std::clog << s << std::endl;// split and print
         }, 0
     );
 
@@ -1133,7 +1133,7 @@ void Parser::usage(const VecS &actions, bool brief) const
     for (const std::string &str : actions) {
         auto search = hashMap.find(str);
         if (search == hashMap.end()) throw std::invalid_argument(iter->names[0]+": Parser:::usage: unsupported action \""+str+"\"\n");
-        std::cerr << this->usage(*search->second, brief);
+        std::clog << this->usage(*search->second, brief);
     }
 }// Parser::usage
 

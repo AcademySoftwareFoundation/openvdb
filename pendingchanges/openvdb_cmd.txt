@@ -9,6 +9,7 @@ vdb_tool:
   - Added new action "-fog2vol", which converts a fog volume into an adaptive polygon mesh.
   - Added new action "-slice", which generates one or more images of axis-aligned slices through a scalar grid.
   - Added new action "-img2mpeg", which converts multiple images to an mpeg movie file.
+  - Added new action "-log", which logs warnings and (non-fatal) errors to a file.
   - Added triangulation of N-gons to Geometry::readOBJ and Geometry::readSTL, assuming they are convex.
   - Added read support for xyz files.
 

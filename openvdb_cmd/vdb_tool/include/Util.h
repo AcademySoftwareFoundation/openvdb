@@ -25,6 +25,8 @@
 #include <string>
 #include <vector>
 #include <sys/stat.h>
+#include <chrono>
+#include <ctime>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -435,6 +437,29 @@ inline std::string uuid()
     ss << "-" << getVar(prng);// variant 1: random hex number hex in {8,9,a,b}, which maps to the integers {8,9,10,11}
     for (int i=0; i<15; ++i) ss << getHex(prng);// 16 random hex numbers
     return ss.str().insert(8,"-").insert(13,"-4").insert(23,"-");//hardcode version 4
+}
+
+/// @brief std::string with current data stamp
+/// @details Format: %Y-%m-%d is Year-Month-Day, %H-%M-%S is Hour-Minute-Second
+inline std::string dateStamp() {
+    const auto now = std::chrono::system_clock::now();
+
+    // Convert it to a C-style time_t object
+    std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+    std::tm time_info;
+
+    // Convert to local time safely (thread-safe)
+#ifdef _WIN32
+    localtime_s(&time_info, &now_time_t); // Windows
+#else
+    localtime_r(&now_time_t, &time_info); // Mac/Linux/POSIX
+#endif
+
+    // Stream it into a string using put_time
+    std::ostringstream ss;
+    ss << std::put_time(&time_info, "%Y-%m-%d_%H-%M-%S");
+
+    return ss.str();
 }
 
 /// @brief Spinning wheel used to indicate progress

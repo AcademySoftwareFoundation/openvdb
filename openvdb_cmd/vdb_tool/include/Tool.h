@@ -15,7 +15,7 @@
 ///
 /// @warning All prints are directed to cerr since cout is used for piping!
 ///
-/// @todo add logging, expose LevelSetMeasure and add mesh2offset
+/// @todo expose LevelSetMeasure and add mesh2offset
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -112,6 +112,10 @@ public:
 
     /// @brief Constructor from command-line arguments
     Tool(int argc, char *argv[]);
+    ~Tool() {
+      this->clear();
+      this->endLog();
+    }
 
     Tool(const Tool&) = delete;// disallow copy construction
     Tool(Tool&&) = delete;// disallow move construction
@@ -121,9 +125,17 @@ public:
     /// @brief Executes all the actions defined during construction
     void run();
 
+    void startLog(std::string logFile);
+
+    void endLog() {
+      if (mOldClogBuffer) std::clog.rdbuf(mOldClogBuffer);
+      if (mLogFile.is_open()) mLogFile.close();
+      mOldClogBuffer = nullptr;
+    }
+
     /// @brief prints information to the terminal about the current stack of VDB grids and Geometry
-    void print(std::ostream& os = std::cerr) const;
-    void print_args(std::ostream& os = std::cerr) const;
+    void print(std::ostream& os = std::clog) const;
+    void print_args(std::ostream& os = std::clog) const;
 
     /// @brief return a string with the current version number of this tool
     static std::string version() {return std::to_string(sMajor)+"."+std::to_string(sMinor)+"."+std::to_string(sPatch);}
@@ -147,7 +159,9 @@ private:
     std::list<Geometry::Ptr> mGeom;// list of geometries owned by this tool
     std::list<GridBase::Ptr> mGrid;// list of based grids owned by this tool
     Parser                   mParser;
-    bool                     mErrorOnWarning{false};
+    bool                     mErrorOnWarning;
+    std::ofstream            mLogFile;
+    std::streambuf          *mOldClogBuffer;
 
     /// @brief Deletes geometry, VDB grids and local variables
     void clear();
@@ -272,7 +286,7 @@ private:
     /// @brief print examples to the terminal and terminate
     std::string examples() const;
 
-    void warning(const std::string &msg, std::ostream& os = std::cerr) const;
+    void warning(const std::string &msg, std::ostream& os = std::clog) const;
 
     /// @brief Initialize this parser, i.e. register available actions
     void init();
@@ -288,7 +302,7 @@ private:
 // ==============================================================================================================
 
 Tool::Tool(int argc, char *argv[])
-    : mTimer(std::cerr)
+    : mTimer(std::clog)
     , mCmdName(getBase(argv[0]))// name of executable
     , mParser({{"dim", "256", "256", "default grid resolution along the longest axis"},
                {"voxel", "0.0", "0.01", "default voxel size in world units. A value of zero indicates that dim is used to derive the voxel size."},
@@ -296,12 +310,33 @@ Tool::Tool(int argc, char *argv[])
                {"time", "1", "1|2|3", "default temporal discretization order"},
                {"space", "5", "1|2|3|5", "default spatial discretization order"},
                {"keep", "false", "1|0|true|false", "by default delete the input"}})
+    , mErrorOnWarning(false)
+    , mLogFile()
+    , mOldClogBuffer(nullptr)
 {
     openvdb::initialize();
     this->init();// fast: less than 1 ms
-    mParser.finalize();
-    mParser.parse(argc, argv);// extremely fast
+    try {
+        mParser.finalize();
+        mParser.parse(argc, argv);// extremely fast, but might throw
+    } catch (const std::exception& e) {
+        this->clear();
+        this->endLog();
+        throw std::invalid_argument(e.what());
+    }
 }// Tool::Tool
+
+// ==============================================================================================================
+
+void Tool::startLog(std::string logFile)
+{
+    if (mOldClogBuffer) return;
+    if (logFile.empty()) logFile = "vdb_tool_" + dateStamp() + ".log";
+    mLogFile = std::ofstream(logFile);
+    mOldClogBuffer = std::clog.rdbuf();
+    std::clog.rdbuf(mLogFile.rdbuf());
+    OPENVDB_ASSERT(mOldClogBuffer);
+}
 
 // ==============================================================================================================
 
@@ -854,15 +889,20 @@ void Tool::init()
 
   mParser.addAction(
       {"version"}, "write timing information to the terminal", {},
-      [&](){std::cerr << mCmdName << ": version " << Tool::version() << std::endl;std::exit(EXIT_SUCCESS);}, [](){});
+      [&](){std::clog << mCmdName << ": version " << Tool::version() << std::endl;std::exit(EXIT_SUCCESS);}, [](){});
 
   mParser.addAction(
       {"examples"}, "print examples to the terminal and terminate", {},
-      [&](){std::cerr << this->examples() << std::endl; std::exit(EXIT_SUCCESS);}, [](){});
+      [&](){std::clog << this->examples() << std::endl; std::exit(EXIT_SUCCESS);}, [](){});
 
   mParser.addAction(
       {"errorOnWarning", "stopOnWarning"}, "stop on warnings, i.e. treat warnings as errors", {},
       [&](){mErrorOnWarning = true;}, [](){});
+
+  mParser.addAction(
+      {"log"}, "enable logging to file",
+      {{"file", "",  "vdb_tool.log", "file used for logging"}},
+      [&](){this->startLog(mParser.get<std::string>("file"));}, [](){}, 0);
 
   Processor &proc = mParser.processor;
 
@@ -1005,7 +1045,7 @@ void Tool::help()
     if (actions.empty()) {
       if (mParser.actions.size()==1) {// ./vdb_tool -help
         if (!brief) {
-          std::cerr << "\nThis command-line tool can perform a use-defined, and possibly\n"
+          std::clog << "\nThis command-line tool can perform a use-defined, and possibly\n"
                     << "non-linear, sequence of high-level tasks available in openvdb.\n"
                     << "For instance, it can convert polygon meshes and particles to level\n"
                     << "sets, and subsequently perform a large number of operations on these\n"
@@ -1015,7 +1055,7 @@ void Tool::help()
         }
         mParser.usage_all(brief);
         if (!brief) {
-          std::cerr << "\nNote that actions always start with one or more \"-\", and (except for file names)\n"
+          std::clog << "\nNote that actions always start with one or more \"-\", and (except for file names)\n"
                     << "its options always contain a \"=\" and an optional number of characters\n"
                     << "used for identification, e.g. \"-erode r=2\" is identical to \"-erode radius=2.0\"\n"
                     << "but \"-erode rr=2\" will produce an error since \"rr\" does not match\n"
@@ -1111,7 +1151,7 @@ void Tool::read()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
-      std::cerr << action_name << ": skipping do to " << e.what() << std::endl;
+      std::clog << action_name << ": skipping do to " << e.what() << std::endl;
     }
   }
 }// Tool::read
@@ -1121,7 +1161,7 @@ void Tool::read()
 void Tool::readGeo(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
-  if (mParser.verbose>1) std::cerr << "Reading geometry from \"" << fileName << "\"\n";
+  if (mParser.verbose>1) std::clog << "Reading geometry from \"" << fileName << "\"\n";
   if (mParser.verbose) mTimer.start("Read geometry");
   Geometry::Ptr geom(new Geometry());
   geom->read(fileName, mParser.verbose);
@@ -1160,11 +1200,11 @@ void Tool::readVDB(const std::string &fileName)
       if (gridNames[0]=="*" || findMatch(grid->getName(), gridNames)) mGrid.push_back(grid);
     }
   } else if (mParser.verbose) {
-    std::cerr << "readVDB: no vdb grids in \"" << fileName << "\"";
+    std::clog << "readVDB: no vdb grids in \"" << fileName << "\"";
   }
   if (mParser.verbose) {
     mTimer.stop();
-    if (mGrid.size() == count) std::cerr << "readVDB: no vdb grids were loaded\n";
+    if (mGrid.size() == count) std::clog << "readVDB: no vdb grids were loaded\n";
     if (mParser.verbose>1) for (GridBase::Ptr grid : *grids) grid->print();
   }
 }// Tool::readVDB
@@ -1193,11 +1233,11 @@ void Tool::readNVDB(const std::string &fileName)
       if (gridNames[0]=="*" || findMatch(gridHandle.gridMetaData()->shortGridName(), gridNames)) mGrid.push_back(nanovdb::tools::nanoToOpenVDB(gridHandle));
     }
   } else if (mParser.verbose>0) {
-    std::cerr << "readVDB: no vdb grids in \"" << fileName << "\"";
+    std::clog << "readVDB: no vdb grids in \"" << fileName << "\"";
   }
   if (mParser.verbose) {
     mTimer.stop();
-    if (mGrid.size() == count) std::cerr << "readNVDB: no NanoVDB grids were loaded\n";
+    if (mGrid.size() == count) std::clog << "readNVDB: no NanoVDB grids were loaded\n";
     if (mParser.verbose>1) for (auto it = std::next(mGrid.cbegin(), count); it != mGrid.cend(); ++it) (*it)->print();
   }
 }// Tool::readNVDB
@@ -1234,7 +1274,7 @@ void Tool::config()
         if (execute) {
             std::ifstream file(fileName);
             if (!file.is_open()) throw std::invalid_argument("readConf: unable to open \""+fileName+"\"");
-            if (mParser.verbose>1) std::cerr << "Reading configuration from \"" << fileName << "\"\n";
+            if (mParser.verbose>1) std::clog << "Reading configuration from \"" << fileName << "\"\n";
             if (mParser.verbose) mTimer.start("Read config");
             if (!getline (file,line)) throw std::invalid_argument("readConf: empty file \""+fileName+"\"");
             Header header(line);
@@ -1287,7 +1327,7 @@ void Tool::write()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
-      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
     }
   }
 }// Tool::write
@@ -1492,7 +1532,7 @@ void Tool::writeGeo(const std::string &fileName)
   const int age = mParser.get<int>("geo");
   const bool keep = mParser.get<bool>("keep");
   const bool ascii = mParser.get<bool>("ascii");
-  if (mParser.verbose>1) std::cerr << "Writing geometry to \"" << fileName << "\"\n";
+  if (mParser.verbose>1) std::clog << "Writing geometry to \"" << fileName << "\"\n";
   auto it = this->getGeom(age);
   if (mParser.verbose) mTimer.start("Write geometry");
   (*it)->write(fileName, ascii);
@@ -1505,7 +1545,7 @@ void Tool::writeGeo(const std::string &fileName)
 void Tool::writeConf(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
-  if (mParser.verbose>1) std::cerr << "Writing configuration to \"" << fileName << "\"\n";
+  if (mParser.verbose>1) std::clog << "Writing configuration to \"" << fileName << "\"\n";
   std::ofstream file(fileName);
   if (!file.is_open()) throw std::invalid_argument("writeConf: unable to open \""+fileName+"\"");
   if (mParser.verbose) mTimer.start("Write config");
@@ -1723,7 +1763,7 @@ void Tool::levelSetToFog()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
-      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
     }
   }
 }// Tool::levelSetToFog
@@ -1764,7 +1804,7 @@ void Tool::isoToLevelSet()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
-      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
     }
   }
 }// Tool::isoToLevelSet
@@ -1808,7 +1848,7 @@ void Tool::quadsToTriangles()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
-      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
     }
   }
 }// Tool::quadsToTriangles
@@ -1864,7 +1904,7 @@ void Tool::meshToLevelSet()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
-      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
     }
   }
 }// Tool::meshToLevelSet
@@ -1907,7 +1947,7 @@ void Tool::meshToUnsignedDistanceField()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
-      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
     }
   }
 }// Tool::meshToUnsignedDistanceField
@@ -1954,7 +1994,7 @@ void Tool::soupToLevelSet()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
-      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
     }
   }
 }// Tool::soupToLevelSet
@@ -1990,7 +2030,7 @@ void Tool::particlesToLevelSet()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
-      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
     }
   }
 }// Tool::particlesToLevelSet
@@ -2082,7 +2122,7 @@ void Tool::offsetLevelSet()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
-      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
     }
   }
 }// Tool::offsetLevelSet
@@ -2127,7 +2167,7 @@ void Tool::filterLevelSet()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
-      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
     }
   }
 }// Tool::filterLevelSet
@@ -2154,7 +2194,7 @@ void Tool::pruneLevelSet()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
-      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
     }
   }
 }// Tool::pruneLevelSet
@@ -2181,7 +2221,7 @@ void Tool::floodLevelSet()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
-      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
     }
   }
 }// Tool::floodLevelSet
@@ -2253,7 +2293,7 @@ void Tool::compute()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
-      std::cerr << action_name << ": skipping due to: " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
     }
   }
 }// Tool::compute
@@ -2302,7 +2342,7 @@ void Tool::composite()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name + ": " + e.what());
     } else {
-      std::cerr << action_name << ": skipping do to " << e.what() << std::endl;
+      std::clog << action_name << ": skipping do to " << e.what() << std::endl;
     }
   }
 }// Tool::composite
@@ -2387,7 +2427,7 @@ void Tool::csg()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
-      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
     }
   }
 }// Tool::csg
@@ -2446,7 +2486,7 @@ void Tool::volumeToMesh()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
-      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
     }
   }
 }// Tool::volumeToMesh
@@ -2466,7 +2506,7 @@ void Tool::levelSetSphere()
     const float width = mParser.get<float>("width");
     const std::string grid_name = mParser.get<std::string>("name");
     if (voxel == 0.0f) voxel = 2.0f*radius/(static_cast<float>(dim) - 2.0f*width);
-    if (mParser.verbose) mTimer.start("Create sphere");
+    if (mParser.verbose) mTimer.start(action_name);
     GridT::Ptr grid = tools::createLevelSetSphere<GridT>(radius, center, voxel, width);
     if (mParser.verbose) mTimer.stop();
     grid->setName(grid_name);
@@ -2475,7 +2515,7 @@ void Tool::levelSetSphere()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
-      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
     }
   }
 }// Tool::levelSetSphere
@@ -2518,7 +2558,7 @@ void Tool::levelSetPlatonic()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
-      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
     }
   }
 }// Tool::levelSetPlatonic
@@ -2551,7 +2591,7 @@ void Tool::multires()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
-      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
     }
   }
 }// Tool::multires
@@ -2583,7 +2623,7 @@ void Tool::expandLevelSet()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
-      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
     }
   }
 }// Tool::expandLevelSet
@@ -2619,7 +2659,7 @@ void Tool::segment()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
-      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
     }
   }
 }// Tool::segment
@@ -2677,7 +2717,7 @@ void Tool::resample()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
-      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
     }
   }
 }// Tool::resample
@@ -2732,7 +2772,7 @@ void Tool::scatter()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
-      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
     }
   }
 }// Tool::scatter
@@ -2810,7 +2850,7 @@ void Tool::slice()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
-      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
     }
   }
 }// Tool::slice
@@ -2851,7 +2891,7 @@ void Tool::movie()
     if (getExt(output) == "gif") cmd += " -c:v gif";// create animated gif
     cmd += " -y " + output;// overwrite output files without asking
     cmd += " > " + log + " 2>&1";// redirect stdout and stderr to log file
-    if (mParser.verbose>1) std::cerr << cmd << std::endl;
+    if (mParser.verbose>1) std::clog << cmd << std::endl;
     auto mySystem = [&](const std::string &cmd){
       if (int code = std::system(cmd.c_str())) {
         std::stringstream ss;
@@ -2866,7 +2906,7 @@ void Tool::movie()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
-      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
     }
   }
 #else
@@ -2931,7 +2971,7 @@ void Tool::enright()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
-      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
     }
   }
 }// Tool::enright
@@ -3006,7 +3046,7 @@ void Tool::clip()
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
     } else {
-      std::cerr << action_name << ": skipping due to " << e.what() << std::endl;
+      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
     }
   }
 }
