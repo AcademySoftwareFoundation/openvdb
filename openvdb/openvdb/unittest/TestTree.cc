@@ -790,6 +790,58 @@ TEST_F(TestTree, testIO)
 }
 
 
+TEST_F(TestTree, testTreeIO)
+{
+    const char* filename = "testTreeIO.dbg";
+    openvdb::SharedPtr<const char> scopedFile(filename, ::remove);
+    {
+        ValueType background=5.0f;
+        RootNodeType root_node(background);
+        root_node.setValueOn(openvdb::Coord(5,10,20),0.234f);
+        root_node.setValueOn(openvdb::Coord(50000,20000,30000),4.5678f);
+
+        std::ofstream os(filename, std::ios_base::binary);
+        root_node.writeTopology(os);
+        root_node.writeBuffers(os);
+        EXPECT_TRUE(!os.fail());
+    }
+    {
+        ValueType background=2.0f;
+        RootNodeType root_node(background);
+        ASSERT_DOUBLES_EXACTLY_EQUAL(background, root_node.getValue(openvdb::Coord(5,10,20)));
+        {
+            std::ifstream is(filename, std::ios_base::binary);
+            openvdb::io::setCurrentVersion(is);
+            root_node.readTopology(is);
+            root_node.readBuffers(is);
+            EXPECT_TRUE(!is.fail());
+        }
+
+        ASSERT_DOUBLES_EXACTLY_EQUAL(0.234f, root_node.getValue(openvdb::Coord(5,10,20)));
+        ASSERT_DOUBLES_EXACTLY_EQUAL(5.0f, root_node.getValue(openvdb::Coord(5,11,20)));
+        ValueType sum=0.0f;
+        for (RootNodeType::ChildOnIter root_iter = root_node.beginChildOn();
+            root_iter.test(); ++root_iter)
+        {
+            for (InternalNodeType2::ChildOnIter internal_iter2 = root_iter->beginChildOn();
+                internal_iter2.test(); ++internal_iter2)
+            {
+                for (InternalNodeType1::ChildOnIter internal_iter1 =
+                    internal_iter2->beginChildOn(); internal_iter1.test(); ++internal_iter1)
+                {
+                    for (LeafNodeType::ValueOnIter block_iter =
+                        internal_iter1->beginValueOn(); block_iter.test(); ++block_iter)
+                    {
+                        sum += *block_iter;
+                    }
+                }
+            }
+        }
+        ASSERT_DOUBLES_EXACTLY_EQUAL(sum, (0.234f + 4.5678f));
+    }
+}
+
+
 TEST_F(TestTree, testNegativeIndexing)
 {
     ValueType background=5.0f;

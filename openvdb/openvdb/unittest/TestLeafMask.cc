@@ -337,6 +337,35 @@ TEST_F(TestLeafMask, testIO)
 }
 
 
+TEST_F(TestLeafMask, testTreeIO)
+{
+    LeafType leaf(openvdb::Coord(1, 3, 5));
+    const openvdb::Coord origin = leaf.origin();
+
+    leaf.setValueOn(openvdb::Coord(0, 1, 0));
+    leaf.setValueOn(openvdb::Coord(1, 0, 0));
+
+    std::ostringstream ostr(std::ios_base::binary);
+
+    leaf.writeBuffers(ostr);
+
+    leaf.setValueOff(openvdb::Coord(0, 1, 0));
+    leaf.setValueOn(openvdb::Coord(0, 1, 1));
+
+    std::istringstream istr(ostr.str(), std::ios_base::binary);
+    openvdb::io::setCurrentVersion(istr);
+
+    leaf.readBuffers(istr);
+
+    EXPECT_EQ(origin, leaf.origin());
+
+    EXPECT_TRUE(leaf.isValueOn(openvdb::Coord(0, 1, 0)));
+    EXPECT_TRUE(leaf.isValueOn(openvdb::Coord(1, 0, 0)));
+
+    EXPECT_TRUE(leaf.onVoxelCount() == 2);
+}
+
+
 TEST_F(TestLeafMask, testTopologyCopy)
 {
     using openvdb::Coord;

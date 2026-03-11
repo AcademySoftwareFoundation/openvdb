@@ -17,6 +17,7 @@ class TestLeafIO
 {
 public:
     static void testBuffer();
+    static void testTreeIO();
 };
 
 template<typename T>
@@ -74,6 +75,35 @@ TestLeafIO<T>::testBuffer()
 
         remove("leaf_io.vdb");
     }
+}
+
+
+template<typename T>
+void
+TestLeafIO<T>::testTreeIO()
+{
+    using LeafT = openvdb::tree::LeafNode<T, 3>;
+    LeafT leaf(openvdb::Coord(0, 0, 0));
+
+    leaf.setValueOn(openvdb::Coord(0, 1, 0), T(1));
+    leaf.setValueOn(openvdb::Coord(1, 0, 0), T(1));
+
+    std::ostringstream ostr(std::ios_base::binary);
+
+    leaf.writeBuffers(ostr);
+
+    leaf.setValueOn(openvdb::Coord(0, 1, 0), T(0));
+    leaf.setValueOn(openvdb::Coord(0, 1, 1), T(1));
+
+    std::istringstream istr(ostr.str(), std::ios_base::binary);
+    openvdb::io::setCurrentVersion(istr);
+
+    leaf.readBuffers(istr);
+
+    EXPECT_NEAR(T(1), leaf.getValue(openvdb::Coord(0, 1, 0)), /*tolerance=*/0);
+    EXPECT_NEAR(T(1), leaf.getValue(openvdb::Coord(1, 0, 0)), /*tolerance=*/0);
+
+    EXPECT_TRUE(leaf.onVoxelCount() == 2);
 }
 
 
@@ -143,4 +173,37 @@ TEST_F(TestLeafIOTest, testBufferVec3R)
 
         remove("leaf_vec3r.vdb");
     }
+}
+
+TEST_F(TestLeafIOTest, testTreeIOInt) { TestLeafIO<int>::testTreeIO(); }
+TEST_F(TestLeafIOTest, testTreeIOFloat) { TestLeafIO<float>::testTreeIO(); }
+TEST_F(TestLeafIOTest, testTreeIODouble) { TestLeafIO<double>::testTreeIO(); }
+TEST_F(TestLeafIOTest, testTreeIOBool) { TestLeafIO<bool>::testTreeIO(); }
+TEST_F(TestLeafIOTest, testTreeIOByte) { TestLeafIO<openvdb::Byte>::testTreeIO(); }
+
+
+TEST_F(TestLeafIOTest, testTreeIOVec3R)
+{
+    using LeafT = openvdb::tree::LeafNode<openvdb::Vec3R, 3>;
+    LeafT leaf(openvdb::Coord(0, 0, 0));
+
+    leaf.setValueOn(openvdb::Coord(0, 1, 0), openvdb::Vec3R(1, 1, 1));
+    leaf.setValueOn(openvdb::Coord(1, 0, 0), openvdb::Vec3R(1, 1, 1));
+
+    std::ostringstream ostr(std::ios_base::binary);
+
+    leaf.writeBuffers(ostr);
+
+    leaf.setValueOn(openvdb::Coord(0, 1, 0), openvdb::Vec3R(0, 0, 0));
+    leaf.setValueOn(openvdb::Coord(0, 1, 1), openvdb::Vec3R(1, 1, 1));
+
+    std::istringstream istr(ostr.str(), std::ios_base::binary);
+    openvdb::io::setCurrentVersion(istr);
+
+    leaf.readBuffers(istr);
+
+    EXPECT_TRUE(leaf.getValue(openvdb::Coord(0, 1, 0)) == openvdb::Vec3R(1, 1, 1));
+    EXPECT_TRUE(leaf.getValue(openvdb::Coord(1, 0, 0)) == openvdb::Vec3R(1, 1, 1));
+
+    EXPECT_TRUE(leaf.onVoxelCount() == 2);
 }
