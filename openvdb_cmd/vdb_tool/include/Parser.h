@@ -208,7 +208,7 @@ private:
 
 /// @brief   Implements a light-weight stack-oriented programming language (very loosely) inspired by Forth
 /// @details Specifically, it uses Reverse Polish Notation to define operations that are evaluated during
-///          paring of the command-line arguments (options to be precise).
+///          parsing of the command-line arguments (options to be precise).
 class Processor
 {
 public:

@@ -326,7 +326,7 @@ Tool::Tool(int argc, char *argv[])
 
 int Tool::startLog(std::string logFile)
 {
-    if (mOldClogBuffer != nullptr) return 0;
+    if (mOldClogBuffer != nullptr) return 0;// handles repeated calls
     if (logFile.empty()) logFile = "vdb_tool_" + dateStamp() + ".log";
     mLogFile = std::ofstream(logFile);
     if (!mLogFile.is_open()) {

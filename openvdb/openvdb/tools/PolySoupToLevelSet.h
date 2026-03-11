@@ -23,7 +23,8 @@
 #include "MeshToVolume.h"// for meshToLevelSet
 #include "VolumeToMesh.h"// for volumeToMesh
 #include "LevelSetFilter.h"// for Filter
-#include "LevelSetMeasure.h"/// for levelSetVolume
+#include "LevelSetMeasure.h"// for levelSetVolume
+#include "FastSweeping.h"// for fogToSdf
 
 #include <iostream>
 #include <vector>
@@ -256,8 +257,12 @@ private:
     auto offset(float dx){
         auto xform = math::Transform::createLinearTransform(dx);
         auto udf = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> UDF
+#if 0
+        return tools::fogToSdf(*udf, dx);
+#else
         volumeToMesh(*udf, mPoly.vtx, mPoly.tri, mPoly.quad, dx, 0.0);// UDF -> mesh (clears and re-allocates mesh)
         return meshToLevelSet<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> SDF
+#endif
     }
 
     /// @brief Private method that resamples inGrid(dx) to outGrid(dx/2)
@@ -272,8 +277,13 @@ private:
     auto shrinkWrap(GridType &grid, const GridType &gridB, float &d){
         const float maxDist = 2.0f;
         LevelSetFilter<GridType> filter(grid);
+#if 1
         filter.setSpatialScheme(math::FIRST_BIAS);
         filter.setTemporalScheme(math::TVD_RK1);
+#else
+        filter.setSpatialScheme(math::HJWENO5_BIAS);
+        filter.setTemporalScheme(math::TVD_RK3);
+#endif
         if (mIsGridSDF == false) filter.normalize();
         filter.offset(maxDist * grid.voxelSize()[0]);// erode by maxDist * dx
         mIsGridSDF = false;// the CSG operation messed up the SDF
