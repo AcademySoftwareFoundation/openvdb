@@ -1276,6 +1276,97 @@ TEST_F(TestPointDataLeaf, testIO)
 }
 
 
+TEST_F(TestPointDataLeaf, testTreeIO)
+{
+    using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
+    using AttributeF        = TypedAttributeArray<float>;
+
+    using Descriptor = AttributeSet::Descriptor;
+
+    Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
+
+    const size_t size = LeafType::NUM_VOXELS;
+
+    LeafType leaf(openvdb::Coord(0, 0, 0));
+    leaf.initializeAttributes(descrA, /*arrayLength=*/size/2);
+
+    descrA = descrA->duplicateAppend("density", AttributeF::attributeType());
+    leaf.appendAttribute(leaf.attributeSet().descriptor(), descrA, descrA->find("density"));
+
+    leaf.setOffsetOn(1, 10);
+    leaf.setOffsetOn(4, 20);
+    leaf.setOffsetOn(7, 5);
+
+    TypedAttributeArray<float>& attr =
+        TypedAttributeArray<float>::cast(leaf.attributeArray("density"));
+
+    attr.set(0, 5.0f);
+    attr.set(50, 2.0f);
+    attr.set(51, 8.1f);
+
+    {
+        LeafType leaf2(openvdb::Coord(0, 0, 0));
+
+        std::ostringstream ostr(std::ios_base::binary);
+        leaf.writeTopology(ostr);
+
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        leaf2.readTopology(istr);
+
+        EXPECT_EQ(leaf.onVoxelCount(), leaf2.onVoxelCount());
+        EXPECT_TRUE(leaf2.isValueOn(4));
+        EXPECT_TRUE(!leaf2.isValueOn(5));
+
+        EXPECT_EQ(leaf2.getValue(4), ValueType(0));
+        EXPECT_EQ(leaf2.attributeSet().size(), size_t(0));
+    }
+
+    {
+        LeafType leaf2(openvdb::Coord(0, 0, 0));
+
+        io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
+
+        std::ostringstream ostr(std::ios_base::binary);
+        io::setStreamMetadataPtr(ostr, streamMetadata);
+        io::setDataCompression(ostr, io::COMPRESS_BLOSC);
+        leaf.writeTopology(ostr);
+        for (Index b = 0; b < leaf.buffers(); b++) {
+            uint32_t pass = (uint32_t(leaf.buffers()) << 16) | uint32_t(b);
+            streamMetadata->setPass(pass);
+            leaf.writeBuffers(ostr);
+        }
+        {
+            streamMetadata->setPass(1000);
+            leaf.writeBuffers(ostr);
+
+            io::StreamMetadata::Ptr meta;
+            io::setStreamMetadataPtr(ostr, meta);
+            EXPECT_THROW(leaf.writeBuffers(ostr), openvdb::IoError);
+        }
+
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        io::setStreamMetadataPtr(istr, streamMetadata);
+        io::setDataCompression(istr, io::COMPRESS_BLOSC);
+
+        io::setCurrentVersion(istr);
+
+        leaf2.readTopology(istr);
+        for (Index b = 0; b < leaf.buffers(); b++) {
+            uint32_t pass = (uint32_t(leaf.buffers()) << 16) | uint32_t(b);
+            streamMetadata->setPass(pass);
+            leaf2.readBuffers(istr);
+        }
+
+        EXPECT_EQ(leaf.onVoxelCount(), leaf2.onVoxelCount());
+        EXPECT_TRUE(leaf2.isValueOn(4));
+        EXPECT_TRUE(!leaf2.isValueOn(5));
+
+        EXPECT_EQ(leaf2.getValue(4), ValueType(20));
+        EXPECT_EQ(leaf2.attributeSet().size(), size_t(2));
+    }
+}
+
+
 TEST_F(TestPointDataLeaf, testSwap)
 {
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
