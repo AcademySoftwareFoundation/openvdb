@@ -455,7 +455,7 @@ void Tool::init()
 
   mParser.addAction(
      {"write", "export", "save", "o"}, "Write list of geometry, VDB or config files to disk or STDOUT",
-    {{"files", "", "{file|stdout}.{obj|ply|stl|off|vdb|nvdb}", "list of files or the output stream, e.g. file.vdb or stdin.vdb. Note that \"files=\" is optional since any argument without the \"=\" character is intrepreted as a file and appended to \"files\"."},
+    {{"files", "", "{file|stdout}.{obj|ply|stl|off|vdb|nvdb|txt}", "list of files or the output stream, e.g. file.vdb or stdin.vdb. Note that \"files=\" is optional since any argument without the \"=\" character is intrepreted as a file and appended to \"files\"."},
      {"geo", "0", "0|1...", "geometry to write (defaults to \"0\" which is the latest)."},
      {"vdb", "*", "0,1,...", "list of VDB grids to write (defaults to \"*\", i.e. all available grids)."},
      {"keep", "", "1|0|true|false", "toggle wether to preserved or deleted geometry and grids after they have been written."},

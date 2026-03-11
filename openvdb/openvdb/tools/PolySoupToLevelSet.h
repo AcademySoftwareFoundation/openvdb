@@ -257,7 +257,7 @@ private:
     auto offset(float dx){
         auto xform = math::Transform::createLinearTransform(dx);
         auto udf = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> UDF
-#if 0
+#if 0// crashes!?!?
         return tools::fogToSdf(*udf, dx);
 #else
         volumeToMesh(*udf, mPoly.vtx, mPoly.tri, mPoly.quad, dx, 0.0);// UDF -> mesh (clears and re-allocates mesh)
