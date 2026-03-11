@@ -2,6 +2,19 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: Apache-2.0
 
+import os
+
+# If on Windows, add required dll directories from our binary build tree
+if 'add_dll_directory' in dir(os):
+    config = os.path.basename(os.getcwd())
+    os.add_dll_directory(os.getcwd() + '\\..\\..\\..\\..\\openvdb\\openvdb\\' + config)
+    for p in os.environ.get('PATH', '').split(os.pathsep):
+        if os.path.isdir(p):
+            try:
+                os.add_dll_directory(p)
+            except OSError:
+                pass
+
 import nanovdb
 import unittest
 import tempfile
@@ -326,8 +339,12 @@ class TestGridHandleExchange(unittest.TestCase):
         self.assertEqual(handle.gridCount(), 1)
         self.assertIsNotNone(handle.doubleGrid())
         handles = [handle, handle]
-        dstFile = tempfile.NamedTemporaryFile()
-        nanovdb.io.writeGrids(dstFile.name, handles)
+        dstFile = tempfile.NamedTemporaryFile(delete=False)
+        dstFile.close()
+        try:
+            nanovdb.io.writeGrids(dstFile.name, handles)
+        finally:
+            os.unlink(dstFile.name)
 
 
 class TestReadWriteGrids(unittest.TestCase):
@@ -336,10 +353,16 @@ class TestReadWriteGrids(unittest.TestCase):
         sphereHandle = nanovdb.tools.createLevelSetSphere(
             nanovdb.GridType.Float, name=self.gridName
         )
-        self.srcFile = tempfile.NamedTemporaryFile()
+        self.srcFile = tempfile.NamedTemporaryFile(delete=False)
+        self.srcFile.close()
         nanovdb.io.writeGrid(self.srcFile.name, sphereHandle)
         nanovdb.io.writeGrid(self.srcFile.name, sphereHandle)
-        self.dstFile = tempfile.NamedTemporaryFile()
+        self.dstFile = tempfile.NamedTemporaryFile(delete=False)
+        self.dstFile.close()
+
+    def tearDown(self):
+        os.unlink(self.srcFile.name)
+        os.unlink(self.dstFile.name)
 
     def test_metadata(self):
         metadataList = nanovdb.io.readGridMetaData(self.srcFile.name)
@@ -400,16 +423,25 @@ class TestReadWriteGrids(unittest.TestCase):
 @unittest.skipIf(
     not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
 )
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
+)
 class TestDeviceReadWriteGrids(unittest.TestCase):
     def setUp(self):
         self.gridName = "sphere_ls"
         sphereHandle = nanovdb.tools.cuda.createLevelSetSphere(
             nanovdb.GridType.Float, name=self.gridName
         )
-        self.srcFile = tempfile.NamedTemporaryFile()
+        self.srcFile = tempfile.NamedTemporaryFile(delete=False)
+        self.srcFile.close()
         nanovdb.io.deviceWriteGrid(self.srcFile.name, sphereHandle)
         nanovdb.io.deviceWriteGrid(self.srcFile.name, sphereHandle)
-        self.dstFile = tempfile.NamedTemporaryFile()
+        self.dstFile = tempfile.NamedTemporaryFile(delete=False)
+        self.dstFile.close()
+
+    def tearDown(self):
+        os.unlink(self.srcFile.name)
+        os.unlink(self.dstFile.name)
 
     def test_metadata(self):
         metadataList = nanovdb.io.readGridMetaData(self.srcFile.name)
@@ -482,6 +514,9 @@ class TestDeviceReadWriteGrids(unittest.TestCase):
 @unittest.skipIf(
     not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
 )
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
+)
 class TestPointsToGrid(unittest.TestCase):
     def test_points_to_grid(self):
         try:
@@ -505,6 +540,9 @@ class TestPointsToGrid(unittest.TestCase):
 
 @unittest.skipIf(
     not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
+)
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
 )
 class TestSignedFloodFill(unittest.TestCase):
     def test_signed_flood_fill_float(self):
@@ -570,6 +608,9 @@ class TestSignedFloodFill(unittest.TestCase):
 
 @unittest.skipIf(
     not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
+)
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
 )
 class TestSampleFromPoints(unittest.TestCase):
     def test_sample_from_points_float(self):
