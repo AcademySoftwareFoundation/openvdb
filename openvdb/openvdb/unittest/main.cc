@@ -12,11 +12,23 @@
 #include <string>
 #include <vector>
 
+#if defined(__linux__) && defined(OPENVDB_TESTS_FPE)
+#include <fenv.h>
+#endif
+
 #include <gtest/gtest.h>
 
 int
 main(int argc, char *argv[])
 {
     ::testing::InitGoogleTest(&argc, argv);
+
+#if defined(__linux__) && defined(OPENVDB_TESTS_FPE)
+    int excepts = FE_DIVBYZERO;
+    // Note: NO FE_OVERFLOW as some unit tests don't pass with that.
+    // Note: NO FE_INVALID as some unit tests don't pass with that.
+    feenableexcept(excepts);
+#endif
+
     return RUN_ALL_TESTS();
 }
