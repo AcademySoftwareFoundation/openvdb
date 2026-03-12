@@ -14,7 +14,7 @@
 #ifndef NANOVDB_UTIL_UTIL_H_HAS_BEEN_INCLUDED
 #define NANOVDB_UTIL_UTIL_H_HAS_BEEN_INCLUDED
 
-#ifdef __CUDACC_RTC__
+#if defined(__CUDACC_RTC__) || defined(__HIPCC_RTC__)
 
 typedef signed char        int8_t;
 typedef short              int16_t;
@@ -31,7 +31,7 @@ typedef unsigned long long uint64_t;
 #define UINT64_C(x) (x ## ULL)
 #endif
 
-#else // !__CUDACC_RTC__
+#else // !__CUDACC_RTC__ || !__HIPCC_RTC__ 
 
 #include <stdlib.h> //    for abs in clang7
 #include <stdint.h> //    for types like int32_t etc
