@@ -1,6 +1,5 @@
 # vdb_tool
-
-This command-line tool, dubbed vdb_tool, can combine any number of the of high-level tools available in openvdb/tools. For instance, it can convert a sequence of polygon meshes and particles to level sets, and perform a large number of operations on these level set surfaces. It can also generate adaptive polygon meshes from level sets, ray-trace images and export particles, meshes or VDBs to disk or even stream VDBs to STDOUT so other tools can render them (using pipelining). We denote the operations **actions**, and their arguments **options**. Any sequence of **actions** and their **options** can be exported and imported to configuration files, which allows convenient reuse. This command-line tool also supports a string-evaluation language that can be used to define procedural expressions for options of the actions. Currently the following list of actions are supported:
+The vdb_tool is a versatile command-line utility that chains together high-level operations from the OpenVDB library. It can convert polygon meshes and particles into level sets, perform complex volumetric transformations, and generate adaptive meshes or ray-traced images. Results can be exported as particles, meshes, or VDB files, or streamed directly to STDOUT for seamless pipelining with other renderers. We denote the operations **actions**, and their arguments **options**. Any sequence of **actions** and their **options** can be exported and imported to configuration files, which allows convenient reuse. This command-line tool also supports a string-evaluation language that can be used to define procedural expressions for options of the actions. Currently the following list of actions are supported:
 
 | Action | Description |
 |-------|-------|
@@ -332,6 +331,41 @@ Generate adaptive meshes from a sequence of points files, points_0[200,299].vdb,
 vdb_tool -read mesh_mask.obj -mesh2ls voxel=0.1 width=3 -for n=200,300,1 -read points_{$n:4:pad0}.vdb -vdb2points -points2ls voxel=0.035 radius=2.142 width=3 -dilate radius=2.5 space=5 time=1 -gauss iter=2 space=5 time=1 size=1 -erode radius=2.5 space=5 time=1 -ls2mesh vdb=0 mask=1 adapt=0.005 -write mesh_{$n:4:pad0}.abc -end
 ```
 
+## Example of a configuration file performing Particle-to-Mesh generation
+```
+# 1. LOAD A MASK (Optional)
+# Used to clip the fluid so it doesn't leak out of the container
+-read collision_geo.obj 
+-mesh2ls voxel=0.1 width=3
+
+# 2. LOOP THROUGH PARTICLE SEQUENCE
+# Processing frames 200 to 300
+-for n=200,300,1
+    
+    # Read the particle VDB for the current frame
+    -read points_{$n:4:pad0}.vdb
+    
+    # Convert particles to a Level Set
+    # 'radius' is the particle size; 'voxel' is the grid resolution
+    -points2ls voxel=0.035 radius=2.142 width=3
+    
+    # SURFACE REFINEMENT
+    -dilate radius=2.5         # Expand to merge gaps
+    -gauss iter=2              # Smooth out the "blobby" look
+    -erode radius=2.5          # Shrink back to original scale
+    
+    # 3. MESHING & CLIPPING
+    # Convert to adaptive mesh, clipped by our collision mask (vdb=1)
+    -ls2mesh vdb=0 mask=1 adapt=0.005
+    
+    # 4. EXPORT
+    -write mesh_{$n:4:pad0}.abc
+    
+    # Clear the stack for the next frame to prevent memory bloat
+    -clear
+-end
+```
+
 ## Production example with complex math
 Union 200 level set spheres scattered in a spiral pattern and ray-trace them into an image
 ```
@@ -339,3 +373,4 @@ vdb_tool -for n=0,200,1 -eval '{$n:137.5:*:@deg}' -eval '{$deg:d2r:@radian}' -ev
 ```
 
 ---
+
