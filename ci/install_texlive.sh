@@ -16,7 +16,7 @@ cd install-tl-*
 ./install-tl --no-interaction --no-doc-install --no-src-install --scheme=minimal
 
 # Export the texlive PATH to GITHUB_PATH
-TEXLIVE_PATH=/usr/local/texlive/2025/bin/x86_64-linux
+TEXLIVE_PATH=$(echo /usr/local/texlive/*/bin/x86_64-linux)
 export PATH=${TEXLIVE_PATH}:${PATH}
 echo "${TEXLIVE_PATH}" >> $GITHUB_PATH
 

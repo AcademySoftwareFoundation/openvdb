@@ -740,6 +740,100 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_UnifiedBuffer)
     cudaCheck(cudaFree(d_coords));
 }// Large_CudaPointsToGrid_UnifiedBuffer
 
+/// @brief Exercises the serial per-tile sort path (< 32 tiles) in PointsToGrid.
+///        Coordinates in [-512, 512] produce at most 2^3 = 8 upper internal node tiles
+///        (each upper node covers 4096 voxels per dimension), well below the threshold of 32.
+TEST(TestNanoVDBCUDA, FewTiles_CudaPointsToGrid)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    const size_t voxelCount = 1 << 16;// 65536
+    std::vector<nanovdb::Coord> voxels;
+    {
+        voxels.reserve(voxelCount);
+        std::srand(12345);
+        const int max = 512, min = -max;
+        auto op = [&](){return rand() % (max - min) + min;};
+        while (voxels.size() < voxelCount) voxels.push_back(nanovdb::Coord(op(), op(), op()));
+    }
+
+    nanovdb::Coord* d_coords;
+    cudaCheck(cudaMalloc(&d_coords, voxels.size() * sizeof(nanovdb::Coord)));
+    cudaCheck(cudaMemcpy(d_coords, voxels.data(), voxels.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+
+    auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_coords, voxelCount, 1.0);
+
+    EXPECT_TRUE(handle.deviceData());
+    EXPECT_TRUE(handle.deviceGrid<BuildT>());
+    handle.deviceDownload();
+    auto *grid = handle.grid<BuildT>();
+    EXPECT_TRUE(grid);
+    EXPECT_TRUE(grid->valueCount() > 0);
+    EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
+
+    nanovdb::util::forEach(voxels, [&](const nanovdb::util::Range1D &r){
+        auto acc = grid->getAccessor();
+        for (size_t i=r.begin(); i!=r.end(); ++i) {
+            const nanovdb::Coord &ijk = voxels[i];
+            EXPECT_TRUE(acc.probeLeaf(ijk)!=nullptr);
+            EXPECT_TRUE(acc.isActive(ijk));
+            EXPECT_TRUE(acc.getValue(ijk) > 0u);
+            const auto *leaf = acc.get<nanovdb::GetLeaf<BuildT>>(ijk);
+            EXPECT_TRUE(leaf);
+            const auto offset = leaf->CoordToOffset(ijk);
+            EXPECT_EQ(ijk, leaf->offsetToGlobalCoord(offset));
+        }
+    });
+
+    cudaCheck(cudaFree(d_coords));
+}// FewTiles_CudaPointsToGrid
+
+/// @brief Exercises the segmented sort path (>= 32 tiles) in PointsToGrid.
+///        Coordinates in [-8000, 8000] produce 4^3 = 64 upper internal node tiles
+///        (each upper node covers 4096 voxels per dimension), exceeding the threshold of 32.
+TEST(TestNanoVDBCUDA, ManyTiles_CudaPointsToGrid)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    const size_t voxelCount = 1 << 20;// 1048576
+    std::vector<nanovdb::Coord> voxels;
+    {
+        voxels.reserve(voxelCount);
+        std::srand(54321);
+        const int max = 8000, min = -max;
+        auto op = [&](){return rand() % (max - min) + min;};
+        while (voxels.size() < voxelCount) voxels.push_back(nanovdb::Coord(op(), op(), op()));
+    }
+
+    nanovdb::Coord* d_coords;
+    cudaCheck(cudaMalloc(&d_coords, voxels.size() * sizeof(nanovdb::Coord)));
+    cudaCheck(cudaMemcpy(d_coords, voxels.data(), voxels.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+
+    auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_coords, voxelCount, 1.0);
+
+    EXPECT_TRUE(handle.deviceData());
+    EXPECT_TRUE(handle.deviceGrid<BuildT>());
+    handle.deviceDownload();
+    auto *grid = handle.grid<BuildT>();
+    EXPECT_TRUE(grid);
+    EXPECT_TRUE(grid->valueCount() > 0);
+    EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
+
+    nanovdb::util::forEach(voxels, [&](const nanovdb::util::Range1D &r){
+        auto acc = grid->getAccessor();
+        for (size_t i=r.begin(); i!=r.end(); ++i) {
+            const nanovdb::Coord &ijk = voxels[i];
+            EXPECT_TRUE(acc.probeLeaf(ijk)!=nullptr);
+            EXPECT_TRUE(acc.isActive(ijk));
+            EXPECT_TRUE(acc.getValue(ijk) > 0u);
+            const auto *leaf = acc.get<nanovdb::GetLeaf<BuildT>>(ijk);
+            EXPECT_TRUE(leaf);
+            const auto offset = leaf->CoordToOffset(ijk);
+            EXPECT_EQ(ijk, leaf->offsetToGlobalCoord(offset));
+        }
+    });
+
+    cudaCheck(cudaFree(d_coords));
+}// ManyTiles_CudaPointsToGrid
+
 TEST(TestNanoVDBCUDA, mergeSplitGrids)
 {
     size_t size1 = 0, size2 = 0;
