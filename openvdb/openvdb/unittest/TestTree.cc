@@ -731,7 +731,68 @@ TEST_F(TestTree, testIterators)
 
 TEST_F(TestTree, testIO)
 {
-    const char* filename = "testIO.dbg";
+    using TreeType = openvdb::tree::Tree<RootNodeType>;
+    using GridType = openvdb::Grid<TreeType>;
+
+    const char* filename = "testIO.vdb";
+    openvdb::SharedPtr<const char> scopedFile(filename, ::remove);
+    {
+        ValueType background=5.0f;
+        GridType::Ptr grid = GridType::create(background);
+        grid->setName("test_grid");
+        grid->tree().setValueOn(openvdb::Coord(5,10,20),0.234f);
+        grid->tree().setValueOn(openvdb::Coord(50000,20000,30000),4.5678f);
+
+        openvdb::GridCPtrVec grids;
+        grids.push_back(grid);
+
+        openvdb::io::File file(filename);
+        file.write(grids);
+        file.close();
+    }
+    {
+        ValueType background=2.0f;
+        GridType::Ptr grid = GridType::create(background);
+        ASSERT_DOUBLES_EXACTLY_EQUAL(background, grid->tree().getValue(openvdb::Coord(5,10,20)));
+
+        {
+            openvdb::io::File file(filename);
+            file.open();
+            openvdb::GridBase::Ptr baseGrid = file.readGrid("test_grid");
+            file.close();
+
+            grid = openvdb::gridPtrCast<GridType>(baseGrid);
+            EXPECT_TRUE(grid.get() != nullptr);
+        }
+
+        ASSERT_DOUBLES_EXACTLY_EQUAL(0.234f, grid->tree().getValue(openvdb::Coord(5,10,20)));
+        ASSERT_DOUBLES_EXACTLY_EQUAL(5.0f, grid->tree().getValue(openvdb::Coord(5,11,20)));
+        ValueType sum=0.0f;
+        for (RootNodeType::ChildOnIter root_iter = grid->tree().root().beginChildOn();
+            root_iter.test(); ++root_iter)
+        {
+            for (InternalNodeType2::ChildOnIter internal_iter2 = root_iter->beginChildOn();
+                internal_iter2.test(); ++internal_iter2)
+            {
+                for (InternalNodeType1::ChildOnIter internal_iter1 =
+                    internal_iter2->beginChildOn(); internal_iter1.test(); ++internal_iter1)
+                {
+                    for (LeafNodeType::ValueOnIter block_iter =
+                        internal_iter1->beginValueOn(); block_iter.test(); ++block_iter)
+                    {
+                        sum += *block_iter;
+                    }
+                }
+            }
+        }
+        ASSERT_DOUBLES_EXACTLY_EQUAL(sum, (0.234f + 4.5678f));
+    }
+}
+
+
+TEST_F(TestTree, testTreeIO)
+{
+    const char* filename = "testTreeIO.dbg";
     openvdb::SharedPtr<const char> scopedFile(filename, ::remove);
     {
         ValueType background=5.0f;
@@ -750,8 +811,6 @@ TEST_F(TestTree, testIO)
         ASSERT_DOUBLES_EXACTLY_EQUAL(background, root_node.getValue(openvdb::Coord(5,10,20)));
         {
             std::ifstream is(filename, std::ios_base::binary);
-            // Since the test file doesn't include a VDB header with file format version info,
-            // tag the input stream explicitly with the current version number.
             openvdb::io::setCurrentVersion(is);
             root_node.readTopology(is);
             root_node.readBuffers(is);
