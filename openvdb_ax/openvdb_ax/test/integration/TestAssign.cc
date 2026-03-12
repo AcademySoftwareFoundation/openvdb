@@ -1012,6 +1012,9 @@ _T1_@test7 += local2;
         for (const auto& test : expc.second) {
             mHarness.reset();
             test.operator()();
+            // Matrix multiply may produce small floating-point differences
+            // across architectures (e.g. x86_64 vs aarch64 FMA patterns).
+            mHarness.mUseTolerance = true;
             this->execute("assign_compound." + expc.first + ".ax");
         }
     }
