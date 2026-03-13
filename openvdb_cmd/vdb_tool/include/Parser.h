@@ -661,22 +661,26 @@ struct FilesLoop : public BaseLoop
 public:
 
     FilesLoop(Memory &s, ActIterT i, const std::string &name,
-              const std::string &pathString,
+              std::vector<std::string> &&pathString,
               std::vector<std::string> &&fileExt,
               std::vector<std::string> &&includePattern,
               std::vector<std::string> &&excludePattern)
         : BaseLoop(s, i, name)
-        , mFilePath{pathString}
+        , mPathNames(std::move(pathString))
         , mFileExt(std::move(fileExt))
         , mInclude(std::move(includePattern))
         , mExclude(std::move(excludePattern))
-        , mIter(mFilePath)
-        , mEnd(std::filesystem::end(mIter))
+        , mPathIter(mPathNames.begin())
+        , mPathEnd(mPathNames.end())
     {
-        OPENVDB_ASSERT(std::filesystem::is_directory(mFilePath));
-        while (!this->valid()) {
-            if (mIter == mEnd) break;
-            ++mIter;
+        while (mPathIter != mPathEnd) {
+            mFilePath = std::filesystem::path(*mPathIter);
+            OPENVDB_ASSERT(std::filesystem::is_directory(mFilePath));
+            mIter = IterT(mFilePath);
+            mEnd  = std::filesystem::end(mIter);
+            for(; !this->valid() && mIter != mEnd; ++mIter);
+            if (mIter != mEnd) break;
+            ++mPathIter;
         }
         if (mIter != mEnd) this->set(mIter->path().string());
     }
@@ -709,13 +713,20 @@ public:
         return std::filesystem::is_regular_file(mIter->path());
     }
     bool next() override {
-        if (mIter == mEnd) return false;
+        if (mPathIter == mPathEnd) return false;
         ++pos;
         ++mIter;
-        while (!this->valid()) {
-            if (mIter == mEnd) return false;
-            ++mIter;
-        }
+        while(mPathIter != mPathEnd) {
+            for(; !this->valid() && mIter != mEnd; ++mIter);
+            if (mIter != mEnd) break;// done
+            ++mPathIter;
+            if (mPathIter != mPathEnd) {
+                mFilePath = std::filesystem::path(*mPathIter);
+                OPENVDB_ASSERT(std::filesystem::is_directory(mFilePath));
+                mIter = IterT(mFilePath);
+                mEnd  = std::filesystem::end(mIter);
+            }
+        };
         if (mIter != mEnd) this->set(mIter->path().string());
         return mIter != mEnd;
     }
@@ -723,9 +734,11 @@ public:
 private:
  
     using BaseLoop::pos;
-    const std::filesystem::path mFilePath;
+    const std::vector<std::string> mPathNames;
+    std::filesystem::path mFilePath;
     const std::vector<std::string> mFileExt, mInclude, mExclude;
     IterT mIter, mEnd;
+    std::vector<std::string>::const_iterator mPathIter, mPathEnd;
 };// FilesLoop struct
 
 // ==============================================================================================================
@@ -1006,13 +1019,14 @@ Parser::Parser(std::vector<Option> &&def)
             std::shared_ptr<BaseLoop> loop;
             if (this->get<bool>("recursive")) {
                 using LoopT = FilesLoop<std::filesystem::recursive_directory_iterator>;
-                loop = std::make_shared<LoopT>(processor.memory(), iter, "file", iter->options[0].value,
+                //loop = std::make_shared<LoopT>(processor.memory(), iter, "file", iter->options[0].value,
+                loop = std::make_shared<LoopT>(processor.memory(), iter, "file", this->getVec<std::string>("path"),
                                                this->getVec<std::string>("extension",","),
                                                this->getVec<std::string>("include",","),
                                                this->getVec<std::string>("exclude",","));
             } else {
                 using LoopT = FilesLoop<std::filesystem::directory_iterator>;
-                loop = std::make_shared<LoopT>(processor.memory(), iter, "file", iter->options[0].value,
+                loop = std::make_shared<LoopT>(processor.memory(), iter, "file", this->getVec<std::string>("path"),
                                                this->getVec<std::string>("extension",","), 
                                                this->getVec<std::string>("include",","),
                                                this->getVec<std::string>("exclude",","));
