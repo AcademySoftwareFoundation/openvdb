@@ -7,8 +7,6 @@
 ///
 /// @brief GR Render Hook and Primitive for VDB PointDataGrid
 
-#include <UT/UT_Version.h>
-
 #include <openvdb/Grid.h>
 #include <openvdb/Platform.h>
 #include <openvdb/Types.h>
@@ -30,6 +28,18 @@
 #include <RE/RE_VertexArray.h>
 #include <UT/UT_DSOVersion.h>
 #include <UT/UT_UniquePtr.h>
+#include <UT/UT_Version.h>
+
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
+#include <GR/GR_Uniforms.h>
+#include <RV/RV_Geometry.h>
+#include <RV/RV_Render.h>
+#include <RV/RV_ShaderProgram.h>
+#include <RV/RV_ShaderBlock.h>
+#include <RV/RV_ShaderVariableSet.h>
+#include <RV/RV_VKBuffer.h>
+#include <RV/RV_VKDescriptorSet.h>
+#endif
 
 #include <iostream>
 #include <limits>
@@ -39,18 +49,18 @@
 #include <utility>
 #include <vector>
 
-#if UT_VERSION_INT < 0x14000000 // Below 20.0, there is no RE_RenderContext
-#define RE_RenderContext  RE_Render *
-#endif
-
 ////////////////////////////////////////
 
 static RE_ShaderHandle theMarkerDecorShader("decor/GL32/point_marker.prog");
 static RE_ShaderHandle theNormalDecorShader("decor/GL32/point_normal.prog");
 static RE_ShaderHandle theVelocityDecorShader("decor/GL32/user_point_vector3.prog");
-static RE_ShaderHandle theLineShader("basic/GL32/wire_color.prog");
 static RE_ShaderHandle thePixelShader("particle/GL32/pixel.prog");
 static RE_ShaderHandle thePointShader("particle/GL32/point.prog");
+
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
+static RV_ShaderProgram* theVkPointShader = nullptr;
+static RV_ShaderProgram* theVkVelocityShader = nullptr;
+#endif
 
 /// @note  An additional scale for velocity trails to accurately match
 ///        the visualization of velocity for Houdini points
@@ -120,11 +130,8 @@ public:
 
     /// return true if the primitive is in or overlaps the view frustum.
     /// always returning true will effectively disable frustum culling.
-    bool inViewFrustum(const UT_Matrix4D &objviewproj
-#if (UT_VERSION_INT >= 0x1105014e) // 17.5.334 or later
-                       , const UT_BoundingBoxD *bbox
-#endif
-                       ) override;
+    bool inViewFrustum(const UT_Matrix4D &objviewproj,
+                       const UT_BoundingBoxD *bbox) override;
 
     /// Called whenever the primitive is required to render, which may be more
     /// than one time per viewport redraw (beauty, shadow passes, wireframe-over)
@@ -145,10 +152,6 @@ protected:
                          const openvdb::points::PointDataGrid& grid,
                          const RE_CacheVersion& version);
 
-    void updateWireBuffer(RE_Render* r,
-                          const openvdb::points::PointDataGrid& grid,
-                          const RE_CacheVersion& version);
-
     bool updateVec3Buffer(RE_Render* r,
                           const openvdb::points::PointDataGrid& grid,
                           const std::string& attributeName,
@@ -162,12 +165,35 @@ protected:
 
     void removeBuffer(const std::string& name);
 
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
+    void updatePosBufferVk(RV_Render* r,
+                           const openvdb::points::PointDataGrid& grid,
+                           const RE_CacheVersion& version);
+
+    bool updateVec3BufferVk(RV_Render* r,
+                            const openvdb::points::PointDataGrid& grid,
+                            const std::string& attributeName,
+                            const std::string& bufferName,
+                            const RE_CacheVersion& version);
+#endif
+
 private:
     UT_UniquePtr<RE_Geometry> myGeo;
-    UT_UniquePtr<RE_Geometry> myWire;
     bool mDefaultPointColor = true;
     openvdb::Vec3f mCentroid{0, 0, 0};
     openvdb::BBoxd mBbox;
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
+    UT_UniquePtr<RV_Geometry> myGeoVk;
+    UT_UniquePtr<RV_ShaderVariableSet> myVkObjectSet;
+    UT_UniquePtr<RV_ShaderBlock> myVkObjectBlock;
+    UT_UniquePtr<RV_ShaderVariableSet> myVkDrawingSet;
+    UT_UniquePtr<RV_ShaderBlock> myVkGeoBlock;
+    // velocity shader uniform state (separate to avoid clobbering point shader)
+    UT_UniquePtr<RV_ShaderVariableSet> myVkVelObjectSet;
+    UT_UniquePtr<RV_ShaderBlock> myVkVelObjectBlock;
+    bool mHasNormals = false;
+    bool mHasVelocity = false;
+#endif
 };
 
 
@@ -252,10 +278,15 @@ bool patchShader(RE_Render* r, RE_ShaderHandle& shader, RE_ShaderType type,
     shader->getShaderSource(r, source, type);
     const int version = shader->getCodeVersion();
 
+    // normalize whitespace (collapse tabs and runs of spaces to single space)
+
+    source.substitute("\t", " ");
+    while (source.substitute("  ", " ")) {}
+
     // patch the shader to replace the strings
 
     for (const auto& stringPair : stringReplacements) {
-        source.substitute(stringPair.first.c_str(), stringPair.second.c_str(), /*all=*/true);
+        source.substitute(stringPair.first.c_str(), stringPair.second.c_str());
     }
 
     // patch the shader to insert the strings
@@ -312,9 +343,6 @@ void patchShaderNoRedeclarations(RE_Render* r, RE_ShaderHandle& shader)
 {
     static const std::vector<StringPair> stringReplacements
     {
-        StringPair("\t", " "),
-        StringPair("  ", " "),
-        StringPair("  ", " "),
         StringPair("uniform vec2 glH_DepthProject;", "//uniform vec2 glH_DepthProject;"),
         StringPair("uniform vec2 glH_ScreenSize", "//uniform vec2 glH_ScreenSize")
     };
@@ -353,84 +381,6 @@ GR_PrimVDBPoints::acceptPrimitive(GT_PrimitiveType,
 
     return GR_NOT_PROCESSED;
 }
-
-namespace gr_primitive_internal
-{
-
-struct FillGPUBuffersLeafBoxes
-{
-    FillGPUBuffersLeafBoxes(UT_Vector3H* buffer,
-                         const std::vector<openvdb::Coord>& coords,
-                         const openvdb::math::Transform& transform,
-                         const openvdb::Vec3f& positionOffset)
-        : mBuffer(buffer)
-        , mCoords(coords)
-        , mTransform(transform)
-        , mPositionOffset(positionOffset) { }
-
-    void operator()(const tbb::blocked_range<size_t>& range) const
-    {
-        std::vector<UT_Vector3H> corners;
-        corners.reserve(8);
-
-        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
-            const openvdb::Coord& origin = mCoords[n];
-
-            // define 8 corners
-
-            corners.clear();
-
-            const openvdb::Vec3f pos000 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 0.0)) - mPositionOffset;
-            corners.emplace_back(pos000.x(), pos000.y(), pos000.z());
-            const openvdb::Vec3f pos001 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 8.0)) - mPositionOffset;
-            corners.emplace_back(pos001.x(), pos001.y(), pos001.z());
-            const openvdb::Vec3f pos010 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 8.0, 0.0)) - mPositionOffset;
-            corners.emplace_back(pos010.x(), pos010.y(), pos010.z());
-            const openvdb::Vec3f pos011 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 8.0, 8.0)) - mPositionOffset;
-            corners.emplace_back(pos011.x(), pos011.y(), pos011.z());
-            const openvdb::Vec3f pos100 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 0.0, 0.0)) - mPositionOffset;
-            corners.emplace_back(pos100.x(), pos100.y(), pos100.z());
-            const openvdb::Vec3f pos101 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 0.0, 8.0)) - mPositionOffset;
-            corners.emplace_back(pos101.x(), pos101.y(), pos101.z());
-            const openvdb::Vec3f pos110 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 8.0, 0.0)) - mPositionOffset;
-            corners.emplace_back(pos110.x(), pos110.y(), pos110.z());
-            const openvdb::Vec3f pos111 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 8.0, 8.0)) - mPositionOffset;
-            corners.emplace_back(pos111.x(), pos111.y(), pos111.z());
-
-            openvdb::Index64 offset = n*8*3;
-
-            // Z axis
-
-            mBuffer[offset++] = corners[0]; mBuffer[offset++] = corners[1];
-            mBuffer[offset++] = corners[2]; mBuffer[offset++] = corners[3];
-            mBuffer[offset++] = corners[4]; mBuffer[offset++] = corners[5];
-            mBuffer[offset++] = corners[6]; mBuffer[offset++] = corners[7];
-
-            // Y axis
-
-            mBuffer[offset++] = corners[0]; mBuffer[offset++] = corners[2];
-            mBuffer[offset++] = corners[1]; mBuffer[offset++] = corners[3];
-            mBuffer[offset++] = corners[4]; mBuffer[offset++] = corners[6];
-            mBuffer[offset++] = corners[5]; mBuffer[offset++] = corners[7];
-
-            // X axis
-
-            mBuffer[offset++] = corners[0]; mBuffer[offset++] = corners[4];
-            mBuffer[offset++] = corners[1]; mBuffer[offset++] = corners[5];
-            mBuffer[offset++] = corners[2]; mBuffer[offset++] = corners[6];
-            mBuffer[offset++] = corners[3]; mBuffer[offset++] = corners[7];
-        }
-    }
-
-    //////////
-
-    UT_Vector3H*                        mBuffer;
-    const std::vector<openvdb::Coord>&  mCoords;
-    const openvdb::math::Transform&     mTransform;
-    const openvdb::Vec3f                mPositionOffset;
-}; // class FillGPUBuffersLeafBoxes
-
-} // namespace gr_primitive_internal
 
 void
 GR_PrimVDBPoints::computeCentroid(const openvdb::points::PointDataGrid& grid)
@@ -530,12 +480,49 @@ private:
     UT_Vector3H* mBuffer;
 }; // struct VectorAttribute
 
+struct VectorAttribute4H
+{
+    using ValueType = Vec3f;
+
+    struct Handle
+    {
+        Handle(VectorAttribute4H& attribute)
+            : mBuffer(attribute.mBuffer) { }
+
+        template <typename ValueType>
+        void set(openvdb::Index offset,
+                 openvdb::Index /*stride*/,
+                 const openvdb::math::Vec3<ValueType>& value)
+        {
+            mBuffer[offset] = UT_Vector4H(
+                fpreal16(float(value.x())),
+                fpreal16(float(value.y())),
+                fpreal16(float(value.z())),
+                fpreal16(0));
+        }
+
+    private:
+        UT_Vector4H* mBuffer;
+    }; // struct Handle
+
+    VectorAttribute4H(UT_Vector4H* buffer)
+        : mBuffer(buffer) { }
+
+    void expand() { }
+    void compact() { }
+
+private:
+    UT_Vector4H* mBuffer;
+}; // struct VectorAttribute4H
+
 void
 GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
              const openvdb::points::PointDataGrid& grid,
              const RE_CacheVersion& version)
 {
-    const bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
+    const GR_RenderVersion renderVersion = getRenderVersion();
+    const bool gl3 = (renderVersion == GR_RENDER_GL3
+                      || renderVersion == GR_RENDER_GL4);
 
     // Initialize the geometry with the proper name for the GL cache
     if (!myGeo) myGeo.reset(new RE_Geometry);
@@ -632,85 +619,42 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
 }
 
 void
-GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
-             const openvdb::points::PointDataGrid& grid,
-             const RE_CacheVersion& version)
-{
-    const bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
-
-    // Initialize the geometry with the proper name for the GL cache
-    if (!myWire) myWire.reset(new RE_Geometry);
-    myWire->cacheBuffers(getCacheName());
-
-    using GridType = openvdb::points::PointDataGrid;
-    using TreeType = GridType::TreeType;
-    using LeafNode = TreeType::LeafNodeType;
-
-    const TreeType& tree = grid.tree();
-    size_t leafCount = tree.leafCount();
-    if (tree.leafCount() == 0)  return;
-
-    // Initialize the number of points for the wireframe box per leaf.
-
-    int numPoints = static_cast<int>(leafCount*8*3);
-    myWire->setNumPoints(numPoints);
-
-    // fetch wireframe position, if its cache version matches, no upload is required.
-
-    RE_VertexArray* posWire = myWire->findCachedAttrib(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
-
-    if (posWire->getCacheVersion() != version)
-    {
-        using gr_primitive_internal::FillGPUBuffersLeafBoxes;
-
-        // fill the wire data
-
-        UT_UniquePtr<UT_Vector3H[]> data(new UT_Vector3H[numPoints]);
-
-        std::vector<openvdb::Coord> coords;
-
-        for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
-            const LeafNode& leaf = *iter;
-
-            coords.push_back(leaf.origin());
-        }
-
-        FillGPUBuffersLeafBoxes fill(data.get(), coords, grid.transform(), mCentroid);
-        const tbb::blocked_range<size_t> range(0, coords.size());
-        tbb::parallel_for(range, fill);
-
-        posWire->setArray(r, data.get());
-        posWire->setCacheVersion(version);
-    }
-
-    if (gl3)
-    {
-        // Extra constant inputs for the GL3 default shaders we are using.
-
-        fpreal32 uv[2]  = { 0.0, 0.0 };
-        fpreal32 alpha  = 1.0;
-        fpreal32 pnt    = 0.0;
-        UT_Matrix4F instance;
-        instance.identity();
-
-        myWire->createConstAttribute(r, "uv",    RE_GPU_FLOAT32, 2, uv);
-        myWire->createConstAttribute(r, "Alpha", RE_GPU_FLOAT32, 1, &alpha);
-        myWire->createConstAttribute(r, "pointSelection", RE_GPU_FLOAT32, 1,&pnt);
-        myWire->createConstAttribute(r, "instmat", RE_GPU_MATRIX4, 1,
-                    instance.data());
-    }
-
-    myWire->connectAllPrims(r, RE_GEO_WIRE_IDX, RE_PRIM_LINES, nullptr, true);
-}
-
-void
 GR_PrimVDBPoints::update(RE_RenderContext r,
              const GT_PrimitiveHandle &primh,
              const GR_UpdateParms &p)
 {
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
+    if (r.isVulkan())
+    {
+        if (p.reason & (GR_GEO_CHANGED | GR_GEO_TOPOLOGY_CHANGED))
+        {
+            const GT_PrimVDB& gt_primVDB =
+                static_cast<const GT_PrimVDB&>(*primh);
+
+            const openvdb::GridBase* grid =
+                const_cast<GT_PrimVDB&>(gt_primVDB).getGrid();
+
+            const openvdb::points::PointDataGrid& pointDataGrid =
+                static_cast<const openvdb::points::PointDataGrid&>(*grid);
+
+            computeCentroid(pointDataGrid);
+            computeBbox(pointDataGrid);
+
+            RV_Render* rv = r.vkRender();
+            updatePosBufferVk(rv, pointDataGrid, p.geo_version);
+            mDefaultPointColor = !updateVec3BufferVk(
+                rv, pointDataGrid, "Cd", "Cd", p.geo_version);
+            updateVec3BufferVk(
+                rv, pointDataGrid, "N", "N", p.geo_version);
+            updateVec3BufferVk(
+                rv, pointDataGrid, "v", "V", p.geo_version);
+        }
+        return;
+    }
+#endif
+
     // patch the point shaders at run-time to add an offset (does nothing if already patched)
 
-    patchShaderVertexOffset(r, theLineShader);
     patchShaderVertexOffset(r, thePixelShader);
     patchShaderVertexOffset(r, thePointShader);
 
@@ -738,27 +682,19 @@ GR_PrimVDBPoints::update(RE_RenderContext r,
         computeCentroid(pointDataGrid);
         computeBbox(pointDataGrid);
         updatePosBuffer(r, pointDataGrid, p.geo_version);
-        updateWireBuffer(r, pointDataGrid, p.geo_version);
 
         mDefaultPointColor = !updateVec3Buffer(r, pointDataGrid, "Cd", "Cd", p.geo_version);
     }
 }
 
 bool
-GR_PrimVDBPoints::inViewFrustum(const UT_Matrix4D& objviewproj
-#if (UT_VERSION_INT >= 0x1105014e) // 17.5.334 or later
-                                , const UT_BoundingBoxD *passed_bbox
-#endif
-                                )
+GR_PrimVDBPoints::inViewFrustum(const UT_Matrix4D& objviewproj,
+                                const UT_BoundingBoxD *passed_bbox)
 {
     const UT_BoundingBoxD bbox( mBbox.min().x(), mBbox.min().y(), mBbox.min().z(),
                                 mBbox.max().x(), mBbox.max().y(), mBbox.max().z());
-#if (UT_VERSION_INT >= 0x1105014e) // 17.5.334 or later
-    return GR_Utils::inViewFrustum(passed_bbox ? *passed_bbox :bbox,
+    return GR_Utils::inViewFrustum(passed_bbox ? *passed_bbox : bbox,
                                    objviewproj);
-#else
-    return GR_Utils::inViewFrustum(bbox, objviewproj);
-#endif
 }
 
 bool
@@ -853,14 +789,294 @@ GR_PrimVDBPoints::removeBuffer(const std::string& name)
     myGeo->clearAttribute(name.c_str());
 }
 
+
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
+
+void
+GR_PrimVDBPoints::updatePosBufferVk(RV_Render* r,
+             const openvdb::points::PointDataGrid& grid,
+             const RE_CacheVersion& version)
+{
+    using GridType = openvdb::points::PointDataGrid;
+    using TreeType = GridType::TreeType;
+    using AttributeSet = openvdb::points::AttributeSet;
+
+    const TreeType& tree = grid.tree();
+    auto iter = tree.cbeginLeaf();
+    if (!iter) return;
+
+    const AttributeSet::Descriptor& descriptor =
+        iter->attributeSet().descriptor();
+
+    // check if group viewport is in use
+
+    const openvdb::StringMetadata::ConstPtr s =
+        grid.getMetadata<openvdb::StringMetadata>(
+            openvdb_houdini::META_GROUP_VIEWPORT);
+
+    const std::string groupName = s ? s->value() : "";
+    const bool useGroup =
+        !groupName.empty() && descriptor.hasGroup(groupName);
+
+    // count up total points
+
+    int numPoints = 0;
+    if (useGroup) {
+        GroupFilter filter(groupName, iter->attributeSet());
+        numPoints = static_cast<int>(pointCount(tree, filter));
+    } else {
+        NullFilter filter;
+        numPoints = static_cast<int>(pointCount(tree, filter));
+    }
+
+    if (numPoints == 0) return;
+
+    const size_t positionIndex = descriptor.find("P");
+    if (positionIndex == AttributeSet::INVALID_POS) return;
+
+    // check for decoration attributes
+
+    mHasNormals = (descriptor.find("N") != AttributeSet::INVALID_POS);
+    mHasVelocity = (descriptor.find("v") != AttributeSet::INVALID_POS);
+
+    // (re)create the VK geometry
+
+    myGeoVk.reset(new RV_Geometry);
+    myGeoVk->setName("vdb_points");
+    myGeoVk->setNumPoints(numPoints);
+    myGeoVk->createAttribute("P", RV_GPU_FLOAT32, 3);
+    myGeoVk->createAttribute("Cd", RV_GPU_FLOAT16, 4);
+    if (mHasNormals)
+        myGeoVk->createAttribute("N", RV_GPU_FLOAT16, 4);
+    if (mHasVelocity)
+        myGeoVk->createAttribute("V", RV_GPU_FLOAT16, 4);
+    myGeoVk->createConstant("pointSelection", RV_GPU_UINT32, 1);
+    myGeoVk->connectAllPrims(0, RV_PRIM_POINTS);
+    if (mHasVelocity)
+        myGeoVk->connectAllPrims(1, RV_PRIM_PATCHES, /*patch_size=*/1);
+    myGeoVk->populateBuffers(r);
+
+    // set pointSelection to zero (no selection)
+
+    myGeoVk->setAttributeConstValue("pointSelection", 0.0);
+
+    // fill the position buffer (world-space, no offset subtraction)
+
+    {
+        std::vector<Name> includeGroups, excludeGroups;
+        if (useGroup) includeGroups.emplace_back(groupName);
+
+        MultiGroupFilter filter(
+            includeGroups, excludeGroups, iter->attributeSet());
+
+        std::vector<Index64> offsets;
+        pointOffsets(offsets, grid.tree(), filter);
+
+        UT_UniquePtr<UT_Vector3F[]> pdata(new UT_Vector3F[numPoints]);
+
+        // use zero offset so positions are stored in world space
+        PositionAttribute positionAttribute(
+            pdata.get(), Vec3f(0, 0, 0));
+        convertPointDataGridPosition(
+            positionAttribute, grid, offsets,
+            /*startOffset=*/ 0, filter);
+
+        const exint byteSize =
+            static_cast<exint>(numPoints) * sizeof(UT_Vector3F);
+        myGeoVk->getAttribute("P")->uploadData(r, pdata.get(), byteSize);
+    }
+
+    // set a default Cd (will be overwritten if Cd attribute exists)
+
+    myGeoVk->setAttributeConstVecValue(
+        "Cd", UT_Vector4F(0.6f, 0.6f, 0.5f, 1.0f));
+
+}
+
+
+bool
+GR_PrimVDBPoints::updateVec3BufferVk(RV_Render* r,
+             const openvdb::points::PointDataGrid& grid,
+             const std::string& attributeName,
+             const std::string& bufferName,
+             const RE_CacheVersion& version)
+{
+    if (!myGeoVk) return false;
+
+    using GridType = openvdb::points::PointDataGrid;
+    using TreeType = GridType::TreeType;
+    using AttributeSet = openvdb::points::AttributeSet;
+
+    const TreeType& tree = grid.tree();
+    auto iter = tree.cbeginLeaf();
+    if (!iter) return false;
+
+    const int numPoints = static_cast<int>(myGeoVk->getNumPoints());
+    if (numPoints == 0) return false;
+
+    const AttributeSet::Descriptor& descriptor =
+        iter->attributeSet().descriptor();
+    const size_t index = descriptor.find(attributeName);
+
+    if (index == AttributeSet::INVALID_POS) return false;
+
+    const openvdb::Name& type = descriptor.type(index).first;
+    if (type != "vec3s") return false;
+
+    // check if group viewport is in use
+
+    const openvdb::StringMetadata::ConstPtr s =
+        grid.getMetadata<openvdb::StringMetadata>(
+            openvdb_houdini::META_GROUP_VIEWPORT);
+
+    const std::string groupName = s ? s->value() : "";
+    const bool useGroup =
+        !groupName.empty() && descriptor.hasGroup(groupName);
+
+    std::vector<Name> includeGroups, excludeGroups;
+    if (useGroup) includeGroups.emplace_back(groupName);
+
+    MultiGroupFilter filter(
+        includeGroups, excludeGroups, iter->attributeSet());
+
+    std::vector<Index64> offsets;
+    pointOffsets(offsets, grid.tree(), filter);
+
+    // read vec3s attribute data directly into 4-component float16
+    // (VK_FORMAT_R16G16B16A16_SFLOAT is mandatory; 3-component is not)
+
+    UT_UniquePtr<UT_Vector4H[]> data(new UT_Vector4H[numPoints]);
+
+    VectorAttribute4H typedAttribute(data.get());
+    convertPointDataGridAttribute(typedAttribute, grid.tree(), offsets,
+        /*startOffset=*/ 0, static_cast<unsigned>(index),
+        /*stride=*/1, filter);
+
+    const exint byteSize =
+        static_cast<exint>(numPoints) * sizeof(UT_Vector4H);
+    RV_VKBuffer* buf = myGeoVk->getAttribute(bufferName.c_str());
+    if (buf) {
+        buf->uploadData(r, data.get(), byteSize);
+    }
+
+    return true;
+}
+
+#endif // UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN)
+
+
 void
 GR_PrimVDBPoints::render(RE_RenderContext r, GR_RenderMode, GR_RenderFlags, GR_DrawParms dp)
 {
-    if (!myGeo && !myWire)  return;
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
+    if (r.isVulkan())
+    {
+        if (!myGeoVk)  return;
 
-    const bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
+        RV_Render* rv = r.vkRender();
+        GR_Uniforms* uniforms = r.uniforms();
 
-    if (!gl3)   return;
+        // initialize the VK point shader on first use
+
+        if (!theVkPointShader) {
+            theVkPointShader = RV_ShaderProgram::loadShaderProgram(
+                rv->instance(), "openvdb/VK/points.prog");
+            if (!theVkPointShader) return;
+        }
+
+        // set the shader
+
+        rv->setShader(theVkPointShader);
+
+        // bind global uniform blocks (pass info, object transforms)
+
+        if (uniforms) {
+            bool globalBound = uniforms->bindRVGlobalBlock(rv, theVkPointShader);
+
+            // bind set 1 (glH_Object) for per-object transform uniforms
+            if (theVkPointShader->hasSet(1)) {
+                const auto* objBinding =
+                    theVkPointShader->getBinding(1, 0);
+                if (objBinding) {
+                    if (!myVkObjectBlock) {
+                        myVkObjectBlock.reset(
+                            RV_ShaderBlock::create(
+                                rv->instance(), *objBinding));
+                    }
+                    if (!myVkObjectSet ||
+                        !theVkPointShader->isSetCompatible(
+                            *myVkObjectSet)) {
+                        myVkObjectSet =
+                            theVkPointShader->createSet(
+                                rv->instance(), 1);
+                    }
+                    uniforms->assignRVBlock(
+                        rv, myVkObjectBlock.get(), theVkPointShader);
+                    // override DecorationScale with the user's
+                    // point size from display options
+                    const GR_CommonDispOption& commonOpts =
+                        dp.opts->common();
+                    myVkObjectBlock->bindFloat(
+                        "DecorationScale",
+                        static_cast<float>(commonOpts.pointSize()));
+                    myVkObjectBlock->uploadBuffer(rv);
+                    myVkObjectSet->attachBufferBlock(
+                        rv->instance(), "Object",
+                        myVkObjectBlock.get());
+                    rv->bindSet(
+                        myVkObjectSet.get(), theVkPointShader);
+                }
+            }
+
+            // bind set 2 (auto-injected Geometry uniform block)
+            if (theVkPointShader->hasSet(2)) {
+                const auto* geoBinding =
+                    theVkPointShader->getBinding(2, 2);
+                if (geoBinding) {
+                    if (!myVkGeoBlock) {
+                        myVkGeoBlock.reset(
+                            RV_ShaderBlock::create(
+                                rv->instance(), *geoBinding));
+                    }
+                    if (!myVkDrawingSet ||
+                        !theVkPointShader->isSetCompatible(
+                            *myVkDrawingSet)) {
+                        myVkDrawingSet =
+                            theVkPointShader->createSet(
+                                rv->instance(), 2);
+                    }
+                    myVkGeoBlock->uploadBuffer(rv);
+                    myVkDrawingSet->attachBufferBlock(
+                        rv->instance(), "Geometry",
+                        myVkGeoBlock.get());
+                    rv->bindSet(
+                        myVkDrawingSet.get(), theVkPointShader);
+                }
+            }
+
+        }
+
+        // draw - must be inside beginRendering/endRendering block
+
+        bool beganRendering = false;
+        if (!rv->isRendering()) {
+            beganRendering = rv->beginRendering();
+        }
+
+        rv->draw(myGeoVk.get(), 0);
+
+        if (beganRendering) {
+            rv->endRendering();
+        }
+        return;
+    }
+#endif
+
+    if (!myGeo)  return;
+
+    const GR_RenderVersion renderVersion = getRenderVersion();
+    if (renderVersion != GR_RENDER_GL3 && renderVersion != GR_RENDER_GL4)
+        return;
 
     const GR_CommonDispOption& commonOpts = dp.opts->common();
 
@@ -900,35 +1116,133 @@ GR_PrimVDBPoints::render(RE_RenderContext r, GR_RenderMode, GR_RenderFlags, GR_D
 
         r->popShader();
     }
-
-    // draw leaf bboxes
-
-    if (myWire && myWire->getNumPoints() > 0) {
-
-        // bind the shader
-
-        r->pushShader();
-        r->bindShader(theLineShader);
-
-        // bind the position offset
-
-        UT_Vector3F positionOffset(mCentroid.x(), mCentroid.y(), mCentroid.z());
-        theLineShader->bindVector(r, "offset", positionOffset);
-
-        fpreal32 constcol[3] = { 0.6f, 0.6f, 0.6f };
-        myWire->createConstAttribute(r, "Cd", RE_GPU_FLOAT32, 3, constcol);
-
-        r->pushLineWidth(commonOpts.wireWidth());
-        myWire->draw(r, RE_GEO_WIRE_IDX);
-        r->popLineWidth();
-        r->popShader();
-    }
 }
 
 
 void
 GR_PrimVDBPoints::renderDecoration(RE_RenderContext r, GR_Decoration decor, const GR_DecorationParms& p)
 {
+#if UT_VERSION_INT >= 0x15000000 && defined(USE_VULKAN) // 21.0 or later - Vulkan support
+    if (r.isVulkan())
+    {
+        if (!myGeoVk) return;
+
+        if (decor == GR_POINT_MARKER)
+        {
+            drawDecorationForGeo(r, myGeoVk.get(), decor, p.opts,
+                GR_DECOR_RENDER_FLAG_NONE,
+                /*overlay=*/false, /*override_vis=*/false,
+                /*instance_group=*/-1, GR_SELECT_NONE,
+                GR_DecorationRender::PRIM_POINT);
+        }
+        else if (decor == GR_POINT_NORMAL && mHasNormals)
+        {
+            drawDecorationForGeo(r, myGeoVk.get(), decor, p.opts,
+                GR_DECOR_RENDER_FLAG_NONE,
+                /*overlay=*/false, /*override_vis=*/false,
+                /*instance_group=*/-1, GR_SELECT_NONE,
+                GR_DecorationRender::PRIM_POINT);
+        }
+        else if (decor == GR_POINT_VELOCITY && mHasVelocity)
+        {
+            // GPU-based velocity trail rendering using tessellation.
+            // The VK decoration system requires GR_GeoRenderVK for its
+            // built-in tessellation shaders, which custom GR_Primitive
+            // subclasses don't have. Instead, we use a custom velocity
+            // shader that reads P and V as vertex inputs and generates
+            // isolines via tessellation on the GPU.
+
+            RV_Render* rv = r.vkRender();
+            GR_Uniforms* uniforms = r.uniforms();
+
+            // load the velocity tessellation shader on first use
+
+            if (!theVkVelocityShader) {
+                theVkVelocityShader =
+                    RV_ShaderProgram::loadShaderProgram(
+                        rv->instance(),
+                        "openvdb/VK/velocity.prog");
+                if (!theVkVelocityShader) return;
+            }
+
+            rv->setShader(theVkVelocityShader);
+
+            // compute velocity scale and trail color
+
+            const GR_CommonDispOption& commonOpts =
+                p.opts->common();
+            const float velocityScale =
+                static_cast<float>(commonOpts.vectorScale())
+                * -0.041f;
+
+            UT_Color trailColor =
+                commonOpts.getColor(GR_POINT_TRAIL_COLOR);
+            float cr, cg, cb;
+            trailColor.getRGB(&cr, &cg, &cb);
+
+            // bind uniform blocks
+
+            if (uniforms) {
+                uniforms->bindRVGlobalBlock(
+                    rv, theVkVelocityShader);
+
+                // bind set 1 (glH_Object) with velocity overrides
+                if (theVkVelocityShader->hasSet(1)) {
+                    const auto* objBinding =
+                        theVkVelocityShader->getBinding(1, 0);
+                    if (objBinding) {
+                        if (!myVkVelObjectBlock) {
+                            myVkVelObjectBlock.reset(
+                                RV_ShaderBlock::create(
+                                    rv->instance(),
+                                    *objBinding));
+                        }
+                        if (!myVkVelObjectSet ||
+                            !theVkVelocityShader->isSetCompatible(
+                                *myVkVelObjectSet)) {
+                            myVkVelObjectSet =
+                                theVkVelocityShader->createSet(
+                                    rv->instance(), 1);
+                        }
+                        // fill with viewport transforms
+                        uniforms->assignRVBlock(rv,
+                            myVkVelObjectBlock.get(),
+                            theVkVelocityShader);
+                        // override decoration scale and wire color
+                        myVkVelObjectBlock->bindFloat(
+                            "DecorationScale", velocityScale);
+                        myVkVelObjectBlock->bindVector(
+                            "WireColor",
+                            UT_Vector4F(cr, cg, cb, 1.0f));
+                        myVkVelObjectBlock->uploadBuffer(rv);
+                        myVkVelObjectSet->attachBufferBlock(
+                            rv->instance(), "Object",
+                            myVkVelObjectBlock.get());
+                        rv->bindSet(myVkVelObjectSet.get(),
+                            theVkVelocityShader);
+                    }
+                }
+            }
+
+            // draw using PATCHES connection group (index 1)
+
+            bool beganRendering = false;
+            if (!rv->isRendering()) {
+                beganRendering = rv->beginRendering();
+            }
+
+            rv->draw(myGeoVk.get(), 1);
+
+            if (beganRendering) {
+                rv->endRendering();
+            }
+        }
+        return;
+    }
+#endif
+
+    if (!myGeo) return;
+
     // just render native GR_Primitive decorations if position not available
 
     const RE_VertexArray* const position = myGeo->getAttribute("P");
