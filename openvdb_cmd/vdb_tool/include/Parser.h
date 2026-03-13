@@ -664,7 +664,8 @@ public:
               std::vector<std::string> &&pathString,
               std::vector<std::string> &&fileExt,
               std::vector<std::string> &&includePattern,
-              std::vector<std::string> &&excludePattern)
+              std::vector<std::string> &&excludePattern,
+              uint64_t minFileSize, uint64_t maxFileSize)
         : BaseLoop(s, i, name)
         , mPathNames(std::move(pathString))
         , mFileExt(std::move(fileExt))
@@ -672,6 +673,8 @@ public:
         , mExclude(std::move(excludePattern))
         , mPathIter(mPathNames.begin())
         , mPathEnd(mPathNames.end())
+        , mMinFileSize(minFileSize)
+        , mMaxFileSize(maxFileSize)
     {
         while (mPathIter != mPathEnd) {
             mFilePath = std::filesystem::path(*mPathIter);
@@ -705,8 +708,14 @@ public:
         for (const auto &p : mExclude) if (name.find(p) != std::string::npos) return false;
         return true;
     }
+    bool fileSize() const {
+        OPENVDB_ASSERT(mIter != mEnd);
+        const uint64_t size = file_size( mIter->path() );
+        return size >= mMinFileSize && size <= mMaxFileSize;
+    }
     bool valid() override {
         if (mIter == mEnd) return false;
+        if (!this->fileSize()) return false;
         if (!mFileExt.empty() && !this->matchExtensions()) return false;
         if (!mInclude.empty() && !this->includePatterns()) return false;
         if (!mExclude.empty() && !this->excludePatterns()) return false;
@@ -739,6 +748,7 @@ private:
     const std::vector<std::string> mFileExt, mInclude, mExclude;
     IterT mIter, mEnd;
     std::vector<std::string>::const_iterator mPathIter, mPathEnd;
+    const uint64_t mMinFileSize, mMaxFileSize;
 };// FilesLoop struct
 
 // ==============================================================================================================
@@ -1012,6 +1022,8 @@ Parser::Parser(std::vector<Option> &&def)
          {"extension", "", "\"obj,ply\"", "files must have one or more extensions"},
          {"include", "", "\"file1,file2\"", "include files that match one or more patterns"},
          {"exclude", "", "\"file1,file2\"", "exclude files that match one or more patterns"},
+         {"min_size", "0", "1|1B|1KB|1MB|1GB|1TB", "minimum byte size, smaller files will be skipped"},
+         {"max_size", "1TB", "1|1B|1KB|1MB|1GB|1TB", "maximum byte size, larger files will be skipped"},
          {"recursive", "0", "0|1|false|true", "recursive search of files into sub-directories."}},
         [&](){++counter;},
         [&](){
@@ -1019,17 +1031,20 @@ Parser::Parser(std::vector<Option> &&def)
             std::shared_ptr<BaseLoop> loop;
             if (this->get<bool>("recursive")) {
                 using LoopT = FilesLoop<std::filesystem::recursive_directory_iterator>;
-                //loop = std::make_shared<LoopT>(processor.memory(), iter, "file", iter->options[0].value,
                 loop = std::make_shared<LoopT>(processor.memory(), iter, "file", this->getVec<std::string>("path"),
                                                this->getVec<std::string>("extension",","),
                                                this->getVec<std::string>("include",","),
-                                               this->getVec<std::string>("exclude",","));
+                                               this->getVec<std::string>("exclude",","),
+                                               strSizeToByteSize(this->getStr("min_size")),
+                                               strSizeToByteSize(this->getStr("max_size")));
             } else {
                 using LoopT = FilesLoop<std::filesystem::directory_iterator>;
                 loop = std::make_shared<LoopT>(processor.memory(), iter, "file", this->getVec<std::string>("path"),
                                                this->getVec<std::string>("extension",","), 
                                                this->getVec<std::string>("include",","),
-                                               this->getVec<std::string>("exclude",","));
+                                               this->getVec<std::string>("exclude",","),
+                                               strSizeToByteSize(this->getStr("min_size")),
+                                               strSizeToByteSize(this->getStr("max_size")));
             }
             if (loop->valid()) {
                 loops.push_back(loop);
@@ -1037,7 +1052,7 @@ Parser::Parser(std::vector<Option> &&def)
             } else {
                 skipToEnd(iter);// skip to matching -end
             }
-        }, 0
+        }, 0// <-- "path=" is not required, ie both -files /path/dir and -files path=/path/dir are allowed
     );
 
     this->addAction(

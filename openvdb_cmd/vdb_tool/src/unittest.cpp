@@ -80,6 +80,7 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_EQ(4, openvdb::vdb_tool::findMatch("aa", {"abc,o", "a,b,c", "ab,k,j", "abc,d,aa,w"}));
       EXPECT_EQ(2, openvdb::vdb_tool::findMatch("aaa", {"abc,o", "a,aaa,c,aa", "ab,k,j", "abc,d,bb,w"}));
     }
+
     {// findAll
       auto vec = openvdb::vdb_tool::findAll("%1234%678%0123%");
       EXPECT_EQ( 4, vec.size());
@@ -88,12 +89,15 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_EQ( 9, vec[2]);
       EXPECT_EQ(14, vec[3]);
     }
+
     {// toLowerCase
       EXPECT_EQ(" abc=", openvdb::vdb_tool::toLowerCase(" AbC="));
     }
+
     {// toUpperCase
       EXPECT_EQ(" ABC=", openvdb::vdb_tool::toUpperCase(" AbC="));
     }
+
     {// contains
       EXPECT_TRUE( openvdb::vdb_tool::contains("path/base.ext", "base"));
       EXPECT_TRUE( openvdb::vdb_tool::contains("path/base.ext", "base", 5));
@@ -101,6 +105,7 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_TRUE( openvdb::vdb_tool::contains("path/base.ext", 'b'));
       EXPECT_FALSE(openvdb::vdb_tool::contains("path/base.ext", "bbase"));
     }
+
     {// getFile
       EXPECT_EQ("base.ext", openvdb::vdb_tool::getFile("path/base.ext"));
       EXPECT_EQ("base.ext", openvdb::vdb_tool::getFile("/path/base.ext"));
@@ -109,6 +114,7 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_EQ("base.ext", openvdb::vdb_tool::getFile("base.ext"));
       EXPECT_EQ("base", openvdb::vdb_tool::getFile("base"));
     }
+
     {// getBase
       EXPECT_EQ("base", openvdb::vdb_tool::getBase("path/base.ext"));
       EXPECT_EQ("base", openvdb::vdb_tool::getBase("/path/base.ext"));
@@ -117,6 +123,7 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_EQ("base", openvdb::vdb_tool::getBase("base.ext"));
       EXPECT_EQ("base", openvdb::vdb_tool::getBase("base"));
     }
+
     {// getExt
       EXPECT_EQ("ext", openvdb::vdb_tool::getExt("path/file_100.ext"));
       EXPECT_EQ("ext", openvdb::vdb_tool::getExt("path/file.100.ext"));
@@ -124,6 +131,7 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_EQ("", openvdb::vdb_tool::getExt("path/file_100."));
       EXPECT_EQ("", openvdb::vdb_tool::getExt("path/file_100"));
     }
+
     {// replaceExt
       EXPECT_EQ("path/file_100.abc", openvdb::vdb_tool::replaceExt("path/file_100.ext", "abc"));
       EXPECT_EQ("path/file.100.abc", openvdb::vdb_tool::replaceExt("path/file.100.ext", "abc"));
@@ -131,6 +139,7 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_EQ("path/file_100.abc", openvdb::vdb_tool::replaceExt("path/file_100.", "abc"));
       EXPECT_EQ("path/file_100.abc", openvdb::vdb_tool::replaceExt("path/file_100", "abc"));
     }
+
     {// replacePath
       EXPECT_EQ("path/file_100.ext", openvdb::vdb_tool::replacePath("abc/file_100.ext", "path"));
       EXPECT_EQ("/path/file.100.ext", openvdb::vdb_tool::replacePath("/abc/file.100.ext", "/path"));
@@ -138,6 +147,7 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_EQ("path/abc/file_100.ext", openvdb::vdb_tool::replacePath("foo/bar/file_100.ext", "path/abc"));
       EXPECT_EQ("/path/abc/file_100.ext", openvdb::vdb_tool::replacePath("/foo/bar/file_100.ext", "/path/abc"));
     }
+
     {// findFileExt
       EXPECT_EQ(0, openvdb::vdb_tool::findFileExt("path/file_002.eXt", {"ext", "abs", "ab"}, false));
       EXPECT_EQ(1, openvdb::vdb_tool::findFileExt("path/file_002.eXt", {"ext", "abs", "ab"}));
@@ -175,6 +185,7 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_EQ("5",   tokens[4]);
       EXPECT_EQ("6",   tokens[5]);
     }
+
     {// tokenize vectors
       auto tokens = openvdb::vdb_tool::tokenize("(1,2,3)", ",()");
       EXPECT_EQ(3,   tokens.size());
@@ -293,6 +304,29 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_THROW(openvdb::vdb_tool::strToBool("2"), std::invalid_argument);
       EXPECT_THROW(openvdb::vdb_tool::strToBool("t"), std::invalid_argument);
       EXPECT_THROW(openvdb::vdb_tool::strToBool("f"), std::invalid_argument);
+    }
+
+    {// strSizeToByteSize
+      EXPECT_NO_THROW({
+        EXPECT_EQ(uint64_t(2), openvdb::vdb_tool::strSizeToByteSize("2"));
+        EXPECT_EQ(uint64_t(2), openvdb::vdb_tool::strSizeToByteSize("2B"));
+        EXPECT_EQ(uint64_t(2048), openvdb::vdb_tool::strSizeToByteSize("2KB"));
+        EXPECT_EQ(uint64_t(40) << 20, openvdb::vdb_tool::strSizeToByteSize("40MB"));
+        EXPECT_EQ(uint64_t(21) << 30, openvdb::vdb_tool::strSizeToByteSize("21GB"));
+        EXPECT_EQ(uint64_t(12) << 40, openvdb::vdb_tool::strSizeToByteSize("12TB"));
+        EXPECT_EQ(uint64_t(2), openvdb::vdb_tool::strSizeToByteSize(" 2  "));
+        EXPECT_EQ(uint64_t(2), openvdb::vdb_tool::strSizeToByteSize(" 2B  "));
+        EXPECT_EQ(uint64_t(2048), openvdb::vdb_tool::strSizeToByteSize(" 2KB  "));
+        EXPECT_EQ(uint64_t(40) << 20, openvdb::vdb_tool::strSizeToByteSize(" 40MB  "));
+        EXPECT_EQ(uint64_t(21) << 30, openvdb::vdb_tool::strSizeToByteSize(" 21GB  "));
+        EXPECT_EQ(uint64_t(12) << 40, openvdb::vdb_tool::strSizeToByteSize(" 12TB  "));
+      });
+      EXPECT_THROW(openvdb::vdb_tool::strSizeToByteSize(""), std::out_of_range);// stoi
+      EXPECT_THROW(openvdb::vdb_tool::strSizeToByteSize("2b"), std::invalid_argument);
+      EXPECT_THROW(openvdb::vdb_tool::strSizeToByteSize("foo"), std::invalid_argument);
+      EXPECT_THROW(openvdb::vdb_tool::strSizeToByteSize("1PB"), std::invalid_argument);
+      EXPECT_THROW(openvdb::vdb_tool::strSizeToByteSize(" B"), std::invalid_argument);
+      EXPECT_THROW(openvdb::vdb_tool::strSizeToByteSize("KB1KB"), std::invalid_argument);
     }
 
     {// isNumber

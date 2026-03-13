@@ -255,6 +255,26 @@ inline bool strToBool(const std::string &str)
     return false; // "strToBool: internal error" should never happen
 }
 
+/// @brief converts a string of byte size to integer byte size, e.g. "2KB" -> 2048
+inline uint64_t strSizeToByteSize(const std::string &str)
+{
+    const size_t first = str.find_first_not_of(" \t"), last = str.find_last_of("0123456789");
+    uint64_t size = static_cast<uint64_t>( strToInt(str.substr(first, last + 1 - first)) );// might throw
+    const std::string unit = str.substr(last + 1, str.find_last_not_of(" \t") - last);
+    if (unit == "KB") {
+        size <<= 10;
+    } else if (unit == "MB") {
+        size <<= 20;
+    } else if (unit == "GB") {
+        size <<= 30;
+    } else if (unit == "TB") {
+        size <<= 40;
+    } else if (unit != "B" && unit != "") {
+        throw std::invalid_argument("strSizeToByteSize: unsupported unit \"" + unit + "\"");
+    }
+    return size;
+}
+
 template <typename T>
 inline T strTo(const std::string &str);
 
@@ -460,7 +480,7 @@ inline std::string dateStamp() {
     ss << std::put_time(&time_info, "%Y-%m-%d_%H-%M-%S");
 
     return ss.str();
-}
+}// dateStamp
 
 /// @brief Spinning wheel used to indicate progress
 class Spinner {
