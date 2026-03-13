@@ -1285,10 +1285,11 @@ void Tool::config()
             if (!header.isCompatible()) throw std::invalid_argument("readConf: incompatible version \""+line+"\"");
             std::vector<char*> args({&header.mMagic[0]});//parser is expecting first argument to the name of the executable
             while (getline(file, line)) {
-                const size_t start = line.find_first_not_of(" \t"), stop = line.find_first_of("#/%!");
+                const size_t start = line.find_first_not_of(" \t"), stop = line.find_first_of("#%");
                 if (start >= stop) continue;// line is empty or starts with a comment
                 line = line.substr(start, stop - start);// remove leading whitespaces and tailing comments
                 line = line.substr(0, line.find_last_not_of(" \t") + 1);// remove tailing whitespaces
+                //std::cerr << "config: \"" << line << "\"" << std::endl;
                 VecS tmp = vdb_tool::tokenize(line, " ");
                 tmp[0].insert (0, 1, '-');// first token is an action
                 std::transform(tmp.begin(), tmp.end(), std::back_inserter(args), [](const std::string &s){
