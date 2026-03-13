@@ -671,19 +671,16 @@ public:
         , mFileExt(std::move(fileExt))
         , mInclude(std::move(includePattern))
         , mExclude(std::move(excludePattern))
-        , mPathIter(mPathNames.begin())
-        , mPathEnd(mPathNames.end())
         , mMinFileSize(minFileSize)
         , mMaxFileSize(maxFileSize)
     {
-        while (mPathIter != mPathEnd) {
+        for (mPathIter = mPathNames.begin(); mPathIter != mPathNames.end(); ++mPathIter) {
             mFilePath = std::filesystem::path(*mPathIter);
             OPENVDB_ASSERT(std::filesystem::is_directory(mFilePath));
             mIter = IterT(mFilePath);
             mEnd  = std::filesystem::end(mIter);
             for(; !this->valid() && mIter != mEnd; ++mIter);
             if (mIter != mEnd) break;
-            ++mPathIter;
         }
         if (mIter != mEnd) this->set(mIter->path().string());
     }
@@ -710,6 +707,7 @@ public:
     }
     bool fileSize() const {
         OPENVDB_ASSERT(mIter != mEnd);
+        if (!std::filesystem::is_regular_file(mIter->path())) return false;// only loop over regular files
         const uint64_t size = file_size( mIter->path() );
         return size >= mMinFileSize && size <= mMaxFileSize;
     }
@@ -719,17 +717,17 @@ public:
         if (!mFileExt.empty() && !this->matchExtensions()) return false;
         if (!mInclude.empty() && !this->includePatterns()) return false;
         if (!mExclude.empty() && !this->excludePatterns()) return false;
-        return std::filesystem::is_regular_file(mIter->path());
+        return true;
     }
     bool next() override {
-        if (mPathIter == mPathEnd) return false;
+        if (mPathIter == mPathNames.end()) return false;
         ++pos;
         ++mIter;
-        while(mPathIter != mPathEnd) {
+        while(mPathIter != mPathNames.end()) {
             for(; !this->valid() && mIter != mEnd; ++mIter);
             if (mIter != mEnd) break;// done
             ++mPathIter;
-            if (mPathIter != mPathEnd) {
+            if (mPathIter != mPathNames.end()) {
                 mFilePath = std::filesystem::path(*mPathIter);
                 OPENVDB_ASSERT(std::filesystem::is_directory(mFilePath));
                 mIter = IterT(mFilePath);
@@ -747,7 +745,7 @@ private:
     std::filesystem::path mFilePath;
     const std::vector<std::string> mFileExt, mInclude, mExclude;
     IterT mIter, mEnd;
-    std::vector<std::string>::const_iterator mPathIter, mPathEnd;
+    std::vector<std::string>::const_iterator mPathIter;
     const uint64_t mMinFileSize, mMaxFileSize;
 };// FilesLoop struct
 

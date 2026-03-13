@@ -19,6 +19,7 @@
 #include <openvdb/util/Assert.h>
 
 #include "Composite.h" // for csgUnion
+#include "ValueTransformer.h"// for tools::foreach
 #include "GridTransformer.h" // for resampleToMatch
 #include "MeshToVolume.h"// for meshToLevelSet
 #include "VolumeToMesh.h"// for volumeToMesh
@@ -256,10 +257,19 @@ private:
     /// @brief Private method that generates a dx offset level set surface from mPoly, while also updating mPoly
     auto offset(float dx){
         auto xform = math::Transform::createLinearTransform(dx);
-        auto udf = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> UDF
-#if 0// crashes!?!?
-        return tools::fogToSdf(*udf, dx);
+#if 0// no mesh <-> VDB round trips!
+        auto grid = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth + 1);// mesh -> UDF
+        struct OffsetOp {
+            const float dx;
+            OffsetOp(float _dx) : dx(_dx) {}
+            inline void operator()(const typename GridType::ValueOnIter& it) const {it.setValue(*it - dx);}
+        } op(dx);
+        tools::foreach(grid->beginValueOn(), op, true, true);
+        tools::changeBackground(grid->tree(), mHalfWidth*dx);
+        grid->setGridClass(GRID_LEVEL_SET);
+        return grid;
 #else
+        auto udf = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> UDF
         volumeToMesh(*udf, mPoly.vtx, mPoly.tri, mPoly.quad, dx, 0.0);// UDF -> mesh (clears and re-allocates mesh)
         return meshToLevelSet<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> SDF
 #endif
