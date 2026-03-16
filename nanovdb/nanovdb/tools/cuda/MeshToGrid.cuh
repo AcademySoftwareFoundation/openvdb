@@ -211,7 +211,7 @@ GridHandle<BufferT>
 MeshToGrid<BuildT>::getHandle(const BufferT &pool)
 {
     cudaStreamSynchronize(mStream);
-    
+
     // Transform triangle data to (floating-point) index space
     if (mVerbose==1) mTimer.start("Transforming triangles to grid index space");
     transformTriangles();
@@ -331,7 +331,7 @@ struct TransformTrianglesFunctor
     const nanovdb::Vec3f* dPoints;
     const nanovdb::Vec3i* dTriangleIndices;
     Triangle* dXformedTriangles;
-    nanovdb::Map map; 
+    nanovdb::Map map;
 
     __device__
     void operator()(size_t triangleID) const
@@ -378,7 +378,7 @@ struct CountRootBoxesFunctor
 {
     const Triangle* dXformedTriangles;
     uint64_t* dCounts;
-    float mBandWidth; 
+    float mBandWidth;
 
     __device__
     void operator()(size_t triangleID) const
@@ -494,7 +494,7 @@ void MeshToGrid<BuildT>::processRootTrianglePairs()
     cudaGetDevice(&device);
 
     // Pass 1: Count intersecting root boxes per triangle
-    
+
     if (mVerbose >= 2) mTimer.restart("[In MeshToGrid::processRootTrianglePairs()] Launching processRootTrianglePairs");
 
     nanovdb::cuda::DeviceBuffer
@@ -502,7 +502,7 @@ void MeshToGrid<BuildT>::processRootTrianglePairs()
     if (rootBoxCounts.deviceData() == nullptr) throw std::runtime_error("Failed to allocate root box counts buffer");
 
     util::cuda::lambdaKernel<<<numBlocks(mTriangleCount), mNumThreads, 0, mStream>>>(
-        mTriangleCount, 
+        mTriangleCount,
         topology::detail::CountRootBoxesFunctor<BuildT>{
             deviceXformedTriangles(),
             static_cast<uint64_t*>(rootBoxCounts.deviceData()),
@@ -512,9 +512,9 @@ void MeshToGrid<BuildT>::processRootTrianglePairs()
     cudaCheckError();
 
     // Pass 2: InclusiveSum Scan to compute offsets and total allocations
-    
+
     if (mVerbose >= 2) mTimer.restart("[In MeshToGrid::processRootTrianglePairs()] Prefix sum");
-    
+
     nanovdb::cuda::DeviceBuffer rootBoxOffsets =
         nanovdb::cuda::DeviceBuffer::create((mTriangleCount+1)*sizeof(uint64_t), nullptr, device, mStream);
     if (rootBoxOffsets.deviceData() == nullptr) throw std::runtime_error("Failed to allocate root box offsets buffer");
@@ -538,7 +538,7 @@ void MeshToGrid<BuildT>::processRootTrianglePairs()
     if (mBoxTrianglePairsBuffer.deviceData() == nullptr) throw std::runtime_error("Failed to allocate pairs buffer");
 
     util::cuda::lambdaKernel<<<numBlocks(mTriangleCount), mNumThreads, 0, mStream>>>(
-        mTriangleCount, 
+        mTriangleCount,
         topology::detail::ScatterRootTrianglePairsFunctor<BuildT>{
             deviceXformedTriangles(),
             static_cast<uint64_t*>(rootBoxOffsets.deviceData()),
@@ -625,7 +625,7 @@ __device__ inline bool testTriangleAABB(
     float maxZ = fmaxf(v0[2], fmaxf(v1[2], v2[2]));
     if (minZ > boxHalfExtents[2] || maxZ < -boxHalfExtents[2]) return false;
 
-    if constexpr (OnlyUseAABB) return true; 
+    if constexpr (OnlyUseAABB) return true;
 
     // --- PHASE 2: SEPARATING AXIS THEOREM (SAT) (10 additional axes) ---
     nanovdb::Vec3f f0 = v1 - v0, f1 = v2 - v1, f2 = v0 - v2;
@@ -707,7 +707,7 @@ __global__ void evaluateAndCountSubBoxesKernel(
     float centerX = parentPair.origin[0] + i * childScale + (childScale * 0.5f) - 0.5f;
     float centerY = parentPair.origin[1] + j * childScale + (childScale * 0.5f) - 0.5f;
     float centerZ = parentPair.origin[2] + k * childScale + (childScale * 0.5f) - 0.5f;
-    
+
     nanovdb::Vec3f boxCenter(centerX, centerY, centerZ);
     float halfExt = (childScale * 0.5f) + padding;
     nanovdb::Vec3f boxHalfExtents(halfExt, halfExt, halfExt);
@@ -960,7 +960,7 @@ void MeshToGrid<BuildT>::processLeafTrianglePairs()
 
     for (int pass = 0; pass < 3; ++pass) {
         if (mVerbose >= 2) {
-            printf("\n--- Subdivision Pass %d (Scale: %d -> %d) ---\n", 
+            printf("\n--- Subdivision Pass %d (Scale: %d -> %d) ---\n",
                    pass, scale, scale / 8);
         }
 

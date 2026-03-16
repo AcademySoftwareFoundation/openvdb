@@ -30,7 +30,7 @@ void readOBJ(const std::string& filename,
     std::vector<openvdb::Vec3s>& points,
     std::vector<openvdb::Vec3I>& triangles,
     std::vector<openvdb::Vec4I>& quads)
-{             
+{
     std::ifstream file(filename);
     if (!file.is_open()) {
         OPENVDB_THROW(openvdb::IoError, "Failed to open OBJ file: " + filename);
@@ -44,7 +44,7 @@ void readOBJ(const std::string& filename,
         std::istringstream iss(line);
         std::string type;
         iss >> type;
-        
+
         if (type == "v") {
             float x, y, z;
             iss >> x >> y >> z;
@@ -52,44 +52,44 @@ void readOBJ(const std::string& filename,
         } else if (type == "f") {
             std::vector<int> faceIndices;
             std::string vertexData;
-            
+
             while (iss >> vertexData) {
                 // Isolate the vertex index (everything before the first slash)
                 size_t slashPos = vertexData.find('/');
                 std::string indexStr = vertexData.substr(0, slashPos);
-                
+
                 if (indexStr.empty()) continue;
 
                 int raw_idx = std::stoi(indexStr);
                 int actual_idx = 0;
-                
+
                 // Handle negative indices: relative to the number of points parsed so far
                 if (raw_idx < 0) {
-                    actual_idx = points.size() + raw_idx; 
+                    actual_idx = points.size() + raw_idx;
                 } else {
                     // Standard positive indices: OBJ is 1-based, convert to 0-based for C++
-                    actual_idx = raw_idx - 1; 
+                    actual_idx = raw_idx - 1;
                 }
 
                 // Strict bounds checking to prevent segfaults
                 if (actual_idx < 0 || actual_idx >= points.size()) {
-                    OPENVDB_THROW(openvdb::ValueError, 
-                        "OBJ parse error on line " + std::to_string(lineNumber) + 
-                        ": Face index out of bounds (Raw: " + std::to_string(raw_idx) + 
-                        ", Computed: " + std::to_string(actual_idx) + ", Total Points: " + 
+                    OPENVDB_THROW(openvdb::ValueError,
+                        "OBJ parse error on line " + std::to_string(lineNumber) +
+                        ": Face index out of bounds (Raw: " + std::to_string(raw_idx) +
+                        ", Computed: " + std::to_string(actual_idx) + ", Total Points: " +
                         std::to_string(points.size()) + ")");
                 }
 
-                faceIndices.push_back(actual_idx); 
+                faceIndices.push_back(actual_idx);
             }
-            
+
             // Add to the appropriate OpenVDB list
             if (faceIndices.size() == 3) {
                 triangles.push_back(openvdb::Vec3I(faceIndices[0], faceIndices[1], faceIndices[2]));
             } else if (faceIndices.size() == 4) {
                 quads.push_back(openvdb::Vec4I(faceIndices[0], faceIndices[1], faceIndices[2], faceIndices[3]));
             } else if (faceIndices.size() > 4) {
-                std::cerr << "Warning on line " << lineNumber << ": Skipping face with " 
+                std::cerr << "Warning on line " << lineNumber << ": Skipping face with "
                           << faceIndices.size() << " vertices. Triangulate your mesh!" << std::endl;
             }
         }
@@ -121,8 +121,8 @@ int main(int argc, char *argv[])
         // Read the OBJ file
         std::cout << "Reading " << inputFile << "..." << std::endl;
         readOBJ(inputFile, openvdb_points, openvdb_triangles, quads);
-        std::cout << "Loaded " << openvdb_points.size() << " vertices, " 
-                  << openvdb_triangles.size() << " openvdb_triangles, and " 
+        std::cout << "Loaded " << openvdb_points.size() << " vertices, "
+                  << openvdb_triangles.size() << " openvdb_triangles, and "
                   << quads.size() << " quads." << std::endl;
 
         // Initialize OpenVDB
@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
         // Cast the raw pointers from the std::vector data
         const auto* nano_pts_data = reinterpret_cast<const nanovdb::Vec3f*>(openvdb_points.data());
         const auto* nano_tris_data = reinterpret_cast<const nanovdb::Vec3i*>(openvdb_triangles.data());
-        
+
         // Initialize the thrust vectors using the casted pointer ranges
         thrust::universal_vector<nanovdb::Vec3f> nanovdb_points(nano_pts_data, nano_pts_data + openvdb_points.size());
         thrust::universal_vector<nanovdb::Vec3i> nanovdb_triangles(nano_tris_data, nano_tris_data + openvdb_triangles.size());
