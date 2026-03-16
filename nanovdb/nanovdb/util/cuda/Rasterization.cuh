@@ -94,7 +94,7 @@ struct RasterizeLeafNodesFunctor
     const PairT      *dPairs;
     const TriangleT  *dTriangles;
     NanoGrid<BuildT> *dGrid;
-    float             bandWidthSqr;
+    float            bandWidthSqr;
 
     __device__ void operator()() const
     {
@@ -170,7 +170,7 @@ struct ComputeUDFFunctor
     const TriangleT        *dTriangles;
     const NanoGrid<BuildT> *dGrid;
     float                  *dSidecar;
-    float                   bandWidthSqr;
+    float                  bandWidthSqr;
 
     __device__ void operator()() const
     {
