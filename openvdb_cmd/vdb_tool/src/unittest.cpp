@@ -1050,7 +1050,7 @@ TEST_F(Test_vdb_tool, ToolFilesLoop)
     for (int i=0; i<3; ++i) EXPECT_TRUE(fileExists("data/sphere_"+std::to_string(i)+".vdb"));
 
     EXPECT_NO_THROW({
-      auto args = getArgs("vdb_tool -quiet -files path=data include=sphere_ ext=vdb -read {$file} -ls2mesh -write {$file:path}/{$file:name}.obj -end");
+      auto args = getArgs("vdb_tool -quiet -files path=data include=sphere_ ext=vdb min=8 -read {$file} -ls2mesh -write {$file:path}/{$file:name}.obj -end");
       Tool vdb_tool(int(args.size()), args.data());
       vdb_tool.run();
     });

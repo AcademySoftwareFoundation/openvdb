@@ -371,6 +371,23 @@ Union 200 level set spheres scattered in a spiral pattern and ray-trace them int
 ```
 vdb_tool -for n=0,200,1 -eval '{$n:137.5:*:@deg}' -eval '{$deg:d2r:@radian}' -eval '{$radian:cos:@x}' -eval '{$radian:sin:@y}' -eval '{$n:sqrt:@r}' -eval '{$r:5:+:@r_sum}' -eval '{$r_sum:0.25:pow:@pow_r}' -sphere voxel=0.1 radius='{$pow_r:0.5:*}' center='({$r:$x:*},{$r:$y:*},0)' -if '{$n:0:>}' -union -end -end -render spiral.ppm image=1024x1024 translate='(0,0,40)'
 ```
-
+or as a config file:
+```
+vdb_tool 10.8.0
+for n=0,200,1
+  eval {$n:137.5:*:@deg}  # deg = 137.5 * n
+  eval {$deg:d2r:@radian} # radian = d2r(dev)
+  eval {$radian:cos:@x}   # x = cos(radian)
+  eval {$radian:sin:@y}   # y = sin(radian)
+  eval {$n:sqrt:@r}       # r = sqrt(n)
+  eval {$r:5:+:@r_sum}    # r_sum = 5 + r
+  eval {$r_sum:0.25:pow:@pow_r} # pow_r = pow(r_sum, 0.25)
+  sphere voxel=0.1 radius={$pow_r:0.5:*} center=({$r:$x:*},{$r:$y:*},0) # radius=0.5*pow_r center=(r*x, r*x,0)
+  if {$n:0:>} # if n > 0
+    union
+  end
+end
+render spiral.ppm image=1024x1024 translate=(0,0,40)
+```
 ---
 

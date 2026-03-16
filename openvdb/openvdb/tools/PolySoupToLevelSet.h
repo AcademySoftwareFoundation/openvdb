@@ -259,12 +259,7 @@ private:
         auto xform = math::Transform::createLinearTransform(dx);
 #if 0// no mesh <-> VDB round trips!
         auto grid = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth + 1);// mesh -> UDF
-        struct OffsetOp {
-            const float dx;
-            OffsetOp(float _dx) : dx(_dx) {}
-            inline void operator()(const typename GridType::ValueOnIter& it) const {it.setValue(*it - dx);}
-        } op(dx);
-        tools::foreach(grid->beginValueOn(), op, true, true);
+        tools::foreach(grid->beginValueOn(), [dx](const typename GridType::ValueOnIter& it){it.setValue(*it - dx);}, true, true);
         tools::changeBackground(grid->tree(), mHalfWidth*dx);
         grid->setGridClass(GRID_LEVEL_SET);
         return grid;

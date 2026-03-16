@@ -708,7 +708,7 @@ public:
     bool fileSize() const {
         OPENVDB_ASSERT(mIter != mEnd);
         if (!std::filesystem::is_regular_file(mIter->path())) return false;// only loop over regular files
-        const uint64_t size = file_size( mIter->path() );
+        const uint64_t size = file_size( mIter->path() );// fails if path is a directory
         return size >= mMinFileSize && size <= mMaxFileSize;
     }
     bool valid() override {
