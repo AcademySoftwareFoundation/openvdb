@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // the following files are from OpenVDB
-#include <openvdb/tools/Morphology.h>
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/tools/MeshToVolume.h>
 
@@ -112,7 +111,7 @@ int main(int argc, char *argv[])
             outputFile = argv[2];
         float voxelSize = 0.001f;
         if (argc > 3)
-            voxelSize = atof(argv[3]);
+            voxelSize = std::stof(argv[3]);
 
         std::vector<openvdb::Vec3s> openvdb_points;
         std::vector<openvdb::Vec3I> openvdb_triangles;
@@ -122,7 +121,7 @@ int main(int argc, char *argv[])
         std::cout << "Reading " << inputFile << "..." << std::endl;
         readOBJ(inputFile, openvdb_points, openvdb_triangles, quads);
         std::cout << "Loaded " << openvdb_points.size() << " vertices, "
-                  << openvdb_triangles.size() << " openvdb_triangles, and "
+                  << openvdb_triangles.size() << " triangles, and "
                   << quads.size() << " quads." << std::endl;
 
         // Initialize OpenVDB
@@ -139,7 +138,6 @@ int main(int argc, char *argv[])
         openvdb::FloatGrid::Ptr grid = openvdb::tools::meshToUnsignedDistanceField<openvdb::FloatGrid>(
             *transform, openvdb_points, openvdb_triangles, quads, halfband);
         cpuTimer.stop();
-
 
         // Write the Grid to a VDB File
         grid->setName("UnsignedDistanceField");
@@ -160,7 +158,6 @@ int main(int argc, char *argv[])
         thrust::universal_vector<nanovdb::Vec3i> nanovdb_triangles(nano_tris_data, nano_tris_data + openvdb_triangles.size());
 
         // Convert OpenVDB transform to nanovdb::Map
-
         const auto openvdb_mat4 = transform->baseMap()->getAffineMap()->getMat4();
         nanovdb::Map map;
         map.set(openvdb_mat4, openvdb_mat4.inverse());
