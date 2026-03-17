@@ -125,12 +125,14 @@ public:
     ///
     /// @tparam GridBufferT    Buffer type for the output grid handle
     /// @tparam SidecarBufferT Buffer type for the UDF sidecar (defaults to DeviceBuffer)
+    /// @param buffer          optional allocator for the grid handle (currently ignored)
+    /// @param sidecarBuffer   optional allocator for the UDF sidecar (currently ignored)
     /// @return std::pair of grid handle and UDF sidecar buffer
-    template<typename GridBufferT   = nanovdb::cuda::DeviceBuffer,
+    template<typename GridBufferT    = nanovdb::cuda::DeviceBuffer,
              typename SidecarBufferT = nanovdb::cuda::DeviceBuffer>
     std::pair<GridHandle<GridBufferT>, SidecarBufferT>
-    getHandleAndUDF(const GridBufferT&    gridPool    = GridBufferT(),
-                    const SidecarBufferT& sidecarPool = SidecarBufferT());
+    getHandleAndUDF(const GridBufferT&    buffer        = GridBufferT(),
+                    const SidecarBufferT& sidecarBuffer = SidecarBufferT());
 
 private:
     void transformTriangles();
@@ -177,14 +179,6 @@ private:
     auto deviceUniqueRootOrigins() const { return static_cast<nanovdb::Coord*>(mUniqueRootOriginsBuffer.deviceData()); }
 
     nanovdb::cuda::TempDevicePool mTempDevicePool;
-
-    // For diagnostic purposes
-public:
-    uint64_t getPairCount() const { return mBoxTrianglePairCount; }
-    const BoxTrianglePair *getDevicePairs() const { return static_cast<const BoxTrianglePair*>(mBoxTrianglePairsBuffer.deviceData()); }
-
-    uint64_t getRootTileCount() const { return mUniqueRootTileCount; }
-    const nanovdb::Coord *getDeviceRootOrigins() const { return deviceUniqueRootOrigins(); }
 }; // tools::cuda::MeshToGrid<BuildT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -209,7 +203,7 @@ public:
 template<typename BuildT>
 template<typename BufferT>
 GridHandle<BufferT>
-MeshToGrid<BuildT>::getHandle(const BufferT &pool)
+MeshToGrid<BuildT>::getHandle(const BufferT &buffer)
 {
     cudaStreamSynchronize(mStream);
 
@@ -256,7 +250,7 @@ MeshToGrid<BuildT>::getHandle(const BufferT &pool)
 
     // Allocate output grid buffer
     if (mVerbose==1) mTimer.start("Allocating grid buffer");
-    auto buffer = mBuilder.getBuffer(pool, mStream);
+    auto gridBuffer = mBuilder.getBuffer(buffer, mStream);
     if (mVerbose==1) mTimer.stop();
 
     // Initialize grid/tree/root metadata
@@ -302,7 +296,7 @@ MeshToGrid<BuildT>::getHandle(const BufferT &pool)
     if (mVerbose==1) mTimer.start("Pruning empty leaves");
     int device = 0; cudaGetDevice(&device);
     const uint32_t leafCount = mBuilder.data()->nodeCount[0];
-    auto handle = GridHandle<BufferT>(std::move(buffer));
+    auto handle = GridHandle<BufferT>(std::move(gridBuffer));
     if (leafCount) {
         nanovdb::cuda::DeviceBuffer retainMaskBuffer = nanovdb::cuda::DeviceBuffer::create(
             uint64_t(leafCount) * sizeof(nanovdb::Mask<3>), nullptr, device, mStream);
@@ -312,7 +306,7 @@ MeshToGrid<BuildT>::getHandle(const BufferT &pool)
             static_cast<const GridT*>(handle.deviceData()),
             static_cast<nanovdb::Mask<3>*>(retainMaskBuffer.deviceData()),
             mStream);
-        handle = pruner.template getHandle<BufferT>(pool);
+        handle = pruner.template getHandle<BufferT>(buffer);
     }
     if (mVerbose==1) mTimer.stop();
     return handle;
@@ -1052,7 +1046,7 @@ struct FinalizeSidecarFunctor
 template<typename BuildT>
 template<typename GridBufferT, typename SidecarBufferT>
 std::pair<GridHandle<GridBufferT>, SidecarBufferT>
-MeshToGrid<BuildT>::getHandleAndUDF(const GridBufferT& gridPool, const SidecarBufferT&)
+MeshToGrid<BuildT>::getHandleAndUDF(const GridBufferT& buffer, const SidecarBufferT&)
 {
     cudaStreamSynchronize(mStream);
 
@@ -1092,7 +1086,7 @@ MeshToGrid<BuildT>::getHandleAndUDF(const GridBufferT& gridPool, const SidecarBu
     if (mVerbose==1) mTimer.stop();
 
     if (mVerbose==1) mTimer.start("Allocating grid buffer");
-    auto buffer = mBuilder.getBuffer(gridPool, mStream);
+    auto gridBuffer = mBuilder.getBuffer(buffer, mStream);
     if (mVerbose==1) mTimer.stop();
 
     if (mVerbose==1) mTimer.start("Processing grid/tree/root");
@@ -1127,7 +1121,7 @@ MeshToGrid<BuildT>::getHandleAndUDF(const GridBufferT& gridPool, const SidecarBu
     if (mVerbose==1) mTimer.start("Pruning empty leaves");
     int device = 0; cudaGetDevice(&device);
     const uint32_t leafCount = mBuilder.data()->nodeCount[0];
-    auto handle = GridHandle<GridBufferT>(std::move(buffer));
+    auto handle = GridHandle<GridBufferT>(std::move(gridBuffer));
     if (leafCount) {
         nanovdb::cuda::DeviceBuffer retainMaskBuffer = nanovdb::cuda::DeviceBuffer::create(
             uint64_t(leafCount) * sizeof(nanovdb::Mask<3>), nullptr, device, mStream);
@@ -1137,7 +1131,7 @@ MeshToGrid<BuildT>::getHandleAndUDF(const GridBufferT& gridPool, const SidecarBu
             static_cast<const GridT*>(handle.deviceData()),
             static_cast<nanovdb::Mask<3>*>(retainMaskBuffer.deviceData()),
             mStream);
-        handle = pruner.template getHandle<GridBufferT>(gridPool);
+        handle = pruner.template getHandle<GridBufferT>(buffer);
     }
     if (mVerbose==1) mTimer.stop();
 
