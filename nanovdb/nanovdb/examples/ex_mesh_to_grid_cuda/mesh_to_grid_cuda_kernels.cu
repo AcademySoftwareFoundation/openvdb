@@ -23,6 +23,14 @@ void mainMeshToGrid(
     const nanovdb::Map map,
     const openvdb::FloatGrid::Ptr refGrid)
 {
+    // Test topology-only path (getHandle)
+    {
+        nanovdb::tools::cuda::MeshToGrid<BuildT> conv(devicePoints, pointCount, deviceTriangles, triangleCount, map);
+        conv.setVerbose(1);
+        auto handle = conv.getHandle();
+        std::cout << "[getHandle] completed, buffer size: " << handle.bufferSize() << " bytes\n";
+    }
+
     // Initialize mesh-to-grid converter
     nanovdb::tools::cuda::MeshToGrid<BuildT> converter( devicePoints, pointCount, deviceTriangles, triangleCount, map );
     converter.setVerbose(1);
