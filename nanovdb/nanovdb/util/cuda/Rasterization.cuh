@@ -44,8 +44,8 @@ struct RasterizeInternalNodesFunctor
 
     const PairT *dPairs;
     const RootT *dRoot;
-    Mask<5>     *dUpperMasks;
-    Mask<4>     (*dLowerMasks)[Mask<5>::SIZE];
+    Mask<5> *dUpperMasks;
+    Mask<4> (*dLowerMasks)[Mask<5>::SIZE];
 
     __device__ void operator()(size_t pairID) const
     {
@@ -53,8 +53,7 @@ struct RasterizeInternalNodesFunctor
 
         // Locate the root tile containing this leaf origin
         const auto *tile = dRoot->probeTile(pair.origin);
-        uint64_t tileIdx = util::PtrDiff(tile, dRoot->tile(0))
-                           / sizeof(typename RootT::Tile);
+        uint64_t tileIdx = util::PtrDiff(tile, dRoot->tile(0)) / sizeof(typename RootT::Tile);
 
         // Offsets of the enclosing upper and lower nodes
         const uint32_t upperBit = UpperT::CoordToOffset(pair.origin);
@@ -65,20 +64,18 @@ struct RasterizeInternalNodesFunctor
     }
 };
 
-/// @brief Fills leaf voxel value masks via exact point-to-triangle UDF.
+/// @brief Fills leaf voxel value masks via exact point-to-triangle distance calculation.
 ///
 ///        Intended to be called via nanovdb::util::cuda::operatorKernelInstance.
 ///        Launched as <<<pairCount, MaxThreadsPerBlock>>> - 1 CTA per leaf/triangle
-///        pair, 512 threads (one per voxel in the 8^3 leaf). Each CTA:
-///          1. Each thread decodes its voxel local coords (lx, ly, lz) and
-///             computes closestPointOnTriangleToPoint from the voxel center
-///             to the pair's triangle.
-///          2. Warp ballot builds a local 16-word mask without atomics (same
-///             pattern as evaluateAndCountSubBoxesKernel).
+///        pair, 512 threads (one per voxel in the 8^3 leaf). For each CTA:
+///          1. Each thread computes closestPointOnTriangleToPoint from the voxel
+///             center (lx,ly,lz) to the triangle.
+///          2. Warp ballot builds a local 16-word mask without atomics
 ///          3. Thread 0 locates the destination leaf via probeLeaf().
 ///          4. Threads 0..7 each pack two 32-bit ballots into one uint64_t and
 ///             atomicOr into the corresponding mask word, allowing multiple CTAs
-///             writing to the same leaf to coexist.
+///             to work concurrently on the same leaf.
 ///
 /// @note  Degenerate triangles (zero area) are handled implicitly: the face
 ///        interior test naturally fails and the code falls through to the
@@ -91,18 +88,18 @@ struct RasterizeLeafNodesFunctor
     static constexpr int MaxThreadsPerBlock = 512;
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
-    const PairT      *dPairs;
-    const TriangleT  *dTriangles;
+    const PairT *dPairs;
+    const TriangleT *dTriangles;
     NanoGrid<BuildT> *dGrid;
-    float            bandWidthSqr;
+    float bandWidthSqr;
 
     __device__ void operator()() const
     {
         const uint64_t pairID   = blockIdx.x;
-        const int      threadID = threadIdx.x; // 0..511 = voxel index within leaf
+        const int threadID = threadIdx.x; // 0..511 = voxel index within leaf
 
         const auto &pair = dPairs[pairID];
-        const auto &tri  = dTriangles[pair.triangleID];
+        const auto &tri = dTriangles[pair.triangleID];
 
         // Decode voxel local coords within the 8^3 leaf
         // Bit ordering: threadID = lx + ly*8 + lz*64 matches NanoVDB Mask<3> layout
@@ -110,13 +107,8 @@ struct RasterizeLeafNodesFunctor
         const int ly = (threadID >> 3) & 0x7;
         const int lz = (threadID >> 6) & 0x7;
 
-        const nanovdb::Vec3f voxelCenter(
-            float(pair.origin[0] + lx),
-            float(pair.origin[1] + ly),
-            float(pair.origin[2] + lz));
-
-        const bool hit = nanovdb::math::pointToTriangleDistSqr(
-            tri[0], tri[1], tri[2], voxelCenter) <= bandWidthSqr;
+        const nanovdb::Vec3f voxelCenter(float(pair.origin[0] + lx), float(pair.origin[1] + ly), float(pair.origin[2] + lz));
+        const bool hit = nanovdb::math::pointToTriangleDistSqr(tri[0], tri[1], tri[2], voxelCenter) <= bandWidthSqr;
 
         // Build a per-block local mask via warp ballot (avoids per-voxel atomics).
         // 512 threads -> 16 warps -> 16 x 32-bit ballot words.
@@ -128,8 +120,7 @@ struct RasterizeLeafNodesFunctor
 
         // Threads 0..7 each pack two ballots into one uint64_t and atomicOr into the
         // corresponding mask word.
-        auto *leaf = const_cast<nanovdb::NanoLeaf<BuildT>*>(
-            dGrid->tree().root().probeLeaf(pair.origin));
+        auto *leaf = const_cast<nanovdb::NanoLeaf<BuildT>*>(dGrid->tree().root().probeLeaf(pair.origin));
 
         if (threadID < int(nanovdb::Mask<3>::WORD_COUNT)) {
             const uint64_t word = uint64_t(s_ballots[2*threadID])
@@ -147,7 +138,7 @@ struct RasterizeLeafNodesFunctor
 ///
 ///        Intended to be called via nanovdb::util::cuda::operatorKernelInstance.
 ///        Launched as <<<pairCount, MaxThreadsPerBlock>>> - 1 CTA per leaf/triangle
-///        pair, 512 threads (one per voxel in the 8^3 leaf). Each CTA:
+///        pair, 512 threads (one per voxel in the 8^3 leaf). For each CTA:
 ///          1. Probes the leaf pointer from the grid using the pair's origin.
 ///          2. Each thread skips its voxel if inactive in the leaf mask.
 ///          3. Active threads compute pointToTriangleDistSqr from the voxel center
@@ -163,19 +154,19 @@ struct RasterizeLeafNodesFunctor
 template<typename BuildT, typename PairT, typename TriangleT>
 struct ComputeUDFFunctor
 {
-    static constexpr int MaxThreadsPerBlock         = 512;
+    static constexpr int MaxThreadsPerBlock = 512;
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
-    const PairT            *dPairs;
-    const TriangleT        *dTriangles;
+    const PairT *dPairs;
+    const TriangleT *dTriangles;
     const NanoGrid<BuildT> *dGrid;
-    float                  *dSidecar;
-    float                  bandWidthSqr;
+    float *dSidecar;
+    float bandWidthSqr;
 
     __device__ void operator()() const
     {
         const uint64_t pairID   = blockIdx.x;
-        const int      threadID = threadIdx.x;
+        const int threadID = threadIdx.x;
 
         const auto &pair = dPairs[pairID];
         const auto *leaf = dGrid->tree().root().probeLeaf(pair.origin);
@@ -186,14 +177,10 @@ struct ComputeUDFFunctor
         const int ly = (threadID >> 3) & 0x7;
         const int lz = (threadID >> 6) & 0x7;
 
-        const nanovdb::Vec3f voxelCenter(
-            float(pair.origin[0] + lx),
-            float(pair.origin[1] + ly),
-            float(pair.origin[2] + lz));
+        const nanovdb::Vec3f voxelCenter(float(pair.origin[0] + lx), float(pair.origin[1] + ly), float(pair.origin[2] + lz));
 
         const auto &tri = dTriangles[pair.triangleID];
-        const float distSqr = nanovdb::math::pointToTriangleDistSqr(
-            tri[0], tri[1], tri[2], voxelCenter);
+        const float distSqr = nanovdb::math::pointToTriangleDistSqr(tri[0], tri[1], tri[2], voxelCenter);
 
         if (distSqr >= bandWidthSqr) return;
 
