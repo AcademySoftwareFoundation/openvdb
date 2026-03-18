@@ -81,7 +81,7 @@ struct VoxelBlockManager
         // Initialize leafIndex & voxelOffset to sentinel values
         // for blocks that extend beyond the last active voxel in the grid
         if (tID < BlockWidth)
-#pragma cuda unroll
+#pragma unroll
             for (int i = 0; i < BlockWidth; i += blockDim.x) {
                 smem_leafIndex[i+tID] = UnusedLeafIndex;
                 smem_voxelOffset[i+tID] = UnusedVoxelOffset;
@@ -231,7 +231,7 @@ void buildVoxelBlockManager(
     uint64_t firstOffset,
     uint64_t lastOffset,
     int nBlocks,
-    int lowerCount,
+    uint32_t lowerCount,
     const NanoGrid<ValueOnIndex> *grid,
     uint32_t *firstLeafID,
     uint64_t *jumpMap,

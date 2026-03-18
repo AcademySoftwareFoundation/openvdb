@@ -40,7 +40,7 @@ class VoxelBlockManagerHandle
 public:
     /// @brief Move constructor from metadata buffers
     VoxelBlockManagerHandle(BufferT&& firstLeafID, BufferT&& jumpMap, const uint64_t blockCount,
-        const uint64_t firstOffset, const uint64_t lastOffset, const uint64_t lowerCount) {
+        const uint64_t firstOffset, const uint64_t lastOffset, const uint32_t lowerCount) {
         mFirstLeafID = std::move(firstLeafID);
         mJumpMap = std::move(jumpMap);
         mBlockCount = blockCount;
@@ -56,20 +56,20 @@ public:
     VoxelBlockManagerHandle& operator=(VoxelBlockManagerHandle&& other) noexcept {
         mFirstLeafID = std::move(other.mFirstLeafID);
         mJumpMap = std::move(other.mJumpMap);
-        mBlockCount = other.mblockCount;
-        mFirstOffset = other.mfirstOffset;
-        mLastOffset = other.mlastOffset;
-        mLowerCount = other.mlowerCount;
+        mBlockCount = other.mBlockCount;
+        mFirstOffset = other.mFirstOffset;
+        mLastOffset = other.mLastOffset;
+        mLowerCount = other.mLowerCount;
         return *this;
     }
 
     VoxelBlockManagerHandle(VoxelBlockManagerHandle&& other) noexcept {
         mFirstLeafID = std::move(other.mFirstLeafID);
         mJumpMap = std::move(other.mJumpMap);
-        mBlockCount = other.mblockCount;
-        mFirstOffset = other.mfirstOffset;
-        mLastOffset = other.mlastOffset;
-        mLowerCount = other.mlowerCount;
+        mBlockCount = other.mBlockCount;
+        mFirstOffset = other.mFirstOffset;
+        mLastOffset = other.mLastOffset;
+        mLowerCount = other.mLowerCount;
     }
 
     ~VoxelBlockManagerHandle() { this->reset(); }

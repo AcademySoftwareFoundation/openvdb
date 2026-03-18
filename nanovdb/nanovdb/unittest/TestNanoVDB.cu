@@ -3500,7 +3500,7 @@ void testVoxelBlockManager()
     EXPECT_TRUE(handle.data()); // no grid was yet allocated on the CPU
     auto grid = handle.template grid<BuildT>();
     EXPECT_TRUE(grid);
-    std::size_t nLowerNodes = grid->tree().nodeCount(1);
+    auto nLowerNodes = grid->tree().nodeCount(1);
 
     // Construct VBM structure
     nanovdb::tools::VoxelBlockManagerHandle<BufferT> vbmHandle;
