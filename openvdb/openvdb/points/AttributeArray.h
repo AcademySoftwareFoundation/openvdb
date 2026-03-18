@@ -363,10 +363,12 @@ protected:
     mutable tbb::spin_mutex mMutex;
     uint8_t mFlags = 0;
     uint8_t mUsePagedRead = 0;
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     std::atomic<Index32> mOutOfCore{0}; // interpreted as bool
+#endif
     /// used for out-of-core, paged reading
     union {
-        compression::PageHandle::Ptr mPageHandle;
+        std::unique_ptr<compression::PageHandle> mPageHandle;
         size_t mCompressedBytes;
     };
 }; // class AttributeArray
@@ -1535,8 +1537,6 @@ TypedAttributeArray<ValueType_, Codec_>::readBuffers(std::istream& is)
         OPENVDB_THROW(IoError, "Cannot read paged AttributeArray buffers.");
     }
 
-    tbb::spin_mutex::scoped_lock lock(mMutex);
-
     this->deallocate();
 
     uint8_t bloscCompressed(0);
@@ -1585,8 +1585,6 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
     }
 
     OPENVDB_ASSERT(mPageHandle);
-
-    tbb::spin_mutex::scoped_lock lock(mMutex);
 
     this->deallocate();
 
