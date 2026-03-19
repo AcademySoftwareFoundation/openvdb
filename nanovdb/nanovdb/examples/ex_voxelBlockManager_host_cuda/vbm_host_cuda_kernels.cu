@@ -9,13 +9,18 @@
     Builds the VoxelBlockManager from a ValueOnIndex grid, decodes the full
     inverse map (leafIndex, voxelOffset) for all active voxels, downloads the
     result to the host, and validates it against the grid structure.
+    Also benchmarks CPU vs GPU VBM construction with repeated timed runs.
 */
 
 #include <nanovdb/NanoVDB.h>
+#include <nanovdb/HostBuffer.h>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 #include <nanovdb/tools/VoxelBlockManager.h>
+#include <nanovdb/util/Timer.h>
+#include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
 
+#include <algorithm>
 #include <vector>
 #include <iostream>
 
@@ -85,37 +90,88 @@ void runVBMCudaTest(const std::vector<nanovdb::Coord>& coords)
     auto* d_grid = handle.deviceGrid<nanovdb::ValueOnIndex>();
     if (!d_grid) throw std::runtime_error("Failed to create device grid");
 
-    // Download grid to host for validation
+    // Download grid to host for validation and CPU build
     handle.deviceDownload();
     auto* h_grid = handle.grid<nanovdb::ValueOnIndex>();
     if (!h_grid) throw std::runtime_error("Failed to download host grid");
 
-    const auto&    tree        = h_grid->tree();
-    const uint64_t nVoxels     = h_grid->activeVoxelCount();
-    const auto     nLowerNodes = tree.nodeCount(1);
-    const uint64_t firstOffset = 1;
-    const uint64_t lastOffset  = nVoxels;
-    const uint32_t nBlocks     = (uint32_t)((nVoxels + BlockWidth - 1) >> BlockWidthLog2);
+    const auto&    tree    = h_grid->tree();
+    const uint64_t nVoxels = h_grid->activeVoxelCount();
+    const uint32_t nBlocks = (uint32_t)((nVoxels + BlockWidth - 1) >> BlockWidthLog2);
 
     std::cout << "Active voxels (unique): " << nVoxels          << "\n"
               << "Leaf nodes            : " << tree.nodeCount(0) << "\n"
-              << "Lower nodes           : " << nLowerNodes       << "\n"
+              << "Lower nodes           : " << tree.nodeCount(1) << "\n"
               << "Upper nodes           : " << tree.nodeCount(2) << "\n"
               << "VBM blocks            : " << nBlocks
-              <<     "  (BlockWidth=" << BlockWidth << ")\n";
+              <<     "  (BlockWidth=" << BlockWidth << ")\n\n";
 
-    // --- Build VoxelBlockManager on GPU ---
-    nanovdb::tools::VoxelBlockManagerHandle<nanovdb::cuda::DeviceBuffer> vbmHandle;
-    vbmHandle.deviceResize<BlockWidthLog2>(nBlocks);
-    vbmHandle.setOffsets(firstOffset, lastOffset);
-    vbmHandle.setLowerCount(nLowerNodes);
+    // --- Benchmark VBM construction: GPU vs CPU ---
+    // Allocate handles once; timing runs reuse the buffers (memset + kernel only,
+    // no allocation overhead). First run per device serves as warmup - important
+    // for unified-memory buffers where the first access triggers page migration.
+    static constexpr int nRuns = 5;
 
-    nanovdb::tools::cuda::buildVoxelBlockManager<BlockWidthLog2>(
-        vbmHandle.firstOffset(), vbmHandle.lastOffset(),
-        vbmHandle.blockCount(),  vbmHandle.lowerCount(),
-        d_grid,
-        vbmHandle.deviceFirstLeafID(),
-        vbmHandle.deviceJumpMap());
+    auto gpuHandle = nanovdb::tools::cuda::buildVoxelBlockManager<BlockWidthLog2>(d_grid);
+    auto cpuHandle = nanovdb::tools::buildVoxelBlockManager<BlockWidthLog2>(h_grid);
+
+    // GPU build (cudaMemsetAsync + kernel, pre-allocated buffers)
+    {
+        float minMs = std::numeric_limits<float>::max();
+        for (int i = 0; i < nRuns; ++i) {
+            cudaCheck(cudaDeviceSynchronize()); // ensure stream is idle before timing
+            nanovdb::util::cuda::Timer gpuTimer;
+            nanovdb::tools::cuda::buildVoxelBlockManager<BlockWidthLog2>(d_grid, gpuHandle);
+            float ms = gpuTimer.elapsed(); // records stop event and synchronizes
+            if (i > 0) minMs = std::min(minMs, ms);
+        }
+        std::cout << "GPU buildVoxelBlockManager (memset+kernel): min " << minMs
+                  << " ms  (over " << nRuns-1 << " post-warmup runs)\n";
+    }
+
+    // CPU build (std::memset + std::for_each(par), pre-allocated buffers)
+    {
+        float minMs = std::numeric_limits<float>::max();
+        for (int i = 0; i < nRuns; ++i) {
+            nanovdb::util::Timer cpuTimer;
+            cpuTimer.start("");
+            nanovdb::tools::buildVoxelBlockManager<BlockWidthLog2>(h_grid, cpuHandle);
+            float ms = (float)cpuTimer.elapsed<std::chrono::microseconds>() / 1000.0f;
+            if (i > 0) minMs = std::min(minMs, ms);
+        }
+        std::cout << "CPU buildVoxelBlockManager (memset+forEachPar): min " << minMs
+                  << " ms  (over " << nRuns-1 << " post-warmup runs)\n\n";
+    }
+
+    // --- Validate CPU build against GPU build ---
+    // Download GPU metadata to host and compare byte-for-byte with the CPU handle.
+    {
+        const uint64_t firstLeafIDBytes = gpuHandle.blockCount() * sizeof(uint32_t);
+        const uint64_t jumpMapBytes     = gpuHandle.blockCount() * (BlockWidth / 64) * sizeof(uint64_t);
+
+        std::vector<uint32_t> gpuFirstLeafID(gpuHandle.blockCount());
+        std::vector<uint64_t> gpuJumpMap(gpuHandle.blockCount() * (BlockWidth / 64));
+
+        cudaCheck(cudaMemcpy(gpuFirstLeafID.data(), gpuHandle.deviceFirstLeafID(),
+            firstLeafIDBytes, cudaMemcpyDeviceToHost));
+        cudaCheck(cudaMemcpy(gpuJumpMap.data(), gpuHandle.deviceJumpMap(),
+            jumpMapBytes, cudaMemcpyDeviceToHost));
+
+        const bool firstLeafIDMatch = std::memcmp(gpuFirstLeafID.data(),
+            cpuHandle.hostFirstLeafID(), firstLeafIDBytes) == 0;
+        const bool jumpMapMatch = std::memcmp(gpuJumpMap.data(),
+            cpuHandle.hostJumpMap(), jumpMapBytes) == 0;
+
+        if (firstLeafIDMatch && jumpMapMatch)
+            std::cout << "CPU/GPU metadata match: PASSED\n";
+        else
+            std::cerr << "CPU/GPU metadata match: FAILED"
+                      << (firstLeafIDMatch ? "" : " [firstLeafID mismatch]")
+                      << (jumpMapMatch     ? "" : " [jumpMap mismatch]") << "\n";
+    }
+
+    // gpuHandle is the last-built GPU VBM; use it for decode/validation below
+    auto& vbmHandle = gpuHandle;
 
     // --- Allocate output arrays on GPU ---
     uint32_t* d_outLeafIndex   = nullptr;
@@ -128,7 +184,7 @@ void runVBMCudaTest(const std::vector<nanovdb::Coord>& coords)
         d_grid,
         vbmHandle.deviceFirstLeafID(),
         vbmHandle.deviceJumpMap(),
-        firstOffset, lastOffset, nBlocks,
+        vbmHandle.firstOffset(), vbmHandle.lastOffset(), nBlocks,
         d_outLeafIndex, d_outVoxelOffset);
     cudaCheckError();
 
@@ -149,7 +205,7 @@ void runVBMCudaTest(const std::vector<nanovdb::Coord>& coords)
     for (uint64_t k = 0; k < nVoxels; ++k) {
         const uint32_t leafIdx     = outLeafIndex[k];
         const uint16_t voxelOff    = outVoxelOffset[k];
-        const uint64_t expectedIdx = k + firstOffset;
+        const uint64_t expectedIdx = k + vbmHandle.firstOffset();
         const uint64_t decodedIdx  = firstLeaf[leafIdx].getValue(voxelOff);
 
         if (decodedIdx != expectedIdx) {

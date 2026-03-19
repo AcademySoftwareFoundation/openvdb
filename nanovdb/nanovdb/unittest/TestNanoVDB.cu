@@ -3500,18 +3500,9 @@ void testVoxelBlockManager()
     EXPECT_TRUE(handle.data()); // no grid was yet allocated on the CPU
     auto grid = handle.template grid<BuildT>();
     EXPECT_TRUE(grid);
-    auto nLowerNodes = grid->tree().nodeCount(1);
-
     // Construct VBM structure
-    nanovdb::tools::VoxelBlockManagerHandle<BufferT> vbmHandle;
-    vbmHandle.template deviceResize<BlockWidthLog2>(nBlocks);
-    vbmHandle.setOffsets(1, nVoxels);
-    vbmHandle.setLowerCount(nLowerNodes);
-
-    nanovdb::tools::cuda::buildVoxelBlockManager<BlockWidthLog2>(
-        vbmHandle.firstOffset(), vbmHandle.lastOffset(),
-        vbmHandle.blockCount(), vbmHandle.lowerCount(),
-        deviceGrid, vbmHandle.deviceFirstLeafID(), vbmHandle.deviceJumpMap() );
+    auto vbmHandle = nanovdb::tools::cuda::buildVoxelBlockManager<BlockWidthLog2, 128, BufferT>(
+        deviceGrid);
 
     // Compute stencil neighbors
     const size_t neighborStencilSize = nBlocks * BlockWidth * 27 * sizeof(uint64_t);
