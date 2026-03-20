@@ -77,56 +77,75 @@ Treat `valueMask` as **16 `uint32_t` words** (not 8 `uint64_t`). Rationale:
 - Software popcount on 32-bit words uses AND/shift/add/multiply — all available as 32-bit SIMD
   ops in AVX2. A `#pragma omp simd` loop over 16 words auto-vectorizes without `VPOPCNTQ`.
 
-### 4b. Vertical SIMD Sweep for Base Offsets
+### 4b. Storage Layout: `prefixCountRealigned[32][16]`
 
-Compute `baseOffset[w]` = number of active voxels in words 0..w-1:
+Declare a `uint32_t` array shaped as `[bitStep][lane]`:
 
 ```cpp
-uint32_t words[16];
-// ... load valueMask as 16 x uint32_t ...
-uint32_t baseOffset[16];
-baseOffset[0] = 0;
-for (int w = 1; w < 16; w++)
-    baseOffset[w] = baseOffset[w-1] + popcount32(words[w-1]);
+alignas(32) uint32_t prefixCountRealigned[/*bitStep*/32][/*lane*/16];
 ```
 
-This prefix sum loop is short and can be left scalar (dependency chain); the 16 popcount calls
-above it are SIMD-vectorizable.
+- **lane** (0..15): indexes which 32-bit word of the valueMask (one per group of 32 consecutive voxels).
+- **bitStep** (0..31): indexes bit position within the word.
+- `prefixCountRealigned[step][lane]` = **inclusive** prefix popcount = number of active voxels
+  in positions 0..step of word `lane`.
 
-### 4c. Vertical Sweep: Producing `leafLocalOffsets`
+Storage is `uint32_t` throughout to match `popcount32`'s natural precision and avoid
+narrowing conversions. A full row `prefixCountRealigned[step]` is 16 × 4 = 64 bytes:
+- **AVX2**: two `__m256i` registers per row (8 uint32_t each)
+- **AVX-512**: one `__m512i` register per row (16 uint32_t) — the layout is designed for this upgrade
 
-Outer loop over bit position k = 0..31; inner SIMD loop over all 16 words simultaneously.
+### 4c. Phase 1 — Per-Word Inclusive Prefix Counts (SIMD)
 
-For each (k, w):
-- `bit = (words[w] >> k) & 1`  — is this voxel active?
-- If active: `localOffset = w * 32 + k` and the dense index is
-  `j = popcount32(words[w] & ((1u << k) - 1)) + baseOffset[w]`
-
-In practice, rather than computing j by popcount on every step, maintain a running count `count[w]`
-per word and increment it each time a 1-bit is encountered:
+For each `step` in 0..31, compute `prefixCountRealigned[step][lane]` for all 16 lanes
+simultaneously via a `#pragma omp simd` loop:
 
 ```cpp
-uint32_t count[16] = { /* baseOffset[w] */ ... };
+const uint32_t* maskWords =
+    reinterpret_cast<const uint32_t*>(leaf.valueMask().words());
 
-// Preallocate output (512 elements max per leaf)
-uint16_t leafLocalOffsets[512];
-
-for (int k = 0; k < 32; k++) {
+for (int step = 0; step < 32; step++) {
+    // TODO: use (uint32_t(2) << step) - 1u, NOT (1u << (step+1)) - 1u
+    // The latter is UB at step=31 (shift by 32 on a 32-bit type).
+    // The safe form: at step=31, (2u << 31) overflows to 0 (defined for unsigned),
+    // and 0 - 1u wraps to 0xFFFFFFFF (all bits set) — correct inclusive mask.
+    const uint32_t mask = (uint32_t(2) << step) - 1u;
     #pragma omp simd
-    for (int w = 0; w < 16; w++) {
-        if ((words[w] >> k) & 1u) {
-            leafLocalOffsets[count[w]++] = (uint16_t)(w * 32 + k);
-        }
-    }
+    for (int lane = 0; lane < 16; lane++)
+        prefixCountRealigned[step][lane] = popcount32(maskWords[lane] & mask);
 }
 ```
 
-**Note:** The `#pragma omp simd` with a data-dependent conditional store does vectorize on modern
-compilers (the compiler emits a masked scatter or conditional store). If the compiler balks, the
-fallback is to separate the popcount prefix-sum from the scatter, using the parallel prefix
-approach described in §4d.
+At `step=31`, `mask = 0xFFFFFFFF`, so `prefixCountRealigned[31][lane] = wordPopcount[lane]`
+(the full per-word active voxel count) — no separate word-popcount pass needed.
 
-### 4d. Parallel Prefix Compaction via `shfl_down` (Alternative / Deeper SIMD)
+### 4d. Phase 2 — Cross-Word Prefix Sum and Global Conversion
+
+Read the last row to get per-word counts, compute their exclusive prefix scan (scalar — short
+dependency chain), then add `baseOffset[lane]` to every row in a second SIMD pass:
+
+```cpp
+// Exclusive prefix scan of the last row → baseOffset[lane]
+uint32_t baseOffset[16];
+baseOffset[0] = 0;
+for (int lane = 1; lane < 16; lane++)
+    baseOffset[lane] = baseOffset[lane-1] + prefixCountRealigned[31][lane-1];
+
+// Add baseOffset to every row: converts per-word to global prefix counts
+for (int step = 0; step < 32; step++) {
+    #pragma omp simd
+    for (int lane = 0; lane < 16; lane++)
+        prefixCountRealigned[step][lane] += baseOffset[lane];
+}
+```
+
+`baseOffset` is constant across all 32 steps for a given lane, so each row's SIMD add is a
+simple lane-wise addition with no broadcast required. After this pass,
+`prefixCountRealigned[step][lane]` holds the full global inclusive prefix count for voxel
+`step + 32*lane` — i.e., the sequential index of that voxel within the leaf (0-based) if it
+is active, counting all active voxels before it across all words.
+
+### 4e. Parallel Prefix Compaction via `shfl_down` (Alternative / Deeper SIMD)
 
 This approach avoids data-dependent stores entirely and is the approach validated in
 `simd_test/shfl_down_test.cpp`.
@@ -154,8 +173,15 @@ Compiles to clean masked blend operations:
 The `move[i]` predicate for pass k is: `(shifts[i] & (1 << k)) != 0`, which itself depends on
 the bitmask but can be computed upfront via popcount before the blend passes.
 
-**Practical recommendation**: Start with the simpler vertical sweep (§4c). Fall back to `shfl_down`
-if the compiler fails to vectorize the conditional store or if profiling shows it is the bottleneck.
+**Practical recommendation**: Start with the simpler vertical sweep (§4c/§4d). Fall back to
+`shfl_down` if the compiler fails to vectorize the conditional store or if profiling shows it
+is the bottleneck.
+
+**TODO**: Investigate whether this collective SIMD prefix-popcount approach could benefit the
+CUDA `decodeInverseMaps` as well. The current GPU implementation iterates all 512 voxel slots
+via `getValue()` (one thread per slot cooperatively across the warp), which is already very fast
+(~0.039 ms for 16384 blocks). Given that baseline, a rewrite is unlikely to be worthwhile, but
+it may be worth a quick look once the CPU path is mature.
 
 ---
 
@@ -199,6 +225,17 @@ Before iterating over leaves, initialize sentinel values for the whole block:
 std::fill(leafIndex,   leafIndex   + BlockWidth, UnusedLeafIndex);
 std::fill(voxelOffset, voxelOffset + BlockWidth, UnusedVoxelOffset);
 ```
+
+**Important:** `std::fill` on a `threadprivate` TLS pointer does **not** auto-vectorize to AVX2
+stores even when `-mavx2` is enabled. The compiler cannot prove alignment through the TLS
+indirection, so it falls back to scalar or SSE stores. Explicit AVX2 intrinsics with an
+`(__m256i*)` cast are required to get `vmovdqa` and recover the expected bandwidth. On the test
+machine (no AVX-512), using explicit `_mm256_store_si256` over `alignas(64)` arrays brought the
+initialization cost from ~1.5 ms down to ~0.22 ms for 16384 blocks across 32 OMP threads.
+
+The same issue will affect the `voxelOffset` range-fill and `leafIndex` range-fill in the
+optimized path (§6 and §7): if the output arrays are caller-allocated (stack or TLS), `std::fill`
+and `std::copy` should be replaced with explicit AVX2 stores where performance matters.
 
 ---
 
@@ -334,3 +371,44 @@ Each pass: `vpand` + 2×`vpcmpeqd` + 2×`vpmaskmovd` + `vpblendvb` + store per 8
    ```
 
    This matches the pattern used by `_CCCL_RESTRICT` in the bundled CCCL dependency.
+
+---
+
+## 12. Benchmarking Findings (ex_voxelBlockManager_host_cuda)
+
+Measurements on the test machine (32 OMP threads, BlockWidth=128, 16384 blocks / 2M active
+voxels, AVX2 but no AVX-512).
+
+### Baseline numbers
+
+| Path | Time per full pass |
+|------|--------------------|
+| GPU `decodeInverseMaps` (all blocks, `benchDecodeKernel`) | ~0.039 ms |
+| CPU `decodeInverseMaps`, 32 OMP threads, unoptimized (`getValue()` loop) | ~77 ms |
+| CPU initialization only (AVX2 stores, 32 threads) | ~0.22 ms |
+| CPU OMP scheduling overhead (empty loop body, 16384 iterations) | ~0.002 ms |
+
+The GPU/CPU gap is ~2000×. The `getValue()` loop accounts for essentially all of the CPU cost.
+
+### OMP parallelism
+
+The outer loop over blocks (`#pragma omp for schedule(static)`) parallelizes correctly — a
+fill-only sanity check scaled from ~77ms (single-thread equivalent) to ~1.5ms with 32 threads
+(~40×). However the full `decodeInverseMaps` showed **zero scaling** with OMP threads. This
+confirms the bottleneck is memory-bandwidth or cache-thrashing in the `getValue()` traversal,
+not compute: all 32 threads together saturate available bandwidth accessing leaf data, giving no
+wall-time improvement over serial.
+
+### `getValue()` is the bottleneck
+
+`getValue(localOffset)` on a `ValueOnIndex` leaf accesses `mValueMask` and the packed
+`mPrefixSum` field to compute the sequential index. It is read-only but touches leaf node data
+for every one of 512 slots per leaf, for every leaf overlapping the block. The unoptimized path
+is O(512 × nLeaves) memory accesses per block rather than O(64 bytes of valueMask) per leaf.
+Replacing this with the prefix-array approach (§4) is the primary optimization target.
+
+### Build flags
+
+`-mavx2` must be passed explicitly to both the host compiler and nvcc (`-Xcompiler -mavx2`).
+Without it, `std::fill` on TLS pointers generates scalar stores. The flag is set in
+`examples/CMakeLists.txt` via `target_compile_options` for `ex_voxelBlockManager_host_cuda`.

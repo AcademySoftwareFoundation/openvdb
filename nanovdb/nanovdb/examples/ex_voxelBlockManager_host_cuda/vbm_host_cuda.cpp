@@ -71,8 +71,8 @@ generateDomain(int ambient_voxels, float occupancy, uint32_t seed = 42)
 int main(int argc, char** argv)
 {
     try {
-        int   ambient_voxels = 1024 * 1024;
-        float occupancy      = 0.5f;
+        int   ambient_voxels = 8 * 1024 * 1024;
+        float occupancy      = 0.25f;
 
         if (argc > 1) ambient_voxels = std::stoi(argv[1]);
         if (argc > 2) occupancy      = std::stof(argv[2]);

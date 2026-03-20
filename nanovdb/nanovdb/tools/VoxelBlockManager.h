@@ -127,6 +127,85 @@ public:
 
 }; // VoxelBlockManagerHandle
 
+// --------------------------> VoxelBlockManager (CPU) <--------------------------------------
+
+/// @brief CPU counterpart of tools::cuda::VoxelBlockManager. Provides host-side
+///        decode of the inverse maps (sequential index -> leaf + voxel offset)
+///        for a single voxel block. No SIMD or parallelism: the implementation
+///        is intentionally plain and single-threaded so the caller can parallelize
+///        across blocks however it likes (e.g. std::execution::par or OpenMP).
+template <int Log2BlockWidth>
+struct VoxelBlockManager
+{
+    static constexpr int BlockWidth    = 1 << Log2BlockWidth;
+    static_assert(Log2BlockWidth >= 6, "BlockWidth must be at least 64 (one jumpMap word per block)");
+    static constexpr int JumpMapLength = BlockWidth / 64;
+
+    static constexpr uint32_t UnusedLeafIndex   = 0xffffffff;
+    static constexpr uint16_t UnusedVoxelOffset = 0xffff;
+
+    /// @brief Decode the inverse maps for a single voxel block on the host.
+    ///
+    /// Given the VBM metadata for one block (firstLeafID and the block's slice of
+    /// the jumpMap) and the block's base sequential offset, fills leafIndex[] and
+    /// voxelOffset[] so that for each position p in [0, BlockWidth):
+    ///   - leafIndex[p]   = index of the leaf node containing sequential voxel
+    ///                      (blockFirstOffset + p), or UnusedLeafIndex if that
+    ///                      index is beyond the last active voxel.
+    ///   - voxelOffset[p] = local (0..511) offset of that voxel within its leaf,
+    ///                      or UnusedVoxelOffset.
+    ///
+    /// This is the direct CPU analogue of the CUDA decodeInverseMaps: same inputs,
+    /// same outputs, same sentinel values. The GPU version runs cooperatively across
+    /// a thread block; this version is a plain sequential loop intended to be called
+    /// once per voxel block from a single thread (or from one thread per block in a
+    /// parallel outer loop).
+    ///
+    /// @tparam BuildT     Build type of the grid (must be an index type)
+    /// @param grid            Host-accessible grid
+    /// @param firstLeafIDVal  Index of the first leaf overlapping this block
+    ///                        (i.e. firstLeafID[blockID] from the VBM metadata)
+    /// @param jumpMap         Pointer to the JumpMapLength words for this block
+    ///                        (i.e. &jumpMap[blockID * JumpMapLength])
+    /// @param blockFirstOffset  Sequential index of the first voxel in this block
+    /// @param leafIndex       Output array of length BlockWidth
+    /// @param voxelOffset     Output array of length BlockWidth
+    template <class BuildT>
+    static typename util::enable_if<BuildTraits<BuildT>::is_index, void>::type
+    decodeInverseMaps(
+        const NanoGrid<BuildT>* grid,
+        const uint32_t          firstLeafIDVal,
+        const uint64_t*         jumpMap,
+        const uint64_t          blockFirstOffset,
+        uint32_t*               leafIndex,
+        uint16_t*               voxelOffset)
+    {
+        NANOVDB_ASSERT(grid->isSequential());
+
+        // Count how many additional leaves follow firstLeafIDVal in this block
+        int nExtraLeaves = 0;
+        for (int i = 0; i < JumpMapLength; i++)
+            nExtraLeaves += util::countOn(jumpMap[i]);
+
+        // Initialize outputs to sentinel values
+        std::fill(leafIndex,   leafIndex   + BlockWidth, UnusedLeafIndex);
+        std::fill(voxelOffset, voxelOffset + BlockWidth, UnusedVoxelOffset);
+
+        const auto& tree = grid->tree();
+        for (int leafID = firstLeafIDVal; leafID <= firstLeafIDVal + nExtraLeaves; leafID++) {
+            const auto& leaf = tree.template getFirstNode<0>()[leafID];
+            for (int localOffset = 0; localOffset < 512; localOffset++) {
+                const uint64_t index = leaf.data()->getValue(localOffset);
+                if (index >= blockFirstOffset && index < blockFirstOffset + BlockWidth) {
+                    const uint64_t blockOffset = index - blockFirstOffset;
+                    leafIndex[blockOffset]   = static_cast<uint32_t>(leafID);
+                    voxelOffset[blockOffset] = static_cast<uint16_t>(localOffset);
+                }
+            }
+        }
+    }
+}; // VoxelBlockManager
+
 // --------------------------> buildVoxelBlockManager (CPU) <---------------------------------
 
 /// @brief Rebuild a VoxelBlockManager in-place using a pre-allocated handle.
