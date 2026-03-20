@@ -886,23 +886,13 @@ Archive::connectInstance(const GridDescriptor& gd, const NamedGridMap& grids) co
 ////////////////////////////////////////
 
 
-namespace {
-
-struct NoBBox {};
-
-template<typename BoxType>
 void
-doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const BoxType& bbox)
+Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd,
+    std::istream& is, const BBoxd& worldBBox)
 {
-    struct Local {
-        static void readBuffers(GridBase& g, std::istream& istrm, NoBBox) { g.readBuffers(istrm); }
-        static void readBuffers(GridBase& g, std::istream& istrm, const CoordBBox& indexBBox) {
-            g.readBuffers(istrm, indexBBox);
-        }
-        static void readBuffers(GridBase& g, std::istream& istrm, const BBoxd& worldBBox) {
-            g.readBuffers(istrm, g.constTransform().worldToIndexNodeCentered(worldBBox));
-        }
-    };
+    // Read the compression settings for this grid and tag the stream with them
+    // so that downstream functions can reference them.
+    readGridCompression(is);
 
     // Restore the file-level stream metadata on exit.
     struct OnExit {
@@ -942,37 +932,14 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
     grid->readTransform(is);
     if (!gd.isInstance()) {
         grid->readTopology(is);
-        Local::readBuffers(*grid, is, bbox);
+        const bool clip = worldBBox.isSorted();
+        if (clip) {
+            const auto indexBBox = grid->constTransform().worldToIndexNodeCentered(worldBBox);
+            grid->readBuffers(is, indexBBox);
+        } else {
+            grid->readBuffers(is);
+        }
     }
-}
-
-} // unnamed namespace
-
-
-void
-Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is)
-{
-    // Read the compression settings for this grid and tag the stream with them
-    // so that downstream functions can reference them.
-    readGridCompression(is);
-
-    doReadGrid(grid, gd, is, NoBBox());
-}
-
-void
-Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd,
-    std::istream& is, const BBoxd& worldBBox)
-{
-    readGridCompression(is);
-    doReadGrid(grid, gd, is, worldBBox);
-}
-
-void
-Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd,
-    std::istream& is, const CoordBBox& indexBBox)
-{
-    readGridCompression(is);
-    doReadGrid(grid, gd, is, indexBBox);
 }
 
 
