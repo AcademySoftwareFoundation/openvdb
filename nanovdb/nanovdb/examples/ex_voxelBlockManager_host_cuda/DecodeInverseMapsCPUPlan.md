@@ -299,7 +299,9 @@ Each pass: `vpand` + 2×`vpcmpeqd` + 2×`vpmaskmovd` + `vpblendvb` + store per 8
 
 1. **`#pragma omp simd` was not needed on GCC 13.3** — the `nosimd` version auto-vectorized
    to identical output on both AVX-512 and AVX2. The pragma is still recommended for portability
-   across compilers with weaker auto-vectorization.
+   across compilers with weaker auto-vectorization. It is safe to use without guards: unknown
+   pragmas are silently ignored by standard-conforming C++ compilers (C++17 §16.6), and all
+   major compilers recognize the `omp` namespace even without OpenMP enabled.
 
 2. **No architecture-specific intrinsics needed.** A single portable source compiles to optimal
    SIMD on both targets.
@@ -313,3 +315,22 @@ Each pass: `vpand` + 2×`vpcmpeqd` + 2×`vpmaskmovd` + `vpblendvb` + store per 8
 
 5. **Software `popcount32`** (Hamming weight via AND/shift/add/multiply) auto-vectorizes to
    `VPMULLD` on both AVX2 and AVX-512. `VPOPCNTQ` (AVX-512VPOPCNTDQ) is **not** required.
+
+6. **`__restrict__` is load-bearing, not just a hint.** Without it the compiler must assume
+   `in` and `out` may alias, making vectorization of the loop illegal (writes to `out[j]` could
+   affect subsequent reads of `in[j+Shift]`). The experiment results are only valid because
+   `__restrict__` was present.
+
+   `__restrict__` is a compiler extension, not standard C++ (`restrict` is C99 only). For
+   portability a macro is needed. NanoVDB has no existing C++ macro for this — `CNanoVDB.h`
+   defines `RESTRICT __restrict` but that is for the C API only. A new macro should be added:
+
+   ```cpp
+   #if defined(_MSC_VER)
+   #  define NANOVDB_RESTRICT __restrict
+   #else
+   #  define NANOVDB_RESTRICT __restrict__
+   #endif
+   ```
+
+   This matches the pattern used by `_CCCL_RESTRICT` in the bundled CCCL dependency.
