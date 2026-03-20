@@ -19,32 +19,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace io {
 
-struct Stream::Impl
-{
-    Impl(): mOutputStream{nullptr} {}
-    Impl(const Impl& other) { *this = other; }
-    Impl& operator=(const Impl& other)
-    {
-        if (&other != this) {
-            mMeta = other.mMeta; ///< @todo deep copy?
-            mGrids = other.mGrids; ///< @todo deep copy?
-            mOutputStream = other.mOutputStream;
-            mFile.reset();
-        }
-        return *this;
-    }
 
-    MetaMap::Ptr mMeta;
-    GridPtrVecPtr mGrids;
-    std::ostream* mOutputStream;
-    std::unique_ptr<File> mFile;
-};
-
-
-////////////////////////////////////////
-
-
-Stream::Stream(std::istream& is): mImpl(new Impl)
+Stream::Stream(std::istream& is)
 {
     if (!is) return;
 
@@ -59,14 +35,14 @@ Stream::Stream(std::istream& is): mImpl(new Impl)
     io::setDataCompression(is, compression());
 
     // Read in the VDB metadata.
-    mImpl->mMeta.reset(new MetaMap);
-    mImpl->mMeta->readMeta(is);
+    mMeta.reset(new MetaMap);
+    mMeta->readMeta(is);
 
     // Read in the number of grids.
     const int32_t gridCount = readGridCount(is);
 
     // Read in all grids and insert them into mGrids.
-    mImpl->mGrids.reset(new GridPtrVec);
+    mGrids.reset(new GridPtrVec);
     std::vector<GridDescriptor> descriptors;
     descriptors.reserve(gridCount);
     Archive::NamedGridMap namedGrids;
@@ -76,7 +52,7 @@ Stream::Stream(std::istream& is): mImpl(new Impl)
         gd.readStreamPos(is);
         descriptors.push_back(gd);
         GridBase::Ptr grid = readGrid(gd, is);
-        mImpl->mGrids->push_back(grid);
+        mGrids->push_back(grid);
         namedGrids[gd.uniqueName()] = grid;
     }
 
@@ -87,23 +63,18 @@ Stream::Stream(std::istream& is): mImpl(new Impl)
 }
 
 
-Stream::Stream(): mImpl(new Impl)
+Stream::Stream(std::ostream& os)
+    : Archive()
+    , mOutputStream(&os)
 {
 }
 
 
-Stream::Stream(std::ostream& os): mImpl(new Impl)
-{
-    mImpl->mOutputStream = &os;
-}
-
-
-Stream::~Stream()
-{
-}
-
-
-Stream::Stream(const Stream& other): Archive(other), mImpl(new Impl(*other.mImpl))
+Stream::Stream(const Stream& other)
+    : Archive(other)
+    , mMeta(other.mMeta)
+    , mGrids(other.mGrids)
+    , mOutputStream(other.mOutputStream)
 {
 }
 
@@ -112,7 +83,9 @@ Stream&
 Stream::operator=(const Stream& other)
 {
     if (&other != this) {
-        mImpl.reset(new Impl(*other.mImpl));
+        mMeta = other.mMeta;
+        mGrids = other.mGrids;
+        mOutputStream = other.mOutputStream;
     }
     return *this;
 }
@@ -150,10 +123,10 @@ Stream::readGrid(const GridDescriptor& gd, std::istream& is) const
 void
 Stream::write(const GridCPtrVec& grids, const MetaMap& metadata) const
 {
-    if (mImpl->mOutputStream == nullptr) {
+    if (mOutputStream == nullptr) {
         OPENVDB_THROW(ValueError, "no output stream was specified");
     }
-    this->writeGrids(*mImpl->mOutputStream, grids, metadata);
+    this->writeGrids(*mOutputStream, grids, metadata);
 }
 
 
@@ -171,10 +144,10 @@ MetaMap::Ptr
 Stream::getMetadata() const
 {
     MetaMap::Ptr result;
-    if (mImpl->mMeta) {
+    if (mMeta) {
         // Return a deep copy of the file-level metadata
         // that was read when this object was constructed.
-        result.reset(new MetaMap(*mImpl->mMeta));
+        result.reset(new MetaMap(*mMeta));
     }
     return result;
 }
@@ -183,7 +156,7 @@ Stream::getMetadata() const
 GridPtrVecPtr
 Stream::getGrids()
 {
-    return mImpl->mGrids;
+    return mGrids;
 }
 
 } // namespace io
