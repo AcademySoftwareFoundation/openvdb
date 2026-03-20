@@ -29,14 +29,14 @@ public:
     Stream(std::istream& is, bool /*delayLoad*/) : Stream(is) { }
 
     /// Construct an archive for stream output.
-    Stream();
+    Stream() = default;
     /// Construct an archive for output to the given stream.
     explicit Stream(std::ostream&);
 
     Stream(const Stream&);
     Stream& operator=(const Stream&);
 
-    ~Stream() override;
+    ~Stream() override { }
 
     /// @brief Return a copy of this archive.
     Archive::Ptr copy() const override;
@@ -64,9 +64,9 @@ private:
 
     void writeGrids(std::ostream&, const GridCPtrVec&, const MetaMap&) const;
 
-
-    struct Impl;
-    std::unique_ptr<Impl> mImpl;
+    MetaMap::Ptr mMeta;
+    GridPtrVecPtr mGrids;
+    std::ostream* mOutputStream = nullptr;
 };
 
 
