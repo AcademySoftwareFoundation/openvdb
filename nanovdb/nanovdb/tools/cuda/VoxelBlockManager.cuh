@@ -249,6 +249,7 @@ void buildVoxelBlockManager(
     static constexpr uint64_t JumpMapLength = BlockWidth / 64;
 
     if (!handle.blockCount()) return;
+    NANOVDB_ASSERT(!((handle.firstOffset() - 1) & (BlockWidth - 1))); // firstOffset == 1 (mod BlockWidth)
 
     // DeviceBuffer::create uses cudaMalloc (no zero-init); jumpMap must be zeroed each build
     cudaCheck(cudaMemsetAsync(handle.deviceJumpMap(), 0,
@@ -297,6 +298,7 @@ buildVoxelBlockManager(
     if (!firstOffset) firstOffset = 1;
     if (!lastOffset)  lastOffset  = Traits::getActiveVoxelCount(d_grid);
     if (lastOffset < firstOffset) return nanovdb::tools::VoxelBlockManagerHandle<BufferT>{};
+    NANOVDB_ASSERT(!((firstOffset - 1) & (BlockWidth - 1))); // firstOffset == 1 (mod BlockWidth)
     if (!nBlocks)     nBlocks     = (lastOffset - firstOffset + BlockWidth) >> BlockWidthLog2;
 
     int device = 0;
