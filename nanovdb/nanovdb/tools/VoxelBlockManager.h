@@ -191,16 +191,8 @@ void buildVoxelBlockManager(const NanoGrid<ValueOnIndex>* grid, VoxelBlockManage
                 firstLeafID[firstBlock] = static_cast<uint32_t>(leafIndex);
             } else {
                 // Leaf starts in the interior of a block: mark in jumpMap with atomic OR
-                uint64_t* target = &jumpMap[firstBlock * JumpMapLength + (offsetInBlock >> 6)];
-#if defined(__GNUC__) || defined(__clang__)
-                __atomic_fetch_or(target, uint64_t(1) << (offsetInBlock & 0x3f), __ATOMIC_RELAXED);
-#elif defined(_MSC_VER)
-                static_assert(sizeof(long long) == sizeof(uint64_t));
-                _InterlockedOr64(reinterpret_cast<volatile long long*>(target),
-                    static_cast<long long>(uint64_t(1) << (offsetInBlock & 0x3f)));
-#else
-#error "No atomic OR implementation for this compiler"
-#endif
+                util::atomicOr(&jumpMap[firstBlock * JumpMapLength + (offsetInBlock >> 6)],
+                               uint64_t(1) << (offsetInBlock & 0x3f));
             }
         });
 }
