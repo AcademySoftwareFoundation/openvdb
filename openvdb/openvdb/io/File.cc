@@ -25,83 +25,24 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace io {
 
-// Implementation details of the File class
-struct File::Impl
+
+File::File(const std::string& filename)
+    : Archive()
+    , mFilename(filename)
 {
-    struct NoBBox {};
-
-    // Common implementation of the various File::readGrid() overloads,
-    // with and without bounding box clipping
-    template<typename BoxType>
-    static GridBase::Ptr readGrid(const File& file, const GridDescriptor& gd, const BoxType& bbox)
-    {
-        // This method should not be called for files that don't contain grid offsets.
-        OPENVDB_ASSERT(file.inputHasGridOffsets());
-
-        GridBase::Ptr grid = file.createGrid(gd);
-        gd.seekToGrid(file.inputStream());
-        unarchive(file, grid, gd, bbox);
-        return grid;
-    }
-
-    static void unarchive(const File& file, GridBase::Ptr& grid,
-        const GridDescriptor& gd, NoBBox)
-    {
-        file.Archive::readGrid(grid, gd, file.inputStream());
-    }
-
-    static void unarchive(const File& file, GridBase::Ptr& grid,
-        const GridDescriptor& gd, const CoordBBox& indexBBox)
-    {
-        file.Archive::readGrid(grid, gd, file.inputStream(), indexBBox);
-    }
-
-    static void unarchive(const File& file, GridBase::Ptr& grid,
-        const GridDescriptor& gd, const BBoxd& worldBBox)
-    {
-        file.Archive::readGrid(grid, gd, file.inputStream(), worldBBox);
-    }
-
-    std::string mFilename;
-    // The file-level metadata
-    MetaMap::Ptr mMeta;
-    // The file stream that is open for reading
-    std::unique_ptr<std::istream> mInStream;
-    // File-level stream metadata (file format, compression, etc.)
-    StreamMetadata::Ptr mStreamMetadata;
-    // Flag indicating if we have read in the global information (header,
-    // metadata, and grid descriptors) for this VDB file
-    bool mIsOpen;
-    // Grid descriptors for all grids stored in the file, indexed by grid name
-    NameMap mGridDescriptors;
-    // All grids, indexed by unique name (used only when mHasGridOffsets is false)
-    Archive::NamedGridMap mNamedGrids;
-    // All grids stored in the file (used only when mHasGridOffsets is false)
-    GridPtrVecPtr mGrids;
-}; // class File::Impl
-
-
-////////////////////////////////////////
-
-
-File::File(const std::string& filename): mImpl(new Impl)
-{
-    mImpl->mFilename = filename;
-    mImpl->mIsOpen = false;
     setInputHasGridOffsets(true);
-}
-
-
-File::~File()
-{
 }
 
 
 File::File(const File& other)
     : Archive(other)
-    , mImpl(new Impl)
+    , mFilename(other.mFilename)
+    , mMeta(other.mMeta)
+    , mIsOpen(false)
+    , mGridDescriptors(other.mGridDescriptors)
+    , mNamedGrids(other.mNamedGrids)
+    , mGrids(other.mGrids)
 {
-    *this = other;
 }
 
 
@@ -110,13 +51,12 @@ File::operator=(const File& other)
 {
     if (&other != this) {
         Archive::operator=(other);
-        const Impl& otherImpl = *other.mImpl;
-        mImpl->mFilename = otherImpl.mFilename;
-        mImpl->mMeta = otherImpl.mMeta;
-        mImpl->mIsOpen = false; // don't want two file objects reading from the same stream
-        mImpl->mGridDescriptors = otherImpl.mGridDescriptors;
-        mImpl->mNamedGrids = otherImpl.mNamedGrids;
-        mImpl->mGrids = otherImpl.mGrids;
+        mFilename = other.mFilename;
+        mMeta = other.mMeta;
+        mIsOpen = false; // don't want two file objects reading from the same stream
+        mGridDescriptors = other.mGridDescriptors;
+        mNamedGrids = other.mNamedGrids;
+        mGrids = other.mGrids;
     }
     return *this;
 }
@@ -135,43 +75,43 @@ File::copy() const
 const std::string&
 File::filename() const
 {
-    return mImpl->mFilename;
+    return mFilename;
 }
 
 
 MetaMap::Ptr
 File::fileMetadata()
 {
-    return mImpl->mMeta;
+    return mMeta;
 }
 
 MetaMap::ConstPtr
 File::fileMetadata() const
 {
-    return mImpl->mMeta;
+    return mMeta;
 }
 
 
 const File::NameMap&
 File::gridDescriptors() const
 {
-    return mImpl->mGridDescriptors;
+    return mGridDescriptors;
 }
 
 File::NameMap&
 File::gridDescriptors()
 {
-    return mImpl->mGridDescriptors;
+    return mGridDescriptors;
 }
 
 
 std::istream&
 File::inputStream() const
 {
-    if (!mImpl->mInStream) {
-        OPENVDB_THROW(IoError, filename() << " is not open for reading");
+    if (!mInStream) {
+        OPENVDB_THROW(IoError, mFilename << " is not open for reading");
     }
-    return *mImpl->mInStream;
+    return *mInStream;
 }
 
 
@@ -187,11 +127,11 @@ File::getSize() const
 
     Index64 result = std::numeric_limits<Index64>::max();
 
-    std::string mesg = "could not get size of file " + filename();
+    std::string mesg = "could not get size of file " + mFilename;
 
 #ifdef _WIN32
     // Get the file size by seeking to the end of the file.
-    std::ifstream fstrm(filename());
+    std::ifstream fstrm(mFilename);
     if (fstrm) {
         fstrm.seekg(0, fstrm.end);
         result = static_cast<Index64>(fstrm.tellg());
@@ -201,7 +141,7 @@ File::getSize() const
 #else
     // Get the file size using the stat() system call.
     struct stat info;
-    if (0 != ::stat(filename().c_str(), &info)) {
+    if (0 != ::stat(mFilename.c_str(), &info)) {
         std::string s = getErrorString();
         if (!s.empty()) mesg += " (" + s + ")";
         OPENVDB_THROW(IoError, mesg);
@@ -223,25 +163,25 @@ File::getSize() const
 bool
 File::isOpen() const
 {
-    return mImpl->mIsOpen;
+    return mIsOpen;
 }
 
 
 bool
 File::open()
 {
-    if (isOpen()) {
-        OPENVDB_THROW(IoError, filename() << " is already open");
+    if (mIsOpen) {
+        OPENVDB_THROW(IoError, mFilename << " is already open");
     }
-    mImpl->mInStream.reset();
+    mInStream.reset();
 
     // Open the file using standard I/O (delayed loading has been removed)
     std::unique_ptr<std::istream> newStream;
     newStream.reset(new std::ifstream(
-        filename().c_str(), std::ios_base::in | std::ios_base::binary));
+        mFilename.c_str(), std::ios_base::in | std::ios_base::binary));
 
     if (newStream->fail()) {
-        OPENVDB_THROW(IoError, "could not open file " << filename());
+        OPENVDB_THROW(IoError, "could not open file " << mFilename);
     }
 
     // Read in the file header.
@@ -251,55 +191,67 @@ File::open()
     } catch (IoError& e) {
         if (e.what() && std::string("not a VDB file") == e.what()) {
             // Rethrow, adding the filename.
-            OPENVDB_THROW(IoError, filename() << " is not a VDB file");
+            OPENVDB_THROW(IoError, mFilename << " is not a VDB file");
         }
         throw;
     }
 
-    mImpl->mInStream.swap(newStream);
+    mInStream.swap(newStream);
 
     // Tag the input stream with the file format and library version numbers
     // and other metadata.
-    mImpl->mStreamMetadata.reset(new StreamMetadata);
-    mImpl->mStreamMetadata->setSeekable(true);
-    io::setStreamMetadataPtr(inputStream(), mImpl->mStreamMetadata, /*transfer=*/false);
+    mStreamMetadata.reset(new StreamMetadata);
+    mStreamMetadata->setSeekable(true);
+    io::setStreamMetadataPtr(inputStream(), mStreamMetadata, /*transfer=*/false);
     Archive::setFormatVersion(inputStream());
     Archive::setLibraryVersion(inputStream());
     Archive::setDataCompression(inputStream());
 
     // Read in the VDB metadata.
-    mImpl->mMeta = MetaMap::Ptr(new MetaMap);
-    mImpl->mMeta->readMeta(inputStream());
+    mMeta = MetaMap::Ptr(new MetaMap);
+    mMeta->readMeta(inputStream());
 
     if (!inputHasGridOffsets()) {
-        OPENVDB_LOG_DEBUG_RUNTIME("file " << filename() << " does not support partial reading");
+        OPENVDB_LOG_DEBUG_RUNTIME("file " << mFilename << " does not support partial reading");
 
-        mImpl->mGrids.reset(new GridPtrVec);
-        mImpl->mNamedGrids.clear();
+        mGrids.reset(new GridPtrVec);
+        mNamedGrids.clear();
 
         // Stream in the entire contents of the file and append all grids to mGrids.
         const int32_t gridCount = readGridCount(inputStream());
         for (int32_t i = 0; i < gridCount; ++i) {
             GridDescriptor gd;
-            gd.read(inputStream());
+            gd.readHeader(inputStream());
+            gd.readStreamPos(inputStream());
 
-            GridBase::Ptr grid = createGrid(gd);
-            Archive::readGrid(grid, gd, inputStream());
+            GridBase::Ptr grid = Archive::readGrid(gd, inputStream(), BBoxd());
 
-            gridDescriptors().insert(std::make_pair(gd.gridName(), gd));
-            mImpl->mGrids->push_back(grid);
-            mImpl->mNamedGrids[gd.uniqueName()] = grid;
+            mGridDescriptors.insert(std::make_pair(gd.gridName(), gd));
+            mGrids->push_back(grid);
+            mNamedGrids[gd.uniqueName()] = grid;
         }
         // Connect instances (grids that share trees with other grids).
-        for (NameMapCIter it = gridDescriptors().begin(); it != gridDescriptors().end(); ++it) {
-            Archive::connectInstance(it->second, mImpl->mNamedGrids);
+        for (NameMapCIter it = mGridDescriptors.begin(); it != mGridDescriptors.end(); ++it) {
+            Archive::connectInstance(it->second, mNamedGrids);
         }
     } else {
-        // Read in just the grid descriptors.
-        readGridDescriptors(inputStream());
+        mGridDescriptors.clear();
+
+        for (int32_t i = 0, N = readGridCount(inputStream()); i < N; ++i) {
+            // Read the grid descriptor.
+            GridDescriptor gd;
+            gd.readHeader(inputStream());
+            gd.readStreamPos(inputStream());
+
+            // Add the descriptor to the dictionary.
+            mGridDescriptors.insert(std::make_pair(gd.gridName(), gd));
+
+            // Skip forward to the next descriptor.
+            gd.seekToEnd(inputStream());
+        }
     }
 
-    mImpl->mIsOpen = true;
+    mIsOpen = true;
     return newFile; // true if file is not identical to opened file
 }
 
@@ -308,14 +260,14 @@ void
 File::close()
 {
     // Reset all data.
-    mImpl->mMeta.reset();
-    mImpl->mGridDescriptors.clear();
-    mImpl->mGrids.reset();
-    mImpl->mNamedGrids.clear();
-    mImpl->mInStream.reset();
-    mImpl->mStreamMetadata.reset();
+    mMeta.reset();
+    mGridDescriptors.clear();
+    mGrids.reset();
+    mNamedGrids.clear();
+    mInStream.reset();
+    mStreamMetadata.reset();
 
-    mImpl->mIsOpen = false;
+    mIsOpen = false;
     setInputHasGridOffsets(true);
 }
 
@@ -326,52 +278,54 @@ File::close()
 bool
 File::hasGrid(const Name& name) const
 {
-    if (!isOpen()) {
-        OPENVDB_THROW(IoError, filename() << " is not open for reading");
+    if (!mIsOpen) {
+        OPENVDB_THROW(IoError, mFilename << " is not open for reading");
     }
-    return (findDescriptor(name) != gridDescriptors().end());
+    return (findDescriptor(name) != mGridDescriptors.end());
 }
 
 
 MetaMap::Ptr
 File::getMetadata() const
 {
-    if (!isOpen()) {
-        OPENVDB_THROW(IoError, filename() << " is not open for reading");
+    if (!mIsOpen) {
+        OPENVDB_THROW(IoError, mFilename << " is not open for reading");
     }
     // Return a deep copy of the file-level metadata, which was read
     // when the file was opened.
-    return MetaMap::Ptr(new MetaMap(*mImpl->mMeta));
+    return MetaMap::Ptr(new MetaMap(*mMeta));
 }
 
 
 GridPtrVecPtr
 File::getGrids() const
 {
-    if (!isOpen()) {
-        OPENVDB_THROW(IoError, filename() << " is not open for reading");
+    if (!mIsOpen) {
+        OPENVDB_THROW(IoError, mFilename << " is not open for reading");
     }
 
     GridPtrVecPtr ret;
     if (!inputHasGridOffsets()) {
         // If the input file doesn't have grid offsets, then all of the grids
         // have already been streamed in and stored in mGrids.
-        ret = mImpl->mGrids;
+        ret = mGrids;
     } else {
         ret.reset(new GridPtrVec);
 
         Archive::NamedGridMap namedGrids;
 
         // Read all grids represented by the GridDescriptors.
-        for (NameMapCIter i = gridDescriptors().begin(), e = gridDescriptors().end(); i != e; ++i) {
+        for (NameMapCIter i = mGridDescriptors.begin(), e = mGridDescriptors.end(); i != e; ++i) {
             const GridDescriptor& gd = i->second;
-            GridBase::Ptr grid = readGrid(gd);
+            // Seek to the grid in the file.
+            gd.seekToGrid(inputStream());
+            GridBase::Ptr grid = Archive::readGrid(gd, inputStream(), BBoxd());
             ret->push_back(grid);
             namedGrids[gd.uniqueName()] = grid;
         }
 
         // Connect instances (grids that share trees with other grids).
-        for (NameMapCIter i = gridDescriptors().begin(), e = gridDescriptors().end(); i != e; ++i) {
+        for (NameMapCIter i = mGridDescriptors.begin(), e = mGridDescriptors.end(); i != e; ++i) {
             Archive::connectInstance(i->second, namedGrids);
         }
     }
@@ -391,11 +345,11 @@ File::retrieveCachedGrid(const Name& name) const
 
     // Search by unique name.
     Archive::NamedGridMap::const_iterator it =
-        mImpl->mNamedGrids.find(GridDescriptor::stringAsUniqueName(name));
+        mNamedGrids.find(GridDescriptor::stringAsUniqueName(name));
     // If not found, search by grid name.
-    if (it == mImpl->mNamedGrids.end()) it = mImpl->mNamedGrids.find(name);
-    if (it == mImpl->mNamedGrids.end()) {
-        OPENVDB_THROW(KeyError, filename() << " has no grid named \"" << name << "\"");
+    if (it == mNamedGrids.end()) it = mNamedGrids.find(name);
+    if (it == mNamedGrids.end()) {
+        OPENVDB_THROW(KeyError, mFilename << " has no grid named \"" << name << "\"");
     }
     return it->second;
 }
@@ -407,8 +361,8 @@ File::retrieveCachedGrid(const Name& name) const
 GridPtrVecPtr
 File::readAllGridMetadata()
 {
-    if (!isOpen()) {
-        OPENVDB_THROW(IoError, filename() << " is not open for reading");
+    if (!mIsOpen) {
+        OPENVDB_THROW(IoError, mFilename << " is not open for reading");
     }
 
     if (fileVersion() < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
@@ -421,18 +375,20 @@ File::readAllGridMetadata()
     if (!inputHasGridOffsets()) {
         // If the input file doesn't have grid offsets, then all of the grids
         // have already been streamed in and stored in mGrids.
-        for (size_t i = 0, N = mImpl->mGrids->size(); i < N; ++i) {
+        for (size_t i = 0, N = mGrids->size(); i < N; ++i) {
             // Return copies of the grids, but with empty trees.
-            ret->push_back((*mImpl->mGrids)[i]->copyGridWithNewTree());
+            ret->push_back((*mGrids)[i]->copyGridWithNewTree());
         }
     } else {
         // Read just the metadata and transforms for all grids.
-        for (NameMapCIter i = gridDescriptors().begin(), e = gridDescriptors().end(); i != e; ++i) {
+        for (NameMapCIter i = mGridDescriptors.begin(), e = mGridDescriptors.end(); i != e; ++i) {
             const GridDescriptor& gd = i->second;
-            GridBase::ConstPtr grid = readGridPartial(gd, /*readTopology=*/false);
+            // Seek to the grid in the file.
+            gd.seekToGrid(inputStream());
+            GridBase::ConstPtr grid = Archive::readGrid(gd, inputStream(), BBoxd(), /*partial=*/true);
             // Return copies of the grids, but with empty trees.
             // (As of 0.98.0, at least, it would suffice to just const cast
-            // the grid pointers returned by readGridPartial(), but shallow
+            // the grid pointers returned by readGrid(partial=true), but shallow
             // copying the grids helps to ensure future compatibility.)
             ret->push_back(grid->copyGridWithNewTree());
         }
@@ -444,8 +400,8 @@ File::readAllGridMetadata()
 GridBase::Ptr
 File::readGridMetadata(const Name& name)
 {
-    if (!isOpen()) {
-        OPENVDB_THROW(IoError, filename() << " is not open for reading.");
+    if (!mIsOpen) {
+        OPENVDB_THROW(IoError, mFilename << " is not open for reading.");
     }
 
     if (fileVersion() < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
@@ -460,13 +416,14 @@ File::readGridMetadata(const Name& name)
         ret = readGrid(name);
     } else {
         NameMapCIter it = findDescriptor(name);
-        if (it == gridDescriptors().end()) {
-            OPENVDB_THROW(KeyError, filename() << " has no grid named \"" << name << "\"");
+        if (it == mGridDescriptors.end()) {
+            OPENVDB_THROW(KeyError, mFilename << " has no grid named \"" << name << "\"");
         }
 
         // Seek to and read in the grid from the file.
         const GridDescriptor& gd = it->second;
-        ret = readGridPartial(gd, /*readTopology=*/false);
+        gd.seekToGrid(inputStream());
+        ret = Archive::readGrid(gd, inputStream(), BBoxd(), /*partial=*/true);
     }
     return ret->copyGridWithNewTree();
 }
@@ -478,22 +435,15 @@ File::readGridMetadata(const Name& name)
 GridBase::Ptr
 File::readGrid(const Name& name)
 {
-    return readGridByName(name, BBoxd());
+    return readGrid(name, BBoxd());
 }
 
 
 GridBase::Ptr
 File::readGrid(const Name& name, const BBoxd& bbox)
 {
-    return readGridByName(name, bbox);
-}
-
-
-GridBase::Ptr
-File::readGridByName(const Name& name, const BBoxd& bbox)
-{
-    if (!isOpen()) {
-        OPENVDB_THROW(IoError, filename() << " is not open for reading.");
+    if (!mIsOpen) {
+        OPENVDB_THROW(IoError, mFilename << " is not open for reading.");
     }
 
     const bool clip = bbox.isSorted();
@@ -511,32 +461,33 @@ File::readGridByName(const Name& name, const BBoxd& bbox)
     }
 
     NameMapCIter it = findDescriptor(name);
-    if (it == gridDescriptors().end()) {
-        OPENVDB_THROW(KeyError, filename() << " has no grid named \"" << name << "\"");
+    if (it == mGridDescriptors.end()) {
+        OPENVDB_THROW(KeyError, mFilename << " has no grid named \"" << name << "\"");
     }
 
     // Seek to and read in the grid from the file.
     const GridDescriptor& gd = it->second;
-    grid = (clip ? readGrid(gd, bbox) : readGrid(gd));
+    // This method should not be called for files that don't contain grid offsets.
+    OPENVDB_ASSERT(inputHasGridOffsets());
+    // Seek to the grid in the file.
+    gd.seekToGrid(inputStream());
+    grid = Archive::readGrid(gd, inputStream(), bbox);
 
     if (gd.isInstance()) {
         /// @todo Refactor to share code with Archive::connectInstance()?
         NameMapCIter parentIt =
             findDescriptor(GridDescriptor::nameAsString(gd.instanceParentName()));
-        if (parentIt == gridDescriptors().end()) {
+        if (parentIt == mGridDescriptors.end()) {
             OPENVDB_THROW(KeyError, "missing instance parent \""
                 << GridDescriptor::nameAsString(gd.instanceParentName())
                 << "\" for grid " << GridDescriptor::nameAsString(gd.uniqueName())
-                << " in file " << filename());
+                << " in file " << mFilename);
         }
 
         GridBase::Ptr parent;
-        if (clip) {
-            const CoordBBox indexBBox = grid->constTransform().worldToIndexNodeCentered(bbox);
-            parent = readGrid(parentIt->second, indexBBox);
-        } else {
-            parent = readGrid(parentIt->second);
-        }
+        OPENVDB_ASSERT(inputHasGridOffsets());
+        parentIt->second.seekToGrid(inputStream());
+        parent = Archive::readGrid(parentIt->second, inputStream(), bbox);
         if (parent) grid->setTree(parent->baseTreePtr());
     }
     return grid;
@@ -549,18 +500,18 @@ File::readGridByName(const Name& name, const BBoxd& bbox)
 void
 File::writeGrids(const GridCPtrVec& grids, const MetaMap& meta) const
 {
-    if (isOpen()) {
+    if (mIsOpen) {
         OPENVDB_THROW(IoError,
-            filename() << " cannot be written because it is open for reading");
+            mFilename << " cannot be written because it is open for reading");
     }
 
     // Create a file stream and write it out.
     std::ofstream file;
-    file.open(filename().c_str(),
+    file.open(mFilename.c_str(),
         std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
 
     if (file.fail()) {
-        OPENVDB_THROW(IoError, "could not open " << filename() << " for writing");
+        OPENVDB_THROW(IoError, "could not open " << mFilename << " for writing");
     }
 
     // Write out the vdb.
@@ -569,30 +520,6 @@ File::writeGrids(const GridCPtrVec& grids, const MetaMap& meta) const
     file.close();
 }
 
-
-////////////////////////////////////////
-
-
-void
-File::readGridDescriptors(std::istream& is)
-{
-    // This method should not be called for files that don't contain grid offsets.
-    OPENVDB_ASSERT(inputHasGridOffsets());
-
-    gridDescriptors().clear();
-
-    for (int32_t i = 0, N = readGridCount(is); i < N; ++i) {
-        // Read the grid descriptor.
-        GridDescriptor gd;
-        gd.read(is);
-
-        // Add the descriptor to the dictionary.
-        gridDescriptors().insert(std::make_pair(gd.gridName(), gd));
-
-        // Skip forward to the next descriptor.
-        gd.seekToEnd(is);
-    }
-}
 
 
 ////////////////////////////////////////
@@ -604,20 +531,20 @@ File::findDescriptor(const Name& name) const
     const Name uniqueName = GridDescriptor::stringAsUniqueName(name);
 
     // Find all descriptors with the given grid name.
-    std::pair<NameMapCIter, NameMapCIter> range = gridDescriptors().equal_range(name);
+    std::pair<NameMapCIter, NameMapCIter> range = mGridDescriptors.equal_range(name);
 
     if (range.first == range.second) {
         // If no descriptors were found with the given grid name, the name might have
         // a suffix ("name[N]").  In that case, remove the "[N]" suffix and search again.
-        range = gridDescriptors().equal_range(GridDescriptor::stripSuffix(uniqueName));
+        range = mGridDescriptors.equal_range(GridDescriptor::stripSuffix(uniqueName));
     }
 
     const size_t count = size_t(std::distance(range.first, range.second));
     if (count > 1 && name == uniqueName) {
-        OPENVDB_LOG_WARN(filename() << " has more than one grid named \"" << name << "\"");
+        OPENVDB_LOG_WARN(mFilename << " has more than one grid named \"" << name << "\"");
     }
 
-    NameMapCIter ret = gridDescriptors().end();
+    NameMapCIter ret = mGridDescriptors.end();
 
     if (count > 0) {
         if (name == uniqueName) {
@@ -643,107 +570,20 @@ File::findDescriptor(const Name& name) const
 ////////////////////////////////////////
 
 
-GridBase::Ptr
-File::createGrid(const GridDescriptor& gd) const
-{
-    // Create the grid.
-    if (!GridBase::isRegistered(gd.gridType())) {
-        OPENVDB_THROW(KeyError, "Cannot read grid "
-            << GridDescriptor::nameAsString(gd.uniqueName())
-            << " from " << filename() << ": grid type "
-            << gd.gridType() << " is not registered");
-    }
-
-    GridBase::Ptr grid = GridBase::createGrid(gd.gridType());
-    if (grid) grid->setSaveFloatAsHalf(gd.saveFloatAsHalf());
-
-    return grid;
-}
-
-
-GridBase::ConstPtr
-File::readGridPartial(const GridDescriptor& gd, bool readTopology) const
-{
-    // This method should not be called for files that don't contain grid offsets.
-    OPENVDB_ASSERT(inputHasGridOffsets());
-
-    GridBase::Ptr grid = createGrid(gd);
-
-    // Seek to grid.
-    gd.seekToGrid(inputStream());
-
-    // Read the grid partially.
-    readGridPartial(grid, inputStream(), gd.isInstance(), readTopology);
-
-    // Promote to a const grid.
-    GridBase::ConstPtr constGrid = grid;
-
-    return constGrid;
-}
-
-
-GridBase::Ptr
-File::readGrid(const GridDescriptor& gd) const
-{
-    return Impl::readGrid(*this, gd, Impl::NoBBox());
-}
-
-
-GridBase::Ptr
-File::readGrid(const GridDescriptor& gd, const BBoxd& bbox) const
-{
-    return Impl::readGrid(*this, gd, bbox);
-}
-
-
-GridBase::Ptr
-File::readGrid(const GridDescriptor& gd, const CoordBBox& bbox) const
-{
-    return Impl::readGrid(*this, gd, bbox);
-}
-
-
-void
-File::readGridPartial(GridBase::Ptr grid, std::istream& is,
-    bool isInstance, bool readTopology) const
-{
-    // This method should not be called for files that don't contain grid offsets.
-    OPENVDB_ASSERT(inputHasGridOffsets());
-
-    // This code needs to stay in sync with io::Archive::readGrid(), in terms of
-    // the order of operations.
-    readGridCompression(is);
-    grid->readMeta(is);
-
-    // Delayed loading is no longer supported - always remove metadata related to delayed loading if it exists
-    if ((*grid)[GridBase::META_FILE_DELAYED_LOAD]) {
-        grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
-    }
-
-    grid->readTransform(is);
-    if (!isInstance && readTopology) {
-        grid->readTopology(is);
-    }
-}
-
-
-////////////////////////////////////////
-
-
 File::NameIterator
 File::beginName() const
 {
-    if (!isOpen()) {
-        OPENVDB_THROW(IoError, filename() << " is not open for reading");
+    if (!mIsOpen) {
+        OPENVDB_THROW(IoError, mFilename << " is not open for reading");
     }
-    return File::NameIterator(gridDescriptors().begin());
+    return File::NameIterator(mGridDescriptors.begin());
 }
 
 
 File::NameIterator
 File::endName() const
 {
-    return File::NameIterator(gridDescriptors().end());
+    return File::NameIterator(mGridDescriptors.end());
 }
 
 } // namespace io
