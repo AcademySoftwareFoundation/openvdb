@@ -225,7 +225,7 @@ File::open()
             gd.readStreamPos(inputStream());
 
             GridBase::Ptr grid = createGrid(gd);
-            Archive::readGrid(grid, gd, inputStream());
+            Archive::readGrid(grid, gd, inputStream(), BBoxd());
 
             mGridDescriptors.insert(std::make_pair(gd.gridName(), gd));
             mGrids->push_back(grid);
@@ -318,7 +318,7 @@ File::getGrids() const
         // Read all grids represented by the GridDescriptors.
         for (NameMapCIter i = mGridDescriptors.begin(), e = mGridDescriptors.end(); i != e; ++i) {
             const GridDescriptor& gd = i->second;
-            GridBase::Ptr grid = readGrid(gd);
+            GridBase::Ptr grid = readGrid(gd, BBoxd());
             ret->push_back(grid);
             namedGrids[gd.uniqueName()] = grid;
         }
@@ -463,7 +463,7 @@ File::readGrid(const Name& name, const BBoxd& bbox)
 
     // Seek to and read in the grid from the file.
     const GridDescriptor& gd = it->second;
-    grid = (clip ? readGrid(gd, bbox) : readGrid(gd));
+    grid = readGrid(gd, bbox);
 
     if (gd.isInstance()) {
         /// @todo Refactor to share code with Archive::connectInstance()?
@@ -477,12 +477,7 @@ File::readGrid(const Name& name, const BBoxd& bbox)
         }
 
         GridBase::Ptr parent;
-        if (clip) {
-            const CoordBBox indexBBox = grid->constTransform().worldToIndexNodeCentered(bbox);
-            parent = readGrid(parentIt->second, indexBBox);
-        } else {
-            parent = readGrid(parentIt->second);
-        }
+        parent = readGrid(parentIt->second, bbox);
         if (parent) grid->setTree(parent->baseTreePtr());
     }
     return grid;
@@ -617,33 +612,7 @@ File::readGridPartial(const GridDescriptor& gd) const
 
 
 GridBase::Ptr
-File::readGrid(const GridDescriptor& gd) const
-{
-    // This method should not be called for files that don't contain grid offsets.
-    OPENVDB_ASSERT(inputHasGridOffsets());
-
-    GridBase::Ptr grid = createGrid(gd);
-    gd.seekToGrid(inputStream());
-    Archive::readGrid(grid, gd, inputStream());
-    return grid;
-}
-
-
-GridBase::Ptr
 File::readGrid(const GridDescriptor& gd, const BBoxd& bbox) const
-{
-    // This method should not be called for files that don't contain grid offsets.
-    OPENVDB_ASSERT(inputHasGridOffsets());
-
-    GridBase::Ptr grid = createGrid(gd);
-    gd.seekToGrid(inputStream());
-    Archive::readGrid(grid, gd, inputStream(), bbox);
-    return grid;
-}
-
-
-GridBase::Ptr
-File::readGrid(const GridDescriptor& gd, const CoordBBox& bbox) const
 {
     // This method should not be called for files that don't contain grid offsets.
     OPENVDB_ASSERT(inputHasGridOffsets());

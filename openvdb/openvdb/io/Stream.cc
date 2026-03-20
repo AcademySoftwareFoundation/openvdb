@@ -114,7 +114,7 @@ Stream::readGrid(const GridDescriptor& gd, std::istream& is) const
         grid = GridBase::createGrid(gd.gridType());
         if (grid) grid->setSaveFloatAsHalf(gd.saveFloatAsHalf());
 
-        Archive::readGrid(grid, gd, is);
+        Archive::readGrid(grid, gd, is, BBoxd());
     }
     return grid;
 }

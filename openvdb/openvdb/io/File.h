@@ -156,14 +156,9 @@ private:
     /// Read in and return the partially-populated grid specified by the given grid descriptor.
     GridBase::ConstPtr readGridPartial(const GridDescriptor&) const;
 
-    /// Read in and return the grid specified by the given grid descriptor.
-    GridBase::Ptr readGrid(const GridDescriptor&) const;
     /// Read in and return the region of the grid specified by the given grid descriptor
     /// that intersects the given world-space bounding box.
     GridBase::Ptr readGrid(const GridDescriptor&, const BBoxd&) const;
-    /// Read in and return the region of the grid specified by the given grid descriptor
-    /// that intersects the given index-space bounding box.
-    GridBase::Ptr readGrid(const GridDescriptor&, const CoordBBox&) const;
 
     /// @brief Retrieve a grid from @c mNamedGrids.  Return a null pointer
     /// if @c mNamedGrids was not populated (because this file is random-access).
