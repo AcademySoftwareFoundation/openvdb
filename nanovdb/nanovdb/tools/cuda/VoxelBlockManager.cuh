@@ -14,8 +14,6 @@
            which enables SIMT parallelism independent of occupancy.
 */
 
-#include <cuda/atomic>
-
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/util/cuda/Util.h>
@@ -195,7 +193,7 @@ struct BuildVoxelBlockManagerFunctor
                 const auto leafValueCount = leaf.data()->valueCount();
                 const auto leafLastOffset = leafFirstOffset + leafValueCount - 1;
 
-                auto leafIndex = util::PtrDiff(&leaf,tree.getFirstNode<0>()) / sizeof(NanoLeaf<ValueOnIndex>);
+                auto leafIndex = &leaf - tree.getFirstNode<0>();
 
                 if ( ( leafFirstOffset > lastOffset ) || (leafLastOffset < firstOffset) ) continue;
 
@@ -218,8 +216,8 @@ struct BuildVoxelBlockManagerFunctor
                     // Otherwise, mark it in the jumpMap
                     // The specific uint64_t in the jumpMap to be marked is at element offset (offsetInBlock>>6), i.e. offsetBlock/64
                     // and bit offset (offsetInBlock & 0x3f), i.e. offsetInBlock%64
-                    ::cuda::atomic_ref<uint64_t> ref(jumpMap[firstBlock * JumpMapLength + (offsetInBlock>>6)]);
-                    ref.fetch_or(0x1ul << (offsetInBlock & 0x3f));
+                    util::atomicOr(&jumpMap[firstBlock * JumpMapLength + (offsetInBlock>>6)],
+                                   0x1ul << (offsetInBlock & 0x3f));
                 }
             }
 
