@@ -154,7 +154,7 @@ private:
     GridBase::Ptr createGrid(const GridDescriptor&) const;
 
     /// Read in and return the partially-populated grid specified by the given grid descriptor.
-    GridBase::ConstPtr readGridPartial(const GridDescriptor&, bool readTopology) const;
+    GridBase::ConstPtr readGridPartial(const GridDescriptor&) const;
 
     /// Read in and return the grid specified by the given grid descriptor.
     GridBase::Ptr readGrid(const GridDescriptor&) const;
@@ -164,10 +164,6 @@ private:
     /// Read in and return the region of the grid specified by the given grid descriptor
     /// that intersects the given index-space bounding box.
     GridBase::Ptr readGrid(const GridDescriptor&, const CoordBBox&) const;
-
-    /// @brief Partially populate the given grid by reading its metadata and transform and,
-    /// if the grid is not an instance, its tree structure, but not the tree's leaf nodes.
-    void readGridPartial(GridBase::Ptr, std::istream&, bool isInstance, bool readTopology) const;
 
     /// @brief Retrieve a grid from @c mNamedGrids.  Return a null pointer
     /// if @c mNamedGrids was not populated (because this file is random-access).
