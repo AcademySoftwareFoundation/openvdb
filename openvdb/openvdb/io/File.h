@@ -146,9 +146,6 @@ public:
     NameIterator endName() const;
 
 private:
-    /// Read in all grid descriptors that are stored in the given stream.
-    void readGridDescriptors(std::istream&);
-
     /// @brief Return an iterator to the descriptor for the grid with the given name.
     /// If the name is non-unique, return an iterator to the first matching descriptor.
     NameMapCIter findDescriptor(const Name&) const;
