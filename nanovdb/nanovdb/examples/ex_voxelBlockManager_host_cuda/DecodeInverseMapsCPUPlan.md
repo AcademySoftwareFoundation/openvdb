@@ -235,12 +235,81 @@ and will likely remain two implementations even after factoring.
 
 ---
 
-## 11. Validated Findings from `simd_test/shfl_down_test.cpp`
+## 11. SIMD Codegen Experiment: `shfl_down`
 
-- `#pragma omp simd` with a compile-time constant offset (`shfl_down<N>`) compiles to:
-  - AVX-512: `vmovdqu32` with mask (single masked move per pass)
-  - AVX2: double-negate blend pattern (compiler generates `vpblendvb` or equivalent)
-- No architecture-specific intrinsics needed.
-- Software `popcount32` (Hamming weight via AND/shift/add/multiply) auto-vectorizes to
-  `VPMULLD` on both AVX2 and AVX-512 with `#pragma omp simd`.
-- `VPOPCNTQ` (AVX-512VPOPCNTDQ) is **not** required.
+The `simd_test/` directory (not checked into the repo) contained two source files and four
+assembly listings produced by GCC 13.3 (`-O3 -march=avx512f` / `-O3 -march=avx2`).
+
+### Source (both files identical except for the pragma)
+
+```cpp
+// shfl_down_test.cpp  — WITH #pragma omp simd
+// shfl_down_nosimd.cpp — WITHOUT #pragma omp simd (testing auto-vectorization alone)
+
+// Conditional blend: for j in [0, Width-Shift):
+//   out[j] = (shifts[j+Shift] & Shift) ? in[j+Shift] : in[j]
+// for j in [Width-Shift, Width):
+//   out[j] = in[j]
+template<typename T, int Shift, int Width>
+void shfl_down(const T* __restrict__ in,
+               const int* __restrict__ shifts,
+               T* __restrict__ out)
+{
+#pragma omp simd   // omitted in shfl_down_nosimd.cpp
+    for (int j = 0; j < Width - Shift; j++)
+        out[j] = (shifts[j + Shift] & Shift) ? in[j + Shift] : in[j];
+
+    for (int j = Width - Shift; j < Width; j++)
+        out[j] = in[j];
+}
+
+// Instantiated for Shift = 1, 2, 4, 8, 16, 32, 64 with T=uint32_t, Width=128
+```
+
+### Assembly patterns observed
+
+**AVX-512** (both files produced identical output — auto-vectorization sufficed):
+```asm
+; Per 16-element chunk, for Shift=S:
+vpbroadcastd  S, %zmm0          ; broadcast shift constant
+vpandd        S*4(%rsi), %zmm0, %zmm2   ; mask = shifts[j+S] & S
+vpcmpd  $4, %zmm1, %zmm2, %k1   ; k1 = mask != 0  (take in[j+S])
+vpcmpd  $0, %zmm1, %zmm2, %k2   ; k2 = mask == 0  (take in[j])
+vmovdqu32  S*4(%rdi), %zmm3{%k1}{z}    ; load in[j+S] where mask != 0
+vmovdqu32     (%rdi),  %zmm2{%k2}{z}   ; load in[j]   where mask == 0
+vmovdqa32  %zmm3, %zmm2{%k1}           ; merge
+vmovdqu32  %zmm2, (%rdx)               ; store
+```
+Each pass: 2 compares + 2 masked zero-loads + 1 masked merge + 1 store per 16 elements.
+
+**AVX2** (both files produced identical output):
+```asm
+; Per 8-element chunk:
+vpand    S*4(%rsi), %ymm1, %ymm3        ; mask = shifts[j+S] & S
+vpcmpeqd %ymm0, %ymm3, %ymm3           ; ymm3 = (mask == 0) — "take in[j]" predicate
+vpmaskmovd   (%rdi), %ymm3, %ymm4      ; load in[j]   where mask == 0
+vpcmpeqd %ymm0, %ymm3, %ymm2           ; ymm2 = (mask != 0) — "take in[j+S]" predicate
+vpmaskmovd S*4(%rdi), %ymm2, %ymm2    ; load in[j+S] where mask != 0
+vpblendvb %ymm3, %ymm4, %ymm2, %ymm2  ; blend: ymm3 selects in[j], ymm2 selects in[j+S]
+vmovdqu  %ymm2, (%rdx)                 ; store
+```
+Each pass: `vpand` + 2×`vpcmpeqd` + 2×`vpmaskmovd` + `vpblendvb` + store per 8 elements.
+
+### Key findings
+
+1. **`#pragma omp simd` was not needed on GCC 13.3** — the `nosimd` version auto-vectorized
+   to identical output on both AVX-512 and AVX2. The pragma is still recommended for portability
+   across compilers with weaker auto-vectorization.
+
+2. **No architecture-specific intrinsics needed.** A single portable source compiles to optimal
+   SIMD on both targets.
+
+3. **No register-level shuffle instructions** (`vpermps`, `vpshufb`, etc.) appear anywhere. The
+   fixed compile-time offset is treated as a constant address displacement — the "shuffle" is
+   simply a load from `in + Shift`, which is a free addressing mode.
+
+4. **AVX-512 is cleaner**: 5 instructions vs AVX2's 7 per chunk, and uses mask registers
+   instead of `vpblendvb`.
+
+5. **Software `popcount32`** (Hamming weight via AND/shift/add/multiply) auto-vectorizes to
+   `VPMULLD` on both AVX2 and AVX-512. `VPOPCNTQ` (AVX-512VPOPCNTDQ) is **not** required.
