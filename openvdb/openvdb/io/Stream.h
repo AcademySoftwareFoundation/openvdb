@@ -57,11 +57,6 @@ public:
     void write(const GridPtrContainerT&, const MetaMap& = MetaMap()) const;
 
 private:
-    /// Create a new grid of the type specified by the given descriptor,
-    /// then populate the grid from the given input stream.
-    /// @return the newly created grid.
-    GridBase::Ptr readGrid(const GridDescriptor&, std::istream&) const;
-
     void writeGrids(std::ostream&, const GridCPtrVec&, const MetaMap&) const;
 
     MetaMap::Ptr mMeta;

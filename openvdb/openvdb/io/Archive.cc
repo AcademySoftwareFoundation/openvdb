@@ -886,9 +886,8 @@ Archive::connectInstance(const GridDescriptor& gd, const NamedGridMap& grids) co
 ////////////////////////////////////////
 
 
-void
-Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd,
-    std::istream& is, const BBoxd& worldBBox)
+GridBase::Ptr
+Archive::readGrid(const GridDescriptor& gd, std::istream& is, const BBoxd& worldBBox, bool partial/* = false*/)
 {
     // Read the compression settings for this grid and tag the stream with them
     // so that downstream functions can reference them.
@@ -902,6 +901,16 @@ Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd,
         void* ptr;
     };
     OnExit restore(is);
+
+    // Create the grid.
+    if (!GridBase::isRegistered(gd.gridType())) {
+        OPENVDB_THROW(KeyError, "Cannot read grid "
+            << GridDescriptor::nameAsString(gd.uniqueName())
+            << ": grid type " << gd.gridType() << " is not registered");
+    }
+
+    GridBase::Ptr grid = GridBase::createGrid(gd.gridType());
+    if (grid) grid->setSaveFloatAsHalf(gd.saveFloatAsHalf());
 
     // Stream metadata varies per grid, and it needs to persist
     // in case delayed load is in effect.
@@ -930,7 +939,7 @@ Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd,
     io::setGridClass(is, gridClass);
 
     grid->readTransform(is);
-    if (!gd.isInstance()) {
+    if (!partial && !gd.isInstance()) {
         grid->readTopology(is);
         const bool clip = worldBBox.isSorted();
         if (clip) {
@@ -940,6 +949,8 @@ Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd,
             grid->readBuffers(is);
         }
     }
+
+    return grid;
 }
 
 

@@ -51,7 +51,7 @@ Stream::Stream(std::istream& is)
         gd.readHeader(is);
         gd.readStreamPos(is);
         descriptors.push_back(gd);
-        GridBase::Ptr grid = readGrid(gd, is);
+        GridBase::Ptr grid = Archive::readGrid(gd, is, BBoxd());
         mGrids->push_back(grid);
         namedGrids[gd.uniqueName()] = grid;
     }
@@ -99,25 +99,6 @@ Stream::copy() const
 
 
 ////////////////////////////////////////
-
-
-GridBase::Ptr
-Stream::readGrid(const GridDescriptor& gd, std::istream& is) const
-{
-    GridBase::Ptr grid;
-
-    if (!GridBase::isRegistered(gd.gridType())) {
-        OPENVDB_THROW(TypeError, "can't read grid \""
-            << GridDescriptor::nameAsString(gd.uniqueName()) <<
-            "\" from input stream because grid type " << gd.gridType() << " is unknown");
-    } else {
-        grid = GridBase::createGrid(gd.gridType());
-        if (grid) grid->setSaveFloatAsHalf(gd.saveFloatAsHalf());
-
-        Archive::readGrid(grid, gd, is, BBoxd());
-    }
-    return grid;
-}
 
 
 void
