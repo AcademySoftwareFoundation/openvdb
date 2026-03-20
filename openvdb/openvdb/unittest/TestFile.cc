@@ -636,11 +636,27 @@ TestFile::testReadGridDescriptors()
     File file2("something.vdb2");
     std::istringstream istr(ostr.str(), std::ios_base::binary);
     io::setCurrentVersion(istr);
-    file2.readGridDescriptors(istr);
+    // file2.readGridDescriptors(istr);
+    ////////////////////////////
+    file2.mGridDescriptors.clear();
+
+    for (int32_t i = 0, N = file2.readGridCount(istr); i < N; ++i) {
+        // Read the grid descriptor.
+        GridDescriptor gd;
+        gd.readHeader(istr);
+        gd.readStreamPos(istr);
+
+        // Add the descriptor to the dictionary.
+        file2.mGridDescriptors.insert(std::make_pair(gd.gridName(), gd));
+
+        // Skip forward to the next descriptor.
+        gd.seekToEnd(istr);
+    }
+    ////////////////////////////
 
     // Compare with the initial grid descriptors.
     File::NameMapCIter it = file2.findDescriptor("temperature");
-    EXPECT_TRUE(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.mGridDescriptors.end());
     GridDescriptor file2gd = it->second;
     EXPECT_EQ(gd.gridName(), file2gd.gridName());
     EXPECT_EQ(gd.getGridPos(), file2gd.getGridPos());
@@ -648,7 +664,7 @@ TestFile::testReadGridDescriptors()
     EXPECT_EQ(gd.getEndPos(), file2gd.getEndPos());
 
     it = file2.findDescriptor("density");
-    EXPECT_TRUE(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.mGridDescriptors.end());
     file2gd = it->second;
     EXPECT_EQ(gd2.gridName(), file2gd.gridName());
     EXPECT_EQ(gd2.getGridPos(), file2gd.getGridPos());
@@ -883,11 +899,27 @@ TestFile::testEmptyGridIO()
     File file2(filename);
     std::istringstream istr(ostr.str(), std::ios_base::binary);
     io::setCurrentVersion(istr);
-    file2.readGridDescriptors(istr);
+    // file2.readGridDescriptors(istr);
+    ////////////////////////////
+    file2.mGridDescriptors.clear();
+
+    for (int32_t i = 0, N = file2.readGridCount(istr); i < N; ++i) {
+        // Read the grid descriptor.
+        GridDescriptor gd;
+        gd.readHeader(istr);
+        gd.readStreamPos(istr);
+
+        // Add the descriptor to the dictionary.
+        file2.mGridDescriptors.insert(std::make_pair(gd.gridName(), gd));
+
+        // Skip forward to the next descriptor.
+        gd.seekToEnd(istr);
+    }
+    ////////////////////////////
 
     // Compare with the initial grid descriptors.
     File::NameMapCIter it = file2.findDescriptor("temperature");
-    EXPECT_TRUE(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.mGridDescriptors.end());
     GridDescriptor file2gd = it->second;
     file2gd.seekToGrid(istr);
     GridBase::Ptr gd_grid = GridBase::createGrid(file2gd.gridType());
@@ -905,7 +937,7 @@ TestFile::testEmptyGridIO()
     EXPECT_EQ(gd.getEndPos(), file2gd.getEndPos());
 
     it = file2.findDescriptor("density");
-    EXPECT_TRUE(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.mGridDescriptors.end());
     file2gd = it->second;
     file2gd.seekToGrid(istr);
     gd_grid = GridBase::createGrid(file2gd.gridType());
@@ -1000,16 +1032,16 @@ void TestFile::testOpen()
     EXPECT_EQ(2009, vdbfile.getMetadata()->metaValue<int32_t>("year"));
 
     // Ensure we got the grid descriptors.
-    EXPECT_EQ(1, int(vdbfile.gridDescriptors().count("density")));
-    EXPECT_EQ(1, int(vdbfile.gridDescriptors().count("temperature")));
+    EXPECT_EQ(1, int(vdbfile.mGridDescriptors.count("density")));
+    EXPECT_EQ(1, int(vdbfile.mGridDescriptors.count("temperature")));
 
     io::File::NameMapCIter it = vdbfile.findDescriptor("density");
-    EXPECT_TRUE(it != vdbfile.gridDescriptors().end());
+    EXPECT_TRUE(it != vdbfile.mGridDescriptors.end());
     io::GridDescriptor gd = it->second;
     EXPECT_EQ(IntTree::treeType(), gd.gridType());
 
     it = vdbfile.findDescriptor("temperature");
-    EXPECT_TRUE(it != vdbfile.gridDescriptors().end());
+    EXPECT_TRUE(it != vdbfile.mGridDescriptors.end());
     gd = it->second;
     EXPECT_EQ(FloatTree::treeType(), gd.gridType());
 
@@ -1021,8 +1053,8 @@ void TestFile::testOpen()
     // Test closing the file.
     vdbfile.close();
     EXPECT_TRUE(vdbfile.isOpen() == false);
-    EXPECT_TRUE(vdbfile.fileMetadata().get() == nullptr);
-    EXPECT_EQ(0, int(vdbfile.gridDescriptors().size()));
+    EXPECT_TRUE(vdbfile.mMeta.get() == nullptr);
+    EXPECT_EQ(0, int(vdbfile.mGridDescriptors.size()));
     EXPECT_THROW(vdbfile.inputStream(), openvdb::IoError);
 
     remove("something.vdb2");

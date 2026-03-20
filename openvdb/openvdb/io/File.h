@@ -34,7 +34,7 @@ public:
     using NameMapCIter = NameMap::const_iterator;
 
     explicit File(const std::string& filename);
-    ~File() override;
+    ~File() override { }
 
     /// @brief Copy constructor
     /// @details The copy will be closed and will not reference the same
@@ -183,8 +183,22 @@ private:
     friend class ::TestFile;
     friend class ::TestStream;
 
-    struct Impl;
-    std::unique_ptr<Impl> mImpl;
+    std::string mFilename;
+    // The file-level metadata
+    MetaMap::Ptr mMeta;
+    // The file stream that is open for reading
+    std::unique_ptr<std::istream> mInStream;
+    // File-level stream metadata (file format, compression, etc.)
+    StreamMetadata::Ptr mStreamMetadata;
+    // Flag indicating if we have read in the global information (header,
+    // metadata, and grid descriptors) for this VDB file
+    bool mIsOpen = false;
+    // Grid descriptors for all grids stored in the file, indexed by grid name
+    NameMap mGridDescriptors;
+    // All grids, indexed by unique name (used only when mHasGridOffsets is false)
+    Archive::NamedGridMap mNamedGrids;
+    // All grids stored in the file (used only when mHasGridOffsets is false)
+    GridPtrVecPtr mGrids;
 };
 
 
