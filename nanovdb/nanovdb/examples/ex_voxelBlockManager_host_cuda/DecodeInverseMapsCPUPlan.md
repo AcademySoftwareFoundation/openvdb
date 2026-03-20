@@ -1,6 +1,6 @@
 # CPU `decodeInverseMaps` Implementation Plan
 
-This document captures the full design for porting `VoxelBlockManager<BlockWidth>::decodeInverseMaps`
+This document captures the full design for porting `VoxelBlockManager<Log2BlockWidth>::decodeInverseMaps`
 to the host. It is the companion to `VoxelBlockManagerContext.md` and serves as a starting point
 for implementing the function in `nanovdb/tools/VoxelBlockManager.h`.
 
@@ -210,7 +210,7 @@ memory, no sync):
 ```cpp
 template <int BlockWidth>
 template <class BuildT>
-void VoxelBlockManager<BlockWidth>::decodeInverseMaps(
+void VoxelBlockManager<Log2BlockWidth>::decodeInverseMaps(
     const NanoGrid<BuildT>* grid,
     uint32_t                blockID,
     const uint32_t*         firstLeafID,
@@ -227,7 +227,7 @@ Or as a free function in an `cpu` sub-namespace alongside `buildVoxelBlockManage
 
 ## 10. Future Factoring
 
-Once `VoxelBlockManager<BlockWidth>` is annotated `__hostdev__` on all its members, the
+Once `VoxelBlockManager<Log2BlockWidth>` is annotated `__hostdev__` on all its members, the
 per-leaf logic shared between the CPU and GPU builds can be factored into a `__hostdev__ static`
 member (e.g., `accumulateLeafContribution(...)`) — see `project_vbm_factoring.md` in the memory
 directory. The `decodeInverseMaps` CPU/GPU split is a separate concern (SIMD vs warp cooperation)

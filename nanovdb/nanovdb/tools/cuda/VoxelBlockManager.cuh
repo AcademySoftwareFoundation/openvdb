@@ -31,9 +31,12 @@ namespace tools::cuda {
 /// blocks) of active voxels in an IndexGrid on the device, and efficient
 /// computation of linear offsets of stencils (e.g. 3-wide box stencil).
 /// @tparam BlockWidth Number of active voxels in a contiguous span
-template <int BlockWidth>
+template <int Log2BlockWidth>
 struct VoxelBlockManager
 {
+    static constexpr int BlockWidth = 1 << Log2BlockWidth;
+    static_assert(Log2BlockWidth >= 6, "BlockWidth must be at least 64 (one jumpMap word per block)");
+
     // The efficiency of the functions in this class are contingent on
     // threadblock-level coordination, which manifests either as using shared
     // memory for synchronization, or warp-level shift operations.
@@ -153,15 +156,15 @@ struct VoxelBlockManager
 /// @brief This functor calculates the firstLeafID and jumpMap for the
 /// VoxelBlockManager over the subset of the Tree nodes specified by
 /// firstOffset, lastOffset, and nBlocks.
-template<int BlockWidthLog2, int NumThreads>
+template<int Log2BlockWidth>
 struct BuildVoxelBlockManagerFunctor
 {
-    static constexpr int BlockWidth = 1 << BlockWidthLog2;
+    static constexpr int BlockWidth = 1 << Log2BlockWidth;
     static constexpr int JumpMapLength = BlockWidth/64;
     static constexpr int SlicesPerLowerNode = 8;
     static constexpr int LeafNodesPerSlice = 4096/SlicesPerLowerNode;
 
-    static constexpr int MaxThreadsPerBlock = NumThreads;
+    static constexpr int MaxThreadsPerBlock = 128;
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
     void __device__
@@ -197,10 +200,10 @@ struct BuildVoxelBlockManagerFunctor
 
                 if ( ( leafFirstOffset > lastOffset ) || (leafLastOffset < firstOffset) ) continue;
 
-                int lastBlock = (leafLastOffset - firstOffset) >> BlockWidthLog2;
+                int lastBlock = (leafLastOffset - firstOffset) >> Log2BlockWidth;
                 lastBlock = min(lastBlock, nBlocks-1);
                 uint64_t firstBlock = (leafFirstOffset < firstOffset) ? 0 :
-                    (leafFirstOffset - firstOffset) >> BlockWidthLog2;
+                    (leafFirstOffset - firstOffset) >> Log2BlockWidth;
 
                 // For all but the first block touched, mark the firstLeaf as being this one
                 for ( uint64_t b = lastBlock; b > firstBlock; --b )
@@ -230,20 +233,19 @@ struct BuildVoxelBlockManagerFunctor
 ///        Zeros the jumpMap on-stream and relaunches the build kernel. No memory
 ///        allocation is performed; the handle must already have correctly-sized
 ///        device buffers. Suitable for repeated builds and benchmarking.
-/// @tparam BlockWidthLog2  Log2 of the number of active voxels per VBM block
-/// @tparam NumThreads      CUDA threads per block for the build kernel
+/// @tparam Log2BlockWidth  Log2 of the number of active voxels per VBM block
 /// @tparam BufferT         Device buffer type (deduced from handle)
 /// @param d_grid  Device-side grid pointer passed to the build kernel; lowerCount
 ///                is read from device memory via DeviceGridTraits
 /// @param handle  Pre-allocated handle (blockCount/firstOffset/lastOffset already set)
 /// @param stream  CUDA stream (default 0)
-template<int BlockWidthLog2, int NumThreads = 128, typename BufferT>
+template<int Log2BlockWidth, typename BufferT>
 void buildVoxelBlockManager(
     NanoGrid<ValueOnIndex>*                            d_grid,
     nanovdb::tools::VoxelBlockManagerHandle<BufferT>&  handle,
     cudaStream_t                                       stream = 0)
 {
-    static constexpr uint64_t BlockWidth    = uint64_t(1) << BlockWidthLog2;
+    static constexpr uint64_t BlockWidth    = uint64_t(1) << Log2BlockWidth;
     static constexpr uint64_t JumpMapLength = BlockWidth / 64;
 
     if (!handle.blockCount()) return;
@@ -255,9 +257,9 @@ void buildVoxelBlockManager(
 
     using Traits = util::cuda::DeviceGridTraits<ValueOnIndex>;
     const uint32_t lowerCount = Traits::getTreeData(d_grid).mNodeCount[1];
-    using Op = BuildVoxelBlockManagerFunctor<BlockWidthLog2, NumThreads>;
+    using Op = BuildVoxelBlockManagerFunctor<Log2BlockWidth>;
     util::cuda::operatorKernel<Op>
-        <<<dim3(lowerCount, Op::SlicesPerLowerNode, 1), NumThreads, 0, stream>>>(
+        <<<dim3(lowerCount, Op::SlicesPerLowerNode, 1), Op::MaxThreadsPerBlock, 0, stream>>>(
             handle.firstOffset(), handle.lastOffset(),
             static_cast<int>(handle.blockCount()),
             d_grid, handle.deviceFirstLeafID(), handle.deviceJumpMap());
@@ -266,8 +268,7 @@ void buildVoxelBlockManager(
 /// @brief Allocate device buffers and build a VoxelBlockManager on the device.
 ///        Returns a fully-constructed VoxelBlockManagerHandle backed by device memory.
 ///        Grid dimensions (when not supplied) are read from device memory via DeviceGridTraits.
-/// @tparam BlockWidthLog2  Log2 of the number of active voxels per VBM block
-/// @tparam NumThreads      CUDA threads per block for the build kernel
+/// @tparam Log2BlockWidth  Log2 of the number of active voxels per VBM block
 /// @tparam BufferT         Device buffer type (default: nanovdb::cuda::DeviceBuffer)
 /// @param d_grid       Device-side grid pointer
 /// @param firstOffset  First active-voxel offset covered by this VBM; must satisfy
@@ -280,7 +281,7 @@ void buildVoxelBlockManager(
 ///                     (default) to use the minimum required capacity.
 /// @param stream       CUDA stream (default 0)
 /// @return A fully constructed VoxelBlockManagerHandle backed by device memory
-template<int BlockWidthLog2, int NumThreads = 128, typename BufferT = nanovdb::cuda::DeviceBuffer>
+template<int Log2BlockWidth, typename BufferT = nanovdb::cuda::DeviceBuffer>
 nanovdb::tools::VoxelBlockManagerHandle<BufferT>
 buildVoxelBlockManager(
     NanoGrid<ValueOnIndex>* d_grid,
@@ -289,7 +290,7 @@ buildVoxelBlockManager(
     uint64_t                nBlocks     = 0,
     cudaStream_t            stream      = 0)
 {
-    static constexpr uint64_t BlockWidth    = uint64_t(1) << BlockWidthLog2;
+    static constexpr uint64_t BlockWidth    = uint64_t(1) << Log2BlockWidth;
     static constexpr uint64_t JumpMapLength = BlockWidth / 64;
 
     using Traits = util::cuda::DeviceGridTraits<ValueOnIndex>;
@@ -297,7 +298,7 @@ buildVoxelBlockManager(
     if (!lastOffset)  lastOffset  = Traits::getActiveVoxelCount(d_grid);
     if (lastOffset < firstOffset) return nanovdb::tools::VoxelBlockManagerHandle<BufferT>{};
     NANOVDB_ASSERT(!((firstOffset - 1) & (BlockWidth - 1))); // firstOffset == 1 (mod BlockWidth)
-    if (!nBlocks)     nBlocks     = (lastOffset - firstOffset + BlockWidth) >> BlockWidthLog2;
+    if (!nBlocks)     nBlocks     = (lastOffset - firstOffset + BlockWidth) >> Log2BlockWidth;
 
     int device = 0;
     cudaCheck(cudaGetDevice(&device));
@@ -309,7 +310,7 @@ buildVoxelBlockManager(
         std::move(firstLeafIDBuf), std::move(jumpMapBuf),
         nBlocks, firstOffset, lastOffset);
 
-    buildVoxelBlockManager<BlockWidthLog2, NumThreads>(d_grid, handle, stream);
+    buildVoxelBlockManager<Log2BlockWidth>(d_grid, handle, stream);
     return handle;
 }
 

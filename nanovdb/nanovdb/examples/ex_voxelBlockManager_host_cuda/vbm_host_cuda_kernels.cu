@@ -26,10 +26,10 @@
 
 namespace {
 
-static constexpr int BlockWidthLog2 = 7;
-static constexpr int BlockWidth     = 1 << BlockWidthLog2; // 128
+static constexpr int Log2BlockWidth = 7;
+static constexpr int BlockWidth     = 1 << Log2BlockWidth; // 128
 
-using VBM = nanovdb::tools::cuda::VoxelBlockManager<BlockWidth>;
+using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
 
 /// @brief For each VBM block, decode the inverse map and store
 /// (leafIndex, voxelOffset) for every active voxel into global output arrays
@@ -97,7 +97,7 @@ void runVBMCudaTest(const std::vector<nanovdb::Coord>& coords)
 
     const auto&    tree    = h_grid->tree();
     const uint64_t nVoxels = h_grid->activeVoxelCount();
-    const uint32_t nBlocks = (uint32_t)((nVoxels + BlockWidth - 1) >> BlockWidthLog2);
+    const uint32_t nBlocks = (uint32_t)((nVoxels + BlockWidth - 1) >> Log2BlockWidth);
 
     std::cout << "Active voxels (unique): " << nVoxels          << "\n"
               << "Leaf nodes            : " << tree.nodeCount(0) << "\n"
@@ -112,8 +112,8 @@ void runVBMCudaTest(const std::vector<nanovdb::Coord>& coords)
     // for unified-memory buffers where the first access triggers page migration.
     static constexpr int nRuns = 5;
 
-    auto gpuHandle = nanovdb::tools::cuda::buildVoxelBlockManager<BlockWidthLog2>(d_grid);
-    auto cpuHandle = nanovdb::tools::buildVoxelBlockManager<BlockWidthLog2>(h_grid);
+    auto gpuHandle = nanovdb::tools::cuda::buildVoxelBlockManager<Log2BlockWidth>(d_grid);
+    auto cpuHandle = nanovdb::tools::buildVoxelBlockManager<Log2BlockWidth>(h_grid);
 
     // GPU build (cudaMemsetAsync + kernel, pre-allocated buffers)
     {
@@ -121,7 +121,7 @@ void runVBMCudaTest(const std::vector<nanovdb::Coord>& coords)
         for (int i = 0; i < nRuns; ++i) {
             cudaCheck(cudaDeviceSynchronize()); // ensure stream is idle before timing
             nanovdb::util::cuda::Timer gpuTimer;
-            nanovdb::tools::cuda::buildVoxelBlockManager<BlockWidthLog2>(d_grid, gpuHandle);
+            nanovdb::tools::cuda::buildVoxelBlockManager<Log2BlockWidth>(d_grid, gpuHandle);
             float ms = gpuTimer.elapsed(); // records stop event and synchronizes
             if (i > 0) minMs = std::min(minMs, ms);
         }
@@ -135,7 +135,7 @@ void runVBMCudaTest(const std::vector<nanovdb::Coord>& coords)
         for (int i = 0; i < nRuns; ++i) {
             nanovdb::util::Timer cpuTimer;
             cpuTimer.start("");
-            nanovdb::tools::buildVoxelBlockManager<BlockWidthLog2>(h_grid, cpuHandle);
+            nanovdb::tools::buildVoxelBlockManager<Log2BlockWidth>(h_grid, cpuHandle);
             float ms = (float)cpuTimer.elapsed<std::chrono::microseconds>() / 1000.0f;
             if (i > 0) minMs = std::min(minMs, ms);
         }

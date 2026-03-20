@@ -117,10 +117,10 @@ convention in NanoVDB:
 **Allocating overload** -- returns a new, fully-constructed handle:
 
     // CPU
-    auto handle = nanovdb::tools::buildVoxelBlockManager<BlockWidthLog2>(grid);
+    auto handle = nanovdb::tools::buildVoxelBlockManager<Log2BlockWidth>(grid);
 
     // CUDA
-    auto handle = nanovdb::tools::cuda::buildVoxelBlockManager<BlockWidthLog2>(d_grid, stream);
+    auto handle = nanovdb::tools::cuda::buildVoxelBlockManager<Log2BlockWidth>(d_grid, stream);
 
 Optional parameters (with sentinel 0 meaning "derive from grid"):
 - `firstOffset` -- defaults to 1
@@ -135,10 +135,10 @@ handle is returned immediately with no allocation attempted.
 zeroes the jumpMap, and recomputes both arrays. No allocation:
 
     // CPU
-    nanovdb::tools::buildVoxelBlockManager<BlockWidthLog2>(grid, handle);
+    nanovdb::tools::buildVoxelBlockManager<Log2BlockWidth>(grid, handle);
 
     // CUDA
-    nanovdb::tools::cuda::buildVoxelBlockManager<BlockWidthLog2>(d_grid, handle, stream);
+    nanovdb::tools::cuda::buildVoxelBlockManager<Log2BlockWidth>(d_grid, handle, stream);
 
 A null handle (`blockCount == 0`) is silently ignored (no-op). This overload
 is the right choice for benchmarking or for rebuilding after a
@@ -163,7 +163,7 @@ This grouping is chosen because:
 - It naturally sizes the CTA workload (4096 slots / 8 slices / 128 threads = 4 slots per thread)
 - Threads in the same warp access leaves from the same lower node, improving
   memory access locality
-- The grid is `<<<dim3(lowerCount, SlicesPerLowerNode), NumThreads>>>`
+- The grid is `<<<dim3(lowerCount, SlicesPerLowerNode), MaxThreadsPerBlock>>>`
 
 The cost is wasted threads for sparse lower nodes (few active leaf children
 out of 4096 slots). This is an acceptable trade-off on the GPU.
@@ -209,10 +209,10 @@ The typical VBM-powered kernel:
         uint64_t blockFirstOffset = firstOffset + (uint64_t)blockID * BlockWidth;
 
         // Cooperative decode: all threads in the block participate
-        VoxelBlockManager<BlockWidth>::decodeInverseMaps(
+        VoxelBlockManager<Log2BlockWidth>::decodeInverseMaps(
             grid,
             firstLeafID[blockID],
-            &jumpMap[blockID * VoxelBlockManager<BlockWidth>::JumpMapLength],
+            &jumpMap[blockID * VoxelBlockManager<Log2BlockWidth>::JumpMapLength],
             blockFirstOffset,
             smem_leafIndex,
             smem_voxelOffset);
@@ -223,10 +223,10 @@ The typical VBM-powered kernel:
         int t = threadIdx.x;
         uint64_t globalIndex = blockFirstOffset + t;
         if (globalIndex > lastOffset) return;
-        if (smem_leafIndex[t] == VoxelBlockManager<BlockWidth>::UnusedLeafIndex) return;
+        if (smem_leafIndex[t] == VoxelBlockManager<Log2BlockWidth>::UnusedLeafIndex) return;
 
         // From here: access the voxel's 3D position, values, or stencil.
-        // VoxelBlockManager<BlockWidth>::computeBoxStencil(...) uses the same
+        // VoxelBlockManager<Log2BlockWidth>::computeBoxStencil(...) uses the same
         // smem arrays to look up the 27 stencil neighbor indices.
     }
 

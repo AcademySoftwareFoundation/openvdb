@@ -133,15 +133,16 @@ public:
 ///        Zeros the jumpMap and recomputes both metadata arrays. This overload
 ///        performs no memory allocation and is suitable for repeated builds
 ///        (e.g. benchmarking, or rebuilding after a topology-preserving update).
-/// @tparam BlockWidthLog2 Log2 of the number of active voxels per VBM block
+/// @tparam Log2BlockWidth Log2 of the number of active voxels per VBM block
 /// @tparam BufferT Buffer type of the handle (must provide host-accessible data())
 /// @param grid Host-accessible ValueOnIndex grid (must satisfy isSequential())
 /// @param handle Pre-allocated handle whose blockCount/firstOffset/lastOffset are
 ///               already set to match the grid
-template<int BlockWidthLog2, typename BufferT>
+template<int Log2BlockWidth, typename BufferT>
 void buildVoxelBlockManager(const NanoGrid<ValueOnIndex>* grid, VoxelBlockManagerHandle<BufferT>& handle)
 {
-    static constexpr uint64_t BlockWidth = uint64_t(1) << BlockWidthLog2;
+    static constexpr uint64_t BlockWidth = uint64_t(1) << Log2BlockWidth;
+    static_assert(Log2BlockWidth >= 6, "BlockWidth must be at least 64 (one jumpMap word per block)");
     static constexpr uint64_t JumpMapLength = BlockWidth / 64;
 
     NANOVDB_ASSERT(grid->isSequential());
@@ -172,9 +173,9 @@ void buildVoxelBlockManager(const NanoGrid<ValueOnIndex>* grid, VoxelBlockManage
             const uint64_t leafIndex = static_cast<uint64_t>(&leaf - firstLeaf);
 
             const uint64_t lastBlock = std::min<uint64_t>(
-                (leafLastOffset - firstOffset) >> BlockWidthLog2, nBlocks - 1);
+                (leafLastOffset - firstOffset) >> Log2BlockWidth, nBlocks - 1);
             const uint64_t firstBlock = (leafFirstOffset < firstOffset) ? 0 :
-                (leafFirstOffset - firstOffset) >> BlockWidthLog2;
+                (leafFirstOffset - firstOffset) >> Log2BlockWidth;
 
             // For blocks after firstBlock, this leaf is the first leaf of each
             for (uint64_t b = lastBlock; b > firstBlock; --b)
@@ -200,7 +201,7 @@ void buildVoxelBlockManager(const NanoGrid<ValueOnIndex>* grid, VoxelBlockManage
 /// @brief Allocate buffers and build a VoxelBlockManager on the host from a
 ///        ValueOnIndex grid. Uses std::execution::par to process lower internal
 ///        nodes in parallel.
-/// @tparam BlockWidthLog2  Log2 of the number of active voxels per VBM block
+/// @tparam Log2BlockWidth  Log2 of the number of active voxels per VBM block
 /// @tparam BufferT         Buffer type for the returned handle (default: HostBuffer)
 /// @param grid         Host-accessible ValueOnIndex grid (must satisfy isSequential())
 /// @param firstOffset  First active-voxel offset covered by this VBM; must satisfy
@@ -213,7 +214,7 @@ void buildVoxelBlockManager(const NanoGrid<ValueOnIndex>* grid, VoxelBlockManage
 ///                     (default) to use the minimum required capacity.
 /// @param pool         Optional pool buffer for allocation (passed to BufferT::create)
 /// @return A fully constructed VoxelBlockManagerHandle
-template<int BlockWidthLog2, typename BufferT = HostBuffer>
+template<int Log2BlockWidth, typename BufferT = HostBuffer>
 VoxelBlockManagerHandle<BufferT>
 buildVoxelBlockManager(
     const NanoGrid<ValueOnIndex>* grid,
@@ -222,14 +223,14 @@ buildVoxelBlockManager(
     uint64_t nBlocks = 0,
     const BufferT* pool = nullptr)
 {
-    static constexpr uint64_t BlockWidth = uint64_t(1) << BlockWidthLog2;
+    static constexpr uint64_t BlockWidth = uint64_t(1) << Log2BlockWidth;
     static constexpr uint64_t JumpMapLength = BlockWidth / 64;
 
     if (!firstOffset) firstOffset = 1;
     if (!lastOffset) lastOffset = grid->activeVoxelCount();
     if (lastOffset < firstOffset) return VoxelBlockManagerHandle<BufferT>{};
     NANOVDB_ASSERT(!((firstOffset - 1) & (BlockWidth - 1))); // firstOffset == 1 (mod BlockWidth)
-    if (!nBlocks) nBlocks = (lastOffset - firstOffset + BlockWidth) >> BlockWidthLog2;
+    if (!nBlocks) nBlocks = (lastOffset - firstOffset + BlockWidth) >> Log2BlockWidth;
 
     auto firstLeafIDBuf = BufferT::create(nBlocks * sizeof(uint32_t), pool);
     auto jumpMapBuf = BufferT::create(nBlocks * JumpMapLength * sizeof(uint64_t), pool);
@@ -238,7 +239,7 @@ buildVoxelBlockManager(
         std::move(firstLeafIDBuf), std::move(jumpMapBuf),
         nBlocks, firstOffset, lastOffset);
 
-    buildVoxelBlockManager<BlockWidthLog2>(grid, handle);
+    buildVoxelBlockManager<Log2BlockWidth>(grid, handle);
     return handle;
 }
 
