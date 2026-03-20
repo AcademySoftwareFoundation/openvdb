@@ -296,8 +296,20 @@ File::open()
             Archive::connectInstance(it->second, mImpl->mNamedGrids);
         }
     } else {
-        // Read in just the grid descriptors.
-        readGridDescriptors(inputStream());
+        gridDescriptors().clear();
+
+        for (int32_t i = 0, N = readGridCount(inputStream()); i < N; ++i) {
+            // Read the grid descriptor.
+            GridDescriptor gd;
+            gd.readHeader(inputStream());
+            gd.readStreamPos(inputStream());
+
+            // Add the descriptor to the dictionary.
+            gridDescriptors().insert(std::make_pair(gd.gridName(), gd));
+
+            // Skip forward to the next descriptor.
+            gd.seekToEnd(inputStream());
+        }
     }
 
     mImpl->mIsOpen = true;
@@ -570,31 +582,6 @@ File::writeGrids(const GridCPtrVec& grids, const MetaMap& meta) const
     file.close();
 }
 
-
-////////////////////////////////////////
-
-
-void
-File::readGridDescriptors(std::istream& is)
-{
-    // This method should not be called for files that don't contain grid offsets.
-    OPENVDB_ASSERT(inputHasGridOffsets());
-
-    gridDescriptors().clear();
-
-    for (int32_t i = 0, N = readGridCount(is); i < N; ++i) {
-        // Read the grid descriptor.
-        GridDescriptor gd;
-        gd.readHeader(is);
-        gd.readStreamPos(is);
-
-        // Add the descriptor to the dictionary.
-        gridDescriptors().insert(std::make_pair(gd.gridName(), gd));
-
-        // Skip forward to the next descriptor.
-        gd.seekToEnd(is);
-    }
-}
 
 
 ////////////////////////////////////////
