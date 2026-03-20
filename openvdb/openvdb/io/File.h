@@ -150,16 +150,6 @@ private:
     /// If the name is non-unique, return an iterator to the first matching descriptor.
     NameMapCIter findDescriptor(const Name&) const;
 
-    /// Return a newly created, empty grid of the type specified by the given grid descriptor.
-    GridBase::Ptr createGrid(const GridDescriptor&) const;
-
-    /// Read in and return the partially-populated grid specified by the given grid descriptor.
-    GridBase::ConstPtr readGridPartial(const GridDescriptor&) const;
-
-    /// Read in and return the region of the grid specified by the given grid descriptor
-    /// that intersects the given world-space bounding box.
-    GridBase::Ptr readGrid(const GridDescriptor&, const BBoxd&) const;
-
     /// @brief Retrieve a grid from @c mNamedGrids.  Return a null pointer
     /// if @c mNamedGrids was not populated (because this file is random-access).
     /// @throw KeyError if no grid with the given name exists in this file.
