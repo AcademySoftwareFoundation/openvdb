@@ -442,7 +442,7 @@ File::readAllGridMetadata()
         // Read just the metadata and transforms for all grids.
         for (NameMapCIter i = gridDescriptors().begin(), e = gridDescriptors().end(); i != e; ++i) {
             const GridDescriptor& gd = i->second;
-            GridBase::ConstPtr grid = readGridPartial(gd, /*readTopology=*/false);
+            GridBase::ConstPtr grid = readGridPartial(gd);
             // Return copies of the grids, but with empty trees.
             // (As of 0.98.0, at least, it would suffice to just const cast
             // the grid pointers returned by readGridPartial(), but shallow
@@ -479,7 +479,7 @@ File::readGridMetadata(const Name& name)
 
         // Seek to and read in the grid from the file.
         const GridDescriptor& gd = it->second;
-        ret = readGridPartial(gd, /*readTopology=*/false);
+        ret = readGridPartial(gd);
     }
     return ret->copyGridWithNewTree();
 }
@@ -644,18 +644,30 @@ File::createGrid(const GridDescriptor& gd) const
 
 
 GridBase::ConstPtr
-File::readGridPartial(const GridDescriptor& gd, bool readTopology) const
+File::readGridPartial(const GridDescriptor& gd) const
 {
     // This method should not be called for files that don't contain grid offsets.
     OPENVDB_ASSERT(inputHasGridOffsets());
 
+    std::istream& is = inputStream();
+
     GridBase::Ptr grid = createGrid(gd);
 
     // Seek to grid.
-    gd.seekToGrid(inputStream());
+    gd.seekToGrid(is);
 
-    // Read the grid partially.
-    readGridPartial(grid, inputStream(), gd.isInstance(), readTopology);
+    // This code needs to stay in sync with io::Archive::readGrid(), in terms of
+    // the order of operations.
+    readGridCompression(is);
+    grid->readMeta(is);
+
+    // Delayed loading is no longer supported - always remove metadata related to delayed loading if it exists
+    if ((*grid)[GridBase::META_FILE_DELAYED_LOAD]) {
+        grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
+    }
+
+    // Read the transform.
+    grid->readTransform(is);
 
     // Promote to a const grid.
     GridBase::ConstPtr constGrid = grid;
@@ -682,30 +694,6 @@ GridBase::Ptr
 File::readGrid(const GridDescriptor& gd, const CoordBBox& bbox) const
 {
     return Impl::readGrid(*this, gd, bbox);
-}
-
-
-void
-File::readGridPartial(GridBase::Ptr grid, std::istream& is,
-    bool isInstance, bool readTopology) const
-{
-    // This method should not be called for files that don't contain grid offsets.
-    OPENVDB_ASSERT(inputHasGridOffsets());
-
-    // This code needs to stay in sync with io::Archive::readGrid(), in terms of
-    // the order of operations.
-    readGridCompression(is);
-    grid->readMeta(is);
-
-    // Delayed loading is no longer supported - always remove metadata related to delayed loading if it exists
-    if ((*grid)[GridBase::META_FILE_DELAYED_LOAD]) {
-        grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
-    }
-
-    grid->readTransform(is);
-    if (!isInstance && readTopology) {
-        grid->readTopology(is);
-    }
 }
 
 
