@@ -72,7 +72,8 @@ Stream::Stream(std::istream& is): mImpl(new Impl)
     Archive::NamedGridMap namedGrids;
     for (int32_t i = 0; i < gridCount; ++i) {
         GridDescriptor gd;
-        gd.read(is);
+        gd.readHeader(is);
+        gd.readStreamPos(is);
         descriptors.push_back(gd);
         GridBase::Ptr grid = readGrid(gd, is);
         mImpl->mGrids->push_back(grid);

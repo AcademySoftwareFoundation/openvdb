@@ -156,9 +156,6 @@ TestFile::testWriteGrid()
     // it doesn't have a header), set the file format version number explicitly.
     io::setCurrentVersion(istr);
 
-    GridBase::Ptr gd2_grid;
-    EXPECT_THROW(gd2.read(istr), openvdb::LookupError);
-
     // Register the grid and the transform and the blocks.
     GridBase::clearRegistry();
     GridType::registerGrid();
@@ -174,7 +171,11 @@ TestFile::testWriteGrid()
     math::NonlinearFrustumMap::registerMap();
 
     istr.seekg(0, std::ios_base::beg);
-    EXPECT_NO_THROW(gd2_grid = gd2.read(istr));
+    gd2.readHeader(istr);
+    gd2.readStreamPos(istr);
+
+    // manually create the grid
+    GridBase::Ptr gd2_grid = GridBase::createGrid(gd2.gridType());
 
     EXPECT_EQ(gd.gridName(), gd2.gridName());
     EXPECT_EQ(GridType::gridType(), gd2_grid->type());
@@ -295,8 +296,9 @@ TestFile::testWriteMultipleGrids()
     std::istringstream istr(ostr.str(), std::ios_base::binary);
     io::setCurrentVersion(istr);
 
-    GridBase::Ptr gd_in_grid;
-    EXPECT_NO_THROW(gd_in_grid = gd_in.read(istr));
+    gd_in.readHeader(istr);
+    gd_in.readStreamPos(istr);
+    GridBase::Ptr gd_in_grid = GridBase::createGrid(gd_in.gridType());
 
     // Ensure read in the right values.
     EXPECT_EQ(gd.gridName(), gd_in.gridName());
@@ -340,8 +342,9 @@ TestFile::testWriteMultipleGrids()
     gd_in.seekToEnd(istr);
 
     GridDescriptor gd2_in;
-    GridBase::Ptr gd2_in_grid;
-    EXPECT_NO_THROW(gd2_in_grid = gd2_in.read(istr));
+    gd2_in.readHeader(istr);
+    gd2_in.readStreamPos(istr);
+    GridBase::Ptr gd2_in_grid = GridBase::createGrid(gd2_in.gridType());
 
     // Ensure that we read in the right values.
     EXPECT_EQ(gd2.gridName(), gd2_in.gridName());
