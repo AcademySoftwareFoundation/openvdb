@@ -153,10 +153,6 @@ private:
     /// Return a newly created, empty grid of the type specified by the given grid descriptor.
     GridBase::Ptr createGrid(const GridDescriptor&) const;
 
-    /// @brief Read a grid, including its data blocks, but only where it
-    /// intersects the given world-space bounding box.
-    GridBase::Ptr readGridByName(const Name&, const BBoxd&);
-
     /// Read in and return the partially-populated grid specified by the given grid descriptor.
     GridBase::ConstPtr readGridPartial(const GridDescriptor&, bool readTopology) const;
 

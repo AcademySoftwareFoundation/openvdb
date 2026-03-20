@@ -491,19 +491,12 @@ File::readGridMetadata(const Name& name)
 GridBase::Ptr
 File::readGrid(const Name& name)
 {
-    return readGridByName(name, BBoxd());
+    return readGrid(name, BBoxd());
 }
 
 
 GridBase::Ptr
 File::readGrid(const Name& name, const BBoxd& bbox)
-{
-    return readGridByName(name, bbox);
-}
-
-
-GridBase::Ptr
-File::readGridByName(const Name& name, const BBoxd& bbox)
 {
     if (!isOpen()) {
         OPENVDB_THROW(IoError, filename() << " is not open for reading.");
