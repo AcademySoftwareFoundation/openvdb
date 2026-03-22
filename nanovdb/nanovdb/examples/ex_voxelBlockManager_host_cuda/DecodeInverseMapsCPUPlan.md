@@ -460,3 +460,181 @@ __m256i s   = _mm256_madd_epi16(_mm256_maddubs_epi16(cnt, ones8), ones16); // su
 `maskWords` (constant across all 32 steps) should be loaded into two `__m256i` registers once
 before the step loop — the compiler will hoist the broadcasts of `lut`, `low4`, `ones8`, `ones16`
 automatically.
+
+---
+
+## 13. Alternative Algorithm: Bit-Parallel Z+Y Prefix Sum
+
+This section records an alternative algorithm under investigation for computing
+`uint16_t prefixSums[512]` (exclusive linear prefix popcount per voxel) from a `Mask<3>`
+(`valueMask` of a leaf node), using bit-parallel operations on the 8 × 64-bit mask words.
+The algorithm is implemented and tested in `simd_test/within_word_prefix_test.cpp`.
+
+### 13a. Data Layout
+
+```cpp
+union qword { uint64_t ui64; uint8_t ui8[8]; };
+static constexpr uint64_t kSpread = 0x0101010101010101ULL;
+
+qword data[8][8];  // indexed [z][x]
+// data[z][x].ui8[y]  ↔  voxel (x, y, z), x = word index, y*8+z = bit within word
+```
+
+NanoVDB leaf linear index: `i = x*64 + y*8 + z`.  Word index = x (0..7), within-word bit
+position = y\*8+z, with z as fast index (bits 0..2 of each 8-bit group) and y as slow (byte
+index 0..7 within the 64-bit word).
+
+`data[z][:]` is contiguous — 64 bytes = one cache line = two YMM registers.  This enables
+`#pragma omp simd` over x in both passes below.
+
+### 13b. Z-Pass: Indicator Fill + Running Sum
+
+```cpp
+// z=0: extract bit 0 from each byte of each word
+#pragma omp simd
+for (int x = 0; x < 8; x++)
+    data[0][x].ui64 = maskWords[x] & kSpread;
+
+// z=1..7: accumulate bit z from each byte, running sum over z
+for (int z = 1; z < 8; z++) {
+    #pragma omp simd
+    for (int x = 0; x < 8; x++)
+        data[z][x].ui64 = data[z-1][x].ui64 + ((maskWords[x] >> z) & kSpread);
+}
+```
+
+After this pass: `data[z][x].ui8[y]` = Σ_{z'≤z} bit(x, y, z') — per-column z-prefix for
+each (x, y).  Per-byte maximum = 8; fits in `uint8_t` with no inter-byte carry.  `vpaddq`
+and `vpaddb` are equivalent here.
+
+**Latency hiding**: the indicator fill `(maskWords[x] >> z) & kSpread` is independent of
+`data[z-1][x]`, so the OOO engine can issue it during the 1-cycle `vpaddq` latency.  The
+7-step dependency chain runs at ~1 cycle/step (throughput-bound, not latency-bound).
+
+### 13c. Y-Pass: Hillis-Steele Prefix Scan Within uint64
+
+```cpp
+for (int z = 0; z < 8; z++) {
+    #pragma omp simd
+    for (int x = 0; x < 8; x++) {
+        data[z][x].ui64 += data[z][x].ui64 << 8;
+        data[z][x].ui64 += data[z][x].ui64 << 16;
+        data[z][x].ui64 += data[z][x].ui64 << 32;
+    }
+}
+```
+
+`vpsllq imm8` is fully supported in AVX2 (1-cycle throughput, 1-cycle latency).  Per-byte
+maximum after this pass: 64 (8 z-values × 8 y-values); still fits in `uint8_t`.  No
+inter-byte carry corruption since bytes evolve independently under byte-parallel arithmetic.
+
+After this pass: `data[z][x].ui8[y]` = **2D rectangle inclusive sum** =
+Σ_{y'≤y, z'≤z} bit(x, y', z').
+
+### 13d. Assembly Quality (GCC 13.3, -O3 -march=core-avx2)
+
+The compiler fully unrolls both passes and keeps all intermediate values register-resident.
+The z-pass processes `data[z][:]` two YMM registers at a time (x=0..3 and x=4..7), with
+one spill (z=7, x=0..3 half) due to requiring all 16 YMM registers simultaneously.  The
+y-pass operates directly on the register-resident z-pass results without reloading from
+memory.  The only missed optimization is 16 dead stores from the z-pass that are immediately
+overwritten by the y-pass.  Overall this is essentially what hand-written intrinsics would
+produce.
+
+### 13e. 2D Rectangle vs Linear Prefix (Correctness Finding)
+
+**Key finding from `simd_test/within_word_prefix_test.cpp`**: the z+y algorithm computes a
+**2D rectangle sum**, not the linear prefix sum that `getValue()` uses.
+
+`getValue()` for `ValueOnIndex` computes: `countOn(w & ((1ULL << (y*8+z)) - 1))` = exclusive
+count of set bits at positions 0..y\*8+z−1 within word x.  This is a **linear** prefix (a
+staircase: all bits in rows 0..y−1 plus bits in row y up to column z).
+
+The 2D rectangle sum Σ_{y'≤y, z'≤z} bit(x,y',z') counts only up to column z in every
+preceding row, missing the "row tails" for y' < y.  Test result on 1000 random masks:
+2D rectangle matches its own reference at 100% (512000/512000); linear inclusive match is
+only ~26% (132806/512000), confirming the discrepancy.
+
+First mismatch example: at (x=0, y=1, z=0), 2D rect = 2 (bits at y=0,z=0 and y=1,z=0),
+linear inclusive = 7 (all 7 bits at positions 0..8 in the word).
+
+### 13f. Rectangle→Linear Fixup
+
+The linear inclusive prefix at (x, y, z) can be recovered from the 2D rectangle data as:
+
+```
+linear_incl(x, y, z) = data[7][x].ui8[y-1]      // all complete rows 0..y-1 (z'=0..7)
+                      + data[z][x].ui8[y]          // current row y, columns 0..z
+                      - data[z][x].ui8[y-1]        // subtract over-counted rectangle below
+```
+
+This simplifies to adding a y-dependent correction, expressible as a byte-parallel operation:
+
+```cpp
+for (int z = 0; z < 8; z++) {
+    #pragma omp simd
+    for (int x = 0; x < 8; x++)
+        data[z][x].ui64 += (data[7][x].ui64 - data[z][x].ui64) >> 8;
+}
+```
+
+`data[7][x].ui64` (available in registers after the y-pass) gives the full per-row popcounts
+packed in bytes; the byte-shift-right-by-8 shifts row y−1's value into row y's byte lane.
+This fixup is cheap — one subtract and one shift per (z, x) pair, all in-place in the
+byte-packed representation.
+
+### 13g. Cross-Word Offsets (mPrefixSum)
+
+`LeafIndexBase::mPrefixSum` stores 7 nine-bit cumulative popcounts (the exclusive prefix
+scan at word boundaries):
+
+- bits 0–8:   Σ_{j=0}^{0} countOn(words[j])  = exclusive prefix at x=1
+- bits 9–17:  Σ_{j=0}^{1} countOn(words[j])  = exclusive prefix at x=2
+- ...
+- bits 54–62: Σ_{j=0}^{6} countOn(words[j])  = exclusive prefix at x=7
+
+These are available for free and must be added to `data[z][x].ui8[y]` to obtain the full
+global sequential index.  However, these offsets require up to 9 bits (max value = 512),
+which exceeds `uint8_t`.  Two approaches for incorporating them:
+
+**Approach #1 — Pack offsets into a uint64 byte lane and vpaddq directly.**  This fails for
+any leaf where the cross-word cumulative count exceeds 255 (i.e., more than ~255 active
+voxels in the preceding words — reachable for moderately dense leaves by the 4th word).
+Only viable for very sparse leaves.
+
+**Approach #2 — Transpose to uint16_t prefixSums[8][8][8].**  Unpack the byte-packed
+`data[z][x].ui8[y]` into `uint16_t prefixSums[x][y][z]` (indexed [x][y][z] = linear order),
+then add the 9-bit cross-word offsets in the wider format.  Widening is safe; all values fit
+in uint16_t (max = 512).  The cost is a 3D index-permutation transpose
+`(z,x,y) → (x,y,z)` on 64 bytes → 128 bytes.
+
+### 13h. Transposition Cost and Alternatives
+
+The output transpose (approach #2) is expensive in isolation: no loop ordering gives a
+unit-stride inner loop for both source and destination simultaneously, so GCC cannot
+auto-vectorize it.  With explicit AVX2 intrinsics (8×8 byte matrix transpose per x-slice,
+8 slices) the cost is ~200 instructions; even scalar it is ~512 operations on L1-resident
+data (~400–800 cycles), dominating the ~14-cycle z+y passes.
+
+**Bit-transpose alternative**: pre-transpose the 8 input uint64_t words (64 bytes) instead
+of post-transposing 512 uint16_t values (1024 bytes).  The specific transposition that makes
+the algorithm output naturally land in `[x][y][z]` memory order is: organize input as
+`inputWords[y]` with bit `z*8+x` = B[x][y][z] (making y the word index, z the byte index,
+and x the step variable).  Transposing 64 bytes is intrinsically cheaper than transposing
+1024 bytes, and the 8×8 bit-matrix transpose per y-slice is a well-studied ~10–15 instruction
+operation.
+
+**Key tradeoff — good output order ↔ simple rectangle→linear fixup:**
+
+With the original layout (word=x, byte=y, step=z), the 2D rectangle is over (y, z) for fixed
+x, and the rectangle→linear fixup collapses to the single byte-shift expression in §13f.
+
+With the bit-transposed layout (word=y, byte=z, step=x), the 2D rectangle is over (x, z) for
+fixed y, and the "missing" terms for the linear prefix involve cross-word contributions from
+all y-slices of preceding words — a significantly more complex expression that does not reduce
+to a simple in-register byte operation.
+
+No 3D transposition of the input eliminates both costs simultaneously.  The original layout
+remains preferred for the simplicity of the fixup; the output transpose cost must be addressed
+separately (either by tolerating it, using explicit intrinsics, or changing the consumer's
+expected layout).
