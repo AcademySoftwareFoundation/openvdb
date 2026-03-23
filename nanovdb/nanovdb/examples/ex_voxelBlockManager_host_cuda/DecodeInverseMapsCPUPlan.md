@@ -638,3 +638,174 @@ No 3D transposition of the input eliminates both costs simultaneously.  The orig
 remains preferred for the simplicity of the fixup; the output transpose cost must be addressed
 separately (either by tolerating it, using explicit intrinsics, or changing the consumer's
 expected layout).
+
+---
+
+## 14. Input Bit-Transpose: Decomposition and Implementation
+
+Although §13h concluded that the original layout (word=x) is preferred for fixup simplicity,
+the input bit-transpose approach was further analysed for completeness and because the output
+transpose cost remains a concern.  This section records the decomposition and implementation
+decisions made during that analysis.
+
+### 14a. Target: y→z→x Layout
+
+To make the algorithm's output land naturally in `[x][y][z]` memory order (= NanoVDB linear
+index order), the input words must be pre-arranged so that:
+
+```
+inputWords[y]  bit (z*8 + x)  =  B[x][y][z]
+```
+
+i.e. word index = y (0..7), within-word byte index = z (0..7), within-byte bit index = x
+(0..7).  With this layout the algorithm's step variable becomes x, and
+`data[x][y].ui8[z]` maps to voxel `(x, y, z)` — the standard linear-index order.
+
+This input transposition from the original NanoVDB layout (word=x, byte=y, bit=z) to the
+target (word=y, byte=z, bit=x) is a 3-axis permutation of an 8×8×8 bit cube.  It
+decomposes into two independent transformations:
+
+1. **Step 1 — 8×8 byte-matrix transpose**: given `maskWords[x]` where byte y = B[x][y][:],
+   produce `tempWords[y]` where byte x = B[x][y][:].  (Only the byte-level arrangement
+   changes; bit ordering within each byte is unchanged.)
+
+2. **Step 2 — 8×8 bit-matrix transpose within each uint64**: given `tempWords[y]` where
+   byte x bit z = B[x][y][z], produce `inputWords[y]` where byte z bit x = B[x][y][z].
+   (The byte→bit and bit→byte roles are swapped within each word.)
+
+### 14b. Step 2 — Bit-Matrix Transpose (Knuth 3-Round)
+
+This step is a standard 8×8 bit-matrix transpose applied independently to each of the 8
+uint64 words.  The Knuth bit-interleaving algorithm uses three rounds of XOR/shift/AND:
+
+```cpp
+static inline uint64_t transpose8x8bits(uint64_t x)
+{
+    // Round 1: swap 1×1 blocks at stride 1 within 2×2 tiles
+    uint64_t t = (x ^ (x >> 7)) & 0x00aa00aa00aa00aaULL;
+    x ^= t ^ (t << 7);
+    // Round 2: swap 2×2 blocks at stride 2 within 4×4 tiles
+    t  = (x ^ (x >> 14)) & 0x0000cccc0000ccccULL;
+    x ^= t ^ (t << 14);
+    // Round 3: swap 4×4 blocks at stride 4 within 8×8 tiles
+    t  = (x ^ (x >> 28)) & 0x00000000f0f0f0f0ULL;
+    x ^= t ^ (t << 28);
+    return x;
+}
+```
+
+**Portability**: pure C++17, no intrinsics, no builtins.  Under `#pragma omp simd` on 8 words
+GCC emits ~36 scalar-width SIMD instructions (`vpsrlq`, `vpxor`, `vpand`, `vpsllq`) — fully
+auto-vectorized.  The 8 words are independent so there is no cross-element dependency.
+
+### 14c. Step 1 — Byte-Matrix Transpose (`__builtin_shufflevector`)
+
+The 8×8 byte-matrix transpose is a gather pattern: `tempWords[y]` byte x = byte y of
+`maskWords[x]`.  Compilers cannot auto-vectorize arbitrary gather patterns, so explicit
+shuffle operations are required for SIMD throughput.
+
+On Clang, `__builtin_shufflevector` on `uint8_t __attribute__((vector_size(16)))` vectors
+maps directly to architecture-appropriate byte-shuffle instructions (`vpunpcklbw`/`vpunpckhbw`
+on x86, `vzip`/`vuzp` on ARM).  On GCC, the equivalent is `__builtin_shuffle` with an integer
+mask vector.  Both builtins are already in the spirit of NanoVDB's existing use of
+`__builtin_popcountll`, `__builtin_ctzl`, etc. in `nanovdb/util/Util.h`.
+
+The scalar fallback (64 independent byte moves) is branch-free and operates entirely on
+L1-resident data — fast even without SIMD.
+
+Implementation with a scalar fallback and `NANOVDB_USE_INTRINSICS` guard (Clang path shown):
+
+```cpp
+using u8x16 = uint8_t __attribute__((vector_size(16)));
+
+static void byteTranspose8x8(const uint64_t src[8], uint64_t dst[8])
+{
+#if defined(__clang__) && defined(NANOVDB_USE_INTRINSICS)
+    // Load 8 words as four 16-byte vectors (two words each)
+    u8x16 v01, v23, v45, v67;
+    __builtin_memcpy(&v01, src+0, 16);  __builtin_memcpy(&v23, src+2, 16);
+    __builtin_memcpy(&v45, src+4, 16);  __builtin_memcpy(&v67, src+6, 16);
+
+    // Round 1: interleave bytes within each pair (vpunpcklbw / vpunpckhbw)
+    u8x16 t01 = __builtin_shufflevector(v01,v01, 0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15);
+    u8x16 t23 = __builtin_shufflevector(v23,v23, 0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15);
+    u8x16 t45 = __builtin_shufflevector(v45,v45, 0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15);
+    u8x16 t67 = __builtin_shufflevector(v67,v67, 0,8,1,9,2,10,3,11,4,12,5,13,6,14,7,15);
+
+    // Round 2: gather 2-byte groups across pairs (vpunpcklwd / vpunpckhwd)
+    u8x16 q02lo = __builtin_shufflevector(t01,t23, 0,1,16,17, 2,3,18,19, 4,5,20,21, 6,7,22,23);
+    u8x16 q02hi = __builtin_shufflevector(t01,t23, 8,9,24,25,10,11,26,27,12,13,28,29,14,15,30,31);
+    u8x16 q46lo = __builtin_shufflevector(t45,t67, 0,1,16,17, 2,3,18,19, 4,5,20,21, 6,7,22,23);
+    u8x16 q46hi = __builtin_shufflevector(t45,t67, 8,9,24,25,10,11,26,27,12,13,28,29,14,15,30,31);
+
+    // Round 3: gather 4-byte groups across quad-pairs (vpunpckldq / vpunpckhdq)
+    u8x16 r01 = __builtin_shufflevector(q02lo,q46lo, 0,1,2,3,16,17,18,19, 4,5,6,7,20,21,22,23);
+    u8x16 r23 = __builtin_shufflevector(q02lo,q46lo, 8,9,10,11,24,25,26,27,12,13,14,15,28,29,30,31);
+    u8x16 r45 = __builtin_shufflevector(q02hi,q46hi, 0,1,2,3,16,17,18,19, 4,5,6,7,20,21,22,23);
+    u8x16 r67 = __builtin_shufflevector(q02hi,q46hi, 8,9,10,11,24,25,26,27,12,13,14,15,28,29,30,31);
+
+    __builtin_memcpy(dst+0,&r01,16); __builtin_memcpy(dst+2,&r23,16);
+    __builtin_memcpy(dst+4,&r45,16); __builtin_memcpy(dst+6,&r67,16);
+#else
+    // Scalar fallback: 64 independent byte moves, L1-resident
+    const uint8_t* s = reinterpret_cast<const uint8_t*>(src);
+    uint8_t*       d = reinterpret_cast<uint8_t*>(dst);
+    for (int i = 0; i < 8; i++)
+        for (int j = 0; j < 8; j++)
+            d[i*8+j] = s[j*8+i];
+#endif
+}
+```
+
+**GCC path**: replace `__builtin_shufflevector(a, b, ...)` with
+`__builtin_shuffle((u8x16)(a), (u8x16)(b), (u8x16){...})` using the same index patterns.
+
+**AVX-512 note**: `__builtin_shufflevector` on 16-byte vectors emits fixed-width 128-bit
+instructions.  Unlike `#pragma omp simd` loops (which the compiler may promote to 256- or
+512-bit), explicit `__builtin_shufflevector` calls on `vector_size(16)` remain 128-bit even
+when targeting AVX-512.  For AVX-512 width, 32-byte (`vector_size(32)`) vectors would be
+needed, processing two 8-word groups per instruction.
+
+### 14d. Full Pipeline
+
+With the input bit-transpose in place, the complete algorithm for a single leaf becomes:
+
+```
+1. byteTranspose8x8(maskWords, tempWords)       // Step 1: byte-matrix transpose
+2. for y in 0..7: inputWords[y] = transpose8x8bits(tempWords[y])  // Step 2: bit-matrix transpose
+3. computeZYPrefix(inputWords, data)             // Z-pass + Y-pass (§13b/13c, step variable = x)
+4. Rectangle→linear fixup (§13f formula, over (x,z) plane for fixed y — complexity TBD)
+5. Zero-extend data[x][y].ui8[z] → uint16_t prefixSums[x*64 + y*8 + z]  (vpmovzxbw, unit-stride)
+6. Add mPrefixSum cross-word offsets            // 8 groups × 64 uint16_t additions, auto-vectorizable
+```
+
+**Step 5 (zero-extension)**: with output naturally in `[x][y][z]` order, the zero-extension
+from packed uint8_t to uint16_t is a unit-stride `vpmovzxbw` over 64 contiguous bytes — no
+reordering, trivially auto-vectorizable.
+
+**Step 6 (cross-word offsets)**: add a constant (from `mPrefixSum`, up to 9 bits) to each of
+the 8 groups of 64 uint16_t values — 8 broadcast-and-add SIMD operations, trivially
+auto-vectorizable.
+
+### 14e. Open Question: Fixup Formula with y→z→x Layout
+
+The rectangle→linear fixup (step 4) is well-understood for the original layout (§13f):
+with step variable = z, the 2D rectangle is over (y, z), and the correction is a simple
+byte-shift within the same word.
+
+With the y→z→x layout and step variable = x, the 2D rectangle is over (x, z) within each
+y-row.  The "missing" contribution for the linear prefix consists of the complete earlier
+y-rows (y' < y) at all z values — contributions that live in *different words* of `data`.
+Whether this can be expressed as a comparably cheap byte-parallel operation on the register-
+resident `data` array is pending analysis.
+
+### 14f. Cost Summary
+
+| Step | Cost (approx) | Portability |
+|------|--------------|-------------|
+| Step 1 (byte transpose) | ~12 shuffles (SIMD) / 64 moves (scalar) | `__builtin_shufflevector` (Clang) or `__builtin_shuffle` (GCC); scalar fallback |
+| Step 2 (bit transpose)  | ~36 SIMD ops (`#pragma omp simd`) | Pure C++17; auto-vectorized |
+| Z-pass + Y-pass          | ~14 cycles / ~56 SIMD ops | Pure C++17; auto-vectorized |
+| Fixup                    | TBD (§14e) | TBD |
+| Zero-extension           | ~4 `vpmovzxbw` | Auto-vectorized |
+| Cross-word offsets       | ~8 broadcast+add | Auto-vectorized |
