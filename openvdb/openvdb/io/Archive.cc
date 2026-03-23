@@ -959,15 +959,15 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const BBoxd& world
 
 void
 Archive::write(std::ostream& os, const GridPtrVec& grids, bool seekable,
-    const MetaMap& metadata) const
+    const MetaMap& metadata, const io::WriteOptions& writeOptions) const
 {
-    this->write(os, GridCPtrVec(grids.begin(), grids.end()), seekable, metadata);
+    this->write(os, GridCPtrVec(grids.begin(), grids.end()), seekable, metadata, writeOptions);
 }
 
 
 void
 Archive::write(std::ostream& os, const GridCPtrVec& grids, bool seekable,
-    const MetaMap& metadata) const
+    const MetaMap& metadata, const io::WriteOptions& writeOptions) const
 {
     // Set stream flags so that downstream functions can reference them.
     io::StreamMetadata::Ptr streamMetadata = io::getStreamMetadataPtr(os);
@@ -1039,7 +1039,7 @@ Archive::write(std::ostream& os, const GridCPtrVec& grids, bool seekable,
                 // Get the name of the other grid.
                 gd.setInstanceParentName(mapIter->second.uniqueName());
                 // Write out this grid's descriptor and metadata, but not its tree.
-                writeGridInstance(gd, grid, os, seekable);
+                writeGridInstance(gd, grid, os, seekable, writeOptions);
 
                 OPENVDB_LOG_DEBUG_RUNTIME("io::Archive::write(): "
                     << GridDescriptor::nameAsString(gd.uniqueName())
@@ -1048,7 +1048,7 @@ Archive::write(std::ostream& os, const GridCPtrVec& grids, bool seekable,
                     << GridDescriptor::nameAsString(gd.instanceParentName()));
             } else {
                 // Write out the grid descriptor and its associated grid.
-                writeGrid(gd, grid, os, seekable);
+                writeGrid(gd, grid, os, seekable, writeOptions);
                 // Record the grid's tree pointer so that the tree doesn't get written
                 // more than once.
                 treeMap[treePtr] = gd;
@@ -1064,7 +1064,7 @@ Archive::write(std::ostream& os, const GridCPtrVec& grids, bool seekable,
 
 void
 Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
-    std::ostream& os, bool seekable) const
+    std::ostream& os, bool seekable, const io::WriteOptions& writeOptions) const
 {
     // Restore file-level stream metadata on exit.
     struct OnExit {
@@ -1143,7 +1143,7 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
 
 void
 Archive::writeGridInstance(GridDescriptor& gd, GridBase::ConstPtr grid,
-    std::ostream& os, bool seekable) const
+    std::ostream& os, bool seekable, const io::WriteOptions& writeOptions) const
 {
     // Write out the Descriptor's header information (grid name, type
     // and instance parent name).

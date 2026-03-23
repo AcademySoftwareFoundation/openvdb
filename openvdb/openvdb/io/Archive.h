@@ -5,11 +5,14 @@
 #define OPENVDB_IO_ARCHIVE_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
-#include "Compression.h" // for COMPRESS_ZIP, etc.
 #include <openvdb/Grid.h>
 #include <openvdb/MetaMap.h>
 #include <openvdb/Platform.h>
 #include <openvdb/version.h> // for VersionId
+
+#include "Codec.h"
+#include "Compression.h" // for COMPRESS_ZIP, etc.
+
 #include <cstdint>
 #include <iosfwd>
 #include <map>
@@ -89,7 +92,8 @@ public:
     void setGridStatsMetadataEnabled(bool b) { mEnableGridStats = b; }
 
     /// @brief Write the grids in the given container to this archive's output stream.
-    virtual void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const {}
+    virtual void write(const GridCPtrVec&, const MetaMap& = MetaMap(),
+        const io::WriteOptions& = io::WriteOptions{}) const {}
 
     /// @brief Return @c false (delayed loading has been removed).
     static bool isDelayedLoadingEnabled() { return false; }
@@ -141,13 +145,14 @@ protected:
     /// Write the given grid descriptor and grid to an output stream
     /// and update the GridDescriptor offsets.
     /// @param seekable  if true, the output stream supports seek operations
-    void writeGrid(GridDescriptor&, GridBase::ConstPtr, std::ostream&, bool seekable) const;
+    void writeGrid(GridDescriptor&, GridBase::ConstPtr, std::ostream&, bool seekable,
+        const io::WriteOptions& writeOptions = io::WriteOptions{}) const;
     /// Write the given grid descriptor and grid metadata to an output stream
     /// and update the GridDescriptor offsets, but don't write the grid's tree,
     /// since it is shared with another grid.
     /// @param seekable  if true, the output stream supports seek operations
     void writeGridInstance(GridDescriptor&, GridBase::ConstPtr,
-        std::ostream&, bool seekable) const;
+        std::ostream&, bool seekable, const io::WriteOptions& writeOptions = io::WriteOptions{}) const;
 
     /// @brief Read the magic number, version numbers, UUID, etc. from the given input stream.
     /// @return @c true if the input UUID differs from the previously-read UUID.
@@ -159,8 +164,10 @@ protected:
 
     //@{
     /// Write the given grids to an output stream.
-    void write(std::ostream&, const GridPtrVec&, bool seekable, const MetaMap& = MetaMap()) const;
-    void write(std::ostream&, const GridCPtrVec&, bool seekable, const MetaMap& = MetaMap()) const;
+    void write(std::ostream&, const GridPtrVec&, bool seekable, const MetaMap&,
+        const io::WriteOptions& writeOptions = io::WriteOptions{}) const;
+    void write(std::ostream&, const GridCPtrVec&, bool seekable, const MetaMap&,
+        const io::WriteOptions& writeOptions = io::WriteOptions{}) const;
     //@}
 
 private:

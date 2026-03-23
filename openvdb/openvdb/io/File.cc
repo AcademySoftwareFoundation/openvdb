@@ -498,7 +498,7 @@ File::readGrid(const Name& name, const BBoxd& bbox)
 
 
 void
-File::writeGrids(const GridCPtrVec& grids, const MetaMap& meta) const
+File::writeGrids(const GridCPtrVec& grids, const MetaMap& meta, const io::WriteOptions& writeOptions) const
 {
     if (mIsOpen) {
         OPENVDB_THROW(IoError,
@@ -515,7 +515,7 @@ File::writeGrids(const GridCPtrVec& grids, const MetaMap& meta) const
     }
 
     // Write out the vdb.
-    Archive::write(file, grids, /*seekable=*/true, meta);
+    Archive::write(file, grids, /*seekable=*/true, meta, writeOptions);
 
     file.close();
 }
