@@ -8,9 +8,9 @@
 //   2D rectangle [0..y][0..z] within word x.
 //
 //   Step 1 (indicator fill):
-//     data[0][x].ui64 = maskWords[x] & kSpread    (z=0: bit at position y*8+0)
-//   Step 2 (z-pass, running sum over z):
-//     data[z][x].ui64 = data[z-1][x].ui64 + ((maskWords[x] >> z) & kSpread)
+//     data[z][x].ui64 = (maskWords[x] >> z) & kSpread    (bit(x, y, z) into byte y)
+//   Step 2 (z-pass, inclusive prefix sum over z):
+//     data[z][x].ui64 += data[z-1][x].ui64
 //   Step 3 (y-pass, Hillis-Steele shift-and-add within each uint64):
 //     data[z][x].ui64 += data[z][x].ui64 << 8
 //     data[z][x].ui64 += data[z][x].ui64 << 16
@@ -69,17 +69,21 @@ static inline uint64_t countOn64(uint64_t x)
 __attribute__((noinline))
 static void computeZYPrefix(const uint64_t maskWords[8], qword data[8][8])
 {
-    // Step 1+2: z-pass — for each z, accumulate indicator bits over z'=0..z.
-    // data[z][x].ui8[y] after this step = Σ_{z'=0..z} bit(x, y, z')
-    //   = count of active voxels in column (x, y, z'=0..z).
-    #pragma omp simd
-    for (int x = 0; x < 8; x++)
-        data[0][x].ui64 = maskWords[x] & kSpread;
+    // Step 1: indicator fill — data[z][x].ui8[y] = bit(x, y, z) ∈ {0, 1}.
+    // Extracts bit z from each byte of maskWords[x] via kSpread isolation.
+    for (int z = 0; z < 8; z++) {
+        #pragma omp simd
+        for (int x = 0; x < 8; x++)
+            data[z][x].ui64 = (maskWords[x] >> z) & kSpread;
+    }
 
+    // Step 2: z-pass — inclusive prefix sum over z for each (x, y).
+    // data[z][x].ui8[y] after this step = Σ_{z'=0..z} bit(x, y, z')
+    //   = count of active voxels in z-column (x, y) up to depth z.
     for (int z = 1; z < 8; z++) {
         #pragma omp simd
         for (int x = 0; x < 8; x++)
-            data[z][x].ui64 = data[z-1][x].ui64 + ((maskWords[x] >> z) & kSpread);
+            data[z][x].ui64 += data[z-1][x].ui64;
     }
 
     // Step 3: y-pass — Hillis-Steele prefix scan within each uint64.

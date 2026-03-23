@@ -856,3 +856,101 @@ resident `data` array is pending analysis.
 
 5. **End-to-end correctness test** — integrate all steps and verify against the
    reference `getValue()` loop for random `Mask<3>` inputs.
+
+---
+
+## 16. Plan #1 — x-major Layout (`data[x][y].ui8[z]`)
+
+An alternative to the original `data[z][x]` algorithm (§13) that keeps the
+native x-y-z mask-word ordering, requires no input bit-transpose, and produces
+the linear inclusive prefix sum **directly** (no rectangle→linear fixup).
+
+### 16a. Layout
+
+```cpp
+union qword { uint64_t ui64; uint8_t ui8[8]; };
+qword data[8][8];  // data[x][y].ui8[z]  ↔  voxel (x, y, z)
+```
+
+- `x` (0..7): word index — outer array dimension, slow index
+- `y` (0..7): byte-within-word — inner array dimension
+- `z` (0..7): bit-within-byte — **byte index** within the uint64
+
+For fixed `x`: `data[x][0..7]` is 64 contiguous bytes (one cache line), enabling
+`#pragma omp simd` over `y`. The byte index `z` lives *inside* each uint64, so
+the Hillis-Steele within-uint64 scan naturally operates along `z`.
+
+### 16b. Algorithm
+
+```
+Step 1 — Indicator fill (scalar triple loop; optimise later):
+  data[x][y].ui8[z] = (maskWords[x] >> (y*8 + z)) & 1  =  I[x][y][z]
+
+Step 2 — Z-pass: Hillis-Steele inclusive prefix sum over z within each uint64.
+  for x in 0..7:
+      for y in 0..7:   ← simd-vectorisable (contiguous, no dep between y)
+          data[x][y].ui64 += data[x][y].ui64 << 8
+          data[x][y].ui64 += data[x][y].ui64 << 16
+          data[x][y].ui64 += data[x][y].ui64 << 32
+  After: data[x][y].ui8[z] = Σ_{z'=0..z} I[x][y][z']
+  Bonus: data[x][y].ui8[7] = full row y popcount (free).
+
+Step 3 — Y-pass: exclusive row-prefix scan + broadcast.
+  3a. Extract row popcounts:
+      shifts[x][y].ui64 = data[x][y].ui64 >> 56   (byte 0 = row popcount, rest = 0)
+
+  3b. Exclusive y-prefix scan of shifts:
+      rowOffset[x][0] = 0
+      rowOffset[x][y] = rowOffset[x][y-1] + shifts[x][y-1]   for y = 1..7
+      Sequential over y (loop-carried); independent over x — with a transposed
+      [y][x] layout the inner x-loop is unit-stride and AVX2/AVX-512-vectorisable.
+
+  3c+3d. Broadcast byte 0 to all 8 bytes and add:
+      data[x][y].ui64 += rowOffset[x][y].ui64 * kSpread
+  After: data[x][y].ui8[z] = Σ_{y'<y} Σ_{z'=0..7} I[x][y'][z'] + Σ_{z'=0..z} I[x][y][z']
+                            = linear inclusive prefix within word x.
+
+Step 4 — Zero-extend to uint16_t (values ≤ 64; already in linear index order):
+      prefixSum[x*64 + y*8 + z] = data[x][y].ui8[z]
+  Vectorisable as vpmovzxbw over 64 contiguous bytes per x-slice.
+
+Step 5 — Add cross-slice offsets from mPrefixSum:
+      xOffset[0] = 0
+      xOffset[x] = (mPrefixSum >> 9*(x-1)) & 0x1FF   for x = 1..7
+      prefixSum[x*64 .. x*64+63] += xOffset[x]        (broadcast + vpaddw, 4 AVX2 ops/slice)
+  After: prefixSum[i] = full linear inclusive prefix count within the leaf at voxel i.
+```
+
+### 16c. Why No Rectangle→Linear Fixup
+
+In the original `data[z][x]` algorithm (§13), the Y-pass accumulates a 2D
+rectangle sum and then a separate fixup step (§13f) corrects it to a linear sum.
+In Plan #1, the Y-pass adds **complete row popcounts** (`data[x][y].ui8[7]` from
+the Z-pass) as a scalar broadcast.  The scalar added to row `y` is exactly
+`Σ_{y'<y} rowpopcount[x][y']` — the full contribution of all preceding rows.
+This lands directly on the linear staircase with no further correction.
+
+### 16d. Inclusive vs Exclusive
+
+The algorithm produces the **linear inclusive** prefix (counts the active bit at
+position `i` itself).  To match `LeafData<ValueOnIndex>::getValue() - mOffset`
+(exclusive), subtract the active bit:
+
+```cpp
+prefixSum[x*64 + y*8 + z] -= (maskWords[x] >> (y*8+z)) & 1u;
+```
+
+For the `decodeInverseMaps` use case (building `leafLocalOffsets[]`) the inclusive
+form is equally usable; the choice depends on the consumer's convention.
+
+### 16e. Reference and Correctness
+
+```cpp
+// Linear inclusive prefix at (x, y, z):
+// Safe mask form: (2ULL << bitPos) - 1u  covers bits 0..bitPos.
+// At bitPos=63: unsigned wrap gives 0xFFFFFFFFFFFFFFFF. ✓
+uint16_t ref = xOffset[x] + countOn64(maskWords[x] & ((2ULL << (y*8+z)) - 1u));
+```
+
+Verified in `simd_test/plan1_prefix_test.cpp`: 512000/512000 positions correct
+across 1000 random `Mask<3>`-equivalent inputs.
