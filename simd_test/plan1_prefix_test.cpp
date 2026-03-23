@@ -46,6 +46,34 @@
 union qword { uint64_t ui64; uint8_t ui8[8]; };
 static constexpr uint64_t kSpread = UINT64_C(0x0101010101010101);
 
+// -------------------------------------------------------------------------
+// scatterLSB: scatter the 8 bits of the low byte of src into the LSB of
+// each of the 8 output bytes.
+//
+// output.ui8[z] = (src >> z) & 1   for z = 0..7
+//
+// Two-stage multiply-and-mask:
+//   Stage 1: replicate 4 bit-pairs into 16-bit lanes
+//     multiply by 2^0 + 2^14 + 2^28 + 2^42 = 0x040010004001
+//     mask with 0x0003000300030003 (bits 0-1, 16-17, 32-33, 48-49)
+//     => pairs [b1,b0], [b3,b2], [b5,b4], [b7,b6] at 16-bit boundaries
+//   Stage 2: separate each pair into individual byte lanes
+//     multiply by 129 = 1 + 2^7 (shifts each pair 7 bits)
+//     mask with kSpread (bit 0 of each byte)
+//     => bit z lands in byte z
+// -------------------------------------------------------------------------
+static inline uint64_t scatterLSB(uint64_t src)
+{
+    uint64_t x = src & 0xFFu;
+    // Stage 1: replicate into 16-bit pairs via shift-or (multiplier = 2^0+2^14+2^28+2^42;
+    // x ≤ 8 bits so shifted copies don't overlap → OR ≡ multiply).
+    // Emits vpsllq+vpor+vpand under AVX2/AVX-512 (no vpmuludq needed).
+    x = (x | (x << 14) | (x << 28) | (x << 42)) & UINT64_C(0x0003000300030003);
+    // Stage 2: separate each pair into individual byte lanes (multiplier = 2^0+2^7).
+    x = (x | (x <<  7))                          & UINT64_C(0x0101010101010101);
+    return x;
+}
+
 // Software popcount — avoids hardware popcntl defeating SIMD under -mavx2.
 static inline uint64_t countOn64(uint64_t x)
 {
@@ -67,18 +95,20 @@ static void computeLinearPrefixPlan1(
     alignas(64) qword data[8][8];
 
     // ------------------------------------------------------------------
-    // Step 1: indicator fill
+    // Step 1: indicator fill — scatterLSB replaces the scalar z-loop.
     // data[x][y].ui8[z] = bit (y*8+z) of maskWords[x] = I[x][y][z] ∈ {0,1}
     //
-    // For each word x: extract byte y, then unpack its 8 bits into 8 bytes.
-    // TODO: replace with a vectorised bit-unpack in an optimisation pass.
+    // scatterLSB(maskWords[x] >> (y*8)) extracts byte y of word x and
+    // scatters its 8 bits into the LSB of the 8 bytes of the output word.
+    // The y-loop is independent for fixed x and vectorisable via #pragma omp simd;
+    // the 8 outer x-iterations are fully independent, allowing the OOO engine
+    // to interleave multiply chains and hide multiply latency.
     // ------------------------------------------------------------------
-    for (int x = 0; x < 8; x++)
-        for (int y = 0; y < 8; y++) {
-            const uint8_t b = (uint8_t)(maskWords[x] >> (y * 8));
-            for (int z = 0; z < 8; z++)
-                data[x][y].ui8[z] = (b >> z) & 1u;
-        }
+    for (int x = 0; x < 8; x++) {
+        #pragma omp simd
+        for (int y = 0; y < 8; y++)
+            data[x][y].ui64 = scatterLSB(maskWords[x] >> (y * 8));
+    }
 
     // ------------------------------------------------------------------
     // Step 2: Z-pass — Hillis-Steele inclusive prefix sum over z.
