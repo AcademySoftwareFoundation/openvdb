@@ -809,3 +809,50 @@ resident `data` array is pending analysis.
 | Fixup                    | TBD (§14e) | TBD |
 | Zero-extension           | ~4 `vpmovzxbw` | Auto-vectorized |
 | Cross-word offsets       | ~8 broadcast+add | Auto-vectorized |
+
+---
+
+## 15. Implementation Status and Next Steps (as of 2026-03-23)
+
+### 15a. Completed
+
+- **`nanovdb/util/Transpose.h`** — `transposeBits8x8` (Knuth 3-round, pure C++17,
+  `__hostdev__`) and `transposeBytes8x8` (3-round butterfly via `__builtin_shuffle` /
+  `__builtin_shufflevector` with scalar fallback).  Both functions follow the
+  `nanovdb::util` free-function style of `Util.h`.  Correctness verified by
+  `simd_test/transpose_test.cpp` on SIMD and scalar paths.  Assembly inspected for
+  AVX2 (21 instructions) and AVX-512 (27 instructions, fixed 128-bit width).
+
+- **`simd_test/within_word_prefix_test.cpp`** — correctness test for `computeZYPrefix`
+  (z-pass + y-pass).  Confirms the algorithm produces the 2D rectangle inclusive sum
+  `data[z][x].ui8[y]` at 100% accuracy; confirms ~74% discrepancy vs linear inclusive
+  prefix (as expected).
+
+- Input bit-transpose (`transposeBytes8x8` + `transposeBytes8x8`) maps `maskWords[x]`
+  (word=x, byte=y, bit=z) → `inputWords[y]` (word=y, byte=z, bit=x), so that the
+  z-pass + y-pass output lands naturally in `data[x][y].ui8[z]` = linear `x*64+y*8+z`
+  order.
+
+### 15b. Next Steps
+
+1. **Rectangle→linear fixup (§14e)** — work out the fixup formula for the y→z→x layout.
+   With step variable = x, the 2D rectangle is over (z, x) within each y-row; the
+   "missing" contribution (complete earlier y-rows at all z) comes from different words
+   of `data` and does not reduce to the simple byte-shift of §13f.  This is the key
+   open design question before the pipeline is complete.
+
+2. **Zero-extension** — expand `data[x][y].ui8[z]` (byte-packed, 64 bytes) to
+   `uint16_t prefixSums[512]` in `x*64+y*8+z` linear order.  Already in the correct
+   memory order after the input bit-transpose; trivially auto-vectorizable via
+   `vpmovzxbw`.
+
+3. **Cross-word offset addition** — add the 9-bit cumulative `mPrefixSum` offsets
+   (one per x-group of 64 voxels) to the uint16_t array.  8 broadcast-and-add
+   operations; trivially auto-vectorizable.
+
+4. **Inclusive→exclusive conversion** — subtract the active bit at each position
+   (`(maskWords[x] >> (y*8+z)) & 1`) to convert from inclusive to exclusive prefix,
+   matching `LeafData<ValueOnIndex>::getValue()` semantics.
+
+5. **End-to-end correctness test** — integrate all steps and verify against the
+   reference `getValue()` loop for random `Mask<3>` inputs.
