@@ -131,6 +131,9 @@ protected:
     /// Read in and return the number of grids on the input stream.
     static int32_t readGridCount(std::istream&);
 
+    /// @brief Find the codec for the given grid type and options.
+    static io::Codec* findCodec(const std::string& gridType, const io::ReadOptions& options = io::ReadOptions{});
+
     /// @brief Read in and create the grid represented by the given grid descriptor using the
     /// given input stream, using the provided options if given.
     static GridBase::Ptr readGrid(const GridDescriptor&, std::istream&,
