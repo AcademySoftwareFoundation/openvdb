@@ -21,6 +21,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h> // for isExactlyEqual()
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/SignedFloodFill.h>
 #include <openvdb/util/NullInterrupter.h>
 
 namespace openvdb {
@@ -610,7 +611,7 @@ typename GridT::Ptr UnionWithFillet<GridT, MaskT>::blend() {
 
 
 template<typename GridT,
-         typename MaskT = typename GridT::template ValueConverter<float>::Type>
+         typename MaskT>
 typename GridT::Ptr
 unionFillet(const GridT& lhs,
      const GridT& rhs,
