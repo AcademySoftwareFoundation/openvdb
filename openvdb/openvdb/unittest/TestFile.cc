@@ -158,7 +158,7 @@ TestFile::testWriteGrid()
     gd2.readHeader(istr);
     gd2.readStreamPos(istr);
 
-    GridBase::Ptr gd2_grid = Archive::readGrid(gd2, istr, BBoxd());
+    GridBase::Ptr gd2_grid = Archive::readGrid(gd2, istr);
 
     // Delay load metadata should not exist.
     ASSERT_FALSE(bool((*gd2_grid)["file_delayed_load"]));
@@ -244,7 +244,7 @@ TestFile::testWriteMultipleGrids()
     gd_in.readHeader(istr);
     gd_in.readStreamPos(istr);
 
-    GridBase::Ptr gd_in_grid = Archive::readGrid(gd_in, istr, BBoxd());
+    GridBase::Ptr gd_in_grid = Archive::readGrid(gd_in, istr);
 
     // Ensure read in the right values.
     EXPECT_EQ(gd.gridName(), gd_in.gridName());
@@ -281,7 +281,7 @@ TestFile::testWriteMultipleGrids()
     GridDescriptor gd2_in;
     gd2_in.readHeader(istr);
     gd2_in.readStreamPos(istr);
-    GridBase::Ptr gd2_in_grid = Archive::readGrid(gd2_in, istr, BBoxd());
+    GridBase::Ptr gd2_in_grid = Archive::readGrid(gd2_in, istr);
 
     // Ensure that we read in the right values.
     EXPECT_EQ(gd2.gridName(), gd2_in.gridName());
@@ -887,7 +887,7 @@ TestFile::testEmptyGridIO()
     EXPECT_TRUE(it != file2.mGridDescriptors.end());
     GridDescriptor file2gd = it->second;
     file2gd.seekToGrid(istr);
-    GridBase::Ptr gd_grid = Archive::readGrid(file2gd, istr, BBoxd());
+    GridBase::Ptr gd_grid = Archive::readGrid(file2gd, istr);
     EXPECT_EQ(gd.gridName(), file2gd.gridName());
     EXPECT_TRUE(gd_grid.get() != nullptr);
     EXPECT_EQ(0, int(gd_grid->baseTree().leafCount()));
@@ -901,7 +901,7 @@ TestFile::testEmptyGridIO()
     EXPECT_TRUE(it != file2.mGridDescriptors.end());
     file2gd = it->second;
     file2gd.seekToGrid(istr);
-    gd_grid = Archive::readGrid(file2gd, istr, BBoxd());
+    gd_grid = Archive::readGrid(file2gd, istr);
     EXPECT_EQ(gd2.gridName(), file2gd.gridName());
     EXPECT_TRUE(gd_grid.get() != nullptr);
     EXPECT_EQ(0, int(gd_grid->baseTree().leafCount()));
