@@ -887,7 +887,7 @@ Archive::connectInstance(const GridDescriptor& gd, const NamedGridMap& grids) co
 
 
 GridBase::Ptr
-Archive::readGrid(const GridDescriptor& gd, std::istream& is, const BBoxd& worldBBox, bool partial/* = false*/)
+Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOptions& readOptions)
 {
     // Read the compression settings for this grid and tag the stream with them
     // so that downstream functions can reference them.
@@ -939,8 +939,9 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const BBoxd& world
     io::setGridClass(is, gridClass);
 
     grid->readTransform(is);
-    if (!partial && !gd.isInstance()) {
+    if (readOptions.readMode != io::ReadMode::TopologyOnly && !gd.isInstance()) {
         grid->readTopology(is);
+        const auto& worldBBox = readOptions.clipBBox;
         const bool clip = worldBBox.isSorted();
         if (clip) {
             const auto indexBBox = grid->constTransform().worldToIndexNodeCentered(worldBBox);
@@ -1064,7 +1065,7 @@ Archive::write(std::ostream& os, const GridCPtrVec& grids, bool seekable,
 
 void
 Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
-    std::ostream& os, bool seekable, const io::WriteOptions& writeOptions) const
+    std::ostream& os, bool seekable, const io::WriteOptions&) const
 {
     // Restore file-level stream metadata on exit.
     struct OnExit {
@@ -1143,7 +1144,7 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
 
 void
 Archive::writeGridInstance(GridDescriptor& gd, GridBase::ConstPtr grid,
-    std::ostream& os, bool seekable, const io::WriteOptions& writeOptions) const
+    std::ostream& os, bool seekable, const io::WriteOptions&) const
 {
     // Write out the Descriptor's header information (grid name, type
     // and instance parent name).

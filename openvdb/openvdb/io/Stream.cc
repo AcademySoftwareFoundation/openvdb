@@ -51,7 +51,7 @@ Stream::Stream(std::istream& is)
         gd.readHeader(is);
         gd.readStreamPos(is);
         descriptors.push_back(gd);
-        GridBase::Ptr grid = Archive::readGrid(gd, is, BBoxd());
+        GridBase::Ptr grid = Archive::readGrid(gd, is, io::ReadOptions{});
         mGrids->push_back(grid);
         namedGrids[gd.uniqueName()] = grid;
     }

@@ -132,9 +132,9 @@ protected:
     static int32_t readGridCount(std::istream&);
 
     /// @brief Read in and create the grid represented by the given grid descriptor using the
-    /// given input stream, but only where it intersects the given world-space bounding box.
-    /// @param partial If true, only read the metadata and transform of the grid.
-    static GridBase::Ptr readGrid(const GridDescriptor&, std::istream&, const BBoxd&, bool partial = false);
+    /// given input stream, using the provided options if given.
+    static GridBase::Ptr readGrid(const GridDescriptor&, std::istream&,
+        const io::ReadOptions& readOptions = io::ReadOptions{});
 
     using NamedGridMap = std::map<Name /*uniqueName*/, GridBase::Ptr>;
 
