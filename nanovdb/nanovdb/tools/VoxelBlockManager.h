@@ -21,6 +21,7 @@
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/HostBuffer.h>
+#include <nanovdb/util/MaskPrefixSum.h>
 
 #include <algorithm>
 #include <cstring>
@@ -194,12 +195,31 @@ struct VoxelBlockManager
         const auto& tree = grid->tree();
         for (int leafID = firstLeafIDVal; leafID <= firstLeafIDVal + nExtraLeaves; leafID++) {
             const auto& leaf = tree.template getFirstNode<0>()[leafID];
-            for (int localOffset = 0; localOffset < 512; localOffset++) {
-                const uint64_t index = leaf.data()->getValue(localOffset);
-                if (index >= blockFirstOffset && index < blockFirstOffset + BlockWidth) {
-                    const uint64_t blockOffset = index - blockFirstOffset;
-                    leafIndex[blockOffset]   = static_cast<uint32_t>(leafID);
-                    voxelOffset[blockOffset] = static_cast<uint16_t>(localOffset);
+
+            // Build the 512-entry inclusive prefix-sum table from the leaf's valueMask.
+            // offsets[i] = 1-based leaf-local rank of the active voxel at position i.
+            // The global sequential index of active voxel at leaf-local position i is:
+            //   leafFirstOffset - 1 + offsets[i]
+            // where leafFirstOffset is the 1-based index of the leaf's first active voxel.
+            uint16_t offsets[512];
+            util::buildMaskPrefixSums(leaf.valueMask(), leaf.data()->mPrefixSum, offsets);
+
+            const uint64_t  leafFirstOffset = leaf.data()->firstOffset();
+            const uint64_t* maskWords       = leaf.valueMask().words();
+
+            for (int x = 0; x < 8; x++) {
+                uint64_t w = maskWords[x];
+                while (w) {
+                    const int      bit         = static_cast<int>(util::findLowestOn(w));
+                    const int      i           = x * 64 + bit;
+                    const uint64_t globalIndex = leafFirstOffset - 1 + offsets[i];
+                    if (globalIndex >= blockFirstOffset &&
+                        globalIndex <  blockFirstOffset + BlockWidth) {
+                        const uint64_t blockOffset = globalIndex - blockFirstOffset;
+                        leafIndex[blockOffset]   = static_cast<uint32_t>(leafID);
+                        voxelOffset[blockOffset] = static_cast<uint16_t>(i);
+                    }
+                    w &= w - 1; // clear lowest set bit
                 }
             }
         }

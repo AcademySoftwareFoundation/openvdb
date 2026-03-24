@@ -115,6 +115,13 @@ nanovdb_example(NAME "ex_refine_nanovdb_cuda" OPENVDB)
 nanovdb_example(NAME "ex_coarsen_nanovdb_cuda" OPENVDB)
 
 nanovdb_example(NAME "ex_voxelBlockManager_host_cuda")
+# prefix_popcnt_bench.cpp is a standalone micro-benchmark with its own main();
+# remove it from the glob-collected sources of the main target and build it separately.
+get_target_property(_vbm_sources ex_voxelBlockManager_host_cuda SOURCES)
+list(REMOVE_ITEM _vbm_sources
+  "${CMAKE_CURRENT_SOURCE_DIR}/ex_voxelBlockManager_host_cuda/prefix_popcnt_bench.cpp")
+set_target_properties(ex_voxelBlockManager_host_cuda PROPERTIES SOURCES "${_vbm_sources}")
+
 find_package(OpenMP)
 if(OpenMP_CXX_FOUND)
   target_link_libraries(ex_voxelBlockManager_host_cuda PRIVATE OpenMP::OpenMP_CXX)
@@ -122,6 +129,14 @@ endif()
 target_compile_options(ex_voxelBlockManager_host_cuda PRIVATE
   $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler -mavx2>
   $<$<COMPILE_LANGUAGE:CXX>:-mavx2>)
+
+add_executable(prefix_popcnt_bench
+  ex_voxelBlockManager_host_cuda/prefix_popcnt_bench.cpp)
+target_link_libraries(prefix_popcnt_bench PRIVATE nanovdb)
+target_compile_options(prefix_popcnt_bench PRIVATE -mavx2)
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(prefix_popcnt_bench PRIVATE OpenMP::OpenMP_CXX)
+endif()
 
 if(CUDAToolkit_FOUND)
   nanovdb_example(NAME "ex_make_mgpu_nanovdb") # requires cuRAND
