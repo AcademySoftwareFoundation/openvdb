@@ -145,38 +145,35 @@ struct VoxelBlockManager
     static constexpr uint32_t UnusedLeafIndex   = 0xffffffff;
     static constexpr uint16_t UnusedVoxelOffset = 0xffff;
 
-    /// @brief One pass of bit-parallel compaction: branchless two-buffer conditional blend.
+    /// @brief One pass of bit-parallel compaction: branchless in-place conditional blend.
     ///
     /// For j in [0, 512-Shift):
     ///   m = 0xFFFF if (shifts[j+Shift] & Shift) != 0, else 0x0000
-    ///   dst[j] = (src[j+Shift] & m) | (src[j] & ~m)
-    /// For j in [512-Shift, 512): dst[j] = src[j]
+    ///   data[j] = (data[j+Shift] & m) | (data[j] & ~m)
     ///
     /// The predicate tests the SOURCE element's shift (bit log2(Shift) of
-    /// shifts[j+Shift]).  Separate __restrict__ src/dst buffers allow the
-    /// vectorizer to emit vpblendvb (AVX2) or masked vmovdqu16 (AVX-512).
+    /// shifts[j+Shift]).  In-place execution is correct because j < j+Shift
+    /// guarantees each source element is read before its slot is written.
+    /// __restrict__ on both parameters discharges the data/shifts aliasing
+    /// concern and allows the vectorizer to emit SIMD blend instructions.
     /// The arithmetic mask avoids conditional branches in the SIMD loop.
     ///
     /// @note __restrict__ is GCC/Clang syntax; MSVC spells it __restrict.
     ///       A NANOVDB_RESTRICT portability macro should be added before
     ///       this header is used in a MSVC build.
     ///
-    /// @param src     Source buffer (512 uint16_t, read-only this pass).
-    /// @param shifts  shifts[i] = i - exclusive_prefix[i], unchanged across passes.
-    /// @param dst     Destination buffer (512 uint16_t, write-only this pass).
+    /// @param data    Buffer (512 uint16_t), updated in-place each pass.
+    /// @param shifts  shifts[i] = exclusive 0-bit prefix at i, unchanged across passes.
     template <int Shift>
-    static void shflDownSep(const uint16_t* __restrict__ src,
-                            const uint16_t* __restrict__ shifts,
-                                  uint16_t* __restrict__ dst)
+    static void shflDown(uint16_t* __restrict__ data,
+                         const uint16_t* __restrict__ shifts)
     {
         #pragma omp simd
         for (int j = 0; j < 512 - Shift; j++) {
             const uint16_t m = static_cast<uint16_t>(
                 -static_cast<int>((shifts[j + Shift] & static_cast<uint16_t>(Shift)) != 0));
-            dst[j] = (src[j + Shift] & m) | (src[j] & ~m);
+            data[j] = (data[j + Shift] & m) | (data[j] & ~m);
         }
-        for (int j = 512 - Shift; j < 512; j++)
-            dst[j] = src[j];
     }
 
     /// @brief Decode the inverse maps for a single voxel block on the host.
@@ -237,7 +234,7 @@ struct VoxelBlockManager
             // exclusive prefix count of 0-bits over the inverted mask.  Using the 513-entry
             // exclusive layout (shifts[0]=0, buildMaskPrefixSums<true> writes inclusive
             // 0-bit counts into shifts[1..512]):
-            //   shifts[i]   = exclusive 0-bit prefix at i  (used by shflDownSep passes)
+            //   shifts[i]   = exclusive 0-bit prefix at i  (used by shflDown passes)
             //   shifts[512] = total inactive voxel count  = 512 - leafValueCount
             uint16_t shifts[513];
             shifts[0] = 0;
@@ -245,24 +242,23 @@ struct VoxelBlockManager
 
             const uint16_t leafValueCount = static_cast<uint16_t>(512u) - shifts[512];
 
-            // Build leafLocalOffsets via 9 shfl_down passes using ping-pong buffers.
-            // buf0 is initialized with the identity (buf0[i] = i).  Passes alternate
-            // source and destination so each call has fully separate __restrict__ buffers,
-            // enabling vpblendvb / masked-vmovdqu16 vectorization.  After 9 passes (odd),
-            // the result is in buf1: buf1[j] = leaf-local position of j-th active voxel.
+            // Build leafLocalOffsets via 9 in-place shfl_down passes.
+            // buf is initialized with the identity (buf[i] = i) and updated in-place
+            // each pass.  __restrict__ on both buf and shifts discharges the aliasing
+            // concern and allows the vectorizer to emit SIMD blend instructions.
             // Only shifts[0..511] are accessed by the passes; shifts[512] was used above.
-            uint16_t buf0[512], buf1[512];
-            for (int i = 0; i < 512; i++) buf0[i] = static_cast<uint16_t>(i);
-            shflDownSep<  1>(buf0, shifts, buf1);
-            shflDownSep<  2>(buf1, shifts, buf0);
-            shflDownSep<  4>(buf0, shifts, buf1);
-            shflDownSep<  8>(buf1, shifts, buf0);
-            shflDownSep< 16>(buf0, shifts, buf1);
-            shflDownSep< 32>(buf1, shifts, buf0);
-            shflDownSep< 64>(buf0, shifts, buf1);
-            shflDownSep<128>(buf1, shifts, buf0);
-            shflDownSep<256>(buf0, shifts, buf1);
-            const uint16_t *leafLocalOffsets = buf1;
+            uint16_t buf[512];
+            for (int i = 0; i < 512; i++) buf[i] = static_cast<uint16_t>(i);
+            shflDown<  1>(buf, shifts);
+            shflDown<  2>(buf, shifts);
+            shflDown<  4>(buf, shifts);
+            shflDown<  8>(buf, shifts);
+            shflDown< 16>(buf, shifts);
+            shflDown< 32>(buf, shifts);
+            shflDown< 64>(buf, shifts);
+            shflDown<128>(buf, shifts);
+            shflDown<256>(buf, shifts);
+            const uint16_t *leafLocalOffsets = buf;
 
             // Intersect this leaf's active range with the block's range.
             // Active voxels span [leafFirstOffset, leafFirstOffset+leafValueCount) globally.
