@@ -138,34 +138,31 @@ not just active ones.  This is intentional and necessary for the shfl_down path.
 
 ---
 
-## 7. decodeInverseMaps CPU — Current Implementation and Bottleneck
+## 7. decodeInverseMaps CPU — Current Implementation and Performance History
 
-**Current implementation** (`VoxelBlockManager.h`):
+**Current implementation** (`VoxelBlockManager.h`, branch `vbm-cpu-port`):
 For each leaf overlapping the block:
-1. Call `buildMaskPrefixSums(leaf.valueMask(), leaf.data()->mPrefixSum, offsets)`.
-2. Bit-scan over active voxels using `util::findLowestOn` + `w &= w-1`.
-3. For each active voxel at position i: compute `globalIndex = leafFirstOffset - 1 + offsets[i]`.
-   If in block range, scatter to `leafIndex[blockOffset]` and `voxelOffset[blockOffset]`.
+1. Build 513-entry exclusive prefix sum: `prefixSums[0]=0`, `buildMaskPrefixSums(..., prefixSums+1)`.
+2. Compute `shifts[i] = i - prefixSums[i]` for i=0..511.
+3. Run 9 shfl_down passes (Shift=1,2,4,...,256) via `shflDownSep` with ping-pong buffers.
+4. Range fill `leafIndex[pStart..pEnd)` and contiguous copy from `leafLocalOffsets`.
 
-**Replaced**: the previous O(512) `getValue()` loop per leaf, which called
-`getValue(localOffset)` for every local offset 0..511.  `getValue()` reads `mValueMask`
-and decodes `mPrefixSum` for each call — O(512 x nLeaves) memory accesses per block.
+**Performance history (2M voxels / 16384 blocks / 25% occupancy / 24 OMP threads / AVX2)**:
+- Original `getValue()` loop: ~77 ms
+- `buildMaskPrefixSums` + bit-scan scatter: ~65 ms (~15% improvement)
+- shfl_down without vectorization (in-place, -fopenmp missing in CUDA host flags): ~250 ms
+- shfl_down with proper vectorization (two-buffer __restrict__, -fopenmp fixed): ~15-20 ms
 
-**Performance (measured, 2M voxels / 16384 blocks, 24 OMP threads, AVX2)**:
-- Old `getValue()` loop: ~77 ms
-- New `buildMaskPrefixSums` + bit-scan: ~65 ms (~15% improvement)
-- Prefix-sum computation alone (sanity bench): ~25 ms
-- Bottleneck is now the **scatter phase** (~40 ms), not the prefix computation.
+**Critical finding**: `#pragma omp simd` is silently ignored for CUDA host code unless
+`-Xcompiler -fopenmp` is explicitly added.  Linking `OpenMP::OpenMP_CXX` does NOT
+automatically propagate compile flags to CUDA sources via CMake.  Without -fopenmp,
+the shfl_down passes compiled as scalar loops and were 4x slower than the bit-scan.
 
-**Why the speedup is modest**: the scatter writes `leafIndex[blockOffset]` and
-`voxelOffset[blockOffset]` use a data-dependent `blockOffset`, causing irregular
-write patterns even though the scratch arrays (128 entries) fit in L1 cache.
-The old `getValue()` bottleneck (leaf node data thrashing) is gone; the scatter
-is what remains.
-
-**OMP scaling**: the old `getValue()` approach showed zero OMP scaling (all threads
-together saturated memory bandwidth on leaf data access).  The new approach has not
-been characterized for OMP scaling yet.
+**Why shfl_down beats bit-scan with vectorization**:
+- Bit-scan is inherently scalar (data-dependent BSF/BSR instruction, variable trip count).
+- shfl_down's 9 passes are fixed-width, data-independent loops over 512 elements.
+- With AVX2 (16 uint16_t per register), each pass takes ~32 vector ops vs ~128 scalar ops
+  for the bit-scan at 25% occupancy.
 
 ---
 

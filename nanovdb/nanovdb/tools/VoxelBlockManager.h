@@ -145,6 +145,40 @@ struct VoxelBlockManager
     static constexpr uint32_t UnusedLeafIndex   = 0xffffffff;
     static constexpr uint16_t UnusedVoxelOffset = 0xffff;
 
+    /// @brief One pass of bit-parallel compaction: branchless two-buffer conditional blend.
+    ///
+    /// For j in [0, 512-Shift):
+    ///   m = 0xFFFF if (shifts[j+Shift] & Shift) != 0, else 0x0000
+    ///   dst[j] = (src[j+Shift] & m) | (src[j] & ~m)
+    /// For j in [512-Shift, 512): dst[j] = src[j]
+    ///
+    /// The predicate tests the SOURCE element's shift (bit log2(Shift) of
+    /// shifts[j+Shift]).  Separate __restrict__ src/dst buffers allow the
+    /// vectorizer to emit vpblendvb (AVX2) or masked vmovdqu16 (AVX-512).
+    /// The arithmetic mask avoids conditional branches in the SIMD loop.
+    ///
+    /// @note __restrict__ is GCC/Clang syntax; MSVC spells it __restrict.
+    ///       A NANOVDB_RESTRICT portability macro should be added before
+    ///       this header is used in a MSVC build.
+    ///
+    /// @param src     Source buffer (512 uint16_t, read-only this pass).
+    /// @param shifts  shifts[i] = i - exclusive_prefix[i], unchanged across passes.
+    /// @param dst     Destination buffer (512 uint16_t, write-only this pass).
+    template <int Shift>
+    static void shflDownSep(const uint16_t* __restrict__ src,
+                            const uint16_t* __restrict__ shifts,
+                                  uint16_t* __restrict__ dst)
+    {
+        #pragma omp simd
+        for (int j = 0; j < 512 - Shift; j++) {
+            const uint16_t m = static_cast<uint16_t>(
+                -static_cast<int>((shifts[j + Shift] & static_cast<uint16_t>(Shift)) != 0));
+            dst[j] = (src[j + Shift] & m) | (src[j] & ~m);
+        }
+        for (int j = 512 - Shift; j < 512; j++)
+            dst[j] = src[j];
+    }
+
     /// @brief Decode the inverse maps for a single voxel block on the host.
     ///
     /// Given the VBM metadata for one block (firstLeafID and the block's slice of
@@ -208,24 +242,52 @@ struct VoxelBlockManager
             prefixSums[0] = 0;
             util::buildMaskPrefixSums(leaf.valueMask(), leaf.data()->mPrefixSum, prefixSums + 1);
 
-            const uint64_t  leafFirstOffset = leaf.data()->firstOffset();
-            const uint64_t* maskWords       = leaf.valueMask().words();
+            const uint64_t leafFirstOffset = leaf.data()->firstOffset();
+            const uint16_t leafValueCount  = prefixSums[512];
 
-            for (int x = 0; x < 8; x++) {
-                uint64_t w = maskWords[x];
-                while (w) {
-                    const int      bit         = static_cast<int>(util::findLowestOn(w));
-                    const int      i           = x * 64 + bit;
-                    const uint64_t globalIndex = leafFirstOffset + prefixSums[i];
-                    if (globalIndex >= blockFirstOffset &&
-                        globalIndex <  blockFirstOffset + BlockWidth) {
-                        const uint64_t blockOffset = globalIndex - blockFirstOffset;
-                        leafIndex[blockOffset]   = static_cast<uint32_t>(leafID);
-                        voxelOffset[blockOffset] = static_cast<uint16_t>(i);
-                    }
-                    w &= w - 1; // clear lowest set bit
-                }
-            }
+            // Skip leaves with no active voxels or entirely outside this block.
+            if (leafValueCount == 0 ||
+                leafFirstOffset + leafValueCount <= blockFirstOffset ||
+                leafFirstOffset >= blockFirstOffset + BlockWidth) continue;
+
+            // Compute shifts[i] = i - prefixSums[i] = number of inactive positions in [0..i-1].
+            // shifts[i] is the total left-movement element i must undergo across all passes.
+            uint16_t shifts[512];
+            for (int i = 0; i < 512; i++)
+                shifts[i] = static_cast<uint16_t>(i) - prefixSums[i];
+
+            // Build leafLocalOffsets via 9 shfl_down passes using ping-pong buffers.
+            // buf0 is initialized with the identity (buf0[i] = i).  Passes alternate
+            // source and destination so each call has fully separate __restrict__ buffers,
+            // enabling vpblendvb / masked-vmovdqu16 vectorization.  After 9 passes (odd),
+            // the result is in buf1: buf1[j] = leaf-local position of j-th active voxel.
+            uint16_t buf0[512], buf1[512];
+            for (int i = 0; i < 512; i++) buf0[i] = static_cast<uint16_t>(i);
+            shflDownSep<  1>(buf0, shifts, buf1);
+            shflDownSep<  2>(buf1, shifts, buf0);
+            shflDownSep<  4>(buf0, shifts, buf1);
+            shflDownSep<  8>(buf1, shifts, buf0);
+            shflDownSep< 16>(buf0, shifts, buf1);
+            shflDownSep< 32>(buf1, shifts, buf0);
+            shflDownSep< 64>(buf0, shifts, buf1);
+            shflDownSep<128>(buf1, shifts, buf0);
+            shflDownSep<256>(buf0, shifts, buf1);
+            const uint16_t* leafLocalOffsets = buf1;
+
+            // Intersect this leaf's active range with the block's range.
+            // Active voxels span [leafFirstOffset, leafFirstOffset+leafValueCount) globally.
+            // Block output slots span [blockFirstOffset, blockFirstOffset+BlockWidth).
+            const uint64_t globalStart = std::max(leafFirstOffset, blockFirstOffset);
+            const uint64_t globalEnd   = std::min(leafFirstOffset + leafValueCount,
+                                                  blockFirstOffset + BlockWidth);
+            const uint64_t jStart = globalStart - leafFirstOffset;  // first dense index in leaf
+            const uint64_t pStart = globalStart - blockFirstOffset; // first output slot in block
+            const uint64_t count  = globalEnd   - globalStart;
+
+            std::fill(leafIndex   + pStart, leafIndex   + pStart + count,
+                      static_cast<uint32_t>(leafID));
+            std::copy(leafLocalOffsets + jStart, leafLocalOffsets + jStart + count,
+                      voxelOffset + pStart);
         }
     }
 }; // VoxelBlockManager

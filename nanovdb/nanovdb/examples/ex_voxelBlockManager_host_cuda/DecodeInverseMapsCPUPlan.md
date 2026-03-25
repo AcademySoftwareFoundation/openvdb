@@ -1025,3 +1025,180 @@ operation.  It does replace the 3-step Z-pass chain with `vpmullq %ymm_kSpread`
 (recognising that `(1+2^8)(1+2^16)(1+2^32) = kSpread`), saving 5 instructions
 per block.  Explicit `__m512i` intrinsics would be needed to unlock the full
 ZMM path and eliminate register spills.
+
+---
+
+## 17. 513-Entry Exclusive Prefix Layout and shfl_down Compaction
+
+### 17a. 513-Entry Exclusive Prefix Layout
+
+Rather than modifying `buildMaskPrefixSums` to return an exclusive prefix or add a variant,
+the caller allocates a 513-entry array, sets `prefixSums[0] = 0`, and passes `prefixSums + 1`
+to `buildMaskPrefixSums`:
+
+```cpp
+uint16_t prefixSums[513];
+prefixSums[0] = 0;
+util::buildMaskPrefixSums(leaf.valueMask(), leaf.data()->mPrefixSum, prefixSums + 1);
+```
+
+Result after the call:
+- `prefixSums[i]`   = exclusive prefix at position i = 0-based rank of active voxel i.
+- `prefixSums[i+1]` = inclusive prefix at position i (what buildMaskPrefixSums wrote).
+- `prefixSums[512]` = total active voxel count of the leaf.
+
+For an active voxel at leaf-local position i:
+- `prefixSums[i]` is its 0-based rank (no subtraction, no isActive call).
+- `globalIndex = leafFirstOffset + prefixSums[i]` (leafFirstOffset is 1-based).
+
+For the shfl_down compaction, define:
+```cpp
+shifts[i] = i - prefixSums[i]   // number of inactive positions in [0..i-1]
+```
+Maximum value: 511.  Fits in uint16_t.  No isActive call anywhere.
+
+### 17b. shfl_down Predicate -- Source vs. Destination
+
+Section 4e describes the predicate as `(shifts[i] & (1<<k)) != 0` (DESTINATION element's
+shift), which is incorrect.  The correct predicate uses the SOURCE element's shift:
+
+```cpp
+// Correct: position j gathers from j+Shift if the SOURCE at j+Shift has bit k set.
+out[j] = (shifts[j + Shift] & Shift) ? in[j + Shift] : in[j];
+```
+
+**Why the source predicate is correct**: element originally at position p needs to move
+left by shifts[p] positions to reach its final destination prefixSums[p].  In pass k
+(Shift = 2^k), it moves left by 2^k if bit k of shifts[p] is set.  If p = j+Shift and
+bit k of shifts[j+Shift] is set, then p lands at j after this pass -- so position j
+should receive the current value of position j+Shift.
+
+**Why the destination predicate fails**: `shifts[j]` is the shift of whatever element
+currently occupies position j, which changes after each pass.  Using the original
+`shifts[j]` as the gate for the j-th write mixes up which element is at j at each pass.
+
+The source predicate always references the ORIGINAL shifts array (computed once from
+`prefixSums` before the passes begin), and the array is not modified between passes.
+
+**Verification**: `simd_test/shfl_down_test.cpp` uses `shifts[j + Shift] & Shift`. ✓
+
+### 17c. Two-Buffer Ping-Pong with __restrict__ and Branchless Blend
+
+**The in-place approach does NOT vectorize**: without separate source and destination
+arrays, the compiler cannot prove that `data[j]` (write) does not alias with
+`data[j+Shift]` (read), even though `j < j+Shift` always holds.  GCC 13 emits only
+scalar code (zero YMM instructions) for the in-place version.
+
+**The two-buffer approach vectorizes**: by using separate `__restrict__` `src` and `dst`
+arrays, the compiler can emit vpblendvb (AVX2) / masked vmovdqu16 (AVX-512).  The blend
+is expressed as an arithmetic mask (0x0000 or 0xFFFF) rather than a ternary, which
+avoids a conditional branch inside the SIMD loop:
+
+```cpp
+template <int Shift>
+static void shflDownSep(const uint16_t* __restrict__ src,
+                        const uint16_t* __restrict__ shifts,
+                              uint16_t* __restrict__ dst)
+{
+    #pragma omp simd
+    for (int j = 0; j < 512 - Shift; j++) {
+        const uint16_t m = static_cast<uint16_t>(
+            -static_cast<int>((shifts[j + Shift] & static_cast<uint16_t>(Shift)) != 0));
+        dst[j] = (src[j + Shift] & m) | (src[j] & ~m);
+    }
+    for (int j = 512 - Shift; j < 512; j++)
+        dst[j] = src[j];
+}
+```
+
+**Arithmetic mask derivation**: `(shifts[j+Shift] & Shift) != 0` produces 0 or 1 (int).
+Negating as int gives 0 or -1 = 0x00000000 or 0xFFFFFFFF.  Truncating to uint16_t gives
+0x0000 or 0xFFFF.  The bitwise blend `(src[j+Shift] & m) | (src[j] & ~m)` then selects
+the source or destination without a branch.  GCC recognises this as vpblendvb.
+
+**Critical CMake fix**: `#pragma omp simd` requires `-fopenmp` to be passed to the host
+compiler.  For CUDA source files, CMake does NOT automatically add `-Xcompiler -fopenmp`
+even when `OpenMP::OpenMP_CXX` is linked.  The CMakeLists.txt must explicitly set:
+```cmake
+$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-mavx2,-fopenmp>
+```
+Without this, `#pragma omp simd` is treated as an unknown pragma and silently ignored,
+causing the loop to compile as fully scalar code (~250ms vs ~15ms measured).
+
+### 17d. Full shfl_down Compaction (9 Passes, Ping-Pong Buffers)
+
+The 9 passes alternate between two buffers so each call has fully separate __restrict__
+source and destination pointers.  buf0 is initialized with the identity; after 9 passes
+(odd count), the result is in buf1:
+
+```cpp
+// Compute shifts from the exclusive prefix sum
+uint16_t shifts[512];
+for (int i = 0; i < 512; i++)
+    shifts[i] = static_cast<uint16_t>(i) - prefixSums[i];
+
+// Initialize identity buffer
+uint16_t buf0[512], buf1[512];
+for (int i = 0; i < 512; i++) buf0[i] = static_cast<uint16_t>(i);
+
+// 9 passes: alternate src/dst so each call sees fully separate __restrict__ buffers
+shflDownSep<  1>(buf0, shifts, buf1);
+shflDownSep<  2>(buf1, shifts, buf0);
+shflDownSep<  4>(buf0, shifts, buf1);
+shflDownSep<  8>(buf1, shifts, buf0);
+shflDownSep< 16>(buf0, shifts, buf1);
+shflDownSep< 32>(buf1, shifts, buf0);
+shflDownSep< 64>(buf0, shifts, buf1);
+shflDownSep<128>(buf1, shifts, buf0);
+shflDownSep<256>(buf0, shifts, buf1);
+
+// Result is in buf1 after 9 (odd) passes.
+const uint16_t* leafLocalOffsets = buf1;
+```
+
+### 17e. Range Intersection and Output Fill
+
+The plan's contiguous-copy approach (sections 3, 6, 7) replaces the per-voxel scatter:
+
+```cpp
+const uint64_t leafValueCount = prefixSums[512];
+if (leafValueCount == 0) continue;
+
+// Intersect [leafFirstOffset, leafFirstOffset+leafValueCount) with
+// [blockFirstOffset, blockFirstOffset+BlockWidth):
+const uint64_t globalStart = std::max(leafFirstOffset, blockFirstOffset);
+const uint64_t globalEnd   = std::min(leafFirstOffset + leafValueCount,
+                                      blockFirstOffset + BlockWidth);
+if (globalStart >= globalEnd) continue;
+
+const uint64_t jStart = globalStart - leafFirstOffset;  // first dense index in leaf
+const uint64_t pStart = globalStart - blockFirstOffset; // first output slot in block
+const uint64_t count  = globalEnd - globalStart;
+
+std::fill(leafIndex   + pStart, leafIndex   + pStart + count, (uint32_t)leafID);
+std::copy(leafLocalOffsets + jStart,
+          leafLocalOffsets + jStart + count,
+          voxelOffset + pStart);
+```
+
+Both std::fill and std::copy operate on contiguous ranges -- no data-dependent offsets.
+
+### 17f. Implementation Status and Performance
+
+Implemented in `VoxelBlockManager::decodeInverseMaps` on branch `vbm-cpu-port`.
+The previous bit-scan scatter is replaced by buildMaskPrefixSums + shfl_down compaction
++ range fill/copy.
+
+**Performance (2M voxels / 16384 blocks / 25% occupancy / 24 OMP threads / AVX2):**
+- Old bit-scan scatter (no -fopenmp in CUDA path): ~65 ms
+- shfl_down without vectorization (in-place, no __restrict__): ~250 ms
+- shfl_down with proper vectorization (two-buffer __restrict__ + -fopenmp): ~15-20 ms
+
+The ~3-4x improvement over the old scatter is entirely from SIMD vectorization of the
+9 fixed-offset blend passes.  Without -fopenmp (which was missing from the CUDA host
+compile flags), the shfl_down passes compiled as scalar and were slower than scatter.
+
+**Key lessons:**
+1. The in-place single-buffer form does NOT vectorize; two buffers + __restrict__ required.
+2. `#pragma omp simd` requires -Xcompiler=-fopenmp in the CUDA host compile flags.
+3. The arithmetic mask form (-(cond != 0)) is needed to avoid branch-vs-blend ambiguity.
