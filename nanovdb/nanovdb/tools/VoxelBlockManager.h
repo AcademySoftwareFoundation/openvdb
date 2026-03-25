@@ -226,9 +226,9 @@ struct VoxelBlockManager
         std::fill(leafIndex,   leafIndex   + BlockWidth, UnusedLeafIndex);
         std::fill(voxelOffset, voxelOffset + BlockWidth, UnusedVoxelOffset);
 
-        const auto& tree = grid->tree();
+        const auto &tree = grid->tree();
         for (int leafID = firstLeafIDVal; leafID <= firstLeafIDVal + nExtraLeaves; leafID++) {
-            const auto& leaf = tree.template getFirstNode<0>()[leafID];
+            const auto &leaf = tree.template getFirstNode<0>()[leafID];
 
             // Allocate a 513-entry array and initialize entry 0 to zero, then
             // call buildMaskPrefixSums into prefixSums+1.  This gives:
@@ -272,7 +272,7 @@ struct VoxelBlockManager
             shflDownSep< 64>(buf0, shifts, buf1);
             shflDownSep<128>(buf1, shifts, buf0);
             shflDownSep<256>(buf0, shifts, buf1);
-            const uint16_t* leafLocalOffsets = buf1;
+            const uint16_t *leafLocalOffsets = buf1;
 
             // Intersect this leaf's active range with the block's range.
             // Active voxels span [leafFirstOffset, leafFirstOffset+leafValueCount) globally.
@@ -313,8 +313,8 @@ void buildVoxelBlockManager(const NanoGrid<ValueOnIndex>* grid, VoxelBlockManage
     NANOVDB_ASSERT(grid->isSequential());
     if (!handle.blockCount()) return;
 
-    uint32_t* firstLeafID = handle.hostFirstLeafID();
-    uint64_t* jumpMap = handle.hostJumpMap();
+    uint32_t *firstLeafID = handle.hostFirstLeafID();
+    uint64_t *jumpMap = handle.hostJumpMap();
     const uint64_t nBlocks = handle.blockCount();
     const uint64_t firstOffset = handle.firstOffset();
     const uint64_t lastOffset = handle.lastOffset();
@@ -323,8 +323,8 @@ void buildVoxelBlockManager(const NanoGrid<ValueOnIndex>* grid, VoxelBlockManage
 
     std::memset(jumpMap, 0, nBlocks * JumpMapLength * sizeof(uint64_t));
 
-    const auto& tree = grid->tree();
-    const auto* firstLeaf = tree.getFirstNode<0>();
+    const auto &tree = grid->tree();
+    const auto *firstLeaf = tree.getFirstNode<0>();
     const uint32_t leafCount = tree.nodeCount(0);
 
     std::for_each(std::execution::par, firstLeaf, firstLeaf + leafCount,

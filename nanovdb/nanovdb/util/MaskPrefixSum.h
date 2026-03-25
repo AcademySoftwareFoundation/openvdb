@@ -176,7 +176,7 @@ inline void buildMaskPrefixSums(
     uint64_t       prefixSum,
     uint16_t       offsets[512])
 {
-    const uint64_t* maskWords = mask.words();
+    const uint64_t *maskWords = mask.words();
 
     alignas(64) MaskPrefixSumQWord data[8][8];
 
@@ -303,7 +303,7 @@ inline void buildMaskPrefixSums(
         xOffset[x] = static_cast<uint16_t>((prefixSum >> (9*(x-1))) & 0x1FFu);
 
     for (int x = 0; x < 8; x++) {
-        uint16_t* p = offsets + x * 64;
+        uint16_t *p = offsets + x * 64;
         for (int i = 0; i < 64; i++)
             p[i] += xOffset[x];
     }
