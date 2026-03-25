@@ -230,7 +230,7 @@ struct VoxelBlockManager
         for (int leafID = firstLeafIDVal; leafID <= firstLeafIDVal + nExtraLeaves; leafID++) {
             const auto& leaf = tree.template getFirstNode<0>()[leafID];
 
-            // Allocate a 513-entry array and initialise entry 0 to zero, then
+            // Allocate a 513-entry array and initialize entry 0 to zero, then
             // call buildMaskPrefixSums into prefixSums+1.  This gives:
             //   prefixSums[i]   = exclusive prefix at i = 0-based rank of active voxel i
             //   prefixSums[i+1] = inclusive prefix at i  (what buildMaskPrefixSums writes)

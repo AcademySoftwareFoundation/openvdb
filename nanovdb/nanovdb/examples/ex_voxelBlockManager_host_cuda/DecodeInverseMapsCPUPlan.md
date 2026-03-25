@@ -422,15 +422,15 @@ no AVX-512, GCC 13.3, `-O3 -mavx2`):
 
 | Implementation | Min time (1M blocks) | ns/block |
 |----------------|---------------------|----------|
-| Auto-vectorised (`popcount32` + `#pragma omp simd`) | ~130 ms | ~124 ns |
-| Auto-vectorised with `-mno-popcnt` | ~101 ms | ~96 ns |
+| Auto-vectorized (`popcount32` + `#pragma omp simd`) | ~130 ms | ~124 ns |
+| Auto-vectorized with `-mno-popcnt` | ~101 ms | ~96 ns |
 | Explicit AVX2 intrinsics (`vpshufb` nibble-table) | ~70 ms | ~66.5 ns |
 
 **Key finding — `#pragma omp simd` is silently defeated by `-mavx2`.**
 When hardware POPCNT is available (implied by `-mavx2` on x86), GCC replaces the `popcount32`
 Hamming-weight expression with the scalar `popcntl` instruction and then runs the lane loop
 scalar. The `#pragma omp simd` hint is ignored because the compiler considers scalar `popcntl`
-cheaper than the vectorised software path. The result is 16 sequential `popcntl` calls per step,
+cheaper than the vectorized software path. The result is 16 sequential `popcntl` calls per step,
 not a SIMD operation across all 16 lanes.
 
 With `-mno-popcnt`, GCC falls back to the software Hamming weight and auto-vectorizes correctly
@@ -440,7 +440,7 @@ disables hardware POPCNT throughout the TU, including places like `countOn` wher
 **Explicit `vpshufb` intrinsics** (`computePrefixPopcntAVX2` in `prefix_popcnt_bench.cpp`)
 bypass this issue entirely: the nibble-table lookup uses ~10 SIMD instructions per step across
 all 16 lanes, without any `popcntl` in sight. At ~66.5 ns/block this is **1.87× faster** than
-the auto-vectorised baseline and is the approach to use in the optimised CPU `decodeInverseMaps`.
+the auto-vectorized baseline and is the approach to use in the optimized CPU `decodeInverseMaps`.
 
 `vpshufb` popcount recipe (8 uint32 lanes per `__m256i`, applied twice for 16 lanes):
 ```cpp
@@ -644,7 +644,7 @@ expected layout).
 ## 14. Input Bit-Transpose: Decomposition and Implementation
 
 Although §13h concluded that the original layout (word=x) is preferred for fixup simplicity,
-the input bit-transpose approach was further analysed for completeness and because the output
+the input bit-transpose approach was further analyzed for completeness and because the output
 transpose cost remains a concern.  This section records the decomposition and implementation
 decisions made during that analysis.
 
@@ -883,12 +883,12 @@ the Hillis-Steele within-uint64 scan naturally operates along `z`.
 ### 16b. Algorithm
 
 ```
-Step 1 — Indicator fill (scalar triple loop; optimise later):
+Step 1 — Indicator fill (scalar triple loop; optimize later):
   data[x][y].ui8[z] = (maskWords[x] >> (y*8 + z)) & 1  =  I[x][y][z]
 
 Step 2 — Z-pass: Hillis-Steele inclusive prefix sum over z within each uint64.
   for x in 0..7:
-      for y in 0..7:   ← simd-vectorisable (contiguous, no dep between y)
+      for y in 0..7:   ← simd-vectorizable (contiguous, no dep between y)
           data[x][y].ui64 += data[x][y].ui64 << 8
           data[x][y].ui64 += data[x][y].ui64 << 16
           data[x][y].ui64 += data[x][y].ui64 << 32
@@ -903,7 +903,7 @@ Step 3 — Y-pass: exclusive row-prefix scan + broadcast.
       rowOffset[x][0] = 0
       rowOffset[x][y] = rowOffset[x][y-1] + shifts[x][y-1]   for y = 1..7
       Sequential over y (loop-carried); independent over x — with a transposed
-      [y][x] layout the inner x-loop is unit-stride and AVX2/AVX-512-vectorisable.
+      [y][x] layout the inner x-loop is unit-stride and AVX2/AVX-512-vectorizable.
 
   3c+3d. Broadcast byte 0 to all 8 bytes and add:
       data[x][y].ui64 += rowOffset[x][y].ui64 * kSpread
@@ -912,7 +912,7 @@ Step 3 — Y-pass: exclusive row-prefix scan + broadcast.
 
 Step 4 — Zero-extend to uint16_t (values ≤ 64; already in linear index order):
       prefixSum[x*64 + y*8 + z] = data[x][y].ui8[z]
-  Vectorisable as vpmovzxbw over 64 contiguous bytes per x-slice.
+  Vectorizable as vpmovzxbw over 64 contiguous bytes per x-slice.
 
 Step 5 — Add cross-slice offsets from mPrefixSum:
       xOffset[0] = 0
@@ -955,7 +955,7 @@ uint16_t ref = xOffset[x] + countOn64(maskWords[x] & ((2ULL << (y*8+z)) - 1u));
 Verified in `simd_test/plan1_prefix_test.cpp`: 512000/512000 positions correct
 across 1000 random `Mask<3>`-equivalent inputs.
 
-### 16f. Indicator Fill — `scatterLSB` Vectorisation
+### 16f. Indicator Fill — `scatterLSB` Vectorization
 
 The original scalar triple loop (Step 1) is replaced by a multiply-free bit-scatter
 that eliminates the inner `z`-loop:
@@ -983,7 +983,7 @@ for (int x = 0; x < 8; x++) {
 
 `scatterLSB(maskWords[x] >> (y*8))` extracts byte `y` of word `x` and scatters
 its 8 bits into the LSB of each of the 8 output bytes.  The `y`-loop is independent
-for fixed `x` and vectorises under `#pragma omp simd`; the 8 outer `x`-iterations
+for fixed `x` and vectorizes under `#pragma omp simd`; the 8 outer `x`-iterations
 are fully independent, allowing the OOO engine to interleave multiply chains and
 hide shift latency.
 
@@ -1114,7 +1114,7 @@ static void shflDownSep(const uint16_t* __restrict__ src,
 **Arithmetic mask derivation**: `(shifts[j+Shift] & Shift) != 0` produces 0 or 1 (int).
 Negating as int gives 0 or -1 = 0x00000000 or 0xFFFFFFFF.  Truncating to uint16_t gives
 0x0000 or 0xFFFF.  The bitwise blend `(src[j+Shift] & m) | (src[j] & ~m)` then selects
-the source or destination without a branch.  GCC recognises this as vpblendvb.
+the source or destination without a branch.  GCC recognizes this as vpblendvb.
 
 **Critical CMake fix**: `#pragma omp simd` requires `-fopenmp` to be passed to the host
 compiler.  For CUDA source files, CMake does NOT automatically add `-Xcompiler -fopenmp`

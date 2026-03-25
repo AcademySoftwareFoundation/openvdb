@@ -187,7 +187,7 @@ inline void buildMaskPrefixSums(
     //
     // transposeByteRow(maskWords[x] >> (y*8)) extracts byte y of word x and
     // places bit z of that byte into byte z of the result.  The y-loop
-    // is independent for fixed x and vectorisable via #pragma omp simd;
+    // is independent for fixed x and vectorizable via #pragma omp simd;
     // the 8 outer x-iterations are also independent, allowing the
     // out-of-order engine to overlap the multiply chains.
     // ------------------------------------------------------------------
@@ -231,7 +231,7 @@ inline void buildMaskPrefixSums(
     //
     // 3b. Exclusive y-prefix scan: sum the extracted popcounts sequentially
     //     over y.  The scan is sequential in y (loop-carried dependence)
-    //     but independent across x -- GCC/Clang vectorise the inner x-loop
+    //     but independent across x -- GCC/Clang vectorize the inner x-loop
     //     via AVX2 (4 x uint64) or AVX-512 (8 x uint64) when the loops
     //     are written with x as the inner axis.
     //
@@ -275,7 +275,7 @@ inline void buildMaskPrefixSums(
     // Values are at most 64 (at most 64 active bits per 64-bit word),
     // so zero-extending to uint16_t is always safe.  The output is already
     // in the correct linear order -- no reordering is required.
-    // Compilers vectorise this loop as vpmovzxbw over 64 contiguous bytes
+    // Compilers vectorize this loop as vpmovzxbw over 64 contiguous bytes
     // per x-slice.
     // ------------------------------------------------------------------
     for (int x = 0; x < 8; x++)
