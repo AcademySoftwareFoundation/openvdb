@@ -196,13 +196,17 @@ struct VoxelBlockManager
         for (int leafID = firstLeafIDVal; leafID <= firstLeafIDVal + nExtraLeaves; leafID++) {
             const auto& leaf = tree.template getFirstNode<0>()[leafID];
 
-            // Build the 512-entry inclusive prefix-sum table from the leaf's valueMask.
-            // offsets[i] = 1-based leaf-local rank of the active voxel at position i.
-            // The global sequential index of active voxel at leaf-local position i is:
-            //   leafFirstOffset - 1 + offsets[i]
-            // where leafFirstOffset is the 1-based index of the leaf's first active voxel.
-            uint16_t offsets[512];
-            util::buildMaskPrefixSums(leaf.valueMask(), leaf.data()->mPrefixSum, offsets);
+            // Allocate a 513-entry array and initialise entry 0 to zero, then
+            // call buildMaskPrefixSums into prefixSums+1.  This gives:
+            //   prefixSums[i]   = exclusive prefix at i = 0-based rank of active voxel i
+            //   prefixSums[i+1] = inclusive prefix at i  (what buildMaskPrefixSums writes)
+            //   prefixSums[512] = total active voxel count of this leaf
+            // The global sequential index of active voxel at leaf-local position i is then:
+            //   leafFirstOffset + prefixSums[i]
+            // (leafFirstOffset is 1-based; prefixSums[i] is the 0-based rank.)
+            uint16_t prefixSums[513];
+            prefixSums[0] = 0;
+            util::buildMaskPrefixSums(leaf.valueMask(), leaf.data()->mPrefixSum, prefixSums + 1);
 
             const uint64_t  leafFirstOffset = leaf.data()->firstOffset();
             const uint64_t* maskWords       = leaf.valueMask().words();
@@ -212,7 +216,7 @@ struct VoxelBlockManager
                 while (w) {
                     const int      bit         = static_cast<int>(util::findLowestOn(w));
                     const int      i           = x * 64 + bit;
-                    const uint64_t globalIndex = leafFirstOffset - 1 + offsets[i];
+                    const uint64_t globalIndex = leafFirstOffset + prefixSums[i];
                     if (globalIndex >= blockFirstOffset &&
                         globalIndex <  blockFirstOffset + BlockWidth) {
                         const uint64_t blockOffset = globalIndex - blockFirstOffset;
