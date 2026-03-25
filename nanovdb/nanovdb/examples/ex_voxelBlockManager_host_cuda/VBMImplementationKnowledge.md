@@ -209,3 +209,33 @@ would be misleading about intended usage and would invite incorrect porting.
 The CUDA `decodeInverseMaps` already has its own highly optimized implementation.
 The CPU and CUDA decode paths are expected to remain separate implementations
 indefinitely.
+
+---
+
+## 10. Two Essential VBM Invariants (Not Enforced by NanoVDB Itself)
+
+These invariants are not structurally guaranteed by the NanoVDB data format, but all
+reasonable ways of constructing a VBM-compatible grid enforce them, and the VBM
+algorithms depend on them for correctness and for simplifying early-exit logic.
+
+**Invariant A — No empty leaves**: every leaf node in a VBM grid has at least one active
+voxel (`leafValueCount > 0`).  This is essential for the JumpMap encoding to give an
+unambiguous leafID per block: a leaf with zero active voxels would contribute nothing to
+the sequential voxel index but would still occupy a slot in the leaf array, breaking the
+1-to-1 mapping between sequential voxel ranges and leaf IDs.
+
+**Invariant B — Monotonically non-decreasing voxelID → leafID mapping, step ≤ 1**: the
+global sequential active voxel index increases monotonically across leaves, and consecutive
+leaves' active voxel ranges are contiguous (no gaps, no overlaps).  Formally:
+  `leafFirstOffset[k+1] = leafFirstOffset[k] + leafValueCount[k]`
+This means active voxel ranges partition the global index space without gaps.
+
+**Consequences for `decodeInverseMaps`**:
+- The check `leafValueCount == 0` is dead code and can be omitted (Invariant A).
+- The check `leafFirstOffset + leafValueCount <= blockFirstOffset` (leaf entirely before
+  block) is impossible for any leaf in the iteration range, given that `firstLeafID` is
+  chosen to be the leaf containing `blockFirstOffset` (Invariant B + correct firstLeafID).
+- When `leafFirstOffset >= blockFirstOffset + BlockWidth` fires for one leaf, it holds for
+  all subsequent leaves (Invariant B), so `break` is correct instead of `continue`.
+- The early-exit collapses to a single line:
+  `if (leafFirstOffset >= blockFirstOffset + BlockWidth) break;`
