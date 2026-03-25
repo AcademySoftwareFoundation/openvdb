@@ -198,8 +198,8 @@ struct VoxelBlockManager
     ///
     /// @tparam BuildT     Build type of the grid (must be an index type)
     /// @param grid            Host-accessible grid
-    /// @param firstLeafIDVal  Index of the first leaf overlapping this block
-    ///                        (i.e. firstLeafID[blockID] from the VBM metadata)
+    /// @param firstLeafID  Index of the first leaf overlapping this block
+    ///                     (i.e. firstLeafID[blockID] from the VBM metadata)
     /// @param jumpMap         Pointer to the JumpMapLength words for this block
     ///                        (i.e. &jumpMap[blockID * JumpMapLength])
     /// @param blockFirstOffset  Sequential index of the first voxel in this block
@@ -209,7 +209,7 @@ struct VoxelBlockManager
     static typename util::enable_if<BuildTraits<BuildT>::is_index, void>::type
     decodeInverseMaps(
         const NanoGrid<BuildT>* grid,
-        const uint32_t          firstLeafIDVal,
+        const uint32_t          firstLeafID,
         const uint64_t*         jumpMap,
         const uint64_t          blockFirstOffset,
         uint32_t*               leafIndex,
@@ -217,7 +217,7 @@ struct VoxelBlockManager
     {
         NANOVDB_ASSERT(grid->isSequential());
 
-        // Count how many additional leaves follow firstLeafIDVal in this block
+        // Count how many additional leaves follow firstLeafID in this block
         int nExtraLeaves = 0;
         for (int i = 0; i < JumpMapLength; i++)
             nExtraLeaves += util::countOn(jumpMap[i]);
@@ -227,40 +227,30 @@ struct VoxelBlockManager
         std::fill(voxelOffset, voxelOffset + BlockWidth, UnusedVoxelOffset);
 
         const auto &tree = grid->tree();
-        for (int leafID = firstLeafIDVal; leafID <= firstLeafIDVal + nExtraLeaves; leafID++) {
+        for (int leafID = firstLeafID; leafID <= firstLeafID + nExtraLeaves; leafID++) {
             const auto &leaf = tree.template getFirstNode<0>()[leafID];
 
-            // Allocate a 513-entry array and initialize entry 0 to zero, then
-            // call buildMaskPrefixSums into prefixSums+1.  This gives:
-            //   prefixSums[i]   = exclusive prefix at i = 0-based rank of active voxel i
-            //   prefixSums[i+1] = inclusive prefix at i  (what buildMaskPrefixSums writes)
-            //   prefixSums[512] = total active voxel count of this leaf
-            // The global sequential index of active voxel at leaf-local position i is then:
-            //   leafFirstOffset + prefixSums[i]
-            // (leafFirstOffset is 1-based; prefixSums[i] is the 0-based rank.)
-            uint16_t prefixSums[513];
-            prefixSums[0] = 0;
-            util::buildMaskPrefixSums(leaf.valueMask(), leaf.data()->mPrefixSum, prefixSums + 1);
-
             const uint64_t leafFirstOffset = leaf.data()->firstOffset();
-            const uint16_t leafValueCount  = prefixSums[512];
+            if (leafFirstOffset >= blockFirstOffset + BlockWidth) break;
 
-            // Skip leaves with no active voxels or entirely outside this block.
-            if (leafValueCount == 0 ||
-                leafFirstOffset + leafValueCount <= blockFirstOffset ||
-                leafFirstOffset >= blockFirstOffset + BlockWidth) continue;
+            // Compute shifts[i] = number of inactive voxels at positions 0..i-1, i.e. the
+            // exclusive prefix count of 0-bits over the inverted mask.  Using the 513-entry
+            // exclusive layout (shifts[0]=0, buildMaskPrefixSums<true> writes inclusive
+            // 0-bit counts into shifts[1..512]):
+            //   shifts[i]   = exclusive 0-bit prefix at i  (used by shflDownSep passes)
+            //   shifts[512] = total inactive voxel count  = 512 - leafValueCount
+            uint16_t shifts[513];
+            shifts[0] = 0;
+            util::buildMaskPrefixSums<true>(leaf.valueMask(), leaf.data()->mPrefixSum, shifts + 1);
 
-            // Compute shifts[i] = i - prefixSums[i] = number of inactive positions in [0..i-1].
-            // shifts[i] is the total left-movement element i must undergo across all passes.
-            uint16_t shifts[512];
-            for (int i = 0; i < 512; i++)
-                shifts[i] = static_cast<uint16_t>(i) - prefixSums[i];
+            const uint16_t leafValueCount = static_cast<uint16_t>(512u) - shifts[512];
 
             // Build leafLocalOffsets via 9 shfl_down passes using ping-pong buffers.
             // buf0 is initialized with the identity (buf0[i] = i).  Passes alternate
             // source and destination so each call has fully separate __restrict__ buffers,
             // enabling vpblendvb / masked-vmovdqu16 vectorization.  After 9 passes (odd),
             // the result is in buf1: buf1[j] = leaf-local position of j-th active voxel.
+            // Only shifts[0..511] are accessed by the passes; shifts[512] was used above.
             uint16_t buf0[512], buf1[512];
             for (int i = 0; i < 512; i++) buf0[i] = static_cast<uint16_t>(i);
             shflDownSep<  1>(buf0, shifts, buf1);

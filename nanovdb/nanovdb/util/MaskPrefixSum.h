@@ -152,25 +152,31 @@ inline uint64_t transposeByteRow(uint64_t src)
 // -----------------------------------------------------------------------
 
 /// @brief Compute the 512-entry inclusive prefix-sum table for a NanoVDB
-///        Mask<3> leaf.
+///        Mask<3> leaf, optionally over the inverted mask.
 ///
 /// @details
-/// Each entry offsets[i] equals the number of active voxels at linearised
-/// positions 0..i (inclusive) within the leaf.  The exclusive prefix sum
-/// (used as the voxel-data index offset) is offsets[i] - isActive(i).
+/// When @p Invert is false (the default), each entry offsets[i] equals the
+/// number of active (set) voxels at linearised positions 0..i (inclusive).
+/// When @p Invert is true, offsets[i] equals the number of inactive (unset)
+/// voxels at positions 0..i (inclusive) -- equivalently, the result of
+/// running the algorithm on the bitwise complement of the mask.
 ///
 /// The algorithm is a three-pass bit-parallel scan that operates entirely
 /// on 64 uint64_t values (the 8x8 workspace data[x][y]) without any
 /// hardware popcount instruction.  See the file-level documentation for a
 /// step-by-step description of all five passes.
 ///
+/// @tparam Invert     If true, count inactive (0) bits instead of active (1) bits.
 /// @param mask        The 8x8x8 leaf value mask (512 bits, 8 uint64_t words).
 /// @param prefixSum   Packed cross-word exclusive offsets: 7 x 9-bit fields,
 ///                    field x-1 = total active voxels in words 0..x-1, for
 ///                    x = 1..7.  This is the value stored in the leaf's
-///                    mPrefixSum member.
+///                    mPrefixSum member.  Always the original (non-inverted)
+///                    field; the function adjusts it internally when Invert=true.
 /// @param offsets     Output array of 512 uint16_t values.  offsets[i] holds
-///                    the inclusive prefix popcount at voxel i.
+///                    the inclusive prefix popcount (of active or inactive bits)
+///                    at voxel i.
+template <bool Invert = false>
 inline void buildMaskPrefixSums(
     const Mask<3>& mask,
     uint64_t       prefixSum,
@@ -192,9 +198,10 @@ inline void buildMaskPrefixSums(
     // out-of-order engine to overlap the multiply chains.
     // ------------------------------------------------------------------
     for (int x = 0; x < 8; x++) {
+        const uint64_t word = Invert ? ~maskWords[x] : maskWords[x];
         #pragma omp simd
         for (int y = 0; y < 8; y++)
-            data[x][y].ui64 = transposeByteRow(maskWords[x] >> (y * 8));
+            data[x][y].ui64 = transposeByteRow(word >> (y * 8));
     }
 
     // ------------------------------------------------------------------
@@ -299,8 +306,13 @@ inline void buildMaskPrefixSums(
     // ------------------------------------------------------------------
     uint16_t xOffset[8];
     xOffset[0] = 0;
-    for (int x = 1; x < 8; x++)
-        xOffset[x] = static_cast<uint16_t>((prefixSum >> (9*(x-1))) & 0x1FFu);
+    for (int x = 1; x < 8; x++) {
+        const uint16_t ones = static_cast<uint16_t>((prefixSum >> (9*(x-1))) & 0x1FFu);
+        if constexpr (Invert)
+            xOffset[x] = static_cast<uint16_t>(64 * x) - ones;
+        else
+            xOffset[x] = ones;
+    }
 
     for (int x = 0; x < 8; x++) {
         uint16_t *p = offsets + x * 64;

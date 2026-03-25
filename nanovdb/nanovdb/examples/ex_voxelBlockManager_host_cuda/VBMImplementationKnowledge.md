@@ -142,10 +142,19 @@ not just active ones.  This is intentional and necessary for the shfl_down path.
 
 **Current implementation** (`VoxelBlockManager.h`, branch `vbm-cpu-port`):
 For each leaf overlapping the block:
-1. Build 513-entry exclusive prefix sum: `prefixSums[0]=0`, `buildMaskPrefixSums(..., prefixSums+1)`.
-2. Compute `shifts[i] = i - prefixSums[i]` for i=0..511.
+1. Early-exit `break` if `leafFirstOffset >= blockFirstOffset + BlockWidth` (monotonicity
+   invariant: all subsequent leaves also fall outside the block).
+2. Build `shifts[513]` directly via `buildMaskPrefixSums<true>`: `shifts[0]=0`,
+   `buildMaskPrefixSums<true>(..., shifts+1)` writes inclusive 0-bit counts into
+   `shifts[1..512]`, giving `shifts[i]` = exclusive count of inactive voxels in [0..i-1].
+   `leafValueCount = 512 - shifts[512]` as a free by-product.
 3. Run 9 shfl_down passes (Shift=1,2,4,...,256) via `shflDownSep` with ping-pong buffers.
 4. Range fill `leafIndex[pStart..pEnd)` and contiguous copy from `leafLocalOffsets`.
+
+**Eliminated from earlier design**: the separate `prefixSums[513]` array and the explicit
+`shifts[i] = i - prefixSums[i]` subtraction loop.  `buildMaskPrefixSums<true>` writes
+`shifts[]` directly in one pass by running the prefix sum over the inverted mask words and
+adjusting the cross-word offsets as `64*x - ones` instead of `ones`.
 
 **Performance history (2M voxels / 16384 blocks / 25% occupancy / 24 OMP threads / AVX2)**:
 - Original `getValue()` loop: ~77 ms

@@ -1030,11 +1030,10 @@ ZMM path and eliminate register spills.
 
 ## 17. 513-Entry Exclusive Prefix Layout and shfl_down Compaction
 
-### 17a. 513-Entry Exclusive Prefix Layout
+### 17a. 513-Entry Exclusive Prefix Layout (initial design)
 
-Rather than modifying `buildMaskPrefixSums` to return an exclusive prefix or add a variant,
-the caller allocates a 513-entry array, sets `prefixSums[0] = 0`, and passes `prefixSums + 1`
-to `buildMaskPrefixSums`:
+The initial design allocates a 513-entry array, sets `prefixSums[0] = 0`, and passes
+`prefixSums + 1` to `buildMaskPrefixSums`:
 
 ```cpp
 uint16_t prefixSums[513];
@@ -1047,15 +1046,12 @@ Result after the call:
 - `prefixSums[i+1]` = inclusive prefix at position i (what buildMaskPrefixSums wrote).
 - `prefixSums[512]` = total active voxel count of the leaf.
 
-For an active voxel at leaf-local position i:
-- `prefixSums[i]` is its 0-based rank (no subtraction, no isActive call).
-- `globalIndex = leafFirstOffset + prefixSums[i]` (leafFirstOffset is 1-based).
-
-For the shfl_down compaction, define:
+For the shfl_down compaction, `shifts[i]` = number of inactive positions in [0..i-1]:
 ```cpp
-shifts[i] = i - prefixSums[i]   // number of inactive positions in [0..i-1]
+shifts[i] = i - prefixSums[i]
 ```
-Maximum value: 511.  Fits in uint16_t.  No isActive call anywhere.
+This was the approach used in the initial shfl_down implementation.  See §17g for the
+refined design that eliminates `prefixSums[]` and the explicit subtraction loop.
 
 ### 17b. shfl_down Predicate -- Source vs. Destination
 
@@ -1129,19 +1125,13 @@ causing the loop to compile as fully scalar code (~250ms vs ~15ms measured).
 
 The 9 passes alternate between two buffers so each call has fully separate __restrict__
 source and destination pointers.  buf0 is initialized with the identity; after 9 passes
-(odd count), the result is in buf1:
+(odd count), the result is in buf1.  See §17g for the current form of the preamble that
+builds `shifts[]`.
 
 ```cpp
-// Compute shifts from the exclusive prefix sum
-uint16_t shifts[512];
-for (int i = 0; i < 512; i++)
-    shifts[i] = static_cast<uint16_t>(i) - prefixSums[i];
-
-// Initialize identity buffer
 uint16_t buf0[512], buf1[512];
 for (int i = 0; i < 512; i++) buf0[i] = static_cast<uint16_t>(i);
 
-// 9 passes: alternate src/dst so each call sees fully separate __restrict__ buffers
 shflDownSep<  1>(buf0, shifts, buf1);
 shflDownSep<  2>(buf1, shifts, buf0);
 shflDownSep<  4>(buf0, shifts, buf1);
@@ -1152,53 +1142,75 @@ shflDownSep< 64>(buf0, shifts, buf1);
 shflDownSep<128>(buf1, shifts, buf0);
 shflDownSep<256>(buf0, shifts, buf1);
 
-// Result is in buf1 after 9 (odd) passes.
 const uint16_t* leafLocalOffsets = buf1;
 ```
 
 ### 17e. Range Intersection and Output Fill
 
-The plan's contiguous-copy approach (sections 3, 6, 7) replaces the per-voxel scatter:
+The contiguous-copy approach (sections 3, 6, 7) replaces the per-voxel scatter.  Two VBM
+invariants simplify the early-exit (see §17g):
+- No leaf has zero active voxels.
+- Active voxel ranges across leaves are contiguous and monotonically ordered.
+
+These guarantee that no leaf in the iteration range is entirely before the block, so the
+only guard needed is a `break` (not `continue`) when a leaf starts at or after the block end:
 
 ```cpp
-const uint64_t leafValueCount = prefixSums[512];
-if (leafValueCount == 0) continue;
+if (leafFirstOffset >= blockFirstOffset + BlockWidth) break;
+```
 
-// Intersect [leafFirstOffset, leafFirstOffset+leafValueCount) with
-// [blockFirstOffset, blockFirstOffset+BlockWidth):
+Range intersection and output:
+```cpp
 const uint64_t globalStart = std::max(leafFirstOffset, blockFirstOffset);
 const uint64_t globalEnd   = std::min(leafFirstOffset + leafValueCount,
                                       blockFirstOffset + BlockWidth);
-if (globalStart >= globalEnd) continue;
-
-const uint64_t jStart = globalStart - leafFirstOffset;  // first dense index in leaf
-const uint64_t pStart = globalStart - blockFirstOffset; // first output slot in block
+const uint64_t jStart = globalStart - leafFirstOffset;
+const uint64_t pStart = globalStart - blockFirstOffset;
 const uint64_t count  = globalEnd - globalStart;
 
 std::fill(leafIndex   + pStart, leafIndex   + pStart + count, (uint32_t)leafID);
-std::copy(leafLocalOffsets + jStart,
-          leafLocalOffsets + jStart + count,
-          voxelOffset + pStart);
+std::copy(leafLocalOffsets + jStart, leafLocalOffsets + jStart + count, voxelOffset + pStart);
 ```
 
-Both std::fill and std::copy operate on contiguous ranges -- no data-dependent offsets.
-
-### 17f. Implementation Status and Performance
-
-Implemented in `VoxelBlockManager::decodeInverseMaps` on branch `vbm-cpu-port`.
-The previous bit-scan scatter is replaced by buildMaskPrefixSums + shfl_down compaction
-+ range fill/copy.
+### 17f. Performance History
 
 **Performance (2M voxels / 16384 blocks / 25% occupancy / 24 OMP threads / AVX2):**
-- Old bit-scan scatter (no -fopenmp in CUDA path): ~65 ms
+- Original `getValue()` loop: ~77 ms
+- `buildMaskPrefixSums` + bit-scan scatter: ~65 ms
 - shfl_down without vectorization (in-place, no __restrict__): ~250 ms
 - shfl_down with proper vectorization (two-buffer __restrict__ + -fopenmp): ~15-20 ms
-
-The ~3-4x improvement over the old scatter is entirely from SIMD vectorization of the
-9 fixed-offset blend passes.  Without -fopenmp (which was missing from the CUDA host
-compile flags), the shfl_down passes compiled as scalar and were slower than scatter.
+- After §17g refactor (buildMaskPrefixSums<true>, no prefixSums[]): ~14-20 ms (no regression)
 
 **Key lessons:**
 1. The in-place single-buffer form does NOT vectorize; two buffers + __restrict__ required.
 2. `#pragma omp simd` requires -Xcompiler=-fopenmp in the CUDA host compile flags.
 3. The arithmetic mask form (-(cond != 0)) is needed to avoid branch-vs-blend ambiguity.
+
+### 17g. Elimination of prefixSums[] via buildMaskPrefixSums<true>
+
+`shifts[i]` = exclusive count of 0-bits (inactive voxels) at positions 0..i-1 is exactly
+what `buildMaskPrefixSums` produces when run over the bitwise complement of the mask.
+Adding a `template <bool Invert = false>` parameter to `buildMaskPrefixSums` allows
+writing `shifts[]` directly, eliminating the `prefixSums[513]` array and the explicit
+`shifts[i] = i - prefixSums[i]` subtraction loop:
+
+```cpp
+uint16_t shifts[513];
+shifts[0] = 0;
+util::buildMaskPrefixSums<true>(leaf.valueMask(), leaf.data()->mPrefixSum, shifts + 1);
+
+const uint16_t leafValueCount = static_cast<uint16_t>(512u) - shifts[512];
+```
+
+Result: `shifts[i]` = exclusive 0-bit prefix at i for i=0..511 (used by shflDownSep).
+`shifts[512]` = total inactive count; `leafValueCount` falls out as `512 - shifts[512]`.
+
+**How `buildMaskPrefixSums<true>` works**: two changes from the default (`Invert=false`):
+1. Step 1 (indicator fill): inverts the mask word before transposing: `~maskWords[x]`.
+2. Step 5 (cross-word offsets): for word x, the exclusive 0-bit count equals
+   `64*x - ones`, where `ones` is the exclusive 1-bit count decoded from `mPrefixSum`.
+   The original (non-inverted) `mPrefixSum` field is passed unchanged by the caller.
+
+**Stack savings**: eliminates 1026 bytes (`prefixSums[513]`) and one 512-iteration pass.
+The `shifts[513]` array (1026 bytes) replaces the old `shifts[512]` (1024 bytes) at
+negligible cost (+2 bytes) while removing the need for `prefixSums[]` entirely.
