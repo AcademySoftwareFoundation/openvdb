@@ -1,0 +1,14 @@
+NanoVDB:
+  Improvements:
+  - CNanoVDB supports integer (I) grids
+  - CNanoVDB has setValue methods to write to voxels
+  - CNanoVDB has getLeaf methods to acquire raw leaf pointers
+
+  Bug Fixes:
+  - static used for local kernel methods in CNanoVDB
+  - Remove auto-computed reserved sizes in favour of hard coded sizes
+    in CNanoVDB.  While less maintainble, C99 forbids zero sized
+    arrays so some compilers crashed when encountering this.
+  - Initialize key value when constructing an accessor, some compilers
+    entered bad states with this undefined.
+  
