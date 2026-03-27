@@ -3452,8 +3452,9 @@ __global__ void testComputeStencilNeighborsKernel(
     uint64_t *stencilNeighborsArray)
 {
     static constexpr int Log2BlockWidth = 7;
-    static constexpr int BlockWidth = 1 << Log2BlockWidth;
-    static constexpr int JumpMapLength = BlockWidth >> 6;
+    using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
+    static constexpr int BlockWidth    = VBM::BlockWidth;
+    static constexpr int JumpMapLength = VBM::JumpMapLength;
     int bID = blockIdx.x;
     int tID = threadIdx.x;
 
@@ -3485,8 +3486,9 @@ void testVoxelBlockManager()
     std::vector<nanovdb::Coord> voxels;
     nanovdb::CoordBBox bbox = nanovdb::CoordBBox::createCube(125,145); // Coordinates chosen to span more than 1 lower node
     for (auto it = bbox.begin(); it; it++) voxels.push_back(*it);
-    constexpr std::size_t Log2BlockWidth = 7;
-    constexpr std::size_t BlockWidth = 1 << Log2BlockWidth; // 128
+    constexpr int Log2BlockWidth = 7;
+    using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
+    constexpr auto BlockWidth = VBM::BlockWidth;
     const std::size_t nVoxels = voxels.size();
     const std::size_t nBlocks = (nVoxels + BlockWidth - 1) >> Log2BlockWidth;
     nanovdb::Coord *deviceVoxels;
