@@ -1202,7 +1202,7 @@ util::buildMaskPrefixSums<true>(leaf.valueMask(), leaf.data()->mPrefixSum, shift
 const uint16_t leafValueCount = static_cast<uint16_t>(512u) - shifts[512];
 ```
 
-Result: `shifts[i]` = exclusive 0-bit prefix at i for i=0..511 (used by shflDownSep).
+Result: `shifts[i]` = exclusive 0-bit prefix at i for i=0..511 (used by `util::shuffleDownMask`).
 `shifts[512]` = total inactive count; `leafValueCount` falls out as `512 - shifts[512]`.
 
 **How `buildMaskPrefixSums<true>` works**: two changes from the default (`Invert=false`):
@@ -1214,3 +1214,51 @@ Result: `shifts[i]` = exclusive 0-bit prefix at i for i=0..511 (used by shflDown
 **Stack savings**: eliminates 1026 bytes (`prefixSums[513]`) and one 512-iteration pass.
 The `shifts[513]` array (1026 bytes) replaces the old `shifts[512]` (1024 bytes) at
 negligible cost (+2 bytes) while removing the need for `prefixSums[]` entirely.
+
+### 17h. shflDown → util::shuffleDownMask; generalize and promote to utility
+
+The single-buffer `shflDown` (introduced in the §17d revision) is generalized and
+promoted to a free function `nanovdb::util::shuffleDownMask` in `VoxelBlockManager.h`
+(a candidate for a future `nanovdb/util/Algo.h`).  The final signature:
+
+```cpp
+template <int N, int Shift, typename DataT, typename MaskT>
+inline void shuffleDownMask(DataT* NANOVDB_RESTRICT data,
+                            const MaskT* NANOVDB_RESTRICT masks,
+                            MaskT maskBits)
+{
+    static_assert(Shift > 0 && Shift < N, "Shift must satisfy 0 < Shift < N");
+    static_assert(std::is_unsigned_v<DataT>, "DataT must be an unsigned integer type");
+    static_assert(std::is_unsigned_v<MaskT>, "MaskT must be an unsigned integer type");
+    #pragma omp simd
+    for (int j = 0; j < N - Shift; j++) {
+        const DataT m = (masks[j + Shift] & maskBits) != 0 ? ~DataT{0} : DataT{0};
+        data[j] = (data[j + Shift] & m) | (data[j] & ~m);
+    }
+}
+```
+
+**Changes from the §17d single-buffer form**:
+- `shifts` → `masks` (parameter name); `& Shift` → `& maskBits` (runtime parameter, no
+  default — caller is explicit).  `maskBits` is always a literal at every call site so
+  the compiler constant-folds it.
+- Generalized from `uint16_t` to `DataT` / `MaskT` (any unsigned integer types).
+- Generalized from hardcoded `512` to template parameter `N`.
+- Blend mask uses `~DataT{0}` / `DataT{0}` (all-ones / all-zeros of the correct width)
+  instead of the `-static_cast<int>(bool)` trick — clearer and equally efficient.
+- `static_assert` guards on `Shift > 0 && Shift < N` and unsigned types.
+- Extracted from `VoxelBlockManager` private static → `nanovdb::util` free function.
+- `NANOVDB_RESTRICT` replaces `__restrict__` for portability (MSVC uses `__restrict`).
+- Renamed `shflDown` → `shuffleDownMask`: "shuffle down" follows the CUDA
+  `__shfl_down_sync` convention; "Mask" denotes the predicate table parameter.
+  The operation is a conditional fixed-distance gather from higher-indexed positions,
+  not an arbitrary permutation — "shuffle" is preferred over "shift" because of the
+  conditional, data-dependent nature of the movement.
+
+**Call site**:
+```cpp
+util::shuffleDownMask<512,   1>(buf, shifts, uint16_t{  1});
+// ... through ...
+util::shuffleDownMask<512, 256>(buf, shifts, uint16_t{256});
+```
+No behavioral change from §17d.

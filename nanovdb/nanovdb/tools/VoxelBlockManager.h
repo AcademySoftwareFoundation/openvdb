@@ -29,6 +29,60 @@
 
 namespace nanovdb {
 
+namespace util {
+
+/// @brief One pass of masked conditional shuffle-down on a stream of values.
+///
+/// For each position j in [0, N - Shift), conditionally replaces data[j] with
+/// data[j+Shift] based on the predicate (masks[j+Shift] & maskBits) != 0:
+///
+///   m = ~DataT{0}  if (masks[j+Shift] & maskBits) != 0  (all-ones blend mask)
+///   m =  DataT{0}  otherwise                             (all-zeros blend mask)
+///   data[j] = (data[j+Shift] & m) | (data[j] & ~m)
+///
+/// Positions j in [N - Shift, N) are left unchanged (the trailing portion of
+/// the stream that cannot receive a shifted element).
+///
+/// The predicate is formed by ANDing masks[j+Shift] with the runtime constant
+/// maskBits.  Since maskBits is always a literal at every call site (and the
+/// function is always inlined), the compiler constant-folds it as effectively
+/// as a template parameter.
+///
+/// In-place correctness: j < j+Shift guarantees every source element is
+/// read before its slot is overwritten, even under SIMD vectorization
+/// (all loads in a vector instruction precede all stores).
+/// NANOVDB_RESTRICT on both parameters resolves the data/masks aliasing concern
+/// and allows the vectorizer to emit SIMD blend instructions (vpblendvb /
+/// vpand + vpor on AVX2).
+///
+/// The name follows the CUDA __shfl_down_sync convention: "shuffle down" denotes
+/// a conditional fixed-distance gather from higher-indexed positions, as opposed
+/// to an arbitrary permutation.
+///
+/// @tparam N      Length of the data and masks arrays.
+/// @tparam Shift  Number of positions to shift; must satisfy 0 < Shift < N.
+/// @tparam DataT  Element type of the data array (any unsigned integer type).
+/// @tparam MaskT  Element type of the masks array (any unsigned integer type).
+/// @param data     Buffer of N DataT values, updated in-place.
+/// @param masks    Read-only predicate table of N MaskT values.
+/// @param maskBits Bitmask ANDed with masks[j+Shift] to form the predicate.
+template <int N, int Shift, typename DataT, typename MaskT>
+inline void shuffleDownMask(DataT* NANOVDB_RESTRICT data,
+                            const MaskT* NANOVDB_RESTRICT masks,
+                            MaskT maskBits)
+{
+    static_assert(Shift > 0 && Shift < N, "Shift must satisfy 0 < Shift < N");
+    static_assert(std::is_unsigned_v<DataT>, "DataT must be an unsigned integer type");
+    static_assert(std::is_unsigned_v<MaskT>, "MaskT must be an unsigned integer type");
+    #pragma omp simd
+    for (int j = 0; j < N - Shift; j++) {
+        const DataT m = (masks[j + Shift] & maskBits) != 0 ? ~DataT{0} : DataT{0};
+        data[j] = (data[j + Shift] & m) | (data[j] & ~m);
+    }
+}
+
+} // namespace util
+
 namespace tools {
 
 /// @brief This class serves to manage the raw memory buffers for the metadata of a NanoVDB VoxelBlockManager
@@ -145,37 +199,6 @@ struct VoxelBlockManager
     static constexpr uint32_t UnusedLeafIndex   = 0xffffffff;
     static constexpr uint16_t UnusedVoxelOffset = 0xffff;
 
-    /// @brief One pass of bit-parallel compaction: branchless in-place conditional blend.
-    ///
-    /// For j in [0, 512-Shift):
-    ///   m = 0xFFFF if (shifts[j+Shift] & Shift) != 0, else 0x0000
-    ///   data[j] = (data[j+Shift] & m) | (data[j] & ~m)
-    ///
-    /// The predicate tests the SOURCE element's shift (bit log2(Shift) of
-    /// shifts[j+Shift]).  In-place execution is correct because j < j+Shift
-    /// guarantees each source element is read before its slot is written.
-    /// __restrict__ on both parameters discharges the data/shifts aliasing
-    /// concern and allows the vectorizer to emit SIMD blend instructions.
-    /// The arithmetic mask avoids conditional branches in the SIMD loop.
-    ///
-    /// @note __restrict__ is GCC/Clang syntax; MSVC spells it __restrict.
-    ///       A NANOVDB_RESTRICT portability macro should be added before
-    ///       this header is used in a MSVC build.
-    ///
-    /// @param data    Buffer (512 uint16_t), updated in-place each pass.
-    /// @param shifts  shifts[i] = exclusive 0-bit prefix at i, unchanged across passes.
-    template <int Shift>
-    static void shflDown(uint16_t* __restrict__ data,
-                         const uint16_t* __restrict__ shifts)
-    {
-        #pragma omp simd
-        for (int j = 0; j < 512 - Shift; j++) {
-            const uint16_t m = static_cast<uint16_t>(
-                -static_cast<int>((shifts[j + Shift] & static_cast<uint16_t>(Shift)) != 0));
-            data[j] = (data[j + Shift] & m) | (data[j] & ~m);
-        }
-    }
-
     /// @brief Decode the inverse maps for a single voxel block on the host.
     ///
     /// Given the VBM metadata for one block (firstLeafID and the block's slice of
@@ -234,7 +257,7 @@ struct VoxelBlockManager
             // exclusive prefix count of 0-bits over the inverted mask.  Using the 513-entry
             // exclusive layout (shifts[0]=0, buildMaskPrefixSums<true> writes inclusive
             // 0-bit counts into shifts[1..512]):
-            //   shifts[i]   = exclusive 0-bit prefix at i  (used by shflDown passes)
+            //   shifts[i]   = exclusive 0-bit prefix at i  (used by shuffleDownMask passes)
             //   shifts[512] = total inactive voxel count  = 512 - leafValueCount
             uint16_t shifts[513];
             shifts[0] = 0;
@@ -244,20 +267,20 @@ struct VoxelBlockManager
 
             // Build leafLocalOffsets via 9 in-place shfl_down passes.
             // buf is initialized with the identity (buf[i] = i) and updated in-place
-            // each pass.  __restrict__ on both buf and shifts discharges the aliasing
+            // each pass.  NANOVDB_RESTRICT on both buf and shifts discharges the aliasing
             // concern and allows the vectorizer to emit SIMD blend instructions.
             // Only shifts[0..511] are accessed by the passes; shifts[512] was used above.
             uint16_t buf[512];
             for (int i = 0; i < 512; i++) buf[i] = static_cast<uint16_t>(i);
-            shflDown<  1>(buf, shifts);
-            shflDown<  2>(buf, shifts);
-            shflDown<  4>(buf, shifts);
-            shflDown<  8>(buf, shifts);
-            shflDown< 16>(buf, shifts);
-            shflDown< 32>(buf, shifts);
-            shflDown< 64>(buf, shifts);
-            shflDown<128>(buf, shifts);
-            shflDown<256>(buf, shifts);
+            util::shuffleDownMask<512,   1>(buf, shifts, uint16_t{  1});
+            util::shuffleDownMask<512,   2>(buf, shifts, uint16_t{  2});
+            util::shuffleDownMask<512,   4>(buf, shifts, uint16_t{  4});
+            util::shuffleDownMask<512,   8>(buf, shifts, uint16_t{  8});
+            util::shuffleDownMask<512,  16>(buf, shifts, uint16_t{ 16});
+            util::shuffleDownMask<512,  32>(buf, shifts, uint16_t{ 32});
+            util::shuffleDownMask<512,  64>(buf, shifts, uint16_t{ 64});
+            util::shuffleDownMask<512, 128>(buf, shifts, uint16_t{128});
+            util::shuffleDownMask<512, 256>(buf, shifts, uint16_t{256});
             const uint16_t *leafLocalOffsets = buf;
 
             // Intersect this leaf's active range with the block's range.

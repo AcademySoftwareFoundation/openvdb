@@ -87,6 +87,15 @@ typedef unsigned long long uint64_t;
 
 #endif // if defined(__CUDACC__) || defined(__HIP__)
 
+// NANOVDB_RESTRICT: cross-compiler no-alias hint for pointer parameters.
+// GCC and Clang (including NVCC host compilation) spell it __restrict__,
+// MSVC spells it __restrict.
+#if defined(_MSC_VER)
+#define NANOVDB_RESTRICT __restrict
+#else
+#define NANOVDB_RESTRICT __restrict__
+#endif
+
 // The following macro will suppress annoying warnings when nvcc
 // compiles functions that call (host) intrinsics (which is perfectly valid)
 #if defined(_MSC_VER) && defined(__CUDACC__)

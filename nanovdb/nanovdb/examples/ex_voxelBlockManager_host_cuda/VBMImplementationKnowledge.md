@@ -148,7 +148,7 @@ For each leaf overlapping the block:
    `buildMaskPrefixSums<true>(..., shifts+1)` writes inclusive 0-bit counts into
    `shifts[1..512]`, giving `shifts[i]` = exclusive count of inactive voxels in [0..i-1].
    `leafValueCount = 512 - shifts[512]` as a free by-product.
-3. Run 9 shfl_down passes (Shift=1,2,4,...,256) via `shflDownSep` with ping-pong buffers.
+3. Run 9 in-place shuffle-down passes (Shift=1,2,4,...,256) via `util::shuffleDownMask` with a single buffer.
 4. Range fill `leafIndex[pStart..pEnd)` and contiguous copy from `leafLocalOffsets`.
 
 **Eliminated from earlier design**: the separate `prefixSums[513]` array and the explicit
