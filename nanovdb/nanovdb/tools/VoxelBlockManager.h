@@ -4,15 +4,23 @@
 /*!
     \file nanovdb/tools/VoxelBlockManager.h
 
-    \author Eftychios Sifakis
+    \author Efty Sifakis
 
     \date July 24, 2025
 
-    \brief Implements a handle class holding the metadata involved in invocations
-           of the VoxelBlockManager structure, and host-side build functions.
-           The VoxelBlockManager is an acceleration structure for sequential access
-           and stencil operations over solely the active voxels of an OnIndexGrid
-           which enables SIMT parallelism independent of occupancy.
+    \brief VoxelBlockManager: acceleration structure for voxel-sequential,
+           SIMT/SIMD-parallel access over the active voxels of an OnIndexGrid,
+           independent of occupancy.
+
+    \details Provides:
+      - VoxelBlockManagerHandle: manages the raw metadata buffers (firstLeafID
+        array and jumpMap) on host or device.
+      - buildVoxelBlockManager: constructs the VBM metadata from a NanoGrid.
+      - VoxelBlockManager: host-side decode of the inverse maps (sequential
+        active-voxel index -> leaf ID + intra-leaf voxel offset) for a single
+        voxel block, intended to be called once per block from a parallel loop.
+      - nanovdb::util::shuffleDownMask: generic masked shuffle-down primitive
+        used by the decode; a candidate for a future nanovdb/util/Algo.h.
 */
 
 
