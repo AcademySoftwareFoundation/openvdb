@@ -22,23 +22,23 @@
         executed cooperatively across a CUDA thread block.
 */
 
+#ifndef NANOVDB_VOXELBLOCKMANAGER_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_VOXELBLOCKMANAGER_CUH_HAS_BEEN_INCLUDED
+
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/util/cuda/Util.h>
 #include <nanovdb/util/cuda/DeviceGridTraits.cuh>
 #include <nanovdb/tools/VoxelBlockManager.h>
 
-#ifndef NANOVDB_VOXELBLOCKMANAGER_CUH_HAS_BEEN_INCLUDED
-#define NANOVDB_VOXELBLOCKMANAGER_CUH_HAS_BEEN_INCLUDED
-
 namespace nanovdb {
 
 namespace tools::cuda {
 
-/// @brief This class allows for sequential access to contiguous spans (i.e.
-/// blocks) of active voxels in an IndexGrid on the device, and efficient
-/// computation of linear offsets of stencils (e.g. 3-wide box stencil).
-/// @tparam BlockWidth Number of active voxels in a contiguous span
+/// @brief Device-side VoxelBlockManager: SIMT-parallel decode of the inverse
+/// maps (sequential active-voxel index -> leaf ID + intra-leaf voxel offset)
+/// for voxel-sequential, occupancy-independent access over an OnIndexGrid.
+/// @tparam Log2BlockWidth Log2 of the number of active voxels per VBM block
 template <int Log2BlockWidth>
 struct VoxelBlockManager
 {
@@ -72,7 +72,7 @@ struct VoxelBlockManager
     __device__
     static typename util::enable_if<BuildTraits<BuildT>::is_index, void>::type
     decodeInverseMaps(
-        NanoGrid<BuildT> *grid,
+        const NanoGrid<BuildT> *grid,
         const uint32_t firstLeafID,
         const uint64_t *jumpMap,
         const uint64_t blockFirstOffset,
@@ -106,10 +106,11 @@ struct VoxelBlockManager
         // with all threads in threadblock working collaboratively within each leafNode
         for (int leafID = firstLeafID; leafID <= firstLeafID + nExtraLeaves; leafID++) {
             const auto& leaf = tree.template getFirstNode<0>()[leafID];
+            if (leaf.data()->firstOffset() >= blockFirstOffset + BlockWidth) break;
             const Coord origin = leaf.origin();
             for (int threadOffset = 0; threadOffset < 512; threadOffset += blockDim.x) {
                 int localOffset = threadOffset + tID;
-                int index = leaf.data()->getValue(localOffset);
+                auto index = leaf.data()->getValue(localOffset);
                 if ((index >= blockFirstOffset) && (index < blockFirstOffset + BlockWidth)) {
                     int blockOffset = index - blockFirstOffset;
                     // Write inverse map to shared memory; no collisions
@@ -228,7 +229,7 @@ struct BuildVoxelBlockManagerFunctor
                     // The specific uint64_t in the jumpMap to be marked is at element offset (offsetInBlock>>6), i.e. offsetBlock/64
                     // and bit offset (offsetInBlock & 0x3f), i.e. offsetInBlock%64
                     util::atomicOr(&jumpMap[firstBlock * JumpMapLength + (offsetInBlock>>6)],
-                                   0x1ul << (offsetInBlock & 0x3f));
+                                   UINT64_C(1) << (offsetInBlock & 0x3f));
                 }
             }
 
