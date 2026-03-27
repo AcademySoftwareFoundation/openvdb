@@ -116,15 +116,9 @@ nanovdb_example(NAME "ex_coarsen_nanovdb_cuda" OPENVDB)
 
 nanovdb_example(NAME "ex_voxelBlockManager_host_cuda")
 if(TARGET ex_voxelBlockManager_host_cuda)
-  find_package(OpenMP)
   target_compile_options(ex_voxelBlockManager_host_cuda PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-mavx2>
     $<$<COMPILE_LANGUAGE:CXX>:-mavx2>)
-  if(OpenMP_CXX_FOUND)
-    target_link_libraries(ex_voxelBlockManager_host_cuda PRIVATE OpenMP::OpenMP_CXX)
-    target_compile_options(ex_voxelBlockManager_host_cuda PRIVATE
-      $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
-  endif()
 endif()
 
 if(CUDAToolkit_FOUND)

@@ -16,6 +16,7 @@
 #include <nanovdb/HostBuffer.h>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 #include <nanovdb/tools/VoxelBlockManager.h>
+#include <nanovdb/util/ForEach.h>
 #include <nanovdb/util/Timer.h>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
@@ -23,13 +24,9 @@
 #include <thrust/universal_vector.h>
 
 #include <immintrin.h>
-#ifdef _OPENMP
-#include <omp.h>
-#else
-inline int omp_get_max_threads() { return 1; }
-#endif
 
 #include <algorithm>
+#include <atomic>
 #include <vector>
 #include <iostream>
 
@@ -37,13 +34,6 @@ namespace {
 
 static constexpr int Log2BlockWidth = 7;
 static constexpr int BlockWidth     = 1 << Log2BlockWidth; // 128
-
-// Thread-private scratch arrays for CPU decodeInverseMaps benchmarks.
-// Declared at namespace scope with static storage so threadprivate is valid;
-// aligned to a cache line to avoid false sharing between threads.
-alignas(64) static uint32_t g_scratchLeafIndex[BlockWidth];
-alignas(64) static uint16_t g_scratchVoxelOffset[BlockWidth];
-#pragma omp threadprivate(g_scratchLeafIndex, g_scratchVoxelOffset)
 
 using VBM    = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
 using CPUVBM = nanovdb::tools::VoxelBlockManager<Log2BlockWidth>;
@@ -381,23 +371,19 @@ void runVBMCudaTest(const std::vector<nanovdb::Coord>& coords)
         static constexpr int nPerfRuns = 20;
 
         // --- Sanity check: countOn + std::fill only, no tree access ---
-        // If OpenMP parallelism is working, this should scale near-linearly.
         {
-            std::cout << "\nCPU decodeInverseMaps sanity (countOn only, "
-                      << omp_get_max_threads() << " OMP threads):\n";
+            std::cout << "\nCPU decodeInverseMaps sanity (countOn only):\n";
 
-            // Never true: nExtraLeaves <= JumpMapLength*64, so == JumpMapLength*64+1 is impossible.
-            // Used only to prevent dead code elimination without a reduction.
+            // Never true: used only to prevent dead code elimination.
             volatile uint32_t dummy = 0;
 
             for (int run = 0; run < nPerfRuns; ++run) {
                 nanovdb::util::Timer timer;
                 timer.start("");
 
-                #pragma omp parallel
-                {
-                    #pragma omp for schedule(static)
-                    for (uint32_t bID = 0; bID < nBlocks; ++bID) {
+                nanovdb::util::forEach(0, nBlocks, 1,
+                    [&](const nanovdb::util::Range1D& range) {
+                    for (auto bID = range.begin(); bID < range.end(); ++bID) {
                         int nExtraLeaves = 0;
                         for (int i = 0; i < CPUVBM::JumpMapLength; i++)
                             nExtraLeaves += nanovdb::util::countOn(
@@ -443,7 +429,7 @@ void runVBMCudaTest(const std::vector<nanovdb::Coord>& coords)
                         if (prefixCountRealigned[31][15] == 513u)
                             dummy = prefixCountRealigned[31][15];
                     }
-                }
+                });
 
                 const float ms =
                     (float)timer.elapsed<std::chrono::microseconds>() / 1000.0f;
@@ -451,20 +437,20 @@ void runVBMCudaTest(const std::vector<nanovdb::Coord>& coords)
             }
         }
 
-        uint32_t dummy = 0;
+        std::atomic<uint32_t> dummy{0};
 
         std::cout << "\nCPU decodeInverseMaps performance ("
-                  << nBlocks << " blocks, " << nVoxels << " voxels"
-                  << ", " << omp_get_max_threads() << " OMP threads):\n";
+                  << nBlocks << " blocks, " << nVoxels << " voxels):\n";
 
         for (int run = 0; run < nPerfRuns; ++run) {
             nanovdb::util::Timer timer;
             timer.start("");
 
-            #pragma omp parallel reduction(+:dummy)
-            {
-                #pragma omp for schedule(static)
-                for (uint32_t bID = 0; bID < nBlocks; ++bID) {
+            nanovdb::util::forEach(0, nBlocks, 1,
+                [&](const nanovdb::util::Range1D& range) {
+                alignas(64) uint32_t scratchLeafIndex[BlockWidth];
+                alignas(64) uint16_t scratchVoxelOffset[BlockWidth];
+                for (auto bID = range.begin(); bID < range.end(); ++bID) {
                     const uint64_t blockFirstOffset =
                         cpuHandle.firstOffset() + (uint64_t)bID * BlockWidth;
 
@@ -473,18 +459,18 @@ void runVBMCudaTest(const std::vector<nanovdb::Coord>& coords)
                         firstLeafIDPtr[bID],
                         &jumpMapPtr[(uint64_t)bID * CPUVBM::JumpMapLength],
                         blockFirstOffset,
-                        g_scratchLeafIndex,
-                        g_scratchVoxelOffset);
+                        scratchLeafIndex,
+                        scratchVoxelOffset);
 
-                    dummy += (g_scratchLeafIndex[0]  != CPUVBM::UnusedLeafIndex)   ? 1u : 0u;
-                    dummy += (g_scratchVoxelOffset[0] != CPUVBM::UnusedVoxelOffset) ? 1u : 0u;
+                    dummy += (scratchLeafIndex[0]  != CPUVBM::UnusedLeafIndex)   ? 1u : 0u;
+                    dummy += (scratchVoxelOffset[0] != CPUVBM::UnusedVoxelOffset) ? 1u : 0u;
                 }
-            }
+            });
 
             const float ms =
                 (float)timer.elapsed<std::chrono::microseconds>() / 1000.0f;
             std::cout << "  run " << run << ": " << ms << " ms\n";
         }
-        std::cout << "  (dummy=" << dummy << ")\n";
+        std::cout << "  (dummy=" << dummy.load() << ")\n";
     }
 }
