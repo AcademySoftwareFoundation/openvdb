@@ -31,9 +31,10 @@
 #include <nanovdb/HostBuffer.h>
 #include <nanovdb/util/MaskPrefixSum.h>
 
+#include <nanovdb/util/ForEach.h>
+
 #include <algorithm>
 #include <cstring>
-#include <execution>
 
 namespace nanovdb {
 
@@ -210,7 +211,7 @@ struct VoxelBlockManagerBase
 ///        for a single voxel block. The implementation is single-threaded per block
 ///        and SIMD-accelerated (via util::shuffleDownMask and util::buildMaskPrefixSums);
 ///        the caller is responsible for parallelism across blocks (e.g. OpenMP or
-///        std::execution::par).
+///        nanovdb::util::forEach).
 template <int Log2BlockWidth>
 struct VoxelBlockManager : VoxelBlockManagerBase<Log2BlockWidth>
 {
@@ -349,15 +350,14 @@ void buildVoxelBlockManager(const NanoGrid<ValueOnIndex>* grid, VoxelBlockManage
     const auto *firstLeaf = tree.getFirstNode<0>();
     const uint32_t leafCount = tree.nodeCount(0);
 
-    std::for_each(std::execution::par, firstLeaf, firstLeaf + leafCount,
-        [&](const NanoLeaf<ValueOnIndex>& leaf) {
+    util::forEach(0, leafCount, 1, [&](const util::Range1D& range) {
+        for (auto leafIndex = range.begin(); leafIndex < range.end(); ++leafIndex) {
+            const auto& leaf = firstLeaf[leafIndex];
             const uint64_t leafFirstOffset = leaf.data()->firstOffset();
             const uint64_t leafValueCount = leaf.data()->valueCount();
             const uint64_t leafLastOffset = leafFirstOffset + leafValueCount - 1;
 
-            if (leafFirstOffset > lastOffset || leafLastOffset < firstOffset) return;
-
-            const uint64_t leafIndex = static_cast<uint64_t>(&leaf - firstLeaf);
+            if (leafFirstOffset > lastOffset || leafLastOffset < firstOffset) continue;
 
             const uint64_t lastBlock = std::min<uint64_t>(
                 (leafLastOffset - firstOffset) >> Log2BlockWidth, nBlocks - 1);
@@ -370,7 +370,7 @@ void buildVoxelBlockManager(const NanoGrid<ValueOnIndex>* grid, VoxelBlockManage
 
             if (leafFirstOffset < firstOffset) {
                 firstLeafID[0] = static_cast<uint32_t>(leafIndex);
-                return;
+                continue;
             }
 
             const uint64_t offsetInBlock = (leafFirstOffset - 1) & (BlockWidth - 1);
@@ -382,11 +382,12 @@ void buildVoxelBlockManager(const NanoGrid<ValueOnIndex>* grid, VoxelBlockManage
                 util::atomicOr(&jumpMap[firstBlock * JumpMapLength + (offsetInBlock >> 6)],
                                uint64_t(1) << (offsetInBlock & 0x3f));
             }
-        });
+        }
+    });
 }
 
 /// @brief Allocate buffers and build a VoxelBlockManager on the host from a
-///        ValueOnIndex grid. Uses std::execution::par to process lower internal
+///        ValueOnIndex grid. Uses nanovdb::util::forEach to process lower internal
 ///        nodes in parallel.
 /// @tparam Log2BlockWidth  Log2 of the number of active voxels per VBM block
 /// @tparam BufferT         Buffer type for the returned handle (default: HostBuffer)
