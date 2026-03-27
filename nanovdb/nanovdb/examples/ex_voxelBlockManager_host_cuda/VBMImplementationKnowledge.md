@@ -157,21 +157,49 @@ For each leaf overlapping the block:
 adjusting the cross-word offsets as `64*x - ones` instead of `ones`.
 
 **Performance history (2M voxels / 16384 blocks / 25% occupancy / 24 OMP threads / AVX2)**:
-- Original `getValue()` loop: ~77 ms
-- `buildMaskPrefixSums` + bit-scan scatter: ~65 ms (~15% improvement)
-- shfl_down without vectorization (in-place, -fopenmp missing in CUDA host flags): ~250 ms
-- shfl_down with proper vectorization (two-buffer __restrict__, -fopenmp fixed): ~15-20 ms
 
-**Critical finding**: `#pragma omp simd` is silently ignored for CUDA host code unless
-`-Xcompiler -fopenmp` is explicitly added.  Linking `OpenMP::OpenMP_CXX` does NOT
-automatically propagate compile flags to CUDA sources via CMake.  Without -fopenmp,
-the shfl_down passes compiled as scalar loops and were 4x slower than the bit-scan.
+All figures below are wall-clock time for the full `decodeInverseMaps` loop over all
+16384 blocks.  Entries marked *unoptimized* were measured with `CMAKE_BUILD_TYPE` unset
+(effectively `-O0` host compilation via NVCC); entries marked *Release* used
+`-DCMAKE_BUILD_TYPE=Release` (`-O3 -DNDEBUG`).
 
-**Why shfl_down beats bit-scan with vectorization**:
+- Original `getValue()` loop (unoptimized): ~77 ms
+- `buildMaskPrefixSums` + bit-scan scatter (unoptimized): ~65 ms (~15% improvement)
+- `shuffleDownMask` without vectorization (-fopenmp missing in CUDA host flags, unoptimized): ~250 ms
+- `shuffleDownMask` with vectorization (two-buffer `__restrict__`, -fopenmp fixed, unoptimized): ~15-20 ms
+- `shuffleDownMask` single-buffer + `buildMaskPrefixSums<true>` (unoptimized): ~15-17 ms (no regression)
+- `shuffleDownMask` single-buffer + `buildMaskPrefixSums<true>` (**Release**): **~0.9-1.6 ms (~15x speedup)**
+
+**Critical finding — build type**: with `CMAKE_BUILD_TYPE` unset, NVCC compiles host
+code without optimization.  Template functions (`shuffleDownMask`, `buildMaskPrefixSums`)
+are not inlined, the `#pragma omp simd` loops are not vectorized, and all locals are
+spilled to the stack.  The resulting ~15-17 ms figure is not representative of real
+performance.  Always benchmark with `-DCMAKE_BUILD_TYPE=Release`.
+
+**Critical finding — -fopenmp**: `#pragma omp simd` is silently ignored for CUDA host
+code unless `-Xcompiler -fopenmp` is explicitly added.  Linking `OpenMP::OpenMP_CXX`
+does NOT automatically propagate compile flags to CUDA sources via CMake.  Without
+-fopenmp, the shuffle-down passes compile as scalar loops.
+
+**Why shuffleDownMask beats bit-scan with vectorization**:
 - Bit-scan is inherently scalar (data-dependent BSF/BSR instruction, variable trip count).
-- shfl_down's 9 passes are fixed-width, data-independent loops over 512 elements.
+- shuffleDownMask's 9 passes are fixed-width, data-independent loops over 512 elements.
 - With AVX2 (16 uint16_t per register), each pass takes ~32 vector ops vs ~128 scalar ops
   for the bit-scan at 25% occupancy.
+
+**Recommended CMake invocation** (from the `build/` directory):
+```bash
+cmake .. \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_CUDA_ARCHITECTURES=89 \
+  -DOpenVDB_ROOT=/home/esifakis/local \
+  -DNANOVDB_USE_CUDA=ON \
+  -DNANOVDB_USE_OPENVDB=ON \
+  -DNANOVDB_USE_TBB=ON \
+  -DNANOVDB_BUILD_EXAMPLES=ON \
+  -DNANOVDB_BUILD_UNITTESTS=ON \
+  -DNANOVDB_BUILD_TOOLS=ON
+```
 
 ---
 
