@@ -3451,8 +3451,10 @@ __global__ void testComputeStencilNeighborsKernel(
     uint64_t *jumpMapArray,
     uint64_t *stencilNeighborsArray)
 {
-    static constexpr int BlockWidth = 128;
-    static constexpr int JumpMapLength = BlockWidth >> 6;
+    static constexpr int Log2BlockWidth = 7;
+    using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
+    static constexpr int BlockWidth    = VBM::BlockWidth;
+    static constexpr int JumpMapLength = VBM::JumpMapLength;
     int bID = blockIdx.x;
     int tID = threadIdx.x;
 
@@ -3463,11 +3465,11 @@ __global__ void testComputeStencilNeighborsKernel(
     __shared__ uint32_t leafIndex[BlockWidth];
     __shared__ uint16_t voxelOffset[BlockWidth];
 
-    nanovdb::tools::cuda::VoxelBlockManager<BlockWidth>::decodeInverseMaps(
+    nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>::decodeInverseMaps(
         grid, firstLeafID, jumpMap, blockFirstOffset, &leafIndex[0], &voxelOffset[0]);
 
     uint64_t localNeighbors[27] = {};
-    nanovdb::tools::cuda::VoxelBlockManager<BlockWidth>::computeBoxStencil(
+    nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>::computeBoxStencil(
         grid, &leafIndex[0], &voxelOffset[0], localNeighbors);
     __syncthreads();
 
@@ -3484,10 +3486,11 @@ void testVoxelBlockManager()
     std::vector<nanovdb::Coord> voxels;
     nanovdb::CoordBBox bbox = nanovdb::CoordBBox::createCube(125,145); // Coordinates chosen to span more than 1 lower node
     for (auto it = bbox.begin(); it; it++) voxels.push_back(*it);
-    constexpr std::size_t BlockWidthLog2 = 7;
-    constexpr std::size_t BlockWidth = 1 << BlockWidthLog2; // 128
+    constexpr int Log2BlockWidth = 7;
+    using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
+    constexpr auto BlockWidth = VBM::BlockWidth;
     const std::size_t nVoxels = voxels.size();
-    const std::size_t nBlocks = (nVoxels + BlockWidth - 1) >> BlockWidthLog2;
+    const std::size_t nBlocks = (nVoxels + BlockWidth - 1) >> Log2BlockWidth;
     nanovdb::Coord *deviceVoxels;
     cudaCheck(cudaMalloc(&deviceVoxels, nVoxels * sizeof(nanovdb::Coord)));
     cudaCheck(cudaMemcpy(deviceVoxels, voxels.data(), nVoxels * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice)); // CPU -> GPU
@@ -3500,18 +3503,9 @@ void testVoxelBlockManager()
     EXPECT_TRUE(handle.data()); // no grid was yet allocated on the CPU
     auto grid = handle.template grid<BuildT>();
     EXPECT_TRUE(grid);
-    std::size_t nLowerNodes = grid->tree().nodeCount(1);
-
     // Construct VBM structure
-    nanovdb::tools::VoxelBlockManagerHandle<BufferT> vbmHandle;
-    vbmHandle.template deviceResize<BlockWidthLog2>(nBlocks);
-    vbmHandle.setOffsets(1, nVoxels);
-    vbmHandle.setLowerCount(nLowerNodes);
-
-    nanovdb::tools::cuda::buildVoxelBlockManager<BlockWidthLog2>(
-        vbmHandle.firstOffset(), vbmHandle.lastOffset(),
-        vbmHandle.blockCount(), vbmHandle.lowerCount(),
-        deviceGrid, vbmHandle.deviceFirstLeafID(), vbmHandle.deviceJumpMap() );
+    auto vbmHandle = nanovdb::tools::cuda::buildVoxelBlockManager<Log2BlockWidth, BufferT>(
+        deviceGrid);
 
     // Compute stencil neighbors
     const size_t neighborStencilSize = nBlocks * BlockWidth * 27 * sizeof(uint64_t);
