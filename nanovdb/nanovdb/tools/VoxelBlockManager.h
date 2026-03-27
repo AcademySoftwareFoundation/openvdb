@@ -45,23 +45,14 @@ namespace util {
 /// data[j+Shift] based on the predicate (masks[j+Shift] & maskBits) != 0:
 ///
 ///   m = ~DataT{0}  if (masks[j+Shift] & maskBits) != 0  (all-ones blend mask)
-///   m =  DataT{0}  otherwise                             (all-zeros blend mask)
+///   m =  DataT{0}  otherwise                            (all-zeros blend mask)
 ///   data[j] = (data[j+Shift] & m) | (data[j] & ~m)
 ///
 /// Positions j in [N - Shift, N) are left unchanged (the trailing portion of
 /// the stream that cannot receive a shifted element).
 ///
-/// The predicate is formed by ANDing masks[j+Shift] with the runtime constant
-/// maskBits.  Since maskBits is always a literal at every call site (and the
-/// function is always inlined), the compiler constant-folds it as effectively
-/// as a template parameter.
-///
-/// In-place correctness: j < j+Shift guarantees every source element is
-/// read before its slot is overwritten, even under SIMD vectorization
-/// (all loads in a vector instruction precede all stores).
-/// NANOVDB_RESTRICT on both parameters resolves the data/masks aliasing concern
-/// and allows the vectorizer to emit SIMD blend instructions (vpblendvb /
-/// vpand + vpor on AVX2).
+/// In-place safe: j < j+Shift guarantees every source element is read before
+/// its slot is overwritten, including under SIMD vectorization.
 ///
 /// The name follows the CUDA __shfl_down_sync convention: "shuffle down" denotes
 /// a conditional fixed-distance gather from higher-indexed positions, as opposed
@@ -93,7 +84,12 @@ inline void shuffleDownMask(DataT* NANOVDB_RESTRICT data,
 
 namespace tools {
 
-/// @brief This class serves to manage the raw memory buffers for the metadata of a NanoVDB VoxelBlockManager
+/// @brief Move-only owner of the two raw metadata buffers that back a VoxelBlockManager:
+///        the per-block firstLeafID array (uint32_t[blockCount]) and the per-block
+///        jumpMap array (uint64_t[blockCount * JumpMapLength]).
+/// @tparam BufferT Buffer type that owns a contiguous allocation.  Must satisfy the
+///         NanoVDB BufferTraits concept: provide data(), clear(), and — when device
+///         memory is needed — deviceData() (gated by BufferTraits<BufferT>::hasDeviceDual).
 template<typename BufferT>
 class VoxelBlockManagerHandle
 {
@@ -105,14 +101,13 @@ class VoxelBlockManagerHandle
 
 public:
     /// @brief Constructor from metadata buffers (used by buildVoxelBlockManager)
-    VoxelBlockManagerHandle(BufferT&& firstLeafID, BufferT&& jumpMap, const uint64_t blockCount,
-        const uint64_t firstOffset, const uint64_t lastOffset) {
-        mFirstLeafID = std::move(firstLeafID);
-        mJumpMap = std::move(jumpMap);
-        mBlockCount = blockCount;
-        mFirstOffset = firstOffset;
-        mLastOffset = lastOffset;
-    }
+    VoxelBlockManagerHandle(BufferT&& firstLeafID, BufferT&& jumpMap,
+        uint64_t blockCount, uint64_t firstOffset, uint64_t lastOffset)
+        : mFirstLeafID(std::move(firstLeafID))
+        , mJumpMap(std::move(jumpMap))
+        , mBlockCount(blockCount)
+        , mFirstOffset(firstOffset)
+        , mLastOffset(lastOffset) {}
 
     VoxelBlockManagerHandle() = default;
     VoxelBlockManagerHandle(const VoxelBlockManagerHandle&) = delete;
@@ -120,19 +115,19 @@ public:
 
     VoxelBlockManagerHandle& operator=(VoxelBlockManagerHandle&& other) noexcept {
         mFirstLeafID = std::move(other.mFirstLeafID);
-        mJumpMap = std::move(other.mJumpMap);
-        mBlockCount = other.mBlockCount;
-        mFirstOffset = other.mFirstOffset;
-        mLastOffset = other.mLastOffset;
+        mJumpMap     = std::move(other.mJumpMap);
+        mBlockCount  = std::exchange(other.mBlockCount,  0);
+        mFirstOffset = std::exchange(other.mFirstOffset, 0);
+        mLastOffset  = std::exchange(other.mLastOffset,  0);
         return *this;
     }
 
     VoxelBlockManagerHandle(VoxelBlockManagerHandle&& other) noexcept {
         mFirstLeafID = std::move(other.mFirstLeafID);
-        mJumpMap = std::move(other.mJumpMap);
-        mBlockCount = other.mBlockCount;
-        mFirstOffset = other.mFirstOffset;
-        mLastOffset = other.mLastOffset;
+        mJumpMap     = std::move(other.mJumpMap);
+        mBlockCount  = std::exchange(other.mBlockCount,  0);
+        mFirstOffset = std::exchange(other.mFirstOffset, 0);
+        mLastOffset  = std::exchange(other.mLastOffset,  0);
     }
 
     ~VoxelBlockManagerHandle() { this->reset(); }
@@ -190,22 +185,40 @@ public:
 
 }; // VoxelBlockManagerHandle
 
+// --------------------------> VoxelBlockManagerBase <----------------------------------------
+
+/// @brief Compile-time geometry parameters and output sentinels shared by the CPU
+///        and CUDA VoxelBlockManager decode structs.
+/// @tparam Log2BlockWidth  Log2 of the number of active voxels per VBM block
+template <int Log2BlockWidth>
+struct VoxelBlockManagerBase
+{
+    static constexpr int BlockWidth    = 1 << Log2BlockWidth;
+    static_assert(Log2BlockWidth >= 6, "BlockWidth must be at least 64 (one jumpMap word per block)");
+    static constexpr int JumpMapLength = BlockWidth / 64; ///< number of uint64_t words per block in the jumpMap
+
+    /// Sentinel written to leafIndex slots with no active voxel in this block
+    static constexpr uint32_t UnusedLeafIndex   = ~uint32_t{0};
+    /// Sentinel written to voxelOffset slots with no active voxel in this block
+    static constexpr uint16_t UnusedVoxelOffset = ~uint16_t{0};
+}; // VoxelBlockManagerBase
+
 // --------------------------> VoxelBlockManager (CPU) <--------------------------------------
 
 /// @brief CPU counterpart of tools::cuda::VoxelBlockManager. Provides host-side
 ///        decode of the inverse maps (sequential index -> leaf + voxel offset)
-///        for a single voxel block. No SIMD or parallelism: the implementation
-///        is intentionally plain and single-threaded so the caller can parallelize
-///        across blocks however it likes (e.g. std::execution::par or OpenMP).
+///        for a single voxel block. The implementation is single-threaded per block
+///        and SIMD-accelerated (via util::shuffleDownMask and util::buildMaskPrefixSums);
+///        the caller is responsible for parallelism across blocks (e.g. OpenMP or
+///        std::execution::par).
 template <int Log2BlockWidth>
-struct VoxelBlockManager
+struct VoxelBlockManager : VoxelBlockManagerBase<Log2BlockWidth>
 {
-    static constexpr int BlockWidth    = 1 << Log2BlockWidth;
-    static_assert(Log2BlockWidth >= 6, "BlockWidth must be at least 64 (one jumpMap word per block)");
-    static constexpr int JumpMapLength = BlockWidth / 64;
-
-    static constexpr uint32_t UnusedLeafIndex   = 0xffffffff;
-    static constexpr uint16_t UnusedVoxelOffset = 0xffff;
+    using Base = VoxelBlockManagerBase<Log2BlockWidth>;
+    using Base::BlockWidth;
+    using Base::JumpMapLength;
+    using Base::UnusedLeafIndex;
+    using Base::UnusedVoxelOffset;
 
     /// @brief Decode the inverse maps for a single voxel block on the host.
     ///
@@ -218,30 +231,27 @@ struct VoxelBlockManager
     ///   - voxelOffset[p] = local (0..511) offset of that voxel within its leaf,
     ///                      or UnusedVoxelOffset.
     ///
-    /// This is the direct CPU analogue of the CUDA decodeInverseMaps: same inputs,
-    /// same outputs, same sentinel values. The GPU version runs cooperatively across
-    /// a thread block; this version is a plain sequential loop intended to be called
-    /// once per voxel block from a single thread (or from one thread per block in a
-    /// parallel outer loop).
+    /// The CPU analogue of the CUDA decodeInverseMaps. Single-threaded per block;
+    /// SIMD is used internally. The caller is responsible for parallelism across blocks.
     ///
-    /// @tparam BuildT     Build type of the grid (must be an index type)
-    /// @param grid            Host-accessible grid
-    /// @param firstLeafID  Index of the first leaf overlapping this block
-    ///                     (i.e. firstLeafID[blockID] from the VBM metadata)
-    /// @param jumpMap         Pointer to the JumpMapLength words for this block
-    ///                        (i.e. &jumpMap[blockID * JumpMapLength])
-    /// @param blockFirstOffset  Sequential index of the first voxel in this block
-    /// @param leafIndex       Output array of length BlockWidth
-    /// @param voxelOffset     Output array of length BlockWidth
+    /// @tparam BuildT  Build type of the grid (must be an index type)
+    /// @param grid               Host-accessible grid
+    /// @param firstLeafID        Index of the first leaf overlapping this block
+    ///                           (i.e. firstLeafID[blockID] from the VBM metadata)
+    /// @param jumpMap            Pointer to the JumpMapLength words for this block
+    ///                           (i.e. &jumpMap[blockID * JumpMapLength])
+    /// @param blockFirstOffset   Sequential index of the first voxel in this block
+    /// @param leafIndex          Output array of length BlockWidth
+    /// @param voxelOffset        Output array of length BlockWidth
     template <class BuildT>
     static typename util::enable_if<BuildTraits<BuildT>::is_index, void>::type
     decodeInverseMaps(
-        const NanoGrid<BuildT>* grid,
-        const uint32_t          firstLeafID,
-        const uint64_t*         jumpMap,
-        const uint64_t          blockFirstOffset,
-        uint32_t*               leafIndex,
-        uint16_t*               voxelOffset)
+        const NanoGrid<BuildT> *grid,
+        const uint32_t firstLeafID,
+        const uint64_t *jumpMap,
+        const uint64_t blockFirstOffset,
+        uint32_t *leafIndex,
+        uint16_t *voxelOffset)
     {
         NANOVDB_ASSERT(grid->isSequential());
 
@@ -251,11 +261,11 @@ struct VoxelBlockManager
             nExtraLeaves += util::countOn(jumpMap[i]);
 
         // Initialize outputs to sentinel values
-        std::fill(leafIndex,   leafIndex   + BlockWidth, UnusedLeafIndex);
+        std::fill(leafIndex, leafIndex + BlockWidth, UnusedLeafIndex);
         std::fill(voxelOffset, voxelOffset + BlockWidth, UnusedVoxelOffset);
 
         const auto &tree = grid->tree();
-        for (int leafID = firstLeafID; leafID <= firstLeafID + nExtraLeaves; leafID++) {
+        for (auto leafID = firstLeafID; leafID <= firstLeafID + nExtraLeaves; leafID++) {
             const auto &leaf = tree.template getFirstNode<0>()[leafID];
 
             const uint64_t leafFirstOffset = leaf.data()->firstOffset();
@@ -277,19 +287,17 @@ struct VoxelBlockManager
             // buf is initialized with the identity (buf[i] = i) and updated in-place
             // each pass.  NANOVDB_RESTRICT on both buf and shifts discharges the aliasing
             // concern and allows the vectorizer to emit SIMD blend instructions.
-            // Only shifts[0..511] are accessed by the passes; shifts[512] was used above.
-            uint16_t buf[512];
-            for (int i = 0; i < 512; i++) buf[i] = static_cast<uint16_t>(i);
-            util::shuffleDownMask<512,   1>(buf, shifts, uint16_t{  1});
-            util::shuffleDownMask<512,   2>(buf, shifts, uint16_t{  2});
-            util::shuffleDownMask<512,   4>(buf, shifts, uint16_t{  4});
-            util::shuffleDownMask<512,   8>(buf, shifts, uint16_t{  8});
-            util::shuffleDownMask<512,  16>(buf, shifts, uint16_t{ 16});
-            util::shuffleDownMask<512,  32>(buf, shifts, uint16_t{ 32});
-            util::shuffleDownMask<512,  64>(buf, shifts, uint16_t{ 64});
-            util::shuffleDownMask<512, 128>(buf, shifts, uint16_t{128});
-            util::shuffleDownMask<512, 256>(buf, shifts, uint16_t{256});
-            const uint16_t *leafLocalOffsets = buf;
+            uint16_t leafLocalOffsets[512];
+            for (int i = 0; i < 512; i++) leafLocalOffsets[i] = static_cast<uint16_t>(i);
+            util::shuffleDownMask<512,   1>(leafLocalOffsets, shifts, uint16_t{  1});
+            util::shuffleDownMask<512,   2>(leafLocalOffsets, shifts, uint16_t{  2});
+            util::shuffleDownMask<512,   4>(leafLocalOffsets, shifts, uint16_t{  4});
+            util::shuffleDownMask<512,   8>(leafLocalOffsets, shifts, uint16_t{  8});
+            util::shuffleDownMask<512,  16>(leafLocalOffsets, shifts, uint16_t{ 16});
+            util::shuffleDownMask<512,  32>(leafLocalOffsets, shifts, uint16_t{ 32});
+            util::shuffleDownMask<512,  64>(leafLocalOffsets, shifts, uint16_t{ 64});
+            util::shuffleDownMask<512, 128>(leafLocalOffsets, shifts, uint16_t{128});
+            util::shuffleDownMask<512, 256>(leafLocalOffsets, shifts, uint16_t{256});
 
             // Intersect this leaf's active range with the block's range.
             // Active voxels span [leafFirstOffset, leafFirstOffset+leafValueCount) globally.
@@ -301,8 +309,7 @@ struct VoxelBlockManager
             const uint64_t pStart = globalStart - blockFirstOffset; // first output slot in block
             const uint64_t count  = globalEnd   - globalStart;
 
-            std::fill(leafIndex   + pStart, leafIndex   + pStart + count,
-                      static_cast<uint32_t>(leafID));
+            std::fill(leafIndex + pStart, leafIndex + pStart + count, leafID);
             std::copy(leafLocalOffsets + jStart, leafLocalOffsets + jStart + count,
                       voxelOffset + pStart);
         }
@@ -312,9 +319,7 @@ struct VoxelBlockManager
 // --------------------------> buildVoxelBlockManager (CPU) <---------------------------------
 
 /// @brief Rebuild a VoxelBlockManager in-place using a pre-allocated handle.
-///        Zeros the jumpMap and recomputes both metadata arrays. This overload
-///        performs no memory allocation and is suitable for repeated builds
-///        (e.g. benchmarking, or rebuilding after a topology-preserving update).
+///        Zeros the jumpMap and recomputes both metadata arrays. No memory allocation.
 /// @tparam Log2BlockWidth Log2 of the number of active voxels per VBM block
 /// @tparam BufferT Buffer type of the handle (must provide host-accessible data())
 /// @param grid Host-accessible ValueOnIndex grid (must satisfy isSequential())
@@ -323,9 +328,9 @@ struct VoxelBlockManager
 template<int Log2BlockWidth, typename BufferT>
 void buildVoxelBlockManager(const NanoGrid<ValueOnIndex>* grid, VoxelBlockManagerHandle<BufferT>& handle)
 {
-    static constexpr uint64_t BlockWidth = uint64_t(1) << Log2BlockWidth;
-    static_assert(Log2BlockWidth >= 6, "BlockWidth must be at least 64 (one jumpMap word per block)");
-    static constexpr uint64_t JumpMapLength = BlockWidth / 64;
+    using Base = VoxelBlockManagerBase<Log2BlockWidth>;
+    constexpr auto BlockWidth    = Base::BlockWidth;
+    constexpr auto JumpMapLength = Base::JumpMapLength;
 
     NANOVDB_ASSERT(grid->isSequential());
     if (!handle.blockCount()) return;
@@ -405,8 +410,9 @@ buildVoxelBlockManager(
     uint64_t nBlocks = 0,
     const BufferT* pool = nullptr)
 {
-    static constexpr uint64_t BlockWidth = uint64_t(1) << Log2BlockWidth;
-    static constexpr uint64_t JumpMapLength = BlockWidth / 64;
+    using Base = VoxelBlockManagerBase<Log2BlockWidth>;
+    constexpr auto BlockWidth    = Base::BlockWidth;
+    constexpr auto JumpMapLength = Base::JumpMapLength;
 
     if (!firstOffset) firstOffset = 1;
     if (!lastOffset) lastOffset = grid->activeVoxelCount();

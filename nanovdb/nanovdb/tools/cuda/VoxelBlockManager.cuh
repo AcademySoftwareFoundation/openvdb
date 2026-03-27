@@ -40,22 +40,17 @@ namespace tools::cuda {
 /// for voxel-sequential, occupancy-independent access over an OnIndexGrid.
 /// @tparam Log2BlockWidth Log2 of the number of active voxels per VBM block
 template <int Log2BlockWidth>
-struct VoxelBlockManager
+struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
 {
-    static constexpr int BlockWidth = 1 << Log2BlockWidth;
-    static_assert(Log2BlockWidth >= 6, "BlockWidth must be at least 64 (one jumpMap word per block)");
+    using Base = nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>;
+    using Base::BlockWidth;
+    using Base::JumpMapLength;
+    using Base::UnusedLeafIndex;
+    using Base::UnusedVoxelOffset;
 
     // The efficiency of the functions in this class are contingent on
     // threadblock-level coordination, which manifests either as using shared
     // memory for synchronization, or warp-level shift operations.
-
-    // The jumpMap is packed in uint64_t's, one per 64 consecutive bits. Hence
-    // JumpMapLength is the number of uint64_t that are needed to straddle the
-    // total BlockWidth bits of the jumpMap.
-    static constexpr int JumpMapLength = BlockWidth/64;
-
-    static constexpr uint32_t UnusedLeafIndex = 0xffffffff;
-    static constexpr uint16_t UnusedVoxelOffset = 0xffff;
 
     /// @brief Given a grid and the associated jumpMap in global memory, compute
     /// the leaf indices and voxel offsets in shared memory. This function
@@ -93,7 +88,7 @@ struct VoxelBlockManager
         // Initialize leafIndex & voxelOffset to sentinel values
         // for blocks that extend beyond the last active voxel in the grid
         if (tID < BlockWidth)
-#pragma unroll
+            #pragma unroll
             for (int i = 0; i < BlockWidth; i += blockDim.x) {
                 smem_leafIndex[i+tID] = UnusedLeafIndex;
                 smem_voxelOffset[i+tID] = UnusedVoxelOffset;
