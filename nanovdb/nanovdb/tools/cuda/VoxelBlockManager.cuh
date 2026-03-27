@@ -2,16 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /*!
-    \file nanovdb/tools/VoxelBlockManager.cuh
+    \file nanovdb/tools/cuda/VoxelBlockManager.cuh
 
-    \author Eftychios Sifakis
+    \author Efty Sifakis
 
     \date January 27, 2025
 
-    \brief Implements device functions to build and query the VoxelBlockManager.
-           The VoxelBlockManager is an acceleration structure for sequential access
-           and stencil operations over solely the active voxels of an OnIndexGrid
-           which enables SIMT parallelism independent of occupancy.
+    \brief VoxelBlockManager: CUDA device kernels for building and decoding the
+           VBM metadata on the GPU.
+
+    \details Implements the SIMT-parallel counterpart of the host-side decode in
+      nanovdb/tools/VoxelBlockManager.h.  The VoxelBlockManager is an acceleration
+      structure for voxel-sequential, SIMT-parallel access over the active voxels
+      of an OnIndexGrid, independent of occupancy.  This file provides:
+      - buildVoxelBlockManager (device): constructs the firstLeafID array and
+        jumpMap on the GPU from a device-resident NanoGrid.
+      - decodeInverseMaps (device): per-block SIMT decode of the inverse maps
+        (sequential active-voxel index -> leaf ID + intra-leaf voxel offset),
+        executed cooperatively across a CUDA thread block.
 */
 
 #include <nanovdb/NanoVDB.h>
