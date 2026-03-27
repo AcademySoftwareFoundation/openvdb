@@ -123,12 +123,14 @@ list(REMOVE_ITEM _vbm_sources
 set_target_properties(ex_voxelBlockManager_host_cuda PROPERTIES SOURCES "${_vbm_sources}")
 
 find_package(OpenMP)
+target_compile_options(ex_voxelBlockManager_host_cuda PRIVATE
+  $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-mavx2>
+  $<$<COMPILE_LANGUAGE:CXX>:-mavx2>)
 if(OpenMP_CXX_FOUND)
   target_link_libraries(ex_voxelBlockManager_host_cuda PRIVATE OpenMP::OpenMP_CXX)
+  target_compile_options(ex_voxelBlockManager_host_cuda PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-fopenmp>)
 endif()
-target_compile_options(ex_voxelBlockManager_host_cuda PRIVATE
-  $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-mavx2,-fopenmp>
-  $<$<COMPILE_LANGUAGE:CXX>:-mavx2>)
 
 add_executable(prefix_popcnt_bench
   ex_voxelBlockManager_host_cuda/prefix_popcnt_bench.cpp)
