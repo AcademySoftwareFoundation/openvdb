@@ -1262,3 +1262,10 @@ util::shuffleDownMask<512,   1>(buf, shifts, uint16_t{  1});
 util::shuffleDownMask<512, 256>(buf, shifts, uint16_t{256});
 ```
 No behavioral change from §17d.
+
+**Future consideration — header migration**: `shuffleDownMask` currently lives in
+`VoxelBlockManager.h` because that is where it was first needed.  It is a generic,
+VBM-independent primitive with no dependency on any VBM type.  A natural future home
+is a dedicated utility header such as `nanovdb/util/Algo.h` (does not yet exist) or
+`nanovdb/util/Util.h`.  Migration should be deferred until at least one second call
+site emerges outside the VBM, to avoid premature abstraction.
