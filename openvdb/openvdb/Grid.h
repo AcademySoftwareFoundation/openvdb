@@ -1199,14 +1199,14 @@ struct IsPointDataLeafNode<PointDataLeafNode<T, Log2Dim>> : std::true_type {};
 /// requires multiple passes to read and write voxel data.
 /// @details Multi-pass I/O allows leaf nodes to optimize their serialization layout
 /// for delayed-load access patterns. Only @c PointDataLeafNode supports multi-pass I/O.
-/// Defining a custom leaf node that inherits @c io::MultiPass is no longer permitted.
+/// Defining a custom leaf node that inherits @c io::PointDataGridMultiPass is no longer permitted.
 /// @sa points::IsPointDataLeafNode
 template<typename LeafNodeType>
 struct HasMultiPassIO {
     static_assert(
-        !std::is_base_of<io::MultiPass, LeafNodeType>::value
+        !std::is_base_of<io::PointDataGridMultiPass, LeafNodeType>::value
         || points::IsPointDataLeafNode<LeafNodeType>::value,
-        "Only PointDataLeafNode may inherit from io::MultiPass; "
+        "Only PointDataLeafNode may inherit from io::PointDataGridMultiPass; "
         "use points::IsPointDataLeafNode to test for multi-pass I/O support.");
     static const bool value = points::IsPointDataLeafNode<LeafNodeType>::value;
 };

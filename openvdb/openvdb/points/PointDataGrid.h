@@ -107,7 +107,7 @@ prefetch(PointDataTreeT&, bool /*position*/ = true, bool /*otherAttributes*/ = t
 
 
 template <typename T, Index Log2Dim>
-class PointDataLeafNode : public tree::LeafNode<T, Log2Dim>, io::MultiPass {
+class PointDataLeafNode : public tree::LeafNode<T, Log2Dim>, io::PointDataGridMultiPass {
 
 public:
     using LeafNodeType  = PointDataLeafNode<T, Log2Dim>;
