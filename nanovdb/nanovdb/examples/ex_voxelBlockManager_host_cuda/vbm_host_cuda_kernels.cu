@@ -23,7 +23,11 @@
 #include <thrust/universal_vector.h>
 
 #include <immintrin.h>
+#ifdef _OPENMP
 #include <omp.h>
+#else
+inline int omp_get_max_threads() { return 1; }
+#endif
 
 #include <algorithm>
 #include <vector>
