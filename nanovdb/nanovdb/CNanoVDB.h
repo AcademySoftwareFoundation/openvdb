@@ -325,12 +325,12 @@ cnanovdb_readaccessor_insert(cnanovdb_readaccessor *RESTRICT acc, int childlevel
 
 // The padding of nodes varies on the signature, as the value type may
 // result in aligned or misaligned...
-#define LEAFDATA_PAD_F 
+#define LEAFDATA_PAD_F
 #define LEAFDATA_PAD_F3 uint32_t _reserved[4];
-#define LEAFDATA_PAD_I 
+#define LEAFDATA_PAD_I
 
 #define NODEDATA_PAD_F uint8_t _reserved[16];
-#define NODEDATA_PAD_F3 
+#define NODEDATA_PAD_F3
 #define NODEDATA_PAD_I uint8_t _reserved[16];
 
 #define CREATE_LEAF_NODE_int(LEVEL, LOG2DIM, CHILDTOTAL, TOTAL, MASK, VALUETYPE, STATSTYPE, SUFFIX) \
@@ -548,7 +548,7 @@ CREATE_INTERNAL_NODE_int(CHILDLEVEL, LEVEL, LOG2DIM, (TOTAL-LOG2DIM), TOTAL, ((1
 // Whether this is aligned varies with the signature...
 #define ROOTDATATILE_PAD_F uint8_t _reserved[8];
 #define ROOTDATATILE_PAD_I uint8_t _reserved[8];
-#define ROOTDATATILE_PAD_F3 
+#define ROOTDATATILE_PAD_F3
 
 #define DEFINE_KEY(KEY) \
         uint64_t        KEY;
@@ -586,9 +586,9 @@ CREATE_INTERNAL_NODE_int(CHILDLEVEL, LEVEL, LOG2DIM, (TOTAL-LOG2DIM), TOTAL, ((1
 #else
 
 // Whether this is aligned varies with the signature...
-#define ROOTDATATILE_PAD_F 
+#define ROOTDATATILE_PAD_F
 #define ROOTDATATILE_PAD_I
-#define ROOTDATATILE_PAD_F3 uint8_t _reserved[24]; 
+#define ROOTDATATILE_PAD_F3 uint8_t _reserved[24];
 
 #define DEFINE_KEY(KEY) \
         cnanovdb_coord   KEY;
