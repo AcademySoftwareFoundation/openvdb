@@ -23,10 +23,6 @@ enum class ReadMode {
 /// Contains common options shared across all codec types
 struct OPENVDB_API ReadOptions
 {
-    using Ptr = std::shared_ptr<ReadOptions>;
-
-    virtual ~ReadOptions() = default;
-
     // BBox Clip Data
     BBoxd clipBBox = BBoxd();
 
@@ -38,9 +34,6 @@ struct OPENVDB_API ReadOptions
 /// Contains common options shared across all codec types
 struct OPENVDB_API WriteOptions
 {
-    using Ptr = std::shared_ptr<WriteOptions>;
-
-    virtual ~WriteOptions() = default;
 }; // struct WriteOptions
 
 
