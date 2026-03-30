@@ -163,34 +163,13 @@ public:
     /// @param poly  Polygon soup that will be moved to this instance.
     /// @param dim   Desired voxel dimension of the output level set.
     /// @param width Half-width of the output narrow-band level set, in voxel units.
-    PolySoupToLevelSet(PolySoup &&poly, int dim, float width = float(LEVEL_SET_HALF_WIDTH))
-      : mPoly(poly), mHalfWidth(width)
-    {
-        if constexpr(!std::is_floating_point<typename GridType::ValueType>::value) {
-            OPENVDB_THROW(TypeError, "polySoupToLevelSet: supported only for scalar floating-point grids");
-        }
-        if (!mPoly.bbox) mPoly.bbox = PolySoupToLevelSet::getBBox(mPoly.vtx);
-        const float maxLength = mPoly.bbox.extents()[mPoly.bbox.maxExtent()];
-        mMinVoxelSize = maxLength/(dim - 2.0f*(mHalfWidth + 1.0f));// +1 since final surface is dilated by dx
-        mMaxVoxelSize = maxLength / 2.0f;
-        OPENVDB_ASSERT(2*mMinVoxelSize <= mMaxVoxelSize);
-    }
+    PolySoupToLevelSet(PolySoup &&poly, int dim, float width = float(LEVEL_SET_HALF_WIDTH));
 
     /// @brief Constructor from a desired voxel size.
     /// @param poly      Polygon soup that will be moved to this instance.
     /// @param voxelSize Desired voxel size of the output level set in world units.
     /// @param width     Half-width of the output narrow-band level set, in voxel units.
-    PolySoupToLevelSet(PolySoup &&poly, float voxelSize, float width = float(LEVEL_SET_HALF_WIDTH))
-      : mPoly(poly), mMinVoxelSize(voxelSize), mHalfWidth(width)
-    {
-        if constexpr(!std::is_floating_point<typename GridType::ValueType>::value) {
-            OPENVDB_THROW(TypeError, "polySoupToLevelSet: supported only for scalar floating-point grids");
-        }
-        if (!mPoly.bbox) mPoly.bbox = PolySoupToLevelSet::getBBox(mPoly.vtx);
-        const float maxLength = mPoly.bbox.extents()[mPoly.bbox.maxExtent()];
-        mMaxVoxelSize = maxLength / 2.0f;
-        OPENVDB_ASSERT(2*mMinVoxelSize <= mMaxVoxelSize);
-    }
+    PolySoupToLevelSet(PolySoup &&poly, float voxelSize, float width = float(LEVEL_SET_HALF_WIDTH));
 
     /// @brief Performs the actual processing to generate the shrink wrap surfaces.
     /// @tparam  ShrinkWrapT Optional template parameter of the functor controlling
@@ -229,24 +208,7 @@ public:
 
     /// @brief Static method that computes the bounding box of a list of vertex coordinates.
     /// @param vtx Vector of vertex coordinates.
-    static math::BBox<Vec3f> getBBox(const std::vector<Vec3s> &vtx)
-    {
-        using RangeT = tbb::blocked_range<std::vector<Vec3s>::const_iterator>;
-        RangeT range(vtx.begin(), vtx.end(), 1024);
-        struct BBoxOp {
-            math::BBox<Vec3f> bbox;
-            BBoxOp() : bbox() {}
-            BBoxOp(BBoxOp& s, tbb::split) : bbox(s.bbox) {}
-            void operator()(const RangeT& r) {for (auto p=r.begin(); p!=r.end(); ++p) bbox.expand(*p);}
-            void join(BBoxOp& rhs) {bbox.expand(rhs.bbox);}
-        } tmp;
-#if 0
-        tmp(range);// serial
-#else
-        tbb::parallel_reduce(range, tmp);// parallel
-#endif
-        return tmp.bbox;
-    }
+    static math::BBox<Vec3f> getBBox(const std::vector<Vec3s> &vtx);
 
 private:
     PolySoup mPoly;
@@ -255,48 +217,46 @@ private:
     bool mIsGridSDF;
 
     /// @brief Private method that generates a dx offset level set surface from mPoly, while also updating mPoly
-    auto offset(float dx){
-        auto xform = math::Transform::createLinearTransform(dx);
-#if 0// no mesh <-> VDB round trips!
-        auto grid = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth + 1);// mesh -> UDF
-        tools::foreach(grid->beginValueOn(), [dx](const typename GridType::ValueOnIter& it){it.setValue(*it - dx);}, true, true);
-        tools::changeBackground(grid->tree(), mHalfWidth*dx);
-        grid->setGridClass(GRID_LEVEL_SET);
-        return grid;
-#else
-        auto udf = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> UDF
-        volumeToMesh(*udf, mPoly.vtx, mPoly.tri, mPoly.quad, dx, 0.0);// UDF -> mesh (clears and re-allocates mesh)
-        return meshToLevelSet<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> SDF
-#endif
-    }
+    auto offset(float dx);
 
     /// @brief Private method that resamples inGrid(dx) to outGrid(dx/2)
-    auto upsample(const GridType &inGrid){
-        auto outGrid = createLevelSet<GridType>(inGrid.voxelSize()[0]/2, mHalfWidth);
-        resampleToMatch<BoxSampler>(inGrid, *outGrid);
-        mIsGridSDF = true;
-        return outGrid;
-    }
+    auto upsample(const GridType &inGrid);
 
     /// @brief Performs the shrink wrap operation as a constrained level set erosion
-    auto shrinkWrap(GridType &grid, const GridType &gridB, float &d){
-        const float maxDist = 2.0f;
-        LevelSetFilter<GridType> filter(grid);
-#if 1
-        filter.setSpatialScheme(math::FIRST_BIAS);
-        filter.setTemporalScheme(math::TVD_RK1);
-#else
-        filter.setSpatialScheme(math::HJWENO5_BIAS);
-        filter.setTemporalScheme(math::TVD_RK3);
-#endif
-        if (mIsGridSDF == false) filter.normalize();
-        filter.offset(maxDist * grid.voxelSize()[0]);// erode by maxDist * dx
-        mIsGridSDF = false;// the CSG operation messed up the SDF
-        d += maxDist;
-        return csgUnionCopy(grid, gridB);
-    }
-  
+    auto shrinkWrap(GridType &grid, const GridType &gridB, float &d);
+
 };// PolySoupToLevelSet<GridType>
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+template<typename GridType>
+PolySoupToLevelSet<GridType>::PolySoupToLevelSet(PolySoup &&poly, int dim, float width)
+    : mPoly(poly), mHalfWidth(width)
+{
+    if constexpr(!std::is_floating_point<typename GridType::ValueType>::value) {
+        OPENVDB_THROW(TypeError, "polySoupToLevelSet: supported only for scalar floating-point grids");
+    }
+    if (!mPoly.bbox) mPoly.bbox = PolySoupToLevelSet::getBBox(mPoly.vtx);
+    const float maxLength = mPoly.bbox.extents()[mPoly.bbox.maxExtent()];
+    mMinVoxelSize = maxLength/(dim - 2.0f*(mHalfWidth + 1.0f));// +1 since final surface is dilated by dx
+    mMaxVoxelSize = maxLength / 2.0f;
+    OPENVDB_ASSERT(2*mMinVoxelSize <= mMaxVoxelSize);
+}// tools::PolySoupToLevelSet::PolySoupToLevelSet()
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+template<typename GridType>
+PolySoupToLevelSet<GridType>::PolySoupToLevelSet(PolySoup &&poly, float voxelSize, float width)
+    : mPoly(poly), mMinVoxelSize(voxelSize), mHalfWidth(width)
+{
+    if constexpr(!std::is_floating_point<typename GridType::ValueType>::value) {
+        OPENVDB_THROW(TypeError, "polySoupToLevelSet: supported only for scalar floating-point grids");
+    }
+    if (!mPoly.bbox) mPoly.bbox = PolySoupToLevelSet::getBBox(mPoly.vtx);
+    const float maxLength = mPoly.bbox.extents()[mPoly.bbox.maxExtent()];
+    mMaxVoxelSize = maxLength / 2.0f;
+    OPENVDB_ASSERT(2*mMinVoxelSize <= mMaxVoxelSize);
+}// tools::PolySoupToLevelSet::PolySoupToLevelSet()
 
 /////////////////////////////////////////////////////////////////////////////////////
 
@@ -334,6 +294,79 @@ void PolySoupToLevelSet<GridType>::process(const ShrinkWrapT &D, ProgressT *prog
 
 //////////////////////////////////////////////////////////////////////////
 
+template<typename GridType>
+math::BBox<Vec3f> PolySoupToLevelSet<GridType>::getBBox(const std::vector<Vec3s> &vtx)
+{
+    using RangeT = tbb::blocked_range<std::vector<Vec3s>::const_iterator>;
+    RangeT range(vtx.begin(), vtx.end(), 1024);
+    struct BBoxOp {
+        math::BBox<Vec3f> bbox;
+        BBoxOp() : bbox() {}
+        BBoxOp(BBoxOp& s, tbb::split) : bbox(s.bbox) {}
+        void operator()(const RangeT& r) {for (auto p=r.begin(); p!=r.end(); ++p) bbox.expand(*p);}
+        void join(BBoxOp& rhs) {bbox.expand(rhs.bbox);}
+    } tmp;
+#if 0
+    tmp(range);// serial
+#else
+    tbb::parallel_reduce(range, tmp);// parallel
+#endif
+    return tmp.bbox;
+}// tools::PolySoupToLevelSet::getBBox
+
+//////////////////////////////////////////////////////////////////////////
+
+template<typename GridType>
+auto PolySoupToLevelSet<GridType>::offset(float dx)
+{
+    auto xform = math::Transform::createLinearTransform(dx);
+#if 0// no mesh <-> VDB round trips!
+    auto grid = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth + 1);// mesh -> UDF
+    tools::foreach(grid->beginValueOn(), [dx](const typename GridType::ValueOnIter& it){it.setValue(*it - dx);}, true, true);
+    tools::changeBackground(grid->tree(), mHalfWidth*dx);
+    grid->setGridClass(GRID_LEVEL_SET);
+    return grid;
+#else
+    auto udf = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> UDF
+    volumeToMesh(*udf, mPoly.vtx, mPoly.tri, mPoly.quad, dx, 0.0);// UDF -> mesh (clears and re-allocates mesh)
+    return meshToLevelSet<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> SDF
+#endif
+}// tools::PolySoupToLevelSet<GridType>::offset
+
+//////////////////////////////////////////////////////////////////////////
+
+template<typename GridType>
+auto PolySoupToLevelSet<GridType>::upsample(const GridType &inGrid)
+{
+    auto outGrid = createLevelSet<GridType>(inGrid.voxelSize()[0]/2, mHalfWidth);
+    resampleToMatch<BoxSampler>(inGrid, *outGrid);
+    mIsGridSDF = true;
+    return outGrid;
+}// tools::PolySoupToLevelSet<GridType>::upsample
+
+//////////////////////////////////////////////////////////////////////////
+
+template<typename GridType>
+auto PolySoupToLevelSet<GridType>::shrinkWrap(GridType &grid, const GridType &gridB, float &d)
+{
+    const float maxDist = 2.0f;
+    LevelSetFilter<GridType> filter(grid);
+#if 1
+    filter.setSpatialScheme(math::FIRST_BIAS);
+    filter.setTemporalScheme(math::TVD_RK1);
+#else
+    filter.setSpatialScheme(math::HJWENO5_BIAS);
+    filter.setTemporalScheme(math::TVD_RK3);
+#endif
+    if (mIsGridSDF == false) filter.normalize();
+    filter.offset(maxDist * grid.voxelSize()[0]);// erode by maxDist * dx
+    mIsGridSDF = false;// the CSG operation messed up the SDF
+    d += maxDist;
+    return csgUnionCopy(grid, gridB);
+}// tools::PolySoupToLevelSet<GridType>::shrinkWrap
+
+//////////////////////////////////////////////////////////////////////////
+
 class ShrinkWrapLimit {
     const float mErode, mThres;
 public:
@@ -342,7 +375,6 @@ public:
         return dx>=2*mThres ? mErode : dx<=mThres ? 1.0f : 1.0f + (mErode-1.0f)*(dx-mThres)/mThres;
     }
 };// ShrinkWrapLimit
-
 
 /////////////////////////////////////////////////////////////////////////////////////
 
