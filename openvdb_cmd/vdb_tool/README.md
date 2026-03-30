@@ -23,7 +23,7 @@ The vdb_tool is a versatile command-line utility that chains together high-level
 | **quad2tri** | Convert all quads in a mesh to triangles |
 | **segment** | Segment level set and float grids into its disconnected parts |
 | **sphere** | Create a narrow-band level set of a sphere |
-| **platonic** | Create a narrow-band level set of a tetrahedron(4), cube(6), octahedron(8), dodecahedron(12) or icosahedron(2) |
+| **platonic** | Create a narrow-band level set of a tetrahedron(4), cube(6), octahedron(8), dodecahedron(12) or icosahedron(20) |
 | **dilate** | Dilate a level set surface |
 | **erode** |  Erode a level set surface |
 | **open** |  Morphological opening of a level set surface |
@@ -42,9 +42,9 @@ The vdb_tool is a versatile command-line utility that chains together high-level
 | **div** | Compute the divergence of a vector VDB |
 | **curvature** | Mean curvature of a scalar VDB |
 | **length** | Compute the magnitude of a vector VDB |
-| **min** | Composite two grid by means of min |
-| **max** | Composite two grid by means of max |
-| **sum** | Composite two grid by means of sum |
+| **min** | Composite two grids by means of min |
+| **max** | Composite two grids by means of max |
+| **sum** | Composite two grids by means of sum |
 | **multires** | Compute multi-resolution grids |
 | **enright** | Advects a level set in a periodic and divergence-free velocity field. Primarily intended for benchmarks |
 | **expand** | Expand the narrow band of a level set |
@@ -65,8 +65,8 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 | obj | read and write | ASCII OBJ mesh files with triangles, quads or points |
 | ply | read and write | Binary and ASCII PLY mesh files with triangles, quads or points |
 | stl | read and write | Binary STL mesh files with triangles |
-| off | read and write | ASCI OFF mesh files with triangles, quads or points |
-| xyz | read and write | ASCI XYZ files with x y z coordinates, |
+| off | read and write | ASCII OFF mesh files with triangles, quads or points |
+| xyz | read and write | ASCII XYZ files with x y z coordinates, |
 | pts | read | ASCII PTS points files with one or more point clouds |
 | abc | optional read and write | Alembic binary mesh files |
 | nvdb| optional read and write | NanoVDB file with voxels or points |
@@ -86,14 +86,14 @@ Note that this tool maintains two stacks of primitives, namely geometry (i.e. po
 
 # Stack-based string expressions
 
-This tool supports its own light-weight stack-oriented programming language that is (very loosely) inspired by Forth. Specifically, it uses Reverse Polish Notation (RPN) to define instructions that are evaluated during paring of the command-line arguments (options to be precise). All such expressions start with the character "{", ends with "}", and arguments are separated by ":". Variables starting with "\$" are substituted by its (previously) defined values, and variables starting with "@" are stored in memory. So, "{1:2:+:@x}" is conceptually equivalent to "x = 1 + 2". Conversely, "{\$x:++}" is conceptually equivalent "2 + 1 = 3" since "x=2" was already saved to memory. This is especially useful in combination loops, e.g. "-quiet -for i=1,3,1 -eval {\$i:++} -end" will print 2 and 3 to the terminal. Branching is also supported, e.g. "radius={$x:1:>:if(0.5:sin?0.3:cos)}" is conceptually equal to "if (x>1) radius=sin(0.5) else radius=cos(0.3)". See the root-searching example below or run vdb_tool -eval help="*" to see a list of all instructions currently supported by this scripting language. Note that since this language uses characters that are interpreted by most shells it is necessary to use single quotes around strings! This is of course not the case when using config files.
+This tool supports its own light-weight stack-oriented programming language that is (very loosely) inspired by Forth. Specifically, it uses Reverse Polish Notation (RPN) to define instructions that are evaluated during paring of the command-line arguments (options to be precise). All such expressions start with the character "{", ends with "}", and arguments are separated by ":". Variables starting with "\$" are substituted by its (previously) defined values, and variables starting with "@" are stored in memory. So, "{1:2:+:@x}" is conceptually equivalent to "x = 1 + 2". Conversely, "{\$x:++}" is conceptually equivalent "2 + 1 = 3" since "x=2" was already saved to memory. This is especially useful in combination with loops, e.g. "-quiet -for i=1,3,1 -eval {\$i:++} -end" will print 2 and 3 to the terminal. Branching is also supported, e.g. "radius={$x:1:>:if(0.5:sin?0.3:cos)}" is conceptually equal to "if (x>1) radius=sin(0.5) else radius=cos(0.3)". See the root-searching example below or run vdb_tool -eval help="*" to see a list of all instructions currently supported by this scripting language. Note that since this language uses characters that are interpreted by most shells it is necessary to use single quotes around strings! This is of course not the case when using config files.
 
 # Building this tool
 
 This tool is using CMake for build on Linux and Windows.
-The only mandatory dependency of is [OpenVDB](http://www.openvdb.org). Optional dependencies include NanoVDB, libpng, libjpeg, OpenEXR, and Alembic. To enable them use the `-DUSE_<name>=ON` flags. See the CMakeLists.txt for details.
+The only mandatory dependency is [OpenVDB](http://www.openvdb.org). Optional dependencies include NanoVDB, libpng, libjpeg, OpenEXR, and Alembic. To enable them use the `-DUSE_<name>=ON` flags. See the CMakeLists.txt for details.
 
-The included unit test are using Gtest. Add `-DOPENVDB_BUILD_VDB_TOOL_UNITTESTS=ON` to the cmake command line to build it.
+The included unit tests are using Gtest. Add `-DOPENVDB_BUILD_VDB_TOOL_UNITTESTS=ON` to the cmake command line to build it.
 
 ## Building OpenVDB
 
@@ -209,19 +209,19 @@ vdb_tool -read mesh.obj,reference.vdb -mesh2ls vdb=0 -write level_set.vdb
 ```
 
 ## Convert a sequence of files
-Convert 5 polygon mesh files, "mesh_00{1,2,3,4,5}.obj", into separate narrow-band levels and save them to the files "level_set_0{1,2,3,4,5}.vdb". Note that the value of loop variables is accessible with a preceding "$" character and that the end of the for-loop (here 6) is exclusive.The instruction "pad0" add zero-padding and takes two arguments, the string to pad and the desired length after padding.
+Convert 5 polygon mesh files, "mesh_00{1,2,3,4,5}.obj", into separate narrow-band levels and save them to the files "level_set_0{1,2,3,4,5}.vdb". Note that the value of loop variables is accessible with a preceding "$" character and that the end of the for-loop (here 6) is exclusive.The instruction "pad0" adds zero-padding and takes two arguments, the string to pad and the desired length after padding.
 ```
 vdb_tool -for n=1,6 -read mesh_'{$n:3:pad0}'.obj -mesh2ls -write level_set_'{$n:2:pad0}'.vdb -end
 ```
 
 ## Loop over specific files
-Convert 3 polygon mesh files, "bunny.obj,teapot.ply,car.stl", into the Alembic files "mesh_0{1,2,3}.vdb". Note that all loop variables have a matching counter defined with a preceding "#" character.
+Convert 3 polygon mesh files, "bunny.obj,teapot.ply,car.stl", into the Alembic files "mesh_0{1,2,3}.abc". Note that all loop variables have a matching counter defined with a preceding "#" character.
 ```
 vdb_tool -each file=bunny.obj,teapot.ply,car.stl -read '{$file}' -write mesh_'{$#file:1:+:2:pad0}'.abc -end
 ```
  
 ## Define voxel size from a loop-variable
-Generate 5 sphere with different voxel sizes and save them all into a single vdb file
+Generate 5 spheres with different voxel sizes and save them all into a single vdb file
 ```
 vdb_tool -for v=0.01,0.06,0.01 -sphere voxel='{$v}' name=sphere_%v -end -write vdb="*" spheres.vdb
 ```
@@ -333,37 +333,39 @@ vdb_tool -read mesh_mask.obj -mesh2ls voxel=0.1 width=3 -for n=200,300,1 -read p
 
 ## Example of a configuration file performing Particle-to-Mesh generation
 ```
+vdb_tool 10.8.0
+
 # 1. LOAD A MASK (Optional)
 # Used to clip the fluid so it doesn't leak out of the container
--read collision_geo.obj 
--mesh2ls voxel=0.1 width=3
+read collision_geo.obj 
+mesh2ls voxel=0.1 width=3
 
 # 2. LOOP THROUGH PARTICLE SEQUENCE
 # Processing frames 200 to 300
--for n=200,300,1
+for n=200,300,1
     
     # Read the particle VDB for the current frame
-    -read points_{$n:4:pad0}.vdb
+    read points_{$n:4:pad0}.vdb
     
     # Convert particles to a Level Set
     # 'radius' is the particle size; 'voxel' is the grid resolution
-    -points2ls voxel=0.035 radius=2.142 width=3
+    points2ls voxel=0.035 radius=2.142 width=3
     
     # SURFACE REFINEMENT
-    -dilate radius=2.5         # Expand to merge gaps
-    -gauss iter=2              # Smooth out the "blobby" look
-    -erode radius=2.5          # Shrink back to original scale
+    dilate radius=2.5         # Expand to merge gaps
+    gauss iter=2              # Smooth out the "blobby" look
+    erode radius=2.5          # Shrink back to original scale
     
     # 3. MESHING & CLIPPING
     # Convert to adaptive mesh, clipped by our collision mask (vdb=1)
-    -ls2mesh vdb=0 mask=1 adapt=0.005
+    ls2mesh vdb=0 mask=1 adapt=0.005
     
     # 4. EXPORT
-    -write mesh_{$n:4:pad0}.abc
+    write mesh_{$n:4:pad0}.abc
     
     # Clear the stack for the next frame to prevent memory bloat
-    -clear
--end
+    clear
+end
 ```
 
 ## Production example with complex math
@@ -372,20 +374,22 @@ Union 200 level set spheres scattered in a spiral pattern and ray-trace them int
 vdb_tool -for n=0,200,1 -eval '{$n:137.5:*:@deg}' -eval '{$deg:d2r:@radian}' -eval '{$radian:cos:@x}' -eval '{$radian:sin:@y}' -eval '{$n:sqrt:@r}' -eval '{$r:5:+:@r_sum}' -eval '{$r_sum:0.25:pow:@pow_r}' -sphere voxel=0.1 radius='{$pow_r:0.5:*}' center='({$r:$x:*},{$r:$y:*},0)' -if '{$n:0:>}' -union -end -end -render spiral.ppm image=1024x1024 translate='(0,0,40)'
 ```
 or as a config file:
+
+## Production example with complex math in a configuration file
 ```
 vdb_tool 10.8.0
 for n=0,200,1
-  eval {$n:137.5:*:@deg}  # deg = 137.5 * n
-  eval {$deg:d2r:@radian} # radian = d2r(dev)
-  eval {$radian:cos:@x}   # x = cos(radian)
-  eval {$radian:sin:@y}   # y = sin(radian)
-  eval {$n:sqrt:@r}       # r = sqrt(n)
-  eval {$r:5:+:@r_sum}    # r_sum = 5 + r
-  eval {$r_sum:0.25:pow:@pow_r} # pow_r = pow(r_sum, 0.25)
-  sphere voxel=0.1 radius={$pow_r:0.5:*} center=({$r:$x:*},{$r:$y:*},0) # radius=0.5*pow_r center=(r*x, r*x,0)
-  if {$n:0:>} # if n > 0
-    union
-  end
+    eval {$n:137.5:*:@deg}  # deg = 137.5 * n
+    eval {$deg:d2r:@radian} # radian = d2r(deg)
+    eval {$radian:cos:@x}   # x = cos(radian)
+    eval {$radian:sin:@y}   # y = sin(radian)
+    eval {$n:sqrt:@r}       # r = sqrt(n)
+    eval {$r:5:+:@r_sum}    # r_sum = 5 + r
+    eval {$r_sum:0.25:pow:@pow_r} # pow_r = pow(r_sum, 0.25)
+    sphere voxel=0.1 radius={$pow_r:0.5:*} center=({$r:$x:*},{$r:$y:*},0) # radius=0.5*pow_r center=(r*x, r*x,0)
+    if {$n:0:>} # if n > 0
+        union
+    end
 end
 render spiral.ppm image=1024x1024 translate=(0,0,40)
 ```
