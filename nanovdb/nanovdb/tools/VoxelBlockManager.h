@@ -102,6 +102,11 @@ class VoxelBlockManagerHandle
 
 public:
     /// @brief Constructor from metadata buffers (used by buildVoxelBlockManager)
+    /// @param firstLeafID  Allocated buffer holding the firstLeafID array
+    /// @param jumpMap      Allocated buffer holding the jumpMap array
+    /// @param blockCount   Number of voxel blocks (allocated capacity of the buffers)
+    /// @param firstOffset  Sequential index of the first voxel covered by this VBM
+    /// @param lastOffset   Sequential index of the last voxel covered by this VBM
     VoxelBlockManagerHandle(BufferT&& firstLeafID, BufferT&& jumpMap,
         uint64_t blockCount, uint64_t firstOffset, uint64_t lastOffset)
         : mFirstLeafID(std::move(firstLeafID))
