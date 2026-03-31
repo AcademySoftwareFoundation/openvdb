@@ -5,7 +5,7 @@
 #define OPENVDB_IO_CODEC_HAS_BEEN_INCLUDED
 
 #include <string>
-#include <map>
+#include <unordered_map>
 #include <memory>
 #include <iostream>
 
@@ -66,7 +66,7 @@ struct OPENVDB_API ReadOptions
     ReadMode readMode = ReadMode::Original;
 
     // Per-grid-type codec-specific options, keyed by grid type string
-    std::map<std::string, ReadTypedOptions::Ptr> typeData;
+    std::unordered_map<std::string, ReadTypedOptions::Ptr> typeData;
 }; // struct ReadOptions
 
 /// Global write configuration that applies to all grids
