@@ -784,6 +784,7 @@ public:
     /// representation of the filled box.  Follow fill operations with a prune()
     /// operation for optimal sparseness.
     void sparseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
+
     /// @brief Set all voxels within a given axis-aligned box to a constant value.
     /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box
     /// @param value   the value to which to set voxels within the box
@@ -792,6 +793,7 @@ public:
     /// @note This operation generates a sparse, but not always optimally sparse,
     /// representation of the filled box.  Follow fill operations with a prune()
     /// operation for optimal sparseness.
+    /// @details Identical to sparseFill defined above.
     void fill(const CoordBBox& bbox, const ValueType& value, bool active = true);
 
     /// @brief Set all voxels within a given axis-aligned box to a constant value
