@@ -240,14 +240,12 @@ struct VoxelBlockManager : VoxelBlockManagerBase<Log2BlockWidth>
     /// SIMD is used internally. The caller is responsible for parallelism across blocks.
     ///
     /// @tparam BuildT  Build type of the grid (must be an index type)
-    /// @param grid               Host-accessible grid
-    /// @param firstLeafID        Index of the first leaf overlapping this block
-    ///                           (i.e. firstLeafID[blockID] from the VBM metadata)
-    /// @param jumpMap            Pointer to the JumpMapLength words for this block
-    ///                           (i.e. &jumpMap[blockID * JumpMapLength])
-    /// @param blockFirstOffset   Sequential index of the first voxel in this block
-    /// @param leafIndex          Output array of length BlockWidth
-    /// @param voxelOffset        Output array of length BlockWidth
+    /// @param grid              Host-accessible OnIndex grid
+    /// @param firstLeafID       Index of the first leaf overlapping this block
+    /// @param jumpMap           Pointer to the JumpMapLength words for this block
+    /// @param blockFirstOffset  Sequential index of the first voxel in this block
+    /// @param leafIndex         Output array of length BlockWidth
+    /// @param voxelOffset       Output array of length BlockWidth
     template <class BuildT>
     static typename util::enable_if<BuildTraits<BuildT>::is_index, void>::type
     decodeInverseMaps(

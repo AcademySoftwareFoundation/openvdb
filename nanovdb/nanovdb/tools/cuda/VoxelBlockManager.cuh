@@ -52,17 +52,28 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
     // threadblock-level coordination, which manifests either as using shared
     // memory for synchronization, or warp-level shift operations.
 
-    /// @brief Given a grid and the associated jumpMap in global memory, compute
-    /// the leaf indices and voxel offsets in shared memory. This function
-    /// writes to shared memory and synchronizes threads and thus should not be
-    /// called from divergent threads within a thread block.
-    /// @tparam BuildT Build type of the grid
-    /// @param grid
-    /// @param firstLeafID
-    /// @param jumpMap
-    /// @param blockFirstOffset
-    /// @param smem_leafIndex Leaf indices stored in shared memory
-    /// @param smem_voxelOffset Voxel offsets stored in shared memory
+    /// @brief Decode the inverse maps for a single voxel block on the device.
+    ///
+    /// Given the VBM metadata for one block (firstLeafID and the block's slice of
+    /// the jumpMap) and the block's base sequential offset, fills smem_leafIndex[]
+    /// and smem_voxelOffset[] in shared memory so that for each position p in
+    /// [0, BlockWidth):
+    ///   - smem_leafIndex[p]   = index of the leaf node containing sequential voxel
+    ///                           (blockFirstOffset + p), or UnusedLeafIndex if that
+    ///                           index is beyond the last active voxel.
+    ///   - smem_voxelOffset[p] = local (0..511) offset of that voxel within its leaf,
+    ///                           or UnusedVoxelOffset.
+    ///
+    /// Must be called by all threads in the block (uses __syncthreads internally).
+    /// Do not call from divergent threads within a thread block.
+    ///
+    /// @tparam BuildT  Build type of the grid (must be an index type)
+    /// @param grid              Device-accessible OnIndex grid
+    /// @param firstLeafID       Index of the first leaf overlapping this block
+    /// @param jumpMap           Pointer to the JumpMapLength words for this block
+    /// @param blockFirstOffset  Sequential index of the first voxel in this block
+    /// @param smem_leafIndex    Output array of length BlockWidth in shared memory
+    /// @param smem_voxelOffset  Output array of length BlockWidth in shared memory
     template <class BuildT>
     __device__
     static typename util::enable_if<BuildTraits<BuildT>::is_index, void>::type
