@@ -123,12 +123,16 @@ public:
         return *this;
     }
 
-    VoxelBlockManagerHandle(VoxelBlockManagerHandle&& other) noexcept {
-        mFirstLeafID = std::move(other.mFirstLeafID);
-        mJumpMap     = std::move(other.mJumpMap);
-        mBlockCount  = std::exchange(other.mBlockCount,  0);
-        mFirstOffset = std::exchange(other.mFirstOffset, 0);
-        mLastOffset  = std::exchange(other.mLastOffset,  0);
+    VoxelBlockManagerHandle(VoxelBlockManagerHandle&& other) noexcept
+        : mFirstLeafID(std::move(other.mFirstLeafID))
+        , mJumpMap(std::move(other.mJumpMap))
+        , mBlockCount(other.mBlockCount)
+        , mFirstOffset(other.mFirstOffset)
+        , mLastOffset(other.mLastOffset)
+    {
+        other.mBlockCount = 0;
+        other.mFirstOffset = 0;
+        other.mLastOffset = 0;
     }
 
     ~VoxelBlockManagerHandle() { this->reset(); }
