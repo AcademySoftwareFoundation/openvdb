@@ -8,6 +8,8 @@
 #include <unordered_map>
 #include <memory>
 #include <iostream>
+#include <vector>
+#include <mutex>
 
 #include <openvdb/Types.h>
 
@@ -71,6 +73,49 @@ struct OPENVDB_API WriteOptions
 {
 }; // struct WriteOptions
 
+enum class DiagnosticSeverity { Warning };
+
+struct ReadDiagnostic {
+    DiagnosticSeverity severity;
+    std::string context;
+    std::string message;
+};
+
+struct OPENVDB_API ReadDiagnostics {
+    ReadDiagnostics() = default;
+    ReadDiagnostics(const ReadDiagnostics& other) {
+        std::lock_guard<std::mutex> lock(other.mMutex);
+        mEnabled = other.mEnabled;
+        mDiagnostics = other.mDiagnostics;
+    }
+    ReadDiagnostics& operator=(const ReadDiagnostics& other) {
+        if (this != &other) {
+            std::scoped_lock lock(mMutex, other.mMutex);
+            mEnabled = other.mEnabled;
+            mDiagnostics = other.mDiagnostics;
+        }
+        return *this;
+    }
+    void addWarning(const std::string& context, const std::string& message) {
+        if (!mEnabled) return;
+        std::lock_guard<std::mutex> lock(mMutex);
+        mDiagnostics.push_back({DiagnosticSeverity::Warning, context, message});
+    }
+    void clear() {
+        std::lock_guard<std::mutex> lock(mMutex);
+        mDiagnostics.clear();
+    }
+    void enable() { mEnabled = true; }
+    void disable() { mEnabled = false; }
+    bool enabled() const { return mEnabled; }
+    const std::vector<ReadDiagnostic>& diagnostics() const { return mDiagnostics; }
+    bool empty() const { return mDiagnostics.empty(); }
+private:
+    bool mEnabled = false;
+    std::vector<ReadDiagnostic> mDiagnostics;
+    mutable std::mutex mMutex;
+}; // struct ReadDiagnostics
+
 /// Per-codec mutable data created by Codec::createData()
 /// Contains the grid and any codec-specific state
 struct OPENVDB_API CodecData
@@ -93,10 +138,10 @@ struct OPENVDB_API Codec
     virtual CodecData::Ptr createData() = 0;
 
     /// Read the grid topology
-    virtual void readTopology(std::istream&, CodecData&, const ReadOptions&) { }
+    virtual void readTopology(std::istream&, CodecData&, const ReadOptions&, ReadDiagnostics&) { }
 
     /// Read all data buffers for this grid
-    virtual void readBuffers(std::istream&, CodecData&, const ReadOptions&) { }
+    virtual void readBuffers(std::istream&, CodecData&, const ReadOptions&, ReadDiagnostics&) { }
 
     /// Write the grid topology
     virtual void writeTopology(std::ostream&, const GridBase&, const WriteOptions&) { }

@@ -319,7 +319,7 @@ File::getGrids(const io::ReadOptions& readOptions) const
             const GridDescriptor& gd = i->second;
             // Seek to the grid in the file.
             gd.seekToGrid(inputStream());
-            GridBase::Ptr grid = Archive::readGrid(gd, inputStream(), readOptions);
+            GridBase::Ptr grid = Archive::readGrid(gd, inputStream(), readOptions, mReadDiagnostics);
             ret->push_back(grid);
             namedGrids[gd.uniqueName()] = grid;
         }
@@ -477,7 +477,7 @@ File::readGrid(const Name& name, const io::ReadOptions& readOptions)
     OPENVDB_ASSERT(inputHasGridOffsets());
     // Seek to the grid in the file.
     gd.seekToGrid(inputStream());
-    grid = Archive::readGrid(gd, inputStream(), readOptions);
+    grid = Archive::readGrid(gd, inputStream(), readOptions, mReadDiagnostics);
 
     if (gd.isInstance()) {
         /// @todo Refactor to share code with Archive::connectInstance()?
@@ -493,7 +493,7 @@ File::readGrid(const Name& name, const io::ReadOptions& readOptions)
         GridBase::Ptr parent;
         OPENVDB_ASSERT(inputHasGridOffsets());
         parentIt->second.seekToGrid(inputStream());
-        parent = Archive::readGrid(parentIt->second, inputStream(), readOptions);
+        parent = Archive::readGrid(parentIt->second, inputStream(), readOptions, mReadDiagnostics);
         if (parent) grid->setTree(parent->baseTreePtr());
     }
     return grid;
@@ -591,6 +591,7 @@ File::endName() const
 {
     return File::NameIterator(mGridDescriptors.end());
 }
+
 
 } // namespace io
 } // namespace OPENVDB_VERSION_NAME

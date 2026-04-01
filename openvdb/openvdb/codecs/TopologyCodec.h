@@ -107,9 +107,12 @@ struct ReadTopologyOp
     using LeafT = typename TreeT::LeafNodeType;
     using StorageValueT = typename StorageTreeT::ValueType;
 
-    ReadTopologyOp(std::istream& _is, bool _saveFloatAsHalf)
+    ReadTopologyOp(std::istream& _is, bool _saveFloatAsHalf, io::ReadDiagnostics& _diagnostics,
+            const std::string& _gridName)
         : is(_is)
-        , saveFloatAsHalf(_saveFloatAsHalf) { }
+        , saveFloatAsHalf(_saveFloatAsHalf)
+        , diagnostics(_diagnostics)
+        , gridName(_gridName) { }
 
     void operator()(RootT& root)
     {
@@ -117,7 +120,9 @@ struct ReadTopologyOp
 
         int32_t bufferCount;
         is.read(reinterpret_cast<char*>(&bufferCount), sizeof(int32_t));
-        if (bufferCount != 1) OPENVDB_LOG_WARN("multi-buffer trees are no longer supported");
+        if (bufferCount != 1) {
+            diagnostics.addWarning(gridName, "multi-buffer trees are no longer supported");
+        }
 
         // Delete the existing tree.
         root.clear();
@@ -216,6 +221,8 @@ struct ReadTopologyOp
     std::istream& is;
     bool saveFloatAsHalf;
     ValueT background;
+    io::ReadDiagnostics& diagnostics;
+    std::string gridName;
 }; // struct ReadTopologyOp
 
 template <typename TreeT>
@@ -264,14 +271,14 @@ void setTilesToBackground(TreeT& tree)
 
 // Free-standing function for read case (supports type conversion via StorageGridT)
 template<typename GridT, typename StorageGridT = GridT>
-void topologyCodecReadTopology(GridBase& gridBase, std::istream& is, const io::ReadOptions& options)
+void topologyCodecReadTopology(GridBase& gridBase, std::istream& is, const io::ReadOptions& options, io::ReadDiagnostics& diagnostics)
 {
     io::checkFormatVersion(is);
 
     GridT& grid = static_cast<GridT&>(gridBase);
     grid.tree().clearAllAccessors();
 
-    internal::ReadTopologyOp<typename GridT::TreeType, typename StorageGridT::TreeType> readTopologyOp(is, grid.saveFloatAsHalf());
+    internal::ReadTopologyOp<typename GridT::TreeType, typename StorageGridT::TreeType> readTopologyOp(is, grid.saveFloatAsHalf(), diagnostics, grid.getName());
     readTopologyOp(grid.tree().root());
 
     if (options.readMode == io::ReadMode::TopologyOnly) {
@@ -307,9 +314,10 @@ struct OPENVDB_API TopologyCodec : public io::Codec
         return data;
     }
 
-    void readTopology(std::istream& is, io::CodecData& data, const io::ReadOptions& options) final
+    void readTopology(std::istream& is, io::CodecData& data, const io::ReadOptions& options,
+        io::ReadDiagnostics& diagnostics) final
     {
-        internal::topologyCodecReadTopology<GridT, StorageGridT>(*data.grid, is, options);
+        internal::topologyCodecReadTopology<GridT, StorageGridT>(*data.grid, is, options, diagnostics);
     }
 
     void writeTopology(std::ostream& os, const GridBase& gridBase, const io::WriteOptions&) final
