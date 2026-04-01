@@ -311,9 +311,8 @@ struct DilateInternalNodesFunctor
                         auto& outputUpperMask = upperMasks[tileChildIndex];
                         outputUpperMask.setOnAtomic(upperChildIndex);
                         auto& outputLowerMask = lowerMasks[tileChildIndex][upperChildIndex];
-                        unsigned long long int *outputWord = reinterpret_cast<unsigned long long int*>(
-                            const_cast<uint64_t*>(&outputLowerMask.words()[threadInWarpID+tOffset]));
-                        atomicOr( outputWord, computedWord); } } } }
+                        util::atomicOr(const_cast<uint64_t*>(&outputLowerMask.words()[threadInWarpID+tOffset]),
+                                       static_cast<uint64_t>(computedWord)); } } } }
         __syncthreads();
     }
 
@@ -922,7 +921,7 @@ struct CoarsenLeafMasksFunctor
         auto dstLeafPtr = dstGrid->tree().root().probeLeaf(coarsenedOrigin);
         auto& dstMask = const_cast<Mask<3>&>(dstLeafPtr->valueMask());
         for (int w = 0; w < 4; w++)
-            atomicOr( (unsigned long long*)&dstMask.words()[w+4*bi], coarsenedMask.words()[w] << (4*bk+32*bj));
+            util::atomicOr(&dstMask.words()[w+4*bi], coarsenedMask.words()[w] << (4*bk+32*bj));
     }
 };
 

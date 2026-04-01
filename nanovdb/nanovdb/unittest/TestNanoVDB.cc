@@ -32,6 +32,7 @@
 #include <nanovdb/tools/GridChecksum.h>
 #include <nanovdb/NodeManager.h>
 #include <nanovdb/util/Timer.h>
+#include <nanovdb/tools/VoxelBlockManager.h>
 
 #if !defined(_MSC_VER) // does not compile in msvc c++ due to zero-sized arrays.
 #include <nanovdb/CNanoVDB.h>
@@ -8531,6 +8532,73 @@ TEST_F(TestNanoVDB, checkGrid)
     //nanovdb::tools::checkGrid( grid, str, nanovdb::ChecksumMode::Full);// deprecation warning
     EXPECT_TRUE(nanovdb::util::empty(str));
 }// checkGrid
+
+TEST_F(TestNanoVDB, VoxelBlockManager)
+{
+    // Build a 21^3 box of active voxels spanning multiple leaf nodes,
+    // matching the domain used in the CUDA VoxelBlockManager test.
+    using SrcGridT = nanovdb::tools::build::Grid<float>;
+    SrcGridT srcGrid(0.0f);
+    auto srcAcc = srcGrid.getAccessor();
+    nanovdb::CoordBBox bbox = nanovdb::CoordBBox::createCube(125, 145);
+    for (auto it = bbox.begin(); it; it++)
+        srcAcc.setValue(*it, 1.0f);
+
+    auto handle = nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::ValueOnIndex>(
+        srcGrid, 0u, false, false);
+    auto *grid = handle.grid<nanovdb::ValueOnIndex>();
+    ASSERT_TRUE(grid);
+    ASSERT_TRUE(grid->isSequential());
+
+    constexpr int Log2BlockWidth = 7;
+    using VBM = nanovdb::tools::VoxelBlockManager<Log2BlockWidth>;
+    constexpr auto BlockWidth = VBM::BlockWidth;
+
+    const uint64_t nVoxels = grid->activeVoxelCount();
+    const uint64_t nBlocks = (nVoxels + BlockWidth - 1) >> Log2BlockWidth;
+
+    auto vbmHandle = nanovdb::tools::buildVoxelBlockManager<Log2BlockWidth>(grid);
+    ASSERT_EQ(vbmHandle.blockCount(), nBlocks);
+
+    const uint32_t *firstLeafID = vbmHandle.hostFirstLeafID();
+    const uint64_t *jumpMap     = vbmHandle.hostJumpMap();
+    const auto     &tree        = grid->tree();
+
+    uint32_t leafIndex[BlockWidth];
+    uint16_t voxelOffset[BlockWidth];
+
+    for (uint64_t b = 0; b < nBlocks; b++) {
+        const uint64_t blockFirstOffset = 1 + b * BlockWidth;
+
+        VBM::decodeInverseMaps(
+            grid,
+            firstLeafID[b],
+            jumpMap + b * VBM::JumpMapLength,
+            blockFirstOffset,
+            leafIndex,
+            voxelOffset);
+
+        for (int p = 0; p < BlockWidth; p++) {
+            const uint64_t globalOffset = blockFirstOffset + p;
+            if (globalOffset > nVoxels) {
+                // Padding slots beyond the last active voxel must be sentinels.
+                EXPECT_EQ(leafIndex[p],   VBM::UnusedLeafIndex);
+                EXPECT_EQ(voxelOffset[p], VBM::UnusedVoxelOffset);
+            } else {
+                // Active slot: verify the (leafIndex, voxelOffset) pair is consistent.
+                ASSERT_NE(leafIndex[p],   VBM::UnusedLeafIndex);
+                ASSERT_NE(voxelOffset[p], VBM::UnusedVoxelOffset);
+                const auto &leaf = tree.template getFirstNode<0>()[leafIndex[p]];
+                // The dense position voxelOffset[p] must be active in the leaf's mask.
+                EXPECT_TRUE(leaf.valueMask().isOn(voxelOffset[p]));
+                // rank(voxelOffset[p]) = number of ON bits at positions 0..voxelOffset[p]-1
+                // so leaf.firstOffset() + rank == globalOffset.
+                const uint64_t rank = leaf.valueMask().countOn(voxelOffset[p]);
+                EXPECT_EQ(leaf.data()->firstOffset() + rank, globalOffset);
+            }
+        }
+    }
+}// VoxelBlockManager
 
 int main(int argc, char** argv)
 {
