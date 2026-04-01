@@ -136,9 +136,10 @@ inline void buildMaskPrefixSums(
     for (int x = 0; x < 8; x++) {
         #pragma omp simd
         for (int y = 0; y < 8; y++) {
-            data[x][y].ui64 += data[x][y].ui64 << 8;
-            data[x][y].ui64 += data[x][y].ui64 << 16;
-            data[x][y].ui64 += data[x][y].ui64 << 32;
+            uint64_t& zRow = data[x][y].ui64;
+            zRow += zRow << 8;
+            zRow += zRow << 16;
+            zRow += zRow << 32;
         }
     }
 
