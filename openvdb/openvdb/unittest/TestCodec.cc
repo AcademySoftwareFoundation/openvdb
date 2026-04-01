@@ -77,6 +77,71 @@ TEST_F(TestCodec, testCodecRegistry)
 }
 
 
+TEST_F(TestCodec, testReadDiagnostics)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    // ReadDiagnostics struct: disabled by default, addWarning is a no-op until enabled
+    {
+        ReadDiagnostics diags;
+        EXPECT_FALSE(diags.enabled());
+        diags.addWarning("grid_a", "something went wrong");
+        EXPECT_TRUE(diags.diagnostics().empty());
+
+        diags.enable();
+        diags.addWarning("grid_a", "something went wrong");
+        ASSERT_EQ(diags.diagnostics().size(), size_t(1));
+        EXPECT_EQ(diags.diagnostics()[0].severity, DiagnosticSeverity::Warning);
+
+        diags.clear();
+        EXPECT_TRUE(diags.diagnostics().empty());
+    }
+
+    CodecRegistry::clear();
+    openvdb::io::internal::initialize();
+
+    // Archive API and getGrids() with diagnostics
+
+    BoolGrid::Ptr srcGrid = BoolGrid::create(false);
+    srcGrid->setName("bool_grid");
+    srcGrid->fill(CoordBBox(Coord(-5), Coord(5)), true, true);
+
+    const std::string codecPath = "testReadDiagnostics.vdb";
+    {
+        io::File f(codecPath);
+        f.write(GridPtrVec{srcGrid});
+    }
+
+    // Disabled by default; enabling produces no warnings on a clean read
+    {
+        io::File f(codecPath);
+        f.open();
+        EXPECT_FALSE(f.readDiagnostics().enabled());
+        f.enableReadDiagnostics();
+        EXPECT_TRUE(f.readDiagnostics().enabled());
+        f.readGrid("bool_grid");
+        EXPECT_TRUE(f.readDiagnostics().diagnostics().empty());
+        f.close();
+    }
+
+    // clearReadDiagnostics() resets entries but keeps diagnostics enabled
+    {
+        io::File f(codecPath);
+        f.open();
+        f.enableReadDiagnostics();
+        GridPtrVecPtr grids = f.getGrids();
+        ASSERT_TRUE(grids && !grids->empty());
+        f.clearReadDiagnostics();
+        EXPECT_TRUE(f.readDiagnostics().enabled());
+        EXPECT_TRUE(f.readDiagnostics().diagnostics().empty());
+        f.close();
+    }
+
+    std::remove(codecPath.c_str());
+}
+
+
 template <typename GridT>
 void testIOImpl(
     const std::string& gridName,

@@ -384,6 +384,35 @@ Archive::copy() const
 }
 
 
+void
+Archive::enableReadDiagnostics()
+{
+    mReadDiagnostics.enable();
+}
+
+
+void
+Archive::disableReadDiagnostics()
+{
+    mReadDiagnostics.disable();
+    mReadDiagnostics.clear();
+}
+
+
+const ReadDiagnostics&
+Archive::readDiagnostics() const
+{
+    return mReadDiagnostics;
+}
+
+
+void
+Archive::clearReadDiagnostics()
+{
+    mReadDiagnostics.clear();
+}
+
+
 ////////////////////////////////////////
 
 
@@ -898,7 +927,7 @@ Archive::connectInstance(const GridDescriptor& gd, const NamedGridMap& grids) co
 
 
 GridBase::Ptr
-Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOptions& readOptions)
+Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOptions& readOptions, ReadDiagnostics& diagnostics)
 {
     // Read the compression settings for this grid and tag the stream with them
     // so that downstream functions can reference them.
@@ -964,13 +993,13 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
     if (readOptions.readMode != io::ReadMode::TopologyOnly && !gd.isInstance()) {
         // read topology
         if (codec) {
-            codec->readTopology(is, *codecData, readOptions);
+            codec->readTopology(is, *codecData, readOptions, diagnostics);
         } else {
             grid->readTopology(is);
         }
         // read buffers
         if (codec) {
-            codec->readBuffers(is, *codecData, readOptions);
+            codec->readBuffers(is, *codecData, readOptions, diagnostics);
         } else {
             const auto& worldBBox = readOptions.clipBBox;
             const bool clip = worldBBox.isSorted();
@@ -984,6 +1013,14 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
     }
 
     return grid;
+}
+
+
+GridBase::Ptr
+Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOptions& readOptions)
+{
+    ReadDiagnostics nullDiagnostics;
+    return readGrid(gd, is, readOptions, nullDiagnostics);
 }
 
 
