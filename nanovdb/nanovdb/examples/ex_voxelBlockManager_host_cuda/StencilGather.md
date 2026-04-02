@@ -1,14 +1,16 @@
 # Per-Block Stencil Gather
 
 This document is the design and planning reference for the per-block stencil gather
-kernel — the operation that, given a built VBM and a block ID, computes the neighbor
-index sets for all active voxels in that block under a given stencil shape.  It is
-written as dense, agent-consumable facts and design decisions.
+kernel — the operation that, given a built VBM, a block ID, and a user-supplied kernel
+lambda, gathers stencil neighbor values for all active voxels in the block and
+produces a per-voxel output array.  It is written as dense, agent-consumable facts
+and design decisions.
 
 The WENO5 19-point stencil (±3 along each axis independently) is the motivating
 instantiation, but the architecture is stencil-agnostic.  The stencil shape enters
-only as a compile-time parameter governing the number of output slots and the
-neighbor leaf resolution logic.
+as a compile-time template parameter governing the number of neighbor slots, the
+neighbor leaf resolution logic, and the value fetch.  The user supplies a scalar
+kernel lambda that operates on the gathered values and produces the output.
 
 ---
 
@@ -43,37 +45,133 @@ Within one call (one CPU thread / one CUDA CTA):
      (cache-resident), filled by a single call to `decodeInverseMaps`.
 2. **Loop over active voxels** in the block (positions where
    `leafIndex[p] != UnusedLeafIndex`).
-3. **For each active voxel**: resolve the neighbor leaf pointers for the stencil
-   shape, then fill the stencil's N-entry index array.
+3. **For each active voxel**: resolve the neighbor leaf pointers, fetch the N
+   neighbor values into a local array, invoke the kernel lambda, and write the
+   output.
 
-**Key invariant on intermediate storage**: `leafIndex` and `voxelOffset` are scratch
-only.  They do not persist beyond this per-block call, and neither do any intermediate
-neighbor-leaf-pointer structures.  The stencil index arrays are the outputs.
-
----
-
-## 3. Stencil Parameterization
-
-A stencil is characterized by:
-
-- **N**: number of points (including center).
-- **Point set**: compile-time set of relative (Δx, Δy, Δz) offsets, with a defined
-  mapping from each offset to an index in [0, N).
-- **Reach R**: max |Δ| along any axis.  Governs how many distinct neighbor leaves
-  per axis must be resolved (see §4).
-
-For the WENO5 stencil: N=19, reach R=3, point set = {0} ∪ {±1,±2,±3 along each
-axis independently}, index mapping = `WenoPt<i,j,k>::idx`.
-
-The index mapping convention is stencil-specific and must be documented per stencil.
-In particular, `WenoPt<i,j,k>::idx` (NanoVDB) is inconsistent with `NineteenPt<i,j,k>::idx`
-(OpenVDB) and must not be cross-used.
+**Key invariant on intermediate storage**: `leafIndex`, `voxelOffset`, the
+neighbor-leaf-pointer structs, and the per-voxel value arrays are all scratch only.
+They do not persist beyond this per-block call.  The kernel output array is the
+only output.
 
 ---
 
-## 4. Neighbor Leaf Resolution
+## 3. Stencil Type as Template Parameter
 
-### 4a. How Many Leaf Neighbors Per Axis
+### 3a. What the Infrastructure Needs
+
+The gather infrastructure iterates over stencil slots `n = 0 .. N-1` and for each
+needs to know the Cartesian offset `(Δx, Δy, Δz)` to look up.  The pipeline is:
+
+```
+for n in 0..N-1:
+    values[n] = grid.getValue(center + StencilT::offset(n))
+```
+
+This requires **index → offsets** direction: given slot index n, return `(Δx, Δy, Δz)`.
+
+The existing `WenoPt<i,j,k>::idx` (NanoVDB) and `NineteenPt<i,j,k>::idx` (OpenVDB)
+go in the **opposite** direction (offsets → index) and are primarily useful to the
+user writing the kernel lambda (addressing a specific neighbor by name).  They are
+not directly usable by the infrastructure's gather loop.
+
+The stencil type must therefore expose a compile-time offset table:
+
+```cpp
+// For each slot n in [0, N), the Cartesian offset
+static constexpr std::array<std::array<int,3>, N> offsets;
+// or equivalently a static constexpr accessor:
+static constexpr std::array<int,3> offset(int n);
+```
+
+### 3b. Relationship to BaseStencil / WenoStencil
+
+`nanovdb::math::BaseStencil<Derived, SIZE, GridT>` and `WenoStencil` couple the
+stencil geometry to a grid accessor (`mAcc`) via `init()` / `moveTo()`.  This coupling
+is incompatible with the VBM batch gather, where the infrastructure owns the value
+lookup.
+
+What is reusable from the existing design:
+- `SIZE` / `static constexpr int SIZE` — directly useful.
+- `WenoPt<i,j,k>::idx` / `pos<i,j,k>()` — useful to the *user's kernel lambda*
+  for addressing neighbors by name, but not to the gather loop itself.
+
+The stencil type for our template parameter is a **geometry-only descriptor** — no
+accessor, no stored values.  It could be a thin wrapper around the existing types,
+or a new family of types alongside them.
+
+### 3c. Stencil Characteristics
+
+- **N** (`SIZE`): number of points including center.
+- **Offset table**: compile-time mapping from slot index → `(Δx, Δy, Δz)`.
+- **Reach R**: `max |Δ|` over all axes and all slots.  Governs neighbor leaf
+  resolution (see §5).
+
+For WENO5: N=19, R=3, offsets derived from `WenoPt` specializations.
+
+---
+
+## 4. Kernel Lambda and Output Type
+
+### 4a. Kernel Lambda Signature
+
+The user supplies a kernel lambda with signature:
+
+```cpp
+std::array<ValueType, K> kernel(const ValueType* u);
+```
+
+where `u[n]` is the grid value at stencil slot `n` (i.e. `u[0]` is the center,
+`u[WenoPt<1,0,0>::idx]` is the +x neighbor for WENO5, etc.).  The lambda is
+completely unaware of indices, leaf pointers, or SIMD lanes.
+
+Example — Laplacian (K=1):
+```cpp
+auto laplacian = [](const float* u) -> std::array<float, 1> {
+    return { -6.f*u[0] + u[GradPt<1,0,0>::idx] + u[GradPt<-1,0,0>::idx]
+                       + u[GradPt<0,1,0>::idx] + u[GradPt<0,-1,0>::idx]
+                       + u[GradPt<0,0,1>::idx] + u[GradPt<0,0,-1>::idx] };
+};
+```
+
+Example — gradient (K=3):
+```cpp
+auto grad = [](const float* u) -> std::array<float, 3> {
+    return { 0.5f*(u[GradPt<1,0,0>::idx] - u[GradPt<-1,0,0>::idx]),
+             0.5f*(u[GradPt<0,1,0>::idx] - u[GradPt<0,-1,0>::idx]),
+             0.5f*(u[GradPt<0,0,1>::idx] - u[GradPt<0,0,-1>::idx]) };
+};
+```
+
+### 4b. Output Type: std::array<ValueType, K>
+
+The output is always `std::array<ValueType, K>` — homogeneous in type.  K=1
+degenerates naturally to the scalar case without special-casing.
+
+Heterogeneous output (e.g. `std::tuple`) is not needed for the typical PDE/level-set
+workload: Laplacian (K=1), gradient (K=3), WENO upwind differences (K=6), curvature
+components (K=2) are all uniform in type.  A tuple would also defeat auto-vectorization.
+
+### 4c. Output Buffer Layout
+
+The per-block output is stored in SoA layout:
+
+```
+results[k][BlockWidth]   for k = 0 .. K-1
+```
+
+Each channel `k` is a contiguous array of `ValueType` across all BlockWidth voxel
+positions, mapping cleanly to K independent SIMD registers.  AoS layout
+(`results[BlockWidth][K]`) would interleave channels and defeat SIMD.
+
+K is either deduced from the lambda's return type or supplied as an explicit template
+parameter.
+
+---
+
+## 5. Neighbor Leaf Resolution
+
+### 5a. How Many Leaf Neighbors Per Axis
 
 A leaf covers 8 positions along each axis.  For a stencil with reach R, a voxel at
 leaf-local position p along one axis needs neighbors at p-R .. p+R.  The number of
@@ -90,7 +188,7 @@ The current `resolveLeafPtrs` design (`ptrs[axis][0..2]`: lo/center/hi) is corre
 for R ≤ 3.  A more general design would use `ptrs[axis][0..K]` where K = number of
 neighbor leaves per axis.
 
-### 4b. resolveLeafPtrs — Design
+### 5b. resolveLeafPtrs — Design
 
 ```
 resolveLeafPtrs(grid, leaf, voxelOffset) → StencilLeafPtrs
@@ -102,7 +200,7 @@ resolveLeafPtrs(grid, leaf, voxelOffset) → StencilLeafPtrs
 - Returns a `StencilLeafPtrs` struct whose layout is stencil-specific (see §5).
 - Intentionally scalar: `probeLeaf` is pointer-chasing and not vectorizable.
 
-### 4c. computeStencil — Design
+### 5c. computeStencil — Design
 
 ```
 computeStencil(leaf, voxelOffset, leafPtrs, data[N])
@@ -117,7 +215,7 @@ computeStencil(leaf, voxelOffset, leafPtrs, data[N])
 
 ---
 
-## 5. StencilLeafPtrs Struct
+## 6. StencilLeafPtrs Struct
 
 Unified template parameterized on build type and leaf pointer type, enabling both
 scalar (GPU) and batched (CPU) instantiations from one definition:
@@ -142,7 +240,7 @@ and for supporting additional stencil shapes.
 
 ---
 
-## 6. GPU Inner Loop (Current Draft)
+## 7. GPU Inner Loop (Current Draft)
 
 After `decodeInverseMaps`, each thread with `smem_leafIndex[tID] != UnusedLeafIndex`:
 
@@ -161,14 +259,14 @@ per-thread and divergence-safe.
 
 ---
 
-## 7. CPU Inner Loop
+## 8. CPU Inner Loop
 
-### 7a. SIMD Batch Width
+### 8a. SIMD Batch Width
 
 Process voxels in batches of `SIMDw = 16`.  With AVX2 (16 × uint16_t per register),
 each batch maps to one SIMD register width for `voxelOffset`.
 
-### 7b. probeLeaf Deduplication
+### 8b. probeLeaf Deduplication
 
 Within a batch of SIMDw=16 voxels, the neighbor coordinate along each axis (rounded
 to leaf granularity) takes at most **2 distinct values** per axis.  The result of each
@@ -180,7 +278,7 @@ For a stencil with R ≤ 3: ≤ 2 `probeLeaf` calls per axis × 3 axes =
 The deduplication bound depends on both SIMDw and leaf size (8).  For larger SIMDw
 or larger R, more distinct neighbor coordinates can appear per batch.
 
-### 7c. computeStencil Vectorization
+### 8c. computeStencil Vectorization
 
 The outer loop over lanes (i = 0 .. SIMDw-1) calls `computeStencil` once per lane
 with output into a SoA `stencilData[N][SIMDw]` array.  Auto-vectorization strategy:
@@ -193,20 +291,26 @@ with output into a SoA `stencilData[N][SIMDw]` array.  Auto-vectorization strate
 
 ---
 
-## 8. Open Questions / Deferred Decisions
+## 9. Open Questions / Deferred Decisions
 
 - **Launcher design**: the system-level wrapper that dispatches per-block calls
   (the `buildVoxelBlockManager` analogue for the stencil gather).  Deferred until
   the per-block kernel is validated.
 
-- **Index → value conversion**: `stencilData[N]` currently holds global sequential
-  indices.  The PDE consumer wants `float` values.  Whether the index-to-value lookup
-  (`grid->tree().getValue(idx)`) happens inside or outside this kernel is TBD.
+- **Stencil type definition**: the geometry-only stencil descriptor (§3) needs a
+  concrete C++ form — whether a new family of types, a thin wrapper around existing
+  `BaseStencil` specializations, or a standalone `constexpr` struct.  The offset table
+  representation (`std::array<std::array<int,3>, N>` vs a static `constexpr` accessor
+  function) is also TBD.
 
-- **CPU `resolveLeafPtrs` batch function**: the per-batch deduplication logic (§7b)
+- **K deduction vs explicit parameter**: whether K (output count) is deduced from the
+  lambda's return type via `decltype` / CTAD, or supplied as an explicit template
+  parameter alongside the stencil type.
+
+- **CPU `resolveLeafPtrs` batch function**: the per-batch deduplication logic (§8b)
   needs its own function, separate from the GPU scalar `resolveLeafPtrs`.  Signature
   and deduplication algorithm TBD.
 
 - **Generalizing beyond R ≤ 3**: the `ptrs[3][3]` struct and single-neighbor-per-axis
   assumption are baked into the current design.  Any stencil with R > 4 would require
-  revisiting §4a and §5.
+  revisiting §5a and §6.
