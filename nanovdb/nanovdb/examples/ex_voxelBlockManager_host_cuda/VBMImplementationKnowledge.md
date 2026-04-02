@@ -4,7 +4,7 @@ This document captures non-obvious design decisions, rejected alternatives, inva
 and performance phenomenology for the VoxelBlockManager (VBM) subsystem and its CPU
 port of `decodeInverseMaps`.  It is written as dense, structured, agent-consumable
 facts rather than narrative.  It complements `VoxelBlockManagerContext.md` (semantics
-and API) and `DecodeInverseMapsCPUPlan.md` (algorithm design journal).
+and API).
 
 ---
 
@@ -267,3 +267,71 @@ This means active voxel ranges partition the global index space without gaps.
   all subsequent leaves (Invariant B), so `break` is correct instead of `continue`.
 - The early-exit collapses to a single line:
   `if (leafFirstOffset >= blockFirstOffset + BlockWidth) break;`
+
+---
+
+## 11. decodeInverseMaps CPU — Threading and Calling Philosophy
+
+`decodeInverseMaps` (CPU) is **intentionally single-threaded and stateless**.  It decodes
+exactly one voxel block per call.  The caller (`buildVoxelBlockManager` CPU path) distributes
+blocks across threads via `util::forEach` (TBB or `std::thread`).  There is no OpenMP thread
+parallelism inside the function — `#pragma omp simd` is present only to hint the compiler
+toward SIMD vectorization, not to spawn threads.
+
+**Consequence for callers**: the output arrays `leafIndex[BlockWidth]` and
+`voxelOffset[BlockWidth]` must be caller-allocated.  The natural pattern is stack allocation
+inside the `util::forEach` lambda, one array per block per thread.  Heap allocation (e.g.,
+`new[]` per block) is wasteful; thread-local storage is an option but introduces alignment
+complications (see §12).
+
+**Contrast with GPU**: the GPU `decodeInverseMaps` is cooperative — a full CUDA thread block
+(up to 512 threads) decodes one voxel block together, writing to shared memory.  On CPU, one
+thread decodes one block sequentially but with SIMD across the 512 voxel positions.
+
+---
+
+## 12. Why mPrefixSum Is Not Used in decodeInverseMaps
+
+`LeafIndexBase::mPrefixSum` encodes per-word exclusive cumulative popcounts as 7 × 9-bit
+packed fields (see §2).  It is designed for **random access** — locating the global sequential
+index of a single voxel in O(1) without scanning the whole mask.
+
+`decodeInverseMaps` needs the full 512-entry prefix-sum table for every active voxel in the
+leaf.  For this **bulk sequential access**, recomputing per-word popcounts from scratch via the
+`buildMaskPrefixSums` SIMD algorithm (§3) is cheaper than unpacking the 9-bit fields.
+Specifically:
+- Unpacking 7 × 9-bit fields requires masked shifts and is awkward to vectorize.
+- `buildMaskPrefixSums` operates on the raw 8 `uint64_t` words, uses only shifts and adds, and
+  vectorizes cleanly to 8 AVX2 `vpaddq`/`vpsllq` pairs.
+- At 25% occupancy (typical level-set narrow band), `buildMaskPrefixSums` consumes a small
+  fraction of the total per-leaf work.
+
+`mPrefixSum` is still used indirectly: it is the `prefixSum` argument passed to
+`buildMaskPrefixSums` to fold in the cross-word exclusive offsets (Step 5 of the algorithm).
+What is bypassed is the idea of using `mPrefixSum` alone (without a full table build) to compute
+individual voxel offsets one at a time.
+
+---
+
+## 13. Output Fill Structure — Range Fill + Contiguous Copy, Not Scatter
+
+The CPU `decodeInverseMaps` fills its output arrays per leaf as:
+
+```
+leafIndex[pStart..pEnd)   = leafID             (range fill, constant value)
+voxelOffset[pStart..pEnd) = leafLocalOffsets[jStart..jStart+(pEnd-pStart))  (contiguous copy)
+```
+
+**Why contiguous copy (not scatter)**: `shuffleDownMask` produces `leafLocalOffsets` as a
+compacted array of active local positions in ascending order — position 0 holds the 0-th active
+voxel's leaf-local offset, position 1 holds the 1-st, etc.  Since the block's output range
+`[pStart, pEnd)` maps to a contiguous slice `[jStart, jStart+len)` of this compacted array, a
+single `std::copy` (or `memcpy`) suffices.  No scatter is needed.
+
+**`std::fill`/`std::copy` vectorization caveat**: if the output pointers are stack-allocated or
+derived from TLS, the compiler may not prove alignment and fall back to scalar or SSE stores even
+under `-mavx2`.  For the sentinel-fill initialization (filling `UnusedLeafIndex` /
+`UnusedVoxelOffset` before the leaf loop), this can dominate runtime.  Measurements on the test
+machine showed `std::fill` via TLS taking ~1.5 ms vs ~0.22 ms with explicit `_mm256_store_si256`
+over `alignas(64)` arrays (16384 blocks, 32 threads).  Stack-allocate the output arrays with
+`alignas(64)` and replace `std::fill` with explicit AVX2 stores when performance matters.
