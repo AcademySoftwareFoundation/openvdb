@@ -114,6 +114,13 @@ nanovdb_example(NAME "ex_merge_nanovdb_cuda" OPENVDB)
 nanovdb_example(NAME "ex_refine_nanovdb_cuda" OPENVDB)
 nanovdb_example(NAME "ex_coarsen_nanovdb_cuda" OPENVDB)
 
+nanovdb_example(NAME "ex_voxelBlockManager_host_cuda")
+if(TARGET ex_voxelBlockManager_host_cuda)
+  target_compile_options(ex_voxelBlockManager_host_cuda PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=-mavx2,-fopenmp-simd>
+    $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -fopenmp-simd>)
+endif()
+
 if(CUDAToolkit_FOUND)
   nanovdb_example(NAME "ex_make_mgpu_nanovdb") # requires cuRAND
   target_link_libraries(ex_make_mgpu_nanovdb PRIVATE CUDA::curand)
