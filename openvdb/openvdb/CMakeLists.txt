@@ -329,6 +329,7 @@ configure_file(version.h.in openvdb/version.h)
 set(OPENVDB_LIBRARY_SOURCE_FILES
   Grid.cc
   io/Archive.cc
+  io/Codec.cc
   io/Compression.cc
   io/File.cc
   io/GridDescriptor.cc
@@ -373,6 +374,11 @@ set(OPENVDB_LIBRARY_IO_INCLUDE_FILES
   io/io.h
   io/Queue.h
   io/Stream.h
+)
+
+set(OPENVDB_LIBRARY_CODECS_INCLUDE_FILES
+  codecs/BoolCodec.h
+  codecs/TopologyCodec.h
 )
 
 set(OPENVDB_LIBRARY_MATH_INCLUDE_FILES

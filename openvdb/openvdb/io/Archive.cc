@@ -855,6 +855,17 @@ Archive::readGridCount(std::istream& is)
 ////////////////////////////////////////
 
 
+io::Codec*
+Archive::findCodec(const std::string& gridType, const io::ReadOptions&)
+{
+    // Determine the I/O codec to use to read this grid
+    return io::CodecRegistry::get(gridType);
+}
+
+
+////////////////////////////////////////
+
+
 void
 Archive::connectInstance(const GridDescriptor& gd, const NamedGridMap& grids) const
 {
@@ -902,15 +913,26 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
     };
     OnExit restore(is);
 
-    // Create the grid.
-    if (!GridBase::isRegistered(gd.gridType())) {
-        OPENVDB_THROW(KeyError, "Cannot read grid "
-            << GridDescriptor::nameAsString(gd.uniqueName())
-            << ": grid type " << gd.gridType() << " is not registered");
-    }
+    // Find the codec for the grid type and options.
+    io::Codec* codec = findCodec(gd.gridType(), readOptions);
 
-    GridBase::Ptr grid = GridBase::createGrid(gd.gridType());
-    if (grid) grid->setSaveFloatAsHalf(gd.saveFloatAsHalf());
+    GridBase::Ptr grid;
+    io::CodecData::Ptr codecData;
+
+    // Create the grid.
+    if (codec) {
+        codecData = codec->createData();
+        if (codecData->grid)    grid = codecData->grid;
+    } else {
+        if (!GridBase::isRegistered(gd.gridType())) {
+            OPENVDB_THROW(KeyError, "Cannot read grid "
+                << GridDescriptor::nameAsString(gd.uniqueName())
+                << ": grid type " << gd.gridType() << " is not registered");
+        }
+
+        grid = GridBase::createGrid(gd.gridType());
+    }
+    grid->setSaveFloatAsHalf(gd.saveFloatAsHalf());
 
     // Stream metadata varies per grid, and it needs to persist
     // in case delayed load is in effect.
@@ -940,14 +962,24 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
 
     grid->readTransform(is);
     if (readOptions.readMode != io::ReadMode::TopologyOnly && !gd.isInstance()) {
-        grid->readTopology(is);
-        const auto& worldBBox = readOptions.clipBBox;
-        const bool clip = worldBBox.isSorted();
-        if (clip) {
-            const auto indexBBox = grid->constTransform().worldToIndexNodeCentered(worldBBox);
-            grid->readBuffers(is, indexBBox);
+        // read topology
+        if (codec) {
+            codec->readTopology(is, *codecData, readOptions);
         } else {
-            grid->readBuffers(is);
+            grid->readTopology(is);
+        }
+        // read buffers
+        if (codec) {
+            codec->readBuffers(is, *codecData, readOptions);
+        } else {
+            const auto& worldBBox = readOptions.clipBBox;
+            const bool clip = worldBBox.isSorted();
+            if (clip) {
+                const auto indexBBox = grid->constTransform().worldToIndexNodeCentered(worldBBox);
+                grid->readBuffers(is, indexBBox);
+            } else {
+                grid->readBuffers(is);
+            }
         }
     }
 
@@ -1065,7 +1097,7 @@ Archive::write(std::ostream& os, const GridCPtrVec& grids, bool seekable,
 
 void
 Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
-    std::ostream& os, bool seekable, const io::WriteOptions&) const
+    std::ostream& os, bool seekable, const io::WriteOptions& writeOptions) const
 {
     // Restore file-level stream metadata on exit.
     struct OnExit {
@@ -1075,6 +1107,9 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
         void* ptr;
     };
     OnExit restore(os);
+
+    // Find the codec for the grid type and options.
+    io::Codec* codec = findCodec(gd.gridType());
 
     // Stream metadata varies per grid, so make a copy of the file-level stream metadata.
     io::StreamMetadata::Ptr streamMetadata;
@@ -1119,13 +1154,21 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     grid->writeTransform(os);
 
     // Save the grid's structure.
-    grid->writeTopology(os);
+    if (codec) {
+        codec->writeTopology(os, *grid, writeOptions);
+    } else {
+        grid->writeTopology(os);
+    }
 
     // Now we know the grid block storage position.
     if (seekable) gd.setBlockPos(os.tellp());
 
     // Save out the data blocks of the grid.
-    grid->writeBuffers(os);
+    if (codec) {
+        codec->writeBuffers(os, *grid, writeOptions);
+    } else {
+        grid->writeBuffers(os);
+    }
 
     // Now we know the end position of this grid.
     if (seekable) gd.setEndPos(os.tellp());
