@@ -6,7 +6,7 @@
 // Two implementations, selected automatically at compile time:
 //
 //   NANOVDB_USE_STD_SIMD (set when <experimental/simd> is available):
-//     Simd<T,W> and SimdMask<T,W> are thin wrappers around
+//     Simd<T,W> and SimdMask<T,W> are pure type aliases for
 //     std::experimental::fixed_size_simd / fixed_size_simd_mask.
 //     All arithmetic delegates to the standard type; the compiler emits
 //     native vector instructions without relying on the auto-vectorizer.
@@ -32,7 +32,7 @@
 // ---------------------------------------------------------------------------
 // Auto-detect std::experimental::simd (Parallelism TS v2)
 // ---------------------------------------------------------------------------
-#if defined(__has_include) && __has_include(<experimental/simd>)
+#if !defined(NANOVDB_NO_STD_SIMD) && defined(__has_include) && __has_include(<experimental/simd>)
 #  include <experimental/simd>
 #  ifdef __cpp_lib_experimental_parallel_simd
 #    define NANOVDB_USE_STD_SIMD 1
@@ -42,67 +42,44 @@
 namespace nanovdb {
 namespace util {
 
+// ---------------------------------------------------------------------------
+// element_aligned_tag — portable load/store alignment descriptor.
+// In the stdx backend this is an alias for stdx::element_aligned_tag so that
+// nanovdb::util::element_aligned is the same token stdx constructors expect.
+// In the std::array backend it is a standalone dummy struct (ignored).
+// ---------------------------------------------------------------------------
+#ifdef NANOVDB_USE_STD_SIMD
+namespace stdx = std::experimental;
+using element_aligned_tag = stdx::element_aligned_tag;
+#else
+struct element_aligned_tag {};
+#endif
+inline constexpr element_aligned_tag element_aligned{};
+
 // ===========================================================================
-// Implementation A: std::experimental::simd wrapper
+// Implementation A: std::experimental::simd — pure type aliases
 // ===========================================================================
 #ifdef NANOVDB_USE_STD_SIMD
 
-namespace stdx = std::experimental;
+template<typename T, int W>
+using SimdMask = stdx::fixed_size_simd_mask<T, W>;
 
 template<typename T, int W>
-struct SimdMask {
-    stdx::fixed_size_simd_mask<T, W> inner{};
-
-    SimdMask() = default;
-    SimdMask(stdx::fixed_size_simd_mask<T, W> m) : inner(m) {}
-    bool operator[](int i) const { return inner[i]; }
-};
+using Simd = stdx::fixed_size_simd<T, W>;
 
 template<typename T, int W>
-struct Simd {
-    using StdxT = stdx::fixed_size_simd<T, W>;
-    StdxT inner{};
-
-    Simd() = default;
-    Simd(T scalar) : inner(scalar) {}                              // broadcast
-    explicit Simd(const T* p)                                      // load
-        : inner(p, stdx::element_aligned) {}
-    Simd(StdxT v) : inner(v) {}                                    // from stdx ops
-
-    T operator[](int i) const { return inner[i]; }
-    void store(T* p) const { inner.copy_to(p, stdx::element_aligned); }
-
-    Simd operator-()        const { return Simd(-inner); }
-    Simd operator+(Simd o)  const { return Simd(inner + o.inner); }
-    Simd operator-(Simd o)  const { return Simd(inner - o.inner); }
-    Simd operator*(Simd o)  const { return Simd(inner * o.inner); }
-    Simd operator/(Simd o)  const { return Simd(inner / o.inner); }
-    SimdMask<T,W> operator>(Simd o) const { return SimdMask<T,W>(inner > o.inner); }
-};
-
-// Mixed scalar/Simd — stdx handles scalar*StdxT natively
-template<typename T, int W> inline Simd<T,W> operator+(T a, Simd<T,W> b) { return Simd<T,W>(a + b.inner); }
-template<typename T, int W> inline Simd<T,W> operator+(Simd<T,W> a, T b) { return Simd<T,W>(a.inner + b); }
-template<typename T, int W> inline Simd<T,W> operator-(T a, Simd<T,W> b) { return Simd<T,W>(a - b.inner); }
-template<typename T, int W> inline Simd<T,W> operator-(Simd<T,W> a, T b) { return Simd<T,W>(a.inner - b); }
-template<typename T, int W> inline Simd<T,W> operator*(T a, Simd<T,W> b) { return Simd<T,W>(a * b.inner); }
-template<typename T, int W> inline Simd<T,W> operator*(Simd<T,W> a, T b) { return Simd<T,W>(a.inner * b); }
-template<typename T, int W> inline Simd<T,W> operator/(T a, Simd<T,W> b) { return Simd<T,W>(a / b.inner); }
-template<typename T, int W> inline Simd<T,W> operator/(Simd<T,W> a, T b) { return Simd<T,W>(a.inner / b); }
+inline Simd<T,W> min(Simd<T,W> a, Simd<T,W> b) { return stdx::min(a, b); }
 
 template<typename T, int W>
-inline Simd<T,W> min(Simd<T,W> a, Simd<T,W> b) { return Simd<T,W>(stdx::min(a.inner, b.inner)); }
-
-template<typename T, int W>
-inline Simd<T,W> max(Simd<T,W> a, Simd<T,W> b) { return Simd<T,W>(stdx::max(a.inner, b.inner)); }
+inline Simd<T,W> max(Simd<T,W> a, Simd<T,W> b) { return stdx::max(a, b); }
 
 // TS v2 where(mask, v) is a masked assignment proxy, not a 3-arg select.
 // Wrap it into the select(mask, a, b) form our kernels expect.
 template<typename T, int W>
 inline Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> b) {
-    auto result = b.inner;
-    stdx::where(mask.inner, result) = a.inner;
-    return Simd<T,W>(result);
+    auto result = b;
+    stdx::where(mask, result) = a;
+    return result;
 }
 
 // ===========================================================================
@@ -122,13 +99,13 @@ struct Simd {
     std::array<T, W> data{};
 
     Simd() = default;
-    NANOVDB_SIMD_HOSTDEV Simd(T scalar) { data.fill(scalar); }    // broadcast
-    NANOVDB_SIMD_HOSTDEV explicit Simd(const T* p) {              // load
+    NANOVDB_SIMD_HOSTDEV Simd(T scalar) { data.fill(scalar); }               // broadcast
+    NANOVDB_SIMD_HOSTDEV explicit Simd(const T* p, element_aligned_tag = {}) { // load
         for (int i = 0; i < W; i++) data[i] = p[i];
     }
     NANOVDB_SIMD_HOSTDEV T  operator[](int i) const { return data[i]; }
     NANOVDB_SIMD_HOSTDEV T& operator[](int i)       { return data[i]; }
-    NANOVDB_SIMD_HOSTDEV void store(T* p) const {
+    NANOVDB_SIMD_HOSTDEV void store(T* p, element_aligned_tag = {}) const {   // store
         for (int i = 0; i < W; i++) p[i] = data[i];
     }
     NANOVDB_SIMD_HOSTDEV Simd operator-() const {

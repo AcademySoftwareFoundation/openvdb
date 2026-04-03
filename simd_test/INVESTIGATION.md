@@ -44,7 +44,7 @@ auto liftToSimd(ScalarFn f) {
 
 Clang 18 vectorizes the unmodified kernel (with `std::max` and `bool isOutside`)
 producing a full ymm path with a runtime alias check.  GCC 13 does not vectorize in
-any attempted form (see §4).
+any attempted form (see §5).
 
 ### Why Superseded
 
@@ -60,11 +60,6 @@ any attempted form (see §4).
 ### Core Idea
 
 Write the kernel **once** as a template on its value type `T`:
-
-```cpp
-template<typename T>
-T normSqGrad(T v0, T v1, ..., T v18, float dx2, float invDx2, float isoValue);
-```
 
 - `T = float` → scalar path, `__hostdev__`-compatible, used on GPU per-thread
 - `T = Simd<float, W>` → W-wide SIMD path, used on CPU per-batch
@@ -90,47 +85,46 @@ Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> b);
 `v0 > T(isoValue)` deduces to `bool` when `T=float` and `SimdMask<float,W>` when
 `T=Simd<float,W>`, so the `where()` call resolves correctly in both cases.
 
-### Kernel structure
+### Class hierarchy
 
-```cpp
-template<typename T, typename MaskT>
-T godunovsNormSqrd(MaskT isOutside,
-                   T dP_xm, T dP_xp, T dP_ym, T dP_yp, T dP_zm, T dP_zp)
-{
-    const T zero(0.f);
-    T outside = max(max(dP_xm,zero)*max(dP_xm,zero), min(dP_xp,zero)*min(dP_xp,zero))
-              + ...;  // y, z axes
-    T inside  = max(min(dP_xm,zero)*min(dP_xm,zero), max(dP_xp,zero)*max(dP_xp,zero))
-              + ...;
-    return where(isOutside, outside, inside);
-}
+`WENO5<T>` and `GodunovsNormSqrd<T, MaskT>` are free functions in `StencilKernel.h`,
+mirroring their counterparts in `Stencils.h`.  The stencil data and compute methods
+live in a two-level class hierarchy:
 
-template<typename T>
-T normSqGrad(T v0, T v1, ..., T v18, float dx2, float invDx2, float isoValue)
-{
-    const T dP_xm = weno5<T>(...), dP_xp = weno5<T>(...);
-    const T dP_ym = weno5<T>(...), dP_yp = weno5<T>(...);
-    const T dP_zm = weno5<T>(...), dP_zp = weno5<T>(...);
-    return invDx2 * godunovsNormSqrd(v0 > T(isoValue),
-                                     dP_xm, dP_xp, dP_ym, dP_yp, dP_zm, dP_zp);
-}
+```
+BaseStencilKernel<T, SIZE>      mValues[SIZE], mDx2, mInvDx2 — pure data
+         |
+WenoStencilKernel<T>            normSqGrad(), ... — pure compute
 ```
 
-Structurally identical to `WenoStencil::normSqGrad` in `Stencils.h`.
+No grid coupling, no accessor, no `moveTo()`.  The VBM gather populates `mValues`
+directly; `normSqGrad()` is then called on the populated kernel object.
 
 ### GPU / CPU call sites
 
 ```cpp
-// GPU: one thread per voxel, scalar instantiation
-float result = normSqGrad<float>(v[0], ..., v[18], dx2, invDx2, iso);
+// GPU: one thread, scalar — fill from per-thread stencil gather
+WenoStencilKernel<float> sk(dx);
+for (int n = 0; n < 19; n++) sk[n] = gathered_scalar_values[n];
+float result = sk.normSqGrad(isoValue);
 
-// CPU: one call per batch of W voxels, SIMD instantiation
-using FloatSimd = nanovdb::util::Simd<float, 16>;
-FloatSimd result = normSqGrad<FloatSimd>(sv[0], ..., sv[18], dx2, invDx2, iso);
+// CPU: one batch, SIMD — fill from VBM batch gather
+WenoStencilKernel<Simd<float,16>> sk(dx);
+for (int n = 0; n < 19; n++) sk[n] = gathered_simd_values[n];
+Simd<float,16> result = sk.normSqGrad(isoValue);
 ```
 
-NVCC's demand-driven template instantiation ensures `normSqGrad<FloatSimd>` is
-never compiled for device.
+### Relationship to legacy WenoStencil
+
+The existing `BaseStencil<Derived, SIZE, GridT>` / `WenoStencil<GridT>` hierarchy in
+`Stencils.h` couples data storage to a grid accessor and a `moveTo()` cursor — a
+sequential, single-threaded API incompatible with VBM batch processing.  The kernel
+hierarchy is designed as its eventual replacement.  During transition, the legacy
+classes can simply derive from the kernel classes to inherit the compute methods
+without disruption.
+
+NVCC's demand-driven template instantiation ensures `WenoStencilKernel<Simd<float,W>>`
+is never compiled for device.
 
 ---
 
@@ -138,52 +132,57 @@ never compiled for device.
 
 `simd_test/Simd.h` (destined for `nanovdb/util/`) provides `Simd<T,W>`,
 `SimdMask<T,W>`, `min`, `max`, and `where` with two interchangeable implementations
-selected automatically at compile time.
+selected automatically at compile time.  Suppress Backend A with
+`-DNANOVDB_NO_STD_SIMD` to force the fallback.
 
 ### Backend A: `std::experimental::simd` (C++26 / Parallelism TS v2)
 
-Activated when `<experimental/simd>` is available and
-`__cpp_lib_experimental_parallel_simd` is defined.
+Activated when `<experimental/simd>` is available,
+`__cpp_lib_experimental_parallel_simd` is defined, and `NANOVDB_NO_STD_SIMD` is not
+set.
 
-`Simd<T,W>` and `SimdMask<T,W>` are thin wrappers around
+`Simd<T,W>` and `SimdMask<T,W>` are **pure type aliases** for
 `std::experimental::fixed_size_simd<T,W>` and
 `std::experimental::fixed_size_simd_mask<T,W>`.  All arithmetic delegates to the
 standard types; the compiler emits native vector instructions without relying on the
 auto-vectorizer.
 
 The TS v2 `where(mask, v)` is a 2-arg masked-assignment proxy, not a 3-arg select.
-The wrapper adapts it:
+A thin free function adapts it:
 ```cpp
 template<typename T, int W>
 Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> b) {
-    auto result = b.inner;
-    stdx::where(mask.inner, result) = a.inner;
-    return Simd<T,W>(result);
+    auto result = b;
+    stdx::where(mask, result) = a;
+    return result;
 }
 ```
 
 ### Backend B: `std::array` (default, C++17)
 
 `Simd<T,W>` wraps `std::array<T,W>` with element-wise operator loops.
-Clang auto-vectorizes these loops; GCC does not (same class of struct-access
-limitation as Approach A).  `__hostdev__`-annotated throughout for CUDA
-compatibility.
+`__hostdev__`-annotated throughout for CUDA compatibility.
 
-### Assembly comparison (Clang 18, AVX2, `-O3 -march=native`)
+**GCC vectorization note**: GCC's failure to auto-vectorize in §5 was specific to
+Approach A's outer-lane loop pattern, where GCC could not see through `std::tuple`
+struct indirection in GIMPLE.  Backend B's element-wise operator loops (e.g.
+`for (int i = 0; i < W; i++) r[i] = a[i] + b[i]`) are a completely different target
+— fixed-count, no struct indirection — and GCC does auto-vectorize them when used
+with the Generic-T kernel class hierarchy (see §6).
 
-| Standard flag | Backend active | ymm count | Assembly |
-|---|---|---|---|
-| `-std=c++17` | `std::array` | 1275 | — |
-| `-std=c++26` | `std::experimental::simd` | 1275 | **byte-for-byte identical** |
+### element_aligned_tag — portable load/store descriptor
 
-Clang fully inlines through the `stdx` wrapper — zero overhead.  Both paths produce
-the same 1275 ymm instructions, all 16 lanes pass.
+`nanovdb::util::element_aligned_tag` and `nanovdb::util::element_aligned` are always
+present.  In Backend A they alias `stdx::element_aligned_tag` (same type the stdx
+constructors expect); in Backend B they are a standalone dummy struct (ignored).
+This makes the load constructor `Simd(const T*, element_aligned)` portable across
+both backends and forward-compatible with `std::simd`.
 
 ### C++26 migration path
 
-When `std::simd` lands in `<simd>` (not yet in Clang 18's libstdc++), replacing the
-`std::experimental` wrapper with a `std::simd` alias will be a one-line typedef
-change.  The kernel source is unchanged.
+When `std::simd` lands in `<simd>`, migration is a one-line change: replace the
+`stdx` detection block with `#if __cpp_lib_simd` and `std::experimental` with `std`.
+The kernel source, `element_aligned_tag`, and all call sites are unchanged.
 
 ---
 
@@ -211,38 +210,55 @@ Base flags: `-O3 -march=native -std=c++17`
 | 10 | Flat `float[N][W]` arrays | No (gather stride) | n/a |
 
 **Conclusion for Approach A**: GCC 13 cannot auto-vectorize the `liftToSimd` pattern
-in any attempted form.  Clang 18 vectorizes the unmodified original.
+in any attempted form.  The root cause is GCC's inability to see through `std::tuple`'s
+recursive-inheritance struct layout in GIMPLE — not a limitation of Backend B per se.
 
 ---
 
 ## 6. Vectorization Results (Approach B, assembly-verified)
 
-| Compiler / flags | Backend | ymm in hot fn | Result |
-|---|---|---|---|
-| clang++-18 `-std=c++17` | `std::array` | 691 / 1275 total | PASS |
-| clang++-18 `-std=c++26` | `std::experimental::simd` | 691 / 1275 total | PASS |
-| g++ `-std=c++17` | `std::array` | 0 (not vectorized) | PASS (scalar) |
+GCC 13, AVX2, `-O3 -march=native -std=c++17`.  ymm counts per function (assembly-inspected).
 
-Key instructions in vectorized path: `vfmadd*ps`, `vsubps`, `vmulps`, `vmaxps`,
-`vminps`, `vblendvps`, `vcmpnltps`.  Two separate instantiations in the symbol
-table: `normSqGrad<Simd<float,16>>` (SIMD) and `normSqGrad<float>` (scalar ref).
+### Backend A (`std::experimental::simd`, auto-detected)
+
+| Function | ymm instructions |
+|---|---|
+| `WenoStencilKernel::normSqGrad` | 945 (WENO5 inlined ×6) |
+| `GodunovsNormSqrd` | 289 (out-of-line) |
+| `min` / `max` | 10 each |
+| `runSimdNormSqGrad` (test wrapper) | 0 (call shell only) |
+| **Total** | **1267** |
+
+### Backend B (`std::array`, forced with `-DNANOVDB_NO_STD_SIMD`)
+
+| Function | ymm instructions |
+|---|---|
+| `WenoStencilKernel::normSqGrad` | 365 |
+| `WENO5` | 137 (out-of-line) |
+| `GodunovsNormSqrd` | 117 (out-of-line) |
+| **Total** | **619** |
+
+Both backends pass all 16 lanes.  Backend B vectorizes via GCC's auto-vectorizer on
+the fixed-count element-wise operator loops — the struct-access limitation from
+Approach A does not apply here.
+
+Key instructions in both paths: `vfmadd*ps`, `vsubps`, `vmulps`, `vmaxps`,
+`vminps`, `vblendvps`, `vcmpnltps`.
 
 ---
 
 ## 7. Open Questions / Next Steps
 
-- **GCC support**: The per-operator loops in `Simd<T,W>` (Backend B) are simple
-  W-iteration loops over `std::array`.  GCC's "return slot optimization" on `weno5`
-  calls prevents vectorization.  Explicit AVX2 intrinsics in a GCC-specific
-  `Simd<float,8>` specialization would guarantee it, at the cost of
-  architecture-specific code.
 - **Benchmarking**: Throughput of the vectorized path vs. scalar not yet measured on
   representative VBM data.
-- **Integration**: Move `Simd.h` to `nanovdb/util/Simd.h`; template `weno5`,
-  `godunovsNormSqrd`, `normSqGrad` in `nanovdb/math/Stencils.h`.
+- **Integration**: Move `Simd.h` to `nanovdb/util/Simd.h`; move `StencilKernel.h`
+  to `nanovdb/math/`; have legacy `WenoStencil` derive from `WenoStencilKernel`
+  during transition, then retire it.
 - **`<simd>` header**: Clang 18 provides `<experimental/simd>` but not `<simd>`.
-  Once `<simd>` is available, the detection guard can be simplified to
-  `#if __cpp_lib_simd`.
+  Once `<simd>` is available, the detection guard simplifies to `#if __cpp_lib_simd`.
+- **Clang assembly verification**: Clang not yet installed on this machine.  Previous
+  results (691 ymm flat in hot function, free-function version) predate the
+  class-based refactor; re-verification pending.
 
 ---
 
@@ -251,23 +267,27 @@ table: `normSqGrad<Simd<float,16>>` (SIMD) and `normSqGrad<float>` (scalar ref).
 | File | Purpose |
 |------|---------|
 | `simd_test/Simd.h` | `nanovdb::util::Simd<T,W>` — two backends, auto-detected (prototype for `nanovdb/util/`) |
-| `simd_test/lift_test.cpp` | Test: templated `weno5`, `godunovsNormSqrd`, `normSqGrad`; correctness vs. scalar reference |
-| `nanovdb/nanovdb/math/Stencils.h` | Original `weno5`, `GodunovsNormSqrd`, `WenoStencil::normSqGrad` |
+| `simd_test/StencilKernel.h` | `BaseStencilKernel<T,SIZE>`, `WenoStencilKernel<T>`, `WENO5<T>`, `GodunovsNormSqrd<T,MaskT>` (prototype for `nanovdb/math/`) |
+| `simd_test/lift_test.cpp` | Correctness test: SIMD vs scalar reference via `WenoStencilKernel` |
+| `nanovdb/nanovdb/math/Stencils.h` | Original scalar `WENO5`, `GodunovsNormSqrd`, `WenoStencil::normSqGrad` |
 | `nanovdb/nanovdb/examples/ex_voxelBlockManager_host_cuda/StencilGather.md` | Per-block stencil gather design doc |
 | `nanovdb/nanovdb/tools/VoxelBlockManager.h` | CPU VBM implementation |
 
 Build commands:
 ```sh
-# Clang, std::array backend (C++17):
-clang++-18 -O3 -march=native -std=c++17 \
-  -I/usr/include/c++/13 -I/usr/include/x86_64-linux-gnu/c++/13 \
-  -o lift_test lift_test.cpp
+# GCC, Backend A (std::experimental::simd, auto-detected):
+g++ -O3 -march=native -std=c++17 -o lift_test lift_test.cpp
 
-# Clang, std::experimental::simd backend (C++26) — identical assembly:
+# GCC, Backend B (std::array, forced):
+g++ -O3 -march=native -std=c++17 -DNANOVDB_NO_STD_SIMD -o lift_test lift_test.cpp
+
+# Clang, Backend A (std::experimental::simd, C++26):
 clang++-18 -O3 -march=native -std=c++26 \
   -I/usr/include/c++/13 -I/usr/include/x86_64-linux-gnu/c++/13 \
   -o lift_test lift_test.cpp
 
-# GCC (correct results, does not vectorize):
-g++ -O3 -march=native -std=c++17 -fopt-info-vec-missed -o lift_test lift_test.cpp
+# Clang, Backend B (std::array, C++17 or forced):
+clang++-18 -O3 -march=native -std=c++17 \
+  -I/usr/include/c++/13 -I/usr/include/x86_64-linux-gnu/c++/13 \
+  -o lift_test lift_test.cpp
 ```
