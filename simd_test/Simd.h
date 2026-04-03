@@ -3,12 +3,22 @@
 
 // Minimal SIMD abstraction for NanoVDB stencil kernels.
 //
-// Designed to be __hostdev__-compatible: on CUDA device code, instantiate
-// kernels with T=float (scalar); on CPU, instantiate with T=Simd<float,W>.
-// All arithmetic operators and where()/max() are overloaded for both cases,
-// so a single templated kernel compiles correctly for both execution contexts.
+// Two implementations, selected automatically at compile time:
 //
-// Mirrors the C++26 std::simd interface deliberately — migration is a typedef.
+//   NANOVDB_USE_STD_SIMD (set when <experimental/simd> is available):
+//     Simd<T,W> and SimdMask<T,W> are thin wrappers around
+//     std::experimental::fixed_size_simd / fixed_size_simd_mask.
+//     All arithmetic delegates to the standard type; the compiler emits
+//     native vector instructions without relying on the auto-vectorizer.
+//
+//   Default (std::array backend):
+//     Simd<T,W> wraps std::array<T,W> with element-wise operator loops.
+//     Clang auto-vectorizes these loops; GCC does not.
+//
+// In both cases the interface is identical, so templated kernels (T=float
+// for GPU, T=Simd<float,W> for CPU) compile unmodified.
+//
+// Mirrors the C++26 std::simd naming — migration will be a typedef swap.
 
 // ---------------------------------------------------------------------------
 // Portability: __hostdev__ is a no-op outside CUDA
@@ -19,51 +29,111 @@
 #  define NANOVDB_SIMD_HOSTDEV __host__ __device__
 #endif
 
+// ---------------------------------------------------------------------------
+// Auto-detect std::experimental::simd (Parallelism TS v2)
+// ---------------------------------------------------------------------------
+#if defined(__has_include) && __has_include(<experimental/simd>)
+#  include <experimental/simd>
+#  ifdef __cpp_lib_experimental_parallel_simd
+#    define NANOVDB_USE_STD_SIMD 1
+#  endif
+#endif
+
 namespace nanovdb {
 namespace util {
 
-template<typename T, int W> struct Simd;
-template<typename T, int W> struct SimdMask;
+// ===========================================================================
+// Implementation A: std::experimental::simd wrapper
+// ===========================================================================
+#ifdef NANOVDB_USE_STD_SIMD
 
-// ---------------------------------------------------------------------------
-// SimdMask<T, W>: result of a lane-wise comparison
-// ---------------------------------------------------------------------------
+namespace stdx = std::experimental;
+
+template<typename T, int W>
+struct SimdMask {
+    stdx::fixed_size_simd_mask<T, W> inner{};
+
+    SimdMask() = default;
+    SimdMask(stdx::fixed_size_simd_mask<T, W> m) : inner(m) {}
+    bool operator[](int i) const { return inner[i]; }
+};
+
+template<typename T, int W>
+struct Simd {
+    using StdxT = stdx::fixed_size_simd<T, W>;
+    StdxT inner{};
+
+    Simd() = default;
+    Simd(T scalar) : inner(scalar) {}                              // broadcast
+    explicit Simd(const T* p)                                      // load
+        : inner(p, stdx::element_aligned) {}
+    Simd(StdxT v) : inner(v) {}                                    // from stdx ops
+
+    T operator[](int i) const { return inner[i]; }
+    void store(T* p) const { inner.copy_to(p, stdx::element_aligned); }
+
+    Simd operator-()        const { return Simd(-inner); }
+    Simd operator+(Simd o)  const { return Simd(inner + o.inner); }
+    Simd operator-(Simd o)  const { return Simd(inner - o.inner); }
+    Simd operator*(Simd o)  const { return Simd(inner * o.inner); }
+    Simd operator/(Simd o)  const { return Simd(inner / o.inner); }
+    SimdMask<T,W> operator>(Simd o) const { return SimdMask<T,W>(inner > o.inner); }
+};
+
+// Mixed scalar/Simd — stdx handles scalar*StdxT natively
+template<typename T, int W> inline Simd<T,W> operator+(T a, Simd<T,W> b) { return Simd<T,W>(a + b.inner); }
+template<typename T, int W> inline Simd<T,W> operator+(Simd<T,W> a, T b) { return Simd<T,W>(a.inner + b); }
+template<typename T, int W> inline Simd<T,W> operator-(T a, Simd<T,W> b) { return Simd<T,W>(a - b.inner); }
+template<typename T, int W> inline Simd<T,W> operator-(Simd<T,W> a, T b) { return Simd<T,W>(a.inner - b); }
+template<typename T, int W> inline Simd<T,W> operator*(T a, Simd<T,W> b) { return Simd<T,W>(a * b.inner); }
+template<typename T, int W> inline Simd<T,W> operator*(Simd<T,W> a, T b) { return Simd<T,W>(a.inner * b); }
+template<typename T, int W> inline Simd<T,W> operator/(T a, Simd<T,W> b) { return Simd<T,W>(a / b.inner); }
+template<typename T, int W> inline Simd<T,W> operator/(Simd<T,W> a, T b) { return Simd<T,W>(a.inner / b); }
+
+template<typename T, int W>
+inline Simd<T,W> min(Simd<T,W> a, Simd<T,W> b) { return Simd<T,W>(stdx::min(a.inner, b.inner)); }
+
+template<typename T, int W>
+inline Simd<T,W> max(Simd<T,W> a, Simd<T,W> b) { return Simd<T,W>(stdx::max(a.inner, b.inner)); }
+
+// TS v2 where(mask, v) is a masked assignment proxy, not a 3-arg select.
+// Wrap it into the select(mask, a, b) form our kernels expect.
+template<typename T, int W>
+inline Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> b) {
+    auto result = b.inner;
+    stdx::where(mask.inner, result) = a.inner;
+    return Simd<T,W>(result);
+}
+
+// ===========================================================================
+// Implementation B: std::array backend (default)
+// ===========================================================================
+#else
+
 template<typename T, int W>
 struct SimdMask {
     std::array<bool, W> data{};
-
     NANOVDB_SIMD_HOSTDEV bool  operator[](int i) const { return data[i]; }
     NANOVDB_SIMD_HOSTDEV bool& operator[](int i)       { return data[i]; }
 };
 
-// ---------------------------------------------------------------------------
-// Simd<T, W>: W-wide vector of T, backed by std::array<T, W>
-// ---------------------------------------------------------------------------
 template<typename T, int W>
 struct Simd {
     std::array<T, W> data{};
 
     Simd() = default;
-    NANOVDB_SIMD_HOSTDEV Simd(T scalar) { data.fill(scalar); }           // broadcast
-    NANOVDB_SIMD_HOSTDEV explicit Simd(const T* p) {
+    NANOVDB_SIMD_HOSTDEV Simd(T scalar) { data.fill(scalar); }    // broadcast
+    NANOVDB_SIMD_HOSTDEV explicit Simd(const T* p) {              // load
         for (int i = 0; i < W; i++) data[i] = p[i];
     }
-
     NANOVDB_SIMD_HOSTDEV T  operator[](int i) const { return data[i]; }
     NANOVDB_SIMD_HOSTDEV T& operator[](int i)       { return data[i]; }
-
     NANOVDB_SIMD_HOSTDEV void store(T* p) const {
         for (int i = 0; i < W; i++) p[i] = data[i];
     }
-
-    // Unary minus
     NANOVDB_SIMD_HOSTDEV Simd operator-() const {
-        Simd r;
-        for (int i = 0; i < W; i++) r.data[i] = -data[i];
-        return r;
+        Simd r; for (int i = 0; i < W; i++) r.data[i] = -data[i]; return r;
     }
-
-    // Lane-wise arithmetic (Simd op Simd)
     NANOVDB_SIMD_HOSTDEV Simd operator+(Simd o) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] + o.data[i]; return r;
     }
@@ -76,8 +146,6 @@ struct Simd {
     NANOVDB_SIMD_HOSTDEV Simd operator/(Simd o) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] / o.data[i]; return r;
     }
-
-    // Lane-wise comparison → SimdMask
     NANOVDB_SIMD_HOSTDEV SimdMask<T,W> operator>(Simd o) const {
         SimdMask<T,W> m;
         for (int i = 0; i < W; i++) m.data[i] = data[i] > o.data[i];
@@ -85,69 +153,44 @@ struct Simd {
     }
 };
 
-// ---------------------------------------------------------------------------
-// Mixed scalar/Simd arithmetic (enables e.g. 2.f * simd_val)
-// Template argument deduction does not use implicit conversions, so these
-// explicit overloads are required for scalar op Simd and Simd op scalar.
-// ---------------------------------------------------------------------------
+template<typename T, int W> NANOVDB_SIMD_HOSTDEV
+Simd<T,W> operator+(T a, Simd<T,W> b) { return Simd<T,W>(a) + b; }
 template<typename T, int W> NANOVDB_SIMD_HOSTDEV
 Simd<T,W> operator+(Simd<T,W> a, T b) { return a + Simd<T,W>(b); }
 template<typename T, int W> NANOVDB_SIMD_HOSTDEV
-Simd<T,W> operator+(T a, Simd<T,W> b) { return Simd<T,W>(a) + b; }
-
+Simd<T,W> operator-(T a, Simd<T,W> b) { return Simd<T,W>(a) - b; }
 template<typename T, int W> NANOVDB_SIMD_HOSTDEV
 Simd<T,W> operator-(Simd<T,W> a, T b) { return a - Simd<T,W>(b); }
 template<typename T, int W> NANOVDB_SIMD_HOSTDEV
-Simd<T,W> operator-(T a, Simd<T,W> b) { return Simd<T,W>(a) - b; }
-
+Simd<T,W> operator*(T a, Simd<T,W> b) { return Simd<T,W>(a) * b; }
 template<typename T, int W> NANOVDB_SIMD_HOSTDEV
 Simd<T,W> operator*(Simd<T,W> a, T b) { return a * Simd<T,W>(b); }
 template<typename T, int W> NANOVDB_SIMD_HOSTDEV
-Simd<T,W> operator*(T a, Simd<T,W> b) { return Simd<T,W>(a) * b; }
-
+Simd<T,W> operator/(T a, Simd<T,W> b) { return Simd<T,W>(a) / b; }
 template<typename T, int W> NANOVDB_SIMD_HOSTDEV
 Simd<T,W> operator/(Simd<T,W> a, T b) { return a / Simd<T,W>(b); }
-template<typename T, int W> NANOVDB_SIMD_HOSTDEV
-Simd<T,W> operator/(T a, Simd<T,W> b) { return Simd<T,W>(a) / b; }
-
-// ---------------------------------------------------------------------------
-// min/max: lane-wise minimum and maximum
-// Scalar overloads ensure templated kernels compile for T=float (GPU path)
-// ---------------------------------------------------------------------------
-template<typename T>
-NANOVDB_SIMD_HOSTDEV T min(T a, T b) { return a < b ? a : b; }
-
-template<typename T>
-NANOVDB_SIMD_HOSTDEV T max(T a, T b) { return a > b ? a : b; }
 
 template<typename T, int W>
 NANOVDB_SIMD_HOSTDEV Simd<T,W> min(Simd<T,W> a, Simd<T,W> b) {
-    Simd<T,W> r;
-    for (int i = 0; i < W; i++) r[i] = a[i] < b[i] ? a[i] : b[i];
-    return r;
+    Simd<T,W> r; for (int i = 0; i < W; i++) r[i] = a[i] < b[i] ? a[i] : b[i]; return r;
 }
-
 template<typename T, int W>
 NANOVDB_SIMD_HOSTDEV Simd<T,W> max(Simd<T,W> a, Simd<T,W> b) {
-    Simd<T,W> r;
-    for (int i = 0; i < W; i++) r[i] = a[i] > b[i] ? a[i] : b[i];
-    return r;
+    Simd<T,W> r; for (int i = 0; i < W; i++) r[i] = a[i] > b[i] ? a[i] : b[i]; return r;
 }
-
-// ---------------------------------------------------------------------------
-// where: lane-wise select — returns a where mask is true, b otherwise
-// Maps to VBLENDVPS on AVX2; no branching in vectorized code.
-// Scalar overload: plain ternary, for T=float (GPU path)
-// ---------------------------------------------------------------------------
-template<typename T>
-NANOVDB_SIMD_HOSTDEV T where(bool mask, T a, T b) { return mask ? a : b; }
-
 template<typename T, int W>
 NANOVDB_SIMD_HOSTDEV Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> b) {
-    Simd<T,W> r;
-    for (int i = 0; i < W; i++) r[i] = mask[i] ? a[i] : b[i];
-    return r;
+    Simd<T,W> r; for (int i = 0; i < W; i++) r[i] = mask[i] ? a[i] : b[i]; return r;
 }
+
+#endif // NANOVDB_USE_STD_SIMD
+
+// ---------------------------------------------------------------------------
+// Scalar overloads — always present, for T=float (GPU / scalar path)
+// ---------------------------------------------------------------------------
+template<typename T> NANOVDB_SIMD_HOSTDEV T min(T a, T b)           { return a < b ? a : b; }
+template<typename T> NANOVDB_SIMD_HOSTDEV T max(T a, T b)           { return a > b ? a : b; }
+template<typename T> NANOVDB_SIMD_HOSTDEV T where(bool m, T a, T b) { return m ? a : b; }
 
 } // namespace util
 } // namespace nanovdb
