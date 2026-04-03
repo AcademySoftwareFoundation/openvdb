@@ -48,12 +48,8 @@ any attempted form (see §4).
 
 ### Why Superseded
 
-The input/output types are `std::tuple<const std::array<T,W>&, ...>` — reference
-tuples pointing into existing SoA buffers.  While correct, the design has two
-limitations:
-
-1. The scalar kernel is a separate code path from the GPU kernel — it takes a
-   tuple, not individual arguments, and cannot be templated on `T` directly.
+1. The scalar kernel takes a tuple, not individual arguments, and cannot be
+   templated on `T` directly — it is a separate code path from the GPU kernel.
 2. Vectorization relies entirely on the auto-vectorizer seeing through the tuple
    extraction loop, which GCC cannot do.
 
@@ -63,8 +59,7 @@ limitations:
 
 ### Core Idea
 
-Instead of lifting a scalar kernel into SIMD, write the kernel **once** as a
-template on its value type `T`:
+Write the kernel **once** as a template on its value type `T`:
 
 ```cpp
 template<typename T>
@@ -80,36 +75,20 @@ zero `#ifdef`.
 
 ### `where()` — the key primitive
 
-The `bool isOutside ? a : b` ternary cannot be used with a SIMD mask.  `where(mask,
-a, b)` replaces it:
+`bool isOutside ? a : b` cannot be used with a SIMD mask.  `where(mask, a, b)`
+replaces it:
 
 ```cpp
-// Scalar overload (T=float): plain ternary
+// Scalar (T=float): plain ternary — GPU path
 template<typename T> T where(bool mask, T a, T b) { return mask ? a : b; }
 
-// SIMD overload (T=Simd<float,W>): lane-wise blend → VBLENDVPS, no branch
+// SIMD (T=Simd<float,W>): lane-wise blend → VBLENDVPS, no branch
 template<typename T, int W>
 Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> b);
 ```
 
 `v0 > T(isoValue)` deduces to `bool` when `T=float` and `SimdMask<float,W>` when
-`T=Simd<float,W>`, so the call to `where()` resolves correctly in both cases.
-
-### `nanovdb::util::Simd<T, W>`
-
-A minimal header-only library (`simd_test/Simd.h`, destined for `nanovdb/util/`)
-providing:
-
-| Component | Purpose |
-|-----------|---------|
-| `Simd<T, W>` | W-wide vector backed by `std::array<T, W>`; broadcast constructor, `operator[]`, `store()`, arithmetic operators |
-| `SimdMask<T, W>` | Lane-wise boolean result of comparisons |
-| `min`, `max` | Lane-wise min/max; scalar overloads for GPU path |
-| `where` | Lane-wise blend; scalar overload for GPU path |
-| Mixed `T op Simd` / `Simd op T` overloads | Enable `2.f * simd_val` etc. without requiring implicit conversions in template deduction |
-
-~150 lines total.  `__hostdev__`-annotated throughout (macro-guarded for non-CUDA
-builds).  Mirrors C++26 `std::simd` naming deliberately — migration is a typedef.
+`T=Simd<float,W>`, so the `where()` call resolves correctly in both cases.
 
 ### Kernel structure
 
@@ -120,9 +99,9 @@ T godunovsNormSqrd(MaskT isOutside,
 {
     const T zero(0.f);
     T outside = max(max(dP_xm,zero)*max(dP_xm,zero), min(dP_xp,zero)*min(dP_xp,zero))
-              + ...;  // y, z
+              + ...;  // y, z axes
     T inside  = max(min(dP_xm,zero)*min(dP_xm,zero), max(dP_xp,zero)*max(dP_xp,zero))
-              + ...;  // y, z
+              + ...;
     return where(isOutside, outside, inside);
 }
 
@@ -137,25 +116,78 @@ T normSqGrad(T v0, T v1, ..., T v18, float dx2, float invDx2, float isoValue)
 }
 ```
 
-This is structurally identical to `WenoStencil::normSqGrad` in `Stencils.h`.
+Structurally identical to `WenoStencil::normSqGrad` in `Stencils.h`.
 
 ### GPU / CPU call sites
 
 ```cpp
 // GPU: one thread per voxel, scalar instantiation
-float result = normSqGrad<float>(v[0], v[1], ..., v[18], dx2, invDx2, iso);
+float result = normSqGrad<float>(v[0], ..., v[18], dx2, invDx2, iso);
 
 // CPU: one call per batch of W voxels, SIMD instantiation
 using FloatSimd = nanovdb::util::Simd<float, 16>;
-FloatSimd result = normSqGrad<FloatSimd>(sv[0], sv[1], ..., sv[18], dx2, invDx2, iso);
+FloatSimd result = normSqGrad<FloatSimd>(sv[0], ..., sv[18], dx2, invDx2, iso);
 ```
 
 NVCC's demand-driven template instantiation ensures `normSqGrad<FloatSimd>` is
-never compiled for device — it is only instantiated in host code.
+never compiled for device.
 
 ---
 
-## 4. Vectorization Experiments and Findings (Approach A)
+## 4. `nanovdb::util::Simd<T, W>` — two backends
+
+`simd_test/Simd.h` (destined for `nanovdb/util/`) provides `Simd<T,W>`,
+`SimdMask<T,W>`, `min`, `max`, and `where` with two interchangeable implementations
+selected automatically at compile time.
+
+### Backend A: `std::experimental::simd` (C++26 / Parallelism TS v2)
+
+Activated when `<experimental/simd>` is available and
+`__cpp_lib_experimental_parallel_simd` is defined.
+
+`Simd<T,W>` and `SimdMask<T,W>` are thin wrappers around
+`std::experimental::fixed_size_simd<T,W>` and
+`std::experimental::fixed_size_simd_mask<T,W>`.  All arithmetic delegates to the
+standard types; the compiler emits native vector instructions without relying on the
+auto-vectorizer.
+
+The TS v2 `where(mask, v)` is a 2-arg masked-assignment proxy, not a 3-arg select.
+The wrapper adapts it:
+```cpp
+template<typename T, int W>
+Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> b) {
+    auto result = b.inner;
+    stdx::where(mask.inner, result) = a.inner;
+    return Simd<T,W>(result);
+}
+```
+
+### Backend B: `std::array` (default, C++17)
+
+`Simd<T,W>` wraps `std::array<T,W>` with element-wise operator loops.
+Clang auto-vectorizes these loops; GCC does not (same class of struct-access
+limitation as Approach A).  `__hostdev__`-annotated throughout for CUDA
+compatibility.
+
+### Assembly comparison (Clang 18, AVX2, `-O3 -march=native`)
+
+| Standard flag | Backend active | ymm count | Assembly |
+|---|---|---|---|
+| `-std=c++17` | `std::array` | 1275 | — |
+| `-std=c++26` | `std::experimental::simd` | 1275 | **byte-for-byte identical** |
+
+Clang fully inlines through the `stdx` wrapper — zero overhead.  Both paths produce
+the same 1275 ymm instructions, all 16 lanes pass.
+
+### C++26 migration path
+
+When `std::simd` lands in `<simd>` (not yet in Clang 18's libstdc++), replacing the
+`std::experimental` wrapper with a `std::simd` alias will be a one-line typedef
+change.  The kernel source is unchanged.
+
+---
+
+## 5. Vectorization Experiments and Findings (Approach A)
 
 Platform: x86-64, AVX2, Ubuntu.  GCC 13.  Clang 18.
 Base flags: `-O3 -march=native -std=c++17`
@@ -183,60 +215,56 @@ in any attempted form.  Clang 18 vectorizes the unmodified original.
 
 ---
 
-## 5. Vectorization Results (Approach B, assembly-verified)
+## 6. Vectorization Results (Approach B, assembly-verified)
 
-Compiled with:
-```sh
-clang++-18 -O3 -march=native -std=c++17 \
-  -I/usr/include/c++/13 -I/usr/include/x86_64-linux-gnu/c++/13 \
-  -o lift_test lift_test.cpp
-```
+| Compiler / flags | Backend | ymm in hot fn | Result |
+|---|---|---|---|
+| clang++-18 `-std=c++17` | `std::array` | 691 / 1275 total | PASS |
+| clang++-18 `-std=c++26` | `std::experimental::simd` | 691 / 1275 total | PASS |
+| g++ `-std=c++17` | `std::array` | 0 (not vectorized) | PASS (scalar) |
 
-**Clang**: 964 total ymm instructions; 691 inside `runSimdNormSqGrad` +
-`normSqGrad<Simd<float,16>>`.  Key instructions: `vfmadd*ps`, `vsubps`, `vmulps`,
-`vmaxps`, `vminps`, `vblendvps`, `vcmpnltps`.  Two separate instantiations confirmed
-in the symbol table: `normSqGrad<Simd<float,16>>` and `normSqGrad<float>`.
-
-**GCC**: Correct results but does not vectorize the per-operator loops inside
-`Simd<T,W>` ("more than one data ref in stmt", "return slot optimization" on
-`weno5` calls).  Same class of struct-access limitation as Approach A.
-
-All 16 lanes produce correct results vs. the scalar (`T=float`) reference on both
-compilers.
+Key instructions in vectorized path: `vfmadd*ps`, `vsubps`, `vmulps`, `vmaxps`,
+`vminps`, `vblendvps`, `vcmpnltps`.  Two separate instantiations in the symbol
+table: `normSqGrad<Simd<float,16>>` (SIMD) and `normSqGrad<float>` (scalar ref).
 
 ---
 
-## 6. Open Questions / Next Steps
+## 7. Open Questions / Next Steps
 
-- **GCC support**: The per-operator loops in `Simd<T,W>` (e.g., `operator+`) are
-  simple W-iteration loops over `std::array` members.  GCC's "return slot
-  optimization" diagnostic on `weno5` calls suggests it cannot treat the `Simd`
-  return values as local registers.  Explicit intrinsics (AVX2 `__m256`) in
-  `Simd<float,8>` would guarantee GCC vectorization but require architecture-specific
-  specializations.
-- **Benchmarking**: Throughput of the vectorized Clang path vs. scalar not yet
-  measured on representative VBM data.
-- **Integration**: `Simd.h` to be moved to `nanovdb/util/Simd.h`; `weno5`,
-  `godunovsNormSqrd`, `normSqGrad` to be templated in `nanovdb/math/Stencils.h`.
-- **C++26 migration**: Once `std::simd` is available, `nanovdb::util::Simd<T,W>`
-  can be replaced with `std::fixed_size_simd<T,W>` — the kernel source is unchanged.
+- **GCC support**: The per-operator loops in `Simd<T,W>` (Backend B) are simple
+  W-iteration loops over `std::array`.  GCC's "return slot optimization" on `weno5`
+  calls prevents vectorization.  Explicit AVX2 intrinsics in a GCC-specific
+  `Simd<float,8>` specialization would guarantee it, at the cost of
+  architecture-specific code.
+- **Benchmarking**: Throughput of the vectorized path vs. scalar not yet measured on
+  representative VBM data.
+- **Integration**: Move `Simd.h` to `nanovdb/util/Simd.h`; template `weno5`,
+  `godunovsNormSqrd`, `normSqGrad` in `nanovdb/math/Stencils.h`.
+- **`<simd>` header**: Clang 18 provides `<experimental/simd>` but not `<simd>`.
+  Once `<simd>` is available, the detection guard can be simplified to
+  `#if __cpp_lib_simd`.
 
 ---
 
-## 7. File Reference
+## 8. File Reference
 
 | File | Purpose |
 |------|---------|
-| `simd_test/Simd.h` | Minimal `nanovdb::util::Simd<T,W>` library (prototype; destined for `nanovdb/util/`) |
-| `simd_test/lift_test.cpp` | Test: templated `weno5`, `godunovsNormSqrd`, `normSqGrad`; correctness check vs. scalar reference |
+| `simd_test/Simd.h` | `nanovdb::util::Simd<T,W>` — two backends, auto-detected (prototype for `nanovdb/util/`) |
+| `simd_test/lift_test.cpp` | Test: templated `weno5`, `godunovsNormSqrd`, `normSqGrad`; correctness vs. scalar reference |
 | `nanovdb/nanovdb/math/Stencils.h` | Original `weno5`, `GodunovsNormSqrd`, `WenoStencil::normSqGrad` |
 | `nanovdb/nanovdb/examples/ex_voxelBlockManager_host_cuda/StencilGather.md` | Per-block stencil gather design doc |
 | `nanovdb/nanovdb/tools/VoxelBlockManager.h` | CPU VBM implementation |
 
 Build commands:
 ```sh
-# Clang (vectorizes):
+# Clang, std::array backend (C++17):
 clang++-18 -O3 -march=native -std=c++17 \
+  -I/usr/include/c++/13 -I/usr/include/x86_64-linux-gnu/c++/13 \
+  -o lift_test lift_test.cpp
+
+# Clang, std::experimental::simd backend (C++26) — identical assembly:
+clang++-18 -O3 -march=native -std=c++26 \
   -I/usr/include/c++/13 -I/usr/include/x86_64-linux-gnu/c++/13 \
   -o lift_test lift_test.cpp
 
