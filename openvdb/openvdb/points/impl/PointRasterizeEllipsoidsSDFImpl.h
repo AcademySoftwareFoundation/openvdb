@@ -390,13 +390,16 @@ struct EllipsoidTransferQuat final :
         return ret;
     }
 
-    inline void rasterizePoint(const Coord& ijk,
-                    const Index id,
+    inline void rasterizePoints(const Coord& ijk,
+                    const Index start,
+                    const Index end,
                     const CoordBBox& bounds)
     {
         Mat3s R;
-        R.setToRotation(mRotationHandle->get(id));
-        this->BaseT::rasterizePoint(ijk, id, bounds, R);
+        for (Index i = start; i < end; ++i) {
+            R.setToRotation(mRotationHandle->get(i));
+            this->BaseT::rasterizePoint(ijk, i, bounds, R);
+        }
     }
 
 private:
@@ -439,11 +442,14 @@ struct EllipsoidTransferMat3 final :
         return ret;
     }
 
-    inline void rasterizePoint(const Coord& ijk,
-                    const Index id,
+    inline void rasterizePoints(const Coord& ijk,
+                    const Index start,
+                    const Index end,
                     const CoordBBox& bounds)
     {
-        this->BaseT::rasterizePoint(ijk, id, bounds, mXformHandle->get(id));
+        for (Index i = start; i < end; ++i) {
+            this->BaseT::rasterizePoint(ijk, i, bounds, mXformHandle->get(i));
+        }
     }
 
 private:
