@@ -151,7 +151,7 @@
 /* Denotes whether VDB was built with VCL support */
 #ifndef OPENVDB_USE_VCL
 #cmakedefine OPENVDB_USE_VCL
-// The namespace to use for VCL. See openvdb/util/Simd.h
+// The namespace to use for VCL. See openvdb/simd/Simd.h
 #define OPENVDB_VCL_NAMESPACE openvdb_ext_vcl
 #endif
 

@@ -79,7 +79,7 @@
 #include <openvdb/thread/Threading.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Assert.h>
-#include <openvdb/util/Simd.h>
+#include <openvdb/simd/Simd.h>
 
 #include <unordered_map>
 

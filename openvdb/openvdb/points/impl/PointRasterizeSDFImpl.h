@@ -187,7 +187,6 @@ struct SignedDistanceFieldTransfer :
 #if OPENVDB_DISABLE_BATCHED_TRANSFERS
         return 1;
 #else
-        using namespace openvdb::util;
         using NativeT = typename simd::SimdNativeT<RealT>::Type;
         return simd::SimdTraits<NativeT>::size;
 #endif
@@ -443,7 +442,6 @@ private:
         const std::array<int64_t, BaseT::template GetBatchSize<Real>()>& points,
         const CoordBBox& bounds)
     {
-        using namespace openvdb::util;
         using SimdT  = typename simd::SimdT<RealT, Size>::Type;
         using SimdIT = typename simd::SimdT<int64_t, Size>::Type;
 
@@ -542,8 +540,6 @@ private:
                     const IdT& ids,
                     const CoordBBox& intersection)
     {
-        using namespace openvdb::util;
-
         OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(r)));
         OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Px)));
         OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Py)));

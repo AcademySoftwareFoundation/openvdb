@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 ///
 /// @author Nick Avramoussis
 ///
@@ -9,14 +9,14 @@
 ///   proof the underlying SIMD wrapper in use, and to provide extended
 ///   functionality (such as traits and matching tuple/scalar API for writing
 ///   generic tools), manual SIMD usage should be restricted to the
-///   openvdb::util::simd namespace.
+///   openvdb::simd namespace.
 ///
 /// @note OpenVDB currently supports SIMD usage of intel x86 intrinsics via
 ///   Agner Fog's VCL wrapper library.
 ///
 
-#ifndef OPENVDB_UTIL_SIMD_HAS_BEEN_INCLUDED
-#define OPENVDB_UTIL_SIMD_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_SIMD_SIMD_HAS_BEEN_INCLUDED
+#define OPENVDB_SIMD_SIMD_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
 #include <openvdb/math/Tuple.h>
@@ -55,7 +55,6 @@
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
-namespace util {
 namespace simd {
 
 #ifdef OPENVDB_USE_VCL
@@ -355,7 +354,7 @@ template <typename T> struct SimdTraits; // fwd declare
 ///
 /// template <typename T>
 /// T Lerp(const T a, const T b, const T t) {
-///   using namespace openvdb::util::simd;
+///   using namespace openvdb::simd;
 ///   return add(mul(sub(T(1), t), a), mul(t, b));
 /// }
 
@@ -614,8 +613,7 @@ inline int horizontal_count(const bool a) { return a ? 1 : 0; }
 #undef OPENVDB_ENABLE_IF_VCL
 
 } // namespace simd
-} // namespace util
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif // OPENVDB_UTIL_SIMD_HAS_BEEN_INCLUDED
+#endif // OPENVDB_SIMD_SIMD_HAS_BEEN_INCLUDED
