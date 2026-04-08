@@ -82,9 +82,9 @@ Apache 2.0
   https://github.com/vectorclass/version2
 
   OpenVDB includes a copy of vectorclass for x86 SIMD intrinsic usage. Usage
-  of VCL is enabled by default and requires the VCL headers to be shipped with
-  OpenVDB installations. This behaviour and usage of VCL can be disabled
-  should license issues be of a concern. See the full LICENSE terms in:
+  of VCL is disabled by default and requires the VCL headers to be shipped with
+  OpenVDB installations. This behaviour and usage of VCL can be controlled
+  during OpenVDB configuration. See the full LICENSE terms in:
 
     vcl/openvdb/ext/vcl/LICENSE
 
