@@ -9,6 +9,13 @@
 #ifndef OPENVDB_POINTS_RASTERIZE_SDF_IMPL_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_RASTERIZE_SDF_IMPL_HAS_BEEN_INCLUDED
 
+#include <openvdb/simd/Simd.h>
+
+/// @brief  Set to 1 to disable batched SIMD rasterization and always use the
+///   scalar per-point path, regardless of the ISA in use.  Useful for
+///   debugging or performance comparison.
+#define OPENVDB_DISABLE_BATCHED_TRANSFERS 0
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -177,6 +184,19 @@ struct SignedDistanceFieldTransfer :
     using FilteredTransferT = FilteredTransfer<FilterT>;
     using PositionHandleT = AttributeHandle<Vec3f, PositionCodecT>;
 
+    /// @brief  Return the SIMD batch width for arithmetic type RealT.
+    ///   Returns 1 (scalar fallback) when batched transfers are disabled or
+    ///   no ISA is configured.
+    template<typename RealT>
+    static constexpr size_t GetBatchSize()
+    {
+#if OPENVDB_DISABLE_BATCHED_TRANSFERS
+        return 1;
+#else
+        return simd::SimdNativeT<RealT>::width;
+#endif
+    }
+
     // typically the max radius of all points rounded up
     inline Vec3i range(const Coord&, size_t) const { return mMaxKernelWidth; }
 
@@ -305,10 +325,7 @@ struct SphericalTransfer :
             const std::unordered_map<const PointDataTree::LeafNodeType*, Index>* ids = nullptr)
         : SphericalTransfer(pidx, Vec3i(width), rt, source, filter, interrupt, surface, cpg, ids) {}
 
-    /// @brief  For each point, stamp a sphere with a given radius by running
-    ///   over all intersecting voxels and calculating if this point is closer
-    ///   than the currently held distance value. Note that the default value
-    ///   of the surface buffer should be the background value of the surface.
+    /// @brief  Dispatch: batched SIMD path when N2 > 1, scalar fallback when N2 == 1.
     inline void rasterizePoint(const Coord& ijk,
                     const Index id,
                     const CoordBBox& bounds)
@@ -326,6 +343,46 @@ struct SphericalTransfer :
 #endif
         P = this->transformSourceToTarget(P);
         this->rasterizePoint(P, id, bounds, this->mRadius.eval(id));
+    }
+
+    /// @brief  For each point in [start, end), batch into groups of N2 and
+    ///   dispatch to rasterizeN2.  Partial final batches pad with -1 sentinels
+    ///   and fall through to scalar for size-1 remainders.
+    inline void rasterizePoints(const Coord& ijk,
+                    const Index start,
+                    const Index end,
+                    const CoordBBox& bounds)
+    {
+        constexpr size_t N2 = BaseT::template GetBatchSize<RealT>();
+        if constexpr (N2 == 1) {
+            // Scalar fallback: no ISA configured or batching disabled
+            for (Index i = start; i < end; ++i) {
+                this->rasterizePoint(ijk, i, bounds);
+            }
+        } else {
+            // Batched SIMD path.  N2 must be a power of two.
+            static_assert((N2 > 1) && !(N2 & (N2 - 1)));
+
+            std::array<int64_t, N2> ids;
+            size_t offset = 0;
+            for (Index i = start; i < end; ++i) {
+                if (!BaseT::filter(i)) continue;
+                ids[offset++] = int64_t(i);
+                if (offset == N2) {
+                    this->rasterizeN2<N2>(ijk, ids, bounds);
+                    offset = 0;
+                }
+            }
+
+            if (offset == 0) return;
+            if (offset == 1) {
+                this->rasterizePoint(ijk, Index(ids[0]), bounds);
+            } else {
+                // Pad remaining slots with -1 sentinel; stamp will ignore them.
+                for (; offset < N2; ++offset) ids[offset] = int64_t(-1);
+                this->rasterizeN2<N2>(ijk, ids, bounds);
+            }
+        }
     }
 
     /// @brief Allow early termination if all voxels in the surface have been
@@ -371,9 +428,6 @@ protected:
     ///   to pass a different P and scaled FixedBandRadius from its ellipsoid
     ///   path (as isolated points are stamped as spheres with a different
     ///   scale and positions may have been smoothed).
-    /// @todo   I would prefer this second function wasn't necessary but there
-    ///   is no easy way to allow differently scaled radii to exist in a more
-    ///   efficient manner, nor use a different P.
     inline void rasterizePoint(const Vec3d& P,
                     const Index id,
                     const CoordBBox& bounds,
@@ -383,64 +437,179 @@ protected:
         CoordBBox intersectBox(Coord::round(P - max), Coord::round(P + max));
         intersectBox.intersect(bounds);
         if (intersectBox.empty()) return;
+        this->stamp<RealT>(RealT(P[0]), RealT(P[1]), RealT(P[2]),
+            RealT(r.get()), RealT(r.minSq()), RealT(r.maxSq()), &id, intersectBox);
+    }
+
+    /// @brief  Gather N2 points from the point-data leaf, convert AoS→SoA,
+    ///   load into Simd<RealT,Size> vectors, and call the generic stamp.
+    template<size_t Size>
+    inline void rasterizeN2(const Coord& ijk,
+        const std::array<int64_t, BaseT::template GetBatchSize<RealT>()>& points,
+        const CoordBBox& bounds)
+    {
+        using SimdT = simd::Simd<RealT, int(Size)>;
+
+        // Scratch: 3 SoA position arrays (+ 3 radius arrays for varying radii)
+        constexpr size_t CacheWords = (RadiusType::Fixed ? 3 : 6) * Size;
+        std::array<RealT, CacheWords> cache;
+
+        const Vec3d ijkd = ijk.asVec3d();
+        Vec3d tmp{};
+
+        // Find last valid index; sentinel -1 marks padding slots.
+        // It is guaranteed at least 2 valid entries (caller routes size-1 to scalar).
+        int64_t firstInvalid = Size;
+        for (size_t i = 0; i < Size; ++i) {
+            if (points[i] == int64_t(-1)) { firstInvalid = int64_t(i); break; }
+        }
+
+        // AoS → SoA: convert positions (and optionally radii) to RealT arrays.
+        for (size_t i = 0; i < Size; ++i) {
+            if (int64_t(i) < firstInvalid) {
+                tmp = ijkd + Vec3d(this->mPosition->get(Index(points[i])));
+                tmp = this->transformSourceToTarget(tmp);
+            }
+            cache[i + Size*0] = tmp[0];
+            cache[i + Size*1] = tmp[1];
+            cache[i + Size*2] = tmp[2];
+            if constexpr (!RadiusType::Fixed) {
+                if (int64_t(i) < firstInvalid) {
+                    auto r = this->mRadius.eval(Index(points[i]));
+                    cache[i + Size*3] = RealT(r.get());
+                    cache[i + Size*4] = RealT(r.minSq());
+                    cache[i + Size*5] = RealT(r.maxSq());
+                } else {
+                    cache[i + Size*3] = cache[i + Size*4] = cache[i + Size*5] = RealT(0);
+                }
+            }
+        }
+
+        // Load SoA arrays into SIMD registers.
+        SimdT px(cache.data() + Size*0);
+        SimdT py(cache.data() + Size*1);
+        SimdT pz(cache.data() + Size*2);
+
+        SimdT rad, rmin2, rmax2;
+        if constexpr (RadiusType::Fixed) {
+            auto r = this->mRadius.eval(Index(0));  // same for all
+            rad   = SimdT(RealT(r.get()));
+            rmin2 = SimdT(RealT(r.minSq()));
+            rmax2 = SimdT(RealT(r.maxSq()));
+        } else {
+            rad   = SimdT(cache.data() + Size*3);
+            rmin2 = SimdT(cache.data() + Size*4);
+            rmax2 = SimdT(cache.data() + Size*5);
+        }
+
+        // Compute bounding box from the widest point in the batch.
+        const SimdT rmax_broad = simd::hmax(rmax2);  // broadcast max radius²
+        // Conservative: use sqrt(max rmax2) as the search radius
+        const RealT searchR = std::sqrt(RealT(simd::hmax(rmax2)));
+        const SimdT pxMin = simd::hmin(px), pyMin = simd::hmin(py), pzMin = simd::hmin(pz);
+        const SimdT pxMax = simd::hmax(px), pyMax = simd::hmax(py), pzMax = simd::hmax(pz);
+
+        CoordBBox intersectBox(
+            Coord::round(Vec3d(RealT(pxMin) - searchR, RealT(pyMin) - searchR, RealT(pzMin) - searchR)),
+            Coord::round(Vec3d(RealT(pxMax) + searchR, RealT(pyMax) + searchR, RealT(pzMax) + searchR)));
+        intersectBox.intersect(bounds);
+        if (intersectBox.empty()) return;
+
+        this->stamp<SimdT>(px, py, pz, rad, rmin2, rmax2, points.data(), intersectBox);
+    }
+
+    /// @brief  Generic-T stamp: ScalarT is either RealT (scalar) or Simd<RealT,W>
+    ///   (SIMD batch).  The same source compiles for both with zero #ifdef.
+    ///
+    ///   Key design points:
+    ///   - Arithmetic operators (+, -, *, /) and comparisons (>=, <=, ==) are
+    ///     overloaded for Simd<T,W> and resolve to the built-in operators for
+    ///     scalar T.  No simd::add() free-function calls.
+    ///   - simd::where(mask, a, b) replaces ternary; scalar overload is a
+    ///     plain ternary.
+    ///   - simd::hmin(dist) reduces all lanes to the minimum and broadcasts
+    ///     back, keeping the result in ScalarT space.  For scalar T it is the
+    ///     identity.
+    ///   - ScalarT(hmin_result) invokes explicit operator T() on Simd<T,W> to
+    ///     extract the scalar at the single write boundary; for scalar T this
+    ///     is a trivial copy.
+    ///   - simd::hall / simd::hany return bool for both scalar and SIMD.
+    template<typename ScalarT, typename IdT = const Index*>
+    inline void stamp(const ScalarT& Px, const ScalarT& Py, const ScalarT& Pz,
+                      const ScalarT& r,  const ScalarT& Rmin2, const ScalarT& Rmax2,
+                      const IdT ids, const CoordBBox& intersection)
+    {
+        using simd::where;
+        using simd::hall;
+        using simd::hany;
+        using simd::hmin;
+        using simd::hfirst;
+        using ElemT = simd::scalar_t<ScalarT>;
+
+        if (intersection.empty()) return;
 
         auto* const data = this->template buffer<0>();
-        auto* const cpg = CPG ? this->template buffer<CPG ? 1 : 0>() : nullptr;
+        [[maybe_unused]] auto* const cpgbuf =
+            CPG ? this->template buffer<CPG ? 1 : 0>() : nullptr;
         auto& mask = *(this->template mask<0>());
 
-        // If min2 == 0.0, then the index space radius is equal to or less than
-        // the desired half band. In this case each sphere interior always needs
-        // to be filled with distance values as we won't ever reach the negative
-        // background value. If, however, a point overlaps a voxel coord exactly,
-        // x2y2z2 will be 0.0. Forcing min2 to be less than zero here avoids
-        // incorrectly setting these voxels to inactive -background values as
-        // x2y2z2 will never be < 0.0. We still want the lteq logic in the
-        // (x2y2z2 <= min2) check as this is valid when min2 > 0.0.
-        const RealT min2 = r.minSq() == 0.0 ? -1.0 : r.minSq();
-        const RealT max2 = r.maxSq();
+        // When Rmin2 == 0 the sphere interior must be filled but x2y2z2 can
+        // equal 0 at the centre, which would incorrectly trigger the <= check.
+        // Force min2 negative so x2y2z2 <= min2 is never true in that case.
+        const ScalarT min2 = where(Rmin2 == ScalarT(ElemT(0)), ScalarT(ElemT(-1)), Rmin2);
+        const ScalarT max2 = Rmax2;
+        const ScalarT vdx(ElemT(this->mDx));
 
-        const Coord& a(intersectBox.min());
-        const Coord& b(intersectBox.max());
+        const Coord& a(intersection.min());
+        const Coord& b(intersection.max());
         for (Coord c = a; c.x() <= b.x(); ++c.x()) {
-            const RealT x2 = static_cast<RealT>(math::Pow2(c.x() - P[0]));
-            const Index i = ((c.x() & (DIM-1u)) << 2*LOG2DIM); // unsigned bit shift mult
+            const ScalarT x2 = simd::square(ScalarT(ElemT(c.x())) - Px);
+            const Index ii = ((c.x() & (DIM-1u)) << 2*LOG2DIM);
             for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
-                const RealT x2y2 = static_cast<RealT>(x2 + math::Pow2(c.y() - P[1]));
-                const Index ij = i + ((c.y() & (DIM-1u)) << LOG2DIM);
+                const ScalarT x2y2 = x2 + simd::square(ScalarT(ElemT(c.y())) - Py);
+                const Index ij = ii + ((c.y() & (DIM-1u)) << LOG2DIM);
                 for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
-                    const Index offset = ij + /*k*/(c.z() & (DIM-1u));
-                    if (!mask.isOn(offset)) continue; // inside existing level set or not in range
+                    const Index offset = ij + (c.z() & (DIM-1u));
+                    if (!mask.isOn(offset)) continue;
 
-                    const RealT x2y2z2 = static_cast<RealT>(x2y2 + math::Pow2(c.z() - P[2]));
-                    if (x2y2z2 >= max2) continue; //outside narrow band of particle in positive direction
-                    if (x2y2z2 <= min2) { //outside narrow band of the particle in negative direction. can disable this to fill interior
+                    const ScalarT x2y2z2 = x2y2 + simd::square(ScalarT(ElemT(c.z())) - Pz);
+
+                    // All lanes outside positive band — skip voxel entirely.
+                    if (hall(x2y2z2 >= max2)) continue;
+
+                    // Any lane inside negative band — voxel is interior.
+                    if (hany(x2y2z2 <= min2)) {
                         data[offset] = -(this->mBackground);
                         mask.setOff(offset);
                         continue;
                     }
 
-                    const ValueT d = ValueT(this->mDx * (math::Sqrt(x2y2z2) - r.get())); // back to world space
+                    // Distance to surface, back to world space.
+                    const ScalarT dist = vdx * (simd::sqrt(x2y2z2) - r);
+
+                    // hmin reduces all lanes to the minimum distance and
+                    // broadcasts it back into ScalarT so subsequent arithmetic
+                    // stays in the same type domain.  operator ElemT() then
+                    // extracts the scalar at this single write boundary.
+                    const ScalarT mindist = hmin(dist);
+                    const ValueT d = ValueT(ElemT(mindist));
+
                     ValueT& v = data[offset];
                     if (d < v) {
                         v = d;
-                        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
-                        if (CPG) cpg[offset] = Int64(this->mPLeafMask | Index64(id));
-                        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
-                        // transfer attributes - we can't use this here as the exposed
-                        // function signatures take vector of attributes (i.e. an unbounded
-                        // size). If we instead clamped the attribute transfer to a fixed
-                        // amount of attributes we could get rid of the closest point logic
-                        // entirely. @todo consider adding another signature for increased
-                        // performance
-                        // this->foreach([&](auto* buffer, const size_t idx) {
-                        //     using Type = typename std::remove_pointer<decltype(buffer)>::type;
-                        //     buffer[offset] = mAttributes.template get<Type>(idx);
-                        // })
+                        if constexpr (CPG) {
+                            // Find which lane contributed the minimum distance.
+                            const int winner = hfirst(mindist == dist);
+                            OPENVDB_ASSERT(winner >= 0);
+                            OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+                            cpgbuf[offset] = Int64(this->mPLeafMask | Index64(ids[winner]));
+                            OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+                        }
                     }
                 }
             }
-        } // outer sdf voxel
-    } // point idx
+        }
+    }
 };
 
 /// @brief  The transfer implementation for averaging of positions followed by

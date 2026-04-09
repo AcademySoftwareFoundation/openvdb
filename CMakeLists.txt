@@ -131,6 +131,13 @@ required.]=] ${USE_EXR})
 option(USE_PNG "Use PNG while building openvdb components." OFF)
 option(USE_AX "Use OpenVDB AX while building openvdb components." ${OPENVDB_BUILD_AX})
 option(USE_NANOVDB "Use NanoVDB while building openvdb components." ${OPENVDB_BUILD_NANOVDB})
+option(USE_STD_SIMD [=[
+Suppress auto-detection of std::experimental::simd (C++ Parallelism TS v2) and
+force the std::array fallback backend for openvdb::simd::Simd<T,W>.  By default
+the TS v2 header is used when the compiler provides it; set this to OFF to
+disable.  Has no effect on non-x86 or compilers that do not ship the TS header.
+Note: unlike USE_VCL this option requires no external dependency — the TS header
+is part of the compiler's standard library.]=] ON)
 
 cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
@@ -418,6 +425,11 @@ elseif(OPENVDB_SIMD STREQUAL "SSE42")
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-msse4.2>")
   endif()
   add_compile_definitions("$<$<COMPILE_LANGUAGE:CXX>:OPENVDB_USE_SSE42>")
+endif()
+
+# Suppress std::experimental::simd auto-detection if USE_STD_SIMD is OFF.
+if(NOT USE_STD_SIMD)
+  add_compile_definitions("$<$<COMPILE_LANGUAGE:CXX>:OPENVDB_NO_STD_SIMD>")
 endif()
 
 #########################################################################
