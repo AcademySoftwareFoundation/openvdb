@@ -399,6 +399,20 @@ struct EllipsoidTransferQuat final :
         this->BaseT::rasterizePoint(ijk, id, bounds, R);
     }
 
+    /// @brief  Point-by-point dispatch — ellipsoids are not batchable via
+    ///   the spherical SIMD path.  This override prevents SphericalTransfer::
+    ///   rasterizePoints (which calls rasterizeN2) from being instantiated for
+    ///   the FixedBandRadius<Vec3f> radius type used by ellipsoids.
+    inline void rasterizePoints(const Coord& ijk,
+                    const Index start,
+                    const Index end,
+                    const CoordBBox& bounds)
+    {
+        for (Index i = start; i < end; ++i) {
+            this->rasterizePoint(ijk, i, bounds);
+        }
+    }
+
 private:
     std::unique_ptr<QuatHandleT> mRotationHandle;
 };
@@ -444,6 +458,17 @@ struct EllipsoidTransferMat3 final :
                     const CoordBBox& bounds)
     {
         this->BaseT::rasterizePoint(ijk, id, bounds, mXformHandle->get(id));
+    }
+
+    /// @brief  See EllipsoidTransferQuat::rasterizePoints.
+    inline void rasterizePoints(const Coord& ijk,
+                    const Index start,
+                    const Index end,
+                    const CoordBBox& bounds)
+    {
+        for (Index i = start; i < end; ++i) {
+            this->rasterizePoint(ijk, i, bounds);
+        }
     }
 
 private:

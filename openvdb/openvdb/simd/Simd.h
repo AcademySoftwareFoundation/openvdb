@@ -163,13 +163,15 @@ Simd<T,W> abs(Simd<T,W> v) { return Simd<T,W>(stdx::abs(v.v)); }
 ///   the scalar at the write boundary: T result = T(hmin(v));
 template<typename T, int W>
 Simd<T,W> hmin(Simd<T,W> v) {
-    T m = stdx::reduce(v.v, [](T a, T b){ return a < b ? a : b; });
+    // stdx::reduce passes intermediate simd chunks to the binary op (tree reduction),
+    // so the lambda must use auto parameters and stdx::min for element-wise selection.
+    T m = stdx::reduce(v.v, [](auto a, auto b){ return stdx::min(a, b); });
     return Simd<T,W>(m);
 }
 
 template<typename T, int W>
 Simd<T,W> hmax(Simd<T,W> v) {
-    T m = stdx::reduce(v.v, [](T a, T b){ return a > b ? a : b; });
+    T m = stdx::reduce(v.v, [](auto a, auto b){ return stdx::max(a, b); });
     return Simd<T,W>(m);
 }
 
