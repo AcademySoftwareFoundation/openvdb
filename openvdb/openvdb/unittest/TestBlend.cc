@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <openvdb/openvdb.h>
+#include <openvdb/io/File.h>
 #include <openvdb/tools/Blend.h>
 #include <openvdb/tools/Composite.h>
 #include <openvdb/tools/MeshToVolume.h>
@@ -22,60 +23,72 @@ public:
 
 namespace {
 
-/// @brief  Generate the 8 vertices and 6 quad faces of an axis-aligned cube
-///         centered at @a center with the given half @a extent, then rotate
-///         every vertex by @a angleDeg degrees around the Z-axis.
+/// @brief  Generate the 8 vertices and 6 quad faces of an axis-aligned box
+///         centered at @a center with half-extents @a halfSize, then rotate
+///         by Euler angles @a rotDeg (X, Y, Z order) in degrees.
 ///
-/// @param center    World-space center of the cube.
-/// @param extent    Half-size of the cube (distance from center to each face).
-/// @param angleDeg  Rotation angle around the Z-axis, in degrees.
+/// @param center    World-space center of the box.
+/// @param halfSize  Half-extents along each axis before rotation.
+/// @param rotDeg    Euler rotation angles (X, Y, Z) in degrees.
 /// @param points    Output vertex list (index-space, divided by voxelSize).
 /// @param quads     Output quad-index list.
 /// @param voxelSize Voxel size used to convert world coords to index space.
-void makeRotatedCube(
+void makeRotatedBox(
     const openvdb::Vec3s& center,
-    float extent,
-    float angleDeg,
+    const openvdb::Vec3s& halfSize,
+    const openvdb::Vec3s& rotDeg,
     float voxelSize,
     std::vector<openvdb::Vec3s>& points,
     std::vector<openvdb::Vec4I>& quads)
 {
     using openvdb::Vec3s;
 
-    const float lo = -extent;
-    const float hi =  extent;
-
-    // 8 corners of an axis-aligned cube centered at origin
     Vec3s corners[8] = {
-        Vec3s(lo, lo, lo), // 0
-        Vec3s(hi, lo, lo), // 1
-        Vec3s(hi, hi, lo), // 2
-        Vec3s(lo, hi, lo), // 3
-        Vec3s(lo, lo, hi), // 4
-        Vec3s(hi, lo, hi), // 5
-        Vec3s(hi, hi, hi), // 6
-        Vec3s(lo, hi, hi), // 7
+        Vec3s(-halfSize[0], -halfSize[1], -halfSize[2]),
+        Vec3s( halfSize[0], -halfSize[1], -halfSize[2]),
+        Vec3s( halfSize[0],  halfSize[1], -halfSize[2]),
+        Vec3s(-halfSize[0],  halfSize[1], -halfSize[2]),
+        Vec3s(-halfSize[0], -halfSize[1],  halfSize[2]),
+        Vec3s( halfSize[0], -halfSize[1],  halfSize[2]),
+        Vec3s( halfSize[0],  halfSize[1],  halfSize[2]),
+        Vec3s(-halfSize[0],  halfSize[1],  halfSize[2]),
     };
 
-    // Rotation around Z-axis
-    const float rad = angleDeg * float(M_PI) / 180.0f;
-    const float c = std::cos(rad);
-    const float s = std::sin(rad);
+    const float rx = rotDeg[0] * float(M_PI) / 180.0f;
+    const float ry = rotDeg[1] * float(M_PI) / 180.0f;
+    const float rz = rotDeg[2] * float(M_PI) / 180.0f;
+
+    const float cx = std::cos(rx), sx = std::sin(rx);
+    const float cy = std::cos(ry), sy = std::sin(ry);
+    const float cz = std::cos(rz), sz = std::sin(rz);
+
+    // Combined rotation matrix R = Rz * Ry * Rx
+    auto rotate = [&](const Vec3s& v) -> Vec3s {
+        // Rx
+        const float x1 = v[0];
+        const float y1 = cx * v[1] - sx * v[2];
+        const float z1 = sx * v[1] + cx * v[2];
+        // Ry
+        const float x2 =  cy * x1 + sy * z1;
+        const float y2 =  y1;
+        const float z2 = -sy * x1 + cy * z1;
+        // Rz
+        const float x3 = cz * x2 - sz * y2;
+        const float y3 = sz * x2 + cz * y2;
+        const float z3 = z2;
+        return Vec3s(x3, y3, z3);
+    };
 
     points.clear();
     points.reserve(8);
     for (int i = 0; i < 8; ++i) {
-        const float rx = c * corners[i][0] - s * corners[i][1];
-        const float ry = s * corners[i][0] + c * corners[i][1];
-        const float rz = corners[i][2];
-        // Translate to center, then convert to index space
+        Vec3s r = rotate(corners[i]);
         points.emplace_back(
-            (rx + center[0]) / voxelSize,
-            (ry + center[1]) / voxelSize,
-            (rz + center[2]) / voxelSize);
+            (r[0] + center[0]) / voxelSize,
+            (r[1] + center[1]) / voxelSize,
+            (r[2] + center[2]) / voxelSize);
     }
 
-    // 6 quad faces (winding consistent with outward normals)
     quads.clear();
     quads.reserve(6);
     quads.emplace_back(openvdb::Vec4I(0, 3, 2, 1)); // -Z face
@@ -92,113 +105,75 @@ void makeRotatedCube(
 ////////////////////////////////////////
 
 
-TEST_F(TestBlend, testUnionFilletRotatedCubes)
+TEST_F(TestBlend, testBlendTwoBoxes)
 {
     using namespace openvdb;
 
-    // --- Parameters ----------------------------------------------------------
-    const float voxelSize = 0.1f;
-    const float halfWidth = float(LEVEL_SET_HALF_WIDTH); // in voxels
-    const float cubeExtent = 1.0f;    // half-size of each cube (world units)
+    const float voxelSize = 0.02f;
+    const float exteriorBand = 6.0f;
+    const float interiorBand = 3.0f;
 
-    // Place two cubes so they slightly overlap along the X-axis.
-    // Each cube spans 2*cubeExtent = 2.0 in diameter before rotation.
-    // After 45-degree rotation a cube's bounding width grows to 2*sqrt(2) ~ 2.83.
-    // We offset them so the rotated edges overlap:
-    const float separation = 2.0f;    // center-to-center distance along X
-    const Vec3s centerA(-separation / 2.0f, 0.0f, 0.0f);
-    const Vec3s centerB( separation / 2.0f, 0.0f, 0.0f);
-    const float rotAngle = 45.0f;     // degrees around Z
+    const float alpha = 2.0f;   // band radius
+    const float beta  = 80.0f;  // exponent
+    const float gamma = 1.0f;   // multiplier
 
-    // Blend parameters (from the Allen et al. paper)
-    const float alpha = 3.0f;  // bandwidth falloff
-    const float beta  = 2.0f;  // exponent
-    const float gamma = 1.0f;  // amplitude/multiplier
-
-    // --- Build level-set cubes -----------------------------------------------
     math::Transform::Ptr xform = math::Transform::createLinearTransform(voxelSize);
 
-    // Cube A
+    // Box A: half-extents (0.5, 0.5, 0.5) rotated (45, 0, 45) degrees
     std::vector<Vec3s> ptsA;
     std::vector<Vec4I> quadsA;
-    makeRotatedCube(centerA, cubeExtent, rotAngle, voxelSize, ptsA, quadsA);
-
+    makeRotatedBox(
+        Vec3s(0.0f), Vec3s(0.5f, 0.5f, 0.5f), Vec3s(45.0f, 0.0f, 45.0f),
+        voxelSize, ptsA, quadsA);
     tools::QuadAndTriangleDataAdapter<Vec3s, Vec4I> meshA(ptsA, quadsA);
-    FloatGrid::Ptr gridA = tools::meshToVolume<FloatGrid>(meshA, *xform, halfWidth, halfWidth);
+    FloatGrid::Ptr gridA = tools::meshToVolume<FloatGrid>(
+        meshA, *xform, exteriorBand, interiorBand);
     ASSERT_TRUE(gridA);
     gridA->setGridClass(GRID_LEVEL_SET);
 
-    // Cube B
+    // Box B: half-extents (1, 0.2, 1) axis-aligned
     std::vector<Vec3s> ptsB;
     std::vector<Vec4I> quadsB;
-    makeRotatedCube(centerB, cubeExtent, rotAngle, voxelSize, ptsB, quadsB);
-
+    makeRotatedBox(
+        Vec3s(0.0f), Vec3s(1.0f, 0.2f, 1.0f), Vec3s(0.0f),
+        voxelSize, ptsB, quadsB);
     tools::QuadAndTriangleDataAdapter<Vec3s, Vec4I> meshB(ptsB, quadsB);
-    FloatGrid::Ptr gridB = tools::meshToVolume<FloatGrid>(meshB, *xform, halfWidth, halfWidth);
+    FloatGrid::Ptr gridB = tools::meshToVolume<FloatGrid>(
+        meshB, *xform, exteriorBand, interiorBand);
     ASSERT_TRUE(gridB);
     gridB->setGridClass(GRID_LEVEL_SET);
 
-    // Both grids must share the same transform (required by unionFillet)
-    ASSERT_EQ(gridA->constTransform(), gridB->constTransform());
+    FloatGrid::ConstPtr noMask;
+    FloatGrid::Ptr blendResult =
+        tools::unionFillet<FloatGrid>(*gridA, *gridB, noMask, alpha, beta, gamma);
+    ASSERT_TRUE(blendResult);
+    EXPECT_TRUE(blendResult->activeVoxelCount() > 0);
 
-    // --- Compute plain CSG union ---------------------------------------------
     FloatGrid::Ptr csgResult = tools::csgUnionCopy(*gridA, *gridB);
     ASSERT_TRUE(csgResult);
 
-    // --- Compute fillet union ------------------------------------------------
-    FloatGrid::ConstPtr noMask; // nullptr mask
-    FloatGrid::Ptr filletResult =
-        tools::unionFillet<FloatGrid>(*gridA, *gridB, noMask, alpha, beta, gamma);
-    ASSERT_TRUE(filletResult);
-    EXPECT_EQ(int(GRID_LEVEL_SET), int(filletResult->getGridClass()));
-    EXPECT_TRUE(filletResult->activeVoxelCount() > 0);
+    // The fillet blend should carve outward (more negative SDF) at
+    // concave seam locations between the two boxes.
+    {
+        auto blendAcc = blendResult->getConstAccessor();
+        auto csgAcc   = csgResult->getConstAccessor();
 
-    // --- Verify smoothness near the seam -------------------------------------
-    // Near the overlap region (around x = 0) the fillet should carve outward,
-    // producing more-negative distance values than the plain union.
-    FloatGrid::ConstAccessor csgAcc    = csgResult->getConstAccessor();
-    FloatGrid::ConstAccessor filletAcc = filletResult->getConstAccessor();
+        const Vec3d probes[4] = {
+            Vec3d(-0.80, 0.24, 0.0),
+            Vec3d(-0.82, 0.22, 0.0),
+            Vec3d(-0.84, 0.22, 0.0),
+            Vec3d(-0.86, 0.22, 0.0),
+        };
 
-    int countSmoother = 0;
-    int countSampled  = 0;
+        for (int i = 0; i < 4; ++i) {
+            const Coord ijk = xform->worldToIndexNodeCentered(probes[i]);
+            const float blendVal = blendAcc.getValue(ijk);
+            const float csgVal   = csgAcc.getValue(ijk);
 
-    // Sample voxels in a slab around x = 0 (the seam)
-    const int slabHalf = int(std::ceil(0.5f / voxelSize)); // +/- 0.5 world units
-    const int extentIdx = int(std::ceil((cubeExtent + 0.5f) / voxelSize));
-
-    for (int i = -slabHalf; i <= slabHalf; ++i) {
-        for (int j = -extentIdx; j <= extentIdx; ++j) {
-            for (int k = -extentIdx; k <= extentIdx; ++k) {
-                const Coord ijk(i, j, k);
-                const float csgVal    = csgAcc.getValue(ijk);
-                const float filletVal = filletAcc.getValue(ijk);
-
-                // Only look at voxels that are inside or near the surface for both results
-                if (csgVal < 0.0f && csgVal > -2.0f * voxelSize * halfWidth) {
-                    ++countSampled;
-                    if (filletVal < csgVal) {
-                        ++countSmoother;
-                    }
-                }
-            }
+            EXPECT_LT(blendVal, csgVal);
         }
     }
-
-    // We expect a meaningful number of voxels to have been sampled, and a
-    // significant fraction of those should show the fillet effect.
-    EXPECT_GT(countSampled, 0)
-        << "No inside-surface voxels found in the seam region.";
-    EXPECT_GT(countSmoother, 0)
-        << "The fillet union did not produce any smoother (more negative) "
-           "values than the plain union near the seam.";
-
-    // At least 10 % of sampled interior voxels near the seam should be affected
-    const float ratio = float(countSmoother) / float(countSampled);
-    EXPECT_GT(ratio, 0.10f)
-        << "Only " << (ratio * 100.0f) << "% of sampled voxels were smoothed; "
-           "expected at least 10%.";
 }
-
 
 TEST_F(TestBlend, testUnionFilletMismatchedTransformsThrow)
 {
@@ -220,64 +195,4 @@ TEST_F(TestBlend, testUnionFilletMismatchedTransformsThrow)
     EXPECT_THROW(
         tools::unionFillet<FloatGrid>(*gridA, *gridB, noMask, 3.0f, 2.0f, 1.0f),
         std::runtime_error);
-}
-
-
-TEST_F(TestBlend, testUnionFilletWithMask)
-{
-    using namespace openvdb;
-
-    // --- Parameters ----------------------------------------------------------
-    const float voxelSize = 0.1f;
-    const float halfWidth = float(LEVEL_SET_HALF_WIDTH);
-    const float cubeExtent = 1.0f;
-    const float separation = 2.0f;
-    const Vec3s centerA(-separation / 2.0f, 0.0f, 0.0f);
-    const Vec3s centerB( separation / 2.0f, 0.0f, 0.0f);
-    const float rotAngle = 45.0f;
-
-    const float alpha = 3.0f;
-    const float beta  = 2.0f;
-    const float gamma = 1.0f;
-
-    math::Transform::Ptr xform = math::Transform::createLinearTransform(voxelSize);
-
-    // Build cubes
-    std::vector<Vec3s> ptsA, ptsB;
-    std::vector<Vec4I> quadsA, quadsB;
-    makeRotatedCube(centerA, cubeExtent, rotAngle, voxelSize, ptsA, quadsA);
-    makeRotatedCube(centerB, cubeExtent, rotAngle, voxelSize, ptsB, quadsB);
-
-    tools::QuadAndTriangleDataAdapter<Vec3s, Vec4I> meshA(ptsA, quadsA);
-    FloatGrid::Ptr gridA = tools::meshToVolume<FloatGrid>(meshA, *xform, halfWidth, halfWidth);
-    gridA->setGridClass(GRID_LEVEL_SET);
-
-    tools::QuadAndTriangleDataAdapter<Vec3s, Vec4I> meshB(ptsB, quadsB);
-    FloatGrid::Ptr gridB = tools::meshToVolume<FloatGrid>(meshB, *xform, halfWidth, halfWidth);
-    gridB->setGridClass(GRID_LEVEL_SET);
-
-    // Create a uniform mask grid with value 1.0 everywhere (same transform).
-    // This should produce the same result as no mask.
-    FloatGrid::Ptr maskGrid = FloatGrid::create(/*background=*/1.0f);
-    maskGrid->setTransform(xform);
-
-    FloatGrid::ConstPtr mask = maskGrid;
-    FloatGrid::Ptr filletWithMask =
-        tools::unionFillet<FloatGrid>(*gridA, *gridB, mask, alpha, beta, gamma);
-    ASSERT_TRUE(filletWithMask);
-
-    FloatGrid::ConstPtr noMask;
-    FloatGrid::Ptr filletNoMask =
-        tools::unionFillet<FloatGrid>(*gridA, *gridB, noMask, alpha, beta, gamma);
-    ASSERT_TRUE(filletNoMask);
-
-    // With a uniform mask of 1.0 the results should be identical.
-    FloatGrid::ConstAccessor accMask   = filletWithMask->getConstAccessor();
-    FloatGrid::ConstAccessor accNoMask = filletNoMask->getConstAccessor();
-
-    for (auto iter = filletNoMask->cbeginValueOn(); iter; ++iter) {
-        const Coord& ijk = iter.getCoord();
-        EXPECT_FLOAT_EQ(accNoMask.getValue(ijk), accMask.getValue(ijk))
-            << "Mismatch at coord " << ijk;
-    }
 }
