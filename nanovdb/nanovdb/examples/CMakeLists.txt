@@ -121,6 +121,13 @@ if(TARGET ex_voxelBlockManager_host_cuda)
     $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -fopenmp-simd>)
 endif()
 
+# CPU-only SIMD stencil gather prototype (Phase 1: neighbor leaf resolution).
+# No CUDA required.  Design in ex_voxelBlockManager_host_cuda/StencilGather.md.
+nanovdb_example(NAME "ex_stencil_gather_cpu")
+if(TARGET ex_stencil_gather_cpu)
+  target_compile_options(ex_stencil_gather_cpu PRIVATE -mavx2 -fopenmp-simd)
+endif()
+
 if(CUDAToolkit_FOUND)
   nanovdb_example(NAME "ex_make_mgpu_nanovdb") # requires cuRAND
   target_link_libraries(ex_make_mgpu_nanovdb PRIVATE CUDA::curand)
