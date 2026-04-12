@@ -61,8 +61,8 @@ namespace simd {
 #define OPENVDB_SELECT_SIMD_T(A, ...) A
 static inline constexpr size_t OPENVDB_MAX_REGISTER_SIZE =
     (OPENVDB_X86_INSTRSET < 7 ? 128 : // no AVX, SSE __m128 registers
-        (OPENVDB_X86_INSTRSET < 9 ? 256 : // AVX  __m256 registers
-            (OPENVDB_X86_INSTRSET > 9 ? 512 : 0))); // AVX  __m512 registers, else 128
+        (OPENVDB_X86_INSTRSET < 9 ? 256 : // AVX/AVX2 __m256 registers
+            (OPENVDB_X86_INSTRSET >= 9 ? 512 : 0))); // AVX512  __m512 registers
 #else
 #define OPENVDB_SELECT_SIMD_T(A, ...) __VA_ARGS__
 // @note  In this case VCL will not have been used to determine any requested ISA.
@@ -249,24 +249,28 @@ template <> struct IsSimdMaskT<simd::Vec512b> : std::true_type {};
 
 // broad bool masks
 #ifdef OPENVDB_USE_VCL // Duplicate specializations when VCL is NOT in use
-template <> struct IsSimdMaskT<simd::Vec16cb> : std::true_type {};
+#if OPENVDB_X86_INSTRSET < 9 // These alias to corresponding VecNb containers with AVX512f
 template <> struct IsSimdMaskT<simd::Vec16fb> : std::true_type {};
+template <> struct IsSimdMaskT<simd::Vec8db> : std::true_type {};
+template <> struct IsSimdMaskT<simd::Vec8qb> : std::true_type {};
 template <> struct IsSimdMaskT<simd::Vec16ib> : std::true_type {};
+#endif
+#if OPENVDB_X86_INSTRSET < 10  // These alias to corresponding VecNb containers with AVX512+
+template <> struct IsSimdMaskT<simd::Vec16cb> : std::true_type {};
 template <> struct IsSimdMaskT<simd::Vec16sb> : std::true_type {};
 template <> struct IsSimdMaskT<simd::Vec2db> : std::true_type {};
 template <> struct IsSimdMaskT<simd::Vec2qb> : std::true_type {};
 template <> struct IsSimdMaskT<simd::Vec32cb> : std::true_type {};
-template <> struct IsSimdMaskT<simd::Vec32sb> : std::true_type {};
-template <> struct IsSimdMaskT<simd::Vec4db> : std::true_type {};
 template <> struct IsSimdMaskT<simd::Vec4fb> : std::true_type {};
+template <> struct IsSimdMaskT<simd::Vec4db> : std::true_type {};
 template <> struct IsSimdMaskT<simd::Vec4ib> : std::true_type {};
-template <> struct IsSimdMaskT<simd::Vec4qb> : std::true_type {};
 template <> struct IsSimdMaskT<simd::Vec64cb> : std::true_type {};
-template <> struct IsSimdMaskT<simd::Vec8db> : std::true_type {};
+template <> struct IsSimdMaskT<simd::Vec4qb> : std::true_type {};
 template <> struct IsSimdMaskT<simd::Vec8fb> : std::true_type {};
 template <> struct IsSimdMaskT<simd::Vec8ib> : std::true_type {};
-template <> struct IsSimdMaskT<simd::Vec8qb> : std::true_type {};
 template <> struct IsSimdMaskT<simd::Vec8sb> : std::true_type {};
+template <> struct IsSimdMaskT<simd::Vec32sb> : std::true_type {};
+#endif
 #endif
 
 // 8-bit signed integer vectors
