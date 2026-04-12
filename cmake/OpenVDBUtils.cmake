@@ -191,6 +191,22 @@ function(OPENVDB_COMPUTE_X86_INSTRSET_FROM_VCL VCL_INSTRSET)
   include(CheckCXXSourceCompiles)
   check_cxx_source_compiles([[
     #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    int main() { static_assert(INSTRSET == 10); return 0; } ]] COMPUTE_VCL_INSTRSET__AVX512VL_DQ_BW__)
+  if(COMPUTE_VCL_INSTRSET__AVX512VL_DQ_BW__)
+    set(${VCL_INSTRSET} 10 PARENT_SCOPE)
+    set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
+    return()
+  endif()
+  check_cxx_source_compiles([[
+    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    int main() { static_assert(INSTRSET == 9); return 0; } ]] COMPUTE_VCL_INSTRSET__AVX512F__)
+  if(COMPUTE_VCL_INSTRSET__AVX512F__)
+    set(${VCL_INSTRSET} 9 PARENT_SCOPE)
+    set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
+    return()
+  endif()
+  check_cxx_source_compiles([[
+    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
     int main() { static_assert(INSTRSET == 8); return 0; } ]] COMPUTE_VCL_INSTRSET__AVX2__)
   if(COMPUTE_VCL_INSTRSET__AVX2__)
     set(${VCL_INSTRSET} 8 PARENT_SCOPE)
