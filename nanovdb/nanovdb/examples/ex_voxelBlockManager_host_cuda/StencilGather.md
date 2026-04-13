@@ -14,6 +14,12 @@ kernel lambda that operates on the gathered values and produces the output.
 
 ---
 
+**Related design document**: `BatchAccessor.md` (same directory) — full design of the
+SIMD batch leaf-neighborhood cache that provides the `prefetch` / `cachedGetValue` /
+`getValue` API used by the stencil kernel in Phase 2.
+
+---
+
 ## 1. Scope and Place in the Architecture
 
 The stencil gather sits at the **second level** of the two-level VBM parallelism
