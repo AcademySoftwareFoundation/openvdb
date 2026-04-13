@@ -471,43 +471,124 @@ batches in that leaf, always ≤ 26 (≤ 6 for WENO5).
 same leaf repeatedly.  One accessor per thread, reused across the entire block loop,
 accumulates leaf-cache hits throughout the computation.
 
-### 8e. `computeNeededDirs` — Stencil-Specific Batch Probe Mask
+### 8e. `computeNeededDirs` — Shift-OR Carry Trick
 
 ```cpp
-uint32_t computeNeededDirs(const uint16_t* voxelOffset, uint32_t laneMask);
+// Caller builds the pre-expanded vector at the gather site:
+//   1. broadcast kSentinelExpanded to all SIMDw lanes (inactive/straddle lanes stay neutral)
+//   2. overwrite leafMask lanes with expandVoxelOffset(voxelOffset[b+i])
+// Then call:
+uint32_t computeNeededDirs(Simd<uint32_t, SIMDw> expandedVec);
 ```
 
-Inspects the `voxelOffset` values of active lanes and returns a bitmask of directions
-whose neighbor leaf is accessed by at least one lane.  This is purely arithmetic on
-voxelOffsets — no tree access, no probeLeaf.
-
-Direction bits use the shared 3×3×3 encoding from §6a:
-`bit(dx,dy,dz) = (dx+1)*9 + (dy+1)*3 + (dz+1)`.
+Returns a bitmask of directions whose neighbor leaf is required by at least one active
+lane.  Purely arithmetic — no tree access, no probeLeaf.  Direction bits use the §6a
+encoding: `bit(dx,dy,dz) = (dx+1)*9 + (dy+1)*3 + (dz+1)`.
 
 **Direction encoding (WENO5, 6 active bits out of 27):**
 
 | Bit | Direction | (dx,dy,dz) | Condition (per lane)              |
 |-----|-----------|-----------|-----------------------------------|
-| 4   | x-lo      | (-1,0,0)  | `(vo >> 6) < R`                   |
-| 10  | y-lo      | (0,-1,0)  | `((vo >> 3) & 0x7) < R`           |
-| 12  | z-lo      | (0,0,-1)  | `(vo & 0x7) < R`                  |
-| 14  | z-hi      | (0,0,+1)  | `(vo & 0x7) >= (8 - R)`           |
-| 16  | y-hi      | (0,+1,0)  | `((vo >> 3) & 0x7) >= (8 - R)`    |
-| 22  | x-hi      | (+1,0,0)  | `(vo >> 6) >= (8 - R)`            |
+| 4   | x-lo      | (-1,0,0)  | `lx < R`                          |
+| 10  | y-lo      | (0,-1,0)  | `ly < R`                          |
+| 12  | z-lo      | (0,0,-1)  | `lz < R`                          |
+| 14  | z-hi      | (0,0,+1)  | `lz >= (8 - R)`                   |
+| 16  | y-hi      | (0,+1,0)  | `ly >= (8 - R)`                   |
+| 22  | x-hi      | (+1,0,0)  | `lx >= (8 - R)`                   |
 
-For WENO5 (R=3): z-lo when lz ∈ {0,1,2}, z-hi when lz ∈ {5,6,7}.  Each condition
-is a threshold comparison across SIMDw lanes, folded with an `any()` reduction.
-The remaining 21 bits of `neededMask` are always zero for WENO5.
+where `lx = vo >> 6`, `ly = (vo >> 3) & 7`, `lz = vo & 7`.
 
-**Box stencil (R=1, up to 26 active bits):** face directions use the same six bit
-positions with thresholds 0 and 7.  Edge directions (e.g. (-1,-1,0) → bit 1)
-require a pairwise AND: `any(lx == 0 && ly == 0)`.  Corner directions require all
-three simultaneously.  Same mechanism throughout — all pure arithmetic on
-voxelOffsets, same `uint32_t` mask type.
+**Algorithm — "expand, add, reduce" (single SIMD add for all 6 directions):**
+
+`expandVoxelOffset(vo)` packs lz, lx, ly into a 32-bit integer with 3-bit zero-guard
+separators so that one carry-bit addition simultaneously tests all six directions.
+Three shift-OR steps; no multiply:
+
+```
+e = vo
+e |= (e << 9)    // two packed xyz copies at 9-bit stride
+e &= 0x71C7      // 0b0111_0001_1100_0111 — isolate lz@[0:2], lx@[6:8], ly@[12:14]
+e |= (e << 16)   // duplicate lower 15 bits to [16:30]
+```
+
+Target layout after expansion:
+
+```
+bits  0– 2 : lz  (group 1 — plus-z  carry exits at bit  3)
+bits  3– 5 : 0   (3-bit guard)
+bits  6– 8 : lx  (group 2 — plus-x  carry exits at bit  9)
+bits  9–11 : 0
+bits 12–14 : ly  (group 3 — plus-y  carry exits at bit 15)
+bit  15    : 0   (1-bit guard — sufficient: max carry from 3-bit + constant < 8 is 1 bit)
+bits 16–18 : lz  (group 4 — minus-z carry exits at bit 19)
+bits 19–21 : 0
+bits 22–24 : lx  (group 5 — minus-x carry exits at bit 25)
+bits 25–27 : 0
+bits 28–30 : ly  (group 6 — minus-y carry exits at bit 31)
+```
+
+`kExpandCarryK` encodes the detection threshold for all six groups in one `uint32_t`
+(= 0x514530C3):
+
+```
+K = R        | R<<6     | R<<12    | (8-R)<<16 | (8-R)<<22 | (8-R)<<28
+  = 0x514530C3  (for R = 3)
+```
+
+Groups 1–3 receive `+R`: a field ≥ (8−R) carries (plus-direction needed).
+Groups 4–6 receive `+(8−R)`: a field ≥ R carries (a CLEAR carry means minus-direction
+needed — at least one lane had lc < R).
+
+After `result = expandedVec + kExpandCarryK` (one `vpaddd ymm` × 2):
+
+```
+hor_or  = OR  of all lanes → bit k SET   ↔ plus-direction  k needed (any lane)
+hor_and = AND of all lanes → bit k CLEAR ↔ minus-direction k needed (any lane)
+
+if  (hor_or  & (1 <<  3))  neededMask |= (1 << kHiBit[z]);  // bit 14
+if  (hor_or  & (1 <<  9))  neededMask |= (1 << kHiBit[x]);  // bit 22
+if  (hor_or  & (1 << 15))  neededMask |= (1 << kHiBit[y]);  // bit 16
+if (!(hor_and & (1 << 19))) neededMask |= (1 << kLoBit[z]); // bit 12
+if (!(hor_and & (1 << 25))) neededMask |= (1 << kLoBit[x]); // bit 4
+if (!(hor_and & (1 << 31))) neededMask |= (1 << kLoBit[y]); // bit 10
+```
+
+**Sentinel for inactive/straddle lanes:** Local coordinate (4,4,4) maps to
+`kInactiveVoxelOffset = 292`.  Its pre-expanded form `kSentinelExpanded = 0x41044104`
+satisfies: groups 1–3 sum to 4+3=7 (no carry → plus bits stay clear), groups 4–6 sum
+to 4+5=9 (carry → minus bits stay set).  The sentinel is broadcast at the **gather
+site** — the only place where `leafMask` is known — before overwriting the active
+lanes.  This keeps sentinel responsibility out of `computeNeededDirs` itself.
+
+**Codegen (AVX2, `ex_stencil_gather_cpu`, -O3 -mavx2):**
+
+`computeNeededDirs` compiles to a non-inlined function of ~80 bytes with no branches
+or function calls in the carry path:
+
+```asm
+vpbroadcastd  xmm0→ymm0          ; broadcast kExpandCarryK (0x514530c3)
+vpaddd   ymm0, [rdi],   ymm1     ; add to lanes 0–7
+vpaddd   ymm0, [rdi+32],ymm0     ; add to lanes 8–15
+vpor     ymm1, ymm0, ymm2        ; hor_or  intermediate (8 lanes)
+vpand    ymm1, ymm0, ymm1        ; hor_and intermediate (8 lanes)
+; shuffle-tree 8→4→2→1 via vextracti128 / vpand / vpor / vpsrldq  (×2)
+; scalar carry-bit → neededMask decode via shl/and/test/cmov (branchless)
+vzeroupper; ret
+```
+
+**Codegen for the gather-site loop (within `runPrototype`/`main`):**
+
+- `activeMask = (leafSlice != UnusedLeafIndex)`: `vpcmpeqd ymm × 4` + `vmovmskps ymm × 2` — fully vectorized.
+- `leafMask = activeMask & (leafSlice == currentLeafID)`: `vpbroadcastd` + `vpcmpeqd ymm × 2` + `vmovmskps ymm × 2` + scalar AND — fully vectorized.
+- Sentinel broadcast: `0x41044104` literal → `vpbroadcastd ymm` × 2 stores filling all 64 bytes.
+- `expandVoxelOffset` scatter (per leafMask lane): scalar — 5 ops inlined per lane, gated by bit tests on the 16-bit bitmask.  Not vectorizable due to `if (leafMask[i])` branch; dominated by downstream `probeLeaf` calls anyway.
+
+**Box stencil (R=1, up to 26 active bits):** face directions use the same algorithm
+with different thresholds; edge and corner directions require AND of pairwise/triple
+conditions and are left for future work.
 
 `computeNeededDirs` is the only function that encodes knowledge of the stencil's
-reach R and how offsets map to neighbor leaves.  It is written once per stencil
-shape and is small (≤ 20 SIMD instructions for WENO5).
+reach R and direction-to-offset mapping.  Written once per stencil shape.
 
 ### 8f. CPU Block-Level Loop Structure
 
@@ -554,8 +635,12 @@ for (int b = 0; b < BlockWidth; b += SIMDw) {
             continue;
         }
 
-        // Probe any newly needed neighbors
-        uint32_t neededMask = computeNeededDirs(voxelOffset + b, leafMask);
+        // Build pre-expanded vector at the gather site (only place leafMask is known).
+        // Broadcast sentinel; overwrite active lanes with real expandVoxelOffset().
+        VecU32 expandedVec(kSentinelExpanded);
+        for (int i = 0; i < SIMDw; i++)
+            if (leafMask & (1 << i)) expandedVec[i] = expandVoxelOffset(voxelOffset[b+i]);
+        uint32_t neededMask = computeNeededDirs(expandedVec);
         uint32_t toProbe    = neededMask & ~probedMask;
         while (toProbe) {
             int d = __builtin_ctz(toProbe);
@@ -619,16 +704,18 @@ with output into a SoA `stencilData[N][SIMDw]` array.  Auto-vectorization strate
   `decodeInverseMaps` returns (popcount loop, same as the internal loop bound).
   `decodeInverseMaps` API is not modified — avoids CPU/GPU asymmetry.
 
-- **Prototype — immediate next step**: `stencil_gather_cpu.cpp` in
-  `ex_voxelBlockManager_host_cuda/`.  Scope:
-  - Generate domain with `generateDomain` (reuse from `vbm_host_cuda.cpp`).
-  - Build VBM.  Iterate over blocks; call `decodeInverseMaps` per block.
-  - For each batch: run the full §8d probeLeaf + `batchPtrs[4][SIMDw]` population.
-  - Verification only (no `computeStencil`): for each active lane, walk all 19
-    WENO5 offsets, check that `batchPtrs[axis][i]` matches a direct `probeLeaf`
-    reference for every neighbor that crosses a leaf boundary.
-  - Use WENO5 stencil directly (not the simpler 7-pt Laplacian — WENO5 exercises
-    R=3 boundary conditions and all six face directions).
+- **Prototype — DONE** (`ex_stencil_gather_cpu/stencil_gather_cpu.cpp`):
+  Phase 1 (neighbor leaf resolution) fully implemented and verified:
+  - `generateDomain` + VBM build + `decodeInverseMaps` per block.
+  - Full §8d probeLeaf + `batchPtrs[4][SIMDw]` population with lazy `probedMask`.
+  - `computeNeededDirs` with shift-OR carry trick (§8e) and gather-site sentinel.
+  - Always-on scalar cross-check at every `computeNeededDirs` call site.
+  - `verifyComputeNeededDirsSentinel()`: dedicated straddle-lane sentinel unit test.
+  - `verifyBatchPtrs()`: end-to-end per-lane batchPtrs check against direct `probeLeaf`.
+  - AVX2 codegen confirmed via `objdump` for `computeNeededDirs` and all mask
+    operations in the outer/inner loops (see §8e Codegen notes).
+  - Next: implement `computeStencil` (Phase 2 — index gather) and the scalar
+    cross-check launcher.
 
 - **Generalizing beyond R ≤ 3**: the single-neighbor-per-axis assumption is baked
   into the current design.  Any stencil with R > 4 would require revisiting §5a and §6.

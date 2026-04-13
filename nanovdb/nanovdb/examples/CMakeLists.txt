@@ -126,6 +126,9 @@ endif()
 nanovdb_example(NAME "ex_stencil_gather_cpu")
 if(TARGET ex_stencil_gather_cpu)
   target_compile_options(ex_stencil_gather_cpu PRIVATE -mavx2 -fopenmp-simd)
+  # simd_test/Simd.h lives three levels above this CMakeLists (at the repo root).
+  target_include_directories(ex_stencil_gather_cpu PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
 endif()
 
 if(CUDAToolkit_FOUND)

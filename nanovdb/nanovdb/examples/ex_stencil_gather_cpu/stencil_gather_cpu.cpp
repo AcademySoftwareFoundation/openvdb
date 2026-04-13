@@ -34,6 +34,7 @@
 #include <nanovdb/tools/CreateNanoGrid.h>
 #include <nanovdb/tools/VoxelBlockManager.h>
 #include <nanovdb/util/ForEach.h>
+#include <simd_test/Simd.h>   // SimdMask<T,W>, Simd<T,W>, any_of, none_of, to_bitmask
 
 #include <random>
 #include <string>
@@ -57,6 +58,10 @@ using GridT  = nanovdb::NanoGrid<BuildT>;
 using LeafT  = nanovdb::NanoLeaf<BuildT>;
 using CPUVBM = nanovdb::tools::VoxelBlockManager<Log2BlockWidth>;
 using AccT   = nanovdb::DefaultReadAccessor<BuildT>;
+
+// Lane-predicate types: SIMDw-wide boolean mask and the uint32_t vector it compares.
+using LeafIdxVec = nanovdb::util::Simd<uint32_t, SIMDw>;
+using LaneMask   = nanovdb::util::SimdMask<uint32_t, SIMDw>;
 
 // Direction bit encoding shared across all stencil types:
 //   bit(dx, dy, dz) = (dx+1)*9 + (dy+1)*3 + (dz+1),   dx,dy,dz ∈ {-1,0,+1}
@@ -129,27 +134,300 @@ static inline int localAxisCoord(uint16_t vo, int axis)
 }
 
 // ============================================================
-// computeNeededDirs (§8e)
+// Vectorized computeNeededDirs — shift-OR carry trick (§8e)
+//
+// Determines which of the 6 face-neighbor directions (±x, ±y, ±z) are required
+// by any active lane in a SIMDw-wide batch.  For WENO5 (R=3):
+//   plus-c  neighbor needed  iff any active lane has local coordinate lc ≥ 8−R = 5
+//   minus-c neighbor needed  iff any active lane has local coordinate lc ≤   R−1 = 2
+//
+// Algorithm — "expand, add, reduce":
+//   1. expandVoxelOffset(): pack lz, lx, ly (and second copies) into a 32-bit
+//      integer with 3-bit zero guards between groups.  Each group occupies its
+//      own 3-bit field; the guards absorb carries so adjacent groups do not bleed.
+//   2. Add kExpandCarryK to all SIMDw lane values simultaneously (one SIMD add).
+//      Groups 1–3 detect plus-directions; groups 4–6 detect minus-directions.
+//   3. Horizontal OR  across all lanes: carry bit SET   → plus-direction needed.
+//      Horizontal AND across all lanes: carry bit CLEAR → minus-direction needed.
+//      (A minus-direction is needed when at least one lane has NO carry, i.e.,
+//       lc < R; the AND bit is clear iff any lane failed to carry.)
+//
 // ============================================================
 
-/// @brief Return a 27-bit probedMask bitmask of neighbor directions accessed by
-/// any lane set in laneMask.  For WENO5 (R=3) only the 6 face-direction bits
-/// {4,10,12,14,16,22} can ever be set; the 21 edge/corner bits remain zero.
-static uint32_t computeNeededDirs(const uint16_t* voxelOffset,
-                                   int             batchStart,
-                                   uint32_t        laneMask)
+/// @brief voxelOffset sentinel for inactive / don't-care SIMD lanes.
+///
+/// Any lane with laneMask[i] = false needs a voxelOffset value that:
+///   • does NOT set carry bits 3, 9, 15  (would wrongly assert plus-directions), AND
+///   • DOES set carry bits 19, 25, 31    (a clear bit would wrongly assert minus-directions).
+///
+/// Local coordinate (4, 4, 4) satisfies both: R ≤ 4 < 8−R for R=3 (strictly interior).
+///   voxelOffset(4,4,4) = 4*64 + 4*8 + 4 = 292
+///   group 1-3: 4 + 3 = 7  → no carry  → bits 3, 9, 15 stay clear  ✓
+///   group 4-6: 4 + 5 = 9  → carry     → bits 19, 25, 31 stay set   ✓
+///
+static constexpr uint16_t kInactiveVoxelOffset = (4u << 6) | (4u << 3) | 4u;  // = 292
+
+/// @brief Expand a 9-bit voxelOffset into a 32-bit "carry lane" layout.
+///
+/// NanoVDB voxelOffset bit layout: [8:6] = lx,  [5:3] = ly,  [2:0] = lz.
+///
+/// Target 32-bit layout — 6 groups of 3 bits with zero-guard separators:
+///
+///   bits  0– 2 : lz     ← group 1 (plus-z  carry exits at bit  3)
+///   bits  3– 5 : 0      (3-bit guard)
+///   bits  6– 8 : lx     ← group 2 (plus-x  carry exits at bit  9)
+///   bits  9–11 : 0      (3-bit guard)
+///   bits 12–14 : ly     ← group 3 (plus-y  carry exits at bit 15)
+///   bit  15    : 0      (1-bit guard — sufficient because max carry from a
+///                        3-bit field added to a constant < 8 is exactly 1 bit;
+///                        at bit 15: input=0, addend=0, carry-in∈{0,1} → no further carry)
+///   bits 16–18 : lz     ← group 4 (minus-z carry exits at bit 19)
+///   bits 19–21 : 0      (3-bit guard)
+///   bits 22–24 : lx     ← group 5 (minus-x carry exits at bit 25)
+///   bits 25–27 : 0      (3-bit guard)
+///   bits 28–30 : ly     ← group 6 (minus-y carry exits at bit 31)
+///   bit  31    : 0      (receives minus-y carry; bit 31 is within uint32_t range)
+///
+/// Construction — three shift-OR steps, no multiply:
+///
+///   Step 1: e |= (e << 9)    → 0o xyzxyz  (two 9-bit copies stacked, 18 bits)
+///   Step 2: e &= 0x71C7      → keep lz@[0:2], lx@[6:8], ly@[12:14]; zero all others.
+///                               0x71C7 = 0b 0111 0001 1100 0111 = 0o 070707
+///                               Bits set: {0,1,2, 6,7,8, 12,13,14}
+///   Step 3: e |= (e << 16)   → copy the 15-bit pattern to bits [16:18],[22:24],[28:30]
+///
+static inline constexpr uint32_t expandVoxelOffset(uint16_t vo)
+{
+    uint32_t e = vo;
+    e |= (e <<  9);   // step 1: two packed xyz copies at 9-bit stride
+    e &= 0x71C7u;     // step 2: isolate lz@[0:2], lx@[6:8], ly@[12:14] with zero gaps
+    e |= (e << 16);   // step 3: second copy to bits [16:18], [22:24], [28:30]
+    return e;
+}
+
+/// @brief Combined carry-detection constant (added to expandVoxelOffset results).
+///
+/// Groups 1–3 receive +R   so a 3-bit field ≥ (8−R) produces a carry (plus-direction test).
+/// Groups 4–6 receive +(8−R) so a 3-bit field ≥ R   produces a carry (minus-direction test:
+///   carry CLEAR ⟺ field < R ⟺ minus-direction needed).
+///
+///               group1     group2      group3       group4        group5        group6
+///   K  =  R   | R<<6    | R<<12    | (8-R)<<16 | (8-R)<<22 | (8-R)<<28
+///      =  3   | 192     | 12288    | 327680    | 20971520  | 1342177280
+///      =  1,363,488,963  (0x514530C3)  — fits in uint32_t (< 2^32).
+///
+/// Carry bits produced by expanded + K:
+///   bit  3  set   ↔  lz ≥ 8−R  → plus-z  needed
+///   bit  9  set   ↔  lx ≥ 8−R  → plus-x  needed
+///   bit 15  set   ↔  ly ≥ 8−R  → plus-y  needed
+///   bit 19  clear ↔  lz <   R  → minus-z needed
+///   bit 25  clear ↔  lx <   R  → minus-x needed
+///   bit 31  clear ↔  ly <   R  → minus-y needed
+///
+static constexpr uint32_t kExpandCarryK =
+    ((uint32_t)R      )         |   // bits  0– 2: +R   → lz plus-z  group
+    ((uint32_t)R      <<  6)    |   // bits  6– 8: +R   → lx plus-x  group
+    ((uint32_t)R      << 12)    |   // bits 12–14: +R   → ly plus-y  group
+    ((uint32_t)(8-R)  << 16)    |   // bits 16–18: +5   → lz minus-z group
+    ((uint32_t)(8-R)  << 22)    |   // bits 22–24: +5   → lx minus-x group
+    ((uint32_t)(8-R)  << 28);       // bits 28–30: +5   → ly minus-y group
+
+/// @brief Pre-expanded sentinel value for inactive / straddle SIMD lanes.
+///
+/// Caller broadcasts this to all lanes before overwriting the leafMask lanes
+/// with the real expandVoxelOffset() values.  Equivalent to
+///   expandVoxelOffset(kInactiveVoxelOffset)
+/// which, at compile time, is 0x41044104.
+static constexpr uint32_t kSentinelExpanded = expandVoxelOffset(kInactiveVoxelOffset);
+
+/// @brief Scalar reference implementation (lane-by-lane loop).
+/// Kept alongside the SIMD version so debug builds can cross-check.
+static uint32_t computeNeededDirsScalar(const uint16_t* voxelOffset,
+                                         int             batchStart,
+                                         LaneMask        laneMask)
 {
     uint32_t needed = 0;
     for (int i = 0; i < SIMDw; i++) {
-        if (!(laneMask & (1u << i))) continue;
+        if (!laneMask[i]) continue;
         const uint16_t vo = voxelOffset[batchStart + i];
         for (int axis = 0; axis < 3; axis++) {
             const int lc = localAxisCoord(vo, axis);
-            if (lc < R)     needed |= (1u << kLoBit[axis]);
-            if (lc >= 8-R)  needed |= (1u << kHiBit[axis]);
+            if (lc < R)    needed |= (1u << kLoBit[axis]);
+            if (lc >= 8-R) needed |= (1u << kHiBit[axis]);
         }
     }
     return needed;
+}
+
+/// @brief Vectorized computeNeededDirs — shift-OR carry trick.
+///
+/// Returns the 27-bit probedMask subset identifying which of the 6 WENO5
+/// face-neighbor directions are required by any active lane.
+///
+/// For WENO5 (R=3) only the 6 face-direction bits {4,10,12,14,16,22} can
+/// ever be set; the 21 edge/corner bits remain zero.
+///
+/// @param expandedVec  SIMDw pre-expanded voxelOffset values (see expandVoxelOffset).
+///   Caller is responsible for:
+///     • Broadcasting kSentinelExpanded to all lanes first.
+///     • Overwriting leafMask lanes with expandVoxelOffset(voxelOffset[...]).
+///   This keeps sentinel / masking logic at the single gather site where leafMask
+///   is known, not buried inside this function.
+///
+/// High-level flow:
+///   1. Single SIMD add of kExpandCarryK (caller already expanded each lane).
+///   2. Horizontal OR  of all results → carry SET   = plus-direction needed.
+///      Horizontal AND of all results → carry CLEAR = minus-direction needed.
+///   3. Map carry bits to the 27-bit probedMask encoding.
+///
+static uint32_t computeNeededDirs(nanovdb::util::Simd<uint32_t, SIMDw> expandedVec)
+{
+    using VecU32 = nanovdb::util::Simd<uint32_t, SIMDw>;
+
+    // --- Single SIMD add --------------------------------------------------
+    // Inject carry-detection thresholds for all 6 groups simultaneously.
+    // After this add, each lane's result[i] encodes all six direction tests
+    // as carry bits at positions 3, 9, 15 (plus) and 19, 25, 31 (minus).
+    const VecU32 result = expandedVec + VecU32(kExpandCarryK);
+
+    // --- Horizontal reductions --------------------------------------------
+    //
+    // hor_or:  bit k is set iff at least one lane has bit k set in result.
+    //   → Check carry bits 3 (z), 9 (x), 15 (y): SET means plus-direction needed.
+    //
+    // hor_and: bit k is set iff every lane has bit k set in result.
+    //   → Check carry bits 19 (z), 25 (x), 31 (y): CLEAR means minus-direction
+    //     needed (at least one lane did not carry, i.e., its coordinate < R).
+    //
+    uint32_t hor_or = 0u, hor_and = ~0u;
+    for (int i = 0; i < SIMDw; i++) {
+        hor_or  |= result[i];
+        hor_and &= result[i];
+    }
+
+    // --- Map carry bits → probedMask direction bits -----------------------
+    //
+    // Plus carries  (bits  3,  9, 15) set   → kHiBit (hi-side neighbor needed).
+    // Minus carries (bits 19, 25, 31) clear → kLoBit (lo-side neighbor needed).
+    //
+    //  carry bit | axis | condition  | probedMask bit
+    //  ----------+------+------------+---------------
+    //      3     |  z   | lz ≥ 8−R  | kHiBit[2] = 14
+    //      9     |  x   | lx ≥ 8−R  | kHiBit[0] = 22
+    //     15     |  y   | ly ≥ 8−R  | kHiBit[1] = 16
+    //     19 clr |  z   | lz <   R  | kLoBit[2] = 12
+    //     25 clr |  x   | lx <   R  | kLoBit[0] =  4
+    //     31 clr |  y   | ly <   R  | kLoBit[1] = 10
+    //
+    uint32_t needed = 0;
+    if ( hor_or  & (1u <<  3))   needed |= (1u << kHiBit[2]);  // plus-z
+    if ( hor_or  & (1u <<  9))   needed |= (1u << kHiBit[0]);  // plus-x
+    if ( hor_or  & (1u << 15))   needed |= (1u << kHiBit[1]);  // plus-y
+    if (!(hor_and & (1u << 19))) needed |= (1u << kLoBit[2]);  // minus-z
+    if (!(hor_and & (1u << 25))) needed |= (1u << kLoBit[0]);  // minus-x
+    if (!(hor_and & (1u << 31))) needed |= (1u << kLoBit[1]);  // minus-y
+
+    return needed;
+}
+
+// ============================================================
+// Targeted sentinel correctness test (§8e supplement)
+//
+// Verifies that inactive lanes — including straddle lanes that ARE active
+// voxels but belong to a different leaf — do not inject spurious direction
+// bits into the SIMD result.
+//
+// The test is designed so that a broken sentinel (i.e., using the straddle
+// lane's real voxelOffset instead of kInactiveVoxelOffset) would produce a
+// DIFFERENT result from the scalar reference in BOTH the plus and minus
+// directions, making the bug impossible to miss.
+//
+// Layout (SIMDw = 16 lanes):
+//   leafMask lanes (even: 0,2,4,...,14):
+//     lx=4 (neutral for x), ly=4 (neutral for y), lz=6 (→ plus-z needed)
+//     voxelOffset = 4*64 + 4*8 + 6 = 294
+//
+//   straddle lanes (odd: 1,3,5,...,15) — active voxels, wrong leaf:
+//     lx=0 (→ minus-x if used), ly=7 (→ plus-y if used), lz=1 (→ minus-z if used)
+//     voxelOffset = 0*64 + 7*8 + 1 = 57
+//
+// Expected result (scalar — straddle lanes ignored):
+//   plus-z  needed  (bit kHiBit[2]=14): lz=6 ≥ 5 in leafMask lanes   ✓
+//   minus-x NOT needed: lx=4 ≥ R=3 for all leafMask lanes             ✓
+//   plus-y  NOT needed: ly=4 < 8-R=5 for all leafMask lanes           ✓
+//   minus-z NOT needed: lz=6 ≥ R=3 for all leafMask lanes             ✓
+//   plus-x  NOT needed: lx=4 < 8-R=5 for all leafMask lanes           ✓
+//   minus-y NOT needed: ly=4 ≥ R=3 for all leafMask lanes             ✓
+//
+// If sentinel fails: straddle lx=0 → minus-x spuriously added;
+//                    straddle ly=7 → plus-y spuriously added;
+//                    straddle lz=1 → minus-z spuriously added.
+// Those discrepancies are caught by the scalar cross-check inside
+// computeNeededDirs, which will abort immediately.
+// ============================================================
+
+static void verifyComputeNeededDirsSentinel()
+{
+    // --- Sentinel property: expandVoxelOffset(292) + K must have ---
+    // --- plus-carry bits {3,9,15} clear and minus-carry bits {19,25,31} set ---
+    {
+        const uint32_t expanded = expandVoxelOffset(kInactiveVoxelOffset);
+        const uint32_t result   = expanded + kExpandCarryK;
+        const bool plus_ok  = !(result & ((1u<<3)|(1u<<9)|(1u<<15)));
+        const bool minus_ok =  (result & ((1u<<19)|(1u<<25)|(1u<<31))) ==
+                                         ((1u<<19)|(1u<<25)|(1u<<31));
+        if (!plus_ok || !minus_ok) {
+            std::cerr << "verifyComputeNeededDirsSentinel: sentinel carry property violated"
+                      << "  expanded=0x" << std::hex << expanded
+                      << "  result=0x"   << result << std::dec << "\n";
+            std::abort();
+        }
+    }
+
+    // --- Straddle scenario: straddle lanes must not pollute the result ---
+    alignas(64) uint16_t voxelOffset[BlockWidth] = {};
+
+    // leafMask lanes (even): lx=4, ly=4, lz=6  →  voxelOffset = 4*64+4*8+6 = 294
+    // straddle lanes (odd):  lx=0, ly=7, lz=1  →  voxelOffset = 0*64+7*8+1 = 57
+    LaneMask laneMask;
+    for (int i = 0; i < SIMDw; i++) {
+        const bool active  = (i % 2 == 0);
+        laneMask[i]        = active;
+        voxelOffset[i]     = active ? uint16_t(294) : uint16_t(57);
+    }
+
+    // Expected: only plus-z (kHiBit[2] = 14) should be set.
+    //
+    // Build the pre-expanded vector exactly as the gather site would.
+    using VecU32 = nanovdb::util::Simd<uint32_t, SIMDw>;
+    VecU32 expandedVec(kSentinelExpanded);
+    for (int i = 0; i < SIMDw; i++) {
+        if (laneMask[i]) expandedVec[i] = expandVoxelOffset(voxelOffset[i]);
+    }
+    const uint32_t result   = computeNeededDirs(expandedVec);
+
+    // Explicit cross-check: scalar reference (SIMD cross-check no longer lives inside
+    // computeNeededDirs — it is the caller's responsibility at each gather site).
+    {
+        const uint32_t ref = computeNeededDirsScalar(voxelOffset, 0, laneMask);
+        if (result != ref) {
+            std::cerr << "verifyComputeNeededDirsSentinel: SIMD/scalar mismatch"
+                      << "  simd=0x" << std::hex << result
+                      << "  ref=0x"  << ref << std::dec << "\n";
+            std::abort();
+        }
+    }
+
+    const uint32_t expected = (1u << kHiBit[2]);  // plus-z only
+
+    if (result != expected) {
+        std::cerr << "verifyComputeNeededDirsSentinel: wrong direction mask"
+                  << "  got=0x"      << std::hex << result
+                  << "  expected=0x" << expected  << std::dec << "\n";
+        std::abort();
+    }
+
+    std::cout << "verifyComputeNeededDirsSentinel: PASSED\n";
 }
 
 // ============================================================
@@ -179,12 +457,12 @@ static void verifyBatchPtrs(
     const uint32_t*     leafIndex,
     const uint16_t*     voxelOffset,
     int                 batchStart,
-    uint32_t            laneMask,
+    LaneMask            laneMask,
     AccT&               refAcc,
     VerifyStats&        stats)
 {
     for (int i = 0; i < SIMDw; i++) {
-        if (!(laneMask & (1u << i))) continue;
+        if (!laneMask[i]) continue;
         const int p = batchStart + i;
 
         const LeafT* centerLeaf   = &firstLeaf[leafIndex[p]];
@@ -284,34 +562,27 @@ static void runPrototype(const GridT*                                           
         // Process SIMD batches.
         for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
 
-            // Build active-lane mask: positions with a valid (non-sentinel) leafIndex.
-            uint32_t activeMask = 0;
-            for (int i = 0; i < SIMDw; i++) {
-                if (leafIndex[batchStart + i] != CPUVBM::UnusedLeafIndex)
-                    activeMask |= (1u << i);
-            }
-            if (!activeMask) continue;
+            // Load the SIMDw leafIndex values for this batch once; reused below.
+            const LeafIdxVec leafSlice(&leafIndex[batchStart], nanovdb::util::element_aligned);
+
+            // Active-lane mask: lanes with a valid (non-sentinel) leafIndex.
+            LaneMask activeMask = (leafSlice != LeafIdxVec(CPUVBM::UnusedLeafIndex));
+            if (nanovdb::util::none_of(activeMask)) continue;
 
             // Track straddle batches for diagnostic output.
             for (int i = 0; i < SIMDw; i++) {
-                if ((activeMask & (1u << i)) &&
-                    leafIndex[batchStart + i] != currentLeafID) {
+                if (activeMask[i] && leafIndex[batchStart + i] != currentLeafID) {
                     nStraddles++;
                     break;
                 }
             }
 
             // Inner loop: consume one center leaf's worth of lanes per iteration.
-            while (activeMask) {
+            while (nanovdb::util::any_of(activeMask)) {
                 // Identify lanes belonging to currentLeafID.
-                uint32_t leafMask = 0;
-                for (int i = 0; i < SIMDw; i++) {
-                    if ((activeMask & (1u << i)) &&
-                        leafIndex[batchStart + i] == currentLeafID)
-                        leafMask |= (1u << i);
-                }
+                LaneMask leafMask = activeMask & (leafSlice == LeafIdxVec(currentLeafID));
 
-                if (!leafMask) {
+                if (nanovdb::util::none_of(leafMask)) {
                     // No lanes for currentLeafID: advance to next leaf.
                     assert(currentLeafID < firstLeafID[bID] + (uint32_t)nExtraLeaves);
                     currentLeafID++;
@@ -321,7 +592,31 @@ static void runPrototype(const GridT*                                           
                 }
 
                 // --- Phase 1: probe newly needed neighbor leaves (§8d) ---
-                const uint32_t neededMask = computeNeededDirs(voxelOffset, batchStart, leafMask);
+                //
+                // Build the pre-expanded vector at the gather site — the only
+                // place where leafMask is known.  Broadcast the sentinel first
+                // (straddle / inactive lanes stay neutral), then overwrite the
+                // leafMask lanes with their actual expandVoxelOffset values.
+                using VecU32 = nanovdb::util::Simd<uint32_t, SIMDw>;
+                VecU32 expandedVec(kSentinelExpanded);
+                for (int i = 0; i < SIMDw; i++) {
+                    if (leafMask[i])
+                        expandedVec[i] = expandVoxelOffset(voxelOffset[batchStart + i]);
+                }
+                const uint32_t neededMask = computeNeededDirs(expandedVec);
+
+                // Cross-check against scalar reference (always-on; overhead is
+                // ~18 scalar ops per batch, negligible vs. the probeLeaf calls).
+                {
+                    const uint32_t ref = computeNeededDirsScalar(voxelOffset, batchStart, leafMask);
+                    if (neededMask != ref) {
+                        std::cerr << "computeNeededDirs: SIMD/scalar mismatch"
+                                  << "  simd=0x" << std::hex << neededMask
+                                  << "  ref=0x"  << ref << std::dec << "\n";
+                        std::abort();
+                    }
+                }
+
                 uint32_t toProbe = neededMask & ~probedMask;
 
                 while (toProbe) {
@@ -338,7 +633,7 @@ static void runPrototype(const GridT*                                           
                 // batchPtrs[3][i] = z-axis neighbor
                 const LeafT* batchPtrs[4][SIMDw] = {};
                 for (int i = 0; i < SIMDw; i++) {
-                    if (!(leafMask & (1u << i))) continue;
+                    if (!leafMask[i]) continue;
                     batchPtrs[0][i] = &firstLeaf[currentLeafID];
                     for (int axis = 0; axis < 3; axis++) {
                         const int lc = localAxisCoord(voxelOffset[batchStart + i], axis);
@@ -354,7 +649,7 @@ static void runPrototype(const GridT*                                           
                 verifyBatchPtrs(batchPtrs, firstLeaf, leafIndex, voxelOffset,
                                 batchStart, leafMask, acc, stats);
 
-                activeMask &= ~leafMask;
+                activeMask = activeMask & !leafMask;
             }
         }
     }
@@ -378,6 +673,9 @@ static void runPrototype(const GridT*                                           
 int main(int argc, char** argv)
 {
     try {
+        // Targeted sentinel test runs unconditionally before any VBM data is needed.
+        verifyComputeNeededDirsSentinel();
+
         int   ambient_voxels = 1024 * 1024;  // smaller default than the CUDA test
         float occupancy      = 0.5f;
 

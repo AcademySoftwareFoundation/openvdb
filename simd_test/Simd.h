@@ -82,6 +82,13 @@ inline Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> b) {
     return result;
 }
 
+template<typename T, int W>
+inline bool any_of(SimdMask<T,W> m) { return stdx::any_of(m); }
+template<typename T, int W>
+inline bool none_of(SimdMask<T,W> m) { return stdx::none_of(m); }
+template<typename T, int W>
+inline bool all_of(SimdMask<T,W> m) { return stdx::all_of(m); }
+
 // ===========================================================================
 // Implementation B: std::array backend (default)
 // ===========================================================================
@@ -92,6 +99,15 @@ struct SimdMask {
     std::array<bool, W> data{};
     NANOVDB_SIMD_HOSTDEV bool  operator[](int i) const { return data[i]; }
     NANOVDB_SIMD_HOSTDEV bool& operator[](int i)       { return data[i]; }
+    NANOVDB_SIMD_HOSTDEV SimdMask operator!() const {
+        SimdMask r; for (int i = 0; i < W; i++) r.data[i] = !data[i]; return r;
+    }
+    NANOVDB_SIMD_HOSTDEV SimdMask operator&(SimdMask o) const {
+        SimdMask r; for (int i = 0; i < W; i++) r.data[i] = data[i] && o.data[i]; return r;
+    }
+    NANOVDB_SIMD_HOSTDEV SimdMask operator|(SimdMask o) const {
+        SimdMask r; for (int i = 0; i < W; i++) r.data[i] = data[i] || o.data[i]; return r;
+    }
 };
 
 template<typename T, int W>
@@ -128,6 +144,12 @@ struct Simd {
         for (int i = 0; i < W; i++) m.data[i] = data[i] > o.data[i];
         return m;
     }
+    NANOVDB_SIMD_HOSTDEV SimdMask<T,W> operator==(Simd o) const {
+        SimdMask<T,W> m; for (int i = 0; i < W; i++) m.data[i] = data[i] == o.data[i]; return m;
+    }
+    NANOVDB_SIMD_HOSTDEV SimdMask<T,W> operator!=(Simd o) const {
+        SimdMask<T,W> m; for (int i = 0; i < W; i++) m.data[i] = data[i] != o.data[i]; return m;
+    }
 };
 
 template<typename T, int W> NANOVDB_SIMD_HOSTDEV
@@ -160,7 +182,30 @@ NANOVDB_SIMD_HOSTDEV Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> 
     Simd<T,W> r; for (int i = 0; i < W; i++) r[i] = mask[i] ? a[i] : b[i]; return r;
 }
 
+template<typename T, int W>
+NANOVDB_SIMD_HOSTDEV bool any_of(SimdMask<T,W> m) {
+    bool r = false; for (int i = 0; i < W; i++) r |= m[i]; return r;
+}
+template<typename T, int W>
+NANOVDB_SIMD_HOSTDEV bool none_of(SimdMask<T,W> m) { return !any_of(m); }
+template<typename T, int W>
+NANOVDB_SIMD_HOSTDEV bool all_of(SimdMask<T,W> m) {
+    bool r = true; for (int i = 0; i < W; i++) r &= m[i]; return r;
+}
+
 #endif // NANOVDB_USE_STD_SIMD
+
+// ---------------------------------------------------------------------------
+// to_bitmask — fold SimdMask<T,W> into a uint32_t (one bit per lane).
+// T is the associated element type; only W matters.  Requires W <= 32.
+// ---------------------------------------------------------------------------
+template<typename T, int W>
+NANOVDB_SIMD_HOSTDEV uint32_t to_bitmask(SimdMask<T,W> m) {
+    static_assert(W <= 32, "to_bitmask: W must be <= 32");
+    uint32_t r = 0;
+    for (int i = 0; i < W; i++) if (m[i]) r |= (1u << i);
+    return r;
+}
 
 // ---------------------------------------------------------------------------
 // Scalar overloads — always present, for T=float (GPU / scalar path)
