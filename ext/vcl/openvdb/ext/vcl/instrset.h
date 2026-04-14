@@ -115,28 +115,6 @@
 #include <stdlib.h>                    // define abs(int)
 
 
-// functions in instrset_detect.cpp:
-#ifdef VCL_NAMESPACE
-namespace VCL_NAMESPACE {
-#endif
-    int  instrset_detect(void);        // tells which instruction sets are supported
-    bool hasFMA3(void);                // true if FMA3 instructions supported
-    bool hasFMA4(void);                // true if FMA4 instructions supported
-    bool hasXOP(void);                 // true if XOP  instructions supported
-    bool hasAVX512ER(void);            // true if AVX512ER instructions supported
-    bool hasAVX512VBMI(void);          // true if AVX512VBMI instructions supported
-    bool hasAVX512VBMI2(void);         // true if AVX512VBMI2 instructions supported
-    bool hasF16C(void);                // true if F16C instructions supported
-    bool hasAVX512FP16(void);          // true if AVX512_FP16 instructions supported
-
-    // function in physical_processors.cpp:
-    int physicalProcessors(int * logical_processors = 0);
-
-#ifdef VCL_NAMESPACE
-}
-#endif
-
-
 // GCC version
 #if defined(__GNUC__) && !defined (GCC_VERSION) && !defined (__clang__)
 #define GCC_VERSION  ((__GNUC__) * 10000 + (__GNUC_MINOR__) * 100 + (__GNUC_PATCHLEVEL__))
