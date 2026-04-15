@@ -40,9 +40,10 @@
 #pragma once
 
 #include <nanovdb/NanoVDB.h>
-#include <simd_test/Simd.h>   // simd_traits, Simd<T,W>, SimdMask<T,W>
+#include <simd_test/Simd.h>   // simd_traits, scalar_traits, Simd<T,W>, SimdMask<T,W>
 #include <cstdint>
 #include <cassert>
+#include <type_traits>
 
 namespace nanovdb {
 
@@ -74,6 +75,18 @@ class BatchAccessor
         "BatchAccessor: VoxelOffsetT and PredicateT must have the same lane width");
     static_assert(Val_traits::width == 1 || Val_traits::width == VO_traits::width,
         "BatchAccessor: ValueT lane width must be 1 (scalar) or match VoxelOffsetT");
+
+    // The SWAR packed layout in prefetch occupies bits 0–14 of each element
+    // (max packed value 0x71C7, max sum 0xE38E).  The element type must therefore
+    // be an unsigned integer of at least 16 bits; signed types produce UB on
+    // carry overflow, and 8-bit types cannot hold the packed fields.
+    using VoxelOffsetScalarT = util::scalar_traits_t<VoxelOffsetT>;
+    static_assert(std::is_unsigned_v<VoxelOffsetScalarT>,
+        "BatchAccessor: VoxelOffsetT element type must be unsigned "
+        "(SWAR carry detection requires wrap-around, not signed overflow)");
+    static_assert(sizeof(VoxelOffsetScalarT) >= 2,
+        "BatchAccessor: VoxelOffsetT element type must be at least 16 bits "
+        "(SWAR packed layout occupies bits 0-14, max sum 0xE38E)");
 
 public:
     // -------------------------------------------------------------------------
@@ -185,48 +198,46 @@ public:
         // For axis-aligned WENO5 taps (one nonzero component) there is no over-probing.
         // -----------------------------------------------------------------------
 
-        // Use VoxelOffsetT (Simd<uint16_t, LaneWidth>) directly for the packed
-        // arithmetic: 16 × uint16_t = 256 bits = one YMM → one vpaddw, vs two
-        // vpaddd if we widened to uint32_t.  All intermediate values fit in uint16_t:
-        //   packed_lc  ≤ 0x71C7, packed_d ≤ 0x71C7, sum ≤ 0xE38E < 0xFFFF.
-        static_assert(LaneWidth >= 16,
-            "BatchAccessor::prefetch SWAR requires LaneWidth >= 16");
+        // Use VoxelOffsetT directly for the packed arithmetic: LaneWidth elements
+        // of VoxelOffsetScalarT in one register → one vpaddw (16-bit) or vpaddd
+        // (32-bit) depending on the instantiation.  All intermediate values fit:
+        //   packed_lc ≤ 0x71C7, packed_d ≤ 0x71C7, sum ≤ 0xE38E < 2^16.
 
         // Compile-time packed stencil offset (3-bit two's complement per axis).
-        // Using uint16_t arithmetic: dk & 7u fits in 3 bits, shifted into position.
-        static constexpr uint16_t packed_d =
-              static_cast<uint16_t>(
-                  (uint32_t(unsigned(dk) & 7u))
-                | (uint32_t(unsigned(di) & 7u) <<  6)
-                | (uint32_t(unsigned(dj) & 7u) << 12));
+        // d & 7u gives the 3-bit representation; for negative d, d & 7 = 8+d.
+        static constexpr auto packed_d =
+            static_cast<VoxelOffsetScalarT>(
+                 (unsigned(dk) & 7u)
+               | ((unsigned(di) & 7u) <<  6)
+               | ((unsigned(dj) & 7u) << 12));
 
-        // Sentinel for inactive lanes: lc = (4,4,4) → packed = 4|(4<<6)|(4<<12) = 0x4104.
-        // Note: expandVoxelOffset(kInactiveVoxelOffset=292) = 0x4104 = kSentinel15.
-        // So even unconditionally expanded inactive-lane values would yield the correct
-        // sentinel.  However, straddle lanes carry arbitrary vo values (from the next
-        // leaf), so we must apply leafMask before the add to avoid false crossing signals.
-        static constexpr uint16_t kSentinel15 =
-            static_cast<uint16_t>(4u | (4u << 6u) | (4u << 12u));
-        static constexpr uint16_t kMask15     = uint16_t(0x71C7u);
+        // Sentinel for inactive lanes: lc = (4,4,4) → packed = 4|(4<<6)|(4<<12).
+        // Note: expandVoxelOffset(kInactiveVoxelOffset=292) = kSentinel15, so even
+        // unconditionally expanded inactive-lane vo values yield the sentinel.
+        // However, straddle lanes carry arbitrary vo from the next leaf, so we
+        // must apply leafMask before the add to avoid false crossing signals.
+        static constexpr auto kSentinel15 =
+            static_cast<VoxelOffsetScalarT>(4u | (4u << 6u) | (4u << 12u));
+        static constexpr auto kMask15 =
+            static_cast<VoxelOffsetScalarT>(0b111'000'111'000'111u);
 
         // Expand the 9-bit voxel offset into the 15-bit SWAR packed form —
         // one vpor + vpsllw + vpand (no scalar loop).
         //   bits [0:2]  = lz,  bits [6:8]  = lx,  bits [12:14] = ly
         // Then blend: active lanes → expanded form, straddle/inactive → sentinel.
         // util::where accepts SimdMask<U,W> for any U (heterogeneous overload).
-        const VoxelOffsetT expanded =
-              (vo | (vo << VoxelOffsetT(uint16_t(9)))) & VoxelOffsetT(kMask15);
-        const VoxelOffsetT packed_lc =
+        const auto expanded =
+              (vo | (vo << VoxelOffsetScalarT(9))) & VoxelOffsetT(kMask15);
+        const auto packed_lc =
               util::where(leafMask, expanded, VoxelOffsetT(kSentinel15));
 
-        // One SIMD add across all LaneWidth lanes (one vpaddw YMM instruction).
-        const VoxelOffsetT packed_sum = packed_lc + VoxelOffsetT(packed_d);
+        // One SIMD add across all LaneWidth lanes (one vpaddw/vpaddd instruction).
+        const auto packed_sum = packed_lc + VoxelOffsetT(packed_d);
 
         // Horizontal reductions: widen to uint32_t for the carry-bit checks.
         uint32_t hor_or = 0u, hor_and = ~0u;
         for (int i = 0; i < LaneWidth; ++i) {
-            const uint32_t s = static_cast<uint32_t>(
-                static_cast<uint16_t>(VO_traits::get(packed_sum, i)));
+            const uint32_t s = static_cast<uint32_t>(VO_traits::get(packed_sum, i));
             hor_or  |= s;
             hor_and &= s;
         }

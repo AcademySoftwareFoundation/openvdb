@@ -210,11 +210,19 @@ struct Simd {
     NANOVDB_SIMD_HOSTDEV Simd operator^(Simd o) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] ^ o.data[i]; return r;
     }
+    // Per-lane variable shift (shift count from corresponding lane of o).
     NANOVDB_SIMD_HOSTDEV Simd operator<<(Simd o) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] << o.data[i]; return r;
     }
     NANOVDB_SIMD_HOSTDEV Simd operator>>(Simd o) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] >> o.data[i]; return r;
+    }
+    // Uniform shift: all lanes shifted by the same scalar count (vpsllw imm8 / vpsrlw imm8).
+    NANOVDB_SIMD_HOSTDEV Simd operator<<(T shift) const {
+        Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] << shift; return r;
+    }
+    NANOVDB_SIMD_HOSTDEV Simd operator>>(T shift) const {
+        Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] >> shift; return r;
     }
 };
 
@@ -337,6 +345,23 @@ struct simd_traits<SimdMask<T,W>> {
     NANOVDB_SIMD_HOSTDEV static bool get(SimdMask<T,W> m, int i)          { return m[i]; }
     NANOVDB_SIMD_HOSTDEV static void set(SimdMask<T,W>& m, int i, bool v) { m[i] = v; }
 };
+
+// ---------------------------------------------------------------------------
+// scalar_traits — extract the scalar element type from T or Simd<T,W>.
+//
+// Primary template: a plain scalar type is its own element type.
+// The = void default parameter reserves a slot for enable_if specialisations.
+// Specialisation for Simd<T,W>: the element type is T.
+// scalar_traits_t<U> is a convenience alias for typename scalar_traits<U>::type.
+// ---------------------------------------------------------------------------
+template<typename T, typename = void>
+struct scalar_traits { using type = T; };
+
+template<typename T, int W>
+struct scalar_traits<Simd<T,W>> { using type = T; };
+
+template<typename T>
+using scalar_traits_t = typename scalar_traits<T>::type;
 
 // ---------------------------------------------------------------------------
 // to_bitmask — fold SimdMask<T,W> into a uint32_t (one bit per lane).
