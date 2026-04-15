@@ -35,6 +35,7 @@
 #include <nanovdb/tools/VoxelBlockManager.h>
 #include <nanovdb/util/ForEach.h>
 #include <simd_test/Simd.h>   // SimdMask<T,W>, Simd<T,W>, any_of, none_of, to_bitmask
+#include "../ex_voxelBlockManager_host_cuda/BatchAccessor.h"  // BatchAccessor
 
 #include <random>
 #include <string>
@@ -62,6 +63,14 @@ using AccT   = nanovdb::DefaultReadAccessor<BuildT>;
 // Lane-predicate types: SIMDw-wide boolean mask and the uint32_t vector it compares.
 using LeafIdxVec = nanovdb::util::Simd<uint32_t, SIMDw>;
 using LaneMask   = nanovdb::util::SimdMask<uint32_t, SIMDw>;
+
+// BatchAccessor instantiation for correctness cross-validation.
+// ValueT = Simd<uint64_t,SIMDw> because ValueOnIndex leaf values are uint64_t active indices.
+using BAccT = nanovdb::BatchAccessor<BuildT,
+    nanovdb::util::Simd<uint64_t, SIMDw>,   // ValueT
+    nanovdb::util::Simd<uint16_t, SIMDw>,   // VoxelOffsetT
+    nanovdb::util::Simd<uint32_t, SIMDw>,   // LeafIDT (unused by BatchAccessor internals)
+    LaneMask>;                               // PredicateT
 
 // Direction bit encoding shared across all stencil types:
 //   bit(dx, dy, dz) = (dx+1)*9 + (dy+1)*3 + (dz+1),   dx,dy,dz ∈ {-1,0,+1}
@@ -509,6 +518,112 @@ static void verifyBatchPtrs(
 }
 
 // ============================================================
+// BatchAccessor correctness verification
+//
+// checkOneTap<di,dj,dk>: calls batchAcc.cachedGetValue for stencil tap (di,dj,dk),
+// then for each active lane compares the result against a direct tree reference.
+//
+// Assumes the caller has already issued the 6 WENO5 extremal prefetches so that
+// all directions reachable by ±3 along any axis are in mProbedMask.
+// ============================================================
+
+template<int di, int dj, int dk>
+static void checkOneTap(
+    const BAccT&                          batchAcc,
+    nanovdb::util::Simd<uint16_t, SIMDw>  voVec,
+    LaneMask                               leafMask,
+    nanovdb::Coord                         centerLeafOrigin,
+    const LeafT*                           firstLeaf,
+    uint32_t                               currentLeafID,
+    const uint16_t*                        voxelOffset,
+    int                                    batchStart,
+    AccT&                                  refAcc,
+    VerifyStats&                           stats)
+{
+    nanovdb::util::Simd<uint64_t, SIMDw> tapResult(uint64_t(0));
+    batchAcc.cachedGetValue<di, dj, dk>(tapResult, voVec, leafMask);
+
+    for (int i = 0; i < SIMDw; ++i) {
+        if (!leafMask[i]) continue;
+        ++stats.laneChecks;
+
+        const uint16_t vo_i = voxelOffset[batchStart + i];
+        const int lx = (vo_i >> 6) & 7;
+        const int ly = (vo_i >> 3) & 7;
+        const int lz =  vo_i       & 7;
+        const int nx = lx + di, ny = ly + dj, nz = lz + dk;
+        const int dx = (nx < 0) ? -1 : (nx >= 8) ? 1 : 0;
+        const int dy = (ny < 0) ? -1 : (ny >= 8) ? 1 : 0;
+        const int dz = (nz < 0) ? -1 : (nz >= 8) ? 1 : 0;
+        const int nx_w = nx - dx * 8;
+        const int ny_w = ny - dy * 8;
+        const int nz_w = nz - dz * 8;
+        const uint32_t offset = uint32_t(nx_w) * 64u + uint32_t(ny_w) * 8u + uint32_t(nz_w);
+
+        const LeafT* refLeaf;
+        if (dx == 0 && dy == 0 && dz == 0) {
+            refLeaf = &firstLeaf[currentLeafID];
+        } else {
+            refLeaf = refAcc.probeLeaf(
+                centerLeafOrigin + nanovdb::Coord(dx * 8, dy * 8, dz * 8));
+        }
+
+        const uint64_t expected = refLeaf
+            ? static_cast<uint64_t>(refLeaf->getValue(offset))
+            : uint64_t(0);
+        const uint64_t actual = static_cast<uint64_t>(tapResult[i]);
+
+        if (actual != expected) {
+            ++stats.errors;
+            if (stats.errors <= 10) {
+                std::cerr << "BATCHACC MISMATCH"
+                          << " tap=(" << di << "," << dj << "," << dk << ")"
+                          << " lane=" << i
+                          << " expected=" << expected
+                          << " actual="   << actual << "\n";
+            }
+        }
+    }
+}
+
+/// @brief Cross-validate BatchAccessor::cachedGetValue for all 18 WENO5 non-center taps.
+/// Requires the 6 extremal prefetches to have been called first.
+static void verifyBatchAccessor(
+    const BAccT&                          batchAcc,
+    nanovdb::util::Simd<uint16_t, SIMDw>  voVec,
+    LaneMask                               leafMask,
+    nanovdb::Coord                         centerLeafOrigin,
+    const LeafT*                           firstLeaf,
+    uint32_t                               currentLeafID,
+    const uint16_t*                        voxelOffset,
+    int                                    batchStart,
+    AccT&                                  refAcc,
+    VerifyStats&                           stats)
+{
+    // x-axis taps (di in {-3,-2,-1,+1,+2,+3})
+    checkOneTap<-3, 0, 0>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    checkOneTap<-2, 0, 0>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    checkOneTap<-1, 0, 0>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    checkOneTap<+1, 0, 0>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    checkOneTap<+2, 0, 0>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    checkOneTap<+3, 0, 0>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    // y-axis taps
+    checkOneTap< 0,-3, 0>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    checkOneTap< 0,-2, 0>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    checkOneTap< 0,-1, 0>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    checkOneTap< 0,+1, 0>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    checkOneTap< 0,+2, 0>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    checkOneTap< 0,+3, 0>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    // z-axis taps
+    checkOneTap< 0, 0,-3>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    checkOneTap< 0, 0,-2>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    checkOneTap< 0, 0,-1>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    checkOneTap< 0, 0,+1>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    checkOneTap< 0, 0,+2>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+    checkOneTap< 0, 0,+3>(batchAcc, voVec, leafMask, centerLeafOrigin, firstLeaf, currentLeafID, voxelOffset, batchStart, refAcc, stats);
+}
+
+// ============================================================
 // Main prototype: Phase 1 (neighbor leaf resolution) + verification
 // ============================================================
 
@@ -559,6 +674,9 @@ static void runPrototype(const GridT*                                           
         const LeafT* ptrs[27]         = {};
         nanovdb::Coord centerLeafCoord = firstLeaf[currentLeafID].origin();
 
+        // BatchAccessor: alternate execution path for correctness cross-validation.
+        BAccT batchAcc(*grid, currentLeafID);
+
         // Process SIMD batches.
         for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
 
@@ -588,6 +706,7 @@ static void runPrototype(const GridT*                                           
                     currentLeafID++;
                     probedMask       = 0;
                     centerLeafCoord  = firstLeaf[currentLeafID].origin();
+                    batchAcc.advance(currentLeafID);
                     continue;
                 }
 
@@ -645,16 +764,34 @@ static void runPrototype(const GridT*                                           
                     }
                 }
 
-                // --- Verification ---
+                // --- Verification (Phase 1 pointer check) ---
                 verifyBatchPtrs(batchPtrs, firstLeaf, leafIndex, voxelOffset,
                                 batchStart, leafMask, acc, stats);
+
+                // --- BatchAccessor alternate path + cross-validation ---
+                //
+                // 6 extremal WENO5 prefetches cover all face-neighbor directions.
+                // The center direction (dir(0,0,0)) is guaranteed populated by at
+                // least one of these calls (see BatchAccessor.md §5).
+                using VoVecT = nanovdb::util::Simd<uint16_t, SIMDw>;
+                const VoVecT voVec(&voxelOffset[batchStart], nanovdb::util::element_aligned);
+                batchAcc.prefetch<-3,  0,  0>(voVec, leafMask);
+                batchAcc.prefetch<+3,  0,  0>(voVec, leafMask);
+                batchAcc.prefetch< 0, -3,  0>(voVec, leafMask);
+                batchAcc.prefetch< 0, +3,  0>(voVec, leafMask);
+                batchAcc.prefetch< 0,  0, -3>(voVec, leafMask);
+                batchAcc.prefetch< 0,  0, +3>(voVec, leafMask);
+
+                verifyBatchAccessor(batchAcc, voVec, leafMask, centerLeafCoord,
+                                    firstLeaf, currentLeafID, voxelOffset,
+                                    batchStart, acc, stats);
 
                 activeMask = activeMask & !leafMask;
             }
         }
     }
 
-    std::cout << "Prototype (Phase 1 verification):\n"
+    std::cout << "Prototype (Phase 1 + BatchAccessor verification):\n"
               << "  blocks     = " << nBlocks          << "\n"
               << "  voxels     = " << nVoxels           << "\n"
               << "  straddles  = " << nStraddles        << "\n"

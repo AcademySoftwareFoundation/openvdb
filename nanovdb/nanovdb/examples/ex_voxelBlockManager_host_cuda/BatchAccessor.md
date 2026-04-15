@@ -1,8 +1,7 @@
 # BatchAccessor — SIMD Batch Leaf-Neighborhood Cache
 
-This document is the design reference for `BatchAccessor`, the SIMD-batch analog
-of NanoVDB's `ValueAccessor`.  It captures the full design rationale developed
-alongside the `ex_stencil_gather_cpu` Phase 1 prototype.
+Design reference for `BatchAccessor.h`.  Captures the full design rationale
+and API contract developed alongside the `ex_stencil_gather_cpu` Phase 1 prototype.
 
 ---
 
@@ -10,423 +9,302 @@ alongside the `ex_stencil_gather_cpu` Phase 1 prototype.
 
 NanoVDB's `DefaultReadAccessor` amortizes the cost of root-to-leaf tree traversal
 by caching the path for a single voxel.  When successive scalar `getValue(ijk)` calls
-land in the same leaf, only the first call pays the full traversal; subsequent calls
-hit the cached leaf pointer in ~6 integer instructions.
+land in the same leaf, only the first call pays the full traversal.
 
 `BatchAccessor` lifts this idea one level: instead of caching the path to one leaf,
 it caches the **3×3×3 neighborhood of leaf pointers** surrounding the current center
-leaf.  Instead of serving one voxel per call, it serves a **SIMD batch of SIMDw
+leaf.  Instead of serving one voxel per call, it serves a **SIMD batch of LaneWidth
 voxels** simultaneously.
 
 | Property | Scalar `ValueAccessor` | `BatchAccessor` |
 |----------|------------------------|-----------------|
 | Cache unit | Path root→leaf (3 node ptrs) | 27 neighbor leaf ptrs |
-| Granularity | 1 voxel per call | SIMDw voxels per call |
-| Cache key | Voxel coordinate in cached leaf's bbox | `currentLeafID` (VBM ordering) |
+| Granularity | 1 voxel per call | LaneWidth voxels per call |
+| Cache key | Voxel coordinate in cached leaf's bbox | `mCenterLeafID` |
 | "Hit" condition | Next voxel in same leaf | `mProbedMask` covers needed direction |
 | Eviction trigger | Implicit on any miss | Explicit: `none_of(leafMask)` |
-| Guarantee of hit rate | Access-pattern dependent | Structural (VBM Morton ordering) |
+| Hit rate guarantee | Access-pattern dependent | Structural (VBM Morton ordering) |
 
 The hit rate of the scalar accessor depends on the access pattern.  `BatchAccessor`'s
-amortization is **structural**: the VBM groups voxels by leaf, so within any batch,
-the center leaf is known in advance, and directions probed for batch k remain valid
-for all subsequent batches in the same center leaf.
+amortization is **structural**: the VBM groups voxels by leaf, so within any batch the
+center leaf is known in advance, and directions probed for batch k remain valid for all
+subsequent batches in the same center leaf.
 
 ---
 
-## 2. Cache State
-
-Four pieces of state persist across batches within one center leaf:
+## 2. Template Parameters
 
 ```cpp
-template<typename BuildT, int SIMDw>
-class BatchAccessor {
-    uint32_t       mProbedMask    = 0;    // bit d set ↔ direction d has been probed
-    const LeafT*   mPtrs[27]      = {};   // canonical neighbor table; mPtrs[13] = center
-    uint32_t       mCurrentLeafID;        // index of current center leaf
-    nanovdb::Coord mCenterLeafCoord;      // origin of current center leaf
-    // (plus a reference to the underlying grid for probeLeaf calls)
-};
+template<typename BuildT,
+         typename ValueT       = float,
+         typename VoxelOffsetT = uint16_t,
+         typename LeafIDT      = uint32_t,
+         typename PredicateT   = bool>
+class BatchAccessor;
 ```
 
-`mPtrs[27]` uses the shared 3×3×3 direction encoding from `StencilGather.md §6a`:
+| Parameter | Scalar default | SIMD example | Role |
+|-----------|---------------|--------------|------|
+| `BuildT` | — | — | NanoVDB build type; determines `LeafT`, `TreeT` |
+| `ValueT` | `float` | `Simd<float,W>` | Return type of `cachedGetValue` |
+| `VoxelOffsetT` | `uint16_t` | `Simd<uint16_t,W>` | Compact 9-bit voxel offset within a leaf |
+| `LeafIDT` | `uint32_t` | `Simd<uint32_t,W>` | Per-lane leaf ID (reserved for caller loop) |
+| `PredicateT` | `bool` | `SimdMask<float,W>` | Per-lane active predicate |
+
+For `NanoGrid<ValueOnIndex>`, use `ValueT = uint64_t` (scalar) or
+`ValueT = Simd<uint64_t,W>` (SIMD).
+
+The scalar defaults allow instantiation without a SIMD library, giving a clean
+scalar path for debugging and cross-validation.
+
+Per-lane access is provided by `nanovdb::util::simd_traits<T>` (defined in `Simd.h`),
+which works for both scalar and vector types via specialisation.
+
+---
+
+## 3. Persistent State
+
+Four members persist across batches within one center leaf:
+
+```cpp
+const GridT& mGrid;                          // for probeLeaf calls via mGrid.tree()
+uint32_t     mCenterLeafID;                  // index of current center leaf
+Coord        mCenterOrigin;                  // world-space origin of current center leaf
+uint32_t     mProbedMask = (1u << 13);       // bit 13 (center) pre-set at construction
+const LeafT* mLeafNeighbors[27];             // [13] = center (eager); others: lazily probed
+```
+
+**Direction encoding** (`dir` is a `static constexpr` member):
 
 ```
-bit(dx, dy, dz) = (dx+1)*9 + (dy+1)*3 + (dz+1)     dx,dy,dz ∈ {-1, 0, +1}
+dir(dx, dy, dz) = (dx+1)*9 + (dy+1)*3 + (dz+1)     dx,dy,dz ∈ {-1,0,+1}
 ```
 
-`mPtrs[13]` (the center, `bit(0,0,0)`) always points to
-`&tree.getFirstNode<0>()[mCurrentLeafID]`.  The 26 non-center entries are populated
-lazily by `prefetch` calls.
+`mLeafNeighbors[27]` is a flat array indexed by `dir(dx,dy,dz)`.
+`mLeafNeighbors[13]` (= `dir(0,0,0)`) is the center leaf pointer.
+`mLeafNeighbors[d]` is `nullptr` when the neighbor leaf lies outside the narrow band.
 
-**Cache advance:** when `mCurrentLeafID` changes:
+**Why pointers, not leaf IDs:**  `cachedGetValue` accesses the leaf data array for
+every active lane in every batch.  Storing `const LeafT*` avoids a `base + id *
+sizeof(LeafT)` multiply on every call; `nullptr` is a natural "outside narrow band"
+sentinel.  `NanoVDB::ReadAccessor` uses the same approach for its cached node pointers.
+
+**Cache advance:** when `none_of(leafMask)` fires in the outer loop:
 
 ```cpp
 void advance(uint32_t newLeafID) {
-    mCurrentLeafID  = newLeafID;
-    mProbedMask     = 0;           // stale neighbor ptrs; force re-probe before use
-    mCenterLeafCoord = tree.getFirstNode<0>()[newLeafID].origin();
-    // mPtrs[] entries are stale but harmless; mProbedMask=0 prevents their use
+    mCenterLeafID              = newLeafID;
+    mCenterOrigin              = mGrid.tree().getFirstLeaf()[newLeafID].origin();
+    mLeafNeighbors[dir(0,0,0)] = &mGrid.tree().getFirstLeaf()[newLeafID];
+    mProbedMask                = (1u << dir(0,0,0));  // center pre-set; neighbors stale
 }
 ```
 
----
-
-## 3. Eviction and the `leafMask` — The Straddle Problem
-
-This is the key structural difference from the scalar accessor.
-
-In the scalar case, "cache miss" and "eviction" are the same event — the single voxel
-is either in the cached leaf or it isn't.  In the batch case they decouple:
-
-- **Straddle lanes**: active voxels in the batch that belong to a *later* leaf
-  (`leafIndex[i] != currentLeafID`, `leafMask[i] = false`).  The cache is still valid
-  for the remaining current-leaf lanes.  No eviction.
-- **Eviction**: `none_of(leafMask)` — no lane in this batch belongs to the current
-  leaf.  Only then does `advance()` fire.
-
-`leafMask` is therefore the accessor's **partial-hit signal** — a concept that has
-no scalar analog.  Without it, the accessor would evict prematurely on every straddle
-batch, losing the cross-batch amortization that makes `mProbedMask` valuable.
-
-The straddle lane problem is solved at the call site by masking: straddle lanes receive
-a sentinel voxelOffset value (`kSentinelExpanded = expandVoxelOffset(292)`, local
-coordinate (4,4,4)) that produces no false direction bits in either the plus-OR or
-minus-AND reduction.  This is already implemented and verified in the Phase 1
-prototype (`ex_stencil_gather_cpu`).
+Stale neighbor entries in `mLeafNeighbors[]` are harmless: `mProbedMask` has only
+bit 13 set, so `toProbe = neededMask & ~mProbedMask` will never return a stale index.
 
 ---
 
-## 4. The Prefetch Insight — Extremal Taps as a Neighborhood Census
+## 4. Eviction and the Straddle Problem
 
-The naive "vanilla accessor" approach would issue a `probeLeaf` call on first access
-for each stencil tap, lazily.  The `BatchAccessor` exploits **domain-specific
-knowledge of the stencil geometry** to warm the cache with a minimal set of
-strategically chosen taps — the *extremal* taps — that together constitute a complete
-census of the neighborhood.
+In a SIMD batch, "straddle lanes" are active voxels that belong to a *later* leaf
+(`leafIndex[i] != mCenterLeafID`, `leafMask[i] = false`).  They do NOT trigger an
+eviction — the cache is still valid for the remaining current-leaf lanes.
 
-### 4a. WENO5 (Axis-Aligned, Reach R=3) — 6 Extremal Taps
+Eviction fires only when `none_of(leafMask)` — no lane in the batch belongs to the
+current leaf.
 
-For an axis-aligned stencil, only one axis can cross a leaf boundary per tap.  The
-condition for needing the x+ neighbor leaf is:
+`leafMask` is the accessor's **partial-hit signal** — a concept with no scalar analog.
 
-```
-∃ delta ∈ {1..R}  s.t.  lx + delta ≥ 8   ↔   lx ≥ 8 − R
-```
-
-The extremal tap at `+R` detects exactly `lx + R ≥ 8 ↔ lx ≥ 8 − R` — which is the
-**necessary and sufficient condition** for needing x+ at all.  Any smaller delta for
-the same voxel would probe the same x+ leaf if it crosses, or not cross at all.
-
-Therefore, prefetching the 6 extremal taps covers all directions needed by any
-intermediate tap:
+Straddle lanes are given the inactive sentinel voxel offset `kInactiveVoxelOffset`
+(= local coordinate (4,4,4)), which is strictly interior to the leaf and generates
+no false crossing detections.  The outer `while (any_of(activeMask))` loop processes
+one leaf ID per iteration, re-using the same SIMD batch:
 
 ```
-prefetch<+R, 0, 0>,  prefetch<-R, 0, 0>   → x+ / x- face leaves
-prefetch< 0,+R, 0>,  prefetch< 0,-R, 0>   → y+ / y- face leaves
-prefetch< 0, 0,+R>,  prefetch< 0, 0,-R>   → z+ / z- face leaves
+while any_of(activeMask):
+    leafMask = activeMask & (leafIndex_vec == mCenterLeafID)
+    if none_of(leafMask):
+        acc.advance(++currentLeafID)
+        continue
+    # prefetch + cachedGetValue for leafMask lanes only
+    acc.prefetch<...>(vo, leafMask)
+    acc.cachedGetValue<...>(result, vo, leafMask)   # fills leafMask lanes of result
+    activeMask &= ~leafMask
+# all lanes now filled; call kernel once with complete result
 ```
-
-For WENO5 with R=3: **6 probeLeaf calls maximum** per center leaf, covering all
-19 stencil taps.  This is identical to what `computeNeededDirs` computes (the carry
-trick encodes all 6 thresholds simultaneously).
-
-### 4b. 3×3×3 Box Stencil (R=1) — 8 Corner Taps
-
-For the box stencil, a stencil tap at `(lx+dx, ly+dy, lz+dz)` where `dx,dy,dz ∈
-{-1,0,+1}` can cross one, two, or three axes simultaneously (face, edge, or corner
-neighbor leaf respectively).
-
-**Claim**: the 8 corner taps `(±1, ±1, ±1)` collectively cover all 26 non-center
-neighbor directions for any voxel position in the batch.
-
-**Coverage argument**: For any voxel `(lx, ly, lz)` and any direction
-`(dx, dy, dz)` that the stencil actually needs (i.e., some coordinate crosses a leaf
-boundary), there exists a corner tap `(sx, sy, sz)` with `sx, sy, sz ∈ {-1, +1}`
-such that when applied to this voxel it probes the **same neighbor leaf**.
-
-Concretely, the corner tap `(-1,-1,+1)` applied to voxel `(0, 0, 4)` accesses
-`(-1, -1, 5)`, which falls in the `(x−, y−)` edge leaf — the same leaf needed by
-the edge tap `(-1, -1, 0)` for this voxel.  The corner tap `(-1,+1,-1)` for the
-same voxel accesses `(-1, 1, 3)`, falling in the `x−` face leaf — the same leaf
-needed by `(-1, 0, 0)`.
-
-Each corner tap, applied to varying voxel positions in the batch, will probe face,
-edge, or corner leaves depending on how many axes actually cross — collectively
-exhausting all 26 directions across the batch.
-
-**At most 8 probeLeaf calls** per center leaf for the full 27-point box stencil
-(in practice fewer, since many corner taps land in the center leaf for interior
-voxels, and `mProbedMask` prevents re-probing the same direction twice).
 
 ---
 
-## 5. API — Three Tiers
+## 5. Center Leaf Initialisation — Eager (Constructor and advance)
 
-### 5a. Core Functions
+`mLeafNeighbors[dir(0,0,0)]` (center) is populated **eagerly** by both the
+constructor and `advance()`:
 
 ```cpp
-// ── Tier 1a: warm the cache for a specific stencil offset ──────────────────
-// For each active (leafMask) lane: compute which neighbor leaf the tap
-// (di,dj,dk) falls in, probe it into mPtrs[] if not already in mProbedMask.
-// Takes treeAcc — may call probeLeaf.
+mLeafNeighbors[dir(0,0,0)] = &mGrid.tree().getFirstLeaf()[mCenterLeafID];
+mProbedMask = (1u << dir(0,0,0));   // bit 13 pre-set
+```
+
+The center pointer is O(1) to compute — no `probeLeaf` traversal needed — so there
+is no reason to defer it.
+
+**Consequences:**
+
+- `cachedGetValue<0,0,0>` (center tap) is valid immediately after construction or
+  `advance()`, without any `prefetch` call.
+- The SWAR `neededMask` computed inside `prefetch` never needs to include bit 13:
+  crossings are detected per-axis, and a lane whose tap stays in the center leaf
+  contributes `dir(0,0,0)` which is already in `mProbedMask` and filtered by
+  `toProbe = neededMask & ~mProbedMask`.
+- The `if (d == dir(0,0,0))` special case is removed from the probe loop: every
+  direction in `toProbe` is a genuine neighbor requiring `probeLeaf`.
+
+---
+
+## 6. API
+
+### 6a. Direction Helper
+
+```cpp
+static constexpr int dir(int dx, int dy, int dz);
+```
+
+### 6b. Lifecycle
+
+```cpp
+BatchAccessor(const GridT& grid, uint32_t firstLeafID);
+void advance(uint32_t newLeafID);
+```
+
+### 6c. Tier 1a — `prefetch`
+
+```cpp
 template<int di, int dj, int dk>
-void prefetch(Simd<uint16_t,SIMDw> vo, LaneMask leafMask, AccT& treeAcc);
+void prefetch(VoxelOffsetT vo, PredicateT leafMask);
+```
 
-// ── Tier 1b: read from cache (cache assumed warm) ──────────────────────────
-// For each active lane: compute local offset within the cached neighbor leaf,
-// fetch and return the value (or index for ValueOnIndex grids).
-// Does NOT take treeAcc — guaranteed not to touch the tree.
-// Debug builds assert mProbedMask covers the needed direction.
+- Computes the neighbor direction for each active lane.
+- Probes at most one new leaf per unique direction per call (skips directions
+  already in `mProbedMask`).
+- Calls `mGrid.tree().probeLeaf(coord)` directly — no `AccT` parameter.
+  `ReadAccessor` is not used because `probeLeaf` only hits the LEVEL=0 leaf cache,
+  which is never warm for neighbor leaves; the internal-node caches are bypassed
+  entirely for `GetLeaf` operations.
+- The center direction is set from `mCenterLeafID` without `probeLeaf`.
+
+### 6d. Tier 1b — `cachedGetValue`
+
+```cpp
 template<int di, int dj, int dk>
-Simd<ValueT,SIMDw> cachedGetValue(Simd<uint16_t,SIMDw> vo, LaneMask leafMask) const;
-
-// ── Tier 2: lazy combined operation (vanilla accessor style) ───────────────
-// Equivalent to prefetch<di,dj,dk> + cachedGetValue<di,dj,dk>.
-// Correct without explicit prefetch management; slightly suboptimal for
-// repeated calls in the same center leaf (redundant bitmask checks).
-template<int di, int dj, int dk>
-Simd<ValueT,SIMDw> getValue(Simd<uint16_t,SIMDw> vo, LaneMask leafMask, AccT& treeAcc);
+void cachedGetValue(ValueT& result, VoxelOffsetT vo, PredicateT leafMask) const;
 ```
 
-The presence or absence of `treeAcc` in the signature is self-documenting:
-`cachedGetValue` is the only function that can be called in a "no tree access"
-context, and the compiler enforces that it doesn't get one.
+- Fills **only the `leafMask` lanes** of `result` (by reference).
+- Inactive lanes are not touched — values from a previous iteration are preserved.
+- This is the correct API for the straddle-aware outer loop: the caller declares
+  all stencil result variables before the `while` loop, fills them progressively
+  across iterations, and calls the kernel once after `activeMask` is empty.
+- Requires the corresponding direction to be in `mProbedMask` (asserted in debug).
+- `nullptr` leaf (outside narrow band) writes `ScalarValueT(0)`.
 
-### 5b. Usage Patterns
+### 6e. Deferred
 
-**Tier 1 — production path** (explicit prefetch, recommended for performance-critical
-stencil kernels):
-
-```cpp
-// Warm the cache with the 6 WENO5 extremal taps
-batchAcc.prefetch<-3, 0, 0>(vo, leafMask, treeAcc);
-batchAcc.prefetch<+3, 0, 0>(vo, leafMask, treeAcc);
-batchAcc.prefetch< 0,-3, 0>(vo, leafMask, treeAcc);
-batchAcc.prefetch< 0,+3, 0>(vo, leafMask, treeAcc);
-batchAcc.prefetch< 0, 0,-3>(vo, leafMask, treeAcc);
-batchAcc.prefetch< 0, 0,+3>(vo, leafMask, treeAcc);
-
-// All cachedGetValue calls are pure arithmetic + gather — no tree access
-auto u_m3 = batchAcc.cachedGetValue<-3, 0, 0>(vo, leafMask);
-auto u_m2 = batchAcc.cachedGetValue<-2, 0, 0>(vo, leafMask);
-auto u_m1 = batchAcc.cachedGetValue<-1, 0, 0>(vo, leafMask);
-auto u_0  = batchAcc.cachedGetValue< 0, 0, 0>(vo, leafMask);
-auto u_p1 = batchAcc.cachedGetValue<+1, 0, 0>(vo, leafMask);
-auto u_p2 = batchAcc.cachedGetValue<+2, 0, 0>(vo, leafMask);
-auto u_p3 = batchAcc.cachedGetValue<+3, 0, 0>(vo, leafMask);
-// ... y and z axes similarly
-
-Simd<float,SIMDw> flux_x = wenoKernel(u_m3, u_m2, u_m1, u_0, u_p1, u_p2, u_p3);
-```
-
-**Tier 2 — prototyping path** (lazy, correct, no explicit prefetch management):
-
-```cpp
-// Identical stencil formula; each getValue probes lazily on first need
-auto u_m3 = batchAcc.getValue<-3, 0, 0>(vo, leafMask, treeAcc);
-auto u_m2 = batchAcc.getValue<-2, 0, 0>(vo, leafMask, treeAcc);
-// ...
-```
-
-The redundant `prefetch` calls inside non-extremal `getValue` invocations reduce to
-a single `mProbedMask` bitmask check and immediate return — the direction was already
-probed by an earlier extremal call.
-
-### 5c. Invariant Ordering
-
-In Tier 1, all `prefetch` calls must precede all `cachedGetValue` calls for the same
-batch.  A debug-mode RAII scope guard (`batchAcc.beginGather()` / `endGather()`) could
-enforce this, but is probably overkill for a first implementation.
+`getValue<di,dj,dk>` (lazy combined) and the runtime `nanovdb::Coord` overload
+are not yet implemented.  Both are additive and straightforward once the two
+primitives above are validated.
 
 ---
 
-## 6. Template vs Runtime Interface
+## 7. Prefetch Patterns
 
-### 6a. Arguments for `<di, dj, dk>` Template Parameters
-
-- **Compile-time direction resolution**: for `cachedGetValue<-3,0,0>`, the compiler
-  proves only lx can cross, and only leftward.  The direction bit reduces to a
-  compile-time choice between two constants (`mPtrs[4]` or `mPtrs[13]`); y/z
-  boundary checks are eliminated entirely.
-- **Dead axis elimination**: for axis-aligned taps, two of the three axis checks
-  vanish at compile time.
-- **VDB convention alignment**: `WenoPt<i,j,k>::idx`, `NineteenPt<i,j,k>::idx` —
-  the ecosystem already addresses stencil points as compile-time named entities.
-- **Structural contract**: the `prefetch`/`cachedGetValue` pairing is expressible as
-  a static invariant when offsets are compile-time constants.
-
-### 6b. When Runtime `nanovdb::Coord` Is Needed
-
-A generic `computeStencil<StencilT>` that iterates over `StencilT::offsets` at
-runtime cannot use template parameters.  A runtime overload:
+### WENO5 (R=3, axis-aligned) — 6 extremal taps
 
 ```cpp
-Simd<ValueT,SIMDw> getValue(nanovdb::Coord offset,
-                             Simd<uint16_t,SIMDw> vo,
-                             LaneMask leafMask, AccT& treeAcc);
+acc.prefetch<-3, 0, 0>(vo, leafMask);
+acc.prefetch<+3, 0, 0>(vo, leafMask);
+acc.prefetch< 0,-3, 0>(vo, leafMask);
+acc.prefetch< 0,+3, 0>(vo, leafMask);
+acc.prefetch< 0, 0,-3>(vo, leafMask);
+acc.prefetch< 0, 0,+3>(vo, leafMask);
+// All subsequent cachedGetValue calls are pure arithmetic — no tree access.
+auto u_m3 = /* ... */; acc.cachedGetValue<-3,0,0>(u_m3, vo, leafMask);
+auto u_m2 = /* ... */; acc.cachedGetValue<-2,0,0>(u_m2, vo, leafMask);
+// ... 19 taps total
+Simd<float,W> flux_x = wenoKernel(u_m3, u_m2, u_m1, u_0, u_p1, u_p2, u_p3);
 ```
 
-dispatches through a small switch on the runtime direction bit (26 cases, easily
-predicted).  The gather still dominates; the dispatch overhead is negligible.
-
-**C++20 note**: if `nanovdb::Coord` is made a structural type, the template and
-runtime interfaces unify naturally:
+### Box stencil (R=1) — 8 corner taps
 
 ```cpp
-template<nanovdb::Coord offset>
-Simd<ValueT,SIMDw> cachedGetValue(Simd<uint16_t,SIMDw> vo, LaneMask leafMask) const;
-
-// Called as:
-batchAcc.cachedGetValue<nanovdb::Coord(-3,0,0)>(vo, leafMask);
+for each (sx,sy,sz) in {±1}³:
+    acc.prefetch<sx,sy,sz>(vo, leafMask);
+// then cachedGetValue for all 27 taps
 ```
-
-### 6c. Recommendation
-
-- **Template `<di,dj,dk>`** as the primary, idiomatic interface for all hand-written
-  stencil kernels — cleaner codegen, natural fit with VDB conventions.
-- **Runtime `Coord` overload** for generic stencil adapters and prototyping loops.
-- Both interfaces backed by the same `mPtrs[]` / `mProbedMask` state machine.
 
 ---
 
-## 7. AVX2 Vectorization Profile
+## 8. Implementation Notes
 
-### 7a. `prefetch<di,dj,dk>` — Crossing Detection
+### 8a. Lane loop in prefetch / cachedGetValue
 
-```
-Extract lx/ly/lz from all 16 vo lanes     vpsrl / vpand  ymm (SIMD)
-Compare lx+di against [0,7]               vpcmpgtd       ymm (SIMD)
-Fold crossing mask to scalar bitmask      vmovmskps      ymm (SIMD)
-AND with ~mProbedMask                     scalar bitmask check
-If new direction needed: probeLeaf        scalar (≤1 call per prefetch for WENO5)
-```
+The current implementation uses a scalar `for (int i = 0; i < LaneWidth; ++i)` loop
+over lanes, using `simd_traits<T>::get` / `set` for per-lane access.  This is correct
+for both scalar (LaneWidth=1) and SIMD (LaneWidth=W) instantiations.
 
-Structurally identical to the `computeNeededDirs` carry trick in the prototype
-(indeed, `prefetch<di,dj,dk>` is `computeNeededDirs` specialized to a single tap).
+`prefetch` is called at most once per direction per center leaf, so the loop is not
+performance-critical.  `cachedGetValue` is in the hot path; the loop over W=16 lanes
+with scalar per-lane `leaf->getValue(offset)` is a first correct implementation.
+Vectorising this loop (SIMD offset arithmetic + `vgatherdps`) is the Phase 2
+optimisation task described in `StencilGather.md §7b`.
 
-### 7b. `cachedGetValue<di,dj,dk>` — Offset Arithmetic and Gather
+### 8b. No tree accessor in prefetch
 
-```
-Compute neighbor offsets for all 16 lanes:
-  nx[i] = lx[i] + di,  wrapped to [0,7]  vpaddd / vpand  ymm (SIMD, constant di)
-  local offset[i] = nx[i]*64 + ny[i]*8 + nz[i]          vpmadd / vpaddd ymm
+NanoVDB's `ReadAccessor` is not passed to `prefetch`.  Its LEVEL=0 leaf cache is never
+warm for neighbor leaves (by definition distinct from the center leaf), and its
+internal-node caches are bypassed entirely when `get<GetLeaf>` misses at LEVEL=0.
+`probeLeaf` is equivalent to a direct root traversal in all non-trivial cases.
 
-Determine which lanes cross to neighbor leaf:
-  crossMask = (lx < threshold)            vpcmpgtd        ymm (SIMD)
+### 8c. probeLeaf returns nullptr for missing neighbors
 
-Gather values from (at most) two leaf arrays:
-  centerVals   = gather(mPtrs[13]->array, offset)         vgatherdps  ymm (SIMD)
-  neighborVals = gather(mPtrs[dir]->array, offset_wrapped) vgatherdps ymm (SIMD)
-  result = blend(crossMask, neighborVals, centerVals)     vpblendvb   ymm (SIMD)
-```
-
-The key insight: for axis-aligned WENO5 taps, there are **at most two distinct leaf
-pointers** across all 16 lanes.  This reduces the gather to two base-pointer loads
-plus a predicated blend — a clean AVX2 pattern.
-
-### 7c. Comparison to Phase 1 Prototype
-
-The two scalar bottlenecks in the prototype are eliminated by `BatchAccessor`:
-
-| Phase 1 bottleneck | `BatchAccessor` replacement | AVX2? |
-|--------------------|----------------------------|-------|
-| `expandVoxelOffset` scatter (conditional per-lane) | `cachedGetValue` offset arithmetic (uniform SIMD add) | ✓ |
-| `batchPtrs` fill (pointer scatter, data-dependent) | Crossing mask + gather + blend | ✓ |
-| `probeLeaf` loop | `prefetch<di,dj,dk>` (≤1 probeLeaf per call) | inherently scalar |
-
-The WENO kernel itself (`wenoKernel(u_m3, ..., u_p3)`) operates entirely on
-`Simd<float,SIMDw>` with no tree access in sight.
-
-### 7d. Complete Per-Batch AVX2 Profile
-
-| Operation | Instructions | Vectorized? |
-|-----------|-------------|-------------|
-| `activeMask` computation | `vpcmpeqd ymm ×4` + `vmovmskps ×2` | ✓ Full |
-| `leafMask` computation | `vpbroadcastd` + `vpcmpeqd ymm ×2` + `vmovmskps ×2` | ✓ Full |
-| `prefetch` crossing detection | `vpcmpgtd ymm` + `vmovmskps` | ✓ Full |
-| `probeLeaf` (per prefetch) | scalar tree traversal | inherently scalar |
-| `cachedGetValue` offset arithmetic | `vpaddd ymm` / `vpand ymm` | ✓ Full |
-| `cachedGetValue` lane split | `vpcmpgtd ymm` | ✓ Full |
-| `cachedGetValue` value gather | `vgatherdps ymm ×2` + `vpblendvb ymm` | ✓ Full |
-| WENO kernel | `Simd<float,SIMDw>` arithmetic | ✓ Full |
+`mGrid.tree().probeLeaf(coord)` returns `nullptr` when the requested coordinate lies
+outside the active narrow band.  `cachedGetValue` checks for `nullptr` and returns
+`ScalarValueT(0)`, which is correct for level-set grids (background value = 0).
 
 ---
 
-## 8. Scoping and Lifetime
+## 9. Relationship to Phase 1 Prototype
 
-A `BatchAccessor` is scoped to **one CPU thread**, constructed once before the block
-loop and reused across all batches and all blocks:
-
-```cpp
-BatchAccessor<BuildT, SIMDw> batchAcc(grid, firstLeafID[0]);
-
-for (uint32_t bID = 0; bID < nBlocks; bID++) {
-    decodeInverseMaps(..., leafIndex, voxelOffset);
-
-    for (int b = 0; b < BlockWidth; b += SIMDw) {
-        // compute activeMask, leafMask ...
-        while (any_of(activeMask)) {
-            if (none_of(leafMask)) {
-                batchAcc.advance(++currentLeafID);
-                continue;
-            }
-            // prefetch / cachedGetValue / kernel ...
-        }
-    }
-}
-```
-
-**Cross-block carryover**: resetting `mProbedMask` between blocks is safe and simple.
-Carrying over is also valid — consecutive blocks process spatially adjacent leaves,
-so some `mPtrs[]` entries may still be correct.  In practice, resetting is recommended
-(one `mProbedMask = 0` per block, negligible cost) to avoid subtle stale-pointer bugs.
-
----
-
-## 9. Relationship to the Phase 1 Prototype
-
-`ex_stencil_gather_cpu` (`stencil_gather_cpu.cpp`) implements the core cache
-machinery as free functions:
+`ex_stencil_gather_cpu` implements the core cache machinery as free functions.
 
 | Prototype component | `BatchAccessor` equivalent |
 |--------------------|-----------------------------|
-| `probedMask` + `ptrs[27]` locals | `mProbedMask` + `mPtrs[27]` members |
-| `computeNeededDirs(expandedVec)` | inner logic of `prefetch<di,dj,dk>` (one tap) |
-| `kSentinelExpanded` broadcast | same sentinel in `prefetch` for straddle lanes |
-| `probeLeaf` loop (`toProbe` bits) | `prefetch` body |
-| `batchPtrs[4][SIMDw]` population | replaced by `cachedGetValue` gather + blend |
+| `probedMask` + `ptrs[27]` locals | `mProbedMask` + `mLeafNeighbors[27]` members |
+| `computeNeededDirs(expandedVec)` | per-lane loop inside `prefetch<di,dj,dk>` |
+| `kSentinelExpanded` broadcast | sentinel applied by caller before `prefetch` |
+| `probeLeaf` loop (`toProbe` bits) | `while (toProbe)` inside `prefetch` |
+| `batchPtrs[4][SIMDw]` population | replaced by `cachedGetValue` |
 | `verifyBatchPtrs` | future: `cachedGetValue` unit test |
-
-Phase 2 (not yet implemented): `cachedGetValue` — the actual index/value gather from
-the cached leaf pointers.  The AVX2 machinery for crossing detection and offset
-arithmetic is a direct extension of what is already working and verified in Phase 1.
 
 ---
 
-## 10. Open Questions / Future Work
+## 10. Future Work
 
-- **`ValueOnIndex` two-level fetch**: `cachedGetValue` returns `Simd<uint64_t,SIMDw>`
-  indices for index grids; a `cachedGetValue<di,dj,dk>(channel, vo, leafMask)` overload
-  dereferences through a channel pointer in one step.  Channel data layout (AoS vs SoA)
-  affects gather efficiency.
+- **`cachedGetValue` vectorisation (Phase 2):** replace per-lane scalar loop with SIMD
+  offset arithmetic + `vgatherdps` × 2 + `vpblendvb` for the two-pointer case.
+  See `StencilGather.md §7b` for the AVX2 profile.
 
-- **Multi-leaf stencils (R > 4)**: the single-neighbor-per-axis assumption breaks for
-  stencils with reach R > 4 (a center voxel can simultaneously need both the lo and hi
-  neighbor along the same axis).  `mPtrs[27]` remains correct; only the `cachedGetValue`
-  lane-split logic (currently "at most 2 leaf pointers per axis tap") needs generalization.
+- **`getValue<di,dj,dk>`:** lazy combined `prefetch` + `cachedGetValue`.
 
-- **Generic stencil adapter**: a `computeStencil<StencilT>` wrapper that calls
-  `getValue(StencilT::offset(n), ...)` for `n = 0..N-1` via the runtime `Coord`
-  overload — correctness-first entry point for new stencil types.
+- **Runtime `Coord` overload:** for generic stencil adapters iterating over an offset
+  list at runtime.
 
-- **C++20 structural `Coord`**: unify template and runtime interfaces with
-  `cachedGetValue<nanovdb::Coord(-3,0,0)>(vo, leafMask)` non-type template parameter.
+- **`StencilAccessor`:** higher-level wrapper that owns the `while (any_of)` loop,
+  hides straddling from the caller, and fills complete stencil result arrays.
 
-- **Debug-mode RAII scope guard**: enforce the prefetch-before-cachedGetValue ordering
-  in debug builds without any runtime cost in release.
+- **Multi-leaf stencils (R > 4):** the single-neighbor-per-axis assumption in
+  `cachedGetValue` holds for R ≤ 4.  Generalisation requires checking both lo and hi
+  neighbors per axis.
 
-- **Launcher integration**: the `BatchAccessor` is a per-block, per-thread object.
-  The system-level launcher (the `buildVoxelBlockManager` analogue for stencil
-  computation) constructs one per worker thread and passes it into the per-block kernel.
-  Design of the launcher is deferred until the per-block kernel is fully validated.
+- **C++20 structural `Coord`:** unify template and runtime interfaces via
+  `cachedGetValue<nanovdb::Coord(-3,0,0)>(result, vo, leafMask)`.
