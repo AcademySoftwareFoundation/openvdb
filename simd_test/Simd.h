@@ -359,6 +359,26 @@ NANOVDB_SIMD_HOSTDEV void gather_if(Simd<T,W>& dst, SimdMask<T,W> mask,
 #endif // NANOVDB_USE_STD_SIMD
 
 // ---------------------------------------------------------------------------
+// simd_cast<DstT> — element-wise static_cast between Simd types of the same W.
+//
+// Used for widening (uint16_t → uint32_t, uint32_t → uint64_t) and for
+// reinterpreting signedness (uint32_t → int32_t) when building gather indices.
+// Both backends: the array backend uses a lane loop; the stdx backend uses the
+// generator constructor, which the compiler lowers to a vpmovsxbw / vpmovzxwd
+// sequence or similar sign/zero-extend instruction depending on the types.
+// ---------------------------------------------------------------------------
+template<typename DstT, typename SrcT, int W>
+NANOVDB_SIMD_HOSTDEV Simd<DstT,W> simd_cast(Simd<SrcT,W> src) {
+#ifdef NANOVDB_USE_STD_SIMD
+    return Simd<DstT,W>([&](int i) { return static_cast<DstT>(src[i]); });
+#else
+    Simd<DstT,W> r;
+    for (int i = 0; i < W; ++i) r[i] = static_cast<DstT>(src[i]);
+    return r;
+#endif
+}
+
+// ---------------------------------------------------------------------------
 // simd_traits — generic per-lane access for scalar and Simd<T,W> types.
 //
 // Lets algorithms be written once and work for both scalar (width=1) and

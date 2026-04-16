@@ -67,11 +67,11 @@ which works for both scalar and vector types via specialisation.
 Four members persist across batches within one center leaf:
 
 ```cpp
-const GridT& mGrid;                          // for probeLeaf calls via mGrid.tree()
-uint32_t     mCenterLeafID;                  // index of current center leaf
-Coord        mCenterOrigin;                  // world-space origin of current center leaf
-uint32_t     mProbedMask = (1u << 13);       // bit 13 (center) pre-set at construction
-const LeafT* mLeafNeighbors[27];             // [13] = center (eager); others: lazily probed
+const GridT& mGrid;                            // for probeLeaf calls via mGrid.tree()
+uint32_t     mCenterLeafID;                    // index of current center leaf
+Coord        mCenterOrigin;                    // world-space origin of current center leaf
+uint32_t     mProbedMask = (1u << 13);         // bit 13 (center) pre-set at construction
+uint32_t     mNeighborLeafIDs[27];             // kNullLeafID when outside narrow band or unprobed
 ```
 
 **Direction encoding** (`dir` is a `static constexpr` member):
@@ -80,28 +80,37 @@ const LeafT* mLeafNeighbors[27];             // [13] = center (eager); others: l
 dir(dx, dy, dz) = (dx+1)*9 + (dy+1)*3 + (dz+1)     dx,dy,dz ∈ {-1,0,+1}
 ```
 
-`mLeafNeighbors[27]` is a flat array indexed by `dir(dx,dy,dz)`.
-`mLeafNeighbors[13]` (= `dir(0,0,0)`) is the center leaf pointer.
-`mLeafNeighbors[d]` is `nullptr` when the neighbor leaf lies outside the narrow band.
+`mNeighborLeafIDs[27]` is a flat array indexed by `dir(dx,dy,dz)`.
+`mNeighborLeafIDs[13]` (= `dir(0,0,0)`) holds the center leaf ID.
+`mNeighborLeafIDs[d] = kNullLeafID` when the neighbor lies outside the narrow band or
+has not yet been probed.
 
-**Why pointers, not leaf IDs:**  `cachedGetValue` accesses the leaf data array for
-every active lane in every batch.  Storing `const LeafT*` avoids a `base + id *
-sizeof(LeafT)` multiply on every call; `nullptr` is a natural "outside narrow band"
-sentinel.  `NanoVDB::ReadAccessor` uses the same approach for its cached node pointers.
+```cpp
+static constexpr uint32_t kNullLeafID = ~uint32_t(0);
+```
+
+**Why leaf IDs, not pointers:**  `cachedGetValue` fetches `mOffset`, `mPrefixSum`, and
+`valueMask().words()[w]` for all active lanes via SIMD gathers (§8d).  The gather index
+is `leaf_id × (sizeof(LeafT)/sizeof(uint64_t))`, computed once per call as a
+`Simd<uint32_t,W>` multiply.  Storing IDs enables a single flat-base gather over the
+contiguous leaf array; storing pointers would require per-lane pointer arithmetic that
+doesn't map to `vgatherdpd` / `vpgatherqq`.  The `kNullLeafID` sentinel cleanly
+replaces `nullptr` and is masked out in the gather via `where`.
 
 **Cache advance:** when `none_of(leafMask)` fires in the outer loop:
 
 ```cpp
 void advance(uint32_t newLeafID) {
-    mCenterLeafID              = newLeafID;
-    mCenterOrigin              = mGrid.tree().getFirstLeaf()[newLeafID].origin();
-    mLeafNeighbors[dir(0,0,0)] = &mGrid.tree().getFirstLeaf()[newLeafID];
-    mProbedMask                = (1u << dir(0,0,0));  // center pre-set; neighbors stale
+    mCenterLeafID                  = newLeafID;
+    mCenterOrigin                  = mGrid.tree().getFirstLeaf()[newLeafID].origin();
+    for (auto& id : mNeighborLeafIDs) id = kNullLeafID;
+    mNeighborLeafIDs[dir(0, 0, 0)] = newLeafID;
+    mProbedMask                    = (1u << dir(0, 0, 0));
 }
 ```
 
-Stale neighbor entries in `mLeafNeighbors[]` are harmless: `mProbedMask` has only
-bit 13 set, so `toProbe = neededMask & ~mProbedMask` will never return a stale index.
+All 27 entries are reset to `kNullLeafID` on advance; `mProbedMask` is set to only
+bit 13.  `toProbe = neededMask & ~mProbedMask` therefore never returns a stale index.
 
 ---
 
@@ -142,7 +151,7 @@ while any_of(activeMask):
 constructor and `advance()`:
 
 ```cpp
-mLeafNeighbors[dir(0,0,0)] = &mGrid.tree().getFirstLeaf()[mCenterLeafID];
+mNeighborLeafIDs[dir(0,0,0)] = mCenterLeafID;
 mProbedMask = (1u << dir(0,0,0));   // bit 13 pre-set
 ```
 
@@ -246,17 +255,17 @@ for each (sx,sy,sz) in {±1}³:
 
 ## 8. Implementation Notes
 
-### 8a. Lane loop in prefetch / cachedGetValue
+### 8a. Lane loops in prefetch / cachedGetValue
 
-The current implementation uses a scalar `for (int i = 0; i < LaneWidth; ++i)` loop
-over lanes, using `simd_traits<T>::get` / `set` for per-lane access.  This is correct
-for both scalar (LaneWidth=1) and SIMD (LaneWidth=W) instantiations.
+`prefetch` uses a scalar `for (int i = 0; i < LaneWidth; ++i)` loop over lanes.  It is
+called at most once per direction per center leaf, so the loop is not
+performance-critical.
 
-`prefetch` is called at most once per direction per center leaf, so the loop is not
-performance-critical.  `cachedGetValue` is in the hot path; the loop over W=16 lanes
-with scalar per-lane `leaf->getValue(offset)` is a first correct implementation.
-Vectorising this loop (SIMD offset arithmetic + `vgatherdps`) is the Phase 2
-optimisation task described in `StencilGather.md §7b`.
+`cachedGetValue` uses a scalar loop only for the legacy scalar value-fetch path (the
+authoritative result path until the full SIMD index pipeline is wired in).  The
+ingredient-fetch block — `mOffset`, `mPrefixSum[w]`, and `valueMask().words()[w]` for
+all active lanes — is already **fully SIMD** via the gather chain described in §8d.
+`prefetch` remains scalar and is not performance-critical.
 
 ### 8b. No tree accessor in prefetch
 
@@ -270,6 +279,72 @@ internal-node caches are bypassed entirely when `get<GetLeaf>` misses at LEVEL=0
 `mGrid.tree().probeLeaf(coord)` returns `nullptr` when the requested coordinate lies
 outside the active narrow band.  `cachedGetValue` checks for `nullptr` and returns
 `ScalarValueT(0)`, which is correct for level-set grids (background value = 0).
+
+### 8d. SWAR direction extraction — the base-32 multiply trick
+
+`cachedGetValue` must compute a **per-lane** neighbor direction `dir ∈ [0,26]` at
+runtime, because for a fixed compile-time tap `(di, dj, dk)` different lanes can land
+in different neighbor leaves (one lane may cross only the z-face; another may cross
+x and z; another may stay in the center leaf).
+
+`dir` is the mixed-radix value `dir = cz + 3·cy + 9·cx` where each carry component
+`cz, cy, cx ∈ {0,1,2}` encodes {underflow, in-leaf, overflow} for the z-, y-, x-axis
+respectively.  The carry components are already sitting inside the SWAR `packed_sum`
+(see §8a / `prefetch` implementation) at bit positions [3:4], [8:9], [13:14].
+
+**Step 1 — extract carry pairs into base-32 digits**
+
+```cpp
+// mask the six carry bits, right-shift by 3
+// result layout: 0b 00xx 000 yy 000 zz  (three 2-bit fields, 3-bit gaps)
+auto v = (packed_sum & VoxelOffsetT(0x6318u)) >> 3;
+```
+
+The 3-bit gaps are not accidental: the 5-bit SWAR groups naturally give a
+**base-32 representation**.  With the `>> 3` shift, `v` is the 3-digit duotrigesimal
+(base-32) number `0d cx·cy·cz`, where digit-k = the carry component for axis k.
+
+**Step 2 — re-evaluate the same digits in base 3 via a single multiply**
+
+```cpp
+// 0d 1'3'9  =  1·32² + 3·32 + 9  =  1024 + 96 + 9  =  1129
+auto dir_vec = (v * VoxelOffsetT(1129u)) >> 10;
+// bits [10:14] of the product = digit-2 of v·(0d 1'3'9) = cz + 3·cy + 9·cx = dir
+```
+
+**Why digit-2 of the product equals `dir`:**
+
+Base-32 long multiplication `(0d cx·cy·cz) × (0d 1·3·9)`:
+
+| Digit of product | Contributions | Max value |
+|---|---|---|
+| 0 | 9·cz | 18 |
+| 1 | 3·cz + 9·cy | 24 |
+| **2** | **cz + 3·cy + 9·cx** | **26** |
+| 3 | cy + 3·cx | 8 |
+| 4 | cx | 2 |
+
+Every digit sum is **< 32**, so **no carries propagate between base-32 digits**.
+Digit 2 is therefore exact: it equals `cz + 3·cy + 9·cx = dir` with no contamination
+from adjacent digits.  Digit-2 occupies bits [10:14] of the integer product, which is
+why `>> 10` (and an optional `& 31`) extracts it.
+
+**Overflow note:** `v` fits in `uint16_t` (max = 2 + 2·32 + 2·1024 = 2114), and
+`v · 1129` reaches up to 2 386 706 — a 22-bit value that overflows `uint16_t`.
+**No widening is required**, however: we extract bits [10:14] of the product, and those
+bits sit entirely below bit 16.  Masking to 16 bits removes only bits 16+, leaving
+bits [10:14] intact.  The `uint16_t` modular product gives the same result as the
+full-width product for all valid and sentinel inputs.
+
+**Compile-time sanity check** (all 27 valid inputs):
+
+```cpp
+for (int cx : {0,1,2}) for (int cy : {0,1,2}) for (int cz : {0,1,2}) {
+    uint32_t v   = cz + 32*cy + 1024*cx;
+    uint32_t dir = (v * 1129u) >> 10;
+    assert(dir == unsigned(cz + 3*cy + 9*cx));
+}
+```
 
 ---
 
@@ -290,9 +365,11 @@ outside the active narrow band.  `cachedGetValue` checks for `nullptr` and retur
 
 ## 10. Future Work
 
-- **`cachedGetValue` vectorisation (Phase 2):** replace per-lane scalar loop with SIMD
-  offset arithmetic + `vgatherdps` × 2 + `vpblendvb` for the two-pointer case.
-  See `StencilGather.md §7b` for the AVX2 profile.
+- **`cachedGetValue` vectorisation (Phase 2):** ingredient fetch (`mOffset`,
+  `mPrefixSum[w]`, `valueMask().words()[w]`) is now fully SIMD via the gather chain
+  in §8d.  Remaining: popcount `(maskWord & partial_mask)` → global value index →
+  `gather_if(result, leafMask, globalValueArray, indices)` to replace the scalar
+  `leaf->getValue(offset)` loop.  See `StencilGather.md §7b` for the AVX2 profile.
 
 - **`getValue<di,dj,dk>`:** lazy combined `prefetch` + `cachedGetValue`.
 

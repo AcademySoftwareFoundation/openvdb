@@ -78,7 +78,7 @@ class BatchAccessor
         "BatchAccessor: ValueT lane width must be 1 (scalar) or match VoxelOffsetT");
 
     // The SWAR packed layout in prefetch occupies bits 0–14 of each element
-    // (max packed value 0x71C7, max sum 0xE38E).  The element type must therefore
+    // (max packed value 0x1CE7, max sum 0x4A52).  The element type must therefore
     // be an unsigned integer of at least 16 bits; signed types produce UB on
     // carry overflow, and 8-bit types cannot hold the packed fields.
     using VoxelOffsetScalarT = util::scalar_traits_t<VoxelOffsetT>;
@@ -87,33 +87,36 @@ class BatchAccessor
         "(SWAR carry detection requires wrap-around, not signed overflow)");
     static_assert(sizeof(VoxelOffsetScalarT) >= 2,
         "BatchAccessor: VoxelOffsetT element type must be at least 16 bits "
-        "(SWAR packed layout occupies bits 0-14, max sum 0xE38E)");
+        "(SWAR packed layout occupies bits 0-14, max sum 0x4A52)");
 
 public:
     // -------------------------------------------------------------------------
     // Direction encoding
     //
-    // bit(dx,dy,dz) = (dx+1)*9 + (dy+1)*3 + (dz+1),   dx,dy,dz ∈ {-1,0,+1}
+    // dir(dx,dy,dz) = (dx+1)*9 + (dy+1)*3 + (dz+1),   dx,dy,dz ∈ {-1,0,+1}
     //
     // Selected entries:
-    //   dir( 0, 0, 0) = 13  — center leaf        (mLeafNeighbors[13])
+    //   dir( 0, 0, 0) = 13  — center leaf        (mNeighborLeafIDs[13])
     //   dir(-1, 0, 0) =  4  — x-minus face
     //   dir(+1, 0, 0) = 22  — x-plus  face
     //   dir( 0,-1, 0) = 10  — y-minus face
     //   dir( 0,+1, 0) = 16  — y-plus  face
     //   dir( 0, 0,-1) = 12  — z-minus face
     //   dir( 0, 0,+1) = 14  — z-plus  face
+    //
+    // Sentinel leaf ID for directions outside the narrow band (no leaf exists).
     // -------------------------------------------------------------------------
-    static constexpr int dir(int dx, int dy, int dz)
+    static constexpr int      dir(int dx, int dy, int dz)
     {
         return (dx + 1) * 9 + (dy + 1) * 3 + (dz + 1);
     }
+    static constexpr uint32_t kNullLeafID = ~uint32_t(0);
 
     // -------------------------------------------------------------------------
     // Construction
     //
-    // Eagerly populates mLeafNeighbors[dir(0,0,0)] (the center pointer) and
-    // marks bit 13 in mProbedMask.  The center pointer is O(1) to compute
+    // Eagerly populates mNeighborLeafIDs[dir(0,0,0)] (the center leaf ID) and
+    // marks bit 13 in mProbedMask.  The center ID is O(1) to compute
     // (no probeLeaf needed), so there is no reason to defer it.
     //
     // Consequence: cachedGetValue<0,0,0> is valid immediately after construction
@@ -127,23 +130,26 @@ public:
         , mCenterOrigin(grid.tree().getFirstLeaf()[firstLeafID].origin())
         , mProbedMask(1u << dir(0, 0, 0))
     {
-        for (auto& p : mLeafNeighbors) p = nullptr;
-        mLeafNeighbors[dir(0, 0, 0)] = &mGrid.tree().getFirstLeaf()[mCenterLeafID];
+        for (auto& id : mNeighborLeafIDs) id = kNullLeafID;
+        mNeighborLeafIDs[dir(0, 0, 0)] = mCenterLeafID;
     }
 
     // -------------------------------------------------------------------------
     // advance — move to a new center leaf
     //
     // Call when none_of(leafMask): all active lanes have moved past mCenterLeafID.
-    // Repopulates the center pointer eagerly and resets mProbedMask to bit 13,
-    // so stale neighbor entries are blocked and the center is immediately valid.
+    // Resets all neighbor IDs to kNullLeafID, repopulates the center eagerly,
+    // and resets mProbedMask to bit 13 so the center is immediately valid.
+    // Resetting all 27 IDs (108 bytes) ensures mNeighborLeafIDs[d] == kNullLeafID
+    // iff bit d is absent from mProbedMask — a clean invariant for SIMD gather.
     // -------------------------------------------------------------------------
     void advance(uint32_t newLeafID)
     {
-        mCenterLeafID              = newLeafID;
-        mCenterOrigin              = mGrid.tree().getFirstLeaf()[newLeafID].origin();
-        mLeafNeighbors[dir(0,0,0)] = &mGrid.tree().getFirstLeaf()[newLeafID];
-        mProbedMask                = (1u << dir(0, 0, 0));
+        mCenterLeafID = newLeafID;
+        mCenterOrigin = mGrid.tree().getFirstLeaf()[newLeafID].origin();
+        for (auto& id : mNeighborLeafIDs) id = kNullLeafID;
+        mNeighborLeafIDs[dir(0, 0, 0)] = newLeafID;
+        mProbedMask                    = (1u << dir(0, 0, 0));
     }
 
     // -------------------------------------------------------------------------
@@ -169,86 +175,96 @@ public:
         // Replace the scalar per-lane loop with a single SIMD add + two horizontal
         // reductions, using a 15-bit packed coordinate representation.
         //
-        // packed_lc layout (one group per axis, zero-guard gaps):
-        //   bits  0– 2: lz   carry exits at bit  3  (z-axis crossing)
-        //   bits  6– 8: lx   carry exits at bit  9  (x-axis crossing)
-        //   bits 12–14: ly   carry exits at bit 15  (y-axis crossing)
+        // packed_lc layout — 5-bit groups, tightly packed, no inter-group gaps:
+        //   bits  0– 2: lz   carry region bits  3–4  (z-axis)
+        //   bits  5– 7: ly   carry region bits  8–9  (y-axis)
+        //   bits 10–12: lx   carry region bits 13–14 (x-axis)
         //
-        // This is expandVoxelOffset() steps 1+2 only (no step 3), because for a
-        // fixed (di,dj,dk) each axis has exactly one possible crossing direction,
-        // so we need only one group per axis rather than two.
+        // All carry bits land within [0:14], fitting cleanly in uint16_t with
+        // bit 15 unused.  The z,y,x ordering matches the weight sequence in
+        // dir(): (dz+1)×1 + (dy+1)×3 + (dx+1)×9.
         //
-        // packed_d = 3-bit two's complement of each offset placed in the same groups:
-        //   dk & 7  at bits [0:2]  (= 8+dk for dk<0, dk for dk>=0)
-        //   di & 7  at bits [6:8]
-        //   dj & 7  at bits [12:14]
+        // packed_tap = stencil offsets biased by +8, placed in the same groups:
+        //   (dk+8) at bits [0:...]   dk+8 ∈ [5,11] for dk ∈ [-3,3]
+        //   (dj+8) at bits [5:...]
+        //   (di+8) at bits [10:...]
         //
-        // After SIMD add(packed_lc, packed_d):
-        //   carry at bit  3 SET   ↔  lz + dk ≥ 8   ↔  hi-z crossing (dk > 0)
-        //   carry at bit  3 CLEAR ↔  lz + dk <  0  ↔  lo-z crossing (dk < 0)
-        //   (same logic for x@bit9 and y@bit15)
+        // The +8 bias shifts the zero point so that the per-group sum
+        //   s = lc + (d+8),  lc ∈ [0,7], d ∈ [-3,3]  →  s ∈ [5,18]
+        // encodes the neighbor coordinate measured from the (-1,-1,-1) leaf:
+        //   s ∈ [ 5, 7]: component + d <  0  → lo-neighbor (d < 0 case)
+        //   s ∈ [ 8,15]: component + d ∈ [0,7] → center leaf
+        //   s ∈ [16,18]: component + d ≥  8  → hi-neighbor (d > 0 case)
         //
-        // Inactive lanes carry the sentinel (lc = 4 per axis), which satisfies
-        // |d| ≤ 4: never fires a false hi-carry, never clears a lo-carry.
+        // Carry bits after add:
+        //   bit[+3] SET   ↔  s ≥  8  (= no lo-crossing)
+        //   bit[+4] SET   ↔  s ≥ 16  (= hi-crossing)
         //
-        // For multi-axis taps (more than one nonzero component), the per-axis
-        // may-cross flags are combined conservatively: if two axes can independently
-        // cross, the edge/corner direction combining both is also added to neededMask.
-        // This may over-probe (extra probeLeaf if no single lane crosses both axes
-        // simultaneously) but never misses a direction any lane actually needs.
-        // For axis-aligned WENO5 taps (one nonzero component) there is no over-probing.
+        // For prefetch, only one bit per axis is needed (compile-time dispatch):
+        //   dk > 0: z_cross = hor_or  & (1 << 4)   — any lane has hi-z carry
+        //   dk < 0: z_cross = !(hor_and & (1 << 3)) — any lane lacks lo-z guard
+        //   (same at bits [9]/[8] for y, bits [14]/[13] for x)
+        //
+        // Inactive lanes carry sentinel lc = 4 per axis: s = d+12 ∈ [9,15]
+        // → bit[+3]=1, bit[+4]=0 → no crossing signal regardless of d. ✓
+        //
+        // For multi-axis taps, may-cross flags are combined conservatively.
         // -----------------------------------------------------------------------
 
         // Use VoxelOffsetT directly for the packed arithmetic: LaneWidth elements
         // of VoxelOffsetScalarT in one register → one vpaddw (16-bit) or vpaddd
         // (32-bit) depending on the instantiation.  All intermediate values fit:
-        //   packed_lc ≤ 0x71C7, packed_d ≤ 0x71C7, sum ≤ 0xE38E < 2^16.
+        //   packed_lc ≤ 0x1CE7, packed_tap ≤ 0x2D6B, sum ≤ 0x4A52 < 2^16.
 
-        // Compile-time packed stencil offset (3-bit two's complement per axis).
-        // d & 7u gives the 3-bit representation; for negative d, d & 7 = 8+d.
-        static constexpr auto packed_d =
+        // Compile-time packed stencil offset (+8-biased per axis, 5-bit groups).
+        static constexpr auto packed_tap =
             static_cast<VoxelOffsetScalarT>(
-                 (unsigned(dk) & 7u)
-               | ((unsigned(di) & 7u) <<  6)
-               | ((unsigned(dj) & 7u) << 12));
+                 (unsigned(dk) + 8u)
+               | ((unsigned(dj) + 8u) <<  5)
+               | ((unsigned(di) + 8u) << 10));
 
-        // Sentinel for inactive lanes: lc = (4,4,4) → packed = 4|(4<<6)|(4<<12).
-        // Note: expandVoxelOffset(kInactiveVoxelOffset=292) = kSentinel15, so even
-        // unconditionally expanded inactive-lane vo values yield the sentinel.
-        // However, straddle lanes carry arbitrary vo from the next leaf, so we
-        // must apply leafMask before the add to avoid false crossing signals.
+        // Sentinel for inactive lanes: lc = (4,4,4) → packed = 4|(4<<5)|(4<<10).
+        // Straddle lanes carry arbitrary vo from the next leaf, so we must apply
+        // leafMask before the add to avoid false crossing signals.
         static constexpr auto kSentinel15 =
-            static_cast<VoxelOffsetScalarT>(4u | (4u << 6u) | (4u << 12u));
+            static_cast<VoxelOffsetScalarT>(4u | (4u << 5u) | (4u << 10u));
+        // Data mask: keeps bits [0:2], [5:7], [10:12] — the three 3-bit data fields.
         static constexpr auto kMask15 =
-            static_cast<VoxelOffsetScalarT>(0b111'000'111'000'111u);
+            static_cast<VoxelOffsetScalarT>(0b111'00'111'00'111u);
 
-        // Expand the 9-bit voxel offset into the 15-bit SWAR packed form —
-        // one vpor + vpsllw + vpand (no scalar loop).
-        //   bits [0:2]  = lz,  bits [6:8]  = lx,  bits [12:14] = ly
-        // Then blend: active lanes → expanded form, straddle/inactive → sentinel.
-        // util::where(mask, target) = value uses the stdx-style 2-argument proxy:
-        // packed_lc is pre-initialised to kSentinel15; active lanes are overwritten
-        // with expanded.  This form may emit vpblendvb more reliably under GCC.
+        // Expand the 9-bit voxel offset into the 15-bit SWAR packed form.
+        // vo = lx[6:8] | ly[3:5] | lz[0:2]  (NanoVDB leaf layout)
+        // target: lx[10:12] | ly[5:7] | lz[0:2]
+        //
+        // (vo | (vo<<4)) & 0x1C07 places lz (stays at [0:2]) and lx ([6:8]→[10:12])
+        //   in one OR+mask; (vo<<2) & 0xE0 moves ly ([3:5]→[5:7]).
         const auto expanded =
-              (vo | (vo << VoxelOffsetScalarT(9))) & VoxelOffsetT(kMask15);
+              ((vo | (vo << VoxelOffsetScalarT(4))) & VoxelOffsetT(0x1C07u))
+            | ((vo << VoxelOffsetScalarT(2)) & VoxelOffsetT(0xE0u));
+
+        // Blend: active lanes → expanded form, straddle/inactive → sentinel.
+        // util::where(mask, target) = value uses the stdx-style 2-argument proxy:
+        // packed_lc is pre-initialised to kSentinel15; active lanes are overwritten.
         auto packed_lc = VoxelOffsetT(kSentinel15);
         util::where(leafMask, packed_lc) = expanded;
 
         // One SIMD add across all LaneWidth lanes (one vpaddw/vpaddd instruction).
-        const auto packed_sum = packed_lc + VoxelOffsetT(packed_d);
+        const auto packed_sum = packed_lc + VoxelOffsetT(packed_tap);
 
         // Horizontal reductions for the carry-bit checks.
         const auto hor_or  = util::reduce(packed_sum, std::bit_or<>{});
         const auto hor_and = util::reduce(packed_sum, std::bit_and<>{});
 
         // Per-axis may-cross flags: compile-time dispatch on sign of d.
+        // Overflow (d>0): detected by the hi-carry bit (+4 from group base).
+        // Underflow (d<0): detected by absence of the lo-guard bit (+3).
         bool x_cross = false, y_cross = false, z_cross = false;
-        if constexpr (di > 0) x_cross = bool(hor_or  & (1u <<  9));
-        if constexpr (di < 0) x_cross = !bool(hor_and & (1u <<  9));
-        if constexpr (dj > 0) y_cross = bool(hor_or  & (1u << 15));
-        if constexpr (dj < 0) y_cross = !bool(hor_and & (1u << 15));
-        if constexpr (dk > 0) z_cross = bool(hor_or  & (1u <<  3));
+        if constexpr (dk > 0) z_cross =  bool(hor_or  & (1u <<  4));
         if constexpr (dk < 0) z_cross = !bool(hor_and & (1u <<  3));
+        if constexpr (dj > 0) y_cross =  bool(hor_or  & (1u <<  9));
+        if constexpr (dj < 0) y_cross = !bool(hor_and & (1u <<  8));
+        if constexpr (di > 0) x_cross =  bool(hor_or  & (1u << 14));
+        if constexpr (di < 0) x_cross = !bool(hor_and & (1u << 13));
 
         // Compile-time crossing sign per axis.
         constexpr int sx = (di > 0) ? 1 : -1;  // only used when di != 0
@@ -271,8 +287,11 @@ public:
         if (toProbe) {
             const auto& root = mGrid.tree().root();
             do {
-                const int d = static_cast<int>(util::countTrailingZeros(toProbe));
-                mLeafNeighbors[d] = root.probeLeaf(originForDir(d));
+                const int     d       = static_cast<int>(util::countTrailingZeros(toProbe));
+                const LeafT*  leafPtr = root.probeLeaf(originForDir(d));
+                mNeighborLeafIDs[d]   = leafPtr
+                    ? uint32_t(leafPtr - mGrid.tree().getFirstLeaf())
+                    : kNullLeafID;
                 mProbedMask |= (1u << d);
                 toProbe     &= toProbe - 1;
             } while (toProbe);
@@ -294,6 +313,172 @@ public:
     template<int di, int dj, int dk>
     void cachedGetValue(ValueT& result, VoxelOffsetT vo, PredicateT leafMask) const
     {
+        // -----------------------------------------------------------------------
+        // SIMD ingredient fetch (WIP — not yet wired to result)
+        //
+        // Recomputes packed_sum (same SWAR expansion as prefetch) to extract the
+        // three per-lane ingredients needed to replace leaf->getValue() with fully
+        // SIMD index arithmetic + value gather.  See BatchAccessor.md §8d.
+        //
+        //   offsets    — leaf->mOffset:      base value index for the leaf
+        //   prefixSums — leaf->mPrefixSum[w]: prefix popcount up to x-slice w
+        //   maskWords  — leaf->mMask.mWords[w]: uint64_t mask for x-slice w
+        //
+        // w = dest_x = bits [10:12] of packed_sum (NanoVDB leaf layout: x is
+        // the most significant axis, so x-slices index the eight uint64_t words).
+        //
+        // dir per lane is extracted via the base-32 multiply trick (§8d):
+        //   v = (packed_sum & 0x6318u) >> 3
+        //   dir = (v * 1129u) >> 10
+        //
+        // Note: exact field names (mOffset, mPrefixSum, mMask.mWords) need
+        // verification against LeafData<ValueOnIndex, 3, false> in NanoVDB.h.
+        // -----------------------------------------------------------------------
+        {
+            const auto expanded =
+                  ((vo | (vo << VoxelOffsetScalarT(4))) & VoxelOffsetT(0x1C07u))
+                | ((vo << VoxelOffsetScalarT(2))         & VoxelOffsetT(0x00E0u));
+
+            static constexpr auto packed_tap =
+                static_cast<VoxelOffsetScalarT>(
+                     (unsigned(dk) + 8u)
+                   | ((unsigned(dj) + 8u) <<  5)
+                   | ((unsigned(di) + 8u) << 10));
+            static constexpr auto kSentinel15 =
+                static_cast<VoxelOffsetScalarT>(4u | (4u << 5u) | (4u << 10u));
+
+            auto packed_lc = VoxelOffsetT(kSentinel15);
+            util::where(leafMask, packed_lc) = expanded;
+            const auto packed_sum = packed_lc + VoxelOffsetT(packed_tap);
+
+            // w per lane: dest_x = bits [10:12] → index of the uint64_t mask word
+            const auto w_vec = (packed_sum >> VoxelOffsetScalarT(10)) & VoxelOffsetT(7u);
+
+            // SIMD gather of mOffset, mPrefixSum[w], and maskWords[w] per lane.
+            //
+            // Step 1 — d_vec: per-lane dir (0..26) via base-32 multiply trick (§8d).
+            //   No widening needed: we extract bits [10:14] of (v * 1129).  Those
+            //   bits lie entirely below bit 16, so the modular uint16_t product gives
+            //   the same answer as the full-width product for all valid + sentinel inputs.
+            //
+            // Step 2 — leaf_id_vec: gather mNeighborLeafIDs[d] for all lanes at once.
+            //
+            // Step 3 — raw_idx: leaf_id * (sizeof(LeafT)/sizeof(uint64_t)).
+            //   This is the per-lane uint64_t-stride index into the flat leaf array,
+            //   viewed as a uint64_t[] through the base pointer of the target field.
+            //   Invalid (kNullLeafID) lanes are clamped to index 0 (safe; masked out).
+            //
+            // Step 4 — offsets / prefixSums: two gathers with different base pointers
+            //   but the same raw_idx; masked to 0 for null lanes.
+            //   mPrefixSum is a packed uint64_t: field w lives at bits [9*(w-1)+:9]
+            //   (9-bit fields, w=0 → prefix = 0 by definition).
+            //
+            // Step 5 — maskWords: gather from valueMask().words() base.
+            //   words()[wi] for leaf[leaf_id] = mask_word_base[leaf_id*kStride + wi].
+            //   The per-lane wi is added to raw_idx to form the mask gather index.
+            using U32T = util::Simd<uint32_t, LaneWidth>;
+            using U64T = util::Simd<uint64_t, LaneWidth>;
+            using U64Traits = util::simd_traits<U64T>;
+
+            // Step 1 — d_vec: per-lane dir (0..26) via base-32 multiply (§8d).
+            // Stay in uint16_t throughout: bits [10:14] of (v * 1129) are entirely
+            // within the lower 16 bits, so the modular uint16_t product gives the
+            // same result as the full-width product for all valid inputs.
+            const auto d_u16 = ((packed_sum & VoxelOffsetT(0x6318u))
+                                    >> VoxelOffsetScalarT(3))
+                                * VoxelOffsetT(1129u) >> VoxelOffsetScalarT(10)
+                                & VoxelOffsetT(31u);
+            const auto d_i32 = util::simd_cast<int32_t>(d_u16);
+
+            // Step 2 — leaf IDs
+            const auto leaf_id_vec = util::gather(mNeighborLeafIDs, d_i32);  // Simd<uint32_t,W>
+            const auto valid_u32   = (leaf_id_vec != U32T(kNullLeafID));     // SimdMask<uint32_t,W>
+
+            // Step 3 — stride-scaled gather indices (null lanes → 0)
+            static constexpr uint32_t kStride = sizeof(LeafT) / sizeof(uint64_t);
+            const auto raw_idx = util::simd_cast<int32_t>(
+                util::where(valid_u32, leaf_id_vec * U32T(kStride), U32T(0)));
+
+            // Step 4a — offsets (mOffset)
+            const uint64_t* offset_base = reinterpret_cast<const uint64_t*>(
+                &mGrid.tree().getFirstLeaf()[0].data()->mOffset);
+            const U64T offsets = util::where(valid_u32,
+                util::gather(offset_base, raw_idx), U64T(0));
+
+            // Step 4b — prefixSums (mPrefixSum packed uint64_t, shift-extract field w)
+            const uint64_t* prefix_base = reinterpret_cast<const uint64_t*>(
+                &mGrid.tree().getFirstLeaf()[0].data()->mPrefixSum);
+            const auto prefix_raw = util::gather(prefix_base, raw_idx);
+            const auto w_u64      = util::simd_cast<uint64_t>(w_vec);
+            const auto nonzero_w  = (w_u64 != U64T(0));
+            const auto shift      = util::where(nonzero_w, (w_u64 - U64T(1)) * U64T(9), U64T(0));
+            const U64T prefixSums = util::where(valid_u32,
+                util::where(nonzero_w, (prefix_raw >> shift) & U64T(511u), U64T(0)),
+                U64T(0));
+
+            // Step 5 — maskWords (valueMask().words()[w])
+            //   mask_word_base[leaf_id*kStride + w] == leaf[leaf_id].valueMask().words()[w]
+            //   because the mask field is at a fixed offsetof within every LeafT.
+            const uint64_t* mask_word_base =
+                mGrid.tree().getFirstLeaf()[0].valueMask().words();
+            const auto w_i32     = util::simd_cast<int32_t>(util::simd_cast<uint32_t>(w_vec));
+            const auto mask_idx  = raw_idx + w_i32;
+            const U64T maskWords = util::where(valid_u32,
+                util::gather(mask_word_base, mask_idx), U64T(0));
+            // -------------------------------------------------------------------
+            // Debug cross-check: validate SIMD-path values against scalar ref
+            // -------------------------------------------------------------------
+#ifndef NDEBUG
+            for (int i = 0; i < LaneWidth; ++i) {
+                if (!Pred_traits::get(leafMask, i)) continue;
+
+                // Scalar reference: same arithmetic as the legacy loop below
+                const auto vo_i = static_cast<uint16_t>(VO_traits::get(vo, i));
+                const int lx = (vo_i >> 6) & 7, ly = (vo_i >> 3) & 7, lz = vo_i & 7;
+                const int nx = lx + di, ny = ly + dj, nz = lz + dk;
+                const int dx = (nx < 0) ? -1 : (nx >= 8) ? 1 : 0;
+                const int dy = (ny < 0) ? -1 : (ny >= 8) ? 1 : 0;
+                const int dz = (nz < 0) ? -1 : (nz >= 8) ? 1 : 0;
+                const int d_ref  = dir(dx, dy, dz);
+                const int nx_w   = nx - dx * 8;    // = dest_x = word index w
+                const uint32_t ref_id = mNeighborLeafIDs[d_ref];
+                const LeafT*   ref    = (ref_id != kNullLeafID)
+                    ? &mGrid.tree().getFirstLeaf()[ref_id] : nullptr;
+
+                // SIMD-path values for this lane
+                const uint32_t ps_i   = static_cast<uint32_t>(VO_traits::get(packed_sum, i));
+                const int      d_simd = int((((ps_i & 0x6318u) >> 3) * 1129u >> 10) & 31u);
+                const int      wi     = int(VO_traits::get(w_vec, i));
+
+                assert(d_simd == d_ref && "cachedGetValue SIMD: dir mismatch");
+                assert(wi == nx_w      && "cachedGetValue SIMD: w (dest_x) mismatch");
+
+                if (ref) {
+                    const uint64_t pfx_ref = (uint32_t(nx_w) > 0u)
+                        ? (ref->data()->mPrefixSum >> (9u * (uint32_t(nx_w) - 1u))) & 511u
+                        : uint64_t(0);
+                    assert(U64Traits::get(offsets,    i) == ref->data()->mOffset
+                           && "cachedGetValue SIMD: mOffset mismatch");
+                    assert(U64Traits::get(prefixSums, i) == pfx_ref
+                           && "cachedGetValue SIMD: mPrefixSum mismatch");
+                    assert(U64Traits::get(maskWords,  i) == ref->valueMask().words()[nx_w]
+                           && "cachedGetValue SIMD: maskWord mismatch");
+                } else {
+                    assert(U64Traits::get(offsets,    i) == uint64_t(0)
+                           && "cachedGetValue SIMD: null leaf offsets should be 0");
+                    assert(U64Traits::get(prefixSums, i) == uint64_t(0)
+                           && "cachedGetValue SIMD: null leaf prefixSums should be 0");
+                    assert(U64Traits::get(maskWords,  i) == uint64_t(0)
+                           && "cachedGetValue SIMD: null leaf maskWords should be 0");
+                }
+            }
+#endif
+            (void)offsets; (void)prefixSums; (void)maskWords;
+        }
+
+        // -----------------------------------------------------------------------
+        // Legacy scalar path — authoritative until SIMD path is wired in
+        // -----------------------------------------------------------------------
         for (int i = 0; i < LaneWidth; ++i) {
             if (!Pred_traits::get(leafMask, i)) continue;
             const auto vo_i = static_cast<uint16_t>(VO_traits::get(vo, i));
@@ -312,9 +497,11 @@ public:
             const uint32_t offset = uint32_t(nx_w) * 64u
                                   + uint32_t(ny_w) *  8u
                                   + uint32_t(nz_w);
-            const int d = dir(dx, dy, dz);
+            const int      d       = dir(dx, dy, dz);
             assert((mProbedMask & (1u << d)) && "cachedGetValue: direction not prefetched");
-            const LeafT* leaf = mLeafNeighbors[d];
+            const uint32_t leaf_id = mNeighborLeafIDs[d];
+            const LeafT*   leaf    = (leaf_id != kNullLeafID)
+                ? &mGrid.tree().getFirstLeaf()[leaf_id] : nullptr;
             const ScalarValueT val = leaf
                 ? static_cast<ScalarValueT>(leaf->getValue(offset))
                 : ScalarValueT(0);
@@ -337,7 +524,7 @@ private:
     uint32_t     mCenterLeafID;
     Coord        mCenterOrigin;
     uint32_t     mProbedMask;
-    const LeafT* mLeafNeighbors[27];
+    uint32_t     mNeighborLeafIDs[27]; // kNullLeafID when not probed or outside narrow band
 };
 
 } // namespace nanovdb
