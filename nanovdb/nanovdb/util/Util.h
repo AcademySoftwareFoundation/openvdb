@@ -609,6 +609,41 @@ __hostdev__ inline uint32_t findLowestOn(uint64_t v)
 #endif
 }// util::findLowestOn(uint64_t)
 
+// -------------------> countTrailingZeros <----------------------------
+
+/// @brief Returns the number of trailing zero bits in the specified 32 bit word,
+///        i.e. the index of the lowest set bit.
+///
+/// @warning Assumes that at least one bit is set in the word, i.e. @a v != uint32_t(0)!
+NANOVDB_HOSTDEV_DISABLE_WARNING
+__hostdev__ inline uint32_t countTrailingZeros(uint32_t v)
+{
+    NANOVDB_ASSERT(v);
+#if (defined(__CUDA_ARCH__) || defined(__HIP__)) && defined(NANOVDB_USE_INTRINSICS)
+    return __ffs(v) - 1; // one based indexing
+#elif defined(_MSC_VER) && defined(NANOVDB_USE_INTRINSICS)
+    unsigned long index;
+    _BitScanForward(&index, v);
+    return static_cast<uint32_t>(index);
+#elif (defined(__GNUC__) || defined(__clang__)) && defined(NANOVDB_USE_INTRINSICS)
+    return static_cast<uint32_t>(__builtin_ctz(v));
+#else
+    //NANO_WARNING("Using software implementation for util::countTrailingZeros(uint32_t v)")
+    static const unsigned char DeBruijn[32] = {
+        0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8, 31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9};
+// disable unary minus on unsigned warning
+#if defined(_MSC_VER) && !defined(__NVCC__)
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif
+    return DeBruijn[uint32_t((v & -v) * 0x077CB531U) >> 27];
+#if defined(_MSC_VER) && !defined(__NVCC__)
+#pragma warning(pop)
+#endif
+
+#endif
+}// util::countTrailingZeros(uint32_t)
+
 // -------------------> findHighestOn <----------------------------
 
 /// @brief Returns the index of the highest, i.e. most significant, on bit in the specified 32 bit word

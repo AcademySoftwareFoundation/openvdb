@@ -43,6 +43,7 @@
 #include <simd_test/Simd.h>   // simd_traits, scalar_traits, Simd<T,W>, SimdMask<T,W>
 #include <cstdint>
 #include <cassert>
+#include <functional>
 #include <type_traits>
 
 namespace nanovdb {
@@ -225,22 +226,20 @@ public:
         // one vpor + vpsllw + vpand (no scalar loop).
         //   bits [0:2]  = lz,  bits [6:8]  = lx,  bits [12:14] = ly
         // Then blend: active lanes → expanded form, straddle/inactive → sentinel.
-        // util::where accepts SimdMask<U,W> for any U (heterogeneous overload).
+        // util::where(mask, target) = value uses the stdx-style 2-argument proxy:
+        // packed_lc is pre-initialised to kSentinel15; active lanes are overwritten
+        // with expanded.  This form may emit vpblendvb more reliably under GCC.
         const auto expanded =
               (vo | (vo << VoxelOffsetScalarT(9))) & VoxelOffsetT(kMask15);
-        const auto packed_lc =
-              util::where(leafMask, expanded, VoxelOffsetT(kSentinel15));
+        auto packed_lc = VoxelOffsetT(kSentinel15);
+        util::where(leafMask, packed_lc) = expanded;
 
         // One SIMD add across all LaneWidth lanes (one vpaddw/vpaddd instruction).
         const auto packed_sum = packed_lc + VoxelOffsetT(packed_d);
 
-        // Horizontal reductions: widen to uint32_t for the carry-bit checks.
-        uint32_t hor_or = 0u, hor_and = ~0u;
-        for (int i = 0; i < LaneWidth; ++i) {
-            const uint32_t s = static_cast<uint32_t>(VO_traits::get(packed_sum, i));
-            hor_or  |= s;
-            hor_and &= s;
-        }
+        // Horizontal reductions for the carry-bit checks.
+        const auto hor_or  = util::reduce(packed_sum, std::bit_or<>{});
+        const auto hor_and = util::reduce(packed_sum, std::bit_and<>{});
 
         // Per-axis may-cross flags: compile-time dispatch on sign of d.
         bool x_cross = false, y_cross = false, z_cross = false;
@@ -269,11 +268,14 @@ public:
         // Probe neighbor directions not already cached.
         // Every direction here requires probeLeaf (center is pre-populated, never in toProbe).
         uint32_t toProbe = neededMask & ~mProbedMask;
-        while (toProbe) {
-            const int d = __builtin_ctz(toProbe);
-            mLeafNeighbors[d] = mGrid.tree().root().probeLeaf(originForDir(d));
-            mProbedMask |= (1u << d);
-            toProbe     &= toProbe - 1;
+        if (toProbe) {
+            const auto& root = mGrid.tree().root();
+            do {
+                const int d = static_cast<int>(util::countTrailingZeros(toProbe));
+                mLeafNeighbors[d] = root.probeLeaf(originForDir(d));
+                mProbedMask |= (1u << d);
+                toProbe     &= toProbe - 1;
+            } while (toProbe);
         }
     }
 

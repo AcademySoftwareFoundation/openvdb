@@ -94,6 +94,34 @@ inline Simd<T,W> where(SimdMask<U,W> mask, Simd<T,W> a, Simd<T,W> b) {
     return result;
 }
 
+// 2-argument where: stdx-style masked-assignment proxy.
+// where(mask, target) = value  writes value[i] into target[i] for lanes where mask[i] is true.
+// Heterogeneous mask (mask element type U may differ from value element type T).
+// stdx::fixed_size_simd operator[] returns by value, so the assignment delegates to
+// a boolean round-trip + stdx::where rather than a per-lane scalar store.
+template<typename T, typename U, int W>
+struct WhereExpression {
+    const SimdMask<U,W>& mask;
+    Simd<T,W>& target;
+    WhereExpression& operator=(const Simd<T,W>& value) {
+        bool arr[W];
+        for (int i = 0; i < W; ++i) arr[i] = static_cast<bool>(mask[i]);
+        SimdMask<T,W> tmask(arr, element_aligned);
+        stdx::where(tmask, target) = value;
+        return *this;
+    }
+};
+template<typename T, typename U, int W>
+inline WhereExpression<T,U,W> where(const SimdMask<U,W>& mask, Simd<T,W>& target) {
+    return {mask, target};
+}
+
+// Horizontal reduction: delegates to stdx::reduce.
+// Mirrors std::experimental::reduce(v, binary_op) — same signature, same semantics.
+// Use with std::bit_or<>{}, std::bit_and<>{}, std::plus<>{}, etc.
+template<typename T, int W, typename BinaryOp>
+inline T reduce(Simd<T,W> v, BinaryOp op) { return stdx::reduce(v, op); }
+
 template<typename T, int W>
 inline bool any_of(SimdMask<T,W> m) { return stdx::any_of(m); }
 template<typename T, int W>
@@ -262,6 +290,34 @@ NANOVDB_SIMD_HOSTDEV Simd<T,W> where(SimdMask<U,W> mask, Simd<T,W> a, Simd<T,W> 
     Simd<T,W> r; for (int i = 0; i < W; i++) r[i] = mask[i] ? a[i] : b[i]; return r;
 }
 
+// 2-argument where: stdx-style masked-assignment proxy.
+// where(mask, target) = value  writes value[i] into target[i] for lanes where mask[i] is true.
+// Heterogeneous mask (mask element type U may differ from value element type T).
+template<typename T, typename U, int W>
+struct WhereExpression {
+    const SimdMask<U,W>& mask;
+    Simd<T,W>& target;
+    NANOVDB_SIMD_HOSTDEV WhereExpression& operator=(const Simd<T,W>& value) {
+        for (int i = 0; i < W; ++i)
+            if (mask[i]) target[i] = value[i];
+        return *this;
+    }
+};
+template<typename T, typename U, int W>
+NANOVDB_SIMD_HOSTDEV WhereExpression<T,U,W> where(const SimdMask<U,W>& mask, Simd<T,W>& target) {
+    return {mask, target};
+}
+
+// Horizontal reduction: fold all lanes with a binary operator.
+// Mirrors std::experimental::reduce(v, binary_op).
+// Use with std::bit_or<>{}, std::bit_and<>{}, std::plus<>{}, etc.
+template<typename T, int W, typename BinaryOp>
+NANOVDB_SIMD_HOSTDEV T reduce(Simd<T,W> v, BinaryOp op) {
+    T r = v[0];
+    for (int i = 1; i < W; ++i) r = op(r, v[i]);
+    return r;
+}
+
 template<typename T, int W>
 NANOVDB_SIMD_HOSTDEV bool any_of(SimdMask<T,W> m) {
     bool r = false; for (int i = 0; i < W; i++) r |= m[i]; return r;
@@ -363,6 +419,7 @@ struct scalar_traits<Simd<T,W>> { using type = T; };
 template<typename T>
 using scalar_traits_t = typename scalar_traits<T>::type;
 
+
 // ---------------------------------------------------------------------------
 // to_bitmask — fold SimdMask<T,W> into a uint32_t (one bit per lane).
 // T is the associated element type; only W matters.  Requires W <= 32.
@@ -381,6 +438,8 @@ NANOVDB_SIMD_HOSTDEV uint32_t to_bitmask(SimdMask<T,W> m) {
 template<typename T> NANOVDB_SIMD_HOSTDEV T min(T a, T b)           { return a < b ? a : b; }
 template<typename T> NANOVDB_SIMD_HOSTDEV T max(T a, T b)           { return a > b ? a : b; }
 template<typename T> NANOVDB_SIMD_HOSTDEV T where(bool m, T a, T b) { return m ? a : b; }
+template<typename T, typename BinaryOp>
+NANOVDB_SIMD_HOSTDEV T reduce(T v, BinaryOp) { return v; }
 
 } // namespace util
 } // namespace nanovdb
