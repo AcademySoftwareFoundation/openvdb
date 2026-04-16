@@ -281,7 +281,8 @@ File::open()
         const int32_t gridCount = readGridCount(inputStream());
         for (int32_t i = 0; i < gridCount; ++i) {
             GridDescriptor gd;
-            gd.read(inputStream());
+            gd.readHeader(inputStream());
+            gd.readStreamPos(inputStream());
 
             GridBase::Ptr grid = createGrid(gd);
             Archive::readGrid(grid, gd, inputStream());
@@ -584,7 +585,8 @@ File::readGridDescriptors(std::istream& is)
     for (int32_t i = 0, N = readGridCount(is); i < N; ++i) {
         // Read the grid descriptor.
         GridDescriptor gd;
-        gd.read(is);
+        gd.readHeader(is);
+        gd.readStreamPos(is);
 
         // Add the descriptor to the dictionary.
         gridDescriptors().insert(std::make_pair(gd.gridName(), gd));
