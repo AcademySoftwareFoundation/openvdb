@@ -769,6 +769,11 @@ TEST_F(TestFile, testGridNaming)
             file.write(gridVec);
         }
 
+        // Redirect stderr to suppress expected warnings about duplicate grid names
+        std::streambuf* orig_cerr = std::cerr.rdbuf();
+        std::ostringstream null_stream;
+        std::cerr.rdbuf(null_stream.rdbuf());
+
         // Open the file for reading.
         File file(filename);
         file.setInstancingEnabled(instancing);
@@ -801,6 +806,9 @@ TEST_F(TestFile, testGridNaming)
             EXPECT_EQ(openvdb::Name("grid"), grid->getName());
             EXPECT_EQ((n < 0 ? 0 : n), grid->metaValue<openvdb::Int32>("index"));
         }
+
+        // Restore stderr
+        std::cerr.rdbuf(orig_cerr);
 
         // Read all three grids at once.
         GridPtrVecPtr allGrids = file.getGrids();
