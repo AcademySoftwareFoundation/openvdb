@@ -255,17 +255,47 @@ for each (sx,sy,sz) in {±1}³:
 
 ## 8. Implementation Notes
 
-### 8a. Lane loops in prefetch / cachedGetValue
+### 8a. SIMD structure of prefetch and cachedGetValue
 
-`prefetch` uses a scalar `for (int i = 0; i < LaneWidth; ++i)` loop over lanes.  It is
-called at most once per direction per center leaf, so the loop is not
-performance-critical.
+**`prefetch` — fully SIMD for the crossing detection, scalar only for probeLeaf**
 
-`cachedGetValue` uses a scalar loop only for the legacy scalar value-fetch path (the
-authoritative result path until the full SIMD index pipeline is wired in).  The
-ingredient-fetch block — `mOffset`, `mPrefixSum[w]`, and `valueMask().words()[w]` for
-all active lanes — is already **fully SIMD** via the gather chain described in §8d.
-`prefetch` remains scalar and is not performance-critical.
+`prefetch` contains no per-lane scalar loop.  The crossing decision uses:
+
+1. **SWAR expansion** (YMM throughout): `vpsllw`, `vpor`, `vpand` — maps the 9-bit
+   voxel offset vector into the 15-bit packed form across all LaneWidth lanes.
+2. **Sentinel blend**: `vpblendvb` — applies `leafMask` in one instruction.
+3. **Add**: `vpaddw` — adds the compile-time `packed_tap` across all lanes.
+4. **Horizontal reductions**: `vextracti128` + `vpand`/`vpor` tree → scalar `hor_and`
+   / `hor_or` — unavoidable for the crossing decision, which is a single bool per axis.
+
+Assembly-confirmed (Release, `-O3 -mavx2`, `ex_stencil_gather_cpu`):
+
+```
+vmovdqu  (%rbx,%rax,2),%ymm2       ; load vo (16 × uint16_t)
+vpsllw   $0x4,%ymm2,%ymm0          ; vo << 4
+vpor     %ymm2,%ymm0,%ymm0         ; vo | (vo << 4)
+vpand    %ymm1,%ymm0,%ymm0         ; & 0x1C07
+vpsllw   $0x2,%ymm2,%ymm1          ; vo << 2
+vpand    %ymm2,%ymm1,%ymm1         ; & 0xE0
+vpor     %ymm1,%ymm0,%ymm0         ; → expanded
+vpblendvb %ymm1,%ymm0,%ymm6,%ymm1  ; where(leafMask, packed_lc) = expanded
+vpaddw   %ymm2,%ymm1,%ymm1         ; packed_sum = packed_lc + packed_tap
+vextracti128 $0x1,%ymm1,%xmm2      ; \
+vpand    %xmm1,%xmm2,%xmm2         ;  | hor_and tree:
+vpunpckhwd ...                      ;  | 16→8→4→2→1 lanes
+vpand    ...; vpshufd ...; vpand .. ;  |
+vpextrw  $0x0,%xmm1,%eax           ; / scalar hor_and
+```
+
+After the scalar crossing check, `probeLeaf` is called at most once per unique
+direction per center leaf — inherently scalar tree traversal, not per-voxel.
+
+**`cachedGetValue` — SIMD ingredient fetch, scalar value path**
+
+The ingredient-fetch block — `mOffset`, `mPrefixSum[w]`, and `valueMask().words()[w]`
+for all active lanes — is **fully SIMD** via the gather chain described in §8d.
+The final value-fetch (scalar loop over `leaf->getValue(offset)`) is the remaining
+work before the full SIMD index pipeline is wired in.
 
 ### 8b. No tree accessor in prefetch
 
@@ -277,8 +307,11 @@ internal-node caches are bypassed entirely when `get<GetLeaf>` misses at LEVEL=0
 ### 8c. probeLeaf returns nullptr for missing neighbors
 
 `mGrid.tree().probeLeaf(coord)` returns `nullptr` when the requested coordinate lies
-outside the active narrow band.  `cachedGetValue` checks for `nullptr` and returns
-`ScalarValueT(0)`, which is correct for level-set grids (background value = 0).
+outside the active narrow band.  `prefetch` stores `kNullLeafID` in
+`mNeighborLeafIDs[d]` for those directions.  `cachedGetValue` detects `kNullLeafID`
+and writes `ScalarValueT(0)` for those lanes, which is correct for level-set grids
+(background value = 0).  The SIMD gather chain masks out `kNullLeafID` lanes via the
+`valid_u32` mask before accessing any leaf data.
 
 ### 8d. SWAR direction extraction — the base-32 multiply trick
 
