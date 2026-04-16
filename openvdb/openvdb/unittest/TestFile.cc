@@ -158,21 +158,7 @@ TestFile::testWriteGrid()
     gd2.readHeader(istr);
     gd2.readStreamPos(istr);
 
-    // manually create the grid
-    GridBase::Ptr gd2_grid = GridBase::createGrid(gd2.gridType());
-
-    EXPECT_EQ(gd.gridName(), gd2.gridName());
-    EXPECT_EQ(GridType::gridType(), gd2_grid->type());
-    EXPECT_EQ(gd.getGridPos(), gd2.getGridPos());
-    EXPECT_EQ(gd.getBlockPos(), gd2.getBlockPos());
-    EXPECT_EQ(gd.getEndPos(), gd2.getEndPos());
-
-    // Position the stream to beginning of the grid storage and read the grid.
-    gd2.seekToGrid(istr);
-    Archive::readGridCompression(istr);
-    gd2_grid->readMeta(istr);
-    gd2_grid->readTransform(istr);
-    gd2_grid->readTopology(istr);
+    GridBase::Ptr gd2_grid = Archive::readGrid(gd2, istr, BBoxd());
 
     // Delay load metadata should not exist.
     ASSERT_FALSE(bool((*gd2_grid)["file_delayed_load"]));
@@ -192,9 +178,6 @@ TestFile::testWriteGrid()
     EXPECT_EQ(
         grid->baseTree().treeDepth(), gd2_grid->baseTree().treeDepth());
 
-    // Read in the data blocks.
-    gd2.seekToBlocks(istr);
-    gd2_grid->readBuffers(istr);
     TreeType::Ptr tree2 = DynamicPtrCast<TreeType>(gd2_grid->baseTreePtr());
     EXPECT_TRUE(tree2.get() != nullptr);
     EXPECT_EQ(10, tree2->getValue(Coord(10, 1, 2)));
@@ -260,7 +243,8 @@ TestFile::testWriteMultipleGrids()
 
     gd_in.readHeader(istr);
     gd_in.readStreamPos(istr);
-    GridBase::Ptr gd_in_grid = GridBase::createGrid(gd_in.gridType());
+
+    GridBase::Ptr gd_in_grid = Archive::readGrid(gd_in, istr, BBoxd());
 
     // Ensure read in the right values.
     EXPECT_EQ(gd.gridName(), gd_in.gridName());
@@ -268,13 +252,6 @@ TestFile::testWriteMultipleGrids()
     EXPECT_EQ(gd.getGridPos(), gd_in.getGridPos());
     EXPECT_EQ(gd.getBlockPos(), gd_in.getBlockPos());
     EXPECT_EQ(gd.getEndPos(), gd_in.getEndPos());
-
-    // Position the stream to beginning of the grid storage and read the grid.
-    gd_in.seekToGrid(istr);
-    Archive::readGridCompression(istr);
-    gd_in_grid->readMeta(istr);
-    gd_in_grid->readTransform(istr);
-    gd_in_grid->readTopology(istr);
 
     // Ensure that we have the same topology and transform.
     EXPECT_EQ(
@@ -289,8 +266,6 @@ TestFile::testWriteMultipleGrids()
     // EXPECT_EQ(0.1, gd_in_grid->getTransform()->getVoxelSizeZ());
 
     // Read in the data blocks.
-    gd_in.seekToBlocks(istr);
-    gd_in_grid->readBuffers(istr);
     TreeType::Ptr grid_in = DynamicPtrCast<TreeType>(gd_in_grid->baseTreePtr());
     EXPECT_TRUE(grid_in.get() != nullptr);
     EXPECT_EQ(10, grid_in->getValue(Coord(10, 1, 2)));
@@ -306,7 +281,7 @@ TestFile::testWriteMultipleGrids()
     GridDescriptor gd2_in;
     gd2_in.readHeader(istr);
     gd2_in.readStreamPos(istr);
-    GridBase::Ptr gd2_in_grid = GridBase::createGrid(gd2_in.gridType());
+    GridBase::Ptr gd2_in_grid = Archive::readGrid(gd2_in, istr, BBoxd());
 
     // Ensure that we read in the right values.
     EXPECT_EQ(gd2.gridName(), gd2_in.gridName());
@@ -314,13 +289,6 @@ TestFile::testWriteMultipleGrids()
     EXPECT_EQ(gd2.getGridPos(), gd2_in.getGridPos());
     EXPECT_EQ(gd2.getBlockPos(), gd2_in.getBlockPos());
     EXPECT_EQ(gd2.getEndPos(), gd2_in.getEndPos());
-
-    // Position the stream to beginning of the grid storage and read the grid.
-    gd2_in.seekToGrid(istr);
-    Archive::readGridCompression(istr);
-    gd2_in_grid->readMeta(istr);
-    gd2_in_grid->readTransform(istr);
-    gd2_in_grid->readTopology(istr);
 
     // Ensure that we have the same topology and transform.
     EXPECT_EQ(
@@ -333,9 +301,6 @@ TestFile::testWriteMultipleGrids()
     // EXPECT_EQ(0.2, gd2_in_grid->getTransform()->getVoxelSizeY());
     // EXPECT_EQ(0.2, gd2_in_grid->getTransform()->getVoxelSizeZ());
 
-    // Read in the data blocks.
-    gd2_in.seekToBlocks(istr);
-    gd2_in_grid->readBuffers(istr);
     TreeType::Ptr grid2_in = DynamicPtrCast<TreeType>(gd2_in_grid->baseTreePtr());
     EXPECT_TRUE(grid2_in.get() != nullptr);
     EXPECT_EQ(50, grid2_in->getValue(Coord(1000, 1000, 1000)));
@@ -922,11 +887,7 @@ TestFile::testEmptyGridIO()
     EXPECT_TRUE(it != file2.mGridDescriptors.end());
     GridDescriptor file2gd = it->second;
     file2gd.seekToGrid(istr);
-    GridBase::Ptr gd_grid = GridBase::createGrid(file2gd.gridType());
-    Archive::readGridCompression(istr);
-    gd_grid->readMeta(istr);
-    gd_grid->readTransform(istr);
-    gd_grid->readTopology(istr);
+    GridBase::Ptr gd_grid = Archive::readGrid(file2gd, istr, BBoxd());
     EXPECT_EQ(gd.gridName(), file2gd.gridName());
     EXPECT_TRUE(gd_grid.get() != nullptr);
     EXPECT_EQ(0, int(gd_grid->baseTree().leafCount()));
@@ -940,11 +901,7 @@ TestFile::testEmptyGridIO()
     EXPECT_TRUE(it != file2.mGridDescriptors.end());
     file2gd = it->second;
     file2gd.seekToGrid(istr);
-    gd_grid = GridBase::createGrid(file2gd.gridType());
-    Archive::readGridCompression(istr);
-    gd_grid->readMeta(istr);
-    gd_grid->readTransform(istr);
-    gd_grid->readTopology(istr);
+    gd_grid = Archive::readGrid(file2gd, istr, BBoxd());
     EXPECT_EQ(gd2.gridName(), file2gd.gridName());
     EXPECT_TRUE(gd_grid.get() != nullptr);
     EXPECT_EQ(0, int(gd_grid->baseTree().leafCount()));
