@@ -21,10 +21,8 @@
                   For NanoGrid<ValueOnIndex>:   uint64_t or Simd<uint64_t,W>
     VoxelOffsetT  Compact (9-bit) voxel offset within a leaf.
                   Scalar path: uint16_t.  SIMD path: Simd<uint16_t,W>.
-    LeafIDT       Leaf index type -- reserved for future use by the caller loop.
-                  Scalar: uint32_t.  SIMD: Simd<uint32_t,W>.
     PredicateT    Per-lane active predicate (the leafMask).
-                  Scalar: bool.  SIMD: SimdMask<float,W> or similar.
+                  Scalar: bool.  SIMD: SimdMask<uint32_t,W>.
 
     Usage
     -----
@@ -55,7 +53,6 @@ namespace nanovdb {
 template<typename BuildT,
          typename ValueT       = float,
          typename VoxelOffsetT = uint16_t,
-         typename LeafIDT      = uint32_t,
          typename PredicateT   = bool>
 class BatchAccessor
 {
@@ -72,8 +69,16 @@ class BatchAccessor
 
     static constexpr int LaneWidth = VO_traits::width;
 
+    // SIMD bundle types for the ingredient gather.
+    // Degrade to plain scalar types when LaneWidth == 1.
+    using LeafIDVecT   = std::conditional_t<LaneWidth == 1, uint32_t, util::Simd<uint32_t, LaneWidth>>;
+    using LeafDataVecT = std::conditional_t<LaneWidth == 1, uint64_t, util::Simd<uint64_t, LaneWidth>>;
+
     static_assert(VO_traits::width == Pred_traits::width,
         "BatchAccessor: VoxelOffsetT and PredicateT must have the same lane width");
+    static_assert(std::is_same_v<PredicateT, bool> ||
+                  std::is_same_v<PredicateT, util::SimdMask<uint32_t, LaneWidth>>,
+        "BatchAccessor: PredicateT must be bool (scalar) or SimdMask<uint32_t,W> (SIMD)");
     static_assert(Val_traits::width == 1 || Val_traits::width == VO_traits::width,
         "BatchAccessor: ValueT lane width must be 1 (scalar) or match VoxelOffsetT");
 
@@ -376,9 +381,6 @@ public:
             // Step 5 -- maskWords: gather from valueMask().words() base.
             //   words()[wi] for leaf[leaf_id] = mask_word_base[leaf_id*kStride + wi].
             //   The per-lane wi is added to raw_idx to form the mask gather index.
-            using U32T = util::Simd<uint32_t, LaneWidth>;
-            using U64T = util::Simd<uint64_t, LaneWidth>;
-
             // Direction-extraction constants (base-32 multiply trick, Sec.8d).
             static constexpr uint16_t kSwarCarryMask = 0x6318u; // carry bits [3:4],[8:9],[13:14]
             static constexpr uint16_t kDirMul        = 1129u;   // base-32 multiplier: 1*32^2 + 3*32 + 9
@@ -395,31 +397,33 @@ public:
                                 & VoxelOffsetT(kDirMask);
             const auto d_i32 = util::simd_cast<int32_t>(d_u16);
 
-            // Step 2 -- leaf IDs
-            const auto leaf_id_vec = util::gather(mNeighborLeafIDs, d_i32);  // Simd<uint32_t,W>
-            const auto valid_u32   = (leaf_id_vec != U32T(kNullLeafID));     // SimdMask<uint32_t,W>
+            // Step 2 -- leaf IDs: gather only for active lanes; inactive lanes keep kNullLeafID.
+            // valid_u32 is then the combined effective mask (leafMask AND neighbor exists).
+            LeafIDVecT leaf_id_vec(kNullLeafID);
+            util::gather_if(leaf_id_vec, leafMask, mNeighborLeafIDs, d_i32);
+            const auto valid_u32 = (leaf_id_vec != LeafIDVecT(kNullLeafID));       // SimdMask<uint32_t,W>
 
             // Step 3 -- stride-scaled gather indices (null lanes -> 0)
             static constexpr uint32_t kStride = sizeof(LeafT) / sizeof(uint64_t);
             const auto raw_idx = util::simd_cast<int32_t>(
-                util::where(valid_u32, leaf_id_vec * U32T(kStride), U32T(0)));
+                util::where(valid_u32, leaf_id_vec * LeafIDVecT(kStride), LeafIDVecT(0)));
 
             // Step 4a -- offsets (mOffset)
             const uint64_t* offset_base = reinterpret_cast<const uint64_t*>(
                 &mGrid.tree().getFirstLeaf()[0].data()->mOffset);
-            const U64T offsets = util::where(valid_u32,
-                util::gather(offset_base, raw_idx), U64T(0));
+            const LeafDataVecT offsets = util::where(valid_u32,
+                util::gather(offset_base, raw_idx), LeafDataVecT(0));
 
             // Step 4b -- prefixSums (mPrefixSum packed uint64_t, shift-extract field w)
             const uint64_t* prefix_base = reinterpret_cast<const uint64_t*>(
                 &mGrid.tree().getFirstLeaf()[0].data()->mPrefixSum);
             const auto prefix_raw = util::gather(prefix_base, raw_idx);
             const auto w_u64      = util::simd_cast<uint64_t>(wordIndex);
-            const auto nonzero_w  = (w_u64 != U64T(0));
-            const auto shift      = util::where(nonzero_w, (w_u64 - U64T(1)) * U64T(9), U64T(0));
-            const U64T prefixSums = util::where(valid_u32,
-                util::where(nonzero_w, (prefix_raw >> shift) & U64T(511u), U64T(0)),
-                U64T(0));
+            const auto nonzero_w  = (w_u64 != LeafDataVecT(0));
+            const auto shift      = util::where(nonzero_w, (w_u64 - LeafDataVecT(1)) * LeafDataVecT(9), LeafDataVecT(0));
+            const LeafDataVecT prefixSums = util::where(valid_u32,
+                util::where(nonzero_w, (prefix_raw >> shift) & LeafDataVecT(511u), LeafDataVecT(0)),
+                LeafDataVecT(0));
 
             // Step 5 -- maskWords (valueMask().words()[w])
             //   mask_word_base[leaf_id*kStride + w] == leaf[leaf_id].valueMask().words()[w]
@@ -428,13 +432,13 @@ public:
                 mGrid.tree().getFirstLeaf()[0].valueMask().words();
             const auto w_i32     = util::simd_cast<int32_t>(util::simd_cast<uint32_t>(wordIndex));
             const auto mask_idx  = raw_idx + w_i32;
-            const U64T maskWords = util::where(valid_u32,
-                util::gather(mask_word_base, mask_idx), U64T(0));
+            const LeafDataVecT maskWords = util::where(valid_u32,
+                util::gather(mask_word_base, mask_idx), LeafDataVecT(0));
             // -------------------------------------------------------------------
             // Debug cross-check: validate SIMD-path values against scalar ref
             // -------------------------------------------------------------------
 #ifndef NDEBUG
-            using U64Traits = util::simd_traits<U64T>;
+            using LeafDataVecTraits = util::simd_traits<LeafDataVecT>;
             for (int i = 0; i < LaneWidth; ++i) {
                 if (!Pred_traits::get(leafMask, i)) continue;
 
@@ -463,18 +467,18 @@ public:
                     const uint64_t pfx_ref = (uint32_t(nx_w) > 0u)
                         ? (ref->data()->mPrefixSum >> (9u * (uint32_t(nx_w) - 1u))) & 511u
                         : uint64_t(0);
-                    assert(U64Traits::get(offsets,    i) == ref->data()->mOffset
+                    assert(LeafDataVecTraits::get(offsets,    i) == ref->data()->mOffset
                            && "cachedGetValue SIMD: mOffset mismatch");
-                    assert(U64Traits::get(prefixSums, i) == pfx_ref
+                    assert(LeafDataVecTraits::get(prefixSums, i) == pfx_ref
                            && "cachedGetValue SIMD: mPrefixSum mismatch");
-                    assert(U64Traits::get(maskWords,  i) == ref->valueMask().words()[nx_w]
+                    assert(LeafDataVecTraits::get(maskWords,  i) == ref->valueMask().words()[nx_w]
                            && "cachedGetValue SIMD: maskWord mismatch");
                 } else {
-                    assert(U64Traits::get(offsets,    i) == uint64_t(0)
+                    assert(LeafDataVecTraits::get(offsets,    i) == uint64_t(0)
                            && "cachedGetValue SIMD: null leaf offsets should be 0");
-                    assert(U64Traits::get(prefixSums, i) == uint64_t(0)
+                    assert(LeafDataVecTraits::get(prefixSums, i) == uint64_t(0)
                            && "cachedGetValue SIMD: null leaf prefixSums should be 0");
-                    assert(U64Traits::get(maskWords,  i) == uint64_t(0)
+                    assert(LeafDataVecTraits::get(maskWords,  i) == uint64_t(0)
                            && "cachedGetValue SIMD: null leaf maskWords should be 0");
                 }
             }

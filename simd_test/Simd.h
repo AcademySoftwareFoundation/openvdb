@@ -366,6 +366,7 @@ NANOVDB_SIMD_HOSTDEV void gather_if(Simd<T,W>& dst, SimdMask<T,W> mask,
 // Both backends: the array backend uses a lane loop; the stdx backend uses the
 // generator constructor, which the compiler lowers to a vpmovsxbw / vpmovzxwd
 // sequence or similar sign/zero-extend instruction depending on the types.
+// Scalar overload: degrades to static_cast for plain scalar types.
 // ---------------------------------------------------------------------------
 template<typename DstT, typename SrcT, int W>
 NANOVDB_SIMD_HOSTDEV Simd<DstT,W> simd_cast(Simd<SrcT,W> src) {
@@ -377,6 +378,8 @@ NANOVDB_SIMD_HOSTDEV Simd<DstT,W> simd_cast(Simd<SrcT,W> src) {
     return r;
 #endif
 }
+template<typename DstT, typename SrcT>
+NANOVDB_SIMD_HOSTDEV DstT simd_cast(SrcT src) { return static_cast<DstT>(src); }
 
 // ---------------------------------------------------------------------------
 // simd_traits — generic per-lane access for scalar and Simd<T,W> types.
@@ -460,6 +463,28 @@ template<typename T> NANOVDB_SIMD_HOSTDEV T max(T a, T b)           { return a >
 template<typename T> NANOVDB_SIMD_HOSTDEV T where(bool m, T a, T b) { return m ? a : b; }
 template<typename T, typename BinaryOp>
 NANOVDB_SIMD_HOSTDEV T reduce(T v, BinaryOp) { return v; }
+
+// 2-argument where: scalar masked-assignment proxy matching the Simd form.
+// where(mask, target) = value  writes value into target only if mask is true.
+template<typename T>
+struct ScalarWhereProxy {
+    bool mask; T& target;
+    NANOVDB_SIMD_HOSTDEV void operator=(const T& v) { if (mask) target = v; }
+};
+template<typename T>
+NANOVDB_SIMD_HOSTDEV ScalarWhereProxy<T> where(bool mask, T& target) {
+    return {mask, target};
+}
+
+// Unmasked scalar gather: result = ptr[idx].
+template<typename T>
+NANOVDB_SIMD_HOSTDEV T gather(const T* __restrict__ ptr, int32_t idx) { return ptr[idx]; }
+
+// Merge-masked scalar gather: dst = ptr[idx] only if mask, else dst unchanged.
+template<typename T>
+NANOVDB_SIMD_HOSTDEV void gather_if(T& dst, bool mask, const T* __restrict__ ptr, int32_t idx) {
+    if (mask) dst = ptr[idx];
+}
 
 } // namespace util
 } // namespace nanovdb

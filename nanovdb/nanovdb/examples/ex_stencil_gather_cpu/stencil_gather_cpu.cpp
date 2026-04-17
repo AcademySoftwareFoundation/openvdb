@@ -69,7 +69,6 @@ using LaneMask   = nanovdb::util::SimdMask<uint32_t, SIMDw>;
 using BAccT = nanovdb::BatchAccessor<BuildT,
     nanovdb::util::Simd<uint64_t, SIMDw>,   // ValueT
     nanovdb::util::Simd<uint16_t, SIMDw>,   // VoxelOffsetT
-    nanovdb::util::Simd<uint32_t, SIMDw>,   // LeafIDT (unused by BatchAccessor internals)
     LaneMask>;                               // PredicateT
 
 // Direction bit encoding shared across all stencil types:
