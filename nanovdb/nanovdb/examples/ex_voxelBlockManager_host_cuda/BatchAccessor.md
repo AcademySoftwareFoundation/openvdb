@@ -463,6 +463,52 @@ Step 8 — fill result
 the scalar `popcnt` instruction, which is not vectorisable.  The SWAR tree uses only
 `vpsrlq` / `vpand` / `vpaddq`, which are all AVX2-native.
 
+### 8f. Assembly codegen — GCC 13 vs Clang 18
+
+Platform: x86-64, AVX2, `-O3 -DNDEBUG -march=native -std=c++17`.
+Representative instantiation: `cachedGetValue<1,0,0>` (x+1 tap, W=16).
+
+| Metric | GCC 13 | Clang 18 |
+|--------|--------|----------|
+| Total instructions | 465 | 535 |
+| Vector (ymm) | 237 | 262 |
+| `call` | 14 | **1** |
+| `vzeroupper` | 13 | **2** |
+| Hardware gather instructions | **0** | **14** |
+| `gather_if` inlined | No | **Yes** |
+| `simd_cast` / `where` inlined | No | **Yes** |
+| `popcount` inlined | No | No |
+
+**GCC** emits every `Simd.h` helper (`gather_if`, `simd_cast`, `simd_cast_if`, `where`,
+`popcount`) as an out-of-line call.  The `gather_if` body does scalar element-by-element
+loads via `vmovq` + `vpinsrq` + `vinserti128` — no hardware gather instructions.  Each
+out-of-line call forces a `vzeroupper` transition (≈80 cycles on many µarchs), giving 13
+such transitions per `cachedGetValue` call.
+
+**Clang** inlines everything except `popcount`.  With `gather_if` inlined, Clang emits
+actual hardware gather instructions:
+
+```
+vpgatherdd  — 2× for the uint32_t tapLeafID gather (Step 2, 8-wide × 2 = 16 lanes)
+vpgatherqq  — 12× for the three uint64_t gathers (Steps 4a, 4b, 5: 4-wide × 4 = 16 lanes each)
+```
+
+Only 2 `vzeroupper` transitions remain (function entry/exit).
+
+The 43 `vpinsrb` instructions in the Clang output are the mask-format conversion cost
+for the heterogeneous `gather_if` mask: `SimdMask<uint32_t,16>` must be widened to
+4 × `SimdMask<uint64_t,4>` to drive `vpgatherqq`'s sign-bit mask mechanism.
+
+**`popcount`** body (out-of-line in both compilers): 88 instructions, 85 ymm.
+The SWAR shift-and-add tree is fully vectorized with `vpsrlq`, `vpand`, `vpsubq`,
+`vpaddq` — exactly the AVX2-friendly instruction set targeted in §8e.  Adding
+`[[gnu::always_inline]]` to `util::popcount` in `Simd.h` would fold these 88
+instructions inline and eliminate the last `callq`.
+
+**Action:** GCC inlining can be forced across the board with `[[gnu::always_inline]]`
+on `gather_if`, `simd_cast`, `simd_cast_if`, `where`, and `popcount` in `Simd.h`.
+This is a pure-upside change for GCC; Clang already inlines all but `popcount`.
+
 ---
 
 ## 9. Relationship to Phase 1 Prototype
@@ -491,6 +537,10 @@ the scalar `popcnt` instruction, which is not vectorisable.  The SWAR tree uses 
 - `simd_cast_if`, heterogeneous `gather_if`, `popcount64`/`popcount` added to `Simd.h`.
 
 ### Remaining
+
+- **`[[gnu::always_inline]]` on `Simd.h` helpers:** `gather_if`, `simd_cast`,
+  `simd_cast_if`, `where`, `popcount` — eliminates 13 `vzeroupper` transitions per
+  `cachedGetValue` call under GCC 13 (§8f).
 
 - **`getValue<di,dj,dk>`:** lazy combined `prefetch` + `cachedGetValue`.
 
