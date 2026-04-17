@@ -509,6 +509,34 @@ instructions inline and eliminate the last `callq`.
 on `gather_if`, `simd_cast`, `simd_cast_if`, `where`, and `popcount` in `Simd.h`.
 This is a pure-upside change for GCC; Clang already inlines all but `popcount`.
 
+**`popcount` alternative — `vpshufb`-based nibble popcount:**
+The current SWAR shift-and-add tree (88 instructions, §8e) avoids the scalar `popcnt`
+instruction because it is not vectorisable into `VPOPCNTQ` on AVX2.  There are two
+other options worth considering:
+
+*Scalar `popcnt` with extract/reassemble:*  `popcnt` is pipelined (Skylake+: 3-cycle
+latency, 1/cycle throughput on port 1; 16 independent lanes retire in ~16 cycles).
+The catch is the vector↔scalar domain crossing: extracting 16 uint64_t from 4 ymm
+registers requires ~20 `vpextrq`/`vextracti128` instructions, and reassembly costs
+another ~20 `vmovq`/`vpinsrq`/`vinserti128`.  Total ≈ 56 instructions — fewer than
+SWAR, but the bypass latency penalty (~2 cycles per ymm→GPR crossing on Skylake)
+reduces the advantage, and port 1 serialises all 16 `popcnt`s.
+
+*`vpshufb`-based nibble popcount (recommended):*  Stays entirely in vector registers,
+no domain crossing, and shrinks the body to ≈ 40 instructions:
+
+```
+lo   = v & 0x0F0F0F0F0F0F0F0F       (vpand)
+hi   = (v >> 4) & 0x0F0F0F0F0F0F0F0F (vpsrlq + vpand)
+bpop = vpshufb(lut, lo) + vpshufb(lut, hi)   (2× vpshufb + vpaddq)
+sum  = vpsadbw(bpop, zero)            (horizontal byte-sum → 64-bit lane result)
+```
+
+`vpshufb` and `vpsadbw` use ports 0/5 and port 5 respectively — orthogonal to the
+arithmetic-heavy SWAR ports — so the `vpshufb` path is also more friendly to
+out-of-order overlap with surrounding code.  This is the standard compiler-generated
+AVX2 popcount pattern and the likely replacement for `popcount64` in `Simd.h`.
+
 ---
 
 ## 9. Relationship to Phase 1 Prototype
@@ -541,6 +569,10 @@ This is a pure-upside change for GCC; Clang already inlines all but `popcount`.
 - **`[[gnu::always_inline]]` on `Simd.h` helpers:** `gather_if`, `simd_cast`,
   `simd_cast_if`, `where`, `popcount` — eliminates 13 `vzeroupper` transitions per
   `cachedGetValue` call under GCC 13 (§8f).
+
+- **`vpshufb`-based `popcount` in `Simd.h`:** replace `popcount64` SWAR tree with
+  nibble-LUT + `vpsadbw` pattern (§8f); reduces the out-of-line body from 88 to ≈40
+  instructions and uses orthogonal execution ports.
 
 - **`getValue<di,dj,dk>`:** lazy combined `prefetch` + `cachedGetValue`.
 
