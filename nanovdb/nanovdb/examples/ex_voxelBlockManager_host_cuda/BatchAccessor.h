@@ -148,6 +148,9 @@ public:
         , mCenterLeafID(firstLeafID)
         , mCenterOrigin(grid.tree().getFirstLeaf()[firstLeafID].origin())
         , mProbedMask(1u << dir(0, 0, 0))
+        , mOffsetBase  (reinterpret_cast<const uint64_t*>(&grid.tree().getFirstLeaf()[0].data()->mOffset))
+        , mPrefixBase  (reinterpret_cast<const uint64_t*>(&grid.tree().getFirstLeaf()[0].data()->mPrefixSum))
+        , mMaskWordBase(grid.tree().getFirstLeaf()[0].valueMask().words())
     {
         for (auto& id : mNeighborLeafIDs) id = kNullLeafID;
         mNeighborLeafIDs[dir(0, 0, 0)] = mCenterLeafID;
@@ -357,7 +360,7 @@ public:
             const auto packed_sum = packed_lc + VoxelOffsetT(packed_tap);
 
             // dest_x per lane: bits [10:12] of packed_sum -> uint64_t mask word index (0..7)
-            const auto wordIndex = (packed_sum >> VoxelOffsetScalarT(10)) & VoxelOffsetT(7u);
+            const auto wordIdx_u16 = (packed_sum >> VoxelOffsetScalarT(10)) & VoxelOffsetT(7u);
 
             // SIMD gather of mOffset, mPrefixSum[w], and maskWords[w] per lane.
             //
@@ -366,21 +369,21 @@ public:
             //   bits lie entirely below bit 16, so the modular uint16_t product gives
             //   the same answer as the full-width product for all valid + sentinel inputs.
             //
-            // Step 2 -- leaf_id_vec: gather mNeighborLeafIDs[d] for all lanes at once.
+            // Step 2 -- tapLeafID_u32: gather mNeighborLeafIDs[d] for all lanes at once.
             //
-            // Step 3 -- raw_idx: leaf_id * (sizeof(LeafT)/sizeof(uint64_t)).
+            // Step 3 -- tapLeafOffset_i64: leaf_id * (sizeof(LeafT)/sizeof(uint64_t)).
             //   This is the per-lane uint64_t-stride index into the flat leaf array,
             //   viewed as a uint64_t[] through the base pointer of the target field.
             //   Invalid (kNullLeafID) lanes are clamped to index 0 (safe; masked out).
             //
             // Step 4 -- offsets / prefixSums: two gathers with different base pointers
-            //   but the same raw_idx; masked to 0 for null lanes.
+            //   but the same tapLeafOffset_i64; masked to 0 for null lanes.
             //   mPrefixSum is a packed uint64_t: field w lives at bits [9*(w-1)+:9]
             //   (9-bit fields, w=0 -> prefix = 0 by definition).
             //
             // Step 5 -- maskWords: gather from valueMask().words() base.
             //   words()[wi] for leaf[leaf_id] = mask_word_base[leaf_id*kStride + wi].
-            //   The per-lane wi is added to raw_idx to form the mask gather index.
+            //   The per-lane wi is added to tapLeafOffset_i64 to form the mask gather index.
             // Direction-extraction constants (base-32 multiply trick, Sec.8d).
             static constexpr uint16_t kSwarCarryMask = 0x6318u; // carry bits [3:4],[8:9],[13:14]
             static constexpr uint16_t kDirMul        = 1129u;   // base-32 multiplier: 1*32^2 + 3*32 + 9
@@ -399,48 +402,65 @@ public:
 
             // Step 2 -- leaf IDs: gather only for active lanes; inactive lanes keep kNullLeafID.
             // valid_u32 is then the combined effective mask (leafMask AND neighbor exists).
-            LeafIDVecT leaf_id_vec(kNullLeafID);
-            util::gather_if(leaf_id_vec, leafMask, mNeighborLeafIDs, d_i32);
-            const auto valid_u32 = (leaf_id_vec != LeafIDVecT(kNullLeafID));       // SimdMask<uint32_t,W>
+            LeafIDVecT tapLeafID_u32(kNullLeafID);
+            util::gather_if(tapLeafID_u32, leafMask, mNeighborLeafIDs, d_i32);
+            const auto valid_u32 = (tapLeafID_u32 != LeafIDVecT(kNullLeafID));       // SimdMask<uint32_t,W>
 
-            // Step 3 -- stride-scaled gather indices (null lanes -> 0)
-            static constexpr uint32_t kStride = sizeof(LeafT) / sizeof(uint64_t);
-            const auto raw_idx = util::simd_cast<int32_t>(
-                util::where(valid_u32, leaf_id_vec * LeafIDVecT(kStride), LeafIDVecT(0)));
+            // Step 3 -- stride-scaled gather indices (widened to int64_t, invalid lanes -> 0)
+            // kStride is sizeof(LeafT)/sizeof(uint64_t); the static_assert makes the
+            // divisibility assumption explicit (NanoVDB leaves are always 8-byte aligned).
+            static_assert(sizeof(LeafT) % sizeof(uint64_t) == 0,
+                "LeafT must be uint64_t-aligned for packed gather indexing");
+            static constexpr int64_t kStride = int64_t(sizeof(LeafT) / sizeof(uint64_t));
+            using Int64VecT = std::conditional_t<LaneWidth == 1, int64_t, util::Simd<int64_t, LaneWidth>>;
+            Int64VecT tapLeafOffset_i64(0);
+            util::simd_cast_if<int64_t>(tapLeafOffset_i64, valid_u32, tapLeafID_u32);
+            tapLeafOffset_i64 = tapLeafOffset_i64 * Int64VecT(kStride);
 
             // Step 4a -- offsets (mOffset)
-            const uint64_t* offset_base = reinterpret_cast<const uint64_t*>(
-                &mGrid.tree().getFirstLeaf()[0].data()->mOffset);
-            const LeafDataVecT offsets = util::where(valid_u32,
-                util::gather(offset_base, raw_idx), LeafDataVecT(0));
+            LeafDataVecT offsets(0);
+            util::gather_if(offsets, valid_u32, mOffsetBase, tapLeafOffset_i64);
 
             // Step 4b -- prefixSums (mPrefixSum packed uint64_t, shift-extract field w)
-            const uint64_t* prefix_base = reinterpret_cast<const uint64_t*>(
-                &mGrid.tree().getFirstLeaf()[0].data()->mPrefixSum);
-            const auto prefix_raw = util::gather(prefix_base, raw_idx);
-            const auto w_u64      = util::simd_cast<uint64_t>(wordIndex);
-            const auto nonzero_w  = (w_u64 != LeafDataVecT(0));
-            const auto shift      = util::where(nonzero_w, (w_u64 - LeafDataVecT(1)) * LeafDataVecT(9), LeafDataVecT(0));
-            const LeafDataVecT prefixSums = util::where(valid_u32,
-                util::where(nonzero_w, (prefix_raw >> shift) & LeafDataVecT(511u), LeafDataVecT(0)),
-                LeafDataVecT(0));
+            // Invalid lanes have prefixSums=0 after gather_if; (0>>shift)&511=0 for any shift,
+            // so the outer valid_u32 guard from before is not needed.
+            LeafDataVecT prefixSums(0);
+            util::gather_if(prefixSums, valid_u32, mPrefixBase, tapLeafOffset_i64);
+            const auto wordIdx_u64     = util::simd_cast<uint64_t>(wordIdx_u16);
+            const auto nonzero_w = (wordIdx_u64 != LeafDataVecT(0));
+            const auto shift     = util::where(nonzero_w, (wordIdx_u64 - LeafDataVecT(1)) * LeafDataVecT(9), LeafDataVecT(0));
+            prefixSums = util::where(nonzero_w, (prefixSums >> shift) & LeafDataVecT(511u), LeafDataVecT(0));
 
             // Step 5 -- maskWords (valueMask().words()[w])
-            //   mask_word_base[leaf_id*kStride + w] == leaf[leaf_id].valueMask().words()[w]
+            //   mMaskWordBase[leaf_id*kStride + w] == leaf[leaf_id].valueMask().words()[w]
             //   because the mask field is at a fixed offsetof within every LeafT.
-            const uint64_t* mask_word_base =
-                mGrid.tree().getFirstLeaf()[0].valueMask().words();
-            const auto w_i32     = util::simd_cast<int32_t>(util::simd_cast<uint32_t>(wordIndex));
-            const auto mask_idx  = raw_idx + w_i32;
-            const LeafDataVecT maskWords = util::where(valid_u32,
-                util::gather(mask_word_base, mask_idx), LeafDataVecT(0));
+            const auto wordIdx_i64    = util::simd_cast<int64_t>(wordIdx_u16);
+            const auto mask_idx = tapLeafOffset_i64 + wordIdx_i64;
+            LeafDataVecT maskWords(0);
+            util::gather_if(maskWords, valid_u32, mMaskWordBase, mask_idx);
+            // Step 6 -- dest_yz: 6-bit intra-word bit position (ny_w*8 + nz_w).
+            // packed_sum bits [5:7] = dest_y, bits [0:2] = dest_z (both wrapped mod 8).
+            const auto dest_yz_u16 = ((packed_sum >> VoxelOffsetScalarT(2)) & VoxelOffsetT(0x38u))
+                                    |  (packed_sum                           & VoxelOffsetT(0x07u));
+            const auto dest_yz_u64 = util::simd_cast<uint64_t>(dest_yz_u16);
+
+            // Step 7 -- activity check + truncated maskWord.
+            // If voxel dest_yz is inactive, getValue returns 0 (not the formula below).
+            // Null-leaf lanes already have maskWords=0, so they are implicitly inactive.
+            const auto voxelBit  = LeafDataVecT(1) << dest_yz_u64;
+            const auto isActive  = (maskWords & voxelBit) != LeafDataVecT(0);
+            const auto truncated = maskWords & (voxelBit - LeafDataVecT(1));
+
+            // Step 8 -- fill result in-place; leafMask-clear lanes are untouched.
+            util::where(isActive, result) = offsets + prefixSums + util::popcount(truncated);
+
             // -------------------------------------------------------------------
             // Debug cross-check: validate SIMD-path values against scalar ref
             // -------------------------------------------------------------------
 #ifndef NDEBUG
             using LeafDataVecTraits = util::simd_traits<LeafDataVecT>;
             for (int i = 0; i < LaneWidth; ++i) {
-                if (!Pred_traits::get(leafMask, i)) continue;
+                if (!Pred_traits::get(leafMask, i)) continue;  // only check lanes caller asked about
 
                 // Scalar reference: same arithmetic as the legacy loop below
                 const auto vo_i = static_cast<uint16_t>(VO_traits::get(vo, i));
@@ -449,8 +469,10 @@ public:
                 const int dx = (nx < 0) ? -1 : (nx >= 8) ? 1 : 0;
                 const int dy = (ny < 0) ? -1 : (ny >= 8) ? 1 : 0;
                 const int dz = (nz < 0) ? -1 : (nz >= 8) ? 1 : 0;
-                const int d_ref  = dir(dx, dy, dz);
-                const int nx_w   = nx - dx * 8;    // = dest_x = word index w
+                const int d_ref = dir(dx, dy, dz);
+                const int nx_w  = nx - dx * 8;
+                const int ny_w  = ny - dy * 8;
+                const int nz_w  = nz - dz * 8;
                 const uint32_t ref_id = mNeighborLeafIDs[d_ref];
                 const LeafT*   ref    = (ref_id != kNullLeafID)
                     ? &mGrid.tree().getFirstLeaf()[ref_id] : nullptr;
@@ -458,7 +480,7 @@ public:
                 // SIMD-path values for this lane
                 const uint32_t ps_i   = static_cast<uint32_t>(VO_traits::get(packed_sum, i));
                 const int      d_simd = int((((ps_i & 0x6318u) >> 3) * 1129u >> 10) & 31u);
-                const int      wi     = int(VO_traits::get(wordIndex, i));
+                const int      wi     = int(VO_traits::get(wordIdx_u16, i));
 
                 assert(d_simd == d_ref && "cachedGetValue SIMD: dir mismatch");
                 assert(wi == nx_w      && "cachedGetValue SIMD: w (dest_x) mismatch");
@@ -467,12 +489,15 @@ public:
                     const uint64_t pfx_ref = (uint32_t(nx_w) > 0u)
                         ? (ref->data()->mPrefixSum >> (9u * (uint32_t(nx_w) - 1u))) & 511u
                         : uint64_t(0);
+                    const uint32_t ref_offset = uint32_t(nx_w)*64u + uint32_t(ny_w)*8u + uint32_t(nz_w);
                     assert(LeafDataVecTraits::get(offsets,    i) == ref->data()->mOffset
                            && "cachedGetValue SIMD: mOffset mismatch");
                     assert(LeafDataVecTraits::get(prefixSums, i) == pfx_ref
                            && "cachedGetValue SIMD: mPrefixSum mismatch");
                     assert(LeafDataVecTraits::get(maskWords,  i) == ref->valueMask().words()[nx_w]
                            && "cachedGetValue SIMD: maskWord mismatch");
+                    assert(Val_traits::get(result, i) == static_cast<uint64_t>(ref->getValue(ref_offset))
+                           && "cachedGetValue SIMD: final result mismatch");
                 } else {
                     assert(LeafDataVecTraits::get(offsets,    i) == uint64_t(0)
                            && "cachedGetValue SIMD: null leaf offsets should be 0");
@@ -480,42 +505,11 @@ public:
                            && "cachedGetValue SIMD: null leaf prefixSums should be 0");
                     assert(LeafDataVecTraits::get(maskWords,  i) == uint64_t(0)
                            && "cachedGetValue SIMD: null leaf maskWords should be 0");
+                    assert(Val_traits::get(result, i) == uint64_t(0)
+                           && "cachedGetValue SIMD: null leaf result should be 0");
                 }
             }
 #endif
-            (void)offsets; (void)prefixSums; (void)maskWords;
-        }
-
-        // -----------------------------------------------------------------------
-        // Legacy scalar path -- authoritative until SIMD path is wired in
-        // -----------------------------------------------------------------------
-        for (int i = 0; i < LaneWidth; ++i) {
-            if (!Pred_traits::get(leafMask, i)) continue;
-            const auto vo_i = static_cast<uint16_t>(VO_traits::get(vo, i));
-            const int lx = (vo_i >> 6) & 7;
-            const int ly = (vo_i >> 3) & 7;
-            const int lz =  vo_i       & 7;
-            const int nx = lx + di, ny = ly + dj, nz = lz + dk;
-            const int dx = (nx < 0) ? -1 : (nx >= 8) ? 1 : 0;
-            const int dy = (ny < 0) ? -1 : (ny >= 8) ? 1 : 0;
-            const int dz = (nz < 0) ? -1 : (nz >= 8) ? 1 : 0;
-            // Wrapped local coordinate within the neighbor leaf.
-            const int nx_w = nx - dx * 8;
-            const int ny_w = ny - dy * 8;
-            const int nz_w = nz - dz * 8;
-            // NanoVDB leaf layout: offset = lx*64 + ly*8 + lz.
-            const uint32_t offset = uint32_t(nx_w) * 64u
-                                  + uint32_t(ny_w) *  8u
-                                  + uint32_t(nz_w);
-            const int      d       = dir(dx, dy, dz);
-            assert((mProbedMask & (1u << d)) && "cachedGetValue: direction not prefetched");
-            const uint32_t leaf_id = mNeighborLeafIDs[d];
-            const LeafT*   leaf    = (leaf_id != kNullLeafID)
-                ? &mGrid.tree().getFirstLeaf()[leaf_id] : nullptr;
-            const ScalarValueT val = leaf
-                ? static_cast<ScalarValueT>(leaf->getValue(offset))
-                : ScalarValueT(0);
-            Val_traits::set(result, i, val);
         }
     }
 
@@ -530,11 +524,14 @@ private:
         return mCenterOrigin + Coord(dx * 8, dy * 8, dz * 8);
     }
 
-    const GridT& mGrid;
-    uint32_t     mCenterLeafID;
-    Coord        mCenterOrigin;
-    uint32_t     mProbedMask;
-    uint32_t     mNeighborLeafIDs[27]; // kNullLeafID when not probed or outside narrow band
+    const GridT&          mGrid;
+    uint32_t              mCenterLeafID;
+    Coord                 mCenterOrigin;
+    uint32_t              mProbedMask;
+    uint32_t              mNeighborLeafIDs[27]; // kNullLeafID when not probed or outside narrow band
+    const uint64_t* const mOffsetBase;           // &getFirstLeaf()[0].data()->mOffset
+    const uint64_t* const mPrefixBase;           // &getFirstLeaf()[0].data()->mPrefixSum
+    const uint64_t* const mMaskWordBase;         // getFirstLeaf()[0].valueMask().words()
 };
 
 } // namespace nanovdb

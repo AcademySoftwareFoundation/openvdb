@@ -38,7 +38,6 @@ subsequent batches in the same center leaf.
 template<typename BuildT,
          typename ValueT       = float,
          typename VoxelOffsetT = uint16_t,
-         typename LeafIDT      = uint32_t,
          typename PredicateT   = bool>
 class BatchAccessor;
 ```
@@ -46,10 +45,9 @@ class BatchAccessor;
 | Parameter | Scalar default | SIMD example | Role |
 |-----------|---------------|--------------|------|
 | `BuildT` | — | — | NanoVDB build type; determines `LeafT`, `TreeT` |
-| `ValueT` | `float` | `Simd<float,W>` | Return type of `cachedGetValue` |
+| `ValueT` | `float` | `Simd<float,W>` | Result type of `cachedGetValue` |
 | `VoxelOffsetT` | `uint16_t` | `Simd<uint16_t,W>` | Compact 9-bit voxel offset within a leaf |
-| `LeafIDT` | `uint32_t` | `Simd<uint32_t,W>` | Per-lane leaf ID (reserved for caller loop) |
-| `PredicateT` | `bool` | `SimdMask<float,W>` | Per-lane active predicate |
+| `PredicateT` | `bool` | `SimdMask<uint32_t,W>` | Per-lane active predicate |
 
 For `NanoGrid<ValueOnIndex>`, use `ValueT = uint64_t` (scalar) or
 `ValueT = Simd<uint64_t,W>` (SIMD).
@@ -64,14 +62,18 @@ which works for both scalar and vector types via specialisation.
 
 ## 3. Persistent State
 
-Four members persist across batches within one center leaf:
+Members that persist across batches within one center leaf:
 
 ```cpp
-const GridT& mGrid;                            // for probeLeaf calls via mGrid.tree()
-uint32_t     mCenterLeafID;                    // index of current center leaf
-Coord        mCenterOrigin;                    // world-space origin of current center leaf
-uint32_t     mProbedMask = (1u << 13);         // bit 13 (center) pre-set at construction
-uint32_t     mNeighborLeafIDs[27];             // kNullLeafID when outside narrow band or unprobed
+const GridT&          mGrid;             // for probeLeaf calls via mGrid.tree()
+uint32_t              mCenterLeafID;     // index of current center leaf
+Coord                 mCenterOrigin;     // world-space origin of current center leaf
+uint32_t              mProbedMask;       // bit 13 (center) pre-set at construction
+uint32_t              mNeighborLeafIDs[27]; // kNullLeafID when outside narrow band or unprobed
+
+const uint64_t* const mOffsetBase;       // &getFirstLeaf()[0].data()->mOffset
+const uint64_t* const mPrefixBase;       // &getFirstLeaf()[0].data()->mPrefixSum
+const uint64_t* const mMaskWordBase;     // getFirstLeaf()[0].valueMask().words()
 ```
 
 **Direction encoding** (`dir` is a `static constexpr` member):
@@ -90,12 +92,17 @@ static constexpr uint32_t kNullLeafID = ~uint32_t(0);
 ```
 
 **Why leaf IDs, not pointers:**  `cachedGetValue` fetches `mOffset`, `mPrefixSum`, and
-`valueMask().words()[w]` for all active lanes via SIMD gathers (§8d).  The gather index
-is `leaf_id × (sizeof(LeafT)/sizeof(uint64_t))`, computed once per call as a
-`Simd<uint32_t,W>` multiply.  Storing IDs enables a single flat-base gather over the
-contiguous leaf array; storing pointers would require per-lane pointer arithmetic that
-doesn't map to `vgatherdpd` / `vpgatherqq`.  The `kNullLeafID` sentinel cleanly
-replaces `nullptr` and is masked out in the gather via `where`.
+`valueMask().words()[w]` for all active lanes via SIMD gathers (§8d–§8e).  The gather index
+is `leaf_id × (sizeof(LeafT)/sizeof(uint64_t))`, computed as a `Simd<int64_t,W>` (see §8e).
+Storing IDs enables a single flat-base gather over the contiguous leaf array; storing
+pointers would require per-lane pointer arithmetic that doesn't map to `vpgatherqq`.
+The `kNullLeafID` sentinel is masked out before any gather via `valid_u32` (§8e).
+
+**Class-level base pointers:**  `mOffsetBase`, `mPrefixBase`, and `mMaskWordBase` are
+`const` pointers computed once in the constructor from `getFirstLeaf()[0]`.  They are
+invariant over the lifetime of the accessor (the leaf array is fixed after grid construction)
+and are shared across all 18 `cachedGetValue` instantiations in a WENO5 gather, avoiding
+the equivalent recomputation in every call.
 
 **Cache advance:** when `none_of(leafMask)` fires in the outer loop:
 
@@ -209,13 +216,20 @@ template<int di, int dj, int dk>
 void cachedGetValue(ValueT& result, VoxelOffsetT vo, PredicateT leafMask) const;
 ```
 
-- Fills **only the `leafMask` lanes** of `result` (by reference).
-- Inactive lanes are not touched — values from a previous iteration are preserved.
-- This is the correct API for the straddle-aware outer loop: the caller declares
-  all stencil result variables before the `while` loop, fills them progressively
-  across iterations, and calls the kernel once after `activeMask` is empty.
+- Fills **only the `leafMask` lanes** of `result` (by reference) via a 2-arg `where`
+  directly on `result` — no intermediate copy, no write-back.
+- `leafMask`-clear lanes are **not touched**: values from a previous iteration are
+  preserved exactly as the caller left them.
+- Additionally, lanes for which the tap voxel is inactive (outside the narrow band
+  within an existing neighbor leaf) are also not written; `result` retains whatever
+  default the caller initialised it to (typically 0 for a zero-initialized stencil
+  buffer, matching `ValueOnIndex::getValue`'s return of 0 for inactive voxels).
+- This contract suits the straddle-aware outer loop: the caller declares stencil
+  result variables (zero-initialised) before the `while` loop, fills them
+  progressively across iterations, and calls the kernel once after `activeMask` is empty.
 - Requires the corresponding direction to be in `mProbedMask` (asserted in debug).
-- `nullptr` leaf (outside narrow band) writes `ScalarValueT(0)`.
+- `kNullLeafID` leaf (neighbor outside the narrow band entirely) also leaves `result`
+  untouched, for the same reason: `maskWords = 0` → `isActive = false`.
 
 ### 6e. Deferred
 
@@ -290,12 +304,12 @@ vpextrw  $0x0,%xmm1,%eax           ; / scalar hor_and
 After the scalar crossing check, `probeLeaf` is called at most once per unique
 direction per center leaf — inherently scalar tree traversal, not per-voxel.
 
-**`cachedGetValue` — SIMD ingredient fetch, scalar value path**
+**`cachedGetValue` — fully SIMD, no scalar loop**
 
-The ingredient-fetch block — `mOffset`, `mPrefixSum[w]`, and `valueMask().words()[w]`
-for all active lanes — is **fully SIMD** via the gather chain described in §8d.
-The final value-fetch (scalar loop over `leaf->getValue(offset)`) is the remaining
-work before the full SIMD index pipeline is wired in.
+`cachedGetValue` is fully vectorised end-to-end.  The scalar `leaf->getValue(offset)`
+loop has been replaced by the gather chain described in §8e.  The result is written
+directly to `result` via a 2-arg `where(isActive, result) = ...` — no intermediate
+variable, no write-back copy.
 
 ### 8b. No tree accessor in prefetch
 
@@ -379,6 +393,76 @@ for (int cx : {0,1,2}) for (int cy : {0,1,2}) for (int cz : {0,1,2}) {
 }
 ```
 
+### 8e. `cachedGetValue` gather pipeline — Steps 1–8
+
+`cachedGetValue` recomputes `packed_sum` identically to `prefetch` (§8a), then runs
+the following fully-SIMD pipeline.  All types are SIMD vectors of the indicated element
+type; scalar `LaneWidth==1` degrades to plain scalar types.
+
+```
+Step 1 — d_vec  (Simd<uint16_t,W>)
+    base-32 multiply trick (§8d): per-lane dir ∈ [0,26]
+
+Step 2 — tapLeafID_u32  (Simd<uint32_t,W>)
+    gather_if(tapLeafID_u32, leafMask, mNeighborLeafIDs, d_vec)
+    valid_u32 = (tapLeafID_u32 != kNullLeafID)     ← effective mask for steps 3–5
+
+Step 3 — tapLeafOffset_i64  (Simd<int64_t,W>)
+    simd_cast_if<int64_t>(tapLeafOffset_i64, valid_u32, tapLeafID_u32)
+    tapLeafOffset_i64 *= kStride          (kStride = sizeof(LeafT)/sizeof(uint64_t))
+
+    Widening to int64_t is required: uint32_t * kStride overflows for large leaf
+    pools (kNullLeafID = 0xFFFFFFFF).  simd_cast_if writes 0 for invalid lanes,
+    keeping gather indices non-negative.  x86 vpgatherqq treats indices as signed
+    int64_t, so negative values would access memory before the base pointer.
+
+Step 4a — offsets  (Simd<uint64_t,W>)
+    gather_if(offsets, valid_u32, mOffsetBase, tapLeafOffset_i64)
+    → leaf->mOffset for each valid lane
+
+Step 4b — prefixSums  (Simd<uint64_t,W>)
+    gather_if(prefixSums, valid_u32, mPrefixBase, tapLeafOffset_i64)
+    Extract field w from packed mPrefixSum:
+        shift = (w > 0) ? (w-1)*9 : 0
+        prefixSums = (w > 0) ? (prefixSums >> shift) & 511 : 0
+
+    mPrefixSum packs 7 nine-bit prefix counts in one uint64_t:
+        field w (1..7) at bits [9*(w-1) +: 9]; field 0 is defined as 0 (empty prefix).
+
+Step 5 — maskWords  (Simd<uint64_t,W>)
+    mask_idx = tapLeafOffset_i64 + simd_cast<int64_t>(wordIdx_u16)
+    gather_if(maskWords, valid_u32, mMaskWordBase, mask_idx)
+    → valueMask().words()[w] for each valid lane
+
+    Heterogeneous mask: valid_u32 is SimdMask<uint32_t,W> applied to uint64_t data.
+    Implemented via MaskElemT template parameter on gather_if in Simd.h.
+
+Step 6 — dest_yz  (Simd<uint64_t,W>)
+    dest_yz = ((packed_sum >> 2) & 0x38) | (packed_sum & 0x07)
+    → ny_w*8 + nz_w  (6-bit intra-word bit position, range [0,63])
+
+Step 7 — activity check + truncated maskWord
+    voxelBit  = 1u64 << dest_yz
+    isActive  = (maskWords & voxelBit) != 0
+    truncated = maskWords & (voxelBit - 1)
+
+    ValueOnIndex::getValue returns 0 for inactive voxels (bit not set in valueMask).
+    Null-leaf lanes have maskWords=0, so isActive=false there too — no explicit
+    valid_u32 guard is needed at this step.
+
+Step 8 — fill result
+    where(isActive, result) = offsets + prefixSums + popcount(truncated)
+
+    2-arg where writes only active lanes; leafMask-clear and inactive-voxel lanes
+    are untouched.
+```
+
+**popcount choice:** `popcount(Simd<uint64_t,W>)` uses a SWAR shift-and-add tree
+(`popcount64` in `Simd.h`) rather than `__builtin_popcountll`.  AVX2 lacks a
+64-bit lane-wise popcount (VPOPCNTQ is AVX-512DQ); `__builtin_popcountll` maps to
+the scalar `popcnt` instruction, which is not vectorisable.  The SWAR tree uses only
+`vpsrlq` / `vpand` / `vpaddq`, which are all AVX2-native.
+
 ---
 
 ## 9. Relationship to Phase 1 Prototype
@@ -396,13 +480,17 @@ for (int cx : {0,1,2}) for (int cy : {0,1,2}) for (int cz : {0,1,2}) {
 
 ---
 
-## 10. Future Work
+## 10. Status and Future Work
 
-- **`cachedGetValue` vectorisation (Phase 2):** ingredient fetch (`mOffset`,
-  `mPrefixSum[w]`, `valueMask().words()[w]`) is now fully SIMD via the gather chain
-  in §8d.  Remaining: popcount `(maskWord & partial_mask)` → global value index →
-  `gather_if(result, leafMask, globalValueArray, indices)` to replace the scalar
-  `leaf->getValue(offset)` loop.  See `StencilGather.md §7b` for the AVX2 profile.
+### Completed
+
+- `prefetch<di,dj,dk>`: fully SIMD crossing detection, lazy probeLeaf.
+- `cachedGetValue<di,dj,dk>`: fully SIMD end-to-end (Steps 1–8, §8e).
+  Verified against scalar reference over 12M lane-checks across all 18 WENO5 taps.
+- Class-level base pointers (`mOffsetBase`, `mPrefixBase`, `mMaskWordBase`).
+- `simd_cast_if`, heterogeneous `gather_if`, `popcount64`/`popcount` added to `Simd.h`.
+
+### Remaining
 
 - **`getValue<di,dj,dk>`:** lazy combined `prefetch` + `cachedGetValue`.
 

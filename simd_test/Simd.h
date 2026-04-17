@@ -130,30 +130,36 @@ template<typename T, int W>
 inline bool all_of(SimdMask<T,W> m) { return stdx::all_of(m); }
 
 // Unmasked gather: result[i] = ptr[idx[i]] for all lanes.
-// Expressed as a generator constructor — Clang lowers to vgatherdps (all-ones mask).
-template<typename T, int W>
-inline Simd<T,W> gather(const T* __restrict__ ptr, Simd<int32_t,W> idx) {
+// IdxT may be int32_t or int64_t; the compiler selects the matching hardware
+// instruction (vpgatherdps/vpgatherdq for 32-bit idx, vpgatherqq for 64-bit idx).
+template<typename T, typename IdxT, int W>
+inline Simd<T,W> gather(const T* __restrict__ ptr, Simd<IdxT,W> idx) {
     return Simd<T,W>([&](int i) { return ptr[idx[i]]; });
 }
 
 // Masked gather: result[i] = mask[i] ? ptr[idx[i]] : fallback.
 // Implemented as a full gather + where-blend; ptr is accessed for ALL lanes,
 // so every idx[i] must be a valid offset regardless of mask[i].
-template<typename T, int W>
+template<typename T, typename IdxT, int W>
 inline Simd<T,W> gather(SimdMask<T,W> mask, const T* __restrict__ ptr,
-                         Simd<int32_t,W> idx, T fallback = T(0)) {
+                         Simd<IdxT,W> idx, T fallback = T(0)) {
     auto result = Simd<T,W>(fallback);
     stdx::where(mask, result) = Simd<T,W>([&](int i) { return ptr[idx[i]]; });
     return result;
 }
 
 // Merge-masked gather: dst[i] = mask[i] ? ptr[idx[i]] : dst[i]  (unchanged).
-// Mirrors vgatherdps merge-masking semantics: dst is both input and output.
-// Hope: compiler emits a single vgatherdps with dst as the destination register.
-template<typename T, int W>
-inline void gather_if(Simd<T,W>& dst, SimdMask<T,W> mask,
-                       const T* __restrict__ ptr, Simd<int32_t,W> idx) {
-    stdx::where(mask, dst) = Simd<T,W>([&](int i) { return ptr[idx[i]]; });
+// MaskElemT may differ from T (heterogeneous mask, e.g. SimdMask<uint32_t,W>
+// applied to Simd<uint64_t,W> data).  When T==MaskElemT, delegates directly
+// to stdx::where; otherwise uses the WhereExpression boolean round-trip.
+template<typename T, typename IdxT, typename MaskElemT, int W>
+inline void gather_if(Simd<T,W>& dst, SimdMask<MaskElemT,W> mask,
+                       const T* __restrict__ ptr, Simd<IdxT,W> idx) {
+    if constexpr (std::is_same_v<T, MaskElemT>) {
+        stdx::where(mask, dst) = Simd<T,W>([&](int i) { return ptr[idx[i]]; });
+    } else {
+        where(mask, dst) = Simd<T,W>([&](int i) { return ptr[idx[i]]; });
+    }
 }
 
 // ===========================================================================
@@ -330,8 +336,8 @@ NANOVDB_SIMD_HOSTDEV bool all_of(SimdMask<T,W> m) {
 }
 
 // Unmasked gather: result[i] = ptr[idx[i]] for all lanes.
-template<typename T, int W>
-NANOVDB_SIMD_HOSTDEV Simd<T,W> gather(const T* __restrict__ ptr, Simd<int32_t,W> idx) {
+template<typename T, typename IdxT, int W>
+NANOVDB_SIMD_HOSTDEV Simd<T,W> gather(const T* __restrict__ ptr, Simd<IdxT,W> idx) {
     Simd<T,W> r;
     for (int i = 0; i < W; i++) r[i] = ptr[idx[i]];
     return r;
@@ -339,19 +345,20 @@ NANOVDB_SIMD_HOSTDEV Simd<T,W> gather(const T* __restrict__ ptr, Simd<int32_t,W>
 
 // Masked gather: result[i] = mask[i] ? ptr[idx[i]] : fallback.
 // Scalar path: accesses ptr only for true lanes (ternary short-circuits).
-template<typename T, int W>
+template<typename T, typename IdxT, int W>
 NANOVDB_SIMD_HOSTDEV Simd<T,W> gather(SimdMask<T,W> mask, const T* __restrict__ ptr,
-                                        Simd<int32_t,W> idx, T fallback = T(0)) {
+                                        Simd<IdxT,W> idx, T fallback = T(0)) {
     Simd<T,W> r;
     for (int i = 0; i < W; i++) r[i] = mask[i] ? ptr[idx[i]] : fallback;
     return r;
 }
 
 // Merge-masked gather: dst[i] = mask[i] ? ptr[idx[i]] : dst[i]  (unchanged).
+// MaskElemT may differ from T (heterogeneous mask).
 // Scalar path: only accesses ptr for true lanes.
-template<typename T, int W>
-NANOVDB_SIMD_HOSTDEV void gather_if(Simd<T,W>& dst, SimdMask<T,W> mask,
-                                     const T* __restrict__ ptr, Simd<int32_t,W> idx) {
+template<typename T, typename IdxT, typename MaskElemT, int W>
+NANOVDB_SIMD_HOSTDEV void gather_if(Simd<T,W>& dst, SimdMask<MaskElemT,W> mask,
+                                     const T* __restrict__ ptr, Simd<IdxT,W> idx) {
     for (int i = 0; i < W; i++)
         if (mask[i]) dst[i] = ptr[idx[i]];
 }
@@ -380,6 +387,60 @@ NANOVDB_SIMD_HOSTDEV Simd<DstT,W> simd_cast(Simd<SrcT,W> src) {
 }
 template<typename DstT, typename SrcT>
 NANOVDB_SIMD_HOSTDEV DstT simd_cast(SrcT src) { return static_cast<DstT>(src); }
+
+// ---------------------------------------------------------------------------
+// simd_cast_if — masked element-wise cast (merge-masked).
+//
+// dst[i] = mask[i] ? static_cast<DstT>(src[i]) : dst[i]   (unchanged)
+//
+// Typical use: widen an integer index type into a wider type before arithmetic,
+// keeping invalid (masked-out) lanes at their initial value (usually 0).
+// On AVX-512 the compiler may emit a single masked vcvt/vpmovzx instruction.
+// On AVX2 it lowers to an unmasked cast + blend.
+//
+// Scalar fallback: plain conditional cast.
+// ---------------------------------------------------------------------------
+template<typename DstT, typename SrcT, typename MaskElemT, int W>
+NANOVDB_SIMD_HOSTDEV void simd_cast_if(Simd<DstT,W>& dst, SimdMask<MaskElemT,W> mask, Simd<SrcT,W> src) {
+    dst = where(mask, simd_cast<DstT, SrcT, W>(src), dst);
+}
+template<typename DstT, typename SrcT>
+NANOVDB_SIMD_HOSTDEV void simd_cast_if(DstT& dst, bool mask, SrcT src) {
+    if (mask) dst = static_cast<DstT>(src);
+}
+
+// ---------------------------------------------------------------------------
+// popcount64 — scalar SWAR popcount, always uses arithmetic (no __builtin_popcountll).
+//
+// Safe to call per-lane inside a vectorizable loop: every operation (>>, &, +, -)
+// maps to an AVX2 instruction for 64-bit elements (vpsrlq, vpand, vpaddq, vpsubq).
+// The final byte-sum uses a shift-and-add tree instead of the multiply trick
+// (v * 0x0101...) since 64x64->64 multiply has no AVX2 equivalent (vpmullq is AVX-512).
+// ---------------------------------------------------------------------------
+NANOVDB_SIMD_HOSTDEV inline uint64_t popcount64(uint64_t v)
+{
+    v -= (v >> 1) & uint64_t(0x5555555555555555);
+    v  = (v & uint64_t(0x3333333333333333)) + ((v >> 2) & uint64_t(0x3333333333333333));
+    v  = (v + (v >> 4)) & uint64_t(0x0F0F0F0F0F0F0F0F);  // per-byte counts
+    v += v >> 8;   v &= uint64_t(0x00FF00FF00FF00FF);
+    v += v >> 16;  v &= uint64_t(0x0000FFFF0000FFFF);
+    v += v >> 32;
+    return v & uint64_t(63);
+}
+
+// Lane-wise SIMD popcount: applies popcount64 to every lane.
+// Backend A: generator constructor; Backend B: element loop (auto-vectorized by GCC/Clang).
+template<int W>
+NANOVDB_SIMD_HOSTDEV Simd<uint64_t,W> popcount(Simd<uint64_t,W> v) {
+#ifdef NANOVDB_USE_STD_SIMD
+    return Simd<uint64_t,W>([&](int i) { return popcount64(v[i]); });
+#else
+    Simd<uint64_t,W> r;
+    for (int i = 0; i < W; ++i) r[i] = popcount64(v[i]);
+    return r;
+#endif
+}
+NANOVDB_SIMD_HOSTDEV inline uint64_t popcount(uint64_t v) { return popcount64(v); }
 
 // ---------------------------------------------------------------------------
 // simd_traits — generic per-lane access for scalar and Simd<T,W> types.
@@ -477,12 +538,12 @@ NANOVDB_SIMD_HOSTDEV ScalarWhereProxy<T> where(bool mask, T& target) {
 }
 
 // Unmasked scalar gather: result = ptr[idx].
-template<typename T>
-NANOVDB_SIMD_HOSTDEV T gather(const T* __restrict__ ptr, int32_t idx) { return ptr[idx]; }
+template<typename T, typename IdxT>
+NANOVDB_SIMD_HOSTDEV T gather(const T* __restrict__ ptr, IdxT idx) { return ptr[idx]; }
 
 // Merge-masked scalar gather: dst = ptr[idx] only if mask, else dst unchanged.
-template<typename T>
-NANOVDB_SIMD_HOSTDEV void gather_if(T& dst, bool mask, const T* __restrict__ ptr, int32_t idx) {
+template<typename T, typename IdxT>
+NANOVDB_SIMD_HOSTDEV void gather_if(T& dst, bool mask, const T* __restrict__ ptr, IdxT idx) {
     if (mask) dst = ptr[idx];
 }
 
