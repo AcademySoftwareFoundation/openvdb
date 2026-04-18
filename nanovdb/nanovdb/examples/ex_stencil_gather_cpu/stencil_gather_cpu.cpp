@@ -353,6 +353,90 @@ static void runPerf(
         std::accumulate(sums.begin(), sums.end(), uint64_t(0),
                         [](uint64_t a, uint64_t b) { return a ^ b; });
 
+    // ---- Legacy cost decomposition variants ----
+    // (a) "framing only"  — Legacy loop structure, no accessor call (anti-DCE writes use li+k).
+    //     Measures: decodeInverseMaps + Coord compute + 18-iteration inner loop + anti-DCE store.
+    // (b) "center-hit only" — Legacy loop + 18× mAcc.getValue(center) instead of tap offsets.
+    //     Always hits the ReadAccessor's leaf cache → no tree walk.
+    //     Measures: framing + cache-query + leaf-local lookup (mValueMask + mPrefixSum + popcount).
+    // (c) "full" — the original LegacyStencilAccessor path.
+    //     Measures: framing + cache-query + leaf-local lookup + tree-walk-on-miss.
+    //
+    // Tree-walk cost per voxel ≈ full − center-hit.
+    // Cache + leaf-lookup per voxel ≈ center-hit − framing.
+    // Framing per voxel ≈ framing.
+
+    std::fill(sums.begin(), sums.end(), uint64_t(0));
+    const double framingUs = timeForEach([&] {
+        nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
+            [&](const nanovdb::util::Range1D& range) {
+                alignas(64) uint32_t leafIndex[BlockWidth];
+                alignas(64) uint16_t voxelOffset[BlockWidth];
+                uint64_t* bs0 = sums.data();
+
+                for (size_t bID = range.begin(); bID != range.end(); ++bID) {
+                    CPUVBM::decodeInverseMaps(
+                        grid, firstLeafID[bID],
+                        &jumpMap[bID * CPUVBM::JumpMapLength],
+                        firstOffset + bID * BlockWidth,
+                        leafIndex, voxelOffset);
+
+                    uint64_t* bs = bs0 + bID * BlockWidth;
+                    for (int i = 0; i < BlockWidth; ++i) {
+                        if (leafIndex[i] == CPUVBM::UnusedLeafIndex) continue;
+                        const uint16_t vo = voxelOffset[i];
+                        const uint32_t li = leafIndex[i];
+                        const nanovdb::Coord cOrigin = firstLeaf[li].origin();
+                        const int lx = (vo >> 6) & 7, ly = (vo >> 3) & 7, lz = vo & 7;
+                        const nanovdb::Coord center = cOrigin + nanovdb::Coord(lx, ly, lz);
+                        // 18 trivial "taps" — no accessor call; anti-DCE via Coord components.
+                        uint64_t s = 0;
+                        for (int k = 0; k < LegacyAccT::size(); ++k)
+                            s += static_cast<uint64_t>(center.x() + center.y() + center.z() + k);
+                        bs[i] = s;
+                    }
+                }
+            });
+    });
+
+    std::fill(sums.begin(), sums.end(), uint64_t(0));
+    const double centerHitUs = timeForEach([&] {
+        nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
+            [&](const nanovdb::util::Range1D& range) {
+                alignas(64) uint32_t leafIndex[BlockWidth];
+                alignas(64) uint16_t voxelOffset[BlockWidth];
+                auto acc = grid->getAccessor();
+                uint64_t* bs0 = sums.data();
+
+                for (size_t bID = range.begin(); bID != range.end(); ++bID) {
+                    CPUVBM::decodeInverseMaps(
+                        grid, firstLeafID[bID],
+                        &jumpMap[bID * CPUVBM::JumpMapLength],
+                        firstOffset + bID * BlockWidth,
+                        leafIndex, voxelOffset);
+
+                    uint64_t* bs = bs0 + bID * BlockWidth;
+                    for (int i = 0; i < BlockWidth; ++i) {
+                        if (leafIndex[i] == CPUVBM::UnusedLeafIndex) continue;
+                        (void)voxelOffset[i];   // keep decode non-dead
+                        const uint32_t li = leafIndex[i];
+                        const nanovdb::Coord cOrigin = firstLeaf[li].origin();
+                        // 18 distinct positions ALL within this leaf's 8^3 footprint
+                        // — guarantees leaf-cache hit on every call, but each coord
+                        // is unique so the compiler can't CSE the lookups.
+                        //   k in [0..17]: local (k&7, (k>>3)&1, 0) sweeps an 8x2x1 slab.
+                        uint64_t s = 0;
+                        for (int k = 0; k < LegacyAccT::size(); ++k) {
+                            const nanovdb::Coord c = cOrigin
+                                + nanovdb::Coord(k & 7, (k >> 3) & 1, 0);
+                            s += static_cast<uint64_t>(acc.getValue(c));
+                        }
+                        bs[i] = s;
+                    }
+                }
+            });
+    });
+
     // ---- LegacyStencilAccessor ----
     std::fill(sums.begin(), sums.end(), uint64_t(0));
 
@@ -402,6 +486,23 @@ static void runPerf(
     std::printf("  LegacyStencilAccessor : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
         legacyUs  / 1e3, legacyUs  * 1e3 / double(nVoxels),
         (legacyUs - decodeUs) / 1e3, legacyChecksum);
+
+    // Decomposition of LegacyStencilAccessor's ns/voxel:
+    //   framing       = no accessor call
+    //   cache + leaf  = centerHit − framing   (per 18 taps)
+    //   tree walk     = legacy    − centerHit (per 18 taps; amortises over ~25% miss rate)
+    const double framingNs    = framingUs    * 1e3 / double(nVoxels);
+    const double centerHitNs  = centerHitUs  * 1e3 / double(nVoxels);
+    const double legacyNs     = legacyUs     * 1e3 / double(nVoxels);
+    std::printf("\nLegacy cost decomposition (18 taps/voxel):\n");
+    std::printf("  framing only         : %7.1f ms  (%5.1f ns/voxel)\n",
+        framingUs / 1e3, framingNs);
+    std::printf("  + center-hit × 18    : %7.1f ms  (%5.1f ns/voxel)  [cache+leaf = %5.2f ns/vox = %4.2f ns/tap]\n",
+        centerHitUs / 1e3, centerHitNs,
+        centerHitNs - framingNs, (centerHitNs - framingNs) / 18.0);
+    std::printf("  + stencil × 18 (full): %7.1f ms  (%5.1f ns/voxel)  [tree walk = %5.2f ns/vox = %4.2f ns/tap]\n",
+        legacyUs / 1e3, legacyNs,
+        legacyNs - centerHitNs, (legacyNs - centerHitNs) / 18.0);
 
     if (stencilChecksum != legacyChecksum)
         std::cerr << "  WARNING: checksums differ — accessor results disagree!\n";
