@@ -38,6 +38,7 @@
 #include <nanovdb/util/BatchAccessor.h>
 
 #include <cstdint>
+#include <cstring>      // std::memset
 #include <cassert>
 #include <tuple>
 #include <type_traits>
@@ -123,44 +124,47 @@ class StencilAccessor
     using GridT = NanoGrid<BuildT>;
 
     // -------------------------------------------------------------------------
-    // Type aliases — scalar/SIMD split (§5 of design doc)
+    // Private type aliases — only used inside moveTo().
+    //
+    // These are the W-lane SIMD types that carry the input arrays through the
+    // straddling loop and the SWAR direction extraction.  They do NOT appear
+    // in the public API: callers consume `mIndices` (raw uint64_t[SIZE][W])
+    // directly, and `moveTo` returns `void` — active-lane information is read
+    // from `leafIndex[]` vs `UnusedLeafIndex` by the caller.
     // -------------------------------------------------------------------------
+    using OffsetVec    = std::conditional_t<W == 1, uint16_t, util::Simd<uint16_t, W>>;
+    using LeafIdVec    = std::conditional_t<W == 1, uint32_t, util::Simd<uint32_t, W>>;
+    using LeafMaskVec  = std::conditional_t<W == 1, bool,     util::SimdMask<uint32_t, W>>;
 
-    // Output index type: one Simd<uint64_t,W> per tap.
-    using IndexVec  = std::conditional_t<W == 1, uint64_t,  util::Simd<uint64_t, W>>;
-
-    // Voxel offset type: loaded from the voxelOffset[] array (uint16_t).
-    using OffsetVec = std::conditional_t<W == 1, uint16_t,  util::Simd<uint16_t, W>>;
-
-    // Leaf index type: loaded from the leafIndex[] array (uint32_t).
-    using LeafIdVec = std::conditional_t<W == 1, uint32_t,  util::Simd<uint32_t, W>>;
-
-    // Internal mask — derived from leafIndex[] comparisons (uint32_t domain).
-    // Passed to BatchAccessor::prefetch / cachedGetValue.
-    using LeafMaskVec  = std::conditional_t<W == 1, bool, util::SimdMask<uint32_t, W>>;
-
-    // External mask — returned by moveTo; semantically over mIndices (uint64_t).
-    // Both LeafMaskVec and IndexMaskVec are W-bit masks; conversion is a
-    // boolean round-trip (see SimdMask converting constructor in Simd.h).
-    using IndexMaskVec = std::conditional_t<W == 1, bool, util::SimdMask<uint64_t, W>>;
-
-    // BatchAccessor parameterised with LeafMaskVec (prefetch/cachedGetValue domain).
     using BatchAcc = std::conditional_t<W == 1,
                          BatchAccessor<BuildT, uint64_t,  uint16_t, bool>,
-                         BatchAccessor<BuildT, IndexVec,  OffsetVec, LeafMaskVec>>;
+                         BatchAccessor<BuildT, uint64_t,  OffsetVec, LeafMaskVec>>;
 
     static constexpr int SIZE      = int(std::tuple_size_v<typename StencilT::Taps>);
     static constexpr int HULL_SIZE = int(std::tuple_size_v<typename StencilT::Hull>);
 
 public:
     // -------------------------------------------------------------------------
+    // Public API — entirely free of Simd<>/SimdMask<> types.
+    //
+    // Storage layout: `mIndices[tap][lane]` is a plain uint64_t.  Callers are
+    // free to SIMD-load it with whatever backend they choose
+    // (e.g. `Simd<uint64_t,W>::load(stencilAcc.mIndices[k], element_aligned)`),
+    // iterate scalarly, or pass slices to downstream kernels — we don't
+    // impose a choice.
+    //
+    // Layout is part of the ABI: [SIZE][W] row-major.  Changing it is
+    // a breaking change.
+    // -------------------------------------------------------------------------
+    alignas(64) uint64_t mIndices[SIZE][W];
+
+    // -------------------------------------------------------------------------
     // Construction
     //
     // firstLeafID  -- VBM block's starting leaf ID (vbm.hostFirstLeafID()[blockID]).
     // nExtraLeaves -- number of distinct center-leaf advances possible in this block
-    //                 (computed by the caller from the jumpMap).  Used only as a
-    //                 debug-mode assert bound; not needed for correctness.
-    //                 See StencilAccessor.md §7 for removal instructions.
+    //                 (computed by the caller from the jumpMap).  Debug-only bound
+    //                 on the straddling loop; not needed for correctness.
     // -------------------------------------------------------------------------
     StencilAccessor(const GridT& grid, uint32_t firstLeafID, uint32_t nExtraLeaves)
         : mBatch(grid, firstLeafID)
@@ -168,37 +172,42 @@ public:
         , mNExtraLeaves(nExtraLeaves)
 #endif
     {
-        (void)nExtraLeaves;  // suppress unused-parameter warning in release builds
+        (void)nExtraLeaves;
     }
 
     // -------------------------------------------------------------------------
-    // moveTo -- gather all tap indices for a W-wide batch of center voxels
+    // moveTo -- fill mIndices[0..SIZE-1][0..W-1] for a W-wide batch.
     //
-    // leafIndex   -- ptr to leafIndex[batchStart]   (uint32_t array from decodeInverseMaps)
-    // voxelOffset -- ptr to voxelOffset[batchStart] (uint16_t array from decodeInverseMaps)
+    // leafIndex   -- ptr to leafIndex[batchStart]   (uint32_t from decodeInverseMaps)
+    // voxelOffset -- ptr to voxelOffset[batchStart] (uint16_t from decodeInverseMaps)
     //
-    // Returns the initial active-lane mask (leafSlice != UnusedLeafIndex), widened
-    // to IndexMaskVec.  Active lanes have valid results in mIndices[0..SIZE-1].
-    // Inactive lanes hold 0 (NanoVDB background index).
+    // Active-lane semantics: a lane i is "active" iff
+    //     leafIndex[i] != UnusedLeafIndex
+    // Active lanes receive their 18 tap indices in mIndices[k][i].
+    // Inactive lanes are zeroed (NanoVDB background index).
+    //
+    // Caller pattern:
+    //     stencilAcc.moveTo(leafIndex + bs, voxelOffset + bs);
+    //     for (int i = 0; i < W; ++i) {
+    //         if (leafIndex[bs + i] == UnusedLeafIndex) continue;
+    //         ...stencilAcc.mIndices[k][i]...
+    //     }
     //
     // See StencilAccessor.md §8 for the full straddling loop design.
     // -------------------------------------------------------------------------
-    IndexMaskVec moveTo(const uint32_t* leafIndex, const uint16_t* voxelOffset)
+    void moveTo(const uint32_t* leafIndex, const uint16_t* voxelOffset)
     {
-        // Zero all tap slots — inactive lanes will hold 0 (background index).
-        zeroIndices(std::make_index_sequence<SIZE>{});
+        // Zero the whole results buffer — inactive lanes stay 0.
+        std::memset(mIndices, 0, sizeof(mIndices));
 
-        // Load this batch.
+        // Load the batch into SIMD registers for the SWAR / straddling logic.
         const LeafIdVec leafSlice = loadLeafIdVec(leafIndex);
         const OffsetVec voVec     = loadOffsetVec(voxelOffset);
 
         // Initial active-lane mask (which lanes have real voxels).
         LeafMaskVec activeMask = (leafSlice != LeafIdVec(UnusedLeafIndex));
 
-        // Save before the drain loop — this is what we return.
-        const IndexMaskVec resultMask = widenMask(activeMask);
-
-        if (util::none_of(activeMask)) return resultMask;
+        if (util::none_of(activeMask)) return;
 
 #ifndef NDEBUG
         uint32_t nAdvances = 0;
@@ -219,40 +228,35 @@ public:
             }
 
             // Prefetch hull — warms all neighbor-leaf directions the full
-            // stencil can reach, before any cachedGetValue is called.
+            // stencil can reach, before any cachedGetValue runs.
             prefetchHull(voVec, leafMask, std::make_index_sequence<HULL_SIZE>{});
 
-            // Compute all tap indices and blend into mIndices.
+            // Fill all SIZE tap entries for the lanes in leafMask.
             calcTaps(voVec, leafMask, std::make_index_sequence<SIZE>{});
 
             // Remove processed lanes.
             activeMask = activeMask & !leafMask;
         }
-
-        return resultMask;
     }
 
     // -------------------------------------------------------------------------
-    // getValue<DI,DJ,DK> -- access tap result by compile-time coordinate
+    // tapIndex<DI,DJ,DK>() -- compile-time tap lookup.
     //
-    // Resolved entirely at compile time via the findIndex constexpr fold.
-    // Returns a const reference valid until the next moveTo() call.
+    // Returns the slot in mIndices that corresponds to a named stencil tap,
+    // resolved at compile time against StencilT::Taps.  A tap that is not in
+    // the stencil produces a static_assert.
+    //
+    // Usage (reorder-safe, zero runtime cost):
+    //     auto& xm3 = stencilAcc.mIndices[SAccT::tapIndex<-3,0,0>()];
     // -------------------------------------------------------------------------
     template<int DI, int DJ, int DK>
-    const IndexVec& getValue() const
+    static constexpr int tapIndex()
     {
         constexpr int I = detail::findIndex<typename StencilT::Taps, DI, DJ, DK>(
             std::make_index_sequence<SIZE>{});
-        static_assert(I >= 0, "StencilAccessor::getValue: tap not in stencil");
-        return mIndices[I];
+        static_assert(I >= 0, "StencilAccessor::tapIndex: tap not in stencil");
+        return I;
     }
-
-    // -------------------------------------------------------------------------
-    // operator[] -- indexed tap access (for generic iteration over all taps)
-    //
-    // No bounds check in release.  Same lifetime as getValue.
-    // -------------------------------------------------------------------------
-    const IndexVec& operator[](int i) const { return mIndices[i]; }
 
     static constexpr int size() { return SIZE; }
 
@@ -260,13 +264,6 @@ private:
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
-
-    // Compile-time zero of all SIZE index slots.
-    template<size_t... Is>
-    void zeroIndices(std::index_sequence<Is...>)
-    {
-        ((mIndices[Is] = IndexVec(uint64_t(0))), ...);
-    }
 
     // Load LeafIdVec from a uint32_t pointer (scalar or SIMD).
     static LeafIdVec loadLeafIdVec(const uint32_t* p)
@@ -282,16 +279,6 @@ private:
         else return OffsetVec(p, util::element_aligned);
     }
 
-    // Widen LeafMaskVec (uint32_t domain) → IndexMaskVec (uint64_t domain).
-    // Both are W-bit masks; SimdMask<T,W> has a converting constructor from
-    // SimdMask<U,W> that copies the bool array element-by-element (Simd.h §B).
-    // The stdx backend uses a boolean round-trip (WhereExpression, Simd.h §A).
-    static IndexMaskVec widenMask(LeafMaskVec m)
-    {
-        if constexpr (W == 1) return m;
-        else return IndexMaskVec(m);
-    }
-
     // Compile-time fold: prefetch all HULL_SIZE hull directions.
     template<size_t... Is>
     void prefetchHull(OffsetVec voVec, LeafMaskVec leafMask, std::index_sequence<Is...>)
@@ -304,24 +291,19 @@ private:
          >(voVec, leafMask), ...);
     }
 
-    // Compile-time fold: cachedGetValue for all SIZE taps, where-blend into mIndices.
+    // Compile-time fold: cachedGetValue for all SIZE taps, write directly into mIndices.
+    // No where-blend: cachedGetValue's scalar tail writes only leafMask-active
+    // lanes; lanes outside leafMask keep whatever was written by a previous
+    // straddling-loop iteration (or zero from the initial memset).
     template<size_t... Is>
     void calcTaps(OffsetVec voVec, LeafMaskVec leafMask, std::index_sequence<Is...>)
     {
-        (blendOneTap<Is>(voVec, leafMask), ...);
-    }
-
-    // Fetch one tap and blend its result into mIndices[I] for the active lanes.
-    // The where(leafMask, mIndices[I]) = tmp blend uses the heterogeneous
-    // where() overload from Simd.h: LeafMaskVec (uint32_t) applied to
-    // IndexVec (uint64_t).  Both are W-bit masks; Simd.h handles the conversion.
-    template<size_t I>
-    void blendOneTap(OffsetVec voVec, LeafMaskVec leafMask)
-    {
-        using P = std::tuple_element_t<I, typename StencilT::Taps>;
-        IndexVec tmp(uint64_t(0));
-        mBatch.template cachedGetValue<P::di, P::dj, P::dk>(tmp, voVec, leafMask);
-        util::where(leafMask, mIndices[I]) = tmp;
+        using Taps = typename StencilT::Taps;
+        (mBatch.template cachedGetValue<
+             std::tuple_element_t<Is, Taps>::di,
+             std::tuple_element_t<Is, Taps>::dj,
+             std::tuple_element_t<Is, Taps>::dk
+         >(mIndices[Is], voVec, leafMask), ...);
     }
 
     // -------------------------------------------------------------------------
@@ -329,7 +311,6 @@ private:
     // -------------------------------------------------------------------------
 
     BatchAcc  mBatch;           // owns neighbor-leaf cache, mCenterLeafID
-    IndexVec  mIndices[SIZE];   // one vector per tap — output store
 
 #ifndef NDEBUG
     uint32_t  mNExtraLeaves;    // removable sanity bound on center-leaf advances

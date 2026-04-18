@@ -393,7 +393,16 @@ for (int cx : {0,1,2}) for (int cy : {0,1,2}) for (int cz : {0,1,2}) {
 }
 ```
 
-### 8e. `cachedGetValue` gather pipeline — Steps 1–8
+### 8e. `cachedGetValue` gather pipeline — Steps 1–8 *(historical)*
+
+> **Note — this section describes the prior fully-SIMD design.**  The current
+> implementation uses a **hybrid SIMD → scalar-tail** design (see §8i): Step 1
+> (`d_vec`) plus a parallel local-offset extraction stay SIMD (native `__m256i`
+> uint16 arithmetic with no aggregate ABI), then per-lane values are harvested
+> into stack C arrays and the leaf lookup runs as a plain scalar loop calling
+> `leaf.getValue(offset)` directly.  Steps 2–8 below no longer appear in the
+> source.  The material is preserved here as the rationale behind the original
+> SIMD gather chain and the baseline the hybrid was compared against.
 
 `cachedGetValue` recomputes `packed_sum` identically to `prefetch` (§8a), then runs
 the following fully-SIMD pipeline.  All types are SIMD vectors of the indicated element
@@ -898,6 +907,110 @@ StencilAccessor-style callers that require peak GCC performance may apply it
 to their own hot entry point; the attribute is safe and a no-op under Clang.
 This choice keeps the library's default codegen predictable and avoids forcing
 a 77 KB monolithic body on callers with smaller working sets.
+
+### 8i. Hybrid SIMD → scalar-tail design *(current)*
+
+The findings of §8f/§8h motivated a different trade-off, which is what the
+codebase now ships.
+
+**Where SIMD genuinely helps** (kept as SIMD):
+- `prefetch<di,dj,dk>()` — SWAR direction extraction over
+  `Simd<uint16_t, W>` (32 B = one native `__m256i`), horizontal carry-bit
+  reductions, mask-bit identification of unique neighbor directions.
+  Amortizes the `probeLeaf` call over all 16 lanes and over every tap that
+  reaches the same direction.
+- The *setup* half of `cachedGetValue`: SWAR expansion, `packed_sum`, base-32
+  direction extraction (`d_u16`), and local-offset extraction
+  (`localOffset_u16`) from the packed layout.  All of this is pure uint16
+  SIMD arithmetic on a single `__m256i` — no aggregate ABI, no gathers, no
+  heterogeneous where-blends, no Simd.h helpers that GCC outlines.
+
+**Where SIMD was dragging us down** (now scalar):
+- The gather chain (Steps 2–8 of §8e): 14 Simd.h helper calls per
+  `cachedGetValue` instantiation, operating on `_Fixed<16>` aggregates.  This
+  is what produces 282 `vzeroupper` per batch on GCC without `flatten` (§8h).
+- Scalar equivalents of the arithmetic (single `popcnt`, couple of scalar
+  loads from the target leaf, one `uint64_t` add) measure at **0.05 ns/tap**
+  when 18 taps × 16 lanes overlap freely on the load ports (§8 Legacy
+  decomposition — it's what `leaf.getValue(offset)` does internally anyway).
+
+**The boundary**: right after `d_u16` / `localOffset_u16` are computed.  Two
+`util::store` calls harvest them into stack `uint16_t[W]` C arrays; a
+`util::to_bitmask` harvests the SIMD `leafMask` into a `uint32_t` bitmask.
+The scalar tail is a one-liner per lane:
+
+```cpp
+const uint32_t leafID = mNeighborLeafIDs[neighborIdx[lane]];
+if (leafID == kNullLeafID) { dst[lane] = 0; continue; }
+dst[lane] = mFirstLeaf[leafID].getValue(localOffset[lane]);
+```
+
+**API change**: `cachedGetValue`'s output parameter is now
+`ScalarValueT (&dst)[LaneWidth]` — a plain C array, one entry per lane —
+instead of the old `Simd<ScalarValueT, W>&` aggregate.  Scalar lane writes
+are a single `mov` with no mask round-trip, which is what eliminates the
+18× `WhereExpression::operator=` outlined symbol.
+
+**StencilAccessor changes** (StencilAccessor.md §8.1):
+- Storage: `Simd<uint64_t, W> mIndices[SIZE]` → `uint64_t mIndices[SIZE][W]`,
+  made **public** (there's no work hidden behind the access).
+- Return type of `moveTo()`: `SimdMask<uint64_t, W>` → `void` (active-lane
+  information is `leafIndex[i] != UnusedLeafIndex`, already available to
+  the caller).
+- Removed `getValue<DI,DJ,DK>()` and `operator[]`; added
+  `static constexpr tapIndex<DI,DJ,DK>()` for reorder-safe compile-time
+  named-tap access.
+
+**Public API of `StencilAccessor`**: zero `Simd<>` or `SimdMask<>` types.
+Callers may SIMD-load tap rows from `mIndices[k]` with their own preferred
+backend (`Simd<uint64_t,W>::load(mIndices[k], element_aligned)`) or iterate
+scalarly — we don't impose a choice.
+
+#### Perf comparison (same workload as §8h: 32 M ambient / 50% / 32 threads)
+
+| Variant                          | GCC 13 ns/vox | Clang 18 ns/vox |
+|----------------------------------|--------------:|----------------:|
+| Old SIMD path, no flatten        | 7.5           | 4.3             |
+| Old SIMD path, +flatten on moveTo| 3.7           | 4.3             |
+| **Hybrid (current), no flatten** | **5.1**       | **4.9**         |
+| Hybrid +flatten on moveTo        | 4.8           | 4.8             |
+| `LegacyStencilAccessor`          | 5.5           | 6.7             |
+
+Without `flatten`, the hybrid is **31% faster than the old SIMD path on GCC**
+(7.5 → 5.1) and beats scalar Legacy on both compilers.  Compiler-sensitivity
+collapses: GCC and Clang deliver within 0.2 ns/voxel of each other,
+eliminating the 3× spread that §8f / §8h documented.
+
+The 4.8 ns/voxel asymptote with `flatten` on both compilers is consistent
+with the scalar `popcnt` throughput bound (288 `popcnt/batch` ÷ 1 port ÷
+5 GHz = 57 ns/batch ÷ 16 voxels = 3.6 ns/voxel just for `popcnt`, plus
+~1.2 ns/voxel of surrounding work).
+
+#### Cost of the refactor
+
+- GCC loses 1.4 ns/voxel vs the best previous configuration (SIMD +
+  `flatten(moveTo)` at 3.7 ns/vox).  The SIMD popcount SWAR tree did real
+  work that scalar `popcnt` can't fully replace on port-1 throughput.
+- Clang loses ~0.6 ns/voxel vs its previous 4.3 ns/vox.
+- Both gains are recoverable by re-enabling `flatten` at the caller's
+  `moveTo` site (4.8 ns/vox on both compilers) — the shipped code just
+  doesn't require it by default.
+
+#### Cleanup of `Simd.h`
+
+With the gather chain gone, several helpers are no longer exercised by
+`BatchAccessor`:
+- `util::gather` / `util::gather_if`
+- `util::simd_cast` for widening `u16 → i32`, `i32 → i64`, `u16 → u64`
+- `util::simd_cast_if`
+- `util::popcount` (vector SWAR) — replaced by scalar `leaf.getValue`'s
+  internal `popcnt`
+- `util::WhereExpression` (heterogeneous form)
+
+These can be removed from `Simd.h` in a follow-up, subject to no external
+caller using them.  Added to support the hybrid: `util::store(v, p)` (a
+uniform `store` shim that dispatches to `copy_to` on stdx and `store` on
+the array backend).
 
 ---
 

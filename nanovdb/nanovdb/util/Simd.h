@@ -129,6 +129,12 @@ inline bool none_of(SimdMask<T,W> m) { return stdx::none_of(m); }
 template<typename T, int W>
 inline bool all_of(SimdMask<T,W> m) { return stdx::all_of(m); }
 
+// Store W lanes of v into p[0..W-1] (stdx calls this copy_to).
+template<typename T, int W>
+inline void store(Simd<T,W> v, T* p, element_aligned_tag = {}) {
+    v.copy_to(p, element_aligned);
+}
+
 // Unmasked gather: result[i] = ptr[idx[i]] for all lanes.
 // IdxT may be int32_t or int64_t; the compiler selects the matching hardware
 // instruction (vpgatherdps/vpgatherdq for 32-bit idx, vpgatherqq for 64-bit idx).
@@ -333,6 +339,12 @@ NANOVDB_SIMD_HOSTDEV bool none_of(SimdMask<T,W> m) { return !any_of(m); }
 template<typename T, int W>
 NANOVDB_SIMD_HOSTDEV bool all_of(SimdMask<T,W> m) {
     bool r = true; for (int i = 0; i < W; i++) r &= m[i]; return r;
+}
+
+// Store W lanes of v into p[0..W-1] (array-backend passthrough to member).
+template<typename T, int W>
+NANOVDB_SIMD_HOSTDEV void store(Simd<T,W> v, T* p, element_aligned_tag = {}) {
+    v.store(p);
 }
 
 // Unmasked gather: result[i] = ptr[idx[i]] for all lanes.

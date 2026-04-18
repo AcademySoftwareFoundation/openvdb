@@ -68,7 +68,6 @@ using CPUVBM = nanovdb::tools::VoxelBlockManager<Log2BlockWidth>;
 
 using SAccT      = nanovdb::StencilAccessor<BuildT, SIMDw, nanovdb::Weno5Stencil>;
 using LegacyAccT = nanovdb::LegacyStencilAccessor<BuildT, nanovdb::Weno5Stencil>;
-using IndexMaskT = nanovdb::util::SimdMask<uint64_t, SIMDw>;
 
 // ============================================================
 // Test domain generation (mirrors vbm_host_cuda.cpp)
@@ -120,13 +119,13 @@ struct VerifyStats {
 
 /// Cross-validate one StencilAccessor batch against LegacyStencilAccessor.
 ///
-/// Active lanes: reconstruct the global coordinate from (leafIndex, voxelOffset),
-/// call legacyAcc.moveTo(), and compare all SIZE tap indices element-by-element.
+/// Active lanes (leafIndex[p] != UnusedLeafIndex): reconstruct the global
+/// coordinate from (leafIndex, voxelOffset), call legacyAcc.moveTo(), and
+/// compare all SIZE tap indices element-by-element.
 ///
 /// Inactive lanes: assert all tap slots in stencilAcc hold 0 (background index).
 static void verifyStencilAccessor(
     const SAccT&    stencilAcc,
-    IndexMaskT      activeMask,
     const uint32_t* leafIndex,
     const uint16_t* voxelOffset,
     int             batchStart,
@@ -134,29 +133,28 @@ static void verifyStencilAccessor(
     LegacyAccT&     legacyAcc,
     VerifyStats&    stats)
 {
-    // Inactive lanes: all tap slots must hold 0 (NanoVDB background index).
     for (int i = 0; i < SIMDw; ++i) {
-        if (activeMask[i]) continue;
-        for (int k = 0; k < stencilAcc.size(); ++k) {
-            ++stats.laneChecks;
-            const uint64_t got = static_cast<uint64_t>(stencilAcc[k][i]);
-            if (got != 0) {
-                ++stats.errors;
-                if (stats.errors <= 10)
-                    std::cerr << "STENCIL inactive lane=" << i
-                              << " tap=" << k
-                              << ": expected 0, got " << got << "\n";
+        const int      p  = batchStart + i;
+        const uint32_t li = leafIndex[p];
+
+        if (li == CPUVBM::UnusedLeafIndex) {
+            // Inactive lane: all tap slots must hold 0 (NanoVDB background index).
+            for (int k = 0; k < stencilAcc.size(); ++k) {
+                ++stats.laneChecks;
+                const uint64_t got = stencilAcc.mIndices[k][i];
+                if (got != 0) {
+                    ++stats.errors;
+                    if (stats.errors <= 10)
+                        std::cerr << "STENCIL inactive lane=" << i
+                                  << " tap=" << k
+                                  << ": expected 0, got " << got << "\n";
+                }
             }
+            continue;
         }
-    }
 
-    // Active lanes: compare against the LegacyStencilAccessor oracle.
-    for (int i = 0; i < SIMDw; ++i) {
-        if (!activeMask[i]) continue;
-
-        const int      p       = batchStart + i;
-        const uint16_t vo      = voxelOffset[p];
-        const uint32_t li      = leafIndex[p];
+        // Active lane: compare against the LegacyStencilAccessor oracle.
+        const uint16_t vo = voxelOffset[p];
         const nanovdb::Coord cOrigin = firstLeaf[li].origin();
         const int lx = (vo >> 6) & 7, ly = (vo >> 3) & 7, lz = vo & 7;
 
@@ -165,7 +163,7 @@ static void verifyStencilAccessor(
         for (int k = 0; k < stencilAcc.size(); ++k) {
             ++stats.laneChecks;
             const uint64_t expected = legacyAcc[k];
-            const uint64_t actual   = static_cast<uint64_t>(stencilAcc[k][i]);
+            const uint64_t actual   = stencilAcc.mIndices[k][i];
             if (actual != expected) {
                 ++stats.errors;
                 if (stats.errors <= 10)
@@ -218,9 +216,8 @@ static void runPrototype(
         SAccT stencilAcc(*grid, firstLeafID[bID], (uint32_t)nExtraLeaves);
 
         for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
-            const IndexMaskT active =
-                stencilAcc.moveTo(leafIndex + batchStart, voxelOffset + batchStart);
-            verifyStencilAccessor(stencilAcc, active,
+            stencilAcc.moveTo(leafIndex + batchStart, voxelOffset + batchStart);
+            verifyStencilAccessor(stencilAcc,
                                   leafIndex, voxelOffset, batchStart,
                                   firstLeaf, legacyAcc, stats);
         }
@@ -335,13 +332,12 @@ static void runPerf(
                     uint64_t* bs = sums.data() + bID * BlockWidth;
 
                     for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
-                        const IndexMaskT active =
-                            stencilAcc.moveTo(leafIndex + batchStart, voxelOffset + batchStart);
+                        stencilAcc.moveTo(leafIndex + batchStart, voxelOffset + batchStart);
                         for (int i = 0; i < SIMDw; ++i) {
-                            if (!active[i]) continue;
+                            if (leafIndex[batchStart + i] == CPUVBM::UnusedLeafIndex) continue;
                             uint64_t s = 0;
                             for (int k = 0; k < SAccT::size(); ++k)
-                                s += static_cast<uint64_t>(stencilAcc[k][i]);
+                                s += stencilAcc.mIndices[k][i];
                             bs[batchStart + i] = s;
                         }
                     }

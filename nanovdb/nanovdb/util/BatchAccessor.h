@@ -148,6 +148,7 @@ public:
         , mCenterLeafID(firstLeafID)
         , mCenterOrigin(grid.tree().getFirstLeaf()[firstLeafID].origin())
         , mProbedMask(1u << dir(0, 0, 0))
+        , mFirstLeaf   (grid.tree().getFirstLeaf())
         , mOffsetBase  (reinterpret_cast<const uint64_t*>(&grid.tree().getFirstLeaf()[0].data()->mOffset))
         , mPrefixBase  (reinterpret_cast<const uint64_t*>(&grid.tree().getFirstLeaf()[0].data()->mPrefixSum))
         , mMaskWordBase(grid.tree().getFirstLeaf()[0].valueMask().words())
@@ -325,203 +326,92 @@ public:
     // appropriate neighbor leaf and calls leaf->getValue(offset).
     //
     // Requires prefetch<di,dj,dk> (or any prefetch covering the same directions)
-    // to have been called first.  Debug builds assert mProbedMask coverage.
+    // to have been called first.
     //
-    // A null leaf pointer (neighbor outside the narrow band) writes 0 to result.
-    // Inactive lanes (leafMask[i] == false) are not touched.
+    // A null leaf pointer (neighbor outside the narrow band) writes 0 to dst[lane].
+    // Inactive lanes (bit lane of leafMask clear) are not touched.
+    //
+    // Output layout: `ScalarValueT (&dst)[LaneWidth]` — a plain C array, one
+    // entry per SIMD lane.  This allows the scalar-tail loop below to write
+    // lane results with a single `mov`, avoiding the heterogeneous-mask
+    // where-blend that the old `Simd<ScalarValueT,W>&` signature triggered.
+    //
+    // Hybrid design (BatchAccessor.md §8h / StencilAccessor.md §8.1):
+    //   SIMD portion stays in native uint16_t __m256i (no aggregate ABI):
+    //     SWAR expansion, packed_sum, base-32 direction extract (d_u16),
+    //     local-offset extract (localOffset_u16).
+    //   Harvest: two YMM stores to stack C arrays (neighborIdx[], localOffset[]).
+    //   Scalar tail: per-lane pointer chase into mNeighborLeafIDs + mFirstLeaf,
+    //     one leaf.getValue(offset) call.  The LeafNode handles valueMask /
+    //     prefixSum / popcount internally — one popcnt per lookup.
     // -------------------------------------------------------------------------
     template<int di, int dj, int dk>
-    void cachedGetValue(ValueT& result, VoxelOffsetT vo, PredicateT leafMask) const
+    void cachedGetValue(ScalarValueT (&dst)[LaneWidth],
+                        VoxelOffsetT   vo,
+                        PredicateT     leafMask) const
     {
-        // -----------------------------------------------------------------------
-        // SIMD ingredient fetch (WIP -- not yet wired to result)
-        //
-        // Recomputes packed_sum (same SWAR expansion as prefetch) to extract the
-        // three per-lane ingredients needed to replace leaf->getValue() with fully
-        // SIMD index arithmetic + value gather.  See BatchAccessor.md Sec.8d.
-        //
-        //   offsets    -- leaf->mOffset:      base value index for the leaf
-        //   prefixSums -- leaf->mPrefixSum[w]: prefix popcount up to x-slice w
-        //   maskWords  -- leaf->mMask.mWords[w]: uint64_t mask for x-slice w
-        //
-        // w = dest_x = bits [10:12] of packed_sum (NanoVDB leaf layout: x is
-        // the most significant axis, so x-slices index the eight uint64_t words).
-        //
-        // dir per lane is extracted via the base-32 multiply trick (Sec.8d):
-        //   v = (packed_sum & 0x6318u) >> 3
-        //   dir = (v * 1129u) >> 10
-        //
-        // Note: exact field names (mOffset, mPrefixSum, mMask.mWords) need
-        // verification against LeafData<ValueOnIndex, 3, false> in NanoVDB.h.
-        // -----------------------------------------------------------------------
-        {
-            static constexpr auto packed_tap =
-                static_cast<VoxelOffsetScalarT>(
-                     (unsigned(dk) + 8u)
-                   | ((unsigned(dj) + 8u) <<  5)
-                   | ((unsigned(di) + 8u) << 10));
-            const auto expanded =
-                  ((vo | (vo << VoxelOffsetScalarT(4))) & VoxelOffsetT(kSwarXZMask))
-                | ((vo << VoxelOffsetScalarT(2))        & VoxelOffsetT(kSwarYMask));
+        // ---- SIMD portion (native __m256i uint16_t throughout — no aggregate ABI) ----
+        static constexpr auto packed_tap =
+            static_cast<VoxelOffsetScalarT>(
+                 (unsigned(dk) + 8u)
+               | ((unsigned(dj) + 8u) <<  5)
+               | ((unsigned(di) + 8u) << 10));
+        // SWAR expansion of the (x,y,z) local position of the center voxel.
+        // Inactive-lane values are garbage; the scalar tail below filters them
+        // out via the leafMask bitmask, so no sentinel / where-blend is needed.
+        const auto expanded =
+              ((vo | (vo << VoxelOffsetScalarT(4))) & VoxelOffsetT(kSwarXZMask))
+            | ((vo << VoxelOffsetScalarT(2))        & VoxelOffsetT(kSwarYMask));
+        const auto packed_sum = expanded + VoxelOffsetT(packed_tap);
 
-            auto packed_lc = VoxelOffsetT(kSwarSentinel);
-            util::where(leafMask, packed_lc) = expanded;
-            const auto packed_sum = packed_lc + VoxelOffsetT(packed_tap);
+        // Per-lane direction index (0..26) via the base-32 multiply trick (§8d).
+        // Stays in uint16_t — bits [10:14] of (v * 1129) lie entirely below bit 16,
+        // so the modular uint16_t product gives the same result as the full-width
+        // product for all valid inputs.  No int32 widening → no _Fixed<W> aggregate.
+        static constexpr uint16_t kSwarCarryMask = 0x6318u;
+        static constexpr uint16_t kDirMul        = 1129u;
+        static constexpr uint16_t kDirMask       = 31u;
+        const auto d_u16 = (((packed_sum & VoxelOffsetT(kSwarCarryMask))
+                                 >> VoxelOffsetScalarT(3))
+                             * VoxelOffsetT(kDirMul)
+                                 >> VoxelOffsetScalarT(10))
+                            & VoxelOffsetT(kDirMask);
 
-            // dest_x per lane: bits [10:12] of packed_sum -> uint64_t mask word index (0..7)
-            const auto wordIdx_u16 = (packed_sum >> VoxelOffsetScalarT(10)) & VoxelOffsetT(7u);
+        // Per-lane 9-bit local offset in the destination leaf.
+        // NanoVDB leaf layout: offset = (destX << 6) | (destY << 3) | destZ.
+        //   packed_sum bits: destX=[10:12], destY=[5:7], destZ=[0:2]
+        //   output   bits:   destX=[6:8],   destY=[3:5], destZ=[0:2]
+        const auto localOffset_u16 =
+              ((packed_sum >> VoxelOffsetScalarT(4)) & VoxelOffsetT(0x1C0u))
+            | ((packed_sum >> VoxelOffsetScalarT(2)) & VoxelOffsetT(0x38u))
+            |  (packed_sum                           & VoxelOffsetT(0x07u));
 
-            // SIMD gather of mOffset, mPrefixSum[w], and maskWords[w] per lane.
-            //
-            // Step 1 -- d_vec: per-lane dir (0..26) via base-32 multiply trick (Sec.8d).
-            //   No widening needed: we extract bits [10:14] of (v * 1129).  Those
-            //   bits lie entirely below bit 16, so the modular uint16_t product gives
-            //   the same answer as the full-width product for all valid + sentinel inputs.
-            //
-            // Step 2 -- tapLeafID_u32: gather mNeighborLeafIDs[d] for all lanes at once.
-            //
-            // Step 3 -- tapLeafOffset_i64: leaf_id * (sizeof(LeafT)/sizeof(uint64_t)).
-            //   This is the per-lane uint64_t-stride index into the flat leaf array,
-            //   viewed as a uint64_t[] through the base pointer of the target field.
-            //   Invalid (kNullLeafID) lanes are clamped to index 0 (safe; masked out).
-            //
-            // Step 4 -- offsets / prefixSums: two gathers with different base pointers
-            //   but the same tapLeafOffset_i64; masked to 0 for null lanes.
-            //   mPrefixSum is a packed uint64_t: field w lives at bits [9*(w-1)+:9]
-            //   (9-bit fields, w=0 -> prefix = 0 by definition).
-            //
-            // Step 5 -- maskWords: gather from valueMask().words() base.
-            //   words()[wi] for leaf[leaf_id] = mask_word_base[leaf_id*kStride + wi].
-            //   The per-lane wi is added to tapLeafOffset_i64 to form the mask gather index.
-            // Direction-extraction constants (base-32 multiply trick, Sec.8d).
-            static constexpr uint16_t kSwarCarryMask = 0x6318u; // carry bits [3:4],[8:9],[13:14]
-            static constexpr uint16_t kDirMul        = 1129u;   // base-32 multiplier: 1*32^2 + 3*32 + 9
-            static constexpr uint16_t kDirMask       = 31u;     // 5-bit digit mask
+        // ---- Harvest SIMD → C arrays and scalar tail ----
+        if constexpr (LaneWidth == 1) {
+            if (!leafMask) return;   // inactive: leave dst[0] alone
+            const uint32_t leafID = mNeighborLeafIDs[uint32_t(d_u16)];
+            if (leafID == kNullLeafID) { dst[0] = ScalarValueT(0); return; }
+            dst[0] = static_cast<ScalarValueT>(
+                mFirstLeaf[leafID].getValue(uint32_t(localOffset_u16)));
+        } else {
+            alignas(32) uint16_t localOffset[LaneWidth];
+            alignas(32) uint16_t neighborIdx[LaneWidth];
+            util::store(localOffset_u16, localOffset);
+            util::store(d_u16,           neighborIdx);
 
-            // Step 1 -- d_vec: per-lane dir (0..26) via base-32 multiply (Sec.8d).
-            // Stay in uint16_t throughout: bits [10:14] of (v * 1129) are entirely
-            // within the lower 16 bits, so the modular uint16_t product gives the
-            // same result as the full-width product for all valid inputs.
-            const auto d_u16 = (((packed_sum & VoxelOffsetT(kSwarCarryMask))
-                                     >> VoxelOffsetScalarT(3))
-                                 * VoxelOffsetT(kDirMul)
-                                     >> VoxelOffsetScalarT(10))
-                                & VoxelOffsetT(kDirMask);
-            const auto d_i32 = util::simd_cast<int32_t>(d_u16);
-
-            // Step 2 -- leaf IDs: unmasked gather (all lanes have d_i32 ∈ [0,26] by
-            // SWAR invariant, so mNeighborLeafIDs[d_i32[i]] is always a valid access).
-            // Non-leafMask lanes read the current center leaf's neighbor at direction d,
-            // which is filtered out by the explicit leafMask AND in valid_u32 below.
-            const LeafIDVecT tapLeafID_u32 = util::gather(mNeighborLeafIDs, d_i32);
-            const auto valid_u32 = leafMask & (tapLeafID_u32 != LeafIDVecT(kNullLeafID));
-
-            // Step 3 -- stride-scaled gather indices (widened to int64_t, invalid lanes -> 0)
-            // kStride is sizeof(LeafT)/sizeof(uint64_t); the static_assert makes the
-            // divisibility assumption explicit (NanoVDB leaves are always 8-byte aligned).
-            static_assert(sizeof(LeafT) % sizeof(uint64_t) == 0,
-                "LeafT must be uint64_t-aligned for packed gather indexing");
-            static constexpr int64_t kStride = int64_t(sizeof(LeafT) / sizeof(uint64_t));
-            using Int64VecT = std::conditional_t<LaneWidth == 1, int64_t, util::Simd<int64_t, LaneWidth>>;
-            Int64VecT tapLeafOffset_i64(0);
-            util::simd_cast_if<int64_t>(tapLeafOffset_i64, valid_u32, tapLeafID_u32);
-            tapLeafOffset_i64 = tapLeafOffset_i64 * Int64VecT(kStride);
-
-            // Step 4a -- offsets (mOffset): unmasked gather.
-            // Invalid lanes have tapLeafOffset_i64=0 (from simd_cast_if), reading from
-            // index 0 (center leaf's data).  These lanes are excluded by isActive in Step 7.
-            const LeafDataVecT offsets = util::gather(mOffsetBase, tapLeafOffset_i64);
-
-            // Step 4b -- prefixSums (mPrefixSum packed uint64_t, shift-extract field w):
-            // unmasked gather for the same reason as Step 4a.  After the shift-extract
-            // below, invalid-lane values don't matter because isActive filters them in Step 8.
-            LeafDataVecT prefixSums = util::gather(mPrefixBase, tapLeafOffset_i64);
-            const auto wordIdx_u64     = util::simd_cast<uint64_t>(wordIdx_u16);
-            const auto nonzero_w = (wordIdx_u64 != LeafDataVecT(0));
-            const auto shift     = util::where(nonzero_w, (wordIdx_u64 - LeafDataVecT(1)) * LeafDataVecT(9), LeafDataVecT(0));
-            prefixSums = util::where(nonzero_w, (prefixSums >> shift) & LeafDataVecT(511u), LeafDataVecT(0));
-
-            // Step 5 -- maskWords (valueMask().words()[w])
-            //   mMaskWordBase[leaf_id*kStride + w] == leaf[leaf_id].valueMask().words()[w]
-            //   because the mask field is at a fixed offsetof within every LeafT.
-            // Kept as gather_if (masked) so that invalid lanes get maskWords=0, which
-            // guarantees isActive=false in Step 7 without needing a cross-width mask AND.
-            const auto wordIdx_i64    = util::simd_cast<int64_t>(wordIdx_u16);
-            const auto mask_idx = tapLeafOffset_i64 + wordIdx_i64;
-            LeafDataVecT maskWords(0);
-            util::gather_if(maskWords, valid_u32, mMaskWordBase, mask_idx);
-            // Step 6 -- dest_yz: 6-bit intra-word bit position (ny_w*8 + nz_w).
-            // packed_sum bits [5:7] = dest_y, bits [0:2] = dest_z (both wrapped mod 8).
-            const auto dest_yz_u16 = ((packed_sum >> VoxelOffsetScalarT(2)) & VoxelOffsetT(0x38u))
-                                    |  (packed_sum                           & VoxelOffsetT(0x07u));
-            const auto dest_yz_u64 = util::simd_cast<uint64_t>(dest_yz_u16);
-
-            // Step 7 -- activity check + truncated maskWord.
-            // If voxel dest_yz is inactive, getValue returns 0 (not the formula below).
-            // Null-leaf lanes already have maskWords=0, so they are implicitly inactive.
-            const auto voxelBit  = LeafDataVecT(1) << dest_yz_u64;
-            const auto isActive  = (maskWords & voxelBit) != LeafDataVecT(0);
-            const auto truncated = maskWords & (voxelBit - LeafDataVecT(1));
-
-            // Step 8 -- fill result in-place; leafMask-clear lanes are untouched.
-            util::where(isActive, result) = offsets + prefixSums + util::popcount(truncated);
-
-            // -------------------------------------------------------------------
-            // Debug cross-check: validate SIMD-path values against scalar ref
-            // -------------------------------------------------------------------
-#ifndef NDEBUG
-            using LeafDataVecTraits = util::simd_traits<LeafDataVecT>;
-            for (int i = 0; i < LaneWidth; ++i) {
-                if (!Pred_traits::get(leafMask, i)) continue;  // only check lanes caller asked about
-
-                // Scalar reference: same arithmetic as the legacy loop below
-                const auto vo_i = static_cast<uint16_t>(VO_traits::get(vo, i));
-                const int lx = (vo_i >> 6) & 7, ly = (vo_i >> 3) & 7, lz = vo_i & 7;
-                const int nx = lx + di, ny = ly + dj, nz = lz + dk;
-                const int dx = (nx < 0) ? -1 : (nx >= 8) ? 1 : 0;
-                const int dy = (ny < 0) ? -1 : (ny >= 8) ? 1 : 0;
-                const int dz = (nz < 0) ? -1 : (nz >= 8) ? 1 : 0;
-                const int d_ref = dir(dx, dy, dz);
-                const int nx_w  = nx - dx * 8;
-                const int ny_w  = ny - dy * 8;
-                const int nz_w  = nz - dz * 8;
-                const uint32_t ref_id = mNeighborLeafIDs[d_ref];
-                const LeafT*   ref    = (ref_id != kNullLeafID)
-                    ? &mGrid.tree().getFirstLeaf()[ref_id] : nullptr;
-
-                // SIMD-path values for this lane
-                const uint32_t ps_i   = static_cast<uint32_t>(VO_traits::get(packed_sum, i));
-                const int      d_simd = int((((ps_i & 0x6318u) >> 3) * 1129u >> 10) & 31u);
-                const int      wi     = int(VO_traits::get(wordIdx_u16, i));
-
-                assert(d_simd == d_ref && "cachedGetValue SIMD: dir mismatch");
-                assert(wi == nx_w      && "cachedGetValue SIMD: w (dest_x) mismatch");
-
-                if (ref) {
-                    const uint64_t pfx_ref = (uint32_t(nx_w) > 0u)
-                        ? (ref->data()->mPrefixSum >> (9u * (uint32_t(nx_w) - 1u))) & 511u
-                        : uint64_t(0);
-                    const uint32_t ref_offset = uint32_t(nx_w)*64u + uint32_t(ny_w)*8u + uint32_t(nz_w);
-                    assert(LeafDataVecTraits::get(offsets,    i) == ref->data()->mOffset
-                           && "cachedGetValue SIMD: mOffset mismatch");
-                    assert(LeafDataVecTraits::get(prefixSums, i) == pfx_ref
-                           && "cachedGetValue SIMD: mPrefixSum mismatch");
-                    assert(LeafDataVecTraits::get(maskWords,  i) == ref->valueMask().words()[nx_w]
-                           && "cachedGetValue SIMD: maskWord mismatch");
-                    assert(Val_traits::get(result, i) == static_cast<uint64_t>(ref->getValue(ref_offset))
-                           && "cachedGetValue SIMD: final result mismatch");
-                } else {
-                    assert(LeafDataVecTraits::get(offsets,    i) == uint64_t(0)
-                           && "cachedGetValue SIMD: null leaf offsets should be 0");
-                    assert(LeafDataVecTraits::get(prefixSums, i) == uint64_t(0)
-                           && "cachedGetValue SIMD: null leaf prefixSums should be 0");
-                    assert(LeafDataVecTraits::get(maskWords,  i) == uint64_t(0)
-                           && "cachedGetValue SIMD: null leaf maskWords should be 0");
-                    assert(Val_traits::get(result, i) == uint64_t(0)
-                           && "cachedGetValue SIMD: null leaf result should be 0");
+            // Convert SIMD leafMask → uint32_t bitmask once; then a single
+            // scalar loop over active lanes with no further SIMD in sight.
+            const uint32_t activeBits = util::to_bitmask(leafMask);
+            for (int lane = 0; lane < LaneWidth; ++lane) {
+                if (!((activeBits >> lane) & 1u)) continue;
+                const uint32_t leafID = mNeighborLeafIDs[neighborIdx[lane]];
+                if (leafID == kNullLeafID) {
+                    dst[lane] = ScalarValueT(0);
+                    continue;
                 }
+                dst[lane] = static_cast<ScalarValueT>(
+                    mFirstLeaf[leafID].getValue(localOffset[lane]));
             }
-#endif
         }
     }
 
@@ -541,6 +431,7 @@ private:
     Coord                 mCenterOrigin;
     uint32_t              mProbedMask;
     uint32_t              mNeighborLeafIDs[27]; // kNullLeafID when not probed or outside narrow band
+    const LeafT* const    mFirstLeaf;           // getFirstLeaf() — scalar-tail leaf lookup base
     const uint64_t* const mOffsetBase;           // &getFirstLeaf()[0].data()->mOffset
     const uint64_t* const mPrefixBase;           // &getFirstLeaf()[0].data()->mPrefixSum
     const uint64_t* const mMaskWordBase;         // getFirstLeaf()[0].valueMask().words()

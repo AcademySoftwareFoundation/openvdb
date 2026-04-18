@@ -380,20 +380,63 @@ Both loops expand to zero-overhead compile-time instantiations:
 where `blendOneTap<I>` calls `cachedGetValue<P::di, P::dj, P::dk>` into a
 temporary and then `where`-blends into `mIndices[I]`.
 
-### 8.1 GCC codegen note — `[[gnu::flatten]]` on `moveTo`
+### 8.1 Hybrid SIMD → scalar-tail design and public API
 
-Under GCC 13 + `-O3`, the default inliner outlines both the 14 Simd.h helpers
-inside each `cachedGetValue` and the 18 per-tap `cachedGetValue` calls
-themselves, producing ~282 `vzeroupper` transitions per 16-voxel batch and
-making this whole SIMD pipeline measurably slower than the scalar
-`LegacyStencilAccessor` oracle.  Annotating `moveTo` with `[[gnu::flatten]]`
-collapses the full call tree into a single ~77 KB inlined body, restoring
-end-to-end performance from 7.5 ns/voxel to 3.7 ns/voxel (2×) and beating
-Clang's 4.3 ns/voxel in the same test.  The attribute is a no-op under Clang
-(which inlines by default) and is safe to add, but the header does not apply
-it by default — see `BatchAccessor.md` §8h for the measurement matrix and the
-rationale for leaving it opt-in.  Consumers that instantiate
-`StencilAccessor` in hot GCC-compiled code paths should consider enabling it.
+`StencilAccessor` uses the hybrid design documented in `BatchAccessor.md`
+§8i.  The straddling loop in `moveTo` and the SWAR / direction-extraction
+portion of each tap are SIMD; `BatchAccessor::cachedGetValue` then harvests
+per-lane direction and local-offset values into stack C arrays and runs a
+scalar loop calling `leaf.getValue(offset)`.  Each tap writes directly into
+`mIndices[I][0..W-1]` — one scalar `mov` per active lane, no
+mask-bool round-trip.
+
+#### Public API is Simd-free
+
+| Member | Type |
+|--------|:-----|
+| `mIndices` (public) | `alignas(64) uint64_t[SIZE][W]` — results buffer, populated by `moveTo()` |
+| `moveTo(leafIndex*, voxelOffset*)` | returns `void` |
+| `tapIndex<DI,DJ,DK>()` (static constexpr) | `int` — compile-time tap slot lookup |
+| `size()` (static constexpr) | `int` |
+
+Callers consume `mIndices` directly.  Active-lane information comes from
+`leafIndex[i] != UnusedLeafIndex` — the same sentinel that `decodeInverseMaps`
+produces.  No `SimdMask<>` or `Simd<>` appears in the API.
+
+```cpp
+stencilAcc.moveTo(leafIndex + bs, voxelOffset + bs);
+for (int i = 0; i < W; ++i) {
+    if (leafIndex[bs + i] == CPUVBM::UnusedLeafIndex) continue;
+    // named-tap access (compile-time, reorder-safe):
+    uint64_t idx_xm3 = stencilAcc.mIndices[SAccT::tapIndex<-3,0,0>()][i];
+    // iteration:
+    for (int k = 0; k < SAccT::size(); ++k)
+        consume(stencilAcc.mIndices[k][i]);
+    // SIMD load of tap row using caller's own backend:
+    auto row = nanovdb::util::Simd<uint64_t,W>(stencilAcc.mIndices[k],
+                                               nanovdb::util::element_aligned);
+}
+```
+
+#### Layout is ABI
+
+`mIndices[SIZE][W]` row-major is part of the contract.  Changing it (for
+example to `[W][SIZE]` or to a SIMD aggregate) is a breaking change.  The
+choice matches how the scalar tail produces the data, so "what's written"
+and "what's read" share a single authoritative layout.
+
+#### GCC codegen (short version)
+
+With the hybrid in place, neither compiler needs `[[gnu::flatten]]` to
+reach reasonable performance.  Measured at 32 M ambient voxels / 50% / 32
+threads on i9-285K Arrow Lake: GCC 5.1 ns/voxel, Clang 4.9 ns/voxel —
+both beat the scalar `LegacyStencilAccessor` oracle (5.5 GCC, 6.7 Clang).
+Adding `flatten` on `moveTo` closes the compiler gap to ~4.8 ns/voxel on
+both; the 0.3 ns/voxel gain is not worth the 77 KB monolithic body for
+default builds.  Consumers that need peak GCC performance can still
+annotate their own entry point.  See `BatchAccessor.md` §8i for the full
+perf matrix and the analysis of which operations were kept SIMD vs
+scalarized.
 
 ---
 
