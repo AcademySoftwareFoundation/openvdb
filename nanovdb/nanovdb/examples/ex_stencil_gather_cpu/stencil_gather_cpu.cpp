@@ -35,7 +35,10 @@
 #include <nanovdb/tools/VoxelBlockManager.h>
 #include <nanovdb/util/ForEach.h>
 #include <simd_test/Simd.h>   // SimdMask<T,W>, Simd<T,W>, any_of, none_of, to_bitmask
-#include "../ex_voxelBlockManager_host_cuda/BatchAccessor.h"  // BatchAccessor
+#include "../ex_voxelBlockManager_host_cuda/BatchAccessor.h"    // BatchAccessor
+#include "../ex_voxelBlockManager_host_cuda/StencilAccessor.h"  // StencilAccessor, Weno5Stencil
+
+#include <x86intrin.h>   // __rdtsc, __rdtscp, _mm_lfence
 
 #include <random>
 #include <string>
@@ -70,6 +73,11 @@ using BAccT = nanovdb::BatchAccessor<BuildT,
     nanovdb::util::Simd<uint64_t, SIMDw>,   // ValueT
     nanovdb::util::Simd<uint16_t, SIMDw>,   // VoxelOffsetT
     LaneMask>;                               // PredicateT
+
+// StencilAccessor instantiation for WENO5.
+using SAccT       = nanovdb::StencilAccessor<BuildT, SIMDw, nanovdb::Weno5Stencil>;
+// Return type of StencilAccessor::moveTo (mask over the uint64_t index domain).
+using IndexMaskT  = nanovdb::util::SimdMask<uint64_t, SIMDw>;
 
 // Direction bit encoding shared across all stencil types:
 //   bit(dx, dy, dz) = (dx+1)*9 + (dy+1)*3 + (dz+1),   dx,dy,dz ∈ {-1,0,+1}
@@ -623,6 +631,105 @@ static void verifyBatchAccessor(
 }
 
 // ============================================================
+// StencilAccessor correctness verification
+//
+// For every active lane (set in activeMask returned by moveTo):
+//   - Reconstruct the global coordinate from (leafIndex, voxelOffset).
+//   - For each of the 18 WENO5 taps, add the tap offset, decompose into
+//     leaf-local coordinates, probe the neighbor leaf, and compare
+//     stencilAcc[k][lane] against refLeaf->getValue(localOffset).
+//
+// For every inactive lane:
+//   - Assert that all tap slots hold 0 (the NanoVDB background index).
+// ============================================================
+
+static void verifyStencilAccessor(
+    const SAccT&    stencilAcc,
+    IndexMaskT      activeMask,   // returned by stencilAcc.moveTo()
+    const uint32_t* leafIndex,
+    const uint16_t* voxelOffset,
+    int             batchStart,
+    const LeafT*    firstLeaf,
+    AccT&           refAcc,
+    VerifyStats&    stats)
+{
+    // Check inactive lanes: all tap slots must hold 0 (background index).
+    for (int i = 0; i < SIMDw; ++i) {
+        if (activeMask[i]) continue;
+        for (int k = 0; k < stencilAcc.size(); ++k) {
+            ++stats.laneChecks;
+            const uint64_t got = static_cast<uint64_t>(stencilAcc[k][i]);
+            if (got != 0) {
+                ++stats.errors;
+                if (stats.errors <= 10)
+                    std::cerr << "STENCIL inactive lane=" << i
+                              << " tap=" << k
+                              << ": expected 0, got " << got << "\n";
+            }
+        }
+    }
+
+    // Check active lanes against the scalar tree reference.
+    for (int i = 0; i < SIMDw; ++i) {
+        if (!activeMask[i]) continue;
+
+        const int      p              = batchStart + i;
+        const uint16_t vo             = voxelOffset[p];
+        const uint32_t li             = leafIndex[p];
+        const nanovdb::Coord cOrigin  = firstLeaf[li].origin();
+
+        // Center voxel local coordinates within the leaf.
+        const int lx = (vo >> 6) & 7;
+        const int ly = (vo >> 3) & 7;
+        const int lz =  vo       & 7;
+
+        for (int k = 0; k < 18; ++k) {
+            const int axis  = kWeno5Offsets[k][0];
+            const int delta = kWeno5Offsets[k][1];
+            const int di    = (axis == 0) ? delta : 0;
+            const int dj    = (axis == 1) ? delta : 0;
+            const int dk    = (axis == 2) ? delta : 0;
+
+            // Tap destination in leaf-local space (may be outside [0,7]).
+            const int nx = lx + di, ny = ly + dj, nz = lz + dk;
+
+            // Leaf-crossing step (−1, 0, or +1 per axis).
+            const int dx = (nx < 0) ? -1 : (nx >= 8) ? 1 : 0;
+            const int dy = (ny < 0) ? -1 : (ny >= 8) ? 1 : 0;
+            const int dz = (nz < 0) ? -1 : (nz >= 8) ? 1 : 0;
+
+            // Wrapped local coordinates within the target leaf.
+            const int nx_w = nx - dx * 8;
+            const int ny_w = ny - dy * 8;
+            const int nz_w = nz - dz * 8;
+            const uint32_t offset = uint32_t(nx_w) * 64u + uint32_t(ny_w) * 8u + uint32_t(nz_w);
+
+            // Reference: probe the target leaf and read its value.
+            const LeafT* refLeaf = (dx == 0 && dy == 0 && dz == 0)
+                ? &firstLeaf[li]
+                : refAcc.probeLeaf(cOrigin + nanovdb::Coord(dx * 8, dy * 8, dz * 8));
+
+            const uint64_t expected = refLeaf
+                ? static_cast<uint64_t>(refLeaf->getValue(offset))
+                : uint64_t(0);
+            const uint64_t actual   = static_cast<uint64_t>(stencilAcc[k][i]);
+
+            ++stats.laneChecks;
+            if (actual != expected) {
+                ++stats.errors;
+                if (stats.errors <= 10)
+                    std::cerr << "STENCIL MISMATCH"
+                              << " tap=(" << di << "," << dj << "," << dk << ")"
+                              << " slot=" << k
+                              << " lane=" << i
+                              << " expected=" << expected
+                              << " actual="   << actual << "\n";
+            }
+        }
+    }
+}
+
+// ============================================================
 // Main prototype: Phase 1 (neighbor leaf resolution) + verification
 // ============================================================
 
@@ -676,6 +783,9 @@ static void runPrototype(const GridT*                                           
         // BatchAccessor: alternate execution path for correctness cross-validation.
         BAccT batchAcc(*grid, currentLeafID);
 
+        // StencilAccessor: constructed once per block, persists across batches.
+        SAccT stencilAcc(*grid, firstLeafID[bID], (uint32_t)nExtraLeaves);
+
         // Process SIMD batches.
         for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
 
@@ -685,6 +795,15 @@ static void runPrototype(const GridT*                                           
             // Active-lane mask: lanes with a valid (non-sentinel) leafIndex.
             LaneMask activeMask = (leafSlice != LeafIdxVec(CPUVBM::UnusedLeafIndex));
             if (nanovdb::util::none_of(activeMask)) continue;
+
+            // StencilAccessor: gather all 18 WENO5 tap indices for this batch.
+            // moveTo owns the straddling loop internally; call once per batch.
+            {
+                const IndexMaskT sActive =
+                    stencilAcc.moveTo(leafIndex + batchStart, voxelOffset + batchStart);
+                verifyStencilAccessor(stencilAcc, sActive, leafIndex, voxelOffset,
+                                      batchStart, firstLeaf, acc, stats);
+            }
 
             // Track straddle batches for diagnostic output.
             for (int i = 0; i < SIMDw; i++) {
@@ -803,6 +922,79 @@ static void runPrototype(const GridT*                                           
 }
 
 // ============================================================
+// Performance measurement: StencilAccessor::moveTo throughput
+//
+// Two-pass design: first pass warms instruction cache, branch predictor,
+// and the leaf data accessed by advance()/prefetch().  Second pass is timed.
+// decodeInverseMaps is outside the rdtsc fence — we measure moveTo only.
+//
+// Reports TSC ticks/batch and TSC ticks/voxel (using BlockWidth as denominator;
+// slightly over-counts inactive padding slots but is stable across runs).
+// TSC ticks ≈ ns × (nominal_GHz); divide by actual turbo frequency for
+// CPU cycles if needed.
+// ============================================================
+
+static void runPerf(const GridT*                                                          grid,
+                    const nanovdb::tools::VoxelBlockManagerHandle<nanovdb::HostBuffer>&  vbmHandle)
+{
+    const LeafT*    firstLeaf   = grid->tree().getFirstNode<0>();
+    const uint32_t  nBlocks     = (uint32_t)vbmHandle.blockCount();
+    const uint32_t* firstLeafID = vbmHandle.hostFirstLeafID();
+    const uint64_t* jumpMap     = vbmHandle.hostJumpMap();
+
+    alignas(64) uint32_t leafIndex[BlockWidth];
+    alignas(64) uint16_t voxelOffset[BlockWidth];
+
+    static constexpr int kBatchesPerBlock = BlockWidth / SIMDw;
+
+    // Shared decode + moveTo loop, run twice (warmup then timed).
+    uint64_t totalTicks = 0;
+
+    for (int pass = 0; pass < 2; ++pass) {
+        uint64_t passTicks = 0;
+
+        for (uint32_t bID = 0; bID < nBlocks; ++bID) {
+            const uint64_t blockFirstOffset =
+                vbmHandle.firstOffset() + (uint64_t)bID * BlockWidth;
+
+            // Decode is outside the timed region.
+            CPUVBM::decodeInverseMaps(
+                grid, firstLeafID[bID],
+                &jumpMap[(uint64_t)bID * CPUVBM::JumpMapLength],
+                blockFirstOffset, leafIndex, voxelOffset);
+
+            int nExtraLeaves = 0;
+            for (int w = 0; w < CPUVBM::JumpMapLength; ++w)
+                nExtraLeaves += nanovdb::util::countOn(
+                    jumpMap[(uint64_t)bID * CPUVBM::JumpMapLength + w]);
+
+            SAccT stencilAcc(*grid, firstLeafID[bID], (uint32_t)nExtraLeaves);
+
+            _mm_lfence();
+            const uint64_t t0 = __rdtsc();
+
+            for (int b = 0; b < kBatchesPerBlock; ++b)
+                stencilAcc.moveTo(leafIndex + b * SIMDw, voxelOffset + b * SIMDw);
+
+            uint32_t aux;
+            const uint64_t t1 = __rdtscp(&aux);
+
+            passTicks += (t1 - t0);
+        }
+
+        if (pass == 1) totalTicks = passTicks;  // only record the warm pass
+    }
+
+    const uint64_t totalBatches = (uint64_t)nBlocks * kBatchesPerBlock;
+    const uint64_t totalVoxels  = (uint64_t)nBlocks * BlockWidth;
+
+    std::printf("\nStencilAccessor::moveTo throughput (warm pass, %u blocks):\n", nBlocks);
+    std::printf("  total TSC ticks : %lu\n",   totalTicks);
+    std::printf("  ticks / batch   : %.1f\n",  double(totalTicks) / double(totalBatches));
+    std::printf("  ticks / voxel   : %.2f\n",  double(totalTicks) / double(totalVoxels));
+}
+
+// ============================================================
 // Entry point
 // ============================================================
 
@@ -856,6 +1048,7 @@ int main(int argc, char** argv)
                   << "  (BlockWidth=" << BlockWidth << ")\n\n";
 
         runPrototype(grid, vbmHandle);
+        runPerf(grid, vbmHandle);
 
     } catch (const std::exception& e) {
         std::cerr << "Exception: " << e.what() << "\n";

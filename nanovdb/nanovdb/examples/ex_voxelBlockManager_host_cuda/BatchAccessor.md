@@ -463,51 +463,154 @@ Step 8 — fill result
 the scalar `popcnt` instruction, which is not vectorisable.  The SWAR tree uses only
 `vpsrlq` / `vpand` / `vpaddq`, which are all AVX2-native.
 
-### 8f. Assembly codegen — GCC 13 vs Clang 18
+### 8f. Assembly codegen — compiler × backend × ISA matrix
 
-Platform: x86-64, AVX2, `-O3 -DNDEBUG -march=native -std=c++17`.
-Representative instantiation: `cachedGetValue<1,0,0>` (x+1 tap, W=16).
+Flags: `-O3 -DNDEBUG -std=c++17 -fopenmp-simd -Wno-invalid-offsetof`.
+ISA: `-mavx2` (base) or `-march=native` (i9-285K Arrow Lake, AVX2; no AVX-512).
+Representative instantiation: `cachedGetValue<-3,0,0>` (x−3 tap, W=16), full Steps 1–8.
 
-| Metric | GCC 13 | Clang 18 |
-|--------|--------|----------|
-| Total instructions | 465 | 535 |
-| Vector (ymm) | 237 | 262 |
-| `call` | 14 | **1** |
-| `vzeroupper` | 13 | **2** |
-| Hardware gather instructions | **0** | **14** |
-| `gather_if` inlined | No | **Yes** |
-| `simd_cast` / `where` inlined | No | **Yes** |
-| `popcount` inlined | No | No |
+**Backend selection:** Simd.h auto-detects `<experimental/simd>` via `__has_include`.
+`-DNANOVDB_USE_STD_SIMD` is redundant when the header is present.
+Use `-DNANOVDB_NO_STD_SIMD` to force the array backend.
 
-**GCC** emits every `Simd.h` helper (`gather_if`, `simd_cast`, `simd_cast_if`, `where`,
-`popcount`) as an out-of-line call.  The `gather_if` body does scalar element-by-element
-loads via `vmovq` + `vpinsrq` + `vinserti128` — no hardware gather instructions.  Each
-out-of-line call forces a `vzeroupper` transition (≈80 cycles on many µarchs), giving 13
-such transitions per `cachedGetValue` call.
+#### `cachedGetValue<-3,0,0>` — instruction counts
 
-**Clang** inlines everything except `popcount`.  With `gather_if` inlined, Clang emits
-actual hardware gather instructions:
+Numbers reflect the **unmasked-gather variant** (Steps 2/4a/4b changed to `gather`;
+Step 5 `maskWords` kept as `gather_if`).  The `ymm`/`xmm`/`calls`/`vzup`/`vpins`
+columns are from the original full measurement; `insns` and `vpgather` are
+post-unmasked-gather.  `—` = not separately measured.
 
+| Variant | ISA | insns | ymm | xmm | calls | vzup | vpgather | vpins |
+|---------|-----|------:|----:|----:|------:|-----:|---------:|------:|
+| GCC 13 + stdx  | avx2   |  579 | 393 | 100 |  14 |  13 |  0 |  8 |
+| GCC 13 + array | avx2   | 1313 | 605 | 524 |   2 |   3 |  0 |  0 |
+| Clang 18 + stdx  | avx2 |  828 | 530 | 470 |   1 |   2 |  0 | 62 |
+| Clang 18 + array | avx2 | 1231 | 459 | 326 |   2 |   2 |  0 |  0 |
+| GCC 13 + stdx  | native |  641 | 393 | 100 |  14 |  13 |  0 |  8 |
+| GCC 13 + array | native | 1175 |  — |  — |   0 |   0 |  0 |  — |
+| Clang 18 + stdx | native |  599 | 568 | 284 |   1 |   2 | **16** | 50 |
+| Clang 18 + array | native | 1200 |  — |  — |   — |   — | **6** |  — |
+
+`vpgather` breakdown (post-unmasked-gather):
+- `clang18-stdx-native`: 4× `vpgatherdd` (Step 2: 16 lanes in 4×4) + 12× `vpgatherqq` (Steps 4a/4b/5: 4-wide ×4 chunks ×3) = 16 total
+- `clang18-array-native`: 2× `vpgatherdd` + 4× `vpgatherqq` = 6 total
+
+#### Before/after delta — unmasked-gather change
+
+| Variant | ISA | insns before | insns after | Δ | vpgather before | vpgather after |
+|---------|-----|------------:|------------:|--:|----------------:|---------------:|
+| GCC 13 + stdx   | avx2   |  641 |  579 |  −62 | 0 |  0 |
+| GCC 13 + array  | avx2   | 1320 | 1313 |   −7 | 0 |  0 |
+| Clang 18 + stdx | avx2   |  795 |  828 |  +33 | 0 |  0 |
+| Clang 18 + array| avx2   | 1365 | 1231 | −134 | 0 |  0 |
+| GCC 13 + stdx   | native |  641 |  641 |    0 | 0 |  0 |
+| GCC 13 + array  | native | 1365 | 1175 | −190 | 0 |  0 |
+| Clang 18 + stdx | native |  600 |  599 |   −1 | 14 | 16 |
+| Clang 18 + array| native | 1365 | 1200 | −165 |  0 |  6 |
+
+The `clang18-stdx-avx2` regression (+33) is expected: the unmasked `gather` path
+in the stdx backend emits a slightly different `where`-free code sequence that Clang
+does not fold as aggressively as the original `gather_if`.  Total instruction count
+is still lower than the array backend.
+
+#### `-mavx2 -mtune=native` equivalence
+
+On this machine (i9-285K Arrow Lake, no AVX-512), `-march=native` and
+`-mavx2 -mtune=native` produce **identical hardware-gather emission** under Clang:
+
+| Variant | flags | insns | vpgdd | vpgqq |
+|---------|-------|------:|------:|------:|
+| Clang 18 + stdx  | `-mavx2 -mtune=native` | 599 | 4 | 12 |
+| Clang 18 + array | `-mavx2 -mtune=native` | 1219 | 2 |  4 |
+
+The difference between `-mavx2` and `-march=native` is purely the **tuning model**,
+not the ISA:
+- `-mavx2`: targets `mtune=generic` — conservative gather cost model, no hardware gathers.
+- `-march=native` (Clang): implies `mtune=sierraforest` — knows Arrow Lake's gather
+  throughput, auto-vectorizer considers gathers profitable → emits `vpgatherqq`.
+- `-march=native` (GCC): sets the ISA to sierraforest but keeps `mtune=generic` —
+  same conservative behaviour as `-mavx2`.  No hardware gathers emitted by GCC even
+  with `-march=native`.
+
+GCC's stdx backend produces identical output (641 insns before / 579 after, 0 gathers)
+for both `-mavx2` and `-march=native`.
+
+#### `prefetch<-3,0,0>` — standalone vs inlined
+
+| Variant | ISA | standalone symbol? | insns |
+|---------|-----|--------------------|------:|
+| GCC 13 + stdx   | any    | No — fully inlined | — |
+| GCC 13 + array  | avx2   | Yes                | 260 |
+| Clang 18 + stdx | any    | No — fully inlined | — |
+| Clang 18 + array| avx2   | Yes                | 176 |
+
+---
+
+**Finding 1 — stdx backend is far superior to the array backend.**
+The array backend is ≈2× larger in instruction count and degrades every `gather_if`
+to a scalar lane-by-lane loop: 16 `vpextrw` to extract uint16_t direction indices, 16
+conditional branches, 16 scalar uint32_t loads from `mNeighborLeafIDs`, then repeated
+for each of the three uint64_t gathers (48 `vpextrq` total). In the stdx backends,
+`gather_if` either maps to hardware gather instructions (Clang + native) or at worst
+compact `vpinsrq` sequences (Clang + avx2). The 76 vpextr instructions (array backend)
+vs 62 vpinsrb/q (stdx avx2) is telling: array is still scalar-inserting via extract,
+not vectorised. The array backend also fails to inline `prefetch`.
+
+**Finding 2 — Clang inlines all helpers; GCC emits 14 out-of-line weak stubs.**
+GCC 13 emits `gather_if`, `simd_cast`, `simd_cast_if`, `where`, and `popcount` as
+out-of-line COMDAT weak symbols and calls them. Each call requires `vzeroupper` on
+entry (AVX ABI), yielding 13 transitions per `cachedGetValue` invocation. Clang 18
+inlines all of them into a single function body except the final `popcount` call.
+
+**Finding 3 — Hardware gathers require Clang + native tuning; unmasked gathers unlock the array backend too.**
+After the unmasked-gather change, `clang18-stdx-native` emits **16** hardware gathers per `cachedGetValue`:
 ```
-vpgatherdd  — 2× for the uint32_t tapLeafID gather (Step 2, 8-wide × 2 = 16 lanes)
-vpgatherqq  — 12× for the three uint64_t gathers (Steps 4a, 4b, 5: 4-wide × 4 = 16 lanes each)
+vpgatherdd  — 4× for the uint32_t tapLeafID gather   (Step 2:  4-wide × 4 = 16 lanes)
+vpgatherqq  — 12× for the three uint64_t data gathers (Steps 4a/4b/5: 4-wide × 4 each)
 ```
+`clang18-array-native` now emits **6** hardware gathers (2 vpgdd + 4 vpgqq) — the first
+gathers ever seen in the array backend.  The unmasked `for (i) dst[i] = ptr[idx[i]]`
+loop is the pattern Clang's auto-vectorizer converts to `vpgatherqq`; the `if (mask[i])`
+conditional in `gather_if` defeated auto-vectorization for all mask types.
 
-Only 2 `vzeroupper` transitions remain (function entry/exit).
+GCC 13 emits 0 hardware gathers even with `-march=native` — its stdx backend does not
+exploit `vpgatherdd`/`vpgatherqq` for `experimental::simd` gather operations.  With
+`-mavx2` alone, Clang also falls back to software gather (62 `vpinsrq/b`).
 
-The 43 `vpinsrb` instructions in the Clang output are the mask-format conversion cost
-for the heterogeneous `gather_if` mask: `SimdMask<uint32_t,16>` must be widened to
-4 × `SimdMask<uint64_t,4>` to drive `vpgatherqq`'s sign-bit mask mechanism.
+The 50 `vpinsrb` that remain in `clang18-stdx-native` are the mask-widening cost for
+the one remaining heterogeneous `gather_if` (Step 5 `maskWords`): `SimdMask<uint32_t,16>`
+is widened to four `SimdMask<uint64_t,4>` chunks to provide the sign-bit masks that
+`vpgatherqq` expects.
 
-**`popcount`** body (out-of-line in both compilers): 88 instructions, 85 ymm.
-The SWAR shift-and-add tree is fully vectorized with `vpsrlq`, `vpand`, `vpsubq`,
-`vpaddq` — exactly the AVX2-friendly instruction set targeted in §8e.  Adding
-`[[gnu::always_inline]]` to `util::popcount` in `Simd.h` would fold these 88
-instructions inline and eliminate the last `callq`.
+**Finding 4 — `-march=native` gains nothing for GCC, in either backend.**
+GCC's stdx backend produces identical output (641/579 insns, 0 gathers) for both
+`-mavx2` and `-march=native`.  The array backend with `-march=native` (1175 insns,
+0 gathers) also emits zero hardware gathers — even for the bare unmasked
+`for (i) dst[i] = ptr[idx[i]]` loop that Clang converts to `vpgatherqq`.  GCC's
+auto-vectorizer cost model treats gather instructions as unprofitable regardless of
+tuning, preferring 40 `vpextrq` + 16 `vpinsrq` + 65 `vmovq` (scalar lane-by-lane)
+instead.  This is a GCC backend policy, not a flag or mask-type issue.
 
-**Action:** GCC inlining can be forced across the board with `[[gnu::always_inline]]`
-on `gather_if`, `simd_cast`, `simd_cast_if`, `where`, and `popcount` in `Simd.h`.
-This is a pure-upside change for GCC; Clang already inlines all but `popcount`.
+**Finding 5 — Masking was the auto-vectorizer blocker for gathers.**
+`gather_if` takes an `if (mask[i]) dst[i] = ptr[idx[i]]` shape — a conditional store.
+This defeats Clang's gather auto-vectorizer for every mask element type tried (bool,
+uint32_t, uint64_t).  The unmasked `gather` loop `dst[i] = ptr[idx[i]]` is the one
+pattern that Clang + native tuning converts to `vpgatherqq`.  The sentinel invariant
+makes the change safe: Step 2 uses `d ∈ [0,26]` (SWAR always valid); Steps 4a/4b use
+`tapLeafOffset_i64 = 0` for invalid lanes (reading from base[0], the center leaf — safe
+but unused); Step 5 is kept masked so that `maskWords = 0` for invalid lanes, ensuring
+`isActive = false` without a cross-width mask AND.
+
+**`popcount`** (out-of-line in all variants that reach it): 88 instructions, 85 ymm.
+Fully vectorised with `vpsrlq`, `vpand`, `vpsubq`, `vpaddq`. Adding
+`[[gnu::always_inline]]` to `util::popcount` in Simd.h eliminates the last remaining
+out-of-line call in the Clang path and reduces GCC from 14 to 13 external calls.
+
+**Action — `[[gnu::always_inline]]` on Simd.h helpers:**
+Adding `[[gnu::always_inline]]` (or `__attribute__((always_inline))`) to `gather_if`,
+`simd_cast`, `simd_cast_if`, `where`, and `popcount` in Simd.h eliminates all 13
+`vzeroupper` transitions under GCC. Clang already inlines all but `popcount`; the
+attribute is safe and a no-op for Clang.
 
 **`popcount` alternative — `vpshufb`-based nibble popcount:**
 The current SWAR shift-and-add tree (88 instructions, §8e) avoids the scalar `popcnt`
@@ -537,6 +640,88 @@ arithmetic-heavy SWAR ports — so the `vpshufb` path is also more friendly to
 out-of-order overlap with surrounding code.  This is the standard compiler-generated
 AVX2 popcount pattern and the likely replacement for `popcount64` in `Simd.h`.
 
+### 8g. Cycle budget and architectural comparison
+
+#### `cachedGetValue` critical path (Clang 18 + stdx + `-march=native`, W=16)
+
+| Step | Work | Cumulative cycles |
+|------|------|------------------:|
+| 1 | SWAR expansion + base-32 multiply → `d_vec` | ~8 |
+| 2 | 4× `vpgatherdd` → `tapLeafID_u32` | ~20 |
+| 3 | `simd_cast_if` + ×kStride → `tapLeafOffset_i64` | ~25 |
+| 4a/4b/5 | 4+4+4 `vpgatherqq` (3 independent groups, overlap in OoO) | ~41 |
+| 6–8 | bitwise `dest_yz`, `maskWords & voxelBit`, popcount SWAR + `where` | **~55** |
+
+Critical path per call: **~55 cycles** (gather-chain limited; Steps 4a/4b/5 are the
+deepest dependency).
+
+Single-core throughput reality: each call is ~600 instructions.  Arrow Lake's ROB
+(~500 entries) holds less than one full call, so call-to-call OoO overlap is minimal.
+Realistic single-core cost is **~80–100 cy/call**, not the ~7 cy/call that perfect 8×
+OoO would imply.  For 128 elements × 18 taps = 144 calls: **~12,000–14,000 cycles
+single-threaded**, or **~100 cy/element**.
+
+#### Comparison with scalar NanoVDB `getValue(ijk)`
+
+Naive alternative: 128 voxels × 18 taps = 2304 scalar `ReadAccessor::getValue()` calls.
+
+| Accessor L0 cache behaviour | cy/call | 2304 calls | cy/element |
+|-----------------------------|--------:|-----------:|-----------:|
+| Hit (same leaf as last call) | ~22 | ~51,000 | ~400 |
+| Miss, tree nodes L1-warm | ~52 | ~120,000 | ~940 |
+| Miss, tree nodes cold | ~100+ | ~230,000 | ~1800 |
+
+**BatchAccessor speedup: 4–10× depending on hit rate.**
+
+The two sources of gain:
+
+1. **Amortised tree traversal (dominant).** `prefetch` calls `probeLeaf` at most once
+   per direction per center-leaf switch — **12 calls** for a 128-element block (6
+   directions × 2 center-leaf switches) vs. up to 2304 traversals for the scalar path.
+   Each saved traversal is ~25–35 cycles of pointer-chasing through root → internal →
+   internal → leaf with warm L1 nodes.
+
+2. **SIMD × 16.** The SWAR expansion, gather chain, and popcount all execute once for
+   16 lanes simultaneously.  Even if the scalar accessor hit perfectly on every call,
+   the SIMD path still wins by ~4× on arithmetic work alone.
+
+The scalar hit rate depends on loop ordering.  Processing all 18 taps for one voxel
+before moving to the next evicts the cached leaf on nearly every tap switch (high miss
+rate).  Sweeping all 128 voxels for one tap at a time improves hit rate, but requires
+18 passes over the voxel array and hurts reuse of stencil results.
+
+#### CPU vs GPU: why the same operation inverts
+
+On CPU (8 P-cores), the 128-element block is **compute-bound**:
+
+- Index computation: ~12,000 cy per core
+- Value fetch (512 unique floats, 32 cache lines, 8 cores competing for DDR5-5600):
+  ~80–664 cycles depending on cache level and core count
+- System DRAM bandwidth consumed at full parallelism: ~4.6 GB/s out of 89 GB/s
+  available (~5% utilisation)
+
+The gather chain latency is the bottleneck; bandwidth sits largely idle.  The CPU
+BatchAccessor design (SIMD W=16, hardware `vpgatherqq`) directly attacks this by
+compressing 16 serial gather chains into one parallel 55-cycle critical path.
+
+On GPU the same operation becomes **bandwidth-bound**:
+
+- An SM has hundreds of warps in flight.  When a warp stalls on a gather or arithmetic
+  latency (~20–100+ cycles), the scheduler switches to another ready warp instantly.
+  The entire index computation — SWAR, base-32 multiply, all gather latencies — is
+  absorbed by warp switching.  Effective compute cost per thread: ~0 stall cycles.
+- What remains visible to the GPU is the **global memory traffic**: fetching stencil
+  float values.  With hundreds of SMs each issuing many transactions simultaneously,
+  HBM bandwidth saturates quickly.
+- GPU gathers are scalar-per-thread: 32 threads in a warp each doing an 8-byte load =
+  32 independent transactions.  Non-contiguous addresses (stencil neighbours across
+  leaves) yield uncoalesced access, amplifying bandwidth pressure.
+
+Consequently, GPU optimisation for this workload targets **coalescing** (adjacent
+threads access adjacent values) and **cache footprint** (keeping the neighbour-leaf
+working set in L1/shared memory), rather than the gather-chain depth that dominates
+on CPU.
+
 ---
 
 ## 9. Relationship to Phase 1 Prototype
@@ -563,6 +748,17 @@ AVX2 popcount pattern and the likely replacement for `popcount64` in `Simd.h`.
   Verified against scalar reference over 12M lane-checks across all 18 WENO5 taps.
 - Class-level base pointers (`mOffsetBase`, `mPrefixBase`, `mMaskWordBase`).
 - `simd_cast_if`, heterogeneous `gather_if`, `popcount64`/`popcount` added to `Simd.h`.
+- Simd.h array-backend `Simd(const T*, element_aligned_tag)` load constructor:
+  removed default argument for the tag to eliminate the `Simd(0)` null-pointer-constant
+  ambiguity that breaks compilation under `-DNANOVDB_NO_STD_SIMD`.
+- Full 7-variant codegen analysis (compiler × backend × ISA, §8f), including
+  before/after delta for the unmasked-gather change and `-mavx2 -mtune=native`
+  equivalence finding.
+- **Unmasked gather (Steps 2/4a/4b):** `gather_if` replaced with `gather` using the
+  sentinel invariant (d ∈ [0,26]; invalid lanes read base[0]).  Step 5 kept masked so
+  `maskWords=0` for invalid lanes → `isActive=false` without cross-width mask AND.
+  Verified: 12M lane-checks pass across all 18 WENO5 taps.  Unlocks hardware
+  `vpgatherqq` in the array backend under Clang + native tuning.
 
 ### Remaining
 

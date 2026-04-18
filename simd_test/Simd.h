@@ -171,7 +171,7 @@ template<typename T, int W>
 struct SimdMask {
     std::array<bool, W> data{};
     SimdMask() = default;
-    NANOVDB_SIMD_HOSTDEV explicit SimdMask(const bool* p, element_aligned_tag = {}) {
+    NANOVDB_SIMD_HOSTDEV explicit SimdMask(const bool* p, element_aligned_tag) {
         for (int i = 0; i < W; i++) data[i] = p[i];
     }
     // Converting constructor: copy bool values from a mask over a different element type.
@@ -200,7 +200,7 @@ struct Simd {
 
     Simd() = default;
     NANOVDB_SIMD_HOSTDEV Simd(T scalar) { data.fill(scalar); }               // broadcast
-    NANOVDB_SIMD_HOSTDEV explicit Simd(const T* p, element_aligned_tag = {}) { // load
+    NANOVDB_SIMD_HOSTDEV explicit Simd(const T* p, element_aligned_tag) { // load
         for (int i = 0; i < W; i++) data[i] = p[i];
     }
     NANOVDB_SIMD_HOSTDEV T  operator[](int i) const { return data[i]; }

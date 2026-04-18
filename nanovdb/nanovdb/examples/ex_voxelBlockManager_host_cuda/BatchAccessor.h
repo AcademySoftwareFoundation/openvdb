@@ -157,6 +157,15 @@ public:
     }
 
     // -------------------------------------------------------------------------
+    // centerLeafID -- read the current center leaf ID
+    //
+    // Exposed for StencilAccessor::moveTo, which needs it for the
+    // leafSlice == centerLeafID() comparison in the straddling loop.
+    // There is no raw setter; advance() is the sole legitimate transition.
+    // -------------------------------------------------------------------------
+    uint32_t centerLeafID() const { return mCenterLeafID; }
+
+    // -------------------------------------------------------------------------
     // advance -- move to a new center leaf
     //
     // Call when none_of(leafMask): all active lanes have moved past mCenterLeafID.
@@ -400,11 +409,12 @@ public:
                                 & VoxelOffsetT(kDirMask);
             const auto d_i32 = util::simd_cast<int32_t>(d_u16);
 
-            // Step 2 -- leaf IDs: gather only for active lanes; inactive lanes keep kNullLeafID.
-            // valid_u32 is then the combined effective mask (leafMask AND neighbor exists).
-            LeafIDVecT tapLeafID_u32(kNullLeafID);
-            util::gather_if(tapLeafID_u32, leafMask, mNeighborLeafIDs, d_i32);
-            const auto valid_u32 = (tapLeafID_u32 != LeafIDVecT(kNullLeafID));       // SimdMask<uint32_t,W>
+            // Step 2 -- leaf IDs: unmasked gather (all lanes have d_i32 ∈ [0,26] by
+            // SWAR invariant, so mNeighborLeafIDs[d_i32[i]] is always a valid access).
+            // Non-leafMask lanes read the current center leaf's neighbor at direction d,
+            // which is filtered out by the explicit leafMask AND in valid_u32 below.
+            const LeafIDVecT tapLeafID_u32 = util::gather(mNeighborLeafIDs, d_i32);
+            const auto valid_u32 = leafMask & (tapLeafID_u32 != LeafIDVecT(kNullLeafID));
 
             // Step 3 -- stride-scaled gather indices (widened to int64_t, invalid lanes -> 0)
             // kStride is sizeof(LeafT)/sizeof(uint64_t); the static_assert makes the
@@ -417,15 +427,15 @@ public:
             util::simd_cast_if<int64_t>(tapLeafOffset_i64, valid_u32, tapLeafID_u32);
             tapLeafOffset_i64 = tapLeafOffset_i64 * Int64VecT(kStride);
 
-            // Step 4a -- offsets (mOffset)
-            LeafDataVecT offsets(0);
-            util::gather_if(offsets, valid_u32, mOffsetBase, tapLeafOffset_i64);
+            // Step 4a -- offsets (mOffset): unmasked gather.
+            // Invalid lanes have tapLeafOffset_i64=0 (from simd_cast_if), reading from
+            // index 0 (center leaf's data).  These lanes are excluded by isActive in Step 7.
+            const LeafDataVecT offsets = util::gather(mOffsetBase, tapLeafOffset_i64);
 
-            // Step 4b -- prefixSums (mPrefixSum packed uint64_t, shift-extract field w)
-            // Invalid lanes have prefixSums=0 after gather_if; (0>>shift)&511=0 for any shift,
-            // so the outer valid_u32 guard from before is not needed.
-            LeafDataVecT prefixSums(0);
-            util::gather_if(prefixSums, valid_u32, mPrefixBase, tapLeafOffset_i64);
+            // Step 4b -- prefixSums (mPrefixSum packed uint64_t, shift-extract field w):
+            // unmasked gather for the same reason as Step 4a.  After the shift-extract
+            // below, invalid-lane values don't matter because isActive filters them in Step 8.
+            LeafDataVecT prefixSums = util::gather(mPrefixBase, tapLeafOffset_i64);
             const auto wordIdx_u64     = util::simd_cast<uint64_t>(wordIdx_u16);
             const auto nonzero_w = (wordIdx_u64 != LeafDataVecT(0));
             const auto shift     = util::where(nonzero_w, (wordIdx_u64 - LeafDataVecT(1)) * LeafDataVecT(9), LeafDataVecT(0));
@@ -434,6 +444,8 @@ public:
             // Step 5 -- maskWords (valueMask().words()[w])
             //   mMaskWordBase[leaf_id*kStride + w] == leaf[leaf_id].valueMask().words()[w]
             //   because the mask field is at a fixed offsetof within every LeafT.
+            // Kept as gather_if (masked) so that invalid lanes get maskWords=0, which
+            // guarantees isActive=false in Step 7 without needing a cross-width mask AND.
             const auto wordIdx_i64    = util::simd_cast<int64_t>(wordIdx_u16);
             const auto mask_idx = tapLeafOffset_i64 + wordIdx_i64;
             LeafDataVecT maskWords(0);
