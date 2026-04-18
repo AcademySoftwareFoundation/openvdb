@@ -722,6 +722,183 @@ threads access adjacent values) and **cache footprint** (keeping the neighbour-l
 working set in L1/shared memory), rather than the gather-chain depth that dominates
 on CPU.
 
+### 8h. End-to-end perf: outlining, `[[gnu::flatten]]`, and W=8
+
+§8f measured `cachedGetValue` as a standalone symbol.  This section measures the
+**full WENO5 pipeline end-to-end** — `StencilAccessor::moveTo` driving 18 taps ×
+128 voxels/block × 131072 blocks across 32 TBB threads — and reveals a much
+larger GCC pathology that a single-function measurement cannot see.
+
+Workload: `ex_stencil_gather_cpu 33554432 0.5` (16 M active voxels, 50% occupancy,
+i9-285K Arrow Lake, 32 threads, `-O3 -march=native`).  Time is wall clock via
+`nanovdb::util::Timer`; checksum-matches `LegacyStencilAccessor` in every run.
+
+#### End-to-end latency (ns/voxel, smaller is better)
+
+| Variant                              | GCC 13 | Clang 18 |
+|--------------------------------------|-------:|---------:|
+| No `flatten`                         |  7.5   |  4.3     |
+| `flatten` on `BatchAccessor::{prefetch,cachedGetValue}` | 4.9 | 4.3 |
+| `flatten` on `StencilAccessor::moveTo` (full transitive) | **3.7** | 4.3 |
+| `LegacyStencilAccessor` reference    |  5.4   |  6.7     |
+
+Without `flatten`, GCC's SIMD `StencilAccessor` is **39% slower than the scalar
+`ReadAccessor`-based `LegacyStencilAccessor`** — the SIMD abstraction turns into a
+net loss.  With `[[gnu::flatten]]` on `moveTo`, GCC becomes 33% faster than scalar
+and edges out Clang.
+
+#### Per-batch call accounting (GCC, W=16)
+
+`moveTo` processes 16 voxels per batch.  Per-batch call count is the product of:
+
+| Call site                           | No flatten | moveTo flatten |
+|-------------------------------------|-----------:|---------------:|
+| `moveTo` → `prefetchHull`, `calcTaps` |  3        |  inlined       |
+| `prefetchHull` internals              | 12         |  inlined       |
+| `calcTaps` → 18× `cachedGetValue` + 18× `WhereExpression::op=` | 37 | inlined |
+| Inside each `cachedGetValue`: 14 outlined Simd.h helpers × 18 | 252 | inlined |
+| Stack-canary / misc                   | 19         |  0             |
+| **Total calls per batch**             | **~323**   | **0**          |
+| **Total `vzeroupper` per batch**      | **~282**   | **1** (epilogue) |
+
+At 16 voxels/batch, that is **~18 `vzeroupper` per voxel** without flatten.  Each
+VZU is cheap (~1–2 cycles) but serves as a strong ABI barrier that defeats the
+out-of-order engine's ability to overlap pre- and post-call work.  Combined with
+the per-call argument marshaling of `_Fixed<16>` aggregates (128 B by reference),
+the accumulated cost is the full 3.2 ns/voxel gap between the two variants.
+
+#### Why outlining happens under GCC
+
+Each Simd.h helper (`gather`, `gather_if`, `simd_cast`, `simd_cast_if`, `where`,
+`popcount`, `WhereExpression::op=`) is an `inline` template.  With `-O3`, GCC's
+inliner decides each is "too expensive to inline" once the caller
+(`cachedGetValue`, ~900 B) reaches a growth-budget threshold.  It emits each
+helper as a weak COMDAT and calls it.  Every such call takes `_Fixed<16>`
+aggregates by reference (the parameter doesn't fit in YMM), triggering
+`vzeroupper` on entry.
+
+The same pattern propagates up: `calcTaps` (after inlining) is too big to accept
+18 copies of `cachedGetValue`, so GCC outlines those too — one weak symbol per
+template instantiation.  Then `StencilAccessor::moveTo` calls `calcTaps` and
+`prefetchHull` across that same boundary.
+
+Clang's inliner makes different decisions — it inlines the Simd.h helpers into
+each `cachedGetValue`, keeps `cachedGetValue` outlined per-tap, and accepts the
+18 calls from `calcTaps`.  Clang also emits hardware gathers under `-march=native`
+(16 `vpgather` per tap, see §8f), amortising the per-call cost with faster
+gather semantics.
+
+#### Why `[[gnu::flatten]]` on `moveTo` wins
+
+`__attribute__((flatten))` forces **every call** in the annotated function's body
+to be inlined, recursively — overriding all cost heuristics.  Applied to
+`StencilAccessor::moveTo`, it collapses the entire call tree (`prefetchHull`,
+`calcTaps`, 18× `cachedGetValue`, 14× helpers per tap) into one monolithic
+inlined body.  Observed: **0 calls, 1 `vzeroupper` (function epilogue only),
+14 350 insns, 77 KB of text in a single symbol**.
+
+Trade-offs:
+
+- Binary size: one 77 KB function per `StencilAccessor` instantiation.  L1i is
+  32 KB, but the per-batch hot path only sweeps a small fraction of the body
+  linearly, so I-cache pressure is manageable.
+- Debuggability: one giant symbol to step through vs 40+ small symbols.
+- Compile time: GCC spends notably longer compiling a flattened `moveTo`.
+
+#### Why `flatten` on `BatchAccessor::prefetch`/`cachedGetValue` alone is insufficient
+
+Flattening at the BatchAccessor level inlines the 14 Simd.h helpers into each
+`cachedGetValue`/`prefetch` body (so each of those becomes a clean, self-contained
+~800-insn function with ≤2 residual calls — typically `WhereExpression::op=` and
+the `_S_generator` stdx lambda for `popcount`).  However it leaves the 18
+`cachedGetValue` call sites *themselves* outlined — `calcTaps` still pays 38
+calls and 26 `vzeroupper` per batch.  Measured: 4.9 ns/voxel — halfway between
+no-flatten and full-flatten.
+
+The signal is clear: the *outer* `moveTo` → `calcTaps` → per-tap call boundary
+is the dominant cost, not the inner helper-call boundary.
+
+#### W=8 experiment (batch-width halving)
+
+Motivation: halving the batch width reduces register pressure and spill volume,
+and shifts some types from `_Fixed<W>` to `_VecBuiltin<32>` (the native
+`__m256i` ABI).  Specifically at W=8:
+
+- `Simd<uint16_t, 8>`   — 16 B, `_VecBuiltin<16>` (native XMM)
+- `Simd<uint32_t, 8>`   — 32 B, `_VecBuiltin<32>` (native YMM) ✓ register-passable
+- `Simd<uint64_t, 8>`   — 64 B, still `_Fixed<8>` (2× YMM aggregate, not passable)
+- `Simd<int64_t, 8>`    — same as uint64
+
+Only the `uint32_t` leaf-ID/mask vectors become register-passable; the dominant
+`uint64_t` index vectors are still aggregate (half the size of the W=16
+aggregate, but still stack-passed).
+
+Measured at W=8 with full flatten:
+
+| Metric                  | W=16    | W=8     | Δ       |
+|-------------------------|--------:|--------:|--------:|
+| `moveTo` text size      | 77 KB   | 34 KB   | −56%    |
+| `moveTo` insns          | 14,349  | 7,182   | −50%    |
+| YMM spill stores        |   469   |    67   | **−86%**|
+| YMM spill loads         |   351   |   167   | −52%    |
+| vpinsrq (software-gather glue) | 432 | 216 | −50%    |
+| `vpgather*`             | 0       | 0       | unchanged |
+| `vzeroupper`            | 1       | 1       | unchanged |
+| **End-to-end (GCC)**    | **3.7 ns/vox** | 4.2 ns/vox | +0.5 |
+| **End-to-end (Clang)**  | 4.3 ns/vox | 4.0 ns/vox | −0.3 |
+
+W=8 dramatically reduces register pressure (the spill count is 86% lower).  But
+GCC's end-to-end time regresses by 0.5 ns/voxel because the per-batch framing
+cost (`zeroIndices<SIZE>`, `leafSlice == centerLeafID` mask compute, straddling
+loop control, `prefetchHull`) is now amortised across only 8 lanes instead of
+16.  The body of `moveTo` halved; the surrounding scaffolding doubled.
+
+Clang benefits slightly (−0.3 ns/voxel), likely because its outlined
+`cachedGetValue` was paying more call-frame marshaling at W=16 (4× YMM aggregate
+vs 2× YMM at W=8).
+
+**Takeaway for future design**: W=8 would become attractive if the per-batch
+framing work can be amortised across multiple adjacent batches — for example,
+hoisting `prefetchHull` outside the batch loop for cases where the hull mask
+is invariant across several batches of the same center-leaf.
+
+#### Findings
+
+**F1 — GCC's default codegen for this abstraction is broken.**  Without
+`flatten` or equivalent attributes, GCC emits ~323 calls / ~282 `vzeroupper`
+per 16-voxel batch, making the SIMD `StencilAccessor` *slower* than the scalar
+`LegacyStencilAccessor`.
+
+**F2 — `[[gnu::flatten]]` on `StencilAccessor::moveTo` restores performance.**
+One attribute, targeting the WENO5 pipeline entry point, drops GCC from 7.5 to
+3.7 ns/voxel (2×) and makes GCC the fastest of the measured configurations.
+
+**F3 — Partial flattening at `BatchAccessor::{prefetch,cachedGetValue}` is not
+enough.**  The inner helper calls are eliminated but the 18 `cachedGetValue`
+call sites themselves remain — 4.9 ns/voxel.
+
+**F4 — Hardware gathers are not needed on Arrow Lake.**  GCC emits 0 `vpgather`
+in all variants; Clang+native emits 16 per `cachedGetValue`.  GCC's
+software-gather path (scalar loads + `vpinsrq`) nevertheless beats Clang's
+hardware-gather path end-to-end (3.7 vs 4.3 ns/voxel) because the three load
+ports issue the scalar gathers in parallel and the out-of-order engine hides
+the latency.  §8f Finding 5 (unmasked-gather auto-vectorisation) remains
+correct; it is simply not load-bearing on this microarchitecture.
+
+**F5 — W=8 reduces spills dramatically but does not help end-to-end on GCC.**
+Per-batch framing cost dominates at smaller widths.
+
+**F6 — Clang's performance is relatively insensitive to these knobs.**
+Clang inlines the Simd.h helpers regardless of `flatten`, and its outlined
+`cachedGetValue` pays only moderate call overhead.  Both 4.0–4.3 ns/voxel
+across all variants tested.
+
+**Not applied.**  The codebase does not ship `[[gnu::flatten]]` by default.
+StencilAccessor-style callers that require peak GCC performance may apply it
+to their own hot entry point; the attribute is safe and a no-op under Clang.
+This choice keeps the library's default codegen predictable and avoids forcing
+a 77 KB monolithic body on callers with smaller working sets.
+
 ---
 
 ## 9. Relationship to Phase 1 Prototype
@@ -759,12 +936,25 @@ on CPU.
   `maskWords=0` for invalid lanes → `isActive=false` without cross-width mask AND.
   Verified: 12M lane-checks pass across all 18 WENO5 taps.  Unlocks hardware
   `vpgatherqq` in the array backend under Clang + native tuning.
+- **End-to-end codegen analysis (§8h)**: measured the full WENO5 pipeline
+  (`StencilAccessor::moveTo` × 131 K blocks × 32 threads) on i9-285K Arrow Lake.
+  Established that GCC's default `-O3` outlines 14 Simd.h helpers per
+  `cachedGetValue` and outlines `cachedGetValue`/`WhereExpression::op=` per tap,
+  producing ~282 `vzeroupper` per 16-voxel batch and making the SIMD path
+  slower than scalar `LegacyStencilAccessor`.  `[[gnu::flatten]]` on
+  `StencilAccessor::moveTo` collapses the full call tree and drops GCC from
+  7.5 to 3.7 ns/voxel (2×), beating Clang's 4.3 ns/voxel.  W=8 cuts spills by
+  86% but regresses GCC end-to-end due to per-batch framing overhead.
+  Attributes **not applied** in the shipped code; see §8h "Not applied" note.
 
 ### Remaining
 
-- **`[[gnu::always_inline]]` on `Simd.h` helpers:** `gather_if`, `simd_cast`,
-  `simd_cast_if`, `where`, `popcount` — eliminates 13 `vzeroupper` transitions per
-  `cachedGetValue` call under GCC 13 (§8f).
+- **`[[gnu::always_inline]]` on `Simd.h` helpers** (§8f) vs
+  **`[[gnu::flatten]]` on StencilAccessor-style entry points** (§8h):
+  two candidate approaches to restore GCC inlining.  The flatten path was
+  measured end-to-end (2× speedup); the always_inline path was measured only
+  on the standalone `cachedGetValue` symbol.  Decide which to ship once a
+  consumer of StencilAccessor exists in the production build.
 
 - **`vpshufb`-based `popcount` in `Simd.h`:** replace `popcount64` SWAR tree with
   nibble-LUT + `vpsadbw` pattern (§8f); reduces the out-of-line body from 88 to ≈40

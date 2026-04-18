@@ -380,6 +380,21 @@ Both loops expand to zero-overhead compile-time instantiations:
 where `blendOneTap<I>` calls `cachedGetValue<P::di, P::dj, P::dk>` into a
 temporary and then `where`-blends into `mIndices[I]`.
 
+### 8.1 GCC codegen note — `[[gnu::flatten]]` on `moveTo`
+
+Under GCC 13 + `-O3`, the default inliner outlines both the 14 Simd.h helpers
+inside each `cachedGetValue` and the 18 per-tap `cachedGetValue` calls
+themselves, producing ~282 `vzeroupper` transitions per 16-voxel batch and
+making this whole SIMD pipeline measurably slower than the scalar
+`LegacyStencilAccessor` oracle.  Annotating `moveTo` with `[[gnu::flatten]]`
+collapses the full call tree into a single ~77 KB inlined body, restoring
+end-to-end performance from 7.5 ns/voxel to 3.7 ns/voxel (2×) and beating
+Clang's 4.3 ns/voxel in the same test.  The attribute is a no-op under Clang
+(which inlines by default) and is safe to add, but the header does not apply
+it by default — see `BatchAccessor.md` §8h for the measurement matrix and the
+rationale for leaving it opt-in.  Consumers that instantiate
+`StencilAccessor` in hot GCC-compiled code paths should consider enabling it.
+
 ---
 
 ## 9. `getValue<DI,DJ,DK>()` — tap access by coordinate
