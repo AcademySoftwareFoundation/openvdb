@@ -34,9 +34,9 @@
 #include <nanovdb/tools/CreateNanoGrid.h>
 #include <nanovdb/tools/VoxelBlockManager.h>
 #include <nanovdb/util/ForEach.h>
-#include <simd_test/Simd.h>   // SimdMask<T,W>, Simd<T,W>, any_of, none_of, to_bitmask
-#include "../ex_voxelBlockManager_host_cuda/BatchAccessor.h"    // BatchAccessor
-#include "../ex_voxelBlockManager_host_cuda/StencilAccessor.h"  // StencilAccessor, Weno5Stencil
+#include <nanovdb/util/Simd.h>   // SimdMask<T,W>, Simd<T,W>, any_of, none_of, to_bitmask
+#include <nanovdb/util/BatchAccessor.h>    // BatchAccessor
+#include <nanovdb/util/StencilAccessor.h>  // StencilAccessor, Weno5Stencil
 
 #include <x86intrin.h>   // __rdtsc, __rdtscp, _mm_lfence
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "Simd.h"
+#include <nanovdb/util/Simd.h>
 
 // Portable __hostdev__ annotation — no-op outside CUDA, matching NanoVDB convention.
 #ifndef __CUDACC__

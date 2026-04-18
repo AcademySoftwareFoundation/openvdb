@@ -38,7 +38,7 @@
 #pragma once
 
 #include <nanovdb/NanoVDB.h>
-#include <simd_test/Simd.h>   // simd_traits, scalar_traits, Simd<T,W>, SimdMask<T,W>
+#include <nanovdb/util/Simd.h>
 #include <cstdint>
 #include <cassert>
 #include <functional>

@@ -34,8 +34,8 @@
 #pragma once
 
 #include <nanovdb/NanoVDB.h>
-#include <simd_test/Simd.h>
-#include "BatchAccessor.h"
+#include <nanovdb/util/Simd.h>
+#include <nanovdb/util/BatchAccessor.h>
 
 #include <cstdint>
 #include <cassert>
