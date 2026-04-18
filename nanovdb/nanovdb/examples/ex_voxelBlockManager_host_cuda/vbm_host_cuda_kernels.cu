@@ -23,7 +23,6 @@
 
 #include <thrust/universal_vector.h>
 
-#include <immintrin.h>
 
 #include <algorithm>
 #include <atomic>
@@ -38,16 +37,6 @@ static constexpr int BlockWidth     = 1 << Log2BlockWidth; // 128
 using VBM    = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
 using CPUVBM = nanovdb::tools::VoxelBlockManager<Log2BlockWidth>;
 
-/// @brief Software 32-bit popcount (Hamming weight) via the AND/shift/add/multiply path.
-/// Unlike hardware POPCNT (which is scalar), this compiles to VPMULLD under AVX2 and
-/// vectorizes across all 16 lanes of a uint32_t vertical sweep over a valueMask.
-inline uint32_t popcount32(uint32_t x)
-{
-    x =  x - ((x >> 1) & 0x55555555u);
-    x = (x & 0x33333333u) + ((x >> 2) & 0x33333333u);
-    x = (x + (x >> 4)) & 0x0f0f0f0fu;
-    return (x * 0x01010101u) >> 24;
-}
 
 /// @brief For each VBM block, decode the inverse map and store
 /// (leafIndex, voxelOffset) for every active voxel into global output arrays
@@ -369,73 +358,6 @@ void runVBMCudaTest(const std::vector<nanovdb::Coord>& coords)
         const uint64_t* jumpMapPtr     = cpuHandle.hostJumpMap();
 
         static constexpr int nPerfRuns = 20;
-
-        // --- Sanity check: countOn + std::fill only, no tree access ---
-        {
-            std::cout << "\nCPU decodeInverseMaps sanity (countOn only):\n";
-
-            // Never true: used only to prevent dead code elimination.
-            volatile uint32_t dummy = 0;
-
-            for (int run = 0; run < nPerfRuns; ++run) {
-                nanovdb::util::Timer timer;
-                timer.start("");
-
-                nanovdb::util::forEach(0, nBlocks, 1,
-                    [&](const nanovdb::util::Range1D& range) {
-                    for (auto bID = range.begin(); bID < range.end(); ++bID) {
-                        int nExtraLeaves = 0;
-                        for (int i = 0; i < CPUVBM::JumpMapLength; i++)
-                            nExtraLeaves += nanovdb::util::countOn(
-                                jumpMapPtr[(uint64_t)bID * CPUVBM::JumpMapLength + i]);
-
-                        // Reinterpret the first leaf's 8 x uint64_t valueMask as
-                        // 16 x uint32_t words, one per group of 32 consecutive voxels.
-                        const auto& leaf =
-                            h_grid->tree().getFirstNode<0>()[firstLeafIDPtr[bID]];
-                        const uint32_t* maskWords =
-                            reinterpret_cast<const uint32_t*>(leaf.valueMask().words());
-
-                        // Phase 1: per-word inclusive prefix counts.
-                        // prefixCountRealigned[step][lane] = popcount(maskWords[lane] & mask)
-                        // where mask covers bits 0..step (inclusive).
-                        // At step=31, mask=0xFFFFFFFF so row[31] == wordPopcount[lane].
-                        // Safe mask form: (uint32_t(2) << step) - 1u avoids UB at step=31.
-                        alignas(32) uint32_t prefixCountRealigned[32][16];
-                        for (int step = 0; step < 32; step++) {
-                            const uint32_t mask = (uint32_t(2) << step) - 1u;
-                            #pragma omp simd
-                            for (int lane = 0; lane < 16; lane++)
-                                prefixCountRealigned[step][lane] =
-                                    popcount32(maskWords[lane] & mask);
-                        }
-
-                        // Phase 2: exclusive prefix scan of row[31] -> baseOffset[lane],
-                        // then add baseOffset to every row to get global prefix counts.
-                        uint32_t baseOffset[16];
-                        baseOffset[0] = 0;
-                        for (int lane = 1; lane < 16; lane++)
-                            baseOffset[lane] = baseOffset[lane-1] +
-                                               prefixCountRealigned[31][lane-1];
-
-                        for (int step = 0; step < 32; step++) {
-                            #pragma omp simd
-                            for (int lane = 0; lane < 16; lane++)
-                                prefixCountRealigned[step][lane] += baseOffset[lane];
-                        }
-
-                        // Dummy: global prefix count at the last voxel equals the total
-                        // active voxel count for this leaf, which is <= 512, never 513.
-                        if (prefixCountRealigned[31][15] == 513u)
-                            dummy = prefixCountRealigned[31][15];
-                    }
-                });
-
-                const float ms =
-                    (float)timer.elapsed<std::chrono::microseconds>() / 1000.0f;
-                std::cout << "  run " << run << ": " << ms << " ms\n";
-            }
-        }
 
         std::atomic<uint32_t> dummy{0};
 
