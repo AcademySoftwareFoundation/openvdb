@@ -693,10 +693,9 @@ static void runPerf(
                             const uint32_t offset = (uint32_t(c[0] & 7) << 6)
                                                   | (uint32_t(c[1] & 7) << 3)
                                                   |  uint32_t(c[2] & 7);
-                            // NanoVDB LeafData<ValueOnIndex>::getValueBranchless --
-                            // same formula as getValue but with the isOn check
-                            // replaced by a cmov-style mask gate.
-                            s += leaf->data()->getValueBranchless(offset);
+                            // LeafData<ValueOnIndex>::getValue (branchless by default;
+                            // see NanoVDB.h + BatchAccessor.md §8k).
+                            s += leaf->data()->getValue(offset);
                         };
 
                         // Unroll all 18 WENO5 taps via the compile-time tuple.

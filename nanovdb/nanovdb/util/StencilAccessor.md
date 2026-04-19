@@ -517,24 +517,25 @@ because both pay the same dominant `isOn` mispredict cost.
 - **The shipped hybrid design is the right API choice** (Simd-free public
   surface, compiler-portable) but its wall-clock edge over Legacy is
   marginal (~0.3 ns/voxel), not the ~3 ns/voxel originally implied.
-- **The cheap architectural win was a branchless variant of
-  `LeafData<ValueOnIndex>::getValue`**: `getValueBranchless`, shipped in
-  `NanoVDB.h:4161` (see `BatchAccessor.md` §8k).  Opt-in expert path for
-  neighbourhood-aware cachers; end-to-end 1.4× on realistic narrow-band
-  workloads, 2.8× on random-access.
+- **The cheap architectural win was a branchless reformulation of
+  `LeafData<ValueOnIndex>::getValue`**: shipped as the default body of
+  `getValue` in `NanoVDB.h` (see `BatchAccessor.md` §8k), gated by
+  `NANOVDB_USE_BRANCHY_GETVALUE` to restore the old branchy form.
+  End-to-end 1.4× on realistic narrow-band workloads, 2.8× on
+  random-access.
 - **HaloStencilAccessor's value proposition is validated but narrower**:
   its precomputed uint64 index buffer naturally eliminates `isOn`
-  branches by never evaluating them.  Now that `getValueBranchless`
-  captures the same win cheaply, the halo's remaining advantage is
-  "zero per-tap work at query time" rather than "avoids the isOn
-  mispredict storm."  Worth building for the absolute-perf cases; less
-  urgent than previously framed.
+  branches by never evaluating them.  Now that the branchless
+  `getValue` captures the same win cheaply, the halo's remaining
+  advantage is "zero per-tap work at query time" rather than "avoids
+  the isOn mispredict storm."  Worth building for the absolute-perf
+  cases; less urgent than previously framed.
 
 See `BatchAccessor.md` §8j for the original measurement matrix and
 correction log (§8g/§8h/§8i), and `BatchAccessor.md` §8k for the
-follow-on that added `getValueBranchless`, the narrow-band validation
-benchmark (`ex_narrowband_stencil_cpu`), and the leaf-only
-`ReadAccessor<BuildT, 0, -1, -1>` finding.
+follow-on that made `getValue` branchless-by-default, added the
+narrow-band validation benchmark (`ex_narrowband_stencil_cpu`), and
+the leaf-only `ReadAccessor<BuildT, 0, -1, -1>` finding.
 
 ---
 

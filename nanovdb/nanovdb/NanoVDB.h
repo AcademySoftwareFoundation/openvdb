@@ -4136,44 +4136,26 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueOnIndex, CoordT, Mask
     __hostdev__ uint64_t getMax() const { return this->hasStats() ? this->lastOffset() + 2u : 0u; }
     __hostdev__ uint64_t getAvg() const { return this->hasStats() ? this->lastOffset() + 3u : 0u; }
     __hostdev__ uint64_t getDev() const { return this->hasStats() ? this->lastOffset() + 4u : 0u; }
+    // Default branchless; define NANOVDB_USE_BRANCHY_GETVALUE to restore the
+    // pre-2026 branchy form.  See BatchAccessor.md §8k for rationale.
     __hostdev__ uint64_t getValue(uint32_t i) const
     {
-        //return mValueMask.isOn(i) ? mOffset + mValueMask.countOn(i) : 0u;// for debugging
+#ifdef NANOVDB_USE_BRANCHY_GETVALUE
         uint32_t       n = i >> 6;
         const uint64_t w = BaseT::mValueMask.words()[n], mask = uint64_t(1) << (i & 63u);
-        if (!(w & mask)) return uint64_t(0); // if i'th value is inactive return offset to background value
+        if (!(w & mask)) return uint64_t(0);
         uint64_t sum  = BaseT::mOffset + util::countOn(w & (mask - 1u));
         if (n--) sum += BaseT::mPrefixSum >> (9u * n) & 511u;
         return sum;
-    }
-
-    /// @brief Branchless variant of getValue, intended for neighbourhood-aware
-    /// caching paths (e.g. nanovdb::BatchAccessor's scalar tail) where the
-    /// per-tap mValueMask.isOn(offset) test is data-dependent and unpredictable.
-    ///
-    /// Semantics are identical to getValue: returns 0 for inactive voxels,
-    /// otherwise returns mOffset + prefix9(n) + popcount(w & (bit - 1u)).
-    /// Implementation uses a ternary-constant gate that the compiler emits as
-    /// `test + cmov` on x86, avoiding the branch-mispredict storm observed on
-    /// workloads with low spatial coherence between tap positions and the
-    /// source mValueMask.  See BatchAccessor.md §8j for the perf-counter
-    /// investigation that motivated this variant.
-    __hostdev__ uint64_t getValueBranchless(uint32_t i) const
-    {
+#else
         const uint32_t n      = i >> 6;
         const uint64_t w      = BaseT::mValueMask.words()[n];
         const uint64_t bit    = uint64_t(1) << (i & 63u);
-        // prefix9 extraction: predictable branch (n=0 only for the first
-        // x-slice; compilers emit as cmov).  Kept as a ternary rather than
-        // unconditional because the prefix-sum shift would be UB at n=0.
         const uint64_t prefix = n == 0u ? uint64_t(0)
                                         : (BaseT::mPrefixSum >> (9u * (n - 1u))) & 511u;
         const uint64_t sum    = BaseT::mOffset + prefix + util::countOn(w & (bit - 1u));
-        // 0 for inactive voxels, all-ones mask for active.  The ternary on
-        // two compile-time-constant arms compiles to test + cmov, not to a
-        // conditional jump -- the whole point of this method.
-        const uint64_t mask   = (w & bit) ? ~uint64_t(0) : uint64_t(0);
-        return mask & sum;
+        return ((w & bit) ? ~uint64_t(0) : uint64_t(0)) & sum;
+#endif
     }
 }; // LeafData<ValueOnIndex>
 
