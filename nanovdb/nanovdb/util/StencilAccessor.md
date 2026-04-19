@@ -438,58 +438,180 @@ annotate their own entry point.  See `BatchAccessor.md` §8i for the full
 perf matrix and the analysis of which operations were kept SIMD vs
 scalarized.
 
+### 8.2 What actually bottlenecks the CPU path — `valueMask.isOn` mispredicts
+
+A PMU-counter investigation (`BatchAccessor.md` §8j) replaced several rounds
+of structural reasoning with hardware measurements.  It refutes two
+hypotheses that had shaped earlier design discussions and identifies the
+one lever that dominates CPU performance.
+
+#### What we measured
+
+On a single P-core of an i9-285K (Arrow Lake, 8 P + 16 E, GCC 13 at
+`-O3 -march=native`, 32 M-voxel / 50 %-occupancy workload), comparing
+per-variant PMU counters for every benchmarking pass exposed via
+`ex_stencil_gather_cpu --pass=<name>`:
+
+| Variant | ns/voxel | IPC | branch-miss | L1 miss |
+|---------|---------:|----:|------------:|--------:|
+| Degenerate (18 × (0,0,0), CSE'd) | 29.0 | 4.02 | **0.75 %** | 0.41 % |
+| center-hit × 18 (Legacy, same-leaf, `cmov`'d) | 19.0 | 4.80 | **0.84 %** | 0.47 % |
+| InLeaf (hybrid, 18 distinct same-leaf, no CSE) | 76.6 | 1.45 | **9.87 %** | 0.68 % |
+| Stencil (hybrid WENO5 cross-leaf) | 96.9 | 1.53 | **8.75 %** | 0.46 % |
+| Legacy (WENO5, full tree walks) | 99.2 | 1.98 | **8.85 %** | 0.40 % |
+
+#### The two big findings
+
+1. **L1-dcache miss rates are flat across all variants (~0.4–0.7 %).**
+   Multi-leaf L1 pressure — the earlier narrative for why cross-leaf taps
+   cost so much — is **not a factor** on this workload.  The neighbour
+   leaves' `mValueMask` / `mPrefixSum` data stays L1-resident throughout a
+   VBM block.
+
+2. **Branch-miss rates split cleanly into two groups**, and the split is
+   not along tree-walk lines.  InLeaf has *no* tree walks (it wraps taps
+   mod 8 to the centre leaf by construction) but still lands in the "bad"
+   group at 9.87 % — higher than Legacy.  The common factor is the
+   **`valueMask.isOn(offset)` conditional** inside
+   `LeafNode<ValueOnIndex>::getValue(offset)`:
+
+   ```cpp
+   if (!(w & mask)) return 0;   // data-dependent, ~50/50 outcome, unpredictable
+   ```
+
+   Every per-tap leaf lookup in the "bad" group — the hybrid's scalar tail,
+   Legacy's `legacyAcc[k]`, InLeaf's `cachedGetValueInLeaf` — routes through
+   this branch.  Degenerate escapes it via CSE (18 identical taps collapse
+   to 1 evaluation).  center-hit escapes it because GCC's inliner in that
+   tight loop emits the guarded return as a branchless `cmov` — an
+   optimiser accident, not a general property.
+
+#### Branchless experiment
+
+A `legacy-branchless` variant that replaces `leaf.getValue(offset)` with
+the unconditional formula inlined at the call site (see §8j.5) recovers a
+**3× speedup on Legacy**: from 5.6 ns/voxel to 2.0 ns/voxel at 32 threads,
+IPC from 1.98 to 4.29, branch-miss rate from 8.07 % to 1.67 %.  The
+tree-walk machinery (`acc.probeLeaf()`) is preserved in that variant; the
+only thing removed is the single `isOn` branch per tap.  That single
+change accounts for ~65 % of Legacy's total wall-clock time.
+
+#### Revised attribution of Legacy's 5.4 ns/voxel
+
+| Component | ns/voxel |
+|-----------|---------:|
+| Framing (`decodeInverseMaps`, loop, anti-DCE) | 0.25 |
+| Leaf-local `getValue` work (loads + `popcnt`) | 0.75 |
+| **`valueMask.isOn` branch mispredicts** (~24/voxel × ~15 cy) | **~3.6** |
+| Tree walk vs 27-leaf cache differential | ~0.3 |
+| Multi-leaf L1 pressure | ~0 |
+| **Total** | **~5.4** |
+
+Earlier versions of this section attributed the bulk of Legacy's cost to
+tree-walk pointer chases and multi-leaf L1 traffic; both turned out to
+be minor.  The hybrid `StencilAccessor` matches Legacy (~5.1 ns/voxel)
+because both pay the same dominant `isOn` mispredict cost.
+
+#### Consequence for architectural decisions
+
+- **The shipped hybrid design is the right API choice** (Simd-free public
+  surface, compiler-portable) but its wall-clock edge over Legacy is
+  marginal (~0.3 ns/voxel), not the ~3 ns/voxel originally implied.
+- **The cheap architectural win is a branchless
+  `LeafNode<ValueOnIndex>::getValue(offset)` in NanoVDB** — ~15 lines
+  that would speed up every stencil gather caller (Legacy, hybrid,
+  HaloStencilAccessor, future variants) by ~3×.
+- **HaloStencilAccessor's value proposition is validated**: its precomputed
+  uint64 index buffer naturally eliminates `isOn` branches by never evaluating
+  them.  The speedup over branchless-leaf is smaller than previously
+  framed (~0.5–1 ns/voxel rather than sub-2 ns/voxel territory), but
+  still real.  Worth building for the absolute-perf cases.
+
+See `BatchAccessor.md` §8j for the full measurement matrix, methodology,
+correction log relative to §8g/§8h/§8i, and the branchless-experiment
+source.
+
 ---
 
-## 9. `getValue<DI,DJ,DK>()` — tap access by coordinate
+## 9. `tapIndex<DI,DJ,DK>()` — compile-time slot lookup, `mIndices[][]` access
+
+> **API evolution.**  Earlier drafts of this document described a
+> `getValue<DI,DJ,DK>() const → const IndexVec&` member and an
+> `operator[](int) → const IndexVec&` accessor.  Both were removed in the
+> hybrid refactor (§8.1).  The results buffer is now a plain public 2D
+> C array; callers pick their own access pattern.  The change aligns with
+> the hybrid's Simd-free public API — no `Simd<>` or `SimdMask<>` type
+> appears in the class's public interface.
 
 ```cpp
+// Storage — public, part of the ABI:
+alignas(64) uint64_t mIndices[SIZE][W];
+
+// Compile-time slot lookup (reorder-safe, zero runtime cost):
 template<int DI, int DJ, int DK>
-const IndexVec& getValue() const {
-    constexpr int I = findIndex<typename StencilT::Taps, DI, DJ, DK>(
+static constexpr int tapIndex() {
+    constexpr int I = detail::findIndex<typename StencilT::Taps, DI, DJ, DK>(
         std::make_index_sequence<SIZE>{});
-    static_assert(I >= 0, "StencilAccessor::getValue: tap not in stencil");
-    return mIndices[I];
+    static_assert(I >= 0, "StencilAccessor::tapIndex: tap not in stencil");
+    return I;
 }
+
+// Iteration bound:
+static constexpr int size() { return SIZE; }
 ```
 
-**Inverse map** (`findIndex`): a `constexpr` fold over all `SIZE` taps, comparing
-`(di,dj,dk)` against each `StencilPoint`.  O(N) compile-time evaluations —
-negligible for realistic stencil sizes.  Resolved entirely at compile time; the
-resulting `I` is a compile-time constant used as an array index.
+**Inverse map** (`detail::findIndex`): a `constexpr` fold over all `SIZE`
+taps, comparing `(DI,DJ,DK)` against each `StencilPoint`.  O(N) compile-time
+evaluations — negligible for realistic stencil sizes.  Resolved entirely at
+compile time; `tapIndex<-3,0,0>()` compiles to an integer literal.
 
-**`static_assert`**: catches invalid tap coordinates at compile time with a clear
-message.  Same safety guarantee as OpenVDB stencil's bounds check.
+**`static_assert`**: catches invalid tap coordinates at compile time with a
+clear message.  Same safety guarantee as OpenVDB stencil's bounds check.
 
-**Lifetime**: the returned reference is valid only until the next `moveTo` call.
-The caller must not cache the reference across batches.
+**Lifetime**: `mIndices` is valid only until the next `moveTo` call.  The
+caller must not cache references across batches.
 
-**Indexed access** — for kernels that iterate over all taps generically:
-
-```cpp
-const IndexVec& operator[](int i) const { return mIndices[i]; }
-```
-
-Public, no bounds check in release.  Same lifetime caveat as `getValue`.
+**Why expose `mIndices` directly** (rather than a method that returns it):
+the results buffer is plain data — no lazy work, no layout translation, no
+invariants to enforce.  Hiding it behind an accessor would pretend
+otherwise.  Direct access also lets callers choose their SIMD load pattern
+(or scalar iteration) without our API imposing one.
 
 ---
 
 ## 10. Caller-side usage pattern
 
 ```cpp
-// Construct once per VBM block
-StencilAccessor<BuildT, W, Weno5Stencil> stencil(grid, vbm.firstLeafID(blockID), nExtraLeaves);
+// Construct once per VBM block.
+StencilAccessor<BuildT, W, Weno5Stencil> stencil(
+    grid, vbm.firstLeafID(blockID), nExtraLeaves);
 
-for (int b = 0; b < nBatches; ++b) {
-    auto active = stencil.moveTo(leafIndex + b*W, voxelOffset + b*W);
-    if (util::none_of(active)) continue;
+// Active-lane information comes from decodeInverseMaps's UnusedLeafIndex
+// sentinel — the same source that StencilAccessor uses internally.
+for (int bs = 0; bs < BlockWidth; bs += W) {
+    stencil.moveTo(leafIndex + bs, voxelOffset + bs);  // returns void
 
-    // Access by coordinate — compile-time slot resolution
-    auto idx_m3 = stencil.getValue<-3, 0, 0>();  // Simd<uint64_t,W>
-    auto idx_m2 = stencil.getValue<-2, 0, 0>();
-    // ... feed into WENO kernel alongside sidecar value fetches
+    // Option A: scalar iteration across lanes and taps.
+    for (int i = 0; i < W; ++i) {
+        if (leafIndex[bs + i] == UnusedLeafIndex) continue;
+        for (int k = 0; k < StencilAccessor::size(); ++k) {
+            consume(stencil.mIndices[k][i]);  // uint64_t
+        }
+    }
+
+    // Option B: SIMD load of an entire tap row (caller picks backend/width).
+    auto row_m3 = util::Simd<uint64_t, W>(
+        stencil.mIndices[stencilAccT::tapIndex<-3, 0, 0>()],
+        util::element_aligned);
+
+    // Option C: compile-time named tap access for a handful of taps.
+    const uint64_t& xm3 = stencil.mIndices[stencilAccT::tapIndex<-3,0,0>()][i];
 }
 // stencil destroyed here (end of block scope)
 ```
+
+No `Simd<>` or `SimdMask<>` types appear in the public API.  The caller
+uses its own SIMD backend (or none) to consume `mIndices`.
 
 ---
 
@@ -506,8 +628,8 @@ for (int b = 0; b < nBatches; ++b) {
 | `leafMask` computation | `StencilAccessor` (derived inside `moveTo`) |
 | Straddling loop | `StencilAccessor` |
 | Hull prefetch sequencing | `StencilAccessor` |
-| Tap fold and `where`-blend | `StencilAccessor` |
-| `mIndices[SIZE]` storage and zeroing | `StencilAccessor` (zeroed at top of each `moveTo`) |
+| Tap fold (writes directly into `mIndices[Is]`) | `StencilAccessor::calcTaps` |
+| `mIndices[SIZE][W]` storage and zeroing | `StencilAccessor` (public member; `std::memset` at top of each `moveTo`) |
 | `nExtraLeaves` debug bound | `StencilAccessor` (`#ifndef NDEBUG` member; removable) |
 | Center-leaf lifetime (block scope) | Caller |
 
@@ -515,28 +637,42 @@ for (int b = 0; b < nBatches; ++b) {
 
 ## 12. Design decisions (all resolved)
 
-1. **`moveTo` return type — `IndexMaskVec` by value.**
-   The initial `activeMask = (leafSlice != UnusedLeafIndex)` is saved before the
-   straddling loop drains it to zero, widened from `LeafMaskVec` (uint32_t) to
-   `IndexMaskVec` (uint64_t), and returned.  This gives the caller a mask that is
-   semantically aligned with the uint64_t `mIndices` data.  The returned mask has
-   two simultaneous readings: which lanes held valid voxels (not padding sentinels),
-   and which lanes of `mIndices[k]` contain valid stencil indices.  These are the
-   same predicate.  No member copy is kept — the mask is consumed at the call site.
+> **Evolution.**  Decisions 1 and 3 below have been superseded by the
+> hybrid refactor (§8.1): `moveTo` now returns `void`, and `operator[]` /
+> `getValue<>()` were removed in favour of public `mIndices` access +
+> `tapIndex<>()`.  The original rationales are preserved for historical
+> context; the current API is §9's.
+
+1. **`moveTo` return type — ~~`IndexMaskVec` by value~~ `void` (revised §8.1).**
+   *Original rationale:* The initial
+   `activeMask = (leafSlice != UnusedLeafIndex)` was saved before the
+   straddling loop drains it to zero, widened from `LeafMaskVec` (uint32_t)
+   to `IndexMaskVec` (uint64_t), and returned.  This gave the caller a mask
+   semantically aligned with the uint64_t `mIndices` data.
+   *Revised:* `moveTo` now returns `void`.  The active-lane information is
+   redundant: callers already have `leafIndex[]` from `decodeInverseMaps`
+   and the same `UnusedLeafIndex` sentinel that `StencilAccessor` uses
+   internally.  Returning the mask duplicated state and forced a
+   heterogeneous `SimdMask<uint32_t>` → `SimdMask<uint64_t>` widening with
+   a boolean round-trip (§8h) — all for zero information gain.  Removing
+   it also eliminated the last `SimdMask<>` type from the public API.
 
 2. **Inactive-lane `mIndices` values — zeroed at top of `moveTo`.**
-   `mIndices[0..SIZE-1]` is set to `IndexVec(0)` at the start of every `moveTo`
-   call.  Index 0 is the NanoVDB IndexGrid "not found / background" sentinel, so
-   inactive lanes yield a well-defined background index rather than stale data.
-   The cost is `SIZE` × W zero-writes per call (~36 YMM stores for WENO5 W=16),
-   which is negligible.
+   `mIndices` is set to zero (via `std::memset`) at the start of every
+   `moveTo` call.  Index 0 is the NanoVDB IndexGrid "not found / background"
+   sentinel, so inactive lanes yield a well-defined background index rather
+   than stale data.  The cost is a single `memset` of `SIZE * W * 8` bytes
+   per call (2304 B for WENO5 W=16), which stays in L1 and pipelines under
+   other work.
 
-3. **`operator[]` — public, const-ref, no bounds check.**
-   ```cpp
-   const IndexVec& operator[](int i) const { return mIndices[i]; }
-   ```
-   For kernels that iterate over all taps generically.  Same lifetime as
-   `getValue`: valid only until the next `moveTo` call.
+3. **~~`operator[]` — public, const-ref, no bounds check~~ removed (revised §9).**
+   *Original:* `const IndexVec& operator[](int i) const { return mIndices[i]; }`
+   for kernels that iterate over all taps generically.
+   *Revised:* `mIndices` is now a public member (§9); direct indexing
+   replaces both `operator[](int)` and `getValue<DI,DJ,DK>()`.  Named-tap
+   access is via the `tapIndex<DI,DJ,DK>()` static constexpr slot lookup.
+   This change is consistent with the hybrid's Simd-free public API — no
+   method can now return a `Simd<>` or `SimdMask<>` reference.
 
 4. **`StencilT` representation — `std::tuple<StencilPoint<...>...>` for both
    `Taps` and `Hull`.**

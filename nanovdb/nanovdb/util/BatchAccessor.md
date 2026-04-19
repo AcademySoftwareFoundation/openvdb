@@ -651,6 +651,18 @@ AVX2 popcount pattern and the likely replacement for `popcount64` in `Simd.h`.
 
 ### 8g. Cycle budget and architectural comparison
 
+> **Revision note (see §8j).**  The cycle-budget table below models the
+> *historical* fully-SIMD `cachedGetValue` (§8e) and predicts a ~55-cycle
+> critical path dominated by the gather chain.  That pipeline no longer
+> ships (hybrid refactor, §8i), and even for the scalar-tail path PMU
+> measurement shows that the dominant cost is **not** gather/pointer-chase
+> latency but rather **`valueMask.isOn(offset)` branch mispredicts**
+> (§8j).  The "4–10× CPU speedup over scalar" framing below remains
+> directionally correct (the hybrid does still beat Legacy), but the
+> magnitude is ~1.05× on 32-thread WENO5, not 4×.  Use the §8j matrix as
+> the authoritative measurement; treat this section as design-rationale
+> history.
+
 #### `cachedGetValue` critical path (Clang 18 + stdx + `-march=native`, W=16)
 
 | Step | Work | Cumulative cycles |
@@ -732,6 +744,15 @@ working set in L1/shared memory), rather than the gather-chain depth that domina
 on CPU.
 
 ### 8h. End-to-end perf: outlining, `[[gnu::flatten]]`, and W=8
+
+> **Revision note (see §8j).**  The end-to-end measurements and `[[gnu::flatten]]`
+> findings in this section are correct.  The *attribution* of cross-leaf cost to
+> "multi-leaf L1 pressure" — which appeared here and in the original analysis —
+> was **wrong**.  `perf` counter measurements later showed that L1 miss rates are
+> flat across all variants (~0.4 %) and that the dominant cross-leaf cost is
+> actually **branch-mispredict stalls on the `valueMask.isOn(offset)` check**
+> inside `LeafNode<ValueOnIndex>::getValue(offset)`.  See §8j for the full
+> perf-counter investigation and revised decomposition.
 
 §8f measured `cachedGetValue` as a standalone symbol.  This section measures the
 **full WENO5 pipeline end-to-end** — `StencilAccessor::moveTo` driving 18 taps ×
@@ -910,6 +931,25 @@ a 77 KB monolithic body on callers with smaller working sets.
 
 ### 8i. Hybrid SIMD → scalar-tail design *(current)*
 
+> **Revision note (see §8j).**  The hybrid design and the perf-matrix numbers
+> in this section are correct.  Two *claims* in the "Cost of the refactor" /
+> "Cleanup" subsections were subsequently refined:
+>
+> 1. The cross-leaf overhead (`Stencil − InLeaf ≈ 0.9 ns/voxel`) was attributed
+>    here to "multi-leaf L1 pressure".  `perf` showed L1 miss rates are flat;
+>    the real source is additional unpredictable branches in the cross-leaf
+>    path.
+> 2. The architectural claim that the 27-leaf neighbor cache eliminates full
+>    tree walks (§8i "Not applied" discussion) is correct structurally, but the
+>    *magnitude* of that savings is much smaller than implied.  Measured via
+>    controlled decomposition: ~**0.3 ns/voxel** — about 6 % of Legacy's total
+>    5.4 ns/voxel — not the majority of the "4.4 ns/voxel cross-leaf cost" this
+>    section's table implies.  See §8j for the quantified breakdown.
+>
+> The hybrid design itself remains the right shipped choice; the refactor's
+> primary win is Simd-free public API and compiler-portable performance,
+> not the cache lookup.
+
 The findings of §8f/§8h motivated a different trade-off, which is what the
 codebase now ships.
 
@@ -1012,6 +1052,237 @@ caller using them.  Added to support the hybrid: `util::store(v, p)` (a
 uniform `store` shim that dispatches to `copy_to` on stdx and `store` on
 the array backend).
 
+### 8j. `perf`-counter investigation — what actually bottlenecks the CPU path
+
+This section records the results of a direct PMU-counter investigation that
+replaced several rounds of structural reasoning and cycle-budget estimation
+(§8e–§8i) with measurements.  **It revises or refutes several earlier claims**
+and identifies the single biggest lever for CPU-side speedup of any
+`ValueOnIndex` stencil gather.
+
+#### 8j.1 Motivation
+
+By §8i we had three working hypotheses for where the ~5.4 ns/voxel of Legacy
+(and ~5.1 ns/voxel of the hybrid) was spent:
+
+1. **Tree-walk pointer chases** on leaf-cache misses (~25 % of taps cross
+   leaves in WENO5).
+2. **L1 pressure** from touching up to 6 neighbour leaves' `mValueMask` /
+   `mPrefixSum` data per voxel.
+3. **Gather-chain latency** in the old SIMD pipeline (largely mitigated by
+   the hybrid refactor — §8i).
+
+All three were structural guesses, anchored by the cycle-budget table in §8g
+and by assembly reading.  None had been validated with hardware counters.
+
+#### 8j.2 Methodology
+
+Added two CLI knobs to `ex_stencil_gather_cpu`:
+
+- `--pass=<name>` — runs exactly one of the timed variants
+  (`framing`, `decode`, `center-hit`, `legacy`, `legacy-branchless`,
+  `degenerate`, `inleaf`, `stencil`).  Needed because the default harness
+  runs every variant back-to-back, and `perf stat` cannot attribute counters
+  to a subrange.
+- `--threads=<n>` — gates TBB parallelism via `tbb::global_control`.  Needed
+  because `perf` event multiplexing and hybrid-CPU attribution is cleaner
+  single-threaded on a single P-core.
+
+Setup: i9-285K Arrow Lake (8 P-cores + 16 E-cores, no HT).  Pin to
+`taskset -c 0` for the P-core.  Lower `kernel.perf_event_paranoid` to 1.
+Baseline events: `cycles, instructions, branch-instructions, branch-misses,
+L1-dcache-loads, L1-dcache-load-misses`.  Workload: 32 M ambient voxels /
+50 % occupancy (16.7 M active).  Build: GCC 13.3 at `-O3 -march=native`
+with `NANOVDB_USE_INTRINSICS=ON` (though see §8j.7 for why this flag is a
+no-op on this toolchain).
+
+#### 8j.3 Measurement matrix (single P-core, `--threads=1`)
+
+| Variant | ns/voxel | IPC | branch-miss | L1 miss | branch-misses / voxel |
+|---------|---------:|----:|------------:|--------:|----------------------:|
+| framing (no accessor call)       |   3.2 | 2.52 | 3.15 % | 1.41 % |  2.05 |
+| center-hit × 18 (legacy, same leaf, 18 distinct coords) | 19.0 | **4.80** | **0.84 %** | 0.47 % | 2.38 |
+| Degenerate (hybrid, 18 × (0,0,0) — compiler CSE'd)      | 29.0 | **4.02** | **0.75 %** | 0.41 % | 2.22 |
+| InLeaf (hybrid, 18 distinct same-leaf, no CSE)          | 76.6 | **1.45** | **9.87 %** | 0.68 % | 23.1 |
+| Stencil (hybrid, WENO5 cross-leaf)                      | 96.9 | **1.53** | **8.75 %** | 0.46 % | 24.1 |
+| Legacy (WENO5, 1-slot path cache)                       | 99.2 | **1.98** | **8.85 %** | 0.40 % | 26.7 |
+
+Three immediate observations from this matrix:
+
+1. **L1-dcache-load-misses is flat** across all six variants (0.40 – 0.68 %,
+   absolute counts 25.8 – 28.3 M).  The multi-leaf L1 pressure hypothesis is
+   **falsified**.  Even WENO5's 6-leaf working set stays L1-resident.
+2. **Branch-miss rate splits cleanly into two groups**: "good" (0.75 – 0.84 %)
+   and "bad" (8.75 – 9.87 %).  The split is not along tree-walk lines —
+   InLeaf has **no** tree walks (it is same-leaf by construction) yet lands
+   in the "bad" group with the highest miss rate of all.
+3. **IPC collapses from ~4.5 to ~1.5** between the two groups.  A backend
+   throughput difference of 3× is far too large to be attributable to any
+   single cache effect.
+
+#### 8j.4 Identifying the real source — the `valueMask.isOn(offset)` branch
+
+Every path that ends at `LeafNode<ValueOnIndex>::getValue(offset)` evaluates:
+
+```cpp
+uint32_t n = i >> 6;
+uint64_t w = mValueMask.words()[n], mask = 1ull << (i & 63u);
+if (!(w & mask)) return 0;                      // ← unpredictable branch
+uint64_t sum = mOffset + util::countOn(w & (mask - 1u));
+if (n--) sum += mPrefixSum >> (9u * n) & 511u;
+return sum;
+```
+
+For our 50 %-occupancy workload, tap positions land on ON vs OFF bits with
+roughly 60/40 frequency (spatially correlated but not perfectly).  **This
+branch is fundamentally unpredictable.**  Its cost compounds: ~288 taps per
+16-voxel batch × ~25 mispredicts per voxel × ~15-cycle mispredict penalty =
+the dominant stall in both the hybrid and Legacy paths.
+
+Why do Degenerate and center-hit escape it?
+
+- **Degenerate**: 18 identical compile-time taps produce 18 identical values
+  per lane.  GCC CSEs the entire per-lane computation (including the `isOn`
+  check) down to 1 evaluation + 18 stores of the same value.  One branch per
+  lane survives instead of 18.
+- **center-hit (legacy)**: after the tight loop is fully inlined, GCC emits
+  the `isOn`-guarded return as a **branchless `cmov`** pattern.  Verified by
+  disassembly: no conditional jump in the hot path.  This is not a general
+  property — it happens because `acc.getValue(coord)` in its minimal form
+  exposes a clean `?:`-equivalent to the compiler.  In the hybrid's scalar
+  tail (larger function body, per-lane loop, harvest-buffer loads), GCC
+  keeps the `isOn` as a conditional jump.
+
+#### 8j.5 Branchless experiment — quantifying the `isOn` cost
+
+Added a `legacy-branchless` variant that replaces the `leaf.getValue(offset)`
+call with the unconditional formula inlined at the call site:
+
+```cpp
+// in place of `leaf.getValue(offset)` with isOn check:
+const uint32_t offset  = (c[0]&7)<<6 | (c[1]&7)<<3 | c[2]&7;
+const uint32_t wordIdx = offset >> 6;
+const uint64_t bit     = 1ull << (offset & 63);
+const uint64_t word    = leaf->valueMask().words()[wordIdx];
+const uint64_t prefix  = (wordIdx > 0)
+                       ? (leaf->data()->mPrefixSum >> (9 * (wordIdx - 1))) & 511
+                       : 0;
+s += leaf->data()->mOffset + prefix + __builtin_popcountll(word & (bit - 1));
+// No isOn check.  Produces a non-zero "wrong" value for OFF voxels —
+// so the checksum will NOT match — but wall-clock and PMU counters are clean.
+```
+
+Results:
+
+| Metric                | Legacy (with `isOn`) | Legacy branchless |     Δ |
+|-----------------------|---------------------:|------------------:|------:|
+| ns/voxel (32 thread)  | 5.6                  | **2.0**           | −3.6  |
+| ns/voxel (1 P-core)   | 103.7                | **33.2**          | −70.5 |
+| IPC                   | 1.98                 | **4.29**          |  2.2× |
+| branch-miss rate      | 8.07 %               | **1.67 %**        | −5×   |
+| branch-misses / voxel | 27                   | **4.6**           | −6×   |
+| L1 miss rate          | 0.36 %               | 0.48 %            | ~0    |
+| instructions / voxel  | 2646                 | 2416              | −9 %  |
+
+**The single change of removing the `isOn` branch recovers a 3× speedup on
+Legacy end-to-end.**  It accounts for the entire IPC collapse.  The tree
+walk inside `acc.probeLeaf()` is preserved in this variant, so the speedup
+is not from avoiding tree walks — it is from removing the pipeline stalls
+caused by mispredicting one branch per tap.
+
+#### 8j.6 Revised attribution of Legacy WENO5's 5.4 ns/voxel
+
+| Component                                     | ns/voxel | How isolated |
+|-----------------------------------------------|---------:|:-------------|
+| Framing (decodeInverseMaps, loop, anti-DCE)   |     0.25 | measured standalone |
+| Leaf-local `getValue` work (loads + `popcnt`) |     0.75 | center-hit × 18 minus framing |
+| `valueMask.isOn` branch mispredicts (~24/voxel × ~15 cy) | **~3.6** | Legacy minus Legacy-branchless |
+| Full tree walk vs 27-leaf cache (stencil minus legacy)   | **~0.3** | Stencil minus Legacy (or Legacy-branchless minus Stencil-branchless, if both existed) |
+| Multi-leaf L1 pressure                        |      ~0 | measured: L1 miss rate flat |
+| **Total**                                     |   **~5.4** | |
+
+The earlier framing — that "tree walks and L1 pressure dominate" — was
+wrong.  Both turn out to be minor.  The entire ~78 % of Legacy's cost that
+§8h attributed to "cross-leaf overhead" is actually **~80 % `isOn` mispredicts,
+~10 % real tree-walk work, ~10 % other**.
+
+#### 8j.7 `NANOVDB_USE_INTRINSICS` is a no-op on GCC 13 at `-O3 -march=native`
+
+`util::countOn(uint64_t)` in `nanovdb/util/Util.h` gates
+`__builtin_popcountll` behind `NANOVDB_USE_INTRINSICS`; the fallback is a
+SWAR popcount that uses a magic multiply (`0x0101010101010101`).  Verified
+by `objdump`: the compiled binary contains 178 `popcnt` instructions and
+only 1 occurrence of the SWAR magic multiply.  GCC's peephole pattern
+matcher at `-O3` recognises the SWAR shape and replaces it with hardware
+`popcnt` whether or not `NANOVDB_USE_INTRINSICS` is defined.  This is
+brittle (depends on GCC version, flags, and code layout); the macro should
+be enabled explicitly in production builds for portability, but none of
+the perf numbers in this section change when it is toggled.
+
+#### 8j.8 Architectural implications
+
+1. **BatchAccessor's 27-leaf cache addresses ~6 % of the total cost.**  Its
+   architectural value over the scalar `DefaultReadAccessor`'s 1-slot cache
+   is real but modest on this workload.  The neighbour cache eliminates the
+   full root-to-leaf traversal on every cross-leaf tap (§8i, confirmed
+   structurally), but the wall-clock saving is ~0.3 ns/voxel — dominated by
+   OoO pipelining of otherwise-serial pointer chases.
+
+2. **The biggest cheap CPU win available is branchless
+   `LeafNode<ValueOnIndex>::getValue(offset)` in NanoVDB proper.**  Rewriting
+   that function (perhaps ~15 lines, preserving semantics for OFF voxels via
+   a branchless arithmetic gate) would give every stencil-gather caller —
+   Legacy, hybrid, HaloStencilAccessor, any future variant — a 2–3× speedup
+   on CPU.  Proposed form, sketched below, keeps OFF-returns-0 semantics:
+
+   ```cpp
+   // sketch, not tested:
+   __hostdev__ uint64_t getValue(uint32_t i) const {
+       const uint32_t n    = i >> 6;
+       const uint64_t w    = mValueMask.words()[n];
+       const uint64_t bit  = 1ull << (i & 63u);
+       const uint64_t mask = bit - 1u;
+       const uint64_t on   = (w & bit) ? ~0ull : 0ull;  // cmov via explicit ternary
+       const uint64_t pfx  = n ? ((mPrefixSum >> (9u * (n - 1u))) & 511u) : 0ull;
+       return on & (mOffset + pfx + util::countOn(w & mask));
+   }
+   ```
+   (The `on` gate pattern compiles to a `test`+`cmov` on GCC; the
+   `leaf.getValue` call pays one predictable branch instead of one
+   unpredictable one.  Needs benchmarking to confirm the optimiser doesn't
+   refold it into a conditional jump.)
+
+3. **HaloStencilAccessor's value proposition is validated but smaller than
+   advertised.**  Its core architectural advantage (precomputed uint64
+   indices per tap position, so stencil queries are unconditional indexed
+   loads) naturally eliminates the `isOn` branch.  But a branchless
+   `LeafNode::getValue` would capture most of the same win without needing
+   the halo-buffer infrastructure.  The halo still wins on absolute perf
+   (zero per-tap work at query time), but the delta over a branchless
+   leaf lookup is more like ~0.5–1 ns/voxel than the "sub-2 ns/voxel
+   territory" framed earlier.
+
+4. **The hybrid `StencilAccessor`'s design rationale needs a small rewrite.**
+   The shipped hybrid design (§8i) is still the right API choice (Simd-free
+   public surface, compiler-portable perf) — but the justification is not
+   "it beats the gather chain's L1 pressure" (there is none); it is "it
+   matches the compiler's natural inlining / vectorisation model for this
+   workload and eliminates the outlining/vzeroupper pathology (§8h)."  The
+   gain over Legacy WENO5 is marginal (~0.3 ns/voxel) because both pay the
+   same dominant `isOn` mispredict cost; the hybrid's real value emerges
+   only if and when `leaf.getValue` is made branchless.
+
+#### 8j.9 Historical correction log
+
+| Earlier claim                                              | Source     | Revised to |
+|------------------------------------------------------------|:-----------|:-----------|
+| "Tree-walk latency is the critical path" (cycle-budget)    | §8g        | OoO absorbs most of it; isOn mispredicts dominate. |
+| "Multi-leaf L1 pressure accounts for ~0.9 ns/voxel cross-leaf overhead" | §8h, §8i | L1 miss rate is flat; the 0.9 ns/voxel is mostly isOn mispredicts shared with same-leaf InLeaf. |
+| "Tree walks cost ~78 % of Legacy's time (4.4 ns/voxel)"     | §8h (implicit); my thread claim | Real tree-walk cost is ~0.3 ns/voxel; the 4.4 ns/voxel was mostly isOn mispredicts. |
+| "Degenerate ~1.7 ns/voxel is the hybrid's floor"            | my thread claim | Degenerate is heavily CSE-biased; real floor is InLeaf at ~4.2 ns/voxel, of which ~3.5 is isOn mispredicts. |
+| "`NANOVDB_USE_INTRINSICS` matters for popcount-heavy paths" | general assumption | No-op on GCC `-O3 -march=native`: SWAR → popcnt pattern match. Enable for portability anyway. |
+| "27-leaf cache is the architectural win of BatchAccessor"   | §8i "Cost of the refactor" | Cache delta is ~0.3 ns/voxel. Real wins are the Simd-free API and flatten-free compiler portability (§8i). |
+
 ---
 
 ## 9. Relationship to Phase 1 Prototype
@@ -1060,14 +1331,43 @@ the array backend).
   86% but regresses GCC end-to-end due to per-batch framing overhead.
   Attributes **not applied** in the shipped code; see §8h "Not applied" note.
 
+- **Hybrid SIMD → scalar-tail refactor (§8i)**: shipped.  `BatchAccessor::cachedGetValue`
+  now keeps the SIMD SWAR setup and harvests per-lane direction / local-offset
+  into C arrays for a plain scalar tail calling `leaf.getValue(offset)`.
+  Public API of `StencilAccessor` is Simd-free; performance is within
+  ~0.3 ns/voxel of the old flatten-forced path, but compiler-portable.
+
+- **PMU-counter investigation (§8j)**: validated the above empirically and
+  refuted two earlier working hypotheses.  Specifically:
+  - L1 miss rate is flat across all variants (~0.4 %) — **multi-leaf L1
+    pressure is not a factor**.
+  - The dominant cost (~65 % of Legacy's 5.4 ns/voxel) is branch-mispredict
+    stalls on the **`valueMask.isOn(offset)` check** inside
+    `LeafNode<ValueOnIndex>::getValue(offset)`.
+  - A branchless reformulation of that call recovers a 3× speedup
+    (5.6 → 2.0 ns/voxel on 32 threads) with IPC rising from 1.98 to 4.29.
+  - Tree-walk elimination by the 27-leaf cache saves ~0.3 ns/voxel, not
+    the ~3 – 4 ns/voxel implied by §8h/§8i.
+  - `NANOVDB_USE_INTRINSICS` is a no-op on GCC 13 at `-O3 -march=native`
+    (SWAR `util::countOn` is pattern-matched to hardware `popcnt`).  Enable
+    it in the build anyway for portability.
+
 ### Remaining
+
+- **Branchless `LeafNode<ValueOnIndex>::getValue(offset)` in NanoVDB** (§8j).
+  The single biggest available CPU-side speedup for any stencil caller.  A
+  ~15-line rewrite that preserves the OFF-returns-0 semantics via an
+  arithmetic mask gate instead of a conditional `return 0` would give
+  Legacy, the hybrid, HaloStencilAccessor, and any future variant a 2–3×
+  end-to-end speedup on 32-thread WENO5 workloads.  Needs benchmarking to
+  confirm GCC/Clang don't refold the gate back into a branch.
 
 - **`[[gnu::always_inline]]` on `Simd.h` helpers** (§8f) vs
   **`[[gnu::flatten]]` on StencilAccessor-style entry points** (§8h):
-  two candidate approaches to restore GCC inlining.  The flatten path was
-  measured end-to-end (2× speedup); the always_inline path was measured only
-  on the standalone `cachedGetValue` symbol.  Decide which to ship once a
-  consumer of StencilAccessor exists in the production build.
+  two candidate approaches to restore GCC inlining.  Mostly superseded
+  by the hybrid refactor (§8i) and the branchless-leaf opportunity
+  (§8j); leave open in case later callers reintroduce the outlining
+  pathology.
 
 - **`vpshufb`-based `popcount` in `Simd.h`:** replace `popcount64` SWAR tree with
   nibble-LUT + `vpsadbw` pattern (§8f); reduces the out-of-line body from 88 to ≈40
