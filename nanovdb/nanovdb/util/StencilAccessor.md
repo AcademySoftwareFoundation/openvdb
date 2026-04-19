@@ -517,19 +517,24 @@ because both pay the same dominant `isOn` mispredict cost.
 - **The shipped hybrid design is the right API choice** (Simd-free public
   surface, compiler-portable) but its wall-clock edge over Legacy is
   marginal (~0.3 ns/voxel), not the ~3 ns/voxel originally implied.
-- **The cheap architectural win is a branchless
-  `LeafNode<ValueOnIndex>::getValue(offset)` in NanoVDB** — ~15 lines
-  that would speed up every stencil gather caller (Legacy, hybrid,
-  HaloStencilAccessor, future variants) by ~3×.
-- **HaloStencilAccessor's value proposition is validated**: its precomputed
-  uint64 index buffer naturally eliminates `isOn` branches by never evaluating
-  them.  The speedup over branchless-leaf is smaller than previously
-  framed (~0.5–1 ns/voxel rather than sub-2 ns/voxel territory), but
-  still real.  Worth building for the absolute-perf cases.
+- **The cheap architectural win was a branchless variant of
+  `LeafData<ValueOnIndex>::getValue`**: `getValueBranchless`, shipped in
+  `NanoVDB.h:4161` (see `BatchAccessor.md` §8k).  Opt-in expert path for
+  neighbourhood-aware cachers; end-to-end 1.4× on realistic narrow-band
+  workloads, 2.8× on random-access.
+- **HaloStencilAccessor's value proposition is validated but narrower**:
+  its precomputed uint64 index buffer naturally eliminates `isOn`
+  branches by never evaluating them.  Now that `getValueBranchless`
+  captures the same win cheaply, the halo's remaining advantage is
+  "zero per-tap work at query time" rather than "avoids the isOn
+  mispredict storm."  Worth building for the absolute-perf cases; less
+  urgent than previously framed.
 
-See `BatchAccessor.md` §8j for the full measurement matrix, methodology,
-correction log relative to §8g/§8h/§8i, and the branchless-experiment
-source.
+See `BatchAccessor.md` §8j for the original measurement matrix and
+correction log (§8g/§8h/§8i), and `BatchAccessor.md` §8k for the
+follow-on that added `getValueBranchless`, the narrow-band validation
+benchmark (`ex_narrowband_stencil_cpu`), and the leaf-only
+`ReadAccessor<BuildT, 0, -1, -1>` finding.
 
 ---
 

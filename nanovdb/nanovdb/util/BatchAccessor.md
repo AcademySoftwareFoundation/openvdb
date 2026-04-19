@@ -1283,6 +1283,169 @@ the perf numbers in this section change when it is toggled.
 | "`NANOVDB_USE_INTRINSICS` matters for popcount-heavy paths" | general assumption | No-op on GCC `-O3 -march=native`: SWAR → popcnt pattern match. Enable for portability anyway. |
 | "27-leaf cache is the architectural win of BatchAccessor"   | §8i "Cost of the refactor" | Cache delta is ~0.3 ns/voxel. Real wins are the Simd-free API and flatten-free compiler portability (§8i). |
 
+### 8k. Follow-up: `LeafData::getValueBranchless`, narrow-band validation, and accessor cache-level
+
+Follow-on to §8j.  Three things happened:
+(1) the branchless reformulation of `leaf.getValue` was moved from a
+hand-inlined benchmark hack into `NanoVDB.h` proper as a new method on
+`LeafData<ValueOnIndex>`;
+(2) a second example (`ex_narrowband_stencil_cpu`) was added to validate
+the finding on a real narrow-band level set rather than a pathological
+random-occupancy synthetic;
+(3) we noticed the scaffolding was using the default 3-level
+`ReadAccessor<BuildT, 0, 1, 2>` when only the leaf-level cache can
+actually contribute, and switched to `ReadAccessor<BuildT, 0, -1, -1>`.
+
+#### 8k.1 The new API: `LeafData<ValueOnIndex>::getValueBranchless`
+
+Located at `NanoVDB.h:4161`, sibling to the existing `getValue` at 4139.
+Same signature, same inputs, bit-for-bit identical output:
+
+```cpp
+__hostdev__ uint64_t getValueBranchless(uint32_t i) const
+{
+    const uint32_t n      = i >> 6;
+    const uint64_t w      = BaseT::mValueMask.words()[n];
+    const uint64_t bit    = uint64_t(1) << (i & 63u);
+    const uint64_t prefix = n == 0u ? uint64_t(0)
+                                    : (BaseT::mPrefixSum >> (9u*(n-1u))) & 511u;
+    const uint64_t sum    = BaseT::mOffset + prefix + util::countOn(w & (bit - 1u));
+    const uint64_t mask   = (w & bit) ? ~uint64_t(0) : uint64_t(0);
+    return mask & sum;
+}
+```
+
+Key design points:
+- Scoped to `LeafData` (not `LeafNode`) — opt-in expert path for
+  neighbourhood-aware cachers; the generic `LeafNode::getValue` and the
+  `ReadAccessor::getValue` chain are unchanged.
+- The ternary `(w & bit) ? ~0ull : 0ull` compiles to `test + cmov` on
+  x86 (verified on GCC 13 / `-O3 -march=native`), eliminating the
+  mispredict-prone conditional-jump pattern of the original `getValue`.
+- The prefix-extract ternary (`n == 0u ? 0 : …`) is kept as-is — its
+  outcome is 7:1 biased and the predictor handles it cleanly, so
+  expanding it to branchless arithmetic wouldn't help and would risk
+  tripping UB on the `n-1` shift for `n==0`.
+- OFF voxels still return 0 (gated by the mask-AND at the end), so the
+  method is a drop-in replacement for `getValue`.  **Checksum matches
+  byte-for-byte on all measured workloads.**
+
+During the earlier investigation we'd used a hand-inlined variant that
+skipped the gate — faster (~5% on single-thread), semantically wrong
+(OFF voxels returned the formula's non-zero junk).  The shipped method
+includes the gate and is the correct drop-in.
+
+#### 8k.2 `ex_narrowband_stencil_cpu` — realistic workload benchmark
+
+New example under `nanovdb/nanovdb/examples/ex_narrowband_stencil_cpu/`.
+Structurally a clone of `ex_stencil_gather_cpu` (same `--pass=<name>` /
+`--threads=<n>` CLI, same set of decomposition variants), but replaces
+the procedural random-occupancy domain with `.vdb` file loading:
+
+- `openvdb::io::File(path).readGrid(name)` → `openvdb::FloatGrid`
+- `nanovdb::tools::CreateNanoGrid<openvdb::FloatGrid>(grid).getHandle<
+  ValueOnIndex, HostBuffer>(channels=0, ...)` → topology-only `NanoGrid`
+- `builder.copyValues<ValueOnIndex>(sidecar.data())` → separately-
+  allocated `std::vector<float>` sidecar (no blind-data residue in the
+  grid).  Ordering sanity-checked at startup (1000 samples).
+
+The sidecar is plumbed through but not yet consumed by any stencil path
+— placeholder for future "fetch values via the sidecar" work.
+
+Test input: `taperLER.vdb`, a ~129 MB narrow-band `UnsignedDistanceField`
+FloatGrid with 31.8 M active voxels over a 1125×1081×762 bbox.
+
+#### 8k.3 Narrow-band vs synthetic measurement matrix
+
+Single P-core, `--threads=1`, PMU counters, `-O3 -march=native`:
+
+| Variant             | Workload    | ns/voxel | IPC  | branch-miss | L1 miss |
+|---------------------|-------------|---------:|-----:|------------:|--------:|
+| Legacy              | narrow-band |   47.0   | 4.22 |    1.74 %   |  0.06 % |
+| `getValueBranchless`| narrow-band |   **34.5** | **5.55** | **0.45 %** |  0.07 % |
+| Legacy              | synthetic   |  106.1   | 1.96 |    8.07 %   |  0.36 % |
+| `getValueBranchless`| synthetic   |   **37.9** | **4.55** | **1.63 %** |  0.39 % |
+
+Two observations that refine §8j:
+
+1. **Narrow-band is *not* pathological for branch prediction.**  At 1.74 %
+   miss rate the branch predictor handles spatially-coherent traversals
+   well enough that the original `getValue` runs at IPC ~4.2 (near peak
+   for integer code).  The isOn branch is only catastrophic when access
+   patterns are genuinely unpredictable; narrow-band SDF walks aren't.
+2. **`getValueBranchless` still wins on narrow-band** (47→34.5 ns/vox,
+   1.4×) because the branch is still data-dependent even if mostly
+   predictable — every ~1 in 60 calls costs ~15 cycles.  On synthetic
+   the benefit is much larger (2.8×) because there's a genuine
+   mispredict storm to eliminate.
+
+Per-call instruction count is within a handful of `getValue` in both
+cases; L1 behaviour is identical.  The speedup is entirely
+branch-mispredict-pipeline-stall recovery.
+
+#### 8k.4 Accessor cache-level finding
+
+The `ReadAccessor<BuildT, 0, 1, 2>` (`DefaultReadAccessor`) maintains
+three cache slots (leaf, lower, upper).  For `GetValue` workloads the
+upper/lower slots are **never consulted** on a leaf-cache miss —
+`ReadAccessor::get<OpT>` falls straight through to `mRoot->getAndCache`
+(NanoVDB.h:5387) — they're only written as passive side-effects of the
+root-walk's `acc.insert(ijk, child)` calls at each level.
+
+Switching the scaffolding to `ReadAccessor<BuildT, 0, -1, -1>`
+(`LegacyStencilAccessor.h`, plus the `center-hit` / `legacy-branchless`
+passes of both examples) removes those passive writes.  Measured 32-
+thread wall-clock deltas:
+
+| Workload, config          | Legacy        | `getValueBranchless` |
+|---------------------------|--------------:|---------------------:|
+| narrow-band, 8 P-cores    | no change     | 140.0 → 132.1 ms (−5.6 %) |
+| narrow-band, 24 cores     | no change     |  66.1 →  60.3 ms (−8.8 %) |
+| synthetic, 8 P-cores      | no change     |  80.8 →  76.8 ms (−5.0 %) |
+| synthetic, 24 cores       | no change     |  35.8 →  34.3 ms (−4.2 %) |
+
+Legacy paths are backend-bound on mispredicts — the extra stores
+overlap for free in the stall cycles.  The branchless paths run at
+near-peak IPC (~5.5) where there is no slack, so every retired
+instruction shows up.  Classic Amdahl corollary: the closer to peak,
+the more every small thing matters.
+
+**Scope caveat** (for any future "should the library default change"
+discussion): the 1-level accessor is strictly better only for
+`GetValue`-only hot loops.  `probeValue`, `probeLeaf`, and
+`isActive`/`GetState` queries do traverse at levels ≥ 1 and benefit from
+the upper/lower slots.  `DefaultReadAccessor` is the right default for
+mixed workloads; opt into 1-level only when you know the loop is
+`GetValue`-exclusive.
+
+#### 8k.5 End-to-end headline numbers (updated)
+
+24-core Arrow Lake, full pipeline including decode:
+
+| Workload                          | Legacy | `getValueBranchless` | Speedup |
+|-----------------------------------|-------:|---------------------:|--------:|
+| Narrow-band taperLER (31.8 M)     | 85 ms  | **60 ms**            | 1.4 ×   |
+| Synthetic random 50% (16.7 M)     | 95 ms  | **34 ms**            | 2.8 ×   |
+
+Speedup is thread-count-independent (same ratio across 8 P-cores and
+24 cores).  The two workloads' speedup *spread* — 1.4 × vs 2.8 × —
+tracks exactly how unpredictable the isOn branch is for each pattern.
+
+#### 8k.6 What this updates in the §10 Remaining list
+
+The "Branchless `LeafNode<ValueOnIndex>::getValue`" item is complete
+(shipped at the `LeafData` level per the scope decision, with benchmark
+coverage on both synthetic and real narrow-band workloads).  Future
+follow-ons implied by this work but not pursued here:
+- A `ProbeValue::get` variant that reuses `getValueBranchless` and the
+  already-computed `(w & bit)` to eliminate the redundant second
+  `isOn` test at NanoVDB.h:6302–6306.
+- Steering-team proposal for the NanoVDB library: adopt
+  `getValueBranchless` as a public API (or possibly as the default for
+  `LeafData<ValueOnIndex>::getValue`, if the single-thread ~14 %
+  instruction-count increase is acceptable given its branchless
+  universal applicability).
+
 ---
 
 ## 9. Relationship to Phase 1 Prototype
@@ -1352,15 +1515,28 @@ the perf numbers in this section change when it is toggled.
     (SWAR `util::countOn` is pattern-matched to hardware `popcnt`).  Enable
     it in the build anyway for portability.
 
-### Remaining
+- **`LeafData<ValueOnIndex>::getValueBranchless` in `NanoVDB.h` (§8k)**:
+  shipped.  Branchless sibling to `getValue`; same semantics, `test+cmov`
+  gate instead of a conditional jump.  Validated on both synthetic random
+  50% (2.8× end-to-end speedup on 24 cores) and real narrow-band
+  `taperLER.vdb` (1.4× speedup).
 
-- **Branchless `LeafNode<ValueOnIndex>::getValue(offset)` in NanoVDB** (§8j).
-  The single biggest available CPU-side speedup for any stencil caller.  A
-  ~15-line rewrite that preserves the OFF-returns-0 semantics via an
-  arithmetic mask gate instead of a conditional `return 0` would give
-  Legacy, the hybrid, HaloStencilAccessor, and any future variant a 2–3×
-  end-to-end speedup on 32-thread WENO5 workloads.  Needs benchmarking to
-  confirm GCC/Clang don't refold the gate back into a branch.
+- **`ex_narrowband_stencil_cpu` (§8k.2)**: new `.vdb`-based benchmark
+  companion to `ex_stencil_gather_cpu`.  Loads an openvdb `FloatGrid`,
+  converts to `ValueOnIndex` topology + separately-allocated float
+  sidecar, runs the same perf-decomposition battery on realistic
+  narrow-band workloads.
+
+- **Leaf-only `ReadAccessor<BuildT, 0, -1, -1>` in benchmark scaffolding
+  (§8k.4)**: `LegacyStencilAccessor` and the `center-hit` /
+  `legacy-branchless` passes switched from `DefaultReadAccessor` (3-level
+  cache) to a 1-level leaf-only cache.  Upper/lower slots are never
+  consulted for `GetValue` workloads; the switch removes passive
+  bookkeeping and gives 4–9 % additional speedup on branchless paths.
+  Scope: benchmark-only; the library default is unchanged (right default
+  for `probeValue`/`probeLeaf`/mixed workloads).
+
+### Remaining
 
 - **`[[gnu::always_inline]]` on `Simd.h` helpers** (§8f) vs
   **`[[gnu::flatten]]` on StencilAccessor-style entry points** (§8h):
