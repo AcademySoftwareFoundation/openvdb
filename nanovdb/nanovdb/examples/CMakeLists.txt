@@ -131,6 +131,16 @@ if(TARGET ex_stencil_gather_cpu)
     ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
 endif()
 
+# CPU-only stencil gather benchmark on a real narrow-band level-set .vdb
+# (see BatchAccessor.md §8j for the isOn-branch investigation that motivates
+# comparing random-occupancy vs realistic spatial-coherence workloads).
+nanovdb_example(NAME "ex_narrowband_stencil_cpu" OPENVDB)
+if(TARGET ex_narrowband_stencil_cpu)
+  target_compile_options(ex_narrowband_stencil_cpu PRIVATE -march=native -fopenmp-simd)
+  target_include_directories(ex_narrowband_stencil_cpu PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
+endif()
+
 if(CUDAToolkit_FOUND)
   nanovdb_example(NAME "ex_make_mgpu_nanovdb") # requires cuRAND
   target_link_libraries(ex_make_mgpu_nanovdb PRIVATE CUDA::curand)
