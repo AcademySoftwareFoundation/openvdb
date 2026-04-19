@@ -415,6 +415,69 @@ public:
         }
     }
 
+    // -------------------------------------------------------------------------
+    // cachedGetValueInLeaf<di,dj,dk> -- benchmarking variant that forces all
+    // taps to stay in the center leaf via mod-8 wrap.
+    //
+    // Purpose: measure the hybrid pipeline's floor cost when all 18 taps
+    // access the SAME leaf, with distinct per-tap / per-lane positions (so
+    // the compiler can't CSE across taps, and we still exercise different
+    // mValueMask words and prefix-sum slots).  The result is semantically
+    //   target_local = (voxel_local + (di,dj,dk)) mod 8
+    // with target always in the center leaf (direction code 0).
+    //
+    // Implementation: same SWAR + harvest + scalar-tail pipeline as
+    // cachedGetValue, but after `packed_sum = expanded + packed_tap` we mask
+    // with kSwarFieldMask = 0x1CE7 to discard all inter-field carry bits,
+    // which is exactly `x mod 8 | y mod 8 | z mod 8` in the packed layout.
+    //
+    // Requires di, dj, dk in [0, 7].  No prefetch call needed; the center
+    // leaf is always in mNeighborLeafIDs[13] from construction/advance.
+    // -------------------------------------------------------------------------
+    template<int di, int dj, int dk>
+    void cachedGetValueInLeaf(ScalarValueT (&dst)[LaneWidth],
+                              VoxelOffsetT   vo,
+                              PredicateT     leafMask) const
+    {
+        static_assert(di >= 0 && di < 8 && dj >= 0 && dj < 8 && dk >= 0 && dk < 8,
+            "cachedGetValueInLeaf: tap offsets must be in [0, 7] per axis");
+
+        static constexpr auto packed_tap =
+            static_cast<VoxelOffsetScalarT>(
+                 unsigned(dk)
+               | (unsigned(dj) <<  5)
+               | (unsigned(di) << 10));
+        const auto expanded =
+              ((vo | (vo << VoxelOffsetScalarT(4))) & VoxelOffsetT(kSwarXZMask))
+            | ((vo << VoxelOffsetScalarT(2))        & VoxelOffsetT(kSwarYMask));
+        // Mask off inter-field carry bits → per-axis mod-8 wrap; always center.
+        static constexpr uint16_t kSwarFieldMask = 0x1CE7u;
+        const auto packed_sum =
+            (expanded + VoxelOffsetT(packed_tap)) & VoxelOffsetT(kSwarFieldMask);
+
+        // Extract 9-bit local offset (same layout as cachedGetValue).
+        const auto localOffset_u16 =
+              ((packed_sum >> VoxelOffsetScalarT(4)) & VoxelOffsetT(0x1C0u))
+            | ((packed_sum >> VoxelOffsetScalarT(2)) & VoxelOffsetT(0x38u))
+            |  (packed_sum                           & VoxelOffsetT(0x07u));
+
+        if constexpr (LaneWidth == 1) {
+            if (!leafMask) return;
+            dst[0] = static_cast<ScalarValueT>(
+                mFirstLeaf[mCenterLeafID].getValue(uint32_t(localOffset_u16)));
+        } else {
+            alignas(32) uint16_t localOffset[LaneWidth];
+            util::store(localOffset_u16, localOffset);
+            const uint32_t activeBits = util::to_bitmask(leafMask);
+            const LeafT* const leaf = &mFirstLeaf[mCenterLeafID];  // hoisted
+            for (int lane = 0; lane < LaneWidth; ++lane) {
+                if (!((activeBits >> lane) & 1u)) continue;
+                dst[lane] = static_cast<ScalarValueT>(
+                    leaf->getValue(localOffset[lane]));
+            }
+        }
+    }
+
 private:
     // Compute the world-space origin of the leaf at direction bit d from center.
     // bit(dx,dy,dz) = (dx+1)*9 + (dy+1)*3 + (dz+1); leaf stride = 8 per axis.

@@ -240,6 +240,52 @@ public:
     }
 
     // -------------------------------------------------------------------------
+    // moveToInLeaf -- benchmarking variant: identical to moveTo except that
+    // each tap is wrapped to the center leaf via (localVoxel + tap) mod 8.
+    //
+    // Purpose: measure the hybrid pipeline's floor cost with 18 distinct
+    // compile-time taps that all access the SAME leaf, preventing both the
+    // cross-leaf L1 pressure and the compiler CSE of identical taps.  All
+    // StencilT::Taps offsets must be in [0, 7] per axis.
+    //
+    // NOT for production use -- results have no geometric meaning; they
+    // just exercise the hybrid's code path under a controlled cache regime.
+    // -------------------------------------------------------------------------
+    void moveToInLeaf(const uint32_t* leafIndex, const uint16_t* voxelOffset)
+    {
+        std::memset(mIndices, 0, sizeof(mIndices));
+
+        const LeafIdVec leafSlice = loadLeafIdVec(leafIndex);
+        const OffsetVec voVec     = loadOffsetVec(voxelOffset);
+
+        LeafMaskVec activeMask = (leafSlice != LeafIdVec(UnusedLeafIndex));
+
+        if (util::none_of(activeMask)) return;
+
+#ifndef NDEBUG
+        uint32_t nAdvances = 0;
+#endif
+
+        while (util::any_of(activeMask)) {
+            const LeafMaskVec leafMask =
+                activeMask & (leafSlice == LeafIdVec(mBatch.centerLeafID()));
+
+            if (util::none_of(leafMask)) {
+                mBatch.advance(mBatch.centerLeafID() + 1);
+#ifndef NDEBUG
+                assert(++nAdvances <= mNExtraLeaves);
+#endif
+                continue;
+            }
+
+            // No prefetchHull — all targets are the center leaf by construction.
+            calcTapsInLeaf(voVec, leafMask, std::make_index_sequence<SIZE>{});
+
+            activeMask = activeMask & !leafMask;
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // tapIndex<DI,DJ,DK>() -- compile-time tap lookup.
     //
     // Returns the slot in mIndices that corresponds to a named stencil tap,
@@ -300,6 +346,18 @@ private:
     {
         using Taps = typename StencilT::Taps;
         (mBatch.template cachedGetValue<
+             std::tuple_element_t<Is, Taps>::di,
+             std::tuple_element_t<Is, Taps>::dj,
+             std::tuple_element_t<Is, Taps>::dk
+         >(mIndices[Is], voVec, leafMask), ...);
+    }
+
+    // Benchmark-only counterpart: forces all taps into the center leaf.
+    template<size_t... Is>
+    void calcTapsInLeaf(OffsetVec voVec, LeafMaskVec leafMask, std::index_sequence<Is...>)
+    {
+        using Taps = typename StencilT::Taps;
+        (mBatch.template cachedGetValueInLeaf<
              std::tuple_element_t<Is, Taps>::di,
              std::tuple_element_t<Is, Taps>::dj,
              std::tuple_element_t<Is, Taps>::dk

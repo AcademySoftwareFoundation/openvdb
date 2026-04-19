@@ -49,9 +49,11 @@
 #include <stdexcept>
 #include <cstdio>
 #include <cassert>
+#include <memory>       // std::unique_ptr
 #include <sstream>
 #include <numeric>   // std::accumulate (checksum)
 #include <nanovdb/util/Timer.h>
+#include <tbb/global_control.h>
 
 // ============================================================
 // Constants and type aliases
@@ -68,6 +70,55 @@ using CPUVBM = nanovdb::tools::VoxelBlockManager<Log2BlockWidth>;
 
 using SAccT      = nanovdb::StencilAccessor<BuildT, SIMDw, nanovdb::Weno5Stencil>;
 using LegacyAccT = nanovdb::LegacyStencilAccessor<BuildT, nanovdb::Weno5Stencil>;
+
+// Decomposition-only stencil: 18 taps all at (0,0,0).  Measures the hybrid
+// StencilAccessor's floor cost when no tap crosses a leaf boundary and every
+// lookup hits the center leaf.  Subtracting this from the Weno5 run isolates
+// the cross-leaf overhead — BUT the 18 identical compile-time taps give the
+// compiler a large CSE opportunity, biasing the number downward.
+struct DegenerateStencil {
+    using Taps = std::tuple<
+        nanovdb::StencilPoint<0,0,0>, nanovdb::StencilPoint<0,0,0>,
+        nanovdb::StencilPoint<0,0,0>, nanovdb::StencilPoint<0,0,0>,
+        nanovdb::StencilPoint<0,0,0>, nanovdb::StencilPoint<0,0,0>,
+        nanovdb::StencilPoint<0,0,0>, nanovdb::StencilPoint<0,0,0>,
+        nanovdb::StencilPoint<0,0,0>, nanovdb::StencilPoint<0,0,0>,
+        nanovdb::StencilPoint<0,0,0>, nanovdb::StencilPoint<0,0,0>,
+        nanovdb::StencilPoint<0,0,0>, nanovdb::StencilPoint<0,0,0>,
+        nanovdb::StencilPoint<0,0,0>, nanovdb::StencilPoint<0,0,0>,
+        nanovdb::StencilPoint<0,0,0>, nanovdb::StencilPoint<0,0,0>
+    >;
+    // Empty Hull: prefetchHull becomes a no-op; center leaf is always cached
+    // by BatchAccessor's constructor / advance().
+    using Hull = std::tuple<>;
+};
+using DegAccT = nanovdb::StencilAccessor<BuildT, SIMDw, DegenerateStencil>;
+
+// CSE-resistant in-leaf stencil: 18 distinct compile-time taps spanning the
+// leaf's 8^3 footprint (all axes, 6 tap offsets in [0..6] per axis).  Used
+// via StencilAccessor::moveToInLeaf, which applies (voxel_local + tap) mod 8
+// to the center voxel — guaranteeing every tap accesses the center leaf
+// while touching distinct mValueMask words across taps and across voxels.
+// This isolates the hybrid's single-leaf floor without the CSE bias that
+// DegenerateStencil suffers from.
+struct InLeafStencil {
+    using Taps = std::tuple<
+        // x spans 0..6 (hits mValueMask words 0..6 depending on voxel's local x)
+        nanovdb::StencilPoint<0,0,0>, nanovdb::StencilPoint<1,0,0>,
+        nanovdb::StencilPoint<2,0,0>, nanovdb::StencilPoint<3,0,0>,
+        nanovdb::StencilPoint<4,0,0>, nanovdb::StencilPoint<5,0,0>,
+        // y spans 1..6 (different destY positions within a word)
+        nanovdb::StencilPoint<0,1,0>, nanovdb::StencilPoint<0,2,0>,
+        nanovdb::StencilPoint<0,3,0>, nanovdb::StencilPoint<0,4,0>,
+        nanovdb::StencilPoint<0,5,0>, nanovdb::StencilPoint<0,6,0>,
+        // z spans 1..6
+        nanovdb::StencilPoint<0,0,1>, nanovdb::StencilPoint<0,0,2>,
+        nanovdb::StencilPoint<0,0,3>, nanovdb::StencilPoint<0,0,4>,
+        nanovdb::StencilPoint<0,0,5>, nanovdb::StencilPoint<0,0,6>
+    >;
+    using Hull = std::tuple<>;  // moveToInLeaf skips prefetchHull entirely
+};
+using InLeafAccT = nanovdb::StencilAccessor<BuildT, SIMDw, InLeafStencil>;
 
 // ============================================================
 // Test domain generation (mirrors vbm_host_cuda.cpp)
@@ -256,8 +307,16 @@ static void runPrototype(
 
 static void runPerf(
     const GridT*                                                          grid,
-    const nanovdb::tools::VoxelBlockManagerHandle<nanovdb::HostBuffer>&  vbmHandle)
+    const nanovdb::tools::VoxelBlockManagerHandle<nanovdb::HostBuffer>&  vbmHandle,
+    const std::string&                                                    passFilter = "all")
 {
+    // wantPass(<name>) returns true if this pass should run under the current filter.
+    // Supported names: "decode", "stencil", "degenerate", "inleaf", "framing",
+    //                  "center-hit", "legacy".  "all" runs everything.
+    auto wantPass = [&](const char* name) {
+        return passFilter == "all" || passFilter == name;
+    };
+
     const LeafT*    firstLeaf   = grid->tree().getFirstNode<0>();
     const uint64_t  nVoxels     = grid->activeVoxelCount();
     const uint32_t  nBlocks     = (uint32_t)vbmHandle.blockCount();
@@ -286,7 +345,8 @@ static void runPerf(
     // ---- decodeInverseMaps-only baseline (both paths pay this cost) ----
     // Anti-DCE: XOR one uint64_t per block derived from leafIndex[] + voxelOffset[]
     // so the compiler can't elide the decode work.
-    const double decodeUs = timeForEach([&] {
+    double decodeUs = 0.0;
+    if (wantPass("decode")) decodeUs = timeForEach([&] {
         nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
             [&](const nanovdb::util::Range1D& range) {
                 alignas(64) uint32_t leafIndex[BlockWidth];
@@ -308,9 +368,12 @@ static void runPerf(
     });
 
     // ---- StencilAccessor ----
+    double stencilUs = 0.0;
+    uint64_t stencilChecksum = 0;
+    if (wantPass("stencil")) {
     std::fill(sums.begin(), sums.end(), uint64_t(0));
 
-    const double stencilUs = timeForEach([&] {
+    stencilUs = timeForEach([&] {
         nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
             [&](const nanovdb::util::Range1D& range) {
                 alignas(64) uint32_t leafIndex[BlockWidth];
@@ -345,9 +408,99 @@ static void runPerf(
             });
     });
 
-    const uint64_t stencilChecksum =
+    stencilChecksum =
         std::accumulate(sums.begin(), sums.end(), uint64_t(0),
                         [](uint64_t a, uint64_t b) { return a ^ b; });
+    }  // end wantPass("stencil")
+
+    // ---- Hybrid floor: DegenerateStencil (18 taps all at (0,0,0)) ----
+    double degenerateUs = 0.0;
+    uint64_t degenerateChecksum = 0;
+    if (wantPass("degenerate")) {
+    std::fill(sums.begin(), sums.end(), uint64_t(0));
+    degenerateUs = timeForEach([&] {
+        nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
+            [&](const nanovdb::util::Range1D& range) {
+                alignas(64) uint32_t leafIndex[BlockWidth];
+                alignas(64) uint16_t voxelOffset[BlockWidth];
+
+                for (size_t bID = range.begin(); bID != range.end(); ++bID) {
+                    CPUVBM::decodeInverseMaps(
+                        grid, firstLeafID[bID],
+                        &jumpMap[bID * CPUVBM::JumpMapLength],
+                        firstOffset + bID * BlockWidth,
+                        leafIndex, voxelOffset);
+
+                    int nExtraLeaves = 0;
+                    for (int w = 0; w < CPUVBM::JumpMapLength; ++w)
+                        nExtraLeaves += nanovdb::util::countOn(
+                            jumpMap[bID * CPUVBM::JumpMapLength + w]);
+
+                    DegAccT degAcc(*grid, firstLeafID[bID], (uint32_t)nExtraLeaves);
+                    uint64_t* bs = sums.data() + bID * BlockWidth;
+
+                    for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
+                        degAcc.moveTo(leafIndex + batchStart, voxelOffset + batchStart);
+                        for (int i = 0; i < SIMDw; ++i) {
+                            if (leafIndex[batchStart + i] == CPUVBM::UnusedLeafIndex) continue;
+                            uint64_t s = 0;
+                            for (int k = 0; k < DegAccT::size(); ++k)
+                                s += degAcc.mIndices[k][i];
+                            bs[batchStart + i] = s;
+                        }
+                    }
+                }
+            });
+    });
+    degenerateChecksum =
+        std::accumulate(sums.begin(), sums.end(), uint64_t(0),
+                        [](uint64_t a, uint64_t b) { return a ^ b; });
+    }  // end wantPass("degenerate")
+
+    // ---- Hybrid floor (CSE-resistant): 18 distinct taps wrapped to center leaf ----
+    double inLeafUs = 0.0;
+    uint64_t inLeafChecksum = 0;
+    if (wantPass("inleaf")) {
+    std::fill(sums.begin(), sums.end(), uint64_t(0));
+    inLeafUs = timeForEach([&] {
+        nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
+            [&](const nanovdb::util::Range1D& range) {
+                alignas(64) uint32_t leafIndex[BlockWidth];
+                alignas(64) uint16_t voxelOffset[BlockWidth];
+
+                for (size_t bID = range.begin(); bID != range.end(); ++bID) {
+                    CPUVBM::decodeInverseMaps(
+                        grid, firstLeafID[bID],
+                        &jumpMap[bID * CPUVBM::JumpMapLength],
+                        firstOffset + bID * BlockWidth,
+                        leafIndex, voxelOffset);
+
+                    int nExtraLeaves = 0;
+                    for (int w = 0; w < CPUVBM::JumpMapLength; ++w)
+                        nExtraLeaves += nanovdb::util::countOn(
+                            jumpMap[bID * CPUVBM::JumpMapLength + w]);
+
+                    InLeafAccT inLeafAcc(*grid, firstLeafID[bID], (uint32_t)nExtraLeaves);
+                    uint64_t* bs = sums.data() + bID * BlockWidth;
+
+                    for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
+                        inLeafAcc.moveToInLeaf(
+                            leafIndex + batchStart, voxelOffset + batchStart);
+                        for (int i = 0; i < SIMDw; ++i) {
+                            if (leafIndex[batchStart + i] == CPUVBM::UnusedLeafIndex) continue;
+                            uint64_t s = 0;
+                            for (int k = 0; k < InLeafAccT::size(); ++k)
+                                s += inLeafAcc.mIndices[k][i];
+                            bs[batchStart + i] = s;
+                        }
+                    }
+                }
+            });
+    });
+    inLeafChecksum =
+        std::accumulate(sums.begin(), sums.end(), uint64_t(0),
+                        [](uint64_t a, uint64_t b) { return a ^ b; });
+    }  // end wantPass("inleaf")
 
     // ---- Legacy cost decomposition variants ----
     // (a) "framing only"  — Legacy loop structure, no accessor call (anti-DCE writes use li+k).
@@ -362,8 +515,10 @@ static void runPerf(
     // Cache + leaf-lookup per voxel ≈ center-hit − framing.
     // Framing per voxel ≈ framing.
 
+    double framingUs = 0.0;
+    if (wantPass("framing")) {
     std::fill(sums.begin(), sums.end(), uint64_t(0));
-    const double framingUs = timeForEach([&] {
+    framingUs = timeForEach([&] {
         nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
             [&](const nanovdb::util::Range1D& range) {
                 alignas(64) uint32_t leafIndex[BlockWidth];
@@ -394,9 +549,12 @@ static void runPerf(
                 }
             });
     });
+    }  // end wantPass("framing")
 
+    double centerHitUs = 0.0;
+    if (wantPass("center-hit")) {
     std::fill(sums.begin(), sums.end(), uint64_t(0));
-    const double centerHitUs = timeForEach([&] {
+    centerHitUs = timeForEach([&] {
         nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
             [&](const nanovdb::util::Range1D& range) {
                 alignas(64) uint32_t leafIndex[BlockWidth];
@@ -433,10 +591,15 @@ static void runPerf(
             });
     });
 
+    }  // end wantPass("center-hit")
+
     // ---- LegacyStencilAccessor ----
+    double legacyUs = 0.0;
+    uint64_t legacyChecksum = 0;
+    if (wantPass("legacy")) {
     std::fill(sums.begin(), sums.end(), uint64_t(0));
 
-    const double legacyUs = timeForEach([&] {
+    legacyUs = timeForEach([&] {
         nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
             [&](const nanovdb::util::Range1D& range) {
                 alignas(64) uint32_t leafIndex[BlockWidth];
@@ -468,9 +631,94 @@ static void runPerf(
             });
     });
 
-    const uint64_t legacyChecksum =
+    legacyChecksum =
         std::accumulate(sums.begin(), sums.end(), uint64_t(0),
                         [](uint64_t a, uint64_t b) { return a ^ b; });
+    }  // end wantPass("legacy")
+
+    // ---- Legacy branchless: same as legacy but skip the leaf.getValue isOn branch ----
+    // Replaces `leaf.getValue(offset)` (which branches on valueMask.isOn(offset))
+    // with the unconditional formula:
+    //   mOffset + prefix9(wordIdx) + popcount(maskWord & ((1<<bit)-1))
+    // For OFF voxels this produces a non-zero "wrong" result (doesn't return 0),
+    // so the checksum will differ — but wall-clock time and perf counters are
+    // what we care about here.  Tree walk via acc.probeLeaf() is preserved;
+    // only the per-leaf isOn branch is eliminated.
+    double legacyBranchlessUs = 0.0;
+    uint64_t legacyBranchlessChecksum = 0;
+    if (wantPass("legacy-branchless")) {
+    std::fill(sums.begin(), sums.end(), uint64_t(0));
+
+    // Unroll WENO5 tap offsets at compile time.
+    using Weno5Taps = nanovdb::Weno5Stencil::Taps;
+    static constexpr int SIZE = int(std::tuple_size_v<Weno5Taps>);
+
+    legacyBranchlessUs = timeForEach([&] {
+        nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
+            [&](const nanovdb::util::Range1D& range) {
+                alignas(64) uint32_t leafIndex[BlockWidth];
+                alignas(64) uint16_t voxelOffset[BlockWidth];
+                auto acc = grid->getAccessor();
+                uint64_t* bs0 = sums.data();
+
+                for (size_t bID = range.begin(); bID != range.end(); ++bID) {
+                    CPUVBM::decodeInverseMaps(
+                        grid, firstLeafID[bID],
+                        &jumpMap[bID * CPUVBM::JumpMapLength],
+                        firstOffset + bID * BlockWidth,
+                        leafIndex, voxelOffset);
+
+                    uint64_t* bs = bs0 + bID * BlockWidth;
+
+                    for (int i = 0; i < BlockWidth; ++i) {
+                        if (leafIndex[i] == CPUVBM::UnusedLeafIndex) continue;
+                        const uint16_t vo = voxelOffset[i];
+                        const uint32_t li = leafIndex[i];
+                        const nanovdb::Coord cOrigin = firstLeaf[li].origin();
+                        const int lx = (vo >> 6) & 7, ly = (vo >> 3) & 7, lz = vo & 7;
+                        const nanovdb::Coord center = cOrigin + nanovdb::Coord(lx, ly, lz);
+
+                        uint64_t s = 0;
+                        auto addTap = [&](int di, int dj, int dk) {
+                            const nanovdb::Coord c = center + nanovdb::Coord(di, dj, dk);
+                            const LeafT* leaf = acc.probeLeaf(c);
+                            if (!leaf) return;   // tap outside narrow band (still branches,
+                                                 // but well-predicted for active-region voxels)
+                            const uint32_t offset = (uint32_t(c[0] & 7) << 6)
+                                                  | (uint32_t(c[1] & 7) << 3)
+                                                  |  uint32_t(c[2] & 7);
+                            const uint32_t wordIdx  = offset >> 6;
+                            const uint64_t bit      = uint64_t(1) << (offset & 63);
+                            const uint64_t maskWord = leaf->valueMask().words()[wordIdx];
+                            // prefix9 extract — cmov'd by the compiler, not a branch-miss source
+                            const uint64_t prefix   = (wordIdx > 0)
+                                ? (leaf->data()->mPrefixSum >> (9u * (wordIdx - 1u))) & 511u
+                                : uint64_t(0);
+                            // UNCONDITIONAL: no isOn test.  For OFF voxels this computes a
+                            // non-zero value but does no branch.
+                            s += leaf->data()->mOffset + prefix
+                               + __builtin_popcountll(maskWord & (bit - 1));
+                        };
+
+                        // Unroll all 18 WENO5 taps via the compile-time tuple.
+                        [&]<size_t... Is>(std::index_sequence<Is...>) {
+                            (addTap(
+                                std::tuple_element_t<Is, Weno5Taps>::di,
+                                std::tuple_element_t<Is, Weno5Taps>::dj,
+                                std::tuple_element_t<Is, Weno5Taps>::dk
+                             ), ...);
+                        }(std::make_index_sequence<SIZE>{});
+
+                        bs[i] = s;
+                    }
+                }
+            });
+    });
+
+    legacyBranchlessChecksum =
+        std::accumulate(sums.begin(), sums.end(), uint64_t(0),
+                        [](uint64_t a, uint64_t b) { return a ^ b; });
+    }  // end wantPass("legacy-branchless")
 
     std::printf("\nEnd-to-end stencil gather (%u blocks, %lu active voxels):\n",
         nBlocks, nVoxels);
@@ -479,9 +727,18 @@ static void runPerf(
     std::printf("  StencilAccessor       : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
         stencilUs / 1e3, stencilUs * 1e3 / double(nVoxels),
         (stencilUs - decodeUs) / 1e3, stencilChecksum);
+    std::printf("  Degenerate (18×center): %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
+        degenerateUs / 1e3, degenerateUs * 1e3 / double(nVoxels),
+        (degenerateUs - decodeUs) / 1e3, degenerateChecksum);
+    std::printf("  InLeaf (18 distinct) : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
+        inLeafUs / 1e3, inLeafUs * 1e3 / double(nVoxels),
+        (inLeafUs - decodeUs) / 1e3, inLeafChecksum);
     std::printf("  LegacyStencilAccessor : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
         legacyUs  / 1e3, legacyUs  * 1e3 / double(nVoxels),
         (legacyUs - decodeUs) / 1e3, legacyChecksum);
+    std::printf("  Legacy branchless    : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
+        legacyBranchlessUs  / 1e3, legacyBranchlessUs  * 1e3 / double(nVoxels),
+        (legacyBranchlessUs - decodeUs) / 1e3, legacyBranchlessChecksum);
 
     // Decomposition of LegacyStencilAccessor's ns/voxel:
     //   framing       = no accessor call
@@ -511,15 +768,24 @@ static void runPerf(
 int main(int argc, char** argv)
 {
     try {
-        int   ambient_voxels = 1024 * 1024;
-        float occupancy      = 0.5f;
+        int         ambient_voxels = 1024 * 1024;
+        float       occupancy      = 0.5f;
+        std::string passFilter     = "all";   // --pass=<name>
+        int         nThreads       = 0;       // --threads=<n>, 0 = TBB default
 
         if (argc > 1) ambient_voxels = std::stoi(argv[1]);
         if (argc > 2) occupancy      = std::stof(argv[2]);
+        for (int i = 3; i < argc; ++i) {
+            std::string a = argv[i];
+            if (a.rfind("--pass=", 0) == 0)    passFilter = a.substr(7);
+            else if (a.rfind("--threads=", 0) == 0) nThreads = std::stoi(a.substr(10));
+        }
         occupancy = std::max(0.0f, std::min(1.0f, occupancy));
 
         std::cout << "ambient_voxels = " << ambient_voxels << "\n"
-                  << "occupancy      = " << occupancy      << "\n";
+                  << "occupancy      = " << occupancy      << "\n"
+                  << "pass           = " << passFilter     << "\n"
+                  << "threads        = " << (nThreads > 0 ? std::to_string(nThreads) : std::string("(TBB default)")) << "\n";
 
         auto coords = generateDomain(ambient_voxels, occupancy);
         std::cout << "Active voxels generated: " << coords.size() << "\n";
@@ -551,8 +817,16 @@ int main(int argc, char** argv)
         std::cout << "VBM blocks=" << vbmHandle.blockCount()
                   << "  (BlockWidth=" << BlockWidth << ")\n\n";
 
-        runPrototype(grid, vbmHandle);
-        runPerf(grid, vbmHandle);
+        // TBB thread-count limit for perf measurements.
+        std::unique_ptr<tbb::global_control> tbbLimit;
+        if (nThreads > 0) {
+            tbbLimit = std::make_unique<tbb::global_control>(
+                tbb::global_control::max_allowed_parallelism, (size_t)nThreads);
+        }
+
+        if (passFilter == "all" || passFilter == "verify")
+            runPrototype(grid, vbmHandle);
+        runPerf(grid, vbmHandle, passFilter);
 
     } catch (const std::exception& e) {
         std::cerr << "Exception: " << e.what() << "\n";
