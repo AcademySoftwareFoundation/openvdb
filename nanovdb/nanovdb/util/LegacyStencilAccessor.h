@@ -56,8 +56,16 @@ class LegacyStencilAccessor
     static constexpr int SIZE = int(std::tuple_size_v<typename StencilT::Taps>);
 
 public:
+    // Leaf-only ReadAccessor (cache level 0 only).  The DefaultReadAccessor
+    // (levels 0/1/2) caches upper and lower nodes too, but those slots are
+    // never consulted during a GetValue cache-miss resolution -- the fallback
+    // goes straight to mRoot->getAndCache(...).  Using a 1-level accessor
+    // removes passive bookkeeping of the upper/lower slots on every miss and
+    // keeps the benchmark honest about what's being measured.
+    using AccessorT = ReadAccessor<BuildT, 0, -1, -1>;
+
     explicit LegacyStencilAccessor(const GridT& grid)
-        : mAcc(grid.getAccessor()) {}
+        : mAcc(grid.tree().root()) {}
 
     // -------------------------------------------------------------------------
     // moveTo -- resolve all SIZE tap indices for the voxel at @a center.
@@ -107,8 +115,8 @@ private:
                 std::tuple_element_t<Is, Taps>::dk)))), ...);
     }
 
-    DefaultReadAccessor<BuildT> mAcc;
-    uint64_t                    mStencil[SIZE];
+    AccessorT mAcc;
+    uint64_t  mStencil[SIZE];
 };
 
 } // namespace nanovdb

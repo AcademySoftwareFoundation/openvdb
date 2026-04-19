@@ -559,7 +559,10 @@ static void runPerf(
             [&](const nanovdb::util::Range1D& range) {
                 alignas(64) uint32_t leafIndex[BlockWidth];
                 alignas(64) uint16_t voxelOffset[BlockWidth];
-                auto acc = grid->getAccessor();
+                // Leaf-only cache (levels 1/2 would never be consulted for
+                // GetValue — see NanoVDB.h:5387 — and would only pay passive
+                // bookkeeping on miss).  See LegacyStencilAccessor.h for rationale.
+                nanovdb::ReadAccessor<BuildT, 0, -1, -1> acc(grid->tree().root());
                 uint64_t* bs0 = sums.data();
 
                 for (size_t bID = range.begin(); bID != range.end(); ++bID) {
@@ -658,7 +661,10 @@ static void runPerf(
             [&](const nanovdb::util::Range1D& range) {
                 alignas(64) uint32_t leafIndex[BlockWidth];
                 alignas(64) uint16_t voxelOffset[BlockWidth];
-                auto acc = grid->getAccessor();
+                // Leaf-only cache (levels 1/2 would never be consulted for
+                // GetValue — see NanoVDB.h:5387 — and would only pay passive
+                // bookkeeping on miss).  See LegacyStencilAccessor.h for rationale.
+                nanovdb::ReadAccessor<BuildT, 0, -1, -1> acc(grid->tree().root());
                 uint64_t* bs0 = sums.data();
 
                 for (size_t bID = range.begin(); bID != range.end(); ++bID) {
@@ -682,22 +688,15 @@ static void runPerf(
                         auto addTap = [&](int di, int dj, int dk) {
                             const nanovdb::Coord c = center + nanovdb::Coord(di, dj, dk);
                             const LeafT* leaf = acc.probeLeaf(c);
-                            if (!leaf) return;   // tap outside narrow band (still branches,
-                                                 // but well-predicted for active-region voxels)
+                            if (!leaf) return;   // tap outside narrow band (predictable branch
+                                                 // for active-region voxels)
                             const uint32_t offset = (uint32_t(c[0] & 7) << 6)
                                                   | (uint32_t(c[1] & 7) << 3)
                                                   |  uint32_t(c[2] & 7);
-                            const uint32_t wordIdx  = offset >> 6;
-                            const uint64_t bit      = uint64_t(1) << (offset & 63);
-                            const uint64_t maskWord = leaf->valueMask().words()[wordIdx];
-                            // prefix9 extract — cmov'd by the compiler, not a branch-miss source
-                            const uint64_t prefix   = (wordIdx > 0)
-                                ? (leaf->data()->mPrefixSum >> (9u * (wordIdx - 1u))) & 511u
-                                : uint64_t(0);
-                            // UNCONDITIONAL: no isOn test.  For OFF voxels this computes a
-                            // non-zero value but does no branch.
-                            s += leaf->data()->mOffset + prefix
-                               + __builtin_popcountll(maskWord & (bit - 1));
+                            // NanoVDB LeafData<ValueOnIndex>::getValueBranchless --
+                            // same formula as getValue but with the isOn check
+                            // replaced by a cmov-style mask gate.
+                            s += leaf->data()->getValueBranchless(offset);
                         };
 
                         // Unroll all 18 WENO5 taps via the compile-time tuple.
