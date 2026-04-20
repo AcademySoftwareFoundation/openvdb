@@ -419,7 +419,7 @@ public:
     // cachedGetValueInLeaf<di,dj,dk> -- benchmarking variant that forces all
     // taps to stay in the center leaf via mod-8 wrap.
     //
-    // Purpose: measure the hybrid pipeline's floor cost when all 18 taps
+    // Purpose: measure the hybrid pipeline's floor cost when all taps
     // access the SAME leaf, with distinct per-tap / per-lane positions (so
     // the compiler can't CSE across taps, and we still exercise different
     // mValueMask words and prefix-sum slots).  The result is semantically

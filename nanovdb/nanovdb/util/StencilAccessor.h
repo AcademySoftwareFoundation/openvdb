@@ -83,14 +83,22 @@ constexpr int findIndex(std::index_sequence<Is...>)
 } // namespace detail
 
 // =============================================================================
-// Weno5Stencil — 18-tap axis-aligned WENO5 stencil, radius 3
+// Weno5Stencil — 19-tap axis-aligned WENO5 stencil, radius 3
 // =============================================================================
 
 /// Concrete StencilT for the WENO5 3D stencil.
-/// Taps:  18 axis-aligned offsets in {±1,±2,±3} × {x,y,z}.
-/// Hull:   6 extremal offsets that cover all 18 tap crossing directions.
+/// Taps:  19 axis-aligned offsets — the center plus {±1,±2,±3} along each of x,y,z.
+/// Hull:   6 extremal offsets that cover all 18 non-center tap crossing directions.
+///
+/// Tap ordering matches WenoPt<i,j,k>::idx in nanovdb/math/Stencils.h:
+///    idx  0     : <0,0,0>
+///    idx  1.. 6 : x-axis  <-3,0,0> <-2,0,0> <-1,0,0> <+1,0,0> <+2,0,0> <+3,0,0>
+///    idx  7..12 : y-axis  <0,-3,0> <0,-2,0> <0,-1,0> <0,+1,0> <0,+2,0> <0,+3,0>
+///    idx 13..18 : z-axis  <0,0,-3> <0,0,-2> <0,0,-1> <0,0,+1> <0,0,+2> <0,0,+3>
 struct Weno5Stencil {
     using Taps = std::tuple<
+        // center
+        StencilPoint< 0, 0, 0>,
         // x-axis
         StencilPoint<-3, 0, 0>, StencilPoint<-2, 0, 0>, StencilPoint<-1, 0, 0>,
         StencilPoint<+1, 0, 0>, StencilPoint<+2, 0, 0>, StencilPoint<+3, 0, 0>,
@@ -102,7 +110,8 @@ struct Weno5Stencil {
         StencilPoint< 0, 0,+1>, StencilPoint< 0, 0,+2>, StencilPoint< 0, 0,+3>
     >;
     // Hull = 6 extremal taps that collectively probe all reachable face-neighbor
-    // directions for any combination of voxel position and WENO5 tap.
+    // directions for any combination of voxel position and non-center WENO5 tap.
+    // The center tap never crosses a leaf, so it's absent here by design.
     // See StencilAccessor.md §4b for the monotonicity argument.
     using Hull = std::tuple<
         StencilPoint<-3, 0, 0>, StencilPoint<+3, 0, 0>,
@@ -183,7 +192,7 @@ public:
     //
     // Active-lane semantics: a lane i is "active" iff
     //     leafIndex[i] != UnusedLeafIndex
-    // Active lanes receive their 18 tap indices in mIndices[k][i].
+    // Active lanes receive their 19 tap indices in mIndices[k][i].
     // Inactive lanes are zeroed (NanoVDB background index).
     //
     // Caller pattern:

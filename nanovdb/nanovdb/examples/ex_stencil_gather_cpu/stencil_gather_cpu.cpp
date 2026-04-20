@@ -366,7 +366,7 @@ static void runPerf(
 
     // ---- Legacy framing floor: loop structure + decode, no accessor call ----
     // Anti-DCE writes derive from Coord components.  Subtracted from the legacy
-    // pass to expose the 18-tap cost proper.
+    // pass to expose the 19-tap cost proper.
     double framingUs = 0.0;
     if (wantPass("framing")) {
     std::fill(sums.begin(), sums.end(), uint64_t(0));
@@ -447,7 +447,7 @@ static void runPerf(
     }  // end wantPass("legacy")
 
     // ---- Legacy transposed: tap-outer, voxel-inner ----
-    // Same semantics as `legacy`, reordered.  For each of the 18 WENO5 taps,
+    // Same semantics as `legacy`, reordered.  For each of the 19 WENO5 taps,
     // sweep all BlockWidth voxels — giving long runs of probeLeaf + getValue
     // calls with the SAME compile-time tap offset but varying center voxels.
     double legacyXposedUs = 0.0;

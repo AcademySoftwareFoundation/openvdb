@@ -1480,15 +1480,17 @@ both workloads.
 
 First attempt used a runtime-args inner lambda
 `[&](int di, int dj, int dk) { for (int i = 0; i < 128; ++i) ... }`
-invoked 18 times via a parameter-pack fold.  GCC refused to inline the
-18 instantiations — the lambda body contains a 128-iteration loop with
-`probeLeaf` + `getValue` inside, which blew past the per-caller inline
-budget × 18.  Result: 18 explicit `call` instructions to a 542-byte
-`processTap` function with a 6-register prologue/epilogue per call,
-and tap offsets `(di, dj, dk)` as runtime register arguments (one
-spilled to stack) — so the compiler also couldn't specialise the loop
-body per tap.  That alone accounted for ~10 ms (~13 %) of the observed
-slowdown vs. Legacy.
+invoked N_taps times via a parameter-pack fold (18 at the time of the
+experiment — pre-center-tap — which is when these numbers were
+collected; the same issue and fix apply at 19).  GCC refused to
+inline the instantiations — the lambda body contains a 128-iteration
+loop with `probeLeaf` + `getValue` inside, which blew past the
+per-caller inline budget × N_taps.  Result: explicit `call`
+instructions to a 542-byte `processTap` function with a 6-register
+prologue/epilogue per call, and tap offsets `(di, dj, dk)` as runtime
+register arguments (one spilled to stack) — so the compiler also
+couldn't specialise the loop body per tap.  That alone accounted for
+~10 ms (~13 %) of the observed slowdown vs. Legacy.
 
 Fix: templated lambda
 `[&]<int DI, int DJ, int DK>() [[gnu::always_inline]] { ... }`
@@ -1661,3 +1663,140 @@ lanes at the same tap).
 
 - **C++20 structural `Coord`:** unify template and runtime interfaces via
   `cachedGetValue<nanovdb::Coord(-3,0,0)>(result, vo, leafMask)`.
+
+---
+
+## 11. Target pipeline: per-block CPU WENO5 with sidecar values
+
+The work documented in §5–§8 — VBM decode, `BatchAccessor`,
+`StencilAccessor`, branchless `LeafData::getValue`, the voxel-outer vs
+tap-outer evaluation (§8l), the 19-tap `Weno5Stencil` alignment with
+canonical `WenoPt<>` ordering — are all in service of a single target
+end-to-end pipeline.  For each VBM block the CPU WENO5 pass runs three
+phases:
+
+### 11.1 Phase structure
+
+**(1) Decode inverse maps** — produce `leafIndex[128]` and
+`voxelOffset[128]` from the block's `firstLeafID`, `jumpMap`, and
+`firstOffset`.  Already shipped; see §2.
+
+**(2) Per-batch sidecar value assembly** — for each W-wide batch within
+the block (W = SIMD float lane width, typically 4 or 8), produce a
+dense 2D array `float mValues[Ntaps][W]` that packs every tap's float
+value for every active lane in the batch.  This is where
+`StencilAccessor` (hybrid SIMD cache + scalar tail) or
+`LegacyStencilAccessor` (scalar per-voxel) plugs in — but the *output*
+shape changes from the current `uint64_t mIndices[Ntaps][W]` to a
+float array obtained via sidecar lookup (plus sign-extrapolation for
+off-band taps; see §11.2).  Per-batch scope is deliberate: `mValues`
+stays resident in registers / L1 for the duration of the batch's WENO
+arithmetic; a block-wide buffer would be 19 × 128 × 4 B ≈ 9.5 KB and
+would spill L1 prematurely.
+
+**(3) Full SIMD WENO** — consume `mValues[tap][lane]` as
+`Simd<float, W>` loads (one SIMD register per tap) and evaluate the
+WENO5 reconstruction via the generic-T Simd backend.  The existing
+Phase-2 GPU draft and the Simd.h infrastructure provide the
+arithmetic; this phase is essentially `nanovdb::math::WENO5<>` applied
+across W voxels simultaneously.
+
+### 11.2 Sidecar value assembly semantics
+
+For a tap at position *p = center + Δ*, the sidecar lookup is:
+
+```
+idx = leafPtr->getValue(localOffset(p))          // uint64_t, branchless
+if (idx != 0) {
+    mValues[tap][lane] = sidecar[idx]
+} else {
+    // out-of-band: voxel p is outside the narrow band
+    mValues[tap][lane] = sign_of_next_inner_tap * |sidecar[0]|
+}
+```
+
+The "next-inner tap" is the tap one step closer to the center along
+the *same* axis.  This preserves a single-signed distance-field
+interpretation across the band boundary: out-of-band voxels are
+treated as "still outside on the same side as the near side," with
+magnitude set to the background `|sidecar[0]|`.
+
+| Outer tap | Sign donor (next-inner along same axis) |
+|-----------|-----------------------------------------|
+| `<+2, 0, 0>`, `<0,+2, 0>`, `<0, 0,+2>` | `<+1, 0, 0>`, `<0,+1, 0>`, `<0, 0,+1>` |
+| `<+3, 0, 0>`, `<0,+3, 0>`, `<0, 0,+3>` | `<+2, 0, 0>`, `<0,+2, 0>`, `<0, 0,+2>` |
+| `<-2, 0, 0>`, `<0,-2, 0>`, `<0, 0,-2>` | `<-1, 0, 0>`, `<0,-1, 0>`, `<0, 0,-1>` |
+| `<-3, 0, 0>`, `<0,-3, 0>`, `<0, 0,-3>` | `<-2, 0, 0>`, `<0,-2, 0>`, `<0, 0,-2>` |
+| `<±1,0,0>`, `<0,±1,0>`, `<0,0,±1>` | *see §11.4 below* |
+
+### 11.3 Loop-order implications
+
+Two forces align to favor a tap-outer, voxel-inner assembly loop in
+Phase 2:
+
+**(a) Output shape matches consumer.**  `mValues[tap][lane]` is the
+natural layout for `Simd<float, W>::load(mValues[k], element_aligned)`.
+A tap-outer assembly fills this directly.  A voxel-outer assembly
+would need either a transpose at the end or strided SIMD loads in
+Phase 3.
+
+**(b) Sign-extrapolation dependency is tap-local.**  If taps are
+filled in axis-major / ascending-|Δ| order (e.g. for the x-axis:
+first `<+1,0,0>`, then `<+2,0,0>`, then `<+3,0,0>`; similarly for
+`−1,−2,−3` and for the y and z axes), the inner tap's float value is
+already resident when the outer tap's sign-extrap check fires.
+Voxel-outer also works but repeats the sign check per voxel rather
+than once per (axis, |Δ|) pair.
+
+The §8l measurements (voxel-outer modestly beats tap-outer at
+BlockWidth=128 inner-loop size over uint64 indices) do *not* settle
+the Phase-2 loop-order question: at W=4 or W=8 inner-loop size, the
+compiler-amortisation advantage of voxel-outer shrinks drastically
+(only 4–8 voxels per unroll), while the output-layout-match benefit of
+tap-outer becomes dominant.  Re-running the ordering comparison at
+the real pipeline's batch width is a required step before the
+implementation choice is locked in.
+
+### 11.4 Open questions (to resolve before implementation)
+
+**(a) Sign source for distance-1 taps.**  `<±1,0,0>`, `<0,±1,0>`,
+`<0,0,±1>` have no inner tap along their axis except the center
+`<0,0,0>`.  Two possible rules:
+
+- *Uniform rule:* distance-1 inherits sign from the center tap's
+  float value.  Always safe; one extra sign-check per distance-1
+  tap.
+- *Invariant-based rule:* distance-1 neighbours of any active voxel
+  are guaranteed in-band, so the sign-extrap branch never fires for
+  |Δ|=1 taps.  Requires confirmation against how narrow-band layers
+  are generated upstream (openvdb level-set builders).
+
+The uniform rule is the default unless the invariant can be
+confirmed and codified.
+
+**(b) Cascade behavior.**  If the inner tap's value is *itself* the
+result of a prior sign-extrapolation, using its sign directly is
+correct by transitivity: when taps are processed in ascending-|Δ|
+order along each axis, the inner tap's resolved float already carries
+the correct sign (real or extrapolated), so the rule is
+self-consistent without special-casing.  Worth capturing here
+because it's the quiet invariant that keeps the algorithm simple.
+
+### 11.5 Deliverables (not yet shipped)
+
+Implementation items that follow directly from §11.1–§11.4:
+
+- **Sidecar-aware `moveTo` variant** on `StencilAccessor` (and a
+  parallel form on `LegacyStencilAccessor`): same straddling + SIMD
+  cache structure as today, but writes `float mValues[SIZE][W]` via
+  sidecar lookup instead of `uint64_t mIndices[SIZE][W]`.
+- **Sign-extrapolation pass** — either fused into the scalar tail (per
+  §11.3b), or as a post-pass that walks taps in axis-major,
+  ascending-|Δ| order over the filled `mValues`.
+- **Phase-3 WENO kernel** — `nanovdb::math::WENO5<Simd<float, W>>`
+  driven by the 19-slot `mValues` array, following the existing
+  `WenoStencil::WENO5` arithmetic but with all reads from the
+  pre-assembled batch buffer.
+- **Batch-width ordering benchmark** — rerun the legacy/transposed
+  comparison at W=4 and W=8 over floats (not uint64 indices) to lock
+  in the Phase-2 loop order.

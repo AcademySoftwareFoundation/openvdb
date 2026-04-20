@@ -127,18 +127,23 @@ that would need to reason about leaf size vs. tap radius.
 ### 4c. Sketch of `StencilT` concept
 
 ```cpp
-// WENO5 3D stencil: 18 axis-aligned taps, radius 3, hull = 6 extremal taps
+// WENO5 3D stencil: 19 taps (center + 6 per axis at ±1,±2,±3), radius 3,
+// hull = 6 extremal taps.  Tap ordering matches WenoPt<i,j,k>::idx in
+// nanovdb/math/Stencils.h, so slot k here corresponds to the same physical
+// tap as any code using the canonical WenoStencil index convention.
 struct Weno5Stencil {
-    static constexpr int SIZE = 18;
+    static constexpr int SIZE = 19;
 
     // ordered tap list: output slot i ↔ taps[i]
     static constexpr nanovdb::Coord taps[SIZE] = {
+        { 0, 0, 0},
         {-3,0,0}, {-2,0,0}, {-1,0,0}, {1,0,0}, {2,0,0}, {3,0,0},
         {0,-3,0}, {0,-2,0}, {0,-1,0}, {0,1,0}, {0,2,0}, {0,3,0},
         {0,0,-3}, {0,0,-2}, {0,0,-1}, {0,0,1}, {0,0,2}, {0,0,3},
     };
 
-    // prefetch hull: 6 extremal taps cover all 18
+    // prefetch hull: 6 extremal taps cover all 18 non-center taps
+    // (center never crosses a leaf, so it's excluded from the hull).
     static constexpr int HULL_SIZE = 6;
     static constexpr nanovdb::Coord hull[HULL_SIZE] = {
         {-3,0,0}, {3,0,0},
@@ -224,7 +229,7 @@ than stale data.  Active lanes are then written by the straddling loop via
 `where`-blend; in the straddling case the blend ensures majority-leaf results
 are not overwritten when minority-leaf lanes are processed.
 
-**Stack footprint:** for WENO5, W=16: 18 × 16 × 8 bytes = **2.25 KB**.
+**Stack footprint:** for WENO5, W=16: 19 × 16 × 8 bytes = **2.375 KB**.
 Acceptable for a stack-local object within a VBM block kernel; would need care
 if embedded in a larger persistent structure.
 
