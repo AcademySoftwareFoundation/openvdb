@@ -385,18 +385,21 @@ static void runPerf(
                         leafIndex, voxelOffset);
 
                     uint64_t* bs = bs0 + bID * BlockWidth;
-                    for (int i = 0; i < BlockWidth; ++i) {
-                        if (leafIndex[i] == CPUVBM::UnusedLeafIndex) continue;
-                        const uint16_t vo = voxelOffset[i];
-                        const uint32_t li = leafIndex[i];
-                        const nanovdb::Coord cOrigin = firstLeaf[li].origin();
-                        const int lx = (vo >> 6) & 7, ly = (vo >> 3) & 7, lz = vo & 7;
-                        const nanovdb::Coord center = cOrigin + nanovdb::Coord(lx, ly, lz);
-                        // 18 trivial "taps" — no accessor call; anti-DCE via Coord components.
-                        uint64_t s = 0;
-                        for (int k = 0; k < LegacyAccT::size(); ++k)
-                            s += static_cast<uint64_t>(center.x() + center.y() + center.z() + k);
-                        bs[i] = s;
+                    for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
+                        for (int i = 0; i < SIMDw; ++i) {
+                            const int p = batchStart + i;
+                            if (leafIndex[p] == CPUVBM::UnusedLeafIndex) continue;
+                            const uint16_t vo = voxelOffset[p];
+                            const uint32_t li = leafIndex[p];
+                            const nanovdb::Coord cOrigin = firstLeaf[li].origin();
+                            const int lx = (vo >> 6) & 7, ly = (vo >> 3) & 7, lz = vo & 7;
+                            const nanovdb::Coord center = cOrigin + nanovdb::Coord(lx, ly, lz);
+                            // 18 trivial "taps" — no accessor call; anti-DCE via Coord components.
+                            uint64_t s = 0;
+                            for (int k = 0; k < LegacyAccT::size(); ++k)
+                                s += static_cast<uint64_t>(center.x() + center.y() + center.z() + k);
+                            bs[p] = s;
+                        }
                     }
                 }
             });
@@ -426,16 +429,19 @@ static void runPerf(
 
                     uint64_t* bs = bs0 + bID * BlockWidth;
 
-                    for (int i = 0; i < BlockWidth; ++i) {
-                        if (leafIndex[i] == CPUVBM::UnusedLeafIndex) continue;
-                        const uint16_t vo = voxelOffset[i];
-                        const uint32_t li = leafIndex[i];
-                        const nanovdb::Coord cOrigin = firstLeaf[li].origin();
-                        const int lx = (vo >> 6) & 7, ly = (vo >> 3) & 7, lz = vo & 7;
-                        legacyAcc.moveTo(cOrigin + nanovdb::Coord(lx, ly, lz));
-                        uint64_t s = 0;
-                        for (int k = 0; k < LegacyAccT::size(); ++k) s += legacyAcc[k];
-                        bs[i] = s;
+                    for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
+                        for (int i = 0; i < SIMDw; ++i) {
+                            const int p = batchStart + i;
+                            if (leafIndex[p] == CPUVBM::UnusedLeafIndex) continue;
+                            const uint16_t vo = voxelOffset[p];
+                            const uint32_t li = leafIndex[p];
+                            const nanovdb::Coord cOrigin = firstLeaf[li].origin();
+                            const int lx = (vo >> 6) & 7, ly = (vo >> 3) & 7, lz = vo & 7;
+                            legacyAcc.moveTo(cOrigin + nanovdb::Coord(lx, ly, lz));
+                            uint64_t s = 0;
+                            for (int k = 0; k < LegacyAccT::size(); ++k) s += legacyAcc[k];
+                            bs[p] = s;
+                        }
                     }
                 }
             });
@@ -463,8 +469,8 @@ static void runPerf(
             [&](const nanovdb::util::Range1D& range) {
                 alignas(64) uint32_t leafIndex[BlockWidth];
                 alignas(64) uint16_t voxelOffset[BlockWidth];
-                alignas(64) nanovdb::Coord centers[BlockWidth];
-                alignas(64) uint64_t s[BlockWidth];
+                alignas(64) nanovdb::Coord centers[SIMDw];
+                alignas(64) uint64_t s[SIMDw];
                 nanovdb::ReadAccessor<BuildT, 0, -1, -1> acc(grid->tree().root());
                 uint64_t* bs0 = sums.data();
 
@@ -475,41 +481,45 @@ static void runPerf(
                         firstOffset + bID * BlockWidth,
                         leafIndex, voxelOffset);
 
-                    for (int i = 0; i < BlockWidth; ++i) {
-                        s[i] = 0;
-                        if (leafIndex[i] == CPUVBM::UnusedLeafIndex) continue;
-                        const uint16_t vo = voxelOffset[i];
-                        const uint32_t li = leafIndex[i];
-                        const nanovdb::Coord cOrigin = firstLeaf[li].origin();
-                        centers[i] = cOrigin + nanovdb::Coord(
-                            (vo >> 6) & 7, (vo >> 3) & 7, vo & 7);
-                    }
-
-                    auto processTap = [&]<int DI, int DJ, int DK>()
-                        [[gnu::always_inline]]
-                    {
-                        for (int i = 0; i < BlockWidth; ++i) {
-                            if (leafIndex[i] == CPUVBM::UnusedLeafIndex) continue;
-                            const nanovdb::Coord c = centers[i]
-                                + nanovdb::Coord(DI, DJ, DK);
-                            const LeafT* leaf = acc.probeLeaf(c);
-                            if (!leaf) continue;
-                            const uint32_t offset = (uint32_t(c[0] & 7) << 6)
-                                                  | (uint32_t(c[1] & 7) << 3)
-                                                  |  uint32_t(c[2] & 7);
-                            s[i] += leaf->data()->getValue(offset);
-                        }
-                    };
-
-                    [&]<size_t... Is>(std::index_sequence<Is...>) {
-                        (processTap.template operator()<
-                            std::tuple_element_t<Is, Weno5Taps>::di,
-                            std::tuple_element_t<Is, Weno5Taps>::dj,
-                            std::tuple_element_t<Is, Weno5Taps>::dk>(), ...);
-                    }(std::make_index_sequence<SIZE>{});
-
                     uint64_t* bs = bs0 + bID * BlockWidth;
-                    for (int i = 0; i < BlockWidth; ++i) bs[i] = s[i];
+
+                    for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
+                        for (int i = 0; i < SIMDw; ++i) {
+                            s[i] = 0;
+                            const int p = batchStart + i;
+                            if (leafIndex[p] == CPUVBM::UnusedLeafIndex) continue;
+                            const uint16_t vo = voxelOffset[p];
+                            const uint32_t li = leafIndex[p];
+                            const nanovdb::Coord cOrigin = firstLeaf[li].origin();
+                            centers[i] = cOrigin + nanovdb::Coord(
+                                (vo >> 6) & 7, (vo >> 3) & 7, vo & 7);
+                        }
+
+                        auto processTap = [&]<int DI, int DJ, int DK>()
+                            [[gnu::always_inline]]
+                        {
+                            for (int i = 0; i < SIMDw; ++i) {
+                                if (leafIndex[batchStart + i] == CPUVBM::UnusedLeafIndex) continue;
+                                const nanovdb::Coord c = centers[i]
+                                    + nanovdb::Coord(DI, DJ, DK);
+                                const LeafT* leaf = acc.probeLeaf(c);
+                                if (!leaf) continue;
+                                const uint32_t offset = (uint32_t(c[0] & 7) << 6)
+                                                      | (uint32_t(c[1] & 7) << 3)
+                                                      |  uint32_t(c[2] & 7);
+                                s[i] += leaf->data()->getValue(offset);
+                            }
+                        };
+
+                        [&]<size_t... Is>(std::index_sequence<Is...>) {
+                            (processTap.template operator()<
+                                std::tuple_element_t<Is, Weno5Taps>::di,
+                                std::tuple_element_t<Is, Weno5Taps>::dj,
+                                std::tuple_element_t<Is, Weno5Taps>::dk>(), ...);
+                        }(std::make_index_sequence<SIZE>{});
+
+                        for (int i = 0; i < SIMDw; ++i) bs[batchStart + i] = s[i];
+                    }
                 }
             });
     });
