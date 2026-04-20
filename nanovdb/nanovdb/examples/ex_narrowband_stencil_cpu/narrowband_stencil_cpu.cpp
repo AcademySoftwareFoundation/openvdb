@@ -58,6 +58,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <cstdio>
+#include <cstring>   // std::memcpy (sidecar-pass checksum)
 #include <cassert>
 #include <memory>       // std::unique_ptr
 #include <sstream>
@@ -146,6 +147,12 @@ convertToIndexGridWithSidecar(openvdb::FloatGrid& floatGrid)
     // valueCount() is only valid after getHandle with an index DstBuildT.
     p.sidecar.resize(builder.valueCount());
     builder.template copyValues<nanovdb::ValueOnIndex>(p.sidecar.data());
+
+    // NanoVDB convention: index 0 of the sidecar holds the background value.
+    // copyValues does not write slot 0 (active voxel indices start at 1);
+    // set it explicitly so downstream code can treat sidecar[idx] as valid
+    // for both in-band (idx>0) and out-of-band (idx==0) taps without branching.
+    if (!p.sidecar.empty()) p.sidecar[0] = floatGrid.background();
     return p;
 }
 
@@ -353,10 +360,12 @@ static void runPrototype(
 static void runPerf(
     const GridT*                                                          grid,
     const nanovdb::tools::VoxelBlockManagerHandle<nanovdb::HostBuffer>&  vbmHandle,
+    const std::vector<float>&                                             sidecar,
     const std::string&                                                    passFilter = "all")
 {
     // wantPass(<name>) returns true if this pass should run under the current filter.
     // Supported names: "decode", "stencil", "framing", "legacy",
+    //                  "sidecar-legacy", "sidecar-stencil", "sidecar-transposed",
     //                  "legacy-transposed".  "all" runs everything.
     auto wantPass = [&](const char* name) {
         return passFilter == "all" || passFilter == name;
@@ -372,6 +381,12 @@ static void runPerf(
     // Anti-DCE output array.  Each thread writes its own non-overlapping
     // range (bID * BlockWidth ... + BlockWidth - 1) — no synchronisation needed.
     std::vector<uint64_t> sums((size_t)nBlocks * BlockWidth, 0);
+
+    // Second sidecar for the `sidecar` pass: written at each voxel's
+    // VBM-sequential index (firstOffset + bID*BlockWidth + lane), which by
+    // construction equals the center voxel's ValueOnIndex.  Sized to match
+    // the input sidecar so we can reuse its indexing.
+    std::vector<float> outputSidecar(sidecar.size(), 0.f);
 
     std::ostringstream sink;  // absorbs Timer's warm-pass "... " output
     nanovdb::util::Timer timer;
@@ -546,6 +561,271 @@ static void runPerf(
                         [](uint64_t a, uint64_t b) { return a ^ b; });
     }  // end wantPass("legacy")
 
+    // ---- sidecar-legacy: float value + bool isActive matrices via LegacyStencilAccessor ----
+    // Precursor to the full WENO5 pipeline (§11 of BatchAccessor.md).  Within
+    // each SIMDw-lane batch, assembles two per-tap arrays:
+    //   float values[SIZE][SIMDw]   -- sidecar[idx]  (idx==0 -> background)
+    //   bool  isActive[SIZE][SIMDw] -- (idx != 0)
+    // Token op (anti-DCE, stand-in for WENO arithmetic): per active voxel,
+    // sum values[k][i] over taps with isActive[k][i]==true, write the result
+    // to outputSidecar at the voxel's VBM-sequential index.
+    double sidecarLegacyUs = 0.0;
+    uint64_t sidecarLegacyChecksum = 0;
+    if (wantPass("sidecar-legacy")) {
+    std::fill(outputSidecar.begin(), outputSidecar.end(), 0.f);
+
+    sidecarLegacyUs = timeForEach([&] {
+        nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
+            [&](const nanovdb::util::Range1D& range) {
+                alignas(64) uint32_t leafIndex[BlockWidth];
+                alignas(64) uint16_t voxelOffset[BlockWidth];
+                LegacyAccT legacyAcc(*grid);
+
+                constexpr int SIZE = LegacyAccT::size();
+                alignas(64) float values  [SIZE][SIMDw];
+                alignas(64) bool  isActive[SIZE][SIMDw];
+
+                const float* const scIn  = sidecar.data();
+                float*       const scOut = outputSidecar.data();
+
+                for (size_t bID = range.begin(); bID != range.end(); ++bID) {
+                    CPUVBM::decodeInverseMaps(
+                        grid, firstLeafID[bID],
+                        &jumpMap[bID * CPUVBM::JumpMapLength],
+                        firstOffset + bID * BlockWidth,
+                        leafIndex, voxelOffset);
+
+                    const uint64_t blockBase =
+                        firstOffset + (uint64_t)bID * BlockWidth;
+
+                    for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
+                        // Fill values[][] and isActive[][] for this batch.
+                        for (int i = 0; i < SIMDw; ++i) {
+                            const int p = batchStart + i;
+                            if (leafIndex[p] == CPUVBM::UnusedLeafIndex) {
+                                for (int k = 0; k < SIZE; ++k) {
+                                    values[k][i]   = scIn[0];
+                                    isActive[k][i] = false;
+                                }
+                                continue;
+                            }
+                            const uint16_t vo = voxelOffset[p];
+                            const uint32_t li = leafIndex[p];
+                            const nanovdb::Coord cOrigin = firstLeaf[li].origin();
+                            const int lx = (vo >> 6) & 7, ly = (vo >> 3) & 7, lz = vo & 7;
+                            legacyAcc.moveTo(cOrigin + nanovdb::Coord(lx, ly, lz));
+                            for (int k = 0; k < SIZE; ++k) {
+                                const uint64_t idx = legacyAcc[k];
+                                values[k][i]   = scIn[idx];     // scIn[0] == background
+                                isActive[k][i] = (idx != 0);
+                            }
+                        }
+
+                        // Token op: sum values for Active taps per voxel.
+                        for (int i = 0; i < SIMDw; ++i) {
+                            const int p = batchStart + i;
+                            if (leafIndex[p] == CPUVBM::UnusedLeafIndex) continue;
+                            float sum = 0.f;
+                            for (int k = 0; k < SIZE; ++k)
+                                if (isActive[k][i]) sum += values[k][i];
+                            scOut[blockBase + p] = sum;
+                        }
+                    }
+                }
+            });
+    });
+
+    // Anti-DCE checksum: XOR of the float bit patterns across the full
+    // output sidecar.  Zero-initialised slots contribute 0 (XOR identity),
+    // so inactive voxels don't disturb the result.
+    sidecarLegacyChecksum =
+        std::accumulate(outputSidecar.begin(), outputSidecar.end(), uint64_t(0),
+            [](uint64_t a, float b) {
+                uint32_t bits;
+                std::memcpy(&bits, &b, sizeof(bits));
+                return a ^ uint64_t(bits);
+            });
+    }  // end wantPass("sidecar-legacy")
+
+    // ---- sidecar-stencil: same matrices via StencilAccessor (hybrid SIMD+scalar) ----
+    // Uses StencilAccessor's mIndices[SIZE][SIMDw] — the result of its SIMD
+    // direction-decode + scalar leaf.getValue() tail — directly as the
+    // uint64 index source for the sidecar lookup.  Inactive lanes have
+    // mIndices[k][i]=0 naturally (StencilAccessor zero-fills), so the fill
+    // loop has no per-lane UnusedLeafIndex guard.
+    double sidecarStencilUs = 0.0;
+    uint64_t sidecarStencilChecksum = 0;
+    if (wantPass("sidecar-stencil")) {
+    std::fill(outputSidecar.begin(), outputSidecar.end(), 0.f);
+
+    sidecarStencilUs = timeForEach([&] {
+        nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
+            [&](const nanovdb::util::Range1D& range) {
+                alignas(64) uint32_t leafIndex[BlockWidth];
+                alignas(64) uint16_t voxelOffset[BlockWidth];
+
+                constexpr int SIZE = SAccT::size();
+                alignas(64) float values  [SIZE][SIMDw];
+                alignas(64) bool  isActive[SIZE][SIMDw];
+
+                const float* const scIn  = sidecar.data();
+                float*       const scOut = outputSidecar.data();
+
+                for (size_t bID = range.begin(); bID != range.end(); ++bID) {
+                    CPUVBM::decodeInverseMaps(
+                        grid, firstLeafID[bID],
+                        &jumpMap[bID * CPUVBM::JumpMapLength],
+                        firstOffset + bID * BlockWidth,
+                        leafIndex, voxelOffset);
+
+                    int nExtraLeaves = 0;
+                    for (int w = 0; w < CPUVBM::JumpMapLength; ++w)
+                        nExtraLeaves += nanovdb::util::countOn(
+                            jumpMap[bID * CPUVBM::JumpMapLength + w]);
+
+                    SAccT stencilAcc(*grid, firstLeafID[bID], (uint32_t)nExtraLeaves);
+                    const uint64_t blockBase =
+                        firstOffset + (uint64_t)bID * BlockWidth;
+
+                    for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
+                        stencilAcc.moveTo(leafIndex + batchStart, voxelOffset + batchStart);
+
+                        // Tap-outer fill: StencilAccessor stores mIndices[tap][lane]
+                        // contiguously along the lane axis, so iterating k-outer
+                        // turns lane-inner into a 16-wide sweep over one row.
+                        for (int k = 0; k < SIZE; ++k) {
+                            for (int i = 0; i < SIMDw; ++i) {
+                                const uint64_t idx = stencilAcc.mIndices[k][i];
+                                values[k][i]   = scIn[idx];     // scIn[0] == background
+                                isActive[k][i] = (idx != 0);
+                            }
+                        }
+
+                        for (int i = 0; i < SIMDw; ++i) {
+                            const int p = batchStart + i;
+                            if (leafIndex[p] == CPUVBM::UnusedLeafIndex) continue;
+                            float sum = 0.f;
+                            for (int k = 0; k < SIZE; ++k)
+                                if (isActive[k][i]) sum += values[k][i];
+                            scOut[blockBase + p] = sum;
+                        }
+                    }
+                }
+            });
+    });
+
+    sidecarStencilChecksum =
+        std::accumulate(outputSidecar.begin(), outputSidecar.end(), uint64_t(0),
+            [](uint64_t a, float b) {
+                uint32_t bits;
+                std::memcpy(&bits, &b, sizeof(bits));
+                return a ^ uint64_t(bits);
+            });
+    }  // end wantPass("sidecar-stencil")
+
+    // ---- sidecar-transposed: tap-outer fill via direct ReadAccessor ----
+    // Mirrors `legacy-transposed`'s loop structure, but instead of summing
+    // uint64 indices into a per-voxel accumulator, the tap-outer loop fills
+    // values[tap][lane] + isActive[tap][lane].  A second voxel-outer pass
+    // performs the same token sum as the other variants.
+    double sidecarXposedUs = 0.0;
+    uint64_t sidecarXposedChecksum = 0;
+    if (wantPass("sidecar-transposed")) {
+    std::fill(outputSidecar.begin(), outputSidecar.end(), 0.f);
+
+    using Weno5TapsX = nanovdb::Weno5Stencil::Taps;
+    static constexpr int SIZEX = int(std::tuple_size_v<Weno5TapsX>);
+
+    sidecarXposedUs = timeForEach([&] {
+        nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
+            [&](const nanovdb::util::Range1D& range) {
+                alignas(64) uint32_t leafIndex[BlockWidth];
+                alignas(64) uint16_t voxelOffset[BlockWidth];
+                alignas(64) nanovdb::Coord centers[SIMDw];
+                alignas(64) float values  [SIZEX][SIMDw];
+                alignas(64) bool  isActive[SIZEX][SIMDw];
+                nanovdb::ReadAccessor<BuildT, 0, -1, -1> acc(grid->tree().root());
+
+                const float* const scIn  = sidecar.data();
+                float*       const scOut = outputSidecar.data();
+
+                for (size_t bID = range.begin(); bID != range.end(); ++bID) {
+                    CPUVBM::decodeInverseMaps(
+                        grid, firstLeafID[bID],
+                        &jumpMap[bID * CPUVBM::JumpMapLength],
+                        firstOffset + bID * BlockWidth,
+                        leafIndex, voxelOffset);
+
+                    const uint64_t blockBase =
+                        firstOffset + (uint64_t)bID * BlockWidth;
+
+                    for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
+                        for (int i = 0; i < SIMDw; ++i) {
+                            const int p = batchStart + i;
+                            if (leafIndex[p] == CPUVBM::UnusedLeafIndex) continue;
+                            const uint16_t vo = voxelOffset[p];
+                            const uint32_t li = leafIndex[p];
+                            const nanovdb::Coord cOrigin = firstLeaf[li].origin();
+                            centers[i] = cOrigin + nanovdb::Coord(
+                                (vo >> 6) & 7, (vo >> 3) & 7, vo & 7);
+                        }
+
+                        auto processTap = [&]<int K, int DI, int DJ, int DK>()
+                            [[gnu::always_inline]]
+                        {
+                            for (int i = 0; i < SIMDw; ++i) {
+                                if (leafIndex[batchStart + i] == CPUVBM::UnusedLeafIndex) {
+                                    values  [K][i] = scIn[0];
+                                    isActive[K][i] = false;
+                                    continue;
+                                }
+                                const nanovdb::Coord c = centers[i]
+                                    + nanovdb::Coord(DI, DJ, DK);
+                                const LeafT* leaf = acc.probeLeaf(c);
+                                if (!leaf) {
+                                    values  [K][i] = scIn[0];
+                                    isActive[K][i] = false;
+                                    continue;
+                                }
+                                const uint32_t offset = (uint32_t(c[0] & 7) << 6)
+                                                      | (uint32_t(c[1] & 7) << 3)
+                                                      |  uint32_t(c[2] & 7);
+                                const uint64_t idx = leaf->data()->getValue(offset);
+                                values  [K][i] = scIn[idx];
+                                isActive[K][i] = (idx != 0);
+                            }
+                        };
+
+                        [&]<size_t... Is>(std::index_sequence<Is...>) {
+                            (processTap.template operator()<
+                                int(Is),
+                                std::tuple_element_t<Is, Weno5TapsX>::di,
+                                std::tuple_element_t<Is, Weno5TapsX>::dj,
+                                std::tuple_element_t<Is, Weno5TapsX>::dk>(), ...);
+                        }(std::make_index_sequence<SIZEX>{});
+
+                        for (int i = 0; i < SIMDw; ++i) {
+                            const int p = batchStart + i;
+                            if (leafIndex[p] == CPUVBM::UnusedLeafIndex) continue;
+                            float sum = 0.f;
+                            for (int k = 0; k < SIZEX; ++k)
+                                if (isActive[k][i]) sum += values[k][i];
+                            scOut[blockBase + p] = sum;
+                        }
+                    }
+                }
+            });
+    });
+
+    sidecarXposedChecksum =
+        std::accumulate(outputSidecar.begin(), outputSidecar.end(), uint64_t(0),
+            [](uint64_t a, float b) {
+                uint32_t bits;
+                std::memcpy(&bits, &b, sizeof(bits));
+                return a ^ uint64_t(bits);
+            });
+    }  // end wantPass("sidecar-transposed")
+
     // ---- Legacy transposed: tap-outer, voxel-inner ----
     // Same semantics as `legacy`, reordered.  For each of the 19 WENO5 taps,
     // sweep all BlockWidth voxels — giving long runs of probeLeaf + getValue
@@ -636,6 +916,15 @@ static void runPerf(
     std::printf("  LegacyStencilAccessor : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
         legacyUs  / 1e3, legacyUs  * 1e3 / double(nVoxels),
         (legacyUs - decodeUs) / 1e3, legacyChecksum);
+    std::printf("  Sidecar (legacy)      : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
+        sidecarLegacyUs / 1e3, sidecarLegacyUs * 1e3 / double(nVoxels),
+        (sidecarLegacyUs - decodeUs) / 1e3, sidecarLegacyChecksum);
+    std::printf("  Sidecar (stencil)     : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
+        sidecarStencilUs / 1e3, sidecarStencilUs * 1e3 / double(nVoxels),
+        (sidecarStencilUs - decodeUs) / 1e3, sidecarStencilChecksum);
+    std::printf("  Sidecar (transposed)  : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
+        sidecarXposedUs / 1e3, sidecarXposedUs * 1e3 / double(nVoxels),
+        (sidecarXposedUs - decodeUs) / 1e3, sidecarXposedChecksum);
     std::printf("  Legacy transposed     : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
         legacyXposedUs / 1e3, legacyXposedUs * 1e3 / double(nVoxels),
         (legacyXposedUs - decodeUs) / 1e3, legacyXposedChecksum);
@@ -644,6 +933,10 @@ static void runPerf(
         std::cerr << "  WARNING: stencil/legacy checksums differ — accessor results disagree!\n";
     if (legacyChecksum != legacyXposedChecksum)
         std::cerr << "  WARNING: legacy/legacy-transposed checksums differ — ordering bug!\n";
+    if (sidecarLegacyChecksum != sidecarStencilChecksum)
+        std::cerr << "  WARNING: sidecar legacy/stencil checksums differ — accessor results disagree!\n";
+    if (sidecarLegacyChecksum != sidecarXposedChecksum)
+        std::cerr << "  WARNING: sidecar legacy/transposed checksums differ — ordering bug!\n";
 }
 
 // ============================================================
@@ -663,7 +956,8 @@ static void printUsage(const char* argv0)
         << "  --grid=<name>        Select grid by name (default: first FloatGrid)\n"
         << "  --pass=<name>        Run one perf pass:\n"
         << "                         all (default), verify, decode, stencil,\n"
-        << "                         framing, legacy, legacy-transposed\n"
+        << "                         framing, legacy, legacy-transposed,\n"
+        << "                         sidecar-legacy, sidecar-stencil, sidecar-transposed\n"
         << "  --threads=<n>        Limit TBB parallelism (0 = TBB default)\n"
         << "  --skip-validation    Skip the sidecar ordering sanity check\n";
 }
@@ -748,10 +1042,7 @@ int main(int argc, char** argv)
 
         if (passFilter == "all" || passFilter == "verify")
             runPrototype(grid, vbmHandle);
-        runPerf(grid, vbmHandle, passFilter);
-
-        // Silence unused-variable warning for sidecar until a future pass uses it.
-        (void)payload.sidecar;
+        runPerf(grid, vbmHandle, payload.sidecar, passFilter);
     } catch (const std::exception& e) {
         std::cerr << "Exception: " << e.what() << "\n";
         return 1;
