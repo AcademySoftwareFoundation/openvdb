@@ -262,7 +262,8 @@ static void runPerf(
     const std::string&                                                    passFilter = "all")
 {
     // wantPass(<name>) returns true if this pass should run under the current filter.
-    // Supported names: "decode", "stencil", "framing", "legacy".  "all" runs everything.
+    // Supported names: "decode", "stencil", "framing", "legacy",
+    //                  "legacy-transposed".  "all" runs everything.
     auto wantPass = [&](const char* name) {
         return passFilter == "all" || passFilter == name;
     };
@@ -445,6 +446,79 @@ static void runPerf(
                         [](uint64_t a, uint64_t b) { return a ^ b; });
     }  // end wantPass("legacy")
 
+    // ---- Legacy transposed: tap-outer, voxel-inner ----
+    // Same semantics as `legacy`, reordered.  For each of the 18 WENO5 taps,
+    // sweep all BlockWidth voxels — giving long runs of probeLeaf + getValue
+    // calls with the SAME compile-time tap offset but varying center voxels.
+    double legacyXposedUs = 0.0;
+    uint64_t legacyXposedChecksum = 0;
+    if (wantPass("legacy-transposed")) {
+    std::fill(sums.begin(), sums.end(), uint64_t(0));
+
+    using Weno5Taps = nanovdb::Weno5Stencil::Taps;
+    static constexpr int SIZE = int(std::tuple_size_v<Weno5Taps>);
+
+    legacyXposedUs = timeForEach([&] {
+        nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
+            [&](const nanovdb::util::Range1D& range) {
+                alignas(64) uint32_t leafIndex[BlockWidth];
+                alignas(64) uint16_t voxelOffset[BlockWidth];
+                alignas(64) nanovdb::Coord centers[BlockWidth];
+                alignas(64) uint64_t s[BlockWidth];
+                nanovdb::ReadAccessor<BuildT, 0, -1, -1> acc(grid->tree().root());
+                uint64_t* bs0 = sums.data();
+
+                for (size_t bID = range.begin(); bID != range.end(); ++bID) {
+                    CPUVBM::decodeInverseMaps(
+                        grid, firstLeafID[bID],
+                        &jumpMap[bID * CPUVBM::JumpMapLength],
+                        firstOffset + bID * BlockWidth,
+                        leafIndex, voxelOffset);
+
+                    for (int i = 0; i < BlockWidth; ++i) {
+                        s[i] = 0;
+                        if (leafIndex[i] == CPUVBM::UnusedLeafIndex) continue;
+                        const uint16_t vo = voxelOffset[i];
+                        const uint32_t li = leafIndex[i];
+                        const nanovdb::Coord cOrigin = firstLeaf[li].origin();
+                        centers[i] = cOrigin + nanovdb::Coord(
+                            (vo >> 6) & 7, (vo >> 3) & 7, vo & 7);
+                    }
+
+                    auto processTap = [&]<int DI, int DJ, int DK>()
+                        [[gnu::always_inline]]
+                    {
+                        for (int i = 0; i < BlockWidth; ++i) {
+                            if (leafIndex[i] == CPUVBM::UnusedLeafIndex) continue;
+                            const nanovdb::Coord c = centers[i]
+                                + nanovdb::Coord(DI, DJ, DK);
+                            const LeafT* leaf = acc.probeLeaf(c);
+                            if (!leaf) continue;
+                            const uint32_t offset = (uint32_t(c[0] & 7) << 6)
+                                                  | (uint32_t(c[1] & 7) << 3)
+                                                  |  uint32_t(c[2] & 7);
+                            s[i] += leaf->data()->getValue(offset);
+                        }
+                    };
+
+                    [&]<size_t... Is>(std::index_sequence<Is...>) {
+                        (processTap.template operator()<
+                            std::tuple_element_t<Is, Weno5Taps>::di,
+                            std::tuple_element_t<Is, Weno5Taps>::dj,
+                            std::tuple_element_t<Is, Weno5Taps>::dk>(), ...);
+                    }(std::make_index_sequence<SIZE>{});
+
+                    uint64_t* bs = bs0 + bID * BlockWidth;
+                    for (int i = 0; i < BlockWidth; ++i) bs[i] = s[i];
+                }
+            });
+    });
+
+    legacyXposedChecksum =
+        std::accumulate(sums.begin(), sums.end(), uint64_t(0),
+                        [](uint64_t a, uint64_t b) { return a ^ b; });
+    }  // end wantPass("legacy-transposed")
+
     std::printf("\nEnd-to-end stencil gather (%u blocks, %lu active voxels):\n",
         nBlocks, nVoxels);
     std::printf("  decodeInverseMaps only: %7.1f ms  (%5.1f ns/voxel)\n",
@@ -458,9 +532,14 @@ static void runPerf(
     std::printf("  LegacyStencilAccessor : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
         legacyUs  / 1e3, legacyUs  * 1e3 / double(nVoxels),
         (legacyUs - decodeUs) / 1e3, legacyChecksum);
+    std::printf("  Legacy transposed     : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
+        legacyXposedUs / 1e3, legacyXposedUs * 1e3 / double(nVoxels),
+        (legacyXposedUs - decodeUs) / 1e3, legacyXposedChecksum);
 
     if (stencilChecksum != legacyChecksum)
-        std::cerr << "  WARNING: checksums differ — accessor results disagree!\n";
+        std::cerr << "  WARNING: stencil/legacy checksums differ — accessor results disagree!\n";
+    if (legacyChecksum != legacyXposedChecksum)
+        std::cerr << "  WARNING: legacy/legacy-transposed checksums differ — ordering bug!\n";
 }
 
 // ============================================================

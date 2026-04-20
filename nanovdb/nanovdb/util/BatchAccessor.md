@@ -1467,6 +1467,71 @@ follow-ons implied by this work but not pursued here:
   legacy compatibility shim (to be retired after a deprecation window)
   rather than a permanent toggle.
 
+### 8l. Follow-up: tap-outer loop ordering in the Legacy path
+
+Tested whether flipping `legacy`'s loop nest to tap-outer,
+voxel-inner helps on spatially-coherent workloads where many voxels in
+a batch are likely to share the same `valueMask` word.  Added a
+`legacy-transposed` benchmark pass in both `ex_stencil_gather_cpu` and
+`ex_narrowband_stencil_cpu`; checksums match `legacy` byte-for-byte on
+both workloads.
+
+#### 8l.1 Inlining pitfall
+
+First attempt used a runtime-args inner lambda
+`[&](int di, int dj, int dk) { for (int i = 0; i < 128; ++i) ... }`
+invoked 18 times via a parameter-pack fold.  GCC refused to inline the
+18 instantiations — the lambda body contains a 128-iteration loop with
+`probeLeaf` + `getValue` inside, which blew past the per-caller inline
+budget × 18.  Result: 18 explicit `call` instructions to a 542-byte
+`processTap` function with a 6-register prologue/epilogue per call,
+and tap offsets `(di, dj, dk)` as runtime register arguments (one
+spilled to stack) — so the compiler also couldn't specialise the loop
+body per tap.  That alone accounted for ~10 ms (~13 %) of the observed
+slowdown vs. Legacy.
+
+Fix: templated lambda
+`[&]<int DI, int DJ, int DK>() [[gnu::always_inline]] { ... }`
+dispatched via `.template operator()<di, dj, dk>()` inside the fold.
+The standalone `processTap` symbol disappears; transposed body grows
+from 4.4 KB → 9.8 KB (matching Legacy's 10.5 KB), and only cold-path
+tree-walk helpers remain as call targets.
+
+#### 8l.2 Results
+
+Measured at ~32M active voxel scale on i9-285K (24 threads, no HT):
+
+| Workload | Legacy (voxel-outer) | Transposed (tap-outer) | Δ |
+|----------|---------------------:|-----------------------:|--:|
+| Narrowband taperLER.vdb | 2.2 ns/vox | 2.1 ns/vox | −3 to −6 % (within noise) |
+| Synthetic 64M/50%       | 2.4 ns/vox | 2.8 ns/vox | +19 % |
+
+The narrowband tap-outer edge is marginal and within the ~10 %
+run-to-run noise floor observed on this host.  Synthetic's tap-outer
+slowdown is clearly outside noise.  Not a consistent win.
+
+#### 8l.3 Implementation verdict: voxel-outer stays the default
+
+`LegacyStencilAccessor`'s voxel-outer `moveTo(center)` kept as the
+production default:
+
+- **Clean abstraction**: `moveTo(center)` + indexed tap access maps
+  1:1 to the stencil operator's mental model.  A tap-outer batched
+  form would need external accumulator state and a centers-array
+  input, with no natural class boundary.
+- **No scratch arrays**: voxel-outer keeps the per-voxel accumulator
+  in a register and the 18-tap buffer inside the accessor; tap-outer
+  needs stack-local `centers[128]` and `s[128]`.
+- **Compiler robustness**: voxel-outer's 18-call single source
+  location is reliably collapsed by GCC.  Tap-outer relies on an
+  explicit `[[gnu::always_inline]]` workaround that, if lost during
+  future refactors, would silently regress performance by ~13 %.
+
+`legacy-transposed` retained as a benchmark pass for reference and as
+a datapoint reinforcing why the hybrid `StencilAccessor` is structured
+tap-outer (SIMD direction-computation inherently amortises across
+lanes at the same tap).
+
 ---
 
 ## 9. Relationship to Phase 1 Prototype
@@ -1558,6 +1623,16 @@ follow-ons implied by this work but not pursued here:
   bookkeeping and gives 4–9 % additional speedup on branchless paths.
   Scope: benchmark-only; the library default is unchanged (right default
   for `probeValue`/`probeLeaf`/mixed workloads).
+
+- **Tap-outer loop ordering evaluation in the Legacy path (§8l)**:
+  added `legacy-transposed` benchmark pass (checksums match byte-for-byte)
+  and tested on both workloads at matched ~32M-voxel scale.  Narrowband:
+  marginal tap-outer edge, within noise.  Synthetic: tap-outer ~19 %
+  slower.  Uncovered a GCC inlining pitfall for runtime-args inner lambdas
+  (fixed via templated lambda + `[[gnu::always_inline]]`).
+  **Verdict**: voxel-outer `LegacyStencilAccessor` remains the default —
+  cleaner abstraction, no scratch arrays, no compiler-inlining fragility,
+  and no consistent perf advantage to tap-outer.
 
 ### Remaining
 
