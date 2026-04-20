@@ -1800,3 +1800,96 @@ Implementation items that follow directly from §11.1–§11.4:
 - **Batch-width ordering benchmark** — rerun the legacy/transposed
   comparison at W=4 and W=8 over floats (not uint64 indices) to lock
   in the Phase-2 loop order.
+
+### 11.6  Implementation status (Stage 1 / 2 / 3 landed)
+
+The target pipeline above is being landed in three incremental stages.
+The first three are done; the WENO5 arithmetic + write-back phase is
+the remaining gap before a full end-to-end advection step.
+
+#### Stage 1 — batch-structured outer loop
+
+`ex_stencil_gather_cpu` and `ex_narrowband_stencil_cpu`: the `legacy`,
+`framing`, and `legacy-transposed` passes were restructured from a
+flat `for i in 0..BlockWidth` loop into a nested
+`for batchStart in 0..BlockWidth step SIMDw; for i in 0..SIMDw` loop.
+The `stencil` pass was already batch-structured and served as the
+reference shape.  Rationale: every downstream phase (sidecar fetch,
+extrapolate, WENO5 reconstruct) is SIMD-wide, so the outer loop has
+to match that cadence first.
+
+Perf cost (narrowband, 24 threads): ~5% on legacy, ~7% on
+legacy-transposed — the flat-128 loop previously gave GCC more
+iterations over which to amortize loop overhead.  Recovered in full
+by subsequent stages.
+
+Commit: `5a920596`.
+
+#### Stage 2 — sidecar value assembly (uint64 → float via lookup)
+
+`ex_narrowband_stencil_cpu`: three new passes that assemble the
+per-batch `float values[SIZE][SIMDw]` + `bool isActive[SIZE][SIMDw]`
+matrices from the sidecar, plus a stand-in token op (sum of active
+tap values per voxel, written to a second sidecar at the VBM-sequential
+index).  Variants:
+
+| Pass | Gather method | Time (ns/voxel) |
+|------|---------------|----------------:|
+| `sidecar-legacy`     | LegacyStencilAccessor scalar moveTo        | 4.1 |
+| `sidecar-stencil`    | StencilAccessor (hybrid SIMD + scalar tail) | **3.0** |
+| `sidecar-transposed` | ReadAccessor tap-outer direct probeLeaf    | 4.0 |
+
+All three produce identical output checksums (cross-validation).
+StencilAccessor wins by ~25% over the scalar paths — its SIMD moveTo
+amortises direction-decode + leaf-cache across the batch, and its
+contiguous `mIndices[k][i]` row feeds a vector-friendly sidecar gather.
+
+Supporting change: `convertToIndexGridWithSidecar` now sets
+`sidecar[0] = floatGrid.background()` so the sidecar fetch is
+unconditional (no per-lane branch on `idx == 0`).
+
+Commit: `110d852c`.
+
+#### Stage 3 — out-of-band extrapolation via WenoStencil<W>
+
+New header `nanovdb/nanovdb/util/WenoStencil.h` (design doc:
+[WenoStencil.md](WenoStencil.md)) defines `WenoStencil<W>`: a 19-tap
+value + activity container templated on SIMD lane width, with a
+single-source scalar/SIMD `extrapolate(absBackground)` method.  The
+extrapolation implements the cascade from §11.2: out-of-band lanes
+take `copysign(|background|, mValues[innerTap][lane])`, processed in
+ascending-|Δ| order so the inner tap is always already resolved.
+
+Integration: new `sidecar-stencil-extrap` pass in
+`ex_narrowband_stencil_cpu` reuses StencilAccessor for the gather,
+fills a `WenoStencil<SIMDw>`, calls `extrapolate()`, then sums all
+19 taps unconditionally (no longer gated by `isActive`).
+
+Measured extrapolation overhead: **+4.5 ms / 31.8M voxels
+= 0.14 ns/voxel** end-to-end on taperLER.vdb (24 threads,
+i9-285K) — 18 SIMD blend pairs per batch, ~126 cycles per 16-voxel
+batch, ~8 cycles/voxel per core.
+
+| Pass | ns/voxel | Checksum |
+|------|---------:|----------|
+| `sidecar-stencil`        | 3.1 | `0xcfbff7c8` |
+| `sidecar-stencil-extrap` | 3.2 | `0x371273d0` |
+
+Checksums differ as expected: the extrap variant sums
+`mValues[k]` for all 19 taps after extrapolation, whereas
+`sidecar-stencil` gates the sum by `isActive[k]` and so excludes
+out-of-band lanes.
+
+Commit: `a6b08712`.
+
+#### Remaining (Stage 4+)
+
+The §11.5 "deliverables" list is now reduced to two items:
+
+- **Phase-3 WENO5 kernel** — `reconstruct()` method on
+  `WenoStencil<W>` (or a free function consuming it) producing per-axis
+  fluxes via the Weno5 arithmetic, single-source across W.  Sketched
+  in WenoStencil.md §7.1.
+- **Batch-width ordering benchmark** — at W=4 / W=8 over floats,
+  to validate that the tap-outer fill hypothesis (§11.3) holds at
+  the real Phase-3 inner-loop size before locking the shape.
