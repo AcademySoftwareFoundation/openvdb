@@ -48,6 +48,7 @@
 #include <nanovdb/util/BatchAccessor.h>
 #include <nanovdb/util/StencilAccessor.h>
 #include <nanovdb/util/LegacyStencilAccessor.h>
+#include <nanovdb/util/WenoStencil.h>
 
 #include <openvdb/openvdb.h>
 #include <openvdb/io/File.h>
@@ -57,6 +58,7 @@
 #include <vector>
 #include <iostream>
 #include <stdexcept>
+#include <cmath>     // std::abs (sidecar-stencil-extrap)
 #include <cstdio>
 #include <cstring>   // std::memcpy (sidecar-pass checksum)
 #include <cassert>
@@ -365,8 +367,9 @@ static void runPerf(
 {
     // wantPass(<name>) returns true if this pass should run under the current filter.
     // Supported names: "decode", "stencil", "framing", "legacy",
-    //                  "sidecar-legacy", "sidecar-stencil", "sidecar-transposed",
-    //                  "legacy-transposed".  "all" runs everything.
+    //                  "sidecar-legacy", "sidecar-stencil", "sidecar-stencil-extrap",
+    //                  "sidecar-transposed", "legacy-transposed".
+    // "all" runs everything.
     auto wantPass = [&](const char* name) {
         return passFilter == "all" || passFilter == name;
     };
@@ -723,6 +726,83 @@ static void runPerf(
             });
     }  // end wantPass("sidecar-stencil")
 
+    // ---- sidecar-stencil-extrap: sidecar-stencil + WenoStencil::extrapolate ----
+    // Same fill as sidecar-stencil, then calls WenoStencil<SIMDw>::extrapolate
+    // to repair out-of-band lanes via copysign(|background|, mValues[innerTap]).
+    // After extrapolation, isActive is not needed for the downstream op;
+    // the token sum over ALL taps (active + extrapolated) is the anti-DCE
+    // artifact.  Checksum will differ from sidecar-stencil (which summed
+    // active-only) — that's the expected correctness signal.
+    double sidecarStencilExtrapUs = 0.0;
+    uint64_t sidecarStencilExtrapChecksum = 0;
+    if (wantPass("sidecar-stencil-extrap")) {
+    std::fill(outputSidecar.begin(), outputSidecar.end(), 0.f);
+
+    const float absBackground = std::abs(sidecar[0]);  // sidecar[0] = floatGrid.background()
+
+    sidecarStencilExtrapUs = timeForEach([&] {
+        nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
+            [&](const nanovdb::util::Range1D& range) {
+                alignas(64) uint32_t leafIndex[BlockWidth];
+                alignas(64) uint16_t voxelOffset[BlockWidth];
+
+                nanovdb::WenoStencil<SIMDw> stencil;
+                constexpr int SIZE = nanovdb::WenoStencil<SIMDw>::size();
+
+                const float* const scIn  = sidecar.data();
+                float*       const scOut = outputSidecar.data();
+
+                for (size_t bID = range.begin(); bID != range.end(); ++bID) {
+                    CPUVBM::decodeInverseMaps(
+                        grid, firstLeafID[bID],
+                        &jumpMap[bID * CPUVBM::JumpMapLength],
+                        firstOffset + bID * BlockWidth,
+                        leafIndex, voxelOffset);
+
+                    int nExtraLeaves = 0;
+                    for (int w = 0; w < CPUVBM::JumpMapLength; ++w)
+                        nExtraLeaves += nanovdb::util::countOn(
+                            jumpMap[bID * CPUVBM::JumpMapLength + w]);
+
+                    SAccT stencilAcc(*grid, firstLeafID[bID], (uint32_t)nExtraLeaves);
+                    const uint64_t blockBase =
+                        firstOffset + (uint64_t)bID * BlockWidth;
+
+                    for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
+                        stencilAcc.moveTo(leafIndex + batchStart, voxelOffset + batchStart);
+
+                        for (int k = 0; k < SIZE; ++k) {
+                            for (int i = 0; i < SIMDw; ++i) {
+                                const uint64_t idx = stencilAcc.mIndices[k][i];
+                                stencil.mValues  [k][i] = scIn[idx];
+                                stencil.mIsActive[k][i] = (idx != 0);
+                            }
+                        }
+
+                        stencil.extrapolate(absBackground);
+
+                        for (int i = 0; i < SIMDw; ++i) {
+                            const int p = batchStart + i;
+                            if (leafIndex[p] == CPUVBM::UnusedLeafIndex) continue;
+                            float sum = 0.f;
+                            for (int k = 0; k < SIZE; ++k)
+                                sum += stencil.mValues[k][i];
+                            scOut[blockBase + p] = sum;
+                        }
+                    }
+                }
+            });
+    });
+
+    sidecarStencilExtrapChecksum =
+        std::accumulate(outputSidecar.begin(), outputSidecar.end(), uint64_t(0),
+            [](uint64_t a, float b) {
+                uint32_t bits;
+                std::memcpy(&bits, &b, sizeof(bits));
+                return a ^ uint64_t(bits);
+            });
+    }  // end wantPass("sidecar-stencil-extrap")
+
     // ---- sidecar-transposed: tap-outer fill via direct ReadAccessor ----
     // Mirrors `legacy-transposed`'s loop structure, but instead of summing
     // uint64 indices into a per-voxel accumulator, the tap-outer loop fills
@@ -922,6 +1002,9 @@ static void runPerf(
     std::printf("  Sidecar (stencil)     : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
         sidecarStencilUs / 1e3, sidecarStencilUs * 1e3 / double(nVoxels),
         (sidecarStencilUs - decodeUs) / 1e3, sidecarStencilChecksum);
+    std::printf("  Sidecar (stencil+extrap): %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
+        sidecarStencilExtrapUs / 1e3, sidecarStencilExtrapUs * 1e3 / double(nVoxels),
+        (sidecarStencilExtrapUs - decodeUs) / 1e3, sidecarStencilExtrapChecksum);
     std::printf("  Sidecar (transposed)  : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
         sidecarXposedUs / 1e3, sidecarXposedUs * 1e3 / double(nVoxels),
         (sidecarXposedUs - decodeUs) / 1e3, sidecarXposedChecksum);
@@ -957,7 +1040,8 @@ static void printUsage(const char* argv0)
         << "  --pass=<name>        Run one perf pass:\n"
         << "                         all (default), verify, decode, stencil,\n"
         << "                         framing, legacy, legacy-transposed,\n"
-        << "                         sidecar-legacy, sidecar-stencil, sidecar-transposed\n"
+        << "                         sidecar-legacy, sidecar-stencil,\n"
+        << "                         sidecar-stencil-extrap, sidecar-transposed\n"
         << "  --threads=<n>        Limit TBB parallelism (0 = TBB default)\n"
         << "  --skip-validation    Skip the sidecar ordering sanity check\n";
 }
