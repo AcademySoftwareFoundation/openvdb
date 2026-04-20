@@ -142,6 +142,10 @@ public:
     /// pointers will be stored to load the data lazily.
     void readBuffers(std::istream&, bool delayed);
 
+    /// @brief Skip the Page buffers by seeking past the compressed data
+    /// without reading or decompressing it.
+    void skipBuffers(std::istream&);
+
     OPENVDB_DEPRECATED_MESSAGE("Always returns false. This method is deprecated and will be removed. Delayed loading is no longer supported.")
     bool isOutOfCore() const { return false; }
 
@@ -221,6 +225,10 @@ public:
     /// current stream pointer position and if @a delayed is false performs
     /// an immediate read of the data.
     void read(PageHandle::Ptr& pageHandle, std::streamsize n, bool delayed = true);
+
+    /// @brief Skip past the page data referenced by @a pageHandle without
+    /// reading or decompressing it.
+    void skip(PageHandle::Ptr& pageHandle, std::streamsize n);
 
 private:
     int mByteIndex = 0;
