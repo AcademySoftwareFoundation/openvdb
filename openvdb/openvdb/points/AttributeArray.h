@@ -308,6 +308,9 @@ public:
 
     /// Read attribute buffers from a paged stream.
     virtual void readPagedBuffers(compression::PagedInputStream&) = 0;
+    /// Skip attribute buffers in a paged stream without reading or
+    /// allocating any data.
+    void skipPagedBuffers(compression::PagedInputStream&);
     /// Write attribute buffers to a paged stream.
     /// @param outputTransient if true, write out transient attributes
     virtual void writePagedBuffers(compression::PagedOutputStream&, bool outputTransient) const = 0;
@@ -1591,6 +1594,43 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
     is.read(mPageHandle, std::streamsize(mPageHandle->size()), false);
     std::unique_ptr<char[]> buffer = mPageHandle->read();
     mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
+    mPageHandle.reset();
+
+    // clear page state
+
+    mUsePagedRead = 0;
+}
+
+
+inline void
+AttributeArray::skipPagedBuffers(compression::PagedInputStream& is)
+{
+    if (!mUsePagedRead) {
+        if (!is.sizeOnly()) {
+            // for non-paged data, seek past the raw data in the stream
+            std::istream& inputStream = is.getInputStream();
+            uint8_t bloscCompressed(0);
+            if (!mIsUniform)    inputStream.read(reinterpret_cast<char*>(&bloscCompressed), sizeof(uint8_t));
+            inputStream.seekg(mCompressedBytes, std::ios_base::cur);
+            mCompressedBytes = 0;
+            mFlags = static_cast<uint8_t>(mFlags & ~PARTIALREAD);
+        }
+        return;
+    }
+
+    if (is.sizeOnly())
+    {
+        size_t compressedBytes(mCompressedBytes);
+        mCompressedBytes = 0;
+        mFlags = static_cast<uint8_t>(mFlags & ~PARTIALREAD);
+        OPENVDB_ASSERT(!mPageHandle);
+        mPageHandle = is.createHandle(compressedBytes);
+        return;
+    }
+
+    OPENVDB_ASSERT(mPageHandle);
+
+    is.skip(mPageHandle, std::streamsize(mPageHandle->size()));
     mPageHandle.reset();
 
     // clear page state

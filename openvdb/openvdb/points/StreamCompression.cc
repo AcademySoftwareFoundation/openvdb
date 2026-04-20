@@ -339,6 +339,21 @@ Page::readBuffers(std::istream&is, bool delayed)
 
 
 void
+Page::skipBuffers(std::istream& is)
+{
+    OPENVDB_ASSERT(mInfo);
+
+    bool isCompressed = mInfo->compressedBytes > 0;
+    std::streamsize bytes = isCompressed ?
+        mInfo->compressedBytes : -mInfo->compressedBytes;
+
+    is.seekg(bytes, std::ios_base::cur);
+
+    mInfo.reset();
+}
+
+
+void
 Page::copy(const std::unique_ptr<char[]>& temp, int pageSize)
 {
     mData.reset(new char[pageSize]);
@@ -431,6 +446,23 @@ PagedInputStream::read(PageHandle::Ptr& pageHandle, std::streamsize n, bool dela
     if (mByteIndex == mUncompressedBytes) {
         mUncompressedBytes = static_cast<int>(page.uncompressedBytes());
         page.readBuffers(*mIs, delayed);
+        mByteIndex = 0;
+    }
+
+    mByteIndex += int(n);
+}
+
+
+void
+PagedInputStream::skip(PageHandle::Ptr& pageHandle, std::streamsize n)
+{
+    OPENVDB_ASSERT(mByteIndex <= mUncompressedBytes);
+
+    Page& page = pageHandle->page();
+
+    if (mByteIndex == mUncompressedBytes) {
+        mUncompressedBytes = static_cast<int>(page.uncompressedBytes());
+        page.skipBuffers(*mIs);
         mByteIndex = 0;
     }
 
