@@ -3,7 +3,9 @@
 
 #include "Codec.h"
 
+#include <openvdb/codecs/ScalarCodec.h>
 #include <openvdb/codecs/BoolCodec.h>
+#include <openvdb/codecs/ValueMaskCodec.h>
 
 #include <openvdb/openvdb.h>
 
@@ -37,9 +39,16 @@ getCodecRegistry()
 
 namespace internal {
 
+template <typename GridT>
+struct RegisterCodec { inline void operator()() { CodecRegistry::registerCodec<codecs::ScalarCodec<GridT>>(); } };
+
 void initialize()
 {
+    NumericGridTypes::foreach<RegisterCodec>();
+    Vec3GridTypes::foreach<RegisterCodec>();
+
     CodecRegistry::registerCodec<codecs::BoolCodec<BoolGrid>>();
+    CodecRegistry::registerCodec<codecs::ValueMaskCodec<MaskGrid>>();
 }
 
 void uninitialize()
