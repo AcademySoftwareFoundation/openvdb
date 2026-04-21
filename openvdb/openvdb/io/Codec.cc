@@ -42,6 +42,15 @@ namespace internal {
 template <typename GridT>
 struct RegisterCodec { inline void operator()() { CodecRegistry::registerCodec<codecs::ScalarCodec<GridT>>(); } };
 
+template <typename GridT>
+struct RegisterConvertCodec {
+    inline void operator()()
+    {
+        CodecRegistry::registerCodec<codecs::ScalarCodec<MaskGrid, GridT, CodecMode::ReadOnly>>();
+        CodecRegistry::registerCodec<codecs::ScalarCodec<BoolGrid, GridT, CodecMode::ReadOnly>>();
+    }
+}; // struct RegisterConvertCodec
+
 void initialize()
 {
     NumericGridTypes::foreach<RegisterCodec>();
@@ -49,6 +58,12 @@ void initialize()
 
     CodecRegistry::registerCodec<codecs::BoolCodec<BoolGrid>>();
     CodecRegistry::registerCodec<codecs::ValueMaskCodec<MaskGrid>>();
+
+    // register the plugin that converts from scalar to mask/bool
+    NumericGridTypes::foreach<RegisterConvertCodec>();
+
+    // register the plugin that converts from float to half
+    CodecRegistry::registerCodec<codecs::ScalarCodec<HalfGrid, FloatGrid, CodecMode::ReadOnly>>();
 }
 
 void uninitialize()
