@@ -1004,6 +1004,7 @@ TestAttributeSet::testAttributeSet()
     openvdb::MetaMap& meta = attrSetA.descriptor().getMetadata();
     meta.insertMeta("exampleMeta", openvdb::FloatMetadata(2.0));
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     { // I/O test
         std::ostringstream ostr(std::ios_base::binary);
         attrSetA.write(ostr);
@@ -1039,6 +1040,7 @@ TestAttributeSet::testAttributeSet()
 
         EXPECT_EQ(attrSetC.size(), size_t(2));
     }
+#endif // OPENVDB_ENABLE_TREE_IO
 }
 TEST_F(TestAttributeSet, testAttributeSet) { testAttributeSet(); }
 

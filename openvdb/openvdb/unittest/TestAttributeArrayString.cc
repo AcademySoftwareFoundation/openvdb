@@ -279,6 +279,7 @@ TEST_F(TestAttributeArrayString, testStringAttribute)
         EXPECT_TRUE(!baseAttr.valueTypeIsFloatingPoint());
     }
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     { // IO
         const Index count = 50;
         StringAttributeArray attrA(count);
@@ -309,6 +310,7 @@ TEST_F(TestAttributeArrayString, testStringAttribute)
             EXPECT_EQ(attrA.get(i), attrB.get(i));
         }
     }
+#endif // OPENVDB_ENABLE_TREE_IO
 }
 
 

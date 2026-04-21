@@ -378,6 +378,7 @@ public:
     const Buffer& buffer() const { return mBuffer; }
     Buffer& buffer() { return mBuffer; }
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     //
     // I/O methods
     //
@@ -403,6 +404,7 @@ public:
     /// @param os      the stream to which to write
     /// @param toHalf  if true, output floating-point values as 16-bit half floats
     void writeBuffers(std::ostream& os, bool toHalf = false) const;
+#endif // OPENVDB_ENABLE_TREE_IO
 
     size_t streamingSize(bool toHalf = false) const;
 
@@ -921,7 +923,9 @@ protected:
     void setValueMaskOn(Index n)  { mValueMask.setOn(n); }
     void setValueMaskOff(Index n) { mValueMask.setOff(n); }
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     inline void skipCompressedValues(bool seekable, std::istream&, bool fromHalf);
+#endif // OPENVDB_ENABLE_TREE_IO
 
     /// Compute the origin of the leaf node that contains the voxel with the given coordinates.
     static void evalNodeOrigin(Coord& xyz) { xyz &= ~(DIM - 1); }
@@ -1319,6 +1323,8 @@ LeafNode<T, Log2Dim>::copyFromDense(const CoordBBox& bbox, const DenseT& dense,
 ////////////////////////////////////////
 
 
+#ifdef OPENVDB_ENABLE_TREE_IO
+
 template<typename T, Index Log2Dim>
 inline void
 LeafNode<T, Log2Dim>::readTopology(std::istream& is, bool /*fromHalf*/)
@@ -1425,6 +1431,8 @@ LeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
     io::writeCompressedValues(os, mBuffer.mData, SIZE,
         mValueMask, /*childMask=*/NodeMaskType(), toHalf);
 }
+
+#endif // OPENVDB_ENABLE_TREE_IO
 
 
 ////////////////////////////////////////

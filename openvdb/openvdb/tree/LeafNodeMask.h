@@ -199,6 +199,7 @@ public:
     const Buffer& buffer() const { return mBuffer; }
     Buffer& buffer() { return mBuffer; }
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     //
     // I/O methods
     //
@@ -212,6 +213,7 @@ public:
     void readBuffers(std::istream& is, const CoordBBox&, bool fromHalf = false);
     /// Write out the topology and the origin.
     void writeBuffers(std::ostream&, bool toHalf = false) const;
+#endif // OPENVDB_ENABLE_TREE_IO
 
     //
     // Accessor methods
@@ -962,6 +964,8 @@ LeafNode<ValueMask, Log2Dim>::offsetToGlobalCoord(Index n) const
 ////////////////////////////////////////
 
 
+#ifdef OPENVDB_ENABLE_TREE_IO
+
 template<Index Log2Dim>
 inline void
 LeafNode<ValueMask, Log2Dim>::readTopology(std::istream& is, bool /*fromHalf*/)
@@ -1016,6 +1020,8 @@ LeafNode<ValueMask, Log2Dim>::writeBuffers(std::ostream& os, bool /*toHalf*/) co
     // Write out the origin.
     os.write(reinterpret_cast<const char*>(&mOrigin), sizeof(Coord::ValueType) * 3);
 }
+
+#endif // OPENVDB_ENABLE_TREE_IO
 
 
 ////////////////////////////////////////

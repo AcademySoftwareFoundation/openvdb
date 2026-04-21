@@ -148,6 +148,21 @@
 #cmakedefine OPENVDB_USE_EXPLICIT_INSTANTIATION
 #endif
 
+/* Denotes whether VDB was built with Tree I/O support */
+#ifndef OPENVDB_ENABLE_TREE_IO
+#cmakedefine OPENVDB_ENABLE_TREE_IO
+#endif
+
+/* Macro for virtual functions that are pure (=0) or deleted based on Tree I/O and ABI.
+ * On Itanium C++ ABI platforms (Linux, macOS), virtual functions are marked deleted when
+ * Tree I/O is disabled. On Windows, all Tree I/O methods are disabled, but Grid virtual
+ * methods are left as pure virtual to avoid ABI issues. */
+#if (defined(__GNUC__) || defined(__clang__)) && !defined(OPENVDB_ENABLE_TREE_IO)
+#define OPENVDB_TREE_IO_VIRTUAL delete
+#else
+#define OPENVDB_TREE_IO_VIRTUAL 0
+#endif
+
 /* Defines the macros for explicit template declarations. */
 #define OPENVDB_INSTANTIATE extern template OPENVDB_TEMPLATE_IMPORT
 #define OPENVDB_INSTANTIATE_CLASS extern template class OPENVDB_TEMPLATE_IMPORT

@@ -60,17 +60,23 @@ public:
 
     TreeBasePtr copy() const override { return TreeBasePtr(new ProxyTree(*this)); }
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     void readTopology(std::istream& is, bool = false) override { is.seekg(0, std::ios::beg); }
     void writeTopology(std::ostream& os, bool = false) const override { os.seekp(0); }
 
     void readBuffers(std::istream& is,
         const openvdb::CoordBBox&, bool /*saveFloatAsHalf*/=false) override { is.seekg(0); }
+#endif
+
 #if OPENVDB_ABI_VERSION_NUMBER < 14
     void readNonresidentBuffers() const override {}
 #endif
+
+#ifdef OPENVDB_ENABLE_TREE_IO
     void readBuffers(std::istream& is, bool /*saveFloatAsHalf*/=false) override { is.seekg(0); }
     void writeBuffers(std::ostream& os, bool /*saveFloatAsHalf*/=false) const override
         { os.seekp(0, std::ios::beg); }
+#endif // OPENVDB_ENABLE_TREE_IO
 
     bool empty() const { return true; }
     void clear() {}
