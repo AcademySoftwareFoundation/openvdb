@@ -38,6 +38,9 @@ enum class CodecMode {
 
 enum class ReadMode {
     Original,      // Read data as-is (default)
+    Half,          // Read data as half precision
+    Bool,          // Read data as boolean
+    Mask,          // Read data as mask
     TopologyOnly   // Read topology only, no buffer data
 };
 
