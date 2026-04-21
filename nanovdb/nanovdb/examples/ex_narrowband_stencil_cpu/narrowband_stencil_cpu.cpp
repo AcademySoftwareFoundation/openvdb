@@ -368,7 +368,8 @@ static void runPerf(
     // wantPass(<name>) returns true if this pass should run under the current filter.
     // Supported names: "decode", "stencil", "framing", "legacy",
     //                  "sidecar-legacy", "sidecar-stencil", "sidecar-stencil-extrap",
-    //                  "sidecar-transposed", "legacy-transposed".
+    //                  "sidecar-stencil-normsqgrad", "sidecar-transposed",
+    //                  "legacy-transposed".
     // "all" runs everything.
     auto wantPass = [&](const char* name) {
         return passFilter == "all" || passFilter == name;
@@ -825,6 +826,100 @@ static void runPerf(
             });
     }  // end wantPass("sidecar-stencil-extrap")
 
+    // ---- sidecar-stencil-normsqgrad: full Phase-2+3 pipeline ----
+    // load → extrapolate → normSqGrad → store.  Same Phase-2 front end as
+    // sidecar-stencil-extrap, but the 19-tap token sum is replaced by the
+    // real Phase-3 arithmetic: Godunov's fifth-order WENO upwind
+    // norm-square gradient.  The per-voxel `|∇φ|²` goes straight into the
+    // output sidecar — no debug intermediate.
+    //
+    // Grid voxel size from grid->voxelSize()[0] (isotropic assumption for
+    // narrow-band SDFs).  iso = 0 (zero-crossing is the surface).
+    double sidecarStencilNormSqGradUs = 0.0;
+    uint64_t sidecarStencilNormSqGradChecksum = 0;
+    if (wantPass("sidecar-stencil-normsqgrad")) {
+    std::fill(outputSidecar.begin(), outputSidecar.end(), 0.f);
+
+    const float absBackground = std::abs(sidecar[0]);
+    const float dx            = float(grid->voxelSize()[0]);
+
+    sidecarStencilNormSqGradUs = timeForEach([&] {
+        nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
+            [&](const nanovdb::util::Range1D& range) {
+                alignas(64) uint32_t leafIndex[BlockWidth];
+                alignas(64) uint16_t voxelOffset[BlockWidth];
+
+                alignas(64) float raw_values[nanovdb::WenoStencil<SIMDw>::size()][SIMDw];
+                alignas(64) bool  raw_active[nanovdb::WenoStencil<SIMDw>::size()][SIMDw];
+
+                nanovdb::WenoStencil<SIMDw> stencil(dx);
+                constexpr int SIZE = nanovdb::WenoStencil<SIMDw>::size();
+                using FloatV = nanovdb::util::Simd    <float, SIMDw>;
+                using MaskV  = nanovdb::util::SimdMask<float, SIMDw>;
+
+                const float* const scIn  = sidecar.data();
+                float*       const scOut = outputSidecar.data();
+
+                for (size_t bID = range.begin(); bID != range.end(); ++bID) {
+                    CPUVBM::decodeInverseMaps(
+                        grid, firstLeafID[bID],
+                        &jumpMap[bID * CPUVBM::JumpMapLength],
+                        firstOffset + bID * BlockWidth,
+                        leafIndex, voxelOffset);
+
+                    int nExtraLeaves = 0;
+                    for (int w = 0; w < CPUVBM::JumpMapLength; ++w)
+                        nExtraLeaves += nanovdb::util::countOn(
+                            jumpMap[bID * CPUVBM::JumpMapLength + w]);
+
+                    SAccT stencilAcc(*grid, firstLeafID[bID], (uint32_t)nExtraLeaves);
+                    const uint64_t blockBase =
+                        firstOffset + (uint64_t)bID * BlockWidth;
+
+                    for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
+                        stencilAcc.moveTo(leafIndex + batchStart, voxelOffset + batchStart);
+
+                        // Fill — scalar scatter from sidecar into caller-owned raw C arrays.
+                        for (int k = 0; k < SIZE; ++k) {
+                            for (int i = 0; i < SIMDw; ++i) {
+                                const uint64_t idx = stencilAcc.mIndices[k][i];
+                                raw_values[k][i] = scIn[idx];
+                                raw_active[k][i] = (idx != 0);
+                            }
+                        }
+
+                        // Load — per-tap SIMD load into stencil's compute view.
+                        for (int k = 0; k < SIZE; ++k) {
+                            stencil.values  [k] = FloatV(raw_values[k], nanovdb::util::element_aligned);
+                            stencil.isActive[k] = MaskV (raw_active[k], nanovdb::util::element_aligned);
+                        }
+
+                        // Phase-3 arithmetic (in-place on stencil.values[], then reduce).
+                        stencil.extrapolate(absBackground);
+                        const FloatV result = stencil.normSqGrad(/* iso = */ 0.f);
+
+                        // Simd → scalar bridge; per-lane scalar write to output sidecar.
+                        alignas(64) float result_lanes[SIMDw];
+                        nanovdb::util::store(result, result_lanes, nanovdb::util::element_aligned);
+                        for (int i = 0; i < SIMDw; ++i) {
+                            const int p = batchStart + i;
+                            if (leafIndex[p] == CPUVBM::UnusedLeafIndex) continue;
+                            scOut[blockBase + p] = result_lanes[i];
+                        }
+                    }
+                }
+            });
+    });
+
+    sidecarStencilNormSqGradChecksum =
+        std::accumulate(outputSidecar.begin(), outputSidecar.end(), uint64_t(0),
+            [](uint64_t a, float b) {
+                uint32_t bits;
+                std::memcpy(&bits, &b, sizeof(bits));
+                return a ^ uint64_t(bits);
+            });
+    }  // end wantPass("sidecar-stencil-normsqgrad")
+
     // ---- sidecar-transposed: tap-outer fill via direct ReadAccessor ----
     // Mirrors `legacy-transposed`'s loop structure, but instead of summing
     // uint64 indices into a per-voxel accumulator, the tap-outer loop fills
@@ -1027,6 +1122,9 @@ static void runPerf(
     std::printf("  Sidecar (stencil+extrap): %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
         sidecarStencilExtrapUs / 1e3, sidecarStencilExtrapUs * 1e3 / double(nVoxels),
         (sidecarStencilExtrapUs - decodeUs) / 1e3, sidecarStencilExtrapChecksum);
+    std::printf("  Sidecar (+normSqGrad) : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
+        sidecarStencilNormSqGradUs / 1e3, sidecarStencilNormSqGradUs * 1e3 / double(nVoxels),
+        (sidecarStencilNormSqGradUs - decodeUs) / 1e3, sidecarStencilNormSqGradChecksum);
     std::printf("  Sidecar (transposed)  : %7.1f ms  (%5.1f ns/voxel)  [%+5.1f ms over decode]  checksum=0x%016lx\n",
         sidecarXposedUs / 1e3, sidecarXposedUs * 1e3 / double(nVoxels),
         (sidecarXposedUs - decodeUs) / 1e3, sidecarXposedChecksum);
@@ -1063,7 +1161,8 @@ static void printUsage(const char* argv0)
         << "                         all (default), verify, decode, stencil,\n"
         << "                         framing, legacy, legacy-transposed,\n"
         << "                         sidecar-legacy, sidecar-stencil,\n"
-        << "                         sidecar-stencil-extrap, sidecar-transposed\n"
+        << "                         sidecar-stencil-extrap,\n"
+        << "                         sidecar-stencil-normsqgrad, sidecar-transposed\n"
         << "  --threads=<n>        Limit TBB parallelism (0 = TBB default)\n"
         << "  --skip-validation    Skip the sidecar ordering sanity check\n";
 }
