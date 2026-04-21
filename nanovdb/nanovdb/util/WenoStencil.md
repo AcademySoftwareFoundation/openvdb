@@ -2,131 +2,143 @@
 
 Design reference for `nanovdb/nanovdb/util/WenoStencil.h`.  Captures the
 rationale behind the templated-on-lane-width class, the out-of-band
-extrapolation algorithm, and the relationship to the broader Phase-2
-pipeline sketched in `BatchAccessor.md §11`.
+extrapolation algorithm, the Godunov norm-square-gradient method, and the
+relationship to the broader Phase-2 pipeline sketched in
+`BatchAccessor.md §11`.
 
 ---
 
 ## 1.  Motivation
 
-The WENO5 CPU pipeline (`BatchAccessor.md §11`) produces a per-batch
-matrix of 19 tap values per voxel:
+The WENO5 CPU pipeline (`BatchAccessor.md §11`) assembles, per voxel
+batch, a 19-tap value matrix with per-tap activity flags:
 
 ```
 float  values[Ntaps][W]     -- real sidecar value, or background for OOB lanes
 bool   isActive[Ntaps][W]   -- true iff the tap voxel is in the narrow band
 ```
 
-The next pipeline phase consumes `values[tap][lane]` as 19 `Simd<float, W>`
-rows for the WENO5 reconstruction arithmetic.  But before arithmetic,
-out-of-band lanes must be repaired so that `values[tap][lane]` holds a
-sensible float for every lane, not just the in-band ones.  That repair
-is the **extrapolation** step.
+Downstream phases are (1) **extrapolation** to repair out-of-band lanes
+with sign-corrected background, and (2) **WENO5 arithmetic** (the fifth-
+order upwind Godunov norm-square-gradient) to produce a per-voxel
+`|∇φ|²` scalar.
 
-`WenoStencil<W>` encapsulates:
+`WenoStencil<W>` encapsulates the compute state and both operations:
 
-1. Storage for the 19-tap × W-lane data + activity flags.
-2. The extrapolation algorithm (ascending-|Δ| cascade, hardcoded tap pairs).
-3. A pattern that keeps GPU (W=1) code textually identical to CPU SIMD
-   (W>1) code — only the storage shapes and the Simd.h backend differ.
+1. Storage of the 19-tap × W-lane Simd values + activity masks.
+2. `extrapolate()` — ascending-|Δ| cascade, hardcoded tap pairs.
+3. `normSqGrad()` — six axial WENO5 reconstructions + Godunov combinator.
+4. A single-source pattern that keeps GPU (W=1, per-thread) code
+   textually identical to CPU SIMD (W>1) code — only the compile-time
+   lane width changes.
 
 ---
 
 ## 2.  Single-source scalar/SIMD design
 
-### 2.1  The conditional_t storage trick
+### 2.1  `Simd<T, W>` as the storage type
+
+Storage is `Simd<float, W>` / `SimdMask<float, W>` directly — *not* raw
+`float[W]` / `bool[W]` arrays:
 
 ```cpp
 template<int W = 1>
 class WenoStencil
 {
 public:
-    using ValueT = std::conditional_t<W == 1, float, float[W]>;
-    using PredT  = std::conditional_t<W == 1, bool,  bool[W]>;
+    using FloatV = util::Simd    <float, W>;
+    using MaskV  = util::SimdMask<float, W>;
 
-    alignas(64) ValueT mValues  [SIZE];
-    alignas(64) PredT  mIsActive[SIZE];
-    /* ... */
+    FloatV values  [SIZE];
+    MaskV  isActive[SIZE];
+
+    float mDx2{1.f};       // dx²      — scalar, broadcast on use
+    float mInvDx2{1.f};    // 1 / dx²  — scalar, broadcast on use
+    /* ... extrapolate(), normSqGrad() ... */
 };
 ```
 
-| W | `mValues` expands to | `mIsActive` expands to | Intended use |
-|---|---|---|---|
-| 1    | `float mValues[19]`         | `bool mIsActive[19]`        | GPU thread-per-voxel — 19 scalar registers |
-| 16   | `float mValues[19][16]`     | `bool mIsActive[19][16]`    | CPU SIMD batch — 19 YMM-tiles in L1 |
+At W=1 the Simd types collapse to plain `float` / `bool` under the
+array backend.  At W>1 they are the backend-native SIMD type (stdx or
+array wrapper).  Memory layout at W>1 is identical to `float[SIZE][W]`
+directly, so there is no storage-cost penalty — just a cleaner
+compute-side type.
 
-Same declaration syntax, different expansion.  Memory layout at W>1 is
-identical to writing `float mValues[SIZE][W]` directly — no performance
-difference, just a cleaner scalar case at W=1.
+### 2.2  Why first-class Simd storage (vs raw C arrays + `addr()` bridge)
 
-### 2.2  Why the same source compiles to good scalar and SIMD code
+An earlier version used `std::conditional_t<W==1, float, float[W]>` as
+the element type, with an `addr()` helper to normalize the W=1 scalar-
+reference vs W>1 array-decay at every SIMD load/store site.  That
+design was rejected in favour of Simd-typed storage for three reasons:
 
-`extrapolate()`'s body uses only `nanovdb::util::Simd<float, W>` primitives:
+- **W=1 ceremony**.  Approach 1 forced the scalar case to read
+  `FloatV val(addr(mValues[k]), element_aligned)` — loading a
+  `Simd<float, 1>` from a scalar reference.  On the CUDA per-thread
+  path (where the scalar case is the *production* pipeline, not a
+  degenerate convenience) this ceremony survives into every
+  `__hostdev__` method that reads the stencil.  Under Simd-typed
+  storage, W=1 reads `FloatV val = values[k]` — pure scalar code.
 
-- load / store (ctor + free `store`)
-- `operator>` (produces `SimdMask<float, W>`)
-- unary `operator-`
-- `where(mask, a, b)` — 3-arg blend
+- **Arithmetic boundary ceremony**.  Approach 1 made `extrapolate()`
+  and a prospective `normSqGrad()` bracket every read/write with an
+  explicit Simd load or store.  With Simd-typed storage, the
+  arithmetic reads as if scalar (`values[k] = util::where(...)`) and
+  the load/store boundary moves out to the caller where the Simd
+  values meet raw fill-side buffers.
 
-All of these exist in Simd.h's scalar degenerate (`fixed_size<1>` in the
-stdx backend, 1-element array in the array backend).  At W=1 the
-compiler inlines and collapses every operation to a plain scalar
-instruction.  **One source body, two target ISAs, no `if constexpr`
-branches on W inside the algorithm.**
+- **Symmetric, explicit boundary placement**.  The caller already owns
+  the fill-side scalar-scatter loop (sidecar `sidecar[idx]` gathers are
+  inherently scalar-indexed per lane).  Making the array→Simd
+  conversion an explicit caller-side step (`FloatV(raw_values[k],
+  element_aligned)`) preserves that ownership — the arithmetic class
+  doesn't care where its data came from.
+
+### 2.3  Scalar runtime constants, broadcast on use
+
+`mDx2` and `mInvDx2` stay plain `float` at every W.  They are
+broadcast to `FloatV` at the point of use inside `normSqGrad()`:
+
+```cpp
+return FloatV(mInvDx2) * detail::GodunovsNormSqrd<FloatV, MaskV>(...);
+```
+
+`vbroadcastss` is free on x86 (folds into the FMA consumer); identity
+at W=1.  Storing these as `Simd<float, W>` instead would cost 64
+bytes × 2 of storage and hold two YMM registers across the entire
+kernel lifetime for no benefit.
+
+### 2.4  Caller-owned fill-side buffers
+
+The class has **no** fill-side storage — no `mValues`/`mIsActive` raw C
+arrays.  Callers own whatever shape of raw data is natural for them.
+For the CPU SIMD case that's typically a pair of stack-local
+`alignas(64)` C arrays sized `[SIZE][W]`; for the CUDA per-thread case
+no intermediate buffer is needed at all.
+
+This preserves the arithmetic class's purity and gives callers flex-
+ibility — a different Phase-2 path (e.g. a halo-based fetch, or a
+future hardware-gather fill) can populate the stencil using whatever
+pattern fits, without the class having to expose a "fill API" that
+bakes in one shape.
 
 ---
 
-## 3.  The `addr()` bridge
+## 3.  Extrapolation semantics
 
-One asymmetry survives the `conditional_t` unification: at W=1,
-`mValues[k]` is a scalar `float` value (not an array), so it does not
-decay to `float*` — `Simd<float,1>::load(mValues[k], flags)` wouldn't
-type-check.  At W>1, `mValues[k]` is a `float[W]` array and decays
-naturally.
-
-A private `addr()` helper papers over this in one place:
-
-```cpp
-static constexpr float* addr(ValueT& v) noexcept {
-    if constexpr (W == 1) return &v; else return v;
-}
-```
-
-Callers (inside `extrapolate()`) always write:
-
-```cpp
-FloatV val(addr(mValues[k]), element_aligned);
-```
-
-and get a uniform expression that works at any W.  There are four
-overloads (`ValueT&` / `const ValueT&` / `PredT&` / `const PredT&`);
-all are `constexpr` and compile to a no-op at W>1 and a trivial address
-fetch at W=1.
-
-**Alternative considered (rejected):** overloading `Simd<T,W>::load`
-to accept `T&` at W=1.  Blocked by the stdx backend's type-alias
-representation (`using Simd = stdx::fixed_size_simd`) — we can't add
-member ctors to an alias.  The equivalent free-function workaround
-turned out no shorter than the `addr()` helper and would have forced
-Simd.h churn for a benefit scoped to one class.  See the Stage-3 design
-exchange for the full discussion.
-
----
-
-## 4.  Extrapolation semantics
-
-### 4.1  The out-of-band problem
+### 3.1  The out-of-band problem
 
 For a narrow-band SDF, only the center tap `<0,0,0>` is guaranteed to
 be in the active narrow band.  Every other tap may land outside the
-band for some lanes of a batch — for those lanes, `idx == 0` in the
-sidecar fill, so `values[k][lane] = sidecar[0] = |background|` and
+band for some lanes — for those lanes the sidecar fill writes
+`values[k][lane] = sidecar[0]` (magnitude of the background, since the
+sidecar builder pre-sets slot 0 to `floatGrid.background()`) and
 `isActive[k][lane] = false`.
 
-Applying WENO5 arithmetic directly to the `|background|` magnitude
-produces wrong gradients at the band boundary: the reconstructed field
-would not track the sign of the underlying signed distance function.
-The standard fix is to **extrapolate from the next inner tap's sign**:
+Applying WENO5 arithmetic directly to the unsigned `|background|`
+magnitude produces wrong gradients at the band boundary: the
+reconstructed field would not track the sign of the underlying signed-
+distance function.  The standard fix is to **extrapolate from the next
+inner tap's sign**:
 
 ```
 if (!isActive[k][lane])
@@ -135,9 +147,9 @@ if (!isActive[k][lane])
 
 The `|background|` magnitude is preserved; the sign is copied from
 whichever "inner" tap (one step closer to center along the same axis)
-best represents which side of the surface this lane belongs to.
+best represents which side of the surface the lane belongs to.
 
-### 4.2  Inner-tap cascade — ascending |Δ| order
+### 3.2  Inner-tap cascade — ascending |Δ| order
 
 | Outer tap |Δ| | Inner tap (source of sign) |
 |---|---|
@@ -146,18 +158,17 @@ best represents which side of the surface this lane belongs to.
 | `<±3,0,0>`, `<0,±3,0>`, `<0,0,±3>` | `<±2,0,0>`, `<0,±2,0>`, `<0,0,±2>` |
 
 Processing taps in ascending-|Δ| order guarantees the inner tap is
-already resolved (real value or previously extrapolated) when the outer
-tap is processed.  Sign propagation through a |Δ|=1 → |Δ|=2 → |Δ|=3
-chain is automatic — no special casing.
+already resolved (real value or previously extrapolated) when the
+outer tap is processed.  Sign propagation through a |Δ|=1 → |Δ|=2 →
+|Δ|=3 chain is transitive — no special casing.
 
-### 4.3  The `kPairs[]` table
+### 3.3  The `kPairs[]` table
 
 The inner-tap relationship is `Weno5Stencil`-specific and hardcoded as
 a static table inside the class:
 
 ```cpp
-static constexpr int kNumPairs = 18;
-static constexpr int kPairs[kNumPairs][2] = {
+static constexpr int kPairs[18][2] = {
     // |Δ|=1 (inner = center, idx 0)
     {3,0},{4,0},{9,0},{10,0},{15,0},{16,0},
     // |Δ|=2 (inner = |Δ|=1 on same axis)
@@ -168,147 +179,254 @@ static constexpr int kPairs[kNumPairs][2] = {
 ```
 
 Indices match the tuple ordering in `Weno5Stencil::Taps`
-(`StencilAccessor.h`).  Center tap (idx 0) is not processed — assumed
-always in-band.
+(`StencilAccessor.h`) and `WenoPt<i,j,k>::idx` in
+`nanovdb/math/Stencils.h`.  Center tap (idx 0) is not processed —
+assumed always in-band.
 
 **Why hardcoded, not template-derived:**  a generic scheme would walk
 `Weno5Stencil::Taps` at compile time and derive inner-tap indices from
-|Δ| and axis alignment.  For a single stencil (Weno5) this is
-over-engineering: the table is 18 entries, reads directly, and makes
-the cascade ordering self-documenting.  Worth revisiting if we add
-Weno7 or other axis-aligned WENO variants.
+|Δ| and axis alignment.  For a single stencil the table is 18 entries,
+reads directly, and makes the cascade ordering self-documenting.
+Worth revisiting if we add Weno7 or other axis-aligned WENO variants.
 
----
-
-## 5.  Extrapolate — implementation
+### 3.4  `extrapolate()` implementation
 
 ```cpp
 template<int W>
 void WenoStencil<W>::extrapolate(float absBackground)
 {
-    using FloatV = nanovdb::util::Simd    <float, W>;
-    using MaskV  = nanovdb::util::SimdMask<float, W>;
-
     const FloatV absBg(absBackground);
-    const FloatV zero (0.0f);
+    const FloatV zero (0.f);
 
     for (int p = 0; p < kNumPairs; ++p) {
         const int k      = kPairs[p][0];
         const int kInner = kPairs[p][1];
 
-        const MaskV  active(addr(mIsActive[k]),      element_aligned);
-        const FloatV val   (addr(mValues  [k]),      element_aligned);
-        const FloatV inner (addr(mValues  [kInner]), element_aligned);
-
         // copysign(absBg, inner): +absBg if inner >= 0, else -absBg.
-        const MaskV  isNegInner = zero > inner;
-        const FloatV extrap     = where(isNegInner, -absBg, absBg);
+        const MaskV  isNegInner = zero > values[kInner];
+        const FloatV extrap     = util::where(isNegInner, -absBg, absBg);
 
-        // Active lanes keep `val`; inactive lanes take `extrap`.
-        const FloatV result = where(active, val, extrap);
-        store(result, addr(mValues[k]), element_aligned);
+        // Active lanes keep their own value; inactive take the extrapolated sign-corrected background.
+        values[k] = util::where(isActive[k], values[k], extrap);
     }
 }
 ```
+
+No `addr()`.  No `element_aligned`.  Reads `values[]` as Simd,
+operates as Simd, writes Simd — the kernel body never drops to the
+underlying scalar/array representation.
 
 **Per-pair cost (W=16, AVX2):**
 
 | Op | Cycles (est.) |
 |----|--------------:|
-| 3× load (mIsActive, mValues[k], mValues[kInner]) | 3 |
-| `0 > inner` (vcmpltps + sign mask) | 1 |
+| compare `zero > values[kInner]` | 1 |
 | `where(isNegInner, -absBg, absBg)` (vblendvps) | 1 |
-| `where(active, val, extrap)` (mask convert + vblendvps) | 1–2 |
-| 1× store (mValues[k]) | 1 |
-| **≈ 7 cycles / pair** |
+| `where(isActive[k], values[k], extrap)` (mask convert + vblendvps) | 1–2 |
+| **≈ 4 cycles / pair** (values[] register-resident) |
 
-Total: 18 pairs × 7 cycles = ~126 cycles per call.  Amortised over
-W=16 lanes gives ~8 cycles/voxel, or ~2 ns/voxel on a 4 GHz core.
-
-Measured overhead in `sidecar-stencil-extrap` pass on taperLER.vdb
-(24 threads): **+4.5 ms / 31.8M voxels = 0.14 ns/voxel** end-to-end —
-lines up with the per-core estimate divided by thread count (24×
-speedup ≈ 2 / 24 ≈ 0.083 ns; measurement includes framing overhead).
-
-**Skipping active lanes:**  the algorithm reads and computes for every
-lane regardless of `isActive`.  For active lanes, `extrap` is computed
-but then discarded by the final `where`.  This wasted work is cheaper
-than a predicated-store alternative because:
-
-- The SIMD blend is one instruction (`vblendvps`).
-- Per-lane branching would serialize the batch.
-- Active-fraction is high (~90% on narrow-band SDFs), so masked
-  computation saves little even in the best case.
+Total: 18 pairs × ~4 cycles = ~72 cycles per call — lower than the
+Approach-1 estimate of ~7 cycles/pair, because we no longer do the
+explicit per-pair load.  The Simd values live in YMM registers across
+the pair loop.  Measured end-to-end cost (sidecar-stencil-extrap minus
+sidecar-stencil): ~0.14–0.19 ns/voxel on 24 threads.
 
 ---
 
-## 6.  API usage
+## 4.  Godunov norm-square-gradient
 
-### 6.1  Filling the stencil from sidecar indices
+### 4.1  Semantics — tracking the ground-truth scalar
+
+`nanovdb::math::WenoStencil<GridT>::normSqGrad(isoValue)` in
+`nanovdb/math/Stencils.h` is the ground-truth scalar reference.  Its
+body:
 
 ```cpp
-WenoStencil<SIMDw> stencil;
-StencilAccessor<BuildT, SIMDw, Weno5Stencil> acc(grid, ...);
-acc.moveTo(leafIndex + batchStart, voxelOffset + batchStart);
+const ValueType* v = mValues;
+const RealT
+    dP_xm = WENO5<RealT>(v[2]-v[1], v[3]-v[2], v[0]-v[3], v[4]-v[0], v[5]-v[4], mDx2),
+    dP_xp = WENO5<RealT>(v[6]-v[5], v[5]-v[4], v[4]-v[0], v[0]-v[3], v[3]-v[2], mDx2),
+    dP_ym = ..., dP_yp = ..., dP_zm = ..., dP_zp = ...;
+return mInvDx2 * GodunovsNormSqrd(v[0] > isoValue, dP_xm, dP_xp, dP_ym, dP_yp, dP_zm, dP_zp);
+```
 
-for (int k = 0; k < WenoStencil<SIMDw>::size(); ++k) {
-    for (int i = 0; i < SIMDw; ++i) {
-        const uint64_t idx = acc.mIndices[k][i];
-        stencil.mValues  [k][i] = sidecar[idx];     // sidecar[0] = background
-        stencil.mIsActive[k][i] = (idx != 0);
-    }
+`WenoStencil<W>::normSqGrad(iso)` is a line-for-line transliteration of
+the same body, with three adaptations:
+
+1. `v = values` (Simd-typed storage, not `mValues` scalar array).
+2. Local `dP_*` are `FloatV` rather than `RealT`.
+3. The final `mInvDx2 * ...` multiplication broadcasts the scalar
+   `mInvDx2` to `FloatV` (via `FloatV(mInvDx2)`); at W=1 this is a
+   no-op.
+
+### 4.2  `WENO5<T>` — generic over scalar and Simd
+
+The six axial reconstructions are driven by a single free-function
+template `nanovdb::detail::WENO5<T, RealT=T>` that mirrors
+`nanovdb::math::WENO5<ValueType, RealT>` exactly (Shu ICASE
+smoothness indicators, 0.1/0.6/0.3 linear weights, static_cast at the
+end replaced by the trailing division).  Structure is the same; only
+the literal constants are wrapped in `RealT(...)` constructors to
+broadcast at W>1.  Lives in `nanovdb::detail` to keep the naming
+convention close to the ground-truth without colliding with the
+existing `nanovdb::math::WENO5`.
+
+### 4.3  `GodunovsNormSqrd<T, MaskT>` — `where`-based, no control flow
+
+The scalar ground-truth has a runtime `if (isOutside) { … } else { … }`.
+The generic-T version computes both branches unconditionally and
+blends via `util::where`:
+
+```cpp
+template<typename T, typename MaskT>
+inline T GodunovsNormSqrd(MaskT isOutside,
+                          T dP_xm, T dP_xp, T dP_ym, T dP_yp, T dP_zm, T dP_zp)
+{
+    const T zero(0.f);
+    const T outside = max(Pow2(max(dP_xm, zero)), Pow2(min(dP_xp, zero)))   // (dP/dx)²
+                    + max(Pow2(max(dP_ym, zero)), Pow2(min(dP_yp, zero)))
+                    + max(Pow2(max(dP_zm, zero)), Pow2(min(dP_zp, zero)));
+    const T inside  = max(Pow2(min(dP_xm, zero)), Pow2(max(dP_xp, zero)))
+                    + max(Pow2(min(dP_ym, zero)), Pow2(max(dP_yp, zero)))
+                    + max(Pow2(min(dP_zm, zero)), Pow2(max(dP_zp, zero)));
+    return where(isOutside, outside, inside);
 }
 ```
 
-At W=1 (GPU per-thread) the same body would just drop the `[i]` index:
+At `T=float, MaskT=bool` this compiles to scalar code with both
+branches speculatively evaluated — slightly slower than the
+ground-truth's branchy form for scalar workloads in isolation, but
+identical correctness.  At `T=Simd<float,W>, MaskT=SimdMask<float,W>`
+the branches are unconditional SIMD compute plus a `vblendvps` —
+no lane-divergent branches, no scalarisation.
+
+Per-lane cost of the full `normSqGrad`:
+
+| Phase | Ops |
+|-------|-----|
+| 6× axial WENO5 | ~60 mul/add/fma + 6× reciprocals (the `0.N / Pow2(…)` terms) |
+| Godunov: 12× max/min + 12× mul + 5× add, both branches | ~29 ops |
+| Blend + final multiply by FloatV(mInvDx2) | 2 ops |
+
+Roughly ~100 arithmetic ops per voxel per `normSqGrad` call.  At W=16
+AVX2 that's ~100 / 16 ≈ 6.3 cycles/voxel × some FMA-throughput factor
+— call it 2 ns/voxel single-threaded, 0.1 ns/voxel on 24 threads.
+(To be validated by measurement; see §7.1 Future work.)
+
+---
+
+## 5.  API usage
+
+### 5.1  CPU SIMD — caller-owned raw buffers, explicit load
 
 ```cpp
-stencil.mValues  [k] = sidecar[idx];
-stencil.mIsActive[k] = (idx != 0);
+// Caller owns its scalar-scatter target.
+alignas(64) float raw_values[SIZE][W];
+alignas(64) bool  raw_active[SIZE][W];
+
+nanovdb::WenoStencil<W> stencil(dx);
+
+// Fill — pure scalar stores, guaranteed fast codegen on all backends.
+for (int k = 0; k < SIZE; ++k) {
+    for (int i = 0; i < W; ++i) {
+        const uint64_t idx = /* sidecar index for tap k, lane i */;
+        raw_values[k][i] = sidecar[idx];
+        raw_active[k][i] = (idx != 0);
+    }
+}
+
+// Bridge — one SIMD load per tap.
+for (int k = 0; k < SIZE; ++k) {
+    stencil.values  [k] = FloatV(raw_values[k], util::element_aligned);
+    stencil.isActive[k] = MaskV (raw_active[k], util::element_aligned);
+}
+
+// Arithmetic — reads/writes stencil.values[] as Simd in place.
+stencil.extrapolate(std::abs(sidecar[0]));
+FloatV normSq = stencil.normSqGrad(/* iso = */ 0.f);
+
+// Simd → scalar bridge at the output side if downstream consumers are scalar.
+alignas(64) float normSq_lanes[W];
+util::store(normSq, normSq_lanes, util::element_aligned);
 ```
 
-### 6.2  Extrapolating
+### 5.2  CUDA scalar — no intermediate buffer
 
 ```cpp
-stencil.extrapolate(std::abs(floatGrid.background()));
+nanovdb::WenoStencil<1> stencil(dx);
+for (int k = 0; k < SIZE; ++k) {
+    const uint64_t idx = gather_index_for_tap(k);
+    stencil.values  [k] = sidecar[idx];
+    stencil.isActive[k] = (idx != 0);
+}
+
+stencil.extrapolate(fabsf(sidecar[0]));
+float normSq = stencil.normSqGrad();
 ```
 
-After this call, every `stencil.mValues[k][i]` holds either the real
-sidecar value (for active lanes) or a sign-corrected `|background|`
-(for inactive lanes).  `mIsActive[]` is no longer needed downstream.
+`FloatV` is `float` at W=1; direct scalar assignment.  `MaskV` is
+`bool`.  No raw buffers, no `element_aligned`, no load loops — the
+per-thread path reads as pure scalar arithmetic.
 
-### 6.3  Compile-time named-tap access
+### 5.3  Compile-time named-tap access
 
 ```cpp
-constexpr int ctr = WenoStencil<SIMDw>::tapIndex<0, 0, 0>();
-float centerValue = stencil.mValues[ctr][i];
+constexpr int ctr = WenoStencil<W>::tapIndex<0, 0, 0>();
+FloatV centerValue = stencil.values[ctr];
 
-constexpr int xm3 = WenoStencil<SIMDw>::tapIndex<-3, 0, 0>();
-// ... etc, for WENO5 arithmetic
+constexpr int xm3 = WenoStencil<W>::tapIndex<-3, 0, 0>();
+FloatV xm3Value   = stencil.values[xm3];
 ```
 
 `tapIndex<DI,DJ,DK>()` forwards to `detail::findIndex` (shared with
-`StencilAccessor`), static-asserting at compile time that the requested
-tap exists in the Weno5Stencil::Taps tuple.
+`StencilAccessor`), static-asserting at compile time that the
+requested tap exists in the Weno5Stencil::Taps tuple.
+
+---
+
+## 6.  Ownership boundaries
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│ Caller                                                            │
+│   alignas(64) float raw_values[SIZE][W];    ← fill-side buffer    │
+│   alignas(64) bool  raw_active[SIZE][W];                          │
+│                                                                   │
+│   <scalar scatter fill>                                           │
+│                                                                   │
+│   for k: stencil.values[k]   = FloatV(raw_values[k], ...);        │
+│          stencil.isActive[k] = MaskV (raw_active[k], ...);        │
+│   ═══════════════════════════════════════════════════ Simd border │
+├───────────────────────────────────────────────────────────────────┤
+│ WenoStencil<W>                                                    │
+│   FloatV values  [19];   MaskV isActive[19];                      │
+│   float  mDx2, mInvDx2;                                           │
+│   extrapolate() / normSqGrad() — Simd-in / Simd-out, pure compute │
+├───────────────────────────────────────────────────────────────────┤
+│ Caller                                                            │
+│   ═══════════════════════════════════════════════════ Simd border │
+│   util::store(normSq, normSq_lanes, util::element_aligned);       │
+│   <per-lane scalar write to output sidecar>                       │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+Array↔Simd bridges exist only at the two explicit boundaries where
+scalar-indexed I/O meets SIMD-parallel compute.  Inside `WenoStencil`
+everything is Simd; outside the class the caller chooses whatever
+scalar pattern fits its source/sink.
 
 ---
 
 ## 7.  Future work
 
-### 7.1  WENO5 reconstruction method
+### 7.1  Measurement — lock in the perf numbers
 
-The class's second substantive operation (not yet implemented) will be
-the WENO5 arithmetic itself — a compile-time fold over the 19 tap
-rows, producing three `Simd<float, W>` fluxes (one per axis) from the
-fully-resolved `mValues` matrix.  Natural signature:
-
-```cpp
-struct Weno5Flux { FloatV dx, dy, dz; };
-Weno5Flux reconstruct() const;
-```
-
-Adopting the same single-source structure: at W=1 the fluxes collapse
-to scalars; at W>1 they are SIMD vectors.
+Reconstruct()-path (normSqGrad) cost hasn't been measured yet.  Next
+step: add a `sidecar-stencil-normsqgrad` benchmark pass in
+`ex_narrowband_stencil_cpu` to drive normSqGrad to completion on
+taperLER.vdb; compare against `sidecar-stencil-extrap` (which writes
+the tap-sum instead of normSqGrad) to isolate the Phase-3 arithmetic
+cost.
 
 ### 7.2  Consolidate the Weno5Stencil policy
 
@@ -317,13 +435,13 @@ Currently `Weno5Stencil` (the tap-tuple policy struct) lives in
 `using Taps = Weno5Stencil::Taps`.  The policy is arguably a
 Weno-specific definition and could move into `WenoStencil.h`;
 `StencilAccessor.h` would then `#include <.../WenoStencil.h>` for the
-policy.  Left as-is for this pass to minimise Stage-3 churn.
+policy.  Left as-is to minimise churn across files.
 
 ### 7.3  Alternative stencils
 
-If/when Weno7 or a non-axis-aligned stencil is needed, the class would
-specialise on a stencil-policy template parameter rather than hardcode
-`Weno5Stencil`:
+If/when Weno7 or a non-axis-aligned stencil is needed, the class
+would specialise on a stencil-policy template parameter rather than
+hardcode `Weno5Stencil`:
 
 ```cpp
 template<typename StencilPolicy, int W>
@@ -339,16 +457,21 @@ exists.
 
 ## 8.  Relationship to other design docs
 
-- **`BatchAccessor.md §11`** — the broader Phase-2 pipeline plan
-  (VBM decode → sidecar assembly → extrapolation → WENO arithmetic →
-  write-back).  WenoStencil<W> implements the "extrapolation" step and
-  provides the storage that carries data from "sidecar assembly" into
-  the future "WENO arithmetic" step.
+- **`BatchAccessor.md §11`** — the broader Phase-2/3 pipeline plan
+  (VBM decode → sidecar assembly → extrapolation → WENO arithmetic
+  → write-back).  `WenoStencil<W>` implements the extrapolation and
+  (now) the WENO arithmetic steps; the storage carries data across
+  from sidecar-assembly.
 - **`StencilAccessor.md`** — Phase-1 accessor (batched uint64 index
-  gather).  StencilAccessor fills `mIndices[SIZE][W]`; WenoStencil
-  consumes those indices (via `sidecar[idx]` in user code) and owns
-  the per-lane float result.
+  gather).  `StencilAccessor` fills `mIndices[SIZE][W]`; callers
+  consume those indices (via `sidecar[idx]` in their fill loops) and
+  populate `WenoStencil<W>::values[]` / `isActive[]`.
 - **`HaloStencilAccessor.md`** — speculative alternative that
   precomputes a dense float halo buffer; if that path is pursued,
-  WenoStencil<W> would fill from the halo instead of from sidecar
-  indices.  The extrapolation algorithm here transfers unchanged.
+  `WenoStencil<W>` would fill from the halo instead of from sidecar
+  indices.  The extrapolation and normSqGrad algorithms here transfer
+  unchanged.
+- **`nanovdb/math/Stencils.h`** — the scalar ground-truth for WENO5
+  and Godunov.  `WenoStencil<W>::normSqGrad()` is a line-for-line
+  transliteration of `nanovdb::math::WenoStencil<GridT>::normSqGrad()`
+  to generic-T form.

@@ -746,8 +746,16 @@ static void runPerf(
                 alignas(64) uint32_t leafIndex[BlockWidth];
                 alignas(64) uint16_t voxelOffset[BlockWidth];
 
+                // Caller-owned fill-side scratch — scalar scatter writes from
+                // the sidecar land here, then a per-tap SIMD load moves the
+                // data into the stencil's Simd-typed compute view.
+                alignas(64) float raw_values[nanovdb::WenoStencil<SIMDw>::size()][SIMDw];
+                alignas(64) bool  raw_active[nanovdb::WenoStencil<SIMDw>::size()][SIMDw];
+
                 nanovdb::WenoStencil<SIMDw> stencil;
                 constexpr int SIZE = nanovdb::WenoStencil<SIMDw>::size();
+                using FloatV = nanovdb::util::Simd    <float, SIMDw>;
+                using MaskV  = nanovdb::util::SimdMask<float, SIMDw>;
 
                 const float* const scIn  = sidecar.data();
                 float*       const scOut = outputSidecar.data();
@@ -771,23 +779,37 @@ static void runPerf(
                     for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
                         stencilAcc.moveTo(leafIndex + batchStart, voxelOffset + batchStart);
 
+                        // Scalar scatter fill into caller-owned C arrays.
                         for (int k = 0; k < SIZE; ++k) {
                             for (int i = 0; i < SIMDw; ++i) {
                                 const uint64_t idx = stencilAcc.mIndices[k][i];
-                                stencil.mValues  [k][i] = scIn[idx];
-                                stencil.mIsActive[k][i] = (idx != 0);
+                                raw_values[k][i] = scIn[idx];
+                                raw_active[k][i] = (idx != 0);
                             }
                         }
 
+                        // SIMD load-per-tap into the stencil's compute view.
+                        for (int k = 0; k < SIZE; ++k) {
+                            stencil.values  [k] = FloatV(raw_values[k], nanovdb::util::element_aligned);
+                            stencil.isActive[k] = MaskV (raw_active[k], nanovdb::util::element_aligned);
+                        }
+
+                        // Arithmetic — reads/writes stencil.values[] as Simd in place.
                         stencil.extrapolate(absBackground);
 
+                        // Token sum over all 19 taps, entirely in Simd form.
+                        FloatV sum(0.f);
+                        for (int k = 0; k < SIZE; ++k) sum = sum + stencil.values[k];
+
+                        // Simd → scalar bridge at the output side, mirroring the
+                        // fill-side bridge: SIMD store into a scratch, then per-lane
+                        // scalar write to the output sidecar (gated by leafIndex).
+                        alignas(64) float sum_lanes[SIMDw];
+                        nanovdb::util::store(sum, sum_lanes, nanovdb::util::element_aligned);
                         for (int i = 0; i < SIMDw; ++i) {
                             const int p = batchStart + i;
                             if (leafIndex[p] == CPUVBM::UnusedLeafIndex) continue;
-                            float sum = 0.f;
-                            for (int k = 0; k < SIZE; ++k)
-                                sum += stencil.mValues[k][i];
-                            scOut[blockBase + p] = sum;
+                            scOut[blockBase + p] = sum_lanes[i];
                         }
                     }
                 }

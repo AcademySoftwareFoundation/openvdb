@@ -4,76 +4,160 @@
 /*!
     \file WenoStencil.h
 
-    \brief 19-tap WENO5 stencil data container + per-tap out-of-band
-           extrapolation, templated on SIMD lane width.
+    \brief 19-tap WENO5 stencil value container + out-of-band extrapolation +
+           fifth-order upwind Godunov's norm-square gradient.  Templated on
+           SIMD lane width W.
 
-    `WenoStencil<W>` holds the per-tap float values and per-tap activity
-    flags for a single voxel (W=1, scalar / GPU-friendly) or a batch of W
-    voxels (W>1, CPU SIMD).  The underlying element types switch via
-    `std::conditional_t`:
+    `WenoStencil<W>` holds the per-tap float values and activity flags for a
+    single voxel (W=1, scalar / GPU-friendly) or a batch of W voxels (W>1,
+    CPU SIMD).  Storage is first-class Simd types directly:
 
-       W == 1 :  ValueT = float            PredT = bool
-       W >  1 :  ValueT = float[W]         PredT = bool[W]
+       FloatV values  [19]      ≡  Simd<float, W>     values  [19]
+       MaskV  isActive[19]      ≡  SimdMask<float, W> isActive[19]
 
-    Storage is a plain C array (`ValueT mValues[SIZE]`) so the caller can
-    fill it lane-by-lane with the same scalar syntax in both cases
-    (`s.mValues[k][i] = ...` at W>1; `s.mValues[k] = ...` at W=1).
+    At W=1 the Simd types collapse to plain float / bool so scalar CUDA code
+    reads as plain scalar arithmetic, and the class is pure-compute — the
+    caller owns any fill-side C-array storage it wants to use for scalar
+    scatter before an explicit load-into-Simd step.
 
-    The class's one substantive operation is `extrapolate(|background|)`,
-    which repairs out-of-band lanes (mIsActive[k] == false) by applying
-    copysign(|background|, mValues[innerTap]) via an ascending-|Δ|
-    cascade.  After `extrapolate` returns, every tap holds either its
-    true sidecar value (for active lanes) or a sign-corrected background
-    magnitude (for inactive lanes) — ready for WENO5 arithmetic.
+    Grid-spacing scalars `mDx2` and `mInvDx2` stay scalar `float` at every
+    W and are broadcast to FloatV at the point of use.
 
-    The inner-tap mapping is spelled out explicitly (Weno5-specific,
-    non-generic on purpose):
+    Operations provided:
+      - extrapolate(absBackground)
+            Repair out-of-band lanes (isActive[k] == false) via
+            copysign(absBackground, values[innerTap]), processed in
+            ascending-|Δ| order so the inner tap is already resolved.
+      - normSqGrad(isoValue = 0)
+            Godunov's norm-square of the fifth-order WENO upwind gradient.
+            Matches the semantics of WenoStencil::normSqGrad(isoValue) in
+            nanovdb/math/Stencils.h (the ground-truth scalar reference).
 
-       |Δ|=1 taps  -->  inner = center tap (0,0,0)
-       |Δ|=2 taps  -->  inner = |Δ|=1 tap on the same axis
-       |Δ|=3 taps  -->  inner = |Δ|=2 tap on the same axis
-
-    Cascade order (ascending-|Δ|) guarantees the inner tap is already
-    resolved when the outer tap is processed, so distance-3 taps inherit
-    sign via the |Δ|=1 → |Δ|=2 → |Δ|=3 chain without special casing.
-
-    See BatchAccessor.md §11 for the full Phase-2 sidecar-WENO pipeline
-    design and §11.2 for the extrapolation semantics.
+    See BatchAccessor.md §11 for the full Phase-2 sidecar-WENO pipeline design
+    and §11.2 for the extrapolation semantics.
 */
 
 #pragma once
 
 #include <nanovdb/util/Simd.h>
 #include <nanovdb/util/StencilAccessor.h>  // StencilPoint, Weno5Stencil, detail::findIndex
+#include <nanovdb/math/Math.h>             // Pow2
 
 #include <cstdint>
 #include <tuple>
-#include <type_traits>
 #include <utility>
 
 namespace nanovdb {
 
+namespace detail {
+
+// ---------------------------------------------------------------------------
+// Generic-T WENO5 reconstruction — templated on T ∈ {float, Simd<float, W>}.
+//
+// Structurally identical to nanovdb::math::WENO5 (ground-truth scalar WENO5
+// in nanovdb/math/Stencils.h), transliterated to use only primitives that
+// exist for both scalar T=float and Simd<T,W>: operator+/-/*, math::Pow2.
+// No ternaries, no if/else — same source compiles to scalar or SIMD code
+// via the Simd backend in Simd.h.
+//
+// scale2 is the optional reference magnitude (squared) used to scale the
+// numerical epsilon; kept as a plain float for broadcast-on-demand.
+// ---------------------------------------------------------------------------
+template<typename T, typename RealT = T>
+NANOVDB_SIMD_HOSTDEV inline T WENO5(const T& v1, const T& v2, const T& v3,
+                                     const T& v4, const T& v5,
+                                     float scale2 = 1.f)
+{
+    const RealT C   = RealT(13.f / 12.f);
+    const RealT eps = RealT(1.e-6f * scale2);
+
+    const RealT A1 = RealT(0.1f) / math::Pow2(
+            C * math::Pow2(v1 - RealT(2)*v2 + v3)
+          + RealT(0.25f) * math::Pow2(v1 - RealT(4)*v2 + RealT(3)*v3) + eps);
+    const RealT A2 = RealT(0.6f) / math::Pow2(
+            C * math::Pow2(v2 - RealT(2)*v3 + v4)
+          + RealT(0.25f) * math::Pow2(v2 - v4) + eps);
+    const RealT A3 = RealT(0.3f) / math::Pow2(
+            C * math::Pow2(v3 - RealT(2)*v4 + v5)
+          + RealT(0.25f) * math::Pow2(RealT(3)*v3 - RealT(4)*v4 + v5) + eps);
+
+    return (A1 * (RealT( 2)*v1 - RealT(7)*v2 + RealT(11)*v3)
+          + A2 * (RealT( 5)*v3 -           v2 + RealT( 2)*v4)
+          + A3 * (RealT( 2)*v3 + RealT(5)*v4 -             v5))
+         / (RealT(6) * (A1 + A2 + A3));
+}
+
+// ---------------------------------------------------------------------------
+// Generic-T Godunov's norm-square gradient — templated on T (value type) and
+// MaskT (mask type that `>` of T produces).  Ground-truth scalar version is
+// nanovdb::math::GodunovsNormSqrd in nanovdb/math/Stencils.h, which uses a
+// runtime if/else on `isOutside`.  Here we compute both branches uncondition-
+// ally and blend via util::where, so the SIMD path has no control-flow
+// divergence across lanes.  At T=float the scalar where(bool, T, T) overload
+// degenerates this to the same semantics as the if/else.
+// ---------------------------------------------------------------------------
+template<typename T, typename MaskT>
+NANOVDB_SIMD_HOSTDEV inline T GodunovsNormSqrd(MaskT isOutside,
+                                                T dP_xm, T dP_xp,
+                                                T dP_ym, T dP_yp,
+                                                T dP_zm, T dP_zp)
+{
+    using util::min; using util::max; using util::where;
+    const T zero(0.f);
+
+    const T outside = max(math::Pow2(max(dP_xm, zero)), math::Pow2(min(dP_xp, zero)))   // (dP/dx)²
+                    + max(math::Pow2(max(dP_ym, zero)), math::Pow2(min(dP_yp, zero)))   // (dP/dy)²
+                    + max(math::Pow2(max(dP_zm, zero)), math::Pow2(min(dP_zp, zero)));  // (dP/dz)²
+
+    const T inside  = max(math::Pow2(min(dP_xm, zero)), math::Pow2(max(dP_xp, zero)))
+                    + max(math::Pow2(min(dP_ym, zero)), math::Pow2(max(dP_yp, zero)))
+                    + max(math::Pow2(min(dP_zm, zero)), math::Pow2(max(dP_zp, zero)));
+
+    return where(isOutside, outside, inside);
+}
+
+} // namespace detail
+
+// ---------------------------------------------------------------------------
+// WenoStencil<W> — pure-compute container for a 19-tap WENO5 stencil state.
+//
+// The class holds only Simd-typed compute state + scalar grid constants.
+// Fill-side responsibility (scalar writes into any raw float/bool buffers,
+// followed by a SIMD load-per-tap into this stencil's values[] / isActive[])
+// lives in the caller.  See WenoStencil.md §6 for usage patterns.
+// ---------------------------------------------------------------------------
 template<int W = 1>
 class WenoStencil
 {
 public:
-    using Taps = Weno5Stencil::Taps;
-    using Hull = Weno5Stencil::Hull;
-    static constexpr int SIZE = int(std::tuple_size_v<Taps>);
+    static constexpr int SIZE = 19;
 
-    // Per-lane storage shape chosen by W:
-    //   W == 1 :  plain scalar (GPU thread-per-voxel model)
-    //   W >  1 :  W-wide array (CPU SIMD batch)
-    using ValueT = std::conditional_t<W == 1, float, float[W]>;
-    using PredT  = std::conditional_t<W == 1, bool,  bool[W]>;
+    using Taps   = Weno5Stencil::Taps;
+    using FloatV = util::Simd    <float, W>;
+    using MaskV  = util::SimdMask<float, W>;
 
-    alignas(64) ValueT mValues  [SIZE];
-    alignas(64) PredT  mIsActive[SIZE];
+    // Compute-side storage — first-class Simd values.  At W=1 these collapse
+    // to plain scalar float / bool under the array backend.
+    FloatV values  [SIZE];
+    MaskV  isActive[SIZE];
+
+    // Runtime grid-spacing constants — plain scalars at every W, broadcast
+    // to FloatV at the use sites inside normSqGrad().  Storing them as
+    // scalars saves YMM-register pressure (vbroadcastss folds into the FMA
+    // consumer on x86) and keeps the W=1 code path free of any Simd wrapper.
+    float mDx2{1.f};       // dx²      — fed to WENO5's epsilon via scale2
+    float mInvDx2{1.f};    // 1 / dx²  — final normalisation in normSqGrad
+
+    NANOVDB_SIMD_HOSTDEV WenoStencil() = default;
+    NANOVDB_SIMD_HOSTDEV explicit WenoStencil(float dx)
+        : mDx2(dx * dx), mInvDx2(1.f / (dx * dx)) {}
 
     static constexpr int size() { return SIZE; }
 
-    // Compile-time named-tap access: returns the index of tap (DI,DJ,DK)
-    // in the Taps tuple, matching StencilAccessor's convention.
+    // Compile-time named-tap access: returns the index of tap (DI,DJ,DK) in
+    // the Taps tuple.  Ordering matches WenoPt<i,j,k>::idx in
+    // nanovdb/math/Stencils.h, so this is interoperable with canonical WENO
+    // index conventions.
     template<int DI, int DJ, int DK>
     static constexpr int tapIndex()
     {
@@ -83,38 +167,42 @@ public:
         return I;
     }
 
-    // Replace out-of-band lanes (mIsActive[k][i] == false) of mValues[k]
-    // with copysign(absBackground, mValues[innerTap][i]).  Active lanes
-    // are untouched.  Center tap (0,0,0) is assumed always in-band and
-    // is not processed.
+    // ------------------------------------------------------------------
+    // extrapolate — repair out-of-band lanes (isActive[k][i] == false) of
+    // values[k] with copysign(absBackground, values[innerTap][i]).  Active
+    // lanes are preserved.  Center tap (idx 0) is assumed always in-band
+    // and is not processed.
     //
-    // Requires absBackground >= 0 (caller typically passes
-    // std::abs(floatGrid.background()) or sidecar[0] for a narrow-band
-    // level set where background > 0).
-    void extrapolate(float absBackground);
+    // Processes 18 (tap, innerTap) pairs in ascending-|Δ| order so the
+    // inner tap is already resolved when the outer tap is touched;
+    // sign-inheritance through |Δ|=1 → |Δ|=2 → |Δ|=3 is automatic.
+    //
+    // Requires absBackground ≥ 0.
+    // ------------------------------------------------------------------
+    NANOVDB_SIMD_HOSTDEV void extrapolate(float absBackground);
+
+    // ------------------------------------------------------------------
+    // normSqGrad — Godunov's norm-square of the fifth-order WENO upwind
+    // gradient at the stencil center.  Returns |∇φ|².
+    //
+    // Semantics match WenoStencil::normSqGrad(isoValue) in
+    // nanovdb/math/Stencils.h line-for-line: six axial WENO5 reconstructions
+    // (one pair ±x, ±y, ±z), then Godunov's upwind combinator driven by the
+    // sign of (center − iso).
+    //
+    // Call only after the stencil has been populated (see usage pattern in
+    // WenoStencil.md §6).  extrapolate() is idempotent w.r.t. this — calling
+    // normSqGrad after extrapolate is the typical pipeline shape, but the
+    // method itself does not require extrapolate to have been called.
+    // ------------------------------------------------------------------
+    NANOVDB_SIMD_HOSTDEV FloatV normSqGrad(float iso = 0.f) const;
 
 private:
-    // Bridge W=1 (scalar reference) and W>1 (array decays to pointer).
-    // The address taken at W=1 is to the scalar member of mValues/mIsActive;
-    // at W>1 an array-to-pointer decay works without extra syntax.
-    static constexpr       float* addr(      ValueT& v) noexcept {
-        if constexpr (W == 1) return &v; else return v;
-    }
-    static constexpr const float* addr(const ValueT& v) noexcept {
-        if constexpr (W == 1) return &v; else return v;
-    }
-    static constexpr       bool*  addr(      PredT& p) noexcept {
-        if constexpr (W == 1) return &p; else return p;
-    }
-    static constexpr const bool*  addr(const PredT& p) noexcept {
-        if constexpr (W == 1) return &p; else return p;
-    }
-
     // Hardcoded (tap, innerTap) pairs for Weno5Stencil::Taps, ordered by
     // ascending |Δ|.  Indices match the tuple definition in StencilAccessor.h.
     //
     //   idx  0     :  center     ( 0, 0, 0)
-    //   idx  1.. 6 :  x-axis     (-3..+3)
+    //   idx  1.. 6 :  x-axis     (-3..+3 in the order -3,-2,-1,+1,+2,+3)
     //   idx  7..12 :  y-axis     (-3..+3)
     //   idx 13..18 :  z-axis     (-3..+3)
     static constexpr int kNumPairs = 18;
@@ -124,11 +212,11 @@ private:
         { 9, 0}, {10, 0},        // y: -1, +1
         {15, 0}, {16, 0},        // z: -1, +1
         // |Δ|=2  (inner tap = |Δ|=1 on same axis)
-        { 2, 3}, { 5, 4},        // x: -2<-(-1), +2<-(+1)
+        { 2, 3}, { 5, 4},        // x: -2 ← (-1),  +2 ← (+1)
         { 8, 9}, {11, 10},       // y
         {14, 15}, {17, 16},      // z
         // |Δ|=3  (inner tap = |Δ|=2 on same axis)
-        { 1, 2}, { 6, 5},        // x: -3<-(-2), +3<-(+2)
+        { 1, 2}, { 6, 5},        // x: -3 ← (-2),  +3 ← (+2)
         { 7, 8}, {12, 11},       // y
         {13, 14}, {18, 17}       // z
     };
@@ -137,36 +225,55 @@ private:
 // ---------------------------------------------------------------------------
 // extrapolate — single-source implementation.
 //
-// Same body compiles for scalar (W=1) and SIMD (W>1): Simd.h's fixed_size<1>
-// path collapses every instruction to a scalar store.  The only non-uniform
-// bit is the addr() helper above.
+// values[] and isActive[] are already Simd-typed; the algorithm is a
+// sequence of whole-SIMD blends (plus a broadcast of absBg) per pair.
+// Same source body compiles at W=1 (Simd<float,1> collapses to scalar)
+// and W>1 (native SIMD width).
 // ---------------------------------------------------------------------------
 template<int W>
-void WenoStencil<W>::extrapolate(float absBackground)
+NANOVDB_SIMD_HOSTDEV void WenoStencil<W>::extrapolate(float absBackground)
 {
-    using FloatV = nanovdb::util::Simd    <float, W>;
-    using MaskV  = nanovdb::util::SimdMask<float, W>;
-
-    const FloatV absBg(absBackground);           // broadcast
-    const FloatV zero (0.0f);
+    const FloatV absBg(absBackground);
+    const FloatV zero (0.f);
 
     for (int p = 0; p < kNumPairs; ++p) {
         const int k      = kPairs[p][0];
         const int kInner = kPairs[p][1];
 
-        const MaskV  active(addr(mIsActive[k]),      nanovdb::util::element_aligned);
-        const FloatV val   (addr(mValues  [k]),      nanovdb::util::element_aligned);
-        const FloatV inner (addr(mValues  [kInner]), nanovdb::util::element_aligned);
-
         // copysign(absBg, inner): +absBg if inner >= 0, else -absBg.
-        const MaskV  isNegInner = zero > inner;
-        const FloatV extrap     = nanovdb::util::where(isNegInner, -absBg, absBg);
+        const MaskV  isNegInner = zero > values[kInner];
+        const FloatV extrap     = util::where(isNegInner, -absBg, absBg);
 
-        // Active lanes keep `val`; inactive lanes take `extrap`.
-        const FloatV result = nanovdb::util::where(active, val, extrap);
-
-        nanovdb::util::store(result, addr(mValues[k]), nanovdb::util::element_aligned);
+        // Active lanes keep their own value; inactive lanes take the extrapolated sign-corrected background.
+        values[k] = util::where(isActive[k], values[k], extrap);
     }
+}
+
+// ---------------------------------------------------------------------------
+// normSqGrad — Godunov's upwind WENO norm-square gradient.
+//
+// Structurally mirrors WenoStencil::normSqGrad(isoValue) in
+// nanovdb/math/Stencils.h: six axial WENO5 reconstructions driving
+// GodunovsNormSqrd.  Tap indices 0..18 match WenoPt<i,j,k>::idx in that
+// file.  mInvDx2 and iso are broadcast to FloatV at the final
+// combinator only (free on x86; identity at W=1).
+// ---------------------------------------------------------------------------
+template<int W>
+NANOVDB_SIMD_HOSTDEV typename WenoStencil<W>::FloatV
+WenoStencil<W>::normSqGrad(float iso) const
+{
+    const FloatV* v = values;
+
+    const FloatV dP_xm = detail::WENO5<FloatV>(v[ 2]-v[ 1], v[ 3]-v[ 2], v[ 0]-v[ 3], v[ 4]-v[ 0], v[ 5]-v[ 4], mDx2);
+    const FloatV dP_xp = detail::WENO5<FloatV>(v[ 6]-v[ 5], v[ 5]-v[ 4], v[ 4]-v[ 0], v[ 0]-v[ 3], v[ 3]-v[ 2], mDx2);
+    const FloatV dP_ym = detail::WENO5<FloatV>(v[ 8]-v[ 7], v[ 9]-v[ 8], v[ 0]-v[ 9], v[10]-v[ 0], v[11]-v[10], mDx2);
+    const FloatV dP_yp = detail::WENO5<FloatV>(v[12]-v[11], v[11]-v[10], v[10]-v[ 0], v[ 0]-v[ 9], v[ 9]-v[ 8], mDx2);
+    const FloatV dP_zm = detail::WENO5<FloatV>(v[14]-v[13], v[15]-v[14], v[ 0]-v[15], v[16]-v[ 0], v[17]-v[16], mDx2);
+    const FloatV dP_zp = detail::WENO5<FloatV>(v[18]-v[17], v[17]-v[16], v[16]-v[ 0], v[ 0]-v[15], v[15]-v[14], mDx2);
+
+    return FloatV(mInvDx2) *
+           detail::GodunovsNormSqrd<FloatV, MaskV>(v[0] > FloatV(iso),
+                                                    dP_xm, dP_xp, dP_ym, dP_yp, dP_zm, dP_zp);
 }
 
 } // namespace nanovdb
