@@ -64,9 +64,10 @@ namespace detail {
 // numerical epsilon; kept as a plain float for broadcast-on-demand.
 // ---------------------------------------------------------------------------
 template<typename T, typename RealT = T>
-NANOVDB_SIMD_HOSTDEV inline T WENO5(const T& v1, const T& v2, const T& v3,
-                                     const T& v4, const T& v5,
-                                     float scale2 = 1.f)
+[[gnu::always_inline]] NANOVDB_SIMD_HOSTDEV inline T
+WENO5(const T& v1, const T& v2, const T& v3,
+      const T& v4, const T& v5,
+      float scale2 = 1.f)
 {
     const RealT C   = RealT(13.f / 12.f);
     const RealT eps = RealT(1.e-6f * scale2);
@@ -97,10 +98,11 @@ NANOVDB_SIMD_HOSTDEV inline T WENO5(const T& v1, const T& v2, const T& v3,
 // degenerates this to the same semantics as the if/else.
 // ---------------------------------------------------------------------------
 template<typename T, typename MaskT>
-NANOVDB_SIMD_HOSTDEV inline T GodunovsNormSqrd(MaskT isOutside,
-                                                T dP_xm, T dP_xp,
-                                                T dP_ym, T dP_yp,
-                                                T dP_zm, T dP_zp)
+[[gnu::always_inline]] NANOVDB_SIMD_HOSTDEV inline T
+GodunovsNormSqrd(MaskT isOutside,
+                 T dP_xm, T dP_xp,
+                 T dP_ym, T dP_yp,
+                 T dP_zm, T dP_zp)
 {
     using util::min; using util::max; using util::where;
     const T zero(0.f);
@@ -179,7 +181,7 @@ public:
     //
     // Requires absBackground ≥ 0.
     // ------------------------------------------------------------------
-    NANOVDB_SIMD_HOSTDEV void extrapolate(float absBackground);
+    [[gnu::always_inline]] NANOVDB_SIMD_HOSTDEV inline void extrapolate(float absBackground);
 
     // ------------------------------------------------------------------
     // normSqGrad — Godunov's norm-square of the fifth-order WENO upwind
@@ -195,7 +197,7 @@ public:
     // normSqGrad after extrapolate is the typical pipeline shape, but the
     // method itself does not require extrapolate to have been called.
     // ------------------------------------------------------------------
-    NANOVDB_SIMD_HOSTDEV FloatV normSqGrad(float iso = 0.f) const;
+    [[gnu::always_inline]] NANOVDB_SIMD_HOSTDEV inline FloatV normSqGrad(float iso = 0.f) const;
 
 private:
     // Hardcoded (tap, innerTap) pairs for Weno5Stencil::Taps, ordered by
@@ -231,7 +233,8 @@ private:
 // and W>1 (native SIMD width).
 // ---------------------------------------------------------------------------
 template<int W>
-NANOVDB_SIMD_HOSTDEV void WenoStencil<W>::extrapolate(float absBackground)
+[[gnu::always_inline]] NANOVDB_SIMD_HOSTDEV inline void
+WenoStencil<W>::extrapolate(float absBackground)
 {
     const FloatV absBg(absBackground);
     const FloatV zero (0.f);
@@ -259,7 +262,7 @@ NANOVDB_SIMD_HOSTDEV void WenoStencil<W>::extrapolate(float absBackground)
 // combinator only (free on x86; identity at W=1).
 // ---------------------------------------------------------------------------
 template<int W>
-NANOVDB_SIMD_HOSTDEV typename WenoStencil<W>::FloatV
+[[gnu::always_inline]] NANOVDB_SIMD_HOSTDEV inline typename WenoStencil<W>::FloatV
 WenoStencil<W>::normSqGrad(float iso) const
 {
     const FloatV* v = values;

@@ -68,16 +68,22 @@ using SimdMask = stdx::fixed_size_simd_mask<T, W>;
 template<typename T, int W>
 using Simd = stdx::fixed_size_simd<T, W>;
 
+// [[gnu::always_inline]] forces these thin wrappers to inline at every
+// call site.  Without it, GCC's cost model sometimes outlines them —
+// each call then pays a function-call + vzeroupper + register-ABI
+// transition that dominates the one-instruction body (vminps / vmaxps /
+// vblendvps).  See BatchAccessor.md §8h for the analogous fix on the
+// StencilAccessor path.
 template<typename T, int W>
-inline Simd<T,W> min(Simd<T,W> a, Simd<T,W> b) { return stdx::min(a, b); }
+[[gnu::always_inline]] inline Simd<T,W> min(Simd<T,W> a, Simd<T,W> b) { return stdx::min(a, b); }
 
 template<typename T, int W>
-inline Simd<T,W> max(Simd<T,W> a, Simd<T,W> b) { return stdx::max(a, b); }
+[[gnu::always_inline]] inline Simd<T,W> max(Simd<T,W> a, Simd<T,W> b) { return stdx::max(a, b); }
 
 // TS v2 where(mask, v) is a masked assignment proxy, not a 3-arg select.
 // Wrap it into the select(mask, a, b) form our kernels expect.
 template<typename T, int W>
-inline Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> b) {
+[[gnu::always_inline]] inline Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> b) {
     auto result = b;
     stdx::where(mask, result) = a;
     return result;
@@ -85,7 +91,7 @@ inline Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> b) {
 // Heterogeneous where: mask element type U ≠ value element type T.
 // Converts the U-mask to a T-mask via a boolean round-trip.
 template<typename T, typename U, int W>
-inline Simd<T,W> where(SimdMask<U,W> mask, Simd<T,W> a, Simd<T,W> b) {
+[[gnu::always_inline]] inline Simd<T,W> where(SimdMask<U,W> mask, Simd<T,W> a, Simd<T,W> b) {
     bool arr[W];
     for (int i = 0; i < W; i++) arr[i] = static_cast<bool>(mask[i]);
     SimdMask<T,W> tmask(arr, element_aligned);
