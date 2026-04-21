@@ -144,30 +144,29 @@ public:
     /// Return the total amount of memory in bytes occupied by this tree.
     virtual Index64 memUsage() const { return 0; }
 
-
     //
     // I/O methods
     //
     /// @brief Read the tree topology from a stream.
     ///
     /// This will read the tree structure and tile values, but not voxel data.
-    virtual void readTopology(std::istream&, bool saveFloatAsHalf = false) = 0;
+    virtual void readTopology(std::istream&, bool saveFloatAsHalf = false) = OPENVDB_TREE_IO_VIRTUAL;
     /// @brief Write the tree topology to a stream.
     ///
     /// This will write the tree structure and tile values, but not voxel data.
-    virtual void writeTopology(std::ostream&, bool saveFloatAsHalf = false) const = 0;
-
+    virtual void writeTopology(std::ostream&, bool saveFloatAsHalf = false) const = OPENVDB_TREE_IO_VIRTUAL;
     /// Read all data buffers for this tree.
-    virtual void readBuffers(std::istream&, bool saveFloatAsHalf = false) = 0;
+    virtual void readBuffers(std::istream&, bool saveFloatAsHalf = false) = OPENVDB_TREE_IO_VIRTUAL;
     /// Read all of this tree's data buffers that intersect the given bounding box.
-    virtual void readBuffers(std::istream&, const CoordBBox&, bool saveFloatAsHalf = false) = 0;
+    virtual void readBuffers(std::istream&, const CoordBBox&, bool saveFloatAsHalf = false) = OPENVDB_TREE_IO_VIRTUAL;
 
 #if OPENVDB_ABI_VERSION_NUMBER < 14
     OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    virtual void readNonresidentBuffers() const = 0;
+    virtual void readNonresidentBuffers() const = OPENVDB_TREE_IO_VIRTUAL;
 #endif
+
     /// Write out all the data buffers for this tree.
-    virtual void writeBuffers(std::ostream&, bool saveFloatAsHalf = false) const = 0;
+    virtual void writeBuffers(std::ostream&, bool saveFloatAsHalf = false) const = OPENVDB_TREE_IO_VIRTUAL;
 
     /// @brief Print statistics, memory usage and other information about this tree.
     /// @param os            a stream to which to write textual information
@@ -320,6 +319,7 @@ public:
     //
     // I/O methods
     //
+#ifdef OPENVDB_ENABLE_TREE_IO
     /// @brief Read the tree topology from a stream.
     ///
     /// This will read the tree structure and tile values, but not voxel data.
@@ -340,6 +340,7 @@ public:
 
     /// Write out all data buffers for this tree.
     void writeBuffers(std::ostream&, bool saveFloatAsHalf = false) const override;
+#endif // OPENVDB_ENABLE_TREE_IO
 
     void print(std::ostream& os = std::cout, int verboseLevel = 1) const override;
 
@@ -1250,6 +1251,7 @@ Tree<RootNodeType>::cbegin() const
 
 ////////////////////////////////////////
 
+#ifdef OPENVDB_ENABLE_TREE_IO
 
 template<typename RootNodeType>
 void
@@ -1298,6 +1300,7 @@ Tree<RootNodeType>::writeBuffers(std::ostream &os, bool saveFloatAsHalf) const
     mRoot.writeBuffers(os, saveFloatAsHalf);
 }
 
+#endif // OPENVDB_ENABLE_TREE_IO
 
 template<typename RootNodeType>
 template<typename ArrayT>

@@ -575,6 +575,7 @@ public:
     void copyToDense(const CoordBBox& bbox, DenseT& dense) const;
 
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     //
     // I/O
     //
@@ -584,6 +585,7 @@ public:
     void writeBuffers(std::ostream&, bool toHalf = false) const;
     void readBuffers(std::istream&, bool fromHalf = false);
     void readBuffers(std::istream&, const CoordBBox&, bool fromHalf = false);
+#endif
 
 
     //
@@ -2342,6 +2344,7 @@ RootNode<ChildT>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
 
 ////////////////////////////////////////
 
+#ifdef OPENVDB_ENABLE_TREE_IO
 
 template<typename ChildT>
 inline bool
@@ -2463,6 +2466,8 @@ RootNode<ChildT>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool 
     // Clip root-level tiles and prune children that were clipped.
     this->clip(clipBBox);
 }
+
+#endif // OPENVDB_ENABLE_TREE_IO
 
 
 ////////////////////////////////////////

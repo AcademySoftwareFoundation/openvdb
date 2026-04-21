@@ -1005,12 +1005,17 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
         if (codec) {
             codec->readTopology(is, *codecData, readOptions, diagnostics);
         } else {
+#ifdef OPENVDB_ENABLE_TREE_IO
             grid->readTopology(is);
+#else
+            OPENVDB_THROW(IoError, "Tree I/O functionality is not enabled");
+#endif
         }
         // read buffers
         if (codec) {
             codec->readBuffers(is, *codecData, readOptions, diagnostics);
         } else {
+#ifdef OPENVDB_ENABLE_TREE_IO
             const auto& worldBBox = readOptions.clipBBox;
             const bool clip = worldBBox.isSorted();
             if (clip) {
@@ -1019,6 +1024,9 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
             } else {
                 grid->readBuffers(is);
             }
+#else
+            OPENVDB_THROW(IoError, "Tree I/O functionality is not enabled");
+#endif
         }
     }
 
@@ -1204,7 +1212,11 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     if (codec) {
         codec->writeTopology(os, *grid, writeOptions);
     } else {
+#ifdef OPENVDB_ENABLE_TREE_IO
         grid->writeTopology(os);
+#else
+        OPENVDB_THROW(IoError, "Tree I/O functionality is not enabled");
+#endif
     }
 
     // Now we know the grid block storage position.
@@ -1214,7 +1226,11 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     if (codec) {
         codec->writeBuffers(os, *grid, writeOptions);
     } else {
+#ifdef OPENVDB_ENABLE_TREE_IO
         grid->writeBuffers(os);
+#else
+        OPENVDB_THROW(IoError, "Tree I/O functionality is not enabled");
+#endif
     }
 
     // Now we know the end position of this grid.

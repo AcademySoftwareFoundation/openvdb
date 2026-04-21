@@ -240,12 +240,14 @@ void testCodecIOImpl(
     ASSERT_TRUE(openvdb::io::CodecRegistry::isRegistered(GridT::gridType()));
     // test the io implementation (codec)
     testIOImpl<GridT>(gridName, bgValue, fillValue);
+#ifdef OPENVDB_ENABLE_TREE_IO
     // clear the codec registry (now read/write falls back to Tree I/O)
     openvdb::io::CodecRegistry::clear();
     // ensure the codec is not registered
     ASSERT_FALSE(openvdb::io::CodecRegistry::isRegistered(GridT::gridType()));
     // test the io implementation (tree I/O)
     testIOImpl<GridT>(gridName, bgValue, fillValue);
+#endif
 }
 
 TEST_F(TestCodec, testFloatCodecIO) { testCodecIOImpl<openvdb::FloatGrid>("float_grid", 0.0f, 1.0f); }

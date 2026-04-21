@@ -448,15 +448,15 @@ public:
 
     /// @brief Read the grid topology from a stream.
     /// This will read only the grid structure, not the actual data buffers.
-    virtual void readTopology(std::istream&) = 0;
+    virtual void readTopology(std::istream&) = OPENVDB_TREE_IO_VIRTUAL;
     /// @brief Write the grid topology to a stream.
     /// This will write only the grid structure, not the actual data buffers.
-    virtual void writeTopology(std::ostream&) const = 0;
+    virtual void writeTopology(std::ostream&) const = OPENVDB_TREE_IO_VIRTUAL;
 
     /// Read all data buffers for this grid.
-    virtual void readBuffers(std::istream&) = 0;
+    virtual void readBuffers(std::istream&) = OPENVDB_TREE_IO_VIRTUAL;
     /// Read all of this grid's data buffers that intersect the given index-space bounding box.
-    virtual void readBuffers(std::istream&, const CoordBBox&) = 0;
+    virtual void readBuffers(std::istream&, const CoordBBox&) = OPENVDB_TREE_IO_VIRTUAL;
 
 #if OPENVDB_ABI_VERSION_NUMBER < 14
     OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
@@ -464,7 +464,7 @@ public:
 #endif
 
     /// Write out all data buffers for this grid.
-    virtual void writeBuffers(std::ostream&) const = 0;
+    virtual void writeBuffers(std::ostream&) const = OPENVDB_TREE_IO_VIRTUAL;
 
     /// Read in the transform for this grid.
     void readTransform(std::istream& is) { transform().read(is); }
@@ -928,6 +928,7 @@ public:
     /// @name I/O
     /// @{
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     /// @brief Read the grid topology from a stream.
     /// This will read only the grid structure, not the actual data buffers.
     void readTopology(std::istream&) override;
@@ -939,14 +940,17 @@ public:
     void readBuffers(std::istream&) override;
     /// Read all of this grid's data buffers that intersect the given index-space bounding box.
     void readBuffers(std::istream&, const CoordBBox&) override;
+#endif // OPENVDB_ENABLE_TREE_IO
 
 #if OPENVDB_ABI_VERSION_NUMBER < 14
     OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     void readNonresidentBuffers() const override { }
 #endif
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     /// Write out all data buffers for this grid.
     void writeBuffers(std::ostream&) const override;
+#endif // OPENVDB_ENABLE_TREE_IO
 
     /// Output a human-readable description of this grid.
     void print(std::ostream& = std::cout, int verboseLevel = 1) const override;
@@ -1625,6 +1629,8 @@ Grid<TreeT>::evalActiveVoxelDim() const
 /// @internal Consider using the stream tagging mechanism (see io::Archive)
 /// to specify the float precision, but note that the setting is per-grid.
 
+#ifdef OPENVDB_ENABLE_TREE_IO
+
 template<typename TreeT>
 inline void
 Grid<TreeT>::readTopology(std::istream& is)
@@ -1716,6 +1722,8 @@ Grid<TreeT>::writeBuffers(std::ostream& os) const
         }
     }
 }
+
+#endif // OPENVDB_ENABLE_TREE_IO
 
 
 //static

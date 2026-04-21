@@ -454,6 +454,7 @@ public:
     /// Mark all values (both tiles and voxels) as active.
     void setValuesOn();
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     //
     // I/O
     //
@@ -463,6 +464,7 @@ public:
     void readBuffers(std::istream&, bool fromHalf = false);
     void readBuffers(std::istream&, const CoordBBox&, bool fromHalf = false);
 
+#endif // OPENVDB_ENABLE_TREE_IO
 
     //
     // Unsafe methods
@@ -2388,6 +2390,7 @@ InternalNode<ChildT, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense)
 
 ////////////////////////////////////////
 
+#ifdef OPENVDB_ENABLE_TREE_IO
 
 template<typename ChildT, Index Log2Dim>
 inline void
@@ -2458,6 +2461,7 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
     }
 }
 
+#endif // OPENVDB_ENABLE_TREE_IO
 
 ////////////////////////////////////////
 
@@ -3213,6 +3217,8 @@ InternalNode<ChildT, Log2Dim>::combine2(const InternalNode& other, const OtherVa
 ////////////////////////////////////////
 
 
+#ifdef OPENVDB_ENABLE_TREE_IO
+
 template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
@@ -3253,6 +3259,8 @@ InternalNode<ChildT, Log2Dim>::readBuffers(std::istream& is,
     }
     this->clip(clipBBox, background);
 }
+
+#endif // OPENVDB_ENABLE_TREE_IO
 
 
 ////////////////////////////////////////

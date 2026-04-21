@@ -105,6 +105,7 @@ TEST_F(TestAttributeGroup, testAttributeGroup)
         EXPECT_NO_THROW(GroupAttributeArray::cast(constGroupArray));
     }
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     { // IO
         const size_t count = 50;
         GroupAttributeArray attrA(count);
@@ -135,6 +136,7 @@ TEST_F(TestAttributeGroup, testAttributeGroup)
             EXPECT_EQ(attrA.get(i), attrB.get(i));
         }
     }
+#endif // OPENVDB_ENABLE_TREE_IO
 }
 
 

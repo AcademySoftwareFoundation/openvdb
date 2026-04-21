@@ -48,6 +48,7 @@ TEST_F(TestPointCodec, testPointIndexCodecIO)
         tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
     srcGrid->setName("point_index_grid");
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     const std::string rawPath = "testPointIndexCodec_raw.vdb";
 
     // Phase 1: write/read without codec
@@ -79,6 +80,7 @@ TEST_F(TestPointCodec, testPointIndexCodecIO)
     EXPECT_EQ(rawTopo->getName(), std::string("point_index_grid"));
 
     std::remove(rawPath.c_str());
+#endif
 
     const std::string codecPath = "testPointIndexCodec_codec.vdb";
 
@@ -194,6 +196,7 @@ TEST_F(TestPointCodec, testPointDataCodecIO)
             createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
         srcGrid->setName("pdg_positions");
 
+#ifdef OPENVDB_ENABLE_TREE_IO
         const std::string rawPath = "testPDG_A_raw.vdb";
 
         // Phase 1: write/read without codec
@@ -225,6 +228,7 @@ TEST_F(TestPointCodec, testPointDataCodecIO)
         EXPECT_EQ(rawTopo->activeVoxelCount(), Index64(4));
 
         std::remove(rawPath.c_str());
+#endif
 
         const std::string codecPath = "testPDG_A_codec.vdb";
 
@@ -325,6 +329,7 @@ TEST_F(TestPointCodec, testPointDataCodecIO)
 
         CodecRegistry::clear();
 
+#ifdef OPENVDB_ENABLE_TREE_IO
         const std::string rawPath = "testPDG_B_raw.vdb";
 
         // Phase 1: write/read without codec
@@ -343,6 +348,7 @@ TEST_F(TestPointCodec, testPointDataCodecIO)
         ASSERT_TRUE(rawGrid);
 
         std::remove(rawPath.c_str());
+#endif
 
         const std::string codecPath = "testPDG_B_codec.vdb";
 
