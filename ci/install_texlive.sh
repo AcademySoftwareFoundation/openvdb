@@ -13,7 +13,7 @@ rm install-tl-unx.tar.gz
 cd install-tl-*
 
 # Run the installer with no docs or source installation
-./install-tl --no-interaction --no-doc-install --no-src-install --scheme=minimal
+./install-tl --no-interaction --no-doc-install --no-src-install --scheme=minimal --repository https://mirror.ctan.org/systems/texlive/tlnet
 
 # Export the texlive PATH to GITHUB_PATH
 TEXLIVE_PATH=$(echo /usr/local/texlive/*/bin/x86_64-linux)
