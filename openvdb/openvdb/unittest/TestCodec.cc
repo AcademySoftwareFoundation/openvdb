@@ -240,12 +240,14 @@ void testCodecIOImpl(
     ASSERT_TRUE(openvdb::io::CodecRegistry::isRegistered(GridT::gridType()));
     // test the io implementation (codec)
     testIOImpl<GridT>(gridName, bgValue, fillValue);
+#ifdef OPENVDB_ENABLE_TREE_IO
     // clear the codec registry (now read/write falls back to Tree I/O)
     openvdb::io::CodecRegistry::clear();
     // ensure the codec is not registered
     ASSERT_FALSE(openvdb::io::CodecRegistry::isRegistered(GridT::gridType()));
     // test the io implementation (tree I/O)
     testIOImpl<GridT>(gridName, bgValue, fillValue);
+#endif
 }
 
 TEST_F(TestCodec, testFloatCodecIO) { testCodecIOImpl<openvdb::FloatGrid>("float_grid", 0.0f, 1.0f); }
@@ -264,16 +266,12 @@ TEST_F(TestCodec, testFloatToHalfCodecConversion)
     using namespace openvdb;
     using namespace openvdb::io;
 
-    openvdb::initialize();
-    CodecRegistry::clear();
-
     // Verify the conversion codec name
     const std::string expectedName = FloatGrid::gridType() + "_to_half";
     EXPECT_EQ((codecs::ScalarCodec<HalfGrid, FloatGrid, CodecMode::ReadOnly>::name()),
               expectedName);
 
-    // Verify the codec is registered after initialize()
-    io::internal::initialize();
+    // Verify the codec is registered
     EXPECT_TRUE(CodecRegistry::isRegistered(expectedName));
 
     // Write a FloatGrid with a known fill value (1.5f is exactly representable in half)

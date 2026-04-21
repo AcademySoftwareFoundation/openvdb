@@ -1276,6 +1276,7 @@ TEST_F(TestPointDataLeaf, testIO)
 }
 
 
+#ifdef OPENVDB_ENABLE_TREE_IO
 TEST_F(TestPointDataLeaf, testTreeIO)
 {
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
@@ -1365,6 +1366,7 @@ TEST_F(TestPointDataLeaf, testTreeIO)
         EXPECT_EQ(leaf2.attributeSet().size(), size_t(2));
     }
 }
+#endif // OPENVDB_ENABLE_TREE_IO
 
 
 TEST_F(TestPointDataLeaf, testSwap)

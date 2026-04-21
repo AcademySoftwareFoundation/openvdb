@@ -830,6 +830,7 @@ TEST_F(TestTree, testIO)
     }
 }
 
+#ifdef OPENVDB_ENABLE_TREE_IO
 
 TEST_F(TestTree, testTreeIO)
 {
@@ -881,6 +882,7 @@ TEST_F(TestTree, testTreeIO)
         ASSERT_DOUBLES_EXACTLY_EQUAL(sum, (0.234f + 4.5678f));
     }
 }
+#endif // OPENVDB_ENABLE_TREE_IO
 
 
 TEST_F(TestTree, testNegativeIndexing)

@@ -336,6 +336,7 @@ TEST_F(TestLeafMask, testIO)
     }
 }
 
+#ifdef OPENVDB_ENABLE_TREE_IO
 
 TEST_F(TestLeafMask, testTreeIO)
 {
@@ -364,6 +365,7 @@ TEST_F(TestLeafMask, testTreeIO)
 
     EXPECT_TRUE(leaf.onVoxelCount() == 2);
 }
+#endif // OPENVDB_ENABLE_TREE_IO
 
 
 TEST_F(TestLeafMask, testTopologyCopy)
