@@ -7,6 +7,7 @@
 #include <openvdb/tools/ValueTransformer.h> // for tools::setValueOnMin(), et al.
 #include <openvdb/tree/LeafNode.h>
 #include <openvdb/io/Compression.h> // for io::RealToHalf
+#include <openvdb/io/Stream.h>
 #include <openvdb/math/Math.h> // for Abs()
 #include <openvdb/openvdb.h>
 #include <openvdb/util/CpuTimer.h>
@@ -104,6 +105,10 @@ TEST_F(TestTree, testChangeBackground)
 
 TEST_F(TestTree, testHalf)
 {
+    // explicitly register these grid types as they are not registered by default
+    openvdb::Grid<openvdb::Vec2STree>::registerGrid();
+    openvdb::Grid<openvdb::Vec2DTree>::registerGrid();
+
     testWriteHalf<openvdb::FloatTree>();
     testWriteHalf<openvdb::DoubleTree>();
     testWriteHalf<openvdb::Vec2STree>();
@@ -125,27 +130,54 @@ TestTree::testWriteHalf()
     using GridType = openvdb::Grid<TreeType>;
     using ValueT = typename TreeType::ValueType;
     ValueT background(5);
-    GridType grid(background);
+    typename GridType::Ptr grid = GridType::create(background);
+    grid->setName("density");
 
     unittest_util::makeSphere<GridType>(openvdb::Coord(64, 64, 64),
                                         openvdb::Vec3f(35, 30, 40),
-                                        /*radius=*/10, grid,
+                                        /*radius=*/10, *grid,
                                         /*dx=*/1.0f, unittest_util::SPHERE_DENSE);
-    EXPECT_TRUE(!grid.tree().empty());
+    EXPECT_TRUE(!grid->tree().empty());
+
+    // find stream and grid header position for save as float
+
+    size_t headerSize = 0;
+    {
+        std::ostringstream outFull(std::ios_base::binary);
+        openvdb::io::Stream streamFull(outFull);
+        streamFull.write({});
+        openvdb::io::GridDescriptor gd(grid->getName(), grid->type());
+        gd.writeHeader(outFull);
+        headerSize = outFull.str().size();
+    }
+
+    // find stream and grid header position for save as half
+
+    size_t halfHeaderSize = 0;
+    {
+        std::ostringstream outHalf(std::ios_base::binary);
+        openvdb::io::Stream streamHalf(outHalf);
+        streamHalf.write({});
+        openvdb::io::GridDescriptor gdHalf(grid->getName(), grid->type(), /*half=*/true);
+        gdHalf.writeHeader(outHalf);
+        halfHeaderSize = outHalf.str().size();
+    }
 
     // Write grid blocks in both float and half formats.
     std::ostringstream outFull(std::ios_base::binary);
-    grid.setSaveFloatAsHalf(false);
-    grid.writeBuffers(outFull);
+    openvdb::io::Stream streamFull(outFull);
+    grid->setSaveFloatAsHalf(false);
+    streamFull.write({grid});
     outFull.flush();
-    const size_t fullBytes = outFull.str().size();
+    const size_t fullBytes = outFull.str().size() - headerSize;
     if (fullBytes == 0) FAIL() << "wrote empty full float buffers";
 
     std::ostringstream outHalf(std::ios_base::binary);
-    grid.setSaveFloatAsHalf(true);
-    grid.writeBuffers(outHalf);
+    openvdb::io::Stream streamHalf(outHalf);
+    grid->setSaveFloatAsHalf(true);
+    streamHalf.write({grid});
     outHalf.flush();
-    const size_t halfBytes = outHalf.str().size();
+    const size_t halfBytes = outHalf.str().size() - halfHeaderSize;
     if (halfBytes == 0) FAIL() << "wrote empty half float buffers";
 
     if (openvdb::io::RealToHalf<ValueT>::isReal) {
@@ -166,22 +198,26 @@ TestTree::testWriteHalf()
     // then write it out again in half float format.  Verify that the resulting file
     // is identical to the original half float file.
     {
-        openvdb::Grid<TreeType> gridCopy(grid);
-        gridCopy.setSaveFloatAsHalf(true);
         std::istringstream is(outHalf.str(), std::ios_base::binary);
+        openvdb::io::Stream streamHalf2(is);
 
-        // Since the input stream doesn't include a VDB header with file format version info,
-        // tag the input stream explicitly with the current version number.
-        openvdb::io::setCurrentVersion(is);
-
-        gridCopy.readBuffers(is);
+        openvdb::GridPtrVecPtr grids = streamHalf2.getGrids();
+        openvdb::GridBase::Ptr gridCopy = (*grids)[0];
+        gridCopy->setSaveFloatAsHalf(true);
 
         std::ostringstream outDiff(std::ios_base::binary);
-        gridCopy.writeBuffers(outDiff);
+        openvdb::io::Stream streamDiff(outDiff);
+        streamDiff.write({gridCopy});
         outDiff.flush();
 
-        if (outHalf.str() != outDiff.str()) {
-            FAIL() << "half-from-full and half-from-half buffers differ";
+        // Compare the two buffers, skipping the header region
+        {
+            const std::string s1 = outHalf.str().substr(halfHeaderSize);
+            const std::string s2 = outDiff.str().substr(halfHeaderSize);
+            if (s1 != s2)
+            {
+                FAIL() << "half-from-full and half-from-half buffers differ";
+            }
         }
     }
 }
@@ -731,7 +767,68 @@ TEST_F(TestTree, testIterators)
 
 TEST_F(TestTree, testIO)
 {
-    const char* filename = "testIO.dbg";
+    using TreeType = openvdb::tree::Tree<RootNodeType>;
+    using GridType = openvdb::Grid<TreeType>;
+
+    const char* filename = "testIO.vdb";
+    openvdb::SharedPtr<const char> scopedFile(filename, ::remove);
+    {
+        ValueType background=5.0f;
+        GridType::Ptr grid = GridType::create(background);
+        grid->setName("test_grid");
+        grid->tree().setValueOn(openvdb::Coord(5,10,20),0.234f);
+        grid->tree().setValueOn(openvdb::Coord(50000,20000,30000),4.5678f);
+
+        openvdb::GridCPtrVec grids;
+        grids.push_back(grid);
+
+        openvdb::io::File file(filename);
+        file.write(grids);
+        file.close();
+    }
+    {
+        ValueType background=2.0f;
+        GridType::Ptr grid = GridType::create(background);
+        ASSERT_DOUBLES_EXACTLY_EQUAL(background, grid->tree().getValue(openvdb::Coord(5,10,20)));
+
+        {
+            openvdb::io::File file(filename);
+            file.open();
+            openvdb::GridBase::Ptr baseGrid = file.readGrid("test_grid");
+            file.close();
+
+            grid = openvdb::gridPtrCast<GridType>(baseGrid);
+            EXPECT_TRUE(grid.get() != nullptr);
+        }
+
+        ASSERT_DOUBLES_EXACTLY_EQUAL(0.234f, grid->tree().getValue(openvdb::Coord(5,10,20)));
+        ASSERT_DOUBLES_EXACTLY_EQUAL(5.0f, grid->tree().getValue(openvdb::Coord(5,11,20)));
+        ValueType sum=0.0f;
+        for (RootNodeType::ChildOnIter root_iter = grid->tree().root().beginChildOn();
+            root_iter.test(); ++root_iter)
+        {
+            for (InternalNodeType2::ChildOnIter internal_iter2 = root_iter->beginChildOn();
+                internal_iter2.test(); ++internal_iter2)
+            {
+                for (InternalNodeType1::ChildOnIter internal_iter1 =
+                    internal_iter2->beginChildOn(); internal_iter1.test(); ++internal_iter1)
+                {
+                    for (LeafNodeType::ValueOnIter block_iter =
+                        internal_iter1->beginValueOn(); block_iter.test(); ++block_iter)
+                    {
+                        sum += *block_iter;
+                    }
+                }
+            }
+        }
+        ASSERT_DOUBLES_EXACTLY_EQUAL(sum, (0.234f + 4.5678f));
+    }
+}
+
+
+TEST_F(TestTree, testTreeIO)
+{
+    const char* filename = "testTreeIO.dbg";
     openvdb::SharedPtr<const char> scopedFile(filename, ::remove);
     {
         ValueType background=5.0f;
@@ -750,8 +847,6 @@ TEST_F(TestTree, testIO)
         ASSERT_DOUBLES_EXACTLY_EQUAL(background, root_node.getValue(openvdb::Coord(5,10,20)));
         {
             std::ifstream is(filename, std::ios_base::binary);
-            // Since the test file doesn't include a VDB header with file format version info,
-            // tag the input stream explicitly with the current version number.
             openvdb::io::setCurrentVersion(is);
             root_node.readTopology(is);
             root_node.readBuffers(is);

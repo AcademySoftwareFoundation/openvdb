@@ -44,7 +44,7 @@
 class TestFile: public ::testing::Test
 {
 public:
-    void SetUp() override {}
+    void SetUp() override { openvdb::initialize(); }
     void TearDown() override { openvdb::uninitialize(); }
 
     void testHeader();
@@ -126,8 +126,6 @@ TestFile::testWriteGrid()
     tree.setValue(Coord(0, 0, 0), 5);
 
     // Add some metadata.
-    Metadata::clearRegistry();
-    StringMetadata::registerType();
     const std::string meta0Val, meta1Val("Hello, world.");
     Metadata::Ptr stringMetadata = Metadata::createMetadata(typeNameAsString<std::string>());
     EXPECT_TRUE(stringMetadata);
@@ -157,22 +155,6 @@ TestFile::testWriteGrid()
     io::setCurrentVersion(istr);
 
     GridBase::Ptr gd2_grid;
-    EXPECT_THROW(gd2.read(istr), openvdb::LookupError);
-
-    // Register the grid and the transform and the blocks.
-    GridBase::clearRegistry();
-    GridType::registerGrid();
-
-    // Register transform maps
-    math::MapRegistry::clear();
-    math::AffineMap::registerMap();
-    math::ScaleMap::registerMap();
-    math::UniformScaleMap::registerMap();
-    math::TranslationMap::registerMap();
-    math::ScaleTranslateMap::registerMap();
-    math::UniformScaleTranslateMap::registerMap();
-    math::NonlinearFrustumMap::registerMap();
-
     istr.seekg(0, std::ios_base::beg);
     EXPECT_NO_THROW(gd2_grid = gd2.read(istr));
 
@@ -207,10 +189,6 @@ TestFile::testWriteGrid()
     EXPECT_EQ(
         grid->baseTree().treeDepth(), gd2_grid->baseTree().treeDepth());
 
-    //EXPECT_EQ(0.1, gd2_grid->getTransform()->getVoxelSizeX());
-    //EXPECT_EQ(0.1, gd2_grid->getTransform()->getVoxelSizeY());
-    //EXPECT_EQ(0.1, gd2_grid->getTransform()->getVoxelSizeZ());
-
     // Read in the data blocks.
     gd2.seekToBlocks(istr);
     gd2_grid->readBuffers(istr);
@@ -220,10 +198,6 @@ TestFile::testWriteGrid()
     EXPECT_EQ(5, tree2->getValue(Coord(0, 0, 0)));
 
     EXPECT_EQ(1, tree2->getValue(Coord(1000, 1000, 16000)));
-    // Clear registries.
-    GridBase::clearRegistry();
-    Metadata::clearRegistry();
-    math::MapRegistry::clear();
 
     remove("something.vdb2");
 }
@@ -275,20 +249,6 @@ TestFile::testWriteMultipleGrids()
     EXPECT_TRUE(gd2.getGridPos() != 0);
     EXPECT_TRUE(gd2.getBlockPos() != 0);
     EXPECT_TRUE(gd2.getEndPos() != 0);
-
-    // register the grid
-    GridBase::clearRegistry();
-    GridType::registerGrid();
-
-    // register maps
-    math::MapRegistry::clear();
-    math::AffineMap::registerMap();
-    math::ScaleMap::registerMap();
-    math::UniformScaleMap::registerMap();
-    math::TranslationMap::registerMap();
-    math::ScaleTranslateMap::registerMap();
-    math::UniformScaleTranslateMap::registerMap();
-    math::NonlinearFrustumMap::registerMap();
 
     // Read in the first grid descriptor.
     GridDescriptor gd_in;
@@ -377,10 +337,6 @@ TestFile::testWriteMultipleGrids()
     EXPECT_EQ(10, grid2_in->getValue(Coord(0, 0, 0)));
     EXPECT_EQ(2, grid2_in->getValue(Coord(100000, 100000, 16000)));
 
-    // Clear registries.
-    GridBase::clearRegistry();
-
-    math::MapRegistry::clear();
     remove("something.vdb2");
 }
 TEST_F(TestFile, testWriteMultipleGrids) { testWriteMultipleGrids(); }
@@ -393,12 +349,6 @@ TEST_F(TestFile, testWriteFloatAsHalf)
 
     using TreeType = Vec3STree;
     using GridType = Grid<TreeType>;
-
-    // Register all grid types.
-    initialize();
-    // Ensure that the registry is cleared on exit.
-    struct Local { static void uninitialize(char*) { openvdb::uninitialize(); } };
-    SharedPtr<char> onExit(nullptr, Local::uninitialize);
 
     // Create two test grids.
     GridType::Ptr grid1 = createGrid<GridType>(/*bg=*/Vec3s(1, 1, 1));
@@ -459,9 +409,6 @@ TEST_F(TestFile, testWriteFloatAsHalf)
 TEST_F(TestFile, testWriteInstancedGrids)
 {
     using namespace openvdb;
-
-    // Register data types.
-    openvdb::initialize();
 
     // Remove something.vdb2 when done. We must declare this here before the
     // other grid smart_ptr's because we re-use them in the test several times.
@@ -680,19 +627,6 @@ TestFile::testReadGridDescriptors()
     file.writeGrid(gd, grid, ostr, /*seekable=*/true);
     file.writeGrid(gd2, grid2, ostr, /*seekable=*/true);
 
-    // Register the grid and the transform and the blocks.
-    GridBase::clearRegistry();
-    GridType::registerGrid();
-    // register maps
-    math::MapRegistry::clear();
-    math::AffineMap::registerMap();
-    math::ScaleMap::registerMap();
-    math::UniformScaleMap::registerMap();
-    math::TranslationMap::registerMap();
-    math::ScaleTranslateMap::registerMap();
-    math::UniformScaleTranslateMap::registerMap();
-    math::NonlinearFrustumMap::registerMap();
-
     // Read in the grid descriptors.
     File file2("something.vdb2");
     std::istringstream istr(ostr.str(), std::ios_base::binary);
@@ -716,10 +650,6 @@ TestFile::testReadGridDescriptors()
     EXPECT_EQ(gd2.getBlockPos(), file2gd.getBlockPos());
     EXPECT_EQ(gd2.getEndPos(), file2gd.getEndPos());
 
-    // Clear registries.
-    GridBase::clearRegistry();
-    math::MapRegistry::clear();
-
     remove("something.vdb2");
 }
 TEST_F(TestFile, testReadGridDescriptors) { testReadGridDescriptors(); }
@@ -731,9 +661,6 @@ TEST_F(TestFile, testGridNaming)
     using namespace openvdb::io;
 
     using TreeType = Int32Tree;
-
-    // Register data types.
-    openvdb::initialize();
 
     logging::LevelScope suppressLogging{logging::Level::Fatal};
 
@@ -947,19 +874,6 @@ TestFile::testEmptyGridIO()
     EXPECT_EQ(gd.getEndPos(), gd.getBlockPos());
     EXPECT_EQ(gd2.getEndPos(), gd2.getBlockPos());
 
-    // Register the grid and the transform and the blocks.
-    GridBase::clearRegistry();
-    GridType::registerGrid();
-    // register maps
-    math::MapRegistry::clear();
-    math::AffineMap::registerMap();
-    math::ScaleMap::registerMap();
-    math::UniformScaleMap::registerMap();
-    math::TranslationMap::registerMap();
-    math::ScaleTranslateMap::registerMap();
-    math::UniformScaleTranslateMap::registerMap();
-    math::NonlinearFrustumMap::registerMap();
-
     // Read in the grid descriptors.
     File file2(filename);
     std::istringstream istr(ostr.str(), std::ios_base::binary);
@@ -1002,10 +916,6 @@ TestFile::testEmptyGridIO()
     EXPECT_EQ(gd2.getGridPos(), file2gd.getGridPos());
     EXPECT_EQ(gd2.getBlockPos(), file2gd.getBlockPos());
     EXPECT_EQ(gd2.getEndPos(), file2gd.getEndPos());
-
-    // Clear registries.
-    GridBase::clearRegistry();
-    math::MapRegistry::clear();
 }
 TEST_F(TestFile, testEmptyGridIO) { testEmptyGridIO(); }
 
@@ -1055,23 +965,6 @@ void TestFile::testOpen()
     EXPECT_TRUE(meta.metaValue<std::string>("author") == "Einstein");
     EXPECT_EQ(2009, meta.metaValue<int32_t>("year"));
 
-    // Register grid and transform.
-    GridBase::clearRegistry();
-    IntGrid::registerGrid();
-    FloatGrid::registerGrid();
-    Metadata::clearRegistry();
-    StringMetadata::registerType();
-    Int32Metadata::registerType();
-    // register maps
-    math::MapRegistry::clear();
-    math::AffineMap::registerMap();
-    math::ScaleMap::registerMap();
-    math::UniformScaleMap::registerMap();
-    math::TranslationMap::registerMap();
-    math::ScaleTranslateMap::registerMap();
-    math::UniformScaleTranslateMap::registerMap();
-    math::NonlinearFrustumMap::registerMap();
-
     // Write the vdb out to a file.
     io::File vdbfile("something.vdb2");
     vdbfile.write(grids, meta);
@@ -1120,11 +1013,6 @@ void TestFile::testOpen()
     EXPECT_THROW(vdbfile2.open(), openvdb::IoError);
     EXPECT_THROW(vdbfile2.inputStream(), openvdb::IoError);
 
-    // Clear registries.
-    GridBase::clearRegistry();
-    Metadata::clearRegistry();
-    math::MapRegistry::clear();
-
     // Test closing the file.
     vdbfile.close();
     EXPECT_TRUE(vdbfile.isOpen() == false);
@@ -1166,11 +1054,6 @@ TEST_F(TestFile, testGetMetadata)
     meta.insertMeta("author", StringMetadata("Einstein"));
     meta.insertMeta("year", Int32Metadata(2009));
 
-    // Adjust registry before writing.
-    Metadata::clearRegistry();
-    StringMetadata::registerType();
-    Int32Metadata::registerType();
-
     // Write the vdb out to a file.
     io::File vdbfile("something.vdb2");
     vdbfile.write(grids, meta);
@@ -1186,9 +1069,6 @@ TEST_F(TestFile, testGetMetadata)
 
     EXPECT_TRUE(meta2->metaValue<std::string>("author") == "Einstein");
     EXPECT_EQ(2009, meta2->metaValue<int32_t>("year"));
-
-    // Clear registry.
-    Metadata::clearRegistry();
 
     remove("something.vdb2");
 }
@@ -1234,9 +1114,6 @@ TEST_F(TestFile, testReadAll)
     grids.push_back(grid1);
     grids.push_back(grid2);
 
-    // Register grid and transform.
-    openvdb::initialize();
-
     // Write the vdb out to a file.
     io::File vdbfile("something.vdb2");
     vdbfile.write(grids, meta);
@@ -1276,11 +1153,6 @@ TEST_F(TestFile, testReadAll)
     EXPECT_NEAR(10, temperature->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
     EXPECT_NEAR(11, temperature->getValue(Coord(0, 100, 0)), /*tolerance=*/0);
 
-    // Clear registries.
-    GridBase::clearRegistry();
-    Metadata::clearRegistry();
-    math::MapRegistry::clear();
-
     vdbfile2.close();
 
     remove("something.vdb2");
@@ -1294,11 +1166,6 @@ TEST_F(TestFile, testWriteOpenFile)
     MetaMap::Ptr meta(new MetaMap);
     meta->insertMeta("author", StringMetadata("Einstein"));
     meta->insertMeta("year", Int32Metadata(2009));
-
-    // Register metadata
-    Metadata::clearRegistry();
-    StringMetadata::registerType();
-    Int32Metadata::registerType();
 
     // Write the metadata out to a file.
     io::File vdbfile("something.vdb2");
@@ -1330,9 +1197,6 @@ TEST_F(TestFile, testWriteOpenFile)
 
     EXPECT_NO_THROW(vdbfile2.write(*grids));
 
-    // Clear registries.
-    Metadata::clearRegistry();
-
     remove("something.vdb2");
 }
 
@@ -1340,8 +1204,6 @@ TEST_F(TestFile, testWriteOpenFile)
 TEST_F(TestFile, testReadGridMetadata)
 {
     using namespace openvdb;
-
-    openvdb::initialize();
 
     const char* filename = "testReadGridMetadata.vdb2";
     SharedPtr<const char> scopedFile(filename, ::remove);
@@ -1512,9 +1374,6 @@ TEST_F(TestFile, testReadGrid)
     grids.push_back(grid);
     grids.push_back(grid2);
 
-    // Register grid and transform.
-    openvdb::initialize();
-
     // Write the vdb out to a file.
     io::File vdbfile("something.vdb2");
     vdbfile.write(grids, meta);
@@ -1548,11 +1407,6 @@ TEST_F(TestFile, testReadGrid)
 
     EXPECT_NEAR(5,typedDensity->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
     EXPECT_NEAR(6,typedDensity->getValue(Coord(100, 0, 0)), /*tolerance=*/0);
-
-    // Clear registries.
-    GridBase::clearRegistry();
-    Metadata::clearRegistry();
-    math::MapRegistry::clear();
 
     vdbfile2.close();
 
@@ -1603,9 +1457,6 @@ validateClippedGrid(const GridT& clipped, const typename GridT::ValueType& fg)
 TEST_F(TestFile, testReadClippedGrid)
 {
     using namespace openvdb;
-
-    // Register types.
-    openvdb::initialize();
 
     // World-space clipping region
     const BBoxd clipBox(Vec3d(4.0, 4.0, -6.0), Vec3d(4.9, 4.9, 6.0));
@@ -1958,23 +1809,6 @@ TEST_F(TestFile, testHasGrid)
     grids.push_back(grid);
     grids.push_back(grid2);
 
-    // Register grid and transform.
-    GridBase::clearRegistry();
-    IntGrid::registerGrid();
-    FloatGrid::registerGrid();
-    Metadata::clearRegistry();
-    StringMetadata::registerType();
-    Int32Metadata::registerType();
-    // register maps
-    math::MapRegistry::clear();
-    math::AffineMap::registerMap();
-    math::ScaleMap::registerMap();
-    math::UniformScaleMap::registerMap();
-    math::TranslationMap::registerMap();
-    math::ScaleTranslateMap::registerMap();
-    math::UniformScaleTranslateMap::registerMap();
-    math::NonlinearFrustumMap::registerMap();
-
     // Write the vdb out to a file.
     io::File vdbfile("something.vdb2");
     vdbfile.write(grids, meta);
@@ -1989,11 +1823,6 @@ TEST_F(TestFile, testHasGrid)
     EXPECT_TRUE(vdbfile2.hasGrid("temperature"));
     EXPECT_TRUE(!vdbfile2.hasGrid("Temperature"));
     EXPECT_TRUE(!vdbfile2.hasGrid("densitY"));
-
-    // Clear registries.
-    GridBase::clearRegistry();
-    Metadata::clearRegistry();
-    math::MapRegistry::clear();
 
     vdbfile2.close();
 
@@ -2039,9 +1868,6 @@ TEST_F(TestFile, testNameIterator)
     grid = createGrid(ftree);
     grid->setName("level_set");
     grids.push_back(grid);
-
-    // Register types.
-    openvdb::initialize();
 
     const char* filename = "testNameIterator.vdb2";
     SharedPtr<const char> scopedFile(filename, ::remove);
@@ -2089,9 +1915,6 @@ TEST_F(TestFile, testCompression)
     using namespace openvdb::io;
 
     using IntGrid = openvdb::Int32Grid;
-
-    // Register types.
-    openvdb::initialize();
 
     // Create reference grids.
     IntGrid::Ptr intGrid = IntGrid::create(/*background=*/0);
@@ -2302,9 +2125,6 @@ TEST_F(TestFile, testAsync)
 {
     using namespace openvdb;
 
-    // Register types.
-    openvdb::initialize();
-
     // Create a grid.
     FloatGrid::Ptr lsGrid = createLevelSet<FloatGrid>();
     unittest_util::makeSphere(/*dim=*/Coord(100), /*ctr=*/Vec3f(50, 50, 50), /*r=*/20.0,
@@ -2422,8 +2242,6 @@ TEST_F(TestFile, testAsync)
 // (see https://github.com/Blosc/c-blosc/pull/63).
 TEST_F(TestFile, testBlosc)
 {
-    openvdb::initialize();
-
     const unsigned char rawdata[] = {
         0x93, 0xb0, 0x49, 0xaf, 0x62, 0xad, 0xe3, 0xaa, 0xe4, 0xa5, 0x43, 0x20, 0x24,
         0x29, 0xc9, 0xaf, 0xee, 0xad, 0x0b, 0xac, 0x3d, 0xa8, 0x1f, 0x99, 0x53, 0x27,
