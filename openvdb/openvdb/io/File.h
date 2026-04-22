@@ -87,7 +87,7 @@ public:
     MetaMap::Ptr getMetadata() const;
 
     /// Read the entire contents of the file and return a list of grid pointers.
-    GridPtrVecPtr getGrids() const;
+    GridPtrVecPtr getGrids(const io::ReadOptions& readOptions = io::ReadOptions{}) const;
 
     /// @brief Read just the grid metadata and transforms from the file and return a list
     /// of pointers to grids that are empty except for their metadata and transforms.
@@ -100,8 +100,8 @@ public:
     /// @throw KeyError if no grid with the given name exists in this file.
     GridBase::Ptr readGridMetadata(const Name&);
 
-    /// Read an entire grid, including all of its data blocks.
-    GridBase::Ptr readGrid(const Name&);
+    /// Read an entire grid, including all of its data blocks, using the provided options if given.
+    GridBase::Ptr readGrid(const Name&, const io::ReadOptions& readOptions = io::ReadOptions{});
     /// @brief Read a grid, including its data blocks, but only where it
     /// intersects the given world-space bounding box.
     GridBase::Ptr readGrid(const Name&, const BBoxd&);
@@ -110,12 +110,14 @@ public:
 
     /// @brief Write the grids in the given container to the file whose name
     /// was given in the constructor.
-    void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const override;
+    void write(const GridCPtrVec&, const MetaMap& = MetaMap(),
+        const io::WriteOptions& = io::WriteOptions{}) const override;
 
     /// @brief Write the grids in the given container to the file whose name
     /// was given in the constructor.
     template<typename GridPtrContainerT>
-    void write(const GridPtrContainerT&, const MetaMap& = MetaMap()) const;
+    void write(const GridPtrContainerT&, const MetaMap& = MetaMap(),
+        const io::WriteOptions& = io::WriteOptions{}) const;
 
     /// A const iterator that iterates over all names in the file. This is only
     /// valid once the file has been opened.
@@ -155,7 +157,7 @@ private:
     /// @throw KeyError if no grid with the given name exists in this file.
     GridBase::Ptr retrieveCachedGrid(const Name&) const;
 
-    void writeGrids(const GridCPtrVec&, const MetaMap&) const;
+    void writeGrids(const GridCPtrVec&, const MetaMap&, const io::WriteOptions&) const;
 
     MetaMap::Ptr fileMetadata();
     MetaMap::ConstPtr fileMetadata() const;
@@ -191,19 +193,21 @@ private:
 
 
 inline void
-File::write(const GridCPtrVec& grids, const MetaMap& meta) const
+File::write(const GridCPtrVec& grids, const MetaMap& meta,
+    const io::WriteOptions& writeOptions) const
 {
-    this->writeGrids(grids, meta);
+    this->writeGrids(grids, meta, writeOptions);
 }
 
 
 template<typename GridPtrContainerT>
 inline void
-File::write(const GridPtrContainerT& container, const MetaMap& meta) const
+File::write(const GridPtrContainerT& container, const MetaMap& meta,
+    const io::WriteOptions& writeOptions) const
 {
     GridCPtrVec grids;
     std::copy(container.begin(), container.end(), std::back_inserter(grids));
-    this->writeGrids(grids, meta);
+    this->writeGrids(grids, meta, writeOptions);
 }
 
 } // namespace io

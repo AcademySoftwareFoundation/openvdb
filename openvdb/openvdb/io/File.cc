@@ -224,7 +224,7 @@ File::open()
             gd.readHeader(inputStream());
             gd.readStreamPos(inputStream());
 
-            GridBase::Ptr grid = Archive::readGrid(gd, inputStream(), BBoxd());
+            GridBase::Ptr grid = Archive::readGrid(gd, inputStream(), io::ReadOptions{});
 
             mGridDescriptors.insert(std::make_pair(gd.gridName(), gd));
             mGrids->push_back(grid);
@@ -298,7 +298,7 @@ File::getMetadata() const
 
 
 GridPtrVecPtr
-File::getGrids() const
+File::getGrids(const io::ReadOptions& readOptions) const
 {
     if (!mIsOpen) {
         OPENVDB_THROW(IoError, mFilename << " is not open for reading");
@@ -319,7 +319,7 @@ File::getGrids() const
             const GridDescriptor& gd = i->second;
             // Seek to the grid in the file.
             gd.seekToGrid(inputStream());
-            GridBase::Ptr grid = Archive::readGrid(gd, inputStream(), BBoxd());
+            GridBase::Ptr grid = Archive::readGrid(gd, inputStream(), readOptions);
             ret->push_back(grid);
             namedGrids[gd.uniqueName()] = grid;
         }
@@ -385,7 +385,9 @@ File::readAllGridMetadata()
             const GridDescriptor& gd = i->second;
             // Seek to the grid in the file.
             gd.seekToGrid(inputStream());
-            GridBase::ConstPtr grid = Archive::readGrid(gd, inputStream(), BBoxd(), /*partial=*/true);
+            io::ReadOptions readOptions;
+            readOptions.readMode = io::ReadMode::TopologyOnly;
+            GridBase::ConstPtr grid = Archive::readGrid(gd, inputStream(), readOptions);
             // Return copies of the grids, but with empty trees.
             // (As of 0.98.0, at least, it would suffice to just const cast
             // the grid pointers returned by readGrid(partial=true), but shallow
@@ -423,7 +425,9 @@ File::readGridMetadata(const Name& name)
         // Seek to and read in the grid from the file.
         const GridDescriptor& gd = it->second;
         gd.seekToGrid(inputStream());
-        ret = Archive::readGrid(gd, inputStream(), BBoxd(), /*partial=*/true);
+        io::ReadOptions readOptions;
+        readOptions.readMode = io::ReadMode::TopologyOnly;
+        ret = Archive::readGrid(gd, inputStream(), readOptions);
     }
     return ret->copyGridWithNewTree();
 }
@@ -433,26 +437,28 @@ File::readGridMetadata(const Name& name)
 
 
 GridBase::Ptr
-File::readGrid(const Name& name)
+File::readGrid(const Name& name, const BBoxd& bbox)
 {
-    return readGrid(name, BBoxd());
+    io::ReadOptions readOptions;
+    readOptions.clipBBox = bbox;
+    return readGrid(name, readOptions);
 }
 
 
 GridBase::Ptr
-File::readGrid(const Name& name, const BBoxd& bbox)
+File::readGrid(const Name& name, const io::ReadOptions& readOptions)
 {
     if (!mIsOpen) {
         OPENVDB_THROW(IoError, mFilename << " is not open for reading.");
     }
-
-    const bool clip = bbox.isSorted();
 
     // If a grid with the given name was already read and cached
     // (along with the entire contents of the file, because the file
     // doesn't support random access), retrieve and return it.
     GridBase::Ptr grid = retrieveCachedGrid(name);
     if (grid) {
+        const auto& bbox = readOptions.clipBBox;
+        const bool clip = bbox.isSorted();
         if (clip) {
             grid = grid->deepCopyGrid();
             grid->clipGrid(bbox);
@@ -471,7 +477,7 @@ File::readGrid(const Name& name, const BBoxd& bbox)
     OPENVDB_ASSERT(inputHasGridOffsets());
     // Seek to the grid in the file.
     gd.seekToGrid(inputStream());
-    grid = Archive::readGrid(gd, inputStream(), bbox);
+    grid = Archive::readGrid(gd, inputStream(), readOptions);
 
     if (gd.isInstance()) {
         /// @todo Refactor to share code with Archive::connectInstance()?
@@ -487,7 +493,7 @@ File::readGrid(const Name& name, const BBoxd& bbox)
         GridBase::Ptr parent;
         OPENVDB_ASSERT(inputHasGridOffsets());
         parentIt->second.seekToGrid(inputStream());
-        parent = Archive::readGrid(parentIt->second, inputStream(), bbox);
+        parent = Archive::readGrid(parentIt->second, inputStream(), readOptions);
         if (parent) grid->setTree(parent->baseTreePtr());
     }
     return grid;
@@ -498,7 +504,7 @@ File::readGrid(const Name& name, const BBoxd& bbox)
 
 
 void
-File::writeGrids(const GridCPtrVec& grids, const MetaMap& meta) const
+File::writeGrids(const GridCPtrVec& grids, const MetaMap& meta, const io::WriteOptions& writeOptions) const
 {
     if (mIsOpen) {
         OPENVDB_THROW(IoError,
@@ -515,7 +521,7 @@ File::writeGrids(const GridCPtrVec& grids, const MetaMap& meta) const
     }
 
     // Write out the vdb.
-    Archive::write(file, grids, /*seekable=*/true, meta);
+    Archive::write(file, grids, /*seekable=*/true, meta, writeOptions);
 
     file.close();
 }
