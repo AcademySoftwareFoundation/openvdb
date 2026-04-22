@@ -154,22 +154,11 @@ TestFile::testWriteGrid()
     // it doesn't have a header), set the file format version number explicitly.
     io::setCurrentVersion(istr);
 
-    GridBase::Ptr gd2_grid;
     istr.seekg(0, std::ios_base::beg);
-    EXPECT_NO_THROW(gd2_grid = gd2.read(istr));
+    gd2.readHeader(istr);
+    gd2.readStreamPos(istr);
 
-    EXPECT_EQ(gd.gridName(), gd2.gridName());
-    EXPECT_EQ(GridType::gridType(), gd2_grid->type());
-    EXPECT_EQ(gd.getGridPos(), gd2.getGridPos());
-    EXPECT_EQ(gd.getBlockPos(), gd2.getBlockPos());
-    EXPECT_EQ(gd.getEndPos(), gd2.getEndPos());
-
-    // Position the stream to beginning of the grid storage and read the grid.
-    gd2.seekToGrid(istr);
-    Archive::readGridCompression(istr);
-    gd2_grid->readMeta(istr);
-    gd2_grid->readTransform(istr);
-    gd2_grid->readTopology(istr);
+    GridBase::Ptr gd2_grid = Archive::readGrid(gd2, istr, BBoxd());
 
     // Delay load metadata should not exist.
     ASSERT_FALSE(bool((*gd2_grid)["file_delayed_load"]));
@@ -189,9 +178,6 @@ TestFile::testWriteGrid()
     EXPECT_EQ(
         grid->baseTree().treeDepth(), gd2_grid->baseTree().treeDepth());
 
-    // Read in the data blocks.
-    gd2.seekToBlocks(istr);
-    gd2_grid->readBuffers(istr);
     TreeType::Ptr tree2 = DynamicPtrCast<TreeType>(gd2_grid->baseTreePtr());
     EXPECT_TRUE(tree2.get() != nullptr);
     EXPECT_EQ(10, tree2->getValue(Coord(10, 1, 2)));
@@ -255,8 +241,10 @@ TestFile::testWriteMultipleGrids()
     std::istringstream istr(ostr.str(), std::ios_base::binary);
     io::setCurrentVersion(istr);
 
-    GridBase::Ptr gd_in_grid;
-    EXPECT_NO_THROW(gd_in_grid = gd_in.read(istr));
+    gd_in.readHeader(istr);
+    gd_in.readStreamPos(istr);
+
+    GridBase::Ptr gd_in_grid = Archive::readGrid(gd_in, istr, BBoxd());
 
     // Ensure read in the right values.
     EXPECT_EQ(gd.gridName(), gd_in.gridName());
@@ -264,13 +252,6 @@ TestFile::testWriteMultipleGrids()
     EXPECT_EQ(gd.getGridPos(), gd_in.getGridPos());
     EXPECT_EQ(gd.getBlockPos(), gd_in.getBlockPos());
     EXPECT_EQ(gd.getEndPos(), gd_in.getEndPos());
-
-    // Position the stream to beginning of the grid storage and read the grid.
-    gd_in.seekToGrid(istr);
-    Archive::readGridCompression(istr);
-    gd_in_grid->readMeta(istr);
-    gd_in_grid->readTransform(istr);
-    gd_in_grid->readTopology(istr);
 
     // Ensure that we have the same topology and transform.
     EXPECT_EQ(
@@ -285,8 +266,6 @@ TestFile::testWriteMultipleGrids()
     // EXPECT_EQ(0.1, gd_in_grid->getTransform()->getVoxelSizeZ());
 
     // Read in the data blocks.
-    gd_in.seekToBlocks(istr);
-    gd_in_grid->readBuffers(istr);
     TreeType::Ptr grid_in = DynamicPtrCast<TreeType>(gd_in_grid->baseTreePtr());
     EXPECT_TRUE(grid_in.get() != nullptr);
     EXPECT_EQ(10, grid_in->getValue(Coord(10, 1, 2)));
@@ -300,8 +279,9 @@ TestFile::testWriteMultipleGrids()
     gd_in.seekToEnd(istr);
 
     GridDescriptor gd2_in;
-    GridBase::Ptr gd2_in_grid;
-    EXPECT_NO_THROW(gd2_in_grid = gd2_in.read(istr));
+    gd2_in.readHeader(istr);
+    gd2_in.readStreamPos(istr);
+    GridBase::Ptr gd2_in_grid = Archive::readGrid(gd2_in, istr, BBoxd());
 
     // Ensure that we read in the right values.
     EXPECT_EQ(gd2.gridName(), gd2_in.gridName());
@@ -309,13 +289,6 @@ TestFile::testWriteMultipleGrids()
     EXPECT_EQ(gd2.getGridPos(), gd2_in.getGridPos());
     EXPECT_EQ(gd2.getBlockPos(), gd2_in.getBlockPos());
     EXPECT_EQ(gd2.getEndPos(), gd2_in.getEndPos());
-
-    // Position the stream to beginning of the grid storage and read the grid.
-    gd2_in.seekToGrid(istr);
-    Archive::readGridCompression(istr);
-    gd2_in_grid->readMeta(istr);
-    gd2_in_grid->readTransform(istr);
-    gd2_in_grid->readTopology(istr);
 
     // Ensure that we have the same topology and transform.
     EXPECT_EQ(
@@ -328,9 +301,6 @@ TestFile::testWriteMultipleGrids()
     // EXPECT_EQ(0.2, gd2_in_grid->getTransform()->getVoxelSizeY());
     // EXPECT_EQ(0.2, gd2_in_grid->getTransform()->getVoxelSizeZ());
 
-    // Read in the data blocks.
-    gd2_in.seekToBlocks(istr);
-    gd2_in_grid->readBuffers(istr);
     TreeType::Ptr grid2_in = DynamicPtrCast<TreeType>(gd2_in_grid->baseTreePtr());
     EXPECT_TRUE(grid2_in.get() != nullptr);
     EXPECT_EQ(50, grid2_in->getValue(Coord(1000, 1000, 1000)));
@@ -631,11 +601,27 @@ TestFile::testReadGridDescriptors()
     File file2("something.vdb2");
     std::istringstream istr(ostr.str(), std::ios_base::binary);
     io::setCurrentVersion(istr);
-    file2.readGridDescriptors(istr);
+    // file2.readGridDescriptors(istr);
+    ////////////////////////////
+    file2.mGridDescriptors.clear();
+
+    for (int32_t i = 0, N = file2.readGridCount(istr); i < N; ++i) {
+        // Read the grid descriptor.
+        GridDescriptor gd;
+        gd.readHeader(istr);
+        gd.readStreamPos(istr);
+
+        // Add the descriptor to the dictionary.
+        file2.mGridDescriptors.insert(std::make_pair(gd.gridName(), gd));
+
+        // Skip forward to the next descriptor.
+        gd.seekToEnd(istr);
+    }
+    ////////////////////////////
 
     // Compare with the initial grid descriptors.
     File::NameMapCIter it = file2.findDescriptor("temperature");
-    EXPECT_TRUE(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.mGridDescriptors.end());
     GridDescriptor file2gd = it->second;
     EXPECT_EQ(gd.gridName(), file2gd.gridName());
     EXPECT_EQ(gd.getGridPos(), file2gd.getGridPos());
@@ -643,7 +629,7 @@ TestFile::testReadGridDescriptors()
     EXPECT_EQ(gd.getEndPos(), file2gd.getEndPos());
 
     it = file2.findDescriptor("density");
-    EXPECT_TRUE(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.mGridDescriptors.end());
     file2gd = it->second;
     EXPECT_EQ(gd2.gridName(), file2gd.gridName());
     EXPECT_EQ(gd2.getGridPos(), file2gd.getGridPos());
@@ -878,18 +864,30 @@ TestFile::testEmptyGridIO()
     File file2(filename);
     std::istringstream istr(ostr.str(), std::ios_base::binary);
     io::setCurrentVersion(istr);
-    file2.readGridDescriptors(istr);
+    // file2.readGridDescriptors(istr);
+    ////////////////////////////
+    file2.mGridDescriptors.clear();
+
+    for (int32_t i = 0, N = file2.readGridCount(istr); i < N; ++i) {
+        // Read the grid descriptor.
+        GridDescriptor gd;
+        gd.readHeader(istr);
+        gd.readStreamPos(istr);
+
+        // Add the descriptor to the dictionary.
+        file2.mGridDescriptors.insert(std::make_pair(gd.gridName(), gd));
+
+        // Skip forward to the next descriptor.
+        gd.seekToEnd(istr);
+    }
+    ////////////////////////////
 
     // Compare with the initial grid descriptors.
     File::NameMapCIter it = file2.findDescriptor("temperature");
-    EXPECT_TRUE(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.mGridDescriptors.end());
     GridDescriptor file2gd = it->second;
     file2gd.seekToGrid(istr);
-    GridBase::Ptr gd_grid = GridBase::createGrid(file2gd.gridType());
-    Archive::readGridCompression(istr);
-    gd_grid->readMeta(istr);
-    gd_grid->readTransform(istr);
-    gd_grid->readTopology(istr);
+    GridBase::Ptr gd_grid = Archive::readGrid(file2gd, istr, BBoxd());
     EXPECT_EQ(gd.gridName(), file2gd.gridName());
     EXPECT_TRUE(gd_grid.get() != nullptr);
     EXPECT_EQ(0, int(gd_grid->baseTree().leafCount()));
@@ -900,14 +898,10 @@ TestFile::testEmptyGridIO()
     EXPECT_EQ(gd.getEndPos(), file2gd.getEndPos());
 
     it = file2.findDescriptor("density");
-    EXPECT_TRUE(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.mGridDescriptors.end());
     file2gd = it->second;
     file2gd.seekToGrid(istr);
-    gd_grid = GridBase::createGrid(file2gd.gridType());
-    Archive::readGridCompression(istr);
-    gd_grid->readMeta(istr);
-    gd_grid->readTransform(istr);
-    gd_grid->readTopology(istr);
+    gd_grid = Archive::readGrid(file2gd, istr, BBoxd());
     EXPECT_EQ(gd2.gridName(), file2gd.gridName());
     EXPECT_TRUE(gd_grid.get() != nullptr);
     EXPECT_EQ(0, int(gd_grid->baseTree().leafCount()));
@@ -995,16 +989,16 @@ void TestFile::testOpen()
     EXPECT_EQ(2009, vdbfile.getMetadata()->metaValue<int32_t>("year"));
 
     // Ensure we got the grid descriptors.
-    EXPECT_EQ(1, int(vdbfile.gridDescriptors().count("density")));
-    EXPECT_EQ(1, int(vdbfile.gridDescriptors().count("temperature")));
+    EXPECT_EQ(1, int(vdbfile.mGridDescriptors.count("density")));
+    EXPECT_EQ(1, int(vdbfile.mGridDescriptors.count("temperature")));
 
     io::File::NameMapCIter it = vdbfile.findDescriptor("density");
-    EXPECT_TRUE(it != vdbfile.gridDescriptors().end());
+    EXPECT_TRUE(it != vdbfile.mGridDescriptors.end());
     io::GridDescriptor gd = it->second;
     EXPECT_EQ(IntTree::treeType(), gd.gridType());
 
     it = vdbfile.findDescriptor("temperature");
-    EXPECT_TRUE(it != vdbfile.gridDescriptors().end());
+    EXPECT_TRUE(it != vdbfile.mGridDescriptors.end());
     gd = it->second;
     EXPECT_EQ(FloatTree::treeType(), gd.gridType());
 
@@ -1016,8 +1010,8 @@ void TestFile::testOpen()
     // Test closing the file.
     vdbfile.close();
     EXPECT_TRUE(vdbfile.isOpen() == false);
-    EXPECT_TRUE(vdbfile.fileMetadata().get() == nullptr);
-    EXPECT_EQ(0, int(vdbfile.gridDescriptors().size()));
+    EXPECT_TRUE(vdbfile.mMeta.get() == nullptr);
+    EXPECT_EQ(0, int(vdbfile.mGridDescriptors.size()));
     EXPECT_THROW(vdbfile.inputStream(), openvdb::IoError);
 
     remove("something.vdb2");
