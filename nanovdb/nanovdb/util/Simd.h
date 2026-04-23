@@ -2,6 +2,8 @@
 #include <array>
 #include <cstdint>
 
+#include <nanovdb/util/Util.h>  // __hostdev__
+
 // Minimal SIMD abstraction for NanoVDB stencil kernels.
 //
 // Two implementations, selected automatically at compile time:
@@ -20,15 +22,6 @@
 // for GPU, T=Simd<float,W> for CPU) compile unmodified.
 //
 // Mirrors the C++26 std::simd naming — migration will be a typedef swap.
-
-// ---------------------------------------------------------------------------
-// Portability: __hostdev__ is a no-op outside CUDA
-// ---------------------------------------------------------------------------
-#ifndef __CUDACC__
-#  define NANOVDB_SIMD_HOSTDEV
-#else
-#  define NANOVDB_SIMD_HOSTDEV __host__ __device__
-#endif
 
 // ---------------------------------------------------------------------------
 // Auto-detect std::experimental::simd (Parallelism TS v2)
@@ -68,22 +61,22 @@ using SimdMask = stdx::fixed_size_simd_mask<T, W>;
 template<typename T, int W>
 using Simd = stdx::fixed_size_simd<T, W>;
 
-// [[gnu::always_inline]] forces these thin wrappers to inline at every
-// call site.  Without it, GCC's cost model sometimes outlines them —
-// each call then pays a function-call + vzeroupper + register-ABI
-// transition that dominates the one-instruction body (vminps / vmaxps /
-// vblendvps).  See BatchAccessor.md §8h for the analogous fix on the
-// StencilAccessor path.
+// NANOVDB_FORCEINLINE (see Util.h) forces these thin wrappers to inline
+// at every call site.  Without it, GCC's cost model sometimes outlines
+// them — each call then pays a function-call + vzeroupper + register-
+// ABI transition that dominates the one-instruction body
+// (vminps / vmaxps / vblendvps).  See BatchAccessor.md §8h for the
+// analogous fix on the StencilAccessor path.
 template<typename T, int W>
-[[gnu::always_inline]] inline Simd<T,W> min(Simd<T,W> a, Simd<T,W> b) { return stdx::min(a, b); }
+NANOVDB_FORCEINLINE Simd<T,W> min(Simd<T,W> a, Simd<T,W> b) { return stdx::min(a, b); }
 
 template<typename T, int W>
-[[gnu::always_inline]] inline Simd<T,W> max(Simd<T,W> a, Simd<T,W> b) { return stdx::max(a, b); }
+NANOVDB_FORCEINLINE Simd<T,W> max(Simd<T,W> a, Simd<T,W> b) { return stdx::max(a, b); }
 
 // TS v2 where(mask, v) is a masked assignment proxy, not a 3-arg select.
 // Wrap it into the select(mask, a, b) form our kernels expect.
 template<typename T, int W>
-[[gnu::always_inline]] inline Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> b) {
+NANOVDB_FORCEINLINE Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> b) {
     auto result = b;
     stdx::where(mask, result) = a;
     return result;
@@ -91,7 +84,7 @@ template<typename T, int W>
 // Heterogeneous where: mask element type U ≠ value element type T.
 // Converts the U-mask to a T-mask via a boolean round-trip.
 template<typename T, typename U, int W>
-[[gnu::always_inline]] inline Simd<T,W> where(SimdMask<U,W> mask, Simd<T,W> a, Simd<T,W> b) {
+NANOVDB_FORCEINLINE Simd<T,W> where(SimdMask<U,W> mask, Simd<T,W> a, Simd<T,W> b) {
     bool arr[W];
     for (int i = 0; i < W; i++) arr[i] = static_cast<bool>(mask[i]);
     SimdMask<T,W> tmask(arr, element_aligned);
@@ -183,25 +176,25 @@ template<typename T, int W>
 struct SimdMask {
     std::array<bool, W> data{};
     SimdMask() = default;
-    NANOVDB_SIMD_HOSTDEV explicit SimdMask(const bool* p, element_aligned_tag) {
+    __hostdev__ explicit SimdMask(const bool* p, element_aligned_tag) {
         for (int i = 0; i < W; i++) data[i] = p[i];
     }
     // Converting constructor: copy bool values from a mask over a different element type.
     // All SimdMask<U,W> are boolean arrays of the same width; this allows
     // where(SimdMask<float,W>, Simd<uint16_t,W>, Simd<uint16_t,W>) without explicit casting.
     template<typename U>
-    NANOVDB_SIMD_HOSTDEV explicit SimdMask(SimdMask<U,W> const& o) {
+    __hostdev__ explicit SimdMask(SimdMask<U,W> const& o) {
         for (int i = 0; i < W; i++) data[i] = o[i];
     }
-    NANOVDB_SIMD_HOSTDEV bool  operator[](int i) const { return data[i]; }
-    NANOVDB_SIMD_HOSTDEV bool& operator[](int i)       { return data[i]; }
-    NANOVDB_SIMD_HOSTDEV SimdMask operator!() const {
+    __hostdev__ bool  operator[](int i) const { return data[i]; }
+    __hostdev__ bool& operator[](int i)       { return data[i]; }
+    __hostdev__ SimdMask operator!() const {
         SimdMask r; for (int i = 0; i < W; i++) r.data[i] = !data[i]; return r;
     }
-    NANOVDB_SIMD_HOSTDEV SimdMask operator&(SimdMask o) const {
+    __hostdev__ SimdMask operator&(SimdMask o) const {
         SimdMask r; for (int i = 0; i < W; i++) r.data[i] = data[i] && o.data[i]; return r;
     }
-    NANOVDB_SIMD_HOSTDEV SimdMask operator|(SimdMask o) const {
+    __hostdev__ SimdMask operator|(SimdMask o) const {
         SimdMask r; for (int i = 0; i < W; i++) r.data[i] = data[i] || o.data[i]; return r;
     }
 };
@@ -211,100 +204,100 @@ struct Simd {
     std::array<T, W> data{};
 
     Simd() = default;
-    NANOVDB_SIMD_HOSTDEV Simd(T scalar) { data.fill(scalar); }               // broadcast
-    NANOVDB_SIMD_HOSTDEV explicit Simd(const T* p, element_aligned_tag) { // load
+    __hostdev__ Simd(T scalar) { data.fill(scalar); }               // broadcast
+    __hostdev__ explicit Simd(const T* p, element_aligned_tag) { // load
         for (int i = 0; i < W; i++) data[i] = p[i];
     }
-    NANOVDB_SIMD_HOSTDEV T  operator[](int i) const { return data[i]; }
-    NANOVDB_SIMD_HOSTDEV T& operator[](int i)       { return data[i]; }
-    NANOVDB_SIMD_HOSTDEV void store(T* p, element_aligned_tag = {}) const {   // store
+    __hostdev__ T  operator[](int i) const { return data[i]; }
+    __hostdev__ T& operator[](int i)       { return data[i]; }
+    __hostdev__ void store(T* p, element_aligned_tag = {}) const {   // store
         for (int i = 0; i < W; i++) p[i] = data[i];
     }
-    NANOVDB_SIMD_HOSTDEV Simd operator-() const {
+    __hostdev__ Simd operator-() const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = -data[i]; return r;
     }
-    NANOVDB_SIMD_HOSTDEV Simd operator+(Simd o) const {
+    __hostdev__ Simd operator+(Simd o) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] + o.data[i]; return r;
     }
-    NANOVDB_SIMD_HOSTDEV Simd operator-(Simd o) const {
+    __hostdev__ Simd operator-(Simd o) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] - o.data[i]; return r;
     }
-    NANOVDB_SIMD_HOSTDEV Simd operator*(Simd o) const {
+    __hostdev__ Simd operator*(Simd o) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] * o.data[i]; return r;
     }
-    NANOVDB_SIMD_HOSTDEV Simd operator/(Simd o) const {
+    __hostdev__ Simd operator/(Simd o) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] / o.data[i]; return r;
     }
-    NANOVDB_SIMD_HOSTDEV SimdMask<T,W> operator>(Simd o) const {
+    __hostdev__ SimdMask<T,W> operator>(Simd o) const {
         SimdMask<T,W> m;
         for (int i = 0; i < W; i++) m.data[i] = data[i] > o.data[i];
         return m;
     }
-    NANOVDB_SIMD_HOSTDEV SimdMask<T,W> operator==(Simd o) const {
+    __hostdev__ SimdMask<T,W> operator==(Simd o) const {
         SimdMask<T,W> m; for (int i = 0; i < W; i++) m.data[i] = data[i] == o.data[i]; return m;
     }
-    NANOVDB_SIMD_HOSTDEV SimdMask<T,W> operator!=(Simd o) const {
+    __hostdev__ SimdMask<T,W> operator!=(Simd o) const {
         SimdMask<T,W> m; for (int i = 0; i < W; i++) m.data[i] = data[i] != o.data[i]; return m;
     }
     // Bitwise and shift operators — valid for integer element types.
-    NANOVDB_SIMD_HOSTDEV Simd operator|(Simd o) const {
+    __hostdev__ Simd operator|(Simd o) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] | o.data[i]; return r;
     }
-    NANOVDB_SIMD_HOSTDEV Simd operator&(Simd o) const {
+    __hostdev__ Simd operator&(Simd o) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] & o.data[i]; return r;
     }
-    NANOVDB_SIMD_HOSTDEV Simd operator^(Simd o) const {
+    __hostdev__ Simd operator^(Simd o) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] ^ o.data[i]; return r;
     }
     // Per-lane variable shift (shift count from corresponding lane of o).
-    NANOVDB_SIMD_HOSTDEV Simd operator<<(Simd o) const {
+    __hostdev__ Simd operator<<(Simd o) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] << o.data[i]; return r;
     }
-    NANOVDB_SIMD_HOSTDEV Simd operator>>(Simd o) const {
+    __hostdev__ Simd operator>>(Simd o) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] >> o.data[i]; return r;
     }
     // Uniform shift: all lanes shifted by the same scalar count (vpsllw imm8 / vpsrlw imm8).
-    NANOVDB_SIMD_HOSTDEV Simd operator<<(T shift) const {
+    __hostdev__ Simd operator<<(T shift) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] << shift; return r;
     }
-    NANOVDB_SIMD_HOSTDEV Simd operator>>(T shift) const {
+    __hostdev__ Simd operator>>(T shift) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] >> shift; return r;
     }
 };
 
-template<typename T, int W> NANOVDB_SIMD_HOSTDEV
+template<typename T, int W> __hostdev__
 Simd<T,W> operator+(T a, Simd<T,W> b) { return Simd<T,W>(a) + b; }
-template<typename T, int W> NANOVDB_SIMD_HOSTDEV
+template<typename T, int W> __hostdev__
 Simd<T,W> operator+(Simd<T,W> a, T b) { return a + Simd<T,W>(b); }
-template<typename T, int W> NANOVDB_SIMD_HOSTDEV
+template<typename T, int W> __hostdev__
 Simd<T,W> operator-(T a, Simd<T,W> b) { return Simd<T,W>(a) - b; }
-template<typename T, int W> NANOVDB_SIMD_HOSTDEV
+template<typename T, int W> __hostdev__
 Simd<T,W> operator-(Simd<T,W> a, T b) { return a - Simd<T,W>(b); }
-template<typename T, int W> NANOVDB_SIMD_HOSTDEV
+template<typename T, int W> __hostdev__
 Simd<T,W> operator*(T a, Simd<T,W> b) { return Simd<T,W>(a) * b; }
-template<typename T, int W> NANOVDB_SIMD_HOSTDEV
+template<typename T, int W> __hostdev__
 Simd<T,W> operator*(Simd<T,W> a, T b) { return a * Simd<T,W>(b); }
-template<typename T, int W> NANOVDB_SIMD_HOSTDEV
+template<typename T, int W> __hostdev__
 Simd<T,W> operator/(T a, Simd<T,W> b) { return Simd<T,W>(a) / b; }
-template<typename T, int W> NANOVDB_SIMD_HOSTDEV
+template<typename T, int W> __hostdev__
 Simd<T,W> operator/(Simd<T,W> a, T b) { return a / Simd<T,W>(b); }
 
 template<typename T, int W>
-NANOVDB_SIMD_HOSTDEV Simd<T,W> min(Simd<T,W> a, Simd<T,W> b) {
+__hostdev__ Simd<T,W> min(Simd<T,W> a, Simd<T,W> b) {
     Simd<T,W> r; for (int i = 0; i < W; i++) r[i] = a[i] < b[i] ? a[i] : b[i]; return r;
 }
 template<typename T, int W>
-NANOVDB_SIMD_HOSTDEV Simd<T,W> max(Simd<T,W> a, Simd<T,W> b) {
+__hostdev__ Simd<T,W> max(Simd<T,W> a, Simd<T,W> b) {
     Simd<T,W> r; for (int i = 0; i < W; i++) r[i] = a[i] > b[i] ? a[i] : b[i]; return r;
 }
 template<typename T, int W>
-NANOVDB_SIMD_HOSTDEV Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> b) {
+__hostdev__ Simd<T,W> where(SimdMask<T,W> mask, Simd<T,W> a, Simd<T,W> b) {
     Simd<T,W> r; for (int i = 0; i < W; i++) r[i] = mask[i] ? a[i] : b[i]; return r;
 }
 // Heterogeneous where: mask element type U need not match value element type T.
 // Useful for applying PredicateT=SimdMask<float,W> to VoxelOffsetT=Simd<uint16_t,W>.
 template<typename T, typename U, int W>
-NANOVDB_SIMD_HOSTDEV Simd<T,W> where(SimdMask<U,W> mask, Simd<T,W> a, Simd<T,W> b) {
+__hostdev__ Simd<T,W> where(SimdMask<U,W> mask, Simd<T,W> a, Simd<T,W> b) {
     Simd<T,W> r; for (int i = 0; i < W; i++) r[i] = mask[i] ? a[i] : b[i]; return r;
 }
 
@@ -315,14 +308,14 @@ template<typename T, typename U, int W>
 struct WhereExpression {
     const SimdMask<U,W>& mask;
     Simd<T,W>& target;
-    NANOVDB_SIMD_HOSTDEV WhereExpression& operator=(const Simd<T,W>& value) {
+    __hostdev__ WhereExpression& operator=(const Simd<T,W>& value) {
         for (int i = 0; i < W; ++i)
             if (mask[i]) target[i] = value[i];
         return *this;
     }
 };
 template<typename T, typename U, int W>
-NANOVDB_SIMD_HOSTDEV WhereExpression<T,U,W> where(const SimdMask<U,W>& mask, Simd<T,W>& target) {
+__hostdev__ WhereExpression<T,U,W> where(const SimdMask<U,W>& mask, Simd<T,W>& target) {
     return {mask, target};
 }
 
@@ -330,32 +323,32 @@ NANOVDB_SIMD_HOSTDEV WhereExpression<T,U,W> where(const SimdMask<U,W>& mask, Sim
 // Mirrors std::experimental::reduce(v, binary_op).
 // Use with std::bit_or<>{}, std::bit_and<>{}, std::plus<>{}, etc.
 template<typename T, int W, typename BinaryOp>
-NANOVDB_SIMD_HOSTDEV T reduce(Simd<T,W> v, BinaryOp op) {
+__hostdev__ T reduce(Simd<T,W> v, BinaryOp op) {
     T r = v[0];
     for (int i = 1; i < W; ++i) r = op(r, v[i]);
     return r;
 }
 
 template<typename T, int W>
-NANOVDB_SIMD_HOSTDEV bool any_of(SimdMask<T,W> m) {
+__hostdev__ bool any_of(SimdMask<T,W> m) {
     bool r = false; for (int i = 0; i < W; i++) r |= m[i]; return r;
 }
 template<typename T, int W>
-NANOVDB_SIMD_HOSTDEV bool none_of(SimdMask<T,W> m) { return !any_of(m); }
+__hostdev__ bool none_of(SimdMask<T,W> m) { return !any_of(m); }
 template<typename T, int W>
-NANOVDB_SIMD_HOSTDEV bool all_of(SimdMask<T,W> m) {
+__hostdev__ bool all_of(SimdMask<T,W> m) {
     bool r = true; for (int i = 0; i < W; i++) r &= m[i]; return r;
 }
 
 // Store W lanes of v into p[0..W-1] (array-backend passthrough to member).
 template<typename T, int W>
-NANOVDB_SIMD_HOSTDEV void store(Simd<T,W> v, T* p, element_aligned_tag = {}) {
+__hostdev__ void store(Simd<T,W> v, T* p, element_aligned_tag = {}) {
     v.store(p);
 }
 
 // Unmasked gather: result[i] = ptr[idx[i]] for all lanes.
 template<typename T, typename IdxT, int W>
-NANOVDB_SIMD_HOSTDEV Simd<T,W> gather(const T* __restrict__ ptr, Simd<IdxT,W> idx) {
+__hostdev__ Simd<T,W> gather(const T* __restrict__ ptr, Simd<IdxT,W> idx) {
     Simd<T,W> r;
     for (int i = 0; i < W; i++) r[i] = ptr[idx[i]];
     return r;
@@ -364,7 +357,7 @@ NANOVDB_SIMD_HOSTDEV Simd<T,W> gather(const T* __restrict__ ptr, Simd<IdxT,W> id
 // Masked gather: result[i] = mask[i] ? ptr[idx[i]] : fallback.
 // Scalar path: accesses ptr only for true lanes (ternary short-circuits).
 template<typename T, typename IdxT, int W>
-NANOVDB_SIMD_HOSTDEV Simd<T,W> gather(SimdMask<T,W> mask, const T* __restrict__ ptr,
+__hostdev__ Simd<T,W> gather(SimdMask<T,W> mask, const T* __restrict__ ptr,
                                         Simd<IdxT,W> idx, T fallback = T(0)) {
     Simd<T,W> r;
     for (int i = 0; i < W; i++) r[i] = mask[i] ? ptr[idx[i]] : fallback;
@@ -375,7 +368,7 @@ NANOVDB_SIMD_HOSTDEV Simd<T,W> gather(SimdMask<T,W> mask, const T* __restrict__ 
 // MaskElemT may differ from T (heterogeneous mask).
 // Scalar path: only accesses ptr for true lanes.
 template<typename T, typename IdxT, typename MaskElemT, int W>
-NANOVDB_SIMD_HOSTDEV void gather_if(Simd<T,W>& dst, SimdMask<MaskElemT,W> mask,
+__hostdev__ void gather_if(Simd<T,W>& dst, SimdMask<MaskElemT,W> mask,
                                      const T* __restrict__ ptr, Simd<IdxT,W> idx) {
     for (int i = 0; i < W; i++)
         if (mask[i]) dst[i] = ptr[idx[i]];
@@ -394,7 +387,7 @@ NANOVDB_SIMD_HOSTDEV void gather_if(Simd<T,W>& dst, SimdMask<MaskElemT,W> mask,
 // Scalar overload: degrades to static_cast for plain scalar types.
 // ---------------------------------------------------------------------------
 template<typename DstT, typename SrcT, int W>
-NANOVDB_SIMD_HOSTDEV Simd<DstT,W> simd_cast(Simd<SrcT,W> src) {
+__hostdev__ Simd<DstT,W> simd_cast(Simd<SrcT,W> src) {
 #ifdef NANOVDB_USE_STD_SIMD
     return Simd<DstT,W>([&](int i) { return static_cast<DstT>(src[i]); });
 #else
@@ -404,7 +397,7 @@ NANOVDB_SIMD_HOSTDEV Simd<DstT,W> simd_cast(Simd<SrcT,W> src) {
 #endif
 }
 template<typename DstT, typename SrcT>
-NANOVDB_SIMD_HOSTDEV DstT simd_cast(SrcT src) { return static_cast<DstT>(src); }
+__hostdev__ DstT simd_cast(SrcT src) { return static_cast<DstT>(src); }
 
 // ---------------------------------------------------------------------------
 // simd_cast_if — masked element-wise cast (merge-masked).
@@ -419,11 +412,11 @@ NANOVDB_SIMD_HOSTDEV DstT simd_cast(SrcT src) { return static_cast<DstT>(src); }
 // Scalar fallback: plain conditional cast.
 // ---------------------------------------------------------------------------
 template<typename DstT, typename SrcT, typename MaskElemT, int W>
-NANOVDB_SIMD_HOSTDEV void simd_cast_if(Simd<DstT,W>& dst, SimdMask<MaskElemT,W> mask, Simd<SrcT,W> src) {
+__hostdev__ void simd_cast_if(Simd<DstT,W>& dst, SimdMask<MaskElemT,W> mask, Simd<SrcT,W> src) {
     dst = where(mask, simd_cast<DstT, SrcT, W>(src), dst);
 }
 template<typename DstT, typename SrcT>
-NANOVDB_SIMD_HOSTDEV void simd_cast_if(DstT& dst, bool mask, SrcT src) {
+__hostdev__ void simd_cast_if(DstT& dst, bool mask, SrcT src) {
     if (mask) dst = static_cast<DstT>(src);
 }
 
@@ -435,7 +428,7 @@ NANOVDB_SIMD_HOSTDEV void simd_cast_if(DstT& dst, bool mask, SrcT src) {
 // The final byte-sum uses a shift-and-add tree instead of the multiply trick
 // (v * 0x0101...) since 64x64->64 multiply has no AVX2 equivalent (vpmullq is AVX-512).
 // ---------------------------------------------------------------------------
-NANOVDB_SIMD_HOSTDEV inline uint64_t popcount64(uint64_t v)
+__hostdev__ inline uint64_t popcount64(uint64_t v)
 {
     v -= (v >> 1) & uint64_t(0x5555555555555555);
     v  = (v & uint64_t(0x3333333333333333)) + ((v >> 2) & uint64_t(0x3333333333333333));
@@ -449,7 +442,7 @@ NANOVDB_SIMD_HOSTDEV inline uint64_t popcount64(uint64_t v)
 // Lane-wise SIMD popcount: applies popcount64 to every lane.
 // Backend A: generator constructor; Backend B: element loop (auto-vectorized by GCC/Clang).
 template<int W>
-NANOVDB_SIMD_HOSTDEV Simd<uint64_t,W> popcount(Simd<uint64_t,W> v) {
+__hostdev__ Simd<uint64_t,W> popcount(Simd<uint64_t,W> v) {
 #ifdef NANOVDB_USE_STD_SIMD
     return Simd<uint64_t,W>([&](int i) { return popcount64(v[i]); });
 #else
@@ -458,7 +451,7 @@ NANOVDB_SIMD_HOSTDEV Simd<uint64_t,W> popcount(Simd<uint64_t,W> v) {
     return r;
 #endif
 }
-NANOVDB_SIMD_HOSTDEV inline uint64_t popcount(uint64_t v) { return popcount64(v); }
+__hostdev__ inline uint64_t popcount(uint64_t v) { return popcount64(v); }
 
 // ---------------------------------------------------------------------------
 // simd_traits — generic per-lane access for scalar and Simd<T,W> types.
@@ -474,16 +467,16 @@ template<typename T>
 struct simd_traits {
     static constexpr int width = 1;
     using scalar_type = T;
-    NANOVDB_SIMD_HOSTDEV static T    get(T v, int)         { return v; }
-    NANOVDB_SIMD_HOSTDEV static void set(T& v, int, T val) { v = val; }
+    __hostdev__ static T    get(T v, int)         { return v; }
+    __hostdev__ static void set(T& v, int, T val) { v = val; }
 };
 
 template<>
 struct simd_traits<bool> {
     static constexpr int width = 1;
     using scalar_type = bool;
-    NANOVDB_SIMD_HOSTDEV static bool get(bool m, int)          { return m; }
-    NANOVDB_SIMD_HOSTDEV static void set(bool& m, int, bool v) { m = v; }
+    __hostdev__ static bool get(bool m, int)          { return m; }
+    __hostdev__ static void set(bool& m, int, bool v) { m = v; }
 };
 
 // Simd<T,W> and SimdMask<T,W>: valid for both backends because the aliases
@@ -492,16 +485,16 @@ template<typename T, int W>
 struct simd_traits<Simd<T,W>> {
     static constexpr int width = W;
     using scalar_type = T;
-    NANOVDB_SIMD_HOSTDEV static T    get(Simd<T,W> v, int i)         { return v[i]; }
-    NANOVDB_SIMD_HOSTDEV static void set(Simd<T,W>& v, int i, T val) { v[i] = val; }
+    __hostdev__ static T    get(Simd<T,W> v, int i)         { return v[i]; }
+    __hostdev__ static void set(Simd<T,W>& v, int i, T val) { v[i] = val; }
 };
 
 template<typename T, int W>
 struct simd_traits<SimdMask<T,W>> {
     static constexpr int width = W;
     using scalar_type = bool;
-    NANOVDB_SIMD_HOSTDEV static bool get(SimdMask<T,W> m, int i)          { return m[i]; }
-    NANOVDB_SIMD_HOSTDEV static void set(SimdMask<T,W>& m, int i, bool v) { m[i] = v; }
+    __hostdev__ static bool get(SimdMask<T,W> m, int i)          { return m[i]; }
+    __hostdev__ static void set(SimdMask<T,W>& m, int i, bool v) { m[i] = v; }
 };
 
 // ---------------------------------------------------------------------------
@@ -527,7 +520,7 @@ using scalar_traits_t = typename scalar_traits<T>::type;
 // T is the associated element type; only W matters.  Requires W <= 32.
 // ---------------------------------------------------------------------------
 template<typename T, int W>
-NANOVDB_SIMD_HOSTDEV uint32_t to_bitmask(SimdMask<T,W> m) {
+__hostdev__ uint32_t to_bitmask(SimdMask<T,W> m) {
     static_assert(W <= 32, "to_bitmask: W must be <= 32");
     uint32_t r = 0;
     for (int i = 0; i < W; i++) if (m[i]) r |= (1u << i);
@@ -537,31 +530,31 @@ NANOVDB_SIMD_HOSTDEV uint32_t to_bitmask(SimdMask<T,W> m) {
 // ---------------------------------------------------------------------------
 // Scalar overloads — always present, for T=float (GPU / scalar path)
 // ---------------------------------------------------------------------------
-template<typename T> NANOVDB_SIMD_HOSTDEV T min(T a, T b)           { return a < b ? a : b; }
-template<typename T> NANOVDB_SIMD_HOSTDEV T max(T a, T b)           { return a > b ? a : b; }
-template<typename T> NANOVDB_SIMD_HOSTDEV T where(bool m, T a, T b) { return m ? a : b; }
+template<typename T> __hostdev__ T min(T a, T b)           { return a < b ? a : b; }
+template<typename T> __hostdev__ T max(T a, T b)           { return a > b ? a : b; }
+template<typename T> __hostdev__ T where(bool m, T a, T b) { return m ? a : b; }
 template<typename T, typename BinaryOp>
-NANOVDB_SIMD_HOSTDEV T reduce(T v, BinaryOp) { return v; }
+__hostdev__ T reduce(T v, BinaryOp) { return v; }
 
 // 2-argument where: scalar masked-assignment proxy matching the Simd form.
 // where(mask, target) = value  writes value into target only if mask is true.
 template<typename T>
 struct ScalarWhereProxy {
     bool mask; T& target;
-    NANOVDB_SIMD_HOSTDEV void operator=(const T& v) { if (mask) target = v; }
+    __hostdev__ void operator=(const T& v) { if (mask) target = v; }
 };
 template<typename T>
-NANOVDB_SIMD_HOSTDEV ScalarWhereProxy<T> where(bool mask, T& target) {
+__hostdev__ ScalarWhereProxy<T> where(bool mask, T& target) {
     return {mask, target};
 }
 
 // Unmasked scalar gather: result = ptr[idx].
 template<typename T, typename IdxT>
-NANOVDB_SIMD_HOSTDEV T gather(const T* __restrict__ ptr, IdxT idx) { return ptr[idx]; }
+__hostdev__ T gather(const T* __restrict__ ptr, IdxT idx) { return ptr[idx]; }
 
 // Merge-masked scalar gather: dst = ptr[idx] only if mask, else dst unchanged.
 template<typename T, typename IdxT>
-NANOVDB_SIMD_HOSTDEV void gather_if(T& dst, bool mask, const T* __restrict__ ptr, IdxT idx) {
+__hostdev__ void gather_if(T& dst, bool mask, const T* __restrict__ ptr, IdxT idx) {
     if (mask) dst = ptr[idx];
 }
 

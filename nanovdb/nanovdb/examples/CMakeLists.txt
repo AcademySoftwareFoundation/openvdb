@@ -121,26 +121,6 @@ if(TARGET ex_voxelBlockManager_host_cuda)
     $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -fopenmp-simd>)
 endif()
 
-# CPU-only SIMD stencil gather prototype (Phase 1: neighbor leaf resolution).
-# No CUDA required.  Design in ex_voxelBlockManager_host_cuda/StencilGather.md.
-nanovdb_example(NAME "ex_stencil_gather_cpu")
-if(TARGET ex_stencil_gather_cpu)
-  target_compile_options(ex_stencil_gather_cpu PRIVATE -march=native -fopenmp-simd)
-  # simd_test/Simd.h lives three levels above this CMakeLists (at the repo root).
-  target_include_directories(ex_stencil_gather_cpu PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
-endif()
-
-# CPU-only stencil gather benchmark on a real narrow-band level-set .vdb
-# (see BatchAccessor.md §8j for the isOn-branch investigation that motivates
-# comparing random-occupancy vs realistic spatial-coherence workloads).
-nanovdb_example(NAME "ex_narrowband_stencil_cpu" OPENVDB)
-if(TARGET ex_narrowband_stencil_cpu)
-  target_compile_options(ex_narrowband_stencil_cpu PRIVATE -march=native -fopenmp-simd)
-  target_include_directories(ex_narrowband_stencil_cpu PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
-endif()
-
 # End-to-end CPU WENO5 norm-square-gradient on a narrow-band level set,
 # with a scalar reference for correctness validation.
 # (See BatchAccessor.md §11 for the full Phase-2+3 pipeline this demonstrates.)

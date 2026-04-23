@@ -7,22 +7,13 @@
     \brief Scalar stencil-index accessor using a NanoVDB ReadAccessor.
 
     LegacyStencilAccessor resolves each stencil tap via a path-cached
-    NanoVDB ReadAccessor, one voxel at a time.  It is templatized on the
-    same StencilT policy class used by StencilAccessor, so the tap-offset
-    table is shared at compile time.
+    NanoVDB ReadAccessor, one voxel at a time.  It is templatized on a
+    StencilT policy class whose Taps tuple defines the tap offsets.
 
     This mirrors the approach of OpenVDB's math/Stencils.h: the accessor
     caches the last-visited tree path so that consecutive taps within the
     same leaf are cheap, but distant taps (e.g. WENO5 radius-3 offsets)
-    can evict the center-leaf path.  That cache-pressure problem is the
-    motivation for the BatchAccessor / StencilAccessor design.
-
-    Intended uses
-    -------------
-      - Correctness oracle for StencilAccessor: sharing StencilT guarantees
-        identical tap offsets, so a mismatch is a genuine bug.
-      - Benchmark baseline: measures the cost of the accessor path-eviction
-        problem that StencilAccessor is designed to eliminate.
+    can evict the center-leaf path.
 
     Thread safety
     -------------
@@ -32,14 +23,14 @@
     -------------------
     BuildT    NanoVDB build type (e.g. ValueOnIndex).
     StencilT  Policy class describing the stencil.  Must expose:
-                using Taps = std::tuple<StencilPoint<di,dj,dk>...>;
-              Same type as passed to StencilAccessor.
+                using Taps = std::tuple<S<di,dj,dk>...>;
+              where each S is any type with static int members di, dj, dk
+              (e.g. WenoStencil<>::TapPoint).
 */
 
 #pragma once
 
 #include <nanovdb/NanoVDB.h>
-#include <nanovdb/util/StencilAccessor.h>  // StencilPoint, detail::findIndex
 
 #include <cstdint>
 #include <tuple>
@@ -54,6 +45,22 @@ class LegacyStencilAccessor
     using GridT = NanoGrid<BuildT>;
 
     static constexpr int SIZE = int(std::tuple_size_v<typename StencilT::Taps>);
+
+    // Compile-time inverse map: (DI,DJ,DK) → slot index in StencilT::Taps.
+    // Returns -1 if no matching tap exists; getValue() turns that into a
+    // static_assert.  Same shape as WenoStencil<W>::findTap (kept local here
+    // to avoid a cross-header dependency).
+    template<int DI, int DJ, int DK, size_t... Is>
+    static constexpr int findTap(std::index_sequence<Is...>)
+    {
+        using Taps = typename StencilT::Taps;
+        int result = -1;
+        ((std::tuple_element_t<Is, Taps>::di == DI &&
+          std::tuple_element_t<Is, Taps>::dj == DJ &&
+          std::tuple_element_t<Is, Taps>::dk == DK &&
+          result < 0 ? (result = int(Is)) : 0), ...);
+        return result;
+    }
 
 public:
     // Leaf-only ReadAccessor (cache level 0 only).  The DefaultReadAccessor
@@ -88,15 +95,11 @@ public:
 
     // -------------------------------------------------------------------------
     // getValue<DI,DJ,DK> -- compile-time named tap access.
-    //
-    // Same interface as StencilAccessor::getValue; resolved entirely at
-    // compile time via detail::findIndex.
     // -------------------------------------------------------------------------
     template<int DI, int DJ, int DK>
     uint64_t getValue() const
     {
-        constexpr int I = detail::findIndex<typename StencilT::Taps, DI, DJ, DK>(
-            std::make_index_sequence<SIZE>{});
+        constexpr int I = findTap<DI, DJ, DK>(std::make_index_sequence<SIZE>{});
         static_assert(I >= 0, "LegacyStencilAccessor::getValue: tap not in stencil");
         return mStencil[I];
     }

@@ -85,7 +85,7 @@ using LeafT      = nanovdb::NanoLeaf<BuildT>;
 using FloatGridT = nanovdb::NanoGrid<float>;
 using CPUVBM     = nanovdb::tools::VoxelBlockManager<Log2BlockWidth>;
 
-using LegacyAccT = nanovdb::LegacyStencilAccessor<BuildT, nanovdb::Weno5Stencil>;
+using LegacyAccT = nanovdb::LegacyStencilAccessor<BuildT, nanovdb::WenoStencil<>>;
 
 // ============================================================
 // VDB loading and NanoVDB conversion
