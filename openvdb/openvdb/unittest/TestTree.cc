@@ -3,6 +3,7 @@
 
 #include <openvdb/Exceptions.h>
 #include <openvdb/Types.h>
+#include <openvdb/codecs/ScalarCodec.h>
 #include <openvdb/math/Transform.h>
 #include <openvdb/tools/ValueTransformer.h> // for tools::setValueOnMin(), et al.
 #include <openvdb/tree/LeafNode.h>
@@ -108,6 +109,10 @@ TEST_F(TestTree, testHalf)
     // explicitly register these grid types as they are not registered by default
     openvdb::Grid<openvdb::Vec2STree>::registerGrid();
     openvdb::Grid<openvdb::Vec2DTree>::registerGrid();
+
+    // Register scalar codecs for all vec2 tree types which are not registered by default
+    openvdb::io::CodecRegistry::registerCodec<openvdb::codecs::ScalarCodec<openvdb::Grid<openvdb::Vec2STree>>>();
+    openvdb::io::CodecRegistry::registerCodec<openvdb::codecs::ScalarCodec<openvdb::Grid<openvdb::Vec2DTree>>>();
 
     testWriteHalf<openvdb::FloatTree>();
     testWriteHalf<openvdb::DoubleTree>();

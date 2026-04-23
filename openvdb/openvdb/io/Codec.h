@@ -31,6 +31,11 @@ OPENVDB_API void uninitialize();
 
 ////////////////////////////////////////
 
+enum class CodecMode {
+    ReadWrite,  // Both read and write enabled (default)
+    ReadOnly    // Only read methods enabled
+};
+
 enum class ReadMode {
     Original,      // Read data as-is (default)
     TopologyOnly   // Read topology only, no buffer data

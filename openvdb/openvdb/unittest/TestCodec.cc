@@ -247,4 +247,13 @@ void testCodecIOImpl(
     testIOImpl<GridT>(gridName, bgValue, fillValue);
 }
 
+TEST_F(TestCodec, testFloatCodecIO) { testCodecIOImpl<openvdb::FloatGrid>("float_grid", 0.0f, 1.0f); }
+TEST_F(TestCodec, testDoubleCodecIO) { testCodecIOImpl<openvdb::DoubleGrid>("double_grid", 0.0, 1.0); }
+TEST_F(TestCodec, testInt32CodecIO) { testCodecIOImpl<openvdb::Int32Grid>("int32_grid", 0, 1); }
+TEST_F(TestCodec, testInt64CodecIO) { testCodecIOImpl<openvdb::Int64Grid>("int64_grid", openvdb::Int64(0), openvdb::Int64(1)); }
+TEST_F(TestCodec, testHalfCodecIO) { testCodecIOImpl<openvdb::HalfGrid>("half_grid", openvdb::Half(0.0), openvdb::Half(1.5)); }
+TEST_F(TestCodec, testVec3ICodecIO) { testCodecIOImpl<openvdb::Vec3IGrid>("vec3i_grid", openvdb::Vec3i(0), openvdb::Vec3i(1, 2, 3)); }
+TEST_F(TestCodec, testVec3SCodecIO) { testCodecIOImpl<openvdb::Vec3SGrid>("vec3s_grid", openvdb::Vec3s(0.0f), openvdb::Vec3s(1.0f, 2.0f, 3.0f)); }
+TEST_F(TestCodec, testVec3DCodecIO) { testCodecIOImpl<openvdb::Vec3DGrid>("vec3d_grid", openvdb::Vec3d(0.0), openvdb::Vec3d(1.0, 2.0, 3.0)); }
 TEST_F(TestCodec, testBoolCodecIO) { testCodecIOImpl<openvdb::BoolGrid>("bool_grid", false, true); }
+TEST_F(TestCodec, testMaskCodecIO) { testCodecIOImpl<openvdb::MaskGrid>("mask_grid", false, true); }
