@@ -40,7 +40,6 @@
 #pragma once
 
 #include <nanovdb/util/Simd.h>
-#include <nanovdb/util/StencilAccessor.h>  // StencilPoint, Weno5Stencil, detail::findIndex
 #include <nanovdb/math/Math.h>             // Pow2
 
 #include <cstdint>
@@ -132,11 +131,34 @@ template<int W = 1>
 class WenoStencil
 {
 public:
-    static constexpr int SIZE = 19;
-
-    using Taps   = Weno5Stencil::Taps;
     using FloatV = util::Simd    <float, W>;
     using MaskV  = util::SimdMask<float, W>;
+
+    // --- Tap-offset types (compile-time only) -----------------------------
+    // TapPoint<DI,DJ,DK> carries the tap offset as a type.  Taps is the
+    // 19-tap tuple in the canonical WenoPt<i,j,k>::idx ordering from
+    // nanovdb/math/Stencils.h:
+    //    idx  0     : center  < 0, 0, 0>
+    //    idx  1.. 6 : x-axis  <-3,0,0> <-2,0,0> <-1,0,0> <+1,0,0> <+2,0,0> <+3,0,0>
+    //    idx  7..12 : y-axis  <0,-3,0> <0,-2,0> <0,-1,0> <0,+1,0> <0,+2,0> <0,+3,0>
+    //    idx 13..18 : z-axis  <0,0,-3> <0,0,-2> <0,0,-1> <0,0,+1> <0,0,+2> <0,0,+3>
+    template<int DI, int DJ, int DK>
+    struct TapPoint {
+        static constexpr int di = DI, dj = DJ, dk = DK;
+    };
+
+    using Taps = std::tuple<
+        TapPoint< 0, 0, 0>,
+        TapPoint<-3, 0, 0>, TapPoint<-2, 0, 0>, TapPoint<-1, 0, 0>,
+        TapPoint<+1, 0, 0>, TapPoint<+2, 0, 0>, TapPoint<+3, 0, 0>,
+        TapPoint< 0,-3, 0>, TapPoint< 0,-2, 0>, TapPoint< 0,-1, 0>,
+        TapPoint< 0,+1, 0>, TapPoint< 0,+2, 0>, TapPoint< 0,+3, 0>,
+        TapPoint< 0, 0,-3>, TapPoint< 0, 0,-2>, TapPoint< 0, 0,-1>,
+        TapPoint< 0, 0,+1>, TapPoint< 0, 0,+2>, TapPoint< 0, 0,+3>
+    >;
+
+    static constexpr int SIZE = int(std::tuple_size_v<Taps>);
+    static constexpr int size() { return SIZE; }
 
     // Compute-side storage — first-class Simd values.  At W=1 these collapse
     // to plain scalar float / bool under the array backend.
@@ -154,17 +176,13 @@ public:
     NANOVDB_SIMD_HOSTDEV explicit WenoStencil(float dx)
         : mDx2(dx * dx), mInvDx2(1.f / (dx * dx)) {}
 
-    static constexpr int size() { return SIZE; }
-
     // Compile-time named-tap access: returns the index of tap (DI,DJ,DK) in
     // the Taps tuple.  Ordering matches WenoPt<i,j,k>::idx in
-    // nanovdb/math/Stencils.h, so this is interoperable with canonical WENO
-    // index conventions.
+    // nanovdb/math/Stencils.h.
     template<int DI, int DJ, int DK>
     static constexpr int tapIndex()
     {
-        constexpr int I = detail::findIndex<Taps, DI, DJ, DK>(
-            std::make_index_sequence<SIZE>{});
+        constexpr int I = findTap<DI, DJ, DK>(std::make_index_sequence<SIZE>{});
         static_assert(I >= 0, "WenoStencil::tapIndex: tap not in stencil");
         return I;
     }
@@ -200,8 +218,22 @@ public:
     [[gnu::always_inline]] NANOVDB_SIMD_HOSTDEV inline FloatV normSqGrad(float iso = 0.f) const;
 
 private:
-    // Hardcoded (tap, innerTap) pairs for Weno5Stencil::Taps, ordered by
-    // ascending |Δ|.  Indices match the tuple definition in StencilAccessor.h.
+    // Compile-time inverse map: (DI,DJ,DK) → slot index in Taps.  Returns -1
+    // if no matching tap exists; tapIndex() turns that into a static_assert.
+    template<int DI, int DJ, int DK, size_t... Is>
+    static constexpr int findTap(std::index_sequence<Is...>)
+    {
+        int result = -1;
+        ((std::tuple_element_t<Is, Taps>::di == DI &&
+          std::tuple_element_t<Is, Taps>::dj == DJ &&
+          std::tuple_element_t<Is, Taps>::dk == DK &&
+          result < 0 ? (result = int(Is)) : 0), ...);
+        return result;
+    }
+
+    // Hardcoded (tap, innerTap) pairs for the 19-tap Taps tuple, ordered by
+    // ascending |Δ| so the inner tap is always already resolved when the
+    // outer tap is processed.  Indices match the Taps tuple above.
     //
     //   idx  0     :  center     ( 0, 0, 0)
     //   idx  1.. 6 :  x-axis     (-3..+3 in the order -3,-2,-1,+1,+2,+3)

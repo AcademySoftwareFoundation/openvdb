@@ -164,8 +164,8 @@ outer tap is processed.  Sign propagation through a |Δ|=1 → |Δ|=2 →
 
 ### 3.3  The `kPairs[]` table
 
-The inner-tap relationship is `Weno5Stencil`-specific and hardcoded as
-a static table inside the class:
+The inner-tap relationship is WENO5-specific and hardcoded as a static
+table inside the class:
 
 ```cpp
 static constexpr int kPairs[18][2] = {
@@ -178,16 +178,16 @@ static constexpr int kPairs[18][2] = {
 };
 ```
 
-Indices match the tuple ordering in `Weno5Stencil::Taps`
-(`StencilAccessor.h`) and `WenoPt<i,j,k>::idx` in
-`nanovdb/math/Stencils.h`.  Center tap (idx 0) is not processed —
+Indices match the `WenoStencil<W>::Taps` tuple defined in
+`WenoStencil.h` (same ordering as `WenoPt<i,j,k>::idx` in
+`nanovdb/math/Stencils.h`).  Center tap (idx 0) is not processed —
 assumed always in-band.
 
 **Why hardcoded, not template-derived:**  a generic scheme would walk
-`Weno5Stencil::Taps` at compile time and derive inner-tap indices from
-|Δ| and axis alignment.  For a single stencil the table is 18 entries,
-reads directly, and makes the cascade ordering self-documenting.
-Worth revisiting if we add Weno7 or other axis-aligned WENO variants.
+`Taps` at compile time and derive inner-tap indices from |Δ| and axis
+alignment.  For a single stencil the table is 18 entries, reads
+directly, and makes the cascade ordering self-documenting.  Worth
+revisiting if we add Weno7 or other axis-aligned WENO variants.
 
 ### 3.4  `extrapolate()` implementation
 
@@ -378,9 +378,9 @@ constexpr int xm3 = WenoStencil<W>::tapIndex<-3, 0, 0>();
 FloatV xm3Value   = stencil.values[xm3];
 ```
 
-`tapIndex<DI,DJ,DK>()` forwards to `detail::findIndex` (shared with
-`StencilAccessor`), static-asserting at compile time that the
-requested tap exists in the Weno5Stencil::Taps tuple.
+`tapIndex<DI,DJ,DK>()` forwards to a private static `findTap` helper
+inside `WenoStencil<W>`, static-asserting at compile time that the
+requested tap exists in the `Taps` tuple.
 
 ---
 
@@ -428,20 +428,11 @@ taperLER.vdb; compare against `sidecar-stencil-extrap` (which writes
 the tap-sum instead of normSqGrad) to isolate the Phase-3 arithmetic
 cost.
 
-### 7.2  Consolidate the Weno5Stencil policy
-
-Currently `Weno5Stencil` (the tap-tuple policy struct) lives in
-`StencilAccessor.h` and is shared with `WenoStencil<W>` via
-`using Taps = Weno5Stencil::Taps`.  The policy is arguably a
-Weno-specific definition and could move into `WenoStencil.h`;
-`StencilAccessor.h` would then `#include <.../WenoStencil.h>` for the
-policy.  Left as-is to minimise churn across files.
-
-### 7.3  Alternative stencils
+### 7.2  Alternative stencils
 
 If/when Weno7 or a non-axis-aligned stencil is needed, the class
 would specialise on a stencil-policy template parameter rather than
-hardcode `Weno5Stencil`:
+hardcoding the 19-tap WENO5 shape:
 
 ```cpp
 template<typename StencilPolicy, int W>
