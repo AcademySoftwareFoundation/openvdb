@@ -1181,14 +1181,34 @@ struct TreeAdapter<tree::ValueAccessor<_TreeType> >
 ////////////////////////////////////////
 
 
+namespace points {
+
+template<typename T, Index Log2Dim> class PointDataLeafNode;
+
+/// @brief Type trait that evaluates to true only for @c PointDataLeafNode instantiations.
+template<typename T>
+struct IsPointDataLeafNode : std::false_type {};
+
+template<typename T, Index Log2Dim>
+struct IsPointDataLeafNode<PointDataLeafNode<T, Log2Dim>> : std::true_type {};
+
+} // namespace points
+
+
 /// @brief Metafunction that specifies whether a given leaf node, tree, or grid type
-/// requires multiple passes to read and write voxel data
-/// @details Multi-pass I/O allows one to optimize the data layout of leaf nodes
-/// for certain access patterns during delayed loading.
-/// @sa io::MultiPass
+/// requires multiple passes to read and write voxel data.
+/// @details Multi-pass I/O allows leaf nodes to optimize their serialization layout
+/// for delayed-load access patterns. Only @c PointDataLeafNode supports multi-pass I/O.
+/// Defining a custom leaf node that inherits @c io::PointDataGridMultiPass is no longer permitted.
+/// @sa points::IsPointDataLeafNode
 template<typename LeafNodeType>
 struct HasMultiPassIO {
-    static const bool value = std::is_base_of<io::MultiPass, LeafNodeType>::value;
+    static_assert(
+        !std::is_base_of<io::PointDataGridMultiPass, LeafNodeType>::value
+        || points::IsPointDataLeafNode<LeafNodeType>::value,
+        "Only PointDataLeafNode may inherit from io::PointDataGridMultiPass; "
+        "use points::IsPointDataLeafNode to test for multi-pass I/O support.");
+    static const bool value = points::IsPointDataLeafNode<LeafNodeType>::value;
 };
 
 // Partial specialization for Tree types

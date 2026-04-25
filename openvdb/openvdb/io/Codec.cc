@@ -5,6 +5,8 @@
 
 #include <openvdb/codecs/ScalarCodec.h>
 #include <openvdb/codecs/BoolCodec.h>
+#include <openvdb/codecs/PointDataCodec.h>
+#include <openvdb/codecs/PointIndexCodec.h>
 #include <openvdb/codecs/ValueMaskCodec.h>
 
 #include <openvdb/openvdb.h>
@@ -58,6 +60,8 @@ void initialize()
 
     CodecRegistry::registerCodec<codecs::BoolCodec<BoolGrid>>();
     CodecRegistry::registerCodec<codecs::ValueMaskCodec<MaskGrid>>();
+    CodecRegistry::registerCodec<codecs::PointIndexCodec<tools::PointIndexGrid>>();
+    CodecRegistry::registerCodec<codecs::PointDataCodec<points::PointDataGrid>>();
 
     // register the plugin that converts from scalar to mask/bool
     NumericGridTypes::foreach<RegisterConvertCodec>();

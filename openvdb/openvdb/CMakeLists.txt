@@ -367,6 +367,8 @@ set(OPENVDB_LIBRARY_INCLUDE_FILES
 
 set(OPENVDB_LIBRARY_CODECS_INCLUDE_FILES
   codecs/BoolCodec.h
+  codecs/PointDataCodec.h
+  codecs/PointIndexCodec.h
   codecs/ScalarCodec.h
   codecs/TopologyCodec.h
   codecs/ValueMaskCodec.h
@@ -421,6 +423,7 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
   points/PointConversion.h
   points/PointCount.h
   points/PointDataGrid.h
+  points/PointDataIO.h
   points/PointDelete.h
   points/PointGroup.h
   points/PointMask.h
