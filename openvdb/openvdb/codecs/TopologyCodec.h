@@ -300,10 +300,10 @@ void topologyCodecWriteTopology(const GridBase& gridBase, std::ostream& os)
 
 } // namespace internal
 
-template <typename GridT, typename StorageGridT = GridT>
+template <typename GridT, typename StorageGridT = GridT, io::CodecMode Mode = io::CodecMode::ReadWrite>
 struct TopologyCodec : public io::Codec
 {
-    using Ptr = std::unique_ptr<TopologyCodec<GridT, StorageGridT>>;
+    using Ptr = std::unique_ptr<TopologyCodec<GridT, StorageGridT, Mode>>;
 
     ~TopologyCodec() noexcept = default;
 
@@ -322,6 +322,9 @@ struct TopologyCodec : public io::Codec
 
     void writeTopology(std::ostream& os, const GridBase& gridBase, const io::WriteOptions&) final
     {
+        // disable implementation when read only
+        if constexpr (Mode == io::CodecMode::ReadOnly) return;
+
         internal::topologyCodecWriteTopology<GridT>(gridBase, os);
     }
 }; // struct TopologyCodec

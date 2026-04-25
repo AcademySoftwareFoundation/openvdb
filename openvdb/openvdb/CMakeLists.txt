@@ -367,7 +367,9 @@ set(OPENVDB_LIBRARY_INCLUDE_FILES
 
 set(OPENVDB_LIBRARY_CODECS_INCLUDE_FILES
   codecs/BoolCodec.h
+  codecs/ScalarCodec.h
   codecs/TopologyCodec.h
+  codecs/ValueMaskCodec.h
 )
 
 set(OPENVDB_LIBRARY_IO_INCLUDE_FILES

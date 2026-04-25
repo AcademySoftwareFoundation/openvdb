@@ -3,6 +3,7 @@
 
 #include <openvdb/Exceptions.h>
 #include <openvdb/openvdb.h>
+#include <openvdb/codecs/ScalarCodec.h>
 #include <gtest/gtest.h>
 
 #include <cstdio> // for remove()
@@ -278,5 +279,10 @@ TEST_F(TestGridIO, testReadAllBool) { readAllTest<openvdb::BoolGrid>(); }
 TEST_F(TestGridIO, testReadAllFloat) { readAllTest<openvdb::FloatGrid>(); }
 TEST_F(TestGridIO, testReadAllHalf) { readAllTest<openvdb::HalfGrid>(); }
 TEST_F(TestGridIO, testReadAllVec3S) { readAllTest<openvdb::Vec3SGrid>(); }
-TEST_F(TestGridIO, testReadAllFloat5432) { Float5432Grid::registerGrid(); readAllTest<Float5432Grid>(); }
+TEST_F(TestGridIO, testReadAllFloat5432)
+{
+    Float5432Grid::registerGrid();
+    openvdb::io::CodecRegistry::registerCodec<openvdb::codecs::ScalarCodec<Float5432Grid>>();
+    readAllTest<Float5432Grid>();
+}
 TEST_F(TestGridIO, testCreateWriteReadHalf) { testCreateWriteReadHalf(); }
