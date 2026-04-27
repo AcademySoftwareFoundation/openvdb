@@ -528,13 +528,6 @@ because both pay the same dominant `isOn` mispredict cost.
   `NANOVDB_USE_BRANCHY_GETVALUE` to restore the old branchy form.
   End-to-end 1.4× on realistic narrow-band workloads, 2.8× on
   random-access.
-- **HaloStencilAccessor's value proposition is validated but narrower**:
-  its precomputed uint64 index buffer naturally eliminates `isOn`
-  branches by never evaluating them.  Now that the branchless
-  `getValue` captures the same win cheaply, the halo's remaining
-  advantage is "zero per-tap work at query time" rather than "avoids
-  the isOn mispredict storm."  Worth building for the absolute-perf
-  cases; less urgent than previously framed.
 
 See `BatchAccessor.md` §8j for the original measurement matrix and
 correction log (§8g/§8h/§8i), and `BatchAccessor.md` §8k for the

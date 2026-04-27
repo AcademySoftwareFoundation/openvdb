@@ -1232,7 +1232,7 @@ the perf numbers in this section change when it is toggled.
    `LeafNode<ValueOnIndex>::getValue(offset)` in NanoVDB proper.**  Rewriting
    that function (perhaps ~15 lines, preserving semantics for OFF voxels via
    a branchless arithmetic gate) would give every stencil-gather caller —
-   Legacy, hybrid, HaloStencilAccessor, any future variant — a 2–3× speedup
+   Legacy, hybrid, any future variant — a 2–3× speedup
    on CPU.  Proposed form, sketched below, keeps OFF-returns-0 semantics:
 
    ```cpp
@@ -1252,17 +1252,7 @@ the perf numbers in this section change when it is toggled.
    unpredictable one.  Needs benchmarking to confirm the optimiser doesn't
    refold it into a conditional jump.)
 
-3. **HaloStencilAccessor's value proposition is validated but smaller than
-   advertised.**  Its core architectural advantage (precomputed uint64
-   indices per tap position, so stencil queries are unconditional indexed
-   loads) naturally eliminates the `isOn` branch.  But a branchless
-   `LeafNode::getValue` would capture most of the same win without needing
-   the halo-buffer infrastructure.  The halo still wins on absolute perf
-   (zero per-tap work at query time), but the delta over a branchless
-   leaf lookup is more like ~0.5–1 ns/voxel than the "sub-2 ns/voxel
-   territory" framed earlier.
-
-4. **The hybrid `StencilAccessor`'s design rationale needs a small rewrite.**
+3. **The hybrid `StencilAccessor`'s design rationale needs a small rewrite.**
    The shipped hybrid design (§8i) is still the right API choice (Simd-free
    public surface, compiler-portable perf) — but the justification is not
    "it beats the gather chain's L1 pressure" (there is none); it is "it

@@ -116,10 +116,9 @@ For the CPU SIMD case that's typically a pair of stack-local
 no intermediate buffer is needed at all.
 
 This preserves the arithmetic class's purity and gives callers flex-
-ibility — a different Phase-2 path (e.g. a halo-based fetch, or a
-future hardware-gather fill) can populate the stencil using whatever
-pattern fits, without the class having to expose a "fill API" that
-bakes in one shape.
+ibility — a different Phase-2 path (e.g. a future hardware-gather
+fill) can populate the stencil using whatever pattern fits, without
+the class having to expose a "fill API" that bakes in one shape.
 
 ---
 
@@ -457,11 +456,6 @@ exists.
   gather).  `StencilAccessor` fills `mIndices[SIZE][W]`; callers
   consume those indices (via `sidecar[idx]` in their fill loops) and
   populate `WenoStencil<W>::values[]` / `isActive[]`.
-- **`HaloStencilAccessor.md`** — speculative alternative that
-  precomputes a dense float halo buffer; if that path is pursued,
-  `WenoStencil<W>` would fill from the halo instead of from sidecar
-  indices.  The extrapolation and normSqGrad algorithms here transfer
-  unchanged.
 - **`nanovdb/math/Stencils.h`** — the scalar ground-truth for WENO5
   and Godunov.  `WenoStencil<W>::normSqGrad()` is a line-for-line
   transliteration of `nanovdb::math::WenoStencil<GridT>::normSqGrad()`
