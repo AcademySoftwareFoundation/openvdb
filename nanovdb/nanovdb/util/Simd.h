@@ -134,39 +134,6 @@ inline void store(Simd<T,W> v, T* p, element_aligned_tag = {}) {
     v.copy_to(p, element_aligned);
 }
 
-// Unmasked gather: result[i] = ptr[idx[i]] for all lanes.
-// IdxT may be int32_t or int64_t; the compiler selects the matching hardware
-// instruction (vpgatherdps/vpgatherdq for 32-bit idx, vpgatherqq for 64-bit idx).
-template<typename T, typename IdxT, int W>
-inline Simd<T,W> gather(const T* __restrict__ ptr, Simd<IdxT,W> idx) {
-    return Simd<T,W>([&](int i) { return ptr[idx[i]]; });
-}
-
-// Masked gather: result[i] = mask[i] ? ptr[idx[i]] : fallback.
-// Implemented as a full gather + where-blend; ptr is accessed for ALL lanes,
-// so every idx[i] must be a valid offset regardless of mask[i].
-template<typename T, typename IdxT, int W>
-inline Simd<T,W> gather(SimdMask<T,W> mask, const T* __restrict__ ptr,
-                         Simd<IdxT,W> idx, T fallback = T(0)) {
-    auto result = Simd<T,W>(fallback);
-    stdx::where(mask, result) = Simd<T,W>([&](int i) { return ptr[idx[i]]; });
-    return result;
-}
-
-// Merge-masked gather: dst[i] = mask[i] ? ptr[idx[i]] : dst[i]  (unchanged).
-// MaskElemT may differ from T (heterogeneous mask, e.g. SimdMask<uint32_t,W>
-// applied to Simd<uint64_t,W> data).  When T==MaskElemT, delegates directly
-// to stdx::where; otherwise uses the WhereExpression boolean round-trip.
-template<typename T, typename IdxT, typename MaskElemT, int W>
-inline void gather_if(Simd<T,W>& dst, SimdMask<MaskElemT,W> mask,
-                       const T* __restrict__ ptr, Simd<IdxT,W> idx) {
-    if constexpr (std::is_same_v<T, MaskElemT>) {
-        stdx::where(mask, dst) = Simd<T,W>([&](int i) { return ptr[idx[i]]; });
-    } else {
-        where(mask, dst) = Simd<T,W>([&](int i) { return ptr[idx[i]]; });
-    }
-}
-
 // ===========================================================================
 // Implementation B: std::array backend (default)
 // ===========================================================================
@@ -346,44 +313,16 @@ __hostdev__ void store(Simd<T,W> v, T* p, element_aligned_tag = {}) {
     v.store(p);
 }
 
-// Unmasked gather: result[i] = ptr[idx[i]] for all lanes.
-template<typename T, typename IdxT, int W>
-__hostdev__ Simd<T,W> gather(const T* __restrict__ ptr, Simd<IdxT,W> idx) {
-    Simd<T,W> r;
-    for (int i = 0; i < W; i++) r[i] = ptr[idx[i]];
-    return r;
-}
-
-// Masked gather: result[i] = mask[i] ? ptr[idx[i]] : fallback.
-// Scalar path: accesses ptr only for true lanes (ternary short-circuits).
-template<typename T, typename IdxT, int W>
-__hostdev__ Simd<T,W> gather(SimdMask<T,W> mask, const T* __restrict__ ptr,
-                                        Simd<IdxT,W> idx, T fallback = T(0)) {
-    Simd<T,W> r;
-    for (int i = 0; i < W; i++) r[i] = mask[i] ? ptr[idx[i]] : fallback;
-    return r;
-}
-
-// Merge-masked gather: dst[i] = mask[i] ? ptr[idx[i]] : dst[i]  (unchanged).
-// MaskElemT may differ from T (heterogeneous mask).
-// Scalar path: only accesses ptr for true lanes.
-template<typename T, typename IdxT, typename MaskElemT, int W>
-__hostdev__ void gather_if(Simd<T,W>& dst, SimdMask<MaskElemT,W> mask,
-                                     const T* __restrict__ ptr, Simd<IdxT,W> idx) {
-    for (int i = 0; i < W; i++)
-        if (mask[i]) dst[i] = ptr[idx[i]];
-}
-
 #endif // NANOVDB_USE_STD_SIMD
 
 // ---------------------------------------------------------------------------
 // simd_cast<DstT> — element-wise static_cast between Simd types of the same W.
 //
-// Used for widening (uint16_t → uint32_t, uint32_t → uint64_t) and for
-// reinterpreting signedness (uint32_t → int32_t) when building gather indices.
-// Both backends: the array backend uses a lane loop; the stdx backend uses the
-// generator constructor, which the compiler lowers to a vpmovsxbw / vpmovzxwd
-// sequence or similar sign/zero-extend instruction depending on the types.
+// Used for widening between integer element types (uint16_t → uint32_t,
+// uint32_t → uint64_t).  Both backends: the array backend uses a lane loop;
+// the stdx backend uses the generator constructor, which the compiler lowers
+// to a vpmovsxbw / vpmovzxwd sequence or similar sign/zero-extend instruction
+// depending on the types.
 // Scalar overload: degrades to static_cast for plain scalar types.
 // ---------------------------------------------------------------------------
 template<typename DstT, typename SrcT, int W>
@@ -419,39 +358,6 @@ template<typename DstT, typename SrcT>
 __hostdev__ void simd_cast_if(DstT& dst, bool mask, SrcT src) {
     if (mask) dst = static_cast<DstT>(src);
 }
-
-// ---------------------------------------------------------------------------
-// popcount64 — scalar SWAR popcount, always uses arithmetic (no __builtin_popcountll).
-//
-// Safe to call per-lane inside a vectorizable loop: every operation (>>, &, +, -)
-// maps to an AVX2 instruction for 64-bit elements (vpsrlq, vpand, vpaddq, vpsubq).
-// The final byte-sum uses a shift-and-add tree instead of the multiply trick
-// (v * 0x0101...) since 64x64->64 multiply has no AVX2 equivalent (vpmullq is AVX-512).
-// ---------------------------------------------------------------------------
-__hostdev__ inline uint64_t popcount64(uint64_t v)
-{
-    v -= (v >> 1) & uint64_t(0x5555555555555555);
-    v  = (v & uint64_t(0x3333333333333333)) + ((v >> 2) & uint64_t(0x3333333333333333));
-    v  = (v + (v >> 4)) & uint64_t(0x0F0F0F0F0F0F0F0F);  // per-byte counts
-    v += v >> 8;   v &= uint64_t(0x00FF00FF00FF00FF);
-    v += v >> 16;  v &= uint64_t(0x0000FFFF0000FFFF);
-    v += v >> 32;
-    return v & uint64_t(63);
-}
-
-// Lane-wise SIMD popcount: applies popcount64 to every lane.
-// Backend A: generator constructor; Backend B: element loop (auto-vectorized by GCC/Clang).
-template<int W>
-__hostdev__ Simd<uint64_t,W> popcount(Simd<uint64_t,W> v) {
-#ifdef NANOVDB_USE_STD_SIMD
-    return Simd<uint64_t,W>([&](int i) { return popcount64(v[i]); });
-#else
-    Simd<uint64_t,W> r;
-    for (int i = 0; i < W; ++i) r[i] = popcount64(v[i]);
-    return r;
-#endif
-}
-__hostdev__ inline uint64_t popcount(uint64_t v) { return popcount64(v); }
 
 // ---------------------------------------------------------------------------
 // simd_traits — generic per-lane access for scalar and Simd<T,W> types.
@@ -546,16 +452,6 @@ struct ScalarWhereProxy {
 template<typename T>
 __hostdev__ ScalarWhereProxy<T> where(bool mask, T& target) {
     return {mask, target};
-}
-
-// Unmasked scalar gather: result = ptr[idx].
-template<typename T, typename IdxT>
-__hostdev__ T gather(const T* __restrict__ ptr, IdxT idx) { return ptr[idx]; }
-
-// Merge-masked scalar gather: dst = ptr[idx] only if mask, else dst unchanged.
-template<typename T, typename IdxT>
-__hostdev__ void gather_if(T& dst, bool mask, const T* __restrict__ ptr, IdxT idx) {
-    if (mask) dst = ptr[idx];
 }
 
 } // namespace util
