@@ -11,9 +11,10 @@
     \brief  Minimal SIMD abstraction for NanoVDB stencil kernels.
 */
 
-#pragma once
+#ifndef NANOVDB_UTIL_SIMD_H_HAS_BEEN_INCLUDED
+#define NANOVDB_UTIL_SIMD_H_HAS_BEEN_INCLUDED
+
 #include <array>
-#include <cstdint>
 
 #include <nanovdb/util/Util.h>  // __hostdev__
 
@@ -45,13 +46,13 @@ namespace nanovdb {
 namespace util {
 
 // ===========================================================================
-// nanovdb::util::experimental — internal SIMD primitives.  Names in this
+// nanovdb::util::experimental -- internal SIMD primitives.  Names in this
 // nested namespace are unstable API by convention; external callers should
 // not depend on them.
 // ===========================================================================
 namespace experimental {
 
-// element_aligned_tag — load/store alignment descriptor.  Aliases
+// element_aligned_tag -- load/store alignment descriptor.  Aliases
 // stdx::element_aligned_tag in the stdx backend; empty struct in the
 // array backend.
 #ifdef NANOVDB_USE_STDX_SIMD
@@ -63,7 +64,7 @@ struct element_aligned_tag {};
 inline constexpr element_aligned_tag element_aligned{};
 
 // ===========================================================================
-// Implementation A: std::experimental::simd — pure type aliases
+// Implementation A: std::experimental::simd -- pure type aliases
 // ===========================================================================
 #ifdef NANOVDB_USE_STDX_SIMD
 
@@ -177,7 +178,7 @@ struct Simd {
     __hostdev__ SimdMask<T,W> operator!=(Simd o) const {
         SimdMask<T,W> m; for (int i = 0; i < W; i++) m.data[i] = data[i] != o.data[i]; return m;
     }
-    // Bitwise and shift operators — valid for integer element types.
+    // Bitwise and shift operators -- valid for integer element types.
     __hostdev__ Simd operator|(Simd o) const {
         Simd r; for (int i = 0; i < W; i++) r.data[i] = data[i] | o.data[i]; return r;
     }
@@ -226,7 +227,7 @@ Simd<T,W> operator/(Simd<T,W> a, T b) { return a / Simd<T,W>(b); }
 } // namespace util
 
 // ---------------------------------------------------------------------------
-// nanovdb::math::Min / Max / Select — Simd<T,W> overloads.  Scalar overloads
+// nanovdb::math::Min / Max / Select -- Simd<T,W> overloads.  Scalar overloads
 // live in nanovdb/math/Math.h; defining the SIMD overloads here avoids a
 // Math.h -> Simd.h dependency.
 // ---------------------------------------------------------------------------
@@ -280,3 +281,5 @@ Select(util::experimental::SimdMask<T,W> mask,
 } // namespace math
 
 } // namespace nanovdb
+
+#endif // end of NANOVDB_UTIL_SIMD_H_HAS_BEEN_INCLUDED

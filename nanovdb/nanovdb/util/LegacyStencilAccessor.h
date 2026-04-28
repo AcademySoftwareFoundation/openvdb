@@ -6,13 +6,13 @@
 
     \brief Scalar stencil-index accessor using a NanoVDB ReadAccessor.
 
-    LegacyStencilAccessor resolves each stencil tap via a path-cached
+    LegacyStencilAccessor resolves each stencil point via a path-cached
     NanoVDB ReadAccessor, one voxel at a time.  It is templatized on a
-    StencilT policy class whose Taps tuple defines the tap offsets.
+    StencilT policy class whose StencilPoints tuple defines the point offsets.
 
     This mirrors the approach of OpenVDB's math/Stencils.h: the accessor
-    caches the last-visited tree path so that consecutive taps within the
-    same leaf are cheap, but distant taps (e.g. WENO5 radius-3 offsets)
+    caches the last-visited tree path so that consecutive points within the
+    same leaf are cheap, but distant points (e.g. WENO5 radius-3 offsets)
     can evict the center-leaf path.
 
     Thread safety
@@ -23,9 +23,9 @@
     -------------------
     BuildT    NanoVDB build type (e.g. ValueOnIndex).
     StencilT  Policy class describing the stencil.  Must expose:
-                using Taps = std::tuple<S<di,dj,dk>...>;
+                using StencilPoints = std::tuple<S<i,j,k>...>;
               where each S is any type with static int members di, dj, dk
-              (e.g. WenoStencil<>::TapPoint).
+              (e.g. WenoStencil<float>::StencilPoint).
 */
 
 #pragma once
@@ -44,20 +44,21 @@ class LegacyStencilAccessor
 {
     using GridT = NanoGrid<BuildT>;
 
-    static constexpr int SIZE = int(std::tuple_size_v<typename StencilT::Taps>);
+    static constexpr int SIZE = int(std::tuple_size_v<typename StencilT::StencilPoints>);
 
-    // Compile-time inverse map: (DI,DJ,DK) → slot index in StencilT::Taps.
-    // Returns -1 if no matching tap exists; getValue() turns that into a
-    // static_assert.  Same shape as WenoStencil<W>::findTap (kept local here
-    // to avoid a cross-header dependency).
-    template<int DI, int DJ, int DK, size_t... Is>
-    static constexpr int findTap(std::index_sequence<Is...>)
+    // Compile-time inverse map: (i,j,k) -> slot index in
+    // StencilT::StencilPoints.  Returns -1 if no matching point exists;
+    // getValue() turns that into a static_assert.  Same shape as
+    // WenoStencil::findPoint (kept local here to avoid a cross-header
+    // dependency).
+    template<int i, int j, int k, size_t... Is>
+    static constexpr int findPoint(std::index_sequence<Is...>)
     {
-        using Taps = typename StencilT::Taps;
+        using StencilPoints = typename StencilT::StencilPoints;
         int result = -1;
-        ((std::tuple_element_t<Is, Taps>::di == DI &&
-          std::tuple_element_t<Is, Taps>::dj == DJ &&
-          std::tuple_element_t<Is, Taps>::dk == DK &&
+        ((std::tuple_element_t<Is, StencilPoints>::di == i &&
+          std::tuple_element_t<Is, StencilPoints>::dj == j &&
+          std::tuple_element_t<Is, StencilPoints>::dk == k &&
           result < 0 ? (result = int(Is)) : 0), ...);
         return result;
     }
@@ -75,32 +76,33 @@ public:
         : mAcc(grid.tree().root()) {}
 
     // -------------------------------------------------------------------------
-    // moveTo -- resolve all SIZE tap indices for the voxel at @a center.
+    // moveTo -- resolve all SIZE stencil-point indices for the voxel at @a center.
     //
-    // Calls ReadAccessor::getValue(center + offset) for each tap in StencilT::Taps.
-    // The path cache inside mAcc amortizes tree-traversal cost for nearby taps,
-    // but distant taps (e.g. WENO5 ±3) may evict the center-leaf path.
+    // Calls ReadAccessor::getValue(center + offset) for each point in
+    // StencilT::StencilPoints.  The path cache inside mAcc amortizes
+    // tree-traversal cost for nearby points, but distant points (e.g. WENO5
+    // +/-3) may evict the center-leaf path.
     //
     // Results are valid until the next moveTo() call.
     // -------------------------------------------------------------------------
     void moveTo(const Coord& center)
     {
-        fillTaps(center, std::make_index_sequence<SIZE>{});
+        fillStencil(center, std::make_index_sequence<SIZE>{});
     }
 
     // -------------------------------------------------------------------------
-    // operator[] -- indexed tap access.  i must be in [0, SIZE).
+    // operator[] -- indexed point access.  i must be in [0, SIZE).
     // -------------------------------------------------------------------------
     uint64_t operator[](int i) const { return mStencil[i]; }
 
     // -------------------------------------------------------------------------
-    // getValue<DI,DJ,DK> -- compile-time named tap access.
+    // getValue<i,j,k> -- compile-time named point access.
     // -------------------------------------------------------------------------
-    template<int DI, int DJ, int DK>
+    template<int i, int j, int k>
     uint64_t getValue() const
     {
-        constexpr int I = findTap<DI, DJ, DK>(std::make_index_sequence<SIZE>{});
-        static_assert(I >= 0, "LegacyStencilAccessor::getValue: tap not in stencil");
+        constexpr int I = findPoint<i, j, k>(std::make_index_sequence<SIZE>{});
+        static_assert(I >= 0, "LegacyStencilAccessor::getValue: point not in stencil");
         return mStencil[I];
     }
 
@@ -108,14 +110,14 @@ public:
 
 private:
     template<size_t... Is>
-    void fillTaps(const Coord& center, std::index_sequence<Is...>)
+    void fillStencil(const Coord& center, std::index_sequence<Is...>)
     {
-        using Taps = typename StencilT::Taps;
+        using StencilPoints = typename StencilT::StencilPoints;
         ((mStencil[Is] = static_cast<uint64_t>(
             mAcc.getValue(center + Coord(
-                std::tuple_element_t<Is, Taps>::di,
-                std::tuple_element_t<Is, Taps>::dj,
-                std::tuple_element_t<Is, Taps>::dk)))), ...);
+                std::tuple_element_t<Is, StencilPoints>::di,
+                std::tuple_element_t<Is, StencilPoints>::dj,
+                std::tuple_element_t<Is, StencilPoints>::dk)))), ...);
     }
 
     AccessorT mAcc;

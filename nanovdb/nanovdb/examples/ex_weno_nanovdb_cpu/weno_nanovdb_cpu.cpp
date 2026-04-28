@@ -7,7 +7,7 @@
     \brief End-to-end CPU WENO5 norm-square-gradient on a narrow-band level
            set, with a scalar reference for correctness validation.
 
-    Demonstrates the full Phase-2+3 pipeline that BatchAccessor.md §11 has
+    Demonstrates the full Phase-2+3 pipeline that BatchAccessor.md Sec. 11 has
     been leading up to:
 
       VBM decode -> per-batch sidecar value assembly -> out-of-band
@@ -85,7 +85,7 @@ using LeafT      = nanovdb::NanoLeaf<BuildT>;
 using FloatGridT = nanovdb::NanoGrid<float>;
 using CPUVBM     = nanovdb::tools::VoxelBlockManager<Log2BlockWidth>;
 
-using LegacyAccT = nanovdb::LegacyStencilAccessor<BuildT, nanovdb::WenoStencil<>>;
+using LegacyAccT = nanovdb::LegacyStencilAccessor<BuildT, nanovdb::WenoStencil<float>>;
 
 // ============================================================
 // VDB loading and NanoVDB conversion
@@ -117,9 +117,9 @@ loadFloatGridFromVdb(const std::string& path, const std::string& gridName)
 }
 
 /// NanoVDB conversion products shared across the two passes.
-/// - floatHandle  : NanoGrid<float> — tile values + in-leaf inactive values
+/// - floatHandle  : NanoGrid<float> -- tile values + in-leaf inactive values
 ///                  preserved verbatim, used by the scalar reference stencil.
-/// - indexHandle  : NanoGrid<ValueOnIndex> — the topology-only index grid.
+/// - indexHandle  : NanoGrid<ValueOnIndex> -- the topology-only index grid.
 /// - sidecar      : float sidecar (slot 0 = background, slots 1..N = active
 ///                  voxel values in NanoVDB indexing order).
 struct ConvertedGrids {
@@ -158,7 +158,7 @@ convertFloatGrid(openvdb::FloatGrid& floatGrid)
 }
 
 // ============================================================
-// Reference pass — scalar WenoStencil per active voxel
+// Reference pass -- scalar WenoStencil per active voxel
 // ============================================================
 //
 // Uses nanovdb::math::WenoStencil<NanoGrid<float>>.  Its moveTo(ijk)
@@ -206,7 +206,7 @@ runReference(const FloatGridT&    floatGrid,
                     // The two grids share topology, so leaf LID in the
                     // index grid aligns with leaf LID in the float grid
                     // (same order of insertion).  Iterate the index grid's
-                    // active voxels — those are the slots we need to fill.
+                    // active voxels -- those are the slots we need to fill.
                     const auto& indexLeaf = firstIndexLeaf[lid];
                     (void)firstFloatLeaf;  // stencil.moveTo uses its own acc
 
@@ -223,7 +223,7 @@ runReference(const FloatGridT&    floatGrid,
 }
 
 // ============================================================
-// Fast pass — LegacyStencilAccessor gather + WenoStencil<W> compute
+// Fast pass -- LegacyStencilAccessor gather + WenoStencil<W> compute
 // ============================================================
 //
 // Structure:
@@ -265,19 +265,21 @@ runFast(const IndexGridT&                                                  index
     return timeIt([&] {
         nanovdb::util::forEach(size_t(0), size_t(nBlocks), size_t(1),
             [&](const nanovdb::util::Range1D& range) {
+                using FloatV   = nanovdb::util::experimental::Simd    <float, SIMDw>;
+                using MaskV    = nanovdb::util::experimental::SimdMask<float, SIMDw>;
+                using StencilT = nanovdb::WenoStencil<FloatV>;
+                constexpr int SIZE = StencilT::size();
+
                 alignas(64) uint32_t leafIndex[BlockWidth];
                 alignas(64) uint16_t voxelOffset[BlockWidth];
 
-                // Caller-owned fill-side scratch — scalar scatter from the
+                // Caller-owned fill-side scratch -- scalar scatter from the
                 // sidecar lands here, then a per-tap SIMD load moves the
                 // data into the stencil's Simd compute view.
-                alignas(64) float raw_values[nanovdb::WenoStencil<SIMDw>::size()][SIMDw];
-                alignas(64) bool  raw_active[nanovdb::WenoStencil<SIMDw>::size()][SIMDw];
+                alignas(64) float raw_values[SIZE][SIMDw];
+                alignas(64) bool  raw_active[SIZE][SIMDw];
 
-                nanovdb::WenoStencil<SIMDw> stencil(dx);
-                constexpr int SIZE = nanovdb::WenoStencil<SIMDw>::size();
-                using FloatV = nanovdb::util::experimental::Simd    <float, SIMDw>;
-                using MaskV  = nanovdb::util::experimental::SimdMask<float, SIMDw>;
+                StencilT stencil(dx);
 
                 // One LegacyStencilAccessor per TBB task (one ReadAccessor).
                 LegacyAccT legacyAcc(indexGrid);
@@ -359,7 +361,7 @@ runFast(const IndexGridT&                                                  index
 // from 0 to 1e+1 plus a tail bucket for anything >= 10.
 //
 // Expected shape: the two leftmost bins ([0,1e-8), [1e-8,1e-7)) hold
-// the overwhelming majority — FP-rounding / FMA-fusion differences.
+// the overwhelming majority -- FP-rounding / FMA-fusion differences.
 // Anything to the right of [1e-5,1e-4) warrants investigation.
 
 static void
