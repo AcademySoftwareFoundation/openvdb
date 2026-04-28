@@ -215,18 +215,23 @@ public:
     }
 
     // ------------------------------------------------------------------
-    // extrapolate -- repair out-of-band lanes (isActive[k][i] == false) of
-    // values[k] with copysign(absBackground, values[innerPoint][i]).
-    // Active lanes are preserved.  Center point (idx 0) is assumed always
-    // in-band and is not processed.
+    // extrapolate -- sign-correct out-of-band lanes (isActive[k][i] == false)
+    // of values[k] by multiplying with Sign(values[innerPoint][i]).  Active
+    // lanes are preserved.  Center point (idx 0) is assumed always in-band
+    // and is not processed.
+    //
+    // Convention: the caller must pre-load inactive lanes of values[k] with
+    // the sidecar slot-0 background value (which the standard NanoVDB fill
+    // pattern produces automatically: a missing tap resolves to index 0,
+    // and sidecar[0] is the background).  This routine then flips the sign
+    // when the parent (innerPoint) is negative, leaves it alone when the
+    // parent is positive, and zeros the lane when the parent is exactly 0.
     //
     // Processes 18 (point, innerPoint) pairs in ascending-|d| order so the
     // inner point is already resolved when the outer point is touched;
     // sign-inheritance through |d|=1 -> |d|=2 -> |d|=3 is automatic.
-    //
-    // Requires absBackground >= 0.
     // ------------------------------------------------------------------
-    __hostdev__ NANOVDB_FORCEINLINE void extrapolate(float absBackground);
+    __hostdev__ NANOVDB_FORCEINLINE void extrapolate();
 
     // ------------------------------------------------------------------
     // normSqGrad -- Godunov's norm-square of the fifth-order WENO upwind
@@ -289,21 +294,25 @@ private:
 // ---------------------------------------------------------------------------
 template<typename ValueType>
 __hostdev__ NANOVDB_FORCEINLINE void
-WenoStencil<ValueType>::extrapolate(float absBackground)
+WenoStencil<ValueType>::extrapolate()
 {
-    const ValueType absBg(absBackground);
-    const ValueType zero (0.f);
+    const ValueType zero(0.f);
 
     for (int p = 0; p < kNumPairs; ++p) {
         const int k      = kPairs[p][0];
         const int kInner = kPairs[p][1];
 
-        // copysign(absBg, inner): +absBg if inner >= 0, else -absBg.
-        const MaskType  isNegInner = zero > values[kInner];
-        const ValueType extrap     = math::Select(isNegInner, -absBg, absBg);
+        // values[k] *= Sign(values[kInner]):
+        //   parent > 0  -> values[k] (already pre-loaded with +background);
+        //   parent < 0  -> -values[k];
+        //   parent == 0 -> 0.
+        const MaskType  isPosParent = values[kInner] > zero;
+        const MaskType  isNegParent = values[kInner] < zero;
+        const ValueType signed_k    = math::Select(isPosParent, values[k],
+                                      math::Select(isNegParent, -values[k], zero));
 
-        // Active lanes keep their own value; inactive lanes take the extrapolated sign-corrected background.
-        values[k] = math::Select(isActive[k], values[k], extrap);
+        // Active lanes keep their own value; inactive lanes get the sign-corrected background.
+        values[k] = math::Select(isActive[k], values[k], signed_k);
     }
 }
 

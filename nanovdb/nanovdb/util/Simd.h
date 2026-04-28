@@ -227,9 +227,9 @@ Simd<T,W> operator/(Simd<T,W> a, T b) { return a / Simd<T,W>(b); }
 } // namespace util
 
 // ---------------------------------------------------------------------------
-// nanovdb::math::Min / Max / Select -- Simd<T,W> overloads.  Scalar overloads
-// live in nanovdb/math/Math.h; defining the SIMD overloads here avoids a
-// Math.h -> Simd.h dependency.
+// nanovdb::math::Min / Max / Select / Sqrt -- Simd<T,W> overloads.  Scalar
+// overloads live in nanovdb/math/Math.h; defining the SIMD overloads here
+// avoids a Math.h -> Simd.h dependency.
 // ---------------------------------------------------------------------------
 namespace math {
 #ifdef NANOVDB_USE_STDX_SIMD
@@ -253,6 +253,11 @@ Select(util::experimental::SimdMask<T,W> mask,
     util::experimental::stdx::where(mask, result) = a;
     return result;
 }
+template<typename T, int W>
+NANOVDB_FORCEINLINE util::experimental::Simd<T,W>
+Sqrt(util::experimental::Simd<T,W> a) {
+    return std::experimental::sqrt(a);
+}
 #else
 template<typename T, int W>
 __hostdev__ util::experimental::Simd<T,W>
@@ -275,6 +280,13 @@ Select(util::experimental::SimdMask<T,W> mask,
        util::experimental::Simd<T,W> b) {
     util::experimental::Simd<T,W> r;
     for (int i = 0; i < W; i++) r[i] = mask[i] ? a[i] : b[i];
+    return r;
+}
+template<typename T, int W>
+__hostdev__ util::experimental::Simd<T,W>
+Sqrt(util::experimental::Simd<T,W> a) {
+    util::experimental::Simd<T,W> r;
+    for (int i = 0; i < W; i++) r[i] = Sqrt(a[i]);
     return r;
 }
 #endif

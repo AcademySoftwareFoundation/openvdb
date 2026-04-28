@@ -251,7 +251,6 @@ runFast(const IndexGridT&                                                  index
     const uint64_t* jumpMap     = vbmHandle.hostJumpMap();
     const uint64_t  firstOffset = vbmHandle.firstOffset();
 
-    const float absBackground = std::abs(sidecar[0]);
     const float dx            = float(indexGrid.voxelSize()[0]);
 
     std::ostringstream sink;
@@ -335,7 +334,7 @@ runFast(const IndexGridT&                                                  index
                         }
 
                         // -------- Phase-3 arithmetic (in-place on Simd values) --------
-                        stencil.extrapolate(absBackground);
+                        stencil.extrapolate();
                         const FloatV result = stencil.normSqGrad(/*iso=*/0.f);
 
                         // -------- Simd -> scalar bridge + per-lane store --------
