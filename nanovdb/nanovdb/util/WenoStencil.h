@@ -32,9 +32,6 @@
             ascending-|d| order so the inner point is already resolved.
       - normSqGrad(isoValue = 0)
             Godunov's norm-square of the fifth-order WENO upwind gradient.
-
-    See BatchAccessor.md Sec. 11 for the full Phase-2 sidecar-WENO pipeline design
-    and Sec. 11.2 for the extrapolation semantics.
 */
 
 #pragma once
@@ -156,7 +153,7 @@ GodunovsNormSqrd(MaskType isOutside,
 // stencil state.  Holds ValueType-typed values + MaskType-typed activity
 // flags + scalar grid constants.  Fill-side responsibility (scalar writes
 // into any raw buffers, followed by a per-point load into this stencil's
-// values[] / isActive[]) lives in the caller.  See WenoStencil.md Sec. 6
+// values[] / isActive[]) lives in the caller.  See WenoStencil.md
 // for usage patterns.
 // ---------------------------------------------------------------------------
 template<typename ValueType>
@@ -214,6 +211,18 @@ public:
         return I;
     }
 
+    // Resolve all SIZE stencil-point indices for the voxel at @a center via
+    // Acc::getValue(center + offset).  Indices land in out[0..SIZE-1] in the
+    // StencilPoints tuple ordering.  Acc is any NanoVDB accessor whose
+    // getValue() returns a value convertible to uint64_t (e.g. ValueOnIndex's
+    // sequential active-voxel indices).  The accessor's path cache is reused
+    // across the SIZE getValue calls.
+    template<typename Acc>
+    static void gatherIndices(Acc& acc, const Coord& center, uint64_t* out)
+    {
+        gatherIndicesImpl(acc, center, out, std::make_index_sequence<SIZE>{});
+    }
+
     // ------------------------------------------------------------------
     // extrapolate -- sign-correct out-of-band lanes (isActive[k][i] == false)
     // of values[k] by multiplying with Sign(values[innerPoint][i]).  Active
@@ -241,7 +250,7 @@ public:
     // Godunov's upwind combinator driven by the sign of (center - iso).
     //
     // Call only after the stencil has been populated (see usage pattern in
-    // WenoStencil.md Sec. 6).  extrapolate() before normSqGrad() is the
+    // WenoStencil.md).  extrapolate() before normSqGrad() is the
     // typical pipeline shape but is not required by this method.
     // ------------------------------------------------------------------
     __hostdev__ NANOVDB_FORCEINLINE ValueType normSqGrad(float iso = 0.f) const;
@@ -259,6 +268,18 @@ private:
           std::tuple_element_t<Is, StencilPoints>::dk == k &&
           result < 0 ? (result = int(Is)) : 0), ...);
         return result;
+    }
+
+    // Parameter-pack expansion driving gatherIndices(): unrolls SIZE getValue
+    // calls into a single fold expression.
+    template<typename Acc, size_t... Is>
+    static void gatherIndicesImpl(Acc& acc, const Coord& center, uint64_t* out,
+                                   std::index_sequence<Is...>)
+    {
+        ((out[Is] = static_cast<uint64_t>(acc.getValue(center + Coord(
+            std::tuple_element_t<Is, StencilPoints>::di,
+            std::tuple_element_t<Is, StencilPoints>::dj,
+            std::tuple_element_t<Is, StencilPoints>::dk)))), ...);
     }
 
     // Hardcoded (point, innerPoint) pairs for the 19-point StencilPoints

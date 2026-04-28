@@ -7,8 +7,7 @@
     \brief End-to-end CPU WENO5 norm-square-gradient on a narrow-band level
            set, with a scalar reference for correctness validation.
 
-    Demonstrates the full Phase-2+3 pipeline that BatchAccessor.md Sec. 11 has
-    been leading up to:
+    End-to-end pipeline:
 
       VBM decode -> per-batch sidecar value assembly -> out-of-band
       sign-extrapolation -> SIMD Godunov WENO5 -> per-voxel |grad phi|^2
@@ -22,10 +21,8 @@
                   extrapolation "for free", matching our explicit extrapolate()
                   semantics on in-the-band-typical topology.
 
-      fast      : LegacyStencilAccessor gather -> WenoStencil<W> load ->
+      fast      : WenoStencil::gatherIndices() -> per-tap SIMD load ->
                   extrapolate() -> normSqGrad() -> per-lane scalar store.
-                  No hybrid SIMD StencilAccessor; voxel-outer Legacy path
-                  for code clarity.
 
     Both passes write to the same-shape output buffer, keyed by ValueOnIndex
     slot; a histogram of |outputRef - outputFast| follows.
@@ -46,7 +43,6 @@
 #include <nanovdb/tools/VoxelBlockManager.h>
 #include <nanovdb/util/ForEach.h>
 #include <nanovdb/util/Simd.h>
-#include <nanovdb/util/LegacyStencilAccessor.h>
 #include <nanovdb/util/WenoStencil.h>
 #include <nanovdb/math/Stencils.h>      // scalar reference WenoStencil<GridT>
 
@@ -84,8 +80,6 @@ using IndexGridT = nanovdb::NanoGrid<BuildT>;
 using LeafT      = nanovdb::NanoLeaf<BuildT>;
 using FloatGridT = nanovdb::NanoGrid<float>;
 using CPUVBM     = nanovdb::tools::VoxelBlockManager<Log2BlockWidth>;
-
-using LegacyAccT = nanovdb::LegacyStencilAccessor<BuildT, nanovdb::WenoStencil<float>>;
 
 // ============================================================
 // VDB loading and NanoVDB conversion
@@ -223,7 +217,7 @@ runReference(const FloatGridT&    floatGrid,
 }
 
 // ============================================================
-// Fast pass -- LegacyStencilAccessor gather + WenoStencil<W> compute
+// Fast pass -- WenoStencil::gatherIndices + WenoStencil<W> compute
 // ============================================================
 //
 // Structure:
@@ -231,7 +225,7 @@ runReference(const FloatGridT&    floatGrid,
 //     decodeInverseMaps -> leafIndex[128], voxelOffset[128]
 //     for each batch of SIMDw voxels:
 //       fill: scalar scatter from sidecar into raw_values[SIZE][SIMDw]
-//             via LegacyStencilAccessor::moveTo per voxel
+//             via WenoStencil::gatherIndices() per voxel
 //       load: per-tap SIMD load into stencil.values[] / isActive[]
 //       extrapolate (sign-fix OOB lanes in-place, Simd)
 //       normSqGrad -> FloatV
@@ -280,8 +274,9 @@ runFast(const IndexGridT&                                                  index
 
                 StencilT stencil(dx);
 
-                // One LegacyStencilAccessor per TBB task (one ReadAccessor).
-                LegacyAccT legacyAcc(indexGrid);
+                // One leaf-only ReadAccessor per TBB task; cache stays warm
+                // across the SIZE getValue calls in WenoStencil::gatherIndices().
+                nanovdb::ReadAccessor<BuildT, 0, -1, -1> acc(indexGrid.tree().root());
 
                 const float* const scIn  = sidecar.data();
                 float*       const scOut = outputFast.data();
@@ -297,10 +292,7 @@ runFast(const IndexGridT&                                                  index
                         firstOffset + (uint64_t)bID * BlockWidth;
 
                     for (int batchStart = 0; batchStart < BlockWidth; batchStart += SIMDw) {
-                        // -------- Fill: LegacyStencilAccessor per voxel --------
-                        // Voxel-outer, tap-inner inside the moveTo call
-                        // (fillTaps unrolls the 19 tap lookups against the
-                        // shared ReadAccessor).  Zero-fill inactive lanes.
+                        // -------- Fill: per-voxel gatherIndices + sidecar lookup --------
                         for (int i = 0; i < SIMDw; ++i) {
                             const int p = batchStart + i;
 
@@ -319,11 +311,11 @@ runFast(const IndexGridT&                                                  index
                             const nanovdb::Coord center =
                                 cOrigin + nanovdb::Coord(lx, ly, lz);
 
-                            legacyAcc.moveTo(center);
+                            uint64_t indices[SIZE];
+                            nanovdb::WenoStencil<float>::gatherIndices(acc, center, indices);
                             for (int k = 0; k < SIZE; ++k) {
-                                const uint64_t idx = legacyAcc[k];
-                                raw_values[k][i] = scIn[idx];
-                                raw_active[k][i] = (idx != 0);
+                                raw_values[k][i] = scIn[indices[k]];
+                                raw_active[k][i] = (indices[k] != 0);
                             }
                         }
 

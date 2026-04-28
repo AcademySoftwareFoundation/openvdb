@@ -4137,7 +4137,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueOnIndex, CoordT, Mask
     __hostdev__ uint64_t getAvg() const { return this->hasStats() ? this->lastOffset() + 3u : 0u; }
     __hostdev__ uint64_t getDev() const { return this->hasStats() ? this->lastOffset() + 4u : 0u; }
     // Default branchless; define NANOVDB_USE_BRANCHY_GETVALUE to restore the
-    // pre-2026 branchy form.  See BatchAccessor.md §8k for rationale.
+    // pre-2026 branchy form.
     __hostdev__ uint64_t getValue(uint32_t i) const
     {
 #ifdef NANOVDB_USE_BRANCHY_GETVALUE

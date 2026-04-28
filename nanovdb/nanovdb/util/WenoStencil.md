@@ -2,16 +2,14 @@
 
 Design reference for `nanovdb/nanovdb/util/WenoStencil.h`.  Captures the
 rationale behind the templated-on-lane-width class, the out-of-band
-extrapolation algorithm, the Godunov norm-square-gradient method, and the
-relationship to the broader Phase-2 pipeline sketched in
-`BatchAccessor.md §11`.
+extrapolation algorithm, and the Godunov norm-square-gradient method.
 
 ---
 
 ## 1.  Motivation
 
-The WENO5 CPU pipeline (`BatchAccessor.md §11`) assembles, per voxel
-batch, a 19-tap value matrix with per-tap activity flags:
+The WENO5 CPU pipeline assembles, per voxel batch, a 19-tap value
+matrix with per-tap activity flags:
 
 ```
 float  values[Ntaps][W]     -- real sidecar value, or background for OOB lanes
@@ -418,16 +416,7 @@ scalar pattern fits its source/sink.
 
 ## 7.  Future work
 
-### 7.1  Measurement — lock in the perf numbers
-
-Reconstruct()-path (normSqGrad) cost hasn't been measured yet.  Next
-step: add a `sidecar-stencil-normsqgrad` benchmark pass in
-`ex_narrowband_stencil_cpu` to drive normSqGrad to completion on
-taperLER.vdb; compare against `sidecar-stencil-extrap` (which writes
-the tap-sum instead of normSqGrad) to isolate the Phase-3 arithmetic
-cost.
-
-### 7.2  Alternative stencils
+### 7.1  Alternative stencils
 
 If/when Weno7 or a non-axis-aligned stencil is needed, the class
 would specialise on a stencil-policy template parameter rather than
@@ -443,20 +432,3 @@ constexpr pass that finds, for each tap, the same-axis neighbour with
 |Δ| = |tap.Δ| − 1.  Not needed until a second axis-aligned stencil
 exists.
 
----
-
-## 8.  Relationship to other design docs
-
-- **`BatchAccessor.md §11`** — the broader Phase-2/3 pipeline plan
-  (VBM decode → sidecar assembly → extrapolation → WENO arithmetic
-  → write-back).  `WenoStencil<W>` implements the extrapolation and
-  (now) the WENO arithmetic steps; the storage carries data across
-  from sidecar-assembly.
-- **`StencilAccessor.md`** — Phase-1 accessor (batched uint64 index
-  gather).  `StencilAccessor` fills `mIndices[SIZE][W]`; callers
-  consume those indices (via `sidecar[idx]` in their fill loops) and
-  populate `WenoStencil<W>::values[]` / `isActive[]`.
-- **`nanovdb/math/Stencils.h`** — the scalar ground-truth for WENO5
-  and Godunov.  `WenoStencil<W>::normSqGrad()` is a line-for-line
-  transliteration of `nanovdb::math::WenoStencil<GridT>::normSqGrad()`
-  to generic-T form.

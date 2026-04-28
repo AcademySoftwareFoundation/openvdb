@@ -123,7 +123,6 @@ endif()
 
 # End-to-end CPU WENO5 norm-square-gradient on a narrow-band level set,
 # with a scalar reference for correctness validation.
-# (See BatchAccessor.md §11 for the full Phase-2+3 pipeline this demonstrates.)
 nanovdb_example(NAME "ex_weno_nanovdb_cpu" OPENVDB)
 if(TARGET ex_weno_nanovdb_cpu)
   target_compile_options(ex_weno_nanovdb_cpu PRIVATE -march=native -fopenmp-simd)
