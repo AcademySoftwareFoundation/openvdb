@@ -172,6 +172,11 @@ __hostdev__ inline double Max(double a, double b)
 {
     return fmax(a, b);
 }
+template<typename T>
+__hostdev__ inline T Select(bool m, T a, T b)
+{
+    return m ? a : b;
+}
 __hostdev__ inline float Clamp(float x, float a, float b)
 {
     return Max(Min(x, b), a);

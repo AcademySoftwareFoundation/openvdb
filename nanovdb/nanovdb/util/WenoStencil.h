@@ -92,9 +92,9 @@ WENO5(const T& v1, const T& v2, const T& v3,
 // MaskT (mask type that `>` of T produces).  Ground-truth scalar version is
 // nanovdb::math::GodunovsNormSqrd in nanovdb/math/Stencils.h, which uses a
 // runtime if/else on `isOutside`.  Here we compute both branches uncondition-
-// ally and blend via util::where, so the SIMD path has no control-flow
-// divergence across lanes.  At T=float the scalar where(bool, T, T) overload
-// degenerates this to the same semantics as the if/else.
+// ally and blend via math::Select, so the SIMD path has no control-flow
+// divergence across lanes.  At T=float the scalar math::Select(bool, T, T)
+// overload degenerates this to the same semantics as the if/else.
 // ---------------------------------------------------------------------------
 template<typename T, typename MaskT>
 __hostdev__ NANOVDB_FORCEINLINE T
@@ -103,18 +103,18 @@ GodunovsNormSqrd(MaskT isOutside,
                  T dP_ym, T dP_yp,
                  T dP_zm, T dP_zp)
 {
-    using util::min; using util::max; using util::where;
+    using math::Min; using math::Max; using math::Select;
     const T zero(0.f);
 
-    const T outside = max(math::Pow2(max(dP_xm, zero)), math::Pow2(min(dP_xp, zero)))   // (dP/dx)²
-                    + max(math::Pow2(max(dP_ym, zero)), math::Pow2(min(dP_yp, zero)))   // (dP/dy)²
-                    + max(math::Pow2(max(dP_zm, zero)), math::Pow2(min(dP_zp, zero)));  // (dP/dz)²
+    const T outside = Max(math::Pow2(Max(dP_xm, zero)), math::Pow2(Min(dP_xp, zero)))   // (dP/dx)²
+                    + Max(math::Pow2(Max(dP_ym, zero)), math::Pow2(Min(dP_yp, zero)))   // (dP/dy)²
+                    + Max(math::Pow2(Max(dP_zm, zero)), math::Pow2(Min(dP_zp, zero)));  // (dP/dz)²
 
-    const T inside  = max(math::Pow2(min(dP_xm, zero)), math::Pow2(max(dP_xp, zero)))
-                    + max(math::Pow2(min(dP_ym, zero)), math::Pow2(max(dP_yp, zero)))
-                    + max(math::Pow2(min(dP_zm, zero)), math::Pow2(max(dP_zp, zero)));
+    const T inside  = Max(math::Pow2(Min(dP_xm, zero)), math::Pow2(Max(dP_xp, zero)))
+                    + Max(math::Pow2(Min(dP_ym, zero)), math::Pow2(Max(dP_yp, zero)))
+                    + Max(math::Pow2(Min(dP_zm, zero)), math::Pow2(Max(dP_zp, zero)));
 
-    return where(isOutside, outside, inside);
+    return Select(isOutside, outside, inside);
 }
 
 } // namespace detail
@@ -131,8 +131,8 @@ template<int W = 1>
 class WenoStencil
 {
 public:
-    using FloatV = util::Simd    <float, W>;
-    using MaskV  = util::SimdMask<float, W>;
+    using FloatV = util::experimental::Simd    <float, W>;
+    using MaskV  = util::experimental::SimdMask<float, W>;
 
     // --- Tap-offset types (compile-time only) -----------------------------
     // TapPoint<DI,DJ,DK> carries the tap offset as a type.  Taps is the
@@ -277,10 +277,10 @@ WenoStencil<W>::extrapolate(float absBackground)
 
         // copysign(absBg, inner): +absBg if inner >= 0, else -absBg.
         const MaskV  isNegInner = zero > values[kInner];
-        const FloatV extrap     = util::where(isNegInner, -absBg, absBg);
+        const FloatV extrap     = math::Select(isNegInner, -absBg, absBg);
 
         // Active lanes keep their own value; inactive lanes take the extrapolated sign-corrected background.
-        values[k] = util::where(isActive[k], values[k], extrap);
+        values[k] = math::Select(isActive[k], values[k], extrap);
     }
 }
 

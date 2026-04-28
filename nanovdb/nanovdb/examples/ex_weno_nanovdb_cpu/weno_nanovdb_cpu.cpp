@@ -276,8 +276,8 @@ runFast(const IndexGridT&                                                  index
 
                 nanovdb::WenoStencil<SIMDw> stencil(dx);
                 constexpr int SIZE = nanovdb::WenoStencil<SIMDw>::size();
-                using FloatV = nanovdb::util::Simd    <float, SIMDw>;
-                using MaskV  = nanovdb::util::SimdMask<float, SIMDw>;
+                using FloatV = nanovdb::util::experimental::Simd    <float, SIMDw>;
+                using MaskV  = nanovdb::util::experimental::SimdMask<float, SIMDw>;
 
                 // One LegacyStencilAccessor per TBB task (one ReadAccessor).
                 LegacyAccT legacyAcc(indexGrid);
@@ -328,8 +328,8 @@ runFast(const IndexGridT&                                                  index
 
                         // -------- Load: per-tap SIMD load into stencil view --------
                         for (int k = 0; k < SIZE; ++k) {
-                            stencil.values  [k] = FloatV(raw_values[k], nanovdb::util::element_aligned);
-                            stencil.isActive[k] = MaskV (raw_active[k], nanovdb::util::element_aligned);
+                            stencil.values  [k] = FloatV(raw_values[k], nanovdb::util::experimental::element_aligned);
+                            stencil.isActive[k] = MaskV (raw_active[k], nanovdb::util::experimental::element_aligned);
                         }
 
                         // -------- Phase-3 arithmetic (in-place on Simd values) --------
@@ -338,7 +338,7 @@ runFast(const IndexGridT&                                                  index
 
                         // -------- Simd -> scalar bridge + per-lane store --------
                         alignas(64) float result_lanes[SIMDw];
-                        nanovdb::util::store(result, result_lanes, nanovdb::util::element_aligned);
+                        result.copy_to(result_lanes, nanovdb::util::experimental::element_aligned);
                         for (int i = 0; i < SIMDw; ++i) {
                             const int p = batchStart + i;
                             if (leafIndex[p] == CPUVBM::UnusedLeafIndex) continue;
