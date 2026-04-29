@@ -45,7 +45,7 @@ inline void forEach(RangeT range, const FuncT &func)
 #ifdef NANOVDB_USE_TBB
     tbb::parallel_for(range, func);
 #else// naive and likely slow alternative based on std::thread
-    if (const size_t threadCount = std::thread::hardware_concurrency()>>1) {
+    if (const size_t threadCount = std::thread::hardware_concurrency()) {
         std::vector<RangeT> rangePool{ range };
         while(rangePool.size() < threadCount) {
             const size_t oldSize = rangePool.size();

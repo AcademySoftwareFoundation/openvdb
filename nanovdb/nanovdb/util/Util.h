@@ -87,13 +87,20 @@ typedef unsigned long long uint64_t;
 
 #endif // if defined(__CUDACC__) || defined(__HIP__)
 
-// NANOVDB_RESTRICT: cross-compiler no-alias hint for pointer parameters.
-// GCC and Clang (including NVCC host compilation) spell it __restrict__,
-// MSVC spells it __restrict.
+// NANOVDB_RESTRICT: cross-compiler no-alias hint for pointer parameters
 #if defined(_MSC_VER)
 #define NANOVDB_RESTRICT __restrict
 #else
 #define NANOVDB_RESTRICT __restrict__
+#endif
+
+// NANOVDB_FORCEINLINE: force inlining at the call site
+#if defined(_MSC_VER)
+#define NANOVDB_FORCEINLINE __forceinline
+#elif defined(__GNUC__) || defined(__clang__)
+#define NANOVDB_FORCEINLINE inline __attribute__((always_inline))
+#else
+#define NANOVDB_FORCEINLINE inline
 #endif
 
 // The following macro will suppress annoying warnings when nvcc
