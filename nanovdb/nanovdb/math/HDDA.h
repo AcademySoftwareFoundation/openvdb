@@ -179,7 +179,7 @@ private:
     Vec3T   mDelta, mNext; // delta time and next time
 }; // class HDDA
 
-/////////////////////////////////////////// ZeroCrossing ////////////////////////////////////////////
+/////////////////////////////////////////// zeroCrossing ////////////////////////////////////////////
 
 /// @brief returns true if the ray intersects a zero-crossing at the voxel level of the grid in the accessor
 ///        The empty-space ray-marching is performed at all levels of the tree using an
@@ -187,7 +187,7 @@ private:
 ///        voxel after the intersection point, v contains the grid values at ijk, and t is set to the time of
 ///        the intersection along the ray.
 template<typename RayT, typename AccT>
-inline __hostdev__ bool ZeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename AccT::ValueType& v, float& t)
+inline __hostdev__ bool zeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename AccT::ValueType& v, float& t)
 {
     if (!ray.clip(acc.root().bbox()) || ray.t1() > 1e20)
         return false; // clip ray to bbox
@@ -210,7 +210,40 @@ inline __hostdev__ bool ZeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename 
         }
     }
     return false;
+}// zeroCrossing
+
+template<typename RayT, typename AccT>
+[[deprecated("Use zeroCrossing(ray, acc, ijk, v, t)")]]
+inline __hostdev__ bool ZeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename AccT::ValueType& v, float& t)
+{
+    return zeroCrossing(ray, acc, ijk, v,t);
 }
+
+/////////////////////////////////////////// isoCrossing ////////////////////////////////////////////
+
+template<typename RayT, typename AccT>
+inline __hostdev__ bool isoCrossing(const typename AccT::ValueType& iso, RayT& ray, AccT& acc, Coord& ijk, typename AccT::ValueType& v, float& t)
+{
+    if (!ray.clip(acc.root().bbox()) || ray.t1() > 1e20) return false; // clip ray to bbox
+    static const float Delta = 1.0001f;
+    ijk = RoundDown<Coord>(ray.start()); // first hit of bbox
+    HDDA<RayT, Coord> hdda(ray, acc.getDim(ijk, ray));
+    const auto v0 = acc.getValue(ijk) - iso;
+    while (hdda.step()) {
+        ijk = RoundDown<Coord>(ray(hdda.time() + Delta));
+        hdda.update(ray, acc.getDim(ijk, ray));
+        if (hdda.dim() > 1 || !acc.isActive(ijk)) continue; // either a tile value or an inactive voxel
+        while (hdda.step() && acc.isActive(hdda.voxel())) { // in the narrow band
+            v = acc.getValue(hdda.voxel()) - iso;
+            if (v * v0 < 0) { // zero crossing
+                ijk = hdda.voxel();
+                t = hdda.time();
+                return true;
+            }
+        }
+    }
+    return false;
+}// isoCrossing
 
 /////////////////////////////////////////// DDA ////////////////////////////////////////////
 
@@ -343,10 +376,10 @@ private:
     Vec3T  mDelta, mNext; // delta time and next time
 }; // class DDA
 
-/////////////////////////////////////////// ZeroCrossingNode ////////////////////////////////////////////
+/////////////////////////////////////////// zeroCrossingNode ////////////////////////////////////////////
 
 template<typename RayT, typename NodeT>
-inline __hostdev__ bool ZeroCrossingNode(RayT& ray, const NodeT& node, float v0, nanovdb::math::Coord& ijk, float& v, float& t)
+inline __hostdev__ bool zeroCrossingNode(RayT& ray, const NodeT& node, float v0, nanovdb::math::Coord& ijk, float& v, float& t)
 {
     math::BBox<Coord> bbox(node.origin(), node.origin() + Coord(node.dim() - 1));
 
@@ -376,6 +409,13 @@ inline __hostdev__ bool ZeroCrossingNode(RayT& ray, const NodeT& node, float v0,
         }
     }
     return false;
+}// zeroCrossingNode
+
+template<typename RayT, typename NodeT>
+[[deprecated("Use zeroCrossingNode(ray, node, v0, ijk, v, t)")]]
+inline __hostdev__ bool ZeroCrossingNode(RayT& ray, const NodeT& node, float v0, nanovdb::math::Coord& ijk, float& v, float& t)
+{
+    return zeroCrossingNode(ray, node, v0, ijk, v, t);
 }
 
 /////////////////////////////////////////// TreeMarcher ////////////////////////////////////////////
@@ -399,7 +439,7 @@ inline __hostdev__ bool firstActive(RayT& ray, AccT& acc, Coord &ijk, float& t)
         ijk = RoundDown<Coord>( ray(t) );// update ijk
     }
     return true;
-}
+}// firstActive
 
 /////////////////////////////////////////// TreeMarcher ////////////////////////////////////////////
 
