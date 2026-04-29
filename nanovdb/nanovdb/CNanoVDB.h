@@ -220,7 +220,7 @@ typedef struct
 {
     int64_t     mByteOffset;   // byte offset to the blind data, relative to the GridData.
     uint64_t    mElementCount; // number of elements, e.g. point count
-    uint32_t    mFlags;        // flags
+    uint32_t    mValueSize;    // byte size of each value, etc.
     uint32_t    mSemantic;     // semantic meaning of the data.
     uint32_t    mDataClass;    // 4 bytes
     uint32_t    mDataType;     // 4 bytes
@@ -244,8 +244,8 @@ typedef struct
     double           mVoxelSize[3]; // 24B. size of a voxel in world units
     uint32_t         mGridClass; // 4B.
     uint32_t         mGridType; // 4B.
-    uint64_t         mBlindMetadataOffset; // 8B. offset of GridBlindMetaData structures.
-    int32_t          mBlindMetadataCount; // 4B. count of GridBlindMetaData structures.
+    int64_t          mBlindMetadataOffset; // 8B. offset of GridBlindMetaData structures.
+    uint32_t         mBlindMetadataCount; // 4B. count of GridBlindMetaData structures.
 
     // Total 652: misaligned by 20.
     // uint32_t         _reserved[CNANOVDB_ALIGNMENT_PADDING(8 + 8 + 4 + 4 + 4 + 4 + 8 + 256 + 24 + 24 + sizeof(cnanovdb_map) + 24 + 4 + 4 + 8 + 4, CNANOVDB_DATA_ALIGNMENT) / 4];

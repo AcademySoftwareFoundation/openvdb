@@ -7,7 +7,7 @@ NanoVDB:
   Bug Fixes:
   - static used for local kernel methods in CNanoVDB
   - Remove auto-computed reserved sizes in favour of hard coded sizes
-    in CNanoVDB.  While less maintainble, C99 forbids zero sized
+    in CNanoVDB.  While less maintainable, C99 forbids zero sized
     arrays so some compilers crashed when encountering this.
   - Initialize key value when constructing an accessor, some compilers
     entered bad states with this undefined.
