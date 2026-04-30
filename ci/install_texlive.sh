@@ -5,7 +5,7 @@
 set -ex
 
 # Download the TeX Live installer
-wget https://mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz
+wget https://mirrors.mit.edu/CTAN/systems/texlive/tlnet/install-tl-unx.tar.gz
 
 # Extract
 tar xzf install-tl-unx.tar.gz
@@ -13,7 +13,7 @@ rm install-tl-unx.tar.gz
 cd install-tl-*
 
 # Run the installer with no docs or source installation
-./install-tl --no-interaction --no-doc-install --no-src-install --scheme=minimal
+./install-tl --no-interaction --no-doc-install --no-src-install --scheme=minimal --repository https://mirrors.mit.edu/CTAN/systems/texlive/tlnet
 
 # Export the texlive PATH to GITHUB_PATH
 TEXLIVE_PATH=$(echo /usr/local/texlive/*/bin/x86_64-linux)
