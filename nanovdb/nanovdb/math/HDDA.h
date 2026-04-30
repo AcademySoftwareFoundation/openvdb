@@ -189,6 +189,7 @@ private:
 template<typename RayT, typename AccT>
 inline __hostdev__ bool zeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename AccT::ValueType& v, float& t)
 {
+    static_assert(util::is_floating_point<typename AccT::ValueType>::value, "zeroCrossing assumed a grid with floating point values");
     if (!ray.clip(acc.root().bbox()) || ray.t1() > 1e20)
         return false; // clip ray to bbox
     static const float Delta = 1.0001f;
@@ -222,8 +223,9 @@ inline __hostdev__ bool ZeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename 
 /////////////////////////////////////////// isoCrossing ////////////////////////////////////////////
 
 template<typename RayT, typename AccT>
-inline __hostdev__ bool isoCrossing(const typename AccT::ValueType& iso, RayT& ray, AccT& acc, Coord& ijk, typename AccT::ValueType& v, float& t)
+inline __hostdev__ bool isoCrossing(RayT& ray, AccT& acc, Coord& ijk, typename AccT::ValueType& v, float& t, const typename AccT::ValueType& iso = 0.0f)
 {
+    static_assert(util::is_floating_point<typename AccT::ValueType>::value, "isoCrossing assumed a grid with floating point values");
     if (!ray.clip(acc.root().bbox()) || ray.t1() > 1e20) return false; // clip ray to bbox
     static const float Delta = 1.0001f;
     ijk = RoundDown<Coord>(ray.start()); // first hit of bbox
