@@ -57,6 +57,10 @@ code and has the right to release it under the
 [Apache License, version 2.0](LICENSE.md)
 license. See the [TAC documentation on contribution sign off](https://github.com/AcademySoftwareFoundation/tac/blob/master/process/contributing.md#contribution-sign-off) for more information on this requirement.
 
+#### Stale PRs
+
+A PR that does not have a signed CLA or DCO sign-off will be given at least one week in which to resolve the issue and then will be closed. The TSC cannot review or merge PRs without these requirements having been met. Please re-open PRs that are now expected to pass once this criteria has been met.
+
 ## Maintainer
 
 The maintainer role is the equivalent of the "Committer" role in the charter.

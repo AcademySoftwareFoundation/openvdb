@@ -34,6 +34,9 @@ typedef unsigned long long uint64_t;
 #else // !__CUDACC_RTC__
 
 #include <stdlib.h> //    for abs in clang7
+#if __cplusplus >= 202002L
+#include <atomic> //      for std::atomic_ref (C++20)
+#endif
 #include <stdint.h> //    for types like int32_t etc
 #include <stddef.h> //    for size_t type
 #include <cassert> //     for assert
@@ -83,6 +86,15 @@ typedef unsigned long long uint64_t;
 #endif
 
 #endif // if defined(__CUDACC__) || defined(__HIP__)
+
+// NANOVDB_RESTRICT: cross-compiler no-alias hint for pointer parameters.
+// GCC and Clang (including NVCC host compilation) spell it __restrict__,
+// MSVC spells it __restrict.
+#if defined(_MSC_VER)
+#define NANOVDB_RESTRICT __restrict
+#else
+#define NANOVDB_RESTRICT __restrict__
+#endif
 
 // The following macro will suppress annoying warnings when nvcc
 // compiles functions that call (host) intrinsics (which is perfectly valid)
@@ -672,6 +684,54 @@ __hostdev__ inline uint32_t countOn(uint64_t v)
     return (((v + (v >> 4)) & uint64_t(0xF0F0F0F0F0F0F0F)) * uint64_t(0x101010101010101)) >> 56;
 #endif
 }// util::countOn(uint64_t)
+
+// ----------------------------> util::atomicOr <--------------------------------------
+
+/// @brief Atomically ORs @a mask into the 64-bit word at @a target (relaxed ordering).
+///        Returns the old value. Callable from both host and device code.
+NANOVDB_HOSTDEV_DISABLE_WARNING
+__hostdev__ inline uint64_t atomicOr(uint64_t* target, uint64_t mask)
+{
+#if defined(__CUDA_ARCH__) || defined(__HIP__)
+    return static_cast<uint64_t>(::atomicOr(reinterpret_cast<unsigned long long int*>(target),
+                                            static_cast<unsigned long long int>(mask)));
+#elif __cplusplus >= 202002L
+    return std::atomic_ref<uint64_t>(*target).fetch_or(mask, std::memory_order_relaxed);
+#elif defined(__GNUC__) || defined(__clang__)
+    return __atomic_fetch_or(target, mask, __ATOMIC_RELAXED);
+#elif defined(_MSC_VER)
+    static_assert(sizeof(long long) == sizeof(uint64_t), "Unexpected long long size");
+    return static_cast<uint64_t>(_InterlockedOr64(
+        reinterpret_cast<volatile long long*>(target),
+        static_cast<long long>(mask)));
+#else
+#error "util::atomicOr: no implementation for this compiler"
+#endif
+}// util::atomicOr(uint64_t*, uint64_t)
+
+// ----------------------------> util::atomicAnd <--------------------------------------
+
+/// @brief Atomically ANDs @a mask into the 64-bit word at @a target (relaxed ordering).
+///        Returns the old value. Callable from both host and device code.
+NANOVDB_HOSTDEV_DISABLE_WARNING
+__hostdev__ inline uint64_t atomicAnd(uint64_t* target, uint64_t mask)
+{
+#if defined(__CUDA_ARCH__) || defined(__HIP__)
+    return static_cast<uint64_t>(::atomicAnd(reinterpret_cast<unsigned long long int*>(target),
+                                             static_cast<unsigned long long int>(mask)));
+#elif __cplusplus >= 202002L
+    return std::atomic_ref<uint64_t>(*target).fetch_and(mask, std::memory_order_relaxed);
+#elif defined(__GNUC__) || defined(__clang__)
+    return __atomic_fetch_and(target, mask, __ATOMIC_RELAXED);
+#elif defined(_MSC_VER)
+    static_assert(sizeof(long long) == sizeof(uint64_t), "Unexpected long long size");
+    return static_cast<uint64_t>(_InterlockedAnd64(
+        reinterpret_cast<volatile long long*>(target),
+        static_cast<long long>(mask)));
+#else
+#error "util::atomicAnd: no implementation for this compiler"
+#endif
+}// util::atomicAnd(uint64_t*, uint64_t)
 
 }// namespace util ==================================================================
 
