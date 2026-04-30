@@ -765,7 +765,7 @@ cnanovdb_rootdata##SUFFIX##_isActiveAndCache(const CNANOVDB_GLOBAL cnanovdb_root
 /**/
 
 
-inline void
+static inline void
 cnanovdb_readaccessor_init(cnanovdb_readaccessor *RESTRICT acc,
                     const CNANOVDB_GLOBAL void /*cnanovdb_rootdata* */ *RESTRICT rootdata)
 {
@@ -921,7 +921,7 @@ cnanovdb_griddata_valid(const CNANOVDB_GLOBAL cnanovdb_griddata *RESTRICT grid)
 {
     if (!grid)
         return 0;
-    if (grid->mMagic != 0x304244566f6e614eUL && grid->mMagic != 0x314244566f6e614eUL)
+    if (grid->mMagic != 0x304244566f6e614eUL)
         return 0;
     return 1;
 }
