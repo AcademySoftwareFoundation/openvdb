@@ -19,6 +19,7 @@ endif()
 project(OpenVDBCore LANGUAGES CXX)
 
 include(GNUInstallDirs)
+include(${CMAKE_SOURCE_DIR}/cmake/OpenVDBUtils.cmake)
 
 ###### OpenVDB Core Options
 
@@ -277,6 +278,25 @@ endif()
 ##### Core library configuration
 
 # Configure the version header
+
+if(USE_VCL)
+  # If VCL is in use, determine which instruction set it's detected and embed
+  # this value into version.h.in. If downstream software ends up computing a
+  # different value, we can issue a warning.
+  set(OPENVDB_USE_VCL 1)
+  set(OPENVDB_X86_INSTRSET -1)
+  openvdb_compute_x86_instrset_from_vcl(OPENVDB_X86_INSTRSET)
+else()
+  # Without VCL, still set OPENVDB_X86_INSTRSET based on any explicitly
+  # provided CMake Defines
+  if(OPENVDB_USE_AVX)
+    set(OPENVDB_X86_INSTRSET 7)
+  elseif(OPENVDB_USE_SSE42)
+    set(OPENVDB_X86_INSTRSET 6)
+  else()
+    set(OPENVDB_X86_INSTRSET 0)
+  endif()
+endif()
 
 if(USE_IMATH_HALF)
   set(OPENVDB_USE_IMATH_HALF 1)
@@ -581,6 +601,10 @@ set(OPENVDB_LIBRARY_THREAD_INCLUDE_FILES
   thread/Threading.h
 )
 
+set(OPENVDB_LIBRARY_SIMD_INCLUDE_FILES
+  simd/Simd.h
+)
+
 list(APPEND OPENVDB_LIBRARY_MATH_INCLUDE_FILES
   ${CMAKE_SOURCE_DIR}/ext/imath/openvdb/math/Half.h)
 list(APPEND OPENVDB_LIBRARY_SOURCE_FILES
@@ -685,7 +709,11 @@ if(OPENVDB_CORE_STATIC)
   )
 
   if(NOT USE_IMATH_HALF)
-    target_include_directories(openvdb_static PUBLIC ${CMAKE_SOURCE_DIR}/ext/imath)
+    target_include_directories(openvdb_static SYSTEM PUBLIC ${CMAKE_SOURCE_DIR}/ext/imath)
+  endif()
+
+  if(USE_VCL)
+    target_include_directories(openvdb_static SYSTEM PUBLIC ${CMAKE_SOURCE_DIR}/ext/vcl)
   endif()
 
   target_compile_definitions(openvdb_static
@@ -722,7 +750,11 @@ if(OPENVDB_CORE_SHARED)
   )
 
   if(NOT USE_IMATH_HALF)
-    target_include_directories(openvdb_shared PUBLIC ${CMAKE_SOURCE_DIR}/ext/imath)
+    target_include_directories(openvdb_shared SYSTEM PUBLIC ${CMAKE_SOURCE_DIR}/ext/imath)
+  endif()
+
+  if(USE_VCL)
+    target_include_directories(openvdb_shared SYSTEM PUBLIC ${CMAKE_SOURCE_DIR}/ext/vcl)
   endif()
 
   target_compile_definitions(openvdb_shared
@@ -783,3 +815,8 @@ install(FILES ${OPENVDB_LIBRARY_TOOLS_IMPL_INCLUDE_FILES} DESTINATION ${OPENVDB_
 install(FILES ${OPENVDB_LIBRARY_TREE_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/tree)
 install(FILES ${OPENVDB_LIBRARY_UTIL_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/util)
 install(FILES ${OPENVDB_LIBRARY_THREAD_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/thread)
+install(FILES ${OPENVDB_LIBRARY_SIMD_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/simd)
+
+if(USE_VCL)
+  install(DIRECTORY ${CMAKE_SOURCE_DIR}/ext/vcl/openvdb DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR})
+endif()

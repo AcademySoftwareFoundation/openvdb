@@ -83,8 +83,8 @@ function(OPENVDB_GET_VERSION_DEFINE HEADER KEY VALUE)
 endfunction()
 
 
-########################################################################
-########################################################################
+###############################################################################
+###############################################################################
 
 
 function(OPENVDB_VERSION_FROM_HEADER OPENVDB_VERSION_FILE)
@@ -120,8 +120,8 @@ function(OPENVDB_VERSION_FROM_HEADER OPENVDB_VERSION_FILE)
 endfunction()
 
 
-########################################################################
-########################################################################
+###############################################################################
+###############################################################################
 
 
 function(OPENVDB_ABI_VERSION_FROM_PRINT OPENVDB_PRINT)
@@ -161,4 +161,115 @@ function(OPENVDB_ABI_VERSION_FROM_PRINT OPENVDB_PRINT)
   if(_VDB_ABI)
     set(${_VDB_ABI} ${_OpenVDB_ABI} PARENT_SCOPE)
   endif()
+endfunction()
+
+###############################################################################
+## @brief  Compute the enumerated ISA value for x86/x86_64 architectures that
+##   VCL will use during compilation of OpenVDB. The value is stored in the
+##   VCL_INSTRSET variable. Possible values are:
+##     0:  Unknown or error
+##     2:  SSE2
+##     3:  SSE3
+##     4:  SSSE3
+##     5:  SSE4.1
+##     6:  SSE4.2
+##     7:  AVX
+##     8:  AVX2
+##     9:  AVX512F
+##     10: AVX512BW/DQ/VL
+function(OPENVDB_COMPUTE_X86_INSTRSET_FROM_VCL VCL_INSTRSET)
+  # Append project specific flags
+  set(OLD_CMAKE_REQUIRED_FLAGS ${CMAKE_REQUIRED_FLAGS})
+  if(OPENVDB_SIMD STREQUAL "AVX")
+    set(CMAKE_REQUIRED_FLAGS "-mavx;-msse4.2")
+  elseif(OPENVDB_SIMD STREQUAL "SSE42")
+    set(CMAKE_REQUIRED_FLAGS "-msse4.2")
+  endif()
+
+  # Figure out that the INSTRSET macor would expand to.
+  # @todo would be much faster with try_run
+  include(CheckCXXSourceCompiles)
+  check_cxx_source_compiles([[
+    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    int main() { static_assert(INSTRSET == 10); return 0; } ]] COMPUTE_VCL_INSTRSET__AVX512VL_DQ_BW__)
+  if(COMPUTE_VCL_INSTRSET__AVX512VL_DQ_BW__)
+    set(${VCL_INSTRSET} 10 PARENT_SCOPE)
+    set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
+    return()
+  endif()
+  check_cxx_source_compiles([[
+    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    int main() { static_assert(INSTRSET == 9); return 0; } ]] COMPUTE_VCL_INSTRSET__AVX512F__)
+  if(COMPUTE_VCL_INSTRSET__AVX512F__)
+    set(${VCL_INSTRSET} 9 PARENT_SCOPE)
+    set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
+    return()
+  endif()
+  check_cxx_source_compiles([[
+    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    int main() { static_assert(INSTRSET == 8); return 0; } ]] COMPUTE_VCL_INSTRSET__AVX2__)
+  if(COMPUTE_VCL_INSTRSET__AVX2__)
+    set(${VCL_INSTRSET} 8 PARENT_SCOPE)
+    set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
+    return()
+  endif()
+  check_cxx_source_compiles([[
+    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    int main() { static_assert(INSTRSET == 7); return 0; } ]] COMPUTE_VCL_INSTRSET__AVX__)
+  if(COMPUTE_VCL_INSTRSET__AVX__)
+    set(${VCL_INSTRSET} 7 PARENT_SCOPE)
+    set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
+    return()
+  endif()
+  check_cxx_source_compiles([[
+    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    int main() { static_assert(INSTRSET == 6); return 0; } ]] COMPUTE_VCL_INSTRSET__SSE4_2__)
+  if(COMPUTE_VCL_INSTRSET__SSE4_2__)
+    set(${VCL_INSTRSET} 6 PARENT_SCOPE)
+    set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
+    return()
+  endif()
+  check_cxx_source_compiles([[
+    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    int main() { static_assert(INSTRSET == 5); return 0; } ]] COMPUTE_VCL_INSTRSET__SSE4_1__)
+  if(COMPUTE_VCL_INSTRSET__SSE4_1__)
+    set(${VCL_INSTRSET} 5 PARENT_SCOPE)
+    set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
+    return()
+  endif()
+  check_cxx_source_compiles([[
+    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    int main() { static_assert(INSTRSET == 4); return 0; } ]] COMPUTE_VCL_INSTRSET__SSSE3__)
+  if(COMPUTE_VCL_INSTRSET__SSSE3__)
+    set(${VCL_INSTRSET} 4 PARENT_SCOPE)
+    set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
+    return()
+  endif()
+  check_cxx_source_compiles([[
+    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    int main() { static_assert(INSTRSET == 3); return 0; } ]] COMPUTE_VCL_INSTRSET__SSE3__)
+  if(COMPUTE_VCL_INSTRSET__SSE3__)
+    set(${VCL_INSTRSET} 3 PARENT_SCOPE)
+    set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
+    return()
+  endif()
+  check_cxx_source_compiles([[
+    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    int main() { static_assert(INSTRSET == 2); return 0; } ]] COMPUTE_VCL_INSTRSET__SSE2__)
+  if(COMPUTE_VCL_INSTRSET__SSE2__)
+    set(${VCL_INSTRSET} 2 PARENT_SCOPE)
+    set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
+    return()
+  endif()
+  check_cxx_source_compiles([[
+    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    int main() { static_assert(INSTRSET == 1); return 0; } ]] COMPUTE_VCL_INSTRSET__SSE__)
+  if(COMPUTE_VCL_INSTRSET__SSE__)
+    set(${VCL_INSTRSET} 1 PARENT_SCOPE)
+    set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
+    return()
+  endif()
+  # Unknown or error
+  set(${VCL_INSTRSET} 0 PARENT_SCOPE)
+  set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
 endfunction()
