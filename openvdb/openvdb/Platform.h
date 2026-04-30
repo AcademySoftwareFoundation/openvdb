@@ -55,6 +55,17 @@
     #endif
 #endif
 
+/// Auto-detect std::experimental::simd (C++ Parallelism TS v2).
+/// When available, openvdb::simd::Simd<T,W> wraps it to emit native SIMD
+/// instructions without relying on the auto-vectorizer.
+/// Suppress with -DOPENVDB_NO_STD_SIMD to force the std::array fallback.
+#if !defined(OPENVDB_NO_STD_SIMD) && defined(__has_include) && __has_include(<experimental/simd>)
+#  include <experimental/simd>
+#  ifdef __cpp_lib_experimental_parallel_simd
+#    define OPENVDB_USE_STD_SIMD 1
+#  endif
+#endif
+
 /// Windows defines
 #ifdef _WIN32
     ///Disable the non-portable Windows definitions of min() and max() macros
