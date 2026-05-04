@@ -219,6 +219,8 @@ private:
     /// @brief Converts a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh
     void soupToLevelSet();
 
+    void soupToOffset();
+
     /// @brief Converts all quads into triangles
     void quadsToTriangles();
 
@@ -537,6 +539,18 @@ void Tool::init()
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
      {"name", "", "soup2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
      [&](){mParser.setDefaults();}, [&](){this->soupToLevelSet();});
+  
+  mParser.addAction(
+     {"soup2offset"}, "Convert a polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+    {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
+     {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
+     {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
+     {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
+//     {"erode", "8", "2", "number of iterations of constrained erosion. Defaults to 8."},
+//     {"thres", "0", "0.01", "closing (or engineering) threshold. Defaults to 0, i.e. it\'s diabled."},
+     {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
+     {"name", "", "soup2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
+     [&](){mParser.setDefaults();}, [&](){this->soupToOffset();});
 
   mParser.addAction(
      {"vol2mesh", "vdb2mesh"}, "Convert a scalar volume to an adaptive polygon mesh",
@@ -2006,6 +2020,57 @@ void Tool::soupToLevelSet()
     }
   }
 }// Tool::soupToLevelSet
+
+// ==============================================================================================================
+
+void Tool::soupToOffset()
+{
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "soup2offset");
+  try {
+    mParser.printAction();
+    const int dim = mParser.get<int>("dim");// final dimension
+    float voxel = mParser.get<float>("voxel");// final voxel size
+    const float width = mParser.get<float>("width");
+    const int geo_age = mParser.get<int>("geo");
+    const bool keep = mParser.get<bool>("keep");
+    std::string grid_name = mParser.get<std::string>("name");
+
+    auto it = this->getGeom(geo_age);
+    Geometry::Ptr mesh = *it;
+    if (mesh->isPoints()) {
+      if (!keep) mGeom.erase(std::next(it).base());
+      throw std::invalid_argument("got points, expected mesh! Hint: use -points2ls instead!");
+    }
+    if (keep) mesh = mesh->deepCopy();// deep copy since mesh will be modified below
+    if (mParser.verbose) mTimer.start("Soup -> Offset");
+
+    //Spinner spin, *progress = mParser.verbose ? &spin : nullptr;
+    //const tools::ShrinkWrapLimit D(nErode, thres);
+    tools::PolySoup poly{std::move(mesh->vtx()), std::move(mesh->tri()), std::move(mesh->quad()), mesh->bbox()};
+    
+    //PolySoup poly{std::move(vtx), std::move(tri), std::move(quad), bbox};
+    tools::PolySoupToLevelSet<GridT> tmp(std::move(poly), voxel, width);
+    auto grid = tmp.offset(voxel);
+    //tmp.process(D, progress);
+    
+    //auto grid = tools::polySoupToLevelSet<GridT>(std::move(poly), dim, voxel, D, width, progress);
+
+    if (mParser.verbose) mTimer.stop();
+
+    if (grid_name.empty()) grid_name = "soup2offset_" + mesh->getName();
+    grid->setName(grid_name);
+    mGrid.push_back(grid);
+    if (!keep) mGeom.erase(std::next(it).base());
+
+  } catch (const std::exception& e) {
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
+    }
+  }
+}// Tool::soupToOffset
 
 // ==============================================================================================================
 

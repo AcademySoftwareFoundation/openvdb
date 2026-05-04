@@ -28,6 +28,7 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
 
     auto *h_grid = handle.grid<float>();
     if (!h_grid) throw std::runtime_error("GridHandle does not contain a valid host grid");
+    const float iso = h_grid->voxelSize()[0];// <-- define iso-value as one voxel offset
 
     float* h_outImage = reinterpret_cast<float*>(imageBuffer.data());
 
@@ -41,9 +42,10 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
     RayGenOp<Vec3T> rayGenOp(wBBoxDimZ, wBBoxCenter);
     CompositeOp     compositeOp;
 
-    auto renderOp = [width, height, rayGenOp, compositeOp, treeIndexBbox, wBBoxDimZ] __hostdev__(int start, int end, float* image, const GridT* grid) {
+    auto renderOp = [iso, width, height, rayGenOp, compositeOp, treeIndexBbox, wBBoxDimZ] __hostdev__(int start, int end, float* image, const GridT* grid) {
         // get an accessor.
         auto acc = grid->tree().getAccessor();
+        
 
         for (int i = start; i < end; ++i) {
             Vec3T rayEye;
@@ -57,7 +59,7 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
             float  t0;
             CoordT ijk;
             float  v;
-            if (nanovdb::math::zeroCrossing(iRay, acc, ijk, v, t0)) {
+            if (nanovdb::math::isoCrossing(iRay, acc, ijk, v, t0, iso)) {
                 // write distance to surface. (we assume it is a uniform voxel)
                 float wT0 = t0 * float(grid->voxelSize()[0]);
                 compositeOp(image, i, width, height, wT0 / (wBBoxDimZ * 2), 1.0f);
@@ -66,7 +68,7 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
                 compositeOp(image, i, width, height, 0.0f, 0.0f);
             }
         }
-    };
+    };// renderOp lambda function
 
     {
         float durationAvg = 0;
@@ -76,9 +78,9 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
             durationAvg += duration;
         }
         durationAvg /= numIterations;
-        std::cout << "Average Duration(NanoVDB-Host) = " << durationAvg << " ms" << std::endl;
+        std::cout << "Average of " << numIterations << " renderings (NanoVDB-Host) = " << durationAvg << " ms" << std::endl;
 
-        saveImage("raytrace_level_set-nanovdb-host.pfm", width, height, (float*)imageBuffer.data());
+        saveImage("raytrace_iso_surface-nanovdb-host.pfm", width, height, (float*)imageBuffer.data());
     }
 
 #if defined(NANOVDB_USE_CUDA)
@@ -99,10 +101,10 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
             durationAvg += duration;
         }
         durationAvg /= numIterations;
-        std::cout << "Average Duration(NanoVDB-Cuda) = " << durationAvg << " ms" << std::endl;
+        std::cout << "Average of " << numIterations << " renderings (NanoVDB-Cuda) = " << durationAvg << " ms " << std::endl;
 
         imageBuffer.deviceDownload();
-        saveImage("raytrace_level_set-nanovdb-cuda.pfm", width, height, (float*)imageBuffer.data());
+        saveImage("raytrace_iso_surface-nanovdb-cuda.pfm", width, height, (float*)imageBuffer.data());
     }
 #endif
-}
+}// runNanoVDB
