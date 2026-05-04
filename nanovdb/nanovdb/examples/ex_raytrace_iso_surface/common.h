@@ -58,88 +58,113 @@ inline float renderImage(bool useCuda, const RenderFn renderOp, int width, int h
     return duration;
 }
 
-inline void saveImage(const std::string& filename, int width, int height, const float* image)
+struct RenderOp
 {
-    const auto isLittleEndian = []() -> bool {
-        static int  x = 1;
-        static bool result = reinterpret_cast<uint8_t*>(&x)[0] == 1;
-        return result;
-    };
-
-    float scale = 1.0f;
-    if (isLittleEndian())
-        scale = -scale;
-
-    std::fstream fs(filename, std::ios::out | std::ios::binary);
-    if (!fs.is_open()) {
-        throw std::runtime_error("Unable to open file: " + filename);
-    }
-
-    fs << "Pf\n"
-       << width << "\n"
-       << height << "\n"
-       << scale << "\n";
-
-    for (int i = 0; i < width * height; ++i) {
-        float r = image[i];
-        fs.write((char*)&r, sizeof(float));
-    }
-}
-
-template<typename Vec3T>
-struct RayGenOp
-{
-    float mWBBoxDimZ;
+    using Vec3T  = nanovdb::math::Vec3<float>;
+    using RayT   = nanovdb::math::Ray<float>;
+    int mWidth, mHeight;
+    float mDx, mIso, mWBBoxDimZ;
     Vec3T mWBBoxCenter;
 
-    inline RayGenOp(float wBBoxDimZ, Vec3T wBBoxCenter)
-        : mWBBoxDimZ(wBBoxDimZ)
-        , mWBBoxCenter(wBBoxCenter)
+    template<typename BufferT> 
+    RenderOp(nanovdb::GridHandle<BufferT>& handle, int width, int height)
     {
+        mWidth = width;
+        mHeight = height;
+        const auto *metaData = handle.gridMetaData();
+        mDx = float(metaData->voxelSize()[0]);
+        mIso = mDx;
+        mWBBoxDimZ = (float)metaData->worldBBox().dim()[2] * 2;
+        mWBBoxCenter = Vec3T(metaData->worldBBox().min() + metaData->worldBBox().dim() * 0.5f);
     }
 
-    inline __hostdev__ void operator()(int i, int w, int h, Vec3T& outOrigin, Vec3T& outDir) const
+    template<typename GridT>
+    inline float renderImage(bool useCuda, float* image, const GridT* grid)
+    {
+        using ClockT = std::chrono::high_resolution_clock;
+        auto t0 = ClockT::now();
+
+        computeForEach(
+            useCuda, mWidth * mHeight, 512, __FILE__, __LINE__, [this, image, grid] __hostdev__(int start, int end) {
+            (*this)(start, end, image, grid);
+        });
+        computeSync(useCuda, __FILE__, __LINE__);
+
+        auto t1 = ClockT::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() / 1000.f;
+        return duration;
+    }
+
+    template <typename GridT>
+    inline __hostdev__ void operator()(int start, int end, float* image, const GridT* grid) const
+    {
+        using BuildT = typename GridT::BuildType;
+        static_assert(nanovdb::util::is_same<BuildT, float, nanovdb::ValueOnIndex>::value, "only works for float and OnIndex grids");
+        using AccT = nanovdb::AccType<BuildT, float>;
+        
+        AccT acc(*grid);
+        float  t0, v;
+        nanovdb::Coord ijk;
+        for (int i = start; i < end; ++i) {
+            RayT iRay = this->getIndexRay(i, grid);   
+            if (nanovdb::math::isoCrossing(iRay, acc, ijk, v, t0, mIso)) {// intersect...
+                this->composite(image, i, (t0 * mDx) / (mWBBoxDimZ * 2), 1.0f);
+            } else {
+                this->composite(image, i, 0.0f, 0.0f);// write background value.
+            }
+        }
+    }
+
+    template <typename GridT>  
+    inline __hostdev__ RayT getIndexRay(int i, const GridT *grid) const
     {
         // perspective camera along Z-axis...
-        uint32_t x, y;
-#if 0
-        mortonDecode(i, x, y);
-#else
-        x = i % w;
-        y = i / w;
-#endif
+        const uint32_t x = i % mWidth, y = i / mWidth;
         const float fov = 45.f;
-        const float u = (float(x) + 0.5f) / w;
-        const float v = (float(y) + 0.5f) / h;
-        const float aspect = w / float(h);
+        const float u = (float(x) + 0.5f) / mWidth;
+        const float v = (float(y) + 0.5f) / mHeight;
+        const float aspect = mWidth / float(mHeight);
         const float Px = (2.f * u - 1.f) * tanf(fov / 2 * 3.14159265358979323846f / 180.f) * aspect;
         const float Py = (2.f * v - 1.f) * tanf(fov / 2 * 3.14159265358979323846f / 180.f);
         const Vec3T origin = mWBBoxCenter + Vec3T(0, 0, mWBBoxDimZ);
         Vec3T       dir(Px, Py, -1.f);
         dir.normalize();
-        outOrigin = origin;
-        outDir = dir;
+        RayT wRay(origin, dir);
+        return wRay.worldToIndexF(*grid);// transform the ray to the grid's index-space.
     }
-};
 
-struct CompositeOp
-{
-    inline __hostdev__ void operator()(float* outImage, int i, int w, int h, float value, float alpha) const
+    inline __hostdev__ void composite(float* outImage, int offset, float value, float alpha) const
     {
-        uint32_t x, y;
-        int      offset;
-#if 0
-        mortonDecode(i, x, y);
-        offset = x + y * w;
-#else
-        x = i % w;
-        y = i / w;
-        offset = i;
-#endif
+        const uint32_t x = offset % mWidth, y = offset / mWidth;
 
         // checkerboard background...
         const int   mask = 1 << 7;
         const float bg = ((x & mask) ^ (y & mask)) ? 1.0f : 0.5f;
         outImage[offset] = alpha * value + (1.0f - alpha) * bg;
+    }
+
+    inline void saveImage(const std::string& filename, const float* image) const
+    {
+        const auto isLittleEndian = []() -> bool {
+            static int  x = 1;
+            static bool result = reinterpret_cast<uint8_t*>(&x)[0] == 1;
+            return result;
+        };
+
+        float scale = 1.0f;
+        if (isLittleEndian()) scale = -scale;
+
+        std::fstream fs(filename, std::ios::out | std::ios::binary);
+        if (!fs.is_open()) throw std::runtime_error("Unable to open file: " + filename);
+
+        fs << "Pf\n"
+           << mWidth << "\n"
+           << mHeight << "\n"
+           << scale << "\n";
+
+        for (int i = 0; i < mWidth * mHeight; ++i) {
+            float r = image[i];
+            fs.write((char*)&r, sizeof(float));
+        }
     }
 };

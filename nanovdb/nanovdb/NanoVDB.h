@@ -5760,6 +5760,10 @@ public:
 
 }; // ChannelAccessor
 
+template <typename BuildT, typename ValueT>
+using AccType = typename util::conditional<BuildTraits<BuildT>::is_index,
+                ChannelAccessor<ValueT, BuildT>, DefaultReadAccessor<BuildT>>::type;
+
 #if 0
 // This MiniGridHandle class is only included as a stand-alone example. Note that aligned_alloc is a C++17 feature!
 // Normally we recommend using GridHandle defined in util/GridHandle.h but this minimal implementation could be an
