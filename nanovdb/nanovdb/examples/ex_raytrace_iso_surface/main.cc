@@ -27,10 +27,9 @@ int main(int ac, char** av)
         }
 
         const int numIterations = 50;
-
         const int width  = 1024;
         const int height = 1024;
-        BufferT   imageBuffer(width * height * sizeof(float));
+        BufferT imageBuffer(width * height * sizeof(float));
 
         runNanoVDB(handle, numIterations, width, height, imageBuffer);
     }

@@ -4717,7 +4717,7 @@ using OnIndexGrid = Grid<OnIndexTree>;
 * @endcode
 */
 
-/// @brief Use this function, which depends a pointer to GridData, to call
+/// @brief Use this function, which depends on a pointer to GridData, to call
 ///        other functions that depend on a NanoGrid of a known ValueType.
 /// @details This function allows for generic programming by converting GridData
 ///          to a NanoGrid of the type encoded in GridData::mGridType.
