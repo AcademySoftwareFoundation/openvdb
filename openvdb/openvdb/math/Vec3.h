@@ -659,6 +659,26 @@ inline Vec3<T> Exp(Vec3<T> v) { return v.exp(); }
 template <typename T>
 inline Vec3<T> Log(Vec3<T> v) { return v.log(); }
 
+/// @brief  Componentwise less than for Vec3 types.
+template <typename T1, typename T2>
+inline bool cwiseLessThan(const Vec3<T1>& a, const Vec3<T2>& b)
+{
+    for (int i = 0; i < 2; ++i) {
+        if (!isExactlyEqual(a[i], b[i])) return a[i] < b[i];
+    }
+    return a[2] < b[2];
+}
+
+/// @brief  Componentwise greater than for Vec3 types.
+template <typename T1, typename T2>
+inline bool cwiseGreaterThan(const Vec3<T1>& a, const Vec3<T2>& b)
+{
+    for (int i = 0; i < 2; ++i) {
+        if (!isExactlyEqual(a[i], b[i])) return a[i] > b[i];
+    }
+    return a[2] > b[2];
+}
+
 using Vec3i = Vec3<int32_t>;
 using Vec3ui = Vec3<uint32_t>;
 using Vec3s = Vec3<float>;
