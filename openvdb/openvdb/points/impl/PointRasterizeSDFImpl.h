@@ -456,7 +456,7 @@ private:
 
         const SimdIT ids = simd::load<Size>(points.data());
         int64_t firstInvalidIdx =
-            simd::horizontal_find_first(simd::eq(ids, SimdIT(-1)));
+            simd::horizontal_find_first(ids == SimdIT(-1));
         if (firstInvalidIdx == -1) firstInvalidIdx = Size;
         // It's guaranteed that at least two indices are valid in the
         // "points" array (if it's one then rasterizePoint is called).
@@ -514,14 +514,14 @@ private:
         //   single -/+ by horizontallying into 2xVCL4 types.
         CoordBBox intersectBox(
             Coord::round(Vec3d(
-                simd::horizontal_min(simd::sub(px, rmax)),
-                simd::horizontal_min(simd::sub(py, rmax)),
-                simd::horizontal_min(simd::sub(pz, rmax))
+                simd::horizontal_min(px - rmax),
+                simd::horizontal_min(py - rmax),
+                simd::horizontal_min(pz - rmax)
             )),
             Coord::round(Vec3d(
-                simd::horizontal_max(simd::add(px, rmax)),
-                simd::horizontal_max(simd::add(py, rmax)),
-                simd::horizontal_max(simd::add(pz, rmax))
+                simd::horizontal_max(px + rmax),
+                simd::horizontal_max(py + rmax),
+                simd::horizontal_max(pz + rmax)
             ))
         );
         intersectBox.intersect(bounds);
@@ -560,36 +560,36 @@ private:
         // incorrectly setting these voxels to inactive -background values as
         // x2y2z2 will never be < 0.0. We still want the lteq logic in the
         // (x2y2z2 <= min2) check as this is valid when min2 > 0.0.
-        const ScalarT min2 = simd::select(simd::eq(Rmin2, ScalarT(0.0)), ScalarT(-1.0), Rmin2);
+        const ScalarT min2 = simd::select((Rmin2 == ScalarT(0.0)), ScalarT(-1.0), Rmin2);
         const ScalarT max2 = Rmax2;
         const ScalarT vdx(this->mDx);
 
         const Coord& a(intersection.min());
         const Coord& b(intersection.max());
         for (Coord c = a; c.x() <= b.x(); ++c.x()) {
-            const ScalarT x2 = simd::square(simd::sub(ScalarT(RealT(c.x())), Px));
+            const ScalarT x2 = simd::square(ScalarT(RealT(c.x())) - Px);
             const Index i = ((c.x() & (DIM-1u)) << 2*LOG2DIM); // unsigned bit shift mult
             for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
-                const ScalarT x2y2 = simd::add(x2, simd::square(simd::sub(ScalarT(RealT(c.y())), Py)));
+                const ScalarT x2y2 = x2 + simd::square(ScalarT(RealT(c.y())) - Py);
                 const Index ij = i + ((c.y() & (DIM-1u)) << LOG2DIM);
                 for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
                     const Index offset = ij + /*k*/(c.z() & (DIM-1u));
                     if (!mask.isOn(offset)) continue; // inside existing level set or not in range
 
-                    const ScalarT x2y2z2 = simd::add(x2y2, simd::square(simd::sub(ScalarT(RealT(c.z())), Pz)));
+                    const ScalarT x2y2z2 = x2y2 + simd::square(ScalarT(RealT(c.z())) - Pz);
                     OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(x2y2z2)));
 
                     // If all outside the maximum band, continue
-                    if (simd::horizontal_and(simd::gte(x2y2z2, max2))) continue;
+                    if (simd::horizontal_and(x2y2z2 >= max2)) continue;
                     // If any inside the minimum band, set the maximum negative background
-                    if (simd::horizontal_or(simd::lte(x2y2z2, min2))) {
+                    if (simd::horizontal_or(x2y2z2 <= min2)) {
                         data[offset] = -(this->mBackground);
                         mask.setOff(offset);
                         continue;
                     }
 
                     // Compute distance to surface (the mul() takes us back to world space)
-                    const ScalarT dist = simd::mul(vdx, (simd::sub(simd::sqrt(x2y2z2), r)));
+                    const ScalarT dist = (vdx * (simd::sqrt(x2y2z2) - r));
                     // keep original precision for horizontal_find_first below
                     const auto mindist = simd::horizontal_min(dist);
                     // Convert to surface precision
@@ -599,7 +599,7 @@ private:
                     if (d < v) {
                         v = d; // replace surface value
                         if constexpr(CPG) {
-                            const int id = simd::horizontal_find_first(simd::eq(ScalarT(mindist), dist));
+                            const int id = simd::horizontal_find_first(ScalarT(mindist) == dist);
                             OPENVDB_ASSERT(id != -1);
                             // transfer attributes - we can't use this here as the exposed
                             // function signatures take vector of attributes (i.e. an unbounded
