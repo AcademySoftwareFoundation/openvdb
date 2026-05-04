@@ -359,7 +359,7 @@ template <typename T> struct SimdTraits; // fwd declare
 /// template <typename T>
 /// T Lerp(const T a, const T b, const T t) {
 ///   using namespace openvdb::simd;
-///   return add(mul(sub(T(1), t), a), mul(t, b));
+///   return ((T(1) - t) * a) + (t * b));
 /// }
 
 //// Vector API
@@ -377,10 +377,6 @@ template <size_t N, typename T> inline auto load_partial(int C, const T* a)
 
 OPENVDB_ENABLE_IF_VCL inline auto compress(const T& a) { return openvdb_ext_vcl::compress(a); }
 
-OPENVDB_ENABLE_IF_VCL inline T add(const T& a, const T& b) { return a + b; }
-OPENVDB_ENABLE_IF_VCL inline T sub(const T& a, const T& b) { return a - b; }
-OPENVDB_ENABLE_IF_VCL inline T mul(const T& a, const T& b) { return a * b; }
-OPENVDB_ENABLE_IF_VCL inline T div(const T& a, const T& b) { return a / b; }
 OPENVDB_ENABLE_IF_VCL inline T max(const T& a, const T& b) { return openvdb_ext_vcl::max(a, b); }
 OPENVDB_ENABLE_IF_VCL inline T min(const T& a, const T& b) { return openvdb_ext_vcl::min(a, b); }
 OPENVDB_ENABLE_IF_VCL inline T abs(const T& a) { return openvdb_ext_vcl::abs(a); }
@@ -391,14 +387,6 @@ OPENVDB_ENABLE_IF_VCL inline T pow3(const T& a) { return a*openvdb_ext_vcl::squa
 
 template <int N, typename T, typename std::enable_if<IsSimdT<T>::value>::type* = nullptr>
 inline auto pow(const T& a) { return openvdb_ext_vcl::pow_n<T, N>(a); }
-
-OPENVDB_ENABLE_IF_VCL inline auto eq(const T& a, const T& b) { return a == b; }
-OPENVDB_ENABLE_IF_VCL inline auto neq(const T& a, const T& b) { return a != b; }
-OPENVDB_ENABLE_IF_VCL inline auto gt(const T& a, const T& b) { return a > b; }
-OPENVDB_ENABLE_IF_VCL inline auto gte(const T& a, const T& b) { return a >= b; }
-OPENVDB_ENABLE_IF_VCL inline auto lt(const T& a, const T& b) { return a < b; }
-OPENVDB_ENABLE_IF_VCL inline auto lte(const T& a, const T& b) { return a <= b; }
-OPENVDB_ENABLE_IF_VCL inline auto logical_and(const T& a, const T& b) { return a && b; }
 
 OPENVDB_ENABLE_IF_VCL inline T select(const typename SimdTraits<T>::MaskT& m, const T& a, const T& b) {
     return openvdb_ext_vcl::select(m, a, b);
@@ -470,28 +458,15 @@ inline typename SimdT<T, N>::Type load(const T* a)
 
 OPENVDB_ENABLE_IF_TUPLE inline auto compress(const T& a) { return simd_internal::unaryop(a,simd_internal::compressop); }
 
-OPENVDB_ENABLE_IF_TUPLE inline auto add(const T& a, const T& b) { return simd_internal::binop<std::plus>(a,b); }
-OPENVDB_ENABLE_IF_TUPLE inline auto sub(const T& a, const T& b) { return simd_internal::binop<std::minus>(a,b); }
-OPENVDB_ENABLE_IF_TUPLE inline auto mul(const T& a, const T& b) { return simd_internal::binop<std::multiplies>(a,b); }
-OPENVDB_ENABLE_IF_TUPLE inline auto div(const T& a, const T& b) { return simd_internal::binop<std::divides>(a,b); }
-
 OPENVDB_ENABLE_IF_TUPLE inline auto abs(const T& a) { return simd_internal::unaryop(a,simd_internal::absop); }
 OPENVDB_ENABLE_IF_TUPLE inline auto sqrt(const T& a) { return simd_internal::unaryop(a,simd_internal::sqrtop); }
-OPENVDB_ENABLE_IF_TUPLE inline auto square(const T& a) { return mul(a,a); }
-OPENVDB_ENABLE_IF_TUPLE inline auto pow2(const T& a) { return mul(a,a); }
-OPENVDB_ENABLE_IF_TUPLE inline auto pow3(const T& a) { return mul(a, mul(a,a)); }
+OPENVDB_ENABLE_IF_TUPLE inline auto square(const T& a) { return a * a; }
+OPENVDB_ENABLE_IF_TUPLE inline auto pow2(const T& a) { return a * a; }
+OPENVDB_ENABLE_IF_TUPLE inline auto pow3(const T& a) { return a * a * a; }
 template <typename T, typename ExpT> inline auto pow(const T& a, const ExpT n)
 {
     T r; for (int i = 0; i < T::size; ++i) { r[i] = math::Pow(a[i],n); } return r;
 }
-
-OPENVDB_ENABLE_IF_TUPLE inline auto eq(const T& a, const T& b) { return simd_internal::binop<std::equal_to>(a,b); }
-OPENVDB_ENABLE_IF_TUPLE inline auto neq(const T& a, const T& b) { return simd_internal::binop<std::not_equal_to>(a,b); }
-OPENVDB_ENABLE_IF_TUPLE inline auto gt(const T& a, const T& b) { return simd_internal::binop<std::greater>(a,b); }
-OPENVDB_ENABLE_IF_TUPLE inline auto gte(const T& a, const T& b) { return simd_internal::binop<std::greater_equal>(a,b); }
-OPENVDB_ENABLE_IF_TUPLE inline auto lt(const T& a, const T& b) { return simd_internal::binop<std::less>(a,b); }
-OPENVDB_ENABLE_IF_TUPLE inline auto lte(const T& a, const T& b) { return simd_internal::binop<std::less_equal>(a,b); }
-OPENVDB_ENABLE_IF_TUPLE inline auto logical_and(const T& a, const T& b) { return simd_internal::binop<std::logical_and>(a,b); }
 
 OPENVDB_ENABLE_IF_TUPLE inline T select(const typename SimdTraits<T>::MaskT& m, const T& a, const T& b)
 {
@@ -561,7 +536,7 @@ struct SimdTraits
 {
     static constexpr size_t size = T::size();
     using ElementT = typename simd_internal::elem<T::elementtype()>::Type;
-    using MaskT = decltype(eq<T>(std::declval<T>(), std::declval<T>()));
+    using MaskT = decltype(std::declval<T>() == std::declval<T>());
     template <typename S> using ConvertT = typename SimdT<S, size>::Type;
 };
 
@@ -572,7 +547,7 @@ struct SimdTraits
 {
     static constexpr size_t size = T::size;
     using ElementT = typename T::ValueType;
-    using MaskT = decltype(eq<T>(std::declval<T>(), std::declval<T>()));
+    using MaskT = decltype(std::declval<T>() == std::declval<T>());
     template <typename S> using ConvertT = typename SimdT<S, size>::Type;
 };
 
@@ -580,27 +555,14 @@ struct SimdTraits
 
 //// Scalar API
 
-OPENVDB_ENABLE_IF_ARITHMETIC inline T add(const T& a, const T& b) { return a + b; }
-OPENVDB_ENABLE_IF_ARITHMETIC inline T sub(const T& a, const T& b) { return a - b; }
-OPENVDB_ENABLE_IF_ARITHMETIC inline T mul(const T& a, const T& b) { return a * b; }
-OPENVDB_ENABLE_IF_ARITHMETIC inline T div(const T& a, const T& b) { return a / b; }
-
 OPENVDB_ENABLE_IF_ARITHMETIC inline T max(const T& a, const T& b) { return std::max(a, b); }
 OPENVDB_ENABLE_IF_ARITHMETIC inline T min(const T& a, const T& b) { return std::min(a, b); }
 OPENVDB_ENABLE_IF_ARITHMETIC inline auto sqrt(const T& a) { return std::sqrt(a); }
 OPENVDB_ENABLE_IF_ARITHMETIC inline T pow2(const T& a) { return math::Pow2(a); }
 OPENVDB_ENABLE_IF_ARITHMETIC inline T pow3(const T& a) { return math::Pow3(a); }
 
-OPENVDB_ENABLE_IF_ARITHMETIC inline auto square(const T& a) { return mul(a, a); }
+OPENVDB_ENABLE_IF_ARITHMETIC inline auto square(const T& a) { return a * a; }
 OPENVDB_ENABLE_IF_ARITHMETIC inline bool is_finite(const T& a) { return std::isfinite(a); }
-
-OPENVDB_ENABLE_IF_ARITHMETIC inline bool eq(const T& a, const T& b) { return a == b; }
-OPENVDB_ENABLE_IF_ARITHMETIC inline bool neq(const T& a, const T& b) { return a != b; }
-OPENVDB_ENABLE_IF_ARITHMETIC inline bool gt(const T& a, const T& b) { return a > b; }
-OPENVDB_ENABLE_IF_ARITHMETIC inline bool gte(const T& a, const T& b) { return a >= b; }
-OPENVDB_ENABLE_IF_ARITHMETIC inline bool lt(const T& a, const T& b) { return a < b; }
-OPENVDB_ENABLE_IF_ARITHMETIC inline bool lte(const T& a, const T& b) { return a <= b; }
-OPENVDB_ENABLE_IF_ARITHMETIC inline auto logical_and(const T& a, const T& b) { return a && b; }
 
 OPENVDB_ENABLE_IF_ARITHMETIC inline T select(const bool m, const T& a, const T& b) { return m ? a : b; }
 
