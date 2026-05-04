@@ -1544,11 +1544,11 @@ LeafNode<T, Log2Dim>::isConstant(ValueType& minValue,
     minValue = maxValue = mBuffer[0];
     for (Index i = 1; i < SIZE; ++i) {
         const T& v = mBuffer[i];
-        if (v < minValue) {
-            if ((maxValue - v) > tolerance) return false;// early termination
+        if (math::cwiseLessThan(v, minValue)) {
+            if (math::cwiseGreaterThan((maxValue - v), tolerance)) return false;// early termination
             minValue = v;
-        } else if (v > maxValue) {
-            if ((v - minValue) > tolerance) return false;// early termination
+        } else if (math::cwiseGreaterThan(v, maxValue)) {
+            if (math::cwiseGreaterThan((v - minValue), tolerance)) return false;// early termination
             maxValue = v;
         }
     }
@@ -1569,7 +1569,10 @@ LeafNode<T, Log2Dim>::medianAll(T *tmp) const
         for (T* dst = tmp; dst-tmp < NUM_VALUES;) *dst++ = *src++;
     }
     static const size_t midpoint = (NUM_VALUES - 1) >> 1;
-    std::nth_element(tmp, tmp + midpoint, tmp + NUM_VALUES);
+    std::nth_element(tmp, tmp + midpoint, tmp + NUM_VALUES,
+        [](const auto& a, const auto& b) {
+            return math::cwiseLessThan(a, b);
+        });
     return tmp[midpoint];
 }
 
@@ -1592,7 +1595,10 @@ LeafNode<T, Log2Dim>::medianOn(T &value, T *tmp) const
     for (auto iter=this->cbeginValueOn(); iter; ++iter) *tmp++ = *iter;
     T *begin = tmp - count;
     const size_t midpoint = (count - 1) >> 1;
-    std::nth_element(begin, begin + midpoint, tmp);
+    std::nth_element(begin, begin + midpoint, tmp,
+        [](const auto& a, const auto& b) {
+            return math::cwiseLessThan(a, b);
+        });
     value = begin[midpoint];
     return count;
 }
@@ -1616,7 +1622,10 @@ LeafNode<T, Log2Dim>::medianOff(T &value, T *tmp) const
     for (auto iter=this->cbeginValueOff(); iter; ++iter) *tmp++ = *iter;
     T *begin = tmp - count;
     const size_t midpoint = (count - 1) >> 1;
-    std::nth_element(begin, begin + midpoint, tmp);
+    std::nth_element(begin, begin + midpoint, tmp,
+        [](const auto& a, const auto& b) {
+            return math::cwiseLessThan(a, b);
+        });
     value = begin[midpoint];
     return count;
 }

@@ -527,6 +527,23 @@ inline Vec2<T> Exp(Vec2<T> v) { return v.exp(); }
 template <typename T>
 inline Vec2<T> Log(Vec2<T> v) { return v.log(); }
 
+/// @brief  Componentwise less than for Vec2 types.
+template <typename T1, typename T2>
+inline bool cwiseLessThan(const Vec2<T1>& a, const Vec2<T2>& b)
+{
+    if (!isExactlyEqual(a[0], b[0])) return a[0] < b[0];
+    return a[1] < b[1];
+}
+
+/// @brief  Componentwise greater than for Vec2 types.
+template <typename T1, typename T2>
+inline bool cwiseGreaterThan(const Vec2<T1>& a, const Vec2<T2>& b)
+{
+    if (!isExactlyEqual(a[0], b[0])) return a[0] > b[0];
+    return a[1] > b[1];
+}
+
+
 using Vec2i = Vec2<int32_t>;
 using Vec2ui = Vec2<uint32_t>;
 using Vec2s = Vec2<float>;

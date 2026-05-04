@@ -237,14 +237,18 @@ template<typename ValueType>
 struct MinOp {
     const ValueType val;
     MinOp(const ValueType& v): val(v) {}
-    inline void operator()(ValueType& v) const { v = std::min<ValueType>(v, val); }
+    inline void operator()(ValueType& v) const {
+        if (math::cwiseLessThan(val, v)) v = val;
+    }
 };
 
 template<typename ValueType>
 struct MaxOp {
     const ValueType val;
     MaxOp(const ValueType& v): val(v) {}
-    inline void operator()(ValueType& v) const { v = std::max<ValueType>(v, val); }
+    inline void operator()(ValueType& v) const {
+        if (math::cwiseGreaterThan(val, v)) v = val;
+    }
 };
 
 template<typename ValueType>

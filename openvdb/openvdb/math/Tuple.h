@@ -170,36 +170,21 @@ protected:
     T mm[SIZE];
 };
 
+///////////////////////////////////////////////////////////////////////////
 
-////////////////////////////////////////
-
-
-/// @return true if t0 < t1, comparing components in order of significance.
-template<int SIZE, typename T0, typename T1>
-bool
-operator<(const Tuple<SIZE, T0>& t0, const Tuple<SIZE, T1>& t1)
+template<int SIZE>
+inline Tuple<SIZE, bool> operator&&(const Tuple<SIZE, bool> a, const Tuple<SIZE, bool> b)
 {
-    for (int i = 0; i < SIZE-1; ++i) {
-        if (!isExactlyEqual(t0[i], t1[i])) return t0[i] < t1[i];
-    }
-    return t0[SIZE-1] < t1[SIZE-1];
+    return a & b;
 }
 
-
-/// @return true if t0 > t1, comparing components in order of significance.
-template<int SIZE, typename T0, typename T1>
-bool
-operator>(const Tuple<SIZE, T0>& t0, const Tuple<SIZE, T1>& t1)
+template<int SIZE>
+inline Tuple<SIZE, bool> operator||(const Tuple<SIZE, bool> a, const Tuple<SIZE, bool> b)
 {
-    for (int i = 0; i < SIZE-1; ++i) {
-        if (!isExactlyEqual(t0[i], t1[i])) return t0[i] > t1[i];
-    }
-    return t0[SIZE-1] > t1[SIZE-1];
+    return a | b;
 }
 
-
-////////////////////////////////////////
-
+///////////////////////////////////////////////////////////////////////////
 
 /// @return the absolute value of the given Tuple.
 template<int SIZE, typename T>
