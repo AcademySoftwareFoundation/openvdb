@@ -20,91 +20,55 @@ using BufferT = nanovdb::HostBuffer;
 
 void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int width, int height, BufferT& imageBuffer)
 {
-    using GridT  = nanovdb::FloatGrid;
     using CoordT = nanovdb::Coord;
-    using RealT  = float;
-    using Vec3T  = nanovdb::math::Vec3<RealT>;
-    using RayT   = nanovdb::math::Ray<RealT>;
+    using Vec3T  = nanovdb::math::Vec3<float>;
+    using RayT   = nanovdb::math::Ray<float>;
 
-    auto *h_grid = handle.grid<float>();
-    if (!h_grid) throw std::runtime_error("GridHandle does not contain a valid host grid");
-    const float iso = h_grid->voxelSize()[0];// <-- define iso-value as one voxel offset
-
-    float* h_outImage = reinterpret_cast<float*>(imageBuffer.data());
-
-    float              wBBoxDimZ = (float)h_grid->worldBBox().dim()[2] * 2;
-    Vec3T              wBBoxCenter = Vec3T(h_grid->worldBBox().min() + h_grid->worldBBox().dim() * 0.5f);
-    nanovdb::CoordBBox treeIndexBbox = h_grid->tree().bbox();
-    std::cout << "Bounds: "
-              << "[" << treeIndexBbox.min()[0] << "," << treeIndexBbox.min()[1] << "," << treeIndexBbox.min()[2] << "] -> ["
-              << treeIndexBbox.max()[0] << "," << treeIndexBbox.max()[1] << "," << treeIndexBbox.max()[2] << "]" << std::endl;
-
+    const auto *metaData = handle.gridMetaData();
+    const float dx = float(metaData->voxelSize()[0]), iso = dx;// <-- define iso-value as one voxel offset
+    float wBBoxDimZ = (float)metaData->worldBBox().dim()[2] * 2;
+    Vec3T wBBoxCenter = Vec3T(metaData->worldBBox().min() + metaData->worldBBox().dim() * 0.5f);
     RayGenOp<Vec3T> rayGenOp(wBBoxDimZ, wBBoxCenter);
-    CompositeOp     compositeOp;
+    float *h_outImage = reinterpret_cast<float*>(imageBuffer.data());
+    CompositeOp compositeOp;
 
-    auto renderOp = [iso, width, height, rayGenOp, compositeOp, treeIndexBbox, wBBoxDimZ] __hostdev__(int start, int end, float* image, const GridT* grid) {
-        // get an accessor.
-        auto acc = grid->tree().getAccessor();
-        
-
+    auto renderOp = [iso, width, height, rayGenOp, compositeOp, wBBoxDimZ] __hostdev__(int start, int end, float* image, const auto* grid) {
+        auto acc = grid->tree().getAccessor();// get an accessor
         for (int i = start; i < end; ++i) {
-            Vec3T rayEye;
-            Vec3T rayDir;
+            Vec3T rayEye, rayDir;
             rayGenOp(i, width, height, rayEye, rayDir);
-            // generate ray.
-            RayT wRay(rayEye, rayDir);
-            // transform the ray to the grid's index-space.
-            RayT iRay = wRay.worldToIndexF(*grid);
-            // intersect...
-            float  t0;
+            RayT wRay(rayEye, rayDir), iRay = wRay.worldToIndexF(*grid);// transform the ray to the grid's index-space.
+            float  t0, v;
             CoordT ijk;
-            float  v;
-            if (nanovdb::math::isoCrossing(iRay, acc, ijk, v, t0, iso)) {
-                // write distance to surface. (we assume it is a uniform voxel)
-                float wT0 = t0 * float(grid->voxelSize()[0]);
-                compositeOp(image, i, width, height, wT0 / (wBBoxDimZ * 2), 1.0f);
+            if (nanovdb::math::isoCrossing(iRay, acc, ijk, v, t0, iso)) {// intersect...
+                compositeOp(image, i, width, height, (t0 * dx) / (wBBoxDimZ * 2), 1.0f);
             } else {
-                // write background value.
-                compositeOp(image, i, width, height, 0.0f, 0.0f);
+                compositeOp(image, i, width, height, 0.0f, 0.0f);// write background value.
             }
         }
     };// renderOp lambda function
 
-    {
-        float durationAvg = 0;
-        for (int i = 0; i < numIterations; ++i) {
-            float duration = renderImage(false, renderOp, width, height, h_outImage, h_grid);
-            //std::cout << "Duration(NanoVDB-Host) = " << duration << " ms" << std::endl;
-            durationAvg += duration;
-        }
-        durationAvg /= numIterations;
-        std::cout << "Average of " << numIterations << " renderings (NanoVDB-Host) = " << durationAvg << " ms" << std::endl;
-
+    float sum = 0;
+    if (auto *h_grid = handle.grid<float>()) {
+        for (int i = 0; i < numIterations; ++i, sum += renderImage(false, renderOp, width, height, h_outImage, h_grid));
+        std::cout << "Average of " << numIterations << " renderings (NanoVDB-Host) = " << (sum/numIterations) << " ms" << std::endl;
         saveImage("raytrace_iso_surface-nanovdb-host.pfm", width, height, (float*)imageBuffer.data());
-    }
 
 #if defined(NANOVDB_USE_CUDA)
-    handle.deviceUpload();
-
-    auto* d_grid = handle.deviceGrid<float>();
-    if (!d_grid)
-        throw std::runtime_error("GridHandle does not contain a valid device grid");
-
-    imageBuffer.deviceUpload();
-    float* d_outImage = reinterpret_cast<float*>(imageBuffer.deviceData());
-
-    {
-        float durationAvg = 0;
-        for (int i = 0; i < numIterations; ++i) {
-            float duration = renderImage(true, renderOp, width, height, d_outImage, d_grid);
-            //std::cout << "Duration(NanoVDB-Cuda) = " << duration << " ms" << std::endl;
-            durationAvg += duration;
-        }
-        durationAvg /= numIterations;
-        std::cout << "Average of " << numIterations << " renderings (NanoVDB-Cuda) = " << durationAvg << " ms " << std::endl;
-
+        handle.deviceUpload();
+        auto* d_grid = handle.deviceGrid<float>();
+        if (!d_grid) throw std::runtime_error("GridHandle does not contain a valid device grid");
+        imageBuffer.deviceUpload();
+        float* d_outImage = reinterpret_cast<float*>(imageBuffer.deviceData());
+        sum = 0;
+        for (int i = 0; i < numIterations; ++i, sum += renderImage(true, renderOp, width, height, d_outImage, d_grid));
+        std::cout << "Average of " << numIterations << " renderings (NanoVDB-Cuda) = " << (sum/numIterations) << " ms " << std::endl;
         imageBuffer.deviceDownload();
         saveImage("raytrace_iso_surface-nanovdb-cuda.pfm", width, height, (float*)imageBuffer.data());
-    }
 #endif
+    } else if () {
+
+    }
+
+
 }// runNanoVDB
