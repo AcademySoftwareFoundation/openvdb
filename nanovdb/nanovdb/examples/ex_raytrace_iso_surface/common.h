@@ -10,37 +10,6 @@
 #include <nanovdb/NanoVDB.h>
 #include "ComputePrimitives.h"
 
-inline __hostdev__ uint32_t CompactBy1(uint32_t x)
-{
-    x &= 0x55555555;
-    x = (x ^ (x >> 1)) & 0x33333333;
-    x = (x ^ (x >> 2)) & 0x0f0f0f0f;
-    x = (x ^ (x >> 4)) & 0x00ff00ff;
-    x = (x ^ (x >> 8)) & 0x0000ffff;
-    return x;
-}
-
-inline __hostdev__ uint32_t SeparateBy1(uint32_t x)
-{
-    x &= 0x0000ffff;
-    x = (x ^ (x << 8)) & 0x00ff00ff;
-    x = (x ^ (x << 4)) & 0x0f0f0f0f;
-    x = (x ^ (x << 2)) & 0x33333333;
-    x = (x ^ (x << 1)) & 0x55555555;
-    return x;
-}
-
-inline __hostdev__ void mortonDecode(uint32_t code, uint32_t& x, uint32_t& y)
-{
-    x = CompactBy1(code);
-    y = CompactBy1(code >> 1);
-}
-
-inline __hostdev__ void mortonEncode(uint32_t& code, uint32_t x, uint32_t y)
-{
-    code = SeparateBy1(x) | (SeparateBy1(y) << 1);
-}
-
 template<typename RenderFn, typename GridT>
 inline float renderImage(bool useCuda, const RenderFn renderOp, int width, int height, float* image, const GridT* grid)
 {
@@ -98,11 +67,8 @@ struct RenderOp
     template <typename GridT>
     inline __hostdev__ void operator()(int start, int end, float* image, const GridT* grid) const
     {
-        using BuildT = typename GridT::BuildType;
-        static_assert(nanovdb::util::is_same<BuildT, float, nanovdb::ValueOnIndex>::value, "only works for float and OnIndex grids");
-        using AccT = nanovdb::AccType<BuildT, float>;
-        
-        AccT acc(*grid);
+        static_assert(nanovdb::util::is_same<typename GridT::BuildType, float, nanovdb::ValueOnIndex>::value, "only works for float and OnIndex grids");
+        auto acc = nanovdb::getAccessor<GridT, float>(*grid);
         float  t0, v;
         nanovdb::Coord ijk;
         for (int i = start; i < end; ++i) {

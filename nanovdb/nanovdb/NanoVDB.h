@@ -5760,9 +5760,25 @@ public:
 
 }; // ChannelAccessor
 
+/// @brief Generic Accessor type that maps to either a ReadAccessor or ChannelAccessor
+/// @tparam BuildT Build type, e.g. float or ValueOnIndex
+/// @tparam ValueT Value type, e.g. float or Vec3f
 template <typename BuildT, typename ValueT>
 using AccType = typename util::conditional<BuildTraits<BuildT>::is_index,
                 ChannelAccessor<ValueT, BuildT>, DefaultReadAccessor<BuildT>>::type;
+
+/// @brief Generic template functions that return an Accessor to either an index grid or a regular grid
+template <typename GridT, typename ValueT>
+inline __hostdev__ auto getAccessor(const GridT &grid, ValueT *sideCar = nullptr)
+{
+    using BuildT = typename GridT::BuildType;
+    if constexpr(BuildTraits<BuildT>::is_index) {
+        return sideCar ? ChannelAccessor<ValueT, BuildT>(grid, sideCar) : ChannelAccessor<ValueT, BuildT>(grid);
+    } else {
+        static_assert(util::is_same<ValueT, typename GridT::ValueType>::value, "wrong ValueT for regular GridT");
+        return DefaultReadAccessor<BuildT>(grid);
+    }
+}
 
 #if 0
 // This MiniGridHandle class is only included as a stand-alone example. Note that aligned_alloc is a C++17 feature!
