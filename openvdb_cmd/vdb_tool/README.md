@@ -10,7 +10,7 @@ The vdb_tool is a versatile command-line utility that chains together high-level
 | **eval** | Evaluate an expression written in our Reverse Polish Notation (see below) |
 | **config** | Load a configuration file and add the actions for processing |
 | **default** | Set default values used by all subsequent actions |
-| **read** | Read mesh, points, grids or config as obj, ply, abc, stl, off, pts, xyz, e57, vdb, nvdb or txt files |
+| **read** | Read mesh, points, grids or config as obj, ply, abc, stl, off, pts, xyz, e57 (PDAL), vdb, nvdb or txt files |
 | **write** | Write a polygon mesh, points, vdb or config as a obj, ply, stl, off, abc, vdb, or txt file |
 | **vdb2points** | Extracts points from a VDB grid |
 | **mesh2ls** | Convert a (water-tight) polygon mesh to a narrow-band signed distance field |
