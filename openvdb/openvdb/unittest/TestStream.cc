@@ -36,25 +36,7 @@ protected:
 void
 TestStream::SetUp()
 {
-    openvdb::uninitialize();
-
-    openvdb::Int32Grid::registerGrid();
-    openvdb::FloatGrid::registerGrid();
-
-    openvdb::StringMetadata::registerType();
-    openvdb::Int32Metadata::registerType();
-    openvdb::Int64Metadata::registerType();
-    openvdb::Vec3IMetadata::registerType();
-
-    // Register maps
-    openvdb::math::MapRegistry::clear();
-    openvdb::math::AffineMap::registerMap();
-    openvdb::math::ScaleMap::registerMap();
-    openvdb::math::UniformScaleMap::registerMap();
-    openvdb::math::TranslationMap::registerMap();
-    openvdb::math::ScaleTranslateMap::registerMap();
-    openvdb::math::UniformScaleTranslateMap::registerMap();
-    openvdb::math::NonlinearFrustumMap::registerMap();
+    openvdb::initialize();
 }
 
 

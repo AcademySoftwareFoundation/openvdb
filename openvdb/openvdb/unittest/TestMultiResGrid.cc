@@ -208,6 +208,8 @@ TEST_F(TestMultiResGrid, testIO)
 {
     using namespace openvdb;
 
+    openvdb::initialize();
+
     const float radius = 1.0f;
     const Vec3f center(0.0f, 0.0f, 0.0f);
     const float voxelSize = 0.01f;
@@ -243,7 +245,6 @@ TEST_F(TestMultiResGrid, testIO)
     outputFile.close();
 
     // Read grids
-    openvdb::initialize();
     openvdb::io::File file( filename );
     file.open();
     GridPtrVecPtr grids = file.getGrids();
