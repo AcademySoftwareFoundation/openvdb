@@ -523,9 +523,9 @@ File::readAllGridMetadata()
         OPENVDB_THROW(IoError, filename() << " is not open for reading");
     }
 
-    if (fileVersion() < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+    if (fileVersion() < OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX) {
         OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
+            "VDB file version < 221 (FLOAT_FRUSTUM_BBOX) is no longer supported.");
     }
 
     GridPtrVecPtr ret(new GridPtrVec);
@@ -560,9 +560,9 @@ File::readGridMetadata(const Name& name)
         OPENVDB_THROW(IoError, filename() << " is not open for reading.");
     }
 
-    if (fileVersion() < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+    if (fileVersion() < OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX) {
         OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
+            "VDB file version < 221 (FLOAT_FRUSTUM_BBOX) is no longer supported.");
     }
 
     GridBase::ConstPtr ret;
