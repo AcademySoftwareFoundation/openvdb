@@ -67,7 +67,7 @@ struct RenderOp
     template <typename GridT>
     inline __hostdev__ void operator()(int start, int end, float* image, const GridT* grid) const
     {
-        static_assert(nanovdb::util::is_same<typename GridT::BuildType, float, nanovdb::ValueOnIndex>::value, "only works for float and OnIndex grids");
+        static_assert(nanovdb::util::is_same<typename GridT::BuildType, float, nanovdb::ValueOnIndex, nanovdb::ValueIndex>::value, "only works for float and OnIndex grids");
         auto acc = nanovdb::getAccessor<GridT, float>(*grid);
         float  t0, v;
         nanovdb::Coord ijk;

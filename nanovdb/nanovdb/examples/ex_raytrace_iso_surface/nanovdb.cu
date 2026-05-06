@@ -45,6 +45,8 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
 
     if (auto *h_grid = handle.grid<float>()) {
         kernel(h_grid);
+    } else if (auto *h_grid = handle.grid<nanovdb::ValueIndex>()) {
+        kernel(h_grid);
     } else if (auto *h_grid = handle.grid<nanovdb::ValueOnIndex>()) {
         kernel(h_grid);
     } else {
