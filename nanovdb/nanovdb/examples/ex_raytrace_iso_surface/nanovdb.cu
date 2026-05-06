@@ -35,9 +35,8 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
         auto* d_grid = handle.deviceGrid<BuildT>();
         if (!d_grid) throw std::runtime_error("GridHandle does not contain a valid device grid");
         imageBuffer.deviceUpload();
-        float* d_outImage = reinterpret_cast<float*>(imageBuffer.deviceData());
         sum = 0;
-        for (int i = 0; i < numIterations; ++i, sum += renderOp.renderImage(true/*useCuda*/, d_outImage, d_grid));
+        for (int i = 0; i < numIterations; ++i, sum += renderOp.renderImage(true/*useCuda*/, (float*)imageBuffer.deviceData(), d_grid));
         std::cout << "Average of " << numIterations << " renderings (NanoVDB-Cuda) = " << (sum/numIterations) << " ms " << std::endl;
         imageBuffer.deviceDownload();
         renderOp.saveImage("raytrace_iso_surface-nanovdb-cuda.pfm", (float*)imageBuffer.data());
