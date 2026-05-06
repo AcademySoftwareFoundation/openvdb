@@ -2426,7 +2426,9 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
     mChildMask.load(is);
     mValueMask.load(is);
 
-    const Index numValues = NUM_VALUES;
+    const bool oldVersion =
+        (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION);
+    const Index numValues = (oldVersion ? mChildMask.countOff() : NUM_VALUES);
     {
         // Read in (and uncompress, if necessary) all of this node's values
         // into a contiguous array.
@@ -2435,8 +2437,16 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         io::readCompressedValues(is, values, numValues, mValueMask, fromHalf);
 
         // Copy values from the array into this node's table.
-        for (ValueAllIter iter = this->beginValueAll(); iter; ++iter) {
-            mNodes[iter.pos()].setValue(values[iter.pos()]);
+        if (oldVersion) {
+            Index n = 0;
+            for (ValueAllIter iter = this->beginValueAll(); iter; ++iter) {
+                mNodes[iter.pos()].setValue(values[n++]);
+            }
+            OPENVDB_ASSERT(n == numValues);
+        } else {
+            for (ValueAllIter iter = this->beginValueAll(); iter; ++iter) {
+                mNodes[iter.pos()].setValue(values[iter.pos()]);
+            }
         }
     }
 
