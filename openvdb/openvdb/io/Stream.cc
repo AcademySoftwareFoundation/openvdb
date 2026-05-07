@@ -51,7 +51,7 @@ Stream::Stream(std::istream& is)
         gd.readHeader(is);
         gd.readStreamPos(is);
         descriptors.push_back(gd);
-        GridBase::Ptr grid = Archive::readGrid(gd, is, BBoxd());
+        GridBase::Ptr grid = Archive::readGrid(gd, is, io::ReadOptions{});
         mGrids->push_back(grid);
         namedGrids[gd.uniqueName()] = grid;
     }
@@ -102,19 +102,21 @@ Stream::copy() const
 
 
 void
-Stream::write(const GridCPtrVec& grids, const MetaMap& metadata) const
+Stream::write(const GridCPtrVec& grids, const MetaMap& metadata,
+    const io::WriteOptions& writeOptions) const
 {
     if (mOutputStream == nullptr) {
         OPENVDB_THROW(ValueError, "no output stream was specified");
     }
-    this->writeGrids(*mOutputStream, grids, metadata);
+    this->writeGrids(*mOutputStream, grids, metadata, writeOptions);
 }
 
 
 void
-Stream::writeGrids(std::ostream& os, const GridCPtrVec& grids, const MetaMap& metadata) const
+Stream::writeGrids(std::ostream& os, const GridCPtrVec& grids, const MetaMap& metadata,
+    const io::WriteOptions& writeOptions) const
 {
-    Archive::write(os, grids, /*seekable=*/false, metadata);
+    Archive::write(os, grids, /*seekable=*/false, metadata, writeOptions);
 }
 
 

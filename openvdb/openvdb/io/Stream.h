@@ -49,15 +49,18 @@ public:
 
     /// @brief Write the grids in the given container to this archive's output stream.
     /// @throw ValueError if this archive was constructed without specifying an output stream.
-    void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const override;
+    void write(const GridCPtrVec&, const MetaMap& = MetaMap(),
+        const io::WriteOptions& = io::WriteOptions{}) const override;
 
     /// @brief Write the grids in the given container to this archive's output stream.
     /// @throw ValueError if this archive was constructed without specifying an output stream.
     template<typename GridPtrContainerT>
-    void write(const GridPtrContainerT&, const MetaMap& = MetaMap()) const;
+    void write(const GridPtrContainerT&, const MetaMap& = MetaMap(),
+        const io::WriteOptions& = io::WriteOptions{}) const;
 
 private:
-    void writeGrids(std::ostream&, const GridCPtrVec&, const MetaMap&) const;
+    void writeGrids(std::ostream&, const GridCPtrVec&, const MetaMap&,
+        const io::WriteOptions&) const;
 
     MetaMap::Ptr mMeta;
     GridPtrVecPtr mGrids;
@@ -70,11 +73,12 @@ private:
 
 template<typename GridPtrContainerT>
 inline void
-Stream::write(const GridPtrContainerT& container, const MetaMap& metadata) const
+Stream::write(const GridPtrContainerT& container, const MetaMap& metadata,
+    const io::WriteOptions& writeOptions) const
 {
     GridCPtrVec grids;
     std::copy(container.begin(), container.end(), std::back_inserter(grids));
-    this->write(grids, metadata);
+    this->write(grids, metadata, writeOptions);
 }
 
 } // namespace io
