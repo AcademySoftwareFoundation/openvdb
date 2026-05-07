@@ -34,7 +34,7 @@ public:
     using NameMapCIter = NameMap::const_iterator;
 
     explicit File(const std::string& filename);
-    ~File() override;
+    ~File() override { }
 
     /// @brief Copy constructor
     /// @details The copy will be closed and will not reference the same
@@ -146,35 +146,9 @@ public:
     NameIterator endName() const;
 
 private:
-    /// Read in all grid descriptors that are stored in the given stream.
-    void readGridDescriptors(std::istream&);
-
     /// @brief Return an iterator to the descriptor for the grid with the given name.
     /// If the name is non-unique, return an iterator to the first matching descriptor.
     NameMapCIter findDescriptor(const Name&) const;
-
-    /// Return a newly created, empty grid of the type specified by the given grid descriptor.
-    GridBase::Ptr createGrid(const GridDescriptor&) const;
-
-    /// @brief Read a grid, including its data blocks, but only where it
-    /// intersects the given world-space bounding box.
-    GridBase::Ptr readGridByName(const Name&, const BBoxd&);
-
-    /// Read in and return the partially-populated grid specified by the given grid descriptor.
-    GridBase::ConstPtr readGridPartial(const GridDescriptor&, bool readTopology) const;
-
-    /// Read in and return the grid specified by the given grid descriptor.
-    GridBase::Ptr readGrid(const GridDescriptor&) const;
-    /// Read in and return the region of the grid specified by the given grid descriptor
-    /// that intersects the given world-space bounding box.
-    GridBase::Ptr readGrid(const GridDescriptor&, const BBoxd&) const;
-    /// Read in and return the region of the grid specified by the given grid descriptor
-    /// that intersects the given index-space bounding box.
-    GridBase::Ptr readGrid(const GridDescriptor&, const CoordBBox&) const;
-
-    /// @brief Partially populate the given grid by reading its metadata and transform and,
-    /// if the grid is not an instance, its tree structure, but not the tree's leaf nodes.
-    void readGridPartial(GridBase::Ptr, std::istream&, bool isInstance, bool readTopology) const;
 
     /// @brief Retrieve a grid from @c mNamedGrids.  Return a null pointer
     /// if @c mNamedGrids was not populated (because this file is random-access).
@@ -194,8 +168,22 @@ private:
     friend class ::TestFile;
     friend class ::TestStream;
 
-    struct Impl;
-    std::unique_ptr<Impl> mImpl;
+    std::string mFilename;
+    // The file-level metadata
+    MetaMap::Ptr mMeta;
+    // The file stream that is open for reading
+    std::unique_ptr<std::istream> mInStream;
+    // File-level stream metadata (file format, compression, etc.)
+    StreamMetadata::Ptr mStreamMetadata;
+    // Flag indicating if we have read in the global information (header,
+    // metadata, and grid descriptors) for this VDB file
+    bool mIsOpen = false;
+    // Grid descriptors for all grids stored in the file, indexed by grid name
+    NameMap mGridDescriptors;
+    // All grids, indexed by unique name (used only when mHasGridOffsets is false)
+    Archive::NamedGridMap mNamedGrids;
+    // All grids stored in the file (used only when mHasGridOffsets is false)
+    GridPtrVecPtr mGrids;
 };
 
 

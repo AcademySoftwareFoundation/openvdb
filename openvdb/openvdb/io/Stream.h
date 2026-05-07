@@ -29,14 +29,14 @@ public:
     Stream(std::istream& is, bool /*delayLoad*/) : Stream(is) { }
 
     /// Construct an archive for stream output.
-    Stream();
+    Stream() = default;
     /// Construct an archive for output to the given stream.
     explicit Stream(std::ostream&);
 
     Stream(const Stream&);
     Stream& operator=(const Stream&);
 
-    ~Stream() override;
+    ~Stream() override { }
 
     /// @brief Return a copy of this archive.
     Archive::Ptr copy() const override;
@@ -57,16 +57,11 @@ public:
     void write(const GridPtrContainerT&, const MetaMap& = MetaMap()) const;
 
 private:
-    /// Create a new grid of the type specified by the given descriptor,
-    /// then populate the grid from the given input stream.
-    /// @return the newly created grid.
-    GridBase::Ptr readGrid(const GridDescriptor&, std::istream&) const;
-
     void writeGrids(std::ostream&, const GridCPtrVec&, const MetaMap&) const;
 
-
-    struct Impl;
-    std::unique_ptr<Impl> mImpl;
+    MetaMap::Ptr mMeta;
+    GridPtrVecPtr mGrids;
+    std::ostream* mOutputStream = nullptr;
 };
 
 
