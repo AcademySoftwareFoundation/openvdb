@@ -23,6 +23,7 @@
 #include "GridTransformer.h" // for resampleToMatch
 #include "MeshToVolume.h"// for meshToLevelSet
 #include "VolumeToMesh.h"// for volumeToMesh
+#include "LevelSetDilatedMesh.h"// for createLevelSetDilatedMesh
 #include "LevelSetFilter.h"// for Filter
 #include "LevelSetMeasure.h"// for levelSetVolume
 #include "FastSweeping.h"// for fogToSdf
@@ -30,8 +31,6 @@
 
 #include <iostream>
 #include <vector>
-
-#define VDB_TOOL_USE_NEW_OFFSET
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -86,7 +85,8 @@ polySoupToLevelSet(
     float voxelSize = 0.0,// invalid so use dim instead
     const ShrinkWrapT &D = ShrinkWrapT(),
     float halfWidth = float(LEVEL_SET_HALF_WIDTH),
-    ProgressT *progress = nullptr);
+    ProgressT *progress = nullptr,
+    int offset_mode = 0);
 
 /// @brief Convert a soup of polygons to a LOD sequence of shrink wrapped level set volumes.
 ///
@@ -118,7 +118,8 @@ polySoupToLevelSet(
     std::vector<Vec4I>& quad,
     const ShrinkWrapT &D = ShrinkWrapT(),
     float halfWidth = float(LEVEL_SET_HALF_WIDTH),
-    ProgressT *progress = nullptr);
+    ProgressT *progress = nullptr,
+    int offset_mode = 0);
 
 /// @brief Convert a soup of polygons to a LOD sequence of shrink wrapped level set volumes.
 ///
@@ -150,7 +151,8 @@ polySoupToLevelSet(
     std::vector<Vec4I>& quad,
     const ShrinkWrapT &D = ShrinkWrapT(),
     float halfWidth = float(LEVEL_SET_HALF_WIDTH),
-    ProgressT *progress = nullptr);
+    ProgressT *progress = nullptr,
+    int offset_mode = 0);
 
 /////////////////////////////////////////////////////////////////////////////////////
 
@@ -182,7 +184,7 @@ public:
     ///          erosion steps and the closing threshold (see our paper).
     /// @param progress Optional pointer to a progress bar.
     template<class ShrinkWrapT, class ProgressT>
-    void process(const ShrinkWrapT &D, ProgressT *progress);
+    void process(const ShrinkWrapT &D, ProgressT *progress, int mode = 0);
 
     /// @brief Number of shrink wrap grids generated, i.e. depth of the LOD hierarchy. 
     size_t gridCount() const {return mGrids.size();}
@@ -215,8 +217,10 @@ public:
 
     /// @brief Generates a dx-offset level set surface from the internal polygon soup.
     /// @param dx Voxel size (world units) of the output level set.
+    /// @param mode 0) old method (using mesh -> UDF -> mesh -> SDF), 1) Mihai's
+    ///             signed-flood-fill and 2) Greg's createLevelSetDilatedMesh
     /// @return Shared pointer to the newly created level set grid.
-    auto offset(float dx);
+    auto offset(float dx, int mode = 0);
 
 private:
     PolySoup mPoly;
@@ -269,7 +273,7 @@ PolySoupToLevelSet<GridType>::PolySoupToLevelSet(PolySoup &&poly, float voxelSiz
 
 template<typename GridType>
 template<class ShrinkWrapT, class ProgressT>
-void PolySoupToLevelSet<GridType>::process(const ShrinkWrapT &D, ProgressT *progress)
+void PolySoupToLevelSet<GridType>::process(const ShrinkWrapT &D, ProgressT *progress, int offset_mode)
 {
     auto myProgress = [&](const std::string &s){if constexpr(!std::is_same<ProgressT,void>::value) if (progress) (*progress)(s);};
 
@@ -278,7 +282,7 @@ void PolySoupToLevelSet<GridType>::process(const ShrinkWrapT &D, ProgressT *prog
     // Fine to coarse offset generation
     for (float dx = mMinVoxelSize; dx <= mMaxVoxelSize; dx *= 2.0f) {
         myProgress("Offset: dx=" + std::to_string(dx)+", range: "+std::to_string(mMinVoxelSize)+" -> "+std::to_string(mMaxVoxelSize));
-        mGrids.push_back(this->offset(dx));
+        mGrids.push_back(this->offset(dx, offset_mode));
     }
 
     // Coarse to fine shrink wrap algorithm
@@ -324,24 +328,33 @@ math::BBox<Vec3f> PolySoupToLevelSet<GridType>::getBBox(const std::vector<Vec3s>
 //////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
-auto PolySoupToLevelSet<GridType>::offset(float dx)
+auto PolySoupToLevelSet<GridType>::offset(float dx, int mode)
 {
+    std::cerr << "\n offset mode = " << mode << std::endl;
     auto xform = math::Transform::createLinearTransform(dx);
-#ifdef VDB_TOOL_USE_NEW_OFFSET// no mesh <-> VDB round trips!
-    auto grid = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth + 1);// mesh -> UDF
-    //std::cerr << "\nwidth of narrow-band: " << mHalfWidth + 1 << std::endl;
-    tools::foreach(grid->beginValueOn(), [dx](const typename GridType::ValueOnIter& it){it.setValue(*it - dx);}, /*threaded*/true, /*share functor*/true);
-    tools::changeBackground(grid->tree(), mHalfWidth*dx);
-    //grid->tree().root().setBackground(exteriorWidth, /*updateChildNodes=*/true);
-    //tools::signedFloodFillWithValues(grid->tree(), exteriorWidth, interiorWidth);
-    tools::distanceFieldToSDF(*grid, /*removeDisconnectedInterior*/true, /*rebuildNarrowBand*/true);
-    //grid->setGridClass(GRID_LEVEL_SET);
+    typename GridType::Ptr grid(nullptr);
+    switch (mode) {
+    case 0:// algorithm presented in the paper, using mesh<-> VDB round-trip
+        grid = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> UDF
+        volumeToMesh(*grid, mPoly.vtx, mPoly.tri, mPoly.quad, /*iso*/dx, /*adapt*/0.0);// UDF -> mesh (clears and re-allocates mesh)
+        grid = meshToLevelSet<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> SDF
+        break;
+    case 1:// algorithm using Mihai's signed flood-fill algorithm
+        grid = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth + 1);// mesh -> UDF
+        tools::foreach(grid->beginValueOn(), [dx](const typename GridType::ValueOnIter& it){it.setValue(*it - dx);}, /*threaded*/true, /*share functor*/true);
+        tools::changeBackground(grid->tree(), mHalfWidth*dx);
+        //grid->tree().root().setBackground(exteriorWidth, /*updateChildNodes=*/true);
+        //tools::signedFloodFillWithValues(grid->tree(), exteriorWidth, interiorWidth);
+        tools::distanceFieldToSDF(*grid, /*removeDisconnectedInterior*/true, /*rebuildNarrowBand*/true);
+        break; 
+    case 2:// algorithm using Greg's polyOffset algorithm
+        grid = tools::createLevelSetDilatedMesh<GridType, float>(mPoly.vtx, mPoly.tri, mPoly.quad, dx, dx, mHalfWidth);
+        break;
+    default:
+        OPENVDB_THROW(TypeError, "polySoupToLevelSet::offset: invalid mode(" + std::to_string(mode) + ")");
+        break;
+    }// end of switch
     return grid;
-#else
-    auto udf = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> UDF
-    volumeToMesh(*udf, mPoly.vtx, mPoly.tri, mPoly.quad, /*iso*/dx, /*adapt*/0.0);// UDF -> mesh (clears and re-allocates mesh)
-    return meshToLevelSet<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> SDF
-#endif
 }// tools::PolySoupToLevelSet<GridType>::offset
 
 //////////////////////////////////////////////////////////////////////////
@@ -401,14 +414,15 @@ polySoupToLevelSet(
     float voxelSize,
     const ShrinkWrapT &D,
     float halfWidth,
-    ProgressT *progress)
+    ProgressT *progress,
+    int offset_mode)
 {
     static_assert(std::is_floating_point<typename GridType::ValueType>::value,
         "polySoupToLevelSet requires an SDF grid with floating-point values");
     using T = PolySoupToLevelSet<GridType>;
     auto ptr = voxelSize > 0.0f ? std::make_unique<T>(std::move(poly), voxelSize, halfWidth) :
                                   std::make_unique<T>(std::move(poly), dim, halfWidth);
-    ptr->process(D, progress);
+    ptr->process(D, progress, offset_mode);
     return ptr->grid();
 }
 
@@ -424,13 +438,14 @@ polySoupToLevelSet(
     std::vector<Vec4I>& quad,
     const ShrinkWrapT &D,
     float halfWidth,
-    ProgressT *progress)
+    ProgressT *progress,
+    int offset_mode)
 {
     static_assert(std::is_floating_point<typename GridType::ValueType>::value,
         "polySoupToLevelSet requires an SDF grid with floating-point values");
     PolySoup poly{std::move(vtx), std::move(tri), std::move(quad), bbox};
     PolySoupToLevelSet<GridType> tmp(std::move(poly), dim, halfWidth);
-    tmp.process(D, progress);
+    tmp.process(D, progress, offset_mode);
     return tmp.grids();
 }
 
@@ -446,13 +461,14 @@ polySoupToLevelSet(
     std::vector<Vec4I>& quad,
     const ShrinkWrapT &D,
     float halfWidth,
-    ProgressT *progress)
+    ProgressT *progress,
+    int offset_mode)
 {
     static_assert(std::is_floating_point<typename GridType::ValueType>::value,
         "polySoupToLevelSet requires an SDF grid with floating-point values");
     PolySoup poly{std::move(vtx), std::move(tri), std::move(quad), bbox};
     PolySoupToLevelSet<GridType> tmp(std::move(poly), minVoxelSize, halfWidth);
-    tmp.process(D, progress);
+    tmp.process(D, progress, offset_mode);
     return tmp.grids();
 }// polySoupToLevelSet
 

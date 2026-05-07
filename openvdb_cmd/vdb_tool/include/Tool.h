@@ -533,6 +533,7 @@ void Tool::init()
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
+     {"mode", "0", "0", "mode of offset operator: 0) old method (using mesh -> UDF -> mesh -> SDF), 1) Mihai's signed-flood-fill and 2) Greg's createLevelSetDilatedMesh. Defaults to 0, i.e. paper."},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"erode", "8", "2", "number of iterations of constrained erosion. Defaults to 8."},
      {"thres", "0", "0.01", "closing (or engineering) threshold. Defaults to 0, i.e. it\'s diabled."},
@@ -545,9 +546,8 @@ void Tool::init()
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
+     {"mode", "0", "0", "mode of offset operator: 0) old method (using mesh -> UDF -> mesh -> SDF), 1) Mihai's signed-flood-fill and 2) Greg's createLevelSetDilatedMesh. Defaults to 0, i.e. paper."},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
-//     {"erode", "8", "2", "number of iterations of constrained erosion. Defaults to 8."},
-//     {"thres", "0", "0.01", "closing (or engineering) threshold. Defaults to 0, i.e. it\'s diabled."},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
      {"name", "", "soup2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
      [&](){mParser.setDefaults();}, [&](){this->soupToOffset();});
@@ -1985,6 +1985,7 @@ void Tool::soupToLevelSet()
     const int dim = mParser.get<int>("dim");// final dimension
     float voxel = mParser.get<float>("voxel");// final voxel size
     const float width = mParser.get<float>("width");
+    const int offset_mode = mParser.get<int>("mode");
     const int geo_age = mParser.get<int>("geo");
     const int nErode = mParser.get<int>("erode");
     const float thres = mParser.get<float>("thres");
@@ -2003,7 +2004,7 @@ void Tool::soupToLevelSet()
     Spinner spin, *progress = mParser.verbose ? &spin : nullptr;
     const tools::ShrinkWrapLimit D(nErode, thres);
     tools::PolySoup poly{std::move(mesh->vtx()), std::move(mesh->tri()), std::move(mesh->quad()), mesh->bbox()};
-    auto grid = tools::polySoupToLevelSet<GridT>(std::move(poly), dim, voxel, D, width, progress);
+    auto grid = tools::polySoupToLevelSet<GridT>(std::move(poly), dim, voxel, D, width, progress, offset_mode);
 
     if (mParser.verbose) mTimer.stop();
 
@@ -2032,6 +2033,7 @@ void Tool::soupToOffset()
     const int dim = mParser.get<int>("dim");// final dimension
     float voxel = mParser.get<float>("voxel");// final voxel size
     const float width = mParser.get<float>("width");
+    const int offset_mode = mParser.get<int>("mode");
     const int geo_age = mParser.get<int>("geo");
     const bool keep = mParser.get<bool>("keep");
     std::string grid_name = mParser.get<std::string>("name");
@@ -2045,16 +2047,9 @@ void Tool::soupToOffset()
     if (keep) mesh = mesh->deepCopy();// deep copy since mesh will be modified below
     if (mParser.verbose) mTimer.start("Soup -> Offset");
 
-    //Spinner spin, *progress = mParser.verbose ? &spin : nullptr;
-    //const tools::ShrinkWrapLimit D(nErode, thres);
     tools::PolySoup poly{std::move(mesh->vtx()), std::move(mesh->tri()), std::move(mesh->quad()), mesh->bbox()};
-    
-    //PolySoup poly{std::move(vtx), std::move(tri), std::move(quad), bbox};
     tools::PolySoupToLevelSet<GridT> tmp(std::move(poly), voxel, width);
-    auto grid = tmp.offset(voxel);
-    //tmp.process(D, progress);
-    
-    //auto grid = tools::polySoupToLevelSet<GridT>(std::move(poly), dim, voxel, D, width, progress);
+    auto grid = tmp.offset(voxel, offset_mode);
 
     if (mParser.verbose) mTimer.stop();
 
