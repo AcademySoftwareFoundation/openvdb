@@ -330,7 +330,6 @@ math::BBox<Vec3f> PolySoupToLevelSet<GridType>::getBBox(const std::vector<Vec3s>
 template<typename GridType>
 auto PolySoupToLevelSet<GridType>::offset(float dx, int mode)
 {
-    std::cerr << "\n offset mode = " << mode << std::endl;
     auto xform = math::Transform::createLinearTransform(dx);
     typename GridType::Ptr grid(nullptr);
     switch (mode) {
