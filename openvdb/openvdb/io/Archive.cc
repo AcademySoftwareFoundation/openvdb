@@ -448,9 +448,9 @@ getFormatVersion(std::ios_base& is)
 void
 checkFormatVersion(std::ios_base& is)
 {
-    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION ) {
+    if (getFormatVersion(is) < OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX ) {
         OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported. "
+            "VDB file version < 221 (FLOAT_FRUSTUM_BBOX) is no longer supported. "
             "To read older VDB files, please use VDB 12.x or older and then write "
             "them out again to produce files that are compatible with 13.0 and above.");
     }
@@ -750,9 +750,9 @@ Archive::readHeader(std::istream& is)
     if (mFileVersion > OPENVDB_FILE_VERSION) {
         OPENVDB_LOG_WARN("unsupported VDB file format (expected version "
             << OPENVDB_FILE_VERSION << " or earlier, got version " << mFileVersion << ")");
-    } else if (mFileVersion < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+    } else if (mFileVersion < OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX) {
         OPENVDB_THROW(IoError,
-            "VDB file version < 222 (NODE_MASK_COMPRESSION) is no longer supported.");
+            "VDB file version < 221 (FLOAT_FRUSTUM_BBOX) is no longer supported.");
     }
 
     // 3) Read the library version numbers (not stored prior to file format version 211).
