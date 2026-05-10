@@ -222,13 +222,15 @@ public:
     /// @return Shared pointer to the newly created level set grid.
     auto offset(float dx, int mode = 0);
 
+    float minVoxelSize() const {return mMinVoxelSize;}
+    float maxVoxelSize() const {return mMaxVoxelSize;}
+    float halfWidth() const {return mHalfWidth;}
+
 private:
     PolySoup mPoly;
     float mMinVoxelSize, mMaxVoxelSize, mHalfWidth;
     std::vector<typename GridType::Ptr> mGrids;// fine(0) -> coarse grids(size-1)    
     bool mIsGridSDF;
-
-    /// @brief Private method that resamples inGrid(dx) to outGrid(dx/2)
 
     /// @brief Private method that resamples inGrid(dx) to outGrid(dx/2).
     auto upsample(const GridType &inGrid);

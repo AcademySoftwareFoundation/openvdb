@@ -219,6 +219,7 @@ private:
     /// @brief Converts a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh
     void soupToLevelSet();
 
+    /// @brief generates an offset surface by dx
     void soupToOffset();
 
     /// @brief Converts all quads into triangles
@@ -545,6 +546,7 @@ void Tool::init()
      {"soup2offset"}, "Convert a polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
+     //{"offset", "1.0", "1.0", "Offset in voxel units. Defaults to one, i.e. offset surface corresponds to one voxel dilation from mesh."},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
      {"mode", "0", "0", "mode of offset operator: 0) old method (using mesh -> UDF -> mesh -> SDF), 1) Mihai's signed-flood-fill and 2) Greg's createLevelSetDilatedMesh. Defaults to 0, i.e. paper."},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
@@ -2033,12 +2035,14 @@ void Tool::soupToOffset()
     const int dim = mParser.get<int>("dim");// final dimension
     float voxel = mParser.get<float>("voxel");// final voxel size
     const float width = mParser.get<float>("width");
+    //const float offset = mParser.get<float>("offset");
     const int offset_mode = mParser.get<int>("mode");
     const int geo_age = mParser.get<int>("geo");
     const bool keep = mParser.get<bool>("keep");
     std::string grid_name = mParser.get<std::string>("name");
 
     auto it = this->getGeom(geo_age);
+    if (voxel == 0.0f) voxel = this->estimateVoxelSize(dim, width, geo_age);
     Geometry::Ptr mesh = *it;
     if (mesh->isPoints()) {
       if (!keep) mGeom.erase(std::next(it).base());
