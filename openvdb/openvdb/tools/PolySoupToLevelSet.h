@@ -349,7 +349,7 @@ auto PolySoupToLevelSet<GridType>::offset(float dx, int mode)
         tools::distanceFieldToSDF(*grid, /*removeDisconnectedInterior*/true, /*rebuildNarrowBand*/true);
         break; 
     case 2:// algorithm using Greg's polyOffset algorithm
-        grid = tools::createLevelSetDilatedMesh<GridType, float>(mPoly.vtx, mPoly.tri, mPoly.quad, dx, dx, mHalfWidth);
+        grid = tools::createLevelSetDilatedMesh<GridType, float>(mPoly.vtx, mPoly.tri, mPoly.quad, /*radius*/dx, /*voxel size*/dx, mHalfWidth);
         break;
     default:
         OPENVDB_THROW(TypeError, "polySoupToLevelSet::offset: invalid mode(" + std::to_string(mode) + ")");

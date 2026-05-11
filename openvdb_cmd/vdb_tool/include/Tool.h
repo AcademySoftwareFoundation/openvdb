@@ -530,7 +530,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->meshToUnsignedDistanceField();});
 
   mParser.addAction(
-     {"soup2ls", "soup2sdf"}, "Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+     {"soup2ls", "soup2sdf", "shrinkwrap"}, "Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
