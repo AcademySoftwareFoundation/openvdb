@@ -38,9 +38,18 @@ OPENVDB_API void uninitialize();
 
 ////////////////////////////////////////
 
+/// @brief Controls which operations a codec exposes.
+///
+/// Passed to codec registration to restrict how the codec may be used at
+/// runtime. A @c ReadOnly codec can still be used to read existing files but
+/// will not be selected as the write codec for new grids.
 enum class CodecMode {
-    ReadWrite,  // Both read and write enabled (default)
-    ReadOnly    // Only read methods enabled
+    /// Both @c readTopology()/@c readBuffers() and
+    /// @c writeTopology()/@c writeBuffers() are enabled. This is the default.
+    ReadWrite,
+    /// Only @c readTopology() and @c readBuffers() are enabled; the codec
+    /// will not be offered as a write target.
+    ReadOnly
 };
 
 /// @brief Controls how grid data is read.
@@ -54,9 +63,20 @@ enum class ReadMode {
     /// behaviour and produces a fully populated grid identical to the one
     /// that was written.
     Original,
-    Half,          // Read data as half precision
-    Bool,          // Read data as boolean
-    Mask,          // Read data as mask
+    /// Deserialize topology and value buffers, converting each voxel value
+    /// to half-precision floating point on the fly. Codecs that do not
+    /// support native half conversion should fall back to @c Original and
+    /// record a @c ReadDiagnostic warning.
+    Half,
+    /// Deserialize topology and value buffers, converting each voxel value
+    /// to @c bool (non-zero to @c true, zero to @c false). Produces a
+    /// @c BoolGrid whose active set matches the source grid's active set.
+    Bool,
+    /// Deserialize topology only and promote the result to a mask grid,
+    /// discarding all value data. Equivalent to reading @c TopologyOnly and
+    /// then constructing a @c MaskGrid from the active-voxel set, but may
+    /// be performed more efficiently inside the codec.
+    Mask,
     /// Deserialize topology only; value buffers are skipped. The resulting
     /// grid has a valid tree structure (active/inactive state, node
     /// hierarchy) but leaf buffer data is left at its default (background)
@@ -117,8 +137,11 @@ struct OPENVDB_API ReadTypedOptions
 /// bounding box. An empty bbox (the default) means no clipping is applied.
 ///
 /// @par Read mode
-/// @c readMode controls the granularity of deserialization. The default,
-/// @c ReadMode::Original, loads both topology and value buffers.
+/// @c readMode controls the granularity and on-the-fly conversion applied
+/// during deserialization. The default, @c ReadMode::Original, loads both
+/// topology and value buffers without modification.
+/// @c ReadMode::Half, @c ReadMode::Bool, and @c ReadMode::Mask request
+/// in-place type conversion as data is read.
 /// @c ReadMode::TopologyOnly skips value buffers entirely, which can be
 /// significantly faster when only the active-voxel mask is needed.
 ///
