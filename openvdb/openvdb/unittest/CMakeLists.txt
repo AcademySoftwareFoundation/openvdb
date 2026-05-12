@@ -82,6 +82,7 @@ else()
     TestAttributeSet.cc
     TestBBox.cc
     TestClip.cc
+    TestCodec.cc
     TestConjGradient.cc
     TestCoord.cc
     TestCount.cc

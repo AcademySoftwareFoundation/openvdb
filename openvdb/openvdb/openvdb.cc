@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "openvdb.h"
+#include "io/Codec.h"
 #include "points/PointDataGrid.h"
 #include "tools/PointIndexGrid.h"
 #include "util/logging.h"
@@ -70,6 +71,8 @@ initialize()
 
     logging::initialize();
 
+    io::internal::initialize();
+
     // Register metadata.
     Metadata::clearRegistry();
     MetaTypes::foreach<RegisterMeta>();
@@ -130,6 +133,7 @@ __pragma(warning(default:1711))
     Metadata::clearRegistry();
     GridBase::clearRegistry();
     math::MapRegistry::clear();
+    io::internal::uninitialize();
     points::internal::uninitialize();
 
 #ifdef OPENVDB_USE_BLOSC

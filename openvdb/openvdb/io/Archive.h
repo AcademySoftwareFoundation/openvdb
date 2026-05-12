@@ -98,6 +98,18 @@ public:
     /// @brief Return @c false (delayed loading has been removed).
     static bool isDelayedLoadingEnabled() { return false; }
 
+    /// @brief Enable collection of read diagnostics (warnings, etc.) during I/O operations.
+    void enableReadDiagnostics();
+
+    /// @brief Disable collection of read diagnostics.
+    void disableReadDiagnostics();
+
+    /// @brief Return a const reference to the diagnostics collector.
+    const ReadDiagnostics& readDiagnostics() const;
+
+    /// @brief Clear the diagnostics list while keeping collection active.
+    void clearReadDiagnostics();
+
 protected:
     /// @brief Return @c true if the input stream contains grid offsets
     /// that allow for random access or partial reading.
@@ -131,8 +143,13 @@ protected:
     /// Read in and return the number of grids on the input stream.
     static int32_t readGridCount(std::istream&);
 
+    /// @brief Find the codec for the given grid type and options.
+    static io::Codec* findCodec(const std::string& gridType, const io::ReadOptions& options = io::ReadOptions{});
+
     /// @brief Read in and create the grid represented by the given grid descriptor using the
     /// given input stream, using the provided options if given.
+    static GridBase::Ptr readGrid(const GridDescriptor&, std::istream&,
+        const io::ReadOptions& readOptions, ReadDiagnostics& diagnostics);
     static GridBase::Ptr readGrid(const GridDescriptor&, std::istream&,
         const io::ReadOptions& readOptions = io::ReadOptions{});
 
@@ -169,6 +186,9 @@ protected:
     void write(std::ostream&, const GridCPtrVec&, bool seekable, const MetaMap&,
         const io::WriteOptions& writeOptions = io::WriteOptions{}) const;
     //@}
+
+    /// Diagnostics collector for read operations (always valid; enabled/disabled via flag)
+    mutable ReadDiagnostics mReadDiagnostics;
 
 private:
     friend class ::TestFile;
