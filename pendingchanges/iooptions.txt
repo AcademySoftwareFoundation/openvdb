@@ -1,0 +1,6 @@
+OpenVDB:
+  API changes:
+  - Added optional trailing WriteOptions parameter to io::File::write() and io::Stream::write().
+    No changes in behavior.
+  - Added optional trailing ReadOptions parameter to io::File::getGrids() and io::File::readGrid().
+    No changes in behavior.
