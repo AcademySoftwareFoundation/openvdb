@@ -545,6 +545,143 @@ TEST_F(Test_vdb_tool, Geometry)
     EXPECT_EQ(openvdb::Vec3f(10,11,12), geo2.vtx()[3]);
   }
   #endif
+
+  {// PLY round-trip (binary)
+    geo.write("data/test.ply");// binary by default
+    openvdb::vdb_tool::Geometry geo2;
+    geo2.read("data/test.ply");
+    EXPECT_EQ(geo.vtxCount(),  geo2.vtxCount());
+    EXPECT_EQ(geo.triCount(),  geo2.triCount());
+    EXPECT_EQ(geo.quadCount(), geo2.quadCount());
+    for (size_t i = 0; i < geo.vtxCount(); ++i) EXPECT_EQ(geo.vtx()[i], geo2.vtx()[i]);
+    for (size_t i = 0; i < geo.triCount(); ++i) EXPECT_EQ(geo.tri()[i], geo2.tri()[i]);
+    for (size_t i = 0; i < geo.quadCount(); ++i) EXPECT_EQ(geo.quad()[i], geo2.quad()[i]);
+  }
+
+  {// PLY round-trip (ASCII)
+    geo.write("data/test_ascii.ply", /*ascii=*/true);
+    openvdb::vdb_tool::Geometry geo2;
+    geo2.read("data/test_ascii.ply");
+    EXPECT_EQ(geo.vtxCount(),  geo2.vtxCount());
+    EXPECT_EQ(geo.triCount(),  geo2.triCount());
+    EXPECT_EQ(geo.quadCount(), geo2.quadCount());
+    for (size_t i = 0; i < geo.vtxCount(); ++i) EXPECT_EQ(geo.vtx()[i], geo2.vtx()[i]);
+    for (size_t i = 0; i < geo.triCount(); ++i) EXPECT_EQ(geo.tri()[i], geo2.tri()[i]);
+    for (size_t i = 0; i < geo.quadCount(); ++i) EXPECT_EQ(geo.quad()[i], geo2.quad()[i]);
+  }
+
+  {// OBJ round-trip
+    geo.write("data/test.obj");
+    openvdb::vdb_tool::Geometry geo2;
+    geo2.read("data/test.obj");
+    EXPECT_EQ(geo.vtxCount(),  geo2.vtxCount());
+    EXPECT_EQ(geo.triCount(),  geo2.triCount());
+    EXPECT_EQ(geo.quadCount(), geo2.quadCount());
+    for (size_t i = 0; i < geo.vtxCount(); ++i) EXPECT_EQ(geo.vtx()[i], geo2.vtx()[i]);
+  }
+
+  {// STL: writing a mesh containing quads must throw (documented in Geometry.h)
+    EXPECT_THROW(geo.writeSTL("data/test_quads.stl"), std::invalid_argument);
+  }
+
+  {// STL round-trip after triangulating quads.
+   // Note: STL stores per-triangle vertex coordinates rather than vertex indices,
+   //       so the round-tripped Geometry's vertex *count* differs from the source.
+   //       The triangle count is the invariant we can check.
+    openvdb::vdb_tool::Geometry tris;
+    tris.vtx()  = geo.vtx();
+    tris.tri()  = geo.tri();
+    tris.quad() = geo.quad();
+    const size_t added = tris.triangulateQuads();
+    EXPECT_EQ(0,                       tris.quadCount());
+    EXPECT_EQ(geo.triCount() + added,  tris.triCount());
+    EXPECT_NO_THROW(tris.write("data/test.stl"));
+    openvdb::vdb_tool::Geometry stl;
+    EXPECT_NO_THROW(stl.read("data/test.stl"));
+    EXPECT_EQ(tris.triCount(), stl.triCount());
+    EXPECT_EQ(0,               stl.quadCount());
+  }
+
+  {// XYZ read (Geometry has no XYZ writer, so build the file directly)
+    {
+      std::ofstream os("data/test.xyz");
+      for (size_t i = 0; i < geo.vtxCount(); ++i) {
+        os << geo.vtx()[i][0] << " " << geo.vtx()[i][1] << " " << geo.vtx()[i][2] << "\n";
+      }
+    }
+    openvdb::vdb_tool::Geometry pts;
+    pts.read("data/test.xyz");
+    EXPECT_EQ(geo.vtxCount(), pts.vtxCount());
+    EXPECT_EQ(0,              pts.triCount());
+    EXPECT_EQ(0,              pts.quadCount());
+    EXPECT_TRUE(pts.isPoints());
+    for (size_t i = 0; i < geo.vtxCount(); ++i) EXPECT_EQ(geo.vtx()[i], pts.vtx()[i]);
+  }
+
+  {// triangulateQuads
+    openvdb::vdb_tool::Geometry tmp;
+    tmp.vtx()  = geo.vtx();
+    tmp.tri()  = geo.tri();
+    tmp.quad() = geo.quad();
+    const size_t origQuad = tmp.quadCount();
+    const size_t origTri  = tmp.triCount();
+    const size_t origVtx  = tmp.vtxCount();
+    const size_t added    = tmp.triangulateQuads();
+    EXPECT_EQ(2 * origQuad,                added);  // two triangles per quad
+    EXPECT_EQ(0,                           tmp.quadCount());
+    EXPECT_EQ(origTri + 2 * origQuad,      tmp.triCount());
+    EXPECT_EQ(origVtx,                     tmp.vtxCount()); // vertex list unchanged
+    // Re-triangulating a quad-free mesh is a no-op.
+    EXPECT_EQ(0, tmp.triangulateQuads());
+  }
+
+  {// triangulate (static, planar convex N-gon)
+    using openvdb::vdb_tool::Geometry;
+    // Triangle: 3 vertices -> 1 triangle
+    auto t3 = Geometry::triangulate({0, 1, 2});
+    EXPECT_EQ(1u, t3.size());
+    EXPECT_EQ(openvdb::Vec3I(0,1,2), t3[0]);
+    // Quad: 4 vertices -> 2 triangles (fan from vertex 0)
+    auto t4 = Geometry::triangulate({0, 1, 2, 3});
+    EXPECT_EQ(2u, t4.size());
+    EXPECT_EQ(openvdb::Vec3I(0,1,2), t4[0]);
+    EXPECT_EQ(openvdb::Vec3I(0,2,3), t4[1]);
+    // Pentagon: 5 vertices -> 3 triangles
+    auto t5 = Geometry::triangulate({0, 1, 2, 3, 4});
+    EXPECT_EQ(3u, t5.size());
+    EXPECT_EQ(openvdb::Vec3I(0,1,2), t5[0]);
+    EXPECT_EQ(openvdb::Vec3I(0,2,3), t5[1]);
+    EXPECT_EQ(openvdb::Vec3I(0,3,4), t5[2]);
+    // Degenerate inputs return an empty triangulation.
+    EXPECT_TRUE(Geometry::triangulate({}).empty());
+    EXPECT_TRUE(Geometry::triangulate({0}).empty());
+    EXPECT_TRUE(Geometry::triangulate({0, 1}).empty());
+  }
+
+  {// transform: uniform scale via createLinearTransform(2.0) should double every coordinate.
+    openvdb::vdb_tool::Geometry tmp;
+    tmp.vtx() = geo.vtx();
+    auto xform = openvdb::math::Transform::createLinearTransform(2.0);
+    tmp.transform(*xform);
+    EXPECT_EQ(geo.vtxCount(), tmp.vtxCount());
+    for (size_t i = 0; i < geo.vtxCount(); ++i) {
+      EXPECT_EQ(geo.vtx()[i] * 2.0f, tmp.vtx()[i]);
+    }
+  }
+
+  {// deepCopy: copy must be independent of the source.
+    auto copy = geo.deepCopy();
+    ASSERT_TRUE(copy != nullptr);
+    EXPECT_EQ(geo.vtxCount(),  copy->vtxCount());
+    EXPECT_EQ(geo.triCount(),  copy->triCount());
+    EXPECT_EQ(geo.quadCount(), copy->quadCount());
+    EXPECT_EQ(geo.getName(),   copy->getName());
+    for (size_t i = 0; i < geo.vtxCount(); ++i) EXPECT_EQ(geo.vtx()[i], copy->vtx()[i]);
+    // Mutating the copy must not affect the source.
+    copy->vtx().emplace_back(99.0f, 99.0f, 99.0f);
+    EXPECT_EQ(geo.vtxCount() + 1, copy->vtxCount());
+    EXPECT_EQ(4u,                 geo.vtxCount());
+  }
 }// Geometry
 
 TEST_F(Test_vdb_tool, Memory)
@@ -615,6 +752,23 @@ TEST_F(Test_vdb_tool, Stack)
     std::stringstream ss;
     s.print(ss);
     EXPECT_EQ(std::string("bla,foo,bar,bob"), ss.str());
+
+    {// throw paths documented in Parser.h
+      Stack t;
+      EXPECT_THROW(t.pop(),    std::invalid_argument);
+      EXPECT_THROW(t.drop(),   std::invalid_argument);
+      EXPECT_THROW(t.top(),    std::invalid_argument);
+      EXPECT_THROW(t.peek(),   std::invalid_argument);
+      EXPECT_THROW(t.dup(),    std::invalid_argument);
+      EXPECT_THROW(t.scrape(), std::invalid_argument);
+      t.push("a");
+      EXPECT_THROW(t.swap(),   std::invalid_argument); // size < 2
+      EXPECT_THROW(t.nip(),    std::invalid_argument); // size < 2
+      EXPECT_THROW(t.over(),   std::invalid_argument); // size < 2
+      t.push("b");
+      EXPECT_THROW(t.rot(),    std::invalid_argument); // size < 3
+      EXPECT_THROW(t.tuck(),   std::invalid_argument); // size < 3
+    }
 }// Stack
 
 TEST_F(Test_vdb_tool, Processor)
@@ -1114,7 +1268,24 @@ TEST_F(Test_vdb_tool, ToolConfig)
     EXPECT_TRUE(fileExists("data"));
     std::remove("data/sphere.vdb");
     std::remove("data/sphere.ply");
+    std::remove("data/config.txt");
 
+    EXPECT_FALSE(fileExists("data/sphere.vdb"));
+    EXPECT_FALSE(fileExists("data/sphere.ply"));
+    EXPECT_FALSE(fileExists("data/config.txt"));
+
+    // Generate the config file this test exercises. Previously this depended
+    // on test ordering with ToolKeep; producing it here keeps the test
+    // self-contained and survives --gtest_filter.
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -default keep=1 -sphere r=2 -ls2mesh vdb=0 -write vdb=0 geo=0 data/sphere.vdb data/sphere.ply data/config.txt");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+
+    // Remove the data files so we can verify the config alone re-creates them.
+    std::remove("data/sphere.vdb");
+    std::remove("data/sphere.ply");
     EXPECT_FALSE(fileExists("data/sphere.vdb"));
     EXPECT_FALSE(fileExists("data/sphere.ply"));
     EXPECT_TRUE(fileExists("data/config.txt"));
@@ -1128,6 +1299,70 @@ TEST_F(Test_vdb_tool, ToolConfig)
     EXPECT_TRUE(fileExists("data/sphere.vdb"));
     EXPECT_TRUE(fileExists("data/sphere.ply"));
     EXPECT_TRUE(fileExists("data/config.txt"));
+}
+
+// Tool::Header is a private nested struct, so we exercise it indirectly:
+// generate a config file, corrupt its header line, and verify -config rejects it.
+TEST_F(Test_vdb_tool, ToolConfigHeader)
+{
+    using namespace openvdb::vdb_tool;
+    EXPECT_TRUE(fileExists("data"));
+
+    const std::string cfg = "data/header_test.txt";
+    std::remove(cfg.c_str());
+
+    // Produce a valid config.
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -sphere -write " + cfg);
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    ASSERT_TRUE(fileExists(cfg));
+
+    // The unmodified config must load successfully.
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -config " + cfg);
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+
+    // Helper: replace the first line of the config file with `newHeader`.
+    auto rewriteHeader = [&](const std::string &newHeader) {
+        std::ifstream in(cfg);
+        std::string body((std::istreambuf_iterator<char>(in)),
+                          std::istreambuf_iterator<char>());
+        in.close();
+        const auto nl = body.find('\n');
+        ASSERT_NE(std::string::npos, nl);
+        std::ofstream out(cfg, std::ios::trunc);
+        out << newHeader << "\n" << body.substr(nl + 1);
+    };
+
+    // Incompatible major version (Header parses, isCompatible() returns false).
+    rewriteHeader("vdb_tool 999.0.0");
+    EXPECT_THROW({
+      auto args = getArgs("vdb_tool -quiet -config " + cfg);
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    }, std::invalid_argument);
+
+    // Bad magic (Header constructor throws).
+    rewriteHeader("not_vdb_tool 10.8.0");
+    EXPECT_THROW({
+      auto args = getArgs("vdb_tool -quiet -config " + cfg);
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    }, std::invalid_argument);
+
+    // Malformed header (wrong number of fields).
+    rewriteHeader("garbage");
+    EXPECT_THROW({
+      auto args = getArgs("vdb_tool -quiet -config " + cfg);
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    }, std::invalid_argument);
+
+    std::remove(cfg.c_str());
 }
 
 
