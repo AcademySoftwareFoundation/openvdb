@@ -973,6 +973,17 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
     }
     grid->setSaveFloatAsHalf(gd.saveFloatAsHalf());
 
+#ifndef OPENVDB_ENABLE_TREE_IO
+    if (!codec) {
+        OPENVDB_THROW(IoError,
+            "No I/O codec found for " << gd.gridType() << ", "
+            << "register the codec for this grid type "
+            << "(either explicitly or via openvdb::initialize()). "
+            << "Note: Tree I/O is deprecated, "
+            << "but can be re-enabled by recompiling with CMake OPENVDB_ENABLE_TREE_IO=ON.");
+    }
+#endif
+
     // Stream metadata varies per grid, and it needs to persist
     // in case delayed load is in effect.
     io::StreamMetadata::Ptr streamMetadata;
@@ -1007,8 +1018,6 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
         } else {
 #ifdef OPENVDB_ENABLE_TREE_IO
             grid->readTopology(is);
-#else
-            OPENVDB_THROW(IoError, "Tree I/O functionality is not enabled");
 #endif
         }
         // read buffers
@@ -1024,8 +1033,6 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
             } else {
                 grid->readBuffers(is);
             }
-#else
-            OPENVDB_THROW(IoError, "Tree I/O functionality is not enabled");
 #endif
         }
     }
@@ -1166,6 +1173,17 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     // Find the codec for the grid type and options.
     io::Codec* codec = findCodec(gd.gridType());
 
+#ifndef OPENVDB_ENABLE_TREE_IO
+    if (!codec) {
+        OPENVDB_THROW(IoError,
+            "No I/O codec found for " << gd.gridType() << ", "
+            << "register the codec for this grid type "
+            << "(either explicitly or via openvdb::initialize()). "
+            << "Note: Tree I/O is deprecated, "
+            << "but can be re-enabled by recompiling with CMake OPENVDB_ENABLE_TREE_IO=ON.");
+    }
+#endif
+
     // Stream metadata varies per grid, so make a copy of the file-level stream metadata.
     io::StreamMetadata::Ptr streamMetadata;
     if (io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(os)) {
@@ -1214,8 +1232,6 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     } else {
 #ifdef OPENVDB_ENABLE_TREE_IO
         grid->writeTopology(os);
-#else
-        OPENVDB_THROW(IoError, "Tree I/O functionality is not enabled");
 #endif
     }
 
@@ -1228,8 +1244,6 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     } else {
 #ifdef OPENVDB_ENABLE_TREE_IO
         grid->writeBuffers(os);
-#else
-        OPENVDB_THROW(IoError, "Tree I/O functionality is not enabled");
 #endif
     }
 
