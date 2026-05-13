@@ -182,7 +182,9 @@ struct ReadTopologyOp
         valueMask.load(is);
         node.setValueMaskUnsafe(valueMask);
 
-        const Index numValues = NodeT::NUM_VALUES;
+        const bool oldVersion =
+            (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION);
+        const Index numValues = (oldVersion ? childMask.countOff() : NodeT::NUM_VALUES);
         {
             // Read in (and uncompress, if necessary) all of this node's values
             // into a contiguous array.
@@ -191,13 +193,27 @@ struct ReadTopologyOp
             io::readCompressedValues(is, values, numValues, valueMask, saveFloatAsHalf);
 
             // Copy values from the array into this node's table.
-            if constexpr (std::is_same_v<ValueT, StorageValueT>) {
-                for (auto iter = node.beginValueAll(); iter; ++iter) {
-                    node.setValueOnlyUnsafe(iter.pos(), values[iter.pos()]);
+            if (oldVersion) {
+                Index n = 0;
+                if constexpr (std::is_same_v<ValueT, StorageValueT>) {
+                    for (auto iter = node.beginValueAll(); iter; ++iter) {
+                        node.setValueOnlyUnsafe(iter.pos(), values[n++]);
+                    }
+                } else {
+                    for (auto iter = node.beginValueAll(); iter; ++iter) {
+                        node.setValueOnlyUnsafe(iter.pos(), static_cast<ValueT>(values[n++]));
+                    }
                 }
+                OPENVDB_ASSERT(n == numValues);
             } else {
-                for (auto iter = node.beginValueAll(); iter; ++iter) {
-                    node.setValueOnlyUnsafe(iter.pos(), static_cast<ValueT>(values[iter.pos()]));
+                if constexpr (std::is_same_v<ValueT, StorageValueT>) {
+                    for (auto iter = node.beginValueAll(); iter; ++iter) {
+                        node.setValueOnlyUnsafe(iter.pos(), values[iter.pos()]);
+                    }
+                } else {
+                    for (auto iter = node.beginValueAll(); iter; ++iter) {
+                        node.setValueOnlyUnsafe(iter.pos(), static_cast<ValueT>(values[iter.pos()]));
+                    }
                 }
             }
         }

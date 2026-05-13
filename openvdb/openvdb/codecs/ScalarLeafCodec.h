@@ -48,6 +48,21 @@ void readScalarLeafBuffers(LeafT& leaf, std::istream& is, bool saveFloatAsHalf,
     if (seekable)   valueMask.seek(is);
     else            valueMask.load(is);
 
+    // Pre-node-mask-compression format stored the origin and buffer count
+    // inline after the value mask.
+    int8_t numBuffers = 1;
+    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+        Coord origin;
+        is.read(reinterpret_cast<char*>(&origin), sizeof(Coord::ValueType) * 3);
+        leaf.setOrigin(origin);
+
+        is.read(reinterpret_cast<char*>(&numBuffers), sizeof(int8_t));
+
+        if (numBuffers > 1) {
+            OPENVDB_THROW(IoError, "Old file format 221 (FLOAT_FRUSTUM_BBOX) with multiple buffers is not supported");
+        }
+    }
+
     if (skip) {
         if (seekable) {
             io::readCompressedValues<StorageValueT, NodeMaskT>(is, nullptr, SIZE, valueMask, saveFloatAsHalf);
