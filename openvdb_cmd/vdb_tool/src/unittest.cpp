@@ -395,6 +395,202 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_NE((char*)(vec),  (char*)(&p));// yep
       EXPECT_NE((char*)(&p),   (char*)p);// of course
     }
+
+    {// fileExists
+      using namespace openvdb::vdb_tool;
+      EXPECT_TRUE(fileExists("data"));// directory created by SetUp
+      EXPECT_FALSE(fileExists("data/no_such_file_xyz_42.bin"));
+      const std::string probe = "data/fileExists_probe.tmp";
+      { std::ofstream os(probe); os << "x"; }
+      EXPECT_TRUE(fileExists(probe));
+      std::remove(probe.c_str());
+      EXPECT_FALSE(fileExists(probe));
+    }
+
+    {// getPath
+      using namespace openvdb::vdb_tool;
+      EXPECT_EQ("path",     getPath("path/base.ext"));
+      EXPECT_EQ("/path",    getPath("/path/base.ext"));
+      EXPECT_EQ("C:\\path", getPath("C:\\path\\base.ext"));
+      EXPECT_EQ("path/sub", getPath("path/sub/base.ext"));
+      EXPECT_EQ(".",        getPath("base.ext"));// no separator → "."
+      EXPECT_EQ(".",        getPath("base"));
+    }
+
+    {// getName
+      using namespace openvdb::vdb_tool;
+      EXPECT_EQ("base",     getName("path/base.ext"));
+      EXPECT_EQ("base",     getName("/path/base.ext"));
+      EXPECT_EQ("base",     getName("C:\\path\\base.ext"));
+      EXPECT_EQ("base",     getName("base.ext"));
+      EXPECT_EQ("base0123", getName("path/base0123.ext"));
+      EXPECT_EQ("base0123", getName("base0123.ext"));
+    }
+
+    {// getNumber
+      using namespace openvdb::vdb_tool;
+      EXPECT_EQ("0123", getNumber("path/base0123.ext"));
+      EXPECT_EQ("100",  getNumber("base_100.ext"));
+      EXPECT_EQ("0042", getNumber("file_0042.txt"));
+    }
+
+    {// in-place toLowerCase / toUpperCase return a reference to the input
+      using namespace openvdb::vdb_tool;
+      std::string s = "Hello World";
+      std::string &refL = toLowerCase(s);
+      EXPECT_EQ(&s, &refL);                  // same object
+      EXPECT_EQ("hello world", s);
+      std::string &refU = toUpperCase(s);
+      EXPECT_EQ(&s, &refU);
+      EXPECT_EQ("HELLO WORLD", s);
+    }
+
+    {// isInt(float)
+      using namespace openvdb::vdb_tool;
+      EXPECT_TRUE (isInt( 0.0f));
+      EXPECT_TRUE (isInt( 1.0f));
+      EXPECT_TRUE (isInt(-2.0f));
+      EXPECT_FALSE(isInt( 1.5f));
+      EXPECT_FALSE(isInt(-0.25f));
+    }
+
+    {// strTo<T> dispatcher with explicit template argument
+      using namespace openvdb::vdb_tool;
+      EXPECT_EQ(42,    strTo<int>("42"));
+      EXPECT_EQ(3.14f, strTo<float>("3.14"));
+      EXPECT_EQ(3.14,  strTo<double>("3.14"));
+      EXPECT_TRUE (strTo<bool>("true"));
+      EXPECT_TRUE (strTo<bool>("1"));
+      EXPECT_FALSE(strTo<bool>("false"));
+      EXPECT_FALSE(strTo<bool>("0"));
+      EXPECT_THROW(strTo<int>("nope"),   std::invalid_argument);
+      EXPECT_THROW(strTo<float>(""),     std::invalid_argument);
+      EXPECT_THROW(strTo<double>("xyz"), std::invalid_argument);
+      EXPECT_THROW(strTo<bool>(""),      std::invalid_argument);
+    }
+
+    {// vectorize<int>
+      using namespace openvdb::vdb_tool;
+      auto v = vectorize<int>("1 2 3 -4");
+      ASSERT_EQ(4u, v.size());
+      EXPECT_EQ( 1, v[0]);
+      EXPECT_EQ( 2, v[1]);
+      EXPECT_EQ( 3, v[2]);
+      EXPECT_EQ(-4, v[3]);
+      v = vectorize<int>("1,2,3", " ,");
+      ASSERT_EQ(3u, v.size());
+      EXPECT_EQ(1, v[0]);
+      EXPECT_THROW(vectorize<int>("1 foo 3"), std::invalid_argument);
+    }
+
+    {// vectorize<bool>
+      using namespace openvdb::vdb_tool;
+      auto v = vectorize<bool>("1 0 true false");
+      ASSERT_EQ(4u, v.size());
+      EXPECT_TRUE (v[0]);
+      EXPECT_FALSE(v[1]);
+      EXPECT_TRUE (v[2]);
+      EXPECT_FALSE(v[3]);
+      EXPECT_THROW(vectorize<bool>("1 maybe 0"), std::invalid_argument);
+    }
+
+    {// vectorize<std::string>
+      using namespace openvdb::vdb_tool;
+      auto v = vectorize<std::string>("foo bar baz");
+      ASSERT_EQ(3u, v.size());
+      EXPECT_EQ("foo", v[0]);
+      EXPECT_EQ("bar", v[1]);
+      EXPECT_EQ("baz", v[2]);
+    }
+
+    {// findIntN: "option=1,3,6" -> {1,3,6}
+      using namespace openvdb::vdb_tool;
+      auto v = findIntN({"cmd", "rgb=1,3,6"}, "rgb");
+      ASSERT_EQ(3u, v.size());
+      EXPECT_EQ(1, v[0]);
+      EXPECT_EQ(3, v[1]);
+      EXPECT_EQ(6, v[2]);
+      // space-separated values are also accepted (delimiter set is " ,")
+      v = findIntN({"opt=1 2 3"}, "opt");
+      ASSERT_EQ(3u, v.size());
+      EXPECT_EQ(1, v[0]);
+      EXPECT_EQ(2, v[1]);
+      EXPECT_EQ(3, v[2]);
+      EXPECT_THROW(findIntN({"opt=1,foo,3"}, "opt"), std::invalid_argument);
+      EXPECT_THROW(findIntN({"abc=1"}, "missing"),   std::invalid_argument);
+    }
+
+    {// findFltN: "option=1.3,-3.1,6.0" -> {1.3f,-3.1f,6.0f}
+      using namespace openvdb::vdb_tool;
+      auto v = findFltN({"opt=1.3,-3.1,6.0"}, "opt");
+      ASSERT_EQ(3u, v.size());
+      EXPECT_FLOAT_EQ( 1.3f, v[0]);
+      EXPECT_FLOAT_EQ(-3.1f, v[1]);
+      EXPECT_FLOAT_EQ( 6.0f, v[2]);
+      EXPECT_THROW(findFltN({"opt=1.0,bad"}, "opt"), std::invalid_argument);
+      EXPECT_THROW(findFltN({"abc=1.0"}, "missing"), std::invalid_argument);
+    }
+
+    {// isLittleEndian: deterministic and cross-checks a byte-inspected uint16_t
+      using namespace openvdb::vdb_tool;
+      const bool le = isLittleEndian();
+      EXPECT_EQ(le, isLittleEndian());// idempotent
+      const uint16_t v = 0x0102;
+      const bool actuallyLittle = (*reinterpret_cast<const uint8_t*>(&v) == 0x02);
+      EXPECT_EQ(actuallyLittle, le);
+    }
+
+    {// dateStamp: format "YYYY-MM-DD_HH-MM-SS" (19 chars)
+      using namespace openvdb::vdb_tool;
+      const std::string s = dateStamp();
+      ASSERT_EQ(19u, s.size());
+      EXPECT_EQ('-', s[4]);
+      EXPECT_EQ('-', s[7]);
+      EXPECT_EQ('_', s[10]);
+      EXPECT_EQ('-', s[13]);
+      EXPECT_EQ('-', s[16]);
+      for (size_t i : {0u,1u,2u,3u,5u,6u,8u,9u,11u,12u,14u,15u,17u,18u}) {
+        EXPECT_TRUE(std::isdigit(static_cast<unsigned char>(s[i]))) << "char " << i << " = " << s[i];
+      }
+    }
+
+    {// Spinner: glyph cycles through |/-\ then wraps to |
+      using namespace openvdb::vdb_tool;
+      std::stringstream ss;
+      Spinner spin(ss);
+      spin("step1");
+      spin("step2");
+      spin("step3");
+      spin("step4");
+      spin("step5");// expected to wrap back to '|'
+      const std::string out = ss.str();
+      EXPECT_NE(std::string::npos, out.find("step1: |"));
+      EXPECT_NE(std::string::npos, out.find("step2: /"));
+      EXPECT_NE(std::string::npos, out.find("step3: -"));
+      EXPECT_NE(std::string::npos, out.find("step4: \\"));
+      EXPECT_NE(std::string::npos, out.find("step5: |"));// wrapped
+    }
+
+    {// tokenize edge cases not covered above
+      using namespace openvdb::vdb_tool;
+      EXPECT_TRUE(tokenize("").empty());          // empty input
+      EXPECT_TRUE(tokenize("   ").empty());       // only delimiters
+      auto t = tokenize("a  b   c", " ");         // consecutive delimiters → tokens skipped
+      ASSERT_EQ(3u, t.size());
+      EXPECT_EQ("a", t[0]);
+      EXPECT_EQ("b", t[1]);
+      EXPECT_EQ("c", t[2]);
+    }
+
+    {// startsWith / endsWith edge cases
+      using namespace openvdb::vdb_tool;
+      EXPECT_TRUE (startsWith("anything", ""));// empty pattern is always a prefix
+      EXPECT_TRUE (endsWith  ("anything", ""));// empty pattern is always a suffix
+      EXPECT_FALSE(startsWith("ab", "abc"));   // pattern longer than string
+      EXPECT_FALSE(endsWith  ("ab", "abc"));
+      EXPECT_TRUE (startsWith("abc", "abc"));  // equal
+      EXPECT_TRUE (endsWith  ("abc", "abc"));
+    }
 }// Util
 
 TEST_F(Test_vdb_tool, getArgs)
