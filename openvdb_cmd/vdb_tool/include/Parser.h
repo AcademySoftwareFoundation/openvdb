@@ -220,22 +220,26 @@ public:
         return mData.back();
     }
     /// @brief Duplicate the top element.   Stack effect: x -- x x
+    /// @throw std::invalid_argument if the stack is empty.
     void dup() {
         if (mData.empty()) throw std::invalid_argument("Stack::dup: empty stack");
         mData.push_back(mData.back());
     }
     /// @brief Swap the two top elements.   Stack effect: y x -- x y
+    /// @throw std::invalid_argument if the stack has fewer than 2 elements.
     void swap() {
         if (mData.size()<2) throw std::invalid_argument("Stack::swap: size<2");
         const size_t n = mData.size()-1;
         std::swap(mData[n], mData[n-1]);
     }
     /// @brief Remove the element just below the top.   Stack effect: y x -- x
+    /// @throw std::invalid_argument if the stack has fewer than 2 elements.
     void nip() {
         if (mData.size()<2) throw std::invalid_argument("Stack::nip: size<2");
         mData.erase(mData.end()-2);
     }
     /// @brief Remove everything except the top element.   Stack effect: ... x -- x
+    /// @throw std::invalid_argument if the stack is empty.
     void scrape() {
         if (mData.empty()) throw std::invalid_argument("Stack::scrape: empty stack");
         mData.erase(mData.begin(), mData.end()-1);
@@ -243,11 +247,13 @@ public:
     /// @brief Remove every element from the stack.
     void clear() {mData.clear();}
     /// @brief Copy the second element onto the top.   Stack effect: y x -- y x y
+    /// @throw std::invalid_argument if the stack has fewer than 2 elements.
     void over() {
         if (mData.size()<2) throw std::invalid_argument("Stack::over: size<2");
         mData.push_back(mData[mData.size()-2]);
     }
     /// @brief Rotate the top three elements left.   Stack effect: z y x -- y x z
+    /// @throw std::invalid_argument if the stack has fewer than 3 elements.
     void rot() {
         if (mData.size()<3) throw std::invalid_argument("Stack::rot: size<3");
         const size_t n = mData.size() - 1;
@@ -255,6 +261,7 @@ public:
         std::swap(mData[n-2], mData[n-1]);
     }
     /// @brief Rotate the top three elements right.   Stack effect: z y x -- x z y
+    /// @throw std::invalid_argument if the stack has fewer than 3 elements.
     void tuck() {
         if (mData.size()<3) throw std::invalid_argument("Stack::tuck: size<3");
         const size_t n = mData.size()-1;
@@ -942,6 +949,8 @@ struct Parser {
     /// @param def Global default options (applied to every matching action unless overridden).
     Parser(std::vector<Option> &&def);
     /// @brief Parse argv into the @c actions list, dispatching each token to an action's options.
+    /// @throw std::invalid_argument if no arguments are supplied, an unknown action is encountered,
+    ///        or "-for/-each/-files/-if" actions are not balanced by matching "-end" actions.
     void parse(int argc, char *argv[]);
     /// @brief Validate the parsed action list (loop matching, etc.) and prepare for run().
     inline void finalize();
@@ -959,6 +968,7 @@ struct Parser {
     template <typename T>
     T get(const std::string &name) const {return strTo<T>(this->getStr(name));}
     /// @brief Retrieve an option's value as a 3-component vector parsed with the given delimiters.
+    /// @throw std::invalid_argument if the option does not parse into exactly 3 components.
     template <typename T>
     inline math::Vec3<T> getVec3(const std::string &name, const char* delimiters = "(),") const;
     /// @brief Retrieve an option's value as a variable-length vector parsed with the given delimiters.

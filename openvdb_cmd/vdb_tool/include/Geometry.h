@@ -136,16 +136,23 @@ public:
     /// @throw std::invalid_argument if the extension is not recognized.
     void write(const std::string &fileName, bool ascii = false) const;
     /// @brief Write the mesh as a Wavefront OBJ file.
+    /// @throw std::invalid_argument if the file cannot be opened for writing.
     void writeOBJ(const std::string &fileName) const;
     /// @brief Write the mesh as an OFF (Object File Format) file.
+    /// @throw std::invalid_argument if the file cannot be opened for writing.
     void writeOFF(const std::string &fileName) const;
     /// @brief Write the mesh as a PLY file (binary by default, ASCII if @a ascii is true).
+    /// @throw std::invalid_argument if the file cannot be opened or if binary buffer allocation fails.
     void writePLY(const std::string &fileName, bool ascii = false) const;
     /// @brief Write the triangulated mesh as a binary STL file.
+    /// @throw std::invalid_argument if the file cannot be opened, the host is big-endian,
+    ///        or the mesh contains quads (call triangulateQuads() first).
     void writeSTL(const std::string &fileName) const;
     /// @brief Write the geometry in the native compact binary .geo format.
+    /// @throw std::invalid_argument if the file cannot be opened for writing.
     void writeGEO(const std::string &fileName) const;
     /// @brief Write the mesh as an Alembic (.abc) file (requires VDB_TOOL_USE_ABC).
+    /// @throw std::runtime_error if Alembic support was not enabled at compile time.
     void writeABC(const std::string &fileName) const;
 
     /// @brief Stream version of writeGEO; serializes this Geometry to @a os.
@@ -158,8 +165,10 @@ public:
     /// @brief Stream version of writeOFF.
     void   writeOFF(std::ostream &os) const;
     /// @brief Stream version of writePLY (binary or ASCII based on @a ascii).
+    /// @throw std::invalid_argument if binary buffer allocation fails.
     void   writePLY(std::ostream &os, bool ascii = false) const;
     /// @brief Stream version of writeSTL.
+    /// @throw std::invalid_argument if the host is big-endian or the mesh contains quads.
     void   writeSTL(std::ostream &os) const;
 
     /// @brief Read geometry from file, dispatching on the filename extension.
@@ -168,28 +177,45 @@ public:
     /// @throw std::invalid_argument on unrecognized extension or I/O failure.
     void read(const std::string &fileName, int verbose = 0);
     /// @brief Read a Wavefront OBJ file.
+    /// @throw std::invalid_argument if the file cannot be opened.
     void readOBJ(const std::string &fileName);
     /// @brief Read an OFF (Object File Format) file.
+    /// @throw std::invalid_argument if the file cannot be opened, the "OFF" header is missing,
+    ///        or a face has more vertices than the supported maximum (n-gons beyond quads).
     void readOFF(const std::string &fileName);
     /// @brief Read a PLY file (binary or ASCII auto-detected from the header).
+    /// @throw std::invalid_argument if the file cannot be opened, the header is malformed,
+    ///        binary buffer allocation fails, or polygons exceed the supported maximum.
     void readPLY(const std::string &fileName);
-    /// @brief Read a binary STL file.
+    /// @brief Read a binary or ASCII STL file (format auto-detected).
+    /// @throw std::runtime_error if the file cannot be opened or is unexpectedly empty.
+    /// @throw std::invalid_argument if the binary file is malformed, host is big-endian,
+    ///        or the ASCII file contains unsupported n-gons.
     void readSTL(const std::string &fileName);
     /// @brief Read a PTS point-cloud file (one or more clouds, ASCII).
+    /// @throw std::runtime_error if the file cannot be opened.
+    /// @throw std::invalid_argument on a malformed coordinate line.
     void readPTS(const std::string &fileName);
     /// @brief Read a native .geo file (compact binary format).
+    /// @throw std::invalid_argument if the file cannot be opened.
     void readGEO(const std::string &fileName);
     /// @brief Read an Alembic (.abc) file (requires VDB_TOOL_USE_ABC).
+    /// @throw std::runtime_error if Alembic support was not enabled at compile time
+    ///        or if a polygon with more than 4 vertices is encountered.
     void readABC(const std::string &fileName);
     /// @brief Read a point cloud via PDAL (e.g. LAS/LAZ/E57).
     /// @return true on success, false if PDAL could not parse the file.
     /// @note  Requires VDB_TOOL_USE_PDAL.
+    /// @throw std::runtime_error if PDAL support was not enabled at compile time
+    ///        or if the underlying PDAL pipeline fails.
     bool readPDAL(const std::string &fileName);
     /// @brief Read an ASCII XYZ point file (x y z per line).
+    /// @throw std::invalid_argument if the file cannot be opened or a line is malformed.
     void readXYZ(const std::string &fileName);
     /// @brief Read points from an OpenVDB file (.vdb).
     void readVDB(const std::string &fileName);
     /// @brief Read points from a NanoVDB file (.nvdb). Requires VDB_TOOL_USE_NANO.
+    /// @throw std::runtime_error if NanoVDB support was not enabled at compile time.
     void readNVDB(const std::string &fileName);
 
     /// @brief Stream version of readGEO; deserializes from @a is.
@@ -201,10 +227,14 @@ public:
     /// @brief Stream version of readOBJ.
     void   readOBJ(std::istream &is);
     /// @brief Stream version of readOFF.
+    /// @throw std::invalid_argument on a malformed header or unsupported n-gons.
     void   readOFF(std::istream &is);
     /// @brief Stream version of readPLY.
+    /// @throw std::invalid_argument on a malformed header, buffer-allocation failure,
+    ///        or unsupported n-gons.
     void   readPLY(std::istream &is);
     /// @brief Stream version of readXYZ.
+    /// @throw std::invalid_argument on a malformed coordinate line.
     void   readXYZ(std::istream &is);
 
     /// @brief Number of vertices in this Geometry.

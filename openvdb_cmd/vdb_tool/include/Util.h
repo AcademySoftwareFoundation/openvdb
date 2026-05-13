@@ -24,7 +24,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <sys/stat.h>
+#include <sys/stat.h>// for state
 #include <chrono>
 #include <ctime>
 
@@ -107,28 +107,28 @@ inline std::string replaceExt(const std::string &str, const std::string &ext)
     return (pos >= str.length() ? str + "." : str.substr(0, pos + 1)) + ext;
 }
 
-/// @brief Turns all characters in a string into lower case
+/// @brief Turns all characters in a string into lower case. Works in-place, i.e. not copy is performed.
 inline std::string &toLowerCase(std::string &str)
 {
     std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return std::tolower(c); });
     return str;
 }
 
-/// @brief Turns all characters in a string into upper case
+/// @brief Turns all characters in a string into upper case. Works in-place, i.e. not copy is performed.
 inline std::string &toUpperCase(std::string &str)
 {
     std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return std::toupper(c); });
     return str;
 }
 
-/// @brief Turns all characters in a string into lower case
+/// @brief Turns all characters in a string into lower case and returns a copy.
 inline std::string toLowerCase(const std::string &str)
 {
     std::string tmp = str;
     return toLowerCase(tmp);
 }
 
-/// @brief Turns all characters in a string into upper case
+/// @brief Turns all characters in a string into upper case and returns a copy.
 inline std::string toUpperCase(const std::string &str)
 {
     std::string tmp = str;
@@ -165,7 +165,7 @@ inline int findFileExt(const std::string &fileName, const std::vector<std::strin
 
 /// @brief Returns a new string where the leading and trailing characters in @b c have been trimmed away.
 /// @param s Input string (unchanged).
-/// @param c Set of characters to treat as whitespace (defaults to standard whitespace).
+/// @param c Set of characters to treat as whitespace (defaults to standard whitespace, new-line etc).
 inline std::string trim(const std::string &s, std::string c = " \n\r\t\f\v")
 {
     const size_t start = s.find_first_not_of(c), end = s.find_last_not_of(c);
@@ -206,14 +206,15 @@ inline bool isInt(const std::string &s, int &i)
 {
     size_t pos = 0;
     try {
-        i = stoi(s, &pos);
+        i = stoi(s, &pos); // might throw
     } catch (const std::invalid_argument &) {
         return false;
     }
     return pos == s.size();
 }
 
-/// @brief convert @b str into an integer
+/// @brief Convert @b str into an integer.
+/// @throw std::invalid_argument if @b str is not a valid integer (extra characters are not allowed).
 inline int strToInt(const std::string &str)
 {
     size_t pos = 0;
@@ -227,7 +228,8 @@ inline int strToInt(const std::string &str)
     return i;
 }
 
-/// @brief convert @b str into a float
+/// @brief Convert @b str into a float.
+/// @throw std::invalid_argument if @b str is not a valid float (extra characters are not allowed).
 inline float strToFloat(const std::string &str)
 {
     size_t pos = 0;
@@ -241,7 +243,8 @@ inline float strToFloat(const std::string &str)
     return v;
 }
 
-/// @brief convert @b str into a double
+/// @brief Convert @b str into a double.
+/// @throw std::invalid_argument if @b str is not a valid double (extra characters are not allowed).
 inline double strToDouble(const std::string &str)
 {
     size_t pos = 0;
@@ -255,7 +258,8 @@ inline double strToDouble(const std::string &str)
     return v;
 }
 
-/// @brief convert @b str into a bool
+/// @brief Convert @b str into a bool. Accepts "0"/"1" and (case-insensitive) "true"/"false".
+/// @throw std::invalid_argument if @b str is not one of the accepted forms.
 inline bool strToBool(const std::string &str)
 {
     if (str == "1" || toLowerCase(str) == "true") return true;
@@ -264,7 +268,9 @@ inline bool strToBool(const std::string &str)
     return false; // "strToBool: internal error" should never happen
 }
 
-/// @brief converts a string of byte size to integer byte size, e.g. "2KB" -> 2048
+/// @brief Convert a human-readable byte-size string to an integer byte count, e.g. "2KB" -> 2048.
+/// @details Recognized unit suffixes are "B", "KB", "MB", "GB", "TB", or an empty unit (bytes).
+/// @throw std::invalid_argument if the numeric part fails to parse or the unit is unrecognized.
 inline uint64_t strSizeToByteSize(const std::string &str)
 {
     const size_t first = str.find_first_not_of(" \t"), last = str.find_last_of("0123456789");
