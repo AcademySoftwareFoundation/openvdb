@@ -576,6 +576,29 @@ inline bool cwiseGreaterThan(const Vec4<T1>& a, const Vec4<T2>& b)
     return a[3] > b[3];
 }
 
+#ifndef OPENVDB_ENABLE_VEC_RELATIONAL_OPERATIONS
+template <typename T1, typename T2>
+inline bool operator<(const Vec4<T1>& a, const Vec4<T2>& b) = delete;
+template <typename T1, typename T2>
+inline bool operator>(const Vec4<T1>& a, const Vec4<T2>& b) = delete;
+#else
+/// @return true if a < b, comparing components in order of significance.
+template <typename T1, typename T2>
+OPENVDB_DEPRECATED_MESSAGE("relational operator< on vectors is ambiguous")
+inline bool operator<(const Vec4<T1>& a, const Vec4<T2>& b)
+{
+    return cwiseLessThan(a, b);
+}
+
+/// @return true if a > b, comparing components in order of significance.
+template <typename T1, typename T2>
+OPENVDB_DEPRECATED_MESSAGE("relational operator> on vectors is ambiguous")
+inline bool operator>(const Vec4<T1>& a, const Vec4<T2>& b)
+{
+    return cwiseGreaterThan(a, b);
+}
+#endif
+
 using Vec4i = Vec4<int32_t>;
 using Vec4ui = Vec4<uint32_t>;
 using Vec4s = Vec4<float>;
