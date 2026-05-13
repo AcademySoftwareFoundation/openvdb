@@ -161,6 +161,10 @@ public:
 
     void print(size_t n = 0, std::ostream& os = std::clog) const;
 
+    /// @brief Static method to triangulate a a planar and convex N-gon
+    /// @param nGon list of vertex indices for an N-gon
+    /// @return vector of triangles, as triplets of vertex indices, that make up N-gon
+    /// @warning The triangulation is pretty naive an assume the input N-gon to be both planar and convex
     static std::vector<Vec3I> triangulate(const std::vector<int> &nGon);
 
 private:
