@@ -151,8 +151,11 @@ inline int findMatch(const std::string &word, const std::vector<std::string> &ve
     return 0;
 }
 
-/// @brief return the 1-based on of array on candidate extensions in @b suffix that matches the extension in @b fileName.
-///        If ignore_case is true the case of the file extension is ignored.
+/// @brief Return the 1-based index of the candidate extension in @b suffix that matches the extension of @b fileName.
+/// @param fileName    File path whose extension will be tested.
+/// @param suffix      Vector of candidate extensions (without leading dot).
+/// @param ignore_case If true (the default), the comparison is case-insensitive.
+/// @return 1-based index of the matching entry in @b suffix, or 0 if no match.
 inline int findFileExt(const std::string &fileName, const std::vector<std::string> &suffix, bool ignore_case = true)
 {
     std::string ext = getExt(fileName);
@@ -160,13 +163,19 @@ inline int findFileExt(const std::string &fileName, const std::vector<std::strin
     return findMatch(ext, suffix);
 }
 
-/// @brief Returns a new string where the leading and training characters of type @b c have been trimmed away.
+/// @brief Returns a new string where the leading and trailing characters in @b c have been trimmed away.
+/// @param s Input string (unchanged).
+/// @param c Set of characters to treat as whitespace (defaults to standard whitespace).
 inline std::string trim(const std::string &s, std::string c = " \n\r\t\f\v")
 {
     const size_t start = s.find_first_not_of(c), end = s.find_last_not_of(c);
     return start == std::string::npos ? "" : s.substr(start, 1 + end - start);
 }
 
+/// @brief Find every occurrence of a character in a string.
+/// @param str  String to scan.
+/// @param name Character to search for (defaults to '%').
+/// @return Vector of zero-based positions of every match.
 inline std::vector<size_t> findAll(const std::string &str, char name = '%')
 {
     std::vector<size_t> vec;
@@ -188,7 +197,7 @@ inline bool endsWith(const std::string &str, const std::string &pattern)
     return m >= n ? str.compare(m - n, n, pattern) == 0 : false;
 }
 
-/// @return return true if the floating-point arguments is an integer
+/// @brief Returns true if the floating-point argument has no fractional part.
 inline bool isInt(float x) {return floorf(x) == x;}
 
 /// @brief Returns true if the string contains an integer, in which case @b i contains the value.
@@ -275,15 +284,22 @@ inline uint64_t strSizeToByteSize(const std::string &str)
     return size;
 }
 
+/// @brief Generic string-to-T conversion; specialized for int, float, double, and bool.
+/// @tparam T Target type. Only int, float, double, and bool are provided.
+/// @throw std::invalid_argument if @b str cannot be parsed as a T.
 template <typename T>
 inline T strTo(const std::string &str);
 
+/// @brief Specialization of strTo for int.
 template <>
 inline int strTo<int>(const std::string &str){return strToInt(str);}
+/// @brief Specialization of strTo for float.
 template <>
 inline float strTo<float>(const std::string &str){return strToFloat(str);}
+/// @brief Specialization of strTo for double.
 template <>
 inline double strTo<double>(const std::string &str){return strToDouble(str);}
+/// @brief Specialization of strTo for bool.
 template <>
 inline bool strTo<bool>(const std::string &str){return strToBool(str);}
 
@@ -314,7 +330,10 @@ inline int isNumber(const std::string &s, int &i, float &v)
     return 0;
 }
 
-// alternative delimiters = " ,[]{}()"
+/// @brief Split a string into tokens using any character in @b delimiters as a separator.
+/// @param line       Input string to split.
+/// @param delimiters Null-terminated set of delimiter characters (e.g. " ,[]{}()").
+/// @return Vector of token strings; empty tokens between consecutive delimiters are skipped.
 inline std::vector<std::string> tokenize(const std::string &line, const char *delimiters = " ")
 {
     std::vector<char> buffer(line.c_str(), line.c_str() + line.size() + 1);
@@ -327,15 +346,20 @@ inline std::vector<std::string> tokenize(const std::string &line, const char *de
     return tokens; // move semantics
 }
 
+/// @brief Tokenize @b line and convert each token to type @c T.
+/// @tparam T Target element type. Specializations are provided for std::string, int, float, and bool.
+/// @throw std::invalid_argument if any token fails to parse as a T.
 template <typename T>
 std::vector<T> vectorize(const std::string &line, const char *delimiters = " ");
 
+/// @brief Specialization of vectorize for std::string (identical to tokenize).
 template <>
 std::vector<std::string> vectorize<std::string>(const std::string &line, const char *delimiters)
 {
     return tokenize(line, delimiters);
 }
 
+/// @brief Specialization of vectorize for int.
 template <>
 std::vector<int> vectorize<int>(const std::string &line, const char *delimiters)
 {
@@ -349,6 +373,7 @@ std::vector<int> vectorize<int>(const std::string &line, const char *delimiters)
     return tokens; // move semantics
 }
 
+/// @brief Specialization of vectorize for float.
 template <>
 std::vector<float> vectorize<float>(const std::string &line, const char *delimiters)
 {
@@ -362,6 +387,7 @@ std::vector<float> vectorize<float>(const std::string &line, const char *delimit
     return tokens; // move semantics
 }
 
+/// @brief Specialization of vectorize for bool (accepts "0/1" or "true/false").
 template <>
 std::vector<bool> vectorize<bool>(const std::string &line, const char *delimiters)
 {
@@ -375,7 +401,10 @@ std::vector<bool> vectorize<bool>(const std::string &line, const char *delimiter
     return tokens; // move semantics
 }
 
-/// @brief find first "option=str" in args and then return "str".
+/// @brief Find the first argument of the form "option=value" in @b args and return "value".
+/// @param args   Argument vector to search.
+/// @param option Option name to match exactly (no partial matching).
+/// @throw std::invalid_argument if no argument with the requested option name is found.
 inline std::string findArg(const std::vector<std::string> &args, const std::string &option)
 {
     const size_t pos = option.length();
@@ -387,7 +416,8 @@ inline std::string findArg(const std::vector<std::string> &args, const std::stri
     return "error in findArg"; // should never happen due to the previous throw
 }
 
-/// @brief find "option=1,3,6" in args and return std::vector<int>{1,3,6}.
+/// @brief Find "option=1,3,6" in @b args and return std::vector<int>{1,3,6}.
+/// @throw std::invalid_argument if @b option is missing or any token fails to parse as an int.
 inline std::vector<int> findIntN(const std::vector<std::string> &args, const std::string &option)
 {
     const auto t = tokenize(findArg(args, option), " ,");
@@ -396,7 +426,8 @@ inline std::vector<int> findIntN(const std::vector<std::string> &args, const std
     return v; // move semantics
 }
 
-/// @brief find "option=1.3,-3.1,6.0" in args and return std::vector<float>{1.3f,-3.1f,6.0f}.
+/// @brief Find "option=1.3,-3.1,6.0" in @b args and return std::vector<float>{1.3f,-3.1f,6.0f}.
+/// @throw std::invalid_argument if @b option is missing or any token fails to parse as a float.
 std::vector<float> findFltN(const std::vector<std::string> &args, const std::string &option)
 {
     const auto t = tokenize(findArg(args, option), " ,");
@@ -459,8 +490,9 @@ inline std::string uuid()
     return ss.str().insert(8,"-").insert(13,"-4").insert(23,"-");//hardcode version 4
 }
 
-/// @brief std::string with current data stamp
-/// @details Format: %Y-%m-%d is Year-Month-Day, %H-%M-%S is Hour-Minute-Second
+/// @brief Returns a string with the current local-time date stamp.
+/// @details Format: "%Y-%m-%d_%H-%M-%S" (Year-Month-Day_Hour-Minute-Second).
+/// @return Date-stamp string suitable for embedding in filenames.
 inline std::string dateStamp() {
     const auto now = std::chrono::system_clock::now();
 
@@ -482,13 +514,19 @@ inline std::string dateStamp() {
     return ss.str();
 }// dateStamp
 
-/// @brief Spinning wheel used to indicate progress
+/// @brief Spinning-wheel progress indicator that overwrites a single terminal line.
+/// @details Each invocation cycles through the glyphs |, /, -, \ and prints them
+///          alongside a caller-supplied message, followed by a carriage return so
+///          successive calls update the same line.
 class Spinner {
-    std::ostream& mOutStream;
-    const char* mBuffer;
-    int mOffset;
+    std::ostream& mOutStream; ///< Stream that receives the spinner output (typically std::cerr).
+    const char* mBuffer;      ///< Cyclic glyph buffer "|/-\\".
+    int mOffset;              ///< Index of the next glyph to display.
 public:
+    /// @brief Construct a Spinner writing to @a os (defaults to std::cerr).
     Spinner(std::ostream& os = std::cerr) : mOutStream(os), mBuffer{"|/-\\"}, mOffset{0} {}
+    /// @brief Print one frame of the spinner with @a msg as the leading label.
+    /// @param msg Message printed before the spinner glyph.
     void operator()(const std::string &msg){
         mOutStream << msg << ": " << mBuffer[mOffset] << std::setfill(' ') << std::setw(80) << "\r" << std::flush;
         mOffset = (mOffset + 1) % 4;

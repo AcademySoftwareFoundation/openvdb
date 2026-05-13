@@ -47,16 +47,35 @@ namespace vdb_tool {
 
 // ==============================================================================================================
 
-/// @brief This class defines string attributes for options, i.e. arguments for actions
+/// @brief String attributes for a single option (i.e. an argument to an action).
+/// @details Each option carries a name, its current value (possibly empty),
+///          an example string used in help output, and a documentation string.
 struct Option {
+    /// @brief Append @a v to value, comma-separating if value is already non-empty.
     void append(const std::string &v) {value = value.empty() ? v : value + "," + v;}
 
-    std::string name, value, example, documentation;
+    std::string name;          ///< Option name, e.g. "voxel" or "radius".
+    std::string value;         ///< Current value as a string (may contain expressions).
+    std::string example;       ///< Example value shown in usage/help output.
+    std::string documentation; ///< Human-readable description of the option.
 };
 
 // ==============================================================================================================
+
+/// @brief Describes a single command-line action (e.g. "-sphere", "-read")
+///        with its aliases, options, and init/run callbacks.
+/// @details Actions are registered with the Parser via Parser::addAction. During
+///          parsing, the init callback is invoked when the action is encountered;
+///          during execution, the run callback is invoked to perform the work.
 struct Action {
-    /// @brief c-tor
+    /// @brief Constructor.
+    /// @param _names      List of names/aliases for this action (e.g. {"read", "import", "load", "i"}).
+    /// @param _doc        One-line documentation string shown in usage output.
+    /// @param _options    Options accepted by this action.
+    /// @param _init       Callback invoked during parsing (typically for syntax/state checks).
+    /// @param _run        Callback invoked during execution to perform the action.
+    /// @param _anonymous  Index of the option to which un-named option values are appended,
+    ///                    or size_t(-1) if anonymous values are disallowed.
     Action(std::vector<std::string> &&_names,
            std::string _doc,
            std::vector<Option> &&_options,
@@ -70,35 +89,51 @@ struct Action {
       , init(std::move(_init))
       , run(std::move(_run)) {}
 
-    /// @brief default copy constructor
+    /// @brief Default copy constructor.
     Action(const Action&) = default;
-    /// @brief Sets the options of this actions
+
+    /// @brief Parse a single "name=value" token and update the matching option.
+    /// @param str Token such as "voxel=0.1" or a bare value appended to the anonymous option.
+    /// @throw std::invalid_argument if the token cannot be matched to any option.
     void setOption(const std::string &str);
+
+    /// @brief Print this action and its current options in the canonical "-name opt=val ..." form.
     void print(std::ostream& os = std::clog) const;
 
-    std::vector<std::string> names;// list of names of action, e.g. {"read", "import", "load", "i"}
-    std::string              documentation;// documentation e.g. "read", "i", "files", "read files"
-    size_t                   anonymous;// index of the option to which the value of un-named option will be appended, e.g. files
-    std::vector<Option>      options;// e.g. {{"grids", "density,sphere"}, {"files", "path/base.ext"}}
-    std::function<void()>    init, run;// callback functions
+    std::vector<std::string> names;         ///< Names/aliases of the action, e.g. {"read", "import", "load", "i"}.
+    std::string              documentation; ///< One-line description shown in usage output.
+    size_t                   anonymous;     ///< Index of the option receiving un-named values, or -1 if disallowed.
+    std::vector<Option>      options;       ///< Options registered for this action.
+    std::function<void()>    init;          ///< Callback invoked during parsing.
+    std::function<void()>    run;           ///< Callback invoked during execution.
 };// Action struct
 
 // ==============================================================================================================
 
-using ActListT = std::list<Action>;
-using ActIterT = typename ActListT::iterator;
-using VecF = std::vector<float>;// vector of floats
-using VecI = std::vector<int>;// vector for integers
-using VecS = std::vector<std::string>;// vector of strings
+using ActListT = std::list<Action>;                  ///< Doubly-linked list of Actions (stable iterators).
+using ActIterT = typename ActListT::iterator;        ///< Iterator into an ActListT.
+using VecF     = std::vector<float>;                 ///< Convenience alias for a vector of floats.
+using VecI     = std::vector<int>;                   ///< Convenience alias for a vector of ints.
+using VecS     = std::vector<std::string>;           ///< Convenience alias for a vector of strings.
 
 // ==============================================================================================================
 
-/// @brief Class that stores values by name
+/// @brief Key-value store mapping variable names to string values.
+/// @details Used by the Processor (and by loops) to persist named variables
+///          across expression evaluations. Provides built-in read-only constants
+///          for "pi" and "e" when no user-defined value of that name exists.
 class Memory
 {
 public:
 
+    /// @brief Default constructor: produces an empty memory.
     Memory() = default;
+
+    /// @brief Look up the value of a named variable.
+    /// @param name Variable name (without the leading "$").
+    /// @return The stored string value, or a string representation of pi/e
+    ///         if @a name equals "pi" or "e" and no user value is set.
+    /// @throw std::invalid_argument if the variable is not defined.
     std::string get(const std::string &name) {
         auto it = mData.find(name);
         if (it == mData.end()) {
@@ -112,87 +147,121 @@ public:
         }
         return it->second;
     }
+    /// @brief Erase all stored variables.
     void clear() {mData.clear();}
+    /// @brief Erase a single variable by name (no-op if not present).
     void clear(const std::string &name) {mData.erase(name);}
+    /// @brief Assign a string value to a variable.
     void set(const std::string &name, const std::string &value) {mData[name]=value;}
+    /// @brief Assign a C-string value to a variable.
     void set(const std::string &name, const char *value) {mData[name]=value;}
+    /// @brief Assign a numeric value to a variable (converted via std::to_string).
     template <typename T>
     void set(const std::string &name, const T &value) {mData[name]=std::to_string(value);}
+    /// @brief Print all variables in lexicographic order as "name=value" lines.
     void print(std::ostream& os = std::clog) const {
         std::map<std::string, std::string> tmp(mData.begin(),mData.end());// sort output
         for (auto &d : tmp) os << d.first <<"="<<d.second<<std::endl;
     }
+    /// @brief Returns the number of variables currently stored.
     size_t size() const {return mData.size();}
+    /// @brief Returns true if a variable with the given name is currently set.
     bool isSet(const std::string &name) const {return mData.find(name)!=mData.end();}
 
 private:
 
-    std::unordered_map<std::string, std::string> mData;
+    std::unordered_map<std::string, std::string> mData; ///< Backing hash-map from name to value.
 };// Memory
 
 // ==============================================================================================================
 
+/// @brief String stack used by the Processor for Forth-like Reverse Polish Notation evaluation.
+/// @details Stack effects in the inline comments use the convention "before -- after",
+///          where the rightmost token is the top of the stack.
 class Stack {
 public:
 
+    /// @brief Default constructor; reserves a small initial capacity.
     Stack(){mData.reserve(10);}
+    /// @brief Construct a stack from an initializer list (first element is the bottom).
     Stack(std::initializer_list<std::string> d) : mData(d.begin(), d.end()) {}
+    /// @brief Returns the current depth (number of elements) of the stack.
     size_t depth() const {return mData.size();}
+    /// @brief Returns true if the stack contains no elements.
     bool empty() const {return mData.empty();}
+    /// @brief Equality test: returns true iff both stacks hold the same elements in the same order.
     bool operator==(const Stack &other) const {return mData == other.mData;}
+    /// @brief Push @a s onto the top of the stack.
     void push(const std::string &s) {mData.push_back(s);}
-    std::string pop() {// y x -- y
+    /// @brief Remove and return the top element.   Stack effect: y x -- y
+    /// @throw std::invalid_argument if the stack is empty.
+    std::string pop() {
         if (mData.empty()) throw std::invalid_argument("Stack::pop: empty stack");
         const std::string str = mData.back();
         mData.pop_back();
         return str;
     }
-    void drop() {// y x -- y
+    /// @brief Remove the top element without returning it.   Stack effect: y x -- y
+    /// @throw std::invalid_argument if the stack is empty.
+    void drop() {
         if (mData.empty()) throw std::invalid_argument("Stack::drop: empty stack");
         mData.pop_back();
     }
+    /// @brief Returns a mutable reference to the top element.
+    /// @throw std::invalid_argument if the stack is empty.
     std::string& top() {
         if (mData.empty()) throw std::invalid_argument("Stack::top: empty stack");
         return mData.back();
     }
+    /// @brief Returns a const reference to the top element without modifying the stack.
+    /// @throw std::invalid_argument if the stack is empty.
     const std::string& peek() const {
         if (mData.empty()) throw std::invalid_argument("Stack::peak: empty stack");
         return mData.back();
     }
-    void dup() {// x -- x x
+    /// @brief Duplicate the top element.   Stack effect: x -- x x
+    void dup() {
         if (mData.empty()) throw std::invalid_argument("Stack::dup: empty stack");
         mData.push_back(mData.back());
     }
-    void swap() {// y x -- x y
+    /// @brief Swap the two top elements.   Stack effect: y x -- x y
+    void swap() {
         if (mData.size()<2) throw std::invalid_argument("Stack::swap: size<2");
         const size_t n = mData.size()-1;
         std::swap(mData[n], mData[n-1]);
     }
-    void nip() {// y x -- x
+    /// @brief Remove the element just below the top.   Stack effect: y x -- x
+    void nip() {
         if (mData.size()<2) throw std::invalid_argument("Stack::nip: size<2");
         mData.erase(mData.end()-2);
     }
-    void scrape() {// ... x -- x
+    /// @brief Remove everything except the top element.   Stack effect: ... x -- x
+    void scrape() {
         if (mData.empty()) throw std::invalid_argument("Stack::scrape: empty stack");
         mData.erase(mData.begin(), mData.end()-1);
     }
+    /// @brief Remove every element from the stack.
     void clear() {mData.clear();}
-    void over() {// y x -- y x y
+    /// @brief Copy the second element onto the top.   Stack effect: y x -- y x y
+    void over() {
         if (mData.size()<2) throw std::invalid_argument("Stack::over: size<2");
         mData.push_back(mData[mData.size()-2]);
     }
-    void rot() {// z y x -- y x z
+    /// @brief Rotate the top three elements left.   Stack effect: z y x -- y x z
+    void rot() {
         if (mData.size()<3) throw std::invalid_argument("Stack::rot: size<3");
         const size_t n = mData.size() - 1;
         std::swap(mData[n-2], mData[n  ]);
         std::swap(mData[n-2], mData[n-1]);
     }
-    void tuck() {// z y x -- x z y
+    /// @brief Rotate the top three elements right.   Stack effect: z y x -- x z y
+    void tuck() {
         if (mData.size()<3) throw std::invalid_argument("Stack::tuck: size<3");
         const size_t n = mData.size()-1;
         std::swap(mData[n-2], mData[n]);
         std::swap(mData[n-1], mData[n]);
     }
+    /// @brief Print stack contents to @a os, comma-separated from bottom to top.
     void print(std::ostream& os = std::clog) const {
         if (mData.empty()) return;
         os << mData[0];
@@ -201,32 +270,48 @@ public:
 
 private:
 
-    std::vector<std::string> mData;
+    std::vector<std::string> mData; ///< Underlying contiguous storage; back() is the top of the stack.
 };// Stack
 
 // ==============================================================================================================
 
-/// @brief   Implements a light-weight stack-oriented programming language (very loosely) inspired by Forth
-/// @details Specifically, it uses Reverse Polish Notation to define operations that are evaluated during
-///          parsing of the command-line arguments (options to be precise).
+/// @brief   Implements a light-weight stack-oriented programming language (very loosely) inspired by Forth.
+/// @details Specifically, it uses Reverse Polish Notation (RPN) to define operations that are evaluated
+///          during parsing of the command-line arguments (options to be precise). Expressions are
+///          delimited by "{" and "}" and tokens are separated by ":". Variables starting with "$" are
+///          substituted from Memory; variables starting with "@" are stored to Memory.
+///          See the README.md "Stack-based string expressions" section for the full language reference.
 class Processor
 {
 public:
 
+    /// @brief Push a numeric value onto the call stack (converted to string via std::to_string).
     template <typename T>
     void push(const T &t) {mCallStack.push(std::to_string(t));}
+    /// @brief Push a string onto the call stack.
     void push(const std::string &s) {mCallStack.push(s);}
+    /// @brief Replace the top stack entry with a numeric value (converted to string).
     template <typename T>
     void set(const T &t) {mCallStack.top() = std::to_string(t);}
+    /// @brief Replace the top stack entry with "1" (true) or "0" (false).
     void set(bool t) {mCallStack.top() = t ? "1" : "0";}
+    /// @brief Replace the top stack entry with a string.
     void set(const std::string &str) {mCallStack.top() = str;}
+    /// @brief Replace the top stack entry with a C-string.
     void set(const char *str) {mCallStack.top() = str;}
+    /// @brief Returns a mutable reference to the top stack entry.
     std::string& get() {return mCallStack.top();}
+    /// @brief Read-only access to the memory used for "$name" and "@name" variables.
     const Memory& memory() const {return mMemory;}
+    /// @brief Mutable access to the memory used for "$name" and "@name" variables.
     Memory& memory() {return mMemory;}
+    /// @brief Register a new instruction with documentation and a callback function.
+    /// @param name Instruction name (e.g. "+", "sqrt", "pad0").
+    /// @param doc  Documentation string shown by the help() methods.
+    /// @param func Callback executed when the instruction is invoked during evaluation.
     void add(const std::string &name, std::string &&doc, std::function<void()> &&func) {mInstructions[name]={std::move(doc),std::move(func)};}
 
-    /// @brief default c-tor for Processor. Add all the instructions required by the tool
+    /// @brief Default constructor; registers all built-in instructions of the scripting language.
     Processor()
     {
         // file-name operations
@@ -421,8 +506,12 @@ public:
         add("quit","terminate evaluation, e.g. {1:2:+:quit:4:*} -> {3}",[](){});
     }
 
-    /// @brief performs syntax analysis on the specified str. Implements control-flows like for- and each-loops, if- and switch-statements,
-    ///        and calls the lambda functions associated with the actions.
+    /// @brief Performs syntax analysis on @a str and evaluates any embedded expressions.
+    /// @details Each substring enclosed in "{}" is parsed as a sequence of colon-separated
+    ///          tokens (values and instructions) and replaced in-place by the result.
+    ///          Supports control-flow like if- and switch-statements. Modifies @a str directly.
+    /// @param str Input/output string; rewritten with all expressions reduced to their values.
+    /// @throw std::invalid_argument on any syntax error or unknown instruction.
     void operator()(std::string &str)
     {
         try {
@@ -496,18 +585,24 @@ public:
             throw std::invalid_argument("Error evaluating \""+str+"\": "+e.what());
         }
     }
+    /// @brief Non-mutating overload of operator(): evaluates @a str and returns the result.
+    /// @return A new string with all "{}" expressions reduced.
     std::string operator()(const std::string &str)
     {
         std::string tmp = str;// copy
         (*this)(tmp);
         return tmp;
     }
+    /// @brief Print documentation for every registered instruction in lexicographic order.
     void help(std::ostream& os = std::clog) const
     {
         std::set<std::string> vec;// print help in lexicographic order
         for (auto it=mInstructions.begin(); it!=mInstructions.end(); ++it) vec.insert(it->first);
         this->help(vec, os);
     }
+    /// @brief Print documentation for a specific subset of instructions.
+    /// @param vec Iterable of instruction names to look up.
+    /// @throw std::invalid_argument if any name in @a vec is not a registered instruction.
     template <typename VecT>
     void help(const VecT &vec, std::ostream& os = std::clog) const
     {
@@ -526,14 +621,17 @@ public:
 
 private:
 
-    struct Instruction {std::string doc; std::function<void()> callback;};// documentation and callback for instruction
+    /// @brief Documentation string and callback function for a single registered instruction.
+    struct Instruction {std::string doc; std::function<void()> callback;};
+    /// @brief Hash-map type from instruction name to its Instruction record.
     using Instructions = std::unordered_map<std::string, Instruction>;
 
-    Stack        mCallStack;// processor stack for data and instructions
-    Instructions mInstructions;// map of all supported instructions
-    Memory       mMemory;
+    Stack        mCallStack;    ///< Processor stack for data and intermediate results.
+    Instructions mInstructions; ///< Map of all supported instructions, keyed by name.
+    Memory       mMemory;       ///< Variable store used by "$name" / "@name" tokens.
 
-    /// @brief apply functor to the top element, assuming it's either a float or integer
+    /// @brief Apply unary functor to the top element, parsed as either int or float.
+    /// @throw std::invalid_argument if the top element parses as neither.
     template <typename OpT>
     void a(OpT op){
         union {std::int32_t i; float x;} A;
@@ -546,7 +644,8 @@ private:
         }
     }
 
-    /// @brief apply functor to the two top element, assuming they are both floats or integers
+    /// @brief Apply binary functor to the two top elements, parsed as either ints or floats.
+    /// @throw std::invalid_argument if both elements do not share a numeric type.
     template <typename OpT>
     void ab(OpT op){
         union {std::int32_t i; float x;} A, B;
@@ -560,7 +659,8 @@ private:
         }
     }
 
-    /// @brief apply a boolean test, e.g. a == b, to the two top elements, assuming they are floats, integers or strings
+    /// @brief Apply a boolean test (e.g. a == b) to the two top elements. If both parse as
+    ///        the same numeric type the comparison is numeric, otherwise it is a string comparison.
     template <typename T>
     void boolean(T test){
         union {std::int32_t i; float x;} A, B;
@@ -577,47 +677,72 @@ private:
 
 // ==============================================================================================================
 
-/// @brief Abstract base class
+/// @brief Abstract base class for the iteration constructs (-for, -each, -files, -if).
+/// @details A BaseLoop binds a loop variable name to a Memory store, exposes a position
+///          counter accessible as "#name", and remembers the iterator pointing to the
+///          first action inside the loop body. Concrete subclasses implement valid()
+///          and next() to define the iteration policy.
 struct BaseLoop
 {
+    /// @brief Constructor.
+    /// @param s  Memory store used to publish the current loop value and counter.
+    /// @param i  Iterator pointing at the action that opened the loop (e.g. "-for").
+    /// @param n  Name of the loop variable (accessible as "$n", with counter as "$#n").
     BaseLoop(Memory &s, ActIterT i, const std::string &n) : memory(s), begin(i), name(n), pos(0) {}
+    /// @brief Virtual destructor. Erases the loop variable and its counter from Memory.
     virtual ~BaseLoop() {
         memory.clear(name);
         memory.clear("#"+name);
     }
+    /// @brief Returns true if the current iteration is valid (the body should execute).
     virtual bool valid() = 0;
+    /// @brief Advance to the next iteration and return true if it is valid.
     virtual bool next() = 0;
+    /// @brief Read the current loop value from Memory, converted to type @c T.
     template <typename T>
     T get() const { return strTo<T>(memory.get(name)); }
+    /// @brief Publish a new loop value to Memory along with the updated position counter.
     template <typename T>
     void set(T v){
         memory.set(name, v);
         memory.set("#"+name, pos);
     }
+    /// @brief Print "Processing: name = value, counter #name = pos" to @a os.
     void print(std::ostream& os = std::clog) const {
         os << "Processing: " << name << " = " << memory.get(name) << ", counter #" << name << " = " << pos <<std::endl;
     }
 
-    Memory&     memory;
-    ActIterT    begin;// marks the start of the for loop
-    std::string name;
-    size_t      pos;// loop counter starting at zero
+    Memory&     memory; ///< Reference to the Parser's Memory store.
+    ActIterT    begin;  ///< Iterator marking the start of the loop body.
+    std::string name;   ///< Loop-variable name.
+    size_t      pos;    ///< Zero-based iteration counter.
 };// BaseLoop struct
 
 // ==============================================================================================================
 
+/// @brief Numeric for-loop driven by an inclusive lower bound, exclusive upper bound, and step.
+/// @tparam T Numeric type of the loop variable (typically int or float).
 template <typename T>
 struct ForLoop : public BaseLoop
 {
 public:
 
+    /// @brief Constructor.
+    /// @param s Memory store used to publish the loop variable.
+    /// @param i Iterator pointing at the -for action.
+    /// @param n Name of the loop variable.
+    /// @param v Vector containing {start, end} or {start, end, step}. Step defaults to 1.
+    /// @throw std::invalid_argument if @a v has any size other than 2 or 3.
     ForLoop(Memory &s, ActIterT i, const std::string &n, const std::vector<T> &v) : BaseLoop(s, i, n), vec(1) {
         if (v.size()!=2 && v.size()!=3)  throw std::invalid_argument("ForLoop: expected two or three arguments, i=1,9 or i=1,9,2");
         for (size_t i=0; i<v.size(); ++i) vec[i] = v[i];
         if (this->valid()) this->set(vec[0]);
     }
     virtual ~ForLoop() {}
+    /// @brief Returns true if the current value is still strictly less than the upper bound.
     bool valid() override {return vec[0] < vec[1];}
+    /// @brief Advance the loop variable by the step and publish it to Memory.
+    /// @return true if the new value is still in range.
     bool next() override {
         ++pos;
         vec[0] = this->template get<T>() + vec[2];// read from memory
@@ -628,20 +753,28 @@ public:
 private:
 
     using BaseLoop::pos;
-    math::Vec3<T> vec;
+    math::Vec3<T> vec; ///< Triplet holding (current value, end value, step).
 };// ForLoop struct
 
 // ==============================================================================================================
 
+/// @brief Loop that iterates over an explicit list of string values (the -each action).
 class EachLoop : public BaseLoop
 {
 public:
 
+    /// @brief Constructor.
+    /// @param s Memory store used to publish the loop variable.
+    /// @param i Iterator pointing at the -each action.
+    /// @param n Name of the loop variable.
+    /// @param v Ordered list of string values that the loop will iterate over.
     EachLoop(Memory &s, ActIterT i, const std::string &n, const VecS &v) : BaseLoop(s,i,n), vec(v.begin(), v.end()){
         if (this->valid()) this->set(vec[0]);
     }
     virtual ~EachLoop() {}
+    /// @brief Returns true if the position counter is still within @c vec.
     bool valid() override {return pos < vec.size();}
+    /// @brief Advance to the next entry in @c vec; returns true if such an entry exists.
     bool next() override {
         if (++pos < vec.size()) this->set(vec[pos]);
         return pos < vec.size();
@@ -650,16 +783,30 @@ public:
 private:
 
     using BaseLoop::pos;
-    const VecS vec;// list of all string values
+    const VecS vec; ///< Immutable list of values to iterate over.
 };// EachLoop class
 
 // ==============================================================================================================
 
+/// @brief Loop that iterates over files matching extension, name-pattern, and size filters
+///        within one or more directories (the -files action).
+/// @tparam IterT Filesystem directory iterator type (e.g. std::filesystem::directory_iterator
+///               or recursive_directory_iterator), selected to control recursion behavior.
 template <typename IterT>
 struct FilesLoop : public BaseLoop
 {
 public:
 
+    /// @brief Constructor.
+    /// @param s              Memory store used to publish the loop variable.
+    /// @param i              Iterator pointing at the -files action.
+    /// @param name           Name of the loop variable bound to each matching file path.
+    /// @param pathString     One or more directories to traverse.
+    /// @param fileExt        Acceptable file extensions (without leading dot); empty means accept all.
+    /// @param includePattern Substring patterns; if non-empty, file name must contain at least one.
+    /// @param excludePattern Substring patterns; if non-empty, file name must contain none of them.
+    /// @param minFileSize    Minimum file size in bytes (inclusive).
+    /// @param maxFileSize    Maximum file size in bytes (inclusive).
     FilesLoop(Memory &s, ActIterT i, const std::string &name,
               std::vector<std::string> &&pathString,
               std::vector<std::string> &&fileExt,
@@ -685,6 +832,7 @@ public:
         if (mIter != mEnd) this->set(mIter->path().string());
     }
     virtual ~FilesLoop() {}
+    /// @brief Returns true if the current file's extension matches any in @c mFileExt.
     bool matchExtensions() const {
         OPENVDB_ASSERT(mIter != mEnd && !mFileExt.empty());
         std::string ext = mIter->path().extension().string();// ".obj"
@@ -693,24 +841,28 @@ public:
         for (const auto &e : mFileExt) if (e == ext) return true;
         return false;
     }
+    /// @brief Returns true if the current file's name contains at least one include pattern.
     bool includePatterns() const {
         OPENVDB_ASSERT(mIter != mEnd && !mInclude.empty());
         const std::string name = mIter->path().filename().string();// "file.obj"
         for (const auto &p : mInclude) if (name.find(p) != std::string::npos) return true;
         return false;
     }
+    /// @brief Returns true if the current file's name contains none of the exclude patterns.
     bool excludePatterns() const {
         OPENVDB_ASSERT(mIter != mEnd && !mExclude.empty());
         const std::string name = mIter->path().filename().string();// "file.obj"
         for (const auto &p : mExclude) if (name.find(p) != std::string::npos) return false;
         return true;
     }
+    /// @brief Returns true if the current entry is a regular file with size within bounds.
     bool fileSize() const {
         OPENVDB_ASSERT(mIter != mEnd);
         if (!std::filesystem::is_regular_file(mIter->path())) return false;// only loop over regular files
         const uint64_t size = file_size( mIter->path() );// fails if path is a directory
         return size >= mMinFileSize && size <= mMaxFileSize;
     }
+    /// @brief Returns true if the current entry passes all configured filters.
     bool valid() override {
         if (mIter == mEnd) return false;
         if (!this->fileSize()) return false;
@@ -719,6 +871,8 @@ public:
         if (!mExclude.empty() && !this->excludePatterns()) return false;
         return true;
     }
+    /// @brief Advance to the next matching file, spanning directories if needed.
+    /// @return true if another valid file was found.
     bool next() override {
         if (mPathIter == mPathNames.end()) return false;
         ++pos;
@@ -741,72 +895,121 @@ public:
 private:
  
     using BaseLoop::pos;
-    const std::vector<std::string> mPathNames;
-    std::filesystem::path mFilePath;
-    const std::vector<std::string> mFileExt, mInclude, mExclude;
-    IterT mIter, mEnd;
-    std::vector<std::string>::const_iterator mPathIter;
-    const uint64_t mMinFileSize, mMaxFileSize;
+    const std::vector<std::string> mPathNames;            ///< Directories to traverse.
+    std::filesystem::path mFilePath;                      ///< Path of the directory currently being scanned.
+    const std::vector<std::string> mFileExt;              ///< Acceptable file extensions, or empty.
+    const std::vector<std::string> mInclude;              ///< Required substring patterns, or empty.
+    const std::vector<std::string> mExclude;              ///< Forbidden substring patterns, or empty.
+    IterT mIter;                                          ///< Filesystem iterator over the current directory.
+    IterT mEnd;                                           ///< End sentinel for @c mIter.
+    std::vector<std::string>::const_iterator mPathIter;   ///< Iterator over @c mPathNames.
+    const uint64_t mMinFileSize;                          ///< Minimum file size in bytes (inclusive).
+    const uint64_t mMaxFileSize;                          ///< Maximum file size in bytes (inclusive).
 };// FilesLoop struct
 
 // ==============================================================================================================
 
+/// @brief Degenerate "loop" that represents an if-block (the -if action).
+/// @details Executes its body at most once: valid() always returns true on entry,
+///          while next() always returns false to terminate after one pass.
 class IfLoop : public BaseLoop
 {
 public:
 
+    /// @brief Constructor; the if-block has no loop variable, hence the empty name.
     IfLoop(Memory &s, ActIterT i) : BaseLoop(s,i,"") {}
     virtual ~IfLoop() {}
+    /// @brief Always returns true so the body executes once on entry.
     bool valid() override {return true;}
+    /// @brief Always returns false; the if-block runs at most once.
     bool next() override {return false;}
 };// IfLoop class
 
 // ==============================================================================================================
 
+/// @brief Top-level command-line parser for vdb_tool.
+/// @details Owns the registry of available actions, the ordered list of actions selected
+///          on the command line, the active loop stack, and a Processor for evaluating
+///          embedded "{}" expressions. Typical lifecycle:
+///          @code
+///              Parser p(defaults);
+///              p.parse(argc, argv); // populates 'actions'
+///              p.finalize();        // validates loops, applies defaults
+///              p.run();             // executes each action's 'run' callback in order
+///          @endcode
 struct Parser {
+    /// @brief Constructor.
+    /// @param def Global default options (applied to every matching action unless overridden).
     Parser(std::vector<Option> &&def);
+    /// @brief Parse argv into the @c actions list, dispatching each token to an action's options.
     void parse(int argc, char *argv[]);
+    /// @brief Validate the parsed action list (loop matching, etc.) and prepare for run().
     inline void finalize();
+    /// @brief Execute every action in @c actions, in order, honoring loops and if-blocks.
     inline void run();
+    /// @brief Apply currently-stored defaults to the option list of the action at @c iter.
     inline void setDefaults();
+    /// @brief Print every selected action in canonical form (useful for config-file output).
     void print(std::ostream& os = std::clog) const {for (auto &a : actions) a.print(os);}
 
+    /// @brief Retrieve an option's value as a string, evaluating any "{}" expressions it contains.
+    /// @throw std::invalid_argument if the current action has no option named @a name.
     inline std::string getStr(const std::string &name) const;
+    /// @brief Retrieve an option's value converted to type @c T.
     template <typename T>
     T get(const std::string &name) const {return strTo<T>(this->getStr(name));}
+    /// @brief Retrieve an option's value as a 3-component vector parsed with the given delimiters.
     template <typename T>
     inline math::Vec3<T> getVec3(const std::string &name, const char* delimiters = "(),") const;
+    /// @brief Retrieve an option's value as a variable-length vector parsed with the given delimiters.
     template <typename T>
     inline std::vector<T> getVec(const std::string &name, const char* delimiters = "(),") const;
 
+    /// @brief Print usage information for a specific list of action names.
     void usage(const VecS &actions, bool brief) const;
+    /// @brief Print usage for every action selected after the current one.
     void usage(bool brief) const {for (auto i = std::next(iter);i!=actions.end(); ++i) std::clog << this->usage(*i, brief);}
+    /// @brief Print usage for every registered action.
     void usage_all(bool brief) const {for (const auto &a : available) std::clog << this->usage(a, brief);}
+    /// @brief Format usage text for a single Action; brief omits per-option documentation.
     std::string usage(const Action &action, bool brief) const;
-    void addAction(std::vector<std::string> &&names, // primary name of the action
-                   std::string &&doc, // documentation of action
-                   std::vector<Option>   &&options, // list of options for the action
-                   std::function<void()> &&parse, // callback function called during parsing
-                   std::function<void()> &&run,  // callback function to perform the action
-                   size_t anonymous = -1)//defines if un-named options are allowed
+    /// @brief Register a new action with the parser.
+    /// @param names     Names/aliases of the action (first entry is the canonical name).
+    /// @param doc       Documentation string for the action.
+    /// @param options   Options accepted by the action.
+    /// @param parse     Callback invoked during parsing (e.g. for loop bookkeeping).
+    /// @param run       Callback invoked during execution to perform the action.
+    /// @param anonymous Index of the option receiving un-named values, or -1 to disallow them.
+    void addAction(std::vector<std::string> &&names,
+                   std::string &&doc,
+                   std::vector<Option>   &&options,
+                   std::function<void()> &&parse,
+                   std::function<void()> &&run,
+                   size_t anonymous = -1)
     {
       available.emplace_back(std::move(names), std::move(doc), std::move(options),
                              std::move(parse), std::move(run), anonymous);
     }
 
+    /// @brief Returns a mutable reference to the action currently being processed.
     Action& getAction() {return *iter;}
+    /// @brief Returns a const reference to the action currently being processed.
     const Action& getAction() const {return *iter;}
+    /// @brief Print the current action to std::clog when verbose > 1.
     void printAction() const {if (verbose>1) iter->print();}
-    std::multimap<size_t, std::string> closeMatches(const std::string &str) const;// returns available actions that contain str
+    /// @brief Search registered actions for names containing @a str (case-insensitive, leading '-' stripped).
+    /// @return Multimap keyed by match position, used to suggest "did you mean" completions.
+    std::multimap<size_t, std::string> closeMatches(const std::string &str) const;
 
-    ActListT            available, actions;
-    ActIterT            iter;// iterator pointing to the current actions being processed
-    std::unordered_map<std::string, ActIterT> hashMap;
-    std::list<std::shared_ptr<BaseLoop>> loops;
-    std::vector<Option> defaults;
-    int                 verbose;
-    mutable size_t      counter;// loop counter used to validate matching "-for/each" and "-end" actions
-    mutable Processor   processor;// responsible for storing local variables and executing string expressions
+    ActListT            available;                              ///< All registered (available) actions.
+    ActListT            actions;                                ///< Actions selected by the user, in order.
+    ActIterT            iter;                                   ///< Iterator pointing to the action being processed.
+    std::unordered_map<std::string, ActIterT> hashMap;          ///< Name-to-iterator map for fast action lookup.
+    std::list<std::shared_ptr<BaseLoop>> loops;                 ///< Active loop stack (innermost at the back).
+    std::vector<Option> defaults;                               ///< Global default options applied to matching actions.
+    int                 verbose;                                ///< Verbosity level (0=quiet, 1=info, 2=debug).
+    mutable size_t      counter;                                ///< Counter validating balanced "-for/each/if" and "-end".
+    mutable Processor   processor;                              ///< Processor evaluating "{}" expressions in option values.
 };// Parser struct
 
 // ==============================================================================================================

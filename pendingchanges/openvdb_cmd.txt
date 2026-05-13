@@ -20,6 +20,7 @@ vdb_tool:
   - Added cutoff option to "-ls2fog" action.
   - Improved error handling in vdb_tool (will recover from many non-fatal errors)
   - Improved parsing of configuration files (tabs and tailing comments are now ignored)
+  - Massively improved Doxygen documentation for all files related to the vdb_tool.
 
   Fixes:
   - Fixed issues in Geometry::readSTL so it works on all files in Thingi10K.
