@@ -2,20 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 ////////////////////////////////////////////////////////////////////////////////
-///ƒ
+///
 /// @author Ken Museth
 ///
 /// @file Tool.h
 ///
-/// @brief This tool can combine any sequence of the of high-level tools available in openvdb.
-///        For instance, it can convert a sequence of polygon meshes and particles to level sets,
-///        and perform a large number of operations on these level set surfaces. It can also
-///        generate adaptive polygon meshes from level sets, render images and write particles,
-///        meshes or VDBs them to disk.
+/// @brief Defines the Tool class, which chains together any sequence of high-level
+///        OpenVDB operations exposed by the vdb_tool command-line utility.
+///
+/// @details Tool ties Parser (command-line action registry) and Geometry (polygon
+///          mesh and point storage) together with the internal stacks of VDB grids
+///          and Geometry instances. For example, it can convert a sequence of polygon
+///          meshes and particles to level sets, perform a large number of operations
+///          on these level set surfaces, generate adaptive polygon meshes from level
+///          sets, render images, and write particles, meshes, or VDBs to disk.
 ///
 /// @warning All prints are directed to cerr since cout is used for piping!
 ///
-/// @todo expose LevelSetMeasure and add mesh2offset
+/// @todo expose LevelSetMeasure
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -106,195 +110,250 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace vdb_tool {
 
+/// @brief Top-level command-line tool that chains OpenVDB high-level operations.
+/// @details Owns the action parser, the stacks of in-flight Geometry and VDB grids,
+///          and the log-redirection state. A Tool instance is constructed from argv,
+///          which registers and parses all command-line actions; run() then executes
+///          them in order. The class is non-copyable and non-movable.
 class Tool
 {
 public:
 
-    /// @brief Constructor from command-line arguments
+    /// @brief Construct a Tool from command-line arguments.
+    /// @param argc Argument count, as received by main().
+    /// @param argv Argument vector, as received by main(). argv[0] is taken as the command name.
+    /// @throw std::invalid_argument if parsing fails (unknown action, malformed option, etc.).
     Tool(int argc, char *argv[]);
+
+    /// @brief Destructor; restores std::clog if a log file was opened.
     ~Tool() {this->endLog();}
 
-    Tool(const Tool&) = delete;// disallow copy construction
-    Tool(Tool&&) = delete;// disallow move construction
-    Tool& operator=(const Tool&) = delete;// disallow assignment
-    Tool& operator=(Tool&&) = delete;// disallow move assignment
+    Tool(const Tool&) = delete;            ///< Copy construction is disabled.
+    Tool(Tool&&) = delete;                 ///< Move construction is disabled.
+    Tool& operator=(const Tool&) = delete; ///< Copy assignment is disabled.
+    Tool& operator=(Tool&&) = delete;      ///< Move assignment is disabled.
 
-    /// @brief Executes all the actions defined during construction
+    /// @brief Execute every action that was registered during construction, in order.
+    /// @note  On a fatal exception inside an action this method writes the message to
+    ///        std::cerr and calls std::exit(EXIT_FAILURE) rather than propagating.
     void run();
 
+    /// @brief Redirect std::clog to a log file for the remainder of this Tool's lifetime.
+    /// @param logFile Path of the log file. If empty, a timestamped name is generated.
+    /// @return 0 on success, 1 if the file cannot be opened, 2 if std::clog cannot be captured.
+    /// @note Subsequent calls are no-ops while a redirection is already active.
     int startLog(std::string logFile);
 
+    /// @brief Restore std::clog to its original buffer and close the log file (if any).
     void endLog() {
       if (mOldClogBuffer) std::clog.rdbuf(mOldClogBuffer);
       if (mLogFile.is_open()) mLogFile.close();
       mOldClogBuffer = nullptr;
     }
 
-    /// @brief prints information to the terminal about the current stack of VDB grids and Geometry
+    /// @brief Print a summary of the current VDB-grid and Geometry stacks to @a os.
     void print(std::ostream& os = std::clog) const;
+
+    /// @brief Print the canonical "-action option=value ..." form of every queued action to @a os.
     void print_args(std::ostream& os = std::clog) const;
 
-    /// @brief return a string with the current version number of this tool
+    /// @brief Return the current version of this tool as "major.minor.patch".
     static std::string version() {return std::to_string(sMajor)+"."+std::to_string(sMinor)+"."+std::to_string(sPatch);}
+    /// @brief Return the major version (incremented on incompatible option/file changes).
     static int major() {return sMajor;}
+    /// @brief Return the minor version (incremented on backwards-compatible new features).
     static int minor() {return sMinor;}
+    /// @brief Return the patch version (incremented on backwards-compatible bug fixes).
     static int patch() {return sPatch;}
 
 private:
 
-    static const int sMajor =10;// incremented for incompatible changes options or file.
-    static const int sMinor = 8;// incremented for new functionality that is backwards-compatible.
-    static const int sPatch = 0;// incremented for backwards-compatible bug fixes.
+    static const int sMajor = 10; ///< Major version: incremented on incompatible option/file changes.
+    static const int sMinor =  8; ///< Minor version: incremented on backwards-compatible new features.
+    static const int sPatch =  0; ///< Patch version: incremented on backwards-compatible bug fixes.
 
-    using GridT = FloatGrid;
-    using FilterT = std::unique_ptr<tools::LevelSetFilter<GridT>>;
-    struct Points;// defined below
-    struct Header;// defined below
- 
-    mutable util::CpuTimer   mTimer;
-    std::string              mCmdName;// name of this command-line tool
-    std::list<Geometry::Ptr> mGeom;// list of geometries owned by this tool
-    std::list<GridBase::Ptr> mGrid;// list of based grids owned by this tool
-    Parser                   mParser;
-    bool                     mErrorOnWarning;
-    std::ofstream            mLogFile;
-    std::streambuf          *mOldClogBuffer;
+    using GridT   = FloatGrid;                                       ///< Scalar grid type used by most level-set operations.
+    using FilterT = std::unique_ptr<tools::LevelSetFilter<GridT>>;   ///< Owned pointer to a LevelSetFilter over GridT.
+    struct Points; ///< Forward declaration of the helper points wrapper used by particlesToSdf.
+    struct Header; ///< Forward declaration of the config-file header record.
 
-    /// @brief Deletes geometry, VDB grids and local variables
+    mutable util::CpuTimer   mTimer;          ///< Reusable timer for verbose timing reports.
+    std::string              mCmdName;        ///< Base name of this command-line tool (argv[0]).
+    std::list<Geometry::Ptr> mGeom;           ///< Stack of Geometry instances owned by this tool (back = top).
+    std::list<GridBase::Ptr> mGrid;           ///< Stack of VDB grids owned by this tool (back = top).
+    Parser                   mParser;         ///< Command-line action parser and processor.
+    bool                     mErrorOnWarning; ///< If true, warning() escalates to a fatal error.
+    std::ofstream            mLogFile;        ///< Backing file used by startLog/endLog when active.
+    std::streambuf          *mOldClogBuffer;  ///< Cached std::clog buffer for restoring after logging.
+
+    /// @brief Delete all queued Geometry, VDB grids, and local variables.
     void clear();
 
-    /// @brief Clip a VDB grid against another grid, a bbox or frustum
+    /// @brief Clip an input VDB grid against another grid, a bbox, or a frustum.
+    /// @tparam GridType Type of the input grid being clipped.
+    /// @param v     Numeric parameters defining the clipping region (interpretation depends on mode).
+    /// @param age   Stack age of the secondary clipping grid, or sentinel meaning "use bbox/frustum".
+    /// @param input The grid being clipped (left unchanged).
+    /// @return Shared pointer to the clipped grid.
     template <typename GridType>
     GridBase::Ptr clip(const VecF &v, int age, const GridType &input);
+    /// @brief Action callback for "-clip"; dispatches to the templated clip() above.
     void clip();
 
-    /// @brief composite two grids, e.g. min, max, sum
+    /// @brief Composite two grids using a binary op (min, max, or sum).
     void composite();
 
-    /// @brief generate a grid of selected properties from another grid
+    /// @brief Generate a derived grid (e.g. gradient, curl, divergence) from another grid.
     void compute();
 
-    /// @brief Import and process one or more configuration files
+    /// @brief Import and process one or more configuration files.
     void config();
 
-    /// @brief "perform CSG operations between of two level sets surfaces
+    /// @brief Perform CSG operations (union/intersection/difference) between two level-set surfaces.
     void csg();
 
-    /// @brief Performs Enright advection benchmark test on a level set
+    /// @brief Run the Enright advection benchmark on a level set.
     void enright();
 
-    /// @brief expand narrow band of level set
+    /// @brief Expand the narrow band of a level set.
     void expandLevelSet();
 
-    /// @brief perform filtering (convolution) of a level set surface
+    /// @brief Perform filtering (convolution) of a level-set surface.
     void filterLevelSet();
 
-    /// @brief signed-flood filling of a level set VDB
+    /// @brief Signed flood-fill of a level-set VDB.
     void floodLevelSet();
 
-    /// @brief Print documentation for one, multiple or all available actions
+    /// @brief Print documentation for one, multiple, or all available actions.
     void help();
 
-    /// @brief Converts an iso-surface of a scalar field into a level set (i.e. SDF)
+    /// @brief Convert an iso-surface of a scalar field into a level set (i.e. SDF).
     void isoToLevelSet();
 
-    /// @brief Convert a volume to an adaptive polygon mesh
+    /// @brief Convert a volume into an adaptive polygon mesh.
     void volumeToMesh();
 
-    /// @brief Create a level set sphere, i.e. a narrow-band signed distance to a sphere
+    /// @brief Create a level-set sphere, i.e. a narrow-band signed distance to a sphere.
     void levelSetSphere();
 
-    /// @brief Create a level set shape with the specified number of polygon faces
+    /// @brief Create a level-set platonic solid with the specified number of polygon faces.
     void levelSetPlatonic();
 
-    /// @brief Converts a level set VDB into a VDB with a fog volume, i.e. normalized density
+    /// @brief Convert a level-set VDB into a fog volume (normalized density).
     void levelSetToFog();
 
-    /// @brief Converts a polygon soup into a symmetric or asymmetric narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh
+    /// @brief Convert a polygon mesh into a symmetric or asymmetric narrow-band level set.
     void meshToLevelSet();
 
-    /// @brief Converts a polygon soup into a symmetric narrow-band unsigned distance to a polygon mesh
+    /// @brief Convert a polygon mesh into a symmetric narrow-band unsigned distance field.
     void meshToUnsignedDistanceField();
 
-    /// @brief Converts a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh
+    /// @brief Convert an arbitrary (possibly non-watertight) polygon soup into a narrow-band level set.
     void soupToLevelSet();
 
-    /// @brief generates an offset surface by dx
+    /// @brief Generate a dx-offset surface from a polygon soup.
     void soupToOffset();
 
-    /// @brief Converts all quads into triangles
+    /// @brief Convert every quad in the current mesh into two triangles.
     void quadsToTriangles();
 
-    /// @brief Convert multiple image files to a mpeg movie file
+    /// @brief Convert a sequence of image files into a single MPEG movie file.
     void movie();
 
-    /// @brief construct a LoD sequences of VDB trees with powers of two refinements
+    /// @brief Construct a level-of-detail sequence of VDB trees with powers-of-two refinements.
     void multires();
 
-    /// @brief perform morphology operations on a level set surface
+    /// @brief Perform morphological dilation/erosion on a level-set surface.
     void offsetLevelSet();
 
-    /// @brief Converts geometry points into a narrow-band level set
+    /// @brief Convert geometry points into a narrow-band level set.
     void particlesToLevelSet();
 
-    /// @brief Encode geometry points into a VDB grid
+    /// @brief Encode geometry points into a VDB PointDataGrid.
     void pointsToVdb();
 
-    /// @brief prune away inactive values in a VDB grid
+    /// @brief Prune away inactive values in a VDB grid.
     void pruneLevelSet();
 
-    /// @brief Read one or more geometry or VDB files from disk or STDIN
+    /// @brief Read one or more geometry or VDB files from disk or STDIN.
     void read();
+    /// @brief Read a geometry file (mesh or point cloud) and push it onto the geometry stack.
     void readGeo(  const std::string &fileName);
+    /// @brief Read an OpenVDB file and push every selected grid onto the grid stack.
     void readVDB(  const std::string &fileName);
+    /// @brief Read a NanoVDB file (.nvdb) and push every selected grid onto the grid stack.
     void readNVDB( const std::string &fileName);
 
-    /// @brief ray-tracing of level set surfaces and volume rendering of fog volumes
+    /// @brief Ray-trace level-set surfaces or volume-render fog volumes.
     void render();
 
-    /// @brief resample one VDB grid into another VDB grid or a transformation of the input grid
+    /// @brief Resample one VDB grid into another VDB grid or onto a transformed copy of itself.
     void resample();
 
-    /// @brief "segment an input VDB into a list if topologically disconnected VDB grids
+    /// @brief Segment an input VDB into a list of topologically disconnected VDB grids.
     void segment();
 
-    /// @brief Scatters point into the active values of an input VDB grid
+    /// @brief Scatter points into the active values of an input VDB grid.
     void scatter();
 
-    /// @brief generates images of volume slices
+    /// @brief Generate images of axis-aligned volume slices.
     void slice();
 
-    /// @brief apply affine transformations (uniform scale -> rotation -> translation) to a VDB grids and geometry
+    /// @brief Apply affine transformations (uniform scale -> rotation -> translation) to VDB grids and geometry.
     void transform();
 
-    /// @brief Extracts points encoded in a VDB to points in a geometry format
+    /// @brief Extract points encoded in a VDB into geometry-format point lists.
     void vdbToPoints();
 
-    /// @brief Write list of geometry, VDB or config files to disk or STDOUT
+    /// @brief Write the list of geometries, VDB grids, or config files to disk or STDOUT.
     void write();
+    /// @brief Write a single geometry to disk in the format implied by the file extension.
     void writeGeo( const std::string &fileName);
+    /// @brief Write a single VDB grid to disk.
     void writeVDB( const std::string &fileName);
+    /// @brief Write a single VDB grid as a NanoVDB (.nvdb) file.
     void writeNVDB(const std::string &fileName);
+    /// @brief Write the currently parsed action list as a config file.
     void writeConf(const std::string &fileName);
 
-    /// @brief return the voxel-size of  a LS estimated from a desired grid dimension of a specific geometry
+    /// @brief Estimate the voxel size of a level set from a desired grid dimension.
+    /// @param maxDimension Maximum voxel resolution along the longest axis of the bbox.
+    /// @param exWidth      Exterior half-width of the narrow band, in voxel units.
+    /// @param inWidth      Interior half-width of the narrow band, in voxel units.
+    /// @param geo_age      Stack age of the geometry whose bbox drives the estimate.
+    /// @return Voxel size in world units.
     float estimateVoxelSize(int maxDimension, float exWidth, float inWidth, int geo_age);
+    /// @brief Convenience overload: symmetric narrow band (exWidth == inWidth == halfWidth).
     float estimateVoxelSize(int maxDim,  float halfWidth, int geo_age) {return this->estimateVoxelSize(maxDim, halfWidth, halfWidth, geo_age);}
 
+    /// @brief Build a LevelSetFilter configured with the given spatial and temporal schemes.
+    /// @param grid  Grid the filter will operate on.
+    /// @param space Spatial discretization order.
+    /// @param time  Temporal discretization order.
     FilterT createFilter(GridT &grid,  int space, int time);
 
-    /// @brief print examples to the terminal and terminate
+    /// @brief Return a formatted string of usage examples (for the -examples action).
     std::string examples() const;
 
+    /// @brief Emit a banner-framed warning to @a os. Escalates to error if mErrorOnWarning is true.
     void warning(const std::string &msg, std::ostream& os = std::clog) const;
 
-    /// @brief Initialize this parser, i.e. register available actions
+    /// @brief Register every available action with the parser. Called from the constructor.
     void init();
 
+    /// @brief Return an iterator to the VDB grid at stack age @a age (0 = most recent).
+    /// @throw std::invalid_argument if @a age exceeds the current stack depth.
     inline auto getGrid(size_t age) const;
+    /// @brief Return an iterator to the Geometry at stack age @a age (0 = most recent).
+    /// @throw std::invalid_argument if @a age exceeds the current stack depth.
     inline auto getGeom(size_t age) const;
 
+    /// @brief Convert the output of a VolumeToMesh pass into a Geometry instance.
     Geometry::Ptr mesherToGeometry(tools::VolumeToMesh&) const;
+    /// @brief Adaptively mesh a scalar grid at @a isoValue and return the result as a Geometry.
+    /// @param grid       Input scalar grid.
+    /// @param isoValue   Iso-value at which to extract the surface (default 0 for SDFs).
+    /// @param adaptivity Adaptivity parameter passed to VolumeToMesh (0 = uniform quads).
     Geometry::Ptr volumeToGeometry(const GridT &grid, float isoValue=0.0f, float adaptivity=0.0f) const;
 
 };// Tool class
@@ -394,9 +453,16 @@ void Tool::warning(const std::string &msg, std::ostream& os) const
 
 // ==============================================================================================================
 
-/// @brief Private struct for the header of config files
+/// @brief Header record prepended to every vdb_tool config (.txt) file.
+/// @details Identifies a config file with the magic string "vdb_tool" followed by
+///          the major.minor.patch version that produced it. Used to gate loading
+///          configs from incompatible tool versions.
 struct Tool::Header {
+    /// @brief Construct a header for the current tool version.
     Header() : mMagic("vdb_tool"), mMajor(sMajor), mMinor(sMinor), mPatch(sPatch) {}
+    /// @brief Parse a header from the first line of a config file.
+    /// @param line First line of the config file, e.g. "vdb_tool 10.8.0".
+    /// @throw std::invalid_argument if @a line does not match "vdb_tool MAJOR.MINOR.PATCH".
     Header(const std::string &line) : mMagic("vdb_tool") {
       const VecS header = tokenize(line, " .");
       if (header.size()!=4 || header[0]!=mMagic ||
@@ -404,26 +470,37 @@ struct Tool::Header {
          !isInt(header[2], mMinor) ||
          !isInt(header[3], mPatch)) throw std::invalid_argument("Header: incompatible: \""+line+"\"");
     }
+    /// @brief Format the header as the string written at the top of a config file.
     std::string str() const {
       return mMagic+" "+std::to_string(mMajor)+"."+std::to_string(mMinor)+"."+std::to_string(mPatch);
     }
+    /// @brief Returns true if this header's major version matches the running tool.
     bool isCompatible() const {return mMajor == sMajor;}
 
-    std::string mMagic;
-    int mMajor, mMinor, mPatch;
+    std::string mMagic; ///< Magic identifier; always "vdb_tool" for a valid header.
+    int mMajor;         ///< Major version recorded in (or expected by) the config file.
+    int mMinor;         ///< Minor version recorded in (or expected by) the config file.
+    int mPatch;         ///< Patch version recorded in (or expected by) the config file.
 };// Header struct
 
 // ==============================================================================================================
 
-/// @brief Private wrapper struct for points required by particlesToSdf
+/// @brief Lightweight adapter exposing a std::vector<Vec3s> as the point-source interface
+///        expected by tools::ParticlesToLevelSet.
+/// @details ParticlesToLevelSet requires the source to define a PosType alias and to provide
+///          size() and getPos() member functions. This wrapper supplies them over a borrowed
+///          vector of vertices without copying the data.
 struct Tool::Points {
-    using PosType = Vec3R;
+    using PosType = Vec3R; ///< Position type required by ParticlesToLevelSet (double precision).
 
+    /// @brief Construct a Points adapter over an existing vertex array (stored by reference).
     Points(const std::vector<Vec3s> &vtx) : mPoints(vtx) {}
+    /// @brief Number of points exposed by this adapter.
     size_t size() const { return mPoints.size(); }
+    /// @brief Write the n'th point into @a p, converting from Vec3s to PosType (Vec3R).
     void getPos(size_t n, PosType &p) const { p = mPoints[n]; }
 
-    const std::vector<Vec3s> &mPoints;
+    const std::vector<Vec3s> &mPoints; ///< Borrowed reference to the underlying vertex array.
 };// Points struct
 
 // ==============================================================================================================
