@@ -55,7 +55,7 @@ struct ReadValueMaskBuffersOp
         leaf.getValueMask().load(is);
         // Read in the origin.
         Coord origin;
-        is.read(reinterpret_cast<char*>(&origin), sizeof(Coord::ValueType) * 3);
+        origin.read(is);
         leaf.setOrigin(origin);
     }
 
@@ -84,7 +84,7 @@ struct WriteValueMaskBuffersOp
         leaf.getValueMask().save(os);
 
         // Write out the origin.
-        os.write(reinterpret_cast<const char*>(&leaf.origin()), sizeof(Coord::ValueType) * 3);
+        leaf.origin().write(os);
     }
 
     std::ostream& os;
@@ -94,7 +94,7 @@ struct WriteValueMaskBuffersOp
 } // namespace internal
 
 template <typename GridT>
-struct ValueMaskCodec : public TopologyCodec<GridT>
+struct ValueMaskCodec final: public TopologyCodec<GridT>
 {
     using Ptr = std::unique_ptr<ValueMaskCodec<GridT>>;
 

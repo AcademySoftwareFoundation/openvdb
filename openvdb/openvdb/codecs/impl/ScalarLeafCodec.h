@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef OPENVDB_IO_CODECS_SCALARLEAFCODEC_HAS_BEEN_INCLUDED
-#define OPENVDB_IO_CODECS_SCALARLEAFCODEC_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_IO_CODECS_IMPL_SCALARLEAFCODEC_HAS_BEEN_INCLUDED
+#define OPENVDB_IO_CODECS_IMPL_SCALARLEAFCODEC_HAS_BEEN_INCLUDED
 
 #include <openvdb/io/Compression.h>
 
@@ -88,10 +88,14 @@ void readScalarLeafBuffers(LeafT& leaf, std::istream& is, bool saveFloatAsHalf,
         }
     } else if constexpr (std::is_same_v<ValueT, bool>) {
         // Bool leaf: must read storage values regardless of seekability, then convert.
-        StorageBufferT storageTemp;
-        io::readCompressedValues(is, storageTemp.data(), SIZE, valueMask, saveFloatAsHalf);
-        for (Index i = 0; i < SIZE; ++i) {
-            leaf.buffer().setValue(i, static_cast<bool>(storageTemp.getValue(i)));
+        if constexpr (std::is_same_v<StorageValueT, bool>) {
+            io::readCompressedValues(is, leaf.buffer().data(), SIZE, valueMask, saveFloatAsHalf);
+        } else {
+            StorageBufferT storageTemp;
+            io::readCompressedValues(is, storageTemp.data(), SIZE, valueMask, saveFloatAsHalf);
+            for (Index i = 0; i < SIZE; ++i) {
+                leaf.buffer().setValue(i, static_cast<bool>(storageTemp.getValue(i)));
+            }
         }
     } else {
         leaf.buffer().allocate();
@@ -116,4 +120,4 @@ void readScalarLeafBuffers(LeafT& leaf, std::istream& is, bool saveFloatAsHalf,
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif // OPENVDB_IO_CODECS_SCALARLEAFCODEC_HAS_BEEN_INCLUDED
+#endif // OPENVDB_IO_CODECS_IMPL_SCALARLEAFCODEC_HAS_BEEN_INCLUDED

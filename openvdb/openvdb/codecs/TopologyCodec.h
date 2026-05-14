@@ -195,25 +195,13 @@ struct ReadTopologyOp
             // Copy values from the array into this node's table.
             if (oldVersion) {
                 Index n = 0;
-                if constexpr (std::is_same_v<ValueT, StorageValueT>) {
-                    for (auto iter = node.beginValueAll(); iter; ++iter) {
-                        node.setValueOnlyUnsafe(iter.pos(), values[n++]);
-                    }
-                } else {
-                    for (auto iter = node.beginValueAll(); iter; ++iter) {
-                        node.setValueOnlyUnsafe(iter.pos(), static_cast<ValueT>(values[n++]));
-                    }
+                for (auto iter = node.beginValueAll(); iter; ++iter) {
+                    node.setValueOnlyUnsafe(iter.pos(), static_cast<ValueT>(values[n++]));
                 }
                 OPENVDB_ASSERT(n == numValues);
             } else {
-                if constexpr (std::is_same_v<ValueT, StorageValueT>) {
-                    for (auto iter = node.beginValueAll(); iter; ++iter) {
-                        node.setValueOnlyUnsafe(iter.pos(), values[iter.pos()]);
-                    }
-                } else {
-                    for (auto iter = node.beginValueAll(); iter; ++iter) {
-                        node.setValueOnlyUnsafe(iter.pos(), static_cast<ValueT>(values[iter.pos()]));
-                    }
+                for (auto iter = node.beginValueAll(); iter; ++iter) {
+                    node.setValueOnlyUnsafe(iter.pos(), static_cast<ValueT>(values[iter.pos()]));
                 }
             }
         }

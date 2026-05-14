@@ -102,7 +102,7 @@ struct WriteBoolBuffersOp
 } // namespace internal
 
 template <typename GridT>
-struct BoolCodec : public TopologyCodec<GridT>
+struct BoolCodec final: public TopologyCodec<GridT>
 {
     using Ptr = std::unique_ptr<BoolCodec<GridT>>;
 

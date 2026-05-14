@@ -10,7 +10,7 @@
 #include <openvdb/tools/NodeVisitor.h>
 #include <openvdb/io/Codec.h>
 
-#include "ScalarLeafCodec.h"
+#include "impl/ScalarLeafCodec.h"
 #include "TopologyCodec.h"
 
 namespace openvdb {
@@ -130,7 +130,7 @@ void scalarCodecWriteBuffers(const GridT& grid, std::ostream& os)
 } // namespace internal
 
 template <typename GridT, typename StorageGridT = GridT, io::CodecMode Mode = io::CodecMode::ReadWrite>
-struct ScalarCodec : public TopologyCodec<GridT, StorageGridT, Mode>
+struct ScalarCodec final: public TopologyCodec<GridT, StorageGridT, Mode>
 {
     static_assert(GridT::TreeType::RootNodeType::template SameConfiguration<
         typename StorageGridT::TreeType::RootNodeType>::value,
@@ -138,19 +138,7 @@ struct ScalarCodec : public TopologyCodec<GridT, StorageGridT, Mode>
 
     using Ptr = std::unique_ptr<ScalarCodec<GridT, StorageGridT, Mode>>;
 
-    struct ScalarCodecData : public io::CodecData
-    {
-        std::vector<int> leafCoords;
-    };
-
     ~ScalarCodec() noexcept = default;
-
-    io::CodecData::Ptr createData() final
-    {
-        auto data = std::make_unique<ScalarCodecData>();
-        data->grid = GridT::create();
-        return data;
-    }
 
     static inline std::string name()
     {
