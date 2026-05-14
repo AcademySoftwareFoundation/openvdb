@@ -1,0 +1,23 @@
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: Apache-2.0
+//
+// VDB velocity decoration tessellation evaluation shader.
+// Generates isoline vertices by interpolating between start and end
+// positions. The u parameter drives a fade effect in the fragment shader.
+
+layout(isolines) in;
+
+layout(location = 0) in patch nparms
+{
+    vec4 startPos;
+    vec4 endPos;
+} tsIn;
+
+layout(location = 0) out float fsU;
+
+void main()
+{
+    float t = gl_TessCoord.x;
+    fsU = 1.0 - t;
+    gl_Position = mix(tsIn.startPos, tsIn.endPos, t);
+}

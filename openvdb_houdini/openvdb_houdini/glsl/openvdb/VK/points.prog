@@ -1,0 +1,6 @@
+#name VDB Points
+#version 450
+#output color 0
+
+points.vert
+points.frag

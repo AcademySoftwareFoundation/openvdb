@@ -1,0 +1,46 @@
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: Apache-2.0
+//
+// VDB velocity decoration tessellation control shader.
+// Takes a single control point (patch size 1) and computes the
+// start and end positions of the velocity vector in clip space.
+// Tessellation generates one isoline segment (2 vertices).
+
+layout(vertices = 1) out;
+
+layout(location = 0) in parms
+{
+    vec3 velocity;
+} tsIn[];
+
+layout(location = 0) out patch nparms
+{
+    vec4 startPos;
+    vec4 endPos;
+} tsOut;
+
+layout(set=0, binding=0)
+#using glH_PassInfo
+
+layout(set=1, binding=0)
+#using glH_Object
+
+void main()
+{
+    vec3 vel = tsIn[0].velocity * glH_Object.DecorationScale;
+
+    // start position in clip space
+    tsOut.startPos = glH_PassInfo.Projection * gl_in[0].gl_Position;
+
+    // end position in clip space (add scaled velocity in view space)
+    tsOut.endPos = glH_PassInfo.Projection *
+        (gl_in[0].gl_Position + vec4(vel, 0.0));
+
+    // one isoline segment = 2 vertices
+    gl_TessLevelInner[0] = 0.0;
+    gl_TessLevelInner[1] = 0.0;
+    gl_TessLevelOuter[0] = 1.0;
+    gl_TessLevelOuter[1] = 1.0;
+    gl_TessLevelOuter[2] = 1.0;
+    gl_TessLevelOuter[3] = 1.0;
+}
