@@ -1,0 +1,46 @@
+OpenVDB:
+  New features:
+  - Significant performance improvements across many tools with the introduction
+    of targeted SIMD support to the core library. The main framework advancement
+    is the introduction of Agner Fog's vectorclass library (VCL) as an optional
+    dependency, specificlly for x86 instruction set architecture intrinsic support.
+    This allows for programmatic selection of desired SIMD widths, independent
+    of the targets supported SIMD extension, as well as access to a comprehensive
+    vectorized math library. See https://github.com/vectorclass/version2.
+
+    Using VCL can be controlled via the USE_VCL build option. The desired x86
+    ISA can be provided via OPENVDB_X86_INSTRSET.
+
+    To support other platforms and plan for future transitions, a generic SIMD
+    interface has been introduced in simd/Simd.h. When VCL is not in use, this
+    interface falls back to representing SIMD types as math::Tuple<> containers
+    of an equal or fallback size. This encourages the design of SIMD compatible
+    code which can be auto-vectorized, regardless of the underlying SIMD
+    acceleration library in use.
+
+  Improvements:
+  - Vectorized rasterizeSdf(SphereSettings), improving performance upwards of 2x
+    on x86 and 1.5x on other platforms.
+  - Introduced new component wise arithmetic and relational operators for
+    math::Tuple instantiations for use with fallback SIMD support.
+  - Using Limiter::CLAMP when advecting vector fields through VolumeAdvect now
+    clamps each vector component individually rather than resetting out-of-range
+    vector values to the entire min or max value.
+  - Deprecated the relational Vec2, Vec3 and Vec4 less than and greater than
+    class operators, as their behaviour is ambiguous and can lead to generic
+    code which is not correct. Note that these operators primary use was to
+    easily support stl container and algorithm usage (e.g. std::map<Vec, Other>,
+    std::sort(), etc). In these cases, the deprecation warning will NOT fire.
+    You can disable the operators entirely via OPENVDB_ENABLE_VEC_RELATIONAL_OPERATIONS=OFF
+    to find any instances you may be relying on. This new build option will
+    switch to OFF in the future and the operators will subsequently be removed.
+
+  Build:
+  - Introduced OPENVDB_X86_INSTRSET to supersede the OPENVDB_SIMD build define.
+    This option takes an integer which corresponds to a suite of x86 ISA flags.
+    Defaults to 0 if not provided. See the root CMakeLists for all available
+    values.
+  - New build options to control x86 ISA targetting. USE_VCL controls the use
+    Agner Fog's VCL SIMD wrapper library and will automatically compute
+    OPENVDB_X86_INSTRSET based on the compiler and provided CXX flags if unset.
+    OPENVDB_X86_INSTRSET should typically be set by the installer.
