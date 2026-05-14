@@ -27,7 +27,7 @@ struct VectorFromScalarOp
 {
     using ScalarT = typename ScalarTreeT::ValueType;
     using VectorT = math::Vec3<ScalarT>;
-    using VectorTreeT = typename ScalarTreeT::ValueConverter<VectorT>::Type;
+    using VectorTreeT = typename ScalarTreeT::template ValueConverter<VectorT>::Type;
 
     using VectorRootT = typename VectorTreeT::RootNodeType;
     using VectorLeafT = typename VectorTreeT::LeafNodeType;
@@ -55,7 +55,7 @@ struct VectorFromScalarOp
 
     template<typename VectorNodeT>
     void operator()(VectorNodeT& node) const {
-        using ScalarNodeT = typename VectorNodeT::ValueConverter<ScalarT>::Type;
+        using ScalarNodeT = typename VectorNodeT::template ValueConverter<ScalarT>::Type;
 
         const ScalarNodeT* xNode = mXTree->template probeNode<ScalarNodeT>(node.origin());
         const ScalarNodeT* yNode = mYTree->template probeNode<ScalarNodeT>(node.origin());
