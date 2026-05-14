@@ -111,7 +111,7 @@ template <typename LeafT>
 inline void readPointDataVoxelData(const std::vector<LeafT*>& leaves,
     std::istream& is, bool saveFloatAsHalf,
     const typename LeafT::ValueType& background,
-    const std::unordered_map<Coord, uint16_t>& voxelBufferSizes)
+    [[maybe_unused]] const std::unordered_map<Coord, uint16_t>& voxelBufferSizes)
 {
     using BaseLeaf = typename LeafT::BaseLeaf;
     for (auto* leaf : leaves) {
