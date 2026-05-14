@@ -12,7 +12,7 @@
 #include <openvdb/points/AttributeSet.h>
 #include <openvdb/points/StreamCompression.h>
 
-#include "ScalarLeafCodec.h"
+#include "impl/ScalarLeafCodec.h"
 #include "TopologyCodec.h"
 
 #include <set>
@@ -32,8 +32,9 @@ inline typename PagedStreamPtrT::element_type* getOrCreatePagedStream(
     auto it = pagedStreams.find(attributeIndex);
     if (it != pagedStreams.end()) return it->second.get();
     using PagedStreamT = typename PagedStreamPtrT::element_type;
-    pagedStreams[attributeIndex] = std::make_shared<PagedStreamT>();
-    return pagedStreams[attributeIndex].get();
+    auto ptr = std::make_shared<PagedStreamT>();
+    auto& stored = (pagedStreams[attributeIndex] = std::move(ptr));
+    return stored.get();
 }
 
 ////////////////////////////////////////
@@ -41,7 +42,7 @@ inline typename PagedStreamPtrT::element_type* getOrCreatePagedStream(
 
 template <typename LeafT>
 inline void readPointDataVoxelSizes(const std::vector<LeafT*>& leaves,
-    std::istream& is, std::map<Coord, uint16_t>& voxelBufferSizes)
+    std::istream& is, std::unordered_map<Coord, uint16_t>& voxelBufferSizes)
 {
     for (auto* leaf : leaves) {
         uint16_t voxelBufferSize;
@@ -110,9 +111,8 @@ template <typename LeafT>
 inline void readPointDataVoxelData(const std::vector<LeafT*>& leaves,
     std::istream& is, bool saveFloatAsHalf,
     const typename LeafT::ValueType& background,
-    const std::map<Coord, uint16_t>& voxelBufferSizes)
+    const std::unordered_map<Coord, uint16_t>& voxelBufferSizes)
 {
-    (void) voxelBufferSizes;
     using BaseLeaf = typename LeafT::BaseLeaf;
     for (auto* leaf : leaves) {
         OPENVDB_ASSERT(voxelBufferSizes.find(leaf->origin()) != voxelBufferSizes.end());
@@ -302,7 +302,7 @@ struct OPENVDB_API PointDataCodecTypeData : public io::ReadTypedOptions
 }; // struct PointDataCodecTypeData
 
 template <typename GridT>
-struct PointDataCodec : public TopologyCodec<GridT>
+struct PointDataCodec final: public TopologyCodec<GridT>
 {
     using Ptr = std::unique_ptr<PointDataCodec<GridT>>;
 
@@ -312,6 +312,8 @@ struct PointDataCodec : public TopologyCodec<GridT>
 
     void readBuffers(std::istream& is, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics&) final
     {
+        OPENVDB_ASSERT(dynamic_cast<GridT*>(data.grid.get()));
+
         GridT& grid = static_cast<GridT&>(*data.grid);
 
         std::vector<std::string> pointAttributeNames;
@@ -339,7 +341,7 @@ struct PointDataCodec : public TopologyCodec<GridT>
         tree.getNodes(leaves);
 
         // Pass 0: read voxel data sizes
-        std::map<Coord, uint16_t> voxelBufferSizes;
+        std::unordered_map<Coord, uint16_t> voxelBufferSizes;
         internal::readPointDataVoxelSizes(leaves, is, voxelBufferSizes);
 
         // Pass 1: read descriptor and attribute metadata

@@ -8,7 +8,7 @@
 
 #include <openvdb/tools/PointIndexGrid.h>
 
-#include "ScalarLeafCodec.h"
+#include "impl/ScalarLeafCodec.h"
 #include "TopologyCodec.h"
 
 namespace openvdb {
@@ -106,7 +106,7 @@ struct WritePointIndexBuffersOp
 } // namespace internal
 
 template <typename GridT>
-struct PointIndexCodec : public TopologyCodec<GridT>
+struct PointIndexCodec final: public TopologyCodec<GridT>
 {
     using Ptr = std::unique_ptr<PointIndexCodec<GridT>>;
 
@@ -116,6 +116,8 @@ struct PointIndexCodec : public TopologyCodec<GridT>
 
     void readBuffers(std::istream& is, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics& diagnostics) final
     {
+        OPENVDB_ASSERT(dynamic_cast<GridT*>(data.grid.get()));
+
         GridT& grid = static_cast<GridT&>(*data.grid);
 
         if (grid.hasMultiPassIO()) {
