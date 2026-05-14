@@ -343,7 +343,8 @@ auto PolySoupToLevelSet<GridType>::offset(float dx, int mode)
     case 1:// algorithm using Mihai's signed flood-fill algorithm
         grid = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth + 1);// mesh -> UDF
         tools::foreach(grid->beginValueOn(), [dx](const typename GridType::ValueOnIter& it){it.setValue(*it - dx);}, /*threaded*/true, /*share functor*/true);
-        tools::changeBackground(grid->tree(), mHalfWidth*dx);
+        //tools::changeBackground(grid->tree(), mHalfWidth*dx);
+        tools::changeLevelSetBackground(grid->tree(), mHalfWidth);
         //grid->tree().root().setBackground(exteriorWidth, /*updateChildNodes=*/true);
         //tools::signedFloodFillWithValues(grid->tree(), exteriorWidth, interiorWidth);
         tools::distanceFieldToSDF(*grid, /*removeDisconnectedInterior*/true, /*rebuildNarrowBand*/true);

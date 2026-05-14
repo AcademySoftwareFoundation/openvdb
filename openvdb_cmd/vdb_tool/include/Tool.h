@@ -236,6 +236,9 @@ private:
     /// @brief Create a level-set sphere, i.e. a narrow-band signed distance to a sphere.
     void levelSetSphere();
 
+    /// @brief  Convert  signed distance field into a unsigned distance field
+    void sdf2udf();
+
     /// @brief Create a level-set platonic solid with the specified number of polygon faces.
     void levelSetPlatonic();
 
@@ -562,9 +565,17 @@ void Tool::init()
      {"voxel", "", "0.0", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\". Defaults to 0.0, i.e. this option is disabled"},
      {"radius", "1.0", "1.0", "radius of sphere in world units"},
      {"center", "(0,0,0)", "(0.0,0.0,0.0)", "center of sphere in world units"},
+     {"signed", "true", "1|0|true|false", "toggle wether the output volume should be a signed vs unsigned distance field"},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
      {"name", "sphere", "sphere", "name assigned to the level set sphere"}},
      [&](){mParser.setDefaults();}, [&](){this->levelSetSphere();});
+
+  mParser.addAction(
+     {"abs", "sdf2udf"}, "Converts a signed distance field into an unsigned distance field, i.e. performs the Abs of all values.",
+    {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
+     {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
+     {"name", "sphere", "sphere", "name assigned to the output volume"}},
+     [&](){mParser.setDefaults();}, [&](){this->sdf2udf();});
 
   mParser.addAction(
      {"quad2tri", "q2t"}, "Convert all quads in mesh to triangles, assuming they are both planar and convex",
@@ -2639,6 +2650,41 @@ void Tool::volumeToMesh()
     }
   }
 }// Tool::volumeToMesh
+
+// ==============================================================================================================
+
+void Tool::sdf2udf()
+{
+  const std::string &action_name = mParser.getAction().names[0];
+  const int mode = findMatch(action_name, {"sdf2udf", "abs"});// 1-based index
+  OPENVDB_ASSERT(mode);// mode = 0 for no match
+  try {
+    const int age = mParser.get<int>("vdb");
+    const bool keep = mParser.get<bool>("keep");
+    std::string grid_name = mParser.get<std::string>("name");
+    auto it = this->getGrid(age);// will throw if grid doesn't exist
+    GridT::Ptr grid = gridPtrCast<GridT>(*it);
+    if (!grid) throw std::invalid_argument("no FloatGrid with age " + std::to_string(age));
+    if (mode == 1) {
+      if (grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("no level set with age "+std::to_string(age));
+      grid->setGridClass(GRID_UNKNOWN);// GRID_LEVEL_SET -> GRID_UNKNOW
+    }
+    if (mParser.verbose) mTimer.start(action_name);
+    struct Local {static inline void op(const GridT::ValueAllIter& iter) {iter.setValue(math::Abs(*iter));}};
+    tools::foreach(grid->beginValueAll(), Local::op);
+    if (mParser.verbose) mTimer.stop();
+    if (!keep) mGrid.erase(std::next(it).base());
+    if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
+    grid->setName(grid_name);
+    mGrid.push_back(grid);
+  } catch (const std::exception& e) {
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
+    }
+  }
+}// Tool::sdf2udf
 
 // ==============================================================================================================
 
