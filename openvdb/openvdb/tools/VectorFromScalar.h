@@ -57,6 +57,13 @@ struct VectorFromScalarOp
     void operator()(VectorNodeT& node) const {
         using ScalarNodeT = typename VectorNodeT::template ValueConverter<ScalarT>::Type;
 
+        // Probe for matching tiles or voxels in each of the source scalar grids.
+        // The output vector grid has been topology-merged with all source grids,
+        // which guarantees that none of the corresponding nodes in the source
+        // grids are more finely discretized. Each source grid either has a matching
+        // node of equal level, or the tree is tiled more coarsely or empty at
+        // the same location.
+
         const ScalarNodeT* xNode = mXTree->template probeNode<ScalarNodeT>(node.origin());
         const ScalarNodeT* yNode = mYTree->template probeNode<ScalarNodeT>(node.origin());
         const ScalarNodeT* zNode = mZTree->template probeNode<ScalarNodeT>(node.origin());
@@ -64,9 +71,9 @@ struct VectorFromScalarOp
         for (auto i = node.beginValueOn(); i; ++i)
         {
             i.setValue(VectorT(
-                xNode ? xNode->getValueUnsafe(i.offset()) : mXTree->background(),
-                yNode ? yNode->getValueUnsafe(i.offset()) : mYTree->background(),
-                zNode ? zNode->getValueUnsafe(i.offset()) : mZTree->background()
+                xNode ? xNode->getValueUnsafe(i.offset()) : mXTree->getValue(i.getCoord()),
+                yNode ? yNode->getValueUnsafe(i.offset()) : mYTree->getValue(i.getCoord()),
+                zNode ? zNode->getValueUnsafe(i.offset()) : mZTree->getValue(i.getCoord())
             ));
         }
     }
@@ -108,12 +115,17 @@ vectorFromScalar(const ScalarGridT& x, const ScalarGridT& y, const ScalarGridT& 
 
     auto background = VectorT(x.background(), y.background(), z.background());
 
+    // Create an empty grid
     auto vectorGrid = createGrid<VectorGridT>(background);
 
+    // Perform a topology union with each of the source scalar grids.
+    // This leaves the combined grid whose tile and voxel depth is the
+    // maximum of all the source grids.
     vectorGrid->topologyUnion(x);
     vectorGrid->topologyUnion(y);
     vectorGrid->topologyUnion(z);
 
+    // Write the grid values
     auto nodeManager = tree::NodeManager<VectorTreeT>(vectorGrid->tree());
     auto op = VectorFromScalarOp<ScalarTreeT>(&x.tree(), &y.tree(), &z.tree());
     nodeManager.foreachTopDown(op);
