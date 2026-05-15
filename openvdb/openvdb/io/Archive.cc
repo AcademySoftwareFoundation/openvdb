@@ -885,8 +885,18 @@ Archive::readGridCount(std::istream& is)
 
 
 io::Codec*
-Archive::findCodec(const std::string& gridType, const io::ReadOptions&)
+Archive::findCodec(const std::string& gridType, const io::ReadOptions& options)
 {
+    // if readMode is Half, then search for a codec that converts
+    // from the storage grid type to the grid type
+    if (options.readMode == ReadMode::Half) {
+        return io::CodecRegistry::get(gridType + "_to_half");
+    } else if (options.readMode == ReadMode::Bool) {
+        return io::CodecRegistry::get(gridType + "_to_bool");
+    } else if (options.readMode == ReadMode::Mask) {
+        return io::CodecRegistry::get(gridType + "_to_mask");
+    }
+
     // Determine the I/O codec to use to read this grid
     return io::CodecRegistry::get(gridType);
 }

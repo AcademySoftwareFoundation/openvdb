@@ -182,7 +182,9 @@ struct ReadTopologyOp
         valueMask.load(is);
         node.setValueMaskUnsafe(valueMask);
 
-        const Index numValues = NodeT::NUM_VALUES;
+        const bool oldVersion =
+            (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION);
+        const Index numValues = (oldVersion ? childMask.countOff() : NodeT::NUM_VALUES);
         {
             // Read in (and uncompress, if necessary) all of this node's values
             // into a contiguous array.
@@ -191,10 +193,12 @@ struct ReadTopologyOp
             io::readCompressedValues(is, values, numValues, valueMask, saveFloatAsHalf);
 
             // Copy values from the array into this node's table.
-            if constexpr (std::is_same_v<ValueT, StorageValueT>) {
+            if (oldVersion) {
+                Index n = 0;
                 for (auto iter = node.beginValueAll(); iter; ++iter) {
-                    node.setValueOnlyUnsafe(iter.pos(), values[iter.pos()]);
+                    node.setValueOnlyUnsafe(iter.pos(), static_cast<ValueT>(values[n++]));
                 }
+                OPENVDB_ASSERT(n == numValues);
             } else {
                 for (auto iter = node.beginValueAll(); iter; ++iter) {
                     node.setValueOnlyUnsafe(iter.pos(), static_cast<ValueT>(values[iter.pos()]));
@@ -300,10 +304,10 @@ void topologyCodecWriteTopology(const GridBase& gridBase, std::ostream& os)
 
 } // namespace internal
 
-template <typename GridT, typename StorageGridT = GridT>
+template <typename GridT, typename StorageGridT = GridT, io::CodecMode Mode = io::CodecMode::ReadWrite>
 struct TopologyCodec : public io::Codec
 {
-    using Ptr = std::unique_ptr<TopologyCodec<GridT, StorageGridT>>;
+    using Ptr = std::unique_ptr<TopologyCodec<GridT, StorageGridT, Mode>>;
 
     ~TopologyCodec() noexcept = default;
 
@@ -322,6 +326,9 @@ struct TopologyCodec : public io::Codec
 
     void writeTopology(std::ostream& os, const GridBase& gridBase, const io::WriteOptions&) final
     {
+        // disable implementation when read only
+        if constexpr (Mode == io::CodecMode::ReadOnly) return;
+
         internal::topologyCodecWriteTopology<GridT>(gridBase, os);
     }
 }; // struct TopologyCodec

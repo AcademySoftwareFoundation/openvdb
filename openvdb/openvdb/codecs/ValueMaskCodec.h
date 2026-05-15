@@ -1,12 +1,13 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef OPENVDB_IO_CODECS_BOOLCODEC_HAS_BEEN_INCLUDED
-#define OPENVDB_IO_CODECS_BOOLCODEC_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_IO_CODECS_VALUEMASKCODEC_HAS_BEEN_INCLUDED
+#define OPENVDB_IO_CODECS_VALUEMASKCODEC_HAS_BEEN_INCLUDED
 
 #include <openvdb/io/Codec.h>
 
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/Clip.h>
 
 #include "TopologyCodec.h"
 
@@ -17,14 +18,14 @@ namespace codecs {
 namespace internal {
 
 template <typename GridT>
-struct ReadBoolBuffersOp
+struct ReadValueMaskBuffersOp
 {
     using TreeT = typename GridT::TreeType;
     using RootT = typename TreeT::RootNodeType;
     using LeafT = typename TreeT::LeafNodeType;
     using ValueT = typename TreeT::ValueType;
 
-    ReadBoolBuffersOp(std::istream& _is, bool _saveFloatAsHalf,
+    ReadValueMaskBuffersOp(std::istream& _is, bool _saveFloatAsHalf,
         const ValueT& _background, const CoordBBox* _clipBBox)
         : is(_is)
         , saveFloatAsHalf(_saveFloatAsHalf)
@@ -54,29 +55,23 @@ struct ReadBoolBuffersOp
         leaf.getValueMask().load(is);
         // Read in the origin.
         Coord origin;
-        is.read(reinterpret_cast<char*>(&origin), sizeof(Coord::ValueType) * 3);
+        origin.read(is);
         leaf.setOrigin(origin);
-
-        // Read in the mask for the voxel values.
-        typename LeafT::Buffer::NodeMaskType nodeMask;
-        nodeMask.load(is);
-        typename LeafT::Buffer temp(nodeMask);
-        leaf.swap(temp);
     }
 
     std::istream& is;
     const bool saveFloatAsHalf;
     const ValueT& background;
     const CoordBBox* clipBBox = nullptr;
-}; // struct ReadBoolBuffersOp
+}; // struct ReadValueMaskBuffersOp
 
 template <typename GridT>
-struct WriteBoolBuffersOp
+struct WriteValueMaskBuffersOp
 {
     using TreeT = typename GridT::TreeType;
     using LeafT = typename TreeT::LeafNodeType;
 
-    WriteBoolBuffersOp(std::ostream& _os, bool _saveFloatAsHalf)
+    WriteValueMaskBuffersOp(std::ostream& _os, bool _saveFloatAsHalf)
         : os(_os)
         , saveFloatAsHalf(_saveFloatAsHalf) { }
 
@@ -89,24 +84,21 @@ struct WriteBoolBuffersOp
         leaf.getValueMask().save(os);
 
         // Write out the origin.
-        os.write(reinterpret_cast<const char*>(&leaf.origin()), sizeof(Coord::ValueType) * 3);
-
-        // Write out the voxel values.
-        leaf.buffer().storage().save(os);
+        leaf.origin().write(os);
     }
 
     std::ostream& os;
     const bool saveFloatAsHalf;
-}; // struct WriteBoolBuffersOp
+}; // struct WriteValueMaskBuffersOp
 
 } // namespace internal
 
 template <typename GridT>
-struct BoolCodec final: public TopologyCodec<GridT>
+struct ValueMaskCodec final: public TopologyCodec<GridT>
 {
-    using Ptr = std::unique_ptr<BoolCodec<GridT>>;
+    using Ptr = std::unique_ptr<ValueMaskCodec<GridT>>;
 
-    ~BoolCodec() noexcept = default;
+    ~ValueMaskCodec() noexcept = default;
 
     static inline std::string name() { return GridT::gridType(); }
 
@@ -115,7 +107,7 @@ struct BoolCodec final: public TopologyCodec<GridT>
         GridT& grid = static_cast<GridT&>(*data.grid);
 
         if (grid.hasMultiPassIO()) {
-            OPENVDB_THROW(IoError, "Multi-pass IO is not supported in BoolCodec");
+            OPENVDB_THROW(IoError, "Multi-pass IO is not supported in ValueMaskCodec");
         }
 
         io::checkFormatVersion(is);
@@ -130,7 +122,7 @@ struct BoolCodec final: public TopologyCodec<GridT>
             clipIndexBBox = std::make_unique<CoordBBox>(grid.constTransform().worldToIndexNodeCentered(options.clipBBox));
         }
 
-        internal::ReadBoolBuffersOp<GridT> readBuffersOp(is, saveFloatAsHalf, tree.background(), clipIndexBBox.get());
+        internal::ReadValueMaskBuffersOp<GridT> readBuffersOp(is, saveFloatAsHalf, tree.background(), clipIndexBBox.get());
         tools::visitNodesDepthFirst(grid.tree(), readBuffersOp, /*idx=*/0, /*topDown=*/false);
     }
 
@@ -139,16 +131,16 @@ struct BoolCodec final: public TopologyCodec<GridT>
         const GridT& grid = static_cast<const GridT&>(gridBase);
 
         if (grid.hasMultiPassIO()) {
-            OPENVDB_THROW(IoError, "Multi-pass IO is not supported in BoolCodec");
+            OPENVDB_THROW(IoError, "Multi-pass IO is not supported in ValueMaskCodec");
         }
 
-        internal::WriteBoolBuffersOp<GridT> writeBuffersOp(os, grid.saveFloatAsHalf());
+        internal::WriteValueMaskBuffersOp<GridT> writeBuffersOp(os, grid.saveFloatAsHalf());
         tools::visitNodesDepthFirst(grid.tree(), writeBuffersOp);
     }
-}; // struct BoolCodec
+}; // struct ValueMaskCodec
 
 } // namespace codecs
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif // OPENVDB_IO_CODECS_BOOLCODEC_HAS_BEEN_INCLUDED
+#endif // OPENVDB_IO_CODECS_VALUEMASKCODEC_HAS_BEEN_INCLUDED

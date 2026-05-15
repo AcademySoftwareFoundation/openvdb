@@ -3,7 +3,9 @@
 
 #include "Codec.h"
 
+#include <openvdb/codecs/ScalarCodec.h>
 #include <openvdb/codecs/BoolCodec.h>
+#include <openvdb/codecs/ValueMaskCodec.h>
 
 #include <openvdb/openvdb.h>
 
@@ -37,9 +39,31 @@ getCodecRegistry()
 
 namespace internal {
 
+template <typename GridT>
+struct RegisterCodec { inline void operator()() { CodecRegistry::registerCodec<codecs::ScalarCodec<GridT>>(); } };
+
+template <typename GridT>
+struct RegisterConvertCodec {
+    inline void operator()()
+    {
+        CodecRegistry::registerCodec<codecs::ScalarCodec<MaskGrid, GridT, CodecMode::ReadOnly>>();
+        CodecRegistry::registerCodec<codecs::ScalarCodec<BoolGrid, GridT, CodecMode::ReadOnly>>();
+    }
+}; // struct RegisterConvertCodec
+
 void initialize()
 {
+    NumericGridTypes::foreach<RegisterCodec>();
+    Vec3GridTypes::foreach<RegisterCodec>();
+
     CodecRegistry::registerCodec<codecs::BoolCodec<BoolGrid>>();
+    CodecRegistry::registerCodec<codecs::ValueMaskCodec<MaskGrid>>();
+
+    // register the plugin that converts from scalar to mask/bool
+    NumericGridTypes::foreach<RegisterConvertCodec>();
+
+    // register the plugin that converts from float to half
+    CodecRegistry::registerCodec<codecs::ScalarCodec<HalfGrid, FloatGrid, CodecMode::ReadOnly>>();
 }
 
 void uninitialize()
