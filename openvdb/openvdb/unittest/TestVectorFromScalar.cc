@@ -23,6 +23,75 @@ TEST_F(TestVectorFromScalar, testEmptyGrids)
     EXPECT_EQ(vectorGrid->background(), Vec3f(1.1f, 2.2f, 3.3f));
 }
 
+TEST_F(TestVectorFromScalar, testMergeVoxels)
+{
+    auto xGrid = createGrid<FloatGrid>(-0.1f);
+    auto yGrid = createGrid<FloatGrid>(-0.2f);
+    auto zGrid = createGrid<FloatGrid>(-0.3f);
+
+    auto& xTree = xGrid->tree();
+    auto& yTree = yGrid->tree();
+    auto& zTree = zGrid->tree();
+
+    // Create various overlapping and non-overlapping voxels
+    // voxel   |
+    // index   | 0    1    2    3    4    5    6    7
+    // --------|---------------------------------------
+    // x grid  |    [1.1]     [3.1]     [5.1]     [7.1]
+    // y grid  |         [2.2][3.2]          [6.2][7.2]
+    // z grid  |                   [4.3][5.3][6.3][7.3]
+
+    xTree.setValue(Coord(1, 0, 0), 1.1f);
+    xTree.setValue(Coord(3, 0, 0), 3.1f);
+    xTree.setValue(Coord(5, 0, 0), 5.1f);
+    xTree.setValue(Coord(7, 0, 0), 7.1f);
+
+    yTree.setValue(Coord(2, 0, 0), 2.2f);
+    yTree.setValue(Coord(3, 0, 0), 3.2f);
+    yTree.setValue(Coord(6, 0, 0), 6.2f);
+    yTree.setValue(Coord(7, 0, 0), 7.2f);
+
+    zTree.setValue(Coord(4, 0, 0), 4.3f);
+    zTree.setValue(Coord(5, 0, 0), 5.3f);
+    zTree.setValue(Coord(6, 0, 0), 6.3f);
+    zTree.setValue(Coord(7, 0, 0), 7.3f);
+
+    auto vectorGrid = tools::vectorFromScalar(*xGrid, *yGrid, *zGrid);
+    auto& vectorTree = vectorGrid->tree();
+
+    EXPECT_EQ(vectorGrid->background(), Vec3f(-0.1f, -0.2f, -0.3f));
+
+    EXPECT_EQ(vectorTree.activeTileCount(), 0);
+    EXPECT_EQ(vectorTree.leafCount(), 1);
+    EXPECT_EQ(vectorTree.activeVoxelCount(), 7);
+
+    EXPECT_EQ(vectorTree.getValue(Coord(-1, 0, 0)), Vec3f(-0.1f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord( 0, 0, 0)), Vec3f(-0.1f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord( 1, 0, 0)), Vec3f( 1.1f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord( 2, 0, 0)), Vec3f(-0.1f,  2.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord( 3, 0, 0)), Vec3f( 3.1f,  3.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord( 4, 0, 0)), Vec3f(-0.1f, -0.2f,  4.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord( 5, 0, 0)), Vec3f( 5.1f, -0.2f,  5.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord( 6, 0, 0)), Vec3f(-0.1f,  6.2f,  6.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord( 7, 0, 0)), Vec3f( 7.1f,  7.2f,  7.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord( 8, 0, 0)), Vec3f(-0.1f, -0.2f, -0.3f));
+
+    const Index NOT_FOUND_DEPTH = -1;
+    const Index L2_DEPTH = 2;
+    const Index LEAF_DEPTH = 3;
+
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(-1, 0, 0)), NOT_FOUND_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord( 0, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord( 1, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord( 2, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord( 3, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord( 4, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord( 5, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord( 6, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord( 7, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord( 8, 0, 0)), L2_DEPTH);
+}
+
 TEST_F(TestVectorFromScalar, testMergeRootTiles)
 {
     auto xGrid = createGrid<FloatGrid>(-0.1f);
@@ -256,14 +325,14 @@ TEST_F(TestVectorFromScalar, testMergeTilesAndVoxels)
     // y grid (l2 tiles  | [       3       ][       9       ]                  ...                   [       4       ]
     // z grid (l1 tiles) | [                           5                       ... ]
 
-    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 0, 0 ,0), 0.0f);
-    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 1, 0 ,0), 1.0f);
-    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 2, 0 ,0), 2.0f);
-    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 3, 0 ,0), 3.0f);
-    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 4, 0 ,0), 4.0f);
-    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 5, 0 ,0), 5.0f);
-    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 6, 0 ,0), 6.0f);
-    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 7, 0 ,0), 7.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 0, 0, 0), 0.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 1, 0, 0), 1.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 2, 0, 0), 2.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 3, 0, 0), 3.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 4, 0, 0), 4.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 5, 0, 0), 5.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 6, 0, 0), 6.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 7, 0, 0), 7.0f);
 
     xTree.setValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 0, 0, 0), 0.0f);
     xTree.setValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 1, 0, 0), 1.0f);
