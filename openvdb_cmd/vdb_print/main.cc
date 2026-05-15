@@ -4,12 +4,14 @@
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Count.h>
+#include <openvdb/util/Formats.h>
 #include <openvdb/util/logging.h>
 
 
@@ -19,6 +21,165 @@ using StringVec = std::vector<std::string>;
 
 const char* INDENT = "   ";
 const char* gProgName = "";
+
+/// Human-readable attribute value-type and codec (single field; avoids duplicating type vs codec).
+std::string
+attributeValueAndCodec(const openvdb::NamePair& typePair)
+{
+    std::ostringstream oss;
+    oss << typePair.first;
+    if (!typePair.second.empty()) {
+        oss << " (" << typePair.second << ")";
+    }
+    return oss.str();
+}
+
+
+/// Human-readable attribute flags (no hex).
+std::string
+attributeFlagsReadable(uint8_t flags)
+{
+    using Attr = openvdb::points::AttributeArray;
+    const auto f = flags;
+    std::ostringstream oss;
+    bool first = true;
+    auto append = [&](const char* label) {
+        if (!first) oss << ", ";
+        first = false;
+        oss << label;
+    };
+    if (f & Attr::TRANSIENT) append("transient");
+    if (f & Attr::HIDDEN) append("hidden");
+    if (f & Attr::CONSTANTSTRIDE) append("constantstride");
+    if (f & Attr::STREAMING) append("streaming");
+    if (f & Attr::PARTIALREAD) append("partialread");
+    return first ? std::string("none") : oss.str();
+}
+
+
+void
+printAttributeRows(std::ostream& os,
+    const openvdb::points::PointDataGrid::TreeType::LeafNodeType& leaf,
+    const std::string& rowIndent)
+{
+    using namespace openvdb;
+    using namespace openvdb::points;
+
+    const AttributeSet::Descriptor& descriptor = leaf.attributeSet().descriptor();
+    std::vector<std::pair<size_t, Name>> attrs;
+    attrs.reserve(descriptor.map().size());
+    for (const auto& nameAndPos : descriptor.map()) {
+        attrs.emplace_back(nameAndPos.second, nameAndPos.first);
+    }
+    std::sort(attrs.begin(), attrs.end(),
+        [](const std::pair<size_t, Name>& a, const std::pair<size_t, Name>& b) {
+            return a.first < b.first;
+        });
+
+    for (const auto& idxAndName : attrs) {
+        const size_t idx = idxAndName.first;
+        const Name& attrName = idxAndName.second;
+        const AttributeArray& array = leaf.constAttributeArray(attrName);
+        const NamePair& typePair = descriptor.type(idx);
+
+        os << rowIndent << attrName << ": index=" << idx
+            << ", type " << attributeValueAndCodec(typePair)
+            << ", uniform=" << (array.isUniform() ? "yes" : "no")
+            << ", flags " << attributeFlagsReadable(array.flags())
+            << "\n";
+    }
+}
+
+
+/// Extra verbose statistics for VDB point grids, aligned with Tree::print formatting.
+void
+printPointDataDetails(std::ostream& os, const openvdb::points::PointDataGrid& grid)
+{
+    using namespace openvdb;
+    using namespace openvdb::points;
+
+    using TreeT = PointDataGrid::TreeType;
+    using LeafT = TreeT::LeafNodeType;
+    using Descriptor = AttributeSet::Descriptor;
+
+    struct DescriptorGroup {
+        Index64 leafCount{0};
+        Coord exampleOrigin;
+        bool hasExampleLeaf = false;
+    };
+
+    Index64 totalPts = 0, activePts = 0, inactivePts = 0;
+    std::map<const Descriptor*, DescriptorGroup> descriptorGroups;
+
+    for (typename TreeT::LeafCIter leafIter = grid.tree().cbeginLeaf(); leafIter; ++leafIter) {
+        const LeafT& leaf = *leafIter;
+        totalPts += leaf.pointCount();
+        activePts += leaf.onPointCount();
+        inactivePts += leaf.offPointCount();
+
+        const Descriptor* descPtr = leaf.attributeSet().descriptorPtr().get();
+        DescriptorGroup& grp = descriptorGroups[descPtr];
+        ++grp.leafCount;
+        if (!grp.hasExampleLeaf) {
+            grp.exampleOrigin = leaf.origin();
+            grp.hasExampleLeaf = true;
+        }
+    }
+
+    os << "Point data:\n";
+    os << "  Total points:                   " << util::formattedInt(totalPts) << "\n";
+    os << "  Active points:                  " << util::formattedInt(activePts) << "\n";
+    os << "  Inactive points:                " << util::formattedInt(inactivePts) << "\n";
+
+    if (descriptorGroups.empty()) {
+        os << "  Descriptor shared by all leaves: n/a\n";
+        return;
+    }
+
+    const bool descriptorSharedGlobally = (descriptorGroups.size() == 1);
+
+    os << "  Descriptor shared by all leaves: "
+        << (descriptorSharedGlobally ? "yes" : "no") << "\n";
+
+    if (!descriptorSharedGlobally) {
+        return;
+    }
+
+    const Coord origin = descriptorGroups.begin()->second.exampleOrigin;
+    const LeafT* sampleLeaf = grid.tree().probeConstLeaf(origin);
+
+    os << "  Attributes:\n";
+    if (sampleLeaf == nullptr) {
+        os << "    (unavailable)\n";
+    } else if (sampleLeaf->attributeSet().size() == 0) {
+        os << "    (none)\n";
+    } else {
+        printAttributeRows(os, *sampleLeaf, "    ");
+    }
+
+    std::vector<Name> groupNames;
+    if (sampleLeaf != nullptr) {
+        for (const auto& groupEntry : sampleLeaf->attributeSet().descriptor().groupMap()) {
+            groupNames.push_back(groupEntry.first);
+        }
+        std::sort(groupNames.begin(), groupNames.end());
+    }
+
+    os << "  Groups:\n";
+    if (sampleLeaf == nullptr) {
+        os << "    (unavailable)\n";
+    } else if (groupNames.empty()) {
+        os << "    (none)\n";
+    } else {
+        for (const Name& groupName : groupNames) {
+            Index64 groupPts = 0;
+            for (typename TreeT::LeafCIter leafIter = grid.tree().cbeginLeaf(); leafIter; ++leafIter) {
+                groupPts += leafIter->groupPointCount(groupName);
+            }
+            os << "    " << groupName << ": " << util::formattedInt(groupPts) << "\n";
+        }
+    }
+}
 
 void
 usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
@@ -140,6 +301,10 @@ printLongListing(const StringVec& filenames)
                 if (!firstGrid) std::cout << "\n\n";
                 std::cout << "Name: " << grid->getName() << std::endl;
                 grid->print(std::cout, /*verboseLevel=*/11);
+                if (auto pointsGrid =
+                        openvdb::GridBase::grid<openvdb::points::PointDataGrid>(grid)) {
+                    printPointDataDetails(std::cout, *pointsGrid);
+                }
                 firstGrid = false;
             }
         }
