@@ -511,5 +511,58 @@ TEST_F(TestVectorFromScalar, testMergeTilesAndVoxels)
 
 TEST_F(TestVectorFromScalar, testMergeIntGrids)
 {
-    // TODO
+    auto xGrid = createGrid<Int32Grid>(1);
+    auto yGrid = createGrid<Int32Grid>(2);
+    auto zGrid = createGrid<Int32Grid>(3);
+
+    auto& xTree = xGrid->tree();
+    auto& yTree = yGrid->tree();
+    auto& zTree = zGrid->tree();
+
+    xTree.setValue(Coord(1, 0, 0), 10);
+    yTree.setValue(Coord(0, 1, 0), 20);
+    zTree.setValue(Coord(0, 0, 1), 30);
+
+    auto vectorGrid = tools::vectorFromScalar(*xGrid, *yGrid, *zGrid);
+    auto& vectorTree = vectorGrid->tree();
+
+    EXPECT_EQ(vectorGrid->background(), Vec3I(1, 2, 3));
+
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 0, 0)), Vec3I( 1,  2,  3));
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 0, 1)), Vec3I( 1,  2, 30));
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 1, 0)), Vec3I( 1, 20,  3));
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 1, 1)), Vec3I( 1,  2,  3));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 0, 0)), Vec3I(10,  2,  3));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 0, 1)), Vec3I( 1,  2,  3));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 1, 0)), Vec3I( 1,  2,  3));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 1, 1)), Vec3I( 1,  2,  3));
+}
+
+TEST_F(TestVectorFromScalar, testMergeDoubleGrids)
+{
+    auto xGrid = createGrid<DoubleGrid>(1.0);
+    auto yGrid = createGrid<DoubleGrid>(2.0);
+    auto zGrid = createGrid<DoubleGrid>(3.0);
+
+    auto& xTree = xGrid->tree();
+    auto& yTree = yGrid->tree();
+    auto& zTree = zGrid->tree();
+
+    xTree.setValue(Coord(1, 0, 0), 10.0);
+    yTree.setValue(Coord(0, 1, 0), 20.0);
+    zTree.setValue(Coord(0, 0, 1), 30.0);
+
+    auto vectorGrid = tools::vectorFromScalar(*xGrid, *yGrid, *zGrid);
+    auto& vectorTree = vectorGrid->tree();
+
+    EXPECT_EQ(vectorGrid->background(), Vec3R(1, 2, 3));
+
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 0, 0)), Vec3R( 1.0,  2.0,  3.0));
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 0, 1)), Vec3R( 1.0,  2.0, 30.0));
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 1, 0)), Vec3R( 1.0, 20.0,  3.0));
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 1, 1)), Vec3R( 1.0,  2.0,  3.0));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 0, 0)), Vec3R(10.0,  2.0,  3.0));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 0, 1)), Vec3R( 1.0,  2.0,  3.0));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 1, 0)), Vec3R( 1.0,  2.0,  3.0));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 1, 1)), Vec3R( 1.0,  2.0,  3.0));
 }
