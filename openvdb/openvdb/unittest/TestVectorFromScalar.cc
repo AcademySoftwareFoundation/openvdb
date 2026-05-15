@@ -109,9 +109,6 @@ TEST_F(TestVectorFromScalar, testMergeMixedLevelTiles)
     const Index L1_LEVEL = L1NodeType::getLevel();
     const Index L1_STRIDE = L1NodeType::getChildDim();
 
-    // index at  |
-    // L1 stride |    0    1    2 ...      32   33   34 ...      64   65   66         96   97   98 ...
-    // ----------|---------------------------------------------------------------------------------------
     // x grid    |                       [---------1.1--------][---------2.1--------][-------3.1--------]
     // y grid    | [[0.2][1.2]      ... ]                      [[4.2][5.2]       ...]
     // z grid    | [--------0.3---------][[2.3][3.3]      ... ][[4.3][5.3]       ...][-------6.3--------]
@@ -141,11 +138,45 @@ TEST_F(TestVectorFromScalar, testMergeMixedLevelTiles)
 
     EXPECT_EQ(vectorGrid->background(), Vec3f(-0.1f, -0.2f, -0.3f));
 
+    // Footprint of root tile -1
+    EXPECT_EQ(vectorTree.getValue(Coord(-1 * ROOT_STRIDE + 0 * L1_STRIDE, 0, 0)), Vec3f(-0.1f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * ROOT_STRIDE - 1 * L1_STRIDE, 0, 0)), Vec3f(-0.1f, -0.2f, -0.3f));
+
+    // Footprint of root tile 0
     EXPECT_EQ(vectorTree.getValue(Coord(0 * ROOT_STRIDE + 0 * L1_STRIDE, 0, 0)), Vec3f(-0.1f, 0.2f, 0.3f));
     EXPECT_EQ(vectorTree.getValue(Coord(0 * ROOT_STRIDE + 1 * L1_STRIDE, 0, 0)), Vec3f(-0.1f, 1.2f, 0.3f));
     EXPECT_EQ(vectorTree.getValue(Coord(0 * ROOT_STRIDE + 2 * L1_STRIDE, 0, 0)), Vec3f(-0.1f, -0.2f, 0.3f));
-    EXPECT_EQ(vectorTree.getValue(Coord(0 * ROOT_STRIDE + 3 * L1_STRIDE, 0, 0)), Vec3f(-0.1f, -0.2f, 0.3f));
     // ...
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * ROOT_STRIDE - 2 * L1_STRIDE, 0, 0)), Vec3f(-0.1f, -0.2f, 0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * ROOT_STRIDE - 1 * L1_STRIDE, 0, 0)), Vec3f(-0.1f, -0.2f, 0.3f));
+
+    // Footprint of root tile 1
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * ROOT_STRIDE + 0 * L1_STRIDE, 0, 0)), Vec3f(1.1f, -0.2f, 2.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * ROOT_STRIDE + 1 * L1_STRIDE, 0, 0)), Vec3f(1.1f, -0.2f, 3.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * ROOT_STRIDE + 2 * L1_STRIDE, 0, 0)), Vec3f(1.1f, -0.2f, -0.3f));
+    // ...
+    EXPECT_EQ(vectorTree.getValue(Coord(2 * ROOT_STRIDE - 2 * L1_STRIDE, 0, 0)), Vec3f(1.1f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(2 * ROOT_STRIDE - 1 * L1_STRIDE, 0, 0)), Vec3f(1.1f, -0.2f, -0.3f));
+
+    // Footprint of root tile 2
+    EXPECT_EQ(vectorTree.getValue(Coord(2 * ROOT_STRIDE + 0 * L1_STRIDE, 0, 0)), Vec3f(2.1f, 4.2f, 4.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(2 * ROOT_STRIDE + 1 * L1_STRIDE, 0, 0)), Vec3f(2.1f, 5.2f, 5.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(2 * ROOT_STRIDE + 2 * L1_STRIDE, 0, 0)), Vec3f(2.1f, -0.2f, -0.3f));
+    // ...
+    EXPECT_EQ(vectorTree.getValue(Coord(3 * ROOT_STRIDE - 2 * L1_STRIDE, 0, 0)), Vec3f(2.1f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(3 * ROOT_STRIDE - 1 * L1_STRIDE, 0, 0)), Vec3f(2.1f, -0.2f, -0.3f));
+
+    // Footprint of root tile 3
+    EXPECT_EQ(vectorTree.getValue(Coord(3 * ROOT_STRIDE + 0 * L1_STRIDE, 0, 0)), Vec3f(3.1f, -0.2f, 6.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(3 * ROOT_STRIDE + 1 * L1_STRIDE, 0, 0)), Vec3f(3.1f, -0.2f, 6.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(3 * ROOT_STRIDE + 2 * L1_STRIDE, 0, 0)), Vec3f(3.1f, -0.2f, 6.3f));
+    // ...
+    EXPECT_EQ(vectorTree.getValue(Coord(4 * ROOT_STRIDE - 2 * L1_STRIDE, 0, 0)), Vec3f(3.1f, -0.2f, 6.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(4 * ROOT_STRIDE - 1 * L1_STRIDE, 0, 0)), Vec3f(3.1f, -0.2f, 6.3f));
+
+    // Footprint of root tile 4
+    EXPECT_EQ(vectorTree.getValue(Coord(4 * ROOT_STRIDE + 0 * L1_STRIDE, 0, 0)), Vec3f(-0.1f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(5 * ROOT_STRIDE - 1 * L1_STRIDE, 0, 0)), Vec3f(-0.1f, -0.2f, -0.3f));
 
     const Index NOT_FOUND_DEPTH = -1;
     const Index ROOT_DEPTH = 0;
@@ -198,5 +229,218 @@ TEST_F(TestVectorFromScalar, testMergeMixedLevelTiles)
     // ...
     EXPECT_EQ(vectorTree.getValueDepth(Coord(5 * ROOT_STRIDE - 2 * L1_STRIDE, 0, 0)), NOT_FOUND_DEPTH);
     EXPECT_EQ(vectorTree.getValueDepth(Coord(5 * ROOT_STRIDE - 1 * L1_STRIDE, 0, 0)), NOT_FOUND_DEPTH);
+}
 
+TEST_F(TestVectorFromScalar, testMergeTilesAndVoxels)
+{
+    auto xGrid = createGrid<FloatGrid>(-0.1f);
+    auto yGrid = createGrid<FloatGrid>(-0.2f);
+    auto zGrid = createGrid<FloatGrid>(-0.3f);
+
+    auto& xTree = xGrid->tree();
+    auto& yTree = yGrid->tree();
+    auto& zTree = zGrid->tree();
+
+    using RootNodeType = typename FloatTree::RootNodeType;
+    using L1NodeType = typename RootNodeType::ChildNodeType;
+    using L2NodeType = typename L1NodeType::ChildNodeType;
+    using LeafNodeType = typename FloatTree::LeafNodeType;
+
+    const Index L1_LEVEL = L1NodeType::getLevel();
+    const Index L1_STRIDE = L1NodeType::getChildDim();
+    const Index L2_LEVEL = L2NodeType::getLevel();
+    const Index L2_STRIDE = L2NodeType::getChildDim();
+    const Index LEAF_LEVEL = LeafNodeType::getLevel();
+
+    // x grid (voxels)   | [0][1][...][6][7]                 [0][1][...][6][7] ...  [0][1][...][6][7][0][1][...][6][7]
+    // y grid (l2 tiles  | [       3       ][       9       ]                  ...                   [       4       ]
+    // z grid (l1 tiles) | [                           5                       ... ]
+
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 0, 0 ,0), 0.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 1, 0 ,0), 1.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 2, 0 ,0), 2.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 3, 0 ,0), 3.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 4, 0 ,0), 4.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 5, 0 ,0), 5.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 6, 0 ,0), 6.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 7, 0 ,0), 7.0f);
+
+    xTree.setValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 0, 0, 0), 0.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 1, 0, 0), 1.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 2, 0, 0), 2.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 3, 0, 0), 3.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 4, 0, 0), 4.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 5, 0, 0), 5.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 6, 0, 0), 6.0f);
+    xTree.setValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 7, 0, 0), 7.0f);
+
+    xTree.setValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 0, 0, 0), 0.0f);
+    xTree.setValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 1, 0, 0), 1.0f);
+    xTree.setValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 2, 0, 0), 2.0f);
+    xTree.setValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 3, 0, 0), 3.0f);
+    xTree.setValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 4, 0, 0), 4.0f);
+    xTree.setValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 5, 0, 0), 5.0f);
+    xTree.setValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 6, 0, 0), 6.0f);
+    xTree.setValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 7, 0, 0), 7.0f);
+
+    xTree.setValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 0, 0, 0), 0.0f);
+    xTree.setValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 1, 0, 0), 1.0f);
+    xTree.setValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 2, 0, 0), 2.0f);
+    xTree.setValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 3, 0, 0), 3.0f);
+    xTree.setValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 4, 0, 0), 4.0f);
+    xTree.setValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 5, 0, 0), 5.0f);
+    xTree.setValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 6, 0, 0), 6.0f);
+    xTree.setValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 7, 0, 0), 7.0f);
+
+    yTree.addTile(L2_LEVEL, Coord(0 * L1_STRIDE + 0 * L2_STRIDE, 0, 0), 3.0f, true);
+    yTree.addTile(L2_LEVEL, Coord(0 * L1_STRIDE + 1 * L2_STRIDE, 0, 0), 9.0f, true);
+    yTree.addTile(L2_LEVEL, Coord(1 * L1_STRIDE + 1 * L2_STRIDE, 0, 0), 4.0f, true);
+
+    zTree.addTile(L1_LEVEL, Coord(0 * L1_STRIDE, 0, 0), 5.0f, true);
+
+    auto vectorGrid = tools::vectorFromScalar(*xGrid, *yGrid, *zGrid);
+    auto& vectorTree = vectorGrid->tree();
+
+    EXPECT_EQ(vectorGrid->background(), Vec3f(-0.1f, -0.2f, -0.3f));
+
+    // Footprint of L1 tile -1, L2 tile -1
+    EXPECT_EQ(vectorTree.getValue(Coord(-1 * L1_STRIDE + 0 * L2_STRIDE + 0, 0, 0)), Vec3f(-0.1f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE - 1 * L2_STRIDE + 0, 0, 0)), Vec3f(-0.1f, -0.2f, -0.3f));
+
+    // Footprint of L1 tile 0, L2 tile +0
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 0, 0, 0)), Vec3f(0.0f, 3.0f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 1, 0, 0)), Vec3f(1.0f, 3.0f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 2, 0, 0)), Vec3f(2.0f, 3.0f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 3, 0, 0)), Vec3f(3.0f, 3.0f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 4, 0, 0)), Vec3f(4.0f, 3.0f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 5, 0, 0)), Vec3f(5.0f, 3.0f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 6, 0, 0)), Vec3f(6.0f, 3.0f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 7, 0, 0)), Vec3f(7.0f, 3.0f, 5.0f));
+
+    // Footprint of L1 tile 0, L2 tile +1
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 0, 0, 0)), Vec3f(-0.1f, 9.0f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 1, 0, 0)), Vec3f(-0.1f, 9.0f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 2, 0, 0)), Vec3f(-0.1f, 9.0f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 3, 0, 0)), Vec3f(-0.1f, 9.0f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 4, 0, 0)), Vec3f(-0.1f, 9.0f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 5, 0, 0)), Vec3f(-0.1f, 9.0f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 6, 0, 0)), Vec3f(-0.1f, 9.0f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 7, 0, 0)), Vec3f(-0.1f, 9.0f, 5.0f));
+
+    // Footprint of L1 tile 0, L2 tile +2
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 0, 0, 0)), Vec3f(0.0f, -0.2f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 1, 0, 0)), Vec3f(1.0f, -0.2f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 2, 0, 0)), Vec3f(2.0f, -0.2f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 3, 0, 0)), Vec3f(3.0f, -0.2f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 4, 0, 0)), Vec3f(4.0f, -0.2f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 5, 0, 0)), Vec3f(5.0f, -0.2f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 6, 0, 0)), Vec3f(6.0f, -0.2f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 7, 0, 0)), Vec3f(7.0f, -0.2f, 5.0f));
+
+    // Footprint of L1 tile 0, L2 tile +3
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 0, 0, 0)), Vec3f(-0.1f, -0.2f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 1, 0, 0)), Vec3f(-0.1f, -0.2f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 2, 0, 0)), Vec3f(-0.1f, -0.2f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 3, 0, 0)), Vec3f(-0.1f, -0.2f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 4, 0, 0)), Vec3f(-0.1f, -0.2f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 5, 0, 0)), Vec3f(-0.1f, -0.2f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 6, 0, 0)), Vec3f(-0.1f, -0.2f, 5.0f));
+    EXPECT_EQ(vectorTree.getValue(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 7, 0, 0)), Vec3f(-0.1f, -0.2f, 5.0f));
+
+    // Footprint of L1 tile 1, L2 tile +0
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 0, 0, 0)), Vec3f(0.0f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 1, 0, 0)), Vec3f(1.0f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 2, 0, 0)), Vec3f(2.0f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 3, 0, 0)), Vec3f(3.0f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 4, 0, 0)), Vec3f(4.0f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 5, 0, 0)), Vec3f(5.0f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 6, 0, 0)), Vec3f(6.0f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 7, 0, 0)), Vec3f(7.0f, -0.2f, -0.3f));
+
+    // Footprint of L1 tile 1, L2 tile +1
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 0, 0, 0)), Vec3f(0.0f, 4.0f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 1, 0, 0)), Vec3f(1.0f, 4.0f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 2, 0, 0)), Vec3f(2.0f, 4.0f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 3, 0, 0)), Vec3f(3.0f, 4.0f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 4, 0, 0)), Vec3f(4.0f, 4.0f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 5, 0, 0)), Vec3f(5.0f, 4.0f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 6, 0, 0)), Vec3f(6.0f, 4.0f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 7, 0, 0)), Vec3f(7.0f, 4.0f, -0.3f));
+
+    // Footprint of L1 tile 1, L2 tile +2
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 2 * L2_STRIDE + 0, 0, 0)), Vec3f(-0.1f, -0.2f, -0.3f));
+    EXPECT_EQ(vectorTree.getValue(Coord(1 * L1_STRIDE + 2 * L2_STRIDE + 1, 0, 0)), Vec3f(-0.1f, -0.2f, -0.3f));
+
+    const Index NOT_FOUND_DEPTH = -1;
+    const Index L2_DEPTH = 2;
+    const Index LEAF_DEPTH = 3;
+
+    // Footprint of L1 tile -1, L2 tile -1
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(-1 * L1_STRIDE + 0 * L2_STRIDE + 0, 0, 0)), NOT_FOUND_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE - 1 * L2_STRIDE + 0, 0, 0)), NOT_FOUND_DEPTH);
+
+    // Footprint of L1 tile 0, L2 tile +0
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 0, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 1, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 2, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 3, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 4, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 5, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 6, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 0 * L2_STRIDE + 7, 0, 0)), LEAF_DEPTH);
+
+    // Footprint of L1 tile 0, L2 tile +1
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 0, 0, 0)), L2_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 1, 0, 0)), L2_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 2, 0, 0)), L2_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 3, 0, 0)), L2_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 4, 0, 0)), L2_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 5, 0, 0)), L2_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 6, 0, 0)), L2_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 1 * L2_STRIDE + 7, 0, 0)), L2_DEPTH);
+
+    // Footprint of L1 tile 0, L2 tile +2
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 0, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 1, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 2, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 3, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 4, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 5, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 6, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 2 * L2_STRIDE + 7, 0, 0)), LEAF_DEPTH);
+
+    // Footprint of L1 tile 0, L2 tile +3
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 0, 0, 0)), L2_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 1, 0, 0)), L2_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 2, 0, 0)), L2_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 3, 0, 0)), L2_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 4, 0, 0)), L2_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 5, 0, 0)), L2_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 6, 0, 0)), L2_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(0 * L1_STRIDE + 3 * L2_STRIDE + 7, 0, 0)), L2_DEPTH);
+
+    // Footprint of L1 tile 1, L2 tile +0
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 0, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 1, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 2, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 3, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 4, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 5, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 6, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 0 * L2_STRIDE + 7, 0, 0)), LEAF_DEPTH);
+
+    // Footprint of L1 tile 1, L2 tile +1
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 0, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 1, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 2, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 3, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 4, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 5, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 6, 0, 0)), LEAF_DEPTH);
+    EXPECT_EQ(vectorTree.getValueDepth(Coord(1 * L1_STRIDE + 1 * L2_STRIDE + 7, 0, 0)), LEAF_DEPTH);
+}
+
+TEST_F(TestVectorFromScalar, testMergeIntGrids)
+{
+    // TODO
 }
