@@ -146,6 +146,7 @@ else()
     TestParticlesToLevelSet.cc
     TestPointAdvect.cc
     TestPointAttribute.cc
+    TestPointCodec.cc
     TestPointConversion.cc
     TestPointCount.cc
     TestPointDataLeaf.cc

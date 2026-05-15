@@ -116,9 +116,9 @@ std::ostream& operator<<(std::ostream&, const StreamMetadata::AuxDataMap&);
 ////////////////////////////////////////
 
 
-/// @brief Leaf nodes that require multi-pass I/O must inherit from this struct.
-/// @sa Grid::hasMultiPassIO()
-struct MultiPass {};
+/// @brief Tag for multi-pass I/O. Only points::PointDataLeafNode may inherit from this.
+/// @sa Grid::hasMultiPassIO(), points::IsPointDataLeafNode
+struct PointDataGridMultiPass {};
 
 
 ////////////////////////////////////////
