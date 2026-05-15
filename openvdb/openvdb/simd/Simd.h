@@ -359,7 +359,7 @@ template <typename T> struct SimdTraits; // fwd declare
 /// template <typename T>
 /// T Lerp(const T a, const T b, const T t) {
 ///   using namespace openvdb::simd;
-///   return ((T(1) - t) * a) + (t * b));
+///   return ((T(1) - t) * a) + (t * b);
 /// }
 
 //// Vector API

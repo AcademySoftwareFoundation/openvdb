@@ -3,7 +3,7 @@ OpenVDB:
   - Significant performance improvements across many tools with the introduction
     of targeted SIMD support to the core library. The main framework advancement
     is the introduction of Agner Fog's vectorclass library (VCL) as an optional
-    dependency, specificlly for x86 instruction set architecture intrinsic support.
+    dependency, specifically for x86 instruction set architecture intrinsic support.
     This allows for programmatic selection of desired SIMD widths, independent
     of the targets supported SIMD extension, as well as access to a comprehensive
     vectorized math library. See https://github.com/vectorclass/version2.
@@ -38,8 +38,9 @@ OpenVDB:
   Build:
   - Introduced OPENVDB_X86_INSTRSET to supersede the OPENVDB_SIMD build define.
     This option takes an integer which corresponds to a suite of x86 ISA flags.
-    Defaults to 0 if not provided. See the root CMakeLists for all available
-    values.
+    Defaults to 0 if not provided. OPENVDB_SIMD is still supported and will set
+    the appropriate value of OPENVDB_X86_INSTRSET, but its use is deprecated.
+    See the root CMakeLists for all available values.
   - New build options to control x86 ISA targetting. USE_VCL controls the use
     Agner Fog's VCL SIMD wrapper library and will automatically compute
     OPENVDB_X86_INSTRSET based on the compiler and provided CXX flags if unset.
