@@ -136,7 +136,7 @@ public:
     Tuple& operator*=(Tuple in) { for (int i = 0; i < SIZE; ++i) mm[i] *= in[i]; return *this; }
     Tuple& operator/=(Tuple in) { for (int i = 0; i < SIZE; ++i) mm[i] /= in[i]; return *this; }
     Tuple& operator&=(Tuple in) { for (int i = 0; i < SIZE; ++i) mm[i] &= in[i]; return *this; }
-    Tuple& operator|=(Tuple in) { for (int i = 0; i < SIZE; ++i) mm[i] &= in[i]; return *this; }
+    Tuple& operator|=(Tuple in) { for (int i = 0; i < SIZE; ++i) mm[i] |= in[i]; return *this; }
 
     Tuple<SIZE, bool> operator>=(Tuple in) const {
         Tuple<SIZE, bool> r; for (int i = 0; i < SIZE; ++i) r[i] = mm[i] >= in[i]; return r;

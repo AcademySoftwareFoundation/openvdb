@@ -9,9 +9,6 @@
 #ifndef OPENVDB_POINTS_RASTERIZE_SDF_IMPL_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_RASTERIZE_SDF_IMPL_HAS_BEEN_INCLUDED
 
-/// @brief  Dev option to experiment with batched rasterization, regardless of
-///   the ISA in use.
-#define OPENVDB_DISABLE_BATCHED_TRANSFERS 0
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -184,12 +181,9 @@ struct SignedDistanceFieldTransfer :
     template <typename RealT>
     static constexpr size_t GetBatchSize()
     {
-#if OPENVDB_DISABLE_BATCHED_TRANSFERS
-        return 1;
-#else
+        // @note You can return 1 here to disable batched rasterization
         using NativeT = typename simd::SimdNativeT<RealT>::Type;
         return simd::SimdTraits<NativeT>::size;
-#endif
     }
 
     // typically the max radius of all points rounded up
@@ -334,7 +328,7 @@ struct SphericalTransfer :
                     const Index end,
                     const CoordBBox& bounds)
     {
-        constexpr auto N2 = BaseT::template GetBatchSize<Real>();
+        constexpr auto N2 = GetBatchSize();
         if constexpr(N2 == 1) {
             // Fallback to per point rasterization
             for (Index i = start; i < end; ++i) {
@@ -439,7 +433,7 @@ protected:
 private:
     template <size_t Size>
     inline void rasterizeN2(const Coord& ijk,
-        const std::array<int64_t, BaseT::template GetBatchSize<Real>()>& points,
+        const std::array<int64_t, GetBatchSize()>& points,
         const CoordBBox& bounds)
     {
         using SimdT  = typename simd::SimdT<RealT, Size>::Type;
