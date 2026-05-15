@@ -17,7 +17,9 @@ class TestLeafIO
 {
 public:
     static void testBuffer();
+#ifdef OPENVDB_ENABLE_TREE_IO
     static void testTreeIO();
+#endif // OPENVDB_ENABLE_TREE_IO
 };
 
 template<typename T>
@@ -78,6 +80,7 @@ TestLeafIO<T>::testBuffer()
 }
 
 
+#ifdef OPENVDB_ENABLE_TREE_IO
 template<typename T>
 void
 TestLeafIO<T>::testTreeIO()
@@ -105,6 +108,7 @@ TestLeafIO<T>::testTreeIO()
 
     EXPECT_TRUE(leaf.onVoxelCount() == 2);
 }
+#endif // OPENVDB_ENABLE_TREE_IO
 
 
 class TestLeafIOTest: public ::testing::Test
@@ -119,7 +123,9 @@ TEST_F(TestLeafIOTest, testBufferInt) { TestLeafIO<int>::testBuffer(); }
 TEST_F(TestLeafIOTest, testBufferFloat) { TestLeafIO<float>::testBuffer(); }
 TEST_F(TestLeafIOTest, testBufferDouble) { TestLeafIO<double>::testBuffer(); }
 TEST_F(TestLeafIOTest, testBufferBool) { TestLeafIO<bool>::testBuffer(); }
+#ifdef OPENVDB_ENABLE_TREE_IO
 TEST_F(TestLeafIOTest, testBufferByte) { TestLeafIO<openvdb::Byte>::testBuffer(); }
+#endif
 
 
 TEST_F(TestLeafIOTest, testBufferVec3R)
@@ -175,6 +181,7 @@ TEST_F(TestLeafIOTest, testBufferVec3R)
     }
 }
 
+#ifdef OPENVDB_ENABLE_TREE_IO
 TEST_F(TestLeafIOTest, testTreeIOInt) { TestLeafIO<int>::testTreeIO(); }
 TEST_F(TestLeafIOTest, testTreeIOFloat) { TestLeafIO<float>::testTreeIO(); }
 TEST_F(TestLeafIOTest, testTreeIODouble) { TestLeafIO<double>::testTreeIO(); }
@@ -207,3 +214,4 @@ TEST_F(TestLeafIOTest, testTreeIOVec3R)
 
     EXPECT_TRUE(leaf.onVoxelCount() == 2);
 }
+#endif // OPENVDB_ENABLE_TREE_IO

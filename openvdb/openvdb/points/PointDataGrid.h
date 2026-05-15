@@ -362,16 +362,18 @@ public:
     //@}
 
     // I/O methods
-
+#ifdef OPENVDB_ENABLE_TREE_IO
     void readTopology(std::istream& is, bool fromHalf = false);
     void writeTopology(std::ostream& os, bool toHalf = false) const;
+#endif // OPENVDB_ENABLE_TREE_IO
 
     Index buffers() const;
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     void readBuffers(std::istream& is, bool fromHalf = false);
     void readBuffers(std::istream& is, const CoordBBox&, bool fromHalf = false);
     void writeBuffers(std::ostream& os, bool toHalf = false) const;
-
+#endif // OPENVDB_ENABLE_TREE_IO
 
     Index64 memUsage() const;
     OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
@@ -987,6 +989,7 @@ PointDataLeafNode<T, Log2Dim>::setOffsetOnly(Index offset, const ValueType& val)
     this->buffer().setValue(offset, val);
 }
 
+#ifdef OPENVDB_ENABLE_TREE_IO
 template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
@@ -1000,6 +1003,7 @@ PointDataLeafNode<T, Log2Dim>::writeTopology(std::ostream& os, bool toHalf) cons
 {
     BaseLeaf::writeTopology(os, toHalf);
 }
+#endif // OPENVDB_ENABLE_TREE_IO
 
 template<typename T, Index Log2Dim>
 inline Index
@@ -1013,6 +1017,7 @@ PointDataLeafNode<T, Log2Dim>::buffers() const
                     /*cleanup*/                     1);
 }
 
+#ifdef OPENVDB_ENABLE_TREE_IO
 template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
@@ -1385,6 +1390,7 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
         Local::destroyPagedStream(meta->auxData(), attributeIndex);
     }
 }
+#endif // OPENVDB_ENABLE_TREE_IO
 
 template<typename T, Index Log2Dim>
 inline Index64

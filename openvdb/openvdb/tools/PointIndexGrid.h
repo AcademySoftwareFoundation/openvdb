@@ -1485,9 +1485,11 @@ public:
 
     // I/O methods
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     void readBuffers(std::istream& is, bool fromHalf = false);
     void readBuffers(std::istream& is, const CoordBBox&, bool fromHalf = false);
     void writeBuffers(std::ostream& os, bool toHalf = false) const;
+#endif // OPENVDB_ENABLE_TREE_IO
 
 
     Index64 memUsage() const;
@@ -1718,6 +1720,8 @@ PointIndexLeafNode<T, Log2Dim>::isEmpty(const CoordBBox& bbox) const
 }
 
 
+#ifdef OPENVDB_ENABLE_TREE_IO
+
 template<typename T, Index Log2Dim>
 inline void
 PointIndexLeafNode<T, Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
@@ -1790,6 +1794,8 @@ PointIndexLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) cons
     const Index64 auxDataBytes = Index64(0);
     os.write(reinterpret_cast<const char*>(&auxDataBytes), sizeof(Index64));
 }
+
+#endif // OPENVDB_ENABLE_TREE_IO
 
 
 template<typename T, Index Log2Dim>

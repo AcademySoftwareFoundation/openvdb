@@ -795,6 +795,7 @@ TEST_F(TestAttributeArray, testAttributeArray)
         EXPECT_NEAR(double(vec3.z()), unitVec.get(2).z(), /*tolerance=*/double(0.0001));
     }
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     { // IO
         const Index count = 50;
         AttributeArrayI attrA(count);
@@ -830,6 +831,7 @@ TEST_F(TestAttributeArray, testAttributeArray)
 
         EXPECT_TRUE(!ostrD.str().empty());
     }
+#endif // OPENVDB_ENABLE_TREE_IO
 
     // Registry
     AttributeArrayI::registerType();
@@ -1354,6 +1356,7 @@ TEST_F(TestAttributeArray, testStrided)
         EXPECT_EQ(array->dataSize(), handle.size());
     }
 
+#ifdef OPENVDB_ENABLE_TREE_IO
     { // IO
         const Index count = 50, total = 100;
         AttributeArrayI attrA(count, total, /*constantStride=*/false);
@@ -1372,6 +1375,7 @@ TEST_F(TestAttributeArray, testStrided)
 
         EXPECT_TRUE(attrA == attrB);
     }
+#endif // OPENVDB_ENABLE_TREE_IO
 }
 
 

@@ -67,9 +67,9 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2026',           abi: '13', build: 'Release', cmake: '-DOPENVDB_USE_FUTURE_ABI_13=ON -DOPENVDB_ENABLE_ASSERTS=ON' }
-          - { cxx: g++,     image: '2026',           abi: '13', build: 'Release', cmake: '-DOPENVDB_USE_FUTURE_ABI_13=ON' }
-          - { cxx: clang++, image: '2026',           abi: '13', build: 'Debug',   cmake: '-DOPENVDB_USE_FUTURE_ABI_13=ON' }
+          - { cxx: clang++, image: '2026',           abi: '13', build: 'Release', cmake: '-DOPENVDB_ENABLE_ASSERTS=ON -DOPENVDB_ENABLE_TREE_IO=ON' }
+          - { cxx: g++,     image: '2026',           abi: '13', build: 'Release', cmake: '' }
+          - { cxx: clang++, image: '2026',           abi: '13', build: 'Debug',   cmake: '' }
           - { cxx: clang++, image: '2025-clang19.1', abi: '12', build: 'Release', cmake: '' }
           - { cxx: clang++, image: '2024-clang17.2', abi: '11', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
       fail-fast: false

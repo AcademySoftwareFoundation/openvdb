@@ -973,6 +973,17 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
     }
     grid->setSaveFloatAsHalf(gd.saveFloatAsHalf());
 
+#ifndef OPENVDB_ENABLE_TREE_IO
+    if (!codec) {
+        OPENVDB_THROW(IoError,
+            "No I/O codec found for " << gd.gridType() << ", "
+            << "register the codec for this grid type "
+            << "(either explicitly or via openvdb::initialize()). "
+            << "Note: Tree I/O is deprecated, "
+            << "but can be re-enabled by recompiling with CMake OPENVDB_ENABLE_TREE_IO=ON.");
+    }
+#endif
+
     // Stream metadata varies per grid, and it needs to persist
     // in case delayed load is in effect.
     io::StreamMetadata::Ptr streamMetadata;
@@ -1005,12 +1016,15 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
         if (codec) {
             codec->readTopology(is, *codecData, readOptions, diagnostics);
         } else {
+#ifdef OPENVDB_ENABLE_TREE_IO
             grid->readTopology(is);
+#endif
         }
         // read buffers
         if (codec) {
             codec->readBuffers(is, *codecData, readOptions, diagnostics);
         } else {
+#ifdef OPENVDB_ENABLE_TREE_IO
             const auto& worldBBox = readOptions.clipBBox;
             const bool clip = worldBBox.isSorted();
             if (clip) {
@@ -1019,6 +1033,7 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
             } else {
                 grid->readBuffers(is);
             }
+#endif
         }
     }
 
@@ -1158,6 +1173,17 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     // Find the codec for the grid type and options.
     io::Codec* codec = findCodec(gd.gridType());
 
+#ifndef OPENVDB_ENABLE_TREE_IO
+    if (!codec) {
+        OPENVDB_THROW(IoError,
+            "No I/O codec found for " << gd.gridType() << ", "
+            << "register the codec for this grid type "
+            << "(either explicitly or via openvdb::initialize()). "
+            << "Note: Tree I/O is deprecated, "
+            << "but can be re-enabled by recompiling with CMake OPENVDB_ENABLE_TREE_IO=ON.");
+    }
+#endif
+
     // Stream metadata varies per grid, so make a copy of the file-level stream metadata.
     io::StreamMetadata::Ptr streamMetadata;
     if (io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(os)) {
@@ -1204,7 +1230,9 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     if (codec) {
         codec->writeTopology(os, *grid, writeOptions);
     } else {
+#ifdef OPENVDB_ENABLE_TREE_IO
         grid->writeTopology(os);
+#endif
     }
 
     // Now we know the grid block storage position.
@@ -1214,7 +1242,9 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     if (codec) {
         codec->writeBuffers(os, *grid, writeOptions);
     } else {
+#ifdef OPENVDB_ENABLE_TREE_IO
         grid->writeBuffers(os);
+#endif
     }
 
     // Now we know the end position of this grid.
