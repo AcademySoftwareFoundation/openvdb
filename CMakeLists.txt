@@ -80,6 +80,10 @@ option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library. Turns ON if USE_NANOVDB
 # Global options
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_ENABLE_ASSERTS "Build with asserts in OpenVDB code enabled" OFF)
+option(OPENVDB_ENABLE_VEC_RELATIONAL_OPERATIONS [=[
+Enabled deprecated relational < and > operators on Vector types. This option
+will be switched to OFF and the feature will be subsequently removed in future
+releases.]=] ON)
 option(OPENVDB_USE_DELAYED_LOADING "Build the core OpenVDB library with delayed-loading." ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
@@ -131,6 +135,30 @@ required.]=] ${USE_EXR})
 option(USE_PNG "Use PNG while building openvdb components." OFF)
 option(USE_AX "Use OpenVDB AX while building openvdb components." ${OPENVDB_BUILD_AX})
 option(USE_NANOVDB "Use NanoVDB while building openvdb components." ${OPENVDB_BUILD_NANOVDB})
+option(USE_VCL [=[
+Use the internally supplied copy of Agner Fog's vectorclass (VCL) SIMD wrapper
+library to instrument OpenVDB tools. This also requires VCL to be installed
+along with OpenVDB headers. Only applicable which compiling for x86 targets.]=] OFF)
+set(OPENVDB_X86_INSTRSET 0 CACHE STRING [=[
+The x86 instruction set to use. When unset, if USE_VCL is ON, this is
+automatically configured based on provided build flags. When unset and USE_VCL
+is OFF, defaults to 0. It is expected for you to provide this flag. Available
+values are:
+    0:  Unknown or unspecified
+    1:  SSE             -msse
+    2:  SSE2            -msse2 # Minimum on x86_64
+    3:  SSE3            -msse3
+    4:  SSSE3           -mssse3
+    5:  SSE4.1          -msse4.1
+    6:  SSE4.2          -msse4.2 # Minimum recommended where supported
+    7:  AVX             -mavx
+    8:  AVX2            -mavx2
+    9:  AVX512F         -mavx512f
+    10: AVX512BW/DQ/VL  -mavx512bw -mavx512dq -mavx512vl
+Note that (while not strictly enforced by vendors) each option implies all
+preceeding flags. If you need more granular control you can provide your
+desired flags via CXX_FLAGS. Only applicable which compiling for x86 targets.
+]=])
 
 cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
@@ -170,19 +198,6 @@ if(NOT CONCURRENT_MALLOC)
 elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
   message(WARNING "Unrecognized value for CONCURRENT_MALLOC, using Auto instead.")
   set(CONCURRENT_MALLOC Auto CACHE STRING FORCE)
-endif()
-
-set(_OPENVDB_SIMD_OPTIONS None SSE42 AVX)
-if(NOT OPENVDB_SIMD)
-  set(OPENVDB_SIMD None CACHE STRING
-    "Choose whether to enable SIMD compiler flags or not, options are: None SSE42 AVX.
-    Although not required, it is strongly recommended to enable SIMD. AVX implies SSE42.
-    None is the default." FORCE
-  )
-elseif(NOT ${OPENVDB_SIMD} IN_LIST _OPENVDB_SIMD_OPTIONS)
-  message(WARNING "Unrecognized or unsupported value for OPENVDB_SIMD, "
-    "using None instead.")
-  set(OPENVDB_SIMD None CACHE STRING FORCE)
 endif()
 
 if(USE_BLOSC AND NOT USE_ZLIB)
@@ -385,6 +400,28 @@ endif()
 
 #########################################################################
 
+# Still support -DOPENVDB_SIMD=SSE42 and -DOPENVDB_SIMD=AVX, these alias to
+# their respective OPENVDB_X86_INSTRSET value but, as a build option, are
+# deprecated. Not that the defines in version.h need to persist in case
+# downstream software was using them before including VDB headers
+set(_OPENVDB_SIMD_OPTIONS None SSE42 AVX)
+if(NOT OPENVDB_SIMD)
+  set(OPENVDB_SIMD None CACHE STRING "Deprecated, see OPENVDB_X86_INSTRSET." FORCE)
+else()
+  if(NOT ${OPENVDB_SIMD} IN_LIST _OPENVDB_SIMD_OPTIONS)
+    message(WARNING "Unrecognized or unsupported value for OPENVDB_SIMD, using None instead.")
+    set(OPENVDB_SIMD None CACHE STRING "Deprecated, see OPENVDB_X86_INSTRSET." FORCE)
+  endif()
+  message(DEPRECATION "The OPENVDB_SIMD option is deprecated and will be removed. Use OPENVDB_X86_INSTRSET.")
+  if(OPENVDB_SIMD STREQUAL "AVX")
+    set(OPENVDB_X86_INSTRSET 7)
+  elseif(OPENVDB_SIMD STREQUAL "SSE42")
+    set(OPENVDB_X86_INSTRSET 6)
+  endif()
+endif()
+
+#########################################################################
+
 # Configure general CMake and CXX settings
 
 include(cmake/config/OpenVDBCXX.cmake)
@@ -402,22 +439,6 @@ if(CONCURRENT_MALLOC STREQUAL "Auto")
   else()
     set(CONCURRENT_MALLOC "Jemalloc")
   endif()
-endif()
-
-# Configure SIMD. AVX implies SSE 4.2.
-
-if(OPENVDB_SIMD STREQUAL "AVX")
-  if (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-mavx>")
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-msse4.2>")
-  endif()
-  add_compile_definitions("$<$<COMPILE_LANGUAGE:CXX>:OPENVDB_USE_AVX>")
-  add_compile_definitions("$<$<COMPILE_LANGUAGE:CXX>:OPENVDB_USE_SSE42>")
-elseif(OPENVDB_SIMD STREQUAL "SSE42")
-  if (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
-    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-msse4.2>")
-  endif()
-  add_compile_definitions("$<$<COMPILE_LANGUAGE:CXX>:OPENVDB_USE_SSE42>")
 endif()
 
 #########################################################################

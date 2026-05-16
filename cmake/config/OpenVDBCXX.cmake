@@ -127,6 +127,47 @@ endif()
 
 ###############################################################################
 
+# x86 ISA selection
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
+  if(OPENVDB_X86_INSTRSET GREATER_EQUAL 1)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-msse>")
+  endif()
+  if(OPENVDB_X86_INSTRSET GREATER_EQUAL 2)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-msse2>")
+  endif()
+  if(OPENVDB_X86_INSTRSET GREATER_EQUAL 3)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-msse3>")
+  endif()
+  if(OPENVDB_X86_INSTRSET GREATER_EQUAL 4)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-mssse3>")
+  endif()
+  if(OPENVDB_X86_INSTRSET GREATER_EQUAL 5)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-msse4.1>")
+  endif()
+  if(OPENVDB_X86_INSTRSET GREATER_EQUAL 6)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-msse4.2>")
+  endif()
+  if(OPENVDB_X86_INSTRSET GREATER_EQUAL 7)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-mavx>")
+  endif()
+  if(OPENVDB_X86_INSTRSET GREATER_EQUAL 8)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-mavx2>")
+  endif()
+  if(OPENVDB_X86_INSTRSET GREATER_EQUAL 9)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-mavx512f>")
+  endif()
+  if(OPENVDB_X86_INSTRSET GREATER_EQUAL 10)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-mavx512bw>")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-mavx512dq>")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-mavx512vl>")
+  endif()
+elseif(OPENVDB_X86_INSTRSET GREATER 0)
+  message(WARNING "OPENVDB_X86_INSTRSET has been set but has no effect when building for ${CMAKE_SYSTEM_PROCESSOR}.")
+endif()
+
+###############################################################################
+
 # Increase the number of sections that an object file can contain
 add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/bigobj>")
 # Enable MSVC options that make it behave like other compilers
