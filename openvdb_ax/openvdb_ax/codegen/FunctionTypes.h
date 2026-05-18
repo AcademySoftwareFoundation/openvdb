@@ -1293,6 +1293,7 @@ protected:
             if (result->getType()->isPointerTy())
             {
 #if LLVM_VERSION_MAJOR <= 15
+                (void)this;
                 return Value(result, result->getType()->getPointerElementType());
 #else
                 ArgInfoVector unused;

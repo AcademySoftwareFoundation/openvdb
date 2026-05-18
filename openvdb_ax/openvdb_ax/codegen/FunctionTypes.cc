@@ -20,6 +20,8 @@
 #include <llvm/Support/ModRef.h> // MemoryEffects
 #endif
 
+#include <limits>
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -100,7 +102,8 @@ inline ArgInfo llvmTypeToArgInfo(llvm::Type* in)
         in = in->getContainedType(0);
         ++nptrs;
     }
-    return ArgInfo(in, nptrs);
+    OPENVDB_ASSERT(nptrs < size_t(std::numeric_limits<uint8_t>::max()));
+    return ArgInfo(in, uint8_t(nptrs));
 }
 
 inline ArgInfoVector llvmTypeToArgInfo(const std::vector<llvm::Type*>& in)
