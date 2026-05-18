@@ -2676,8 +2676,7 @@ void Tool::sdf2udf()
       grid->setGridClass(GRID_UNKNOWN);// GRID_LEVEL_SET -> GRID_UNKNOW
     }
     if (mParser.verbose) mTimer.start(action_name);
-    struct Local {static inline void op(const GridT::ValueAllIter& iter) {iter.setValue(math::Abs(*iter));}};
-    tools::foreach(grid->beginValueAll(), Local::op);
+    tools::foreach(grid->beginValueAll(), [](auto &it){it.setValue(math::Abs(*it));});
     if (mParser.verbose) mTimer.stop();
     if (!keep) mGrid.erase(std::next(it).base());
     if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
