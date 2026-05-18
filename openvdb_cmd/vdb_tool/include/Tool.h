@@ -2652,6 +2652,12 @@ void Tool::volumeToMesh()
 }// Tool::volumeToMesh
 
 // ==============================================================================================================
+/*
+void forEachVoxels()
+{
+-forEachVoxels iter=all,on,off op=abs,sqrt,sin,cos,+a,-b,*a,*b,/a,/b,*a+b class=ls,fog,unknown background=
+}
+*/
 
 void Tool::sdf2udf()
 {
