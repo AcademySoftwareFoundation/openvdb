@@ -1404,10 +1404,16 @@ struct OPENVDB_AX_API FunctionGroup
             const FunctionList& list)
         : mName(name)
         , mDoc(doc)
-        , mFunctionList(list) {}
+        , mFunctionList(list) {
+            // Can't verify signatures yet without an LLVM context, asserted on demand
+            OPENVDB_ASSERT(this->HasUniqueFunctionSymbols());
+        }
     ~FunctionGroup() = default;
 
-    /// @brief  Verify the function signatures in this group.
+    /// @brief  Verify the function symbol names in this group (must be unique).
+    bool HasUniqueFunctionSymbols() const;
+
+    /// @brief  Verify the function signatures in this group (must be unique).
     bool HasUniqueTypeSignatures(llvm::LLVMContext& C) const;
 
     /// @brief  Given a vector of args, automatically returns the best

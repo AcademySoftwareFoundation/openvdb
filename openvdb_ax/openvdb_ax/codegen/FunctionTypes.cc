@@ -21,6 +21,8 @@
 #endif
 
 #include <limits>
+#include <vector>
+#include <set>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -707,6 +709,16 @@ Value IRFunctionBase::call(const Arguments& args,
 
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
+
+bool
+FunctionGroup::HasUniqueFunctionSymbols() const
+{
+    std::set<std::string> symset;
+    for (const auto& function : mFunctionList) {
+        if (!symset.insert(function->symbol()).second) return false;
+    }
+    return true;
+}
 
 bool
 FunctionGroup::HasUniqueTypeSignatures(llvm::LLVMContext& C) const
