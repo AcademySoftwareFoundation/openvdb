@@ -136,11 +136,11 @@ __hostdev__ inline Type Min(Type a, Type b)
 }
 __hostdev__ inline int32_t Min(int32_t a, int32_t b)
 {
-    return int32_t(fminf(float(a), float(b)));
+    return a < b ? a : b;
 }
 __hostdev__ inline uint32_t Min(uint32_t a, uint32_t b)
 {
-    return uint32_t(fminf(float(a), float(b)));
+    return a < b ? a : b;
 }
 __hostdev__ inline float Min(float a, float b)
 {
@@ -158,11 +158,11 @@ __hostdev__ inline Type Max(Type a, Type b)
 
 __hostdev__ inline int32_t Max(int32_t a, int32_t b)
 {
-    return int32_t(fmaxf(float(a), float(b)));
+    return a > b ? a : b;
 }
 __hostdev__ inline uint32_t Max(uint32_t a, uint32_t b)
 {
-    return uint32_t(fmaxf(float(a), float(b)));
+    return a > b ? a : b;
 }
 __hostdev__ inline float Max(float a, float b)
 {
@@ -252,18 +252,23 @@ __hostdev__ inline int Abs(int x)
 template<typename CoordT, typename RealT, template<typename> class Vec3T>
 __hostdev__ inline CoordT Round(const Vec3T<RealT>& xyz);
 
+/// @brief Round each component to its closest integer (round-half-toward-+inf)
+/// using @c floor(x+0.5). Same rule is applied to both single and double
+/// precision so float and double inputs yield the same integer coords.
 template<typename CoordT, template<typename> class Vec3T>
 __hostdev__ inline CoordT Round(const Vec3T<float>& xyz)
 {
-    return CoordT(int32_t(rintf(xyz[0])), int32_t(rintf(xyz[1])), int32_t(rintf(xyz[2])));
-    //return CoordT(int32_t(roundf(xyz[0])), int32_t(roundf(xyz[1])), int32_t(roundf(xyz[2])) );
-    //return CoordT(int32_t(floorf(xyz[0] + 0.5f)), int32_t(floorf(xyz[1] + 0.5f)), int32_t(floorf(xyz[2] + 0.5f)));
+    return CoordT(int32_t(floorf(xyz[0] + 0.5f)),
+                  int32_t(floorf(xyz[1] + 0.5f)),
+                  int32_t(floorf(xyz[2] + 0.5f)));
 }
 
 template<typename CoordT, template<typename> class Vec3T>
 __hostdev__ inline CoordT Round(const Vec3T<double>& xyz)
 {
-    return CoordT(int32_t(floor(xyz[0] + 0.5)), int32_t(floor(xyz[1] + 0.5)), int32_t(floor(xyz[2] + 0.5)));
+    return CoordT(int32_t(floor(xyz[0] + 0.5)),
+                  int32_t(floor(xyz[1] + 0.5)),
+                  int32_t(floor(xyz[2] + 0.5)));
 }
 
 template<typename CoordT, typename RealT, template<typename> class Vec3T>
@@ -802,154 +807,279 @@ public:
     __hostdev__ inline Coord2 round() const { return *this; }
 }; // Coord2 class
 
-// ----------------------------> Vec2 <--------------------------------------
+// ----------------------------> VecBase <-----------------------------------
 
-/// @brief A simple vector class with three components, similar to openvdb::math::Vec3
-template<typename T>
-class Vec2
+/// @brief Base class for fixed-size vectors. Provides shared element-wise
+/// arithmetic, scalar arithmetic, equality, length/dot reductions,
+/// component min/max, and integer-coord rounding. Derived classes provide
+/// constructors and any dimension-specific extras (e.g. cross/outer on Vec3).
+template<typename T, int N>
+class VecBase
 {
-    T mVec[2];
+protected:
+    T mVec[N];
 
 public:
-    static const int SIZE = 2;
-    static const int size = 2; // in openvdb::math::Tuple
     using ValueType = T;
+    static constexpr int SIZE = N;
+
+    VecBase() = default;
+
+    /// @brief Indexed element access (no bounds check; assumes 0 <= i < N)
+    __hostdev__ const T& operator[](int i) const { return mVec[i]; }
+    __hostdev__ T&       operator[](int i)       { return mVec[i]; }
+
+    /// @brief raw pointer to the underlying N-element storage
+    __hostdev__ T*       asPointer()       { return mVec; }
+    __hostdev__ const T* asPointer() const { return mVec; }
+
+    // ---- generic element-wise helpers (taking/returning Derived) ----
+
+    template<typename Derived>
+    __hostdev__ Derived plus(const Derived& rhs) const {
+        Derived out;
+        for (int i = 0; i < N; ++i) out[i] = mVec[i] + rhs[i];
+        return out;
+    }
+    template<typename Derived>
+    __hostdev__ Derived minus(const Derived& rhs) const {
+        Derived out;
+        for (int i = 0; i < N; ++i) out[i] = mVec[i] - rhs[i];
+        return out;
+    }
+    template<typename Derived>
+    __hostdev__ Derived mul(const Derived& rhs) const {
+        Derived out;
+        for (int i = 0; i < N; ++i) out[i] = mVec[i] * rhs[i];
+        return out;
+    }
+    template<typename Derived>
+    __hostdev__ Derived div(const Derived& rhs) const {
+        Derived out;
+        for (int i = 0; i < N; ++i) out[i] = mVec[i] / rhs[i];
+        return out;
+    }
+    template<typename Derived>
+    __hostdev__ Derived negate() const {
+        Derived out;
+        for (int i = 0; i < N; ++i) out[i] = -mVec[i];
+        return out;
+    }
+    template<typename Derived>
+    __hostdev__ Derived scale(const T& s) const {
+        Derived out;
+        for (int i = 0; i < N; ++i) out[i] = mVec[i] * s;
+        return out;
+    }
+    /// @brief return (*this) / @a s element-wise as a @c Derived. Uses per-element
+    /// division (correct for integer @c T, unlike multiplying by 1/s).
+    template<typename Derived>
+    __hostdev__ Derived divideBy(const T& s) const {
+        Derived out;
+        for (int i = 0; i < N; ++i) out[i] = mVec[i] / s;
+        return out;
+    }
+
+    // ---- in-place compound assignment helpers ----
+
+    __hostdev__ VecBase& addAssign(const VecBase& rhs) {
+        for (int i = 0; i < N; ++i) mVec[i] += rhs.mVec[i];
+        return *this;
+    }
+    __hostdev__ VecBase& subAssign(const VecBase& rhs) {
+        for (int i = 0; i < N; ++i) mVec[i] -= rhs.mVec[i];
+        return *this;
+    }
+    __hostdev__ VecBase& mulAssign(const VecBase& rhs) {
+        for (int i = 0; i < N; ++i) mVec[i] *= rhs.mVec[i];
+        return *this;
+    }
+    __hostdev__ VecBase& divAssign(const VecBase& rhs) {
+        for (int i = 0; i < N; ++i) mVec[i] /= rhs.mVec[i];
+        return *this;
+    }
+    __hostdev__ VecBase& scaleAssign(const T& s) {
+        for (int i = 0; i < N; ++i) mVec[i] *= s;
+        return *this;
+    }
+    __hostdev__ VecBase& divideAssignScalar(const T& s) {
+        for (int i = 0; i < N; ++i) mVec[i] /= s;
+        return *this;
+    }
+
+    __hostdev__ bool equals(const VecBase& rhs) const {
+        for (int i = 0; i < N; ++i) if (mVec[i] != rhs.mVec[i]) return false;
+        return true;
+    }
+
+    // ---- reductions ----
+
+    /// @brief dot product. @a V must have @c operator[] valid for 0..N-1.
+    template<typename V>
+    __hostdev__ T dot(const V& v) const {
+        T s = T(0);
+        for (int i = 0; i < N; ++i) s += mVec[i] * v[i];
+        return s;
+    }
+    __hostdev__ T lengthSqr() const {
+        T s = T(0);
+        for (int i = 0; i < N; ++i) s += mVec[i] * mVec[i];
+        return s;
+    }
+    __hostdev__ T length() const { return Sqrt(this->lengthSqr()); }
+
+    /// @brief return the smallest of the N components
+    __hostdev__ T smallestComponent() const {
+        T m = mVec[0];
+        for (int i = 1; i < N; ++i) if (mVec[i] < m) m = mVec[i];
+        return m;
+    }
+    /// @brief return the largest of the N components
+    __hostdev__ T largestComponent() const {
+        T m = mVec[0];
+        for (int i = 1; i < N; ++i) if (mVec[i] > m) m = mVec[i];
+        return m;
+    }
+
+    // ---- component-wise (mutating) min/max ----
+
+    template<typename V>
+    __hostdev__ VecBase& mergeMin(const V& other) {
+        for (int i = 0; i < N; ++i) if (other[i] < mVec[i]) mVec[i] = other[i];
+        return *this;
+    }
+    template<typename V>
+    __hostdev__ VecBase& mergeMax(const V& other) {
+        for (int i = 0; i < N; ++i) if (other[i] > mVec[i]) mVec[i] = other[i];
+        return *this;
+    }
+
+    // ---- integer rounding (toward -inf / +inf / nearest) ----
+
+    /// @brief floor-rounded components into the @c Result type (whose @c [i]
+    /// must accept int32_t). For integer @c T the value is passed through.
+    template<typename Result>
+    __hostdev__ Result floorAs() const {
+        Result r;
+        if constexpr (util::is_floating_point<T>::value) {
+            for (int i = 0; i < N; ++i) r[i] = math::Floor(mVec[i]);
+        } else {
+            for (int i = 0; i < N; ++i) r[i] = static_cast<int32_t>(mVec[i]);
+        }
+        return r;
+    }
+    template<typename Result>
+    __hostdev__ Result ceilAs() const {
+        Result r;
+        if constexpr (util::is_floating_point<T>::value) {
+            for (int i = 0; i < N; ++i) r[i] = math::Ceil(mVec[i]);
+        } else {
+            for (int i = 0; i < N; ++i) r[i] = static_cast<int32_t>(mVec[i]);
+        }
+        return r;
+    }
+    /// @brief nearest-integer rounding using floor(x + 0.5) for floating @c T
+    /// (round-half-toward-positive-infinity). Unifies behaviour between float
+    /// and double; pass-through for integer @c T.
+    template<typename Result>
+    __hostdev__ Result roundAs() const {
+        Result r;
+        if constexpr (util::is_floating_point<T>::value) {
+            const T half = T(0.5);
+            for (int i = 0; i < N; ++i) r[i] = math::Floor(mVec[i] + half);
+        } else {
+            for (int i = 0; i < N; ++i) r[i] = static_cast<int32_t>(mVec[i]);
+        }
+        return r;
+    }
+}; // VecBase<T, N>
+
+// ----------------------------> Vec2 <--------------------------------------
+
+/// @brief A simple vector class with two components, similar to openvdb::math::Vec2
+template<typename T>
+class Vec2 : public VecBase<T, 2>
+{
+    using Base = VecBase<T, 2>;
+
+public:
+    using ValueType = T;
+    static const int size = 2; // openvdb::math::Tuple-compat alias of SIZE
+
     Vec2() = default;
-    __hostdev__ explicit Vec2(T x)
-        : mVec{x, x}
-    {
-    }
-    __hostdev__ Vec2(T x, T y)
-        : mVec{x, y}
-    {
-    }
+    __hostdev__ explicit Vec2(T x)            { this->mVec[0] = x;    this->mVec[1] = x;    }
+    __hostdev__ Vec2(T x, T y)                { this->mVec[0] = x;    this->mVec[1] = y;    }
+
     template<template<class> class Vec2T, class T2>
-    __hostdev__ Vec2(const Vec2T<T2>& v)
-        : mVec{T(v[0]), T(v[1])}
-    {
-        static_assert(Vec2T<T2>::size == size, "expected Vec2T::size==2!");
+    __hostdev__ Vec2(const Vec2T<T2>& v) {
+        static_assert(Vec2T<T2>::SIZE == 2, "expected Vec2T::SIZE==2!");
+        this->mVec[0] = T(v[0]); this->mVec[1] = T(v[1]);
     }
     template<typename T2>
-    __hostdev__ explicit Vec2(const Vec2<T2>& v)
-        : mVec{T(v[0]), T(v[1])}
-    {
+    __hostdev__ explicit Vec2(const Vec2<T2>& v) {
+        this->mVec[0] = T(v[0]); this->mVec[1] = T(v[1]);
     }
-    __hostdev__ explicit Vec2(const Coord2& ijk)
-        : mVec{T(ijk[0]), T(ijk[1])}
-    {
+    __hostdev__ explicit Vec2(const Coord2& ijk) {
+        this->mVec[0] = T(ijk[0]); this->mVec[1] = T(ijk[1]);
     }
-    __hostdev__ bool operator==(const Vec2& rhs) const { return mVec[0] == rhs[0] && mVec[1] == rhs[1]; }
-    __hostdev__ bool operator!=(const Vec2& rhs) const { return mVec[0] != rhs[0] || mVec[1] != rhs[1]; }
+
     template<template<class> class Vec2T, class T2>
-    __hostdev__ Vec2& operator=(const Vec2T<T2>& rhs)
-    {
-        static_assert(Vec2T<T2>::size == size, "expected Vec2T::size==2!");
-        mVec[0] = rhs[0];
-        mVec[1] = rhs[1];
-        return *this;
-    }
-    __hostdev__ const T& operator[](int i) const { return mVec[i]; }
-    __hostdev__ T&       operator[](int i) { return mVec[i]; }
-    template<typename Vec2T>
-    __hostdev__ T dot(const Vec2T& v) const { return mVec[0] * v[0] + mVec[1] * v[1]; }
-    __hostdev__ T lengthSqr() const
-    {
-        return mVec[0] * mVec[0] + mVec[1] * mVec[1]; // 3 flops
-    }
-    __hostdev__ T     length() const { return Sqrt(this->lengthSqr()); }
-    __hostdev__ Vec2  operator-() const { return Vec2(-mVec[0], -mVec[1]); }
-    __hostdev__ Vec2  operator*(const Vec2& v) const { return Vec2(mVec[0] * v[0], mVec[1] * v[1]); }
-    __hostdev__ Vec2  operator/(const Vec2& v) const { return Vec2(mVec[0] / v[0], mVec[1] / v[1]); }
-    __hostdev__ Vec2  operator+(const Vec2& v) const { return Vec2(mVec[0] + v[0], mVec[1] + v[1]); }
-    __hostdev__ Vec2  operator-(const Vec2& v) const { return Vec2(mVec[0] - v[0], mVec[1] - v[1]); }
-    __hostdev__ Vec2  operator+(const Coord& ijk) const { return Vec2(mVec[0] + ijk[0], mVec[1] + ijk[1]); }
-    __hostdev__ Vec2  operator-(const Coord& ijk) const { return Vec2(mVec[0] - ijk[0], mVec[1] - ijk[1]); }
-    __hostdev__ Vec2  operator*(const T& s) const { return Vec2(s * mVec[0], s * mVec[1]); }
-    __hostdev__ Vec2  operator/(const T& s) const { return (T(1) / s) * (*this); }
-    __hostdev__ Vec2& operator+=(const Vec2& v)
-    {
-        mVec[0] += v[0];
-        mVec[1] += v[1];
-        return *this;
-    }
-    __hostdev__ Vec2& operator+=(const Coord& ijk)
-    {
-        mVec[0] += T(ijk[0]);
-        mVec[1] += T(ijk[1]);
-        return *this;
-    }
-    __hostdev__ Vec2& operator-=(const Vec2& v)
-    {
-        mVec[0] -= v[0];
-        mVec[1] -= v[1];
-        return *this;
-    }
-    __hostdev__ Vec2& operator-=(const Coord& ijk)
-    {
-        mVec[0] -= T(ijk[0]);
-        mVec[1] -= T(ijk[1]);
-        return *this;
-    }
-    __hostdev__ Vec2& operator*=(const T& s)
-    {
-        mVec[0] *= s;
-        mVec[1] *= s;
-        return *this;
-    }
-    __hostdev__ Vec2& operator/=(const T& s) { return (*this) *= T(1) / s; }
-    __hostdev__ Vec2& normalize() { return (*this) /= this->length(); }
-    /// @brief Perform a component-wise minimum with the other Coord.
-    __hostdev__ Vec2& minComponent(const Vec2& other)
-    {
-        if (other[0] < mVec[0])
-            mVec[0] = other[0];
-        if (other[1] < mVec[1])
-            mVec[1] = other[1];
+    __hostdev__ Vec2& operator=(const Vec2T<T2>& rhs) {
+        static_assert(Vec2T<T2>::SIZE == 2, "expected Vec2T::SIZE==2!");
+        this->mVec[0] = rhs[0]; this->mVec[1] = rhs[1];
         return *this;
     }
 
-    /// @brief Perform a component-wise maximum with the other Coord.
-    __hostdev__ Vec2& maxComponent(const Vec2& other)
-    {
-        if (other[0] > mVec[0])
-            mVec[0] = other[0];
-        if (other[1] > mVec[1])
-            mVec[1] = other[1];
+    // ---- element-wise (Vec & Vec) ----
+    __hostdev__ Vec2  operator-() const            { return Base::template negate<Vec2>(); }
+    __hostdev__ Vec2  operator+(const Vec2& v) const { return Base::template plus<Vec2>(v); }
+    __hostdev__ Vec2  operator-(const Vec2& v) const { return Base::template minus<Vec2>(v); }
+    __hostdev__ Vec2  operator*(const Vec2& v) const { return Base::template mul<Vec2>(v); }
+    __hostdev__ Vec2  operator/(const Vec2& v) const { return Base::template div<Vec2>(v); }
+    __hostdev__ Vec2& operator+=(const Vec2& v)    { Base::addAssign(v); return *this; }
+    __hostdev__ Vec2& operator-=(const Vec2& v)    { Base::subAssign(v); return *this; }
+
+    // ---- mixed Vec2 / Coord2 ----
+    __hostdev__ Vec2  operator+(const Coord2& ijk) const { return Vec2(this->mVec[0] + ijk[0], this->mVec[1] + ijk[1]); }
+    __hostdev__ Vec2  operator-(const Coord2& ijk) const { return Vec2(this->mVec[0] - ijk[0], this->mVec[1] - ijk[1]); }
+    __hostdev__ Vec2& operator+=(const Coord2& ijk) {
+        this->mVec[0] += T(ijk[0]); this->mVec[1] += T(ijk[1]);
         return *this;
     }
+    __hostdev__ Vec2& operator-=(const Coord2& ijk) {
+        this->mVec[0] -= T(ijk[0]); this->mVec[1] -= T(ijk[1]);
+        return *this;
+    }
+
+    // ---- scalar ----
+    __hostdev__ Vec2  operator*(const T& s) const  { return Base::template scale<Vec2>(s); }
+    __hostdev__ Vec2  operator/(const T& s) const  { return Base::template divideBy<Vec2>(s); }
+    __hostdev__ Vec2& operator*=(const T& s)       { Base::scaleAssign(s); return *this; }
+    __hostdev__ Vec2& operator/=(const T& s)       { Base::divideAssignScalar(s); return *this; }
+    __hostdev__ Vec2& normalize()                  { return (*this) /= this->length(); }
+
+    // ---- equality ----
+    __hostdev__ bool operator==(const Vec2& rhs) const { return Base::equals(rhs); }
+    __hostdev__ bool operator!=(const Vec2& rhs) const { return !Base::equals(rhs); }
+
+    // ---- component-wise min/max ----
+    __hostdev__ Vec2& minComponent(const Vec2& other) { Base::mergeMin(other); return *this; }
+    __hostdev__ Vec2& maxComponent(const Vec2& other) { Base::mergeMax(other); return *this; }
+
     /// @brief Return the smallest vector component
-    __hostdev__ ValueType min() const
-    {
-        return mVec[0] < mVec[1] ? mVec[0] : mVec[1];
-    }
+    __hostdev__ ValueType min() const { return Base::smallestComponent(); }
     /// @brief Return the largest vector component
-    __hostdev__ ValueType max() const
-    {
-        return mVec[0] > mVec[1] ? mVec[0] : mVec[1];
-    }
-    /// @brief Round each component if this Vec<T> up to its integer value
-    /// @return Return an integer Coord
-    __hostdev__ Coord2 floor() const { return Coord2(Floor(mVec[0]), Floor(mVec[1])); }
-    /// @brief Round each component if this Vec<T> down to its integer value
-    /// @return Return an integer Coord
-    __hostdev__ Coord2 ceil() const { return Coord2(Ceil(mVec[0]), Ceil(mVec[1])); }
-    /// @brief Round each component if this Vec<T> to its closest integer value
-    /// @return Return an integer Coord
-    __hostdev__ Coord2 round() const
-    {
-        if constexpr(util::is_same<T, float>::value) {
-            return Coord2(Floor(mVec[0] + 0.5f), Floor(mVec[1] + 0.5f));
-        } else if constexpr(util::is_same<T, int>::value) {
-            return Coord2(mVec[0], mVec[1]);
-        } else {
-            return Coord2(Floor(mVec[0] + 0.5), Floor(mVec[1] + 0.5));
-        }
-    }
+    __hostdev__ ValueType max() const { return Base::largestComponent(); }
 
-    /// @brief return a non-const raw constant pointer to array of three vector components
-    __hostdev__ T* asPointer() { return mVec; }
-    /// @brief return a const raw constant pointer to array of three vector components
-    __hostdev__ const T* asPointer() const { return mVec; }
+    /// @brief Round each component down (toward negative infinity)
+    /// @return integer Coord2
+    __hostdev__ Coord2 floor() const { return Base::template floorAs<Coord2>(); }
+    /// @brief Round each component up (toward positive infinity)
+    /// @return integer Coord2
+    __hostdev__ Coord2 ceil()  const { return Base::template ceilAs<Coord2>(); }
+    /// @brief Round each component to its closest integer value
+    /// @return integer Coord2
+    __hostdev__ Coord2 round() const { return Base::template roundAs<Coord2>(); }
 }; // Vec2<T>
 
 template<typename T1, typename T2>
@@ -982,16 +1112,18 @@ class MatBase {
 protected:
     T mData[ROWS * COLS];  // 1D array storage
 
+public:
+    using ValueType = T;
+
     static constexpr int rows() { return ROWS; }
     static constexpr int cols() { return COLS; }
     static constexpr int size() { return ROWS * COLS; }
 
-public:
     MatBase() = default;
 
     template<typename S>
     __hostdev__ MatBase(S* array) {
-        for (int i = 0; i < ROWS * COLS; ++i) {
+        for (int i = 0; i < size(); ++i) {
             mData[i] = static_cast<T>(array[i]);
         }
     }
@@ -1003,6 +1135,131 @@ public:
     __hostdev__ const T* operator[](int row) const {
         return &mData[row * COLS];
     }
+
+    /// @brief return a raw pointer to the underlying 1D storage (row-major)
+    __hostdev__ T*       data()       { return mData; }
+    /// @brief return a const raw pointer to the underlying 1D storage (row-major)
+    __hostdev__ const T* data() const { return mData; }
+
+    // ---- generic element-wise helpers ----
+
+    /// @brief return @c *this + @a rhs as a @c Derived
+    template<typename Derived>
+    __hostdev__ Derived plus(const Derived& rhs) const {
+        Derived out;
+        for (int i = 0; i < size(); ++i) out.data()[i] = mData[i] + rhs.data()[i];
+        return out;
+    }
+
+    /// @brief return @c *this - @a rhs as a @c Derived
+    template<typename Derived>
+    __hostdev__ Derived minus(const Derived& rhs) const {
+        Derived out;
+        for (int i = 0; i < size(); ++i) out.data()[i] = mData[i] - rhs.data()[i];
+        return out;
+    }
+
+    /// @brief return -(*this) as a @c Derived
+    template<typename Derived>
+    __hostdev__ Derived negate() const {
+        Derived out;
+        for (int i = 0; i < size(); ++i) out.data()[i] = -mData[i];
+        return out;
+    }
+
+    /// @brief return @a s * (*this) as a @c Derived
+    template<typename Derived>
+    __hostdev__ Derived scale(const T& s) const {
+        Derived out;
+        for (int i = 0; i < size(); ++i) out.data()[i] = mData[i] * s;
+        return out;
+    }
+
+    __hostdev__ MatBase& addAssign(const MatBase& rhs) {
+        for (int i = 0; i < size(); ++i) mData[i] += rhs.mData[i];
+        return *this;
+    }
+    __hostdev__ MatBase& subAssign(const MatBase& rhs) {
+        for (int i = 0; i < size(); ++i) mData[i] -= rhs.mData[i];
+        return *this;
+    }
+    __hostdev__ MatBase& scaleAssign(const T& s) {
+        for (int i = 0; i < size(); ++i) mData[i] *= s;
+        return *this;
+    }
+
+    /// @brief return (*this) / @a s element-wise as a @c Derived. Uses
+    /// per-element division (correct for integer @c T, unlike multiplying by 1/s).
+    template<typename Derived>
+    __hostdev__ Derived divideBy(const T& s) const {
+        Derived out;
+        for (int i = 0; i < size(); ++i) out.data()[i] = mData[i] / s;
+        return out;
+    }
+    __hostdev__ MatBase& divideAssign(const T& s) {
+        for (int i = 0; i < size(); ++i) mData[i] /= s;
+        return *this;
+    }
+
+    __hostdev__ bool equals(const MatBase& rhs) const {
+        for (int i = 0; i < size(); ++i) if (mData[i] != rhs.mData[i]) return false;
+        return true;
+    }
+
+    // ---- generic transpose ----
+
+    /// @brief return the transpose of @c *this as the @c Result type.
+    /// @tparam Result a matrix type whose dimensions are (COLS, ROWS)
+    template<typename Result>
+    __hostdev__ Result transposeAs() const {
+        static_assert(Result::rows() == COLS && Result::cols() == ROWS,
+                      "transposeAs: result dims must be (COLS, ROWS)");
+        Result r;
+        for (int i = 0; i < ROWS; ++i)
+            for (int j = 0; j < COLS; ++j)
+                r[j][i] = mData[i * COLS + j];
+        return r;
+    }
+
+    // ---- generic matrix * matrix ----
+
+    /// @brief return (*this) * @a rhs as the @c Result type.
+    /// @tparam Result a matrix type whose dimensions are (ROWS, Rhs::cols())
+    /// @tparam Rhs    a matrix type whose row count equals @c COLS
+    template<typename Result, typename Rhs>
+    __hostdev__ Result multiply(const Rhs& rhs) const {
+        static_assert(COLS == Rhs::rows(), "multiply: lhs.cols must equal rhs.rows");
+        static_assert(Result::rows() == ROWS && Result::cols() == Rhs::cols(),
+                      "multiply: result dims mismatch");
+        Result r;
+        for (int i = 0; i < ROWS; ++i) {
+            for (int j = 0; j < Rhs::cols(); ++j) {
+                T sum = T(0);
+                for (int k = 0; k < COLS; ++k)
+                    sum += mData[i * COLS + k] * rhs[k][j];
+                r[i][j] = sum;
+            }
+        }
+        return r;
+    }
+
+    // ---- generic matrix * vector ----
+
+    /// @brief return (*this) * @a v as the @c VecResult type.
+    /// @tparam VecResult a vector type whose @c SIZE equals @c ROWS
+    /// @tparam VecRhs    a vector type whose @c SIZE equals @c COLS
+    template<typename VecResult, typename VecRhs>
+    __hostdev__ VecResult multiplyVec(const VecRhs& v) const {
+        static_assert(VecRhs::SIZE == COLS && VecResult::SIZE == ROWS,
+                      "multiplyVec: dim mismatch");
+        VecResult r;
+        for (int i = 0; i < ROWS; ++i) {
+            T sum = T(0);
+            for (int k = 0; k < COLS; ++k) sum += mData[i * COLS + k] * v[k];
+            r[i] = sum;
+        }
+        return r;
+    }
 };
 
 // Forward declarations
@@ -1011,6 +1268,7 @@ template<typename T> class Mat2x3;
 template<typename T> class Mat3x2;
 template<typename T> class Mat3;
 template<typename T> class Mat4;
+template<typename T> class Vec4;
 
 
 
@@ -1033,40 +1291,39 @@ public:
     template<typename Source>
     __hostdev__ Mat2(Source* array) : Base(array) {}
 
-    __hostdev__ Mat2  operator-() const { return Mat2(-(*this)[0][0], -(*this)[0][1], -(*this)[1][0], -(*this)[1][1]); }
+    // ---- element-wise ----
+    __hostdev__ Mat2  operator-() const                  { return this->template negate<Mat2>(); }
+    __hostdev__ Mat2  operator+(const Mat2& m) const     { return this->template plus<Mat2>(m); }
+    __hostdev__ Mat2  operator-(const Mat2& m) const     { return this->template minus<Mat2>(m); }
+    __hostdev__ Mat2& operator+=(const Mat2& m)          { Base::addAssign(m); return *this; }
+    __hostdev__ Mat2& operator-=(const Mat2& m)          { Base::subAssign(m); return *this; }
 
-    /// @brief Multiply by 2x2 matrix @a m and return the resulting matrix.
-    __hostdev__ Mat2<T> operator*(const Mat2<T>& m) const {
-        return Mat2<T>(
-            (*this)[0][0] * m[0][0] + (*this)[0][1] * m[1][0],
-            (*this)[0][0] * m[0][1] + (*this)[0][1] * m[1][1],
-            (*this)[1][0] * m[0][0] + (*this)[1][1] * m[1][0],
-            (*this)[1][0] * m[0][1] + (*this)[1][1] * m[1][1]
-        );
-    }
+    // ---- matrix * matrix / matrix * vector ----
+    __hostdev__ Mat2     operator*(const Mat2& m) const     { return this->template multiply<Mat2, Mat2>(m); }
+    __hostdev__ Vec2<T>  operator*(const Vec2<T>& v) const  { return this->template multiplyVec<Vec2<T>, Vec2<T>>(v); }
 
-    /// @brief Add each element of the given matrix to the corresponding element of this matrix.
-    __hostdev__ Mat2<T>& operator+=(const Mat2<T>& m) {
-        (*this)[0][0] += m[0][0];
-        (*this)[0][1] += m[0][1];
-        (*this)[1][0] += m[1][0];
-        (*this)[1][1] += m[1][1];
-        return *this;
-    }
+    // ---- scalar ----
+    __hostdev__ Mat2  operator*(const T& s) const        { return this->template scale<Mat2>(s); }
+    __hostdev__ Mat2  operator/(const T& s) const        { return this->template divideBy<Mat2>(s); }
+    __hostdev__ Mat2& operator*=(const T& s)             { Base::scaleAssign(s); return *this; }
+    __hostdev__ Mat2& operator/=(const T& s)             { Base::divideAssign(s); return *this; }
+
+    // ---- equality ----
+    __hostdev__ bool operator==(const Mat2& m) const     { return Base::equals(m); }
+    __hostdev__ bool operator!=(const Mat2& m) const     { return !Base::equals(m); }
 
     /// @brief returns transpose of this
-    __hostdev__ Mat2<T> transpose() const {
-        return Mat2<T>((*this)[0][0], (*this)[1][0], (*this)[0][1], (*this)[1][1]);
-    }
+    __hostdev__ Mat2 transpose() const { return this->template transposeAs<Mat2>(); }
 
     /// @brief returns inverse of this
     __hostdev__ Mat2<T> inverse() const {
         T det = (*this)[0][0] * (*this)[1][1] - (*this)[0][1] * (*this)[1][0];
         if (isApproxZero(det)) {
-            return Mat2<T>();
+            return Mat2<T>(T(0), T(0), T(0), T(0));
         }
-        T invDet   = 1.f / det;
-        return Mat2<T>((*this)[1][1] * invDet, -(*this)[0][1] * invDet, -(*this)[1][0] * invDet, (*this)[0][0] * invDet);
+        T invDet = T(1) / det;
+        return Mat2<T>((*this)[1][1] * invDet, -(*this)[0][1] * invDet,
+                      -(*this)[1][0] * invDet,  (*this)[0][0] * invDet);
     }
 };
 
@@ -1090,29 +1347,28 @@ public:
     __hostdev__ Mat2x3(Source* array) : Base(array) {}
 
 
-    /// @brief Add two matrices and return the resulting matrix.
-    __hostdev__ Mat2x3<T> operator+(const Mat2x3<T>& m) const {
-        return Mat2x3<T>(
-            (*this)[0][0] + m[0][0], (*this)[0][1] + m[0][1], (*this)[0][2] + m[0][2],
-            (*this)[1][0] + m[1][0], (*this)[1][1] + m[1][1], (*this)[1][2] + m[1][2]
-        );
-    }
+    // ---- element-wise ----
+    __hostdev__ Mat2x3  operator-() const                  { return this->template negate<Mat2x3>(); }
+    __hostdev__ Mat2x3  operator+(const Mat2x3& m) const   { return this->template plus<Mat2x3>(m); }
+    __hostdev__ Mat2x3  operator-(const Mat2x3& m) const   { return this->template minus<Mat2x3>(m); }
+    __hostdev__ Mat2x3& operator+=(const Mat2x3& m)        { Base::addAssign(m); return *this; }
+    __hostdev__ Mat2x3& operator-=(const Mat2x3& m)        { Base::subAssign(m); return *this; }
 
-    /// @brief Add a 2x3 matrix to this matrix.
-    __hostdev__ Mat2x3<T>& operator+=(const Mat2x3<T>& m) {
-        (*this)[0][0] += m[0][0]; (*this)[0][1] += m[0][1]; (*this)[0][2] += m[0][2];
-        (*this)[1][0] += m[1][0]; (*this)[1][1] += m[1][1]; (*this)[1][2] += m[1][2];
-        return *this;
-    }
+    // ---- matrix * vector ----
+    __hostdev__ Vec2<T> operator*(const Vec3<T>& v) const  { return this->template multiplyVec<Vec2<T>, Vec3<T>>(v); }
+
+    // ---- scalar ----
+    __hostdev__ Mat2x3  operator*(const T& s) const        { return this->template scale<Mat2x3>(s); }
+    __hostdev__ Mat2x3  operator/(const T& s) const        { return this->template divideBy<Mat2x3>(s); }
+    __hostdev__ Mat2x3& operator*=(const T& s)             { Base::scaleAssign(s); return *this; }
+    __hostdev__ Mat2x3& operator/=(const T& s)             { Base::divideAssign(s); return *this; }
+
+    // ---- equality ----
+    __hostdev__ bool operator==(const Mat2x3& m) const     { return Base::equals(m); }
+    __hostdev__ bool operator!=(const Mat2x3& m) const     { return !Base::equals(m); }
 
     /// @brief returns transpose of this
-    __hostdev__ Mat3x2<T> transpose() const {
-        return Mat3x2<T>(
-            (*this)[0][0], (*this)[1][0],  // First row
-            (*this)[0][1], (*this)[1][1],  // Second row
-            (*this)[0][2], (*this)[1][2]   // Third row
-        );
-    }
+    __hostdev__ Mat3x2<T> transpose() const { return this->template transposeAs<Mat3x2<T>>(); }
 };
 
 template <typename T>
@@ -1127,8 +1383,7 @@ public:
         c d
         e f
         @endverbatim */
-    template<typename Source>
-    __hostdev__ Mat3x2(Source a, Source b, Source c, Source d, Source e, Source f)
+    __hostdev__ Mat3x2(T a, T b, T c, T d, T e, T f)
     {
         this->mData[0] = a; this->mData[1] = b;
         this->mData[2] = c; this->mData[3] = d;
@@ -1139,11 +1394,28 @@ public:
     template<typename Source>
     __hostdev__ Mat3x2(Source *a): Base(a) {}
 
+    // ---- element-wise ----
+    __hostdev__ Mat3x2  operator-() const                  { return this->template negate<Mat3x2>(); }
+    __hostdev__ Mat3x2  operator+(const Mat3x2& m) const   { return this->template plus<Mat3x2>(m); }
+    __hostdev__ Mat3x2  operator-(const Mat3x2& m) const   { return this->template minus<Mat3x2>(m); }
+    __hostdev__ Mat3x2& operator+=(const Mat3x2& m)        { Base::addAssign(m); return *this; }
+    __hostdev__ Mat3x2& operator-=(const Mat3x2& m)        { Base::subAssign(m); return *this; }
+
+    // ---- matrix * vector ----
+    __hostdev__ Vec3<T> operator*(const Vec2<T>& v) const  { return this->template multiplyVec<Vec3<T>, Vec2<T>>(v); }
+
+    // ---- scalar ----
+    __hostdev__ Mat3x2  operator*(const T& s) const        { return this->template scale<Mat3x2>(s); }
+    __hostdev__ Mat3x2  operator/(const T& s) const        { return this->template divideBy<Mat3x2>(s); }
+    __hostdev__ Mat3x2& operator*=(const T& s)             { Base::scaleAssign(s); return *this; }
+    __hostdev__ Mat3x2& operator/=(const T& s)             { Base::divideAssign(s); return *this; }
+
+    // ---- equality ----
+    __hostdev__ bool operator==(const Mat3x2& m) const     { return Base::equals(m); }
+    __hostdev__ bool operator!=(const Mat3x2& m) const     { return !Base::equals(m); }
+
     /// @brief returns transpose of this
-    __hostdev__ Mat2x3<T> transpose() const {
-        return Mat2x3<T>((*this)[0][0], (*this)[1][0], (*this)[2][0], // First row
-                   (*this)[0][1], (*this)[1][1], (*this)[2][1]); // Second row
-    }
+    __hostdev__ Mat2x3<T> transpose() const { return this->template transposeAs<Mat2x3<T>>(); }
 
 };
 
@@ -1159,10 +1431,9 @@ public:
         d e f
         g h i
         @endverbatim */
-    template<typename Source>
-    __hostdev__ Mat3(Source a, Source b, Source c,
-         Source d, Source e, Source f,
-         Source g, Source h, Source i)
+    __hostdev__ Mat3(T a, T b, T c,
+                     T d, T e, T f,
+                     T g, T h, T i)
     {
         this->mData[0] = a; this->mData[1] = b; this->mData[2] = c;
         this->mData[3] = d; this->mData[4] = e; this->mData[5] = f;
@@ -1174,53 +1445,29 @@ public:
     __hostdev__ Mat3(Source *a): Base(a) {}
 
 
-    /// @brief Add two matrices and return the resulting matrix.
-    __hostdev__ Mat3<T> operator+(const Mat3<T>& m) const {
-        return Mat3<T>(
-            (*this)[0][0] + m[0][0], (*this)[0][1] + m[0][1], (*this)[0][2] + m[0][2],
-            (*this)[1][0] + m[1][0], (*this)[1][1] + m[1][1], (*this)[1][2] + m[1][2],
-            (*this)[2][0] + m[2][0], (*this)[2][1] + m[2][1], (*this)[2][2] + m[2][2]
-        );
-    }
+    // ---- element-wise ----
+    __hostdev__ Mat3  operator-() const                  { return this->template negate<Mat3>(); }
+    __hostdev__ Mat3  operator+(const Mat3& m) const     { return this->template plus<Mat3>(m); }
+    __hostdev__ Mat3  operator-(const Mat3& m) const     { return this->template minus<Mat3>(m); }
+    __hostdev__ Mat3& operator+=(const Mat3& m)          { Base::addAssign(m); return *this; }
+    __hostdev__ Mat3& operator-=(const Mat3& m)          { Base::subAssign(m); return *this; }
 
-    /// @brief Multiply by @a v and return the resulting vector.
-    __hostdev__ Vec3<T> operator*(const Vec3<T>& v) const {
-        return Vec3<T>(
-            (*this)[0][0] * v[0] + (*this)[0][1] * v[1] + (*this)[0][2] * v[2],
-            (*this)[1][0] * v[0] + (*this)[1][1] * v[1] + (*this)[1][2] * v[2],
-            (*this)[2][0] * v[0] + (*this)[2][1] * v[1] + (*this)[2][2] * v[2]
-        );
-    }
+    // ---- matrix * matrix / matrix * vector ----
+    __hostdev__ Mat3    operator*(const Mat3& m) const     { return this->template multiply<Mat3, Mat3>(m); }
+    __hostdev__ Vec3<T> operator*(const Vec3<T>& v) const  { return this->template multiplyVec<Vec3<T>, Vec3<T>>(v); }
 
-    /// @brief Multiply by 3x3 matrix @a m and return the resulting matrix.
-    __hostdev__ Mat3<T> operator*(const Mat3<T>& m) const {
-        return Mat3<T>(
-            (*this)[0][0] * m[0][0] + (*this)[0][1] * m[1][0] + (*this)[0][2] * m[2][0],
-            (*this)[0][0] * m[0][1] + (*this)[0][1] * m[1][1] + (*this)[0][2] * m[2][1],
-            (*this)[0][0] * m[0][2] + (*this)[0][1] * m[1][2] + (*this)[0][2] * m[2][2],
-            (*this)[1][0] * m[0][0] + (*this)[1][1] * m[1][0] + (*this)[1][2] * m[2][0],
-            (*this)[1][0] * m[0][1] + (*this)[1][1] * m[1][1] + (*this)[1][2] * m[2][1],
-            (*this)[1][0] * m[0][2] + (*this)[1][1] * m[1][2] + (*this)[1][2] * m[2][2],
-            (*this)[2][0] * m[0][0] + (*this)[2][1] * m[1][0] + (*this)[2][2] * m[2][0],
-            (*this)[2][0] * m[0][1] + (*this)[2][1] * m[1][1] + (*this)[2][2] * m[2][1],
-            (*this)[2][0] * m[0][2] + (*this)[2][1] * m[1][2] + (*this)[2][2] * m[2][2]
-        );
-    }
+    // ---- scalar ----
+    __hostdev__ Mat3  operator*(const T& s) const        { return this->template scale<Mat3>(s); }
+    __hostdev__ Mat3  operator/(const T& s) const        { return this->template divideBy<Mat3>(s); }
+    __hostdev__ Mat3& operator*=(const T& s)             { Base::scaleAssign(s); return *this; }
+    __hostdev__ Mat3& operator/=(const T& s)             { Base::divideAssign(s); return *this; }
 
-    /// @brief Add each element of the given matrix to the corresponding element of this matrix.
-    __hostdev__ Mat3<T>& operator+=(const Mat3<T>& m) {
-        (*this)[0][0] += m[0][0]; (*this)[0][1] += m[0][1]; (*this)[0][2] += m[0][2];
-        (*this)[1][0] += m[1][0]; (*this)[1][1] += m[1][1]; (*this)[1][2] += m[1][2];
-        (*this)[2][0] += m[2][0]; (*this)[2][1] += m[2][1]; (*this)[2][2] += m[2][2];
-        return *this;
-    }
+    // ---- equality ----
+    __hostdev__ bool operator==(const Mat3& m) const     { return Base::equals(m); }
+    __hostdev__ bool operator!=(const Mat3& m) const     { return !Base::equals(m); }
 
     /// @brief returns transpose of this
-    __hostdev__ Mat3 transpose() const {
-        return Mat3((*this)[0][0], (*this)[1][0], (*this)[2][0],
-                   (*this)[0][1], (*this)[1][1], (*this)[2][1],
-                   (*this)[0][2], (*this)[1][2], (*this)[2][2]);
-    }
+    __hostdev__ Mat3 transpose() const { return this->template transposeAs<Mat3>(); }
 };
 
 template <typename T>
@@ -1236,11 +1483,10 @@ public:
         i j k l
         m n o p
         @endverbatim */
-    template<typename Source>
-    __hostdev__ Mat4(Source a, Source b, Source c, Source d,
-         Source e, Source f, Source g, Source h,
-         Source i, Source j, Source k, Source l,
-         Source m, Source n, Source o, Source p)
+    __hostdev__ Mat4(T a, T b, T c, T d,
+                     T e, T f, T g, T h,
+                     T i, T j, T k, T l,
+                     T m, T n, T o, T p)
     {
         this->mData[0] = a; this->mData[1] = b; this->mData[2] = c; this->mData[3] = d;
         this->mData[4] = e; this->mData[5] = f; this->mData[6] = g; this->mData[7] = h;
@@ -1252,281 +1498,181 @@ public:
     template<typename Source>
     __hostdev__ Mat4(Source *a): Base(a) {}
 
+    // ---- element-wise ----
+    __hostdev__ Mat4  operator-() const                  { return this->template negate<Mat4>(); }
+    __hostdev__ Mat4  operator+(const Mat4& m) const     { return this->template plus<Mat4>(m); }
+    __hostdev__ Mat4  operator-(const Mat4& m) const     { return this->template minus<Mat4>(m); }
+    __hostdev__ Mat4& operator+=(const Mat4& m)          { Base::addAssign(m); return *this; }
+    __hostdev__ Mat4& operator-=(const Mat4& m)          { Base::subAssign(m); return *this; }
+
+    // ---- matrix * matrix / matrix * vector ----
+    __hostdev__ Mat4    operator*(const Mat4& m) const     { return this->template multiply<Mat4, Mat4>(m); }
+    __hostdev__ Vec4<T> operator*(const Vec4<T>& v) const  { return this->template multiplyVec<Vec4<T>, Vec4<T>>(v); }
+
+    // ---- scalar ----
+    __hostdev__ Mat4  operator*(const T& s) const        { return this->template scale<Mat4>(s); }
+    __hostdev__ Mat4  operator/(const T& s) const        { return this->template divideBy<Mat4>(s); }
+    __hostdev__ Mat4& operator*=(const T& s)             { Base::scaleAssign(s); return *this; }
+    __hostdev__ Mat4& operator/=(const T& s)             { Base::divideAssign(s); return *this; }
+
+    // ---- equality ----
+    __hostdev__ bool operator==(const Mat4& m) const     { return Base::equals(m); }
+    __hostdev__ bool operator!=(const Mat4& m) const     { return !Base::equals(m); }
+
     /// @brief returns transpose of this
-    __hostdev__ Mat4 transpose() const {
-        return Mat4((*this)[0][0], (*this)[1][0], (*this)[2][0], (*this)[3][0],
-                   (*this)[0][1], (*this)[1][1], (*this)[2][1], (*this)[3][1],
-                   (*this)[0][2], (*this)[1][2], (*this)[2][2], (*this)[3][2],
-                   (*this)[0][3], (*this)[1][3], (*this)[2][3], (*this)[3][3]);
-    }
+    __hostdev__ Mat4 transpose() const { return this->template transposeAs<Mat4>(); }
 };
 
 /// @brief Multiply a scalar by a 2x2 matrix, result is a 2x2 matrix
 template<typename T>
-__hostdev__ Mat2<T> operator*(const T& s, const Mat2<T>& m) {
-    return Mat2<T>(m[0][0] * s, m[0][1] * s, m[1][0] * s, m[1][1] * s);
-}
+__hostdev__ Mat2<T> operator*(const T& s, const Mat2<T>& m) { return m.template scale<Mat2<T>>(s); }
+/// @brief Multiply a scalar by a 2x3 matrix, result is a 2x3 matrix
+template<typename T>
+__hostdev__ Mat2x3<T> operator*(const T& s, const Mat2x3<T>& m) { return m.template scale<Mat2x3<T>>(s); }
+/// @brief Multiply a scalar by a 3x2 matrix, result is a 3x2 matrix
+template<typename T>
+__hostdev__ Mat3x2<T> operator*(const T& s, const Mat3x2<T>& m) { return m.template scale<Mat3x2<T>>(s); }
+/// @brief Multiply a scalar by a 3x3 matrix, result is a 3x3 matrix
+template<typename T>
+__hostdev__ Mat3<T> operator*(const T& s, const Mat3<T>& m) { return m.template scale<Mat3<T>>(s); }
+/// @brief Multiply a scalar by a 4x4 matrix, result is a 4x4 matrix
+template<typename T>
+__hostdev__ Mat4<T> operator*(const T& s, const Mat4<T>& m) { return m.template scale<Mat4<T>>(s); }
 
 /// @brief Multiply a 2x3 matrix by a 3x2 matrix, result is a 2x2 matrix
 template<typename T>
 __hostdev__ Mat2<T> operator*(const Mat2x3<T>& lhs, const Mat3x2<T>& rhs) {
-    return Mat2<T>(
-        // First row
-        lhs[0][0] * rhs[0][0] + lhs[0][1] * rhs[1][0] + lhs[0][2] * rhs[2][0],    // [0][0]
-        lhs[0][0] * rhs[0][1] + lhs[0][1] * rhs[1][1] + lhs[0][2] * rhs[2][1],    // [0][1]
-
-        // Second row
-        lhs[1][0] * rhs[0][0] + lhs[1][1] * rhs[1][0] + lhs[1][2] * rhs[2][0],    // [1][0]
-        lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1] + lhs[1][2] * rhs[2][1]     // [1][1]
-    );
-}
-/// @brief Multiply a 3x3 matrix by a 2x3 matrix, result is a 2x3 matrix
-template<typename T>
-__hostdev__ Mat2x3<T> operator*(const Mat3<T>& lhs, const Mat2x3<T>& rhs) {
-    return Mat2x3<T>(
-        // First row
-        lhs[0][0] * rhs[0][0] + lhs[0][1] * rhs[1][0],
-        lhs[0][0] * rhs[0][1] + lhs[0][1] * rhs[1][1],
-        lhs[0][0] * rhs[0][2] + lhs[0][1] * rhs[1][2],
-
-        // Second row
-        lhs[1][0] * rhs[0][0] + lhs[1][1] * rhs[1][0],
-        lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1],
-        lhs[1][0] * rhs[0][2] + lhs[1][1] * rhs[1][2]
-    );
+    return lhs.template multiply<Mat2<T>, Mat3x2<T>>(rhs);
 }
 /// @brief Multiply a 2x3 matrix by a 3x3 matrix, result is a 2x3 matrix
 template<typename T>
 __hostdev__ Mat2x3<T> operator*(const Mat2x3<T>& lhs, const Mat3<T>& rhs) {
-    return Mat2x3<T>(
-        // First row (3 elements)
-        lhs[0][0] * rhs[0][0] + lhs[0][1] * rhs[1][0] + lhs[0][2] * rhs[2][0],
-        lhs[0][0] * rhs[0][1] + lhs[0][1] * rhs[1][1] + lhs[0][2] * rhs[2][1],
-        lhs[0][0] * rhs[0][2] + lhs[0][1] * rhs[1][2] + lhs[0][2] * rhs[2][2],
-
-        // Second row (3 elements)
-        lhs[1][0] * rhs[0][0] + lhs[1][1] * rhs[1][0] + lhs[1][2] * rhs[2][0],
-        lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1] + lhs[1][2] * rhs[2][1],
-        lhs[1][0] * rhs[0][2] + lhs[1][1] * rhs[1][2] + lhs[1][2] * rhs[2][2]
-    );
+    return lhs.template multiply<Mat2x3<T>, Mat3<T>>(rhs);
 }
 /// @brief Multiply a 3x2 matrix by a 2x2 matrix, result is a 3x2 matrix
 template<typename T>
 __hostdev__ Mat3x2<T> operator*(const Mat3x2<T>& lhs, const Mat2<T>& rhs) {
-    return Mat3x2<T>(
-        lhs[0][0] * rhs[0][0] + lhs[0][1] * rhs[1][0],
-        lhs[0][0] * rhs[0][1] + lhs[0][1] * rhs[1][1],
-        lhs[1][0] * rhs[0][0] + lhs[1][1] * rhs[1][0],
-        lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1],
-        lhs[2][0] * rhs[0][0] + lhs[2][1] * rhs[1][0],
-        lhs[2][0] * rhs[0][1] + lhs[2][1] * rhs[1][1]
-    );
+    return lhs.template multiply<Mat3x2<T>, Mat2<T>>(rhs);
 }
 /// @brief Multiply a 2x2 matrix by a 2x3 matrix, result is a 2x3 matrix
 template<typename T>
 __hostdev__ Mat2x3<T> operator*(const Mat2<T>& lhs, const Mat2x3<T>& rhs) {
-    return Mat2x3<T>(
-        // First row (3 elements)
-        lhs[0][0] * rhs[0][0] + lhs[0][1] * rhs[1][0],
-        lhs[0][0] * rhs[0][1] + lhs[0][1] * rhs[1][1],
-        lhs[0][0] * rhs[0][2] + lhs[0][1] * rhs[1][2],
-
-        // Second row (3 elements)
-        lhs[1][0] * rhs[0][0] + lhs[1][1] * rhs[1][0],
-        lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1],
-        lhs[1][0] * rhs[0][2] + lhs[1][1] * rhs[1][2]
-    );
+    return lhs.template multiply<Mat2x3<T>, Mat2x3<T>>(rhs);
 }
 /// @brief Multiply a 3x2 matrix by a 2x3 matrix, result is a 3x3 matrix
 template<typename T>
 __hostdev__ Mat3<T> operator*(const Mat3x2<T>& lhs, const Mat2x3<T>& rhs) {
-    return Mat3<T>(
-        lhs[0][0] * rhs[0][0] + lhs[0][1] * rhs[1][0],
-        lhs[0][0] * rhs[0][1] + lhs[0][1] * rhs[1][1],
-        lhs[0][0] * rhs[0][2] + lhs[0][1] * rhs[1][2],
-
-        lhs[1][0] * rhs[0][0] + lhs[1][1] * rhs[1][0],
-        lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1],
-        lhs[1][0] * rhs[0][2] + lhs[1][1] * rhs[1][2],
-
-        lhs[2][0] * rhs[0][0] + lhs[2][1] * rhs[1][0],
-        lhs[2][0] * rhs[0][1] + lhs[2][1] * rhs[1][1],
-        lhs[2][0] * rhs[0][2] + lhs[2][1] * rhs[1][2]
-    );
+    return lhs.template multiply<Mat3<T>, Mat2x3<T>>(rhs);
+}
+/// @brief Multiply a 3x3 matrix by a 3x2 matrix, result is a 3x2 matrix
+template<typename T>
+__hostdev__ Mat3x2<T> operator*(const Mat3<T>& lhs, const Mat3x2<T>& rhs) {
+    return lhs.template multiply<Mat3x2<T>, Mat3x2<T>>(rhs);
 }
 // ----------------------------> Vec3 <--------------------------------------
 
 /// @brief A simple vector class with three components, similar to openvdb::math::Vec3
 template<typename T>
-class Vec3
+class Vec3 : public VecBase<T, 3>
 {
-    T mVec[3];
+    using Base = VecBase<T, 3>;
 
 public:
-    static const int SIZE = 3;
-    static const int size = 3; // in openvdb::math::Tuple
     using ValueType = T;
+    static const int size = 3; // openvdb::math::Tuple-compat alias of SIZE
+
     Vec3() = default;
-    __hostdev__ explicit Vec3(T x)
-        : mVec{x, x, x}
-    {
-    }
-    __hostdev__ Vec3(T x, T y, T z)
-        : mVec{x, y, z}
-    {
-    }
+    __hostdev__ explicit Vec3(T x)            { this->mVec[0] = x; this->mVec[1] = x; this->mVec[2] = x; }
+    __hostdev__ Vec3(T x, T y, T z)           { this->mVec[0] = x; this->mVec[1] = y; this->mVec[2] = z; }
+
     template<template<class> class Vec3T, class T2>
-    __hostdev__ Vec3(const Vec3T<T2>& v)
-        : mVec{T(v[0]), T(v[1]), T(v[2])}
-    {
-        static_assert(Vec3T<T2>::size == size, "expected Vec3T::size==3!");
+    __hostdev__ Vec3(const Vec3T<T2>& v) {
+        static_assert(Vec3T<T2>::SIZE == 3, "expected Vec3T::SIZE==3!");
+        this->mVec[0] = T(v[0]); this->mVec[1] = T(v[1]); this->mVec[2] = T(v[2]);
     }
     template<typename T2>
-    __hostdev__ explicit Vec3(const Vec3<T2>& v)
-        : mVec{T(v[0]), T(v[1]), T(v[2])}
-    {
+    __hostdev__ explicit Vec3(const Vec3<T2>& v) {
+        this->mVec[0] = T(v[0]); this->mVec[1] = T(v[1]); this->mVec[2] = T(v[2]);
     }
-    __hostdev__ explicit Vec3(const Coord& ijk)
-        : mVec{T(ijk[0]), T(ijk[1]), T(ijk[2])}
-    {
+    __hostdev__ explicit Vec3(const Coord& ijk) {
+        this->mVec[0] = T(ijk[0]); this->mVec[1] = T(ijk[1]); this->mVec[2] = T(ijk[2]);
     }
-    __hostdev__ bool operator==(const Vec3& rhs) const { return mVec[0] == rhs[0] && mVec[1] == rhs[1] && mVec[2] == rhs[2]; }
-    __hostdev__ bool operator!=(const Vec3& rhs) const { return mVec[0] != rhs[0] || mVec[1] != rhs[1] || mVec[2] != rhs[2]; }
+
     template<template<class> class Vec3T, class T2>
-    __hostdev__ Vec3& operator=(const Vec3T<T2>& rhs)
-    {
-        static_assert(Vec3T<T2>::size == size, "expected Vec3T::size==3!");
-        mVec[0] = rhs[0];
-        mVec[1] = rhs[1];
-        mVec[2] = rhs[2];
+    __hostdev__ Vec3& operator=(const Vec3T<T2>& rhs) {
+        static_assert(Vec3T<T2>::SIZE == 3, "expected Vec3T::SIZE==3!");
+        this->mVec[0] = rhs[0]; this->mVec[1] = rhs[1]; this->mVec[2] = rhs[2];
         return *this;
     }
-    __hostdev__ const T& operator[](int i) const { return mVec[i]; }
-    __hostdev__ T&       operator[](int i) { return mVec[i]; }
-    template<typename Vec3T>
-    __hostdev__ T dot(const Vec3T& v) const { return mVec[0] * v[0] + mVec[1] * v[1] + mVec[2] * v[2]; }
-    template<typename Vec3T>
-    __hostdev__ Vec3 cross(const Vec3T& v) const
-    {
-        return Vec3(mVec[1] * v[2] - mVec[2] * v[1],
-                    mVec[2] * v[0] - mVec[0] * v[2],
-                    mVec[0] * v[1] - mVec[1] * v[0]);
+
+    // ---- element-wise (Vec & Vec) ----
+    __hostdev__ Vec3  operator-() const             { return Base::template negate<Vec3>(); }
+    __hostdev__ Vec3  operator+(const Vec3& v) const { return Base::template plus<Vec3>(v); }
+    __hostdev__ Vec3  operator-(const Vec3& v) const { return Base::template minus<Vec3>(v); }
+    __hostdev__ Vec3  operator*(const Vec3& v) const { return Base::template mul<Vec3>(v); }
+    __hostdev__ Vec3  operator/(const Vec3& v) const { return Base::template div<Vec3>(v); }
+    __hostdev__ Vec3& operator+=(const Vec3& v)     { Base::addAssign(v); return *this; }
+    __hostdev__ Vec3& operator-=(const Vec3& v)     { Base::subAssign(v); return *this; }
+
+    // ---- mixed Vec3 / Coord (3D) ----
+    __hostdev__ Vec3  operator+(const Coord& ijk) const { return Vec3(this->mVec[0] + ijk[0], this->mVec[1] + ijk[1], this->mVec[2] + ijk[2]); }
+    __hostdev__ Vec3  operator-(const Coord& ijk) const { return Vec3(this->mVec[0] - ijk[0], this->mVec[1] - ijk[1], this->mVec[2] - ijk[2]); }
+    __hostdev__ Vec3& operator+=(const Coord& ijk) {
+        this->mVec[0] += T(ijk[0]); this->mVec[1] += T(ijk[1]); this->mVec[2] += T(ijk[2]);
+        return *this;
     }
+    __hostdev__ Vec3& operator-=(const Coord& ijk) {
+        this->mVec[0] -= T(ijk[0]); this->mVec[1] -= T(ijk[1]); this->mVec[2] -= T(ijk[2]);
+        return *this;
+    }
+
+    // ---- scalar ----
+    __hostdev__ Vec3  operator*(const T& s) const   { return Base::template scale<Vec3>(s); }
+    __hostdev__ Vec3  operator/(const T& s) const   { return Base::template divideBy<Vec3>(s); }
+    __hostdev__ Vec3& operator*=(const T& s)        { Base::scaleAssign(s); return *this; }
+    __hostdev__ Vec3& operator/=(const T& s)        { Base::divideAssignScalar(s); return *this; }
+    __hostdev__ Vec3& normalize()                   { return (*this) /= this->length(); }
+
+    // ---- equality ----
+    __hostdev__ bool operator==(const Vec3& rhs) const { return Base::equals(rhs); }
+    __hostdev__ bool operator!=(const Vec3& rhs) const { return !Base::equals(rhs); }
+
+    // ---- component-wise min/max ----
+    __hostdev__ Vec3& minComponent(const Vec3& other) { Base::mergeMin(other); return *this; }
+    __hostdev__ Vec3& maxComponent(const Vec3& other) { Base::mergeMax(other); return *this; }
+
+    /// @brief Return the smallest vector component
+    __hostdev__ ValueType min() const { return Base::smallestComponent(); }
+    /// @brief Return the largest vector component
+    __hostdev__ ValueType max() const { return Base::largestComponent(); }
+
+    /// @brief Round each component down (toward negative infinity)
+    /// @return integer Coord
+    __hostdev__ Coord floor() const { return Base::template floorAs<Coord>(); }
+    /// @brief Round each component up (toward positive infinity)
+    /// @return integer Coord
+    __hostdev__ Coord ceil()  const { return Base::template ceilAs<Coord>(); }
+    /// @brief Round each component to its closest integer value
+    /// @return integer Coord
+    __hostdev__ Coord round() const { return Base::template roundAs<Coord>(); }
+
+    // ---- 3D-specific ----
+
+    /// @brief cross product with another 3-vector
+    template<typename Vec3T>
+    __hostdev__ Vec3 cross(const Vec3T& v) const {
+        return Vec3(this->mVec[1] * v[2] - this->mVec[2] * v[1],
+                    this->mVec[2] * v[0] - this->mVec[0] * v[2],
+                    this->mVec[0] * v[1] - this->mVec[1] * v[0]);
+    }
+
     /// @brief Outer product of a 3x1 vector and a 1x3 vector, result is a 3x3 matrix
     template<typename Vec3T>
-    __hostdev__ Mat3<ValueType> outer(const Vec3T& v) const
-    {
-        return Mat3<ValueType>(mVec[0] * v[0], mVec[0] * v[1], mVec[0] * v[2],
-                    mVec[1] * v[0], mVec[1] * v[1], mVec[1] * v[2],
-                    mVec[2] * v[0], mVec[2] * v[1], mVec[2] * v[2]);
+    __hostdev__ Mat3<ValueType> outer(const Vec3T& v) const {
+        return Mat3<ValueType>(this->mVec[0] * v[0], this->mVec[0] * v[1], this->mVec[0] * v[2],
+                               this->mVec[1] * v[0], this->mVec[1] * v[1], this->mVec[1] * v[2],
+                               this->mVec[2] * v[0], this->mVec[2] * v[1], this->mVec[2] * v[2]);
     }
-    __hostdev__ T lengthSqr() const
-    {
-        return mVec[0] * mVec[0] + mVec[1] * mVec[1] + mVec[2] * mVec[2]; // 5 flops
-    }
-    __hostdev__ T     length() const { return Sqrt(this->lengthSqr()); }
-    __hostdev__ Vec3  operator-() const { return Vec3(-mVec[0], -mVec[1], -mVec[2]); }
-    __hostdev__ Vec3  operator*(const Vec3& v) const { return Vec3(mVec[0] * v[0], mVec[1] * v[1], mVec[2] * v[2]); }
-    __hostdev__ Vec3  operator/(const Vec3& v) const { return Vec3(mVec[0] / v[0], mVec[1] / v[1], mVec[2] / v[2]); }
-    __hostdev__ Vec3  operator+(const Vec3& v) const { return Vec3(mVec[0] + v[0], mVec[1] + v[1], mVec[2] + v[2]); }
-    __hostdev__ Vec3  operator-(const Vec3& v) const { return Vec3(mVec[0] - v[0], mVec[1] - v[1], mVec[2] - v[2]); }
-    __hostdev__ Vec3  operator+(const Coord& ijk) const { return Vec3(mVec[0] + ijk[0], mVec[1] + ijk[1], mVec[2] + ijk[2]); }
-    __hostdev__ Vec3  operator-(const Coord& ijk) const { return Vec3(mVec[0] - ijk[0], mVec[1] - ijk[1], mVec[2] - ijk[2]); }
-    __hostdev__ Vec3  operator*(const T& s) const { return Vec3(s * mVec[0], s * mVec[1], s * mVec[2]); }
-    __hostdev__ Vec3  operator/(const T& s) const { return (T(1) / s) * (*this); }
-    __hostdev__ Vec3& operator+=(const Vec3& v)
-    {
-        mVec[0] += v[0];
-        mVec[1] += v[1];
-        mVec[2] += v[2];
-        return *this;
-    }
-    __hostdev__ Vec3& operator+=(const Coord& ijk)
-    {
-        mVec[0] += T(ijk[0]);
-        mVec[1] += T(ijk[1]);
-        mVec[2] += T(ijk[2]);
-        return *this;
-    }
-    __hostdev__ Vec3& operator-=(const Vec3& v)
-    {
-        mVec[0] -= v[0];
-        mVec[1] -= v[1];
-        mVec[2] -= v[2];
-        return *this;
-    }
-    __hostdev__ Vec3& operator-=(const Coord& ijk)
-    {
-        mVec[0] -= T(ijk[0]);
-        mVec[1] -= T(ijk[1]);
-        mVec[2] -= T(ijk[2]);
-        return *this;
-    }
-    __hostdev__ Vec3& operator*=(const T& s)
-    {
-        mVec[0] *= s;
-        mVec[1] *= s;
-        mVec[2] *= s;
-        return *this;
-    }
-    __hostdev__ Vec3& operator/=(const T& s) { return (*this) *= T(1) / s; }
-    __hostdev__ Vec3& normalize() { return (*this) /= this->length(); }
-    /// @brief Perform a component-wise minimum with the other Coord.
-    __hostdev__ Vec3& minComponent(const Vec3& other)
-    {
-        if (other[0] < mVec[0])
-            mVec[0] = other[0];
-        if (other[1] < mVec[1])
-            mVec[1] = other[1];
-        if (other[2] < mVec[2])
-            mVec[2] = other[2];
-        return *this;
-    }
-
-    /// @brief Perform a component-wise maximum with the other Coord.
-    __hostdev__ Vec3& maxComponent(const Vec3& other)
-    {
-        if (other[0] > mVec[0])
-            mVec[0] = other[0];
-        if (other[1] > mVec[1])
-            mVec[1] = other[1];
-        if (other[2] > mVec[2])
-            mVec[2] = other[2];
-        return *this;
-    }
-    /// @brief Return the smallest vector component
-    __hostdev__ ValueType min() const
-    {
-        return mVec[0] < mVec[1] ? (mVec[0] < mVec[2] ? mVec[0] : mVec[2]) : (mVec[1] < mVec[2] ? mVec[1] : mVec[2]);
-    }
-    /// @brief Return the largest vector component
-    __hostdev__ ValueType max() const
-    {
-        return mVec[0] > mVec[1] ? (mVec[0] > mVec[2] ? mVec[0] : mVec[2]) : (mVec[1] > mVec[2] ? mVec[1] : mVec[2]);
-    }
-    /// @brief Round each component if this Vec<T> up to its integer value
-    /// @return Return an integer Coord
-    __hostdev__ Coord floor() const { return Coord(Floor(mVec[0]), Floor(mVec[1]), Floor(mVec[2])); }
-    /// @brief Round each component if this Vec<T> down to its integer value
-    /// @return Return an integer Coord
-    __hostdev__ Coord ceil() const { return Coord(Ceil(mVec[0]), Ceil(mVec[1]), Ceil(mVec[2])); }
-    /// @brief Round each component if this Vec<T> to its closest integer value
-    /// @return Return an integer Coord
-    __hostdev__ Coord round() const
-    {
-        if constexpr(util::is_same<T, float>::value) {
-            return Coord(Floor(mVec[0] + 0.5f), Floor(mVec[1] + 0.5f), Floor(mVec[2] + 0.5f));
-        } else if constexpr(util::is_same<T, int>::value) {
-            return Coord(mVec[0], mVec[1], mVec[2]);
-        } else {
-            return Coord(Floor(mVec[0] + 0.5), Floor(mVec[1] + 0.5), Floor(mVec[2] + 0.5));
-        }
-    }
-
-    /// @brief return a non-const raw constant pointer to array of three vector components
-    __hostdev__ T* asPointer() { return mVec; }
-    /// @brief return a const raw constant pointer to array of three vector components
-    __hostdev__ const T* asPointer() const { return mVec; }
 }; // Vec3<T>
 
 template<typename T1, typename T2>
@@ -1556,116 +1702,72 @@ __hostdev__ inline Vec3<double> Coord::asVec3d() const
 
 /// @brief A simple vector class with four components, similar to openvdb::math::Vec4
 template<typename T>
-class Vec4
+class Vec4 : public VecBase<T, 4>
 {
-    T mVec[4];
+    using Base = VecBase<T, 4>;
 
 public:
-    static const int SIZE = 4;
-    static const int size = 4;
     using ValueType = T;
+    static const int size = 4; // openvdb::math::Tuple-compat alias of SIZE
+
     Vec4() = default;
-    __hostdev__ explicit Vec4(T x)
-        : mVec{x, x, x, x}
-    {
-    }
-    __hostdev__ Vec4(T x, T y, T z, T w)
-        : mVec{x, y, z, w}
-    {
-    }
+    __hostdev__ explicit Vec4(T x)            { this->mVec[0] = x; this->mVec[1] = x; this->mVec[2] = x; this->mVec[3] = x; }
+    __hostdev__ Vec4(T x, T y, T z, T w)      { this->mVec[0] = x; this->mVec[1] = y; this->mVec[2] = z; this->mVec[3] = w; }
+
     template<typename T2>
-    __hostdev__ explicit Vec4(const Vec4<T2>& v)
-        : mVec{T(v[0]), T(v[1]), T(v[2]), T(v[3])}
-    {
+    __hostdev__ explicit Vec4(const Vec4<T2>& v) {
+        this->mVec[0] = T(v[0]); this->mVec[1] = T(v[1]); this->mVec[2] = T(v[2]); this->mVec[3] = T(v[3]);
     }
     template<template<class> class Vec4T, class T2>
-    __hostdev__ Vec4(const Vec4T<T2>& v)
-        : mVec{T(v[0]), T(v[1]), T(v[2]), T(v[3])}
-    {
-        static_assert(Vec4T<T2>::size == size, "expected Vec4T::size==4!");
+    __hostdev__ Vec4(const Vec4T<T2>& v) {
+        static_assert(Vec4T<T2>::SIZE == 4, "expected Vec4T::SIZE==4!");
+        this->mVec[0] = T(v[0]); this->mVec[1] = T(v[1]); this->mVec[2] = T(v[2]); this->mVec[3] = T(v[3]);
     }
-    __hostdev__ bool operator==(const Vec4& rhs) const { return mVec[0] == rhs[0] && mVec[1] == rhs[1] && mVec[2] == rhs[2] && mVec[3] == rhs[3]; }
-    __hostdev__ bool operator!=(const Vec4& rhs) const { return mVec[0] != rhs[0] || mVec[1] != rhs[1] || mVec[2] != rhs[2] || mVec[3] != rhs[3]; }
     template<template<class> class Vec4T, class T2>
-    __hostdev__ Vec4& operator=(const Vec4T<T2>& rhs)
-    {
-        static_assert(Vec4T<T2>::size == size, "expected Vec4T::size==4!");
-        mVec[0] = rhs[0];
-        mVec[1] = rhs[1];
-        mVec[2] = rhs[2];
-        mVec[3] = rhs[3];
+    __hostdev__ Vec4& operator=(const Vec4T<T2>& rhs) {
+        static_assert(Vec4T<T2>::SIZE == 4, "expected Vec4T::SIZE==4!");
+        this->mVec[0] = rhs[0]; this->mVec[1] = rhs[1]; this->mVec[2] = rhs[2]; this->mVec[3] = rhs[3];
         return *this;
     }
 
-    __hostdev__ const T& operator[](int i) const { return mVec[i]; }
-    __hostdev__ T&       operator[](int i) { return mVec[i]; }
-    template<typename Vec4T>
-    __hostdev__ T dot(const Vec4T& v) const { return mVec[0] * v[0] + mVec[1] * v[1] + mVec[2] * v[2] + mVec[3] * v[3]; }
-    __hostdev__ T lengthSqr() const
-    {
-        return mVec[0] * mVec[0] + mVec[1] * mVec[1] + mVec[2] * mVec[2] + mVec[3] * mVec[3]; // 7 flops
-    }
-    __hostdev__ T     length() const { return Sqrt(this->lengthSqr()); }
-    __hostdev__ Vec4  operator-() const { return Vec4(-mVec[0], -mVec[1], -mVec[2], -mVec[3]); }
-    __hostdev__ Vec4  operator*(const Vec4& v) const { return Vec4(mVec[0] * v[0], mVec[1] * v[1], mVec[2] * v[2], mVec[3] * v[3]); }
-    __hostdev__ Vec4  operator/(const Vec4& v) const { return Vec4(mVec[0] / v[0], mVec[1] / v[1], mVec[2] / v[2], mVec[3] / v[3]); }
-    __hostdev__ Vec4  operator+(const Vec4& v) const { return Vec4(mVec[0] + v[0], mVec[1] + v[1], mVec[2] + v[2], mVec[3] + v[3]); }
-    __hostdev__ Vec4  operator-(const Vec4& v) const { return Vec4(mVec[0] - v[0], mVec[1] - v[1], mVec[2] - v[2], mVec[3] - v[3]); }
-    __hostdev__ Vec4  operator*(const T& s) const { return Vec4(s * mVec[0], s * mVec[1], s * mVec[2], s * mVec[3]); }
-    __hostdev__ Vec4  operator/(const T& s) const { return (T(1) / s) * (*this); }
-    __hostdev__ Vec4& operator+=(const Vec4& v)
-    {
-        mVec[0] += v[0];
-        mVec[1] += v[1];
-        mVec[2] += v[2];
-        mVec[3] += v[3];
-        return *this;
-    }
-    __hostdev__ Vec4& operator-=(const Vec4& v)
-    {
-        mVec[0] -= v[0];
-        mVec[1] -= v[1];
-        mVec[2] -= v[2];
-        mVec[3] -= v[3];
-        return *this;
-    }
-    __hostdev__ Vec4& operator*=(const T& s)
-    {
-        mVec[0] *= s;
-        mVec[1] *= s;
-        mVec[2] *= s;
-        mVec[3] *= s;
-        return *this;
-    }
-    __hostdev__ Vec4& operator/=(const T& s) { return (*this) *= T(1) / s; }
-    __hostdev__ Vec4& normalize() { return (*this) /= this->length(); }
-    /// @brief Perform a component-wise minimum with the other Coord.
-    __hostdev__ Vec4& minComponent(const Vec4& other)
-    {
-        if (other[0] < mVec[0])
-            mVec[0] = other[0];
-        if (other[1] < mVec[1])
-            mVec[1] = other[1];
-        if (other[2] < mVec[2])
-            mVec[2] = other[2];
-        if (other[3] < mVec[3])
-            mVec[3] = other[3];
-        return *this;
-    }
+    // ---- element-wise (Vec & Vec) ----
+    __hostdev__ Vec4  operator-() const             { return Base::template negate<Vec4>(); }
+    __hostdev__ Vec4  operator+(const Vec4& v) const { return Base::template plus<Vec4>(v); }
+    __hostdev__ Vec4  operator-(const Vec4& v) const { return Base::template minus<Vec4>(v); }
+    __hostdev__ Vec4  operator*(const Vec4& v) const { return Base::template mul<Vec4>(v); }
+    __hostdev__ Vec4  operator/(const Vec4& v) const { return Base::template div<Vec4>(v); }
+    __hostdev__ Vec4& operator+=(const Vec4& v)     { Base::addAssign(v); return *this; }
+    __hostdev__ Vec4& operator-=(const Vec4& v)     { Base::subAssign(v); return *this; }
 
-    /// @brief Perform a component-wise maximum with the other Coord.
-    __hostdev__ Vec4& maxComponent(const Vec4& other)
-    {
-        if (other[0] > mVec[0])
-            mVec[0] = other[0];
-        if (other[1] > mVec[1])
-            mVec[1] = other[1];
-        if (other[2] > mVec[2])
-            mVec[2] = other[2];
-        if (other[3] > mVec[3])
-            mVec[3] = other[3];
-        return *this;
-    }
+    // ---- scalar ----
+    __hostdev__ Vec4  operator*(const T& s) const   { return Base::template scale<Vec4>(s); }
+    __hostdev__ Vec4  operator/(const T& s) const   { return Base::template divideBy<Vec4>(s); }
+    __hostdev__ Vec4& operator*=(const T& s)        { Base::scaleAssign(s); return *this; }
+    __hostdev__ Vec4& operator/=(const T& s)        { Base::divideAssignScalar(s); return *this; }
+    __hostdev__ Vec4& normalize()                   { return (*this) /= this->length(); }
+
+    // ---- equality ----
+    __hostdev__ bool operator==(const Vec4& rhs) const { return Base::equals(rhs); }
+    __hostdev__ bool operator!=(const Vec4& rhs) const { return !Base::equals(rhs); }
+
+    // ---- component-wise min/max ----
+    __hostdev__ Vec4& minComponent(const Vec4& other) { Base::mergeMin(other); return *this; }
+    __hostdev__ Vec4& maxComponent(const Vec4& other) { Base::mergeMax(other); return *this; }
+
+    /// @brief Return the smallest vector component
+    __hostdev__ ValueType min() const { return Base::smallestComponent(); }
+    /// @brief Return the largest vector component
+    __hostdev__ ValueType max() const { return Base::largestComponent(); }
+
+    /// @brief Round each component down (toward negative infinity)
+    /// @return Vec4<int32_t> (NanoVDB has no Coord4)
+    __hostdev__ Vec4<int32_t> floor() const { return Base::template floorAs<Vec4<int32_t>>(); }
+    /// @brief Round each component up (toward positive infinity)
+    /// @return Vec4<int32_t>
+    __hostdev__ Vec4<int32_t> ceil()  const { return Base::template ceilAs<Vec4<int32_t>>(); }
+    /// @brief Round each component to its closest integer value
+    /// @return Vec4<int32_t>
+    __hostdev__ Vec4<int32_t> round() const { return Base::template roundAs<Vec4<int32_t>>(); }
 }; // Vec4<T>
 
 template<typename T1, typename T2>
@@ -1678,20 +1780,6 @@ __hostdev__ inline Vec4<T2> operator/(T1 scalar, const Vec4<T2>& vec)
 {
     return Vec4<T2>(scalar / vec[0], scalar / vec[1], scalar / vec[2], scalar / vec[3]);
 }
-/// @brief Return the matrix vector product of a 4x4 matrix and a 4d vector
-/// @param m 4x4 matrix
-/// @param v 4d vector
-/// @return result of matrix-vector multiplication, i.e. m x v
-template <typename T>
-__hostdev__ inline Vec4<T> operator*(const Mat4<T>& m, const Vec4<T>& v) {
-    return Vec4<T>(
-        m[0][0] * v[0] + m[0][1] * v[1] + m[0][2] * v[2] + m[0][3] * v[3],
-        m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2] + m[1][3] * v[3],
-        m[2][0] * v[0] + m[2][1] * v[1] + m[2][2] * v[2] + m[2][3] * v[3],
-        m[3][0] * v[0] + m[3][1] * v[1] + m[3][2] * v[2] + m[3][3] * v[3]
-    );
-}
-
 // ----------------------------> matMult <--------------------------------------
 
 /// @brief Multiply a 3x3 matrix and a 3d vector using 32bit floating point arithmetics
