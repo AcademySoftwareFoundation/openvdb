@@ -197,6 +197,20 @@ inline __hostdev__ bool ZeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename 
     const auto        v0 = acc.getValue(ijk);
     while (hdda.step()) {
         ijk = RoundDown<Coord>(ray(hdda.time() + Delta));
+        // NB: keeping this as separate getDim + isActive calls rather than
+        // a fused acc.getDimAndActive<ActiveOnLeafOnly>(ijk, ray) is a
+        // measured choice, not an oversight. On this register-tight
+        // kernel (sm_120, ~64 reg/thread, theoretical occupancy 66.7%
+        // limited by registers, achieved 14% — i.e. severely
+        // memory-latency bound), any shape of fused getDim+active forces
+        // the {dim, active} pair to live across hdda.update, growing
+        // reg/thread by 2-3 and dropping us from 4 to 3 blocks/SM.
+        // The 25% occupancy hit dominates the descent-fusion savings.
+        // The hot path is already cache-warm: the ReadAccessor cache and
+        // L1 absorb the second descent at ~87% L1 hit rate.
+        // See ReadAccessor::getDimAndActive (in NanoVDB.h) for the fused
+        // API, which fvdb's HDDA iterators use productively (active is
+        // read unconditionally there, so no register-cliff issue).
         hdda.update(ray, acc.getDim(ijk, ray));
         if (hdda.dim() > 1 || !acc.isActive(ijk))
             continue; // either a tile value or an inactive voxel

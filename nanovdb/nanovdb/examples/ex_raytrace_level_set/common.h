@@ -44,11 +44,42 @@ inline __hostdev__ void mortonEncode(uint32_t& code, uint32_t x, uint32_t y)
 template<typename RenderFn, typename GridT>
 inline float renderImage(bool useCuda, const RenderFn renderOp, int width, int height, float* image, const GridT* grid)
 {
+#if defined(__CUDACC__)
+    // Kernel-only timing on the GPU path. cudaEventElapsedTime measures only
+    // the work between the two record points on the default stream, so it
+    // excludes host-side launch latency and the cudaDeviceSynchronize wakeup
+    // that std::chrono would otherwise pick up. Events are created/destroyed
+    // per call; the ~10us creation cost is dwarfed by the kernel itself and
+    // keeps the warmup loop honest (each iter goes through the same path).
+    if (useCuda) {
+        cudaEvent_t startEv, stopEv;
+        NANOVDB_CUDA_CHECK_ERROR(cudaEventCreate(&startEv), __FILE__, __LINE__);
+        NANOVDB_CUDA_CHECK_ERROR(cudaEventCreate(&stopEv), __FILE__, __LINE__);
+
+        NANOVDB_CUDA_CHECK_ERROR(cudaEventRecord(startEv, 0), __FILE__, __LINE__);
+
+        computeForEach(
+            true, width * height, 256, __FILE__, __LINE__, [renderOp, image, grid] __hostdev__(int start, int end) {
+                renderOp(start, end, image, grid);
+            });
+
+        NANOVDB_CUDA_CHECK_ERROR(cudaEventRecord(stopEv, 0), __FILE__, __LINE__);
+        NANOVDB_CUDA_CHECK_ERROR(cudaEventSynchronize(stopEv), __FILE__, __LINE__);
+
+        float ms = 0.f;
+        NANOVDB_CUDA_CHECK_ERROR(cudaEventElapsedTime(&ms, startEv, stopEv), __FILE__, __LINE__);
+
+        cudaEventDestroy(startEv);
+        cudaEventDestroy(stopEv);
+        return ms;
+    }
+#endif
+
     using ClockT = std::chrono::high_resolution_clock;
     auto t0 = ClockT::now();
 
     computeForEach(
-        useCuda, width * height, 512, __FILE__, __LINE__, [renderOp, image, grid] __hostdev__(int start, int end) {
+        useCuda, width * height, 256, __FILE__, __LINE__, [renderOp, image, grid] __hostdev__(int start, int end) {
             renderOp(start, end, image, grid);
         });
     computeSync(useCuda, __FILE__, __LINE__);
