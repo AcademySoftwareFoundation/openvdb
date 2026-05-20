@@ -472,6 +472,59 @@ class TestSplitMergeCopy(unittest.TestCase):
         self.assertEqual(cp.grid().gridName(), "orig")
 
 
+class TestPhase2BuildTCoverage(unittest.TestCase):
+    """Phase 2: every additional BuildT registers a Grid + ReadAccessor (and
+    NodeInfo where applicable). We can't host-construct most of these (the
+    primitives that produce them land in Phase 5), but we can confirm
+    registration completed and the accessor surfaces match the type kind.
+    """
+
+    SCALARS = ["Int16", "Int64", "UInt8", "UInt32"]
+    VECTORS = ["Vec3d", "Vec4f", "Vec4d", "Vec3u8", "Vec3u16"]
+    READONLY = ["Boolean", "Fp4", "Fp8", "Fp16", "FpN", "Index", "OnIndex", "Mask"]
+
+    def test_all_grid_classes_registered(self):
+        for suffix in self.SCALARS + self.VECTORS + self.READONLY:
+            cls = getattr(nanovdb, suffix + "Grid", None)
+            self.assertIsNotNone(cls, f"{suffix}Grid missing")
+            # All inherit from the type-erased Grid base.
+            self.assertIn(nanovdb.Grid, cls.__mro__)
+
+    def test_all_accessors_registered(self):
+        for suffix in self.SCALARS + self.VECTORS + self.READONLY:
+            acc = getattr(nanovdb, suffix + "ReadAccessor", None)
+            self.assertIsNotNone(acc, f"{suffix}ReadAccessor missing")
+
+    def test_scalar_accessors_have_setvoxel_and_nodeinfo(self):
+        for suffix in self.SCALARS:
+            acc = getattr(nanovdb, suffix + "ReadAccessor")
+            self.assertTrue(hasattr(acc, "setVoxel"),
+                            f"{suffix}ReadAccessor missing setVoxel")
+            self.assertTrue(hasattr(acc, "getNodeInfo"),
+                            f"{suffix}ReadAccessor missing getNodeInfo")
+            self.assertIsNotNone(getattr(nanovdb, suffix + "NodeInfo", None),
+                                 f"{suffix}NodeInfo missing")
+
+    def test_vector_accessors_have_setvoxel_no_nodeinfo(self):
+        # Vector accessor names are aligned in Phase 2 (Vec3dReadAccessor,
+        # ...). The legacy Vec3f one is still Vec3fReadVectorAccessor.
+        for suffix in self.VECTORS:
+            acc = getattr(nanovdb, suffix + "ReadAccessor")
+            self.assertTrue(hasattr(acc, "setVoxel"))
+            self.assertFalse(hasattr(acc, "getNodeInfo"))
+
+    def test_readonly_accessors_have_neither_setvoxel_nor_nodeinfo(self):
+        # The plan calls out: quantized types decode to float on read but
+        # do not bind setVoxel; index types return uint64 and ValueMask
+        # exposes only active-state queries.
+        for suffix in self.READONLY:
+            acc = getattr(nanovdb, suffix + "ReadAccessor")
+            self.assertFalse(hasattr(acc, "setVoxel"),
+                             f"{suffix}ReadAccessor should not have setVoxel")
+            self.assertFalse(hasattr(acc, "getNodeInfo"),
+                             f"{suffix}ReadAccessor should not have getNodeInfo")
+
+
 class TestGridMetaDataGuards(unittest.TestCase):
     """Copilot review #3: GridMetaData ctor + safeCast guard against bad input."""
 

@@ -533,7 +533,13 @@ void defineGridMetaData(nb::module_& m)
 
 template<typename BuildT> nb::class_<DefaultReadAccessor<BuildT>> defineAccessor(nb::module_& m, const char* name)
 {
-    using ValueType = typename DefaultReadAccessor<BuildT>::ValueType;
+    // Use the decoded value type (nanovdb::BuildToValueMap<BuildT>::Type)
+    // rather than DefaultReadAccessor<BuildT>::ValueType. For ordinary types
+    // (float/double/Int*/Vec*) the two are identical, but for Half / Fp* the
+    // accessor decodes to float on read, for ValueIndex/OnIndex it returns
+    // uint64, and for ValueMask / bool it returns bool. The probeValue out-
+    // parameter and the Python return type both want the decoded form.
+    using ValueType = typename nanovdb::BuildToValueMap<BuildT>::Type;
     using CoordType = typename DefaultReadAccessor<BuildT>::CoordType;
 
     nb::class_<DefaultReadAccessor<BuildT>> accessor(m, name);
@@ -721,6 +727,9 @@ NB_MODULE(nanovdb, m)
     defineNanoGrid<T>(m, #Suffix "Grid");                      \
     defineVectorAccessor<T>(m, AccessorName);
 #define NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix, GridTypeEnum) \
+    defineNanoGrid<T>(m, #Suffix "Grid");                      \
+    defineAccessor<T>(m, #Suffix "ReadAccessor");
+#define NANOVDB_PY_FOR_EACH_READONLY_BUILDT(T, Suffix, GridTypeEnum) \
     defineNanoGrid<T>(m, #Suffix "Grid");                      \
     defineAccessor<T>(m, #Suffix "ReadAccessor");
 #include "BuildTypes.def"

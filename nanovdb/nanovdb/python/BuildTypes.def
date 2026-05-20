@@ -19,16 +19,17 @@
 //
 // Macros:
 //   NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, GridTypeEnum)
-//       Scalar value types — exposed with full NodeInfo accessors. Suffix
-//       forms Python class names (e.g. "Float" -> "FloatGrid").
-//       GridTypeEnum names the nanovdb::GridType:: enumerator a grid of
-//       this BuildT carries (used by the polymorphic handle.grid(n)
-//       dispatch). Usually identical to Suffix.
+//       Scalar value types with arithmetic semantics — exposed with full
+//       NodeInfo + setVoxel accessors. Suffix forms Python class names
+//       (e.g. "Float" -> "FloatGrid"). GridTypeEnum names the
+//       nanovdb::GridType:: enumerator a grid of this BuildT carries
+//       (used by the polymorphic handle.grid(n) dispatch).
 //
 //   NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, GridTypeEnum)
 //       Vector value types — exposed with a setVoxel accessor but no
 //       NodeInfo. AccessorName is passed explicitly because the legacy
-//       Python class names for these are inconsistent.
+//       Python class names for the original two (Vec3f, RGBA8) are
+//       inconsistent — kept as-is for backwards compatibility.
 //
 //   NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix, GridTypeEnum)
 //       The nanovdb::Point build type — exposed with a bare accessor.
@@ -36,6 +37,16 @@
 //       that enumerator doesn't exist), so GridTypeEnum is given
 //       explicitly. Polymorphic dispatch routes PointIndex grids to
 //       NanoGrid<Point>.
+//
+//   NANOVDB_PY_FOR_EACH_READONLY_BUILDT(T, Suffix, GridTypeEnum)
+//       BuildTs whose nanovdb::SetVoxel<T> is unavailable (bool, the
+//       quantized Fp4/Fp8/Fp16/FpN types, the index types ValueIndex /
+//       ValueOnIndex, and ValueMask). nanovdb::BuildTraits<T>::is_special
+//       is true for all of these. Exposed with a bare accessor only — no
+//       setVoxel, no NodeInfo. The Python accessor's getValue() returns
+//       the type given by nanovdb::BuildToValueMap<T>::Type (float for
+//       Fp*, uint64 for ValueIndex / ValueOnIndex, bool for ValueMask
+//       and bool).
 //
 //   NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix)
 //       Subset that has C++ sampler specializations (used by PyMath
@@ -53,21 +64,54 @@
 #define NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix, GridTypeEnum)
 #define NANOVDB_PY_LOCAL_DEFINED_POINT
 #endif
+#ifndef NANOVDB_PY_FOR_EACH_READONLY_BUILDT
+#define NANOVDB_PY_FOR_EACH_READONLY_BUILDT(T, Suffix, GridTypeEnum)
+#define NANOVDB_PY_LOCAL_DEFINED_READONLY
+#endif
 #ifndef NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT
 #define NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix)
 #define NANOVDB_PY_LOCAL_DEFINED_SAMPLEABLE
 #endif
 
-NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(float,   Float,  Float)
-NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(double,  Double, Double)
-NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(int32_t, Int32,  Int32)
+NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(float,    Float,  Float)
+NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(double,   Double, Double)
+NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(int16_t,  Int16,  Int16)
+NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(int32_t,  Int32,  Int32)
+NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(int64_t,  Int64,  Int64)
+NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(uint8_t,  UInt8,  UInt8)
+NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(uint32_t, UInt32, UInt32)
+// nanovdb::Half is intentionally not bound. The source declares it as
+// `class Half{};` (an empty placeholder for IEEE 754 half-precision, see
+// NanoVDB.h around line 180) and the C++ ProbeValue<Half> chain is
+// inconsistent — leaf storage carries Half but the ProbeValue specialization
+// expects float, causing a type mismatch during instantiation. When the
+// upstream Half implementation lands this can be added in a follow-up.
 
 NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(::nanovdb::Vec3f, Vec3f,
                                   "Vec3fReadVectorAccessor", Vec3f)
+NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(::nanovdb::Vec3d, Vec3d,
+                                  "Vec3dReadAccessor", Vec3d)
+NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(::nanovdb::Vec4f, Vec4f,
+                                  "Vec4fReadAccessor", Vec4f)
+NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(::nanovdb::Vec4d, Vec4d,
+                                  "Vec4dReadAccessor", Vec4d)
+NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(::nanovdb::Vec3u8, Vec3u8,
+                                  "Vec3u8ReadAccessor", Vec3u8)
+NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(::nanovdb::Vec3u16, Vec3u16,
+                                  "Vec3u16ReadAccessor", Vec3u16)
 NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(::nanovdb::math::Rgba8, RGBA8,
                                   "RGBA8ReadAccessor", RGBA8)
 
 NANOVDB_PY_FOR_EACH_POINT_BUILDT(::nanovdb::Point, Point, PointIndex)
+
+NANOVDB_PY_FOR_EACH_READONLY_BUILDT(bool,                  Boolean,     Boolean)
+NANOVDB_PY_FOR_EACH_READONLY_BUILDT(::nanovdb::Fp4,        Fp4,         Fp4)
+NANOVDB_PY_FOR_EACH_READONLY_BUILDT(::nanovdb::Fp8,        Fp8,         Fp8)
+NANOVDB_PY_FOR_EACH_READONLY_BUILDT(::nanovdb::Fp16,       Fp16,        Fp16)
+NANOVDB_PY_FOR_EACH_READONLY_BUILDT(::nanovdb::FpN,        FpN,         FpN)
+NANOVDB_PY_FOR_EACH_READONLY_BUILDT(::nanovdb::ValueIndex, Index,       Index)
+NANOVDB_PY_FOR_EACH_READONLY_BUILDT(::nanovdb::ValueOnIndex, OnIndex,   OnIndex)
+NANOVDB_PY_FOR_EACH_READONLY_BUILDT(::nanovdb::ValueMask,  Mask,        Mask)
 
 NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(float,            Float)
 NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(double,           Double)
@@ -83,6 +127,9 @@ NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(::nanovdb::Vec3f, Vec3f)
 #ifdef NANOVDB_PY_LOCAL_DEFINED_POINT
 #undef NANOVDB_PY_LOCAL_DEFINED_POINT
 #endif
+#ifdef NANOVDB_PY_LOCAL_DEFINED_READONLY
+#undef NANOVDB_PY_LOCAL_DEFINED_READONLY
+#endif
 #ifdef NANOVDB_PY_LOCAL_DEFINED_SAMPLEABLE
 #undef NANOVDB_PY_LOCAL_DEFINED_SAMPLEABLE
 #endif
@@ -90,4 +137,5 @@ NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(::nanovdb::Vec3f, Vec3f)
 #undef NANOVDB_PY_FOR_EACH_SCALAR_BUILDT
 #undef NANOVDB_PY_FOR_EACH_VECTOR_BUILDT
 #undef NANOVDB_PY_FOR_EACH_POINT_BUILDT
+#undef NANOVDB_PY_FOR_EACH_READONLY_BUILDT
 #undef NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT
