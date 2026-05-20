@@ -73,7 +73,15 @@ void defineDeviceGridHandle(nb::module_& m)
             "deviceUpload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceUpload(nullptr, sync); }, "sync"_a = true)
         .def(
             "deviceDownload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceDownload(nullptr, sync); }, "sync"_a = true);
-    defineGridHandleUtilities<BufferT>(m);
+    // NOTE: defineGridHandleUtilities<BufferT> intentionally NOT called for
+    // DeviceBuffer. Registering nanovdb.splitGrids / nanovdb.mergeGrids as a
+    // second overload taking a DeviceGridHandle list conflicts with the host
+    // overload because both signatures take nb::list, and nanobind's
+    // overload resolution can't disambiguate by element type — it picks one
+    // and the inner cast fails with std::bad_cast. The host-only utilities
+    // are what the Phase 1 plan calls for; a properly typed device variant
+    // (with its own name, or with strongly-typed std::vector<HandleT> args
+    // and nanobind/stl/vector.h support) can land later if it's needed.
 }
 
 } // namespace pynanovdb
