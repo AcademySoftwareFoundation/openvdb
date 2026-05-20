@@ -44,6 +44,12 @@ static nb::object pyDeviceGrid(nb::handle py_handle, uint32_t n)
             return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle)   \
                         : nb::none();                                           \
         }
+#define NANOVDB_PY_FOR_EACH_READONLY_BUILDT(T, Suffix, GridTypeEnum)            \
+        case nanovdb::GridType::GridTypeEnum: {                                 \
+            auto* grid = handle.template deviceGrid<T>(n);                      \
+            return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle)   \
+                        : nb::none();                                           \
+        }
 #include "../BuildTypes.def"
         default:
             return nb::none();
