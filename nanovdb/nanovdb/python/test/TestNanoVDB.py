@@ -648,6 +648,115 @@ class TestTreeNodeWalking(unittest.TestCase):
             nm.leaf(0).values(), self.tree.getFirstLeaf().values()))
 
 
+class TestBoundsChecks(unittest.TestCase):
+    """Out-of-range indices on Leaf / Tree / NodeManager raise Python
+    exceptions rather than falling through into raw memory access. The
+    underlying C++ uses NANOVDB_ASSERT which is a no-op in release builds,
+    so the Python layer guards every entry point that takes a level or
+    index argument.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.h = nanovdb.tools.createFogVolumeSphere()
+        cls.g = cls.h.grid()
+        cls.tree = cls.g.tree()
+        cls.leaf = cls.tree.getFirstLeaf()
+        cls.nm_handle = nanovdb.createNodeManager(cls.g)
+        cls.nm = cls.nm_handle.mgr()
+
+    def test_leaf_offset_bounds(self):
+        n = nanovdb.FloatLeaf.voxelCount()
+        with self.assertRaises(IndexError):
+            self.leaf.isActive(n)
+        with self.assertRaises(IndexError):
+            self.leaf.isActive(n + 1000)
+        with self.assertRaises(IndexError):
+            self.leaf.getValue(n)
+        # In-range still works.
+        self.assertIsNotNone(self.leaf.getValue(0))
+        self.assertIsNotNone(self.leaf.getValue(n - 1))
+
+    def test_tree_active_tile_count_level(self):
+        # activeTileCount levels are 1..3 (level 0 is leaves, not tiles).
+        with self.assertRaises(ValueError):
+            self.tree.activeTileCount(0)
+        with self.assertRaises(ValueError):
+            self.tree.activeTileCount(4)
+        # In-range still works.
+        self.assertGreaterEqual(self.tree.activeTileCount(3), 0)
+
+    def test_tree_node_count_level(self):
+        # nodeCount levels are 0..2 (leaf / lower / upper).
+        with self.assertRaises(ValueError):
+            self.tree.nodeCount(-1)
+        with self.assertRaises(ValueError):
+            self.tree.nodeCount(3)
+        self.assertGreater(self.tree.nodeCount(0), 0)
+
+    def test_node_manager_indexed_access(self):
+        with self.assertRaises(IndexError):
+            self.nm.leaf(self.nm.leafCount())
+        with self.assertRaises(IndexError):
+            self.nm.lower(self.nm.lowerCount())
+        with self.assertRaises(IndexError):
+            self.nm.upper(self.nm.upperCount())
+        with self.assertRaises(ValueError):
+            self.nm.nodeCount(3)
+        # In-range still works.
+        self.assertEqual(self.nm.leaf(0).origin(), self.leaf.origin())
+
+
+class TestZeroCopyViewLifetimes(unittest.TestCase):
+    """Returned typed grids, trees, leaves, NodeManagers, and zero-copy
+    NumPy views must keep their backing buffers alive across the chained
+    temporary expressions used at the call site (e.g.
+    `nanovdb.tools.createFogVolumeSphere().grid().tree().getFirstLeaf().values()`).
+    Without explicit nb::keep_alive linkages the intermediate handle gets
+    GC'd between expressions and the returned object reads freed memory.
+    """
+
+    def _force_gc(self):
+        import gc
+        for _ in range(3):
+            gc.collect()
+
+    def test_handle_grid_temporary(self):
+        g = nanovdb.tools.createFogVolumeSphere(name="probe").grid()
+        self._force_gc()
+        self.assertEqual(g.gridName(), "probe")
+
+    def test_handle_grid_tree_leaf_values_chain(self):
+        vals = (nanovdb.tools.createFogVolumeSphere()
+                .grid().tree().getFirstLeaf().values())
+        self._force_gc()
+        # Touching the view shouldn't crash.
+        self.assertEqual(vals.shape, (512,))
+        _ = float(vals[0])
+
+    def test_grid_leaf_values_temporary(self):
+        bulk = nanovdb.tools.createFogVolumeSphere().grid().leaf_values()
+        self._force_gc()
+        self.assertEqual(bulk.shape[1], 512)
+        _ = float(bulk[0, 0])
+
+    def test_node_manager_temporary_grid(self):
+        nm = nanovdb.createNodeManager(
+            nanovdb.tools.createFogVolumeSphere().grid()).mgr()
+        self._force_gc()
+        self.assertGreater(nm.leafCount(), 0)
+        leaf0_vals = nm.leaf(0).values()
+        self._force_gc()
+        self.assertEqual(leaf0_vals.shape, (512,))
+
+    def test_blind_data_temporary(self):
+        # The grid has no blind data so getBlindData returns None — what we
+        # care about here is that the temporary chain doesn't segfault.
+        result = nanovdb.tools.createFogVolumeSphere().grid().getBlindData(0)
+        self._force_gc()
+        self.assertIsNone(result)
+
+
 class TestGridMetaDataGuards(unittest.TestCase):
     """GridMetaData() constructor and safeCast() reject bad input (None, a
     Grid wrapping an invalid buffer) with a Python exception or False

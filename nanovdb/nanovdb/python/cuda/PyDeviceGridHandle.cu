@@ -72,9 +72,11 @@ void defineDeviceGridHandle(nb::module_& m)
             "cpu_t"_a.noconvert(),
             "cuda_t"_a.noconvert())
         .def("deviceGrid", &pyDeviceGrid, "n"_a = 0,
+             nb::keep_alive<0, 1>(),
              "Return the n-th device-resident grid as a typed Grid subclass "
              "selected by gridType(n), or None if the BuildT is not bound in "
-             "Python or the device copy has not been uploaded yet.")
+             "Python or the device copy has not been uploaded yet. The "
+             "returned grid keeps this handle alive.")
         .def(
             "deviceUpload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceUpload(nullptr, sync); }, "sync"_a = true)
         .def(

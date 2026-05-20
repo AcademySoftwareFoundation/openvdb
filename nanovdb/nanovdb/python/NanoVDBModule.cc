@@ -252,9 +252,11 @@ void defineGrid(nb::module_& m)
             return -1;
         }, "semantic"_a)
         .def("getBlindData", &pyGetBlindData, "n"_a,
+             nb::keep_alive<0, 1>(),
              "Return a zero-copy NumPy view of the n-th blind data channel, "
              "or None if n is out of range. dtype and shape are derived from "
-             "the channel's mDataType / mValueCount.");
+             "the channel's mDataType / mValueCount. The view keeps the grid "
+             "alive (and therefore the GridHandle that owns the buffer).");
 }
 
 // BuildT-dependent slice of the typed grid Python class. Inherits the
@@ -446,7 +448,9 @@ template<typename AttT> void definePointAccessor(nb::module_& m, const char* nam
             uint64_t count = acc.gridPoints(begin, end);
             if (begin == nullptr || count == 0) return nb::none();
             return pyPointsToNdarray<AttT>(py_self, begin, count);
-        }, "Return all point attributes in the grid as a single NumPy view.")
+        }, nb::keep_alive<0, 1>(),
+           "Return all point attributes in the grid as a single NumPy view. "
+           "The view keeps this accessor alive.")
         .def("leafPoints", [](nb::handle py_self, const Coord& ijk) -> nb::object {
             auto& acc = nb::cast<PA&>(py_self);
             const AttT* begin = nullptr;
@@ -454,9 +458,10 @@ template<typename AttT> void definePointAccessor(nb::module_& m, const char* nam
             uint64_t count = acc.leafPoints(ijk, begin, end);
             if (begin == nullptr || count == 0) return nb::none();
             return pyPointsToNdarray<AttT>(py_self, begin, count);
-        }, "ijk"_a,
+        }, "ijk"_a, nb::keep_alive<0, 1>(),
            "Return the point attributes contained within the leaf node "
-           "covering ijk, or None if no leaf is present.")
+           "covering ijk, or None if no leaf is present. The view keeps "
+           "this accessor alive.")
         .def("voxelPoints", [](nb::handle py_self, const Coord& ijk) -> nb::object {
             auto& acc = nb::cast<PA&>(py_self);
             const AttT* begin = nullptr;
@@ -464,9 +469,10 @@ template<typename AttT> void definePointAccessor(nb::module_& m, const char* nam
             uint64_t count = acc.voxelPoints(ijk, begin, end);
             if (begin == nullptr || count == 0) return nb::none();
             return pyPointsToNdarray<AttT>(py_self, begin, count);
-        }, "ijk"_a,
+        }, "ijk"_a, nb::keep_alive<0, 1>(),
            "Return the point attributes at the specific voxel ijk, or None "
-           "if the voxel is inactive / empty.");
+           "if the voxel is inactive / empty. The view keeps this accessor "
+           "alive.");
 }
 
 // Type-erased grid introspector. Mirrors nanovdb::GridMetaData (768B) and

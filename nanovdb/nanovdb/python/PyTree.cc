@@ -56,8 +56,10 @@ void defineNodeManagerHandle(nb::module_& m)
             [](const HandleT& h) { return h.data() != nullptr; },
             nb::is_operator())
         .def("mgr", &pyNodeMgr<HostBuffer>,
+             nb::keep_alive<0, 1>(),
              "Return the typed NodeManager for the grid this handle was "
-             "built from, or None if the BuildT is not Python-visible.");
+             "built from, or None if the BuildT is not Python-visible. The "
+             "returned NodeManager keeps this handle alive.");
 }
 
 // createNodeManager has one template instantiation per BuildT. We expose a
@@ -104,9 +106,14 @@ void defineCreateNodeManager(nb::module_& m)
                 "bound BuildT");
         },
         "grid"_a,
+        // The constructed NodeManager stores a raw pointer back to the
+        // grid; the handle must therefore keep the grid (and transitively
+        // the GridHandle that owns the grid's buffer) alive.
+        nb::keep_alive<0, 1>(),
         "Build a NodeManager for the given grid, returning a "
         "NodeManagerHandle that owns the underlying buffer. The handle's "
-        "mgr() method returns the typed NodeManager.");
+        "mgr() method returns the typed NodeManager. The handle keeps the "
+        "source grid alive for as long as it lives.");
 }
 
 } // namespace pynanovdb

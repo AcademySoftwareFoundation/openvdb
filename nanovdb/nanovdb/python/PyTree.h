@@ -43,10 +43,25 @@ template<typename BuildT> void defineNanoLeaf(nb::module_& m, const char* name)
             nb::overload_cast<const CoordT&>(&LeafT::isActive, nb::const_),
             nb::arg("ijk"))
        .def("isActive",
-            nb::overload_cast<uint32_t>(&LeafT::isActive, nb::const_),
+            [](const LeafT& leaf, uint32_t n) {
+                // Underlying mValueMask.isOn(n) is unchecked; release builds
+                // skip the C++ NANOVDB_ASSERT and would silently read OOB.
+                if (n >= LeafT::voxelCount()) {
+                    throw nb::index_error(
+                        "Leaf.isActive(n): n out of range [0, voxelCount)");
+                }
+                return leaf.isActive(n);
+            },
             nb::arg("n"))
        .def("getValue",
-            nb::overload_cast<uint32_t>(&LeafT::getValue, nb::const_),
+            [](const LeafT& leaf, uint32_t offset) {
+                // mValues[offset] is unchecked in C++; guard the Python side.
+                if (offset >= LeafT::voxelCount()) {
+                    throw nb::index_error(
+                        "Leaf.getValue(offset): offset out of range [0, voxelCount)");
+                }
+                return leaf.getValue(offset);
+            },
             nb::arg("offset"))
        .def("getValue",
             nb::overload_cast<const CoordT&>(&LeafT::getValue, nb::const_),
@@ -90,9 +105,10 @@ template<typename BuildT> void defineNanoLeaf(nb::module_& m, const char* name)
                         size_t(1), shape, py_self),
                     nb::rv_policy::reference);
             },
-            "Return a zero-copy NumPy view of the 512 leaf values. "
-            "Lifetime is anchored to the leaf (which is itself parented "
-            "to the GridHandle that owns the buffer).");
+            nb::keep_alive<0, 1>(),
+            "Return a zero-copy NumPy view of the 512 leaf values. The view "
+            "keeps the leaf (and transitively the GridHandle that owns the "
+            "underlying buffer) alive.");
     }
 }
 
@@ -203,14 +219,31 @@ template<typename BuildT> void defineNanoTree(nb::module_& m, const char* name)
              nb::rv_policy::reference_internal)
         .def("background", &TreeT::background, nb::rv_policy::reference_internal)
         .def("activeVoxelCount", &TreeT::activeVoxelCount)
-        .def("activeTileCount", &TreeT::activeTileCount,
-             nb::rv_policy::reference_internal, nb::arg("level"))
-        // Use static_cast (not nb::overload_cast<int>) — Tree has a templated
-        // nodeCount<NodeT>() in addition to nodeCount(int), and Clang's
-        // overload-set check rejects nb::overload_cast for this combination
-        // even though GCC accepts it.
+        // activeTileCount(level): valid range is 1..3 (lower / upper / root
+        // tile counts). C++ uses NANOVDB_ASSERT(level > 0 && level <= 3)
+        // which is a no-op in release builds — so guard explicitly.
+        .def("activeTileCount",
+             [](const TreeT& tree, uint32_t level) -> uint32_t {
+                 if (level < 1 || level > 3) {
+                     throw nb::value_error(
+                         "Tree.activeTileCount(level): level must be 1, 2, or 3");
+                 }
+                 return tree.activeTileCount(level);
+             },
+             nb::arg("level"))
+        // nodeCount(level): valid range is 0..2 (leaf / lower / upper).
+        // C++ uses NANOVDB_ASSERT(level < 3), again no-op in release.
+        // The lambda's `int level` argument disambiguates the call against
+        // Tree's templated nodeCount<NodeT>() overload at the C++ level,
+        // so we don't need an overload_cast / static_cast wrapper here.
         .def("nodeCount",
-             static_cast<uint32_t (TreeT::*)(int) const>(&TreeT::nodeCount),
+             [](const TreeT& tree, int level) -> uint32_t {
+                 if (level < 0 || level >= 3) {
+                     throw nb::value_error(
+                         "Tree.nodeCount(level): level must be 0, 1, or 2");
+                 }
+                 return tree.nodeCount(level);
+             },
              nb::arg("level"))
         .def("totalNodeCount", &TreeT::totalNodeCount)
         .def_static("memUsage", &TreeT::memUsage)
@@ -263,18 +296,48 @@ template<typename BuildT> void defineNodeManager(nb::module_& m, const char* nam
              nb::overload_cast<>(&NMT::isLinear, nb::const_))
         .def("memUsage",
              nb::overload_cast<>(&NMT::memUsage, nb::const_))
-        .def("nodeCount", &NMT::nodeCount, nb::arg("level"))
+        .def("nodeCount",
+             [](const NMT& nm, int level) -> uint64_t {
+                 // Mirror Tree.nodeCount bounds (NodeManager forwards to Tree).
+                 if (level < 0 || level >= 3) {
+                     throw nb::value_error(
+                         "NodeManager.nodeCount(level): level must be 0, 1, or 2");
+                 }
+                 return nm.nodeCount(level);
+             },
+             nb::arg("level"))
         .def("leafCount",  &NMT::leafCount)
         .def("lowerCount", &NMT::lowerCount)
         .def("upperCount", &NMT::upperCount)
+        // leaf / lower / upper: NANOVDB_ASSERT(i < nodeCount(LEVEL)) in C++ is
+        // no-op in release, so guard explicitly to convert OOB access into a
+        // Python IndexError instead of memory corruption.
         .def("leaf",
-             nb::overload_cast<uint32_t>(&NMT::leaf, nb::const_),
+             [](const NMT& nm, uint32_t i) -> const nanovdb::NanoLeaf<BuildT>& {
+                 if (i >= nm.leafCount()) {
+                     throw nb::index_error(
+                         "NodeManager.leaf(i): i out of range [0, leafCount)");
+                 }
+                 return nm.leaf(i);
+             },
              nb::rv_policy::reference_internal, nb::arg("i"))
         .def("lower",
-             nb::overload_cast<uint32_t>(&NMT::lower, nb::const_),
+             [](const NMT& nm, uint32_t i) -> const nanovdb::NanoLower<BuildT>& {
+                 if (i >= nm.lowerCount()) {
+                     throw nb::index_error(
+                         "NodeManager.lower(i): i out of range [0, lowerCount)");
+                 }
+                 return nm.lower(i);
+             },
              nb::rv_policy::reference_internal, nb::arg("i"))
         .def("upper",
-             nb::overload_cast<uint32_t>(&NMT::upper, nb::const_),
+             [](const NMT& nm, uint32_t i) -> const nanovdb::NanoUpper<BuildT>& {
+                 if (i >= nm.upperCount()) {
+                     throw nb::index_error(
+                         "NodeManager.upper(i): i out of range [0, upperCount)");
+                 }
+                 return nm.upper(i);
+             },
              nb::rv_policy::reference_internal, nb::arg("i"));
 }
 
@@ -336,11 +399,12 @@ struct PyLeafValuesBinder<BuildT,
                         size_t(2), shape, py_self, strides),
                     nb::rv_policy::reference);
             },
+            nb::keep_alive<0, 1>(),
             "Return a zero-copy (N_leaves, 512) NumPy view of every leaf's "
             "values, in breadth-first leaf order. Available only for "
             "BuildTs whose leaf layout carries T mValues[512] (i.e. not "
             "Fp*, Index, Mask, bool, or Point) and only on breadth-first "
-            "grids. Lifetime is anchored to the grid.");
+            "grids. The view keeps the grid alive.");
     }
 };
 
