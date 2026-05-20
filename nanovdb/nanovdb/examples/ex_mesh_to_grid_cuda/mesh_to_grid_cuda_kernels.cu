@@ -72,8 +72,8 @@ void mainMeshToGrid(
         const auto origin = leaf.origin();
         for (uint32_t vi = 0; vi < 512; ++vi) {
             if (!leaf.isActive(vi)) continue;
-            const int lx = vi & 7, ly = (vi >> 3) & 7, lz = (vi >> 6) & 7;
-            const int x = origin[0]+lx, y = origin[1]+ly, z = origin[2]+lz;
+            const auto local = nanovdb::NanoLeaf<BuildT>::OffsetToLocalCoord(vi);
+            const int x = origin[0]+local[0], y = origin[1]+local[1], z = origin[2]+local[2];
             ourCoords.push_back(encodeCoord(x, y, z));
 
             const openvdb::Coord coord(x, y, z);

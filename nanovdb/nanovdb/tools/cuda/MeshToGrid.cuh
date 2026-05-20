@@ -562,13 +562,11 @@ struct ScatterChildPairsFunctor
 
         for (uint32_t n = 0; n < 512; ++n) {
             if (mask.isOn(n)) {
-                int i =  n       & 0x7;
-                int j = (n >> 3) & 0x7;
-                int k = (n >> 6) & 0x7;
+                const nanovdb::Coord local = nanovdb::NanoLeaf<BuildT>::OffsetToLocalCoord(n);
                 dNewPairs[writeIdx].origin = nanovdb::Coord(
-                    parentPair.origin[0] + i * childScale,
-                    parentPair.origin[1] + j * childScale,
-                    parentPair.origin[2] + k * childScale);
+                    parentPair.origin[0] + local[0] * childScale,
+                    parentPair.origin[1] + local[1] * childScale,
+                    parentPair.origin[2] + local[2] * childScale);
                 dNewPairs[writeIdx].triangleID = parentPair.triangleID;
                 ++writeIdx;
             }
@@ -675,16 +673,13 @@ __global__ void evaluateAndCountSubBoxesKernel(
 
     int childScale = parentScale / 8;
 
-    // Thread to 3D sub-box index mapping
-    int i =  threadID       & 0x7;
-    int j = (threadID >> 3) & 0x7;
-    int k = (threadID >> 6) & 0x7;
+    const nanovdb::Coord local = nanovdb::NanoLeaf<BuildT>::OffsetToLocalCoord(threadID);
 
     // Compute voxel-encompassing bounding box for this subdomain
     // Voxel bounds are [origin - 0.5, origin + childScale - 0.5]
-    float centerX = parentPair.origin[0] + i * childScale + (childScale * 0.5f) - 0.5f;
-    float centerY = parentPair.origin[1] + j * childScale + (childScale * 0.5f) - 0.5f;
-    float centerZ = parentPair.origin[2] + k * childScale + (childScale * 0.5f) - 0.5f;
+    float centerX = parentPair.origin[0] + local[0] * childScale + (childScale * 0.5f) - 0.5f;
+    float centerY = parentPair.origin[1] + local[1] * childScale + (childScale * 0.5f) - 0.5f;
+    float centerZ = parentPair.origin[2] + local[2] * childScale + (childScale * 0.5f) - 0.5f;
 
     nanovdb::Vec3f boxCenter(centerX, centerY, centerZ);
     float halfExt = (childScale * 0.5f) + padding;
@@ -694,7 +689,7 @@ __global__ void evaluateAndCountSubBoxesKernel(
     bool hit = testTriangleAABB<OnlyUseAABB>(boxCenter, boxHalfExtents, tri[0], tri[1], tri[2]);
 
     // Mask Building without using atomics, via Warp Voting
-    // threadID = i + j*8 + k*64 matches NanoVDB Mask<3> bit ordering exactly,
+    // threadID uses NanoVDB's Mask<3> bit ordering,
     // so warp ballots map directly into the mask with no stitching required.
     // We use reinterpret_cast rather than a union to avoid Mask<3>'s non-trivial
     // constructor deleting the union's default constructor.

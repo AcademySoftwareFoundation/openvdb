@@ -3870,8 +3870,8 @@ TEST(TestNanoVDBCUDA, MeshToGrid_UnitTetrahedron)
             if (!leaf.isActive(vi)) continue;
             ++activeCount;
 
-            const int lx = vi & 7, ly = (vi >> 3) & 7, lz = (vi >> 6) & 7;
-            const int ix = org[0]+lx, iy = org[1]+ly, iz = org[2]+lz;
+            const auto local = nanovdb::NanoLeaf<BuildT>::OffsetToLocalCoord(vi);
+            const int ix = org[0]+local[0], iy = org[1]+local[1], iz = org[2]+local[2];
 
             const float exactUDF = cpuUDF(ix, iy, iz);
             ASSERT_LE(exactUDF, bandWidthWorld * (1.f + 1e-5f))
@@ -3904,8 +3904,8 @@ TEST(TestNanoVDBCUDA, MeshToGrid_UnitTetrahedron)
         const auto  org  = leaf.origin();
         for (int vi = 0; vi < 512; ++vi) {
             if (!leaf.isActive(vi)) continue;
-            const int lx = vi & 7, ly = (vi >> 3) & 7, lz = (vi >> 6) & 7;
-            activeSet.insert(encodeCoord(org[0]+lx, org[1]+ly, org[2]+lz));
+            const auto local = nanovdb::NanoLeaf<BuildT>::OffsetToLocalCoord(vi);
+            activeSet.insert(encodeCoord(org[0]+local[0], org[1]+local[1], org[2]+local[2]));
         }
     }
 

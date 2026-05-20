@@ -101,13 +101,10 @@ struct RasterizeLeafNodesFunctor
         const auto &pair = dPairs[pairID];
         const auto &tri = dTriangles[pair.triangleID];
 
-        // Decode voxel local coords within the 8^3 leaf
-        // Bit ordering: threadID = lx + ly*8 + lz*64 matches NanoVDB Mask<3> layout
-        const int lx =  threadID       & 0x7;
-        const int ly = (threadID >> 3) & 0x7;
-        const int lz = (threadID >> 6) & 0x7;
-
-        const nanovdb::Vec3f voxelCenter(float(pair.origin[0] + lx), float(pair.origin[1] + ly), float(pair.origin[2] + lz));
+        const nanovdb::Coord local = nanovdb::NanoLeaf<BuildT>::OffsetToLocalCoord(threadID);
+        const nanovdb::Vec3f voxelCenter(float(pair.origin[0] + local[0]),
+                                         float(pair.origin[1] + local[1]),
+                                         float(pair.origin[2] + local[2]));
         const bool hit = nanovdb::math::pointToTriangleDistSqr(tri[0], tri[1], tri[2], voxelCenter) <= bandWidthSqr;
 
         // Build a per-block local mask via warp ballot (avoids per-voxel atomics).
@@ -173,11 +170,10 @@ struct ComputeUDFFunctor
         if (!leaf) return;
         if (!leaf->isActive(threadID)) return;
 
-        const int lx =  threadID       & 0x7;
-        const int ly = (threadID >> 3) & 0x7;
-        const int lz = (threadID >> 6) & 0x7;
-
-        const nanovdb::Vec3f voxelCenter(float(pair.origin[0] + lx), float(pair.origin[1] + ly), float(pair.origin[2] + lz));
+        const nanovdb::Coord local = nanovdb::NanoLeaf<BuildT>::OffsetToLocalCoord(threadID);
+        const nanovdb::Vec3f voxelCenter(float(pair.origin[0] + local[0]),
+                                         float(pair.origin[1] + local[1]),
+                                         float(pair.origin[2] + local[2]));
 
         const auto &tri = dTriangles[pair.triangleID];
         const float distSqr = nanovdb::math::pointToTriangleDistSqr(tri[0], tri[1], tri[2], voxelCenter);
