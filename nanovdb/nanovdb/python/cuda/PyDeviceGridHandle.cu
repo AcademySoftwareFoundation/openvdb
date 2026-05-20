@@ -6,6 +6,7 @@
 #include <nanobind/ndarray.h>
 
 #include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/NanoVDB.h>
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -13,10 +14,46 @@ using namespace nanovdb;
 
 namespace pynanovdb {
 
+// Device-side polymorphic deviceGrid(n) — same dispatch shape as
+// pyHostGrid<BufferT> in PyGridHandle.h, but returns the device pointer.
+// gridType(n) is read from the host-side GridData header (the handle keeps
+// a host mirror), so this works whether or not the grid has been uploaded.
+// Returns None if the device-side grid is null (i.e. no deviceUpload yet)
+// or the BuildT is not Python-visible.
+static nb::object pyDeviceGrid(nb::handle py_handle, uint32_t n)
+{
+    using BufferT = nanovdb::cuda::DeviceBuffer;
+    auto& handle = nb::cast<GridHandle<BufferT>&>(py_handle);
+    if (n >= handle.gridCount()) return nb::none();
+    switch (handle.gridType(n)) {
+#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, GridTypeEnum)              \
+        case nanovdb::GridType::GridTypeEnum: {                                 \
+            auto* grid = handle.template deviceGrid<T>(n);                      \
+            return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle)   \
+                        : nb::none();                                           \
+        }
+#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, GridTypeEnum) \
+        case nanovdb::GridType::GridTypeEnum: {                                 \
+            auto* grid = handle.template deviceGrid<T>(n);                      \
+            return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle)   \
+                        : nb::none();                                           \
+        }
+#define NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix, GridTypeEnum)               \
+        case nanovdb::GridType::GridTypeEnum: {                                 \
+            auto* grid = handle.template deviceGrid<T>(n);                      \
+            return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle)   \
+                        : nb::none();                                           \
+        }
+#include "../BuildTypes.def"
+        default:
+            return nb::none();
+    }
+}
+
 void defineDeviceGridHandle(nb::module_& m)
 {
     using BufferT = nanovdb::cuda::DeviceBuffer;
-    auto cls = defineGridHandle<BufferT>(m, "DeviceGridHandle")
+    defineGridHandle<BufferT>(m, "DeviceGridHandle")
         .def(
             "__init__",
             [](GridHandle<BufferT>&                                 handle,
@@ -27,24 +64,16 @@ void defineDeviceGridHandle(nb::module_& m)
                 new (&handle) GridHandle<BufferT>(std::move(buffer));
             },
             "cpu_t"_a.noconvert(),
-            "cuda_t"_a.noconvert());
-
-#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceMethod) \
-    cls.def(DeviceMethod,                                        \
-            nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<T>), \
-            "n"_a = 0,                                                 \
-            nb::rv_policy::reference_internal);
-#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceMethod) \
-    cls.def(DeviceMethod,                                        \
-            nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<T>), \
-            "n"_a = 0,                                                 \
-            nb::rv_policy::reference_internal);
-#include "../BuildTypes.def"
-
-    cls.def(
+            "cuda_t"_a.noconvert())
+        .def("deviceGrid", &pyDeviceGrid, "n"_a = 0,
+             "Return the n-th device-resident grid as a typed Grid subclass "
+             "selected by gridType(n), or None if the BuildT is not bound in "
+             "Python or the device copy has not been uploaded yet.")
+        .def(
             "deviceUpload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceUpload(nullptr, sync); }, "sync"_a = true)
         .def(
             "deviceDownload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceDownload(nullptr, sync); }, "sync"_a = true);
+    defineGridHandleUtilities<BufferT>(m);
 }
 
 } // namespace pynanovdb

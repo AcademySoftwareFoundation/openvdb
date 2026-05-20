@@ -1,6 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 #include <nanobind/nanobind.h>
+#include <nanobind/ndarray.h>
 #include <nanobind/operators.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/tuple.h>
@@ -137,9 +138,25 @@ void defineMap(nb::module_& m)
         .def("getVoxelSize", &Map::getVoxelSize);
 }
 
-void defineGridData(nb::module_& m)
+// Forward declaration — body lives below defineGridBlindData() so it can
+// reference the enum / class bindings registered there.
+static nb::object pyGetBlindData(nb::handle py_grid, uint32_t n);
+
+// Type-erased Grid base class. nb::class_ is bound to nanovdb::GridData
+// (the 672 B POD prefix present at the start of every NanoGrid<BuildT>),
+// but the Python name is "Grid" to match the C++ class hierarchy where
+// Grid<TreeT> (a.k.a. NanoGrid<BuildT>) is the user-facing type and
+// GridData is the implementation-detail POD.
+//
+// Every BuildT-independent method lives here. The lambdas below read public
+// data members on GridData directly because the accessor methods named
+// version()/gridType()/isLevelSet()/etc. are defined on Grid<TreeT>, not on
+// GridData itself — but they all just forward to a GridData data member,
+// so the same value is reachable from the base.
+void defineGrid(nb::module_& m)
 {
-    nb::class_<GridData>(m, "GridData")
+    nb::class_<GridData>(m, "Grid")
+        // Validation and flag mutators (already member functions on GridData).
         .def("isValid", &GridData::isValid)
         .def("setMinMaxOn", &GridData::setMinMaxOn, "on"_a = true)
         .def("setBBoxOn", &GridData::setBBoxOn, "on"_a = true)
@@ -147,6 +164,7 @@ void defineGridData(nb::module_& m)
         .def("setAverageOn", &GridData::setAverageOn, "on"_a = true)
         .def("setStdDeviationOn", &GridData::setStdDeviationOn, "on"_a = true)
         .def("setGridName", &GridData::setGridName, "src"_a)
+        // Affine transforms (already member functions on GridData).
         .def("applyMap", nb::overload_cast<const Vec3f&>(&GridData::template applyMap<Vec3f>, nb::const_), "xyz"_a)
         .def("applyMap", nb::overload_cast<const Vec3d&>(&GridData::template applyMap<Vec3d>, nb::const_), "xyz"_a)
         .def("applyMapF", nb::overload_cast<const Vec3f&>(&GridData::template applyMapF<Vec3f>, nb::const_), "xyz"_a)
@@ -167,50 +185,307 @@ void defineGridData(nb::module_& m)
         .def("applyIJT", nb::overload_cast<const Vec3d&>(&GridData::template applyIJT<Vec3d>, nb::const_), "xyz"_a)
         .def("applyIJTF", nb::overload_cast<const Vec3f&>(&GridData::template applyIJTF<Vec3f>, nb::const_), "xyz"_a)
         .def("applyIJTF", nb::overload_cast<const Vec3d&>(&GridData::template applyIJTF<Vec3d>, nb::const_), "xyz"_a)
+        // Strings, geometry, layout (already member functions on GridData).
         .def("gridName", &GridData::gridName)
         .def("memUsage", &GridData::memUsage)
         .def("worldBBox", &GridData::worldBBox)
         .def("indexBBox", &GridData::indexBBox)
-        .def("isEmpty", &GridData::isEmpty);
+        .def("isEmpty", &GridData::isEmpty)
+        // Lifted from Grid<TreeT> via direct data-member access.
+        .def("version",         [](const GridData& g) { return g.mVersion; })
+        .def("gridSize",        [](const GridData& g) { return g.mGridSize; })
+        .def("gridIndex",       [](const GridData& g) { return g.mGridIndex; })
+        .def("gridCount",       [](const GridData& g) { return g.mGridCount; })
+        .def("voxelSize",       [](const GridData& g) -> const Vec3d& { return g.mVoxelSize; },
+             nb::rv_policy::reference_internal)
+        .def("map",             [](const GridData& g) -> const Map& { return g.mMap; },
+             nb::rv_policy::reference_internal)
+        .def("gridType",  [](const GridData& g) { return g.mGridType; })
+        .def("gridClass", [](const GridData& g) { return g.mGridClass; })
+        .def("checksum",  [](const GridData& g) { return g.mChecksum; })
+        .def("isLevelSet",   [](const GridData& g) { return g.mGridClass == GridClass::LevelSet; })
+        .def("isFogVolume",  [](const GridData& g) { return g.mGridClass == GridClass::FogVolume; })
+        .def("isStaggered",  [](const GridData& g) { return g.mGridClass == GridClass::Staggered; })
+        .def("isPointIndex",
+             [](const GridData& g) { return g.mGridClass == GridClass::PointIndex; })
+        .def("isGridIndex",  [](const GridData& g) { return g.mGridClass == GridClass::IndexGrid; })
+        .def("isPointData",  [](const GridData& g) { return g.mGridClass == GridClass::PointData; })
+        .def("isMask",       [](const GridData& g) { return g.mGridClass == GridClass::Topology; })
+        .def("isUnknown",    [](const GridData& g) { return g.mGridClass == GridClass::Unknown; })
+        .def("hasMinMax", [](const GridData& g) { return g.mFlags.isMaskOn(GridFlags::HasMinMax); })
+        .def("hasBBox",   [](const GridData& g) { return g.mFlags.isMaskOn(GridFlags::HasBBox); })
+        .def("hasLongGridName",
+             [](const GridData& g) { return g.mFlags.isMaskOn(GridFlags::HasLongGridName); })
+        .def("hasAverage",
+             [](const GridData& g) { return g.mFlags.isMaskOn(GridFlags::HasAverage); })
+        .def("hasStdDeviation",
+             [](const GridData& g) { return g.mFlags.isMaskOn(GridFlags::HasStdDeviation); })
+        .def("isBreadthFirst",
+             [](const GridData& g) { return g.mFlags.isMaskOn(GridFlags::IsBreadthFirst); })
+        .def("shortGridName", [](const GridData& g) { return std::string(g.mGridName); })
+        // Blind data — exposes the sidecar channels that PointGrid and
+        // OnIndexGrid use to carry their actual values, colors, normals, IDs,
+        // etc. blindMetaData(n) returns the descriptor; getBlindData(n)
+        // returns a zero-copy NumPy view onto the underlying bytes typed by
+        // mDataType (Float -> float32 ndarray, Vec3f -> (N, 3) float32, etc.;
+        // unrecognized types fall back to a flat uint8 byte view).
+        .def("blindDataCount",          [](const GridData& g) { return g.mBlindMetadataCount; })
+        .def("blindMetaData",
+             [](const GridData& g, uint32_t n) -> const GridBlindMetaData* {
+                 return n < g.mBlindMetadataCount ? g.blindMetaData(n) : nullptr;
+             },
+             nb::rv_policy::reference_internal, "n"_a)
+        .def("findBlindData",           [](const GridData& g, const std::string& name) -> int {
+            for (uint32_t i = 0; i < g.mBlindMetadataCount; ++i) {
+                const auto* meta = g.blindMetaData(i);
+                if (std::strncmp(meta->mName, name.c_str(), GridBlindMetaData::MaxNameSize) == 0)
+                    return static_cast<int>(i);
+            }
+            return -1;
+        }, "name"_a)
+        .def("findBlindDataForSemantic", [](const GridData& g, GridBlindDataSemantic sem) -> int {
+            for (uint32_t i = 0; i < g.mBlindMetadataCount; ++i) {
+                if (g.blindMetaData(i)->mSemantic == sem)
+                    return static_cast<int>(i);
+            }
+            return -1;
+        }, "semantic"_a)
+        .def("getBlindData", &pyGetBlindData, "n"_a,
+             "Return a zero-copy NumPy view of the n-th blind data channel, "
+             "or None if n is out of range. dtype and shape are derived from "
+             "the channel's mDataType / mValueCount.");
 }
 
-template<typename BuildT> void defineGrid(nb::module_& m, const char* name)
+// BuildT-dependent slice of the typed grid Python class. Inherits the
+// type-erased Grid base bound by defineGrid() above — anything that doesn't
+// need to know BuildT lives there, not here.
+template<typename BuildT> void defineNanoGrid(nb::module_& m, const char* name)
 {
     nb::class_<NanoGrid<BuildT>, GridData>(m, name)
-        .def("version", &NanoGrid<BuildT>::version)
-        .def("memUsage", &NanoGrid<BuildT>::memUsage)
-        .def("gridSize", &NanoGrid<BuildT>::gridSize)
-        .def("gridIndex", &NanoGrid<BuildT>::gridIndex)
-        .def("gridCount", &NanoGrid<BuildT>::gridCount)
         .def("getAccessor", &NanoGrid<BuildT>::getAccessor)
-        .def("voxelSize", &NanoGrid<BuildT>::voxelSize)
-        .def("map", &NanoGrid<BuildT>::map)
-        .def("worldBBox", &NanoGrid<BuildT>::worldBBox)
-        .def("indexBBox", &NanoGrid<BuildT>::indexBBox)
         .def("activeVoxelCount", &NanoGrid<BuildT>::activeVoxelCount)
-        .def("isValid", &NanoGrid<BuildT>::isValid)
-        .def("gridType", &NanoGrid<BuildT>::gridType)
-        .def("gridClass", &NanoGrid<BuildT>::gridClass)
-        .def("isLevelSet", &NanoGrid<BuildT>::isLevelSet)
-        .def("isFogVolume", &NanoGrid<BuildT>::isFogVolume)
-        .def("isStaggered", &NanoGrid<BuildT>::isStaggered)
-        .def("isPointIndex", &NanoGrid<BuildT>::isPointIndex)
-        .def("isGridIndex", &NanoGrid<BuildT>::isGridIndex)
-        .def("isPointData", &NanoGrid<BuildT>::isPointData)
-        .def("isMask", &NanoGrid<BuildT>::isMask)
-        .def("isUnknown", &NanoGrid<BuildT>::isUnknown)
-        .def("hasMinMax", &NanoGrid<BuildT>::hasMinMax)
-        .def("hasBBox", &NanoGrid<BuildT>::hasBBox)
-        .def("hasLongGridName", &NanoGrid<BuildT>::hasLongGridName)
-        .def("hasAverage", &NanoGrid<BuildT>::hasAverage)
-        .def("hasStdDeviation", &NanoGrid<BuildT>::hasStdDeviation)
-        .def("isBreadthFirst", &NanoGrid<BuildT>::isBreadthFirst)
-        // .def("isLexicographic", &NanoGrid<BuildT>::isLexicographic)
-        .def("isSequential", [](const NanoGrid<BuildT>& grid) { return grid.isSequential(); })
-        .def("gridName", &NanoGrid<BuildT>::gridName)
-        .def("shortGridName", &NanoGrid<BuildT>::shortGridName)
-        .def("checksum", &NanoGrid<BuildT>::checksum)
-        .def("isEmpty", &NanoGrid<BuildT>::isEmpty);
+        .def("isSequential", [](const NanoGrid<BuildT>& grid) { return grid.isSequential(); });
+}
+
+void defineGridBlindData(nb::module_& m)
+{
+    nb::enum_<GridBlindDataClass>(m, "GridBlindDataClass")
+        .value("Unknown",        GridBlindDataClass::Unknown)
+        .value("IndexArray",     GridBlindDataClass::IndexArray)
+        .value("AttributeArray", GridBlindDataClass::AttributeArray)
+        .value("GridName",       GridBlindDataClass::GridName)
+        .value("ChannelArray",   GridBlindDataClass::ChannelArray)
+        .value("End",            GridBlindDataClass::End)
+        .export_values();
+
+    nb::enum_<GridBlindDataSemantic>(m, "GridBlindDataSemantic")
+        .value("Unknown",       GridBlindDataSemantic::Unknown)
+        .value("PointPosition", GridBlindDataSemantic::PointPosition)
+        .value("PointColor",    GridBlindDataSemantic::PointColor)
+        .value("PointNormal",   GridBlindDataSemantic::PointNormal)
+        .value("PointRadius",   GridBlindDataSemantic::PointRadius)
+        .value("PointVelocity", GridBlindDataSemantic::PointVelocity)
+        .value("PointId",       GridBlindDataSemantic::PointId)
+        .value("WorldCoords",   GridBlindDataSemantic::WorldCoords)
+        .value("GridCoords",    GridBlindDataSemantic::GridCoords)
+        .value("VoxelCoords",   GridBlindDataSemantic::VoxelCoords)
+        .value("LevelSet",      GridBlindDataSemantic::LevelSet)
+        .value("FogVolume",     GridBlindDataSemantic::FogVolume)
+        .value("Staggered",     GridBlindDataSemantic::Staggered)
+        .value("End",           GridBlindDataSemantic::End)
+        .export_values();
+
+    nb::class_<GridBlindMetaData>(m, "GridBlindMetaData",
+                                  "Sidecar metadata for one blind-data channel attached to a Grid.")
+        .def_ro("valueCount", &GridBlindMetaData::mValueCount)
+        .def_ro("valueSize",  &GridBlindMetaData::mValueSize)
+        .def_ro("semantic",   &GridBlindMetaData::mSemantic)
+        .def_ro("dataClass",  &GridBlindMetaData::mDataClass)
+        .def_ro("dataType",   &GridBlindMetaData::mDataType)
+        .def("name",  [](const GridBlindMetaData& m) { return std::string(m.mName); })
+        .def("isValid", &GridBlindMetaData::isValid)
+        .def("blindDataSize", &GridBlindMetaData::blindDataSize);
+}
+
+// Resolve a blind-data channel into a zero-copy NumPy view. The dtype and
+// shape are derived from the GridBlindMetaData's mDataType / mValueSize.
+// For unrecognized types we fall back to a flat uint8 byte view so callers
+// can still copy out the raw bytes. Falls back to None on a count mismatch
+// between mValueSize and the GridType-implied stride.
+static nb::object pyGetBlindData(nb::handle py_grid, uint32_t n)
+{
+    const auto& grid = nb::cast<const GridData&>(py_grid);
+    if (n >= grid.mBlindMetadataCount) return nb::none();
+    const auto* meta = grid.blindMetaData(n);
+    void* data = const_cast<void*>(static_cast<const void*>(
+        util::PtrAdd<uint8_t>(meta, meta->mDataOffset)));
+    const size_t count = static_cast<size_t>(meta->mValueCount);
+
+    // Helper macro: build a typed 1D or (count, dim) ndarray and cast it,
+    // anchoring the lifetime to the source Grid via py_grid.
+    auto make1D = [&](void* p, size_t n_elems, auto sentinel) -> nb::object {
+        using T = decltype(sentinel);
+        size_t shape[1] = {n_elems};
+        return nb::cast(nb::ndarray<T, nb::ndim<1>, nb::c_contig, nb::device::cpu>(
+                            static_cast<T*>(p), 1, shape, py_grid),
+                        nb::rv_policy::reference);
+    };
+    auto make2D = [&](void* p, size_t n_outer, size_t n_inner, auto sentinel) -> nb::object {
+        using T = decltype(sentinel);
+        size_t shape[2] = {n_outer, n_inner};
+        return nb::cast(nb::ndarray<T, nb::ndim<2>, nb::c_contig, nb::device::cpu>(
+                            static_cast<T*>(p), 2, shape, py_grid),
+                        nb::rv_policy::reference);
+    };
+
+    switch (meta->mDataType) {
+        case GridType::Float:   return make1D(data, count, float{});
+        case GridType::Double:  return make1D(data, count, double{});
+        case GridType::Int16:   return make1D(data, count, int16_t{});
+        case GridType::Int32:   return make1D(data, count, int32_t{});
+        case GridType::Int64:   return make1D(data, count, int64_t{});
+        case GridType::UInt8:   return make1D(data, count, uint8_t{});
+        case GridType::UInt32:  return make1D(data, count, uint32_t{});
+        case GridType::Vec3f:   return make2D(data, count, 3, float{});
+        case GridType::Vec3d:   return make2D(data, count, 3, double{});
+        case GridType::Vec4f:   return make2D(data, count, 4, float{});
+        case GridType::Vec4d:   return make2D(data, count, 4, double{});
+        case GridType::Vec3u8:  return make2D(data, count, 3, uint8_t{});
+        case GridType::Vec3u16: return make2D(data, count, 3, uint16_t{});
+        case GridType::RGBA8:   return make2D(data, count, 4, uint8_t{});
+        default:
+            // Fall back to a raw uint8 byte view of mValueCount * mValueSize.
+            return make1D(data, count * meta->mValueSize, uint8_t{});
+    }
+}
+
+// PointAccessor — exposes the per-voxel point attributes that PointGrid
+// carries as blind data. PointIndex grids store uint32 voxel indices;
+// PointData grids store Vec3f positions. Constructor asserts the grid is
+// the right shape; in Python an exception is the result of a mismatch.
+//
+// gridPoints() / leafPoints(ijk) / voxelPoints(ijk) all return a zero-copy
+// NumPy view onto the underlying blind-data buffer, sliced to just the
+// range associated with the call. Lifetime is anchored to the accessor.
+template<typename AttT, int Dim>
+struct PyPointAccessorTraits;
+template<> struct PyPointAccessorTraits<uint32_t, 1> { using Scalar = uint32_t; };
+template<> struct PyPointAccessorTraits<Vec3f, 2>    { using Scalar = float; };
+
+template<typename AttT>
+static nb::object pyPointsToNdarray(nb::handle py_self,
+                                    const AttT* begin,
+                                    uint64_t count);
+
+template<>
+nb::object pyPointsToNdarray<uint32_t>(nb::handle py_self,
+                                       const uint32_t* begin,
+                                       uint64_t count)
+{
+    size_t shape[1] = {static_cast<size_t>(count)};
+    return nb::cast(
+        nb::ndarray<uint32_t, nb::ndim<1>, nb::c_contig, nb::device::cpu>(
+            const_cast<uint32_t*>(begin), 1, shape, py_self),
+        nb::rv_policy::reference);
+}
+
+template<>
+nb::object pyPointsToNdarray<Vec3f>(nb::handle py_self,
+                                    const Vec3f* begin,
+                                    uint64_t count)
+{
+    size_t shape[2] = {static_cast<size_t>(count), 3};
+    return nb::cast(
+        nb::ndarray<float, nb::ndim<2>, nb::c_contig, nb::device::cpu>(
+            reinterpret_cast<float*>(const_cast<Vec3f*>(begin)), 2, shape, py_self),
+        nb::rv_policy::reference);
+}
+
+template<typename AttT> void definePointAccessor(nb::module_& m, const char* name)
+{
+    using PA = PointAccessor<AttT, Point>;
+    nb::class_<PA>(m, name,
+                   "Per-voxel access to the point attributes carried as blind "
+                   "data on a PointGrid. gridPoints / leafPoints / voxelPoints "
+                   "return zero-copy NumPy views.")
+        .def(nb::init<const NanoGrid<Point>&>(), "grid"_a, nb::keep_alive<1, 2>())
+        .def("__bool__", [](const PA& a) { return bool(a); })
+        .def("grid", &PA::grid, nb::rv_policy::reference_internal)
+        .def("gridPoints", [](nb::handle py_self) -> nb::object {
+            auto& acc = nb::cast<PA&>(py_self);
+            const AttT* begin = nullptr;
+            const AttT* end = nullptr;
+            uint64_t count = acc.gridPoints(begin, end);
+            if (begin == nullptr || count == 0) return nb::none();
+            return pyPointsToNdarray<AttT>(py_self, begin, count);
+        }, "Return all point attributes in the grid as a single NumPy view.")
+        .def("leafPoints", [](nb::handle py_self, const Coord& ijk) -> nb::object {
+            auto& acc = nb::cast<PA&>(py_self);
+            const AttT* begin = nullptr;
+            const AttT* end = nullptr;
+            uint64_t count = acc.leafPoints(ijk, begin, end);
+            if (begin == nullptr || count == 0) return nb::none();
+            return pyPointsToNdarray<AttT>(py_self, begin, count);
+        }, "ijk"_a,
+           "Return the point attributes contained within the leaf node "
+           "covering ijk, or None if no leaf is present.")
+        .def("voxelPoints", [](nb::handle py_self, const Coord& ijk) -> nb::object {
+            auto& acc = nb::cast<PA&>(py_self);
+            const AttT* begin = nullptr;
+            const AttT* end = nullptr;
+            uint64_t count = acc.voxelPoints(ijk, begin, end);
+            if (begin == nullptr || count == 0) return nb::none();
+            return pyPointsToNdarray<AttT>(py_self, begin, count);
+        }, "ijk"_a,
+           "Return the point attributes at the specific voxel ijk, or None "
+           "if the voxel is inactive / empty.");
+}
+
+// Type-erased grid introspector. Mirrors nanovdb::GridMetaData (768B) and
+// answers "what's in this buffer?" questions without needing to know
+// BuildT. Construct from a Grid (which is the Python-side GridData); all
+// queries below are flat data-member reads with no tree traversal.
+void defineGridMetaData(nb::module_& m)
+{
+    nb::class_<GridMetaData>(m, "GridMetaData",
+                             "Type-erased introspector. Mirrors FileMetaData "
+                             "but reads from an in-memory grid header.")
+        .def(nb::init<const GridData*>(), "grid"_a)
+        .def_static("safeCast",
+                    [](const GridData* gd) { return GridMetaData::safeCast(gd); }, "grid"_a)
+        .def("isValid", &GridMetaData::isValid)
+        .def("gridType", &GridMetaData::gridType)
+        .def("gridClass", &GridMetaData::gridClass)
+        .def("isLevelSet", &GridMetaData::isLevelSet)
+        .def("isFogVolume", &GridMetaData::isFogVolume)
+        .def("isStaggered", &GridMetaData::isStaggered)
+        .def("isPointIndex", &GridMetaData::isPointIndex)
+        .def("isGridIndex", &GridMetaData::isGridIndex)
+        .def("isPointData", &GridMetaData::isPointData)
+        .def("isMask", &GridMetaData::isMask)
+        .def("isUnknown", &GridMetaData::isUnknown)
+        .def("hasMinMax", &GridMetaData::hasMinMax)
+        .def("hasBBox", &GridMetaData::hasBBox)
+        .def("hasLongGridName", &GridMetaData::hasLongGridName)
+        .def("hasAverage", &GridMetaData::hasAverage)
+        .def("hasStdDeviation", &GridMetaData::hasStdDeviation)
+        .def("isBreadthFirst", &GridMetaData::isBreadthFirst)
+        .def("gridSize", &GridMetaData::gridSize)
+        .def("gridIndex", &GridMetaData::gridIndex)
+        .def("gridCount", &GridMetaData::gridCount)
+        .def("shortGridName", [](const GridMetaData& m) { return std::string(m.shortGridName()); })
+        .def("map", &GridMetaData::map, nb::rv_policy::reference_internal)
+        .def("worldBBox", &GridMetaData::worldBBox, nb::rv_policy::reference_internal)
+        .def("indexBBox", &GridMetaData::indexBBox, nb::rv_policy::reference_internal)
+        .def("voxelSize", &GridMetaData::voxelSize)
+        .def("blindDataCount", &GridMetaData::blindDataCount)
+        .def("activeVoxelCount", &GridMetaData::activeVoxelCount)
+        .def("activeTileCount", &GridMetaData::activeTileCount, "level"_a)
+        .def("nodeCount", &GridMetaData::nodeCount, "level"_a)
+        .def("checksum", &GridMetaData::checksum, nb::rv_policy::reference_internal)
+        .def("rootTableSize", &GridMetaData::rootTableSize)
+        .def("isEmpty", &GridMetaData::isEmpty)
+        .def("version", &GridMetaData::version);
 }
 
 template<typename BuildT> nb::class_<DefaultReadAccessor<BuildT>> defineAccessor(nb::module_& m, const char* name)
@@ -383,25 +658,37 @@ NB_MODULE(nanovdb, m)
 
     defineMap(m);
 
-    defineGridData(m);
+    // CheckMode + Checksum must be bound before defineGrid() because
+    // Grid.checksum() returns Checksum by value.
+    defineCheckMode(m);
+    defineChecksum(m);
 
-#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceMethod) \
-    defineGrid<T>(m, #Suffix "Grid");                          \
+    // GridBlindData enums + GridBlindMetaData class — must be bound before
+    // defineGrid() because Grid.blindMetaData()/findBlindDataForSemantic()
+    // use them in their signatures.
+    defineGridBlindData(m);
+    defineGrid(m);
+    defineGridMetaData(m);
+
+#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, GridTypeEnum) \
+    defineNanoGrid<T>(m, #Suffix "Grid");                      \
     defineScalarAccessor<T>(m, #Suffix "ReadAccessor");        \
     defineNodeInfo<T>(m, #Suffix "NodeInfo");
-#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceMethod) \
-    defineGrid<T>(m, #Suffix "Grid");                          \
+#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, GridTypeEnum) \
+    defineNanoGrid<T>(m, #Suffix "Grid");                      \
     defineVectorAccessor<T>(m, AccessorName);
-#define NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix)               \
-    defineGrid<T>(m, #Suffix "Grid");                          \
+#define NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix, GridTypeEnum) \
+    defineNanoGrid<T>(m, #Suffix "Grid");                      \
     defineAccessor<T>(m, #Suffix "ReadAccessor");
 #include "BuildTypes.def"
 
+    // PointAccessor variants — PointIndex grids carry uint32 indices,
+    // PointData grids carry Vec3f positions.
+    definePointAccessor<uint32_t>(m, "PointIndexAccessor");
+    definePointAccessor<Vec3f>(m,    "PointDataAccessor");
+
     defineHostBuffer(m);
     defineHostGridHandle(m);
-
-    defineCheckMode(m);
-    defineChecksum(m);
 
 #ifdef NANOVDB_USE_CUDA
     defineDeviceBuffer(m);
