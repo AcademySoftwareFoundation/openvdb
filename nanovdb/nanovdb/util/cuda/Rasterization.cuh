@@ -120,11 +120,11 @@ struct RasterizeLeafNodesFunctor
         auto *leaf = const_cast<nanovdb::NanoLeaf<BuildT>*>(dGrid->tree().root().probeLeaf(pair.origin));
 
         if (threadID < int(nanovdb::Mask<3>::WORD_COUNT)) {
-            const uint64_t word = uint64_t(s_ballots[2*threadID])
-                                | (uint64_t(s_ballots[2*threadID + 1]) << 32);
-            auto &maskWord = const_cast<nanovdb::Mask<3>&>(leaf->valueMask()).words()[threadID];
-            atomicOr(reinterpret_cast<unsigned long long*>(&maskWord),
-                     static_cast<unsigned long long>(word));
+            const unsigned long long word = (unsigned long long)(s_ballots[2*threadID])
+                                          | ((unsigned long long)(s_ballots[2*threadID + 1]) << 32);
+            unsigned long long *maskWord = reinterpret_cast<unsigned long long*>(
+                const_cast<uint64_t*>(&leaf->valueMask().words()[threadID]));
+            ::atomicOr(maskWord, word);
         }
     }
 };
