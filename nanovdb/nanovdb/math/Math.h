@@ -1004,7 +1004,7 @@ class Vec2 : public VecBase<T, 2>
 
 public:
     using ValueType = T;
-    static const int size = 2; // openvdb::math::Tuple-compat alias of SIZE
+    static constexpr int size = 2; // openvdb::math::Tuple-compat alias of SIZE
 
     Vec2() = default;
     __hostdev__ explicit Vec2(T x)            { this->mVec[0] = x;    this->mVec[1] = x;    }
@@ -1579,7 +1579,7 @@ class Vec3 : public VecBase<T, 3>
 
 public:
     using ValueType = T;
-    static const int size = 3; // openvdb::math::Tuple-compat alias of SIZE
+    static constexpr int size = 3; // openvdb::math::Tuple-compat alias of SIZE
 
     Vec3() = default;
     __hostdev__ explicit Vec3(T x)            { this->mVec[0] = x; this->mVec[1] = x; this->mVec[2] = x; }
@@ -1708,7 +1708,7 @@ class Vec4 : public VecBase<T, 4>
 
 public:
     using ValueType = T;
-    static const int size = 4; // openvdb::math::Tuple-compat alias of SIZE
+    static constexpr int size = 4; // openvdb::math::Tuple-compat alias of SIZE
 
     Vec4() = default;
     __hostdev__ explicit Vec4(T x)            { this->mVec[0] = x; this->mVec[1] = x; this->mVec[2] = x; this->mVec[3] = x; }

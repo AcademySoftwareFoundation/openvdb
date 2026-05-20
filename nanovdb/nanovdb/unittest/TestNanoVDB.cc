@@ -1414,8 +1414,8 @@ TEST_F(TestNanoVDB, Vec2)
     using Vec2i  = nanovdb::math::Vec2<int>;
     using Coord2 = nanovdb::math::Coord2;
 
-    EXPECT_EQ(2, Vec2d::SIZE);
-    EXPECT_EQ(2, Vec2d::size); // openvdb::math::Tuple-compat alias
+    static_assert(Vec2d::SIZE == 2, "");
+    static_assert(Vec2d::size == 2, ""); // openvdb::math::Tuple-compat alias
     bool tt = nanovdb::util::is_same<double, Vec2d::ValueType>::value;
     EXPECT_TRUE(tt);
 
