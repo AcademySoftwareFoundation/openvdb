@@ -63,17 +63,18 @@ void defineNodeManagerHandle(nb::module_& m)
 // createNodeManager has one template instantiation per BuildT. We expose a
 // single polymorphic `createNodeManager(grid)` that picks the right one
 // based on the runtime type of `grid` (any nb::class_-bound NanoGrid<T>).
+// nb::isinstance is a fast type check that avoids the exception-on-mismatch
+// overhead that would come from trying nb::cast and catching cast_error for
+// every non-matching BuildT.
 template<typename BuildT>
 static nb::object tryCreateNodeManager(nb::handle py_grid)
 {
     using GridT = NanoGrid<BuildT>;
-    GridT* grid = nullptr;
-    try {
-        grid = &nb::cast<GridT&>(py_grid);
-    } catch (const nb::cast_error&) {
+    if (!nb::isinstance<GridT>(py_grid)) {
         return nb::object();  // sentinel: "not this BuildT, try next"
     }
-    return nb::cast(createNodeManager<BuildT, HostBuffer>(*grid));
+    auto& grid = nb::cast<GridT&>(py_grid);
+    return nb::cast(createNodeManager<BuildT, HostBuffer>(grid));
 }
 
 void defineCreateNodeManager(nb::module_& m)

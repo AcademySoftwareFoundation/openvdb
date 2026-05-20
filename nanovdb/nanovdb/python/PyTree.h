@@ -205,8 +205,12 @@ template<typename BuildT> void defineNanoTree(nb::module_& m, const char* name)
         .def("activeVoxelCount", &TreeT::activeVoxelCount)
         .def("activeTileCount", &TreeT::activeTileCount,
              nb::rv_policy::reference_internal, nb::arg("level"))
+        // Use static_cast (not nb::overload_cast<int>) — Tree has a templated
+        // nodeCount<NodeT>() in addition to nodeCount(int), and Clang's
+        // overload-set check rejects nb::overload_cast for this combination
+        // even though GCC accepts it.
         .def("nodeCount",
-             nb::overload_cast<int>(&TreeT::nodeCount, nb::const_),
+             static_cast<uint32_t (TreeT::*)(int) const>(&TreeT::nodeCount),
              nb::arg("level"))
         .def("totalNodeCount", &TreeT::totalNodeCount)
         .def_static("memUsage", &TreeT::memUsage)
