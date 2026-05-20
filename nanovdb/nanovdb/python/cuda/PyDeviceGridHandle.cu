@@ -84,10 +84,9 @@ void defineDeviceGridHandle(nb::module_& m)
     // second overload taking a DeviceGridHandle list conflicts with the host
     // overload because both signatures take nb::list, and nanobind's
     // overload resolution can't disambiguate by element type — it picks one
-    // and the inner cast fails with std::bad_cast. The host-only utilities
-    // are what the Phase 1 plan calls for; a properly typed device variant
-    // (with its own name, or with strongly-typed std::vector<HandleT> args
-    // and nanobind/stl/vector.h support) can land later if it's needed.
+    // and the inner cast fails with std::bad_cast. A properly typed device
+    // variant (with its own name, or strongly-typed std::vector<HandleT>
+    // args via nanobind/stl/vector.h) can land later if it's needed.
 }
 
 } // namespace pynanovdb

@@ -348,7 +348,9 @@ class TestGridHandleExchange(unittest.TestCase):
 
 
 class TestPolymorphicGridAccess(unittest.TestCase):
-    """Phase 1a: handle.grid(n) returns the correct typed Grid subclass."""
+    """handle.grid(n) returns the correct typed Grid subclass selected by
+    gridType(n); the legacy per-type accessors (floatGrid(), etc.) are not
+    bound."""
 
     def test_float_grid(self):
         h = nanovdb.tools.createFogVolumeSphere()
@@ -368,8 +370,8 @@ class TestPolymorphicGridAccess(unittest.TestCase):
         self.assertIsNone(nanovdb.GridHandle().grid())
 
     def test_typed_accessors_removed(self):
+        # The legacy per-type accessors were replaced by handle.grid(n).
         h = nanovdb.tools.createFogVolumeSphere()
-        # Phase 1a.3 removed these in favour of handle.grid(n).
         self.assertFalse(hasattr(h, "floatGrid"))
         self.assertFalse(hasattr(h, "doubleGrid"))
         self.assertFalse(hasattr(h, "int32Grid"))
@@ -378,7 +380,9 @@ class TestPolymorphicGridAccess(unittest.TestCase):
 
 
 class TestGridBase(unittest.TestCase):
-    """Phase 1a.1: BuildT-independent methods resolve via the Grid base class."""
+    """Methods that don't depend on BuildT (gridType, gridClass, voxelSize,
+    isLevelSet/...) resolve via the Grid base class shared by every typed
+    grid subclass."""
 
     def test_grid_base_class_name(self):
         # Typed grids inherit from a base class named "Grid" (no more "GridData").
@@ -399,7 +403,9 @@ class TestGridBase(unittest.TestCase):
 
 
 class TestGridMetaData(unittest.TestCase):
-    """Phase 1b.1: type-erased GridMetaData introspector."""
+    """nanovdb.GridMetaData is a type-erased introspector — construct from a
+    Grid and query gridType/gridClass/voxelSize/etc. without knowing
+    BuildT."""
 
     def test_constructed_from_grid(self):
         h = nanovdb.tools.createFogVolumeSphere(name="probe")
@@ -415,7 +421,9 @@ class TestGridMetaData(unittest.TestCase):
 
 
 class TestBlindDataEmpty(unittest.TestCase):
-    """Phase 1b.2: blind data API works on grids that have none."""
+    """Blind data API (blindDataCount, blindMetaData, findBlindData,
+    findBlindDataForSemantic, getBlindData) returns sensible None/-1
+    sentinels on grids that have no blind data channels."""
 
     def test_no_blind_data(self):
         h = nanovdb.tools.createFogVolumeSphere()
@@ -431,7 +439,9 @@ class TestBlindDataEmpty(unittest.TestCase):
 
 
 class TestSplitMergeCopy(unittest.TestCase):
-    """Phase 1c.2: splitGrids / mergeGrids / handle.copy()."""
+    """splitGrids(h) -> list of single-grid handles, mergeGrids([h1, h2])
+    -> combined handle, h.copy() -> deep buffer copy. mergeGrids must not
+    consume its input handles."""
 
     def test_split_and_merge_roundtrip(self):
         h1 = nanovdb.tools.createFogVolumeSphere(name="a")
@@ -444,10 +454,10 @@ class TestSplitMergeCopy(unittest.TestCase):
             self.assertEqual(s.gridCount(), 1)
 
     def test_merge_does_not_consume_inputs(self):
-        # Regression: original Phase 1 mergeGrids used nb::cast<HandleT&&>
-        # which moved the underlying C++ handle out of the Python wrapper,
-        # silently emptying h1/h2. The fixed version reads each handle by
-        # const reference.
+        # Regression: a previous mergeGrids implementation used
+        # nb::cast<HandleT&&> which moved the underlying C++ handle out of
+        # the Python wrapper, silently emptying h1/h2 after the call. The
+        # binding now reads each handle by const reference.
         h1 = nanovdb.tools.createFogVolumeSphere(name="a")
         h2 = nanovdb.tools.createLevelSetTorus(nanovdb.GridType.Float, name="b")
         sz1, sz2 = h1.size(), h2.size()
@@ -472,12 +482,12 @@ class TestSplitMergeCopy(unittest.TestCase):
         self.assertEqual(cp.grid().gridName(), "orig")
 
 
-class TestPhase2BuildTCoverage(unittest.TestCase):
-    """Phase 2: every additional BuildT registers a Grid + ReadAccessor (and
-    NodeInfo where applicable). We can't host-construct most of these (the
-    primitives that produce them land in Phase 5), but we can confirm
-    registration completed and the accessor surfaces match the type kind.
-    """
+class TestBuildTRegistrations(unittest.TestCase):
+    """Every BuildT we bind exposes the right shape — a Grid class, a
+    ReadAccessor, and (for arithmetic-valued scalars) a NodeInfo. Accessor
+    surface depends on the type kind: scalar accessors have setVoxel +
+    getNodeInfo; vector accessors have setVoxel only; read-only accessors
+    (Boolean, Fp*, Index, OnIndex, Mask) have neither."""
 
     SCALARS = ["Int16", "Int64", "UInt8", "UInt32"]
     VECTORS = ["Vec3d", "Vec4f", "Vec4d", "Vec3u8", "Vec3u16"]
@@ -506,8 +516,10 @@ class TestPhase2BuildTCoverage(unittest.TestCase):
                                  f"{suffix}NodeInfo missing")
 
     def test_vector_accessors_have_setvoxel_no_nodeinfo(self):
-        # Vector accessor names are aligned in Phase 2 (Vec3dReadAccessor,
-        # ...). The legacy Vec3f one is still Vec3fReadVectorAccessor.
+        # The newer vector accessor names follow the consistent
+        # <Suffix>ReadAccessor pattern (Vec3dReadAccessor, ...); the
+        # original Vec3f one is named Vec3fReadVectorAccessor for backwards
+        # compatibility.
         for suffix in self.VECTORS:
             acc = getattr(nanovdb, suffix + "ReadAccessor")
             self.assertTrue(hasattr(acc, "setVoxel"))
@@ -516,7 +528,8 @@ class TestPhase2BuildTCoverage(unittest.TestCase):
     def test_all_grid_type_enums_reachable(self):
         # GridType enum binding must cover every BuildT we register —
         # otherwise Python users can't compare against handle.gridType(n).
-        # UInt8 was missed in Phase 0; this test locks the fix in.
+        # Locks in the full set; missing entries (e.g. an unbound enumerator
+        # for a freshly-added BuildT) get caught here.
         for name in ["Float", "Double", "Int16", "Int32", "Int64", "UInt8",
                      "UInt32", "Boolean", "Half", "RGBA8", "Vec3f", "Vec3d",
                      "Vec4f", "Vec4d", "Vec3u8", "Vec3u16", "Mask", "Fp4",
@@ -525,9 +538,9 @@ class TestPhase2BuildTCoverage(unittest.TestCase):
                             f"nanovdb.GridType.{name} not bound")
 
     def test_readonly_accessors_have_neither_setvoxel_nor_nodeinfo(self):
-        # The plan calls out: quantized types decode to float on read but
-        # do not bind setVoxel; index types return uint64 and ValueMask
-        # exposes only active-state queries.
+        # Quantized types decode to float on read but don't bind setVoxel;
+        # index types return uint64; ValueMask exposes only active-state
+        # queries. All share a bare ReadAccessor.
         for suffix in self.READONLY:
             acc = getattr(nanovdb, suffix + "ReadAccessor")
             self.assertFalse(hasattr(acc, "setVoxel"),
@@ -536,10 +549,10 @@ class TestPhase2BuildTCoverage(unittest.TestCase):
                              f"{suffix}ReadAccessor should not have getNodeInfo")
 
 
-class TestPhase3TreeNodes(unittest.TestCase):
-    """Phase 3: Grid.tree(), Root/Upper/Lower/Leaf node walking, leaf values
-    zero-copy views, NodeManager + createNodeManager.
-    """
+class TestTreeNodeWalking(unittest.TestCase):
+    """Walk a grid's tree from Python: Grid.tree(), Root/Upper/Lower/Leaf
+    node access and metadata, per-leaf zero-copy values() and bulk
+    grid.leaf_values() NumPy views, NodeManager + createNodeManager."""
 
     @classmethod
     def setUpClass(cls):
@@ -636,7 +649,9 @@ class TestPhase3TreeNodes(unittest.TestCase):
 
 
 class TestGridMetaDataGuards(unittest.TestCase):
-    """Copilot review #3: GridMetaData ctor + safeCast guard against bad input."""
+    """GridMetaData() constructor and safeCast() reject bad input (None, a
+    Grid wrapping an invalid buffer) with a Python exception or False
+    rather than asserting / null-dereferencing inside NanoVDB."""
 
     def test_init_rejects_none(self):
         # nanobind's type system rejects None for const GridData* before our
