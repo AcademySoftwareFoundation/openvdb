@@ -19,9 +19,9 @@ namespace pynanovdb {
 
 // Polymorphic host-side `handle.grid(n)`: dispatch on gridType(n) to the
 // matching NanoGrid<BuildT> subclass currently bound in Python. Returns
-// None when the underlying BuildT is not yet Python-visible (e.g. Boolean,
-// Half, Fp16 — they land in Phase 2). The returned object is parented to
-// the handle so the handle is kept alive at least as long as the grid.
+// None when the underlying BuildT is not bound in this build — see the
+// list of bound types in BuildTypes.def. The returned object is parented
+// to the handle so the handle is kept alive at least as long as the grid.
 template<typename BufferT>
 inline nb::object pyHostGrid(nb::handle py_handle, uint32_t n)
 {

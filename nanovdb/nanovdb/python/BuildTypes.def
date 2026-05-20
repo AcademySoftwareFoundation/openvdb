@@ -44,9 +44,9 @@
 //       ValueOnIndex, and ValueMask). nanovdb::BuildTraits<T>::is_special
 //       is true for all of these. Exposed with a bare accessor only — no
 //       setVoxel, no NodeInfo. The Python accessor's getValue() returns
-//       the type given by nanovdb::BuildToValueMap<T>::Type (float for
-//       Fp*, uint64 for ValueIndex / ValueOnIndex, bool for ValueMask
-//       and bool).
+//       the type given by nanovdb::BuildToValueMap<T>::Type — float for
+//       Fp4 / Fp8 / Fp16 / FpN, uint64 for ValueIndex / ValueOnIndex,
+//       bool for ValueMask and for the BuildT=bool (Boolean) grid.
 //
 //   NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix)
 //       Subset that has C++ sampler specializations (used by PyMath

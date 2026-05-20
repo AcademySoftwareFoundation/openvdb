@@ -513,6 +513,17 @@ class TestPhase2BuildTCoverage(unittest.TestCase):
             self.assertTrue(hasattr(acc, "setVoxel"))
             self.assertFalse(hasattr(acc, "getNodeInfo"))
 
+    def test_all_grid_type_enums_reachable(self):
+        # GridType enum binding must cover every BuildT we register —
+        # otherwise Python users can't compare against handle.gridType(n).
+        # UInt8 was missed in Phase 0; this test locks the fix in.
+        for name in ["Float", "Double", "Int16", "Int32", "Int64", "UInt8",
+                     "UInt32", "Boolean", "Half", "RGBA8", "Vec3f", "Vec3d",
+                     "Vec4f", "Vec4d", "Vec3u8", "Vec3u16", "Mask", "Fp4",
+                     "Fp8", "Fp16", "FpN", "Index", "OnIndex", "PointIndex"]:
+            self.assertTrue(hasattr(nanovdb.GridType, name),
+                            f"nanovdb.GridType.{name} not bound")
+
     def test_readonly_accessors_have_neither_setvoxel_nor_nodeinfo(self):
         # The plan calls out: quantized types decode to float on read but
         # do not bind setVoxel; index types return uint64 and ValueMask

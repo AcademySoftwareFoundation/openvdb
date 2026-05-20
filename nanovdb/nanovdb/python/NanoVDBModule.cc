@@ -666,6 +666,7 @@ NB_MODULE(nanovdb, m)
         .value("PointIndex", GridType::PointIndex)
         .value("Vec3u8", GridType::Vec3u8)
         .value("Vec3u16", GridType::Vec3u16)
+        .value("UInt8", GridType::UInt8)
         .value("End", GridType::End)
         .export_values()
         .def("__repr__", [](const GridType& gridType) {
