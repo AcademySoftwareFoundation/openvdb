@@ -28,6 +28,7 @@ nanobind_add_module(nanovdb_python NB_STATIC
     PyPrimitives.cc
     PySampleFromVoxels.cc
     PyTools.cc
+    PyTree.cc
     cuda/PyDeviceBuffer.cc
     cuda/PyDeviceGridHandle.cu
     cuda/PyPointsToGrid.cu

@@ -536,6 +536,105 @@ class TestPhase2BuildTCoverage(unittest.TestCase):
                              f"{suffix}ReadAccessor should not have getNodeInfo")
 
 
+class TestPhase3TreeNodes(unittest.TestCase):
+    """Phase 3: Grid.tree(), Root/Upper/Lower/Leaf node walking, leaf values
+    zero-copy views, NodeManager + createNodeManager.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.h = nanovdb.tools.createFogVolumeSphere(name="probe")
+        cls.g = cls.h.grid()
+        cls.tree = cls.g.tree()
+
+    def test_grid_tree_basic(self):
+        self.assertIsInstance(self.tree, nanovdb.FloatTree)
+        self.assertEqual(self.tree.background(), 3.0)  # halfwidth*voxelsize default
+        self.assertGreater(self.tree.activeVoxelCount(), 0)
+        self.assertGreaterEqual(self.tree.totalNodeCount(), self.tree.nodeCount(0))
+
+    def test_extrema(self):
+        mn, mx = self.tree.extrema()
+        # FogVolumeSphere produces values in [0, 1].
+        self.assertGreaterEqual(mn, 0.0)
+        self.assertLessEqual(mx, 1.0)
+        self.assertLessEqual(mn, mx)
+
+    def test_first_leaf_and_node_metadata(self):
+        leaf = self.tree.getFirstLeaf()
+        self.assertIsInstance(leaf, nanovdb.FloatLeaf)
+        self.assertEqual(nanovdb.FloatLeaf.dim(), 8)
+        self.assertEqual(nanovdb.FloatLeaf.voxelCount(), 512)
+        # Origin should be aligned to LeafNode dim=8.
+        for c in (leaf.origin().x, leaf.origin().y, leaf.origin().z):
+            self.assertEqual(c % 8, 0)
+
+    def test_root_metadata(self):
+        root = self.tree.root()
+        self.assertIsInstance(root, nanovdb.FloatRoot)
+        self.assertGreater(root.tileCount(), 0)
+        # Root bbox covers ALL active voxels — non-empty for a fog sphere.
+        bb = root.bbox()
+        self.assertFalse(bb.empty())
+        self.assertEqual(root.background(), self.tree.background())
+
+    def test_leaf_values_zero_copy(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy not installed")
+        leaf = self.tree.getFirstLeaf()
+        vals = leaf.values()
+        self.assertEqual(vals.shape, (512,))
+        self.assertEqual(vals.dtype, np.float32)
+        # Mutation through the view writes back into the grid buffer.
+        original = float(vals[0])
+        vals[0] = original + 1.0
+        self.assertAlmostEqual(float(leaf.getValue(0)), original + 1.0)
+        vals[0] = original  # restore
+
+    def test_leaf_values_unavailable_for_special_buildts(self):
+        # ValueIndex / ValueMask / bool / Fp* leaves don't carry T mValues[512],
+        # so the `values` accessor is not bound for them.
+        for cls_name in ("BooleanLeaf", "Fp4Leaf", "IndexLeaf", "MaskLeaf"):
+            leaf_cls = getattr(nanovdb, cls_name)
+            self.assertFalse(hasattr(leaf_cls, "values"),
+                             f"{cls_name}.values should not be bound")
+
+    def test_bulk_leaf_values(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy not installed")
+        bulk = self.g.leaf_values()
+        self.assertEqual(bulk.shape, (self.tree.nodeCount(0), 512))
+        self.assertEqual(bulk.dtype, np.float32)
+        # First row should match per-leaf values().
+        first_via_bulk = np.asarray(bulk[0])
+        first_via_leaf = np.asarray(self.tree.getFirstLeaf().values())
+        self.assertTrue(np.array_equal(first_via_bulk, first_via_leaf))
+
+    def test_node_manager_round_trip(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy not installed")
+        handle = nanovdb.createNodeManager(self.g)
+        self.assertGreater(handle.size(), 0)
+        self.assertTrue(bool(handle))
+        nm = handle.mgr()
+        self.assertIsInstance(nm, nanovdb.FloatNodeManager)
+        self.assertTrue(nm.isLinear())  # createNanoGrid produces breadth-first
+        self.assertEqual(nm.leafCount(), self.tree.nodeCount(0))
+        self.assertEqual(nm.lowerCount(), self.tree.nodeCount(1))
+        self.assertEqual(nm.upperCount(), self.tree.nodeCount(2))
+        # NodeManager.leaf(0) should be the same leaf as tree.getFirstLeaf()
+        # (breadth-first order).
+        self.assertEqual(nm.leaf(0).origin(), self.tree.getFirstLeaf().origin())
+        self.assertTrue(np.array_equal(
+            nm.leaf(0).values(), self.tree.getFirstLeaf().values()))
+
+
 class TestGridMetaDataGuards(unittest.TestCase):
     """Copilot review #3: GridMetaData ctor + safeCast guard against bad input."""
 

@@ -20,6 +20,7 @@
 #include "PyIO.h"
 #include "PyMath.h"
 #include "PyTools.h"
+#include "PyTree.h"
 #include "PyGridChecksum.h"
 
 namespace nb = nanobind;
@@ -261,10 +262,17 @@ void defineGrid(nb::module_& m)
 // need to know BuildT lives there, not here.
 template<typename BuildT> void defineNanoGrid(nb::module_& m, const char* name)
 {
-    nb::class_<NanoGrid<BuildT>, GridData>(m, name)
+    auto cls = nb::class_<NanoGrid<BuildT>, GridData>(m, name)
         .def("getAccessor", &NanoGrid<BuildT>::getAccessor)
         .def("activeVoxelCount", &NanoGrid<BuildT>::activeVoxelCount)
-        .def("isSequential", [](const NanoGrid<BuildT>& grid) { return grid.isSequential(); });
+        .def("isSequential", [](const NanoGrid<BuildT>& grid) { return grid.isSequential(); })
+        .def("tree",
+             nb::overload_cast<>(&NanoGrid<BuildT>::tree, nb::const_),
+             nb::rv_policy::reference_internal,
+             "Return the tree associated with this grid. Lifetime is "
+             "anchored to the grid (and therefore to the GridHandle).");
+    // Add leaf_values() only for BuildTs whose LeafData carries T mValues[512].
+    PyLeafValuesBinder<BuildT>::apply(cls);
 }
 
 void defineGridBlindData(nb::module_& m)
@@ -720,6 +728,43 @@ NB_MODULE(nanovdb, m)
     defineGrid(m);
     defineGridMetaData(m);
 
+    // Tree / node bindings must come BEFORE defineNanoGrid because
+    // NanoGrid<T>.tree() returns NanoTree<T> (registered here) by const
+    // reference. Per-BuildT, register Leaf, Lower, Upper, Root, Tree in
+    // child->parent order so each return type is registered before the
+    // method binding that returns it.
+#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, GridTypeEnum) \
+    defineNanoLeaf<T>(m,  #Suffix "Leaf");                         \
+    defineNanoLower<T>(m, #Suffix "Lower");                        \
+    defineNanoUpper<T>(m, #Suffix "Upper");                        \
+    defineNanoRoot<T>(m,  #Suffix "Root");                         \
+    defineNanoTree<T>(m,  #Suffix "Tree");                         \
+    defineNodeManager<T>(m, #Suffix "NodeManager");
+#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, GridTypeEnum) \
+    defineNanoLeaf<T>(m,  #Suffix "Leaf");                         \
+    defineNanoLower<T>(m, #Suffix "Lower");                        \
+    defineNanoUpper<T>(m, #Suffix "Upper");                        \
+    defineNanoRoot<T>(m,  #Suffix "Root");                         \
+    defineNanoTree<T>(m,  #Suffix "Tree");                         \
+    defineNodeManager<T>(m, #Suffix "NodeManager");
+#define NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix, GridTypeEnum)  \
+    defineNanoLeaf<T>(m,  #Suffix "Leaf");                         \
+    defineNanoLower<T>(m, #Suffix "Lower");                        \
+    defineNanoUpper<T>(m, #Suffix "Upper");                        \
+    defineNanoRoot<T>(m,  #Suffix "Root");                         \
+    defineNanoTree<T>(m,  #Suffix "Tree");                         \
+    defineNodeManager<T>(m, #Suffix "NodeManager");
+#define NANOVDB_PY_FOR_EACH_READONLY_BUILDT(T, Suffix, GridTypeEnum) \
+    defineNanoLeaf<T>(m,  #Suffix "Leaf");                         \
+    defineNanoLower<T>(m, #Suffix "Lower");                        \
+    defineNanoUpper<T>(m, #Suffix "Upper");                        \
+    defineNanoRoot<T>(m,  #Suffix "Root");                         \
+    defineNanoTree<T>(m,  #Suffix "Tree");                         \
+    defineNodeManager<T>(m, #Suffix "NodeManager");
+#include "BuildTypes.def"
+
+    // Now bind the per-BuildT NanoGrid + accessors (tree() return type now
+    // registered above).
 #define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, GridTypeEnum) \
     defineNanoGrid<T>(m, #Suffix "Grid");                      \
     defineScalarAccessor<T>(m, #Suffix "ReadAccessor");        \
@@ -734,6 +779,10 @@ NB_MODULE(nanovdb, m)
     defineNanoGrid<T>(m, #Suffix "Grid");                      \
     defineAccessor<T>(m, #Suffix "ReadAccessor");
 #include "BuildTypes.def"
+
+    // Host-side NodeManagerHandle + module-scope createNodeManager.
+    defineNodeManagerHandle(m);
+    defineCreateNodeManager(m);
 
     // PointAccessor variants — PointIndex grids carry uint32 indices,
     // PointData grids carry Vec3f positions.
