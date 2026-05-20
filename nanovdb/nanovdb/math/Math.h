@@ -1012,7 +1012,7 @@ public:
 
     template<template<class> class Vec2T, class T2>
     __hostdev__ Vec2(const Vec2T<T2>& v) {
-        static_assert(Vec2T<T2>::SIZE == 2, "expected Vec2T::SIZE==2!");
+        static_assert(Vec2T<T2>::size == 2, "expected Vec2T::size==2!");
         this->mVec[0] = T(v[0]); this->mVec[1] = T(v[1]);
     }
     template<typename T2>
@@ -1025,7 +1025,7 @@ public:
 
     template<template<class> class Vec2T, class T2>
     __hostdev__ Vec2& operator=(const Vec2T<T2>& rhs) {
-        static_assert(Vec2T<T2>::SIZE == 2, "expected Vec2T::SIZE==2!");
+        static_assert(Vec2T<T2>::size == 2, "expected Vec2T::size==2!");
         this->mVec[0] = rhs[0]; this->mVec[1] = rhs[1];
         return *this;
     }
@@ -1587,7 +1587,7 @@ public:
 
     template<template<class> class Vec3T, class T2>
     __hostdev__ Vec3(const Vec3T<T2>& v) {
-        static_assert(Vec3T<T2>::SIZE == 3, "expected Vec3T::SIZE==3!");
+        static_assert(Vec3T<T2>::size == 3, "expected Vec3T::size==3!");
         this->mVec[0] = T(v[0]); this->mVec[1] = T(v[1]); this->mVec[2] = T(v[2]);
     }
     template<typename T2>
@@ -1600,7 +1600,7 @@ public:
 
     template<template<class> class Vec3T, class T2>
     __hostdev__ Vec3& operator=(const Vec3T<T2>& rhs) {
-        static_assert(Vec3T<T2>::SIZE == 3, "expected Vec3T::SIZE==3!");
+        static_assert(Vec3T<T2>::size == 3, "expected Vec3T::size==3!");
         this->mVec[0] = rhs[0]; this->mVec[1] = rhs[1]; this->mVec[2] = rhs[2];
         return *this;
     }
@@ -1720,12 +1720,12 @@ public:
     }
     template<template<class> class Vec4T, class T2>
     __hostdev__ Vec4(const Vec4T<T2>& v) {
-        static_assert(Vec4T<T2>::SIZE == 4, "expected Vec4T::SIZE==4!");
+        static_assert(Vec4T<T2>::size == 4, "expected Vec4T::size==4!");
         this->mVec[0] = T(v[0]); this->mVec[1] = T(v[1]); this->mVec[2] = T(v[2]); this->mVec[3] = T(v[3]);
     }
     template<template<class> class Vec4T, class T2>
     __hostdev__ Vec4& operator=(const Vec4T<T2>& rhs) {
-        static_assert(Vec4T<T2>::SIZE == 4, "expected Vec4T::SIZE==4!");
+        static_assert(Vec4T<T2>::size == 4, "expected Vec4T::size==4!");
         this->mVec[0] = rhs[0]; this->mVec[1] = rhs[1]; this->mVec[2] = rhs[2]; this->mVec[3] = rhs[3];
         return *this;
     }
