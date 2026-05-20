@@ -4,9 +4,15 @@ option(NANOVDB_BUILD_PYTHON_UNITTESTS [=[
   "Include the NanoVDB Python unit test. Requires a python interpreter]=]
 ${NANOVDB_BUILD_UNITTESTS})
 
+# Stubs are only consumed from an installed wheel (they ship next to the .so
+# in nanovdb/), so default ON only when SKBUILD is driving the build. In an
+# in-source dev / OpenVDB-CI build the .pyi is not used and stub generation
+# can be skipped — which also dodges the macOS CI's sanitizer-runtime
+# DYLD_INSERT_LIBRARIES wrapper, under which Python dlopen'ing the .so
+# triggers TSan "Interceptors are not working" and aborts stubgen.
 option(NANOVDB_BUILD_PYTHON_STUBS
   "Generate .pyi type stubs for the nanovdb Python module (requires nanobind 2.x or newer)."
-  ON)
+  ${SKBUILD})
 
 nanobind_add_module(nanovdb_python NB_STATIC
     NanoVDBModule.cc
