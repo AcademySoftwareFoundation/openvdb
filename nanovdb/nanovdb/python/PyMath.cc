@@ -376,7 +376,7 @@ void defineMathModule(nb::module_& m)
     defineBaseBBox<math::Coord>(m, "CoordBaseBBox");
     defineBBoxInteger<math::Coord>(m, "CoordBBox", "Bounding box for Coord minimum and maximum");
 
-#define NVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix)               \
+#define NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix)               \
     defineNearestNeighborSampler<T>(m, #Suffix "NearestNeighborSampler"); \
     defineTrilinearSampler<T>(m, #Suffix "TrilinearSampler");       \
     defineTriquadraticSampler<T>(m, #Suffix "TriquadraticSampler"); \

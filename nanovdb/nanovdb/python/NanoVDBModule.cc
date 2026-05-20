@@ -385,14 +385,14 @@ NB_MODULE(nanovdb, m)
 
     defineGridData(m);
 
-#define NVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceHandleMethod) \
+#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceMethod) \
     defineGrid<T>(m, #Suffix "Grid");                          \
     defineScalarAccessor<T>(m, #Suffix "ReadAccessor");        \
     defineNodeInfo<T>(m, #Suffix "NodeInfo");
-#define NVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceHandleMethod) \
+#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceMethod) \
     defineGrid<T>(m, #Suffix "Grid");                          \
     defineVectorAccessor<T>(m, AccessorName);
-#define NVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix)               \
+#define NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix)               \
     defineGrid<T>(m, #Suffix "Grid");                          \
     defineAccessor<T>(m, #Suffix "ReadAccessor");
 #include "BuildTypes.def"

@@ -3,78 +3,90 @@
 //
 // X-macro list of NanoVDB BuildT types currently exposed to Python.
 //
+// NanoVDB coding style says "avoid macro functions; use inline and templates
+// instead" (docs/codingstyle.txt). This file is a deliberate exception: it
+// must emit top-level template instantiations and binding registrations into
+// several translation units from one canonical list, which a C++ template
+// cannot do. The pattern is contained to this file plus the matching
+// per-consumer macro definitions; no runtime behavior is hidden behind a
+// macro function.
+//
 // Consumers define one or more of the kind-specific macros below before
 // including this file. Each macro is invoked once per matching type; any
-// macro the consumer does not define is treated as a no-op and reset
-// after the file is processed. This is the single point that must be
-// edited when adding (or removing) a Python-visible BuildT.
+// macro the consumer does not define is treated as a no-op and reset after
+// the file is processed. This is the single point that must be edited when
+// adding (or removing) a Python-visible BuildT.
 //
 // Macros:
-//   NVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceHandleMethod)
-//       Scalar value types — exposed with full NodeInfo accessors.
-//       Suffix forms Python class names (e.g. "Float" -> "FloatGrid").
-//       HandleMethod / DeviceHandleMethod are the legacy lower-camel-case
-//       method names on GridHandle / DeviceGridHandle (e.g. "floatGrid").
+//   NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceMethod)
+//       Scalar value types — exposed with full NodeInfo accessors. Suffix
+//       forms Python class names (e.g. "Float" -> "FloatGrid"). HandleMethod
+//       and DeviceMethod are the legacy lower-camel-case method names
+//       on GridHandle / DeviceGridHandle (e.g. "floatGrid").
 //
-//   NVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceHandleMethod)
+//   NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceMethod)
 //       Vector value types — exposed with a setVoxel accessor but no
 //       NodeInfo. AccessorName is passed explicitly because the legacy
 //       Python class names for these are inconsistent.
 //
-//   NVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix)
-//       The nanovdb::Point build type — exposed with a bare accessor and
-//       no GridHandle method (Point is not currently surfaced through
+//   NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix)
+//       The nanovdb::Point build type — exposed with a bare accessor and no
+//       GridHandle method (Point is not currently surfaced through
 //       handle.*Grid()).
 //
-//   NVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix)
-//       Subset that has C++ sampler specializations (used by PyMath
-//       samplers and PyCreateNanoGrid create*Grid factories).
+//   NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix)
+//       Subset that has C++ sampler specializations (used by PyMath samplers
+//       and PyCreateNanoGrid create*Grid factories).
 
-#ifndef NVDB_PY_FOR_EACH_SCALAR_BUILDT
-#define NVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceHandleMethod)
-#define NVDB_PY_LOCAL_DEFINED_SCALAR
+#ifndef NANOVDB_PY_FOR_EACH_SCALAR_BUILDT
+#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceMethod)
+#define NANOVDB_PY_LOCAL_DEFINED_SCALAR
 #endif
-#ifndef NVDB_PY_FOR_EACH_VECTOR_BUILDT
-#define NVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceHandleMethod)
-#define NVDB_PY_LOCAL_DEFINED_VECTOR
+#ifndef NANOVDB_PY_FOR_EACH_VECTOR_BUILDT
+#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceMethod)
+#define NANOVDB_PY_LOCAL_DEFINED_VECTOR
 #endif
-#ifndef NVDB_PY_FOR_EACH_POINT_BUILDT
-#define NVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix)
-#define NVDB_PY_LOCAL_DEFINED_POINT
+#ifndef NANOVDB_PY_FOR_EACH_POINT_BUILDT
+#define NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix)
+#define NANOVDB_PY_LOCAL_DEFINED_POINT
 #endif
-#ifndef NVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT
-#define NVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix)
-#define NVDB_PY_LOCAL_DEFINED_SAMPLEABLE
-#endif
-
-NVDB_PY_FOR_EACH_SCALAR_BUILDT(float,   Float, "floatGrid",  "deviceFloatGrid")
-NVDB_PY_FOR_EACH_SCALAR_BUILDT(double,  Double, "doubleGrid", "deviceDoubleGrid")
-NVDB_PY_FOR_EACH_SCALAR_BUILDT(int32_t, Int32, "int32Grid",  "deviceInt32Grid")
-
-NVDB_PY_FOR_EACH_VECTOR_BUILDT(::nanovdb::Vec3f,       Vec3f, "Vec3fReadVectorAccessor", "vec3fGrid", "deviceVec3fGrid")
-NVDB_PY_FOR_EACH_VECTOR_BUILDT(::nanovdb::math::Rgba8, RGBA8, "RGBA8ReadAccessor",       "rgba8Grid", "deviceRGBA8Grid")
-
-NVDB_PY_FOR_EACH_POINT_BUILDT(::nanovdb::Point, Point)
-
-NVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(float,             Float)
-NVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(double,            Double)
-NVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(int32_t,           Int32)
-NVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(::nanovdb::Vec3f,  Vec3f)
-
-#ifdef NVDB_PY_LOCAL_DEFINED_SCALAR
-#undef NVDB_PY_LOCAL_DEFINED_SCALAR
-#endif
-#ifdef NVDB_PY_LOCAL_DEFINED_VECTOR
-#undef NVDB_PY_LOCAL_DEFINED_VECTOR
-#endif
-#ifdef NVDB_PY_LOCAL_DEFINED_POINT
-#undef NVDB_PY_LOCAL_DEFINED_POINT
-#endif
-#ifdef NVDB_PY_LOCAL_DEFINED_SAMPLEABLE
-#undef NVDB_PY_LOCAL_DEFINED_SAMPLEABLE
+#ifndef NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT
+#define NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix)
+#define NANOVDB_PY_LOCAL_DEFINED_SAMPLEABLE
 #endif
 
-#undef NVDB_PY_FOR_EACH_SCALAR_BUILDT
-#undef NVDB_PY_FOR_EACH_VECTOR_BUILDT
-#undef NVDB_PY_FOR_EACH_POINT_BUILDT
-#undef NVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT
+NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(float,   Float,  "floatGrid",  "deviceFloatGrid")
+NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(double,  Double, "doubleGrid", "deviceDoubleGrid")
+NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(int32_t, Int32,  "int32Grid",  "deviceInt32Grid")
+
+NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(::nanovdb::Vec3f, Vec3f,
+                                  "Vec3fReadVectorAccessor",
+                                  "vec3fGrid", "deviceVec3fGrid")
+NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(::nanovdb::math::Rgba8, RGBA8,
+                                  "RGBA8ReadAccessor",
+                                  "rgba8Grid", "deviceRGBA8Grid")
+
+NANOVDB_PY_FOR_EACH_POINT_BUILDT(::nanovdb::Point, Point)
+
+NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(float,            Float)
+NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(double,           Double)
+NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(int32_t,          Int32)
+NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(::nanovdb::Vec3f, Vec3f)
+
+#ifdef NANOVDB_PY_LOCAL_DEFINED_SCALAR
+#undef NANOVDB_PY_LOCAL_DEFINED_SCALAR
+#endif
+#ifdef NANOVDB_PY_LOCAL_DEFINED_VECTOR
+#undef NANOVDB_PY_LOCAL_DEFINED_VECTOR
+#endif
+#ifdef NANOVDB_PY_LOCAL_DEFINED_POINT
+#undef NANOVDB_PY_LOCAL_DEFINED_POINT
+#endif
+#ifdef NANOVDB_PY_LOCAL_DEFINED_SAMPLEABLE
+#undef NANOVDB_PY_LOCAL_DEFINED_SAMPLEABLE
+#endif
+
+#undef NANOVDB_PY_FOR_EACH_SCALAR_BUILDT
+#undef NANOVDB_PY_FOR_EACH_VECTOR_BUILDT
+#undef NANOVDB_PY_FOR_EACH_POINT_BUILDT
+#undef NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT

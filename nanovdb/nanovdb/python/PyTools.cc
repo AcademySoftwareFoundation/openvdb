@@ -34,7 +34,7 @@ void defineToolsModule(nb::module_& m)
 
     definePrimitives<HostBuffer>(m);
 
-#define NVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix) \
+#define NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix) \
     defineCreateNanoGrid<T>(m, "create" #Suffix "Grid");
 #include "BuildTypes.def"
 

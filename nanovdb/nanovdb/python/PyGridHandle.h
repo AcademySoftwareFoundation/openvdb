@@ -21,14 +21,16 @@ template<typename BufferT> nb::class_<nanovdb::GridHandle<BufferT>> defineGridHa
         .def("isEmpty", &nanovdb::GridHandle<BufferT>::isEmpty)
         .def("empty", &nanovdb::GridHandle<BufferT>::empty)
         .def(
-            "__bool__", [](const nanovdb::GridHandle<BufferT>& handle) { return !handle.empty(); }, nb::is_operator());
+            "__bool__",
+            [](const nanovdb::GridHandle<BufferT>& handle) { return !handle.empty(); },
+            nb::is_operator());
 
-#define NVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceHandleMethod) \
+#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceMethod) \
     cls.def(HandleMethod,                                               \
             nb::overload_cast<uint32_t>(&nanovdb::GridHandle<BufferT>::template grid<T>), \
             nb::arg("n") = 0,                                           \
             nb::rv_policy::reference_internal);
-#define NVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceHandleMethod) \
+#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceMethod) \
     cls.def(HandleMethod,                                               \
             nb::overload_cast<uint32_t>(&nanovdb::GridHandle<BufferT>::template grid<T>), \
             nb::arg("n") = 0,                                           \

@@ -29,13 +29,13 @@ void defineDeviceGridHandle(nb::module_& m)
             "cpu_t"_a.noconvert(),
             "cuda_t"_a.noconvert());
 
-#define NVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceHandleMethod) \
-    cls.def(DeviceHandleMethod,                                        \
+#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceMethod) \
+    cls.def(DeviceMethod,                                        \
             nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<T>), \
             "n"_a = 0,                                                 \
             nb::rv_policy::reference_internal);
-#define NVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceHandleMethod) \
-    cls.def(DeviceHandleMethod,                                        \
+#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceMethod) \
+    cls.def(DeviceMethod,                                        \
             nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<T>), \
             "n"_a = 0,                                                 \
             nb::rv_policy::reference_internal);

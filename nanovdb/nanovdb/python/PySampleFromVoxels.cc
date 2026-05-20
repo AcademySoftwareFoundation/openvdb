@@ -65,7 +65,7 @@ template<typename BuildT> void defineTricubicSampler(nb::module_& m, const char*
     defineCreateSampler<TreeT, 3>(m, "createTricubicSampler");
 }
 
-#define NVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix)            \
+#define NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix)            \
     template void defineNearestNeighborSampler<T>(nb::module_&, const char*); \
     template void defineTrilinearSampler<T>(nb::module_&, const char*);       \
     template void defineTriquadraticSampler<T>(nb::module_&, const char*);    \
