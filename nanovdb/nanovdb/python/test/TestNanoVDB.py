@@ -307,7 +307,7 @@ class TestGrid(unittest.TestCase):
         for i in range(handle.gridCount()):
             self.assertTrue(handle.gridSize(i) > 0)
             self.assertEqual(handle.gridType(i), nanovdb.GridType.Float)
-            grid = handle.floatGrid(i)
+            grid = handle.grid(i)
             self.assertIsNotNone(grid)
             accessor = nanovdb.FloatReadAccessor(grid)
             coord = nanovdb.math.Coord(0)
@@ -325,7 +325,7 @@ class TestGrid(unittest.TestCase):
         for i in range(handle.gridCount()):
             self.assertTrue(handle.gridSize(i) > 0)
             self.assertEqual(handle.gridType(i), nanovdb.GridType.Float)
-            grid = handle.floatGrid(i)
+            grid = handle.grid(i)
             self.assertIsNotNone(grid)
             checksum = grid.checksum()
             nanovdb.tools.updateChecksum(grid, nanovdb.CheckMode.Default)
@@ -337,7 +337,7 @@ class TestGridHandleExchange(unittest.TestCase):
     def test_list_to_vector(self):
         handle = nanovdb.tools.createLevelSetTorus(nanovdb.GridType.Double)
         self.assertEqual(handle.gridCount(), 1)
-        self.assertIsNotNone(handle.doubleGrid())
+        self.assertIsNotNone(handle.grid())
         handles = [handle, handle]
         dstFile = tempfile.NamedTemporaryFile(delete=False)
         dstFile.close()
@@ -345,6 +345,152 @@ class TestGridHandleExchange(unittest.TestCase):
             nanovdb.io.writeGrids(dstFile.name, handles)
         finally:
             os.unlink(dstFile.name)
+
+
+class TestPolymorphicGridAccess(unittest.TestCase):
+    """Phase 1a: handle.grid(n) returns the correct typed Grid subclass."""
+
+    def test_float_grid(self):
+        h = nanovdb.tools.createFogVolumeSphere()
+        self.assertIsInstance(h.grid(), nanovdb.FloatGrid)
+        self.assertEqual(h.grid().gridType(), nanovdb.GridType.Float)
+
+    def test_double_grid(self):
+        h = nanovdb.tools.createLevelSetTorus(nanovdb.GridType.Double)
+        self.assertIsInstance(h.grid(), nanovdb.DoubleGrid)
+        self.assertEqual(h.grid().gridType(), nanovdb.GridType.Double)
+
+    def test_out_of_range_returns_none(self):
+        h = nanovdb.tools.createFogVolumeSphere()
+        self.assertIsNone(h.grid(99))
+
+    def test_empty_handle_returns_none(self):
+        self.assertIsNone(nanovdb.GridHandle().grid())
+
+    def test_typed_accessors_removed(self):
+        h = nanovdb.tools.createFogVolumeSphere()
+        # Phase 1a.3 removed these in favour of handle.grid(n).
+        self.assertFalse(hasattr(h, "floatGrid"))
+        self.assertFalse(hasattr(h, "doubleGrid"))
+        self.assertFalse(hasattr(h, "int32Grid"))
+        self.assertFalse(hasattr(h, "vec3fGrid"))
+        self.assertFalse(hasattr(h, "rgba8Grid"))
+
+
+class TestGridBase(unittest.TestCase):
+    """Phase 1a.1: BuildT-independent methods resolve via the Grid base class."""
+
+    def test_grid_base_class_name(self):
+        # Typed grids inherit from a base class named "Grid" (no more "GridData").
+        self.assertTrue(any(b.__name__ == "Grid" for b in nanovdb.FloatGrid.__bases__))
+        self.assertFalse(hasattr(nanovdb, "GridData"))
+
+    def test_lifted_methods_accessible_via_inheritance(self):
+        h = nanovdb.tools.createFogVolumeSphere(name="probe")
+        g = h.grid()
+        self.assertEqual(g.gridType(), nanovdb.GridType.Float)
+        self.assertEqual(g.gridClass(), nanovdb.GridClass.FogVolume)
+        self.assertTrue(g.isFogVolume())
+        self.assertFalse(g.isLevelSet())
+        self.assertEqual(g.gridName(), "probe")
+        self.assertEqual(g.shortGridName(), "probe")
+        self.assertGreater(g.gridSize(), 0)
+        self.assertEqual(g.gridCount(), 1)
+
+
+class TestGridMetaData(unittest.TestCase):
+    """Phase 1b.1: type-erased GridMetaData introspector."""
+
+    def test_constructed_from_grid(self):
+        h = nanovdb.tools.createFogVolumeSphere(name="probe")
+        m = nanovdb.GridMetaData(h.grid())
+        self.assertEqual(m.gridType(), nanovdb.GridType.Float)
+        self.assertEqual(m.gridClass(), nanovdb.GridClass.FogVolume)
+        self.assertEqual(m.shortGridName(), "probe")
+        self.assertTrue(m.isValid())
+        self.assertTrue(m.isFogVolume())
+        self.assertGreater(m.activeVoxelCount(), 0)
+        self.assertEqual(m.blindDataCount(), 0)
+        self.assertTrue(nanovdb.GridMetaData.safeCast(h.grid()))
+
+
+class TestBlindDataEmpty(unittest.TestCase):
+    """Phase 1b.2: blind data API works on grids that have none."""
+
+    def test_no_blind_data(self):
+        h = nanovdb.tools.createFogVolumeSphere()
+        g = h.grid()
+        self.assertEqual(g.blindDataCount(), 0)
+        self.assertIsNone(g.blindMetaData(0))
+        self.assertEqual(g.findBlindData("anything"), -1)
+        self.assertEqual(
+            g.findBlindDataForSemantic(nanovdb.GridBlindDataSemantic.PointPosition),
+            -1,
+        )
+        self.assertIsNone(g.getBlindData(0))
+
+
+class TestSplitMergeCopy(unittest.TestCase):
+    """Phase 1c.2: splitGrids / mergeGrids / handle.copy()."""
+
+    def test_split_and_merge_roundtrip(self):
+        h1 = nanovdb.tools.createFogVolumeSphere(name="a")
+        h2 = nanovdb.tools.createLevelSetTorus(nanovdb.GridType.Float, name="b")
+        merged = nanovdb.mergeGrids([h1, h2])
+        self.assertEqual(merged.gridCount(), 2)
+        split = nanovdb.splitGrids(merged)
+        self.assertEqual(len(split), 2)
+        for s in split:
+            self.assertEqual(s.gridCount(), 1)
+
+    def test_merge_does_not_consume_inputs(self):
+        # Regression: original Phase 1 mergeGrids used nb::cast<HandleT&&>
+        # which moved the underlying C++ handle out of the Python wrapper,
+        # silently emptying h1/h2. The fixed version reads each handle by
+        # const reference.
+        h1 = nanovdb.tools.createFogVolumeSphere(name="a")
+        h2 = nanovdb.tools.createLevelSetTorus(nanovdb.GridType.Float, name="b")
+        sz1, sz2 = h1.size(), h2.size()
+        gc1, gc2 = h1.gridCount(), h2.gridCount()
+
+        merged = nanovdb.mergeGrids([h1, h2])
+
+        self.assertEqual(h1.gridCount(), gc1)
+        self.assertEqual(h2.gridCount(), gc2)
+        self.assertEqual(h1.size(), sz1)
+        self.assertEqual(h2.size(), sz2)
+        # merged still works
+        self.assertEqual(merged.gridCount(), 2)
+        self.assertEqual(merged.grid(0).gridName(), "a")
+        self.assertEqual(merged.grid(1).gridName(), "b")
+
+    def test_copy_is_deep(self):
+        src = nanovdb.tools.createFogVolumeSphere(name="orig")
+        cp = src.copy()
+        self.assertIsNot(src, cp)
+        self.assertEqual(cp.gridCount(), src.gridCount())
+        self.assertEqual(cp.grid().gridName(), "orig")
+
+
+class TestGridMetaDataGuards(unittest.TestCase):
+    """Copilot review #3: GridMetaData ctor + safeCast guard against bad input."""
+
+    def test_init_rejects_none(self):
+        # nanobind's type system rejects None for const GridData* before our
+        # validity check runs. Either is acceptable as long as we don't
+        # crash / abort.
+        with self.assertRaises((TypeError, ValueError)):
+            nanovdb.GridMetaData(None)
+
+    def test_safeCast_rejects_none(self):
+        with self.assertRaises((TypeError, ValueError)):
+            nanovdb.GridMetaData.safeCast(None)
+
+    def test_valid_grid_still_works(self):
+        h = nanovdb.tools.createFogVolumeSphere()
+        m = nanovdb.GridMetaData(h.grid())
+        self.assertTrue(m.isValid())
+        self.assertTrue(nanovdb.GridMetaData.safeCast(h.grid()))
 
 
 class TestReadWriteGrids(unittest.TestCase):
@@ -391,7 +537,7 @@ class TestReadWriteGrids(unittest.TestCase):
         for i in range(handle.gridCount()):
             self.assertTrue(handle.gridSize(i) > 0)
             self.assertEqual(handle.gridType(i), nanovdb.GridType.Float)
-            grid = handle.floatGrid(i)
+            grid = handle.grid(i)
             self.assertIsNotNone(grid)
             self.assertTrue(grid.activeVoxelCount() > 0)
             self.assertTrue(grid.isSequential())
@@ -470,14 +616,14 @@ class TestDeviceReadWriteGrids(unittest.TestCase):
         for i in range(handle.gridCount()):
             self.assertTrue(handle.gridSize(i) > 0)
             self.assertEqual(handle.gridType(i), nanovdb.GridType.Float)
-            grid = handle.floatGrid(i)
+            grid = handle.grid(i)
             self.assertIsNotNone(grid)
-            deviceGrid = handle.deviceFloatGrid(i)
+            deviceGrid = handle.deviceGrid(i)
             self.assertIsNone(deviceGrid)
             handle.deviceUpload()
-            deviceGrid = handle.deviceFloatGrid(i)
+            deviceGrid = handle.deviceGrid(i)
             handle.deviceDownload()
-            grid = handle.floatGrid(i)
+            grid = handle.grid(i)
             self.assertIsNotNone(grid)
             self.assertIsNotNone(deviceGrid)
             self.assertTrue(grid.activeVoxelCount() > 0)
@@ -526,12 +672,12 @@ class TestPointsToGrid(unittest.TestCase):
                 [[1, 2, 3]], dtype=torch.int32, device=torch.device("cuda", 0)
             )
             handle = nanovdb.tools.cuda.pointsToRGBA8Grid(tensor)
-            deviceGrid = handle.deviceRGBA8Grid()
+            deviceGrid = handle.deviceGrid()
             self.assertTrue(deviceGrid)
-            grid = handle.rgba8Grid()
+            grid = handle.grid()
             self.assertFalse(grid)
             handle.deviceDownload()
-            grid = handle.rgba8Grid()
+            grid = handle.grid()
             self.assertTrue(grid)
         except ImportError:
             print("PyTorch not found. Skipping...")
@@ -547,7 +693,7 @@ class TestPointsToGrid(unittest.TestCase):
 class TestSignedFloodFill(unittest.TestCase):
     def test_signed_flood_fill_float(self):
         handle = nanovdb.tools.cuda.createLevelSetSphere(nanovdb.GridType.Float, 100)
-        grid = handle.floatGrid()
+        grid = handle.grid()
         self.assertIsNotNone(grid)
         accessor = grid.getAccessor()
         self.assertFalse(accessor.isActive(nanovdb.math.Coord(103, 0, 0)))
@@ -562,11 +708,11 @@ class TestSignedFloodFill(unittest.TestCase):
         self.assertEqual(0.0, accessor(100, 0, 0))
         self.assertEqual(1.0, accessor(97, 0, 0))
         handle.deviceUpload()
-        deviceGrid = handle.deviceFloatGrid(0)
+        deviceGrid = handle.deviceGrid(0)
         self.assertIsNotNone(deviceGrid)
         nanovdb.tools.cuda.signedFloodFill(deviceGrid)
         handle.deviceDownload()
-        grid = handle.floatGrid()
+        grid = handle.grid()
         self.assertIsNotNone(grid)
         accessor = grid.getAccessor()
         self.assertEqual(3.0, accessor(103, 0, 0))
@@ -577,7 +723,7 @@ class TestSignedFloodFill(unittest.TestCase):
 
     def test_signed_flood_fill_double(self):
         handle = nanovdb.tools.cuda.createLevelSetSphere(nanovdb.GridType.Double, 100)
-        grid = handle.doubleGrid()
+        grid = handle.grid()
         self.assertIsNotNone(grid)
         accessor = grid.getAccessor()
         self.assertFalse(accessor.isActive(nanovdb.math.Coord(103, 0, 0)))
@@ -592,11 +738,11 @@ class TestSignedFloodFill(unittest.TestCase):
         self.assertEqual(0.0, accessor(100, 0, 0))
         self.assertEqual(1.0, accessor(97, 0, 0))
         handle.deviceUpload()
-        deviceGrid = handle.deviceDoubleGrid(0)
+        deviceGrid = handle.deviceGrid(0)
         self.assertIsNotNone(deviceGrid)
         nanovdb.tools.cuda.signedFloodFill(deviceGrid)
         handle.deviceDownload()
-        grid = handle.doubleGrid()
+        grid = handle.grid()
         self.assertIsNotNone(grid)
         accessor = grid.getAccessor()
         self.assertEqual(3.0, accessor(103, 0, 0))
@@ -629,7 +775,7 @@ class TestSampleFromPoints(unittest.TestCase):
                 voxelSize=voxelSize,
             )
             handle.deviceUpload()
-            grid = handle.deviceFloatGrid()
+            grid = handle.deviceGrid()
             self.assertIsNotNone(grid)
 
             points = torch.tensor(
@@ -690,7 +836,7 @@ class TestSampleFromPoints(unittest.TestCase):
                 voxelSize=voxelSize,
             )
             handle.deviceUpload()
-            grid = handle.deviceDoubleGrid()
+            grid = handle.deviceGrid()
             self.assertIsNotNone(grid)
 
             points = torch.tensor(
@@ -733,7 +879,7 @@ class TestSampler(unittest.TestCase):
             halfWidth=halfWidth,
             voxelSize=voxelSize,
         )
-        grid = handle.floatGrid()
+        grid = handle.grid()
         xform = grid.map()
         index_space_pos = xform.applyInverseMap(world_space_pos)
         sampler = nanovdb.math.createNearestNeighborSampler(grid)
@@ -761,7 +907,7 @@ class TestSampler(unittest.TestCase):
             halfWidth=halfWidth,
             voxelSize=voxelSize,
         )
-        grid = handle.doubleGrid()
+        grid = handle.grid()
         xform = grid.map()
         index_space_pos = xform.applyInverseMap(world_space_pos)
         sampler = nanovdb.math.createNearestNeighborSampler(grid)
@@ -789,7 +935,7 @@ class TestCreateNanoGrid(unittest.TestCase):
         for i in range(handle.gridCount()):
             self.assertTrue(handle.gridSize(i) > 0)
             self.assertEqual(handle.gridType(i), nanovdb.GridType.Float)
-            grid = handle.floatGrid(i)
+            grid = handle.grid(i)
             self.assertIsNotNone(grid)
             self.assertTrue(grid.activeVoxelCount() > 0)
             self.assertTrue(grid.isSequential())
@@ -807,7 +953,7 @@ class TestCreateNanoGrid(unittest.TestCase):
         for i in range(handle.gridCount()):
             self.assertTrue(handle.gridSize(i) > 0)
             self.assertEqual(handle.gridType(i), nanovdb.GridType.Double)
-            grid = handle.doubleGrid(i)
+            grid = handle.grid(i)
             self.assertIsNotNone(grid)
             self.assertTrue(grid.activeVoxelCount() > 0)
             self.assertTrue(grid.isSequential())
@@ -825,7 +971,7 @@ class TestCreateNanoGrid(unittest.TestCase):
         for i in range(handle.gridCount()):
             self.assertTrue(handle.gridSize(i) > 0)
             self.assertEqual(handle.gridType(i), nanovdb.GridType.Int32)
-            grid = handle.int32Grid(i)
+            grid = handle.grid(i)
             self.assertIsNotNone(grid)
             self.assertTrue(grid.activeVoxelCount() > 0)
             self.assertTrue(grid.isSequential())
@@ -847,7 +993,7 @@ class TestCreateNanoGrid(unittest.TestCase):
         for i in range(handle.gridCount()):
             self.assertTrue(handle.gridSize(i) > 0)
             self.assertEqual(handle.gridType(i), nanovdb.GridType.Vec3f)
-            grid = handle.vec3fGrid(i)
+            grid = handle.grid(i)
             self.assertIsNotNone(grid)
             self.assertTrue(grid.activeVoxelCount() > 0)
             self.assertTrue(grid.isSequential())
@@ -881,7 +1027,7 @@ class TestOpenToNanoVDB(unittest.TestCase):
             for i in range(handle.gridCount()):
                 self.assertTrue(handle.gridSize(i) > 0)
                 self.assertEqual(handle.gridType(i), nanovdb.GridType.Float)
-                grid = handle.floatGrid(i)
+                grid = handle.grid(i)
                 self.assertIsNotNone(grid)
                 self.assertTrue(grid.activeVoxelCount() > 0)
                 self.assertTrue(grid.isSequential())

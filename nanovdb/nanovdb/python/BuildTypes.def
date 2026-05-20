@@ -18,36 +18,39 @@
 // adding (or removing) a Python-visible BuildT.
 //
 // Macros:
-//   NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceMethod)
+//   NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, GridTypeEnum)
 //       Scalar value types — exposed with full NodeInfo accessors. Suffix
-//       forms Python class names (e.g. "Float" -> "FloatGrid"). HandleMethod
-//       and DeviceMethod are the legacy lower-camel-case method names
-//       on GridHandle / DeviceGridHandle (e.g. "floatGrid").
+//       forms Python class names (e.g. "Float" -> "FloatGrid").
+//       GridTypeEnum names the nanovdb::GridType:: enumerator a grid of
+//       this BuildT carries (used by the polymorphic handle.grid(n)
+//       dispatch). Usually identical to Suffix.
 //
-//   NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceMethod)
+//   NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, GridTypeEnum)
 //       Vector value types — exposed with a setVoxel accessor but no
 //       NodeInfo. AccessorName is passed explicitly because the legacy
 //       Python class names for these are inconsistent.
 //
-//   NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix)
-//       The nanovdb::Point build type — exposed with a bare accessor and no
-//       GridHandle method (Point is not currently surfaced through
-//       handle.*Grid()).
+//   NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix, GridTypeEnum)
+//       The nanovdb::Point build type — exposed with a bare accessor.
+//       Point grids carry GridType::PointIndex (NOT a GridType::Point;
+//       that enumerator doesn't exist), so GridTypeEnum is given
+//       explicitly. Polymorphic dispatch routes PointIndex grids to
+//       NanoGrid<Point>.
 //
 //   NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix)
-//       Subset that has C++ sampler specializations (used by PyMath samplers
-//       and PyCreateNanoGrid create*Grid factories).
+//       Subset that has C++ sampler specializations (used by PyMath
+//       samplers and PyCreateNanoGrid create*Grid factories).
 
 #ifndef NANOVDB_PY_FOR_EACH_SCALAR_BUILDT
-#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceMethod)
+#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, GridTypeEnum)
 #define NANOVDB_PY_LOCAL_DEFINED_SCALAR
 #endif
 #ifndef NANOVDB_PY_FOR_EACH_VECTOR_BUILDT
-#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceMethod)
+#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, GridTypeEnum)
 #define NANOVDB_PY_LOCAL_DEFINED_VECTOR
 #endif
 #ifndef NANOVDB_PY_FOR_EACH_POINT_BUILDT
-#define NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix)
+#define NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix, GridTypeEnum)
 #define NANOVDB_PY_LOCAL_DEFINED_POINT
 #endif
 #ifndef NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT
@@ -55,18 +58,16 @@
 #define NANOVDB_PY_LOCAL_DEFINED_SAMPLEABLE
 #endif
 
-NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(float,   Float,  "floatGrid",  "deviceFloatGrid")
-NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(double,  Double, "doubleGrid", "deviceDoubleGrid")
-NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(int32_t, Int32,  "int32Grid",  "deviceInt32Grid")
+NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(float,   Float,  Float)
+NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(double,  Double, Double)
+NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(int32_t, Int32,  Int32)
 
 NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(::nanovdb::Vec3f, Vec3f,
-                                  "Vec3fReadVectorAccessor",
-                                  "vec3fGrid", "deviceVec3fGrid")
+                                  "Vec3fReadVectorAccessor", Vec3f)
 NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(::nanovdb::math::Rgba8, RGBA8,
-                                  "RGBA8ReadAccessor",
-                                  "rgba8Grid", "deviceRGBA8Grid")
+                                  "RGBA8ReadAccessor", RGBA8)
 
-NANOVDB_PY_FOR_EACH_POINT_BUILDT(::nanovdb::Point, Point)
+NANOVDB_PY_FOR_EACH_POINT_BUILDT(::nanovdb::Point, Point, PointIndex)
 
 NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(float,            Float)
 NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(double,           Double)
