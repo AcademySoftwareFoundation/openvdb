@@ -348,7 +348,9 @@ class TestGridHandleExchange(unittest.TestCase):
 
 
 class TestPolymorphicGridAccess(unittest.TestCase):
-    """Phase 1a: handle.grid(n) returns the correct typed Grid subclass."""
+    """handle.grid(n) returns the correct typed Grid subclass selected by
+    gridType(n); the legacy per-type accessors (floatGrid(), etc.) are not
+    bound."""
 
     def test_float_grid(self):
         h = nanovdb.tools.createFogVolumeSphere()
@@ -368,8 +370,8 @@ class TestPolymorphicGridAccess(unittest.TestCase):
         self.assertIsNone(nanovdb.GridHandle().grid())
 
     def test_typed_accessors_removed(self):
+        # The legacy per-type accessors were replaced by handle.grid(n).
         h = nanovdb.tools.createFogVolumeSphere()
-        # Phase 1a.3 removed these in favour of handle.grid(n).
         self.assertFalse(hasattr(h, "floatGrid"))
         self.assertFalse(hasattr(h, "doubleGrid"))
         self.assertFalse(hasattr(h, "int32Grid"))
@@ -378,7 +380,9 @@ class TestPolymorphicGridAccess(unittest.TestCase):
 
 
 class TestGridBase(unittest.TestCase):
-    """Phase 1a.1: BuildT-independent methods resolve via the Grid base class."""
+    """Methods that don't depend on BuildT (gridType, gridClass, voxelSize,
+    isLevelSet/...) resolve via the Grid base class shared by every typed
+    grid subclass."""
 
     def test_grid_base_class_name(self):
         # Typed grids inherit from a base class named "Grid" (no more "GridData").
@@ -399,7 +403,9 @@ class TestGridBase(unittest.TestCase):
 
 
 class TestGridMetaData(unittest.TestCase):
-    """Phase 1b.1: type-erased GridMetaData introspector."""
+    """nanovdb.GridMetaData is a type-erased introspector — construct from a
+    Grid and query gridType/gridClass/voxelSize/etc. without knowing
+    BuildT."""
 
     def test_constructed_from_grid(self):
         h = nanovdb.tools.createFogVolumeSphere(name="probe")
@@ -415,7 +421,9 @@ class TestGridMetaData(unittest.TestCase):
 
 
 class TestBlindDataEmpty(unittest.TestCase):
-    """Phase 1b.2: blind data API works on grids that have none."""
+    """Blind data API (blindDataCount, blindMetaData, findBlindData,
+    findBlindDataForSemantic, getBlindData) returns sensible None/-1
+    sentinels on grids that have no blind data channels."""
 
     def test_no_blind_data(self):
         h = nanovdb.tools.createFogVolumeSphere()
@@ -431,7 +439,9 @@ class TestBlindDataEmpty(unittest.TestCase):
 
 
 class TestSplitMergeCopy(unittest.TestCase):
-    """Phase 1c.2: splitGrids / mergeGrids / handle.copy()."""
+    """splitGrids(h) -> list of single-grid handles, mergeGrids([h1, h2])
+    -> combined handle, h.copy() -> deep buffer copy. mergeGrids must not
+    consume its input handles."""
 
     def test_split_and_merge_roundtrip(self):
         h1 = nanovdb.tools.createFogVolumeSphere(name="a")
@@ -444,10 +454,10 @@ class TestSplitMergeCopy(unittest.TestCase):
             self.assertEqual(s.gridCount(), 1)
 
     def test_merge_does_not_consume_inputs(self):
-        # Regression: original Phase 1 mergeGrids used nb::cast<HandleT&&>
-        # which moved the underlying C++ handle out of the Python wrapper,
-        # silently emptying h1/h2. The fixed version reads each handle by
-        # const reference.
+        # Regression: a previous mergeGrids implementation used
+        # nb::cast<HandleT&&> which moved the underlying C++ handle out of
+        # the Python wrapper, silently emptying h1/h2 after the call. The
+        # binding now reads each handle by const reference.
         h1 = nanovdb.tools.createFogVolumeSphere(name="a")
         h2 = nanovdb.tools.createLevelSetTorus(nanovdb.GridType.Float, name="b")
         sz1, sz2 = h1.size(), h2.size()
@@ -472,12 +482,12 @@ class TestSplitMergeCopy(unittest.TestCase):
         self.assertEqual(cp.grid().gridName(), "orig")
 
 
-class TestPhase2BuildTCoverage(unittest.TestCase):
-    """Phase 2: every additional BuildT registers a Grid + ReadAccessor (and
-    NodeInfo where applicable). We can't host-construct most of these (the
-    primitives that produce them land in Phase 5), but we can confirm
-    registration completed and the accessor surfaces match the type kind.
-    """
+class TestBuildTRegistrations(unittest.TestCase):
+    """Every BuildT we bind exposes the right shape — a Grid class, a
+    ReadAccessor, and (for arithmetic-valued scalars) a NodeInfo. Accessor
+    surface depends on the type kind: scalar accessors have setVoxel +
+    getNodeInfo; vector accessors have setVoxel only; read-only accessors
+    (Boolean, Fp*, Index, OnIndex, Mask) have neither."""
 
     SCALARS = ["Int16", "Int64", "UInt8", "UInt32"]
     VECTORS = ["Vec3d", "Vec4f", "Vec4d", "Vec3u8", "Vec3u16"]
@@ -506,8 +516,10 @@ class TestPhase2BuildTCoverage(unittest.TestCase):
                                  f"{suffix}NodeInfo missing")
 
     def test_vector_accessors_have_setvoxel_no_nodeinfo(self):
-        # Vector accessor names are aligned in Phase 2 (Vec3dReadAccessor,
-        # ...). The legacy Vec3f one is still Vec3fReadVectorAccessor.
+        # The newer vector accessor names follow the consistent
+        # <Suffix>ReadAccessor pattern (Vec3dReadAccessor, ...); the
+        # original Vec3f one is named Vec3fReadVectorAccessor for backwards
+        # compatibility.
         for suffix in self.VECTORS:
             acc = getattr(nanovdb, suffix + "ReadAccessor")
             self.assertTrue(hasattr(acc, "setVoxel"))
@@ -516,7 +528,8 @@ class TestPhase2BuildTCoverage(unittest.TestCase):
     def test_all_grid_type_enums_reachable(self):
         # GridType enum binding must cover every BuildT we register —
         # otherwise Python users can't compare against handle.gridType(n).
-        # UInt8 was missed in Phase 0; this test locks the fix in.
+        # Locks in the full set; missing entries (e.g. an unbound enumerator
+        # for a freshly-added BuildT) get caught here.
         for name in ["Float", "Double", "Int16", "Int32", "Int64", "UInt8",
                      "UInt32", "Boolean", "Half", "RGBA8", "Vec3f", "Vec3d",
                      "Vec4f", "Vec4d", "Vec3u8", "Vec3u16", "Mask", "Fp4",
@@ -525,9 +538,9 @@ class TestPhase2BuildTCoverage(unittest.TestCase):
                             f"nanovdb.GridType.{name} not bound")
 
     def test_readonly_accessors_have_neither_setvoxel_nor_nodeinfo(self):
-        # The plan calls out: quantized types decode to float on read but
-        # do not bind setVoxel; index types return uint64 and ValueMask
-        # exposes only active-state queries.
+        # Quantized types decode to float on read but don't bind setVoxel;
+        # index types return uint64; ValueMask exposes only active-state
+        # queries. All share a bare ReadAccessor.
         for suffix in self.READONLY:
             acc = getattr(nanovdb, suffix + "ReadAccessor")
             self.assertFalse(hasattr(acc, "setVoxel"),
@@ -536,8 +549,233 @@ class TestPhase2BuildTCoverage(unittest.TestCase):
                              f"{suffix}ReadAccessor should not have getNodeInfo")
 
 
+class TestTreeNodeWalking(unittest.TestCase):
+    """Walk a grid's tree from Python: Grid.tree(), Root/Upper/Lower/Leaf
+    node access and metadata, per-leaf zero-copy values() and bulk
+    grid.leaf_values() NumPy views, NodeManager + createNodeManager."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.h = nanovdb.tools.createFogVolumeSphere(name="probe")
+        cls.g = cls.h.grid()
+        cls.tree = cls.g.tree()
+
+    def test_grid_tree_basic(self):
+        self.assertIsInstance(self.tree, nanovdb.FloatTree)
+        self.assertEqual(self.tree.background(), 3.0)  # halfwidth*voxelsize default
+        self.assertGreater(self.tree.activeVoxelCount(), 0)
+        self.assertGreaterEqual(self.tree.totalNodeCount(), self.tree.nodeCount(0))
+
+    def test_extrema(self):
+        mn, mx = self.tree.extrema()
+        # FogVolumeSphere produces values in [0, 1].
+        self.assertGreaterEqual(mn, 0.0)
+        self.assertLessEqual(mx, 1.0)
+        self.assertLessEqual(mn, mx)
+
+    def test_first_leaf_and_node_metadata(self):
+        leaf = self.tree.getFirstLeaf()
+        self.assertIsInstance(leaf, nanovdb.FloatLeaf)
+        self.assertEqual(nanovdb.FloatLeaf.dim(), 8)
+        self.assertEqual(nanovdb.FloatLeaf.voxelCount(), 512)
+        # Origin should be aligned to LeafNode dim=8.
+        for c in (leaf.origin().x, leaf.origin().y, leaf.origin().z):
+            self.assertEqual(c % 8, 0)
+
+    def test_root_metadata(self):
+        root = self.tree.root()
+        self.assertIsInstance(root, nanovdb.FloatRoot)
+        self.assertGreater(root.tileCount(), 0)
+        # Root bbox covers ALL active voxels — non-empty for a fog sphere.
+        bb = root.bbox()
+        self.assertFalse(bb.empty())
+        self.assertEqual(root.background(), self.tree.background())
+
+    def test_leaf_values_zero_copy(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy not installed")
+        leaf = self.tree.getFirstLeaf()
+        vals = leaf.values()
+        self.assertEqual(vals.shape, (512,))
+        self.assertEqual(vals.dtype, np.float32)
+        # Mutation through the view writes back into the grid buffer.
+        original = float(vals[0])
+        vals[0] = original + 1.0
+        self.assertAlmostEqual(float(leaf.getValue(0)), original + 1.0)
+        vals[0] = original  # restore
+
+    def test_leaf_values_unavailable_for_special_buildts(self):
+        # ValueIndex / ValueMask / bool / Fp* leaves don't carry T mValues[512],
+        # so the `values` accessor is not bound for them.
+        for cls_name in ("BooleanLeaf", "Fp4Leaf", "IndexLeaf", "MaskLeaf"):
+            leaf_cls = getattr(nanovdb, cls_name)
+            self.assertFalse(hasattr(leaf_cls, "values"),
+                             f"{cls_name}.values should not be bound")
+
+    def test_bulk_leaf_values(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy not installed")
+        bulk = self.g.leaf_values()
+        self.assertEqual(bulk.shape, (self.tree.nodeCount(0), 512))
+        self.assertEqual(bulk.dtype, np.float32)
+        # First row should match per-leaf values().
+        first_via_bulk = np.asarray(bulk[0])
+        first_via_leaf = np.asarray(self.tree.getFirstLeaf().values())
+        self.assertTrue(np.array_equal(first_via_bulk, first_via_leaf))
+
+    def test_bulk_leaf_values_empty_grid_returns_empty_array(self):
+        # A grid with no leaves returns an empty (0, 512) NumPy view rather
+        # than None, so callers can iterate / shape-test without a sentinel.
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy not installed")
+        empty_bbox = nanovdb.math.CoordBBox()  # default-constructed = empty
+        empty_h = nanovdb.tools.createFloatGrid(
+            0.0, "empty", nanovdb.GridClass.Unknown,
+            lambda ijk: 0.0, empty_bbox)
+        bulk = empty_h.grid().leaf_values()
+        self.assertEqual(bulk.shape, (0, 512))
+        self.assertEqual(bulk.dtype, np.float32)
+
+    def test_node_manager_round_trip(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy not installed")
+        handle = nanovdb.createNodeManager(self.g)
+        self.assertGreater(handle.size(), 0)
+        self.assertTrue(bool(handle))
+        nm = handle.mgr()
+        self.assertIsInstance(nm, nanovdb.FloatNodeManager)
+        self.assertTrue(nm.isLinear())  # createNanoGrid produces breadth-first
+        self.assertEqual(nm.leafCount(), self.tree.nodeCount(0))
+        self.assertEqual(nm.lowerCount(), self.tree.nodeCount(1))
+        self.assertEqual(nm.upperCount(), self.tree.nodeCount(2))
+        # NodeManager.leaf(0) should be the same leaf as tree.getFirstLeaf()
+        # (breadth-first order).
+        self.assertEqual(nm.leaf(0).origin(), self.tree.getFirstLeaf().origin())
+        self.assertTrue(np.array_equal(
+            nm.leaf(0).values(), self.tree.getFirstLeaf().values()))
+
+
+class TestBoundsChecks(unittest.TestCase):
+    """Out-of-range indices on Leaf / Tree / NodeManager raise Python
+    exceptions rather than falling through into raw memory access. The
+    underlying C++ uses NANOVDB_ASSERT which is a no-op in release builds,
+    so the Python layer guards every entry point that takes a level or
+    index argument.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.h = nanovdb.tools.createFogVolumeSphere()
+        cls.g = cls.h.grid()
+        cls.tree = cls.g.tree()
+        cls.leaf = cls.tree.getFirstLeaf()
+        cls.nm_handle = nanovdb.createNodeManager(cls.g)
+        cls.nm = cls.nm_handle.mgr()
+
+    def test_leaf_offset_bounds(self):
+        n = nanovdb.FloatLeaf.voxelCount()
+        with self.assertRaises(IndexError):
+            self.leaf.isActive(n)
+        with self.assertRaises(IndexError):
+            self.leaf.isActive(n + 1000)
+        with self.assertRaises(IndexError):
+            self.leaf.getValue(n)
+        # In-range still works.
+        self.assertIsNotNone(self.leaf.getValue(0))
+        self.assertIsNotNone(self.leaf.getValue(n - 1))
+
+    def test_tree_active_tile_count_level(self):
+        # activeTileCount levels are 1..3 (level 0 is leaves, not tiles).
+        with self.assertRaises(ValueError):
+            self.tree.activeTileCount(0)
+        with self.assertRaises(ValueError):
+            self.tree.activeTileCount(4)
+        # In-range still works.
+        self.assertGreaterEqual(self.tree.activeTileCount(3), 0)
+
+    def test_tree_node_count_level(self):
+        # nodeCount levels are 0..2 (leaf / lower / upper).
+        with self.assertRaises(ValueError):
+            self.tree.nodeCount(-1)
+        with self.assertRaises(ValueError):
+            self.tree.nodeCount(3)
+        self.assertGreater(self.tree.nodeCount(0), 0)
+
+    def test_node_manager_indexed_access(self):
+        with self.assertRaises(IndexError):
+            self.nm.leaf(self.nm.leafCount())
+        with self.assertRaises(IndexError):
+            self.nm.lower(self.nm.lowerCount())
+        with self.assertRaises(IndexError):
+            self.nm.upper(self.nm.upperCount())
+        with self.assertRaises(ValueError):
+            self.nm.nodeCount(3)
+        # In-range still works.
+        self.assertEqual(self.nm.leaf(0).origin(), self.leaf.origin())
+
+
+class TestZeroCopyViewLifetimes(unittest.TestCase):
+    """Returned typed grids, trees, leaves, NodeManagers, and zero-copy
+    NumPy views must keep their backing buffers alive across the chained
+    temporary expressions used at the call site (e.g.
+    `nanovdb.tools.createFogVolumeSphere().grid().tree().getFirstLeaf().values()`).
+    Without explicit nb::keep_alive linkages the intermediate handle gets
+    GC'd between expressions and the returned object reads freed memory.
+    """
+
+    def _force_gc(self):
+        import gc
+        for _ in range(3):
+            gc.collect()
+
+    def test_handle_grid_temporary(self):
+        g = nanovdb.tools.createFogVolumeSphere(name="probe").grid()
+        self._force_gc()
+        self.assertEqual(g.gridName(), "probe")
+
+    def test_handle_grid_tree_leaf_values_chain(self):
+        vals = (nanovdb.tools.createFogVolumeSphere()
+                .grid().tree().getFirstLeaf().values())
+        self._force_gc()
+        # Touching the view shouldn't crash.
+        self.assertEqual(vals.shape, (512,))
+        _ = float(vals[0])
+
+    def test_grid_leaf_values_temporary(self):
+        bulk = nanovdb.tools.createFogVolumeSphere().grid().leaf_values()
+        self._force_gc()
+        self.assertEqual(bulk.shape[1], 512)
+        _ = float(bulk[0, 0])
+
+    def test_node_manager_temporary_grid(self):
+        nm = nanovdb.createNodeManager(
+            nanovdb.tools.createFogVolumeSphere().grid()).mgr()
+        self._force_gc()
+        self.assertGreater(nm.leafCount(), 0)
+        leaf0_vals = nm.leaf(0).values()
+        self._force_gc()
+        self.assertEqual(leaf0_vals.shape, (512,))
+
+    def test_blind_data_temporary(self):
+        # The grid has no blind data so getBlindData returns None — what we
+        # care about here is that the temporary chain doesn't segfault.
+        result = nanovdb.tools.createFogVolumeSphere().grid().getBlindData(0)
+        self._force_gc()
+        self.assertIsNone(result)
+
+
 class TestGridMetaDataGuards(unittest.TestCase):
-    """Copilot review #3: GridMetaData ctor + safeCast guard against bad input."""
+    """GridMetaData() constructor and safeCast() reject bad input (None, a
+    Grid wrapping an invalid buffer) with a Python exception or False
+    rather than asserting / null-dereferencing inside NanoVDB."""
 
     def test_init_rejects_none(self):
         # nanobind's type system rejects None for const GridData* before our

@@ -137,8 +137,10 @@ template<typename BufferT> nb::class_<nanovdb::GridHandle<BufferT>> defineGridHa
              },
              "Return a deep copy of this GridHandle backed by a freshly-allocated buffer.")
         .def("grid", &pyHostGrid<BufferT>, nb::arg("n") = 0,
+             nb::keep_alive<0, 1>(),
              "Return the n-th grid as a typed Grid subclass selected by "
-             "gridType(n), or None if the BuildT is not bound in Python.")
+             "gridType(n), or None if the BuildT is not bound in Python. "
+             "The returned grid keeps this handle alive.")
         .def("isPadded", &nanovdb::GridHandle<BufferT>::isPadded)
         .def("gridCount", &nanovdb::GridHandle<BufferT>::gridCount)
         .def("gridSize", &nanovdb::GridHandle<BufferT>::gridSize, nb::arg("n") = 0)
