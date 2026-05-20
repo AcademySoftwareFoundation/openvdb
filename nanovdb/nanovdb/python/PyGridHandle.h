@@ -14,31 +14,30 @@ namespace pynanovdb {
 
 template<typename BufferT> nb::class_<nanovdb::GridHandle<BufferT>> defineGridHandle(nb::module_& m, const char* name)
 {
-    return nb::class_<nanovdb::GridHandle<BufferT>>(m, name)
+    auto cls = nb::class_<nanovdb::GridHandle<BufferT>>(m, name)
         .def(nb::init<>())
         .def("reset", &nanovdb::GridHandle<BufferT>::reset)
         .def("size", &nanovdb::GridHandle<BufferT>::bufferSize)
         .def("isEmpty", &nanovdb::GridHandle<BufferT>::isEmpty)
         .def("empty", &nanovdb::GridHandle<BufferT>::empty)
         .def(
-            "__bool__", [](const nanovdb::GridHandle<BufferT>& handle) { handle.empty(); }, nb::is_operator())
-        .def("floatGrid", nb::overload_cast<uint32_t>(&nanovdb::GridHandle<BufferT>::template grid<float>), nb::arg("n") = 0, nb::rv_policy::reference_internal)
-        .def("doubleGrid",
-             nb::overload_cast<uint32_t>(&nanovdb::GridHandle<BufferT>::template grid<double>),
-             nb::arg("n") = 0,
-             nb::rv_policy::reference_internal)
-        .def("int32Grid",
-             nb::overload_cast<uint32_t>(&nanovdb::GridHandle<BufferT>::template grid<int32_t>),
-             nb::arg("n") = 0,
-             nb::rv_policy::reference_internal)
-        .def("vec3fGrid",
-             nb::overload_cast<uint32_t>(&nanovdb::GridHandle<BufferT>::template grid<nanovdb::Vec3f>),
-             nb::arg("n") = 0,
-             nb::rv_policy::reference_internal)
-        .def("rgba8Grid",
-             nb::overload_cast<uint32_t>(&nanovdb::GridHandle<BufferT>::template grid<nanovdb::math::Rgba8>),
-             nb::arg("n") = 0,
-             nb::rv_policy::reference_internal)
+            "__bool__",
+            [](const nanovdb::GridHandle<BufferT>& handle) { return !handle.empty(); },
+            nb::is_operator());
+
+#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceMethod) \
+    cls.def(HandleMethod,                                               \
+            nb::overload_cast<uint32_t>(&nanovdb::GridHandle<BufferT>::template grid<T>), \
+            nb::arg("n") = 0,                                           \
+            nb::rv_policy::reference_internal);
+#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceMethod) \
+    cls.def(HandleMethod,                                               \
+            nb::overload_cast<uint32_t>(&nanovdb::GridHandle<BufferT>::template grid<T>), \
+            nb::arg("n") = 0,                                           \
+            nb::rv_policy::reference_internal);
+#include "BuildTypes.def"
+
+    return cls
         .def("isPadded", &nanovdb::GridHandle<BufferT>::isPadded)
         .def("gridCount", &nanovdb::GridHandle<BufferT>::gridCount)
         .def("gridSize", &nanovdb::GridHandle<BufferT>::gridSize, nb::arg("n") = 0)

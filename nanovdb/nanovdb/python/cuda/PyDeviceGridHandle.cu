@@ -16,7 +16,7 @@ namespace pynanovdb {
 void defineDeviceGridHandle(nb::module_& m)
 {
     using BufferT = nanovdb::cuda::DeviceBuffer;
-    defineGridHandle<BufferT>(m, "DeviceGridHandle")
+    auto cls = defineGridHandle<BufferT>(m, "DeviceGridHandle")
         .def(
             "__init__",
             [](GridHandle<BufferT>&                                 handle,
@@ -27,16 +27,21 @@ void defineDeviceGridHandle(nb::module_& m)
                 new (&handle) GridHandle<BufferT>(std::move(buffer));
             },
             "cpu_t"_a.noconvert(),
-            "cuda_t"_a.noconvert())
-        .def("deviceFloatGrid", nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<float>), "n"_a = 0, nb::rv_policy::reference_internal)
-        .def("deviceDoubleGrid", nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<double>), "n"_a = 0, nb::rv_policy::reference_internal)
-        .def("deviceInt32Grid", nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<int32_t>), "n"_a = 0, nb::rv_policy::reference_internal)
-        .def("deviceVec3fGrid", nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<Vec3f>), "n"_a = 0, nb::rv_policy::reference_internal)
-        .def("deviceRGBA8Grid",
-             nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<math::Rgba8>),
-             "n"_a = 0,
-             nb::rv_policy::reference_internal)
-        .def(
+            "cuda_t"_a.noconvert());
+
+#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceMethod) \
+    cls.def(DeviceMethod,                                        \
+            nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<T>), \
+            "n"_a = 0,                                                 \
+            nb::rv_policy::reference_internal);
+#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceMethod) \
+    cls.def(DeviceMethod,                                        \
+            nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<T>), \
+            "n"_a = 0,                                                 \
+            nb::rv_policy::reference_internal);
+#include "../BuildTypes.def"
+
+    cls.def(
             "deviceUpload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceUpload(nullptr, sync); }, "sync"_a = true)
         .def(
             "deviceDownload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceDownload(nullptr, sync); }, "sync"_a = true);
