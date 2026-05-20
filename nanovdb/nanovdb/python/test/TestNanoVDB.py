@@ -443,12 +443,54 @@ class TestSplitMergeCopy(unittest.TestCase):
         for s in split:
             self.assertEqual(s.gridCount(), 1)
 
+    def test_merge_does_not_consume_inputs(self):
+        # Regression: original Phase 1 mergeGrids used nb::cast<HandleT&&>
+        # which moved the underlying C++ handle out of the Python wrapper,
+        # silently emptying h1/h2. The fixed version reads each handle by
+        # const reference.
+        h1 = nanovdb.tools.createFogVolumeSphere(name="a")
+        h2 = nanovdb.tools.createLevelSetTorus(nanovdb.GridType.Float, name="b")
+        sz1, sz2 = h1.size(), h2.size()
+        gc1, gc2 = h1.gridCount(), h2.gridCount()
+
+        merged = nanovdb.mergeGrids([h1, h2])
+
+        self.assertEqual(h1.gridCount(), gc1)
+        self.assertEqual(h2.gridCount(), gc2)
+        self.assertEqual(h1.size(), sz1)
+        self.assertEqual(h2.size(), sz2)
+        # merged still works
+        self.assertEqual(merged.gridCount(), 2)
+        self.assertEqual(merged.grid(0).gridName(), "a")
+        self.assertEqual(merged.grid(1).gridName(), "b")
+
     def test_copy_is_deep(self):
         src = nanovdb.tools.createFogVolumeSphere(name="orig")
         cp = src.copy()
         self.assertIsNot(src, cp)
         self.assertEqual(cp.gridCount(), src.gridCount())
         self.assertEqual(cp.grid().gridName(), "orig")
+
+
+class TestGridMetaDataGuards(unittest.TestCase):
+    """Copilot review #3: GridMetaData ctor + safeCast guard against bad input."""
+
+    def test_init_rejects_none(self):
+        # nanobind's type system rejects None for const GridData* before our
+        # validity check runs. Either is acceptable as long as we don't
+        # crash / abort.
+        with self.assertRaises((TypeError, ValueError)):
+            nanovdb.GridMetaData(None)
+
+    def test_safeCast_rejects_none(self):
+        with self.assertRaises((TypeError, ValueError)):
+            nanovdb.GridMetaData.safeCast(None)
+
+    def test_valid_grid_still_works(self):
+        h = nanovdb.tools.createFogVolumeSphere()
+        m = nanovdb.GridMetaData(h.grid())
+        self.assertTrue(m.isValid())
+        self.assertTrue(nanovdb.GridMetaData.safeCast(h.grid()))
 
 
 class TestReadWriteGrids(unittest.TestCase):

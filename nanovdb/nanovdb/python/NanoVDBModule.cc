@@ -320,9 +320,8 @@ static nb::object pyGetBlindData(nb::handle py_grid, uint32_t n)
     void* data = const_cast<void*>(static_cast<const void*>(
         util::PtrAdd<uint8_t>(meta, meta->mDataOffset)));
     const size_t count = static_cast<size_t>(meta->mValueCount);
+    const uint32_t valueSize = meta->mValueSize;
 
-    // Helper macro: build a typed 1D or (count, dim) ndarray and cast it,
-    // anchoring the lifetime to the source Grid via py_grid.
     auto make1D = [&](void* p, size_t n_elems, auto sentinel) -> nb::object {
         using T = decltype(sentinel);
         size_t shape[1] = {n_elems};
@@ -337,25 +336,46 @@ static nb::object pyGetBlindData(nb::handle py_grid, uint32_t n)
                             static_cast<T*>(p), 2, shape, py_grid),
                         nb::rv_policy::reference);
     };
+    // Raw byte view fallback. Used either when the data type is unknown OR
+    // when the recorded mValueSize doesn't match the stride implied by
+    // mDataType — in that case constructing a typed ndarray would overrun the
+    // underlying blind-data region. mValueCount * mValueSize is by definition
+    // the actual byte extent of the channel, so this is always safe.
+    auto raw = [&]() -> nb::object {
+        return make1D(data, count * valueSize, uint8_t{});
+    };
 
     switch (meta->mDataType) {
-        case GridType::Float:   return make1D(data, count, float{});
-        case GridType::Double:  return make1D(data, count, double{});
-        case GridType::Int16:   return make1D(data, count, int16_t{});
-        case GridType::Int32:   return make1D(data, count, int32_t{});
-        case GridType::Int64:   return make1D(data, count, int64_t{});
-        case GridType::UInt8:   return make1D(data, count, uint8_t{});
-        case GridType::UInt32:  return make1D(data, count, uint32_t{});
-        case GridType::Vec3f:   return make2D(data, count, 3, float{});
-        case GridType::Vec3d:   return make2D(data, count, 3, double{});
-        case GridType::Vec4f:   return make2D(data, count, 4, float{});
-        case GridType::Vec4d:   return make2D(data, count, 4, double{});
-        case GridType::Vec3u8:  return make2D(data, count, 3, uint8_t{});
-        case GridType::Vec3u16: return make2D(data, count, 3, uint16_t{});
-        case GridType::RGBA8:   return make2D(data, count, 4, uint8_t{});
+        case GridType::Float:
+            return valueSize == sizeof(float) ? make1D(data, count, float{}) : raw();
+        case GridType::Double:
+            return valueSize == sizeof(double) ? make1D(data, count, double{}) : raw();
+        case GridType::Int16:
+            return valueSize == sizeof(int16_t) ? make1D(data, count, int16_t{}) : raw();
+        case GridType::Int32:
+            return valueSize == sizeof(int32_t) ? make1D(data, count, int32_t{}) : raw();
+        case GridType::Int64:
+            return valueSize == sizeof(int64_t) ? make1D(data, count, int64_t{}) : raw();
+        case GridType::UInt8:
+            return valueSize == sizeof(uint8_t) ? make1D(data, count, uint8_t{}) : raw();
+        case GridType::UInt32:
+            return valueSize == sizeof(uint32_t) ? make1D(data, count, uint32_t{}) : raw();
+        case GridType::Vec3f:
+            return valueSize == 3 * sizeof(float) ? make2D(data, count, 3, float{}) : raw();
+        case GridType::Vec3d:
+            return valueSize == 3 * sizeof(double) ? make2D(data, count, 3, double{}) : raw();
+        case GridType::Vec4f:
+            return valueSize == 4 * sizeof(float) ? make2D(data, count, 4, float{}) : raw();
+        case GridType::Vec4d:
+            return valueSize == 4 * sizeof(double) ? make2D(data, count, 4, double{}) : raw();
+        case GridType::Vec3u8:
+            return valueSize == 3 * sizeof(uint8_t) ? make2D(data, count, 3, uint8_t{}) : raw();
+        case GridType::Vec3u16:
+            return valueSize == 3 * sizeof(uint16_t) ? make2D(data, count, 3, uint16_t{}) : raw();
+        case GridType::RGBA8:
+            return valueSize == 4 * sizeof(uint8_t) ? make2D(data, count, 4, uint8_t{}) : raw();
         default:
-            // Fall back to a raw uint8 byte view of mValueCount * mValueSize.
-            return make1D(data, count * meta->mValueSize, uint8_t{});
+            return raw();
     }
 }
 
@@ -447,12 +467,35 @@ template<typename AttT> void definePointAccessor(nb::module_& m, const char* nam
 // queries below are flat data-member reads with no tree traversal.
 void defineGridMetaData(nb::module_& m)
 {
+    // Constructing GridMetaData calls into nanovdb::GridMetaData::safeCast
+    // which has a NANOVDB_ASSERT(gridData && gridData->isValid()). nanobind
+    // already rejects Python None at the type-check level (None can't bind to
+    // const GridData*), but a Grid wrapping a corrupted / partially-formed
+    // buffer would still abort debug builds and undefined-behave in release.
+    // Guard explicitly: validate first, raise nb::value_error on bad input.
     nb::class_<GridMetaData>(m, "GridMetaData",
                              "Type-erased introspector. Mirrors FileMetaData "
                              "but reads from an in-memory grid header.")
-        .def(nb::init<const GridData*>(), "grid"_a)
+        .def("__init__",
+             [](GridMetaData* self, const GridData* gd) {
+                 if (gd == nullptr) {
+                     throw nb::value_error("GridMetaData: grid must not be None");
+                 }
+                 if (!gd->isValid()) {
+                     throw nb::value_error("GridMetaData: grid header is invalid "
+                                           "(bad magic, version, or class/type tags)");
+                 }
+                 new (self) GridMetaData(gd);
+             }, "grid"_a)
         .def_static("safeCast",
-                    [](const GridData* gd) { return GridMetaData::safeCast(gd); }, "grid"_a)
+                    [](const GridData* gd) {
+                        // Mirror the spirit of NanoVDB's static safeCast: "is
+                        // it safe to cast this gridData to a GridMetaData?".
+                        // null and invalid grids are by definition not safe;
+                        // return False rather than dereference.
+                        if (gd == nullptr || !gd->isValid()) return false;
+                        return GridMetaData::safeCast(gd);
+                    }, "grid"_a)
         .def("isValid", &GridMetaData::isValid)
         .def("gridType", &GridMetaData::gridType)
         .def("gridClass", &GridMetaData::gridClass)
