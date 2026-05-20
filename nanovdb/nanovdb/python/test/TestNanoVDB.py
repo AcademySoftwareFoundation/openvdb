@@ -627,6 +627,21 @@ class TestTreeNodeWalking(unittest.TestCase):
         first_via_leaf = np.asarray(self.tree.getFirstLeaf().values())
         self.assertTrue(np.array_equal(first_via_bulk, first_via_leaf))
 
+    def test_bulk_leaf_values_empty_grid_returns_empty_array(self):
+        # A grid with no leaves returns an empty (0, 512) NumPy view rather
+        # than None, so callers can iterate / shape-test without a sentinel.
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy not installed")
+        empty_bbox = nanovdb.math.CoordBBox()  # default-constructed = empty
+        empty_h = nanovdb.tools.createFloatGrid(
+            0.0, "empty", nanovdb.GridClass.Unknown,
+            lambda ijk: 0.0, empty_bbox)
+        bulk = empty_h.grid().leaf_values()
+        self.assertEqual(bulk.shape, (0, 512))
+        self.assertEqual(bulk.dtype, np.float32)
+
     def test_node_manager_round_trip(self):
         try:
             import numpy as np

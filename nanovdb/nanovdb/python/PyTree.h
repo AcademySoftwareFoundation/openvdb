@@ -11,6 +11,8 @@
 #include <nanovdb/NodeManager.h>
 #include <nanovdb/HostBuffer.h>
 
+#include <type_traits>  // std::is_arithmetic_v, std::enable_if
+
 namespace nb = nanobind;
 
 namespace pynanovdb {
@@ -374,29 +376,31 @@ struct PyLeafValuesBinder<BuildT,
                 auto& grid = nb::cast<GridT&>(py_self);
                 const auto& tree = grid.tree();
                 const uint32_t nLeaves = tree.template nodeCount<LeafT>();
-                if (nLeaves == 0) return nb::none();
                 if (!grid.isBreadthFirst()) {
                     throw nb::value_error(
-                        "leaf_values() requires a breadth-first grid layout; "
-                        "rebuild via tools::createNanoGrid(...).");
+                        "leaf_values() requires a breadth-first grid "
+                        "layout; rebuild via "
+                        "nanovdb.tools.createNanoGrid(...).");
                 }
+                // For an empty grid (no leaves) we still return an ndarray
+                // — shape (0, 512) — so callers can iterate / np.asarray()
+                // / shape-test without branching on a None sentinel.
                 LeafT* first = const_cast<LeafT*>(tree.getFirstLeaf());
-                if (first == nullptr) return nb::none();
-                // The leaves are laid out contiguously in memory in
-                // breadth-first order. Each leaf is sizeof(LeafT) bytes; the
-                // mValues array is the inline 512-element block, but the
-                // surrounding leaf header means the stride between values
-                // of two consecutive leaves is sizeof(LeafT), not
-                // sizeof(ValueT)*512. So return a strided ndarray.
                 size_t  shape[2]   = {nLeaves, LeafT::voxelCount()};
                 int64_t strides[2] = {
                     static_cast<int64_t>(sizeof(LeafT) / sizeof(ValueT)),
                     1
                 };
+                // first is non-null whenever nLeaves > 0; when nLeaves == 0
+                // we pass a dummy non-null aligned pointer (the grid itself)
+                // so nanobind has something to base the empty array on.
+                // Nothing will be read since the leading shape is 0.
+                void* data = (first != nullptr)
+                    ? static_cast<void*>(first->data()->mValues)
+                    : static_cast<void*>(&grid);
                 return nb::cast(
                     nb::ndarray<nb::numpy, ValueT, nb::ndim<2>, nb::device::cpu>(
-                        static_cast<void*>(first->data()->mValues),
-                        size_t(2), shape, py_self, strides),
+                        data, size_t(2), shape, py_self, strides),
                     nb::rv_policy::reference);
             },
             nb::keep_alive<0, 1>(),
@@ -404,7 +408,8 @@ struct PyLeafValuesBinder<BuildT,
             "values, in breadth-first leaf order. Available only for "
             "BuildTs whose leaf layout carries T mValues[512] (i.e. not "
             "Fp*, Index, Mask, bool, or Point) and only on breadth-first "
-            "grids. The view keeps the grid alive.");
+            "grids. Returns an empty (0, 512) array for grids with no "
+            "leaves. The view keeps the grid alive.");
     }
 };
 
