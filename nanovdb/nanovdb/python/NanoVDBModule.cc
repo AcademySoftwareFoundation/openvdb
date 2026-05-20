@@ -343,12 +343,12 @@ NB_MODULE(nanovdb, m)
         .value("Vec3u8", GridType::Vec3u8)
         .value("Vec3u16", GridType::Vec3u16)
         .value("End", GridType::End)
-        .export_values();
-        // .def("__repr__", [](const GridType& gridType) {
-        //     char str[strlen<GridType>()];
-        //     toStr(str, gridType);
-        //     return std::string(str);
-        // });
+        .export_values()
+        .def("__repr__", [](const GridType& gridType) {
+            char str[strlen<GridType>()];
+            toStr(str, gridType);
+            return std::string(str);
+        });
 
     nb::enum_<GridClass>(m, "GridClass")
         .value("Unknown", GridClass::Unknown)
@@ -362,12 +362,12 @@ NB_MODULE(nanovdb, m)
         .value("IndexGrid", GridClass::IndexGrid)
         .value("TensorGrid", GridClass::TensorGrid)
         .value("End", GridClass::End)
-        .export_values();
-        // .def("__repr__", [](const GridClass& gridClass) {
-        //     char str[strlen<GridClass>()];
-        //     toStr(str, gridClass);
-        //     return std::string(str);
-        // });
+        .export_values()
+        .def("__repr__", [](const GridClass& gridClass) {
+            char str[strlen<GridClass>()];
+            toStr(str, gridClass);
+            return std::string(str);
+        });
 
     defineVersion(m);
 
@@ -385,26 +385,17 @@ NB_MODULE(nanovdb, m)
 
     defineGridData(m);
 
-    defineGrid<float>(m, "FloatGrid");
-    defineScalarAccessor<float>(m, "FloatReadAccessor");
-    defineNodeInfo<float>(m, "FloatNodeInfo");
-
-    defineGrid<double>(m, "DoubleGrid");
-    defineScalarAccessor<double>(m, "DoubleReadAccessor");
-    defineNodeInfo<double>(m, "DoubleNodeInfo");
-
-    defineGrid<int32_t>(m, "Int32Grid");
-    defineScalarAccessor<int32_t>(m, "Int32ReadAccessor");
-    defineNodeInfo<int32_t>(m, "Int32NodeInfo");
-
-    defineGrid<Vec3f>(m, "Vec3fGrid");
-    defineVectorAccessor<Vec3f>(m, "Vec3fReadVectorAccessor");
-
-    defineGrid<math::Rgba8>(m, "RGBA8Grid");
-    defineVectorAccessor<math::Rgba8>(m, "RGBA8ReadAccessor");
-
-    defineGrid<Point>(m, "PointGrid");
-    defineAccessor<Point>(m, "PointReadAccessor");
+#define NVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, HandleMethod, DeviceHandleMethod) \
+    defineGrid<T>(m, #Suffix "Grid");                          \
+    defineScalarAccessor<T>(m, #Suffix "ReadAccessor");        \
+    defineNodeInfo<T>(m, #Suffix "NodeInfo");
+#define NVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, HandleMethod, DeviceHandleMethod) \
+    defineGrid<T>(m, #Suffix "Grid");                          \
+    defineVectorAccessor<T>(m, AccessorName);
+#define NVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix)               \
+    defineGrid<T>(m, #Suffix "Grid");                          \
+    defineAccessor<T>(m, #Suffix "ReadAccessor");
+#include "BuildTypes.def"
 
     defineHostBuffer(m);
     defineHostGridHandle(m);

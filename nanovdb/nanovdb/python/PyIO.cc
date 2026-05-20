@@ -138,12 +138,12 @@ void defineIOModule(nb::module_& m)
         .value("NONE", io::Codec::NONE)
         .value("ZIP", io::Codec::ZIP)
         .value("BLOSC", io::Codec::BLOSC)
-        .export_values();
-        // .def("__repr__", [](const io::Codec& codec) {
-        //     char str[strlen<io::Codec>()];
-        //     toStr(str, codec);
-        //     return std::string(str);
-        // });
+        .export_values()
+        .def("__repr__", [](const io::Codec& codec) {
+            char str[strlen<io::Codec>()];
+            toStr(str, codec);
+            return std::string(str);
+        });
 
     defineFileGridMetaData(m);
     defineHostReadWriteGrid(m);

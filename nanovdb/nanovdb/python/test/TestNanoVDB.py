@@ -663,7 +663,7 @@ class TestSampleFromPoints(unittest.TestCase):
                 dtype=torch.float32,
                 device=torch.device("cuda", 0),
             )
-            nanovdb.math.cuda.sampleFromVoxels(points, grid, values, gradients)
+            nanovdb.tools.cuda.sampleFromVoxels(points, grid, values, gradients)
             for i in range(5):
                 self.assertEqual(values[i], expected_values[i])
             for i in range(5):
@@ -710,7 +710,7 @@ class TestSampleFromPoints(unittest.TestCase):
             expected_values = torch.tensor(
                 [-value, 0.0, -1.0, 1.0, value], dtype=torch.float64
             )
-            nanovdb.math.cuda.sampleFromVoxels(points, grid, values)
+            nanovdb.tools.cuda.sampleFromVoxels(points, grid, values)
             for i in range(5):
                 self.assertEqual(values[i], expected_values[i])
 

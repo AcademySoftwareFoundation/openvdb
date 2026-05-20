@@ -65,24 +65,11 @@ template<typename BuildT> void defineTricubicSampler(nb::module_& m, const char*
     defineCreateSampler<TreeT, 3>(m, "createTricubicSampler");
 }
 
-template void defineNearestNeighborSampler<float>(nb::module_&, const char*);
-template void defineTrilinearSampler<float>(nb::module_&, const char*);
-template void defineTriquadraticSampler<float>(nb::module_&, const char*);
-template void defineTricubicSampler<float>(nb::module_&, const char*);
-
-template void defineNearestNeighborSampler<double>(nb::module_&, const char*);
-template void defineTrilinearSampler<double>(nb::module_&, const char*);
-template void defineTriquadraticSampler<double>(nb::module_&, const char*);
-template void defineTricubicSampler<double>(nb::module_&, const char*);
-
-template void defineNearestNeighborSampler<int32_t>(nb::module_&, const char*);
-template void defineTrilinearSampler<int32_t>(nb::module_&, const char*);
-template void defineTriquadraticSampler<int32_t>(nb::module_&, const char*);
-template void defineTricubicSampler<int32_t>(nb::module_&, const char*);
-
-template void defineNearestNeighborSampler<Vec3f>(nb::module_&, const char*);
-template void defineTrilinearSampler<Vec3f>(nb::module_&, const char*);
-template void defineTriquadraticSampler<Vec3f>(nb::module_&, const char*);
-template void defineTricubicSampler<Vec3f>(nb::module_&, const char*);
+#define NVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix)            \
+    template void defineNearestNeighborSampler<T>(nb::module_&, const char*); \
+    template void defineTrilinearSampler<T>(nb::module_&, const char*);       \
+    template void defineTriquadraticSampler<T>(nb::module_&, const char*);    \
+    template void defineTricubicSampler<T>(nb::module_&, const char*);
+#include "BuildTypes.def"
 
 } // namespace pynanovdb

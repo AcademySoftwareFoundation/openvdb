@@ -45,10 +45,9 @@ template<typename BufferT> void defineOpenToNanoVDB(nb::module_& m)
 #endif
 }
 
-template void defineCreateNanoGrid<float>(nb::module_&, const char*);
-template void defineCreateNanoGrid<double>(nb::module_&, const char*);
-template void defineCreateNanoGrid<int32_t>(nb::module_&, const char*);
-template void defineCreateNanoGrid<Vec3f>(nb::module_&, const char*);
+#define NVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix) \
+    template void defineCreateNanoGrid<T>(nb::module_&, const char*);
+#include "BuildTypes.def"
 
 template void defineOpenToNanoVDB<HostBuffer>(nb::module_&);
 

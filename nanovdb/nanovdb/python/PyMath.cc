@@ -11,7 +11,6 @@
 #include <nanobind/stl/bind_vector.h>
 
 #include "PySampleFromVoxels.h"
-#include "cuda/PySampleFromVoxels.h"
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -377,33 +376,12 @@ void defineMathModule(nb::module_& m)
     defineBaseBBox<math::Coord>(m, "CoordBaseBBox");
     defineBBoxInteger<math::Coord>(m, "CoordBBox", "Bounding box for Coord minimum and maximum");
 
-    defineNearestNeighborSampler<float>(m, "FloatNearestNeighborSampler");
-    defineTrilinearSampler<float>(m, "FloatTrilinearSampler");
-    defineTriquadraticSampler<float>(m, "FloatTriquadraticSampler");
-    defineTricubicSampler<float>(m, "FloatTricubicSampler");
-
-    defineNearestNeighborSampler<double>(m, "DoubleNearestNeighborSampler");
-    defineTrilinearSampler<double>(m, "DoubleTrilinearSampler");
-    defineTriquadraticSampler<double>(m, "DoubleTriquadraticSampler");
-    defineTricubicSampler<double>(m, "DoubleTricubicSampler");
-
-    defineNearestNeighborSampler<int32_t>(m, "Int32NearestNeighborSampler");
-    defineTrilinearSampler<int32_t>(m, "Int32TrilinearSampler");
-    defineTriquadraticSampler<int32_t>(m, "Int32TriquadraticSampler");
-    defineTricubicSampler<int32_t>(m, "Int32TricubicSampler");
-
-    defineNearestNeighborSampler<Vec3f>(m, "Vec3fNearestNeighborSampler");
-    defineTrilinearSampler<Vec3f>(m, "Vec3fTrilinearSampler");
-    defineTriquadraticSampler<Vec3f>(m, "Vec3fTriquadraticSampler");
-    defineTricubicSampler<Vec3f>(m, "Vec3fTricubicSampler");
-
-#ifdef NANOVDB_USE_CUDA
-    nb::module_ cudaModule = m.def_submodule("cuda");
-    cudaModule.doc() = "A submodule that implements CUDA-accelerated math functions";
-
-    defineSampleFromVoxels<float>(cudaModule, "sampleFromVoxels");
-    defineSampleFromVoxels<double>(cudaModule, "sampleFromVoxels");
-#endif
+#define NVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix)               \
+    defineNearestNeighborSampler<T>(m, #Suffix "NearestNeighborSampler"); \
+    defineTrilinearSampler<T>(m, #Suffix "TrilinearSampler");       \
+    defineTriquadraticSampler<T>(m, #Suffix "TriquadraticSampler"); \
+    defineTricubicSampler<T>(m, #Suffix "TricubicSampler");
+#include "BuildTypes.def"
 }
 
 } // namespace pynanovdb
