@@ -114,6 +114,11 @@ nanovdb_example(NAME "ex_merge_nanovdb_cuda" OPENVDB)
 nanovdb_example(NAME "ex_refine_nanovdb_cuda" OPENVDB)
 nanovdb_example(NAME "ex_coarsen_nanovdb_cuda" OPENVDB)
 
+# Host-side port of topology operators (in progress).
+# These examples start identical to their _cuda siblings (using nanovdb::tools::
+# instead of nanovdb::tools::cuda::) and progressively shed CUDA dependencies.
+nanovdb_example(NAME "ex_merge_nanovdb_cpu" OPENVDB)
+
 nanovdb_example(NAME "ex_voxelBlockManager_host_cuda")
 if(TARGET ex_voxelBlockManager_host_cuda)
   target_compile_options(ex_voxelBlockManager_host_cuda PRIVATE
