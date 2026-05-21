@@ -21,6 +21,7 @@
 #include "PyMath.h"
 #include "PyTools.h"
 #include "PyTree.h"
+#include "PyVoxelBlockManager.h"
 #include "PyGridChecksum.h"
 
 namespace nb = nanobind;
@@ -806,6 +807,7 @@ NB_MODULE(nanovdb, m)
     nb::module_ toolsModule = m.def_submodule("tools");
     toolsModule.doc() = "A submodule that implements tools for NanoVDB grids";
     defineToolsModule(toolsModule);
+    defineVoxelBlockManagerModule(toolsModule);
 
     nb::module_ ioModule = m.def_submodule("io");
     ioModule.doc() = "A submodule that implements I/O functionality for NanoVDB grids";

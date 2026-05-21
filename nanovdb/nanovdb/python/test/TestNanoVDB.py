@@ -772,6 +772,125 @@ class TestZeroCopyViewLifetimes(unittest.TestCase):
         self.assertIsNone(result)
 
 
+class TestVoxelBlockManager(unittest.TestCase):
+    """nanovdb.tools.buildVoxelBlockManager + VoxelBlockManagerHandle +
+    decodeInverseMaps and the createOnIndexGrid test-scaffold factory.
+
+    NOTE: end-to-end decode verification across every block is intentionally
+    deferred until the Phase 4 build::Grid bindings land. The C++
+    buildVoxelBlockManager has an algorithmic gap when the source OnIndex
+    grid is tile-compressed (blocks not reached by any leaf's iteration
+    sweep are left with uninitialized firstLeafID). The current host-side
+    createFloatGrid + createOnIndexGrid path triggers tile compression on
+    uniform regions, so we only exercise decodeBlock(0) here — that block
+    is guaranteed to be covered when the grid's firstOffset is 1. The
+    bindings include a defensive check that raises ValueError if a
+    user hits the uninitialized-block case rather than crashing.
+    """
+
+    def _make_cube_on_index_grid(self):
+        # 21^3 fully-active cube — matches the C++ unit test's input.
+        bbox = nanovdb.math.CoordBBox(
+            nanovdb.math.Coord(125), nanovdb.math.Coord(145))
+        float_h = nanovdb.tools.createFloatGrid(
+            0.0, "cube", nanovdb.GridClass.Unknown,
+            lambda ijk: 1.0, bbox)
+        return nanovdb.tools.createOnIndexGrid(
+            float_h.grid(), include_stats=False, include_tiles=False)
+
+    def test_create_on_index_grid(self):
+        h = self._make_cube_on_index_grid()
+        g = h.grid()
+        self.assertEqual(g.gridType(), nanovdb.GridType.OnIndex)
+        self.assertEqual(g.gridClass(), nanovdb.GridClass.IndexGrid)
+        self.assertGreater(g.activeVoxelCount(), 0)
+        self.assertTrue(g.isSequential())
+
+    def test_create_on_index_grid_rejects_unsupported_source(self):
+        # PointGrid is not in the accepted source set.
+        # (The bound source types are float / double / int32 / Vec3f.)
+        try:
+            import numpy as np  # noqa
+        except ImportError:
+            self.skipTest("numpy not installed")
+        # Build a PointGrid via the binding stack; if there isn't an easy
+        # way, just attempt with an empty GridHandle.grid() which is None
+        # and should hit the type-error path. Skip if we can't easily make
+        # a non-source-typed grid available.
+        with self.assertRaises(TypeError):
+            nanovdb.tools.createOnIndexGrid(None)
+
+    def test_build_voxel_block_manager_handle(self):
+        h = self._make_cube_on_index_grid()
+        g = h.grid()
+        vbm = nanovdb.tools.buildVoxelBlockManager(g, log2_block_width=6)
+        self.assertGreater(vbm.blockCount(), 0)
+        self.assertEqual(vbm.firstOffset(), 1)
+        self.assertEqual(vbm.lastOffset(), g.activeVoxelCount())
+        self.assertTrue(bool(vbm))
+
+    def test_buffers_zero_copy_shape_and_dtype(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy not installed")
+        h = self._make_cube_on_index_grid()
+        vbm = nanovdb.tools.buildVoxelBlockManager(h.grid(), log2_block_width=6)
+        fl = vbm.firstLeafID()
+        self.assertEqual(fl.shape, (vbm.blockCount(),))
+        self.assertEqual(fl.dtype, np.uint32)
+        # Default jump_map_length=1 matches log2_block_width=6.
+        jm = vbm.jumpMap()
+        self.assertEqual(jm.shape, (vbm.blockCount(), 1))
+        self.assertEqual(jm.dtype, np.uint64)
+        # Wider widths reshape correctly:
+        jm2 = vbm.jumpMap(jump_map_length=2)
+        # Same underlying bytes, different reshape — leading dim halves.
+        self.assertEqual(jm2.shape[1], 2)
+
+    def test_decode_block_zero(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy not installed")
+        h = self._make_cube_on_index_grid()
+        g = h.grid()
+        vbm = nanovdb.tools.buildVoxelBlockManager(g, log2_block_width=6)
+        leaf_index, voxel_offset = vbm.decodeBlock(g, 0, log2_block_width=6)
+        self.assertEqual(leaf_index.shape, (64,))
+        self.assertEqual(leaf_index.dtype, np.uint32)
+        self.assertEqual(voxel_offset.shape, (64,))
+        self.assertEqual(voxel_offset.dtype, np.uint16)
+        # Free function should produce the same result for the same input.
+        fl = np.asarray(vbm.firstLeafID())
+        jm = np.asarray(vbm.jumpMap())
+        li_free, vo_free = nanovdb.tools.decodeInverseMaps(
+            g, int(fl[0]), jm[0], vbm.firstOffset(), log2_block_width=6)
+        self.assertTrue(np.array_equal(leaf_index, li_free))
+        self.assertTrue(np.array_equal(voxel_offset, vo_free))
+
+    def test_decode_block_out_of_range(self):
+        h = self._make_cube_on_index_grid()
+        g = h.grid()
+        vbm = nanovdb.tools.buildVoxelBlockManager(g)
+        with self.assertRaises(IndexError):
+            vbm.decodeBlock(g, vbm.blockCount())
+
+    def test_log2_block_width_out_of_range(self):
+        h = self._make_cube_on_index_grid()
+        g = h.grid()
+        with self.assertRaises(ValueError):
+            nanovdb.tools.buildVoxelBlockManager(g, log2_block_width=5)
+        with self.assertRaises(ValueError):
+            nanovdb.tools.buildVoxelBlockManager(g, log2_block_width=10)
+
+    def test_build_voxel_block_manager_rejects_non_on_index_grid(self):
+        # FloatGrid is not an OnIndexGrid.
+        h_float = nanovdb.tools.createFogVolumeSphere()
+        with self.assertRaises(TypeError):
+            nanovdb.tools.buildVoxelBlockManager(h_float.grid())
+
+
 class TestGridMetaDataGuards(unittest.TestCase):
     """GridMetaData() constructor and safeCast() reject bad input (None, a
     Grid wrapping an invalid buffer) with a Python exception or False
