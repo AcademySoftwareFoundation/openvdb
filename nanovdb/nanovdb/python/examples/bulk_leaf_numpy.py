@@ -46,16 +46,16 @@ def main():
     per_leaf_max = arr.max(axis=1)
     print(f"  per-leaf max (first 5): {per_leaf_max[:5]}")
 
-    # Zero-copy means writes propagate. Zero out the first leaf and read
-    # it back through the binding to confirm the grid actually changed.
+    # Zero-copy means writes propagate. Zero out the first leaf's values
+    # and read one back through the regular accessor to confirm the grid
+    # actually changed. (The active *mask* is unchanged — we wrote into
+    # mValues only — so activeVoxelCount() stays the same.)
     arr[0] = 0.0
     leaf = grid.tree().getFirstLeaf()
     if leaf is not None:
-        n_active_after = sum(1 for n in range(leaf.voxelCount()) if leaf.isActive(n))
-        # The active mask is unchanged by writing into mValues — we
-        # just zeroed the *values*, not the active state. The grid's
-        # activeVoxelCount() therefore stays the same.
-        print(f"  zeroed first leaf's values in place — "
+        first_value_after = leaf.getFirstValue()
+        print(f"  zeroed first leaf's values in place: "
+              f"leaf.getFirstValue() = {first_value_after}, "
               f"activeVoxelCount unchanged: {grid.activeVoxelCount()}")
 
 
