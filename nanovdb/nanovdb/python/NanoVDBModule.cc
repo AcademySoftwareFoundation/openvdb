@@ -15,6 +15,7 @@
 #include <sstream>
 
 #include "cuda/PyDeviceBuffer.h"
+#include "PyBuildGrid.h"
 #include "PyGridHandle.h"
 #include "PyHostBuffer.h"
 #include "PyIO.h"
@@ -808,6 +809,7 @@ NB_MODULE(nanovdb, m)
     toolsModule.doc() = "A submodule that implements tools for NanoVDB grids";
     defineToolsModule(toolsModule);
     defineVoxelBlockManagerModule(toolsModule);
+    defineBuildGridModule(toolsModule);
 
     nb::module_ ioModule = m.def_submodule("io");
     ioModule.doc() = "A submodule that implements I/O functionality for NanoVDB grids";

@@ -16,6 +16,7 @@ option(NANOVDB_BUILD_PYTHON_STUBS
 
 nanobind_add_module(nanovdb_python NB_STATIC
     NanoVDBModule.cc
+    PyBuildGrid.cc
     PyCreateNanoGrid.cc
     PyGridChecksum.cc
     PyGridHandle.cc
