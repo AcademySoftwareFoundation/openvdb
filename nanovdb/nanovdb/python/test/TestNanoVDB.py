@@ -1581,18 +1581,21 @@ class TestGridStats(unittest.TestCase):
         self.assertTrue(nanovdb.tools.FloatStats.hasAverage())
         self.assertTrue(nanovdb.tools.FloatStats.hasStdDeviation())
 
-    def test_get_extrema_over_active_bbox(self):
+    def test_get_extrema_strictly_inside_active_region(self):
+        # Pick a bbox strictly inside the root's active bbox so the C++
+        # implementation takes the recursive-traversal branch (the
+        # "bbox contains root.bbox()" branch unconditionally adds the
+        # background value, which would muddy this assertion). With
+        # only the three active voxels at (1,0,0)..(3,0,0) sampled, the
+        # extrema should be exactly their min and max.
         h = self._five_voxel_float_grid()
         ng = h.grid()
-        # bbox containing only the 5 active voxels at (0..4, 0, 0); the
-        # extrema visits the leaf the active voxels live in, plus the
-        # background tile inside that leaf — so the min is 0.0 (background).
         ex = nanovdb.tools.getExtrema(
             ng, nanovdb.math.CoordBBox(
-                nanovdb.math.Coord(0, 0, 0), nanovdb.math.Coord(4, 0, 0)))
+                nanovdb.math.Coord(1, 0, 0), nanovdb.math.Coord(3, 0, 0)))
         self.assertTrue(bool(ex))
-        self.assertEqual(ex.min(), 0.0)
-        self.assertEqual(ex.max(), 5.0)
+        self.assertEqual(ex.min(), 2.0)
+        self.assertEqual(ex.max(), 4.0)
 
     def test_update_grid_stats_polymorphic(self):
         # Building with StatsMode.Disable leaves stats uncomputed; calling
@@ -1609,17 +1612,24 @@ class TestGridStats(unittest.TestCase):
         ok, msg = nanovdb.tools.checkGrid(ng, nanovdb.CheckMode.Full)
         self.assertTrue(ok, msg)
 
-    def test_update_grid_stats_rejects_index_grid(self):
-        # OnIndexGrid is a special BuildT — updateGridStats should raise
-        # because Stats<uint64> isn't meaningful.
+    def test_update_grid_stats_on_index_grid(self):
+        # OnIndexGrid is a special BuildT — MinMax and All raise because
+        # Stats<uint64> isn't meaningful, but BBox (NoopStats) is still
+        # accepted because it only touches node bounding boxes.
         bbox = nanovdb.math.CoordBBox(
             nanovdb.math.Coord(0), nanovdb.math.Coord(4))
         h_float = nanovdb.tools.createFloatGrid(
             0.0, "src", nanovdb.GridClass.Unknown, lambda ijk: 1.0, bbox)
         h_index = nanovdb.tools.createOnIndexGrid(h_float.grid())
+        ng = h_index.grid()
         with self.assertRaises(ValueError):
-            nanovdb.tools.updateGridStats(
-                h_index.grid(), nanovdb.tools.StatsMode.MinMax)
+            nanovdb.tools.updateGridStats(ng, nanovdb.tools.StatsMode.MinMax)
+        with self.assertRaises(ValueError):
+            nanovdb.tools.updateGridStats(ng, nanovdb.tools.StatsMode.All)
+        # BBox mode is a NoopStats path — must succeed.
+        nanovdb.tools.updateGridStats(ng, nanovdb.tools.StatsMode.BBox)
+        # And Disable is a true no-op.
+        nanovdb.tools.updateGridStats(ng, nanovdb.tools.StatsMode.Disable)
 
 
 class TestGridValidate(unittest.TestCase):

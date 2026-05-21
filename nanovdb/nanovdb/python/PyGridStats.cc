@@ -127,16 +127,32 @@ struct UpdateGridStatsOp
     template<typename BuildT>
     static void known(GridData* gridData, tools::StatsMode mode)
     {
+        using GridT  = NanoGrid<BuildT>;
+        using ValueT = typename GridT::ValueType;
         if constexpr (BuildTraits<BuildT>::is_special &&
                       !util::is_same<bool, BuildT>::value) {
-            (void)gridData; (void)mode;
-            throw nb::value_error(
-                "updateGridStats: the grid's BuildT does not support "
-                "tools::Stats (special / quantized / index / mask grids "
-                "have no arithmetic value type).");
+            // Special / quantized / index / mask BuildTs don't have an
+            // arithmetic ValueT, so tools::updateGridStats's MinMax / All
+            // branches would instantiate Stats<ValueT> / Extrema<ValueT>
+            // with no meaningful semantics (and may not even compile).
+            // The Disable and BBox branches use NoopStats, which works
+            // for any ValueT — drive that directly here so the BBox path
+            // remains available on special grids (it just recomputes
+            // node bounding boxes without touching min/max/avg).
+            if (mode == tools::StatsMode::Disable) {
+                return;
+            } else if (mode == tools::StatsMode::BBox) {
+                tools::GridStats<GridT, tools::NoopStats<ValueT>> stats;
+                stats.update(*static_cast<GridT*>(gridData));
+            } else {
+                throw nb::value_error(
+                    "updateGridStats: this grid's BuildT (special / "
+                    "quantized / index / mask) has no arithmetic value "
+                    "type — only StatsMode.Disable and StatsMode.BBox "
+                    "are supported.");
+            }
         } else {
-            tools::updateGridStats(static_cast<NanoGrid<BuildT>*>(gridData),
-                                   mode);
+            tools::updateGridStats(static_cast<GridT*>(gridData), mode);
         }
     }
     static void unknown(GridData*, tools::StatsMode) {
@@ -178,11 +194,13 @@ void defineGridStatsModule(nb::module_& toolsModule)
         },
         "grid"_a, "mode"_a = tools::StatsMode::Default,
         nb::call_guard<nb::gil_scoped_release>(),
-        "Recompute and write per-node statistics (min/max/avg/dev) into "
-        "the given grid in place. Polymorphic over BuildT. Only scalar "
-        "and vector grids carry arithmetic statistics; special "
-        "(quantized / index / mask) grids raise ValueError unless mode "
-        "is StatsMode.BBox.");
+        "Recompute and write per-node statistics into the given grid in "
+        "place. Polymorphic over BuildT. Scalar and vector grids accept "
+        "every StatsMode (Disable / BBox / MinMax / All). Special "
+        "(quantized / index / mask) grids accept Disable and BBox (the "
+        "latter recomputes node bounding boxes only); MinMax and All "
+        "raise ValueError because their value type has no arithmetic "
+        "semantics.");
 
     // Per-BuildT getExtrema. We expose one overload per scalar/vector
     // BuildT — they each return a Python-side Extrema<ValueT> of the

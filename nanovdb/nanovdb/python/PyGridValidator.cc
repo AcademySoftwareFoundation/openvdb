@@ -14,6 +14,7 @@
 #endif
 
 #include <cstring>
+#include <iostream>
 #include <string>
 #include <utility>
 
@@ -70,11 +71,11 @@ struct IsValidOp
     }
     static bool unknown(const GridData* gridData, CheckMode /*mode*/, bool verbose)
     {
-        if (verbose) {
-            // Don't pull in <iostream> in the binding TU; just return false.
-            // The C++ helper writes to std::cerr; we mirror the same
-            // 'unsupported' outcome silently.
-            (void)gridData;
+        if (verbose && gridData != nullptr) {
+            char str[16];
+            std::cerr << "Validation failed: Unsupported GridType: \""
+                      << toStr(str, gridData->mGridType) << "\""
+                      << std::endl;
         }
         return false;
     }
@@ -94,8 +95,11 @@ void defineGridValidatorModule(nb::module_& toolsModule)
         nb::call_guard<nb::gil_scoped_release>(),
         "Validate the gridID'th grid in the host handle against the "
         "given CheckMode. Returns False (without raising) if gridID is "
-        "out of range or the grid fails any check. Complements "
-        "validateGrids() which checks the whole handle.");
+        "out of range or the grid fails any check. CheckMode.Disable is "
+        "a short-circuit that always returns True without inspecting "
+        "the grid (even when gridID is out of range), matching the C++ "
+        "behavior. Complements validateGrids() which checks the whole "
+        "handle.");
 
     // Polymorphic checkGrid — returns (ok, error_message). Mirrors the C++
     // char-buffer-out signature, but the buffer is hidden inside the
