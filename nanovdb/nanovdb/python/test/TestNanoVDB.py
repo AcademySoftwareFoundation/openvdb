@@ -924,6 +924,19 @@ class TestVoxelBlockManager(unittest.TestCase):
             nanovdb.tools.decodeInverseMaps(
                 g, n_leaves, jm0, vbm.firstOffset(), log2_block_width=6)
 
+    def test_build_voxel_block_manager_rejects_undersized_n_blocks(self):
+        # Caller-supplied n_blocks must hold at least
+        # ceil((last_offset - first_offset + 1) / BlockWidth) blocks;
+        # smaller values would silently truncate coverage.
+        h = self._make_cube_on_index_grid()
+        g = h.grid()
+        # The cube grid has ~9261 active voxels, so at log2_block_width=6
+        # (BlockWidth=64) the minimum is roughly 145 blocks. Passing 1
+        # must be rejected.
+        with self.assertRaises(ValueError):
+            nanovdb.tools.buildVoxelBlockManager(
+                g, log2_block_width=6, n_blocks=1)
+
     def test_build_voxel_block_manager_rejects_non_on_index_grid(self):
         # FloatGrid is not an OnIndexGrid.
         h_float = nanovdb.tools.createFogVolumeSphere()

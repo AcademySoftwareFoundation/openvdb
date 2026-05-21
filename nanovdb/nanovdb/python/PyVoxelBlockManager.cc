@@ -9,6 +9,7 @@
 #include <nanovdb/HostBuffer.h>
 #include <nanovdb/tools/CreateNanoGrid.h>
 #include <nanovdb/tools/VoxelBlockManager.h>
+#include <nanovdb/util/Util.h>
 
 #include <cstring>
 #include <memory>
@@ -87,7 +88,27 @@ static nb::object pyDecodeInverseMapsImpl(const NanoGrid<ValueOnIndex>& grid,
                                           const uint64_t* jumpMap,
                                           uint64_t blockFirstOffset)
 {
-    constexpr int BlockWidth = 1 << Log2BlockWidth;
+    constexpr int BlockWidth    = 1 << Log2BlockWidth;
+    constexpr int JumpMapLength =
+        VoxelBlockManagerBase<Log2BlockWidth>::JumpMapLength;
+
+    // The C++ decodeInverseMaps iterates leafID = firstLeafID ..
+    // firstLeafID + nExtraLeaves, where nExtraLeaves is the popcount of
+    // this block's jumpMap (each set bit marks an additional leaf
+    // boundary crossed within the block). If the jumpMap is corrupt or
+    // was built against a different grid, the loop could read past
+    // tree.getFirstNode<0>(). Pre-compute the upper bound and validate
+    // it against grid.tree().nodeCount(0) before any allocation.
+    uint32_t nExtraLeaves = 0;
+    for (int i = 0; i < JumpMapLength; ++i)
+        nExtraLeaves += util::countOn(jumpMap[i]);
+    const uint32_t nLeaves = grid.tree().nodeCount(0);
+    if (uint64_t(firstLeafID) + uint64_t(nExtraLeaves) >= nLeaves) {
+        throw nb::value_error(
+            "decodeInverseMaps: firstLeafID + popcount(jumpMap) would "
+            "index past grid.tree().nodeCount(0) — the jumpMap is "
+            "either corrupt or was paired with a different grid.");
+    }
 
     // Each call allocates fresh BlockWidth-sized output arrays for the
     // leaf-index and voxel-offset results. We use plain new[] (rather than
@@ -313,10 +334,25 @@ static void defineBuild(nb::module_& toolsModule)
                 if (first_offset == 0) first_offset = 1;
                 if (last_offset  == 0) last_offset  = grid->activeVoxelCount();
                 if (last_offset < first_offset) return PyVBMHandle();
-                if (n_blocks == 0) {
-                    n_blocks = (last_offset - first_offset + BlockWidth)
-                               >> LBW;
+                // Capacity must hold at least ceil((last - first + 1) /
+                // BlockWidth) blocks; otherwise the handle's lastOffset
+                // would advertise more coverage than blockCount allows
+                // and decodeBlock would silently truncate. The formula
+                // below equals the ceil() above when BlockWidth is a
+                // power of two.
+                const uint64_t minBlocks =
+                    (last_offset - first_offset + BlockWidth) >> LBW;
+                if (n_blocks != 0 && n_blocks < minBlocks) {
+                    std::string msg(
+                        "buildVoxelBlockManager: n_blocks must be at "
+                        "least ceil((last_offset - first_offset + 1) / "
+                        "BlockWidth) = ");
+                    msg += std::to_string(minBlocks);
+                    msg += ". Pass 0 (the default) to use the minimum "
+                           "required capacity.";
+                    throw nb::value_error(msg.c_str());
                 }
+                if (n_blocks == 0) n_blocks = minBlocks;
                 // Allocate the metadata buffers ourselves so we can
                 // pre-initialize firstLeafID with a sentinel value before
                 // the in-place builder runs. The C++ allocating overload
