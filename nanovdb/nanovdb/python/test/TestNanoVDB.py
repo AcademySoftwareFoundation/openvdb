@@ -742,6 +742,12 @@ class TestZeroCopyViewLifetimes(unittest.TestCase):
         self.assertEqual(g.gridName(), "probe")
 
     def test_handle_grid_tree_leaf_values_chain(self):
+        # nb::ndarray<nb::numpy, ...> requires numpy at runtime, so the
+        # binding raises TypeError if numpy isn't installed. Skip then.
+        try:
+            import numpy  # noqa: F401
+        except ImportError:
+            self.skipTest("numpy not installed")
         vals = (nanovdb.tools.createFogVolumeSphere()
                 .grid().tree().getFirstLeaf().values())
         self._force_gc()
@@ -750,12 +756,20 @@ class TestZeroCopyViewLifetimes(unittest.TestCase):
         _ = float(vals[0])
 
     def test_grid_leaf_values_temporary(self):
+        try:
+            import numpy  # noqa: F401
+        except ImportError:
+            self.skipTest("numpy not installed")
         bulk = nanovdb.tools.createFogVolumeSphere().grid().leaf_values()
         self._force_gc()
         self.assertEqual(bulk.shape[1], 512)
         _ = float(bulk[0, 0])
 
     def test_node_manager_temporary_grid(self):
+        try:
+            import numpy  # noqa: F401
+        except ImportError:
+            self.skipTest("numpy not installed")
         nm = nanovdb.createNodeManager(
             nanovdb.tools.createFogVolumeSphere().grid()).mgr()
         self._force_gc()
@@ -807,16 +821,9 @@ class TestVoxelBlockManager(unittest.TestCase):
         self.assertTrue(g.isSequential())
 
     def test_create_on_index_grid_rejects_unsupported_source(self):
-        # PointGrid is not in the accepted source set.
-        # (The bound source types are float / double / int32 / Vec3f.)
-        try:
-            import numpy as np  # noqa
-        except ImportError:
-            self.skipTest("numpy not installed")
-        # Build a PointGrid via the binding stack; if there isn't an easy
-        # way, just attempt with an empty GridHandle.grid() which is None
-        # and should hit the type-error path. Skip if we can't easily make
-        # a non-source-typed grid available.
+        # createOnIndexGrid only accepts {float, double, int32, Vec3f}
+        # source grids; passing None (or any non-grid object) should raise
+        # TypeError at the first BuildT-isinstance check.
         with self.assertRaises(TypeError):
             nanovdb.tools.createOnIndexGrid(None)
 
