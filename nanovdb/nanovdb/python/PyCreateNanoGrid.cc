@@ -67,6 +67,12 @@ namespace {
 // Try SrcBuildT against both NanoGrid<SrcBuildT> and build::Grid<SrcBuildT>
 // and return an empty nb::object on no match so the caller can fall through
 // to the next SrcBuildT.
+//
+// GIL is held for the isinstance / cast dispatch (which touches the Python
+// object's type and reference graph) but released around the underlying
+// tools::createNanoGrid traversal — the source data lives in stable C++
+// storage whose lifetime is anchored by the Python wrapper passed in via
+// py_src, so it's safe to read without holding the GIL.
 template<typename SrcBuildT, typename DstBuildT>
 nb::object tryQuantizeFpX(nb::handle       py_src,
                           tools::StatsMode sMode,
@@ -78,13 +84,23 @@ nb::object tryQuantizeFpX(nb::handle       py_src,
     using BuildSrcT = tools::build::Grid<SrcBuildT>;
     if (nb::isinstance<NanoSrcT>(py_src)) {
         const auto& src = nb::cast<const NanoSrcT&>(py_src);
-        return nb::cast(tools::createNanoGrid<NanoSrcT, DstBuildT, HostBuffer>(
-            src, sMode, cMode, ditherOn, verbose));
+        GridHandle<HostBuffer> handle;
+        {
+            nb::gil_scoped_release release;
+            handle = tools::createNanoGrid<NanoSrcT, DstBuildT, HostBuffer>(
+                src, sMode, cMode, ditherOn, verbose);
+        }
+        return nb::cast(std::move(handle));
     }
     if (nb::isinstance<BuildSrcT>(py_src)) {
         const auto& src = nb::cast<const BuildSrcT&>(py_src);
-        return nb::cast(tools::createNanoGrid<BuildSrcT, DstBuildT, HostBuffer>(
-            src, sMode, cMode, ditherOn, verbose));
+        GridHandle<HostBuffer> handle;
+        {
+            nb::gil_scoped_release release;
+            handle = tools::createNanoGrid<BuildSrcT, DstBuildT, HostBuffer>(
+                src, sMode, cMode, ditherOn, verbose);
+        }
+        return nb::cast(std::move(handle));
     }
     return nb::object();
 }
@@ -122,15 +138,27 @@ nb::object tryQuantizeFpN(nb::handle       py_src,
 {
     using NanoSrcT  = NanoGrid<SrcBuildT>;
     using BuildSrcT = tools::build::Grid<SrcBuildT>;
+    // Same GIL pattern as tryQuantizeFpX: hold the GIL through the
+    // isinstance / cast dispatch, release it for the conversion.
     if (nb::isinstance<NanoSrcT>(py_src)) {
         const auto& src = nb::cast<const NanoSrcT&>(py_src);
-        return nb::cast(tools::createNanoGrid<NanoSrcT, FpN, OracleT, HostBuffer>(
-            src, sMode, cMode, ditherOn, verbose, oracle));
+        GridHandle<HostBuffer> handle;
+        {
+            nb::gil_scoped_release release;
+            handle = tools::createNanoGrid<NanoSrcT, FpN, OracleT, HostBuffer>(
+                src, sMode, cMode, ditherOn, verbose, oracle);
+        }
+        return nb::cast(std::move(handle));
     }
     if (nb::isinstance<BuildSrcT>(py_src)) {
         const auto& src = nb::cast<const BuildSrcT&>(py_src);
-        return nb::cast(tools::createNanoGrid<BuildSrcT, FpN, OracleT, HostBuffer>(
-            src, sMode, cMode, ditherOn, verbose, oracle));
+        GridHandle<HostBuffer> handle;
+        {
+            nb::gil_scoped_release release;
+            handle = tools::createNanoGrid<BuildSrcT, FpN, OracleT, HostBuffer>(
+                src, sMode, cMode, ditherOn, verbose, oracle);
+        }
+        return nb::cast(std::move(handle));
     }
     return nb::object();
 }
@@ -166,15 +194,26 @@ nb::object tryIndexify(nb::handle py_src,
 {
     using NanoSrcT  = NanoGrid<SrcBuildT>;
     using BuildSrcT = tools::build::Grid<SrcBuildT>;
+    // Same GIL pattern as tryQuantizeFpX.
     if (nb::isinstance<NanoSrcT>(py_src)) {
         const auto& src = nb::cast<const NanoSrcT&>(py_src);
-        return nb::cast(tools::createNanoGrid<NanoSrcT, DstBuildT, HostBuffer>(
-            src, channels, includeStats, includeTiles, verbose));
+        GridHandle<HostBuffer> handle;
+        {
+            nb::gil_scoped_release release;
+            handle = tools::createNanoGrid<NanoSrcT, DstBuildT, HostBuffer>(
+                src, channels, includeStats, includeTiles, verbose);
+        }
+        return nb::cast(std::move(handle));
     }
     if (nb::isinstance<BuildSrcT>(py_src)) {
         const auto& src = nb::cast<const BuildSrcT&>(py_src);
-        return nb::cast(tools::createNanoGrid<BuildSrcT, DstBuildT, HostBuffer>(
-            src, channels, includeStats, includeTiles, verbose));
+        GridHandle<HostBuffer> handle;
+        {
+            nb::gil_scoped_release release;
+            handle = tools::createNanoGrid<BuildSrcT, DstBuildT, HostBuffer>(
+                src, channels, includeStats, includeTiles, verbose);
+        }
+        return nb::cast(std::move(handle));
     }
     return nb::object();
 }
@@ -205,8 +244,9 @@ void defineCreateNanoGridConversions(nb::module_& toolsModule)
     nb::class_<tools::AbsDiff>(toolsModule, "AbsDiff",
         "Compression oracle for FpN: accept the approximation when "
         "|exact - approx| <= tolerance. A tolerance of -1.0 (the "
-        "default) means uninitialized; pass an explicit positive value "
-        "or have the create function fill it in via init().")
+        "default) means uninitialized; any non-negative value (including "
+        "0.0) is treated as initialized by the operator bool() check, "
+        "or the C++ create function can fill it in via init().")
         .def(nb::init<float>(), "tolerance"_a = -1.0f)
         .def("getTolerance", &tools::AbsDiff::getTolerance)
         .def("setTolerance", &tools::AbsDiff::setTolerance, "tolerance"_a)

@@ -1715,12 +1715,22 @@ class TestCreateNanoGridIndex(unittest.TestCase):
         h = nanovdb.tools.createNanoGridOnIndex(bv)
         self.assertEqual(h.gridType(0), nanovdb.GridType.OnIndex)
 
-    def test_index_rejects_unsupported_source(self):
-        # bool / Boolean grids are not in the supported source set for
-        # the Phase 5 index conversion (only float/double/int32/Vec3f
-        # plus the matching build::* counterparts).
+    def test_index_rejects_none(self):
+        # The conversion functions accept either a NanoGrid or a
+        # build::Grid; None matches neither and is rejected at the
+        # isinstance dispatch.
         with self.assertRaises(TypeError):
             nanovdb.tools.createNanoGridOnIndex(None)
+
+    def test_index_rejects_unsupported_buildt(self):
+        # The Phase 5 index conversion accepts float / double / int32 /
+        # Vec3f sources (NanoGrid or build::Grid). A Vec3d build::Grid
+        # is a structurally valid grid but a BuildT outside that set —
+        # the try-each-SrcBuildT chain falls through and raises.
+        bv = nanovdb.tools.build.Vec3dGrid(nanovdb.math.Vec3d(0.0))
+        bv.setValue(nanovdb.math.Coord(0, 0, 0), nanovdb.math.Vec3d(1, 2, 3))
+        with self.assertRaises(TypeError):
+            nanovdb.tools.createNanoGridOnIndex(bv)
 
 
 class TestGridStats(unittest.TestCase):
@@ -1842,10 +1852,13 @@ class TestGridValidate(unittest.TestCase):
         self.assertTrue(
             nanovdb.tools.validateGrid(h, 99, nanovdb.CheckMode.Disable))
 
-    @unittest.skipUnless(
-        hasattr(nanovdb.tools, "cuda") and
-        hasattr(nanovdb.tools.cuda, "createLevelSetSphere"),
-        "device handles require a CUDA-enabled build",
+    @unittest.skipIf(
+        not nanovdb.isCudaAvailable(),
+        "nanovdb module was compiled without CUDA support",
+    )
+    @unittest.skipIf(
+        not nanovdb.isGpuAvailable(),
+        "No CUDA-capable GPU available at runtime",
     )
     def test_validateGrid_on_device_handle(self):
         # validateGrid is bound for both host and device handles. The
