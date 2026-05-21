@@ -11,9 +11,10 @@
 #include <nanovdb/tools/VoxelBlockManager.h>
 #include <nanovdb/util/Util.h>
 
-#include <cstring>
 #include <memory>
-#include <stdexcept>
+#include <string>
+#include <type_traits>
+#include <utility>
 
 namespace nb = nanobind;
 using namespace nb::literals;
