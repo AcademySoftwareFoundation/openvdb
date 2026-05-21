@@ -70,7 +70,9 @@ void defineDeviceGridHandle(nb::module_& m)
                 new (&handle) GridHandle<BufferT>(std::move(buffer));
             },
             "cpu_t"_a.noconvert(),
-            "cuda_t"_a.noconvert())
+            "cuda_t"_a.noconvert(),
+            "Construct a DeviceGridHandle that wraps an existing pair of "
+            "host and device uint32 arrays of equal length.")
         .def("deviceGrid", &pyDeviceGrid, "n"_a = 0,
              nb::keep_alive<0, 1>(),
              "Return the n-th device-resident grid as a typed Grid subclass "
@@ -78,9 +80,13 @@ void defineDeviceGridHandle(nb::module_& m)
              "Python or the device copy has not been uploaded yet. The "
              "returned grid keeps this handle alive.")
         .def(
-            "deviceUpload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceUpload(nullptr, sync); }, "sync"_a = true)
+            "deviceUpload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceUpload(nullptr, sync); }, "sync"_a = true,
+            "Copy the host-side buffer to the device. If sync is True the "
+            "call blocks until the transfer completes.")
         .def(
-            "deviceDownload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceDownload(nullptr, sync); }, "sync"_a = true);
+            "deviceDownload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceDownload(nullptr, sync); }, "sync"_a = true,
+            "Copy the device-side buffer back to the host. If sync is True "
+            "the call blocks until the transfer completes.");
     // NOTE: defineGridHandleUtilities<BufferT> intentionally NOT called for
     // DeviceBuffer. Registering nanovdb.splitGrids / nanovdb.mergeGrids as a
     // second overload taking a DeviceGridHandle list conflicts with the host

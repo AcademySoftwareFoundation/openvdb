@@ -121,16 +121,28 @@ template<typename BufferT> void defineGridHandleUtilities(nb::module_& m)
 
 template<typename BufferT> nb::class_<nanovdb::GridHandle<BufferT>> defineGridHandle(nb::module_& m, const char* name)
 {
-    return nb::class_<nanovdb::GridHandle<BufferT>>(m, name)
-        .def(nb::init<>())
-        .def("reset", &nanovdb::GridHandle<BufferT>::reset)
-        .def("size", &nanovdb::GridHandle<BufferT>::bufferSize)
-        .def("isEmpty", &nanovdb::GridHandle<BufferT>::isEmpty)
-        .def("empty", &nanovdb::GridHandle<BufferT>::empty)
+    return nb::class_<nanovdb::GridHandle<BufferT>>(m, name,
+            "Owns a buffer holding one or more serialized NanoVDB grids. "
+            "Construct via nanovdb.tools.create* factories or nanovdb.io.readGrid(s); "
+            "access individual grids via handle.grid(n).")
+        .def(nb::init<>(),
+            "Construct an empty handle. Use the nanovdb.tools.create* "
+            "factories or nanovdb.io.readGrid(s) instead in normal use.")
+        .def("reset", &nanovdb::GridHandle<BufferT>::reset,
+            "Drop the underlying buffer; the handle becomes empty.")
+        .def("size", &nanovdb::GridHandle<BufferT>::bufferSize,
+            "Total byte size of the buffer backing this handle (sum of "
+            "every grid plus any internal padding).")
+        .def("isEmpty", &nanovdb::GridHandle<BufferT>::isEmpty,
+            "True iff the handle owns no buffer.")
+        .def("empty", &nanovdb::GridHandle<BufferT>::empty,
+            "Same as isEmpty(). Retained for parity with the C++ "
+            "GridHandle::empty() member.")
         .def(
             "__bool__",
             [](const nanovdb::GridHandle<BufferT>& handle) { return !handle.empty(); },
-            nb::is_operator())
+            nb::is_operator(),
+            "True iff the handle owns a non-empty buffer (`not isEmpty()`).")
         .def("copy",
              [](const nanovdb::GridHandle<BufferT>& handle) {
                  return handle.template copy<BufferT>();
@@ -141,29 +153,48 @@ template<typename BufferT> nb::class_<nanovdb::GridHandle<BufferT>> defineGridHa
              "Return the n-th grid as a typed Grid subclass selected by "
              "gridType(n), or None if the BuildT is not bound in Python. "
              "The returned grid keeps this handle alive.")
-        .def("isPadded", &nanovdb::GridHandle<BufferT>::isPadded)
-        .def("gridCount", &nanovdb::GridHandle<BufferT>::gridCount)
-        .def("gridSize", &nanovdb::GridHandle<BufferT>::gridSize, nb::arg("n") = 0)
-        .def("gridType", &nanovdb::GridHandle<BufferT>::gridType, nb::arg("n") = 0)
+        .def("isPadded", &nanovdb::GridHandle<BufferT>::isPadded,
+            "True iff this handle's buffer is aligned past the natural "
+            "GridData alignment (used by the I/O code path).")
+        .def("gridCount", &nanovdb::GridHandle<BufferT>::gridCount,
+            "Number of grids stored in this handle.")
+        .def("gridSize", &nanovdb::GridHandle<BufferT>::gridSize, nb::arg("n") = 0,
+            "Byte size of the n-th grid (without padding).")
+        .def("gridType", &nanovdb::GridHandle<BufferT>::gridType, nb::arg("n") = 0,
+            "GridType enumerator of the n-th grid (e.g. GridType.Float). "
+            "Cheap to query — does not require materializing the grid.")
         .def(
             "gridData",
             [](nanovdb::GridHandle<BufferT>& handle, uint32_t n) { return nb::bytes(handle.gridData(n), handle.gridSize(n)); },
             nb::arg("n") = 0,
-            nb::rv_policy::reference_internal)
-        .def("write", nb::overload_cast<const std::string&>(&nanovdb::GridHandle<BufferT>::write, nb::const_), nb::arg("fileName"))
-        .def("write", nb::overload_cast<const std::string&, uint32_t>(&nanovdb::GridHandle<BufferT>::write, nb::const_), nb::arg("fileName"), nb::arg("n"))
+            nb::rv_policy::reference_internal,
+            "Raw byte contents of the n-th grid as a Python bytes object. "
+            "Useful for hashing or for handing off to non-NanoVDB tooling.")
+        .def("write", nb::overload_cast<const std::string&>(&nanovdb::GridHandle<BufferT>::write, nb::const_),
+            nb::arg("fileName"),
+            "Write every grid in this handle to the given .nvdb file.")
+        .def("write", nb::overload_cast<const std::string&, uint32_t>(&nanovdb::GridHandle<BufferT>::write, nb::const_),
+            nb::arg("fileName"), nb::arg("n"),
+            "Write just the n-th grid in this handle to the given .nvdb file.")
         .def(
-            "read", [](nanovdb::GridHandle<BufferT>& handle, const std::string& fileName) { handle.read(fileName); }, nb::arg("fileName"))
+            "read", [](nanovdb::GridHandle<BufferT>& handle, const std::string& fileName) { handle.read(fileName); },
+            nb::arg("fileName"),
+            "Replace this handle's contents with every grid read from the "
+            "given .nvdb file.")
         .def(
             "read",
             [](nanovdb::GridHandle<BufferT>& handle, const std::string& fileName, uint32_t n) { handle.read(fileName, n); },
             nb::arg("fileName"),
-            nb::arg("n"))
+            nb::arg("n"),
+            "Replace this handle's contents with the n-th grid read from "
+            "the given .nvdb file.")
         .def(
             "read",
             [](nanovdb::GridHandle<BufferT>& handle, const std::string& fileName, const std::string& gridName) { handle.read(fileName, gridName); },
             nb::arg("fileName"),
-            nb::arg("gridName"));
+            nb::arg("gridName"),
+            "Replace this handle's contents with the grid of the given "
+            "name read from the .nvdb file.");
 }
 
 void defineHostGridHandle(nb::module_& m);

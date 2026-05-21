@@ -50,7 +50,8 @@ template<typename BuildT> void definePointsToGrid(nb::module_& m, const char* na
             auto                                       handle = converter.getHandle(points, tensor.shape(0));
             return handle;
         },
-        "tensor"_a);
+        "tensor"_a,
+        "Rasterize the given (N, 3) int32 device tensor of points into a fresh GridHandle.");
 }
 
 template void definePointsToGrid<nanovdb::math::Rgba8>(nb::module_&, const char*);

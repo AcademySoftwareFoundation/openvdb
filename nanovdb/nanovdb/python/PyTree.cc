@@ -50,11 +50,13 @@ void defineNodeManagerHandle(nb::module_& m)
         "Owns the memory backing a NodeManager. Move-only. "
         "Obtain via nanovdb.createNodeManager(grid).")
         .def("size",
-             [](const HandleT& h) { return h.size(); })
+             [](const HandleT& h) { return h.size(); },
+             "Byte size of the buffer backing this NodeManagerHandle.")
         .def(
             "__bool__",
             [](const HandleT& h) { return h.data() != nullptr; },
-            nb::is_operator())
+            nb::is_operator(),
+            "True iff this handle owns a non-empty buffer.")
         .def("mgr", &pyNodeMgr<HostBuffer>,
              nb::keep_alive<0, 1>(),
              "Return the typed NodeManager for the grid this handle was "
