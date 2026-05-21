@@ -930,6 +930,41 @@ class TestVoxelBlockManager(unittest.TestCase):
         with self.assertRaises(TypeError):
             nanovdb.tools.buildVoxelBlockManager(h_float.grid())
 
+    def test_untouched_blocks_trip_sentinel_guard(self):
+        # Build the cube VBM and probe every block. The Python binding
+        # prefills firstLeafID with a sentinel (== nLeaves) before calling
+        # the in-place builder, so any block the upstream algorithm doesn't
+        # touch deterministically trips the firstLeafID >= nLeaves guard in
+        # decodeBlock (raising ValueError). The sweep must therefore see
+        # only two outcomes per block: a successful decode or a sentinel
+        # ValueError — no segfaults, no IndexError (those would indicate
+        # block_index out of range, not sentinel), and no silent wrong
+        # decode.
+        try:
+            import numpy as np  # noqa: F401
+        except ImportError:
+            self.skipTest("numpy not installed")
+        h = self._make_cube_on_index_grid()
+        g = h.grid()
+        vbm = nanovdb.tools.buildVoxelBlockManager(g, log2_block_width=6)
+        n_leaves = g.tree().nodeCount(0)
+        fl = vbm.firstLeafID()
+        for b in range(vbm.blockCount()):
+            slot = int(fl[b])
+            # Slot must be a real leaf id or the sentinel — never garbage.
+            self.assertTrue(slot < n_leaves or slot == n_leaves,
+                f"block {b}: firstLeafID={slot} is neither a real leaf id "
+                f"(< {n_leaves}) nor the sentinel (== {n_leaves}); "
+                "uninitialized memory leaked through.")
+            if slot >= n_leaves:
+                with self.assertRaises(ValueError):
+                    vbm.decodeBlock(g, b)
+            else:
+                # Successful decode path — just confirm the shapes.
+                li, vo = vbm.decodeBlock(g, b)
+                self.assertEqual(li.shape, (64,))
+                self.assertEqual(vo.shape, (64,))
+
     def test_default_constructed_handle_returns_empty_arrays(self):
         # A default-constructed VoxelBlockManagerHandle has null backing
         # buffers; firstLeafID() and jumpMap() should still return empty

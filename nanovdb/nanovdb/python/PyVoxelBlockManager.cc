@@ -11,6 +11,7 @@
 #include <nanovdb/tools/VoxelBlockManager.h>
 
 #include <cstring>
+#include <memory>
 #include <stdexcept>
 
 namespace nb = nanobind;
@@ -93,27 +94,35 @@ static nb::object pyDecodeInverseMapsImpl(const NanoGrid<ValueOnIndex>& grid,
     // a numpy-allocated buffer) because the produced ndarrays are returned
     // by reference and Python owns them via the capsule deleters below —
     // when the ndarray is destroyed, the capsule's deleter runs delete[].
-    auto* leafIndex = new uint32_t[BlockWidth];
-    auto* voxelOffset = new uint16_t[BlockWidth];
+    //
+    // The raw pointers live in std::unique_ptr until the matching capsule
+    // has been constructed; that way if the second allocation, the
+    // decodeInverseMaps call, or either capsule construction throws, the
+    // unique_ptr unwinds the half-built state cleanly. After a capsule
+    // takes ownership we release() so the unique_ptr no longer double-frees.
+    std::unique_ptr<uint32_t[]> leafIndex(new uint32_t[BlockWidth]);
+    std::unique_ptr<uint16_t[]> voxelOffset(new uint16_t[BlockWidth]);
 
     using VBM = VoxelBlockManager<Log2BlockWidth>;
     VBM::template decodeInverseMaps<ValueOnIndex>(
         &grid, firstLeafID, jumpMap, blockFirstOffset,
-        leafIndex, voxelOffset);
+        leafIndex.get(), voxelOffset.get());
 
     // nb::capsule wraps the raw pointer + matching delete[] so it can serve
     // as the ndarray's owner — the capsule lives as long as the ndarray and
     // its destruction runs the deleter.
-    nb::capsule leafOwner(leafIndex,
+    nb::capsule leafOwner(leafIndex.get(),
         [](void* p) noexcept { delete[] static_cast<uint32_t*>(p); });
-    nb::capsule offsetOwner(voxelOffset,
+    auto* leafRaw = leafIndex.release();
+    nb::capsule offsetOwner(voxelOffset.get(),
         [](void* p) noexcept { delete[] static_cast<uint16_t*>(p); });
+    auto* offsetRaw = voxelOffset.release();
 
     size_t shape[1] = {static_cast<size_t>(BlockWidth)};
     nb::ndarray<nb::numpy, uint32_t, nb::ndim<1>, nb::c_contig, nb::device::cpu>
-        leafArr(leafIndex, size_t(1), shape, leafOwner);
+        leafArr(leafRaw, size_t(1), shape, leafOwner);
     nb::ndarray<nb::numpy, uint16_t, nb::ndim<1>, nb::c_contig, nb::device::cpu>
-        offsetArr(voxelOffset, size_t(1), shape, offsetOwner);
+        offsetArr(offsetRaw, size_t(1), shape, offsetOwner);
     return nb::make_tuple(
         nb::cast(leafArr,   nb::rv_policy::reference),
         nb::cast(offsetArr, nb::rv_policy::reference));
@@ -287,10 +296,13 @@ static void defineBuild(nb::module_& toolsModule)
             }
             return dispatchLog2BlockWidth(log2_block_width, [&](auto W) {
                 constexpr int LBW = decltype(W)::value;
-                constexpr uint64_t BlockWidth = uint64_t(1) << LBW;
-                // first_offset must be 1 (mod BlockWidth). The C++ helper
-                // normalizes a zero input to 1, so we only need to validate
-                // the nonzero case ourselves.
+                using Base = VoxelBlockManagerBase<LBW>;
+                constexpr uint64_t BlockWidth    = Base::BlockWidth;
+                constexpr uint64_t JumpMapLength = Base::JumpMapLength;
+                // first_offset must be 1 (mod BlockWidth). The single-arg
+                // C++ helper would normalize a zero input to 1; we do the
+                // same here so the in-place builder below sees a valid
+                // value. Validate the nonzero case ourselves.
                 if (first_offset != 0 &&
                     ((first_offset - 1) & (BlockWidth - 1)) != 0) {
                     throw nb::value_error(
@@ -298,10 +310,42 @@ static void defineBuild(nb::module_& toolsModule)
                         "first_offset == 1 (mod BlockWidth). Pass 0 (the "
                         "default) to let the implementation use 1.");
                 }
-                return PyVBMHandle(
-                    buildVoxelBlockManager<LBW, HostBuffer>(
-                        grid, first_offset, last_offset, n_blocks),
-                    LBW);
+                if (first_offset == 0) first_offset = 1;
+                if (last_offset  == 0) last_offset  = grid->activeVoxelCount();
+                if (last_offset < first_offset) return PyVBMHandle();
+                if (n_blocks == 0) {
+                    n_blocks = (last_offset - first_offset + BlockWidth)
+                               >> LBW;
+                }
+                // Allocate the metadata buffers ourselves so we can
+                // pre-initialize firstLeafID with a sentinel value before
+                // the in-place builder runs. The C++ allocating overload
+                // calls HostBuffer::create() which returns uninitialized
+                // memory; blocks that the algorithm doesn't touch would
+                // then retain arbitrary values, and our decodeBlock guard
+                // (firstLeafID >= nLeaves) might miss any garbage value
+                // that happens to be < nLeaves. By prefilling with nLeaves
+                // up front, every untouched slot deterministically trips
+                // the guard.
+                auto firstLeafIDBuf = HostBuffer::create(
+                    n_blocks * sizeof(uint32_t));
+                auto jumpMapBuf = HostBuffer::create(
+                    n_blocks * JumpMapLength * sizeof(uint64_t));
+                const uint32_t nLeaves = grid->tree().nodeCount(0);
+                {
+                    uint32_t* slots = static_cast<uint32_t*>(
+                        firstLeafIDBuf.data());
+                    for (uint64_t i = 0; i < n_blocks; ++i) {
+                        slots[i] = nLeaves;
+                    }
+                }
+                VoxelBlockManagerHandle<HostBuffer> handle(
+                    std::move(firstLeafIDBuf), std::move(jumpMapBuf),
+                    n_blocks, first_offset, last_offset);
+                // In-place builder zeros the jumpMap itself and only
+                // touches firstLeafID slots it actually visits.
+                buildVoxelBlockManager<LBW, HostBuffer>(grid, handle);
+                return PyVBMHandle(std::move(handle), LBW);
             });
         },
         "grid"_a,
