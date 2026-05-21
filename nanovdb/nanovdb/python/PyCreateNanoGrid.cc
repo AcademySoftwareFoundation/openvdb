@@ -118,7 +118,7 @@ nb::object createNanoGridFpX(nb::handle       py_src,
     if (auto r = tryQuantizeFpX<float, DstBuildT>(
             py_src, sMode, cMode, ditherOn, verbose); r.is_valid()) return r;
     std::string msg(pyFnName);
-    msg += ": source must be a FloatGrid or tools.build.FloatGrid "
+    msg += ": source must be a FloatGrid or nanovdb.tools.build.FloatGrid "
            "(Fp4/Fp8/Fp16/FpN require a float source value type).";
     throw nb::type_error(msg.c_str());
 }
@@ -175,7 +175,7 @@ nb::object createNanoGridFpNImpl(nb::handle       py_src,
             py_src, sMode, cMode, ditherOn, verbose, oracle); r.is_valid()) return r;
     throw nb::type_error(
         "createNanoGridFpN: source must be a FloatGrid or "
-        "tools.build.FloatGrid (FpN requires a float source value type).");
+        "nanovdb.tools.build.FloatGrid (FpN requires a float source value type).");
 }
 
 // ----- Index / OnIndex -----
@@ -232,7 +232,7 @@ nb::object createIndexImpl(nb::handle  py_src,
     if (auto r = tryIndexify<Vec3f,    DstBuildT>(py_src, channels, includeStats, includeTiles, verbose); r.is_valid()) return r;
     std::string msg(pyFnName);
     msg += ": source must be a FloatGrid, DoubleGrid, Int32Grid, "
-           "Vec3fGrid, or the matching tools.build.* mutable grid.";
+           "Vec3fGrid, or the matching nanovdb.tools.build.* mutable grid.";
     throw nb::type_error(msg.c_str());
 }
 
@@ -273,7 +273,7 @@ void defineCreateNanoGridConversions(nb::module_& toolsModule)
         },
         "src"_a, "sMode"_a = tools::StatsMode::Default,
         "cMode"_a = CheckMode::Default, "ditherOn"_a = false, "verbose"_a = 0,
-        "Quantize a NanoGrid<float> or tools.build.FloatGrid into a "
+        "Quantize a NanoGrid<float> or nanovdb.tools.build.FloatGrid into a "
         "NanoGrid<Fp4> (4 bits per voxel). ditherOn adds sub-quantum "
         "noise to break up banding.");
 
@@ -285,7 +285,7 @@ void defineCreateNanoGridConversions(nb::module_& toolsModule)
         },
         "src"_a, "sMode"_a = tools::StatsMode::Default,
         "cMode"_a = CheckMode::Default, "ditherOn"_a = false, "verbose"_a = 0,
-        "Quantize a NanoGrid<float> or tools.build.FloatGrid into a NanoGrid<Fp8> (8 bits "
+        "Quantize a NanoGrid<float> or nanovdb.tools.build.FloatGrid into a NanoGrid<Fp8> (8 bits "
         "per voxel). ditherOn adds sub-quantum noise.");
 
     toolsModule.def("createNanoGridFp16",
@@ -296,7 +296,7 @@ void defineCreateNanoGridConversions(nb::module_& toolsModule)
         },
         "src"_a, "sMode"_a = tools::StatsMode::Default,
         "cMode"_a = CheckMode::Default, "ditherOn"_a = false, "verbose"_a = 0,
-        "Quantize a NanoGrid<float> or tools.build.FloatGrid into a NanoGrid<Fp16> (16 bits "
+        "Quantize a NanoGrid<float> or nanovdb.tools.build.FloatGrid into a NanoGrid<Fp16> (16 bits "
         "per voxel). ditherOn adds sub-quantum noise.");
 
     // ------ Variable bit-width: FpN with AbsDiff or RelDiff oracle ------
@@ -315,7 +315,7 @@ void defineCreateNanoGridConversions(nb::module_& toolsModule)
         "src"_a, "oracle"_a = tools::AbsDiff(),
         "sMode"_a = tools::StatsMode::Default,
         "cMode"_a = CheckMode::Default, "ditherOn"_a = false, "verbose"_a = 0,
-        "Quantize a NanoGrid<float> or tools.build.FloatGrid into a NanoGrid<FpN> (variable "
+        "Quantize a NanoGrid<float> or nanovdb.tools.build.FloatGrid into a NanoGrid<FpN> (variable "
         "bits per voxel; each leaf picks the smallest N that satisfies "
         "the oracle's tolerance). Pass an AbsDiff oracle for absolute "
         "error bound, or use the RelDiff overload for relative error.");
