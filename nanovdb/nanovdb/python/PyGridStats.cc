@@ -195,12 +195,14 @@ void defineGridStatsModule(nb::module_& toolsModule)
         "grid"_a, "mode"_a = tools::StatsMode::Default,
         nb::call_guard<nb::gil_scoped_release>(),
         "Recompute and write per-node statistics into the given grid in "
-        "place. Polymorphic over BuildT. Scalar and vector grids accept "
-        "every StatsMode (Disable / BBox / MinMax / All). Special "
-        "(quantized / index / mask) grids accept Disable and BBox (the "
-        "latter recomputes node bounding boxes only); MinMax and All "
-        "raise ValueError because their value type has no arithmetic "
-        "semantics.");
+        "place. Polymorphic over BuildT. Scalar, vector, and Boolean "
+        "grids accept every StatsMode (Disable / BBox / MinMax / All); "
+        "Boolean grids use the C++ NoopStats path internally regardless "
+        "of mode because there's no arithmetic min/max/avg/dev on bool. "
+        "Other special (quantized / index / mask) grids accept Disable "
+        "and BBox (the latter recomputes node bounding boxes only); "
+        "MinMax and All raise ValueError because their value type has "
+        "no arithmetic semantics.");
 
     // Per-BuildT getExtrema. We expose one overload per scalar/vector
     // BuildT — they each return a Python-side Extrema<ValueT> of the

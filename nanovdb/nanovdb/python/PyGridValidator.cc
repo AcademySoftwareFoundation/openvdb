@@ -39,13 +39,24 @@ namespace {
 
 // callNanoGrid op for checkGrid: writes into a fixed-size buffer and returns
 // it as a std::pair<bool, std::string> for nb::make_tuple consumption.
+//
+// tools::checkGrid writes error messages with util::sprint / util::strcpy,
+// neither of which is bounded — they trust the caller's buffer is big
+// enough. Size the buffer well above what any current error message
+// produces (the longest formatted message in GridValidator.h is on the
+// order of ~80 characters once both GridType and GridClass enumerator
+// names are stringified) and leave generous headroom for future
+// additions.
 struct CheckGridOp
 {
+    static constexpr size_t kErrorBufSize = 4096;
+
     template<typename BuildT>
     static std::pair<bool, std::string> known(const GridData* gridData,
                                               CheckMode        mode)
     {
-        char buf[256];
+        char buf[kErrorBufSize];
+        buf[0] = '\0';
         tools::checkGrid<BuildT>(
             static_cast<const NanoGrid<BuildT>*>(gridData), buf, mode);
         const bool ok = (buf[0] == '\0');
