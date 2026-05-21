@@ -85,21 +85,35 @@ struct IsValidOp
 
 void defineGridValidatorModule(nb::module_& toolsModule)
 {
-    // Single-grid validate. Takes a host handle, a grid index, and the
+    // Single-grid validate. Takes a handle, a grid index, and the
     // usual mode + verbose flags. Returns true iff the grid passes all
-    // tests for the given mode.
+    // tests for the given mode. Bound for both host and device handles
+    // (when CUDA is enabled), matching validateGrids' coverage —
+    // tools::validateGrid does host-side dispatch via callNanoGrid on
+    // the host-resident gridData() pointer that DeviceGridHandle also
+    // exposes, so the same overload pair is appropriate.
     toolsModule.def("validateGrid",
         &tools::validateGrid<GridHandle<HostBuffer>>,
         "handle"_a, "gridID"_a,
         "mode"_a = CheckMode::Default, "verbose"_a = false,
         nb::call_guard<nb::gil_scoped_release>(),
-        "Validate the gridID'th grid in the host handle against the "
-        "given CheckMode. Returns False (without raising) if gridID is "
-        "out of range or the grid fails any check. CheckMode.Disable is "
-        "a short-circuit that always returns True without inspecting "
-        "the grid (even when gridID is out of range), matching the C++ "
-        "behavior. Complements validateGrids() which checks the whole "
-        "handle.");
+        "Validate the gridID'th grid in the handle against the given "
+        "CheckMode. Returns False (without raising) if gridID is out "
+        "of range or the grid fails any check. CheckMode.Disable is a "
+        "short-circuit that always returns True without inspecting "
+        "the grid (even when gridID is out of range), matching the "
+        "C++ behavior. Complements validateGrids() which checks the "
+        "whole handle.");
+#ifdef NANOVDB_USE_CUDA
+    toolsModule.def("validateGrid",
+        &tools::validateGrid<GridHandle<cuda::DeviceBuffer>>,
+        "handle"_a, "gridID"_a,
+        "mode"_a = CheckMode::Default, "verbose"_a = false,
+        nb::call_guard<nb::gil_scoped_release>(),
+        "Validate the gridID'th grid in the device handle (uses the "
+        "host-resident copy of the grid metadata for the actual "
+        "checks). Same semantics as the host-handle overload.");
+#endif
 
     // Polymorphic checkGrid — returns (ok, error_message). Mirrors the C++
     // char-buffer-out signature, but the buffer is hidden inside the

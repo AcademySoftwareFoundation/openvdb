@@ -1662,6 +1662,23 @@ class TestGridValidate(unittest.TestCase):
         self.assertTrue(
             nanovdb.tools.validateGrid(h, 99, nanovdb.CheckMode.Disable))
 
+    @unittest.skipUnless(
+        hasattr(nanovdb.tools, "cuda") and
+        hasattr(nanovdb.tools.cuda, "createLevelSetSphere"),
+        "device handles require a CUDA-enabled build",
+    )
+    def test_validateGrid_on_device_handle(self):
+        # validateGrid is bound for both host and device handles. The
+        # device overload routes through the same callNanoGrid dispatch
+        # against the host-resident copy of the grid metadata.
+        h = nanovdb.tools.cuda.createLevelSetSphere()
+        self.assertTrue(nanovdb.tools.validateGrid(h, 0))
+        # Out-of-range gridID returns False (without raising); Disable
+        # mode short-circuits to True even on an out-of-range gridID.
+        self.assertFalse(nanovdb.tools.validateGrid(h, 99))
+        self.assertTrue(
+            nanovdb.tools.validateGrid(h, 99, nanovdb.CheckMode.Disable))
+
 
 class TestGridChecksum(unittest.TestCase):
     """nanovdb.tools.evalChecksum and validateChecksum."""
