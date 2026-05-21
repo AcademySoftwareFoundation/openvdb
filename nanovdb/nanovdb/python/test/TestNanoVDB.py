@@ -1543,6 +1543,144 @@ class TestCreateNanoGrid(unittest.TestCase):
             self.assertEqual(grid.gridClass(), nanovdb.GridClass.Unknown)
 
 
+class TestGridStats(unittest.TestCase):
+    """nanovdb.tools.Extrema*, Stats*, updateGridStats, getExtrema."""
+
+    def _five_voxel_float_grid(self):
+        g = nanovdb.tools.build.FloatGrid(0.0, "stats", nanovdb.GridClass.FogVolume)
+        for i in range(5):
+            g.setValue(nanovdb.math.Coord(i, 0, 0), float(i + 1))
+        return g.to_nanovdb(sMode=nanovdb.tools.StatsMode.All)
+
+    def test_extrema_default_and_add(self):
+        ex = nanovdb.tools.FloatExtrema()
+        self.assertFalse(bool(ex))
+        ex.add(2.5)
+        ex.add(1.0)
+        ex.add(7.0)
+        self.assertTrue(bool(ex))
+        self.assertEqual(ex.min(), 1.0)
+        self.assertEqual(ex.max(), 7.0)
+        # Extrema doesn't compute averages or std deviation.
+        self.assertTrue(nanovdb.tools.FloatExtrema.hasMinMax())
+        self.assertFalse(nanovdb.tools.FloatExtrema.hasAverage())
+        self.assertFalse(nanovdb.tools.FloatExtrema.hasStdDeviation())
+
+    def test_stats_default_and_accumulate(self):
+        st = nanovdb.tools.FloatStats()
+        for v in (1.0, 2.0, 3.0, 4.0, 5.0):
+            st.add(v)
+        self.assertEqual(st.size(), 5)
+        self.assertEqual(st.min(), 1.0)
+        self.assertEqual(st.max(), 5.0)
+        self.assertAlmostEqual(st.avg(), 3.0)
+        self.assertAlmostEqual(st.mean(), 3.0)
+        # Population variance of 1..5 = (((-2)^2 + (-1)^2 + 0 + 1 + 4) / 5) = 2
+        self.assertAlmostEqual(st.var(), 2.0)
+        self.assertAlmostEqual(st.std() ** 2, 2.0)
+        self.assertTrue(nanovdb.tools.FloatStats.hasAverage())
+        self.assertTrue(nanovdb.tools.FloatStats.hasStdDeviation())
+
+    def test_get_extrema_over_active_bbox(self):
+        h = self._five_voxel_float_grid()
+        ng = h.grid()
+        # bbox containing only the 5 active voxels at (0..4, 0, 0); the
+        # extrema visits the leaf the active voxels live in, plus the
+        # background tile inside that leaf — so the min is 0.0 (background).
+        ex = nanovdb.tools.getExtrema(
+            ng, nanovdb.math.CoordBBox(
+                nanovdb.math.Coord(0, 0, 0), nanovdb.math.Coord(4, 0, 0)))
+        self.assertTrue(bool(ex))
+        self.assertEqual(ex.min(), 0.0)
+        self.assertEqual(ex.max(), 5.0)
+
+    def test_update_grid_stats_polymorphic(self):
+        # Building with StatsMode.Disable leaves stats uncomputed; calling
+        # tools.updateGridStats on the resulting handle should populate
+        # them in-place. Asserting "no exception" is the round-trip we
+        # care about — the actual stats live inside the grid's nodes.
+        g = nanovdb.tools.build.FloatGrid(0.0)
+        for i in range(3):
+            g.setValue(nanovdb.math.Coord(i, 0, 0), float(i + 10))
+        h = g.to_nanovdb(sMode=nanovdb.tools.StatsMode.Disable)
+        ng = h.grid()
+        nanovdb.tools.updateGridStats(ng, nanovdb.tools.StatsMode.All)
+        # checkGrid still passes after writing stats.
+        ok, msg = nanovdb.tools.checkGrid(ng, nanovdb.CheckMode.Full)
+        self.assertTrue(ok, msg)
+
+    def test_update_grid_stats_rejects_index_grid(self):
+        # OnIndexGrid is a special BuildT — updateGridStats should raise
+        # because Stats<uint64> isn't meaningful.
+        bbox = nanovdb.math.CoordBBox(
+            nanovdb.math.Coord(0), nanovdb.math.Coord(4))
+        h_float = nanovdb.tools.createFloatGrid(
+            0.0, "src", nanovdb.GridClass.Unknown, lambda ijk: 1.0, bbox)
+        h_index = nanovdb.tools.createOnIndexGrid(h_float.grid())
+        with self.assertRaises(ValueError):
+            nanovdb.tools.updateGridStats(
+                h_index.grid(), nanovdb.tools.StatsMode.MinMax)
+
+
+class TestGridValidate(unittest.TestCase):
+    """nanovdb.tools.validateGrid, checkGrid, isValid."""
+
+    def _good_handle(self):
+        bbox = nanovdb.math.CoordBBox(
+            nanovdb.math.Coord(0), nanovdb.math.Coord(3))
+        return nanovdb.tools.createFloatGrid(
+            0.0, "v", nanovdb.GridClass.Unknown, lambda ijk: 1.0, bbox)
+
+    def test_checkGrid_on_valid_grid(self):
+        h = self._good_handle()
+        ok, msg = nanovdb.tools.checkGrid(h.grid(), nanovdb.CheckMode.Full)
+        self.assertTrue(ok)
+        self.assertEqual(msg, "")
+
+    def test_isValid_on_valid_grid(self):
+        h = self._good_handle()
+        self.assertTrue(nanovdb.tools.isValid(h.grid(), nanovdb.CheckMode.Default))
+
+    def test_validateGrid_on_valid_handle(self):
+        h = self._good_handle()
+        self.assertTrue(nanovdb.tools.validateGrid(h, 0))
+        # validateGrid with out-of-range gridID returns False, never raises.
+        self.assertFalse(nanovdb.tools.validateGrid(h, 99))
+
+    def test_validateGrid_disable_mode_always_true(self):
+        h = self._good_handle()
+        self.assertTrue(
+            nanovdb.tools.validateGrid(h, 99, nanovdb.CheckMode.Disable))
+
+
+class TestGridChecksum(unittest.TestCase):
+    """nanovdb.tools.evalChecksum and validateChecksum."""
+
+    def _handle(self):
+        bbox = nanovdb.math.CoordBBox(
+            nanovdb.math.Coord(0), nanovdb.math.Coord(3))
+        return nanovdb.tools.createFloatGrid(
+            0.0, "cs", nanovdb.GridClass.Unknown, lambda ijk: 1.0, bbox)
+
+    def test_eval_then_update_then_validate(self):
+        h = self._handle()
+        ng = h.grid()
+        cs1 = nanovdb.tools.evalChecksum(ng, nanovdb.CheckMode.Full)
+        nanovdb.tools.updateChecksum(ng, nanovdb.CheckMode.Full)
+        cs2 = nanovdb.tools.evalChecksum(ng, nanovdb.CheckMode.Full)
+        # Recomputing on an unchanged grid gives the same checksum.
+        self.assertEqual(cs1, cs2)
+        self.assertTrue(
+            nanovdb.tools.validateChecksum(ng, nanovdb.CheckMode.Full))
+
+    def test_validate_empty_stored_returns_true(self):
+        # A grid with no stored checksum is considered valid by the C++
+        # rule (Checksum.isEmpty() short-circuit).
+        h = self._handle()
+        self.assertTrue(
+            nanovdb.tools.validateChecksum(h.grid(), nanovdb.CheckMode.Default))
+
+
 class TestBuildGrid(unittest.TestCase):
     """nanovdb.tools.build.* — mutable voxel-by-voxel CPU grid builder."""
 
