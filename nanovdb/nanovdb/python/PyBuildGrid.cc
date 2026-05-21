@@ -86,8 +86,7 @@ static void defineBuildGrid(nb::module_& m,
             [](const GridT& self) -> std::array<size_t, 3> {
                 return self.nodeCount();
             },
-            "Return a 3-tuple (leaf_count, lower_count, upper_count) of "
-            "internal node counts.")
+            "Return a 3-tuple (leaf_count, lower_count, upper_count).")
         .def("gridType",  &GridT::gridType,
             "Return the GridType enumerator this BuildT carries.")
         .def("gridClass", &GridT::gridClass,
@@ -102,7 +101,9 @@ static void defineBuildGrid(nb::module_& m,
             "Set an affine index-to-world map from a uniform scale and "
             "translation. Replaces any prior transform.")
         .def_prop_ro("background",
-            [](const GridT& self) -> ValueT { return self.mRoot.mBackground; },
+            [](const GridT& self) -> ValueT {
+                return self.mRoot.background();
+            },
             "The background value supplied at construction.")
         .def("getAccessor", &GridT::getAccessor,
             nb::keep_alive<0, 1>(),
@@ -126,6 +127,9 @@ static void defineBuildGrid(nb::module_& m,
             "parent grid on destruction (or on an explicit merge() call). "
             "Held by nanobind on the heap so the accessor's internal "
             "references stay valid.")
+        // Baking a large grid is the most expensive operation on this
+        // class; release the GIL so other Python threads can run during
+        // the conversion (the lambda only touches C++ state).
         .def("to_nanovdb",
             [](const GridT& self,
                tools::StatsMode sMode,
@@ -134,11 +138,13 @@ static void defineBuildGrid(nb::module_& m,
                 return tools::createNanoGrid<GridT, BuildT, HostBuffer>(
                     self, sMode, cMode, verbose);
             },
+            nb::call_guard<nb::gil_scoped_release>(),
             "sMode"_a   = tools::StatsMode::Default,
             "cMode"_a   = CheckMode::Default,
             "verbose"_a = 0,
             "Bake this mutable grid into a host NanoGrid<BuildT> and "
-            "return its GridHandle. The build grid is unchanged.");
+            "return its GridHandle. The build grid is unchanged. "
+            "Releases the GIL during conversion.");
 
     // ----- build::ValueAccessor<BuildT> -----
     //

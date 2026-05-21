@@ -1587,18 +1587,30 @@ class TestBuildGrid(unittest.TestCase):
         # isValueOn is an alias for isActive.
         self.assertEqual(acc.isValueOn(ijk), acc.isActive(ijk))
 
-    def test_write_accessor_merges_on_destruction(self):
+    def test_write_accessor_explicit_merge(self):
         g = nanovdb.tools.build.FloatGrid(0.0)
         ijk = nanovdb.math.Coord(50, 50, 50)
-        # Buffer the write into a thread-local root, then let the
-        # accessor go out of scope so its destructor merges into the
-        # parent grid.
         wa = g.getWriteAccessor()
         wa.setValue(ijk, 9.0)
         # Before merge, the parent grid hasn't seen the change yet.
         self.assertEqual(g.getValue(ijk), 0.0)
         wa.merge()
         self.assertEqual(g.getValue(ijk), 9.0)
+        self.assertTrue(g.isActive(ijk))
+
+    def test_write_accessor_merges_on_destruction(self):
+        # When the Python wrapper for a WriteAccessor is collected, the
+        # C++ destructor runs merge() automatically. Force collection by
+        # dropping the only reference and running the GC.
+        import gc
+        g = nanovdb.tools.build.FloatGrid(0.0)
+        ijk = nanovdb.math.Coord(60, 60, 60)
+        wa = g.getWriteAccessor()
+        wa.setValue(ijk, 3.5)
+        self.assertEqual(g.getValue(ijk), 0.0)
+        del wa
+        gc.collect()
+        self.assertEqual(g.getValue(ijk), 3.5)
         self.assertTrue(g.isActive(ijk))
 
     def test_to_nanovdb_roundtrip(self):
