@@ -88,9 +88,11 @@ static nb::object pyDecodeInverseMapsImpl(const NanoGrid<ValueOnIndex>& grid,
 {
     constexpr int BlockWidth = 1 << Log2BlockWidth;
 
-    // Allocate outputs as numpy-owned arrays. nb::ndarray with no parent
-    // and the nb::numpy framework tag tells nanobind to allocate fresh
-    // memory through numpy (so Python owns the result).
+    // Each call allocates fresh BlockWidth-sized output arrays for the
+    // leaf-index and voxel-offset results. We use plain new[] (rather than
+    // a numpy-allocated buffer) because the produced ndarrays are returned
+    // by reference and Python owns them via the capsule deleters below —
+    // when the ndarray is destroyed, the capsule's deleter runs delete[].
     auto* leafIndex = new uint32_t[BlockWidth];
     auto* voxelOffset = new uint16_t[BlockWidth];
 
@@ -99,9 +101,9 @@ static nb::object pyDecodeInverseMapsImpl(const NanoGrid<ValueOnIndex>& grid,
         &grid, firstLeafID, jumpMap, blockFirstOffset,
         leafIndex, voxelOffset);
 
-    // Hand ownership to nanobind via the delete-on-destruction owner
-    // capsule pattern. nb::capsule wraps a raw pointer + deleter and lives
-    // for as long as the ndarray that takes it as parent.
+    // nb::capsule wraps the raw pointer + matching delete[] so it can serve
+    // as the ndarray's owner — the capsule lives as long as the ndarray and
+    // its destruction runs the deleter.
     nb::capsule leafOwner(leafIndex,
         [](void* p) noexcept { delete[] static_cast<uint32_t*>(p); });
     nb::capsule offsetOwner(voxelOffset,
@@ -156,16 +158,25 @@ static void defineHandle(nb::module_& toolsModule)
             [](nb::handle py_self) -> nb::object {
                 auto& h = nb::cast<PyVBMHandle&>(py_self);
                 size_t shape[1] = {static_cast<size_t>(h.blockCount())};
+                // A default-constructed or reset() handle has a null
+                // hostFirstLeafID(); we still return an empty (0,) ndarray
+                // so callers don't have to branch on a None sentinel. The
+                // dummy non-null pointer (the handle itself) keeps nanobind
+                // happy; nothing is read since the leading shape is 0.
+                uint32_t* raw = h.handle.hostFirstLeafID();
+                void* data = (raw != nullptr) ? static_cast<void*>(raw)
+                                              : static_cast<void*>(&h);
                 return nb::cast(
                     nb::ndarray<nb::numpy, uint32_t, nb::ndim<1>,
                                 nb::c_contig, nb::device::cpu>(
-                        static_cast<void*>(h.handle.hostFirstLeafID()),
-                        size_t(1), shape, py_self),
+                        data, size_t(1), shape, py_self),
                     nb::rv_policy::reference);
             },
             nb::keep_alive<0, 1>(),
             "Return a zero-copy (blockCount,) uint32 NumPy view of the "
-            "firstLeafID array. The view keeps this handle alive.")
+            "firstLeafID array. Returns an empty (0,) array on a "
+            "default-constructed or reset() handle. The view keeps this "
+            "handle alive.")
         // jumpMap is uint64_t[blockCount * JumpMapLength]. JumpMapLength is
         // determined by the log2_block_width recorded on the handle, not by
         // the caller — that way the returned view always covers exactly the
@@ -175,18 +186,25 @@ static void defineHandle(nb::module_& toolsModule)
                 auto& h = nb::cast<PyVBMHandle&>(py_self);
                 size_t shape[2] = {static_cast<size_t>(h.blockCount()),
                                    static_cast<size_t>(h.jumpMapLength())};
+                // Same null-buffer guard as firstLeafID(): a
+                // default-constructed / reset() handle has a null
+                // hostJumpMap(); return an empty (0, jump_map_length)
+                // ndarray rather than passing nullptr to nanobind.
+                uint64_t* raw = h.handle.hostJumpMap();
+                void* data = (raw != nullptr) ? static_cast<void*>(raw)
+                                              : static_cast<void*>(&h);
                 return nb::cast(
                     nb::ndarray<nb::numpy, uint64_t, nb::ndim<2>,
                                 nb::c_contig, nb::device::cpu>(
-                        static_cast<void*>(h.handle.hostJumpMap()),
-                        size_t(2), shape, py_self),
+                        data, size_t(2), shape, py_self),
                     nb::rv_policy::reference);
             },
             nb::keep_alive<0, 1>(),
             "Return a zero-copy (blockCount, jump_map_length) uint64 NumPy "
             "view of the jumpMap. The shape is determined by the "
-            "log2_block_width the handle was built with. The view keeps "
-            "this handle alive.")
+            "log2_block_width the handle was built with. Returns an empty "
+            "(0, jump_map_length) array on a default-constructed or reset() "
+            "handle. The view keeps this handle alive.")
         // Decode the inverse maps for a single block of this VBM. The
         // log2_block_width is taken from the handle, so the caller cannot
         // request a width that doesn't match what was built.

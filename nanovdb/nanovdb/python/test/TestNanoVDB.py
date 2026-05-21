@@ -930,6 +930,39 @@ class TestVoxelBlockManager(unittest.TestCase):
         with self.assertRaises(TypeError):
             nanovdb.tools.buildVoxelBlockManager(h_float.grid())
 
+    def test_default_constructed_handle_returns_empty_arrays(self):
+        # A default-constructed VoxelBlockManagerHandle has null backing
+        # buffers; firstLeafID() and jumpMap() should still return empty
+        # ndarrays rather than crash on the null pointer.
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy not installed")
+        vbm = nanovdb.tools.VoxelBlockManagerHandle()
+        self.assertEqual(vbm.blockCount(), 0)
+        self.assertFalse(bool(vbm))
+        fl = np.asarray(vbm.firstLeafID())
+        self.assertEqual(fl.shape, (0,))
+        self.assertEqual(fl.dtype, np.uint32)
+        jm = np.asarray(vbm.jumpMap())
+        # Default-constructed handle uses log2_block_width=6 -> JumpMapLength=1.
+        self.assertEqual(jm.shape, (0, 1))
+        self.assertEqual(jm.dtype, np.uint64)
+
+    def test_reset_handle_returns_empty_arrays(self):
+        # Same guard but exercising reset() after a real build.
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy not installed")
+        h = self._make_cube_on_index_grid()
+        vbm = nanovdb.tools.buildVoxelBlockManager(h.grid(), log2_block_width=6)
+        self.assertGreater(vbm.blockCount(), 0)
+        vbm.reset()
+        self.assertEqual(vbm.blockCount(), 0)
+        self.assertEqual(np.asarray(vbm.firstLeafID()).shape, (0,))
+        self.assertEqual(np.asarray(vbm.jumpMap()).shape, (0, 1))
+
 
 class TestGridMetaDataGuards(unittest.TestCase):
     """GridMetaData() constructor and safeCast() reject bad input (None, a
