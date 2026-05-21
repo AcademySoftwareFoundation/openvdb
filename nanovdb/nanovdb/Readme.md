@@ -7,7 +7,7 @@ A lightweight GPU friendly version of VDB initially targeting rendering applicat
 * [Frequently asked questions](../../doc/nanovdb/FAQ.md)
 * [Source tree](../../doc/nanovdb/SourceTree.md)
 * [Examples](../../doc/nanovdb/HelloWorld.md)
-* [Python examples](nanovdb/python/examples/)
+* [Python examples](python/examples/)
 
 ### Copyright Contributors to the OpenVDB Project
 ### SPDX-License-Identifier: Apache-2.0

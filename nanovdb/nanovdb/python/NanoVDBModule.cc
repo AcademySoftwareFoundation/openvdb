@@ -171,37 +171,37 @@ void defineMap(nb::module_& m)
         .def("set", nb::overload_cast<double, const Vec3d&, double>(&Map::template set<Vec3d>), "scale"_a, "translation"_a, "taper"_a = 1.,
              "Rebuild this Map from a uniform scale, translation and optional frustum taper.")
         .def("applyMap", nb::overload_cast<const Vec3f&>(&Map::template applyMap<Vec3f>, nb::const_), "ijk"_a,
-             "Transform an index-space point to world space (double precision).")
+             "Transform an index-space point to world space using 64-bit math; returns a vector of the same dtype as the input.")
         .def("applyMap", nb::overload_cast<const Vec3d&>(&Map::template applyMap<Vec3d>, nb::const_), "ijk"_a,
-             "Transform an index-space point to world space (double precision).")
+             "Transform an index-space point to world space using 64-bit math; returns a vector of the same dtype as the input.")
         .def("applyMapF", nb::overload_cast<const Vec3f&>(&Map::template applyMapF<Vec3f>, nb::const_), "ijk"_a,
-             "Transform an index-space point to world space (single precision).")
+             "Transform an index-space point to world space using 32-bit math; returns a vector of the same dtype as the input.")
         .def("applyMapF", nb::overload_cast<const Vec3d&>(&Map::template applyMapF<Vec3d>, nb::const_), "ijk"_a,
-             "Transform an index-space point to world space (single precision).")
+             "Transform an index-space point to world space using 32-bit math; returns a vector of the same dtype as the input.")
         .def("applyJacobian", nb::overload_cast<const Vec3f&>(&Map::template applyJacobian<Vec3f>, nb::const_), "ijk"_a,
-             "Apply the linear (Jacobian) part of the transform, ignoring translation.")
+             "Apply the linear (Jacobian) part of the transform using 64-bit math, ignoring translation.")
         .def("applyJacobian", nb::overload_cast<const Vec3d&>(&Map::template applyJacobian<Vec3d>, nb::const_), "ijk"_a,
-             "Apply the linear (Jacobian) part of the transform, ignoring translation.")
+             "Apply the linear (Jacobian) part of the transform using 64-bit math, ignoring translation.")
         .def("applyJacobianF", nb::overload_cast<const Vec3f&>(&Map::template applyJacobianF<Vec3f>, nb::const_), "ijk"_a,
-             "Apply the linear part in single precision, ignoring translation.")
+             "Apply the linear (Jacobian) part of the transform using 32-bit math, ignoring translation.")
         .def("applyJacobianF", nb::overload_cast<const Vec3d&>(&Map::template applyJacobianF<Vec3d>, nb::const_), "ijk"_a,
-             "Apply the linear part in single precision, ignoring translation.")
+             "Apply the linear (Jacobian) part of the transform using 32-bit math, ignoring translation.")
         .def("applyInverseMap", nb::overload_cast<const Vec3f&>(&Map::template applyInverseMap<Vec3f>, nb::const_), "xyz"_a,
-             "Transform a world-space point back to index space (double precision).")
+             "Transform a world-space point back to index space using 64-bit math; returns a vector of the same dtype as the input.")
         .def("applyInverseMap", nb::overload_cast<const Vec3d&>(&Map::template applyInverseMap<Vec3d>, nb::const_), "xyz"_a,
-             "Transform a world-space point back to index space (double precision).")
+             "Transform a world-space point back to index space using 64-bit math; returns a vector of the same dtype as the input.")
         .def("applyInverseMapF", nb::overload_cast<const Vec3f&>(&Map::template applyInverseMapF<Vec3f>, nb::const_), "xyz"_a,
-             "Transform a world-space point back to index space (single precision).")
+             "Transform a world-space point back to index space using 32-bit math; returns a vector of the same dtype as the input.")
         .def("applyInverseMapF", nb::overload_cast<const Vec3d&>(&Map::template applyInverseMapF<Vec3d>, nb::const_), "xyz"_a,
-             "Transform a world-space point back to index space (single precision).")
+             "Transform a world-space point back to index space using 32-bit math; returns a vector of the same dtype as the input.")
         .def("applyInverseJacobian", nb::overload_cast<const Vec3f&>(&Map::template applyInverseJacobian<Vec3f>, nb::const_), "xyz"_a,
-             "Apply the inverse linear (Jacobian) part of the transform.")
+             "Apply the inverse linear (Jacobian) part of the transform using 64-bit math.")
         .def("applyInverseJacobian", nb::overload_cast<const Vec3d&>(&Map::template applyInverseJacobian<Vec3d>, nb::const_), "xyz"_a,
-             "Apply the inverse linear (Jacobian) part of the transform.")
+             "Apply the inverse linear (Jacobian) part of the transform using 64-bit math.")
         .def("applyInverseJacobianF", nb::overload_cast<const Vec3f&>(&Map::template applyInverseJacobianF<Vec3f>, nb::const_), "xyz"_a,
-             "Apply the inverse linear part in single precision.")
+             "Apply the inverse linear (Jacobian) part using 32-bit math.")
         .def("applyInverseJacobianF", nb::overload_cast<const Vec3d&>(&Map::template applyInverseJacobianF<Vec3d>, nb::const_), "xyz"_a,
-             "Apply the inverse linear part in single precision.")
+             "Apply the inverse linear (Jacobian) part using 32-bit math.")
         .def("applyIJT", nb::overload_cast<const Vec3f&>(&Map::template applyIJT<Vec3f>, nb::const_), "xyz"_a,
              "Apply the inverse-Jacobian-transpose used for transforming normals.")
         .def("applyIJT", nb::overload_cast<const Vec3d&>(&Map::template applyIJT<Vec3d>, nb::const_), "xyz"_a,
@@ -261,9 +261,9 @@ void defineGrid(nb::module_& m)
         .def("applyMapF", nb::overload_cast<const Vec3d&>(&GridData::template applyMapF<Vec3d>, nb::const_), "xyz"_a,
              "Transform an index-space point to world space in single precision.")
         .def("applyJacobian", nb::overload_cast<const Vec3f&>(&GridData::template applyJacobian<Vec3f>, nb::const_), "xyz"_a,
-             "Apply the linear (Jacobian) part of the transform, ignoring translation.")
+             "Apply the linear (Jacobian) part of the transform using 64-bit math, ignoring translation.")
         .def("applyJacobian", nb::overload_cast<const Vec3d&>(&GridData::template applyJacobian<Vec3d>, nb::const_), "xyz"_a,
-             "Apply the linear (Jacobian) part of the transform, ignoring translation.")
+             "Apply the linear (Jacobian) part of the transform using 64-bit math, ignoring translation.")
         .def("applyJacobianF", nb::overload_cast<const Vec3f&>(&GridData::template applyJacobianF<Vec3f>, nb::const_), "xyz"_a,
              "Apply the linear part in single precision.")
         .def("applyJacobianF", nb::overload_cast<const Vec3d&>(&GridData::template applyJacobianF<Vec3d>, nb::const_), "xyz"_a,
@@ -277,13 +277,13 @@ void defineGrid(nb::module_& m)
         .def("applyInverseMapF", nb::overload_cast<const Vec3d&>(&GridData::template applyInverseMapF<Vec3d>, nb::const_), "xyz"_a,
              "Transform a world-space point back to index space in single precision.")
         .def("applyInverseJacobian", nb::overload_cast<const Vec3f&>(&GridData::template applyInverseJacobian<Vec3f>, nb::const_), "xyz"_a,
-             "Apply the inverse linear (Jacobian) part of the transform.")
+             "Apply the inverse linear (Jacobian) part of the transform using 64-bit math.")
         .def("applyInverseJacobian", nb::overload_cast<const Vec3d&>(&GridData::template applyInverseJacobian<Vec3d>, nb::const_), "xyz"_a,
-             "Apply the inverse linear (Jacobian) part of the transform.")
+             "Apply the inverse linear (Jacobian) part of the transform using 64-bit math.")
         .def("applyInverseJacobianF", nb::overload_cast<const Vec3f&>(&GridData::template applyInverseJacobianF<Vec3f>, nb::const_), "xyz"_a,
-             "Apply the inverse linear part in single precision.")
+             "Apply the inverse linear (Jacobian) part using 32-bit math.")
         .def("applyInverseJacobianF", nb::overload_cast<const Vec3d&>(&GridData::template applyInverseJacobianF<Vec3d>, nb::const_), "xyz"_a,
-             "Apply the inverse linear part in single precision.")
+             "Apply the inverse linear (Jacobian) part using 32-bit math.")
         .def("applyIJT", nb::overload_cast<const Vec3f&>(&GridData::template applyIJT<Vec3f>, nb::const_), "xyz"_a,
              "Apply the inverse-Jacobian-transpose used for transforming normals.")
         .def("applyIJT", nb::overload_cast<const Vec3d&>(&GridData::template applyIJT<Vec3d>, nb::const_), "xyz"_a,
