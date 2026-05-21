@@ -11,7 +11,6 @@ on:
       - 'CHANGES'
       - 'openvdb_maya/**'
       - 'pendingchanges/**'
-      - '**.md'
   pull_request:
     branches:
       - '**'
@@ -19,7 +18,6 @@ on:
       - 'CHANGES'
       - 'openvdb_maya/**'
       - 'pendingchanges/**'
-      - '**.md'
   workflow_dispatch:
     inputs:
       deploy:
@@ -33,7 +31,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  validate_docs:
+    # Cheap static checks that run before the heavier doxygen build:
+    #  * every #include <...> referenced from a fenced code block in doc/ resolves
+    #  * every github.com/.../blob/<branch>/<path> URL points to a file on disk
+    # Catches the class of docs-rot from issue #2161 (e.g. nanovdb::util ->
+    # nanovdb::tools rename) before the doxygen job runs.
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: set_up_python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+    - name: run_validator
+      run: python3 ci/validate_docs_references.py
+
   doxygen:
+    needs: validate_docs
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     env:
       CXX: g++
@@ -45,9 +60,18 @@ jobs:
       run: ./ci/install_doxygen.sh 1_14_0
     - name: nanobind
       run: ./ci/install_nanobind.sh 2.5.0
-    - name: install_latex
-      run: ./ci/install_texlive.sh
+    # NOTE: install_texlive.sh used to run here. Doxygen now renders math via
+    # MathJax (set DOXYGEN_USE_MATHJAX YES in doc/CMakeLists.txt), so no TeX
+    # toolchain is needed at build time. The script is kept in ci/ in case a
+    # future use re-introduces a TeX dependency.
     - name: build
+      # Note on warn-as-error: Doxygen's own WARN_AS_ERROR is all-or-nothing
+      # and would block on the pre-existing backlog (broken \link refs in
+      # doc/changes.txt, vendored ext/imath/Half.h, etc.). Instead we let
+      # Doxygen finish, capture every warning to doxygen.warnings.log, and
+      # gate the build on the *filtered* log via ci/check_doxygen_warnings.py
+      # below. Per-file suppressions live in doc/.doxygen_warning_suppress.txt
+      # and act as an explicit backlog to chip away at.
       run: >
         ./ci/build.sh -v
         --build-type=Release
@@ -59,6 +83,23 @@ jobs:
         -DUSE_EXPLICIT_INSTANTIATION=OFF
         -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON
         \"
+    - name: check_doxygen_warnings
+      # Fails the PR if Doxygen emitted any warning that isn't covered by an
+      # explicit pattern in doc/.doxygen_warning_suppress.txt. Surviving
+      # warnings, suppression hit-counts, and a preview are printed inline so
+      # the failure is debuggable directly from the GitHub Actions log; the
+      # full unfiltered log is also uploaded as an artifact below.
+      run: python3 ci/check_doxygen_warnings.py --log build/doc/doxygen.warnings.log
+    - name: upload_doxygen_warning_log
+      # Always upload so contributors can debug failed PR builds without
+      # having to reproduce the doxygen environment locally.
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: doxygen-warnings
+        path: build/doc/doxygen.warnings.log
+        if-no-files-found: ignore
+        retention-days: 14
     - name: pre_deploy
       # Overwrite global SSH configuration
       #  https://github.com/peaceiris/actions-gh-pages/issues/719
@@ -147,4 +188,3 @@ jobs:
           - Deployed from: AcademySoftwareFoundation/openvdb ${{ github.sha }}
 
           Signed-off-by: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>"
-

@@ -1,6 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
+//! [read_nanovdb_sphere_accessor_cuda]
 #include <nanovdb/io/IO.h> // this is required to read (and write) NanoVDB files on the host
 #include <nanovdb/cuda/DeviceBuffer.h> // required for CUDA memory management
 #include <nanovdb/GridHandle.h>
@@ -39,3 +40,4 @@ int main(int, char**)
 
     return 0;
 }
+//! [read_nanovdb_sphere_accessor_cuda]

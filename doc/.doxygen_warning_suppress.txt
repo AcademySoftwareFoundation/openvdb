@@ -1,0 +1,60 @@
+# Suppression list for the CI Doxygen warning gate.
+#
+# Each non-blank, non-comment line is a Python regular expression matched
+# against full lines of doc/doxygen.warnings.log. Lines that match ANY
+# pattern are dropped before the strict gate decides whether to fail the
+# build. Comments start with '#'.
+#
+# IMPORTANT: This file is the *triage backlog*. Every pattern here is a
+# license to ship doc rot in a specific file. Whittle this list down over
+# time and prefer fixing the underlying warnings to adding suppressions.
+# When a category is fully fixed, remove its entry so any future regression
+# fails CI again.
+#
+# Format reference (Doxygen warning lines look like):
+#   /abs/path/to/file.h:123: warning: ...message...
+#   /abs/path/to/file.h:123: error: ...message...
+#   <child>:1: error: ...
+#
+# Tip: anchor patterns with '^' and use '\.' to escape literal dots so a
+# pattern can't accidentally match unrelated files.
+
+# ---------------------------------------------------------------------------
+# doc/changes.txt - historical Release Notes
+# ---------------------------------------------------------------------------
+# The Release Notes page (rendered at openvdb.org/documentation/doxygen/
+# changes.html via @page changes in this file) carries ~50 \link references
+# to APIs that were renamed or removed in earlier major versions of OpenVDB.
+# Rewriting them all is out of scope for the CI gate. Re-render the page
+# verbatim; just don't gate PRs on its historical link rot.
+^[^:]*/doc/changes\.txt:
+
+# ---------------------------------------------------------------------------
+# ext/imath/openvdb/math/Half.h - vendored 3rd-party code
+# ---------------------------------------------------------------------------
+# Vendored Imath header. The "explicit link request to 'define' could not
+# be resolved" warnings are an artifact of Doxygen 1.13's handling of
+# \link <macro>; we don't own this source and shouldn't be patching it.
+^[^:]*/ext/imath/openvdb/math/Half\.h:
+
+# ---------------------------------------------------------------------------
+# nanovdb/examples/ex_util/ComputePrimitives.h - recursive template detection
+# ---------------------------------------------------------------------------
+# cxx14::make_index_sequence is a recursive variadic template; Doxygen's
+# class-relation analyser misclassifies the recursion and emits ~8 false
+# positives per build. Upstream Doxygen quirk, no real bug here.
+^[^:]*/ex_util/ComputePrimitives\.h:.*recursive class relation
+
+# ---------------------------------------------------------------------------
+# openvdb_ax/ast/AST.h - INLINE_INHERITED_MEMB + unnamed override params
+# ---------------------------------------------------------------------------
+# Node::child(const size_t index) is documented with @param index. Several
+# leaf-node overrides (Variable, ValueBase, Keyword) take `(const size_t)`
+# without naming the parameter -- the standard C++ idiom for an intentionally
+# unused override under -Wunused-parameter. With DOXYGEN_INLINE_INHERITED_MEMB
+# set to YES (doc/CMakeLists.txt) Doxygen inlines the base @param into the
+# override's synthesised doc page, then complains the name `index` doesn't
+# match any parameter in the override signature. The C++ is correct; this is
+# a Doxygen/C++-idiom interaction we choose to keep on the C++ side. The
+# synthesised warnings appear with the `<child>:1:` pseudo-location.
+^<child>:.*\bchild\(const size_t\)

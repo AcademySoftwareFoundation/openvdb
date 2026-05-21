@@ -163,7 +163,6 @@ public:
     /// @brief Return a const pointer to the @a n'th grid encoded in this GridHandle on the device, e.g. GPU
     /// @tparam ValueT Value type of the grid point to be returned
     /// @param n Index of the grid pointer to be returned
-    /// @param verbose if non-zero error messages will be printed in case something failed
     /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized, @a n is invalid,
     ///          or if the template parameter does not match the specified grid.
     template<typename ValueT, typename U = BufferT>
@@ -293,7 +292,7 @@ public:
     void read(std::istream& is, const std::string &gridName, const BufferT& pool = BufferT());
 
     /// @brief Read a raw grid buffer from a file
-    /// @param filename string name of the input file containing a raw grid buffer
+    /// @param fileName string name of the input file containing a raw grid buffer
     /// @param pool optional pool from which to allocate the new grid buffer
     void read(const std::string &fileName, const BufferT& pool = BufferT()) {
         std::ifstream is(fileName, std::ios::in | std::ios::binary);
@@ -302,7 +301,7 @@ public:
     }
 
     /// @brief Read a specific grid from a file containing a raw grid buffer
-    /// @param filename string name of the input file containing a raw grid buffer
+    /// @param fileName string name of the input file containing a raw grid buffer
     /// @param n zero-based index of the grid to be read
     /// @param pool optional pool from which to allocate the new grid buffer
     /// @throw Will throw a std::ios_base::failure if the file does not exist and a
@@ -314,7 +313,7 @@ public:
     }
 
     /// @brief Read a specific grid from a file containing a raw grid buffer
-    /// @param filename string name of the input file containing a raw grid buffer
+    /// @param fileName string name of the input file containing a raw grid buffer
     /// @param gridName string name of the grid to be read
     /// @param pool optional pool from which to allocate the new grid buffer
     /// @throw Will throw a std::ios_base::failure if the file does not exist and a
@@ -470,7 +469,7 @@ void GridHandle<BufferT>::read(std::istream& is, const std::string &gridName, co
 /// @brief Split all grids in a single GridHandle into a vector of multiple GridHandles each with a single grid
 /// @tparam BufferT Type of the input and output grid buffers
 /// @param handle GridHandle with grids that will be slip into individual GridHandles
-/// @param pool optional pool used for allocation of output GridHandle
+/// @param other optional pool used for allocation of output GridHandle
 /// @return Vector of GridHandles each containing a single grid
 template<typename BufferT, template <class, class...> class VectorT = std::vector>
 inline VectorT<GridHandle<BufferT>>
