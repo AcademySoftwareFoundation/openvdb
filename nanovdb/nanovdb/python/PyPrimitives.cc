@@ -115,6 +115,236 @@ GridHandle<BufferT> createFogVolumeTorus(GridType           gridType,
     }
 }
 
+// ---------- New primitives ----------
+// Same float/double switch pattern as the four existing primitives above.
+// The C++ templates also accept Fp4/Fp8/Fp16/FpN; those flavors live on
+// the createNanoGrid path with explicit oracle and dither parameters
+// rather than being expressed as primitive overloads here.
+
+template<typename BufferT>
+GridHandle<BufferT> createLevelSetBox(GridType           gridType,
+                                      double             width,
+                                      double             height,
+                                      double             depth,
+                                      const Vec3d&       center,
+                                      double             voxelSize,
+                                      double             halfWidth,
+                                      const Vec3d&       origin,
+                                      const std::string& name,
+                                      tools::StatsMode   sMode,
+                                      CheckMode          cMode,
+                                      const BufferT&     buffer)
+{
+    switch (gridType) {
+    case GridType::Float:
+        return tools::createLevelSetBox<float, BufferT>(
+            width, height, depth, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+    case GridType::Double:
+        return tools::createLevelSetBox<double, BufferT>(
+            width, height, depth, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+    default:
+        throw std::runtime_error(
+            "createLevelSetBox: only float and double grid types are supported");
+    }
+}
+
+template<typename BufferT>
+GridHandle<BufferT> createLevelSetBBox(GridType           gridType,
+                                       double             width,
+                                       double             height,
+                                       double             depth,
+                                       double             thickness,
+                                       const Vec3d&       center,
+                                       double             voxelSize,
+                                       double             halfWidth,
+                                       const Vec3d&       origin,
+                                       const std::string& name,
+                                       tools::StatsMode   sMode,
+                                       CheckMode          cMode,
+                                       const BufferT&     buffer)
+{
+    switch (gridType) {
+    case GridType::Float:
+        return tools::createLevelSetBBox<float, BufferT>(
+            width, height, depth, thickness, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+    case GridType::Double:
+        return tools::createLevelSetBBox<double, BufferT>(
+            width, height, depth, thickness, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+    default:
+        throw std::runtime_error(
+            "createLevelSetBBox: only float and double grid types are supported");
+    }
+}
+
+template<typename BufferT>
+GridHandle<BufferT> createLevelSetOctahedron(GridType           gridType,
+                                             double             scale,
+                                             const Vec3d&       center,
+                                             double             voxelSize,
+                                             double             halfWidth,
+                                             const Vec3d&       origin,
+                                             const std::string& name,
+                                             tools::StatsMode   sMode,
+                                             CheckMode          cMode,
+                                             const BufferT&     buffer)
+{
+    switch (gridType) {
+    case GridType::Float:
+        return tools::createLevelSetOctahedron<float, BufferT>(
+            scale, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+    case GridType::Double:
+        return tools::createLevelSetOctahedron<double, BufferT>(
+            scale, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+    default:
+        throw std::runtime_error(
+            "createLevelSetOctahedron: only float and double grid types are supported");
+    }
+}
+
+template<typename BufferT>
+GridHandle<BufferT> createFogVolumeBox(GridType           gridType,
+                                       double             width,
+                                       double             height,
+                                       double             depth,
+                                       const Vec3d&       center,
+                                       double             voxelSize,
+                                       double             halfWidth,
+                                       const Vec3d&       origin,
+                                       const std::string& name,
+                                       tools::StatsMode   sMode,
+                                       CheckMode          cMode,
+                                       const BufferT&     buffer)
+{
+    switch (gridType) {
+    case GridType::Float:
+        return tools::createFogVolumeBox<float, BufferT>(
+            width, height, depth, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+    case GridType::Double:
+        return tools::createFogVolumeBox<double, BufferT>(
+            width, height, depth, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+    default:
+        throw std::runtime_error(
+            "createFogVolumeBox: only float and double grid types are supported");
+    }
+}
+
+template<typename BufferT>
+GridHandle<BufferT> createFogVolumeOctahedron(GridType           gridType,
+                                              double             scale,
+                                              const Vec3d&       center,
+                                              double             voxelSize,
+                                              double             halfWidth,
+                                              const Vec3d&       origin,
+                                              const std::string& name,
+                                              tools::StatsMode   sMode,
+                                              CheckMode          cMode,
+                                              const BufferT&     buffer)
+{
+    switch (gridType) {
+    case GridType::Float:
+        return tools::createFogVolumeOctahedron<float, BufferT>(
+            scale, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+    case GridType::Double:
+        return tools::createFogVolumeOctahedron<double, BufferT>(
+            scale, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+    default:
+        throw std::runtime_error(
+            "createFogVolumeOctahedron: only float and double grid types are supported");
+    }
+}
+
+// Point primitives (no stats mode; result is a PointGrid).
+template<typename BufferT>
+GridHandle<BufferT> createPointSphere(GridType           gridType,
+                                      int                pointsPerVoxel,
+                                      double             radius,
+                                      const Vec3d&       center,
+                                      double             voxelSize,
+                                      const Vec3d&       origin,
+                                      const std::string& name,
+                                      CheckMode          mode,
+                                      const BufferT&     buffer)
+{
+    switch (gridType) {
+    case GridType::Float:
+        return tools::createPointSphere<float, BufferT>(
+            pointsPerVoxel, radius, center, voxelSize, origin, name, mode, buffer);
+    case GridType::Double:
+        return tools::createPointSphere<double, BufferT>(
+            pointsPerVoxel, radius, center, voxelSize, origin, name, mode, buffer);
+    default:
+        throw std::runtime_error(
+            "createPointSphere: only float and double grid types are supported");
+    }
+}
+
+template<typename BufferT>
+GridHandle<BufferT> createPointTorus(GridType           gridType,
+                                     int                pointsPerVoxel,
+                                     double             majorRadius,
+                                     double             minorRadius,
+                                     const Vec3d&       center,
+                                     double             voxelSize,
+                                     const Vec3d&       origin,
+                                     const std::string& name,
+                                     CheckMode          cMode,
+                                     const BufferT&     buffer)
+{
+    switch (gridType) {
+    case GridType::Float:
+        return tools::createPointTorus<float, BufferT>(
+            pointsPerVoxel, majorRadius, minorRadius, center, voxelSize, origin, name, cMode, buffer);
+    case GridType::Double:
+        return tools::createPointTorus<double, BufferT>(
+            pointsPerVoxel, majorRadius, minorRadius, center, voxelSize, origin, name, cMode, buffer);
+    default:
+        throw std::runtime_error(
+            "createPointTorus: only float and double grid types are supported");
+    }
+}
+
+template<typename BufferT>
+GridHandle<BufferT> createPointBox(GridType           gridType,
+                                   int                pointsPerVoxel,
+                                   double             width,
+                                   double             height,
+                                   double             depth,
+                                   const Vec3d&       center,
+                                   double             voxelSize,
+                                   const Vec3d&       origin,
+                                   const std::string& name,
+                                   CheckMode          mode,
+                                   const BufferT&     buffer)
+{
+    switch (gridType) {
+    case GridType::Float:
+        return tools::createPointBox<float, BufferT>(
+            pointsPerVoxel, width, height, depth, center, voxelSize, origin, name, mode, buffer);
+    case GridType::Double:
+        return tools::createPointBox<double, BufferT>(
+            pointsPerVoxel, width, height, depth, center, voxelSize, origin, name, mode, buffer);
+    default:
+        throw std::runtime_error(
+            "createPointBox: only float and double grid types are supported");
+    }
+}
+
+// createPointScatter takes an existing level set as its source. We bind
+// the float source variant — the C++ template also accepts double, but
+// the existing primitives and tests use float, and the source grid is
+// the runtime-typed nanovdb::NanoGrid<float>, so a single overload keeps
+// the Python surface simple.
+template<typename BufferT>
+GridHandle<BufferT> createPointScatter(const NanoGrid<float>& srcGrid,
+                                       int                    pointsPerVoxel,
+                                       const std::string&     name,
+                                       CheckMode              mode,
+                                       const BufferT&         buffer)
+{
+    return tools::createPointScatter<float, BufferT>(
+        srcGrid, pointsPerVoxel, name, mode, buffer);
+}
+
 } // namespace
 
 template<typename BufferT> void definePrimitives(nb::module_& m)
@@ -194,6 +424,131 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
           "buffer"_a = BufferT());
+
+    // ---------- Level-set / fog-volume primitives added in Phase 5a ----------
+    m.def("createLevelSetBox", &createLevelSetBox<BufferT>,
+          "gridType"_a = GridType::Float,
+          "width"_a = 40.0,
+          "height"_a = 60.0,
+          "depth"_a = 100.0,
+          "center"_a = Vec3d(0.0),
+          "voxelSize"_a = 1.0,
+          "halfWidth"_a = 3.0,
+          "origin"_a = Vec3d(0.0),
+          "name"_a = "box_ls",
+          "sMode"_a = tools::StatsMode::Default,
+          "cMode"_a = CheckMode::Default,
+          "buffer"_a = BufferT(),
+          "Narrow-band level set of an axis-aligned box.");
+
+    m.def("createLevelSetBBox", &createLevelSetBBox<BufferT>,
+          "gridType"_a = GridType::Float,
+          "width"_a = 40.0,
+          "height"_a = 60.0,
+          "depth"_a = 100.0,
+          "thickness"_a = 10.0,
+          "center"_a = Vec3d(0.0),
+          "voxelSize"_a = 1.0,
+          "halfWidth"_a = 3.0,
+          "origin"_a = Vec3d(0.0),
+          "name"_a = "bbox_ls",
+          "sMode"_a = tools::StatsMode::Default,
+          "cMode"_a = CheckMode::Default,
+          "buffer"_a = BufferT(),
+          "Narrow-band level set of a hollow box wireframe (BBox = bounding "
+          "box edges with the given thickness).");
+
+    m.def("createLevelSetOctahedron", &createLevelSetOctahedron<BufferT>,
+          "gridType"_a = GridType::Float,
+          "scale"_a = 100.0,
+          "center"_a = Vec3d(0.0),
+          "voxelSize"_a = 1.0,
+          "halfWidth"_a = 3.0,
+          "origin"_a = Vec3d(0.0),
+          "name"_a = "octadedron_ls",
+          "sMode"_a = tools::StatsMode::Default,
+          "cMode"_a = CheckMode::Default,
+          "buffer"_a = BufferT(),
+          "Narrow-band level set of an octahedron.");
+
+    m.def("createFogVolumeBox", &createFogVolumeBox<BufferT>,
+          "gridType"_a = GridType::Float,
+          "width"_a = 40.0,
+          "height"_a = 60.0,
+          "depth"_a = 100.0,
+          "center"_a = Vec3d(0.0),
+          "voxelSize"_a = 1.0,
+          "halfWidth"_a = 3.0,
+          "origin"_a = Vec3d(0.0),
+          "name"_a = "box_fog",
+          "sMode"_a = tools::StatsMode::Default,
+          "cMode"_a = CheckMode::Default,
+          "buffer"_a = BufferT(),
+          "Sparse fog volume of a box (exterior 0/inactive, interior active "
+          "with values smoothly varying from 0 at the surface to 1 inside).");
+
+    m.def("createFogVolumeOctahedron", &createFogVolumeOctahedron<BufferT>,
+          "gridType"_a = GridType::Float,
+          "scale"_a = 100.0,
+          "center"_a = Vec3d(0.0),
+          "voxelSize"_a = 1.0,
+          "halfWidth"_a = 3.0,
+          "origin"_a = Vec3d(0.0),
+          "name"_a = "octadedron_fog",
+          "sMode"_a = tools::StatsMode::Default,
+          "cMode"_a = CheckMode::Default,
+          "buffer"_a = BufferT(),
+          "Sparse fog volume of an octahedron.");
+
+    // ---------- Point primitives added in Phase 5a ----------
+    m.def("createPointSphere", &createPointSphere<BufferT>,
+          "gridType"_a = GridType::Float,
+          "pointsPerVoxel"_a = 1,
+          "radius"_a = 100.0,
+          "center"_a = Vec3d(0.0),
+          "voxelSize"_a = 1.0,
+          "origin"_a = Vec3d(0.0),
+          "name"_a = "sphere_points",
+          "cMode"_a = CheckMode::Default,
+          "buffer"_a = BufferT(),
+          "PointDataGrid of points scattered on the surface of a sphere.");
+
+    m.def("createPointTorus", &createPointTorus<BufferT>,
+          "gridType"_a = GridType::Float,
+          "pointsPerVoxel"_a = 1,
+          "majorRadius"_a = 100.0,
+          "minorRadius"_a = 50.0,
+          "center"_a = Vec3d(0.0),
+          "voxelSize"_a = 1.0,
+          "origin"_a = Vec3d(0.0),
+          "name"_a = "torus_points",
+          "cMode"_a = CheckMode::Default,
+          "buffer"_a = BufferT(),
+          "PointDataGrid of points scattered on the surface of a torus.");
+
+    m.def("createPointBox", &createPointBox<BufferT>,
+          "gridType"_a = GridType::Float,
+          "pointsPerVoxel"_a = 1,
+          "width"_a = 40.0,
+          "height"_a = 60.0,
+          "depth"_a = 100.0,
+          "center"_a = Vec3d(0.0),
+          "voxelSize"_a = 1.0,
+          "origin"_a = Vec3d(0.0),
+          "name"_a = "box_points",
+          "cMode"_a = CheckMode::Default,
+          "buffer"_a = BufferT(),
+          "PointDataGrid of points scattered on the surface of a box.");
+
+    m.def("createPointScatter", &createPointScatter<BufferT>,
+          "srcGrid"_a,
+          "pointsPerVoxel"_a = 1,
+          "name"_a = "point_scatter",
+          "cMode"_a = CheckMode::Default,
+          "buffer"_a = BufferT(),
+          "Scatter PointDataGrid into the active voxels of a NanoGrid<float> "
+          "level set or fog volume. Point coordinates are stored as blind "
+          "data in world space.");
 }
 
 template void definePrimitives<HostBuffer>(nb::module_&);

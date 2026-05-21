@@ -36,6 +36,8 @@ void defineToolsModule(nb::module_& m)
     defineGridValidatorModule(m);
     defineEvalChecksumModule(m);
 
+    defineCreateNanoGridConversions(m);
+
     definePrimitives<HostBuffer>(m);
 
 #define NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix) \

@@ -1543,6 +1543,186 @@ class TestCreateNanoGrid(unittest.TestCase):
             self.assertEqual(grid.gridClass(), nanovdb.GridClass.Unknown)
 
 
+class TestNewPrimitives(unittest.TestCase):
+    """Phase 5a: the 9 host primitives that didn't ship in Phase 0."""
+
+    def test_create_level_set_box(self):
+        h = nanovdb.tools.createLevelSetBox(width=10.0, height=15.0, depth=20.0)
+        self.assertEqual(h.gridCount(), 1)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.Float)
+        self.assertGreater(h.grid().activeVoxelCount(), 0)
+        self.assertEqual(h.grid().gridClass(), nanovdb.GridClass.LevelSet)
+
+    def test_create_level_set_box_double(self):
+        h = nanovdb.tools.createLevelSetBox(
+            gridType=nanovdb.GridType.Double, width=10.0)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.Double)
+
+    def test_create_level_set_bbox(self):
+        h = nanovdb.tools.createLevelSetBBox(
+            width=40.0, height=40.0, depth=40.0, thickness=5.0)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.Float)
+        self.assertGreater(h.grid().activeVoxelCount(), 0)
+
+    def test_create_level_set_octahedron(self):
+        h = nanovdb.tools.createLevelSetOctahedron(scale=20.0)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.Float)
+        self.assertGreater(h.grid().activeVoxelCount(), 0)
+
+    def test_create_fog_volume_box(self):
+        h = nanovdb.tools.createFogVolumeBox(width=10.0)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.Float)
+        self.assertEqual(h.grid().gridClass(), nanovdb.GridClass.FogVolume)
+        self.assertGreater(h.grid().activeVoxelCount(), 0)
+
+    def test_create_fog_volume_octahedron(self):
+        h = nanovdb.tools.createFogVolumeOctahedron(scale=20.0)
+        self.assertEqual(h.grid().gridClass(), nanovdb.GridClass.FogVolume)
+
+    def test_create_point_sphere(self):
+        h = nanovdb.tools.createPointSphere(pointsPerVoxel=2, radius=10.0)
+        self.assertEqual(h.gridCount(), 1)
+        # PointGrid stores point counts as UInt32 sequential indices.
+        self.assertEqual(h.gridType(0), nanovdb.GridType.UInt32)
+        self.assertEqual(h.grid().gridClass(), nanovdb.GridClass.PointData)
+        self.assertGreater(h.grid().activeVoxelCount(), 0)
+
+    def test_create_point_torus(self):
+        h = nanovdb.tools.createPointTorus(
+            pointsPerVoxel=1, majorRadius=10.0, minorRadius=3.0)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.UInt32)
+        self.assertGreater(h.grid().activeVoxelCount(), 0)
+
+    def test_create_point_box(self):
+        # Box must be large enough to enclose at least one active voxel
+        # for createPointScatter's internal "ActiveVoxelCount is required"
+        # precondition to pass.
+        h = nanovdb.tools.createPointBox(
+            pointsPerVoxel=1, width=40.0, height=40.0, depth=40.0)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.UInt32)
+        self.assertGreater(h.grid().activeVoxelCount(), 0)
+
+    def test_create_point_scatter(self):
+        # Source level set, then scatter points into it.
+        sphere = nanovdb.tools.createLevelSetSphere(radius=10.0).grid()
+        h = nanovdb.tools.createPointScatter(sphere, pointsPerVoxel=2)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.UInt32)
+        self.assertGreater(h.grid().activeVoxelCount(), 0)
+
+    def test_create_point_scatter_rejects_non_float_source(self):
+        # The binding accepts NanoGrid<float> only — other source types
+        # should raise TypeError at the conversion boundary.
+        h_double = nanovdb.tools.createLevelSetSphere(
+            gridType=nanovdb.GridType.Double, radius=10.0)
+        with self.assertRaises(TypeError):
+            nanovdb.tools.createPointScatter(h_double.grid())
+
+
+class TestCreateNanoGridQuantized(unittest.TestCase):
+    """Phase 5b: tools.createNanoGridFp4 / Fp8 / Fp16 / FpN with AbsDiff/RelDiff."""
+
+    def _float_sphere(self):
+        return nanovdb.tools.createLevelSetSphere(radius=10.0).grid()
+
+    def test_quantize_fp4(self):
+        h = nanovdb.tools.createNanoGridFp4(self._float_sphere())
+        self.assertEqual(h.gridType(0), nanovdb.GridType.Fp4)
+        self.assertGreater(h.grid().activeVoxelCount(), 0)
+
+    def test_quantize_fp8(self):
+        h = nanovdb.tools.createNanoGridFp8(self._float_sphere())
+        self.assertEqual(h.gridType(0), nanovdb.GridType.Fp8)
+
+    def test_quantize_fp16(self):
+        h = nanovdb.tools.createNanoGridFp16(self._float_sphere())
+        self.assertEqual(h.gridType(0), nanovdb.GridType.Fp16)
+
+    def test_quantize_fpn_absdiff(self):
+        oracle = nanovdb.tools.AbsDiff(0.05)
+        self.assertAlmostEqual(oracle.getTolerance(), 0.05, places=5)
+        self.assertTrue(bool(oracle))
+        h = nanovdb.tools.createNanoGridFpN(self._float_sphere(), oracle)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.FpN)
+
+    def test_quantize_fpn_reldiff(self):
+        oracle = nanovdb.tools.RelDiff(0.1)
+        self.assertAlmostEqual(oracle.getTolerance(), 0.1, places=5)
+        h = nanovdb.tools.createNanoGridFpN(self._float_sphere(), oracle)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.FpN)
+
+    def test_oracle_default_tolerance(self):
+        # Default-constructed oracle has tolerance == -1, which means
+        # "uninitialized"; the operator bool() detects that.
+        a = nanovdb.tools.AbsDiff()
+        self.assertEqual(a.getTolerance(), -1.0)
+        self.assertFalse(bool(a))
+        a.setTolerance(0.5)
+        self.assertEqual(a.getTolerance(), 0.5)
+        self.assertTrue(bool(a))
+
+    def test_quantize_rejects_double_source(self):
+        # The C++ Fp{4,8,16,N} preProcess static-asserts SrcValueT == float;
+        # Python must surface this as a TypeError at the conversion boundary.
+        h_double = nanovdb.tools.createLevelSetSphere(
+            gridType=nanovdb.GridType.Double, radius=5.0)
+        with self.assertRaises(TypeError):
+            nanovdb.tools.createNanoGridFp16(h_double.grid())
+        with self.assertRaises(TypeError):
+            nanovdb.tools.createNanoGridFpN(
+                h_double.grid(), nanovdb.tools.AbsDiff(0.05))
+
+    def test_quantize_from_build_grid(self):
+        # Phase 5c: build::FloatGrid accepted as quantization source.
+        bg = nanovdb.tools.build.FloatGrid(0.0)
+        for i in range(5):
+            bg.setValue(nanovdb.math.Coord(i, 0, 0), float(i + 1))
+        h = nanovdb.tools.createNanoGridFp16(bg)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.Fp16)
+        self.assertEqual(h.grid().activeVoxelCount(), 5)
+
+
+class TestCreateNanoGridIndex(unittest.TestCase):
+    """Phase 5b/5c: tools.createNanoGridIndex / OnIndex with broad source set."""
+
+    def test_index_from_float_nanogrid(self):
+        sphere = nanovdb.tools.createLevelSetSphere(radius=10.0).grid()
+        h = nanovdb.tools.createNanoGridIndex(sphere)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.Index)
+
+    def test_on_index_from_float_nanogrid(self):
+        sphere = nanovdb.tools.createLevelSetSphere(radius=10.0).grid()
+        h = nanovdb.tools.createNanoGridOnIndex(sphere)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.OnIndex)
+
+    def test_index_from_double_nanogrid(self):
+        sphere = nanovdb.tools.createLevelSetSphere(
+            gridType=nanovdb.GridType.Double, radius=10.0).grid()
+        h = nanovdb.tools.createNanoGridIndex(sphere)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.Index)
+
+    def test_index_from_int32_build(self):
+        # Phase 5c source: build::Int32Grid is accepted by the index path.
+        bg = nanovdb.tools.build.Int32Grid(0)
+        bg.setValue(nanovdb.math.Coord(0, 0, 0), 42)
+        bg.setValue(nanovdb.math.Coord(1, 0, 0), -7)
+        h = nanovdb.tools.createNanoGridOnIndex(bg)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.OnIndex)
+        self.assertEqual(h.grid().activeVoxelCount(), 2)
+
+    def test_index_from_vec3f_build(self):
+        bv = nanovdb.tools.build.Vec3fGrid(nanovdb.math.Vec3f(0.0))
+        bv.setValue(nanovdb.math.Coord(0, 0, 0), nanovdb.math.Vec3f(1, 2, 3))
+        h = nanovdb.tools.createNanoGridOnIndex(bv)
+        self.assertEqual(h.gridType(0), nanovdb.GridType.OnIndex)
+
+    def test_index_rejects_unsupported_source(self):
+        # bool / Boolean grids are not in the supported source set for
+        # the Phase 5 index conversion (only float/double/int32/Vec3f
+        # plus the matching build::* counterparts).
+        with self.assertRaises(TypeError):
+            nanovdb.tools.createNanoGridOnIndex(None)
+
+
 class TestGridStats(unittest.TestCase):
     """nanovdb.tools.Extrema*, Stats*, updateGridStats, getExtrema."""
 
