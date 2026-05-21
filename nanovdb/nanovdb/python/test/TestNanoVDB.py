@@ -1650,11 +1650,7 @@ class TestBuildGrid(unittest.TestCase):
             nanovdb.math.Vec3f(0.0), "v", nanovdb.GridClass.Unknown)
         v = nanovdb.math.Vec3f(1.0, 2.0, 3.0)
         g.setValue(nanovdb.math.Coord(0, 0, 0), v)
-        got = g.getValue(nanovdb.math.Coord(0, 0, 0))
-        # Vec3f equality isn't bound here, so compare components.
-        self.assertEqual(got[0], 1.0)
-        self.assertEqual(got[1], 2.0)
-        self.assertEqual(got[2], 3.0)
+        self.assertEqual(g.getValue(nanovdb.math.Coord(0, 0, 0)), v)
         h = g.to_nanovdb()
         self.assertEqual(h.grid().gridType(), nanovdb.GridType.Vec3f)
 
