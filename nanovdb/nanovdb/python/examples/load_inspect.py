@@ -2,12 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 """Load a NanoVDB grid and inspect it polymorphically.
 
-Phase 1 of the bindings restructure replaced every typed accessor
-(handle.floatGrid(i), handle.doubleGrid(i), ...) with a single
-polymorphic handle.grid(i) that returns the correct typed Python
-subclass for whatever GridType the grid carries. This example walks
-through that — construct a grid of an unknown type, inspect it via
-GridMetaData and the polymorphic accessor, and print a summary.
+handle.grid(i) returns the correct typed Python subclass for whatever
+GridType the grid carries, so a single call site can handle a mixed
+bundle of grid types. This example builds two grids of different
+value types into one handle, then walks the handle inspecting each
+grid via the polymorphic accessor plus GridMetaData (the type-erased
+introspector that answers "what's in this buffer?" without knowing
+BuildT at compile time).
 
 Run with: python load_inspect.py
 """

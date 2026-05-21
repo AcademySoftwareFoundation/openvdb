@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 """Quantize a NanoGrid<float> down to a quantized BuildT.
 
-Phase 5b binds tools.createNanoGridFp4 / Fp8 / Fp16 / FpN — the
-quantized counterparts of the regular grid types. Fp4 / Fp8 / Fp16
-use a fixed bit-width per voxel. FpN picks the bit-width per leaf so
-each leaf hits a user-supplied tolerance (the "oracle"). Smaller bit
-widths give smaller files at the cost of approximation error.
+nanovdb.tools.createNanoGridFp4 / Fp8 / Fp16 / FpN are the quantized
+counterparts of the regular grid types. Fp4 / Fp8 / Fp16 use a fixed
+bit-width per voxel. FpN picks the bit-width per leaf so each leaf
+hits a user-supplied tolerance (the "oracle"). Smaller bit widths
+give smaller files at the cost of approximation error.
 
 Run with: python quantize.py
 """

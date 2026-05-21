@@ -2,11 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """Validate a NanoVDB grid and round-trip its checksum.
 
-Phase 4c bound the grid-quality surface: tools.validateGrid (single
-grid), tools.checkGrid -> (ok, error), tools.isValid, plus the
-checksum helpers tools.evalChecksum / validateChecksum /
-updateChecksum. This example walks through a typical "load and
-verify" workflow.
+nanovdb.tools exposes the grid-quality surface: validateGrid (single
+grid), checkGrid -> (ok, error), isValid, plus the checksum helpers
+evalChecksum / validateChecksum / updateChecksum. This example walks
+through a typical "load and verify" workflow.
 
 Run with: python validate.py
 """

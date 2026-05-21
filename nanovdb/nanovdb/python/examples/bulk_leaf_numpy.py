@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """Bulk per-leaf value access as a zero-copy NumPy array.
 
-Phase 3d's grid.leaf_values() is the highest-bandwidth path from
-NanoVDB into NumPy. It returns an (N_leaves, 512) view of every
-leaf's mValues without copying — modify it, slice it, feed it into a
-PyTorch tensor, hash it for cache lookup, whatever you need.
+grid.leaf_values() is the highest-bandwidth path from NanoVDB into
+NumPy. It returns an (N_leaves, 512) view of every leaf's mValues
+without copying — modify it, slice it, feed it into a PyTorch tensor,
+hash it for cache lookup, whatever you need.
 
 Run with: python bulk_leaf_numpy.py
 """

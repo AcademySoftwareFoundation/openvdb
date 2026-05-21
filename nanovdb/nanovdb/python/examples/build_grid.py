@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 """Construct a NanoVDB grid voxel-by-voxel in pure Python.
 
-Phase 4a added nanovdb.tools.build.<Suffix>Grid — the mutable CPU
-grid builder that mirrors nanovdb::tools::build::Grid<T>. This
-example shows the typical construction loop (setValue + writable
-accessors), then bakes the build grid into a host NanoGrid via
+nanovdb.tools.build.<Suffix>Grid is the mutable CPU grid builder
+that mirrors nanovdb::tools::build::Grid<T>. This example shows the
+three construction loops you'll typically reach for (setValue
+directly, the cached ValueAccessor, and the thread-safe
+WriteAccessor), then bakes each build grid into a host NanoGrid via
 .to_nanovdb() and reads it back through the regular polymorphic
 handle.grid() API.
 
