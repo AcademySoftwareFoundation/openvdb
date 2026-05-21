@@ -1617,6 +1617,13 @@ class TestNewPrimitives(unittest.TestCase):
         with self.assertRaises(TypeError):
             nanovdb.tools.createPointScatter(h_double.grid())
 
+    def test_create_point_scatter_rejects_fog_volume(self):
+        # createPointScatter's C++ implementation requires the source to
+        # pass srcGrid.isLevelSet(); fog volumes raise RuntimeError.
+        h_fog = nanovdb.tools.createFogVolumeSphere(radius=10.0)
+        with self.assertRaises(RuntimeError):
+            nanovdb.tools.createPointScatter(h_fog.grid())
+
 
 class TestCreateNanoGridQuantized(unittest.TestCase):
     """Phase 5b: tools.createNanoGridFp4 / Fp8 / Fp16 / FpN with AbsDiff/RelDiff."""

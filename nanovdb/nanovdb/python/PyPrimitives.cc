@@ -526,9 +526,11 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "point_scatter",
           "cMode"_a = CheckMode::Default,
           "buffer"_a = BufferT(),
-          "Scatter PointDataGrid into the active voxels of a NanoGrid<float> "
-          "level set or fog volume. Point coordinates are stored as blind "
-          "data in world space.");
+          "Scatter a PointDataGrid into the active voxels of a "
+          "NanoGrid<float> level set. The source grid must satisfy "
+          "srcGrid.isLevelSet() and have an active bounding box; "
+          "non-level-set sources (e.g. fog volumes) raise RuntimeError. "
+          "Point coordinates are stored as blind data in world space.");
 }
 
 template void definePrimitives<HostBuffer>(nb::module_&);
