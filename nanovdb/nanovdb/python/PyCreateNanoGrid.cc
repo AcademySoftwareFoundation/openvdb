@@ -37,7 +37,9 @@ GridHandle<HostBuffer> createNanoGridFromFunc(const BuildT&                     
 
 template<typename BuildT> void defineCreateNanoGrid(nb::module_& m, const char* name)
 {
-    m.def(name, &createNanoGridFromFunc<BuildT>, nb::call_guard<nb::gil_scoped_release>(), "background"_a, "name"_a, "gridClass"_a, "func"_a, "bbox"_a);
+    m.def(name, &createNanoGridFromFunc<BuildT>, nb::call_guard<nb::gil_scoped_release>(), "background"_a, "name"_a, "gridClass"_a, "func"_a, "bbox"_a,
+          "Construct a NanoGrid by evaluating func(Coord) over every voxel in bbox. "
+          "Returns a GridHandle owning the freshly-built grid.");
 }
 
 template<typename BufferT> void defineOpenToNanoVDB(nb::module_& m)
@@ -47,14 +49,15 @@ template<typename BufferT> void defineOpenToNanoVDB(nb::module_& m)
           "base"_a,
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
-          "verbose"_a = 0);
+          "verbose"_a = 0,
+          "Convert an OpenVDB base grid to a NanoVDB GridHandle.");
 #endif
 }
 
 // ============================================================================
-// Phase 5b/5c conversion bindings: AbsDiff/RelDiff oracle classes, and the
-// polymorphic createNanoGrid free functions for quantized + index destination
-// BuildTs. Each accepts source = NanoGrid<SrcBuildT> OR build::Grid<SrcBuildT>.
+// Conversion bindings: AbsDiff/RelDiff oracle classes, and the polymorphic
+// createNanoGrid free functions for quantized + index destination BuildTs.
+// Each accepts source = NanoGrid<SrcBuildT> OR build::Grid<SrcBuildT>.
 // ============================================================================
 
 namespace {
@@ -247,9 +250,12 @@ void defineCreateNanoGridConversions(nb::module_& toolsModule)
         "default) means uninitialized; any non-negative value (including "
         "0.0) is treated as initialized by the operator bool() check, "
         "or the C++ create function can fill it in via init().")
-        .def(nb::init<float>(), "tolerance"_a = -1.0f)
-        .def("getTolerance", &tools::AbsDiff::getTolerance)
-        .def("setTolerance", &tools::AbsDiff::setTolerance, "tolerance"_a)
+        .def(nb::init<float>(), "tolerance"_a = -1.0f,
+             "Construct an AbsDiff oracle with the given absolute tolerance.")
+        .def("getTolerance", &tools::AbsDiff::getTolerance,
+             "Return the current absolute tolerance.")
+        .def("setTolerance", &tools::AbsDiff::setTolerance, "tolerance"_a,
+             "Replace the current absolute tolerance.")
         .def("__bool__",
             [](const tools::AbsDiff& self) { return bool(self); },
             "True iff the tolerance has been initialized (>= 0).");
@@ -257,9 +263,12 @@ void defineCreateNanoGridConversions(nb::module_& toolsModule)
     nb::class_<tools::RelDiff>(toolsModule, "RelDiff",
         "Compression oracle for FpN: accept the approximation when "
         "|exact - approx| / max(|exact|, |approx|) <= tolerance.")
-        .def(nb::init<float>(), "tolerance"_a = -1.0f)
-        .def("getTolerance", &tools::RelDiff::getTolerance)
-        .def("setTolerance", &tools::RelDiff::setTolerance, "tolerance"_a)
+        .def(nb::init<float>(), "tolerance"_a = -1.0f,
+             "Construct a RelDiff oracle with the given relative tolerance.")
+        .def("getTolerance", &tools::RelDiff::getTolerance,
+             "Return the current relative tolerance.")
+        .def("setTolerance", &tools::RelDiff::setTolerance, "tolerance"_a,
+             "Replace the current relative tolerance.")
         .def("__bool__",
             [](const tools::RelDiff& self) { return bool(self); },
             "True iff the tolerance has been initialized (>= 0).");
@@ -332,10 +341,10 @@ void defineCreateNanoGridConversions(nb::module_& toolsModule)
 
     // ------ Index / OnIndex ------
     //
-    // createOnIndexGrid (the test-scaffold factory from Phase 3 follow-up)
-    // is now superseded by createNanoGridOnIndex. The legacy name keeps
-    // working through PyVoxelBlockManager.cc; the official Phase 5 name
-    // lives here.
+    // createNanoGridIndex / createNanoGridOnIndex are the canonical names
+    // for the broad-source-coverage index conversion bindings. A narrower
+    // createOnIndexGrid factory still lives in PyVoxelBlockManager.cc as
+    // the test scaffolding entry point used by the VBM unit tests.
     toolsModule.def("createNanoGridIndex",
         [](nb::handle src, uint32_t channels, bool includeStats,
            bool includeTiles, int verbose) {

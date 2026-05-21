@@ -16,19 +16,26 @@ namespace {
 template<typename TreeT, int Order> void defineSampleFromVoxels(nb::module_& m, const char* name)
 {
     using CoordT = typename TreeT::CoordType;
-    nb::class_<math::SampleFromVoxels<TreeT, Order, false>>(m, name)
+    nb::class_<math::SampleFromVoxels<TreeT, Order, false>>(m, name,
+        "Callable sampler that reconstructs a grid value at an arbitrary "
+        "index-space position. Build via the matching create*Sampler() factory.")
         .def(
-            "__call__", [](const math::SampleFromVoxels<TreeT, Order, false>& sampler, const CoordT& ijk) { return sampler(ijk); }, nb::is_operator(), "ijk"_a)
+            "__call__", [](const math::SampleFromVoxels<TreeT, Order, false>& sampler, const CoordT& ijk) { return sampler(ijk); }, nb::is_operator(), "ijk"_a,
+            "Sample the grid at integer voxel coordinate ijk.")
         .def(
-            "__call__", [](const math::SampleFromVoxels<TreeT, Order, false>& sampler, const Vec3f& xyz) { return sampler(xyz); }, nb::is_operator(), "xyz"_a)
+            "__call__", [](const math::SampleFromVoxels<TreeT, Order, false>& sampler, const Vec3f& xyz) { return sampler(xyz); }, nb::is_operator(), "xyz"_a,
+            "Sample the grid at fractional index-space position xyz.")
         .def(
-            "__call__", [](const math::SampleFromVoxels<TreeT, Order, false>& sampler, const Vec3d& xyz) { return sampler(xyz); }, nb::is_operator(), "xyz"_a);
+            "__call__", [](const math::SampleFromVoxels<TreeT, Order, false>& sampler, const Vec3d& xyz) { return sampler(xyz); }, nb::is_operator(), "xyz"_a,
+            "Sample the grid at fractional index-space position xyz (double).");
 }
 
 template<typename TreeT, int Order> void defineCreateSampler(nb::module_& m, const char* name)
 {
     m.def(
-        name, [](const Grid<TreeT>& grid) { return math::createSampler<Order, TreeT, false>(grid.tree()); }, "grid"_a);
+        name, [](const Grid<TreeT>& grid) { return math::createSampler<Order, TreeT, false>(grid.tree()); }, "grid"_a,
+        "Build a sampler of the matching order that reads values from the "
+        "given grid's tree.");
 }
 
 } // namespace

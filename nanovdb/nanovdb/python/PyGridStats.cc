@@ -17,7 +17,11 @@ namespace pynanovdb {
 
 void defineStatsMode(nb::module_& m)
 {
-    nb::enum_<tools::StatsMode>(m, "StatsMode")
+    nb::enum_<tools::StatsMode>(m, "StatsMode",
+        "Selector controlling which per-node statistics are computed by "
+        "tools.updateGridStats: Disable skips stats, BBox refreshes only "
+        "bounding boxes, MinMax adds min/max, and All adds average and "
+        "standard deviation as well.")
         .value("Disable", tools::StatsMode::Disable)
         .value("BBox", tools::StatsMode::BBox)
         .value("MinMax", tools::StatsMode::MinMax)
@@ -35,7 +39,9 @@ static void defineExtrema(nb::module_& m, const char* name)
     using ValueT   = typename NanoGrid<BuildT>::ValueType;
     using ExtremaT = tools::Extrema<ValueT>;
 
-    nb::class_<ExtremaT>(m, name)
+    nb::class_<ExtremaT>(m, name,
+        "Running minimum / maximum accumulator over a stream of values. "
+        "Build via repeated add(v) calls or via tools.getExtrema(grid, bbox).")
         .def(nb::init<>(),
             "Default-construct an Extrema with min = numeric_limits::max and "
             "max = numeric_limits::lowest, so any subsequent .add(v) gives "
@@ -77,7 +83,9 @@ static void defineStats(nb::module_& m, const char* name, const char* baseName)
     using StatsT  = tools::Stats<ValueT>;
     (void)baseName; // kept in signature for parity with extrema name lookup
 
-    nb::class_<StatsT, BaseT>(m, name)
+    nb::class_<StatsT, BaseT>(m, name,
+        "Running min/max/mean/variance/std accumulator over a stream of "
+        "values. Extends Extrema with sample-count-weighted moments.")
         .def(nb::init<>(),
             "Default-construct a Stats accumulator with zero samples.")
         .def("add",

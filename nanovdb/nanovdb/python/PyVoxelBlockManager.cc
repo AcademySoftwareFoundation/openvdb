@@ -168,11 +168,16 @@ static void defineHandle(nb::module_& toolsModule)
     nb::class_<PyVBMHandle>(toolsModule, "VoxelBlockManagerHandle",
         "Owns the firstLeafID / jumpMap metadata buffers backing a "
         "VoxelBlockManager. Constructed by nanovdb.tools.buildVoxelBlockManager.")
-        .def(nb::init<>())
-        .def("blockCount",  &PyVBMHandle::blockCount)
-        .def("firstOffset", &PyVBMHandle::firstOffset)
-        .def("lastOffset",  &PyVBMHandle::lastOffset)
-        .def("reset",       &PyVBMHandle::reset)
+        .def(nb::init<>(),
+             "Construct an empty VoxelBlockManagerHandle with no buffers.")
+        .def("blockCount",  &PyVBMHandle::blockCount,
+             "Number of voxel blocks managed by this handle.")
+        .def("firstOffset", &PyVBMHandle::firstOffset,
+             "Linear leaf offset of the first block managed by this handle.")
+        .def("lastOffset",  &PyVBMHandle::lastOffset,
+             "Linear leaf offset of the last block managed by this handle.")
+        .def("reset",       &PyVBMHandle::reset,
+             "Release this handle's buffers and reset it to the empty state.")
         .def_prop_ro("log2_block_width", [](const PyVBMHandle& h) { return h.log2BlockWidth; },
             "The log2_block_width this handle was built with. The jumpMap "
             "and decodeBlock outputs derive their shapes from this value.")
@@ -454,7 +459,11 @@ static void defineDecode(nb::module_& toolsModule)
         "BlockWidth/64. first_leaf_id must be in [0, grid.tree().nodeCount(0)).");
 }
 
-// ----- createOnIndexGrid test-scaffold factory (subset of Phase 5) --------
+// ----- createOnIndexGrid test-scaffold factory ----------------------------
+//
+// Narrow source-coverage factory used by the VoxelBlockManager unit tests.
+// New code should prefer tools.createNanoGridOnIndex (in PyCreateNanoGrid.cc)
+// which accepts a wider source set.
 
 template<typename SrcBuildT>
 static nb::object tryCreateOnIndexGrid(nb::handle py_grid,

@@ -35,15 +35,22 @@ template<typename BuildT> void defineNanoLeaf(nb::module_& m, const char* name)
         "Leaf node — 8x8x8 voxels. Inherits stats and bbox from the same "
         "leaf-data block bound across BuildTs.");
 
-    cls.def("origin",        &LeafT::origin)
-       .def("bbox",          &LeafT::bbox)
-       .def("hasBBox",       &LeafT::hasBBox)
-       .def_static("dim",    &LeafT::dim)
-       .def_static("voxelCount", &LeafT::voxelCount)
-       .def("memUsage",      &LeafT::memUsage)
+    cls.def("origin",        &LeafT::origin,
+            "Index-space origin (minimum corner) of this leaf node.")
+       .def("bbox",          &LeafT::bbox,
+            "Index-space bounding box of this leaf's active voxels.")
+       .def("hasBBox",       &LeafT::hasBBox,
+            "True iff this leaf carries a cached active bounding box.")
+       .def_static("dim",    &LeafT::dim,
+            "Side length of a leaf node in voxels (always 8).")
+       .def_static("voxelCount", &LeafT::voxelCount,
+            "Total voxel count in a leaf (always 512).")
+       .def("memUsage",      &LeafT::memUsage,
+            "Byte size of this leaf node.")
        .def("isActive",
             nb::overload_cast<const CoordT&>(&LeafT::isActive, nb::const_),
-            nb::arg("ijk"))
+            nb::arg("ijk"),
+            "True iff the voxel at index-space ijk is active.")
        .def("isActive",
             [](const LeafT& leaf, uint32_t n) {
                 // Underlying mValueMask.isOn(n) is unchecked; release builds
@@ -54,7 +61,8 @@ template<typename BuildT> void defineNanoLeaf(nb::module_& m, const char* name)
                 }
                 return leaf.isActive(n);
             },
-            nb::arg("n"))
+            nb::arg("n"),
+            "True iff the n-th voxel (linear index into the 512-element leaf) is active.")
        .def("getValue",
             [](const LeafT& leaf, uint32_t offset) {
                 // mValues[offset] is unchecked in C++; guard the Python side.
@@ -64,28 +72,39 @@ template<typename BuildT> void defineNanoLeaf(nb::module_& m, const char* name)
                 }
                 return leaf.getValue(offset);
             },
-            nb::arg("offset"))
+            nb::arg("offset"),
+            "Return the value at linear offset (0..511) within this leaf.")
        .def("getValue",
             nb::overload_cast<const CoordT&>(&LeafT::getValue, nb::const_),
-            nb::arg("ijk"))
-       .def("getFirstValue", &LeafT::getFirstValue)
-       .def("getLastValue",  &LeafT::getLastValue)
-       .def("minimum",       &LeafT::minimum)
-       .def("maximum",       &LeafT::maximum)
-       .def("average",       &LeafT::average)
-       .def("stdDeviation",  &LeafT::stdDeviation)
+            nb::arg("ijk"),
+            "Return the value at index-space ijk; ijk must lie inside this leaf.")
+       .def("getFirstValue", &LeafT::getFirstValue,
+            "Value at the leaf's first voxel (linear offset 0).")
+       .def("getLastValue",  &LeafT::getLastValue,
+            "Value at the leaf's last voxel (linear offset 511).")
+       .def("minimum",       &LeafT::minimum,
+            "Minimum active value within this leaf.")
+       .def("maximum",       &LeafT::maximum,
+            "Maximum active value within this leaf.")
+       .def("average",       &LeafT::average,
+            "Average of active values within this leaf.")
+       .def("stdDeviation",  &LeafT::stdDeviation,
+            "Standard deviation of active values within this leaf.")
        // NOTE: variance() omitted — NanoVDB.h line 4388 uses unqualified
        // Pow2() which fails ADL for non-float ValueTs (ValueIndex /
        // ValueMask / etc.). Users can compute it as stdDeviation() ** 2.
-       .def("flags",         &LeafT::flags)
-       .def("valueMask",     &LeafT::valueMask, nb::rv_policy::reference_internal)
+       .def("flags",         &LeafT::flags,
+            "Raw leaf flag bits.")
+       .def("valueMask",     &LeafT::valueMask, nb::rv_policy::reference_internal,
+            "Reference to the leaf's 512-bit active-value mask.")
        .def("probeValue",
             [](const LeafT& leaf, const CoordT& ijk) {
                 ValueT v;
                 bool   on = leaf.probeValue(ijk, v);
                 return std::make_tuple(v, on);
             },
-            nb::arg("ijk"));
+            nb::arg("ijk"),
+            "Return (value, isActive) for the voxel at index-space ijk.");
 
     // Zero-copy 512-element NumPy view of mValues. Only enabled for
     // BuildTs whose ValueType is a primitive arithmetic type (float,
@@ -123,33 +142,48 @@ void defineInternalNodeBase(nb::class_<InternalT>& cls)
 {
     using ValueT = typename InternalT::ValueType;
     using CoordT = typename InternalT::CoordType;
-    cls.def("origin",       &InternalT::origin)
-       .def("bbox",         &InternalT::bbox)
-       .def_static("dim",   &InternalT::dim)
-       .def_static("memUsage", []() { return InternalT::memUsage(); })
-       .def("minimum",      &InternalT::minimum)
-       .def("maximum",      &InternalT::maximum)
-       .def("average",      &InternalT::average)
-       .def("stdDeviation", &InternalT::stdDeviation)
+    cls.def("origin",       &InternalT::origin,
+            "Index-space origin (minimum corner) of this internal node.")
+       .def("bbox",         &InternalT::bbox,
+            "Index-space bounding box of this internal node's active voxels.")
+       .def_static("dim",   &InternalT::dim,
+            "Side length in voxels covered by this internal node.")
+       .def_static("memUsage", []() { return InternalT::memUsage(); },
+            "Byte size of an internal node.")
+       .def("minimum",      &InternalT::minimum,
+            "Minimum active value within this node's subtree.")
+       .def("maximum",      &InternalT::maximum,
+            "Maximum active value within this node's subtree.")
+       .def("average",      &InternalT::average,
+            "Average of active values within this node's subtree.")
+       .def("stdDeviation", &InternalT::stdDeviation,
+            "Standard deviation of active values within this node's subtree.")
        // variance() omitted for parity with the leaf binding; compute as
        // stdDeviation() ** 2 in Python.
-       .def("valueMask",    &InternalT::valueMask, nb::rv_policy::reference_internal)
-       .def("childMask",    &InternalT::childMask, nb::rv_policy::reference_internal)
+       .def("valueMask",    &InternalT::valueMask, nb::rv_policy::reference_internal,
+            "Reference to the node's active-tile mask.")
+       .def("childMask",    &InternalT::childMask, nb::rv_policy::reference_internal,
+            "Reference to the node's child-pointer mask (1 where a child node exists).")
        .def("getValue",
             nb::overload_cast<const CoordT&>(&InternalT::getValue, nb::const_),
-            nb::arg("ijk"))
-       .def("getFirstValue", &InternalT::getFirstValue)
-       .def("getLastValue",  &InternalT::getLastValue)
+            nb::arg("ijk"),
+            "Return the value at index-space ijk by descending into the subtree.")
+       .def("getFirstValue", &InternalT::getFirstValue,
+            "Value at the first (lowest-indexed) tile in this node.")
+       .def("getLastValue",  &InternalT::getLastValue,
+            "Value at the last (highest-indexed) tile in this node.")
        .def("isActive",
             nb::overload_cast<const CoordT&>(&InternalT::isActive, nb::const_),
-            nb::arg("ijk"))
+            nb::arg("ijk"),
+            "True iff the voxel at index-space ijk is active.")
        .def("probeValue",
             [](const InternalT& node, const CoordT& ijk) {
                 ValueT v;
                 bool   on = node.probeValue(ijk, v);
                 return std::make_tuple(v, on);
             },
-            nb::arg("ijk"));
+            nb::arg("ijk"),
+            "Return (value, isActive) for the voxel at index-space ijk.");
 }
 
 template<typename BuildT> void defineNanoUpper(nb::module_& m, const char* name)
@@ -176,30 +210,43 @@ template<typename BuildT> void defineNanoRoot(nb::module_& m, const char* name)
     using CoordT = typename RootT::CoordType;
 
     nb::class_<RootT>(m, name, "Root node — top of the tree, holds the tile table.")
-        .def("background",    &RootT::background, nb::rv_policy::reference_internal)
-        .def("tileCount",     &RootT::tileCount)
-        .def("getTableSize",  &RootT::getTableSize)
-        .def("isEmpty",       &RootT::isEmpty)
-        .def("bbox",          &RootT::bbox, nb::rv_policy::reference_internal)
-        .def("minimum",       &RootT::minimum, nb::rv_policy::reference_internal)
-        .def("maximum",       &RootT::maximum, nb::rv_policy::reference_internal)
-        .def("average",       &RootT::average, nb::rv_policy::reference_internal)
-        .def("stdDeviation",  &RootT::stdDeviation, nb::rv_policy::reference_internal)
+        .def("background",    &RootT::background, nb::rv_policy::reference_internal,
+             "Background value returned for inactive voxels.")
+        .def("tileCount",     &RootT::tileCount,
+             "Number of active tiles in the root tile table.")
+        .def("getTableSize",  &RootT::getTableSize,
+             "Total number of entries in the root tile table.")
+        .def("isEmpty",       &RootT::isEmpty,
+             "True iff the root has no active tiles.")
+        .def("bbox",          &RootT::bbox, nb::rv_policy::reference_internal,
+             "Index-space bounding box of every active tile.")
+        .def("minimum",       &RootT::minimum, nb::rv_policy::reference_internal,
+             "Minimum active value in the tree.")
+        .def("maximum",       &RootT::maximum, nb::rv_policy::reference_internal,
+             "Maximum active value in the tree.")
+        .def("average",       &RootT::average, nb::rv_policy::reference_internal,
+             "Average of active values in the tree.")
+        .def("stdDeviation",  &RootT::stdDeviation, nb::rv_policy::reference_internal,
+             "Standard deviation of active values in the tree.")
         .def("memUsage",
-             nb::overload_cast<>(&RootT::memUsage, nb::const_))
+             nb::overload_cast<>(&RootT::memUsage, nb::const_),
+             "Byte size of the root node and its tile table.")
         .def("getValue",
              nb::overload_cast<const CoordT&>(&RootT::getValue, nb::const_),
-             nb::arg("ijk"))
+             nb::arg("ijk"),
+             "Return the value at index-space ijk by walking from the root.")
         .def("isActive",
              nb::overload_cast<const CoordT&>(&RootT::isActive, nb::const_),
-             nb::arg("ijk"))
+             nb::arg("ijk"),
+             "True iff the voxel at index-space ijk is active.")
         .def("probeValue",
              [](const RootT& root, const CoordT& ijk) {
                  ValueT v;
                  bool   on = root.probeValue(ijk, v);
                  return std::make_tuple(v, on);
              },
-             nb::arg("ijk"));
+             nb::arg("ijk"),
+             "Return (value, isActive) for the voxel at index-space ijk.");
 }
 
 // -------------------- NanoTree<BuildT> --------------------
@@ -218,9 +265,12 @@ template<typename BuildT> void defineNanoTree(nb::module_& m, const char* name)
         "(node counts, active voxel count, extrema).")
         .def("root",
              nb::overload_cast<>(&TreeT::root, nb::const_),
-             nb::rv_policy::reference_internal)
-        .def("background", &TreeT::background, nb::rv_policy::reference_internal)
-        .def("activeVoxelCount", &TreeT::activeVoxelCount)
+             nb::rv_policy::reference_internal,
+             "Root node of this tree. Lifetime is anchored to the tree.")
+        .def("background", &TreeT::background, nb::rv_policy::reference_internal,
+             "Background value returned for inactive voxels.")
+        .def("activeVoxelCount", &TreeT::activeVoxelCount,
+             "Total number of active voxels in this tree.")
         // activeTileCount(level): valid range is 1..3 (lower / upper / root
         // tile counts). C++ uses NANOVDB_ASSERT(level > 0 && level <= 3)
         // which is a no-op in release builds — so guard explicitly.
@@ -232,7 +282,8 @@ template<typename BuildT> void defineNanoTree(nb::module_& m, const char* name)
                  }
                  return tree.activeTileCount(level);
              },
-             nb::arg("level"))
+             nb::arg("level"),
+             "Number of active tiles at the given tree level (1=lower, 2=upper, 3=root).")
         // nodeCount(level): valid range is 0..2 (leaf / lower / upper).
         // C++ uses NANOVDB_ASSERT(level < 3), again no-op in release.
         // The lambda's `int level` argument disambiguates the call against
@@ -246,20 +297,26 @@ template<typename BuildT> void defineNanoTree(nb::module_& m, const char* name)
                  }
                  return tree.nodeCount(level);
              },
-             nb::arg("level"))
-        .def("totalNodeCount", &TreeT::totalNodeCount)
-        .def_static("memUsage", &TreeT::memUsage)
+             nb::arg("level"),
+             "Number of nodes at the given tree level (0=leaf, 1=lower, 2=upper).")
+        .def("totalNodeCount", &TreeT::totalNodeCount,
+             "Sum of node counts across every tree level.")
+        .def_static("memUsage", &TreeT::memUsage,
+             "Byte size of a single tree structure (header only).")
         .def("getValue",
              nb::overload_cast<const CoordT&>(&TreeT::getValue, nb::const_),
-             nb::arg("ijk"))
-        .def("isActive", &TreeT::isActive, nb::arg("ijk"))
+             nb::arg("ijk"),
+             "Return the value at index-space ijk by descending from the root.")
+        .def("isActive", &TreeT::isActive, nb::arg("ijk"),
+             "True iff the voxel at index-space ijk is active.")
         .def("probeValue",
              [](const TreeT& tree, const CoordT& ijk) {
                  ValueT v;
                  bool   on = tree.probeValue(ijk, v);
                  return std::make_tuple(v, on);
              },
-             nb::arg("ijk"))
+             nb::arg("ijk"),
+             "Return (value, isActive) for the voxel at index-space ijk.")
         .def("extrema",
              [](const TreeT& tree) {
                  ValueT mn, mx;
@@ -273,10 +330,12 @@ template<typename BuildT> void defineNanoTree(nb::module_& m, const char* name)
              "First leaf node in breadth-first order, or None if the tree is empty.")
         .def("getFirstLower",
              nb::overload_cast<>(&TreeT::getFirstLower, nb::const_),
-             nb::rv_policy::reference_internal)
+             nb::rv_policy::reference_internal,
+             "First lower internal node in breadth-first order, or None if none exists.")
         .def("getFirstUpper",
              nb::overload_cast<>(&TreeT::getFirstUpper, nb::const_),
-             nb::rv_policy::reference_internal);
+             nb::rv_policy::reference_internal,
+             "First upper internal node in breadth-first order, or None if none exists.");
 }
 
 // -------------------- NodeManager<BuildT> --------------------
@@ -295,9 +354,11 @@ template<typename BuildT> void defineNodeManager(nb::module_& m, const char* nam
         "internal nodes of a NanoGrid. Construct via "
         "nanovdb.createNodeManager(grid).")
         .def("isLinear",
-             nb::overload_cast<>(&NMT::isLinear, nb::const_))
+             nb::overload_cast<>(&NMT::isLinear, nb::const_),
+             "True iff this NodeManager is laid out as a linear offset table over a breadth-first grid.")
         .def("memUsage",
-             nb::overload_cast<>(&NMT::memUsage, nb::const_))
+             nb::overload_cast<>(&NMT::memUsage, nb::const_),
+             "Byte size of this NodeManager.")
         .def("nodeCount",
              [](const NMT& nm, int level) -> uint64_t {
                  // Mirror Tree.nodeCount bounds (NodeManager forwards to Tree).
@@ -307,10 +368,14 @@ template<typename BuildT> void defineNodeManager(nb::module_& m, const char* nam
                  }
                  return nm.nodeCount(level);
              },
-             nb::arg("level"))
-        .def("leafCount",  &NMT::leafCount)
-        .def("lowerCount", &NMT::lowerCount)
-        .def("upperCount", &NMT::upperCount)
+             nb::arg("level"),
+             "Number of nodes at the given tree level (0=leaf, 1=lower, 2=upper).")
+        .def("leafCount",  &NMT::leafCount,
+             "Number of leaf nodes managed by this NodeManager.")
+        .def("lowerCount", &NMT::lowerCount,
+             "Number of lower internal nodes managed by this NodeManager.")
+        .def("upperCount", &NMT::upperCount,
+             "Number of upper internal nodes managed by this NodeManager.")
         // leaf / lower / upper: NANOVDB_ASSERT(i < nodeCount(LEVEL)) in C++ is
         // no-op in release, so guard explicitly to convert OOB access into a
         // Python IndexError instead of memory corruption.
@@ -322,7 +387,8 @@ template<typename BuildT> void defineNodeManager(nb::module_& m, const char* nam
                  }
                  return nm.leaf(i);
              },
-             nb::rv_policy::reference_internal, nb::arg("i"))
+             nb::rv_policy::reference_internal, nb::arg("i"),
+             "Return the i-th leaf node in breadth-first order.")
         .def("lower",
              [](const NMT& nm, uint32_t i) -> const nanovdb::NanoLower<BuildT>& {
                  if (i >= nm.lowerCount()) {
@@ -331,7 +397,8 @@ template<typename BuildT> void defineNodeManager(nb::module_& m, const char* nam
                  }
                  return nm.lower(i);
              },
-             nb::rv_policy::reference_internal, nb::arg("i"))
+             nb::rv_policy::reference_internal, nb::arg("i"),
+             "Return the i-th lower internal node in breadth-first order.")
         .def("upper",
              [](const NMT& nm, uint32_t i) -> const nanovdb::NanoUpper<BuildT>& {
                  if (i >= nm.upperCount()) {
@@ -340,7 +407,8 @@ template<typename BuildT> void defineNodeManager(nb::module_& m, const char* nam
                  }
                  return nm.upper(i);
              },
-             nb::rv_policy::reference_internal, nb::arg("i"));
+             nb::rv_policy::reference_internal, nb::arg("i"),
+             "Return the i-th upper internal node in breadth-first order.");
 }
 
 void defineNodeManagerHandle(nb::module_& m);

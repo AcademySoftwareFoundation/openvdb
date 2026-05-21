@@ -14,7 +14,10 @@ namespace pynanovdb {
 
 void defineCheckMode(nb::module_& m)
 {
-    nb::enum_<CheckMode>(m, "CheckMode")
+    nb::enum_<CheckMode>(m, "CheckMode",
+        "Selector controlling how aggressively a grid checksum is computed: "
+        "Disable skips checksumming, Partial covers only the header, Full "
+        "covers the whole grid, and Default picks the recommended mode.")
         .value("Disable", CheckMode::Disable)
         .value("Partial", CheckMode::Partial)
         .value("Full", CheckMode::Full)
@@ -24,13 +27,21 @@ void defineCheckMode(nb::module_& m)
 
 void defineChecksum(nb::module_& m)
 {
-    nb::class_<Checksum>(m, "Checksum").def(nb::self == nb::self, "rhs"_a).def(nb::self != nb::self, "rhs"_a);
+    nb::class_<Checksum>(m, "Checksum",
+        "64-bit checksum value stored in a grid header. Produced by "
+        "tools.evalChecksum and compared against the stored one by "
+        "tools.validateChecksum.")
+        .def(nb::self == nb::self, "rhs"_a,
+             "Equality of two Checksum values.")
+        .def(nb::self != nb::self, "rhs"_a,
+             "Inequality of two Checksum values.");
 }
 
 void defineUpdateChecksum(nb::module_& m)
 {
     m.def(
-        "updateChecksum", [](GridData* gridData, CheckMode mode) { tools::updateChecksum(gridData, mode); }, "gridData"_a, "mode"_a);
+        "updateChecksum", [](GridData* gridData, CheckMode mode) { tools::updateChecksum(gridData, mode); }, "gridData"_a, "mode"_a,
+        "Recompute and store the checksum of gridData using the given CheckMode.");
 }
 
 void defineEvalChecksumModule(nb::module_& toolsModule)

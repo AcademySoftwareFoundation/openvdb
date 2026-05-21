@@ -337,7 +337,8 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "sphere_ls",
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT());
+          "buffer"_a = BufferT(),
+          "Narrow-band level set of a sphere of the given radius and center.");
 
     m.def("createLevelSetTorus",
           nb::overload_cast<GridType,
@@ -361,7 +362,8 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "torus_ls",
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT());
+          "buffer"_a = BufferT(),
+          "Narrow-band level set of a torus with the given major and minor radii.");
 
     m.def("createFogVolumeSphere",
           nb::overload_cast<GridType, double, const Vec3d&, double, double, const Vec3d&, const std::string&, tools::StatsMode, CheckMode, const BufferT&>(
@@ -375,7 +377,8 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "sphere_fog",
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT());
+          "buffer"_a = BufferT(),
+          "Sparse fog volume of a sphere of the given radius and center.");
 
     m.def("createFogVolumeTorus",
           nb::overload_cast<GridType,
@@ -399,9 +402,10 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "torus_fog",
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT());
+          "buffer"_a = BufferT(),
+          "Sparse fog volume of a torus with the given major and minor radii.");
 
-    // ---------- Level-set / fog-volume primitives added in Phase 5a ----------
+    // ---------- Level-set / fog-volume box / bbox / octahedron primitives ----
     m.def("createLevelSetBox", &createLevelSetBox<BufferT>,
           "gridType"_a = GridType::Float,
           "width"_a = 40.0,
@@ -479,7 +483,7 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "buffer"_a = BufferT(),
           "Sparse fog volume of an octahedron.");
 
-    // ---------- Point primitives added in Phase 5a ----------
+    // ---------- Point primitives ----------
     m.def("createPointSphere", &createPointSphere<BufferT>,
           "pointsPerVoxel"_a = 1,
           "radius"_a = 100.0,

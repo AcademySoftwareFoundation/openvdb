@@ -42,7 +42,10 @@ static void defineBuildGrid(nb::module_& m,
     using ValueT    = typename GridT::ValueType;
 
     // ----- build::Grid<BuildT> -----
-    nb::class_<GridT>(m, gridName)
+    nb::class_<GridT>(m, gridName,
+        "Mutable host-side grid builder for this BuildT. Write voxels via "
+        "setValue / getAccessor / getWriteAccessor, then call to_nanovdb() "
+        "to bake a frozen NanoGrid GridHandle.")
         .def(nb::init<const ValueT&, const std::string&, GridClass>(),
             "background"_a,
             "name"_a      = std::string(""),
@@ -151,7 +154,9 @@ static void defineBuildGrid(nb::module_& m,
     // Move-only (copy is deleted) — returned by getAccessor(). Caches the
     // last leaf / lower / upper node it touched, so repeated access to
     // neighboring coordinates is fast.
-    nb::class_<AccT>(m, valueAccName)
+    nb::class_<AccT>(m, valueAccName,
+        "Move-only read/write accessor returned by build.Grid.getAccessor(). "
+        "Caches the most recently visited tree path for fast neighbor access.")
         .def("getValue",
             [](const AccT& self, const Coord& ijk) -> ValueT {
                 return self.getValue(ijk);
@@ -186,7 +191,10 @@ static void defineBuildGrid(nb::module_& m,
     // mutex; on destruction (or explicit merge()) it locks the mutex and
     // splices its buffered nodes into the parent. Designed for multi-thread
     // writes — one WriteAccessor per thread, no shared mutable state.
-    nb::class_<WriteAccT>(m, writeAccName)
+    nb::class_<WriteAccT>(m, writeAccName,
+        "Thread-safe write accessor returned by build.Grid.getWriteAccessor(). "
+        "Buffers writes into a private root and merges them into the parent "
+        "grid on destruction or explicit merge().")
         .def("setValue",
             [](WriteAccT& self, const Coord& ijk, const ValueT& value) {
                 self.setValue(ijk, value);
