@@ -1543,6 +1543,127 @@ class TestCreateNanoGrid(unittest.TestCase):
             self.assertEqual(grid.gridClass(), nanovdb.GridClass.Unknown)
 
 
+class TestBuildGrid(unittest.TestCase):
+    """nanovdb.tools.build.* — mutable voxel-by-voxel CPU grid builder."""
+
+    def test_constructor_defaults_and_metadata(self):
+        g = nanovdb.tools.build.FloatGrid(0.0)
+        self.assertEqual(g.getName(), "")
+        self.assertEqual(g.gridClass(), nanovdb.GridClass.Unknown)
+        self.assertEqual(g.gridType(), nanovdb.GridType.Float)
+        self.assertEqual(g.background, 0.0)
+        self.assertEqual(g.nodeCount(), [0, 0, 0])
+        g.setName("renamed")
+        self.assertEqual(g.getName(), "renamed")
+
+    def test_set_get_value_marks_active(self):
+        g = nanovdb.tools.build.FloatGrid(0.0, "demo")
+        ijk = nanovdb.math.Coord(1, 2, 3)
+        self.assertFalse(g.isActive(ijk))
+        self.assertEqual(g.getValue(ijk), 0.0)
+        g.setValue(ijk, 4.5)
+        self.assertTrue(g.isActive(ijk))
+        self.assertEqual(g.getValue(ijk), 4.5)
+        # An untouched voxel is still background-valued and inactive.
+        self.assertEqual(g.getValue(nanovdb.math.Coord(10, 0, 0)), 0.0)
+        self.assertFalse(g.isActive(nanovdb.math.Coord(10, 0, 0)))
+
+    def test_set_value_on_keeps_background_value(self):
+        g = nanovdb.tools.build.FloatGrid(-1.0, "demo")
+        ijk = nanovdb.math.Coord(5, 6, 7)
+        g.setValueOn(ijk)
+        self.assertTrue(g.isActive(ijk))
+        # setValueOn does not change the stored value — still background.
+        self.assertEqual(g.getValue(ijk), -1.0)
+
+    def test_value_accessor_parity_with_grid(self):
+        g = nanovdb.tools.build.FloatGrid(0.0)
+        acc = g.getAccessor()
+        ijk = nanovdb.math.Coord(100, 200, 300)
+        acc.setValue(ijk, 7.5)
+        self.assertEqual(g.getValue(ijk), 7.5)
+        self.assertEqual(acc.getValue(ijk), 7.5)
+        self.assertTrue(acc.isActive(ijk))
+        # isValueOn is an alias for isActive.
+        self.assertEqual(acc.isValueOn(ijk), acc.isActive(ijk))
+
+    def test_write_accessor_merges_on_destruction(self):
+        g = nanovdb.tools.build.FloatGrid(0.0)
+        ijk = nanovdb.math.Coord(50, 50, 50)
+        # Buffer the write into a thread-local root, then let the
+        # accessor go out of scope so its destructor merges into the
+        # parent grid.
+        wa = g.getWriteAccessor()
+        wa.setValue(ijk, 9.0)
+        # Before merge, the parent grid hasn't seen the change yet.
+        self.assertEqual(g.getValue(ijk), 0.0)
+        wa.merge()
+        self.assertEqual(g.getValue(ijk), 9.0)
+        self.assertTrue(g.isActive(ijk))
+
+    def test_to_nanovdb_roundtrip(self):
+        g = nanovdb.tools.build.FloatGrid(0.0, "trip", nanovdb.GridClass.FogVolume)
+        g.setValue(nanovdb.math.Coord(0, 0, 0), 1.0)
+        g.setValue(nanovdb.math.Coord(1, 0, 0), 2.0)
+        g.setValue(nanovdb.math.Coord(2, 0, 0), 3.0)
+        h = g.to_nanovdb()
+        self.assertEqual(h.gridCount(), 1)
+        ng = h.grid()
+        self.assertEqual(ng.gridType(), nanovdb.GridType.Float)
+        self.assertEqual(ng.gridClass(), nanovdb.GridClass.FogVolume)
+        self.assertEqual(ng.gridName(), "trip")
+        self.assertEqual(ng.activeVoxelCount(), 3)
+
+    def test_to_nanovdb_does_not_consume_source(self):
+        # Source build::Grid must remain usable after .to_nanovdb().
+        g = nanovdb.tools.build.FloatGrid(0.0)
+        g.setValue(nanovdb.math.Coord(0, 0, 0), 1.0)
+        _ = g.to_nanovdb()
+        g.setValue(nanovdb.math.Coord(1, 0, 0), 2.0)
+        h2 = g.to_nanovdb()
+        self.assertEqual(h2.grid().activeVoxelCount(), 2)
+
+    def test_int32_build_grid(self):
+        g = nanovdb.tools.build.Int32Grid(0, "ints", nanovdb.GridClass.Unknown)
+        g.setValue(nanovdb.math.Coord(0, 0, 0), 42)
+        g.setValue(nanovdb.math.Coord(1, 1, 1), -7)
+        self.assertEqual(g.getValue(nanovdb.math.Coord(0, 0, 0)), 42)
+        self.assertEqual(g.getValue(nanovdb.math.Coord(1, 1, 1)), -7)
+        h = g.to_nanovdb()
+        self.assertEqual(h.grid().gridType(), nanovdb.GridType.Int32)
+        self.assertEqual(h.grid().activeVoxelCount(), 2)
+
+    def test_vec3f_build_grid(self):
+        g = nanovdb.tools.build.Vec3fGrid(
+            nanovdb.math.Vec3f(0.0), "v", nanovdb.GridClass.Unknown)
+        v = nanovdb.math.Vec3f(1.0, 2.0, 3.0)
+        g.setValue(nanovdb.math.Coord(0, 0, 0), v)
+        got = g.getValue(nanovdb.math.Coord(0, 0, 0))
+        # Vec3f equality isn't bound here, so compare components.
+        self.assertEqual(got[0], 1.0)
+        self.assertEqual(got[1], 2.0)
+        self.assertEqual(got[2], 3.0)
+        h = g.to_nanovdb()
+        self.assertEqual(h.grid().gridType(), nanovdb.GridType.Vec3f)
+
+    def test_set_transform(self):
+        g = nanovdb.tools.build.FloatGrid(0.0)
+        g.setTransform(scale=0.5, translation=nanovdb.math.Vec3d(1.0, 2.0, 3.0))
+        g.setValue(nanovdb.math.Coord(0, 0, 0), 1.0)
+        h = g.to_nanovdb()
+        ng = h.grid()
+        vs = ng.voxelSize()
+        self.assertAlmostEqual(vs[0], 0.5)
+        self.assertAlmostEqual(vs[1], 0.5)
+        self.assertAlmostEqual(vs[2], 0.5)
+        # Index (0,0,0) mapped through (scale=0.5, translation=(1,2,3))
+        # lands at world-space (1, 2, 3).
+        w = ng.map().applyMap(nanovdb.math.Vec3d(0.0, 0.0, 0.0))
+        self.assertAlmostEqual(w[0], 1.0)
+        self.assertAlmostEqual(w[1], 2.0)
+        self.assertAlmostEqual(w[2], 3.0)
+
+
 class TestNanoToOpenVDB(unittest.TestCase):
     def test_function(self):
         handle = nanovdb.tools.createLevelSetSphere()
