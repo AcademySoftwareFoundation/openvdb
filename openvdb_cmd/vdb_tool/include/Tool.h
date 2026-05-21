@@ -236,8 +236,11 @@ private:
     /// @brief Create a level-set sphere, i.e. a narrow-band signed distance to a sphere.
     void levelSetSphere();
 
-    /// @brief  Convert  signed distance field into a unsigned distance field
+    /// @brief  Convert signed distance field into a unsigned distance field
     void sdf2udf();
+
+    /// @brief Apply a simple function to each voxel in a grid
+    void forValues();
 
     /// @brief Create a level-set platonic solid with the specified number of polygon faces.
     void levelSetPlatonic();
@@ -571,7 +574,40 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->levelSetSphere();});
 
   mParser.addAction(
-     {"abs", "sdf2udf"}, "Converts a signed distance field into an unsigned distance field, i.e. performs the Abs of all values.",
+     {"forAllValues"}, "Applied a simple computational kernel to values in a grid.",
+    {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
+     {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
+     {"op", "", "abs", "operator to be applied to all,on or off values in a grid."},
+     {"poly", "", "1,2,3", "polynomial function to be applied to values"},
+     {"class", "", "ls", "class label of the output volume."},
+     {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
+     {"name", "", "foo-bar", "name assigned to the output volume"}},
+     [&](){mParser.setDefaults();}, [&](){this->forValues();});
+
+  mParser.addAction(
+     {"forOnValues"}, "Applied a simple computational kernel to values in a grid.",
+    {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
+     {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
+     {"op", "", "abs", "operator to be applied to all,on or off values in a grid."},
+     {"poly", "", "1,2,3", "polynomial function to be applied to values"},
+     {"class", "", "ls", "class label of the output volume."},
+     {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
+     {"name", "", "foo-bar", "name assigned to the output volume"}},
+     [&](){mParser.setDefaults();}, [&](){this->forValues();});
+
+  mParser.addAction(
+     {"forOffValues"}, "Applied a simple computational kernel to values in a grid.",
+    {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
+     {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
+     {"op", "", "abs", "operator to be applied to all,on or off values in a grid."},
+     {"poly", "", "1,2,3", "polynomial function to be applied to values"},
+     {"class", "", "ls", "class label of the output volume."},
+     {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
+     {"name", "", "foo-bar", "name assigned to the output volume"}},
+     [&](){mParser.setDefaults();}, [&](){this->forValues();});
+
+  mParser.addAction(
+     {"sdf2udf"}, "Converts a signed distance field into an unsigned distance field, i.e. performs the Abs of all values and changes GridClass to UNKNOWN.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
      {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"name", "sphere", "sphere", "name assigned to the output volume"}},
@@ -1393,7 +1429,6 @@ void Tool::config()
                 if (start >= stop) continue;// line is empty or starts with a comment
                 line = line.substr(start, stop - start);// remove leading whitespaces and tailing comments
                 line = line.substr(0, line.find_last_not_of(" \t") + 1);// remove tailing whitespaces
-                //std::cerr << "config: \"" << line << "\"" << std::endl;
                 VecS tmp = vdb_tool::tokenize(line, " ");
                 tmp[0].insert (0, 1, '-');// first token is an action
                 std::transform(tmp.begin(), tmp.end(), std::back_inserter(args), [](const std::string &s){
@@ -2652,36 +2687,115 @@ void Tool::volumeToMesh()
 }// Tool::volumeToMesh
 
 // ==============================================================================================================
-/*
-void forEachVoxels()
+
+template <typename GridPtrT, typename T>
+inline void forEachKenel(GridPtrT grid, int mode, T func)
 {
--forEachVoxels iter=all,on,off op=abs,sqrt,sin,cos,+a,-b,*a,*b,/a,/b,*a+b class=ls,fog,unknown background=
-}
-*/
+  switch (mode) {
+  case 1:
+    tools::foreach(grid->beginValueAll(),[&func](auto &it){it.setValue(func(*it));});
+    break;
+  case 2:
+    tools::foreach(grid->beginValueOn(), [&func](auto &it){it.setValue(func(*it));});
+    break;
+  case 3:
+    tools::foreach(grid->beginValueOff(),[&func](auto &it){it.setValue(func(*it));});
+    break;
+  default:
+    throw std::invalid_argument("forEachKenel: invalid mode = " + std::to_string(mode));
+    break;
+  }
+}// forEachKenel
+
+void Tool::forValues()
+{
+  const std::string &action_name = mParser.getAction().names[0];
+  const int mode = findMatch(action_name, {"forAllValues", "forOnValues", "forOffValues"});// 1-based index
+  OPENVDB_ASSERT(mode);// mode = 0 for no match
+  try {
+    const int age = mParser.get<int>("vdb");
+    const bool keep = mParser.get<bool>("keep");
+    const std::string ops = mParser.get<std::string>("op");
+    const std::string cls = mParser.get<std::string>("class");
+    std::vector<float> poly = mParser.getVec<float>("poly");
+    std::vector<float> back = mParser.getVec<float>("background");
+    std::string grid_name = mParser.get<std::string>("name");
+
+    /// get the relevant grid to be processed
+    auto it = this->getGrid(age);// will throw if grid doesn't exist
+    GridT::Ptr grid = gridPtrCast<GridT>(*it);
+    if (!grid) throw std::invalid_argument("no FloatGrid with age " + std::to_string(age));
+    if (keep) {
+      GridT::Ptr tmp = grid->deepCopy();
+      mGrid.push_back(tmp);
+      grid = tmp;
+    }
+    if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
+    grid->setName(grid_name);
+
+    if (mParser.verbose) mTimer.start(action_name);
+    if (poly.size()==1) {
+      forEachKenel(grid, mode, [&poly](float  ){return poly[0]; });
+    } else if (poly.size()==2) {
+      forEachKenel(grid, mode, [&poly](float v){return poly[0] + poly[1]*v; });
+    } else if (poly.size()==3) {
+      forEachKenel(grid, mode, [&poly](float v){return poly[0] + (poly[1] + poly[2]*v)*v; });
+    }
+    if (ops=="abs" ) {
+      forEachKenel(grid, mode, [](float v){return math::Abs(v);});
+    } else if (ops=="sqrt") {
+      forEachKenel(grid, mode, [](float v){return math::Sqrt(v);});
+    }
+    if (int n = findMatch(cls, {"ls", "fog", "unknown"})) {
+      auto class_tag = n==1 ? GRID_LEVEL_SET : n==2 ? GRID_FOG_VOLUME : GRID_UNKNOWN;
+      grid->setGridClass(class_tag);
+    }
+    if (back.size()==1) {
+      tools::changeBackground(grid->tree(), back[0]);// +/- outside (sign is preserved)
+    } else if (back.size()==2) {
+      tools::changeAsymmetricLevelSetBackground(grid->tree(), back[0], back[1]);// outside, inside
+    }
+    if (mParser.verbose) mTimer.stop();
+
+  } catch (const std::exception& e) {
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name+": "+e.what());
+    } else {
+      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
+    }
+  }
+}// Tool::forValues
+
+// ==============================================================================================================
 
 void Tool::sdf2udf()
 {
   const std::string &action_name = mParser.getAction().names[0];
-  const int mode = findMatch(action_name, {"sdf2udf", "abs"});// 1-based index
+  const int mode = findMatch(action_name, {"sdf2udf"});// 1-based index
   OPENVDB_ASSERT(mode);// mode = 0 for no match
   try {
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
     std::string grid_name = mParser.get<std::string>("name");
+
+    /// get the relevant grid to be processed
     auto it = this->getGrid(age);// will throw if grid doesn't exist
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid) throw std::invalid_argument("no FloatGrid with age " + std::to_string(age));
-    if (mode == 1) {
-      if (grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("no level set with age "+std::to_string(age));
-      grid->setGridClass(GRID_UNKNOWN);// GRID_LEVEL_SET -> GRID_UNKNOW
+    if (keep) {
+      GridT::Ptr tmp = grid->deepCopy();
+      mGrid.push_back(tmp);
+      grid = tmp;
     }
+    if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
+    grid->setName(grid_name);
+    if (grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("no level set with age "+std::to_string(age));
+    grid->setGridClass(GRID_UNKNOWN);// GRID_LEVEL_SET -> GRID_UNKNOW
+
     if (mParser.verbose) mTimer.start(action_name);
     tools::foreach(grid->beginValueAll(), [](auto &it){it.setValue(math::Abs(*it));});
     if (mParser.verbose) mTimer.stop();
-    if (!keep) mGrid.erase(std::next(it).base());
-    if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
-    grid->setName(grid_name);
-    mGrid.push_back(grid);
+
   } catch (const std::exception& e) {
     if (mErrorOnWarning) {
       throw std::invalid_argument(action_name+": "+e.what());
