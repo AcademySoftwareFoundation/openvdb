@@ -43,7 +43,11 @@ template<typename BuildT> void defineCreateNanoGrid(nb::module_& m, const char* 
 template<typename BufferT> void defineOpenToNanoVDB(nb::module_& m)
 {
 #ifdef NANOVDB_USE_OPENVDB
-    m.def("openToNanoVDB", &tools::openToNanoVDB<BufferT>, "base"_a = tools::StatsMode::Default, "cMode"_a = CheckMode::Default, "verbose"_a = 0);
+    m.def("openToNanoVDB", &tools::openToNanoVDB<BufferT>,
+          "base"_a,
+          "sMode"_a = tools::StatsMode::Default,
+          "cMode"_a = CheckMode::Default,
+          "verbose"_a = 0);
 #endif
 }
 

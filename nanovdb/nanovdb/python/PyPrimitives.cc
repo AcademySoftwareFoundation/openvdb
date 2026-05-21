@@ -253,10 +253,15 @@ GridHandle<BufferT> createFogVolumeOctahedron(GridType           gridType,
     }
 }
 
-// Point primitives (no stats mode; result is a PointGrid).
+// Point primitives. The result is always a PointDataGrid (uint32 storage),
+// so unlike the level-set / fog-volume primitives there's no value-type
+// dispatch worth exposing — the intermediate level-set's precision is
+// not user-controllable in this binding. The C++ template also accepts
+// BuildT=double, but that path segfaults during scatter at least with the
+// current C++ implementation, so the binding stays on the float-only
+// instantiation that's exercised by the C++ unit tests.
 template<typename BufferT>
-GridHandle<BufferT> createPointSphere(GridType           gridType,
-                                      int                pointsPerVoxel,
+GridHandle<BufferT> createPointSphere(int                pointsPerVoxel,
                                       double             radius,
                                       const Vec3d&       center,
                                       double             voxelSize,
@@ -265,22 +270,12 @@ GridHandle<BufferT> createPointSphere(GridType           gridType,
                                       CheckMode          mode,
                                       const BufferT&     buffer)
 {
-    switch (gridType) {
-    case GridType::Float:
-        return tools::createPointSphere<float, BufferT>(
-            pointsPerVoxel, radius, center, voxelSize, origin, name, mode, buffer);
-    case GridType::Double:
-        return tools::createPointSphere<double, BufferT>(
-            pointsPerVoxel, radius, center, voxelSize, origin, name, mode, buffer);
-    default:
-        throw std::runtime_error(
-            "createPointSphere: only float and double grid types are supported");
-    }
+    return tools::createPointSphere<float, BufferT>(
+        pointsPerVoxel, radius, center, voxelSize, origin, name, mode, buffer);
 }
 
 template<typename BufferT>
-GridHandle<BufferT> createPointTorus(GridType           gridType,
-                                     int                pointsPerVoxel,
+GridHandle<BufferT> createPointTorus(int                pointsPerVoxel,
                                      double             majorRadius,
                                      double             minorRadius,
                                      const Vec3d&       center,
@@ -290,22 +285,12 @@ GridHandle<BufferT> createPointTorus(GridType           gridType,
                                      CheckMode          cMode,
                                      const BufferT&     buffer)
 {
-    switch (gridType) {
-    case GridType::Float:
-        return tools::createPointTorus<float, BufferT>(
-            pointsPerVoxel, majorRadius, minorRadius, center, voxelSize, origin, name, cMode, buffer);
-    case GridType::Double:
-        return tools::createPointTorus<double, BufferT>(
-            pointsPerVoxel, majorRadius, minorRadius, center, voxelSize, origin, name, cMode, buffer);
-    default:
-        throw std::runtime_error(
-            "createPointTorus: only float and double grid types are supported");
-    }
+    return tools::createPointTorus<float, BufferT>(
+        pointsPerVoxel, majorRadius, minorRadius, center, voxelSize, origin, name, cMode, buffer);
 }
 
 template<typename BufferT>
-GridHandle<BufferT> createPointBox(GridType           gridType,
-                                   int                pointsPerVoxel,
+GridHandle<BufferT> createPointBox(int                pointsPerVoxel,
                                    double             width,
                                    double             height,
                                    double             depth,
@@ -316,17 +301,8 @@ GridHandle<BufferT> createPointBox(GridType           gridType,
                                    CheckMode          mode,
                                    const BufferT&     buffer)
 {
-    switch (gridType) {
-    case GridType::Float:
-        return tools::createPointBox<float, BufferT>(
-            pointsPerVoxel, width, height, depth, center, voxelSize, origin, name, mode, buffer);
-    case GridType::Double:
-        return tools::createPointBox<double, BufferT>(
-            pointsPerVoxel, width, height, depth, center, voxelSize, origin, name, mode, buffer);
-    default:
-        throw std::runtime_error(
-            "createPointBox: only float and double grid types are supported");
-    }
+    return tools::createPointBox<float, BufferT>(
+        pointsPerVoxel, width, height, depth, center, voxelSize, origin, name, mode, buffer);
 }
 
 // createPointScatter takes an existing level set as its source. We bind
@@ -465,7 +441,10 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "voxelSize"_a = 1.0,
           "halfWidth"_a = 3.0,
           "origin"_a = Vec3d(0.0),
-          "name"_a = "octadedron_ls",
+          // Default name spells the shape correctly even though the
+          // upstream C++ default still carries the historical
+          // "octadedron_ls" typo. Callers can override either way.
+          "name"_a = "octahedron_ls",
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
           "buffer"_a = BufferT(),
@@ -494,7 +473,7 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "voxelSize"_a = 1.0,
           "halfWidth"_a = 3.0,
           "origin"_a = Vec3d(0.0),
-          "name"_a = "octadedron_fog",
+          "name"_a = "octahedron_fog",
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
           "buffer"_a = BufferT(),
@@ -502,7 +481,6 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
 
     // ---------- Point primitives added in Phase 5a ----------
     m.def("createPointSphere", &createPointSphere<BufferT>,
-          "gridType"_a = GridType::Float,
           "pointsPerVoxel"_a = 1,
           "radius"_a = 100.0,
           "center"_a = Vec3d(0.0),
@@ -511,10 +489,11 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "sphere_points",
           "cMode"_a = CheckMode::Default,
           "buffer"_a = BufferT(),
-          "PointDataGrid of points scattered on the surface of a sphere.");
+          "PointDataGrid of points scattered on the surface of a sphere. "
+          "The output grid is always a UInt32 PointDataGrid; the "
+          "intermediate level-set's value type is hard-coded to float.");
 
     m.def("createPointTorus", &createPointTorus<BufferT>,
-          "gridType"_a = GridType::Float,
           "pointsPerVoxel"_a = 1,
           "majorRadius"_a = 100.0,
           "minorRadius"_a = 50.0,
@@ -524,10 +503,10 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "torus_points",
           "cMode"_a = CheckMode::Default,
           "buffer"_a = BufferT(),
-          "PointDataGrid of points scattered on the surface of a torus.");
+          "PointDataGrid of points scattered on the surface of a torus. "
+          "Always returns a UInt32 PointDataGrid.");
 
     m.def("createPointBox", &createPointBox<BufferT>,
-          "gridType"_a = GridType::Float,
           "pointsPerVoxel"_a = 1,
           "width"_a = 40.0,
           "height"_a = 60.0,
@@ -538,7 +517,8 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "box_points",
           "cMode"_a = CheckMode::Default,
           "buffer"_a = BufferT(),
-          "PointDataGrid of points scattered on the surface of a box.");
+          "PointDataGrid of points scattered on the surface of a box. "
+          "Always returns a UInt32 PointDataGrid.");
 
     m.def("createPointScatter", &createPointScatter<BufferT>,
           "srcGrid"_a,
