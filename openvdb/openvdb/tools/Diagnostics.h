@@ -1098,6 +1098,11 @@ checkFogVolume(const GridType& grid, size_t n)
 
 namespace diagnostics_internal {
 
+inline constexpr auto cmp = [](auto a, auto b) {
+    return math::cwiseLessThan(a, b);
+};
+template <typename T>
+using SetType = std::set<T, decltype(cmp)>;
 
 template<typename TreeType>
 class InactiveVoxelValues
@@ -1105,14 +1110,13 @@ class InactiveVoxelValues
 public:
     using LeafArray = tree::LeafManager<TreeType>;
     using ValueType = typename TreeType::ValueType;
-    using SetType = std::set<ValueType>;
 
     InactiveVoxelValues(LeafArray&, size_t numValues);
 
     void runParallel();
     void runSerial();
 
-    void getInactiveValues(SetType&) const;
+    void getInactiveValues(SetType<ValueType>&) const;
 
     inline InactiveVoxelValues(const InactiveVoxelValues<TreeType>&, tbb::split);
     inline void operator()(const tbb::blocked_range<size_t>&);
@@ -1120,14 +1124,13 @@ public:
 
 private:
     LeafArray& mLeafArray;
-    SetType mInactiveValues;
+    SetType<ValueType> mInactiveValues {cmp};
     size_t mNumValues;
 };// InactiveVoxelValues
 
 template<typename TreeType>
 InactiveVoxelValues<TreeType>::InactiveVoxelValues(LeafArray& leafs, size_t numValues)
     : mLeafArray(leafs)
-    , mInactiveValues()
     , mNumValues(numValues)
 {
 }
@@ -1137,7 +1140,6 @@ inline
 InactiveVoxelValues<TreeType>::InactiveVoxelValues(
     const InactiveVoxelValues<TreeType>& rhs, tbb::split)
     : mLeafArray(rhs.mLeafArray)
-    , mInactiveValues()
     , mNumValues(rhs.mNumValues)
 {
 }
@@ -1184,7 +1186,7 @@ InactiveVoxelValues<TreeType>::join(const InactiveVoxelValues<TreeType>& rhs)
 
 template<typename TreeType>
 inline void
-InactiveVoxelValues<TreeType>::getInactiveValues(SetType& values) const
+InactiveVoxelValues<TreeType>::getInactiveValues(SetType<typename TreeType::ValueType>& values) const
 {
     values.insert(mInactiveValues.begin(), mInactiveValues.end());
 }
@@ -1199,29 +1201,27 @@ class InactiveTileValues
 public:
     using IterRange = tree::IteratorRange<typename TreeType::ValueOffCIter>;
     using ValueType = typename TreeType::ValueType;
-    using SetType = std::set<ValueType>;
 
     InactiveTileValues(size_t numValues);
 
     void runParallel(IterRange&);
     void runSerial(IterRange&);
 
-    void getInactiveValues(SetType&) const;
+    void getInactiveValues(SetType<ValueType>&) const;
 
     inline InactiveTileValues(const InactiveTileValues<TreeType>&, tbb::split);
     inline void operator()(const IterRange&);
     inline void join(const InactiveTileValues<TreeType>&);
 
 private:
-    SetType mInactiveValues;
+    SetType<ValueType> mInactiveValues {cmp};
     size_t mNumValues;
 };
 
 
 template<typename TreeType>
 InactiveTileValues<TreeType>::InactiveTileValues(size_t numValues)
-    : mInactiveValues()
-    , mNumValues(numValues)
+    : mNumValues(numValues)
 {
 }
 
@@ -1229,8 +1229,7 @@ template <typename TreeType>
 inline
 InactiveTileValues<TreeType>::InactiveTileValues(
     const InactiveTileValues<TreeType>& rhs, tbb::split)
-    : mInactiveValues()
-    , mNumValues(rhs.mNumValues)
+    : mNumValues(rhs.mNumValues)
 {
 }
 
@@ -1275,7 +1274,7 @@ InactiveTileValues<TreeType>::join(const InactiveTileValues<TreeType>& rhs)
 
 template<typename TreeType>
 inline void
-InactiveTileValues<TreeType>::getInactiveValues(SetType& values) const
+InactiveTileValues<TreeType>::getInactiveValues(SetType<typename TreeType::ValueType>& values) const
 {
     values.insert(mInactiveValues.begin(), mInactiveValues.end());
 }
@@ -1294,9 +1293,8 @@ uniqueInactiveValues(const GridType& grid,
 {
     using TreeType = typename GridType::TreeType;
     using ValueType = typename GridType::ValueType;
-    using SetType = std::set<ValueType>;
 
-    SetType uniqueValues;
+    diagnostics_internal::SetType<ValueType> uniqueValues {diagnostics_internal::cmp};
 
     { // Check inactive voxels
         TreeType& tree = const_cast<TreeType&>(grid.tree());
@@ -1320,10 +1318,8 @@ uniqueInactiveValues(const GridType& grid,
 
     values.clear();
     values.reserve(uniqueValues.size());
-
-    typename SetType::iterator it = uniqueValues.begin();
-    for ( ; it != uniqueValues.end(); ++it) {
-        values.push_back(*it);
+    for (const auto& item : uniqueValues) {
+        values.emplace_back(item);
     }
 
     return values.size() <= numValues;

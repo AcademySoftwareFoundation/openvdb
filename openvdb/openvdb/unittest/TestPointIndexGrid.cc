@@ -216,6 +216,63 @@ TEST_F(TestPointIndexGrid, testPointIndexGrid)
 }
 
 
+TEST_F(TestPointIndexGrid, testPointIndexGridIO)
+{
+    // Register grid and transform.
+    openvdb::initialize();
+
+    const float voxelSize = 1.0f;
+    const openvdb::math::Transform::Ptr transform =
+            openvdb::math::Transform::createLinearTransform(voxelSize);
+
+    // generate points
+
+    std::vector<openvdb::Vec3R> points;
+    unittest_util::genPoints(10, points);
+
+    PointList pointList(points);
+
+
+    // construct data structure
+    typedef openvdb::tools::PointIndexGrid PointIndexGrid;
+
+    PointIndexGrid::Ptr pointGridPtr =
+        openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
+
+    // test I/O
+
+    pointGridPtr->setName("points");
+
+    openvdb::GridPtrVec grids;
+    grids.push_back(pointGridPtr);
+
+    // Write the vdb out to a file.
+    openvdb::io::File vdbfile("pointidx.vdb2");
+    vdbfile.write(grids);
+
+    openvdb::io::File vdbfile2("pointidx.vdb2");
+
+    vdbfile2.open();
+
+    EXPECT_TRUE(vdbfile2.isOpen());
+
+    openvdb::tools::PointIndexGrid::Ptr pointGridPtr2 = openvdb::gridPtrCast<openvdb::tools::PointIndexGrid>(vdbfile2.readGrid("points"));
+
+    EXPECT_TRUE(pointGridPtr2.get() != nullptr);
+    EXPECT_EQ(pointGridPtr->tree().activeVoxelCount(), pointGridPtr2->tree().activeVoxelCount());
+    EXPECT_TRUE(openvdb::tools::isValidPartition(pointList, *pointGridPtr2));
+
+    // Clear registries.
+    openvdb::GridBase::clearRegistry();
+    openvdb::Metadata::clearRegistry();
+    openvdb::math::MapRegistry::clear();
+
+    vdbfile2.close();
+
+    remove("pointidx.vdb2");
+}
+
+
 TEST_F(TestPointIndexGrid, testPointIndexFilter)
 {
     // generate points

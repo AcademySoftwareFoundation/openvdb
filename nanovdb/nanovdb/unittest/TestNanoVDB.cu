@@ -23,6 +23,8 @@
 #include <nanovdb/tools/cuda/CoarsenGrid.cuh>
 #include <nanovdb/tools/cuda/RefineGrid.cuh>
 #include <nanovdb/util/cuda/Injection.cuh>
+#include <nanovdb/tools/cuda/MeshToGrid.cuh>
+#include <nanovdb/math/Proximity.h>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/Timer.h>
 #include <nanovdb/io/IO.h>
@@ -34,6 +36,7 @@
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
 #include <algorithm>// for std::sort
+#include <unordered_set>
 #include <iomanip> // for std::setw, std::setfill
 #include <thread> // for std::thread
 
@@ -739,6 +742,100 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_UnifiedBuffer)
     //timer.stop();
     cudaCheck(cudaFree(d_coords));
 }// Large_CudaPointsToGrid_UnifiedBuffer
+
+/// @brief Exercises the serial per-tile sort path (< 32 tiles) in PointsToGrid.
+///        Coordinates in [-512, 512] produce at most 2^3 = 8 upper internal node tiles
+///        (each upper node covers 4096 voxels per dimension), well below the threshold of 32.
+TEST(TestNanoVDBCUDA, FewTiles_CudaPointsToGrid)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    const size_t voxelCount = 1 << 16;// 65536
+    std::vector<nanovdb::Coord> voxels;
+    {
+        voxels.reserve(voxelCount);
+        std::srand(12345);
+        const int max = 512, min = -max;
+        auto op = [&](){return rand() % (max - min) + min;};
+        while (voxels.size() < voxelCount) voxels.push_back(nanovdb::Coord(op(), op(), op()));
+    }
+
+    nanovdb::Coord* d_coords;
+    cudaCheck(cudaMalloc(&d_coords, voxels.size() * sizeof(nanovdb::Coord)));
+    cudaCheck(cudaMemcpy(d_coords, voxels.data(), voxels.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+
+    auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_coords, voxelCount, 1.0);
+
+    EXPECT_TRUE(handle.deviceData());
+    EXPECT_TRUE(handle.deviceGrid<BuildT>());
+    handle.deviceDownload();
+    auto *grid = handle.grid<BuildT>();
+    EXPECT_TRUE(grid);
+    EXPECT_TRUE(grid->valueCount() > 0);
+    EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
+
+    nanovdb::util::forEach(voxels, [&](const nanovdb::util::Range1D &r){
+        auto acc = grid->getAccessor();
+        for (size_t i=r.begin(); i!=r.end(); ++i) {
+            const nanovdb::Coord &ijk = voxels[i];
+            EXPECT_TRUE(acc.probeLeaf(ijk)!=nullptr);
+            EXPECT_TRUE(acc.isActive(ijk));
+            EXPECT_TRUE(acc.getValue(ijk) > 0u);
+            const auto *leaf = acc.get<nanovdb::GetLeaf<BuildT>>(ijk);
+            EXPECT_TRUE(leaf);
+            const auto offset = leaf->CoordToOffset(ijk);
+            EXPECT_EQ(ijk, leaf->offsetToGlobalCoord(offset));
+        }
+    });
+
+    cudaCheck(cudaFree(d_coords));
+}// FewTiles_CudaPointsToGrid
+
+/// @brief Exercises the segmented sort path (>= 32 tiles) in PointsToGrid.
+///        Coordinates in [-8000, 8000] produce 4^3 = 64 upper internal node tiles
+///        (each upper node covers 4096 voxels per dimension), exceeding the threshold of 32.
+TEST(TestNanoVDBCUDA, ManyTiles_CudaPointsToGrid)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    const size_t voxelCount = 1 << 20;// 1048576
+    std::vector<nanovdb::Coord> voxels;
+    {
+        voxels.reserve(voxelCount);
+        std::srand(54321);
+        const int max = 8000, min = -max;
+        auto op = [&](){return rand() % (max - min) + min;};
+        while (voxels.size() < voxelCount) voxels.push_back(nanovdb::Coord(op(), op(), op()));
+    }
+
+    nanovdb::Coord* d_coords;
+    cudaCheck(cudaMalloc(&d_coords, voxels.size() * sizeof(nanovdb::Coord)));
+    cudaCheck(cudaMemcpy(d_coords, voxels.data(), voxels.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+
+    auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_coords, voxelCount, 1.0);
+
+    EXPECT_TRUE(handle.deviceData());
+    EXPECT_TRUE(handle.deviceGrid<BuildT>());
+    handle.deviceDownload();
+    auto *grid = handle.grid<BuildT>();
+    EXPECT_TRUE(grid);
+    EXPECT_TRUE(grid->valueCount() > 0);
+    EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
+
+    nanovdb::util::forEach(voxels, [&](const nanovdb::util::Range1D &r){
+        auto acc = grid->getAccessor();
+        for (size_t i=r.begin(); i!=r.end(); ++i) {
+            const nanovdb::Coord &ijk = voxels[i];
+            EXPECT_TRUE(acc.probeLeaf(ijk)!=nullptr);
+            EXPECT_TRUE(acc.isActive(ijk));
+            EXPECT_TRUE(acc.getValue(ijk) > 0u);
+            const auto *leaf = acc.get<nanovdb::GetLeaf<BuildT>>(ijk);
+            EXPECT_TRUE(leaf);
+            const auto offset = leaf->CoordToOffset(ijk);
+            EXPECT_EQ(ijk, leaf->offsetToGlobalCoord(offset));
+        }
+    });
+
+    cudaCheck(cudaFree(d_coords));
+}// ManyTiles_CudaPointsToGrid
 
 TEST(TestNanoVDBCUDA, mergeSplitGrids)
 {
@@ -3357,8 +3454,10 @@ __global__ void testComputeStencilNeighborsKernel(
     uint64_t *jumpMapArray,
     uint64_t *stencilNeighborsArray)
 {
-    static constexpr int BlockWidth = 128;
-    static constexpr int JumpMapLength = BlockWidth >> 6;
+    static constexpr int Log2BlockWidth = 7;
+    using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
+    static constexpr int BlockWidth = VBM::BlockWidth;
+    static constexpr int JumpMapLength = VBM::JumpMapLength;
     int bID = blockIdx.x;
     int tID = threadIdx.x;
 
@@ -3369,11 +3468,11 @@ __global__ void testComputeStencilNeighborsKernel(
     __shared__ uint32_t leafIndex[BlockWidth];
     __shared__ uint16_t voxelOffset[BlockWidth];
 
-    nanovdb::tools::cuda::VoxelBlockManager<BlockWidth>::decodeInverseMaps(
+    nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>::decodeInverseMaps(
         grid, firstLeafID, jumpMap, blockFirstOffset, &leafIndex[0], &voxelOffset[0]);
 
     uint64_t localNeighbors[27] = {};
-    nanovdb::tools::cuda::VoxelBlockManager<BlockWidth>::computeBoxStencil(
+    nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>::computeBoxStencil(
         grid, &leafIndex[0], &voxelOffset[0], localNeighbors);
     __syncthreads();
 
@@ -3390,10 +3489,11 @@ void testVoxelBlockManager()
     std::vector<nanovdb::Coord> voxels;
     nanovdb::CoordBBox bbox = nanovdb::CoordBBox::createCube(125,145); // Coordinates chosen to span more than 1 lower node
     for (auto it = bbox.begin(); it; it++) voxels.push_back(*it);
-    constexpr std::size_t BlockWidthLog2 = 7;
-    constexpr std::size_t BlockWidth = 1 << BlockWidthLog2; // 128
+    constexpr int Log2BlockWidth = 7;
+    using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
+    constexpr auto BlockWidth = VBM::BlockWidth;
     const std::size_t nVoxels = voxels.size();
-    const std::size_t nBlocks = (nVoxels + BlockWidth - 1) >> BlockWidthLog2;
+    const std::size_t nBlocks = (nVoxels + BlockWidth - 1) >> Log2BlockWidth;
     nanovdb::Coord *deviceVoxels;
     cudaCheck(cudaMalloc(&deviceVoxels, nVoxels * sizeof(nanovdb::Coord)));
     cudaCheck(cudaMemcpy(deviceVoxels, voxels.data(), nVoxels * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice)); // CPU -> GPU
@@ -3406,18 +3506,9 @@ void testVoxelBlockManager()
     EXPECT_TRUE(handle.data()); // no grid was yet allocated on the CPU
     auto grid = handle.template grid<BuildT>();
     EXPECT_TRUE(grid);
-    std::size_t nLowerNodes = grid->tree().nodeCount(1);
-
     // Construct VBM structure
-    nanovdb::tools::VoxelBlockManagerHandle<BufferT> vbmHandle;
-    vbmHandle.template deviceResize<BlockWidthLog2>(nBlocks);
-    vbmHandle.setOffsets(1, nVoxels);
-    vbmHandle.setLowerCount(nLowerNodes);
-
-    nanovdb::tools::cuda::buildVoxelBlockManager<BlockWidthLog2>(
-        vbmHandle.firstOffset(), vbmHandle.lastOffset(),
-        vbmHandle.blockCount(), vbmHandle.lowerCount(),
-        deviceGrid, vbmHandle.deviceFirstLeafID(), vbmHandle.deviceJumpMap() );
+    auto vbmHandle = nanovdb::tools::cuda::buildVoxelBlockManager<Log2BlockWidth, BufferT>(
+        deviceGrid);
 
     // Compute stencil neighbors
     const size_t neighborStencilSize = nBlocks * BlockWidth * 27 * sizeof(uint64_t);
@@ -3652,3 +3743,178 @@ TEST(TestNanoVDBCUDA, GridHandle_from_HostBuffer)
     }
 }
 
+TEST(TestNanoVDBCUDA, MeshToGrid_EmptyMesh)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+
+    nanovdb::Map map;
+    map.set(0.1, nanovdb::Vec3d(0.0));
+
+    nanovdb::tools::cuda::MeshToGrid<BuildT> converter(nullptr, 0u, nullptr, 0u, map);
+    converter.setVerbose(0);
+    auto handle = converter.getHandle();
+    handle.deviceDownload();
+    const auto* grid = handle.grid<BuildT>();
+    ASSERT_NE(grid, nullptr);
+    EXPECT_EQ(grid->tree().activeVoxelCount(), 0);
+}// MeshToGrid_EmptyMesh
+
+TEST(TestNanoVDBCUDA, MeshToGrid_UnitTetrahedron)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+
+    // Unit tetrahedron: four vertices, four triangular faces.
+    // Vertex coordinates are in world space.
+    const std::vector<nanovdb::Vec3f> hostPoints = {
+        {0.f, 0.f, 0.f},  // p0
+        {1.f, 0.f, 0.f},  // p1
+        {0.f, 1.f, 0.f},  // p2
+        {0.f, 0.f, 1.f},  // p3
+    };
+    // t0: z=0 face, t1: x=0 face, t2: y=0 face, t3: diagonal face (x+y+z=1)
+    const std::vector<nanovdb::Vec3i> hostTriangles = {
+        {0, 1, 2},
+        {0, 2, 3},
+        {0, 3, 1},
+        {1, 2, 3},
+    };
+
+    auto nPoints = hostPoints.size();
+    auto nTriangles = hostTriangles.size();
+
+    // Upload points and triangles to device
+    auto pointsBuf = nanovdb::cuda::DeviceBuffer::create(nPoints * sizeof(nanovdb::Vec3f), nullptr, false);
+    ASSERT_TRUE(pointsBuf.deviceData());
+    cudaCheck(cudaMemcpy(pointsBuf.deviceData(), hostPoints.data(),
+                         nPoints * sizeof(nanovdb::Vec3f), cudaMemcpyHostToDevice));
+
+    auto trisBuf = nanovdb::cuda::DeviceBuffer::create(nTriangles * sizeof(nanovdb::Vec3i), nullptr, false);
+    ASSERT_TRUE(trisBuf.deviceData());
+    cudaCheck(cudaMemcpy(trisBuf.deviceData(), hostTriangles.data(),
+                         nTriangles * sizeof(nanovdb::Vec3i), cudaMemcpyHostToDevice));
+
+    auto dPoints = static_cast<const nanovdb::Vec3f*>(pointsBuf.deviceData());
+    auto dTriangles = static_cast<const nanovdb::Vec3i*>(trisBuf.deviceData());
+
+    // Uniform-scale map: world = dx * index
+    const double dx = 0.1;
+    nanovdb::Map map;
+    map.set(dx, nanovdb::Vec3d(0.0));
+
+    const float bandWidth = 3.0f;  // default, in voxels
+    const float bandWidthWorld = bandWidth * float(dx);
+
+    // CPU brute-force UDF in index space (matches GPU arithmetic exactly):
+    // transform world-space verts to index space, compute pointToTriangleDistSqr
+    // with integer voxel centers, scale result to world space.
+    std::array<nanovdb::Vec3f, 4> idxVerts;
+    for (uint32_t i = 0; i < nPoints; ++i)
+        idxVerts[i] = map.applyInverseMap(hostPoints[i]);
+
+    auto cpuUDF = [&](int ix, int iy, int iz) -> float {
+        const nanovdb::Vec3f p{float(ix), float(iy), float(iz)};
+        float minDistSqr = std::numeric_limits<float>::max();
+        for (const auto& tri : hostTriangles) {
+            const float d = nanovdb::math::pointToTriangleDistSqr<nanovdb::Vec3f>(
+                idxVerts[tri[0]], idxVerts[tri[1]], idxVerts[tri[2]], p);
+            minDistSqr = std::min(minDistSqr, d);
+        }
+        return std::sqrt(minDistSqr) * float(dx);  // world-space distance
+    };
+
+    // --- Topology-only path ---
+    uint64_t topoChecksum = 0;
+    {
+        nanovdb::tools::cuda::MeshToGrid<BuildT> conv(dPoints, nPoints, dTriangles, nTriangles, map);
+        conv.setVerbose(0);
+        conv.setChecksum(nanovdb::CheckMode::Full);
+        auto handle = conv.getHandle();
+        handle.deviceDownload();
+        const auto* topoGrid = handle.grid<BuildT>();
+        ASSERT_NE(topoGrid, nullptr);
+        topoChecksum = topoGrid->mChecksum.full();
+        EXPECT_GT(topoGrid->tree().activeVoxelCount(), uint64_t(0));
+    }
+
+    // --- UDF path ---
+    nanovdb::tools::cuda::MeshToGrid<BuildT> converter(dPoints, nPoints, dTriangles, nTriangles, map);
+    converter.setVerbose(0);
+    converter.setChecksum(nanovdb::CheckMode::Full);
+    auto [handle, sidecarBuf] = converter.getHandleAndUDF();
+
+    handle.deviceDownload();
+    const auto* grid = handle.grid<BuildT>();
+    ASSERT_NE(grid, nullptr);
+
+    const uint64_t sidecarCount = sidecarBuf.size() / sizeof(float);
+    std::vector<float> hostSidecar(sidecarCount);
+    cudaCheck(cudaMemcpy(hostSidecar.data(), sidecarBuf.deviceData(),
+                         sidecarBuf.size(), cudaMemcpyDeviceToHost));
+
+    // Per-voxel UDF correctness: every active voxel must lie inside the narrow band
+    // and its sidecar distance must match the CPU brute-force value within 1e-3 voxels.
+    const uint32_t nLeaves = grid->tree().nodeCount(0);
+    const auto* leaves  = grid->tree().getFirstLeaf();
+    uint64_t activeCount = 0;
+
+    for (uint32_t li = 0; li < nLeaves; ++li) {
+        const auto& leaf = leaves[li];
+        const auto  org  = leaf.origin();
+        for (int vi = 0; vi < 512; ++vi) {
+            if (!leaf.isActive(vi)) continue;
+            ++activeCount;
+
+            const auto local = nanovdb::NanoLeaf<BuildT>::OffsetToLocalCoord(vi);
+            const int ix = org[0]+local[0], iy = org[1]+local[1], iz = org[2]+local[2];
+
+            const float exactUDF = cpuUDF(ix, iy, iz);
+            ASSERT_LE(exactUDF, bandWidthWorld * (1.f + 1e-5f))
+                << "Active voxel at (" << ix << "," << iy << "," << iz
+                << ") is outside the narrow band (distance=" << exactUDF/float(dx) << " voxels)";
+
+            const uint64_t sIdx = leaf.getValue(vi);
+            ASSERT_LT(sIdx, sidecarCount) << "Sidecar index out of range";
+
+            const float ourUDF    = hostSidecar[sIdx];
+            const float errVoxels = std::abs(ourUDF - exactUDF) / float(dx);
+            EXPECT_LT(errVoxels, 1e-3f)
+                << "UDF error at (" << ix << "," << iy << "," << iz
+                << "): ours=" << ourUDF/float(dx) << " exact=" << exactUDF/float(dx) << " voxels";
+        }
+    }
+    EXPECT_GT(activeCount, uint64_t(0));
+
+    // Build a flat set of active coord keys from the leaf iteration
+    // Encode each (ix,iy,iz) as a uint64_t with 21 bits per axis, offset by 2^20.
+    auto encodeCoord = [](int x, int y, int z) -> uint64_t {
+        return (uint64_t(x + (1<<20)))
+             | (uint64_t(y + (1<<20)) << 21)
+             | (uint64_t(z + (1<<20)) << 42);
+    };
+    std::unordered_set<uint64_t> activeSet;
+    activeSet.reserve(activeCount);
+    for (uint32_t li = 0; li < nLeaves; ++li) {
+        const auto& leaf = leaves[li];
+        const auto  org  = leaf.origin();
+        for (int vi = 0; vi < 512; ++vi) {
+            if (!leaf.isActive(vi)) continue;
+            const auto local = nanovdb::NanoLeaf<BuildT>::OffsetToLocalCoord(vi);
+            activeSet.insert(encodeCoord(org[0]+local[0], org[1]+local[1], org[2]+local[2]));
+        }
+    }
+
+    // No false negatives: every voxel with CPU UDF strictly inside the band must be active.
+    const int ilo = (int)std::floor(-bandWidth) - 1;
+    const int ihi = (int)std::ceil(1.0 / dx + bandWidth) + 1;
+    uint64_t missedCount = 0;
+    for (int ix = ilo; ix <= ihi; ++ix)
+        for (int iy = ilo; iy <= ihi; ++iy)
+            for (int iz = ilo; iz <= ihi; ++iz)
+                if (cpuUDF(ix, iy, iz) < bandWidthWorld)
+                    if (activeSet.count(encodeCoord(ix, iy, iz)) == 0)
+                        ++missedCount;
+    EXPECT_EQ(missedCount, uint64_t(0));
+
+    // getHandle() and getHandleAndUDF() must produce identical grids.
+    EXPECT_EQ(grid->mChecksum.full(), topoChecksum);
+}// MeshToGrid_UnitTetrahedron

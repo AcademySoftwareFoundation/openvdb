@@ -271,6 +271,17 @@ void operatorKernel(
     op( args... );
 }
 
+/// @brief Cuda kernel that launches a pre-constructed device operator functor with arbitrary arguments.
+///        Unlike operatorKernel, the operator is passed by value (copied at launch) rather than
+///        default-constructed on the device, allowing functors with data members.
+template<class Operator, typename... Args>
+__global__
+__launch_bounds__(Operator::MaxThreadsPerBlock, Operator::MinBlocksPerMultiprocessor)
+void operatorKernelInstance(Operator op, Args... args)
+{
+    op( args... );
+}
+
 /// @brief Cuda kernel that launches device operator functors with arbitrary arguments, using dynamic shared memory
 template<class Operator, typename... Args>
 __global__

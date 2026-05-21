@@ -354,6 +354,13 @@ isZero(const Type& x)
     OPENVDB_NO_FP_EQUALITY_WARNING_END
 }
 
+/// Return @c true if @a x is equal to zero to within the given tolerance.
+template<typename Type>
+inline bool
+isApproxZero(const Type& x, const Type& tolerance)
+{
+    return !cwiseGreaterThan(x, tolerance) && !cwiseLessThan(x, -tolerance);
+}
 
 /// @brief Return @c true if @a x is equal to zero to within
 /// the default floating-point comparison tolerance.
@@ -361,23 +368,13 @@ template<typename Type>
 inline bool
 isApproxZero(const Type& x)
 {
-    const Type tolerance = Type(zeroVal<Type>() + Tolerance<Type>::value());
-    return !(x > tolerance) && !(x < -tolerance);
+    return isApproxZero(x, Type(zeroVal<Type>() + Tolerance<Type>::value()));
 }
-
-/// Return @c true if @a x is equal to zero to within the given tolerance.
-template<typename Type>
-inline bool
-isApproxZero(const Type& x, const Type& tolerance)
-{
-    return !(x > tolerance) && !(x < -tolerance);
-}
-
 
 /// Return @c true if @a x is less than zero.
 template<typename Type>
 inline bool
-isNegative(const Type& x) { return x < zeroVal<Type>(); }
+isNegative(const Type& x) { return cwiseLessThan(x, zeroVal<Type>()); }
 
 // Return false, since bool values are never less than zero.
 template<> inline bool isNegative<bool>(const bool&) { return false; }

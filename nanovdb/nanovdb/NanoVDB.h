@@ -145,7 +145,7 @@
 
 #define NANOVDB_MAJOR_VERSION_NUMBER 32 // reflects changes to the ABI and hence also the file format
 #define NANOVDB_MINOR_VERSION_NUMBER  9 // reflects changes to the API but not ABI
-#define NANOVDB_PATCH_VERSION_NUMBER  0 // reflects changes that does not affect the ABI or API
+#define NANOVDB_PATCH_VERSION_NUMBER  1 // reflects changes that does not affect the ABI or API
 
 #define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
 
@@ -1242,19 +1242,21 @@ public:
     /// @brief Set the specified bit off.
     __hostdev__ void setOff(uint32_t n) { mWords[n >> 6] &= ~(uint64_t(1) << (n & 63)); }
 
-#if defined(__CUDACC__) // the following functions only run on the GPU!
-    __device__ inline void setOnAtomic(uint32_t n)
+    __hostdev__ inline void setOnAtomic(uint32_t n)
     {
-        atomicOr(reinterpret_cast<unsigned long long int*>(this) + (n >> 6), 1ull << (n & 63));
+        util::atomicOr(mWords + (n >> 6), uint64_t(1) << (n & 63));
     }
-    __device__ inline void setOffAtomic(uint32_t n)
+    __hostdev__ inline void setOffAtomic(uint32_t n)
     {
-        atomicAnd(reinterpret_cast<unsigned long long int*>(this) + (n >> 6), ~(1ull << (n & 63)));
+        util::atomicAnd(mWords + (n >> 6), ~(uint64_t(1) << (n & 63)));
     }
-    __device__ inline void setAtomic(uint32_t n, bool on)
+    __hostdev__ inline void setAtomic(uint32_t n, bool on)
     {
         on ? this->setOnAtomic(n) : this->setOffAtomic(n);
     }
+#if defined(__CUDACC__)
+// TODO: setWordAtomic is currently disabled. Before re-enabling, audit for
+// possible migration to __hostdev__ using util::atomicOr/util::atomicAnd.
 /*
     template<typename WordT>
     __device__ inline void setWordAtomic(WordT w, uint32_t n)

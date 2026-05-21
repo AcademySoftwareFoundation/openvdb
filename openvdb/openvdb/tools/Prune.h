@@ -231,7 +231,9 @@ private:
         using UnionT = typename NodeT::UnionType;
         UnionT* data = const_cast<UnionT*>(node.getTable());//never do this at home kids :)
         static const size_t midpoint = (NodeT::NUM_VALUES - 1) >> 1;
-        auto op = [](const UnionT& a, const UnionT& b){return a.getValue() < b.getValue();};
+        auto op = [](const UnionT& a, const UnionT& b) {
+            return math::cwiseLessThan(a.getValue(), b.getValue());
+        };
         std::nth_element(data, data + midpoint, data + NodeT::NUM_VALUES, op);
         return data[midpoint].getValue();
     }

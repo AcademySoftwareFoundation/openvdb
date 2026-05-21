@@ -315,3 +315,103 @@ TEST(TestNanoVDBMultiGPU, Large_DistributedCudaPointsToGrid_UnifiedBuffer)
     cudaSetDevice(current); // restore device so subsequent tests don't fail
 }// Large_DistributedCudaPointsToGrid_UnifiedBuffer
 
+/// @brief Exercises the serial per-tile sort path (< 32 tiles per device) in DistributedPointsToGrid.
+///        Coordinates in [-512, 512] produce at most 2^3 = 8 upper internal node tiles
+///        (each upper node covers 4096 voxels per dimension), well below the threshold of 32.
+TEST(TestNanoVDBMultiGPU, FewTiles_DistributedCudaPointsToGrid)
+{
+    int current = 0;
+    cudaCheck(cudaGetDevice(&current));
+
+    using BuildT = nanovdb::ValueOnIndex;
+    const size_t voxelCount = 1 << 16;// 65536
+    nanovdb::Coord* voxels = nullptr;
+    cudaCheck(cudaMallocManaged(&voxels, voxelCount * sizeof(nanovdb::Coord)));
+    {
+        std::srand(12345);
+        const int max = 512, min = -max;
+        auto op = [&](){return rand() % (max - min) + min;};
+        for (size_t i = 0; i < voxelCount; ++i)
+            voxels[i] = nanovdb::Coord(op(), op(), op());
+    }
+
+    nanovdb::cuda::DeviceMesh deviceMesh;
+    nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
+    auto handle = converter.getHandle(voxels, voxelCount);
+
+    EXPECT_TRUE(handle.deviceData());
+    EXPECT_TRUE(handle.deviceGrid<BuildT>());
+    handle.deviceDownload();
+    auto *grid = handle.grid<BuildT>();
+    EXPECT_TRUE(grid);
+    EXPECT_TRUE(grid->valueCount() > 0);
+    EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
+
+    nanovdb::util::forEach(0, voxelCount, 1, [&](const nanovdb::util::Range1D &r){
+        auto acc = grid->getAccessor();
+        for (size_t i=r.begin(); i!=r.end(); ++i) {
+            const nanovdb::Coord &ijk = voxels[i];
+            EXPECT_TRUE(acc.probeLeaf(ijk)!=nullptr);
+            EXPECT_TRUE(acc.isActive(ijk));
+            EXPECT_TRUE(acc.getValue(ijk) > 0u);
+            const auto *leaf = acc.get<nanovdb::GetLeaf<BuildT>>(ijk);
+            EXPECT_TRUE(leaf);
+            const auto offset = leaf->CoordToOffset(ijk);
+            EXPECT_EQ(ijk, leaf->offsetToGlobalCoord(offset));
+        }
+    });
+
+    cudaCheck(cudaFree(voxels));
+    cudaSetDevice(current);
+}// FewTiles_DistributedCudaPointsToGrid
+
+/// @brief Exercises the segmented sort path (>= 32 tiles per device) in DistributedPointsToGrid.
+///        Coordinates in [-16000, 16000] produce ~8^3 = 512 upper internal node tiles
+///        (each upper node covers 4096 voxels per dimension). Even with 8 GPUs, each device
+///        receives ~64 tiles, exceeding the threshold of 32.
+TEST(TestNanoVDBMultiGPU, ManyTiles_DistributedCudaPointsToGrid)
+{
+    int current = 0;
+    cudaCheck(cudaGetDevice(&current));
+
+    using BuildT = nanovdb::ValueOnIndex;
+    const size_t voxelCount = 1 << 20;// 1048576
+    nanovdb::Coord* voxels = nullptr;
+    cudaCheck(cudaMallocManaged(&voxels, voxelCount * sizeof(nanovdb::Coord)));
+    {
+        std::srand(54321);
+        const int max = 16000, min = -max;
+        auto op = [&](){return rand() % (max - min) + min;};
+        for (size_t i = 0; i < voxelCount; ++i)
+            voxels[i] = nanovdb::Coord(op(), op(), op());
+    }
+
+    nanovdb::cuda::DeviceMesh deviceMesh;
+    nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
+    auto handle = converter.getHandle(voxels, voxelCount);
+
+    EXPECT_TRUE(handle.deviceData());
+    EXPECT_TRUE(handle.deviceGrid<BuildT>());
+    handle.deviceDownload();
+    auto *grid = handle.grid<BuildT>();
+    EXPECT_TRUE(grid);
+    EXPECT_TRUE(grid->valueCount() > 0);
+    EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
+
+    nanovdb::util::forEach(0, voxelCount, 1, [&](const nanovdb::util::Range1D &r){
+        auto acc = grid->getAccessor();
+        for (size_t i=r.begin(); i!=r.end(); ++i) {
+            const nanovdb::Coord &ijk = voxels[i];
+            EXPECT_TRUE(acc.probeLeaf(ijk)!=nullptr);
+            EXPECT_TRUE(acc.isActive(ijk));
+            EXPECT_TRUE(acc.getValue(ijk) > 0u);
+            const auto *leaf = acc.get<nanovdb::GetLeaf<BuildT>>(ijk);
+            EXPECT_TRUE(leaf);
+            const auto offset = leaf->CoordToOffset(ijk);
+            EXPECT_EQ(ijk, leaf->offsetToGlobalCoord(offset));
+        }
+    });
+
+    cudaCheck(cudaFree(voxels));
+    cudaSetDevice(current);
+}// ManyTiles_DistributedCudaPointsToGrid

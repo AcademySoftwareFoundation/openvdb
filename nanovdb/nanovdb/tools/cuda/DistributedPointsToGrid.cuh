@@ -705,24 +705,50 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     }
 
     // For each tile in parallel, we construct another set of keys for the lower nodes, leaf nodes, and voxels within that tile followed by a radix sort of these keys.
-    for (int deviceId = 0, id = 0; deviceId < static_cast<int>(mDeviceMesh.deviceCount()); ++deviceId) {
+    static constexpr uint32_t SEGMENTED_SORT_TILE_THRESHOLD = 32;
+    for (int deviceId = 0; deviceId < static_cast<int>(mDeviceMesh.deviceCount()); ++deviceId) {
         auto stream = mDeviceMesh[deviceId].stream;
         cudaCheck(cudaSetDevice(deviceId));
 
-        uint32_t* devicePointsPerTile = mPointsPerTile + mStripeOffsets[deviceId];
-        for (uint32_t i = 0, tileOffset = 0; i < deviceNodeCount(deviceId)[2]; ++i) {
-            if (!devicePointsPerTile[i]) continue;
+        auto deviceStripeCount = mStripeCounts[deviceId];
+        auto deviceStripeOffset = mStripeOffsets[deviceId];
+        uint32_t* devicePointsPerTile = mPointsPerTile + deviceStripeOffset;
+        uint32_t numDeviceTiles = deviceNodeCount(deviceId)[2];
+        uint32_t tileIdOffset = deviceNodeOffset(deviceId)[2];
 
-            util::cuda::offsetLambdaKernel<<<numBlocks(devicePointsPerTile[i]), mNumThreads, 0, stream>>>(devicePointsPerTile[i], tileOffset + mStripeOffsets[deviceId], VoxelKeyFunctor<BuildT, PtrT>(), mData, coords, id, mKeys, mIndices);
+        if (numDeviceTiles >= SEGMENTED_SORT_TILE_THRESHOLD) {
+            // Bulk segmented sort: one kernel launch + one segmented radix sort (faster for many tiles)
+            uint32_t* d_tile_offsets = nullptr;
+            cudaCheck(cudaMallocManaged(&d_tile_offsets, (numDeviceTiles + 1) * sizeof(uint32_t)));
+            cudaCheck(cudaMemsetAsync(d_tile_offsets, 0, sizeof(uint32_t), stream));
+            CUB_LAUNCH(DeviceScan::InclusiveSum, mTempDevicePools[deviceId], stream, devicePointsPerTile, d_tile_offsets + 1, numDeviceTiles);
 
-            uint64_t* tileInputKeys = mKeys + tileOffset + mStripeOffsets[deviceId];
-            uint32_t* tileInputIndices = mIndices + tileOffset + mStripeOffsets[deviceId];
-            uint64_t* tileOutputKeys = mData->d_keys + tileOffset + mStripeOffsets[deviceId];
-            uint32_t* tileOutputIndices = mData->d_indx + tileOffset + mStripeOffsets[deviceId];
+            uint64_t* deviceKeys = mKeys + deviceStripeOffset;
+            uint32_t* deviceIndices = mIndices + deviceStripeOffset;
+            uint64_t* deviceOutputKeys = mData->d_keys + deviceStripeOffset;
+            uint32_t* deviceOutputIndices = mData->d_indx + deviceStripeOffset;
 
-            CUB_LAUNCH(DeviceRadixSort::SortPairs, mTempDevicePools[deviceId], stream, tileInputKeys, tileOutputKeys, tileInputIndices, tileOutputIndices, devicePointsPerTile[i], 0, 36);// 9+12+15=36
-            ++id;
-            tileOffset += devicePointsPerTile[i];
+            util::cuda::lambdaKernel<<<numBlocks(deviceStripeCount), mNumThreads, 0, stream>>>(deviceStripeCount, BulkVoxelKeyFunctor<BuildT, PtrT>(), mData, coords, d_tile_offsets, numDeviceTiles, deviceKeys, deviceIndices, tileIdOffset);
+            cudaCheckError();
+            CUB_LAUNCH(DeviceSegmentedRadixSort::SortPairs, mTempDevicePools[deviceId], stream, deviceKeys, deviceOutputKeys, deviceIndices, deviceOutputIndices, (int)deviceStripeCount, (int)numDeviceTiles, d_tile_offsets, d_tile_offsets + 1, 0, 36);
+
+            cudaCheck(cudaFree(d_tile_offsets));
+        } else {
+            // Serial per-tile sort: individual kernel + sort per tile (lower overhead for few tiles)
+            for (uint32_t i = 0, tileOffset = 0, id = tileIdOffset; i < numDeviceTiles; ++i) {
+                if (!devicePointsPerTile[i]) continue;
+
+                util::cuda::offsetLambdaKernel<<<numBlocks(devicePointsPerTile[i]), mNumThreads, 0, stream>>>(devicePointsPerTile[i], tileOffset + deviceStripeOffset, VoxelKeyFunctor<BuildT, PtrT>(), mData, coords, id, mKeys, mIndices);
+
+                uint64_t* tileInputKeys = mKeys + tileOffset + deviceStripeOffset;
+                uint32_t* tileInputIndices = mIndices + tileOffset + deviceStripeOffset;
+                uint64_t* tileOutputKeys = mData->d_keys + tileOffset + deviceStripeOffset;
+                uint32_t* tileOutputIndices = mData->d_indx + tileOffset + deviceStripeOffset;
+
+                CUB_LAUNCH(DeviceRadixSort::SortPairs, mTempDevicePools[deviceId], stream, tileInputKeys, tileOutputKeys, tileInputIndices, tileOutputIndices, devicePointsPerTile[i], 0, 36);
+                ++id;
+                tileOffset += devicePointsPerTile[i];
+            }
         }
     }
 
