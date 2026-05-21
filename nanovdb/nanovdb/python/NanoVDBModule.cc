@@ -294,7 +294,10 @@ void defineGrid(nb::module_& m)
              "Apply the inverse-Jacobian-transpose in single precision.")
         // Strings, geometry, layout (already member functions on GridData).
         .def("gridName", &GridData::gridName,
-             "Grid name as a C string (the in-header buffer; truncated if very long).")
+             "Full grid name as a C string. Reads the long-form name from "
+             "blind data when the HasLongGridName flag is set, falling "
+             "back to the in-header buffer otherwise. Use shortGridName() "
+             "if you specifically want the truncated 255-byte header copy.")
         .def("memUsage", &GridData::memUsage,
              "Byte size of this grid header.")
         .def("worldBBox", &GridData::worldBBox,
