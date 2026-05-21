@@ -219,7 +219,7 @@ template<typename BuildT> void defineNanoRoot(nb::module_& m, const char* name)
         .def("isEmpty",       &RootT::isEmpty,
              "True iff the root has no active tiles.")
         .def("bbox",          &RootT::bbox, nb::rv_policy::reference_internal,
-             "Index-space bounding box of every active tile.")
+             "Index-space bounding box of every active value in this tree.")
         .def("minimum",       &RootT::minimum, nb::rv_policy::reference_internal,
              "Minimum active value in the tree.")
         .def("maximum",       &RootT::maximum, nb::rv_policy::reference_internal,

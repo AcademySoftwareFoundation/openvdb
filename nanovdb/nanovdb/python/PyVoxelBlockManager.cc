@@ -173,9 +173,12 @@ static void defineHandle(nb::module_& toolsModule)
         .def("blockCount",  &PyVBMHandle::blockCount,
              "Number of voxel blocks managed by this handle.")
         .def("firstOffset", &PyVBMHandle::firstOffset,
-             "Linear leaf offset of the first block managed by this handle.")
+             "Sequential voxel index of the first active voxel covered "
+             "by this handle (1 by default when the handle covers the "
+             "full grid).")
         .def("lastOffset",  &PyVBMHandle::lastOffset,
-             "Linear leaf offset of the last block managed by this handle.")
+             "Sequential voxel index of the last active voxel covered "
+             "by this handle.")
         .def("reset",       &PyVBMHandle::reset,
              "Release this handle's buffers and reset it to the empty state.")
         .def_prop_ro("log2_block_width", [](const PyVBMHandle& h) { return h.log2BlockWidth; },
