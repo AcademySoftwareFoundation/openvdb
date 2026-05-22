@@ -45,6 +45,18 @@
 #include <Alembic/Util/All.h>
 #endif
 
+#ifdef VDB_TOOL_USE_USD
+#include <pxr/base/gf/matrix4d.h>
+#include <pxr/base/gf/vec3d.h>
+#include <pxr/base/gf/vec3f.h>
+#include <pxr/base/vt/array.h>
+#include <pxr/usd/usd/primRange.h>
+#include <pxr/usd/usd/stage.h>
+#include <pxr/usd/usdGeom/mesh.h>
+#include <pxr/usd/usdGeom/points.h>
+#include <pxr/usd/usdGeom/xformCache.h>
+#endif
+
 #ifdef VDB_TOOL_USE_PDAL
 #include "pdal/pdal.hpp"
 #include "pdal/PipelineManager.hpp"
@@ -203,6 +215,17 @@ public:
     /// @throw std::runtime_error if Alembic support was not enabled at compile time
     ///        or if a polygon with more than 4 vertices is encountered.
     void readABC(const std::string &fileName);
+    /// @brief Read a USD geometry file (.usd, .usda, .usdc, or .usdz). Traverses every
+    ///        UsdGeomMesh and UsdGeomPoints prim and accumulates their points and faces
+    ///        into this Geometry, baking each prim's world transform into the vertex
+    ///        positions.
+    /// @throw std::runtime_error if USD support was not enabled at compile time.
+    /// @throw std::invalid_argument if the file cannot be opened as a USD stage.
+    /// @note  Requires VDB_TOOL_USE_USD. Triangles and quads are preserved as-is;
+    ///        n-gons (n>4) are fan-triangulated. UsdGeomPoints prims contribute only
+    ///        vertex positions (no face data). Instancing, subdivision, animation,
+    ///        and per-point widths are not supported by this minimal reader.
+    void readUSD(const std::string &fileName);
     /// @brief Read a point cloud via PDAL (e.g. LAS/LAZ/E57).
     /// @return true on success, false if PDAL could not parse the file.
     /// @note  Requires VDB_TOOL_USE_PDAL.
@@ -556,7 +579,7 @@ void Geometry::writeGEO(const std::string &fileName) const
 void Geometry::read(const std::string &fileName, int verbose)
 {
     mVerbose = verbose;
-    switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "vdb", "nvdb", "geo", "off", "xyz"})) {
+    switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "vdb", "nvdb", "geo", "off", "xyz", "usd", "usda", "usdc", "usdz"})) {
     case 1:
         this->readOBJ(fileName);
         break;
@@ -586,6 +609,9 @@ void Geometry::read(const std::string &fileName, int verbose)
         break;
     case 10:
         this->readXYZ(fileName);
+        break;
+    case 11: case 12: case 13: case 14:// usd, usda, usdc, usdz
+        this->readUSD(fileName);
         break;
     default:
 #if VDB_TOOL_USE_PDAL
@@ -1450,6 +1476,87 @@ void Geometry::writeABC(const std::string&) const
 }
 
 #endif// VDB_TOOL_USE_ABC
+
+#ifdef VDB_TOOL_USE_USD
+
+void Geometry::readUSD(const std::string &fileName)
+{
+    pxr::UsdStageRefPtr stage = pxr::UsdStage::Open(fileName);
+    if (!stage) {
+        throw std::invalid_argument("Geometry::readUSD: failed to open USD stage \"" + fileName + "\"");
+    }
+
+    // Bake each prim's world transform into the vertex positions, so the
+    // emitted Geometry is in a single world-space frame regardless of how
+    // the source scene was authored.
+    pxr::UsdGeomXformCache xformCache(pxr::UsdTimeCode::EarliestTime());
+
+    // Helper: append the supplied @a points after baking @a prim's world
+    // transform, and return the base index for any subsequent face references.
+    auto appendPoints = [&](const pxr::UsdPrim &prim,
+                            const pxr::VtArray<pxr::GfVec3f> &points) -> int32_t {
+        const int32_t base = static_cast<int32_t>(mVtx.size());
+        const pxr::GfMatrix4d xf = xformCache.GetLocalToWorldTransform(prim);
+        mVtx.reserve(mVtx.size() + points.size());
+        for (const pxr::GfVec3f &p : points) {
+            const pxr::GfVec3d w = xf.Transform(pxr::GfVec3d(p));
+            mVtx.emplace_back(float(w[0]), float(w[1]), float(w[2]));
+        }
+        return base;
+    };
+
+    for (const pxr::UsdPrim &prim : stage->Traverse()) {
+        // Mesh: positions + face topology.
+        pxr::UsdGeomMesh mesh(prim);
+        if (mesh) {
+            pxr::VtArray<pxr::GfVec3f> points;
+            pxr::VtArray<int>          faceCounts;
+            pxr::VtArray<int>          faceIndices;
+            if (!mesh.GetPointsAttr().Get(&points))                 continue;
+            if (!mesh.GetFaceVertexCountsAttr().Get(&faceCounts))   continue;
+            if (!mesh.GetFaceVertexIndicesAttr().Get(&faceIndices)) continue;
+            if (points.empty() || faceCounts.empty()) continue;
+
+            const int32_t base = appendPoints(prim, points);
+            const int *f = faceIndices.cdata();
+            for (int count : faceCounts) {
+                if (count == 3) {
+                    mTri.emplace_back(base + f[0], base + f[1], base + f[2]);
+                } else if (count == 4) {
+                    mQuad.emplace_back(base + f[0], base + f[1], base + f[2], base + f[3]);
+                } else if (count > 4) {
+                    if (mVerbose) std::clog << "Geometry::readUSD: fan-triangulating " << count << "-gon\n";
+                    for (int i = 0; i + 2 < count; ++i) {
+                        mTri.emplace_back(base + f[0], base + f[i+1], base + f[i+2]);
+                    }
+                }// counts < 3 (degenerate) are silently dropped
+                f += count;
+            }
+            continue;
+        }
+
+        // Points: positions only (no face data).
+        pxr::UsdGeomPoints pts(prim);
+        if (pts) {
+            pxr::VtArray<pxr::GfVec3f> points;
+            if (!pts.GetPointsAttr().Get(&points)) continue;
+            if (points.empty()) continue;
+            (void)appendPoints(prim, points);
+            continue;
+        }
+    }
+
+    mBBox = BBoxT();// invalidate cached bbox
+}// Geometry::readUSD
+
+#else
+
+void Geometry::readUSD(const std::string&)
+{
+    throw std::runtime_error("USD read support was disabled during compilation!");
+}
+
+#endif// VDB_TOOL_USE_USD
 
 Geometry::Ptr Geometry::deepCopy() const
 {

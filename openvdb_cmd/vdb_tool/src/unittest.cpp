@@ -880,6 +880,73 @@ TEST_F(Test_vdb_tool, Geometry)
   }
 }// Geometry
 
+#ifdef VDB_TOOL_USE_USD
+// Hand-author a minimal USD ASCII (.usda) file containing one Mesh inside an Xform
+// (translated by +10 along X) and one Points prim at the root, then read it back via
+// the Geometry extension dispatcher. Verifies that:
+//   - both Mesh and Points contribute to mVtx,
+//   - the Xform on the Mesh's parent is baked into the vertex positions,
+//   - triangles and quads are preserved as-is,
+//   - the order of prims in the file matches the order of vertices in the output.
+TEST_F(Test_vdb_tool, GeometryUSD)
+{
+    using namespace openvdb::vdb_tool;
+
+    const std::string fileName = "data/test.usda";
+    std::remove(fileName.c_str());
+
+    {
+        std::ofstream os(fileName);
+        os << "#usda 1.0\n"
+              "\n"
+              "def Xform \"Root\"\n"
+              "{\n"
+              "    double3 xformOp:translate = (10, 0, 0)\n"
+              "    uniform token[] xformOpOrder = [\"xformOp:translate\"]\n"
+              "\n"
+              "    def Mesh \"M\"\n"
+              "    {\n"
+              "        point3f[] points = [(0, 0, 0), (1, 0, 0), (0, 1, 0), (1, 1, 0)]\n"
+              "        int[] faceVertexCounts = [3, 4]\n"
+              "        int[] faceVertexIndices = [0, 1, 2, 0, 1, 3, 2]\n"
+              "    }\n"
+              "}\n"
+              "\n"
+              "def Points \"P\"\n"
+              "{\n"
+              "    point3f[] points = [(100, 0, 0), (101, 0, 0), (102, 0, 0)]\n"
+              "}\n";
+    }
+    ASSERT_TRUE(fileExists(fileName));
+
+    Geometry geo;
+    EXPECT_NO_THROW(geo.read(fileName));
+
+    // 4 (mesh) + 3 (points) = 7 vertices; 1 triangle and 1 quad from the mesh.
+    EXPECT_EQ(7u, geo.vtxCount());
+    EXPECT_EQ(1u, geo.triCount());
+    EXPECT_EQ(1u, geo.quadCount());
+    EXPECT_TRUE(geo.isMesh());
+
+    // Mesh vertices are translated by (+10, 0, 0) from the Xform parent.
+    EXPECT_EQ(openvdb::Vec3f(10, 0, 0), geo.vtx()[0]);
+    EXPECT_EQ(openvdb::Vec3f(11, 0, 0), geo.vtx()[1]);
+    EXPECT_EQ(openvdb::Vec3f(10, 1, 0), geo.vtx()[2]);
+    EXPECT_EQ(openvdb::Vec3f(11, 1, 0), geo.vtx()[3]);
+
+    // Points prim has no parent Xform, so its positions are unmodified.
+    EXPECT_EQ(openvdb::Vec3f(100, 0, 0), geo.vtx()[4]);
+    EXPECT_EQ(openvdb::Vec3f(101, 0, 0), geo.vtx()[5]);
+    EXPECT_EQ(openvdb::Vec3f(102, 0, 0), geo.vtx()[6]);
+
+    // Topology indices are relative to the mesh's base (0 here).
+    EXPECT_EQ(openvdb::Vec3I(0, 1, 2),    geo.tri()[0]);
+    EXPECT_EQ(openvdb::Vec4I(0, 1, 3, 2), geo.quad()[0]);
+
+    std::remove(fileName.c_str());
+}// GeometryUSD
+#endif// VDB_TOOL_USE_USD
+
 TEST_F(Test_vdb_tool, Memory)
 {
     using namespace openvdb::vdb_tool;

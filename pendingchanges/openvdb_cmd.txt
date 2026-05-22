@@ -16,13 +16,14 @@ vdb_tool:
   - Added read support for xyz files.
 
   Improvements:
+  - Action -"read" now has optional support for reading OpenUSD files usd, usda, usdc, and usdz.
   - Action "-mesh2ls/mesh2sdf" now supports generation of asymmetric narrow bands.
   - Improved error reporting when using unsupported actions and options.
   - Actions can now have multiple names, e.g. "-read", "-import, "-load", "-i".
   - Added cutoff option to "-ls2fog" action.
   - Improved error handling in vdb_tool (will recover from many non-fatal errors)
   - Improved parsing of configuration files (tabs and tailing comments are now ignored)
-  - Massively improved Doxygen documentation for all files related to the vdb_tool.
+  - Improved unit-tests and Doxygen documentation for all files related to the vdb_tool.
 
   Fixes:
   - Fixed issues in Geometry::readSTL so it works on all files in Thingi10K.

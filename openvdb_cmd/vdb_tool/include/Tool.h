@@ -1270,7 +1270,7 @@ void Tool::read()
   OPENVDB_ASSERT(action_name == "read");
   try {
     for (auto &fileName : mParser.getVec<std::string>("files")) {
-      switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,off,stl,xyz", "vdb", "nvdb"})) {
+      switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,off,stl,xyz,usd,usda,usdc,usdz", "vdb", "nvdb"})) {
       case 1:
         this->readGeo(fileName);
         break;

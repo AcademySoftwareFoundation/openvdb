@@ -10,7 +10,7 @@ The vdb_tool is a versatile command-line utility that chains together high-level
 | **eval** | Evaluate an expression written in our Reverse Polish Notation (see below) |
 | **config** | Load a configuration file and add the actions for processing |
 | **default** | Set default values used by all subsequent actions |
-| **read** | Read mesh, points, grids or config as obj, ply, abc, stl, off, pts, xyz, e57 (PDAL), vdb, nvdb or txt files |
+| **read** | Read mesh, points, grids or config as obj, ply, abc, stl, off, pts, xyz, e57 (PDAL), usd, usda, usdc, usdz, vdb, nvdb or txt files |
 | **write** | Write a polygon mesh, points, vdb or config as a obj, ply, stl, off, abc, vdb, or txt file |
 | **vdb2points** | Extracts points from a VDB grid |
 | **mesh2ls** | Convert a (water-tight) polygon mesh to a narrow-band signed distance field |
@@ -69,6 +69,7 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 | xyz | read and write | ASCII XYZ files with x y z coordinates, |
 | pts | read | ASCII PTS points files with one or more point clouds |
 | abc | optional read and write | Alembic binary mesh files |
+| usd, usda, usdc, usdz | optional read | OpenUSD scene files; reads UsdGeomMesh and UsdGeomPoints prims |
 | nvdb| optional read and write | NanoVDB file with voxels or points |
 | txt | read and write | ASCII configuration file for this tool |
 | ppm | write | Binary PPM image file |
@@ -91,7 +92,7 @@ This tool supports its own light-weight stack-oriented programming language that
 # Building this tool
 
 This tool is using CMake for build on Linux and Windows.
-The only mandatory dependency is [OpenVDB](http://www.openvdb.org). Optional dependencies include NanoVDB, libpng, libjpeg, OpenEXR, and Alembic. To enable them use the `-DUSE_<name>=ON` flags. See the CMakeLists.txt for details.
+The only mandatory dependency is [OpenVDB](http://www.openvdb.org). Optional dependencies include NanoVDB, libpng, libjpeg, OpenEXR, Alembic, PDAL, and [OpenUSD](https://openusd.org). To enable them use the `-DOPENVDB_TOOL_USE_<name>=ON` flags (e.g. `-DOPENVDB_TOOL_USE_USD=ON` for USD support, or `-DOPENVDB_TOOL_USE_ALL=ON` to enable everything). See the CMakeLists.txt for details.
 
 The included unit tests are using Gtest. Add `-DOPENVDB_BUILD_VDB_TOOL_UNITTESTS=ON` to the cmake command line to build it.
 
@@ -144,6 +145,7 @@ vcpkg install libpng:x64-windows
 vcpkg install libjpeg-turbo:x64-windows
 vcpkg install openexr:x64-windows
 vcpkg install alembic:x64-windows
+vcpkg install usd:x64-windows
 ```
 
 ### Building
@@ -155,6 +157,39 @@ cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DCMAKE_TOOLCHAIN_FILE=<path to vcpkg r
 cmake --build . --config Release --parallel 2
 ```
 To build `vdb_tool` with NanoVDB support, pass in the `-DOPENVDB_BUILD_NANOVDB=ON` argument.
+
+
+## Installing OpenUSD (optional)
+
+USD read support (`.usd`, `.usda`, `.usdc`, `.usdz`) requires linking against [OpenUSD](https://openusd.org/release/index.html). After installing the library, enable it at configure time with `-DOPENVDB_TOOL_USE_USD=ON` (or `-DOPENVDB_TOOL_USE_ALL=ON`) and make sure CMake can locate the `pxrConfig.cmake` file shipped by OpenUSD &mdash; typically by adding the install root to `CMAKE_PREFIX_PATH` or by setting `-Dpxr_DIR=<install>/lib/cmake/pxr`. At runtime you may also need to point `LD_LIBRARY_PATH` (Linux), `DYLD_LIBRARY_PATH` (macOS), or `PATH` (Windows) at `<install>/lib` so the shared libraries are found.
+
+### Linux / macOS (from source &mdash; recommended)
+
+OpenUSD is not packaged in homebrew-core and is rarely packaged in distro repositories, so the most reliable install path on both Linux and macOS is to build it from source. The official build script bootstraps all third-party dependencies and produces a self-contained install (allow ~15&ndash;30 minutes on first build):
+
+```bash
+git clone https://github.com/PixarAnimationStudios/OpenUSD.git
+python3 OpenUSD/build_scripts/build_usd.py \
+    --no-imaging --no-usdview --no-alembic --no-draco --no-openimageio \
+    --no-tutorials --no-examples ~/dev/src/openusd
+cmake -DOPENVDB_TOOL_USE_USD=ON -Dpxr_DIR=$HOME/local/openusd/lib/cmake/pxr ..
+```
+
+For a slimmer build (skips Alembic, Draco, OpenImageIO, materials, imaging, etc., cutting build time substantially), pass `--no-imaging --no-alembic --no-draco --no-openimageio` to `build_usd.py`. vdb_tool only needs the core USD libraries (`usd`, `usdGeom`, `sdf`, `gf`, `vt`, `tf`).
+
+### Windows (vcpkg)
+```bash
+vcpkg install usd:x64-windows
+```
+The vcpkg toolchain file already added to your CMake invocation will make OpenUSD discoverable; no extra `-Dpxr_DIR` is needed.
+
+vcpkg also works on Linux and macOS if you prefer it over building from source &mdash; the package name is the same (`usd`), and you supply the appropriate triplet (e.g. `arm64-osx`, `x64-linux`).
+
+### Verifying the install
+```bash
+vdb_tool -read scene.usda -print
+```
+should list the imported geometry on the stack. Per-prim world transforms are baked into the vertex positions; instancing, subdivision schemes, and animation are intentionally not handled by this minimal reader.
 
 
 # Examples

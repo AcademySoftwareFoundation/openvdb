@@ -39,6 +39,7 @@ option(OPENVDB_TOOL_USE_JPG "Compile with JPG support" OFF)
 option(OPENVDB_TOOL_USE_MPEG "Compile with MPEG support" OFF)
 option(OPENVDB_TOOL_USE_PDAL "Compile with extended points support" OFF)
 option(OPENVDB_TOOL_USE_ABC "Compile with Alembic support" OFF)
+option(OPENVDB_TOOL_USE_USD "Compile with OpenUSD geometry read support" OFF)
 option(OPENVDB_TOOL_USE_ALL "Compile with all optional components" OFF)
 if(OPENVDB_TOOL_USE_ALL)
   set(OPENVDB_TOOL_USE_NANO ON)
@@ -48,7 +49,7 @@ if(OPENVDB_TOOL_USE_ALL)
   set(OPENVDB_TOOL_USE_MPEG ON)
   set(OPENVDB_TOOL_USE_ABC ON)
   set(OPENVDB_TOOL_USE_PDAL ON)
-
+  set(OPENVDB_TOOL_USE_USD ON)
 endif()
 
 if(OPENVDB_TOOL_USE_NANO)
@@ -124,6 +125,15 @@ if(OPENVDB_TOOL_USE_ABC)
   target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_ABC")
   find_package(Alembic CONFIG REQUIRED)
   target_link_libraries(vdb_tool_common INTERFACE Alembic::Alembic)
+endif()
+
+if(OPENVDB_TOOL_USE_USD)
+  target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_USD")
+  # OpenUSD exports its CMake config under the "pxr" package name.
+  find_package(pxr CONFIG REQUIRED)
+  # Minimum set of OpenUSD libraries needed to traverse a stage and pull
+  # UsdGeomMesh data; pxr will transitively pull the rest.
+  target_link_libraries(vdb_tool_common INTERFACE usd usdGeom sdf gf vt tf)
 endif()
 
 if(WIN32 AND (OPENVDB_TOOL_USE_ALL OR (OPENVDB_TOOL_USE_ABC AND OPENVDB_TOOL_USE_EXR)))
