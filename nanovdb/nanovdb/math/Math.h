@@ -17,6 +17,8 @@
 
 #include <nanovdb/util/Util.h>// for __hostdev__ and lots of other utility functions
 
+#include <type_traits>// for std::is_floating_point (matches long double in addition to float / double)
+
 #if defined(__CUDA_ARCH__)
 #include <cuda/std/limits>// for ::cuda::std::numeric_limits
 #endif
@@ -955,13 +957,24 @@ public:
     }
 
     // ---- integer rounding (toward -inf / +inf / nearest) ----
+    //
+    // We test against `std::is_floating_point<T>` rather than
+    // `util::is_floating_point<T>` because the latter only matches `float`
+    // and `double` whereas the former (correctly) also matches
+    // `long double`. Without the broader predicate, `Vec<long double>`
+    // would silently truncate via `static_cast<int32_t>` instead of using
+    // the floor/ceil/round rounding rules. The inner `math::Floor` /
+    // `math::Ceil` only have float/double overloads, so `long double`
+    // implicitly converts to `double` at the call site — matching the
+    // pre-refactor behaviour of `Vec*::round()` which routed `long
+    // double` through the same `Floor(x + 0.5)` path.
 
     /// @brief floor-rounded components into the @c Result type (whose @c [i]
     /// must accept int32_t). For integer @c T the value is passed through.
     template<typename Result>
     __hostdev__ Result floorAs() const {
         Result r;
-        if constexpr (util::is_floating_point<T>::value) {
+        if constexpr (std::is_floating_point<T>::value) {
             for (int i = 0; i < N; ++i) r[i] = math::Floor(mVec[i]);
         } else {
             for (int i = 0; i < N; ++i) r[i] = static_cast<int32_t>(mVec[i]);
@@ -971,7 +984,7 @@ public:
     template<typename Result>
     __hostdev__ Result ceilAs() const {
         Result r;
-        if constexpr (util::is_floating_point<T>::value) {
+        if constexpr (std::is_floating_point<T>::value) {
             for (int i = 0; i < N; ++i) r[i] = math::Ceil(mVec[i]);
         } else {
             for (int i = 0; i < N; ++i) r[i] = static_cast<int32_t>(mVec[i]);
@@ -979,12 +992,12 @@ public:
         return r;
     }
     /// @brief nearest-integer rounding using floor(x + 0.5) for floating @c T
-    /// (round-half-toward-positive-infinity). Unifies behaviour between float
-    /// and double; pass-through for integer @c T.
+    /// (round-half-toward-positive-infinity). Unifies behaviour between
+    /// float, double, and long double; pass-through for integer @c T.
     template<typename Result>
     __hostdev__ Result roundAs() const {
         Result r;
-        if constexpr (util::is_floating_point<T>::value) {
+        if constexpr (std::is_floating_point<T>::value) {
             const T half = T(0.5);
             for (int i = 0; i < N; ++i) r[i] = math::Floor(mVec[i] + half);
         } else {
