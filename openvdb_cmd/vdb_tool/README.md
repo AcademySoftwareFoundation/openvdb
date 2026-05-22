@@ -55,6 +55,9 @@ The vdb_tool is a versatile command-line utility that chains together high-level
 | **render**| Render and save an image of a level set or fog VDB |
 | **clear** | Deletes cached VDB grids and geometry from memory |
 | **print** | Print information about the cached geometries and VDBs |
+| **forAllValues** | Applies a simple computational kernel to all values in a grid |
+| **forOnValues** | Applies a simple computational kernel to active values in a grid |
+| **forOffValues** | Applies a simple computational kernel to in-active values in a grid |
 
 For support, bug-reports or ideas for improvements please contact ken.museth@gmail.com
 

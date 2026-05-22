@@ -11,7 +11,7 @@ vdb_tool:
   - Added new action "-img2mpeg", which converts multiple images to an mpeg movie file.
   - Added new action "-log", which logs warnings and (non-fatal) errors to a file.
   - Added new action "-sdf2udf", which converts a signed distance field into an unsigned distance field.
-  - Added new action "-forAllValues/forOnValues,forOffValues", which applies simple compute kernels of values in a grid.
+  - Added new action "-forAllValues/forOnValues,forOffValues", which applies simple compute kernels to all, active or in-active values in a grid.
   - Added triangulation of N-gons to Geometry::readOBJ and Geometry::readSTL, assuming they are convex.
   - Added read support for xyz files.
 
