@@ -92,6 +92,7 @@
 
 #include <tbb/blocked_range2d.h>
 
+#include "FastExpr.h"
 #include "Parser.h"
 #include "Geometry.h"
 
@@ -579,6 +580,7 @@ void Tool::init()
      {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"op", "", "abs", "operator to be applied to all,on or off values in a grid."},
      {"poly", "", "1,2,3", "polynomial function to be applied to values"},
+     {"kernel", "", "sin(x)+2*x*x", "user-defined math expression to apply to each value. Supports RPN syntax (e.g. \"$x:sin:$x:pow2:2:*:+\") and infix syntax (e.g. \"sin(x)+2*x*x\"). Takes precedence over op/poly when non-empty."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
      {"name", "", "foo-bar", "name assigned to the output volume"}},
@@ -590,6 +592,7 @@ void Tool::init()
      {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"op", "", "abs", "operator to be applied to all,on or off values in a grid."},
      {"poly", "", "1,2,3", "polynomial function to be applied to values"},
+     {"kernel", "", "sin(x)+2*x*x", "user-defined math expression to apply to each value. Supports RPN syntax (e.g. \"$x:sin:$x:pow2:2:*:+\") and infix syntax (e.g. \"sin(x)+2*x*x\"). Takes precedence over op/poly when non-empty."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
      {"name", "", "foo-bar", "name assigned to the output volume"}},
@@ -601,6 +604,7 @@ void Tool::init()
      {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"op", "", "abs", "operator to be applied to all,on or off values in a grid."},
      {"poly", "", "1,2,3", "polynomial function to be applied to values"},
+     {"kernel", "", "sin(x)+2*x*x", "user-defined math expression to apply to each value. Supports RPN syntax (e.g. \"$x:sin:$x:pow2:2:*:+\") and infix syntax (e.g. \"sin(x)+2*x*x\"). Takes precedence over op/poly when non-empty."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
      {"name", "", "foo-bar", "name assigned to the output volume"}},
@@ -2716,6 +2720,7 @@ void Tool::forValues()
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
     const std::string ops = mParser.get<std::string>("op");
+    const std::string kernel = mParser.get<std::string>("kernel");
     const std::string cls = mParser.get<std::string>("class");
     std::vector<float> poly = mParser.getVec<float>("poly");
     std::vector<float> back = mParser.getVec<float>("background");
@@ -2734,7 +2739,12 @@ void Tool::forValues()
     grid->setName(grid_name);
 
     if (mParser.verbose) mTimer.start(action_name);
-    if (poly.size()==1) {
+    // User-supplied math expression takes precedence over op/poly when given.
+    if (!kernel.empty()) {
+      FastExpr expr;
+      expr.compile(kernel);// throws on syntax error / unknown op
+      forEachKenel(grid, mode, [&expr](float v){return expr.eval(v);});
+    } else if (poly.size()==1) {
       forEachKenel(grid, mode, [&poly](float  ){return poly[0]; });
     } else if (poly.size()==2) {
       forEachKenel(grid, mode, [&poly](float v){return poly[0] + poly[1]*v; });
@@ -3149,7 +3159,14 @@ void Tool::slice()
             for (int col=range.cols().begin(); col<range.cols().end(); ++col) {
               xyz[c] = col/float(image.height())*(dim[c]+1) + bbox.min()[c];
               const float v = tools::BoxSampler::sample(acc, xyz);
-              const unsigned char *p = LUT[uint8_t(255.0f*(v - ex.min())/(ex.max() - ex.min()))];
+              // Clamp before the integer cast: float-to-uint8_t conversion is
+              // UB when the value falls outside [0,255], and clang on ARM64
+              // emits an unmasked fcvtzu — values outside ex's range (e.g. the
+              // background of a level set whose active values have been
+              // rewritten by forOnValues) yield huge indices and an OOB read.
+              const float t = (v - ex.min()) / (ex.max() - ex.min());
+              const int   k = int(255.0f * math::Clamp(t, 0.0f, 1.0f));
+              const unsigned char *p = LUT[k];
               image.pixel(row,col) = tools::Film::RGBA(p[0]/255.0f, p[1]/255.0f, p[2]/255.0f);
             }// loop over colums in image
           }// loop over rows in image

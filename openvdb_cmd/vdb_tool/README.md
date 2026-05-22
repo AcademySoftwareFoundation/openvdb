@@ -55,9 +55,9 @@ The vdb_tool is a versatile command-line utility that chains together high-level
 | **render**| Render and save an image of a level set or fog VDB |
 | **clear** | Deletes cached VDB grids and geometry from memory |
 | **print** | Print information about the cached geometries and VDBs |
-| **forAllValues** | Applies a simple computational kernel to all values in a grid |
-| **forOnValues** | Applies a simple computational kernel to active values in a grid |
-| **forOffValues** | Applies a simple computational kernel to in-active values in a grid |
+| **forAllValues** | Apply a math kernel to every value in a grid (see "Per-voxel math kernels" below) |
+| **forOnValues** | Apply a math kernel to every active value in a grid (see "Per-voxel math kernels" below) |
+| **forOffValues** | Apply a math kernel to every inactive value in a grid (see "Per-voxel math kernels" below) |
 
 For support, bug-reports or ideas for improvements please contact ken.museth@gmail.com
 
@@ -91,6 +91,64 @@ Note that this tool maintains two stacks of primitives, namely geometry (i.e. po
 # Stack-based string expressions
 
 This tool supports its own light-weight stack-oriented programming language that is (very loosely) inspired by Forth. Specifically, it uses Reverse Polish Notation (RPN) to define instructions that are evaluated during paring of the command-line arguments (options to be precise). All such expressions start with the character "{", ends with "}", and arguments are separated by ":". Variables starting with "\$" are substituted by its (previously) defined values, and variables starting with "@" are stored in memory. So, "{1:2:+:@x}" is conceptually equivalent to "x = 1 + 2". Conversely, "{\$x:++}" is conceptually equivalent "2 + 1 = 3" since "x=2" was already saved to memory. This is especially useful in combination with loops, e.g. "-quiet -for i=1,3,1 -eval {\$i:++} -end" will print 2 and 3 to the terminal. Branching is also supported, e.g. "radius={$x:1:>:if(0.5:sin?0.3:cos)}" is conceptually equal to "if (x>1) radius=sin(0.5) else radius=cos(0.3)". See the root-searching example below or run vdb_tool -eval help="*" to see a list of all instructions currently supported by this scripting language. Note that since this language uses characters that are interpreted by most shells it is necessary to use single quotes around strings! This is of course not the case when using config files.
+
+# Per-voxel math kernels (forAllValues / forOnValues / forOffValues)
+
+The actions `-forAllValues`, `-forOnValues`, and `-forOffValues` apply a user-defined math expression to every value, every active value, or every inactive value in a `FloatGrid`. The expression is supplied via the `kernel` option, compiled once into a compact bytecode, and then evaluated in parallel across the grid &mdash; no JIT, no extra dependencies, no per-voxel string parsing.
+
+The bound input variable is `x` (the current voxel value), and the same expression can be written in either of two equivalent syntaxes:
+
+| Syntax | Example |
+|---|---|
+| **Infix** (familiar to math users) | `kernel='sin(x) + 2*x*x'` |
+| **RPN** (same language as the rest of vdb_tool's expressions) | `kernel='$x:sin:$x:pow2:2:*:+'` |
+
+Both forms compile to identical bytecode. The compiler picks RPN if the expression contains `:` or `$`, and infix otherwise.
+
+### Operators (infix)
+
+| Op | Precedence | Associativity |
+|----|-----------|---------------|
+| `^` (power)      | 4 | right |
+| unary `-` / `+`  | 5 | right (unary `+` is a no-op) |
+| `*` `/`          | 3 | left |
+| `+` `-` (binary) | 2 | left |
+
+### Functions
+
+| Unary  | `neg` `abs` `inv` `sqrt` `sin` `cos` `tan` `asin` `acos` `atan` `exp` `ln` `log` `floor` `ceil` `pow2` `pow3` |
+|--------|---|
+| **Binary** | `pow(a, b)` (also `a^b`), `min(a, b)`, `max(a, b)` |
+
+### Constants
+
+`pi` and `e` are recognized as named literals in both syntaxes.
+
+### Example commands
+
+```bash
+# Quadratic remap: y = sin(x) + 2*x^2
+vdb_tool -read in.vdb -forAllValues kernel='sin(x) + 2*x*x' -write out.vdb
+
+# Clamp negative values to zero (rectifier / ReLU-style):
+vdb_tool -read in.vdb -forOnValues kernel='max(x, 0)' -write out.vdb
+
+# Take the absolute value (matches the legacy op=abs path):
+vdb_tool -read in.vdb -forAllValues kernel='abs(x)' -write out.vdb
+
+# Smooth-step style mapping using pi:
+vdb_tool -read in.vdb -forOnValues kernel='0.5 - 0.5*cos(pi*x)' -write out.vdb
+
+# Same kernel in RPN, for users who prefer the existing vdb_tool language:
+vdb_tool -read in.vdb -forOnValues kernel='0.5:0.5:$pi:$x:*:cos:*:-' -write out.vdb
+```
+
+### Notes
+
+- **Compile-time validation.** A typo such as `kernel='sin(x'` (mismatched paren) or `kernel='1:2:3'` (leaves three values on the stack) is rejected before the grid is touched, with a clear error message identifying the offending token.
+- **Thread safety.** A compiled `kernel` is evaluated in parallel via TBB. The bytecode evaluator allocates its working stack on the C stack at each call, so a single compiled kernel is safely shared across all worker threads.
+- **Backwards compatibility.** The legacy `op` (e.g. `op=abs`) and `poly` (e.g. `poly=1,2,3`) options still work; a non-empty `kernel` takes precedence over both. Existing config files continue to run unchanged.
+- **Shell quoting.** Always single-quote the kernel value so the shell doesn't interpret `*`, `(`, `$`, etc.
 
 # Building this tool
 

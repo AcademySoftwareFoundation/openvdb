@@ -947,6 +947,143 @@ TEST_F(Test_vdb_tool, GeometryUSD)
 }// GeometryUSD
 #endif// VDB_TOOL_USE_USD
 
+#include "FastExpr.h"
+
+TEST_F(Test_vdb_tool, FastExpr)
+{
+    using namespace openvdb::vdb_tool;
+
+    auto approxEq = [](float a, float b, float tol = 1e-5f) {
+        return std::fabs(a - b) <= tol * std::max(1.0f, std::max(std::fabs(a), std::fabs(b)));
+    };
+
+    {// RPN: identity, literal, simple binary op
+      FastExpr e;
+      e.compile("$x");
+      EXPECT_EQ( 0.0f, e.eval(0.0f));
+      EXPECT_EQ( 3.5f, e.eval(3.5f));
+      EXPECT_EQ(-7.0f, e.eval(-7.0f));
+
+      e.compile("42");
+      EXPECT_EQ(42.0f, e.eval(0.0f));
+      EXPECT_EQ(42.0f, e.eval(123.0f));
+
+      e.compile("$x:2:+");
+      EXPECT_EQ(5.0f, e.eval(3.0f));
+    }
+
+    {// RPN: nontrivial expression with multiple operations
+      FastExpr e;
+      e.compile("$x:sin:$x:pow2:2:*:+");// sin(x) + 2*x*x
+      EXPECT_TRUE(approxEq(std::sin(1.5f) + 2.0f * 1.5f * 1.5f, e.eval(1.5f)));
+      EXPECT_TRUE(approxEq(std::sin(0.0f) + 0.0f,               e.eval(0.0f)));
+    }
+
+    {// Infix: simple operators with standard precedence
+      FastExpr e;
+      e.compile("2 + 3 * 4");
+      EXPECT_EQ(14.0f, e.eval(0.0f));// times binds tighter
+
+      e.compile("(2 + 3) * 4");
+      EXPECT_EQ(20.0f, e.eval(0.0f));
+
+      e.compile("10 - 4 - 3");// left-associative
+      EXPECT_EQ(3.0f, e.eval(0.0f));
+
+      e.compile("2 ^ 3 ^ 2");// right-associative -> 2^(3^2) = 2^9 = 512
+      EXPECT_EQ(512.0f, e.eval(0.0f));
+    }
+
+    {// Infix: variable, named constants, unary minus
+      FastExpr e;
+      e.compile("x");
+      EXPECT_EQ(2.5f, e.eval(2.5f));
+
+      e.compile("-x");
+      EXPECT_EQ(-2.5f, e.eval(2.5f));
+
+      e.compile("2 * -x");
+      EXPECT_EQ(-5.0f, e.eval(2.5f));
+
+      e.compile("pi");
+      EXPECT_TRUE(approxEq(static_cast<float>(M_PI), e.eval(0.0f)));
+
+      e.compile("e");
+      EXPECT_TRUE(approxEq(static_cast<float>(M_E), e.eval(0.0f)));
+    }
+
+    {// Infix: function calls (unary and binary)
+      FastExpr e;
+      e.compile("sin(x)");
+      EXPECT_TRUE(approxEq(std::sin(0.7f), e.eval(0.7f)));
+
+      e.compile("sqrt(x*x + 1)");
+      EXPECT_TRUE(approxEq(std::sqrt(2.0f), e.eval(1.0f)));
+
+      e.compile("pow(x, 3)");
+      EXPECT_TRUE(approxEq(8.0f, e.eval(2.0f)));
+
+      e.compile("max(x, 0)");
+      EXPECT_EQ( 5.0f, e.eval( 5.0f));
+      EXPECT_EQ( 0.0f, e.eval(-2.0f));
+
+      e.compile("min(x, max(0, x*x - 1))");
+      // x=0.5 -> max(0, -0.75)=0, min(0.5, 0)=0
+      EXPECT_EQ(0.0f, e.eval(0.5f));
+      // x=2 -> max(0, 3)=3, min(2, 3)=2
+      EXPECT_EQ(2.0f, e.eval(2.0f));
+    }
+
+    {// Equivalence: same kernel expressed both ways must produce identical bytecode results
+      FastExpr rpn, infix;
+      rpn.compile  ("$x:sin:$x:pow2:2:*:+");
+      infix.compile("sin(x) + 2*x*x");
+      for (float t : {-2.0f, -0.5f, 0.0f, 0.5f, 1.0f, 3.14159f}) {
+          EXPECT_TRUE(approxEq(rpn.eval(t), infix.eval(t)))
+              << "mismatch at x=" << t
+              << ": rpn=" << rpn.eval(t)
+              << " infix=" << infix.eval(t);
+      }
+    }
+
+    {// Error paths
+      FastExpr e;
+      EXPECT_THROW(e.compile(""),                  std::invalid_argument); // empty
+      EXPECT_THROW(e.compile("foo(x)"),            std::invalid_argument); // unknown function
+      EXPECT_THROW(e.compile("$x:notanop"),        std::invalid_argument); // unknown RPN token
+      EXPECT_THROW(e.compile("(x + 1"),            std::invalid_argument); // mismatched (
+      EXPECT_THROW(e.compile("x + 1)"),            std::invalid_argument); // mismatched )
+      EXPECT_THROW(e.compile("$x:+"),              std::invalid_argument); // binary op with one operand
+      EXPECT_THROW(e.compile("1:2:3"),             std::invalid_argument); // leaves 3 values on the stack
+      EXPECT_THROW(e.compile("@"),                 std::invalid_argument); // bad infix character
+    }
+
+    {// Parallel sanity check: a FastExpr is re-entrant; many threads can call eval()
+     // concurrently on the same instance via tools::foreach.
+      FastExpr expr;
+      expr.compile("sin(x) + 2*x*x");
+
+      // Build a small float grid with active values 0..N-1, run the kernel
+      // through the same path Tool::forValues uses, and verify each cell.
+      openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(0.0f);
+      auto acc = grid->getAccessor();
+      constexpr int N = 4096;
+      for (int i = 0; i < N; ++i) acc.setValue(openvdb::Coord(i, 0, 0), float(i));
+
+      openvdb::tools::foreach(grid->beginValueOn(),
+          [&expr](const openvdb::FloatGrid::ValueOnIter &it) {
+              it.setValue(expr.eval(*it));
+          });
+
+      for (int i = 0; i < N; ++i) {
+          const float v   = float(i);
+          const float ref = std::sin(v) + 2.0f * v * v;
+          EXPECT_TRUE(approxEq(ref, acc.getValue(openvdb::Coord(i, 0, 0)), 1e-3f))
+              << "i=" << i;
+      }
+    }
+}// FastExpr
+
 TEST_F(Test_vdb_tool, Memory)
 {
     using namespace openvdb::vdb_tool;
