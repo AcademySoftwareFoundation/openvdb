@@ -19,6 +19,8 @@ on:
       - 'pendingchanges/**'
       - '**.md'
   pull_request:
+    # Add 'ready_for_review' to run CI when a draft PR is marked ready.
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - '**'
     paths-ignore:
@@ -53,9 +55,10 @@ jobs:
     # VFX platform jobs. These are run on the appropriate CentOS images from
     # the provided ASWF docker containers
     if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'linux'
+      (github.event_name == 'push' ||
+       (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+       (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.type == 'all' || github.event.inputs.type == 'linux')))
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux:${{ matrix.config.image }}-abi:${{ matrix.config.abi }}-cxx:${{ matrix.config.cxx }}-type:${{ matrix.config.build }}
@@ -119,9 +122,10 @@ jobs:
   windows:
     # Windows CI. Tests a dynamic build with MD.
     if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'win'
+      (github.event_name == 'push' ||
+       (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+       (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.type == 'all' || github.event.inputs.type == 'win')))
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
     name: windows
     env:
@@ -163,9 +167,10 @@ jobs:
 
   macos:
     if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'mac'
+      (github.event_name == 'push' ||
+       (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+       (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.type == 'all' || github.event.inputs.type == 'mac')))
     runs-on: ${{ matrix.config.image }}
     name: ${{ matrix.config.image }}
     env:
