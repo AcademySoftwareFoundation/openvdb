@@ -19,6 +19,7 @@
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/util/cuda/Morphology.cuh>
 
 namespace nanovdb {
@@ -36,6 +37,15 @@ class TopologyBuilder
     using UpperT = NanoUpper<BuildT>;
     using LowerT = NanoLower<BuildT>;
     using LeafT  = NanoLeaf<BuildT>;
+
+    // Storage policy for device-only scratch (mask/offset/parent arrays + the
+    // local count buffers in countNodes()). UnifiedBuffer keeps kernels happy
+    // while making the scratch host-visible without explicit deviceDownload,
+    // which is the foundation needed before later phases replace kernel
+    // launches with host loops. End state of the port is HostBuffer.
+    // The dual-mode mProcessedRoot and mData remain DeviceBuffer for now
+    // and are migrated separately (see TopologyCpuPortPlan.md §4.4).
+    using ScratchBufferT = nanovdb::cuda::UnifiedBuffer;
 
 public:
 
@@ -75,14 +85,14 @@ public:
     void postProcessGridTree(cudaStream_t stream);
 
     nanovdb::cuda::DeviceBuffer  mProcessedRoot;
-    nanovdb::cuda::DeviceBuffer  mUpperMasks;
-    nanovdb::cuda::DeviceBuffer  mLowerMasks;
-    nanovdb::cuda::DeviceBuffer  mUpperOffsets;
-    nanovdb::cuda::DeviceBuffer  mLowerOffsets;
-    nanovdb::cuda::DeviceBuffer  mLeafOffsets;
-    nanovdb::cuda::DeviceBuffer  mVoxelOffsets;
-    nanovdb::cuda::DeviceBuffer  mLowerParents;
-    nanovdb::cuda::DeviceBuffer  mLeafParents;
+    ScratchBufferT               mUpperMasks;
+    ScratchBufferT               mLowerMasks;
+    ScratchBufferT               mUpperOffsets;
+    ScratchBufferT               mLowerOffsets;
+    ScratchBufferT               mLeafOffsets;
+    ScratchBufferT               mVoxelOffsets;
+    ScratchBufferT               mLowerParents;
+    ScratchBufferT               mLeafParents;
     nanovdb::cuda::DeviceBuffer  mData;
     CheckMode                    mChecksum{CheckMode::Disable};
 
@@ -131,10 +141,10 @@ void TopologyBuilder<BuildT>::allocateInternalMaskBuffers(cudaStream_t stream)
     cudaGetDevice(&device);
     uint64_t upperSize = hostProcessedRoot()->tileCount() * sizeof(Mask<5>);
     uint64_t lowerSize = hostProcessedRoot()->tileCount() * Mask<5>::SIZE * sizeof(Mask<4>);
-    mUpperMasks = nanovdb::cuda::DeviceBuffer::create(upperSize, nullptr, device, stream);
+    mUpperMasks = ScratchBufferT::create(upperSize, nullptr, device, stream);
     if (mUpperMasks.deviceData() == nullptr) throw std::runtime_error("Failed to allocate upper mask buffer on device");
     cudaCheck(cudaMemsetAsync(mUpperMasks.deviceData(), 0, upperSize, stream));
-    mLowerMasks = nanovdb::cuda::DeviceBuffer::create( lowerSize, nullptr, device, stream );
+    mLowerMasks = ScratchBufferT::create( lowerSize, nullptr, device, stream );
     if (mLowerMasks.deviceData() == nullptr) throw std::runtime_error("Failed to allocate lower mask buffer on device");
     cudaCheck(cudaMemsetAsync(mLowerMasks.deviceData(), 0, lowerSize, stream));
 }// TopologyBuilder<BuildT>::allocateInternalMaskBuffers
@@ -158,9 +168,9 @@ void TopologyBuilder<BuildT>::countNodes(cudaStream_t stream)
 
     int device = 0;
     cudaGetDevice(&device);
-    nanovdb::cuda::DeviceBuffer upperCountsBuffer = nanovdb::cuda::DeviceBuffer::create(processedTileCount*sizeof(uint32_t), nullptr, device, stream);
-    nanovdb::cuda::DeviceBuffer lowerCountsBuffer = nanovdb::cuda::DeviceBuffer::create(size*sizeof(uint32_t), nullptr, device, stream);
-    nanovdb::cuda::DeviceBuffer leafCountsBuffer = nanovdb::cuda::DeviceBuffer::create(size*sizeof(uint32_t), nullptr, device, stream);
+    ScratchBufferT upperCountsBuffer = ScratchBufferT::create(processedTileCount*sizeof(uint32_t), nullptr, device, stream);
+    ScratchBufferT lowerCountsBuffer = ScratchBufferT::create(size*sizeof(uint32_t), nullptr, device, stream);
+    ScratchBufferT leafCountsBuffer = ScratchBufferT::create(size*sizeof(uint32_t), nullptr, device, stream);
 
     using CountType = uint32_t (*)[Mask<5>::SIZE];
     auto lowerCounts = reinterpret_cast<CountType>( lowerCountsBuffer.deviceData() );
@@ -171,9 +181,9 @@ void TopologyBuilder<BuildT>::countNodes(cudaStream_t stream)
         <<<dim3(processedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock, 0, stream>>>
         (deviceUpperMasks(), deviceLowerMasks(), lowerCounts, leafCounts);
 
-    mUpperOffsets = nanovdb::cuda::DeviceBuffer::create((processedTileCount+1)*sizeof(uint32_t), nullptr, device, stream);
-    mLowerOffsets = nanovdb::cuda::DeviceBuffer::create((size+1)*sizeof(uint32_t), nullptr, device, stream);
-    mLeafOffsets = nanovdb::cuda::DeviceBuffer::create((size+1)*sizeof(uint32_t), nullptr, device, stream);
+    mUpperOffsets = ScratchBufferT::create((processedTileCount+1)*sizeof(uint32_t), nullptr, device, stream);
+    mLowerOffsets = ScratchBufferT::create((size+1)*sizeof(uint32_t), nullptr, device, stream);
+    mLeafOffsets = ScratchBufferT::create((size+1)*sizeof(uint32_t), nullptr, device, stream);
 
     cudaCheck(cudaMemsetAsync(mLowerOffsets.deviceData(), 0, sizeof(uint32_t), stream));
     CALL_CUBS(DeviceScan::InclusiveSum,
@@ -361,9 +371,9 @@ inline void TopologyBuilder<BuildT>::processLowerNodes(cudaStream_t stream)
         int device = 0;
         cudaGetDevice(&device);
         std::size_t lowerCount = data()->nodeCount[1];
-        mLowerParents = nanovdb::cuda::DeviceBuffer::create(lowerCount*sizeof(uint32_t), nullptr, device, stream);
+        mLowerParents = ScratchBufferT::create(lowerCount*sizeof(uint32_t), nullptr, device, stream);
         std::size_t leafCount = data()->nodeCount[0];
-        mLeafParents = nanovdb::cuda::DeviceBuffer::create(leafCount*sizeof(uint32_t), nullptr, device, stream);
+        mLeafParents = ScratchBufferT::create(leafCount*sizeof(uint32_t), nullptr, device, stream);
 
         using Op = util::morphology::cuda::ProcessLowerNodesFunctor<BuildT>;
         util::cuda::operatorKernel<Op>
@@ -381,10 +391,10 @@ inline void TopologyBuilder<BuildT>::processLowerNodes(cudaStream_t stream)
     }
 
     mProcessedRoot.clear(stream);
-    mUpperMasks.clear(stream);
-    mLowerMasks.clear(stream);
-    mLowerOffsets.clear(stream);
-    mLeafOffsets.clear(stream);
+    mUpperMasks.clear();
+    mLowerMasks.clear();
+    mLowerOffsets.clear();
+    mLeafOffsets.clear();
 }// TopologyBuilder<BuildT>::processLowerNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -426,7 +436,7 @@ inline void TopologyBuilder<BuildT>::processLeafOffsets(cudaStream_t stream)
     cudaGetDevice(&device);
     std::size_t leafCount = data()->nodeCount[0];
     if (leafCount) { // Unless output grid is empty
-        mVoxelOffsets = nanovdb::cuda::DeviceBuffer::create((leafCount+1)*sizeof(uint64_t), nullptr, device, stream);
+        mVoxelOffsets = ScratchBufferT::create((leafCount+1)*sizeof(uint64_t), nullptr, device, stream);
         cudaCheck(cudaMemsetAsync(mVoxelOffsets.deviceData(), 0, sizeof(uint64_t), stream));
         util::cuda::lambdaKernel<<<numBlocks(leafCount), mNumThreads, 0, stream>>>(
             leafCount, topology::detail::UpdateLeafVoxelCountsAndPrefixSumFunctor<BuildT>(), deviceData(), static_cast<uint64_t*>(mVoxelOffsets.deviceData())+1);
@@ -506,13 +516,13 @@ inline void TopologyBuilder<BuildT>::processBBox(cudaStream_t stream)
     // update and propagate bbox from leaf -> lower/parent nodes
     util::cuda::lambdaKernel<<<numBlocks(data()->nodeCount[0]), mNumThreads, 0, stream>>>(
         data()->nodeCount[0], topology::detail::UpdateAndPropagateLeafBBoxFunctor<BuildT>(), deviceData(), static_cast<uint32_t*>(mLeafParents.deviceData()));
-    mLeafParents.clear(stream);
+    mLeafParents.clear();
     cudaCheckError();
 
     // propagate bbox from lower -> upper/parent node
     util::cuda::lambdaKernel<<<numBlocks(data()->nodeCount[1]), mNumThreads, 0, stream>>>(
         data()->nodeCount[1], topology::detail::PropagateLowerBBoxFunctor<BuildT>(), deviceData(), static_cast<uint32_t*>(mLowerParents.deviceData()));
-    mLowerParents.clear(stream);
+    mLowerParents.clear();
     cudaCheckError();
 
     // propagate bbox from upper -> root/parent node
@@ -550,7 +560,7 @@ inline void TopologyBuilder<BuildT>::postProcessGridTree(cudaStream_t stream)
     if (data()->nodeCount[0]) // if grid is empty, the default values are correct
         util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, topology::detail::PostProcessGridTreeFunctor<BuildT>(), deviceData(), static_cast<uint64_t*>(mVoxelOffsets.deviceData()));
     cudaCheckError();
-    mVoxelOffsets.clear(stream);
+    mVoxelOffsets.clear();
 
     tools::cuda::updateChecksum((GridData*)data()->d_bufferPtr, mChecksum, stream);
 }// TopologyBuilder<BuildT>::postProcessGridTree
