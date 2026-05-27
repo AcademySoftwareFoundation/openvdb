@@ -21,6 +21,7 @@
 #include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/util/ForEach.h>
+#include <nanovdb/util/Morphology.h>
 #include <nanovdb/util/PrefixSum.h>
 #include <nanovdb/util/cuda/Morphology.cuh>
 
@@ -199,13 +200,15 @@ void TopologyBuilder<BuildT>::countNodes(cudaStream_t stream)
     auto lowerCounts = reinterpret_cast<CountType>(lowerOffsetsFlattened + 1);
     auto leafCounts  = reinterpret_cast<CountType>(leafOffsets + 1);
 
-    using Op = util::morphology::cuda::EnumerateNodesFunctor;
-    util::cuda::operatorKernel<Op>
-        <<<dim3(processedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock, 0, stream>>>
-        (deviceUpperMasks(), deviceLowerMasks(), lowerCounts, leafCounts);
-
-    // Drain the kernel before the host-side scans/forEach read the counts it wrote.
+    // Drain upstream CUDA writes to mUpperMasks/mLowerMasks (cudaMemsetAsync zero-fill
+    // in allocateInternalMaskBuffers + the operator-specific *InternalNodes kernel)
+    // before host code reads them.
     cudaCheck(cudaStreamSynchronize(stream));
+
+    util::morphology::EnumerateNodes(
+        deviceUpperMasks(), deviceLowerMasks(),
+        lowerCounts, leafCounts,
+        processedTileCount);
 
     // In-place inclusive prefix sums (TBB-backed when NANOVDB_USE_TBB is defined).
     util::inclusiveScan(lowerOffsetsFlattened + 1, size, 0u, /*threaded=*/true, std::plus<uint32_t>{});
