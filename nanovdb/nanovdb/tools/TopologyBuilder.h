@@ -20,6 +20,8 @@
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
+#include <nanovdb/util/ForEach.h>
+#include <nanovdb/util/PrefixSum.h>
 #include <nanovdb/util/cuda/Morphology.cuh>
 
 namespace nanovdb {
@@ -164,54 +166,61 @@ void TopologyBuilder<BuildT>::countNodes(cudaStream_t stream)
     // and (c) count of the speculatively updated root tiles that have actually been used.
     // These are used to reconstruct child offsets for the internal nodes of the updated tree,
     // as well as the tile table at the root.
+    //
+    // Allocation strategy: only the offsets buffers (size N+1) are allocated. Each is laid out
+    // so that offsets[0] is the seeded 0 and offsets[1..N] is the inclusive-scan output. We
+    // therefore have the enumeration kernel and the upper-counts forEach write their per-element
+    // count values *directly* into offsets+1, then run an in-place inclusive scan over the same
+    // N-element region. Reading offsets from [0..N-1] gives the exclusive sum; reading from
+    // [1..N] gives the inclusive sum; offsets[N] is the total.
     std::size_t size = processedTileCount*Mask<5>::SIZE;
 
     int device = 0;
     cudaGetDevice(&device);
-    ScratchBufferT upperCountsBuffer = ScratchBufferT::create(processedTileCount*sizeof(uint32_t), nullptr, device, stream);
-    ScratchBufferT lowerCountsBuffer = ScratchBufferT::create(size*sizeof(uint32_t), nullptr, device, stream);
-    ScratchBufferT leafCountsBuffer = ScratchBufferT::create(size*sizeof(uint32_t), nullptr, device, stream);
+    mUpperOffsets = ScratchBufferT::create((processedTileCount+1)*sizeof(uint32_t), nullptr, device, stream);
+    mLowerOffsets = ScratchBufferT::create((size+1)*sizeof(uint32_t), nullptr, device, stream);
+    mLeafOffsets  = ScratchBufferT::create((size+1)*sizeof(uint32_t), nullptr, device, stream);
 
     using CountType = uint32_t (*)[Mask<5>::SIZE];
-    auto lowerCounts = reinterpret_cast<CountType>( lowerCountsBuffer.deviceData() );
-    auto leafCounts = reinterpret_cast<CountType>( leafCountsBuffer.deviceData() );
+    auto upperOffsets          = static_cast<uint32_t*>(mUpperOffsets.data());
+    auto lowerOffsets          = static_cast<CountType>(mLowerOffsets.data());
+    auto leafOffsets           = static_cast<uint32_t*>(mLeafOffsets.data());
+    auto lowerOffsetsFlattened = static_cast<uint32_t*>(mLowerOffsets.data());
+
+    // Seed the leading zero of each offsets array (host writes; visible to the kernel via
+    // the implicit barrier at kernel launch). The kernel never touches index [0].
+    upperOffsets[0]          = 0;
+    lowerOffsetsFlattened[0] = 0;
+    leafOffsets[0]           = 0;
+
+    // The counts that the enumeration kernel and the upper-counts forEach produce land directly
+    // in the offsets+1 region; the subsequent in-place inclusive scan turns them into offsets.
+    auto upperCounts = upperOffsets + 1;
+    auto lowerCounts = reinterpret_cast<CountType>(lowerOffsetsFlattened + 1);
+    auto leafCounts  = reinterpret_cast<CountType>(leafOffsets + 1);
 
     using Op = util::morphology::cuda::EnumerateNodesFunctor;
     util::cuda::operatorKernel<Op>
         <<<dim3(processedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock, 0, stream>>>
         (deviceUpperMasks(), deviceLowerMasks(), lowerCounts, leafCounts);
 
-    mUpperOffsets = ScratchBufferT::create((processedTileCount+1)*sizeof(uint32_t), nullptr, device, stream);
-    mLowerOffsets = ScratchBufferT::create((size+1)*sizeof(uint32_t), nullptr, device, stream);
-    mLeafOffsets = ScratchBufferT::create((size+1)*sizeof(uint32_t), nullptr, device, stream);
+    // Drain the kernel before the host-side scans/forEach read the counts it wrote.
+    cudaCheck(cudaStreamSynchronize(stream));
 
-    cudaCheck(cudaMemsetAsync(mLowerOffsets.deviceData(), 0, sizeof(uint32_t), stream));
-    CALL_CUBS(DeviceScan::InclusiveSum,
-        static_cast<uint32_t*>(lowerCountsBuffer.deviceData()),
-        static_cast<uint32_t*>(mLowerOffsets.deviceData())+1,
-        size);
-    cudaCheck(cudaMemcpyAsync(&data()->nodeCount[1], static_cast<uint32_t*>(mLowerOffsets.deviceData())+size, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
+    // In-place inclusive prefix sums (TBB-backed when NANOVDB_USE_TBB is defined).
+    util::inclusiveScan(lowerOffsetsFlattened + 1, size, 0u, /*threaded=*/true, std::plus<uint32_t>{});
+    util::inclusiveScan(leafOffsets + 1,           size, 0u, /*threaded=*/true, std::plus<uint32_t>{});
+    data()->nodeCount[1] = lowerOffsetsFlattened[size];
+    data()->nodeCount[0] = leafOffsets[size];
 
-    cudaCheck(cudaMemsetAsync(mLeafOffsets.deviceData(), 0, sizeof(uint32_t), stream));
-    CALL_CUBS(DeviceScan::InclusiveSum,
-        static_cast<uint32_t*>(leafCountsBuffer.deviceData()),
-        static_cast<uint32_t*>(mLeafOffsets.deviceData())+1,
-        size);
-    cudaCheck(cudaMemcpyAsync(&data()->nodeCount[0], static_cast<uint32_t*>(mLeafOffsets.deviceData())+size, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
+    // Host-side derivation of upperCounts from the (just-scanned) lower offsets.
+    util::forEach(0, processedTileCount, 1, [=](const util::Range1D &r) {
+        for (auto tileID = r.begin(); tileID != r.end(); ++tileID)
+            upperCounts[tileID] = (lowerOffsets[tileID+1][0] > lowerOffsets[tileID][0]) ? 1 : 0;
+    });
 
-    util::cuda::lambdaKernel<<<numBlocks(processedTileCount), mNumThreads, 0, stream>>>(
-        processedTileCount,
-        [] __device__(size_t tileID, CountType lowerOffsets, uint32_t* upperCounts)
-            { upperCounts[tileID] = (lowerOffsets[tileID+1][0] > lowerOffsets[tileID][0]) ? 1 : 0; },
-        static_cast<CountType>(mLowerOffsets.deviceData()),
-        static_cast<uint32_t*>(upperCountsBuffer.deviceData()));
-
-    cudaCheck(cudaMemsetAsync( mUpperOffsets.deviceData(), 0, sizeof(uint32_t), stream));
-    CALL_CUBS(DeviceScan::InclusiveSum,
-        static_cast<uint32_t*>(upperCountsBuffer.deviceData()),
-        static_cast<uint32_t*>(mUpperOffsets.deviceData())+1,
-        processedTileCount);
-    cudaCheck(cudaMemcpyAsync(&data()->nodeCount[2], static_cast<uint32_t*>(mUpperOffsets.deviceData())+processedTileCount, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
+    util::inclusiveScan(upperOffsets + 1, processedTileCount, 0u, /*threaded=*/true, std::plus<uint32_t>{});
+    data()->nodeCount[2] = upperOffsets[processedTileCount];
 }// TopologyBuilder<BuildT>::countNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
