@@ -199,18 +199,35 @@ inline __hostdev__ bool ZeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename 
         ijk = RoundDown<Coord>(ray(hdda.time() + Delta));
         // NB: keeping this as separate getDim + isActive calls rather than
         // a fused acc.getDimAndActive<ActiveOnLeafOnly>(ijk, ray) is a
-        // measured choice, not an oversight. On this register-tight
-        // kernel (sm_120, ~64 reg/thread, theoretical occupancy 66.7%
-        // limited by registers, achieved 14% — i.e. severely
-        // memory-latency bound), any shape of fused getDim+active forces
-        // the {dim, active} pair to live across hdda.update, growing
-        // reg/thread by 2-3 and dropping us from 4 to 3 blocks/SM.
-        // The 25% occupancy hit dominates the descent-fusion savings.
-        // The hot path is already cache-warm: the ReadAccessor cache and
-        // L1 absorb the second descent at ~87% L1 hit rate.
+        // measured choice, not an oversight, tested against two distinct
+        // register regimes on sm_120:
+        //
+        //   - master (64 reg/thread, kernel sits on the cliff): fusion
+        //     forces the {dim, active} pair to live across hdda.update,
+        //     growing reg/thread by 2-3 and dropping us from 50% to 37.5%
+        //     occupancy (2 -> 1 blocks/SM at 256 threads). The lost
+        //     occupancy dominates.
+        //
+        //   - lean HDDA refactor (63 reg/thread, with headroom): the
+        //     refactor's freed struct slots absorb the fusion pressure --
+        //     lean + fusion lands at 62 regs with the {uint32_t, bool}
+        //     struct return, or 61 regs with the int32-packed DimAndActive
+        //     encoding. Still no occupancy hit. And still no wall-time
+        //     win -- the variants land within 0-1.3% of each other across
+        //     sphere / dragon / crawler / emu, with the fused versions
+        //     consistently a hair slower.
+        //
+        // Conclusion: it's not the register cliff, it's the descent itself.
+        // The hot path is L1-warm at ~87% hit rate, so eliminating the
+        // second descent saves ~no cycles, and the fused call's slightly
+        // heavier per-call overhead nets out slightly worse. Verified
+        // both struct- and packed-encoded fusion across both regimes.
+        //
         // See ReadAccessor::getDimAndActive (in NanoVDB.h) for the fused
         // API, which fvdb's HDDA iterators use productively (active is
-        // read unconditionally there, so no register-cliff issue).
+        // read unconditionally there, so the descent fusion is a real win
+        // -- and the packed encoding shaves another register off the
+        // return boundary in that hot path).
         hdda.update(ray, acc.getDim(ijk, ray));
         if (hdda.dim() > 1 || !acc.isActive(ijk))
             continue; // either a tile value or an inactive voxel

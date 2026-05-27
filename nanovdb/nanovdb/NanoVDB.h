@@ -1792,10 +1792,27 @@ struct GetNodeInfo;
 /// getDim(ijk, ray)), paired with the active state of @a ijk. The exact
 /// semantics of @c active depend on the @c Policy tag used at the call site
 /// (ActiveExact vs. ActiveOnLeafOnly).
+///
+/// Storage is packed into a single int32_t: low 31 bits hold @c dim
+/// (positive; NanoVDB's max getDim return value is 4096 for the upper
+/// internal node in the default FloatTree hierarchy, well below the
+/// 2^31 limit), and the sign bit encodes @c active (set = active).
+/// This packing saves one register at the function-return boundary
+/// vs. the otherwise natural {uint32_t, bool} layout, which matters
+/// for callers like fvdb's HDDA iterators that hold the result live
+/// across other work. Aggregate-initialization style
+/// `return {dim, active}` is preserved via the explicit two-argument
+/// constructor; accessors @c dim() and @c active() decode on read.
 struct DimAndActive
 {
-    uint32_t dim;
-    bool     active;
+    int32_t packed;
+
+    __hostdev__ DimAndActive() = default;
+    __hostdev__ DimAndActive(uint32_t d, bool a)
+        : packed(int32_t(d) | (int32_t(a) << 31)) {}
+
+    __hostdev__ uint32_t dim()    const { return uint32_t(packed) & 0x7FFFFFFFu; }
+    __hostdev__ bool     active() const { return packed < 0; }
 };
 
 /// @brief Policy tag for getDimAndActive: @c active reflects what isActive(ijk)
@@ -3723,7 +3740,7 @@ private:
                 const ChildT* child = this->getChild(n);
                 acc.insert(ijk, child);
                 const auto r = child->template getDimAndActiveAndCache<Policy>(ijk, ray, acc);
-                return {skip ? this->dim() : r.dim, r.active};
+                return {skip ? this->dim() : r.dim(), r.active()};
             }
             return {skip ? this->dim() : ChildNodeType::dim(), DataType::mValueMask.isOn(n)};
         }
