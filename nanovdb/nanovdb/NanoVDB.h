@@ -1799,10 +1799,10 @@ struct GetNodeInfo;
 /// 2^31 limit), and the sign bit encodes @c active (set = active).
 /// This packing saves one register at the function-return boundary
 /// vs. the otherwise natural {uint32_t, bool} layout, which matters
-/// for callers like fvdb's HDDA iterators that hold the result live
-/// across other work. Aggregate-initialization style
-/// `return {dim, active}` is preserved via the explicit two-argument
-/// constructor; accessors @c dim() and @c active() decode on read.
+/// for callers that hold the result live across other work.
+/// Aggregate-initialization style `return {dim, active}` is preserved
+/// via the explicit two-argument constructor; accessors @c dim() and
+/// @c active() decode on read.
 struct DimAndActive
 {
     int32_t packed;
