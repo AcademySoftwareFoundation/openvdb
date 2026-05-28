@@ -27,7 +27,7 @@ static constexpr int NUM_WARMUP_ITERATIONS = 2;
 
 // Print min / median / mean / max instead of just mean. A single outlier
 // (context switch, OS jitter, thermal blip) pulls the mean noticeably but
-// leaves the median alone, so the median is the more robust headline.
+// leaves the median alone, so the median is the more trustworthy stat.
 static void
 reportStats(const char *label, std::vector<float> samples)
 {

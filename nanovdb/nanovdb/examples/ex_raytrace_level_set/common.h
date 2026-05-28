@@ -49,8 +49,7 @@ inline float renderImage(bool useCuda, const RenderFn renderOp, int width, int h
     // the work between the two record points on the default stream, so it
     // excludes host-side launch latency and the cudaDeviceSynchronize wakeup
     // that std::chrono would otherwise pick up. Events are created/destroyed
-    // per call; the ~10us creation cost is dwarfed by the kernel itself and
-    // keeps the warmup loop honest (each iter goes through the same path).
+    // per call; the ~10us creation cost is dwarfed by the kernel itself.
     if (useCuda) {
         cudaEvent_t startEv, stopEv;
         NANOVDB_CUDA_CHECK_ERROR(cudaEventCreate(&startEv), __FILE__, __LINE__);
