@@ -842,6 +842,19 @@ public:
     __hostdev__ constexpr const T& operator[](int i) const { NANOVDB_ASSERT(i >= 0 && i < N); return mVec[i]; }
     __hostdev__ constexpr T&       operator[](int i)       { NANOVDB_ASSERT(i >= 0 && i < N); return mVec[i]; }
 
+    /// @brief Named component accessors. Available based on dimensionality:
+    /// x() requires N >= 1, y() requires N >= 2, z() requires N >= 3, w()
+    /// requires N >= 4. A call on a Vec too small for the requested component
+    /// triggers a clear compile-time static_assert at the call site.
+    __hostdev__ constexpr const T& x() const { return mVec[0]; }
+    __hostdev__ constexpr       T& x()       { return mVec[0]; }
+    __hostdev__ constexpr const T& y() const { static_assert(N >= 2, "VecBase::y() requires N >= 2"); return mVec[1]; }
+    __hostdev__ constexpr       T& y()       { static_assert(N >= 2, "VecBase::y() requires N >= 2"); return mVec[1]; }
+    __hostdev__ constexpr const T& z() const { static_assert(N >= 3, "VecBase::z() requires N >= 3"); return mVec[2]; }
+    __hostdev__ constexpr       T& z()       { static_assert(N >= 3, "VecBase::z() requires N >= 3"); return mVec[2]; }
+    __hostdev__ constexpr const T& w() const { static_assert(N >= 4, "VecBase::w() requires N >= 4"); return mVec[3]; }
+    __hostdev__ constexpr       T& w()       { static_assert(N >= 4, "VecBase::w() requires N >= 4"); return mVec[3]; }
+
     /// @brief raw pointer to the underlying N-element storage
     __hostdev__ constexpr T*       asPointer()       { return mVec; }
     __hostdev__ constexpr const T* asPointer() const { return mVec; }

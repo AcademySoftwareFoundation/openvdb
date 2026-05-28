@@ -1991,6 +1991,43 @@ TEST_F(TestNanoVDB, MatVecIntrospection)
     Vec4<double> v(10, 20, 30, 40);
     EXPECT_EQ(10.0, v.asPointer()[0]);
     EXPECT_EQ(40.0, v.asPointer()[3]);
+
+    // Named component accessors x()/y()/z()/w(). x() is available on every
+    // Vec*; y() requires N >= 2; z() requires N >= 3; w() requires N >= 4.
+    // Each is exercised here at compile time (constexpr) and at runtime
+    // (read + write through the non-const overload).
+    {
+        constexpr Vec2<int> v2(11, 22);
+        static_assert(v2.x() == 11, "");
+        static_assert(v2.y() == 22, "");
+    }
+    {
+        constexpr Vec3<int> v3(31, 32, 33);
+        static_assert(v3.x() == 31, "");
+        static_assert(v3.y() == 32, "");
+        static_assert(v3.z() == 33, "");
+    }
+    {
+        constexpr Vec4<int> v4(41, 42, 43, 44);
+        static_assert(v4.x() == 41, "");
+        static_assert(v4.y() == 42, "");
+        static_assert(v4.z() == 43, "");
+        static_assert(v4.w() == 44, "");
+    }
+    {
+        // Non-const overloads return mutable references.
+        Vec4<double> vw(0.0, 0.0, 0.0, 0.0);
+        vw.x() = 1.0; vw.y() = 2.0; vw.z() = 3.0; vw.w() = 4.0;
+        EXPECT_EQ(1.0, vw[0]);
+        EXPECT_EQ(2.0, vw[1]);
+        EXPECT_EQ(3.0, vw[2]);
+        EXPECT_EQ(4.0, vw[3]);
+    }
+    // The static_asserts in the bodies of y()/z()/w() guarantee that calling
+    // e.g. Vec2<T>::w() fails with a clear compile-time error
+    // ("VecBase::w() requires N >= 4"); we don't exercise the negative
+    // case here because there's no way to assert "must fail to compile"
+    // inside a gtest TU.
 }// MatVecIntrospection
 
 TEST_F(TestNanoVDB, Map)
