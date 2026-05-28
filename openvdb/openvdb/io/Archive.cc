@@ -14,31 +14,20 @@
 #include <openvdb/openvdb.h>
 
 #ifdef OPENVDB_USE_DELAYED_LOADING
-// Boost.Interprocess uses a header-only portion of Boost.DateTime
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-macros"
-#endif
-#define BOOST_DATE_TIME_NO_LIB
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
-#include <boost/interprocess/file_mapping.hpp>
-#include <boost/interprocess/mapped_region.hpp>
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
-
 #ifdef _WIN32
-#include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
-extern "C" __declspec(dllimport) bool __stdcall GetFileTime(
-    void* fh, void* ctime, void* atime, void* mtime);
-// boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
-// Ensure that both namespaces exist.
-namespace boost { namespace interprocess { namespace detail {} namespace ipcdetail {} } }
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 #else
+#include <sys/mman.h> // for mmap(), munmap()
 #include <sys/types.h> // for struct stat
-#include <sys/stat.h> // for stat()
-#include <unistd.h> // for unlink()
+#include <sys/stat.h> // for stat(), fstat()
+#include <fcntl.h> // for open(), O_RDONLY
+#include <unistd.h> // for unlink(), close()
 #endif
 #endif // OPENVDB_USE_DELAYED_LOADING
 
@@ -457,42 +446,69 @@ operator<<(std::ostream& os, const StreamMetadata::AuxDataMap& auxData)
 // there are unloaded leaf nodes; this is ensured by storing a shared pointer
 // to the map in each unloaded node.
 
+// Seekable read-only streambuf over a memory range; replaces boost::iostreams::array_source.
+struct ArrayStreambuf : std::streambuf {
+    ArrayStreambuf(const char* data, std::size_t n) {
+        char* p = const_cast<char*>(data);
+        setg(p, p, p + n);
+    }
+protected:
+    pos_type seekoff(off_type off, std::ios_base::seekdir dir,
+        std::ios_base::openmode which = std::ios_base::in) override
+    {
+        if (!(which & std::ios_base::in)) return pos_type(off_type(-1));
+        char* base = eback();
+        char* newPos;
+        if      (dir == std::ios_base::beg) newPos = base    + off;
+        else if (dir == std::ios_base::cur) newPos = gptr()  + off;
+        else                                newPos = egptr() + off;
+        if (newPos < base || newPos > egptr()) return pos_type(off_type(-1));
+        setg(base, newPos, egptr());
+        return pos_type(newPos - base);
+    }
+    pos_type seekpos(pos_type pos,
+        std::ios_base::openmode which = std::ios_base::in) override
+    {
+        return seekoff(off_type(pos), std::ios_base::beg, which);
+    }
+};
+
 class MappedFile::Impl
 {
 public:
     Impl(const std::string& filename, bool autoDelete)
-        : mMap(filename.c_str(), boost::interprocess::read_only)
-        , mRegion(mMap, boost::interprocess::read_only)
+        : mFilename(filename)
         , mAutoDelete(autoDelete)
     {
+        this->map(filename);
         if (mAutoDelete) {
 #ifndef _WIN32
             // On Unix systems, unlink the file so that it gets deleted once it is closed.
-            ::unlink(mMap.get_name());
+            ::unlink(mFilename.c_str());
 #endif
         }
     }
 
     ~Impl()
     {
-        std::string filename;
-        if (const char* s = mMap.get_name()) filename = s;
-        OPENVDB_LOG_DEBUG_RUNTIME("closing memory-mapped file " << filename);
-        if (mNotifier) mNotifier(filename);
+        OPENVDB_LOG_DEBUG_RUNTIME("closing memory-mapped file " << mFilename);
+        if (mNotifier) mNotifier(mFilename);
+        this->unmap();
         if (mAutoDelete) {
-            if (!boost::interprocess::file_mapping::remove(filename.c_str())) {
+            if (std::remove(mFilename.c_str()) != 0) {
                 if (errno != ENOENT) {
                     // Warn if the file exists but couldn't be removed.
                     std::string mesg = getErrorString();
                     if (!mesg.empty()) mesg = " (" + mesg + ")";
-                    OPENVDB_LOG_WARN("failed to remove temporary file " << filename << mesg);
+                    OPENVDB_LOG_WARN("failed to remove temporary file " << mFilename << mesg);
                 }
             }
         }
     }
 
-    boost::interprocess::file_mapping mMap;
-    boost::interprocess::mapped_region mRegion;
+    std::string mFilename;
+    void* mAddr = nullptr;
+    std::size_t mSize = 0;
     bool mAutoDelete;
     Notifier mNotifier;
 #if OPENVDB_ABI_VERSION_NUMBER <= 12
@@ -500,8 +516,81 @@ public:
 #endif
 
 private:
-    Impl(const Impl&); // not copyable
-    Impl& operator=(const Impl&); // not copyable
+#ifndef _WIN32
+    void map(const std::string& filename)
+    {
+        const int fd = ::open(filename.c_str(), O_RDONLY);
+        if (fd < 0) {
+            OPENVDB_THROW(IoError, "failed to open file " + filename + " for memory mapping");
+        }
+        struct stat st;
+        if (::fstat(fd, &st) < 0) {
+            ::close(fd);
+            OPENVDB_THROW(IoError, "failed to stat file " + filename);
+        }
+        mSize = static_cast<std::size_t>(st.st_size);
+        mAddr = ::mmap(nullptr, mSize, PROT_READ, MAP_PRIVATE, fd, 0);
+        ::close(fd);
+        if (mAddr == MAP_FAILED) {
+            mAddr = nullptr;
+            OPENVDB_THROW(IoError, "failed to memory-map file " + filename);
+        }
+    }
+
+    void unmap()
+    {
+        if (mAddr) {
+            ::munmap(mAddr, mSize);
+            mAddr = nullptr;
+        }
+    }
+#else // _WIN32
+    void map(const std::string& filename)
+    {
+        mFileHandle = CreateFileA(filename.c_str(), GENERIC_READ, FILE_SHARE_READ,
+            NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (mFileHandle == INVALID_HANDLE_VALUE) {
+            OPENVDB_THROW(IoError, "failed to open file " + filename + " for memory mapping");
+        }
+        LARGE_INTEGER fileSize;
+        if (!GetFileSizeEx(mFileHandle, &fileSize)) {
+            CloseHandle(mFileHandle);
+            mFileHandle = INVALID_HANDLE_VALUE;
+            OPENVDB_THROW(IoError, "failed to get size of file " + filename);
+        }
+        mSize = static_cast<std::size_t>(fileSize.QuadPart);
+        mMapHandle = CreateFileMapping(mFileHandle, NULL, PAGE_READONLY, 0, 0, NULL);
+        if (!mMapHandle) {
+            CloseHandle(mFileHandle);
+            mFileHandle = INVALID_HANDLE_VALUE;
+            OPENVDB_THROW(IoError, "failed to create file mapping for " + filename);
+        }
+        mAddr = MapViewOfFile(mMapHandle, FILE_MAP_READ, 0, 0, 0);
+        if (!mAddr) {
+            CloseHandle(mMapHandle);
+            mMapHandle = NULL;
+            CloseHandle(mFileHandle);
+            mFileHandle = INVALID_HANDLE_VALUE;
+            OPENVDB_THROW(IoError, "failed to map view of file " + filename);
+        }
+    }
+
+    void unmap()
+    {
+        if (mAddr) { UnmapViewOfFile(mAddr); mAddr = nullptr; }
+        if (mMapHandle) { CloseHandle(mMapHandle); mMapHandle = NULL; }
+        if (mFileHandle != INVALID_HANDLE_VALUE) {
+            CloseHandle(mFileHandle);
+            mFileHandle = INVALID_HANDLE_VALUE;
+        }
+    }
+
+    HANDLE mFileHandle = INVALID_HANDLE_VALUE;
+    HANDLE mMapHandle = NULL;
+#endif // _WIN32
+
+    Impl(const Impl&) = delete;
+    Impl& operator=(const Impl&) = delete;
 };
 
 
@@ -519,9 +608,7 @@ MappedFile::~MappedFile()
 std::string
 MappedFile::filename() const
 {
-    std::string result;
-    if (const char* s = mImpl->mMap.get_name()) result = s;
-    return result;
+    return mImpl->mFilename;
 }
 
 
@@ -529,8 +616,8 @@ SharedPtr<std::streambuf>
 MappedFile::createBuffer() const
 {
     return SharedPtr<std::streambuf>{
-        new boost::iostreams::stream_buffer<boost::iostreams::array_source>{
-            static_cast<const char*>(mImpl->mRegion.get_address()), mImpl->mRegion.get_size()}};
+        new ArrayStreambuf{
+            static_cast<const char*>(mImpl->mAddr), mImpl->mSize}};
 }
 
 

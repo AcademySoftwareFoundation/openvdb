@@ -9,15 +9,12 @@
 
 #include <openvdb/Exceptions.h>
 #ifndef _WIN32
-#include <boost/iostreams/stream.hpp>
-#include <boost/iostreams/device/file_descriptor.hpp>
 #include <cstdlib> // for std::getenv(), mkstemp()
 #include <sys/types.h> // for mode_t
 #include <sys/stat.h> // for mkdir(), umask()
-#include <unistd.h> // for access()
-#else
-#include <fstream> // for std::filebuf
+#include <unistd.h> // for access(), close()
 #endif
+#include <fstream> // for std::filebuf
 #include <cstdio> // for std::tmpnam(), L_tmpnam, P_tmpdir
 #include <iostream>
 #include <sstream>
@@ -36,11 +33,8 @@ struct TempFile::TempFileImpl
 
     bool is_open() const { return mBuffer.is_open(); }
 
-    /// @internal boost::filesystem::unique_path(), etc. might be useful here,
-    /// but as of 9/2014, Houdini ships without the Boost.Filesystem library,
-    /// which makes it much less convenient to use that library.
 #ifndef _WIN32
-    TempFileImpl(std::ostream& os): mFileDescr(-1) { this->init(os); }
+    TempFileImpl(std::ostream& os) { this->init(os); }
 
     void init(std::ostream& os)
     {
@@ -49,24 +43,24 @@ struct TempFile::TempFileImpl
         fnbuf.push_back(char(0));
 
         //const mode_t savedMode = ::umask(~(S_IRUSR | S_IWUSR));
-        mFileDescr = ::mkstemp(&fnbuf[0]);
+        int fd = ::mkstemp(&fnbuf[0]);
         //::umask(savedMode);
-        if (mFileDescr < 0) {
+        if (fd < 0) {
             OPENVDB_THROW(IoError, "failed to generate temporary file");
         }
+        // Close the mkstemp fd; the file already exists with a guaranteed-unique name.
+        ::close(fd);
 
         mPath.assign(&fnbuf[0]);
 
-        mDevice = DeviceType(mFileDescr, boost::iostreams::never_close_handle);
-        mBuffer.open(mDevice);
-        os.rdbuf(&mBuffer);
+        os.rdbuf(mBuffer.open(mPath.c_str(), std::ios_base::out | std::ios_base::binary));
 
         if (!os.good()) {
             OPENVDB_THROW(IoError, "failed to open temporary file " + mPath);
         }
     }
 
-    void close() { mBuffer.close(); if (mFileDescr >= 0) ::close(mFileDescr); }
+    void close() { mBuffer.close(); }
 
     static std::string getTempDir()
     {
@@ -88,13 +82,8 @@ struct TempFile::TempFileImpl
         return P_tmpdir;
     }
 
-    using DeviceType = boost::iostreams::file_descriptor_sink;
-    using BufferType = boost::iostreams::stream_buffer<boost::iostreams::file_descriptor_sink>;
-
     std::string mPath;
-    DeviceType mDevice;
-    BufferType mBuffer;
-    int mFileDescr;
+    std::filebuf mBuffer;
 #else // _WIN32
     // Use only standard library routines; no POSIX.
 

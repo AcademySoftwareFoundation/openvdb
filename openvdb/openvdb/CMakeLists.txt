@@ -117,19 +117,6 @@ endif()
 
 # Collect and configure lib dependencies
 
-if(OPENVDB_USE_DELAYED_LOADING)
-  find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams)
-
-  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BOOST_VERSION)
-    # The X.Y.Z boost version value isn't available until CMake 3.14
-    set(FULL_BOOST_VERSION "${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION}.${Boost_SUBMINOR_VERSION}")
-    if(${FULL_BOOST_VERSION} VERSION_LESS FUTURE_MINIMUM_BOOST_VERSION)
-      message(DEPRECATION "Support for Boost versions < ${FUTURE_MINIMUM_BOOST_VERSION} "
-        "is deprecated and will be removed.")
-    endif()
-  endif()
-endif()
-
 find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
 if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_TBB_VERSION)
   if(${TBB_VERSION} VERSION_LESS FUTURE_MINIMUM_TBB_VERSION)
@@ -250,27 +237,6 @@ endif()
 
 if(UNIX)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Threads::Threads)
-endif()
-
-# Pull in Boost last as houdini's boost (hboost) is fully namespaced and libs
-# are renamed too. Boost can be pulled in at any time, but do it last so that,
-# if it's in a shared place (like /usr/local) it doesn't accidently pull in
-# other headers.
-
-if(OPENVDB_USE_DELAYED_LOADING)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Boost::iostreams)
-  if(WIN32)
-    # Boost headers contain #pragma commands on Windows which causes Boost
-    # libraries to be linked in automatically. Custom boost installations
-    # may find that these naming conventions don't always match and can
-    # cause linker errors. This option disables this feature of Boost. Note
-    # -DBOOST_ALL_NO_LIB can also be provided manually.
-    if(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
-        list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
-          Boost::disable_autolinking  # add -DBOOST_ALL_NO_LIB
-        )
-    endif()
-  endif()
 endif()
 
 ##########################################################################

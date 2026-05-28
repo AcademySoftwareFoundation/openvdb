@@ -9,24 +9,7 @@
 #include <gtest/gtest.h>
 
 #ifdef OPENVDB_USE_DELAYED_LOADING
-#ifdef __clang__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-macros"
-#endif
-// Boost.Interprocess uses a header-only portion of Boost.DateTime
-#define BOOST_DATE_TIME_NO_LIB
-#ifdef __clang__
-#pragma GCC diagnostic pop
-#endif
-#include <boost/interprocess/file_mapping.hpp>
-#include <boost/interprocess/mapped_region.hpp>
-#include <boost/iostreams/device/array.hpp>
-#include <boost/iostreams/stream.hpp>
-
-#ifdef _WIN32
-#include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
-#include <windows.h>
-#else
+#ifndef _WIN32
 #include <sys/types.h> // for struct stat
 #include <sys/stat.h> // for stat()
 #include <unistd.h> // for unlink()

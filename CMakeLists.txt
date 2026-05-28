@@ -160,8 +160,6 @@ preceeding flags. If you need more granular control you can provide your
 desired flags via CXX_FLAGS. Only applicable which compiling for x86 targets.
 ]=])
 
-cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
-  "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
 option(USE_STATIC_DEPENDENCIES [=[
 Only search for and use static libraries. If OFF the shared versions of requried libraries are prioritised, falling
 back to static libraries. Forcing individual static dependencies can be enabled by setting XXX_USE_STATIC_LIBS

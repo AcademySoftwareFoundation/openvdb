@@ -603,10 +603,6 @@ elseif(NOT OPENVDB_USE_STATIC_LIBS)
       set(OpenVDB_USES_IMATH_HALF ON)
     endif()
 
-    string(FIND ${PREREQUISITE} "boost_iostreams" _HAS_DEP)
-    if(NOT ${_HAS_DEP} EQUAL -1)
-      set(OpenVDB_USES_DELAYED_LOADING ON)
-    endif()
   endforeach()
 
   unset(_OPENVDB_PREREQUISITE_LIST)
@@ -644,7 +640,6 @@ endif()
 set(_OPENVDB_VISIBLE_DEPENDENCIES "")
 
 if(OpenVDB_USES_DELAYED_LOADING)
-  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES Boost::iostreams)
   list(APPEND OpenVDB_DEFINITIONS OPENVDB_USE_DELAYED_LOADING)
 endif()
 

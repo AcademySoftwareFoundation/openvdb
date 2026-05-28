@@ -9,10 +9,6 @@
 #include <openvdb/Exceptions.h>
 #include <cstdint>
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
-#include <boost/iostreams/copy.hpp>
-#endif
-
 #include <cstdio> // for remove()
 #include <functional> // for std::bind()
 #include <iostream>
@@ -91,8 +87,10 @@ Stream::Stream(std::istream& is, bool delayLoad): mImpl(new Impl)
                 << "; will read directly from the input stream instead");
         }
         if (tempFile) {
-            boost::iostreams::copy(is, *tempFile);
-            const std::string& filename = tempFile->filename();
+            *tempFile << is.rdbuf();
+            const std::string filename = tempFile->filename();
+            tempFile->close(); // flush and close before memory-mapping
+            tempFile.reset();
             mImpl->mFile.reset(new File(filename));
             mImpl->mFile->setCopyMaxBytes(0); // don't make a copy of the temporary file
             /// @todo Need to pass auto-deletion flag to MappedFile.

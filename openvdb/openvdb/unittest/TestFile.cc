@@ -2686,3 +2686,71 @@ TestFile::testDelayedLoadMetadata()
 }
 TEST_F(TestFile, testDelayedLoadMetadata) { testDelayedLoadMetadata(); }
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
+// Verify that MappedFile::createBuffer() returns a fully seekable streambuf so
+// that lazy leaf-node loading (which seeks to stored file offsets) works correctly.
+TEST_F(TestFile, testMappedFileSeek)
+{
+    using namespace openvdb;
+
+    openvdb::initialize();
+
+    // Write a small grid to a temporary file.
+    FloatGrid::Ptr grid = FloatGrid::create();
+    grid->setName("seektest");
+    grid->tree().setValue(Coord(0, 0, 0), 1.0f);
+    grid->tree().setValue(Coord(8, 0, 0), 2.0f);
+
+    const char* filename = "testMappedFileSeek.vdb";
+    SharedPtr<const char> scopedFile(filename, ::remove);
+    io::File(filename).write({grid});
+
+    // Open the file as a MappedFile and obtain a buffer.
+    auto mappedFile = TestMappedFile::create(filename);
+    EXPECT_EQ(filename, mappedFile->filename());
+
+    SharedPtr<std::streambuf> buf = mappedFile->createBuffer();
+    ASSERT_TRUE(bool(buf));
+
+    std::istream is(buf.get());
+
+    // Seek to the beginning and read the magic number.
+    is.seekg(0, std::ios_base::beg);
+    EXPECT_EQ(std::streampos(0), is.tellg());
+
+    uint64_t magic = 0;
+    is.read(reinterpret_cast<char*>(&magic), sizeof(magic));
+    EXPECT_TRUE(is.good());
+    EXPECT_EQ(std::streampos(sizeof(magic)), is.tellg());
+
+    // Seek forward relative to current position.
+    is.seekg(4, std::ios_base::cur);
+    EXPECT_EQ(std::streampos(sizeof(magic) + 4), is.tellg());
+
+    // Seek backward to beginning via seekg(0, beg).
+    is.seekg(0, std::ios_base::beg);
+    EXPECT_EQ(std::streampos(0), is.tellg());
+
+    // Seek from end: one byte before end should be valid.
+    is.seekg(-1, std::ios_base::end);
+    EXPECT_TRUE(is.good());
+
+    // A second independent buffer from the same mapping should have its own
+    // read position and not be affected by seeks on the first.
+    SharedPtr<std::streambuf> buf2 = mappedFile->createBuffer();
+    std::istream is2(buf2.get());
+    is2.seekg(0, std::ios_base::beg);
+    is.seekg(4, std::ios_base::beg); // move first stream
+    EXPECT_EQ(std::streampos(0), is2.tellg()); // second stream unchanged
+
+    // Verify that the file round-trips correctly via delayed load.
+    io::File readFile(filename);
+    readFile.open(/*delayLoad=*/true);
+    auto grids = readFile.getGrids();
+    ASSERT_EQ(1, int(grids->size()));
+    auto readGrid = gridPtrCast<FloatGrid>(*grids->begin());
+    ASSERT_TRUE(bool(readGrid));
+    EXPECT_NEAR(1.0f, readGrid->tree().getValue(Coord(0, 0, 0)), 1e-6f);
+    EXPECT_NEAR(2.0f, readGrid->tree().getValue(Coord(8, 0, 0)), 1e-6f);
+}
+#endif // OPENVDB_USE_DELAYED_LOADING
