@@ -2310,11 +2310,6 @@ public:
     {
     }
 
-    // Not constexpr — every Rgba8 ctor initialises @c mData.c[4] (the first
-    // union member), so reading @c mData.packed is undefined behaviour at
-    // constant evaluation in C++17 / C++20. (C++20 relaxes the rule only
-    // for layout-compatible types sharing a "common initial sequence",
-    // which doesn't apply to uint8_t[4] vs uint32_t.)
     __hostdev__ bool  operator< (const Rgba8& rhs) const { return mData.packed < rhs.mData.packed; }
     __hostdev__ bool  operator==(const Rgba8& rhs) const { return mData.packed == rhs.mData.packed; }
     __hostdev__ constexpr float lengthSqr() const
@@ -2323,13 +2318,11 @@ public:
                                    float(mData.c[1]) * mData.c[1] +
                                    float(mData.c[2]) * mData.c[2]); //1/255^2
     }
-    // Not constexpr — sqrtf isn't constexpr until C++26.
     __hostdev__ float           length() const { return sqrtf(this->lengthSqr()); }
     /// @brief return n'th color channel as a float in the range 0 to 1
     __hostdev__ constexpr float           asFloat(int n) const { return 0.003921569f*float(mData.c[n]); }// divide by 255
     __hostdev__ constexpr const uint8_t&  operator[](int n) const { NANOVDB_ASSERT(n >= 0 && n < 4); return mData.c[n]; }
     __hostdev__ constexpr uint8_t&        operator[](int n) { NANOVDB_ASSERT(n >= 0 && n < 4); return mData.c[n]; }
-    // Not constexpr — see note above operator<.
     __hostdev__ const uint32_t& packed() const { return mData.packed; }
     __hostdev__ uint32_t&       packed() { return mData.packed; }
     __hostdev__ constexpr const uint8_t&  r() const { return mData.c[0]; }
