@@ -395,11 +395,11 @@ public:
 
     /// @brief Return a const reference to the given Coord component.
     /// @warning The argument is assumed to be 0, 1, or 2.
-    __hostdev__ const ValueType& operator[](IndexType i) const { return mVec[i]; }
+    __hostdev__ const ValueType& operator[](IndexType i) const { NANOVDB_ASSERT(i < 3); return mVec[i]; }
 
     /// @brief Return a non-const reference to the given Coord component.
     /// @warning The argument is assumed to be 0, 1, or 2.
-    __hostdev__ ValueType& operator[](IndexType i) { return mVec[i]; }
+    __hostdev__ ValueType& operator[](IndexType i) { NANOVDB_ASSERT(i < 3); return mVec[i]; }
 
     /// @brief Assignment operator that works with openvdb::Coord
     template<typename CoordT>
@@ -646,11 +646,11 @@ public:
 
     /// @brief Return a const reference to the given Coord component.
     /// @warning The argument is assumed to be 0 or 1,
-    __hostdev__ const ValueType& operator[](IndexType i) const { return mVec[i]; }
+    __hostdev__ const ValueType& operator[](IndexType i) const { NANOVDB_ASSERT(i < 2); return mVec[i]; }
 
     /// @brief Return a non-const reference to the given Coord component.
     /// @warning The argument is assumed to be 0 or 1.
-    __hostdev__ ValueType& operator[](IndexType i) { return mVec[i]; }
+    __hostdev__ ValueType& operator[](IndexType i) { NANOVDB_ASSERT(i < 2); return mVec[i]; }
 
     /// @brief Assignment operator that works with openvdb::Coord
     template<typename CoordT>
@@ -827,9 +827,9 @@ public:
 
     VecBase() = default;
 
-    /// @brief Indexed element access (no bounds check; assumes 0 <= i < N)
-    __hostdev__ const T& operator[](int i) const { return mVec[i]; }
-    __hostdev__ T&       operator[](int i)       { return mVec[i]; }
+    /// @brief Indexed element access. Asserts 0 <= i < N in debug builds.
+    __hostdev__ const T& operator[](int i) const { NANOVDB_ASSERT(i >= 0 && i < N); return mVec[i]; }
+    __hostdev__ T&       operator[](int i)       { NANOVDB_ASSERT(i >= 0 && i < N); return mVec[i]; }
 
     /// @brief raw pointer to the underlying N-element storage
     __hostdev__ T*       asPointer()       { return mVec; }
@@ -1141,11 +1141,14 @@ public:
         }
     }
 
-    // 2D array access
+    // 2D array access. Returns a row pointer; the caller is responsible
+    // for the column bound (0 <= col < COLS).
     __hostdev__ T* operator[](int row) {
+        NANOVDB_ASSERT(row >= 0 && row < ROWS);
         return &mData[row * COLS];
     }
     __hostdev__ const T* operator[](int row) const {
+        NANOVDB_ASSERT(row >= 0 && row < ROWS);
         return &mData[row * COLS];
     }
 
@@ -1906,8 +1909,8 @@ struct BaseBBox
     Vec3T                    mCoord[2];
     __hostdev__ bool         operator==(const BaseBBox& rhs) const { return mCoord[0] == rhs.mCoord[0] && mCoord[1] == rhs.mCoord[1]; };
     __hostdev__ bool         operator!=(const BaseBBox& rhs) const { return mCoord[0] != rhs.mCoord[0] || mCoord[1] != rhs.mCoord[1]; };
-    __hostdev__ const Vec3T& operator[](int i) const { return mCoord[i]; }
-    __hostdev__ Vec3T&       operator[](int i) { return mCoord[i]; }
+    __hostdev__ const Vec3T& operator[](int i) const { NANOVDB_ASSERT(i >= 0 && i < 2); return mCoord[i]; }
+    __hostdev__ Vec3T&       operator[](int i) { NANOVDB_ASSERT(i >= 0 && i < 2); return mCoord[i]; }
     __hostdev__ Vec3T&       min() { return mCoord[0]; }
     __hostdev__ Vec3T&       max() { return mCoord[1]; }
     __hostdev__ const Vec3T& min() const { return mCoord[0]; }
@@ -2290,8 +2293,8 @@ public:
     __hostdev__ float           length() const { return sqrtf(this->lengthSqr()); }
     /// @brief return n'th color channel as a float in the range 0 to 1
     __hostdev__ float           asFloat(int n) const { return 0.003921569f*float(mData.c[n]); }// divide by 255
-    __hostdev__ const uint8_t&  operator[](int n) const { return mData.c[n]; }
-    __hostdev__ uint8_t&        operator[](int n) { return mData.c[n]; }
+    __hostdev__ const uint8_t&  operator[](int n) const { NANOVDB_ASSERT(n >= 0 && n < 4); return mData.c[n]; }
+    __hostdev__ uint8_t&        operator[](int n) { NANOVDB_ASSERT(n >= 0 && n < 4); return mData.c[n]; }
     __hostdev__ const uint32_t& packed() const { return mData.packed; }
     __hostdev__ uint32_t&       packed() { return mData.packed; }
     __hostdev__ const uint8_t&  r() const { return mData.c[0]; }
