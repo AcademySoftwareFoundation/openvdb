@@ -2310,12 +2310,13 @@ public:
     {
     }
 
-    // Not usable as a constant expression for instances constructed via the
-    // {{r,g,b,a}} brace-init form (active union member is @c c, not @c packed);
-    // marking constexpr is still valid since a copy from a @c packed()-mutated
-    // instance could in principle be evaluated.
-    __hostdev__ constexpr bool  operator< (const Rgba8& rhs) const { return mData.packed < rhs.mData.packed; }
-    __hostdev__ constexpr bool  operator==(const Rgba8& rhs) const { return mData.packed == rhs.mData.packed; }
+    // Not constexpr — every Rgba8 ctor initialises @c mData.c[4] (the first
+    // union member), so reading @c mData.packed is undefined behaviour at
+    // constant evaluation in C++17 / C++20. (C++20 relaxes the rule only
+    // for layout-compatible types sharing a "common initial sequence",
+    // which doesn't apply to uint8_t[4] vs uint32_t.)
+    __hostdev__ bool  operator< (const Rgba8& rhs) const { return mData.packed < rhs.mData.packed; }
+    __hostdev__ bool  operator==(const Rgba8& rhs) const { return mData.packed == rhs.mData.packed; }
     __hostdev__ constexpr float lengthSqr() const
     {
         return 0.0000153787005f * (float(mData.c[0]) * mData.c[0] +
@@ -2328,10 +2329,9 @@ public:
     __hostdev__ constexpr float           asFloat(int n) const { return 0.003921569f*float(mData.c[n]); }// divide by 255
     __hostdev__ constexpr const uint8_t&  operator[](int n) const { NANOVDB_ASSERT(n >= 0 && n < 4); return mData.c[n]; }
     __hostdev__ constexpr uint8_t&        operator[](int n) { NANOVDB_ASSERT(n >= 0 && n < 4); return mData.c[n]; }
-    // See note above operator< — only usable as a constant expression for
-    // instances whose active union member is @c packed.
-    __hostdev__ constexpr const uint32_t& packed() const { return mData.packed; }
-    __hostdev__ constexpr uint32_t&       packed() { return mData.packed; }
+    // Not constexpr — see note above operator<.
+    __hostdev__ const uint32_t& packed() const { return mData.packed; }
+    __hostdev__ uint32_t&       packed() { return mData.packed; }
     __hostdev__ constexpr const uint8_t&  r() const { return mData.c[0]; }
     __hostdev__ constexpr const uint8_t&  g() const { return mData.c[1]; }
     __hostdev__ constexpr const uint8_t&  b() const { return mData.c[2]; }
