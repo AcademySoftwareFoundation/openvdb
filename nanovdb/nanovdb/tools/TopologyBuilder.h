@@ -332,41 +332,39 @@ struct BuildGridTreeRootFunctor
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-namespace topology::detail {
-
-template <typename BuildT>
-struct BuildUpperNodesFunctor
-{
-    __device__
-    void operator()(size_t processedTileID, typename TopologyBuilder<BuildT>::Data *d_data, NanoRoot<BuildT> *d_processedRoot) {
-        uint32_t tileID = d_data->d_upperOffsets[processedTileID];
-        if (tileID != d_data->d_upperOffsets[processedTileID+1]) // if the offsets are the same, this was a speculatively introduced tile which was not necessary
-        {
-            auto &root  = d_data->getRoot();
-            auto &dstUpper = d_data->getUpper(tileID);
-            auto &processedTile = *d_processedRoot->tile(processedTileID);
-            root.tile(tileID)->setChild( processedTile.origin(), &dstUpper, &root );
-            dstUpper.mBBox = CoordBBox(); // To be further updated after the operation has been applied at leaf-level
-            // TODO: Is this accurate? Any other flags that should be set?
-            dstUpper.mFlags = (uint64_t)GridFlags::HasBBox;
-        }
-    }
-};
-
-}// namespace topology::detail
-
 template <typename BuildT>
 inline void TopologyBuilder<BuildT>::processUpperNodes(cudaStream_t stream)
 {
     // Connect all newly allocated upper nodes to their respective tiles
     // Also fill in any necessary part of the preamble (in InternalData) of upper nodes
     auto processedTileCount = hostProcessedRoot()->tileCount();
+    if (processedTileCount == 0) return; // output grid is empty
 
-    if (processedTileCount) { // Unless output grid is empty
-        util::cuda::lambdaKernel<<<numBlocks(processedTileCount), mNumThreads, 0, stream>>>(
-            processedTileCount, topology::detail::BuildUpperNodesFunctor<BuildT>(), deviceData(), deviceProcessedRoot());
-        cudaCheckError();
-    }
+    // Drain upstream CUDA work (cudaMemsetAsync zero-fill of the output grid buffer +
+    // deviceUpload of mData in getBuffer) so the host code below can read/write through
+    // these regions safely.
+    cudaCheck(cudaStreamSynchronize(stream));
+
+    auto data          = this->data();
+    auto processedRoot = hostProcessedRoot();
+    auto &root         = data->getRoot();
+
+    util::forEach(0, processedTileCount, 1, [=, &root](const util::Range1D &r) {
+        for (auto processedTileID = r.begin(); processedTileID != r.end(); ++processedTileID) {
+            const uint32_t tileID = data->d_upperOffsets[processedTileID];
+            // If the offsets are the same, this was a speculatively introduced tile which was
+            // not necessary.
+            if (tileID != data->d_upperOffsets[processedTileID+1]) {
+                auto &dstUpper      = data->getUpper(tileID);
+                auto &processedTile = *processedRoot->tile(processedTileID);
+                root.tile(tileID)->setChild(processedTile.origin(), &dstUpper, &root);
+                // mBBox will be further updated after the operation has been applied at leaf-level.
+                dstUpper.mBBox = CoordBBox();
+                // TODO: Is this accurate? Any other flags that should be set?
+                dstUpper.mFlags = (uint64_t)GridFlags::HasBBox;
+            }
+        }
+    });
 }// TopologyBuilder<BuildT>::processUpperNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
