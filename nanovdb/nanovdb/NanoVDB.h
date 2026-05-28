@@ -1406,7 +1406,7 @@ struct Map
     double mTaperD; // 8B, placeholder for taper value
 
     /// @brief Default constructor for the identity map
-    __hostdev__ Map()
+    __hostdev__ constexpr Map()
         : mMatF{   1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f}
         , mInvMatF{1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f}
         , mVecF{0.0f, 0.0f, 0.0f}
@@ -1417,7 +1417,7 @@ struct Map
         , mTaperD{1.0}
     {
     }
-    __hostdev__ Map(double s, const Vec3d& t = Vec3d(0.0, 0.0, 0.0))
+    __hostdev__ constexpr Map(double s, const Vec3d& t = Vec3d(0.0, 0.0, 0.0))
         : mMatF{float(s), 0.0f, 0.0f, 0.0f, float(s), 0.0f, 0.0f, 0.0f, float(s)}
         , mInvMatF{1.0f / float(s), 0.0f, 0.0f, 0.0f, 1.0f / float(s), 0.0f, 0.0f, 0.0f, 1.0f / float(s)}
         , mVecF{float(t[0]), float(t[1]), float(t[2])}
@@ -1449,7 +1449,7 @@ struct Map
     /// @param ijk 3D vector to be mapped - typically floating point index coordinates
     /// @return Forward mapping for affine transformation, i.e. (mat x ijk) + translation
     template<typename Vec3T>
-    __hostdev__ Vec3T applyMap(const Vec3T& ijk) const { return math::matMult(mMatD, mVecD, ijk); }
+    __hostdev__ constexpr Vec3T applyMap(const Vec3T& ijk) const { return math::matMult(mMatD, mVecD, ijk); }
 
     /// @brief Apply the forward affine transformation to a vector using 32bit floating point arithmetics.
     /// @note Typically this operation is used for the scale, rotation and translation of index -> world mapping
@@ -1457,7 +1457,7 @@ struct Map
     /// @param ijk 3D vector to be mapped - typically floating point index coordinates
     /// @return Forward mapping for affine transformation, i.e. (mat x ijk) + translation
     template<typename Vec3T>
-    __hostdev__ Vec3T applyMapF(const Vec3T& ijk) const { return math::matMult(mMatF, mVecF, ijk); }
+    __hostdev__ constexpr Vec3T applyMapF(const Vec3T& ijk) const { return math::matMult(mMatF, mVecF, ijk); }
 
     /// @brief Apply the linear forward 3x3 transformation to an input 3d vector using 64bit floating point arithmetics,
     ///        e.g. scale and rotation WITHOUT translation.
@@ -1466,7 +1466,7 @@ struct Map
     /// @param ijk 3D vector to be mapped - typically floating point index coordinates
     /// @return linear forward 3x3 mapping of the input vector
     template<typename Vec3T>
-    __hostdev__ Vec3T applyJacobian(const Vec3T& ijk) const { return math::matMult(mMatD, ijk); }
+    __hostdev__ constexpr Vec3T applyJacobian(const Vec3T& ijk) const { return math::matMult(mMatD, ijk); }
 
     /// @brief Apply the linear forward 3x3 transformation to an input 3d vector using 32bit floating point arithmetics,
     ///        e.g. scale and rotation WITHOUT translation.
@@ -1475,7 +1475,7 @@ struct Map
     /// @param ijk 3D vector to be mapped - typically floating point index coordinates
     /// @return linear forward 3x3 mapping of the input vector
     template<typename Vec3T>
-    __hostdev__ Vec3T applyJacobianF(const Vec3T& ijk) const { return math::matMult(mMatF, ijk); }
+    __hostdev__ constexpr Vec3T applyJacobianF(const Vec3T& ijk) const { return math::matMult(mMatF, ijk); }
 
     /// @brief Apply the inverse affine mapping to a vector using 64bit floating point arithmetics.
     /// @note Typically this operation is used for the world -> index mapping
@@ -1483,7 +1483,7 @@ struct Map
     /// @param xyz 3D vector to be mapped - typically floating point world coordinates
     /// @return Inverse affine mapping of the input @c xyz i.e. (xyz - translation) x mat^-1
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseMap(const Vec3T& xyz) const
+    __hostdev__ constexpr Vec3T applyInverseMap(const Vec3T& xyz) const
     {
         return math::matMult(mInvMatD, Vec3T(xyz[0] - mVecD[0], xyz[1] - mVecD[1], xyz[2] - mVecD[2]));
     }
@@ -1494,7 +1494,7 @@ struct Map
     /// @param xyz 3D vector to be mapped - typically floating point world coordinates
     /// @return Inverse affine mapping of the input @c xyz i.e. (xyz - translation) x mat^-1
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseMapF(const Vec3T& xyz) const
+    __hostdev__ constexpr Vec3T applyInverseMapF(const Vec3T& xyz) const
     {
         return math::matMult(mInvMatF, Vec3T(xyz[0] - mVecF[0], xyz[1] - mVecF[1], xyz[2] - mVecF[2]));
     }
@@ -1506,7 +1506,7 @@ struct Map
     /// @param ijk 3D vector to be mapped - typically floating point index coordinates
     /// @return linear inverse 3x3 mapping of the input vector i.e. xyz x mat^-1
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseJacobian(const Vec3T& xyz) const { return math::matMult(mInvMatD, xyz); }
+    __hostdev__ constexpr Vec3T applyInverseJacobian(const Vec3T& xyz) const { return math::matMult(mInvMatD, xyz); }
 
     /// @brief Apply the linear inverse 3x3 transformation to an input 3d vector using 32bit floating point arithmetics,
     ///        e.g. inverse scale and inverse rotation WITHOUT translation.
@@ -1515,7 +1515,7 @@ struct Map
     /// @param ijk 3D vector to be mapped - typically floating point index coordinates
     /// @return linear inverse 3x3 mapping of the input vector i.e. xyz x mat^-1
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseJacobianF(const Vec3T& xyz) const { return math::matMult(mInvMatF, xyz); }
+    __hostdev__ constexpr Vec3T applyInverseJacobianF(const Vec3T& xyz) const { return math::matMult(mInvMatF, xyz); }
 
     /// @brief Apply the transposed inverse 3x3 transformation to an input 3d vector using 64bit floating point arithmetics,
     ///        e.g. inverse scale and inverse rotation WITHOUT translation.
@@ -1524,12 +1524,12 @@ struct Map
     /// @param ijk 3D vector to be mapped - typically floating point index coordinates
     /// @return linear inverse 3x3 mapping of the input vector i.e. xyz x mat^-1
     template<typename Vec3T>
-    __hostdev__ Vec3T applyIJT(const Vec3T& xyz) const { return math::matMultT(mInvMatD, xyz); }
+    __hostdev__ constexpr Vec3T applyIJT(const Vec3T& xyz) const { return math::matMultT(mInvMatD, xyz); }
     template<typename Vec3T>
-    __hostdev__ Vec3T applyIJTF(const Vec3T& xyz) const { return math::matMultT(mInvMatF, xyz); }
+    __hostdev__ constexpr Vec3T applyIJTF(const Vec3T& xyz) const { return math::matMultT(mInvMatF, xyz); }
 
     /// @brief Return a voxels size in each coordinate direction, measured at the origin
-    __hostdev__ Vec3d getVoxelSize() const { return this->applyMap(Vec3d(1)) - this->applyMap(Vec3d(0)); }
+    __hostdev__ constexpr Vec3d getVoxelSize() const { return this->applyMap(Vec3d(1)) - this->applyMap(Vec3d(0)); }
 }; // Map
 
 template<typename MatT, typename Vec3T>
