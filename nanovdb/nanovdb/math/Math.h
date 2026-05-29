@@ -157,8 +157,6 @@ __hostdev__ [[nodiscard]] inline constexpr bool isApproxZero(const Type& x) noex
 }
 
 /// @brief Same-type minimum (the primary template).
-/// @note Float/double overloads below use @c fminf/fmin for NaN handling and are
-/// therefore not @c constexpr.
 template<typename Type>
 __hostdev__ [[nodiscard]] inline constexpr Type Min(Type a, Type b) noexcept
 {
@@ -176,19 +174,15 @@ __hostdev__ [[nodiscard]] inline constexpr uint32_t Min(uint32_t a, uint32_t b) 
 {
     return a < b ? a : b;
 }
-// Not constexpr — fminf/fmin aren't constexpr until C++23.
 __hostdev__ [[nodiscard]] inline float Min(float a, float b) noexcept
 {
     return fminf(a, b);
 }
-// Not constexpr — fminf/fmin aren't constexpr until C++23.
 __hostdev__ [[nodiscard]] inline double Min(double a, double b) noexcept
 {
     return fmin(a, b);
 }
 /// @brief Same-type maximum (the primary template).
-/// @note Float/double overloads below use @c fmaxf/fmax for NaN handling and
-/// are therefore not @c constexpr.
 template<typename Type>
 __hostdev__ [[nodiscard]] inline constexpr Type Max(Type a, Type b) noexcept
 {
@@ -203,19 +197,16 @@ __hostdev__ [[nodiscard]] inline constexpr uint32_t Max(uint32_t a, uint32_t b) 
 {
     return a > b ? a : b;
 }
-// Not constexpr — fmaxf/fmax aren't constexpr until C++23.
 __hostdev__ [[nodiscard]] inline float Max(float a, float b) noexcept
 {
     return fmaxf(a, b);
 }
-// Not constexpr — fmaxf/fmax aren't constexpr until C++23.
 __hostdev__ [[nodiscard]] inline double Max(double a, double b) noexcept
 {
     return fmax(a, b);
 }
 //@{
 /// @brief Clamp @c x to the closed interval [@c a, @c b].
-/// @note Not @c constexpr — relies on the non-constexpr float/double @c Min/@c Max overloads.
 __hostdev__ [[nodiscard]] inline float Clamp(float x, float a, float b) noexcept
 {
     return Max(Min(x, b), a);
@@ -284,28 +275,24 @@ __hostdev__ [[nodiscard]] inline constexpr T Pow4(T x) noexcept
 }
 /// @brief Absolute value (generic primary template, branchless for arithmetic types).
 /// @note The @c float / @c double / @c int specializations below are not
-/// @c constexpr because @c fabsf / @c fabs / @c abs are not @c constexpr until C++23.
 template<typename T>
 __hostdev__ [[nodiscard]] inline constexpr T Abs(T x) noexcept
 {
     return x < 0 ? -x : x;
 }
 
-// Not constexpr — fabsf isn't constexpr until C++23.
 template<>
 __hostdev__ [[nodiscard]] inline float Abs(float x) noexcept
 {
     return fabsf(x);
 }
 
-// Not constexpr — fabs isn't constexpr until C++23.
 template<>
 __hostdev__ [[nodiscard]] inline double Abs(double x) noexcept
 {
     return fabs(x);
 }
 
-// Not constexpr — std::abs(int) isn't constexpr until C++23.
 template<>
 __hostdev__ [[nodiscard]] inline int Abs(int x) noexcept
 {
@@ -660,7 +647,6 @@ public:
 
     /// @brief Return the largest integer coordinates that are not greater
     /// than @a xyz (node centered conversion).
-    // Not constexpr — math::Floor uses floorf/floor which aren't constexpr until C++23.
     template<typename Vec3T>
     __hostdev__ [[nodiscard]] static Coord Floor(const Vec3T& xyz) noexcept { return Coord(math::Floor(xyz[0]), math::Floor(xyz[1]), math::Floor(xyz[2])); }
 
@@ -673,7 +659,6 @@ public:
     __hostdev__ [[nodiscard]] constexpr uint32_t hash() const noexcept { return ((1 << Log2N) - 1) & (mVec[0] * 73856093 ^ mVec[1] * 19349669 ^ mVec[2] * 83492791); }
 
     /// @brief Return the octant of this Coord
-    //__hostdev__ size_t octant() const { return (uint32_t(mVec[0])>>31) | ((uint32_t(mVec[1])>>31)<<1) | ((uint32_t(mVec[2])>>31)<<2); }
     __hostdev__ [[nodiscard]] constexpr uint8_t octant() const noexcept { return (uint8_t(bool(mVec[0] & (1u << 31)))) |
                                                 (uint8_t(bool(mVec[1] & (1u << 31))) << 1) |
                                                 (uint8_t(bool(mVec[2] & (1u << 31))) << 2); }
@@ -913,7 +898,6 @@ public:
 
     /// @brief Return the largest integer coordinates that are not greater
     /// than @a xyz (node centered conversion).
-    // Not constexpr — math::Floor uses floorf/floor which aren't constexpr until C++23.
     template<typename Vec2T>
     __hostdev__ [[nodiscard]] static Coord2 Floor(const Vec2T& xy) noexcept { return Coord2(math::Floor(xy[0]), math::Floor(xy[1])); }
 
@@ -963,10 +947,6 @@ public:
     __hostdev__ constexpr const T& operator[](int i) const noexcept { NANOVDB_ASSERT(i >= 0 && i < N); return mVec[i]; }
     __hostdev__ constexpr T&       operator[](int i) noexcept       { NANOVDB_ASSERT(i >= 0 && i < N); return mVec[i]; }
 
-    /// @brief Named component accessors. Available based on dimensionality:
-    /// x() requires N >= 1, y() requires N >= 2, z() requires N >= 3, w()
-    /// requires N >= 4. A call on a Vec too small for the requested component
-    /// triggers a clear compile-time static_assert at the call site.
     __hostdev__ constexpr const T& x() const noexcept { return mVec[0]; }
     __hostdev__ constexpr       T& x() noexcept       { return mVec[0]; }
     __hostdev__ constexpr const T& y() const noexcept { static_assert(N >= 2, "VecBase::y() requires N >= 2"); return mVec[1]; }
@@ -1121,16 +1101,6 @@ public:
 
     // ---- integer rounding (toward -inf / +inf / nearest) ----
     //
-    // We test against `std::is_floating_point<T>` rather than
-    // `util::is_floating_point<T>` because the latter only matches `float`
-    // and `double` whereas the former (correctly) also matches
-    // `long double`. Without the broader predicate, `Vec<long double>`
-    // would silently truncate via `static_cast<int32_t>` instead of using
-    // the floor/ceil/round rounding rules. The inner `math::Floor` /
-    // `math::Ceil` only have float/double overloads, so `long double`
-    // implicitly converts to `double` at the call site — matching the
-    // pre-refactor behaviour of `Vec*::round()` which routed `long
-    // double` through the same `Floor(x + 0.5)` path.
 
     /// @brief floor-rounded components into the @c Result type (whose @c [i]
     /// must accept int32_t). For integer @c T the value is passed through.
@@ -1184,9 +1154,7 @@ public:
 /// @brief A simple vector class with two components, similar to openvdb::math::Vec2
 ///
 /// Aligned to 2*alignof(T) so the whole class fits in one SIMD-friendly
-/// chunk (e.g. 8 bytes for Vec2<float>, 16 bytes for Vec2<double>),
-/// without any tail padding because the byte size is already a power-of-2
-/// multiple of alignof(T).
+/// chunk (e.g. 8 bytes for Vec2<float>, 16 bytes for Vec2<double>)
 template<typename T>
 class alignas(alignof(T) * 2) Vec2 final : public VecBase<T, 2>
 {
@@ -1301,13 +1269,13 @@ public:
     // ---- scalar * Vec / scalar / Vec (hidden friends — found only via ADL on Vec2,
     // never participate in unrelated namespace-scope overload sets) ----
 
-    /// @brief Scalar-on-the-left multiplication (hidden friend; found only via ADL on @c Vec2).
+    /// @brief Scalar-on-the-left multiplication (hidden friend).
     template<typename T1>
     __hostdev__ [[nodiscard]] friend constexpr Vec2 operator*(T1 scalar, const Vec2& vec) noexcept
     {
         return Vec2(scalar * vec[0], scalar * vec[1]);
     }
-    /// @brief Scalar-on-the-left division (hidden friend; found only via ADL on @c Vec2).
+    /// @brief Scalar-on-the-left division (hidden friend).
     template<typename T1>
     __hostdev__ [[nodiscard]] friend constexpr Vec2 operator/(T1 scalar, const Vec2& vec) noexcept
     {
@@ -1760,8 +1728,7 @@ public:
 /// for @c Mat4<double>) is heavy compared to row-alignment (4*alignof(T))
 /// but matches the per-class "align to full size" rule used for @c Vec2 /
 /// @c Vec4 / @c Mat2 above and lets a @c Mat4<float> load with a single
-/// AVX-512 instruction. Drop to @c alignas(alignof(T) * 4) here if the
-/// over-aligned constraint causes friction with downstream allocators.
+/// AVX-512 instruction.
 template <typename T>
 class alignas(alignof(T) * 16) Mat4 final : public MatBase<T, 4, 4> {
     using Base = MatBase<T, 4, 4>;
@@ -1854,9 +1821,7 @@ __hostdev__ [[nodiscard]] constexpr Mat3x2<T> operator*(const Mat3<T>& lhs, cons
 /// Vec3 is intentionally NOT alignas-elevated: its byte size
 /// (3*sizeof(T)) is not a power-of-2 multiple of alignof(T), so any
 /// alignas(N > alignof(T)) would force tail padding and break
-/// packed-array layout plus on-disk format compatibility. An opt-in
-/// over-aligned Vec3 wrapper (e.g. for CUDA-coalesced loads) is best
-/// added as a separate type rather than changing Vec3 itself.
+/// packed-array layout plus on-disk format compatibility.
 template<typename T>
 class Vec3 final : public VecBase<T, 3>
 {
@@ -1989,13 +1954,13 @@ public:
     // ---- scalar * Vec / scalar / Vec (hidden friends — found only via ADL on Vec3,
     // never participate in unrelated namespace-scope overload sets) ----
 
-    /// @brief Scalar-on-the-left multiplication (hidden friend; found only via ADL on @c Vec3).
+    /// @brief Scalar-on-the-left multiplication (hidden friend).
     template<typename T1>
     __hostdev__ [[nodiscard]] friend constexpr Vec3 operator*(T1 scalar, const Vec3& vec) noexcept
     {
         return Vec3(scalar * vec[0], scalar * vec[1], scalar * vec[2]);
     }
-    /// @brief Scalar-on-the-left division (hidden friend; found only via ADL on @c Vec3).
+    /// @brief Scalar-on-the-left division (hidden friend).
     template<typename T1>
     __hostdev__ [[nodiscard]] friend constexpr Vec3 operator/(T1 scalar, const Vec3& vec) noexcept
     {
@@ -2118,13 +2083,13 @@ public:
     // ---- scalar * Vec / scalar / Vec (hidden friends — found only via ADL on Vec4,
     // never participate in unrelated namespace-scope overload sets) ----
 
-    /// @brief Scalar-on-the-left multiplication (hidden friend; found only via ADL on @c Vec4).
+    /// @brief Scalar-on-the-left multiplication (hidden friend).
     template<typename T1>
     __hostdev__ [[nodiscard]] friend constexpr Vec4 operator*(T1 scalar, const Vec4& vec) noexcept
     {
         return Vec4(scalar * vec[0], scalar * vec[1], scalar * vec[2], scalar * vec[3]);
     }
-    /// @brief Scalar-on-the-left division (hidden friend; found only via ADL on @c Vec4).
+    /// @brief Scalar-on-the-left division (hidden friend).
     template<typename T1>
     __hostdev__ [[nodiscard]] friend constexpr Vec4 operator/(T1 scalar, const Vec4& vec) noexcept
     {
@@ -2336,10 +2301,6 @@ struct BaseBBox
         return *this;
     }
 
-//    __hostdev__ BaseBBox expandBy(typename Vec3T::ValueType padding) const
-//    {
-//        return BaseBBox(mCoord[0].offsetBy(-padding),mCoord[1].offsetBy(padding));
-//    }
     /// @brief Return @c true iff @a xyz lies in the closed box (each component
     /// satisfies @c min[i] <= @c xyz[i] <= @c max[i]).
     __hostdev__ [[nodiscard]] constexpr bool isInside(const Vec3T& xyz) const noexcept
