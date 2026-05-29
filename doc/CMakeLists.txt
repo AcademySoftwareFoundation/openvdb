@@ -75,9 +75,14 @@ if(OPENVDB_DOXYGEN_INTERNAL)
 endif()
 
 if(NOT OPENVDB_DOXYGEN_INTERNAL)
+  # Hide implementation-detail symbols in the lowercase `internal` namespaces
+  # (the project convention for non-public helpers). Note: do NOT add a
+  # capital-I "*Internal*" glob here -- it also matches the public
+  # tree::InternalNode (and nanovdb::InternalNode) class, silently dropping it
+  # from the docs and breaking every \link to it (e.g. InternalNode::childCount
+  # in doc/changes.txt) while its RootNode/LeafNode siblings resolve fine.
   set(DOXYGEN_EXCLUDE_SYMBOLS
-    "*internal*"
-    "*Internal*")
+    "*internal*")
 endif()
 
 set(DOXYGEN_PROJECT_NAME "OpenVDB")
@@ -214,6 +219,11 @@ set(DOXYGEN_PREDEFINED
   "OPENVDB_VERSION_NAME=v${OpenVDB_MAJOR_VERSION}_${OpenVDB_MINOR_VERSION}"
   "OPENVDB_ABI_VERSION_NUMBER=${OpenVDB_MAJOR_VERSION}"
   [[__declspec(x):= __attribute__(x):=]]
+  # Strip the symbol-visibility/export macro so Doxygen doesn't fold it into a
+  # declaration's name. Doxygen tolerates `class OPENVDB_API X` but mis-parses
+  # `enum OPENVDB_API X` (e.g. half::FromBitsTag in ext/imath/.../Half.h),
+  # reporting the enum as a documented-but-undeclared symbol.
+  "OPENVDB_API="
   # Replace the deprecated macros with doxygen deprecated comments. This ensures
   # that every bit of deprecated C++ is listed in the doxygen deprecated list,
   # even if it was not properly tagged

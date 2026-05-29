@@ -54,7 +54,7 @@ OpenVDB:
     ellipsoidal rasterizations.
 
 - API Changes:
-  - Added @vdblink::tree::LeafBuffer::storage() LeafBuffer::storage()@endlink
+  - Added @c LeafBuffer::storage()
     for direct const access to the raw data buffer when using the bool LeafNode.
   - Removed Grid::evalMinMax(), use
     @vdblink::tools::minMax tools::minMax@endlink for superior threaded
@@ -2807,8 +2807,8 @@ Improvements:
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 - Registration of OpenVDB&nbsp;Points grid and attribute types is now
   handled in @vdblink::initialize() openvdb::initialize@endlink,
-  and @vdblink::points::initialize() points::initialize@endlink
-  and @vdblink::points::uninitialize() points::uninitialize@endlink
+  and @c points::initialize
+  and @c points::uninitialize
   are therefore deprecated.
 - Extended multi-pass I/O to handle a variable number of passes per leaf node.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
@@ -3526,11 +3526,9 @@ Houdini:
 - @vdblink::tools::volumeToMesh() tools::volumeToMesh@endlink now compiles
   for all grid types but throws an exception if the input grid does not
   have a scalar value type.
-- Added a
-  @vdblink::io::File::readGrid(const Name&, const BBoxd&) File::readGrid@endlink
-  overload and @vdblink::GridBase::readBuffers(std::istream&, const CoordBBox&)
-  readBuffers@endlink overloads to the grid, tree and node classes that allow
-  one to specify a bounding box against which to clip a grid while reading it.
+- Added a @c File::readGrid
+  overload and @c readBuffers overloads to the grid, tree and node classes that
+  allow one to specify a bounding box against which to clip a grid while reading it.
   For large grids, clipping while reading can result in significantly lower
   memory usage than clipping after reading.
 - Added @vdblink::GridBase::clipGrid() GridBase::clipGrid@endlink, which
@@ -3589,10 +3587,7 @@ Houdini:
 - Added constructors and methods to both
   @vdblink::math::RandInt RandInt@endlink and
   @vdblink::math::Rand01 Rand01@endlink to set and reset the random seed value.
-- Added convenience methods for
-  @vdblink::math::Transform::indexToWorld(const BBoxd&) const transforming@endlink
-  @vdblink::math::Transform::worldToIndex(const BBoxd&) const bounding@endlink
-  @vdblink::math::Transform::worldToIndexCellCentered(const BBoxd&) const boxes@endlink
+- Added convenience methods for transforming bounding boxes
   to @vdblink::math::Transform math::Transform@endlink.
 - @c vdb_view is now compatible with both GLFW&nbsp;2 and GLFW&nbsp;3.
 - Made many small changes to address type conversion and other warnings
@@ -3612,9 +3607,8 @@ Houdini:
 
 @par
 API changes:
-- The addition of a
-  @vdblink::GridBase::readBuffers(std::istream&, const CoordBBox&)
-  GridBase::readBuffers@endlink virtual function overload and the
+- The addition of a @c GridBase::readBuffers
+  virtual function overload and the
   @vdblink::GridBase::clip() GridBase::clip@endlink
   @vdblink::GridBase::readNonresidentBuffers()
   GridBase::readNonresidentBuffers@endlink and
@@ -3719,16 +3713,9 @@ Houdini:
   extractSparseTreeWithMask@endlink, which copies data from the index-space
   intersection of a sparse tree and a dense input grid.
 - Added copy constructors to the
-  @vdblink::Grid::Grid(const Grid<OtherTreeType>&) Grid@endlink,
-  @vdblink::tree::Tree::Tree(const Tree<OtherRootType>&) Tree@endlink,
-  @vdblink::tree::RootNode::RootNode(const RootNode<OtherChildType>&)
-  RootNode@endlink,
-  @vdblink::tree::InternalNode::InternalNode(const InternalNode<OtherChildNodeType, Log2Dim>&)
-  InternalNode@endlink and
-  @vdblink::tree::LeafNode::LeafNode(const LeafNode<OtherValueType, Log2Dim>&) LeafNode@endlink
+  @c Grid, @c Tree, @c RootNode, @c InternalNode and @c LeafNode
   classes, and an assignment operator overload to
-  @vdblink::tree::RootNode::operator=(const RootNode<OtherChildType>&)
-  RootNode@endlink, that allow the source and destination to have different
+  @c RootNode, that allow the source and destination to have different
   value types.
 - Modified @vdblink::tree::Tree::combine2() Tree::combine2@endlink to permit
   combination of trees with different value types.
@@ -3780,7 +3767,7 @@ API changes:
   LeafManager::LeafRange::Iterator@endlink,
   @vdblink::util::BaseMaskIterator::operator=() BaseMaskIterator@endlink,
   @vdblink::util::NodeMask::operator=() NodeMask@endlink and
-  @vdblink::util::RootNodeMask::operator=() RootNodeMask@endlink
+  @c RootNodeMask
   now return references to the respective objects.
 - Removed a number of methods that were deprecated in version&nbsp;2.0.0
   or earlier.
@@ -4246,7 +4233,7 @@ API changes:
 - @vdblink::tree::LeafManager tree::LeafManager@endlink can now be
   instantiated with a @const tree, although buffer swapping with @const trees
   is disabled.
-- Added a @vdblink::Grid::signedFloodFill() Grid::signedFloodFill@endlink
+- Added a @c Grid::signedFloodFill()
   overload that allows one to specify inside and outside values.
 - Fixed a bug in Grid::setBackground() so that now only the values of
   inactive voxels change.
@@ -4256,8 +4243,7 @@ API changes:
   that relied on input and output grids having compatible tree topology.
 - @vdblink::math::Transform math::Transform@endlink now includes an
   @vdblink::math::Transform::isIdentity() isIdentity@endlink predicate
-  and methods to @vdblink::math::Transform::preMult(const Mat4d&) pre-@endlink
-  and @vdblink::math::Transform::postMult(const Mat4d&) postmultiply@endlink
+  and methods to pre- and postmultiply
   by a matrix.
 - Modified the @link NodeMasks.h node mask@endlink classes to permit
   octree-like tree configurations (i.e., with a branching factor of two)
@@ -4331,7 +4317,7 @@ API changes:
   faster for high-resolution meshes where the polygon/voxel size ratio
   is small.
 - Added @vdblink::createLevelSet() createLevelSet@endlink and
-  @vdblink::createLevelSetSphere() createLevelSetSphere@endlink
+  @vdblink::tools::createLevelSetSphere() createLevelSetSphere@endlink
   factory functions for level set grids.
 - @vdblink::tree::ValueAccessor tree::ValueAccessor@endlink is now faster
   for trees of height 2, 3 and 4 (the latter is the default), and it now
@@ -4444,7 +4430,7 @@ API changes:
 - Added @vdblink::tools::compReplace() tools::compReplace@endlink,
   which copies the active values of one grid into another, and added
   a "Replace A With Active B" mode to the Combine SOP.
-- @vdblink::Grid::signedFloodFill() Grid::signedFloodFill@endlink
+- @c Grid::signedFloodFill()
   no longer enters an infinite loop when filling an empty grid.
 - Fixed a bug in the particle to level set converter that sometimes
   produced level sets with holes, and fixed a bug in the SOP that
@@ -4707,16 +4693,14 @@ API changes:
   math library and a method to return the
   @vdblink::math::Mat3::trace trace@endlink of a @c Mat3.
 - Fixed a bug in the
-  @vdblink::tree::ValueAccessor::ValueAccessor(const ValueAccessor&)
-  ValueAccessor@endlink copy constructor that caused the copy to reference
+  @c ValueAccessor copy constructor that caused the copy to reference
   the original.
 - Fixed a bug in @vdblink::tree::RootNode::setActiveState()
   RootNode::setActiveState@endlink that caused a crash
   when marking a (virtual) background voxel as inactive.
 - Added a @c Tree::pruneLevelSet method that is similar to but faster than
   Tree::pruneInactive() for level set grids.
-- Added fast leaf node voxel access
-  @vdblink::tree::LeafNode::getValue(Index) const methods@endlink
+- Added fast leaf node voxel access methods
   that index by linear offset (as returned by
   @vdblink::tree::LeafNode::ValueOnIter::pos() ValueIter::pos@endlink)
   instead of by @ijk coordinates.
@@ -4769,7 +4753,7 @@ API changes:
   just the active states of voxels from one grid with those of
   another grid of a possibly different type.
 - Fixed an incorrect scale factor in the Laplacian diffusion
-  @vdblink::tools::Filter::laplacian() filter@endlink.
+  filter.
 - Fixed a bug in @vdblink::tree::Tree::merge() Tree::merge@endlink
   that could leave a tree with invalid value accessors.
 - Added @vdblink::tree::TreeValueIteratorBase::setActiveState()
@@ -4804,7 +4788,7 @@ API changes:
 @par
 <B>Version 0.92.0</B> - <I>August 23 2012</I>
 - Added a Laplacian diffusion
-  @vdblink::tools::Filter::laplacian() filter@endlink.
+  filter.
 - Fixed a bug in the initialization of the sparse contour tracer
   that caused mesh-to-volume conversion to fail in certain cases.
 - Fixed a bug in the curvature stencil that caused mean curvature
@@ -4832,8 +4816,7 @@ API changes:
   method that replaces a grid&rsquo;s tree with a new, empty tree of the
   correct type.
 - Fixed a crash in
-  @vdblink::tree::Tree::setValueOff(const Coord& xyz, const ValueType& value)
-  Tree::setValueOff@endlink when the new value was equal to the
+  @c Tree::setValueOff when the new value was equal to the
   background value.
 - Fixed bugs in Tree::prune() that could result in output tiles with
   incorrect active states.

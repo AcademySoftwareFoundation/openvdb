@@ -20,24 +20,6 @@
 # pattern can't accidentally match unrelated files.
 
 # ---------------------------------------------------------------------------
-# doc/changes.txt - historical Release Notes
-# ---------------------------------------------------------------------------
-# The Release Notes page (rendered at openvdb.org/documentation/doxygen/
-# changes.html via @page changes in this file) carries ~50 \link references
-# to APIs that were renamed or removed in earlier major versions of OpenVDB.
-# Rewriting them all is out of scope for the CI gate. Re-render the page
-# verbatim; just don't gate PRs on its historical link rot.
-^[^:]*/doc/changes\.txt:
-
-# ---------------------------------------------------------------------------
-# ext/imath/openvdb/math/Half.h - vendored 3rd-party code
-# ---------------------------------------------------------------------------
-# Vendored Imath header. The "explicit link request to 'define' could not
-# be resolved" warnings are an artifact of Doxygen 1.13's handling of
-# \link <macro>; we don't own this source and shouldn't be patching it.
-^[^:]*/ext/imath/openvdb/math/Half\.h:
-
-# ---------------------------------------------------------------------------
 # nanovdb/examples/ex_util/ComputePrimitives.h - recursive template detection
 # ---------------------------------------------------------------------------
 # cxx14::make_index_sequence is a recursive variadic template; Doxygen's
