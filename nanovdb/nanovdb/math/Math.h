@@ -838,6 +838,18 @@ public:
 
     VecBase() noexcept = default;
 
+protected:
+    /// @brief Variadic component-init ctor — used only by derived ctors
+    /// (`Vec2(T x, T y) : Base(x, y) {}`). The member-init list directly
+    /// initializes @c mVec, avoiding the default-construct-then-assign that
+    /// a body-assignment ctor would impose on a non-fundamental @c T.
+    template<typename... Args>
+    __hostdev__ explicit constexpr VecBase(Args... args) noexcept : mVec{T(args)...}
+    {
+        static_assert(sizeof...(Args) == N, "VecBase: wrong number of constructor arguments");
+    }
+
+public:
     /// @brief Indexed element access. Asserts 0 <= i < N in debug builds.
     __hostdev__ constexpr const T& operator[](int i) const noexcept { NANOVDB_ASSERT(i >= 0 && i < N); return mVec[i]; }
     __hostdev__ constexpr T&       operator[](int i) noexcept       { NANOVDB_ASSERT(i >= 0 && i < N); return mVec[i]; }
@@ -1054,21 +1066,17 @@ public:
     static constexpr int size = 2; // openvdb::math::Tuple-compat alias of SIZE
 
     Vec2() noexcept = default;
-    __hostdev__ explicit constexpr Vec2(T x) noexcept            { this->mVec[0] = x;    this->mVec[1] = x;    }
-    __hostdev__ constexpr Vec2(T x, T y) noexcept                { this->mVec[0] = x;    this->mVec[1] = y;    }
+    __hostdev__ explicit constexpr Vec2(T x) noexcept            : Base(x, x) {}
+    __hostdev__ constexpr Vec2(T x, T y) noexcept                : Base(x, y) {}
 
     template<template<class> class Vec2T, class T2>
-    __hostdev__ explicit constexpr Vec2(const Vec2T<T2>& v) noexcept {
+    __hostdev__ explicit constexpr Vec2(const Vec2T<T2>& v) noexcept : Base(v[0], v[1])
+    {
         static_assert(Vec2T<T2>::size == 2, "expected Vec2T::size==2!");
-        this->mVec[0] = T(v[0]); this->mVec[1] = T(v[1]);
     }
     template<typename T2>
-    __hostdev__ explicit constexpr Vec2(const Vec2<T2>& v) noexcept {
-        this->mVec[0] = T(v[0]); this->mVec[1] = T(v[1]);
-    }
-    __hostdev__ explicit constexpr Vec2(const Coord2& ijk) noexcept {
-        this->mVec[0] = T(ijk[0]); this->mVec[1] = T(ijk[1]);
-    }
+    __hostdev__ explicit constexpr Vec2(const Vec2<T2>& v) noexcept : Base(v[0], v[1]) {}
+    __hostdev__ explicit constexpr Vec2(const Coord2& ijk) noexcept : Base(ijk[0], ijk[1]) {}
 
     template<template<class> class Vec2T, class T2>
     __hostdev__ constexpr Vec2& operator=(const Vec2T<T2>& rhs) noexcept {
@@ -1180,6 +1188,20 @@ public:
             mData[i] = static_cast<T>(array[i]);
         }
     }
+
+protected:
+    /// @brief Variadic component-init ctor — used only by derived ctors
+    /// (`Mat2(T a, T b, T c, T d) : Base(a, b, c, d) {}`). The member-init
+    /// list directly initializes @c mData, avoiding the default-construct-
+    /// then-assign that a body-assignment ctor would impose on a
+    /// non-fundamental @c T.
+    template<typename... Args>
+    __hostdev__ explicit constexpr MatBase(Args... args) noexcept : mData{T(args)...}
+    {
+        static_assert(sizeof...(Args) == ROWS * COLS, "MatBase: wrong number of constructor arguments");
+    }
+
+public:
 
     // 2D array access. Returns a row pointer; the caller is responsible
     // for the column bound (0 <= col < COLS).
@@ -1341,10 +1363,7 @@ public:
         a b
         c d
         @endverbatim */
-    __hostdev__ constexpr Mat2(T a, T b, T c, T d) noexcept {
-        this->mData[0] = a; this->mData[1] = b;
-        this->mData[2] = c; this->mData[3] = d;
-    }
+    __hostdev__ constexpr Mat2(T a, T b, T c, T d) noexcept : Base(a, b, c, d) {}
 
     /// @brief Constructor given array of elements, the ordering is in row major form
     template<typename Source>
@@ -1405,10 +1424,7 @@ public:
         a b c
         d e f
         @endverbatim */
-    __hostdev__ constexpr Mat2x3(T a, T b, T c, T d, T e, T f) noexcept {
-        this->mData[0] = a; this->mData[1] = b; this->mData[2] = c;
-        this->mData[3] = d; this->mData[4] = e; this->mData[5] = f;
-    }
+    __hostdev__ constexpr Mat2x3(T a, T b, T c, T d, T e, T f) noexcept : Base(a, b, c, d, e, f) {}
 
     /// @brief Constructor given array of elements, the ordering is in row major form
     template<typename Source>
@@ -1460,12 +1476,7 @@ public:
         c d
         e f
         @endverbatim */
-    __hostdev__ constexpr Mat3x2(T a, T b, T c, T d, T e, T f) noexcept
-    {
-        this->mData[0] = a; this->mData[1] = b;
-        this->mData[2] = c; this->mData[3] = d;
-        this->mData[4] = e; this->mData[5] = f;
-    }
+    __hostdev__ constexpr Mat3x2(T a, T b, T c, T d, T e, T f) noexcept : Base(a, b, c, d, e, f) {}
 
     /// @brief Constructor given array of elements, the ordering is in row major form
     template<typename Source>
@@ -1518,12 +1529,7 @@ public:
         @endverbatim */
     __hostdev__ constexpr Mat3(T a, T b, T c,
                                T d, T e, T f,
-                               T g, T h, T i) noexcept
-    {
-        this->mData[0] = a; this->mData[1] = b; this->mData[2] = c;
-        this->mData[3] = d; this->mData[4] = e; this->mData[5] = f;
-        this->mData[6] = g; this->mData[7] = h; this->mData[8] = i;
-    }
+                               T g, T h, T i) noexcept : Base(a, b, c, d, e, f, g, h, i) {}
 
     /// @brief Constructor given array of elements, the ordering is in row major form
     template<typename Source>
@@ -1585,12 +1591,7 @@ public:
                                T e, T f, T g, T h,
                                T i, T j, T k, T l,
                                T m, T n, T o, T p) noexcept
-    {
-        this->mData[0] = a; this->mData[1] = b; this->mData[2] = c; this->mData[3] = d;
-        this->mData[4] = e; this->mData[5] = f; this->mData[6] = g; this->mData[7] = h;
-        this->mData[8] = i; this->mData[9] = j; this->mData[10] = k; this->mData[11] = l;
-        this->mData[12] = m; this->mData[13] = n; this->mData[14] = o; this->mData[15] = p;
-    }
+        : Base(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) {}
 
     /// @brief Constructor given array of elements, the ordering is in row major form
     template<typename Source>
@@ -1677,21 +1678,17 @@ public:
     static constexpr int size = 3; // openvdb::math::Tuple-compat alias of SIZE
 
     Vec3() noexcept = default;
-    __hostdev__ explicit constexpr Vec3(T x) noexcept            { this->mVec[0] = x; this->mVec[1] = x; this->mVec[2] = x; }
-    __hostdev__ constexpr Vec3(T x, T y, T z) noexcept           { this->mVec[0] = x; this->mVec[1] = y; this->mVec[2] = z; }
+    __hostdev__ explicit constexpr Vec3(T x) noexcept            : Base(x, x, x) {}
+    __hostdev__ constexpr Vec3(T x, T y, T z) noexcept           : Base(x, y, z) {}
 
     template<template<class> class Vec3T, class T2>
-    __hostdev__ explicit constexpr Vec3(const Vec3T<T2>& v) noexcept {
+    __hostdev__ explicit constexpr Vec3(const Vec3T<T2>& v) noexcept : Base(v[0], v[1], v[2])
+    {
         static_assert(Vec3T<T2>::size == 3, "expected Vec3T::size==3!");
-        this->mVec[0] = T(v[0]); this->mVec[1] = T(v[1]); this->mVec[2] = T(v[2]);
     }
     template<typename T2>
-    __hostdev__ explicit constexpr Vec3(const Vec3<T2>& v) noexcept {
-        this->mVec[0] = T(v[0]); this->mVec[1] = T(v[1]); this->mVec[2] = T(v[2]);
-    }
-    __hostdev__ explicit constexpr Vec3(const Coord& ijk) noexcept {
-        this->mVec[0] = T(ijk[0]); this->mVec[1] = T(ijk[1]); this->mVec[2] = T(ijk[2]);
-    }
+    __hostdev__ explicit constexpr Vec3(const Vec3<T2>& v) noexcept : Base(v[0], v[1], v[2]) {}
+    __hostdev__ explicit constexpr Vec3(const Coord& ijk) noexcept : Base(ijk[0], ijk[1], ijk[2]) {}
 
     template<template<class> class Vec3T, class T2>
     __hostdev__ constexpr Vec3& operator=(const Vec3T<T2>& rhs) noexcept {
@@ -1817,17 +1814,15 @@ public:
     static constexpr int size = 4; // openvdb::math::Tuple-compat alias of SIZE
 
     Vec4() noexcept = default;
-    __hostdev__ explicit constexpr Vec4(T x) noexcept            { this->mVec[0] = x; this->mVec[1] = x; this->mVec[2] = x; this->mVec[3] = x; }
-    __hostdev__ constexpr Vec4(T x, T y, T z, T w) noexcept      { this->mVec[0] = x; this->mVec[1] = y; this->mVec[2] = z; this->mVec[3] = w; }
+    __hostdev__ explicit constexpr Vec4(T x) noexcept            : Base(x, x, x, x) {}
+    __hostdev__ constexpr Vec4(T x, T y, T z, T w) noexcept      : Base(x, y, z, w) {}
 
     template<typename T2>
-    __hostdev__ explicit constexpr Vec4(const Vec4<T2>& v) noexcept {
-        this->mVec[0] = T(v[0]); this->mVec[1] = T(v[1]); this->mVec[2] = T(v[2]); this->mVec[3] = T(v[3]);
-    }
+    __hostdev__ explicit constexpr Vec4(const Vec4<T2>& v) noexcept : Base(v[0], v[1], v[2], v[3]) {}
     template<template<class> class Vec4T, class T2>
-    __hostdev__ explicit constexpr Vec4(const Vec4T<T2>& v) noexcept {
+    __hostdev__ explicit constexpr Vec4(const Vec4T<T2>& v) noexcept : Base(v[0], v[1], v[2], v[3])
+    {
         static_assert(Vec4T<T2>::size == 4, "expected Vec4T::size==4!");
-        this->mVec[0] = T(v[0]); this->mVec[1] = T(v[1]); this->mVec[2] = T(v[2]); this->mVec[3] = T(v[3]);
     }
     template<template<class> class Vec4T, class T2>
     __hostdev__ constexpr Vec4& operator=(const Vec4T<T2>& rhs) noexcept {
