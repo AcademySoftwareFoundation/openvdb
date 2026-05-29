@@ -2075,7 +2075,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel32)
                 EXPECT_LE(voxel[0],  0.5f);
                 EXPECT_LE(voxel[1],  0.5f);
                 EXPECT_LE(voxel[2],  0.5f);
-                test = (begin[i] - nanovdb::voxelToWorld(voxel, ijk, grid->map())).length() < 1e-9;
+                test = (begin[i] - nanovdb::voxelToWorld<Vec3T>(voxel, ijk, grid->map())).length() < 1e-9;
             }
             EXPECT_TRUE(test);
         }
@@ -2202,7 +2202,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel16)
             EXPECT_LE(count, maxPointsPerVoxel);
             bool test = false;
             for (uint64_t j=0; test == false && j<count; ++j) {
-                test = (begin[i] - nanovdb::voxelToWorld(start[j], ijk, grid->map())).length() < 1e-6;
+                test = (begin[i] - nanovdb::voxelToWorld<Vec3T>(start[j], ijk, grid->map())).length() < 1e-6;
             }
         }
     });
@@ -2331,7 +2331,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel8)
             EXPECT_LE(count, maxPointsPerVoxel);
             bool test = false;
             for (uint64_t j=0; test == false && j<count; ++j) {
-                test = (begin[i] - nanovdb::voxelToWorld(start[j], ijk, grid->map())).length() < 1e-2;
+                test = (begin[i] - nanovdb::voxelToWorld<Vec3T>(start[j], ijk, grid->map())).length() < 1e-2;
             }
             EXPECT_TRUE(test);
         }

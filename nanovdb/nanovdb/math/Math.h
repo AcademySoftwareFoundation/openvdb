@@ -146,6 +146,18 @@ __hostdev__ [[nodiscard]] inline constexpr Type Min(Type a, Type b) noexcept
 {
     return (a < b) ? a : b;
 }
+// Mixed integer-type tiebreakers: the templated `Min<Type>` requires both
+// args to deduce to the same `Type`, so calls like `Min(uint32_t, size_t)`
+// would otherwise fall through to the float/double overloads with equal
+// implicit-conversion cost — ambiguous. These integer overloads win.
+__hostdev__ [[nodiscard]] inline constexpr int32_t Min(int32_t a, int32_t b) noexcept
+{
+    return a < b ? a : b;
+}
+__hostdev__ [[nodiscard]] inline constexpr uint32_t Min(uint32_t a, uint32_t b) noexcept
+{
+    return a < b ? a : b;
+}
 // Not constexpr — fminf/fmin aren't constexpr until C++23.
 __hostdev__ [[nodiscard]] inline float Min(float a, float b) noexcept
 {
@@ -160,6 +172,15 @@ template<typename Type>
 __hostdev__ [[nodiscard]] inline constexpr Type Max(Type a, Type b) noexcept
 {
     return (a > b) ? a : b;
+}
+// See Min above: these integer overloads disambiguate mixed-int calls.
+__hostdev__ [[nodiscard]] inline constexpr int32_t Max(int32_t a, int32_t b) noexcept
+{
+    return a > b ? a : b;
+}
+__hostdev__ [[nodiscard]] inline constexpr uint32_t Max(uint32_t a, uint32_t b) noexcept
+{
+    return a > b ? a : b;
 }
 // Not constexpr — fmaxf/fmax aren't constexpr until C++23.
 __hostdev__ [[nodiscard]] inline float Max(float a, float b) noexcept
