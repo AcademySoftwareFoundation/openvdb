@@ -158,14 +158,38 @@ template<typename BufferT> nb::class_<nanovdb::GridHandle<BufferT>> defineGridHa
             "GridData alignment (used by the I/O code path).")
         .def("gridCount", &nanovdb::GridHandle<BufferT>::gridCount,
             "Number of grids stored in this handle.")
-        .def("gridSize", &nanovdb::GridHandle<BufferT>::gridSize, nb::arg("n") = 0,
+        .def(
+            "gridSize",
+            [](const nanovdb::GridHandle<BufferT>& handle, uint32_t n) {
+                // GridHandle::gridSize(n) indexes mMetaData[n] unchecked, so an
+                // out-of-range n (including any n on an empty handle) is UB.
+                if (n >= handle.gridCount())
+                    throw nb::index_error("gridSize: grid index out of range [0, gridCount()).");
+                return handle.gridSize(n);
+            },
+            nb::arg("n") = 0,
             "Byte size of the n-th grid (without padding).")
-        .def("gridType", &nanovdb::GridHandle<BufferT>::gridType, nb::arg("n") = 0,
+        .def(
+            "gridType",
+            [](const nanovdb::GridHandle<BufferT>& handle, uint32_t n) {
+                // GridHandle::gridType(n) indexes mMetaData[n] unchecked, so an
+                // out-of-range n (including any n on an empty handle) is UB.
+                if (n >= handle.gridCount())
+                    throw nb::index_error("gridType: grid index out of range [0, gridCount()).");
+                return handle.gridType(n);
+            },
+            nb::arg("n") = 0,
             "GridType enumerator of the n-th grid (e.g. GridType.Float). "
             "Cheap to query — does not require materializing the grid.")
         .def(
             "gridData",
-            [](nanovdb::GridHandle<BufferT>& handle, uint32_t n) { return nb::bytes(handle.gridData(n), handle.gridSize(n)); },
+            [](nanovdb::GridHandle<BufferT>& handle, uint32_t n) {
+                // gridData(n) returns nullptr for out-of-range n, but gridSize(n)
+                // below indexes mMetaData[n] unchecked — guard both here.
+                if (n >= handle.gridCount())
+                    throw nb::index_error("gridData: grid index out of range [0, gridCount()).");
+                return nb::bytes(handle.gridData(n), handle.gridSize(n));
+            },
             nb::arg("n") = 0,
             nb::rv_policy::reference_internal,
             "Raw byte contents of the n-th grid as a Python bytes object. "

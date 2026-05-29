@@ -518,9 +518,10 @@ static void defineCreateOnIndexGrid(nb::module_& toolsModule)
         "verbose"_a = 0,
         "Convert a source grid into a NanoGrid<ValueOnIndex> "
         "(OnIndexGrid). Accepts FloatGrid / DoubleGrid / Int32Grid / "
-        "Vec3fGrid. Required for constructing inputs to "
-        "buildVoxelBlockManager. The broader createNanoGrid<SrcGridT, "
-        "DstBuildT> surface lands in a later phase.");
+        "Vec3fGrid. This is a narrow helper kept alongside "
+        "buildVoxelBlockManager; for general index conversion (broader "
+        "source coverage, blind-data channels) prefer "
+        "nanovdb.tools.createNanoGridOnIndex.");
 }
 
 void defineVoxelBlockManagerModule(nb::module_& toolsModule)
