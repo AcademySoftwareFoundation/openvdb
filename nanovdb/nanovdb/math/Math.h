@@ -1039,8 +1039,13 @@ public:
 // ----------------------------> Vec2 <--------------------------------------
 
 /// @brief A simple vector class with two components, similar to openvdb::math::Vec2
+///
+/// Aligned to 2*alignof(T) so the whole class fits in one SIMD-friendly
+/// chunk (e.g. 8 bytes for Vec2<float>, 16 bytes for Vec2<double>),
+/// without any tail padding because the byte size is already a power-of-2
+/// multiple of alignof(T).
 template<typename T>
-class Vec2 : public VecBase<T, 2>
+class alignas(alignof(T) * 2) Vec2 : public VecBase<T, 2>
 {
     using Base = VecBase<T, 2>;
 
@@ -1321,8 +1326,11 @@ template<typename T> class Vec4;
 
 
 
+// Aligned to 4*alignof(T) — Mat2 stores 4 elements (2x2), which is already
+// a power-of-2 multiple of alignof(T), so this is free in size and gives
+// SIMD-friendly placement (16 bytes for Mat2<float>, 32 bytes for double).
 template <typename T>
-class Mat2 : public MatBase<T, 2, 2> {
+class alignas(alignof(T) * 4) Mat2 : public MatBase<T, 2, 2> {
     using Base = MatBase<T, 2, 2>;
 public:
     Mat2() = default;
@@ -1376,6 +1384,10 @@ public:
     }
 };
 
+// Mat2x3 is intentionally NOT alignas-elevated: its byte size
+// (6*sizeof(T)) is not a power-of-2 multiple of alignof(T), so any
+// alignas(N > alignof(T)) would force tail padding and break
+// packed-array layout plus on-disk format compatibility.
 template <typename T>
 class Mat2x3 : public MatBase<T, 2, 3> {
     using Base = MatBase<T, 2, 3>;
@@ -1420,6 +1432,10 @@ public:
     __hostdev__ constexpr Mat3x2<T> transpose() const { return this->template transposeAs<Mat3x2<T>>(); }
 };
 
+// Mat3x2 is intentionally NOT alignas-elevated: its byte size
+// (6*sizeof(T)) is not a power-of-2 multiple of alignof(T), so any
+// alignas(N > alignof(T)) would force tail padding and break
+// packed-array layout plus on-disk format compatibility.
 template <typename T>
 class Mat3x2: public MatBase<T, 3, 2> {
     using Base = MatBase<T, 3, 2>;
@@ -1468,6 +1484,10 @@ public:
 
 };
 
+// Mat3 is intentionally NOT alignas-elevated: its byte size
+// (9*sizeof(T)) is not a power-of-2 multiple of alignof(T), so any
+// alignas(N > alignof(T)) would force tail padding and break
+// packed-array layout plus on-disk format compatibility.
 template <typename T>
 class Mat3 : public MatBase<T, 3, 3> {
     using Base = MatBase<T, 3, 3>;
@@ -1519,8 +1539,16 @@ public:
     __hostdev__ constexpr Mat3 transpose() const { return this->template transposeAs<Mat3>(); }
 };
 
+// Aligned to 16*alignof(T) — Mat4 stores 16 elements (4x4), which is
+// already a power-of-2 multiple of alignof(T), so the alignment is free
+// in size. Whole-matrix alignment (64 bytes for Mat4<float>, 128 bytes
+// for Mat4<double>) is heavy compared to row-alignment (4*alignof(T))
+// but matches the per-class "align to full size" rule used for Vec2 /
+// Vec4 / Mat2 above and lets a Mat4<float> load with a single AVX-512
+// instruction. Drop to alignas(alignof(T) * 4) here if the over-aligned
+// constraint causes friction with downstream allocators.
 template <typename T>
-class Mat4 : public MatBase<T, 4, 4> {
+class alignas(alignof(T) * 16) Mat4 : public MatBase<T, 4, 4> {
     using Base = MatBase<T, 4, 4>;
 public:
     Mat4() = default;
@@ -1621,6 +1649,13 @@ __hostdev__ constexpr Mat3x2<T> operator*(const Mat3<T>& lhs, const Mat3x2<T>& r
 // ----------------------------> Vec3 <--------------------------------------
 
 /// @brief A simple vector class with three components, similar to openvdb::math::Vec3
+///
+/// Vec3 is intentionally NOT alignas-elevated: its byte size
+/// (3*sizeof(T)) is not a power-of-2 multiple of alignof(T), so any
+/// alignas(N > alignof(T)) would force tail padding and break
+/// packed-array layout plus on-disk format compatibility. An opt-in
+/// over-aligned Vec3 wrapper (e.g. for CUDA-coalesced loads) is best
+/// added as a separate type rather than changing Vec3 itself.
 template<typename T>
 class Vec3 : public VecBase<T, 3>
 {
@@ -1754,8 +1789,13 @@ __hostdev__ inline constexpr Vec3<double> Coord::asVec3d() const
 // ----------------------------> Vec4 <--------------------------------------
 
 /// @brief A simple vector class with four components, similar to openvdb::math::Vec4
+///
+/// Aligned to 4*alignof(T) so the whole class fits in one SIMD register
+/// (16 bytes for Vec4<float>, 32 bytes for Vec4<double>), without any
+/// tail padding because the byte size is already a power-of-2 multiple
+/// of alignof(T).
 template<typename T>
-class Vec4 : public VecBase<T, 4>
+class alignas(alignof(T) * 4) Vec4 : public VecBase<T, 4>
 {
     using Base = VecBase<T, 4>;
 
