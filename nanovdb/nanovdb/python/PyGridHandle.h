@@ -98,18 +98,26 @@ template<typename BufferT> void defineGridHandleUtilities(nb::module_& m)
             }
         }
 
+        // Nothing to merge (empty sequence, or only empty handles): return an
+        // empty handle. BufferT::create(0) is ill-defined — for HostBuffer it
+        // yields a non-null data() over a zero-byte region, and the
+        // GridHandle(buffer) ctor would then read a full GridData header out of
+        // it (heap overflow / "invalid host buffer" throw).
+        if (totalGrids == 0) return HandleT();
+
         auto buffer = BufferT::create(totalSize);
         uint8_t* dst = static_cast<uint8_t*>(buffer.data());
         uint32_t writeIndex = 0;
         for (const HandleT* h : sources) {
-            const uint8_t* src = static_cast<const uint8_t*>(h->data());
             for (uint32_t n = 0; n < h->gridCount(); ++n) {
+                // gridData(n) is the authoritative per-grid start pointer (it
+                // applies mMetaData[n].offset), so we don't assume the source
+                // grids are laid out contiguously in the buffer.
                 const uint64_t gs = h->gridSize(n);
-                std::memcpy(dst, src, gs);
+                std::memcpy(dst, h->gridData(n), gs);
                 auto* gd = reinterpret_cast<nanovdb::GridData*>(dst);
                 nanovdb::tools::updateGridCount(gd, writeIndex++, totalGrids);
                 dst += gs;
-                src += gs;
             }
         }
         return HandleT(std::move(buffer));
