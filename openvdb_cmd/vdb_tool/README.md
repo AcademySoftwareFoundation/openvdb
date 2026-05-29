@@ -55,6 +55,8 @@ The vdb_tool is a versatile command-line utility that chains together high-level
 | **render**| Render and save an image of a level set or fog VDB |
 | **clear** | Deletes cached VDB grids and geometry from memory |
 | **print** | Print information about the cached geometries and VDBs |
+| **slice** | Generate image files of slices through a VDB grid |
+| **img2mpeg** | Convert multiple image files to an mpeg movie file |
 | **forAllValues** | Apply a math kernel to every value in a grid (see "Per-voxel math kernels" below) |
 | **forOnValues** | Apply a math kernel to every active value in a grid (see "Per-voxel math kernels" below) |
 | **forOffValues** | Apply a math kernel to every inactive value in a grid (see "Per-voxel math kernels" below) |
@@ -296,6 +298,18 @@ vdb_tool -read mesh.obj -mesh2ls -write level_set.vdb
 Convert an obj file with n-gons into a ply file with only triangles
 ```
 vdb_tool -read mesh.obj -quad2tri -write mesh.ply
+```
+
+## Generate image files from slices through a VDB grid
+Generates a level set of a sphere and loops over multiple slices (in the yz plane) each generating an image files
+```
+vdb_tool -sphere -for x=0,1,0.01 -slice X='{$x}' -end
+```
+
+## Convert multiple images to a movie file
+Reads multiple image files and converts them to an mpeg file
+```
+vdb_tool -img2mpeg input="slice_*.ppm" output=slices.mp4
 ```
 
 ## Read multiple specific files

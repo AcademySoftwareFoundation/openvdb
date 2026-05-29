@@ -8,16 +8,16 @@ vdb_tool:
   - Added new action "-vol2mesh", which converts a scalar volume into an adaptive polygon mesh.
   - Added new action "-fog2vol", which converts a fog volume into an adaptive polygon mesh.
   - Added new action "-slice", which generates one or more images of axis-aligned slices through a scalar grid.
-  - Added new action "-img2mpeg", which converts multiple images to an mpeg movie file.
+  - Added new action "-img2mpeg", which converts multiple images files to an mpeg movie file when vdb_tool is optionally build with ffmpeg.
   - Added new action "-log", which logs warnings and (non-fatal) errors to a file.
   - Added new action "-sdf2udf", which converts a signed distance field into an unsigned distance field.
-  - Added new action "-forAllValues/forOnValues,forOffValues", which applies arbitrary compute kernels to all, active or in-active values in a grid.
+  - Added new action "-forAllValues/forOnValues,forOffValues", which applies simple math kernels to all, active or in-active values in a grid.
+    Note, these Math expressions can be both infix and RPN, e.g. kernel="{$x:abs:1:+}" or kernel="abs(x)+1".
   - Added triangulation of N-gons to Geometry::readOBJ and Geometry::readSTL, assuming they are convex.
   - Added read support for xyz files.
 
   Improvements:
-  - Math expressions are now infix in addition to RPN, ie. both {$x:abs:1:+} and "abs(x)+1" are valid expressions.
-  - Action -"read" now has optional support for reading OpenUSD files usd, usda, usdc, and usdz.
+  - Action -"read" now has optional support for reading UsdGeomMesh and UsdGeomPoints in OpenUSD files usd, usda, usdc, and usdz.
   - Action "-mesh2ls/mesh2sdf" now supports generation of asymmetric narrow bands.
   - Improved error reporting when using unsupported actions and options.
   - Actions can now have multiple names, e.g. "-read", "-import, "-load", "-i".

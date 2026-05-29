@@ -629,8 +629,8 @@ void Tool::init()
      {"input", "slice_*.ppm", "slice_*.ppm|input.avi", "input image files or movie file to get converted"},
      {"output", "slices.mp4", "output.mp4|output.gif", "name of output mpeg or gif file"},
      {"scale", "", "1280x720|640", "scale of the output movie or gif."},
-     {"flip", "", "vertical|horizontal|180", "flip output video vertical or horizontal or rotate it by 180"},
-     {"keep", "true", "1|0|true|false", "toggle wether the input images are preserved or deleted after the conversion"}},
+//     {"keep", "true", "1|0|true|false", "toggle wether the input images are preserved or deleted after the conversion"},
+     {"flip", "", "vertical|horizontal|180", "flip output video vertical or horizontal or rotate it by 180"}},
      [&](){mParser.setDefaults();}, [&](){this->movie();});
 
   mParser.addAction(
@@ -3201,7 +3201,7 @@ void Tool::movie()
     const std::string input = mParser.get<std::string>("input");
     const std::string output = mParser.get<std::string>("output");
     const VecI scale = mParser.getVec<int>("scale", "x");
-    const bool keep = mParser.get<bool>("keep");
+    //const bool keep = mParser.get<bool>("keep");
     const std::string flip = mParser.get<std::string>("flip");
     if (mParser.verbose) mTimer.start(action_name);
 
