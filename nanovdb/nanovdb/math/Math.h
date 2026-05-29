@@ -67,6 +67,11 @@ struct Tolerance<double>
 {
     __hostdev__ [[nodiscard]] static constexpr double value() noexcept { return 1e-15; }
 };
+template<>
+struct Tolerance<long double>
+{
+    __hostdev__ [[nodiscard]] static constexpr long double value() noexcept { return 1e-18L; }
+};
 //@}
 
 //@{
@@ -82,6 +87,11 @@ template<>
 struct Delta<double>
 {
     __hostdev__ [[nodiscard]] static constexpr double value() noexcept { return 1e-9; }
+};
+template<>
+struct Delta<long double>
+{
+    __hostdev__ [[nodiscard]] static constexpr long double value() noexcept { return 1e-12L; }
 };
 //@}
 
@@ -136,14 +146,6 @@ __hostdev__ [[nodiscard]] inline constexpr Type Min(Type a, Type b) noexcept
 {
     return (a < b) ? a : b;
 }
-__hostdev__ [[nodiscard]] inline constexpr int32_t Min(int32_t a, int32_t b) noexcept
-{
-    return a < b ? a : b;
-}
-__hostdev__ [[nodiscard]] inline constexpr uint32_t Min(uint32_t a, uint32_t b) noexcept
-{
-    return a < b ? a : b;
-}
 // Not constexpr — fminf/fmin aren't constexpr until C++23.
 __hostdev__ [[nodiscard]] inline float Min(float a, float b) noexcept
 {
@@ -158,15 +160,6 @@ template<typename Type>
 __hostdev__ [[nodiscard]] inline constexpr Type Max(Type a, Type b) noexcept
 {
     return (a > b) ? a : b;
-}
-
-__hostdev__ [[nodiscard]] inline constexpr int32_t Max(int32_t a, int32_t b) noexcept
-{
-    return a > b ? a : b;
-}
-__hostdev__ [[nodiscard]] inline constexpr uint32_t Max(uint32_t a, uint32_t b) noexcept
-{
-    return a > b ? a : b;
 }
 // Not constexpr — fmaxf/fmax aren't constexpr until C++23.
 __hostdev__ [[nodiscard]] inline float Max(float a, float b) noexcept
@@ -1274,7 +1267,7 @@ public:
         for (int i = 0; i < size(); ++i) out.data()[i] = mData[i] / s;
         return out;
     }
-    __hostdev__ constexpr MatBase& divideAssign(const T& s) noexcept {
+    __hostdev__ constexpr MatBase& divideAssignScalar(const T& s) noexcept {
         for (int i = 0; i < size(); ++i) mData[i] /= s;
         return *this;
     }
@@ -1384,7 +1377,7 @@ public:
     __hostdev__ [[nodiscard]] constexpr Mat2  operator*(const T& s) const noexcept        { return this->template scale<Mat2>(s); }
     __hostdev__ [[nodiscard]] constexpr Mat2  operator/(const T& s) const noexcept        { return this->template divideBy<Mat2>(s); }
     __hostdev__ constexpr Mat2& operator*=(const T& s) noexcept             { Base::scaleAssign(s); return *this; }
-    __hostdev__ constexpr Mat2& operator/=(const T& s) noexcept             { Base::divideAssign(s); return *this; }
+    __hostdev__ constexpr Mat2& operator/=(const T& s) noexcept             { Base::divideAssignScalar(s); return *this; }
 
     // ---- equality ----
     __hostdev__ [[nodiscard]] constexpr bool operator==(const Mat2& m) const noexcept     { return Base::equals(m); }
@@ -1445,7 +1438,7 @@ public:
     __hostdev__ [[nodiscard]] constexpr Mat2x3  operator*(const T& s) const noexcept        { return this->template scale<Mat2x3>(s); }
     __hostdev__ [[nodiscard]] constexpr Mat2x3  operator/(const T& s) const noexcept        { return this->template divideBy<Mat2x3>(s); }
     __hostdev__ constexpr Mat2x3& operator*=(const T& s) noexcept             { Base::scaleAssign(s); return *this; }
-    __hostdev__ constexpr Mat2x3& operator/=(const T& s) noexcept             { Base::divideAssign(s); return *this; }
+    __hostdev__ constexpr Mat2x3& operator/=(const T& s) noexcept             { Base::divideAssignScalar(s); return *this; }
 
     // ---- equality ----
     __hostdev__ [[nodiscard]] constexpr bool operator==(const Mat2x3& m) const noexcept     { return Base::equals(m); }
@@ -1496,7 +1489,7 @@ public:
     __hostdev__ [[nodiscard]] constexpr Mat3x2  operator*(const T& s) const noexcept        { return this->template scale<Mat3x2>(s); }
     __hostdev__ [[nodiscard]] constexpr Mat3x2  operator/(const T& s) const noexcept        { return this->template divideBy<Mat3x2>(s); }
     __hostdev__ constexpr Mat3x2& operator*=(const T& s) noexcept             { Base::scaleAssign(s); return *this; }
-    __hostdev__ constexpr Mat3x2& operator/=(const T& s) noexcept             { Base::divideAssign(s); return *this; }
+    __hostdev__ constexpr Mat3x2& operator/=(const T& s) noexcept             { Base::divideAssignScalar(s); return *this; }
 
     // ---- equality ----
     __hostdev__ [[nodiscard]] constexpr bool operator==(const Mat3x2& m) const noexcept     { return Base::equals(m); }
@@ -1551,7 +1544,7 @@ public:
     __hostdev__ [[nodiscard]] constexpr Mat3  operator*(const T& s) const noexcept        { return this->template scale<Mat3>(s); }
     __hostdev__ [[nodiscard]] constexpr Mat3  operator/(const T& s) const noexcept        { return this->template divideBy<Mat3>(s); }
     __hostdev__ constexpr Mat3& operator*=(const T& s) noexcept             { Base::scaleAssign(s); return *this; }
-    __hostdev__ constexpr Mat3& operator/=(const T& s) noexcept             { Base::divideAssign(s); return *this; }
+    __hostdev__ constexpr Mat3& operator/=(const T& s) noexcept             { Base::divideAssignScalar(s); return *this; }
 
     // ---- equality ----
     __hostdev__ [[nodiscard]] constexpr bool operator==(const Mat3& m) const noexcept     { return Base::equals(m); }
@@ -1612,7 +1605,7 @@ public:
     __hostdev__ [[nodiscard]] constexpr Mat4  operator*(const T& s) const noexcept        { return this->template scale<Mat4>(s); }
     __hostdev__ [[nodiscard]] constexpr Mat4  operator/(const T& s) const noexcept        { return this->template divideBy<Mat4>(s); }
     __hostdev__ constexpr Mat4& operator*=(const T& s) noexcept             { Base::scaleAssign(s); return *this; }
-    __hostdev__ constexpr Mat4& operator/=(const T& s) noexcept             { Base::divideAssign(s); return *this; }
+    __hostdev__ constexpr Mat4& operator/=(const T& s) noexcept             { Base::divideAssignScalar(s); return *this; }
 
     // ---- equality ----
     __hostdev__ [[nodiscard]] constexpr bool operator==(const Mat4& m) const noexcept     { return Base::equals(m); }
@@ -2076,7 +2069,7 @@ struct BaseBBox
 //    {
 //        return BaseBBox(mCoord[0].offsetBy(-padding),mCoord[1].offsetBy(padding));
 //    }
-    __hostdev__ [[nodiscard]] constexpr bool isInside(const Vec3T& xyz) noexcept
+    __hostdev__ [[nodiscard]] constexpr bool isInside(const Vec3T& xyz) const noexcept
     {
         if (xyz[0] < mCoord[0][0] || xyz[1] < mCoord[0][1] || xyz[2] < mCoord[0][2])
             return false;
