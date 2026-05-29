@@ -126,9 +126,16 @@ static nb::object pyDecodeInverseMapsImpl(const NanoGrid<ValueOnIndex>& grid,
     std::unique_ptr<uint16_t[]> voxelOffset(new uint16_t[BlockWidth]);
 
     using VBM = VoxelBlockManager<Log2BlockWidth>;
-    VBM::template decodeInverseMaps<ValueOnIndex>(
-        &grid, firstLeafID, jumpMap, blockFirstOffset,
-        leafIndex.get(), voxelOffset.get());
+    {
+        // Release the GIL around the pure-C++ decode kernel — the heavy part,
+        // and the only part of this helper that touches no Python objects. The
+        // GIL is re-acquired on scope exit (including during exception unwind)
+        // before the capsules / ndarrays below are constructed.
+        nb::gil_scoped_release release;
+        VBM::template decodeInverseMaps<ValueOnIndex>(
+            &grid, firstLeafID, jumpMap, blockFirstOffset,
+            leafIndex.get(), voxelOffset.get());
+    }
 
     // nb::capsule wraps the raw pointer + matching delete[] so it can serve
     // as the ndarray's owner — the capsule lives as long as the ndarray and
@@ -388,8 +395,13 @@ static void defineBuild(nb::module_& toolsModule)
                     std::move(firstLeafIDBuf), std::move(jumpMapBuf),
                     n_blocks, first_offset, last_offset);
                 // In-place builder zeros the jumpMap itself and only
-                // touches firstLeafID slots it actually visits.
-                buildVoxelBlockManager<LBW, HostBuffer>(grid, handle);
+                // touches firstLeafID slots it actually visits. Release the
+                // GIL around it — it's pure C++ (touches no Python objects)
+                // and may parallelize internally via util::forEach.
+                {
+                    nb::gil_scoped_release release;
+                    buildVoxelBlockManager<LBW, HostBuffer>(grid, handle);
+                }
                 return PyVBMHandle(std::move(handle), LBW);
             });
         },
