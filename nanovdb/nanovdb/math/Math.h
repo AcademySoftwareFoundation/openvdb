@@ -1131,18 +1131,20 @@ public:
     /// @return integer Coord2
     /// @note Only constexpr for integer @c T (roundAs uses non-constexpr math::Floor for floating point).
     __hostdev__ [[nodiscard]] constexpr Coord2 round() const noexcept { return Base::template roundAs<Coord2>(); }
-}; // Vec2<T>
 
-template<typename T1, typename T2>
-__hostdev__ [[nodiscard]] inline constexpr Vec2<T2> operator*(T1 scalar, const Vec2<T2>& vec) noexcept
-{
-    return Vec2<T2>(scalar * vec[0], scalar * vec[1]);
-}
-template<typename T1, typename T2>
-__hostdev__ [[nodiscard]] inline constexpr Vec2<T2> operator/(T1 scalar, const Vec2<T2>& vec) noexcept
-{
-    return Vec2<T2>(scalar / vec[0], scalar / vec[1]);
-}
+    // ---- scalar * Vec / scalar / Vec (hidden friends — found only via ADL on Vec2,
+    // never participate in unrelated namespace-scope overload sets) ----
+    template<typename T1>
+    __hostdev__ [[nodiscard]] friend constexpr Vec2 operator*(T1 scalar, const Vec2& vec) noexcept
+    {
+        return Vec2(scalar * vec[0], scalar * vec[1]);
+    }
+    template<typename T1>
+    __hostdev__ [[nodiscard]] friend constexpr Vec2 operator/(T1 scalar, const Vec2& vec) noexcept
+    {
+        return Vec2(scalar / vec[0], scalar / vec[1]);
+    }
+}; // Vec2<T>
 
 /// @brief Return a single precision floating-point vector of this coordinate
 __hostdev__ [[nodiscard]] inline constexpr Vec2<float> Coord2::asVec2s() const noexcept
@@ -1382,6 +1384,11 @@ public:
         return Mat2<T>((*this)[1][1] * invDet, -(*this)[0][1] * invDet,
                       -(*this)[1][0] * invDet,  (*this)[0][0] * invDet);
     }
+
+    /// @brief scalar * Mat (hidden friend — found only via ADL on Mat2)
+    __hostdev__ [[nodiscard]] friend constexpr Mat2 operator*(const T& s, const Mat2& m) noexcept {
+        return m.template scale<Mat2>(s);
+    }
 };
 
 // Mat2x3 is intentionally NOT alignas-elevated: its byte size
@@ -1430,6 +1437,11 @@ public:
 
     /// @brief returns transpose of this
     __hostdev__ [[nodiscard]] constexpr Mat3x2<T> transpose() const noexcept { return this->template transposeAs<Mat3x2<T>>(); }
+
+    /// @brief scalar * Mat (hidden friend — found only via ADL on Mat2x3)
+    __hostdev__ [[nodiscard]] friend constexpr Mat2x3 operator*(const T& s, const Mat2x3& m) noexcept {
+        return m.template scale<Mat2x3>(s);
+    }
 };
 
 // Mat3x2 is intentionally NOT alignas-elevated: its byte size
@@ -1482,6 +1494,10 @@ public:
     /// @brief returns transpose of this
     __hostdev__ [[nodiscard]] constexpr Mat2x3<T> transpose() const noexcept { return this->template transposeAs<Mat2x3<T>>(); }
 
+    /// @brief scalar * Mat (hidden friend — found only via ADL on Mat3x2)
+    __hostdev__ [[nodiscard]] friend constexpr Mat3x2 operator*(const T& s, const Mat3x2& m) noexcept {
+        return m.template scale<Mat3x2>(s);
+    }
 };
 
 // Mat3 is intentionally NOT alignas-elevated: its byte size
@@ -1537,6 +1553,11 @@ public:
 
     /// @brief returns transpose of this
     __hostdev__ [[nodiscard]] constexpr Mat3 transpose() const noexcept { return this->template transposeAs<Mat3>(); }
+
+    /// @brief scalar * Mat (hidden friend — found only via ADL on Mat3)
+    __hostdev__ [[nodiscard]] friend constexpr Mat3 operator*(const T& s, const Mat3& m) noexcept {
+        return m.template scale<Mat3>(s);
+    }
 };
 
 // Aligned to 16*alignof(T) — Mat4 stores 16 elements (4x4), which is
@@ -1598,23 +1619,13 @@ public:
 
     /// @brief returns transpose of this
     __hostdev__ [[nodiscard]] constexpr Mat4 transpose() const noexcept { return this->template transposeAs<Mat4>(); }
+
+    /// @brief scalar * Mat (hidden friend — found only via ADL on Mat4)
+    __hostdev__ [[nodiscard]] friend constexpr Mat4 operator*(const T& s, const Mat4& m) noexcept {
+        return m.template scale<Mat4>(s);
+    }
 };
 
-/// @brief Multiply a scalar by a 2x2 matrix, result is a 2x2 matrix
-template<typename T>
-__hostdev__ [[nodiscard]] constexpr Mat2<T> operator*(const T& s, const Mat2<T>& m) noexcept { return m.template scale<Mat2<T>>(s); }
-/// @brief Multiply a scalar by a 2x3 matrix, result is a 2x3 matrix
-template<typename T>
-__hostdev__ [[nodiscard]] constexpr Mat2x3<T> operator*(const T& s, const Mat2x3<T>& m) noexcept { return m.template scale<Mat2x3<T>>(s); }
-/// @brief Multiply a scalar by a 3x2 matrix, result is a 3x2 matrix
-template<typename T>
-__hostdev__ [[nodiscard]] constexpr Mat3x2<T> operator*(const T& s, const Mat3x2<T>& m) noexcept { return m.template scale<Mat3x2<T>>(s); }
-/// @brief Multiply a scalar by a 3x3 matrix, result is a 3x3 matrix
-template<typename T>
-__hostdev__ [[nodiscard]] constexpr Mat3<T> operator*(const T& s, const Mat3<T>& m) noexcept { return m.template scale<Mat3<T>>(s); }
-/// @brief Multiply a scalar by a 4x4 matrix, result is a 4x4 matrix
-template<typename T>
-__hostdev__ [[nodiscard]] constexpr Mat4<T> operator*(const T& s, const Mat4<T>& m) noexcept { return m.template scale<Mat4<T>>(s); }
 
 /// @brief Multiply a 2x3 matrix by a 3x2 matrix, result is a 2x2 matrix
 template<typename T>
@@ -1761,18 +1772,20 @@ public:
                                this->mVec[1] * v[0], this->mVec[1] * v[1], this->mVec[1] * v[2],
                                this->mVec[2] * v[0], this->mVec[2] * v[1], this->mVec[2] * v[2]);
     }
-}; // Vec3<T>
 
-template<typename T1, typename T2>
-__hostdev__ [[nodiscard]] inline constexpr Vec3<T2> operator*(T1 scalar, const Vec3<T2>& vec) noexcept
-{
-    return Vec3<T2>(scalar * vec[0], scalar * vec[1], scalar * vec[2]);
-}
-template<typename T1, typename T2>
-__hostdev__ [[nodiscard]] inline constexpr Vec3<T2> operator/(T1 scalar, const Vec3<T2>& vec) noexcept
-{
-    return Vec3<T2>(scalar / vec[0], scalar / vec[1], scalar / vec[2]);
-}
+    // ---- scalar * Vec / scalar / Vec (hidden friends — found only via ADL on Vec3,
+    // never participate in unrelated namespace-scope overload sets) ----
+    template<typename T1>
+    __hostdev__ [[nodiscard]] friend constexpr Vec3 operator*(T1 scalar, const Vec3& vec) noexcept
+    {
+        return Vec3(scalar * vec[0], scalar * vec[1], scalar * vec[2]);
+    }
+    template<typename T1>
+    __hostdev__ [[nodiscard]] friend constexpr Vec3 operator/(T1 scalar, const Vec3& vec) noexcept
+    {
+        return Vec3(scalar / vec[0], scalar / vec[1], scalar / vec[2]);
+    }
+}; // Vec3<T>
 
 /// @brief Return a single precision floating-point vector of this coordinate
 __hostdev__ [[nodiscard]] inline constexpr Vec3<float> Coord::asVec3s() const noexcept
@@ -1865,18 +1878,20 @@ public:
     /// @return Vec4<int32_t>
     /// @note Only constexpr for integer @c T (roundAs uses non-constexpr math::Floor for floating point).
     __hostdev__ [[nodiscard]] constexpr Vec4<int32_t> round() const noexcept { return Base::template roundAs<Vec4<int32_t>>(); }
-}; // Vec4<T>
 
-template<typename T1, typename T2>
-__hostdev__ [[nodiscard]] inline constexpr Vec4<T2> operator*(T1 scalar, const Vec4<T2>& vec) noexcept
-{
-    return Vec4<T2>(scalar * vec[0], scalar * vec[1], scalar * vec[2], scalar * vec[3]);
-}
-template<typename T1, typename T2>
-__hostdev__ [[nodiscard]] inline constexpr Vec4<T2> operator/(T1 scalar, const Vec4<T2>& vec) noexcept
-{
-    return Vec4<T2>(scalar / vec[0], scalar / vec[1], scalar / vec[2], scalar / vec[3]);
-}
+    // ---- scalar * Vec / scalar / Vec (hidden friends — found only via ADL on Vec4,
+    // never participate in unrelated namespace-scope overload sets) ----
+    template<typename T1>
+    __hostdev__ [[nodiscard]] friend constexpr Vec4 operator*(T1 scalar, const Vec4& vec) noexcept
+    {
+        return Vec4(scalar * vec[0], scalar * vec[1], scalar * vec[2], scalar * vec[3]);
+    }
+    template<typename T1>
+    __hostdev__ [[nodiscard]] friend constexpr Vec4 operator/(T1 scalar, const Vec4& vec) noexcept
+    {
+        return Vec4(scalar / vec[0], scalar / vec[1], scalar / vec[2], scalar / vec[3]);
+    }
+}; // Vec4<T>
 // ----------------------------> matMult <--------------------------------------
 //
 // All six matMult / matMultT overloads were originally written with
