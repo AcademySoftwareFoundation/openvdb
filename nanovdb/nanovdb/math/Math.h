@@ -1002,8 +1002,8 @@ public:
     /// @brief floor-rounded components into the @c Result type (whose @c [i]
     /// must accept int32_t). For integer @c T the value is passed through.
     /// @note Only the integer-@c T specialization is usable as a constant
-    /// expression; the floating-point branch calls @c math::Floor /
-    /// @c math::Ceil, which aren't constexpr until C++23.
+    /// expression; the floating-point branch calls @c math::Floor, which
+    /// isn't constexpr until C++23.
     template<typename Result>
     __hostdev__ [[nodiscard]] constexpr Result floorAs() const noexcept {
         Result r{};
@@ -1014,6 +1014,11 @@ public:
         }
         return r;
     }
+    /// @brief ceil-rounded components into the @c Result type (whose @c [i]
+    /// must accept int32_t). For integer @c T the value is passed through.
+    /// @note Only the integer-@c T specialization is usable as a constant
+    /// expression; the floating-point branch calls @c math::Ceil, which
+    /// isn't constexpr until C++23.
     template<typename Result>
     __hostdev__ [[nodiscard]] constexpr Result ceilAs() const noexcept {
         Result r{};
