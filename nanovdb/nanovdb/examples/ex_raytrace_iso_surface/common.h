@@ -84,9 +84,14 @@ struct RenderOp
         NANOVDB_CUDA_CHECK_ERROR(cudaGetDeviceProperties(&properties, device), __FILE__, __LINE__);
 
         constexpr int blockSize = 256;
+        // Launch a small, fixed pool of blocks that persists on the GPU and
+        // pulls pixel work from a global counter instead of launching one
+        // logical thread per pixel up front.
         int           blockCount = properties.multiProcessorCount * 4;
         if (blockCount < 1) blockCount = 1;
 
+        // Reset the work queue before each timed render. The kernel advances
+        // this counter by one warp of pixels at a time.
         NANOVDB_CUDA_CHECK_ERROR(cudaMemset(nextPixel, 0, sizeof(int)), __FILE__, __LINE__);
 
         using ClockT = std::chrono::high_resolution_clock;
@@ -163,11 +168,17 @@ __global__ void renderIsoSurfacePersistentKernel(RenderOp renderOp, float* image
     auto acc = nanovdb::getAccessor<GridT, float>(*grid);
     const unsigned int lane = threadIdx.x & 31u;
 
+    // Keep the fixed set of launched threads busy until all pixels have been assigned.
     while (true) {
         int base = 0;
+        // Each warp asks the shared counter for the next batch of 32 pixels.
+        // Only lane 0 updates the counter; __shfl_sync copies lane 0's result
+        // to the other lanes in the warp.
         if (lane == 0) base = atomicAdd(nextPixel, 32);
         base = __shfl_sync(0xFFFFFFFFu, base, 0);
 
+        // Each lane renders one pixel from the batch: lane 0 renders base,
+        // lane 1 renders base + 1, and so on.
         const int i = base + int(lane);
         if (i >= numPixels) break;
 
