@@ -60,12 +60,12 @@ struct Tolerance;
 template<>
 struct Tolerance<float>
 {
-    __hostdev__ static constexpr float value() { return 1e-8f; }
+    __hostdev__ [[nodiscard]] static constexpr float value() { return 1e-8f; }
 };
 template<>
 struct Tolerance<double>
 {
-    __hostdev__ static constexpr double value() { return 1e-15; }
+    __hostdev__ [[nodiscard]] static constexpr double value() { return 1e-15; }
 };
 //@}
 
@@ -76,12 +76,12 @@ struct Delta;
 template<>
 struct Delta<float>
 {
-    __hostdev__ static constexpr float value() { return 1e-5f; }
+    __hostdev__ [[nodiscard]] static constexpr float value() { return 1e-5f; }
 };
 template<>
 struct Delta<double>
 {
-    __hostdev__ static constexpr double value() { return 1e-9; }
+    __hostdev__ [[nodiscard]] static constexpr double value() { return 1e-9; }
 };
 //@}
 
@@ -93,181 +93,181 @@ struct Maximum;
 template<typename T>
 struct Maximum
 {
-    __hostdev__ static constexpr T value() { return ::cuda::std::numeric_limits<T>::max(); }
+    __hostdev__ [[nodiscard]] static constexpr T value() { return ::cuda::std::numeric_limits<T>::max(); }
 };
 #elif defined(__HIP__)
 template<>
 struct Maximum<int>
 {
-    __hostdev__ static constexpr int value() { return 2147483647; }
+    __hostdev__ [[nodiscard]] static constexpr int value() { return 2147483647; }
 };
 template<>
 struct Maximum<uint32_t>
 {
-    __hostdev__ static constexpr uint32_t value() { return 4294967295u; }
+    __hostdev__ [[nodiscard]] static constexpr uint32_t value() { return 4294967295u; }
 };
 template<>
 struct Maximum<float>
 {
-    __hostdev__ static constexpr float value() { return 1e+38f; }
+    __hostdev__ [[nodiscard]] static constexpr float value() { return 1e+38f; }
 };
 template<>
 struct Maximum<double>
 {
-    __hostdev__ static constexpr double value() { return 1e+308; }
+    __hostdev__ [[nodiscard]] static constexpr double value() { return 1e+308; }
 };
 #else
 template<typename T>
 struct Maximum
 {
-    static constexpr T value() { return std::numeric_limits<T>::max(); }
+    [[nodiscard]] static constexpr T value() { return std::numeric_limits<T>::max(); }
 };
 #endif
 //@}
 
 template<typename Type>
-__hostdev__ inline constexpr bool isApproxZero(const Type& x)
+__hostdev__ [[nodiscard]] inline constexpr bool isApproxZero(const Type& x)
 {
     return !(x > Tolerance<Type>::value()) && !(x < -Tolerance<Type>::value());
 }
 
 template<typename Type>
-__hostdev__ inline constexpr Type Min(Type a, Type b)
+__hostdev__ [[nodiscard]] inline constexpr Type Min(Type a, Type b)
 {
     return (a < b) ? a : b;
 }
-__hostdev__ inline constexpr int32_t Min(int32_t a, int32_t b)
+__hostdev__ [[nodiscard]] inline constexpr int32_t Min(int32_t a, int32_t b)
 {
     return a < b ? a : b;
 }
-__hostdev__ inline constexpr uint32_t Min(uint32_t a, uint32_t b)
+__hostdev__ [[nodiscard]] inline constexpr uint32_t Min(uint32_t a, uint32_t b)
 {
     return a < b ? a : b;
 }
 // Not constexpr — fminf/fmin aren't constexpr until C++23.
-__hostdev__ inline float Min(float a, float b)
+__hostdev__ [[nodiscard]] inline float Min(float a, float b)
 {
     return fminf(a, b);
 }
 // Not constexpr — fminf/fmin aren't constexpr until C++23.
-__hostdev__ inline double Min(double a, double b)
+__hostdev__ [[nodiscard]] inline double Min(double a, double b)
 {
     return fmin(a, b);
 }
 template<typename Type>
-__hostdev__ inline constexpr Type Max(Type a, Type b)
+__hostdev__ [[nodiscard]] inline constexpr Type Max(Type a, Type b)
 {
     return (a > b) ? a : b;
 }
 
-__hostdev__ inline constexpr int32_t Max(int32_t a, int32_t b)
+__hostdev__ [[nodiscard]] inline constexpr int32_t Max(int32_t a, int32_t b)
 {
     return a > b ? a : b;
 }
-__hostdev__ inline constexpr uint32_t Max(uint32_t a, uint32_t b)
+__hostdev__ [[nodiscard]] inline constexpr uint32_t Max(uint32_t a, uint32_t b)
 {
     return a > b ? a : b;
 }
 // Not constexpr — fmaxf/fmax aren't constexpr until C++23.
-__hostdev__ inline float Max(float a, float b)
+__hostdev__ [[nodiscard]] inline float Max(float a, float b)
 {
     return fmaxf(a, b);
 }
 // Not constexpr — fmaxf/fmax aren't constexpr until C++23.
-__hostdev__ inline double Max(double a, double b)
+__hostdev__ [[nodiscard]] inline double Max(double a, double b)
 {
     return fmax(a, b);
 }
 // Not constexpr — depends on non-constexpr float/double Min/Max overloads.
-__hostdev__ inline float Clamp(float x, float a, float b)
+__hostdev__ [[nodiscard]] inline float Clamp(float x, float a, float b)
 {
     return Max(Min(x, b), a);
 }
 // Not constexpr — depends on non-constexpr float/double Min/Max overloads.
-__hostdev__ inline double Clamp(double x, double a, double b)
+__hostdev__ [[nodiscard]] inline double Clamp(double x, double a, double b)
 {
     return Max(Min(x, b), a);
 }
 
-__hostdev__ inline float Fract(float x)
+__hostdev__ [[nodiscard]] inline float Fract(float x)
 {
     return x - floorf(x);
 }
-__hostdev__ inline double Fract(double x)
+__hostdev__ [[nodiscard]] inline double Fract(double x)
 {
     return x - floor(x);
 }
 
-__hostdev__ inline int32_t Floor(float x)
+__hostdev__ [[nodiscard]] inline int32_t Floor(float x)
 {
     return int32_t(floorf(x));
 }
-__hostdev__ inline int32_t Floor(double x)
+__hostdev__ [[nodiscard]] inline int32_t Floor(double x)
 {
     return int32_t(floor(x));
 }
 
-__hostdev__ inline int32_t Ceil(float x)
+__hostdev__ [[nodiscard]] inline int32_t Ceil(float x)
 {
     return int32_t(ceilf(x));
 }
-__hostdev__ inline int32_t Ceil(double x)
+__hostdev__ [[nodiscard]] inline int32_t Ceil(double x)
 {
     return int32_t(ceil(x));
 }
 
 template<typename T>
-__hostdev__ inline constexpr T Pow2(T x)
+__hostdev__ [[nodiscard]] inline constexpr T Pow2(T x)
 {
     return x * x;
 }
 
 template<typename T>
-__hostdev__ inline constexpr T Pow3(T x)
+__hostdev__ [[nodiscard]] inline constexpr T Pow3(T x)
 {
     return x * x * x;
 }
 
 template<typename T>
-__hostdev__ inline constexpr T Pow4(T x)
+__hostdev__ [[nodiscard]] inline constexpr T Pow4(T x)
 {
     return Pow2(x * x);
 }
 template<typename T>
-__hostdev__ inline constexpr T Abs(T x)
+__hostdev__ [[nodiscard]] inline constexpr T Abs(T x)
 {
     return x < 0 ? -x : x;
 }
 
 // Not constexpr — fabsf isn't constexpr until C++23.
 template<>
-__hostdev__ inline float Abs(float x)
+__hostdev__ [[nodiscard]] inline float Abs(float x)
 {
     return fabsf(x);
 }
 
 // Not constexpr — fabs isn't constexpr until C++23.
 template<>
-__hostdev__ inline double Abs(double x)
+__hostdev__ [[nodiscard]] inline double Abs(double x)
 {
     return fabs(x);
 }
 
 // Not constexpr — std::abs(int) isn't constexpr until C++23.
 template<>
-__hostdev__ inline int Abs(int x)
+__hostdev__ [[nodiscard]] inline int Abs(int x)
 {
     return abs(x);
 }
 
 template<typename CoordT, typename RealT, template<typename> class Vec3T>
-__hostdev__ inline CoordT Round(const Vec3T<RealT>& xyz);
+__hostdev__ [[nodiscard]] inline CoordT Round(const Vec3T<RealT>& xyz);
 
 /// @brief Round each component to its closest integer (round-half-toward-+inf)
 /// using @c floor(x+0.5). Same rule is applied to both single and double
 /// precision so float and double inputs yield the same integer coords.
 template<typename CoordT, template<typename> class Vec3T>
-__hostdev__ inline CoordT Round(const Vec3T<float>& xyz)
+__hostdev__ [[nodiscard]] inline CoordT Round(const Vec3T<float>& xyz)
 {
     return CoordT(int32_t(floorf(xyz[0] + 0.5f)),
                   int32_t(floorf(xyz[1] + 0.5f)),
@@ -275,7 +275,7 @@ __hostdev__ inline CoordT Round(const Vec3T<float>& xyz)
 }
 
 template<typename CoordT, template<typename> class Vec3T>
-__hostdev__ inline CoordT Round(const Vec3T<double>& xyz)
+__hostdev__ [[nodiscard]] inline CoordT Round(const Vec3T<double>& xyz)
 {
     return CoordT(int32_t(floor(xyz[0] + 0.5)),
                   int32_t(floor(xyz[1] + 0.5)),
@@ -283,18 +283,18 @@ __hostdev__ inline CoordT Round(const Vec3T<double>& xyz)
 }
 
 template<typename CoordT, typename RealT, template<typename> class Vec3T>
-__hostdev__ inline CoordT RoundDown(const Vec3T<RealT>& xyz)
+__hostdev__ [[nodiscard]] inline CoordT RoundDown(const Vec3T<RealT>& xyz)
 {
     return CoordT(Floor(xyz[0]), Floor(xyz[1]), Floor(xyz[2]));
 }
 
 //@{
 /// Return the square root of a floating-point value.
-__hostdev__ inline float Sqrt(float x)
+__hostdev__ [[nodiscard]] inline float Sqrt(float x)
 {
     return sqrtf(x);
 }
-__hostdev__ inline double Sqrt(double x)
+__hostdev__ [[nodiscard]] inline double Sqrt(double x)
 {
     return sqrt(x);
 }
@@ -302,13 +302,13 @@ __hostdev__ inline double Sqrt(double x)
 
 /// Return the sign of the given value as an integer (either -1, 0 or 1).
 template<typename T>
-__hostdev__ inline constexpr T Sign(const T& x)
+__hostdev__ [[nodiscard]] inline constexpr T Sign(const T& x)
 {
     return ((T(0) < x) ? T(1) : T(0)) - ((x < T(0)) ? T(1) : T(0));
 }
 
 template<typename Vec3T>
-__hostdev__ inline constexpr int MinIndex(const Vec3T& v)
+__hostdev__ [[nodiscard]] inline constexpr int MinIndex(const Vec3T& v)
 {
 #if 0
     static const int hashTable[8] = {2, 1, 9, 1, 2, 9, 0, 0}; //9 are dummy values
@@ -325,7 +325,7 @@ __hostdev__ inline constexpr int MinIndex(const Vec3T& v)
 }
 
 template<typename Vec3T>
-__hostdev__ inline constexpr int MaxIndex(const Vec3T& v)
+__hostdev__ [[nodiscard]] inline constexpr int MaxIndex(const Vec3T& v)
 {
 #if 0
     static const int hashTable[8] = {2, 1, 9, 1, 2, 9, 0, 0}; //9 are dummy values
@@ -345,7 +345,7 @@ __hostdev__ inline constexpr int MaxIndex(const Vec3T& v)
 ///
 /// @details both wordSize and byteSize are in byte units
 template<uint64_t wordSize>
-__hostdev__ inline constexpr uint64_t AlignUp(uint64_t byteCount)
+__hostdev__ [[nodiscard]] inline constexpr uint64_t AlignUp(uint64_t byteCount)
 {
     const uint64_t r = byteCount % wordSize;
     return r ? byteCount - r + wordSize : byteCount;
@@ -396,11 +396,11 @@ public:
     __hostdev__ constexpr int32_t& y() { return mVec[1]; }
     __hostdev__ constexpr int32_t& z() { return mVec[2]; }
 
-    __hostdev__ static constexpr Coord max() { return Coord(int32_t((1u << 31) - 1)); }
+    __hostdev__ [[nodiscard]] static constexpr Coord max() { return Coord(int32_t((1u << 31) - 1)); }
 
-    __hostdev__ static constexpr Coord min() { return Coord(-int32_t((1u << 31) - 1) - 1); }
+    __hostdev__ [[nodiscard]] static constexpr Coord min() { return Coord(-int32_t((1u << 31) - 1) - 1); }
 
-    __hostdev__ static constexpr size_t memUsage() { return sizeof(Coord); }
+    __hostdev__ [[nodiscard]] static constexpr size_t memUsage() { return sizeof(Coord); }
 
     /// @brief Return a const reference to the given Coord component.
     /// @warning The argument is assumed to be 0, 1, or 2.
@@ -422,16 +422,16 @@ public:
     }
 
     /// @brief Return a new instance with coordinates masked by the given unsigned integer.
-    __hostdev__ constexpr Coord operator&(IndexType n) const { return Coord(mVec[0] & n, mVec[1] & n, mVec[2] & n); }
+    __hostdev__ [[nodiscard]] constexpr Coord operator&(IndexType n) const { return Coord(mVec[0] & n, mVec[1] & n, mVec[2] & n); }
 
     // @brief Return a new instance with coordinates left-shifted by the given unsigned integer.
-    __hostdev__ constexpr Coord operator<<(IndexType n) const { return Coord(mVec[0] << n, mVec[1] << n, mVec[2] << n); }
+    __hostdev__ [[nodiscard]] constexpr Coord operator<<(IndexType n) const { return Coord(mVec[0] << n, mVec[1] << n, mVec[2] << n); }
 
     // @brief Return a new instance with coordinates right-shifted by the given unsigned integer.
-    __hostdev__ constexpr Coord operator>>(IndexType n) const { return Coord(mVec[0] >> n, mVec[1] >> n, mVec[2] >> n); }
+    __hostdev__ [[nodiscard]] constexpr Coord operator>>(IndexType n) const { return Coord(mVec[0] >> n, mVec[1] >> n, mVec[2] >> n); }
 
     /// @brief Return true if this Coord is lexicographically less than the given Coord.
-    __hostdev__ constexpr bool operator<(const Coord& rhs) const
+    __hostdev__ [[nodiscard]] constexpr bool operator<(const Coord& rhs) const
     {
         return mVec[0] < rhs[0] ? true
              : mVec[0] > rhs[0] ? false
@@ -441,7 +441,7 @@ public:
     }
 
     /// @brief Return true if this Coord is lexicographically less or equal to the given Coord.
-    __hostdev__ constexpr bool operator<=(const Coord& rhs) const
+    __hostdev__ [[nodiscard]] constexpr bool operator<=(const Coord& rhs) const
     {
         return mVec[0] < rhs[0] ? true
              : mVec[0] > rhs[0] ? false
@@ -451,7 +451,7 @@ public:
     }
 
     // @brief Return true if this Coord is lexicographically greater than the given Coord.
-    __hostdev__ constexpr bool operator>(const Coord& rhs) const
+    __hostdev__ [[nodiscard]] constexpr bool operator>(const Coord& rhs) const
     {
         return mVec[0] > rhs[0] ? true
              : mVec[0] < rhs[0] ? false
@@ -461,7 +461,7 @@ public:
     }
 
     // @brief Return true if this Coord is lexicographically greater or equal to the given Coord.
-    __hostdev__ constexpr bool operator>=(const Coord& rhs) const
+    __hostdev__ [[nodiscard]] constexpr bool operator>=(const Coord& rhs) const
     {
         return mVec[0] > rhs[0] ? true
              : mVec[0] < rhs[0] ? false
@@ -471,8 +471,8 @@ public:
     }
 
     // @brief Return true if the Coord components are identical.
-    __hostdev__ constexpr bool   operator==(const Coord& rhs) const { return mVec[0] == rhs[0] && mVec[1] == rhs[1] && mVec[2] == rhs[2]; }
-    __hostdev__ constexpr bool   operator!=(const Coord& rhs) const { return mVec[0] != rhs[0] || mVec[1] != rhs[1] || mVec[2] != rhs[2]; }
+    __hostdev__ [[nodiscard]] constexpr bool   operator==(const Coord& rhs) const { return mVec[0] == rhs[0] && mVec[1] == rhs[1] && mVec[2] == rhs[2]; }
+    __hostdev__ [[nodiscard]] constexpr bool   operator!=(const Coord& rhs) const { return mVec[0] != rhs[0] || mVec[1] != rhs[1] || mVec[2] != rhs[2]; }
     __hostdev__ constexpr Coord& operator&=(int n)
     {
         mVec[0] &= n;
@@ -501,9 +501,9 @@ public:
         mVec[2] += n;
         return *this;
     }
-    __hostdev__ constexpr Coord  operator+(const Coord& rhs) const { return Coord(mVec[0] + rhs[0], mVec[1] + rhs[1], mVec[2] + rhs[2]); }
-    __hostdev__ constexpr Coord  operator-(const Coord& rhs) const { return Coord(mVec[0] - rhs[0], mVec[1] - rhs[1], mVec[2] - rhs[2]); }
-    __hostdev__ constexpr Coord  operator-() const { return Coord(-mVec[0], -mVec[1], -mVec[2]); }
+    __hostdev__ [[nodiscard]] constexpr Coord  operator+(const Coord& rhs) const { return Coord(mVec[0] + rhs[0], mVec[1] + rhs[1], mVec[2] + rhs[2]); }
+    __hostdev__ [[nodiscard]] constexpr Coord  operator-(const Coord& rhs) const { return Coord(mVec[0] - rhs[0], mVec[1] - rhs[1], mVec[2] - rhs[2]); }
+    __hostdev__ [[nodiscard]] constexpr Coord  operator-() const { return Coord(-mVec[0], -mVec[1], -mVec[2]); }
     __hostdev__ constexpr Coord& operator+=(const Coord& rhs)
     {
         mVec[0] += rhs[0];
@@ -559,16 +559,16 @@ public:
     }
 #endif
 
-    __hostdev__ constexpr Coord offsetBy(ValueType dx, ValueType dy, ValueType dz) const
+    __hostdev__ [[nodiscard]] constexpr Coord offsetBy(ValueType dx, ValueType dy, ValueType dz) const
     {
         return Coord(mVec[0] + dx, mVec[1] + dy, mVec[2] + dz);
     }
 
-    __hostdev__ constexpr Coord offsetBy(ValueType n) const { return this->offsetBy(n, n, n); }
+    __hostdev__ [[nodiscard]] constexpr Coord offsetBy(ValueType n) const { return this->offsetBy(n, n, n); }
 
     /// Return true if any of the components of @a a are smaller than the
     /// corresponding components of @a b.
-    __hostdev__ static inline constexpr bool lessThan(const Coord& a, const Coord& b)
+    __hostdev__ [[nodiscard]] static inline constexpr bool lessThan(const Coord& a, const Coord& b)
     {
         return (a[0] < b[0] || a[1] < b[1] || a[2] < b[2]);
     }
@@ -577,7 +577,7 @@ public:
     /// than @a xyz (node centered conversion).
     // Not constexpr — math::Floor uses floorf/floor which aren't constexpr until C++23.
     template<typename Vec3T>
-    __hostdev__ static Coord Floor(const Vec3T& xyz) { return Coord(math::Floor(xyz[0]), math::Floor(xyz[1]), math::Floor(xyz[2])); }
+    __hostdev__ [[nodiscard]] static Coord Floor(const Vec3T& xyz) { return Coord(math::Floor(xyz[0]), math::Floor(xyz[1]), math::Floor(xyz[2])); }
 
     /// @brief Return a hash key derived from the existing coordinates.
     /// @details The hash function is originally taken from the SIGGRAPH paper:
@@ -585,22 +585,22 @@ public:
     ///          and the prime numbers are modified based on the ACM Transactions on Graphics paper:
     ///          "Real-time 3D reconstruction at scale using voxel hashing" (the second number had a typo!)
     template<int Log2N = 3 + 4 + 5>
-    __hostdev__ constexpr uint32_t hash() const { return ((1 << Log2N) - 1) & (mVec[0] * 73856093 ^ mVec[1] * 19349669 ^ mVec[2] * 83492791); }
+    __hostdev__ [[nodiscard]] constexpr uint32_t hash() const { return ((1 << Log2N) - 1) & (mVec[0] * 73856093 ^ mVec[1] * 19349669 ^ mVec[2] * 83492791); }
 
     /// @brief Return the octant of this Coord
     //__hostdev__ size_t octant() const { return (uint32_t(mVec[0])>>31) | ((uint32_t(mVec[1])>>31)<<1) | ((uint32_t(mVec[2])>>31)<<2); }
-    __hostdev__ constexpr uint8_t octant() const { return (uint8_t(bool(mVec[0] & (1u << 31)))) |
+    __hostdev__ [[nodiscard]] constexpr uint8_t octant() const { return (uint8_t(bool(mVec[0] & (1u << 31)))) |
                                                 (uint8_t(bool(mVec[1] & (1u << 31))) << 1) |
                                                 (uint8_t(bool(mVec[2] & (1u << 31))) << 2); }
 
     /// @brief Return a single precision floating-point vector of this coordinate
-    __hostdev__ inline constexpr Vec3<float> asVec3s() const;
+    __hostdev__ [[nodiscard]] inline constexpr Vec3<float> asVec3s() const;
 
     /// @brief Return a double precision floating-point vector of this coordinate
-    __hostdev__ inline constexpr Vec3<double> asVec3d() const;
+    __hostdev__ [[nodiscard]] inline constexpr Vec3<double> asVec3d() const;
 
     // returns a copy of itself, so it mimics the behaviour of Vec3<T>::round()
-    __hostdev__ inline constexpr Coord round() const { return *this; }
+    __hostdev__ [[nodiscard]] inline constexpr Coord round() const { return *this; }
 }; // Coord class
 
 
@@ -648,11 +648,11 @@ public:
     __hostdev__ constexpr int32_t& x() { return mVec[0]; }
     __hostdev__ constexpr int32_t& y() { return mVec[1]; }
 
-    __hostdev__ static constexpr Coord2 max() { return Coord2(int32_t((1u << 31) - 1)); }
+    __hostdev__ [[nodiscard]] static constexpr Coord2 max() { return Coord2(int32_t((1u << 31) - 1)); }
 
-    __hostdev__ static constexpr Coord2 min() { return Coord2(-int32_t((1u << 31) - 1) - 1); }
+    __hostdev__ [[nodiscard]] static constexpr Coord2 min() { return Coord2(-int32_t((1u << 31) - 1) - 1); }
 
-    __hostdev__ static constexpr size_t memUsage() { return sizeof(Coord2); }
+    __hostdev__ [[nodiscard]] static constexpr size_t memUsage() { return sizeof(Coord2); }
 
     /// @brief Return a const reference to the given Coord component.
     /// @warning The argument is assumed to be 0 or 1,
@@ -673,16 +673,16 @@ public:
     }
 
     /// @brief Return a new instance with coordinates masked by the given unsigned integer.
-    __hostdev__ constexpr Coord2 operator&(IndexType n) const { return Coord2(mVec[0] & n, mVec[1] & n); }
+    __hostdev__ [[nodiscard]] constexpr Coord2 operator&(IndexType n) const { return Coord2(mVec[0] & n, mVec[1] & n); }
 
     // @brief Return a new instance with coordinates left-shifted by the given unsigned integer.
-    __hostdev__ constexpr Coord2 operator<<(IndexType n) const { return Coord2(mVec[0] << n, mVec[1] << n); }
+    __hostdev__ [[nodiscard]] constexpr Coord2 operator<<(IndexType n) const { return Coord2(mVec[0] << n, mVec[1] << n); }
 
     // @brief Return a new instance with coordinates right-shifted by the given unsigned integer.
-    __hostdev__ constexpr Coord2 operator>>(IndexType n) const { return Coord2(mVec[0] >> n, mVec[1] >> n); }
+    __hostdev__ [[nodiscard]] constexpr Coord2 operator>>(IndexType n) const { return Coord2(mVec[0] >> n, mVec[1] >> n); }
 
     /// @brief Return true if this Coord is lexicographically less than the given Coord.
-    __hostdev__ constexpr bool operator<(const Coord2& rhs) const
+    __hostdev__ [[nodiscard]] constexpr bool operator<(const Coord2& rhs) const
     {
         return mVec[0] < rhs[0] ? true
              : mVec[0] > rhs[0] ? false
@@ -690,7 +690,7 @@ public:
     }
 
     /// @brief Return true if this Coord is lexicographically less or equal to the given Coord.
-    __hostdev__ constexpr bool operator<=(const Coord2& rhs) const
+    __hostdev__ [[nodiscard]] constexpr bool operator<=(const Coord2& rhs) const
     {
         return mVec[0] < rhs[0] ? true
              : mVec[0] > rhs[0] ? false
@@ -698,7 +698,7 @@ public:
     }
 
     // @brief Return true if this Coord is lexicographically greater than the given Coord.
-    __hostdev__ constexpr bool operator>(const Coord2& rhs) const
+    __hostdev__ [[nodiscard]] constexpr bool operator>(const Coord2& rhs) const
     {
         return mVec[0] > rhs[0] ? true
              : mVec[0] < rhs[0] ? false
@@ -706,7 +706,7 @@ public:
     }
 
     // @brief Return true if this Coord is lexicographically greater or equal to the given Coord.
-    __hostdev__ constexpr bool operator>=(const Coord2& rhs) const
+    __hostdev__ [[nodiscard]] constexpr bool operator>=(const Coord2& rhs) const
     {
         return mVec[0] > rhs[0] ? true
              : mVec[0] < rhs[0] ? false
@@ -714,8 +714,8 @@ public:
     }
 
     // @brief Return true if the Coord components are identical.
-    __hostdev__ constexpr bool   operator==(const Coord2& rhs) const { return mVec[0] == rhs[0] && mVec[1] == rhs[1]; }
-    __hostdev__ constexpr bool   operator!=(const Coord2& rhs) const { return mVec[0] != rhs[0] || mVec[1] != rhs[1]; }
+    __hostdev__ [[nodiscard]] constexpr bool   operator==(const Coord2& rhs) const { return mVec[0] == rhs[0] && mVec[1] == rhs[1]; }
+    __hostdev__ [[nodiscard]] constexpr bool   operator!=(const Coord2& rhs) const { return mVec[0] != rhs[0] || mVec[1] != rhs[1]; }
     __hostdev__ constexpr Coord2& operator&=(int n)
     {
         mVec[0] &= n;
@@ -740,9 +740,9 @@ public:
         mVec[1] += n;
         return *this;
     }
-    __hostdev__ constexpr Coord2  operator+(const Coord2& rhs) const { return Coord2(mVec[0] + rhs[0], mVec[1] + rhs[1]); }
-    __hostdev__ constexpr Coord2  operator-(const Coord2& rhs) const { return Coord2(mVec[0] - rhs[0], mVec[1] - rhs[1]); }
-    __hostdev__ constexpr Coord2  operator-() const { return Coord2(-mVec[0], -mVec[1]); }
+    __hostdev__ [[nodiscard]] constexpr Coord2  operator+(const Coord2& rhs) const { return Coord2(mVec[0] + rhs[0], mVec[1] + rhs[1]); }
+    __hostdev__ [[nodiscard]] constexpr Coord2  operator-(const Coord2& rhs) const { return Coord2(mVec[0] - rhs[0], mVec[1] - rhs[1]); }
+    __hostdev__ [[nodiscard]] constexpr Coord2  operator-() const { return Coord2(-mVec[0], -mVec[1]); }
     __hostdev__ constexpr Coord2& operator+=(const Coord2& rhs)
     {
         mVec[0] += rhs[0];
@@ -790,16 +790,16 @@ public:
     }
 #endif
 
-    __hostdev__ constexpr Coord2 offsetBy(ValueType dx, ValueType dy) const
+    __hostdev__ [[nodiscard]] constexpr Coord2 offsetBy(ValueType dx, ValueType dy) const
     {
         return Coord2(mVec[0] + dx, mVec[1] + dy);
     }
 
-    __hostdev__ constexpr Coord2 offsetBy(ValueType n) const { return this->offsetBy(n, n); }
+    __hostdev__ [[nodiscard]] constexpr Coord2 offsetBy(ValueType n) const { return this->offsetBy(n, n); }
 
     /// Return true if any of the components of @a a are smaller than the
     /// corresponding components of @a b.
-    __hostdev__ static inline constexpr bool lessThan(const Coord2& a, const Coord2& b)
+    __hostdev__ [[nodiscard]] static inline constexpr bool lessThan(const Coord2& a, const Coord2& b)
     {
         return (a[0] < b[0] || a[1] < b[1]);
     }
@@ -808,16 +808,16 @@ public:
     /// than @a xyz (node centered conversion).
     // Not constexpr — math::Floor uses floorf/floor which aren't constexpr until C++23.
     template<typename Vec2T>
-    __hostdev__ static Coord2 Floor(const Vec2T& xy) { return Coord2(math::Floor(xy[0]), math::Floor(xy[1])); }
+    __hostdev__ [[nodiscard]] static Coord2 Floor(const Vec2T& xy) { return Coord2(math::Floor(xy[0]), math::Floor(xy[1])); }
 
     /// @brief Return a single precision floating-point vector of this coordinate
-    __hostdev__ inline constexpr Vec2<float> asVec2s() const;
+    __hostdev__ [[nodiscard]] inline constexpr Vec2<float> asVec2s() const;
 
     /// @brief Return a double precision floating-point vector of this coordinate
-    __hostdev__ inline constexpr Vec2<double> asVec2d() const;
+    __hostdev__ [[nodiscard]] inline constexpr Vec2<double> asVec2d() const;
 
     // returns a copy of itself, so it mimics the behaviour of Vec3<T>::round()
-    __hostdev__ inline constexpr Coord2 round() const { return *this; }
+    __hostdev__ [[nodiscard]] inline constexpr Coord2 round() const { return *this; }
 }; // Coord2 class
 
 // ----------------------------> VecBase <-----------------------------------
@@ -862,37 +862,37 @@ public:
     // ---- generic element-wise helpers (taking/returning Derived) ----
 
     template<typename Derived>
-    __hostdev__ constexpr Derived plus(const Derived& rhs) const {
+    __hostdev__ [[nodiscard]] constexpr Derived plus(const Derived& rhs) const {
         Derived out{};
         for (int i = 0; i < N; ++i) out[i] = mVec[i] + rhs[i];
         return out;
     }
     template<typename Derived>
-    __hostdev__ constexpr Derived minus(const Derived& rhs) const {
+    __hostdev__ [[nodiscard]] constexpr Derived minus(const Derived& rhs) const {
         Derived out{};
         for (int i = 0; i < N; ++i) out[i] = mVec[i] - rhs[i];
         return out;
     }
     template<typename Derived>
-    __hostdev__ constexpr Derived mul(const Derived& rhs) const {
+    __hostdev__ [[nodiscard]] constexpr Derived mul(const Derived& rhs) const {
         Derived out{};
         for (int i = 0; i < N; ++i) out[i] = mVec[i] * rhs[i];
         return out;
     }
     template<typename Derived>
-    __hostdev__ constexpr Derived div(const Derived& rhs) const {
+    __hostdev__ [[nodiscard]] constexpr Derived div(const Derived& rhs) const {
         Derived out{};
         for (int i = 0; i < N; ++i) out[i] = mVec[i] / rhs[i];
         return out;
     }
     template<typename Derived>
-    __hostdev__ constexpr Derived negate() const {
+    __hostdev__ [[nodiscard]] constexpr Derived negate() const {
         Derived out{};
         for (int i = 0; i < N; ++i) out[i] = -mVec[i];
         return out;
     }
     template<typename Derived>
-    __hostdev__ constexpr Derived scale(const T& s) const {
+    __hostdev__ [[nodiscard]] constexpr Derived scale(const T& s) const {
         Derived out{};
         for (int i = 0; i < N; ++i) out[i] = mVec[i] * s;
         return out;
@@ -900,7 +900,7 @@ public:
     /// @brief return (*this) / @a s element-wise as a @c Derived. Uses per-element
     /// division (correct for integer @c T, unlike multiplying by 1/s).
     template<typename Derived>
-    __hostdev__ constexpr Derived divideBy(const T& s) const {
+    __hostdev__ [[nodiscard]] constexpr Derived divideBy(const T& s) const {
         Derived out{};
         for (int i = 0; i < N; ++i) out[i] = mVec[i] / s;
         return out;
@@ -933,7 +933,7 @@ public:
         return *this;
     }
 
-    __hostdev__ constexpr bool equals(const VecBase& rhs) const {
+    __hostdev__ [[nodiscard]] constexpr bool equals(const VecBase& rhs) const {
         for (int i = 0; i < N; ++i) if (mVec[i] != rhs.mVec[i]) return false;
         return true;
     }
@@ -942,27 +942,27 @@ public:
 
     /// @brief dot product. @a V must have @c operator[] valid for 0..N-1.
     template<typename V>
-    __hostdev__ constexpr T dot(const V& v) const {
+    __hostdev__ [[nodiscard]] constexpr T dot(const V& v) const {
         T s = T(0);
         for (int i = 0; i < N; ++i) s += mVec[i] * v[i];
         return s;
     }
-    __hostdev__ constexpr T lengthSqr() const {
+    __hostdev__ [[nodiscard]] constexpr T lengthSqr() const {
         T s = T(0);
         for (int i = 0; i < N; ++i) s += mVec[i] * mVec[i];
         return s;
     }
     // Not constexpr — std::sqrt isn't constexpr until C++26.
-    __hostdev__ T length() const { return Sqrt(this->lengthSqr()); }
+    __hostdev__ [[nodiscard]] T length() const { return Sqrt(this->lengthSqr()); }
 
     /// @brief return the smallest of the N components
-    __hostdev__ constexpr T smallestComponent() const {
+    __hostdev__ [[nodiscard]] constexpr T smallestComponent() const {
         T m = mVec[0];
         for (int i = 1; i < N; ++i) if (mVec[i] < m) m = mVec[i];
         return m;
     }
     /// @brief return the largest of the N components
-    __hostdev__ constexpr T largestComponent() const {
+    __hostdev__ [[nodiscard]] constexpr T largestComponent() const {
         T m = mVec[0];
         for (int i = 1; i < N; ++i) if (mVec[i] > m) m = mVec[i];
         return m;
@@ -1000,7 +1000,7 @@ public:
     /// expression; the floating-point branch calls @c math::Floor /
     /// @c math::Ceil, which aren't constexpr until C++23.
     template<typename Result>
-    __hostdev__ constexpr Result floorAs() const {
+    __hostdev__ [[nodiscard]] constexpr Result floorAs() const {
         Result r{};
         if constexpr (std::is_floating_point<T>::value) {
             for (int i = 0; i < N; ++i) r[i] = math::Floor(mVec[i]);
@@ -1010,7 +1010,7 @@ public:
         return r;
     }
     template<typename Result>
-    __hostdev__ constexpr Result ceilAs() const {
+    __hostdev__ [[nodiscard]] constexpr Result ceilAs() const {
         Result r{};
         if constexpr (std::is_floating_point<T>::value) {
             for (int i = 0; i < N; ++i) r[i] = math::Ceil(mVec[i]);
@@ -1024,7 +1024,7 @@ public:
     /// float, double, and long double; pass-through for integer @c T.
     /// @note See @c floorAs — only the integer-@c T branch is constexpr-usable.
     template<typename Result>
-    __hostdev__ constexpr Result roundAs() const {
+    __hostdev__ [[nodiscard]] constexpr Result roundAs() const {
         Result r{};
         if constexpr (std::is_floating_point<T>::value) {
             const T half = T(0.5);
@@ -1078,17 +1078,17 @@ public:
     }
 
     // ---- element-wise (Vec & Vec) ----
-    __hostdev__ constexpr Vec2  operator-() const            { return Base::template negate<Vec2>(); }
-    __hostdev__ constexpr Vec2  operator+(const Vec2& v) const { return Base::template plus<Vec2>(v); }
-    __hostdev__ constexpr Vec2  operator-(const Vec2& v) const { return Base::template minus<Vec2>(v); }
-    __hostdev__ constexpr Vec2  operator*(const Vec2& v) const { return Base::template mul<Vec2>(v); }
-    __hostdev__ constexpr Vec2  operator/(const Vec2& v) const { return Base::template div<Vec2>(v); }
+    __hostdev__ [[nodiscard]] constexpr Vec2  operator-() const            { return Base::template negate<Vec2>(); }
+    __hostdev__ [[nodiscard]] constexpr Vec2  operator+(const Vec2& v) const { return Base::template plus<Vec2>(v); }
+    __hostdev__ [[nodiscard]] constexpr Vec2  operator-(const Vec2& v) const { return Base::template minus<Vec2>(v); }
+    __hostdev__ [[nodiscard]] constexpr Vec2  operator*(const Vec2& v) const { return Base::template mul<Vec2>(v); }
+    __hostdev__ [[nodiscard]] constexpr Vec2  operator/(const Vec2& v) const { return Base::template div<Vec2>(v); }
     __hostdev__ constexpr Vec2& operator+=(const Vec2& v)    { Base::addAssign(v); return *this; }
     __hostdev__ constexpr Vec2& operator-=(const Vec2& v)    { Base::subAssign(v); return *this; }
 
     // ---- mixed Vec2 / Coord2 ----
-    __hostdev__ constexpr Vec2  operator+(const Coord2& ijk) const { return Vec2(this->mVec[0] + ijk[0], this->mVec[1] + ijk[1]); }
-    __hostdev__ constexpr Vec2  operator-(const Coord2& ijk) const { return Vec2(this->mVec[0] - ijk[0], this->mVec[1] - ijk[1]); }
+    __hostdev__ [[nodiscard]] constexpr Vec2  operator+(const Coord2& ijk) const { return Vec2(this->mVec[0] + ijk[0], this->mVec[1] + ijk[1]); }
+    __hostdev__ [[nodiscard]] constexpr Vec2  operator-(const Coord2& ijk) const { return Vec2(this->mVec[0] - ijk[0], this->mVec[1] - ijk[1]); }
     __hostdev__ constexpr Vec2& operator+=(const Coord2& ijk) {
         this->mVec[0] += T(ijk[0]); this->mVec[1] += T(ijk[1]);
         return *this;
@@ -1099,59 +1099,59 @@ public:
     }
 
     // ---- scalar ----
-    __hostdev__ constexpr Vec2  operator*(const T& s) const  { return Base::template scale<Vec2>(s); }
-    __hostdev__ constexpr Vec2  operator/(const T& s) const  { return Base::template divideBy<Vec2>(s); }
+    __hostdev__ [[nodiscard]] constexpr Vec2  operator*(const T& s) const  { return Base::template scale<Vec2>(s); }
+    __hostdev__ [[nodiscard]] constexpr Vec2  operator/(const T& s) const  { return Base::template divideBy<Vec2>(s); }
     __hostdev__ constexpr Vec2& operator*=(const T& s)       { Base::scaleAssign(s); return *this; }
     __hostdev__ constexpr Vec2& operator/=(const T& s)       { Base::divideAssignScalar(s); return *this; }
     // Not constexpr — depends on length() which calls std::sqrt.
     __hostdev__ Vec2& normalize()                  { return (*this) /= this->length(); }
 
     // ---- equality ----
-    __hostdev__ constexpr bool operator==(const Vec2& rhs) const { return Base::equals(rhs); }
-    __hostdev__ constexpr bool operator!=(const Vec2& rhs) const { return !Base::equals(rhs); }
+    __hostdev__ [[nodiscard]] constexpr bool operator==(const Vec2& rhs) const { return Base::equals(rhs); }
+    __hostdev__ [[nodiscard]] constexpr bool operator!=(const Vec2& rhs) const { return !Base::equals(rhs); }
 
     // ---- component-wise min/max ----
     __hostdev__ constexpr Vec2& minComponent(const Vec2& other) { Base::mergeMin(other); return *this; }
     __hostdev__ constexpr Vec2& maxComponent(const Vec2& other) { Base::mergeMax(other); return *this; }
 
     /// @brief Return the smallest vector component
-    __hostdev__ constexpr ValueType min() const { return Base::smallestComponent(); }
+    __hostdev__ [[nodiscard]] constexpr ValueType min() const { return Base::smallestComponent(); }
     /// @brief Return the largest vector component
-    __hostdev__ constexpr ValueType max() const { return Base::largestComponent(); }
+    __hostdev__ [[nodiscard]] constexpr ValueType max() const { return Base::largestComponent(); }
 
     /// @brief Round each component down (toward negative infinity)
     /// @return integer Coord2
     /// @note Only constexpr for integer @c T (floorAs uses non-constexpr math::Floor for floating point).
-    __hostdev__ constexpr Coord2 floor() const { return Base::template floorAs<Coord2>(); }
+    __hostdev__ [[nodiscard]] constexpr Coord2 floor() const { return Base::template floorAs<Coord2>(); }
     /// @brief Round each component up (toward positive infinity)
     /// @return integer Coord2
     /// @note Only constexpr for integer @c T (ceilAs uses non-constexpr math::Ceil for floating point).
-    __hostdev__ constexpr Coord2 ceil()  const { return Base::template ceilAs<Coord2>(); }
+    __hostdev__ [[nodiscard]] constexpr Coord2 ceil()  const { return Base::template ceilAs<Coord2>(); }
     /// @brief Round each component to its closest integer value
     /// @return integer Coord2
     /// @note Only constexpr for integer @c T (roundAs uses non-constexpr math::Floor for floating point).
-    __hostdev__ constexpr Coord2 round() const { return Base::template roundAs<Coord2>(); }
+    __hostdev__ [[nodiscard]] constexpr Coord2 round() const { return Base::template roundAs<Coord2>(); }
 }; // Vec2<T>
 
 template<typename T1, typename T2>
-__hostdev__ inline constexpr Vec2<T2> operator*(T1 scalar, const Vec2<T2>& vec)
+__hostdev__ [[nodiscard]] inline constexpr Vec2<T2> operator*(T1 scalar, const Vec2<T2>& vec)
 {
     return Vec2<T2>(scalar * vec[0], scalar * vec[1]);
 }
 template<typename T1, typename T2>
-__hostdev__ inline constexpr Vec2<T2> operator/(T1 scalar, const Vec2<T2>& vec)
+__hostdev__ [[nodiscard]] inline constexpr Vec2<T2> operator/(T1 scalar, const Vec2<T2>& vec)
 {
     return Vec2<T2>(scalar / vec[0], scalar / vec[1]);
 }
 
 /// @brief Return a single precision floating-point vector of this coordinate
-__hostdev__ inline constexpr Vec2<float> Coord2::asVec2s() const
+__hostdev__ [[nodiscard]] inline constexpr Vec2<float> Coord2::asVec2s() const
 {
     return Vec2<float>(float(mVec[0]), float(mVec[1]));
 }
 
 /// @brief Return a double precision floating-point vector of this coordinate
-__hostdev__ inline constexpr Vec2<double> Coord2::asVec2d() const
+__hostdev__ [[nodiscard]] inline constexpr Vec2<double> Coord2::asVec2d() const
 {
     return Vec2<double>(double(mVec[0]), double(mVec[1]));
 }
@@ -1166,9 +1166,9 @@ protected:
 public:
     using ValueType = T;
 
-    static constexpr int rows() { return ROWS; }
-    static constexpr int cols() { return COLS; }
-    static constexpr int size() { return ROWS * COLS; }
+    [[nodiscard]] static constexpr int rows() { return ROWS; }
+    [[nodiscard]] static constexpr int cols() { return COLS; }
+    [[nodiscard]] static constexpr int size() { return ROWS * COLS; }
 
     MatBase() = default;
 
@@ -1199,7 +1199,7 @@ public:
 
     /// @brief return @c *this + @a rhs as a @c Derived
     template<typename Derived>
-    __hostdev__ constexpr Derived plus(const Derived& rhs) const {
+    __hostdev__ [[nodiscard]] constexpr Derived plus(const Derived& rhs) const {
         Derived out{};
         for (int i = 0; i < size(); ++i) out.data()[i] = mData[i] + rhs.data()[i];
         return out;
@@ -1207,7 +1207,7 @@ public:
 
     /// @brief return @c *this - @a rhs as a @c Derived
     template<typename Derived>
-    __hostdev__ constexpr Derived minus(const Derived& rhs) const {
+    __hostdev__ [[nodiscard]] constexpr Derived minus(const Derived& rhs) const {
         Derived out{};
         for (int i = 0; i < size(); ++i) out.data()[i] = mData[i] - rhs.data()[i];
         return out;
@@ -1215,7 +1215,7 @@ public:
 
     /// @brief return -(*this) as a @c Derived
     template<typename Derived>
-    __hostdev__ constexpr Derived negate() const {
+    __hostdev__ [[nodiscard]] constexpr Derived negate() const {
         Derived out{};
         for (int i = 0; i < size(); ++i) out.data()[i] = -mData[i];
         return out;
@@ -1223,7 +1223,7 @@ public:
 
     /// @brief return @a s * (*this) as a @c Derived
     template<typename Derived>
-    __hostdev__ constexpr Derived scale(const T& s) const {
+    __hostdev__ [[nodiscard]] constexpr Derived scale(const T& s) const {
         Derived out{};
         for (int i = 0; i < size(); ++i) out.data()[i] = mData[i] * s;
         return out;
@@ -1245,7 +1245,7 @@ public:
     /// @brief return (*this) / @a s element-wise as a @c Derived. Uses
     /// per-element division (correct for integer @c T, unlike multiplying by 1/s).
     template<typename Derived>
-    __hostdev__ constexpr Derived divideBy(const T& s) const {
+    __hostdev__ [[nodiscard]] constexpr Derived divideBy(const T& s) const {
         Derived out{};
         for (int i = 0; i < size(); ++i) out.data()[i] = mData[i] / s;
         return out;
@@ -1255,7 +1255,7 @@ public:
         return *this;
     }
 
-    __hostdev__ constexpr bool equals(const MatBase& rhs) const {
+    __hostdev__ [[nodiscard]] constexpr bool equals(const MatBase& rhs) const {
         for (int i = 0; i < size(); ++i) if (mData[i] != rhs.mData[i]) return false;
         return true;
     }
@@ -1265,7 +1265,7 @@ public:
     /// @brief return the transpose of @c *this as the @c Result type.
     /// @tparam Result a matrix type whose dimensions are (COLS, ROWS)
     template<typename Result>
-    __hostdev__ constexpr Result transposeAs() const {
+    __hostdev__ [[nodiscard]] constexpr Result transposeAs() const {
         static_assert(Result::rows() == COLS && Result::cols() == ROWS,
                       "transposeAs: result dims must be (COLS, ROWS)");
         Result r{};
@@ -1281,7 +1281,7 @@ public:
     /// @tparam Result a matrix type whose dimensions are (ROWS, Rhs::cols())
     /// @tparam Rhs    a matrix type whose row count equals @c COLS
     template<typename Result, typename Rhs>
-    __hostdev__ constexpr Result multiply(const Rhs& rhs) const {
+    __hostdev__ [[nodiscard]] constexpr Result multiply(const Rhs& rhs) const {
         static_assert(COLS == Rhs::rows(), "multiply: lhs.cols must equal rhs.rows");
         static_assert(Result::rows() == ROWS && Result::cols() == Rhs::cols(),
                       "multiply: result dims mismatch");
@@ -1303,7 +1303,7 @@ public:
     /// @tparam VecResult a vector type whose @c SIZE equals @c ROWS
     /// @tparam VecRhs    a vector type whose @c SIZE equals @c COLS
     template<typename VecResult, typename VecRhs>
-    __hostdev__ constexpr VecResult multiplyVec(const VecRhs& v) const {
+    __hostdev__ [[nodiscard]] constexpr VecResult multiplyVec(const VecRhs& v) const {
         static_assert(VecRhs::SIZE == COLS && VecResult::SIZE == ROWS,
                       "multiplyVec: dim mismatch");
         VecResult r{};
@@ -1349,31 +1349,31 @@ public:
     __hostdev__ constexpr Mat2(Source* array) : Base(array) {}
 
     // ---- element-wise ----
-    __hostdev__ constexpr Mat2  operator-() const                  { return this->template negate<Mat2>(); }
-    __hostdev__ constexpr Mat2  operator+(const Mat2& m) const     { return this->template plus<Mat2>(m); }
-    __hostdev__ constexpr Mat2  operator-(const Mat2& m) const     { return this->template minus<Mat2>(m); }
+    __hostdev__ [[nodiscard]] constexpr Mat2  operator-() const                  { return this->template negate<Mat2>(); }
+    __hostdev__ [[nodiscard]] constexpr Mat2  operator+(const Mat2& m) const     { return this->template plus<Mat2>(m); }
+    __hostdev__ [[nodiscard]] constexpr Mat2  operator-(const Mat2& m) const     { return this->template minus<Mat2>(m); }
     __hostdev__ constexpr Mat2& operator+=(const Mat2& m)          { Base::addAssign(m); return *this; }
     __hostdev__ constexpr Mat2& operator-=(const Mat2& m)          { Base::subAssign(m); return *this; }
 
     // ---- matrix * matrix / matrix * vector ----
-    __hostdev__ constexpr Mat2     operator*(const Mat2& m) const     { return this->template multiply<Mat2, Mat2>(m); }
-    __hostdev__ constexpr Vec2<T>  operator*(const Vec2<T>& v) const  { return this->template multiplyVec<Vec2<T>, Vec2<T>>(v); }
+    __hostdev__ [[nodiscard]] constexpr Mat2     operator*(const Mat2& m) const     { return this->template multiply<Mat2, Mat2>(m); }
+    __hostdev__ [[nodiscard]] constexpr Vec2<T>  operator*(const Vec2<T>& v) const  { return this->template multiplyVec<Vec2<T>, Vec2<T>>(v); }
 
     // ---- scalar ----
-    __hostdev__ constexpr Mat2  operator*(const T& s) const        { return this->template scale<Mat2>(s); }
-    __hostdev__ constexpr Mat2  operator/(const T& s) const        { return this->template divideBy<Mat2>(s); }
+    __hostdev__ [[nodiscard]] constexpr Mat2  operator*(const T& s) const        { return this->template scale<Mat2>(s); }
+    __hostdev__ [[nodiscard]] constexpr Mat2  operator/(const T& s) const        { return this->template divideBy<Mat2>(s); }
     __hostdev__ constexpr Mat2& operator*=(const T& s)             { Base::scaleAssign(s); return *this; }
     __hostdev__ constexpr Mat2& operator/=(const T& s)             { Base::divideAssign(s); return *this; }
 
     // ---- equality ----
-    __hostdev__ constexpr bool operator==(const Mat2& m) const     { return Base::equals(m); }
-    __hostdev__ constexpr bool operator!=(const Mat2& m) const     { return !Base::equals(m); }
+    __hostdev__ [[nodiscard]] constexpr bool operator==(const Mat2& m) const     { return Base::equals(m); }
+    __hostdev__ [[nodiscard]] constexpr bool operator!=(const Mat2& m) const     { return !Base::equals(m); }
 
     /// @brief returns transpose of this
-    __hostdev__ constexpr Mat2 transpose() const { return this->template transposeAs<Mat2>(); }
+    __hostdev__ [[nodiscard]] constexpr Mat2 transpose() const { return this->template transposeAs<Mat2>(); }
 
     /// @brief returns inverse of this
-    __hostdev__ constexpr Mat2<T> inverse() const {
+    __hostdev__ [[nodiscard]] constexpr Mat2<T> inverse() const {
         T det = (*this)[0][0] * (*this)[1][1] - (*this)[0][1] * (*this)[1][0];
         if (isApproxZero(det)) {
             return Mat2<T>(T(0), T(0), T(0), T(0));
@@ -1409,27 +1409,27 @@ public:
 
 
     // ---- element-wise ----
-    __hostdev__ constexpr Mat2x3  operator-() const                  { return this->template negate<Mat2x3>(); }
-    __hostdev__ constexpr Mat2x3  operator+(const Mat2x3& m) const   { return this->template plus<Mat2x3>(m); }
-    __hostdev__ constexpr Mat2x3  operator-(const Mat2x3& m) const   { return this->template minus<Mat2x3>(m); }
+    __hostdev__ [[nodiscard]] constexpr Mat2x3  operator-() const                  { return this->template negate<Mat2x3>(); }
+    __hostdev__ [[nodiscard]] constexpr Mat2x3  operator+(const Mat2x3& m) const   { return this->template plus<Mat2x3>(m); }
+    __hostdev__ [[nodiscard]] constexpr Mat2x3  operator-(const Mat2x3& m) const   { return this->template minus<Mat2x3>(m); }
     __hostdev__ constexpr Mat2x3& operator+=(const Mat2x3& m)        { Base::addAssign(m); return *this; }
     __hostdev__ constexpr Mat2x3& operator-=(const Mat2x3& m)        { Base::subAssign(m); return *this; }
 
     // ---- matrix * vector ----
-    __hostdev__ constexpr Vec2<T> operator*(const Vec3<T>& v) const  { return this->template multiplyVec<Vec2<T>, Vec3<T>>(v); }
+    __hostdev__ [[nodiscard]] constexpr Vec2<T> operator*(const Vec3<T>& v) const  { return this->template multiplyVec<Vec2<T>, Vec3<T>>(v); }
 
     // ---- scalar ----
-    __hostdev__ constexpr Mat2x3  operator*(const T& s) const        { return this->template scale<Mat2x3>(s); }
-    __hostdev__ constexpr Mat2x3  operator/(const T& s) const        { return this->template divideBy<Mat2x3>(s); }
+    __hostdev__ [[nodiscard]] constexpr Mat2x3  operator*(const T& s) const        { return this->template scale<Mat2x3>(s); }
+    __hostdev__ [[nodiscard]] constexpr Mat2x3  operator/(const T& s) const        { return this->template divideBy<Mat2x3>(s); }
     __hostdev__ constexpr Mat2x3& operator*=(const T& s)             { Base::scaleAssign(s); return *this; }
     __hostdev__ constexpr Mat2x3& operator/=(const T& s)             { Base::divideAssign(s); return *this; }
 
     // ---- equality ----
-    __hostdev__ constexpr bool operator==(const Mat2x3& m) const     { return Base::equals(m); }
-    __hostdev__ constexpr bool operator!=(const Mat2x3& m) const     { return !Base::equals(m); }
+    __hostdev__ [[nodiscard]] constexpr bool operator==(const Mat2x3& m) const     { return Base::equals(m); }
+    __hostdev__ [[nodiscard]] constexpr bool operator!=(const Mat2x3& m) const     { return !Base::equals(m); }
 
     /// @brief returns transpose of this
-    __hostdev__ constexpr Mat3x2<T> transpose() const { return this->template transposeAs<Mat3x2<T>>(); }
+    __hostdev__ [[nodiscard]] constexpr Mat3x2<T> transpose() const { return this->template transposeAs<Mat3x2<T>>(); }
 };
 
 // Mat3x2 is intentionally NOT alignas-elevated: its byte size
@@ -1460,27 +1460,27 @@ public:
     __hostdev__ constexpr Mat3x2(Source *a): Base(a) {}
 
     // ---- element-wise ----
-    __hostdev__ constexpr Mat3x2  operator-() const                  { return this->template negate<Mat3x2>(); }
-    __hostdev__ constexpr Mat3x2  operator+(const Mat3x2& m) const   { return this->template plus<Mat3x2>(m); }
-    __hostdev__ constexpr Mat3x2  operator-(const Mat3x2& m) const   { return this->template minus<Mat3x2>(m); }
+    __hostdev__ [[nodiscard]] constexpr Mat3x2  operator-() const                  { return this->template negate<Mat3x2>(); }
+    __hostdev__ [[nodiscard]] constexpr Mat3x2  operator+(const Mat3x2& m) const   { return this->template plus<Mat3x2>(m); }
+    __hostdev__ [[nodiscard]] constexpr Mat3x2  operator-(const Mat3x2& m) const   { return this->template minus<Mat3x2>(m); }
     __hostdev__ constexpr Mat3x2& operator+=(const Mat3x2& m)        { Base::addAssign(m); return *this; }
     __hostdev__ constexpr Mat3x2& operator-=(const Mat3x2& m)        { Base::subAssign(m); return *this; }
 
     // ---- matrix * vector ----
-    __hostdev__ constexpr Vec3<T> operator*(const Vec2<T>& v) const  { return this->template multiplyVec<Vec3<T>, Vec2<T>>(v); }
+    __hostdev__ [[nodiscard]] constexpr Vec3<T> operator*(const Vec2<T>& v) const  { return this->template multiplyVec<Vec3<T>, Vec2<T>>(v); }
 
     // ---- scalar ----
-    __hostdev__ constexpr Mat3x2  operator*(const T& s) const        { return this->template scale<Mat3x2>(s); }
-    __hostdev__ constexpr Mat3x2  operator/(const T& s) const        { return this->template divideBy<Mat3x2>(s); }
+    __hostdev__ [[nodiscard]] constexpr Mat3x2  operator*(const T& s) const        { return this->template scale<Mat3x2>(s); }
+    __hostdev__ [[nodiscard]] constexpr Mat3x2  operator/(const T& s) const        { return this->template divideBy<Mat3x2>(s); }
     __hostdev__ constexpr Mat3x2& operator*=(const T& s)             { Base::scaleAssign(s); return *this; }
     __hostdev__ constexpr Mat3x2& operator/=(const T& s)             { Base::divideAssign(s); return *this; }
 
     // ---- equality ----
-    __hostdev__ constexpr bool operator==(const Mat3x2& m) const     { return Base::equals(m); }
-    __hostdev__ constexpr bool operator!=(const Mat3x2& m) const     { return !Base::equals(m); }
+    __hostdev__ [[nodiscard]] constexpr bool operator==(const Mat3x2& m) const     { return Base::equals(m); }
+    __hostdev__ [[nodiscard]] constexpr bool operator!=(const Mat3x2& m) const     { return !Base::equals(m); }
 
     /// @brief returns transpose of this
-    __hostdev__ constexpr Mat2x3<T> transpose() const { return this->template transposeAs<Mat2x3<T>>(); }
+    __hostdev__ [[nodiscard]] constexpr Mat2x3<T> transpose() const { return this->template transposeAs<Mat2x3<T>>(); }
 
 };
 
@@ -1515,28 +1515,28 @@ public:
 
 
     // ---- element-wise ----
-    __hostdev__ constexpr Mat3  operator-() const                  { return this->template negate<Mat3>(); }
-    __hostdev__ constexpr Mat3  operator+(const Mat3& m) const     { return this->template plus<Mat3>(m); }
-    __hostdev__ constexpr Mat3  operator-(const Mat3& m) const     { return this->template minus<Mat3>(m); }
+    __hostdev__ [[nodiscard]] constexpr Mat3  operator-() const                  { return this->template negate<Mat3>(); }
+    __hostdev__ [[nodiscard]] constexpr Mat3  operator+(const Mat3& m) const     { return this->template plus<Mat3>(m); }
+    __hostdev__ [[nodiscard]] constexpr Mat3  operator-(const Mat3& m) const     { return this->template minus<Mat3>(m); }
     __hostdev__ constexpr Mat3& operator+=(const Mat3& m)          { Base::addAssign(m); return *this; }
     __hostdev__ constexpr Mat3& operator-=(const Mat3& m)          { Base::subAssign(m); return *this; }
 
     // ---- matrix * matrix / matrix * vector ----
-    __hostdev__ constexpr Mat3    operator*(const Mat3& m) const     { return this->template multiply<Mat3, Mat3>(m); }
-    __hostdev__ constexpr Vec3<T> operator*(const Vec3<T>& v) const  { return this->template multiplyVec<Vec3<T>, Vec3<T>>(v); }
+    __hostdev__ [[nodiscard]] constexpr Mat3    operator*(const Mat3& m) const     { return this->template multiply<Mat3, Mat3>(m); }
+    __hostdev__ [[nodiscard]] constexpr Vec3<T> operator*(const Vec3<T>& v) const  { return this->template multiplyVec<Vec3<T>, Vec3<T>>(v); }
 
     // ---- scalar ----
-    __hostdev__ constexpr Mat3  operator*(const T& s) const        { return this->template scale<Mat3>(s); }
-    __hostdev__ constexpr Mat3  operator/(const T& s) const        { return this->template divideBy<Mat3>(s); }
+    __hostdev__ [[nodiscard]] constexpr Mat3  operator*(const T& s) const        { return this->template scale<Mat3>(s); }
+    __hostdev__ [[nodiscard]] constexpr Mat3  operator/(const T& s) const        { return this->template divideBy<Mat3>(s); }
     __hostdev__ constexpr Mat3& operator*=(const T& s)             { Base::scaleAssign(s); return *this; }
     __hostdev__ constexpr Mat3& operator/=(const T& s)             { Base::divideAssign(s); return *this; }
 
     // ---- equality ----
-    __hostdev__ constexpr bool operator==(const Mat3& m) const     { return Base::equals(m); }
-    __hostdev__ constexpr bool operator!=(const Mat3& m) const     { return !Base::equals(m); }
+    __hostdev__ [[nodiscard]] constexpr bool operator==(const Mat3& m) const     { return Base::equals(m); }
+    __hostdev__ [[nodiscard]] constexpr bool operator!=(const Mat3& m) const     { return !Base::equals(m); }
 
     /// @brief returns transpose of this
-    __hostdev__ constexpr Mat3 transpose() const { return this->template transposeAs<Mat3>(); }
+    __hostdev__ [[nodiscard]] constexpr Mat3 transpose() const { return this->template transposeAs<Mat3>(); }
 };
 
 // Aligned to 16*alignof(T) — Mat4 stores 16 elements (4x4), which is
@@ -1576,74 +1576,74 @@ public:
     __hostdev__ constexpr Mat4(Source *a): Base(a) {}
 
     // ---- element-wise ----
-    __hostdev__ constexpr Mat4  operator-() const                  { return this->template negate<Mat4>(); }
-    __hostdev__ constexpr Mat4  operator+(const Mat4& m) const     { return this->template plus<Mat4>(m); }
-    __hostdev__ constexpr Mat4  operator-(const Mat4& m) const     { return this->template minus<Mat4>(m); }
+    __hostdev__ [[nodiscard]] constexpr Mat4  operator-() const                  { return this->template negate<Mat4>(); }
+    __hostdev__ [[nodiscard]] constexpr Mat4  operator+(const Mat4& m) const     { return this->template plus<Mat4>(m); }
+    __hostdev__ [[nodiscard]] constexpr Mat4  operator-(const Mat4& m) const     { return this->template minus<Mat4>(m); }
     __hostdev__ constexpr Mat4& operator+=(const Mat4& m)          { Base::addAssign(m); return *this; }
     __hostdev__ constexpr Mat4& operator-=(const Mat4& m)          { Base::subAssign(m); return *this; }
 
     // ---- matrix * matrix / matrix * vector ----
-    __hostdev__ constexpr Mat4    operator*(const Mat4& m) const     { return this->template multiply<Mat4, Mat4>(m); }
-    __hostdev__ constexpr Vec4<T> operator*(const Vec4<T>& v) const  { return this->template multiplyVec<Vec4<T>, Vec4<T>>(v); }
+    __hostdev__ [[nodiscard]] constexpr Mat4    operator*(const Mat4& m) const     { return this->template multiply<Mat4, Mat4>(m); }
+    __hostdev__ [[nodiscard]] constexpr Vec4<T> operator*(const Vec4<T>& v) const  { return this->template multiplyVec<Vec4<T>, Vec4<T>>(v); }
 
     // ---- scalar ----
-    __hostdev__ constexpr Mat4  operator*(const T& s) const        { return this->template scale<Mat4>(s); }
-    __hostdev__ constexpr Mat4  operator/(const T& s) const        { return this->template divideBy<Mat4>(s); }
+    __hostdev__ [[nodiscard]] constexpr Mat4  operator*(const T& s) const        { return this->template scale<Mat4>(s); }
+    __hostdev__ [[nodiscard]] constexpr Mat4  operator/(const T& s) const        { return this->template divideBy<Mat4>(s); }
     __hostdev__ constexpr Mat4& operator*=(const T& s)             { Base::scaleAssign(s); return *this; }
     __hostdev__ constexpr Mat4& operator/=(const T& s)             { Base::divideAssign(s); return *this; }
 
     // ---- equality ----
-    __hostdev__ constexpr bool operator==(const Mat4& m) const     { return Base::equals(m); }
-    __hostdev__ constexpr bool operator!=(const Mat4& m) const     { return !Base::equals(m); }
+    __hostdev__ [[nodiscard]] constexpr bool operator==(const Mat4& m) const     { return Base::equals(m); }
+    __hostdev__ [[nodiscard]] constexpr bool operator!=(const Mat4& m) const     { return !Base::equals(m); }
 
     /// @brief returns transpose of this
-    __hostdev__ constexpr Mat4 transpose() const { return this->template transposeAs<Mat4>(); }
+    __hostdev__ [[nodiscard]] constexpr Mat4 transpose() const { return this->template transposeAs<Mat4>(); }
 };
 
 /// @brief Multiply a scalar by a 2x2 matrix, result is a 2x2 matrix
 template<typename T>
-__hostdev__ constexpr Mat2<T> operator*(const T& s, const Mat2<T>& m) { return m.template scale<Mat2<T>>(s); }
+__hostdev__ [[nodiscard]] constexpr Mat2<T> operator*(const T& s, const Mat2<T>& m) { return m.template scale<Mat2<T>>(s); }
 /// @brief Multiply a scalar by a 2x3 matrix, result is a 2x3 matrix
 template<typename T>
-__hostdev__ constexpr Mat2x3<T> operator*(const T& s, const Mat2x3<T>& m) { return m.template scale<Mat2x3<T>>(s); }
+__hostdev__ [[nodiscard]] constexpr Mat2x3<T> operator*(const T& s, const Mat2x3<T>& m) { return m.template scale<Mat2x3<T>>(s); }
 /// @brief Multiply a scalar by a 3x2 matrix, result is a 3x2 matrix
 template<typename T>
-__hostdev__ constexpr Mat3x2<T> operator*(const T& s, const Mat3x2<T>& m) { return m.template scale<Mat3x2<T>>(s); }
+__hostdev__ [[nodiscard]] constexpr Mat3x2<T> operator*(const T& s, const Mat3x2<T>& m) { return m.template scale<Mat3x2<T>>(s); }
 /// @brief Multiply a scalar by a 3x3 matrix, result is a 3x3 matrix
 template<typename T>
-__hostdev__ constexpr Mat3<T> operator*(const T& s, const Mat3<T>& m) { return m.template scale<Mat3<T>>(s); }
+__hostdev__ [[nodiscard]] constexpr Mat3<T> operator*(const T& s, const Mat3<T>& m) { return m.template scale<Mat3<T>>(s); }
 /// @brief Multiply a scalar by a 4x4 matrix, result is a 4x4 matrix
 template<typename T>
-__hostdev__ constexpr Mat4<T> operator*(const T& s, const Mat4<T>& m) { return m.template scale<Mat4<T>>(s); }
+__hostdev__ [[nodiscard]] constexpr Mat4<T> operator*(const T& s, const Mat4<T>& m) { return m.template scale<Mat4<T>>(s); }
 
 /// @brief Multiply a 2x3 matrix by a 3x2 matrix, result is a 2x2 matrix
 template<typename T>
-__hostdev__ constexpr Mat2<T> operator*(const Mat2x3<T>& lhs, const Mat3x2<T>& rhs) {
+__hostdev__ [[nodiscard]] constexpr Mat2<T> operator*(const Mat2x3<T>& lhs, const Mat3x2<T>& rhs) {
     return lhs.template multiply<Mat2<T>, Mat3x2<T>>(rhs);
 }
 /// @brief Multiply a 2x3 matrix by a 3x3 matrix, result is a 2x3 matrix
 template<typename T>
-__hostdev__ constexpr Mat2x3<T> operator*(const Mat2x3<T>& lhs, const Mat3<T>& rhs) {
+__hostdev__ [[nodiscard]] constexpr Mat2x3<T> operator*(const Mat2x3<T>& lhs, const Mat3<T>& rhs) {
     return lhs.template multiply<Mat2x3<T>, Mat3<T>>(rhs);
 }
 /// @brief Multiply a 3x2 matrix by a 2x2 matrix, result is a 3x2 matrix
 template<typename T>
-__hostdev__ constexpr Mat3x2<T> operator*(const Mat3x2<T>& lhs, const Mat2<T>& rhs) {
+__hostdev__ [[nodiscard]] constexpr Mat3x2<T> operator*(const Mat3x2<T>& lhs, const Mat2<T>& rhs) {
     return lhs.template multiply<Mat3x2<T>, Mat2<T>>(rhs);
 }
 /// @brief Multiply a 2x2 matrix by a 2x3 matrix, result is a 2x3 matrix
 template<typename T>
-__hostdev__ constexpr Mat2x3<T> operator*(const Mat2<T>& lhs, const Mat2x3<T>& rhs) {
+__hostdev__ [[nodiscard]] constexpr Mat2x3<T> operator*(const Mat2<T>& lhs, const Mat2x3<T>& rhs) {
     return lhs.template multiply<Mat2x3<T>, Mat2x3<T>>(rhs);
 }
 /// @brief Multiply a 3x2 matrix by a 2x3 matrix, result is a 3x3 matrix
 template<typename T>
-__hostdev__ constexpr Mat3<T> operator*(const Mat3x2<T>& lhs, const Mat2x3<T>& rhs) {
+__hostdev__ [[nodiscard]] constexpr Mat3<T> operator*(const Mat3x2<T>& lhs, const Mat2x3<T>& rhs) {
     return lhs.template multiply<Mat3<T>, Mat2x3<T>>(rhs);
 }
 /// @brief Multiply a 3x3 matrix by a 3x2 matrix, result is a 3x2 matrix
 template<typename T>
-__hostdev__ constexpr Mat3x2<T> operator*(const Mat3<T>& lhs, const Mat3x2<T>& rhs) {
+__hostdev__ [[nodiscard]] constexpr Mat3x2<T> operator*(const Mat3<T>& lhs, const Mat3x2<T>& rhs) {
     return lhs.template multiply<Mat3x2<T>, Mat3x2<T>>(rhs);
 }
 // ----------------------------> Vec3 <--------------------------------------
@@ -1690,17 +1690,17 @@ public:
     }
 
     // ---- element-wise (Vec & Vec) ----
-    __hostdev__ constexpr Vec3  operator-() const             { return Base::template negate<Vec3>(); }
-    __hostdev__ constexpr Vec3  operator+(const Vec3& v) const { return Base::template plus<Vec3>(v); }
-    __hostdev__ constexpr Vec3  operator-(const Vec3& v) const { return Base::template minus<Vec3>(v); }
-    __hostdev__ constexpr Vec3  operator*(const Vec3& v) const { return Base::template mul<Vec3>(v); }
-    __hostdev__ constexpr Vec3  operator/(const Vec3& v) const { return Base::template div<Vec3>(v); }
+    __hostdev__ [[nodiscard]] constexpr Vec3  operator-() const             { return Base::template negate<Vec3>(); }
+    __hostdev__ [[nodiscard]] constexpr Vec3  operator+(const Vec3& v) const { return Base::template plus<Vec3>(v); }
+    __hostdev__ [[nodiscard]] constexpr Vec3  operator-(const Vec3& v) const { return Base::template minus<Vec3>(v); }
+    __hostdev__ [[nodiscard]] constexpr Vec3  operator*(const Vec3& v) const { return Base::template mul<Vec3>(v); }
+    __hostdev__ [[nodiscard]] constexpr Vec3  operator/(const Vec3& v) const { return Base::template div<Vec3>(v); }
     __hostdev__ constexpr Vec3& operator+=(const Vec3& v)     { Base::addAssign(v); return *this; }
     __hostdev__ constexpr Vec3& operator-=(const Vec3& v)     { Base::subAssign(v); return *this; }
 
     // ---- mixed Vec3 / Coord (3D) ----
-    __hostdev__ constexpr Vec3  operator+(const Coord& ijk) const { return Vec3(this->mVec[0] + ijk[0], this->mVec[1] + ijk[1], this->mVec[2] + ijk[2]); }
-    __hostdev__ constexpr Vec3  operator-(const Coord& ijk) const { return Vec3(this->mVec[0] - ijk[0], this->mVec[1] - ijk[1], this->mVec[2] - ijk[2]); }
+    __hostdev__ [[nodiscard]] constexpr Vec3  operator+(const Coord& ijk) const { return Vec3(this->mVec[0] + ijk[0], this->mVec[1] + ijk[1], this->mVec[2] + ijk[2]); }
+    __hostdev__ [[nodiscard]] constexpr Vec3  operator-(const Coord& ijk) const { return Vec3(this->mVec[0] - ijk[0], this->mVec[1] - ijk[1], this->mVec[2] - ijk[2]); }
     __hostdev__ constexpr Vec3& operator+=(const Coord& ijk) {
         this->mVec[0] += T(ijk[0]); this->mVec[1] += T(ijk[1]); this->mVec[2] += T(ijk[2]);
         return *this;
@@ -1711,44 +1711,44 @@ public:
     }
 
     // ---- scalar ----
-    __hostdev__ constexpr Vec3  operator*(const T& s) const   { return Base::template scale<Vec3>(s); }
-    __hostdev__ constexpr Vec3  operator/(const T& s) const   { return Base::template divideBy<Vec3>(s); }
+    __hostdev__ [[nodiscard]] constexpr Vec3  operator*(const T& s) const   { return Base::template scale<Vec3>(s); }
+    __hostdev__ [[nodiscard]] constexpr Vec3  operator/(const T& s) const   { return Base::template divideBy<Vec3>(s); }
     __hostdev__ constexpr Vec3& operator*=(const T& s)        { Base::scaleAssign(s); return *this; }
     __hostdev__ constexpr Vec3& operator/=(const T& s)        { Base::divideAssignScalar(s); return *this; }
     // Not constexpr — depends on length() which calls std::sqrt.
     __hostdev__ Vec3& normalize()                   { return (*this) /= this->length(); }
 
     // ---- equality ----
-    __hostdev__ constexpr bool operator==(const Vec3& rhs) const { return Base::equals(rhs); }
-    __hostdev__ constexpr bool operator!=(const Vec3& rhs) const { return !Base::equals(rhs); }
+    __hostdev__ [[nodiscard]] constexpr bool operator==(const Vec3& rhs) const { return Base::equals(rhs); }
+    __hostdev__ [[nodiscard]] constexpr bool operator!=(const Vec3& rhs) const { return !Base::equals(rhs); }
 
     // ---- component-wise min/max ----
     __hostdev__ constexpr Vec3& minComponent(const Vec3& other) { Base::mergeMin(other); return *this; }
     __hostdev__ constexpr Vec3& maxComponent(const Vec3& other) { Base::mergeMax(other); return *this; }
 
     /// @brief Return the smallest vector component
-    __hostdev__ constexpr ValueType min() const { return Base::smallestComponent(); }
+    __hostdev__ [[nodiscard]] constexpr ValueType min() const { return Base::smallestComponent(); }
     /// @brief Return the largest vector component
-    __hostdev__ constexpr ValueType max() const { return Base::largestComponent(); }
+    __hostdev__ [[nodiscard]] constexpr ValueType max() const { return Base::largestComponent(); }
 
     /// @brief Round each component down (toward negative infinity)
     /// @return integer Coord
     /// @note Only constexpr for integer @c T (floorAs uses non-constexpr math::Floor for floating point).
-    __hostdev__ constexpr Coord floor() const { return Base::template floorAs<Coord>(); }
+    __hostdev__ [[nodiscard]] constexpr Coord floor() const { return Base::template floorAs<Coord>(); }
     /// @brief Round each component up (toward positive infinity)
     /// @return integer Coord
     /// @note Only constexpr for integer @c T (ceilAs uses non-constexpr math::Ceil for floating point).
-    __hostdev__ constexpr Coord ceil()  const { return Base::template ceilAs<Coord>(); }
+    __hostdev__ [[nodiscard]] constexpr Coord ceil()  const { return Base::template ceilAs<Coord>(); }
     /// @brief Round each component to its closest integer value
     /// @return integer Coord
     /// @note Only constexpr for integer @c T (roundAs uses non-constexpr math::Floor for floating point).
-    __hostdev__ constexpr Coord round() const { return Base::template roundAs<Coord>(); }
+    __hostdev__ [[nodiscard]] constexpr Coord round() const { return Base::template roundAs<Coord>(); }
 
     // ---- 3D-specific ----
 
     /// @brief cross product with another 3-vector
     template<typename Vec3T>
-    __hostdev__ constexpr Vec3 cross(const Vec3T& v) const {
+    __hostdev__ [[nodiscard]] constexpr Vec3 cross(const Vec3T& v) const {
         return Vec3(this->mVec[1] * v[2] - this->mVec[2] * v[1],
                     this->mVec[2] * v[0] - this->mVec[0] * v[2],
                     this->mVec[0] * v[1] - this->mVec[1] * v[0]);
@@ -1756,7 +1756,7 @@ public:
 
     /// @brief Outer product of a 3x1 vector and a 1x3 vector, result is a 3x3 matrix
     template<typename Vec3T>
-    __hostdev__ constexpr Mat3<ValueType> outer(const Vec3T& v) const {
+    __hostdev__ [[nodiscard]] constexpr Mat3<ValueType> outer(const Vec3T& v) const {
         return Mat3<ValueType>(this->mVec[0] * v[0], this->mVec[0] * v[1], this->mVec[0] * v[2],
                                this->mVec[1] * v[0], this->mVec[1] * v[1], this->mVec[1] * v[2],
                                this->mVec[2] * v[0], this->mVec[2] * v[1], this->mVec[2] * v[2]);
@@ -1764,24 +1764,24 @@ public:
 }; // Vec3<T>
 
 template<typename T1, typename T2>
-__hostdev__ inline constexpr Vec3<T2> operator*(T1 scalar, const Vec3<T2>& vec)
+__hostdev__ [[nodiscard]] inline constexpr Vec3<T2> operator*(T1 scalar, const Vec3<T2>& vec)
 {
     return Vec3<T2>(scalar * vec[0], scalar * vec[1], scalar * vec[2]);
 }
 template<typename T1, typename T2>
-__hostdev__ inline constexpr Vec3<T2> operator/(T1 scalar, const Vec3<T2>& vec)
+__hostdev__ [[nodiscard]] inline constexpr Vec3<T2> operator/(T1 scalar, const Vec3<T2>& vec)
 {
     return Vec3<T2>(scalar / vec[0], scalar / vec[1], scalar / vec[2]);
 }
 
 /// @brief Return a single precision floating-point vector of this coordinate
-__hostdev__ inline constexpr Vec3<float> Coord::asVec3s() const
+__hostdev__ [[nodiscard]] inline constexpr Vec3<float> Coord::asVec3s() const
 {
     return Vec3<float>(float(mVec[0]), float(mVec[1]), float(mVec[2]));
 }
 
 /// @brief Return a double precision floating-point vector of this coordinate
-__hostdev__ inline constexpr Vec3<double> Coord::asVec3d() const
+__hostdev__ [[nodiscard]] inline constexpr Vec3<double> Coord::asVec3d() const
 {
     return Vec3<double>(double(mVec[0]), double(mVec[1]), double(mVec[2]));
 }
@@ -1824,56 +1824,56 @@ public:
     }
 
     // ---- element-wise (Vec & Vec) ----
-    __hostdev__ constexpr Vec4  operator-() const             { return Base::template negate<Vec4>(); }
-    __hostdev__ constexpr Vec4  operator+(const Vec4& v) const { return Base::template plus<Vec4>(v); }
-    __hostdev__ constexpr Vec4  operator-(const Vec4& v) const { return Base::template minus<Vec4>(v); }
-    __hostdev__ constexpr Vec4  operator*(const Vec4& v) const { return Base::template mul<Vec4>(v); }
-    __hostdev__ constexpr Vec4  operator/(const Vec4& v) const { return Base::template div<Vec4>(v); }
+    __hostdev__ [[nodiscard]] constexpr Vec4  operator-() const             { return Base::template negate<Vec4>(); }
+    __hostdev__ [[nodiscard]] constexpr Vec4  operator+(const Vec4& v) const { return Base::template plus<Vec4>(v); }
+    __hostdev__ [[nodiscard]] constexpr Vec4  operator-(const Vec4& v) const { return Base::template minus<Vec4>(v); }
+    __hostdev__ [[nodiscard]] constexpr Vec4  operator*(const Vec4& v) const { return Base::template mul<Vec4>(v); }
+    __hostdev__ [[nodiscard]] constexpr Vec4  operator/(const Vec4& v) const { return Base::template div<Vec4>(v); }
     __hostdev__ constexpr Vec4& operator+=(const Vec4& v)     { Base::addAssign(v); return *this; }
     __hostdev__ constexpr Vec4& operator-=(const Vec4& v)     { Base::subAssign(v); return *this; }
 
     // ---- scalar ----
-    __hostdev__ constexpr Vec4  operator*(const T& s) const   { return Base::template scale<Vec4>(s); }
-    __hostdev__ constexpr Vec4  operator/(const T& s) const   { return Base::template divideBy<Vec4>(s); }
+    __hostdev__ [[nodiscard]] constexpr Vec4  operator*(const T& s) const   { return Base::template scale<Vec4>(s); }
+    __hostdev__ [[nodiscard]] constexpr Vec4  operator/(const T& s) const   { return Base::template divideBy<Vec4>(s); }
     __hostdev__ constexpr Vec4& operator*=(const T& s)        { Base::scaleAssign(s); return *this; }
     __hostdev__ constexpr Vec4& operator/=(const T& s)        { Base::divideAssignScalar(s); return *this; }
     // Not constexpr — depends on length() which calls std::sqrt.
     __hostdev__ Vec4& normalize()                   { return (*this) /= this->length(); }
 
     // ---- equality ----
-    __hostdev__ constexpr bool operator==(const Vec4& rhs) const { return Base::equals(rhs); }
-    __hostdev__ constexpr bool operator!=(const Vec4& rhs) const { return !Base::equals(rhs); }
+    __hostdev__ [[nodiscard]] constexpr bool operator==(const Vec4& rhs) const { return Base::equals(rhs); }
+    __hostdev__ [[nodiscard]] constexpr bool operator!=(const Vec4& rhs) const { return !Base::equals(rhs); }
 
     // ---- component-wise min/max ----
     __hostdev__ constexpr Vec4& minComponent(const Vec4& other) { Base::mergeMin(other); return *this; }
     __hostdev__ constexpr Vec4& maxComponent(const Vec4& other) { Base::mergeMax(other); return *this; }
 
     /// @brief Return the smallest vector component
-    __hostdev__ constexpr ValueType min() const { return Base::smallestComponent(); }
+    __hostdev__ [[nodiscard]] constexpr ValueType min() const { return Base::smallestComponent(); }
     /// @brief Return the largest vector component
-    __hostdev__ constexpr ValueType max() const { return Base::largestComponent(); }
+    __hostdev__ [[nodiscard]] constexpr ValueType max() const { return Base::largestComponent(); }
 
     /// @brief Round each component down (toward negative infinity)
     /// @return Vec4<int32_t> (NanoVDB has no Coord4)
     /// @note Only constexpr for integer @c T (floorAs uses non-constexpr math::Floor for floating point).
-    __hostdev__ constexpr Vec4<int32_t> floor() const { return Base::template floorAs<Vec4<int32_t>>(); }
+    __hostdev__ [[nodiscard]] constexpr Vec4<int32_t> floor() const { return Base::template floorAs<Vec4<int32_t>>(); }
     /// @brief Round each component up (toward positive infinity)
     /// @return Vec4<int32_t>
     /// @note Only constexpr for integer @c T (ceilAs uses non-constexpr math::Ceil for floating point).
-    __hostdev__ constexpr Vec4<int32_t> ceil()  const { return Base::template ceilAs<Vec4<int32_t>>(); }
+    __hostdev__ [[nodiscard]] constexpr Vec4<int32_t> ceil()  const { return Base::template ceilAs<Vec4<int32_t>>(); }
     /// @brief Round each component to its closest integer value
     /// @return Vec4<int32_t>
     /// @note Only constexpr for integer @c T (roundAs uses non-constexpr math::Floor for floating point).
-    __hostdev__ constexpr Vec4<int32_t> round() const { return Base::template roundAs<Vec4<int32_t>>(); }
+    __hostdev__ [[nodiscard]] constexpr Vec4<int32_t> round() const { return Base::template roundAs<Vec4<int32_t>>(); }
 }; // Vec4<T>
 
 template<typename T1, typename T2>
-__hostdev__ inline constexpr Vec4<T2> operator*(T1 scalar, const Vec4<T2>& vec)
+__hostdev__ [[nodiscard]] inline constexpr Vec4<T2> operator*(T1 scalar, const Vec4<T2>& vec)
 {
     return Vec4<T2>(scalar * vec[0], scalar * vec[1], scalar * vec[2], scalar * vec[3]);
 }
 template<typename T1, typename T2>
-__hostdev__ inline constexpr Vec4<T2> operator/(T1 scalar, const Vec4<T2>& vec)
+__hostdev__ [[nodiscard]] inline constexpr Vec4<T2> operator/(T1 scalar, const Vec4<T2>& vec)
 {
     return Vec4<T2>(scalar / vec[0], scalar / vec[1], scalar / vec[2], scalar / vec[3]);
 }
@@ -1898,7 +1898,7 @@ __hostdev__ inline constexpr Vec4<T2> operator/(T1 scalar, const Vec4<T2>& vec)
 /// @param xyz input vector to be multiplied by the matrix
 /// @return result of matrix-vector multiplication, i.e. mat x xyz
 template<typename Vec3T>
-__hostdev__ inline constexpr Vec3T matMult(const float* mat, const Vec3T& xyz)
+__hostdev__ [[nodiscard]] inline constexpr Vec3T matMult(const float* mat, const Vec3T& xyz)
 {
     const float x = static_cast<float>(xyz[0]);
     const float y = static_cast<float>(xyz[1]);
@@ -1915,7 +1915,7 @@ __hostdev__ inline constexpr Vec3T matMult(const float* mat, const Vec3T& xyz)
 /// @param xyz input vector to be multiplied by the matrix
 /// @return result of matrix-vector multiplication, i.e. mat x xyz
 template<typename Vec3T>
-__hostdev__ inline constexpr Vec3T matMult(const double* mat, const Vec3T& xyz)
+__hostdev__ [[nodiscard]] inline constexpr Vec3T matMult(const double* mat, const Vec3T& xyz)
 {
     const double x = static_cast<double>(xyz[0]);
     const double y = static_cast<double>(xyz[1]);
@@ -1933,7 +1933,7 @@ __hostdev__ inline constexpr Vec3T matMult(const double* mat, const Vec3T& xyz)
 /// @param xyz input vector to be multiplied by the matrix and a translated by @c vec
 /// @return result of affine transformation, i.e. (mat x xyz) + vec
 template<typename Vec3T>
-__hostdev__ inline constexpr Vec3T matMult(const float* mat, const float* vec, const Vec3T& xyz)
+__hostdev__ [[nodiscard]] inline constexpr Vec3T matMult(const float* mat, const float* vec, const Vec3T& xyz)
 {
     const float x = static_cast<float>(xyz[0]);
     const float y = static_cast<float>(xyz[1]);
@@ -1951,7 +1951,7 @@ __hostdev__ inline constexpr Vec3T matMult(const float* mat, const float* vec, c
 /// @param xyz input vector to be multiplied by the matrix and a translated by @c vec
 /// @return result of affine transformation, i.e. (mat x xyz) + vec
 template<typename Vec3T>
-__hostdev__ inline constexpr Vec3T matMult(const double* mat, const double* vec, const Vec3T& xyz)
+__hostdev__ [[nodiscard]] inline constexpr Vec3T matMult(const double* mat, const double* vec, const Vec3T& xyz)
 {
     const double x = static_cast<double>(xyz[0]);
     const double y = static_cast<double>(xyz[1]);
@@ -1968,7 +1968,7 @@ __hostdev__ inline constexpr Vec3T matMult(const double* mat, const double* vec,
 /// @param xyz input vector to be multiplied by the transposed matrix
 /// @return result of matrix-vector multiplication, i.e. mat^T x xyz
 template<typename Vec3T>
-__hostdev__ inline constexpr Vec3T matMultT(const float* mat, const Vec3T& xyz)
+__hostdev__ [[nodiscard]] inline constexpr Vec3T matMultT(const float* mat, const Vec3T& xyz)
 {
     const float x = static_cast<float>(xyz[0]);
     const float y = static_cast<float>(xyz[1]);
@@ -1985,7 +1985,7 @@ __hostdev__ inline constexpr Vec3T matMultT(const float* mat, const Vec3T& xyz)
 /// @param xyz input vector to be multiplied by the transposed matrix
 /// @return result of matrix-vector multiplication, i.e. mat^T x xyz
 template<typename Vec3T>
-__hostdev__ inline constexpr Vec3T matMultT(const double* mat, const Vec3T& xyz)
+__hostdev__ [[nodiscard]] inline constexpr Vec3T matMultT(const double* mat, const Vec3T& xyz)
 {
     const double x = static_cast<double>(xyz[0]);
     const double y = static_cast<double>(xyz[1]);
@@ -1996,7 +1996,7 @@ __hostdev__ inline constexpr Vec3T matMultT(const double* mat, const Vec3T& xyz)
 }
 
 template<typename Vec3T>
-__hostdev__ inline constexpr Vec3T matMultT(const float* mat, const float* vec, const Vec3T& xyz)
+__hostdev__ [[nodiscard]] inline constexpr Vec3T matMultT(const float* mat, const float* vec, const Vec3T& xyz)
 {
     const float x = static_cast<float>(xyz[0]);
     const float y = static_cast<float>(xyz[1]);
@@ -2007,7 +2007,7 @@ __hostdev__ inline constexpr Vec3T matMultT(const float* mat, const float* vec, 
 }
 
 template<typename Vec3T>
-__hostdev__ inline constexpr Vec3T matMultT(const double* mat, const double* vec, const Vec3T& xyz)
+__hostdev__ [[nodiscard]] inline constexpr Vec3T matMultT(const double* mat, const double* vec, const Vec3T& xyz)
 {
     const double x = static_cast<double>(xyz[0]);
     const double y = static_cast<double>(xyz[1]);
@@ -2024,8 +2024,8 @@ template<typename Vec3T>
 struct BaseBBox
 {
     Vec3T                    mCoord[2];
-    __hostdev__ constexpr bool         operator==(const BaseBBox& rhs) const { return mCoord[0] == rhs.mCoord[0] && mCoord[1] == rhs.mCoord[1]; };
-    __hostdev__ constexpr bool         operator!=(const BaseBBox& rhs) const { return mCoord[0] != rhs.mCoord[0] || mCoord[1] != rhs.mCoord[1]; };
+    __hostdev__ [[nodiscard]] constexpr bool         operator==(const BaseBBox& rhs) const { return mCoord[0] == rhs.mCoord[0] && mCoord[1] == rhs.mCoord[1]; };
+    __hostdev__ [[nodiscard]] constexpr bool         operator!=(const BaseBBox& rhs) const { return mCoord[0] != rhs.mCoord[0] || mCoord[1] != rhs.mCoord[1]; };
     __hostdev__ constexpr const Vec3T& operator[](int i) const { NANOVDB_ASSERT(i >= 0 && i < 2); return mCoord[i]; }
     __hostdev__ constexpr Vec3T&       operator[](int i) { NANOVDB_ASSERT(i >= 0 && i < 2); return mCoord[i]; }
     __hostdev__ constexpr Vec3T&       min() { return mCoord[0]; }
@@ -2066,7 +2066,7 @@ struct BaseBBox
 //    {
 //        return BaseBBox(mCoord[0].offsetBy(-padding),mCoord[1].offsetBy(padding));
 //    }
-    __hostdev__ constexpr bool isInside(const Vec3T& xyz)
+    __hostdev__ [[nodiscard]] constexpr bool isInside(const Vec3T& xyz)
     {
         if (xyz[0] < mCoord[0][0] || xyz[1] < mCoord[0][1] || xyz[2] < mCoord[0][2])
             return false;
@@ -2113,7 +2113,7 @@ struct BBox<Vec3T, true> : public BaseBBox<Vec3T>
                 Vec3T(ValueType(max[0] + 1), ValueType(max[1] + 1), ValueType(max[2] + 1)))
     {
     }
-    __hostdev__ static constexpr BBox createCube(const Coord& min, typename Coord::ValueType dim)
+    __hostdev__ [[nodiscard]] static constexpr BBox createCube(const Coord& min, typename Coord::ValueType dim)
     {
         return BBox(min, min.offsetBy(dim));
     }
@@ -2122,14 +2122,14 @@ struct BBox<Vec3T, true> : public BaseBBox<Vec3T>
         : BBox(bbox[0], bbox[1])
     {
     }
-    __hostdev__ constexpr bool  empty() const { return mCoord[0][0] >= mCoord[1][0] ||
+    __hostdev__ [[nodiscard]] constexpr bool  empty() const { return mCoord[0][0] >= mCoord[1][0] ||
                                              mCoord[0][1] >= mCoord[1][1] ||
                                              mCoord[0][2] >= mCoord[1][2]; }
-    __hostdev__ constexpr operator bool() const { return mCoord[0][0] < mCoord[1][0] &&
+    __hostdev__ [[nodiscard]] constexpr operator bool() const { return mCoord[0][0] < mCoord[1][0] &&
                                                mCoord[0][1] < mCoord[1][1] &&
                                                mCoord[0][2] < mCoord[1][2]; }
-    __hostdev__ constexpr Vec3T dim() const { return *this ? this->max() - this->min() : Vec3T(0); }
-    __hostdev__ constexpr bool  isInside(const Vec3T& p) const
+    __hostdev__ [[nodiscard]] constexpr Vec3T dim() const { return *this ? this->max() - this->min() : Vec3T(0); }
+    __hostdev__ [[nodiscard]] constexpr bool  isInside(const Vec3T& p) const
     {
         return p[0] > mCoord[0][0] && p[1] > mCoord[0][1] && p[2] > mCoord[0][2] &&
                p[0] < mCoord[1][0] && p[1] < mCoord[1][1] && p[2] < mCoord[1][2];
@@ -2185,32 +2185,32 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
             ++(*this);
             return tmp;
         }
-        __hostdev__ constexpr bool operator==(const Iterator& rhs) const
+        __hostdev__ [[nodiscard]] constexpr bool operator==(const Iterator& rhs) const
         {
             NANOVDB_ASSERT(mBBox == rhs.mBBox);
             return mPos == rhs.mPos;
         }
-        __hostdev__ constexpr bool operator!=(const Iterator& rhs) const
+        __hostdev__ [[nodiscard]] constexpr bool operator!=(const Iterator& rhs) const
         {
             NANOVDB_ASSERT(mBBox == rhs.mBBox);
             return mPos != rhs.mPos;
         }
-        __hostdev__ constexpr bool operator<(const Iterator& rhs) const
+        __hostdev__ [[nodiscard]] constexpr bool operator<(const Iterator& rhs) const
         {
             NANOVDB_ASSERT(mBBox == rhs.mBBox);
             return mPos < rhs.mPos;
         }
-        __hostdev__ constexpr bool operator<=(const Iterator& rhs) const
+        __hostdev__ [[nodiscard]] constexpr bool operator<=(const Iterator& rhs) const
         {
             NANOVDB_ASSERT(mBBox == rhs.mBBox);
             return mPos <= rhs.mPos;
         }
         /// @brief Return @c true if the iterator still points to a valid coordinate.
-        __hostdev__ constexpr operator bool() const { return mPos <= mBBox[1]; }
-        __hostdev__ constexpr const CoordT& operator*() const { return mPos; }
+        __hostdev__ [[nodiscard]] constexpr operator bool() const { return mPos <= mBBox[1]; }
+        __hostdev__ [[nodiscard]] constexpr const CoordT& operator*() const { return mPos; }
     }; // Iterator
-    __hostdev__ constexpr Iterator begin() const { return Iterator{*this}; }
-    __hostdev__ constexpr Iterator end()   const { return Iterator{*this, CoordT(mCoord[1][0]+1, mCoord[0][1], mCoord[0][2])}; }
+    __hostdev__ [[nodiscard]] constexpr Iterator begin() const { return Iterator{*this}; }
+    __hostdev__ [[nodiscard]] constexpr Iterator end()   const { return Iterator{*this, CoordT(mCoord[1][0]+1, mCoord[0][1], mCoord[0][2])}; }
     __hostdev__ constexpr BBox()
         : BaseT(CoordT::max(), CoordT::min())
     {
@@ -2230,56 +2230,56 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
         other.mCoord[0][n] = mCoord[1][n] + 1;
     }
 
-    __hostdev__ static constexpr BBox createCube(const CoordT& min, typename CoordT::ValueType dim)
+    __hostdev__ [[nodiscard]] static constexpr BBox createCube(const CoordT& min, typename CoordT::ValueType dim)
     {
         return BBox(min, min.offsetBy(dim - 1));
     }
 
-    __hostdev__ static constexpr BBox createCube(typename CoordT::ValueType min, typename CoordT::ValueType max)
+    __hostdev__ [[nodiscard]] static constexpr BBox createCube(typename CoordT::ValueType min, typename CoordT::ValueType max)
     {
         return BBox(CoordT(min), CoordT(max));
     }
 
-    __hostdev__ constexpr bool is_divisible() const { return mCoord[0][0] < mCoord[1][0] &&
+    __hostdev__ [[nodiscard]] constexpr bool is_divisible() const { return mCoord[0][0] < mCoord[1][0] &&
                                                    mCoord[0][1] < mCoord[1][1] &&
                                                    mCoord[0][2] < mCoord[1][2]; }
     /// @brief Return true if this bounding box is empty, e.g. uninitialized
-    __hostdev__ constexpr bool     empty() const { return mCoord[0][0] > mCoord[1][0] ||
+    __hostdev__ [[nodiscard]] constexpr bool     empty() const { return mCoord[0][0] > mCoord[1][0] ||
                                                 mCoord[0][1] > mCoord[1][1] ||
                                                 mCoord[0][2] > mCoord[1][2]; }
     /// @brief Convert this BBox to boolean true if it is not empty
-    __hostdev__ constexpr operator bool() const { return mCoord[0][0] <= mCoord[1][0] &&
+    __hostdev__ [[nodiscard]] constexpr operator bool() const { return mCoord[0][0] <= mCoord[1][0] &&
                                                mCoord[0][1] <= mCoord[1][1] &&
                                                mCoord[0][2] <= mCoord[1][2]; }
-    __hostdev__ constexpr CoordT   dim() const { return *this ? this->max() - this->min() + Coord(1) : Coord(0); }
-    __hostdev__ constexpr uint64_t volume() const
+    __hostdev__ [[nodiscard]] constexpr CoordT   dim() const { return *this ? this->max() - this->min() + Coord(1) : Coord(0); }
+    __hostdev__ [[nodiscard]] constexpr uint64_t volume() const
     {
         auto d = this->dim();
         return uint64_t(d[0]) * uint64_t(d[1]) * uint64_t(d[2]);
     }
-    __hostdev__ constexpr bool isInside(const CoordT& p) const { return !(CoordT::lessThan(p, this->min()) || CoordT::lessThan(this->max(), p)); }
+    __hostdev__ [[nodiscard]] constexpr bool isInside(const CoordT& p) const { return !(CoordT::lessThan(p, this->min()) || CoordT::lessThan(this->max(), p)); }
     /// @brief Return @c true if the given bounding box is inside this bounding box.
-    __hostdev__ constexpr bool isInside(const BBox& b) const
+    __hostdev__ [[nodiscard]] constexpr bool isInside(const BBox& b) const
     {
         return !(CoordT::lessThan(b.min(), this->min()) || CoordT::lessThan(this->max(), b.max()));
     }
 
     /// @brief Return @c true if the given bounding box overlaps with this bounding box.
-    __hostdev__ constexpr bool hasOverlap(const BBox& b) const
+    __hostdev__ [[nodiscard]] constexpr bool hasOverlap(const BBox& b) const
     {
         return !(CoordT::lessThan(this->max(), b.min()) || CoordT::lessThan(b.max(), this->min()));
     }
 
     /// @warning This converts a CoordBBox into a floating-point bounding box which implies that max += 1 !
     template<typename RealT = double>
-    __hostdev__ constexpr BBox<Vec3<RealT>> asReal() const
+    __hostdev__ [[nodiscard]] constexpr BBox<Vec3<RealT>> asReal() const
     {
         static_assert(util::is_floating_point<RealT>::value, "CoordBBox::asReal: Expected a floating point coordinate");
         return BBox<Vec3<RealT>>(Vec3<RealT>(RealT(mCoord[0][0]), RealT(mCoord[0][1]), RealT(mCoord[0][2])),
                                  Vec3<RealT>(RealT(mCoord[1][0] + 1), RealT(mCoord[1][1] + 1), RealT(mCoord[1][2] + 1)));
     }
     /// @brief Return a new instance that is expanded by the specified padding.
-    __hostdev__ constexpr BBox expandBy(typename CoordT::ValueType padding) const
+    __hostdev__ [[nodiscard]] constexpr BBox expandBy(typename CoordT::ValueType padding) const
     {
         return BBox(mCoord[0].offsetBy(-padding), mCoord[1].offsetBy(padding));
     }
@@ -2288,7 +2288,7 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
     /// @param map mapping of index to world coordinates
     /// @return world bounding box
     template<typename Map>
-    __hostdev__ constexpr auto transform(const Map& map) const
+    __hostdev__ [[nodiscard]] constexpr auto transform(const Map& map) const
     {
         using Vec3T = Vec3<double>;
         const Vec3T tmp = map.applyMap(Vec3T(mCoord[0][0], mCoord[0][1], mCoord[0][2]));
@@ -2399,17 +2399,17 @@ public:
     {
     }
 
-    __hostdev__ bool  operator< (const Rgba8& rhs) const { return mData.packed < rhs.mData.packed; }
-    __hostdev__ bool  operator==(const Rgba8& rhs) const { return mData.packed == rhs.mData.packed; }
-    __hostdev__ constexpr float lengthSqr() const
+    __hostdev__ [[nodiscard]] bool  operator< (const Rgba8& rhs) const { return mData.packed < rhs.mData.packed; }
+    __hostdev__ [[nodiscard]] bool  operator==(const Rgba8& rhs) const { return mData.packed == rhs.mData.packed; }
+    __hostdev__ [[nodiscard]] constexpr float lengthSqr() const
     {
         return 0.0000153787005f * (float(mData.c[0]) * mData.c[0] +
                                    float(mData.c[1]) * mData.c[1] +
                                    float(mData.c[2]) * mData.c[2]); //1/255^2
     }
-    __hostdev__ float           length() const { return sqrtf(this->lengthSqr()); }
+    __hostdev__ [[nodiscard]] float           length() const { return sqrtf(this->lengthSqr()); }
     /// @brief return n'th color channel as a float in the range 0 to 1
-    __hostdev__ constexpr float           asFloat(int n) const { return 0.003921569f*float(mData.c[n]); }// divide by 255
+    __hostdev__ [[nodiscard]] constexpr float           asFloat(int n) const { return 0.003921569f*float(mData.c[n]); }// divide by 255
     __hostdev__ constexpr const uint8_t&  operator[](int n) const { NANOVDB_ASSERT(n >= 0 && n < 4); return mData.c[n]; }
     __hostdev__ constexpr uint8_t&        operator[](int n) { NANOVDB_ASSERT(n >= 0 && n < 4); return mData.c[n]; }
     __hostdev__ const uint32_t& packed() const { return mData.packed; }
@@ -2422,10 +2422,10 @@ public:
     __hostdev__ constexpr uint8_t&        g() { return mData.c[1]; }
     __hostdev__ constexpr uint8_t&        b() { return mData.c[2]; }
     __hostdev__ constexpr uint8_t&        a() { return mData.c[3]; }
-    __hostdev__ constexpr           operator Vec3<float>() const {
+    __hostdev__ [[nodiscard]] constexpr           operator Vec3<float>() const {
         return Vec3<float>(this->asFloat(0), this->asFloat(1), this->asFloat(2));
     }
-    __hostdev__ constexpr           operator Vec4<float>() const {
+    __hostdev__ [[nodiscard]] constexpr           operator Vec4<float>() const {
         return Vec4<float>(this->asFloat(0), this->asFloat(1), this->asFloat(2), this->asFloat(3));
     }
 }; // Rgba8
