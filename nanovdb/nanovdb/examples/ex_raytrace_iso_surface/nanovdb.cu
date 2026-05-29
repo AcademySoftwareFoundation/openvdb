@@ -18,7 +18,7 @@ using BufferT = nanovdb::HostBuffer;
 
 #include "common.h"
 
-void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int width, int height, BufferT& imageBuffer)
+void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int width, int height, BufferT& imageBuffer, bool usePersistentThreads)
 {
     float *h_outImage = reinterpret_cast<float*>(imageBuffer.data());
     RenderOp renderOp(handle, width, height);
@@ -35,11 +35,22 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
         auto* d_grid = handle.deviceGrid<BuildT>();
         if (!d_grid) throw std::runtime_error("GridHandle does not contain a valid device grid");
         imageBuffer.deviceUpload();
+        float* d_outImage = reinterpret_cast<float*>(imageBuffer.deviceData());
         sum = 0;
-        for (int i = 0; i < numIterations; ++i, sum += renderOp.renderImage(true/*useCuda*/, (float*)imageBuffer.deviceData(), d_grid));
-        std::cout << "Average of " << numIterations << " renderings (NanoVDB-Cuda) = " << (sum/numIterations) << " ms " << std::endl;
-        imageBuffer.deviceDownload();
-        renderOp.saveImage("raytrace_iso_surface-nanovdb-cuda.pfm", (float*)imageBuffer.data());
+        if (usePersistentThreads) {
+            int* d_nextPixel = nullptr;
+            NANOVDB_CUDA_CHECK_ERROR(cudaMalloc(&d_nextPixel, sizeof(int)), __FILE__, __LINE__);
+            for (int i = 0; i < numIterations; ++i, sum += renderOp.renderImagePersistent(d_outImage, d_grid, d_nextPixel));
+            NANOVDB_CUDA_CHECK_ERROR(cudaFree(d_nextPixel), __FILE__, __LINE__);
+            std::cout << "Average of " << numIterations << " renderings (NanoVDB-Cuda-Persistent) = " << (sum/numIterations) << " ms " << std::endl;
+            imageBuffer.deviceDownload();
+            renderOp.saveImage("raytrace_iso_surface-nanovdb-cuda-persistent.pfm", (float*)imageBuffer.data());
+        } else {
+            for (int i = 0; i < numIterations; ++i, sum += renderOp.renderImage(true/*useCuda*/, d_outImage, d_grid));
+            std::cout << "Average of " << numIterations << " renderings (NanoVDB-Cuda) = " << (sum/numIterations) << " ms " << std::endl;
+            imageBuffer.deviceDownload();
+            renderOp.saveImage("raytrace_iso_surface-nanovdb-cuda.pfm", (float*)imageBuffer.data());
+        }
 #endif
     };// kernel
 
