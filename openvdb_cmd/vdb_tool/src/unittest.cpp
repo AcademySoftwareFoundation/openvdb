@@ -947,9 +947,9 @@ TEST_F(Test_vdb_tool, GeometryUSD)
 }// GeometryUSD
 #endif// VDB_TOOL_USE_USD
 
-#include "FastExpr.h"
+#include "Calculator.h"
 
-TEST_F(Test_vdb_tool, FastExpr)
+TEST_F(Test_vdb_tool, Calculator)
 {
     using namespace openvdb::vdb_tool;
 
@@ -958,7 +958,7 @@ TEST_F(Test_vdb_tool, FastExpr)
     };
 
     {// RPN: identity, literal, simple binary op
-      FastExpr e;
+      Calculator e;
       e.compile("$x");
       EXPECT_EQ( 0.0f, e.eval(0.0f));
       EXPECT_EQ( 3.5f, e.eval(3.5f));
@@ -969,18 +969,19 @@ TEST_F(Test_vdb_tool, FastExpr)
       EXPECT_EQ(42.0f, e.eval(123.0f));
 
       e.compile("$x:2:+");
-      EXPECT_EQ(5.0f, e.eval(3.0f));
+      EXPECT_EQ( 5.0f, e.eval( 3.0f));
+      EXPECT_EQ(-1.0f, e.eval(-3.0f));
     }
 
     {// RPN: nontrivial expression with multiple operations
-      FastExpr e;
+      Calculator e;
       e.compile("$x:sin:$x:pow2:2:*:+");// sin(x) + 2*x*x
       EXPECT_TRUE(approxEq(std::sin(1.5f) + 2.0f * 1.5f * 1.5f, e.eval(1.5f)));
       EXPECT_TRUE(approxEq(std::sin(0.0f) + 0.0f,               e.eval(0.0f)));
     }
 
     {// Infix: simple operators with standard precedence
-      FastExpr e;
+      Calculator e;
       e.compile("2 + 3 * 4");
       EXPECT_EQ(14.0f, e.eval(0.0f));// times binds tighter
 
@@ -995,7 +996,7 @@ TEST_F(Test_vdb_tool, FastExpr)
     }
 
     {// Infix: variable, named constants, unary minus
-      FastExpr e;
+      Calculator e;
       e.compile("x");
       EXPECT_EQ(2.5f, e.eval(2.5f));
 
@@ -1013,7 +1014,7 @@ TEST_F(Test_vdb_tool, FastExpr)
     }
 
     {// Infix: function calls (unary and binary)
-      FastExpr e;
+      Calculator e;
       e.compile("sin(x)");
       EXPECT_TRUE(approxEq(std::sin(0.7f), e.eval(0.7f)));
 
@@ -1035,7 +1036,7 @@ TEST_F(Test_vdb_tool, FastExpr)
     }
 
     {// Equivalence: same kernel expressed both ways must produce identical bytecode results
-      FastExpr rpn, infix;
+      Calculator rpn, infix;
       rpn.compile  ("$x:sin:$x:pow2:2:*:+");
       infix.compile("sin(x) + 2*x*x");
       for (float t : {-2.0f, -0.5f, 0.0f, 0.5f, 1.0f, 3.14159f}) {
@@ -1046,11 +1047,40 @@ TEST_F(Test_vdb_tool, FastExpr)
       }
     }
 
+    {// Three-argument support: x, y, z in both infix and RPN, bound by
+     // initializer-list (since eval(x,y,z) was removed).
+      Calculator e;
+
+      // Infix: bare identifiers y and z
+      e.compile("x + y + z");
+      EXPECT_EQ(6.0f, e.eval({1.0f, 2.0f, 3.0f}));
+      EXPECT_EQ(0.0f, e.eval({0.0f, 0.0f, 0.0f}));
+      EXPECT_THROW(e.eval(1.0f),     std::invalid_argument);// eval(x) cannot bind y or z
+
+      e.compile("sin(x)*cos(y) + z*z");
+      EXPECT_TRUE(approxEq(std::sin(0.7f)*std::cos(1.3f) + 4.0f,
+                           e.eval({0.7f, 1.3f, 2.0f})));
+
+      // RPN: $y and $z tokens
+      e.compile("$x:$y:+:$z:+");
+      EXPECT_EQ(6.0f, e.eval({1.0f, 2.0f, 3.0f}));
+
+      // Same expression, infix vs RPN must agree on (x,y,z) inputs
+      Calculator rpn, infix;
+      rpn.compile  ("$x:$y:*:$z:+");
+      infix.compile("x*y + z");
+      for (auto xyz : std::initializer_list<std::array<float,3>>{
+              {1.0f, 2.0f, 3.0f}, {-1.5f, 4.0f, 0.5f}, {0.0f, 0.0f, 7.0f}}) {
+          EXPECT_TRUE(approxEq(rpn.eval({xyz[0], xyz[1], xyz[2]}),
+                               infix.eval({xyz[0], xyz[1], xyz[2]})));
+      }
+    }
+
     {// Error paths
-      FastExpr e;
+      Calculator e;
       EXPECT_THROW(e.compile(""),                  std::invalid_argument); // empty
       EXPECT_THROW(e.compile("foo(x)"),            std::invalid_argument); // unknown function
-      EXPECT_THROW(e.compile("$x:notanop"),        std::invalid_argument); // unknown RPN token
+      EXPECT_THROW(e.compile("$x:notanop"),        std::invalid_argument); // leaves 2 values on stack (notanop is a variable)
       EXPECT_THROW(e.compile("(x + 1"),            std::invalid_argument); // mismatched (
       EXPECT_THROW(e.compile("x + 1)"),            std::invalid_argument); // mismatched )
       EXPECT_THROW(e.compile("$x:+"),              std::invalid_argument); // binary op with one operand
@@ -1058,9 +1088,218 @@ TEST_F(Test_vdb_tool, FastExpr)
       EXPECT_THROW(e.compile("@"),                 std::invalid_argument); // bad infix character
     }
 
-    {// Parallel sanity check: a FastExpr is re-entrant; many threads can call eval()
+    {// Arbitrary variable names: discovered and exposed via variables()
+      Calculator c;
+      c.compile("foo + bar*2");
+      ASSERT_EQ(2u, c.variables().size());
+      EXPECT_EQ("foo", c.variables()[0]);   // order of first appearance
+      EXPECT_EQ("bar", c.variables()[1]);
+
+      const float values[] = {1.0f, 3.0f};
+      EXPECT_EQ(7.0f, c.eval(values));      // 1 + 3*2
+      EXPECT_EQ(7.0f, c.eval({1.0f, 3.0f}));// initializer-list form
+
+      // Underscores and digits are valid in identifiers.
+      c.compile("_a1 * _b2 + 1");
+      ASSERT_EQ(2u, c.variables().size());
+      EXPECT_EQ("_a1", c.variables()[0]);
+      EXPECT_EQ("_b2", c.variables()[1]);
+      EXPECT_EQ(7.0f, c.eval({2.0f, 3.0f}));
+
+      // Repeated references resolve to the same slot.
+      c.compile("alpha*alpha + alpha");
+      ASSERT_EQ(1u, c.variables().size());
+      EXPECT_EQ(12.0f, c.eval({3.0f}));     // 9 + 3
+    }
+
+    {// RPN with arbitrary names: '$foo' and 'foo' are equivalent
+      Calculator c;
+      c.compile("$alpha:$beta:+");
+      ASSERT_EQ(2u, c.variables().size());
+      EXPECT_EQ(7.0f, c.eval({3.0f, 4.0f}));
+
+      c.compile("alpha:beta:*");
+      EXPECT_EQ(12.0f, c.eval({3.0f, 4.0f}));
+    }
+
+    {// Constant names (pi, e) are not promoted to variables, with or without '$'
+      Calculator c;
+      c.compile("pi + e");
+      EXPECT_TRUE(c.variables().empty());
+      EXPECT_TRUE(approxEq(static_cast<float>(M_PI + M_E), c.eval(0.0f)));
+
+      c.compile("$pi:$e:+");
+      EXPECT_TRUE(c.variables().empty());
+      EXPECT_TRUE(approxEq(static_cast<float>(M_PI + M_E), c.eval(0.0f)));
+    }
+
+    {// eval(x) throws on any variable other than `x`
+      Calculator c;
+      c.compile("foo + 1");
+      EXPECT_THROW(c.eval(2.0f),  std::invalid_argument);
+
+      // Matching case still works.
+      c.compile("x + 1");
+      EXPECT_EQ(3.0f, c.eval(2.0f));
+    }
+
+    {// initializer-list eval throws on size mismatch
+      Calculator c;
+      c.compile("x + y");
+      EXPECT_THROW(c.eval({1.0f}),                 std::invalid_argument);
+      EXPECT_THROW(c.eval({1.0f, 2.0f, 3.0f}),     std::invalid_argument);
+      EXPECT_EQ(3.0f, c.eval({1.0f, 2.0f}));
+    }
+
+    {// Persistent memory via evalAndRemember(): the user's `x = y + z` case
+      Calculator c;
+      c.compile("x = y + z");
+      EXPECT_EQ("x", c.resultName());        // trailing LHS captured
+      EXPECT_FALSE(c.has("x"));              // nothing remembered yet
+
+      const float result = c.evalAndRemember({{"y", 1.0f}, {"z", 2.0f}});
+      EXPECT_EQ(3.0f, result);
+      EXPECT_EQ(3.0f, c.get("x"));           // trailing-LHS value
+      EXPECT_EQ(1.0f, c.get("y"));           // input
+      EXPECT_EQ(2.0f, c.get("z"));           // input
+      EXPECT_THROW(c.get("missing"),         std::invalid_argument);
+
+      // Plain final expression: no result name, but inputs are still stored.
+      c.compile("y + z");
+      EXPECT_EQ("", c.resultName());
+      c.evalAndRemember({{"y", 1.0f}, {"z", 2.0f}});
+      EXPECT_FALSE(c.has("x"));
+      EXPECT_EQ(1.0f, c.get("y"));
+      EXPECT_EQ(2.0f, c.get("z"));
+    }
+
+    {// Persistent memory exposes intermediate slot values
+      Calculator c;
+      c.compile("t = x*x; r = sin(t); r + t");
+      EXPECT_EQ("", c.resultName());         // final stmt has no LHS
+
+      const float ref = std::sin(4.0f) + 4.0f;
+      EXPECT_TRUE(approxEq(ref, c.evalAndRemember({{"x", 2.0f}})));
+      EXPECT_EQ(2.0f, c.get("x"));           // input
+      EXPECT_EQ(4.0f, c.get("t"));           // intermediate slot
+      EXPECT_TRUE(approxEq(std::sin(4.0f), c.get("r"))); // intermediate slot
+
+      // memory() returns the whole map.
+      EXPECT_EQ(3u, c.memory().size());
+
+      // compile() clears stale memory.
+      c.compile("y + 1");
+      EXPECT_TRUE(c.memory().empty());
+      EXPECT_FALSE(c.has("t"));
+    }
+
+    {// Positional evalAndRemember + missing-binding error
+      Calculator c;
+      c.compile("a = x*x; a + 1");
+      const float values[] = {3.0f};
+      EXPECT_EQ(10.0f, c.evalAndRemember(values));
+      EXPECT_EQ(3.0f, c.get("x"));
+      EXPECT_EQ(9.0f, c.get("a"));
+
+      // Missing binding via the map form.
+      EXPECT_THROW(c.evalAndRemember(std::unordered_map<std::string, float>{}),
+                   std::invalid_argument);
+
+      // eval() (const, no memory) does not populate mMemory.
+      c.compile("y + 1");
+      c.eval({{"y", 1.0f}});                 // const map overload
+      EXPECT_FALSE(c.has("y"));              // still empty
+    }
+
+    {// By-name lookup: variableIndex and the map-based eval overload
+      Calculator c;
+      c.compile("foo + bar*2");
+      EXPECT_EQ(0, c.variableIndex("foo"));
+      EXPECT_EQ(1, c.variableIndex("bar"));
+      EXPECT_EQ(-1, c.variableIndex("missing"));
+
+      // Cached-index pattern: index lookup once, fill values per call.
+      const int foo_i = c.variableIndex("foo");
+      const int bar_i = c.variableIndex("bar");
+      float values[2];
+      values[foo_i] = 1.0f;
+      values[bar_i] = 3.0f;
+      EXPECT_EQ(7.0f, c.eval(values));
+
+      // Map-based eval: convenient but slower.
+      EXPECT_EQ(7.0f, c.eval(std::unordered_map<std::string, float>{
+                                {"foo", 1.0f}, {"bar", 3.0f}}));
+      // Missing binding throws.
+      EXPECT_THROW(c.eval(std::unordered_map<std::string, float>{
+                            {"foo", 1.0f}}), std::invalid_argument);
+      // Extra entries are ignored.
+      EXPECT_EQ(7.0f, c.eval(std::unordered_map<std::string, float>{
+                                {"foo", 1.0f}, {"bar", 3.0f}, {"extra", 99.0f}}));
+    }
+
+    {// Single assignment: the LHS of the final statement is documentation
+      Calculator c;
+      c.compile("x = y + z");
+      ASSERT_EQ(2u, c.variables().size());   // only RHS names are inputs
+      EXPECT_EQ("y", c.variables()[0]);
+      EXPECT_EQ("z", c.variables()[1]);
+      EXPECT_EQ(5.0f, c.eval({2.0f, 3.0f}));
+
+      // The LHS may also name an input; semantically still just documentation.
+      c.compile("x = x*x + 1");
+      ASSERT_EQ(1u, c.variables().size());
+      EXPECT_EQ("x", c.variables()[0]);
+      EXPECT_EQ(5.0f, c.eval(2.0f));
+    }
+
+    {// Multi-statement: intermediate assignments allocate local slots
+      Calculator c;
+      c.compile("t = x*x; t + sin(t)");
+      ASSERT_EQ(1u, c.variables().size());   // 't' is a slot, not an input
+      EXPECT_EQ("x", c.variables()[0]);
+      const float ref = 4.0f + std::sin(4.0f);
+      EXPECT_TRUE(approxEq(ref, c.eval(2.0f)));
+
+      // Slot reassignment reuses the same storage.
+      c.compile("t = 1; t = t + 2; t = t*3; t");
+      EXPECT_TRUE(c.variables().empty());
+      EXPECT_EQ(9.0f, c.eval(0.0f));         // ((1+2)*3) = 9; x ignored
+
+      // Slots can shadow input names — after `x = x*2`, subsequent reads of
+      // `x` read the slot, not the input. Final statement returns slot.
+      c.compile("x = x*2; x + 1");
+      ASSERT_EQ(1u, c.variables().size());
+      EXPECT_EQ("x", c.variables()[0]);
+      EXPECT_EQ(11.0f, c.eval(5.0f));        // (5*2)+1
+    }
+
+    {// Multi-statement: trailing semicolons and whitespace are tolerated
+      Calculator c;
+      EXPECT_NO_THROW(c.compile("t = x*x;  ;  t + 1;"));
+      EXPECT_EQ(5.0f, c.eval(2.0f));         // 4 + 1
+    }
+
+    {// Multi-statement error paths
+      Calculator c;
+      // Intermediate plain expression strands a value.
+      EXPECT_THROW(c.compile("x + 1; x + 2"),        std::invalid_argument);
+      // Invalid LHS identifier.
+      EXPECT_THROW(c.compile("1+1 = x"),             std::invalid_argument);
+      // Assignment to a reserved constant name.
+      EXPECT_THROW(c.compile("pi = 3.14; pi"),       std::invalid_argument);
+      EXPECT_THROW(c.compile("e = 1; e"),            std::invalid_argument);
+      // Empty RHS.
+      EXPECT_THROW(c.compile("t = ; t"),             std::invalid_argument);
+      // Chained '=' is not supported (no '==').
+      EXPECT_THROW(c.compile("a = b = 1"),           std::invalid_argument);
+      // Mixing assignment with RPN markers is rejected.
+      EXPECT_THROW(c.compile("t = $x; t"),           std::invalid_argument);
+      EXPECT_THROW(c.compile("t = x ; $x"),          std::invalid_argument);
+    }
+
+    {// Parallel sanity check: a Calculator is re-entrant; many threads can call eval()
      // concurrently on the same instance via tools::foreach.
-      FastExpr expr;
+      Calculator expr;
       expr.compile("sin(x) + 2*x*x");
 
       // Build a small float grid with active values 0..N-1, run the kernel
@@ -1082,7 +1321,97 @@ TEST_F(Test_vdb_tool, FastExpr)
               << "i=" << i;
       }
     }
-}// FastExpr
+}// Calculator
+
+TEST_F(Test_vdb_tool, ActionCalc)
+{
+    using namespace openvdb::vdb_tool;
+
+    // Run @a cmd through a fresh Parser. Returns whatever the action wrote
+    // to std::clog so tests can assert on the user-visible echo. State on
+    // p (notably p.processor.memory()) is preserved for post-run inspection.
+    auto runCapture = [](Parser &p, const std::string &cmd) -> std::string {
+        auto args = getArgs(cmd);
+        std::ostringstream oss;
+        auto *old = std::clog.rdbuf(oss.rdbuf());
+        try {
+            p.parse(int(args.size()), args.data());
+            p.run();
+        } catch (...) {
+            std::clog.rdbuf(old);
+            throw;
+        }
+        std::clog.rdbuf(old);
+        return oss.str();
+    };
+
+    // Note: getArgs() tokenizes on whitespace only and does not strip shell
+    // quotes, so kernel values are passed bare (no surrounding apostrophes).
+
+    {// 1. Plain expression: trailing statement has no LHS, so the result
+     //    is echoed and nothing meaningful lands in the Processor's memory.
+      Parser p({});
+      p.finalize();
+      const std::string out = runCapture(p, "vdb_tool -quiet -calc kernel=1+2+3");
+      EXPECT_NE(std::string::npos, out.find("6")) << "expected '6' in: " << out;
+    }
+
+    {// 2. Single assignment: trailing LHS is silent on -calc, but the value
+     //    is written to memory under that name.
+      Parser p({});
+      p.finalize();
+      const std::string out = runCapture(p, "vdb_tool -quiet -calc kernel=x=1+2");
+      EXPECT_EQ("", out);// silent on trailing assignment
+      ASSERT_TRUE(p.processor.memory().isSet("x"));
+      EXPECT_EQ(3.0f, strTo<float>(p.processor.memory().get("x")));
+    }
+
+    {// 3. Multi-statement: intermediate slot and trailing LHS both land in
+     //    memory; the action remains silent because the final stmt assigns.
+      Parser p({});
+      p.finalize();
+      const std::string out = runCapture(p, "vdb_tool -quiet -calc kernel=a=1+2;b=a*3");
+      EXPECT_EQ("", out);
+      ASSERT_TRUE(p.processor.memory().isSet("a"));
+      ASSERT_TRUE(p.processor.memory().isSet("b"));
+      EXPECT_EQ(3.0f, strTo<float>(p.processor.memory().get("a")));
+      EXPECT_EQ(9.0f, strTo<float>(p.processor.memory().get("b")));
+    }
+
+    {// 4. Reading values seeded by a prior -eval, with a plain trailing
+     //    statement so the result is echoed.
+      Parser p({});
+      p.finalize();
+      const std::string out = runCapture(p, "vdb_tool -quiet -eval {2:@x} -calc kernel=3*x+1");
+      EXPECT_NE(std::string::npos, out.find("7")) << "expected '7' in: " << out;
+    }
+
+    {// 5. Chained -calc: the second kernel reads what the first wrote.
+      Parser p({});
+      p.finalize();
+      const std::string out = runCapture(p,
+          "vdb_tool -quiet -calc kernel=a=4 -calc kernel=b=a+1");
+      EXPECT_EQ("", out);// both kernels end in assignments
+      EXPECT_EQ(4.0f, strTo<float>(p.processor.memory().get("a")));
+      EXPECT_EQ(5.0f, strTo<float>(p.processor.memory().get("b")));
+    }
+
+    {// 6. Referencing an undefined variable throws at run time with a
+     //    message naming the offending identifier.
+      Parser p({});
+      p.finalize();
+      auto args = getArgs("vdb_tool -quiet -calc kernel=undef+1");
+      p.parse(int(args.size()), args.data());
+      try {
+          p.run();
+          FAIL() << "expected -calc to throw on undefined variable";
+      } catch (const std::exception &e) {
+          const std::string what = e.what();
+          EXPECT_NE(std::string::npos, what.find("undef"))
+              << "error did not name the offending variable: " << what;
+      }
+    }
+}// ActionCalc
 
 TEST_F(Test_vdb_tool, Memory)
 {

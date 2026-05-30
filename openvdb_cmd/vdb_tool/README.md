@@ -57,6 +57,7 @@ The vdb_tool is a versatile command-line utility that chains together high-level
 | **print** | Print information about the cached geometries and VDBs |
 | **slice** | Generate image files of slices through a VDB grid |
 | **img2mpeg** | Convert multiple image files to an mpeg movie file |
+| **calc** | Calculator |
 | **forAllValues** | Apply a math kernel to every value in a grid (see "Per-voxel math kernels" below) |
 | **forOnValues** | Apply a math kernel to every active value in a grid (see "Per-voxel math kernels" below) |
 | **forOffValues** | Apply a math kernel to every inactive value in a grid (see "Per-voxel math kernels" below) |
@@ -94,18 +95,67 @@ Note that this tool maintains two stacks of primitives, namely geometry (i.e. po
 
 This tool supports its own light-weight stack-oriented programming language that is (very loosely) inspired by Forth. Specifically, it uses Reverse Polish Notation (RPN) to define instructions that are evaluated during paring of the command-line arguments (options to be precise). All such expressions start with the character "{", ends with "}", and arguments are separated by ":". Variables starting with "\$" are substituted by its (previously) defined values, and variables starting with "@" are stored in memory. So, "{1:2:+:@x}" is conceptually equivalent to "x = 1 + 2". Conversely, "{\$x:++}" is conceptually equivalent "2 + 1 = 3" since "x=2" was already saved to memory. This is especially useful in combination with loops, e.g. "-quiet -for i=1,3,1 -eval {\$i:++} -end" will print 2 and 3 to the terminal. Branching is also supported, e.g. "radius={$x:1:>:if(0.5:sin?0.3:cos)}" is conceptually equal to "if (x>1) radius=sin(0.5) else radius=cos(0.3)". See the root-searching example below or run vdb_tool -eval help="*" to see a list of all instructions currently supported by this scripting language. Note that since this language uses characters that are interpreted by most shells it is necessary to use single quotes around strings! This is of course not the case when using config files.
 
+# Standalone calculator (-calc)
+
+The `-calc` action runs a single math expression through the same compiler used by the per-voxel kernels (see next section), but at command-line scope: input variables are read from the Processor's string memory (the same `{...}` namespace described above), and every input, intermediate slot, and trailing-LHS name produced by the expression is written back to that memory. The numeric result is printed **only when the final statement is a plain expression** (no trailing `=`); a kernel that ends in an assignment is silent, since its outputs are already accessible via memory.
+
+Examples:
+
+```bash
+# Plain expression: result is echoed.
+vdb_tool -calc kernel='1+2+3'                          # prints 3
+
+# Single assignment: silent on -calc; the trailing LHS stores the result
+# in memory. Retrieval via {$x} comes from the stack-based expression
+# language above.
+vdb_tool -calc kernel='x=1+2' -eval str='{$x}'         # prints 3.000000
+
+# Multi-statement: intermediate slots persist into the Processor memory
+# too. The trailing assignment is silent.
+vdb_tool -calc kernel='a=1+2; b=a*3' -eval str='a={$a} b={$b}'
+# prints: a=3.000000 b=9.000000
+
+# Inspect everything written to memory with -print mem=1.
+vdb_tool -calc kernel='a=1+2;b=a+3' -print mem=1
+# prints (no leading number; -calc was silent because the kernel ended in
+# an assignment):
+#         ... -print's "Variables" section:
+#         a=3.000000
+#         b=6.000000
+
+# Drive -for's start, stop, step from values computed by -calc.
+vdb_tool -calc kernel='a=1;b=5;c=1' -for x='{$a},{$b},{$c}' -end
+# prints:
+#         Processing: x = 1.000000, counter #x = 0
+#         Processing: x = 2.000000, counter #x = 1
+#         Processing: x = 3.000000, counter #x = 2
+#         Processing: x = 4.000000, counter #x = 3
+
+# Feed values into -calc from prior -eval set operations. The final
+# statement is a plain expression, so the result is echoed.
+vdb_tool -eval str='{2:@x}' -calc kernel='3*sin(x)+1'  # prints 3*sin(2)+1 ≈ 3.727
+```
+
+A few rules:
+
+- **Undefined variables are errors.** If the kernel reads a name that isn't in the Processor's memory, `-calc` throws with a message naming it. Set it first with `-eval str='{<value>:@<name>}'` (or via an earlier `-calc`).
+- **No anonymous syntax.** Because the kernel itself may contain `=`, you must write `-calc kernel='...'`. A bare positional like `vdb_tool -calc 'x=1+2'` is rejected by the option parser.
+- **Floats round-trip via `std::to_string`** (6 decimals). This is fine for casual chaining; for higher-precision pipelines, do all the math in one kernel and read only the final result.
+- **Shell quoting.** Always single-quote the kernel value so `*`, `(`, `$`, `;`, and `=` aren't interpreted by the shell.
+
 # Per-voxel math kernels (forAllValues / forOnValues / forOffValues)
 
 The actions `-forAllValues`, `-forOnValues`, and `-forOffValues` apply a user-defined math expression to every value, every active value, or every inactive value in a `FloatGrid`. The expression is supplied via the `kernel` option, compiled once into a compact bytecode, and then evaluated in parallel across the grid &mdash; no JIT, no extra dependencies, no per-voxel string parsing.
 
-The bound input variable is `x` (the current voxel value), and the same expression can be written in either of two equivalent syntaxes:
+The bound input variable is `x` (the current voxel value). Any other identifier in the expression that isn't a known function or constant becomes an input variable too, and the kernel will throw at the first voxel because `forAllValues`/`forOnValues`/`forOffValues` only binds `x`; the error message names the offending variable, so typos surface immediately. The same expression can be written in any of three equivalent syntaxes:
 
 | Syntax | Example |
 |---|---|
 | **Infix** (familiar to math users) | `kernel='sin(x) + 2*x*x'` |
 | **RPN** (same language as the rest of vdb_tool's expressions) | `kernel='$x:sin:$x:pow2:2:*:+'` |
+| **Infix multi-statement** (with assignment and reusable locals) | `kernel='t = x*x; t + sin(t)'` |
 
-Both forms compile to identical bytecode. The compiler picks RPN if the expression contains `:` or `$`, and infix otherwise.
+All three compile to identical-shape bytecode. The compiler dispatches on the markers it sees: `=` or `;` &rarr; multi-statement infix; otherwise `:` or `$` &rarr; RPN; otherwise plain infix.
 
 ### Operators (infix)
 
@@ -124,7 +174,21 @@ Both forms compile to identical bytecode. The compiler picks RPN if the expressi
 
 ### Constants
 
-`pi` and `e` are recognized as named literals in both syntaxes.
+`pi` and `e` are recognized as named literals in all three syntaxes. They cannot be the target of an assignment.
+
+### Multi-statement programs
+
+Multi-statement kernels are separated by `;`. Each statement except the last must be an assignment `name = <expr>`, declaring a *local slot* whose value is reused by subsequent statements. The final statement may be either a plain expression or an assignment; either way its right-hand side is the value written back to the voxel. A trailing semicolon is fine.
+
+```bash
+# Reuse a squared subexpression instead of recomputing it.
+vdb_tool -read in.vdb -forAllValues kernel='t = x*x; t + sin(t)' -write out.vdb
+
+# Multiple intermediate slots; the final assignment's LHS is documentation.
+vdb_tool -read in.vdb -forOnValues kernel='a = sin(x); b = cos(x); x = a*a + b*b' -write out.vdb
+```
+
+A slot name shadows any input variable of the same name from the point of its first assignment, mirroring ordinary scripting-language scoping. So `kernel='x = x*2; x + 1'` reads the input `x` once on the right-hand side of the first statement, then reads the slot for every subsequent reference.
 
 ### Example commands
 
@@ -147,10 +211,11 @@ vdb_tool -read in.vdb -forOnValues kernel='0.5:0.5:$pi:$x:*:cos:*:-' -write out.
 
 ### Notes
 
-- **Compile-time validation.** A typo such as `kernel='sin(x'` (mismatched paren) or `kernel='1:2:3'` (leaves three values on the stack) is rejected before the grid is touched, with a clear error message identifying the offending token.
-- **Thread safety.** A compiled `kernel` is evaluated in parallel via TBB. The bytecode evaluator allocates its working stack on the C stack at each call, so a single compiled kernel is safely shared across all worker threads.
-- **Backwards compatibility.** The legacy `op` (e.g. `op=abs`) and `poly` (e.g. `poly=1,2,3`) options still work; a non-empty `kernel` takes precedence over both. Existing config files continue to run unchanged.
-- **Shell quoting.** Always single-quote the kernel value so the shell doesn't interpret `*`, `(`, `$`, etc.
+- **Compile-time validation.** A typo such as `kernel='sin(x'` (mismatched paren), `kernel='1:2:3'` (leaves three values on the stack), or `kernel='x + 1; x + 2'` (intermediate plain expression strands a value) is rejected before the grid is touched, with a clear error message identifying the offending token or statement.
+- **Undefined-variable errors are reported at the first voxel.** Compilation accepts arbitrary identifiers, but `forAllValues`/`forOnValues`/`forOffValues` only binds `x`. A kernel like `kernel='y + 1'` therefore compiles, then throws on the first eval with `Calculator::eval(x): expression references undefined variable "y"`.
+- **Thread safety.** A compiled `kernel` is evaluated in parallel via TBB. The bytecode evaluator allocates its working stack &mdash; including the slot buffer used by multi-statement kernels &mdash; on the C stack at each call, so a single compiled kernel is safely shared across all worker threads.
+- **Mixing syntaxes.** `=` and `;` require pure infix; combining them with `$` or `:` is rejected by the dispatcher.
+- **Shell quoting.** Always single-quote the kernel value so the shell doesn't interpret `*`, `(`, `$`, `;`, etc.
 
 # Building this tool
 

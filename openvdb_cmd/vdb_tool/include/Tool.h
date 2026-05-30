@@ -92,7 +92,7 @@
 
 #include <tbb/blocked_range2d.h>
 
-#include "FastExpr.h"
+#include "Calculator.h"
 #include "Parser.h"
 #include "Geometry.h"
 
@@ -578,9 +578,7 @@ void Tool::init()
      {"forAllValues"}, "Applied a simple computational kernel to values in a grid.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
      {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"op", "", "abs", "operator to be applied to all,on or off values in a grid."},
-     {"poly", "", "1,2,3", "polynomial function to be applied to values"},
-     {"kernel", "", "sin(x)+2*x*x", "user-defined math expression to apply to each value. Supports RPN syntax (e.g. \"$x:sin:$x:pow2:2:*:+\") and infix syntax (e.g. \"sin(x)+2*x*x\"). Takes precedence over op/poly when non-empty."},
+     {"kernel", "", "sin(x)+2*x*x", "user-defined math expression to apply to each value. Supports infix (e.g. \"sin(x)+2*x*x\"), RPN (e.g. \"$x:sin:$x:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = x*x; t + sin(t)\"). The only input variable bound by this action is x (the current voxel value); any other name throws. Takes precedence over op/poly when non-empty."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
      {"name", "", "foo-bar", "name assigned to the output volume"}},
@@ -590,9 +588,7 @@ void Tool::init()
      {"forOnValues"}, "Applied a simple computational kernel to values in a grid.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
      {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"op", "", "abs", "operator to be applied to all,on or off values in a grid."},
-     {"poly", "", "1,2,3", "polynomial function to be applied to values"},
-     {"kernel", "", "sin(x)+2*x*x", "user-defined math expression to apply to each value. Supports RPN syntax (e.g. \"$x:sin:$x:pow2:2:*:+\") and infix syntax (e.g. \"sin(x)+2*x*x\"). Takes precedence over op/poly when non-empty."},
+     {"kernel", "", "sin(x)+2*x*x", "user-defined math expression to apply to each value. Supports infix (e.g. \"sin(x)+2*x*x\"), RPN (e.g. \"$x:sin:$x:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = x*x; t + sin(t)\"). The only input variable bound by this action is x (the current voxel value); any other name throws. Takes precedence over op/poly when non-empty."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
      {"name", "", "foo-bar", "name assigned to the output volume"}},
@@ -602,9 +598,7 @@ void Tool::init()
      {"forOffValues"}, "Applied a simple computational kernel to values in a grid.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
      {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"op", "", "abs", "operator to be applied to all,on or off values in a grid."},
-     {"poly", "", "1,2,3", "polynomial function to be applied to values"},
-     {"kernel", "", "sin(x)+2*x*x", "user-defined math expression to apply to each value. Supports RPN syntax (e.g. \"$x:sin:$x:pow2:2:*:+\") and infix syntax (e.g. \"sin(x)+2*x*x\"). Takes precedence over op/poly when non-empty."},
+     {"kernel", "", "sin(x)+2*x*x", "user-defined math expression to apply to each value. Supports infix (e.g. \"sin(x)+2*x*x\"), RPN (e.g. \"$x:sin:$x:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = x*x; t + sin(t)\"). The only input variable bound by this action is x (the current voxel value); any other name throws. Takes precedence over op/poly when non-empty."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
      {"name", "", "foo-bar", "name assigned to the output volume"}},
@@ -2692,25 +2686,6 @@ void Tool::volumeToMesh()
 
 // ==============================================================================================================
 
-template <typename GridPtrT, typename T>
-inline void forEachKenel(GridPtrT grid, int mode, T func)
-{
-  switch (mode) {
-  case 1:
-    tools::foreach(grid->beginValueAll(),[&func](auto &it){it.setValue(func(*it));});
-    break;
-  case 2:
-    tools::foreach(grid->beginValueOn(), [&func](auto &it){it.setValue(func(*it));});
-    break;
-  case 3:
-    tools::foreach(grid->beginValueOff(),[&func](auto &it){it.setValue(func(*it));});
-    break;
-  default:
-    throw std::invalid_argument("forEachKenel: invalid mode = " + std::to_string(mode));
-    break;
-  }
-}// forEachKenel
-
 void Tool::forValues()
 {
   const std::string &action_name = mParser.getAction().names[0];
@@ -2719,10 +2694,8 @@ void Tool::forValues()
   try {
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
-    const std::string ops = mParser.get<std::string>("op");
     const std::string kernel = mParser.get<std::string>("kernel");
     const std::string cls = mParser.get<std::string>("class");
-    std::vector<float> poly = mParser.getVec<float>("poly");
     std::vector<float> back = mParser.getVec<float>("background");
     std::string grid_name = mParser.get<std::string>("name");
 
@@ -2741,20 +2714,22 @@ void Tool::forValues()
     if (mParser.verbose) mTimer.start(action_name);
     // User-supplied math expression takes precedence over op/poly when given.
     if (!kernel.empty()) {
-      FastExpr expr;
-      expr.compile(kernel);// throws on syntax error / unknown op
-      forEachKenel(grid, mode, [&expr](float v){return expr.eval(v);});
-    } else if (poly.size()==1) {
-      forEachKenel(grid, mode, [&poly](float  ){return poly[0]; });
-    } else if (poly.size()==2) {
-      forEachKenel(grid, mode, [&poly](float v){return poly[0] + poly[1]*v; });
-    } else if (poly.size()==3) {
-      forEachKenel(grid, mode, [&poly](float v){return poly[0] + (poly[1] + poly[2]*v)*v; });
-    }
-    if (ops=="abs" ) {
-      forEachKenel(grid, mode, [](float v){return math::Abs(v);});
-    } else if (ops=="sqrt") {
-      forEachKenel(grid, mode, [](float v){return math::Sqrt(v);});
+      Calculator calc;
+      calc.compile(kernel);// throws on syntax error / unknown op
+      switch (mode) {
+      case 1:
+        tools::foreach(grid->beginValueAll(),[&calc](auto &it){it.setValue(calc.eval(*it));});
+        break;
+      case 2:
+        tools::foreach(grid->beginValueOn(), [&calc](auto &it){it.setValue(calc.eval(*it));});
+        break;
+      case 3:
+        tools::foreach(grid->beginValueOff(),[&calc](auto &it){it.setValue(calc.eval(*it));});
+        break;
+      default:
+        throw std::invalid_argument("forEachKenel: invalid mode = " + std::to_string(mode));
+        break;
+      }
     }
     if (int n = findMatch(cls, {"ls", "fog", "unknown"})) {
       auto class_tag = n==1 ? GRID_LEVEL_SET : n==2 ? GRID_FOG_VOLUME : GRID_UNKNOWN;

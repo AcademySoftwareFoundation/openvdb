@@ -134,7 +134,7 @@ public:
     /// @return The stored string value, or a string representation of pi/e
     ///         if @a name equals "pi" or "e" and no user value is set.
     /// @throw std::invalid_argument if the variable is not defined.
-    std::string get(const std::string &name) {
+    std::string get(const std::string &name) const {
         auto it = mData.find(name);
         if (it == mData.end()) {
             if (name=="pi") {
@@ -1160,6 +1160,47 @@ Parser::Parser(std::vector<Option> &&def)
             if (!str.empty()) std::clog << str << std::endl;
             //for (auto s : tokenize(str, ",")) std::clog << s << std::endl;// split and print
         }, 0
+    );
+
+    this->addAction(
+        {"calc"}, "calculate string expression",
+        {{"kernel", "", "3*sin(x)+y", "math expression"}},
+        [](){},// no pre-processing
+        [&](){// post-process
+            OPENVDB_ASSERT(iter->names[0] == "calc");
+            const std::string kernel = this->getStr("kernel");
+            if (kernel.empty()) return;
+            Calculator cal;
+            cal.compile(kernel);
+            // Pull each input variable from the Processor's string memory
+            // (the same namespace used by -eval). A name the kernel
+            // references but the memory doesn't define is a user error —
+            // fail loudly rather than silently substituting 0.
+            auto &mem = processor.memory();
+            std::vector<float> values(cal.variables().size());
+            for (size_t i = 0; i < cal.variables().size(); ++i) {
+                const std::string &name = cal.variables()[i];
+                if (!mem.isSet(name)) {
+                    throw std::invalid_argument(
+                        "calc: kernel references undefined variable \"" + name +
+                        "\" (set it first, e.g. -eval str='value:" + name + ":set')");
+                }
+                values[i] = strTo<float>(mem.get(name));
+            }
+            // evalAndRemember populates cal.memory() with every input,
+            // every intermediate slot, and the trailing LHS name (if any).
+            // Mirror that map into the Processor's memory so subsequent
+            // -eval / -calc actions can read the kernel's outputs by name.
+            const float result = cal.evalAndRemember(values.data());
+            for (const auto &kv : cal.memory()) {
+                mem.set(kv.first, std::to_string(kv.second));
+            }
+            // Only echo the result when the kernel ends in a plain
+            // expression. If the trailing statement is an assignment
+            // (`x = ...`), the value is already accessible via memory
+            // and a separate -eval / -print would be redundant noise.
+            if (cal.resultName().empty()) std::clog << result << std::endl;
+        }, -1// no anonymous options allowed because the kernel string may itself contain a '=' character, which might trip to the parser
     );
 
     this->addAction(
