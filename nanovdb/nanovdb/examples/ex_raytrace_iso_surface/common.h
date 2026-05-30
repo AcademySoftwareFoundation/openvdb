@@ -10,22 +10,9 @@
 #include <nanovdb/NanoVDB.h>
 #include "ComputePrimitives.h"
 
-template<typename RenderFn, typename GridT>
-inline float renderImage(bool useCuda, const RenderFn renderOp, int width, int height, float* image, const GridT* grid)
-{
-    using ClockT = std::chrono::high_resolution_clock;
-    auto t0 = ClockT::now();
-
-    computeForEach(
-        useCuda, width * height, 512, __FILE__, __LINE__, [renderOp, image, grid] __hostdev__(int start, int end) {
-            renderOp(start, end, image, grid);
-        });
-    computeSync(useCuda, __FILE__, __LINE__);
-
-    auto t1 = ClockT::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() / 1000.f;
-    return duration;
-}
+struct RenderOp;
+template<typename GridT>
+__global__ void renderIsoSurfacePersistentKernel(RenderOp renderOp, float* image, const GridT* grid, int numPixels, int* nextPixel);
 
 struct RenderOp
 {
@@ -69,16 +56,55 @@ struct RenderOp
     {
         static_assert(nanovdb::util::is_same<typename GridT::BuildType, float, nanovdb::ValueOnIndex, nanovdb::ValueIndex>::value, "only works for float and OnIndex grids");
         auto acc = nanovdb::getAccessor<GridT, float>(*grid);
-        float  t0, v;
-        nanovdb::Coord ijk;
         for (int i = start; i < end; ++i) {
-            RayT iRay = this->getIndexRay(i, grid);   
-            if (nanovdb::math::isoCrossing(iRay, acc, ijk, v, t0, mIso)) {// intersect...
-                this->composite(image, i, (t0 * mDx) / (mWBBoxDimZ * 2), 1.0f);
-            } else {
-                this->composite(image, i, 0.0f, 0.0f);// write background value.
-            }
+            this->renderPixel(i, image, grid, acc);
         }
+    }
+
+    template <typename GridT, typename AccT>
+    inline __hostdev__ void renderPixel(int i, float* image, const GridT* grid, AccT& acc) const
+    {
+        float          t0, v;
+        nanovdb::Coord ijk;
+        RayT           iRay = this->getIndexRay(i, grid);
+        if (nanovdb::math::isoCrossing(iRay, acc, ijk, v, t0, mIso)) {// intersect...
+            this->composite(image, i, (t0 * mDx) / (mWBBoxDimZ * 2), 1.0f);
+        } else {
+            this->composite(image, i, 0.0f, 0.0f);// write background value.
+        }
+    }
+
+    template<typename GridT>
+    inline float renderImagePersistent(float* image, const GridT* grid, int* nextPixel) const
+    {
+        int device = 0;
+        NANOVDB_CUDA_CHECK_ERROR(cudaGetDevice(&device), __FILE__, __LINE__);
+
+        cudaDeviceProp properties;
+        NANOVDB_CUDA_CHECK_ERROR(cudaGetDeviceProperties(&properties, device), __FILE__, __LINE__);
+
+        constexpr int blockSize = 256;
+        // Launch a small, fixed pool of blocks that persists on the GPU and
+        // pulls pixel work from a global counter instead of launching one
+        // logical thread per pixel up front.
+        int           blockCount = properties.multiProcessorCount * 4;
+        if (blockCount < 1) blockCount = 1;
+
+        // Reset the work queue before each timed render. The kernel advances
+        // this counter by one warp of pixels at a time.
+        NANOVDB_CUDA_CHECK_ERROR(cudaMemset(nextPixel, 0, sizeof(int)), __FILE__, __LINE__);
+
+        using ClockT = std::chrono::high_resolution_clock;
+        auto t0 = ClockT::now();
+
+        const int numPixels = mWidth * mHeight;
+        renderIsoSurfacePersistentKernel<GridT><<<blockCount, blockSize>>>(*this, image, grid, numPixels, nextPixel);
+        NANOVDB_CUDA_CHECK_ERROR(cudaGetLastError(), __FILE__, __LINE__);
+        NANOVDB_CUDA_CHECK_ERROR(cudaDeviceSynchronize(), __FILE__, __LINE__);
+
+        auto t1 = ClockT::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() / 1000.f;
+        return duration;
     }
 
     template <typename GridT>  
@@ -134,3 +160,28 @@ struct RenderOp
         }
     }
 };
+
+template<typename GridT>
+__global__ void renderIsoSurfacePersistentKernel(RenderOp renderOp, float* image, const GridT* grid, int numPixels, int* nextPixel)
+{
+    static_assert(nanovdb::util::is_same<typename GridT::BuildType, float, nanovdb::ValueOnIndex, nanovdb::ValueIndex>::value, "only works for float and OnIndex grids");
+    auto acc = nanovdb::getAccessor<GridT, float>(*grid);
+    const unsigned int lane = threadIdx.x & 31u;
+
+    // Keep the fixed set of launched threads busy until all pixels have been assigned.
+    while (true) {
+        int base = 0;
+        // Each warp asks the shared counter for the next batch of 32 pixels.
+        // Only lane 0 updates the counter; __shfl_sync copies lane 0's result
+        // to the other lanes in the warp.
+        if (lane == 0) base = atomicAdd(nextPixel, 32);
+        base = __shfl_sync(0xFFFFFFFFu, base, 0);
+
+        // Each lane renders one pixel from the batch: lane 0 renders base,
+        // lane 1 renders base + 1, and so on.
+        const int i = base + int(lane);
+        if (i >= numPixels) break;
+
+        renderOp.renderPixel(i, image, grid, acc);
+    }
+}
