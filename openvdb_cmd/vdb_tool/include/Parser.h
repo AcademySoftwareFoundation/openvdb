@@ -76,15 +76,25 @@ struct Action {
     /// @param _run        Callback invoked during execution to perform the action.
     /// @param _anonymous  Index of the option to which un-named option values are appended,
     ///                    or size_t(-1) if anonymous values are disallowed.
+    /// @param _greedy     When true, any "name=value" token whose prefix is not
+    ///                    a recognized option name is also appended (whole) to
+    ///                    the anonymous option, rather than throwing
+    ///                    "Invalid option". Used when the anonymous option's
+    ///                    value may itself contain '=', e.g. the kernel string
+    ///                    in -calc or the kernel of forAllValues / forOnValues
+    ///                    / forOffValues. Requires _anonymous to be a valid
+    ///                    option index.
     Action(std::vector<std::string> &&_names,
            std::string _doc,
            std::vector<Option> &&_options,
            std::function<void()> &&_init,
            std::function<void()> &&_run,
-           size_t _anonymous = -1)
+           size_t _anonymous = -1,
+           bool   _greedy    = false)
       : names(std::move(_names))
       , documentation(std::move(_doc))
       , anonymous(_anonymous)
+      , greedy(_greedy)
       , options(std::move(_options))
       , init(std::move(_init))
       , run(std::move(_run)) {}
@@ -103,6 +113,7 @@ struct Action {
     std::vector<std::string> names;         ///< Names/aliases of the action, e.g. {"read", "import", "load", "i"}.
     std::string              documentation; ///< One-line description shown in usage output.
     size_t                   anonymous;     ///< Index of the option receiving un-named values, or -1 if disallowed.
+    bool                     greedy;        ///< If true, tokens with an unrecognized "name=" prefix also go to the anonymous option (see constructor docstring).
     std::vector<Option>      options;       ///< Options registered for this action.
     std::function<void()>    init;          ///< Callback invoked during parsing.
     std::function<void()>    run;           ///< Callback invoked during execution.
@@ -350,7 +361,7 @@ public:
             [&](){this->boolean(std::greater_equal<>());});
         add("<","returns true if the two top entries on the stack are less than, e.g. {1:2:<} -> {1}",
             [&](){this->boolean(std::less<>());});
-        add(">","returns true if the two top entries on the stack are less than or equal, e.g. {1:2:<=} -> {1}",
+        add(">","returns true if the two top entries on the stack are less than or equal, e.g. {1:2:>} -> {0}",
             [&](){this->boolean(std::greater<>());});
         add("!","logical negation, e.g. {1:!} -> {0}",
             [&](){this->set(!strToBool(mCallStack.top()));});
@@ -990,15 +1001,20 @@ struct Parser {
     /// @param parse     Callback invoked during parsing (e.g. for loop bookkeeping).
     /// @param run       Callback invoked during execution to perform the action.
     /// @param anonymous Index of the option receiving un-named values, or -1 to disallow them.
+    /// @param greedy    If true, tokens whose "name=" prefix is not a recognized
+    ///                  option are also appended (whole) to the anonymous
+    ///                  option. Used when that option's value may contain '='
+    ///                  (e.g. the kernel string in -calc / forValues).
     void addAction(std::vector<std::string> &&names,
                    std::string &&doc,
                    std::vector<Option>   &&options,
                    std::function<void()> &&parse,
                    std::function<void()> &&run,
-                   size_t anonymous = -1)
+                   size_t anonymous = -1,
+                   bool   greedy    = false)
     {
       available.emplace_back(std::move(names), std::move(doc), std::move(options),
-                             std::move(parse), std::move(run), anonymous);
+                             std::move(parse), std::move(run), anonymous, greedy);
     }
 
     /// @brief Returns a mutable reference to the action currently being processed.
@@ -1091,6 +1107,10 @@ std::multimap<size_t, std::string> Parser::closeMatches(const std::string &str) 
 
 void Action::setOption(const std::string &str)
 {
+    // Greedy mode (set on actions whose anonymous option may take a value
+    // containing '=', e.g. the kernel string in -calc / forValues): when no
+    // explicit option matches, fall through to anonymous-append rather than
+    // throwing "Invalid option".
     const size_t pos = str.find_first_of("={");// since expressions are only evaluated for values and not for names of values, we only search for '=' before expressions, which start with '{'
     if (pos == std::string::npos || str[pos]=='{') {// str has no "=" or it's an expression so append it to the value of the anonymous option
         if (anonymous>=options.size()) throw std::invalid_argument(names[0]+": does not support un-named option \""+str+"\"");
@@ -1108,6 +1128,10 @@ void Action::setOption(const std::string &str)
             opt.name  = str.substr(0,pos);
             opt.value = str.substr(pos+1);
             return;// done
+        }
+        if (greedy && anonymous<options.size()) {// the anonymous option's value may contain '='; treat the whole token as anonymous.
+            options[anonymous].append(str);
+            return;
         }
         std::stringstream ss;
         ss << names[0] << ": Invalid option: \"" << str << "\"\n";
@@ -1163,8 +1187,8 @@ Parser::Parser(std::vector<Option> &&def)
     );
 
     this->addAction(
-        {"calc"}, "calculate string expression",
-        {{"kernel", "", "3*sin(x)+y", "math expression"}},
+        {"calc", "math"}, "calculate string expression",
+        {{"kernel", "", "3*sin(x)+y", "math expression. The \"kernel=\" prefix is OPTIONAL; the kernel may also be supplied as a bare positional argument, e.g. \"-calc '3*sin(x)+y'\" or \"-calc 'x=1+2'\". Input variables are read from the Processor's string memory (the same namespace used by -eval). Supports infix, RPN ($-prefixed), and infix multi-statement (;-separated) programs with assignment. Echoes the result only when the trailing statement is a plain expression; assignment-terminated kernels are silent since their outputs are already in memory."}},
         [](){},// no pre-processing
         [&](){// post-process
             OPENVDB_ASSERT(iter->names[0] == "calc");
@@ -1185,14 +1209,38 @@ Parser::Parser(std::vector<Option> &&def)
                         "calc: kernel references undefined variable \"" + name +
                         "\" (set it first, e.g. -eval str='value:" + name + ":set')");
                 }
-                values[i] = strTo<float>(mem.get(name));
+                // Convert the stored string to a float. Memory holds arbitrary
+                // strings (a {name:@name} typo, for instance, stores the
+                // literal token rather than a number) so a clearer message
+                // here helps users locate the offending variable and value.
+                const std::string &raw = mem.get(name);
+                try {
+                    values[i] = strTo<float>(raw);
+                } catch (const std::exception &) {
+                    throw std::invalid_argument(
+                        "calc: variable \"" + name + "\" in memory is not a "
+                        "valid float (got \"" + raw + "\"). Did you mean to "
+                        "store a number, e.g. -eval '{0:@" + name + "}'?");
+                }
             }
             // evalAndRemember populates cal.memory() with every input,
             // every intermediate slot, and the trailing LHS name (if any).
-            // Mirror that map into the Processor's memory so subsequent
-            // -eval / -calc actions can read the kernel's outputs by name.
+            // We only mirror *outputs* (slots and the trailing-LHS result)
+            // back into the Processor's memory; a pure read like kernel=n
+            // must leave mem["n"] untouched, otherwise the float-formatted
+            // "0.000000" rewrite breaks downstream int-typed consumers
+            // such as -for loop variables and -if integer comparators.
             const float result = cal.evalAndRemember(values.data());
+            auto isInput = [&](const std::string &name) {
+                for (const auto &v : cal.variables()) if (v == name) return true;
+                return false;
+            };
             for (const auto &kv : cal.memory()) {
+                const bool input  = isInput(kv.first);
+                const bool result_assign = (kv.first == cal.resultName());
+                // Skip entries that were read-only inputs and not also
+                // reassigned via the trailing LHS.
+                if (input && !result_assign) continue;
                 mem.set(kv.first, std::to_string(kv.second));
             }
             // Only echo the result when the kernel ends in a plain
@@ -1200,7 +1248,7 @@ Parser::Parser(std::vector<Option> &&def)
             // (`x = ...`), the value is already accessible via memory
             // and a separate -eval / -print would be redundant noise.
             if (cal.resultName().empty()) std::clog << result << std::endl;
-        }, -1// no anonymous options allowed because the kernel string may itself contain a '=' character, which might trip to the parser
+        }, /*anonymous=*/0, /*greedy=*/true// kernel value may itself contain '=', so accept "-calc x=1+2" alongside "-calc kernel=x=1+2"
     );
 
     this->addAction(

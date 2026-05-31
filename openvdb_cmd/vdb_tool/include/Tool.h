@@ -578,31 +578,37 @@ void Tool::init()
      {"forAllValues"}, "Applied a simple computational kernel to values in a grid.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
      {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"kernel", "", "sin(x)+2*x*x", "user-defined math expression to apply to each value. Supports infix (e.g. \"sin(x)+2*x*x\"), RPN (e.g. \"$x:sin:$x:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = x*x; t + sin(t)\"). The only input variable bound by this action is x (the current voxel value); any other name throws. Takes precedence over op/poly when non-empty."},
+     {"kernel", "", "sin(v)+2*v*v", "user-defined math expression to apply to each value. The \"kernel=\" prefix is OPTIONAL; the kernel may also be supplied as a bare positional argument, e.g. \"-forOnValues 'sin(v)+1'\" or \"-forOnValues 'sin(v)+1' keep=true\" — other named options of the same action still parse normally. Supports infix (e.g. \"sin(v)+2*v*v\"), RPN (e.g. \"$v:sin:$v:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = v*v; t + sin(t)\"). The variable that holds the current voxel value is configurable via the \"use\" option (defaults to \"v\"); any other identifier in the kernel is looked up once in the Processor's string memory (the same namespace used by -eval / -calc) and used as a per-voxel constant — kernels like \"a*v + b\" therefore require -eval / -calc to have set \"a\" and \"b\" beforehand, else an error is thrown. An empty kernel is a no-op."},
+     {"use", "v", "v|x|val", "name of the variable bound to the current voxel value inside the kernel. Defaults to \"v\". Use e.g. use=x if your kernel reads better with \"x\" as the voxel variable; the chosen name is then treated as the per-voxel input and excluded from the Processor-memory lookup performed for every other identifier in the expression."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
      {"name", "", "foo-bar", "name assigned to the output volume"}},
-     [&](){mParser.setDefaults();}, [&](){this->forValues();});
+     [&](){mParser.setDefaults();}, [&](){this->forValues();},
+     /*anonymous=*/2, /*greedy=*/true);// kernel (index 2) may itself contain '='; accept bare "x+1" or "t=x*x; t+1" alongside kernel='...'
 
   mParser.addAction(
      {"forOnValues"}, "Applied a simple computational kernel to values in a grid.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
      {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"kernel", "", "sin(x)+2*x*x", "user-defined math expression to apply to each value. Supports infix (e.g. \"sin(x)+2*x*x\"), RPN (e.g. \"$x:sin:$x:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = x*x; t + sin(t)\"). The only input variable bound by this action is x (the current voxel value); any other name throws. Takes precedence over op/poly when non-empty."},
+     {"kernel", "", "sin(v)+2*v*v", "user-defined math expression to apply to each value. The \"kernel=\" prefix is OPTIONAL; the kernel may also be supplied as a bare positional argument, e.g. \"-forOnValues 'sin(v)+1'\" or \"-forOnValues 'sin(v)+1' keep=true\" — other named options of the same action still parse normally. Supports infix (e.g. \"sin(v)+2*v*v\"), RPN (e.g. \"$v:sin:$v:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = v*v; t + sin(t)\"). The variable that holds the current voxel value is configurable via the \"use\" option (defaults to \"v\"); any other identifier in the kernel is looked up once in the Processor's string memory (the same namespace used by -eval / -calc) and used as a per-voxel constant — kernels like \"a*v + b\" therefore require -eval / -calc to have set \"a\" and \"b\" beforehand, else an error is thrown. An empty kernel is a no-op."},
+     {"use", "v", "v|x|val", "name of the variable bound to the current voxel value inside the kernel. Defaults to \"v\". Use e.g. use=x if your kernel reads better with \"x\" as the voxel variable; the chosen name is then treated as the per-voxel input and excluded from the Processor-memory lookup performed for every other identifier in the expression."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
      {"name", "", "foo-bar", "name assigned to the output volume"}},
-     [&](){mParser.setDefaults();}, [&](){this->forValues();});
+     [&](){mParser.setDefaults();}, [&](){this->forValues();},
+     /*anonymous=*/2, /*greedy=*/true);// kernel (index 2) may itself contain '='; accept bare "x+1" or "t=x*x; t+1" alongside kernel='...'
 
   mParser.addAction(
      {"forOffValues"}, "Applied a simple computational kernel to values in a grid.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
      {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"kernel", "", "sin(x)+2*x*x", "user-defined math expression to apply to each value. Supports infix (e.g. \"sin(x)+2*x*x\"), RPN (e.g. \"$x:sin:$x:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = x*x; t + sin(t)\"). The only input variable bound by this action is x (the current voxel value); any other name throws. Takes precedence over op/poly when non-empty."},
+     {"kernel", "", "sin(v)+2*v*v", "user-defined math expression to apply to each value. The \"kernel=\" prefix is OPTIONAL; the kernel may also be supplied as a bare positional argument, e.g. \"-forOnValues 'sin(v)+1'\" or \"-forOnValues 'sin(v)+1' keep=true\" — other named options of the same action still parse normally. Supports infix (e.g. \"sin(v)+2*v*v\"), RPN (e.g. \"$v:sin:$v:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = v*v; t + sin(t)\"). The variable that holds the current voxel value is configurable via the \"use\" option (defaults to \"v\"); any other identifier in the kernel is looked up once in the Processor's string memory (the same namespace used by -eval / -calc) and used as a per-voxel constant — kernels like \"a*v + b\" therefore require -eval / -calc to have set \"a\" and \"b\" beforehand, else an error is thrown. An empty kernel is a no-op."},
+     {"use", "v", "v|x|val", "name of the variable bound to the current voxel value inside the kernel. Defaults to \"v\". Use e.g. use=x if your kernel reads better with \"x\" as the voxel variable; the chosen name is then treated as the per-voxel input and excluded from the Processor-memory lookup performed for every other identifier in the expression."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
      {"name", "", "foo-bar", "name assigned to the output volume"}},
-     [&](){mParser.setDefaults();}, [&](){this->forValues();});
+     [&](){mParser.setDefaults();}, [&](){this->forValues();},
+     /*anonymous=*/2, /*greedy=*/true);// kernel (index 2) may itself contain '='; accept bare "x+1" or "t=x*x; t+1" alongside kernel='...'
 
   mParser.addAction(
      {"sdf2udf"}, "Converts a signed distance field into an unsigned distance field, i.e. performs the Abs of all values and changes GridClass to UNKNOWN.",
@@ -2695,9 +2701,13 @@ void Tool::forValues()
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
     const std::string kernel = mParser.get<std::string>("kernel");
+    const std::string voxel_var = mParser.get<std::string>("use");// kernel identifier bound to the current voxel value (defaults to "v")
     const std::string cls = mParser.get<std::string>("class");
     std::vector<float> back = mParser.getVec<float>("background");
     std::string grid_name = mParser.get<std::string>("name");
+    if (voxel_var.empty()) {
+        throw std::invalid_argument(action_name+": use= must name a non-empty identifier (e.g. use=v)");
+    }
 
     /// get the relevant grid to be processed
     auto it = this->getGrid(age);// will throw if grid doesn't exist
@@ -2712,20 +2722,45 @@ void Tool::forValues()
     grid->setName(grid_name);
 
     if (mParser.verbose) mTimer.start(action_name);
-    // User-supplied math expression takes precedence over op/poly when given.
     if (!kernel.empty()) {
       Calculator calc;
       calc.compile(kernel);// throws on syntax error / unknown op
+      // The kernel reads the current voxel value via the variable named by
+      // the "use" option (default "v"); every other identifier must
+      // already exist in the Processor's string memory and is bound once
+      // (a per-voxel constant). This mirrors how -calc consumes Processor
+      // memory and lets kernels share values with -eval / -calc actions
+      // earlier in the pipeline.
+      const auto  &mem  = mParser.processor.memory();
+      const int    vIdx = calc.variableIndex(voxel_var);
+      std::vector<float> base(calc.variables().size());
+      for (size_t i = 0; i < calc.variables().size(); ++i) {
+          if (static_cast<int>(i) == vIdx) continue;// bound per voxel below
+          const std::string &name = calc.variables()[i];
+          if (!mem.isSet(name)) {
+              throw std::invalid_argument(
+                  action_name+": kernel references undefined variable \""+name+
+                  "\" (set it first with -eval / -calc, or use \""+voxel_var+
+                  "\" for the current voxel value)");
+          }
+          base[i] = strTo<float>(mem.get(name));
+      }
+      // Per-voxel lambda. tools::foreach hands a single functor instance to
+      // TBB, which calls it concurrently on multiple voxels; we therefore
+      // allocate the per-call values buffer on the *C* stack so the per-voxel
+      // mutation of `v` is thread-local.
+      auto kernel_fn = [&calc, &base, vIdx](auto &it) {
+          constexpr size_t kMaxVars = 32;
+          OPENVDB_ASSERT(base.size() <= kMaxVars);
+          float values[kMaxVars];
+          for (size_t i = 0; i < base.size(); ++i) values[i] = base[i];
+          if (vIdx >= 0) values[vIdx] = static_cast<float>(*it);
+          it.setValue(calc.eval(values));
+      };
       switch (mode) {
-      case 1:
-        tools::foreach(grid->beginValueAll(),[&calc](auto &it){it.setValue(calc.eval(*it));});
-        break;
-      case 2:
-        tools::foreach(grid->beginValueOn(), [&calc](auto &it){it.setValue(calc.eval(*it));});
-        break;
-      case 3:
-        tools::foreach(grid->beginValueOff(),[&calc](auto &it){it.setValue(calc.eval(*it));});
-        break;
+      case 1: tools::foreach(grid->beginValueAll(), kernel_fn); break;
+      case 2: tools::foreach(grid->beginValueOn(),  kernel_fn); break;
+      case 3: tools::foreach(grid->beginValueOff(), kernel_fn); break;
       default:
         throw std::invalid_argument("forEachKenel: invalid mode = " + std::to_string(mode));
         break;

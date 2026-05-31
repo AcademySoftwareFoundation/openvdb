@@ -1411,7 +1411,131 @@ TEST_F(Test_vdb_tool, ActionCalc)
               << "error did not name the offending variable: " << what;
       }
     }
+
+    {// 7a. Bare positional kernel: greedy-anonymous parsing accepts
+     //     "-calc x=1+2" alongside "-calc kernel=x=1+2", because -calc's
+     //     anonymous option is registered with the greedy flag.
+      Parser p({});
+      p.finalize();
+      runCapture(p, "vdb_tool -quiet -calc x=1+2");
+      ASSERT_TRUE(p.processor.memory().isSet("x"));
+      EXPECT_EQ(3.0f, strTo<float>(p.processor.memory().get("x")));
+
+      // Plain expression as a bare positional still echoes the result.
+      Parser p2({});
+      p2.finalize();
+      const std::string out = runCapture(p2, "vdb_tool -quiet -calc 1+2+3");
+      EXPECT_NE(std::string::npos, out.find("6")) << "expected '6' in: " << out;
+    }
+
+    {// 7b. Reading an input doesn't rewrite it in memory. The float-formatted
+     //     "0.000000" rewrite previously broke downstream int comparators
+     //     (e.g. -for / -if integer ops).
+      Parser p({});
+      p.finalize();
+      runCapture(p, "vdb_tool -quiet -eval {7:@n} -calc kernel=n");
+      ASSERT_TRUE(p.processor.memory().isSet("n"));
+      EXPECT_EQ("7", p.processor.memory().get("n"));// not "7.000000"
+    }
+
+    {// 7c. An input reassigned via trailing LHS IS overwritten (the new
+     //     value is what the user explicitly asked for).
+      Parser p({});
+      p.finalize();
+      runCapture(p, "vdb_tool -quiet -eval {5:@n} -calc kernel=n=n+1");
+      EXPECT_EQ(6.0f, strTo<float>(p.processor.memory().get("n")));
+    }
+
+    {// 8. A memory entry that isn't a valid float (e.g. set with the typo
+     //    "{n:@n}" instead of "{0:@n}") produces a diagnostic naming the
+     //    variable and showing the stored value.
+      Parser p({});
+      p.finalize();
+      auto args = getArgs("vdb_tool -quiet -eval {n:@n} -calc kernel=n+1");
+      p.parse(int(args.size()), args.data());
+      try {
+          p.run();
+          FAIL() << "expected -calc to throw on non-numeric variable value";
+      } catch (const std::exception &e) {
+          const std::string what = e.what();
+          EXPECT_NE(std::string::npos, what.find("\"n\""))   // names the variable
+              << "error did not name the offending variable: " << what;
+          EXPECT_NE(std::string::npos, what.find("not a valid float"))
+              << "error did not describe the float-parse failure: " << what;
+      }
+    }
 }// ActionCalc
+
+TEST_F(Test_vdb_tool, ActionForValuesGreedy)
+{
+    // The three forValues actions also register their `kernel` option with
+    // the greedy flag, so a bare positional kernel works alongside the
+    // explicit kernel='...' form even with multi-option actions where
+    // other options like `keep=` must still parse normally. The voxel
+    // value is bound to the variable "v"; any other identifier in the
+    // kernel must already be set in Processor memory (else an error).
+    using namespace openvdb::vdb_tool;
+
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -sphere -forOnValues sin(v)+1");
+      Tool t(int(args.size()), args.data());
+      t.run();
+    });
+
+    EXPECT_NO_THROW({
+      // Bare kernel with assignment ('=' embedded), alongside a named option.
+      auto args = getArgs("vdb_tool -quiet -sphere -forOnValues v=v+1 keep=true");
+      Tool t(int(args.size()), args.data());
+      t.run();
+    });
+
+    EXPECT_NO_THROW({
+      // Explicit kernel= form continues to work.
+      auto args = getArgs("vdb_tool -quiet -sphere -forOnValues kernel=2*v");
+      Tool t(int(args.size()), args.data());
+      t.run();
+    });
+
+    EXPECT_NO_THROW({
+      // Mixing the voxel variable v with a memory-resolved constant.
+      auto args = getArgs("vdb_tool -quiet -eval {2:@scale} -sphere -forOnValues scale*v+1");
+      Tool t(int(args.size()), args.data());
+      t.run();
+    });
+
+    EXPECT_NO_THROW({
+      // use= renames the voxel variable. "x" is now the voxel
+      // input (not a memory lookup), and the rest of the kernel uses it
+      // freely.
+      auto args = getArgs("vdb_tool -quiet -sphere -forOnValues sin(x)+1 use=x");
+      Tool t(int(args.size()), args.data());
+      t.run();
+    });
+
+    EXPECT_NO_THROW({
+      // use= renames AND a memory variable is still resolved correctly.
+      auto args = getArgs("vdb_tool -quiet -eval {3:@scale} -sphere -forOnValues scale*y use=y");
+      Tool t(int(args.size()), args.data());
+      t.run();
+    });
+
+    {// A kernel that references an unbound (non-"v") variable should throw
+     // with mErrorOnWarning enabled. The default Tool path swallows the
+     // error and logs a "skipping" message, so trigger the strict path by
+     // adding -on-warning=throw equivalent (just observe the log path here
+     // by checking the grid wasn't transformed — we can't easily without
+     // intermediate inspection; instead, drive the Calculator's variable
+     // discovery directly).
+      Calculator c;
+      c.compile("a*v+1");
+      ASSERT_EQ(2u, c.variables().size());
+      // "v" and "a" should both appear; the action implementation would
+      // try to bind "a" from memory and throw if absent.
+      const auto &vars = c.variables();
+      EXPECT_TRUE((vars[0] == "a" && vars[1] == "v") ||
+                  (vars[0] == "v" && vars[1] == "a"));
+    }
+}// ActionForValuesGreedy
 
 TEST_F(Test_vdb_tool, Memory)
 {
