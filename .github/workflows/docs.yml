@@ -60,10 +60,6 @@ jobs:
       run: ./ci/install_doxygen.sh 1_14_0
     - name: nanobind
       run: ./ci/install_nanobind.sh 2.5.0
-    # NOTE: install_texlive.sh used to run here. Doxygen now renders math via
-    # MathJax (set DOXYGEN_USE_MATHJAX YES in doc/CMakeLists.txt), so no TeX
-    # toolchain is needed at build time. The script is kept in ci/ in case a
-    # future use re-introduces a TeX dependency.
     - name: build
       # Doxygen's native WARN_AS_ERROR=FAIL_ON_WARNINGS gates the docs build:
       # any warning fails the job. FAIL_ON_WARNINGS still generates the docs and
