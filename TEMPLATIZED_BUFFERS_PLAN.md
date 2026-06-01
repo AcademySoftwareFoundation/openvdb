@@ -65,6 +65,20 @@ any headers** — and drop the `DeviceBuffer.h`/`DeviceResource.h` forks entirel
    `reinterpret_cast` (same runtime behavior, no `if constexpr`). Surgical, **not**
    a blanket replace — see §5.
 
+6. **Lift `Data` out of `TopologyBuilder`** → `topology::detail::TopologyBuilderData<BuildT>`
+   (parameterized on `BuildT` only), with `using Data = …;` alias in the class.
+   **Deferred to its own milestone (M5)** — *not* done in the M1–M3 templatization pass.
+   *Why it's needed:* `Data` is a nested type, so `TopologyBuilder<BuildT, A>::Data`
+   and `…<BuildT, B>::Data` are **distinct** types per instantiation. The 10 detail
+   functors hardcode `typename TopologyBuilder<BuildT>::Data` (= the *default*
+   `…, DeviceBuffer>::Data`); a non-default `ScratchBufferT` instantiation's
+   `deviceData()` would return a mismatched `Data*` → compile error.
+   *Why it can be deferred:* with the default `DeviceBuffer` everything resolves to
+   one `Data` type, so M1–M3 compile and stay byte-identical without it. `Data` is
+   the **only** structural blocker for non-default instantiation (casts + concept are
+   handled in the M1–M3 pass), so lifting it + the canary in M5 validates M1–M3 at
+   once. **Corollary:** do **not** add a non-default instantiation until M5.
+
 ## 3. Files in scope
 
 | File | Work |
@@ -130,15 +144,23 @@ No ABI concern.
 
 ## 8. Milestones
 
-- **M1 — TopologyBuilder.cuh.** Add `ScratchBufferT`; templatize members + locals;
-  cast fixes. Compile examples + unittest with default param → no regression.
+> M1–M3 keep `Data` nested and use only the **default** `DeviceBuffer`; run the
+> topology unittests after each (`DilateInjectPrune_*`, `RefineCoarsen_*`,
+> `MergeGrids_*`, `MeshToGrid_*`, `mergeSplit*`) to confirm byte-identical behavior.
+
+- **M1 — TopologyBuilder.cuh.** Add `ScratchBufferT`; templatize 8 scratch members
+  + 3 transient locals; `static_cast`→`reinterpret_cast` on those. Verify green.
 - **M2 — Morphology clients.** Thread `ScratchBufferT` through Dilate/Prune/Merge/
-  Coarsen/Refine (class param + `mBuilder` type).
-- **M3 — MeshToGrid.cuh.** Param + members + locals + cast fixes.
-- **M4 — Build verification.** Build nanoVDB CUDA examples + `TestNanoVDB.cu` with
-  default `ScratchBufferT`. Optional canary: instantiate a client with an
-  alternate `ScratchBufferT` (e.g. `UnifiedBuffer`) to prove the seam is real.
-- **M5 — follow-ups (separate branches/PRs):** dual-use host/device split;
+  Coarsen/Refine (class param + `mBuilder` type). Verify green.
+- **M3 — MeshToGrid.cuh.** Param + members + locals + cast fixes. Verify green.
+- **M4 — Build verification.** Build nanoVDB CUDA examples + full `TestNanoVDB.cu`
+  with default `ScratchBufferT` → no regression.
+- **M5 — Lift `Data` + prove the seam (decision §2.6).** Move `Data` to
+  `topology::detail::TopologyBuilderData<BuildT>` + alias; repoint the 10 functors.
+  Add a non-default `ScratchBufferT` instantiation canary (e.g. `UnifiedBuffer`) so
+  the seam is actually compiled. This is the first step that exercises a non-default
+  type — see §2.6 corollary.
+- **M6 — follow-ups (separate branches/PRs):** dual-use host/device split;
   `mTempDevicePool`; fvdb-side `TorchDeviceBuffer` + stream-accepting `clear()`,
   then retire the `DeviceBuffer.h`/`DeviceResource.h` forks.
 
