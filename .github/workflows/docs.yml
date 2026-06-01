@@ -65,13 +65,11 @@ jobs:
     # toolchain is needed at build time. The script is kept in ci/ in case a
     # future use re-introduces a TeX dependency.
     - name: build
-      # Note on warn-as-error: Doxygen's own WARN_AS_ERROR is all-or-nothing
-      # and would block on the pre-existing backlog (broken \link refs in
-      # doc/changes.txt, vendored ext/imath/Half.h, etc.). Instead we let
-      # Doxygen finish, capture every warning to doxygen.warnings.log, and
-      # gate the build on the *filtered* log via ci/check_doxygen_warnings.py
-      # below. Per-file suppressions live in doc/.doxygen_warning_suppress.txt
-      # and act as an explicit backlog to chip away at.
+      # Doxygen's native WARN_AS_ERROR=FAIL_ON_WARNINGS gates the docs build:
+      # any warning fails the job. FAIL_ON_WARNINGS still generates the docs and
+      # writes the full warning log first, so the artifact step below captures
+      # it for debugging. Enabled via OPENVDB_DOXYGEN_WARN_AS_ERROR (see
+      # doc/CMakeLists.txt).
       run: >
         ./ci/build.sh -v
         --build-type=Release
@@ -82,14 +80,8 @@ jobs:
         -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON
         -DUSE_EXPLICIT_INSTANTIATION=OFF
         -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON
+        -DOPENVDB_DOXYGEN_WARN_AS_ERROR=ON
         \"
-    - name: check_doxygen_warnings
-      # Fails the PR if Doxygen emitted any warning that isn't covered by an
-      # explicit pattern in doc/.doxygen_warning_suppress.txt. Surviving
-      # warnings, suppression hit-counts, and a preview are printed inline so
-      # the failure is debuggable directly from the GitHub Actions log; the
-      # full unfiltered log is also uploaded as an artifact below.
-      run: python3 ci/check_doxygen_warnings.py --log build/doc/doxygen.warnings.log
     - name: upload_doxygen_warning_log
       # Always upload so contributors can debug failed PR builds without
       # having to reproduce the doxygen environment locally.

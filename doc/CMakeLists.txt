@@ -25,15 +25,12 @@ option(OPENVDB_DOXYGEN_NANOVDB "Build NanoVDB documentation" ON)
 option(OPENVDB_DOXYGEN_INTERNAL [=[
 Enable documentation of methods and classes which have been explicitly marked as internal
 ]=] OFF)
-# When enabled, Doxygen's own WARN_AS_ERROR=FAIL_ON_WARNINGS fails the build
-# if it emits ANY warning. This is all-or-nothing -- it can't ignore the
-# pre-existing backlog in doc/changes.txt etc. -- so CI does NOT use this
-# option. CI instead lets Doxygen finish and runs
-# ci/check_doxygen_warnings.py, which filters the warning log against
-# doc/.doxygen_warning_suppress.txt and only fails on net-new warnings.
-#
-# Local users can still opt in to the all-or-nothing Doxygen-native gate by
-# passing `-DOPENVDB_DOXYGEN_WARN_AS_ERROR=ON`.
+# When enabled, Doxygen's WARN_AS_ERROR=FAIL_ON_WARNINGS makes any warning fail
+# the docs build (it still generates the docs and writes the full warning log
+# first, then exits non-zero). CI turns this ON -- see .github/workflows/docs.yml
+# -- so net-new doc warnings fail the PR that introduces them. Defaults OFF so a
+# local doc build isn't blocked by a stray warning from a different Doxygen
+# version; pass -DOPENVDB_DOXYGEN_WARN_AS_ERROR=ON to gate locally too.
 option(OPENVDB_DOXYGEN_WARN_AS_ERROR
   "Treat Doxygen warnings as errors" OFF)
 
