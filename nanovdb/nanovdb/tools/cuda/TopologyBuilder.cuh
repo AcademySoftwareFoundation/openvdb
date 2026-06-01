@@ -24,6 +24,34 @@ namespace nanovdb {
 
 namespace tools::cuda {
 
+namespace topology::detail {
+
+/// @brief Grid/tree/node layout metadata shared by TopologyBuilder and the CUDA
+///        functors it dispatches. Parameterized on BuildT only (independent of the
+///        scratch buffer type), so it is one consistent type across every
+///        TopologyBuilder<BuildT, ScratchBufferT> instantiation — see plan §2.6.
+template <typename BuildT>
+struct TopologyBuilderData {
+    using GridT  = NanoGrid<BuildT>;
+    using TreeT  = NanoTree<BuildT>;
+    using RootT  = NanoRoot<BuildT>;
+    using UpperT = NanoUpper<BuildT>;
+    using LowerT = NanoLower<BuildT>;
+    using LeafT  = NanoLeaf<BuildT>;
+    void     *d_bufferPtr;
+    uint64_t grid, tree, root, upper, lower, leaf, size;// byte offsets to nodes in buffer
+    uint32_t nodeCount[3];// 0=leaf,1=lower, 2=upper
+    uint32_t *d_upperOffsets;
+    __hostdev__ GridT&  getGrid() const {return *util::PtrAdd<GridT>(d_bufferPtr, grid);}
+    __hostdev__ TreeT&  getTree() const {return *util::PtrAdd<TreeT>(d_bufferPtr, tree);}
+    __hostdev__ RootT&  getRoot() const {return *util::PtrAdd<RootT>(d_bufferPtr, root);}
+    __hostdev__ UpperT& getUpper(int i) const {return *(util::PtrAdd<UpperT>(d_bufferPtr, upper)+i);}
+    __hostdev__ LowerT& getLower(int i) const {return *(util::PtrAdd<LowerT>(d_bufferPtr, lower)+i);}
+    __hostdev__ LeafT&  getLeaf(int i) const {return *(util::PtrAdd<LeafT>(d_bufferPtr, leaf)+i);}
+};// TopologyBuilderData
+
+}// namespace topology::detail
+
 template <typename BuildT, typename ScratchBufferT = nanovdb::cuda::DeviceBuffer>
 class TopologyBuilder
 {
@@ -43,18 +71,7 @@ public:
         mData = nanovdb::cuda::DeviceBuffer::create(sizeof(Data));
     }
 
-    struct Data {
-        void     *d_bufferPtr;
-        uint64_t grid, tree, root, upper, lower, leaf, size;// byte offsets to nodes in buffer
-        uint32_t nodeCount[3];// 0=leaf,1=lower, 2=upper
-        uint32_t *d_upperOffsets;
-        __hostdev__ GridT&  getGrid() const {return *util::PtrAdd<GridT>(d_bufferPtr, grid);}
-        __hostdev__ TreeT&  getTree() const {return *util::PtrAdd<TreeT>(d_bufferPtr, tree);}
-        __hostdev__ RootT&  getRoot() const {return *util::PtrAdd<RootT>(d_bufferPtr, root);}
-        __hostdev__ UpperT& getUpper(int i) const {return *(util::PtrAdd<UpperT>(d_bufferPtr, upper)+i);}
-        __hostdev__ LowerT& getLower(int i) const {return *(util::PtrAdd<LowerT>(d_bufferPtr, lower)+i);}
-        __hostdev__ LeafT&  getLeaf(int i) const {return *(util::PtrAdd<LeafT>(d_bufferPtr, leaf)+i);}
-    };// Data
+    using Data = topology::detail::TopologyBuilderData<BuildT>;
 
     void allocateInternalMaskBuffers(cudaStream_t stream);
 
@@ -240,7 +257,7 @@ template <typename BuildT>
 struct BuildGridTreeRootFunctor
 {
     __device__
-    void operator()(size_t, typename TopologyBuilder<BuildT>::Data *d_data) {
+    void operator()(size_t, TopologyBuilderData<BuildT> *d_data) {
 
         // process Root
         auto &root = d_data->getRoot();
@@ -320,7 +337,7 @@ struct InitGridTreeRootFunctor
     Map map; // transform to embed in the output grid
 
     __device__
-    void operator()(size_t, typename TopologyBuilder<BuildT>::Data *d_data) {
+    void operator()(size_t, TopologyBuilderData<BuildT> *d_data) {
 
         // process Root (identical to BuildGridTreeRootFunctor)
         auto &root = d_data->getRoot();
@@ -389,7 +406,7 @@ template <typename BuildT>
 struct BuildUpperNodesFunctor
 {
     __device__
-    void operator()(size_t processedTileID, typename TopologyBuilder<BuildT>::Data *d_data, NanoRoot<BuildT> *d_processedRoot) {
+    void operator()(size_t processedTileID, TopologyBuilderData<BuildT> *d_data, NanoRoot<BuildT> *d_processedRoot) {
         uint32_t tileID = d_data->d_upperOffsets[processedTileID];
         if (tileID != d_data->d_upperOffsets[processedTileID+1]) // if the offsets are the same, this was a speculatively introduced tile which was not necessary
         {
@@ -468,7 +485,7 @@ template <typename BuildT>
 struct UpdateLeafVoxelCountsAndPrefixSumFunctor
 {
     __device__
-    void operator()(size_t leafID, typename TopologyBuilder<BuildT>::Data *d_data, uint64_t *d_voxelCounts) {
+    void operator()(size_t leafID, TopologyBuilderData<BuildT> *d_data, uint64_t *d_voxelCounts) {
         auto &leaf = d_data->getGrid().tree().template getFirstNode<0>()[leafID];
         const uint64_t *w = leaf.mValueMask.words();
         uint64_t prefixSum = 0, sum = util::countOn(*w++);
@@ -485,7 +502,7 @@ template <typename BuildT>
 struct UpdateLeafVoxelOffsetsFunctor
 {
     __device__
-    void operator()(size_t leafID, typename TopologyBuilder<BuildT>::Data *d_data, uint64_t *d_voxelOffsets) {
+    void operator()(size_t leafID, TopologyBuilderData<BuildT> *d_data, uint64_t *d_voxelOffsets) {
         auto &leaf = d_data->getGrid().tree().template getFirstNode<0>()[leafID];
         leaf.mOffset = d_voxelOffsets[leafID]+1; }
 };
@@ -527,7 +544,7 @@ template <typename BuildT>
 struct UpdateAndPropagateLeafBBoxFunctor
 {
     __device__
-    void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data, const uint32_t* leafParents) {
+    void operator()(size_t tid, TopologyBuilderData<BuildT> *d_data, const uint32_t* leafParents) {
         auto &lower = d_data->getLower(leafParents[tid]);
         auto &leaf = d_data->getLeaf(tid);
         leaf.updateBBox();
@@ -539,7 +556,7 @@ template <typename BuildT>
 struct PropagateLowerBBoxFunctor
 {
     __device__
-    void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data, const uint32_t* lowerParents) {
+    void operator()(size_t tid, TopologyBuilderData<BuildT> *d_data, const uint32_t* lowerParents) {
         auto &upper = d_data->getUpper(lowerParents[tid]);
         auto &lower = d_data->getLower(tid);
         upper.mBBox.expandAtomic(lower.bbox()); }
@@ -549,7 +566,7 @@ template <typename BuildT>
 struct PropagateUpperBBoxFunctor
 {
     __device__
-    void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data) {
+    void operator()(size_t tid, TopologyBuilderData<BuildT> *d_data) {
         d_data->getRoot().mBBox.expandAtomic(d_data->getUpper(tid).bbox());
     }
 };
@@ -558,7 +575,7 @@ template <typename BuildT>
 struct UpdateRootWorldBBoxFunctor
 {
     __device__
-    void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data) {
+    void operator()(size_t tid, TopologyBuilderData<BuildT> *d_data) {
         // TODO: check that the correct semantics are followed in this transformation
         auto BBox = d_data->getRoot().mBBox;
         BBox.max() += 1;
@@ -605,7 +622,7 @@ template <typename BuildT>
 struct PostProcessGridTreeFunctor
 {
     __device__
-    void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data, uint64_t* d_voxelOffsets) {
+    void operator()(size_t tid, TopologyBuilderData<BuildT> *d_data, uint64_t* d_voxelOffsets) {
         auto& grid = d_data->getGrid();
         auto& tree = grid.tree();
         auto leafCount = tree.mNodeCount[0];

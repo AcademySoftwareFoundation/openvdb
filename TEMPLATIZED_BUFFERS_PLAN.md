@@ -67,7 +67,9 @@ any headers** — and drop the `DeviceBuffer.h`/`DeviceResource.h` forks entirel
 
 6. **Lift `Data` out of `TopologyBuilder`** → `topology::detail::TopologyBuilderData<BuildT>`
    (parameterized on `BuildT` only), with `using Data = …;` alias in the class.
-   **Deferred to its own milestone (M5)** — *not* done in the M1–M3 templatization pass.
+   **DONE** (pulled forward, right after M1) — it's cleaner and unblocks making the
+   `TopologyBuilder` param non-defaulted. The 10 detail functors now reference
+   `TopologyBuilderData<BuildT>` directly (no `TopologyBuilder` mention).
    *Why it's needed:* `Data` is a nested type, so `TopologyBuilder<BuildT, A>::Data`
    and `…<BuildT, B>::Data` are **distinct** types per instantiation. The 10 detail
    functors hardcode `typename TopologyBuilder<BuildT>::Data` (= the *default*
@@ -155,11 +157,14 @@ No ABI concern.
 - **M3 — MeshToGrid.cuh.** Param + members + locals + cast fixes. Verify green.
 - **M4 — Build verification.** Build nanoVDB CUDA examples + full `TestNanoVDB.cu`
   with default `ScratchBufferT` → no regression.
-- **M5 — Lift `Data` + prove the seam (decision §2.6).** Move `Data` to
-  `topology::detail::TopologyBuilderData<BuildT>` + alias; repoint the 10 functors.
-  Add a non-default `ScratchBufferT` instantiation canary (e.g. `UnifiedBuffer`) so
-  the seam is actually compiled. This is the first step that exercises a non-default
-  type — see §2.6 corollary.
+- **`Data` lift — DONE** (between M1 and M2; see §2.6). Build + topology tests green.
+- **M5 — Make `TopologyBuilder` `ScratchBufferT` non-defaulted + prove the seam.**
+  Once M2/M3 thread the param through every client, drop the default on
+  `TopologyBuilder` (it's an internal helper; the default belongs only on the public
+  client classes) so a client that forgets to forward fails to compile instead of
+  silently falling back to `DeviceBuffer`. Add a non-default `ScratchBufferT`
+  instantiation canary (e.g. `UnifiedBuffer`) so the seam is actually compiled —
+  the first thing to exercise a non-default type.
 - **M6 — follow-ups (separate branches/PRs):** dual-use host/device split;
   `mTempDevicePool`; fvdb-side `TorchDeviceBuffer` + stream-accepting `clear()`,
   then retire the `DeviceBuffer.h`/`DeviceResource.h` forks.
