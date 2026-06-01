@@ -158,13 +158,22 @@ No ABI concern.
 - **M4 — Build verification.** Build nanoVDB CUDA examples + full `TestNanoVDB.cu`
   with default `ScratchBufferT` → no regression.
 - **`Data` lift — DONE** (between M1 and M2; see §2.6). Build + topology tests green.
-- **M5 — Make `TopologyBuilder` `ScratchBufferT` non-defaulted + prove the seam.**
-  Once M2/M3 thread the param through every client, drop the default on
-  `TopologyBuilder` (it's an internal helper; the default belongs only on the public
-  client classes) so a client that forgets to forward fails to compile instead of
-  silently falling back to `DeviceBuffer`. Add a non-default `ScratchBufferT`
-  instantiation canary (e.g. `UnifiedBuffer`) so the seam is actually compiled —
-  the first thing to exercise a non-default type.
+- **M5 — Make `TopologyBuilder` `ScratchBufferT` non-defaulted + prove the seam. DONE.**
+  - Dropped the default on `TopologyBuilder` (internal helper; default lives only on
+    the public clients) → a client that forgets to forward fails to compile.
+  - Lifted `MeshToGrid::BoxTrianglePair` to `nanovdb::tools::cuda` scope (+ public
+    alias), mirroring the `Data` lift, so it's one type across instantiations.
+  - Added `UnifiedBuffer::clear(cudaStream_t)` so `UnifiedBuffer` satisfies the
+    scratch concept (parallels the `TorchDeviceBuffer` addition fvdb will make).
+  - Fixed `getHandleAndUDF` to actually honor `SidecarBufferT` (`SidecarBufferT::create`
+    + `reinterpret_cast`); previously it hardcoded `DeviceBuffer` for the sidecar.
+  - Forwarded `ScratchBufferT` into MeshToGrid's internal `PruneGrid` so the all-Unified
+    case is genuinely all-Unified scratch.
+  - Canary: refactored the 4 topology unittests into helpers templated on every buffer
+    axis (scratch / grid-output / sidecar-output), instantiated as all-`DeviceBuffer`
+    and all-`UnifiedBuffer`. All 8 pass; full CUDA suite 55/56 (only the pre-existing
+    `UnifiedBuffer_IO` data-file failure). First runtime exercise of a non-`DeviceBuffer`
+    type — the seam is real.
 - **M6 — follow-ups (separate branches/PRs):** dual-use host/device split;
   `mTempDevicePool`; fvdb-side `TorchDeviceBuffer` + stream-accepting `clear()`,
   then retire the `DeviceBuffer.h`/`DeviceResource.h` forks.

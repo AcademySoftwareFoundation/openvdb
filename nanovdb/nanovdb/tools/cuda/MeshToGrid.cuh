@@ -48,6 +48,17 @@ struct Triangle {
     __hostdev__       nanovdb::Vec3f& operator[](int i)       { return v[i]; }
 };
 
+/// @brief POD (box origin, triangle id) pair used throughout MeshToGrid's rasterization
+///        pipeline, and passed as a template argument to the rasterization functors in
+///        Rasterization.cuh. Lifted to namespace scope here (next to Triangle) — independent
+///        of MeshToGrid's scratch buffer type — so it resolves to one consistent type across
+///        every MeshToGrid<BuildT, ScratchBufferT> instantiation. MeshToGrid keeps a public
+///        `BoxTrianglePair` alias to it for source/API compatibility.
+struct alignas(16) BoxTrianglePair { // sizeof(BoxTrianglePair) = 16B
+    nanovdb::Coord origin; // 12B
+    uint32_t triangleID;   // 4B
+};
+
 template <typename BuildT, typename ScratchBufferT = nanovdb::cuda::DeviceBuffer>
 class MeshToGrid
 {
@@ -62,10 +73,9 @@ class MeshToGrid
     using LeafT  = NanoLeaf<BuildT>;
 
 public:
-    struct alignas(16) BoxTrianglePair { // sizeof(BoxTrianglePair) = 16B
-        nanovdb::Coord origin; // 12B
-        uint32_t triangleID;   // 4B
-    };
+    /// @brief Alias to the namespace-scope nanovdb::tools::cuda::BoxTrianglePair
+    ///        (see above), preserving the public MeshToGrid<BuildT>::BoxTrianglePair name.
+    using BoxTrianglePair = ::nanovdb::tools::cuda::BoxTrianglePair;
 
     /// @brief Constructor
     /// @param devicePoints Vertex list for input triangle surface
@@ -302,7 +312,7 @@ MeshToGrid<BuildT, ScratchBufferT>::getHandle(const BufferT &buffer)
             uint64_t(leafCount) * sizeof(nanovdb::Mask<3>), nullptr, device, mStream);
         cudaCheck(cudaMemsetAsync(retainMaskBuffer.deviceData(), 0xFF,
             uint64_t(leafCount) * sizeof(nanovdb::Mask<3>), mStream));
-        tools::cuda::PruneGrid<BuildT> pruner(
+        tools::cuda::PruneGrid<BuildT, ScratchBufferT> pruner(
             static_cast<const GridT*>(handle.deviceData()),
             reinterpret_cast<nanovdb::Mask<3>*>(retainMaskBuffer.deviceData()),
             mStream);
@@ -1122,7 +1132,7 @@ MeshToGrid<BuildT, ScratchBufferT>::getHandleAndUDF(const GridBufferT& buffer, c
             uint64_t(leafCount) * sizeof(nanovdb::Mask<3>), nullptr, device, mStream);
         cudaCheck(cudaMemsetAsync(retainMaskBuffer.deviceData(), 0xFF,
             uint64_t(leafCount) * sizeof(nanovdb::Mask<3>), mStream));
-        tools::cuda::PruneGrid<BuildT> pruner(
+        tools::cuda::PruneGrid<BuildT, ScratchBufferT> pruner(
             static_cast<const GridT*>(handle.deviceData()),
             reinterpret_cast<nanovdb::Mask<3>*>(retainMaskBuffer.deviceData()),
             mStream);
@@ -1137,9 +1147,9 @@ MeshToGrid<BuildT, ScratchBufferT>::getHandleAndUDF(const GridBufferT& buffer, c
     const uint64_t activeVoxelCount = util::cuda::DeviceGridTraits<BuildT>::getActiveVoxelCount(
         handle.template deviceGrid<BuildT>());
 
-    auto sidecarBuffer = nanovdb::cuda::DeviceBuffer::create(
+    auto sidecarBuffer = SidecarBufferT::create(
         (activeVoxelCount + 1) * sizeof(float), nullptr, device, mStream);
-    auto *dSidecar = static_cast<float*>(sidecarBuffer.deviceData());
+    auto *dSidecar = reinterpret_cast<float*>(sidecarBuffer.deviceData());
 
     if (mVerbose==1) mTimer.start("Initializing UDF sidecar");
     util::cuda::lambdaKernel<<<numBlocks(activeVoxelCount + 1), mNumThreads, 0, mStream>>>(

@@ -52,7 +52,7 @@ struct TopologyBuilderData {
 
 }// namespace topology::detail
 
-template <typename BuildT, typename ScratchBufferT = nanovdb::cuda::DeviceBuffer>
+template <typename BuildT, typename ScratchBufferT>
 class TopologyBuilder
 {
     static_assert(nanovdb::BuildTraits<BuildT>::is_onindex);// For now, only OnIndexGrids supported
