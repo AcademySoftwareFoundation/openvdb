@@ -39,6 +39,38 @@ inline bool contains(const std::string &str, const std::string &pattern, size_t 
     return str.find(pattern, pos) != std::string::npos;
 }
 
+/// @brief Levenshtein edit distance between @a a and @a b. Counts the minimum
+///        number of single-character insertions, deletions, or substitutions
+///        needed to turn one string into the other. Used to rank "did you
+///        mean" suggestions for typos that involve character transpositions
+///        or interior insertions/deletions (cases substring matching misses).
+/// @details Classic O(|a|*|b|) dynamic-programming implementation; rolls over
+///          two rows so memory is O(min(|a|,|b|)). For our use case (a few
+///          dozen candidate names with lengths < 32) the cost is negligible.
+inline size_t levenshtein(const std::string &a, const std::string &b)
+{
+    if (a.empty()) return b.size();
+    if (b.empty()) return a.size();
+    // Ensure b is the shorter string to keep memory at O(min).
+    const std::string &s = a.size() <= b.size() ? a : b;
+    const std::string &t = a.size() <= b.size() ? b : a;
+    const size_t m = s.size();// shorter
+    const size_t n = t.size();// longer
+    std::vector<size_t> prev(m + 1), curr(m + 1);
+    for (size_t j = 0; j <= m; ++j) prev[j] = j;
+    for (size_t i = 1; i <= n; ++i) {
+        curr[0] = i;
+        for (size_t j = 1; j <= m; ++j) {
+            const size_t cost = (t[i-1] == s[j-1]) ? 0 : 1;
+            curr[j] = std::min({curr[j-1] + 1,      // insertion
+                                prev[j]   + 1,      // deletion
+                                prev[j-1] + cost}); // substitution
+        }
+        std::swap(prev, curr);
+    }
+    return prev[m];
+}
+
 /// @brief return @c true if @b character is contained in @b str starting from position @b pos
 inline bool contains(const std::string &str, char character, size_t pos = 0)
 {

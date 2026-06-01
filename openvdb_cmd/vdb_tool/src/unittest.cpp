@@ -965,7 +965,7 @@ TEST_F(Test_vdb_tool, Calculator)
       EXPECT_EQ(-7.0f, e.eval(-7.0f));
 
       e.compile("42");
-      EXPECT_EQ(42.0f, e.eval(0.0f));
+      EXPECT_EQ(42.0f, e.eval());
       EXPECT_EQ(42.0f, e.eval(123.0f));
 
       e.compile("$x:2:+");
@@ -983,16 +983,16 @@ TEST_F(Test_vdb_tool, Calculator)
     {// Infix: simple operators with standard precedence
       Calculator e;
       e.compile("2 + 3 * 4");
-      EXPECT_EQ(14.0f, e.eval(0.0f));// times binds tighter
+      EXPECT_EQ(14.0f, e.eval());// times binds tighter
 
       e.compile("(2 + 3) * 4");
-      EXPECT_EQ(20.0f, e.eval(0.0f));
+      EXPECT_EQ(20.0f, e.eval());
 
       e.compile("10 - 4 - 3");// left-associative
-      EXPECT_EQ(3.0f, e.eval(0.0f));
+      EXPECT_EQ(3.0f, e.eval());
 
       e.compile("2 ^ 3 ^ 2");// right-associative -> 2^(3^2) = 2^9 = 512
-      EXPECT_EQ(512.0f, e.eval(0.0f));
+      EXPECT_EQ(512.0f, e.eval());
     }
 
     {// Infix: variable, named constants, unary minus
@@ -1007,10 +1007,10 @@ TEST_F(Test_vdb_tool, Calculator)
       EXPECT_EQ(-5.0f, e.eval(2.5f));
 
       e.compile("pi");
-      EXPECT_TRUE(approxEq(static_cast<float>(M_PI), e.eval(0.0f)));
+      EXPECT_TRUE(approxEq(static_cast<float>(M_PI), e.eval()));
 
       e.compile("e");
-      EXPECT_TRUE(approxEq(static_cast<float>(M_E), e.eval(0.0f)));
+      EXPECT_TRUE(approxEq(static_cast<float>(M_E), e.eval()));
     }
 
     {// Infix: function calls (unary and binary)
@@ -1126,11 +1126,11 @@ TEST_F(Test_vdb_tool, Calculator)
       Calculator c;
       c.compile("pi + e");
       EXPECT_TRUE(c.variables().empty());
-      EXPECT_TRUE(approxEq(static_cast<float>(M_PI + M_E), c.eval(0.0f)));
+      EXPECT_TRUE(approxEq(static_cast<float>(M_PI + M_E), c.eval()));
 
       c.compile("$pi:$e:+");
       EXPECT_TRUE(c.variables().empty());
-      EXPECT_TRUE(approxEq(static_cast<float>(M_PI + M_E), c.eval(0.0f)));
+      EXPECT_TRUE(approxEq(static_cast<float>(M_PI + M_E), c.eval()));
     }
 
     {// eval(x) throws on any variable other than `x`
@@ -1263,7 +1263,7 @@ TEST_F(Test_vdb_tool, Calculator)
       // Slot reassignment reuses the same storage.
       c.compile("t = 1; t = t + 2; t = t*3; t");
       EXPECT_TRUE(c.variables().empty());
-      EXPECT_EQ(9.0f, c.eval(0.0f));         // ((1+2)*3) = 9; x ignored
+      EXPECT_EQ(9.0f, c.eval());         // ((1+2)*3) = 9; x ignored
 
       // Slots can shadow input names — after `x = x*2`, subsequent reads of
       // `x` read the slot, not the input. Final statement returns slot.
@@ -1277,6 +1277,315 @@ TEST_F(Test_vdb_tool, Calculator)
       Calculator c;
       EXPECT_NO_THROW(c.compile("t = x*x;  ;  t + 1;"));
       EXPECT_EQ(5.0f, c.eval(2.0f));         // 4 + 1
+    }
+
+    {// Extended operators: modulo, comparisons, logical, ternary if()
+      Calculator c;
+
+      // Modulo, both punctuation and word
+      c.compile("7 % 3");        EXPECT_EQ(1.0f, c.eval());
+      c.compile("$x:3:mod");     EXPECT_EQ(1.0f, c.eval(7.0f));
+      c.compile("fmod(10, 3)");  EXPECT_EQ(1.0f, c.eval());
+
+      // Comparisons return 1.0 / 0.0
+      c.compile("1 < 2");        EXPECT_EQ(1.0f, c.eval());
+      c.compile("2 < 1");        EXPECT_EQ(0.0f, c.eval());
+      c.compile("1 <= 1");       EXPECT_EQ(1.0f, c.eval());
+      c.compile("2 >= 3");       EXPECT_EQ(0.0f, c.eval());
+      c.compile("3 == 3");       EXPECT_EQ(1.0f, c.eval());
+      c.compile("3 != 3");       EXPECT_EQ(0.0f, c.eval());
+
+      // Logical
+      c.compile("1 && 1");       EXPECT_EQ(1.0f, c.eval());
+      c.compile("1 && 0");       EXPECT_EQ(0.0f, c.eval());
+      c.compile("0 || 0");       EXPECT_EQ(0.0f, c.eval());
+      c.compile("0 || 1");       EXPECT_EQ(1.0f, c.eval());
+      c.compile("!0");           EXPECT_EQ(1.0f, c.eval());
+      c.compile("!1");           EXPECT_EQ(0.0f, c.eval());
+
+      // Ternary via if() / select()
+      c.compile("if(1, 10, 20)");      EXPECT_EQ(10.0f, c.eval());
+      c.compile("if(0, 10, 20)");      EXPECT_EQ(20.0f, c.eval());
+      c.compile("select(1, 10, 20)");  EXPECT_EQ(10.0f, c.eval());
+
+      // Combined inside a larger expression
+      c.compile("if(x > 0, sqrt(x), 0)");
+      EXPECT_EQ(0.0f, c.eval(-4.0f));
+      EXPECT_EQ(2.0f, c.eval( 4.0f));
+    }
+
+    {// switch(selector, k1, v1, ..., kN, vN, default)
+      Calculator c;
+
+      // Basic case-match
+      c.compile("switch(1, 0, 100, 1, 200, 2, 300, 999)");
+      EXPECT_EQ(200.0f, c.eval());
+      c.compile("switch(2, 0, 100, 1, 200, 2, 300, 999)");
+      EXPECT_EQ(300.0f, c.eval());
+
+      // No match → default
+      c.compile("switch(5, 0, 100, 1, 200, 2, 300, 999)");
+      EXPECT_EQ(999.0f, c.eval());
+
+      // First match wins (k=1 appears twice)
+      c.compile("switch(1, 1, 10, 1, 20, 99)");
+      EXPECT_EQ(10.0f, c.eval());
+
+      // Minimal: 1 case + default
+      c.compile("switch(7, 7, 42, 99)");
+      EXPECT_EQ(42.0f, c.eval());
+      c.compile("switch(8, 7, 42, 99)");
+      EXPECT_EQ(99.0f, c.eval());
+
+      // Selector is a variable
+      c.compile("switch(x, 0, 10, 1, 20, 2, 30, -1)");
+      EXPECT_EQ(10.0f, c.eval(0.0f));
+      EXPECT_EQ(20.0f, c.eval(1.0f));
+      EXPECT_EQ(30.0f, c.eval(2.0f));
+      EXPECT_EQ(-1.0f, c.eval(7.0f));
+
+      // Case-value can also be a variable: switch(0, 0, x, ...) returns x
+      c.compile("switch(0, 0, x, 999)");
+      EXPECT_EQ(3.14f, c.eval(3.14f));
+
+      // Arity errors: 3 args (too few) and 5 args (odd)
+      EXPECT_THROW(c.compile("switch(1, 0, 100)"),       std::invalid_argument);
+      EXPECT_THROW(c.compile("switch(1, 0, 100, 200, 300)"), std::invalid_argument);
+    }
+
+    {// Extended functions: hyperbolic, atan2, hypot, step, clamp, mix, smoothstep, sign, round, trunc
+      Calculator c;
+
+      c.compile("sinh(0)");        EXPECT_EQ(0.0f, c.eval());
+      c.compile("cosh(0)");        EXPECT_EQ(1.0f, c.eval());
+      c.compile("tanh(0)");        EXPECT_EQ(0.0f, c.eval());
+      c.compile("asinh(0)");       EXPECT_EQ(0.0f, c.eval());
+      c.compile("acosh(1)");       EXPECT_EQ(0.0f, c.eval());
+      c.compile("atanh(0)");       EXPECT_EQ(0.0f, c.eval());
+
+      c.compile("atan2(1, 1)");
+      EXPECT_TRUE(approxEq(static_cast<float>(M_PI / 4.0), c.eval()));
+      c.compile("hypot(3, 4)");    EXPECT_EQ(5.0f, c.eval());
+
+      c.compile("step(1, 0.5)");   EXPECT_EQ(0.0f, c.eval());// x < edge → 0
+      c.compile("step(1, 1.5)");   EXPECT_EQ(1.0f, c.eval());// x >= edge → 1
+
+      c.compile("clamp(5, 0, 3)"); EXPECT_EQ(3.0f, c.eval());
+      c.compile("clamp(-1, 0, 3)");EXPECT_EQ(0.0f, c.eval());
+      c.compile("clamp(2, 0, 3)"); EXPECT_EQ(2.0f, c.eval());
+
+      c.compile("mix(0, 10, 0.5)");   EXPECT_EQ(5.0f, c.eval());
+      c.compile("lerp(0, 10, 0.25)"); EXPECT_EQ(2.5f, c.eval());
+
+      c.compile("smoothstep(0, 1, 0.5)"); EXPECT_EQ(0.5f, c.eval());
+      c.compile("smoothstep(0, 1, -1)");  EXPECT_EQ(0.0f, c.eval());
+      c.compile("smoothstep(0, 1, 2)");   EXPECT_EQ(1.0f, c.eval());
+
+      c.compile("sign(0)");        EXPECT_EQ(0.0f, c.eval());
+      c.compile("sign(-3.5)");     EXPECT_EQ(-1.0f, c.eval());
+      c.compile("sign(7)");        EXPECT_EQ(1.0f, c.eval());
+
+      c.compile("round(2.4)");     EXPECT_EQ(2.0f, c.eval());
+      c.compile("round(2.6)");     EXPECT_EQ(3.0f, c.eval());
+      c.compile("trunc(2.9)");     EXPECT_EQ(2.0f, c.eval());
+      c.compile("trunc(-2.9)");    EXPECT_EQ(-2.0f, c.eval());
+    }
+
+    {// No-arg eval() for constant expressions
+      Calculator c;
+      c.compile("1+2+3");
+      EXPECT_TRUE(c.variables().empty());
+      EXPECT_EQ(6.0f, c.eval());            // no dummy argument needed
+
+      c.compile("sin(pi/4)*2");
+      EXPECT_TRUE(c.variables().empty());
+      EXPECT_TRUE(approxEq(std::sin(static_cast<float>(M_PI)/4.0f)*2.0f, c.eval()));
+
+      // Throws when the expression actually references a variable.
+      c.compile("x + 1");
+      EXPECT_THROW(c.eval(), std::invalid_argument);
+    }
+
+    {// New named constants
+      Calculator c;
+      c.compile("tau");
+      EXPECT_TRUE(approxEq(static_cast<float>(2.0 * M_PI), c.eval()));
+      c.compile("phi");
+      EXPECT_TRUE(approxEq(1.6180339887498949f, c.eval()));
+      c.compile("inf");
+      EXPECT_TRUE(std::isinf(c.eval()));
+      c.compile("nan");
+      EXPECT_TRUE(std::isnan(c.eval()));
+
+      // Assignment to constants is rejected for the new constants too.
+      EXPECT_THROW(c.compile("tau = 1; tau"), std::invalid_argument);
+      EXPECT_THROW(c.compile("inf = 0; inf"), std::invalid_argument);
+    }
+
+    {// Operator precedence: comparisons bind tighter than logical, looser than arithmetic
+      Calculator c;
+      c.compile("1 + 2 == 3 && 1");       EXPECT_EQ(1.0f, c.eval());// (1+2)==3 && 1 → 1
+      c.compile("1 < 2 && 3 > 2");        EXPECT_EQ(1.0f, c.eval());
+      c.compile("x > 0 && x < 10");
+      EXPECT_EQ(1.0f, c.eval(5.0f));
+      EXPECT_EQ(0.0f, c.eval(-1.0f));
+      EXPECT_EQ(0.0f, c.eval(15.0f));
+    }
+
+    {// Lazy if(): only the taken branch is evaluated. Without lazy semantics,
+     // these expressions would either crash or produce inf/nan.
+      Calculator c;
+      c.compile("if(1, 42, 1/0)");
+      EXPECT_EQ(42.0f, c.eval());      // 1/0 in non-taken branch is skipped
+
+      c.compile("if(0, 1/0, 99)");
+      EXPECT_EQ(99.0f, c.eval());      // again the bad branch is skipped
+
+      // Signed square root: avoids sqrt of a negative number when x>=0.
+      c.compile("if(x>=0, sqrt(x), -sqrt(-x))");
+      EXPECT_EQ(3.0f, c.eval(9.0f));
+      EXPECT_EQ(-3.0f, c.eval(-9.0f));
+
+      // Nested: only one inner branch survives.
+      c.compile("if(1, if(0, 100, 200), 300)");
+      EXPECT_EQ(200.0f, c.eval());
+      c.compile("if(0, if(1, 100, 200), 300)");
+      EXPECT_EQ(300.0f, c.eval());
+    }
+
+    {// Constant folding: the bytecode for "1+2+3" should collapse to a
+     // single PushLit.
+      Calculator c;
+      c.compile("1+2+3");
+      EXPECT_EQ(1u, c.size());
+      EXPECT_EQ(6.0f, c.eval());
+
+      c.compile("2*pi");
+      EXPECT_EQ(1u, c.size());
+      EXPECT_TRUE(approxEq(static_cast<float>(2.0 * M_PI), c.eval()));
+
+      c.compile("sqrt(16) + abs(-3)");
+      EXPECT_EQ(1u, c.size());
+      EXPECT_EQ(7.0f, c.eval());
+
+      // Variable references prevent folding for the entire expression.
+      c.compile("x + 1");
+      EXPECT_EQ(3u, c.size());// PushVar x, PushLit 1, Add
+      EXPECT_EQ(3.0f, c.eval(2.0f));
+    }
+
+    {// disassemble(): just confirm it returns a non-empty string with the
+     // expected opcode names. Strict pattern matching would be brittle.
+      Calculator c;
+      c.compile("x*x + 1");
+      const std::string out = c.disassemble();
+      EXPECT_TRUE(out.find("PushVar") != std::string::npos);
+      EXPECT_TRUE(out.find("Mul")     != std::string::npos);
+      EXPECT_TRUE(out.find("Add")     != std::string::npos);
+      EXPECT_TRUE(out.find("PushLit") != std::string::npos);
+    }
+
+    {// Batched eval_n
+      Calculator c;
+      c.compile("sin(x) + 1");
+      constexpr size_t N = 5;
+      const float in[N]  = {0.0f, 0.5f, 1.0f, 1.5f, 2.0f};
+      float out[N] = {};
+      c.eval_n(in, out, N);
+      for (size_t i = 0; i < N; ++i) {
+          EXPECT_TRUE(approxEq(std::sin(in[i]) + 1.0f, out[i]));
+      }
+
+      // Custom variable name.
+      c.compile("v*v");
+      const float in2[3] = {2.0f, 3.0f, 4.0f};
+      float out2[3] = {};
+      c.eval_n(in2, out2, 3, "v");
+      EXPECT_EQ(4.0f,  out2[0]);
+      EXPECT_EQ(9.0f,  out2[1]);
+      EXPECT_EQ(16.0f, out2[2]);
+
+      // Constant expression: broadcast.
+      c.compile("42");
+      float out3[3] = {};
+      c.eval_n(nullptr, out3, 3);
+      EXPECT_EQ(42.0f, out3[0]);
+      EXPECT_EQ(42.0f, out3[1]);
+      EXPECT_EQ(42.0f, out3[2]);
+
+      // Wrong variable name throws.
+      c.compile("x + 1");
+      float dummy[1];
+      EXPECT_THROW(c.eval_n(in, dummy, 1, "y"), std::invalid_argument);
+    }
+
+    {// Column-aware error messages include "column N" and a caret line.
+      Calculator c;
+      try {
+          c.compile("1 + @ + 2");
+          FAIL() << "expected throw on '@'";
+      } catch (const std::exception &e) {
+          const std::string what = e.what();
+          EXPECT_TRUE(what.find("column") != std::string::npos)
+              << "error missing column info: " << what;
+          EXPECT_TRUE(what.find("^") != std::string::npos)
+              << "error missing caret marker: " << what;
+      }
+    }
+
+    {// User-defined functions (def name(p1, p2, ...) = body)
+      Calculator c;
+
+      // Single-argument
+      c.compile("def sq(x) = x*x; sq(3)");
+      EXPECT_EQ(9.0f, c.eval());
+
+      // Multiple calls
+      c.compile("def sq(x) = x*x; sq(3) + sq(4)");
+      EXPECT_EQ(25.0f, c.eval());
+
+      // Two parameters
+      c.compile("def hyp(a, b) = sqrt(a*a + b*b); hyp(3, 4)");
+      EXPECT_EQ(5.0f, c.eval());
+
+      // Composition: cube via square
+      c.compile("def sq(x) = x*x; def cu(x) = x*sq(x); cu(3)");
+      EXPECT_EQ(27.0f, c.eval());
+
+      // Lazy if inside a UDF body still lazy:
+      c.compile("def safe_inv(x) = if(x==0, 0, 1/x); safe_inv(0) + safe_inv(2)");
+      EXPECT_EQ(0.5f, c.eval());
+
+      // Inputs flow through: def's parameter is independent of the caller's name.
+      // Here the def has parameter `t`; the caller passes its `x` as the argument.
+      c.compile("def square(t) = t*t; square(x) + x");
+      EXPECT_EQ(20.0f, c.eval(4.0f));// 16 + 4
+
+      // Error: free variable in def body.
+      EXPECT_THROW(c.compile("def f(x) = x + y; f(1)"),
+                   std::invalid_argument);
+
+      // Error: recursion (forward reference to self).
+      EXPECT_THROW(c.compile("def f(x) = f(x-1); f(3)"),
+                   std::invalid_argument);
+
+      // Error: wrong argument count.
+      EXPECT_THROW(c.compile("def f(x, y) = x+y; f(1)"),
+                   std::invalid_argument);
+      EXPECT_THROW(c.compile("def f(x) = x; f(1, 2)"),
+                   std::invalid_argument);
+
+      // Error: def cannot be the final statement.
+      EXPECT_THROW(c.compile("def f(x) = x*x"),
+                   std::invalid_argument);
+
+      // Error: cannot redefine built-in.
+      EXPECT_THROW(c.compile("def sin(x) = x; sin(0)"),
+                   std::invalid_argument);
+
+      // Error: duplicate def.
+      EXPECT_THROW(c.compile("def f(x) = x; def f(y) = y+1; f(2)"),
+                   std::invalid_argument);
     }
 
     {// Multi-statement error paths
@@ -1536,6 +1845,63 @@ TEST_F(Test_vdb_tool, ActionForValuesGreedy)
                   (vars[0] == "v" && vars[1] == "a"));
     }
 }// ActionForValuesGreedy
+
+TEST_F(Test_vdb_tool, ActionForValuesStencil)
+{
+    // -forValues supports relative neighbor access via v(dx, dy, dz). At
+    // every active voxel the kernel sees the current value plus values of
+    // arbitrary neighbors fetched through a per-thread const accessor; the
+    // grid is internally deep-copied so reads are from a stable snapshot.
+    using namespace openvdb::vdb_tool;
+    using GridT = openvdb::FloatGrid;
+
+    // Build a 5×5×5 grid where each voxel stores its x-coordinate (so the
+    // x-derivative kernel v(1,0,0) - v(-1,0,0) has a known answer of 2.0
+    // at every interior voxel, regardless of voxel topology).
+    GridT::Ptr grid = GridT::create(0.0f);
+    auto acc = grid->getAccessor();
+    for (int i = 0; i <= 4; ++i)
+      for (int j = 0; j <= 4; ++j)
+        for (int k = 0; k <= 4; ++k) {
+            acc.setValue(openvdb::Coord(i, j, k), static_cast<float>(i));
+        }
+
+    // Compile and run the stencil kernel through the Calculator + neighbor
+    // binding plumbing. Build the Tool from a config so the action wiring
+    // is the production path (not a bespoke API).
+    {
+      auto args = getArgs("vdb_tool -quiet");
+      Tool tool(int(args.size()), args.data());
+      // Inject our prebuilt grid into the Tool's stack via parser plumbing.
+      // (The Tool doesn't expose a public "addGrid" but it offers writeFile.)
+      // Easier: write to disk, then drive the full -read / -forOnValues / -read pipeline.
+      const std::string tmp = "data/test_stencil_in.vdb";
+      openvdb::io::File(tmp).write({grid});
+      auto args2 = getArgs("vdb_tool -quiet -read " + tmp +
+                          " -forOnValues v(1,0,0)-v(-1,0,0)"
+                          " -write data/test_stencil_out.vdb");
+      Tool t2(int(args2.size()), args2.data());
+      EXPECT_NO_THROW(t2.run());
+    }
+
+    // Read the result back and verify the interior values.
+    GridT::Ptr result;
+    {
+      openvdb::io::File f("data/test_stencil_out.vdb");
+      f.open();
+      auto baseGrid = f.readGrid(f.beginName().gridName());
+      result = openvdb::gridPtrCast<GridT>(baseGrid);
+    }
+    ASSERT_TRUE(result != nullptr);
+    auto racc = result->getConstAccessor();
+    // Interior x-derivative should equal 2.0 (= (i+1) - (i-1)).
+    for (int i = 1; i <= 3; ++i)
+      for (int j = 0; j <= 4; ++j)
+        for (int k = 0; k <= 4; ++k) {
+            const float got = racc.getValue(openvdb::Coord(i, j, k));
+            EXPECT_NEAR(2.0f, got, 1e-5f) << "at (" << i << "," << j << "," << k << ")";
+        }
+}// ActionForValuesStencil
 
 TEST_F(Test_vdb_tool, Memory)
 {

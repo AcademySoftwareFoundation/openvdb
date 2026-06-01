@@ -136,6 +136,33 @@ vdb_tool -calc 'a=1;b=5;c=1' -for x='{$a},{$b},{$c}' -end
 # Feed values into -calc from prior -eval set operations. The final
 # statement is a plain expression, so the result is echoed.
 vdb_tool -eval str='{2:@x}' -calc '3*sin(x)+1'  # prints 3*sin(2)+1 ≈ 3.727
+
+# Control flow: 'if(cond, then, else)' is a 3-arg expression. Both branches
+# are evaluated eagerly; the result is selected.
+vdb_tool -calc 'if(2>1, 10, 20)'                # prints 10
+
+# Combine if() with multi-statement to compute |x|, set in memory:
+vdb_tool -eval '{-5:@x}' -calc 'abs_x = if(x>=0, x, -x)' -eval str='|x|={$abs_x}'
+# prints: |x|=5.000000
+
+# Signed square-root in a single kernel (no memory needed; x is a local slot).
+# Final statement is a plain expression, so the result is echoed.
+vdb_tool -calc 'x=-9; if(x>=0, sqrt(x), -sqrt(-x))'   # prints -3
+
+# Variadic switch(selector, k1, v1, ..., kN, vN, default): pick the value
+# for the first ki that equals the selector, else default.
+vdb_tool -eval '{2:@mode}' -calc 'switch(mode, 0, 100, 1, 200, 2, 300, -1)'
+# prints: 300
+
+# Classify each loop iteration with nested if():
+vdb_tool -for n=-2,3,1 -calc 'label = if(n<0, -1, if(n==0, 0, 1))' \
+                       -eval str='{$n}: label={$label}' -end
+# prints:
+#   Processing: n = -2, ...      -2: label=-1.000000
+#   Processing: n = -1, ...      -1: label=-1.000000
+#   Processing: n =  0, ...       0: label=0.000000
+#   Processing: n =  1, ...       1: label=1.000000
+#   Processing: n =  2, ...       2: label=1.000000
 ```
 
 A few rules:
@@ -153,6 +180,28 @@ The reserved variable `v` is bound to the current voxel value. Any other identif
 
 The voxel-variable name is configurable via the `use=` option (default `v`); for example `-forOnValues 'sin(x)+1' use=x` reads better if you prefer `x`, and is equivalent to `-forOnValues 'sin(v)+1'` &mdash; the chosen name is treated as the per-voxel input and excluded from the Processor-memory lookup performed for every other identifier.
 
+#### Stencil kernels: voxel-neighbor access
+
+When the kernel calls the voxel-variable as a function with three integer-literal offsets, e.g. `v(1, 0, 0)`, the call expands to a relative neighbor read at index-space coordinate `(i+dx, j+dy, k+dz)` where `(i, j, k)` is the current voxel. `v(0, 0, 0)` is equivalent to bare `v` (the center). Neighbor reads go through a per-thread `ConstAccessor` for cache locality, and the grid is internally deep-copied before iteration so reads come from a stable snapshot of the original state &mdash; parallel writes to the iterator's grid don't race with neighbor reads.
+
+```bash
+# Finite-difference x-derivative.
+vdb_tool -read in.vdb -forOnValues 'v(1,0,0) - v(-1,0,0)' -write out.vdb
+
+# 6-point discrete Laplacian.
+vdb_tool -read in.vdb -forOnValues 'v(1,0,0)+v(-1,0,0)+v(0,1,0)+v(0,-1,0)+v(0,0,1)+v(0,0,-1) - 6*v' -write out.vdb
+
+# Jacobi smoothing of a cube: average each voxel with its 6 face neighbors.
+vdb_tool -platonic faces=6 -forOnValues '(v + v(1,0,0)+v(-1,0,0)+v(0,1,0)+v(0,-1,0)+v(0,0,1)+v(0,0,-1)) / 7' -write smooth.vdb
+```
+
+Constraints and caveats:
+
+- Offsets must be **integer literals** (or unary-negated integer literals); a runtime expression like `v(dx, 0, 0)` where `dx` is a variable is rejected at compile time. This keeps each neighbor reference resolvable to a single PushVar opcode with no per-voxel arithmetic.
+- The renamed voxel variable participates: `-forOnValues '...' use=x` makes `x(1, 0, 0)` the +x neighbor.
+- Reads at the boundary of the active region return the grid's background value. There's no `boundary=clamp|...` option (yet); structure the kernel to tolerate it or pre-pad the active region.
+- The implicit deep-copy doubles memory for the duration of the action when any non-zero neighbor offset is used.
+
 The same expression can be written in any of three equivalent syntaxes:
 
 | Syntax | Example |
@@ -169,20 +218,30 @@ The kernel can be supplied either as a bare positional argument (`-forOnValues '
 
 | Op | Precedence | Associativity |
 |----|-----------|---------------|
-| `^` (power)      | 4 | right |
-| unary `-` / `+`  | 5 | right (unary `+` is a no-op) |
-| `*` `/`          | 3 | left |
-| `+` `-` (binary) | 2 | left |
+| unary `-` / `+` / `!`  | 8 | right (unary `+` is a no-op, `!` is logical NOT) |
+| `^` (power)            | 7 | right |
+| `*` `/` `%`            | 6 | left  |
+| `+` `-` (binary)       | 5 | left  |
+| `<` `>` `<=` `>=`      | 4 | left (return 1.0/0.0) |
+| `==` `!=`              | 3 | left (return 1.0/0.0) |
+| `&&`                   | 2 | left (return 1.0/0.0) |
+| `||`                   | 1 | left (return 1.0/0.0) |
+
+In RPN, the punctuation operators have word-form aliases: `mod`, `lt`/`gt`/`le`/`ge`/`eq`/`ne`, `and`/`or`/`not`.
 
 ### Functions
 
-| Unary  | `neg` `abs` `inv` `sqrt` `sin` `cos` `tan` `asin` `acos` `atan` `exp` `ln` `log` `floor` `ceil` `pow2` `pow3` |
-|--------|---|
-| **Binary** | `pow(a, b)` (also `a^b`), `min(a, b)`, `max(a, b)` |
+| Unary   | `neg` `abs` `inv` `sqrt` `sin` `cos` `tan` `asin` `acos` `atan` `sinh` `cosh` `tanh` `asinh` `acosh` `atanh` `exp` `ln` `log` `floor` `ceil` `pow2` `pow3` `sign` `round` `trunc` `not` |
+|---------|---|
+| **Binary**  | `pow(a, b)` (also `a^b`), `min(a, b)`, `max(a, b)`, `atan2(y, x)`, `hypot(a, b)`, `step(edge, x)`, `mod(a, b)` / `fmod(a, b)` |
+| **Ternary** | `clamp(x, lo, hi)`, `lerp(a, b, t)` (alias `mix`), `smoothstep(e0, e1, x)`, `if(cond, then, else)` / `select(cond, then, else)` |
+| **Variadic** | `switch(selector, k1, v1, ..., kN, vN, default)` |
+
+`step(edge, x)` follows GLSL conventions: returns 1 when `x >= edge`, else 0. `lerp(a, b, t)` is `a*(1-t) + b*t`. `smoothstep` clamps to `[0,1]` then applies the Hermite polynomial `t*t*(3-2*t)`. `if`/`select` evaluates both branches eagerly &mdash; they're plain ternary, not short-circuit. `switch(s, k1, v1, ..., kN, vN, d)` returns `vi` for the first `ki == s` (exact equality), else `d`; like `if`, all case bodies are eagerly evaluated. The arg count must be even and at least 4.
 
 ### Constants
 
-`pi` and `e` are recognized as named literals in all three syntaxes. They cannot be the target of an assignment.
+`pi`, `tau` (=2π), `e`, `phi` (golden ratio), `inf`, and `nan` are recognized as named literals in all three syntaxes. None of them can be the target of an assignment.
 
 ### Multi-statement programs
 
@@ -234,6 +293,72 @@ vdb_tool -read in.vdb -forOnValues 'max(v, 0)' keep=true -print
 - **Thread safety.** A compiled `kernel` is evaluated in parallel via TBB. The bytecode evaluator allocates its working stack &mdash; including the slot buffer used by multi-statement kernels &mdash; on the C stack at each call, so a single compiled kernel is safely shared across all worker threads.
 - **Mixing syntaxes.** `=` and `;` require pure infix; combining them with `$` or `:` is rejected by the dispatcher.
 - **Shell quoting.** Always single-quote the kernel value so the shell doesn't interpret `*`, `(`, `$`, `;`, etc.
+
+### Advanced features
+
+The Calculator that drives `-calc` and the per-voxel kernels also supports several optimizations and language features beyond the basics above.
+
+#### Lazy `if(...)` (short-circuit semantics)
+
+`if(cond, then, else)` evaluates **only the taken branch**. The other branch is skipped at runtime, so kernels can guard against divisions by zero, square-roots of negatives, etc. without first evaluating the problematic expression:
+
+```bash
+vdb_tool -calc 'if(1, 42, 1/0)'                              # prints 42 — 1/0 is never evaluated
+vdb_tool -calc 'x=-9; if(x>=0, sqrt(x), -sqrt(-x))'          # prints -3  — sqrt(-9) is never evaluated
+vdb_tool -calc 'def safe_inv(x) = if(x==0, 0, 1/x); \
+                 safe_inv(0) + safe_inv(2)'                  # prints 0.5 — 1/0 never runs
+```
+
+Nested `if()` calls and `if()` inside user-defined function bodies also short-circuit correctly. `switch(...)` is currently eager (all case values are computed); use nested `if()` if you need lazy semantics for many cases.
+
+#### User-defined functions (`def`)
+
+A `def name(params) = body` statement registers a function. Subsequent calls to it inline the body's bytecode with the arguments bound to the parameters &mdash; no runtime call overhead. Functions can call other previously-defined functions, but **recursion is not supported** (a function referencing itself fails with "unknown function"); free variables in the body (anything not in the parameter list) are also rejected at compile time.
+
+```bash
+# Single-parameter function
+vdb_tool -calc 'def sq(x) = x*x; sq(3) + sq(4)'              # prints 25
+
+# Two parameters
+vdb_tool -calc 'def hyp(a, b) = sqrt(a*a + b*b); hyp(3, 4)'  # prints 5
+
+# Composition: `cu` uses `sq` defined earlier
+vdb_tool -calc 'def sq(x) = x*x; def cu(x) = x*sq(x); cu(3)' # prints 27
+
+# Use a `def` inside a voxel kernel for readability:
+vdb_tool -sphere -forOnValues 'def step01(t) = clamp(t, 0, 1); step01(v + 0.5)' -print
+```
+
+The `def` itself emits no bytecode; only call sites do. Therefore a `def` statement cannot be the final statement of a program (it has no return value).
+
+#### Constant folding
+
+Literal-only subexpressions are folded at compile time:
+
+```bash
+vdb_tool -calc '1 + 2 + 3'                                   # bytecode: PushLit 6 (single instruction)
+vdb_tool -calc '2*pi + sqrt(16) + abs(-3)'                   # collapses to one literal
+```
+
+The fold pass runs after the parser and before lazy `if` rewriting; combined with the parser, a kernel like `kernel='sin(pi/4)*2 + a*v'` compiles down to two instructions: one `PushLit` (the precomputed `sin(pi/4)*2`) plus the per-voxel `a*v` chain.
+
+#### Diagnostics: column-aware error messages
+
+Calculator's tokenizer points at exactly where it stopped:
+
+```
+Calculator: unexpected character '@' in expression
+  1 + @ + 2
+      ^  (column 5)
+```
+
+#### Batched evaluation in C++
+
+`Calculator::eval_n(in, out, n, varName="x")` applies a single-variable kernel across an array, suitable for vector-style transforms in tests or programmatic call-sites.
+
+#### Bytecode inspection
+
+`Calculator::disassemble()` returns a multi-line, human-readable dump of the compiled bytecode &mdash; useful when debugging kernel behavior or comparing the effect of the optimization passes.
 
 # Building this tool
 

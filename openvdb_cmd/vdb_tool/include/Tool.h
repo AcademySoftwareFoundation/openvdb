@@ -91,6 +91,7 @@
 #endif
 
 #include <tbb/blocked_range2d.h>
+#include <tbb/enumerable_thread_specific.h>
 
 #include "Calculator.h"
 #include "Parser.h"
@@ -578,7 +579,7 @@ void Tool::init()
      {"forAllValues"}, "Applied a simple computational kernel to values in a grid.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
      {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"kernel", "", "sin(v)+2*v*v", "user-defined math expression to apply to each value. The \"kernel=\" prefix is OPTIONAL; the kernel may also be supplied as a bare positional argument, e.g. \"-forOnValues 'sin(v)+1'\" or \"-forOnValues 'sin(v)+1' keep=true\" — other named options of the same action still parse normally. Supports infix (e.g. \"sin(v)+2*v*v\"), RPN (e.g. \"$v:sin:$v:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = v*v; t + sin(t)\"). The variable that holds the current voxel value is configurable via the \"use\" option (defaults to \"v\"); any other identifier in the kernel is looked up once in the Processor's string memory (the same namespace used by -eval / -calc) and used as a per-voxel constant — kernels like \"a*v + b\" therefore require -eval / -calc to have set \"a\" and \"b\" beforehand, else an error is thrown. An empty kernel is a no-op."},
+     {"kernel", "", "sin(v)+2*v*v", "user-defined math expression to apply to each value. The \"kernel=\" prefix is OPTIONAL; the kernel may also be supplied as a bare positional argument, e.g. \"-forOnValues 'sin(v)+1'\" or \"-forOnValues 'sin(v)+1' keep=true\" — other named options of the same action still parse normally. Supports infix (e.g. \"sin(v)+2*v*v\"), RPN (e.g. \"$v:sin:$v:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = v*v; t + sin(t)\"). The variable that holds the current voxel value is configurable via the \"use\" option (defaults to \"v\"). Stencil kernels: write \"v(dx,dy,dz)\" with integer-literal offsets to read a relative neighbor voxel through a per-thread ConstAccessor (e.g. \"v(1,0,0)-v(-1,0,0)\" computes a finite-difference x-derivative). The grid is internally deep-copied so reads come from a stable snapshot. Any other identifier in the kernel is looked up once in the Processor's string memory (the same namespace used by -eval / -calc) and used as a per-voxel constant — kernels like \"a*v + b\" therefore require -eval / -calc to have set \"a\" and \"b\" beforehand, else an error is thrown. An empty kernel is a no-op."},
      {"use", "v", "v|x|val", "name of the variable bound to the current voxel value inside the kernel. Defaults to \"v\". Use e.g. use=x if your kernel reads better with \"x\" as the voxel variable; the chosen name is then treated as the per-voxel input and excluded from the Processor-memory lookup performed for every other identifier in the expression."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
@@ -590,7 +591,7 @@ void Tool::init()
      {"forOnValues"}, "Applied a simple computational kernel to values in a grid.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
      {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"kernel", "", "sin(v)+2*v*v", "user-defined math expression to apply to each value. The \"kernel=\" prefix is OPTIONAL; the kernel may also be supplied as a bare positional argument, e.g. \"-forOnValues 'sin(v)+1'\" or \"-forOnValues 'sin(v)+1' keep=true\" — other named options of the same action still parse normally. Supports infix (e.g. \"sin(v)+2*v*v\"), RPN (e.g. \"$v:sin:$v:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = v*v; t + sin(t)\"). The variable that holds the current voxel value is configurable via the \"use\" option (defaults to \"v\"); any other identifier in the kernel is looked up once in the Processor's string memory (the same namespace used by -eval / -calc) and used as a per-voxel constant — kernels like \"a*v + b\" therefore require -eval / -calc to have set \"a\" and \"b\" beforehand, else an error is thrown. An empty kernel is a no-op."},
+     {"kernel", "", "sin(v)+2*v*v", "user-defined math expression to apply to each value. The \"kernel=\" prefix is OPTIONAL; the kernel may also be supplied as a bare positional argument, e.g. \"-forOnValues 'sin(v)+1'\" or \"-forOnValues 'sin(v)+1' keep=true\" — other named options of the same action still parse normally. Supports infix (e.g. \"sin(v)+2*v*v\"), RPN (e.g. \"$v:sin:$v:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = v*v; t + sin(t)\"). The variable that holds the current voxel value is configurable via the \"use\" option (defaults to \"v\"). Stencil kernels: write \"v(dx,dy,dz)\" with integer-literal offsets to read a relative neighbor voxel through a per-thread ConstAccessor (e.g. \"v(1,0,0)-v(-1,0,0)\" computes a finite-difference x-derivative). The grid is internally deep-copied so reads come from a stable snapshot. Any other identifier in the kernel is looked up once in the Processor's string memory (the same namespace used by -eval / -calc) and used as a per-voxel constant — kernels like \"a*v + b\" therefore require -eval / -calc to have set \"a\" and \"b\" beforehand, else an error is thrown. An empty kernel is a no-op."},
      {"use", "v", "v|x|val", "name of the variable bound to the current voxel value inside the kernel. Defaults to \"v\". Use e.g. use=x if your kernel reads better with \"x\" as the voxel variable; the chosen name is then treated as the per-voxel input and excluded from the Processor-memory lookup performed for every other identifier in the expression."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
@@ -602,7 +603,7 @@ void Tool::init()
      {"forOffValues"}, "Applied a simple computational kernel to values in a grid.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
      {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"kernel", "", "sin(v)+2*v*v", "user-defined math expression to apply to each value. The \"kernel=\" prefix is OPTIONAL; the kernel may also be supplied as a bare positional argument, e.g. \"-forOnValues 'sin(v)+1'\" or \"-forOnValues 'sin(v)+1' keep=true\" — other named options of the same action still parse normally. Supports infix (e.g. \"sin(v)+2*v*v\"), RPN (e.g. \"$v:sin:$v:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = v*v; t + sin(t)\"). The variable that holds the current voxel value is configurable via the \"use\" option (defaults to \"v\"); any other identifier in the kernel is looked up once in the Processor's string memory (the same namespace used by -eval / -calc) and used as a per-voxel constant — kernels like \"a*v + b\" therefore require -eval / -calc to have set \"a\" and \"b\" beforehand, else an error is thrown. An empty kernel is a no-op."},
+     {"kernel", "", "sin(v)+2*v*v", "user-defined math expression to apply to each value. The \"kernel=\" prefix is OPTIONAL; the kernel may also be supplied as a bare positional argument, e.g. \"-forOnValues 'sin(v)+1'\" or \"-forOnValues 'sin(v)+1' keep=true\" — other named options of the same action still parse normally. Supports infix (e.g. \"sin(v)+2*v*v\"), RPN (e.g. \"$v:sin:$v:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = v*v; t + sin(t)\"). The variable that holds the current voxel value is configurable via the \"use\" option (defaults to \"v\"). Stencil kernels: write \"v(dx,dy,dz)\" with integer-literal offsets to read a relative neighbor voxel through a per-thread ConstAccessor (e.g. \"v(1,0,0)-v(-1,0,0)\" computes a finite-difference x-derivative). The grid is internally deep-copied so reads come from a stable snapshot. Any other identifier in the kernel is looked up once in the Processor's string memory (the same namespace used by -eval / -calc) and used as a per-voxel constant — kernels like \"a*v + b\" therefore require -eval / -calc to have set \"a\" and \"b\" beforehand, else an error is thrown. An empty kernel is a no-op."},
      {"use", "v", "v|x|val", "name of the variable bound to the current voxel value inside the kernel. Defaults to \"v\". Use e.g. use=x if your kernel reads better with \"x\" as the voxel variable; the chosen name is then treated as the per-voxel input and excluded from the Processor-memory lookup performed for every other identifier in the expression."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
@@ -2724,37 +2725,106 @@ void Tool::forValues()
     if (mParser.verbose) mTimer.start(action_name);
     if (!kernel.empty()) {
       Calculator calc;
+      // Configure the neighbor-function rewriter BEFORE compile so the
+      // kernel "v(1,0,0)" parses into a synthesized variable name that we
+      // recognize and bind to a relative accessor lookup below.
+      calc.setNeighborFunction(voxel_var);
       calc.compile(kernel);// throws on syntax error / unknown op
+
       // The kernel reads the current voxel value via the variable named by
-      // the "use" option (default "v"); every other identifier must
-      // already exist in the Processor's string memory and is bound once
-      // (a per-voxel constant). This mirrors how -calc consumes Processor
-      // memory and lets kernels share values with -eval / -calc actions
-      // earlier in the pipeline.
-      const auto  &mem  = mParser.processor.memory();
-      const int    vIdx = calc.variableIndex(voxel_var);
+      // the "use" option (default "v"); calls of the form voxel_var(dx,dy,dz)
+      // are rewritten by the Calculator to input variables literally named
+      // "v(1,0,0)" etc., which we resolve via a ConstAccessor at evaluation
+      // time. Every other identifier must already exist in the Processor's
+      // string memory and is bound once (a per-voxel constant).
+      const auto &mem = mParser.processor.memory();
+      const std::string nbrPrefix = voxel_var + "(";
+
+      // Parse a synthesized neighbor name "v(dx,dy,dz)" into integer offsets.
+      // Returns true iff the name matches the expected shape.
+      auto parseNeighbor = [&nbrPrefix](const std::string &name,
+                                        int &dx, int &dy, int &dz) -> bool {
+          if (name.size() <= nbrPrefix.size() + 1) return false;
+          if (name.compare(0, nbrPrefix.size(), nbrPrefix) != 0) return false;
+          if (name.back() != ')') return false;
+          const std::string inner = name.substr(
+              nbrPrefix.size(), name.size() - nbrPrefix.size() - 1);
+          int vals[3] = {0, 0, 0};
+          int idx = 0;
+          size_t start = 0;
+          for (size_t i = 0; i <= inner.size(); ++i) {
+              if (i == inner.size() || inner[i] == ',') {
+                  if (idx >= 3) return false;
+                  const std::string num = inner.substr(start, i - start);
+                  try { vals[idx++] = std::stoi(num); }
+                  catch (...) { return false; }
+                  start = i + 1;
+              }
+          }
+          if (idx != 3) return false;
+          dx = vals[0]; dy = vals[1]; dz = vals[2];
+          return true;
+      };
+
+      struct NeighborBinding { int idx; int dx, dy, dz; };
+      std::vector<NeighborBinding> neighbors;
+      int vIdx = -1;
       std::vector<float> base(calc.variables().size());
       for (size_t i = 0; i < calc.variables().size(); ++i) {
-          if (static_cast<int>(i) == vIdx) continue;// bound per voxel below
           const std::string &name = calc.variables()[i];
+          if (name == voxel_var) {
+              vIdx = static_cast<int>(i);
+              continue;// bound per voxel below
+          }
+          int dx, dy, dz;
+          if (parseNeighbor(name, dx, dy, dz)) {
+              neighbors.push_back({static_cast<int>(i), dx, dy, dz});
+              continue;// resolved via accessor at eval time
+          }
           if (!mem.isSet(name)) {
               throw std::invalid_argument(
                   action_name+": kernel references undefined variable \""+name+
                   "\" (set it first with -eval / -calc, or use \""+voxel_var+
-                  "\" for the current voxel value)");
+                  "\" for the current voxel value, or \""+voxel_var+"(dx,dy,dz)\" "
+                  "for a relative neighbor)");
           }
           base[i] = strTo<float>(mem.get(name));
       }
-      // Per-voxel lambda. tools::foreach hands a single functor instance to
-      // TBB, which calls it concurrently on multiple voxels; we therefore
-      // allocate the per-call values buffer on the *C* stack so the per-voxel
-      // mutation of `v` is thread-local.
-      auto kernel_fn = [&calc, &base, vIdx](auto &it) {
+
+      // If any neighbor with a non-zero offset is referenced, we need a
+      // read-only snapshot — otherwise parallel writes to the iterator's
+      // grid would race with neighbor reads from the same grid.
+      const bool needSnapshot = std::any_of(neighbors.begin(), neighbors.end(),
+          [](const NeighborBinding &n){ return n.dx || n.dy || n.dz; });
+      GridT::Ptr read_snap = needSnapshot ? grid->deepCopy() : nullptr;
+      using ConstAcc = GridT::ConstAccessor;
+      tbb::enumerable_thread_specific<ConstAcc> tls_acc(
+          [&]{ return read_snap ? read_snap->getConstAccessor()
+                                : grid->getConstAccessor(); });
+
+      // Per-voxel lambda. tls_acc gives each TBB worker its own cached
+      // ConstAccessor for fast neighbor lookups (sequential coordinates
+      // typically hit the same internal nodes). The per-call values buffer
+      // lives on the C stack so per-voxel mutation is thread-local.
+      auto kernel_fn = [&calc, &base, &neighbors, &tls_acc, vIdx](auto &it) {
           constexpr size_t kMaxVars = 32;
           OPENVDB_ASSERT(base.size() <= kMaxVars);
           float values[kMaxVars];
           for (size_t i = 0; i < base.size(); ++i) values[i] = base[i];
-          if (vIdx >= 0) values[vIdx] = static_cast<float>(*it);
+          const float center = static_cast<float>(*it);
+          if (vIdx >= 0) values[vIdx] = center;
+          if (!neighbors.empty()) {
+              ConstAcc &acc = tls_acc.local();
+              const openvdb::Coord c = it.getCoord();
+              for (const NeighborBinding &n : neighbors) {
+                  if (n.dx == 0 && n.dy == 0 && n.dz == 0) {
+                      values[n.idx] = center;// v(0,0,0) is just the center
+                  } else {
+                      values[n.idx] = static_cast<float>(
+                          acc.getValue(c.offsetBy(n.dx, n.dy, n.dz)));
+                  }
+              }
+          }
           it.setValue(calc.eval(values));
       };
       switch (mode) {

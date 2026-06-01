@@ -107,6 +107,12 @@ struct Action {
     /// @throw std::invalid_argument if the token cannot be matched to any option.
     void setOption(const std::string &str);
 
+    /// @brief Return option names that are substring-matched by @a name (used
+    ///        to suggest "did you mean" corrections for typos like
+    ///        `radiuss=` &rarr; `radius=`). Sorted by best match (smallest
+    ///        substring offset). Empty when no option matches.
+    std::multimap<size_t, std::string> closeOptionMatches(const std::string &name) const;
+
     /// @brief Print this action and its current options in the canonical "-name opt=val ..." form.
     void print(std::ostream& os = std::clog) const;
 
@@ -951,7 +957,7 @@ public:
 ///          embedded "{}" expressions. Typical lifecycle:
 ///          @code
 ///              Parser p(defaults);
-///              p.parse(argc, argv); // populates 'actions'
+///              p.parse(argc, argv); // populates available 'actions'
 ///              p.finalize();        // validates loops, applies defaults
 ///              p.run();             // executes each action's 'run' callback in order
 ///          @endcode
@@ -1036,6 +1042,16 @@ struct Parser {
     int                 verbose;                                ///< Verbosity level (0=quiet, 1=info, 2=debug).
     mutable size_t      counter;                                ///< Counter validating balanced "-for/each/if" and "-end".
     mutable Processor   processor;                              ///< Processor evaluating "{}" expressions in option values.
+    /// @brief Stack of currently-open loop/if scopes, in order of opening.
+    ///        Each entry records the scope's keyword ("for", "each", "files",
+    ///        "if") and the argv index where it was opened. Drained by `-end`.
+    ///        Used to emit precise diagnostics for an unbalanced scope.
+    mutable std::vector<std::pair<std::string, int>> mOpenLoops;
+    /// @brief argv index of the action currently being initialized. Updated
+    ///        by parse() before invoking each action's init() callback so the
+    ///        loop-tracking lambdas know which command-line token they came
+    ///        from. -1 outside parse().
+    mutable int         mCurrentArgIdx = -1;
 };// Parser struct
 
 // ==============================================================================================================
@@ -1089,15 +1105,43 @@ math::Vec3<T> Parser::getVec3(const std::string &name, const char* delimiters) c
 // ==============================================================================================================
 
 std::multimap<size_t, std::string> Parser::closeMatches(const std::string &str) const
-{//returns sorted map of available actions that contain str, while ignoring character case and leading '-'
+{//returns sorted map of available actions that look "close" to str. Combines
+ // substring matching (catches "extra suffix" / "shorter prefix" typos) with
+ // Levenshtein edit distance (catches character transpositions, insertions,
+ // and substitutions like -spehre → -sphere). Substring hits are ranked
+ // ahead of edit-distance hits via the multimap key. Case-insensitive and
+ // ignoring leading '-'.
     std::multimap<size_t, std::string> matches;
     size_t pos = str.find_first_not_of("-");
     if (pos==std::string::npos) return matches;// special case when str only contains one or more '-'
     std::string pattern = toLowerCase(str.substr(pos));//remove all leading "-" and convert to lower case
+    // Cap edit-distance proposals so very short typos don't suggest unrelated
+    // actions. 2 is a good default — catches single-typo / transposition
+    // mistakes without flooding the suggestion list.
+    constexpr size_t kMaxLevDist = 2;
     for (auto it = available.begin(); it != available.end(); ++it) {
         for (auto &name : it->names) {
-            pos = name.find(pattern);
-            if (pos != std::string::npos) matches.emplace(pos, name);
+            const std::string nameLower = toLowerCase(name);
+            // Substring (forward): user input is a substring of the action name.
+            size_t key = nameLower.find(pattern);
+            // Substring (reverse): action name is a substring of the user input.
+            // Skip very short candidate names to avoid noise from 1-/2-char
+            // aliases (e.g. "-p", "-h").
+            if (key == std::string::npos && nameLower.size() >= 3) {
+                key = pattern.find(nameLower);
+            }
+            if (key != std::string::npos) {
+                matches.emplace(key, name);// substring hits ranked first
+                continue;
+            }
+            // Levenshtein fallback: catches transpositions and small edits
+            // that substring matching misses. Encode the distance offset by
+            // a large constant so substring hits sort first; among edit-
+            // distance hits, smaller distance still ranks higher.
+            const size_t d = levenshtein(pattern, nameLower);
+            if (d <= kMaxLevDist && nameLower.size() >= 3) {
+                matches.emplace(1000 + d, name);
+            }
         }
     }
     return matches;
@@ -1119,6 +1163,13 @@ void Action::setOption(const std::string &str)
         options[anonymous].append(str.substr(pos+1));
     } else {
         for (Option &opt : options) {
+            // In greedy mode (where the anonymous option's value may legitimately
+            // contain '=', e.g. a kernel assignment "v=v+1"), require an EXACT
+            // option-name match. Otherwise short kernel identifiers that happen
+            // to prefix a registered option name would silently land in that
+            // option ("v=v+1" → "vdb=v+1"). Non-greedy actions keep the
+            // convenient partial-match shortcut (e.g. "-erode r=2" → radius=2).
+            if (greedy && opt.name.size() != pos) continue;
             if (opt.name.compare(0, pos, str, 0, pos) != 0) continue;// find first option with partial match
             opt.value = str.substr(pos+1);
             return;// done
@@ -1135,6 +1186,17 @@ void Action::setOption(const std::string &str)
         }
         std::stringstream ss;
         ss << names[0] << ": Invalid option: \"" << str << "\"\n";
+        // Try a substring-based fuzzy match against the user-supplied name
+        // prefix; if anything overlaps, lead with "Did you mean ..." so the
+        // user's eye lands on the likely fix before the full option dump.
+        const std::string badName = (pos == std::string::npos) ? str : str.substr(0, pos);
+        const auto suggestions = this->closeOptionMatches(badName);
+        if (!suggestions.empty()) {
+            auto it = suggestions.begin();
+            ss << "Did you mean: \"" << (it++)->second << "=...\"";
+            while (it != suggestions.end()) ss << " or \"" << (it++)->second << "=...\"";
+            ss << "?\n";
+        }
         for (auto it = options.begin(); it != options.end();) {
             ss << "Valid options: \"" << it->name << "=" << (it++)->example << "\"";
             while (it != options.end()) ss << " or \"" << it->name << "=" << (it++)->example << "\"";
@@ -1143,6 +1205,36 @@ void Action::setOption(const std::string &str)
         throw std::invalid_argument(ss.str());
     }
 }// Action::setOption
+
+std::multimap<size_t, std::string> Action::closeOptionMatches(const std::string &name) const
+{
+    // Returns option names that overlap with @a name in either direction: the
+    // user's input contains the option name (typo `radiuss=` → `radius`) or
+    // the option name contains the user's input (truncated `rad=` → `radius`).
+    // Case-insensitive; sorted by best match so exact-prefix matches come first.
+    std::multimap<size_t, std::string> matches;
+    if (name.empty()) return matches;
+    const std::string pattern = toLowerCase(name);
+    constexpr size_t kMaxLevDist = 2;
+    for (const Option &opt : options) {
+        if (opt.name.empty()) continue;
+        const std::string optLower = toLowerCase(opt.name);
+        size_t key = optLower.find(pattern);
+        if (key == std::string::npos && optLower.size() >= 3) {
+            key = pattern.find(optLower);
+        }
+        if (key != std::string::npos) {
+            matches.emplace(key, opt.name);// substring hits ranked first
+            continue;
+        }
+        // Levenshtein fallback to catch transpositions / single-edit typos.
+        const size_t d = levenshtein(pattern, optLower);
+        if (d <= kMaxLevDist && optLower.size() >= 3) {
+            matches.emplace(1000 + d, opt.name);
+        }
+    }
+    return matches;
+}// Action::closeOptionMatches
 
 // ==============================================================================================================
 
@@ -1295,7 +1387,7 @@ Parser::Parser(std::vector<Option> &&def)
     this->addAction(
         {"for"}, "start of for-loop over a user-defined loop variable and range.",
         {{"", "", "i=0,9|i=0,9,2", "define name of loop variable and its range."}},
-        [&](){++counter;},
+        [&](){ ++counter; mOpenLoops.emplace_back("for", mCurrentArgIdx); },
         [&](){
             OPENVDB_ASSERT(iter->names[0] == "for");
             const std::string &name = iter->options[0].name;
@@ -1325,7 +1417,7 @@ Parser::Parser(std::vector<Option> &&def)
          {"min_size", "0", "1|1B|1KB|1MB|1GB|1TB", "minimum byte size, smaller files will be skipped"},
          {"max_size", "1TB", "1|1B|1KB|1MB|1GB|1TB", "maximum byte size, larger files will be skipped"},
          {"recursive", "0", "0|1|false|true", "recursive search of files into sub-directories."}},
-        [&](){++counter;},
+        [&](){ ++counter; mOpenLoops.emplace_back("files", mCurrentArgIdx); },
         [&](){
             OPENVDB_ASSERT(iter->names[0] == "files");
             std::shared_ptr<BaseLoop> loop;
@@ -1358,7 +1450,7 @@ Parser::Parser(std::vector<Option> &&def)
     this->addAction(
         {"each"}, "start of each-loop over a user-defined loop variable and list of values.",
         {{"", "", "s=sphere,bunny,...", "defined name of loop variable and list of its values."}},
-        [&](){++counter;},
+        [&](){ ++counter; mOpenLoops.emplace_back("each", mCurrentArgIdx); },
         [&](){
             OPENVDB_ASSERT(iter->names[0] == "each");
             const std::string &name = iter->options[0].name;
@@ -1375,7 +1467,7 @@ Parser::Parser(std::vector<Option> &&def)
     this->addAction(
         {"if"}, "start of if-scope. If the value of its option, named test, evaluates to false the entire scope is skipped",
         {{"test", "", "0|1|false|true", "boolean value used to test if-statement"}},
-        [&](){++counter;},
+        [&](){ ++counter; mOpenLoops.emplace_back("if", mCurrentArgIdx); },
         [&](){
             OPENVDB_ASSERT(iter->names[0] == "if");
             if (this->get<bool>("test")) {
@@ -1389,8 +1481,10 @@ Parser::Parser(std::vector<Option> &&def)
     this->addAction(
         {"end"}, "marks the end scope of \"-for,-each,and -if\" control actions", {},
         [&](){
-            if (counter<=0) throw std::invalid_argument("Parser: -end must be preceeded by -for,-each, or -if");
-            --counter;},
+            if (counter<=0) throw std::invalid_argument("Parser: -end must be preceded by -for,-each, or -if");
+            --counter;
+            if (!mOpenLoops.empty()) mOpenLoops.pop_back();
+        },
         [&](){
             OPENVDB_ASSERT(iter->names[0] == "end");
             auto loop = loops.back();// current loop
@@ -1430,15 +1524,62 @@ void Parser::parse(int argc, char *argv[])
     OPENVDB_ASSERT(!hashMap.empty());
     if (argc <= 1) throw std::invalid_argument("Parser: No arguments provided, try \"" + getFile(argv[0]) + " -help\"");
     counter = 0;// reset to check for matching {for,each,if}/end loops
+    mOpenLoops.clear();
+
+    // Build a command-line excerpt showing argv[badIdx] with a `^` caret line
+    // underneath. Used to decorate setOption/unknown-action errors so the
+    // user can see exactly which token on the command line was rejected.
+    auto cmdLineCaret = [&](int badIdx) -> std::string {
+        // Show a window of args around the bad one, at most ~80 chars total.
+        // Prefer to keep argv[0] visible so the user sees their command name.
+        constexpr size_t kMaxLen = 80;
+        std::string line;
+        line += "  in: ";
+        const size_t caretPrefix = line.size();
+        size_t caretCol = 0;
+        for (int k = 0; k < argc; ++k) {
+            if (k > 0) line += ' ';
+            if (k == badIdx) caretCol = line.size();
+            line += argv[k];
+            if (line.size() > kMaxLen && k > badIdx) {// truncate after bad token
+                line += " ...";
+                break;
+            }
+        }
+        if (line.size() > kMaxLen + 20) {// final truncation if window still huge
+            // Trim near the head, keeping caret visible.
+            const size_t keepFrom = (caretCol > 30) ? caretCol - 20 : caretPrefix;
+            if (keepFrom > caretPrefix) {
+                line = std::string("  in: ...") + line.substr(keepFrom);
+                caretCol = caretCol - keepFrom + std::string("  in: ...").size();
+            }
+        }
+        std::string caretLine(caretCol, ' ');
+        caretLine += '^';
+        return "\n" + line + "\n" + caretLine;
+    };
+
     for (int i=1; i<argc; ++i) {
         const std::string str = argv[i];
         size_t pos = str.find_first_not_of("-");
-        if (pos==std::string::npos) throw std::invalid_argument("Parser: expected an action but got \""+str+"\"");
+        if (pos==std::string::npos) {
+            throw std::invalid_argument(
+                "Parser: expected an action but got \"" + str + "\"" + cmdLineCaret(i));
+        }
         auto search = hashMap.find(str.substr(pos));//first remove all leading "-"
         if (search != hashMap.end()) {
+            const int actionIdx = i;// remember the action keyword's position for diagnostics
             actions.push_back(*search->second);// copy construction of Action
             iter = std::prev(actions.end());// important
-            while(i+1<argc && argv[i+1][0] != '-') iter->setOption(argv[++i]);
+            while(i+1<argc && argv[i+1][0] != '-') {
+                const int badIdx = i + 1;
+                try {
+                    iter->setOption(argv[++i]);
+                } catch (const std::exception &e) {
+                    throw std::invalid_argument(std::string(e.what()) + cmdLineCaret(badIdx));
+                }
+            }
+            mCurrentArgIdx = actionIdx;// argv position of the action keyword (so -for points at "-for", not its option value)
             iter->init();// optional callback function unique to action
         } else {
             std::stringstream ss;
@@ -1447,12 +1588,32 @@ void Parser::parse(int argc, char *argv[])
             for (auto it = matches.begin(); it != matches.end();) {
                 ss << "Did you mean: \"-" << (it++)->second << "\"";
                 while (it != matches.end()) ss << " or \"-" << (it++)->second << "\"";
-                ss << "?\n";
+                ss << "?";
             }
+            ss << cmdLineCaret(i);
             throw std::invalid_argument(ss.str());
         }
     }// loop over all input arguments
-    if (counter!=0) throw std::invalid_argument("Parser: Unmatched pairing of {-for,-files,-each,-if} and -end");
+    if (counter!=0) {
+        // Build a message that names each unclosed scope and shows where it
+        // was opened — far more actionable than the generic
+        // "Unmatched pairing of {-for,-files,-each,-if} and -end".
+        std::stringstream ss;
+        ss << "Parser: " << mOpenLoops.size()
+           << " unclosed scope" << (mOpenLoops.size() == 1 ? "" : "s")
+           << " (missing -end)";
+        for (const auto &kv : mOpenLoops) {
+            ss << "\n  -" << kv.first;
+            if (kv.second >= 0 && kv.second < argc) {
+                ss << " at argv[" << kv.second << "] (\"" << argv[kv.second] << "\")";
+            }
+        }
+        if (!mOpenLoops.empty() && mOpenLoops.back().second >= 0) {
+            ss << cmdLineCaret(mOpenLoops.back().second);
+        }
+        throw std::invalid_argument(ss.str());
+    }
+    mCurrentArgIdx = -1;
 }// Parser::parse
 
 // ==============================================================================================================
@@ -1519,7 +1680,7 @@ std::string Parser::usage(const Action &action, bool brief) const
 void Parser::setDefaults()
 {
     for (auto &dst : iter->options) {
-        if (dst.value.empty()) {// only set default value if the existing value un-defined?
+        if (dst.value.empty()) {// only set default value if the existing value is un-defined
             for (auto &src : defaults) {
                 if (dst.name == src.name) {
                     dst.value = src.value;
