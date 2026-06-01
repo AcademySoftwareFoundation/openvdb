@@ -20,14 +20,6 @@
 # pattern can't accidentally match unrelated files.
 
 # ---------------------------------------------------------------------------
-# nanovdb/examples/ex_util/ComputePrimitives.h - recursive template detection
-# ---------------------------------------------------------------------------
-# cxx14::make_index_sequence is a recursive variadic template; Doxygen's
-# class-relation analyser misclassifies the recursion and emits ~8 false
-# positives per build. Upstream Doxygen quirk, no real bug here.
-^[^:]*/ex_util/ComputePrimitives\.h:.*recursive class relation
-
-# ---------------------------------------------------------------------------
 # openvdb_ax/ast/AST.h - INLINE_INHERITED_MEMB + unnamed override params
 # ---------------------------------------------------------------------------
 # Node::child(const size_t index) is documented with @param index. Several
