@@ -1038,6 +1038,12 @@ NB_MODULE(nanovdb, m)
     cudaModule.doc() = "CUDA device buffers, the device GridHandle, and device infrastructure (mirrors nanovdb::cuda).";
     defineDeviceBuffer(cudaModule);
     defineDeviceGridHandle(cudaModule);
+    // Device NodeManager (DeviceNodeManagerHandle + createDeviceNodeManager)
+    // on nanovdb.cuda, alongside the device GridHandle.
+    defineDeviceNodeManager(cudaModule);
+    // Device VoxelBlockManager (mirrors nanovdb::tools::cuda) is registered on
+    // the existing nanovdb.tools.cuda submodule in PyTools.cc — NOT here — so
+    // the Python layout matches the C++ namespaces.
 #endif
 
     nb::module_ toolsModule = m.def_submodule("tools");

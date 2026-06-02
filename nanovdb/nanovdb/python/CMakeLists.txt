@@ -33,6 +33,8 @@ nanobind_add_module(nanovdb_python NB_STATIC
     PyVoxelBlockManager.cc
     cuda/PyDeviceBuffer.cc
     cuda/PyDeviceGridHandle.cu
+    cuda/PyDeviceNodeManager.cu
+    cuda/PyDeviceVoxelBlockManager.cu
     cuda/PyPointsToGrid.cu
     cuda/PySampleFromVoxels.cu
     cuda/PySignedFloodFill.cu

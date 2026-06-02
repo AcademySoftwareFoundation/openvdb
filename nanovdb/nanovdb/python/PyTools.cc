@@ -14,6 +14,7 @@
 #include "PyGridChecksum.h"
 #include "PyGridValidator.h"
 #include "PyNanoToOpenVDB.h"
+#include "PyVoxelBlockManager.h"  // for defineDeviceVoxelBlockManager (CUDA)
 #ifdef NANOVDB_USE_CUDA
 #include "cuda/PyPointsToGrid.h"
 #include "cuda/PySampleFromVoxels.h"
@@ -64,6 +65,9 @@ void defineToolsModule(nb::module_& m)
 
     defineSampleFromVoxels<float>(cudaModule, "sampleFromVoxels");
     defineSampleFromVoxels<double>(cudaModule, "sampleFromVoxels");
+
+    // Device VoxelBlockManager (nanovdb::tools::cuda) on nanovdb.tools.cuda.
+    defineDeviceVoxelBlockManager(cudaModule);
 #endif
 }
 
