@@ -743,7 +743,27 @@ vdb_tool -for n=0,200,1  -calc 'radian=137.5*n*pi/180; r=sqrt(n); x=r*cos(radian
 
 or as a config file:
 
+## Production example with complex math in a configuration file using infix syntax
+
+Same 200-sphere phyllotaxis spiral as the RPN config above, written with the more readable infix `-calc` syntax (one multi-statement kernel replaces seven sequential `-eval` calls). Notice how `x` and `y` already include the radial factor (`x = r*cos(a)`), so the sphere's `center=` doesn't need to multiply by `r` again as the RPN version does — the two examples are mathematically equivalent.
+```
+vdb_tool 10.8.0
+for n=0,200,1
+    # Multi-statement calc kernel. Reads `n` from for-loop memory; writes
+    # back a, r, x, y. The final assignment `r = 0.5*(5+r)^0.25` reuses
+    # the `r` slot: its right-hand side reads the OLD value (sqrt(n)),
+    # then overwrites the slot with the sphere radius for use below.
+    calc a = 137.5*n*pi/180; r=sqrt(n); x = r*cos(a); y = r*sin(a); r = 0.5*(5+r)^0.25
+    sphere voxel=0.1 radius={$r} center=({$x},{$y},0)
+    if {$n:0:>}  # skip n==0: there's nothing to union with on the first iteration
+        union    # CSG union of this sphere into the accumulator
+    end
+end
+render spiral.ppm image=1024x1024 translate=(0,0,40)
+```
+
 ## Production example with complex math in a configuration file using RPN syntax
+This example, based on -eval vs -calc, is only included for completion! The example above using -calc is much more user-friendly.
 ```
 vdb_tool 10.8.0
 for n=0,200,1
@@ -757,25 +777,6 @@ for n=0,200,1
     sphere voxel=0.1 radius={$pow_r:0.5:*} center=({$r:$x:*},{$r:$y:*},0) # radius=0.5*pow_r center=(r*x, r*x,0)
     if {$n:0:>} # if n > 0
         union
-    end
-end
-render spiral.ppm image=1024x1024 translate=(0,0,40)
-```
-
-## Production example with complex math in a configuration file using infix syntax
-
-Same 200-sphere phyllotaxis spiral as the RPN config above, written with the more readable infix `-calc` syntax (one multi-statement kernel replaces seven sequential `-eval` calls). Notice how `x` and `y` already include the radial factor (`x = r*cos(a)`), so the sphere's `center=` doesn't need to multiply by `r` again as the RPN version does — the two examples are mathematically equivalent.
-```
-vdb_tool 10.8.0
-for n=0,200,1
-    # Multi-statement calc kernel. Reads `n` from for-loop memory; writes
-    # back a, r, x, y. The final assignment `r = 0.5*(5+r)^0.25` reuses
-    # the `r` slot: its right-hand side reads the OLD value (sqrt(n)),
-    # then overwrites the slot with the sphere radius for use below.
-    calc a=137.5*n*pi/180;r=sqrt(n);x=r*cos(a);y=r*sin(a);r=0.5*(5+r)^0.25
-    sphere voxel=0.1 radius={$r} center=({$x},{$y},0)
-    if {$n:0:>}  # skip n==0: there's nothing to union with on the first iteration
-        union    # CSG union of this sphere into the accumulator
     end
 end
 render spiral.ppm image=1024x1024 translate=(0,0,40)
