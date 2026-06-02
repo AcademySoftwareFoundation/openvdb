@@ -43,6 +43,11 @@ nanobind_add_module(nanovdb_python NB_STATIC
     cuda/PyRefineGrid.cu
     cuda/PyPruneGrid.cu
     cuda/PyMergeGrids.cu
+    cuda/PyIndexToGrid.cu
+    cuda/PyAddBlindData.cu
+    cuda/PyDeviceGridStats.cu
+    cuda/PyDeviceGridValidator.cu
+    cuda/PyDeviceGridChecksum.cu
 )
 
 target_include_directories(nanovdb_python PRIVATE ${CUDA_INCLUDE_DIRECTORY})
