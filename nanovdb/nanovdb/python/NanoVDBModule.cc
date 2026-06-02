@@ -1024,8 +1024,10 @@ NB_MODULE(nanovdb, m)
     defineHostGridHandle(m);
 
 #ifdef NANOVDB_USE_CUDA
-    defineDeviceBuffer(m);
-    defineDeviceGridHandle(m);
+    nb::module_ cudaModule = m.def_submodule("cuda");
+    cudaModule.doc() = "CUDA device buffers, the device GridHandle, and device infrastructure (mirrors nanovdb::cuda).";
+    defineDeviceBuffer(cudaModule);
+    defineDeviceGridHandle(cudaModule);
 #endif
 
     nb::module_ toolsModule = m.def_submodule("tools");

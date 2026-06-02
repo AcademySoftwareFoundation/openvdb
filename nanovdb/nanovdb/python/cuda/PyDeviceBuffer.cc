@@ -13,10 +13,7 @@ namespace pynanovdb {
 
 void defineDeviceBuffer(nb::module_& m)
 {
-    nb::class_<cuda::DeviceBuffer>(m, "DeviceBuffer",
-        "CUDA device-side buffer used to back a DeviceGridHandle. Holds a "
-        "host mirror and a device pointer; deviceUpload / deviceDownload on "
-        "the handle move bytes between the two.");
+    defineDeviceBufferLike<nanovdb::cuda::DeviceBuffer>(m, "DeviceBuffer");
 }
 
 } // namespace pynanovdb

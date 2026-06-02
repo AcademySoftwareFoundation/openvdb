@@ -31,3 +31,16 @@ PYTHONPATH=. python /path/to/<example>.py
 For full API signatures and per-argument docstrings, use Python's
 `help()` on any symbol — e.g. `help(nanovdb.tools.createNanoGridFpN)`.
 The bindings ship `.pyi` type stubs for IDE / type-checker support.
+
+## Migration notes
+
+The CUDA device buffer and device grid handle classes now live under the
+`nanovdb.cuda` submodule (mirroring the C++ `nanovdb::cuda` namespace):
+
+- `nanovdb.DeviceBuffer` → `nanovdb.cuda.DeviceBuffer`
+- `nanovdb.DeviceGridHandle` → `nanovdb.cuda.DeviceGridHandle`
+
+Factory functions that return a device handle are unaffected — they never name
+the class — so `nanovdb.io.deviceReadGrid(s)`, `nanovdb.tools.cuda.create*`,
+`nanovdb.tools.cuda.pointsToRGBA8Grid`, and the `deviceUpload` /
+`deviceDownload` / `deviceGrid` handle methods continue to work unchanged.
