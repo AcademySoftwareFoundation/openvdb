@@ -38,6 +38,11 @@ nanobind_add_module(nanovdb_python NB_STATIC
     cuda/PyPointsToGrid.cu
     cuda/PySampleFromVoxels.cu
     cuda/PySignedFloodFill.cu
+    cuda/PyDilateGrid.cu
+    cuda/PyCoarsenGrid.cu
+    cuda/PyRefineGrid.cu
+    cuda/PyPruneGrid.cu
+    cuda/PyMergeGrids.cu
 )
 
 target_include_directories(nanovdb_python PRIVATE ${CUDA_INCLUDE_DIRECTORY})

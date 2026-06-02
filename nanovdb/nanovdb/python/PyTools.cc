@@ -19,6 +19,11 @@
 #include "cuda/PyPointsToGrid.h"
 #include "cuda/PySampleFromVoxels.h"
 #include "cuda/PySignedFloodFill.h"
+#include "cuda/PyDilateGrid.h"
+#include "cuda/PyCoarsenGrid.h"
+#include "cuda/PyRefineGrid.h"
+#include "cuda/PyPruneGrid.h"
+#include "cuda/PyMergeGrids.h"
 #endif
 
 namespace nb = nanobind;
@@ -78,6 +83,15 @@ void defineToolsModule(nb::module_& m)
 
     defineSampleFromVoxels<float>(cudaModule, "sampleFromVoxels");
     defineSampleFromVoxels<double>(cudaModule, "sampleFromVoxels");
+
+    // Topological/morphological ops on OnIndex grids (nanovdb::tools::cuda).
+    // Each is constrained to OnIndex build types by TopologyBuilder's
+    // is_onindex static_assert, so only ValueOnIndex is instantiated.
+    defineDilateGrid<ValueOnIndex>(cudaModule, "dilateGrid");
+    defineCoarsenGrid<ValueOnIndex>(cudaModule, "coarsenGrid");
+    defineRefineGrid<ValueOnIndex>(cudaModule, "refineGrid");
+    definePruneGrid<ValueOnIndex>(cudaModule, "pruneGrid");
+    defineMergeGrids<ValueOnIndex>(cudaModule, "mergeGrids");
 
     // Device VoxelBlockManager (nanovdb::tools::cuda) on nanovdb.tools.cuda.
     defineDeviceVoxelBlockManager(cudaModule);
