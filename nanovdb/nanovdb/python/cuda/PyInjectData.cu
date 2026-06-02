@@ -87,6 +87,43 @@ template<typename T> void defineInject(nb::module_& m, const char* name)
         "stream handle (Python int; 0 = default stream).");
 }
 
+template<typename T> void defineInjectFeatures(nb::module_& m, const char* name)
+{
+    m.def(
+        name,
+        [](nb::handle src_grid, nb::handle dst_grid,
+           nb::ndarray<const T, nb::shape<-1, -1>, nb::c_contig, nb::device::cuda> src_sidecar,
+           nb::ndarray<T, nb::shape<-1, -1>, nb::c_contig, nb::device::cuda>       dst_sidecar,
+           uintptr_t stream) {
+            auto* src = castOnIndexDeviceGrid(src_grid, "inject");
+            auto* dst = castOnIndexDeviceGrid(dst_grid, "inject");
+            if (src_sidecar.shape(1) != dst_sidecar.shape(1))
+                throw nb::value_error(
+                    "inject: src and dst feature sidecars must share the same "
+                    "feature dimension (shape[1]).");
+            cudaStream_t   s    = reinterpret_cast<cudaStream_t>(stream);
+            const T*       dSrc = src_sidecar.data();
+            T*             dDst = dst_sidecar.data();
+            const size_t   dim  = src_sidecar.shape(1);
+            const uint32_t srcLeafCount = leafCountOf(src);
+            using Op = nanovdb::util::cuda::InjectGridFeatureFunctor<nanovdb::ValueOnIndex, T>;
+            nb::gil_scoped_release release;
+            if (srcLeafCount)
+                nanovdb::util::cuda::operatorKernel<Op>
+                    <<<srcLeafCount, Op::MaxThreadsPerBlock, 0, s>>>(src, dst, dSrc, dDst, dim);
+            cudaCheck(cudaStreamSynchronize(s));
+        },
+        "src_grid"_a, "dst_grid"_a, "src_sidecar"_a, "dst_sidecar"_a, "stream"_a = 0,
+        "Inject vector-valued (feature) sidecar data across OnIndex device "
+        "grids -- the multi-channel form of inject. src_sidecar / dst_sidecar "
+        "are 2-D device arrays of shape (value count, dim), row-major per voxel "
+        "(row 0 is the background slot); the feature dimension dim is taken "
+        "from shape[1] and must match. Values are copied for the src/dst voxel "
+        "intersection; the rest of the destination is left unchanged. Wraps "
+        "nanovdb::util::cuda::InjectGridFeatureFunctor. stream is a raw CUDA "
+        "stream handle (Python int; 0 = default stream).");
+}
+
 void defineInjectPredicateToMask(nb::module_& m, const char* name)
 {
     m.def(
@@ -130,8 +167,50 @@ void defineInjectPredicateToMask(nb::module_& m, const char* name)
         "CUDA stream handle (Python int; 0 = default stream).");
 }
 
+void defineInjectGridMask(nb::module_& m, const char* name)
+{
+    m.def(
+        name,
+        [](nb::handle src_grid, nb::handle dst_grid,
+           nb::ndarray<uint64_t, nb::ndim<1>, nb::c_contig, nb::device::cuda> leaf_masks,
+           uintptr_t stream) {
+            auto* src = castOnIndexDeviceGrid(src_grid, "injectGridMask");
+            auto* dst = castOnIndexDeviceGrid(dst_grid, "injectGridMask");
+            cudaStream_t   s            = reinterpret_cast<cudaStream_t>(stream);
+            const uint32_t dstLeafCount = leafCountOf(dst);
+            constexpr size_t W = nanovdb::Mask<3>::WORD_COUNT;  // 8 uint64 / leaf
+            if (leaf_masks.size() < static_cast<size_t>(dstLeafCount) * W)
+                throw nb::value_error(
+                    "injectGridMask: leaf_masks length must be at least "
+                    "(dst leaf count) * 8 uint64 (one Mask<3> per leaf). A safe "
+                    "upper bound is the destination grid's activeVoxelCount * 8.");
+            nanovdb::Mask<3>* dMask =
+                reinterpret_cast<nanovdb::Mask<3>*>(leaf_masks.data());
+            using Op = nanovdb::util::cuda::InjectGridMaskFunctor<nanovdb::ValueOnIndex>;
+            constexpr unsigned threads = 128;
+            nb::gil_scoped_release release;
+            if (dstLeafCount)
+                nanovdb::util::cuda::lambdaKernel
+                    <<<nanovdb::util::cuda::blocksPerGrid(dstLeafCount, threads),
+                       threads, 0, s>>>(dstLeafCount, Op{}, src, dst, dMask);
+            cudaCheck(cudaStreamSynchronize(s));
+        },
+        "src_grid"_a, "dst_grid"_a, "leaf_masks"_a, "stream"_a = 0,
+        "Build a per-leaf mask over the DESTINATION grid marking the voxels "
+        "that are ALSO active in the source grid (the src/dst intersection). "
+        "grid args are device grids from DeviceGridHandle.deviceGrid(n); "
+        "leaf_masks is a 1-D device uint64 output of length at least "
+        "(dst leaf count) * 8 (one nanovdb::Mask<3> per leaf, in leaf order; "
+        "the destination activeVoxelCount * 8 is a safe size). Pass it to "
+        "pruneGrid to keep only the intersection. Wraps "
+        "nanovdb::util::cuda::InjectGridMaskFunctor. stream is a raw CUDA "
+        "stream handle (Python int; 0 = default stream).");
+}
+
 template void defineInject<float>(nb::module_&, const char*);
 template void defineInject<double>(nb::module_&, const char*);
+template void defineInjectFeatures<float>(nb::module_&, const char*);
+template void defineInjectFeatures<double>(nb::module_&, const char*);
 
 } // namespace pynanovdb
 

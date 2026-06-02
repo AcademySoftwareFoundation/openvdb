@@ -10,7 +10,9 @@ namespace nb = nanobind;
 namespace pynanovdb {
 
 template<typename T> void defineInject(nb::module_& m, const char* name);
+template<typename T> void defineInjectFeatures(nb::module_& m, const char* name);
 void defineInjectPredicateToMask(nb::module_& m, const char* name);
+void defineInjectGridMask(nb::module_& m, const char* name);
 
 } // namespace pynanovdb
 

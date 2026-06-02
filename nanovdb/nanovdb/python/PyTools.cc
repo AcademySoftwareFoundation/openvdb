@@ -113,7 +113,10 @@ void defineToolsModule(nb::module_& m)
     // helper that feeds pruneGrid (nanovdb::util::cuda::Inject* functors).
     defineInject<float>(cudaModule, "inject");
     defineInject<double>(cudaModule, "inject");
+    defineInjectFeatures<float>(cudaModule, "inject");
+    defineInjectFeatures<double>(cudaModule, "inject");
     defineInjectPredicateToMask(cudaModule, "injectPredicateToMask");
+    defineInjectGridMask(cudaModule, "injectGridMask");
 
     // Device VoxelBlockManager (nanovdb::tools::cuda) on nanovdb.tools.cuda.
     defineDeviceVoxelBlockManager(cudaModule);
