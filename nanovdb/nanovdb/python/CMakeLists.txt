@@ -32,6 +32,12 @@ nanobind_add_module(nanovdb_python NB_STATIC
     PyTree.cc
     PyVoxelBlockManager.cc
     cuda/PyDeviceBuffer.cc
+    cuda/PyUnifiedBuffer.cu
+    cuda/PyUnifiedGridHandle.cu
+    cuda/PyDeviceMesh.cu
+    cuda/PyDeviceStreamMap.cu
+    cuda/PyTempPool.cu
+    cuda/PyDistributedPointsToGrid.cu
     cuda/PyDeviceGridHandle.cu
     cuda/PyDeviceNodeManager.cu
     cuda/PyDeviceVoxelBlockManager.cu

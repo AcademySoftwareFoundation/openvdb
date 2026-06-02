@@ -16,6 +16,13 @@
 #include <sstream>
 
 #include "cuda/PyDeviceBuffer.h"
+#ifdef NANOVDB_USE_CUDA
+#include "cuda/PyUnifiedBuffer.h"
+#include "cuda/PyUnifiedGridHandle.h"
+#include "cuda/PyDeviceMesh.h"
+#include "cuda/PyDeviceStreamMap.h"
+#include "cuda/PyTempPool.h"
+#endif
 #include "PyBuildGrid.h"
 #include "PyGridHandle.h"
 #include "PyHostBuffer.h"
@@ -1037,10 +1044,19 @@ NB_MODULE(nanovdb, m)
     nb::module_ cudaModule = m.def_submodule("cuda");
     cudaModule.doc() = "CUDA device buffers, the device GridHandle, and device infrastructure (mirrors nanovdb::cuda).";
     defineDeviceBuffer(cudaModule);
+    // UnifiedBuffer (CUDA managed memory) + its GridHandle. The unified handle
+    // is the type returned by nanovdb.tools.cuda.DistributedPointsToGrid.
+    defineUnifiedBuffer(cudaModule);
+    defineUnifiedGridHandle(cudaModule);
     defineDeviceGridHandle(cudaModule);
     // Device NodeManager (DeviceNodeManagerHandle + createDeviceNodeManager)
     // on nanovdb.cuda, alongside the device GridHandle.
     defineDeviceNodeManager(cudaModule);
+    // Multi-GPU / device infrastructure (mirrors nanovdb::cuda): the device
+    // mesh, the device->stream map, and the CUB temp-storage pool primitives.
+    defineDeviceMesh(cudaModule);
+    defineDeviceStreamMap(cudaModule);
+    defineTempPool(cudaModule);
     // Device VoxelBlockManager (mirrors nanovdb::tools::cuda) is registered on
     // the existing nanovdb.tools.cuda submodule in PyTools.cc — NOT here — so
     // the Python layout matches the C++ namespaces.

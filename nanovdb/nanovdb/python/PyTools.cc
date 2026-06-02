@@ -17,6 +17,7 @@
 #include "PyVoxelBlockManager.h"  // for defineDeviceVoxelBlockManager (CUDA)
 #ifdef NANOVDB_USE_CUDA
 #include "cuda/PyPointsToGrid.h"
+#include "cuda/PyDistributedPointsToGrid.h"
 #include "cuda/PySampleFromVoxels.h"
 #include "cuda/PySignedFloodFill.h"
 #include "cuda/PyDilateGrid.h"
@@ -85,6 +86,15 @@ void defineToolsModule(nb::module_& m)
     // the overload that matches the input tensor dtype.
     definePointsToGrid<float>(cudaModule, "pointsToGrid");
     definePointsToGrid<double>(cudaModule, "pointsToGrid");
+
+    // Multi-GPU voxel-coordinate -> grid builder (nanovdb::tools::cuda::
+    // DistributedPointsToGrid). Distributes an (N, 3) int32 unified-memory
+    // array of index-space voxel coordinates over a DeviceMesh. Bound for the
+    // index / Rgba8 build types (matching the voxelsTo*Grid set); Point is
+    // excluded (its coords must be world-space Vec3, not int32 Coord).
+    defineDistributedPointsToGrid<ValueOnIndex>(cudaModule, "DistributedPointsToGrid");
+    defineDistributedPointsToGrid<ValueIndex>(cudaModule, "DistributedIndexPointsToGrid");
+    defineDistributedPointsToGrid<math::Rgba8>(cudaModule, "DistributedRGBA8PointsToGrid");
 
     defineSampleFromVoxels<float>(cudaModule, "sampleFromVoxels");
     defineSampleFromVoxels<double>(cudaModule, "sampleFromVoxels");
