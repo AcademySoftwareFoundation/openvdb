@@ -12,6 +12,7 @@
 #include <nanovdb/cuda/DeviceBuffer.h>
 #endif
 
+#include <cstdint>
 #include <sstream>
 
 #include "cuda/PyDeviceBuffer.h"
@@ -420,7 +421,16 @@ template<typename BuildT> void defineNanoGrid(nb::module_& m, const char* name)
              nb::overload_cast<>(&NanoGrid<BuildT>::tree, nb::const_),
              nb::rv_policy::reference_internal,
              "Return the tree associated with this grid. Lifetime is "
-             "anchored to the grid (and therefore to the GridHandle).");
+             "anchored to the grid (and therefore to the GridHandle).")
+        .def("data_ptr",
+             [](const NanoGrid<BuildT>& grid) {
+                 return reinterpret_cast<uintptr_t>(&grid);
+             },
+             "Raw pointer to this grid as a Python int. The address is a HOST "
+             "pointer when the grid came from handle.grid(n) and a DEVICE "
+             "pointer when it came from handle.deviceGrid(n) — provenance is "
+             "the caller's responsibility, the grid object itself cannot tell "
+             "host from device.");
     // Add leaf_values() only for BuildTs whose LeafData carries T mValues[512].
     PyLeafValuesBinder<BuildT>::apply(cls);
 }
