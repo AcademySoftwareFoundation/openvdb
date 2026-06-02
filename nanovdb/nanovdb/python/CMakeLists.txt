@@ -117,12 +117,22 @@ if(NANOVDB_BUILD_PYTHON_UNITTESTS)
     COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/TestNanoVDB.py -v
     WORKING_DIRECTORY "${NANOVDB_PYTHON_WORKING_DIR}")
 
+  # GPU interop suite. Self-skips when the build has no CUDA or no GPU is
+  # present (so it is harmless to register unconditionally), but is a
+  # separate test file that the pytest_nanovdb command does not discover,
+  # so register it as its own ctest test mirroring the block above.
+  add_test(NAME pytest_nanovdb_gpu_interop
+    COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/TestGpuInterop.py -v
+    WORKING_DIRECTORY "${NANOVDB_PYTHON_WORKING_DIR}")
+
   if(WIN32)
     set(PYTHONPATH "$ENV{PYTHONPATH};${NANOVDB_PYTHON_WORKING_DIR}")
     string(REPLACE "\\;" ";" PYTHONPATH "${PYTHONPATH}")
     string(REPLACE ";" "\\;" PYTHONPATH "${PYTHONPATH}")
-    set_tests_properties(pytest_nanovdb PROPERTIES ENVIRONMENT "PYTHONPATH=${PYTHONPATH}")
+    set_tests_properties(pytest_nanovdb pytest_nanovdb_gpu_interop
+      PROPERTIES ENVIRONMENT "PYTHONPATH=${PYTHONPATH}")
   else()
-    set_tests_properties(pytest_nanovdb PROPERTIES ENVIRONMENT "PYTHONPATH=$ENV{PYTHONPATH}:${NANOVDB_PYTHON_WORKING_DIR}")
+    set_tests_properties(pytest_nanovdb pytest_nanovdb_gpu_interop
+      PROPERTIES ENVIRONMENT "PYTHONPATH=$ENV{PYTHONPATH}:${NANOVDB_PYTHON_WORKING_DIR}")
   endif()
 endif()
