@@ -513,14 +513,14 @@ static nb::object pyGetBlindData(nb::handle py_grid, uint32_t n)
     auto make1D = [&](void* p, size_t n_elems, auto sentinel) -> nb::object {
         using T = decltype(sentinel);
         size_t shape[1] = {n_elems};
-        return nb::cast(nb::ndarray<T, nb::ndim<1>, nb::c_contig, nb::device::cpu>(
+        return nb::cast(nb::ndarray<nb::numpy, T, nb::ndim<1>, nb::c_contig, nb::device::cpu>(
                             static_cast<T*>(p), 1, shape, py_grid),
                         nb::rv_policy::reference);
     };
     auto make2D = [&](void* p, size_t n_outer, size_t n_inner, auto sentinel) -> nb::object {
         using T = decltype(sentinel);
         size_t shape[2] = {n_outer, n_inner};
-        return nb::cast(nb::ndarray<T, nb::ndim<2>, nb::c_contig, nb::device::cpu>(
+        return nb::cast(nb::ndarray<nb::numpy, T, nb::ndim<2>, nb::c_contig, nb::device::cpu>(
                             static_cast<T*>(p), 2, shape, py_grid),
                         nb::rv_policy::reference);
     };
