@@ -61,7 +61,20 @@ void defineToolsModule(nb::module_& m)
     defineSignedFloodFill<float>(cudaModule, "signedFloodFill");
     defineSignedFloodFill<double>(cudaModule, "signedFloodFill");
 
-    definePointsToGrid<math::Rgba8>(cudaModule, "pointsToRGBA8Grid");
+    // Coordinate-input (index-space int32 (N,3)) -> grid. The legacy Rgba8
+    // entry keeps its original Python name; OnIndex/Index get descriptive
+    // names. (Point is excluded here -- see PyPointsToGrid.cu -- and is built
+    // from world positions via pointsToGrid below.)
+    defineVoxelsToGrid<math::Rgba8>(cudaModule, "pointsToRGBA8Grid");
+    defineVoxelsToGrid<math::Rgba8>(cudaModule, "voxelsToRGBA8Grid");
+    defineVoxelsToGrid<ValueOnIndex>(cudaModule, "voxelsToOnIndexGrid");
+    defineVoxelsToGrid<ValueIndex>(cudaModule, "voxelsToIndexGrid");
+
+    // World-position-input ((N,3) float OR double) -> NanoGrid<Point>. Both
+    // scalar precisions are bound under the same Python name; nanobind picks
+    // the overload that matches the input tensor dtype.
+    definePointsToGrid<float>(cudaModule, "pointsToGrid");
+    definePointsToGrid<double>(cudaModule, "pointsToGrid");
 
     defineSampleFromVoxels<float>(cudaModule, "sampleFromVoxels");
     defineSampleFromVoxels<double>(cudaModule, "sampleFromVoxels");
