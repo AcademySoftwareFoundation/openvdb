@@ -25,6 +25,7 @@
 #include "cuda/PyRefineGrid.h"
 #include "cuda/PyPruneGrid.h"
 #include "cuda/PyMergeGrids.h"
+#include "cuda/PyInjectData.h"
 #include "cuda/PyIndexToGrid.h"
 #include "cuda/PyAddBlindData.h"
 #include "cuda/PyDeviceGridStats.h"
@@ -107,6 +108,12 @@ void defineToolsModule(nb::module_& m)
     defineRefineGrid<ValueOnIndex>(cudaModule, "refineGrid");
     definePruneGrid<ValueOnIndex>(cudaModule, "pruneGrid");
     defineMergeGrids<ValueOnIndex>(cudaModule, "mergeGrids");
+
+    // Sidecar value transfer across a topology change, and the predicate->mask
+    // helper that feeds pruneGrid (nanovdb::util::cuda::Inject* functors).
+    defineInject<float>(cudaModule, "inject");
+    defineInject<double>(cudaModule, "inject");
+    defineInjectPredicateToMask(cudaModule, "injectPredicateToMask");
 
     // Device VoxelBlockManager (nanovdb::tools::cuda) on nanovdb.tools.cuda.
     defineDeviceVoxelBlockManager(cudaModule);
