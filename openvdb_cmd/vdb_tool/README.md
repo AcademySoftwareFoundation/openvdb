@@ -1,66 +1,84 @@
 # vdb_tool
 The vdb_tool is a versatile command-line utility that chains together high-level operations from the OpenVDB library. It can convert polygon meshes and particles into level sets, perform complex volumetric transformations, and generate adaptive meshes or ray-traced images. Results can be exported as particles, meshes, or VDB files, or streamed directly to STDOUT for seamless pipelining with other renderers. We denote the operations **actions**, and their arguments **options**. Any sequence of **actions** and their **options** can be exported and imported to configuration files, which allows convenient reuse. This command-line tool also supports a string-evaluation language that can be used to define procedural expressions for options of the actions. Currently the following list of actions are supported:
 
+<!-- BEGIN AUTO-GENERATED ACTION TABLE — do not edit by hand. Regenerate with:
+       vdb_tool -help format=md
+     and replace everything between the BEGIN/END markers with the output. -->
 | Action | Description |
-|-------|-------|
-| **for/end** | Defines the scope of a for-loop with a range for a loop-variable |
-| **files/end** | Defines the scope of loop over all files in a specific directory structure |
-| **each/end** | Defines the scope of an each-loop with a list for a loop-variable |
-| **if/end** | If-statement used to enable/disable actions |
-| **eval** | Evaluate an expression written in our Reverse Polish Notation (see below) |
-| **config** | Load a configuration file and add the actions for processing |
-| **default** | Set default values used by all subsequent actions |
-| **read** | Read mesh, points, grids or config as obj, ply, abc, stl, off, pts, xyz, e57 (PDAL), usd, usda, usdc, usdz, vdb, nvdb or txt files |
-| **write** | Write a polygon mesh, points, vdb or config as a obj, ply, stl, off, abc, vdb, or txt file |
-| **vdb2points** | Extracts points from a VDB grid |
-| **mesh2ls** | Convert a (water-tight) polygon mesh to a narrow-band signed distance field |
-| **mesh2udf** | Convert an arbitrary polygon mesh to a narrow-band unsigned distance field |
-| **soup2ls** | Convert an arbitrary polygon soup to a narrow-band signed distance field |
-| **points2ls** | Convert points into a narrow-band level set |
-| **points2vdb** | Converts points into a VDB PointDataGrid |
-| **iso2ls** | Convert an iso-surface of a scalar field into a level set |
-| **ls2fog** | Convert a level set into a fog volume |
-| **quad2tri** | Convert all quads in a mesh to triangles |
-| **segment** | Segment level set and float grids into its disconnected parts |
-| **sphere** | Create a narrow-band level set of a sphere |
-| **platonic** | Create a narrow-band level set of a tetrahedron(4), cube(6), octahedron(8), dodecahedron(12) or icosahedron(20) |
-| **dilate** | Dilate a level set surface |
-| **erode** |  Erode a level set surface |
-| **open** |  Morphological opening of a level set surface |
-| **close** |  Morphological closing of a level set surface |
-| **gauss** |  Gaussian convolution of a level set surface, i.e. surface smoothing |
-| **mean** |   Mean-value filtering of a level set surface |
-| **median** | Median-value filtering of a level set surface |
-| **union** | Union of two narrow-band level sets |
-| **intersection** | Intersection of two narrow-band level sets |
-| **difference** | Difference of two narrow-band level sets |
-| **prune** | Prune the VDB tree of a narrow-band level set |
-| **flood** | Signed flood-fill of a narrow-band level set |
-| **cpt** | Closest point transform of a narrow-band level set |
-| **grad**| Gradient vector of a scalar VDB |
-| **curl** | Curl of a vector VDB |
-| **div** | Compute the divergence of a vector VDB |
-| **curvature** | Mean curvature of a scalar VDB |
-| **length** | Compute the magnitude of a vector VDB |
-| **min** | Composite two grids by means of min |
-| **max** | Composite two grids by means of max |
-| **sum** | Composite two grids by means of sum |
-| **multires** | Compute multi-resolution grids |
-| **enright** | Advects a level set in a periodic and divergence-free velocity field. Primarily intended for benchmarks |
-| **expand** | Expand the narrow band of a level set |
-| **resample** | Re-sample a scalar VDB grid |
-| **transform** | Apply affine transformations to VDB grids |
-| **ls2mesh** | Convert a level set surface into an adaptive polygon mesh surface |
-| **clip** | Clips one VDB grid with another VDB grid or a bbox or frustum |
-| **render**| Render and save an image of a level set or fog VDB |
-| **clear** | Deletes cached VDB grids and geometry from memory |
-| **print** | Print information about the cached geometries and VDBs |
-| **slice** | Generate image files of slices through a VDB grid |
-| **img2mpeg** | Convert multiple image files to an mpeg movie file |
-| **calc** | Calculator |
-| **forAllValues** | Apply a math kernel to every value in a grid (see "Per-voxel math kernels" below) |
-| **forOnValues** | Apply a math kernel to every active value in a grid (see "Per-voxel math kernels" below) |
-| **forOffValues** | Apply a math kernel to every inactive value in a grid (see "Per-voxel math kernels" below) |
+|---|---|
+| **calc** | calculate string expression |
+| **clear** | Deletes geometry, VDB grids and local variables |
+| **clip** | Clip a VDB grid against another grid, a bbox or frustum |
+| **close** | morphological closing, i.e. dilation followed by erosion, of level set surface by a fixed radius |
+| **config** | Import and process one or more configuration files |
+| **cpt** | generate a vector grid with the closest-point-transform to a level set surface |
+| **curl** | generate a vector grid with the curl of another vector grid |
+| **curvature** | generate scalar grid with the mean curvature of a level set surface |
+| **debug** | print debugging information to the terminal |
+| **default** | define default values to be used by subsequent actions |
+| **difference** | CSG difference of two level sets surfaces |
+| **dilate** | dilate level set surface by a fixed radius |
+| **div** | generate a scalar grid with the divergence of a vector grid |
+| **each** | start of each-loop over a user-defined loop variable and list of values. |
+| **end** | marks the end scope of "-for,-each,and -if" control actions |
+| **enright** | Performs Enright advection benchmark test on a level set |
+| **erode** | erode level set surface by a fixed radius |
+| **errorOnWarning** | stop on warnings, i.e. treat warnings as errors |
+| **eval** | evaluate string expression |
+| **examples** | print examples to the terminal and terminate |
+| **expand** | expand narrow band of level set |
+| **files** | start of files-loop in a directory. |
+| **flood** | signed-flood filling of a level set VDB |
+| **fog2mesh** | Convert a fog volume to an adaptive polygon mesh |
+| **for** | start of for-loop over a user-defined loop variable and range. |
+| **forAllValues** | Applied a simple computational kernel to values in a grid. |
+| **forOffValues** | Applied a simple computational kernel to values in a grid. |
+| **forOnValues** | Applied a simple computational kernel to values in a grid. |
+| **gauss** | gaussian convolution of a level set surface |
+| **grad** | generate a vector grid with the gradient of a scalar grid |
+| **help** | Print documentation for one, multiple or all available actions |
+| **if** | start of if-scope. If the value of its option, named test, evaluates to false the entire scope is skipped |
+| **intersection** | CSG intersection of two level sets surfaces |
+| **iso2ls** | Convert an iso-surface of a scalar field into a level set (i.e. SDF) |
+| **length** | generate a scalar grid with the magnitude of a vector grid |
+| **log** | enable logging to file |
+| **ls2fog** | Convert a level set VDB into a VDB with a fog volume, i.e. normalized density. |
+| **ls2mesh** | Convert a level set to an adaptive polygon mesh |
+| **max** | Given grids A and B, compute max(a, b) per voxel |
+| **mean** | mean value filtering of a level set surface |
+| **median** | median value filtering of a level set surface |
+| **mesh2ls** | Convert a watertight polygon surface into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
+| **min** | Given grids A and B, compute min(a, b) per voxel |
+| **movie** | Convert image and movie files to mpeg or animated gif files |
+| **multires** | construct a LoD sequences of VDB trees with powers of two refinements |
+| **open** | morphological opening, i.e. erosion followed by dilation, of a level set surface by a fixed radius |
+| **platonic** | Create a level set shape with the specified number of polygon faces |
+| **points2ls** | Convert geometry points into a narrow-band level set |
+| **points2vdb** | Encode geometry points into a VDB grid |
+| **print** | prints information to the terminal about the current stack of VDB grids and Geometry |
+| **prune** | prune away inactive values in a VDB grid |
+| **quad2tri** | Convert all quads in mesh to triangles, assuming they are both planar and convex |
+| **quiet** | disable printing to the terminal |
+| **read** | Read one or more geometry or VDB files from disk or STDIN. |
+| **render** | ray-tracing of level set surfaces and volume rendering of fog volumes |
+| **resample** | resample one VDB grid into another VDB grid or a transformation of the input grid |
+| **scatter** | Scatter point into the active values of an input VDB grid |
+| **sdf2udf** | Converts a signed distance field into an unsigned distance field, i.e. performs the Abs of all values and changes GridClass to UNKNOWN. |
+| **segment** | segment an input VDB into a list if topologically disconnected VDB grids |
+| **slice** | Generate images of slices of a VDB grid |
+| **soup2ls** | Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
+| **soup2offset** | Convert a polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
+| **soup2udf** | Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band |
+| **sphere** | Create a level set sphere, i.e. a narrow-band signed distance to a sphere |
+| **sum** | Given grids A and B, compute sum(a, b) per voxel |
+| **transform** | apply affine transformations (uniform scale -> rotation -> translation) to a VDB grids and geometry |
+| **union** | CSG union of two level sets surfaces |
+| **vdb2points** | Extract points encoded in a VDB to points in a geometry format |
+| **verbose** | print timing information to the terminal |
+| **version** | write timing information to the terminal |
+| **vol2mesh** | Convert a scalar volume to an adaptive polygon mesh |
+| **write** | Write list of geometry, VDB or config files to disk or STDOUT |
+<!-- END AUTO-GENERATED ACTION TABLE -->
 
 For support, bug-reports or ideas for improvements please contact ken.museth@gmail.com
 
@@ -201,6 +219,31 @@ Constraints and caveats:
 - The renamed voxel variable participates: `-forOnValues '...' use=x` makes `x(1, 0, 0)` the +x neighbor.
 - Reads at the boundary of the active region return the grid's background value. There's no `boundary=clamp|...` option (yet); structure the kernel to tolerate it or pre-pad the active region.
 - The implicit deep-copy doubles memory for the duration of the action when any non-zero neighbor offset is used.
+
+#### Multi-grid kernels
+
+`use=` and `vdb=` accept comma-separated lists so the kernel can read from more than one grid in a single pass. The first entry is the **output** grid (iterated and written); the rest are **read-only inputs**. Each name becomes a kernel-side handle for that grid:
+
+```bash
+# Pointwise difference: write A - B into A.
+vdb_tool -read a.vdb b.vdb -forOnValues 'a - b' use=a,b vdb=0,1 -write diff.vdb
+
+# Cross-grid finite difference: write a result that depends on a neighbor of A
+# and a neighbor of B.
+vdb_tool -read a.vdb b.vdb -forOnValues 'a(1,2,3) + b(0,1,2)' use=a,b vdb=0,1 -write out.vdb
+
+# Three-grid average.
+vdb_tool -read a.vdb b.vdb c.vdb \
+         -forOnValues '(a + b + c) / 3' use=a,b,c vdb=0,1,2 -write avg.vdb
+```
+
+Rules:
+
+- `use=` and `vdb=` must have the same length (errors out otherwise).
+- Iteration topology is the **output grid's** active voxels; reads from input grids at those coords return the input grid's stored value (or its background if inactive there).
+- Only the output grid is deep-copied (and only if the kernel reads non-zero offsets from it). Inputs are read-only, no snapshot needed.
+- Each input grid gets its own per-thread `ConstAccessor`, cached across sequential voxel reads.
+- Duplicate names in `use=` are rejected — kernels must be unambiguous.
 
 The same expression can be written in any of three equivalent syntaxes:
 
@@ -692,7 +735,7 @@ Union 200 level set spheres scattered in a spiral pattern and ray-trace them int
 vdb_tool -for n=0,200,1 -eval '{$n:137.5:*:@deg}' -eval '{$deg:d2r:@radian}' -eval '{$radian:cos:@x}' -eval '{$radian:sin:@y}' -eval '{$n:sqrt:@r}' -eval '{$r:5:+:@r_sum}' -eval '{$r_sum:0.25:pow:@pow_r}' -sphere voxel=0.1 radius='{$pow_r:0.5:*}' center='({$r:$x:*},{$r:$y:*},0)' -if '{$n:0:>}' -union -end -end -render spiral.ppm image=1024x1024 translate='(0,0,40)'
 ```
 
-## Production example with complex math using InFix syntax
+## Production example with complex math using infix syntax
 Union 200 level set spheres scattered in a spiral pattern and ray-trace them into an image
 ```
 vdb_tool -for n=0,200,1  -calc 'radian=137.5*n*pi/180; r=sqrt(n); x=r*cos(radian); y=r*sin(radian); pow_r=0.5*(5+r)^0.25' -sphere voxel=0.1 radius='{$pow_r}' center='({$x},{$y},0)' -if '{$n:0:>}' -union -end -end -render spiral.ppm image=1024x1024 translate='(0,0,40)'
@@ -719,14 +762,20 @@ end
 render spiral.ppm image=1024x1024 translate=(0,0,40)
 ```
 
-## Production example with complex math in a configuration file using InFix syntax
+## Production example with complex math in a configuration file using infix syntax
+
+Same 200-sphere phyllotaxis spiral as the RPN config above, written with the more readable infix `-calc` syntax (one multi-statement kernel replaces seven sequential `-eval` calls). Notice how `x` and `y` already include the radial factor (`x = r*cos(a)`), so the sphere's `center=` doesn't need to multiply by `r` again as the RPN version does — the two examples are mathematically equivalent.
 ```
 vdb_tool 10.8.0
 for n=0,200,1
+    # Multi-statement calc kernel. Reads `n` from for-loop memory; writes
+    # back a, r, x, y. The final assignment `r = 0.5*(5+r)^0.25` reuses
+    # the `r` slot: its right-hand side reads the OLD value (sqrt(n)),
+    # then overwrites the slot with the sphere radius for use below.
     calc a=137.5*n*pi/180;r=sqrt(n);x=r*cos(a);y=r*sin(a);r=0.5*(5+r)^0.25
     sphere voxel=0.1 radius={$r} center=({$x},{$y},0)
-    if {$n:0:>} # if n > 0
-        union # CSG union of spheres
+    if {$n:0:>}  # skip n==0: there's nothing to union with on the first iteration
+        union    # CSG union of this sphere into the accumulator
     end
 end
 render spiral.ppm image=1024x1024 translate=(0,0,40)

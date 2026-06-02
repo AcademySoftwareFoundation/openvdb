@@ -1903,6 +1903,93 @@ TEST_F(Test_vdb_tool, ActionForValuesStencil)
         }
 }// ActionForValuesStencil
 
+TEST_F(Test_vdb_tool, ActionForValuesMultiGrid)
+{
+    // -forValues with multiple grids: use=x,y vdb=0,1 picks the first as
+    // output (iterated and written) and the rest as read-only inputs. Each
+    // grid is accessible as a center value (bare name) or a relative
+    // neighbor (name(dx,dy,dz)).
+    using namespace openvdb::vdb_tool;
+    using GridT = openvdb::FloatGrid;
+
+    // Build two 5x5x5 grids:
+    //   A: A(i,j,k) = i  (so x-derivative kernel sees +/-1 across i)
+    //   B: B(i,j,k) = 10 (a constant offset)
+    GridT::Ptr A = GridT::create(0.0f);
+    GridT::Ptr B = GridT::create(0.0f);
+    auto accA = A->getAccessor();
+    auto accB = B->getAccessor();
+    for (int i = 0; i <= 4; ++i)
+      for (int j = 0; j <= 4; ++j)
+        for (int k = 0; k <= 4; ++k) {
+            accA.setValue(openvdb::Coord(i, j, k), static_cast<float>(i));
+            accB.setValue(openvdb::Coord(i, j, k), 10.0f);
+        }
+    const std::string aPath = "data/test_mg_a.vdb";
+    const std::string bPath = "data/test_mg_b.vdb";
+    A->setName("A");
+    B->setName("B");
+    openvdb::io::File(aPath).write({A});
+    openvdb::io::File(bPath).write({B});
+
+    // Pointwise sum: out(i,j,k) = a(i,j,k) + b(i,j,k). Note that vdb_tool's
+    // "age" convention is most-recently-read = 0, so after reading A then B,
+    // age 0 is B and age 1 is A. With `use=a,b vdb=0,1`, name "a" is bound
+    // to B (the output grid; written and iterated) and name "b" is bound
+    // to A (read-only input). The kernel value is therefore 10 + i.
+    {
+      auto args = getArgs("vdb_tool -quiet -read " + aPath + " " + bPath +
+                          " -forOnValues a+b use=a,b vdb=0,1"
+                          " -write vdb=0 data/test_mg_out1.vdb");
+      Tool t(int(args.size()), args.data());
+      EXPECT_NO_THROW(t.run());
+    }
+    {
+      openvdb::io::File f("data/test_mg_out1.vdb");
+      f.open();
+      auto baseGrid = f.readGrid(f.beginName().gridName());
+      auto result = openvdb::gridPtrCast<GridT>(baseGrid);
+      ASSERT_TRUE(result != nullptr);
+      auto racc = result->getConstAccessor();
+      for (int i = 0; i <= 4; ++i)
+        for (int j = 0; j <= 4; ++j)
+          for (int k = 0; k <= 4; ++k) {
+              const float got = racc.getValue(openvdb::Coord(i, j, k));
+              EXPECT_NEAR(static_cast<float>(i) + 10.0f, got, 1e-5f)
+                  << "at (" << i << "," << j << "," << k << ")";
+          }
+    }
+
+    // Cross-grid neighbor read: out(i,j,k) = a(1,0,0) + b(0,0,0).
+    // age 0 (= "a") is B (constant 10), age 1 (= "b") is A (= i). So:
+    //   a(1,0,0) at coord (i,j,k) reads B(i+1, j, k) = 10 (for i+1 in [0,4]).
+    //   b(0,0,0) at coord (i,j,k) reads A(i,   j, k) = i.
+    // Result: 10 + i for i in [0,3] (interior). At i=4, a(1,0,0) reads B's
+    // background (= 0), so we skip that boundary plane.
+    {
+      auto args = getArgs("vdb_tool -quiet -read " + aPath + " " + bPath +
+                          " -forOnValues a(1,0,0)+b(0,0,0) use=a,b vdb=0,1"
+                          " -write vdb=0 data/test_mg_out2.vdb");
+      Tool t(int(args.size()), args.data());
+      EXPECT_NO_THROW(t.run());
+    }
+    {
+      openvdb::io::File f("data/test_mg_out2.vdb");
+      f.open();
+      auto baseGrid = f.readGrid(f.beginName().gridName());
+      auto result = openvdb::gridPtrCast<GridT>(baseGrid);
+      ASSERT_TRUE(result != nullptr);
+      auto racc = result->getConstAccessor();
+      for (int i = 0; i <= 3; ++i)// only interior x indices
+        for (int j = 0; j <= 4; ++j)
+          for (int k = 0; k <= 4; ++k) {
+              const float got = racc.getValue(openvdb::Coord(i, j, k));
+              EXPECT_NEAR(10.0f + static_cast<float>(i), got, 1e-5f)
+                  << "at (" << i << "," << j << "," << k << ")";
+          }
+    }
+}// ActionForValuesMultiGrid
+
 TEST_F(Test_vdb_tool, Memory)
 {
     using namespace openvdb::vdb_tool;

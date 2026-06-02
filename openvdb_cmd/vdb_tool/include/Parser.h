@@ -1155,12 +1155,25 @@ void Action::setOption(const std::string &str)
     // containing '=', e.g. the kernel string in -calc / forValues): when no
     // explicit option matches, fall through to anonymous-append rather than
     // throwing "Invalid option".
+    // Space-join when accumulating to a greedy anonymous option (preserves
+    // a kernel like "a = 1+2" that the shell split into ["a", "=", "1+2"];
+    // the default comma-join would corrupt it into "a,=,1+2"). Non-greedy
+    // actions keep the comma separator since that's correct for file/grid
+    // lists like "-read foo.vdb bar.vdb" → "files=foo.vdb,bar.vdb".
+    auto appendValue = [&](Option &opt, const std::string &val) {
+        if (greedy) {
+            if (!opt.value.empty()) opt.value += ' ';
+            opt.value += val;
+        } else {
+            opt.append(val);
+        }
+    };
     const size_t pos = str.find_first_of("={");// since expressions are only evaluated for values and not for names of values, we only search for '=' before expressions, which start with '{'
     if (pos == std::string::npos || str[pos]=='{') {// str has no "=" or it's an expression so append it to the value of the anonymous option
         if (anonymous>=options.size()) throw std::invalid_argument(names[0]+": does not support un-named option \""+str+"\"");
-        options[anonymous].append(str);
+        appendValue(options[anonymous], str);
     } else if (anonymous<options.size() && str.compare(0, pos, options[anonymous].name) == 0) {
-        options[anonymous].append(str.substr(pos+1));
+        appendValue(options[anonymous], str.substr(pos+1));
     } else {
         for (Option &opt : options) {
             // In greedy mode (where the anonymous option's value may legitimately
@@ -1181,7 +1194,7 @@ void Action::setOption(const std::string &str)
             return;// done
         }
         if (greedy && anonymous<options.size()) {// the anonymous option's value may contain '='; treat the whole token as anonymous.
-            options[anonymous].append(str);
+            appendValue(options[anonymous], str);
             return;
         }
         std::stringstream ss;

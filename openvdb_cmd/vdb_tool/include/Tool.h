@@ -531,7 +531,8 @@ void Tool::init()
      {"help", "h"}, "Print documentation for one, multiple or all available actions",
     {{"actions", "", "read,write,...", "list of actions to document. If the list is empty documentation is printed for all available actions and if other actions proceed this action, documentation is printed for those actions only"},
      {"exit", "true", "1|0|true|false", "toggle wether to terminate after this action or not"},
-     {"brief", "false", "1|0|true|false", "toggle brief or detailed documentation"}},
+     {"brief", "false", "1|0|true|false", "toggle brief or detailed documentation"},
+     {"format", "text", "text|md", "output format. 'text' (default) is the usual human-readable help; 'md' emits a single Markdown table of action names + descriptions, used to regenerate the action list in README.md so it can't drift from the registered actions."}},
      [](){}, [&](){this->help();}, 0); // anonymous options are appended to "actions"
 
   mParser.addAction(
@@ -576,11 +577,11 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->levelSetSphere();});
 
   mParser.addAction(
-     {"forAllValues"}, "Applied a simple computational kernel to values in a grid.",
+     {"forAllValues"}, "Applied a simple computational kernel to ALL values in a grid.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
-     {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
+     {"vdb", "0", "0|0,1", "age(s) (i.e. stack index) of grid(s) to be processed. Defaults to 0, i.e. most recently inserted VDB. Accepts a comma-separated list to use multiple grids in the kernel: the FIRST grid is written (iterated), the rest are read-only inputs. Length must match use=."},
      {"kernel", "", "sin(v)+2*v*v", "user-defined math expression to apply to each value. The \"kernel=\" prefix is OPTIONAL; the kernel may also be supplied as a bare positional argument, e.g. \"-forOnValues 'sin(v)+1'\" or \"-forOnValues 'sin(v)+1' keep=true\" — other named options of the same action still parse normally. Supports infix (e.g. \"sin(v)+2*v*v\"), RPN (e.g. \"$v:sin:$v:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = v*v; t + sin(t)\"). The variable that holds the current voxel value is configurable via the \"use\" option (defaults to \"v\"). Stencil kernels: write \"v(dx,dy,dz)\" with integer-literal offsets to read a relative neighbor voxel through a per-thread ConstAccessor (e.g. \"v(1,0,0)-v(-1,0,0)\" computes a finite-difference x-derivative). The grid is internally deep-copied so reads come from a stable snapshot. Any other identifier in the kernel is looked up once in the Processor's string memory (the same namespace used by -eval / -calc) and used as a per-voxel constant — kernels like \"a*v + b\" therefore require -eval / -calc to have set \"a\" and \"b\" beforehand, else an error is thrown. An empty kernel is a no-op."},
-     {"use", "v", "v|x|val", "name of the variable bound to the current voxel value inside the kernel. Defaults to \"v\". Use e.g. use=x if your kernel reads better with \"x\" as the voxel variable; the chosen name is then treated as the per-voxel input and excluded from the Processor-memory lookup performed for every other identifier in the expression."},
+     {"use", "v", "v|x|x,y", "name(s) of the kernel variable(s) bound to the voxel value(s) of the input grid(s). Defaults to \"v\". Accepts a comma-separated list matching vdb=: use=x,y vdb=0,1 makes \"x\" the output grid and \"y\" a read-only input. Each name is excluded from the Processor-memory lookup and may be called as a function (e.g. \"x(1,0,0)\") to read a relative neighbor through a per-thread ConstAccessor."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
      {"name", "", "foo-bar", "name assigned to the output volume"}},
@@ -588,11 +589,11 @@ void Tool::init()
      /*anonymous=*/2, /*greedy=*/true);// kernel (index 2) may itself contain '='; accept bare "x+1" or "t=x*x; t+1" alongside kernel='...'
 
   mParser.addAction(
-     {"forOnValues"}, "Applied a simple computational kernel to values in a grid.",
+     {"forOnValues"}, "Applied a simple computational kernel to ON values in a grid.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
-     {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
+     {"vdb", "0", "0|0,1", "age(s) (i.e. stack index) of grid(s) to be processed. Defaults to 0, i.e. most recently inserted VDB. Accepts a comma-separated list to use multiple grids in the kernel: the FIRST grid is written (iterated), the rest are read-only inputs. Length must match use=."},
      {"kernel", "", "sin(v)+2*v*v", "user-defined math expression to apply to each value. The \"kernel=\" prefix is OPTIONAL; the kernel may also be supplied as a bare positional argument, e.g. \"-forOnValues 'sin(v)+1'\" or \"-forOnValues 'sin(v)+1' keep=true\" — other named options of the same action still parse normally. Supports infix (e.g. \"sin(v)+2*v*v\"), RPN (e.g. \"$v:sin:$v:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = v*v; t + sin(t)\"). The variable that holds the current voxel value is configurable via the \"use\" option (defaults to \"v\"). Stencil kernels: write \"v(dx,dy,dz)\" with integer-literal offsets to read a relative neighbor voxel through a per-thread ConstAccessor (e.g. \"v(1,0,0)-v(-1,0,0)\" computes a finite-difference x-derivative). The grid is internally deep-copied so reads come from a stable snapshot. Any other identifier in the kernel is looked up once in the Processor's string memory (the same namespace used by -eval / -calc) and used as a per-voxel constant — kernels like \"a*v + b\" therefore require -eval / -calc to have set \"a\" and \"b\" beforehand, else an error is thrown. An empty kernel is a no-op."},
-     {"use", "v", "v|x|val", "name of the variable bound to the current voxel value inside the kernel. Defaults to \"v\". Use e.g. use=x if your kernel reads better with \"x\" as the voxel variable; the chosen name is then treated as the per-voxel input and excluded from the Processor-memory lookup performed for every other identifier in the expression."},
+     {"use", "v", "v|x|x,y", "name(s) of the kernel variable(s) bound to the voxel value(s) of the input grid(s). Defaults to \"v\". Accepts a comma-separated list matching vdb=: use=x,y vdb=0,1 makes \"x\" the output grid and \"y\" a read-only input. Each name is excluded from the Processor-memory lookup and may be called as a function (e.g. \"x(1,0,0)\") to read a relative neighbor through a per-thread ConstAccessor."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
      {"name", "", "foo-bar", "name assigned to the output volume"}},
@@ -600,11 +601,11 @@ void Tool::init()
      /*anonymous=*/2, /*greedy=*/true);// kernel (index 2) may itself contain '='; accept bare "x+1" or "t=x*x; t+1" alongside kernel='...'
 
   mParser.addAction(
-     {"forOffValues"}, "Applied a simple computational kernel to values in a grid.",
+     {"forOffValues"}, "Applied a simple computational kernel to OFF values in a grid.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
-     {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
+     {"vdb", "0", "0|0,1", "age(s) (i.e. stack index) of grid(s) to be processed. Defaults to 0, i.e. most recently inserted VDB. Accepts a comma-separated list to use multiple grids in the kernel: the FIRST grid is written (iterated), the rest are read-only inputs. Length must match use=."},
      {"kernel", "", "sin(v)+2*v*v", "user-defined math expression to apply to each value. The \"kernel=\" prefix is OPTIONAL; the kernel may also be supplied as a bare positional argument, e.g. \"-forOnValues 'sin(v)+1'\" or \"-forOnValues 'sin(v)+1' keep=true\" — other named options of the same action still parse normally. Supports infix (e.g. \"sin(v)+2*v*v\"), RPN (e.g. \"$v:sin:$v:pow2:2:*:+\"), and infix multi-statement programs with assignment (e.g. \"t = v*v; t + sin(t)\"). The variable that holds the current voxel value is configurable via the \"use\" option (defaults to \"v\"). Stencil kernels: write \"v(dx,dy,dz)\" with integer-literal offsets to read a relative neighbor voxel through a per-thread ConstAccessor (e.g. \"v(1,0,0)-v(-1,0,0)\" computes a finite-difference x-derivative). The grid is internally deep-copied so reads come from a stable snapshot. Any other identifier in the kernel is looked up once in the Processor's string memory (the same namespace used by -eval / -calc) and used as a per-voxel constant — kernels like \"a*v + b\" therefore require -eval / -calc to have set \"a\" and \"b\" beforehand, else an error is thrown. An empty kernel is a no-op."},
-     {"use", "v", "v|x|val", "name of the variable bound to the current voxel value inside the kernel. Defaults to \"v\". Use e.g. use=x if your kernel reads better with \"x\" as the voxel variable; the chosen name is then treated as the per-voxel input and excluded from the Processor-memory lookup performed for every other identifier in the expression."},
+     {"use", "v", "v|x|x,y", "name(s) of the kernel variable(s) bound to the voxel value(s) of the input grid(s). Defaults to \"v\". Accepts a comma-separated list matching vdb=: use=x,y vdb=0,1 makes \"x\" the output grid and \"y\" a read-only input. Each name is excluded from the Processor-memory lookup and may be called as a function (e.g. \"x(1,0,0)\") to read a relative neighbor through a per-thread ConstAccessor."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
      {"name", "", "foo-bar", "name assigned to the output volume"}},
@@ -614,7 +615,7 @@ void Tool::init()
   mParser.addAction(
      {"sdf2udf"}, "Converts a signed distance field into an unsigned distance field, i.e. performs the Abs of all values and changes GridClass to UNKNOWN.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
-     {"vdb", "0", "0", "age (i.e. stack index) of grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
+     {"vdb", "0", "0|0,1", "age(s) (i.e. stack index) of grid(s) to be processed. Defaults to 0, i.e. most recently inserted VDB. Accepts a comma-separated list to use multiple grids in the kernel: the FIRST grid is written (iterated), the rest are read-only inputs. Length must match use=."},
      {"name", "sphere", "sphere", "name assigned to the output volume"}},
      [&](){mParser.setDefaults();}, [&](){this->sdf2udf();});
 
@@ -1190,6 +1191,29 @@ void Tool::help()
     const VecS actions = mParser.getVec<std::string>("actions");
     const bool stop = mParser.get<bool>("exit");
     const bool brief = mParser.get<bool>("brief");
+    const std::string format = mParser.get<std::string>("format");
+
+    if (format == "md") {
+      // Emit a single Markdown table of registered actions for the README's
+      // big "action list" section. Sorted alphabetically by primary name
+      // (matches the order Parser::finalize() establishes). Generated output
+      // should be diffed against README.md so it can't silently drift.
+      std::clog << "| Action | Description |\n";
+      std::clog << "|---|---|\n";
+      for (const auto &a : mParser.available) {
+        std::string desc = a.documentation;
+        // Markdown table cells can't contain raw newlines or unescaped '|'.
+        for (char &c : desc) if (c == '\n' || c == '\r') c = ' ';
+        size_t bar = 0;
+        while ((bar = desc.find('|', bar)) != std::string::npos) {
+          desc.replace(bar, 1, "\\|");
+          bar += 2;
+        }
+        std::clog << "| **" << a.names[0] << "** | " << desc << " |\n";
+      }
+      if (stop) std::exit(EXIT_SUCCESS);
+      return;
+    }
 
     if (actions.empty()) {
       if (mParser.actions.size()==1) {// ./vdb_tool -help
@@ -2699,21 +2723,32 @@ void Tool::forValues()
   const int mode = findMatch(action_name, {"forAllValues", "forOnValues", "forOffValues"});// 1-based index
   OPENVDB_ASSERT(mode);// mode = 0 for no match
   try {
-    const int age = mParser.get<int>("vdb");
+    // Multi-grid: vdb= and use= accept comma-separated lists. The FIRST
+    // grid in vdb= is the OUTPUT (iterated and written); the rest are
+    // read-only inputs accessible through their respective use= names.
+    std::vector<int> ages = mParser.getVec<int>("vdb");
+    std::vector<std::string> voxel_vars = mParser.getVec<std::string>("use");
     const bool keep = mParser.get<bool>("keep");
     const std::string kernel = mParser.get<std::string>("kernel");
-    const std::string voxel_var = mParser.get<std::string>("use");// kernel identifier bound to the current voxel value (defaults to "v")
     const std::string cls = mParser.get<std::string>("class");
     std::vector<float> back = mParser.getVec<float>("background");
     std::string grid_name = mParser.get<std::string>("name");
-    if (voxel_var.empty()) {
-        throw std::invalid_argument(action_name+": use= must name a non-empty identifier (e.g. use=v)");
+    if (ages.empty()) ages.push_back(0);
+    if (voxel_vars.empty()) voxel_vars.push_back("v");
+    if (ages.size() != voxel_vars.size()) {
+        throw std::invalid_argument(action_name + ": vdb= and use= must have the "
+            "same number of entries (got vdb=" + std::to_string(ages.size()) +
+            " entries and use=" + std::to_string(voxel_vars.size()) + " entries)");
     }
-
-    /// get the relevant grid to be processed
-    auto it = this->getGrid(age);// will throw if grid doesn't exist
-    GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid) throw std::invalid_argument("no FloatGrid with age " + std::to_string(age));
+    for (const std::string &v : voxel_vars) {
+        if (v.empty()) {
+            throw std::invalid_argument(action_name+": each use= entry must be a non-empty identifier");
+        }
+    }
+    // The first (output) grid; secondary grids gathered below into `inputs`.
+    auto it0 = this->getGrid(ages[0]);
+    GridT::Ptr grid = gridPtrCast<GridT>(*it0);
+    if (!grid) throw std::invalid_argument("no FloatGrid with age " + std::to_string(ages[0]));
     if (keep) {
       GridT::Ptr tmp = grid->deepCopy();
       mGrid.push_back(tmp);
@@ -2721,108 +2756,171 @@ void Tool::forValues()
     }
     if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
     grid->setName(grid_name);
+    const std::string &voxel_var = voxel_vars[0];// the OUTPUT grid's kernel name
 
     if (mParser.verbose) mTimer.start(action_name);
     if (!kernel.empty()) {
-      Calculator calc;
-      // Configure the neighbor-function rewriter BEFORE compile so the
-      // kernel "v(1,0,0)" parses into a synthesized variable name that we
-      // recognize and bind to a relative accessor lookup below.
-      calc.setNeighborFunction(voxel_var);
-      calc.compile(kernel);// throws on syntax error / unknown op
-
-      // The kernel reads the current voxel value via the variable named by
-      // the "use" option (default "v"); calls of the form voxel_var(dx,dy,dz)
-      // are rewritten by the Calculator to input variables literally named
-      // "v(1,0,0)" etc., which we resolve via a ConstAccessor at evaluation
-      // time. Every other identifier must already exist in the Processor's
-      // string memory and is bound once (a per-voxel constant).
-      const auto &mem = mParser.processor.memory();
-      const std::string nbrPrefix = voxel_var + "(";
-
-      // Parse a synthesized neighbor name "v(dx,dy,dz)" into integer offsets.
-      // Returns true iff the name matches the expected shape.
-      auto parseNeighbor = [&nbrPrefix](const std::string &name,
-                                        int &dx, int &dy, int &dz) -> bool {
-          if (name.size() <= nbrPrefix.size() + 1) return false;
-          if (name.compare(0, nbrPrefix.size(), nbrPrefix) != 0) return false;
-          if (name.back() != ')') return false;
-          const std::string inner = name.substr(
-              nbrPrefix.size(), name.size() - nbrPrefix.size() - 1);
-          int vals[3] = {0, 0, 0};
-          int idx = 0;
-          size_t start = 0;
-          for (size_t i = 0; i <= inner.size(); ++i) {
-              if (i == inner.size() || inner[i] == ',') {
-                  if (idx >= 3) return false;
-                  const std::string num = inner.substr(start, i - start);
-                  try { vals[idx++] = std::stoi(num); }
-                  catch (...) { return false; }
-                  start = i + 1;
+      // Gather every grid referenced via use=/vdb= as a "read source".
+      // grids[0] is the OUTPUT (being iterated and written); grids[1..]
+      // are read-only inputs.
+      struct GridRef { std::string name; int age; GridT::Ptr grid; };
+      std::vector<GridRef> grids;
+      grids.push_back({voxel_vars[0], ages[0], grid});
+      for (size_t k = 1; k < ages.size(); ++k) {
+          auto itK = this->getGrid(ages[k]);
+          GridT::Ptr gK = gridPtrCast<GridT>(*itK);
+          if (!gK) {
+              throw std::invalid_argument(action_name +
+                  ": vdb=" + std::to_string(ages[k]) + " is not a FloatGrid");
+          }
+          // Disallow accidentally listing the same name twice (the second
+          // would shadow the first and create confusing kernels).
+          for (size_t j = 0; j < k; ++j) {
+              if (voxel_vars[j] == voxel_vars[k]) {
+                  throw std::invalid_argument(action_name + ": duplicate use= "
+                      "name \"" + voxel_vars[k] + "\" in use=...");
               }
           }
-          if (idx != 3) return false;
-          dx = vals[0]; dy = vals[1]; dz = vals[2];
-          return true;
+          grids.push_back({voxel_vars[k], ages[k], gK});
+      }
+
+      Calculator calc;
+      // Configure the neighbor-function rewriter BEFORE compile so calls
+      // like "x(1,0,0)" or "y(0,1,0)" are recognized for ANY grid name in
+      // voxel_vars and synthesized into "<name>(dx,dy,dz)" variables.
+      calc.setNeighborFunctions(voxel_vars);
+      calc.compile(kernel);// throws on syntax error / unknown op
+
+      const auto &mem = mParser.processor.memory();
+
+      // Parse a synthesized neighbor name "<prefix>(dx,dy,dz)" into the
+      // grid index (via prefix lookup) and integer offsets. Returns -1 if
+      // the name doesn't match any registered grid prefix.
+      auto parseNeighbor = [&grids](const std::string &name,
+                                     int &gridIdx, int &dx, int &dy, int &dz) -> bool {
+          for (size_t k = 0; k < grids.size(); ++k) {
+              const std::string prefix = grids[k].name + "(";
+              if (name.size() <= prefix.size() + 1) continue;
+              if (name.compare(0, prefix.size(), prefix) != 0) continue;
+              if (name.back() != ')') continue;
+              const std::string inner = name.substr(
+                  prefix.size(), name.size() - prefix.size() - 1);
+              int vals[3] = {0, 0, 0};
+              int idx = 0;
+              size_t start = 0;
+              bool ok = true;
+              for (size_t i = 0; i <= inner.size(); ++i) {
+                  if (i == inner.size() || inner[i] == ',') {
+                      if (idx >= 3) { ok = false; break; }
+                      const std::string num = inner.substr(start, i - start);
+                      try { vals[idx++] = std::stoi(num); }
+                      catch (...) { ok = false; break; }
+                      start = i + 1;
+                  }
+              }
+              if (!ok || idx != 3) continue;
+              gridIdx = static_cast<int>(k);
+              dx = vals[0]; dy = vals[1]; dz = vals[2];
+              return true;
+          }
+          return false;
       };
 
-      struct NeighborBinding { int idx; int dx, dy, dz; };
+      // Classify each Calculator input variable into one of three buckets:
+      //   - center binding: bare name matches one of the use= names; bound
+      //     per-voxel to grid[k]'s value at the current coord (or *it if k==0).
+      //   - neighbor binding: synthesized "<name>(dx,dy,dz)"; bound via
+      //     thread-local ConstAccessor to grid[k] at (i+dx, j+dy, k+dz).
+      //   - constant binding: looked up once in Processor memory.
+      struct CenterBinding   { int idx; int gridIdx; };
+      struct NeighborBinding { int idx; int gridIdx; int dx, dy, dz; };
+      std::vector<CenterBinding>   centers;
       std::vector<NeighborBinding> neighbors;
-      int vIdx = -1;
       std::vector<float> base(calc.variables().size());
       for (size_t i = 0; i < calc.variables().size(); ++i) {
           const std::string &name = calc.variables()[i];
-          if (name == voxel_var) {
-              vIdx = static_cast<int>(i);
-              continue;// bound per voxel below
+          // Center reference: bare name == one of the registered grid names.
+          int matchedGrid = -1;
+          for (size_t k = 0; k < grids.size(); ++k) {
+              if (grids[k].name == name) { matchedGrid = static_cast<int>(k); break; }
           }
-          int dx, dy, dz;
-          if (parseNeighbor(name, dx, dy, dz)) {
-              neighbors.push_back({static_cast<int>(i), dx, dy, dz});
-              continue;// resolved via accessor at eval time
+          if (matchedGrid >= 0) {
+              centers.push_back({static_cast<int>(i), matchedGrid});
+              continue;
           }
+          // Neighbor reference: "<name>(dx,dy,dz)" for a known grid.
+          int gIdx, dx, dy, dz;
+          if (parseNeighbor(name, gIdx, dx, dy, dz)) {
+              neighbors.push_back({static_cast<int>(i), gIdx, dx, dy, dz});
+              continue;
+          }
+          // Otherwise: looked up once in Processor memory.
           if (!mem.isSet(name)) {
+              std::string nameList;
+              for (size_t k = 0; k < grids.size(); ++k) {
+                  if (k) nameList += ", ";
+                  nameList += "\"" + grids[k].name + "\"";
+              }
               throw std::invalid_argument(
                   action_name+": kernel references undefined variable \""+name+
-                  "\" (set it first with -eval / -calc, or use \""+voxel_var+
-                  "\" for the current voxel value, or \""+voxel_var+"(dx,dy,dz)\" "
-                  "for a relative neighbor)");
+                  "\" (set it first with -eval / -calc, or use one of the grid "
+                  "names [" + nameList + "] for the current voxel value, or "
+                  "<name>(dx,dy,dz) for a relative neighbor)");
           }
           base[i] = strTo<float>(mem.get(name));
       }
 
-      // If any neighbor with a non-zero offset is referenced, we need a
-      // read-only snapshot — otherwise parallel writes to the iterator's
-      // grid would race with neighbor reads from the same grid.
+      // Snapshot the OUTPUT grid only if the kernel reads non-zero offsets
+      // from it: otherwise parallel writes to the iterator's grid would
+      // race with neighbor reads from the same grid. Input grids are
+      // read-only so they don't need a snapshot.
       const bool needSnapshot = std::any_of(neighbors.begin(), neighbors.end(),
-          [](const NeighborBinding &n){ return n.dx || n.dy || n.dz; });
-      GridT::Ptr read_snap = needSnapshot ? grid->deepCopy() : nullptr;
-      using ConstAcc = GridT::ConstAccessor;
-      tbb::enumerable_thread_specific<ConstAcc> tls_acc(
-          [&]{ return read_snap ? read_snap->getConstAccessor()
-                                : grid->getConstAccessor(); });
+          [](const NeighborBinding &n) {
+              return n.gridIdx == 0 && (n.dx || n.dy || n.dz);
+          });
+      GridT::Ptr out_snap = needSnapshot ? grid->deepCopy() : nullptr;
 
-      // Per-voxel lambda. tls_acc gives each TBB worker its own cached
-      // ConstAccessor for fast neighbor lookups (sequential coordinates
-      // typically hit the same internal nodes). The per-call values buffer
-      // lives on the C stack so per-voxel mutation is thread-local.
-      auto kernel_fn = [&calc, &base, &neighbors, &tls_acc, vIdx](auto &it) {
-          constexpr size_t kMaxVars = 32;
+      // One thread-local ConstAccessor per grid. accessors[0] reads the
+      // output's snapshot (or live grid if no snapshot is needed);
+      // accessors[k>0] read each input grid directly.
+      using ConstAcc = GridT::ConstAccessor;
+      using AccTLS  = tbb::enumerable_thread_specific<ConstAcc>;
+      std::vector<std::unique_ptr<AccTLS>> accessors;
+      accessors.reserve(grids.size());
+      for (size_t k = 0; k < grids.size(); ++k) {
+          GridT::Ptr src = (k == 0 && out_snap) ? out_snap : grids[k].grid;
+          accessors.push_back(std::make_unique<AccTLS>(
+              [src]{ return src->getConstAccessor(); }));
+      }
+
+      // Per-voxel lambda. Each TBB worker reuses its thread-local cached
+      // accessors via accessors[k]->local() for fast sequential reads.
+      auto kernel_fn = [&calc, &base, &centers, &neighbors, &accessors](auto &it) {
+          constexpr size_t kMaxVars = 64;
           OPENVDB_ASSERT(base.size() <= kMaxVars);
           float values[kMaxVars];
           for (size_t i = 0; i < base.size(); ++i) values[i] = base[i];
-          const float center = static_cast<float>(*it);
-          if (vIdx >= 0) values[vIdx] = center;
-          if (!neighbors.empty()) {
-              ConstAcc &acc = tls_acc.local();
-              const openvdb::Coord c = it.getCoord();
-              for (const NeighborBinding &n : neighbors) {
-                  if (n.dx == 0 && n.dy == 0 && n.dz == 0) {
-                      values[n.idx] = center;// v(0,0,0) is just the center
-                  } else {
-                      values[n.idx] = static_cast<float>(
-                          acc.getValue(c.offsetBy(n.dx, n.dy, n.dz)));
-                  }
+          const openvdb::Coord c = it.getCoord();
+          const float center0 = static_cast<float>(*it);
+          // Bind bare-name center references: gridIdx==0 uses *it (no
+          // accessor cost), others go through their accessor at the
+          // current coord.
+          for (const CenterBinding &cb : centers) {
+              if (cb.gridIdx == 0) {
+                  values[cb.idx] = center0;
+              } else {
+                  values[cb.idx] = static_cast<float>(
+                      accessors[cb.gridIdx]->local().getValue(c));
+              }
+          }
+          // Bind neighbor references via the corresponding accessor.
+          for (const NeighborBinding &nb : neighbors) {
+              if (nb.gridIdx == 0 && nb.dx == 0 && nb.dy == 0 && nb.dz == 0) {
+                  values[nb.idx] = center0;
+              } else {
+                  values[nb.idx] = static_cast<float>(
+                      accessors[nb.gridIdx]->local().getValue(
+                          c.offsetBy(nb.dx, nb.dy, nb.dz)));
               }
           }
           it.setValue(calc.eval(values));

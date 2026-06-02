@@ -57,6 +57,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <limits>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -251,9 +252,26 @@ public:
     ///        variable means; the binding layer (e.g. Tool::forValues) is
     ///        expected to parse the synthesized name and provide neighbor
     ///        values. Call BEFORE compile(); pass "" (default) to disable.
-    void setNeighborFunction(const std::string &name) { mNeighborFn = name; }
-    /// @brief Returns the configured neighbor-function name ("" if disabled).
-    const std::string& neighborFunction() const { return mNeighborFn; }
+    void setNeighborFunction(const std::string &name)
+    {
+        mNeighborFns.clear();
+        if (!name.empty()) mNeighborFns.insert(name);
+    }
+    /// @brief Multi-name variant: register every name in @a names as a
+    ///        neighbor function. Used by -forValues with `use=x,y` to allow
+    ///        a kernel to reference more than one grid via `x(...)`/`y(...)`.
+    void setNeighborFunctions(const std::vector<std::string> &names)
+    {
+        mNeighborFns.clear();
+        for (const std::string &n : names) if (!n.empty()) mNeighborFns.insert(n);
+    }
+    /// @brief Returns true if @a name is a registered neighbor function.
+    bool isNeighborFunction(const std::string &name) const
+    {
+        return mNeighborFns.find(name) != mNeighborFns.end();
+    }
+    /// @brief Returns the configured neighbor-function names.
+    const std::set<std::string>& neighborFunctions() const { return mNeighborFns; }
 
     /// @brief Returns true if compile() has not yet been called (or failed).
     bool empty() const { return mCode.empty(); }
@@ -333,10 +351,12 @@ private:
         std::vector<std::string> slotNames;
     };
     std::unordered_map<std::string, FunctionDef> mFunctions;
-    /// @brief Name of the function whose `name(dx, dy, dz)` calls are
+    /// @brief Set of function names whose `name(dx, dy, dz)` calls are
     ///        rewritten to synthesized neighbor-variable references.
-    ///        Set via setNeighborFunction(); empty disables the feature.
-    std::string                              mNeighborFn;
+    ///        Set via setNeighborFunction(s)(); empty disables the feature.
+    ///        Allows kernels to reference multiple grids via different names,
+    ///        e.g. `x(1,0,0) + y(0,1,0)` with `setNeighborFunctions({"x","y"})`.
+    std::set<std::string>                    mNeighborFns;
     /// @brief Set of function names currently being compiled (recursion guard).
     std::unordered_map<std::string, bool>        mFunctionsInProgress;
     /// @brief Trailing `name = ...` from the compiled program, if any.
@@ -1164,7 +1184,7 @@ inline void Calculator::compileInfix(const std::string &expr)
                 // literal args -> a single PushVar with a synthesized name
                 // "f(dx,dy,dz)". The binding layer is expected to interpret
                 // the synthesized name as a relative neighbor lookup.
-                if (!mNeighborFn.empty() && fname == mNeighborFn) {
+                if (this->isNeighborFunction(fname)) {
                     if (argCount != 3) {
                         throw std::invalid_argument(
                             "Calculator: \"" + fname + "(...)\" denotes a voxel neighbor "
@@ -1219,7 +1239,7 @@ inline void Calculator::compileInfix(const std::string &expr)
                     // Synthesize a variable name encoding the offset. The
                     // form "name(dx,dy,dz)" mirrors what the user wrote;
                     // the parentheses make it unambiguous vs. ordinary names.
-                    const std::string nbrName = mNeighborFn + "(" +
+                    const std::string nbrName = fname + "(" +
                         std::to_string(off[0]) + "," +
                         std::to_string(off[1]) + "," +
                         std::to_string(off[2]) + ")";
