@@ -1441,7 +1441,8 @@ PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_version_get_patch(pnanovdb_uint
 #define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_TRIANGLE_ID 19    // integer ID of triangle
 #define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_GAUSSIAN_ID 20    // integer ID of Gaussian
 #define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_RANGE 21          // begin/end pair of indices
-#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_END 22
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_VOXEL_BVH 22      // voxelbvh 64-bit voxel value
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_END 23
 
 struct pnanovdb_gridblindmetadata_t
 {

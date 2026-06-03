@@ -432,7 +432,8 @@ enum class GridBlindDataSemantic : uint32_t { Unknown = 0,
                                               TriangleId = 19, // integer ID of triangle
                                               GaussianId = 20, // integer ID of Gaussian
                                               Range = 21, // begin/end pair of indices
-                                              End = 22 };
+                                              VoxelBVH = 22, // voxelbvh 64-bit voxel value
+                                              End = 23 };
 
 /// @brief Maps from GridBlindDataSemantic to GridClass
 /// @note Useful when converting an IndexGrid with blind data of type T into a Grid<T>
@@ -461,6 +462,8 @@ __hostdev__ inline GridClass toGridClass(GridBlindDataSemantic semantics,
         return GridClass::FogVolume;
     case GridBlindDataSemantic::Staggered:
         return GridClass::Staggered;
+    case GridBlindDataSemantic::VoxelBVH:
+        return GridClass::VoxelBVH;
     default:
         return defaultClass;
     }
@@ -483,6 +486,8 @@ __hostdev__ inline GridBlindDataSemantic toSemantic(GridClass gridClass,
         return GridBlindDataSemantic::FogVolume;
     case GridClass::Staggered:
         return GridBlindDataSemantic::Staggered;
+    case GridClass::VoxelBVH:
+        return GridBlindDataSemantic::VoxelBVH;
     default:
         return defaultSemantic;
     }
