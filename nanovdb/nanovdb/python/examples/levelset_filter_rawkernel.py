@@ -1,76 +1,39 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: Apache-2.0
-"""GPU LevelSetFilter on NanoVDB .nvdb files -- compiled-CUDA-kernel backend.
+"""levelset_filter compiled-CUDA-kernel backend -- one fused cupy.RawModule.
 
-One of three sibling examples applying the SAME GPU level-set filter (Laplacian
-deform + Godunov reinit + narrow-band retrack, driven by the VoxelBlockManager);
-they differ only in how the per-voxel stencils are computed:
-  * levelset_filter_rawkernel.py  -- a hand-written CUDA kernel  (this file)
-  * levelset_filter_cupy.py        -- pure CuPy array ops (no kernel)
-  * levelset_filter_cutile.py      -- NVIDIA cuTile tile kernels
-This one fuses the VBM decode + neighbour gather + update into one cupy.RawModule
-CUDA kernel per stage.
+The hand-written-CUDA-kernel backend for levelset_filter.py: each stencil is a
+`cupy.RawModule` (nvcc) kernel that fuses the VoxelBlockManager decode
+(`decodeInverseMaps`) + 3x3x3 neighbour gather (`computeBoxStencil`) + the
+per-voxel update into a single launch -- no dense `gatherBoxStencil` array. Run
+the full file->file filter through the driver:
 
-Reads a .nvdb file, runs N iterations of the GPU LevelSetFilter loop (the
-diffusion + renormalisation + narrow-band retrack that OpenVDB's
-tools::LevelSetFilter + LevelSetTracker perform), and writes the result to
-another .nvdb file:
+    python levelset_filter.py rawkernel  input.nvdb output.nvdb [outer_iterations]
 
-    python levelset_filter_rawkernel.py  input.nvdb  output.nvdb  [outer_iterations]
+Running this file directly executes a stencil-only smoke test (the deform +
+renorm kernels on a sphere, no file I/O and no narrow-band retrack):
 
-The input grid may be EITHER form (the script detects which):
-  * a FloatGrid level set (per-voxel float SDF), or
-  * an OnIndexGrid whose float SDF is stored in blind-data channel 0.
+    python levelset_filter_rawkernel.py
 
-Both are normalised to "(OnIndex topology on the device) + (float SDF sidecar)",
-which is the representation the VoxelBlockManager operates on:
-  * FloatGrid  -> tools.createOnIndexGrid(fg, channels=1) bakes the SDF into a
-                  blind channel; write to a temp .nvdb; io.deviceReadGrid it.
-  * OnIndexGrid -> io.deviceReadGrid directly.
-The SDF sidecar is read on the host with grid.getBlindData(0) (value-index
-order: [0] is the background slot, 1..N the active voxels -- the same order the
-VBM decode uses), then uploaded to the device.
-
-The OUTPUT is written in the SAME style as the input: a FloatGrid input yields a
-FloatGrid .nvdb, an OnIndex+SDF input yields an OnIndexGrid .nvdb with the SDF in
-blind channel 0. The result is baked on the host (tools.build.FloatGrid ->
-to_nanovdb), optionally converted back to OnIndex via createOnIndexGrid, then
-io.writeGrid. (Writing the result as a device-built grid via indexToGrid is
-avoided: in testing it dropped the high-value-index voxels for these
-stats/tiles-free index grids.)
-
-Each filter iteration runs three stages:
-  1. DEFORM      Laplacian flow            phi += (sum6 - 6 phi)/6      (VBM stencil)
-  2. RENORMALIZE Godunov reinit            phi -= dt*S(phi)*(|grad|-1)  (VBM stencil)
-  3. REBUILD     dilateGrid -> inject -> extrapolate -> injectPredicateToMask
-                 -> pruneGrid -> inject   (native bound ops + one extrapolate kernel)
-
-Scope / limitations: first-order Godunov reinitialisation (not higher-order
-WENO), no advection and no alpha mask. The prune keeps |phi| <= band*voxelSize,
-so the active band tracks the surface, but the output's inactive interior
-carries +background (there is no signed flood-fill).
-
-Run without arguments for a self-test: it builds sphere .nvdb files in both
-forms (FloatGrid and OnIndex+SDF), filters each, and asserts that the output
-style matches the input and the sphere shrinks under curvature flow.
-
-Requires CuPy, a CUDA-capable GPU, and nvcc (CuPy honours the NVCC env var). In a
-dev/source tree, set NANOVDB_INCLUDE to the dir containing nanovdb/NanoVDB.h.
+This is the fastest of the three backends (the gather is fused into the compute,
+no `(n, 27)` array is materialised) and the most code -- compare the kernel-free
+levelset_filter_cupy.py / cuTile levelset_filter_cutile.py for the same math.
+Requires CuPy, a CUDA-capable GPU, and nvcc (CuPy honours the NVCC env var). In
+a dev/source tree, set NANOVDB_INCLUDE to the dir containing nanovdb/NanoVDB.h.
 """
 import os
-import sys
-import tempfile
 
 import numpy as np
 
 import nanovdb
 
+import levelset_filter as lsf
 
-LOG2_BLOCK_WIDTH = 9
-BLOCK_WIDTH = 1 << LOG2_BLOCK_WIDTH
-NN_FACE = 6           # nanovdb::tools::morphology::NN_FACE (6-face dilation)
-SENTINEL = 1.0e30     # "value not yet known" marker for freshly-dilated voxels
-SDF_BLIND_CHANNEL = 0  # blind-data channel holding the float SDF on OnIndex input
+
+LOG2_BLOCK_WIDTH = lsf.LOG2_BLOCK_WIDTH       # 9
+BLOCK_WIDTH = 1 << LOG2_BLOCK_WIDTH           # 512
+NN_FACE = lsf.NN_FACE                         # 6-face dilation
+SENTINEL = lsf.SENTINEL                       # "value not yet known" marker
 
 # computeBoxStencil spoke ids: spoke = (di+1)*9 + (dj+1)*3 + (dk+1).
 #   centre=13;  +x=22 -x=4;  +y=16 -y=10;  +z=14 -z=12
@@ -246,26 +209,39 @@ def _include_options():
     return tuple(opts)
 
 
-class Filter:
-    """Holds the compiled kernels + bound ops and runs the level-set filter."""
+def make_backend():
+    if not (nanovdb.isCudaAvailable() and nanovdb.isGpuAvailable()):
+        print("This backend requires a CUDA build of nanovdb and a GPU. Skipping.")
+        return None
+    try:
+        import cupy as cp
+    except ImportError:
+        print("This backend requires CuPy (plus nvcc on PATH or $NVCC). Skipping.")
+        return None
+    options = _include_options()
+    if options is None:
+        return None
+    return Backend(cp, options)
 
-    def __init__(self, cp, band=3, deform_iters=4, normalize_iters=5):
+
+class Backend:
+    """Per-voxel stencils as fused cupy.RawModule CUDA kernels that decode the VBM
+    and gather the 3x3x3 neighbourhood in-kernel (no dense gatherBoxStencil), so
+    this backend keeps its own VBM bookkeeping in the `g` context."""
+
+    NAME = "rawkernel"
+
+    def __init__(self, cp, options):
         self.cp = cp
         self.tc = nanovdb.tools.cuda
-        self.band = band
-        self.deform_iters = deform_iters
-        self.normalize_iters = normalize_iters
-        options = _include_options()
-        if options is None:
-            raise SystemExit(1)
         m = cp.RawModule(code=KERNEL_SRC, backend="nvcc", options=options)
         self.k_decode = m.get_function("decode_coords")
         self.k_laplacian = m.get_function("laplacian_step")
         self.k_godunov = m.get_function("godunov_step")
         self.k_extrapolate = m.get_function("extrapolate")
 
-    # ---- device OnIndex grid + VBM bookkeeping -------------------------------
     def setup(self, handle):
+        """Device OnIndex grid + VBM pointers; decode value-indexed coords once."""
         cp = self.cp
         grid = handle.deviceGrid(0)
         if grid is None or grid.data_ptr() == 0:
@@ -283,190 +259,39 @@ class Filter:
                     fid=vbm.first_leaf_id_ptr(), jmp=vbm.jump_map_ptr(),
                     gptr=grid.data_ptr(), coords=coords)
 
+    def active_coords(self, g):
+        return g["coords"]                            # decoded in setup()
+
     def _vbm(self, g):
         return (g["gptr"], g["fid"], g["jmp"], g["fo"])
 
-    # ---- one full LevelSetFilter iteration -----------------------------------
-    def step(self, g, vals, vx, half_width):
+    def laplacian(self, g, phi, half_width):
         cp = self.cp
-        bg = np.float32(half_width)
-        buf = cp.empty_like(vals)
-        # 1. DEFORM: Laplacian flow.
-        for _ in range(self.deform_iters):
-            self.k_laplacian((g["bc"],), (BLOCK_WIDTH,), (*self._vbm(g), bg, vals, buf))
-            vals, buf = buf, vals
-        # 2. RENORMALIZE: Godunov reinitialisation.
-        for _ in range(self.normalize_iters):
-            self.k_godunov((g["bc"],), (BLOCK_WIDTH,),
-                           (*self._vbm(g), np.float32(vx), np.float32(0.3 * vx), bg, vals, buf))
-            vals, buf = buf, vals
-        cp.cuda.runtime.deviceSynchronize()
-        # 3. REBUILD BAND: dilateGrid -> inject -> extrapolate -> prune -> inject.
-        gd = self.setup(self.tc.dilateGrid(g["grid"], op=NN_FACE))
-        vals_d = cp.full(gd["n"] + 1, SENTINEL, dtype=cp.float32)
-        self.tc.inject(g["grid"], gd["grid"], vals, vals_d)
-        ebuf = cp.empty_like(vals_d)
-        self.k_extrapolate((gd["bc"],), (BLOCK_WIDTH,), (*self._vbm(gd), np.float32(vx), vals_d, ebuf))
-        vals_d = ebuf
-        predicate = cp.abs(vals_d) <= half_width
-        leaf_masks = cp.zeros(gd["n"] * 8, dtype=cp.uint64)   # activeVoxelCount*8
-        self.tc.injectPredicateToMask(gd["grid"], predicate, leaf_masks)
-        gp = self.setup(self.tc.pruneGrid(gd["grid"], leaf_masks))
-        vals_p = cp.full(gp["n"] + 1, half_width, dtype=cp.float32)
-        self.tc.inject(gd["grid"], gp["grid"], vals_d, vals_p)
-        return gp, vals_p
+        out = cp.empty_like(phi)
+        self.k_laplacian((g["bc"],), (BLOCK_WIDTH,),
+                         (*self._vbm(g), np.float32(half_width), phi, out))
+        out[0] = SENTINEL
+        return out
 
-    def surface_radius(self, g, vals, vx):
+    def godunov(self, g, phi, vx, half_width):
         cp = self.cp
-        v = vals[1:g["n"] + 1]
-        near = cp.abs(v) < 0.5 * vx
-        c = g["coords"][1:g["n"] + 1][near].astype(cp.float64) * vx
-        return float(cp.mean(cp.linalg.norm(c, axis=1))) if int(near.sum()) else float("nan")
+        out = cp.empty_like(phi)
+        self.k_godunov((g["bc"],), (BLOCK_WIDTH,),
+                       (*self._vbm(g), np.float32(vx), np.float32(0.3 * vx),
+                        np.float32(half_width), phi, out))
+        out[0] = SENTINEL
+        return out
 
-
-def read_to_device(flt, path):
-    """Read a .nvdb (FloatGrid OR OnIndex+SDF) -> (device-grid dict, sidecar, vx, half_width, style)."""
-    cp = flt.cp
-    io, T = nanovdb.io, nanovdb.tools
-    host = io.readGrid(path)
-    gtype = host.gridType(0)
-    vx = float(host.grid(0).voxelSize()[0])
-    half_width = flt.band * vx
-    tmp = None
-    if gtype == nanovdb.GridType.Float:
-        # Bake the per-voxel SDF into an OnIndex blind channel; read it on the
-        # host via grid.getBlindData (value-index order: [0]=background, 1..N).
-        idx_host = T.createOnIndexGrid(host.grid(0), channels=1,
-                                       include_stats=False, include_tiles=False)
-        sdf = np.array(idx_host.grid(0).getBlindData(SDF_BLIND_CHANNEL), dtype=np.float32)
-        tmp = tempfile.NamedTemporaryFile(suffix=".nvdb", delete=False); tmp.close()
-        io.writeGrid(tmp.name, idx_host)
-        dev = io.deviceReadGrid(tmp.name)
-    elif gtype == nanovdb.GridType.OnIndex:
-        if host.grid(0).blindDataCount() == 0:
-            raise SystemExit(f"{path}: OnIndex grid has no blind-data SDF channel.")
-        sdf = np.array(host.grid(0).getBlindData(SDF_BLIND_CHANNEL), dtype=np.float32)
-        dev = io.deviceReadGrid(path)
-    else:
-        raise SystemExit(f"{path}: unsupported grid type {gtype} "
-                         "(expected Float or OnIndex).")
-    dev.deviceUpload(0, True)
-    g = flt.setup(dev)
-    if sdf.shape[0] != g["n"] + 1:
-        raise SystemExit(f"{path}: SDF channel length {sdf.shape[0]} != activeVoxelCount+1 "
-                         f"({g['n'] + 1}); the OnIndex grid must use contiguous voxel "
-                         "indexing (built with include_stats=False, include_tiles=False).")
-    vals = cp.asarray(sdf)   # value-indexed sidecar; vals[0] is the background slot
-    if tmp is not None:
-        os.unlink(tmp.name)
-    return g, vals, vx, half_width, gtype
-
-
-def write_output(flt, g, vals, vx, path, style, name="filtered"):
-    """Bake the final (coords, SDF) into a host FloatGrid; write it in `style`.
-
-    style == GridType.Float    -> a FloatGrid .nvdb
-    style == GridType.OnIndex  -> an OnIndexGrid .nvdb with the SDF in blind channel 0
-    """
-    cp = flt.cp
-    T, io = nanovdb.tools, nanovdb.io
-    coords = cp.asnumpy(g["coords"])
-    v = cp.asnumpy(vals)
-    builder = T.build.FloatGrid(float(flt.band * vx))
-    builder.setName(name)
-    builder.setTransform(vx)
-    acc = builder.getAccessor()
-    Coord = nanovdb.math.Coord
-    for k in range(1, g["n"] + 1):
-        i, j, kk = coords[k]
-        acc.setValue(Coord(int(i), int(j), int(kk)), float(v[k]))
-    fh = builder.to_nanovdb()
-    if style == nanovdb.GridType.OnIndex:
-        idx_out = T.createOnIndexGrid(fh.grid(0), channels=1,
-                                      include_stats=False, include_tiles=False)
-        io.writeGrid(path, idx_out)
-    else:
-        io.writeGrid(path, fh)
-
-
-def _gpu_or_skip():
-    """Return the cupy module, or None (with a printed reason) if GPU filtering
-    is unavailable -- lets the example self-skip cleanly like the others."""
-    if not (nanovdb.isCudaAvailable() and nanovdb.isGpuAvailable()):
-        print("This example requires a CUDA build of nanovdb and a GPU. Skipping.")
-        return None
-    try:
-        import cupy as cp
-    except ImportError:
-        print("This example requires CuPy (plus nvcc on PATH or $NVCC). Skipping.")
-        return None
-    return cp
-
-
-def filter_file(in_path, out_path, outer_iters=6):
-    cp = _gpu_or_skip()
-    if cp is None:
-        return None
-    flt = Filter(cp)
-    g, vals, vx, half_width, gtype = read_to_device(flt, in_path)
-    print(f"read {in_path}: {gtype}, {g['n']} active voxels, voxelSize {vx:g}")
-    r0 = flt.surface_radius(g, vals, vx)
-    for it in range(outer_iters):
-        g, vals = flt.step(g, vals, vx, half_width)
-        r = flt.surface_radius(g, vals, vx)
-        print(f"  iter {it + 1}: {g['n']:7d} active, surface radius = {r:.4f}")
-    write_output(flt, g, vals, vx, out_path, gtype)
-    style = "OnIndex+SDF" if gtype == nanovdb.GridType.OnIndex else "FloatGrid"
-    print(f"wrote {out_path}: {style} (same style as input), {g['n']} active voxels "
-          f"(surface radius {r0:.4f} -> {r:.4f})")
-    return r0, r, gtype
-
-
-def self_test():
-    """No-args run: build sphere .nvdb files of both styles, filter, assert invariants."""
-    if _gpu_or_skip() is None:
-        return
-    io, T, GT = nanovdb.io, nanovdb.tools, nanovdb.GridType
-    tmps = [tempfile.NamedTemporaryFile(suffix=".nvdb", delete=False) for _ in range(4)]
-    for t in tmps:
-        t.close()
-    f_in, f_out, o_in, o_out = (t.name for t in tmps)
-
-    # 1. FloatGrid in -> FloatGrid out.
-    io.writeGrid(f_in, T.createLevelSetSphere(radius=20.0, voxelSize=1.0, name="sphere"))
-    print("self-test 1: FloatGrid sphere -> filter -> FloatGrid")
-    r0, r, style = filter_file(f_in, f_out, outer_iters=6)
-    rb = io.readGrid(f_out)
-    assert style == GT.Float and rb.gridType(0) == GT.Float, "output style is not FloatGrid"
-    assert r < r0 - 0.05, "sphere did not shrink under curvature flow"
-
-    # 2. OnIndex+SDF in -> OnIndex+SDF out (style preserved).
-    sphere = T.createLevelSetSphere(radius=18.0, voxelSize=1.0, name="sphere")
-    io.writeGrid(o_in, T.createOnIndexGrid(sphere.grid(0), channels=1,
-                                           include_stats=False, include_tiles=False))
-    print("self-test 2: OnIndex+SDF sphere -> filter -> OnIndex+SDF")
-    r0b, rb2, style2 = filter_file(o_in, o_out, outer_iters=4)
-    ro = io.readGrid(o_out)
-    assert style2 == GT.OnIndex and ro.gridType(0) == GT.OnIndex, "output style is not OnIndex"
-    assert ro.grid(0).blindDataCount() >= 1, "OnIndex output has no SDF blind channel"
-    assert rb2 < r0b - 0.05, "sphere did not shrink under curvature flow"
-
-    print("OK: both styles filter correctly and the output style matches the input.")
-    for n in (f_in, f_out, o_in, o_out):
-        os.unlink(n)
-
-
-def main(argv):
-    if len(argv) >= 3:
-        outer = int(argv[3]) if len(argv) >= 4 else 6
-        filter_file(argv[1], argv[2], outer)
-    elif len(argv) == 1:
-        self_test()
-    else:
-        print(__doc__)
-        raise SystemExit("usage: levelset_filter_rawkernel.py input.nvdb output.nvdb "
-                         "[outer_iterations]   (no args = self-test)")
+    def extrapolate(self, g, phi, vx):
+        cp = self.cp
+        out = cp.empty_like(phi)
+        self.k_extrapolate((g["bc"],), (BLOCK_WIDTH,),
+                           (*self._vbm(g), np.float32(vx), phi, out))
+        out[0] = SENTINEL
+        return out
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    backend = make_backend()
+    if backend is not None:
+        lsf.stencil_demo(backend)
