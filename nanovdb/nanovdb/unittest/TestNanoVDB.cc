@@ -1465,6 +1465,11 @@ TEST_F(TestNanoVDB, Vec2)
     EXPECT_EQ(std::sqrt(5.0),    a.length());
     EXPECT_EQ(1.0*3.0 + 2.0*4.0, a.dot(b));
 
+    // normalized() — const, non-mutating, unit length
+    const Vec2d e(3, 4);
+    EXPECT_NEAR(1.0, e.normalized().length(), 1e-12);
+    EXPECT_EQ(Vec2d(3, 4), e);// source unchanged
+
     // min/max scalar reductions
     EXPECT_EQ(1.0, a.min());
     EXPECT_EQ(2.0, a.max());
@@ -1564,6 +1569,15 @@ TEST_F(TestNanoVDB, Vec3Ops)
     Vec3d n(3, 0, 4);
     n.normalize();
     EXPECT_NEAR(1.0, n.length(), 1e-12);
+
+    // normalized() — const, non-mutating counterpart; callable on a const vector
+    const Vec3d c(3, 0, 4);
+    const Vec3d u = c.normalized();
+    EXPECT_NEAR(1.0, u.length(), 1e-12);
+    EXPECT_NEAR(0.6, u[0], 1e-12);
+    EXPECT_NEAR(0.0, u[1], 1e-12);
+    EXPECT_NEAR(0.8, u[2], 1e-12);
+    EXPECT_EQ(Vec3d(3, 0, 4), c);// source unchanged
 }// Vec3Ops
 
 TEST_F(TestNanoVDB, Vec4Ops)
@@ -1614,6 +1628,12 @@ TEST_F(TestNanoVDB, Vec4Ops)
     Vec4d n(1, 0, 0, 0);
     n.normalize();
     EXPECT_NEAR(1.0, n.length(), 1e-12);
+
+    // normalized() — const, non-mutating counterpart; callable on a const vector
+    const Vec4d c(0, 3, 0, 4);
+    const Vec4d u = c.normalized();
+    EXPECT_NEAR(1.0, u.length(), 1e-12);
+    EXPECT_EQ(Vec4d(0, 3, 0, 4), c);// source unchanged
 }// Vec4Ops
 
 TEST_F(TestNanoVDB, Mat2)

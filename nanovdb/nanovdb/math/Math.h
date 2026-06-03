@@ -1012,6 +1012,13 @@ public:
         for (int i = 0; i < N; ++i) out[i] = mVec[i] / s;
         return out;
     }
+    /// @brief Return a unit-length copy (@c *this divided by @c length()) as a @c Derived.
+    /// Const, non-mutating counterpart of the derived @c normalize(). Not @c constexpr —
+    /// @c length() calls @c Sqrt.
+    template<typename Derived>
+    __hostdev__ [[nodiscard]] Derived normalized() const noexcept {
+        return this->template divideBy<Derived>(this->length());
+    }
 
     // ---- in-place compound assignment helpers ----
 
@@ -1235,6 +1242,10 @@ public:
     __hostdev__ constexpr Vec2& operator/=(const T& s) noexcept       { Base::divideAssignScalar(s); return *this; }
     /// @brief Normalize in place (divide by @c length()). Not @c constexpr — calls @c std::sqrt.
     __hostdev__ Vec2& normalize() noexcept                  { return (*this) /= this->length(); }
+    /// @brief Return a normalized (unit-length) copy; const counterpart of @c normalize().
+    __hostdev__ [[nodiscard]] Vec2 normalized() const noexcept {
+        return Base::template normalized<Vec2>();
+    }
 
     // ---- equality ----
     /// @brief Component-wise equality.
@@ -1902,6 +1913,10 @@ public:
     __hostdev__ constexpr Vec3& operator/=(const T& s) noexcept        { Base::divideAssignScalar(s); return *this; }
     /// @brief Normalize in place (divide by @c length()). Not @c constexpr — calls @c std::sqrt.
     __hostdev__ Vec3& normalize() noexcept                   { return (*this) /= this->length(); }
+    /// @brief Return a normalized (unit-length) copy; const counterpart of @c normalize().
+    __hostdev__ [[nodiscard]] Vec3 normalized() const noexcept {
+        return Base::template normalized<Vec3>();
+    }
 
     // ---- equality ----
     /// @brief Component-wise equality.
@@ -2049,6 +2064,10 @@ public:
     __hostdev__ constexpr Vec4& operator/=(const T& s) noexcept        { Base::divideAssignScalar(s); return *this; }
     /// @brief Normalize in place (divide by @c length()). Not @c constexpr — calls @c std::sqrt.
     __hostdev__ Vec4& normalize() noexcept                   { return (*this) /= this->length(); }
+    /// @brief Return a normalized (unit-length) copy; const counterpart of @c normalize().
+    __hostdev__ [[nodiscard]] Vec4 normalized() const noexcept {
+        return Base::template normalized<Vec4>();
+    }
 
     // ---- equality ----
     /// @brief Component-wise equality.
