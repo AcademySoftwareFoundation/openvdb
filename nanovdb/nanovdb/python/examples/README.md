@@ -40,8 +40,24 @@ GPU-array framework it uses is unavailable.
 | [`cupy_rawkernel.py`](cupy_rawkernel.py) | A `cupy.RawKernel` that `#include <nanovdb/NanoVDB.h>` (compiled with `nanovdb.cuda.compile_options()`) and reads a `const nanovdb::NanoGrid<float>*` straight from `grid.data_ptr()`. Documents the device-pointer ABI. Requires CuPy. |
 | [`numba_cuda.py`](numba_cuda.py) | Adopting a NanoVDB device buffer as a zero-copy `numba.cuda` array (Numba can't parse the C++ ABI, so it operates on the raw buffer). Requires Numba. |
 | [`triton_kernel.py`](triton_kernel.py) | Handing a NanoVDB device buffer to a Triton kernel via a zero-copy `torch.from_dlpack` tensor. Requires Triton + PyTorch. |
-| [`cupy_levelset_filter.py`](cupy_levelset_filter.py) | A full GPU level-set filter (`tools::LevelSetFilter`-style diffusion + Godunov renormalisation + narrow-band retrack) on a `.nvdb` file, driven by the device `VoxelBlockManager`: `buildVoxelBlockManager` plus `decodeInverseMaps` / `computeBoxStencil` called from a `cupy.RawModule` (nvcc backend), with `dilateGrid` / `inject` / `injectPredicateToMask` / `pruneGrid` for the retrack. Reads/writes either a `FloatGrid` or an `OnIndexGrid` with the SDF in a blind channel, preserving the input style. No args runs a self-test. Requires CuPy + nvcc. |
-| [`cupy_gather_stencil.py`](cupy_gather_stencil.py) | The **kernel-free** counterpart to `cupy_levelset_filter.py`: the *same* full `.nvdb`→`.nvdb` level-set filter (deform + Godunov reinit + narrow-band retrack, style-preserving) with **no `cupy.RawModule` / CUDA kernel anywhere**. `tools.cuda.gatherBoxStencil` gives each voxel's 3×3×3 neighbourhood as a dense `(N, 27)` array and `tools.cuda.activeVoxelCoords` gives positions as `(N, 3)`, so all per-voxel math is plain **CuPy** (the same dense arrays a cuTile `@ct.kernel` would `ct.load`); the retrack uses the bound `dilateGrid` / `inject` / `injectPredicateToMask` / `pruneGrid`. No args runs a self-test over both input styles. Requires only CuPy (no nvcc / NanoVDB headers). |
+
+#### The same level-set filter, three compute backends
+
+`levelset_filter_*.py` are **three implementations of one GPU level-set filter** —
+`tools::LevelSetFilter`-style Laplacian diffusion + Godunov renormalisation +
+narrow-band retrack on a `.nvdb` file, driven by the device `VoxelBlockManager`,
+reading/writing either a `FloatGrid` or an `OnIndexGrid` (SDF in a blind channel)
+and preserving the input style. They share the *sparse* half (the bound
+`gatherBoxStencil` / `activeVoxelCoords` / `dilateGrid` / `inject` /
+`injectPredicateToMask` / `pruneGrid` ops) and differ **only in how the dense
+per-voxel stencils are computed** — a useful side-by-side of three GPU styles.
+Each runs a self-test with no arguments.
+
+| Script | Per-voxel compute backend |
+| --- | --- |
+| [`levelset_filter_rawkernel.py`](levelset_filter_rawkernel.py) | A hand-written CUDA kernel: `buildVoxelBlockManager` + `decodeInverseMaps` / `computeBoxStencil` fused with the update in a `cupy.RawModule` (nvcc backend). Fastest, most control. Requires CuPy + nvcc. |
+| [`levelset_filter_cupy.py`](levelset_filter_cupy.py) | **Kernel-free**: `gatherBoxStencil` → dense `(N, 27)` neighbourhood + `activeVoxelCoords` → `(N, 3)`, then all per-voxel math as plain **CuPy** array ops. No `RawModule` / CUDA C++ / nvcc. Requires only CuPy. |
+| [`levelset_filter_cutile.py`](levelset_filter_cutile.py) | The same dense arrays, with the per-voxel stencils as **NVIDIA cuTile** (`cuda.tile`) tile kernels (`ct.load` / `ct.store` over `(TILE,)` tiles). Requires CuPy + `cuda-tile`. |
 
 For full API signatures and per-argument docstrings, use Python's
 `help()` on any symbol — e.g. `help(nanovdb.tools.createNanoGridFpN)`.

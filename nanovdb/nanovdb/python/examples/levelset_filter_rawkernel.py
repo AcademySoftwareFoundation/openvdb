@@ -1,13 +1,22 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: Apache-2.0
-"""GPU LevelSetFilter on NanoVDB .nvdb files, driven by the VoxelBlockManager.
+"""GPU LevelSetFilter on NanoVDB .nvdb files -- compiled-CUDA-kernel backend.
+
+One of three sibling examples applying the SAME GPU level-set filter (Laplacian
+deform + Godunov reinit + narrow-band retrack, driven by the VoxelBlockManager);
+they differ only in how the per-voxel stencils are computed:
+  * levelset_filter_rawkernel.py  -- a hand-written CUDA kernel  (this file)
+  * levelset_filter_cupy.py        -- pure CuPy array ops (no kernel)
+  * levelset_filter_cutile.py      -- NVIDIA cuTile tile kernels
+This one fuses the VBM decode + neighbour gather + update into one cupy.RawModule
+CUDA kernel per stage.
 
 Reads a .nvdb file, runs N iterations of the GPU LevelSetFilter loop (the
 diffusion + renormalisation + narrow-band retrack that OpenVDB's
 tools::LevelSetFilter + LevelSetTracker perform), and writes the result to
 another .nvdb file:
 
-    python cupy_levelset_filter.py  input.nvdb  output.nvdb  [outer_iterations]
+    python levelset_filter_rawkernel.py  input.nvdb  output.nvdb  [outer_iterations]
 
 The input grid may be EITHER form (the script detects which):
   * a FloatGrid level set (per-voxel float SDF), or
@@ -455,7 +464,7 @@ def main(argv):
         self_test()
     else:
         print(__doc__)
-        raise SystemExit("usage: cupy_levelset_filter.py input.nvdb output.nvdb "
+        raise SystemExit("usage: levelset_filter_rawkernel.py input.nvdb output.nvdb "
                          "[outer_iterations]   (no args = self-test)")
 
 

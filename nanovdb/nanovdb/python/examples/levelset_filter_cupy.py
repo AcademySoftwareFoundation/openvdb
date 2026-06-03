@@ -1,14 +1,20 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: Apache-2.0
-"""A full GPU LevelSetFilter on .nvdb files with NO hand-written CUDA kernel.
+"""GPU LevelSetFilter on NanoVDB .nvdb files -- pure-CuPy (kernel-free) backend.
 
-This is the kernel-free counterpart to `cupy_levelset_filter.py`. That example
-runs the per-voxel stencils as `cupy.RawModule` kernels that call the device
-VoxelBlockManager decode + `computeBoxStencil`; here every stage runs as plain
-**CuPy** array math on top of bound NanoVDB ops -- no `RawModule`, no CUDA C++,
-no `nvcc`:
+One of three sibling examples applying the SAME GPU level-set filter (Laplacian
+deform + Godunov reinit + narrow-band retrack, driven by the VoxelBlockManager);
+they differ only in how the per-voxel stencils are computed:
+  * levelset_filter_rawkernel.py  -- a hand-written CUDA kernel
+  * levelset_filter_cupy.py        -- pure CuPy array ops (no kernel)  (this file)
+  * levelset_filter_cutile.py      -- NVIDIA cuTile tile kernels
 
-    python cupy_gather_stencil.py  input.nvdb  output.nvdb  [outer_iterations]
+Where levelset_filter_rawkernel.py runs the per-voxel stencils as `cupy.RawModule`
+kernels calling the device VoxelBlockManager decode + `computeBoxStencil`, here
+every stage runs as plain **CuPy** array math on top of bound NanoVDB ops -- no
+`RawModule`, no CUDA C++, no `nvcc`:
+
+    python levelset_filter_cupy.py  input.nvdb  output.nvdb  [outer_iterations]
 
 How each stage stays kernel-free:
   * READ      `createOnIndexGrid` + `grid.getBlindData(0)` -> value-indexed SDF.
@@ -280,7 +286,7 @@ def main(argv):
         self_test()
     else:
         print(__doc__)
-        raise SystemExit("usage: cupy_gather_stencil.py input.nvdb output.nvdb "
+        raise SystemExit("usage: levelset_filter_cupy.py input.nvdb output.nvdb "
                          "[outer_iterations]   (no args = self-test)")
 
 
