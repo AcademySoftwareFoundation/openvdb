@@ -316,10 +316,90 @@ static void defineBuild(nb::module_& m)
 // / jumpMap device pointers (first_leaf_id_ptr / jump_map_ptr above) and the
 // device grid pointer.
 
+// ------------------- gatherBoxStencil (VBM box-stencil gather) -------------
+//
+// Materialise, for every active voxel, the values of its 3x3x3 neighbourhood
+// into a dense (valueCount, 27) array -- the "dense-ise the sparse stencil"
+// bridge that lets tile / array frameworks (CuPy, cuTile, ...) run VDB stencils
+// without pointer-chasing the tree. Column j is the 3x3x3 spoke
+// (di+1)*9 + (dj+1)*3 + (dk+1): the centre is column 13 and the six faces are
+// columns 4, 10, 12, 14, 16, 22. Inactive neighbours read the sidecar's
+// background slot (value index 0).
+template<int Log2BlockWidth, typename T>
+__global__ void gatherBoxStencilKernel(
+    const NanoGrid<ValueOnIndex>* grid,
+    const uint32_t* firstLeafID, const uint64_t* jumpMap, uint64_t firstOffset,
+    const T* values, T* out)
+{
+    constexpr int BW  = 1 << Log2BlockWidth;
+    constexpr int JML = BW / 64;
+    using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
+    __shared__ uint32_t smem_leafIndex[BW];
+    __shared__ uint16_t smem_voxelOffset[BW];
+    const uint64_t blockFirstOffset = firstOffset + uint64_t(blockIdx.x) * BW;
+    VBM::template decodeInverseMaps<ValueOnIndex>(
+        grid, firstLeafID[blockIdx.x], &jumpMap[uint64_t(blockIdx.x) * JML],
+        blockFirstOffset, smem_leafIndex, smem_voxelOffset);
+    const int tID = threadIdx.x;
+    if (smem_leafIndex[tID] == VBM::UnusedLeafIndex) return;
+    uint64_t st[27];
+    VBM::template computeBoxStencil<ValueOnIndex>(
+        grid, smem_leafIndex, smem_voxelOffset, st);
+    const uint64_t c = st[13];                              // centre value index
+    #pragma unroll
+    for (int j = 0; j < 27; ++j) out[c * 27 + j] = values[st[j]];  // 0 -> background
+}
+
+template<typename T> void defineGatherBoxStencil(nb::module_& m, const char* name)
+{
+    m.def(
+        name,
+        [](nb::handle py_grid,
+           nb::ndarray<const T, nb::ndim<1>, nb::c_contig, nb::device::cuda> values,
+           nb::ndarray<T, nb::shape<-1, 27>, nb::c_contig, nb::device::cuda>  out,
+           int log2_block_width, uintptr_t stream) {
+            auto* d_grid = castOnIndexDeviceGrid(py_grid, "gatherBoxStencil");
+            cudaStream_t s     = reinterpret_cast<cudaStream_t>(stream);
+            const T*     dVals = values.data();
+            T*           dOut  = out.data();
+            // Build a transient VBM, then one block per VBM block decodes and
+            // gathers the 27 neighbour values; pure CUDA, so release the GIL.
+            nb::gil_scoped_release release;
+            dispatchLog2BlockWidth(log2_block_width, [&](auto W) {
+                constexpr int LBW = decltype(W)::value;
+                auto handle = nanovdb::tools::cuda::buildVoxelBlockManager<
+                    LBW, nanovdb::cuda::DeviceBuffer>(d_grid, 0, 0, 0, s);
+                const uint32_t bc = static_cast<uint32_t>(handle.blockCount());
+                if (bc)
+                    gatherBoxStencilKernel<LBW, T><<<bc, (1 << LBW), 0, s>>>(
+                        d_grid, handle.deviceFirstLeafID(), handle.deviceJumpMap(),
+                        handle.firstOffset(), dVals, dOut);
+                cudaCheck(cudaStreamSynchronize(s));
+                return 0;
+            });
+        },
+        "device_grid"_a, "values"_a, "out"_a, "log2_block_width"_a = 9, "stream"_a = 0,
+        "Gather the 3x3x3 box-stencil neighbour values of every active voxel "
+        "into a dense (valueCount, 27) array -- the bridge that lets tile / "
+        "array frameworks (CuPy, cuTile, ...) run VDB stencils without pointer-"
+        "chasing the tree. device_grid is an OnIndex device grid from "
+        "DeviceGridHandle.deviceGrid(n); values is a 1-D device array indexed by "
+        "value index (the per-voxel sidecar; entry 0 is the background slot); out "
+        "is a 2-D device array of shape (rows, 27) with rows >= valueCount, "
+        "filled so out[k, j] is voxel k's neighbour value at 3x3x3 spoke "
+        "j = (di+1)*9+(dj+1)*3+(dk+1) (centre j=13; the six faces are "
+        "j = 4, 10, 12, 14, 16, 22). Inactive neighbours read values[0]. A "
+        "transient VoxelBlockManager is built internally at log2_block_width "
+        "(6/7/8/9). stream is a raw CUDA stream handle (Python int; 0 = default "
+        "stream).");
+}
+
 void defineDeviceVoxelBlockManager(nb::module_& m)
 {
     defineHandle(m);
     defineBuild(m);
+    defineGatherBoxStencil<float>(m, "gatherBoxStencil");
+    defineGatherBoxStencil<double>(m, "gatherBoxStencil");
 }
 
 } // namespace pynanovdb
