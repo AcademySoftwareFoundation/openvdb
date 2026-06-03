@@ -394,12 +394,82 @@ template<typename T> void defineGatherBoxStencil(nb::module_& m, const char* nam
         "stream).");
 }
 
+// ------------------- activeVoxelCoords (VBM coordinate decode) -------------
+//
+// Write each active voxel's index-space coordinate into a dense (valueCount, 3)
+// int32 array, keyed by value index -- the decode companion to
+// gatherBoxStencil. Lets callers recover "where is value index k" (e.g. to bake
+// a result back into a grid, or to scatter to a dense field) without a
+// hand-written decode kernel.
+template<int Log2BlockWidth>
+__global__ void activeVoxelCoordsKernel(
+    const NanoGrid<ValueOnIndex>* grid,
+    const uint32_t* firstLeafID, const uint64_t* jumpMap, uint64_t firstOffset,
+    int32_t* out)
+{
+    constexpr int BW  = 1 << Log2BlockWidth;
+    constexpr int JML = BW / 64;
+    using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
+    __shared__ uint32_t smem_leafIndex[BW];
+    __shared__ uint16_t smem_voxelOffset[BW];
+    const uint64_t blockFirstOffset = firstOffset + uint64_t(blockIdx.x) * BW;
+    VBM::template decodeInverseMaps<ValueOnIndex>(
+        grid, firstLeafID[blockIdx.x], &jumpMap[uint64_t(blockIdx.x) * JML],
+        blockFirstOffset, smem_leafIndex, smem_voxelOffset);
+    const int tID = threadIdx.x;
+    if (smem_leafIndex[tID] == VBM::UnusedLeafIndex) return;
+    const auto&    leaf = grid->tree().getFirstNode<0>()[smem_leafIndex[tID]];
+    const Coord    c    = leaf.offsetToGlobalCoord(smem_voxelOffset[tID]);
+    const uint64_t idx  = leaf.getValue(smem_voxelOffset[tID]);
+    out[idx * 3 + 0] = c[0];
+    out[idx * 3 + 1] = c[1];
+    out[idx * 3 + 2] = c[2];
+}
+
+void defineActiveVoxelCoords(nb::module_& m, const char* name)
+{
+    m.def(
+        name,
+        [](nb::handle py_grid,
+           nb::ndarray<int32_t, nb::shape<-1, 3>, nb::c_contig, nb::device::cuda> out,
+           int log2_block_width, uintptr_t stream) {
+            auto* d_grid = castOnIndexDeviceGrid(py_grid, "activeVoxelCoords");
+            cudaStream_t s    = reinterpret_cast<cudaStream_t>(stream);
+            int32_t*     dOut = out.data();
+            nb::gil_scoped_release release;
+            dispatchLog2BlockWidth(log2_block_width, [&](auto W) {
+                constexpr int LBW = decltype(W)::value;
+                auto handle = nanovdb::tools::cuda::buildVoxelBlockManager<
+                    LBW, nanovdb::cuda::DeviceBuffer>(d_grid, 0, 0, 0, s);
+                const uint32_t bc = static_cast<uint32_t>(handle.blockCount());
+                if (bc)
+                    activeVoxelCoordsKernel<LBW><<<bc, (1 << LBW), 0, s>>>(
+                        d_grid, handle.deviceFirstLeafID(), handle.deviceJumpMap(),
+                        handle.firstOffset(), dOut);
+                cudaCheck(cudaStreamSynchronize(s));
+                return 0;
+            });
+        },
+        "device_grid"_a, "out"_a, "log2_block_width"_a = 9, "stream"_a = 0,
+        "Write each active voxel's index-space coordinate into a dense "
+        "(rows, 3) int32 device array keyed by value index (rows >= valueCount); "
+        "out[k] is the (i, j, k) coordinate of value index k (row 0, the "
+        "background slot, is left untouched). The decode companion to "
+        "gatherBoxStencil -- recovers per-voxel coordinates without a "
+        "hand-written decode kernel (e.g. to bake a sidecar result back into a "
+        "grid). device_grid is an OnIndex device grid from "
+        "DeviceGridHandle.deviceGrid(n); a transient VoxelBlockManager is built "
+        "internally at log2_block_width (6/7/8/9). stream is a raw CUDA stream "
+        "handle (Python int; 0 = default stream).");
+}
+
 void defineDeviceVoxelBlockManager(nb::module_& m)
 {
     defineHandle(m);
     defineBuild(m);
     defineGatherBoxStencil<float>(m, "gatherBoxStencil");
     defineGatherBoxStencil<double>(m, "gatherBoxStencil");
+    defineActiveVoxelCoords(m, "activeVoxelCoords");
 }
 
 } // namespace pynanovdb
