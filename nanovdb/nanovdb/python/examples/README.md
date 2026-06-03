@@ -40,6 +40,7 @@ GPU-array framework it uses is unavailable.
 | [`cupy_rawkernel.py`](cupy_rawkernel.py) | A `cupy.RawKernel` that `#include <nanovdb/NanoVDB.h>` (compiled with `nanovdb.cuda.compile_options()`) and reads a `const nanovdb::NanoGrid<float>*` straight from `grid.data_ptr()`. Documents the device-pointer ABI. Requires CuPy. |
 | [`numba_cuda.py`](numba_cuda.py) | Adopting a NanoVDB device buffer as a zero-copy `numba.cuda` array (Numba can't parse the C++ ABI, so it operates on the raw buffer). Requires Numba. |
 | [`triton_kernel.py`](triton_kernel.py) | Handing a NanoVDB device buffer to a Triton kernel via a zero-copy `torch.from_dlpack` tensor. Requires Triton + PyTorch. |
+| [`cupy_levelset_filter.py`](cupy_levelset_filter.py) | A full GPU level-set filter (`tools::LevelSetFilter`-style diffusion + Godunov renormalisation + narrow-band retrack) on a `.nvdb` file, driven by the device `VoxelBlockManager`: `buildVoxelBlockManager` plus `decodeInverseMaps` / `computeBoxStencil` called from a `cupy.RawModule` (nvcc backend), with `dilateGrid` / `inject` / `injectPredicateToMask` / `pruneGrid` for the retrack. Reads/writes either a `FloatGrid` or an `OnIndexGrid` with the SDF in a blind channel, preserving the input style. No args runs a self-test. Requires CuPy + nvcc. |
 
 For full API signatures and per-argument docstrings, use Python's
 `help()` on any symbol — e.g. `help(nanovdb.tools.createNanoGridFpN)`.
