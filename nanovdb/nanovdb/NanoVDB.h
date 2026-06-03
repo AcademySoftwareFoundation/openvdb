@@ -431,7 +431,8 @@ enum class GridBlindDataSemantic : uint32_t { Unknown = 0,
                                               LineId = 18, // integer ID of line
                                               TriangleId = 19, // integer ID of triangle
                                               GaussianId = 20, // integer ID of Gaussian
-                                              End = 21 };
+                                              Range = 21, // begin/end pair of indices
+                                              End = 22 };
 
 /// @brief Maps from GridBlindDataSemantic to GridClass
 /// @note Useful when converting an IndexGrid with blind data of type T into a Grid<T>
