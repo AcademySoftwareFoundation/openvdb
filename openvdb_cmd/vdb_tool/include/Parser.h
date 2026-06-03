@@ -518,7 +518,7 @@ public:
                   ss << std::asctime(std::localtime(&tmp));
                   this->push(ss.str());
         });
-        add("uuid","an approximate uuid v4 random hex string, e.g. {uuid} -> {821105a2-0e60-4a23-970d-0165e0ad4373}",
+        add("uuid","random RFC 4122 v4 UUID hex string (thread-local PRNG), e.g. {uuid:.vdb:append} -> {821105a2-0e60-4a23-970d-0165e0ad4373.vdb}",
             [&](){this->push(uuid());}
         );
 
@@ -740,6 +740,7 @@ struct BaseLoop
     ActIterT    begin;  ///< Iterator marking the start of the loop body.
     std::string name;   ///< Loop-variable name.
     size_t      pos;    ///< Zero-based iteration counter.
+    bool        quiet = false; ///< Suppress per-iteration "Processing: ..." print.
 };// BaseLoop struct
 
 // ==============================================================================================================
@@ -1349,7 +1350,8 @@ Parser::Parser(std::vector<Option> &&def)
 
     this->addAction(
         {"for"}, "start of for-loop over a user-defined loop variable and range.",
-        {{"", "", "i=0,9|i=0,9,2", "define name of loop variable and its range."}},
+        {{"", "", "i=0,9|i=0,9,2", "define name of loop variable and its range."},
+         {"quiet", "false", "0|1|false|true", "suppress per-iteration \"Processing: ...\" output for this loop"}},
         [&](){ ++counter; mOpenLoops.emplace_back("for", mCurrentArgIdx); },
         [&](){
             OPENVDB_ASSERT(iter->names[0] == "for");
@@ -1361,8 +1363,9 @@ Parser::Parser(std::vector<Option> &&def)
                 loop=std::make_shared<ForLoop<float>>(processor.memory(), iter, name, this->getVec<float>(name,","));
             }
             if (loop->valid()) {
+                loop->quiet = this->get<bool>("quiet");
                 loops.push_back(loop);
-                if (verbose) loop->print();
+                if (verbose && !loop->quiet) loop->print();
             } else {
                 skipToEnd(iter);// skip to matching -end
             }
@@ -1379,7 +1382,8 @@ Parser::Parser(std::vector<Option> &&def)
          {"exclude", "", "\"file1,file2\"", "exclude files that match one or more patterns"},
          {"min_size", "0", "1|1B|1KB|1MB|1GB|1TB", "minimum byte size, smaller files will be skipped"},
          {"max_size", "1TB", "1|1B|1KB|1MB|1GB|1TB", "maximum byte size, larger files will be skipped"},
-         {"recursive", "0", "0|1|false|true", "recursive search of files into sub-directories."}},
+         {"recursive", "0", "0|1|false|true", "recursive search of files into sub-directories."},
+         {"quiet", "false", "0|1|false|true", "suppress per-iteration \"Processing: ...\" output for this loop"}},
         [&](){ ++counter; mOpenLoops.emplace_back("files", mCurrentArgIdx); },
         [&](){
             OPENVDB_ASSERT(iter->names[0] == "files");
@@ -1402,8 +1406,9 @@ Parser::Parser(std::vector<Option> &&def)
                                                strSizeToByteSize(this->getStr("max_size")));
             }
             if (loop->valid()) {
+                loop->quiet = this->get<bool>("quiet");
                 loops.push_back(loop);
-                if (verbose) loop->print();
+                if (verbose && !loop->quiet) loop->print();
             } else {
                 skipToEnd(iter);// skip to matching -end
             }
@@ -1412,15 +1417,17 @@ Parser::Parser(std::vector<Option> &&def)
 
     this->addAction(
         {"each"}, "start of each-loop over a user-defined loop variable and list of values.",
-        {{"", "", "s=sphere,bunny,...", "defined name of loop variable and list of its values."}},
+        {{"", "", "s=sphere,bunny,...", "defined name of loop variable and list of its values."},
+         {"quiet", "false", "0|1|false|true", "suppress per-iteration \"Processing: ...\" output for this loop"}},
         [&](){ ++counter; mOpenLoops.emplace_back("each", mCurrentArgIdx); },
         [&](){
             OPENVDB_ASSERT(iter->names[0] == "each");
             const std::string &name = iter->options[0].name;
             auto loop = std::make_shared<EachLoop>(processor.memory(), iter, name, this->getVec<std::string>(name,","));
             if (loop->valid()) {
+                loop->quiet = this->get<bool>("quiet");
                 loops.push_back(loop);
-                if (verbose) loop->print();
+                if (verbose && !loop->quiet) loop->print();
             } else {
                 skipToEnd(iter);// skip to matching -end
             }
@@ -1453,7 +1460,7 @@ Parser::Parser(std::vector<Option> &&def)
             auto loop = loops.back();// current loop
             if (loop->next()) {// rewind loop
                 iter = loop->begin;
-                if (verbose) loop->print();
+                if (verbose && !loop->quiet) loop->print();
             } else {// exit loop
                 loops.pop_back();
             }}

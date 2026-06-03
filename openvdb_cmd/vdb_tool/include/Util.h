@@ -558,27 +558,41 @@ inline void swapBytes(T *val, int n)
     }
 }
 
-/// @brief return a pseudo random uuid string.
+/// @brief Return a pseudo-random UUID version 4 string.
 ///
-/// @details this function approximates a uuid version 4, variant 1 as detailed
-///          here https://en.wikipedia.org/wiki/Universally_unique_identifier
+/// @details Generates a 36-character RFC 4122 v4 UUID of the form
+///          "xxxxxxxx-xxxx-4xxx-Nxxx-xxxxxxxxxxxx", where the version nibble
+///          is fixed at 4 and the variant nibble N ∈ {8, 9, a, b}. Two
+///          mt19937_64 draws provide the 122 random bits the spec requires
+///          (the remaining 6 bits are the fixed version/variant fields).
 ///
-/// @note A true uuid is based on a random 128 bit number. However, std::random_device
-/// generates a 32 bit seed and std::mt19937_64 generates a random 64 bit number. In other
-/// words this uuid is more prone to collision than a true uuid, though in practice
-/// collisions are still extremely rare with our approximation.
+/// @note The PRNG is @c thread_local, so concurrent callers do not race on
+///       shared state and each thread starts with an independent seed drawn
+///       from std::random_device. std::random_device itself only provides a
+///       32-bit seed, so a determined collision attacker could in principle
+///       enumerate states — this UUID is meant for casual uniqueness (temp
+///       filenames, grid IDs), not cryptographic identifiers.
 inline std::string uuid()
 {
-    static std::random_device                      seed;// used to obtain a seed for the random number engine
-    static std::mt19937_64                         prng(seed());// A Mersenne Twister pseudo-random number generator of 64-bit numbers with a state size of 19937 bits.
-    static std::uniform_int_distribution<uint64_t> getHex(0, 15), getVar(8, 11);// random numbers in decimal ranges [0,15] and [8,11]
-    std::stringstream ss;
-    ss << std::hex;
-    for (int i=0; i<15; ++i) ss << getHex(prng);// 16 random hex numbers
-    ss << "-" << getVar(prng);// variant 1: random hex number hex in {8,9,a,b}, which maps to the integers {8,9,10,11}
-    for (int i=0; i<15; ++i) ss << getHex(prng);// 16 random hex numbers
-    return ss.str().insert(8,"-").insert(13,"-4").insert(23,"-");//hardcode version 4
-}
+    static thread_local std::mt19937_64 prng{std::random_device{}()};
+    const std::uint64_t lo = prng();// time_low | time_mid | time_hi_and_version
+    const std::uint64_t hi = prng();// clock_seq | node
+
+    // Mask the version into the high nibble of time_hi_and_version (4) and
+    // the variant into the high two bits of clock_seq (10xx → 8/9/a/b).
+    const unsigned timeLow    = static_cast<unsigned>(lo >> 32);
+    const unsigned timeMid    = static_cast<unsigned>((lo >> 16) & 0xFFFFu);
+    const unsigned timeHiVer  = static_cast<unsigned>((lo & 0x0FFFu) | 0x4000u);
+    const unsigned clockSeq   = static_cast<unsigned>(((hi >> 48) & 0x3FFFu) | 0x8000u);
+    const unsigned nodeHi     = static_cast<unsigned>((hi >> 32) & 0xFFFFu);
+    const unsigned nodeLo     = static_cast<unsigned>(hi & 0xFFFFFFFFu);
+
+    char buf[37];// 36 hex/hyphen chars + null terminator
+    std::snprintf(buf, sizeof(buf),
+                  "%08x-%04x-%04x-%04x-%04x%08x",
+                  timeLow, timeMid, timeHiVer, clockSeq, nodeHi, nodeLo);
+    return std::string(buf, 36);
+}// uuid
 
 /// @brief Returns a string with the current local-time date stamp.
 /// @details Format: "%Y-%m-%d_%H-%M-%S" (Year-Month-Day_Hour-Minute-Second).

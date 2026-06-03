@@ -11,6 +11,7 @@
 #include <string>
 #include <fstream>
 #include <set>
+#include <thread>
 
 #if defined(_WIN32)
 #include <direct.h>// for mkdir
@@ -341,13 +342,67 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_FALSE(openvdb::vdb_tool::isNumber("-7.0f", i, v));
     }
 
-    {// uuid
+    {// uuid: uniqueness across many calls
       std::set<std::string> tmp;
       const size_t size = 10000;
       for (size_t i=0; i<size; ++i) {
         EXPECT_TRUE(tmp.emplace(openvdb::vdb_tool::uuid()).second);
       }
       EXPECT_EQ(size, tmp.size());
+    }
+
+    {// uuid: RFC 4122 v4 format conformance
+      // "xxxxxxxx-xxxx-4xxx-Nxxx-xxxxxxxxxxxx" — 36 chars, hyphens at fixed
+      // positions, version nibble (pos 14) = '4', variant nibble (pos 19) in
+      // {8,9,a,b}, every other char a lowercase hex digit.
+      auto isHex = [](char c) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+      };
+      for (int i = 0; i < 1000; ++i) {
+        const std::string id = openvdb::vdb_tool::uuid();
+        ASSERT_EQ(36u, id.size()) << "got: " << id;
+        EXPECT_EQ('-', id[8])  << id;
+        EXPECT_EQ('-', id[13]) << id;
+        EXPECT_EQ('-', id[18]) << id;
+        EXPECT_EQ('-', id[23]) << id;
+        EXPECT_EQ('4', id[14]) << "version nibble must be 4: " << id;
+        const char v = id[19];
+        EXPECT_TRUE(v == '8' || v == '9' || v == 'a' || v == 'b')
+            << "variant nibble must be 8/9/a/b: " << id;
+        for (size_t k = 0; k < id.size(); ++k) {
+          if (k == 8 || k == 13 || k == 18 || k == 23) continue;
+          EXPECT_TRUE(isHex(id[k]))
+              << "non-hex char at index " << k << " in " << id;
+        }
+      }
+    }
+
+    {// uuid: thread-safety — no two threads produce the same UUID and no
+     // generated string is malformed under concurrent access. Catches
+     // regressions if the thread_local PRNG is ever changed back to a
+     // process-wide static.
+      constexpr int kThreads = 8;
+      constexpr int kPerThread = 2000;
+      std::vector<std::vector<std::string>> perThread(kThreads);
+      std::vector<std::thread> workers;
+      workers.reserve(kThreads);
+      for (int t = 0; t < kThreads; ++t) {
+        workers.emplace_back([&, t]() {
+          perThread[t].reserve(kPerThread);
+          for (int i = 0; i < kPerThread; ++i) {
+            perThread[t].push_back(openvdb::vdb_tool::uuid());
+          }
+        });
+      }
+      for (auto& w : workers) w.join();
+      std::set<std::string> all;
+      for (const auto& bucket : perThread) {
+        for (const auto& id : bucket) {
+          EXPECT_EQ(36u, id.size()) << id;
+          EXPECT_TRUE(all.insert(id).second) << "duplicate across threads: " << id;
+        }
+      }
+      EXPECT_EQ(static_cast<size_t>(kThreads * kPerThread), all.size());
     }
 
     {//swapBytes
