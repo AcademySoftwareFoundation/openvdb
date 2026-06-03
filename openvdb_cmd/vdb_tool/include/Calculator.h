@@ -556,43 +556,41 @@ inline std::string Calculator::suggestNames(const std::string &name,
                                             size_t maxDist,
                                             size_t maxSuggest) const
 {
-    // Build a candidate list: every unary/binary/ternary function name, the
+    // Build the candidate list: every unary/binary/ternary function name, the
     // built-in constants, plus the caller-supplied `extras` (typically the
     // names of user-defined functions and currently-discovered variables).
+    // Skip punctuation-only opcode names ("+", "-", "<=", etc.) — they aren't
+    // valid as function-call names and just noise the suggestion list.
     std::vector<std::string> candidates;
     candidates.reserve(64);
-    for (const auto &kv : unaryOps())   candidates.push_back(kv.first);
-    for (const auto &kv : binaryOps())  candidates.push_back(kv.first);
-    for (const auto &kv : ternaryOps()) candidates.push_back(kv.first);
-    candidates.insert(candidates.end(),
-                      {"pi", "tau", "e", "phi", "inf", "nan", "switch", "if", "select"});
-    for (const std::string &x : extras) candidates.push_back(x);
+    auto addAlpha = [&](const std::string &c) {
+        if (!c.empty() && std::isalpha(static_cast<unsigned char>(c[0])))
+            candidates.push_back(c);
+    };
+    for (const auto &kv : unaryOps())   addAlpha(kv.first);
+    for (const auto &kv : binaryOps())  addAlpha(kv.first);
+    for (const auto &kv : ternaryOps()) addAlpha(kv.first);
+    for (const char *c : {"pi","tau","e","phi","inf","nan","switch","if","select"})
+        candidates.emplace_back(c);
+    for (const std::string &x : extras) addAlpha(x);
+    // Dedup: the binary-op table has both "+" and "add" pointing at the same
+    // opcode, and a name may also appear in both extras and the op tables.
+    std::sort(candidates.begin(), candidates.end());
+    candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
 
-    // Rank by Levenshtein distance; keep candidates within maxDist. Sort
-    // by (distance, name) and dedup so we don't show "Add" twice (the binary
-    // op table has both "+" and "add" pointing at the same opcode).
-    std::vector<std::pair<size_t, std::string>> ranked;
-    ranked.reserve(candidates.size());
-    for (const std::string &c : candidates) {
-        // Skip the punctuation-only opcode names ("+", "-", "*", "/", "%",
-        // "^", "<", ">", "<=", ">=", "==", "!=", "&&", "||") — they aren't
-        // valid as function-call names anyway and just noise the suggestions.
-        if (c.empty() || !std::isalpha(static_cast<unsigned char>(c[0]))) continue;
-        const size_t d = levenshtein(name, c);
-        if (d <= maxDist) ranked.emplace_back(d, c);
-    }
-    std::sort(ranked.begin(), ranked.end());
-    // Dedup adjacent (same name, larger distance impossible after sort).
-    ranked.erase(std::unique(ranked.begin(), ranked.end(),
-                             [](const auto &a, const auto &b){ return a.second == b.second; }),
-                 ranked.end());
+    // Pure-Levenshtein ranking (no substring pass — substring matches would be
+    // noisy across a small symbol table like sin/sinh/asin/asinh). minCandLen=1
+    // keeps every alpha-starting candidate eligible (the punctuation filter
+    // above already removed the ones we don't want).
+    const auto ranked = fuzzyMatch(name, candidates, maxDist, /*minCandLen=*/1, /*useSubstring=*/false);
     if (ranked.empty()) return {};
     std::string out = "Did you mean: ";
     const size_t n = std::min(ranked.size(), maxSuggest);
-    for (size_t i = 0; i < n; ++i) {
+    auto it = ranked.begin();
+    for (size_t i = 0; i < n; ++i, ++it) {
         if (i > 0) out += (i + 1 == n ? " or " : ", ");
         out += '"';
-        out += ranked[i].second;
+        out += it->second;
         out += '"';
     }
     out += '?';
@@ -2077,6 +2075,8 @@ inline std::string Calculator::disassemble() const
         case Op::Smoothstep: return "Smoothstep";
         case Op::IfThenElse: return "IfThenElse";
         case Op::Switch:     return "Switch";
+        case Op::Jump:        return "Jump";
+        case Op::JumpIfFalse: return "JumpIfFalse";
         }
         return "???";
     };
@@ -2096,6 +2096,9 @@ inline std::string Calculator::disassemble() const
             break;
         case Op::Switch:
             out << "  cases=" << in.arg;
+            break;
+        case Op::Jump: case Op::JumpIfFalse:
+            out << "  -> " << in.arg;
             break;
         default:
             break;

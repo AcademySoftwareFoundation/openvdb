@@ -18,13 +18,17 @@
 
 #include <algorithm>// for std::transform
 #include <cctype> // for std::tolower
+#include <cstdio> // for std::fileno (used by Spinner's TTY detection)
 #include <cstring>// for std::strtok
 #include <iomanip> // for std::setfill
 #include <iostream>
+#include <map>     // for std::multimap (used by fuzzyMatch)
 #include <sstream>
 #include <string>
+#include <string_view>// for Spinner's operator() argument
 #include <vector>
 #include <sys/stat.h>// for state
+#include <unistd.h>// for isatty (used by Spinner's TTY detection)
 #include <chrono>
 #include <ctime>
 
@@ -158,6 +162,54 @@ inline std::string toLowerCase(const std::string &str)
 {
     std::string tmp = str;
     return toLowerCase(tmp);
+}
+
+/// @brief Rank @a candidates by similarity to @a query and return a multimap
+///        sorted so the best matches come first (lower key = better match).
+///        Combines two scoring passes:
+///          - Substring match in either direction (key = position of the
+///            substring; 0 means an exact-prefix hit).
+///          - Levenshtein edit distance (key = 1000 + distance), so substring
+///            hits always rank ahead of edit-distance hits.
+///        Comparisons are case-insensitive (both @a query and @a candidates
+///        are lowercased internally).
+/// @param query        user input to match against; empty returns no matches
+/// @param candidates   list of candidate names to rank
+/// @param maxDist      maximum Levenshtein distance to accept (default 2)
+/// @param minCandLen   minimum candidate length for the reverse-substring and
+///                     Levenshtein passes — avoids noise from 1-/2-char
+///                     aliases (e.g. "-p", "-h"). Set to 0 to disable. (default 3)
+/// @param useSubstring if false, skip the substring pass and rank purely by
+///                     Levenshtein. Useful when the candidate domain is small
+///                     and substring matches would be too noisy. (default true)
+inline std::multimap<std::size_t, std::string>
+fuzzyMatch(const std::string &query,
+           const std::vector<std::string> &candidates,
+           std::size_t maxDist      = 2,
+           std::size_t minCandLen   = 3,
+           bool        useSubstring = true)
+{
+    std::multimap<std::size_t, std::string> matches;
+    if (query.empty()) return matches;
+    const std::string pattern = toLowerCase(query);
+    for (const std::string &cand : candidates) {
+        if (cand.empty()) continue;
+        const std::string candLower = toLowerCase(cand);
+        if (useSubstring) {
+            std::size_t key = candLower.find(pattern);
+            if (key == std::string::npos && candLower.size() >= minCandLen) {
+                key = pattern.find(candLower);// reverse: candidate inside the user's input
+            }
+            if (key != std::string::npos) {
+                matches.emplace(key, cand);// substring hits rank ahead of Lev hits
+                continue;
+            }
+        }
+        if (candLower.size() < minCandLen) continue;
+        const std::size_t d = levenshtein(pattern, candLower);
+        if (d <= maxDist) matches.emplace(1000 + d, cand);
+    }
+    return matches;
 }
 
 /// @brief Turns all characters in a string into upper case and returns a copy.
@@ -554,20 +606,65 @@ inline std::string dateStamp() {
 
 /// @brief Spinning-wheel progress indicator that overwrites a single terminal line.
 /// @details Each invocation cycles through the glyphs |, /, -, \ and prints them
-///          alongside a caller-supplied message, followed by a carriage return so
-///          successive calls update the same line.
+///          alongside a caller-supplied message. On a TTY the line is cleared
+///          to the right via the ANSI "erase-to-EOL" escape (`\033[K`) and a
+///          carriage return reuses the same line; off a TTY (pipe, log file,
+///          or in-memory stream) each frame is appended on its own line so the
+///          log stays readable. The destructor emits a final newline so the
+///          terminal cursor lands cleanly on the next line.
 class Spinner {
     std::ostream& mOutStream; ///< Stream that receives the spinner output (typically std::cerr).
-    const char* mBuffer;      ///< Cyclic glyph buffer "|/-\\".
-    int mOffset;              ///< Index of the next glyph to display.
+    bool          mIsTty;     ///< True if @a mOutStream is connected to a terminal.
+    unsigned      mOffset;    ///< Index of the next glyph to display.
+    bool          mActive;    ///< Set on first call so the destructor knows whether to emit a closing newline.
+
+    static constexpr char kGlyphs[]  = "|/-\\";
+    static constexpr unsigned kCount = 4;
+
+    /// @brief Return true if @a os routes to a terminal. Only the three
+    ///        standard streams can be checked portably; any other stream
+    ///        (e.g. a std::stringstream in a unit test) is treated as
+    ///        non-TTY so the spinner uses the log-friendly newline form.
+    static bool detectTty(const std::ostream& os) {
+        if (os.rdbuf() == std::cerr.rdbuf()) return ::isatty(fileno(stderr));
+        if (os.rdbuf() == std::clog.rdbuf()) return ::isatty(fileno(stderr));
+        if (os.rdbuf() == std::cout.rdbuf()) return ::isatty(fileno(stdout));
+        return false;
+    }
+
 public:
     /// @brief Construct a Spinner writing to @a os (defaults to std::cerr).
-    Spinner(std::ostream& os = std::cerr) : mOutStream(os), mBuffer{"|/-\\"}, mOffset{0} {}
+    Spinner(std::ostream& os = std::cerr)
+        : mOutStream(os), mIsTty(detectTty(os)), mOffset(0), mActive(false) {}
+
+    Spinner(const Spinner&) = delete;
+    Spinner& operator=(const Spinner&) = delete;
+
+    ~Spinner() {
+        if (!mActive) return;
+        if (mIsTty) mOutStream << "\033[K";
+        mOutStream << '\n' << std::flush;
+    }
+
     /// @brief Print one frame of the spinner with @a msg as the leading label.
     /// @param msg Message printed before the spinner glyph.
-    void operator()(const std::string &msg){
-        mOutStream << msg << ": " << mBuffer[mOffset] << std::setfill(' ') << std::setw(80) << "\r" << std::flush;
-        mOffset = (mOffset + 1) % 4;
+    void operator()(std::string_view msg) {
+        mActive = true;
+        mOutStream << msg << ": " << kGlyphs[mOffset];
+        // \033[K clears from the cursor to the end of the line — replaces the
+        // old fixed-width space padding so the spinner works on any terminal
+        // width without wrapping. Off-TTY: newline-per-frame for readable logs.
+        mOutStream << (mIsTty ? "\033[K\r" : "\n") << std::flush;
+        mOffset = (mOffset + 1) % kCount;
+    }
+
+    /// @brief End the spinner line, optionally printing a final message.
+    ///        Subsequent operator() calls start a fresh cycle.
+    void finish(std::string_view finalMsg = {}) {
+        if (mIsTty && mActive) mOutStream << "\033[K";
+        mOutStream << finalMsg << '\n' << std::flush;
+        mOffset = 0;
+        mActive = false;
     }
 };// Spinner
 

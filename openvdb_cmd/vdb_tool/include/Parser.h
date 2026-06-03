@@ -1105,46 +1105,16 @@ math::Vec3<T> Parser::getVec3(const std::string &name, const char* delimiters) c
 // ==============================================================================================================
 
 std::multimap<size_t, std::string> Parser::closeMatches(const std::string &str) const
-{//returns sorted map of available actions that look "close" to str. Combines
- // substring matching (catches "extra suffix" / "shorter prefix" typos) with
- // Levenshtein edit distance (catches character transpositions, insertions,
- // and substitutions like -spehre → -sphere). Substring hits are ranked
- // ahead of edit-distance hits via the multimap key. Case-insensitive and
- // ignoring leading '-'.
-    std::multimap<size_t, std::string> matches;
-    size_t pos = str.find_first_not_of("-");
-    if (pos==std::string::npos) return matches;// special case when str only contains one or more '-'
-    std::string pattern = toLowerCase(str.substr(pos));//remove all leading "-" and convert to lower case
-    // Cap edit-distance proposals so very short typos don't suggest unrelated
-    // actions. 2 is a good default — catches single-typo / transposition
-    // mistakes without flooding the suggestion list.
-    constexpr size_t kMaxLevDist = 2;
-    for (auto it = available.begin(); it != available.end(); ++it) {
-        for (auto &name : it->names) {
-            const std::string nameLower = toLowerCase(name);
-            // Substring (forward): user input is a substring of the action name.
-            size_t key = nameLower.find(pattern);
-            // Substring (reverse): action name is a substring of the user input.
-            // Skip very short candidate names to avoid noise from 1-/2-char
-            // aliases (e.g. "-p", "-h").
-            if (key == std::string::npos && nameLower.size() >= 3) {
-                key = pattern.find(nameLower);
-            }
-            if (key != std::string::npos) {
-                matches.emplace(key, name);// substring hits ranked first
-                continue;
-            }
-            // Levenshtein fallback: catches transpositions and small edits
-            // that substring matching misses. Encode the distance offset by
-            // a large constant so substring hits sort first; among edit-
-            // distance hits, smaller distance still ranks higher.
-            const size_t d = levenshtein(pattern, nameLower);
-            if (d <= kMaxLevDist && nameLower.size() >= 3) {
-                matches.emplace(1000 + d, name);
-            }
-        }
-    }
-    return matches;
+{// Returns sorted map of available actions that look "close" to str. Leading
+ // '-' is stripped before matching; the actual scoring (substring + Lev) lives
+ // in Util.h's fuzzyMatch and is shared with Action::closeOptionMatches and
+ // Calculator::suggestNames.
+    const size_t pos = str.find_first_not_of("-");
+    if (pos==std::string::npos) return {};// str is only '-' chars
+    std::vector<std::string> candidates;
+    for (const Action &a : available)
+        for (const std::string &name : a.names) candidates.push_back(name);
+    return fuzzyMatch(str.substr(pos), candidates);
 }// Parser::closeMatches
 
 // ==============================================================================================================
@@ -1220,33 +1190,13 @@ void Action::setOption(const std::string &str)
 }// Action::setOption
 
 std::multimap<size_t, std::string> Action::closeOptionMatches(const std::string &name) const
-{
-    // Returns option names that overlap with @a name in either direction: the
-    // user's input contains the option name (typo `radiuss=` → `radius`) or
-    // the option name contains the user's input (truncated `rad=` → `radius`).
-    // Case-insensitive; sorted by best match so exact-prefix matches come first.
-    std::multimap<size_t, std::string> matches;
-    if (name.empty()) return matches;
-    const std::string pattern = toLowerCase(name);
-    constexpr size_t kMaxLevDist = 2;
-    for (const Option &opt : options) {
-        if (opt.name.empty()) continue;
-        const std::string optLower = toLowerCase(opt.name);
-        size_t key = optLower.find(pattern);
-        if (key == std::string::npos && optLower.size() >= 3) {
-            key = pattern.find(optLower);
-        }
-        if (key != std::string::npos) {
-            matches.emplace(key, opt.name);// substring hits ranked first
-            continue;
-        }
-        // Levenshtein fallback to catch transpositions / single-edit typos.
-        const size_t d = levenshtein(pattern, optLower);
-        if (d <= kMaxLevDist && optLower.size() >= 3) {
-            matches.emplace(1000 + d, opt.name);
-        }
-    }
-    return matches;
+{// Returns option names that look "close" to the user's input — handles both
+ // typo (`radiuss=` → `radius`) and truncation (`rad=` → `radius`). Scoring
+ // logic lives in Util.h's fuzzyMatch.
+    std::vector<std::string> candidates;
+    for (const Option &opt : options)
+        if (!opt.name.empty()) candidates.push_back(opt.name);
+    return fuzzyMatch(name, candidates);
 }// Action::closeOptionMatches
 
 // ==============================================================================================================
