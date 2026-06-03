@@ -290,7 +290,8 @@ enum class GridClass : uint32_t { Unknown = 0,
                                   VoxelVolume = 7, // volume of geometric cubes, e.g. colors cubes in Minecraft
                                   IndexGrid = 8, // grid whose values are offsets, e.g. into an external array
                                   TensorGrid = 9, // Index grid for indexing learnable tensor features
-                                  End = 10,// total number of types in this enum (excluding StrLen since it's not a type)
+                                  VoxelBVH = 10, // grid where each voxel points to list of primitive ids
+                                  End = 11,// total number of types in this enum (excluding StrLen since it's not a type)
                                   StrLen = End + 7};// this entry is used to determine the minimum size of c-string
 
 
@@ -310,6 +311,7 @@ __hostdev__ inline char* toStr(char *dst, GridClass gridClass)
         case GridClass::VoxelVolume: return util::strcpy(dst, "VOX");
         case GridClass::IndexGrid:   return util::strcpy(dst, "INDEX");
         case GridClass::TensorGrid:  return util::strcpy(dst, "TENSOR");
+        case GridClass::VoxelBVH:    return util::strcpy(dst, "VOXBVH");
         default:                     return util::strcpy(dst, "END");
     }
 }
@@ -421,7 +423,15 @@ enum class GridBlindDataSemantic : uint32_t { Unknown = 0,
                                               LevelSet = 10, // narrow band level set, e.g. SDF
                                               FogVolume = 11, // fog volume, e.g. density
                                               Staggered = 12, // staggered MAC grid, e.g. velocity
-                                              End = 13 };
+                                              PointOpacity = 13, // opacity associated with point
+                                              PointQuat = 14, // quaternion rotation, wxyz convention
+                                              PointScale = 15, // vec3 scale
+                                              PointSH0 = 16, // spherical harmonics, DC component
+                                              PointSHN = 17, // spherical haromnics, AC components
+                                              LineId = 18, // integer ID of line
+                                              TriangleId = 19, // integer ID of triangle
+                                              GaussianId = 20, // integer ID of Gaussian
+                                              End = 21 };
 
 /// @brief Maps from GridBlindDataSemantic to GridClass
 /// @note Useful when converting an IndexGrid with blind data of type T into a Grid<T>
@@ -2262,6 +2272,7 @@ public:
     __hostdev__ bool             isPointIndex() const { return DataType::mGridClass == GridClass::PointIndex; }
     __hostdev__ bool             isGridIndex() const { return DataType::mGridClass == GridClass::IndexGrid; }
     __hostdev__ bool             isPointData() const { return DataType::mGridClass == GridClass::PointData; }
+    __hostdev__ bool             isVoxelBVH() const { return DataType::mGridClass == GridClass::VoxelBVH; }
     __hostdev__ bool             isMask() const { return DataType::mGridClass == GridClass::Topology; }
     __hostdev__ bool             isUnknown() const { return DataType::mGridClass == GridClass::Unknown; }
     __hostdev__ bool             hasMinMax() const { return DataType::mFlags.isMaskOn(GridFlags::HasMinMax); }
@@ -5513,6 +5524,7 @@ public:
     __hostdev__ bool             isPointIndex() const { return mGridData.mGridClass == GridClass::PointIndex; }
     __hostdev__ bool             isGridIndex() const { return mGridData.mGridClass == GridClass::IndexGrid; }
     __hostdev__ bool             isPointData() const { return mGridData.mGridClass == GridClass::PointData; }
+    __hostdev__ bool             isVoxelBVH() const { return mGridData.mGridClass == GridClass::VoxelBVH; }
     __hostdev__ bool             isMask() const { return mGridData.mGridClass == GridClass::Topology; }
     __hostdev__ bool             isUnknown() const { return mGridData.mGridClass == GridClass::Unknown; }
     __hostdev__ bool             hasMinMax() const { return mGridData.mFlags.isMaskOn(GridFlags::HasMinMax); }
