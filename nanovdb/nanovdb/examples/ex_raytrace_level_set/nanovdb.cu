@@ -29,21 +29,23 @@ static constexpr int NUM_WARMUP_ITERATIONS = 2;
 // (context switch, OS jitter, thermal blip) pulls the mean noticeably but
 // leaves the median alone, so the median is the more trustworthy stat.
 static void
-reportStats(const char *label, std::vector<float> samples)
+reportStats(const char *label, const std::vector<float> &samples)
 {
-    std::sort(samples.begin(), samples.end());
-    const float minMs = samples.front();
-    const float maxMs = samples.back();
-    const float medianMs = samples[samples.size() / 2];
+    if (samples.empty()) return;
+    std::vector<float> sorted(samples); // copy so we don't reorder the caller's data
+    std::sort(sorted.begin(), sorted.end());
+    const float minMs = sorted.front();
+    const float maxMs = sorted.back();
+    const float medianMs = sorted[sorted.size() / 2];
     float sum = 0;
-    for (float s : samples) sum += s;
-    const float meanMs = sum / float(samples.size());
+    for (float s : sorted) sum += s;
+    const float meanMs = sum / float(sorted.size());
     std::cout << label
               << " min=" << minMs << " ms"
               << "  median=" << medianMs << " ms"
               << "  mean=" << meanMs << " ms"
               << "  max=" << maxMs << " ms"
-              << "  (n=" << samples.size() << ")" << std::endl;
+              << "  (n=" << sorted.size() << ")" << std::endl;
 }
 
 void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int width, int height, BufferT& imageBuffer)

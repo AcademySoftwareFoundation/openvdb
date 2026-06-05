@@ -68,8 +68,8 @@ inline float renderImage(bool useCuda, const RenderFn renderOp, int width, int h
         float ms = 0.f;
         NANOVDB_CUDA_CHECK_ERROR(cudaEventElapsedTime(&ms, startEv, stopEv), __FILE__, __LINE__);
 
-        cudaEventDestroy(startEv);
-        cudaEventDestroy(stopEv);
+        NANOVDB_CUDA_CHECK_ERROR(cudaEventDestroy(startEv), __FILE__, __LINE__);
+        NANOVDB_CUDA_CHECK_ERROR(cudaEventDestroy(stopEv), __FILE__, __LINE__);
         return ms;
     }
 #endif
