@@ -3700,7 +3700,7 @@ private:
     ///     half pays for the descent regardless. We must not skip the
     ///     descent purely on the skip-flag here because skip is set based
     ///     on value range vs. delta (see GridStats::setFlag), not on
-    ///     activeness, so callers like fvdb's HDDA iterators that observe
+    ///     activeness, so callers like HDDA iterators that observe
     ///     @c active even at HDDA-stable upper levels would be broken.
     ///
     ///   - @c ActiveOnLeafOnly: cheap-path variant. When the skip-flag is
@@ -3721,8 +3721,8 @@ private:
         // don't keep `skip` live across the recursive call -- once the
         // short-circuit hasn't fired we know skip is false, and there's no
         // reason to hold a register for it through the descent. This was
-        // worth ~2 reg/thread on parallelForKernel, which crosses the
-        // register/block-count occupancy cliff on sm_120.
+        // worth ~2 reg/thread, which crosses the register/block-count
+        // occupancy cliff on modern hardware.
         if constexpr (util::is_same<Policy, ActiveOnLeafOnly>::value) {
             if (DataType::mFlags & uint32_t(1u))
                 return {this->dim(), false}; // active unspecified per policy
