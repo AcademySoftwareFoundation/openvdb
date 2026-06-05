@@ -32,6 +32,7 @@
 #include <openvdb/util/Formats.h>
 #include <openvdb/util/Assert.h>
 #include <openvdb/tools/Composite.h>
+#include <openvdb/tools/Count.h>// for tools::minMax (used by -print level=2)
 #include <openvdb/tools/FastSweeping.h>
 #include <openvdb/tools/LevelSetAdvect.h>
 #include <openvdb/tools/LevelSetDilatedMesh.h>
@@ -1034,7 +1035,8 @@ void Tool::init()
        {"print", "p"}, "prints information to the terminal about the current stack of VDB grids and Geometry",
       {{"vdb", "*", "*", "print information about VDB grids"},
        {"geo", "*", "*", "print information about geometries"},
-       {"mem", "0", "0|1|false|true", "print a list of all stored variables"}},
+       {"mem", "0", "0|1|false|true", "print a list of all stored variables"},
+       {"level", "0", "0|1|2", "detail level: 0=base table, 1=+bbox column, 2=+value range column"}},
       [](){}, [&](){this->print();});
 
   mParser.addAction(
@@ -1335,7 +1337,7 @@ void Tool::readGeo(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
   if (mParser.verbose>1) std::clog << "Reading geometry from \"" << fileName << "\"\n";
-  if (mParser.verbose) mTimer.start("Read geometry");
+  if (mParser.verbose) mTimer.start("Read geometry from \"" + fileName + "\"");
   Geometry::Ptr geom(new Geometry());
   geom->read(fileName, mParser.verbose);
   if (geom->vtxCount()) {
@@ -3868,69 +3870,274 @@ void Tool::print_args(std::ostream& os) const
 
 // ==============================================================================================================
 
+// ----- Helpers for the pretty-printed -print output ------------------------
+namespace print_detail {
+
+enum Align { LEFT, RIGHT };
+
+// Print a centered title between U+2550 (BOX DRAWINGS DOUBLE HORIZONTAL) chars
+// to a fixed visible width (default 80 columns).
+inline void printBanner(std::ostream& os, const std::string& title, int width = 80)
+{
+    static const std::string kBar = "═";// U+2550, 3 bytes in UTF-8
+    const int titleLen = static_cast<int>(title.size());
+    const int left  = std::max(0, (width - titleLen) / 2);
+    const int right = std::max(0, width - titleLen - left);
+    for (int i = 0; i < left;  ++i) os << kBar;
+    os << title;
+    for (int i = 0; i < right; ++i) os << kBar;
+    os << "\n";
+}
+
+// 1234567 -> "1,234,567" — thousands separators for big counts.
+inline std::string formatCommas(uint64_t n)
+{
+    std::string s = std::to_string(n);
+    int pos = static_cast<int>(s.size()) - 3;
+    while (pos > 0) { s.insert(pos, ","); pos -= 3; }
+    return s;
+}
+
+// Wrap util::printBytes to produce a trim string ("15.326 MB").
+inline std::string formatBytes(uint64_t bytes)
+{
+    std::stringstream ss;
+    util::printBytes(ss, bytes, /*head=*/"", /*tail=*/"", /*exact=*/false,
+                     /*width=*/0, /*precision=*/3);
+    return ss.str();
+}
+
+// Compact "[a,b,c]->[d,e,f]" form for the bbox column. ASCII arrow so column
+// widths computed from byte sizes line up correctly.
+inline std::string formatBBox(const openvdb::CoordBBox& bbox)
+{
+    std::stringstream ss;
+    const auto& mn = bbox.min();
+    const auto& mx = bbox.max();
+    ss << "[" << mn.x() << "," << mn.y() << "," << mn.z() << "]->["
+       << mx.x() << "," << mx.y() << "," << mx.z() << "]";
+    return ss.str();
+}
+
+// Float-valued bbox (world-space, used by Geometry). Trimmed to 3 decimals so
+// the column doesn't bloat to seven-significant-digit floats.
+template <typename BBoxT>
+inline std::string formatBBoxd(const BBoxT& bbox)
+{
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(3);
+    const auto& mn = bbox.min();
+    const auto& mx = bbox.max();
+    ss << "[" << mn[0] << "," << mn[1] << "," << mn[2] << "]->["
+       << mx[0] << "," << mx[1] << "," << mx[2] << "]";
+    return ss.str();
+}
+
+template <typename GridT>
+inline std::string gridRangeStr(const GridT& grid)
+{
+    if (grid.activeVoxelCount() == 0) return "(empty)";
+    const auto mm = tools::minMax(grid.tree());
+    std::stringstream ss;
+    ss << "[" << mm.min() << ", " << mm.max() << "]";
+    return ss.str();
+}
+
+// Dispatch min/max stringification across the scalar grid types we know how
+// to compare. Vec3-typed grids etc. get "(n/a)" because ordering isn't
+// well-defined for them.
+inline std::string formatRange(const openvdb::GridBase& grid)
+{
+    if (auto p = dynamic_cast<const openvdb::FloatGrid*>(&grid))  return gridRangeStr(*p);
+    if (auto p = dynamic_cast<const openvdb::DoubleGrid*>(&grid)) return gridRangeStr(*p);
+    if (auto p = dynamic_cast<const openvdb::Int32Grid*>(&grid))  return gridRangeStr(*p);
+    if (auto p = dynamic_cast<const openvdb::Int64Grid*>(&grid))  return gridRangeStr(*p);
+    if (auto p = dynamic_cast<const openvdb::BoolGrid*>(&grid))   return gridRangeStr(*p);
+    return "(n/a)";
+}
+
+// Background value, dispatched by grid type. Falls back to the typed grid's
+// own background() accessor, which prints scalars as numbers and Vec3s as
+// "[x, y, z]".
+template <typename GridT>
+inline std::string gridBgStr(const GridT& grid)
+{
+    std::stringstream ss;
+    ss << grid.background();
+    return ss.str();
+}
+inline std::string formatBackground(const openvdb::GridBase& grid)
+{
+    if (auto p = dynamic_cast<const openvdb::FloatGrid*>(&grid))  return gridBgStr(*p);
+    if (auto p = dynamic_cast<const openvdb::DoubleGrid*>(&grid)) return gridBgStr(*p);
+    if (auto p = dynamic_cast<const openvdb::Int32Grid*>(&grid))  return gridBgStr(*p);
+    if (auto p = dynamic_cast<const openvdb::Int64Grid*>(&grid))  return gridBgStr(*p);
+    if (auto p = dynamic_cast<const openvdb::BoolGrid*>(&grid))   return gridBgStr(*p);
+    if (auto p = dynamic_cast<const openvdb::Vec3SGrid*>(&grid))  return gridBgStr(*p);
+    return "(n/a)";
+}
+
+// Print a table with column-width auto-sizing. Cells must be pure ASCII
+// (column widths use byte size = visible width). The header separator uses
+// U+2500 BOX DRAWINGS LIGHT HORIZONTAL and is emitted directly so the
+// multibyte glyphs don't interact with std::setw byte-counting.
+inline void printTable(std::ostream& os,
+                       const std::vector<std::string>& headers,
+                       const std::vector<std::vector<std::string>>& rows,
+                       const std::vector<Align>& aligns,
+                       const std::string& indent = "  ")
+{
+    const std::size_t nc = headers.size();
+    std::vector<std::size_t> w(nc, 0);
+    for (std::size_t c = 0; c < nc; ++c) w[c] = headers[c].size();
+    for (const auto& r : rows) {
+        for (std::size_t c = 0; c < nc && c < r.size(); ++c) {
+            w[c] = std::max(w[c], r[c].size());
+        }
+    }
+    auto emit = [&](const std::vector<std::string>& r) {
+        os << indent;
+        for (std::size_t c = 0; c < nc; ++c) {
+            const std::string& cell = c < r.size() ? r[c] : std::string();
+            os << (aligns[c] == RIGHT ? std::right : std::left)
+               << std::setw(static_cast<int>(w[c])) << cell;
+            if (c + 1 < nc) os << "  ";
+        }
+        os << "\n";
+    };
+    emit(headers);
+    // Separator row — repeat U+2500 to match each column's width.
+    os << indent;
+    for (std::size_t c = 0; c < nc; ++c) {
+        for (std::size_t i = 0; i < w[c]; ++i) os << "─";
+        if (c + 1 < nc) os << "  ";
+    }
+    os << "\n";
+    for (const auto& r : rows) emit(r);
+}
+
+}// namespace print_detail
+// ----- end helpers ---------------------------------------------------------
+
 void Tool::print(std::ostream& os) const
 {
+  using namespace print_detail;
   OPENVDB_ASSERT(mParser.getAction().names[0] == "print");
+  const int level = mParser.get<int>("level");
 
   if (mParser.verbose>1) {
-    os << "\n" << std::setw(40) << std::setfill('=') << "> Actions <" << std::setw(40) << "\n";
+    os << "\n";
+    printBanner(os, " Actions ");
     mParser.print(os);
-    os << std::setw(80) << std::setfill('=') << "\n" << std::endl;
-    os << "\n" << std::setw(40) << std::setfill('=') << "> Variables <" << std::setw(40) << "\n";
+    printBanner(os, "");
+    os << "\n";
+    printBanner(os, " Variables ");
     mParser.processor.memory().print(os);
-    os << std::setw(80) << std::setfill('=') << "\n" << std::endl;
+    printBanner(os, "");
+    os << std::endl;
   }
 
   if (mParser.verbose>0) {
-    os << "\n" << std::setw(40) << std::setfill('=') << "> Primitives <" << std::setw(39) << "\n";
+    os << "\n";
+    printBanner(os, " Primitives ");
+
+    // Geometry — same column-aligned table style as the VDB grid table below.
+    std::vector<std::string> geomHeaders = {"age", "name", "vtx", "tri", "quad", "size"};
+    std::vector<Align>       geomAligns  = {RIGHT, LEFT,   RIGHT, RIGHT, RIGHT,  RIGHT};
+    if (level >= 1) { geomHeaders.push_back("bbox"); geomAligns.push_back(LEFT); }
+    if (level >= 2) { geomHeaders.push_back("rgb");  geomAligns.push_back(RIGHT); }
+
+    auto buildGeomRow = [&](int age, const Geometry& geom) {
+        const std::uint64_t mem = sizeof(geom)
+            + geom.vtx().size()  * sizeof(openvdb::Vec3s)
+            + geom.tri().size()  * sizeof(openvdb::Vec3I)
+            + geom.quad().size() * sizeof(openvdb::Vec4I)
+            + geom.rgb().size()  * sizeof(openvdb::Vec3s);
+        std::vector<std::string> row = {
+            std::to_string(age),
+            geom.getName(),
+            formatCommas(geom.vtx().size()),
+            formatCommas(geom.tri().size()),
+            formatCommas(geom.quad().size()),
+            formatBytes(mem),
+        };
+        if (level >= 1) row.push_back(formatBBoxd(geom.bbox()));
+        if (level >= 2) row.push_back(formatCommas(geom.rgb().size()));
+        return row;
+    };
+
+    std::vector<std::vector<std::string>> geomRows;
     if (mParser.getStr("geo")=="*") {
       for (auto begin = mGeom.crbegin(), it = begin, end = mGeom.crend(); it != end; ++it) {
-        const Geometry &geom = **it;
-        os << "Geometry: age = " << std::distance(begin,it) << ", name = \"" << geom.getName() << "\", ";
-        geom.print(0, os);
-        os << "\n";
+        geomRows.push_back(buildGeomRow(static_cast<int>(std::distance(begin, it)), **it));
       }
-      if (mGeom.empty()) os << "Geometry: none\n";
     } else {
       for (int age : mParser.getVec<int>("geo")) {
-        auto it = this->getGeom(age);
-        const Geometry &geom = **it;
-        os << "Geometry: age = " << age << ", name = \"" << geom.getName() << "\", ";
-        geom.print(0, os);
-        os << "\n";
+        geomRows.push_back(buildGeomRow(age, **this->getGeom(age)));
       }
     }
+    if (geomRows.empty()) {
+      os << "Geometry: none\n";
+    } else {
+      os << "Geometry:\n";
+      printTable(os, geomHeaders, geomRows, geomAligns);
+    }
+
+    // VDB grids — column-aligned table.
+    std::vector<std::string> headers = {"age", "name", "type", "class", "dim", "voxels", "dx", "size"};
+    std::vector<Align>       aligns  = {RIGHT, LEFT,   LEFT,   LEFT,    LEFT,  RIGHT,    RIGHT, RIGHT};
+    if (level >= 1) { headers.push_back("bbox");       aligns.push_back(LEFT); }
+    if (level >= 2) { headers.push_back("background"); aligns.push_back(LEFT); }
+    if (level >= 2) { headers.push_back("range");      aligns.push_back(LEFT); }
+
+    auto buildRow = [&](int age, const GridBase& grid) {
+        const auto bbox = grid.evalActiveVoxelBoundingBox();
+        const auto dim  = bbox.dim();
+        std::stringstream dimSS;
+        dimSS << "[" << dim.x() << ", " << dim.y() << ", " << dim.z() << "]";
+        std::stringstream dxSS;
+        dxSS << grid.voxelSize()[0];
+        std::vector<std::string> row = {
+            std::to_string(age),
+            grid.getName(),
+            grid.valueType(),
+            GridBase::gridClassToString(grid.getGridClass()),
+            dimSS.str(),
+            formatCommas(grid.activeVoxelCount()),
+            dxSS.str(),
+            formatBytes(grid.memUsage()),
+        };
+        if (level >= 1) row.push_back(formatBBox(bbox));
+        if (level >= 2) row.push_back(formatBackground(grid));
+        if (level >= 2) row.push_back(formatRange(grid));
+        return row;
+    };
+
+    std::vector<std::vector<std::string>> rows;
     if (mParser.getStr("vdb")=="*") {
       for (auto begin = mGrid.crbegin(), it = begin, end = mGrid.crend(); it != end; ++it) {
-        const auto &grid = **it;
-        const auto bbox = grid.evalActiveVoxelBoundingBox();
-        os << "VDB grid: age = " << std::distance(begin,it) << ", name = \"" << grid.getName() << "\", type = \"";
-        os << grid.valueType() << "\", bbox = " << bbox << ", dim = " << bbox.dim();
-        os << ", voxels = " << grid.activeVoxelCount() << ", dx = " << grid.voxelSize()[0];
-        os << ", size = ";
-        util::printBytes(os, grid.memUsage());
+        rows.push_back(buildRow(static_cast<int>(std::distance(begin, it)), **it));
       }
-      if (mGrid.empty()) os << "VDB grid: none\n";
     } else {
       for (int age : mParser.getVec<int>("vdb")) {
-        auto it = this->getGrid(age);
-        const auto &grid = **it;
-        const auto bbox = grid.evalActiveVoxelBoundingBox();
-        os << "VDB grid: age = " << age << ", name = \"" << grid.getName() << "\", type = \"";
-        os << grid.valueType() << "\", bbox = " << bbox << ", dim = " << bbox.dim();
-        os << ", voxels = " << grid.activeVoxelCount() << ", dx = " << grid.voxelSize()[0];
-        os << ", size = ";
-        util::printBytes(os, grid.memUsage());
+        rows.push_back(buildRow(age, **this->getGrid(age)));
       }
+    }
+    if (rows.empty()) {
+      os << "VDB grids: none\n";
+    } else {
+      os << "VDB grids:\n";
+      printTable(os, headers, rows, aligns);
     }
 
     if (mParser.get<bool>("mem")) {
-      os << "\n" << std::setw(40) << std::setfill('=') << "> Variables <" << std::setw(40) << "\n";
+      os << "\n";
+      printBanner(os, " Variables ");
       mParser.processor.memory().print(os);
     }
 
-    os << std::setw(80) << std::setfill('=') << "\n\n" << std::endl;
-
+    printBanner(os, "");
+    os << std::endl;
   }
 }// Tool::print
 
