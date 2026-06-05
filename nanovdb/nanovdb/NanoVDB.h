@@ -1808,7 +1808,10 @@ struct DimAndActive
 
     __hostdev__ DimAndActive() = default;
     __hostdev__ DimAndActive(uint32_t d, bool a)
-        : packed((d & 0x7FFFFFFFu) | (uint32_t(a) << 31)) {}
+        : packed((d & 0x7FFFFFFFu) | (uint32_t(a) << 31))
+    {
+        NANOVDB_ASSERT(d < (uint32_t(1) << 31)); // dim must fit in 31 bits (bit 31 = active)
+    }
 
     __hostdev__ uint32_t dim()    const { return packed & 0x7FFFFFFFu; }
     __hostdev__ bool     active() const { return (packed >> 31) != 0u; }
