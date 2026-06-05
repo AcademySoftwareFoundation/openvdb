@@ -1809,7 +1809,7 @@ struct DimAndActive
 
     __hostdev__ DimAndActive() = default;
     __hostdev__ DimAndActive(uint32_t d, bool a)
-        : packed(int32_t(d) | (int32_t(a) << 31)) {}
+        : packed(int32_t((d & 0x7FFFFFFFu) | (uint32_t(a) << 31))) {}
 
     __hostdev__ uint32_t dim()    const { return uint32_t(packed) & 0x7FFFFFFFu; }
     __hostdev__ bool     active() const { return packed < 0; }
@@ -1820,7 +1820,7 @@ struct DimAndActive
 ///        traversal. This matches the original separate getDim + isActive
 ///        semantics byte-for-byte, at the cost of forcing a full Root->Leaf
 ///        descent on InternalNodes whose skip-flag is set. Use this when the
-///        caller reads @c active unconditionally (e.g. fvdb's HDDA iterators
+///        caller reads @c active unconditionally (e.g. HDDA iterators
 ///        which observe per-tile activeness above the leaf level).
 struct ActiveExact {};
 
