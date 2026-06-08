@@ -23,6 +23,13 @@ public:
 
 namespace {
 
+struct TwoBoxLevelSets
+{
+    openvdb::math::Transform::Ptr xform;
+    openvdb::FloatGrid::Ptr gridA;
+    openvdb::FloatGrid::Ptr gridB;
+};
+
 /// @brief  Generate the 8 vertices and 6 quad faces of an axis-aligned box
 ///         centered at @a center with half-extents @a halfSize, then rotate
 ///         by Euler angles @a rotDeg (X, Y, Z order) in degrees.
@@ -99,6 +106,40 @@ void makeRotatedBox(
     quads.emplace_back(openvdb::Vec4I(1, 2, 6, 5)); // +X face
 }
 
+
+TwoBoxLevelSets
+makeTwoBoxLevelSets(float voxelSize, float exteriorBand, float interiorBand)
+{
+    using namespace openvdb;
+
+    TwoBoxLevelSets boxes;
+    boxes.xform = math::Transform::createLinearTransform(voxelSize);
+
+    // Box A: half-extents (0.5, 0.5, 0.5) rotated (45, 0, 45) degrees
+    std::vector<Vec3s> ptsA;
+    std::vector<Vec4I> quadsA;
+    makeRotatedBox(
+        Vec3s(0.0f), Vec3s(0.5f, 0.5f, 0.5f), Vec3s(45.0f, 0.0f, 45.0f),
+        voxelSize, ptsA, quadsA);
+    tools::QuadAndTriangleDataAdapter<Vec3s, Vec4I> meshA(ptsA, quadsA);
+    boxes.gridA = tools::meshToVolume<FloatGrid>(
+        meshA, *boxes.xform, exteriorBand, interiorBand);
+    if (boxes.gridA) boxes.gridA->setGridClass(GRID_LEVEL_SET);
+
+    // Box B: half-extents (1, 0.2, 1) axis-aligned
+    std::vector<Vec3s> ptsB;
+    std::vector<Vec4I> quadsB;
+    makeRotatedBox(
+        Vec3s(0.0f), Vec3s(1.0f, 0.2f, 1.0f), Vec3s(0.0f),
+        voxelSize, ptsB, quadsB);
+    tools::QuadAndTriangleDataAdapter<Vec3s, Vec4I> meshB(ptsB, quadsB);
+    boxes.gridB = tools::meshToVolume<FloatGrid>(
+        meshB, *boxes.xform, exteriorBand, interiorBand);
+    if (boxes.gridB) boxes.gridB->setGridClass(GRID_LEVEL_SET);
+
+    return boxes;
+}
+
 } // anonymous namespace
 
 
@@ -117,39 +158,17 @@ TEST_F(TestBlend, testBlendTwoBoxes)
     const float beta  = 80.0f;  // exponent
     const float gamma = 1.0f;   // multiplier
 
-    math::Transform::Ptr xform = math::Transform::createLinearTransform(voxelSize);
-
-    // Box A: half-extents (0.5, 0.5, 0.5) rotated (45, 0, 45) degrees
-    std::vector<Vec3s> ptsA;
-    std::vector<Vec4I> quadsA;
-    makeRotatedBox(
-        Vec3s(0.0f), Vec3s(0.5f, 0.5f, 0.5f), Vec3s(45.0f, 0.0f, 45.0f),
-        voxelSize, ptsA, quadsA);
-    tools::QuadAndTriangleDataAdapter<Vec3s, Vec4I> meshA(ptsA, quadsA);
-    FloatGrid::Ptr gridA = tools::meshToVolume<FloatGrid>(
-        meshA, *xform, exteriorBand, interiorBand);
-    ASSERT_TRUE(gridA);
-    gridA->setGridClass(GRID_LEVEL_SET);
-
-    // Box B: half-extents (1, 0.2, 1) axis-aligned
-    std::vector<Vec3s> ptsB;
-    std::vector<Vec4I> quadsB;
-    makeRotatedBox(
-        Vec3s(0.0f), Vec3s(1.0f, 0.2f, 1.0f), Vec3s(0.0f),
-        voxelSize, ptsB, quadsB);
-    tools::QuadAndTriangleDataAdapter<Vec3s, Vec4I> meshB(ptsB, quadsB);
-    FloatGrid::Ptr gridB = tools::meshToVolume<FloatGrid>(
-        meshB, *xform, exteriorBand, interiorBand);
-    ASSERT_TRUE(gridB);
-    gridB->setGridClass(GRID_LEVEL_SET);
+    TwoBoxLevelSets boxes = makeTwoBoxLevelSets(voxelSize, exteriorBand, interiorBand);
+    ASSERT_TRUE(boxes.gridA);
+    ASSERT_TRUE(boxes.gridB);
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr blendResult =
-        tools::unionFillet<FloatGrid>(*gridA, *gridB, noMask, alpha, beta, gamma);
+        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma);
     ASSERT_TRUE(blendResult);
     EXPECT_TRUE(blendResult->activeVoxelCount() > 0);
 
-    FloatGrid::Ptr csgResult = tools::csgUnionCopy(*gridA, *gridB);
+    FloatGrid::Ptr csgResult = tools::csgUnionCopy(*boxes.gridA, *boxes.gridB);
     ASSERT_TRUE(csgResult);
 
     // The fillet blend should carve outward (more negative SDF) at
@@ -166,13 +185,89 @@ TEST_F(TestBlend, testBlendTwoBoxes)
         };
 
         for (int i = 0; i < 4; ++i) {
-            const Coord ijk = xform->worldToIndexNodeCentered(probes[i]);
+            const Coord ijk = boxes.xform->worldToIndexNodeCentered(probes[i]);
             const float blendVal = blendAcc.getValue(ijk);
             const float csgVal   = csgAcc.getValue(ijk);
 
             EXPECT_LT(blendVal, csgVal);
         }
     }
+}
+
+TEST_F(TestBlend, testUnionFilletRequiresActiveInputSamples)
+{
+    using namespace openvdb;
+
+    const Coord ijk(0, 0, 0);
+    const float background = 2.0f;
+    const float alpha = 2.0f;
+    const float beta = 1.0f;
+    const float gamma = 1.0f;
+
+    math::Transform::Ptr xform = math::Transform::createLinearTransform(1.0);
+
+    FloatGrid::Ptr gridA = FloatGrid::create(background);
+    gridA->setTransform(xform);
+    gridA->setGridClass(GRID_LEVEL_SET);
+    gridA->tree().setValueOn(ijk, 0.1f);
+
+    FloatGrid::Ptr gridB = FloatGrid::create(background);
+    gridB->setTransform(xform->copy());
+    gridB->setGridClass(GRID_LEVEL_SET);
+    gridB->tree().setValueOff(ijk, 0.2f); // off voxel, so should not be blended
+
+    ASSERT_TRUE(gridA->tree().probeConstLeaf(ijk));
+    ASSERT_TRUE(gridB->tree().probeConstLeaf(ijk));
+
+    FloatGrid::ConstPtr noMask;
+    FloatGrid::Ptr blendResult =
+        tools::unionFillet<FloatGrid>(*gridA, *gridB, noMask, alpha, beta, gamma);
+    ASSERT_TRUE(blendResult);
+
+    const float blendVal = blendResult->tree().getValue(ijk);
+    EXPECT_NEAR(blendVal, 0.1f, 1.0e-6f); // should be the same as gridA
+}
+
+TEST_F(TestBlend, testUnionFilletNoHolesInUnion)
+{
+    using namespace openvdb;
+
+    const float voxelSize = 0.02f;
+    const float exteriorBand = 6.0f;
+    const float interiorBand = 3.0f;
+
+    const float alpha = 2.0f;
+    const float beta  = 80.0f;
+    const float gamma = 1.0f;
+
+    TwoBoxLevelSets boxes = makeTwoBoxLevelSets(voxelSize, exteriorBand, interiorBand);
+    ASSERT_TRUE(boxes.gridA);
+    ASSERT_TRUE(boxes.gridB);
+
+    FloatGrid::ConstPtr noMask;
+    FloatGrid::Ptr blendResult =
+        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma);
+    ASSERT_TRUE(blendResult);
+
+    FloatGrid::Ptr csgResult = tools::csgUnionCopy(*boxes.gridA, *boxes.gridB);
+    ASSERT_TRUE(csgResult);
+
+    CoordBBox bbox;
+    ASSERT_TRUE(csgResult->tree().evalActiveVoxelBoundingBox(bbox));
+
+    auto blendAcc = blendResult->getConstAccessor();
+    auto csgAcc = csgResult->getConstAccessor();
+
+    Index64 solidVoxelCount = 0;
+    for (CoordBBox::Iterator<true> iter(bbox); iter; ++iter) {
+        const Coord& ijk = *iter;
+        const float csgVal = csgAcc.getValue(ijk);
+        if (csgVal < -0.5f * voxelSize) {
+            ++solidVoxelCount;
+            EXPECT_LE(blendAcc.getValue(ijk), 0.0f) << "ijk = " << ijk;
+        }
+    }
+    EXPECT_TRUE(solidVoxelCount > 0);
 }
 
 TEST_F(TestBlend, testUnionFilletMismatchedTransformsThrow)
