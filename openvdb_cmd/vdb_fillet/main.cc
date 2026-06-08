@@ -20,6 +20,13 @@ namespace {
 
 const char* gProgName = "";
 
+struct DilationCase
+{
+    const char* name;
+    float exteriorBand;
+    float interiorBand;
+};
+
 void
 usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
 {
@@ -135,55 +142,68 @@ void
 fillet_two_boxes(const std::string& outFilename)
 {
     const float voxelSize = 0.02f;
-    const float exteriorBand = 6.0f;
-    const float interiorBand = 3.0f;
 
     const float alpha = 2.0f;
     const float beta  = 80.0f;
     const float gamma = 1.0f;
 
+    const DilationCase dilationCases[] = {
+        { "fillet_union_dilate_e6_i3", 6.0f, 3.0f },
+        { "fillet_union_dilate_e4_i2", 4.0f, 2.0f },
+        { "fillet_union_dilate_e3_i1p5", 3.0f, 1.5f },
+        { "fillet_union_dilate_e2_i1", 2.0f, 1.0f },
+        { "fillet_union_dilate_e1p5_i0p75", 1.5f, 0.75f },
+        { "fillet_union_dilate_e1_i0p5", 1.0f, 0.5f },
+    };
+
     openvdb::math::Transform::Ptr transform =
         openvdb::math::Transform::createLinearTransform(voxelSize);
 
-    openvdb::FloatGrid::Ptr gridA = makeBoxLevelSet(
-        openvdb::Vec3s(0.0f),
-        openvdb::Vec3s(0.5f, 0.5f, 0.5f),
-        openvdb::Vec3s(45.0f, 0.0f, 45.0f),
-        *transform,
-        voxelSize,
-        exteriorBand,
-        interiorBand);
-    if (!gridA) throw std::runtime_error("failed to create box A level set");
-
-    openvdb::FloatGrid::Ptr gridB = makeBoxLevelSet(
-        openvdb::Vec3s(0.0f),
-        openvdb::Vec3s(1.0f, 0.2f, 1.0f),
-        openvdb::Vec3s(0.0f),
-        *transform,
-        voxelSize,
-        exteriorBand,
-        interiorBand);
-    if (!gridB) throw std::runtime_error("failed to create box B level set");
-
-    openvdb::FloatGrid::ConstPtr noMask;
-    openvdb::FloatGrid::Ptr filletUnion =
-        openvdb::tools::unionFillet<openvdb::FloatGrid>(
-            *gridA, *gridB, noMask, alpha, beta, gamma);
-    if (!filletUnion) throw std::runtime_error("failed to create fillet union");
-
-    filletUnion->setName("fillet_union");
-    filletUnion->setGridClass(openvdb::GRID_LEVEL_SET);
-
     openvdb::GridPtrVec grids;
-    grids.push_back(filletUnion);
+    for (const DilationCase& dilationCase: dilationCases) {
+        openvdb::FloatGrid::Ptr gridA = makeBoxLevelSet(
+            openvdb::Vec3s(0.0f),
+            openvdb::Vec3s(0.5f, 0.5f, 0.5f),
+            openvdb::Vec3s(45.0f, 0.0f, 45.0f),
+            *transform,
+            voxelSize,
+            dilationCase.exteriorBand,
+            dilationCase.interiorBand);
+        if (!gridA) throw std::runtime_error("failed to create box A level set");
+
+        openvdb::FloatGrid::Ptr gridB = makeBoxLevelSet(
+            openvdb::Vec3s(0.0f),
+            openvdb::Vec3s(1.0f, 0.2f, 1.0f),
+            openvdb::Vec3s(0.0f),
+            *transform,
+            voxelSize,
+            dilationCase.exteriorBand,
+            dilationCase.interiorBand);
+        if (!gridB) throw std::runtime_error("failed to create box B level set");
+
+        openvdb::FloatGrid::ConstPtr noMask;
+        openvdb::FloatGrid::Ptr filletUnion =
+            openvdb::tools::unionFillet<openvdb::FloatGrid>(
+                *gridA, *gridB, noMask, alpha, beta, gamma);
+        if (!filletUnion) throw std::runtime_error("failed to create fillet union");
+
+        filletUnion->setName(dilationCase.name);
+        filletUnion->setGridClass(openvdb::GRID_LEVEL_SET);
+
+        std::cout << dilationCase.name
+            << ": exteriorBand=" << dilationCase.exteriorBand
+            << ", interiorBand=" << dilationCase.interiorBand
+            << ", activeVoxels=" << filletUnion->activeVoxelCount() << "\n";
+
+        grids.push_back(filletUnion);
+    }
 
     openvdb::io::File file(outFilename);
     file.write(grids);
     file.close();
 
-    std::cout << "Wrote " << outFilename << " with grid \""
-        << filletUnion->getName() << "\" ("
-        << filletUnion->activeVoxelCount() << " active voxels)\n";
+    std::cout << "Wrote " << outFilename << " with " << grids.size()
+        << " fillet union grids\n";
 }
 
 } // unnamed namespace
