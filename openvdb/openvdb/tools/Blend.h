@@ -292,7 +292,10 @@ private:
                         const float B = rhsData[pos];
                         const float m = openvdb::math::Clamp((alpha - A) / alpha, 0.f, 1.f) *
                                         openvdb::math::Clamp((alpha - B) / alpha, 0.f, 1.f);
-                        const float offset = openvdb::math::Pow(m, beta) * gamma;
+                        // Only use offset if both lhs and rhs are on, else defaults to regular union
+                        const bool hasValidFilletSamples = lhsMask.isOn(pos) && rhsMask.isOn(pos);
+                        const float offset = hasValidFilletSamples ?
+                            openvdb::math::Pow(m, beta) * gamma : 0.0f;
                         const bool isAMin = A < B;
                         // - sign here. Otherwise, we'll get empty space between geos
                         outputData[pos] = isAMin ? A - offset : B - offset;
@@ -378,7 +381,10 @@ private:
                         const float B = rhsData[pos];
                         const float m = openvdb::math::Clamp((alpha - A) / alpha, 0.f, 1.f) *
                                         openvdb::math::Clamp((alpha - B) / alpha, 0.f, 1.f);
-                        const float offset = openvdb::math::Pow(m, beta) * gamma;
+                        // Only use offset if both lhs and rhs are on, else defaults to regular union
+                        const bool hasValidFilletSamples = lhsMask.isOn(pos) && rhsMask.isOn(pos);
+                        const float offset = hasValidFilletSamples ?
+                            openvdb::math::Pow(m, beta) * gamma : 0.0f;
                         const bool isAMin = A < B;
                         // multiply by mask value if it exists
                         const float multiplier = maskData ? maskData[pos] : maskBackground;
@@ -641,4 +647,3 @@ unionFillet(const GridT& lhs,
 } // openvdb
 
 #endif // OPENVDB_TOOLS_BLEND_HAS_BEEN_INCLUDED
-
