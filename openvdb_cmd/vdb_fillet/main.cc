@@ -25,6 +25,7 @@ struct DilationCase
     const char* name;
     float exteriorBand;
     float interiorBand;
+    int supportDilation;
 };
 
 void
@@ -148,12 +149,15 @@ fillet_two_boxes(const std::string& outFilename)
     const float gamma = 1.0f;
 
     const DilationCase dilationCases[] = {
-        { "fillet_union_dilate_e6_i3", 6.0f, 3.0f },
-        { "fillet_union_dilate_e4_i2", 4.0f, 2.0f },
-        { "fillet_union_dilate_e3_i1p5", 3.0f, 1.5f },
-        { "fillet_union_dilate_e2_i1", 2.0f, 1.0f },
-        { "fillet_union_dilate_e1p5_i0p75", 1.5f, 0.75f },
-        { "fillet_union_dilate_e1_i0p5", 1.0f, 0.5f },
+        { "fillet_union_dilate_e6_i3", 6.0f, 3.0f, 0 },
+        { "fillet_union_dilate_e6_i3_support2", 6.0f, 3.0f, 2 },
+        { "fillet_union_dilate_e6_i3_support4", 6.0f, 3.0f, 4 },
+        { "fillet_union_dilate_e4_i2", 4.0f, 2.0f, 0 },
+        { "fillet_union_dilate_e3_i1p5", 3.0f, 1.5f, 0 },
+        { "fillet_union_dilate_e2_i1", 2.0f, 1.0f, 0 },
+        { "fillet_union_dilate_e1p5_i0p75", 1.5f, 0.75f, 0 },
+        { "fillet_union_dilate_e1_i0p5", 1.0f, 0.5f, 0 },
+        { "fillet_union_dilate_e1_i0p5_support4", 1.0f, 0.5f, 4 },
     };
 
     openvdb::math::Transform::Ptr transform =
@@ -184,7 +188,7 @@ fillet_two_boxes(const std::string& outFilename)
         openvdb::FloatGrid::ConstPtr noMask;
         openvdb::FloatGrid::Ptr filletUnion =
             openvdb::tools::unionFillet<openvdb::FloatGrid>(
-                *gridA, *gridB, noMask, alpha, beta, gamma);
+                *gridA, *gridB, noMask, alpha, beta, gamma, dilationCase.supportDilation);
         if (!filletUnion) throw std::runtime_error("failed to create fillet union");
 
         filletUnion->setName(dilationCase.name);
@@ -193,6 +197,7 @@ fillet_two_boxes(const std::string& outFilename)
         std::cout << dilationCase.name
             << ": exteriorBand=" << dilationCase.exteriorBand
             << ", interiorBand=" << dilationCase.interiorBand
+            << ", supportDilation=" << dilationCase.supportDilation
             << ", activeVoxels=" << filletUnion->activeVoxelCount() << "\n";
 
         grids.push_back(filletUnion);

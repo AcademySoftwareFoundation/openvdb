@@ -21,6 +21,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h> // for isExactlyEqual()
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/FastSweeping.h>
 #include <openvdb/tools/SignedFloodFill.h>
 #include <openvdb/util/NullInterrupter.h>
 
@@ -44,6 +45,10 @@ namespace tools {
 ///
 /// @param gamma Controls the strength of the blend by providing a multiplier component.
 ///
+/// @param supportDilation Optional number of voxels by which to dilate the
+///        input SDF narrow bands before blending. A value of zero preserves the
+///        default behavior.
+///
 /// @return The filleted union of the @lhs and @rhs level set inputs.
 ///
 /// @throw  If the transforms of @lsh, @rhs, and @mask do not match.
@@ -55,7 +60,8 @@ unionFillet(const GridT& lhs,
      typename MaskT::ConstPtr mask,
      typename GridT::ValueType alpha,
      typename GridT::ValueType beta,
-     typename GridT::ValueType gamma);
+     typename GridT::ValueType gamma,
+     int supportDilation = 0);
 
 //
 // Main class to handle UnionWithFillet
@@ -119,7 +125,6 @@ private:
     ValueType mExponent;
     ValueType mMultiplier;
 };
-
 
 /// @cond OPENVDB_DOCS_INTERNAL
 /// @brief Go through the lhs nodes (both internal and leaf nodes).
@@ -624,7 +629,8 @@ unionFillet(const GridT& lhs,
      typename MaskT::ConstPtr mask,
      typename GridT::ValueType alpha,
      typename GridT::ValueType beta,
-     typename GridT::ValueType gamma)
+     typename GridT::ValueType gamma,
+     int supportDilation)
 {
     static_assert(std::is_floating_point<typename GridT::ValueType>::value,
         "assert in unionFillet: "
@@ -637,6 +643,16 @@ unionFillet(const GridT& lhs,
     if (mask) {
         const openvdb::math::Transform& maskXform = mask->constTransform();
         if (lhsXform != maskXform) throw std::runtime_error("The grids and the mask need to have the same transforms.");
+    }
+
+    if (supportDilation > 0) {
+        typename GridT::Ptr lhsExtended =
+            tools::dilateSdf(lhs, supportDilation, tools::NN_FACE_EDGE_VERTEX);
+        typename GridT::Ptr rhsExtended =
+            tools::dilateSdf(rhs, supportDilation, tools::NN_FACE_EDGE_VERTEX);
+
+        UnionWithFillet<GridT, MaskT> uf(*lhsExtended, *rhsExtended, mask, alpha, beta, gamma);
+        return uf.blend();
     }
 
     UnionWithFillet<GridT, MaskT> uf(lhs, rhs, mask, alpha, beta, gamma);

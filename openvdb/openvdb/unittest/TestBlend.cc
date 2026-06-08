@@ -228,6 +228,77 @@ TEST_F(TestBlend, testUnionFilletRequiresActiveInputSamples)
     EXPECT_NEAR(blendVal, 0.1f, 1.0e-6f); // should be the same as gridA
 }
 
+TEST_F(TestBlend, testUnionFilletZeroSupportDilationPreservesDefault)
+{
+    using namespace openvdb;
+
+    const float voxelSize = 0.02f;
+    const float exteriorBand = 6.0f;
+    const float interiorBand = 3.0f;
+
+    const float alpha = 2.0f;
+    const float beta  = 80.0f;
+    const float gamma = 1.0f;
+
+    TwoBoxLevelSets boxes = makeTwoBoxLevelSets(voxelSize, exteriorBand, interiorBand);
+    ASSERT_TRUE(boxes.gridA);
+    ASSERT_TRUE(boxes.gridB);
+
+    FloatGrid::ConstPtr noMask;
+    FloatGrid::Ptr defaultResult =
+        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma);
+    ASSERT_TRUE(defaultResult);
+
+    FloatGrid::Ptr zeroDilationResult =
+        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma, 0);
+    ASSERT_TRUE(zeroDilationResult);
+
+    EXPECT_EQ(defaultResult->activeVoxelCount(), zeroDilationResult->activeVoxelCount());
+
+    auto defaultAcc = defaultResult->getConstAccessor();
+    auto zeroDilationAcc = zeroDilationResult->getConstAccessor();
+
+    const Vec3d probes[4] = {
+        Vec3d(-0.80, 0.24, 0.0),
+        Vec3d(-0.82, 0.22, 0.0),
+        Vec3d(-0.84, 0.22, 0.0),
+        Vec3d(-0.86, 0.22, 0.0),
+    };
+
+    for (int i = 0; i < 4; ++i) {
+        const Coord ijk = boxes.xform->worldToIndexNodeCentered(probes[i]);
+        EXPECT_EQ(defaultAcc.getValue(ijk), zeroDilationAcc.getValue(ijk));
+    }
+}
+
+TEST_F(TestBlend, testUnionFilletSupportDilationExtendsInputSamples)
+{
+    using namespace openvdb;
+
+    const float voxelSize = 0.02f;
+    const float exteriorBand = 1.0f;
+    const float interiorBand = 0.5f;
+
+    const float alpha = 2.0f;
+    const float beta = 80.0f;
+    const float gamma = 1.0f;
+
+    TwoBoxLevelSets boxes = makeTwoBoxLevelSets(voxelSize, exteriorBand, interiorBand);
+    ASSERT_TRUE(boxes.gridA);
+    ASSERT_TRUE(boxes.gridB);
+
+    FloatGrid::ConstPtr noMask;
+    FloatGrid::Ptr defaultResult =
+        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma);
+    ASSERT_TRUE(defaultResult);
+
+    FloatGrid::Ptr dilatedResult =
+        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma, 2);
+    ASSERT_TRUE(dilatedResult);
+
+    EXPECT_GT(dilatedResult->activeVoxelCount(), defaultResult->activeVoxelCount());
+}
+
 TEST_F(TestBlend, testUnionFilletNoHolesInUnion)
 {
     using namespace openvdb;
