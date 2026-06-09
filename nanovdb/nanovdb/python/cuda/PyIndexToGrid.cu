@@ -77,15 +77,18 @@ void defineIndexToGridVec3(nb::module_& m, const char* name)
         "(Python int; 0 = default stream).");
 }
 
-// Destination types: float / double (scalar) and Vec3f / Vec3d (vector), each
-// for both index source types (ValueIndex and ValueOnIndex). DstBuildT is
-// restricted by IndexToGrid's processLeafsKernel static_assert to non-special
-// types, so the quantized / index / mask BuildTs are intentionally NOT
-// instantiated.
+// Destination types: float / double / int32 (scalar) and Vec3f / Vec3d
+// (vector), each for both index source types (ValueIndex and ValueOnIndex).
+// DstBuildT is restricted by IndexToGrid's processLeafsKernel static_assert to
+// non-special types (is_special = index || Fp || Point/bool/Mask), so the
+// quantized / index / mask BuildTs are intentionally NOT instantiated; Int32 is
+// a regular type, so it materialises an Int32Grid (e.g. an integer label grid).
 template void defineIndexToGridScalar<float, nanovdb::ValueIndex>(nb::module_&, const char*);
 template void defineIndexToGridScalar<float, nanovdb::ValueOnIndex>(nb::module_&, const char*);
 template void defineIndexToGridScalar<double, nanovdb::ValueIndex>(nb::module_&, const char*);
 template void defineIndexToGridScalar<double, nanovdb::ValueOnIndex>(nb::module_&, const char*);
+template void defineIndexToGridScalar<int32_t, nanovdb::ValueIndex>(nb::module_&, const char*);
+template void defineIndexToGridScalar<int32_t, nanovdb::ValueOnIndex>(nb::module_&, const char*);
 
 template void
 defineIndexToGridVec3<nanovdb::Vec3f, nanovdb::ValueIndex>(nb::module_&, const char*);

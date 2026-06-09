@@ -113,8 +113,12 @@ void defineToolsModule(nb::module_& m)
     // helper that feeds pruneGrid (nanovdb::util::cuda::Inject* functors).
     defineInject<float>(cudaModule, "inject");
     defineInject<double>(cudaModule, "inject");
+    defineInject<int32_t>(cudaModule, "inject");
+    defineInject<uint32_t>(cudaModule, "inject");
     defineInjectFeatures<float>(cudaModule, "inject");
     defineInjectFeatures<double>(cudaModule, "inject");
+    defineInjectFeatures<int32_t>(cudaModule, "inject");
+    defineInjectFeatures<uint32_t>(cudaModule, "inject");
     defineInjectPredicateToMask(cudaModule, "injectPredicateToMask");
     defineInjectGridMask(cudaModule, "injectGridMask");
 
@@ -130,6 +134,8 @@ void defineToolsModule(nb::module_& m)
     defineIndexToGridScalar<float, ValueOnIndex>(cudaModule, "indexToGrid");
     defineIndexToGridScalar<double, ValueIndex>(cudaModule, "indexToGrid");
     defineIndexToGridScalar<double, ValueOnIndex>(cudaModule, "indexToGrid");
+    defineIndexToGridScalar<int32_t, ValueIndex>(cudaModule, "indexToGrid");
+    defineIndexToGridScalar<int32_t, ValueOnIndex>(cudaModule, "indexToGrid");
     defineIndexToGridVec3<Vec3f, ValueIndex>(cudaModule, "indexToGrid");
     defineIndexToGridVec3<Vec3f, ValueOnIndex>(cudaModule, "indexToGrid");
     defineIndexToGridVec3<Vec3d, ValueIndex>(cudaModule, "indexToGrid");
@@ -151,6 +157,15 @@ void defineToolsModule(nb::module_& m)
     defineAddBlindData<ValueIndex, float>(cudaModule, "addBlindData");
     defineAddBlindData<ValueIndex, double>(cudaModule, "addBlindData");
     defineAddBlindData<ValueIndex, uint32_t>(cudaModule, "addBlindData");
+    // Signed-integer blind payloads (Int32 / Int64), e.g. integer labels / ids.
+    defineAddBlindData<float, int32_t>(cudaModule, "addBlindData");
+    defineAddBlindData<float, int64_t>(cudaModule, "addBlindData");
+    defineAddBlindData<double, int32_t>(cudaModule, "addBlindData");
+    defineAddBlindData<double, int64_t>(cudaModule, "addBlindData");
+    defineAddBlindData<ValueOnIndex, int32_t>(cudaModule, "addBlindData");
+    defineAddBlindData<ValueOnIndex, int64_t>(cudaModule, "addBlindData");
+    defineAddBlindData<ValueIndex, int32_t>(cudaModule, "addBlindData");
+    defineAddBlindData<ValueIndex, int64_t>(cudaModule, "addBlindData");
 
     // Device quality-control tools (mirror the host tools.* names on
     // tools.cuda). updateGridStats covers scalar/vector/bool grids; isValid

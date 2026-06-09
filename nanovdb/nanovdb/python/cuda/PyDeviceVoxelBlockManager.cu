@@ -15,6 +15,7 @@
 #include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/tools/VoxelBlockManager.h>
 #include <nanovdb/tools/cuda/VoxelBlockManager.cuh>
+#include <nanovdb/util/cuda/DeviceGridTraits.cuh>
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -89,6 +90,33 @@ static NanoGrid<ValueOnIndex>* castOnIndexDeviceGrid(nb::handle py_grid,
     // returned object's underlying address IS the device pointer. It must NOT
     // be dereferenced on the host — it is only passed to device kernels.
     return &nb::cast<NanoGrid<ValueOnIndex>&>(py_grid);
+}
+
+// gatherBoxStencil / activeVoxelCoords write out[valueIndex] for each active
+// voxel, the caller having sized `out` to activeVoxelCount + 1. That is valid
+// only when active-voxel indexing is CONTIGUOUS (value index 0 = background,
+// 1..N = the N active voxels) -- the VoxelBlockManager invariant. A grid built
+// with per-node statistics / tile values (the createOnIndexGrid defaults) has
+// value indices beyond activeVoxelCount, so those writes run out of bounds (an
+// illegal memory access). Detect it cheaply (two D2H header reads) and raise a
+// clear error instead of crashing.
+static void requireContiguousIndexing(const NanoGrid<ValueOnIndex>* d_grid,
+                                      const char* fn_name)
+{
+    using Traits = nanovdb::util::cuda::DeviceGridTraits<ValueOnIndex>;
+    const uint64_t valueCount  = Traits::getValueCount(d_grid);
+    const uint64_t activeCount = Traits::getActiveVoxelCount(d_grid);
+    if (valueCount != activeCount + 1) {
+        std::string msg(fn_name);
+        msg += ": requires an OnIndex grid with contiguous active-voxel indexing "
+               "(value index 0 = background, 1..N = the N active voxels), but this "
+               "grid has " + std::to_string(valueCount) + " values for " +
+               std::to_string(activeCount) + " active voxels -- it carries "
+               "per-node statistics and/or tile values. Rebuild it with "
+               "createOnIndexGrid(grid, include_stats=False, include_tiles=False) "
+               "or voxelsToOnIndexGrid.";
+        throw nb::value_error(msg.c_str());
+    }
 }
 
 // ------------------- DeviceVoxelBlockManagerHandle binding -----------------
@@ -359,6 +387,7 @@ template<typename T> void defineGatherBoxStencil(nb::module_& m, const char* nam
            nb::ndarray<T, nb::shape<-1, 27>, nb::c_contig, nb::device::cuda>  out,
            int log2_block_width, uintptr_t stream) {
             auto* d_grid = castOnIndexDeviceGrid(py_grid, "gatherBoxStencil");
+            requireContiguousIndexing(d_grid, "gatherBoxStencil");
             cudaStream_t s     = reinterpret_cast<cudaStream_t>(stream);
             const T*     dVals = values.data();
             T*           dOut  = out.data();
@@ -434,6 +463,7 @@ void defineActiveVoxelCoords(nb::module_& m, const char* name)
            nb::ndarray<int32_t, nb::shape<-1, 3>, nb::c_contig, nb::device::cuda> out,
            int log2_block_width, uintptr_t stream) {
             auto* d_grid = castOnIndexDeviceGrid(py_grid, "activeVoxelCoords");
+            requireContiguousIndexing(d_grid, "activeVoxelCoords");
             cudaStream_t s    = reinterpret_cast<cudaStream_t>(stream);
             int32_t*     dOut = out.data();
             nb::gil_scoped_release release;
@@ -469,6 +499,8 @@ void defineDeviceVoxelBlockManager(nb::module_& m)
     defineBuild(m);
     defineGatherBoxStencil<float>(m, "gatherBoxStencil");
     defineGatherBoxStencil<double>(m, "gatherBoxStencil");
+    defineGatherBoxStencil<int32_t>(m, "gatherBoxStencil");
+    defineGatherBoxStencil<uint32_t>(m, "gatherBoxStencil");
     defineActiveVoxelCoords(m, "activeVoxelCoords");
 }
 

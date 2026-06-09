@@ -209,8 +209,12 @@ void defineInjectGridMask(nb::module_& m, const char* name)
 
 template void defineInject<float>(nb::module_&, const char*);
 template void defineInject<double>(nb::module_&, const char*);
+template void defineInject<int32_t>(nb::module_&, const char*);
+template void defineInject<uint32_t>(nb::module_&, const char*);
 template void defineInjectFeatures<float>(nb::module_&, const char*);
 template void defineInjectFeatures<double>(nb::module_&, const char*);
+template void defineInjectFeatures<int32_t>(nb::module_&, const char*);
+template void defineInjectFeatures<uint32_t>(nb::module_&, const char*);
 
 } // namespace pynanovdb
 

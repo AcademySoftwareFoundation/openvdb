@@ -70,6 +70,21 @@ def _build_device_onindex_grid(radius=20.0):
     return dh, dh.deviceGrid(0)
 
 
+def _device_onindex_from_coords(cp, coords_np):
+    """Build a device OnIndex grid directly from (N,3) int32 index coords (no
+    host round-trip; voxelsToOnIndexGrid returns a device grid). Returns
+    (handle, deviceGrid, activeVoxelCount, coordsByValueIndex) where the last is
+    a CuPy (count+1, 3) int32 array mapping value index -> coord (row 0 unused)."""
+    import numpy as np
+    coords = cp.asarray(np.ascontiguousarray(coords_np, dtype=np.int32))
+    dh = nanovdb.tools.cuda.voxelsToOnIndexGrid(coords, 1.0)
+    dg = dh.deviceGrid(0)
+    n = int(nanovdb.tools.cuda.buildVoxelBlockManager(dg, 9, 0, 0, 0, 0).lastOffset())
+    by_index = cp.empty((n + 1, 3), dtype=cp.int32)
+    nanovdb.tools.cuda.activeVoxelCoords(dg, by_index)
+    return dh, dg, n, by_index
+
+
 @unittest.skipIf(
     not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
 )
@@ -488,6 +503,156 @@ class TestDeviceVoxelBlockManager(unittest.TestCase):
         self.assertEqual(jm.dtype, cp.uint64)
         self.assertEqual(jm.shape[0], vbm.blockCount())
         self.assertEqual(int(jm.data.ptr), vbm.jump_map_ptr())
+
+    def test_gather_box_stencil_dtypes(self):
+        """gatherBoxStencil works for float32 AND the integer payload dtypes
+        (int32/uint32). The centre spoke (column 13) is each voxel's own value,
+        inactive neighbours read values[0] (=0 here), and gathering arange yields
+        the SAME neighbour-index pattern in every dtype -- the property that lets
+        callers gather a neighbour-INDEX table directly in int32.
+
+        Built from explicit coords (voxelsToOnIndexGrid) so active-voxel indexing
+        is contiguous -- the invariant the VoxelBlockManager gather relies on."""
+        cp = _require_cupy(self)
+        import numpy as np
+        block = np.array([(i, j, k) for i in range(5) for j in range(5) for k in range(5)],
+                         dtype=np.int32)
+        _h, dg, n, _co = _device_onindex_from_coords(cp, block)
+        N = n + 1
+        ref = None
+        for dt in (cp.float32, cp.int32, cp.uint32):
+            idx = cp.arange(N, dtype=dt)
+            out = cp.empty((N, 27), dtype=dt)
+            nanovdb.tools.cuda.gatherBoxStencil(dg, idx, out)
+            self.assertEqual(out.dtype, cp.dtype(dt))
+            self.assertTrue(bool((out[1:N, 13] == idx[1:N]).all()))   # centre == self
+            self.assertTrue(bool((out[1:N] == 0).any()))              # inactive -> values[0]
+            # row 0 (background slot) is never written by the kernel, so compare
+            # only the written rows across dtypes.
+            as_i64 = out[1:N].astype(cp.int64)
+            if ref is None:
+                ref = as_i64
+            else:
+                self.assertTrue(bool((as_i64 == ref).all()))          # dtype-independent
+
+    def test_gather_rejects_noncontiguous_grid(self):
+        """gatherBoxStencil / activeVoxelCoords raise a clear ValueError (rather
+        than an illegal memory access) on a grid whose active-voxel indexing is
+        NOT contiguous -- e.g. createOnIndexGrid's default include_stats /
+        include_tiles, which add value slots past activeVoxelCount."""
+        cp = _require_cupy(self)
+        dh, dg = _build_device_onindex_grid(20.0)   # createOnIndexGrid defaults: stats+tiles
+        N = int(nanovdb.tools.cuda.buildVoxelBlockManager(dg, 9, 0, 0, 0, 0).lastOffset()) + 1
+        with self.assertRaises(ValueError):
+            nanovdb.tools.cuda.gatherBoxStencil(dg, cp.arange(N, dtype=cp.int32),
+                                                cp.empty((N, 27), dtype=cp.int32))
+        with self.assertRaises(ValueError):
+            nanovdb.tools.cuda.activeVoxelCoords(dg, cp.empty((N, 3), dtype=cp.int32))
+
+
+@unittest.skipIf(
+    not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
+)
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
+)
+class TestDeviceInject(unittest.TestCase):
+    """inject / injectFeatures copy a sidecar over the src/dst voxel
+    intersection, for float AND the integer payloads (int32/uint32) -- the copy
+    is via the assignment operator, so it is type-generic."""
+
+    # src = a 4^3 block; dst = a 6^3 block (a superset), so the intersection is
+    # exactly src. enc(coord) gives each voxel a distinct in-range value.
+    SRC = [(i, j, k) for i in range(4) for j in range(4) for k in range(4)]
+    DST = [(i, j, k) for i in range(6) for j in range(6) for k in range(6)]
+    SENT = 255  # distinct from every enc value; exact in f32/i32/u32
+
+    @staticmethod
+    def _enc(c):                                   # (...,3) int -> (...) int
+        return (c[..., 0] * 6 + c[..., 1]) * 6 + c[..., 2]
+
+    def test_inject_scalar_dtypes(self):
+        cp = _require_cupy(self)
+        import numpy as np
+        _sh, sdg, ns, sco = _device_onindex_from_coords(cp, np.array(self.SRC, np.int32))
+        _dh, ddg, nd, dco = _device_onindex_from_coords(cp, np.array(self.DST, np.int32))
+        sco_h = cp.asnumpy(sco[1:]).astype(np.int64)
+        dco_h = cp.asnumpy(dco[1:]).astype(np.int64)
+        in_src = (dco_h < 4).all(axis=1)
+        expect = np.where(in_src, self._enc(dco_h), self.SENT)
+        for dt in (cp.float32, cp.int32, cp.uint32):
+            with self.subTest(dtype=np.dtype(dt).name):
+                src_vals = cp.zeros(ns + 1, dtype=dt)
+                src_vals[1:] = cp.asarray(self._enc(sco_h), dtype=dt)
+                dst_vals = cp.full(nd + 1, self.SENT, dtype=dt)
+                nanovdb.tools.cuda.inject(sdg, ddg, src_vals, dst_vals)
+                self.assertEqual(dst_vals.dtype, cp.dtype(dt))
+                got = cp.asnumpy(dst_vals[1:]).astype(np.int64)
+                self.assertTrue(bool((got == expect).all()))
+
+    def test_inject_features_dtypes(self):
+        """injectFeatures: the 2-D (value count, dim) form, integer + float."""
+        cp = _require_cupy(self)
+        import numpy as np
+        _sh, sdg, ns, sco = _device_onindex_from_coords(cp, np.array(self.SRC, np.int32))
+        _dh, ddg, nd, dco = _device_onindex_from_coords(cp, np.array(self.DST, np.int32))
+        sco_h = cp.asnumpy(sco[1:]).astype(np.int64)
+        dco_h = cp.asnumpy(dco[1:]).astype(np.int64)
+        in_src = (dco_h < 4).all(axis=1)
+        enc_d = self._enc(dco_h)
+        for dt in (cp.float32, cp.int32):
+            with self.subTest(dtype=np.dtype(dt).name):
+                src_vals = cp.zeros((ns + 1, 2), dtype=dt)
+                e = self._enc(sco_h)
+                src_vals[1:, 0] = cp.asarray(e, dtype=dt)
+                src_vals[1:, 1] = cp.asarray(e + 1000, dtype=dt)   # second channel
+                dst_vals = cp.full((nd + 1, 2), self.SENT, dtype=dt)
+                nanovdb.tools.cuda.inject(sdg, ddg, src_vals, dst_vals)
+                got = cp.asnumpy(dst_vals[1:]).astype(np.int64)
+                exp0 = np.where(in_src, enc_d, self.SENT)
+                exp1 = np.where(in_src, enc_d + 1000, self.SENT)
+                self.assertTrue(bool((got[:, 0] == exp0).all()))
+                self.assertTrue(bool((got[:, 1] == exp1).all()))
+
+
+@unittest.skipIf(
+    not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
+)
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
+)
+class TestDeviceTypedSidecars(unittest.TestCase):
+    """Integer payloads / build types: addBlindData with int32/int64 blind data,
+    and indexToGrid materialising an Int32 destination grid."""
+
+    BLOCK = [(i, j, k) for i in range(4) for j in range(4) for k in range(4)]
+
+    def test_add_blind_data_int_dtypes(self):
+        cp = _require_cupy(self)
+        import numpy as np
+        _h, dg, n, _co = _device_onindex_from_coords(cp, np.array(self.BLOCK, np.int32))
+        for dt in (cp.int32, cp.int64, cp.float32):     # float32 = regression
+            with self.subTest(dtype=np.dtype(dt).name):
+                blind = (cp.arange(n + 1, dtype=dt) * 3)
+                out_dh = nanovdb.tools.cuda.addBlindData(
+                    dg, blind, nanovdb.GridBlindDataClass.ChannelArray,
+                    nanovdb.GridBlindDataSemantic.Unknown, "labels")
+                out_dh.deviceDownload(0, True)
+                g = out_dh.grid(0)
+                self.assertEqual(g.blindDataCount(), 1)
+                bd = np.asarray(g.getBlindData(0))
+                self.assertEqual(bd.dtype, np.dtype(dt))
+                self.assertTrue(bool((bd == cp.asnumpy(blind)).all()))
+
+    def test_index_to_grid_int32(self):
+        cp = _require_cupy(self)
+        import numpy as np
+        _h, dg, n, _co = _device_onindex_from_coords(cp, np.array(self.BLOCK, np.int32))
+        vals = cp.arange(n + 1, dtype=cp.int32) * 7        # int32 sidecar -> Int32Grid
+        out_dh = nanovdb.tools.cuda.indexToGrid(dg, vals)
+        self.assertEqual(out_dh.gridType(0), nanovdb.GridType.Int32)
+        out_dh.deviceDownload(0, True)
+        self.assertEqual(out_dh.grid(0).activeVoxelCount(), n)
 
 
 @unittest.skipIf(

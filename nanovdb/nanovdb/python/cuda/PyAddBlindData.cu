@@ -74,5 +74,15 @@ template void defineAddBlindData<nanovdb::ValueOnIndex, uint32_t>(nb::module_&, 
 template void defineAddBlindData<nanovdb::ValueIndex, float>(nb::module_&, const char*);
 template void defineAddBlindData<nanovdb::ValueIndex, double>(nb::module_&, const char*);
 template void defineAddBlindData<nanovdb::ValueIndex, uint32_t>(nb::module_&, const char*);
+// Signed-integer blind payloads (e.g. integer labels / ids), for the same grid
+// BuildTs.
+template void defineAddBlindData<float, int32_t>(nb::module_&, const char*);
+template void defineAddBlindData<float, int64_t>(nb::module_&, const char*);
+template void defineAddBlindData<double, int32_t>(nb::module_&, const char*);
+template void defineAddBlindData<double, int64_t>(nb::module_&, const char*);
+template void defineAddBlindData<nanovdb::ValueOnIndex, int32_t>(nb::module_&, const char*);
+template void defineAddBlindData<nanovdb::ValueOnIndex, int64_t>(nb::module_&, const char*);
+template void defineAddBlindData<nanovdb::ValueIndex, int32_t>(nb::module_&, const char*);
+template void defineAddBlindData<nanovdb::ValueIndex, int64_t>(nb::module_&, const char*);
 
 } // namespace pynanovdb
