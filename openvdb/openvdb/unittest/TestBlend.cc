@@ -296,7 +296,20 @@ TEST_F(TestBlend, testUnionFilletSupportDilationExtendsInputSamples)
         tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma, 2);
     ASSERT_TRUE(dilatedResult);
 
-    EXPECT_GT(dilatedResult->activeVoxelCount(), defaultResult->activeVoxelCount());
+    CoordBBox bbox;
+    ASSERT_TRUE(defaultResult->tree().evalActiveVoxelBoundingBox(bbox));
+
+    auto defaultAcc = defaultResult->getConstAccessor();
+    auto dilatedAcc = dilatedResult->getConstAccessor();
+
+    Index64 improvedVoxelCount = 0;
+    for (CoordBBox::Iterator<true> iter(bbox); iter; ++iter) {
+        if (dilatedAcc.getValue(*iter) < defaultAcc.getValue(*iter) - 1.0e-6f) {
+            ++improvedVoxelCount;
+        }
+    }
+
+    EXPECT_GT(improvedVoxelCount, Index64(0));
 }
 
 TEST_F(TestBlend, testUnionFilletNoHolesInUnion)
