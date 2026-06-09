@@ -549,6 +549,29 @@ class TestDeviceVoxelBlockManager(unittest.TestCase):
         with self.assertRaises(ValueError):
             nanovdb.tools.cuda.activeVoxelCoords(dg, cp.empty((N, 3), dtype=cp.int32))
 
+    def test_gather_box_stencil_columns(self):
+        """gatherBoxStencilColumns gathers a CHOSEN subset of the 27 spokes into
+        an (N,K) table -- equal to the matching columns of the full gather -- and
+        validates its (host) spoke list + the out shape."""
+        cp = _require_cupy(self)
+        import numpy as np
+        block = np.array([(i, j, k) for i in range(5) for j in range(5) for k in range(5)],
+                         dtype=np.int32)
+        _h, dg, n, _co = _device_onindex_from_coords(cp, block)
+        N = n + 1
+        idx = cp.arange(N, dtype=cp.int32)
+        full = cp.empty((N, 27), dtype=cp.int32)
+        nanovdb.tools.cuda.gatherBoxStencil(dg, idx, full)
+        spokes = np.array([13, 22, 16, 14, 4, 10, 12], dtype=np.int32)   # centre + 6 faces
+        sub = cp.empty((N, spokes.shape[0]), dtype=cp.int32)
+        nanovdb.tools.cuda.gatherBoxStencilColumns(dg, idx, sub, spokes)
+        self.assertTrue(bool((sub[1:N] == full[1:N][:, cp.asarray(spokes)]).all()))
+        with self.assertRaises(ValueError):          # spoke out of [0, 27)
+            nanovdb.tools.cuda.gatherBoxStencilColumns(
+                dg, idx, cp.empty((N, 2), dtype=cp.int32), np.array([13, 99], np.int32))
+        with self.assertRaises(ValueError):          # out.shape[1] != len(spokes)
+            nanovdb.tools.cuda.gatherBoxStencilColumns(dg, idx, cp.empty((N, 3), dtype=cp.int32), spokes)
+
 
 @unittest.skipIf(
     not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"

@@ -423,6 +423,92 @@ template<typename T> void defineGatherBoxStencil(nb::module_& m, const char* nam
         "stream).");
 }
 
+// ------------------- gatherBoxStencilColumns (subset of the 27 spokes) -----
+//
+// Like gatherBoxStencil, but writes only a chosen SUBSET of the 27 box-stencil
+// spokes into an (valueCount, K) array. The VBM decode still computes all 27
+// neighbour indices in registers (that work is cheap and shared), so the only
+// saving is the output table -- which matters when a kernel needs just a handful
+// of the 27 neighbours (e.g. an SDF mesher's 8 corners + 6 faces): a (N, K) table
+// instead of (N, 27). The K (<=27) spoke indices pass by value, no device scratch.
+struct ColumnSpokes { int s[27]; };
+
+template<int Log2BlockWidth, typename T>
+__global__ void gatherBoxStencilColumnsKernel(
+    const NanoGrid<ValueOnIndex>* grid,
+    const uint32_t* firstLeafID, const uint64_t* jumpMap, uint64_t firstOffset,
+    const T* values, T* out, ColumnSpokes spokes, int K)
+{
+    constexpr int BW  = 1 << Log2BlockWidth;
+    constexpr int JML = BW / 64;
+    using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
+    __shared__ uint32_t smem_leafIndex[BW];
+    __shared__ uint16_t smem_voxelOffset[BW];
+    const uint64_t blockFirstOffset = firstOffset + uint64_t(blockIdx.x) * BW;
+    VBM::template decodeInverseMaps<ValueOnIndex>(
+        grid, firstLeafID[blockIdx.x], &jumpMap[uint64_t(blockIdx.x) * JML],
+        blockFirstOffset, smem_leafIndex, smem_voxelOffset);
+    const int tID = threadIdx.x;
+    if (smem_leafIndex[tID] == VBM::UnusedLeafIndex) return;
+    uint64_t st[27];
+    VBM::template computeBoxStencil<ValueOnIndex>(
+        grid, smem_leafIndex, smem_voxelOffset, st);
+    const uint64_t c = st[13];                              // centre value index
+    for (int col = 0; col < K; ++col) out[c * K + col] = values[st[spokes.s[col]]];
+}
+
+template<typename T> void defineGatherBoxStencilColumns(nb::module_& m, const char* name)
+{
+    m.def(
+        name,
+        [](nb::handle py_grid,
+           nb::ndarray<const T, nb::ndim<1>, nb::c_contig, nb::device::cuda> values,
+           nb::ndarray<T, nb::shape<-1, -1>, nb::c_contig, nb::device::cuda>  out,
+           nb::ndarray<const int32_t, nb::ndim<1>, nb::c_contig>             spokes,
+           int log2_block_width, uintptr_t stream) {
+            auto* d_grid = castOnIndexDeviceGrid(py_grid, "gatherBoxStencilColumns");
+            requireContiguousIndexing(d_grid, "gatherBoxStencilColumns");
+            const int K = static_cast<int>(spokes.shape(0));
+            if (K < 1 || K > 27)
+                throw nb::value_error("gatherBoxStencilColumns: len(spokes) must be in [1, 27].");
+            if (static_cast<int>(out.shape(1)) != K)
+                throw nb::value_error("gatherBoxStencilColumns: out.shape[1] must equal len(spokes).");
+            ColumnSpokes sp{};                              // copy + validate spokes host-side
+            const int32_t* hSpokes = spokes.data();
+            for (int i = 0; i < K; ++i) {
+                if (hSpokes[i] < 0 || hSpokes[i] >= 27)
+                    throw nb::value_error("gatherBoxStencilColumns: each spoke must be in [0, 27).");
+                sp.s[i] = static_cast<int>(hSpokes[i]);
+            }
+            cudaStream_t s     = reinterpret_cast<cudaStream_t>(stream);
+            const T*     dVals = values.data();
+            T*           dOut  = out.data();
+            nb::gil_scoped_release release;
+            dispatchLog2BlockWidth(log2_block_width, [&](auto W) {
+                constexpr int LBW = decltype(W)::value;
+                auto handle = nanovdb::tools::cuda::buildVoxelBlockManager<
+                    LBW, nanovdb::cuda::DeviceBuffer>(d_grid, 0, 0, 0, s);
+                const uint32_t bc = static_cast<uint32_t>(handle.blockCount());
+                if (bc)
+                    gatherBoxStencilColumnsKernel<LBW, T><<<bc, (1 << LBW), 0, s>>>(
+                        d_grid, handle.deviceFirstLeafID(), handle.deviceJumpMap(),
+                        handle.firstOffset(), dVals, dOut, sp, K);
+                cudaCheck(cudaStreamSynchronize(s));
+                return 0;
+            });
+        },
+        "device_grid"_a, "values"_a, "out"_a, "spokes"_a, "log2_block_width"_a = 9, "stream"_a = 0,
+        "Like gatherBoxStencil, but gathers only a chosen SUBSET of the 27 box-"
+        "stencil spokes into a dense (valueCount, K) array: out[k, col] is voxel "
+        "k's neighbour value at spoke spokes[col], where spoke "
+        "j = (di+1)*9+(dj+1)*3+(dk+1) (centre 13). `spokes` is a 1-D HOST int32 "
+        "array of K (1..27) spoke indices in [0,27); out has shape (rows, K) with "
+        "rows >= valueCount. Halves/shrinks the table when only a handful of the "
+        "27 neighbours are needed (e.g. an SDF mesher's corners + faces). Inactive "
+        "neighbours read values[0]; the grid must use contiguous active-voxel "
+        "indexing. stream is a raw CUDA stream handle (Python int; 0 = default).");
+}
+
 // ------------------- activeVoxelCoords (VBM coordinate decode) -------------
 //
 // Write each active voxel's index-space coordinate into a dense (valueCount, 3)
@@ -501,6 +587,10 @@ void defineDeviceVoxelBlockManager(nb::module_& m)
     defineGatherBoxStencil<double>(m, "gatherBoxStencil");
     defineGatherBoxStencil<int32_t>(m, "gatherBoxStencil");
     defineGatherBoxStencil<uint32_t>(m, "gatherBoxStencil");
+    defineGatherBoxStencilColumns<float>(m, "gatherBoxStencilColumns");
+    defineGatherBoxStencilColumns<double>(m, "gatherBoxStencilColumns");
+    defineGatherBoxStencilColumns<int32_t>(m, "gatherBoxStencilColumns");
+    defineGatherBoxStencilColumns<uint32_t>(m, "gatherBoxStencilColumns");
     defineActiveVoxelCoords(m, "activeVoxelCoords");
 }
 
