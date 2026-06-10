@@ -219,8 +219,17 @@ void testIOImpl(
         f.close();
     }
     ASSERT_TRUE(readTopo);
-    EXPECT_EQ(readTopo->activeVoxelCount(), Index64(0));
-    EXPECT_TRUE(readTopo->tree().leafCount() == 0);
+    // TopologyOnly: full tree structure is read (topology + active-voxel masks),
+    // leaf buffers are allocated and zero-filled, values are not read.
+    EXPECT_EQ(readTopo->tree().leafCount(), srcGrid->tree().leafCount());
+    EXPECT_TRUE(readTopo->tree().leafCount() > 0);
+    EXPECT_EQ(readTopo->activeVoxelCount(), srcGrid->activeVoxelCount());
+    // verify leaf buffers are allocated (bool/mask buffers are always present, skip empty() check)
+    if constexpr (!std::is_same_v<typename GridT::ValueType, bool>) {
+        for (auto leafIter = readTopo->tree().cbeginLeaf(); leafIter; ++leafIter) {
+            EXPECT_FALSE(leafIter->buffer().empty());
+        }
+    }
     EXPECT_EQ(readTopo->getName(), gridName);
 
     // Cleanup

@@ -6,6 +6,7 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/tree/Tree.h>
+#include <openvdb/tree/LeafManager.h>
 #include <openvdb/tree/NodeManager.h>
 #include <openvdb/tools/NodeVisitor.h>
 #include <openvdb/io/Codec.h>
@@ -291,6 +292,19 @@ void topologyCodecReadTopology(GridBase& gridBase, std::istream& is, const io::R
 
     if (options.readMode == io::ReadMode::TopologyOnly) {
         internal::setTilesToBackground(grid.tree());
+        // allocate leaf buffers in parallel and fill with the background value;
+        // ReadTopologyOp uses PartialCreate which leaves buffers unallocated.
+        const auto background = grid.tree().root().background();
+        tree::LeafManager<typename GridT::TreeType> leafManager(grid.tree());
+        leafManager.foreach([&background](auto& leaf, size_t) {
+            using LeafType = std::decay_t<decltype(leaf)>;
+            if constexpr (!std::is_same_v<typename LeafType::ValueType, bool>) {
+                if (leaf.buffer().empty()) {
+                    leaf.buffer().allocate();
+                    leaf.buffer().fill(background);
+                }
+            }
+        });
         return;
     }
 }

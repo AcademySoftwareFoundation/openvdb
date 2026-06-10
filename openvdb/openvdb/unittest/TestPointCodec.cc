@@ -138,8 +138,15 @@ TEST_F(TestPointCodec, testPointIndexCodecIO)
         f.close();
     }
     ASSERT_TRUE(codecTopo);
-    EXPECT_EQ(codecTopo->activeVoxelCount(), Index64(0));
-    EXPECT_TRUE(codecTopo->tree().leafCount() == 0);
+    // TopologyOnly: topology and active state are preserved; voxel values are zero-filled
+    EXPECT_EQ(codecTopo->tree().leafCount(), srcGrid->tree().leafCount());
+    EXPECT_EQ(codecTopo->activeVoxelCount(), srcGrid->activeVoxelCount());
+    for (auto leafIt = codecTopo->tree().cbeginLeaf(); leafIt; ++leafIt) {
+        EXPECT_FALSE(leafIt->buffer().empty());
+        for (auto voxIt = leafIt->cbeginValueOn(); voxIt; ++voxIt) {
+            EXPECT_EQ(*voxIt, PointIndexGrid::ValueType(0));
+        }
+    }
     EXPECT_EQ(codecTopo->getName(), std::string("point_index_grid"));
 
     // Cleanup
@@ -265,8 +272,14 @@ TEST_F(TestPointCodec, testPointDataCodecIO)
             f.close();
         }
         ASSERT_TRUE(codecTopo);
-        EXPECT_EQ(codecTopo->activeVoxelCount(), Index64(0));
-        EXPECT_TRUE(codecTopo->tree().leafCount() == 0);
+        // TopologyOnly: topology and active state are preserved; voxel values are zero-filled
+        EXPECT_EQ(codecTopo->tree().leafCount(), srcGrid->tree().leafCount());
+        EXPECT_EQ(codecTopo->activeVoxelCount(), srcGrid->activeVoxelCount());
+        for (auto leafIt = codecTopo->tree().cbeginLeaf(); leafIt; ++leafIt) {
+            for (auto voxIt = leafIt->cbeginValueOn(); voxIt; ++voxIt) {
+                EXPECT_EQ(*voxIt, PointDataGrid::ValueType(0));
+            }
+        }
 
         std::remove(codecPath.c_str());
     }

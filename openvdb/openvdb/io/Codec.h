@@ -79,10 +79,14 @@ enum class ReadMode {
     Mask,
     /// Deserialize topology only; value buffers are skipped. The resulting
     /// grid has a valid tree structure (active/inactive state, node
-    /// hierarchy) but leaf buffer data is left at its default (background)
-    /// value. Useful when only the active-voxel mask is needed and
-    /// avoiding the cost of reading large value buffers is desirable.
-    TopologyOnly
+    /// hierarchy) and all leaf buffers are allocated and zero-filled.
+    /// Useful when only the active-voxel mask is needed and avoiding the
+    /// cost of reading large value buffers is desirable.
+    TopologyOnly,
+    /// Deserialize grid metadata and transform only; no topology, no value
+    /// buffers. The codec is still used to construct the correct grid type,
+    /// but its @c readTopology()/@c readBuffers() are not called.
+    MetadataOnly
 };
 
 /// @brief Base class for per-grid-type, codec-specific read options.
@@ -144,6 +148,8 @@ struct OPENVDB_API ReadTypedOptions
 /// in-place type conversion as data is read.
 /// @c ReadMode::TopologyOnly skips value buffers entirely, which can be
 /// significantly faster when only the active-voxel mask is needed.
+/// @c ReadMode::MetadataOnly skips both topology and value buffers,
+/// reading only grid metadata and transform.
 ///
 /// @par Per-type options
 /// @c typeData allows callers to attach codec-specific configuration for

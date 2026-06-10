@@ -182,6 +182,7 @@ struct StreamMetadata::Impl
     bool mDelayedLoadMeta = false;
     uint64_t mLeaf = 0;
     uint32_t mTest = 0; // for testing only
+    bool mAllocateLeafBuffers = false;
 }; // struct StreamMetadata
 
 
@@ -243,6 +244,7 @@ bool            StreamMetadata::writeGridStats() const  { return mImpl->mWriteGr
 bool            StreamMetadata::seekable() const        { return mImpl->mSeekable; }
 bool            StreamMetadata::delayedLoadMeta() const { return mImpl->mDelayedLoadMeta; }
 bool            StreamMetadata::countingPasses() const  { return mImpl->mCountingPasses; }
+bool            StreamMetadata::allocateLeafBuffers() const { return mImpl->mAllocateLeafBuffers; }
 uint32_t        StreamMetadata::pass() const            { return mImpl->mPass; }
 MetaMap&        StreamMetadata::gridMetadata()          { return mImpl->mGridMetadata; }
 const MetaMap&  StreamMetadata::gridMetadata() const    { return mImpl->mGridMetadata; }
@@ -260,6 +262,7 @@ void StreamMetadata::setHalfFloat(bool b)               { mImpl->mHalfFloat = b;
 void StreamMetadata::setWriteGridStats(bool b)          { mImpl->mWriteGridStats = b; }
 void StreamMetadata::setSeekable(bool b)                { mImpl->mSeekable = b; }
 void StreamMetadata::setCountingPasses(bool b)          { mImpl->mCountingPasses = b; }
+void StreamMetadata::setAllocateLeafBuffers(bool b)     { mImpl->mAllocateLeafBuffers = b; }
 void StreamMetadata::setPass(uint32_t i)                { mImpl->mPass = i; }
 void StreamMetadata::__setTest(uint32_t t)              { mImpl->mTest = t; }
 
@@ -1000,13 +1003,23 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
     io::setGridClass(is, gridClass);
 
     grid->readTransform(is);
-    if (readOptions.readMode != io::ReadMode::TopologyOnly && !gd.isInstance()) {
+    const bool readTopology = readOptions.readMode != io::ReadMode::MetadataOnly && !gd.isInstance();
+    const bool readBuffers  = readTopology && readOptions.readMode != io::ReadMode::TopologyOnly;
+    if (readTopology) {
         // read topology
         if (codec) {
             codec->readTopology(is, *codecData, readOptions, diagnostics);
         } else {
+            if (readOptions.readMode == io::ReadMode::TopologyOnly) {
+                // signal Grid<TreeT>::readTopology to allocate+zero-fill leaf buffers
+                if (auto meta = io::getStreamMetadataPtr(is)) {
+                    meta->setAllocateLeafBuffers(true);
+                }
+            }
             grid->readTopology(is);
         }
+    }
+    if (readBuffers) {
         // read buffers
         if (codec) {
             codec->readBuffers(is, *codecData, readOptions, diagnostics);

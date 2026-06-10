@@ -386,7 +386,7 @@ File::readAllGridMetadata()
             // Seek to the grid in the file.
             gd.seekToGrid(inputStream());
             io::ReadOptions readOptions;
-            readOptions.readMode = io::ReadMode::TopologyOnly;
+            readOptions.readMode = io::ReadMode::MetadataOnly;
             GridBase::ConstPtr grid = Archive::readGrid(gd, inputStream(), readOptions);
             // Return copies of the grids, but with empty trees.
             // (As of 0.98.0, at least, it would suffice to just const cast
@@ -426,7 +426,7 @@ File::readGridMetadata(const Name& name)
         const GridDescriptor& gd = it->second;
         gd.seekToGrid(inputStream());
         io::ReadOptions readOptions;
-        readOptions.readMode = io::ReadMode::TopologyOnly;
+        readOptions.readMode = io::ReadMode::MetadataOnly;
         ret = Archive::readGrid(gd, inputStream(), readOptions);
     }
     return ret->copyGridWithNewTree();
