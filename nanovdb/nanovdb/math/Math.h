@@ -531,22 +531,20 @@ public:
             mVec[2] = other[2];
         return *this;
     }
-#if defined(__CUDACC__) // the following functions only run on the GPU!
-    __device__ inline Coord& minComponentAtomic(const Coord& other)
+    __hostdev__ inline Coord& minComponentAtomic(const Coord& other)
     {
-        atomicMin(&mVec[0], other[0]);
-        atomicMin(&mVec[1], other[1]);
-        atomicMin(&mVec[2], other[2]);
+        util::atomicMin(&mVec[0], other[0]);
+        util::atomicMin(&mVec[1], other[1]);
+        util::atomicMin(&mVec[2], other[2]);
         return *this;
     }
-    __device__ inline Coord& maxComponentAtomic(const Coord& other)
+    __hostdev__ inline Coord& maxComponentAtomic(const Coord& other)
     {
-        atomicMax(&mVec[0], other[0]);
-        atomicMax(&mVec[1], other[1]);
-        atomicMax(&mVec[2], other[2]);
+        util::atomicMax(&mVec[0], other[0]);
+        util::atomicMax(&mVec[1], other[1]);
+        util::atomicMax(&mVec[2], other[2]);
         return *this;
     }
-#endif
 
     __hostdev__ Coord offsetBy(ValueType dx, ValueType dy, ValueType dz) const
     {
@@ -763,20 +761,18 @@ public:
             mVec[1] = other[1];
         return *this;
     }
-#if defined(__CUDACC__) // the following functions only run on the GPU!
-    __device__ inline Coord2& minComponentAtomic(const Coord2& other)
+    __hostdev__ inline Coord2& minComponentAtomic(const Coord2& other)
     {
-        atomicMin(&mVec[0], other[0]);
-        atomicMin(&mVec[1], other[1]);
+        util::atomicMin(&mVec[0], other[0]);
+        util::atomicMin(&mVec[1], other[1]);
         return *this;
     }
-    __device__ inline Coord2& maxComponentAtomic(const Coord2& other)
+    __hostdev__ inline Coord2& maxComponentAtomic(const Coord2& other)
     {
-        atomicMax(&mVec[0], other[0]);
-        atomicMax(&mVec[1], other[1]);
+        util::atomicMax(&mVec[0], other[0]);
+        util::atomicMax(&mVec[1], other[1]);
         return *this;
     }
-#endif
 
     __hostdev__ Coord2 offsetBy(ValueType dx, ValueType dy) const
     {
@@ -2087,26 +2083,24 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
         return bbox;
     }
 
-#if defined(__CUDACC__) // the following functions only run on the GPU!
-    __device__ inline BBox& expandAtomic(const CoordT& ijk)
+    __hostdev__ inline BBox& expandAtomic(const CoordT& ijk)
     {
         mCoord[0].minComponentAtomic(ijk);
         mCoord[1].maxComponentAtomic(ijk);
         return *this;
     }
-    __device__ inline BBox& expandAtomic(const BBox& bbox)
+    __hostdev__ inline BBox& expandAtomic(const BBox& bbox)
     {
         mCoord[0].minComponentAtomic(bbox[0]);
         mCoord[1].maxComponentAtomic(bbox[1]);
         return *this;
     }
-    __device__ inline BBox& intersectAtomic(const BBox& bbox)
+    __hostdev__ inline BBox& intersectAtomic(const BBox& bbox)
     {
         mCoord[0].maxComponentAtomic(bbox[0]);
         mCoord[1].minComponentAtomic(bbox[1]);
         return *this;
     }
-#endif
 }; // BBox<CoordT, false>
 
 // --------------------------> Rgba8 <------------------------------------

@@ -740,6 +740,80 @@ __hostdev__ inline uint64_t atomicAnd(uint64_t* target, uint64_t mask)
 #endif
 }// util::atomicAnd(uint64_t*, uint64_t)
 
+// ----------------------------> util::atomicMin <--------------------------------------
+
+/// @brief Atomically replaces the value at @a target with min(*target, @a val) (relaxed
+///        ordering). Returns the old value. Callable from both host and device code.
+/// @note  Unlike atomicOr/atomicAnd, integer min/max has no direct host intrinsic (x86 has
+///        no atomic min/max instruction), so the host paths are a compare-and-swap retry
+///        loop — which is what the hardware does for atomic min/max regardless.
+NANOVDB_HOSTDEV_DISABLE_WARNING
+template<typename T>
+__hostdev__ inline T atomicMin(T* target, T val)
+{
+#if defined(__CUDA_ARCH__) || defined(__HIP__)
+    return ::atomicMin(target, val);
+#elif __cplusplus >= 202002L
+    std::atomic_ref<T> ref(*target);
+    T old = ref.load(std::memory_order_relaxed);
+    while (val < old && !ref.compare_exchange_weak(old, val, std::memory_order_relaxed)) {}
+    return old;
+#elif defined(__GNUC__) || defined(__clang__)
+    T old = __atomic_load_n(target, __ATOMIC_RELAXED);
+    while (val < old && !__atomic_compare_exchange_n(target, &old, val, true,
+                                                     __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {}
+    return old;
+#elif defined(_MSC_VER)
+    static_assert(sizeof(long) == sizeof(T), "util::atomicMin: expected 32-bit T for MSVC path");
+    long old = *reinterpret_cast<volatile long*>(target);
+    while (static_cast<long>(val) < old) {
+        const long prev = _InterlockedCompareExchange(reinterpret_cast<volatile long*>(target),
+                                                      static_cast<long>(val), old);
+        if (prev == old) break;
+        old = prev;
+    }
+    return static_cast<T>(old);
+#else
+#error "util::atomicMin: no implementation for this compiler"
+#endif
+}// util::atomicMin(T*, T)
+
+// ----------------------------> util::atomicMax <--------------------------------------
+
+/// @brief Atomically replaces the value at @a target with max(*target, @a val) (relaxed
+///        ordering). Returns the old value. Callable from both host and device code.
+/// @note  See atomicMin: the host paths are a compare-and-swap retry loop.
+NANOVDB_HOSTDEV_DISABLE_WARNING
+template<typename T>
+__hostdev__ inline T atomicMax(T* target, T val)
+{
+#if defined(__CUDA_ARCH__) || defined(__HIP__)
+    return ::atomicMax(target, val);
+#elif __cplusplus >= 202002L
+    std::atomic_ref<T> ref(*target);
+    T old = ref.load(std::memory_order_relaxed);
+    while (val > old && !ref.compare_exchange_weak(old, val, std::memory_order_relaxed)) {}
+    return old;
+#elif defined(__GNUC__) || defined(__clang__)
+    T old = __atomic_load_n(target, __ATOMIC_RELAXED);
+    while (val > old && !__atomic_compare_exchange_n(target, &old, val, true,
+                                                     __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {}
+    return old;
+#elif defined(_MSC_VER)
+    static_assert(sizeof(long) == sizeof(T), "util::atomicMax: expected 32-bit T for MSVC path");
+    long old = *reinterpret_cast<volatile long*>(target);
+    while (static_cast<long>(val) > old) {
+        const long prev = _InterlockedCompareExchange(reinterpret_cast<volatile long*>(target),
+                                                      static_cast<long>(val), old);
+        if (prev == old) break;
+        old = prev;
+    }
+    return static_cast<T>(old);
+#else
+#error "util::atomicMax: no implementation for this compiler"
+#endif
+}// util::atomicMax(T*, T)
+
 }// namespace util ==================================================================
 
 [[deprecated("Use nanovdb::util::findLowestOn instead")]]

@@ -471,7 +471,7 @@ namespace topology::detail {
 template <typename BuildT>
 struct UpdateAndPropagateLeafBBoxFunctor
 {
-    __device__
+    __hostdev__
     void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data, const uint32_t* leafParents) {
         auto &lower = d_data->getLower(leafParents[tid]);
         auto &leaf = d_data->getLeaf(tid);
@@ -483,7 +483,7 @@ struct UpdateAndPropagateLeafBBoxFunctor
 template <typename BuildT>
 struct PropagateLowerBBoxFunctor
 {
-    __device__
+    __hostdev__
     void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data, const uint32_t* lowerParents) {
         auto &upper = d_data->getUpper(lowerParents[tid]);
         auto &lower = d_data->getLower(tid);
@@ -493,7 +493,7 @@ struct PropagateLowerBBoxFunctor
 template <typename BuildT>
 struct PropagateUpperBBoxFunctor
 {
-    __device__
+    __hostdev__
     void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data) {
         d_data->getRoot().mBBox.expandAtomic(d_data->getUpper(tid).bbox());
     }
@@ -502,7 +502,7 @@ struct PropagateUpperBBoxFunctor
 template <typename BuildT>
 struct UpdateRootWorldBBoxFunctor
 {
-    __device__
+    __hostdev__
     void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data) {
         // TODO: check that the correct semantics are followed in this transformation
         auto BBox = d_data->getRoot().mBBox;
@@ -521,25 +521,38 @@ inline void TopologyBuilder<BuildT>::processBBox(cudaStream_t stream)
 
     // TODO: Do we need a special case when flags indicates no bounding box?
 
-    // update and propagate bbox from leaf -> lower/parent nodes
-    util::cuda::lambdaKernel<<<numBlocks(data()->nodeCount[0]), mNumThreads, 0, stream>>>(
-        data()->nodeCount[0], topology::detail::UpdateAndPropagateLeafBBoxFunctor<BuildT>(), deviceData(), static_cast<uint32_t*>(mLeafParents.deviceData()));
+    // Drain upstream CUDA writes (the operator-specific *LeafNodes kernel populates the leaf
+    // value masks in the managed output buffer) before host code reads them below.
+    cudaCheck(cudaStreamSynchronize(stream));
+
+    auto d_data       = data();
+    auto leafParents  = static_cast<uint32_t*>(mLeafParents.data());
+    auto lowerParents = static_cast<uint32_t*>(mLowerParents.data());
+
+    // update and propagate bbox from leaf -> lower/parent nodes. Concurrent children of a
+    // shared parent race into parent.mBBox via expandAtomic (now host-callable). The forEach
+    // barrier between levels ensures each level's bboxes are final before the next reads them.
+    util::forEach(0, d_data->nodeCount[0], 1, [=](const util::Range1D &r) {
+        topology::detail::UpdateAndPropagateLeafBBoxFunctor<BuildT> op;
+        for (auto tid = r.begin(); tid != r.end(); ++tid) op(tid, d_data, leafParents);
+    });
     mLeafParents.clear();
-    cudaCheckError();
 
     // propagate bbox from lower -> upper/parent node
-    util::cuda::lambdaKernel<<<numBlocks(data()->nodeCount[1]), mNumThreads, 0, stream>>>(
-        data()->nodeCount[1], topology::detail::PropagateLowerBBoxFunctor<BuildT>(), deviceData(), static_cast<uint32_t*>(mLowerParents.deviceData()));
+    util::forEach(0, d_data->nodeCount[1], 1, [=](const util::Range1D &r) {
+        topology::detail::PropagateLowerBBoxFunctor<BuildT> op;
+        for (auto tid = r.begin(); tid != r.end(); ++tid) op(tid, d_data, lowerParents);
+    });
     mLowerParents.clear();
-    cudaCheckError();
 
     // propagate bbox from upper -> root/parent node
-    util::cuda::lambdaKernel<<<numBlocks(data()->nodeCount[2]), mNumThreads, 0, stream>>>(data()->nodeCount[2], topology::detail::PropagateUpperBBoxFunctor<BuildT>(), deviceData());
-    cudaCheckError();
+    util::forEach(0, d_data->nodeCount[2], 1, [=](const util::Range1D &r) {
+        topology::detail::PropagateUpperBBoxFunctor<BuildT> op;
+        for (auto tid = r.begin(); tid != r.end(); ++tid) op(tid, d_data);
+    });
 
-    // update the world-bbox in the root node
-    util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, topology::detail::UpdateRootWorldBBoxFunctor<BuildT>(), deviceData());
-    cudaCheckError();
+    // update the world-bbox in the root node (single element)
+    topology::detail::UpdateRootWorldBBoxFunctor<BuildT>()(0, d_data);
 }// TopologyBuilder<BuildT>::processBBox
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
