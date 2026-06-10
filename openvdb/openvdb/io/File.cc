@@ -490,11 +490,26 @@ File::readGrid(const Name& name, const io::ReadOptions& readOptions)
                 << " in file " << mFilename);
         }
 
+        // Read the parent without clipping. Archive::readGrid() converts the
+        // world-space clip region into index space using the grid's own
+        // transform, but an instance has its own transform that may differ
+        // from the parent's. Instead, read the full parent tree and clip the
+        // assembled instance below using the instance's transform, so that the
+        // retained region matches the requested world-space bbox.
+        io::ReadOptions parentOptions = readOptions;
+        parentOptions.clipBBox = BBoxd();
+
         GridBase::Ptr parent;
         OPENVDB_ASSERT(inputHasGridOffsets());
         parentIt->second.seekToGrid(inputStream());
-        parent = Archive::readGrid(parentIt->second, inputStream(), readOptions, mReadDiagnostics);
-        if (parent) grid->setTree(parent->baseTreePtr());
+        parent = Archive::readGrid(parentIt->second, inputStream(), parentOptions, mReadDiagnostics);
+        if (parent) {
+            grid->setTree(parent->baseTreePtr());
+            const auto& clipBBox = readOptions.clipBBox;
+            if (clipBBox.isSorted()) {
+                grid->clipGrid(clipBBox);
+            }
+        }
     }
     return grid;
 }
