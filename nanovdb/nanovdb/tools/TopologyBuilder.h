@@ -385,19 +385,17 @@ inline void TopologyBuilder<BuildT>::processLowerNodes(cudaStream_t stream)
         std::size_t leafCount = data()->nodeCount[0];
         mLeafParents = ScratchBufferT::create(leafCount*sizeof(uint32_t), nullptr, device, stream);
 
-        using Op = util::morphology::cuda::ProcessLowerNodesFunctor<BuildT>;
-        util::cuda::operatorKernel<Op>
-            <<<dim3(processedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock, 0, stream>>>(
-                deviceUpperMasks(),
-                deviceLowerMasks(),
-                static_cast<uint32_t*>(mUpperOffsets.deviceData()),
-                static_cast<CountType>(mLowerOffsets.deviceData()),
-                static_cast<CountType>(mLeafOffsets.deviceData()),
-                static_cast<GridT*>(data()->d_bufferPtr),
-                static_cast<uint32_t*>(mLowerParents.deviceData()),
-                static_cast<uint32_t*>(mLeafParents.deviceData())
-            );
-        cudaCheckError();
+        util::morphology::ProcessLowerNodes<BuildT>(
+            mUpperMasks.data(),
+            mLowerMasks.data(),
+            static_cast<uint32_t*>(mUpperOffsets.data()),
+            static_cast<CountType>(mLowerOffsets.data()),
+            static_cast<CountType>(mLeafOffsets.data()),
+            static_cast<GridT*>(data()->d_bufferPtr),
+            static_cast<uint32_t*>(mLowerParents.data()),
+            static_cast<uint32_t*>(mLeafParents.data()),
+            processedTileCount
+        );
     }
 
     mProcessedRoot.clear(stream);

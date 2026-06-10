@@ -543,8 +543,8 @@ struct ProcessLowerNodesFunctor
         uint32_t *lowerParents,
         uint32_t *leafParents)
     {
-        int dilatedTileID = blockIdx.x; // TODO: Rename this so it is not specific to dilation
-        int upperID = upperOffsets[dilatedTileID];
+        int processedTileID = blockIdx.x;
+        int upperID = upperOffsets[processedTileID];
         int sliceID = blockIdx.y;
         int threadInWarpID = threadIdx.x & 0x1f;
         int warpID = threadIdx.x >> 5;
@@ -559,19 +559,19 @@ struct ProcessLowerNodesFunctor
 
         const auto& dstTree = dstGrid->tree();
 
-        if (upperOffsets[dilatedTileID+1] > upperID) { // check that this particular dilated tile is not empty, i.e. it exists in the tree
+        if (upperOffsets[processedTileID+1] > upperID) { // check that this particular dilated tile is not empty, i.e. it exists in the tree
             const auto upperOrigin = dstTree.root().tile(upperID)->origin();
             auto& upper = const_cast<NanoUpper<BuildT>&>(dstTree.template getFirstNode<2>()[upperID]);
             for ( int jj = sliceID*LowerNodesPerSlice + warpID; jj < (sliceID+1)*LowerNodesPerSlice; jj += WarpsPerBlock ) {
-                if (upperMasks[dilatedTileID].isOn(jj)) {
+                if (upperMasks[processedTileID].isOn(jj)) {
                     const_cast<Mask<5>&>(upper.childMask()).setOnAtomic(jj);
-                    auto lowerID = lowerOffsets[dilatedTileID][jj];
+                    auto lowerID = lowerOffsets[processedTileID][jj];
                     auto& lower = const_cast<NanoLower<BuildT>&>(dstTree.template getFirstNode<1>()[lowerID]);
                     const auto lowerOrigin = upperOrigin + (NanoUpper<BuildT>::OffsetToLocalCoord(jj) << NanoUpper<BuildT>::ChildNodeType::TOTAL);
                     upper.setChild(jj, &lower);
                     lowerParents[lowerID] = upperID;
 
-                    auto lowerWords = lowerMasks[dilatedTileID][jj].words();
+                    auto lowerWords = lowerMasks[processedTileID][jj].words();
                     lower.mChildMask.words()[2*threadInWarpID  ] = lowerWords[2*threadInWarpID  ];
                     lower.mChildMask.words()[2*threadInWarpID+1] = lowerWords[2*threadInWarpID+1];
                     uint32_t prefixSum = util::countOn(lowerWords[2*threadInWarpID]) + util::countOn(lowerWords[2*threadInWarpID+1]);
@@ -580,7 +580,7 @@ struct ProcessLowerNodesFunctor
                         for ( int bitID = 0; bitID < 64; bitID++)
                             if ( lowerWords[wordID] & (1UL << bitID) ) {
                                 int kk = (wordID << 6) + bitID;
-                                int leafID = leafOffsets[dilatedTileID][jj] + prefixSum;
+                                int leafID = leafOffsets[processedTileID][jj] + prefixSum;
                                 auto& leaf = const_cast<NanoLeaf<BuildT>&>(dstTree.template getFirstNode<0>()[leafID]);
                                 lower.setChild(kk, &leaf);
                                 leafParents[leafID] = lowerID;
