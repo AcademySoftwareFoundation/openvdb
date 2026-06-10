@@ -147,6 +147,10 @@ __global__ void processGridTreeRootKernel(typename IndexToGrid<SrcBuildT>::NodeA
     *dstGrid.data() = *srcGrid.data();
     dstGrid.mGridType = toGridType<DstBuildT>();
     dstGrid.mData1 = 0u;
+
+    dstGrid.mGridSize = nodeAcc->size;
+    dstGrid.mBlindMetadataOffset = nodeAcc->size;
+    dstGrid.mBlindMetadataCount = 0u;
     // we will recompute GridData::mChecksum later
 
     // process Tree
