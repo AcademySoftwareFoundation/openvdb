@@ -562,7 +562,7 @@ namespace topology::detail {
 template <typename BuildT>
 struct PostProcessGridTreeFunctor
 {
-    __device__
+    __hostdev__
     void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data, uint64_t* d_voxelOffsets) {
         auto& grid = d_data->getGrid();
         auto& tree = grid.tree();
@@ -578,9 +578,11 @@ template <typename BuildT>
 inline void TopologyBuilder<BuildT>::postProcessGridTree(cudaStream_t stream)
 {
     // Finish updates to GridData/TreeData and (optionally) update checksum
-    if (data()->nodeCount[0]) // if grid is empty, the default values are correct
-        util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, topology::detail::PostProcessGridTreeFunctor<BuildT>(), deviceData(), static_cast<uint64_t*>(mVoxelOffsets.deviceData()));
-    cudaCheckError();
+    if (data()->nodeCount[0]) { // if grid is empty, the default values are correct
+        // Drain upstream device writes to mVoxelOffsets (processLeafOffsets) before host read.
+        cudaCheck(cudaStreamSynchronize(stream));
+        topology::detail::PostProcessGridTreeFunctor<BuildT>()(0, data(), static_cast<uint64_t*>(mVoxelOffsets.data()));
+    }
     mVoxelOffsets.clear();
 
     tools::cuda::updateChecksum((GridData*)data()->d_bufferPtr, mChecksum, stream);
