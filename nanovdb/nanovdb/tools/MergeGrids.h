@@ -263,17 +263,16 @@ void MergeGrids<BuildT>::processGridTreeRoot()
 template<typename BuildT>
 void MergeGrids<BuildT>::mergeLeafNodes()
 {
-    using Op = util::morphology::cuda::MergeLeafNodesFunctor<BuildT>;
-    if (mSrcTreeData1.mNodeCount[1]) { // Unless first input grid is empty
-        util::cuda::operatorKernel<Op>
-            <<<dim3(mSrcTreeData1.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-            (mDeviceSrcGrid1, static_cast<GridT*>(mBuilder.data()->d_bufferPtr));
-    }
-    if (mSrcTreeData2.mNodeCount[1]) { // Unless second input grid is empty
-        util::cuda::operatorKernel<Op>
-            <<<dim3(mSrcTreeData2.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-            (mDeviceSrcGrid2, static_cast<GridT*>(mBuilder.data()->d_bufferPtr));
-    }
+    // Drain upstream work on the stream before the host unions into the output leaf masks
+    // and reads the source grids host-side.
+    cudaCheck(cudaStreamSynchronize(mStream));
+
+    if (mSrcTreeData1.mNodeCount[0]) // Unless first input grid is empty
+        util::morphology::MergeLeafNodes<BuildT>(
+            mDeviceSrcGrid1, static_cast<GridT*>(mBuilder.data()->d_bufferPtr), mSrcTreeData1.mNodeCount[0]);
+    if (mSrcTreeData2.mNodeCount[0]) // Unless second input grid is empty
+        util::morphology::MergeLeafNodes<BuildT>(
+            mDeviceSrcGrid2, static_cast<GridT*>(mBuilder.data()->d_bufferPtr), mSrcTreeData2.mNodeCount[0]);
 
     // Update leaf offsets and prefix sums
     mBuilder.processLeafOffsets(mStream);

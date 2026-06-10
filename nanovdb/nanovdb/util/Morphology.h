@@ -241,6 +241,40 @@ inline void MergeInternalNodes(
     });
 }
 
+/// @brief Union the leaf value masks of one source grid into the corresponding leaves of the
+///        output grid. Host counterpart to the CUDA MergeLeafNodesFunctor; call once per source
+///        grid (serially) to accumulate the union.
+///
+/// @param srcGrid    (in)  Source grid being merged (read host-side; see note on accessibility).
+/// @param dstGrid    (in/out) Output grid whose leaf value masks receive the union.
+/// @param leafCount  (in)  Number of leaf nodes in the source grid (nodeCount[0]).
+///
+/// Iteration is flat over the source grid's leaf array (cf. PruneLeafMasksFunctor), rather than
+/// the CUDA per-lower/childMask traversal. Each source leaf maps by origin to a distinct output
+/// leaf (probeLeaf), so the value-mask OR needs no atomics; across the two source grids the two
+/// calls run serially (forEach is blocking) so the union accumulates correctly.
+///
+/// @note srcGrid is dereferenced on the host (see MergeInternalNodes' note). Every source leaf
+///       origin is present in the merged topology by construction, so probeLeaf is non-null.
+template<typename BuildT>
+inline void MergeLeafNodes(
+    const NanoGrid<BuildT> *srcGrid,
+    NanoGrid<BuildT> *dstGrid,
+    std::size_t leafCount)
+{
+    util::forEach(0, leafCount, 1, [=](const util::Range1D &r) {
+        const auto& srcTree = srcGrid->tree();
+        const auto& dstTree = dstGrid->tree();
+        for (auto srcLeafID = r.begin(); srcLeafID != r.end(); ++srcLeafID) {
+            const auto& srcLeaf = srcTree.template getFirstNode<0>()[srcLeafID];
+            auto dstLeafPtr = dstTree.root().probeLeaf(srcLeaf.origin());
+            auto& dstMask = const_cast<Mask<3>&>(dstLeafPtr->valueMask());
+            for (uint32_t w = 0; w < Mask<3>::WORD_COUNT; ++w)
+                dstMask.words()[w] |= srcLeaf.valueMask().words()[w];
+        }
+    });
+}
+
 }// namespace nanovdb::util::morphology
 
 #endif // NANOVDB_UTIL_MORPHOLOGY_H_HAS_BEEN_INCLUDED
