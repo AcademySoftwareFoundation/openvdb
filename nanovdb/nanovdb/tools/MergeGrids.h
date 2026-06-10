@@ -18,6 +18,7 @@
 
 #include <cub/cub.cuh>
 
+#include <cstring>
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
@@ -253,9 +254,12 @@ void MergeGrids<BuildT>::processGridTreeRoot()
     // Copy GridData from first source grid
     // TODO: Check for instances where extra processing is needed
     // TODO: check that the second grid input has consistent GridData, too
-    cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrid1->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
-    util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
-    cudaCheckError();
+
+    // Drain upstream device work (getBuffer's cudaMemsetAsync zero-fill of the output buffer)
+    // before the host writes the grid header and builds grid/tree/root metadata.
+    cudaCheck(cudaStreamSynchronize(mStream));
+    std::memcpy(&mBuilder.data()->getGrid(), mDeviceSrcGrid1->data(), GridT::memUsage());
+    topology::detail::BuildGridTreeRootFunctor<BuildT>()(0, mBuilder.data());
 }// MergeGrids<BuildT>::processGridTreeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

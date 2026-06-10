@@ -262,15 +262,15 @@ namespace topology::detail {
 template <typename BuildT>
 struct BuildGridTreeRootFunctor
 {
-    __device__
+    __hostdev__
     void operator()(size_t, typename TopologyBuilder<BuildT>::Data *d_data) {
 
         // process Root
         auto &root = d_data->getRoot();
         root.mTableSize = d_data->nodeCount[2];
-        root.mBackground = NanoRoot<BuildT>::ValueType(0);// background_value
-        root.mMinimum = root.mMaximum = NanoRoot<BuildT>::ValueType(0);
-        root.mAverage = root.mStdDevi = NanoRoot<BuildT>::FloatType(0);
+        root.mBackground = typename NanoRoot<BuildT>::ValueType(0);// background_value
+        root.mMinimum = root.mMaximum = typename NanoRoot<BuildT>::ValueType(0);
+        root.mAverage = root.mStdDevi = typename NanoRoot<BuildT>::FloatType(0);
         root.mBBox = CoordBBox(); // To be further updated after the leaf-level voxel update
 
         // process Tree
