@@ -194,8 +194,12 @@ struct ReadTopologyOp
 
             // Copy values from the array into this node's table.
             if (oldVersion) {
+                // The node's member child mask is still empty at this point
+                // (PartialCreate; setChildUnsafe runs below), so iterate the
+                // local childMask's off-bits to match the legacy ordering and
+                // avoid over-reading the countOff-sized values array.
                 Index n = 0;
-                for (auto iter = node.beginValueAll(); iter; ++iter) {
+                for (auto iter = childMask.beginOff(); iter; ++iter) {
                     node.setValueOnlyUnsafe(iter.pos(), static_cast<ValueT>(values[n++]));
                 }
                 OPENVDB_ASSERT(n == numValues);
