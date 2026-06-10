@@ -412,7 +412,7 @@ namespace topology::detail {
 template <typename BuildT>
 struct UpdateLeafVoxelCountsAndPrefixSumFunctor
 {
-    __device__
+    __hostdev__
     void operator()(size_t leafID, typename TopologyBuilder<BuildT>::Data *d_data, uint64_t *d_voxelCounts) {
         auto &leaf = d_data->getGrid().tree().template getFirstNode<0>()[leafID];
         const uint64_t *w = leaf.mValueMask.words();
@@ -429,7 +429,7 @@ struct UpdateLeafVoxelCountsAndPrefixSumFunctor
 template <typename BuildT>
 struct UpdateLeafVoxelOffsetsFunctor
 {
-    __device__
+    __hostdev__
     void operator()(size_t leafID, typename TopologyBuilder<BuildT>::Data *d_data, uint64_t *d_voxelOffsets) {
         auto &leaf = d_data->getGrid().tree().template getFirstNode<0>()[leafID];
         leaf.mOffset = d_voxelOffsets[leafID]+1; }
@@ -445,15 +445,31 @@ inline void TopologyBuilder<BuildT>::processLeafOffsets(cudaStream_t stream)
     std::size_t leafCount = data()->nodeCount[0];
     if (leafCount) { // Unless output grid is empty
         mVoxelOffsets = ScratchBufferT::create((leafCount+1)*sizeof(uint64_t), nullptr, device, stream);
-        cudaCheck(cudaMemsetAsync(mVoxelOffsets.deviceData(), 0, sizeof(uint64_t), stream));
-        util::cuda::lambdaKernel<<<numBlocks(leafCount), mNumThreads, 0, stream>>>(
-            leafCount, topology::detail::UpdateLeafVoxelCountsAndPrefixSumFunctor<BuildT>(), deviceData(), static_cast<uint64_t*>(mVoxelOffsets.deviceData())+1);
-        CALL_CUBS(DeviceScan::InclusiveSum,
-            static_cast<uint64_t*>(mVoxelOffsets.deviceData())+1,
-            static_cast<uint64_t*>(mVoxelOffsets.deviceData())+1,
-            leafCount);
-        util::cuda::lambdaKernel<<<numBlocks(leafCount), mNumThreads, 0, stream>>>(
-            leafCount, topology::detail::UpdateLeafVoxelOffsetsFunctor<BuildT>(), deviceData(), static_cast<uint64_t*>(mVoxelOffsets.deviceData()));
+
+        // Drain upstream device writes to the leaf value masks (the operator-specific
+        // *LeafNodes kernel) before host code reads them below.
+        cudaCheck(cudaStreamSynchronize(stream));
+
+        // Layout mirrors countNodes: index [0] is the seeded 0, [1..leafCount] receives the
+        // per-leaf counts written below, then an in-place inclusive scan turns them into offsets.
+        auto voxelOffsets = static_cast<uint64_t*>(mVoxelOffsets.data());
+        voxelOffsets[0] = 0;
+        auto d_data = data();
+
+        // Per-leaf voxel counts (into voxelOffsets+1) and the packed intra-leaf prefix sums.
+        util::forEach(0, leafCount, 1, [=](const util::Range1D &r) {
+            topology::detail::UpdateLeafVoxelCountsAndPrefixSumFunctor<BuildT> op;
+            for (auto leafID = r.begin(); leafID != r.end(); ++leafID) op(leafID, d_data, voxelOffsets+1);
+        });
+
+        // In-place inclusive prefix sum (TBB-backed when NANOVDB_USE_TBB is defined).
+        util::inclusiveScan(voxelOffsets + 1, leafCount, uint64_t(0), /*threaded=*/true, std::plus<uint64_t>{});
+
+        // Write each leaf's global voxel start offset (1-based; voxel 0 is the background).
+        util::forEach(0, leafCount, 1, [=](const util::Range1D &r) {
+            topology::detail::UpdateLeafVoxelOffsetsFunctor<BuildT> op;
+            for (auto leafID = r.begin(); leafID != r.end(); ++leafID) op(leafID, d_data, voxelOffsets);
+        });
     }
 }// TopologyBuilder<BuildT>::processLeafOffsets
 
