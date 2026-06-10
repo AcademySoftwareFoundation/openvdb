@@ -92,7 +92,55 @@ OpenVDB uses a **B+tree-like hierarchical sparse data structure**:
 
 ### NanoVDB vs OpenVDB
 
-NanoVDB is a read-optimized, single-allocation, GPU-portable subset of OpenVDB. It cannot be modified after construction. The `nanovdb/tools/CreateNanoGrid.h` and adjacent files handle conversion from OpenVDB grids to NanoVDB grids. The current branch (`mesh-to-grid`) adds `tools/cuda/MeshToGrid.cuh` for direct CUDA mesh-to-NanoVDB conversion.
+NanoVDB is a read-optimized, single-allocation, GPU-portable subset of OpenVDB. It cannot be modified after construction. The `nanovdb/tools/CreateNanoGrid.h` and adjacent files handle conversion from OpenVDB grids to NanoVDB grids.
+
+### Topology Operators — CPU Port (this branch)
+
+The branch `vbm-cpu-port` back-ports the five CUDA-only NanoVDB topology operators (`DilateGrid`, `MergeGrids`, `PruneGrid`, `RefineGrid`, `CoarsenGrid`) from `nanovdb/tools/cuda/*.cuh` (namespace `nanovdb::tools::cuda`) to host-only headers at `nanovdb/tools/*.h` (namespace `nanovdb::tools`). The design plan is in `nanovdb/nanovdb/tools/TopologyCpuPortPlan.md`.
+
+**Key files:**
+- `nanovdb/tools/TopologyBuilder.h` — shared base class (in-progress port; still has CUDA includes during transition)
+- `nanovdb/tools/MergeGrids.h` — first operator being ported
+- `nanovdb/util/Morphology.h` — host-side morphology functors (parallel to `util/cuda/Morphology.cuh`)
+- `nanovdb/util/PrefixSum.h` — host `inclusiveScan` used in place of CUB scans
+- `nanovdb/tools/VoxelBlockManager.h` — VBM acceleration structure for active-voxel SIMT/SIMD access
+
+**CUDA → host transition pattern:**
+- Device-only scratch buffers use `ScratchBufferT = UnifiedBuffer` (transitional) → will become `HostBuffer`
+- `lambdaKernel` launches → `util::forEach` calls
+- CUB inclusive scans → `util::inclusiveScan`
+- Morphology functors move from `util/cuda/Morphology.cuh` (`__device__`) to `util/Morphology.h` (host `inline`)
+- CUDA stays on (`NANOVDB_USE_CUDA=ON`) throughout; host-only completion is signaled by renaming `.cu` → `.cpp` in examples
+
+**Build config for this branch** (build dir: `nanovdb/nanovdb/build/`):
+```bash
+cd nanovdb/nanovdb/build
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DNANOVDB_BUILD_EXAMPLES=ON \
+      -DNANOVDB_USE_CUDA=ON \
+      -DNANOVDB_USE_OPENVDB=ON \
+      -DNANOVDB_USE_TBB=ON \
+      -DCMAKE_CUDA_ARCHITECTURES=120 \
+      -DCMAKE_PREFIX_PATH=~/local \
+      -DOpenVDB_ROOT=~/local \
+      ..
+make -j$(nproc)
+```
+
+OpenVDB is installed at `~/local` (not `/usr/local`). The project's `cmake/FindOpenVDB.cmake` requires `-DOpenVDB_ROOT=~/local` explicitly — `CMAKE_PREFIX_PATH` alone is not enough because the finder is invoked from the repo's `cmake/` directory, not the installed `OpenVDB/` directory, so it doesn't auto-detect the prefix. Always clear `CMakeCache.txt` before re-running cmake if you change this path, as NOTFOUND results are cached.
+
+Always use a specific `-DCMAKE_CUDA_ARCHITECTURES=` value (here `120` for Blackwell). The default `=75` (Turing) causes silent kernel failures on non-sm_75 hardware, surfacing as misleading `cudaErrorInvalidDevice`.
+
+**Validation:**
+```bash
+./ex_merge_nanovdb_cpu  /path/to/dragon.vdb /path/to/torus.vdb 3
+./ex_dilate_nanovdb_cpu /path/to/dragon.vdb 3
+./ex_refine_nanovdb_cpu /path/to/dragon.vdb 3
+./ex_coarsen_nanovdb_cpu /path/to/dragon.vdb 3
+```
+Each should print `Result of <Op> check out CORRECT against reference`.
+
+**Only `OnIndexGrid` buildtypes are supported** (`static_assert(BuildTraits<BuildT>::is_onindex)`). Grids with tile values at any level cause the operator to throw.
 
 ### OpenVDB AX
 

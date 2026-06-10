@@ -547,18 +547,143 @@ and then a small number of warm-start timing lines.
 
 ## 7.  Current Status
 
+### 7.1  Phase tracker
+
 | Phase | Description                                | Status      |
 |-------|--------------------------------------------|-------------|
 | 4.0   | Scaffolding: TopologyBuilder.h + MergeGrids.h + ex_merge_nanovdb_cpu | **Done** (`2b75d970`) |
-| 4.1   | Output `BufferT` default → `UnifiedBuffer`  | Pending     |
-| 4.2   | Scratch buffers → `ScratchBufferT` alias    | Pending     |
-| 4.3   | lambdaKernel launches → `util::forEach`     | Pending     |
-| 4.4   | `mData` and `mProcessedRoot` dual-mode → `UnifiedBuffer` | Pending |
-| 4.5   | Morphology functors → host equivalents (MergeGrids subset first) | Pending |
-| 4.6   | CUB scans → `std::inclusive_scan`           | Pending     |
-| 4.7   | Drop CUDA artifacts; `.cu` → `.cpp`         | Pending     |
-| 4.8   | Repeat 4.1–4.7 for Coarsen → Refine → Dilate → Prune | Pending |
+| 4.1   | Output `BufferT` default → `UnifiedBuffer`  | **Done** (`0179f8c3`) |
+| 4.2   | Scratch buffers → `ScratchBufferT` alias    | **Done** (`003b0a59`) |
+| 4.3   | lambdaKernel/operatorKernel launches → `util::forEach` | **Done** for `MergeGrids` (see 7.2) |
+| 4.4   | `mData` and `mProcessedRoot` dual-mode → `UnifiedBuffer` | Pending (see 7.3) |
+| 4.5   | Morphology functors → host equivalents (MergeGrids subset) | **Done** for `MergeGrids` (see 7.2) |
+| 4.6   | CUB scans → `util::inclusiveScan`           | **Done** (`858afe79`, `ed109ddd`) |
+| 4.7   | Drop CUDA artifacts; `.cu` → `.cpp`         | Pending (see 7.3) |
+| 4.8   | Repeat 4.1–4.7 for Coarsen → Refine → Dilate → Prune | Pending (Merge is the template) |
 
-All five operators pass bit-exact `bufferCheck` against the OpenVDB
-reference (dragon, dragon+torus) under the current CUDA implementation
-as the baseline; the port maintains this invariant at every commit.
+### 7.2  Per-method porting status (MergeGrids `getHandle` pipeline)
+
+As of `7e5f9656`, **every compute stage of the `MergeGrids` pipeline runs on
+the host.** No `lambdaKernel`/`operatorKernel` launches remain in either
+`tools/MergeGrids.h` or `tools/TopologyBuilder.h`.
+
+| Stage (call order in `getHandle`)        | Owner          | Status | Commit      | Notes |
+|------------------------------------------|----------------|--------|-------------|-------|
+| `mergeRoot`                              | MergeGrids     | HOST   | `2b75d970`  | `std::map` tile merge; still D2H-copies source roots (transitional) + `mProcessedRoot.deviceUpload` |
+| `allocateInternalMaskBuffers`            | TopologyBuilder| alloc  | —           | No kernel; `cudaMemsetAsync` zero-fill of `mUpperMasks`/`mLowerMasks` |
+| `mergeInternalNodes`                     | MergeGrids     | HOST   | `b7f41d26`  | `util::morphology::MergeInternalNodes`; OR into lower masks + `setOnAtomic` upper masks |
+| `countNodes`                             | TopologyBuilder| HOST   | `858afe79`, `67e8d5c0` | `EnumerateNodes` + `util::inclusiveScan` |
+| `getBuffer`                              | TopologyBuilder| alloc  | —           | No kernel; buffer alloc + `cudaMemsetAsync` + `mData.deviceUpload` |
+| `processGridTreeRoot`                    | MergeGrids     | HOST   | `7e5f9656`  | host `std::memcpy` of GridData + `BuildGridTreeRootFunctor` |
+| `processUpperNodes`                      | TopologyBuilder| HOST   | `729804db`  | `util::forEach` |
+| `processLowerNodes`                      | TopologyBuilder| HOST   | `4438dfe9`  | `util::morphology::ProcessLowerNodes` |
+| `mergeLeafNodes`                         | MergeGrids     | HOST   | `a73eb2b7`  | `util::morphology::MergeLeafNodes` (flat over source leaves) |
+| `processLeafOffsets`                     | TopologyBuilder| HOST   | `ed109ddd`  | `util::forEach` ×2 + `util::inclusiveScan` |
+| `processBBox`                            | TopologyBuilder| HOST   | `fe80448c`  | `util::forEach`; host `expandAtomic` (see 7.4) |
+| `postProcessGridTree`                    | TopologyBuilder| HOST   | `28e0d65a`  | direct host call of `PostProcessGridTreeFunctor` |
+
+Host morphology functions now living in `util/Morphology.h` (parallel to the
+CUDA `util/cuda/Morphology.cuh`): `EnumerateNodes`, `ProcessLowerNodes`,
+`MergeInternalNodes`, `MergeLeafNodes`. All take ownership of their own
+`util::forEach` parallelization (word-granular or per-node), distinct from the
+CUDA cooperative-block/warp structure — this divergence is by design.
+
+### 7.3  What remains for MergeGrids (transitional plumbing, not compute)
+
+1. **Source grids are now `UnifiedBuffer`** (`ex_merge_nanovdb_cpu`, `b7f41d26`).
+   The operator still receives device-side pointers and `mergeRoot` still does
+   its D2H copy; `mergeInternalNodes`/`mergeLeafNodes`/`processGridTreeRoot`
+   instead read those pointers host-side, relying on managed-memory
+   accessibility, each guarded by a leading `cudaStreamSynchronize`. The D2H
+   copy in `mergeRoot` can be removed once we commit to the managed-access
+   assumption everywhere.
+2. **Phase 4.4 — dual-mode buffers.** `mData` and `mProcessedRoot` are still
+   `nanovdb::cuda::DeviceBuffer` with host-copy + `deviceUpload`. Migrate to
+   `UnifiedBuffer` and collapse the host/device accessor pairs
+   (`data()`/`deviceData()`, `hostProcessedRoot()`/`deviceProcessedRoot()`).
+3. **Dead code to remove.** `TopologyBuilder::mNumThreads`/`numBlocks`, the
+   `CALL_CUBS` macro, `mTempDevicePool`, and the `MergeGrids::mNumThreads`
+   constant are all now unused. Removing `CALL_CUBS` should let us drop the
+   `#include <cub/cub.cuh>` from `MergeGrids.h`, and the various
+   `util/cuda/*` includes can be audited for removal.
+4. **Residual `cudaStreamSynchronize` drains.** Several ported methods begin
+   with a stream-sync to drain upstream device work (mask memsets, buffer
+   zero-fill, `deviceUpload`). These become unnecessary once the upstream
+   allocations/transfers (Phase 4.4 and the `getBuffer`/`allocateInternalMaskBuffers`
+   memsets) are themselves host-side.
+5. **`updateChecksum`.** `postProcessGridTree` still calls
+   `tools::cuda::updateChecksum` (a separate subsystem, gated by `mChecksum`,
+   default `Disable`). Needs a host checksum path or to be made conditional.
+6. **Phase 4.7 — completion signal.** Fold
+   `merge_nanovdb_cpu_kernels.cu` into `merge_nanovdb_cpu.cpp` (rename `.cu` →
+   `.cpp`); once no `.cu` remains and the CUDA includes are gone, the CMake
+   `nanovdb_example` target stops invoking nvcc. Remove the `\warning … include
+   only from .cu files …` doxygen notes from the operator headers.
+
+### 7.4  Core-header changes (affect both host and CUDA builds)
+
+The host port required making three atomics host-callable. These are shared
+NanoVDB core headers, so they affect every consumer:
+
+- **`util/Util.h`** (`fe80448c`): added `util::atomicMin`/`util::atomicMax`
+  (`__hostdev__`, templated), following the existing `util::atomicOr`/`atomicAnd`
+  precedent. Integer min/max has no direct host intrinsic, so the host paths are
+  a compare-and-swap retry loop (`std::atomic_ref` for C++20,
+  `__atomic_compare_exchange_n` for GCC/clang, `_InterlockedCompareExchange` for
+  MSVC); the device path stays the native `::atomicMin`/`::atomicMax` intrinsic,
+  so GPU codegen is unchanged.
+- **`math/Math.h`** (`fe80448c`): moved `Coord`/`Coord2` `min/maxComponentAtomic`
+  and `BBox::expandAtomic`/`intersectAtomic` out of `#if defined(__CUDACC__)` to
+  `__hostdev__`, routing through the new util functions. Mirrors the earlier
+  `Mask::setOnAtomic → util::atomicOr` migration.
+- A latent missing `typename` on `NanoRoot<BuildT>::ValueType`/`FloatType` in
+  `BuildGridTreeRootFunctor` surfaced once the functor became `__hostdev__`
+  (the device-only compile pass had been lenient); fixed in `7e5f9656`.
+
+### 7.5  Testing status
+
+- **`ex_merge_nanovdb_cpu`**: prints `Result of MergeGrids check out CORRECT
+  against reference` (bit-exact `bufferCheck` vs the OpenVDB-built reference)
+  across `dragon+armadillo`, `armadillo+dragon`, `dragon+iss`, and `iss+space`
+  pairings, and is stable over repeated runs (exercises concurrent
+  `expandAtomic`/`setOnAtomic` contention under TBB).
+- **Core regression** (run after the `Math.h`/`Util.h` atomic migration,
+  `fe80448c`): `nanovdb_test_nanovdb` 152/152 and `nanovdb_test_cuda` 50/50
+  pass. The CUDA suite includes the device-side `expandAtomic` path via the
+  `DilateInjectPrune`/`RefineCoarsen`/`MergeGrids` operator tests.
+  - Note: the host test writes to a `data/` directory relative to cwd; create
+    it first or several I/O tests fail spuriously (unrelated to the port).
+  - **Pending re-run:** the unit tests have not been re-run since the core
+    `typename` fix (`7e5f9656`); that change only affects the host port header
+    (`tools/TopologyBuilder.h`), not the CUDA `tools/cuda/TopologyBuilder.cuh`
+    the tests exercise, but a confirming re-run is advisable.
+
+### 7.6  Build / environment notes
+
+- Build dir: `nanovdb/nanovdb/build/`. OpenVDB installed at `~/local`; cmake
+  requires `-DOpenVDB_ROOT=~/local` explicitly (the repo-local
+  `cmake/FindOpenVDB.cmake` does not auto-detect the prefix). See `CLAUDE.md`
+  for the full invocation.
+- `-DCMAKE_CUDA_ARCHITECTURES=120` for the Blackwell test machine (the default
+  `=75` causes silent kernel failures on newer hardware).
+- Unit tests require `-DNANOVDB_BUILD_UNITTESTS=ON` and
+  `-DGTest_DIR=~/local/google/googletest/lib/cmake/GTest`.
+
+### 7.7  Extension to the other operators (Phase 4.8)
+
+`MergeGrids` is now the complete worked template for the host pattern. The
+remaining operators (`CoarsenGrid`, `RefineGrid`, `DilateGrid`, `PruneGrid`)
+reuse the already-host `TopologyBuilder` pipeline (7.2) unchanged and need only
+their own operator-specific functors ported into `util/Morphology.h`:
+
+- `CoarsenInternalNodesFunctor`, `RefineInternalNodesFunctor`,
+  `DilateInternalNodesFunctor`, `PruneInternalNodesFunctor` (+ their leaf-side
+  siblings), following the `MergeInternalNodes`/`MergeLeafNodes` model.
+- `PruneGrid` additionally takes a `Mask<3>*` leaf-mask sidecar (produced by the
+  dilate round-trip in `ex_dilate_nanovdb_cpu`).
+- `DilateGrid` carries the `NN_FACE`/`NN_FACE_EDGE`/`NN_FACE_EDGE_VERTEX`
+  variants; `NN_FACE_EDGE` at leaf level is unimplemented in CUDA and throws —
+  preserve that on host.
+
+All operators continue to pass bit-exact `bufferCheck` against the OpenVDB
+reference; the port maintains this invariant at every commit.
