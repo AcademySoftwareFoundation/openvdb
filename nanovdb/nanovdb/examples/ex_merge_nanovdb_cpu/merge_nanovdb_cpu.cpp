@@ -8,6 +8,7 @@
 // the following files are from NanoVDB
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/tools/CreateNanoGrid.h>
 
 template<typename BuildT>
@@ -60,7 +61,7 @@ int main(int argc, char *argv[])
 
         // Convert to indexGrid
         cpuTimer.start("Converting openVDB input to indexGrid (first component)");
-        auto srcHandle1 = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::cuda::DeviceBuffer>(
+        auto srcHandle1 = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::cuda::UnifiedBuffer>(
             grid1,
             0u,    // Don't copy data channel
             false, // No stats
@@ -71,7 +72,7 @@ int main(int argc, char *argv[])
         cpuTimer.stop();
 
         cpuTimer.start("Converting openVDB input to indexGrid (second component)");
-        auto srcHandle2 = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::cuda::DeviceBuffer>(
+        auto srcHandle2 = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::cuda::UnifiedBuffer>(
             grid2,
             0u,    // Don't copy data channel
             false, // No stats

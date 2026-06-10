@@ -229,18 +229,20 @@ template<typename BuildT>
 void MergeGrids<BuildT>::mergeInternalNodes()
 {
     // Merges the masks of upper and lower nodes from both input topologies into the
-    // densified, pre-allocated mask arrays of the merged result
-    using Op = util::morphology::cuda::MergeInternalNodesFunctor<BuildT>;
-    if (mSrcTreeData1.mNodeCount[1]) { // Unless the first grid to merge is empty
-        util::cuda::operatorKernel<Op>
-            <<<mSrcTreeData1.mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
-            (mDeviceSrcGrid1, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks());
-    }
-    if (mSrcTreeData2.mNodeCount[1]) { // Unless the second grid to merge is empty
-        util::cuda::operatorKernel<Op>
-            <<<mSrcTreeData2.mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
-            (mDeviceSrcGrid2, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks());
-    }
+    // densified, pre-allocated mask arrays of the merged result.
+
+    // Drain upstream device work (allocateInternalMaskBuffers zero-fills mUpperMasks/mLowerMasks
+    // on the stream) before the host unions into them and reads the source grids host-side.
+    cudaCheck(cudaStreamSynchronize(mStream));
+
+    if (mSrcTreeData1.mNodeCount[1]) // Unless the first grid to merge is empty
+        util::morphology::MergeInternalNodes<BuildT>(
+            mDeviceSrcGrid1, mBuilder.hostProcessedRoot(),
+            mBuilder.mUpperMasks.data(), mBuilder.mLowerMasks.data(), mSrcTreeData1.mNodeCount[1]);
+    if (mSrcTreeData2.mNodeCount[1]) // Unless the second grid to merge is empty
+        util::morphology::MergeInternalNodes<BuildT>(
+            mDeviceSrcGrid2, mBuilder.hostProcessedRoot(),
+            mBuilder.mUpperMasks.data(), mBuilder.mLowerMasks.data(), mSrcTreeData2.mNodeCount[1]);
 }// MergeGrids<BuildT>::mergeInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

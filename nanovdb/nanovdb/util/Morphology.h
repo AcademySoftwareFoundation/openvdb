@@ -188,6 +188,59 @@ inline void ProcessLowerNodes(
         });
 }
 
+/// @brief Union the upper/lower child masks of one source grid into the densified, pre-allocated
+///        mask arrays of the speculative merged topology. Host counterpart to the CUDA
+///        MergeInternalNodesFunctor; call once per source grid (serially) to accumulate the union.
+///
+/// @param srcGrid      (in)  Source grid being merged (read host-side; see note on accessibility).
+/// @param mergedRoot   (in)  Speculative merged root (host copy), used to locate the output tile.
+/// @param upperMasks_  (out) Array of Mask<5>, one per merged upper tile.
+/// @param lowerMasks_  (out) Array of (Mask<4>[Mask<5>::SIZE]), one set per merged upper tile.
+/// @param lowerCount   (in)  Number of lower nodes in the source grid (nodeCount[1]).
+///
+/// Iteration is over the source grid's lower nodes. Each lower's child mask is OR'd into the
+/// output lower mask for its (tile, upper-slot) location; distinct source lowers map to distinct
+/// output lower masks, so that OR needs no atomics. The output *upper* mask bit is set via
+/// setOnAtomic because sibling lowers under one upper share a mask word. Across the two source
+/// grids the two calls run serially (forEach is blocking), so the union accumulates correctly.
+///
+/// @note srcGrid is dereferenced on the host. This assumes the grid's storage is host-accessible
+///       (UnifiedBuffer / managed memory) and that upstream device work on the same stream has
+///       been drained before the call.
+template<typename BuildT>
+inline void MergeInternalNodes(
+    const NanoGrid<BuildT> *srcGrid,
+    const NanoRoot<BuildT> *mergedRoot,
+    void *upperMasks_,
+    void *lowerMasks_,
+    std::size_t lowerCount)
+{
+    using UpperMaskArrayT = Mask<5>*;
+    using LowerMaskArrayT = Mask<4>(*)[Mask<5>::SIZE];
+    auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
+    auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
+
+    util::forEach(0, lowerCount, 1, [=](const util::Range1D &r) {
+        const auto& srcTree = srcGrid->tree();
+        for (auto lowerID = r.begin(); lowerID != r.end(); ++lowerID) {
+            const auto& lower = srcTree.template getFirstNode<1>()[lowerID];
+            const auto& valueMask = lower.childMask();
+
+            auto mergedTile = mergedRoot->probeTile(lower.origin());
+            uint64_t tileIndex =
+                util::PtrDiff(mergedTile, mergedRoot->tile(0))
+                / sizeof(typename NanoRoot<BuildT>::Tile);
+            auto upperChildIndex = NanoUpper<BuildT>::CoordToOffset(lower.origin());
+
+            auto& outputUpperMask = upperMasks[tileIndex];
+            auto& outputLowerMask = lowerMasks[tileIndex][upperChildIndex];
+            for (uint32_t w = 0; w < Mask<4>::WORD_COUNT; ++w)
+                outputLowerMask.words()[w] |= valueMask.words()[w];
+            outputUpperMask.setOnAtomic(upperChildIndex);
+        }
+    });
+}
+
 }// namespace nanovdb::util::morphology
 
 #endif // NANOVDB_UTIL_MORPHOLOGY_H_HAS_BEEN_INCLUDED
