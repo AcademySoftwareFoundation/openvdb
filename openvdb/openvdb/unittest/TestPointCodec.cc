@@ -545,3 +545,45 @@ TEST_F(TestPointCodec, testPointDataCodecIO)
         std::remove(diffPath.c_str());
     }
 }
+
+// A leafless PointDataGrid stores numPasses == 0. The attribute count is
+// derived as (numPasses - 4) / 2; without an underflow guard this wraps to a
+// huge unsigned value and the attribute loops spin ~4.3e9 times, hanging
+// both write and read. This test exercises an empty grid round-trip.
+TEST_F(TestPointCodec, testPointDataCodecEmptyGrid)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+    using namespace openvdb::points;
+
+    openvdb::initialize();
+    CodecRegistry::clear();
+    io::internal::initialize();
+    ASSERT_TRUE(CodecRegistry::isRegistered(PointDataGrid::gridType()));
+
+    PointDataGrid::Ptr srcGrid = PointDataGrid::create();
+    srcGrid->setName("pdg_empty");
+    EXPECT_EQ(srcGrid->tree().leafCount(), Index32(0));
+
+    const std::string codecPath = "testPDG_empty_codec.vdb";
+
+    {
+        io::File f(codecPath);
+        EXPECT_NO_THROW(f.write(GridPtrVec{srcGrid}));
+    }
+
+    PointDataGrid::Ptr codecGrid;
+    {
+        io::File f(codecPath);
+        f.open();
+        GridBase::Ptr base;
+        EXPECT_NO_THROW(base = f.readGrid("pdg_empty"));
+        codecGrid = gridPtrCast<PointDataGrid>(base);
+        f.close();
+    }
+    ASSERT_TRUE(codecGrid);
+    EXPECT_EQ(codecGrid->tree().leafCount(), Index32(0));
+    EXPECT_EQ(codecGrid->activeVoxelCount(), Index64(0));
+
+    std::remove(codecPath.c_str());
+}

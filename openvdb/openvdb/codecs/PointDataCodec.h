@@ -334,7 +334,11 @@ struct PointDataCodec final: public TopologyCodec<GridT>
 
         uint16_t numPasses = 1;
         is.read(reinterpret_cast<char*>(&numPasses), sizeof(uint16_t));
-        const Index attributes = (numPasses - 4) / 2;
+        // The pass layout is: voxel sizes (1) + descriptors (1) + attribute
+        // sizes (N) + voxel data (1) + attribute data (N) = 2N + 4 passes.
+        // A leafless grid stores numPasses == 0, and malformed files may store
+        // numPasses < 4; guard against unsigned underflow in either case.
+        const Index attributes = numPasses >= 4 ? Index(numPasses - 4) / 2 : 0;
 
         using LeafT = typename GridT::TreeType::LeafNodeType;
         std::vector<LeafT*> leaves;
@@ -419,7 +423,9 @@ struct PointDataCodec final: public TopologyCodec<GridT>
             static_cast<uint16_t>(internal::countPointDataPasses(leaves));
         os.write(reinterpret_cast<const char*>(&numPasses), sizeof(uint16_t));
 
-        const Index attributes = (numPasses - 4) / 2;
+        // See readBuffers(): a leafless grid yields numPasses == 0, so guard
+        // against unsigned underflow rather than computing (numPasses - 4) / 2.
+        const Index attributes = numPasses >= 4 ? Index(numPasses - 4) / 2 : 0;
 
         // Pass 0: write voxel data sizes + descriptor tracking
         bool matching = true;
