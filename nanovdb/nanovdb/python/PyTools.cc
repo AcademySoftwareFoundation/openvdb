@@ -224,6 +224,27 @@ void defineToolsModule(nb::module_& m)
     defineDeviceGridChecksum<ValueIndex>(cudaModule);
     defineDeviceGridChecksum<ValueOnIndex>(cudaModule);
     defineDeviceGridChecksum<ValueMask>(cudaModule);
+
+    defineDeviceGridMetadata<float>(cudaModule);
+    defineDeviceGridMetadata<double>(cudaModule);
+    defineDeviceGridMetadata<int16_t>(cudaModule);
+    defineDeviceGridMetadata<int32_t>(cudaModule);
+    defineDeviceGridMetadata<int64_t>(cudaModule);
+    defineDeviceGridMetadata<uint8_t>(cudaModule);
+    defineDeviceGridMetadata<uint32_t>(cudaModule);
+    defineDeviceGridMetadata<Vec3f>(cudaModule);
+    defineDeviceGridMetadata<Vec3d>(cudaModule);
+    defineDeviceGridMetadata<Vec4f>(cudaModule);
+    defineDeviceGridMetadata<Vec4d>(cudaModule);
+    defineDeviceGridMetadata<math::Rgba8>(cudaModule);
+    defineDeviceGridMetadata<bool>(cudaModule);
+    defineDeviceGridMetadata<Fp4>(cudaModule);
+    defineDeviceGridMetadata<Fp8>(cudaModule);
+    defineDeviceGridMetadata<Fp16>(cudaModule);
+    defineDeviceGridMetadata<FpN>(cudaModule);
+    defineDeviceGridMetadata<ValueIndex>(cudaModule);
+    defineDeviceGridMetadata<ValueOnIndex>(cudaModule);
+    defineDeviceGridMetadata<ValueMask>(cudaModule);
 #endif
 }
 

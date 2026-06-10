@@ -684,6 +684,64 @@ class TestDeviceTypedSidecars(unittest.TestCase):
 @unittest.skipIf(
     not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
 )
+class TestDeviceGridMetadata(unittest.TestCase):
+    """tools.cuda.setGridClass: retag a device grid's GridClass in place,
+    refreshing its checksum, with the change surviving download and file I/O."""
+
+    BLOCK = [(i, j, k) for i in range(4) for j in range(4) for k in range(4)]
+
+    def _float_grid_from_block(self, cp):
+        """OnIndex(BLOCK) + per-voxel SDF -> device FloatGrid handle. The float
+        grid inherits the source's IndexGrid class (what setGridClass overrides)."""
+        import numpy as np
+        _h, dg, n, _co = _device_onindex_from_coords(cp, np.array(self.BLOCK, np.int32))
+        sdf = cp.arange(n + 1, dtype=cp.float32) * 0.25
+        float_dh = nanovdb.tools.cuda.indexToGrid(dg, sdf)
+        self.assertEqual(float_dh.gridType(0), nanovdb.GridType.Float)
+        return float_dh
+
+    def test_set_grid_class_refreshes_checksum(self):
+        cp = _require_cupy(self)
+        float_dh = self._float_grid_from_block(cp)
+        float_dg = float_dh.deviceGrid(0)
+        # Populate a Full checksum so the retag has something to invalidate: if
+        # setGridClass failed to refresh it, the post-change Full validation
+        # below (computed over the new class field) would no longer match.
+        nanovdb.tools.cuda.updateChecksum(float_dg, nanovdb.CheckMode.Full)
+        self.assertTrue(nanovdb.tools.cuda.validateChecksum(float_dg, nanovdb.CheckMode.Full))
+
+        nanovdb.tools.cuda.setGridClass(float_dg, nanovdb.GridClass.LevelSet)
+        # Class changed AND the Full checksum still validates -> it was refreshed.
+        self.assertTrue(nanovdb.tools.cuda.validateChecksum(float_dg, nanovdb.CheckMode.Full))
+
+        float_dh.deviceDownload(0, True)
+        g = float_dh.grid(0)
+        self.assertEqual(g.gridClass(), nanovdb.GridClass.LevelSet)
+        self.assertTrue(g.isLevelSet())
+        self.assertTrue(nanovdb.tools.validateChecksum(g, nanovdb.CheckMode.Full))
+
+    def test_set_grid_class_survives_file_roundtrip(self):
+        cp = _require_cupy(self)
+        float_dh = self._float_grid_from_block(cp)
+        nanovdb.tools.cuda.setGridClass(float_dh.deviceGrid(0), nanovdb.GridClass.FogVolume)
+        float_dh.deviceDownload(0, True)
+        tmp = tempfile.NamedTemporaryFile(suffix=".nvdb", delete=False)
+        tmp.close()
+        try:
+            float_dh.write(tmp.name)
+            g = nanovdb.io.readGrid(tmp.name).grid(0)
+            self.assertEqual(g.gridClass(), nanovdb.GridClass.FogVolume)
+            self.assertTrue(g.isFogVolume())
+        finally:
+            os.unlink(tmp.name)
+
+
+@unittest.skipIf(
+    not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
+)
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
+)
 class TestDeviceInfra(unittest.TestCase):
     """DeviceMesh / DeviceStreamMap / DeviceResource / TempDevicePool."""
 

@@ -16,6 +16,12 @@ namespace pynanovdb {
 template<typename BuildT>
 void defineDeviceGridChecksum(nb::module_& m);
 
+// Bind mutable grid-header metadata setters for one grid BuildT. Currently
+// registers nanovdb.tools.cuda.setGridClass(d_grid, gridClass, stream), which
+// overwrites the device grid's GridClass in place and refreshes its checksum.
+template<typename BuildT>
+void defineDeviceGridMetadata(nb::module_& m);
+
 } // namespace pynanovdb
 
 #endif
