@@ -430,3 +430,85 @@ TEST_F(TestCodec, testNumericToMaskCodecConversion)
     testConvertCodecImpl<openvdb::Int64Grid,  openvdb::MaskGrid, openvdb::io::ReadMode::Mask>();
     testConvertCodecImpl<openvdb::HalfGrid,   openvdb::MaskGrid, openvdb::io::ReadMode::Mask>();
 }
+
+// Regression test for the dangling storageBackground pointer bug.
+//
+// ReadTopologyOp stores storageBackground on its stack frame and registers
+// &storageBackground with the stream.  Before the fix, topologyCodecReadTopology
+// returned and destroyed ReadTopologyOp before readBuffers() ran; readCompressedValues
+// then dereferenced the dead pointer to reconstruct inactive voxels under
+// COMPRESS_ACTIVE_MASK, producing garbage inactive values.
+//
+// The test is deliberately structured to maximize the chance that the freed
+// stack frame has been overwritten: a non-zero background (3.0f / 5) forces the
+// reconstructed inactive value to be wrong if the pointer is stale, and
+// COMPRESS_ACTIVE_MASK (flag 0x2, always on by default) is the code path that
+// uses the background pointer.
+TEST_F(TestCodec, testInactiveValuesAfterReadBuffers)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    openvdb::io::CodecRegistry::clear();
+    openvdb::io::internal::initialize();
+
+    // Float: non-zero background, active region surrounded by inactive background voxels.
+    {
+        const float bg = 3.0f;
+        FloatGrid::Ptr src = FloatGrid::create(bg);
+        src->setName("float_bg");
+        src->fill(CoordBBox(Coord(0), Coord(15)), 1.0f, /*active=*/true);
+        src->fill(CoordBBox(Coord(4), Coord(11)), bg,   /*active=*/false);
+
+        const std::string path = "testInactiveVals_float.vdb";
+        {
+            io::File f(path);
+            f.setCompression(COMPRESS_ACTIVE_MASK);
+            f.write(GridPtrVec{src});
+        }
+        FloatGrid::Ptr result;
+        {
+            io::File f(path);
+            f.open();
+            result = gridPtrCast<FloatGrid>(f.readGrid("float_bg"));
+            f.close();
+        }
+        ASSERT_TRUE(result);
+        EXPECT_EQ(result->background(), bg);
+        FloatGrid::ConstAccessor refAcc = src->getConstAccessor();
+        for (FloatGrid::ValueAllCIter it = result->cbeginValueAll(); it; ++it) {
+            EXPECT_EQ(*it, refAcc.getValue(it.getCoord()));
+        }
+        std::remove(path.c_str());
+    }
+
+    // Int32: non-zero background (5), verify inactive values round-trip.
+    {
+        const int bg = 5;
+        Int32Grid::Ptr src = Int32Grid::create(bg);
+        src->setName("int_bg");
+        src->fill(CoordBBox(Coord(0), Coord(15)), 99, /*active=*/true);
+        src->fill(CoordBBox(Coord(4), Coord(11)), bg, /*active=*/false);
+
+        const std::string path = "testInactiveVals_int.vdb";
+        {
+            io::File f(path);
+            f.setCompression(COMPRESS_ACTIVE_MASK);
+            f.write(GridPtrVec{src});
+        }
+        Int32Grid::Ptr result;
+        {
+            io::File f(path);
+            f.open();
+            result = gridPtrCast<Int32Grid>(f.readGrid("int_bg"));
+            f.close();
+        }
+        ASSERT_TRUE(result);
+        EXPECT_EQ(result->background(), bg);
+        Int32Grid::ConstAccessor refAcc = src->getConstAccessor();
+        for (Int32Grid::ValueAllCIter it = result->cbeginValueAll(); it; ++it) {
+            EXPECT_EQ(*it, refAcc.getValue(it.getCoord()));
+        }
+        std::remove(path.c_str());
+    }
+}

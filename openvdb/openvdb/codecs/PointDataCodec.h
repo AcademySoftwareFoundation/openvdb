@@ -111,13 +111,14 @@ template <typename LeafT>
 inline void readPointDataVoxelData(const std::vector<LeafT*>& leaves,
     std::istream& is, bool saveFloatAsHalf,
     const typename LeafT::ValueType& background,
-    [[maybe_unused]] const std::unordered_map<Coord, uint16_t>& voxelBufferSizes)
+    [[maybe_unused]] const std::unordered_map<Coord, uint16_t>& voxelBufferSizes,
+    const typename LeafT::ValueType* storageBackground = nullptr)
 {
     using BaseLeaf = typename LeafT::BaseLeaf;
     for (auto* leaf : leaves) {
         OPENVDB_ASSERT(voxelBufferSizes.find(leaf->origin()) != voxelBufferSizes.end());
         BaseLeaf& baseLeaf = static_cast<BaseLeaf&>(*leaf);
-        readScalarLeafBuffers(baseLeaf, is, saveFloatAsHalf, background);
+        readScalarLeafBuffers(baseLeaf, is, saveFloatAsHalf, background, /*skip=*/false, /*clipBBox=*/nullptr, storageBackground);
     }
 }
 
@@ -387,8 +388,10 @@ struct PointDataCodec final: public TopologyCodec<GridT>
         }
 
         // Pass N+2: read voxel data
+        using ValueT = typename GridT::TreeType::ValueType;
+        auto& topoData = static_cast<TopologyCodecData<ValueT>&>(data);
         internal::readPointDataVoxelData(leaves, is, saveFloatAsHalf,
-            tree.background(), voxelBufferSizes);
+            tree.background(), voxelBufferSizes, &topoData.storageBackground);
 
         // Passes N+3..2N+2: read attribute data buffers
         for (Index i = 0; i < attributes; ++i) {

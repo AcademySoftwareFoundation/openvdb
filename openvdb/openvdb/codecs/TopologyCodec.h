@@ -16,6 +16,16 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace codecs {
+
+/// Per-read-operation state shared between readTopology() and readBuffers().
+/// Stores the storage-typed background so readBuffers() can pass it directly
+/// to readCompressedValues(), bypassing the stream background ptr entirely.
+template<typename StorageValueT>
+struct TopologyCodecData : public io::CodecData
+{
+    StorageValueT storageBackground{};
+}; // struct TopologyCodecData
+
 namespace internal {
 
 template <typename TreeT>
@@ -41,7 +51,6 @@ struct WriteTopologyOp
             ValueT truncatedVal = io::truncateRealToHalf(*background);
             os.write(reinterpret_cast<const char*>(&truncatedVal), sizeof(ValueT));
         }
-        io::setGridBackgroundValuePtr(os, background);
 
         const Index numTiles = root.tileCount(), numChildren = root.childCount();
         os.write(reinterpret_cast<const char*>(&numTiles), sizeof(Index));
@@ -84,7 +93,7 @@ struct WriteTopologyOp
                 values[i] = (node.isChildMaskOff(i) ? node.getValueUnsafe(i) : zero);
             }
             // Compress (optionally) and write out the contents of the array.
-            io::writeCompressedValues(os, values, NodeT::NUM_VALUES, valueMask, childMask, saveFloatAsHalf);
+            io::writeCompressedValues(os, values, NodeT::NUM_VALUES, valueMask, childMask, saveFloatAsHalf, background);
         }
     }
 
@@ -130,16 +139,8 @@ struct ReadTopologyOp
 
         // Read a RootNode that was stored in the current format.
 
-        if constexpr (std::is_same_v<ValueT, StorageValueT>) {
-            is.read(reinterpret_cast<char*>(&background), sizeof(ValueT));
-        } else {
-            StorageValueT _background;
-            is.read(reinterpret_cast<char*>(&_background), sizeof(StorageValueT));
-            background = static_cast<ValueT>(_background);
-        }
-
-        root.setBackground(background, false);
-        io::setGridBackgroundValuePtr(is, &root.background());
+        is.read(reinterpret_cast<char*>(&storageBackground), sizeof(StorageValueT));
+        background = static_cast<ValueT>(storageBackground);
 
         Index numTiles = 0, numChildren = 0;
         is.read(reinterpret_cast<char*>(&numTiles), sizeof(Index));
@@ -191,7 +192,7 @@ struct ReadTopologyOp
             // into a contiguous array.
             std::unique_ptr<StorageValueT[]> valuePtr(new StorageValueT[numValues]);
             StorageValueT* values = valuePtr.get();
-            io::readCompressedValues(is, values, numValues, valueMask, saveFloatAsHalf);
+            io::readCompressedValues(is, values, numValues, valueMask, saveFloatAsHalf, &storageBackground);
 
             // Copy values from the array into this node's table.
             if (oldVersion) {
@@ -231,6 +232,7 @@ struct ReadTopologyOp
     std::istream& is;
     bool saveFloatAsHalf;
     ValueT background;
+    StorageValueT storageBackground;
     io::ReadDiagnostics& diagnostics;
     std::string gridName;
 }; // struct ReadTopologyOp
@@ -279,9 +281,12 @@ void setTilesToBackground(TreeT& tree)
     nodeManager.foreachTopDown(op);
 }
 
-// Free-standing function for read case (supports type conversion via StorageGridT)
+// Free-standing function for read case (supports type conversion via StorageGridT).
+// codecData receives the storage-typed background value so readBuffers() callers
+// can pass it explicitly to readCompressedValues(), avoiding the stream background ptr.
 template<typename GridT, typename StorageGridT = GridT>
-void topologyCodecReadTopology(GridBase& gridBase, std::istream& is, const io::ReadOptions& options, io::ReadDiagnostics& diagnostics)
+void topologyCodecReadTopology(GridBase& gridBase, std::istream& is, const io::ReadOptions& options,
+    io::ReadDiagnostics& diagnostics, TopologyCodecData<typename StorageGridT::TreeType::ValueType>& codecData)
 {
     io::checkFormatVersion(is);
 
@@ -290,6 +295,18 @@ void topologyCodecReadTopology(GridBase& gridBase, std::istream& is, const io::R
 
     internal::ReadTopologyOp<typename GridT::TreeType, typename StorageGridT::TreeType> readTopologyOp(is, grid.saveFloatAsHalf(), diagnostics, grid.getName());
     readTopologyOp(grid.tree().root());
+
+    // Restore the (value-typed) background on the root.  ReadTopologyOp only reads
+    // the on-disk background into a local; without this the grid would retain the
+    // default background from GridT::create().  Pass updateChildNodes=false so the
+    // already-populated child nodes are left untouched.
+    grid.tree().root().setBackground(readTopologyOp.background, /*updateChildNodes=*/false);
+
+    // Copy storageBackground out of the stack-local ReadTopologyOp into codecData
+    // so it stays alive until readBuffers() completes.  readBuffers() passes it
+    // explicitly to readCompressedValues(), so the stream background ptr is never
+    // used and setGridBackgroundValuePtr() is not needed in the codec path.
+    codecData.storageBackground = readTopologyOp.storageBackground;
 
     if (options.readMode == io::ReadMode::TopologyOnly) {
         internal::setTilesToBackground(grid.tree());
@@ -326,13 +343,14 @@ void topologyCodecWriteTopology(const GridBase& gridBase, std::ostream& os)
 template <typename GridT, typename StorageGridT = GridT, io::CodecMode Mode = io::CodecMode::ReadWrite>
 struct TopologyCodec : public io::Codec
 {
+    using StorageValueT = typename StorageGridT::TreeType::ValueType;
     using Ptr = std::unique_ptr<TopologyCodec<GridT, StorageGridT, Mode>>;
 
     ~TopologyCodec() noexcept = default;
 
     io::CodecData::Ptr createData() override
     {
-        auto data = std::make_unique<io::CodecData>();
+        auto data = std::make_unique<TopologyCodecData<StorageValueT>>();
         data->grid = GridT::create();
         return data;
     }
@@ -357,7 +375,8 @@ struct TopologyCodec : public io::Codec
                     + GridT::gridType() + "'; reading as original type");
             }
         }
-        internal::topologyCodecReadTopology<GridT, StorageGridT>(*data.grid, is, options, diagnostics);
+        auto& topoData = static_cast<TopologyCodecData<StorageValueT>&>(data);
+        internal::topologyCodecReadTopology<GridT, StorageGridT>(*data.grid, is, options, diagnostics, topoData);
     }
 
     void writeTopology(std::ostream& os, const GridBase& gridBase, const io::WriteOptions&) final
