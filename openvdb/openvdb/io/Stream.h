@@ -23,7 +23,13 @@ class OPENVDB_API Stream: public Archive
 public:
     /// @brief Read grids from an input stream.
     /// @param is The input stream to read from
-    explicit Stream(std::istream&);
+    explicit Stream(std::istream& is);
+
+    /// @brief Read grids from an input stream using the given read options.
+    /// @param is           The input stream to read from
+    /// @param readOptions  Options controlling how grids are read (e.g. attribute
+    ///                     skipping for point data grids)
+    Stream(std::istream& is, const io::ReadOptions& readOptions);
 
     OPENVDB_DEPRECATED_MESSAGE("Use Stream(std::istream&) instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
     Stream(std::istream& is, bool /*delayLoad*/) : Stream(is) { }

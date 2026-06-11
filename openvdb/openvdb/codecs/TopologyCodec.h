@@ -381,10 +381,13 @@ struct TopologyCodec : public io::Codec
 
     void writeTopology(std::ostream& os, const GridBase& gridBase, const io::WriteOptions&) final
     {
-        // disable implementation when read only
-        if constexpr (Mode == io::CodecMode::ReadOnly) return;
-
-        internal::topologyCodecWriteTopology<GridT>(gridBase, os);
+        // Disable implementation when read only. The body must live inside the
+        // negated if constexpr branch so it is not instantiated for read-only
+        // codecs; a bare `if constexpr (...) return;` still instantiates what
+        // follows.
+        if constexpr (Mode != io::CodecMode::ReadOnly) {
+            internal::topologyCodecWriteTopology<GridT>(gridBase, os);
+        }
     }
 }; // struct TopologyCodec
 

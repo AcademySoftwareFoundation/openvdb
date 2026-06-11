@@ -169,10 +169,15 @@ struct ScalarCodec final: public TopologyCodec<GridT, StorageGridT, Mode>
 
     void writeBuffers(std::ostream& os, const GridBase& gridBase, const io::WriteOptions&) final
     {
-        if constexpr (Mode == io::CodecMode::ReadOnly) return;
-
-        const GridT& grid = static_cast<const GridT&>(gridBase);
-        internal::scalarCodecWriteBuffers(grid, os);
+        // Note: the write body must live inside the negated if constexpr branch
+        // so it is not instantiated for read-only codecs. A bare
+        // `if constexpr (Mode == ReadOnly) return;` would still instantiate the
+        // code that follows, which fails to compile for the scalar-to-mask/bool
+        // convert codecs (their leaf buffers expose WordType*, not ValueType*).
+        if constexpr (Mode != io::CodecMode::ReadOnly) {
+            const GridT& grid = static_cast<const GridT&>(gridBase);
+            internal::scalarCodecWriteBuffers(grid, os);
+        }
     }
 }; // struct ScalarCodec
 

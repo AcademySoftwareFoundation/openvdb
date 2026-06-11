@@ -673,35 +673,15 @@ TEST_F(TestPointCodec, testPointDataCodecSkipNonSeekable)
     typeData->pointAttributeNames = {"P"};
     readOptions.typeData[PointDataGrid::gridType()] = typeData;
 
-    // Parse the stream manually, replicating Stream::Stream(istream&) but using
-    // our custom ReadOptions so that the skip path is exercised with seekable=false.
+    // Read via io::Stream (non-seekable by construction) with our ReadOptions, so the
+    // skip path is exercised with seekable == false.
     std::istringstream is(ostr.str(), std::ios_base::binary);
+    io::Stream strm(is, readOptions);
+    GridPtrVecPtr grids = strm.getGrids();
+    ASSERT_TRUE(grids);
+    ASSERT_EQ(grids->size(), size_t(1));
 
-    io::Stream headerReader(is);
-    // StreamMetadata created without setSeekable(true) => seekable() == false
-    StreamMetadata::Ptr streamMeta(new StreamMetadata);
-    EXPECT_FALSE(streamMeta->seekable());
-
-    std::istringstream isFinal(ostr.str(), std::ios_base::binary);
-    headerReader.readHeader(isFinal);
-    io::setStreamMetadataPtr(isFinal, streamMeta, /*transfer=*/false);
-    io::setVersion(isFinal, headerReader.libraryVersion(), headerReader.fileVersion());
-    io::setDataCompression(isFinal, headerReader.compression());
-
-    MetaMap fileMeta;
-    fileMeta.readMeta(isFinal);
-
-    const int32_t gridCount = Archive::readGridCount(isFinal);
-    ASSERT_EQ(gridCount, 1);
-
-    GridDescriptor gd;
-    gd.readHeader(isFinal);
-    gd.readStreamPos(isFinal);
-
-    GridBase::Ptr baseGrid = Archive::readGrid(gd, isFinal, readOptions);
-    ASSERT_TRUE(baseGrid);
-
-    PointDataGrid::Ptr resultGrid = gridPtrCast<PointDataGrid>(baseGrid);
+    PointDataGrid::Ptr resultGrid = gridPtrCast<PointDataGrid>((*grids)[0]);
     ASSERT_TRUE(resultGrid);
 
     // Only "P" should be present; "velocity" and "id" were skipped
