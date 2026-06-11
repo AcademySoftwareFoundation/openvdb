@@ -83,6 +83,7 @@ Stream&
 Stream::operator=(const Stream& other)
 {
     if (&other != this) {
+        Archive::operator=(other);
         mMeta = other.mMeta;
         mGrids = other.mGrids;
         mOutputStream = other.mOutputStream;
