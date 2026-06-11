@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/util/ForEach.h>
+#include <nanovdb/util/MorphologyHelpers.h>
 
 namespace nanovdb::util::morphology {
 
@@ -271,6 +272,271 @@ inline void MergeLeafNodes(
             auto& dstMask = const_cast<Mask<3>&>(dstLeafPtr->valueMask());
             for (uint32_t w = 0; w < Mask<3>::WORD_COUNT; ++w)
                 dstMask.words()[w] |= srcLeaf.valueMask().words()[w];
+        }
+    });
+}
+
+/// @brief Speculatively dilate the upper/lower child masks of one source grid into the densified,
+///        pre-allocated mask arrays of the dilated topology. Host counterpart to the CUDA
+///        DilateInternalNodesFunctor; templated on the nearest-neighbor stencil (NN_FACE,
+///        NN_FACE_EDGE, NN_FACE_EDGE_VERTEX).
+///
+/// @param srcGrid      (in)  Source grid being dilated (read host-side; see MergeInternalNodes' note).
+/// @param dilatedRoot  (in)  Speculative dilated root (host copy), used to locate output tiles.
+/// @param upperMasks_  (out) Array of Mask<5>, one per dilated upper tile.
+/// @param lowerMasks_  (out) Array of (Mask<4>[Mask<5>::SIZE]), one set per dilated upper tile.
+/// @param lowerCount   (in)  Number of lower nodes in the source grid (nodeCount[1]).
+///
+/// For each source lower node: (1) build the 27 per-direction "offset masks" over its 4096 leaf
+/// slots from each leaf's neighborMaskStencil (the host replaces the CUDA WarpReduce packing with a
+/// direct per-slot setOn); (2) turn offset masks into the 27 neighbor-lower-node masks via MaskShift
+/// (the CUDA 4-warp split of these calls collapses to one sequential block, kept verbatim); (3)
+/// scatter the neighbor masks into the dilated tree's upper/lower masks. Distinct source lowers can
+/// dilate into a shared neighbor lower, so the scatter uses setOnAtomic/atomicOr (host-callable).
+template<typename BuildT, tools::morphology::NearestNeighbors nnType>
+inline void DilateInternalNodes(
+    const NanoGrid<BuildT> *srcGrid,
+    const NanoRoot<BuildT> *dilatedRoot,
+    void *upperMasks_,
+    void *lowerMasks_,
+    std::size_t lowerCount)
+{
+    using UpperMaskArrayT = Mask<5>*;
+    using LowerMaskArrayT = Mask<4>(*)[Mask<5>::SIZE];
+    auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
+    auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
+
+    util::forEach(0, lowerCount, 1, [=](const util::Range1D &r) {
+        const auto& srcTree = srcGrid->tree();
+        for (auto lowerID = r.begin(); lowerID != r.end(); ++lowerID) {
+            const auto& lower = srcTree.template getFirstNode<1>()[lowerID];
+
+            // Per-direction offset masks and per-neighbor-node masks (the CUDA shared-memory
+            // sOffsetMasks/sNeighborMasks; default-constructed Mask<4> is zero-filled).
+            Mask<4> offsetMasks[3][3][3];
+            Mask<4> neighborMasks[3][3][3];
+
+            // For each active leaf slot, OR its 27-bit neighbor stencil into the offset masks.
+            // bit = (di+1)*9 + (dj+1)*3 + (dk+1) (matches the CUDA flat sOffsetMasks[0][0][bit]).
+            for (uint32_t jj = 0; jj < Mask<4>::SIZE; ++jj) {
+                if (lower.childMask().isOn(jj)) {
+                    const auto& leaf = *lower.data()->getChild(jj);
+                    uint32_t neighborMask = neighborMaskStencil<nnType>(leaf.valueMask());
+                    for (int bit = 0; bit < 27; ++bit)
+                        if (neighborMask & (1u << bit))
+                            offsetMasks[bit/9][(bit/3)%3][bit%3].setOn(jj);
+                }
+            }
+
+            // Compute neighbor masks from offset masks (verbatim from the CUDA functor; the four
+            // per-warp blocks are concatenated into one sequence on the host).
+            // Contribution to mask of own lower node
+            // Arguments to MaskShift plus indices to offsetMasks add up to (1,1,1)
+            MaskShift<  1,  1,  1>( offsetMasks[0][0][0], neighborMasks[1][1][1] );
+            MaskShift<  1,  1,  0>( offsetMasks[0][0][1], neighborMasks[1][1][1] );
+            MaskShift<  1,  1, -1>( offsetMasks[0][0][2], neighborMasks[1][1][1] );
+            MaskShift<  1,  0,  1>( offsetMasks[0][1][0], neighborMasks[1][1][1] );
+            MaskShift<  1,  0,  0>( offsetMasks[0][1][1], neighborMasks[1][1][1] );
+            MaskShift<  1,  0, -1>( offsetMasks[0][1][2], neighborMasks[1][1][1] );
+            MaskShift<  1, -1,  1>( offsetMasks[0][2][0], neighborMasks[1][1][1] );
+            MaskShift<  1, -1,  0>( offsetMasks[0][2][1], neighborMasks[1][1][1] );
+            MaskShift<  1, -1, -1>( offsetMasks[0][2][2], neighborMasks[1][1][1] );
+            MaskShift<  0,  1,  1>( offsetMasks[1][0][0], neighborMasks[1][1][1] );
+            MaskShift<  0,  1,  0>( offsetMasks[1][0][1], neighborMasks[1][1][1] );
+            MaskShift<  0,  1, -1>( offsetMasks[1][0][2], neighborMasks[1][1][1] );
+            MaskShift<  0,  0,  1>( offsetMasks[1][1][0], neighborMasks[1][1][1] );
+            MaskShift<  0,  0,  0>( offsetMasks[1][1][1], neighborMasks[1][1][1] );
+            MaskShift<  0,  0, -1>( offsetMasks[1][1][2], neighborMasks[1][1][1] );
+            MaskShift<  0, -1,  1>( offsetMasks[1][2][0], neighborMasks[1][1][1] );
+            MaskShift<  0, -1,  0>( offsetMasks[1][2][1], neighborMasks[1][1][1] );
+            MaskShift<  0, -1, -1>( offsetMasks[1][2][2], neighborMasks[1][1][1] );
+            MaskShift< -1,  1,  1>( offsetMasks[2][0][0], neighborMasks[1][1][1] );
+            MaskShift< -1,  1,  0>( offsetMasks[2][0][1], neighborMasks[1][1][1] );
+            MaskShift< -1,  1, -1>( offsetMasks[2][0][2], neighborMasks[1][1][1] );
+            MaskShift< -1,  0,  1>( offsetMasks[2][1][0], neighborMasks[1][1][1] );
+            MaskShift< -1,  0,  0>( offsetMasks[2][1][1], neighborMasks[1][1][1] );
+            MaskShift< -1,  0, -1>( offsetMasks[2][1][2], neighborMasks[1][1][1] );
+            MaskShift< -1, -1,  1>( offsetMasks[2][2][0], neighborMasks[1][1][1] );
+            MaskShift< -1, -1,  0>( offsetMasks[2][2][1], neighborMasks[1][1][1] );
+            MaskShift< -1, -1, -1>( offsetMasks[2][2][2], neighborMasks[1][1][1] );
+            // Contribution to mask of lower node at offset (-1,-1,-1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (-15,-15,-15)
+            MaskShift<-15,-15,-15>( offsetMasks[0][0][0], neighborMasks[0][0][0] );
+            // Contribution to mask of lower node at offset (-1,-1,1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (-15,-15,17)
+            MaskShift<-15,-15, 15>( offsetMasks[0][0][2], neighborMasks[0][0][2] );
+            // Contribution to mask of lower node at offset (-1,1,-1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (-15,17,-15)
+            MaskShift<-15, 15,-15>( offsetMasks[0][2][0], neighborMasks[0][2][0] );
+            // Contribution to mask of lower node at offset (-1,1,1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (-15,17,17)
+            MaskShift<-15, 15, 15>( offsetMasks[0][2][2], neighborMasks[0][2][2] );
+            // Contribution to mask of lower node at offset (1,-1,-1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (17,-15,-15)
+            MaskShift< 15,-15,-15>( offsetMasks[2][0][0], neighborMasks[2][0][0] );
+
+            // Contribution to mask of lower node at offset (0,0,-1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (1,1,-15)
+            MaskShift<  1,  1,-15>( offsetMasks[0][0][0], neighborMasks[1][1][0] );
+            MaskShift<  1,  0,-15>( offsetMasks[0][1][0], neighborMasks[1][1][0] );
+            MaskShift<  1, -1,-15>( offsetMasks[0][2][0], neighborMasks[1][1][0] );
+            MaskShift<  0,  1,-15>( offsetMasks[1][0][0], neighborMasks[1][1][0] );
+            MaskShift<  0,  0,-15>( offsetMasks[1][1][0], neighborMasks[1][1][0] );
+            MaskShift<  0, -1,-15>( offsetMasks[1][2][0], neighborMasks[1][1][0] );
+            MaskShift< -1,  1,-15>( offsetMasks[2][0][0], neighborMasks[1][1][0] );
+            MaskShift< -1,  0,-15>( offsetMasks[2][1][0], neighborMasks[1][1][0] );
+            MaskShift< -1, -1,-15>( offsetMasks[2][2][0], neighborMasks[1][1][0] );
+            // Contribution to mask of lower node at offset (0,0,1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (1,1,17)
+            MaskShift<  1,  1, 15>( offsetMasks[0][0][2], neighborMasks[1][1][2] );
+            MaskShift<  1,  0, 15>( offsetMasks[0][1][2], neighborMasks[1][1][2] );
+            MaskShift<  1, -1, 15>( offsetMasks[0][2][2], neighborMasks[1][1][2] );
+            MaskShift<  0,  1, 15>( offsetMasks[1][0][2], neighborMasks[1][1][2] );
+            MaskShift<  0,  0, 15>( offsetMasks[1][1][2], neighborMasks[1][1][2] );
+            MaskShift<  0, -1, 15>( offsetMasks[1][2][2], neighborMasks[1][1][2] );
+            MaskShift< -1,  1, 15>( offsetMasks[2][0][2], neighborMasks[1][1][2] );
+            MaskShift< -1,  0, 15>( offsetMasks[2][1][2], neighborMasks[1][1][2] );
+            MaskShift< -1, -1, 15>( offsetMasks[2][2][2], neighborMasks[1][1][2] );
+            // Contribution to mask of lower node at offset (-1,-1,0)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (-15,-15,1)
+            MaskShift<-15,-15,  1>( offsetMasks[0][0][0], neighborMasks[0][0][1] );
+            MaskShift<-15,-15,  0>( offsetMasks[0][0][1], neighborMasks[0][0][1] );
+            MaskShift<-15,-15, -1>( offsetMasks[0][0][2], neighborMasks[0][0][1] );
+            // Contribution to mask of lower node at offset (-1,1,0)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (-15,17,1)
+            MaskShift<-15, 15,  1>( offsetMasks[0][2][0], neighborMasks[0][2][1] );
+            MaskShift<-15, 15,  0>( offsetMasks[0][2][1], neighborMasks[0][2][1] );
+            MaskShift<-15, 15, -1>( offsetMasks[0][2][2], neighborMasks[0][2][1] );
+            // Contribution to mask of lower node at offset (1,-1,0)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (17,-15,1)
+            MaskShift< 15,-15,  1>( offsetMasks[2][0][0], neighborMasks[2][0][1] );
+            MaskShift< 15,-15,  0>( offsetMasks[2][0][1], neighborMasks[2][0][1] );
+            MaskShift< 15,-15, -1>( offsetMasks[2][0][2], neighborMasks[2][0][1] );
+            // Contribution to mask of lower node at offset (1,1,0)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (17,17,1)
+            MaskShift< 15, 15,  1>( offsetMasks[2][2][0], neighborMasks[2][2][1] );
+            MaskShift< 15, 15,  0>( offsetMasks[2][2][1], neighborMasks[2][2][1] );
+            MaskShift< 15, 15, -1>( offsetMasks[2][2][2], neighborMasks[2][2][1] );
+            // Contribution to mask of lower node at offset (1,-1,1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (17,-15,17)
+            MaskShift< 15,-15, 15>( offsetMasks[2][0][2], neighborMasks[2][0][2] );
+
+            // Contribution to mask of lower node at offset (0,-1,0)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (1,-15,1)
+            MaskShift<  1,-15,  1>( offsetMasks[0][0][0], neighborMasks[1][0][1] );
+            MaskShift<  1,-15,  0>( offsetMasks[0][0][1], neighborMasks[1][0][1] );
+            MaskShift<  1,-15, -1>( offsetMasks[0][0][2], neighborMasks[1][0][1] );
+            MaskShift<  0,-15,  1>( offsetMasks[1][0][0], neighborMasks[1][0][1] );
+            MaskShift<  0,-15,  0>( offsetMasks[1][0][1], neighborMasks[1][0][1] );
+            MaskShift<  0,-15, -1>( offsetMasks[1][0][2], neighborMasks[1][0][1] );
+            MaskShift< -1,-15,  1>( offsetMasks[2][0][0], neighborMasks[1][0][1] );
+            MaskShift< -1,-15,  0>( offsetMasks[2][0][1], neighborMasks[1][0][1] );
+            MaskShift< -1,-15, -1>( offsetMasks[2][0][2], neighborMasks[1][0][1] );
+            // Contribution to mask of lower node at offset (0,1,0)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (1,17,1)
+            MaskShift<  1, 15,  1>( offsetMasks[0][2][0], neighborMasks[1][2][1] );
+            MaskShift<  1, 15,  0>( offsetMasks[0][2][1], neighborMasks[1][2][1] );
+            MaskShift<  1, 15, -1>( offsetMasks[0][2][2], neighborMasks[1][2][1] );
+            MaskShift<  0, 15,  1>( offsetMasks[1][2][0], neighborMasks[1][2][1] );
+            MaskShift<  0, 15,  0>( offsetMasks[1][2][1], neighborMasks[1][2][1] );
+            MaskShift<  0, 15, -1>( offsetMasks[1][2][2], neighborMasks[1][2][1] );
+            MaskShift< -1, 15,  1>( offsetMasks[2][2][0], neighborMasks[1][2][1] );
+            MaskShift< -1, 15,  0>( offsetMasks[2][2][1], neighborMasks[1][2][1] );
+            MaskShift< -1, 15, -1>( offsetMasks[2][2][2], neighborMasks[1][2][1] );
+            // Contribution to mask of lower node at offset (-1,0,-1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (-15,1,-15)
+            MaskShift<-15,  1,-15>( offsetMasks[0][0][0], neighborMasks[0][1][0] );
+            MaskShift<-15,  0,-15>( offsetMasks[0][1][0], neighborMasks[0][1][0] );
+            MaskShift<-15, -1,-15>( offsetMasks[0][2][0], neighborMasks[0][1][0] );
+            // Contribution to mask of lower node at offset (-1,0,1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (-15,1,17)
+            MaskShift<-15,  1, 15>( offsetMasks[0][0][2], neighborMasks[0][1][2] );
+            MaskShift<-15,  0, 15>( offsetMasks[0][1][2], neighborMasks[0][1][2] );
+            MaskShift<-15, -1, 15>( offsetMasks[0][2][2], neighborMasks[0][1][2] );
+            // Contribution to mask of lower node at offset (1,0,-1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (17,1,-15)
+            MaskShift< 15,  1,-15>( offsetMasks[2][0][0], neighborMasks[2][1][0] );
+            MaskShift< 15,  0,-15>( offsetMasks[2][1][0], neighborMasks[2][1][0] );
+            MaskShift< 15, -1,-15>( offsetMasks[2][2][0], neighborMasks[2][1][0] );
+            // Contribution to mask of lower node at offset (1,0,1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (17,1,17)
+            MaskShift< 15,  1, 15>( offsetMasks[2][0][2], neighborMasks[2][1][2] );
+            MaskShift< 15,  0, 15>( offsetMasks[2][1][2], neighborMasks[2][1][2] );
+            MaskShift< 15, -1, 15>( offsetMasks[2][2][2], neighborMasks[2][1][2] );
+            // Contribution to mask of lower node at offset (1,1,-1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (17,17,-15)
+            MaskShift< 15, 15,-15>( offsetMasks[2][2][0], neighborMasks[2][2][0] );
+
+            // Contribution to mask of lower node at offset (-1,0,0)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (-15,1,1)
+            MaskShift<-15,  1,  1>( offsetMasks[0][0][0], neighborMasks[0][1][1] );
+            MaskShift<-15,  1,  0>( offsetMasks[0][0][1], neighborMasks[0][1][1] );
+            MaskShift<-15,  1, -1>( offsetMasks[0][0][2], neighborMasks[0][1][1] );
+            MaskShift<-15,  0,  1>( offsetMasks[0][1][0], neighborMasks[0][1][1] );
+            MaskShift<-15,  0,  0>( offsetMasks[0][1][1], neighborMasks[0][1][1] );
+            MaskShift<-15,  0, -1>( offsetMasks[0][1][2], neighborMasks[0][1][1] );
+            MaskShift<-15, -1,  1>( offsetMasks[0][2][0], neighborMasks[0][1][1] );
+            MaskShift<-15, -1,  0>( offsetMasks[0][2][1], neighborMasks[0][1][1] );
+            MaskShift<-15, -1, -1>( offsetMasks[0][2][2], neighborMasks[0][1][1] );
+            // Contribution to mask of lower node at offset (1,0,0)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (17,1,1)
+            MaskShift< 15,  1,  1>( offsetMasks[2][0][0], neighborMasks[2][1][1] );
+            MaskShift< 15,  1,  0>( offsetMasks[2][0][1], neighborMasks[2][1][1] );
+            MaskShift< 15,  1, -1>( offsetMasks[2][0][2], neighborMasks[2][1][1] );
+            MaskShift< 15,  0,  1>( offsetMasks[2][1][0], neighborMasks[2][1][1] );
+            MaskShift< 15,  0,  0>( offsetMasks[2][1][1], neighborMasks[2][1][1] );
+            MaskShift< 15,  0, -1>( offsetMasks[2][1][2], neighborMasks[2][1][1] );
+            MaskShift< 15, -1,  1>( offsetMasks[2][2][0], neighborMasks[2][1][1] );
+            MaskShift< 15, -1,  0>( offsetMasks[2][2][1], neighborMasks[2][1][1] );
+            MaskShift< 15, -1, -1>( offsetMasks[2][2][2], neighborMasks[2][1][1] );
+            // Contribution to mask of lower node at offset (0,-1,-1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (1,-15,-15)
+            MaskShift<  1,-15,-15>( offsetMasks[0][0][0], neighborMasks[1][0][0] );
+            MaskShift<  0,-15,-15>( offsetMasks[1][0][0], neighborMasks[1][0][0] );
+            MaskShift< -1,-15,-15>( offsetMasks[2][0][0], neighborMasks[1][0][0] );
+            // Contribution to mask of lower node at offset (0,-1,1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (1,-15,17)
+            MaskShift<  1,-15, 15>( offsetMasks[0][0][2], neighborMasks[1][0][2] );
+            MaskShift<  0,-15, 15>( offsetMasks[1][0][2], neighborMasks[1][0][2] );
+            MaskShift< -1,-15, 15>( offsetMasks[2][0][2], neighborMasks[1][0][2] );
+            // Contribution to mask of lower node at offset (0,1,-1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (1,17,-15)
+            MaskShift<  1, 15,-15>( offsetMasks[0][2][0], neighborMasks[1][2][0] );
+            MaskShift<  0, 15,-15>( offsetMasks[1][2][0], neighborMasks[1][2][0] );
+            MaskShift< -1, 15,-15>( offsetMasks[2][2][0], neighborMasks[1][2][0] );
+            // Contribution to mask of lower node at offset (0,1,1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (1,17,17)
+            MaskShift<  1, 15, 15>( offsetMasks[0][2][2], neighborMasks[1][2][2] );
+            MaskShift<  0, 15, 15>( offsetMasks[1][2][2], neighborMasks[1][2][2] );
+            MaskShift< -1, 15, 15>( offsetMasks[2][2][2], neighborMasks[1][2][2] );
+            // Contribution to mask of lower node at offset (1,1,1)
+            // Arguments to MaskShift plus indices to offsetMasks add up to (17,17,17)
+            MaskShift< 15, 15, 15>( offsetMasks[2][2][2], neighborMasks[2][2][2] );
+
+            // Compose contributions to the lower-node masks of the dilated tree. Distinct source
+            // lowers may target the same neighbor lower, hence setOnAtomic/atomicOr.
+            for (int di = -1; di <= 1; ++di)
+            for (int dj = -1; dj <= 1; ++dj)
+            for (int dk = -1; dk <= 1; ++dk) {
+                const auto& neighborMask = neighborMasks[di+1][dj+1][dk+1];
+                bool any = false;
+                for (uint32_t w = 0; w < Mask<4>::WORD_COUNT; ++w) if (neighborMask.words()[w]) { any = true; break; }
+                if (!any) continue;
+                auto neighborOrigin = lower.origin().offsetBy(di*128, dj*128, dk*128);
+                auto upperChildIndex = NanoUpper<BuildT>::CoordToOffset(neighborOrigin);
+                auto dilatedTile = dilatedRoot->probeTile(neighborOrigin);
+                uint64_t tileChildIndex =
+                    util::PtrDiff(dilatedTile, dilatedRoot->tile(0))
+                    / sizeof(typename NanoRoot<BuildT>::Tile);
+                auto& outputUpperMask = upperMasks[tileChildIndex];
+                outputUpperMask.setOnAtomic(upperChildIndex);
+                auto& outputLowerMask = lowerMasks[tileChildIndex][upperChildIndex];
+                for (uint32_t w = 0; w < Mask<4>::WORD_COUNT; ++w) {
+                    const uint64_t computedWord = neighborMask.words()[w];
+                    if (computedWord)
+                        util::atomicOr(const_cast<uint64_t*>(&outputLowerMask.words()[w]), computedWord);
+                }
+            }
         }
     });
 }
