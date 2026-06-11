@@ -292,6 +292,7 @@ struct FilterParms
     float       mVoxelOffset          = 0.0f;
     float       mHalfWidthWorld       = 0.1f;
     float       mStencilWidthWorld    = 0.1f;
+    bool        mAssumeUniformScale   = false;
     bool        mWorldUnits           = false;
     float       mMinMask              = 0;
     float       mMaxMask              = 1;
@@ -333,7 +334,9 @@ public:
     class Cache: public SOP_VDBCacheOptions
     {
     public:
-        Cache(OperatorType op): mOpType{op} {}
+        Cache(OperatorType op): mOpType{op}, mVoxelSize{1.0} {}
+
+        float getVoxelSize() const { return mVoxelSize; }
 
     protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
@@ -385,10 +388,12 @@ public:
 
     private:
         const OperatorType mOpType;
+        float mVoxelSize;
     };
 
 private:
     const OperatorType mOpType;
+    float mVoxelSize;
 };//SOP_OpenVDB_Filter_Level_Set
 
 
@@ -747,7 +752,7 @@ SOP_OpenVDB_Filter_Level_Set::factoryNarrowBand(
 SOP_OpenVDB_Filter_Level_Set::SOP_OpenVDB_Filter_Level_Set(
     OP_Network* net, const char* name, OP_Operator* op, OperatorType opType)
     : hvdb::SOP_NodeVDB(net, name, op)
-    , mOpType(opType)
+    , mOpType(opType), mVoxelSize(1.0f)
 {
 }
 
@@ -892,6 +897,7 @@ SOP_OpenVDB_Filter_Level_Set::Cache::evalFilterParms(
     parms.mMinMask      = static_cast<float>(evalFloat("minmask", 0, now));
     parms.mMaxMask      = static_cast<float>(evalFloat("maxmask", 0, now));
     parms.mInvertMask   = bool(evalInt("invert", 0, now));
+    parms.mAssumeUniformScale = bool(evalInt("assumeuniformscale", 0, now));
     parms.mWorldUnits   = bool(evalInt("useworldspaceunits", 0, now));
     parms.mAccuracy     = stringToAccuracy(evalStdString("accuracy", now));
     parms.mGroup        = evalStdString("group", now);
@@ -947,9 +953,23 @@ SOP_OpenVDB_Filter_Level_Set::Cache::applyFilters(
 
     if (!grid) return false;
 
+    mVoxelSize = grid->voxelSize()[0];
+
     using ValueT = typename GridT::ValueType;
     using MaskT = openvdb::FloatGrid;
     using FilterT = openvdb::tools::LevelSetFilter<GridT, MaskT, BossT>;
+    using Transform = openvdb::math::Transform;
+
+    // Force uniform scale as a hack to make sure the filter does not throw a
+    // non-uniform transformation error due to unprecise scale extraction from
+    // a rotated vdb.
+    Transform::Ptr origXform;
+    if (filterParms[0].mAssumeUniformScale)
+    {
+        origXform = grid->transform().copy();
+        Transform::Ptr scaledIdentity = Transform::createLinearTransform(mVoxelSize);
+        grid->setTransform(scaledIdentity);
+    }
 
     const float voxelSize = static_cast<float>(grid->voxelSize()[0]);
     FilterT filter(*grid, &boss);
@@ -973,6 +993,10 @@ SOP_OpenVDB_Filter_Level_Set::Cache::applyFilters(
 
         if (boss.wasInterrupted()) break;
     }
+
+    // Bring back original transformation that could contain non-uniform scaling
+    if (filterParms[0].mAssumeUniformScale)
+        grid->setTransform(origXform);
 
     return true;
 }

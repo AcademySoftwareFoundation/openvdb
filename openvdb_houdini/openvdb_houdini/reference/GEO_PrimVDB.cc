@@ -41,6 +41,7 @@
 #include <UT/UT_SparseArray.h>
 #include <UT/UT_StackTrace.h>
 #include <UT/UT_SysClone.h>
+#include <UT/UT_TaskLock.h>
 #include <UT/UT_UniquePtr.h>
 #include "UT_VDBUtils.h"
 #include <UT/UT_Vector.h>
@@ -104,16 +105,12 @@ GEO_PrimVDB::GEO_PrimVDB(GEO_Detail *d, GA_Offset offset)
     , myTreeUniqueId(GEO_PrimVDB::nextUniqueId())
     , myMetadataUniqueId(GEO_PrimVDB::nextUniqueId())
     , myTransformUniqueId(GEO_PrimVDB::nextUniqueId())
-    , myCEGrid(0)
     , myCEGridAuthorative(false)
-    , myCEGridIsOwned(true)
 {
 }
 
 GEO_PrimVDB::~GEO_PrimVDB()
 {
-    if (myCEGridIsOwned)
-        delete myCEGrid;
 }
 
 void
@@ -138,15 +135,21 @@ GEO_PrimVDB::stashed(bool beingstashed, GA_Offset offset)
         myGridAccessor.clear();
 
         // Throw away any GPU cache.
-        if (myCEGridIsOwned)
-            delete myCEGrid;
-        myCEGrid = nullptr;
+        myCEGrid.reset();
         myCEGridAuthorative = false;
-        myCEGridIsOwned = true;
     }
     // Set our internal state to default
     myVis = GEO_VolumeOptions(GEO_VOLUMEVIS_SMOKE, /*iso*/0.0, /*density*/1.0,
                               GEO_VOLUMEVISLOD_FULL);
+}
+
+int64
+GEO_PrimVDB::getDeviceMemoryUsage() const
+{
+    int64 mem = 0;
+    if (myCEGrid)
+        mem += myCEGrid->getDeviceMemoryUsage();
+    return mem;
 }
 
 bool
@@ -616,6 +619,11 @@ GEO_PrimVDB::getIndexSpaceTransform() const
     using openvdb::Vec3d;
     using openvdb::Mat4d;
 
+    if (myCEGridAuthorative && myCEGrid)
+    {
+        return myCEGrid->indexSpace();
+    }
+
     // This taper function follows from the conversion code in
     // GEO_PrimVolume::fromVoxelSpace() until until myXform/myCenter is
     // applied. It has been simplified somewhat, and uses the definition that
@@ -796,85 +804,6 @@ GEO_PrimVDB::computeNormal() const
 }
 
 
-
-template <typename GridType>
-static void
-geo_calcVolume(const GridType &grid, fpreal &volume)
-{
-    bool calculated = false;
-    if (grid.getGridClass() == openvdb::GRID_LEVEL_SET) {
-        try {
-            volume = openvdb::tools::levelSetVolume(grid);
-            calculated = true;
-        } catch (std::exception& /*e*/) {
-            // do nothing
-        }
-    }
-
-    // Simply account for the total number of active voxels
-    if (!calculated) {
-        const openvdb::Vec3d size = grid.voxelSize();
-        volume = size[0] * size[1] * size[2] * grid.activeVoxelCount();
-    }
-}
-
-fpreal
-GEO_PrimVDB::calcVolume(const UT_Vector3 &) const
-{
-    fpreal volume = 0;
-    UTvdbCallAllTopology(getStorageType(), geo_calcVolume, getGrid(), volume);
-    return volume;
-}
-
-template <typename GridType>
-static void
-geo_calcArea(const GridType &grid, fpreal &area)
-{
-    bool calculated = false;
-    if (grid.getGridClass() == openvdb::GRID_LEVEL_SET) {
-        try {
-            area = openvdb::tools::levelSetArea(grid);
-            calculated = true;
-        } catch (std::exception& /*e*/) {
-            // do nothing
-        }
-    }
-
-    if (!calculated) {
-        using LeafIter = typename GridType::TreeType::LeafCIter;
-        using VoxelIter = typename GridType::TreeType::LeafNodeType::ValueOnCIter;
-        using openvdb::Coord;
-        const Coord normals[] = {Coord(0,0,-1), Coord(0,0,1), Coord(-1,0,0),
-                                 Coord(1,0,0), Coord(0,-1,0), Coord(0,1,0)};
-        // NOTE: we assume rectangular prism voxels
-        openvdb::Vec3d voxel_size = grid.voxelSize();
-        const fpreal areas[] = {fpreal(voxel_size.x() * voxel_size.y()),
-                                fpreal(voxel_size.x() * voxel_size.y()),
-                                fpreal(voxel_size.y() * voxel_size.z()),
-                                fpreal(voxel_size.y() * voxel_size.z()),
-                                fpreal(voxel_size.z() * voxel_size.x()),
-                                fpreal(voxel_size.z() * voxel_size.x())};
-        area = 0;
-        for (LeafIter leaf = grid.tree().cbeginLeaf(); leaf; ++leaf) {
-            // Visit all the active voxels in this leaf node.
-            for (VoxelIter iter = leaf->cbeginValueOn(); iter; ++iter) {
-                // Iterate through all the neighboring voxels
-                for (int i=0; i<6; i++)
-                    if (!grid.tree().isValueOn(iter.getCoord() + normals[i])) area += areas[i];
-            }
-        }
-    }
-}
-
-fpreal
-GEO_PrimVDB::calcArea() const
-{
-    // Calculate the surface area of all the exterior voxels.
-    fpreal area = 0;
-    UTvdbCallAllTopology(getStorageType(), geo_calcArea, getGrid(), area);
-    return area;
-}
-
 void
 GEO_PrimVDB::enlargePointBounds(UT_BoundingBox &box) const
 {
@@ -943,6 +872,12 @@ int64
 GEO_PrimVDB::getBaseMemoryUsage() const
 {
     exint mem = 0;
+
+    // If we have authorative CE grid, use its usage instead.
+    if (myCEGridAuthorative && myCEGrid)
+    {
+        return myCEGrid->getMemoryUsage();
+    }
     if (hasGrid())
         mem += getGrid().memUsage();
     return mem;
@@ -978,298 +913,6 @@ GEO_PrimVDB::countBaseMemory(UT_MemoryCounter &counter) const
     }
 }
 
-
-template <typename GridType>
-static inline typename GridType::ValueType
-geo_doubleToGridValue(double val)
-{
-    using ValueT = typename GridType::ValueType;
-    // This ugly construction avoids compiler warnings when,
-    // for example, initializing an openvdb::Vec3i with a double.
-    return ValueT(openvdb::zeroVal<ValueT>() + val);
-}
-
-
-template <typename GridType>
-static fpreal
-geo_sampleGrid(const GridType &grid, const UT_Vector3 &pos)
-{
-    const openvdb::math::Transform &    xform = grid.transform();
-    openvdb::math::Vec3d                vpos;
-    typename GridType::ValueType        value;
-
-    vpos = openvdb::math::Vec3d(pos.x(), pos.y(), pos.z());
-    vpos = xform.worldToIndex(vpos);
-
-    openvdb::tools::BoxSampler::sample(grid.tree(), vpos, value);
-
-    fpreal result = value;
-
-    return result;
-}
-
-template <typename GridType>
-static fpreal
-geo_sampleBoolGrid(const GridType &grid, const UT_Vector3 &pos)
-{
-    const openvdb::math::Transform &    xform = grid.transform();
-    openvdb::math::Vec3d                vpos;
-    typename GridType::ValueType        value;
-
-    vpos = openvdb::math::Vec3d(pos.x(), pos.y(), pos.z());
-    vpos = xform.worldToIndex(vpos);
-
-    openvdb::tools::PointSampler::sample(grid.tree(), vpos, value);
-
-    fpreal result = value;
-
-    return result;
-}
-
-template <typename GridType>
-static UT_Vector3D
-geo_sampleGridV3(const GridType &grid, const UT_Vector3 &pos)
-{
-    const openvdb::math::Transform &    xform = grid.transform();
-    openvdb::math::Vec3d                vpos;
-    typename GridType::ValueType        value;
-
-    vpos = openvdb::math::Vec3d(pos.x(), pos.y(), pos.z());
-    vpos = xform.worldToIndex(vpos);
-
-    openvdb::tools::BoxSampler::sample(grid.tree(), vpos, value);
-
-    UT_Vector3D result;
-    result.x() = double(value[0]);
-    result.y() = double(value[1]);
-    result.z() = double(value[2]);
-
-    return result;
-}
-
-template <typename GridType, typename T, typename IDX>
-static void
-geo_sampleGridMany(const GridType &grid,
-                T *f, int stride,
-                const IDX *pos,
-                int num)
-{
-    typename GridType::ConstAccessor accessor = grid.getAccessor();
-
-    const openvdb::math::Transform &    xform = grid.transform();
-    openvdb::math::Vec3d                vpos;
-    typename GridType::ValueType        value;
-
-
-    for (int i = 0; i < num; i++)
-    {
-        vpos = openvdb::math::Vec3d(pos[i].x(), pos[i].y(), pos[i].z());
-        vpos = xform.worldToIndex(vpos);
-
-        openvdb::tools::BoxSampler::sample(accessor, vpos, value);
-
-        *f = T(value);
-        f += stride;
-    }
-}
-
-template <typename GridType, typename T, typename IDX>
-static void
-geo_sampleBoolGridMany(const GridType &grid,
-                T *f, int stride,
-                const IDX *pos,
-                int num)
-{
-    typename GridType::ConstAccessor accessor = grid.getAccessor();
-
-    const openvdb::math::Transform &    xform = grid.transform();
-    openvdb::math::Vec3d                vpos;
-    typename GridType::ValueType        value;
-
-
-    for (int i = 0; i < num; i++)
-    {
-        vpos = openvdb::math::Vec3d(pos[i].x(), pos[i].y(), pos[i].z());
-        vpos = xform.worldToIndex(vpos);
-
-        openvdb::tools::PointSampler::sample(accessor, vpos, value);
-
-        *f = T(value);
-        f += stride;
-    }
-}
-
-template <typename GridType, typename T, typename IDX>
-static void
-geo_sampleVecGridMany(const GridType &grid,
-                T *f, int stride,
-                const IDX *pos,
-                int num)
-{
-    typename GridType::ConstAccessor accessor = grid.getAccessor();
-
-    const openvdb::math::Transform &    xform = grid.transform();
-    openvdb::math::Vec3d                vpos;
-    typename GridType::ValueType        value;
-
-
-    for (int i = 0; i < num; i++)
-    {
-        vpos = openvdb::math::Vec3d(pos[i].x(), pos[i].y(), pos[i].z());
-        vpos = xform.worldToIndex(vpos);
-
-        openvdb::tools::BoxSampler::sample(accessor, vpos, value);
-
-        f->x() = value[0];
-        f->y() = value[1];
-        f->z() = value[2];
-        f += stride;
-    }
-}
-
-static fpreal
-geoEvaluateVDB(const GEO_PrimVDB *vdb, const UT_Vector3 &pos)
-{
-    UTvdbReturnScalarType(vdb->getStorageType(), geo_sampleGrid, vdb->getGrid(), pos);
-    UTvdbReturnBoolType(vdb->getStorageType(), geo_sampleBoolGrid, vdb->getGrid(), pos);
-    return 0;
-}
-
-static UT_Vector3D
-geoEvaluateVDB_V3(const GEO_PrimVDB *vdb, const UT_Vector3 &pos)
-{
-    UTvdbReturnVec3Type(vdb->getStorageType(),
-                          geo_sampleGridV3, vdb->getGrid(), pos);
-    return UT_Vector3D(0, 0, 0);
-}
-
-static void
-geoEvaluateVDBMany(const GEO_PrimVDB *vdb, float *f, int stride, const UT_Vector3 *pos, int num)
-{
-    UTvdbReturnScalarType(vdb->getStorageType(),
-            geo_sampleGridMany, vdb->getGrid(), f, stride, pos, num);
-    UTvdbReturnBoolType(vdb->getStorageType(),
-            geo_sampleBoolGridMany, vdb->getGrid(), f, stride, pos, num);
-    for (int i = 0; i < num; i++)
-    {
-        *f = 0;
-        f += stride;
-    }
-}
-
-static void
-geoEvaluateVDBMany(const GEO_PrimVDB *vdb, int *f, int stride, const UT_Vector3 *pos, int num)
-{
-    UTvdbReturnScalarType(vdb->getStorageType(),
-            geo_sampleGridMany, vdb->getGrid(), f, stride, pos, num);
-    UTvdbReturnBoolType(vdb->getStorageType(),
-            geo_sampleBoolGridMany, vdb->getGrid(), f, stride, pos, num);
-    for (int i = 0; i < num; i++)
-    {
-        *f = 0;
-        f += stride;
-    }
-}
-
-static void
-geoEvaluateVDBMany(const GEO_PrimVDB *vdb, UT_Vector3 *f, int stride, const UT_Vector3 *pos, int num)
-{
-    UTvdbReturnVec3Type(vdb->getStorageType(),
-            geo_sampleVecGridMany, vdb->getGrid(), f, stride, pos, num);
-    for (int i = 0; i < num; i++)
-    {
-        *f = 0;
-        f += stride;
-    }
-}
-
-static void
-geoEvaluateVDBMany(const GEO_PrimVDB *vdb, double *f, int stride, const UT_Vector3D *pos, int num)
-{
-    UTvdbReturnScalarType(vdb->getStorageType(),
-            geo_sampleGridMany, vdb->getGrid(), f, stride, pos, num);
-    UTvdbReturnBoolType(vdb->getStorageType(),
-            geo_sampleBoolGridMany, vdb->getGrid(), f, stride, pos, num);
-    for (int i = 0; i < num; i++)
-    {
-        *f = 0;
-        f += stride;
-    }
-}
-
-static void
-geoEvaluateVDBMany(const GEO_PrimVDB *vdb, exint *f, int stride, const UT_Vector3D *pos, int num)
-{
-    UTvdbReturnScalarType(vdb->getStorageType(),
-            geo_sampleGridMany, vdb->getGrid(), f, stride, pos, num);
-    UTvdbReturnBoolType(vdb->getStorageType(),
-            geo_sampleBoolGridMany, vdb->getGrid(), f, stride, pos, num);
-    for (int i = 0; i < num; i++)
-    {
-        *f = 0;
-        f += stride;
-    }
-}
-
-static void
-geoEvaluateVDBMany(const GEO_PrimVDB *vdb, UT_Vector3D *f, int stride, const UT_Vector3D *pos, int num)
-{
-    UTvdbReturnVec3Type(vdb->getStorageType(),
-            geo_sampleVecGridMany, vdb->getGrid(), f, stride, pos, num);
-    for (int i = 0; i < num; i++)
-    {
-        *f = 0;
-        f += stride;
-    }
-}
-
-fpreal
-GEO_PrimVDB::getValueF(const UT_Vector3 &pos) const
-{
-    return geoEvaluateVDB(this, pos);
-}
-
-UT_Vector3D
-GEO_PrimVDB::getValueV3(const UT_Vector3 &pos) const
-{
-    return geoEvaluateVDB_V3(this, pos);
-}
-
-void
-GEO_PrimVDB::getValues(float *f, int stride, const UT_Vector3 *pos, int num) const
-{
-    return geoEvaluateVDBMany(this, f, stride, pos, num);
-}
-
-void
-GEO_PrimVDB::getValues(int *f, int stride, const UT_Vector3 *pos, int num) const
-{
-    return geoEvaluateVDBMany(this, f, stride, pos, num);
-}
-
-void
-GEO_PrimVDB::getValues(UT_Vector3 *f, int stride, const UT_Vector3 *pos, int num) const
-{
-    return geoEvaluateVDBMany(this, f, stride, pos, num);
-}
-
-void
-GEO_PrimVDB::getValues(double *f, int stride, const UT_Vector3D *pos, int num) const
-{
-    return geoEvaluateVDBMany(this, f, stride, pos, num);
-}
-
-void
-GEO_PrimVDB::getValues(exint *f, int stride, const UT_Vector3D *pos, int num) const
-{
-    return geoEvaluateVDBMany(this, f, stride, pos, num);
-}
-
-void
-GEO_PrimVDB::getValues(UT_Vector3D *f, int stride, const UT_Vector3D *pos, int num) const
-{
-    return geoEvaluateVDBMany(this, f, stride, pos, num);
-}
 
 namespace // anonymous
 {
@@ -1363,7 +1006,7 @@ GEO_PrimVDB::evalGradients(
 bool
 GEO_PrimVDB::isAligned(const GEO_PrimVDB *vdb) const
 {
-    if (getGrid().transform() == vdb->getGrid().transform())
+    if (getIndexSpaceTransform() == vdb->getIndexSpaceTransform())
         return true;
     return false;
 }
@@ -1407,58 +1050,110 @@ GEO_PrimVDB::isActiveRegionMatched(const GEO_PrimVDB *vdb) const
     return vdb->getGrid().baseTreePtr() == getGrid().baseTreePtr();
 }
 
+void
+GEO_PrimVDB::setBorrowedIMXVDB(const UT_SharedPtr<IMX_VDB> &src)
+{
+    // We want a "deep" copy of the imx layer, this ensures we will
+    // trigger copy on write.
+    IMX_VDBPtr          newvdb = UTmakeShared<IMX_VDB>();
+    if (src)
+        newvdb->copy(*src);
+    myCEGrid = newvdb;
+    myCEGridAuthorative = true;
+    // Erase our grid and set storage type
+    myGridAccessor.clearGridAndSetStorageType(newvdb->storageType());
+
+    if (newvdb)
+    {
+        getDetail().getP()->flushCECaches();
+        getDetail().setPos3(vertexPoint(0), newvdb->indexSpace().myCenter);
+        getDetail().getP()->bumpDataId();
+    }
+}
+
 CE_VDBGrid *
 GEO_PrimVDB::getCEGrid(bool read, bool write) const
 {
-    // No read means there is no topo either, so likely
-    // for someone who only wants tilestarts.
+    CE_VDBGrid *result = nullptr;
+
+    // We used to have a no-read & no-write semantic which would
+    // get a CE_VDBGrid will null buffers.  This doesn't play nicely
+    // with IMX_VDB where we want OnGPU to imply their is readable data.
+    // The use for this was to be able to stash tilestarts indepdendently
+    // of the nanovdb, but I think that was premature optimization as
+    // vdb in question has to be at least marked writable to trigger
+    // that request, so will eventually need at least a buffer allocation.
+
+    UT_ASSERT(read || write);
+
     if (myCEGrid)
     {
-        if (read)
+        try
         {
-            if (!myCEGrid->hasBuffer())
-            {
-                // Attempt to load...
-                try
-                {
-                    myCEGrid->initFromVDB(getGrid());
-                }
-                catch (cl::Error &err)
-                {
-                    CE_Context::reportError(err);
-                    return nullptr;
-                }
-            }
+            // This ensures we are unique if writable.
+            result = myCEGrid->getGPUBuffer(read, write);
         }
-        if (write)
+        catch (cl::Error &err)
         {
-            if (!myCEGridIsOwned)
-            {
-                UT_ASSERT(!"Not implemented");
-            }
-            // Re-flag to write back.
-            myCEGridAuthorative = true;
+            CE_Context::reportError(err);
+            return nullptr;
         }
+    }
+
+    // Failed so re-buld our ce grid.
+    if (!result)
+    {
+        myCEGrid = UTmakeShared<IMX_VDB>();
+
+        try
+        {
+            if (read)
+                myCEGrid->gpuCopyFromVDB(getGrid(), getVoxelSize(), getIndexSpaceTransform());
+            result = myCEGrid->getGPUBuffer(read, write);
+        }
+        catch (cl::Error &err)
+        {
+            myCEGrid.reset();
+            CE_Context::reportError(err);
+            return nullptr;
+        }
+    }
+
+    if (result)
+    {
+        myCEGridAuthorative |= write;
+    }
+
+    return result;
+}
+
+IMX_VDBPtr
+GEO_PrimVDB::getIMXVDB(bool read, bool write) const
+{
+    // Return any existing without updating.
+    if (!read && !write)
         return myCEGrid;
-    }
 
-    CE_VDBGrid  *cegrid = new CE_VDBGrid();
-
-    try
+    if (!myCEGrid)
     {
-        if (read)
-            cegrid->initFromVDB(getGrid());
-        myCEGridIsOwned = true;
-    }
-    catch (cl::Error &err)
-    {
-        CE_Context::reportError(err);
-        delete cegrid;
-        cegrid = 0;
+        myCEGrid = UTmakeShared<IMX_VDB>();
+        try
+        {
+            // We conservatively do a cpu copy, we'd have to do
+            // this anyways for a gpu copy later.
+            if (read)
+                myCEGrid->cpuCopyFromVDB(getGrid(), getVoxelSize(), getIndexSpaceTransform());
+        }
+        catch (cl::Error &err)
+        {
+            myCEGrid.reset();
+            CE_Context::reportError(err);
+            return nullptr;
+        }
     }
 
-    myCEGrid = cegrid;
-    myCEGridAuthorative = write;
+    // Flag that we should write back.
+    myCEGridAuthorative |= write;
 
     return myCEGrid;
 }
@@ -1475,12 +1170,58 @@ GEO_PrimVDB::flushCEWriteCaches()
         {
             openvdb::GridBase::Ptr gpugrid = myCEGrid->createVDB();
             if (gpugrid)
-                setGrid(*gpugrid);
+            {
+                // We do not copy position here as we had set it when
+                // we borrowed the grid in the first place, it is too
+                // dangerous to set now as we might have a read-only
+                // geometry.  (Ie, the P's data id won't have been bumped!)
+                setGrid(*gpugrid, /*copyposition*/ false);
+            }
             getParent()->getPrimitiveList().bumpDataId();
         }
         catch (cl::Error &err)
         {
+            // We've failed to flush, but callers will expect a valid
+            // CPU grid, but there likely is none at the moment.
+            // So we fall back and create an arbitrary one.
+            UT_ASSERT(!"Failed to flush");
             CE_Context::reportError(err);
+            openvdb::GridBase::Ptr grid;
+            switch (myCEGrid->storageType())
+            {
+                case UT_VDB_FLOAT:
+                    grid = openvdb::FloatGrid::create();
+                    break;
+                case UT_VDB_DOUBLE:
+                    grid = openvdb::DoubleGrid::create();
+                    break;
+                case UT_VDB_INT32:
+                    grid = openvdb::Int32Grid::create();
+                    break;
+                case UT_VDB_INT64:
+                    grid = openvdb::Int64Grid::create();
+                    break;
+                case UT_VDB_VEC3F:
+                    grid = openvdb::Vec3fGrid::create();
+                    break;
+                case UT_VDB_VEC3D:
+                    grid = openvdb::Vec3DGrid::create();
+                    break;
+                case UT_VDB_VEC3I:
+                    grid = openvdb::Vec3IGrid::create();
+                    break;
+                case UT_VDB_BOOL:
+                    grid = openvdb::BoolGrid::create();
+                    break;
+                case UT_VDB_POINTINDEX:
+                case UT_VDB_POINTDATA:
+                case UT_VDB_INVALID:
+                    // We can't create a default type here.
+                    grid = openvdb::FloatGrid::create();
+                    break;
+            }
+            setGrid(*grid, /*copyposition*/ false);
+            getParent()->getPrimitiveList().bumpDataId();
         }
         myCEGridAuthorative = false;
     }
@@ -1492,11 +1233,16 @@ GEO_PrimVDB::flushCECaches()
     // Write back if needed
     flushCEWriteCaches();
     // Destroy the grid.
-    if (myCEGridIsOwned)
-        delete myCEGrid;
-    myCEGrid = 0;
+    myCEGrid.reset();
     myCEGridAuthorative = false;
-    myCEGridIsOwned = true;
+}
+
+void
+GEO_PrimVDB::clearCECaches()
+{
+    // Destroy the grid.
+    myCEGrid.reset();
+    myCEGridAuthorative = false;
 }
 
 void
@@ -1509,11 +1255,9 @@ GEO_PrimVDB::stealCEBuffers(const GA_Primitive *psrc)
 
     myCEGrid = src->myCEGrid;
     myCEGridAuthorative = src->myCEGridAuthorative;
-    myCEGridIsOwned = src->myCEGridIsOwned;
 
-    src->myCEGrid = 0;
+    src->myCEGrid.reset();
     src->myCEGridAuthorative = false;
-    src->myCEGridIsOwned = true;
 }
 
 
@@ -1939,12 +1683,21 @@ GEO_PrimVDB::transform(const UT_Matrix4 &mat)
 void
 GEO_PrimVDB::copyGridFrom(const GEO_PrimVDB& src_prim, bool copyPosition)
 {
-    setGrid(src_prim.getGrid(), copyPosition); // makes a shallow copy
+    if (src_prim.myCEGridAuthorative)
+    {
+        IMX_VDBPtr imx_vdb = src_prim.getIMXVDB(false, false);
+        UT_ASSERT(imx_vdb.get());
+        setBorrowedIMXVDB(imx_vdb);
+    }
+    else
+    {
+        setGrid(src_prim.getGrid(), copyPosition); // makes a shallow copy
 
-    // Copy the source primitive's grid serial numbers.
-    myTreeUniqueId.exchange(src_prim.getTreeUniqueId());
-    myMetadataUniqueId.exchange(src_prim.getMetadataUniqueId());
-    myTransformUniqueId.exchange(src_prim.getTransformUniqueId());
+        // Copy the source primitive's grid serial numbers.
+        myTreeUniqueId.exchange(src_prim.getTreeUniqueId());
+        myMetadataUniqueId.exchange(src_prim.getMetadataUniqueId());
+        myTransformUniqueId.exchange(src_prim.getTransformUniqueId());
+    }
 }
 
 
@@ -1955,7 +1708,7 @@ void
 GEO_PrimVDB::GridAccessor::makeGridUnique()
 {
     if (myGrid) {
-        UT_ASSERT(myGrid.unique());
+        UT_ASSERT(myGrid.use_count() == 1);
         openvdb::TreeBase::Ptr localTreePtr = myGrid->baseTreePtr();
         if (localTreePtr.use_count() > 2) { // myGrid + localTreePtr = 2
             myGrid->setTree(myGrid->constBaseTree().copy());
@@ -1969,7 +1722,7 @@ GEO_PrimVDB::GridAccessor::isGridUnique() const
     if (myGrid) {
         // We require the grid to always be unique, it is the tree
         // that is allowed to be shared.
-        UT_ASSERT(myGrid.unique());
+        UT_ASSERT(myGrid.use_count() == 1);
         openvdb::TreeBase::Ptr localTreePtr = myGrid->baseTreePtr();
         if (localTreePtr.use_count() > 2) { // myGrid + localTreePtr = 2
             return false;
@@ -2038,6 +1791,11 @@ GEO_PrimVDB::getVoxelDiameter() const
 UT_Vector3
 GEO_PrimVDB::getVoxelSize() const
 {
+    if (myCEGridAuthorative && myCEGrid)
+    {
+        return myCEGrid->voxelSize();
+    }
+
     UT_Vector3          p1, p2;
     UT_Vector3          vsize;
 
@@ -2056,66 +1814,6 @@ GEO_PrimVDB::getVoxelSize() const
     vsize.z() = p2.length();
 
     return vsize;
-}
-
-template <typename GridType>
-static void
-geo_calcMinVDB( GridType &grid,
-                    fpreal &result)
-{
-    auto val = openvdb::tools::extrema(grid.cbeginValueOn());
-    result = val.min();
-}
-
-fpreal
-GEO_PrimVDB::calcMinimum() const
-{
-    fpreal                      value = SYS_FPREAL_MAX;
-    UTvdbCallScalarType( getStorageType(),
-                        geo_calcMinVDB,
-                        SYSconst_cast(getConstGrid()),
-                        value);
-    return value;
-}
-
-template <typename GridType>
-static void
-geo_calcMaxVDB( GridType &grid,
-                    fpreal &result)
-{
-    auto val = openvdb::tools::extrema(grid.cbeginValueOn());
-    result = val.max();
-}
-
-fpreal
-GEO_PrimVDB::calcMaximum() const
-{
-    fpreal                      value = -SYS_FPREAL_MAX;
-    UTvdbCallScalarType( getStorageType(),
-                        geo_calcMaxVDB,
-                        SYSconst_cast(getConstGrid()),
-                        value);
-    return value;
-}
-
-template <typename GridType>
-static void
-geo_calcAvgVDB( GridType &grid,
-                    fpreal &result)
-{
-    auto val = openvdb::tools::statistics(grid.cbeginValueOn());
-    result = val.avg();
-}
-
-fpreal
-GEO_PrimVDB::calcAverage() const
-{
-    fpreal                      value = 0;
-    UTvdbCallScalarType( getStorageType(),
-                        geo_calcAvgVDB,
-                        SYSconst_cast(getConstGrid()),
-                        value);
-    return value;
 }
 
 
@@ -2150,553 +1848,6 @@ GEO_PrimVDB::getFrustumBounds(UT_BoundingBox &idxbox) const
     }
 
     return false;
-}
-
-static bool
-geoGetFrustumBoundsFromVDB(const GEO_PrimVDB *vdb, openvdb::CoordBBox &box)
-{
-    using namespace openvdb;
-
-    UT_BoundingBox              clip;
-    bool                        doclip;
-
-    doclip = vdb->getFrustumBounds(clip);
-    if (doclip)
-    {
-        box = CoordBBox( Coord( (int)SYSrint(clip.xmin()), (int)SYSrint(clip.ymin()), (int)SYSrint(clip.zmin()) ),
-                         Coord( (int)SYSrint(clip.xmax()), (int)SYSrint(clip.ymax()), (int)SYSrint(clip.zmax()) ) );
-    }
-    return doclip;
-}
-
-// The result of the intersection of active regions goes into grid_a
-template <typename GridTypeA, typename GridTypeB>
-static void
-geoIntersect(GridTypeA& grid_a, const GridTypeB &grid_b)
-{
-    typename GridTypeA::Accessor        access_a = grid_a.getAccessor();
-    typename GridTypeB::ConstAccessor   access_b = grid_b.getAccessor();
-
-    // For each on value in a, set it off if b is also off
-    for (typename GridTypeA::ValueOnCIter
-         iter = grid_a.cbeginValueOn(); iter; ++iter)
-    {
-        openvdb::CoordBBox bbox = iter.getBoundingBox();
-        for (int k=bbox.min().z(); k<=bbox.max().z(); k++)
-        {
-            for (int j=bbox.min().y(); j<=bbox.max().y(); j++)
-            {
-                for (int i=bbox.min().x(); i<=bbox.max().x(); i++)
-                {
-                    openvdb::Coord coord(i, j, k);
-                    if (!access_b.isValueOn(coord))
-                    {
-                        access_a.setValue(coord, grid_a.background());
-                        access_a.setValueOff(coord);
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// This class is used as a functor to set inactive voxels to the background
-/// value.
-template<typename GridType>
-class geoInactiveToBackground
-{
-public:
-    typedef typename GridType::ValueOffIter             Iterator;
-    typedef typename GridType::ValueType                ValueType;
-
-    geoInactiveToBackground(const GridType& grid)
-    {
-        background = grid.background();
-    }
-
-    inline void operator()(const Iterator& iter) const
-    {
-        iter.setValue(background);
-    }
-
-private:
-    ValueType background;
-};
-
-template <typename GridType>
-static void
-geoActivateBBox(GridType& grid,
-                const openvdb::CoordBBox &bbox,
-                bool setvalue,
-                double value,
-                GEO_PrimVDB::ActivateOperation operation,
-                bool doclip,
-                const openvdb::CoordBBox &clipbox)
-{
-    typename GridType::Accessor         access = grid.getAccessor();
-
-    switch (operation)
-    {
-        case GEO_PrimVDB::ACTIVATE_UNION: // Union
-        if (doclip)
-        {
-            openvdb::CoordBBox  clipped = bbox;
-            clipped = bbox;
-            clipped.min().maxComponent(clipbox.min());
-            clipped.max().minComponent(clipbox.max());
-
-            geoActivateBBox(grid, clipped, setvalue, value,
-                    operation,
-                    false,
-                    clipped);
-            break;
-        }
-        if (setvalue)
-        {
-            grid.fill(bbox, geo_doubleToGridValue<GridType>(value), /*active*/true);
-        }
-        else
-        {
-            openvdb::MaskGrid mask(false);
-            mask.denseFill(bbox, true, true);
-            grid.topologyUnion(mask);
-        }
-        break;
-        case GEO_PrimVDB::ACTIVATE_INTERSECT: // Intersect
-            {
-            openvdb::MaskGrid mask(false);
-            mask.fill(bbox, true, true);
-            grid.topologyIntersection(mask);
-            geoInactiveToBackground<GridType> bgop(grid);
-            openvdb::tools::foreach(grid.beginValueOff(), bgop);
-        }
-            break;
-        case GEO_PrimVDB::ACTIVATE_SUBTRACT: // Difference
-            // No matter what, we clear the background colour
-            // for inactive.
-            grid.fill(bbox, grid.background(), /*active*/false);
-            break;
-        case GEO_PrimVDB::ACTIVATE_COPY:                // Copy
-            // intersect
-            geoActivateBBox(grid, bbox, setvalue, value, GEO_PrimVDB::ACTIVATE_INTERSECT, doclip, clipbox);
-            // and union
-            geoActivateBBox(grid, bbox, setvalue, value, GEO_PrimVDB::ACTIVATE_UNION, doclip, clipbox);
-            break;
-    }
-}
-
-void
-GEO_PrimVDB::activateIndexBBoxAdapter(const void* bboxPtr,
-                                      ActivateOperation operation,
-                                      bool setvalue,
-                                      fpreal value)
-{
-    using namespace openvdb;
-
-    // bboxPtr is assumed to point to an openvdb::vX_Y_Z::CoordBBox, for some
-    // version X.Y.Z of OpenVDB that may be newer than the one with which
-    // libHoudiniGEO.so was built.  This is safe provided that CoordBBox and
-    // its member objects are ABI-compatible between the two OpenVDB versions.
-    const CoordBBox& bbox = *static_cast<const CoordBBox*>(bboxPtr);
-
-    bool                        doclip;
-    CoordBBox                   clipbox;
-    doclip = geoGetFrustumBoundsFromVDB(this, clipbox);
-
-    // Activate based on the parameters and inputs
-    UTvdbCallAllTopology(this->getStorageType(), geoActivateBBox,
-                     this->getGrid(),
-                     bbox,
-                     setvalue,
-                     value,
-                     operation,
-                     doclip, clipbox);
-}
-
-// Gets a conservative bounding box that maps to a coordinate
-// in index space.
-openvdb::CoordBBox
-geoMapCoord(const openvdb::CoordBBox& bbox_b,
-            GEO_PrimVolumeXform xform_a,
-            GEO_PrimVolumeXform xform_b)
-{
-    using openvdb::Coord;
-    using openvdb::CoordBBox;
-    // Get the eight corners of the voxel
-    Coord x = Coord(bbox_b.extents().x(), 0, 0);
-    Coord y = Coord(0, bbox_b.extents().y(), 0);
-    Coord z = Coord(0, 0, bbox_b.extents().z());
-    Coord m = bbox_b.min();
-
-    const Coord corners[] = {
-        m, m+z, m+y, m+y+z, m+x, m+x+z, m+x+y, m+x+y+z,
-    };
-
-    CoordBBox index_bbox;
-    for (int i=0; i<8; i++)
-    {
-        UT_Vector3 corner = UT_Vector3(corners[i].x(), corners[i].y(), corners[i].z());
-        UT_Vector3 index = xform_a.toVoxelSpace(xform_b.fromVoxelSpace(corner));
-        Coord coord(int32(index.x()), int32(index.y()), int32(index.z()));
-        if (i == 0)
-            index_bbox = CoordBBox(coord, coord);
-        else
-            index_bbox.expand(coord);
-    }
-    return index_bbox;
-}
-
-openvdb::CoordBBox
-geoMapCoord(const openvdb::Coord& coord_b,
-            GEO_PrimVolumeXform xform_a,
-            GEO_PrimVolumeXform xform_b)
-{
-    const openvdb::CoordBBox bbox_b(coord_b, coord_b + openvdb::Coord(1,1,1));
-    return geoMapCoord(bbox_b, xform_a, xform_b);
-}
-
-/// This class is used as a functor to create a mask for a grid's active
-/// region.
-template<typename GridType>
-class geoMaskTopology
-{
-public:
-    typedef typename GridType::ValueOnCIter             Iterator;
-    typedef typename openvdb::MaskGrid::Accessor        Accessor;
-
-    geoMaskTopology(const GEO_PrimVolumeXform& a, const GEO_PrimVolumeXform& b)
-        : xform_a(a), xform_b(b)
-    {
-    }
-
-    inline void operator()(const Iterator& iter, Accessor& accessor) const
-    {
-        openvdb::CoordBBox bbox = geoMapCoord(iter.getBoundingBox(), xform_a,
-                                              xform_b);
-        accessor.getTree()->fill(bbox, true, true);
-    }
-
-private:
-    const GEO_PrimVolumeXform& xform_a;
-    const GEO_PrimVolumeXform& xform_b;
-};
-
-/// This class is used as a functor to create a mask for the intersection
-/// of two grids.
-template<typename GridTypeA, typename GridTypeB>
-class geoMaskIntersect
-{
-public:
-    typedef typename GridTypeA::ValueOnCIter            IteratorA;
-    typedef typename GridTypeB::ConstAccessor           AccessorB;
-    typedef typename openvdb::MaskGrid::Accessor        Accessor;
-
-    geoMaskIntersect(const GridTypeB& source,
-                     const GEO_PrimVolumeXform& a,
-                     const GEO_PrimVolumeXform& b)
-        : myAccessor(source.getAccessor()),
-          myXformA(a),
-          myXformB(b)
-    {
-    }
-
-    inline void operator()(const IteratorA& iter, Accessor& accessor) const
-    {
-        openvdb::CoordBBox bbox = iter.getBoundingBox();
-        for(int k = bbox.min().z(); k <= bbox.max().z(); k++) {
-            for (int j = bbox.min().y(); j <= bbox.max().y(); j++) {
-                for (int i = bbox.min().x(); i <= bbox.max().x(); i++) {
-                    openvdb::Coord coord(i, j, k);
-                    accessor.setActiveState(coord,
-                        containsActiveVoxels(geoMapCoord(coord, myXformB, myXformA)));
-                }
-            }
-        }
-    }
-
-private:
-    AccessorB myAccessor;
-    const GEO_PrimVolumeXform& myXformA;
-    const GEO_PrimVolumeXform& myXformB;
-
-    // Returns true if there is at least one voxel in the source grid that is active
-    // within the specified bounding box.
-    inline bool containsActiveVoxels(const openvdb::CoordBBox& bbox) const
-    {
-        for(int k = bbox.min().z(); k <= bbox.max().z(); k++)
-        {
-            for(int j = bbox.min().y(); j <= bbox.max().y(); j++)
-            {
-                for(int i = bbox.min().x(); i <= bbox.max().x(); i++)
-                {
-                    if(myAccessor.isValueOn(openvdb::Coord(i, j, k)))
-                        return true;
-                }
-            }
-        }
-        return false;
-    }
-};
-
-template <typename GridTypeA, typename GridTypeB>
-void
-geoUnalignedUnion(GridTypeA &grid_a,
-                  const GridTypeB &grid_b,
-                  GEO_PrimVolumeXform xform_a,
-                  GEO_PrimVolumeXform xform_b,
-                  bool setvalue, double value,
-                  bool doclip, const openvdb::CoordBBox &clipbox)
-{
-    openvdb::MaskGrid mask(false);
-    geoMaskTopology<GridTypeB> maskop(xform_a, xform_b);
-    openvdb::tools::transformValues(grid_b.cbeginValueOn(), mask, maskop);
-    if(doclip)
-        mask.clip(clipbox);
-
-    if(setvalue)
-    {
-        typename GridTypeA::TreeType newTree(mask.tree(),
-            geo_doubleToGridValue<GridTypeA>(value), openvdb::TopologyCopy());
-        openvdb::tools::compReplace(grid_a.tree(), newTree);
-    }
-    else
-        grid_a.tree().topologyUnion(mask.tree());
-}
-
-template <typename GridTypeA, typename GridTypeB>
-void
-geoUnalignedDifference(GridTypeA &grid_a,
-                       const GridTypeB &grid_b,
-                       GEO_PrimVolumeXform xform_a,
-                       GEO_PrimVolumeXform xform_b)
-{
-    openvdb::MaskGrid mask(false);
-    geoMaskIntersect<GridTypeA, GridTypeB> maskop(grid_b, xform_a, xform_b);
-    openvdb::tools::transformValues(grid_a.cbeginValueOn(), mask, maskop, true,
-        // DO NOT SHARE THE OPERATOR, since grid_b's accessor does caching...
-        false);
-
-    grid_a.tree().topologyDifference(mask.tree());
-
-    geoInactiveToBackground<GridTypeA> bgop(grid_a);
-    openvdb::tools::foreach(grid_a.beginValueOff(), bgop);
-}
-
-template <typename GridTypeA, typename GridTypeB>
-static void
-geoUnalignedIntersect(GridTypeA &grid_a,
-                      const GridTypeB &grid_b,
-                      GEO_PrimVolumeXform xform_a,
-                      GEO_PrimVolumeXform xform_b)
-{
-    openvdb::MaskGrid mask(false);
-    geoMaskIntersect<GridTypeA, GridTypeB> maskop(grid_b, xform_a, xform_b);
-    openvdb::tools::transformValues(grid_a.cbeginValueOn(), mask, maskop, true,
-        // DO NOT SHARE THE OPERATOR, since grid_b's accessor does caching...
-        false);
-
-    grid_a.tree().topologyIntersection(mask.tree());
-
-    geoInactiveToBackground<GridTypeA> bgop(grid_a);
-    openvdb::tools::foreach(grid_a.beginValueOff(), bgop);
-}
-
-// The result of the union of active regions goes into grid_a
-template <typename GridTypeA, typename GridTypeB>
-static void
-geoUnion(GridTypeA& grid_a, const GridTypeB &grid_b, bool setvalue, double value, bool doclip, const openvdb::CoordBBox &clipbox)
-{
-    typename GridTypeA::Accessor        access_a = grid_a.getAccessor();
-    typename GridTypeB::ConstAccessor   access_b = grid_b.getAccessor();
-
-    if (!doclip && !setvalue) {
-        grid_a.tree().topologyUnion(grid_b.tree());
-        return;
-    }
-
-    // For each on value in b, set a on
-    for (typename GridTypeB::ValueOnCIter iter = grid_b.cbeginValueOn(); iter; ++iter) {
-        openvdb::CoordBBox bbox = iter.getBoundingBox();
-        // Intersect with our destination
-        if (doclip) {
-            bbox.min().maxComponent(clipbox.min());
-            bbox.max().minComponent(clipbox.max());
-        }
-
-        for (int k=bbox.min().z(); k<=bbox.max().z(); k++) {
-            for (int j=bbox.min().y(); j<=bbox.max().y(); j++) {
-                for (int i=bbox.min().x(); i<=bbox.max().x(); i++) {
-                    openvdb::Coord coord(i, j, k);
-                    if (setvalue) {
-                        access_a.setValue(coord, geo_doubleToGridValue<GridTypeA>(value));
-                    } else {
-                        access_a.setValueOn(coord);
-                    }
-                }
-            }
-        }
-    }
-}
-
-// The result of the union of active regions goes into grid_a
-template <typename GridTypeA, typename GridTypeB>
-static void
-geoDifference(GridTypeA& grid_a, const GridTypeB &grid_b)
-{
-    typename GridTypeA::Accessor        access_a = grid_a.getAccessor();
-    typename GridTypeB::ConstAccessor   access_b = grid_b.getAccessor();
-
-    // For each on value in a, set it off if b is on
-    for (typename GridTypeA::ValueOnCIter
-         iter = grid_a.cbeginValueOn(); iter; ++iter)
-    {
-        openvdb::CoordBBox bbox = iter.getBoundingBox();
-        for (int k=bbox.min().z(); k<=bbox.max().z(); k++)
-        {
-            for (int j=bbox.min().y(); j<=bbox.max().y(); j++)
-            {
-                for (int i=bbox.min().x(); i<=bbox.max().x(); i++)
-                {
-                    openvdb::Coord coord(i, j, k);
-                    // TODO: conditional needed? Profile please.
-                    if (access_b.isValueOn(coord))
-                    {
-                        access_a.setValue(coord, grid_a.background());
-                        access_a.setValueOff(coord);
-                    }
-                }
-            }
-        }
-    }
-}
-
-template <typename GridTypeB>
-static void
-geoDoUnion(const GridTypeB &grid_b,
-    GEO_PrimVolumeXform xform_b,
-    GEO_PrimVDB &vdb_a,
-    bool setvalue, double value,
-    bool doclip, const openvdb::CoordBBox &clipbox,
-    bool ignore_transform)
-{
-    // If the transforms are equal, we can do an aligned union
-    if (ignore_transform || grid_b.transform() == vdb_a.getGrid().transform())
-    {
-        UTvdbCallAllTopology(vdb_a.getStorageType(), geoUnion,
-                         vdb_a.getGrid(), grid_b, setvalue, value,
-                         doclip, clipbox);
-    }
-    else
-    {
-        UTvdbCallAllTopology(vdb_a.getStorageType(), geoUnalignedUnion,
-                         vdb_a.getGrid(), grid_b,
-                         vdb_a.getIndexSpaceTransform(),
-                         xform_b, setvalue, value,
-                         doclip, clipbox);
-    }
-}
-
-template <typename GridTypeB>
-static void
-geoDoIntersect(
-    const GridTypeB &grid_b,
-    GEO_PrimVolumeXform xform_b,
-    GEO_PrimVDB &vdb_a,
-    bool ignore_transform)
-{
-    if (ignore_transform || grid_b.transform() == vdb_a.getGrid().transform())
-    {
-        UTvdbCallAllTopology(vdb_a.getStorageType(),
-                         geoIntersect, vdb_a.getGrid(), grid_b);
-    }
-    else
-    {
-        UTvdbCallAllTopology(vdb_a.getStorageType(),
-                         geoUnalignedIntersect, vdb_a.getGrid(),
-                         grid_b, vdb_a.getIndexSpaceTransform(),
-                         xform_b);
-    }
-}
-
-template <typename GridTypeB>
-static void
-geoDoDifference(
-    const GridTypeB &grid_b,
-    GEO_PrimVolumeXform xform_b,
-    GEO_PrimVDB &vdb_a,
-    bool ignore_transform)
-{
-    if (ignore_transform || grid_b.transform() == vdb_a.getGrid().transform())
-    {
-        UTvdbCallAllTopology(vdb_a.getStorageType(), geoDifference,
-                         vdb_a.getGrid(), grid_b);
-    }
-    else
-    {
-        UTvdbCallAllTopology(vdb_a.getStorageType(), geoUnalignedDifference,
-                         vdb_a.getGrid(), grid_b,
-                         vdb_a.getIndexSpaceTransform(),
-                         xform_b);
-    }
-}
-
-
-void
-GEO_PrimVDB::activateByVDB(
-    const GEO_PrimVDB *input_vdb,
-    ActivateOperation operation,
-    bool setvalue, fpreal value,
-    bool ignore_transform)
-{
-    const openvdb::GridBase& input_grid = input_vdb->getGrid();
-
-    bool                                doclip;
-    openvdb::CoordBBox                  clipbox;
-
-    doclip = geoGetFrustumBoundsFromVDB(this, clipbox);
-
-    switch (operation)
-    {
-        case GEO_PrimVDB::ACTIVATE_UNION: // Union
-            UTvdbCallAllTopology(input_vdb->getStorageType(),
-                             geoDoUnion, input_grid,
-                             input_vdb->getIndexSpaceTransform(),
-                             *this,
-                             setvalue,
-                             value,
-                             doclip, clipbox,
-                             ignore_transform);
-            break;
-        case GEO_PrimVDB::ACTIVATE_INTERSECT: // Intersect
-            UTvdbCallAllTopology(input_vdb->getStorageType(),
-                             geoDoIntersect, input_grid,
-                             input_vdb->getIndexSpaceTransform(),
-                             *this,
-                             ignore_transform);
-            break;
-        case GEO_PrimVDB::ACTIVATE_SUBTRACT: // Difference
-            UTvdbCallAllTopology(input_vdb->getStorageType(),
-                             geoDoDifference, input_grid,
-                             input_vdb->getIndexSpaceTransform(),
-                             *this,
-                             ignore_transform);
-            break;
-        case GEO_PrimVDB::ACTIVATE_COPY: // Copy
-            UTvdbCallAllTopology(input_vdb->getStorageType(),
-                             geoDoIntersect, input_grid,
-                             input_vdb->getIndexSpaceTransform(),
-                             *this,
-                             ignore_transform);
-            UTvdbCallAllTopology(input_vdb->getStorageType(),
-                             geoDoUnion, input_grid,
-                             input_vdb->getIndexSpaceTransform(),
-                             *this,
-                             setvalue,
-                             value,
-                             doclip, clipbox,
-                             ignore_transform);
-            break;
-    }
 }
 
 UT_Matrix4D
@@ -3209,12 +2360,14 @@ enum
     geo_JVOL_VISISO,
     geo_JVOL_VISDENSITY,
     geo_JVOL_VISLOD,
+    geo_JVOL_TYPEINFO,
 };
 UT_FSATable     theJVolumeViz(
     geo_JVOL_VISMODE,           "mode",
     geo_JVOL_VISISO,            "iso",
     geo_JVOL_VISDENSITY,        "density",
     geo_JVOL_VISLOD,            "lod",
+    geo_JVOL_TYPEINFO,          "typeinfo",
     -1,                         nullptr
 );
 
@@ -3242,6 +2395,13 @@ GEO_PrimVDB::saveVisualization(UT_JSONWriter &w, const GA_SaveMap &) const
         ok = ok && w.jsonString(GEOgetVolumeVisLodToken(myVis.myLod));
     }
 
+    // Only save non-default
+    if (myVis.myTypeInfo != GEO_VOLUMETYPEINFO_NONE)
+    {
+        ok = ok && w.jsonKeyToken(theJVolumeViz.getToken(geo_JVOL_TYPEINFO));
+        ok = ok && w.jsonString(GEOgetVolumeTypeInfoToken(myVis.myTypeInfo));
+    }
+
     return ok && w.jsonEndMap();
 }
 
@@ -3250,6 +2410,7 @@ GEO_PrimVDB::loadVisualization(UT_JSONParser &p, const GA_LoadMap &)
 {
     UT_JSONParser::traverser    it;
     GEO_VolumeVis               mode = myVis.myMode;
+    GEO_VolumeTypeInfo          typeinfo = myVis.myTypeInfo;
     fpreal                      iso = myVis.myIso;
     fpreal                      density = myVis.myDensity;
     GEO_VolumeVisLod            lod = myVis.myLod;
@@ -3285,6 +2446,11 @@ GEO_PrimVDB::loadVisualization(UT_JSONParser &p, const GA_LoadMap &)
                     lod = GEOgetVolumeVisLodEnum(
                                 key.buffer(), GEO_VOLUMEVISLOD_FULL);
                 break;
+            case geo_JVOL_TYPEINFO:
+                if ((ok = p.parseString(key)))
+                    typeinfo = GEOgetVolumeTypeInfoEnum(key.buffer(),
+                                GEO_VOLUMETYPEINFO_NONE);
+                break;
             default:
                 p.addWarning("Unexpected key for volume visualization: %s",
                         key.buffer());
@@ -3298,43 +2464,11 @@ GEO_PrimVDB::loadVisualization(UT_JSONParser &p, const GA_LoadMap &)
         ok = false;
     }
     if (ok)
+    {
         setVisualization(mode, iso, density, lod);
-    return ok;
-}
-
-template <typename GridType>
-static void
-geo_sumPosDensity(const GridType &grid, fpreal64 &sum)
-{
-    sum = 0;
-    for (typename GridType::ValueOnCIter iter = grid.cbeginValueOn(); iter; ++iter) {
-        fpreal value = *iter;
-        if (value > 0) {
-            if (iter.isTileValue()) sum += value * iter.getVoxelCount();
-            else sum += value;
-        }
+        setTypeInfo(typeinfo);
     }
-}
-
-fpreal
-GEO_PrimVDB::calcPositiveDensity() const
-{
-    fpreal64 density = 0;
-
-    UT_IF_ASSERT(UT_VDBType type = getStorageType();)
-    UT_ASSERT(type == UT_VDB_FLOAT || type == UT_VDB_DOUBLE);
-
-    UTvdbCallRealType(getStorageType(), geo_sumPosDensity, getGrid(), density);
-    UTvdbCallBoolType(getStorageType(), geo_sumPosDensity, getGrid(), density);
-
-    int numvoxel = getGrid().activeVoxelCount();
-    if (numvoxel)
-        density /= numvoxel;
-
-    UT_Vector3 zero(0, 0, 0);
-    density *= calcVolume(zero);
-
-    return density;
+    return ok;
 }
 
 bool
@@ -3438,6 +2572,26 @@ GEO_PrimVDB::GridAccessor::updateGridTranslates(const GEO_PrimVDB &prim) const
 {
     using namespace     openvdb::math;
     const GA_Detail &   geo = prim.getDetail();
+
+    // REQUIRED to get write backs, but destroys performance of MPM.
+    if (prim.myCEGrid && prim.myCEGridAuthorative)
+    {
+        static UT_TaskLockWithArena             theCELock;
+
+        theCELock.lockedExecute([&]()
+        {
+            SYSconst_cast(prim).flushCEWriteCaches();
+        });
+    }
+#if 0
+    // Traces who is triggering the flushes...
+    if (prim.myCEGrid && prim.myCEGridAuthorative)
+    {
+            UTdebugPrintCd(none,"FLUSHED WRITTEN");
+            TRACE_STACK();
+        SYSconst_cast(prim).flushCEWriteCaches();
+    }
+#endif
 
     // It is possible our vertex offset is invalid, such as us
     // being a stashed primitive.
@@ -3602,6 +2756,7 @@ namespace // anonymous
         geo_INTRINSIC_VOLUMEVISUALDENSITY,
         geo_INTRINSIC_VOLUMEVISUALISO,
         geo_INTRINSIC_VOLUMEVISUALLOD,
+        geo_INTRINSIC_VOLUMETYPEINFO,
 
         geo_INTRINSIC_VOLUMEMINVALUE,
         geo_INTRINSIC_VOLUMEMAXVALUE,
@@ -3736,6 +2891,11 @@ namespace // anonymous
     {
         return GEOgetVolumeVisLodToken(p->getVisLod());
     }
+    const char *
+    intrinsicTypeInfo(const GEO_PrimVDB *p)
+    {
+        return GEOgetVolumeTypeInfoToken(p->getTypeInfo());
+    }
 
     openvdb::Metadata::ConstPtr
     intrinsicGetMeta(const GEO_PrimVDB *p, geo_Intrinsic id)
@@ -3793,6 +2953,14 @@ namespace // anonymous
     intrinsicSetMetaBool(GEO_PrimVDB *p, geo_Intrinsic id, int64 v)
     {
         intrinsicSetMeta(p, id, openvdb::BoolMetadata(v != 0));
+    }
+    bool
+    intrinsicSetTypeInfo(GEO_PrimVDB *p, const char *v)
+    {
+        GEO_VolumeTypeInfo      mode = GEOgetVolumeTypeInfoEnum(v,
+                                            GEO_VOLUMETYPEINFO_NONE);
+        p->setTypeInfo(mode);
+        return true;
     }
 
 } // namespace anonymous
@@ -3879,6 +3047,8 @@ GA_START_INTRINSIC_DEF(GEO_PrimVDB, geo_NUM_INTRINSICS)
             "volumevisualiso", getVisIso)
     GA_INTRINSIC_S(GEO_PrimVDB, geo_INTRINSIC_VOLUMEVISUALLOD,
             "volumevisuallod", intrinsicVisualLod)
+    GA_INTRINSIC_S(GEO_PrimVDB, geo_INTRINSIC_VOLUMETYPEINFO,
+            "volumetypeinfo", intrinsicTypeInfo)
 
     GA_INTRINSIC_METHOD_F(GEO_PrimVDB, geo_INTRINSIC_VOLUMEMINVALUE,
          "volumeminvalue", calcMinimum)
@@ -3893,6 +3063,9 @@ GA_START_INTRINSIC_DEF(GEO_PrimVDB, geo_NUM_INTRINSICS)
     VDB_INTRINSIC_META_BOOL(GEO_PrimVDB, geo_INTRINSIC_META_SAVE_HALF_FLOAT)
     VDB_INTRINSIC_META_STR(GEO_PrimVDB, geo_INTRINSIC_META_VALUE_TYPE)
     VDB_INTRINSIC_META_STR(GEO_PrimVDB, geo_INTRINSIC_META_VECTOR_TYPE)
+
+    GA_INTRINSIC_SET_S(GEO_PrimVDB, geo_INTRINSIC_VOLUMETYPEINFO,
+        intrinsicSetTypeInfo)
 
 GA_END_INTRINSIC_DEF(GEO_PrimVDB, GEO_Primitive)
 
