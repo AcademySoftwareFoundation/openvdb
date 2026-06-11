@@ -739,3 +739,21 @@ host-vs-GPU gap on sparse topology work is expected and not pathological.
 The host checksum swap (`333c942d`) already removed one such artifact:
 `postProcessGridTree` dropped from ~1.64 ms to ~0.17 ms once it stopped invoking
 the device checksum kernel on a host-written managed buffer.
+
+### 7.9  Future refactoring (TODO)
+
+- **Share the leaf-dilation body between host and CUDA via a `__hostdev__` helper.**
+  The leaf-dilation functors (`DilateLeafNodesFunctor` and the host
+  `util::morphology::DilateLeafNodes`) are *thread-centric* — one thread per
+  output leaf, no warp/CTA cooperation — and every primitive they use
+  (`probeLeaf`, `valueMask`, `origin`, the word bit-ops) is already
+  `__hostdev__`. So the per-leaf body (gather neighbor leaves, register/word
+  dilation, write the output mask) could be factored into a single `__hostdev__`
+  function parameterized by the nearest-neighbor stencil, called by both the host
+  `util::forEach` and the CUDA `operatorKernel`. This would remove the current
+  duplication and its double-maintenance cost — e.g. the `[10][3][3]` stencil
+  UB fix (`01105613` host, `c199fcb3` cuda) had to be applied twice. Worth doing
+  once the operator set stabilizes.
+  - Note the contrast: `DilateInternalNodes` is **not** a candidate — it relies
+    on warp-cooperative `MaskShift` shuffles and `cub::WarpReduce`, so its host
+    and device decompositions differ in kind, not just in iteration harness.
