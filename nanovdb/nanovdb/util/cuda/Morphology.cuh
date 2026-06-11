@@ -717,9 +717,13 @@ struct DilateLeafNodesFunctor<BuildT, tools::morphology::NN_FACE_EDGE_VERTEX>
                 auto& dstLeaf = *dstLower.data()->getChild(jj+tID);
                 const auto leafOrigin = dstLeaf.origin();
 
+                // [x-voxel offset][y-block offset][z-block offset], stored with a +1 bias so the
+                // logical ranges [-1,8]x[-1,1]x[-1,1] map to valid [0,10)x[0,3)x[0,3) indices.
+                // (A reinterpret_cast view anchored at [1][1][1] with negative indices is
+                // out-of-object pointer arithmetic = UB; host GCC at -O2+ miscompiles it.)
                 uint64_t originalWordsShifted[10][3][3] = {};
-                using WordStencilT = uint64_t (&)[10][3][3]; // Dimensions: [x-voxel offset][y-block offset][z-block offset]
-                auto& originalWords = reinterpret_cast<WordStencilT>(originalWordsShifted[1][1][1]); // Range: [-1,8][-1,1][-1,1]
+                auto originalWords = [&](int i, int j, int k) -> uint64_t& {
+                    return originalWordsShifted[i+1][j+1][k+1]; };
 
                 for (int dBi = -1; dBi <= 1; dBi++)
                 for (int dBj = -1; dBj <= 1; dBj++)
@@ -728,41 +732,41 @@ struct DilateLeafNodesFunctor<BuildT, tools::morphology::NN_FACE_EDGE_VERTEX>
                     if (auto neighborLeafPtr = srcTree.root().probeLeaf(neighborOrigin)) {
                         auto neighborWords = neighborLeafPtr->valueMask().words();
                         if (dBi == -1)
-                            originalWords[-1][dBj][dBk] = neighborWords[7];
+                            originalWords(-1,dBj,dBk) = neighborWords[7];
                         else if (dBi == 1)
-                            originalWords[8][dBj][dBk] = neighborWords[0];
+                            originalWords(8,dBj,dBk) = neighborWords[0];
                         else
                             for (int i = 0; i < 8; i++)
-                                originalWords[i][dBj][dBk] = neighborWords[i]; } }
+                                originalWords(i,dBj,dBk) = neighborWords[i]; } }
                 // Dilate along z-axis
                 for (int i = -1; i <= 8; i++)
                 for (int dBj = -1; dBj <= 1; dBj++) {
-                    uint64_t dilatedWord = originalWords[i][dBj][0];
+                    uint64_t dilatedWord = originalWords(i,dBj,0);
                     // Activate voxel if the neighbor at stencil offset ( 0, 0, 1) is active
-                    dilatedWord |= (originalWords[i][dBj][ 0] & 0xfefefefefefefefeUL) >> 1;
-                    dilatedWord |= (originalWords[i][dBj][ 1] & 0x0101010101010101UL) << 7;
+                    dilatedWord |= (originalWords(i,dBj, 0) & 0xfefefefefefefefeUL) >> 1;
+                    dilatedWord |= (originalWords(i,dBj, 1) & 0x0101010101010101UL) << 7;
                     // Activate voxel if the neighbor at stencil offset ( 0, 0,-1) is active
-                    dilatedWord |= (originalWords[i][dBj][ 0] & 0x7f7f7f7f7f7f7f7fUL) << 1;
-                    dilatedWord |= (originalWords[i][dBj][-1] & 0x8080808080808080UL) >> 7;
+                    dilatedWord |= (originalWords(i,dBj, 0) & 0x7f7f7f7f7f7f7f7fUL) << 1;
+                    dilatedWord |= (originalWords(i,dBj,-1) & 0x8080808080808080UL) >> 7;
                     // Replace original with dilation result
-                    originalWords[i][dBj][0] = dilatedWord; }
+                    originalWords(i,dBj,0) = dilatedWord; }
 
                 // Dilate along y-axis
                 for (int i = -1; i <= 8; i++) {
-                    uint64_t dilatedWord = originalWords[i][0][0];
+                    uint64_t dilatedWord = originalWords(i,0,0);
                     // Activate voxel if the neighbor at stencil offset ( 0, 1, 0) is active
-                    dilatedWord |= (originalWords[i][ 0][0] & 0xffffffffffffff00UL) >> 8;
-                    dilatedWord |= (originalWords[i][ 1][0] & 0x00000000000000ffUL) << 56;
+                    dilatedWord |= (originalWords(i, 0,0) & 0xffffffffffffff00UL) >> 8;
+                    dilatedWord |= (originalWords(i, 1,0) & 0x00000000000000ffUL) << 56;
                     // Activate voxel if the neighbor at stencil offset ( 0,-1, 0) is active
-                    dilatedWord |= (originalWords[i][ 0][0] & 0x00ffffffffffffffUL) << 8;
-                    dilatedWord |= (originalWords[i][-1][0] & 0xff00000000000000UL) >> 56;
+                    dilatedWord |= (originalWords(i, 0,0) & 0x00ffffffffffffffUL) << 8;
+                    dilatedWord |= (originalWords(i,-1,0) & 0xff00000000000000UL) >> 56;
                     // Replace original with dilation result
-                    originalWords[i][0][0] = dilatedWord; }
+                    originalWords(i,0,0) = dilatedWord; }
 
                 // Dilate along x-axis
                 auto dilatedWords = const_cast<Mask<3>&>(dstLeaf.valueMask()).words();
                 for (int i = 0; i <= 7; i++)
-                    dilatedWords[i] = originalWords[i-1][0][0] | originalWords[i][0][0] | originalWords[i+1][0][0];
+                    dilatedWords[i] = originalWords(i-1,0,0) | originalWords(i,0,0) | originalWords(i+1,0,0);
             }
         return;
     }
