@@ -212,11 +212,12 @@ struct ReadTopologyOp
         }
 
         // Read in all child nodes and insert them into the table at their proper locations.
+        // Register the child before recursing so that node's destructor frees it on a throw.
         for (auto iter = childMask.beginOn(); iter; ++iter) {
             Coord origin = node.offsetToGlobalCoord(iter.pos());
             auto* child = new ChildT(PartialCreate(), origin, background);
-            (*this)(*child);
             node.setChildUnsafe(iter.pos(), child);
+            (*this)(*child);
         }
     }
 
