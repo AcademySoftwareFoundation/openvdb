@@ -893,14 +893,15 @@ Archive::findCodec(const std::string& gridType, const io::ReadOptions& options)
     // if readMode is Half, then search for a codec that converts
     // from the storage grid type to the grid type
     if (options.readMode == ReadMode::Half) {
-        return io::CodecRegistry::get(gridType + "_to_half");
+        if (auto* codec = io::CodecRegistry::get(gridType + "_to_half")) return codec;
     } else if (options.readMode == ReadMode::Bool) {
-        return io::CodecRegistry::get(gridType + "_to_bool");
+        if (auto* codec = io::CodecRegistry::get(gridType + "_to_bool")) return codec;
     } else if (options.readMode == ReadMode::Mask) {
-        return io::CodecRegistry::get(gridType + "_to_mask");
+        if (auto* codec = io::CodecRegistry::get(gridType + "_to_mask")) return codec;
     }
 
-    // Determine the I/O codec to use to read this grid
+    // Determine the I/O codec to use to read this grid (also the fallback when
+    // no conversion codec is registered for a Half/Bool/Mask readMode).
     return io::CodecRegistry::get(gridType);
 }
 

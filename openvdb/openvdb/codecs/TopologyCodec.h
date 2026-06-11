@@ -339,6 +339,23 @@ struct TopologyCodec : public io::Codec
     void readTopology(std::istream& is, io::CodecData& data, const io::ReadOptions& options,
         io::ReadDiagnostics& diagnostics) final
     {
+        // Warn when a conversion readMode was requested but this codec is a
+        // non-conversion instance (GridT == StorageGridT), meaning no conversion
+        // codec was registered for this grid type and we are falling back to the
+        // original type.
+        if constexpr (std::is_same_v<GridT, StorageGridT>) {
+            if (options.readMode == io::ReadMode::Half ||
+                options.readMode == io::ReadMode::Bool ||
+                options.readMode == io::ReadMode::Mask)
+            {
+                const std::string modeStr =
+                    options.readMode == io::ReadMode::Half ? "Half" :
+                    options.readMode == io::ReadMode::Bool ? "Bool" : "Mask";
+                diagnostics.addWarning(data.grid->getName(),
+                    "ReadMode::" + modeStr + " conversion is not supported for grid type '"
+                    + GridT::gridType() + "'; reading as original type");
+            }
+        }
         internal::topologyCodecReadTopology<GridT, StorageGridT>(*data.grid, is, options, diagnostics);
     }
 
