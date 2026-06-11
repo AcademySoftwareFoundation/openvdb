@@ -278,19 +278,21 @@ void DilateGrid<BuildT>::dilateLeafNodes()
 {
     // Dilates the active masks of the source grid (as indicated at the leaf level), into a new grid that
     // has been already topologically dilated to include all necessary leaf nodes.
-    if (mBuilder.data()->nodeCount[1]) { // Unless output grid is empty
-        if (mOp == morphology::NN_FACE) {
-            using Op = util::morphology::cuda::DilateLeafNodesFunctor<BuildT, morphology::NN_FACE>;
-            util::cuda::operatorKernel<Op>
-                <<<dim3(mBuilder.data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-                (mDeviceSrcGrid, static_cast<GridT*>(mBuilder.data()->d_bufferPtr)); }
+
+    // Drain upstream work on the stream before the host dilates into the output leaf masks
+    // and reads the source grid host-side.
+    cudaCheck(cudaStreamSynchronize(mStream));
+
+    if (mBuilder.data()->nodeCount[0]) { // Unless output grid is empty
+        auto dstGrid = static_cast<GridT*>(mBuilder.data()->d_bufferPtr);
+        if (mOp == morphology::NN_FACE)
+            util::morphology::DilateLeafNodes<BuildT, morphology::NN_FACE>(
+                mDeviceSrcGrid, dstGrid, mBuilder.data()->nodeCount[0]);
         else if (mOp == morphology::NN_FACE_EDGE)
             throw std::runtime_error("dilateLeafNodes() not implemented for NN_FACE_EDGE stencil");
-        else if (mOp == morphology::NN_FACE_EDGE_VERTEX) {
-            using Op = util::morphology::cuda::DilateLeafNodesFunctor<BuildT, morphology::NN_FACE_EDGE_VERTEX>;
-            util::cuda::operatorKernel<Op>
-                <<<dim3(mBuilder.data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock>>>
-                (mDeviceSrcGrid, static_cast<GridT*>(mBuilder.data()->d_bufferPtr)); }
+        else if (mOp == morphology::NN_FACE_EDGE_VERTEX)
+            util::morphology::DilateLeafNodes<BuildT, morphology::NN_FACE_EDGE_VERTEX>(
+                mDeviceSrcGrid, dstGrid, mBuilder.data()->nodeCount[0]);
     }
 
     // Update leaf offsets and prefix sums

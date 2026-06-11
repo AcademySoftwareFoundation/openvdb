@@ -541,6 +541,148 @@ inline void DilateInternalNodes(
     });
 }
 
+/// @brief Dilate the leaf value masks of the source grid into the (already topologically dilated)
+///        output grid. Host counterpart to the CUDA DilateLeafNodesFunctor; templated on the
+///        nearest-neighbor stencil (NN_FACE or NN_FACE_EDGE_VERTEX; NN_FACE_EDGE is unsupported at
+///        leaf level, matching CUDA, and is guarded out by the operator).
+///
+/// @param srcGrid    (in)  Source grid being dilated (read host-side; see MergeInternalNodes' note).
+/// @param dstGrid    (in/out) Output grid whose leaf value masks receive the dilated result.
+/// @param leafCount  (in)  Number of leaf nodes in the output grid (nodeCount[0]).
+///
+/// Iteration is flat over the output leaves. Each output leaf is computed independently from the
+/// source grid's corresponding leaf and its neighbors (probeLeaf) with register/word bit-ops, so
+/// the writes are to distinct masks -- no atomics. The per-leaf bodies are copied verbatim from the
+/// CUDA functor (which is already thread-centric: no warp/CTA cooperation).
+template<typename BuildT, tools::morphology::NearestNeighbors nnType>
+inline void DilateLeafNodes(
+    const NanoGrid<BuildT> *srcGrid,
+    NanoGrid<BuildT> *dstGrid,
+    std::size_t leafCount)
+{
+    util::forEach(0, leafCount, 1, [=](const util::Range1D &r) {
+        const auto& srcTree = srcGrid->tree();
+        auto& dstTree = dstGrid->tree();
+        for (auto leafID = r.begin(); leafID != r.end(); ++leafID) {
+            auto& dstLeaf = dstTree.template getFirstNode<0>()[leafID];
+            const auto leafOrigin = dstLeaf.origin();
+
+            if constexpr (nnType == tools::morphology::NN_FACE) {
+                auto originalLeafPtr  = srcTree.root().probeLeaf(leafOrigin);
+                uint64_t originalWords[8] = {}, dilatedWords[8]; // Keep these in registers
+                if (originalLeafPtr)
+                    for (int i = 0; i < 8; i++)
+                        originalWords[i] = originalLeafPtr->valueMask().words()[i];
+
+                for (int i = 0; i < 8; i++) {
+                    dilatedWords[i] = originalWords[i];
+                    // Activate voxel if the neighbor at stencil offset ( 1, 0, 0) is active
+                    if (i < 7) dilatedWords[i] |= originalWords[i+1];
+                    // Activate voxel if the neighbor at stencil offset (-1, 0, 0) is active
+                    if (i > 0) dilatedWords[i] |= originalWords[i-1];
+
+                    // Activate voxel if the neighbor at stencil offset ( 0, 1, 0) is active
+                    dilatedWords[i] |= (originalWords[i] & 0xffffffffffffff00UL) >> 8;
+                    // Activate voxel if the neighbor at stencil offset ( 0,-1, 0) is active
+                    dilatedWords[i] |= (originalWords[i] & 0x00ffffffffffffffUL) << 8;
+
+                    // Activate voxel if the neighbor at stencil offset ( 0, 0, 1) is active
+                    dilatedWords[i] |= (originalWords[i] & 0xfefefefefefefefeUL) >> 1;
+                    // Activate voxel if the neighbor at stencil offset ( 0, 0,-1) is active
+                    dilatedWords[i] |= (originalWords[i] & 0x7f7f7f7f7f7f7f7fUL) << 1;
+                }
+
+                auto leafPlusXPtr  = srcTree.root().probeLeaf(leafOrigin.offsetBy( 8, 0, 0));
+                auto leafMinusXPtr = srcTree.root().probeLeaf(leafOrigin.offsetBy(-8, 0, 0));
+                auto leafPlusYPtr  = srcTree.root().probeLeaf(leafOrigin.offsetBy( 0, 8, 0));
+                auto leafMinusYPtr = srcTree.root().probeLeaf(leafOrigin.offsetBy( 0,-8, 0));
+                auto leafPlusZPtr  = srcTree.root().probeLeaf(leafOrigin.offsetBy( 0, 0, 8));
+                auto leafMinusZPtr = srcTree.root().probeLeaf(leafOrigin.offsetBy( 0, 0,-8));
+
+                // Activate voxel if the neighbor at stencil offset ( 1, 0, 0) is active
+                if (leafPlusXPtr) dilatedWords[7] |= leafPlusXPtr->valueMask().words()[0];
+                // Activate voxel if the neighbor at stencil offset (-1, 0, 0) is active
+                if (leafMinusXPtr) dilatedWords[0] |= leafMinusXPtr->valueMask().words()[7];
+
+                // Activate voxel if the neighbor at stencil offset ( 0, 1, 0) is active
+                if (leafPlusYPtr)
+                    for (int i = 0; i < 8; i++)
+                        dilatedWords[i] |= (leafPlusYPtr->valueMask().words()[i] & 0x00000000000000ffUL) << 56;
+                // Activate voxel if the neighbor at stencil offset ( 0,-1, 0) is active
+                if (leafMinusYPtr)
+                    for (int i = 0; i < 8; i++)
+                        dilatedWords[i] |= (leafMinusYPtr->valueMask().words()[i] & 0xff00000000000000UL) >> 56;
+
+                // Activate voxel if the neighbor at stencil offset ( 0, 0, 1) is active
+                if (leafPlusZPtr)
+                    for (int i = 0; i < 8; i++)
+                        dilatedWords[i] |= (leafPlusZPtr->valueMask().words()[i] & 0x0101010101010101UL) << 7;
+                // Activate voxel if the neighbor at stencil offset ( 0, 0,-1) is active
+                if (leafMinusZPtr)
+                    for (int i = 0; i < 8; i++)
+                        dilatedWords[i] |= (leafMinusZPtr->valueMask().words()[i] & 0x8080808080808080UL) >> 7;
+
+                auto& dilatedMask = const_cast<Mask<3>&>(dstLeaf.valueMask());
+                for (int i = 0; i < 8; i++)
+                    dilatedMask.words()[i] = dilatedWords[i];
+            }
+
+            if constexpr (nnType == tools::morphology::NN_FACE_EDGE_VERTEX) {
+                // [x-voxel offset][y-block offset][z-block offset], stored with a +1 bias so the
+                // logical ranges [-1,8]x[-1,1]x[-1,1] map to valid [0,10)x[0,3)x[0,3) indices.
+                // (The CUDA functor uses a reinterpret_cast + negative indexing; on the host that
+                // is out-of-subobject-bounds UB that the optimizer mishandles, so we bias instead.)
+                uint64_t originalWordsShifted[10][3][3] = {};
+                auto originalWords = [&](int i, int j, int k) -> uint64_t& {
+                    return originalWordsShifted[i+1][j+1][k+1]; };
+
+                for (int dBi = -1; dBi <= 1; dBi++)
+                for (int dBj = -1; dBj <= 1; dBj++)
+                for (int dBk = -1; dBk <= 1; dBk++) {
+                    auto neighborOrigin = leafOrigin.offsetBy( dBi*8, dBj*8, dBk*8);
+                    if (auto neighborLeafPtr = srcTree.root().probeLeaf(neighborOrigin)) {
+                        auto neighborWords = neighborLeafPtr->valueMask().words();
+                        if (dBi == -1)
+                            originalWords(-1,dBj,dBk) = neighborWords[7];
+                        else if (dBi == 1)
+                            originalWords(8,dBj,dBk) = neighborWords[0];
+                        else
+                            for (int i = 0; i < 8; i++)
+                                originalWords(i,dBj,dBk) = neighborWords[i]; } }
+                // Dilate along z-axis
+                for (int i = -1; i <= 8; i++)
+                for (int dBj = -1; dBj <= 1; dBj++) {
+                    uint64_t dilatedWord = originalWords(i,dBj,0);
+                    // Activate voxel if the neighbor at stencil offset ( 0, 0, 1) is active
+                    dilatedWord |= (originalWords(i,dBj, 0) & 0xfefefefefefefefeUL) >> 1;
+                    dilatedWord |= (originalWords(i,dBj, 1) & 0x0101010101010101UL) << 7;
+                    // Activate voxel if the neighbor at stencil offset ( 0, 0,-1) is active
+                    dilatedWord |= (originalWords(i,dBj, 0) & 0x7f7f7f7f7f7f7f7fUL) << 1;
+                    dilatedWord |= (originalWords(i,dBj,-1) & 0x8080808080808080UL) >> 7;
+                    // Replace original with dilation result
+                    originalWords(i,dBj,0) = dilatedWord; }
+
+                // Dilate along y-axis
+                for (int i = -1; i <= 8; i++) {
+                    uint64_t dilatedWord = originalWords(i,0,0);
+                    // Activate voxel if the neighbor at stencil offset ( 0, 1, 0) is active
+                    dilatedWord |= (originalWords(i, 0,0) & 0xffffffffffffff00UL) >> 8;
+                    dilatedWord |= (originalWords(i, 1,0) & 0x00000000000000ffUL) << 56;
+                    // Activate voxel if the neighbor at stencil offset ( 0,-1, 0) is active
+                    dilatedWord |= (originalWords(i, 0,0) & 0x00ffffffffffffffUL) << 8;
+                    dilatedWord |= (originalWords(i,-1,0) & 0xff00000000000000UL) >> 56;
+                    // Replace original with dilation result
+                    originalWords(i,0,0) = dilatedWord; }
+
+                // Dilate along x-axis
+                auto dilatedWords = const_cast<Mask<3>&>(dstLeaf.valueMask()).words();
+                for (int i = 0; i <= 7; i++)
+                    dilatedWords[i] = originalWords(i-1,0,0) | originalWords(i,0,0) | originalWords(i+1,0,0);
+            }
+        }
+    });
+}
+
 }// namespace nanovdb::util::morphology
 
 #endif // NANOVDB_UTIL_MORPHOLOGY_H_HAS_BEEN_INCLUDED
