@@ -559,7 +559,7 @@ and then a small number of warm-start timing lines.
 | 4.5   | Morphology functors → host equivalents (MergeGrids subset) | **Done** for `MergeGrids` (see 7.2) |
 | 4.6   | CUB scans → `util::inclusiveScan`           | **Done** (`858afe79`, `ed109ddd`) |
 | 4.7   | Drop CUDA artifacts; `.cu` → `.cpp`         | Pending (see 7.3) |
-| 4.8   | Repeat 4.1–4.7 for Coarsen → Refine → Dilate → Prune | Pending (Merge is the template) |
+| 4.8   | Repeat 4.1–4.7 for the remaining operators | **In progress** — `DilateGrid` compute ported (see 7.7); Coarsen/Refine/Prune pending |
 
 ### 7.2  Per-method porting status (MergeGrids `getHandle` pipeline)
 
@@ -673,19 +673,49 @@ NanoVDB core headers, so they affect every consumer:
 
 ### 7.7  Extension to the other operators (Phase 4.8)
 
-`MergeGrids` is now the complete worked template for the host pattern. The
-remaining operators (`CoarsenGrid`, `RefineGrid`, `DilateGrid`, `PruneGrid`)
-reuse the already-host `TopologyBuilder` pipeline (7.2) unchanged and need only
-their own operator-specific functors ported into `util/Morphology.h`:
+`MergeGrids` is the complete worked template for the host pattern. The remaining
+operators (`CoarsenGrid`, `RefineGrid`, `DilateGrid`, `PruneGrid`) reuse the
+already-host `TopologyBuilder` pipeline (7.2) unchanged and need only their own
+operator-specific functors ported into `util/Morphology.h`.
+
+#### DilateGrid — compute ported (`tools/DilateGrid.h`, `ex_dilate_nanovdb_cpu`)
+
+The two compute-bearing operator methods run on the host; `dilateRoot` and
+`processGridTreeRoot` retain CUDA for now (the merge playbook: `processGridTreeRoot`
+is a verbatim reuse of merge's host version, `dilateRoot` is the drop-the-D2H-copy
+cleanup). The TopologyBuilder pipeline it rides on is already host.
+
+| Stage (call order in `getHandle`) | Owner | Status | Commit | Notes |
+|-----------------------------------|-------|--------|--------|-------|
+| `dilateRoot`           | DilateGrid | retained CUDA | — | host `std::map` tile speculation + D2H copy + `DeviceBuffer` upload |
+| `dilateInternalNodes`  | DilateGrid | **HOST** | `180b081a` | `util::morphology::DilateInternalNodes`; built on the validated host `MaskShift` |
+| `processGridTreeRoot`  | DilateGrid | retained CUDA | — | trivial; reuse merge's host version |
+| `dilateLeafNodes`      | DilateGrid | **HOST** | `01105613` | `util::morphology::DilateLeafNodes` (`NN_FACE`, `NN_FACE_EDGE_VERTEX`; `NN_FACE_EDGE` throws) |
+
+New host pieces (validated three ways for `MaskShift`: brute-force oracle,
+exhaustive single-bit sweep, and a bit-exact differential vs the device `MaskShift`):
+
+- `util/MorphologyHelpers.h`: `util::shuffleDown`/`shuffleUp` (unmasked flat-array
+  shuffles) and the host `util::morphology::MaskShift` (`6e7401eb`).
+- `util/Morphology.h`: `DilateInternalNodes` (offset-mask aggregation → 27-direction
+  `MaskShift` block → atomic scatter) and `DilateLeafNodes`.
+
+`ex_dilate_nanovdb_cpu` (UnifiedBuffer source + getHandle, dilate-only — no prune
+round-trip yet) checks CORRECT against `dilateActiveValues` across
+dragon/armadillo/iss/space for both `NN_FACE` and the full 26-connected
+`NN_FACE_EDGE_VERTEX`.
+
+Remaining for DilateGrid: `processGridTreeRoot`/`dilateRoot` host conversion (the
+same Phase 4.4/4.7 plumbing as merge), then the dilate→prune round-trip once
+PruneGrid lands.
+
+#### Still to port
 
 - `CoarsenInternalNodesFunctor`, `RefineInternalNodesFunctor`,
-  `DilateInternalNodesFunctor`, `PruneInternalNodesFunctor` (+ their leaf-side
-  siblings), following the `MergeInternalNodes`/`MergeLeafNodes` model.
+  `PruneInternalNodesFunctor` (+ their leaf-side siblings), following the
+  `MergeInternalNodes`/`MergeLeafNodes` (and now `Dilate*`) model.
 - `PruneGrid` additionally takes a `Mask<3>*` leaf-mask sidecar (produced by the
   dilate round-trip in `ex_dilate_nanovdb_cpu`).
-- `DilateGrid` carries the `NN_FACE`/`NN_FACE_EDGE`/`NN_FACE_EDGE_VERTEX`
-  variants; `NN_FACE_EDGE` at leaf level is unimplemented in CUDA and throws —
-  preserve that on host.
 
 All operators continue to pass bit-exact `bufferCheck` against the OpenVDB
 reference; the port maintains this invariant at every commit.
