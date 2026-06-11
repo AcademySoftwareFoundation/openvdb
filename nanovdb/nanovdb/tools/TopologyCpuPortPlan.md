@@ -611,9 +611,11 @@ CUDA cooperative-block/warp structure — this divergence is by design.
    zero-fill, `deviceUpload`). These become unnecessary once the upstream
    allocations/transfers (Phase 4.4 and the `getBuffer`/`allocateInternalMaskBuffers`
    memsets) are themselves host-side.
-5. **`updateChecksum`.** `postProcessGridTree` still calls
-   `tools::cuda::updateChecksum` (a separate subsystem, gated by `mChecksum`,
-   default `Disable`). Needs a host checksum path or to be made conditional.
+5. **`updateChecksum`. — DONE (`333c942d`).** `postProcessGridTree` now calls the
+   host `tools::updateChecksum` (`tools/GridChecksum.h`) on the managed buffer
+   instead of `tools::cuda::updateChecksum`. Host and CUDA checksums produce
+   identical values, so the byte-exact `bufferCheck` still passes; this also
+   removed a host→device migration artifact (see §7.8).
 6. **Phase 4.7 — completion signal.** Fold
    `merge_nanovdb_cpu_kernels.cu` into `merge_nanovdb_cpu.cpp` (rename `.cu` →
    `.cpp`); once no `.cu` remains and the CUDA includes are gone, the CMake
@@ -687,3 +689,53 @@ their own operator-specific functors ported into `util/Morphology.h`:
 
 All operators continue to pass bit-exact `bufferCheck` against the OpenVDB
 reference; the port maintains this invariant at every commit.
+
+### 7.8  Performance observations (MergeGrids, indicative)
+
+Measured on the dragon+armadillo pair (build machine, sm_120), comparing
+`ex_merge_nanovdb_cpu` against `ex_merge_nanovdb_cuda`. Numbers are indicative,
+not a benchmark — there is meaningful run-to-run jitter (TBB scheduling,
+managed-memory residency), so treat them as ballpark.
+
+**Overall:** warm-start total ≈ **CPU 10–11 ms vs CUDA ~0.8 ms ≈ 13×**. A ~13×
+host-vs-GPU gap on sparse topology work is expected and not pathological.
+
+**Per-stage (first/cold call), the two dominant CPU stages:**
+
+| Stage                | CPU cold | CPU warm | CUDA  |
+|----------------------|---------:|---------:|------:|
+| `processLowerNodes`  | ~4.9 ms  | ~4.5 ms  | 0.09 ms |
+| `mergeLeafNodes`     | ~3.9 ms  | ~2.1 ms  | 0.10 ms |
+| `mergeInternalNodes` | ~2.2 ms  | ~1.0 ms  | 1.25 ms |
+| (all others)         | small    | small    | small |
+
+**Key findings:**
+
+1. **Not a one-time cold-start artifact.** The 5 warm-start iterations stay flat
+   at ~10–11 ms with no decay toward the CUDA figure; a true warmup artifact
+   would show iteration 1 ≫ iteration 5.
+
+2. **Cold→warm decay splits by *which buffer* a stage touches.**
+   - `mergeInternalNodes`/`mergeLeafNodes` roughly **halve** cold→warm. They read
+     the **source grids**, which persist across `getHandle` calls (same
+     converter), so their managed pages migrate device→host once and stay
+     host-resident — first-touch cost, genuinely cold-start.
+   - `processLowerNodes` **barely moves** (4.9→4.5). It works on the **output
+     grid buffer**, which `getBuffer` freshly allocates and `cudaMemsetAsync`-
+     zeroes *on the device* every call, so the host re-faults those pages on
+     **every** call. This is a *recurring* hybrid-buffer migration cost, not
+     warmup — and it is expected to drop once Phase 4.4/4.7 move the
+     allocation/zero-fill host-side (no device-resident output pages to migrate).
+
+3. **`forEach` grain size is not the lever.** A quick test bumping
+   `ProcessLowerNodes`' grain from 1 → 64 (4096 word-tasks → 64 chunks) did
+   **not** improve the stage (5.49 vs 4.94 ms cold, within jitter). So the cost
+   is real work + page migration, not TBB task-scheduling overhead from
+   `grain=1`. Conclusion: **defer any `forEach`-grain / perf tuning until after
+   the Phase 4.4/4.7 buffer cleanup**, then re-measure — the cleanup is likely
+   to change the hot-spot ranking and remove the migration noise that currently
+   contaminates these numbers.
+
+The host checksum swap (`333c942d`) already removed one such artifact:
+`postProcessGridTree` dropped from ~1.64 ms to ~0.17 ms once it stopped invoking
+the device checksum kernel on a host-written managed buffer.
