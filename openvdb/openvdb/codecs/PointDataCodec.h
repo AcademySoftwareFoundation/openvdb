@@ -355,7 +355,17 @@ struct PointDataCodec final: public TopologyCodec<GridT>
         // An empty pointAttributeNames means no filtering (read all attributes).
         std::set<Index> skipIndices;
         if (!pointAttributeNames.empty() && !leaves.empty()) {
-            const auto& nameMap = leaves[0]->attributeSet().descriptor().map();
+            // Attribute filtering requires homogeneous descriptors across all
+            // leaves because skip decisions are made per-index across all leaves.
+            const auto* firstDesc = &leaves[0]->attributeSet().descriptor();
+            for (size_t i = 1; i < leaves.size(); ++i) {
+                if (&leaves[i]->attributeSet().descriptor() != firstDesc) {
+                    OPENVDB_THROW(IoError,
+                        "Attribute filtering is not supported for PointDataGrids "
+                        "with heterogeneous descriptors");
+                }
+            }
+            const auto& nameMap = firstDesc->map();
             const std::set<std::string> wantedNames(
                 pointAttributeNames.begin(),
                 pointAttributeNames.end());
