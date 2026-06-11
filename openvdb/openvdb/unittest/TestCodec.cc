@@ -78,6 +78,24 @@ TEST_F(TestCodec, testCodecRegistry)
 }
 
 
+TEST_F(TestCodec, testInitializeIdempotent)
+{
+    using namespace openvdb::io;
+
+    // Calling initialize() twice without uninitialize() in between must not throw.
+    // Previously registerCodecByName() threw KeyError on the duplicate registration.
+    CodecRegistry::clear();
+    EXPECT_NO_THROW(internal::initialize());
+    EXPECT_NO_THROW(internal::initialize());
+
+    // Codecs must still be registered after the second call.
+    EXPECT_TRUE(CodecRegistry::isRegistered(openvdb::BoolGrid::gridType()));
+    EXPECT_TRUE(CodecRegistry::isRegistered(openvdb::FloatGrid::gridType()));
+
+    internal::uninitialize();
+}
+
+
 TEST_F(TestCodec, testReadDiagnostics)
 {
     using namespace openvdb;
