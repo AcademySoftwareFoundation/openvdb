@@ -20,6 +20,7 @@
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
+#include <nanovdb/tools/GridChecksum.h>
 #include <nanovdb/util/ForEach.h>
 #include <nanovdb/util/Morphology.h>
 #include <nanovdb/util/PrefixSum.h>
@@ -601,7 +602,9 @@ inline void TopologyBuilder<BuildT>::postProcessGridTree(cudaStream_t stream)
     }
     mVoxelOffsets.clear();
 
-    tools::cuda::updateChecksum((GridData*)data()->d_bufferPtr, mChecksum, stream);
+    // Host checksum over the managed output buffer (the grid was just written host-side,
+    // so this avoids the host->device page migration a device checksum would force).
+    tools::updateChecksum((GridData*)data()->d_bufferPtr, mChecksum);
 }// TopologyBuilder<BuildT>::postProcessGridTree
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
