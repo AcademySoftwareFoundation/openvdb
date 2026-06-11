@@ -800,7 +800,7 @@ Archive::readGridCompression(std::istream& is)
 {
     checkFormatVersion(is);
 
-    if (mFileVersion >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+    if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
         uint32_t c = COMPRESS_NONE;
         is.read(reinterpret_cast<char*>(&c), sizeof(uint32_t));
         io::setDataCompression(is, c);
