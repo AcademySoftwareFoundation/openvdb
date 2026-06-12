@@ -569,7 +569,7 @@ the host.** No `lambdaKernel`/`operatorKernel` launches remain in either
 
 | Stage (call order in `getHandle`)        | Owner          | Status | Commit      | Notes |
 |------------------------------------------|----------------|--------|-------------|-------|
-| `mergeRoot`                              | MergeGrids     | HOST   | `2b75d970`  | `std::map` tile merge; still D2H-copies source roots (transitional) + `mProcessedRoot.deviceUpload` |
+| `mergeRoot`                              | MergeGrids     | HOST   | `2b75d970`  | `std::map` tile merge into `mProcessedRoot` (now HostBuffer); still D2H-copies the source roots (dropped in Step 4 §7.3) |
 | `allocateInternalMaskBuffers`            | TopologyBuilder| alloc  | —           | No kernel; `cudaMemsetAsync` zero-fill of `mUpperMasks`/`mLowerMasks` |
 | `mergeInternalNodes`                     | MergeGrids     | HOST   | `b7f41d26`  | `util::morphology::MergeInternalNodes`; OR into lower masks + `setOnAtomic` upper masks |
 | `countNodes`                             | TopologyBuilder| HOST   | `858afe79`, `67e8d5c0` | `EnumerateNodes` + `util::inclusiveScan` |
@@ -588,39 +588,54 @@ CUDA `util/cuda/Morphology.cuh`): `EnumerateNodes`, `ProcessLowerNodes`,
 `util::forEach` parallelization (word-granular or per-node), distinct from the
 CUDA cooperative-block/warp structure — this divergence is by design.
 
-### 7.3  What remains for MergeGrids (transitional plumbing, not compute)
+### 7.3  Shared host-only cleanup (transitional plumbing, not compute)
 
-1. **Source grids are now `UnifiedBuffer`** (`ex_merge_nanovdb_cpu`, `b7f41d26`).
-   The operator still receives device-side pointers and `mergeRoot` still does
-   its D2H copy; `mergeInternalNodes`/`mergeLeafNodes`/`processGridTreeRoot`
-   instead read those pointers host-side, relying on managed-memory
-   accessibility, each guarded by a leading `cudaStreamSynchronize`. The D2H
-   copy in `mergeRoot` can be removed once we commit to the managed-access
-   assumption everywhere.
-2. **Phase 4.4 — dual-mode buffers.** `mData` and `mProcessedRoot` are still
-   `nanovdb::cuda::DeviceBuffer` with host-copy + `deviceUpload`. Migrate to
-   `UnifiedBuffer` and collapse the host/device accessor pairs
-   (`data()`/`deviceData()`, `hostProcessedRoot()`/`deviceProcessedRoot()`).
-3. **Dead code to remove.** `TopologyBuilder::mNumThreads`/`numBlocks`, the
-   `CALL_CUBS` macro, `mTempDevicePool`, and the `MergeGrids::mNumThreads`
-   constant are all now unused. Removing `CALL_CUBS` should let us drop the
-   `#include <cub/cub.cuh>` from `MergeGrids.h`, and the various
-   `util/cuda/*` includes can be audited for removal.
-4. **Residual `cudaStreamSynchronize` drains.** Several ported methods begin
-   with a stream-sync to drain upstream device work (mask memsets, buffer
-   zero-fill, `deviceUpload`). These become unnecessary once the upstream
-   allocations/transfers (Phase 4.4 and the `getBuffer`/`allocateInternalMaskBuffers`
-   memsets) are themselves host-side.
-5. **`updateChecksum`. — DONE (`333c942d`).** `postProcessGridTree` now calls the
-   host `tools::updateChecksum` (`tools/GridChecksum.h`) on the managed buffer
-   instead of `tools::cuda::updateChecksum`. Host and CUDA checksums produce
-   identical values, so the byte-exact `bufferCheck` still passes; this also
-   removed a host→device migration artifact (see §7.8).
-6. **Phase 4.7 — completion signal.** Fold
-   `merge_nanovdb_cpu_kernels.cu` into `merge_nanovdb_cpu.cpp` (rename `.cu` →
-   `.cpp`); once no `.cu` remains and the CUDA includes are gone, the CMake
-   `nanovdb_example` target stops invoking nvcc. Remove the `\warning … include
-   only from .cu files …` doxygen notes from the operator headers.
+This is the shared Phase 4.4/4.7 sweep across the three ported operators
+(Merge/Dilate/Prune) and `TopologyBuilder`. The end state is no device memory at
+all: all working buffers `HostBuffer`, inputs presumed host-resident, headers
+compiling as pure C++ (no `cuda.h`). UnifiedBuffer was only a transitional crutch;
+we migrate straight to `HostBuffer`.
+
+**Done — `TopologyBuilder`'s own working state is now host-only:**
+
+1. **Scratch (masks/offsets/parents) → `HostBuffer`** (`db146183`). `ScratchBufferT
+   = nanovdb::HostBuffer`; `create()` drops the device/stream args; mask zero-fills
+   `cudaMemsetAsync` → `std::memset`; `deviceUpperMasks()/deviceLowerMasks()`
+   deleted.
+2. **`mProcessedRoot` → `HostBuffer`** (`56f480b8`). It shares the `ScratchBufferT`
+   policy (transient scratch); the alias is now public on `TopologyBuilder` and the
+   operators alias *it* (`typename TopologyBuilder<BuildT>::ScratchBufferT`) rather
+   than re-declaring. Dropped the `<op>Root` `deviceUpload` and `deviceProcessedRoot()`.
+3. **`mData` → plain `Data` member** (`5fee27c3`) and **`Data::d_upperOffsets`
+   removed** (`82f71cde`). No `DeviceBuffer`, no `deviceUpload`, no `deviceData()`;
+   `processUpperNodes` reads `mUpperOffsets` directly. (Verified mData never had an
+   intentional host/device divergence — the device copy was a pure upload target
+   with no reader.) `Data` is now `{d_bufferPtr, grid..size offsets, nodeCount[3]}`
+   + `get*` accessors; `data()` is a trivial `&mData` accessor, kept (used ~60×).
+4. **`updateChecksum` → host** (`333c942d`, see §7.8).
+
+**Remaining (Step 4 — the output-buffer + example-coupled milestone):**
+
+5. **Output grid buffer → `HostBuffer`.** `getBuffer` still does
+   `BufferT::create(size,&pool,device,stream)` + `cudaMemsetAsync(buffer.deviceData())`
+   + `d_bufferPtr = buffer.deviceData()` (default `BufferT = UnifiedBuffer`). Flip to
+   `HostBuffer`: `create(size,&pool)`, `std::memset(buffer.data())`,
+   `d_bufferPtr = buffer.data()`. This is the one device allocation left in the flow.
+6. **Inputs presumed host-resident.** `getTreeData` (D2H via `DeviceGridTraits`) →
+   direct host read `mSrcTreeData = srcGrid->tree()`; drop `mergeRoot`'s remaining
+   source-root D2H (Dilate/Prune already read the managed source directly); drop the
+   `cudaStream_t` param from the host operator/`TopologyBuilder` signatures.
+7. **Residual `cudaStreamSynchronize` drains** — fall away once 5/6 land (no async
+   device work remains).
+8. **Dead code** — `TopologyBuilder::mNumThreads`/`numBlocks`, the `CALL_CUBS` macro,
+   `mTempDevicePool`, the per-operator `mNumThreads`; then drop `#include <cub/cub.cuh>`
+   and the `util/cuda/*` includes.
+9. **Examples + `.cu` → `.cpp` (completion signal).** `HostBuffer` inputs/output,
+   `deviceGrid()` → `grid()`, `bufferCheck` → `memcmp`. Merge can flip first (no
+   helper kernel) as the no-nvcc proof; Dilate additionally needs a **host
+   `InjectGridMask`** (its injection sidecar helper is still a CUDA kernel). Once no
+   `.cu` remains and the CUDA includes are gone, CMake stops invoking nvcc for the
+   example; remove the `\warning … include only from .cu files …` doxygen notes.
 
 ### 7.4  Core-header changes (affect both host and CUDA builds)
 
