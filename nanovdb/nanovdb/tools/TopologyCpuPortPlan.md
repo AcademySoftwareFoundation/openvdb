@@ -559,7 +559,7 @@ and then a small number of warm-start timing lines.
 | 4.5   | Morphology functors → host equivalents (MergeGrids subset) | **Done** for `MergeGrids` (see 7.2) |
 | 4.6   | CUB scans → `util::inclusiveScan`           | **Done** (`858afe79`, `ed109ddd`) |
 | 4.7   | Drop CUDA artifacts; `.cu` → `.cpp`         | Pending (see 7.3) |
-| 4.8   | Repeat 4.1–4.7 for the remaining operators | **In progress** — `DilateGrid` kernel-free, at merge parity (see 7.7); Coarsen/Refine/Prune pending |
+| 4.8   | Repeat 4.1–4.7 for the remaining operators | **In progress** — `DilateGrid` + `PruneGrid` kernel-free (see 7.7); Coarsen/Refine pending |
 
 ### 7.2  Per-method porting status (MergeGrids `getHandle` pipeline)
 
@@ -700,29 +700,46 @@ exhaustive single-bit sweep, and a bit-exact differential vs the device `MaskShi
 - `util/Morphology.h`: `DilateInternalNodes` (offset-mask aggregation → 27-direction
   `MaskShift` block → atomic scatter) and `DilateLeafNodes`.
 
-`ex_dilate_nanovdb_cpu` (UnifiedBuffer source + getHandle, dilate-only — no prune
-round-trip yet) checks CORRECT against `dilateActiveValues` across
-dragon/armadillo/iss/space for both `NN_FACE` and the full 26-connected
-`NN_FACE_EDGE_VERTEX`.
+`ex_dilate_nanovdb_cpu` (UnifiedBuffer source + getHandle) checks CORRECT against
+`dilateActiveValues` across dragon/armadillo/iss/space for both `NN_FACE` (the
+example default) and the full 26-connected `NN_FACE_EDGE_VERTEX`. It also runs the
+dilate→prune round-trip (see PruneGrid below).
 
 Remaining for DilateGrid is only the shared Phase 4.4/4.7 plumbing (dual-mode
-`mData`/`mProcessedRoot` → `UnifiedBuffer`, dead-code/`cub` removal, `.cu` → `.cpp`),
-then the dilate→prune round-trip once PruneGrid lands.
+`mData`/`mProcessedRoot` → `UnifiedBuffer`, dead-code/`cub` removal, `.cu` → `.cpp`).
 
 Also done as part of this work: the eight host `tools::topology::detail` functor
 `operator()`s in `TopologyBuilder.h` dropped their transitional `__hostdev__` (they are
 host-only now that every operator's `getHandle` is kernel-free) — `517f94b1`.
 
+#### PruneGrid — fully ported (`tools/PruneGrid.h`, via `ex_dilate_nanovdb_cpu`)
+
+All four operator methods run on the host; `PruneGrid.h` has no kernel launches and no D2H
+copies (only the shared Phase 4.4 `mProcessedRoot.deviceUpload` remains). Both functors are
+thread-centric — no `MaskShift`-class complexity — so PruneGrid went in following the dilate
+playbook in one pass (`e86cdee2`).
+
+| Stage (call order in `getHandle`) | Owner | Status | Notes |
+|-----------------------------------|-------|--------|-------|
+| `pruneRoot`           | PruneGrid | **HOST** | duplicates all source tiles (read directly from the managed grid; pruned later if empty) |
+| `pruneInternalNodes`  | PruneGrid | **HOST** | `util::morphology::PruneInternalNodes`: retain a source leaf iff its value mask intersects the sidecar; set pruned upper/lower masks via `setOnAtomic` |
+| `processGridTreeRoot` | PruneGrid | **HOST** | host `std::memcpy` + direct `BuildGridTreeRootFunctor` call |
+| `pruneLeafNodes`      | PruneGrid | **HOST** | `util::morphology::PruneLeafMasks`: output leaf value mask = source value mask ∩ sidecar (flat over source leaves, no atomics) |
+
+`PruneGrid` takes a `Mask<3>*` leaf-mask sidecar marking the voxels to retain. In the example
+the sidecar is the original (un-dilated) topology, injected per dilated leaf by the CUDA
+`InjectGridMaskFunctor` (an example helper, not part of PruneGrid, kept a kernel for now) into a
+`UnifiedBuffer` so the host operator can read it. The dilate→inject→prune round-trip recovers the
+original grid bit-exact: CORRECT for both DilateGrid and PruneGrid across dragon/armadillo/iss/
+space at `NN_FACE` and `NN_FACE_EDGE_VERTEX`.
+
 #### Still to port
 
-- `CoarsenInternalNodesFunctor`, `RefineInternalNodesFunctor`,
-  `PruneInternalNodesFunctor` (+ their leaf-side siblings), following the
-  `MergeInternalNodes`/`MergeLeafNodes` (and now `Dilate*`) model.
-- `PruneGrid` additionally takes a `Mask<3>*` leaf-mask sidecar (produced by the
-  dilate round-trip in `ex_dilate_nanovdb_cpu`).
+- `CoarsenGrid`, `RefineGrid`: their `Coarsen*`/`Refine*` internal- and leaf-node functors,
+  following the `Merge*`/`Dilate*`/`Prune*` model.
 
-All operators continue to pass bit-exact `bufferCheck` against the OpenVDB
-reference; the port maintains this invariant at every commit.
+All operators continue to pass bit-exact `bufferCheck` against the OpenVDB reference; the port
+maintains this invariant at every commit.
 
 ### 7.8  Performance observations (MergeGrids, indicative)
 
