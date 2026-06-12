@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
     using BuildT = nanovdb::ValueOnIndex;
 
     // Select the type of dilation here. dilateLeafNodes supports NN_FACE and NN_FACE_EDGE_VERTEX.
-    openvdb::tools::NearestNeighbors nnType = openvdb::tools::NN_FACE_EDGE_VERTEX;
+    openvdb::tools::NearestNeighbors nnType = openvdb::tools::NN_FACE;
 
     openvdb::util::CpuTimer cpuTimer;
     const bool printGridDiagnostics = true;
