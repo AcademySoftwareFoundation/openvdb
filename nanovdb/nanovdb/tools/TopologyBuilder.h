@@ -54,7 +54,6 @@ public:
 
     TopologyBuilder(cudaStream_t stream)
     {
-        mData = nanovdb::cuda::DeviceBuffer::create(sizeof(Data));
     }
 
     struct Data {
@@ -95,12 +94,11 @@ public:
     ScratchBufferT               mVoxelOffsets;
     ScratchBufferT               mLowerParents;
     ScratchBufferT               mLeafParents;
-    nanovdb::cuda::DeviceBuffer  mData;
+    Data                         mData{};
     CheckMode                    mChecksum{CheckMode::Disable};
 
     auto hostProcessedRoot()   { return static_cast<RootT*>(mProcessedRoot.data()); }
-    Data* data()             { return static_cast<Data*>(mData.data()); }
-    Data* deviceData()       { return static_cast<Data*>(mData.deviceData()); }
+    Data* data()             { return &mData; }
 
 private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
@@ -239,7 +237,6 @@ BufferT TopologyBuilder<BuildT>::getBuffer(const BufferT &pool, cudaStream_t str
 
     data()->d_bufferPtr = buffer.deviceData();
     if (data()->d_bufferPtr == nullptr) throw std::runtime_error("Failed to allocate grid buffer on the device");
-    mData.deviceUpload(device, stream, false);
 
     return buffer;
 }// TopologyBuilder<BuildT>::getBuffer
@@ -328,9 +325,8 @@ inline void TopologyBuilder<BuildT>::processUpperNodes(cudaStream_t stream)
     auto processedTileCount = hostProcessedRoot()->tileCount();
     if (processedTileCount == 0) return; // output grid is empty
 
-    // Drain upstream CUDA work (cudaMemsetAsync zero-fill of the output grid buffer +
-    // deviceUpload of mData in getBuffer) so the host code below can read/write through
-    // these regions safely.
+    // Drain upstream CUDA work (the cudaMemsetAsync zero-fill of the output grid buffer in
+    // getBuffer) so the host code below can read/write through it safely.
     cudaCheck(cudaStreamSynchronize(stream));
 
     auto data          = this->data();
