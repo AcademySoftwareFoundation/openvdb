@@ -263,7 +263,6 @@ namespace topology::detail {
 template <typename BuildT>
 struct BuildGridTreeRootFunctor
 {
-    __hostdev__
     void operator()(size_t, typename TopologyBuilder<BuildT>::Data *d_data) {
 
         // process Root
@@ -413,7 +412,6 @@ namespace topology::detail {
 template <typename BuildT>
 struct UpdateLeafVoxelCountsAndPrefixSumFunctor
 {
-    __hostdev__
     void operator()(size_t leafID, typename TopologyBuilder<BuildT>::Data *d_data, uint64_t *d_voxelCounts) {
         auto &leaf = d_data->getGrid().tree().template getFirstNode<0>()[leafID];
         const uint64_t *w = leaf.mValueMask.words();
@@ -430,7 +428,6 @@ struct UpdateLeafVoxelCountsAndPrefixSumFunctor
 template <typename BuildT>
 struct UpdateLeafVoxelOffsetsFunctor
 {
-    __hostdev__
     void operator()(size_t leafID, typename TopologyBuilder<BuildT>::Data *d_data, uint64_t *d_voxelOffsets) {
         auto &leaf = d_data->getGrid().tree().template getFirstNode<0>()[leafID];
         leaf.mOffset = d_voxelOffsets[leafID]+1; }
@@ -488,7 +485,6 @@ namespace topology::detail {
 template <typename BuildT>
 struct UpdateAndPropagateLeafBBoxFunctor
 {
-    __hostdev__
     void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data, const uint32_t* leafParents) {
         auto &lower = d_data->getLower(leafParents[tid]);
         auto &leaf = d_data->getLeaf(tid);
@@ -500,7 +496,6 @@ struct UpdateAndPropagateLeafBBoxFunctor
 template <typename BuildT>
 struct PropagateLowerBBoxFunctor
 {
-    __hostdev__
     void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data, const uint32_t* lowerParents) {
         auto &upper = d_data->getUpper(lowerParents[tid]);
         auto &lower = d_data->getLower(tid);
@@ -510,7 +505,6 @@ struct PropagateLowerBBoxFunctor
 template <typename BuildT>
 struct PropagateUpperBBoxFunctor
 {
-    __hostdev__
     void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data) {
         d_data->getRoot().mBBox.expandAtomic(d_data->getUpper(tid).bbox());
     }
@@ -519,7 +513,6 @@ struct PropagateUpperBBoxFunctor
 template <typename BuildT>
 struct UpdateRootWorldBBoxFunctor
 {
-    __hostdev__
     void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data) {
         // TODO: check that the correct semantics are followed in this transformation
         auto BBox = d_data->getRoot().mBBox;
@@ -579,7 +572,6 @@ namespace topology::detail {
 template <typename BuildT>
 struct PostProcessGridTreeFunctor
 {
-    __hostdev__
     void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data, uint64_t* d_voxelOffsets) {
         auto& grid = d_data->getGrid();
         auto& tree = grid.tree();
