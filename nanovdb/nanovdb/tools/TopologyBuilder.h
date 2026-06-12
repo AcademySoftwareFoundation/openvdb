@@ -16,7 +16,9 @@
 #ifndef NANOVDB_TOOLS_TOPOLOGYBUILDER_H_HAS_BEEN_INCLUDED
 #define NANOVDB_TOOLS_TOPOLOGYBUILDER_H_HAS_BEEN_INCLUDED
 
+#include <cstring>
 #include <nanovdb/NanoVDB.h>
+#include <nanovdb/HostBuffer.h>
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
@@ -42,14 +44,10 @@ class TopologyBuilder
     using LowerT = NanoLower<BuildT>;
     using LeafT  = NanoLeaf<BuildT>;
 
-    // Storage policy for device-only scratch (mask/offset/parent arrays + the
-    // local count buffers in countNodes()). UnifiedBuffer keeps kernels happy
-    // while making the scratch host-visible without explicit deviceDownload,
-    // which is the foundation needed before later phases replace kernel
-    // launches with host loops. End state of the port is HostBuffer.
-    // The dual-mode mProcessedRoot and mData remain DeviceBuffer for now
-    // and are migrated separately (see TopologyCpuPortPlan.md §4.4).
-    using ScratchBufferT = nanovdb::cuda::UnifiedBuffer;
+    // Storage policy for the host-only scratch (mask/offset/parent arrays). These are written
+    // and read entirely on the host now, so they are plain HostBuffer. The dual-mode
+    // mProcessedRoot and mData remain DeviceBuffer for now and migrate separately.
+    using ScratchBufferT = nanovdb::HostBuffer;
 
 public:
 
@@ -102,8 +100,6 @@ public:
 
     auto deviceProcessedRoot() { return static_cast<RootT*>(mProcessedRoot.deviceData()); }
     auto hostProcessedRoot()   { return static_cast<RootT*>(mProcessedRoot.data()); }
-    void* deviceUpperMasks() { return mUpperMasks.deviceData(); }
-    void* deviceLowerMasks() { return mLowerMasks.deviceData(); }
     Data* data()             { return static_cast<Data*>(mData.data()); }
     Data* deviceData()       { return static_cast<Data*>(mData.deviceData()); }
 
@@ -141,16 +137,14 @@ void TopologyBuilder<BuildT>::allocateInternalMaskBuffers(cudaStream_t stream)
     // Allocate (and zero-fill) buffers large enough to hold:
     // (a) The serialized masks of all upper nodes, for all tiles in the updated root node, and
     // (b) The serialized masks of all densified lower nodes, as if every upper node had a full set of 32^3 lower children
-    int device = 0;
-    cudaGetDevice(&device);
     uint64_t upperSize = hostProcessedRoot()->tileCount() * sizeof(Mask<5>);
     uint64_t lowerSize = hostProcessedRoot()->tileCount() * Mask<5>::SIZE * sizeof(Mask<4>);
-    mUpperMasks = ScratchBufferT::create(upperSize, nullptr, device, stream);
-    if (mUpperMasks.deviceData() == nullptr) throw std::runtime_error("Failed to allocate upper mask buffer on device");
-    cudaCheck(cudaMemsetAsync(mUpperMasks.deviceData(), 0, upperSize, stream));
-    mLowerMasks = ScratchBufferT::create( lowerSize, nullptr, device, stream );
-    if (mLowerMasks.deviceData() == nullptr) throw std::runtime_error("Failed to allocate lower mask buffer on device");
-    cudaCheck(cudaMemsetAsync(mLowerMasks.deviceData(), 0, lowerSize, stream));
+    mUpperMasks = ScratchBufferT::create(upperSize);
+    if (mUpperMasks.data() == nullptr) throw std::runtime_error("Failed to allocate upper mask buffer");
+    std::memset(mUpperMasks.data(), 0, upperSize);
+    mLowerMasks = ScratchBufferT::create(lowerSize);
+    if (mLowerMasks.data() == nullptr) throw std::runtime_error("Failed to allocate lower mask buffer");
+    std::memset(mLowerMasks.data(), 0, lowerSize);
 }// TopologyBuilder<BuildT>::allocateInternalMaskBuffers
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -177,11 +171,9 @@ void TopologyBuilder<BuildT>::countNodes(cudaStream_t stream)
     // [1..N] gives the inclusive sum; offsets[N] is the total.
     std::size_t size = processedTileCount*Mask<5>::SIZE;
 
-    int device = 0;
-    cudaGetDevice(&device);
-    mUpperOffsets = ScratchBufferT::create((processedTileCount+1)*sizeof(uint32_t), nullptr, device, stream);
-    mLowerOffsets = ScratchBufferT::create((size+1)*sizeof(uint32_t), nullptr, device, stream);
-    mLeafOffsets  = ScratchBufferT::create((size+1)*sizeof(uint32_t), nullptr, device, stream);
+    mUpperOffsets = ScratchBufferT::create((processedTileCount+1)*sizeof(uint32_t));
+    mLowerOffsets = ScratchBufferT::create((size+1)*sizeof(uint32_t));
+    mLeafOffsets  = ScratchBufferT::create((size+1)*sizeof(uint32_t));
 
     using CountType = uint32_t (*)[Mask<5>::SIZE];
     auto upperOffsets          = static_cast<uint32_t*>(mUpperOffsets.data());
@@ -201,13 +193,12 @@ void TopologyBuilder<BuildT>::countNodes(cudaStream_t stream)
     auto lowerCounts = reinterpret_cast<CountType>(lowerOffsetsFlattened + 1);
     auto leafCounts  = reinterpret_cast<CountType>(leafOffsets + 1);
 
-    // Drain upstream CUDA writes to mUpperMasks/mLowerMasks (cudaMemsetAsync zero-fill
-    // in allocateInternalMaskBuffers + the operator-specific *InternalNodes kernel)
-    // before host code reads them.
+    // Drain any upstream device work (the operator-specific *InternalNodes step, if still a
+    // kernel) before host code reads the masks.
     cudaCheck(cudaStreamSynchronize(stream));
 
     util::morphology::EnumerateNodes(
-        deviceUpperMasks(), deviceLowerMasks(),
+        mUpperMasks.data(), mLowerMasks.data(),
         lowerCounts, leafCounts,
         processedTileCount);
 
@@ -250,7 +241,7 @@ BufferT TopologyBuilder<BuildT>::getBuffer(const BufferT &pool, cudaStream_t str
     data()->d_bufferPtr = buffer.deviceData();
     if (data()->d_bufferPtr == nullptr) throw std::runtime_error("Failed to allocate grid buffer on the device");
     if (data()->nodeCount[2] != 0) // Unless the result is an empty grid
-        data()->d_upperOffsets = static_cast<uint32_t*>(mUpperOffsets.deviceData());
+        data()->d_upperOffsets = static_cast<uint32_t*>(mUpperOffsets.data());
     mData.deviceUpload(device, stream, false);
 
     return buffer;
@@ -378,12 +369,10 @@ inline void TopologyBuilder<BuildT>::processLowerNodes(cudaStream_t stream)
     using CountType = uint32_t (*)[Mask<5>::SIZE];
  
     if (processedTileCount) { // Unless output grid is empty
-        int device = 0;
-        cudaGetDevice(&device);
         std::size_t lowerCount = data()->nodeCount[1];
-        mLowerParents = ScratchBufferT::create(lowerCount*sizeof(uint32_t), nullptr, device, stream);
+        mLowerParents = ScratchBufferT::create(lowerCount*sizeof(uint32_t));
         std::size_t leafCount = data()->nodeCount[0];
-        mLeafParents = ScratchBufferT::create(leafCount*sizeof(uint32_t), nullptr, device, stream);
+        mLeafParents = ScratchBufferT::create(leafCount*sizeof(uint32_t));
 
         util::morphology::ProcessLowerNodes<BuildT>(
             mUpperMasks.data(),
@@ -438,11 +427,9 @@ struct UpdateLeafVoxelOffsetsFunctor
 template<typename BuildT>
 inline void TopologyBuilder<BuildT>::processLeafOffsets(cudaStream_t stream)
 {
-    int device = 0;
-    cudaGetDevice(&device);
     std::size_t leafCount = data()->nodeCount[0];
     if (leafCount) { // Unless output grid is empty
-        mVoxelOffsets = ScratchBufferT::create((leafCount+1)*sizeof(uint64_t), nullptr, device, stream);
+        mVoxelOffsets = ScratchBufferT::create((leafCount+1)*sizeof(uint64_t));
 
         // Drain upstream device writes to the leaf value masks (the operator-specific
         // *LeafNodes kernel) before host code reads them below.
