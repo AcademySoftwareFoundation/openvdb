@@ -683,6 +683,89 @@ inline void DilateLeafNodes(
     });
 }
 
+/// @brief Set the upper/lower child-mask bits of the pruned topology for every source leaf that
+///        retains at least one voxel under the leaf-mask sidecar. Host counterpart to the CUDA
+///        PruneInternalNodesFunctor.
+///
+/// @param srcGrid      (in)  Source grid being pruned (read host-side; see MergeInternalNodes' note).
+/// @param prunedRoot   (in)  Speculative pruned root (host copy), used to locate output tiles.
+/// @param srcLeafMask  (in)  Per-source-leaf bitmask of voxels to retain (sidecar, host-accessible).
+/// @param upperMasks_  (out) Array of Mask<5>, one per pruned upper tile.
+/// @param lowerMasks_  (out) Array of (Mask<4>[Mask<5>::SIZE]), one set per pruned upper tile.
+/// @param srcLeafCount (in)  Number of leaf nodes in the source grid (nodeCount[0]).
+///
+/// A source leaf is retained iff its value mask intersects the sidecar mask. Sibling leaves under
+/// a shared lower/upper race into the same mask word, so the output bits are set via setOnAtomic.
+template<typename BuildT>
+inline void PruneInternalNodes(
+    const NanoGrid<BuildT> *srcGrid,
+    const NanoRoot<BuildT> *prunedRoot,
+    const Mask<3> *srcLeafMask,
+    void *upperMasks_,
+    void *lowerMasks_,
+    std::size_t srcLeafCount)
+{
+    using UpperMaskArrayT = Mask<5>*;
+    using LowerMaskArrayT = Mask<4>(*)[Mask<5>::SIZE];
+    auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
+    auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
+
+    util::forEach(0, srcLeafCount, 1, [=](const util::Range1D &r) {
+        const auto& srcTree = srcGrid->tree();
+        for (auto srcLeafID = r.begin(); srcLeafID != r.end(); ++srcLeafID) {
+            const auto& srcLeaf = srcTree.template getFirstNode<0>()[srcLeafID];
+            const auto& leafMask = srcLeafMask[srcLeafID];
+            bool retainLeaf = false;
+            for (uint32_t w = 0; w < Mask<3>::WORD_COUNT; w++)
+                if (srcLeaf.valueMask().words()[w] & leafMask.words()[w])
+                    retainLeaf = true;
+            if (retainLeaf) {
+                auto upperChildIndex = NanoUpper<BuildT>::CoordToOffset(srcLeaf.origin());
+                auto lowerChildIndex = NanoLower<BuildT>::CoordToOffset(srcLeaf.origin());
+                auto prunedTile = prunedRoot->probeTile(srcLeaf.origin());
+                uint64_t tileChildIndex =
+                    util::PtrDiff(prunedTile, prunedRoot->tile(0))
+                    / sizeof(typename NanoRoot<BuildT>::Tile);
+                auto& outputUpperMask = upperMasks[tileChildIndex];
+                outputUpperMask.setOnAtomic(upperChildIndex);
+                auto& outputLowerMask = lowerMasks[tileChildIndex][upperChildIndex];
+                outputLowerMask.setOnAtomic(lowerChildIndex);
+            }
+        }
+    });
+}
+
+/// @brief Set each retained output leaf's value mask to its source value mask intersected with the
+///        leaf-mask sidecar. Host counterpart to the CUDA PruneLeafMasksFunctor.
+///
+/// @param srcGrid      (in)  Source grid being pruned (read host-side).
+/// @param dstGrid      (in/out) Output (pruned) grid whose leaf value masks are written.
+/// @param srcLeafMask  (in)  Per-source-leaf bitmask of voxels to retain (sidecar).
+/// @param srcLeafCount (in)  Number of leaf nodes in the source grid (nodeCount[0]).
+///
+/// Iteration is flat over source leaves; each maps by origin to a distinct output leaf (probeLeaf,
+/// non-null only for retained leaves), so the writes are to distinct masks -- no atomics.
+template<typename BuildT>
+inline void PruneLeafMasks(
+    const NanoGrid<BuildT> *srcGrid,
+    NanoGrid<BuildT> *dstGrid,
+    const Mask<3> *srcLeafMask,
+    std::size_t srcLeafCount)
+{
+    util::forEach(0, srcLeafCount, 1, [=](const util::Range1D &r) {
+        const auto& srcTree = srcGrid->tree();
+        auto& dstTree = dstGrid->tree();
+        for (auto srcLeafID = r.begin(); srcLeafID != r.end(); ++srcLeafID) {
+            const auto& srcLeaf = srcTree.template getFirstNode<0>()[srcLeafID];
+            auto leafPtr = dstTree.root().probeLeaf(srcLeaf.origin());
+            if (leafPtr) {
+                const_cast<Mask<3>&>(leafPtr->valueMask())  = srcLeaf.valueMask();
+                const_cast<Mask<3>&>(leafPtr->valueMask()) &= srcLeafMask[srcLeafID];
+            }
+        }
+    });
+}
+
 }// namespace nanovdb::util::morphology
 
 #endif // NANOVDB_UTIL_MORPHOLOGY_H_HAS_BEEN_INCLUDED

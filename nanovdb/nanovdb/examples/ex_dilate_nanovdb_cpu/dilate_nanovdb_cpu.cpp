@@ -14,6 +14,7 @@
 template<typename BuildT>
 void mainDilateGrid(
     nanovdb::NanoGrid<BuildT> *deviceGridOriginal,
+    nanovdb::NanoGrid<BuildT> *indexGridOriginal,
     nanovdb::NanoGrid<BuildT> *indexGridDilated,
     uint32_t nnType,
     uint32_t benchmark_iters
@@ -116,7 +117,7 @@ int main(int argc, char *argv[])
             OPENVDB_THROW(openvdb::RuntimeError, "Failure while uploading indexGrid to GPU");
 
         // Launch benchmark
-        mainDilateGrid( deviceGridOriginal, indexGridDilated, nnType, benchmark_iters );
+        mainDilateGrid( deviceGridOriginal, indexGridOriginal, indexGridDilated, nnType, benchmark_iters );
 
     }
     catch (const std::exception& e) {
