@@ -825,6 +825,47 @@ The host checksum swap (`333c942d`) already removed one such artifact:
 `postProcessGridTree` dropped from ~1.64 ms to ~0.17 ms once it stopped invoking
 the device checksum kernel on a host-written managed buffer.
 
+#### 7.8.1  Three-way benchmark (OpenVDB CPU vs nanovdb host vs nanovdb CUDA)
+
+Measured after the streams/round-trip removal and the HostBuffer flip (warm
+steady-state for the nanovdb paths; the OpenVDB column is the example's own
+ground-truth reference time). Build machine, sm_120.
+
+| Case                    | OpenVDB CPU (ref) | nanovdb host `_cpu` | nanovdb CUDA `_cuda` |
+|-------------------------|------------------:|--------------------:|---------------------:|
+| Merge dragon+armadillo  |  344 ms           |  43 ms              |  0.8 ms              |
+| Merge iss+space         | 1571 ms           | 122 ms              |  4.0 ms              |
+| Dilate dragon (NN_FACE) | 16.7 ms           |  37 ms              |  1.0 ms              |
+| Dilate space (NN_FACE)  |  106 ms           | 120 ms              |  2.9 ms              |
+
+Grid sizes: dragon ~23M active voxels, armadillo ~23M, iss 85.7M, space 165.9M.
+
+**Findings:**
+
+1. **Merge: the host port is ~8× (small) to ~13× (large) *faster* than
+   OpenVDB.** OpenVDB's merge is `deepCopy` + `compSum` on the `FloatGrid` (full
+   grid copy + value-merge tree surgery); the nanovdb host path is a
+   topology-union rebuild on the `OnIndexGrid` and is much cheaper.
+
+2. **Dilate: roughly comparable** — ~2.2× slower on dragon, ~1.1× (par) on
+   space. OpenVDB's `dilateActiveValues` is a mature in-place topology dilation;
+   the nanovdb host path matches it at scale despite carrying the
+   densified-scratch alloc+zero overhead (~80% of host dilate time).
+
+3. **Compute-only, the host dilate already beats OpenVDB:** stripping the
+   alloc/zero, host dilate compute is ~24 ms vs OpenVDB's 106 ms at `space`
+   (~4× faster). The scratch-reuse / lazy-zero optimization (Phase 4.x) would
+   therefore move host dilate from "par with OpenVDB" to "clearly faster," while
+   the GPU stays another ~30–50× ahead.
+
+**Caveats (orders of magnitude are solid, exact ratios are not):** the OpenVDB
+numbers are single cold runs vs nanovdb warm steady-state; OpenVDB operates on
+the `FloatGrid` (values + topology) while nanovdb operates on the `OnIndexGrid`
+(topology only); and output semantics differ (OpenVDB merge yields a value
+grid, nanovdb yields an index grid). The takeaway is that against the relevant
+CPU baseline (OpenVDB), the host port is *faster* for merge and *on par* for
+dilate — it is a legitimate CPU option, not merely a slow GPU fallback.
+
 ### 7.9  Future refactoring (TODO)
 
 - **Share the leaf-dilation body between host and CUDA via a `__hostdev__` helper.**
