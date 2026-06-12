@@ -192,13 +192,11 @@ void DilateGrid<BuildT>::dilateRoot()
     };// coordToKey lambda functor
 
     if (mSrcTreeData.mVoxelCount) { // If the input grid is not empty
-        // Make a host copy of the source topology RootNode *and* the Upper Nodes (needed for BBox'es)
-        // TODO: Consider avoiding to copy the entire set of upper nodes
-        auto deviceSrcRoot = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid, GridT::memUsage() + mSrcTreeData.mNodeOffset[3]));
-        uint64_t rootAndUpperSize = mSrcTreeData.mNodeOffset[1] - mSrcTreeData.mNodeOffset[3];
-        auto srcRootAndUpperBuffer = nanovdb::HostBuffer::create(rootAndUpperSize);
-        cudaCheck(cudaMemcpyAsync(srcRootAndUpperBuffer.data(), deviceSrcRoot, rootAndUpperSize, cudaMemcpyDeviceToHost, mStream));
-        auto srcRootAndUpper = static_cast<RootT*>(srcRootAndUpperBuffer.data());
+        // Read the source RootNode and its Upper Nodes (needed for the BBoxes below) directly from
+        // the managed source grid -- no D2H copy needed (UnifiedBuffer is host-accessible, and the
+        // source grid's pages were drained by the stream-sync at the top of getHandle). getChild()
+        // resolves its relative offsets within the same managed grid, so the uppers are reachable.
+        auto srcRootAndUpper = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid, GridT::memUsage() + mSrcTreeData.mNodeOffset[3]));
 
         // For each original root tile, consider adding those tiles in its 26-connected neighborhood
         for (uint32_t t = 0; t < srcRootAndUpper->tileCount(); t++) {
