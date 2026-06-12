@@ -26,7 +26,7 @@
 #include <nanovdb/util/Morphology.h>
 #include <nanovdb/util/cuda/DeviceGridTraits.cuh>
 #include <nanovdb/util/cuda/Morphology.cuh>
-#include <nanovdb/util/cuda/Timer.h>
+#include <nanovdb/util/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
 
 
@@ -52,7 +52,7 @@ public:
     /// @param d_srcLeafMask sidecar array of leaf masks for voxels to retain
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
     PruneGrid(const GridT* d_srcGrid, const Mask<3>* d_srcLeafMask, cudaStream_t stream = 0)
-        : mBuilder(stream), mStream(stream), mTimer(stream), mDeviceSrcGrid(d_srcGrid), mDeviceSrcLeafMask(d_srcLeafMask) {}
+        : mBuilder(stream), mStream(stream), mDeviceSrcGrid(d_srcGrid), mDeviceSrcLeafMask(d_srcLeafMask) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -84,7 +84,7 @@ private:
 
     TopologyBuilder<BuildT> mBuilder;
     cudaStream_t            mStream{0};
-    util::cuda::Timer       mTimer;
+    util::Timer       mTimer;
     int                     mVerbose{0};
     const GridT             *mDeviceSrcGrid;
     const Mask<3>           *mDeviceSrcLeafMask;

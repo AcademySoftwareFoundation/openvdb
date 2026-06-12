@@ -25,7 +25,7 @@
 #include <nanovdb/tools/TopologyBuilder.h>
 #include <nanovdb/util/cuda/DeviceGridTraits.cuh>
 #include <nanovdb/util/cuda/Morphology.cuh>
-#include <nanovdb/util/cuda/Timer.h>
+#include <nanovdb/util/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
 
 
@@ -49,7 +49,7 @@ public:
     /// @param d_srcGrid2 second source device grid to be merged
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
     MergeGrids(const GridT* d_srcGrid1, const GridT* d_srcGrid2, cudaStream_t stream = 0)
-        : mBuilder(stream), mStream(stream), mTimer(stream), mDeviceSrcGrid1(d_srcGrid1), mDeviceSrcGrid2(d_srcGrid2) {}
+        : mBuilder(stream), mStream(stream), mDeviceSrcGrid1(d_srcGrid1), mDeviceSrcGrid2(d_srcGrid2) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -81,7 +81,7 @@ private:
 
     TopologyBuilder<BuildT> mBuilder;
     cudaStream_t            mStream{0};
-    util::cuda::Timer       mTimer;
+    util::Timer       mTimer;
     int                     mVerbose{0};
     const GridT             *mDeviceSrcGrid1;
     const GridT             *mDeviceSrcGrid2;

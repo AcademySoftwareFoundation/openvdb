@@ -13,7 +13,7 @@ void mainDilateGrid(
     uint32_t nnType,
     uint32_t benchmark_iters)
 {
-    nanovdb::util::cuda::Timer gpuTimer;
+    nanovdb::util::Timer gpuTimer;
 
     // Initialize dilator
     nanovdb::tools::DilateGrid<BuildT> dilator( srcGrid );

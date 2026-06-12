@@ -11,7 +11,7 @@ void mainMergeGrids(
     nanovdb::NanoGrid<BuildT> *dstReferenceGrid,
     uint32_t benchmark_iters)
 {
-    nanovdb::util::cuda::Timer gpuTimer;
+    nanovdb::util::Timer gpuTimer;
 
     // Initialize converter
     nanovdb::tools::MergeGrids<BuildT> converter( srcGrid1, srcGrid2 );
