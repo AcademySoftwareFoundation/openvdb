@@ -559,7 +559,7 @@ and then a small number of warm-start timing lines.
 | 4.5   | Morphology functors → host equivalents (MergeGrids subset) | **Done** for `MergeGrids` (see 7.2) |
 | 4.6   | CUB scans → `util::inclusiveScan`           | **Done** (`858afe79`, `ed109ddd`) |
 | 4.7   | Drop CUDA artifacts; `.cu` → `.cpp`         | Pending (see 7.3) |
-| 4.8   | Repeat 4.1–4.7 for the remaining operators | **In progress** — `DilateGrid` compute ported (see 7.7); Coarsen/Refine/Prune pending |
+| 4.8   | Repeat 4.1–4.7 for the remaining operators | **In progress** — `DilateGrid` kernel-free, at merge parity (see 7.7); Coarsen/Refine/Prune pending |
 
 ### 7.2  Per-method porting status (MergeGrids `getHandle` pipeline)
 
@@ -678,18 +678,18 @@ operators (`CoarsenGrid`, `RefineGrid`, `DilateGrid`, `PruneGrid`) reuse the
 already-host `TopologyBuilder` pipeline (7.2) unchanged and need only their own
 operator-specific functors ported into `util/Morphology.h`.
 
-#### DilateGrid — compute ported (`tools/DilateGrid.h`, `ex_dilate_nanovdb_cpu`)
+#### DilateGrid — fully ported (`tools/DilateGrid.h`, `ex_dilate_nanovdb_cpu`)
 
-The two compute-bearing operator methods run on the host; `dilateRoot` and
-`processGridTreeRoot` retain CUDA for now (the merge playbook: `processGridTreeRoot`
-is a verbatim reuse of merge's host version, `dilateRoot` is the drop-the-D2H-copy
-cleanup). The TopologyBuilder pipeline it rides on is already host.
+All four operator methods run on the host; `DilateGrid.h` has **no kernel launches and no
+D2H copies**, at parity with (and in `dilateRoot`'s case ahead of) `MergeGrids.h`. The only
+remaining device op is the output `mProcessedRoot.deviceUpload`, the shared Phase 4.4
+dual-mode-buffer item. The TopologyBuilder pipeline it rides on is already host.
 
 | Stage (call order in `getHandle`) | Owner | Status | Commit | Notes |
 |-----------------------------------|-------|--------|--------|-------|
-| `dilateRoot`           | DilateGrid | retained CUDA | — | host `std::map` tile speculation + D2H copy + `DeviceBuffer` upload |
+| `dilateRoot`           | DilateGrid | **HOST** | `38fa0259` | host `std::map` tile speculation reading source root/uppers directly from the managed grid (D2H copy dropped); only output `mProcessedRoot.deviceUpload` remains |
 | `dilateInternalNodes`  | DilateGrid | **HOST** | `180b081a` | `util::morphology::DilateInternalNodes`; built on the validated host `MaskShift` |
-| `processGridTreeRoot`  | DilateGrid | retained CUDA | — | trivial; reuse merge's host version |
+| `processGridTreeRoot`  | DilateGrid | **HOST** | `ce255009` | host `std::memcpy` of GridData + direct `BuildGridTreeRootFunctor` call (verbatim reuse of merge's) |
 | `dilateLeafNodes`      | DilateGrid | **HOST** | `01105613` | `util::morphology::DilateLeafNodes` (`NN_FACE`, `NN_FACE_EDGE_VERTEX`; `NN_FACE_EDGE` throws) |
 
 New host pieces (validated three ways for `MaskShift`: brute-force oracle,
@@ -705,9 +705,13 @@ round-trip yet) checks CORRECT against `dilateActiveValues` across
 dragon/armadillo/iss/space for both `NN_FACE` and the full 26-connected
 `NN_FACE_EDGE_VERTEX`.
 
-Remaining for DilateGrid: `processGridTreeRoot`/`dilateRoot` host conversion (the
-same Phase 4.4/4.7 plumbing as merge), then the dilate→prune round-trip once
-PruneGrid lands.
+Remaining for DilateGrid is only the shared Phase 4.4/4.7 plumbing (dual-mode
+`mData`/`mProcessedRoot` → `UnifiedBuffer`, dead-code/`cub` removal, `.cu` → `.cpp`),
+then the dilate→prune round-trip once PruneGrid lands.
+
+Also done as part of this work: the eight host `tools::topology::detail` functor
+`operator()`s in `TopologyBuilder.h` dropped their transitional `__hostdev__` (they are
+host-only now that every operator's `getHandle` is kernel-free) — `517f94b1`.
 
 #### Still to port
 
