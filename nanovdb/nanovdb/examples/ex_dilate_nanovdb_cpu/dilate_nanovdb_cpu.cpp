@@ -13,8 +13,7 @@
 
 template<typename BuildT>
 void mainDilateGrid(
-    nanovdb::NanoGrid<BuildT> *deviceGridOriginal,
-    nanovdb::NanoGrid<BuildT> *indexGridOriginal,
+    nanovdb::NanoGrid<BuildT> *srcGrid,         // original (un-dilated) grid; also the prune reference
     nanovdb::NanoGrid<BuildT> *indexGridDilated,
     uint32_t nnType,
     uint32_t benchmark_iters
@@ -51,7 +50,7 @@ int main(int argc, char *argv[])
 
         // Convert to indexGrid (original, un-dilated)
         cpuTimer.start("Converting openVDB input to indexGrid (original version)");
-        auto handleOriginal = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::cuda::UnifiedBuffer>(
+        auto handleOriginal = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::HostBuffer>(
             grid,
             0u,    // Don't copy data channel
             false, // No stats
@@ -84,7 +83,7 @@ int main(int argc, char *argv[])
 
         // Convert to indexGrid (dilated reference)
         cpuTimer.start("Converting openVDB input to indexGrid (dilated version)");
-        auto handleDilated = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::cuda::DeviceBuffer>(
+        auto handleDilated = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::HostBuffer>(
             grid,
             0u,    // Don't copy data channel
             false, // No stats
@@ -110,14 +109,8 @@ int main(int argc, char *argv[])
             std::cout << "Memory usage                          : " << indexGridDilated->gridSize() << " bytes" << std::endl;
         }
 
-        // Make the (managed) source grid device-accessible for the operator
-        handleOriginal.deviceUpload();
-        auto* deviceGridOriginal = handleOriginal.deviceGrid<BuildT>();
-        if (!deviceGridOriginal)
-            OPENVDB_THROW(openvdb::RuntimeError, "Failure while uploading indexGrid to GPU");
-
-        // Launch benchmark
-        mainDilateGrid( deviceGridOriginal, indexGridOriginal, indexGridDilated, nnType, benchmark_iters );
+        // All grids are host-resident (HostBuffer); the operators read them directly.
+        mainDilateGrid( indexGridOriginal, indexGridDilated, nnType, benchmark_iters );
 
     }
     catch (const std::exception& e) {

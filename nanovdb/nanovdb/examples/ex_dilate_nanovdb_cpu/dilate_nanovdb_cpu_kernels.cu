@@ -1,24 +1,14 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
+#include <cstring>
 #include <nanovdb/tools/DilateGrid.h>
 #include <nanovdb/tools/PruneGrid.h>
 #include <nanovdb/util/Injection.h>
 
-template<typename T>
-bool bufferCheck(const T* deviceBuffer, const T* hostBuffer, size_t elem_count) {
-    T* tmpBuffer = new T[elem_count];
-    cudaCheck(cudaMemcpy(tmpBuffer, deviceBuffer, elem_count * sizeof(T), cudaMemcpyDeviceToHost));
-    bool same = true;
-    for (int i=0; same && i< elem_count; ++i) { same = (tmpBuffer[i] == hostBuffer[i]); }
-    delete [] tmpBuffer;
-    return same;
-}
-
 template<typename BuildT>
 void mainDilateGrid(
-    nanovdb::NanoGrid<BuildT> *deviceGridOriginal,
-    nanovdb::NanoGrid<BuildT> *indexGridOriginal,
+    nanovdb::NanoGrid<BuildT> *srcGrid,          // original (un-dilated) grid; also the prune reference
     nanovdb::NanoGrid<BuildT> *indexGridDilated,
     uint32_t nnType,
     uint32_t benchmark_iters)
@@ -26,16 +16,16 @@ void mainDilateGrid(
     nanovdb::util::cuda::Timer gpuTimer;
 
     // Initialize dilator
-    nanovdb::tools::DilateGrid<BuildT> dilator( deviceGridOriginal );
+    nanovdb::tools::DilateGrid<BuildT> dilator( srcGrid );
     dilator.setOperation(nanovdb::tools::morphology::NearestNeighbors(nnType));
     dilator.setChecksum(nanovdb::CheckMode::Default);
     dilator.setVerbose(1);
 
     auto handle = dilator.getHandle();
-    auto dstGrid = handle.template deviceGrid<BuildT>();
+    auto dstGrid = handle.template grid<BuildT>();   // host grid (HostBuffer)
 
-    // Check for correctness
-    if (bufferCheck((char*)dstGrid, (char*)indexGridDilated->data(), indexGridDilated->gridSize()))
+    // Check for correctness (host vs host)
+    if (std::memcmp((char*)dstGrid, (char*)indexGridDilated->data(), indexGridDilated->gridSize()) == 0)
         std::cout << "Result of DilateGrid check out CORRECT against reference" << std::endl;
     else
         std::cout << "Result of DilateGrid compares INCORRECT against reference" << std::endl;
@@ -51,33 +41,31 @@ void mainDilateGrid(
     // --- Prune round-trip: recover the original grid by pruning the dilated grid back to the
     //     original topology, supplied as a leaf-mask sidecar. ---
 
-    // Inject the original topology as a per-(dilated-)leaf mask sidecar. This injection kernel is
-    // an example helper (not part of PruneGrid), so it stays a CUDA kernel for now; the sidecar is
-    // a UnifiedBuffer so the host PruneGrid can read it.
-    uint32_t dstLeafCount = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(dstGrid).mNodeCount[0];
-    nanovdb::cuda::UnifiedBuffer dstLeafMaskBuffer;
+    // Inject the original topology as a per-(dilated-)leaf mask sidecar (host).
+    uint32_t dstLeafCount = dstGrid->tree().nodeCount(0);
+    nanovdb::HostBuffer dstLeafMaskBuffer;
     nanovdb::Mask<3>* dstLeafMasks = nullptr;
     if (dstLeafCount) {
-        dstLeafMaskBuffer = nanovdb::cuda::UnifiedBuffer::create(std::size_t(dstLeafCount) * sizeof(nanovdb::Mask<3>));
-        dstLeafMasks = static_cast<nanovdb::Mask<3>*>(dstLeafMaskBuffer.deviceData());
+        dstLeafMaskBuffer = nanovdb::HostBuffer::create(std::size_t(dstLeafCount) * sizeof(nanovdb::Mask<3>));
+        dstLeafMasks = static_cast<nanovdb::Mask<3>*>(dstLeafMaskBuffer.data());
         if (!dstLeafMasks) throw std::runtime_error("No buffer for dstLeafMask");
     }
 
     gpuTimer.start("Injecting un-dilated topology as a pruning mask");
     if (dstLeafCount)
-        nanovdb::util::injectGridMask<BuildT>(deviceGridOriginal, dstGrid, dstLeafMasks, dstLeafCount);
+        nanovdb::util::injectGridMask<BuildT>(srcGrid, dstGrid, dstLeafMasks, dstLeafCount);
     gpuTimer.stop();
 
-    // Initialize pruner (host operator; reads dstGrid + dstLeafMasks host-side via managed memory)
+    // Initialize pruner (host operator)
     nanovdb::tools::PruneGrid<BuildT> pruner( dstGrid, dstLeafMasks );
     pruner.setChecksum(nanovdb::CheckMode::Default);
     pruner.setVerbose(1);
 
     auto prunedHandle = pruner.getHandle();
-    auto prunedGrid = prunedHandle.template deviceGrid<BuildT>();
+    auto prunedGrid = prunedHandle.template grid<BuildT>();   // host grid (HostBuffer)
 
     // Check for correctness (the pruned grid should recover the original)
-    if (bufferCheck((char*)prunedGrid, (char*)indexGridOriginal->data(), indexGridOriginal->gridSize()))
+    if (std::memcmp((char*)prunedGrid, (char*)srcGrid->data(), srcGrid->gridSize()) == 0)
         std::cout << "Result of PruneGrid check out CORRECT against reference" << std::endl;
     else
         std::cout << "Result of PruneGrid compares INCORRECT against reference" << std::endl;
@@ -93,8 +81,7 @@ void mainDilateGrid(
 
 template
 void mainDilateGrid(
-    nanovdb::NanoGrid<nanovdb::ValueOnIndex> *deviceGridOriginal,
-    nanovdb::NanoGrid<nanovdb::ValueOnIndex> *indexGridOriginal,
+    nanovdb::NanoGrid<nanovdb::ValueOnIndex> *srcGrid,
     nanovdb::NanoGrid<nanovdb::ValueOnIndex> *indexGridDilated,
     uint32_t nnType,
     uint32_t benchmark_iters
