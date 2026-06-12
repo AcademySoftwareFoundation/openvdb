@@ -52,7 +52,7 @@ public:
     // definition rather than re-declaring their own. (mData migrates separately.)
     using ScratchBufferT = nanovdb::HostBuffer;
 
-    TopologyBuilder(cudaStream_t stream)
+    TopologyBuilder()
     {
     }
 
@@ -68,22 +68,22 @@ public:
         __hostdev__ LeafT&  getLeaf(int i) const {return *(util::PtrAdd<LeafT>(d_bufferPtr, leaf)+i);}
     };// Data
 
-    void allocateInternalMaskBuffers(cudaStream_t stream);
+    void allocateInternalMaskBuffers();
 
-    void countNodes(cudaStream_t stream);
+    void countNodes();
 
     template<typename BufferT>
-    BufferT getBuffer(const BufferT &buffer, cudaStream_t stream);
+    BufferT getBuffer(const BufferT &buffer);
 
-    void processUpperNodes(cudaStream_t stream);
+    void processUpperNodes();
 
-    void processLowerNodes(cudaStream_t stream);
+    void processLowerNodes();
 
-    void processLeafOffsets(cudaStream_t stream);
+    void processLeafOffsets();
 
-    void processBBox(cudaStream_t stream);
+    void processBBox();
 
-    void postProcessGridTree(cudaStream_t stream);
+    void postProcessGridTree();
 
     ScratchBufferT               mProcessedRoot;
     ScratchBufferT               mUpperMasks;
@@ -127,7 +127,7 @@ private:
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT>
-void TopologyBuilder<BuildT>::allocateInternalMaskBuffers(cudaStream_t stream)
+void TopologyBuilder<BuildT>::allocateInternalMaskBuffers()
 {
     if (hostProcessedRoot()->tileCount() == 0) return; // Processing empty grid(s); nothing to allocate
 
@@ -147,7 +147,7 @@ void TopologyBuilder<BuildT>::allocateInternalMaskBuffers(cudaStream_t stream)
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT>
-void TopologyBuilder<BuildT>::countNodes(cudaStream_t stream)
+void TopologyBuilder<BuildT>::countNodes()
 {
     auto processedTileCount = hostProcessedRoot()->tileCount();
     if (processedTileCount == 0) { // Processing empty grid(s); zero nodes at all levels
@@ -190,9 +190,6 @@ void TopologyBuilder<BuildT>::countNodes(cudaStream_t stream)
     auto lowerCounts = reinterpret_cast<CountType>(lowerOffsetsFlattened + 1);
     auto leafCounts  = reinterpret_cast<CountType>(leafOffsets + 1);
 
-    // Drain any upstream device work (the operator-specific *InternalNodes step, if still a
-    // kernel) before host code reads the masks.
-    cudaCheck(cudaStreamSynchronize(stream));
 
     util::morphology::EnumerateNodes(
         mUpperMasks.data(), mLowerMasks.data(),
@@ -219,7 +216,7 @@ void TopologyBuilder<BuildT>::countNodes(cudaStream_t stream)
 
 template <typename BuildT>
 template <typename BufferT>
-BufferT TopologyBuilder<BuildT>::getBuffer(const BufferT &pool, cudaStream_t stream)
+BufferT TopologyBuilder<BuildT>::getBuffer(const BufferT &pool)
 {
     // Allocates the destination grid buffer, once the topology/size of the tree is known.
     data()->grid  = 0;// grid is always stored at the start of the buffer!
@@ -233,7 +230,6 @@ BufferT TopologyBuilder<BuildT>::getBuffer(const BufferT &pool, cudaStream_t str
     // Host-side allocation + zero-fill. Backend-agnostic: HostBuffer and UnifiedBuffer both expose
     // create(size, &pool) and a host-writable data() (UnifiedBuffer's create places it CPU-side),
     // so this works for both with no CUDA. The whole result grid is then built on the host.
-    (void)stream;
     auto buffer = BufferT::create(data()->size, &pool);
     std::memset(buffer.data(), 0, data()->size);
 
@@ -320,16 +316,13 @@ struct BuildGridTreeRootFunctor
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template <typename BuildT>
-inline void TopologyBuilder<BuildT>::processUpperNodes(cudaStream_t stream)
+inline void TopologyBuilder<BuildT>::processUpperNodes()
 {
     // Connect all newly allocated upper nodes to their respective tiles
     // Also fill in any necessary part of the preamble (in InternalData) of upper nodes
     auto processedTileCount = hostProcessedRoot()->tileCount();
     if (processedTileCount == 0) return; // output grid is empty
 
-    // Drain upstream CUDA work (the cudaMemsetAsync zero-fill of the output grid buffer in
-    // getBuffer) so the host code below can read/write through it safely.
-    cudaCheck(cudaStreamSynchronize(stream));
 
     auto data          = this->data();
     auto processedRoot = hostProcessedRoot();
@@ -357,7 +350,7 @@ inline void TopologyBuilder<BuildT>::processUpperNodes(cudaStream_t stream)
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template <typename BuildT>
-inline void TopologyBuilder<BuildT>::processLowerNodes(cudaStream_t stream)
+inline void TopologyBuilder<BuildT>::processLowerNodes()
 {
     // Fill out the contents of all newly allocated lower nodes (using the densified upper/lower mask arrays)
     // Also fill in the preamble (most of LeafData) for their leaf children
@@ -421,15 +414,12 @@ struct UpdateLeafVoxelOffsetsFunctor
 }// namespace topology::detail
 
 template<typename BuildT>
-inline void TopologyBuilder<BuildT>::processLeafOffsets(cudaStream_t stream)
+inline void TopologyBuilder<BuildT>::processLeafOffsets()
 {
     std::size_t leafCount = data()->nodeCount[0];
     if (leafCount) { // Unless output grid is empty
         mVoxelOffsets = ScratchBufferT::create((leafCount+1)*sizeof(uint64_t));
 
-        // Drain upstream device writes to the leaf value masks (the operator-specific
-        // *LeafNodes kernel) before host code reads them below.
-        cudaCheck(cudaStreamSynchronize(stream));
 
         // Layout mirrors countNodes: index [0] is the seeded 0, [1..leafCount] receives the
         // per-leaf counts written below, then an in-place inclusive scan turns them into offsets.
@@ -508,15 +498,12 @@ struct UpdateRootWorldBBoxFunctor
 }// namespace topology::detail
 
 template <typename BuildT>
-inline void TopologyBuilder<BuildT>::processBBox(cudaStream_t stream)
+inline void TopologyBuilder<BuildT>::processBBox()
 {
     if (data()->nodeCount[0] == 0) return; // Output grid is empty; retain empty bounding box
 
     // TODO: Do we need a special case when flags indicates no bounding box?
 
-    // Drain upstream CUDA writes (the operator-specific *LeafNodes kernel populates the leaf
-    // value masks in the managed output buffer) before host code reads them below.
-    cudaCheck(cudaStreamSynchronize(stream));
 
     auto d_data       = data();
     auto leafParents  = static_cast<uint32_t*>(mLeafParents.data());
@@ -567,12 +554,10 @@ struct PostProcessGridTreeFunctor
 }// namespace topology::detail
 
 template <typename BuildT>
-inline void TopologyBuilder<BuildT>::postProcessGridTree(cudaStream_t stream)
+inline void TopologyBuilder<BuildT>::postProcessGridTree()
 {
     // Finish updates to GridData/TreeData and (optionally) update checksum
     if (data()->nodeCount[0]) { // if grid is empty, the default values are correct
-        // Drain upstream device writes to mVoxelOffsets (processLeafOffsets) before host read.
-        cudaCheck(cudaStreamSynchronize(stream));
         topology::detail::PostProcessGridTreeFunctor<BuildT>()(0, data(), static_cast<uint64_t*>(mVoxelOffsets.data()));
     }
     mVoxelOffsets.clear();

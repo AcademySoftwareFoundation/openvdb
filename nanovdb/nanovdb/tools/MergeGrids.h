@@ -47,9 +47,8 @@ public:
     /// @brief Constructor
     /// @param d_srcGrid1 first source device grid to be merged
     /// @param d_srcGrid2 second source device grid to be merged
-    /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    MergeGrids(const GridT* d_srcGrid1, const GridT* d_srcGrid2, cudaStream_t stream = 0)
-        : mBuilder(stream), mStream(stream), mDeviceSrcGrid1(d_srcGrid1), mDeviceSrcGrid2(d_srcGrid2) {}
+    MergeGrids(const GridT* d_srcGrid1, const GridT* d_srcGrid2)
+        : mDeviceSrcGrid1(d_srcGrid1), mDeviceSrcGrid2(d_srcGrid2) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -80,7 +79,6 @@ private:
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
     TopologyBuilder<BuildT> mBuilder;
-    cudaStream_t            mStream{0};
     util::Timer       mTimer;
     int                     mVerbose{0};
     const GridT             *mDeviceSrcGrid1;
@@ -111,7 +109,7 @@ MergeGrids<BuildT>::getHandle(const BufferT &pool)
 
     // Allocate memory for merged upper/lower masks
     if (mVerbose==1) mTimer.restart("Allocating internal node mask buffers");
-    mBuilder.allocateInternalMaskBuffers(mStream);
+    mBuilder.allocateInternalMaskBuffers();
 
     // Merge masks of upper/lower nodes
     if (mVerbose==1) mTimer.restart("Merge internal nodes");
@@ -119,13 +117,12 @@ MergeGrids<BuildT>::getHandle(const BufferT &pool)
 
     // Enumerate tree nodes
     if (mVerbose==1) mTimer.restart("Count merged tree nodes");
-    mBuilder.countNodes(mStream);
+    mBuilder.countNodes();
 
-    cudaStreamSynchronize(mStream);
 
     // Allocate new device grid buffer for merged result
     if (mVerbose==1) mTimer.restart("Allocating merged grid buffer");
-    auto buffer = mBuilder.getBuffer(pool, mStream);
+    auto buffer = mBuilder.getBuffer(pool);
 
     // Process GridData/TreeData/RootData of merged result
     if (mVerbose==1) mTimer.restart("Processing grid/tree/root");
@@ -133,11 +130,11 @@ MergeGrids<BuildT>::getHandle(const BufferT &pool)
 
     // Process upper nodes of merged result
     if (mVerbose==1) mTimer.restart("Processing upper nodes");
-    mBuilder.processUpperNodes(mStream);
+    mBuilder.processUpperNodes();
 
     // Process lower nodes of merged result
     if (mVerbose==1) mTimer.restart("Processing lower nodes");
-    mBuilder.processLowerNodes(mStream);
+    mBuilder.processLowerNodes();
 
     // Merge leaf node active masks into new topology
     if (mVerbose==1) mTimer.restart("Merging leaf nodes");
@@ -145,14 +142,13 @@ MergeGrids<BuildT>::getHandle(const BufferT &pool)
 
     // Process bounding boxes
     if (mVerbose==1) mTimer.restart("Processing bounding boxes");
-    mBuilder.processBBox(mStream);
+    mBuilder.processBBox();
 
     // Post-process Grid/Tree data
     if (mVerbose==1) mTimer.restart("Post-processing grid/tree data");
-    mBuilder.postProcessGridTree(mStream);
+    mBuilder.postProcessGridTree();
     if (mVerbose==1) mTimer.stop();
 
-    cudaStreamSynchronize(mStream);
 
     return GridHandle<BufferT>(std::move(buffer));
 }// MergeGrids<BuildT>::getHandle
@@ -218,9 +214,6 @@ void MergeGrids<BuildT>::mergeInternalNodes()
     // Merges the masks of upper and lower nodes from both input topologies into the
     // densified, pre-allocated mask arrays of the merged result.
 
-    // Drain upstream device work (allocateInternalMaskBuffers zero-fills mUpperMasks/mLowerMasks
-    // on the stream) before the host unions into them and reads the source grids host-side.
-    cudaCheck(cudaStreamSynchronize(mStream));
 
     if (mSrcTreeData1.mNodeCount[1]) // Unless the first grid to merge is empty
         util::morphology::MergeInternalNodes<BuildT>(
@@ -241,9 +234,6 @@ void MergeGrids<BuildT>::processGridTreeRoot()
     // TODO: Check for instances where extra processing is needed
     // TODO: check that the second grid input has consistent GridData, too
 
-    // Drain upstream device work (getBuffer's cudaMemsetAsync zero-fill of the output buffer)
-    // before the host writes the grid header and builds grid/tree/root metadata.
-    cudaCheck(cudaStreamSynchronize(mStream));
     std::memcpy(&mBuilder.data()->getGrid(), mDeviceSrcGrid1->data(), GridT::memUsage());
     topology::detail::BuildGridTreeRootFunctor<BuildT>()(0, mBuilder.data());
 }// MergeGrids<BuildT>::processGridTreeRoot
@@ -253,9 +243,6 @@ void MergeGrids<BuildT>::processGridTreeRoot()
 template<typename BuildT>
 void MergeGrids<BuildT>::mergeLeafNodes()
 {
-    // Drain upstream work on the stream before the host unions into the output leaf masks
-    // and reads the source grids host-side.
-    cudaCheck(cudaStreamSynchronize(mStream));
 
     if (mSrcTreeData1.mNodeCount[0]) // Unless first input grid is empty
         util::morphology::MergeLeafNodes<BuildT>(
@@ -265,7 +252,7 @@ void MergeGrids<BuildT>::mergeLeafNodes()
             mDeviceSrcGrid2, static_cast<GridT*>(mBuilder.data()->d_bufferPtr), mSrcTreeData2.mNodeCount[0]);
 
     // Update leaf offsets and prefix sums
-    mBuilder.processLeafOffsets(mStream);
+    mBuilder.processLeafOffsets();
 }// MergeGrids<BuildT>::mergeLeafNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

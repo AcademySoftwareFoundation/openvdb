@@ -51,9 +51,8 @@ public:
 
     /// @brief Constructor
     /// @param d_srcGrid source device grid to be dilated
-    /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    DilateGrid(const GridT* d_srcGrid, cudaStream_t stream = 0)
-        : mBuilder(stream), mStream(stream), mDeviceSrcGrid(d_srcGrid) {}
+    DilateGrid(const GridT* d_srcGrid)
+        : mDeviceSrcGrid(d_srcGrid) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -88,7 +87,6 @@ private:
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
     TopologyBuilder<BuildT>      mBuilder;
-    cudaStream_t                 mStream{0};
     util::Timer            mTimer;
     int                          mVerbose{0};
     const GridT                  *mDeviceSrcGrid;
@@ -103,8 +101,7 @@ template<typename BufferT>
 GridHandle<BufferT>
 DilateGrid<BuildT>::getHandle(const BufferT &pool)
 {
-    // Copy TreeData from GPU -> CPU
-    cudaStreamSynchronize(mStream);
+    // Read TreeData directly from the host-resident source grid (NanoTree is-a TreeData)
     mSrcTreeData = mDeviceSrcGrid->tree();  // host-resident source grid (NanoTree is-a TreeData)
 
     // Ensure that the input grid contains no tile values
@@ -117,7 +114,7 @@ DilateGrid<BuildT>::getHandle(const BufferT &pool)
 
     // Allocate memory for dilated upper/lower masks
     if (mVerbose==1) mTimer.restart("Allocating internal node mask buffers");
-    mBuilder.allocateInternalMaskBuffers(mStream);
+    mBuilder.allocateInternalMaskBuffers();
 
     // Dilate masks of upper/lower nodes
     if (mVerbose==1) mTimer.restart("Dilate internal nodes");
@@ -125,13 +122,12 @@ DilateGrid<BuildT>::getHandle(const BufferT &pool)
 
     // Enumerate tree nodes
     if (mVerbose==1) mTimer.restart("Count dilated tree nodes");
-    mBuilder.countNodes(mStream);
+    mBuilder.countNodes();
 
-    cudaStreamSynchronize(mStream);
 
     // Allocate new device grid buffer for dilated result
     if (mVerbose==1) mTimer.restart("Allocating dilated grid buffer");
-    auto buffer = mBuilder.getBuffer(pool, mStream);
+    auto buffer = mBuilder.getBuffer(pool);
 
     // Process GridData/TreeData/RootData of dilated result
     if (mVerbose==1) mTimer.restart("Processing grid/tree/root");
@@ -139,11 +135,11 @@ DilateGrid<BuildT>::getHandle(const BufferT &pool)
 
     // Process upper nodes of dilated result
     if (mVerbose==1) mTimer.restart("Processing upper nodes");
-    mBuilder.processUpperNodes(mStream);
+    mBuilder.processUpperNodes();
 
     // Process lower nodes of dilated result
     if (mVerbose==1) mTimer.restart("Processing lower nodes");
-    mBuilder.processLowerNodes(mStream);
+    mBuilder.processLowerNodes();
 
     // Dilate leaf node active masks into new topology
     if (mVerbose==1) mTimer.restart("Dilating leaf nodes");
@@ -151,14 +147,13 @@ DilateGrid<BuildT>::getHandle(const BufferT &pool)
 
     // Process bounding boxes
     if (mVerbose==1) mTimer.restart("Processing bounding boxes");
-    mBuilder.processBBox(mStream);
+    mBuilder.processBBox();
 
     // Post-process Grid/Tree data
     if (mVerbose==1) mTimer.restart("Post-processing grid/tree data");
-    mBuilder.postProcessGridTree(mStream);
+    mBuilder.postProcessGridTree();
     if (mVerbose==1) mTimer.stop();
 
-    cudaStreamSynchronize(mStream);
 
     return GridHandle<BufferT>(std::move(buffer));
 }// DilateGrid<BuildT>::getHandle
@@ -190,9 +185,8 @@ void DilateGrid<BuildT>::dilateRoot()
 
     if (mSrcTreeData.mVoxelCount) { // If the input grid is not empty
         // Read the source RootNode and its Upper Nodes (needed for the BBoxes below) directly from
-        // the managed source grid -- no D2H copy needed (UnifiedBuffer is host-accessible, and the
-        // source grid's pages were drained by the stream-sync at the top of getHandle). getChild()
-        // resolves its relative offsets within the same managed grid, so the uppers are reachable.
+        // the host-resident source grid -- no copy needed. getChild() resolves its relative offsets
+        // within the same grid, so the uppers are reachable.
         auto srcRootAndUpper = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid, GridT::memUsage() + mSrcTreeData.mNodeOffset[3]));
 
         // For each original root tile, consider adding those tiles in its 26-connected neighborhood
@@ -234,9 +228,6 @@ void DilateGrid<BuildT>::dilateInternalNodes()
     // Masks of lower internal nodes are densified in the sense that a serialized array of them is allocated,
     // as if every upper node had a full set of 32^3 lower children.
 
-    // Drain upstream device work (allocateInternalMaskBuffers zero-fills mUpperMasks/mLowerMasks
-    // on the stream) before the host dilates into them and reads the source grid host-side.
-    cudaCheck(cudaStreamSynchronize(mStream));
 
     if (mSrcTreeData.mNodeCount[1]) { // Unless it's an empty grid
         if (mOp == morphology::NN_FACE)
@@ -262,9 +253,6 @@ void DilateGrid<BuildT>::processGridTreeRoot()
     // Copy GridData from source grid
     // By convention: this will duplicate grid name and map. Others will be reset later
 
-    // Drain upstream device work (getBuffer's cudaMemsetAsync zero-fill of the output buffer)
-    // before the host writes the grid header and builds grid/tree/root metadata.
-    cudaCheck(cudaStreamSynchronize(mStream));
     std::memcpy(&mBuilder.data()->getGrid(), mDeviceSrcGrid->data(), GridT::memUsage());
     topology::detail::BuildGridTreeRootFunctor<BuildT>()(0, mBuilder.data());
 }// DilateGrid<BuildT>::processGridTreeRoot
@@ -277,9 +265,6 @@ void DilateGrid<BuildT>::dilateLeafNodes()
     // Dilates the active masks of the source grid (as indicated at the leaf level), into a new grid that
     // has been already topologically dilated to include all necessary leaf nodes.
 
-    // Drain upstream work on the stream before the host dilates into the output leaf masks
-    // and reads the source grid host-side.
-    cudaCheck(cudaStreamSynchronize(mStream));
 
     if (mBuilder.data()->nodeCount[0]) { // Unless output grid is empty
         auto dstGrid = static_cast<GridT*>(mBuilder.data()->d_bufferPtr);
@@ -294,7 +279,7 @@ void DilateGrid<BuildT>::dilateLeafNodes()
     }
 
     // Update leaf offsets and prefix sums
-    mBuilder.processLeafOffsets(mStream);
+    mBuilder.processLeafOffsets();
 }// DilateGrid<BuildT>::dilateLeafNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
