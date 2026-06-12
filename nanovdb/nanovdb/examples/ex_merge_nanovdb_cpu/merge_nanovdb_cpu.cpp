@@ -13,12 +13,9 @@
 
 template<typename BuildT>
 void mainMergeGrids(
-    nanovdb::NanoGrid<BuildT> *deviceSrcGrid1,
-    nanovdb::NanoGrid<BuildT> *deviceSrcGrid2,
-    nanovdb::NanoGrid<BuildT> *deviceDstReferenceGrid,
-    nanovdb::NanoGrid<BuildT> *hostSrcGrid1,
-    nanovdb::NanoGrid<BuildT> *hostSrcGrid2,
-    nanovdb::NanoGrid<BuildT> *hostDstReferenceGrid,
+    nanovdb::NanoGrid<BuildT> *srcGrid1,
+    nanovdb::NanoGrid<BuildT> *srcGrid2,
+    nanovdb::NanoGrid<BuildT> *dstReferenceGrid,
     uint32_t benchmark_iters
 );
 
@@ -61,7 +58,7 @@ int main(int argc, char *argv[])
 
         // Convert to indexGrid
         cpuTimer.start("Converting openVDB input to indexGrid (first component)");
-        auto srcHandle1 = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::cuda::UnifiedBuffer>(
+        auto srcHandle1 = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::HostBuffer>(
             grid1,
             0u,    // Don't copy data channel
             false, // No stats
@@ -72,7 +69,7 @@ int main(int argc, char *argv[])
         cpuTimer.stop();
 
         cpuTimer.start("Converting openVDB input to indexGrid (second component)");
-        auto srcHandle2 = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::cuda::UnifiedBuffer>(
+        auto srcHandle2 = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::HostBuffer>(
             grid2,
             0u,    // Don't copy data channel
             false, // No stats
@@ -119,7 +116,7 @@ int main(int argc, char *argv[])
 
         // Convert to indexGrid
         cpuTimer.start("Converting merged openVDB output to indexGrid");
-        auto dstReferenceHandle = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::cuda::DeviceBuffer>(
+        auto dstReferenceHandle = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::HostBuffer>(
             mergedGrid,
             0u,    // Don't copy data channel
             false, // No stats
@@ -145,20 +142,9 @@ int main(int argc, char *argv[])
             std::cout << "Memory usage                          : " << dstReferenceGrid->gridSize() << " bytes" << std::endl;
         }
 
-        // Copy both NanoVDB grids to GPU
-        srcHandle1.deviceUpload();
-        srcHandle2.deviceUpload();
-        dstReferenceHandle.deviceUpload();
-        auto* deviceSrcGrid1 = srcHandle1.deviceGrid<BuildT>();
-        auto* deviceSrcGrid2 = srcHandle2.deviceGrid<BuildT>();
-        auto* deviceDstReferenceGrid = dstReferenceHandle.deviceGrid<BuildT>();
-        if (!deviceSrcGrid1 || !deviceSrcGrid2 || !deviceDstReferenceGrid)
-            OPENVDB_THROW(openvdb::RuntimeError, "Failure while uploading indexGrids to GPU");
-
-        // Launch benchmark
-        mainMergeGrids(
-            deviceSrcGrid1, deviceSrcGrid2, deviceDstReferenceGrid,
-            srcIndexGrid1, srcIndexGrid2, dstReferenceGrid, benchmark_iters);
+        // All grids are host-resident (HostBuffer) -- no upload; the merge runs on host grids
+        // and the result is checked against the host reference.
+        mainMergeGrids(srcIndexGrid1, srcIndexGrid2, dstReferenceGrid, benchmark_iters);
     }
     catch (const std::exception& e) {
         std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;

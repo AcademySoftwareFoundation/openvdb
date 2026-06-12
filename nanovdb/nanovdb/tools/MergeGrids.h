@@ -63,7 +63,7 @@ public:
     /// @tparam BufferT Buffer type used for allocation of the grid handle
     /// @param buffer optional buffer (currently ignored)
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
-    template<typename BufferT = nanovdb::cuda::UnifiedBuffer>
+    template<typename BufferT = nanovdb::HostBuffer>
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
 
@@ -96,10 +96,9 @@ template<typename BufferT>
 GridHandle<BufferT>
 MergeGrids<BuildT>::getHandle(const BufferT &pool)
 {
-    // Copy TreeData from GPU -> CPU
-    cudaStreamSynchronize(mStream);
-    mSrcTreeData1 = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid1);
-    mSrcTreeData2 = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid2);
+    // Read TreeData directly from the host-resident source grids (NanoTree is-a TreeData)
+    mSrcTreeData1 = mDeviceSrcGrid1->tree();
+    mSrcTreeData2 = mDeviceSrcGrid2->tree();
 
     // Ensure that the input grid contains no tile values
     if (mSrcTreeData1.mTileCount[2] || mSrcTreeData1.mTileCount[1] || mSrcTreeData1.mTileCount[0] ||
@@ -176,16 +175,11 @@ void MergeGrids<BuildT>::mergeRoot()
             (uint64_t(uint32_t(int64_t(ijk[0]) + kOffset) >> 12) << 42); //  x is the upper 21 bits
     };// coordToKey lambda functor
 
-    // Make a host copy of the source root topology RootNode for both inputs
-    // Then, merge tiles of two sources in a sorted container
+    // Read the source RootNodes directly from the host-resident source grids (no D2H copy),
+    // and merge the tiles of both sources into a sorted container.
 
     if (mSrcTreeData1.mVoxelCount) { // If the first input is not a null grid
-        // Make a host copy of the Root topology
-        auto deviceSrcRoot1 = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid1, GridT::memUsage() + mSrcTreeData1.mNodeOffset[3]));
-        uint64_t rootSize1 = mSrcTreeData1.mNodeOffset[2] - mSrcTreeData1.mNodeOffset[3];
-        auto srcRootBuffer1 = nanovdb::HostBuffer::create(rootSize1);
-        cudaCheck(cudaMemcpyAsync(srcRootBuffer1.data(), deviceSrcRoot1, rootSize1, cudaMemcpyDeviceToHost, mStream));
-        auto srcRoot1 = static_cast<RootT*>(srcRootBuffer1.data());
+        auto srcRoot1 = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid1, GridT::memUsage() + mSrcTreeData1.mNodeOffset[3]));
 
         // Add all root tiles, reordering if necessary
         for (uint32_t t = 0; t < srcRoot1->tileCount(); t++) {
@@ -195,13 +189,8 @@ void MergeGrids<BuildT>::mergeRoot()
         }
     }
 
-    if (mSrcTreeData2.mVoxelCount) { // If the first input is not a null grid
-        // Make a host copy of the Root topology
-        auto deviceSrcRoot2 = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid2, GridT::memUsage() + mSrcTreeData2.mNodeOffset[3]));
-        uint64_t rootSize2 = mSrcTreeData2.mNodeOffset[2] - mSrcTreeData2.mNodeOffset[3];
-        auto srcRootBuffer2 = nanovdb::HostBuffer::create(rootSize2);
-        cudaCheck(cudaMemcpyAsync(srcRootBuffer2.data(), deviceSrcRoot2, rootSize2, cudaMemcpyDeviceToHost, mStream));
-        auto srcRoot2 = static_cast<RootT*>(srcRootBuffer2.data());
+    if (mSrcTreeData2.mVoxelCount) { // If the second input is not a null grid
+        auto srcRoot2 = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid2, GridT::memUsage() + mSrcTreeData2.mNodeOffset[3]));
 
         // Add all root tiles, reordering if necessary
         for (uint32_t t = 0; t < srcRoot2->tileCount(); t++) {

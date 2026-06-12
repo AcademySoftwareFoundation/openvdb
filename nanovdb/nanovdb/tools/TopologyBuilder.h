@@ -221,7 +221,7 @@ template <typename BuildT>
 template <typename BufferT>
 BufferT TopologyBuilder<BuildT>::getBuffer(const BufferT &pool, cudaStream_t stream)
 {
-    // Allocates a device buffer for the destination grid, once the topology/size of the tree is known
+    // Allocates the destination grid buffer, once the topology/size of the tree is known.
     data()->grid  = 0;// grid is always stored at the start of the buffer!
     data()->tree  = GridT::memUsage();// grid ends and tree begins
     data()->root  = data()->tree  + TreeT::memUsage(); // tree ends and root node begins
@@ -230,13 +230,15 @@ BufferT TopologyBuilder<BuildT>::getBuffer(const BufferT &pool, cudaStream_t str
     data()->leaf  = data()->lower + LowerT::memUsage()*data()->nodeCount[1];// lower internal nodes ends and leaf nodes begin
     data()->size  = data()->leaf  + LeafT::DataType::memUsage()*data()->nodeCount[0];// leaf nodes end and blind meta data begins
 
-    int device = 0;
-    cudaGetDevice(&device);
-    auto buffer = BufferT::create(data()->size, &pool, device, stream);// only allocate buffer on the device
-    cudaCheck(cudaMemsetAsync(buffer.deviceData(), 0, data()->size, stream));
+    // Host-side allocation + zero-fill. Backend-agnostic: HostBuffer and UnifiedBuffer both expose
+    // create(size, &pool) and a host-writable data() (UnifiedBuffer's create places it CPU-side),
+    // so this works for both with no CUDA. The whole result grid is then built on the host.
+    (void)stream;
+    auto buffer = BufferT::create(data()->size, &pool);
+    std::memset(buffer.data(), 0, data()->size);
 
-    data()->d_bufferPtr = buffer.deviceData();
-    if (data()->d_bufferPtr == nullptr) throw std::runtime_error("Failed to allocate grid buffer on the device");
+    data()->d_bufferPtr = buffer.data();
+    if (data()->d_bufferPtr == nullptr) throw std::runtime_error("Failed to allocate grid buffer");
 
     return buffer;
 }// TopologyBuilder<BuildT>::getBuffer
