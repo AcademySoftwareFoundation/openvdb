@@ -149,15 +149,15 @@ fillet_two_boxes(const std::string& outFilename)
     const float gamma = 1.0f;
 
     const DilationCase dilationCases[] = {
-        { "fillet_union_dilate_e6_i3", 6.0f, 3.0f, 0 },
-        { "fillet_union_dilate_e6_i3_support2", 6.0f, 3.0f, 2 },
-        { "fillet_union_dilate_e6_i3_support4", 6.0f, 3.0f, 4 },
-        { "fillet_union_dilate_e4_i2", 4.0f, 2.0f, 0 },
-        { "fillet_union_dilate_e3_i1p5", 3.0f, 1.5f, 0 },
-        { "fillet_union_dilate_e2_i1", 2.0f, 1.0f, 0 },
-        { "fillet_union_dilate_e1p5_i0p75", 1.5f, 0.75f, 0 },
-        { "fillet_union_dilate_e1_i0p5", 1.0f, 0.5f, 0 },
-        { "fillet_union_dilate_e1_i0p5_support4", 1.0f, 0.5f, 4 },
+        { "fillet_union_dilate_e6_i3_local", 6.0f, 3.0f, 0 },
+        { "fillet_union_dilate_e6_i3_support2_local", 6.0f, 3.0f, 2 },
+        { "fillet_union_dilate_e6_i3_support4_local", 6.0f, 3.0f, 4 },
+        { "fillet_union_dilate_e4_i2_local", 4.0f, 2.0f, 0 },
+        { "fillet_union_dilate_e3_i1p5_local", 3.0f, 1.5f, 0 },
+        { "fillet_union_dilate_e2_i1_local", 2.0f, 1.0f, 0 },
+        { "fillet_union_dilate_e1p5_i0p75_local", 1.5f, 0.75f, 0 },
+        { "fillet_union_dilate_e1_i0p5_local", 1.0f, 0.5f, 0 },
+        { "fillet_union_dilate_e1_i0p5_support4_local", 1.0f, 0.5f, 4 },
     };
 
     openvdb::math::Transform::Ptr transform =
