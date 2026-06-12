@@ -555,10 +555,10 @@ and then a small number of warm-start timing lines.
 | 4.1   | Output `BufferT` default → `UnifiedBuffer`  | **Done** (`0179f8c3`) |
 | 4.2   | Scratch buffers → `ScratchBufferT` alias    | **Done** (`003b0a59`) |
 | 4.3   | lambdaKernel/operatorKernel launches → `util::forEach` | **Done** for `MergeGrids` (see 7.2) |
-| 4.4   | `mData` and `mProcessedRoot` dual-mode → `UnifiedBuffer` | Pending (see 7.3) |
+| 4.4   | Working buffers → `HostBuffer` (straight to host; skipped the UnifiedBuffer step) | **Done** for Merge/Dilate/Prune (see 7.3: scratch, mProcessedRoot, mData, output buffer, streams) |
 | 4.5   | Morphology functors → host equivalents (MergeGrids subset) | **Done** for `MergeGrids` (see 7.2) |
 | 4.6   | CUB scans → `util::inclusiveScan`           | **Done** (`858afe79`, `ed109ddd`) |
-| 4.7   | Drop CUDA artifacts; `.cu` → `.cpp`         | Pending (see 7.3) |
+| 4.7   | Drop CUDA artifacts; `.cu` → `.cpp`         | In progress — data path CUDA-free; dead code/includes + `.cu`→`.cpp` remain (see 7.3 items 10-12) |
 | 4.8   | Repeat 4.1–4.7 for the remaining operators | **In progress** — `DilateGrid` + `PruneGrid` kernel-free (see 7.7); Coarsen/Refine pending |
 
 ### 7.2  Per-method porting status (MergeGrids `getHandle` pipeline)
@@ -614,28 +614,47 @@ we migrate straight to `HostBuffer`.
    + `get*` accessors; `data()` is a trivial `&mData` accessor, kept (used ~60×).
 4. **`updateChecksum` → host** (`333c942d`, see §7.8).
 
-**Remaining (Step 4 — the output-buffer + example-coupled milestone):**
+**Done — output buffer, inputs, streams, timer (the whole data path is host):**
 
-5. **Output grid buffer → `HostBuffer`.** `getBuffer` still does
-   `BufferT::create(size,&pool,device,stream)` + `cudaMemsetAsync(buffer.deviceData())`
-   + `d_bufferPtr = buffer.deviceData()` (default `BufferT = UnifiedBuffer`). Flip to
-   `HostBuffer`: `create(size,&pool)`, `std::memset(buffer.data())`,
-   `d_bufferPtr = buffer.data()`. This is the one device allocation left in the flow.
-6. **Inputs presumed host-resident.** `getTreeData` (D2H via `DeviceGridTraits`) →
-   direct host read `mSrcTreeData = srcGrid->tree()`; drop `mergeRoot`'s remaining
-   source-root D2H (Dilate/Prune already read the managed source directly); drop the
-   `cudaStream_t` param from the host operator/`TopologyBuilder` signatures.
-7. **Residual `cudaStreamSynchronize` drains** — fall away once 5/6 land (no async
-   device work remains).
-8. **Dead code** — `TopologyBuilder::mNumThreads`/`numBlocks`, the `CALL_CUBS` macro,
-   `mTempDevicePool`, the per-operator `mNumThreads`; then drop `#include <cub/cub.cuh>`
-   and the `util/cuda/*` includes.
-9. **Examples + `.cu` → `.cpp` (completion signal).** `HostBuffer` inputs/output,
-   `deviceGrid()` → `grid()`, `bufferCheck` → `memcmp`. Merge can flip first (no
-   helper kernel) as the no-nvcc proof; Dilate additionally needs a **host
-   `InjectGridMask`** (its injection sidecar helper is still a CUDA kernel). Once no
-   `.cu` remains and the CUDA includes are gone, CMake stops invoking nvcc for the
-   example; remove the `\warning … include only from .cu files …` doxygen notes.
+5. **`getBuffer` is backend-agnostic + CUDA-free** (`8d8993ec`): `BufferT::create(size,&pool)`
+   + `std::memset(buffer.data())` + `d_bufferPtr = buffer.data()`. Works for `HostBuffer`
+   (the new default) and `UnifiedBuffer` alike, no behavior change.
+6. **All three operators default `getHandle` `BufferT` → `HostBuffer`** and read inputs
+   host-resident: merge `8d8993ec`, dilate+prune `7eb3a506`. `getTreeData` (D2H via
+   `DeviceGridTraits`) → `mSrcTreeData = srcGrid->tree()`; `mergeRoot`'s source-root D2H
+   dropped (Dilate/Prune already read the source directly). Examples: all grids `HostBuffer`,
+   `deviceGrid()`→`grid()`, `bufferCheck`→`memcmp`, no `deviceUpload`.
+7. **Host `InjectGridMask`** (`79319066`, `util/Injection.h`): the dilate→prune round-trip's
+   injection sidecar helper is now a host `util::forEach` (it was the one remaining example
+   kernel). The dilate example's `mainDilateGrid` has no kernel launches.
+8. **Timer → host `util::Timer`** (`dae9740a`) in all operators + examples.
+9. **`cudaStream_t` plumbing ripped out** (`d5a962bf`): no async op / kernel / `cudaMemcpy*` /
+   `deviceUpload` remains, so every `cudaStreamSynchronize` drained an empty stream. Dropped the
+   stream param from every `TopologyBuilder`/operator method + ctor, the `mStream` members, and
+   all syncs. Purely mechanical — nothing was stream-ordered.
+
+So the operators' data path is fully host and CUDA-free in behavior; all three validate CORRECT
+(merge across pairings; dilate→inject→prune round-trip at both stencils).
+
+**Remaining (cosmetic / build-capability, not behavioral):**
+
+10. **Dead code** — `TopologyBuilder::mNumThreads`/`numBlocks` + `mTempDevicePool` + the
+    `CALL_CUBS` macro (the last things naming a now-gone `stream`, inert/unexpanded), and the
+    per-operator `mNumThreads`/`numBlocks`.
+11. **Include purge** — once 10 lands, drop `#include <cub/cub.cuh>`, `util/cuda/Morphology.cuh`,
+    `util/cuda/DeviceGridTraits.cuh`, `util/cuda/Util.h` (`cudaCheck`), `cuda/TempPool.h`,
+    `cuda/DeviceBuffer.h`, `cuda/UnifiedBuffer.h` from the four headers (and the unused cuda
+    buffer includes from the example `.cpp`s). Audit each for any remaining user.
+12. **`.cu` → `.cpp` (completion signal + proof).** Fold each `*_kernels.cu` into its `.cpp`;
+    once no `.cu` remains and the CUDA includes are gone, CMake stops invoking nvcc for the
+    example. Remove the `\warning … include only from .cu files …` doxygen notes. This compile
+    under plain g++ (no `__CUDACC__`) is what *proves* the headers are CUDA-free — nvcc's host
+    pass is more permissive, so this step may surface a latent dependency (a build fix, not a
+    behavior change).
+
+Note (scope): this records the host port of Merge/Dilate/Prune. CoarsenGrid/RefineGrid are still
+unported (§7.7); they will be written directly in the now-established clean (HostBuffer, no-stream)
+style.
 
 ### 7.4  Core-header changes (affect both host and CUDA builds)
 
