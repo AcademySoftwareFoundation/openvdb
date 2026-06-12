@@ -43,7 +43,7 @@ class PruneGrid
     using UpperT = NanoUpper<BuildT>;
 
     // Storage policy for host-visible scratch (end state of the port is HostBuffer).
-    using ScratchBufferT = nanovdb::cuda::UnifiedBuffer;
+    using ScratchBufferT = typename TopologyBuilder<BuildT>::ScratchBufferT;
 
 public:
 
@@ -167,9 +167,6 @@ void PruneGrid<BuildT>::pruneRoot()
     // For this simple approximation, it is assumed that all root tiles currently present will persist,
     // and they will be pruned at a later stage if deemed empty.
 
-    int device = 0;
-    cudaGetDevice(&device);
-
     std::map<uint64_t, typename RootT::DataType::Tile> prunedTiles;
 
     // This encoding scheme mirrors the one used in PointsToGrid; note that it is different from Tile::key
@@ -194,15 +191,14 @@ void PruneGrid<BuildT>::pruneRoot()
         }
     }
 
-    // Package the duplicated root topology into a RootNode plus Tile list; upload to the GPU
+    // Package the duplicated root topology into a host RootNode plus Tile list
     uint64_t rootSize = RootT::memUsage(prunedTiles.size());
-    mBuilder.mProcessedRoot = nanovdb::cuda::DeviceBuffer::create(rootSize);
+    mBuilder.mProcessedRoot = ScratchBufferT::create(rootSize);
     auto prunedRootPtr = static_cast<RootT*>(mBuilder.mProcessedRoot.data());
     prunedRootPtr->mTableSize = prunedTiles.size();
     uint32_t t = 0;
     for (const auto& [key, tile] : prunedTiles)
         *prunedRootPtr->tile(t++) = tile;
-    mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
 }// PruneGrid<BuildT>::pruneRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

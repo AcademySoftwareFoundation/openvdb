@@ -40,6 +40,7 @@ class MergeGrids
     using TreeT  = NanoTree<BuildT>;
     using RootT  = NanoRoot<BuildT>;
     using UpperT = NanoUpper<BuildT>;
+    using ScratchBufferT = typename TopologyBuilder<BuildT>::ScratchBufferT;
 
 public:
 
@@ -164,9 +165,6 @@ void MergeGrids<BuildT>::mergeRoot()
 {
     // Creates a new merged tree root with the merged tiles of the two input root topologies
 
-    int device = 0;
-    cudaGetDevice(&device);
-
     std::map<uint64_t, typename RootT::DataType::Tile> mergedTiles;
 
     // This encoding scheme mirrors the one used in PointsToGrid; note that it is different from Tile::key
@@ -213,15 +211,14 @@ void MergeGrids<BuildT>::mergeRoot()
         }
     }
 
-    // Package the new root topology into a RootNode plus Tile list; upload to the GPU
+    // Package the new root topology into a host RootNode plus Tile list
     uint64_t rootSize = RootT::memUsage(mergedTiles.size());
-    mBuilder.mProcessedRoot = nanovdb::cuda::DeviceBuffer::create(rootSize);
+    mBuilder.mProcessedRoot = ScratchBufferT::create(rootSize);
     auto mergedRootPtr = static_cast<RootT*>(mBuilder.mProcessedRoot.data());
     mergedRootPtr->mTableSize = mergedTiles.size();
     uint32_t t = 0;
     for (const auto& [key, tile] : mergedTiles)
         *mergedRootPtr->tile(t++) = tile;
-    mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
 }// MergeGrids<BuildT>::mergeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

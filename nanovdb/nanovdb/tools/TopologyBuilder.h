@@ -44,12 +44,13 @@ class TopologyBuilder
     using LowerT = NanoLower<BuildT>;
     using LeafT  = NanoLeaf<BuildT>;
 
-    // Storage policy for the host-only scratch (mask/offset/parent arrays). These are written
-    // and read entirely on the host now, so they are plain HostBuffer. The dual-mode
-    // mProcessedRoot and mData remain DeviceBuffer for now and migrate separately.
-    using ScratchBufferT = nanovdb::HostBuffer;
-
 public:
+
+    // Storage policy for the transient host scratch (the speculative mProcessedRoot plus the
+    // mask/offset/parent arrays). These are built and consumed entirely on the host, so they are
+    // plain HostBuffer. Public so the operators allocating mProcessedRoot share this single
+    // definition rather than re-declaring their own. (mData migrates separately.)
+    using ScratchBufferT = nanovdb::HostBuffer;
 
     TopologyBuilder(cudaStream_t stream)
     {
@@ -86,7 +87,7 @@ public:
 
     void postProcessGridTree(cudaStream_t stream);
 
-    nanovdb::cuda::DeviceBuffer  mProcessedRoot;
+    ScratchBufferT               mProcessedRoot;
     ScratchBufferT               mUpperMasks;
     ScratchBufferT               mLowerMasks;
     ScratchBufferT               mUpperOffsets;
@@ -98,7 +99,6 @@ public:
     nanovdb::cuda::DeviceBuffer  mData;
     CheckMode                    mChecksum{CheckMode::Disable};
 
-    auto deviceProcessedRoot() { return static_cast<RootT*>(mProcessedRoot.deviceData()); }
     auto hostProcessedRoot()   { return static_cast<RootT*>(mProcessedRoot.data()); }
     Data* data()             { return static_cast<Data*>(mData.data()); }
     Data* deviceData()       { return static_cast<Data*>(mData.deviceData()); }
@@ -387,7 +387,7 @@ inline void TopologyBuilder<BuildT>::processLowerNodes(cudaStream_t stream)
         );
     }
 
-    mProcessedRoot.clear(stream);
+    mProcessedRoot.clear();
     mUpperMasks.clear();
     mLowerMasks.clear();
     mLowerOffsets.clear();

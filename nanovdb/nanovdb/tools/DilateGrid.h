@@ -45,7 +45,7 @@ class DilateGrid
     // Storage policy for host-visible scratch. UnifiedBuffer makes device-allocated scratch
     // host-readable without explicit downloads, as in the host TopologyBuilder. End state of
     // the port is HostBuffer.
-    using ScratchBufferT = nanovdb::cuda::UnifiedBuffer;
+    using ScratchBufferT = typename TopologyBuilder<BuildT>::ScratchBufferT;
 
 public:
 
@@ -177,9 +177,6 @@ void DilateGrid<BuildT>::dilateRoot()
     // Root tiles that were preemptively introduced, but end up having no active contents will
     // be pruned in later stages of processing.
 
-    int device = 0;
-    cudaGetDevice(&device);
-
     std::map<uint64_t, typename RootT::DataType::Tile> dilatedTiles;
 
     // This encoding scheme mirrors the one used in PointsToGrid; note that it is different from Tile::key
@@ -218,15 +215,14 @@ void DilateGrid<BuildT>::dilateRoot()
         }
     }
 
-    // Package the new root topology into a RootNode plus Tile list; upload to the GPU
+    // Package the new root topology into a host RootNode plus Tile list
     uint64_t rootSize = RootT::memUsage(dilatedTiles.size());
-    mBuilder.mProcessedRoot = nanovdb::cuda::DeviceBuffer::create(rootSize);
+    mBuilder.mProcessedRoot = ScratchBufferT::create(rootSize);
     auto dilatedRootPtr = static_cast<RootT*>(mBuilder.mProcessedRoot.data());
     dilatedRootPtr->mTableSize = dilatedTiles.size();
     uint32_t t = 0;
     for (const auto& [key, tile] : dilatedTiles)
         *dilatedRootPtr->tile(t++) = tile;
-    mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
 }// DilateGrid<BuildT>::dilateRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
