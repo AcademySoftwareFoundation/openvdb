@@ -3,7 +3,7 @@
 
 #include <nanovdb/tools/DilateGrid.h>
 #include <nanovdb/tools/PruneGrid.h>
-#include <nanovdb/util/cuda/Injection.cuh>
+#include <nanovdb/util/Injection.h>
 
 template<typename T>
 bool bufferCheck(const T* deviceBuffer, const T* hostBuffer, size_t elem_count) {
@@ -63,14 +63,9 @@ void mainDilateGrid(
         if (!dstLeafMasks) throw std::runtime_error("No buffer for dstLeafMask");
     }
 
-    const unsigned int numThreads = 128;
-    auto numBlocks = [numThreads] (unsigned int n) {return (n + numThreads - 1) / numThreads;};
     gpuTimer.start("Injecting un-dilated topology as a pruning mask");
     if (dstLeafCount)
-        nanovdb::util::cuda::lambdaKernel<<<numBlocks(dstLeafCount), numThreads>>>(dstLeafCount,
-            nanovdb::util::cuda::InjectGridMaskFunctor<BuildT>(),
-            deviceGridOriginal, dstGrid, dstLeafMasks );
-    cudaCheck(cudaDeviceSynchronize());
+        nanovdb::util::injectGridMask<BuildT>(deviceGridOriginal, dstGrid, dstLeafMasks, dstLeafCount);
     gpuTimer.stop();
 
     // Initialize pruner (host operator; reads dstGrid + dstLeafMasks host-side via managed memory)
