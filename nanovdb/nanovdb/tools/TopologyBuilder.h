@@ -61,7 +61,6 @@ public:
         void     *d_bufferPtr;
         uint64_t grid, tree, root, upper, lower, leaf, size;// byte offsets to nodes in buffer
         uint32_t nodeCount[3];// 0=leaf,1=lower, 2=upper
-        uint32_t *d_upperOffsets;
         __hostdev__ GridT&  getGrid() const {return *util::PtrAdd<GridT>(d_bufferPtr, grid);}
         __hostdev__ TreeT&  getTree() const {return *util::PtrAdd<TreeT>(d_bufferPtr, tree);}
         __hostdev__ RootT&  getRoot() const {return *util::PtrAdd<RootT>(d_bufferPtr, root);}
@@ -240,8 +239,6 @@ BufferT TopologyBuilder<BuildT>::getBuffer(const BufferT &pool, cudaStream_t str
 
     data()->d_bufferPtr = buffer.deviceData();
     if (data()->d_bufferPtr == nullptr) throw std::runtime_error("Failed to allocate grid buffer on the device");
-    if (data()->nodeCount[2] != 0) // Unless the result is an empty grid
-        data()->d_upperOffsets = static_cast<uint32_t*>(mUpperOffsets.data());
     mData.deviceUpload(device, stream, false);
 
     return buffer;
@@ -339,13 +336,14 @@ inline void TopologyBuilder<BuildT>::processUpperNodes(cudaStream_t stream)
     auto data          = this->data();
     auto processedRoot = hostProcessedRoot();
     auto &root         = data->getRoot();
+    auto upperOffsets  = static_cast<uint32_t*>(mUpperOffsets.data());
 
     util::forEach(0, processedTileCount, 1, [=, &root](const util::Range1D &r) {
         for (auto processedTileID = r.begin(); processedTileID != r.end(); ++processedTileID) {
-            const uint32_t tileID = data->d_upperOffsets[processedTileID];
+            const uint32_t tileID = upperOffsets[processedTileID];
             // If the offsets are the same, this was a speculatively introduced tile which was
             // not necessary.
-            if (tileID != data->d_upperOffsets[processedTileID+1]) {
+            if (tileID != upperOffsets[processedTileID+1]) {
                 auto &dstUpper      = data->getUpper(tileID);
                 auto &processedTile = *processedRoot->tile(processedTileID);
                 root.tile(tileID)->setChild(processedTile.origin(), &dstUpper, &root);
