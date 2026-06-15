@@ -7,10 +7,6 @@
     \authors Efty Sifakis
 
     \brief Morphological pruning of NanoVDB indexGrids using a leaf-indexed mask (host-side port)
-
-    \warning In this initial stage of the host-side port, this header still contains cuda device
-             code; include it only from .cu files (or other .cuh files) until CUDA dependencies
-             are progressively removed.
 */
 
 #ifndef NANOVDB_TOOLS_PRUNEGRID_H_HAS_BEEN_INCLUDED

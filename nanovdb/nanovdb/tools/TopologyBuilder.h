@@ -7,10 +7,6 @@
     \authors Efty Sifakis
 
     \brief Shared functionality of (mostly morphology) operators that alter the voxel content of grids
-
-    \warning In this initial stage of the host-side port, this header still contains cuda device
-             code; include it only from .cu files (or other .cuh files) until CUDA dependencies
-             are progressively removed.
 */
 
 #ifndef NANOVDB_TOOLS_TOPOLOGYBUILDER_H_HAS_BEEN_INCLUDED
@@ -97,8 +93,6 @@ public:
     Data* data()             { return &mData; }
 
 };// tools::TopologyBuilder<BuildT>
-
-//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 

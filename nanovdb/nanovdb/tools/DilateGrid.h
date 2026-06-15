@@ -6,11 +6,7 @@
 
     \authors Efty Sifakis
 
-    \brief Morphological dilation of NanoVDB indexGrids (host-side port in progress)
-
-    \warning In this initial stage of the host-side port, this header still contains cuda device
-             code; include it only from .cu files (or other .cuh files) until CUDA dependencies
-             are progressively removed.
+    \brief Morphological dilation of NanoVDB indexGrids (host-side port)
 */
 
 #ifndef NANOVDB_TOOLS_DILATEGRID_H_HAS_BEEN_INCLUDED

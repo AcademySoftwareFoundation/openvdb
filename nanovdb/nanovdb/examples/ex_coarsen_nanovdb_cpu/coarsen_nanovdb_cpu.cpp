@@ -7,7 +7,6 @@
 
 // the following files are from NanoVDB
 #include <nanovdb/NanoVDB.h>
-#include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/tools/CreateNanoGrid.h>
 
 template<class CoordT>

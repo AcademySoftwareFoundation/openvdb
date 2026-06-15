@@ -558,8 +558,8 @@ and then a small number of warm-start timing lines.
 | 4.4   | Working buffers → `HostBuffer` (straight to host; skipped the UnifiedBuffer step) | **Done** for Merge/Dilate/Prune (see 7.3: scratch, mProcessedRoot, mData, output buffer, streams) |
 | 4.5   | Morphology functors → host equivalents (MergeGrids subset) | **Done** for `MergeGrids` (see 7.2) |
 | 4.6   | CUB scans → `util::inclusiveScan`           | **Done** (`858afe79`, `ed109ddd`) |
-| 4.7   | Drop CUDA artifacts; `.cu` → `.cpp`         | In progress — dead code + CUDA-include purge done for all six headers (7.3 items 10-11); only `.cu`→`.cpp` remains (item 12) |
-| 4.8   | Repeat 4.1–4.7 for the remaining operators | **Done (compute)** — all five operators (Merge/Dilate/Prune/Coarsen/Refine) kernel-free on the host (see 7.7); only the shared 4.7 cosmetic cleanup remains |
+| 4.7   | Drop CUDA artifacts; `.cu` → `.cpp`         | **Done** — dead code + CUDA-include purge across all six headers (7.3 items 10-11) and `.cu`→`.cpp` flip of all four `_cpu` examples (item 12); headers compile under plain g++ |
+| 4.8   | Repeat 4.1–4.7 for the remaining operators | **Done** — all five operators (Merge/Dilate/Prune/Coarsen/Refine) host-ported, CUDA-free, and compiling under plain g++ (see 7.7) |
 
 ### 7.2  Per-method porting status (MergeGrids `getHandle` pipeline)
 
@@ -648,16 +648,22 @@ So the operators' data path is fully host and CUDA-free in behavior; all three v
     through the now-removed CUDA headers. `MorphologyHelpers.h`'s `__CUDACC__`-guarded include of its
     `.cuh` counterpart is kept — it serves the CUDA side. All four `_cpu` examples build and validate
     CORRECT (dragon/iss/space/torus).
-12. **`.cu` → `.cpp` (completion signal + proof) — TODO.** Fold each `*_kernels.cu` into its `.cpp`
-    (and drop the example `.cpp`s' remaining `cuda/DeviceBuffer.h` include); once no `.cu` remains
-    CMake stops invoking nvcc for the example. Remove the `\warning … include only from .cu files …`
-    doxygen notes (still present, now stale, kept until this step). This compile under plain g++
-    (no `__CUDACC__`) is what *proves* the headers are CUDA-free — nvcc's host pass is more
-    permissive, so this step may surface a latent dependency (a build fix, not a behavior change).
+12. **`.cu` → `.cpp` (completion signal + proof) — DONE.** Renamed each example's
+    `*_nanovdb_cpu_kernels.cu` → `*_nanovdb_cpu_benchmark.cpp` (`git mv`; the "kernels" name was
+    stale — no kernels remain — and the file is the operator-driving/benchmark half) and dropped the
+    example `.cpp`s' now-unused `cuda/DeviceBuffer.h`/`cuda/UnifiedBuffer.h` includes. The
+    `nanovdb_example` CMake function globs `*.cpp` and only invokes nvcc when a `*.cu` exists, so the
+    rename alone makes each `_cpu` example a pure C++ (g++) target — verified in the build log (both
+    TUs compile as "CXX object", no CUDA object). Removed the now-stale `\warning … include only from
+    .cu files …` doxygen notes from all six headers. **This compile under plain g++ (no `__CUDACC__`)
+    proves the headers are CUDA-free.** The one latent dependency nvcc's host pass had masked —
+    `<map>`, pulled in transitively through a removed CUDA header — was already fixed under item 11.
+    All four `_cpu` examples build as g++ targets and validate CORRECT (incl. the dilate→prune
+    round-trip).
 
-Note (scope): all five operators (Merge/Dilate/Prune/Coarsen/Refine) are ported and their headers
-are now CUDA-include-free and dead-code-free (items 10-11). Only the `.cu`→`.cpp` completion signal
-(item 12) remains.
+Note (scope): all five operators (Merge/Dilate/Prune/Coarsen/Refine) are ported; their headers are
+CUDA-free (no CUDA includes, no device code, no dead CUDA scaffolding) and compile under plain g++.
+The `_cpu` examples no longer invoke nvcc. Phase 4.7 is complete.
 
 ### 7.4  Core-header changes (affect both host and CUDA builds)
 

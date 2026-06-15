@@ -7,8 +7,6 @@
 
 // the following files are from NanoVDB
 #include <nanovdb/NanoVDB.h>
-#include <nanovdb/cuda/DeviceBuffer.h>
-#include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/tools/CreateNanoGrid.h>
 
 template<typename BuildT>
