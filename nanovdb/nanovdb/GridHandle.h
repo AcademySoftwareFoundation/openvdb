@@ -410,7 +410,7 @@ void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
             sum += data.mGridSize;
         }
         auto buffer = BufferT::create(size + sum, &pool);
-        is.seekg(-int64_t(sum + sizeof(GridData)), std::ios::cur);// rewind to start
+        is.seekg(-int64_t(size + sum - data.mGridSize + sizeof(GridData)), std::ios::cur);// rewind to start
         is.read((char*)(buffer.data()), buffer.size());
         *this = GridHandle(std::move(buffer));
     } else {
