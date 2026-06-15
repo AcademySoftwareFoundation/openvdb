@@ -407,7 +407,7 @@ struct RefineInternalNodesFunctor
     void operator()(
         size_t srcLeafID,
         const NanoGrid<BuildT>* srcGrid,
-        const NanoRoot<BuildT>* prunedRoot,
+        const NanoRoot<BuildT>* refinedRoot,
         void *upperMasks_,
         void *lowerMasks_)
     {
@@ -432,9 +432,9 @@ struct RefineInternalNodesFunctor
                 const auto refinedOrigin = refineCoord(srcLeaf.origin()+nanovdb::Coord(di*4,dj*4,dk*4));
                 auto upperChildIndex = NanoUpper<BuildT>::CoordToOffset(refinedOrigin);
                 auto lowerChildIndex = NanoLower<BuildT>::CoordToOffset(refinedOrigin);
-                auto prunedTile = prunedRoot->probeTile(refinedOrigin);
+                auto refinedTile = refinedRoot->probeTile(refinedOrigin);
                 uint64_t tileChildIndex =
-                    util::PtrDiff(prunedTile, prunedRoot->tile(0))
+                    util::PtrDiff(refinedTile, refinedRoot->tile(0))
                     / sizeof(NanoRoot<BuildT>::Tile); // TODO: consider some faster integer division? or a way to avoid
                 auto& outputUpperMask = upperMasks[tileChildIndex];
                 outputUpperMask.setOnAtomic(upperChildIndex);
@@ -453,7 +453,7 @@ struct CoarsenInternalNodesFunctor
     void operator()(
         size_t srcLeafID,
         const NanoGrid<BuildT>* srcGrid,
-        const NanoRoot<BuildT>* prunedRoot,
+        const NanoRoot<BuildT>* coarsenedRoot,
         void *upperMasks_,
         void *lowerMasks_)
     {
@@ -467,9 +467,9 @@ struct CoarsenInternalNodesFunctor
             auto coarsenedOrigin = coarsenCoord(srcLeaf.origin()); // it's ok if this is not a multiple of 8
             auto upperChildIndex = NanoUpper<BuildT>::CoordToOffset(coarsenedOrigin);
             auto lowerChildIndex = NanoLower<BuildT>::CoordToOffset(coarsenedOrigin);
-            auto prunedTile = prunedRoot->probeTile(coarsenedOrigin);
+            auto coarsenedTile = coarsenedRoot->probeTile(coarsenedOrigin);
             uint64_t tileChildIndex =
-                util::PtrDiff(prunedTile, prunedRoot->tile(0))
+                util::PtrDiff(coarsenedTile, coarsenedRoot->tile(0))
                 / sizeof(NanoRoot<BuildT>::Tile); // TODO: consider some faster integer division? or a way to avoid
             auto& outputUpperMask = upperMasks[tileChildIndex];
             outputUpperMask.setOnAtomic(upperChildIndex);
