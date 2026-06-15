@@ -119,6 +119,7 @@ nanovdb_example(NAME "ex_coarsen_nanovdb_cuda" OPENVDB)
 # instead of nanovdb::tools::cuda::) and progressively shed CUDA dependencies.
 nanovdb_example(NAME "ex_merge_nanovdb_cpu" OPENVDB)
 nanovdb_example(NAME "ex_dilate_nanovdb_cpu" OPENVDB)
+nanovdb_example(NAME "ex_coarsen_nanovdb_cpu" OPENVDB)
 
 nanovdb_example(NAME "ex_voxelBlockManager_host_cuda")
 if(TARGET ex_voxelBlockManager_host_cuda)

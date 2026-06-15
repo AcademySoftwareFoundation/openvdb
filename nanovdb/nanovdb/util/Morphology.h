@@ -766,6 +766,116 @@ inline void PruneLeafMasks(
     });
 }
 
+/// @brief Compute the masks of upper and (densified) lower internal nodes of the coarsened result.
+///        Host counterpart to the CUDA CoarsenInternalNodesFunctor.
+///
+/// @param srcGrid        (in)  Source grid being coarsened (read host-side; see MergeInternalNodes' note).
+/// @param coarsenedRoot  (in)  Speculative coarsened root (host copy), used to locate output tiles.
+/// @param upperMasks_    (out) Array of Mask<5>, one per coarsened upper tile.
+/// @param lowerMasks_    (out) Array of (Mask<4>[Mask<5>::SIZE]), one set per coarsened upper tile.
+/// @param srcLeafCount   (in)  Number of leaf nodes in the source grid (nodeCount[0]).
+///
+/// Every non-empty source leaf maps (via coarsenCoord) into the coarsened topology. Multiple source
+/// leaves can coarsen into a shared lower/upper, so the output bits are set via setOnAtomic.
+template<typename BuildT>
+inline void CoarsenInternalNodes(
+    const NanoGrid<BuildT> *srcGrid,
+    const NanoRoot<BuildT> *coarsenedRoot,
+    void *upperMasks_,
+    void *lowerMasks_,
+    std::size_t srcLeafCount)
+{
+    using UpperMaskArrayT = Mask<5>*;
+    using LowerMaskArrayT = Mask<4>(*)[Mask<5>::SIZE];
+    auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
+    auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
+
+    util::forEach(0, srcLeafCount, 1, [=](const util::Range1D &r) {
+        const auto& srcTree = srcGrid->tree();
+        for (auto srcLeafID = r.begin(); srcLeafID != r.end(); ++srcLeafID) {
+            const auto& srcLeaf = srcTree.template getFirstNode<0>()[srcLeafID];
+            if (!srcLeaf.valueMask().isOff()) { // Gratuitous check; leaf should have at least one active voxel
+                auto coarsenedOrigin = coarsenCoord(srcLeaf.origin()); // it's ok if this is not a multiple of 8
+                auto upperChildIndex = NanoUpper<BuildT>::CoordToOffset(coarsenedOrigin);
+                auto lowerChildIndex = NanoLower<BuildT>::CoordToOffset(coarsenedOrigin);
+                auto coarsenedTile = coarsenedRoot->probeTile(coarsenedOrigin);
+                uint64_t tileChildIndex =
+                    util::PtrDiff(coarsenedTile, coarsenedRoot->tile(0))
+                    / sizeof(typename NanoRoot<BuildT>::Tile);
+                auto& outputUpperMask = upperMasks[tileChildIndex];
+                outputUpperMask.setOnAtomic(upperChildIndex);
+                auto& outputLowerMask = lowerMasks[tileChildIndex][upperChildIndex];
+                outputLowerMask.setOnAtomic(lowerChildIndex);
+            }
+        }
+    });
+}
+
+/// @brief In-place 2x downsampling of a leaf value mask: out(x,y,z) = OR of the eight voxels in the
+///        2x2x2 block at (2x,2y,2z). The result occupies the low (0..3) range along each axis.
+///        Verbatim host copy of the CUDA CoarsenLeafMasksFunctor::coarsenMask word arithmetic.
+inline void coarsenMask(Mask<3>& mask)
+{
+    // Coarsen along x-axis
+    mask.words()[0] |= mask.words()[1];
+    mask.words()[1] = mask.words()[2] | mask.words()[3];
+    mask.words()[2] = mask.words()[4] | mask.words()[5];
+    mask.words()[3] = mask.words()[6] | mask.words()[7];
+    mask.words()[4] = mask.words()[5] = mask.words()[6] = mask.words()[7] = 0UL;
+
+    for (int w = 0; w < 4; w++) {
+        auto& word = mask.words()[w];
+        // Coarsen along y-axis
+        word |= (word >> 8);
+        word &= 0x00ff00ff00ff00ffUL;
+        word |= (word >> 8);
+        word &= 0x0000ffff0000ffffUL;
+        word |= (word >> 16);
+        word &= 0x00000000ffffffffUL;
+        // Coarsen along z-axis
+        word |= (word >> 1);
+        word &= 0x0000000055555555UL;
+        word |= (word >> 1);
+        word &= 0x0000000033333333UL;
+        word |= (word >> 2);
+        word &= 0x000000000f0f0f0fUL;
+    }
+}
+
+/// @brief Coarsen each source leaf's active mask into its destination leaf in the coarsened grid.
+///        Host counterpart to the CUDA CoarsenLeafMasksFunctor.
+///
+/// @param srcGrid      (in)  Source grid being coarsened (read host-side).
+/// @param dstGrid      (in/out) Output (coarsened) grid whose leaf value masks are written.
+/// @param srcLeafCount (in)  Number of leaf nodes in the source grid (nodeCount[0]).
+///
+/// Iteration is flat over source leaves. Up to eight source leaves coarsen into one destination leaf
+/// (each contributing one 4x4x4 octant), so the per-octant words are OR'd in via util::atomicOr.
+template<typename BuildT>
+inline void CoarsenLeafMasks(
+    const NanoGrid<BuildT> *srcGrid,
+    NanoGrid<BuildT> *dstGrid,
+    std::size_t srcLeafCount)
+{
+    util::forEach(0, srcLeafCount, 1, [=](const util::Range1D &r) {
+        const auto& srcTree = srcGrid->tree();
+        auto& dstTree = dstGrid->tree();
+        for (auto srcLeafID = r.begin(); srcLeafID != r.end(); ++srcLeafID) {
+            const auto& srcLeaf = srcTree.template getFirstNode<0>()[srcLeafID];
+            const auto coarsenedOrigin = coarsenCoord(srcLeaf.origin());
+            auto coarsenedMask = srcLeaf.valueMask();
+            coarsenMask(coarsenedMask);
+            int bi = (coarsenedOrigin[0] % 8 != 0);
+            int bj = (coarsenedOrigin[1] % 8 != 0);
+            int bk = (coarsenedOrigin[2] % 8 != 0);
+            auto dstLeafPtr = dstTree.root().probeLeaf(coarsenedOrigin);
+            auto& dstMask = const_cast<Mask<3>&>(dstLeafPtr->valueMask());
+            for (int w = 0; w < 4; w++)
+                util::atomicOr(&dstMask.words()[w+4*bi], coarsenedMask.words()[w] << (4*bk+32*bj));
+        }
+    });
+}
+
 }// namespace nanovdb::util::morphology
 
 #endif // NANOVDB_UTIL_MORPHOLOGY_H_HAS_BEEN_INCLUDED
