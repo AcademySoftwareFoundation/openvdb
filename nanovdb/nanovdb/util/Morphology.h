@@ -876,6 +876,126 @@ inline void CoarsenLeafMasks(
     });
 }
 
+/// @brief Compute the masks of upper and (densified) lower internal nodes of the refined result.
+///        Host counterpart to the CUDA RefineInternalNodesFunctor.
+///
+/// @param srcGrid      (in)  Source grid being refined (read host-side; see MergeInternalNodes' note).
+/// @param refinedRoot  (in)  Speculative refined root (host copy), used to locate output tiles.
+/// @param upperMasks_  (out) Array of Mask<5>, one per refined upper tile.
+/// @param lowerMasks_  (out) Array of (Mask<4>[Mask<5>::SIZE]), one set per refined upper tile.
+/// @param srcLeafCount (in)  Number of leaf nodes in the source grid (nodeCount[0]).
+///
+/// Each source leaf upsamples into up to eight destination octants; the present octants are detected
+/// from the source value-mask words. Adjacent source leaves can refine into a shared lower/upper, so
+/// the output bits are set via setOnAtomic.
+template<typename BuildT>
+inline void RefineInternalNodes(
+    const NanoGrid<BuildT> *srcGrid,
+    const NanoRoot<BuildT> *refinedRoot,
+    void *upperMasks_,
+    void *lowerMasks_,
+    std::size_t srcLeafCount)
+{
+    using UpperMaskArrayT = Mask<5>*;
+    using LowerMaskArrayT = Mask<4>(*)[Mask<5>::SIZE];
+    auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
+    auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
+
+    util::forEach(0, srcLeafCount, 1, [=](const util::Range1D &r) {
+        const auto& srcTree = srcGrid->tree();
+        for (auto srcLeafID = r.begin(); srcLeafID != r.end(); ++srcLeafID) {
+            const auto& srcLeaf = srcTree.template getFirstNode<0>()[srcLeafID];
+            uint64_t octantPresent[2][2][2] = {};
+            const auto words = srcLeaf.valueMask().words();
+            for (int w = 0; w < 8; w++) {
+                octantPresent[w>>2][0][0] |= ( words[w] & 0x000000000f0f0f0fUL );
+                octantPresent[w>>2][0][1] |= ( words[w] & 0x00000000f0f0f0f0UL );
+                octantPresent[w>>2][1][0] |= ( words[w] & 0x0f0f0f0f00000000UL );
+                octantPresent[w>>2][1][1] |= ( words[w] & 0xf0f0f0f000000000UL );
+            }
+            for (int di = 0; di < 2; di++)
+            for (int dj = 0; dj < 2; dj++)
+            for (int dk = 0; dk < 2; dk++) {
+                if (octantPresent[di][dj][dk]) {
+                    const auto refinedOrigin = refineCoord(srcLeaf.origin()+nanovdb::Coord(di*4,dj*4,dk*4));
+                    auto upperChildIndex = NanoUpper<BuildT>::CoordToOffset(refinedOrigin);
+                    auto lowerChildIndex = NanoLower<BuildT>::CoordToOffset(refinedOrigin);
+                    auto refinedTile = refinedRoot->probeTile(refinedOrigin);
+                    uint64_t tileChildIndex =
+                        util::PtrDiff(refinedTile, refinedRoot->tile(0))
+                        / sizeof(typename NanoRoot<BuildT>::Tile);
+                    auto& outputUpperMask = upperMasks[tileChildIndex];
+                    outputUpperMask.setOnAtomic(upperChildIndex);
+                    auto& outputLowerMask = lowerMasks[tileChildIndex][upperChildIndex];
+                    outputLowerMask.setOnAtomic(lowerChildIndex);
+                }
+            }
+        }
+    });
+}
+
+/// @brief In-place 2x upsampling of a leaf value mask: spreads the low (0..3) octant of each axis to
+///        fill the full 8x8x8, duplicating each source voxel into its 2x2x2 refined block.
+///        Verbatim host copy of the CUDA RefineLeafMasksFunctor::refineMask word arithmetic.
+inline void refineMask(Mask<3>& mask)
+{
+    for (int w = 0; w < 4; w++) {
+        auto& word = mask.words()[w];
+        // Refine and duplicate along z-axis
+        word &= 0x000000000f0f0f0fUL;
+        word |= (word << 2);
+        word &= 0x0000000033333333UL;
+        word |= (word << 1);
+        word &= 0x0000000055555555UL;
+        word |= (word << 1);
+        // Refine and duplicate along y-axis
+        word |= (word << 16);
+        word &= 0x0000ffff0000ffffUL;
+        word |= (word << 8);
+        word &= 0x00ff00ff00ff00ffUL;
+        word |= (word << 8);
+    }
+    // Refine and duplicate along x-axis
+    for (int w = 7; w > 0; w--)
+        mask.words()[w] = mask.words()[w>>1];
+}
+
+/// @brief Refine each source leaf's active mask into its (up to eight) destination leaves in the
+///        refined grid. Host counterpart to the CUDA RefineLeafMasksFunctor.
+///
+/// @param srcGrid      (in)  Source grid being refined (read host-side).
+/// @param dstGrid      (in/out) Output (refined) grid whose leaf value masks are written.
+/// @param srcLeafCount (in)  Number of leaf nodes in the source grid (nodeCount[0]).
+///
+/// Iteration is flat over source leaves; each maps to up to eight distinct destination leaves (one per
+/// octant of the upsampled 16x16x16 region), so the writes are to distinct masks -- no atomics.
+template<typename BuildT>
+inline void RefineLeafMasks(
+    const NanoGrid<BuildT> *srcGrid,
+    NanoGrid<BuildT> *dstGrid,
+    std::size_t srcLeafCount)
+{
+    util::forEach(0, srcLeafCount, 1, [=](const util::Range1D &r) {
+        const auto& srcTree = srcGrid->tree();
+        auto& dstTree = dstGrid->tree();
+        for (auto srcLeafID = r.begin(); srcLeafID != r.end(); ++srcLeafID) {
+            const auto& srcLeaf = srcTree.template getFirstNode<0>()[srcLeafID];
+            const auto refinedBaseOrigin = srcLeaf.origin()+srcLeaf.origin();
+            for (int bi = 0; bi < 2; bi++)
+            for (int bj = 0; bj < 2; bj++)
+            for (int bk = 0; bk < 2; bk++) {
+                auto dstLeafPtr = dstTree.root().probeLeaf(refinedBaseOrigin.offsetBy(8*bi,8*bj,8*bk));
+                if (dstLeafPtr != nullptr) {
+                    auto& refinedMask = const_cast<Mask<3>&>(dstLeafPtr->valueMask());
+                    for (int w = 0; w < 4; w++)
+                        refinedMask.words()[w] = srcLeaf.valueMask().words()[w+bi*4] >> (4*bk+32*bj);
+                    refineMask(refinedMask);
+                }
+            }
+        }
+    });
+}
+
 }// namespace nanovdb::util::morphology
 
 #endif // NANOVDB_UTIL_MORPHOLOGY_H_HAS_BEEN_INCLUDED

@@ -559,7 +559,7 @@ and then a small number of warm-start timing lines.
 | 4.5   | Morphology functors → host equivalents (MergeGrids subset) | **Done** for `MergeGrids` (see 7.2) |
 | 4.6   | CUB scans → `util::inclusiveScan`           | **Done** (`858afe79`, `ed109ddd`) |
 | 4.7   | Drop CUDA artifacts; `.cu` → `.cpp`         | In progress — data path CUDA-free; dead code/includes + `.cu`→`.cpp` remain (see 7.3 items 10-12) |
-| 4.8   | Repeat 4.1–4.7 for the remaining operators | **In progress** — `DilateGrid` + `PruneGrid` kernel-free (see 7.7); Coarsen/Refine pending |
+| 4.8   | Repeat 4.1–4.7 for the remaining operators | **Done (compute)** — all five operators (Merge/Dilate/Prune/Coarsen/Refine) kernel-free on the host (see 7.7); only the shared 4.7 cosmetic cleanup remains |
 
 ### 7.2  Per-method porting status (MergeGrids `getHandle` pipeline)
 
@@ -767,10 +767,46 @@ the sidecar is the original (un-dilated) topology, injected per dilated leaf by 
 original grid bit-exact: CORRECT for both DilateGrid and PruneGrid across dragon/armadillo/iss/
 space at `NN_FACE` and `NN_FACE_EDGE_VERTEX`.
 
-#### Still to port
+#### CoarsenGrid — fully ported (`tools/CoarsenGrid.h`, `ex_coarsen_nanovdb_cpu`)
 
-- `CoarsenGrid`, `RefineGrid`: their `Coarsen*`/`Refine*` internal- and leaf-node functors,
-  following the `Merge*`/`Dilate*`/`Prune*` model.
+All four operator methods run on the host; `CoarsenGrid.h` has no kernel launches and no D2H copies
+(only the shared Phase 4.4 `mProcessedRoot.deviceUpload` remains). Both functors are thread-centric —
+no `MaskShift`-class complexity — so CoarsenGrid followed the prune/dilate playbook in one pass.
+
+| Stage (call order in `getHandle`) | Owner | Status | Notes |
+|-----------------------------------|-------|--------|-------|
+| `coarsenRoot`           | CoarsenGrid | **HOST** | `std::map` tile speculation reading source root directly from the managed grid; applies `coarsenCoord` and rebuilds each tile key via `RootT::CoordToKey` |
+| `coarsenInternalNodes`  | CoarsenGrid | **HOST** | `util::morphology::CoarsenInternalNodes`: every non-empty source leaf maps (via `coarsenCoord`) into the coarsened topology; upper/lower masks set via `setOnAtomic` |
+| `processGridTreeRoot`   | CoarsenGrid | **HOST** | host `std::memcpy` + direct `BuildGridTreeRootFunctor` call (verbatim reuse) |
+| `coarsenLeafNodes`      | CoarsenGrid | **HOST** | `util::morphology::CoarsenLeafMasks`: `coarsenMask` word arithmetic + `util::atomicOr` scatter (up to eight source leaves coarsen into one destination leaf) |
+
+`ex_coarsen_nanovdb_cpu` checks CORRECT against an OpenVDB reference (per-active-voxel `coarsenCoord`,
+set-if-not-on) across dragon/iss/space/torus.
+
+#### RefineGrid — fully ported (`tools/RefineGrid.h`, `ex_refine_nanovdb_cpu`)
+
+All four operator methods run on the host; `RefineGrid.h` has no kernel launches and no D2H copies
+(only the shared Phase 4.4 `mProcessedRoot.deviceUpload` remains). Thread-centric like coarsen; the
+only wrinkle is `refineRoot`'s bbox-based 26-connected octant speculation.
+
+| Stage (call order in `getHandle`) | Owner | Status | Notes |
+|-----------------------------------|-------|--------|-------|
+| `refineRoot`           | RefineGrid | **HOST** | reads source root **and** upper nodes directly from the managed grid (no D2H copy); preemptively adds tiles for each 2048³ octant whose bbox overlaps the source upper |
+| `refineInternalNodes`  | RefineGrid | **HOST** | `util::morphology::RefineInternalNodes`: detect present octants from the source value-mask words, then `refineCoord` + `setOnAtomic` |
+| `processGridTreeRoot`  | RefineGrid | **HOST** | host `std::memcpy` + direct `BuildGridTreeRootFunctor` call (verbatim reuse) |
+| `refineLeafNodes`      | RefineGrid | **HOST** | `util::morphology::RefineLeafMasks`: `refineMask` bit-spread into up to eight distinct destination leaves (flat over source leaves, no atomics) |
+
+`ex_refine_nanovdb_cpu` checks CORRECT against an OpenVDB reference (TBB `VoxelRefiner`: each source
+voxel duplicated into its 2×2×2 refined block) across dragon/iss/space/torus.
+
+All five topology operators (Merge/Dilate/Prune/Coarsen/Refine) are now ported to the host.
+
+#### CUDA-side naming fix (done as part of this work)
+
+`CoarsenInternalNodesFunctor` and `RefineInternalNodesFunctor` in `util/cuda/Morphology.cuh` carried a
+copy-paste misnomer — their processed-root parameter was named `prunedRoot`/`prunedTile`. Renamed to
+`coarsenedRoot`/`coarsenedTile` and `refinedRoot`/`refinedTile` respectively so the host and CUDA
+functors read name-for-name identically (`PruneInternalNodesFunctor`'s `prunedRoot` was already correct).
 
 All operators continue to pass bit-exact `bufferCheck` against the OpenVDB reference; the port
 maintains this invariant at every commit.

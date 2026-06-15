@@ -120,6 +120,7 @@ nanovdb_example(NAME "ex_coarsen_nanovdb_cuda" OPENVDB)
 nanovdb_example(NAME "ex_merge_nanovdb_cpu" OPENVDB)
 nanovdb_example(NAME "ex_dilate_nanovdb_cpu" OPENVDB)
 nanovdb_example(NAME "ex_coarsen_nanovdb_cpu" OPENVDB)
+nanovdb_example(NAME "ex_refine_nanovdb_cpu" OPENVDB)
 
 nanovdb_example(NAME "ex_voxelBlockManager_host_cuda")
 if(TARGET ex_voxelBlockManager_host_cuda)
