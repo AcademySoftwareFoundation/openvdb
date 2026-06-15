@@ -16,18 +16,13 @@
 #ifndef NANOVDB_TOOLS_PRUNEGRID_H_HAS_BEEN_INCLUDED
 #define NANOVDB_TOOLS_PRUNEGRID_H_HAS_BEEN_INCLUDED
 
-#include <cub/cub.cuh>
-
 #include <cstring>
+#include <map>
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/GridHandle.h>
-#include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/tools/TopologyBuilder.h>
 #include <nanovdb/util/Morphology.h>
-#include <nanovdb/util/cuda/DeviceGridTraits.cuh>
-#include <nanovdb/util/cuda/Morphology.cuh>
 #include <nanovdb/util/Timer.h>
-#include <nanovdb/util/cuda/Util.h>
 
 
 namespace nanovdb {
@@ -77,9 +72,6 @@ private:
     void processGridTreeRoot();
 
     void pruneLeafNodes();
-
-    static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
-    static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
     TopologyBuilder<BuildT> mBuilder;
     util::Timer       mTimer;

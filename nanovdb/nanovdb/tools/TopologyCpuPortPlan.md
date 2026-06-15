@@ -558,7 +558,7 @@ and then a small number of warm-start timing lines.
 | 4.4   | Working buffers → `HostBuffer` (straight to host; skipped the UnifiedBuffer step) | **Done** for Merge/Dilate/Prune (see 7.3: scratch, mProcessedRoot, mData, output buffer, streams) |
 | 4.5   | Morphology functors → host equivalents (MergeGrids subset) | **Done** for `MergeGrids` (see 7.2) |
 | 4.6   | CUB scans → `util::inclusiveScan`           | **Done** (`858afe79`, `ed109ddd`) |
-| 4.7   | Drop CUDA artifacts; `.cu` → `.cpp`         | In progress — data path CUDA-free; dead code/includes + `.cu`→`.cpp` remain (see 7.3 items 10-12) |
+| 4.7   | Drop CUDA artifacts; `.cu` → `.cpp`         | In progress — dead code + CUDA-include purge done for all six headers (7.3 items 10-11); only `.cu`→`.cpp` remains (item 12) |
 | 4.8   | Repeat 4.1–4.7 for the remaining operators | **Done (compute)** — all five operators (Merge/Dilate/Prune/Coarsen/Refine) kernel-free on the host (see 7.7); only the shared 4.7 cosmetic cleanup remains |
 
 ### 7.2  Per-method porting status (MergeGrids `getHandle` pipeline)
@@ -638,23 +638,26 @@ So the operators' data path is fully host and CUDA-free in behavior; all three v
 
 **Remaining (cosmetic / build-capability, not behavioral):**
 
-10. **Dead code** — `TopologyBuilder::mNumThreads`/`numBlocks` + `mTempDevicePool` + the
-    `CALL_CUBS` macro (the last things naming a now-gone `stream`, inert/unexpanded), and the
-    per-operator `mNumThreads`/`numBlocks`.
-11. **Include purge** — once 10 lands, drop `#include <cub/cub.cuh>`, `util/cuda/Morphology.cuh`,
-    `util/cuda/DeviceGridTraits.cuh`, `util/cuda/Util.h` (`cudaCheck`), `cuda/TempPool.h`,
-    `cuda/DeviceBuffer.h`, `cuda/UnifiedBuffer.h` from the four headers (and the unused cuda
-    buffer includes from the example `.cpp`s). Audit each for any remaining user.
-12. **`.cu` → `.cpp` (completion signal + proof).** Fold each `*_kernels.cu` into its `.cpp`;
-    once no `.cu` remains and the CUDA includes are gone, CMake stops invoking nvcc for the
-    example. Remove the `\warning … include only from .cu files …` doxygen notes. This compile
-    under plain g++ (no `__CUDACC__`) is what *proves* the headers are CUDA-free — nvcc's host
-    pass is more permissive, so this step may surface a latent dependency (a build fix, not a
-    behavior change).
+10. **Dead code — DONE.** Removed `TopologyBuilder::mNumThreads`/`numBlocks` + `mTempDevicePool` +
+    the `CALL_CUBS` macro (and its trailing `#undef`), and the per-operator `mNumThreads`/`numBlocks`
+    across all five operators.
+11. **Include purge — DONE.** Dropped `#include <cub/cub.cuh>`, `util/cuda/Morphology.cuh`,
+    `util/cuda/DeviceGridTraits.cuh`, `util/cuda/Util.h`, `cuda/TempPool.h`, `cuda/DeviceBuffer.h`,
+    `cuda/UnifiedBuffer.h` from all six headers (`TopologyBuilder` + the five operators). Added the
+    direct `<map>` and host `util/Morphology.h` includes the operators had been getting transitively
+    through the now-removed CUDA headers. `MorphologyHelpers.h`'s `__CUDACC__`-guarded include of its
+    `.cuh` counterpart is kept — it serves the CUDA side. All four `_cpu` examples build and validate
+    CORRECT (dragon/iss/space/torus).
+12. **`.cu` → `.cpp` (completion signal + proof) — TODO.** Fold each `*_kernels.cu` into its `.cpp`
+    (and drop the example `.cpp`s' remaining `cuda/DeviceBuffer.h` include); once no `.cu` remains
+    CMake stops invoking nvcc for the example. Remove the `\warning … include only from .cu files …`
+    doxygen notes (still present, now stale, kept until this step). This compile under plain g++
+    (no `__CUDACC__`) is what *proves* the headers are CUDA-free — nvcc's host pass is more
+    permissive, so this step may surface a latent dependency (a build fix, not a behavior change).
 
-Note (scope): this records the host port of Merge/Dilate/Prune. CoarsenGrid/RefineGrid are still
-unported (§7.7); they will be written directly in the now-established clean (HostBuffer, no-stream)
-style.
+Note (scope): all five operators (Merge/Dilate/Prune/Coarsen/Refine) are ported and their headers
+are now CUDA-include-free and dead-code-free (items 10-11). Only the `.cu`→`.cpp` completion signal
+(item 12) remains.
 
 ### 7.4  Core-header changes (affect both host and CUDA builds)
 

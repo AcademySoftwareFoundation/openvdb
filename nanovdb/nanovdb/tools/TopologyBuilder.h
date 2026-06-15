@@ -19,14 +19,10 @@
 #include <cstring>
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/HostBuffer.h>
-#include <nanovdb/cuda/TempPool.h>
-#include <nanovdb/cuda/DeviceBuffer.h>
-#include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/tools/GridChecksum.h>
 #include <nanovdb/util/ForEach.h>
 #include <nanovdb/util/Morphology.h>
 #include <nanovdb/util/PrefixSum.h>
-#include <nanovdb/util/cuda/Morphology.cuh>
 
 namespace nanovdb {
 
@@ -100,29 +96,9 @@ public:
     auto hostProcessedRoot()   { return static_cast<RootT*>(mProcessedRoot.data()); }
     Data* data()             { return &mData; }
 
-private:
-    static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
-    static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
-
-    nanovdb::cuda::TempDevicePool mTempDevicePool;
 };// tools::TopologyBuilder<BuildT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-// Define utility macro used to call cub functions that use dynamic temporary storage
-#ifndef CALL_CUBS
-#ifdef _WIN32
-#define CALL_CUBS(func, ...) \
-    cudaCheck(cub::func(nullptr, mTempDevicePool.requestedSize(), __VA_ARGS__, stream)); \
-    mTempDevicePool.reallocate(stream); \
-    cudaCheck(cub::func(mTempDevicePool.data(), mTempDevicePool.size(), __VA_ARGS__, stream));
-#else// ndef _WIN32
-#define CALL_CUBS(func, args...) \
-    cudaCheck(cub::func(nullptr, mTempDevicePool.requestedSize(), args, stream)); \
-    mTempDevicePool.reallocate(stream); \
-    cudaCheck(cub::func(mTempDevicePool.data(), mTempDevicePool.size(), args, stream));
-#endif// ifdef _WIN32
-#endif// ifndef CALL_CUBS
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -443,13 +419,6 @@ inline void TopologyBuilder<BuildT>::processLeafOffsets()
         });
     }
 }// TopologyBuilder<BuildT>::processLeafOffsets
-
-//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-// Undefine utility macro for cub functions
-#ifdef CALL_CUBS
-#undef CALL_CUBS
-#endif
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
