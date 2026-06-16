@@ -403,14 +403,14 @@ void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
     GridData data;
     is.read((char*)&data, sizeof(GridData));
     if (data.isValid()) {
-        uint64_t size = data.mGridSize, sum = 0u;
+        uint64_t sum = data.mGridSize;
         while(data.mGridIndex + 1u < data.mGridCount) {// loop over remaining raw grids in stream
             is.seekg(data.mGridSize - sizeof(GridData), std::ios::cur);// skip grid
             is.read((char*)&data, sizeof(GridData));
             sum += data.mGridSize;
         }
-        auto buffer = BufferT::create(size + sum, &pool);
-        is.seekg(-int64_t(size + sum - data.mGridSize + sizeof(GridData)), std::ios::cur);// rewind to start
+        auto buffer = BufferT::create(sum, &pool);
+        is.seekg(-int64_t(sum - data.mGridSize + sizeof(GridData)), std::ios::cur);// rewind to start
         is.read((char*)(buffer.data()), buffer.size());
         *this = GridHandle(std::move(buffer));
     } else {
