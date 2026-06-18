@@ -141,17 +141,28 @@ public:
     ///        std::cerr and calls std::exit(EXIT_FAILURE) rather than propagating.
     void run();
 
-    /// @brief Redirect std::clog to a log file for the remainder of this Tool's lifetime.
+    /// @brief Redirect std::clog/std::cerr/std::cout to a log file for the remainder of this Tool's lifetime.
     /// @param logFile Path of the log file. If empty, a timestamped name is generated.
-    /// @return 0 on success, 1 if the file cannot be opened, 2 if std::clog cannot be captured.
+    /// @param append  If true, append to the existing file; otherwise truncate it (default).
+    /// @param tee     If true (default), output is also written to the original terminal stream so the
+    ///                user keeps interactive feedback while the file accumulates the same data. If false,
+    ///                output is routed exclusively to the log file (the pre-#6 behaviour).
+    /// @throw std::invalid_argument if the file cannot be opened or the standard stream buffers cannot be captured.
     /// @note Subsequent calls are no-ops while a redirection is already active.
-    int startLog(std::string logFile);
+    void startLog(std::string logFile, bool append = false, bool tee = true);
 
-    /// @brief Restore std::clog to its original buffer and close the log file (if any).
+    /// @brief Restore std::clog/std::cerr/std::cout to their original buffers and close the log file (if any).
     void endLog() {
       if (mOldClogBuffer) std::clog.rdbuf(mOldClogBuffer);
+      if (mOldCerrBuffer) std::cerr.rdbuf(mOldCerrBuffer);
+      if (mOldCoutBuffer) std::cout.rdbuf(mOldCoutBuffer);
       if (mLogFile.is_open()) mLogFile.close();
       mOldClogBuffer = nullptr;
+      mOldCerrBuffer = nullptr;
+      mOldCoutBuffer = nullptr;
+      mClogTee.reset();
+      mCerrTee.reset();
+      mCoutTee.reset();
     }
 
     /// @brief Print a summary of the current VDB-grid and Geometry stacks to @a os.
@@ -182,12 +193,18 @@ private:
 
     mutable util::CpuTimer   mTimer;          ///< Reusable timer for verbose timing reports.
     std::string              mCmdName;        ///< Base name of this command-line tool (argv[0]).
+    std::string              mRawCmdLine;     ///< Verbatim argv joined by spaces — used in the log header.
     std::list<Geometry::Ptr> mGeom;           ///< Stack of Geometry instances owned by this tool (back = top).
     std::list<GridBase::Ptr> mGrid;           ///< Stack of VDB grids owned by this tool (back = top).
     Parser                   mParser;         ///< Command-line action parser and processor.
     bool                     mErrorOnWarning; ///< If true, warning() escalates to a fatal error.
     std::ofstream            mLogFile;        ///< Backing file used by startLog/endLog when active.
     std::streambuf          *mOldClogBuffer;  ///< Cached std::clog buffer for restoring after logging.
+    std::streambuf          *mOldCerrBuffer;  ///< Cached std::cerr buffer for restoring after logging.
+    std::streambuf          *mOldCoutBuffer;  ///< Cached std::cout buffer for restoring after logging.
+    std::unique_ptr<TeeBuf>  mClogTee;        ///< Tee streambuf for std::clog (terminal + log file) when -log tee=true.
+    std::unique_ptr<TeeBuf>  mCerrTee;        ///< Tee streambuf for std::cerr.
+    std::unique_ptr<TeeBuf>  mCoutTee;        ///< Tee streambuf for std::cout.
 
     /// @brief Delete all queued Geometry, VDB grids, and local variables.
     void clear();
@@ -372,6 +389,14 @@ private:
 Tool::Tool(int argc, char *argv[])
     : mTimer(std::clog)
     , mCmdName(getBase(argv[0]))// name of executable
+    , mRawCmdLine([&]{
+        std::string s;
+        for (int i = 0; i < argc; ++i) {
+            if (i > 0) s += ' ';
+            s += argv[i];
+        }
+        return s;
+      }())
     , mParser({{"dim", "256", "256", "default grid resolution along the longest axis"},
                {"voxel", "0.0", "0.01", "default voxel size in world units. A value of zero indicates that dim is used to derive the voxel size."},
                {"width", "3.0", "3.0", "default narrow-band width of level sets in voxel units"},
@@ -381,6 +406,8 @@ Tool::Tool(int argc, char *argv[])
     , mErrorOnWarning(false)
     , mLogFile()
     , mOldClogBuffer(nullptr)
+    , mOldCerrBuffer(nullptr)
+    , mOldCoutBuffer(nullptr)
 {
     openvdb::initialize();
     this->init();// fast: less than 1 ms
@@ -395,22 +422,54 @@ Tool::Tool(int argc, char *argv[])
 
 // ==============================================================================================================
 
-int Tool::startLog(std::string logFile)
+void Tool::startLog(std::string logFile, bool append, bool tee)
 {
-    if (mOldClogBuffer != nullptr) return 0;// handles repeated calls
+    if (mOldClogBuffer != nullptr) return;// handles repeated calls
     if (logFile.empty()) logFile = "vdb_tool_" + dateStamp() + ".log";
-    mLogFile = std::ofstream(logFile);
+    const auto mode = std::ios::out | (append ? std::ios::app : std::ios::trunc);
+    mLogFile.open(logFile, mode);
     if (!mLogFile.is_open()) {
-        std::cerr << "Failed to open log file!" << std::endl;
-        return 1;
+        throw std::invalid_argument("startLog: failed to open log file \"" + logFile + "\"");
     }
+    // Unit-buffered output so `watch -n 0.5 vdb_tool.log` (and tail -f) see
+    // each line as soon as it's written, instead of waiting for the 4 KB
+    // block buffer to flush. The help text recommends this workflow.
+    mLogFile.setf(std::ios::unitbuf);
+
+    // Redirect all three text streams so warnings/errors (cerr) and any
+    // stdout-bound output also land in the log — not just clog.
     mOldClogBuffer = std::clog.rdbuf();
-    if (mOldClogBuffer == nullptr) {
-        std::cerr << "Failed to cache clog pointer!" << std::endl;
-        return 2;
+    mOldCerrBuffer = std::cerr.rdbuf();
+    mOldCoutBuffer = std::cout.rdbuf();
+    if (mOldClogBuffer == nullptr || mOldCerrBuffer == nullptr || mOldCoutBuffer == nullptr) {
+        throw std::invalid_argument("startLog: failed to cache standard stream buffers");
     }
-    std::clog.rdbuf(mLogFile.rdbuf());
-    return 0;
+    if (tee) {
+        // Each TeeBuf fans output to (original terminal stream, log file) so
+        // the user keeps live console feedback while the log accumulates.
+        mClogTee = std::make_unique<TeeBuf>(mOldClogBuffer, mLogFile.rdbuf());
+        mCerrTee = std::make_unique<TeeBuf>(mOldCerrBuffer, mLogFile.rdbuf());
+        mCoutTee = std::make_unique<TeeBuf>(mOldCoutBuffer, mLogFile.rdbuf());
+        std::clog.rdbuf(mClogTee.get());
+        std::cerr.rdbuf(mCerrTee.get());
+        std::cout.rdbuf(mCoutTee.get());
+    } else {
+        // Exclusive log mode (tee=false): nothing goes to the terminal.
+        std::clog.rdbuf(mLogFile.rdbuf());
+        std::cerr.rdbuf(mLogFile.rdbuf());
+        std::cout.rdbuf(mLogFile.rdbuf());
+    }
+
+    // Self-describing log header — timestamp, vdb_tool version, and the full
+    // command line. Makes a stored log readable days later without needing
+    // to remember what was invoked. In append mode a blank line separates
+    // this run's header from the previous run's output.
+    if (append) mLogFile << "\n";
+    mLogFile << "# vdb_tool log\n"
+             << "# date     : " << dateStamp() << "\n"
+             << "# version  : " << Tool::version() << "\n"
+             << "# command  : " << mRawCmdLine << "\n"
+             << std::flush;
 }
 
 // ==============================================================================================================
@@ -1053,8 +1112,12 @@ void Tool::init()
 
   mParser.addAction(
       {"log"}, "enable logging to file",
-      {{"file", "",  "vdb_tool.log", "file used for logging. Use \"watch -n 0.5 vdb_tool.log\" to see updates in real-time."}},
-      [&](){this->startLog(mParser.get<std::string>("file"));}, [](){}, 0);
+      {{"file",   "",      "vdb_tool.log",   "file used for logging. Use \"watch -n 0.5 vdb_tool.log\" to see updates in real-time."},
+       {"append", "false", "0|1|false|true", "if true, append to the existing log file instead of truncating it"},
+       {"tee",    "true",  "0|1|false|true", "if true (default), also write to the original terminal stream so interactive feedback is preserved"}},
+      [&](){this->startLog(mParser.get<std::string>("file"),
+                            mParser.get<bool>("append"),
+                            mParser.get<bool>("tee"));}, [](){}, 0);
 
   Processor &proc = mParser.processor;
 

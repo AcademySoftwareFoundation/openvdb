@@ -618,6 +618,37 @@ inline std::string dateStamp() {
     return ss.str();
 }// dateStamp
 
+/// @brief A streambuf that forwards everything to two underlying buffers ("tee").
+/// @details Useful for routing std::clog / std::cerr / std::cout to a log file
+///          while also keeping the original terminal output. Install with e.g.
+///          @code
+///            TeeBuf tee(std::cerr.rdbuf(), logFile.rdbuf());
+///            std::cerr.rdbuf(&tee);
+///          @endcode
+///          Both branches are written on every character; sync() flushes both.
+///          Either underlying pointer may be null, which is treated as a no-op
+///          for that branch.
+class TeeBuf : public std::streambuf {
+public:
+    TeeBuf(std::streambuf* a, std::streambuf* b) : mA(a), mB(b) {}
+protected:
+    int_type overflow(int_type c) override {
+        if (c == traits_type::eof()) return traits_type::not_eof(c);
+        const auto ca = static_cast<char_type>(c);
+        const bool okA = (mA == nullptr) || mA->sputc(ca) != traits_type::eof();
+        const bool okB = (mB == nullptr) || mB->sputc(ca) != traits_type::eof();
+        return (okA && okB) ? c : traits_type::eof();
+    }
+    int sync() override {
+        const int ra = mA ? mA->pubsync() : 0;
+        const int rb = mB ? mB->pubsync() : 0;
+        return (ra == 0 && rb == 0) ? 0 : -1;
+    }
+private:
+    std::streambuf* mA;
+    std::streambuf* mB;
+};// TeeBuf
+
 /// @brief Spinning-wheel progress indicator that overwrites a single terminal line.
 /// @details Each invocation cycles through the glyphs |, /, -, \ and prints them
 ///          alongside a caller-supplied message. On a TTY the line is cleared

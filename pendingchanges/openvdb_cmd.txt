@@ -2,7 +2,7 @@ vdb_tool:
 
   New Features:
   - Added new action "-soup2ls/soup2sdf/shrinkwrap", which generates a level set from a soup of polygons.
-  - Added new action "-files", which (recursively) visits files in a directory structure that matches extensions or patterns
+  - Added new action "-files", which (recursively) visits files in a directory structure that matches extensions or patterns.
   - Added new action "-mesh2udf", which generates a symmetric narrow band of unsigned distances to a mesh.
   - Added new action "-quad2tri/q2t", which triangulates all quads in a mesh.
   - Added new action "-vol2mesh", which converts a scalar volume into an adaptive polygon mesh.
@@ -18,19 +18,20 @@ vdb_tool:
   - Added read support for xyz files.
 
   Improvements:
-  - Action -"read" now has optional support for reading UsdGeomMesh and UsdGeomPoints in the OpenUSD files usd, usda, usdc, and usdz.
+  - Action "-read" now has optional support for reading UsdGeomMesh and UsdGeomPoints in the OpenUSD files usd, usda, usdc, and usdz.
   - Action "-mesh2ls/mesh2sdf" now supports generation of asymmetric narrow bands.
   - Improved error reporting when using unsupported actions and options.
   - Actions can now have multiple names, e.g. "-read", "-import", "-load", "-i".
   - Added cutoff option to "-ls2fog" action.
-  - Improved error reporting in vdb_tool (prints diagnostic error messages)
-  - Improved error handling in vdb_tool (will recover from non-fatal errors)
-  - Improved parsing of configuration files (tabs and trailing comments are now ignored)
+  - Improved error reporting in vdb_tool (prints diagnostic error messages).
+  - Improved error handling in vdb_tool (will recover from non-fatal errors).
+  - Improved parsing of configuration files (tabs and trailing comments are now ignored).
   - Improved unit-tests and Doxygen documentation for all files related to the vdb_tool.
-  - Improved format and information for the -print action
+  - Improved format and information for the -print action.
 
   Fixes:
   - Fixed issues in Geometry::readSTL so it works on all files in Thingi10K.
   - Fixed bug when reading ascii ply files and off files with normals.
   - Fixed out-of-bounds read in -slice when the grid's active values had been modified (e.g. by -forOnValues) so that sampled values fell outside the precomputed extrema range; the LUT index is now clamped to [0, 255].
   - Fixed several typos in the documentation of vdb_tool.
+  - Fixed vdb_tool::uuid so it generates a 36-character RFC 4122 v4 UUID.
