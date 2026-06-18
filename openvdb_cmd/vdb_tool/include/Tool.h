@@ -1337,7 +1337,7 @@ void Tool::readGeo(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
   if (mParser.verbose>1) std::clog << "Reading geometry from \"" << fileName << "\"\n";
-  if (mParser.verbose) mTimer.start("Read geometry from \"" + fileName + "\"");
+  if (mParser.verbose) mTimer.start("Read geometry file \"" + fileName + "\"");
   Geometry::Ptr geom(new Geometry());
   geom->read(fileName, mParser.verbose);
   if (geom->vtxCount()) {
@@ -1450,7 +1450,7 @@ void Tool::config()
             std::ifstream file(fileName);
             if (!file.is_open()) throw std::invalid_argument("readConf: unable to open \""+fileName+"\"");
             if (mParser.verbose>1) std::clog << "Reading configuration from \"" << fileName << "\"\n";
-            if (mParser.verbose) mTimer.start("Read config");
+            if (mParser.verbose) mTimer.start("Read config file \"" + fileName + "\"");
             if (!getline (file,line)) throw std::invalid_argument("readConf: empty file \""+fileName+"\"");
             Header header(line);
             if (!header.isCompatible()) throw std::invalid_argument("readConf: incompatible version \""+line+"\"");
@@ -1712,7 +1712,7 @@ void Tool::writeGeo(const std::string &fileName)
   const bool ascii = mParser.get<bool>("ascii");
   if (mParser.verbose>1) std::clog << "Writing geometry to \"" << fileName << "\"\n";
   auto it = this->getGeom(age);
-  if (mParser.verbose) mTimer.start("Write geometry");
+  if (mParser.verbose) mTimer.start("Write geometry file \"" + fileName + "\"");
   (*it)->write(fileName, ascii);
   if (!keep) mGeom.erase(std::next(it).base());
   if (mParser.verbose) mTimer.stop();
@@ -1726,7 +1726,7 @@ void Tool::writeConf(const std::string &fileName)
   if (mParser.verbose>1) std::clog << "Writing configuration to \"" << fileName << "\"\n";
   std::ofstream file(fileName);
   if (!file.is_open()) throw std::invalid_argument("writeConf: unable to open \""+fileName+"\"");
-  if (mParser.verbose) mTimer.start("Write config");
+  if (mParser.verbose) mTimer.start("Write config file \"" + fileName + "\"");
   const Header header;
   file << header.str() << std::endl;
   for (auto &a : mParser.actions) if (a.names[0] != "config") a.print(file);// exclude "-config" to avoid infinite loop

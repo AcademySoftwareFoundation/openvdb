@@ -27,6 +27,7 @@ vdb_tool:
   - Improved error handling in vdb_tool (will recover from non-fatal errors)
   - Improved parsing of configuration files (tabs and trailing comments are now ignored)
   - Improved unit-tests and Doxygen documentation for all files related to the vdb_tool.
+  - Improved format and information for the -print action
 
   Fixes:
   - Fixed issues in Geometry::readSTL so it works on all files in Thingi10K.
