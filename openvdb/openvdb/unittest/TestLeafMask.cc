@@ -4,6 +4,7 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
 #include <openvdb/tools/Filter.h>
+#include <openvdb/tools/Prune.h>
 #include <openvdb/tree/LeafNode.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/io/io.h>
@@ -666,3 +667,16 @@ TEST_F(TestLeafMask, testUnsafe)
     EXPECT_EQ(leaf.getValueUnsafe(33), false);
 }
 
+TEST_F(TestLeafMask, testIterator)
+{
+    using namespace openvdb;
+
+    auto mask = MaskGrid::create(false);
+    mask->tree().setValue(Coord(0, 1, 2), true);
+
+    mask->tree().beginValueOn().setValueOff();
+
+    tools::pruneInactive(mask->tree());
+
+    EXPECT_TRUE(mask->tree().empty());
+}

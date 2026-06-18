@@ -439,13 +439,13 @@ SOP_OpenVDB_Clip::Cache::getFrustum(OP_Context& context)
     const auto time = context.getTime();
 
     UT_String cameraPath;
-    OBJ_CameraParms cameraParms;
     evalString(cameraPath, "camera", 0, time);
     if (!cameraPath.isstring()) {
         throw std::runtime_error{"no camera path was specified"};
     }
 
 #if SYS_VERSION_MAJOR_INT >= 21
+    UT_CameraParms   cameraParms;
     UT_Matrix4D      cameratosop;
     OBJ_Node        *meobj = cookparms()->getNode()
                         ? cookparms()->getNode()->getCreator()->castToOBJNode()
@@ -465,6 +465,7 @@ SOP_OpenVDB_Clip::Cache::getFrustum(OP_Context& context)
     if (errstr.isstring())
         throw std::runtime_error{"camera \"" + cameraPath.toStdString() + "\" was not found"};
 #else
+    OBJ_CameraParms cameraParms;
     OBJ_Camera* camera = nullptr;
     if (auto* obj = cookparms()->getCwd()->findOBJNode(cameraPath)) {
         camera = obj->castToOBJCamera();
@@ -489,10 +490,18 @@ SOP_OpenVDB_Clip::Cache::getFrustum(OP_Context& context)
 
     const float nearPlane = (evalInt("setnear", 0, time)
         ? static_cast<float>(evalFloat("near", 0, time))
+#if SYS_VERSION_MAJOR_INT >= 22
+        : static_cast<float>(cameraParms.clipnear)) - padding[2];
+#else
         : static_cast<float>(cameraParms.mynear)) - padding[2];
+#endif
     const float farPlane = (evalInt("setfar", 0, time)
         ? static_cast<float>(evalFloat("far", 0, time))
+#if SYS_VERSION_MAJOR_INT >= 22
+        : static_cast<float>(cameraParms.clipfar)) + padding[2];
+#else
         : static_cast<float>(cameraParms.myfar)) + padding[2];
+#endif
 
 #if SYS_VERSION_MAJOR_INT >= 21
     mFrustum = hvdb::frustumTransformFromCamera(cameraParms, cameratosop,
