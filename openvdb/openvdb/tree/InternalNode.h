@@ -1727,16 +1727,15 @@ InternalNode<ChildT, Log2Dim>::isConstant(ValueType& minValue,
                                           bool& state,
                                           const ValueType& tolerance) const
 {
-
     if (!mChildMask.isOff() || !mValueMask.isConstant(state)) return false;// early termination
     minValue = maxValue = mNodes[0].getValue();
     for (Index i = 1; i < NUM_VALUES; ++i) {
         const ValueType& v = mNodes[i].getValue();
-        if (v < minValue) {
-            if ((maxValue - v) > tolerance) return false;// early termination
+        if (math::cwiseLessThan(v, minValue)) {
+            if (math::cwiseGreaterThan((maxValue - v), tolerance)) return false;// early termination
             minValue = v;
-        } else if (v > maxValue) {
-            if ((v - minValue) > tolerance) return false;// early termination
+        } else if (math::cwiseGreaterThan(v, maxValue)) {
+            if (math::cwiseGreaterThan((v - minValue), tolerance)) return false;// early termination
             maxValue = v;
         }
     }

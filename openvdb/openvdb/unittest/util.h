@@ -51,12 +51,14 @@ makeSphere(const openvdb::Coord& dim, const openvdb::Vec3f& center, float radius
                     acc.setValue(xyz, val);
                     break;
                 case SPHERE_DENSE_NARROW_BAND:
-                    acc.setValue(xyz, val < inside ? inside : outside < val ? outside : val);
+                    acc.setValue(xyz,
+                        openvdb::math::cwiseLessThan(val, inside) ? inside :
+                            openvdb::math::cwiseLessThan(outside, val) ? outside : val);
                     break;
                 case SPHERE_SPARSE_NARROW_BAND:
-                    if (val < inside)
+                    if (openvdb::math::cwiseLessThan(val, inside))
                         acc.setValueOff(xyz, inside);
-                    else if (outside < val)
+                    else if (openvdb::math::cwiseLessThan(outside, val))
                         acc.setValueOff(xyz, outside);
                     else
                         acc.setValue(xyz, val);
