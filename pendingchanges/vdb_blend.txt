@@ -1,0 +1,11 @@
+New features:
+ - Add vdb_blend: an alternative to combining two level-sets together in a smooth way. Contributed by DreamWorks Animation.
+
+Improvements:
+ - VDB Blend: Add an option to dilate the intersection of the two input level-sets.
+
+Houdini:
+ - Add SOP_OpenVDB_Fillet to combine two level-sets in a smoother fashion.
+
+Bug fix:
+ - VDB Blend: In the blend region, we default to csgUnion behavior if one of the level-sets voxel is inactive when dilation is 0.

@@ -21,6 +21,8 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h> // for isExactlyEqual()
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/FastSweeping.h> // for maskSdf
+#include <openvdb/tools/Morphology.h>
 #include <openvdb/tools/SignedFloodFill.h>
 #include <openvdb/util/NullInterrupter.h>
 
@@ -44,6 +46,10 @@ namespace tools {
 ///
 /// @param gamma Controls the strength of the blend by providing a multiplier component.
 ///
+/// @param supportDilation Optional number of voxels by which to dilate the
+///        local blend support region before extending both inputs into that
+///        region. A value of zero preserves the default behavior.
+///
 /// @return The filleted union of the @lhs and @rhs level set inputs.
 ///
 /// @throw  If the transforms of @lsh, @rhs, and @mask do not match.
@@ -55,7 +61,8 @@ unionFillet(const GridT& lhs,
      typename MaskT::ConstPtr mask,
      typename GridT::ValueType alpha,
      typename GridT::ValueType beta,
-     typename GridT::ValueType gamma);
+     typename GridT::ValueType gamma,
+     int supportDilation = 0);
 
 //
 // Main class to handle UnionWithFillet
@@ -120,6 +127,45 @@ private:
     ValueType mMultiplier;
 };
 
+template<typename GridT>
+MaskGrid::Ptr
+createBlendSupportMask(const GridT& lhs,
+                       const GridT& rhs,
+                       typename GridT::ValueType alpha,
+                       int supportDilation)
+{
+    MaskGrid::Ptr supportMask = MaskGrid::create();
+    supportMask->setTransform(lhs.transform().copy());
+
+    const typename GridT::ValueType supportRadius =
+        alpha + typename GridT::ValueType(supportDilation * lhs.voxelSize()[0]);
+
+    typename GridT::ConstAccessor lhsAcc = lhs.getConstAccessor();
+    typename GridT::ConstAccessor rhsAcc = rhs.getConstAccessor();
+    MaskGrid::Accessor supportAcc = supportMask->getAccessor();
+
+    for (typename GridT::ValueOnCIter iter = lhs.cbeginValueOn(); iter; ++iter) {
+        const Coord& ijk = iter.getCoord();
+        // only prepare extra SDF samples where both shapes could participate in the fillet
+        if (iter.getValue() < supportRadius && rhsAcc.getValue(ijk) < supportRadius) {
+            supportAcc.setValueOn(ijk);
+        }
+    }
+
+    for (typename GridT::ValueOnCIter iter = rhs.cbeginValueOn(); iter; ++iter) {
+        const Coord& ijk = iter.getCoord();
+        if (lhsAcc.getValue(ijk) < supportRadius && iter.getValue() < supportRadius) {
+            supportAcc.setValueOn(ijk);
+        }
+    }
+
+    if (supportMask->activeVoxelCount() > 0 && supportDilation > 0) {
+        tools::dilateActiveValues(
+            supportMask->tree(), supportDilation, tools::NN_FACE_EDGE_VERTEX, tools::IGNORE_TILES);
+    }
+
+    return supportMask;
+}
 
 /// @cond OPENVDB_DOCS_INTERNAL
 /// @brief Go through the lhs nodes (both internal and leaf nodes).
@@ -292,7 +338,10 @@ private:
                         const float B = rhsData[pos];
                         const float m = openvdb::math::Clamp((alpha - A) / alpha, 0.f, 1.f) *
                                         openvdb::math::Clamp((alpha - B) / alpha, 0.f, 1.f);
-                        const float offset = openvdb::math::Pow(m, beta) * gamma;
+                        // Only use offset if both lhs and rhs are on, else defaults to regular union
+                        const bool hasValidFilletSamples = lhsMask.isOn(pos) && rhsMask.isOn(pos);
+                        const float offset = hasValidFilletSamples ?
+                            openvdb::math::Pow(m, beta) * gamma : 0.0f;
                         const bool isAMin = A < B;
                         // - sign here. Otherwise, we'll get empty space between geos
                         outputData[pos] = isAMin ? A - offset : B - offset;
@@ -378,7 +427,10 @@ private:
                         const float B = rhsData[pos];
                         const float m = openvdb::math::Clamp((alpha - A) / alpha, 0.f, 1.f) *
                                         openvdb::math::Clamp((alpha - B) / alpha, 0.f, 1.f);
-                        const float offset = openvdb::math::Pow(m, beta) * gamma;
+                        // Only use offset if both lhs and rhs are on, else defaults to regular union
+                        const bool hasValidFilletSamples = lhsMask.isOn(pos) && rhsMask.isOn(pos);
+                        const float offset = hasValidFilletSamples ?
+                            openvdb::math::Pow(m, beta) * gamma : 0.0f;
                         const bool isAMin = A < B;
                         // multiply by mask value if it exists
                         const float multiplier = maskData ? maskData[pos] : maskBackground;
@@ -618,7 +670,8 @@ unionFillet(const GridT& lhs,
      typename MaskT::ConstPtr mask,
      typename GridT::ValueType alpha,
      typename GridT::ValueType beta,
-     typename GridT::ValueType gamma)
+     typename GridT::ValueType gamma,
+     int supportDilation)
 {
     static_assert(std::is_floating_point<typename GridT::ValueType>::value,
         "assert in unionFillet: "
@@ -633,6 +686,23 @@ unionFillet(const GridT& lhs,
         if (lhsXform != maskXform) throw std::runtime_error("The grids and the mask need to have the same transforms.");
     }
 
+    if (supportDilation > 0) {
+        MaskGrid::Ptr supportMask =
+            createBlendSupportMask(lhs, rhs, alpha, supportDilation);
+        if (supportMask->activeVoxelCount() == 0) {
+            UnionWithFillet<GridT, MaskT> uf(lhs, rhs, mask, alpha, beta, gamma);
+            return uf.blend();
+        }
+
+        typename GridT::Ptr lhsExtended =
+            tools::maskSdf(lhs, *supportMask);
+        typename GridT::Ptr rhsExtended =
+            tools::maskSdf(rhs, *supportMask);
+
+        UnionWithFillet<GridT, MaskT> uf(*lhsExtended, *rhsExtended, mask, alpha, beta, gamma);
+        return uf.blend();
+    }
+
     UnionWithFillet<GridT, MaskT> uf(lhs, rhs, mask, alpha, beta, gamma);
     return uf.blend();
 }
@@ -641,4 +711,3 @@ unionFillet(const GridT& lhs,
 } // openvdb
 
 #endif // OPENVDB_TOOLS_BLEND_HAS_BEEN_INCLUDED
-
