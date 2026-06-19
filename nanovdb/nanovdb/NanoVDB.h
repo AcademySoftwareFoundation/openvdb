@@ -4136,15 +4136,26 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueOnIndex, CoordT, Mask
     __hostdev__ uint64_t getMax() const { return this->hasStats() ? this->lastOffset() + 2u : 0u; }
     __hostdev__ uint64_t getAvg() const { return this->hasStats() ? this->lastOffset() + 3u : 0u; }
     __hostdev__ uint64_t getDev() const { return this->hasStats() ? this->lastOffset() + 4u : 0u; }
+    // Default branchless; define NANOVDB_USE_BRANCHY_GETVALUE to restore the
+    // pre-2026 branchy form.
     __hostdev__ uint64_t getValue(uint32_t i) const
     {
-        //return mValueMask.isOn(i) ? mOffset + mValueMask.countOn(i) : 0u;// for debugging
+#ifdef NANOVDB_USE_BRANCHY_GETVALUE
         uint32_t       n = i >> 6;
         const uint64_t w = BaseT::mValueMask.words()[n], mask = uint64_t(1) << (i & 63u);
-        if (!(w & mask)) return uint64_t(0); // if i'th value is inactive return offset to background value
+        if (!(w & mask)) return uint64_t(0);
         uint64_t sum  = BaseT::mOffset + util::countOn(w & (mask - 1u));
         if (n--) sum += BaseT::mPrefixSum >> (9u * n) & 511u;
         return sum;
+#else
+        const uint32_t n      = i >> 6;
+        const uint64_t w      = BaseT::mValueMask.words()[n];
+        const uint64_t bit    = uint64_t(1) << (i & 63u);
+        const uint64_t prefix = n == 0u ? uint64_t(0)
+                                        : (BaseT::mPrefixSum >> (9u * (n - 1u))) & 511u;
+        const uint64_t sum    = BaseT::mOffset + prefix + util::countOn(w & (bit - 1u));
+        return ((w & bit) ? ~uint64_t(0) : uint64_t(0)) & sum;
+#endif
     }
 }; // LeafData<ValueOnIndex>
 
