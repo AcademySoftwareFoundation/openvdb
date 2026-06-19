@@ -296,11 +296,24 @@ public:
     /// @param os Output stream (defaults to std::clog).
     void print(size_t n = 0, std::ostream& os = std::clog) const;
 
-    /// @brief Static method to triangulate a planar and convex N-gon.
+    /// @brief Static method to fan-triangulate a planar and convex N-gon.
     /// @param nGon List of vertex indices for an N-gon.
     /// @return Vector of triangles, as triplets of vertex indices, that make up the N-gon.
-    /// @warning The triangulation is naive and assumes the input N-gon is both planar and convex.
+    /// @warning The triangulation is naive (fan from @c nGon[0]) and assumes the input N-gon
+    ///          is both planar and convex; non-convex polygons need an ear-clip routine instead.
     static std::vector<Vec3I> triangulate(const std::vector<int> &nGon);
+
+    /// @brief Append the fan-triangulation of an N-gon to an existing triangle vector.
+    /// @details Avoids the per-face allocation of the return-by-value overload, so it's the
+    ///          right choice for use inside reader loops that triangulate many faces.
+    /// @param indices    Pointer to the N-gon's vertex indices.
+    /// @param n          Number of indices in the N-gon (n < 3 is a no-op).
+    /// @param out        Destination vector; the N-2 triangles are appended.
+    /// @param indexOffset Constant added to every emitted index (e.g. -1 to convert
+    ///                    OBJ's 1-based indices to 0-based, or @c base to translate USD's
+    ///                    per-prim indices into Geometry-wide indices).
+    static void triangulate(const int *indices, std::size_t n,
+                            std::vector<Vec3I> &out, int indexOffset = 0);
 
 private:
 
@@ -660,7 +673,7 @@ void Geometry::readOBJ(std::istream &is)
                 mQuad.emplace_back(v[0] - 1, v[1] - 1, v[2] - 1, v[3] - 1);// obj is 1-based
             } else {
                 if (mVerbose) std::clog << "Geometry::readOBJ: triangulating " << nGon << "-gon\n";
-                for (size_t i = 0; i < nGon - 2; ++i) mTri.emplace_back(v[0] - 1, v[i+1] - 1, v[i+2] - 1);// obj is 1-based
+                Geometry::triangulate(v.data(), v.size(), mTri, /*indexOffset=*/-1);// obj is 1-based
             }
         }
     }
@@ -1526,9 +1539,7 @@ void Geometry::readUSD(const std::string &fileName)
                     mQuad.emplace_back(base + f[0], base + f[1], base + f[2], base + f[3]);
                 } else if (count > 4) {
                     if (mVerbose) std::clog << "Geometry::readUSD: fan-triangulating " << count << "-gon\n";
-                    for (int i = 0; i + 2 < count; ++i) {
-                        mTri.emplace_back(base + f[0], base + f[i+1], base + f[i+2]);
-                    }
+                    Geometry::triangulate(f, static_cast<std::size_t>(count), mTri, base);
                 }// counts < 3 (degenerate) are silently dropped
                 f += count;
             }
@@ -1608,15 +1619,26 @@ size_t Geometry::triangulateQuads()
     return 2*quadCount;// number of triangles added
 }// Geometry::triangulateQuads
 
+void Geometry::triangulate(const int *indices, std::size_t n,
+                           std::vector<Vec3I> &out, int indexOffset)
+{
+    if (n < 3) return;
+    const std::size_t added = n - 2;
+    out.reserve(out.size() + added);
+    const int v0 = indices[0] + indexOffset;
+    for (std::size_t i = 0; i < added; ++i) {
+        out.emplace_back(v0,
+                         indices[i + 1] + indexOffset,
+                         indices[i + 2] + indexOffset);
+    }
+}
+
 std::vector<Vec3I> Geometry::triangulate(const std::vector<int> &nGon)
 {
-    std::vector<Vec3I> tri;
-    if (nGon.size()>=3) {
-        tri.resize(nGon.size() - 2);
-        for (size_t i = 0; i < tri.size(); ++i) tri[i] = Vec3I(nGon[0], nGon[i + 1], nGon[i + 2]);
-    }
-    return tri;
-};
+    std::vector<Vec3I> out;
+    triangulate(nGon.data(), nGon.size(), out);
+    return out;
+}
 
 } // namespace vdb_tool
 } // namespace OPENVDB_VERSION_NAME

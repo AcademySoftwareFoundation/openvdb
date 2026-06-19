@@ -466,10 +466,17 @@ TEST_F(Test_vdb_tool, Util)
       using namespace openvdb::vdb_tool;
       EXPECT_EQ("path",     getPath("path/base.ext"));
       EXPECT_EQ("/path",    getPath("/path/base.ext"));
-      EXPECT_EQ("C:\\path", getPath("C:\\path\\base.ext"));
+      // Backslash separators in the INPUT are accepted (normalized to '/'
+      // before parsing) but the OUTPUT uses the canonical '/' separator
+      // because std::filesystem on POSIX does not emit '\\'.
+      EXPECT_EQ("C:/path",  getPath("C:\\path\\base.ext"));
       EXPECT_EQ("path/sub", getPath("path/sub/base.ext"));
       EXPECT_EQ(".",        getPath("base.ext"));// no separator → "."
       EXPECT_EQ(".",        getPath("base"));
+      EXPECT_EQ(".",        getPath(""));        // empty → "."
+      EXPECT_EQ("/",        getPath("/file"));   // root: keep separator
+      EXPECT_EQ("/",        getPath("/"));
+      EXPECT_EQ("/",        getPath("\\file"));  // backslash normalized to '/'
     }
 
     {// getName

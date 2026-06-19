@@ -20,14 +20,16 @@
 #include <cctype> // for std::tolower
 #include <cstdio> // for std::fileno (used by Spinner's TTY detection)
 #include <cstring>// for std::strtok
+#include <filesystem>// for std::filesystem::path (used by getFile/getName/getPath/getExt/replacePath/replaceExt)
 #include <iomanip> // for std::setfill
 #include <iostream>
 #include <map>     // for std::multimap (used by fuzzyMatch)
+#include <random>  // for std::mt19937_64 and std::random_device (used by uuid)
 #include <sstream>
 #include <string>
 #include <string_view>// for Spinner's operator() argument
 #include <vector>
-#include <sys/stat.h>// for state
+#include <sys/stat.h>// for stat (used by fileExists)
 #include <unistd.h>// for isatty (used by Spinner's TTY detection)
 #include <chrono>
 #include <ctime>
@@ -88,40 +90,58 @@ inline bool fileExists(const std::string &fileOrPath)
     return stat(fileOrPath.c_str(), &buffer) == 0;
 }
 
-/// @return the filename, i.e. "base0123.ext" if input is "path/base0123.ext"
+/// @brief Normalize backslashes to forward slashes so Windows-style paths
+///        split correctly under std::filesystem on POSIX (where @c \\ is not
+///        a path separator).
+/// @note Output of every path helper below therefore uses @c / as the
+///       canonical separator regardless of what the input used.
+inline std::string normalizePath(const std::string &str)
+{
+    std::string out = str;
+    std::replace(out.begin(), out.end(), '\\', '/');
+    return out;
+}
+
+/// @return the filename, i.e. "base0123.ext" if input is "path/base0123.ext".
 inline std::string getFile(const std::string &str)
 {
-    return str.substr(str.find_last_of("/\\") + 1);
+    return std::filesystem::path(normalizePath(str)).filename().string();
 }
 
-/// @return the path, i.e. "path" if input is "path/base0123.ext"
+/// @return the path, i.e. "path" if input is "path/base0123.ext".
+/// @details Returns @c "." when no separator is present (analogous to POSIX
+///          dirname) and the separator itself for inputs rooted at the
+///          separator (e.g. @c "/file" yields @c "/"). Backed by
+///          std::filesystem::path::parent_path() so UNC paths and multiple
+///          consecutive separators are handled correctly.
 inline std::string getPath(const std::string &str)
 {
-    const size_t pos = str.find_last_of("/\\");
-    return pos >= str.length() ? "." : str.substr(0,pos);
+    const auto p = std::filesystem::path(normalizePath(str)).parent_path().string();
+    return p.empty() ? "." : p;
 }
 
-/// @return the file name with new path, i.e. "path/base0123.ext" if input is "tmp/base0123.ext"
+/// @return the file name with new path, i.e. "path/base0123.ext" if input is "tmp/base0123.ext".
 inline std::string replacePath(const std::string &str, const std::string &path)
 {
     return path + "/" + getFile(str);
 }
 
-/// @return the name, i.e. "base0123" if input is "path/base0123.ext"
+/// @return the name (without extension), i.e. "base0123" if input is "path/base0123.ext".
 inline std::string getName(const std::string &str)
 {
-    const size_t start = str.find_last_of("/\\") + 1; // valid offset or npos + 1 = 0
-    return str.substr(start, str.find_last_of(".") - start);
+    return std::filesystem::path(normalizePath(str)).stem().string();
 }
 
-/// @return the base, i.e. "base" if input is "path/base0123.ext"
+/// @return the base, i.e. "base" if input is "path/base0123.ext".
+/// @details Built on top of getName by stripping any trailing decimal digits;
+///          not a standard filesystem concept.
 inline std::string getBase(const std::string &str)
 {
     const std::string name = getName(str);
     return name.substr(0, name.find_last_not_of("0123456789")+1);
 }
 
-/// @return the file number, i.e. "0123" if input is "path/base0123.ext"
+/// @return the file number, i.e. "0123" if input is "path/base0123.ext".
 inline std::string getNumber(const std::string &str)
 {
     const std::string name = getName(str);
@@ -129,18 +149,20 @@ inline std::string getNumber(const std::string &str)
     return name.substr(pos, name.find_last_of("0123456789") + 1 - pos);
 }
 
-/// @return the file extension, i.e. "ext" if input is "path/base0123.ext"
+/// @return the file extension (without leading dot), i.e. "ext" if input is "path/base0123.ext".
 inline std::string getExt(const std::string &str)
 {
-    const size_t pos = str.find_last_of('.');
-    return pos >= str.length() ? "" : str.substr(pos + 1);
+    const auto e = std::filesystem::path(normalizePath(str)).extension().string();
+    return e.empty() ? std::string() : e.substr(1);// strip the leading '.'
 }
 
-/// @return the file name with a new extension, i.e. "path/base0123.abc" if input is "path/base0123.ext", "abc"
+/// @return the file name with a new extension, i.e. "path/base0123.abc" if input is "path/base0123.ext", "abc".
+/// @details std::filesystem::path::replace_extension prepends the dot to @a ext
+///          if it doesn't already have one, so calling with "abc" yields
+///          ".abc" — same behaviour as the previous string-based implementation.
 inline std::string replaceExt(const std::string &str, const std::string &ext)
 {
-    const size_t pos = str.find_last_of('.');
-    return (pos >= str.length() ? str + "." : str.substr(0, pos + 1)) + ext;
+    return std::filesystem::path(normalizePath(str)).replace_extension(ext).string();
 }
 
 /// @brief Turns all characters in a string into lower case. Works in-place, i.e. not copy is performed.

@@ -35,3 +35,4 @@ vdb_tool:
   - Fixed out-of-bounds read in -slice when the grid's active values had been modified (e.g. by -forOnValues) so that sampled values fell outside the precomputed extrema range; the LUT index is now clamped to [0, 255].
   - Fixed several typos in the documentation of vdb_tool.
   - Fixed vdb_tool::uuid so it generates a 36-character RFC 4122 v4 UUID.
+  - Fixed corner cases in getFile/getName/getPath/getExt/replacePath/replaceExt by adopting <filesystem>
