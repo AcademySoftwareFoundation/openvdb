@@ -30,7 +30,7 @@ namespace nanovdb {
 
 namespace tools::cuda {
 
-template <typename BuildT>
+template <typename BuildT, typename ScratchBufferT = nanovdb::cuda::DeviceBuffer>
 class RefineGrid
 {
     using GridT  = NanoGrid<BuildT>;
@@ -74,7 +74,7 @@ private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
-    TopologyBuilder<BuildT> mBuilder;
+    TopologyBuilder<BuildT, ScratchBufferT> mBuilder;
     cudaStream_t            mStream{0};
     util::cuda::Timer       mTimer;
     int                     mVerbose{0};
@@ -84,10 +84,10 @@ private:
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
+template<typename BuildT, typename ScratchBufferT>
 template<typename BufferT>
 GridHandle<BufferT>
-RefineGrid<BuildT>::getHandle(const BufferT &pool)
+RefineGrid<BuildT, ScratchBufferT>::getHandle(const BufferT &pool)
 {
     // Copy TreeData from GPU -> CPU
     cudaStreamSynchronize(mStream);
@@ -147,12 +147,12 @@ RefineGrid<BuildT>::getHandle(const BufferT &pool)
     cudaStreamSynchronize(mStream);
 
     return GridHandle<BufferT>(std::move(buffer));
-}// RefineGrid<BuildT>::getHandle
+}// RefineGrid<BuildT, ScratchBufferT>::getHandle
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void RefineGrid<BuildT>::refineRoot()
+template<typename BuildT, typename ScratchBufferT>
+void RefineGrid<BuildT, ScratchBufferT>::refineRoot()
 {
     // This method conservatively and speculatively refines the root tiles, to accommodate
     // any new root nodes that might be introduced by the upsampling operation.
@@ -212,12 +212,12 @@ void RefineGrid<BuildT>::refineRoot()
     for (const auto& [key, tile] : refinedTiles)
         *refinedRootPtr->tile(t++) = tile;
     mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
-}// RefineGrid<BuildT>::refineRoot
+}// RefineGrid<BuildT, ScratchBufferT>::refineRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void RefineGrid<BuildT>::refineInternalNodes()
+template<typename BuildT, typename ScratchBufferT>
+void RefineGrid<BuildT, ScratchBufferT>::refineInternalNodes()
 {
     // Computes the masks of upper and (densified) lower internal nodes, as a result of the refinement operation
     // Masks of lower internal nodes are densified in the sense that a serialized array of them is allocated,
@@ -227,24 +227,24 @@ void RefineGrid<BuildT>::refineInternalNodes()
             srcLeafCount, util::morphology::cuda::RefineInternalNodesFunctor<BuildT>(),
             mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.mUpperMasks.deviceData(), mBuilder.mLowerMasks.deviceData() );
     }
-}// RefineGrid<BuildT>::refineInternalNodes
+}// RefineGrid<BuildT, ScratchBufferT>::refineInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template <typename BuildT>
-void RefineGrid<BuildT>::processGridTreeRoot()
+template <typename BuildT, typename ScratchBufferT>
+void RefineGrid<BuildT, ScratchBufferT>::processGridTreeRoot()
 {
     // Copy GridData from source grid
     // By convention: this will duplicate grid name and map. Others will be reset later
     cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrid->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
     cudaCheckError();
-}// RefineGrid<BuildT>::processGridTreeRoot
+}// RefineGrid<BuildT, ScratchBufferT>::processGridTreeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void RefineGrid<BuildT>::refineLeafNodes()
+template<typename BuildT, typename ScratchBufferT>
+void RefineGrid<BuildT, ScratchBufferT>::refineLeafNodes()
 {
     // Refines the active masks of the source grid (as indicated at the leaf level), into a new grid that
     // has been already topologically refined to include all necessary leaf nodes.
@@ -256,7 +256,7 @@ void RefineGrid<BuildT>::refineLeafNodes()
 
     // Update leaf offsets and prefix sums
     mBuilder.processLeafOffsets(mStream);
-}// RefineGrid<BuildT>::refineLeafNodes
+}// RefineGrid<BuildT, ScratchBufferT>::refineLeafNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
