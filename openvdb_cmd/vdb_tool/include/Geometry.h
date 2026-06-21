@@ -58,7 +58,12 @@
 #endif
 
 #ifdef VDB_TOOL_USE_GLTF
-// Declarations only. The TINYGLTF_IMPLEMENTATION macro lives in src/gltf_impl.cpp.
+// Pull in tinygltf in truly-header-only mode: TINYGLTF_HEADER_ONLY makes every
+// function inline so this header can be included from multiple TUs without
+// linker duplication. No images are loaded by vdb_tool, so disable the
+// bundled stb_image / stb_image_write paths.
+#define TINYGLTF_IMPLEMENTATION
+#define TINYGLTF_HEADER_ONLY
 #define TINYGLTF_NO_STB_IMAGE
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 #include <tiny_gltf.h>

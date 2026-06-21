@@ -140,10 +140,9 @@ endif()
 
 if(OPENVDB_TOOL_USE_GLTF)
   # tinygltf is a single-header BSD-3 reader for .gltf / .glb. Fetched at
-  # configure time so no system install is required. The header itself only
-  # provides declarations; the implementation lives in src/gltf_impl.cpp
-  # (added explicitly to vdb_tool / vdb_tool_test below) so each translation
-  # unit only sees the inline-able portion.
+  # configure time so no system install is required. Used in header-only
+  # mode via TINYGLTF_HEADER_ONLY (set in Geometry.h), so every TU including
+  # the header gets inline definitions — no separate impl source file needed.
   target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_GLTF")
   include(FetchContent)
   FetchContent_Declare(tinygltf
@@ -222,11 +221,7 @@ endif()
 target_include_directories(vdb_tool_common INTERFACE "${Boost_INCLUDE_DIRS}" "${OpenVDB_INCLUDE_DIRS}" "include")
 
 # vdb_tool
-set(VDB_TOOL_SOURCES src/main.cpp)
-if(OPENVDB_TOOL_USE_GLTF)
-  list(APPEND VDB_TOOL_SOURCES src/gltf_impl.cpp)
-endif()
-add_executable(vdb_tool ${VDB_TOOL_SOURCES})
+add_executable(vdb_tool src/main.cpp)
 target_include_directories(vdb_tool PRIVATE vdb_tool_common)
 target_link_libraries(vdb_tool PRIVATE vdb_tool_common)
 install(TARGETS vdb_tool RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR})
@@ -236,11 +231,7 @@ install(TARGETS vdb_tool RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR})
 if(OPENVDB_BUILD_VDB_TOOL_UNITTESTS)
   find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} CONFIG REQUIRED)
 
-  set(VDB_TOOL_TEST_SOURCES src/unittest.cpp)
-  if(OPENVDB_TOOL_USE_GLTF)
-    list(APPEND VDB_TOOL_TEST_SOURCES src/gltf_impl.cpp)
-  endif()
-  add_executable(vdb_tool_test ${VDB_TOOL_TEST_SOURCES})
+  add_executable(vdb_tool_test src/unittest.cpp)
   target_include_directories(vdb_tool_test PRIVATE vdb_tool_common)
   target_link_libraries(vdb_tool_test PRIVATE vdb_tool_common GTest::gmock GTest::gtest GTest::gmock_main GTest::gtest_main)
   add_test(vdb_tool_unit_test vdb_tool_test)
