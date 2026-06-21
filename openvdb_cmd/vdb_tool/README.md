@@ -765,7 +765,7 @@ vdb_tool -for n=0,200,1 -eval '{$n:137.5:*:@deg}' -eval '{$deg:d2r:@radian}' -ev
 ## Production example with complex math using infix syntax
 Union 200 level set spheres scattered in a spiral pattern and ray-trace them into an image
 ```
-vdb_tool -for n=0,200,1  -calc 'radian=137.5*n*pi/180; r=sqrt(n); x=r*cos(radian); y=r*sin(radian); pow_r=0.5*(5+r)^0.25' -sphere voxel=0.1 radius='{$pow_r}' center='({$x},{$y},0)' -if '{$n:0:>}' -union -end -end -render spiral.ppm image=1024x1024 translate='(0,0,40)'
+vdb_tool -for n=0,200,1  -calc 'radian=137.5*n*pi/180; r=sqrt(n); x=r*cos(radian); y=r*sin(radian); pow_r=0.5*(5+r)^0.25' -sphere voxel=0.1 radius='{$pow_r}' center='({$x},{$y},0)' -if 'n > 0' -union -end -end -render spiral.ppm image=1024x1024 translate='(0,0,40)'
 ```
 
 or as a config file:
@@ -802,7 +802,7 @@ for n=0,200,1
     eval {$r:5:+:@r_sum}    # r_sum = 5 + r
     eval {$r_sum:0.25:pow:@pow_r} # pow_r = pow(r_sum, 0.25)
     sphere voxel=0.1 radius={$pow_r:0.5:*} center=({$r:$x:*},{$r:$y:*},0) # radius=0.5*pow_r center=(r*x, r*x,0)
-    if {$n:0:>} # if n > 0
+    if n > 0
         union
     end
 end

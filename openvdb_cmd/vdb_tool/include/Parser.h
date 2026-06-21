@@ -39,6 +39,7 @@
 #include <openvdb/util/Assert.h>
 
 #include "Util.h"
+#include "Calculator.h"// used by the -if action to evaluate infix/RPN test expressions
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -1436,16 +1437,47 @@ Parser::Parser(std::vector<Option> &&def)
 
     this->addAction(
         {"if"}, "start of if-scope. If the value of its option, named test, evaluates to false the entire scope is skipped",
-        {{"test", "", "0|1|false|true", "boolean value used to test if-statement"}},
+        {{"test", "", "0|1|false|true | n>0 | a==b | ...", "boolean value used to test if-statement. Accepts 0/1/false/true (the existing literal form, including post-substitution {...:RPN} expressions), or any Calculator expression — infix or RPN — that evaluates to a numeric value (zero = false, non-zero = true). Variables are looked up in the Processor's string memory, the same namespace used by -eval / -calc, so e.g. -for n=0,10 -if 'n > 5' -... -end works."}},
         [&](){ ++counter; mOpenLoops.emplace_back("if", mCurrentArgIdx); },
         [&](){
             OPENVDB_ASSERT(iter->names[0] == "if");
-            if (this->get<bool>("test")) {
+            const std::string testStr = this->getStr("test");
+            bool result;
+            try {
+                // Existing path: bare 0/1/false/true (and any RPN that already
+                // reduced to such a literal via {...} substitution at parse time).
+                result = strTo<bool>(testStr);
+            } catch (const std::exception&) {
+                // Fall back to the Calculator. Same compile path as -calc, same
+                // variable-source convention (the Processor's memory), so an
+                // -if inside a -for loop sees the loop variable on every pass.
+                Calculator cal;
+                cal.compile(testStr);
+                auto& mem = processor.memory();
+                std::vector<float> values(cal.variables().size());
+                for (size_t i = 0; i < cal.variables().size(); ++i) {
+                    const std::string& name = cal.variables()[i];
+                    if (!mem.isSet(name)) {
+                        throw std::invalid_argument(
+                            "if: test expression \"" + testStr +
+                            "\" references undefined variable \"" + name + "\"");
+                    }
+                    try {
+                        values[i] = strTo<float>(mem.get(name));
+                    } catch (const std::exception&) {
+                        throw std::invalid_argument(
+                            "if: variable \"" + name + "\" in memory is not a number (got \"" +
+                            mem.get(name) + "\")");
+                    }
+                }
+                result = cal.eval(values.data()) != 0.0f;
+            }
+            if (result) {
                 loops.push_back(std::make_shared<IfLoop>(processor.memory(), iter));
             } else {
                 skipToEnd(iter);// skip to matching -end
             }
-        }, 0
+        }, /*anonymous=*/0, /*greedy=*/true// test= may contain spaces (e.g. "n > 0"); collect trailing tokens with space-join so config-file expressions don't get comma-spliced
     );
 
     this->addAction(
