@@ -57,6 +57,13 @@
 #include <pxr/usd/usdGeom/xformCache.h>
 #endif
 
+#ifdef VDB_TOOL_USE_GLTF
+// Declarations only. The TINYGLTF_IMPLEMENTATION macro lives in src/gltf_impl.cpp.
+#define TINYGLTF_NO_STB_IMAGE
+#define TINYGLTF_NO_STB_IMAGE_WRITE
+#include <tiny_gltf.h>
+#endif
+
 #ifdef VDB_TOOL_USE_PDAL
 #include "pdal/pdal.hpp"
 #include "pdal/PipelineManager.hpp"
@@ -232,6 +239,18 @@ public:
     /// @throw std::runtime_error if PDAL support was not enabled at compile time
     ///        or if the underlying PDAL pipeline fails.
     bool readPDAL(const std::string &fileName);
+    /// @brief Read a glTF / glb file. Walks every mesh primitive and appends
+    ///        POSITION + index data to this Geometry. Non-indexed primitives
+    ///        and primitives whose index buffers use UBYTE/USHORT/UINT are all
+    ///        supported. Only TRIANGLES mode is consumed; other primitive
+    ///        modes (POINTS, LINES, STRIP, FAN) are skipped with a warning.
+    /// @throw std::runtime_error if glTF support was not enabled at compile time.
+    /// @throw std::invalid_argument if the file cannot be parsed.
+    /// @note  Requires VDB_TOOL_USE_GLTF. The node-graph transform stack is
+    ///        currently NOT applied — meshes are loaded in their local space.
+    ///        Materials, normals, UVs, vertex colors, animation, and skinning
+    ///        are also ignored by this minimal reader.
+    void readGLTF(const std::string &fileName);
     /// @brief Read an ASCII XYZ point file (x y z per line).
     /// @throw std::invalid_argument if the file cannot be opened or a line is malformed.
     void readXYZ(const std::string &fileName);
@@ -592,7 +611,7 @@ void Geometry::writeGEO(const std::string &fileName) const
 void Geometry::read(const std::string &fileName, int verbose)
 {
     mVerbose = verbose;
-    switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "vdb", "nvdb", "geo", "off", "xyz", "usd", "usda", "usdc", "usdz"})) {
+    switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "vdb", "nvdb", "geo", "off", "xyz", "usd", "usda", "usdc", "usdz", "gltf", "glb"})) {
     case 1:
         this->readOBJ(fileName);
         break;
@@ -625,6 +644,9 @@ void Geometry::read(const std::string &fileName, int verbose)
         break;
     case 11: case 12: case 13: case 14:// usd, usda, usdc, usdz
         this->readUSD(fileName);
+        break;
+    case 15: case 16:// gltf, glb
+        this->readGLTF(fileName);
         break;
     default:
 #if VDB_TOOL_USE_PDAL
@@ -1568,6 +1590,136 @@ void Geometry::readUSD(const std::string&)
 }
 
 #endif// VDB_TOOL_USE_USD
+
+#ifdef VDB_TOOL_USE_GLTF
+
+void Geometry::readGLTF(const std::string &fileName)
+{
+    tinygltf::Model model;
+    tinygltf::TinyGLTF loader;
+    std::string err, warn;
+
+    // Disable image decoding. We compiled tinygltf without stb_image, so its
+    // built-in PNG/JPG decoder is gone; without a substitute, any .gltf/.glb
+    // that references a texture fails to load with "No LoadImageData callback
+    // specified." vdb_tool only consumes geometry, so install a no-op loader
+    // that silently accepts every image and returns success.
+    loader.SetImageLoader(
+        [](tinygltf::Image*, const int, std::string*, std::string*,
+           int, int, const unsigned char*, int, void*) -> bool { return true; },
+        nullptr);
+
+    // Dispatch on the extension to pick the binary (.glb) vs ASCII (.gltf)
+    // path. tinygltf returns false on any parse error and populates `err`.
+    const std::string ext = toLowerCase(getExt(fileName));
+    const bool ok = (ext == "glb")
+        ? loader.LoadBinaryFromFile(&model, &err, &warn, fileName)
+        : loader.LoadASCIIFromFile (&model, &err, &warn, fileName);
+
+    if (!warn.empty() && mVerbose > 0) {
+        std::clog << "Geometry::readGLTF: " << warn << "\n";
+    }
+    if (!ok) {
+        throw std::invalid_argument("readGLTF: " +
+            (err.empty() ? "failed to load \"" + fileName + "\"" : err));
+    }
+
+    // Pulls a flat array of indices regardless of the source componentType
+    // (glTF allows uint8 / uint16 / uint32). The returned vector is sized to
+    // match accessor.count.
+    auto readIndices = [&](const tinygltf::Accessor &acc) {
+        std::vector<int> out;
+        out.reserve(acc.count);
+        const tinygltf::BufferView &bv = model.bufferViews[acc.bufferView];
+        const tinygltf::Buffer     &buf = model.buffers[bv.buffer];
+        const unsigned char *base = &buf.data[bv.byteOffset + acc.byteOffset];
+        switch (acc.componentType) {
+        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+            for (size_t i = 0; i < acc.count; ++i) out.push_back(base[i]);
+            break;
+        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: {
+            const auto *p = reinterpret_cast<const uint16_t*>(base);
+            for (size_t i = 0; i < acc.count; ++i) out.push_back(p[i]);
+            break;
+        }
+        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT: {
+            const auto *p = reinterpret_cast<const uint32_t*>(base);
+            for (size_t i = 0; i < acc.count; ++i) out.push_back(static_cast<int>(p[i]));
+            break;
+        }
+        default:
+            throw std::invalid_argument("readGLTF: unsupported index componentType "
+                                        + std::to_string(acc.componentType));
+        }
+        return out;
+    };
+
+    // Walk every mesh / primitive. glTF allows multiple meshes per file;
+    // primitives within a mesh are independent vertex+index sets that share
+    // attributes only via accessor indices.
+    size_t skipped = 0;
+    for (const tinygltf::Mesh &mesh : model.meshes) {
+        for (const tinygltf::Primitive &prim : mesh.primitives) {
+            // Mode -1 is "unspecified" → triangles per spec; anything else
+            // that isn't TRIANGLES (POINTS, LINES, STRIPS, FANS) is skipped.
+            if (prim.mode != -1 && prim.mode != TINYGLTF_MODE_TRIANGLES) {
+                ++skipped;
+                continue;
+            }
+            const auto posIt = prim.attributes.find("POSITION");
+            if (posIt == prim.attributes.end()) continue;
+            const tinygltf::Accessor &pAcc = model.accessors[posIt->second];
+            if (pAcc.type != TINYGLTF_TYPE_VEC3 ||
+                pAcc.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT) {
+                throw std::invalid_argument("readGLTF: only Vec3 float POSITION accessors are supported");
+            }
+
+            // Append vertices and remember the offset so face indices below
+            // are translated from per-primitive space into Geometry-wide space.
+            const tinygltf::BufferView &pbv = model.bufferViews[pAcc.bufferView];
+            const tinygltf::Buffer     &pbuf = model.buffers[pbv.buffer];
+            const size_t stride = pAcc.ByteStride(pbv);
+            const unsigned char *pbase = &pbuf.data[pbv.byteOffset + pAcc.byteOffset];
+            const int baseIdx = static_cast<int>(mVtx.size());
+            mVtx.reserve(mVtx.size() + pAcc.count);
+            for (size_t i = 0; i < pAcc.count; ++i) {
+                const auto *p = reinterpret_cast<const float*>(pbase + i * stride);
+                mVtx.emplace_back(p[0], p[1], p[2]);
+            }
+
+            if (prim.indices < 0) {
+                // Non-indexed: consecutive vertex triples are triangles.
+                for (size_t i = 0; i + 2 < pAcc.count; i += 3) {
+                    mTri.emplace_back(baseIdx + static_cast<int>(i),
+                                      baseIdx + static_cast<int>(i + 1),
+                                      baseIdx + static_cast<int>(i + 2));
+                }
+            } else {
+                const auto idx = readIndices(model.accessors[prim.indices]);
+                mTri.reserve(mTri.size() + idx.size() / 3);
+                for (size_t i = 0; i + 2 < idx.size(); i += 3) {
+                    mTri.emplace_back(baseIdx + idx[i],
+                                      baseIdx + idx[i + 1],
+                                      baseIdx + idx[i + 2]);
+                }
+            }
+        }
+    }
+    if (skipped > 0 && mVerbose > 0) {
+        std::clog << "Geometry::readGLTF: skipped " << skipped
+                  << " primitive(s) with non-TRIANGLES mode\n";
+    }
+    mBBox = BBoxT();// invalidate cached bbox
+}// Geometry::readGLTF
+
+#else
+
+void Geometry::readGLTF(const std::string&)
+{
+    throw std::runtime_error("glTF read support was disabled during compilation!");
+}
+
+#endif// VDB_TOOL_USE_GLTF
 
 Geometry::Ptr Geometry::deepCopy() const
 {

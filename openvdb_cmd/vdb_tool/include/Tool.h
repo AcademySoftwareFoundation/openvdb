@@ -597,14 +597,14 @@ void Tool::init()
 
   mParser.addAction(
      {"read", "import", "load", "i"}, "Read one or more geometry or VDB files from disk or STDIN.",
-    {{"files", "", "{file|stdin}.{obj|ply|abc|stl|off|pts|xyz|e57|vdb|nvdb}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
+    {{"files", "", "{file|stdin}.{obj|ply|abc|stl|off|pts|xyz|e57|vdb|nvdb|gltf|glb|geo|usd|usda|usdc|usdz}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
      {"grids", "*", "*|grid_name,...", "list of VDB grids name to be imported (defaults to \"*\", i.e. import all available grids)"},
      {"delayed", "true", "1|0|true|false", "toggle delayed loading of VDB grids (enabled by default). This option is ignored by other file types"}},
      [](){}, [&](){this->read();}, 0);//  anonymous options are treated as to the first option,i.e. "files"
 
   mParser.addAction(
      {"write", "export", "save", "o"}, "Write list of geometry, VDB or config files to disk or STDOUT",
-    {{"files", "", "{file|stdout}.{obj|ply|stl|off|vdb|nvdb|txt}", "list of files or the output stream, e.g. file.vdb or stdin.vdb. Note that \"files=\" is optional since any argument without the \"=\" character is intrepreted as a file and appended to \"files\"."},
+    {{"files", "", "{file|stdout}.{obj|ply|stl|off|geo|abc|vdb|nvdb|txt}", "list of files or the output stream, e.g. file.vdb or stdin.vdb. Note that \"files=\" is optional since any argument without the \"=\" character is intrepreted as a file and appended to \"files\"."},
      {"geo", "0", "0|1...", "geometry to write (defaults to \"0\" which is the latest)."},
      {"vdb", "*", "0,1,...", "list of VDB grids to write (defaults to \"*\", i.e. all available grids)."},
      {"keep", "", "1|0|true|false", "toggle wether to preserved or deleted geometry and grids after they have been written."},
@@ -1364,7 +1364,7 @@ void Tool::read()
   OPENVDB_ASSERT(action_name == "read");
   try {
     for (auto &fileName : mParser.getVec<std::string>("files")) {
-      switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,off,stl,xyz,usd,usda,usdc,usdz", "vdb", "nvdb"})) {
+      switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,off,stl,xyz,usd,usda,usdc,usdz,gltf,glb", "vdb", "nvdb"})) {
       case 1:
         this->readGeo(fileName);
         break;

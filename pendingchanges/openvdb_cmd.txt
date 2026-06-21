@@ -18,7 +18,8 @@ vdb_tool:
   - Added read support for xyz files.
 
   Improvements:
-  - Action "-read" now has optional support for reading UsdGeomMesh and UsdGeomPoints in the OpenUSD files usd, usda, usdc, and usdz.
+  - Action "-read" now has optional support for reading UsdGeomMesh and UsdGeomPoints prims from OpenUSD files (.usd, .usda, .usdc, .usdz). Walks every prim, bakes each one's world transform into the vertex positions, preserves triangles and quads as-is, and fan-triangulates n-gons (n>4). UsdGeomPoints contribute vertex positions only. Instancing, subdivision, animation, and per-point widths are not supported by this minimal reader. Enable with VDB_TOOL_USE_USD.
+  - Action "-read" now has optional support for reading glTF (.gltf) and binary glTF (.glb) files. Walks every mesh primitive in TRIANGLES mode (POINTS/LINES/STRIPS/FANS are skipped with a warning), and consumes both indexed and non-indexed primitives with UBYTE/USHORT/UINT index buffers. Node-graph transforms are not applied, and materials, normals, UVs, and vertex colors are ignored by this minimal reader. Uses the tinygltf header-only library, fetched at configure time. Enable with VDB_TOOL_USE_GLTF.
   - Action "-mesh2ls/mesh2sdf" now supports generation of asymmetric narrow bands.
   - Improved error reporting when using unsupported actions and options.
   - Actions can now have multiple names, e.g. "-read", "-import", "-load", "-i".

@@ -40,6 +40,7 @@ option(OPENVDB_TOOL_USE_MPEG "Compile with MPEG support" OFF)
 option(OPENVDB_TOOL_USE_PDAL "Compile with extended points support" OFF)
 option(OPENVDB_TOOL_USE_ABC "Compile with Alembic support" OFF)
 option(OPENVDB_TOOL_USE_USD "Compile with OpenUSD geometry read support" OFF)
+option(OPENVDB_TOOL_USE_GLTF "Compile with glTF (.gltf / .glb) read support via tinygltf" OFF)
 option(OPENVDB_TOOL_USE_ALL "Compile with all optional components" OFF)
 if(OPENVDB_TOOL_USE_ALL)
   set(OPENVDB_TOOL_USE_NANO ON)
@@ -50,6 +51,7 @@ if(OPENVDB_TOOL_USE_ALL)
   set(OPENVDB_TOOL_USE_ABC ON)
   set(OPENVDB_TOOL_USE_PDAL ON)
   set(OPENVDB_TOOL_USE_USD ON)
+  set(OPENVDB_TOOL_USE_GLTF ON)
 endif()
 
 if(OPENVDB_TOOL_USE_NANO)
@@ -136,6 +138,29 @@ if(OPENVDB_TOOL_USE_USD)
   target_link_libraries(vdb_tool_common INTERFACE usd usdGeom sdf gf vt tf)
 endif()
 
+if(OPENVDB_TOOL_USE_GLTF)
+  # tinygltf is a single-header BSD-3 reader for .gltf / .glb. Fetched at
+  # configure time so no system install is required. The header itself only
+  # provides declarations; the implementation lives in src/gltf_impl.cpp
+  # (added explicitly to vdb_tool / vdb_tool_test below) so each translation
+  # unit only sees the inline-able portion.
+  target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_GLTF")
+  include(FetchContent)
+  FetchContent_Declare(tinygltf
+    GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
+    GIT_TAG        v2.9.5
+    GIT_SHALLOW    TRUE
+  )
+  # tinygltf's CMakeLists builds examples by default — disable.
+  set(TINYGLTF_BUILD_LOADER_EXAMPLE    OFF CACHE BOOL "" FORCE)
+  set(TINYGLTF_BUILD_GL_EXAMPLES       OFF CACHE BOOL "" FORCE)
+  set(TINYGLTF_BUILD_VALIDATOR_EXAMPLE OFF CACHE BOOL "" FORCE)
+  set(TINYGLTF_BUILD_BUILDER_EXAMPLE   OFF CACHE BOOL "" FORCE)
+  set(TINYGLTF_HEADER_ONLY             ON  CACHE BOOL "" FORCE)
+  FetchContent_MakeAvailable(tinygltf)
+  target_include_directories(vdb_tool_common INTERFACE ${tinygltf_SOURCE_DIR})
+endif()
+
 if(WIN32 AND (OPENVDB_TOOL_USE_ALL OR (OPENVDB_TOOL_USE_ABC AND OPENVDB_TOOL_USE_EXR)))
   message(WARNING
     " The OpenEXR and Alembic VCPKG packages are using conflicting Imath versions.\n"
@@ -197,7 +222,11 @@ endif()
 target_include_directories(vdb_tool_common INTERFACE "${Boost_INCLUDE_DIRS}" "${OpenVDB_INCLUDE_DIRS}" "include")
 
 # vdb_tool
-add_executable(vdb_tool src/main.cpp)
+set(VDB_TOOL_SOURCES src/main.cpp)
+if(OPENVDB_TOOL_USE_GLTF)
+  list(APPEND VDB_TOOL_SOURCES src/gltf_impl.cpp)
+endif()
+add_executable(vdb_tool ${VDB_TOOL_SOURCES})
 target_include_directories(vdb_tool PRIVATE vdb_tool_common)
 target_link_libraries(vdb_tool PRIVATE vdb_tool_common)
 install(TARGETS vdb_tool RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR})
@@ -207,7 +236,11 @@ install(TARGETS vdb_tool RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR})
 if(OPENVDB_BUILD_VDB_TOOL_UNITTESTS)
   find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} CONFIG REQUIRED)
 
-  add_executable(vdb_tool_test src/unittest.cpp)
+  set(VDB_TOOL_TEST_SOURCES src/unittest.cpp)
+  if(OPENVDB_TOOL_USE_GLTF)
+    list(APPEND VDB_TOOL_TEST_SOURCES src/gltf_impl.cpp)
+  endif()
+  add_executable(vdb_tool_test ${VDB_TOOL_TEST_SOURCES})
   target_include_directories(vdb_tool_test PRIVATE vdb_tool_common)
   target_link_libraries(vdb_tool_test PRIVATE vdb_tool_common GTest::gmock GTest::gtest GTest::gmock_main GTest::gtest_main)
   add_test(vdb_tool_unit_test vdb_tool_test)
