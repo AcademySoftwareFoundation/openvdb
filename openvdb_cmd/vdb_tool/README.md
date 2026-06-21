@@ -31,9 +31,9 @@ The vdb_tool is a versatile command-line utility that chains together high-level
 | **flood** | signed-flood filling of a level set VDB |
 | **fog2mesh** | Convert a fog volume to an adaptive polygon mesh |
 | **for** | start of for-loop over a user-defined loop variable and range. |
-| **forAllValues** | Applied a simple computational kernel to values in a grid. |
-| **forOffValues** | Applied a simple computational kernel to values in a grid. |
-| **forOnValues** | Applied a simple computational kernel to values in a grid. |
+| **forAllValues** | Applied a simple computational kernel to ALL values in a grid. |
+| **forOffValues** | Applied a simple computational kernel to OFF values in a grid. |
+| **forOnValues** | Applied a simple computational kernel to ON values in a grid. |
 | **gauss** | gaussian convolution of a level set surface |
 | **grad** | generate a vector grid with the gradient of a scalar grid |
 | **help** | Print documentation for one, multiple or all available actions |
@@ -94,6 +94,7 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 | pts | read | ASCII PTS points files with one or more point clouds |
 | abc | optional read and write | Alembic binary mesh files |
 | usd, usda, usdc, usdz | optional read | OpenUSD scene files; reads UsdGeomMesh and UsdGeomPoints prims |
+| gltf, glb | optional read | glTF 2.0 and binary glTF mesh files via tinygltf (POSITION + indices, TRIANGLES mode) |
 | nvdb| optional read and write | NanoVDB file with voxels or points |
 | txt | read and write | ASCII configuration file for this tool |
 | ppm | write | Binary PPM image file |
@@ -406,7 +407,7 @@ Calculator: unexpected character '@' in expression
 # Building this tool
 
 This tool is using CMake for build on Linux and Windows.
-The only mandatory dependency is [OpenVDB](http://www.openvdb.org). Optional dependencies include NanoVDB, libpng, libjpeg, OpenEXR, Alembic, PDAL, and [OpenUSD](https://openusd.org). To enable them use the `-DOPENVDB_TOOL_USE_<name>=ON` flags (e.g. `-DOPENVDB_TOOL_USE_USD=ON` for USD support, or `-DOPENVDB_TOOL_USE_ALL=ON` to enable everything). See the CMakeLists.txt for details.
+The only mandatory dependency is [OpenVDB](http://www.openvdb.org). Optional dependencies include NanoVDB, libpng, libjpeg, OpenEXR, Alembic, PDAL, [OpenUSD](https://openusd.org), and [tinygltf](https://github.com/syoyo/tinygltf) (the latter is fetched at configure time, no system install required). To enable them use the `-DOPENVDB_TOOL_USE_<name>=ON` flags (e.g. `-DOPENVDB_TOOL_USE_USD=ON` for USD support, `-DOPENVDB_TOOL_USE_GLTF=ON` for glTF read support, or `-DOPENVDB_TOOL_USE_ALL=ON` to enable everything). See the CMakeLists.txt for details.
 
 The included unit tests are using Gtest. Add `-DOPENVDB_BUILD_VDB_TOOL_UNITTESTS=ON` to the cmake command line to build it.
 
@@ -504,6 +505,32 @@ vcpkg also works on Linux and macOS if you prefer it over building from source &
 vdb_tool -read scene.usda -print
 ```
 should list the imported geometry on the stack. Per-prim world transforms are baked into the vertex positions; instancing, subdivision schemes, and animation are intentionally not handled by this minimal reader.
+
+
+## Enabling glTF support (optional)
+
+glTF read support (`.gltf`, `.glb`) is provided by [tinygltf](https://github.com/syoyo/tinygltf), a single-header BSD-3 reader. Unlike OpenUSD, no system install is required &mdash; CMake's `FetchContent` pulls a pinned release at configure time. Simply enable the option:
+```bash
+cmake -DOPENVDB_TOOL_USE_GLTF=ON ..
+```
+(or pass `-DOPENVDB_TOOL_USE_ALL=ON` to enable every optional component, including glTF). The first configure downloads tinygltf into `<build>/_deps/tinygltf-src/`; subsequent configures reuse the cached checkout.
+
+vdb_tool uses tinygltf in header-only mode (`TINYGLTF_HEADER_ONLY`), with image decoding disabled (`TINYGLTF_NO_STB_IMAGE` / `TINYGLTF_NO_STB_IMAGE_WRITE`) since vdb_tool only consumes mesh geometry &mdash; textures referenced by the glTF are silently skipped.
+
+### What's imported
+- Vertex positions (POSITION attribute) and indices (UBYTE / USHORT / UINT) from every mesh primitive.
+- Both indexed and non-indexed primitives.
+- Only TRIANGLES mode; POINTS / LINES / STRIPS / FANS are skipped with a warning when `-verbose` is on.
+
+### What's not imported
+- Node-graph transforms &mdash; meshes load in their local space.
+- Materials, normals, UVs, vertex colors, animation, and skinning.
+
+### Verifying the install
+```bash
+vdb_tool -read model.glb -print
+```
+should list the imported geometry on the stack.
 
 
 # Examples
