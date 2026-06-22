@@ -7,7 +7,14 @@
 ///
 /// @file Util.h
 ///
-/// @brief Utility functions for vdb_tool
+/// @brief Stand-alone helpers shared across vdb_tool. Covers string
+///        manipulation (tokenize, trim, case conversion, numeric parsing),
+///        filesystem-path queries (getFile / getPath / getName / getExt /
+///        replacePath / replaceExt — all built on std::filesystem), fuzzy
+///        "did you mean" matching via Levenshtein edit distance, endian
+///        byte-swap, RFC 4122 v4 UUID generation, and timestamp formatting,
+///        plus two small classes: a TeeBuf streambuf that forwards output
+///        to two destinations and a Spinner progress indicator.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 

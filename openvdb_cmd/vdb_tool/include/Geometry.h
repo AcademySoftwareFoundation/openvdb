@@ -7,8 +7,16 @@
 ///
 /// @file Geometry.h
 ///
-/// @brief Class that encapsulates (explicit) geometry, i.e. vertices/points,
-///        triangles and quads. It is used to represent points and polygon meshes
+/// @brief Polygon-mesh / point-cloud container used by vdb_tool. Holds vertex
+///        positions plus optional per-vertex RGB colors and any combination
+///        of triangle / quad face lists, with a lazily-cached world-space
+///        bounding box. Provides stream- and file-based readers and writers
+///        for the OBJ, PLY, STL, OFF, GEO, PTS, and XYZ formats (binary and
+///        ASCII where applicable), and optional read/write paths for
+///        Alembic (.abc), OpenUSD (.usd / .usda / .usdc / .usdz), glTF
+///        (.gltf / .glb), OpenVDB (.vdb) and NanoVDB (.nvdb) backends. Also
+///        exposes a static fan-triangulate helper used by the readers to
+///        convert convex N-gons into triangles.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 

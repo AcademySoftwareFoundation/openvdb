@@ -7,8 +7,22 @@
 ///
 /// @file Parser.h
 ///
-/// @brief Defines various classes (Processor, Memory, Parser, Option, Action, Loop)
-///        for processing of command-line arguments.
+/// @brief Command-line argv parser and supporting infrastructure for the
+///        action / option / expression / loop language used by vdb_tool.
+///        Defines:
+///          - Option, Action — declarative description of a registered action
+///            (names, option list, init/run lambdas, anonymous-arg index,
+///            greedy flag for actions whose value may contain spaces).
+///          - Memory, Stack — the string-keyed variable store and the working
+///            stack shared with -eval / -calc.
+///          - Processor — RPN evaluator for "{...}" expressions embedded in
+///            option values (e.g. "{1:2:+}" -> "3", "{$x:path}" -> dirname).
+///          - BaseLoop and the derived ForLoop, EachLoop, FilesLoop, IfLoop —
+///            control-flow scopes implementing -for, -each, -files, -if;
+///            closed by -end and tracked via the openLoops stack.
+///          - Parser — top-level orchestrator: registers actions via
+///            addAction, parses argv, drives the run loop, and produces
+///            "did you mean" suggestions for typo'd action/option names.
 ///
 /// @warning All prints are directed to cerr since cout is used for piping!
 ///
