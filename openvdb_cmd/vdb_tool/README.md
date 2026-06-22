@@ -7,6 +7,7 @@ The vdb_tool is a versatile command-line utility that chains together high-level
 | Action | Description |
 |---|---|
 | **calc** | calculate string expression |
+| **case** | case branch inside a -switch scope. Body runs only if key matches the parent -switch's selector. Use key=* or key=default for a catch-all that fires when no earlier case matched. Closed by -end. |
 | **clear** | Deletes geometry, VDB grids and local variables |
 | **clip** | Clip a VDB grid against another grid, a bbox or frustum |
 | **close** | morphological closing, i.e. dilation followed by erosion, of level set surface by a fixed radius |
@@ -20,7 +21,7 @@ The vdb_tool is a versatile command-line utility that chains together high-level
 | **dilate** | dilate level set surface by a fixed radius |
 | **div** | generate a scalar grid with the divergence of a vector grid |
 | **each** | start of each-loop over a user-defined loop variable and list of values. |
-| **end** | marks the end scope of "-for,-each,and -if" control actions |
+| **end** | marks the end scope of "-for, -each, -files, -if, -switch and -case" control actions |
 | **enright** | Performs Enright advection benchmark test on a level set |
 | **erode** | erode level set surface by a fixed radius |
 | **errorOnWarning** | stop on warnings, i.e. treat warnings as errors |
@@ -71,6 +72,7 @@ The vdb_tool is a versatile command-line utility that chains together high-level
 | **soup2udf** | Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band |
 | **sphere** | Create a level set sphere, i.e. a narrow-band signed distance to a sphere |
 | **sum** | Given grids A and B, compute sum(a, b) per voxel |
+| **switch** | start of switch-scope. The selector value (on=) is compared against each enclosed -case's key; only the matching case body runs (or the '*'/'default' case if nothing else matched). Closed by -end. |
 | **transform** | apply affine transformations (uniform scale -> rotation -> translation) to a VDB grids and geometry |
 | **union** | CSG union of two level sets surfaces |
 | **vdb2points** | Extract points encoded in a VDB to points in a geometry format |
@@ -113,6 +115,22 @@ Note that this tool maintains two stacks of primitives, namely geometry (i.e. po
 # Stack-based string expressions
 
 This tool supports its own light-weight stack-oriented programming language that is (very loosely) inspired by Forth. Specifically, it uses Reverse Polish Notation (RPN) to define instructions that are evaluated during paring of the command-line arguments (options to be precise). All such expressions start with the character "{", ends with "}", and arguments are separated by ":". Variables starting with "\$" are substituted by its (previously) defined values, and variables starting with "@" are stored in memory. So, "{1:2:+:@x}" is conceptually equivalent to "x = 1 + 2". Conversely, "{\$x:++}" is conceptually equivalent "2 + 1 = 3" since "x=2" was already saved to memory. This is especially useful in combination with loops, e.g. "-quiet -for i=1,3,1 -eval {\$i:++} -end" will print 2 and 3 to the terminal. Branching is also supported, e.g. "radius={$x:1:>:if(0.5:sin?0.3:cos)}" is conceptually equal to "if (x>1) radius=sin(0.5) else radius=cos(0.3)". See the root-searching example below or run vdb_tool -eval help="*" to see a list of all instructions currently supported by this scripting language. Note that since this language uses characters that are interpreted by most shells it is necessary to use single quotes around strings! This is of course not the case when using config files.
+
+# Configuration file format
+
+vdb_tool can read and write configuration files (any extension is accepted, but the convention is `.txt`) that capture an entire action pipeline for replay or sharing. Run a saved config with `vdb_tool -config <file>`; produce one from the current command line by piping it to `-write file.txt`.
+
+The format is intentionally tiny and line-oriented:
+
+1. **The first line must be a version header**: `vdb_tool MAJOR.MINOR.PATCH` (e.g. `vdb_tool 10.8.0`). Loading fails if it's missing or the major version doesn't match the running tool.
+2. **One action per line**. The first non-whitespace token on each line is the action name; the leading `-` used on the command line is **implicit and must be omitted**.
+3. **Subsequent tokens on the same line are that action's options/values**, separated by whitespace. E.g. `sphere r=2 voxel=0.05` is a single action with two options.
+4. **Comments**: any text from `#` or `%` to the end of the line is stripped. A line whose first non-whitespace character is `#` or `%` is treated as a full-line comment.
+5. **Leading and trailing whitespace are ignored**, so indenting nested control-flow scopes (`-for` / `-each` / `-files` / `-if` / `-switch` / `-case`) for readability has no effect on behavior.
+6. **No shell quoting is needed** — the line is parsed verbatim. Characters that would otherwise need escaping on the command line (`*`, `{`, `}`, `$`, `(`, `)` etc.) are written plain.
+7. **Blank lines are skipped.**
+
+Example: the [switch-statement example above](#switch-statement-to-pick-one-of-n-branches) written as a config file demonstrates all of these rules &mdash; one action per line, no leading `-`, nested scopes indented, and `key=*` unquoted.
 
 # Standalone calculator (-calc)
 
@@ -650,6 +668,48 @@ Read multiple grids, and render only level set grids
 ```
 vdb_tool -read boat_points.vdb -for v=0,'{gridCount}' -if '{$v:isLS}' -render vdb='{$v}' -end -end
 ```
+
+## Switch-statement to pick one of N branches
+Loop over a few integer class labels and use `-switch` / `-case` to choose which primitive to create. The final case uses `key=*` (alternatively `key=default`) as a catch-all that fires only when none of the earlier cases matched.
+
+```
+vdb_tool -for c=0,4 \
+  -switch on='{$c}' \
+     -case key=0   -sphere       -end \
+     -case key=1   -platonic f=4 -end \
+     -case key=2   -platonic f=8 -end \
+     -case 'key=*' -platonic f=20 -end \
+  -end \
+  -write 'shape_{$c}.vdb' \
+-end
+```
+
+Each `-case` opens its own scope closed by `-end`, and the outer `-switch` is closed by the final `-end`. Numeric keys are compared by value (so `key=1` matches a selector of `1.0`); string keys are compared verbatim. The selector can be a `{...}` template expression — e.g. `-switch on='{$x:1:>}' ...` to branch on whether `x > 1`.
+
+The same example as a configuration file (`switch.txt`, run with `vdb_tool -config switch.txt`):
+
+```
+vdb_tool 10.8.0
+for c=0,4
+   switch {$c}
+      case 0
+         sphere
+      end
+      case 1
+         platonic f=4
+      end
+      case 2
+         platonic f=8
+      end
+      case *
+         platonic f=20
+      end
+   end
+   write shape_{$c}.vdb
+end
+```
+
+In config files, **each action goes on its own line** (the leading `-` is implicit and must be omitted), and any tokens following the action name on the same line are treated as that action's options/values. Indentation is purely cosmetic. No shell quoting is needed since the config file is parsed directly &mdash; e.g. `key=*` is written without the single quotes the shell would otherwise eat.
 
 ## Use shell-script to define list of files
 Find and render thumbnails of all level sets in an entire directory structure

@@ -967,6 +967,33 @@ public:
 
 // ==============================================================================================================
 
+/// @brief Control-flow scope for the -switch / -case construct.
+/// @details A SwitchLoop is pushed by -switch and stays on the loop stack
+///          until the matching outer -end. Each enclosed -case looks at the
+///          stack top to find this SwitchLoop, compares its key against
+///          @c selectedKey, and either opens a nested IfLoop (run the case
+///          body) or skips ahead to the case's matching -end. The @c matched
+///          flag is set the first time any case matches so that subsequent
+///          cases are skipped and the catch-all "*"/"default" only fires
+///          when nothing else did.
+class SwitchLoop : public BaseLoop
+{
+public:
+    std::string selectedKey; ///< Value of the -switch on= option for this scope.
+    bool        matched;     ///< True once a case has matched in this switch.
+
+    SwitchLoop(Memory &s, ActIterT i, std::string key)
+        : BaseLoop(s, i, ""), selectedKey(std::move(key)), matched(false) {}
+    virtual ~SwitchLoop() {}
+    /// @brief Always returns true; the switch itself isn't a looping construct,
+    ///        but the body between the matching -case and its -end runs once.
+    bool valid() override { return true; }
+    /// @brief Always returns false; the switch scope is single-pass.
+    bool next() override  { return false; }
+};// SwitchLoop class
+
+// ==============================================================================================================
+
 /// @brief Top-level command-line parser for vdb_tool.
 /// @details Owns the registry of available actions, the ordered list of actions selected
 ///          on the command line, the active loop stack, and a Processor for evaluating
@@ -1356,7 +1383,8 @@ Parser::Parser(std::vector<Option> &&def)
             const std::string &name = (++it)->names[0];
             if (name == "end") {
                 i -= 1;
-            } else if (name == "for" || name == "each" || name == "if" || name == "files") {
+            } else if (name == "for" || name == "each" || name == "if" || name == "files" ||
+                       name == "switch" || name == "case") {
                 i += 1;
             }
         }
@@ -1495,9 +1523,55 @@ Parser::Parser(std::vector<Option> &&def)
     );
 
     this->addAction(
-        {"end"}, "marks the end scope of \"-for,-each,and -if\" control actions", {},
+        {"switch"}, "start of switch-scope. The selector value (on=) is compared against each enclosed -case's key; only the matching case body runs (or the '*'/'default' case if nothing else matched). Closed by -end.",
+        {{"on", "", "1 | level_set | {$n}", "selector value compared against each enclosed -case key. {...} substitutions (e.g. {$n}) are evaluated before comparison. Numeric strings are compared by value so 1 matches 1.0."}},
+        [&](){ ++counter; mOpenLoops.emplace_back("switch", mCurrentArgIdx); },
         [&](){
-            if (counter<=0) throw std::invalid_argument("Parser: -end must be preceded by -for,-each, or -if");
+            OPENVDB_ASSERT(iter->names[0] == "switch");
+            loops.push_back(std::make_shared<SwitchLoop>(processor.memory(), iter,
+                                                          this->getStr("on")));
+        }, /*anonymous=*/0, /*greedy=*/true// on= may contain spaces (e.g. "{$n} + 1")
+    );
+
+    this->addAction(
+        {"case"}, "case branch inside a -switch scope. Body runs only if key matches the parent -switch's selector. Use key=* or key=default for a catch-all that fires when no earlier case matched. Closed by -end.",
+        {{"key", "", "1 | foo | * | default", "case key compared against the parent -switch's selector. Numeric strings are compared by value (1 matches 1.0); otherwise strings are compared verbatim. The literals * and default mark the catch-all case."}},
+        [&](){ ++counter; mOpenLoops.emplace_back("case", mCurrentArgIdx); },
+        [&](){
+            OPENVDB_ASSERT(iter->names[0] == "case");
+            if (loops.empty()) {
+                throw std::invalid_argument("-case must appear inside a -switch scope");
+            }
+            auto* sw = dynamic_cast<SwitchLoop*>(loops.back().get());
+            if (sw == nullptr) {
+                throw std::invalid_argument("-case must appear directly inside a -switch scope");
+            }
+            const std::string key = this->getStr("key");
+            bool isMatch;
+            if (key == "*" || key == "default") {
+                isMatch = !sw->matched;// fires only if no earlier case in this switch hit
+            } else {
+                // Compare numerically when both sides parse as float, so 1 == 1.0,
+                // 1.5 == 1.5e0, etc. Falls back to verbatim string comparison.
+                try {
+                    isMatch = (strTo<float>(key) == strTo<float>(sw->selectedKey));
+                } catch (const std::exception&) {
+                    isMatch = (key == sw->selectedKey);
+                }
+            }
+            if (isMatch) {
+                sw->matched = true;
+                loops.push_back(std::make_shared<IfLoop>(processor.memory(), iter));
+            } else {
+                skipToEnd(iter);// skip this case body
+            }
+        }, /*anonymous=*/0, /*greedy=*/true
+    );
+
+    this->addAction(
+        {"end"}, "marks the end scope of \"-for, -each, -files, -if, -switch and -case\" control actions", {},
+        [&](){
+            if (counter<=0) throw std::invalid_argument("Parser: -end must be preceded by -for, -each, -if, -switch or -case");
             --counter;
             if (!mOpenLoops.empty()) mOpenLoops.pop_back();
         },

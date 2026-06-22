@@ -2052,6 +2052,141 @@ TEST_F(Test_vdb_tool, ActionForValuesMultiGrid)
     }
 }// ActionForValuesMultiGrid
 
+TEST_F(Test_vdb_tool, ActionSwitch)
+{
+    using namespace openvdb::vdb_tool;
+
+    // Captures std::clog while running cmd through a fresh Parser, so the
+    // tests can assert on what -eval echoed inside the matched -case body.
+    auto runCapture = [](Parser &p, const std::string &cmd) -> std::string {
+        auto args = getArgs(cmd);
+        std::ostringstream oss;
+        auto *old = std::clog.rdbuf(oss.rdbuf());
+        try {
+            p.parse(int(args.size()), args.data());
+            p.run();
+        } catch (...) {
+            std::clog.rdbuf(old);
+            throw;
+        }
+        std::clog.rdbuf(old);
+        return oss.str();
+    };
+
+    {// Exact numeric match — only the case whose key equals the selector runs.
+      Parser p({});
+      p.finalize();
+      const std::string out = runCapture(p, "vdb_tool -quiet "
+          "-switch on=2 "
+            "-case key=1 -eval str=hit-1 -end "
+            "-case key=2 -eval str=hit-2 -end "
+            "-case key=3 -eval str=hit-3 -end "
+          "-end");
+      EXPECT_EQ(std::string::npos, out.find("hit-1")) << out;
+      EXPECT_NE(std::string::npos, out.find("hit-2")) << out;
+      EXPECT_EQ(std::string::npos, out.find("hit-3")) << out;
+    }
+
+    {// Numeric equivalence: 1.0 selector matches key=1, since both parse as float.
+      Parser p({});
+      p.finalize();
+      const std::string out = runCapture(p, "vdb_tool -quiet "
+          "-switch on=1.0 "
+            "-case key=1 -eval str=numeric-hit -end "
+          "-end");
+      EXPECT_NE(std::string::npos, out.find("numeric-hit")) << out;
+    }
+
+    {// String selector with verbatim string keys.
+      Parser p({});
+      p.finalize();
+      const std::string out = runCapture(p, "vdb_tool -quiet "
+          "-switch on=sphere "
+            "-case key=cube   -eval str=hit-cube   -end "
+            "-case key=sphere -eval str=hit-sphere -end "
+          "-end");
+      EXPECT_EQ(std::string::npos, out.find("hit-cube"))   << out;
+      EXPECT_NE(std::string::npos, out.find("hit-sphere")) << out;
+    }
+
+    {// '*' catch-all fires only when no prior case matched.
+      Parser p({});
+      p.finalize();
+      const std::string out = runCapture(p, "vdb_tool -quiet "
+          "-switch on=99 "
+            "-case key=1 -eval str=hit-1 -end "
+            "-case key=2 -eval str=hit-2 -end "
+            "-case key=* -eval str=hit-default -end "
+          "-end");
+      EXPECT_EQ(std::string::npos, out.find("hit-1"))       << out;
+      EXPECT_EQ(std::string::npos, out.find("hit-2"))       << out;
+      EXPECT_NE(std::string::npos, out.find("hit-default")) << out;
+    }
+
+    {// 'default' keyword is a synonym for '*' (catch-all).
+      Parser p({});
+      p.finalize();
+      const std::string out = runCapture(p, "vdb_tool -quiet "
+          "-switch on=99 "
+            "-case key=1       -eval str=hit-1 -end "
+            "-case key=default -eval str=hit-default -end "
+          "-end");
+      EXPECT_NE(std::string::npos, out.find("hit-default")) << out;
+    }
+
+    {// Catch-all does NOT fire if any earlier case matched.
+      Parser p({});
+      p.finalize();
+      const std::string out = runCapture(p, "vdb_tool -quiet "
+          "-switch on=1 "
+            "-case key=1 -eval str=hit-1 -end "
+            "-case key=* -eval str=hit-default -end "
+          "-end");
+      EXPECT_NE(std::string::npos, out.find("hit-1"))       << out;
+      EXPECT_EQ(std::string::npos, out.find("hit-default")) << out;
+    }
+
+    {// Per-iteration evaluation: -switch inside -for sees the loop variable
+     //  each pass, so different cases fire on different iterations.
+      Parser p({});
+      p.finalize();
+      const std::string out = runCapture(p, "vdb_tool -quiet "
+          "-for n=0,3 quiet=true "
+            "-switch on={$n} "
+              "-case key=0 -eval str=iter-zero -end "
+              "-case key=1 -eval str=iter-one  -end "
+              "-case key=* -eval str=iter-other -end "
+            "-end "
+          "-end");
+      EXPECT_NE(std::string::npos, out.find("iter-zero"))  << out;
+      EXPECT_NE(std::string::npos, out.find("iter-one"))   << out;
+      EXPECT_NE(std::string::npos, out.find("iter-other")) << out;
+    }
+
+    {// Nested -switch inside a matched -case: only the inner case for the
+     //  inner selector runs.
+      Parser p({});
+      p.finalize();
+      const std::string out = runCapture(p, "vdb_tool -quiet "
+          "-switch on=outer "
+            "-case key=outer "
+              "-switch on=inner "
+                "-case key=inner -eval str=nested-hit -end "
+                "-case key=*     -eval str=nested-miss -end "
+              "-end "
+            "-end "
+          "-end");
+      EXPECT_NE(std::string::npos, out.find("nested-hit"))  << out;
+      EXPECT_EQ(std::string::npos, out.find("nested-miss")) << out;
+    }
+
+    {// -case outside any -switch is a hard error.
+      Parser p({});
+      p.finalize();
+      EXPECT_THROW(runCapture(p, "vdb_tool -case key=1 -end"), std::exception);
+    }
+}// ActionSwitch
+
 TEST_F(Test_vdb_tool, Memory)
 {
     using namespace openvdb::vdb_tool;
