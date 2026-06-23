@@ -17,9 +17,10 @@
 ///          on these level set surfaces, generate adaptive polygon meshes from level
 ///          sets, render images, and write particles, meshes, or VDBs to disk.
 ///
-/// @warning All prints are directed to cerr since cout is used for piping!
-///
-/// @todo expose LevelSetMeasure
+/// @warning Human-readable output is written to the standard-error stream
+///          (primarily std::clog, with std::cerr for errors), never to
+///          std::cout, because std::cout is reserved for piping VDB / NanoVDB
+///          grids to stdout (e.g. "-write stdout.vdb").
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -3980,8 +3981,9 @@ inline std::string formatBytes(uint64_t bytes)
     return ss.str();
 }
 
-// Compact "[a,b,c]->[d,e,f]" form for the bbox column. ASCII arrow so column
-// widths computed from byte sizes line up correctly.
+// Integer index-space bbox, formatted as a compact "[a,b,c]->[d,e,f]" with an
+// ASCII arrow (so std::setw byte-counting lines up the column). Used for the
+// VDB grid table's index-space active-voxel bbox column.
 inline std::string formatBBox(const openvdb::CoordBBox& bbox)
 {
     std::stringstream ss;
@@ -3992,8 +3994,9 @@ inline std::string formatBBox(const openvdb::CoordBBox& bbox)
     return ss.str();
 }
 
-// Float-valued bbox (world-space, used by Geometry). Trimmed to 3 decimals so
-// the column doesn't bloat to seven-significant-digit floats.
+// Float-valued bbox, formatted like formatBBox but trimmed to 3 decimals to
+// avoid seven-significant-digit float bloat. Used for the Geometry table
+// (world-space vertex bbox) and the VDB grid table's world-space bbox column.
 template <typename BBoxT>
 inline std::string formatBBoxd(const BBoxT& bbox)
 {
@@ -4048,6 +4051,54 @@ inline std::string formatBackground(const openvdb::GridBase& grid)
     if (auto p = dynamic_cast<const openvdb::BoolGrid*>(&grid))   return gridBgStr(*p);
     if (auto p = dynamic_cast<const openvdb::Vec3SGrid*>(&grid))  return gridBgStr(*p);
     return "(n/a)";
+}
+
+// World-space surface area / enclosed volume of a level set, via
+// tools::levelSetArea / tools::levelSetVolume. Both throw TypeError unless the
+// grid is a non-empty scalar float level set, so only Float GRID_LEVEL_SET
+// grids are measured; everything else (and any measurement failure) renders
+// as "(n/a)".
+inline std::string formatArea(const openvdb::GridBase& grid)
+{
+    auto p = dynamic_cast<const openvdb::FloatGrid*>(&grid);
+    if (p == nullptr || grid.getGridClass() != openvdb::GRID_LEVEL_SET) return "(n/a)";
+    try {
+        std::stringstream ss;
+        ss << openvdb::tools::levelSetArea(*p);
+        return ss.str();
+    } catch (const std::exception&) {
+        return "(n/a)";
+    }
+}
+inline std::string formatVolume(const openvdb::GridBase& grid)
+{
+    auto p = dynamic_cast<const openvdb::FloatGrid*>(&grid);
+    if (p == nullptr || grid.getGridClass() != openvdb::GRID_LEVEL_SET) return "(n/a)";
+    try {
+        std::stringstream ss;
+        ss << openvdb::tools::levelSetVolume(*p);
+        return ss.str();
+    } catch (const std::exception&) {
+        return "(n/a)";
+    }
+}
+
+// Per-level node counts, top-down, e.g. "2->10->58" = 2 upper-internal nodes,
+// 10 lower-internal nodes, 58 leaf nodes. TreeBase::nodeCount() returns counts
+// bottom-up (index 0 = leaf) sized treeDepth, with the last element being the
+// single root node — we drop the root and reverse the rest so the order
+// matches the "32->16->8" node-dimension column header. Works on any value
+// type since it goes through the virtual TreeBase interface.
+inline std::string formatNodes(const openvdb::GridBase& grid)
+{
+    const auto counts = grid.baseTree().nodeCount();// bottom-up, includes root at back
+    if (counts.size() < 2) return "(n/a)";
+    std::stringstream ss;
+    for (std::size_t i = counts.size() - 1; i-- > 0; ) {// skip root (back), down to leaf
+        ss << counts[i];
+        if (i > 0) ss << "->";
+    }
+    return ss.str();
 }
 
 // Print a table with column-width auto-sizing. Cells must be pure ASCII
@@ -4159,9 +4210,13 @@ void Tool::print(std::ostream& os) const
     // VDB grids — column-aligned table.
     std::vector<std::string> headers = {"age", "name", "type", "class", "dim", "voxels", "dx", "size"};
     std::vector<Align>       aligns  = {RIGHT, LEFT,   LEFT,   LEFT,    LEFT,  RIGHT,    RIGHT, RIGHT};
-    if (level >= 1) { headers.push_back("bbox");       aligns.push_back(LEFT); }
+    if (level >= 1) { headers.push_back("bbox(index)"); aligns.push_back(LEFT); }
+    if (level >= 1) { headers.push_back("bbox(world)"); aligns.push_back(LEFT); }
+    if (level >= 1) { headers.push_back("32->16->8");   aligns.push_back(RIGHT); }
     if (level >= 2) { headers.push_back("background"); aligns.push_back(LEFT); }
     if (level >= 2) { headers.push_back("range");      aligns.push_back(LEFT); }
+    if (level >= 2) { headers.push_back("area");       aligns.push_back(RIGHT); }
+    if (level >= 2) { headers.push_back("volume");     aligns.push_back(RIGHT); }
 
     auto buildRow = [&](int age, const GridBase& grid) {
         const auto bbox = grid.evalActiveVoxelBoundingBox();
@@ -4180,9 +4235,14 @@ void Tool::print(std::ostream& os) const
             dxSS.str(),
             formatBytes(grid.memUsage()),
         };
+        // Both the index-space active-voxel bbox and its world-space transform.
         if (level >= 1) row.push_back(formatBBox(bbox));
+        if (level >= 1) row.push_back(formatBBoxd(grid.transform().indexToWorld(bbox)));
+        if (level >= 1) row.push_back(formatNodes(grid));
         if (level >= 2) row.push_back(formatBackground(grid));
         if (level >= 2) row.push_back(formatRange(grid));
+        if (level >= 2) row.push_back(formatArea(grid));
+        if (level >= 2) row.push_back(formatVolume(grid));
         return row;
     };
 
