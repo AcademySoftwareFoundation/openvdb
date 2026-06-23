@@ -274,8 +274,12 @@ private:
     /// @brief Convert a polygon mesh into a symmetric narrow-band unsigned distance field.
     void meshToUnsignedDistanceField();
 
+#ifdef VDB_TOOL_USE_SHRINKWRAP
     /// @brief Convert an arbitrary (possibly non-watertight) polygon soup into a narrow-band level set.
+    /// @note  Gated behind VDB_TOOL_USE_SHRINKWRAP (temporarily disabled; not exposed via CMake).
+    ///        Enable a local build with: cmake -DCMAKE_CXX_FLAGS="-DVDB_TOOL_USE_SHRINKWRAP" ..
     void soupToLevelSet();
+#endif
 
     /// @brief Generate a dx-offset surface from a polygon soup.
     void soupToOffset();
@@ -719,6 +723,9 @@ void Tool::init()
      {"name", "", "mesh2udf_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
      [&](){mParser.setDefaults();}, [&](){this->meshToUnsignedDistanceField();});
 
+#ifdef VDB_TOOL_USE_SHRINKWRAP
+  // Temporarily gated out of the PR. Not exposed via CMake by design; enable a
+  // local build with: cmake -DCMAKE_CXX_FLAGS="-DVDB_TOOL_USE_SHRINKWRAP" ..
   mParser.addAction(
      {"soup2ls", "soup2sdf", "shrinkwrap"}, "Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
@@ -731,7 +738,8 @@ void Tool::init()
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
      {"name", "", "soup2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
      [&](){mParser.setDefaults();}, [&](){this->soupToLevelSet();});
-  
+#endif
+
   mParser.addAction(
      {"soup2offset"}, "Convert a polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
@@ -2195,6 +2203,7 @@ void Tool::meshToUnsignedDistanceField()
 
 // ==============================================================================================================
 
+#ifdef VDB_TOOL_USE_SHRINKWRAP
 void Tool::soupToLevelSet()
 {
   const std::string &action_name = mParser.getAction().names[0];
@@ -2240,6 +2249,7 @@ void Tool::soupToLevelSet()
     }
   }
 }// Tool::soupToLevelSet
+#endif// VDB_TOOL_USE_SHRINKWRAP
 
 // ==============================================================================================================
 
