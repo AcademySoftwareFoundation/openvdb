@@ -115,6 +115,7 @@ private:
 
     struct BuildPrimarySegment;
     struct BuildSecondarySegment;
+    struct BuildFusedSegment;
 
     TreePtrType         mSegment;
     GridT const * const mLhsGrid;
@@ -632,6 +633,385 @@ private:
     FilletParms         mParms;
 };
 
+template<typename TreeT, typename MaskT>
+struct UnionWithFillet<TreeT, MaskT>::BuildFusedSegment {
+    using MaskTreeType = typename MaskT::TreeType;
+    using ValueType = typename TreeT::ValueType;
+    using TreePtrType = typename TreeT::Ptr;
+    using LeafNodeType = typename TreeT::LeafNodeType;
+    using NodeMaskType = typename LeafNodeType::NodeMaskType;
+    using RootNodeType = typename TreeT::RootNodeType;
+    using NodeChainType = typename RootNodeType::NodeChainType;
+    using InternalNodeType = typename NodeChainType::template Get<1>;
+    using MaskLeafNodeType = typename MaskT::TreeType::LeafNodeType;
+    using MaskValueType = typename MaskT::ValueType;
+
+    BuildFusedSegment(TreeT const * const lhs,
+                      TreeT const * const rhs,
+                      typename MaskT::TreeType::ConstPtr mask,
+                      FilletParms parms)
+        : mSegment(new TreeT(lhs->background()))
+        , mLhsTree(lhs)
+        , mRhsTree(rhs)
+        , mMaskTree(mask)
+        , mParms(parms)
+    {
+    }
+
+    void operator()() const
+    {
+        // Gather both lhs and rhs internal-node lists up front. One combined
+        // internal-node reduce walks both sides. Internal nodes that do not
+        // overlap the opposite tree and are outside the opposite SDF are copied
+        // directly into the output tree. Overlapping internal nodes are expanded
+        // into two leaf work queues: primaryLeafNodes contains lhs leaves that
+        // need overlap/primary handling, and secondaryLeafNodes contains rhs
+        // leaves that need rhs-only handling.
+        //
+        // One combined leaf reduce processes both queues into a single output
+        // tree. There is no separate primary tree, secondary tree, or final
+        // primary/secondary merge.
+        std::vector<const InternalNodeType*> lhsInternalNodes;
+        std::vector<const InternalNodeType*> rhsInternalNodes;
+        std::vector<const LeafNodeType*> primaryLeafNodes;
+        std::vector<const LeafNodeType*> secondaryLeafNodes;
+
+        mLhsTree->getNodes(lhsInternalNodes);
+        mRhsTree->getNodes(rhsInternalNodes);
+
+        ProcessInternalNodes internalOp(lhsInternalNodes, rhsInternalNodes,
+            *mLhsTree, *mRhsTree, *mSegment, primaryLeafNodes, secondaryLeafNodes, mParms);
+        tbb::parallel_reduce(
+            tbb::blocked_range<size_t>(0, lhsInternalNodes.size() + rhsInternalNodes.size()),
+            internalOp);
+
+        if (mMaskTree) {
+            ProcessLeafNodesMask leafOp(primaryLeafNodes, secondaryLeafNodes,
+                *mLhsTree, *mRhsTree, mMaskTree, *mSegment, mParms);
+            tbb::parallel_reduce(
+                tbb::blocked_range<size_t>(0, primaryLeafNodes.size() + secondaryLeafNodes.size()),
+                leafOp);
+        } else {
+            ProcessLeafNodes leafOp(primaryLeafNodes, secondaryLeafNodes,
+                *mLhsTree, *mRhsTree, *mSegment, mParms);
+            tbb::parallel_reduce(
+                tbb::blocked_range<size_t>(0, primaryLeafNodes.size() + secondaryLeafNodes.size()),
+                leafOp);
+        }
+    }
+
+    TreePtrType& segment() { return mSegment; }
+
+private:
+    struct ProcessInternalNodes {
+        ProcessInternalNodes(
+            std::vector<const InternalNodeType*>& lhsNodes,
+            std::vector<const InternalNodeType*>& rhsNodes,
+            const TreeT& lhsTree,
+            const TreeT& rhsTree,
+            TreeT& outputTree,
+            std::vector<const LeafNodeType*>& primaryLeafNodes,
+            std::vector<const LeafNodeType*>& secondaryLeafNodes,
+            FilletParms parms)
+            : mLhsNodes(lhsNodes)
+            , mRhsNodes(rhsNodes)
+            , mLhsTree(&lhsTree)
+            , mRhsTree(&rhsTree)
+            , mLocalTree(lhsTree.background())
+            , mOutputTree(&outputTree)
+            , mPrimaryLocalLeafNodes()
+            , mSecondaryLocalLeafNodes()
+            , mPrimaryLeafNodes(&primaryLeafNodes)
+            , mSecondaryLeafNodes(&secondaryLeafNodes)
+            , mParms(parms)
+        {
+        }
+
+        ProcessInternalNodes(ProcessInternalNodes& other, tbb::split)
+            : mLhsNodes(other.mLhsNodes)
+            , mRhsNodes(other.mRhsNodes)
+            , mLhsTree(other.mLhsTree)
+            , mRhsTree(other.mRhsTree)
+            , mLocalTree(mLhsTree->background())
+            , mOutputTree(&mLocalTree)
+            , mPrimaryLocalLeafNodes()
+            , mSecondaryLocalLeafNodes()
+            , mPrimaryLeafNodes(&mPrimaryLocalLeafNodes)
+            , mSecondaryLeafNodes(&mSecondaryLocalLeafNodes)
+            , mParms(other.mParms)
+        {
+        }
+
+        void join(ProcessInternalNodes& other)
+        {
+            mOutputTree->merge(*other.mOutputTree);
+            mPrimaryLeafNodes->insert(mPrimaryLeafNodes->end(),
+                other.mPrimaryLeafNodes->begin(), other.mPrimaryLeafNodes->end());
+            mSecondaryLeafNodes->insert(mSecondaryLeafNodes->end(),
+                other.mSecondaryLeafNodes->begin(), other.mSecondaryLeafNodes->end());
+        }
+
+        void operator()(const tbb::blocked_range<size_t>& range)
+        {
+            openvdb::tree::ValueAccessor<const TreeT> lhsAcc(*mLhsTree);
+            openvdb::tree::ValueAccessor<const TreeT> rhsAcc(*mRhsTree);
+            openvdb::tree::ValueAccessor<TreeT> outputAcc(*mOutputTree);
+
+            std::vector<const LeafNodeType*> tmpLeafNodes;
+            const size_t lhsSize = mLhsNodes.size();
+
+            for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+                if (n < lhsSize) {
+                    const InternalNodeType& lhsNode = *mLhsNodes[n];
+                    const openvdb::math::Coord& ijk = lhsNode.origin();
+                    const InternalNodeType* rhsNode =
+                        rhsAcc.template probeConstNode<InternalNodeType>(ijk);
+
+                    if (rhsNode) {
+                        lhsNode.getNodes(*mPrimaryLeafNodes);
+                    } else if (!(rhsAcc.getValue(ijk) < ValueType(0))) {
+                        tmpLeafNodes.clear();
+                        lhsNode.getNodes(tmpLeafNodes);
+                        for (const LeafNodeType* leaf : tmpLeafNodes) {
+                            outputAcc.addLeaf(new LeafNodeType(*leaf));
+                        }
+                    }
+                } else {
+                    const InternalNodeType& rhsNode = *mRhsNodes[n - lhsSize];
+                    const openvdb::math::Coord& ijk = rhsNode.origin();
+                    const InternalNodeType* lhsNode =
+                        lhsAcc.template probeConstNode<InternalNodeType>(ijk);
+
+                    if (lhsNode) {
+                        rhsNode.getNodes(*mSecondaryLeafNodes);
+                    } else if (!(lhsAcc.getValue(ijk) < ValueType(0))) {
+                        tmpLeafNodes.clear();
+                        rhsNode.getNodes(tmpLeafNodes);
+                        for (const LeafNodeType* leaf : tmpLeafNodes) {
+                            outputAcc.addLeaf(new LeafNodeType(*leaf));
+                        }
+                    }
+                }
+            }
+        }
+
+        const std::vector<const InternalNodeType*>& mLhsNodes;
+        const std::vector<const InternalNodeType*>& mRhsNodes;
+        TreeT const * const mLhsTree;
+        TreeT const * const mRhsTree;
+        TreeT mLocalTree;
+        TreeT * const mOutputTree;
+        std::vector<const LeafNodeType*> mPrimaryLocalLeafNodes;
+        std::vector<const LeafNodeType*> mSecondaryLocalLeafNodes;
+        std::vector<const LeafNodeType*> * const mPrimaryLeafNodes;
+        std::vector<const LeafNodeType*> * const mSecondaryLeafNodes;
+        FilletParms mParms;
+    };
+
+    struct ProcessLeafNodes {
+        ProcessLeafNodes(
+            std::vector<const LeafNodeType*>& primaryLeafNodes,
+            std::vector<const LeafNodeType*>& secondaryLeafNodes,
+            const TreeT& lhsTree,
+            const TreeT& rhsTree,
+            TreeT& outputTree,
+            FilletParms parms)
+            : mPrimaryLeafNodes(primaryLeafNodes)
+            , mSecondaryLeafNodes(secondaryLeafNodes)
+            , mLhsTree(&lhsTree)
+            , mRhsTree(&rhsTree)
+            , mLocalTree(lhsTree.background())
+            , mOutputTree(&outputTree)
+            , mParms(parms)
+        {
+        }
+
+        ProcessLeafNodes(ProcessLeafNodes& other, tbb::split)
+            : mPrimaryLeafNodes(other.mPrimaryLeafNodes)
+            , mSecondaryLeafNodes(other.mSecondaryLeafNodes)
+            , mLhsTree(other.mLhsTree)
+            , mRhsTree(other.mRhsTree)
+            , mLocalTree(mLhsTree->background())
+            , mOutputTree(&mLocalTree)
+            , mParms(other.mParms)
+        {
+        }
+
+        void join(ProcessLeafNodes& rhs) { mOutputTree->merge(*rhs.mOutputTree); }
+
+        void operator()(const tbb::blocked_range<size_t>& range)
+        {
+            openvdb::tree::ValueAccessor<const TreeT> lhsAcc(*mLhsTree);
+            openvdb::tree::ValueAccessor<const TreeT> rhsAcc(*mRhsTree);
+            openvdb::tree::ValueAccessor<TreeT> outputAcc(*mOutputTree);
+
+            const float alpha = mParms.mAlpha;
+            const float beta = mParms.mBeta;
+            const float gamma = mParms.mGamma;
+            const size_t primarySize = mPrimaryLeafNodes.size();
+
+            for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+                if (n < primarySize) {
+                    const LeafNodeType& lhsNode = *mPrimaryLeafNodes[n];
+                    const openvdb::math::Coord& ijk = lhsNode.origin();
+                    const LeafNodeType* rhsNode = rhsAcc.probeConstLeaf(ijk);
+
+                    if (rhsNode) {
+                        LeafNodeType* outputNode = outputAcc.touchLeaf(ijk);
+                        ValueType* outputData = outputNode->buffer().data();
+                        NodeMaskType& outputMask = outputNode->getValueMask();
+
+                        const ValueType* lhsData = lhsNode.buffer().data();
+                        const NodeMaskType& lhsMask = lhsNode.getValueMask();
+                        const ValueType* rhsData = rhsNode->buffer().data();
+                        const NodeMaskType& rhsMask = rhsNode->getValueMask();
+
+                        for (openvdb::Index pos = 0; pos < LeafNodeType::SIZE; ++pos) {
+                            const float A = lhsData[pos];
+                            const float B = rhsData[pos];
+                            const float m = openvdb::math::Clamp((alpha - A) / alpha, 0.f, 1.f) *
+                                            openvdb::math::Clamp((alpha - B) / alpha, 0.f, 1.f);
+                            const bool hasValidFilletSamples = lhsMask.isOn(pos) && rhsMask.isOn(pos);
+                            const float offset = hasValidFilletSamples ?
+                                openvdb::math::Pow(m, beta) * gamma : 0.0f;
+                            const bool isAMin = A < B;
+                            outputData[pos] = isAMin ? A - offset : B - offset;
+                            outputMask.set(pos, isAMin ? lhsMask.isOn(pos) : rhsMask.isOn(pos));
+                        }
+                    } else if (!(rhsAcc.getValue(ijk) < ValueType(0.0))) {
+                        outputAcc.addLeaf(new LeafNodeType(lhsNode));
+                    }
+                } else {
+                    const LeafNodeType& rhsNode = *mSecondaryLeafNodes[n - primarySize];
+                    const openvdb::math::Coord& ijk = rhsNode.origin();
+                    const LeafNodeType* lhsNode = lhsAcc.probeConstLeaf(ijk);
+
+                    if (!lhsNode && !(lhsAcc.getValue(ijk) < ValueType(0))) {
+                        outputAcc.addLeaf(new LeafNodeType(rhsNode));
+                    }
+                }
+            }
+        }
+
+        const std::vector<const LeafNodeType*>& mPrimaryLeafNodes;
+        const std::vector<const LeafNodeType*>& mSecondaryLeafNodes;
+        TreeT const * const mLhsTree;
+        TreeT const * const mRhsTree;
+        TreeT mLocalTree;
+        TreeT * const mOutputTree;
+        FilletParms mParms;
+    };
+
+    struct ProcessLeafNodesMask {
+        ProcessLeafNodesMask(
+            std::vector<const LeafNodeType*>& primaryLeafNodes,
+            std::vector<const LeafNodeType*>& secondaryLeafNodes,
+            const TreeT& lhsTree,
+            const TreeT& rhsTree,
+            typename MaskT::TreeType::ConstPtr maskTree,
+            TreeT& outputTree,
+            FilletParms parms)
+            : mPrimaryLeafNodes(primaryLeafNodes)
+            , mSecondaryLeafNodes(secondaryLeafNodes)
+            , mLhsTree(&lhsTree)
+            , mRhsTree(&rhsTree)
+            , mMaskTree(maskTree)
+            , mLocalTree(lhsTree.background())
+            , mOutputTree(&outputTree)
+            , mParms(parms)
+        {
+        }
+
+        ProcessLeafNodesMask(ProcessLeafNodesMask& other, tbb::split)
+            : mPrimaryLeafNodes(other.mPrimaryLeafNodes)
+            , mSecondaryLeafNodes(other.mSecondaryLeafNodes)
+            , mLhsTree(other.mLhsTree)
+            , mRhsTree(other.mRhsTree)
+            , mMaskTree(other.mMaskTree)
+            , mLocalTree(mLhsTree->background())
+            , mOutputTree(&mLocalTree)
+            , mParms(other.mParms)
+        {
+        }
+
+        void join(ProcessLeafNodesMask& rhs) { mOutputTree->merge(*rhs.mOutputTree); }
+
+        void operator()(const tbb::blocked_range<size_t>& range)
+        {
+            openvdb::tree::ValueAccessor<const TreeT> lhsAcc(*mLhsTree);
+            openvdb::tree::ValueAccessor<const TreeT> rhsAcc(*mRhsTree);
+            openvdb::tree::ValueAccessor<const MaskTreeType> maskAcc(*mMaskTree);
+            openvdb::tree::ValueAccessor<TreeT> outputAcc(*mOutputTree);
+
+            const float alpha = mParms.mAlpha;
+            const float beta = mParms.mBeta;
+            const float gamma = mParms.mGamma;
+            const float maskBackground = mMaskTree->background();
+            const size_t primarySize = mPrimaryLeafNodes.size();
+
+            for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+                if (n < primarySize) {
+                    const LeafNodeType& lhsNode = *mPrimaryLeafNodes[n];
+                    const openvdb::math::Coord& ijk = lhsNode.origin();
+                    const LeafNodeType* rhsNode = rhsAcc.probeConstLeaf(ijk);
+                    const MaskLeafNodeType* maskNode = maskAcc.probeConstLeaf(ijk);
+
+                    if (rhsNode) {
+                        LeafNodeType* outputNode = outputAcc.touchLeaf(ijk);
+                        ValueType* outputData = outputNode->buffer().data();
+                        NodeMaskType& outputMask = outputNode->getValueMask();
+
+                        const ValueType* lhsData = lhsNode.buffer().data();
+                        const NodeMaskType& lhsMask = lhsNode.getValueMask();
+                        const ValueType* rhsData = rhsNode->buffer().data();
+                        const NodeMaskType& rhsMask = rhsNode->getValueMask();
+                        const MaskValueType* maskData = maskNode ? maskNode->buffer().data() : nullptr;
+
+                        for (openvdb::Index pos = 0; pos < LeafNodeType::SIZE; ++pos) {
+                            const float A = lhsData[pos];
+                            const float B = rhsData[pos];
+                            const float m = openvdb::math::Clamp((alpha - A) / alpha, 0.f, 1.f) *
+                                            openvdb::math::Clamp((alpha - B) / alpha, 0.f, 1.f);
+                            const bool hasValidFilletSamples = lhsMask.isOn(pos) && rhsMask.isOn(pos);
+                            const float offset = hasValidFilletSamples ?
+                                openvdb::math::Pow(m, beta) * gamma : 0.0f;
+                            const bool isAMin = A < B;
+                            const float multiplier = maskData ? maskData[pos] : maskBackground;
+                            outputData[pos] = isAMin ? (A - offset * multiplier) : (B - offset * multiplier);
+                            outputMask.set(pos, isAMin ? lhsMask.isOn(pos) : rhsMask.isOn(pos));
+                        }
+                    } else if (!(rhsAcc.getValue(ijk) < ValueType(0.0))) {
+                        outputAcc.addLeaf(new LeafNodeType(lhsNode));
+                    }
+                } else {
+                    const LeafNodeType& rhsNode = *mSecondaryLeafNodes[n - primarySize];
+                    const openvdb::math::Coord& ijk = rhsNode.origin();
+                    const LeafNodeType* lhsNode = lhsAcc.probeConstLeaf(ijk);
+
+                    if (!lhsNode && !(lhsAcc.getValue(ijk) < ValueType(0))) {
+                        outputAcc.addLeaf(new LeafNodeType(rhsNode));
+                    }
+                }
+            }
+        }
+
+        const std::vector<const LeafNodeType*>& mPrimaryLeafNodes;
+        const std::vector<const LeafNodeType*>& mSecondaryLeafNodes;
+        TreeT const * const mLhsTree;
+        TreeT const * const mRhsTree;
+        typename MaskT::TreeType::ConstPtr mMaskTree;
+        TreeT mLocalTree;
+        TreeT * const mOutputTree;
+        FilletParms mParms;
+    };
+
+    TreePtrType mSegment;
+    TreeT const * const mLhsTree;
+    TreeT const * const mRhsTree;
+    typename MaskT::TreeType::ConstPtr mMaskTree;
+    FilletParms mParms;
+};
+
 
 template<typename GridT, typename MaskT>
 typename GridT::Ptr UnionWithFillet<GridT, MaskT>::blend() {
@@ -639,21 +1019,14 @@ typename GridT::Ptr UnionWithFillet<GridT, MaskT>::blend() {
     parms.mAlpha = mBandwidth;
     parms.mBeta = mExponent;
     parms.mGamma = mMultiplier;
-    BuildPrimarySegment primary(mLhsTree, mRhsTree, mMaskTree, parms);
-    BuildSecondarySegment secondary(mLhsTree, mRhsTree, parms);
+    BuildFusedSegment fused(mLhsTree, mRhsTree, mMaskTree, parms);
 
-    // Exploiting nested parallelism
-    tbb::task_group tasks;
-    tasks.run(primary);
-    tasks.run(secondary);
-    tasks.wait();
-
-    primary.segment()->merge(*secondary.segment());
+    fused();
 
     // The leafnode (level = 0) sign is set in the segment construction.
-    openvdb::tools::signedFloodFill(*primary.segment(), /*threaded=*/true, /*grainSize=*/1, /*minLevel=*/1);
+    openvdb::tools::signedFloodFill(*fused.segment(), /*threaded=*/true, /*grainSize=*/1, /*minLevel=*/1);
 
-    mSegment = primary.segment();
+    mSegment = fused.segment();
 
     typename GridT::Ptr ret = GridT::create(mSegment);
     ret->setTransform((mRhsGrid->transform()).copy());

@@ -440,29 +440,28 @@ newSopOperator(OP_OperatorTable* table)
         .setTooltip("Optional scalar VDB used for alpha masking\n\n"
             "Values are assumed to be between 0 and 1."));
 
-    // Band radius of influence / falloff width, i.e. alpha
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "alpha", "Band Radius")
+    // Blend radius of influence / falloff width, i.e. alpha
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "alpha", "Blend Radius")
         .setDefault(10.f)
         .setRange(PRM_RANGE_UI, 0.f, PRM_RANGE_UI, 1000.f)
         .setTooltip(
-            "Band radius of influence measures the distance from the zero\n"
+            "Blend radius of influence measures the distance from the zero\n"
             "iso-contour of the intersection that is going to be modified.\n"
             "This is measured in world-space."));
 
     // Exponent, i.e. beta
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "beta", "Exponent")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "beta", "Falloff Sharpness")
         .setDefault(100.f)
         .setRange(PRM_RANGE_UI, 0.f, PRM_RANGE_UI, 1000.f)
         .setTooltip(
-            "Blending curve exponential used in the model."));
+            "Controls how sharply the fillet influence falls off."));
 
     // Amplitude
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "gamma", "Multiplier")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "gamma", "Fillet Strength")
         .setDefault(10.f)
         .setRange(PRM_RANGE_UI, 0.f, PRM_RANGE_UI, 1000.f)
         .setTooltip(
-            "Amplitude provides a multiplier to make the blended\n"
-            "influence weaker or stronger."));
+            "Controls the strength of the fillet offset."));
 
     // Number of voxels to dilate the local blend support.
     parms.add(hutil::ParmFactory(PRM_INT_J, "dilation", "Dilation")
