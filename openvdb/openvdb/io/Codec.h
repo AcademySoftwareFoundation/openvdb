@@ -408,8 +408,9 @@ struct OPENVDB_API Codec
     /// that mode internally for safety. If @c options.clipBBox is non-empty,
     /// restrict the loaded data to the region that intersects it; if the codec
     /// cannot honour clipping natively, fall back to a post-process and record
-    /// a warning via @a diagnostics.
-    virtual void readBuffers(std::istream& /*is*/, CodecData& /*data*/,
+    /// a warning via @a diagnostics. The @c size argument is the number of bytes
+    /// occupied by the entire readBuffers data section.
+    virtual void readBuffers(std::istream& /*is*/, Index64 /*size*/, CodecData& /*data*/,
         const ReadOptions& /*options*/, ReadDiagnostics& /*diagnostics*/) { }
 
     /// @brief Serialize the grid topology (tree structure and active-voxel

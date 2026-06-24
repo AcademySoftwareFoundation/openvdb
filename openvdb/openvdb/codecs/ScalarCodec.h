@@ -159,7 +159,7 @@ struct ScalarCodec final: public TopologyCodec<GridT, StorageGridT, Mode>
         }
     }
 
-    void readBuffers(std::istream& is, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics&) final
+    void readBuffers(std::istream& is, Index64 /*size*/, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics&) final
     {
         using StorageValueT = typename StorageGridT::TreeType::ValueType;
         GridT& grid = static_cast<GridT&>(*data.grid);

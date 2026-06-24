@@ -102,7 +102,7 @@ struct ValueMaskCodec final: public TopologyCodec<GridT>
 
     static inline std::string name() { return GridT::gridType(); }
 
-    void readBuffers(std::istream& is, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics&) final
+    void readBuffers(std::istream& is, Index64 /*size*/, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics&) final
     {
         GridT& grid = static_cast<GridT&>(*data.grid);
 

@@ -116,7 +116,7 @@ struct PointIndexCodec final: public TopologyCodec<GridT>
 
     static inline std::string name() { return GridT::gridType(); }
 
-    void readBuffers(std::istream& is, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics& diagnostics) final
+    void readBuffers(std::istream& is, Index64 /*size*/, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics& diagnostics) final
     {
         OPENVDB_ASSERT(dynamic_cast<GridT*>(data.grid.get()));
 

@@ -1033,7 +1033,9 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
     if (readBuffers) {
         // read buffers
         if (codec) {
-            codec->readBuffers(is, *codecData, readOptions, diagnostics);
+            OPENVDB_ASSERT(gd.getEndPos() >= gd.getGridPos());
+            const Index64 size = static_cast<Index64>(gd.getEndPos() - gd.getGridPos());
+            codec->readBuffers(is, size, *codecData, readOptions, diagnostics);
         } else {
             const auto& worldBBox = readOptions.clipBBox;
             const bool clip = worldBBox.isSorted();
