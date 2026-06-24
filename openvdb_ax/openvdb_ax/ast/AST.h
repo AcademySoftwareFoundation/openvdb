@@ -348,7 +348,7 @@ struct Variable : public Expression
     const Expression* basetype() const override { return this; }
     //
     size_t children() const override { return 0; }
-    const Node* child(const size_t) const override { return nullptr; }
+    const Node* child([[maybe_unused]] const size_t index) const override { return nullptr; }
     //
     inline const std::string& name() const { return mName; }
 
@@ -366,7 +366,7 @@ struct ValueBase : public Expression
     const Expression* basetype() const override { return this; }
     //
     size_t children() const override { return 0; }
-    const Node* child(const size_t) const override { return nullptr; }
+    const Node* child([[maybe_unused]] const size_t index) const override { return nullptr; }
 };
 
 
@@ -1665,7 +1665,7 @@ struct Keyword : public Statement
     /// @copybrief Node::children()
     size_t children() const override final { return 0; }
     /// @copybrief Node::child()
-    const Node* child(const size_t) const override final {
+    const Node* child([[maybe_unused]] const size_t index) const override final {
         return nullptr;
     }
     /// @brief  Query the keyword held on this node.

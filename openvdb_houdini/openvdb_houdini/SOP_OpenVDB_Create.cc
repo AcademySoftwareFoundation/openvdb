@@ -874,7 +874,7 @@ SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform
 
 #if SYS_VERSION_MAJOR_INT >= 21
         UT_Matrix4D      cameratosop;
-        OBJ_CameraParms  cameraParms;
+        UT_CameraParms   cameraParms;
         OBJ_Node        *meobj = getCreator()->castToOBJNode();
         UT_StringHolder  errstr;
 

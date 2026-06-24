@@ -90,7 +90,7 @@ axtestmulti(llvm::LLVMContext& C)
             }, voidty, "ax.i32x2")),
             Function::Ptr(new unittest_util::TestFunction({
                 ArgInfo(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3), 1)
-            }, voidty, "ax.i32x2")),
+            }, voidty, "ax.i32x3")),
          }));
     return group;
 }
