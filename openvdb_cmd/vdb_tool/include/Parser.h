@@ -1442,7 +1442,7 @@ Parser::Parser(std::vector<Option> &&def)
             } else {
                 using LoopT = FilesLoop<std::filesystem::directory_iterator>;
                 loop = std::make_shared<LoopT>(processor.memory(), iter, "file", this->getVec<std::string>("path"),
-                                               this->getVec<std::string>("extension",","), 
+                                               this->getVec<std::string>("extension",","),
                                                this->getVec<std::string>("include",","),
                                                this->getVec<std::string>("exclude",","),
                                                strSizeToByteSize(this->getStr("min_size")),

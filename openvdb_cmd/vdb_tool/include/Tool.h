@@ -1574,7 +1574,7 @@ void Tool::config()
 
 void Tool::write()
 {
-  const std::string &action_name = mParser.getAction().names[0]; 
+  const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "write");
   try {
     for (std::string &fileName : mParser.getVec<std::string>("files")) {
@@ -2780,7 +2780,7 @@ void Tool::volumeToMesh()
     } else if (mode==2 && grid->getGridClass() != GRID_FOG_VOLUME) {
       throw std::invalid_argument("no fog volume with age "+std::to_string(age));
     }
-    
+
     if (mParser.verbose) mTimer.start(action_name);
 
     tools::VolumeToMesh mesher(iso, adaptivity, /*relaxDisorientedTriangles*/true);
