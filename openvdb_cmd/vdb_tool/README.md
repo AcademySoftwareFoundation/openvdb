@@ -798,32 +798,32 @@ vdb_tool 10.8.0
 
 # 1. LOAD A MASK (Optional)
 # Used to clip the fluid so it doesn't leak out of the container
-read collision_geo.obj 
+read collision_geo.obj
 mesh2ls voxel=0.1 width=3
 
 # 2. LOOP THROUGH PARTICLE SEQUENCE
 # Processing frames 200 to 300
 for n=200,300,1
-    
+
     # Read the particle VDB for the current frame
     read points_{$n:4:pad0}.vdb
-    
+
     # Convert particles to a Level Set
     # 'radius' is the particle size; 'voxel' is the grid resolution
     points2ls voxel=0.035 radius=2.142 width=3
-    
+
     # SURFACE REFINEMENT
     dilate radius=2.5         # Expand to merge gaps
     gauss iter=2              # Smooth out the "blobby" look
     erode radius=2.5          # Shrink back to original scale
-    
+
     # 3. MESHING & CLIPPING
     # Convert to adaptive mesh, clipped by our collision mask (vdb=1)
     ls2mesh vdb=0 mask=1 adapt=0.005
-    
+
     # 4. EXPORT
     write mesh_{$n:4:pad0}.abc
-    
+
     # Clear the stack for the next frame to prevent memory bloat
     clear
 end

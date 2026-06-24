@@ -22,7 +22,7 @@ struct RenderOp
     float mDx, mIso, mWBBoxDimZ;
     Vec3T mWBBoxCenter;
 
-    template<typename BufferT> 
+    template<typename BufferT>
     RenderOp(nanovdb::GridHandle<BufferT>& handle, int width, int height)
     {
         mWidth = width;
@@ -107,7 +107,7 @@ struct RenderOp
         return duration;
     }
 
-    template <typename GridT>  
+    template <typename GridT>
     inline __hostdev__ RayT getIndexRay(int i, const GridT *grid) const
     {
         // perspective camera along Z-axis...

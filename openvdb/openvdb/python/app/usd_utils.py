@@ -2,12 +2,12 @@ import numpy as np
 
 
 have_pxr_lib = False
-try: 
+try:
     # conditionally load so it is an optional dependency
     import pxr  # USD support
     from pxr import Usd, UsdGeom
     have_pxr_lib = True
-except ImportError: 
+except ImportError:
     pass
 
 # See https://github.com/ColinKennedy/USD-Cookbook/blob/master/tricks/traverse_instanced_prims/README.md
@@ -36,7 +36,7 @@ def simple_triangulate_faces(face_vertex_counts, face_vertex_inds_flat):
     """
     Given a polygonal mesh (with arbitrary degree faces) in a flat list representation, triangulates the faces, and returns a new (Tx3) numpy array.
 
-    This is a naive pure-python for-loop, so it will be slow for large meshes. 
+    This is a naive pure-python for-loop, so it will be slow for large meshes.
     TODO write some clever numpy or something.
     """
 
@@ -146,7 +146,7 @@ class USDInterface:
             self.merged_faces_source_prim: (M,) array indicating source prim index for each face
         """
         # Open the USD file
-        if self.verbose: 
+        if self.verbose:
             print(f"USD: loading {self.usd_path}")
         self.stage = Usd.Stage.Open(self.usd_path)
         self.root_prim = self.stage.GetPseudoRoot()
@@ -155,7 +155,7 @@ class USDInterface:
         # traverse_instanced_children handles instanced geometry properly
         self.mesh_prims = []
         for prim in traverse_instanced_children(self.root_prim):
-            if self.verbose: 
+            if self.verbose:
                 print(f"  USD traversing: {prim.GetPath()}")
 
             if prim.IsA(UsdGeom.Mesh):

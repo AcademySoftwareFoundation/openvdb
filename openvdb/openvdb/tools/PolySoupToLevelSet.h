@@ -186,7 +186,7 @@ public:
     template<class ShrinkWrapT, class ProgressT>
     void process(const ShrinkWrapT &D, ProgressT *progress, int mode = 0);
 
-    /// @brief Number of shrink wrap grids generated, i.e. depth of the LOD hierarchy. 
+    /// @brief Number of shrink wrap grids generated, i.e. depth of the LOD hierarchy.
     size_t gridCount() const {return mGrids.size();}
 
     /// @brief   Returns a shared pointer to a particular shrink wrap grid
@@ -229,7 +229,7 @@ public:
 private:
     PolySoup mPoly;
     float mMinVoxelSize, mMaxVoxelSize, mHalfWidth;
-    std::vector<typename GridType::Ptr> mGrids;// fine(0) -> coarse grids(size-1)    
+    std::vector<typename GridType::Ptr> mGrids;// fine(0) -> coarse grids(size-1)
     bool mIsGridSDF;
 
     /// @brief Private method that resamples inGrid(dx) to outGrid(dx/2).
@@ -348,7 +348,7 @@ auto PolySoupToLevelSet<GridType>::offset(float dx, int mode)
         //grid->tree().root().setBackground(exteriorWidth, /*updateChildNodes=*/true);
         //tools::signedFloodFillWithValues(grid->tree(), exteriorWidth, interiorWidth);
         tools::distanceFieldToSDF(*grid, /*removeDisconnectedInterior*/true, /*rebuildNarrowBand*/true);
-        break; 
+        break;
     case 2:// algorithm using Greg's polyOffset algorithm
         grid = tools::createLevelSetDilatedMesh<GridType, float>(mPoly.vtx, mPoly.tri, mPoly.quad, /*radius*/dx, /*voxel size*/dx, mHalfWidth);
         //tools::distanceFieldToSDF(*grid, /*removeDisconnectedInterior*/true, /*rebuildNarrowBand*/false);
