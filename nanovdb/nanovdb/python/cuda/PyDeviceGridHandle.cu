@@ -6,12 +6,55 @@
 #include <nanobind/ndarray.h>
 
 #include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/NanoVDB.h>
 
 namespace nb = nanobind;
 using namespace nb::literals;
 using namespace nanovdb;
 
 namespace pynanovdb {
+
+// Device-side polymorphic deviceGrid(n) — same dispatch shape as
+// pyHostGrid<BufferT> in PyGridHandle.h, but returns the device pointer.
+// gridType(n) is read from the host-side GridData header (the handle keeps
+// a host mirror), so this works whether or not the grid has been uploaded.
+// Returns None if the device-side grid is null (i.e. no deviceUpload yet)
+// or the BuildT is not Python-visible.
+static nb::object pyDeviceGrid(nb::handle py_handle, uint32_t n)
+{
+    using BufferT = nanovdb::cuda::DeviceBuffer;
+    auto& handle = nb::cast<GridHandle<BufferT>&>(py_handle);
+    if (n >= handle.gridCount()) return nb::none();
+    switch (handle.gridType(n)) {
+#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, GridTypeEnum)              \
+        case nanovdb::GridType::GridTypeEnum: {                                 \
+            auto* grid = handle.template deviceGrid<T>(n);                      \
+            return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle)   \
+                        : nb::none();                                           \
+        }
+#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, GridTypeEnum) \
+        case nanovdb::GridType::GridTypeEnum: {                                 \
+            auto* grid = handle.template deviceGrid<T>(n);                      \
+            return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle)   \
+                        : nb::none();                                           \
+        }
+#define NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix, GridTypeEnum)               \
+        case nanovdb::GridType::GridTypeEnum: {                                 \
+            auto* grid = handle.template deviceGrid<T>(n);                      \
+            return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle)   \
+                        : nb::none();                                           \
+        }
+#define NANOVDB_PY_FOR_EACH_READONLY_BUILDT(T, Suffix, GridTypeEnum)            \
+        case nanovdb::GridType::GridTypeEnum: {                                 \
+            auto* grid = handle.template deviceGrid<T>(n);                      \
+            return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle)   \
+                        : nb::none();                                           \
+        }
+#include "../BuildTypes.def"
+        default:
+            return nb::none();
+    }
+}
 
 void defineDeviceGridHandle(nb::module_& m)
 {
@@ -27,19 +70,31 @@ void defineDeviceGridHandle(nb::module_& m)
                 new (&handle) GridHandle<BufferT>(std::move(buffer));
             },
             "cpu_t"_a.noconvert(),
-            "cuda_t"_a.noconvert())
-        .def("deviceFloatGrid", nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<float>), "n"_a = 0, nb::rv_policy::reference_internal)
-        .def("deviceDoubleGrid", nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<double>), "n"_a = 0, nb::rv_policy::reference_internal)
-        .def("deviceInt32Grid", nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<int32_t>), "n"_a = 0, nb::rv_policy::reference_internal)
-        .def("deviceVec3fGrid", nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<Vec3f>), "n"_a = 0, nb::rv_policy::reference_internal)
-        .def("deviceRGBA8Grid",
-             nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<math::Rgba8>),
-             "n"_a = 0,
-             nb::rv_policy::reference_internal)
+            "cuda_t"_a.noconvert(),
+            "Construct a DeviceGridHandle that wraps an existing pair of "
+            "host and device uint32 arrays of equal length.")
+        .def("deviceGrid", &pyDeviceGrid, "n"_a = 0,
+             nb::keep_alive<0, 1>(),
+             "Return the n-th device-resident grid as a typed Grid subclass "
+             "selected by gridType(n), or None if the BuildT is not bound in "
+             "Python or the device copy has not been uploaded yet. The "
+             "returned grid keeps this handle alive.")
         .def(
-            "deviceUpload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceUpload(nullptr, sync); }, "sync"_a = true)
+            "deviceUpload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceUpload(nullptr, sync); }, "sync"_a = true,
+            "Copy the host-side buffer to the device. If sync is True the "
+            "call blocks until the transfer completes.")
         .def(
-            "deviceDownload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceDownload(nullptr, sync); }, "sync"_a = true);
+            "deviceDownload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceDownload(nullptr, sync); }, "sync"_a = true,
+            "Copy the device-side buffer back to the host. If sync is True "
+            "the call blocks until the transfer completes.");
+    // NOTE: defineGridHandleUtilities<BufferT> intentionally NOT called for
+    // DeviceBuffer. Registering nanovdb.splitGrids / nanovdb.mergeGrids as a
+    // second overload taking a DeviceGridHandle list conflicts with the host
+    // overload because both signatures take nb::list, and nanobind's
+    // overload resolution can't disambiguate by element type — it picks one
+    // and the inner cast fails with std::bad_cast. A properly typed device
+    // variant (with its own name, or strongly-typed std::vector<HandleT>
+    // args via nanobind/stl/vector.h) can land later if it's needed.
 }
 
 } // namespace pynanovdb

@@ -16,19 +16,26 @@ namespace {
 template<typename TreeT, int Order> void defineSampleFromVoxels(nb::module_& m, const char* name)
 {
     using CoordT = typename TreeT::CoordType;
-    nb::class_<math::SampleFromVoxels<TreeT, Order, false>>(m, name)
+    nb::class_<math::SampleFromVoxels<TreeT, Order, false>>(m, name,
+        "Callable sampler that reconstructs a grid value at an arbitrary "
+        "index-space position. Build via the matching create*Sampler() factory.")
         .def(
-            "__call__", [](const math::SampleFromVoxels<TreeT, Order, false>& sampler, const CoordT& ijk) { return sampler(ijk); }, nb::is_operator(), "ijk"_a)
+            "__call__", [](const math::SampleFromVoxels<TreeT, Order, false>& sampler, const CoordT& ijk) { return sampler(ijk); }, nb::is_operator(), "ijk"_a,
+            "Sample the grid at integer voxel coordinate ijk.")
         .def(
-            "__call__", [](const math::SampleFromVoxels<TreeT, Order, false>& sampler, const Vec3f& xyz) { return sampler(xyz); }, nb::is_operator(), "xyz"_a)
+            "__call__", [](const math::SampleFromVoxels<TreeT, Order, false>& sampler, const Vec3f& xyz) { return sampler(xyz); }, nb::is_operator(), "xyz"_a,
+            "Sample the grid at fractional index-space position xyz.")
         .def(
-            "__call__", [](const math::SampleFromVoxels<TreeT, Order, false>& sampler, const Vec3d& xyz) { return sampler(xyz); }, nb::is_operator(), "xyz"_a);
+            "__call__", [](const math::SampleFromVoxels<TreeT, Order, false>& sampler, const Vec3d& xyz) { return sampler(xyz); }, nb::is_operator(), "xyz"_a,
+            "Sample the grid at fractional index-space position xyz (double).");
 }
 
 template<typename TreeT, int Order> void defineCreateSampler(nb::module_& m, const char* name)
 {
     m.def(
-        name, [](const Grid<TreeT>& grid) { return math::createSampler<Order, TreeT, false>(grid.tree()); }, "grid"_a);
+        name, [](const Grid<TreeT>& grid) { return math::createSampler<Order, TreeT, false>(grid.tree()); }, "grid"_a,
+        "Build a sampler of the matching order that reads values from the "
+        "given grid's tree.");
 }
 
 } // namespace
@@ -65,24 +72,11 @@ template<typename BuildT> void defineTricubicSampler(nb::module_& m, const char*
     defineCreateSampler<TreeT, 3>(m, "createTricubicSampler");
 }
 
-template void defineNearestNeighborSampler<float>(nb::module_&, const char*);
-template void defineTrilinearSampler<float>(nb::module_&, const char*);
-template void defineTriquadraticSampler<float>(nb::module_&, const char*);
-template void defineTricubicSampler<float>(nb::module_&, const char*);
-
-template void defineNearestNeighborSampler<double>(nb::module_&, const char*);
-template void defineTrilinearSampler<double>(nb::module_&, const char*);
-template void defineTriquadraticSampler<double>(nb::module_&, const char*);
-template void defineTricubicSampler<double>(nb::module_&, const char*);
-
-template void defineNearestNeighborSampler<int32_t>(nb::module_&, const char*);
-template void defineTrilinearSampler<int32_t>(nb::module_&, const char*);
-template void defineTriquadraticSampler<int32_t>(nb::module_&, const char*);
-template void defineTricubicSampler<int32_t>(nb::module_&, const char*);
-
-template void defineNearestNeighborSampler<Vec3f>(nb::module_&, const char*);
-template void defineTrilinearSampler<Vec3f>(nb::module_&, const char*);
-template void defineTriquadraticSampler<Vec3f>(nb::module_&, const char*);
-template void defineTricubicSampler<Vec3f>(nb::module_&, const char*);
+#define NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix)            \
+    template void defineNearestNeighborSampler<T>(nb::module_&, const char*); \
+    template void defineTrilinearSampler<T>(nb::module_&, const char*);       \
+    template void defineTriquadraticSampler<T>(nb::module_&, const char*);    \
+    template void defineTricubicSampler<T>(nb::module_&, const char*);
+#include "BuildTypes.def"
 
 } // namespace pynanovdb

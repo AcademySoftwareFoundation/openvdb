@@ -115,6 +115,9 @@ jobs:
     - name: install
       shell: powershell
       run: .\ci\install_windows.ps1
+    - name: install_numpy
+      shell: powershell
+      run: .\ci\install_windows_numpy.ps1
     - name: build
     # nvcc doesn't set _WIN32 when run in bash so we need to set it manually
       shell: bash
