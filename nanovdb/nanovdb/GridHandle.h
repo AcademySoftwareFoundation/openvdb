@@ -400,17 +400,18 @@ GridHandle<BufferT>::deviceGrid(uint32_t n) const
 template<typename BufferT>
 void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
 {
+    const std::streampos start = is.tellg();// remember where the raw buffer begins
     GridData data;
     is.read((char*)&data, sizeof(GridData));
     if (data.isValid()) {
-        uint64_t sum = data.mGridSize;
+        uint64_t size = data.mGridSize, sum = 0u;
         while(data.mGridIndex + 1u < data.mGridCount) {// loop over remaining raw grids in stream
             is.seekg(data.mGridSize - sizeof(GridData), std::ios::cur);// skip grid
             is.read((char*)&data, sizeof(GridData));
             sum += data.mGridSize;
         }
-        auto buffer = BufferT::create(sum, &pool);
-        is.seekg(-int64_t(sum - data.mGridSize + sizeof(GridData)), std::ios::cur);// rewind to start
+        auto buffer = BufferT::create(size + sum, &pool);
+        is.seekg(start);// rewind to the start of the raw buffer
         is.read((char*)(buffer.data()), buffer.size());
         *this = GridHandle(std::move(buffer));
     } else {
