@@ -597,6 +597,7 @@ void Tool::init()
     {{"actions", "", "read,write,...", "list of actions to document. If the list is empty documentation is printed for all available actions and if other actions proceed this action, documentation is printed for those actions only"},
      {"exit", "true", "1|0|true|false", "toggle wether to terminate after this action or not"},
      {"brief", "false", "1|0|true|false", "toggle brief or detailed documentation"},
+     {"search", "", "mesh", "case-insensitive keyword: list every action whose name or documentation contains it (e.g. search=mesh). Useful for discovering the right action without scrolling the full help."},
      {"format", "text", "text|md", "output format. 'text' (default) is the usual human-readable help; 'md' emits a single Markdown table of action names + descriptions, used to regenerate the action list in README.md so it can't drift from the registered actions."}},
      [](){}, [&](){this->help();}, 0); // anonymous options are appended to "actions"
 
@@ -1266,6 +1267,28 @@ void Tool::help()
     const bool stop = mParser.get<bool>("exit");
     const bool brief = mParser.get<bool>("brief");
     const std::string format = mParser.get<std::string>("format");
+    const std::string search = mParser.get<std::string>("search");
+
+    if (!search.empty()) {
+      // Discovery aid: list every action whose primary/alias name OR its
+      // documentation contains the (case-insensitive) keyword. Detailed usage
+      // is printed for each hit so the user sees the options too.
+      const std::string key = toLowerCase(search);
+      VecS hits;
+      for (const auto &a : mParser.available) {
+        bool match = contains(toLowerCase(a.documentation), key);
+        for (const auto &n : a.names) match = match || contains(toLowerCase(n), key);
+        if (match) hits.push_back(a.names[0]);
+      }
+      if (hits.empty()) {
+        std::clog << "help: no action matches keyword \"" << search << "\"\n";
+      } else {
+        std::clog << "Actions matching \"" << search << "\":\n";
+        mParser.usage(hits, brief);
+      }
+      if (stop) std::exit(EXIT_SUCCESS);
+      return;
+    }
 
     if (format == "md") {
       // Emit a single Markdown table of registered actions for the README's

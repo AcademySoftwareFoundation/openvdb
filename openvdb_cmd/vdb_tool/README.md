@@ -563,6 +563,19 @@ vdb_tool -help
 vdb_tool -help read write
 ```
 
+## Searching for an action by keyword
+Lists every action whose name or documentation contains the (case-insensitive) keyword, so you can discover the right action without scrolling the full help. Add `brief=true` for a compact, one-line-per-action listing.
+```
+vdb_tool -help search=mesh
+```
+
+## Did-you-mean suggestions for mistyped actions
+A mistyped action name &mdash; whether invoked directly or queried via `-help` &mdash; reports the closest known names instead of just failing:
+```
+vdb_tool -help mesh2sl     # -> Did you mean: "-mesh2ls" or "-mesh2sdf"?
+vdb_tool -sphre            # -> Did you mean: "-sphere"?
+```
+
 ## Getting help on all actions
 ```
 vdb_tool -eval help="*"

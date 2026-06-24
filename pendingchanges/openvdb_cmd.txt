@@ -23,7 +23,7 @@ vdb_tool:
   - Action "-read" now supports ASCII XYZ point files (.xyz), where each line holds the x, y and z coordinates of a single point separated by whitespace. Blank lines and lines beginning with '#' are skipped as comments; any other line that does not parse as three numbers raises an error identifying the offending text. The points are accumulated as a vertex-only primitive (no faces), suitable for conversion to a VDB via -points2ls or -points2vdb. The data can also be streamed from standard input using the name "stdin.xyz".
   - Action "-mesh2ls/mesh2sdf" now supports generation of asymmetric narrow bands.
   - Improved error reporting when using unsupported actions and options.
-  - Actions can now have multiple names, e.g. "-read", "-import", "-load", "-i".
+  - Actions can now have multiple names (or aliases), e.g. "-read", "-import", "-load", "-i".
   - Added cutoff option to "-ls2fog" action.
   - Improved error reporting in vdb_tool (prints diagnostic error messages).
   - Improved error handling in vdb_tool (will recover from non-fatal errors).

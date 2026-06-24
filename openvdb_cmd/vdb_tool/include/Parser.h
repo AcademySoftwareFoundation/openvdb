@@ -1712,7 +1712,22 @@ void Parser::usage(const VecS &actions, bool brief) const
 {
     for (const std::string &str : actions) {
         auto search = hashMap.find(str);
-        if (search == hashMap.end()) throw std::invalid_argument(iter->names[0]+": Parser:::usage: unsupported action \""+str+"\"\n");
+        if (search == hashMap.end()) {
+            // Mirror the "Did you mean ...?" suggestion the parser gives for a
+            // mistyped action on the command line, so "-help sphre" is as
+            // helpful as "-sphre".
+            // No action prefix here: the only caller (Tool::help) already
+            // prepends "help: " in its catch handler.
+            std::stringstream ss;
+            ss << "unsupported action \"" << str << "\"";
+            auto matches = this->closeMatches(str);
+            for (auto it = matches.begin(); it != matches.end();) {
+                ss << "\nDid you mean: \"-" << (it++)->second << "\"";
+                while (it != matches.end()) ss << " or \"-" << (it++)->second << "\"";
+                ss << "?";
+            }
+            throw std::invalid_argument(ss.str());
+        }
         std::clog << this->usage(*search->second, brief);
     }
 }// Parser::usage
