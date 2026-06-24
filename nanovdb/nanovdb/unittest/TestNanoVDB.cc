@@ -8386,6 +8386,38 @@ TEST_F(TestNanoVDB, CustomStreamGridHandleIO)
     }
 }// CustomStreamGridHandleIO
 
+// make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*GridHandleReadMultiGridRawBuffer"
+TEST_F(TestNanoVDB, GridHandleReadMultiGridRawBuffer)
+{
+    std::vector<nanovdb::GridHandle<>> handles;
+    handles.emplace_back(nanovdb::tools::createLevelSetSphere<float>(20.0));
+    handles.emplace_back(nanovdb::tools::createLevelSetSphere<float>(40.0));
+    ASSERT_EQ(2u, handles.size());
+    ASSERT_NE(handles[0].bufferSize(), handles[1].bufferSize());
+
+    auto mergedHandle = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles);
+    ASSERT_EQ(2u, mergedHandle.gridCount());
+
+    std::stringstream stream(std::ios_base::in | std::ios_base::out | std::ios_base::binary);
+    mergedHandle.write(stream);
+    stream.seekg(0);
+
+    nanovdb::GridHandle<> handle;
+    handle.read(stream);
+
+    EXPECT_EQ(mergedHandle.bufferSize(), handle.bufferSize());
+    EXPECT_EQ(2u, handle.gridCount());
+    for (uint32_t i = 0; i < handle.gridCount(); ++i) {
+        const auto* grid = handle.grid<float>(i);
+        ASSERT_TRUE(grid);
+        EXPECT_EQ(i, grid->gridIndex());
+        EXPECT_EQ(2u, grid->gridCount());
+        EXPECT_EQ(handles[i].bufferSize(), grid->gridSize());
+        EXPECT_TRUE(nanovdb::tools::validateChecksum(grid));
+        EXPECT_TRUE(nanovdb::tools::validateChecksum(grid, nanovdb::CheckMode::Full));
+    }
+}// GridHandleReadMultiGridRawBuffer
+
 // make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*strcpy"
 TEST_F(TestNanoVDB, strcpy)
 {
