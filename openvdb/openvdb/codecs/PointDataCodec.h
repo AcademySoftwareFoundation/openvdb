@@ -111,13 +111,14 @@ template <typename LeafT>
 inline void readPointDataVoxelData(const std::vector<LeafT*>& leaves,
     std::istream& is, bool saveFloatAsHalf,
     const typename LeafT::ValueType& background,
-    [[maybe_unused]] const std::unordered_map<Coord, uint16_t>& voxelBufferSizes)
+    [[maybe_unused]] const std::unordered_map<Coord, uint16_t>& voxelBufferSizes,
+    const typename LeafT::ValueType* storageBackground = nullptr)
 {
     using BaseLeaf = typename LeafT::BaseLeaf;
     for (auto* leaf : leaves) {
         OPENVDB_ASSERT(voxelBufferSizes.find(leaf->origin()) != voxelBufferSizes.end());
         BaseLeaf& baseLeaf = static_cast<BaseLeaf&>(*leaf);
-        readScalarLeafBuffers(baseLeaf, is, saveFloatAsHalf, background);
+        readScalarLeafBuffers(baseLeaf, is, saveFloatAsHalf, background, /*skip=*/false, /*clipBBox=*/nullptr, storageBackground);
     }
 }
 
@@ -310,7 +311,7 @@ struct PointDataCodec final: public TopologyCodec<GridT>
 
     static inline std::string name() { return GridT::gridType(); }
 
-    void readBuffers(std::istream& is, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics&) final
+    void readBuffers(std::istream& is, Index64 /*size*/, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics&) final
     {
         OPENVDB_ASSERT(dynamic_cast<GridT*>(data.grid.get()));
 
@@ -334,7 +335,11 @@ struct PointDataCodec final: public TopologyCodec<GridT>
 
         uint16_t numPasses = 1;
         is.read(reinterpret_cast<char*>(&numPasses), sizeof(uint16_t));
-        const Index attributes = (numPasses - 4) / 2;
+        // The pass layout is: voxel sizes (1) + descriptors (1) + attribute
+        // sizes (N) + voxel data (1) + attribute data (N) = 2N + 4 passes.
+        // A leafless grid stores numPasses == 0, and malformed files may store
+        // numPasses < 4; guard against unsigned underflow in either case.
+        const Index attributes = numPasses >= 4 ? Index(numPasses - 4) / 2 : 0;
 
         using LeafT = typename GridT::TreeType::LeafNodeType;
         std::vector<LeafT*> leaves;
@@ -351,7 +356,17 @@ struct PointDataCodec final: public TopologyCodec<GridT>
         // An empty pointAttributeNames means no filtering (read all attributes).
         std::set<Index> skipIndices;
         if (!pointAttributeNames.empty() && !leaves.empty()) {
-            const auto& nameMap = leaves[0]->attributeSet().descriptor().map();
+            // Attribute filtering requires homogeneous descriptors across all
+            // leaves because skip decisions are made per-index across all leaves.
+            const auto* firstDesc = &leaves[0]->attributeSet().descriptor();
+            for (size_t i = 1; i < leaves.size(); ++i) {
+                if (&leaves[i]->attributeSet().descriptor() != firstDesc) {
+                    OPENVDB_THROW(IoError,
+                        "Attribute filtering is not supported for PointDataGrids "
+                        "with heterogeneous descriptors");
+                }
+            }
+            const auto& nameMap = firstDesc->map();
             const std::set<std::string> wantedNames(
                 pointAttributeNames.begin(),
                 pointAttributeNames.end());
@@ -373,8 +388,10 @@ struct PointDataCodec final: public TopologyCodec<GridT>
         }
 
         // Pass N+2: read voxel data
+        using ValueT = typename GridT::TreeType::ValueType;
+        auto& topoData = static_cast<TopologyCodecData<ValueT>&>(data);
         internal::readPointDataVoxelData(leaves, is, saveFloatAsHalf,
-            tree.background(), voxelBufferSizes);
+            tree.background(), voxelBufferSizes, &topoData.storageBackground);
 
         // Passes N+3..2N+2: read attribute data buffers
         for (Index i = 0; i < attributes; ++i) {
@@ -419,7 +436,9 @@ struct PointDataCodec final: public TopologyCodec<GridT>
             static_cast<uint16_t>(internal::countPointDataPasses(leaves));
         os.write(reinterpret_cast<const char*>(&numPasses), sizeof(uint16_t));
 
-        const Index attributes = (numPasses - 4) / 2;
+        // See readBuffers(): a leafless grid yields numPasses == 0, so guard
+        // against unsigned underflow rather than computing (numPasses - 4) / 2.
+        const Index attributes = numPasses >= 4 ? Index(numPasses - 4) / 2 : 0;
 
         // Pass 0: write voxel data sizes + descriptor tracking
         bool matching = true;

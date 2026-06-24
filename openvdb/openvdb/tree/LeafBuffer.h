@@ -44,7 +44,12 @@ public:
     explicit inline LeafBuffer(const ValueType&);
     /// Copy constructor
     inline LeafBuffer(const LeafBuffer&);
-    /// Construct a buffer but don't allocate memory for the full array of values.
+    /// @brief Construct a buffer without allocating the value array.
+    /// The buffer is left unallocated; call @c allocate() before use.
+    /// Populating the buffer (via @c allocate() or @c data()) must be done
+    /// single-threaded per leaf, or externally synchronized. The valid
+    /// advanced pattern is: create all nodes single-threaded, then call
+    /// @c allocate() in parallel across distinct leaves.
     LeafBuffer(PartialCreate, const ValueType&): mData(nullptr) {}
     /// Destructor
     inline ~LeafBuffer();
@@ -87,11 +92,15 @@ public:
     static Index size() { return SIZE; }
 
     /// @brief Return a const pointer to the array of voxel values.
-    /// @details This method guarantees that the buffer is allocated and loaded.
+    /// @warning The buffer must already be allocated (call @c allocate() first).
+    /// First-touch allocation via @c data() is not thread-safe; concurrent access
+    /// to an unallocated buffer is a programming error flagged in debug builds.
     /// @warning This method should only be used by experts seeking low-level optimizations.
     const ValueType* data() const;
     /// @brief Return a pointer to the array of voxel values.
-    /// @details This method guarantees that the buffer is allocated and loaded.
+    /// @warning The buffer must already be allocated (call @c allocate() first).
+    /// First-touch allocation via @c data() is not thread-safe; concurrent access
+    /// to an unallocated buffer is a programming error flagged in debug builds.
     /// @warning This method should only be used by experts seeking low-level optimizations.
     ValueType* data();
 
@@ -229,9 +238,10 @@ template<typename T, Index Log2Dim>
 inline const typename LeafBuffer<T, Log2Dim>::ValueType*
 LeafBuffer<T, Log2Dim>::data() const
 {
+    OPENVDB_ASSERT(mData != nullptr);
     if (mData == nullptr) {
         LeafBuffer* self = const_cast<LeafBuffer*>(this);
-        if (mData == nullptr) self->mData = new ValueType[SIZE];
+        self->mData = new ValueType[SIZE];
     }
     return mData;
 }
@@ -240,9 +250,8 @@ template<typename T, Index Log2Dim>
 inline typename LeafBuffer<T, Log2Dim>::ValueType*
 LeafBuffer<T, Log2Dim>::data()
 {
-    if (mData == nullptr) {
-        if (mData == nullptr) mData = new ValueType[SIZE];
-    }
+    OPENVDB_ASSERT(mData != nullptr);
+    if (mData == nullptr) mData = new ValueType[SIZE];
     return mData;
 }
 

@@ -1,11 +1,16 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
+#include <openvdb/io/Archive.h>
 #include <openvdb/io/Codec.h>
 #include <openvdb/io/File.h>
+#include <openvdb/io/GridDescriptor.h>
+#include <openvdb/io/Stream.h>
+#include <openvdb/io/io.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/PointIndexGrid.h>
 #include <openvdb/points/PointConversion.h>
+#include <openvdb/codecs/PointDataCodec.h>
 #include <gtest/gtest.h>
 #include "util.h" // for unittest_util::genPoints
 
@@ -138,8 +143,15 @@ TEST_F(TestPointCodec, testPointIndexCodecIO)
         f.close();
     }
     ASSERT_TRUE(codecTopo);
-    EXPECT_EQ(codecTopo->activeVoxelCount(), Index64(0));
-    EXPECT_TRUE(codecTopo->tree().leafCount() == 0);
+    // TopologyOnly: topology and active state are preserved; voxel values are zero-filled
+    EXPECT_EQ(codecTopo->tree().leafCount(), srcGrid->tree().leafCount());
+    EXPECT_EQ(codecTopo->activeVoxelCount(), srcGrid->activeVoxelCount());
+    for (auto leafIt = codecTopo->tree().cbeginLeaf(); leafIt; ++leafIt) {
+        EXPECT_FALSE(leafIt->buffer().empty());
+        for (auto voxIt = leafIt->cbeginValueOn(); voxIt; ++voxIt) {
+            EXPECT_EQ(*voxIt, PointIndexGrid::ValueType(0));
+        }
+    }
     EXPECT_EQ(codecTopo->getName(), std::string("point_index_grid"));
 
     // Cleanup
@@ -265,8 +277,14 @@ TEST_F(TestPointCodec, testPointDataCodecIO)
             f.close();
         }
         ASSERT_TRUE(codecTopo);
-        EXPECT_EQ(codecTopo->activeVoxelCount(), Index64(0));
-        EXPECT_TRUE(codecTopo->tree().leafCount() == 0);
+        // TopologyOnly: topology and active state are preserved; voxel values are zero-filled
+        EXPECT_EQ(codecTopo->tree().leafCount(), srcGrid->tree().leafCount());
+        EXPECT_EQ(codecTopo->activeVoxelCount(), srcGrid->activeVoxelCount());
+        for (auto leafIt = codecTopo->tree().cbeginLeaf(); leafIt; ++leafIt) {
+            for (auto voxIt = leafIt->cbeginValueOn(); voxIt; ++voxIt) {
+                EXPECT_EQ(*voxIt, PointDataGrid::ValueType(0));
+            }
+        }
 
         std::remove(codecPath.c_str());
     }
@@ -543,5 +561,149 @@ TEST_F(TestPointCodec, testPointDataCodecIO)
         std::remove(sharedPath.c_str());
         std::remove(nonSharedPath.c_str());
         std::remove(diffPath.c_str());
+    }
+}
+
+// A leafless PointDataGrid stores numPasses == 0. The attribute count is
+// derived as (numPasses - 4) / 2; without an underflow guard this wraps to a
+// huge unsigned value and the attribute loops spin ~4.3e9 times, hanging
+// both write and read. This test exercises an empty grid round-trip.
+TEST_F(TestPointCodec, testPointDataCodecEmptyGrid)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+    using namespace openvdb::points;
+
+    openvdb::initialize();
+    CodecRegistry::clear();
+    io::internal::initialize();
+    ASSERT_TRUE(CodecRegistry::isRegistered(PointDataGrid::gridType()));
+
+    PointDataGrid::Ptr srcGrid = PointDataGrid::create();
+    srcGrid->setName("pdg_empty");
+    EXPECT_EQ(srcGrid->tree().leafCount(), Index32(0));
+
+    const std::string codecPath = "testPDG_empty_codec.vdb";
+
+    {
+        io::File f(codecPath);
+        EXPECT_NO_THROW(f.write(GridPtrVec{srcGrid}));
+    }
+
+    PointDataGrid::Ptr codecGrid;
+    {
+        io::File f(codecPath);
+        f.open();
+        GridBase::Ptr base;
+        EXPECT_NO_THROW(base = f.readGrid("pdg_empty"));
+        codecGrid = gridPtrCast<PointDataGrid>(base);
+        f.close();
+    }
+    ASSERT_TRUE(codecGrid);
+    EXPECT_EQ(codecGrid->tree().leafCount(), Index32(0));
+    EXPECT_EQ(codecGrid->activeVoxelCount(), Index64(0));
+
+    std::remove(codecPath.c_str());
+}
+
+// Regression test for the fix in AttributeArray::skipPagedBuffers and
+// Page::skipBuffers: when the stream is not seekable (written via io::Stream),
+// skip must read-and-discard rather than seekg. Without the fix, both code
+// paths called seekg unconditionally, corrupting the stream position on
+// non-seekable streams.
+TEST_F(TestPointCodec, testPointDataCodecSkipNonSeekable)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+    using namespace openvdb::points;
+
+    openvdb::initialize();
+    CodecRegistry::clear();
+    io::internal::initialize();
+    ASSERT_TRUE(CodecRegistry::isRegistered(PointDataGrid::gridType()));
+
+    const std::vector<Vec3f> positions = {
+        Vec3f(0.0f, 1.0f, 0.0f),
+        Vec3f(1.5f, 3.5f, 1.0f),
+        Vec3f(-1.0f, 6.0f, -2.0f),
+        Vec3f(1.1f, 1.25f, 0.06f)
+    };
+    const std::vector<Vec3f> velocities = {
+        Vec3f(1.0f, 0.0f, 0.0f),
+        Vec3f(0.0f, 1.0f, 0.0f),
+        Vec3f(0.0f, 0.0f, 1.0f),
+        Vec3f(1.0f, 1.0f, 0.5f)
+    };
+    const std::vector<int> ids = {0, 1, 2, 3};
+
+    const float voxelSize = 0.5f;
+    math::Transform::Ptr transform = math::Transform::createLinearTransform(voxelSize);
+
+    PointAttributeVector<Vec3f> posWrapper(positions);
+    tools::PointIndexGrid::Ptr pointIndexGrid =
+        tools::createPointIndexGrid<tools::PointIndexGrid>(posWrapper, *transform);
+
+    PointDataGrid::Ptr srcGrid =
+        createPointDataGrid<NullCodec, PointDataGrid>(
+            *pointIndexGrid, posWrapper, *transform);
+    srcGrid->setName("pdg_skip");
+
+    PointDataTree& tree = srcGrid->tree();
+    tools::PointIndexTree& indexTree = pointIndexGrid->tree();
+
+    appendAttribute<Vec3f>(tree, "velocity");
+    populateAttribute<PointDataTree, tools::PointIndexTree,
+        PointAttributeVector<Vec3f>>(
+            tree, indexTree, "velocity",
+            PointAttributeVector<Vec3f>(velocities));
+
+    appendAttribute<int>(tree, "id");
+    populateAttribute<PointDataTree, tools::PointIndexTree,
+        PointAttributeVector<int>>(
+            tree, indexTree, "id",
+            PointAttributeVector<int>(ids));
+
+    // Write via io::Stream (seekable=false by construction)
+    std::ostringstream ostr(std::ios_base::binary);
+    io::Stream(ostr).write(GridPtrVec{srcGrid});
+
+    // Build ReadOptions requesting only "P" — "velocity" and "id" will be skipped
+    io::ReadOptions readOptions;
+    auto typeData = std::make_shared<codecs::PointDataCodecTypeData>();
+    typeData->pointAttributeNames = {"P"};
+    readOptions.typeData[PointDataGrid::gridType()] = typeData;
+
+    // Read via io::Stream (non-seekable by construction) with our ReadOptions, so the
+    // skip path is exercised with seekable == false.
+    std::istringstream is(ostr.str(), std::ios_base::binary);
+    io::Stream strm(is, readOptions);
+    GridPtrVecPtr grids = strm.getGrids();
+    ASSERT_TRUE(grids);
+    ASSERT_EQ(grids->size(), size_t(1));
+
+    PointDataGrid::Ptr resultGrid = gridPtrCast<PointDataGrid>((*grids)[0]);
+    ASSERT_TRUE(resultGrid);
+
+    // Only "P" should be present; "velocity" and "id" were skipped
+    {
+        auto leafIt = resultGrid->tree().cbeginLeaf();
+        ASSERT_TRUE(leafIt);
+        EXPECT_EQ(leafIt->attributeSet().size(), size_t(1));
+        EXPECT_NE(leafIt->attributeSet().find("P"), AttributeSet::INVALID_POS);
+        EXPECT_EQ(leafIt->attributeSet().find("velocity"), AttributeSet::INVALID_POS);
+        EXPECT_EQ(leafIt->attributeSet().find("id"), AttributeSet::INVALID_POS);
+    }
+
+    // All 4 points should be present and readable
+    EXPECT_EQ(pointCount(resultGrid->tree()), Index64(4));
+    {
+        std::vector<Vec3f> readPositions;
+        for (auto it = resultGrid->tree().cbeginLeaf(); it; ++it) {
+            AttributeHandle<Vec3f> posHandle(it->constAttributeArray("P"));
+            for (Index i = 0; i < it->pointCount(); ++i) {
+                readPositions.push_back(posHandle.get(i));
+            }
+        }
+        EXPECT_EQ(readPositions.size(), size_t(4));
     }
 }

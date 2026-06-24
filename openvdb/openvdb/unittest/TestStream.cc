@@ -216,3 +216,20 @@ TestStream::testFileReadFromStream()
     verifyTestGrids(grids, meta);
 }
 TEST_F(TestStream, testFileReadFromStream) { testFileReadFromStream(); }
+
+
+TEST_F(TestStream, testAssignmentPreservesArchiveFlags)
+{
+    using namespace openvdb;
+
+    std::ostringstream os1(std::ios_base::binary), os2(std::ios_base::binary);
+    io::Stream src(os1);
+    src.setCompression(io::COMPRESS_ZIP);
+    src.setInstancingEnabled(false);
+
+    io::Stream dst(os2);
+    dst = src;
+
+    EXPECT_EQ(src.compression(), dst.compression());
+    EXPECT_EQ(src.isInstancingEnabled(), dst.isInstancingEnabled());
+}

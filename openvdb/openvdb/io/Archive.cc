@@ -182,6 +182,7 @@ struct StreamMetadata::Impl
     bool mDelayedLoadMeta = false;
     uint64_t mLeaf = 0;
     uint32_t mTest = 0; // for testing only
+    bool mAllocateLeafBuffers = false;
 }; // struct StreamMetadata
 
 
@@ -243,6 +244,7 @@ bool            StreamMetadata::writeGridStats() const  { return mImpl->mWriteGr
 bool            StreamMetadata::seekable() const        { return mImpl->mSeekable; }
 bool            StreamMetadata::delayedLoadMeta() const { return mImpl->mDelayedLoadMeta; }
 bool            StreamMetadata::countingPasses() const  { return mImpl->mCountingPasses; }
+bool            StreamMetadata::allocateLeafBuffers() const { return mImpl->mAllocateLeafBuffers; }
 uint32_t        StreamMetadata::pass() const            { return mImpl->mPass; }
 MetaMap&        StreamMetadata::gridMetadata()          { return mImpl->mGridMetadata; }
 const MetaMap&  StreamMetadata::gridMetadata() const    { return mImpl->mGridMetadata; }
@@ -260,6 +262,7 @@ void StreamMetadata::setHalfFloat(bool b)               { mImpl->mHalfFloat = b;
 void StreamMetadata::setWriteGridStats(bool b)          { mImpl->mWriteGridStats = b; }
 void StreamMetadata::setSeekable(bool b)                { mImpl->mSeekable = b; }
 void StreamMetadata::setCountingPasses(bool b)          { mImpl->mCountingPasses = b; }
+void StreamMetadata::setAllocateLeafBuffers(bool b)     { mImpl->mAllocateLeafBuffers = b; }
 void StreamMetadata::setPass(uint32_t i)                { mImpl->mPass = i; }
 void StreamMetadata::__setTest(uint32_t t)              { mImpl->mTest = t; }
 
@@ -900,14 +903,15 @@ Archive::findCodec(const std::string& gridType, const io::ReadOptions& options)
     // if readMode is Half, then search for a codec that converts
     // from the storage grid type to the grid type
     if (options.readMode == ReadMode::Half) {
-        return io::CodecRegistry::get(gridType + "_to_half");
+        if (auto* codec = io::CodecRegistry::get(gridType + "_to_half")) return codec;
     } else if (options.readMode == ReadMode::Bool) {
-        return io::CodecRegistry::get(gridType + "_to_bool");
+        if (auto* codec = io::CodecRegistry::get(gridType + "_to_bool")) return codec;
     } else if (options.readMode == ReadMode::Mask) {
-        return io::CodecRegistry::get(gridType + "_to_mask");
+        if (auto* codec = io::CodecRegistry::get(gridType + "_to_mask")) return codec;
     }
 
-    // Determine the I/O codec to use to read this grid
+    // Determine the I/O codec to use to read this grid (also the fallback when
+    // no conversion codec is registered for a Half/Bool/Mask readMode).
     return io::CodecRegistry::get(gridType);
 }
 
@@ -1010,16 +1014,28 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
     io::setGridClass(is, gridClass);
 
     grid->readTransform(is);
-    if (readOptions.readMode != io::ReadMode::TopologyOnly && !gd.isInstance()) {
+    const bool readTopology = readOptions.readMode != io::ReadMode::MetadataOnly && !gd.isInstance();
+    const bool readBuffers  = readTopology && readOptions.readMode != io::ReadMode::TopologyOnly;
+    if (readTopology) {
         // read topology
         if (codec) {
             codec->readTopology(is, *codecData, readOptions, diagnostics);
         } else {
+            if (readOptions.readMode == io::ReadMode::TopologyOnly) {
+                // signal Grid<TreeT>::readTopology to allocate+zero-fill leaf buffers
+                if (auto meta = io::getStreamMetadataPtr(is)) {
+                    meta->setAllocateLeafBuffers(true);
+                }
+            }
             grid->readTopology(is);
         }
+    }
+    if (readBuffers) {
         // read buffers
         if (codec) {
-            codec->readBuffers(is, *codecData, readOptions, diagnostics);
+            OPENVDB_ASSERT(gd.getEndPos() >= gd.getGridPos());
+            const Index64 size = static_cast<Index64>(gd.getEndPos() - gd.getGridPos());
+            codec->readBuffers(is, size, *codecData, readOptions, diagnostics);
         } else {
             const auto& worldBBox = readOptions.clipBBox;
             const bool clip = worldBBox.isSorted();

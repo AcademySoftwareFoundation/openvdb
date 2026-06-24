@@ -9,6 +9,7 @@
 #include "Types.h"
 #include "io/io.h"
 #include "math/Transform.h"
+#include "tree/LeafManager.h"
 #include "tree/Tree.h"
 #include "util/Assert.h"
 #include "util/logging.h"
@@ -1630,6 +1631,27 @@ inline void
 Grid<TreeT>::readTopology(std::istream& is)
 {
     tree().readTopology(is, saveFloatAsHalf());
+    // When called from the legacy (non-codec) TopologyOnly path, the stream
+    // metadata carries a flag requesting allocation+zero-fill of leaf buffers
+    // (PartialCreate leaves them unallocated after readTopology).
+    if (io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is)) {
+        if (meta->allocateLeafBuffers()) {
+            meta->setAllocateLeafBuffers(false);
+            if constexpr (!std::is_void_v<typename TreeT::LeafNodeType>) {
+                const auto background = tree().root().background();
+                tree::LeafManager<TreeT> leafManager(tree());
+                leafManager.foreach([&background](auto& leaf, size_t) {
+                    using LeafType = std::decay_t<decltype(leaf)>;
+                    if constexpr (!std::is_same_v<typename LeafType::ValueType, bool>) {
+                        if (leaf.buffer().empty()) {
+                            leaf.buffer().allocate();
+                            leaf.buffer().fill(background);
+                        }
+                    }
+                });
+            }
+        }
+    }
 }
 
 

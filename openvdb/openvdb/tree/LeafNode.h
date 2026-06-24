@@ -83,6 +83,9 @@ public:
     /// @param value   a value with which to fill the buffer
     /// @param active  the active state to which to initialize all voxels
     /// @details This constructor does not allocate memory for voxel values.
+    /// Call @c buffer().allocate() before accessing voxel data. The valid
+    /// advanced pattern is: create all leaves single-threaded, then call
+    /// @c allocate() in parallel across distinct leaves.
     LeafNode(PartialCreate,
              const Coord& coords,
              const ValueType& value = zeroVal<ValueType>(),

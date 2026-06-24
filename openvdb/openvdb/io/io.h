@@ -73,6 +73,11 @@ public:
     bool countingPasses() const;
     void setCountingPasses(bool);
 
+    /// @brief Return @c true if readTopology() should allocate and zero-fill
+    /// leaf buffers after loading the tree structure (topology-only read mode).
+    bool allocateLeafBuffers() const;
+    void setAllocateLeafBuffers(bool);
+
     uint32_t pass() const;
     void setPass(uint32_t);
 

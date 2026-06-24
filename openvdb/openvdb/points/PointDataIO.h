@@ -21,7 +21,8 @@ namespace io
 template<>
 inline void
 readCompressedValues(   std::istream& is, PointDataIndex32* destBuf, Index destCount,
-                        const util::NodeMask<3>& /*valueMask*/, bool /*fromHalf*/)
+                        const util::NodeMask<3>& /*valueMask*/, bool /*fromHalf*/,
+                        const PointDataIndex32* /*background*/)
 {
     using compression::bloscDecompress;
 
@@ -82,7 +83,8 @@ template<>
 inline void
 writeCompressedValues(  std::ostream& os, const PointDataIndex32* srcBuf, Index srcCount,
                         const util::NodeMask<3>& /*valueMask*/,
-                        const util::NodeMask<3>& /*childMask*/, bool /*toHalf*/)
+                        const util::NodeMask<3>& /*childMask*/, bool /*toHalf*/,
+                        const PointDataIndex32* /*background*/)
 {
     using compression::bloscCompress;
 

@@ -82,6 +82,10 @@ public:
     /// @param active    State assigned to all the tiles
     InternalNode(const Coord& origin, const ValueType& fillValue, bool active = false);
 
+    /// @brief Construct a node without allocating child memory. Children are
+    /// left unallocated and must be populated single-threaded, or with external
+    /// synchronization. The valid advanced pattern is: create all nodes
+    /// single-threaded, then allocate leaf buffers in parallel across distinct leaves.
     InternalNode(PartialCreate, const Coord&, const ValueType& fillValue, bool active = false);
 
     /// @brief Deep copy constructor

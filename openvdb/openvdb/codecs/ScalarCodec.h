@@ -23,21 +23,26 @@ template <typename TreeT>
 struct WriteBuffersOp
 {
     using LeafT = typename TreeT::LeafNodeType;
+    using ValueT = typename TreeT::ValueType;
 
-    WriteBuffersOp(std::ostream& _os, bool _saveFloatAsHalf)
+    WriteBuffersOp(std::ostream& _os, bool _saveFloatAsHalf, const ValueT& _background)
         : os(_os)
-        , saveFloatAsHalf(_saveFloatAsHalf) { }
+        , saveFloatAsHalf(_saveFloatAsHalf)
+        , background(_background) { }
 
     template <typename NodeT>
     void operator()(const NodeT&, size_t) { }
 
     void operator()(const LeafT& leaf, size_t)
     {
-        writeScalarLeafBuffers(leaf, os, saveFloatAsHalf);
+        // Pass the background explicitly so leaf compression does not depend on
+        // the stream's background pointer (which the codec path no longer sets).
+        writeScalarLeafBuffers(leaf, os, saveFloatAsHalf, &background);
     }
 
     std::ostream& os;
     const bool saveFloatAsHalf;
+    const ValueT& background;
 }; // struct WriteBuffersOp
 
 
@@ -48,13 +53,15 @@ struct ReadBuffersOp
     using LeafT = typename TreeT::LeafNodeType;
     using ValueT = typename TreeT::ValueType;
     using StorageLeafT = typename StorageTreeT::LeafNodeType;
+    using StorageValueT = typename StorageTreeT::ValueType;
 
     ReadBuffersOp(std::istream& _is, bool _saveFloatAsHalf, const ValueT& _background,
-        const CoordBBox* _clipBBox)
+        const CoordBBox* _clipBBox, const StorageValueT* _storageBackground = nullptr)
         : is(_is)
         , saveFloatAsHalf(_saveFloatAsHalf)
         , background(_background)
-        , clipBBox(_clipBBox) { }
+        , clipBBox(_clipBBox)
+        , storageBackground(_storageBackground) { }
 
     void operator()(RootT& root, size_t)
     {
@@ -73,20 +80,22 @@ struct ReadBuffersOp
 
     void operator()(LeafT& leaf, size_t)
     {
-        readScalarLeafBuffers<LeafT, StorageLeafT>(leaf, is, saveFloatAsHalf, background, /*skip=*/false, clipBBox);
+        readScalarLeafBuffers<LeafT, StorageLeafT>(leaf, is, saveFloatAsHalf, background, /*skip=*/false, clipBBox, storageBackground);
     }
 
     std::istream& is;
     const bool saveFloatAsHalf;
     const ValueT& background;
     const CoordBBox* clipBBox = nullptr;
+    const StorageValueT* storageBackground = nullptr;
 }; // struct ReadBuffersOp
 
 
 // Free-standing function for both standard and conversion codec cases
 // Uses StorageGridT = GridT by default, but allows different storage type for conversions
 template<typename GridT, typename StorageGridT = GridT>
-void scalarCodecReadBuffers(GridT& grid, std::istream& is, const io::ReadOptions& options)
+void scalarCodecReadBuffers(GridT& grid, std::istream& is, const io::ReadOptions& options,
+    const typename StorageGridT::TreeType::ValueType* storageBackground)
 {
     if (grid.hasMultiPassIO()) {
         OPENVDB_THROW(IoError, "Multi-pass IO is not supported in ScalarCodec");
@@ -109,7 +118,7 @@ void scalarCodecReadBuffers(GridT& grid, std::istream& is, const io::ReadOptions
 
     // Works for both standard (TreeT == StorageTreeT) and conversion cases
     ReadBuffersOp<TreeT, StorageTreeT> readBuffersOp(is, saveFloatAsHalf, tree.background(),
-        clipIndexBBox.get());
+        clipIndexBBox.get(), storageBackground);
     tools::visitNodesDepthFirst(grid.tree(), readBuffersOp, /*idx=*/0, /*topDown=*/false);
 }
 
@@ -123,7 +132,7 @@ void scalarCodecWriteBuffers(const GridT& grid, std::ostream& os)
         OPENVDB_THROW(IoError, "Multi-pass IO is not supported in ScalarCodec");
     }
 
-    WriteBuffersOp<TreeType> writeBuffersOp(os, grid.saveFloatAsHalf());
+    WriteBuffersOp<TreeType> writeBuffersOp(os, grid.saveFloatAsHalf(), grid.tree().background());
     tools::visitNodesDepthFirst(grid.tree(), writeBuffersOp);
 }
 
@@ -150,18 +159,25 @@ struct ScalarCodec final: public TopologyCodec<GridT, StorageGridT, Mode>
         }
     }
 
-    void readBuffers(std::istream& is, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics&) final
+    void readBuffers(std::istream& is, Index64 /*size*/, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics&) final
     {
+        using StorageValueT = typename StorageGridT::TreeType::ValueType;
         GridT& grid = static_cast<GridT&>(*data.grid);
-        internal::scalarCodecReadBuffers<GridT, StorageGridT>(grid, is, options);
+        auto& topoData = static_cast<TopologyCodecData<StorageValueT>&>(data);
+        internal::scalarCodecReadBuffers<GridT, StorageGridT>(grid, is, options, &topoData.storageBackground);
     }
 
     void writeBuffers(std::ostream& os, const GridBase& gridBase, const io::WriteOptions&) final
     {
-        if constexpr (Mode == io::CodecMode::ReadOnly) return;
-
-        const GridT& grid = static_cast<const GridT&>(gridBase);
-        internal::scalarCodecWriteBuffers(grid, os);
+        // Note: the write body must live inside the negated if constexpr branch
+        // so it is not instantiated for read-only codecs. A bare
+        // `if constexpr (Mode == ReadOnly) return;` would still instantiate the
+        // code that follows, which fails to compile for the scalar-to-mask/bool
+        // convert codecs (their leaf buffers expose WordType*, not ValueType*).
+        if constexpr (Mode != io::CodecMode::ReadOnly) {
+            const GridT& grid = static_cast<const GridT&>(gridBase);
+            internal::scalarCodecWriteBuffers(grid, os);
+        }
     }
 }; // struct ScalarCodec
 

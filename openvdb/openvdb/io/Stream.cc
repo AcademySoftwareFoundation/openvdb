@@ -21,6 +21,12 @@ namespace io {
 
 
 Stream::Stream(std::istream& is)
+    : Stream(is, io::ReadOptions{})
+{
+}
+
+
+Stream::Stream(std::istream& is, const io::ReadOptions& readOptions)
 {
     if (!is) return;
 
@@ -51,7 +57,7 @@ Stream::Stream(std::istream& is)
         gd.readHeader(is);
         gd.readStreamPos(is);
         descriptors.push_back(gd);
-        GridBase::Ptr grid = Archive::readGrid(gd, is, io::ReadOptions{});
+        GridBase::Ptr grid = Archive::readGrid(gd, is, readOptions);
         mGrids->push_back(grid);
         namedGrids[gd.uniqueName()] = grid;
     }
@@ -83,6 +89,7 @@ Stream&
 Stream::operator=(const Stream& other)
 {
     if (&other != this) {
+        Archive::operator=(other);
         mMeta = other.mMeta;
         mGrids = other.mGrids;
         mOutputStream = other.mOutputStream;
