@@ -12,7 +12,7 @@
 #ifndef OPENVDB_MATH_HALF_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_HALF_HAS_BEEN_INCLUDED
 
-/// @file half.h
+/// @file Half.h
 /// The half type is a 16-bit floating number, compatible with the
 /// IEEE 754-2008 binary16 type.
 ///
@@ -21,6 +21,7 @@
 /// We assume that a float, f, is an IEEE 754 single-precision
 /// floating point number, whose bits are arranged as follows:
 ///
+/// <pre>
 ///     31 (msb)
 ///     |
 ///     | 30     23
@@ -30,28 +31,36 @@
 ///     X XXXXXXXX XXXXXXXXXXXXXXXXXXXXXXX
 ///
 ///     s e        m
+/// </pre>
 ///
 /// S is the sign-bit, e is the exponent and m is the significand.
 ///
 /// If e is between 1 and 254, f is a normalized number:
 ///
+/// <pre>
 ///             s    e-127
 ///     f = (-1)  * 2      * 1.m
+/// </pre>
 ///
 /// If e is 0, and m is not zero, f is a denormalized number:
 ///
+/// <pre>
 ///             s    -126
 ///     f = (-1)  * 2      * 0.m
+/// </pre>
 ///
 /// If e and m are both zero, f is zero:
 ///
+/// <pre>
 ///     f = 0.0
+/// </pre>
 ///
 /// If e is 255, f is an "infinity" or "not a number" (NAN),
 /// depending on whether m is zero or not.
 ///
 /// Examples:
 ///
+/// <pre>
 ///     0 00000000 00000000000000000000000 = 0.0
 ///     0 01111110 00000000000000000000000 = 0.5
 ///     0 01111111 00000000000000000000000 = 1.0
@@ -62,11 +71,13 @@
 ///     1 11111111 00000000000000000000000 = -infinity
 ///     0 11111111 10000000000000000000000 = NAN
 ///     1 11111111 11111111111111111111111 = NAN
+/// </pre>
 ///
 /// **Representation of a 16-bit half:**
 ///
 /// Here is the bit-layout for a half number, h:
 ///
+/// <pre>
 ///     15 (msb)
 ///     |
 ///     | 14  10
@@ -76,28 +87,36 @@
 ///     X XXXXX XXXXXXXXXX
 ///
 ///     s e     m
+/// </pre>
 ///
 /// S is the sign-bit, e is the exponent and m is the significand.
 ///
 /// If e is between 1 and 30, h is a normalized number:
 ///
+/// <pre>
 ///             s    e-15
 ///     h = (-1)  * 2     * 1.m
+/// </pre>
 ///
 /// If e is 0, and m is not zero, h is a denormalized number:
 ///
+/// <pre>
 ///             S    -14
 ///     h = (-1)  * 2     * 0.m
+/// </pre>
 ///
 /// If e and m are both zero, h is zero:
 ///
+/// <pre>
 ///     h = 0.0
+/// </pre>
 ///
 /// If e is 31, h is an "infinity" or "not a number" (NAN),
 /// depending on whether m is zero or not.
 ///
 /// Examples:
 ///
+/// <pre>
 ///     0 00000 0000000000 = 0.0
 ///     0 01110 0000000000 = 0.5
 ///     0 01111 0000000000 = 1.0
@@ -108,13 +127,14 @@
 ///     1 11111 0000000000 = -infinity
 ///     0 11111 1000000000 = NAN
 ///     1 11111 1111111111 = NAN
+/// </pre>
 ///
 /// **Conversion via Lookup Table:**
 ///
 /// Converting from half to float is performed by default using a
 /// lookup table. There are only 65,536 different half numbers; each
 /// of these numbers has been converted and stored in a table pointed
-/// to by the ``imath_half_to_float_table`` pointer.
+/// to by the `imath_half_to_float_table` pointer.
 ///
 /// Prior to Imath v3.1, conversion from float to half was
 /// accomplished with the help of an exponent look table, but this is
@@ -135,30 +155,25 @@
 /// 65,536-entry lookup table.
 ///
 /// The lookup table symbol is included in the compilation even if
-/// ``IMATH_HALF_USE_LOOKUP_TABLE`` is false, because application code
-/// using the exported ``half.h`` may choose to enable the use of the table.
+/// `IMATH_HALF_USE_LOOKUP_TABLE` is false, because application code
+/// using the exported `half.h` may choose to enable the use of the table.
 ///
 /// An implementation can eliminate the table from compilation by
-/// defining the ``IMATH_HALF_NO_LOOKUP_TABLE`` preprocessor symbol.
-/// Simply add:
+/// defining the `IMATH_HALF_NO_LOOKUP_TABLE` preprocessor symbol.
+/// Simply add `#define IMATH_HALF_NO_LOOKUP_TABLE` before including
+/// `half.h`, or define the symbol on the compile command line.
 ///
-///     #define IMATH_HALF_NO_LOOKUP_TABLE
-///
-/// before including ``half.h``, or define the symbol on the compile
-/// command line.
-///
-/// Furthermore, an implementation wishing to receive ``FE_OVERFLOW``
-/// and ``FE_UNDERFLOW`` floating point exceptions when converting
+/// Furthermore, an implementation wishing to receive `FE_OVERFLOW`
+/// and `FE_UNDERFLOW` floating point exceptions when converting
 /// float to half by the bit-shift algorithm can define the
-/// preprocessor symbol ``IMATH_HALF_ENABLE_FP_EXCEPTIONS`` prior to
-/// including ``half.h``:
-///
-///     #define IMATH_HALF_ENABLE_FP_EXCEPTIONS
+/// preprocessor symbol `IMATH_HALF_ENABLE_FP_EXCEPTIONS` (that is,
+/// `#define IMATH_HALF_ENABLE_FP_EXCEPTIONS`) prior to including `half.h`.
 ///
 /// **Conversion Performance Comparison:**
 ///
 /// Testing on a Core i9, the timings are approximately:
 ///
+/// <pre>
 /// half to float
 /// - table: 0.71 ns / call
 /// - no table: 1.06 ns / call
@@ -168,6 +183,7 @@
 /// - original: 5.2 ns / call
 /// - no exp table + opt: 1.27 ns / call
 /// - f16c: 0.45 ns / call
+/// </pre>
 ///
 /// **Note:** the timing above depends on the distribution of the
 /// floats in question.
@@ -206,6 +222,12 @@ namespace internal {
 // Thus any attempt to link two versions of OpenVDB with different
 // namespaces will clash due to redefinition with a new type.
 // The default was not to use a lookup table.
+//
+/// @cond
+/// These internal half-float configuration and limit macros are excluded from
+/// the docs: the `half` type itself lives in the (undocumented) `internal`
+/// namespace, and documenting the `#define`s makes Doxygen auto-link the
+/// literal `#define` token (an unresolvable "link to 'define'" warning).
 #undef  IMATH_HALF_USE_LOOKUP_TABLE
 #define IMATH_HALF_NO_LOOKUP_TABLE
 
@@ -227,7 +249,7 @@ namespace internal {
 #define VDB_HALF_MIN 6.10351562e-05f
 /// Largest positive half
 #define VDB_HALF_MAX 65504.0f
-/// Smallest positive e for which ``half(1.0 + e) != half(1.0)``
+/// Smallest positive e for which `half(1.0 + e) != half(1.0)`
 #define VDB_HALF_EPSILON 0.00097656f
 #else
 /// Smallest positive denormalized half
@@ -238,7 +260,7 @@ namespace internal {
 #define VDB_HALF_MIN 6.10351562e-05f
 /// Largest positive half
 #define VDB_HALF_MAX 65504.0
-/// Smallest positive e for which ``half(1.0 + e) != half(1.0)``
+/// Smallest positive e for which `half(1.0 + e) != half(1.0)`
 #define VDB_HALF_EPSILON 0.00097656
 #endif
 
@@ -246,19 +268,19 @@ namespace internal {
 #define VDB_HALF_MANT_DIG 11
 /// Number of base 10 digits that can be represented without change:
 ///
-/// ``floor( (HALF_MANT_DIG - 1) * log10(2) ) => 3.01... -> 3``
+/// `floor( (HALF_MANT_DIG - 1) * log10(2) ) => 3.01... -> 3`
 #define VDB_HALF_DIG 3
 /// Number of base-10 digits that are necessary to uniquely represent
 /// all distinct values:
 ///
-/// ``ceil(HALF_MANT_DIG * log10(2) + 1) => 4.31... -> 5``
+/// `ceil(HALF_MANT_DIG * log10(2) + 1) => 4.31... -> 5`
 #define VDB_HALF_DECIMAL_DIG 5
 /// Base of the exponent
 #define VDB_HALF_RADIX 2
-/// Minimum negative integer such that ``HALF_RADIX`` raised to the power
+/// Minimum negative integer such that `HALF_RADIX` raised to the power
 /// of one less than that integer is a normalized half
 #define VDBB_HALF_DENORM_MIN_EXP -13
-/// Maximum positive integer such that ``HALF_RADIX`` raised to the power
+/// Maximum positive integer such that `HALF_RADIX` raised to the power
 /// of one less than that integer is a normalized half
 #define VDB_HALF_MAX_EXP 16
 /// Minimum positive integer such that 10 raised to that power is a
@@ -267,6 +289,7 @@ namespace internal {
 /// Maximum positive integer such that 10 raised to that power is a
 /// normalized half
 #define VDB_HALF_MAX_10_EXP 4
+/// @endcond
 
 /// a type for both C-only programs and C++ to use the same utilities
 typedef union imath_half_uif

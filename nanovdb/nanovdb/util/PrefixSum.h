@@ -35,6 +35,7 @@ namespace util {
 /// @tparam OpT Type of operation performed on each element (defaults to sum)
 /// @param vec input and output vector
 /// @param threaded if true multi-threading is used
+/// @param op binary operation used to combine successive elements (defaults to @c std::plus<T>)
 /// @note Inclusive prefix sum: for (i=1; i<N; ++i) vec[i] += vec[i-1]
 /// @return sum of all input elements, which is also the last element of the inclusive prefix sum
 template<typename T, typename OpT = std::plus<T>>

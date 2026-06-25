@@ -547,6 +547,7 @@ public:
     MatteShader(const GridT& grid) : mAcc(grid.getAccessor()), mXform(&grid.transform()) {}
     MatteShader(const MatteShader&) = default;
     ~MatteShader() override = default;
+    /// @brief Sample the color grid at @c xyz; surface normal and ray direction are unused.
     Film::RGBA operator()(const Vec3R& xyz, const Vec3R&, const Vec3R&) const override
     {
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
@@ -568,6 +569,7 @@ public:
     MatteShader(const Film::RGBA& c = Film::RGBA(1.0f)): mRGBA(c) {}
     MatteShader(const MatteShader&) = default;
     ~MatteShader() override = default;
+    /// @brief Return the constant matte color; all shading inputs are unused.
     Film::RGBA operator()(const Vec3R&, const Vec3R&, const Vec3R&) const override
     {
         return mRGBA;
@@ -594,6 +596,7 @@ public:
     NormalShader(const GridT& grid) : mAcc(grid.getAccessor()), mXform(&grid.transform()) {}
     NormalShader(const NormalShader&) = default;
     ~NormalShader() override = default;
+    /// @brief Sample the color grid at @c xyz and modulate by the surface normal; ray direction is unused.
     Film::RGBA operator()(const Vec3R& xyz, const Vec3R& normal, const Vec3R&) const override
     {
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
@@ -615,6 +618,7 @@ public:
     NormalShader(const Film::RGBA& c = Film::RGBA(1.0f)) : mRGBA(c*0.5f) {}
     NormalShader(const NormalShader&) = default;
     ~NormalShader() override = default;
+    /// @brief Return the constant color modulated by the surface normal; position and ray direction are unused.
     Film::RGBA operator()(const Vec3R&, const Vec3R& normal, const Vec3R&) const override
     {
         return mRGBA * Film::RGBA(normal[0] + 1.0, normal[1] + 1.0, normal[2] + 1.0);
@@ -647,6 +651,7 @@ public:
     }
     PositionShader(const PositionShader&) = default;
     ~PositionShader() override = default;
+    /// @brief Sample the color grid at @c xyz and modulate by the normalized position within the bbox; surface normal and ray direction are unused.
     Film::RGBA operator()(const Vec3R& xyz, const Vec3R&, const Vec3R&) const override
     {
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
@@ -671,6 +676,7 @@ public:
         : mMin(bbox.min()), mInvDim(1.0/bbox.extents()), mRGBA(c) {}
     PositionShader(const PositionShader&) = default;
     ~PositionShader() override = default;
+    /// @brief Return the constant color modulated by the normalized position of @c xyz within the bbox; surface normal and ray direction are unused.
     Film::RGBA operator()(const Vec3R& xyz, const Vec3R&, const Vec3R&) const override
     {
         const Vec3R rgb = (xyz - mMin)*mInvDim;
@@ -701,6 +707,7 @@ public:
     DiffuseShader(const GridT& grid): mAcc(grid.getAccessor()), mXform(&grid.transform()) {}
     DiffuseShader(const DiffuseShader&) = default;
     ~DiffuseShader() override = default;
+    /// @brief Sample the color grid at @c xyz and apply Lambertian shading based on the surface normal and ray direction.
     Film::RGBA operator()(const Vec3R& xyz, const Vec3R& normal, const Vec3R& rayDir) const override
     {
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
@@ -725,6 +732,7 @@ public:
     DiffuseShader(const Film::RGBA& d = Film::RGBA(1.0f)): mRGBA(d) {}
     DiffuseShader(const DiffuseShader&) = default;
     ~DiffuseShader() override = default;
+    /// @brief Apply Lambertian shading using the constant material color, the surface normal and the ray direction; position is unused.
     Film::RGBA operator()(const Vec3R&, const Vec3R& normal, const Vec3R& rayDir) const override
     {
         // We assume a single directional light source at the camera,
