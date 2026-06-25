@@ -834,5 +834,68 @@ class TestTorchInterop(unittest.TestCase):
         self.assertTrue(t.is_cuda)
 
 
+@unittest.skipIf(
+    not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
+)
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
+)
+class TestMergeGridsList(unittest.TestCase):
+    """nanovdb.tools.cuda.mergeGrids -- topological (active-mask) union of device
+    OnIndex grids. The binary form merges exactly two; the list overload folds an
+    arbitrary number in a single native N-ary pass and must agree with chaining
+    the binary form."""
+
+    def _grid(self, cp, pts):
+        import numpy as np
+        coords = cp.asarray(np.ascontiguousarray(pts, dtype=np.int32))
+        return nanovdb.tools.cuda.voxelsToOnIndexGrid(coords, 1.0)
+
+    def _stats(self, h):
+        """(active voxels, (leaf, lower, upper) node counts, grid bytes)."""
+        h.deviceDownload(0, True)
+        t = h.grid(0).tree()
+        return (int(t.activeVoxelCount()),
+                (t.nodeCount(0), t.nodeCount(1), t.nodeCount(2)),
+                int(h.gridSize(0)))
+
+    def test_disjoint_union_is_sum(self):
+        cp = _require_cupy(self)
+        sets = [[[0, 0, 0], [1, 0, 0]], [[5, 0, 0]],
+                [[0, 9, 0], [0, 10, 0]], [[4096, 0, 0]]]  # last spans a new upper
+        hs = [self._grid(cp, s) for s in sets]
+        res = nanovdb.tools.cuda.mergeGrids([h.deviceGrid(0) for h in hs])
+        self.assertEqual(self._stats(res)[0], sum(len(s) for s in sets))
+
+    def test_overlap_dedups_and_matches_pairwise(self):
+        cp = _require_cupy(self)
+        # B shares (2,0,0) with A; C lives in a separate upper region.
+        A = [[0, 0, 0], [1, 0, 0], [2, 0, 0]]
+        B = [[2, 0, 0], [3, 0, 0]]
+        C = [[0, 9, 0], [4096, 0, 0]]
+        hs = [self._grid(cp, s) for s in (A, B, C)]
+        truth = len({tuple(p) for p in A + B + C})
+        self.assertLess(truth, len(A) + len(B) + len(C))  # overlap really exists
+
+        nary = nanovdb.tools.cuda.mergeGrids([h.deviceGrid(0) for h in hs])
+        ab = nanovdb.tools.cuda.mergeGrids(hs[0].deviceGrid(0), hs[1].deviceGrid(0))
+        abc = nanovdb.tools.cuda.mergeGrids(ab.deviceGrid(0), hs[2].deviceGrid(0))
+
+        s_nary, s_chain = self._stats(nary), self._stats(abc)
+        self.assertEqual(s_nary[0], truth)     # union dedups the shared voxel
+        self.assertEqual(s_nary, s_chain)      # node counts + bytes identical to chaining
+
+    def test_single_element_is_copy(self):
+        cp = _require_cupy(self)
+        h = self._grid(cp, [[0, 0, 0], [0, 1, 0], [0, 2, 0]])
+        res = nanovdb.tools.cuda.mergeGrids([h.deviceGrid(0)])
+        self.assertEqual(self._stats(res)[0], 3)
+
+    def test_empty_list_raises(self):
+        _require_cupy(self)
+        with self.assertRaises(Exception):
+            nanovdb.tools.cuda.mergeGrids([])
+
+
 if __name__ == "__main__":
     unittest.main()
