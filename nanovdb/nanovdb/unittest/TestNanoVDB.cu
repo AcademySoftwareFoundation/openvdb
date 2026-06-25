@@ -3706,6 +3706,66 @@ TEST(TestNanoVDBCUDA, MergeGrids_ValueOnIndex)
     EXPECT_EQ(mergedTreeData.mVoxelCount, 42); // Each input grid has 27 active voxels, 12 shared between the two
 }// DilateInjectPrune_ValueOnIndex
 
+TEST(TestNanoVDBCUDA, MergeGridsNary_ValueOnIndex)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    using nanovdb::Coord;
+    using GridT = nanovdb::NanoGrid<BuildT>;
+    auto treeData = [](const GridT* g) {
+        return nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(g);
+    };
+
+    // Three inputs: A and B overlap (12 shared voxels, as in the binary test),
+    // C is disjoint and lives in a separate upper region.
+    std::vector<Coord> ptsA, ptsB, ptsC;
+    for (int i = 0; i <= 2; i++)
+        for (int j = 0; j <= 2; j++)
+            for (int k = 0; k <= 2; k++) {
+                ptsA.emplace_back(i - 1,    j * 8 - 1, k * 128);
+                ptsB.emplace_back(i,        j * 8 - 1, (k - 1) * 128);
+                ptsC.emplace_back(i + 4096, j,         k);
+            }
+
+    auto buildGrid = [](const std::vector<Coord>& pts, nanovdb::cuda::DeviceBuffer& buf) {
+        buf = nanovdb::cuda::DeviceBuffer::create(pts.size() * sizeof(Coord), nullptr, false);
+        cudaCheck(cudaMemcpy(buf.deviceData(), pts.data(), pts.size() * sizeof(Coord),
+                             cudaMemcpyHostToDevice));
+        return nanovdb::tools::cuda::voxelsToGrid<BuildT>(
+            static_cast<Coord*>(buf.deviceData()), pts.size());
+    };
+    nanovdb::cuda::DeviceBuffer bufA, bufB, bufC;
+    auto hA = buildGrid(ptsA, bufA); auto gA = hA.deviceGrid<BuildT>();
+    auto hB = buildGrid(ptsB, bufB); auto gB = hB.deviceGrid<BuildT>();
+    auto hC = buildGrid(ptsC, bufC); auto gC = hC.deviceGrid<BuildT>();
+
+    // N-ary merge of all three in a single call
+    auto naryH = nanovdb::tools::cuda::MergeGrids<BuildT>(
+        std::vector<const GridT*>{gA, gB, gC}).getHandle();
+    auto nary = treeData(naryH.deviceGrid<BuildT>());
+
+    // Chaining the binary form must yield byte-identical topology
+    auto abH = nanovdb::tools::cuda::MergeGrids<BuildT>(gA, gB).getHandle();
+    auto abcH = nanovdb::tools::cuda::MergeGrids<BuildT>(
+        abH.deviceGrid<BuildT>(), gC).getHandle();
+    auto chain = treeData(abcH.deviceGrid<BuildT>());
+    EXPECT_EQ(nary.mNodeCount[0], chain.mNodeCount[0]);
+    EXPECT_EQ(nary.mNodeCount[1], chain.mNodeCount[1]);
+    EXPECT_EQ(nary.mNodeCount[2], chain.mNodeCount[2]);
+    EXPECT_EQ(nary.mVoxelCount,   chain.mVoxelCount);
+
+    // Ground truth: |A u B| = 42, C disjoint (+27) => 69 unique voxels
+    EXPECT_EQ(nary.mVoxelCount, 69u);
+
+    // A single-element list returns a copy of that grid's topology
+    auto soloH = nanovdb::tools::cuda::MergeGrids<BuildT>(
+        std::vector<const GridT*>{gA}).getHandle();
+    EXPECT_EQ(treeData(soloH.deviceGrid<BuildT>()).mVoxelCount, treeData(gA).mVoxelCount);
+
+    // An empty input list is rejected
+    EXPECT_THROW(nanovdb::tools::cuda::MergeGrids<BuildT>(
+        std::vector<const GridT*>{}).getHandle(), std::runtime_error);
+}// MergeGridsNary_ValueOnIndex
+
 TEST(TestNanoVDBCUDA, GridHandle_from_HostBuffer)
 {
     using namespace nanovdb;
