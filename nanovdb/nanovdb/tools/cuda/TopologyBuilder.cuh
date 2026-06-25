@@ -311,6 +311,80 @@ struct BuildGridTreeRootFunctor
 
 namespace topology::detail {
 
+/// @brief Variant of BuildGridTreeRootFunctor for grids constructed from scratch
+///        (i.e. with no source grid to copy metadata from). Sets all GridData fields
+///        explicitly rather than asserting they were pre-initialized.
+template <typename BuildT>
+struct InitGridTreeRootFunctor
+{
+    Map map; // transform to embed in the output grid
+
+    __device__
+    void operator()(size_t, typename TopologyBuilder<BuildT>::Data *d_data) {
+
+        // process Root (identical to BuildGridTreeRootFunctor)
+        auto &root = d_data->getRoot();
+        root.mTableSize = d_data->nodeCount[2];
+        root.mBackground = NanoRoot<BuildT>::ValueType(0);
+        root.mMinimum = root.mMaximum = NanoRoot<BuildT>::ValueType(0);
+        root.mAverage = root.mStdDevi = NanoRoot<BuildT>::FloatType(0);
+        root.mBBox = CoordBBox();
+
+        // process Tree (identical to BuildGridTreeRootFunctor)
+        auto &tree = d_data->getTree();
+        tree.setRoot(&root);
+        if (d_data->nodeCount[2]) {
+            tree.setFirstNode(&d_data->getUpper(0));
+            tree.setFirstNode(&d_data->getLower(0));
+            tree.setFirstNode(&d_data->getLeaf(0));
+        } else {
+            tree.template setFirstNode<NanoUpper<BuildT>>(nullptr);
+            tree.template setFirstNode<NanoLower<BuildT>>(nullptr);
+            tree.template setFirstNode<NanoLeaf<BuildT>>(nullptr);
+        }
+        tree.mNodeCount[2] = d_data->nodeCount[2];
+        tree.mNodeCount[1] = d_data->nodeCount[1];
+        tree.mNodeCount[0] = d_data->nodeCount[0];
+        tree.mVoxelCount = 0;
+        tree.mTileCount[2] = tree.mTileCount[1] = tree.mTileCount[0] = 0;
+
+        // process Grid — set all fields explicitly (no source grid to copy from)
+        auto &grid = d_data->getGrid();
+#ifdef NANOVDB_USE_NEW_MAGIC_NUMBERS
+        grid.mMagic = NANOVDB_MAGIC_GRID;
+#else
+        grid.mMagic = NANOVDB_MAGIC_NUMB;
+#endif
+        grid.mChecksum.disable();
+        grid.mVersion = Version();
+        grid.mFlags.initMask({GridFlags::IsBreadthFirst});
+        grid.mGridIndex = 0u;
+        grid.mGridCount = 1u;
+        grid.mGridSize = d_data->size;
+        // grid.mGridName is left zeroed; caller copies name via cudaMemcpyAsync
+        grid.mMap = map;
+        grid.mWorldBBox = Vec3dBBox();
+        grid.mVoxelSize = map.getVoxelSize();
+        grid.mGridClass = GridClass::IndexGrid;
+        grid.mGridType = toGridType<BuildT>();
+        grid.mBlindMetadataOffset = d_data->size;
+        grid.mBlindMetadataCount = 0u;
+        grid.mData0 = 0u;
+        grid.mData1 = 1u;
+#ifdef NANOVDB_USE_NEW_MAGIC_NUMBERS
+        grid.mData2 = 0u;
+#else
+        grid.mData2 = NANOVDB_MAGIC_GRID;
+#endif
+    }
+};
+
+}// namespace topology::detail
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace topology::detail {
+
 template <typename BuildT>
 struct BuildUpperNodesFunctor
 {
