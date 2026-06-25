@@ -1,0 +1,3 @@
+OpenVDB:
+  Build:
+  - Fixed an issue in FindBlosc.cmake when building static libs on Windows.

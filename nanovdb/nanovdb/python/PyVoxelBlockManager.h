@@ -15,6 +15,13 @@ namespace pynanovdb {
 ///        Python submodule (expected to be the existing nanovdb.tools).
 void defineVoxelBlockManagerModule(nb::module_& toolsModule);
 
+#ifdef NANOVDB_USE_CUDA
+/// @brief Bind the device VoxelBlockManagerHandle wrapper and the device
+///        buildVoxelBlockManager onto the given submodule (expected to be the
+///        existing nanovdb.tools.cuda). Defined in cuda/PyDeviceVoxelBlockManager.cu.
+void defineDeviceVoxelBlockManager(nb::module_& cudaToolsModule);
+#endif
+
 } // namespace pynanovdb
 
 #endif

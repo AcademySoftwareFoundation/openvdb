@@ -343,6 +343,17 @@ class TestGridHandleExchange(unittest.TestCase):
         dstFile.close()
         try:
             nanovdb.io.writeGrids(dstFile.name, handles)
+            # Verify that both grids actually made it into the file. Previously
+            # writeGrids re-opened the file per handle with std::ios::trunc, so
+            # only the final grid was retained on disk.
+            metadata = nanovdb.io.readGridMetaData(dstFile.name)
+            self.assertEqual(len(metadata), len(handles))
+            readHandles = nanovdb.io.readGrids(dstFile.name)
+            self.assertEqual(len(readHandles), len(handles))
+            for readHandle in readHandles:
+                self.assertEqual(readHandle.gridCount(), 1)
+                self.assertEqual(readHandle.gridType(0), nanovdb.GridType.Double)
+                self.assertIsNotNone(readHandle.doubleGrid())
         finally:
             os.unlink(dstFile.name)
 
@@ -418,6 +429,84 @@ class TestGridMetaData(unittest.TestCase):
         self.assertGreater(m.activeVoxelCount(), 0)
         self.assertEqual(m.blindDataCount(), 0)
         self.assertTrue(nanovdb.GridMetaData.safeCast(h.grid()))
+
+
+class TestGridHeaderSetters(unittest.TestCase):
+    """Header mutators on the Grid base (setGridClass / setTransform / setGridName
+    / the flag toggles) edit the grid in place and refresh its checksum, so a
+    validating reader still accepts the grid after the edit."""
+
+    def _sphere(self):
+        # voxelSize 1.0 so setTransform's effect on voxelSize() is unambiguous.
+        h = nanovdb.tools.createLevelSetSphere(radius=10.0, voxelSize=1.0)
+        return h, h.grid()
+
+    def test_set_grid_class_refreshes_checksum(self):
+        h, g = self._sphere()
+        self.assertTrue(g.isLevelSet())
+        # Populate a Full checksum so a missing refresh would leave it stale.
+        nanovdb.tools.updateChecksum(g, nanovdb.CheckMode.Full)
+        self.assertTrue(nanovdb.tools.validateChecksum(g, nanovdb.CheckMode.Full))
+
+        g.setGridClass(nanovdb.GridClass.FogVolume)
+        self.assertEqual(g.gridClass(), nanovdb.GridClass.FogVolume)
+        self.assertTrue(g.isFogVolume())
+        self.assertFalse(g.isLevelSet())
+        # Still validates -> the class change refreshed the checksum.
+        self.assertTrue(nanovdb.tools.validateChecksum(g, nanovdb.CheckMode.Full))
+        self.assertTrue(g.isValid())
+
+    def test_set_transform(self):
+        h, g = self._sphere()
+        index_bbox_before = str(g.indexBBox())
+        nanovdb.tools.updateChecksum(g, nanovdb.CheckMode.Full)
+
+        # Uniform scale 2 + world translation (5,0,0).
+        g.setTransform(2.0, nanovdb.math.Vec3d(5.0, 0.0, 0.0))
+        self.assertEqual(g.voxelSize()[0], 2.0)
+        # The transform relabels world coordinates; it does not move voxels.
+        self.assertEqual(str(g.indexBBox()), index_bbox_before)
+        # world = scale * index + translation
+        self.assertEqual(g.applyMap(nanovdb.math.Vec3d(0, 0, 0)), nanovdb.math.Vec3d(5, 0, 0))
+        self.assertEqual(g.applyMap(nanovdb.math.Vec3d(1, 0, 0)), nanovdb.math.Vec3d(7, 0, 0))
+        # World bbox was recomputed under the new map (no longer the unit-scale box).
+        self.assertEqual(g.voxelSize(), nanovdb.math.Vec3d(2.0))
+        self.assertTrue(nanovdb.tools.validateChecksum(g, nanovdb.CheckMode.Full))
+
+        # Default translation is the origin.
+        g.setTransform(0.5)
+        self.assertEqual(g.voxelSize()[0], 0.5)
+        self.assertEqual(g.applyMap(nanovdb.math.Vec3d(0, 0, 0)), nanovdb.math.Vec3d(0, 0, 0))
+
+    def test_flag_and_name_setters_refresh_checksum(self):
+        h, g = self._sphere()
+        nanovdb.tools.updateChecksum(g, nanovdb.CheckMode.Full)
+        for toggle in (lambda: g.setBBoxOn(True), lambda: g.setMinMaxOn(False),
+                       lambda: g.setAverageOn(True), lambda: g.setStdDeviationOn(False),
+                       lambda: g.setLongGridNameOn(False)):
+            toggle()
+            self.assertTrue(nanovdb.tools.validateChecksum(g, nanovdb.CheckMode.Full))
+        self.assertTrue(g.setGridName("renamed_grid"))
+        self.assertEqual(g.shortGridName(), "renamed_grid")
+        self.assertTrue(nanovdb.tools.validateChecksum(g, nanovdb.CheckMode.Full))
+
+    def test_setters_survive_file_roundtrip(self):
+        h, g = self._sphere()
+        g.setGridClass(nanovdb.GridClass.FogVolume)
+        g.setTransform(4.0, nanovdb.math.Vec3d(1.0, 2.0, 3.0))
+        g.setGridName("retagged")
+        tmp = tempfile.NamedTemporaryFile(suffix=".nvdb", delete=False)
+        tmp.close()
+        try:
+            nanovdb.io.writeGrid(tmp.name, h)
+            g2 = nanovdb.io.readGrid(tmp.name).grid()
+            self.assertEqual(g2.gridClass(), nanovdb.GridClass.FogVolume)
+            self.assertEqual(g2.voxelSize()[0], 4.0)
+            self.assertEqual(g2.shortGridName(), "retagged")
+            self.assertEqual(g2.applyMap(nanovdb.math.Vec3d(0, 0, 0)),
+                             nanovdb.math.Vec3d(1, 2, 3))
+        finally:
+            os.unlink(tmp.name)
 
 
 class TestBlindDataEmpty(unittest.TestCase):
@@ -1197,6 +1286,22 @@ class TestDeviceReadWriteGrids(unittest.TestCase):
             )
         except RuntimeError:
             print("ZIP compression codec not supported. Skipping...")
+
+    def test_device_write_grids_multi(self):
+        # Regression test for deviceWriteGrids: all grids in the list must end
+        # up in the output file, not just the last one.
+        handle = nanovdb.tools.cuda.createLevelSetSphere(
+            nanovdb.GridType.Float, name=self.gridName
+        )
+        handles = [handle, handle]
+        nanovdb.io.deviceWriteGrids(self.dstFile.name, handles)
+        metadata = nanovdb.io.readGridMetaData(self.dstFile.name)
+        self.assertEqual(len(metadata), len(handles))
+        readHandles = nanovdb.io.deviceReadGrids(self.dstFile.name)
+        self.assertEqual(len(readHandles), len(handles))
+        for readHandle in readHandles:
+            self.assertEqual(readHandle.gridCount(), 1)
+            self.assertEqual(readHandle.gridType(0), nanovdb.GridType.Float)
 
 
 @unittest.skipIf(

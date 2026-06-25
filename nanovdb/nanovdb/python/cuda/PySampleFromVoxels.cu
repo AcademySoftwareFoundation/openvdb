@@ -4,6 +4,8 @@
 
 #include <nanobind/ndarray.h>
 
+#include <cstdint>
+
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/math/SampleFromVoxels.h>
 
@@ -61,28 +63,40 @@ template<typename BuildT> void defineSampleFromVoxels(nb::module_& m, const char
         name,
         [](nb::ndarray<BuildT, nb::shape<-1, 3>, nb::c_contig, nb::device::cuda> points,
            NanoGrid<BuildT>*                                                          d_grid,
-           nb::ndarray<BuildT, nb::shape<-1>, nb::device::cuda>                  values) {
+           nb::ndarray<BuildT, nb::shape<-1>, nb::device::cuda>                  values,
+           uintptr_t                                                            stream) {
+            cudaStream_t           s = reinterpret_cast<cudaStream_t>(stream);
             constexpr unsigned int numThreads = 128;
             unsigned int           numBlocks = (points.shape(0) + numThreads - 1) / numThreads;
-            sampleFromVoxels<<<numBlocks, numThreads>>>(points.shape(0), points.data(), d_grid, values.data());
+            // Raw kernel launch on the supplied stream; touches no Python
+            // objects, so release the GIL.
+            nb::gil_scoped_release release;
+            sampleFromVoxels<<<numBlocks, numThreads, 0, s>>>(points.shape(0), points.data(), d_grid, values.data());
         },
         "points"_a,
         "d_grid"_a,
-        "values"_a);
+        "values"_a,
+        "stream"_a = 0);
     m.def(
         name,
         [](nb::ndarray<BuildT, nb::shape<-1, 3>, nb::c_contig, nb::device::cuda> points,
            NanoGrid<BuildT>*                                                          d_grid,
            nb::ndarray<BuildT, nb::shape<-1>, nb::device::cuda>                  values,
-           nb::ndarray<BuildT, nb::shape<-1, 3>, nb::device::cuda>               gradients) {
+           nb::ndarray<BuildT, nb::shape<-1, 3>, nb::device::cuda>               gradients,
+           uintptr_t                                                            stream) {
+            cudaStream_t           s = reinterpret_cast<cudaStream_t>(stream);
             constexpr unsigned int numThreads = 128;
             unsigned int           numBlocks = (points.shape(0) + numThreads - 1) / numThreads;
-            sampleFromVoxels<<<numBlocks, numThreads>>>(points.shape(0), points.data(), d_grid, values.data(), gradients.data());
+            // Raw kernel launch on the supplied stream; touches no Python
+            // objects, so release the GIL.
+            nb::gil_scoped_release release;
+            sampleFromVoxels<<<numBlocks, numThreads, 0, s>>>(points.shape(0), points.data(), d_grid, values.data(), gradients.data());
         },
         "points"_a,
         "d_grid"_a,
         "values"_a,
-        "gradients"_a);
+        "gradients"_a,
+        "stream"_a = 0);
 }
 
 template void defineSampleFromVoxels<float>(nb::module_&, const char*);
