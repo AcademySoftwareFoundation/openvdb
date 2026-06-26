@@ -1038,7 +1038,7 @@ void Geometry::readPLY(std::istream &is)
         if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate buffer");
         for (size_t i=0; i<faceCount; ++i) {
             is.read(buffer, faceSkip[0].bytes + 1);// polygon size is encoded as a single char
-            const unsigned int n = (unsigned int)buffer[faceSkip[0].bytes];// char -> unsigned int
+            const int n = (int)buffer[faceSkip[0].bytes];// char -> int
             switch (n) {
             case 3:
                 is.read((char*)vtx, 3*sizeof(uint32_t));

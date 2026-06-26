@@ -1609,8 +1609,7 @@ void Tool::write()
 
 void Tool::writeVDB(const std::string &fileName)
 {
-  const std::string &action_name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(action_name == "write");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
   try {
     mParser.printAction();
     const std::string age = mParser.get<std::string>("vdb");
@@ -1800,8 +1799,7 @@ void Tool::writeNVDB(const std::string&)
 
 void Tool::writeGeo(const std::string &fileName)
 {
-  const std::string &action_name = mParser.getAction().names[0];
-  OPENVDB_ASSERT(action_name == "write");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
   const int age = mParser.get<int>("geo");
   const bool keep = mParser.get<bool>("keep");
   const bool ascii = mParser.get<bool>("ascii");
@@ -2025,7 +2023,7 @@ void Tool::levelSetToFog()
     }
     if (mParser.verbose) mTimer.start("SDF to FOG");
     FloatGrid::Ptr fog = keep ? sdf->deepCopy() : sdf;
-    const float cutoffDistance = cutoff <= 0.0f ? sdf->background() : cutoff * sdf->voxelSize()[0];
+    const float cutoffDistance = cutoff <= 0.0f ? sdf->background() : cutoff * float(sdf->voxelSize()[0]);
     tools::sdfToFogVolume(*fog, cutoffDistance);// fog <- sdf > 0 ? 0 : -sdf / |cutoffDistance|
     if (!keep) mGrid.erase(std::next(it).base());
     if (grid_name.empty()) grid_name = "ls2fog_"+sdf->getName();
@@ -2855,7 +2853,6 @@ void Tool::forValues()
     }
     if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
     grid->setName(grid_name);
-    const std::string &voxel_var = voxel_vars[0];// the OUTPUT grid's kernel name
 
     if (mParser.verbose) mTimer.start(action_name);
     if (!kernel.empty()) {
@@ -3058,8 +3055,7 @@ void Tool::forValues()
 void Tool::sdf2udf()
 {
   const std::string &action_name = mParser.getAction().names[0];
-  const int mode = findMatch(action_name, {"sdf2udf"});// 1-based index
-  OPENVDB_ASSERT(mode);// mode = 0 for no match
+  OPENVDB_ASSERT(findMatch(action_name, {"sdf2udf"}));// mode = 0 for no match
   try {
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
@@ -3426,22 +3422,25 @@ void Tool::slice()
     for (const Axis &axis : axes) {
       tools::Film image(scale[0], scale.size()==2 ? scale[1] : scale[0]*dim[axis.abc[2]]/dim[axis.abc[1]]);
       for (const float slice : axis.slices) {
-        tbb::parallel_for(RangeT(0, image.width(), 0, image.height()), [&](const RangeT &range){
+        tbb::parallel_for(RangeT(0, int(image.width()), 0, int(image.height())), [&](const RangeT &range){
           const int a = axis.abc[0], b = axis.abc[1], c = axis.abc[2];
           Vec3R xyz;
-          xyz[a] = slice * (dim[a]+1) + bbox.min()[a];
+          // Compute in double (Vec3R's element type) so the Int32 dim/bbox
+          // operands widen losslessly; mixing them with float triggers
+          // -Wimplicit-int-float-conversion under -Werror.
+          xyz[a] = double(slice) * (dim[a]+1) + bbox.min()[a];
           auto acc = grid->getAccessor();// thread local copy
           for (auto row=range.rows().begin(); row!=range.rows().end(); ++row) {
-            xyz[b] = row/float(image.width())*(dim[b]+1) + bbox.min()[b];
+            xyz[b] = row/double(image.width())*(dim[b]+1) + bbox.min()[b];
             for (int col=range.cols().begin(); col<range.cols().end(); ++col) {
-              xyz[c] = col/float(image.height())*(dim[c]+1) + bbox.min()[c];
+              xyz[c] = col/double(image.height())*(dim[c]+1) + bbox.min()[c];
               const float v = tools::BoxSampler::sample(acc, xyz);
               // Clamp before the integer cast: float-to-uint8_t conversion is
               // UB when the value falls outside [0,255], and clang on ARM64
               // emits an unmasked fcvtzu — values outside ex's range (e.g. the
               // background of a level set whose active values have been
               // rewritten by forOnValues) yield huge indices and an OOB read.
-              const float t = (v - ex.min()) / (ex.max() - ex.min());
+              const float t = float((v - ex.min()) / (ex.max() - ex.min()));
               const int   k = int(255.0f * math::Clamp(t, 0.0f, 1.0f));
               const unsigned char *p = LUT[k];
               image.pixel(row,col) = tools::Film::RGBA(p[0]/255.0f, p[1]/255.0f, p[2]/255.0f);
@@ -3731,15 +3730,15 @@ void saveJPG(const std::string& fname, const tools::Film& film)
   FILE* fp = std::fopen(fname.c_str(), "wb");
   if (!fp) OPENVDB_THROW(IoError,"Unable to open '" + fname + "' for writing");
   jpeg_stdio_dest(&cinfo, fp);
-  cinfo.image_width      = film.width();
-  cinfo.image_height     = film.height();
+  cinfo.image_width      = static_cast<JDIMENSION>(film.width());
+  cinfo.image_height     = static_cast<JDIMENSION>(film.height());
   cinfo.input_components = 3;
   cinfo.in_color_space   = JCS_RGB;
   jpeg_set_defaults(&cinfo);
   jpeg_start_compress(&cinfo, TRUE);
   auto buf = film.convertToBitBuffer<uint8_t>(/*alpha=*/false);
   uint8_t *row = buf.get();
-  const uint32_t stride = film.width() * 3;
+  const uint32_t stride = static_cast<uint32_t>(film.width() * 3);
   for (int y = 0; y < film.height(); ++y) {
       jpeg_write_scanlines(&cinfo, &row, 1);
       row += stride;
