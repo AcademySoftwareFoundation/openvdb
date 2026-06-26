@@ -251,7 +251,7 @@ PolySoupToLevelSet<GridType>::PolySoupToLevelSet(PolySoup &&poly, int dim, float
     }
     if (!mPoly.bbox) mPoly.bbox = PolySoupToLevelSet::getBBox(mPoly.vtx);
     const float maxLength = mPoly.bbox.extents()[mPoly.bbox.maxExtent()];
-    mMinVoxelSize = maxLength/(dim - 2.0f*(mHalfWidth + 1.0f));// +1 since final surface is dilated by dx
+    mMinVoxelSize = maxLength/(float(dim) - 2.0f*(mHalfWidth + 1.0f));// +1 since final surface is dilated by dx
     mMaxVoxelSize = maxLength / 2.0f;
     OPENVDB_ASSERT(2*mMinVoxelSize <= mMaxVoxelSize);
 }// tools::PolySoupToLevelSet::PolySoupToLevelSet()
@@ -288,13 +288,13 @@ void PolySoupToLevelSet<GridType>::process(const ShrinkWrapT &D, ProgressT *prog
     }
 
     // Coarse to fine shrink wrap algorithm
-    float vol[2];
+    double vol[2];// levelSetVolume returns Real (double); keep full precision
     auto grid = mGrids.back();// initiate grid with the coarsest offset
     mGrids.pop_back();
     mIsGridSDF = true;
     for (auto iter = mGrids.rbegin(), end = mGrids.rend(); iter != end; ++iter) {// coarse -> fine
       grid = this->upsample(*grid);// grid(dx) -> grid(dx/2)
-      for (float d = 0.0f, dx = grid->voxelSize()[0], Ddx = D(dx); d < Ddx; vol[0] = vol[1]) {
+      for (float d = 0.0f, dx = float(grid->voxelSize()[0]), Ddx = D(dx); d < Ddx; vol[0] = vol[1]) {
         myProgress("Shrink wrap d=" + std::to_string(d) + ", D("+std::to_string(dx) + ")=" + std::to_string(Ddx));
         grid = this->shrinkWrap(*grid, **iter, d);
         vol[1] = levelSetVolume(*grid);
@@ -390,7 +390,7 @@ auto PolySoupToLevelSet<GridType>::shrinkWrap(GridType &grid, const GridType &gr
         filter.normalize();
         filter.prune();// is this needed?
     }
-    filter.offset(maxDist * grid.voxelSize()[0]);// erode by maxDist * dx
+    filter.offset(static_cast<typename GridType::ValueType>(maxDist * grid.voxelSize()[0]));// erode by maxDist * dx
     mIsGridSDF = false;// the CSG operation messed up the SDF
     d += maxDist;
     return csgUnionCopy(grid, gridB);
