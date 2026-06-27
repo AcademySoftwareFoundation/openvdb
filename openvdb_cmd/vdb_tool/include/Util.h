@@ -37,7 +37,11 @@
 #include <string_view>// for Spinner's operator() argument
 #include <vector>
 #include <sys/stat.h>// for stat (used by fileExists)
+#if defined(_WIN32)
+#include <io.h>// for isatty/fileno (used by Spinner's TTY detection); unistd.h is POSIX-only
+#else
 #include <unistd.h>// for isatty (used by Spinner's TTY detection)
+#endif
 #include <chrono>
 #include <ctime>
 

@@ -288,7 +288,9 @@ void PolySoupToLevelSet<GridType>::process(const ShrinkWrapT &D, ProgressT *prog
     }
 
     // Coarse to fine shrink wrap algorithm
-    double vol[2];// levelSetVolume returns Real (double); keep full precision
+    double vol[2] = {0.0, 0.0};// levelSetVolume returns Real (double); keep full precision.
+                               // Zero-init silences a GCC -Wmaybe-uninitialized false positive:
+                               // vol[0] is only read when d>0, after the loop's increment has set it.
     auto grid = mGrids.back();// initiate grid with the coarsest offset
     mGrids.pop_back();
     mIsGridSDF = true;
