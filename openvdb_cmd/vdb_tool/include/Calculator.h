@@ -1888,7 +1888,10 @@ inline float Calculator::eval(const std::unordered_map<std::string, float> &bind
     // Realistic expressions have a handful of variables, so a small stack
     // buffer suffices and avoids a heap allocation on every call.
     constexpr size_t kSmall = 16;
-    float small[kSmall];
+    float small[kSmall] = {};// value-initialized: the loop fills the first
+                             // mVariables.size() entries (which is all eval reads),
+                             // but zeroing silences a GCC -Wmaybe-uninitialized
+                             // false positive seen after inlining eval->evalImpl.
     std::vector<float> heap;
     float *values = small;
     if (mVariables.size() > kSmall) {
@@ -1985,7 +1988,10 @@ inline float Calculator::evalAndRemember(const std::unordered_map<std::string, f
     // Build a positional values buffer; small expressions get a stack array,
     // larger ones spill to the heap (same pattern as the const eval(map) overload).
     constexpr size_t kSmall = 16;
-    float small[kSmall];
+    float small[kSmall] = {};// value-initialized: the loop fills the first
+                             // mVariables.size() entries (which is all eval reads),
+                             // but zeroing silences a GCC -Wmaybe-uninitialized
+                             // false positive seen after inlining eval->evalImpl.
     std::vector<float> heap;
     float *values = small;
     if (mVariables.size() > kSmall) {
