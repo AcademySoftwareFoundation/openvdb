@@ -74,6 +74,19 @@ inline R& default_resource()
 ///        models the stream-ordered AsyncResource concept, i.e. exposes
 ///        allocate_async(size_t, size_t, cudaStream_t) and
 ///        deallocate_async(void*, size_t, size_t, cudaStream_t).
+/// @details Use it to dispatch between a stream-ordered resource and a
+///          synchronous one (which exposes allocate/deallocate without a
+///          stream argument):
+/// @code
+/// template<typename R>
+/// void* allocate(R& resource, size_t bytes, size_t alignment, cudaStream_t stream)
+/// {
+///     if constexpr (nanovdb::cuda::is_async_resource<R>::value)
+///         return resource.allocate_async(bytes, alignment, stream); // stream-ordered
+///     else
+///         return resource.allocate(bytes, alignment);               // synchronous
+/// }
+/// @endcode
 template <class R, class = void>
 struct is_async_resource : std::false_type {};
 

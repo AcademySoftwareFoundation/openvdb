@@ -93,15 +93,15 @@ TEST(TestMemoryResource, DefaultResource_AddressStable)
 // PinnedResource (host-pinned, host- and device-accessible)
 //======================================================================
 
-static_assert(nanovdb::cuda::is_async_resource<nanovdb::cuda::PinnedResource>::value,
-              "PinnedResource must satisfy the AsyncResource concept");
+static_assert(!nanovdb::cuda::is_async_resource<nanovdb::cuda::PinnedResource>::value,
+              "PinnedResource is synchronous (no stream-ordered allocate_async)");
 
 TEST(TestMemoryResource, PinnedResource_IsPageLocked)
 {
     using P = nanovdb::cuda::PinnedResource;
     P res;
     const size_t bytes = 4096;
-    void* host = res.allocate_async(bytes, P::DEFAULT_ALIGNMENT, 0);
+    void* host = res.allocate(bytes, P::DEFAULT_ALIGNMENT);
     ASSERT_NE(host, nullptr);
 
     // Must be genuine page-locked (pinned) host memory, not pageable.
@@ -118,16 +118,16 @@ TEST(TestMemoryResource, PinnedResource_IsPageLocked)
     EXPECT_EQ(reinterpret_cast<unsigned char*>(host)[0], 0xABu);
     ASSERT_EQ(cudaFree(d), cudaSuccess);
 
-    res.deallocate_async(host, bytes, P::DEFAULT_ALIGNMENT, 0);
+    res.deallocate(host, bytes, P::DEFAULT_ALIGNMENT);
 }
 
 TEST(TestMemoryResource, PinnedResource_DefaultResourceRoundTrip)
 {
     using P = nanovdb::cuda::PinnedResource;
     P& res = nanovdb::cuda::default_resource<P>();
-    void* p = res.allocate_async(256, P::DEFAULT_ALIGNMENT, 0);
+    void* p = res.allocate(256, P::DEFAULT_ALIGNMENT);
     ASSERT_NE(p, nullptr);
-    res.deallocate_async(p, 256, P::DEFAULT_ALIGNMENT, 0);
+    res.deallocate(p, 256, P::DEFAULT_ALIGNMENT);
     EXPECT_EQ(&res, &nanovdb::cuda::default_resource<P>()); // address-stable
 }
 
