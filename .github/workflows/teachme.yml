@@ -1,0 +1,55 @@
+
+name: TEACHME
+
+# Compile-checks the NanoVDB TEACHME tutorial against the real headers. Runs
+# when EITHER the NanoVDB headers or the tutorial change, so an API change that
+# breaks a lesson code block is caught here (the whole point of the harness).
+# Compile-only: no GPU is required.
+on:
+  push:
+    branches:
+      - 'master'
+      - 'feature/**'
+      - 'pr/**'
+    paths:
+      - 'nanovdb/nanovdb/**'
+      - 'doc/nanovdb/TEACHME/**'
+      - '.github/workflows/teachme.yml'
+  pull_request:
+    branches:
+      - '**'
+    paths:
+      - 'nanovdb/nanovdb/**'
+      - 'doc/nanovdb/TEACHME/**'
+      - '.github/workflows/teachme.yml'
+  workflow_dispatch:
+
+# Allow subsequent pushes to the same PR or REF to cancel any previous jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  teachme-docs-compile:
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
+    name: teachme-docs-compile
+    container:
+      image: aswf/ci-openvdb:2024-clang17.2
+    env:
+      # Compile-only target; matches the arch used by the other NanoVDB jobs.
+      CUDAARCHS: "80"
+      # Each TU compiles the kitchen-sink fixture (most of NanoVDB's heavy
+      # headers), so nvcc is memory-hungry. Cap parallel compiles to stay
+      # within the runner's RAM — unbounded -j OOMs the 8-core/32 GB runner.
+      TEACHME_JOBS: "4"
+    steps:
+      - uses: actions/checkout@v3
+      - name: setup_cuda_12
+        run: |
+          echo "/usr/local/cuda-12/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-12/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+      - name: run_harness
+        # Reference-checks every #include / prose header path, then compiles
+        # every tagged code block. The OpenVDB-dependent blocks are skipped
+        # (still reference-checked) when OpenVDB is not installed in the image.
+        run: bash doc/nanovdb/TEACHME/test/run.sh
