@@ -92,6 +92,10 @@
 #include <jpeglib.h>
 #endif
 
+#ifdef VDB_TOOL_USE_AX
+#include <openvdb_ax/ax.h>// for openvdb::ax::run (the -ax action)
+#endif
+
 #include <tbb/blocked_range2d.h>
 #include <tbb/enumerable_thread_specific.h>
 
@@ -284,6 +288,12 @@ private:
 
     /// @brief Generate a dx-offset surface from a polygon soup.
     void soupToOffset();
+
+#ifdef VDB_TOOL_USE_AX
+    /// @brief Run an OpenVDB AX code snippet over one or more selected grids.
+    /// @note  Gated behind VDB_TOOL_USE_AX (requires the openvdb_ax library + LLVM).
+    void ax();
+#endif
 
     /// @brief Convert every quad in the current mesh into two triangles.
     void quadsToTriangles();
@@ -677,6 +687,15 @@ void Tool::init()
      {"name", "", "foo-bar", "name assigned to the output volume"}},
      [&](){mParser.setDefaults();}, [&](){this->forValues();},
      /*anonymous=*/2, /*greedy=*/true);// kernel (index 2) may itself contain '='; accept bare "x+1" or "t=x*x; t+1" alongside kernel='...'
+
+#ifdef VDB_TOOL_USE_AX
+  mParser.addAction(
+     {"ax"}, "run an OpenVDB AX expression over selected grids (requires the openvdb_ax library and LLVM)",
+    {{"vdb", "*", "*|0|0,1", "age(s) (i.e. stack index) of grid(s) to process, or \"*\" for all (default). AX volume code references grids by name via @gridname, so all selected grids are passed to the executable together and may be read or written."},
+     {"code", "", "@v += 1;", "AX code snippet to parse, compile and execute. The \"code=\" prefix is OPTIONAL; the snippet may be given as a bare positional argument, e.g. -ax '@density += 1;'. Selected grids are modified in place. See the OpenVDB AX documentation for the language."}},
+     [&](){mParser.setDefaults();}, [&](){this->ax();},
+     /*anonymous=*/1, /*greedy=*/true);// code (index 1) contains spaces/';'/'='; accept bare "@v+=1;" alongside code='...'
+#endif
 
   mParser.addAction(
      {"sdf2udf"}, "Converts a signed distance field into an unsigned distance field, i.e. performs the Abs of all values and changes GridClass to UNKNOWN.",
@@ -2321,6 +2340,45 @@ void Tool::soupToOffset()
 }// Tool::soupToOffset
 
 // ==============================================================================================================
+
+#ifdef VDB_TOOL_USE_AX
+void Tool::ax()
+{
+  const std::string &action_name = mParser.getAction().names[0];
+  OPENVDB_ASSERT(action_name == "ax");
+  try {
+    mParser.printAction();
+    const std::string code = mParser.get<std::string>("code");
+    if (code.empty()) return;// nothing to do
+
+    // Gather the selected grids. AX volume code addresses grids by name
+    // (@gridname), so the whole selection is handed to a single AX run and
+    // each grid is modified in place (the GridPtrVec holds the same shared
+    // pointers stored on mGrid, so writes land directly on the stack's grids).
+    const std::string vdb = mParser.get<std::string>("vdb");
+    GridPtrVec grids;
+    if (vdb == "*") {
+      for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it) grids.push_back(*it);
+    } else {
+      for (int a : mParser.getVec<int>("vdb")) grids.push_back(*this->getGrid(a));
+    }
+    if (grids.empty()) return;
+
+    if (mParser.verbose) mTimer.start("AX");
+    if (!openvdb::ax::isInitialized()) openvdb::ax::initialize();// lazily set up the LLVM JIT
+    openvdb::ax::run(code.c_str(), grids);
+    if (mParser.verbose) mTimer.stop();
+  } catch (const std::exception& e) {
+    if (mErrorOnWarning) {
+      throw std::invalid_argument(action_name + ": " + e.what());
+    } else {
+      std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
+    }
+  }
+}// Tool::ax
+
+// ==============================================================================================================
+#endif// VDB_TOOL_USE_AX
 
 void Tool::particlesToLevelSet()
 {

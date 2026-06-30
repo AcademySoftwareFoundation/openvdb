@@ -425,7 +425,7 @@ Calculator: unexpected character '@' in expression
 # Building this tool
 
 This tool is using CMake for build on Linux and Windows.
-The only mandatory dependency is [OpenVDB](http://www.openvdb.org). Optional dependencies include NanoVDB, libpng, libjpeg, OpenEXR, Alembic, PDAL, [OpenUSD](https://openusd.org), and [tinygltf](https://github.com/syoyo/tinygltf) (the latter is fetched at configure time, no system install required). To enable them use the `-DOPENVDB_TOOL_USE_<name>=ON` flags (e.g. `-DOPENVDB_TOOL_USE_USD=ON` for USD support, `-DOPENVDB_TOOL_USE_GLTF=ON` for glTF read support, or `-DOPENVDB_TOOL_USE_ALL=ON` to enable everything). See the CMakeLists.txt for details.
+The only mandatory dependency is [OpenVDB](http://www.openvdb.org). Optional dependencies include NanoVDB, libpng, libjpeg, OpenEXR, Alembic, PDAL, [OpenUSD](https://openusd.org), [tinygltf](https://github.com/syoyo/tinygltf) (the latter is fetched at configure time, no system install required), and OpenVDB AX (which in turn requires LLVM). To enable them use the `-DOPENVDB_TOOL_USE_<name>=ON` flags (e.g. `-DOPENVDB_TOOL_USE_USD=ON` for USD support, `-DOPENVDB_TOOL_USE_GLTF=ON` for glTF read support, `-DOPENVDB_TOOL_USE_AX=ON` for the `-ax` action, or `-DOPENVDB_TOOL_USE_ALL=ON` to enable everything). See the CMakeLists.txt for details.
 
 The included unit tests are using Gtest. Add `-DOPENVDB_BUILD_VDB_TOOL_UNITTESTS=ON` to the cmake command line to build it.
 
@@ -549,6 +549,28 @@ vdb_tool uses tinygltf in header-only mode (`TINYGLTF_HEADER_ONLY`), with image 
 vdb_tool -read model.glb -print
 ```
 should list the imported geometry on the stack.
+
+
+## Enabling AX support (optional)
+
+[OpenVDB AX](https://www.openvdb.org/documentation/doxygen/openvdbax.html) is a JIT-compiled, C-like language for editing grid values and point attributes. Enabling it adds the **`-ax`** action, which runs an AX snippet over selected grids &mdash; complementing vdb_tool's built-in `Calculator` (`-calc` / `-forValues`) with the standard AX language, native point-attribute access, and LLVM-backed performance.
+
+AX requires the `openvdb_ax` library, which in turn requires **LLVM** (a large, version-sensitive dependency &mdash; the heaviest of vdb_tool's optional components). Enable it with:
+```bash
+cmake -DOPENVDB_TOOL_USE_AX=ON ..
+```
+The build resolves the AX library the same way the `vdb_ax` CLI does: it links the in-tree `openvdb_ax` target when AX is built alongside OpenVDB (`-DOPENVDB_BUILD_AX=ON`), otherwise the installed `OpenVDB::openvdb_ax` component. See the [OpenVDB build guide](https://github.com/AcademySoftwareFoundation/openvdb#developer-quick-start) for installing LLVM and building AX.
+
+### Usage
+The `code` snippet may be supplied bare (the `code=` prefix is optional), and `vdb` selects which grids to process (`*`, the default, passes the whole stack so the code can address any grid by name via `@gridname`). Selected grids are modified in place. **The `@name` in the AX code must match the grid's name** (the name shown by `-print`, not the file name) &mdash; referencing a name that isn't on the stack is a silent no-op.
+```bash
+# Clamp a density fog volume to non-negative values (grid named "density")
+vdb_tool -read density.vdb -ax '@density = max(@density, 0.0f);' -write clamped.vdb
+
+# Add 1 to every active voxel of a level-set sphere (the grid is named "sphere")
+vdb_tool -sphere -ax 'f@sphere += 1.0f;' -print
+```
+Note: AX's grid run requires the selection to be homogeneous (all numerical *or* all OpenVDB Points grids); a mixed `vdb=*` selection will raise an error.
 
 
 # Examples

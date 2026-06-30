@@ -2187,6 +2187,84 @@ TEST_F(Test_vdb_tool, ActionSwitch)
     }
 }// ActionSwitch
 
+#ifdef VDB_TOOL_USE_AX
+TEST_F(Test_vdb_tool, ActionAX)
+{
+    // The optional -ax action runs an OpenVDB AX snippet over the selected
+    // grids, modifying them in place. AX addresses grids by name (@gridname),
+    // so the grid is named "test" and the kernel references @test. Compiled
+    // only when VDB_TOOL_USE_AX is enabled (requires openvdb_ax + LLVM).
+    using namespace openvdb::vdb_tool;
+    using GridT = openvdb::FloatGrid;
+
+    // 5x5x5 grid where voxel (i,j,k) stores i, named "test" so @test binds it.
+    auto makeInput = [](const std::string& path) {
+        GridT::Ptr grid = GridT::create(0.0f);
+        grid->setName("test");
+        auto acc = grid->getAccessor();
+        for (int i = 0; i <= 4; ++i)
+          for (int j = 0; j <= 4; ++j)
+            for (int k = 0; k <= 4; ++k)
+                acc.setValue(openvdb::Coord(i, j, k), static_cast<float>(i));
+        openvdb::io::File(path).write({grid});
+    };
+    auto readResult = [](const std::string& path) {
+        openvdb::io::File f(path);
+        f.open();
+        return openvdb::gridPtrCast<GridT>(f.readGrid(f.beginName().gridName()));
+    };
+
+    // 1. Additive kernel: @test += 1  =>  every voxel becomes i+1.
+    {
+      makeInput("data/test_ax_in.vdb");
+      auto args = getArgs("vdb_tool -quiet -read data/test_ax_in.vdb"
+                          " -ax f@test+=1.0f; -write data/test_ax_out.vdb");
+      Tool tool(int(args.size()), args.data());
+      EXPECT_NO_THROW(tool.run());
+      auto result = readResult("data/test_ax_out.vdb");
+      ASSERT_TRUE(result != nullptr);
+      auto racc = result->getConstAccessor();
+      for (int i = 0; i <= 4; ++i)
+        for (int j = 0; j <= 4; ++j)
+          for (int k = 0; k <= 4; ++k)
+              EXPECT_NEAR(static_cast<float>(i) + 1.0f,
+                          racc.getValue(openvdb::Coord(i, j, k)), 1e-5f);
+    }
+
+    // 2. Multiplicative kernel: @test = @test * 2  =>  every voxel becomes 2*i.
+    {
+      makeInput("data/test_ax_in.vdb");
+      auto args = getArgs("vdb_tool -quiet -read data/test_ax_in.vdb"
+                          " -ax f@test=f@test*2.0f; -write data/test_ax_out.vdb");
+      Tool tool(int(args.size()), args.data());
+      EXPECT_NO_THROW(tool.run());
+      auto result = readResult("data/test_ax_out.vdb");
+      ASSERT_TRUE(result != nullptr);
+      auto racc = result->getConstAccessor();
+      for (int i = 0; i <= 4; ++i)
+          EXPECT_NEAR(2.0f * static_cast<float>(i),
+                      racc.getValue(openvdb::Coord(i, 0, 0)), 1e-5f);
+    }
+
+    // 3. Invalid AX is a non-fatal, recoverable warning (default mode): the
+    //    run completes without throwing and leaves the grid untouched.
+    {
+      makeInput("data/test_ax_in.vdb");
+      auto args = getArgs("vdb_tool -quiet -read data/test_ax_in.vdb"
+                          " -ax this_is_not_valid_ax@@@ -write data/test_ax_out.vdb");
+      Tool tool(int(args.size()), args.data());
+      EXPECT_NO_THROW(tool.run());
+      auto result = readResult("data/test_ax_out.vdb");
+      ASSERT_TRUE(result != nullptr);
+      auto racc = result->getConstAccessor();
+      // unchanged: voxel (i,*,*) still == i
+      for (int i = 0; i <= 4; ++i)
+          EXPECT_NEAR(static_cast<float>(i),
+                      racc.getValue(openvdb::Coord(i, 0, 0)), 1e-5f);
+    }
+}// ActionAX
+#endif// VDB_TOOL_USE_AX
+
 TEST_F(Test_vdb_tool, Memory)
 {
     using namespace openvdb::vdb_tool;
