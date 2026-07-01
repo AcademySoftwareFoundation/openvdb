@@ -693,7 +693,9 @@ void Tool::init()
      {"ax"}, "run an OpenVDB AX expression over selected grids (requires the openvdb_ax library and LLVM)",
     {{"vdb", "*", "*|0|0,1", "age(s) (i.e. stack index) of grid(s) to process, or \"*\" for all (default). AX volume code references grids by name via @gridname, so all selected grids are passed to the executable together and may be read or written."},
      {"keep", "", "1|0|true|false", "toggle whether the input grid(s) are preserved. By default (keep=false) the selected grids are edited in place; keep=true instead deep-copies each selected grid, runs AX on the copies (which are pushed onto the stack), and leaves the originals untouched."},
-     {"code", "", "@v += 1;", "AX code snippet to parse, compile and execute. The \"code=\" prefix is OPTIONAL; the snippet may be given as a bare positional argument, e.g. -ax '@density += 1;'. See the OpenVDB AX documentation for the language."}},
+     {"code", "", "@v += 1;", "AX code snippet to parse, compile and execute. The \"code=\" prefix is OPTIONAL; the snippet may be given as a bare positional argument, e.g. -ax '@density += 1;'. See the OpenVDB AX documentation for the language."},
+     {"file", "", "prog.ax", "read the AX code from a file instead of the \"code\" option (useful for longer programs). If both are given, \"file\" takes precedence."},
+     {"bindings", "", "x:density,y:temp", "comma-separated axname:gridname pairs that remap AX attribute/grid names to actual grid names, e.g. bindings=x:density makes @x in the code operate on the grid named \"density\". Lets a kernel be written against generic names and retargeted without editing the code."}},
      [&](){mParser.setDefaults();}, [&](){this->ax();},
      /*anonymous=*/2, /*greedy=*/true);// code (index 2) contains spaces/';'/'='; accept bare "@v+=1;" alongside code='...'
 #endif
@@ -2349,8 +2351,42 @@ void Tool::ax()
   OPENVDB_ASSERT(action_name == "ax");
   try {
     mParser.printAction();
-    const std::string code = mParser.get<std::string>("code");
+    // Code comes from either the "code" option or a "file"; file takes
+    // precedence when both are given (useful for longer AX programs).
+    std::string code = mParser.get<std::string>("code");
+    const std::string file = mParser.get<std::string>("file");
+    if (!file.empty()) {
+      std::ifstream in(file);
+      if (!in.is_open()) {
+        throw std::invalid_argument("ax: cannot open code file \"" + file + "\"");
+      }
+      std::stringstream ss;
+      ss << in.rdbuf();
+      code = ss.str();
+    }
     if (code.empty()) return;// nothing to do
+
+    // Optional attribute bindings: "axname:gridname,..." maps names used in
+    // the AX code to actual grid names, so a kernel can be written against
+    // generic names and retargeted without editing it.
+    openvdb::ax::AttributeBindings bindings;
+    const std::string bindStr = mParser.get<std::string>("bindings");
+    if (!bindStr.empty()) {
+      for (const std::string &pair : tokenize(bindStr, ",")) {
+        const size_t c = pair.find(':');
+        if (c == std::string::npos) {
+          throw std::invalid_argument(
+              "ax: bindings entry \"" + pair + "\" must be of the form axname:gridname");
+        }
+        const std::string axName   = trim(pair.substr(0, c));
+        const std::string gridName = trim(pair.substr(c + 1));
+        if (axName.empty() || gridName.empty()) {
+          throw std::invalid_argument(
+              "ax: bindings entry \"" + pair + "\" has an empty name");
+        }
+        bindings.set(axName, gridName);
+      }
+    }
 
     // Gather the selected grids. AX volume code addresses grids by name
     // (@gridname), so the whole selection is handed to a single AX run.
@@ -2381,7 +2417,7 @@ void Tool::ax()
 
     if (mParser.verbose) mTimer.start("AX");
     if (!openvdb::ax::isInitialized()) openvdb::ax::initialize();// lazily set up the LLVM JIT
-    openvdb::ax::run(code.c_str(), grids);
+    openvdb::ax::run(code.c_str(), grids, bindings);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
     if (mErrorOnWarning) {

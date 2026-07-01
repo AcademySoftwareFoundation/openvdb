@@ -576,13 +576,20 @@ cmake -DOPENVDB_TOOL_USE_AX=ON ..
 The build resolves the AX library the same way the `vdb_ax` CLI does: it links the in-tree `openvdb_ax` target when AX is built alongside OpenVDB (`-DOPENVDB_BUILD_AX=ON`), otherwise the installed `OpenVDB::openvdb_ax` component. See the [OpenVDB build guide](https://github.com/AcademySoftwareFoundation/openvdb#developer-quick-start) for installing LLVM and building AX.
 
 ### Usage
-The `code` snippet may be supplied bare (the `code=` prefix is optional), and `vdb` selects which grids to process (`*`, the default, passes the whole stack so the code can address any grid by name via `@gridname`). By default the selected grids are edited **in place**; pass `keep=true` to instead run AX on deep copies (pushed onto the stack) and leave the originals untouched. **The `@name` in the AX code must match the grid's name** (the name shown by `-print`, not the file name) &mdash; referencing a name that isn't on the stack is a silent no-op.
+The `code` snippet may be supplied bare (the `code=` prefix is optional), and `vdb` selects which grids to process (`*`, the default, passes the whole stack so the code can address any grid by name via `@gridname`). By default the selected grids are edited **in place**; pass `keep=true` to instead run AX on deep copies (pushed onto the stack) and leave the originals untouched. Longer programs can be read from a file with `file=prog.ax` (takes precedence over `code=`). **The `@name` in the AX code must match the grid's name** (the name shown by `-print`, not the file name) &mdash; referencing a name that isn't on the stack is a silent no-op, unless it is remapped via `bindings=` (below).
 ```bash
 # Clamp a density fog volume to non-negative values (grid named "density")
 vdb_tool -read density.vdb -ax '@density = max(@density, 0.0f);' -write clamped.vdb
 
 # Add 1 to every active voxel of a level-set sphere (the grid is named "sphere")
 vdb_tool -sphere -ax 'f@sphere += 1.0f;' -print
+
+# Read a longer program from a file
+vdb_tool -read in.vdb -ax file=edit.ax -write out.vdb
+
+# bindings=: write the kernel against a generic name (@x) and retarget it to
+# whichever grid you like without editing the code (here the grid "density").
+vdb_tool -read density.vdb -ax '@x = max(@x, 0.0f);' bindings=x:density -write out.vdb
 ```
 Note: AX's grid run requires the selection to be homogeneous (all numerical *or* all OpenVDB Points grids); a mixed `vdb=*` selection will raise an error.
 

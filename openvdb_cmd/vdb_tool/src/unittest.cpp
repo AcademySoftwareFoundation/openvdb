@@ -2344,6 +2344,40 @@ TEST_F(Test_vdb_tool, ActionAX)
                       oacc.getValue(openvdb::Coord(i, 0, 0)), 1e-5f);  // original: i
       }
     }
+
+    // 5. bindings=: the kernel is written against a generic name "@x" but is
+    //    retargeted to the grid actually named "test" via bindings=x:test.
+    {
+      makeInput("data/test_ax_in.vdb");
+      auto args = getArgs("vdb_tool -quiet -read data/test_ax_in.vdb"
+                          " -ax f@x+=1.0f; bindings=x:test"
+                          " -write data/test_ax_out.vdb");
+      Tool tool(int(args.size()), args.data());
+      EXPECT_NO_THROW(tool.run());
+      auto result = readResult("data/test_ax_out.vdb");
+      ASSERT_TRUE(result != nullptr);
+      auto racc = result->getConstAccessor();
+      for (int i = 0; i <= 4; ++i)
+          EXPECT_NEAR(static_cast<float>(i) + 1.0f,
+                      racc.getValue(openvdb::Coord(i, 0, 0)), 1e-5f);
+    }
+
+    // 6. file=: the AX code is read from a file rather than the code= option.
+    {
+      makeInput("data/test_ax_in.vdb");
+      { std::ofstream f("data/test_ax_prog.ax"); f << "f@test = f@test * 3.0f;\n"; }
+      auto args = getArgs("vdb_tool -quiet -read data/test_ax_in.vdb"
+                          " -ax file=data/test_ax_prog.ax"
+                          " -write data/test_ax_out.vdb");
+      Tool tool(int(args.size()), args.data());
+      EXPECT_NO_THROW(tool.run());
+      auto result = readResult("data/test_ax_out.vdb");
+      ASSERT_TRUE(result != nullptr);
+      auto racc = result->getConstAccessor();
+      for (int i = 0; i <= 4; ++i)
+          EXPECT_NEAR(3.0f * static_cast<float>(i),
+                      racc.getValue(openvdb::Coord(i, 0, 0)), 1e-5f);
+    }
 }// ActionAX
 #endif// VDB_TOOL_USE_AX
 
