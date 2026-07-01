@@ -610,6 +610,34 @@ inline void Calculator::compile(const std::string &expr)
     if (expr.empty()) {
         throw std::invalid_argument("Calculator: empty expression");
     }
+    // Accept OpenVDB AX-style attribute/grid sigils so a simple scalar kernel
+    // is portable between -forValues and -ax: "f@sphere += 1" and
+    // "@density = ..." are normalized to plain identifiers ("sphere",
+    // "density") by dropping the leading '@' plus any single-character AX type
+    // prefix (b/i/l/f/d/v/m/s) sitting at a token boundary immediately before
+    // it. '@' is not otherwise part of the Calculator grammar, so this is
+    // unambiguous. The stripped string is what all the passes below operate on.
+    std::string src;
+    src.reserve(expr.size());
+    for (char c : expr) {
+        if (c == '@') {
+            if (!src.empty()) {
+                const char t = src.back();
+                const bool isType = (t=='b'||t=='i'||t=='l'||t=='f'||
+                                     t=='d'||t=='v'||t=='m'||t=='s');
+                const bool boundary = src.size()==1 ||
+                    !(std::isalnum(static_cast<unsigned char>(src[src.size()-2])) ||
+                      src[src.size()-2]=='_');
+                if (isType && boundary) src.pop_back();
+            }
+            continue;// drop the '@'
+        }
+        src += c;
+    }
+    if (src.empty()) {
+        throw std::invalid_argument("Calculator: expression is empty after removing AX sigils");
+    }
+    const std::string &expr_ = src;// everything below parses the normalized form
     // Dispatch:
     //   '=' or ';' present  -> multi-statement infix (assignments / slots).
     //                          Note: '=' may also be part of '==', '<=', '>=',
@@ -617,21 +645,21 @@ inline void Calculator::compile(const std::string &expr)
     //                          searching for a *standalone* '='.
     //   ':' or '$' present  -> classic RPN, single statement
     //   otherwise           -> classic infix, single statement
-    const bool hasAssign    = expr.find('=') != std::string::npos;
-    const bool hasSemicolon = expr.find(';') != std::string::npos;
-    const bool hasRPNMarker = expr.find(':') != std::string::npos ||
-                              expr.find('$') != std::string::npos;
+    const bool hasAssign    = expr_.find('=') != std::string::npos;
+    const bool hasSemicolon = expr_.find(';') != std::string::npos;
+    const bool hasRPNMarker = expr_.find(':') != std::string::npos ||
+                              expr_.find('$') != std::string::npos;
     if (hasAssign || hasSemicolon) {
         if (hasRPNMarker) {
             throw std::invalid_argument(
                 "Calculator: assignment ('=') and multi-statement (';') "
                 "require infix syntax; remove ':'/'$' or drop the assignment");
         }
-        this->compileStatements(expr);
+        this->compileStatements(expr_);
     } else if (hasRPNMarker) {
-        this->compileRPN(expr);
+        this->compileRPN(expr_);
     } else {
-        this->compileInfix(expr);
+        this->compileInfix(expr_);
     }
     this->foldConstants();// must run BEFORE lazifyBranches: fold rewrites the
                           // bytecode without preserving jump-target offsets, so
@@ -809,6 +837,28 @@ inline void Calculator::compileStatements(const std::string &expr)
         if (eq != std::string::npos) {
             lhs = trim(s.substr(0, eq));
             rhs = trim(s.substr(eq + 1));
+            // Compound assignment: an LHS ending in an arithmetic operator
+            // (x += e, x -= e, x *= e, x /= e, x %= e) is desugared to
+            // "x = x <op> (e)". The parentheses preserve precedence, e.g.
+            // "x *= a + b" becomes "x = x * (a + b)". Comparison operators
+            // (==, <=, >=, !=) never reach here because findStandaloneEq skips
+            // their '='. Only desugar when the stripped target is a valid
+            // identifier, so a genuine mistake like "a+b = c" still falls
+            // through to the "invalid assignment target" error below.
+            if (!lhs.empty()) {
+                const char op = lhs.back();
+                if (op == '+' || op == '-' || op == '*' || op == '/' || op == '%') {
+                    const std::string target = trim(lhs.substr(0, lhs.size() - 1));
+                    if (isIdentifier(target)) {
+                        if (rhs.empty()) {
+                            throw std::invalid_argument(
+                                "Calculator: empty right-hand side of compound assignment \"" + s + "\"");
+                        }
+                        lhs = target;
+                        rhs = target + " " + op + " (" + rhs + ")";
+                    }
+                }
+            }
             if (findStandaloneEq(rhs) != std::string::npos) {
                 throw std::invalid_argument(
                     "Calculator: chained '=' is not supported (statement: \"" + s + "\")");

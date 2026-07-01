@@ -2909,6 +2909,10 @@ void Tool::forValues()
       mGrid.push_back(tmp);
       grid = tmp;
     }
+    // Capture the output grid's ORIGINAL name before it is renamed below, so
+    // an AX-style kernel can address it by that name (e.g. "-forOnValues
+    // 'f@sphere += 1'" on a grid named "sphere"), matching -ax semantics.
+    const std::string origName0 = grid->getName();
     if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
     grid->setName(grid_name);
 
@@ -2917,9 +2921,11 @@ void Tool::forValues()
       // Gather every grid referenced via use=/vdb= as a "read source".
       // grids[0] is the OUTPUT (being iterated and written); grids[1..]
       // are read-only inputs.
-      struct GridRef { std::string name; int age; GridT::Ptr grid; };
+      // `alias` is the grid's own name (AX-style @gridname access); it may
+      // equal `name` (the use= binding) or be empty for an unnamed grid.
+      struct GridRef { std::string name; std::string alias; int age; GridT::Ptr grid; };
       std::vector<GridRef> grids;
-      grids.push_back({voxel_vars[0], ages[0], grid});
+      grids.push_back({voxel_vars[0], origName0, ages[0], grid});
       for (size_t k = 1; k < ages.size(); ++k) {
           auto itK = this->getGrid(ages[k]);
           GridT::Ptr gK = gridPtrCast<GridT>(*itK);
@@ -2935,14 +2941,19 @@ void Tool::forValues()
                       "name \"" + voxel_vars[k] + "\" in use=...");
               }
           }
-          grids.push_back({voxel_vars[k], ages[k], gK});
+          grids.push_back({voxel_vars[k], gK->getName(), ages[k], gK});
       }
 
       Calculator calc;
-      // Configure the neighbor-function rewriter BEFORE compile so calls
-      // like "x(1,0,0)" or "y(0,1,0)" are recognized for ANY grid name in
-      // voxel_vars and synthesized into "<name>(dx,dy,dz)" variables.
-      calc.setNeighborFunctions(voxel_vars);
+      // Configure the neighbor-function rewriter BEFORE compile so calls like
+      // "x(1,0,0)" (use= name) or "sphere(1,0,0)" (grid name) are recognized
+      // for ANY registered name and synthesized into "<name>(dx,dy,dz)" vars.
+      std::vector<std::string> neighborNames;
+      for (const GridRef &g : grids) {
+          neighborNames.push_back(g.name);
+          if (!g.alias.empty() && g.alias != g.name) neighborNames.push_back(g.alias);
+      }
+      calc.setNeighborFunctions(neighborNames);
       calc.compile(kernel);// throws on syntax error / unknown op
 
       const auto &mem = mParser.processor.memory();
@@ -2953,29 +2964,34 @@ void Tool::forValues()
       auto parseNeighbor = [&grids](const std::string &name,
                                      int &gridIdx, int &dx, int &dy, int &dz) -> bool {
           for (size_t k = 0; k < grids.size(); ++k) {
-              const std::string prefix = grids[k].name + "(";
-              if (name.size() <= prefix.size() + 1) continue;
-              if (name.compare(0, prefix.size(), prefix) != 0) continue;
-              if (name.back() != ')') continue;
-              const std::string inner = name.substr(
-                  prefix.size(), name.size() - prefix.size() - 1);
-              int vals[3] = {0, 0, 0};
-              int idx = 0;
-              size_t start = 0;
-              bool ok = true;
-              for (size_t i = 0; i <= inner.size(); ++i) {
-                  if (i == inner.size() || inner[i] == ',') {
-                      if (idx >= 3) { ok = false; break; }
-                      const std::string num = inner.substr(start, i - start);
-                      try { vals[idx++] = std::stoi(num); }
-                      catch (...) { ok = false; break; }
-                      start = i + 1;
+              // A grid can be addressed by its use= name or by its own name
+              // (@gridname); try both as the "<prefix>(dx,dy,dz)" prefix.
+              for (const std::string &nm : {grids[k].name, grids[k].alias}) {
+                  if (nm.empty()) continue;
+                  const std::string prefix = nm + "(";
+                  if (name.size() <= prefix.size() + 1) continue;
+                  if (name.compare(0, prefix.size(), prefix) != 0) continue;
+                  if (name.back() != ')') continue;
+                  const std::string inner = name.substr(
+                      prefix.size(), name.size() - prefix.size() - 1);
+                  int vals[3] = {0, 0, 0};
+                  int idx = 0;
+                  size_t start = 0;
+                  bool ok = true;
+                  for (size_t i = 0; i <= inner.size(); ++i) {
+                      if (i == inner.size() || inner[i] == ',') {
+                          if (idx >= 3) { ok = false; break; }
+                          const std::string num = inner.substr(start, i - start);
+                          try { vals[idx++] = std::stoi(num); }
+                          catch (...) { ok = false; break; }
+                          start = i + 1;
+                      }
                   }
+                  if (!ok || idx != 3) continue;
+                  gridIdx = static_cast<int>(k);
+                  dx = vals[0]; dy = vals[1]; dz = vals[2];
+                  return true;
               }
-              if (!ok || idx != 3) continue;
-              gridIdx = static_cast<int>(k);
-              dx = vals[0]; dy = vals[1]; dz = vals[2];
-              return true;
           }
           return false;
       };
@@ -2996,7 +3012,11 @@ void Tool::forValues()
           // Center reference: bare name == one of the registered grid names.
           int matchedGrid = -1;
           for (size_t k = 0; k < grids.size(); ++k) {
-              if (grids[k].name == name) { matchedGrid = static_cast<int>(k); break; }
+              // Match either the use= name or the grid's own name (@gridname).
+              if (grids[k].name == name ||
+                  (!grids[k].alias.empty() && grids[k].alias == name)) {
+                  matchedGrid = static_cast<int>(k); break;
+              }
           }
           if (matchedGrid >= 0) {
               centers.push_back({static_cast<int>(i), matchedGrid});

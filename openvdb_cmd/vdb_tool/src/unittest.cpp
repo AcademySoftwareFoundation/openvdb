@@ -1335,6 +1335,59 @@ TEST_F(Test_vdb_tool, Calculator)
       EXPECT_EQ(11.0f, c.eval(5.0f));        // (5*2)+1
     }
 
+    {// Compound assignment operators (+=, -=, *=, /=, %=) desugar to
+     // "x = x <op> (rhs)". Verifies each operator and that the rhs is
+     // parenthesized so precedence is preserved.
+      Calculator c;
+      c.compile("x += 1");                  // x = x + (1)
+      EXPECT_EQ(6.0f, c.eval(5.0f));
+      c.compile("x -= 2");                  // x = x - (2)
+      EXPECT_EQ(3.0f, c.eval(5.0f));
+      c.compile("x *= 3");                  // x = x * (3)
+      EXPECT_EQ(15.0f, c.eval(5.0f));
+      c.compile("x /= 4");                  // x = x / (4)
+      EXPECT_EQ(2.5f, c.eval(10.0f));
+      c.compile("x %= 3");                  // x = x % (3)
+      EXPECT_EQ(2.0f, c.eval(5.0f));
+
+      // Precedence: "x *= a + b" must be "x = x*(a+b)" = 5*(1+2) = 15, not
+      // "x*a + b" = 5*1 + 2 = 7.
+      c.compile("a = 1; b = 2; x *= a + b; x");
+      EXPECT_EQ(15.0f, c.eval(5.0f));
+
+      // Works as an intermediate statement too, updating an existing slot.
+      c.compile("t = 10; t += 5; t");
+      EXPECT_EQ(15.0f, c.eval());
+
+      // A compound operator with an invalid (non-identifier) target still
+      // reports the assignment-target error rather than silently desugaring.
+      EXPECT_THROW(c.compile("a + b *= c"), std::invalid_argument);
+    }
+
+    {// OpenVDB AX-style sigils are stripped so simple kernels are portable
+     // between -forValues and -ax: "@x", "f@x", "v@x" all normalize to the
+     // plain variable "x".
+      Calculator c;
+      c.compile("@x + 1");                  // '@' dropped -> x + 1
+      ASSERT_EQ(1u, c.variables().size());
+      EXPECT_EQ("x", c.variables()[0]);
+      EXPECT_EQ(6.0f, c.eval(5.0f));
+
+      c.compile("f@x += 1");                // typed sigil + compound assign
+      ASSERT_EQ(1u, c.variables().size());
+      EXPECT_EQ("x", c.variables()[0]);     // "f" prefix stripped, not a new var
+      EXPECT_EQ(6.0f, c.eval(5.0f));
+
+      c.compile("v@x * 2");                 // vec-type sigil letter also stripped
+      EXPECT_EQ("x", c.variables()[0]);
+      EXPECT_EQ(10.0f, c.eval(5.0f));
+
+      // Sigil in a sub-expression / after an operator boundary.
+      c.compile("2 * f@x + 1");
+      EXPECT_EQ("x", c.variables()[0]);
+      EXPECT_EQ(11.0f, c.eval(5.0f));       // 2*5 + 1
+    }
+
     {// Multi-statement: trailing semicolons and whitespace are tolerated
       Calculator c;
       EXPECT_NO_THROW(c.compile("t = x*x;  ;  t + 1;"));
@@ -1582,10 +1635,12 @@ TEST_F(Test_vdb_tool, Calculator)
     }
 
     {// Column-aware error messages include "column N" and a caret line.
+      // ('#' is a genuinely invalid character; '@' is now stripped as an
+      //  AX sigil so it can no longer serve as the "bad char" here.)
       Calculator c;
       try {
-          c.compile("1 + @ + 2");
-          FAIL() << "expected throw on '@'";
+          c.compile("1 + # + 2");
+          FAIL() << "expected throw on '#'";
       } catch (const std::exception &e) {
           const std::string what = e.what();
           EXPECT_TRUE(what.find("column") != std::string::npos)

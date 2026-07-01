@@ -309,6 +309,8 @@ In RPN, the punctuation operators have word-form aliases: `mod`, `lt`/`gt`/`le`/
 
 Multi-statement kernels are separated by `;`. Each statement except the last must be an assignment `name = <expr>`, declaring a *local slot* whose value is reused by subsequent statements. The final statement may be either a plain expression or an assignment; either way its right-hand side is the value written back to the voxel. A trailing semicolon is fine.
 
+The **compound-assignment operators** `+=`, `-=`, `*=`, `/=` and `%=` are also accepted; `x op= e` desugars to `x = x op (e)` (the right-hand side is parenthesized, so `x *= a + b` means `x = x*(a+b)`). This makes in-place updates read naturally, e.g. `-forOnValues 'v += 1'`.
+
 ```bash
 # Reuse a squared subexpression instead of recomputing it.
 vdb_tool -read in.vdb -forAllValues 't = v*v; t + sin(t)' -write out.vdb
@@ -323,6 +325,18 @@ vdb_tool -read in.vdb -eval '{2:@scale}' -eval '{0.5:@bias}' -forOnValues 'scale
 ```
 
 A slot name shadows any input variable of the same name from the point of its first assignment, mirroring ordinary scripting-language scoping. So `'v = v*2; v + 1'` reads the input `v` once on the right-hand side of the first statement, then reads the slot for every subsequent reference.
+
+### AX-compatible syntax
+
+For portability with the optional [`-ax` action](#enabling-ax-support-optional), the kernel language also accepts OpenVDB AX-style attribute sigils: a leading `@` and any single-character AX type prefix (`b`/`i`/`l`/`f`/`d`/`v`/`m`/`s`) are stripped, so `@sphere` and `f@sphere` both normalize to the plain variable `sphere`. In addition, the iterated grid may be addressed by its own name (as shown by `-print`), not just by the `use=` variable. Combined with the compound operators above, a simple scalar kernel is therefore **written once and run by either engine**:
+
+```bash
+# The SAME kernel under the LLVM-JIT AX engine and the built-in Calculator VM:
+vdb_tool -sphere -ax          'f@sphere += 1.0f;'   # requires -DOPENVDB_TOOL_USE_AX=ON
+vdb_tool -sphere -forOnValues 'f@sphere += 1.0f;'   # always available
+```
+
+This convergence covers the common per-voxel scalar subset only; AX-only features (control flow, functions, vectors, point attributes) remain exclusive to `-ax`, and a kernel using them will not compile under `-forValues`.
 
 ### Example commands
 
@@ -571,6 +585,8 @@ vdb_tool -read density.vdb -ax '@density = max(@density, 0.0f);' -write clamped.
 vdb_tool -sphere -ax 'f@sphere += 1.0f;' -print
 ```
 Note: AX's grid run requires the selection to be homogeneous (all numerical *or* all OpenVDB Points grids); a mixed `vdb=*` selection will raise an error.
+
+For simple scalar kernels the same string also runs under `-forValues` without AX/LLVM &mdash; the built-in `Calculator` accepts the AX `@`/`f@` sigils and compound operators (see [AX-compatible syntax](#ax-compatible-syntax)).
 
 
 # Examples
