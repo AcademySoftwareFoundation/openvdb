@@ -16,7 +16,7 @@
 #define OPENVDB_TOOLS_LEVELSETFILTER_HAS_BEEN_INCLUDED
 
 #include "LevelSetTracker.h"
-#include "Interpolation.h"
+#include "Interpolation.h"// for tools::AlphaMask
 #include <algorithm> // for std::max()
 #include <functional>
 #include <type_traits>
@@ -173,7 +173,7 @@ private:
         using BufferT = typename tree::LeafManager<TreeType>::BufferType;
         using LeafRange = typename tree::LeafManager<TreeType>::LeafRange;
         using LeafIterT = typename LeafRange::Iterator;
-        using AlphaMaskT = tools::AlphaMask<GridT, MaskT>;
+        using AlphaMaskT = tools::AlphaMask<GridT, MaskT>;// defined in tools/Interpolation.h
 
         Filter(LevelSetFilter* parent, const MaskType* mask) : mParent(parent), mMask(mask) {}
         Filter(const Filter&) = default;

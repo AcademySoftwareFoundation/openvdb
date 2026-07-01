@@ -18,6 +18,7 @@ option(OPENVDB_BUILD_VDB_PRINT "Build vdb_print" ON)
 option(OPENVDB_BUILD_VDB_LOD "Build vdb_lod" OFF)
 option(OPENVDB_BUILD_VDB_RENDER "Build vdb_render" OFF)
 option(OPENVDB_BUILD_VDB_VIEW "Build vdb_view" OFF)
+option(OPENVDB_BUILD_VDB_VIZ "Build vdb_viz (Polyscope-based viewer)" OFF)
 option(OPENVDB_BUILD_VDB_TOOL "Build vdb_tool" OFF)
 option(OPENVDB_BUILD_VDB_AX "Build the OpenVDB AX command line binary" OFF)
 
@@ -77,6 +78,10 @@ endif()
 
 if (OPENVDB_BUILD_VDB_VIEW)
   add_subdirectory(vdb_view)
+endif()
+
+if (OPENVDB_BUILD_VDB_VIZ)
+  add_subdirectory(vdb_viz)
 endif()
 
 if (OPENVDB_BUILD_VDB_AX)

@@ -90,7 +90,7 @@ enum class FastSweepingDomain {
 ///                 Each iteration performs 2^3 = 8 individual sweeps.
 ///
 /// @note Strictly speaking a fog volume is normalized to the range [0,1] but this
-///       method accepts a scalar volume with an arbritary range, as long as the it
+///       method accepts a scalar volume with an arbitrary range, as long as the it
 ///       includes the @a isoValue.
 ///
 /// @details Topology of output grid is identical to that of the input grid, except
@@ -180,7 +180,7 @@ sdfToSdf(const GridT &sdfGrid,
 ///                 is supplied as an argument for @a mode.
 ///
 /// @note Strictly speaking a fog volume is normalized to the range [0,1] but this
-///       method accepts a scalar volume with an arbritary range, as long as the it
+///       method accepts a scalar volume with an arbitrary range, as long as the it
 ///       includes the @a isoValue.
 ///
 /// @details Topology of output grid is identical to that of the input grid, except
@@ -298,7 +298,7 @@ sdfToExt(const SdfGridT &sdfGrid,
 ///                 is supplied as an argument for @a mode.
 ///
 /// @note Strictly speaking a fog volume is normalized to the range [0,1] but this
-///       method accepts a scalar volume with an arbritary range, as long as the it
+///       method accepts a scalar volume with an arbitrary range, as long as the it
 ///       includes the @a isoValue.
 ///
 /// @details Topology of output grids are identical to that of the input grid, except
@@ -361,7 +361,7 @@ fogToSdfAndExt(const FogGridT &fogGrid,
 ///                 is supplied as an argument for @a mode.
 ///
 /// @note Strictly speaking a fog volume is normalized to the range [0,1] but this
-///       method accepts a scalar volume with an arbritary range, as long as the it
+///       method accepts a scalar volume with an arbitrary range, as long as the it
 ///       includes the @a isoValue.
 ///
 /// @details Topology of output grids are identical to that of the input grid, except

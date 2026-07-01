@@ -26,12 +26,12 @@ int main(int argc, char *argv[])
 
     } catch (const std::exception& e) {
 
-        OPENVDB_LOG_FATAL(std::string("Tool: ")+e.what());
+        std::cerr << "Fatal error in " << argv[0] << ":\n\t" << e.what() << std::endl;
         exitStatus = EXIT_FAILURE;
 
     } catch (...) {
 
-        OPENVDB_LOG_FATAL("Tool: exception of unknown type caught");
+        std::cerr << "Fatal error in " << argv[0] << ":\n\texception of unknown type caught" << std::endl;
         exitStatus = EXIT_FAILURE;
         std::terminate();
 
