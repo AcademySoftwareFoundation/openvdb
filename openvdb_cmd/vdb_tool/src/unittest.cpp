@@ -2317,6 +2317,33 @@ TEST_F(Test_vdb_tool, ActionAX)
           EXPECT_NEAR(static_cast<float>(i),
                       racc.getValue(openvdb::Coord(i, 0, 0)), 1e-5f);
     }
+
+    // 4. keep=true runs AX on a deep copy: the ORIGINAL grid is left intact
+    //    and the modified copy is pushed onto the stack. Write vdb=0 (copy)
+    //    and vdb=1 (original) to separate files and verify each.
+    {
+      makeInput("data/test_ax_in.vdb");
+      // keep=true on the first -write so it doesn't consume the copy, leaving
+      // both grids on the stack for the second write.
+      auto args = getArgs("vdb_tool -quiet -read data/test_ax_in.vdb"
+                          " -ax f@test+=1.0f; keep=true"
+                          " -write vdb=0 keep=true data/test_ax_copy.vdb"
+                          " -write vdb=1 data/test_ax_orig.vdb");
+      Tool tool(int(args.size()), args.data());
+      EXPECT_NO_THROW(tool.run());
+      auto copy = readResult("data/test_ax_copy.vdb");
+      auto orig = readResult("data/test_ax_orig.vdb");
+      ASSERT_TRUE(copy != nullptr);
+      ASSERT_TRUE(orig != nullptr);
+      auto cacc = copy->getConstAccessor();
+      auto oacc = orig->getConstAccessor();
+      for (int i = 0; i <= 4; ++i) {
+          EXPECT_NEAR(static_cast<float>(i) + 1.0f,
+                      cacc.getValue(openvdb::Coord(i, 0, 0)), 1e-5f);  // copy: i+1
+          EXPECT_NEAR(static_cast<float>(i),
+                      oacc.getValue(openvdb::Coord(i, 0, 0)), 1e-5f);  // original: i
+      }
+    }
 }// ActionAX
 #endif// VDB_TOOL_USE_AX
 

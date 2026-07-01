@@ -1,11 +1,12 @@
 # vdb_tool
-The vdb_tool is a versatile command-line utility that chains together high-level operations from the OpenVDB library. It can convert polygon meshes and particles into level sets, perform complex volumetric transformations, and generate adaptive meshes or ray-traced images. Results can be exported as particles, meshes, or VDB files, or streamed directly to STDOUT for seamless pipelining with other renderers. We denote the operations **actions**, and their arguments **options**. Any sequence of **actions** and their **options** can be exported and imported to configuration files, which allows convenient reuse. This command-line tool also supports a string-evaluation language that can be used to define procedural expressions for options of the actions. Currently the following list of actions are supported:
+The vdb_tool is a versatile yet lightweight command-line utility that chains together high-level operations from the OpenVDB library. It can convert polygon meshes and particles into level sets, perform complex volumetric transformations, and generate adaptive meshes or ray-traced images. Results can be exported as particles, meshes, or VDB files, or streamed directly to STDOUT for seamless pipelining with other renderers. We denote the operations **actions**, and their arguments **options**. Any sequence of **actions** and their **options** can be exported and imported to configuration files, which allows convenient reuse. This command-line tool also supports a string-evaluation language that can be used to define procedural expressions for options of the actions. Currently the following list of actions are supported:
 
 <!-- BEGIN AUTO-GENERATED ACTION TABLE — do not edit by hand. Regenerate with:
        vdb_tool -help format=md
      and replace everything between the BEGIN/END markers with the output. -->
 | Action | Description |
 |---|---|
+| **ax** | run an OpenVDB AX expression over selected grids (requires the openvdb_ax library and LLVM) |
 | **calc** | calculate string expression |
 | **case** | case branch inside a -switch scope. Body runs only if key matches the parent -switch's selector. Use key=* or key=default for a catch-all that fires when no earlier case matched. Closed by -end. |
 | **clear** | Deletes geometry, VDB grids and local variables |
@@ -67,7 +68,6 @@ The vdb_tool is a versatile command-line utility that chains together high-level
 | **sdf2udf** | Converts a signed distance field into an unsigned distance field, i.e. performs the Abs of all values and changes GridClass to UNKNOWN. |
 | **segment** | segment an input VDB into a list if topologically disconnected VDB grids |
 | **slice** | Generate images of slices of a VDB grid |
-| **soup2ls** | Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
 | **soup2offset** | Convert a polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
 | **soup2udf** | Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band |
 | **sphere** | Create a level set sphere, i.e. a narrow-band signed distance to a sphere |
@@ -576,7 +576,7 @@ cmake -DOPENVDB_TOOL_USE_AX=ON ..
 The build resolves the AX library the same way the `vdb_ax` CLI does: it links the in-tree `openvdb_ax` target when AX is built alongside OpenVDB (`-DOPENVDB_BUILD_AX=ON`), otherwise the installed `OpenVDB::openvdb_ax` component. See the [OpenVDB build guide](https://github.com/AcademySoftwareFoundation/openvdb#developer-quick-start) for installing LLVM and building AX.
 
 ### Usage
-The `code` snippet may be supplied bare (the `code=` prefix is optional), and `vdb` selects which grids to process (`*`, the default, passes the whole stack so the code can address any grid by name via `@gridname`). Selected grids are modified in place. **The `@name` in the AX code must match the grid's name** (the name shown by `-print`, not the file name) &mdash; referencing a name that isn't on the stack is a silent no-op.
+The `code` snippet may be supplied bare (the `code=` prefix is optional), and `vdb` selects which grids to process (`*`, the default, passes the whole stack so the code can address any grid by name via `@gridname`). By default the selected grids are edited **in place**; pass `keep=true` to instead run AX on deep copies (pushed onto the stack) and leave the originals untouched. **The `@name` in the AX code must match the grid's name** (the name shown by `-print`, not the file name) &mdash; referencing a name that isn't on the stack is a silent no-op.
 ```bash
 # Clamp a density fog volume to non-negative values (grid named "density")
 vdb_tool -read density.vdb -ax '@density = max(@density, 0.0f);' -write clamped.vdb

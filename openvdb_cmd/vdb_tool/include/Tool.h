@@ -692,9 +692,10 @@ void Tool::init()
   mParser.addAction(
      {"ax"}, "run an OpenVDB AX expression over selected grids (requires the openvdb_ax library and LLVM)",
     {{"vdb", "*", "*|0|0,1", "age(s) (i.e. stack index) of grid(s) to process, or \"*\" for all (default). AX volume code references grids by name via @gridname, so all selected grids are passed to the executable together and may be read or written."},
-     {"code", "", "@v += 1;", "AX code snippet to parse, compile and execute. The \"code=\" prefix is OPTIONAL; the snippet may be given as a bare positional argument, e.g. -ax '@density += 1;'. Selected grids are modified in place. See the OpenVDB AX documentation for the language."}},
+     {"keep", "", "1|0|true|false", "toggle whether the input grid(s) are preserved. By default (keep=false) the selected grids are edited in place; keep=true instead deep-copies each selected grid, runs AX on the copies (which are pushed onto the stack), and leaves the originals untouched."},
+     {"code", "", "@v += 1;", "AX code snippet to parse, compile and execute. The \"code=\" prefix is OPTIONAL; the snippet may be given as a bare positional argument, e.g. -ax '@density += 1;'. See the OpenVDB AX documentation for the language."}},
      [&](){mParser.setDefaults();}, [&](){this->ax();},
-     /*anonymous=*/1, /*greedy=*/true);// code (index 1) contains spaces/';'/'='; accept bare "@v+=1;" alongside code='...'
+     /*anonymous=*/2, /*greedy=*/true);// code (index 2) contains spaces/';'/'='; accept bare "@v+=1;" alongside code='...'
 #endif
 
   mParser.addAction(
@@ -2352,17 +2353,31 @@ void Tool::ax()
     if (code.empty()) return;// nothing to do
 
     // Gather the selected grids. AX volume code addresses grids by name
-    // (@gridname), so the whole selection is handed to a single AX run and
-    // each grid is modified in place (the GridPtrVec holds the same shared
-    // pointers stored on mGrid, so writes land directly on the stack's grids).
+    // (@gridname), so the whole selection is handed to a single AX run.
+    const bool keep = mParser.get<bool>("keep");
     const std::string vdb = mParser.get<std::string>("vdb");
-    GridPtrVec grids;
+    GridPtrVec selected;
     if (vdb == "*") {
-      for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it) grids.push_back(*it);
+      for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it) selected.push_back(*it);
     } else {
-      for (int a : mParser.getVec<int>("vdb")) grids.push_back(*this->getGrid(a));
+      for (int a : mParser.getVec<int>("vdb")) selected.push_back(*this->getGrid(a));
     }
-    if (grids.empty()) return;
+    if (selected.empty()) return;
+
+    // With keep=false (default) AX edits the stack's grids in place (the
+    // GridPtrVec holds the same shared pointers). With keep=true we run AX on
+    // deep copies pushed onto the stack, leaving the originals untouched;
+    // names are preserved so @gridname cross-references still resolve.
+    GridPtrVec grids;
+    if (keep) {
+      for (const GridBase::Ptr &g : selected) {
+        GridBase::Ptr copy = g->deepCopyGrid();
+        mGrid.push_back(copy);
+        grids.push_back(copy);
+      }
+    } else {
+      grids = selected;
+    }
 
     if (mParser.verbose) mTimer.start("AX");
     if (!openvdb::ax::isInitialized()) openvdb::ax::initialize();// lazily set up the LLVM JIT
