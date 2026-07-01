@@ -1286,11 +1286,14 @@ Parser::Parser(std::vector<Option> &&def)
 
     this->addAction(
         {"calc", "math"}, "calculate string expression",
-        {{"kernel", "", "3*sin(x)+y", "math expression. The \"kernel=\" prefix is OPTIONAL; the kernel may also be supplied as a bare positional argument, e.g. \"-calc '3*sin(x)+y'\" or \"-calc 'x=1+2'\". Input variables are read from the Processor's string memory (the same namespace used by -eval). Supports infix, RPN ($-prefixed), and infix multi-statement (;-separated) programs with assignment. Echoes the result only when the trailing statement is a plain expression; assignment-terminated kernels are silent since their outputs are already in memory."}},
+        {{"kernel", "", "3*sin(x)+y", "math expression. The \"kernel=\" prefix is OPTIONAL; the kernel may also be supplied as a bare positional argument, e.g. \"-calc '3*sin(x)+y'\" or \"-calc 'x=1+2'\". Input variables are read from the Processor's string memory (the same namespace used by -eval). Supports infix, RPN ($-prefixed), and infix multi-statement (;-separated) programs with assignment. Echoes the result only when the trailing statement is a plain expression; assignment-terminated kernels are silent since their outputs are already in memory."},
+         {"file", "", "prog.txt", "read the expression from a file instead of the \"kernel\" option (useful for longer programs). If both are given, \"file\" takes precedence."}},
         [](){},// no pre-processing
         [&](){// post-process
             OPENVDB_ASSERT(iter->names[0] == "calc");
-            const std::string kernel = this->getStr("kernel");
+            std::string kernel = this->getStr("kernel");
+            const std::string file = this->getStr("file");
+            if (!file.empty()) kernel = readFileToString(file);
             if (kernel.empty()) return;
             Calculator cal;
             cal.compile(kernel);

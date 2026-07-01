@@ -660,7 +660,8 @@ void Tool::init()
      {"use", "v", "v|x|x,y", "name(s) of the kernel variable(s) bound to the voxel value(s) of the input grid(s). Defaults to \"v\". Accepts a comma-separated list matching vdb=: use=x,y vdb=0,1 makes \"x\" the output grid and \"y\" a read-only input. Each name is excluded from the Processor-memory lookup and may be called as a function (e.g. \"x(1,0,0)\") to read a relative neighbor through a per-thread ConstAccessor."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
-     {"name", "", "foo-bar", "name assigned to the output volume"}},
+     {"name", "", "foo-bar", "name assigned to the output volume"},
+     {"file", "", "prog.txt", "read the kernel from a file instead of the \"kernel\" option (useful for longer kernels). If both are given, \"file\" takes precedence."}},
      [&](){mParser.setDefaults();}, [&](){this->forValues();},
      /*anonymous=*/2, /*greedy=*/true);// kernel (index 2) may itself contain '='; accept bare "x+1" or "t=x*x; t+1" alongside kernel='...'
 
@@ -672,7 +673,8 @@ void Tool::init()
      {"use", "v", "v|x|x,y", "name(s) of the kernel variable(s) bound to the voxel value(s) of the input grid(s). Defaults to \"v\". Accepts a comma-separated list matching vdb=: use=x,y vdb=0,1 makes \"x\" the output grid and \"y\" a read-only input. Each name is excluded from the Processor-memory lookup and may be called as a function (e.g. \"x(1,0,0)\") to read a relative neighbor through a per-thread ConstAccessor."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
-     {"name", "", "foo-bar", "name assigned to the output volume"}},
+     {"name", "", "foo-bar", "name assigned to the output volume"},
+     {"file", "", "prog.txt", "read the kernel from a file instead of the \"kernel\" option (useful for longer kernels). If both are given, \"file\" takes precedence."}},
      [&](){mParser.setDefaults();}, [&](){this->forValues();},
      /*anonymous=*/2, /*greedy=*/true);// kernel (index 2) may itself contain '='; accept bare "x+1" or "t=x*x; t+1" alongside kernel='...'
 
@@ -684,7 +686,8 @@ void Tool::init()
      {"use", "v", "v|x|x,y", "name(s) of the kernel variable(s) bound to the voxel value(s) of the input grid(s). Defaults to \"v\". Accepts a comma-separated list matching vdb=: use=x,y vdb=0,1 makes \"x\" the output grid and \"y\" a read-only input. Each name is excluded from the Processor-memory lookup and may be called as a function (e.g. \"x(1,0,0)\") to read a relative neighbor through a per-thread ConstAccessor."},
      {"class", "", "ls", "class label of the output volume."},
      {"background", "", "1.5,2.0", "background value(s) of the output volume. If two values are provided they are assumed to be outside, inside"},
-     {"name", "", "foo-bar", "name assigned to the output volume"}},
+     {"name", "", "foo-bar", "name assigned to the output volume"},
+     {"file", "", "prog.txt", "read the kernel from a file instead of the \"kernel\" option (useful for longer kernels). If both are given, \"file\" takes precedence."}},
      [&](){mParser.setDefaults();}, [&](){this->forValues();},
      /*anonymous=*/2, /*greedy=*/true);// kernel (index 2) may itself contain '='; accept bare "x+1" or "t=x*x; t+1" alongside kernel='...'
 
@@ -2355,15 +2358,7 @@ void Tool::ax()
     // precedence when both are given (useful for longer AX programs).
     std::string code = mParser.get<std::string>("code");
     const std::string file = mParser.get<std::string>("file");
-    if (!file.empty()) {
-      std::ifstream in(file);
-      if (!in.is_open()) {
-        throw std::invalid_argument("ax: cannot open code file \"" + file + "\"");
-      }
-      std::stringstream ss;
-      ss << in.rdbuf();
-      code = ss.str();
-    }
+    if (!file.empty()) code = readFileToString(file);
     if (code.empty()) return;// nothing to do
 
     // Optional attribute bindings: "axname:gridname,..." maps names used in
@@ -2935,7 +2930,9 @@ void Tool::forValues()
     std::vector<int> ages = mParser.getVec<int>("vdb");
     std::vector<std::string> voxel_vars = mParser.getVec<std::string>("use");
     const bool keep = mParser.get<bool>("keep");
-    const std::string kernel = mParser.get<std::string>("kernel");
+    std::string kernel = mParser.get<std::string>("kernel");
+    const std::string kernelFile = mParser.get<std::string>("file");
+    if (!kernelFile.empty()) kernel = readFileToString(kernelFile);
     const std::string cls = mParser.get<std::string>("class");
     std::vector<float> back = mParser.getVec<float>("background");
     std::string grid_name = mParser.get<std::string>("name");

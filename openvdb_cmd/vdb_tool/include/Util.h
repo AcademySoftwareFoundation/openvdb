@@ -28,6 +28,7 @@
 #include <cstdio> // for std::fileno (used by Spinner's TTY detection)
 #include <cstring>// for std::strtok
 #include <filesystem>// for std::filesystem::path (used by getFile/getName/getPath/getExt/replacePath/replaceExt)
+#include <fstream> // for std::ifstream (used by readFileToString)
 #include <iomanip> // for std::setfill
 #include <iostream>
 #include <map>     // for std::multimap (used by fuzzyMatch)
@@ -99,6 +100,18 @@ inline bool fileExists(const std::string &fileOrPath)
 {
     struct stat buffer;
     return stat(fileOrPath.c_str(), &buffer) == 0;
+}
+
+/// @brief Read an entire file into a string (used by the "file=" option of the
+///        -ax / -calc / -forValues actions to load a program/kernel from disk).
+/// @throw std::invalid_argument if the file cannot be opened.
+inline std::string readFileToString(const std::string &path)
+{
+    std::ifstream in(path, std::ios::binary);
+    if (!in.is_open()) throw std::invalid_argument("cannot open file \"" + path + "\"");
+    std::stringstream ss;
+    ss << in.rdbuf();
+    return ss.str();
 }
 
 /// @brief Normalize backslashes to forward slashes so Windows-style paths

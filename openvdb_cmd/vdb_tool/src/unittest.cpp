@@ -1890,6 +1890,22 @@ TEST_F(Test_vdb_tool, ActionCalc)
               << "error did not describe the float-parse failure: " << what;
       }
     }
+
+    {// file= reads the expression from a file instead of kernel=
+      { std::ofstream f("data/test_calc_prog.txt"); f << "a = 6; b = a * 7\n"; }
+      Parser p({});
+      p.finalize();
+      runCapture(p, "vdb_tool -quiet -calc file=data/test_calc_prog.txt");
+      ASSERT_TRUE(p.processor.memory().isSet("b"));
+      EXPECT_EQ(42.0f, strTo<float>(p.processor.memory().get("b")));
+    }
+
+    {// file= on a non-existent path throws a clear error
+      Parser p({});
+      p.finalize();
+      EXPECT_THROW(runCapture(p, "vdb_tool -quiet -calc file=data/no_such_calc_file.txt"),
+                   std::exception);
+    }
 }// ActionCalc
 
 TEST_F(Test_vdb_tool, ActionForValuesGreedy)

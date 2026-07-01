@@ -134,7 +134,7 @@ Example: the [switch-statement example above](#switch-statement-to-pick-one-of-n
 
 # Standalone calculator (-calc)
 
-The `-calc` action runs a single math expression through the same compiler used by the per-voxel kernels (see next section), but at command-line scope: input variables are read from the Processor's string memory (the same `{...}` namespace described above), and outputs (intermediate slot values and the trailing-LHS name) are written back to that memory. The numeric result is printed **only when the final statement is a plain expression** (no trailing `=`); a kernel that ends in an assignment is silent, since its outputs are already accessible via memory.
+The `-calc` action runs a single math expression through the same compiler used by the per-voxel kernels (see next section), but at command-line scope: input variables are read from the Processor's string memory (the same `{...}` namespace described above), and outputs (intermediate slot values and the trailing-LHS name) are written back to that memory. The numeric result is printed **only when the final statement is a plain expression** (no trailing `=`); a kernel that ends in an assignment is silent, since its outputs are already accessible via memory. For longer programs the expression can be read from a file with `file=prog.txt` (takes precedence over `kernel=`).
 
 The expression can be supplied either as a bare positional argument (`-calc 'x=1+2'`) or via the explicit option syntax (`-calc kernel='x=1+2'`); the two are equivalent. The bare form is supported because `-calc`'s single option is registered with `Action::kAnonymousGreedy`, so the parser accepts tokens that contain `=` without trying to interpret the prefix as an option name.
 
@@ -275,6 +275,8 @@ The same expression can be written in any of three equivalent syntaxes:
 All three compile to identical-shape bytecode. The compiler dispatches on the markers it sees: `=` or `;` &rarr; multi-statement infix; otherwise `:` or `$` &rarr; RPN; otherwise plain infix.
 
 The kernel can be supplied either as a bare positional argument (`-forOnValues 'sin(v)+1'`) or via the explicit `kernel='...'` form (`-forOnValues kernel='sin(v)+1'`); the two are equivalent. Other options of the same action (e.g. `keep=true`, `class=ls`) parse normally regardless of which form you use, because the greedy fallback only kicks in for tokens whose `name=` prefix isn't a recognized option.
+
+For longer kernels, `file=prog.txt` reads the expression from a file instead of the inline option (this `file=` option is shared by `-calc`, the `-forXValues` actions, and `-ax`). If both are given, `file=` takes precedence.
 
 ### Operators (infix)
 
