@@ -209,4 +209,63 @@ TEST(TestMemoryResource, PointsToGrid_InjectedInstanceSeam)
     ASSERT_EQ(cudaFree(d_coords), cudaSuccess);
 }
 
+//======================================================================
+// A Point grid built through a custom (non-default) resource must still
+// encode its point coordinates. The encode path must not depend on the
+// resource type; only allocation does.
+//======================================================================
+
+TEST(TestMemoryResource, PointsToGrid_PointEncodedWithCustomResource)
+{
+    using BuildT = nanovdb::Point;
+    using Vec3T  = nanovdb::Vec3d;
+
+    const size_t pointCount = 256;
+    std::vector<Vec3T> points;
+    points.reserve(pointCount);
+    std::srand(98765);
+    const int max = 128, min = -max;
+    auto op = [&]() { return double(std::rand() % (max - min) + min); };
+    while (points.size() < pointCount) points.emplace_back(op(), op(), op());
+
+    Vec3T* d_points = nullptr;
+    const size_t pointSize = points.size() * sizeof(Vec3T);
+    ASSERT_EQ(cudaMalloc(&d_points, pointSize), cudaSuccess);
+    ASSERT_EQ(cudaMemcpy(d_points, points.data(), pointSize, cudaMemcpyHostToDevice), cudaSuccess);
+
+    const double voxelSize = 8.0;
+    CountingResource res;
+    nanovdb::tools::cuda::PointsToGrid<BuildT, CountingResource> converter(voxelSize, nanovdb::Vec3d(0.0), 0, res);
+    auto handle = converter.getHandle(d_points, pointCount);
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    ASSERT_EQ(cudaFree(d_points), cudaSuccess);
+
+    EXPECT_TRUE(handle.deviceData());
+    EXPECT_TRUE(handle.deviceGrid<BuildT>());
+
+    handle.deviceDownload();
+    auto* grid = handle.grid<BuildT>();
+    ASSERT_TRUE(grid);
+    EXPECT_EQ(pointCount, grid->pointCount());
+
+    // Every input point must be recoverable from the encoded per-voxel point data.
+    nanovdb::PointAccessor<Vec3T, BuildT> acc(*grid);
+    ASSERT_TRUE(acc);
+    for (size_t i = 0; i < points.size(); ++i) {
+        const nanovdb::Coord ijk = grid->worldToIndex(points[i]).round();
+        ASSERT_TRUE(acc.probeLeaf(ijk) != nullptr);
+        ASSERT_TRUE(acc.isActive(ijk));
+        const Vec3T *start = nullptr, *stop = nullptr;
+        const uint64_t count = acc.voxelPoints(ijk, start, stop);
+        ASSERT_TRUE(start);
+        ASSERT_TRUE(stop);
+        bool found = false;
+        for (uint64_t j = 0; !found && j < count; ++j)
+            found = nanovdb::math::isApproxZero<double>((points[i] - start[j]).lengthSqr());
+        EXPECT_TRUE(found);
+    }
+
+    EXPECT_GT(res.allocs, 0);
+}
+
 } // unnamed namespace
