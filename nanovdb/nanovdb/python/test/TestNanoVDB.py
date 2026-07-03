@@ -2074,5 +2074,326 @@ class TestOpenToNanoVDB(unittest.TestCase):
             pass
 
 
+class TestGridTransformAliases(unittest.TestCase):
+    """worldToIndex / indexToWorld and friends are aliases of the apply*
+    transform family, mirroring the C++ Grid<TreeT> convenience names."""
+
+    def setUp(self):
+        self.handle = nanovdb.tools.createLevelSetSphere(
+            nanovdb.GridType.Float, radius=10.0, voxelSize=0.5
+        )
+        self.grid = self.handle.grid()
+
+    def test_world_index_point_aliases(self):
+        p = nanovdb.math.Vec3d(1.5, -2.0, 3.25)
+        self.assertEqual(self.grid.worldToIndex(p), self.grid.applyInverseMap(p))
+        self.assertEqual(self.grid.indexToWorld(p), self.grid.applyMap(p))
+        roundtrip = self.grid.indexToWorld(self.grid.worldToIndex(p))
+        for i in range(3):
+            self.assertAlmostEqual(roundtrip[i], p[i], places=12)
+
+    def test_direction_and_gradient_aliases(self):
+        d = nanovdb.math.Vec3d(0.25, 1.0, -0.5)
+        self.assertEqual(self.grid.worldToIndexDir(d), self.grid.applyInverseJacobian(d))
+        self.assertEqual(self.grid.indexToWorldDir(d), self.grid.applyJacobian(d))
+        self.assertEqual(self.grid.indexToWorldGrad(d), self.grid.applyIJT(d))
+
+    def test_single_precision_aliases(self):
+        p = nanovdb.math.Vec3f(1.5, -2.0, 3.25)
+        self.assertEqual(self.grid.worldToIndexF(p), self.grid.applyInverseMapF(p))
+        self.assertEqual(self.grid.indexToWorldF(p), self.grid.applyMapF(p))
+        self.assertEqual(self.grid.worldToIndexDirF(p), self.grid.applyInverseJacobianF(p))
+        self.assertEqual(self.grid.indexToWorldDirF(p), self.grid.applyJacobianF(p))
+        self.assertEqual(self.grid.indexToWorldGradF(p), self.grid.applyIJTF(p))
+
+
+class TestGridValuePointCount(unittest.TestCase):
+    """valueCount() on Index/OnIndex grids and pointCount() on PointGrid,
+    mirroring the SFINAE-gated C++ Grid methods."""
+
+    def setUp(self):
+        self.src = nanovdb.tools.createLevelSetSphere(
+            nanovdb.GridType.Float, radius=5.0, voxelSize=1.0
+        )
+
+    def test_on_index_value_count(self):
+        handle = nanovdb.tools.createNanoGridOnIndex(self.src.grid())
+        grid = handle.grid()
+        self.assertIsInstance(grid, nanovdb.OnIndexGrid)
+        self.assertGreaterEqual(grid.valueCount(), self.src.grid().activeVoxelCount())
+
+    def test_index_value_count(self):
+        handle = nanovdb.tools.createNanoGridIndex(self.src.grid())
+        grid = handle.grid()
+        self.assertIsInstance(grid, nanovdb.IndexGrid)
+        self.assertGreaterEqual(grid.valueCount(), self.src.grid().activeVoxelCount())
+
+    def test_point_count_bound_on_point_grid(self):
+        # pointCount() lives on NanoGrid<Point> (GridType.PointIndex). The
+        # point primitives bake UInt32 PointData grids, so only the binding's
+        # presence can be verified host-side without an OpenVDB conversion.
+        self.assertIn("pointCount", dir(nanovdb.PointGrid))
+        self.assertNotIn("valueCount", dir(nanovdb.PointGrid))
+        point_data_grid = nanovdb.tools.createPointSphere(
+            pointsPerVoxel=2, radius=5.0, voxelSize=1.0
+        ).grid()
+        self.assertIsInstance(point_data_grid, nanovdb.UInt32Grid)
+        self.assertFalse(hasattr(point_data_grid, "pointCount"))
+
+    def test_gated_to_matching_buildts(self):
+        float_grid = self.src.grid()
+        self.assertFalse(hasattr(float_grid, "valueCount"))
+        self.assertFalse(hasattr(float_grid, "pointCount"))
+        on_index_grid = nanovdb.tools.createNanoGridOnIndex(float_grid).grid()
+        self.assertFalse(hasattr(on_index_grid, "pointCount"))
+
+
+class TestSamplerGradient(unittest.TestCase):
+    """gradient() on the trilinear sampler and zeroCrossing() on the
+    trilinear + triquadratic samplers, for floating-point grids only."""
+
+    def setUp(self):
+        self.radius = 10.0
+        self.voxelSize = 0.5
+        self.handle = nanovdb.tools.createLevelSetSphere(
+            nanovdb.GridType.Float, radius=self.radius, voxelSize=self.voxelSize
+        )
+        self.grid = self.handle.grid()
+        # Index-space position on the sphere surface, on the +x axis.
+        self.surface = self.grid.worldToIndex(nanovdb.math.Vec3d(self.radius, 0.0, 0.0))
+
+    def test_trilinear_gradient_points_outward(self):
+        sampler = nanovdb.math.createTrilinearSampler(self.grid)
+        surface_f = nanovdb.math.Vec3f(
+            self.surface[0], self.surface[1], self.surface[2]
+        )
+        g = sampler.gradient(surface_f)
+        # An SDF in world units sampled on an index-space lattice changes by
+        # ~voxelSize per index step along the outward normal (+x here). The
+        # tangential components pick up the sphere's curvature across the
+        # stencil cell, so they are small but not zero.
+        self.assertAlmostEqual(g[0], self.voxelSize, places=3)
+        self.assertAlmostEqual(g[1], 0.0, delta=0.05)
+        self.assertAlmostEqual(g[2], 0.0, delta=0.05)
+        # The Vec3d overload agrees.
+        gd = sampler.gradient(nanovdb.math.Vec3d(self.surface))
+        for i in range(3):
+            self.assertAlmostEqual(g[i], gd[i], places=5)
+
+    def test_zero_crossing(self):
+        # Probe just inside the surface: an exactly-zero stencil corner is
+        # not a strict sign change, so the on-surface lattice point (20,0,0)
+        # itself does not count as a crossing.
+        inside = nanovdb.math.Vec3d(self.surface[0] - 0.5, 0.0, 0.0)
+        for make in (
+            nanovdb.math.createTrilinearSampler,
+            nanovdb.math.createTriquadraticSampler,
+        ):
+            sampler = make(self.grid)
+            self.assertTrue(abs(sampler(inside)) < self.voxelSize)
+            self.assertTrue(sampler.zeroCrossing(inside))
+            # Deep inside the narrow band there is no crossing.
+            self.assertFalse(sampler.zeroCrossing(nanovdb.math.Vec3d(0.0, 0.0, 0.0)))
+
+    def test_gated_to_matching_orders_and_buildts(self):
+        nn = nanovdb.math.createNearestNeighborSampler(self.grid)
+        self.assertFalse(hasattr(nn, "gradient"))
+        self.assertFalse(hasattr(nn, "zeroCrossing"))
+        tq = nanovdb.math.createTriquadraticSampler(self.grid)
+        self.assertFalse(hasattr(tq, "gradient"))
+        tc = nanovdb.math.createTricubicSampler(self.grid)
+        self.assertFalse(hasattr(tc, "gradient"))
+        self.assertFalse(hasattr(tc, "zeroCrossing"))
+        bbox = nanovdb.math.CoordBBox(nanovdb.math.Coord(0), nanovdb.math.Coord(7))
+        int_grid = nanovdb.tools.createInt32Grid(
+            0, "ints", nanovdb.GridClass.Unknown, lambda ijk: 1, bbox
+        ).grid()
+        int_sampler = nanovdb.math.createTrilinearSampler(int_grid)
+        self.assertFalse(hasattr(int_sampler, "gradient"))
+        self.assertFalse(hasattr(int_sampler, "zeroCrossing"))
+
+
+class TestChecksumMethods(unittest.TestCase):
+    def test_mode_queries(self):
+        handle = nanovdb.tools.createLevelSetSphere(
+            nanovdb.GridType.Float, radius=5.0, voxelSize=1.0
+        )
+        grid = handle.grid()
+        stored = grid.checksum()
+        self.assertFalse(stored.isEmpty())
+        self.assertNotEqual(stored.mode(), nanovdb.CheckMode.Disable)
+        self.assertEqual(stored.isFull(), stored.mode() == nanovdb.CheckMode.Full)
+        self.assertEqual(stored.isHalf(), stored.mode() == nanovdb.CheckMode.Partial)
+        disabled = nanovdb.tools.evalChecksum(grid, nanovdb.CheckMode.Disable)
+        self.assertTrue(disabled.isEmpty())
+        self.assertEqual(disabled.mode(), nanovdb.CheckMode.Disable)
+
+
+class TestCreateNanoGridClass(unittest.TestCase):
+    """tools.CreateNanoGrid converter: bake with authored blind-data
+    channels, filled through the writable getBlindData() NumPy view."""
+
+    def _build_source(self):
+        g = nanovdb.tools.build.FloatGrid(0.0, "blind_src", nanovdb.GridClass.Unknown)
+        for i in range(8):
+            g.setValue(nanovdb.math.Coord(i, 0, 0), float(i + 1))
+        return g
+
+    def test_bake_without_blind_data(self):
+        src = self._build_source()
+        handle = nanovdb.tools.CreateNanoGrid(src).getHandle()
+        grid = handle.grid()
+        self.assertIsInstance(grid, nanovdb.FloatGrid)
+        acc = grid.getAccessor()
+        for i in range(8):
+            self.assertEqual(acc.getValue(nanovdb.math.Coord(i, 0, 0)), float(i + 1))
+        self.assertEqual(grid.blindDataCount(), 0)
+
+    def test_author_float_channel(self):
+        import numpy as np
+
+        conv = nanovdb.tools.CreateNanoGrid(self._build_source())
+        channel = conv.addBlindData("uv", count=100)
+        self.assertEqual(channel, 0)
+        handle = conv.getHandle()
+        grid = handle.grid()
+        self.assertEqual(grid.blindDataCount(), 1)
+        n = grid.findBlindData("uv")
+        self.assertEqual(n, 0)
+        meta = grid.blindMetaData(n)
+        self.assertEqual(meta.valueCount, 100)
+        self.assertEqual(meta.valueSize, 4)
+        self.assertEqual(meta.dataType, nanovdb.GridType.Float)
+        self.assertTrue(meta.isValid())
+        view = grid.getBlindData(n)
+        self.assertEqual(view.shape, (100,))
+        self.assertTrue(np.all(view == 0.0))
+        view[:] = np.arange(100, dtype=np.float32)
+        again = grid.getBlindData(n)
+        self.assertTrue(np.array_equal(again, np.arange(100, dtype=np.float32)))
+
+    def test_author_vec3f_channel_with_semantic(self):
+        conv = nanovdb.tools.CreateNanoGrid(self._build_source())
+        conv.addBlindData(
+            "N",
+            count=10,
+            dataType=nanovdb.GridType.Vec3f,
+            dataSemantic=nanovdb.GridBlindDataSemantic.PointNormal,
+        )
+        grid = conv.getHandle().grid()
+        n = grid.findBlindDataForSemantic(nanovdb.GridBlindDataSemantic.PointNormal)
+        self.assertEqual(n, 0)
+        self.assertEqual(grid.blindMetaData(n).valueSize, 12)
+        self.assertEqual(grid.getBlindData(n).shape, (10, 3))
+
+    def test_multiple_channels_from_nanogrid_source(self):
+        src = nanovdb.tools.createLevelSetSphere(
+            nanovdb.GridType.Float, radius=5.0, voxelSize=1.0
+        )
+        conv = nanovdb.tools.CreateNanoGrid(src.grid())
+        self.assertEqual(conv.addBlindData("a", count=4), 0)
+        self.assertEqual(
+            conv.addBlindData("b", count=4, dataType=nanovdb.GridType.Int32), 1
+        )
+        grid = conv.getHandle().grid()
+        self.assertEqual(grid.blindDataCount(), 2)
+        self.assertEqual(grid.findBlindData("a"), 0)
+        self.assertEqual(grid.findBlindData("b"), 1)
+        # The baked grid still carries the source's values.
+        self.assertEqual(grid.activeVoxelCount(), src.grid().activeVoxelCount())
+
+    def test_rejects_invalid_specs(self):
+        conv = nanovdb.tools.CreateNanoGrid(self._build_source())
+        with self.assertRaises(ValueError):
+            conv.addBlindData("x" * 300, count=1)
+        with self.assertRaises(ValueError):
+            conv.addBlindData(
+                "bad", count=1, dataClass=nanovdb.GridBlindDataClass.GridName
+            )
+        with self.assertRaises(ValueError):
+            conv.addBlindData("opaque", count=1, dataType=nanovdb.GridType.Unknown)
+        # Unknown dataType is allowed when the element size is explicit.
+        conv.addBlindData(
+            "opaque", count=16, dataType=nanovdb.GridType.Unknown, size=1
+        )
+        self.assertEqual(conv.getHandle().grid().blindDataCount(), 1)
+
+    def test_rejects_unsupported_source(self):
+        src = nanovdb.tools.createLevelSetSphere(
+            nanovdb.GridType.Float, radius=5.0, voxelSize=1.0
+        )
+        on_index = nanovdb.tools.createNanoGridOnIndex(src.grid()).grid()
+        with self.assertRaises(TypeError):
+            nanovdb.tools.CreateNanoGrid(on_index)
+        with self.assertRaises(TypeError):
+            nanovdb.tools.CreateNanoGrid(None)
+
+
+class TestChannelAccessor(unittest.TestCase):
+    """ChannelAccessor reads an Index/OnIndex grid's blind-data channel by
+    Coord; createChannelAccessor dispatches on the channel's dataType."""
+
+    def setUp(self):
+        self.src = nanovdb.tools.createLevelSetSphere(
+            nanovdb.GridType.Float, radius=5.0, voxelSize=1.0
+        )
+        self.surface = nanovdb.math.Coord(5, 0, 0)
+
+    def test_factory_reads_channel_values(self):
+        handle = nanovdb.tools.createNanoGridIndex(self.src.grid(), channels=1)
+        grid = handle.grid()
+        acc = nanovdb.createChannelAccessor(grid, 0)
+        self.assertIsInstance(acc, nanovdb.IndexFloatChannelAccessor)
+        self.assertTrue(bool(acc))
+        self.assertEqual(acc.valueCount(), grid.valueCount())
+        src_acc = self.src.grid().getAccessor()
+        for ijk in (self.surface, nanovdb.math.Coord(0, 5, 0), nanovdb.math.Coord(0, 0, 5)):
+            self.assertEqual(acc.getValue(ijk), src_acc.getValue(ijk))
+            self.assertEqual(acc(ijk), src_acc(ijk))
+        self.assertEqual(
+            acc(self.surface.x, self.surface.y, self.surface.z),
+            src_acc(self.surface),
+        )
+        self.assertTrue(acc.isActive(self.surface))
+        value, is_on = acc.probeValue(self.surface)
+        self.assertEqual(value, src_acc.getValue(self.surface))
+        self.assertTrue(is_on)
+        self.assertGreater(acc.getIndex(self.surface), 0)
+        self.assertEqual(
+            acc.getIndex(self.surface),
+            acc.idx(self.surface.x, self.surface.y, self.surface.z),
+        )
+
+    def test_on_index_factory(self):
+        handle = nanovdb.tools.createNanoGridOnIndex(self.src.grid(), channels=1)
+        acc = nanovdb.createChannelAccessor(handle.grid())
+        self.assertIsInstance(acc, nanovdb.OnIndexFloatChannelAccessor)
+        src_acc = self.src.grid().getAccessor()
+        self.assertEqual(acc.getValue(self.surface), src_acc.getValue(self.surface))
+
+    def test_direct_constructor_and_set_channel(self):
+        handle = nanovdb.tools.createNanoGridIndex(self.src.grid(), channels=2)
+        grid = handle.grid()
+        acc = nanovdb.IndexFloatChannelAccessor(grid, 1)
+        self.assertTrue(bool(acc))
+        acc.setChannel(0)
+        self.assertTrue(bool(acc))
+        with self.assertRaises(IndexError):
+            acc.setChannel(2)
+
+    def test_errors(self):
+        handle = nanovdb.tools.createNanoGridIndex(self.src.grid(), channels=1)
+        grid = handle.grid()
+        with self.assertRaises(IndexError):
+            nanovdb.createChannelAccessor(grid, 1)
+        with self.assertRaises(TypeError):
+            nanovdb.IndexDoubleChannelAccessor(grid, 0)
+        with self.assertRaises(TypeError):
+            nanovdb.createChannelAccessor(self.src.grid(), 0)
+        bare = nanovdb.tools.createNanoGridIndex(self.src.grid(), channels=0)
+        with self.assertRaises(IndexError):
+            nanovdb.createChannelAccessor(bare.grid(), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

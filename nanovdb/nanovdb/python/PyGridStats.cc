@@ -76,12 +76,11 @@ static void defineExtrema(nb::module_& m, const char* name)
 
 // ----- Stats<ValueT> binding (inherits Extrema) -----
 template<typename BuildT>
-static void defineStats(nb::module_& m, const char* name, const char* baseName)
+static void defineStats(nb::module_& m, const char* name)
 {
     using ValueT  = typename NanoGrid<BuildT>::ValueType;
     using BaseT   = tools::Extrema<ValueT>;
     using StatsT  = tools::Stats<ValueT>;
-    (void)baseName; // kept in signature for parity with extrema name lookup
 
     nb::class_<StatsT, BaseT>(m, name,
         "Running min/max/mean/variance/std accumulator over a stream of "
@@ -185,10 +184,10 @@ void defineGridStatsModule(nb::module_& toolsModule)
     // value types are all distinct so we get N pairs of new Python classes.
 #define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, GridTypeEnum)             \
     defineExtrema<T>(toolsModule, #Suffix "Extrema");                          \
-    defineStats<T>(toolsModule,   #Suffix "Stats", #Suffix "Extrema");
+    defineStats<T>(toolsModule,   #Suffix "Stats");
 #define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, GridTypeEnum) \
     defineExtrema<T>(toolsModule, #Suffix "Extrema");                            \
-    defineStats<T>(toolsModule,   #Suffix "Stats", #Suffix "Extrema");
+    defineStats<T>(toolsModule,   #Suffix "Stats");
 #include "BuildTypes.def"
 
     // Polymorphic updateGridStats. Accepts any bound NanoGrid<BuildT> (via

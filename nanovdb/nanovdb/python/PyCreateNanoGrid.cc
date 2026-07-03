@@ -11,7 +11,9 @@
 #include <nanovdb/tools/CreateNanoGrid.h>
 #include <nanovdb/tools/GridBuilder.h>
 
+#include <cstring>
 #include <string>
+#include <vector>
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -239,6 +241,175 @@ nb::object createIndexImpl(nb::handle  py_src,
     throw nb::type_error(msg.c_str());
 }
 
+// ----- tools.CreateNanoGrid: converter class with blind-data authoring -----
+//
+// Mirrors nanovdb::tools::CreateNanoGrid<SrcGridT>. The C++ class is
+// templated on the source grid type, so this binding stores the source
+// Python object plus the recorded settings and addBlindData() calls, then
+// dispatches over the supported SrcBuildTs when getHandle() is called —
+// constructing the C++ converter, replaying the recorded state, and baking
+// the handle. The destination BuildT is the source BuildT (the C++
+// default); quantized and index destinations remain on the
+// createNanoGridFp* / createNanoGridIndex free functions above. Authored
+// channels come back zeroed — fill them through the writable NumPy view
+// returned by grid.getBlindData(n).
+
+// Byte size of one element of the given blind-data GridType, or 0 when the
+// size cannot be derived (the caller must then pass it explicitly). Matches
+// the per-type size table enforced by GridBlindMetaData::isValid().
+uint32_t blindDataTypeSize(GridType dataType)
+{
+    switch (dataType) {
+    case GridType::Float:   return 4u;
+    case GridType::Double:  return 8u;
+    case GridType::Int16:   return 2u;
+    case GridType::Int32:   return 4u;
+    case GridType::Int64:   return 8u;
+    case GridType::UInt8:   return 1u;
+    case GridType::UInt32:  return 4u;
+    case GridType::Half:    return 2u;
+    case GridType::RGBA8:   return 4u;
+    case GridType::Fp8:     return 1u;
+    case GridType::Fp16:    return 2u;
+    case GridType::Vec3f:   return 12u;
+    case GridType::Vec3d:   return 24u;
+    case GridType::Vec4f:   return 16u;
+    case GridType::Vec4d:   return 32u;
+    case GridType::Vec3u8:  return 3u;
+    case GridType::Vec3u16: return 6u;
+    default: return 0u;
+    }
+}
+
+class PyCreateNanoGrid
+{
+    struct BlindDataSpec
+    {
+        std::string           name;
+        GridBlindDataSemantic semantic;
+        GridBlindDataClass    dataClass;
+        GridType              dataType;
+        uint64_t              count;
+        uint32_t              size;
+    };
+
+public:
+    explicit PyCreateNanoGrid(nb::object src)
+        : mSrc(std::move(src))
+    {
+        if (!(matches<float>() || matches<double>() ||
+              matches<int32_t>() || matches<Vec3f>())) {
+            throw nb::type_error(
+                "CreateNanoGrid: source must be a FloatGrid, DoubleGrid, "
+                "Int32Grid, Vec3fGrid, or the matching "
+                "nanovdb.tools.build.* mutable grid.");
+        }
+    }
+
+    // Validates eagerly (the C++ ctor only NANOVDB_ASSERTs, which release
+    // builds skip) so mistakes surface here rather than as an invalid grid.
+    uint64_t addBlindData(const std::string&    name,
+                          uint64_t              count,
+                          GridType              dataType,
+                          GridBlindDataSemantic semantic,
+                          GridBlindDataClass    dataClass,
+                          uint32_t              size)
+    {
+        if (name.size() >= GridBlindMetaData::MaxNameSize) {
+            throw nb::value_error(
+                "addBlindData: name exceeds the 255 character limit.");
+        }
+        if (size == 0u) size = blindDataTypeSize(dataType);
+        if (size == 0u) {
+            throw nb::value_error(
+                "addBlindData: the element size cannot be derived from this "
+                "dataType — pass size explicitly.");
+        }
+        const GridBlindMetaData meta(0, count, size, semantic, dataClass, dataType);
+        if (!meta.isValid()) {
+            throw nb::value_error(
+                "addBlindData: invalid combination of dataSemantic, "
+                "dataClass, dataType, and size.");
+        }
+        mBlind.push_back(BlindDataSpec{name, semantic, dataClass, dataType, count, size});
+        return static_cast<uint64_t>(mBlind.size() - 1);
+    }
+
+    void setStats(tools::StatsMode mode) { mStats = mode; }
+    void setChecksum(CheckMode mode) { mChecksum = mode; }
+    void setVerbose(int mode) { mVerbose = mode; }
+    void enableDithering(bool on) { mDither = on; }
+
+    nb::object getHandle() const
+    {
+        if (auto r = tryGetHandle<float>();   r.is_valid()) return r;
+        if (auto r = tryGetHandle<double>();  r.is_valid()) return r;
+        if (auto r = tryGetHandle<int32_t>(); r.is_valid()) return r;
+        if (auto r = tryGetHandle<Vec3f>();   r.is_valid()) return r;
+        throw nb::type_error("CreateNanoGrid: unsupported source grid type.");
+    }
+
+private:
+    template<typename SrcBuildT> bool matches() const
+    {
+        return nb::isinstance<NanoGrid<SrcBuildT>>(mSrc) ||
+               nb::isinstance<tools::build::Grid<SrcBuildT>>(mSrc);
+    }
+
+    template<typename SrcBuildT> nb::object tryGetHandle() const
+    {
+        using NanoSrcT  = NanoGrid<SrcBuildT>;
+        using BuildSrcT = tools::build::Grid<SrcBuildT>;
+        if (nb::isinstance<NanoSrcT>(mSrc)) return this->bake(nb::cast<const NanoSrcT&>(mSrc));
+        if (nb::isinstance<BuildSrcT>(mSrc)) return this->bake(nb::cast<const BuildSrcT&>(mSrc));
+        return nb::object();
+    }
+
+    // Same GIL pattern as tryQuantizeFpX: the dispatch above runs with the
+    // GIL held, the traversal runs without it (the source's lifetime is
+    // anchored by mSrc).
+    template<typename SrcGridT> nb::object bake(const SrcGridT& src) const
+    {
+        GridHandle<HostBuffer> handle;
+        {
+            nb::gil_scoped_release release;
+            tools::CreateNanoGrid<SrcGridT> converter(src);
+            converter.setStats(mStats);
+            converter.setChecksum(mChecksum);
+            converter.setVerbose(mVerbose);
+            converter.enableDithering(mDither);
+            for (const auto& b : mBlind) {
+                converter.addBlindData(b.name, b.semantic, b.dataClass, b.dataType,
+                                       static_cast<size_t>(b.count),
+                                       static_cast<size_t>(b.size));
+            }
+            handle = converter.getHandle();
+            // The C++ converter allocates authored channels without clearing
+            // them (C++ callers memcpy their payload in). Zero-fill here so
+            // the NumPy view starts deterministic. The authored channels are
+            // the first mBlind.size() blind-data entries — any converter-
+            // added channel (e.g. a long grid name) is appended after them.
+            if (!mBlind.empty()) {
+                if (auto* dst = const_cast<GridData*>(handle.gridData())) {
+                    for (size_t i = 0; i < mBlind.size(); ++i) {
+                        const GridBlindMetaData* meta = dst->blindMetaData(uint32_t(i));
+                        std::memset(const_cast<void*>(meta->blindData()), 0,
+                                    meta->blindDataSize());
+                    }
+                }
+            }
+        }
+        return nb::cast(std::move(handle));
+    }
+
+    nb::object                 mSrc;
+    std::vector<BlindDataSpec> mBlind;
+    tools::StatsMode           mStats    = tools::StatsMode::Default;
+    CheckMode                  mChecksum = CheckMode::Default;
+    int                        mVerbose  = 0;
+    bool                       mDither   = false;
+};
+
 } // namespace
 
 void defineCreateNanoGridConversions(nb::module_& toolsModule)
@@ -370,6 +541,46 @@ void defineCreateNanoGridConversions(nb::module_& toolsModule)
         "Convert a source grid into a NanoGrid<ValueOnIndex>. Only the "
         "active voxels get a sequential index — the canonical input to "
         "buildVoxelBlockManager.");
+
+    // ------ CreateNanoGrid converter class (blind-data authoring) ------
+    nb::class_<PyCreateNanoGrid>(toolsModule, "CreateNanoGrid",
+        "Reusable converter mirroring nanovdb::tools::CreateNanoGrid. "
+        "Construct from a NanoGrid or nanovdb.tools.build.* grid (float, "
+        "double, int32, or Vec3f), optionally declare blind-data channels "
+        "with addBlindData(), then bake a fresh NanoGrid of the same BuildT "
+        "with getHandle(). Authored channels come back zero-filled — write "
+        "their contents through the writable NumPy view returned by "
+        "grid.getBlindData(n). For quantized (Fp*) or index destinations "
+        "use the createNanoGridFp* / createNanoGridIndex functions instead.")
+        .def(nb::init<nb::object>(), "srcGrid"_a,
+             "Construct a converter reading from srcGrid (a NanoGrid or "
+             "nanovdb.tools.build.* grid of BuildT float, double, int32, or "
+             "Vec3f). The converter keeps srcGrid alive.")
+        .def("addBlindData", &PyCreateNanoGrid::addBlindData,
+             "name"_a, "count"_a, "dataType"_a = GridType::Float,
+             "dataSemantic"_a = GridBlindDataSemantic::Unknown,
+             "dataClass"_a = GridBlindDataClass::AttributeArray,
+             "size"_a = 0u,
+             "Declare a blind-data channel of count elements of dataType to "
+             "be allocated in the destination grid, and return its channel "
+             "index. size (bytes per element) is derived from dataType when "
+             "omitted; pass it explicitly for dataTypes without a fixed "
+             "element size. The C++ signature orders the parameters (name, "
+             "dataSemantic, dataClass, dataType, count, size) — reordered "
+             "here so the common case reads addBlindData(name, count).")
+        .def("setStats", &PyCreateNanoGrid::setStats, "mode"_a,
+             "Set the StatsMode used when baking the destination grid.")
+        .def("setChecksum", &PyCreateNanoGrid::setChecksum, "mode"_a,
+             "Set the CheckMode used when baking the destination grid.")
+        .def("setVerbose", &PyCreateNanoGrid::setVerbose, "mode"_a = 1,
+             "Set the verbosity level used when baking the destination grid.")
+        .def("enableDithering", &PyCreateNanoGrid::enableDithering, "on"_a = true,
+             "Toggle dithering of the destination grid (only meaningful for "
+             "quantized BuildTs; kept for parity with the C++ class).")
+        .def("getHandle", &PyCreateNanoGrid::getHandle,
+             "Bake and return a GridHandle owning a NanoGrid of the source's "
+             "BuildT, including any channels declared via addBlindData(). "
+             "Each call bakes a fresh grid.");
 }
 
 #define NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix) \

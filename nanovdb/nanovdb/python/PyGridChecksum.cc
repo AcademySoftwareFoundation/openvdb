@@ -34,7 +34,15 @@ void defineChecksum(nb::module_& m)
         .def(nb::self == nb::self, "rhs"_a,
              "Equality of two Checksum values.")
         .def(nb::self != nb::self, "rhs"_a,
-             "Inequality of two Checksum values.");
+             "Inequality of two Checksum values.")
+        .def("isEmpty", &Checksum::isEmpty,
+             "True iff no checksum is stored (checksumming was disabled).")
+        .def("isHalf", &Checksum::isHalf,
+             "True iff only the header portion (grid + tree + root) is checksummed.")
+        .def("isFull", &Checksum::isFull,
+             "True iff both the header portion and all nodes are checksummed.")
+        .def("mode", &Checksum::mode,
+             "CheckMode this checksum was computed with (Disable, Partial, or Full).");
 }
 
 void defineUpdateChecksum(nb::module_& m)
