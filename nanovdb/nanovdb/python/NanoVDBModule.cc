@@ -340,6 +340,50 @@ void defineGrid(nb::module_& m)
              "Apply the inverse-Jacobian-transpose in single precision.")
         .def("applyIJTF", nb::overload_cast<const Vec3d&>(&GridData::template applyIJTF<Vec3d>, nb::const_), "xyz"_a,
              "Apply the inverse-Jacobian-transpose in single precision.")
+        // The C++ Grid<TreeT> convenience names for the same transforms
+        // (worldToIndex / indexToWorld and friends, NanoVDB.h). Bound as
+        // aliases on the type-erased base so the names most users know
+        // from OpenVDB / NanoVDB are directly discoverable in Python.
+        .def("worldToIndex", [](const GridData& g, const Vec3f& xyz) { return g.applyInverseMap(xyz); }, "xyz"_a,
+             "Transform a world-space point to index space. Alias of applyInverseMap.")
+        .def("worldToIndex", [](const GridData& g, const Vec3d& xyz) { return g.applyInverseMap(xyz); }, "xyz"_a,
+             "Transform a world-space point to index space. Alias of applyInverseMap.")
+        .def("indexToWorld", [](const GridData& g, const Vec3f& xyz) { return g.applyMap(xyz); }, "xyz"_a,
+             "Transform an index-space point to world space. Alias of applyMap.")
+        .def("indexToWorld", [](const GridData& g, const Vec3d& xyz) { return g.applyMap(xyz); }, "xyz"_a,
+             "Transform an index-space point to world space. Alias of applyMap.")
+        .def("worldToIndexDir", [](const GridData& g, const Vec3f& dir) { return g.applyInverseJacobian(dir); }, "dir"_a,
+             "Transform a world-space direction to index space. Alias of applyInverseJacobian.")
+        .def("worldToIndexDir", [](const GridData& g, const Vec3d& dir) { return g.applyInverseJacobian(dir); }, "dir"_a,
+             "Transform a world-space direction to index space. Alias of applyInverseJacobian.")
+        .def("indexToWorldDir", [](const GridData& g, const Vec3f& dir) { return g.applyJacobian(dir); }, "dir"_a,
+             "Transform an index-space direction to world space. Alias of applyJacobian.")
+        .def("indexToWorldDir", [](const GridData& g, const Vec3d& dir) { return g.applyJacobian(dir); }, "dir"_a,
+             "Transform an index-space direction to world space. Alias of applyJacobian.")
+        .def("indexToWorldGrad", [](const GridData& g, const Vec3f& grad) { return g.applyIJT(grad); }, "grad"_a,
+             "Transform an index-space gradient (normal) to world space. Alias of applyIJT.")
+        .def("indexToWorldGrad", [](const GridData& g, const Vec3d& grad) { return g.applyIJT(grad); }, "grad"_a,
+             "Transform an index-space gradient (normal) to world space. Alias of applyIJT.")
+        .def("worldToIndexF", [](const GridData& g, const Vec3f& xyz) { return g.applyInverseMapF(xyz); }, "xyz"_a,
+             "worldToIndex in single precision. Alias of applyInverseMapF.")
+        .def("worldToIndexF", [](const GridData& g, const Vec3d& xyz) { return g.applyInverseMapF(xyz); }, "xyz"_a,
+             "worldToIndex in single precision. Alias of applyInverseMapF.")
+        .def("indexToWorldF", [](const GridData& g, const Vec3f& xyz) { return g.applyMapF(xyz); }, "xyz"_a,
+             "indexToWorld in single precision. Alias of applyMapF.")
+        .def("indexToWorldF", [](const GridData& g, const Vec3d& xyz) { return g.applyMapF(xyz); }, "xyz"_a,
+             "indexToWorld in single precision. Alias of applyMapF.")
+        .def("worldToIndexDirF", [](const GridData& g, const Vec3f& dir) { return g.applyInverseJacobianF(dir); }, "dir"_a,
+             "worldToIndexDir in single precision. Alias of applyInverseJacobianF.")
+        .def("worldToIndexDirF", [](const GridData& g, const Vec3d& dir) { return g.applyInverseJacobianF(dir); }, "dir"_a,
+             "worldToIndexDir in single precision. Alias of applyInverseJacobianF.")
+        .def("indexToWorldDirF", [](const GridData& g, const Vec3f& dir) { return g.applyJacobianF(dir); }, "dir"_a,
+             "indexToWorldDir in single precision. Alias of applyJacobianF.")
+        .def("indexToWorldDirF", [](const GridData& g, const Vec3d& dir) { return g.applyJacobianF(dir); }, "dir"_a,
+             "indexToWorldDir in single precision. Alias of applyJacobianF.")
+        .def("indexToWorldGradF", [](const GridData& g, const Vec3f& grad) { return g.applyIJTF(grad); }, "grad"_a,
+             "indexToWorldGrad in single precision. Alias of applyIJTF.")
+        .def("indexToWorldGradF", [](const GridData& g, const Vec3d& grad) { return g.applyIJTF(grad); }, "grad"_a,
+             "indexToWorldGrad in single precision. Alias of applyIJTF.")
         // Strings, geometry, layout (already member functions on GridData).
         .def("gridName", &GridData::gridName,
              "Full grid name as a C string. Reads the long-form name from "
@@ -478,6 +522,20 @@ template<typename BuildT> void defineNanoGrid(nb::module_& m, const char* name)
              "pointer when it came from handle.deviceGrid(n) — provenance is "
              "the caller's responsibility, the grid object itself cannot tell "
              "host from device.");
+    // Grid<TreeT>::valueCount / pointCount are SFINAE-gated in C++ to the
+    // index and Point BuildTs respectively — mirror that gating here.
+    if constexpr (BuildTraits<BuildT>::is_index) {
+        cls.def("valueCount",
+                [](const NanoGrid<BuildT>& grid) { return grid.valueCount(); },
+                "Total number of values indexed by this grid. Sizes the "
+                "external or blind-data channel arrays that this index "
+                "grid's per-voxel indices map into.");
+    }
+    if constexpr (util::is_same<BuildT, Point>::value) {
+        cls.def("pointCount",
+                [](const NanoGrid<BuildT>& grid) { return grid.pointCount(); },
+                "Total number of points indexed by this PointGrid.");
+    }
     // Add leaf_values() only for BuildTs whose LeafData carries T mValues[512].
     PyLeafValuesBinder<BuildT>::apply(cls);
 }
@@ -550,6 +608,9 @@ static nb::object pyGetBlindData(nb::handle py_grid, uint32_t n)
     const size_t count = static_cast<size_t>(meta->mValueCount);
     const uint32_t valueSize = meta->mValueSize;
 
+    // The nb::numpy framework tag matters: the def-site keep_alive<0, 1>()
+    // needs a weak-referenceable return value, which numpy.ndarray is and
+    // nanobind's framework-agnostic ndarray wrapper is not.
     auto make1D = [&](void* p, size_t n_elems, auto sentinel) -> nb::object {
         using T = decltype(sentinel);
         size_t shape[1] = {n_elems};
@@ -631,8 +692,9 @@ nb::object pyPointsToNdarray<uint32_t>(nb::handle py_self,
                                        uint64_t count)
 {
     size_t shape[1] = {static_cast<size_t>(count)};
+    // nb::numpy tag required — see the equivalent note in pyGetBlindData.
     return nb::cast(
-        nb::ndarray<uint32_t, nb::ndim<1>, nb::c_contig, nb::device::cpu>(
+        nb::ndarray<nb::numpy, uint32_t, nb::ndim<1>, nb::c_contig, nb::device::cpu>(
             const_cast<uint32_t*>(begin), 1, shape, py_self),
         nb::rv_policy::reference);
 }
@@ -643,8 +705,9 @@ nb::object pyPointsToNdarray<Vec3f>(nb::handle py_self,
                                     uint64_t count)
 {
     size_t shape[2] = {static_cast<size_t>(count), 3};
+    // nb::numpy tag required — see the equivalent note in pyGetBlindData.
     return nb::cast(
-        nb::ndarray<float, nb::ndim<2>, nb::c_contig, nb::device::cpu>(
+        nb::ndarray<nb::numpy, float, nb::ndim<2>, nb::c_contig, nb::device::cpu>(
             reinterpret_cast<float*>(const_cast<Vec3f*>(begin)), 2, shape, py_self),
         nb::rv_policy::reference);
 }
@@ -694,6 +757,121 @@ template<typename AttT> void definePointAccessor(nb::module_& m, const char* nam
            "Return the point attributes at the specific voxel ijk, or None "
            "if the voxel is inactive / empty. The view keeps this accessor "
            "alive.");
+}
+
+// Typed ChannelAccessor over an Index/OnIndex grid: combines the uint64
+// per-voxel index lookup with a read of the matching blind-data channel, so
+// channel values can be queried directly by Coord. The C++ ctor only
+// NANOVDB_ASSERTs its preconditions (debug builds), so the binding validates
+// them explicitly and raises instead of returning an accessor that would
+// dereference a null channel pointer.
+template<typename ChannelT, typename IndexT>
+void defineChannelAccessor(nb::module_& m, const char* name)
+{
+    using CA = ChannelAccessor<ChannelT, IndexT>;
+    nb::class_<CA>(m, name,
+        "Accessor that reads one blind-data channel of an Index/OnIndex "
+        "grid at Coord positions. Build via createChannelAccessor() for "
+        "automatic channel-dtype dispatch.")
+        .def(
+            "__init__",
+            [](CA* self, const NanoGrid<IndexT>& grid, uint32_t channelID) {
+                if (grid.gridClass() != GridClass::IndexGrid)
+                    throw nb::value_error(
+                        "ChannelAccessor: grid must have GridClass.IndexGrid.");
+                if (channelID >= grid.blindDataCount())
+                    throw nb::index_error(
+                        "ChannelAccessor: channelID is out of range.");
+                new (self) CA(grid, channelID);
+                if (!*self)
+                    throw nb::type_error(
+                        "ChannelAccessor: the blind-data channel's dataType "
+                        "does not match this accessor's channel type.");
+            },
+            "grid"_a, "channelID"_a = 0u, nb::keep_alive<1, 2>(),
+            "Construct an accessor over the given index grid's channelID-th "
+            "blind-data channel. Raises if the grid is not an IndexGrid, the "
+            "channel is out of range, or its dtype does not match.")
+        .def("__bool__", [](const CA& acc) { return bool(acc); },
+             "True iff this accessor is bound to a valid channel.")
+        .def("grid", &CA::grid, nb::rv_policy::reference_internal,
+             "Return the index grid this accessor is bound to.")
+        .def("valueCount", [](const CA& acc) { return acc.valueCount(); },
+             "Total number of values indexed by the underlying index grid.")
+        .def(
+            "setChannel",
+            [](CA& acc, uint32_t channelID) {
+                if (channelID >= acc.grid().blindDataCount())
+                    throw nb::index_error(
+                        "setChannel: channelID is out of range.");
+                if (acc.setChannel(channelID) == nullptr)
+                    throw nb::type_error(
+                        "setChannel: the blind-data channel's dataType does "
+                        "not match this accessor's channel type.");
+            },
+            "channelID"_a,
+            "Switch this accessor to another blind-data channel of the same "
+            "grid. Raises if the channel is out of range or its dtype does "
+            "not match.")
+        .def("getIndex", [](const CA& acc, const Coord& ijk) { return acc.getIndex(ijk); }, "ijk"_a,
+             "Linear offset into the channel array for the voxel at ijk.")
+        .def("idx", [](const CA& acc, int i, int j, int k) { return acc.idx(i, j, k); }, "i"_a, "j"_a, "k"_a,
+             "Linear offset into the channel array for the voxel at (i, j, k).")
+        .def("getValue", [](const CA& acc, const Coord& ijk) -> ChannelT { return acc.getValue(ijk); }, "ijk"_a,
+             "Channel value mapped to the voxel at ijk.")
+        .def(
+            "__call__", [](const CA& acc, const Coord& ijk) -> ChannelT { return acc.getValue(ijk); }, nb::is_operator(), "ijk"_a,
+            "Channel value mapped to the voxel at ijk.")
+        .def(
+            "__call__", [](const CA& acc, int i, int j, int k) -> ChannelT { return acc(i, j, k); }, nb::is_operator(), "i"_a, "j"_a, "k"_a,
+            "Channel value mapped to the voxel at (i, j, k).")
+        .def("isActive", [](const CA& acc, const Coord& ijk) { return acc.isActive(ijk); }, "ijk"_a,
+             "True iff the voxel at ijk is active in the index grid.")
+        .def(
+            "probeValue",
+            [](const CA& acc, const Coord& ijk) {
+                typename util::remove_const<ChannelT>::type v;
+                bool isOn = acc.probeValue(ijk, v);
+                return std::make_tuple(v, isOn);
+            },
+            "ijk"_a,
+            "Return (channel value, isActive) for the voxel at ijk in a "
+            "single tree traversal.");
+}
+
+// Polymorphic factory: dispatch on the grid's index BuildT and the
+// channel's recorded dataType, returning the matching typed
+// ChannelAccessor. The def-site keep_alive<0, 1>() anchors the grid.
+template<typename IndexT>
+nb::object tryCreateChannelAccessor(nb::handle py_grid, uint32_t channelID)
+{
+    using GridT = NanoGrid<IndexT>;
+    if (!nb::isinstance<GridT>(py_grid)) return nb::object();
+    const auto& grid = nb::cast<const GridT&>(py_grid);
+    if (grid.gridClass() != GridClass::IndexGrid)
+        throw nb::value_error(
+            "createChannelAccessor: grid must have GridClass.IndexGrid.");
+    if (channelID >= grid.blindDataCount())
+        throw nb::index_error(
+            "createChannelAccessor: channelID is out of range.");
+    switch (grid.blindMetaData(channelID).mDataType) {
+    case GridType::Float:  return nb::cast(ChannelAccessor<float,   IndexT>(grid, channelID));
+    case GridType::Double: return nb::cast(ChannelAccessor<double,  IndexT>(grid, channelID));
+    case GridType::Int32:  return nb::cast(ChannelAccessor<int32_t, IndexT>(grid, channelID));
+    case GridType::Vec3f:  return nb::cast(ChannelAccessor<Vec3f,   IndexT>(grid, channelID));
+    default:
+        throw nb::type_error(
+            "createChannelAccessor: the channel's dataType has no bound "
+            "ChannelAccessor (supported: Float, Double, Int32, Vec3f).");
+    }
+}
+
+nb::object createChannelAccessorImpl(nb::handle py_grid, uint32_t channelID)
+{
+    if (auto r = tryCreateChannelAccessor<ValueIndex>(py_grid, channelID); r.is_valid()) return r;
+    if (auto r = tryCreateChannelAccessor<ValueOnIndex>(py_grid, channelID); r.is_valid()) return r;
+    throw nb::type_error(
+        "createChannelAccessor: grid must be an IndexGrid or OnIndexGrid.");
 }
 
 // Type-erased grid introspector. Mirrors nanovdb::GridMetaData (768B) and
@@ -1076,6 +1254,22 @@ NB_MODULE(nanovdb, m)
     // PointData grids carry Vec3f positions.
     definePointAccessor<uint32_t>(m, "PointIndexAccessor");
     definePointAccessor<Vec3f>(m,    "PointDataAccessor");
+
+    // ChannelAccessor<ChannelT, IndexT> — the channel dtypes match the
+    // source BuildTs accepted by tools.createNanoGridIndex / OnIndex.
+    defineChannelAccessor<float,   ValueIndex>(m,   "IndexFloatChannelAccessor");
+    defineChannelAccessor<double,  ValueIndex>(m,   "IndexDoubleChannelAccessor");
+    defineChannelAccessor<int32_t, ValueIndex>(m,   "IndexInt32ChannelAccessor");
+    defineChannelAccessor<Vec3f,   ValueIndex>(m,   "IndexVec3fChannelAccessor");
+    defineChannelAccessor<float,   ValueOnIndex>(m, "OnIndexFloatChannelAccessor");
+    defineChannelAccessor<double,  ValueOnIndex>(m, "OnIndexDoubleChannelAccessor");
+    defineChannelAccessor<int32_t, ValueOnIndex>(m, "OnIndexInt32ChannelAccessor");
+    defineChannelAccessor<Vec3f,   ValueOnIndex>(m, "OnIndexVec3fChannelAccessor");
+    m.def("createChannelAccessor", &createChannelAccessorImpl,
+          "grid"_a, "channelID"_a = 0u, nb::keep_alive<0, 1>(),
+          "Return a typed ChannelAccessor over the channelID-th blind-data "
+          "channel of an IndexGrid or OnIndexGrid, dispatching on the "
+          "channel's recorded dataType. The accessor keeps the grid alive.");
 
     defineHostBuffer(m);
     defineHostGridHandle(m);

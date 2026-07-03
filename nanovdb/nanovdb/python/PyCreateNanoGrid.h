@@ -24,7 +24,10 @@ template<typename BufferT> void defineOpenToNanoVDB(nb::module_& m);
 ///        the createNanoGridIndex / OnIndex paths accept float, double,
 ///        int32_t, and Vec3f sources. Additional source BuildTs can be
 ///        added by extending the explicit try-each-SrcBuildT chains in
-///        createNanoGridFpX / FpNImpl / createIndexImpl.
+///        createNanoGridFpX / FpNImpl / createIndexImpl. Also binds the
+///        tools.CreateNanoGrid converter class, which mirrors the C++
+///        tools::CreateNanoGrid and adds blind-data authoring via
+///        addBlindData() (same source BuildT set as the index paths).
 void defineCreateNanoGridConversions(nb::module_& toolsModule);
 
 } // namespace pynanovdb

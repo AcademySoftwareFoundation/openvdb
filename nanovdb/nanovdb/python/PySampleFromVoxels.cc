@@ -15,19 +15,45 @@ namespace {
 
 template<typename TreeT, int Order> void defineSampleFromVoxels(nb::module_& m, const char* name)
 {
-    using CoordT = typename TreeT::CoordType;
-    nb::class_<math::SampleFromVoxels<TreeT, Order, false>>(m, name,
+    using CoordT   = typename TreeT::CoordType;
+    using ValueT   = typename TreeT::ValueType;
+    using SamplerT = math::SampleFromVoxels<TreeT, Order, false>;
+    auto cls = nb::class_<SamplerT>(m, name,
         "Callable sampler that reconstructs a grid value at an arbitrary "
         "index-space position. Build via the matching create*Sampler() factory.")
         .def(
-            "__call__", [](const math::SampleFromVoxels<TreeT, Order, false>& sampler, const CoordT& ijk) { return sampler(ijk); }, nb::is_operator(), "ijk"_a,
+            "__call__", [](const SamplerT& sampler, const CoordT& ijk) { return sampler(ijk); }, nb::is_operator(), "ijk"_a,
             "Sample the grid at integer voxel coordinate ijk.")
         .def(
-            "__call__", [](const math::SampleFromVoxels<TreeT, Order, false>& sampler, const Vec3f& xyz) { return sampler(xyz); }, nb::is_operator(), "xyz"_a,
+            "__call__", [](const SamplerT& sampler, const Vec3f& xyz) { return sampler(xyz); }, nb::is_operator(), "xyz"_a,
             "Sample the grid at fractional index-space position xyz.")
         .def(
-            "__call__", [](const math::SampleFromVoxels<TreeT, Order, false>& sampler, const Vec3d& xyz) { return sampler(xyz); }, nb::is_operator(), "xyz"_a,
+            "__call__", [](const SamplerT& sampler, const Vec3d& xyz) { return sampler(xyz); }, nb::is_operator(), "xyz"_a,
             "Sample the grid at fractional index-space position xyz (double).");
+    // gradient() exists on the trilinear sampler only, zeroCrossing() on the
+    // trilinear and triquadratic samplers, and both static_assert a
+    // floating-point ValueT in C++ — mirror that gating here.
+    if constexpr (Order == 1 && util::is_floating_point<ValueT>::value) {
+        cls.def(
+               "gradient", [](const SamplerT& sampler, const Vec3f& xyz) { return sampler.gradient(xyz); }, "xyz"_a,
+               "Return the index-space gradient of the trilinear reconstruction "
+               "at fractional index-space position xyz. Use "
+               "grid.indexToWorldGrad() to move it to world space.")
+            .def(
+               "gradient", [](const SamplerT& sampler, const Vec3d& xyz) { return sampler.gradient(xyz); }, "xyz"_a,
+               "Return the index-space gradient at fractional index-space "
+               "position xyz (double).");
+    }
+    if constexpr ((Order == 1 || Order == 2) && util::is_floating_point<ValueT>::value) {
+        cls.def(
+               "zeroCrossing", [](const SamplerT& sampler, const Vec3f& xyz) { return sampler.zeroCrossing(xyz); }, "xyz"_a,
+               "True iff the reconstruction stencil at fractional index-space "
+               "position xyz straddles the zero iso-surface.")
+            .def(
+               "zeroCrossing", [](const SamplerT& sampler, const Vec3d& xyz) { return sampler.zeroCrossing(xyz); }, "xyz"_a,
+               "True iff the reconstruction stencil at fractional index-space "
+               "position xyz (double) straddles the zero iso-surface.");
+    }
 }
 
 template<typename TreeT, int Order> void defineCreateSampler(nb::module_& m, const char* name)

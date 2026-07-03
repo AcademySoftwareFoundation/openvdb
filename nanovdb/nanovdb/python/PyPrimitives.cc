@@ -32,11 +32,9 @@ GridHandle<BufferT> createLevelSetSphere(GridType           gridType,
     switch (gridType) {
     case GridType::Float: return createLevelSetSphere<float, BufferT>(radius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
     case GridType::Double: return createLevelSetSphere<double, BufferT>(radius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
-    default: {
-        std::stringstream ss;
-        // ss << "Cannot createLevelSetSphere for grid of type \"" << toStr(gridType);
-        throw std::runtime_error(ss.str() + "\"");
-    }
+    default:
+        throw std::runtime_error(
+            "createLevelSetSphere: only float and double grid types are supported");
     }
 }
 
@@ -58,11 +56,9 @@ GridHandle<BufferT> createLevelSetTorus(GridType           gridType,
         return createLevelSetTorus<float, BufferT>(majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
     case GridType::Double:
         return createLevelSetTorus<double, BufferT>(majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
-    default: {
-        std::stringstream ss;
-        // ss << "Cannot createLevelSetTorus for grid of type \"" << toStr(gridType);
-        throw std::runtime_error(ss.str() + "\"");
-    }
+    default:
+        throw std::runtime_error(
+            "createLevelSetTorus: only float and double grid types are supported");
     }
 }
 
@@ -81,11 +77,9 @@ GridHandle<BufferT> createFogVolumeSphere(GridType           gridType,
     switch (gridType) {
     case GridType::Float: return createFogVolumeSphere<float, BufferT>(radius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
     case GridType::Double: return createFogVolumeSphere<double, BufferT>(radius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
-    default: {
-        std::stringstream ss;
-        // ss << "Cannot createFogVolumeSphere for grid of type \"" << toStr(gridType);
-        throw std::runtime_error(ss.str() + "\"");
-    }
+    default:
+        throw std::runtime_error(
+            "createFogVolumeSphere: only float and double grid types are supported");
     }
 }
 
@@ -107,11 +101,9 @@ GridHandle<BufferT> createFogVolumeTorus(GridType           gridType,
         return createFogVolumeTorus<float, BufferT>(majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
     case GridType::Double:
         return createFogVolumeTorus<double, BufferT>(majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
-    default: {
-        std::stringstream ss;
-        // ss << "Cannot createFogVolumeTorus for grid of type \"" << toStr(gridType);
-        throw std::runtime_error(ss.str() + "\"");
-    }
+    default:
+        throw std::runtime_error(
+            "createFogVolumeTorus: only float and double grid types are supported");
     }
 }
 
