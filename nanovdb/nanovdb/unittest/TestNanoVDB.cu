@@ -18,7 +18,7 @@
 #include <nanovdb/tools/cuda/GridValidator.cuh>
 #include <nanovdb/tools/cuda/GridStats.cuh>
 #include <nanovdb/tools/cuda/DilateGrid.cuh>
-#include <nanovdb/tools/cuda/MergeGrids.cuh>
+#include <nanovdb/tools/cuda/TopologyUnion.cuh>
 #include <nanovdb/tools/cuda/PruneGrid.cuh>
 #include <nanovdb/tools/cuda/CoarsenGrid.cuh>
 #include <nanovdb/tools/cuda/RefineGrid.cuh>
@@ -3693,7 +3693,7 @@ TEST(TestNanoVDBCUDA, MergeGrids_ValueOnIndex)
     EXPECT_FALSE(inputHandleB.grid<BuildT>());
 
     // Perform the merge operation
-    nanovdb::tools::cuda::MergeGrids<BuildT> merger( inputGridA, inputGridB );
+    nanovdb::tools::cuda::TopologyUnion<BuildT> merger( inputGridA, inputGridB );
     merger.setChecksum(nanovdb::CheckMode::Disable);
     merger.setVerbose(0);
     auto mergedHandle = merger.getHandle();
@@ -3739,13 +3739,13 @@ TEST(TestNanoVDBCUDA, MergeGridsNary_ValueOnIndex)
     auto hC = buildGrid(ptsC, bufC); auto gC = hC.deviceGrid<BuildT>();
 
     // N-ary merge of all three in a single call
-    auto naryH = nanovdb::tools::cuda::MergeGrids<BuildT>(
+    auto naryH = nanovdb::tools::cuda::TopologyUnion<BuildT>(
         std::vector<const GridT*>{gA, gB, gC}).getHandle();
     auto nary = treeData(naryH.deviceGrid<BuildT>());
 
     // Chaining the binary form must yield byte-identical topology
-    auto abH = nanovdb::tools::cuda::MergeGrids<BuildT>(gA, gB).getHandle();
-    auto abcH = nanovdb::tools::cuda::MergeGrids<BuildT>(
+    auto abH = nanovdb::tools::cuda::TopologyUnion<BuildT>(gA, gB).getHandle();
+    auto abcH = nanovdb::tools::cuda::TopologyUnion<BuildT>(
         abH.deviceGrid<BuildT>(), gC).getHandle();
     auto chain = treeData(abcH.deviceGrid<BuildT>());
     EXPECT_EQ(nary.mNodeCount[0], chain.mNodeCount[0]);
@@ -3757,12 +3757,12 @@ TEST(TestNanoVDBCUDA, MergeGridsNary_ValueOnIndex)
     EXPECT_EQ(nary.mVoxelCount, 69u);
 
     // A single-element list returns a copy of that grid's topology
-    auto soloH = nanovdb::tools::cuda::MergeGrids<BuildT>(
+    auto soloH = nanovdb::tools::cuda::TopologyUnion<BuildT>(
         std::vector<const GridT*>{gA}).getHandle();
     EXPECT_EQ(treeData(soloH.deviceGrid<BuildT>()).mVoxelCount, treeData(gA).mVoxelCount);
 
     // An empty input list is rejected
-    EXPECT_THROW(nanovdb::tools::cuda::MergeGrids<BuildT>(
+    EXPECT_THROW(nanovdb::tools::cuda::TopologyUnion<BuildT>(
         std::vector<const GridT*>{}).getHandle(), std::runtime_error);
 }// MergeGridsNary_ValueOnIndex
 

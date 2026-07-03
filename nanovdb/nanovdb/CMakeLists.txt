@@ -229,7 +229,7 @@ set(NANOVDB_INCLUDE_TOOLS_CUDA_FILES
   tools/cuda/IndexToGrid.cuh
   tools/cuda/PointsToGrid.cuh
   tools/cuda/SignedFloodFill.cuh
-  tools/cuda/MergeGrids.cuh
+  tools/cuda/TopologyUnion.cuh
   tools/cuda/TopologyBuilder.cuh
   tools/cuda/RefineGrid.cuh
   tools/cuda/PruneGrid.cuh

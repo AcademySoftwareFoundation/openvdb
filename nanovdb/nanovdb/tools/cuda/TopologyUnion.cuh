@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /*!
-    \file nanovdb/tools/cuda/MergeGrids.cuh
+    \file nanovdb/tools/cuda/TopologyUnion.cuh
 
     \authors Efty Sifakis
 
@@ -12,8 +12,8 @@
              to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NVIDIA_TOOLS_CUDA_MERGEGRIDS_CUH_HAS_BEEN_INCLUDED
-#define NVIDIA_TOOLS_CUDA_MERGEGRIDS_CUH_HAS_BEEN_INCLUDED
+#ifndef NVIDIA_TOOLS_CUDA_TOPOLOGYUNION_CUH_HAS_BEEN_INCLUDED
+#define NVIDIA_TOOLS_CUDA_TOPOLOGYUNION_CUH_HAS_BEEN_INCLUDED
 
 #include <cub/cub.cuh>
 
@@ -34,7 +34,7 @@ namespace nanovdb {
 namespace tools::cuda {
 
 template <typename BuildT>
-class MergeGrids
+class TopologyUnion
 {
     using GridT  = NanoGrid<BuildT>;
     using TreeT  = NanoTree<BuildT>;
@@ -46,15 +46,15 @@ public:
     /// @brief Constructor for an N-ary merge
     /// @param d_srcGrids list of source device grids to be merged (active-mask union)
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    MergeGrids(const std::vector<const GridT*>& d_srcGrids, cudaStream_t stream = 0)
+    TopologyUnion(const std::vector<const GridT*>& d_srcGrids, cudaStream_t stream = 0)
         : mBuilder(stream), mStream(stream), mTimer(stream), mDeviceSrcGrids(d_srcGrids) {}
 
     /// @brief Convenience constructor for the common binary merge
     /// @param d_srcGrid1 first source device grid to be merged
     /// @param d_srcGrid2 second source device grid to be merged
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    MergeGrids(const GridT* d_srcGrid1, const GridT* d_srcGrid2, cudaStream_t stream = 0)
-        : MergeGrids(std::vector<const GridT*>{d_srcGrid1, d_srcGrid2}, stream) {}
+    TopologyUnion(const GridT* d_srcGrid1, const GridT* d_srcGrid2, cudaStream_t stream = 0)
+        : TopologyUnion(std::vector<const GridT*>{d_srcGrid1, d_srcGrid2}, stream) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -90,17 +90,17 @@ private:
     int                     mVerbose{0};
     std::vector<const GridT*> mDeviceSrcGrids;
     std::vector<TreeData>     mSrcTreeData;
-};// tools::cuda::MergeGrids<BuildT>
+};// tools::cuda::TopologyUnion<BuildT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT>
 template<typename BufferT>
 GridHandle<BufferT>
-MergeGrids<BuildT>::getHandle(const BufferT &pool)
+TopologyUnion<BuildT>::getHandle(const BufferT &pool)
 {
     if (mDeviceSrcGrids.empty())
-        throw std::runtime_error("MergeGrids: no input grids");
+        throw std::runtime_error("TopologyUnion: no input grids");
 
     // Copy TreeData from GPU -> CPU for every input grid
     cudaStreamSynchronize(mStream);
@@ -163,12 +163,12 @@ MergeGrids<BuildT>::getHandle(const BufferT &pool)
     cudaStreamSynchronize(mStream);
 
     return GridHandle<BufferT>(std::move(buffer));
-}// MergeGrids<BuildT>::getHandle
+}// TopologyUnion<BuildT>::getHandle
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT>
-void MergeGrids<BuildT>::mergeRoot()
+void TopologyUnion<BuildT>::mergeRoot()
 {
     // Creates a new merged tree root with the merged tiles of the two input root topologies
 
@@ -218,12 +218,12 @@ void MergeGrids<BuildT>::mergeRoot()
     for (const auto& [key, tile] : mergedTiles)
         *mergedRootPtr->tile(t++) = tile;
     mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
-}// MergeGrids<BuildT>::mergeRoot
+}// TopologyUnion<BuildT>::mergeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT>
-void MergeGrids<BuildT>::mergeInternalNodes()
+void TopologyUnion<BuildT>::mergeInternalNodes()
 {
     // Merges the masks of upper and lower nodes from both input topologies into the
     // densified, pre-allocated mask arrays of the merged result
@@ -236,12 +236,12 @@ void MergeGrids<BuildT>::mergeInternalNodes()
             <<<mSrcTreeData[i].mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
             (mDeviceSrcGrids[i], mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks());
     }
-}// MergeGrids<BuildT>::mergeInternalNodes
+}// TopologyUnion<BuildT>::mergeInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template <typename BuildT>
-void MergeGrids<BuildT>::processGridTreeRoot()
+void TopologyUnion<BuildT>::processGridTreeRoot()
 {
     // Copy GridData from the first source grid
     // TODO: Check for instances where extra processing is needed
@@ -249,12 +249,12 @@ void MergeGrids<BuildT>::processGridTreeRoot()
     cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrids.front()->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
     cudaCheckError();
-}// MergeGrids<BuildT>::processGridTreeRoot
+}// TopologyUnion<BuildT>::processGridTreeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT>
-void MergeGrids<BuildT>::mergeLeafNodes()
+void TopologyUnion<BuildT>::mergeLeafNodes()
 {
     using Op = util::morphology::cuda::MergeLeafNodesFunctor<BuildT>;
     // Each input ORs its leaf active masks into the merged leaf topology.
@@ -267,7 +267,7 @@ void MergeGrids<BuildT>::mergeLeafNodes()
 
     // Update leaf offsets and prefix sums
     mBuilder.processLeafOffsets(mStream);
-}// MergeGrids<BuildT>::mergeLeafNodes
+}// TopologyUnion<BuildT>::mergeLeafNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -275,4 +275,4 @@ void MergeGrids<BuildT>::mergeLeafNodes()
 
 }// namespace nanovdb
 
-#endif // NVIDIA_TOOLS_CUDA_MERGEGRIDS_CUH_HAS_BEEN_INCLUDED
+#endif // NVIDIA_TOOLS_CUDA_TOPOLOGYUNION_CUH_HAS_BEEN_INCLUDED
