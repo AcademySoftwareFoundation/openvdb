@@ -57,6 +57,11 @@ if(NANOVDB_USE_CUDA)
   target_link_libraries(nanovdb_test_mgpu PRIVATE nanovdb GTest::GTest GTest::Main)
   set_target_properties(nanovdb_test_mgpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   add_test(nanovdb_mgpu_unit_test nanovdb_test_mgpu)
+
+  add_executable(nanovdb_test_cuda_memory_resource "TestMemoryResource.cu")
+  target_link_libraries(nanovdb_test_cuda_memory_resource PRIVATE nanovdb GTest::GTest GTest::Main)
+  set_target_properties(nanovdb_test_cuda_memory_resource PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+  add_test(nanovdb_cuda_memory_resource_unit_test nanovdb_test_cuda_memory_resource)
 endif()
 
 # -----------------------------------------------------------------------------
