@@ -99,12 +99,19 @@ if(NANOVDB_BUILD_PYTHON_UNITTESTS)
     COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/TestNanoVDB.py -v
     WORKING_DIRECTORY "${NANOVDB_PYTHON_WORKING_DIR}")
 
+  # Smoke-run every example script (they self-skip when optional
+  # dependencies such as NumPy or OpenVDB are unavailable).
+  add_test(NAME pytest_nanovdb_examples
+    COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/TestExamples.py -v
+    WORKING_DIRECTORY "${NANOVDB_PYTHON_WORKING_DIR}")
+  set_tests_properties(pytest_nanovdb_examples PROPERTIES TIMEOUT 300)
+
   if(WIN32)
     set(PYTHONPATH "$ENV{PYTHONPATH};${NANOVDB_PYTHON_WORKING_DIR}")
     string(REPLACE "\\;" ";" PYTHONPATH "${PYTHONPATH}")
     string(REPLACE ";" "\\;" PYTHONPATH "${PYTHONPATH}")
-    set_tests_properties(pytest_nanovdb PROPERTIES ENVIRONMENT "PYTHONPATH=${PYTHONPATH}")
+    set_tests_properties(pytest_nanovdb pytest_nanovdb_examples PROPERTIES ENVIRONMENT "PYTHONPATH=${PYTHONPATH}")
   else()
-    set_tests_properties(pytest_nanovdb PROPERTIES ENVIRONMENT "PYTHONPATH=$ENV{PYTHONPATH}:${NANOVDB_PYTHON_WORKING_DIR}")
+    set_tests_properties(pytest_nanovdb pytest_nanovdb_examples PROPERTIES ENVIRONMENT "PYTHONPATH=$ENV{PYTHONPATH}:${NANOVDB_PYTHON_WORKING_DIR}")
   endif()
 endif()
