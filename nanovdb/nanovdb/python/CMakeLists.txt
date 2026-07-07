@@ -32,10 +32,30 @@ nanobind_add_module(nanovdb_python NB_STATIC
     PyTree.cc
     PyVoxelBlockManager.cc
     cuda/PyDeviceBuffer.cc
+    cuda/PyUnifiedBuffer.cu
+    cuda/PyUnifiedGridHandle.cu
+    cuda/PyDeviceMesh.cu
+    cuda/PyDeviceStreamMap.cu
+    cuda/PyTempPool.cu
+    cuda/PyDistributedPointsToGrid.cu
     cuda/PyDeviceGridHandle.cu
+    cuda/PyDeviceNodeManager.cu
+    cuda/PyDeviceVoxelBlockManager.cu
     cuda/PyPointsToGrid.cu
     cuda/PySampleFromVoxels.cu
     cuda/PySignedFloodFill.cu
+    cuda/PyDilateGrid.cu
+    cuda/PyCoarsenGrid.cu
+    cuda/PyRefineGrid.cu
+    cuda/PyPruneGrid.cu
+    cuda/PyMergeGrids.cu
+    cuda/PyInjectData.cu
+    cuda/PyIndexToGrid.cu
+    cuda/PyMeshToGrid.cu
+    cuda/PyAddBlindData.cu
+    cuda/PyDeviceGridStats.cu
+    cuda/PyDeviceGridValidator.cu
+    cuda/PyDeviceGridChecksum.cu
 )
 
 target_include_directories(nanovdb_python PRIVATE ${CUDA_INCLUDE_DIRECTORY})
@@ -99,6 +119,14 @@ if(NANOVDB_BUILD_PYTHON_UNITTESTS)
     COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/TestNanoVDB.py -v
     WORKING_DIRECTORY "${NANOVDB_PYTHON_WORKING_DIR}")
 
+  # GPU interop suite. Self-skips when the build has no CUDA or no GPU is
+  # present (so it is harmless to register unconditionally), but is a
+  # separate test file that the pytest_nanovdb command does not discover,
+  # so register it as its own ctest test mirroring the block above.
+  add_test(NAME pytest_nanovdb_gpu_interop
+    COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/TestGpuInterop.py -v
+    WORKING_DIRECTORY "${NANOVDB_PYTHON_WORKING_DIR}")
+
   # Smoke-run every example script (they self-skip when optional
   # dependencies such as NumPy or OpenVDB are unavailable).
   add_test(NAME pytest_nanovdb_examples
@@ -110,8 +138,10 @@ if(NANOVDB_BUILD_PYTHON_UNITTESTS)
     set(PYTHONPATH "$ENV{PYTHONPATH};${NANOVDB_PYTHON_WORKING_DIR}")
     string(REPLACE "\\;" ";" PYTHONPATH "${PYTHONPATH}")
     string(REPLACE ";" "\\;" PYTHONPATH "${PYTHONPATH}")
-    set_tests_properties(pytest_nanovdb pytest_nanovdb_examples PROPERTIES ENVIRONMENT "PYTHONPATH=${PYTHONPATH}")
+    set_tests_properties(pytest_nanovdb pytest_nanovdb_gpu_interop pytest_nanovdb_examples
+      PROPERTIES ENVIRONMENT "PYTHONPATH=${PYTHONPATH}")
   else()
-    set_tests_properties(pytest_nanovdb pytest_nanovdb_examples PROPERTIES ENVIRONMENT "PYTHONPATH=$ENV{PYTHONPATH}:${NANOVDB_PYTHON_WORKING_DIR}")
+    set_tests_properties(pytest_nanovdb pytest_nanovdb_gpu_interop pytest_nanovdb_examples
+      PROPERTIES ENVIRONMENT "PYTHONPATH=$ENV{PYTHONPATH}:${NANOVDB_PYTHON_WORKING_DIR}")
   endif()
 endif()

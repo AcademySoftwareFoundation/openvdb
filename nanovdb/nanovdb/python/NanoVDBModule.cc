@@ -8,13 +8,22 @@
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/io/IO.h> // for __repr__
+#include <nanovdb/tools/GridChecksum.h> // host updateChecksum for the header setters
 #ifdef NANOVDB_USE_CUDA
 #include <nanovdb/cuda/DeviceBuffer.h>
 #endif
 
+#include <cstdint>
 #include <sstream>
 
 #include "cuda/PyDeviceBuffer.h"
+#ifdef NANOVDB_USE_CUDA
+#include "cuda/PyUnifiedBuffer.h"
+#include "cuda/PyUnifiedGridHandle.h"
+#include "cuda/PyDeviceMesh.h"
+#include "cuda/PyDeviceStreamMap.h"
+#include "cuda/PyTempPool.h"
+#endif
 #include "PyBuildGrid.h"
 #include "PyGridHandle.h"
 #include "PyHostBuffer.h"
@@ -236,21 +245,60 @@ void defineGrid(nb::module_& m)
         "the affine transform, grid flags and blind-data accessors. Concrete "
         "BuildT-typed subclasses (FloatGrid, Vec3fGrid, ...) add tree access "
         "and per-voxel queries.")
-        // Validation and flag mutators (already member functions on GridData).
+        // Validation and header mutators. Every mutator refreshes the grid's
+        // checksum afterwards (preserving its mode; a no-op when the checksum is
+        // disabled), so editing a header field never silently desyncs a
+        // checksummed grid -- a validating reader would otherwise reject it.
         .def("isValid", &GridData::isValid,
              "True iff the grid header looks consistent (magic / version / class tags).")
-        .def("setMinMaxOn", &GridData::setMinMaxOn, "on"_a = true,
-             "Toggle the HasMinMax grid flag.")
-        .def("setBBoxOn", &GridData::setBBoxOn, "on"_a = true,
-             "Toggle the HasBBox grid flag.")
-        .def("setLongGridNameOn", &GridData::setLongGridNameOn, "on"_a = true,
-             "Toggle the HasLongGridName grid flag.")
-        .def("setAverageOn", &GridData::setAverageOn, "on"_a = true,
-             "Toggle the HasAverage grid flag.")
-        .def("setStdDeviationOn", &GridData::setStdDeviationOn, "on"_a = true,
-             "Toggle the HasStdDeviation grid flag.")
-        .def("setGridName", &GridData::setGridName, "src"_a,
-             "Overwrite the grid's short name (truncated to the in-header buffer).")
+        .def("setMinMaxOn",
+             [](GridData& g, bool on) { g.setMinMaxOn(on); nanovdb::tools::updateChecksum(&g); },
+             "on"_a = true, "Toggle the HasMinMax grid flag (refreshes the checksum).")
+        .def("setBBoxOn",
+             [](GridData& g, bool on) { g.setBBoxOn(on); nanovdb::tools::updateChecksum(&g); },
+             "on"_a = true, "Toggle the HasBBox grid flag (refreshes the checksum).")
+        .def("setLongGridNameOn",
+             [](GridData& g, bool on) { g.setLongGridNameOn(on); nanovdb::tools::updateChecksum(&g); },
+             "on"_a = true, "Toggle the HasLongGridName grid flag (refreshes the checksum).")
+        .def("setAverageOn",
+             [](GridData& g, bool on) { g.setAverageOn(on); nanovdb::tools::updateChecksum(&g); },
+             "on"_a = true, "Toggle the HasAverage grid flag (refreshes the checksum).")
+        .def("setStdDeviationOn",
+             [](GridData& g, bool on) { g.setStdDeviationOn(on); nanovdb::tools::updateChecksum(&g); },
+             "on"_a = true, "Toggle the HasStdDeviation grid flag (refreshes the checksum).")
+        .def("setGridName",
+             [](GridData& g, const char* src) {
+                 const bool ok = g.setGridName(src);
+                 nanovdb::tools::updateChecksum(&g);
+                 return ok;
+             },
+             "src"_a,
+             "Overwrite the grid's short name (truncated to the in-header buffer; "
+             "refreshes the checksum). Returns False if the name had to be truncated.")
+        .def("setGridClass",
+             [](GridData& g, GridClass gridClass) {
+                 g.mGridClass = gridClass;
+                 nanovdb::tools::updateChecksum(&g);
+             },
+             "gridClass"_a,
+             "Set the grid's GridClass (e.g. GridClass.LevelSet) in place and refresh "
+             "the checksum. Host twin of tools.cuda.setGridClass for device grids.")
+        .def("setTransform",
+             [](GridData& g, double voxelSize, const Vec3d& translation) {
+                 // Uniform scale + translation index->world map, then recompute the
+                 // world-space AABB from the index bbox under the new map (mirrors
+                 // how GridStats sets mWorldBBox).
+                 g.mMap.set(voxelSize, translation, 1.0);
+                 g.mVoxelSize = g.mMap.getVoxelSize();
+                 const CoordBBox& ib = g.indexBBox();
+                 g.mWorldBBox = CoordBBox(ib[0], ib[1].offsetBy(1)).transform(g.mMap);
+                 nanovdb::tools::updateChecksum(&g);
+             },
+             "voxelSize"_a, "translation"_a = Vec3d(0.0, 0.0, 0.0),
+             "Set a uniform-scale + translation index->world transform (voxelSize is "
+             "world units per voxel; translation is in world space), recompute the "
+             "world bounding box, and refresh the checksum. For non-uniform or rotated "
+             "maps, build the grid with the desired transform instead.")
         // Affine transforms (already member functions on GridData).
         .def("applyMap", nb::overload_cast<const Vec3f&>(&GridData::template applyMap<Vec3f>, nb::const_), "xyz"_a,
              "Transform an index-space point to world space using this grid's Map.")
@@ -464,7 +512,16 @@ template<typename BuildT> void defineNanoGrid(nb::module_& m, const char* name)
              nb::overload_cast<>(&NanoGrid<BuildT>::tree, nb::const_),
              nb::rv_policy::reference_internal,
              "Return the tree associated with this grid. Lifetime is "
-             "anchored to the grid (and therefore to the GridHandle).");
+             "anchored to the grid (and therefore to the GridHandle).")
+        .def("data_ptr",
+             [](const NanoGrid<BuildT>& grid) {
+                 return reinterpret_cast<uintptr_t>(&grid);
+             },
+             "Raw pointer to this grid as a Python int. The address is a HOST "
+             "pointer when the grid came from handle.grid(n) and a DEVICE "
+             "pointer when it came from handle.deviceGrid(n) — provenance is "
+             "the caller's responsibility, the grid object itself cannot tell "
+             "host from device.");
     // Grid<TreeT>::valueCount / pointCount are SFINAE-gated in C++ to the
     // index and Point BuildTs respectively — mirror that gating here.
     if constexpr (BuildTraits<BuildT>::is_index) {
@@ -1218,8 +1275,25 @@ NB_MODULE(nanovdb, m)
     defineHostGridHandle(m);
 
 #ifdef NANOVDB_USE_CUDA
-    defineDeviceBuffer(m);
-    defineDeviceGridHandle(m);
+    nb::module_ cudaModule = m.def_submodule("cuda");
+    cudaModule.doc() = "CUDA device buffers, the device GridHandle, and device infrastructure (mirrors nanovdb::cuda).";
+    defineDeviceBuffer(cudaModule);
+    // UnifiedBuffer (CUDA managed memory) + its GridHandle. The unified handle
+    // is the type returned by nanovdb.tools.cuda.DistributedPointsToGrid.
+    defineUnifiedBuffer(cudaModule);
+    defineUnifiedGridHandle(cudaModule);
+    defineDeviceGridHandle(cudaModule);
+    // Device NodeManager (DeviceNodeManagerHandle + createDeviceNodeManager)
+    // on nanovdb.cuda, alongside the device GridHandle.
+    defineDeviceNodeManager(cudaModule);
+    // Multi-GPU / device infrastructure (mirrors nanovdb::cuda): the device
+    // mesh, the device->stream map, and the CUB temp-storage pool primitives.
+    defineDeviceMesh(cudaModule);
+    defineDeviceStreamMap(cudaModule);
+    defineTempPool(cudaModule);
+    // Device VoxelBlockManager (mirrors nanovdb::tools::cuda) is registered on
+    // the existing nanovdb.tools.cuda submodule in PyTools.cc — NOT here — so
+    // the Python layout matches the C++ namespaces.
 #endif
 
     nb::module_ toolsModule = m.def_submodule("tools");
