@@ -60,6 +60,17 @@ void mergePath(KeyIteratorIn keys1, size_t keys1Count, KeyIteratorIn keys2, size
     using key_type = typename ::cuda::std::iterator_traits<KeyIteratorIn>::value_type;
 
     const size_t combinedIndex = intervalIndex * (keys1Count + keys2Count) / 2;
+
+    // An empty partition makes the merge trivial: every element up to the
+    // diagonal comes from the non-empty side. Handle it before the binary
+    // search, which reads both arrays and whose unsigned (keysNCount - 1)
+    // bounds checks underflow when a count is zero.
+    if (keys1Count == 0 || keys2Count == 0) {
+        *key1Intervals = static_cast<ptrdiff_t>(combinedIndex < keys1Count ? combinedIndex : keys1Count);
+        *key2Intervals = static_cast<ptrdiff_t>(combinedIndex < keys2Count ? combinedIndex : keys2Count);
+        return;
+    }
+
     size_t leftTop = combinedIndex > keys1Count ? keys1Count : combinedIndex;
     size_t rightTop = combinedIndex > keys1Count ? combinedIndex - keys1Count : 0;
     size_t leftBottom = rightTop;
