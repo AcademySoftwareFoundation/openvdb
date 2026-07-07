@@ -68,5 +68,6 @@ template void defineDeviceIsValid<nanovdb::FpN>(nb::module_&, const char*);
 template void defineDeviceIsValid<nanovdb::ValueIndex>(nb::module_&, const char*);
 template void defineDeviceIsValid<nanovdb::ValueOnIndex>(nb::module_&, const char*);
 template void defineDeviceIsValid<nanovdb::ValueMask>(nb::module_&, const char*);
+template void defineDeviceIsValid<nanovdb::Point>(nb::module_&, const char*);
 
 } // namespace pynanovdb

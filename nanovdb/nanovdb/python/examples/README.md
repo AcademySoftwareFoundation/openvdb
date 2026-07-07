@@ -55,6 +55,16 @@ GPU-array framework it uses is unavailable.
 | [`cupy_rawkernel.py`](cupy_rawkernel.py) | A `cupy.RawKernel` that `#include <nanovdb/NanoVDB.h>` (compiled with `nanovdb.cuda.compile_options()`) and reads a `const nanovdb::NanoGrid<float>*` straight from `grid.data_ptr()`. Documents the device-pointer ABI. Requires CuPy. |
 | [`numba_cuda.py`](numba_cuda.py) | Adopting a NanoVDB device buffer as a zero-copy `numba.cuda` array (Numba can't parse the C++ ABI, so it operates on the raw buffer). Requires Numba. |
 | [`triton_kernel.py`](triton_kernel.py) | Handing a NanoVDB device buffer to a Triton kernel via a zero-copy `torch.from_dlpack` tensor. Requires Triton + PyTorch. |
+| [`voxels_to_grid_cuda.py`](voxels_to_grid_cuda.py) | Build a grid on the GPU from a CuPy coordinate array with `tools.cuda.voxelsToOnIndexGrid` and `tools.cuda.pointsToGrid` — construction entirely on the device (no host tree). GPU counterpart to `build_grid.py`; port of `ex_voxels_to_grid_cuda`. Requires CuPy. |
+| [`device_topology_ops.py`](device_topology_ops.py) | `tools.cuda.dilateGrid` / `coarsenGrid` / `refineGrid` / `mergeGrids` / `pruneGrid` on a device OnIndex grid. Ports the device path of `ex_{dilate,coarsen,refine,merge}_nanovdb_cuda` (OpenVDB-free: the source grid is built on the device). Requires CuPy. |
+| [`sample_from_voxels_cuda.py`](sample_from_voxels_cuda.py) | `tools.cuda.sampleFromVoxels` — batched trilinear samples plus analytic gradients at device query points; the device analog of `createTrilinearSampler`, cross-checked against the host sampler. Requires CuPy. |
+| [`index_to_grid_cuda.py`](index_to_grid_cuda.py) | `tools.cuda.indexToGrid` bakes a CuPy-computed value array onto an index grid on the device, with `tools.cuda.activeVoxelCoords` recovering each value slot's coordinate. Device half of `ex_index_grid_cuda`. Requires CuPy. |
+| [`signed_flood_fill_cuda.py`](signed_flood_fill_cuda.py) | `tools.cuda.signedFloodFill` propagates interior/exterior sign of a level set in place on the device; verified with `tools.cuda.sampleFromVoxels`. Requires CuPy. |
+| [`validate_cuda.py`](validate_cuda.py) | Device quality control: `tools.cuda.isValid`, `evalChecksum` / `updateChecksum` / `validateChecksum`, and `updateGridStats`, all in place on a device grid. GPU counterpart to `validate.py`. Requires CuPy. |
+| [`collide_level_set_cuda.py`](collide_level_set_cuda.py) | GPU counterpart to `collide_level_set.py`: a whole particle set collided against a level set via one `tools.cuda.sampleFromVoxels` call (distances + gradients), with the reflection response as vectorized CuPy. Port of the device path of `ex_collide_level_set`. Requires CuPy. |
+| [`raytrace_level_set_cuda.py`](raytrace_level_set_cuda.py) | GPU counterpart to `raytrace_level_set.py`: one CUDA thread per pixel in a `cupy.RawKernel`, using the faithful `nanovdb::math::Ray` + HDDA `ZeroCrossing` surface search (bound only in C++). Port of the device path of `ex_raytrace_level_set`. Requires CuPy + NanoVDB headers. |
+| [`raytrace_fog_volume_cuda.py`](raytrace_fog_volume_cuda.py) | GPU counterpart to `raytrace_fog_volume.py`: per-pixel transmittance ray-march in a `cupy.RawKernel` over the device grid accessor. Port of the device path of `ex_raytrace_fog_volume`. Requires CuPy + NanoVDB headers. |
+| [`mesh_to_grid_cuda.py`](mesh_to_grid_cuda.py) | `tools.cuda.meshToGrid` rasterizes a triangle mesh into a narrow-band unsigned distance field on the device (returns an OnIndex grid + per-value UDF sidecar), then `indexToGrid` bakes it into a Float distance grid. Port of `ex_mesh_to_grid_cuda` (OpenVDB-free: the mesh is generated with NumPy). Requires CuPy. |
 
 #### One level-set filter, three compute backends
 
@@ -137,7 +147,8 @@ TC = nanovdb.tools.cuda   # ok
   `nanovdb::tools::cuda`): point / voxel rasterizers (`pointsToGrid`,
   `voxelsTo{OnIndex,Index,RGBA8}Grid`, `pointsToRGBA8Grid`), morphology /
   topology (`dilateGrid`, `coarsenGrid`, `refineGrid`, `pruneGrid`,
-  `mergeGrids`), index utilities (`indexToGrid`, `addBlindData`), in-place
+  `mergeGrids`), mesh rasterization (`meshToGrid`), index utilities
+  (`indexToGrid`, `addBlindData`), in-place
   device QC (`updateGridStats`, `updateChecksum`, `evalChecksum`,
   `validateChecksum`, `isValid`), `signedFloodFill`, `sampleFromVoxels`,
   `buildVoxelBlockManager`, and the multi-GPU `Distributed*PointsToGrid`

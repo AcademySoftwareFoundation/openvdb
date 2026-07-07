@@ -27,6 +27,7 @@
 #include "cuda/PyMergeGrids.h"
 #include "cuda/PyInjectData.h"
 #include "cuda/PyIndexToGrid.h"
+#include "cuda/PyMeshToGrid.h"
 #include "cuda/PyAddBlindData.h"
 #include "cuda/PyDeviceGridStats.h"
 #include "cuda/PyDeviceGridValidator.h"
@@ -87,6 +88,10 @@ void defineToolsModule(nb::module_& m)
     // the overload that matches the input tensor dtype.
     definePointsToGrid<float>(cudaModule, "pointsToGrid");
     definePointsToGrid<double>(cudaModule, "pointsToGrid");
+
+    // Triangle mesh -> narrow-band UDF (nanovdb::tools::cuda::MeshToGrid).
+    // Returns (ValueOnIndex device handle, per-value float UDF sidecar buffer).
+    defineMeshToGrid(cudaModule, "meshToGrid");
 
     // Multi-GPU voxel-coordinate -> grid builder (nanovdb::tools::cuda::
     // DistributedPointsToGrid). Distributes an (N, 3) int32 unified-memory
@@ -203,6 +208,7 @@ void defineToolsModule(nb::module_& m)
     defineDeviceIsValid<ValueIndex>(cudaModule, "isValid");
     defineDeviceIsValid<ValueOnIndex>(cudaModule, "isValid");
     defineDeviceIsValid<ValueMask>(cudaModule, "isValid");
+    defineDeviceIsValid<Point>(cudaModule, "isValid");
 
     defineDeviceGridChecksum<float>(cudaModule);
     defineDeviceGridChecksum<double>(cudaModule);

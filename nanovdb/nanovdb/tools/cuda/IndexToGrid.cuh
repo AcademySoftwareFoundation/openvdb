@@ -146,6 +146,10 @@ __global__ void processGridTreeRootKernel(typename IndexToGrid<SrcBuildT>::NodeA
     // process Grid
     *dstGrid.data() = *srcGrid.data();
     dstGrid.mGridType = toGridType<DstBuildT>();
+    // NOTE: The source is an index grid (GridClass::IndexGrid); a plain value
+    // grid must not inherit that class or it forms an invalid GridType/GridClass
+    // combination (e.g. Float + IndexGrid) that fails grid validation.
+    dstGrid.mGridClass = GridClass::Unknown;
     dstGrid.mData1 = 0u;
 
     dstGrid.mGridSize = nodeAcc->size;

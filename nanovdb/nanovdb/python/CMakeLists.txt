@@ -51,6 +51,7 @@ nanobind_add_module(nanovdb_python NB_STATIC
     cuda/PyMergeGrids.cu
     cuda/PyInjectData.cu
     cuda/PyIndexToGrid.cu
+    cuda/PyMeshToGrid.cu
     cuda/PyAddBlindData.cu
     cuda/PyDeviceGridStats.cu
     cuda/PyDeviceGridValidator.cu
