@@ -71,62 +71,47 @@ TEST(TestNanoVDBMultiGPU, RadixSort)
     }
 }
 
-/// @brief Tests that the merge path search handles empty partitions. An empty
-///        side must yield a trivial split (everything up to the diagonal comes
-///        from the non-empty side) without reading either array out of bounds.
-///        Runs on a single GPU: mergePathKernel is a plain kernel over pointers.
+/// @brief Tests the merge path split for empty partitions. An empty side
+///        yields a trivial split (everything up to the diagonal comes from
+///        the non-empty side), computed on the host via mergePathTrivial —
+///        the device search requires non-empty inputs. Runs on a single GPU.
 TEST(TestNanoVDBMultiGPU, MergePathEmptyPartition)
 {
-    using KeyT = int;
+    using nanovdb::tools::cuda::mergePathTrivial;
     constexpr size_t count = 4;
-    constexpr KeyT sentinel = -999; // smaller than every real key
-
-    // One allocation: keys[0..3] hold sorted keys, keys[4..7] hold sentinels.
-    // The sentinel region doubles as the "empty" partition's base pointer, so
-    // an out-of-bounds search reads controlled values and fails deterministically.
-    KeyT* keys = nullptr;
-    cudaCheck(cudaMallocManaged(&keys, 2 * count * sizeof(KeyT)));
-    for (size_t i = 0; i < count; ++i) keys[i] = 10 * (int(i) + 1); // 10 20 30 40
-    for (size_t i = count; i < 2 * count; ++i) keys[i] = sentinel;
-
-    ptrdiff_t* intervals = nullptr;
-    cudaCheck(cudaMallocManaged(&intervals, 2 * sizeof(ptrdiff_t)));
-
-    using nanovdb::tools::cuda::kernels::mergePathKernel;
+    ptrdiff_t k1 = -1, k2 = -1;
 
     // Median diagonal with an empty right partition: all elements from keys1.
-    intervals[0] = intervals[1] = -1;
-    mergePathKernel<<<1, 1>>>(keys, count, keys + count, size_t(0), intervals, intervals + 1, size_t(1));
-    cudaCheck(cudaDeviceSynchronize());
-    EXPECT_EQ(intervals[0], ptrdiff_t(count / 2));
-    EXPECT_EQ(intervals[1], ptrdiff_t(0));
+    mergePathTrivial(count, 0, &k1, &k2, 1);
+    EXPECT_EQ(k1, ptrdiff_t(count / 2));
+    EXPECT_EQ(k2, ptrdiff_t(0));
 
     // Median diagonal with an empty left partition: all elements from keys2.
-    intervals[0] = intervals[1] = -1;
-    mergePathKernel<<<1, 1>>>(keys + count, size_t(0), keys, count, intervals, intervals + 1, size_t(1));
-    cudaCheck(cudaDeviceSynchronize());
-    EXPECT_EQ(intervals[0], ptrdiff_t(0));
-    EXPECT_EQ(intervals[1], ptrdiff_t(count / 2));
+    mergePathTrivial(0, count, &k1, &k2, 1);
+    EXPECT_EQ(k1, ptrdiff_t(0));
+    EXPECT_EQ(k2, ptrdiff_t(count / 2));
 
     // Both partitions empty.
-    intervals[0] = intervals[1] = -1;
-    mergePathKernel<<<1, 1>>>(keys, size_t(0), keys, size_t(0), intervals, intervals + 1, size_t(0));
-    cudaCheck(cudaDeviceSynchronize());
-    EXPECT_EQ(intervals[0], ptrdiff_t(0));
-    EXPECT_EQ(intervals[1], ptrdiff_t(0));
+    mergePathTrivial(0, 0, &k1, &k2, 0);
+    EXPECT_EQ(k1, ptrdiff_t(0));
+    EXPECT_EQ(k2, ptrdiff_t(0));
 
-    // Control: two non-empty interleaved partitions at the median diagonal.
-    KeyT* keys2 = nullptr;
-    cudaCheck(cudaMallocManaged(&keys2, count * sizeof(KeyT)));
-    for (size_t i = 0; i < count; ++i) keys2[i] = 10 * (int(i) + 1) + 5; // 15 25 35 45
+    // Control: the device search on two non-empty interleaved partitions
+    // splits both arrays at the median diagonal.
+    using KeyT = int;
+    KeyT* keys = nullptr;
+    cudaCheck(cudaMallocManaged(&keys, 2 * count * sizeof(KeyT)));
+    for (size_t i = 0; i < count; ++i) keys[i] = 10 * (int(i) + 1);              // 10 20 30 40
+    for (size_t i = 0; i < count; ++i) keys[count + i] = 10 * (int(i) + 1) + 5;  // 15 25 35 45
+    ptrdiff_t* intervals = nullptr;
+    cudaCheck(cudaMallocManaged(&intervals, 2 * sizeof(ptrdiff_t)));
     intervals[0] = intervals[1] = -1;
-    mergePathKernel<<<1, 1>>>(keys, count, keys2, count, intervals, intervals + 1, size_t(1));
+    nanovdb::tools::cuda::kernels::mergePathKernel<<<1, 1>>>(keys, count, keys + count, count, intervals, intervals + 1, size_t(1));
     cudaCheck(cudaDeviceSynchronize());
     // Merged head is 10 15 20 25, so the median splits both arrays at 2.
     EXPECT_EQ(intervals[0], ptrdiff_t(2));
     EXPECT_EQ(intervals[1], ptrdiff_t(2));
 
-    cudaCheck(cudaFree(keys2));
     cudaCheck(cudaFree(intervals));
     cudaCheck(cudaFree(keys));
 }

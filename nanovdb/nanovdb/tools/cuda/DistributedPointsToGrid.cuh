@@ -52,7 +52,21 @@ private:
     const T* mValue;
 };
 
+/// @brief Computes the trivial merge path split for the case where either
+///        input is empty: every element up to the diagonal comes from the
+///        non-empty side. Host-callable so callers can skip the kernel launch.
+inline void mergePathTrivial(size_t keys1Count, size_t keys2Count, ptrdiff_t* key1Intervals, ptrdiff_t* key2Intervals, int intervalIndex)
+{
+    const size_t combinedIndex = intervalIndex * (keys1Count + keys2Count) / 2;
+    *key1Intervals = static_cast<ptrdiff_t>(combinedIndex < keys1Count ? combinedIndex : keys1Count);
+    *key2Intervals = static_cast<ptrdiff_t>(combinedIndex < keys2Count ? combinedIndex : keys2Count);
+}
+
 /// @brief Implements the merge path binary search algorithm in order to find the median across two sorted input key arrays
+/// @warning Both inputs must be non-empty: the binary search reads both
+///          arrays, and its unsigned (keysNCount - 1) bounds checks underflow
+///          when a count is zero. Callers handle an empty side with
+///          mergePathTrivial instead of launching this search.
 template<typename KeyIteratorIn>
 __device__
 void mergePath(KeyIteratorIn keys1, size_t keys1Count, KeyIteratorIn keys2, size_t keys2Count, ptrdiff_t* key1Intervals, ptrdiff_t* key2Intervals, int intervalIndex)
@@ -60,17 +74,6 @@ void mergePath(KeyIteratorIn keys1, size_t keys1Count, KeyIteratorIn keys2, size
     using key_type = typename ::cuda::std::iterator_traits<KeyIteratorIn>::value_type;
 
     const size_t combinedIndex = intervalIndex * (keys1Count + keys2Count) / 2;
-
-    // An empty partition makes the merge trivial: every element up to the
-    // diagonal comes from the non-empty side. Handle it before the binary
-    // search, which reads both arrays and whose unsigned (keysNCount - 1)
-    // bounds checks underflow when a count is zero.
-    if (keys1Count == 0 || keys2Count == 0) {
-        *key1Intervals = static_cast<ptrdiff_t>(combinedIndex < keys1Count ? combinedIndex : keys1Count);
-        *key2Intervals = static_cast<ptrdiff_t>(combinedIndex < keys2Count ? combinedIndex : keys2Count);
-        return;
-    }
-
     size_t leftTop = combinedIndex > keys1Count ? keys1Count : combinedIndex;
     size_t rightTop = combinedIndex > keys1Count ? combinedIndex - keys1Count : 0;
     size_t leftBottom = rightTop;
@@ -229,7 +232,14 @@ void radixSortAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cuda::
                     cudaCheck(cudaSetDevice(deviceId));
 
                     cudaCheck(cudaStreamWaitEvent(deviceMesh[deviceId].stream, postEvents[otherDeviceId]));
-                    kernels::mergePathKernel<<<1, 1, 0, deviceMesh[deviceId].stream>>>(leftDeviceKeysIn, leftDeviceItemCount, rightDeviceKeysIn, rightDeviceItemCount, leftIntervals + deviceId, rightIntervals + deviceId, intervalIndex);
+                    if (leftDeviceItemCount == 0 || rightDeviceItemCount == 0) {
+                        // An empty side makes the split trivial; no kernel launch
+                        // is needed and the search itself requires non-empty inputs.
+                        mergePathTrivial(leftDeviceItemCount, rightDeviceItemCount, leftIntervals + deviceId, rightIntervals + deviceId, intervalIndex);
+                    }
+                    else {
+                        kernels::mergePathKernel<<<1, 1, 0, deviceMesh[deviceId].stream>>>(leftDeviceKeysIn, leftDeviceItemCount, rightDeviceKeysIn, rightDeviceItemCount, leftIntervals + deviceId, rightIntervals + deviceId, intervalIndex);
+                    }
                     cudaCheck(cudaEventRecord(postEvents[deviceId], deviceMesh[deviceId].stream));
                 };
                 mergePathSubfunc(leftDeviceId, rightDeviceId, 0);
