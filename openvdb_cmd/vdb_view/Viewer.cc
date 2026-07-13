@@ -1002,6 +1002,7 @@ ViewerImpl::keyCallback(int key, int action)
             glfwSetWindowShouldClose(mWindow, true);
             break;
         }
+        setNeedsDisplay();
     }
 
     switch (key) {
@@ -1019,7 +1020,6 @@ ViewerImpl::keyCallback(int key, int action)
     mClipBox->shiftIsDown() = mShiftIsDown;
     mClipBox->ctrlIsDown() = mCtrlIsDown;
 
-    setNeedsDisplay();
 }
 
 
