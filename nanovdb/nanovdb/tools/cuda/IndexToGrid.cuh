@@ -218,11 +218,11 @@ __global__ void processNodesKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
     auto &srcNode = nodeAcc->template srcNode<LEVEL>(blockIdx.x);
     auto &dstNode = nodeAcc->template dstNode<DstBuildT, LEVEL>(blockIdx.x);
 
-    if (threadIdx.x == 0 && threadIdx.y == 0) {
+    const int tid = threadIdx.y*blockDim.x + threadIdx.x;
+    const int nThreads = blockDim.x*blockDim.y;
+    if (tid == 0) {
         dstNode.mBBox = srcNode.mBBox;
         dstNode.mFlags = srcNode.mFlags;
-        dstNode.mValueMask = srcNode.mValueMask;
-        dstNode.mChildMask = srcNode.mChildMask;
         auto &srcGrid = nodeAcc->srcGrid();
         if (srcGrid.hasMinMax()) {
             dstNode.mMinimum = srcValues[srcNode.mMinimum];
@@ -233,9 +233,16 @@ __global__ void processNodesKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
             if (srcGrid.hasStdDeviation()) dstNode.mStdDevi = srcValues[srcNode.mStdDevi];
         }
     }
-    const int off = blockDim.x*blockDim.y*threadIdx.x + blockDim.x*threadIdx.y;
-    for (int threadIdx_z=0; threadIdx_z<blockDim.x; ++threadIdx_z) {
-        const int i = off + threadIdx_z;
+    // Cooperative, coalesced mask copies (upper-node masks are 4 KB each; a
+    // single thread used to copy them member-wise while the block idled)
+    for (int w = tid; w < SrcNodeT::SIZE/64; w += nThreads) {
+        dstNode.mValueMask.words()[w] = srcNode.mValueMask.words()[w];
+        dstNode.mChildMask.words()[w] = srcNode.mChildMask.words()[w];
+    }
+    // Consecutive threads process consecutive table entries (coalesced); the
+    // former mapping gave each thread a consecutive RUN, i.e. a 32-entry
+    // stride across the warp on every iteration.
+    for (int i = tid; i < SrcNodeT::SIZE; i += nThreads) {
         if (srcNode.mChildMask.isOn(i)) {
             if constexpr(sizeof(SrcNodeT)==sizeof(DstNodeT) && sizeof(SrcChildT)==sizeof(DstChildT)) {
                 dstNode.mTable[i].child = srcNode.mTable[i].child;
@@ -261,7 +268,9 @@ __global__ void processLeafsKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
     static_assert(!BuildTraits<DstBuildT>::is_special, "Invalid destination type!");
     auto &srcLeaf = nodeAcc->template srcNode<0>(blockIdx.x);
     auto &dstLeaf = nodeAcc->template dstNode<DstBuildT,0>(blockIdx.x);
-    if (threadIdx.x == 0 && threadIdx.y == 0) {
+    const int tid = threadIdx.y*blockDim.x + threadIdx.x;
+    const int nThreads = blockDim.x*blockDim.y;
+    if (tid == 0) {
         dstLeaf.mBBoxMin = srcLeaf.mBBoxMin;
         for (int i=0; i<3; ++i) dstLeaf.mBBoxDif[i] = srcLeaf.mBBoxDif[i];
         dstLeaf.mFlags = srcLeaf.mFlags;
@@ -284,12 +293,11 @@ __global__ void processLeafsKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
             if (srcGrid.hasStdDeviation()) dstLeaf.mStdDevi = srcValues[srcLeaf.getDev()];
         }
     }
-    const int off = blockDim.x*blockDim.y*threadIdx.x + blockDim.x*threadIdx.y;
-    auto *dst = dstLeaf.mValues + off;
-    for (int threadIdx_z=0; threadIdx_z<blockDim.x; ++threadIdx_z) {
-        const int i = off + threadIdx_z;
-        *dst++ = srcValues[srcLeaf.getValue(i)];
-    }
+    // Consecutive threads write consecutive values (coalesced); the former
+    // mapping gave each thread a consecutive run of 8, i.e. an 8-entry
+    // stride across the warp on every iteration.
+    for (int i = tid; i < 512; i += nThreads)
+        dstLeaf.mValues[i] = srcValues[srcLeaf.getValue(i)];
 }// processLeafsKernel
 
 //================================================================================================
