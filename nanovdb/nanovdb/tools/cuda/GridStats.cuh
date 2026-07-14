@@ -114,28 +114,22 @@ __global__ void processInternal(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
     constexpr uint32_t Threads = 128;
     __shared__ StatsT sStats[Threads];
     __shared__ CoordBBox sBBox[Threads];
-    __shared__ int sSlot;// any one child's d_stats slot, claimed for this node
 
     const uint32_t nodeID = blockIdx.x;
     const uint32_t tID = threadIdx.x;
     if (nodeID >= d_nodeMgr->nodeCount(LEVEL)) return;
     auto &d_node = d_nodeMgr->template node<LEVEL>(nodeID);
-    if (tID == 0) sSlot = -1;
-    __syncthreads();
 
     CoordBBox bbox;// empty
     StatsT stats;
-    int mySlot = -1;
     for (uint32_t i = tID; i < NodeT::SIZE; i += Threads) {
         if (d_node.childMask().isOn(i)) {
             auto &child = *d_node.getChild(i);
             bbox.expand( child.bbox() );
             if constexpr(StatsT::hasAverage()) {
-                const int slot = *reinterpret_cast<const uint32_t*>(&child.mMinimum);
-                StatsT &s = d_stats[slot];
+                StatsT &s = d_stats[*reinterpret_cast<const uint32_t*>(&child.mMinimum)];
                 s.setStats(child);
                 stats.add(s);
-                mySlot = slot;
             } else if constexpr(StatsT::hasMinMax()) {
                 stats.add(child.minimum());
                 stats.add(child.maximum());
@@ -147,8 +141,6 @@ __global__ void processInternal(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
             if constexpr(StatsT::hasStats()) stats.add(d_node.data()->getValue(i), ChildT::NUM_VALUES);
         }
     }
-    if constexpr(StatsT::hasAverage())
-        if (mySlot >= 0) atomicMax(&sSlot, mySlot);
     sStats[tID] = stats;
     sBBox[tID] = bbox;
     __syncthreads();
@@ -162,8 +154,15 @@ __global__ void processInternal(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
     if (tID == 0) {
         d_node.mBBox = sBBox[0];
         if constexpr(StatsT::hasAverage()) {
-            d_stats[sSlot] = sStats[0];
-            *reinterpret_cast<uint32_t*>(&d_node.mMinimum) = sSlot;
+            // Each node writes its OWN unique d_stats slot (leaves occupy
+            // [0, leafCount), then lower nodes, then upper nodes), so a node
+            // with no children still has a valid slot. The previous scheme
+            // reused a child's slot, writing d_stats[-1] for a childless
+            // (fully-tiled) internal node - an out-of-bounds write.
+            const uint32_t slot = d_nodeMgr->leafCount()
+                                + (LEVEL == 2 ? d_nodeMgr->nodeCount(1) : 0u) + nodeID;
+            d_stats[slot] = sStats[0];
+            *reinterpret_cast<uint32_t*>(&d_node.mMinimum) = slot;
         } else if constexpr(StatsT::hasMinMax()) {
             sStats[0].setStats(d_node);
         }
@@ -251,10 +250,12 @@ void GridStats<BuildT, StatsT>::update(NanoGrid<BuildT> *d_grid, cudaStream_t st
 
     StatsT *d_stats = nullptr;
 
-    if constexpr(StatsT::hasAverage()) cudaCheck(util::cuda::mallocAsync((void**)&d_stats, nodeCount[0]*sizeof(StatsT), stream));
+    // One d_stats slot per node (leaves, then lower, then upper) so every node
+    // has its own slot - see processInternal.
+    if constexpr(StatsT::hasAverage()) cudaCheck(util::cuda::mallocAsync((void**)&d_stats, (nodeCount[0]+nodeCount[1]+nodeCount[2])*sizeof(StatsT), stream));
 
     // warp per leaf (4 warps per 128-thread block); block per internal node
-    processLeaf<BuildT><<<blocksPerGrid(nodeCount[0]*32), threadsPerBlock, 0, stream>>>(d_nodeMgr, d_stats);
+    if (nodeCount[0]) processLeaf<BuildT><<<blocksPerGrid(nodeCount[0]*32), threadsPerBlock, 0, stream>>>(d_nodeMgr, d_stats);
 
     if (nodeCount[1]) processInternal<BuildT, StatsT, 1><<<nodeCount[1], threadsPerBlock, 0, stream>>>(d_nodeMgr, d_stats);
 
