@@ -792,6 +792,12 @@ inline BufferT PointsToGrid<BuildT, ResourceT>::getBuffer(const PtrT, size_t poi
 
     mData.d_bufferPtr = buffer.deviceData();
     if (mData.d_bufferPtr == nullptr) throw std::runtime_error("Failed to allocate grid buffer on the device");
+    // Zero the whole grid buffer up front. This (a) makes the dense background
+    // fills (upper/lower value tables, inactive leaf values - all zero in this
+    // builder) redundant, so those kernels are skipped, and (b) makes the
+    // output bit-deterministic: alignment padding and stats fields no longer
+    // carry recycled pool bytes (which previously leaked into written files).
+    cudaCheck(cudaMemsetAsync(mData.d_bufferPtr, 0, mData.size, mStream));
     cudaCheck(cudaMemcpyAsync(mDeviceData, &mData, sizeof(PointsToGridData<BuildT>), cudaMemcpyHostToDevice, mStream));// copy Data CPU -> GPU
     return buffer;
 }// PointsToGrid<BuildT, ResourceT>::getBuffer
@@ -938,11 +944,16 @@ inline void PointsToGrid<BuildT, ResourceT>::processGridTreeRoot(const PtrT poin
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, BuildGridTreeRootFunctor<BuildT, PtrT>(), mDeviceData, mPointType, pointCount);// lambdaKernel
     cudaCheckError();
 
+    // Zero the name field, then copy only the actual string (if any). The
+    // previous code copied MaxNameSize bytes from the std::string buffer
+    // (whose .data() is never null, so the memset branch was dead), reading
+    // up to 255 bytes past the allocation and leaking host heap contents
+    // into the grid - nondeterministic output and a hygiene issue for files.
     char *dst = mData.getGrid().mGridName;
-    if (const char *src = mGridName.data()) {
-        cudaCheck(cudaMemcpyAsync(dst, src, GridData::MaxNameSize, cudaMemcpyHostToDevice, mStream));
-    } else {
-        cudaCheck(cudaMemsetAsync(dst, 0, GridData::MaxNameSize, mStream));
+    cudaCheck(cudaMemsetAsync(dst, 0, GridData::MaxNameSize, mStream));
+    if (!mGridName.empty()) {
+        const size_t nameSize = std::min<size_t>(mGridName.size() + 1, GridData::MaxNameSize);
+        cudaCheck(cudaMemcpyAsync(dst, mGridName.c_str(), nameSize, cudaMemcpyHostToDevice, mStream));
     }
 }// PointsToGrid<BuildT, ResourceT>::processGridTreeRoot
 
@@ -995,9 +1006,9 @@ inline void PointsToGrid<BuildT, ResourceT>::processUpperNodes()
 
     mResource->deallocate_async(mData.d_tile_keys, mData.nodeCount[2]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
 
-    const uint64_t valueCount = mData.nodeCount[2] << 15;
-    util::cuda::lambdaKernel<<<numBlocks(valueCount), mNumThreads, 0, mStream>>>(valueCount, SetUpperBackgroundValuesFunctor<BuildT>(), mDeviceData);
-    cudaCheckError();
+    // Upper background values are zero and the grid buffer is zero-initialized
+    // in getBuffer, so the former dense SetUpperBackgroundValuesFunctor pass
+    // (nodeCount[2]<<15 threads) is unnecessary.
 }// PointsToGrid<BuildT, ResourceT>::processUpperNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1039,9 +1050,9 @@ inline void PointsToGrid<BuildT, ResourceT>::processLowerNodes()
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[1]), mNumThreads, 0, mStream>>>(mData.nodeCount[1], BuildLowerNodesFunctor<BuildT>(), mDeviceData);
     cudaCheckError();
 
-    const uint64_t valueCount = mData.nodeCount[1] << 12;
-    util::cuda::lambdaKernel<<<numBlocks(valueCount), mNumThreads, 0, mStream>>>(valueCount, SetLowerBackgroundValuesFunctor<BuildT>(), mDeviceData);
-    cudaCheckError();
+    // Lower background values are zero and the grid buffer is zero-initialized
+    // in getBuffer, so the former dense SetLowerBackgroundValuesFunctor pass
+    // (nodeCount[1]<<12 threads) is unnecessary.
 }// PointsToGrid<BuildT, ResourceT>::processLowerNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1134,10 +1145,16 @@ inline void PointsToGrid<BuildT, ResourceT>::processLeafNodes(size_t pointCount)
     mResource->deallocate_async(mData.pointsPerLeafPrefix, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
     mResource->deallocate_async(mData.pointsPerLeaf,mData.nodeCount[0]*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
 
-    if (mVerbose==2) mTimer.restart("set inactive voxel values");
-    const uint64_t denseVoxelCount = mData.nodeCount[0] << 9;
-    util::cuda::lambdaKernel<<<numBlocks(denseVoxelCount), mNumThreads, 0, mStream>>>(denseVoxelCount, SetLeafInactiveVoxelValuesFunctor<BuildT>(), mDeviceData);
-    cudaCheckError();
+    // Inactive voxel values are zero for every build type except Point (which
+    // copies the previous active value for rank queries); the zero cases are
+    // covered by the buffer memset in getBuffer, and for index grids this
+    // dense pass (nodeCount[0]<<9 threads) was a no-op to begin with.
+    if constexpr(util::is_same<BuildT, Point>::value) {
+        if (mVerbose==2) mTimer.restart("set inactive voxel values");
+        const uint64_t denseVoxelCount = mData.nodeCount[0] << 9;
+        util::cuda::lambdaKernel<<<numBlocks(denseVoxelCount), mNumThreads, 0, mStream>>>(denseVoxelCount, SetLeafInactiveVoxelValuesFunctor<BuildT>(), mDeviceData);
+        cudaCheckError();
+    }
 
     if constexpr(BuildTraits<BuildT>::is_onindex) {
         if (mVerbose==2) mTimer.restart("prefix-sum for index grid");

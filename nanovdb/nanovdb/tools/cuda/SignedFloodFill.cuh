@@ -78,7 +78,7 @@ struct RootChild {
 
 // CPU kernel!
 template<typename BuildT>
-void processRoot(NanoTree<BuildT> *d_tree)
+void processRoot(NanoTree<BuildT> *d_tree, cudaStream_t stream = 0)
 {// the root needs special care since unlike other nodes it's sparse and not dense!
     using TreeT  = NanoTree<BuildT>;
     using RootT  = NanoRoot<BuildT>;
@@ -86,6 +86,9 @@ void processRoot(NanoTree<BuildT> *d_tree)
     using ValueT = typename RootT::ValueType;
     using ChildT = RootChild<ValueT>;
     static const int dim = int(RootT::ChildNodeType::DIM);
+
+    // Ensure the node passes issued on 'stream' have completed before the synchronous copies below read d_tree
+    cudaCheck(cudaStreamSynchronize(stream));
 
     // First copy the tree and root and then its tiles, which is of unknown size
     nanovdb::cuda::UnifiedBuffer uBuffer(sizeof(TreeT) + sizeof(RootT), sizeof(TreeT) + sizeof(RootT) + 64*sizeof(TileT));
@@ -108,11 +111,11 @@ void processRoot(NanoTree<BuildT> *d_tree)
     for (ChildT *a = first, *b = a+1; b!=last; ++a, ++b) {// loop over pairs of adjacent child nodes
         const Coord d = b->ijk - a->ijk;// coord delta of adjacent child nodes
         if (d[0]!=0 || d[1]!=0 || d[2]==dim) continue;// not same z-scanline or they are neighbors
-        util::cuda::lambdaKernel<<<1, 1>>>(1, [=] __device__(size_t) {
+        util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__(size_t) {
             a->val[1] = root->getChild(root->tile(a->idx))->getLastValue();
             b->val[0] = root->getChild(root->tile(b->idx))->getFirstValue();
         });
-        cudaCheck(cudaDeviceSynchronize());// required for host access to RootChild::val[2]
+        cudaCheck(cudaStreamSynchronize(stream));// required for host access to RootChild::val[2]
         if (a->val[1] > 0 || b->val[0] > 0) continue; // scanline is not inside a surface
         for (Coord c = a->ijk.offsetBy(0,0,dim); c[2] != b->ijk[2]; c[2] += dim) {
             TileT *tile = root->probeTile(c);
@@ -208,7 +211,7 @@ void SignedFloodFill<BuildT>::operator()(NanoGrid<BuildT> *d_grid)
     cudaCheckError();
 
     if (mVerbose) mTimer.restart("Process root node");
-    kernels::processRoot<BuildT>(d_tree);
+    kernels::processRoot<BuildT>(d_tree, mStream);
     if (mVerbose) mTimer.stop();
     cudaCheckError();
 }// SignedFloodFill::operator()

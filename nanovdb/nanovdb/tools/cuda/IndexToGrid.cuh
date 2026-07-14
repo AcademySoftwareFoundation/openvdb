@@ -373,6 +373,10 @@ inline BufferT IndexToGrid<SrcBuildT>::getBuffer(const BufferT &pool)
     auto buffer = BufferT::create(mNodeAcc.size, &pool, device, mStream);
     mNodeAcc.d_dstPtr = buffer.deviceData();
     if (mNodeAcc.d_dstPtr == nullptr) throw std::runtime_error("Failed memory allocation on the device");
+    // Zero the output buffer: regions the kernels below do not write (e.g.
+    // padding, unused tile fields) otherwise carry recycled allocator bytes,
+    // making the output nondeterministic and leaking heap contents to files.
+    cudaCheck(cudaMemsetAsync(mNodeAcc.d_dstPtr, 0, mNodeAcc.size, mStream));
 
     if (size_t size = mGridName.size()) {
         cudaCheck(util::cuda::mallocAsync((void**)&mNodeAcc.d_gridName, size, mStream));

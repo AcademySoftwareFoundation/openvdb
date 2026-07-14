@@ -884,12 +884,14 @@ void MeshToGrid<BuildT>::processGridTreeRoot()
         topology::detail::InitGridTreeRootFunctor<BuildT>{mMap}, mBuilder.deviceData());
     cudaCheckError();
 
-    // Copy grid name into the output grid's name field
+    // Copy grid name into the output grid's name field. Zero the field first
+    // and copy only the actual string; see the matching fix in PointsToGrid.cuh
+    // (heap over-read of the name buffer).
     char *dst = mBuilder.data()->getGrid().mGridName;
+    cudaCheck(cudaMemsetAsync(dst, 0, GridData::MaxNameSize, mStream));
     if (!mGridName.empty()) {
-        cudaCheck(cudaMemcpyAsync(dst, mGridName.data(), GridData::MaxNameSize, cudaMemcpyHostToDevice, mStream));
-    } else {
-        cudaCheck(cudaMemsetAsync(dst, 0, GridData::MaxNameSize, mStream));
+        const size_t nameSize = std::min<size_t>(mGridName.size() + 1, GridData::MaxNameSize);
+        cudaCheck(cudaMemcpyAsync(dst, mGridName.c_str(), nameSize, cudaMemcpyHostToDevice, mStream));
     }
 
 } // MeshToGrid<BuildT>::processGridTreeRoot
