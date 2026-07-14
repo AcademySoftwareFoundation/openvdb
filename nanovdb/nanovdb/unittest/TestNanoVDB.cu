@@ -3638,8 +3638,9 @@ TEST(TestNanoVDBCUDA, NonBlockingStreamDilate_ValueOnIndex)
 
     auto dilateOn = [&](cudaStream_t stream, bool occupyDefault) {
         if (occupyDefault) {// keep the default stream busy for ~20 ms
-            int clockKHz = 0;
-            cudaCheck(cudaDeviceGetAttribute(&clockKHz, cudaDevAttrClockRate, 0));
+            int clockKHz = 0, dev = 0;
+            cudaCheck(cudaGetDevice(&dev));
+            cudaCheck(cudaDeviceGetAttribute(&clockKHz, cudaDevAttrClockRate, dev));
             streamBusyWaitKernel<<<1, 1, 0, 0>>>(static_cast<unsigned long long>(clockKHz) * 20ull);
             cudaCheck(cudaGetLastError());
         }
@@ -3690,6 +3691,14 @@ TEST(TestNanoVDBCUDA, GridName_CudaPointsToGrid)
     // Maximum name that fits with a null terminator (MaxNameSize includes it).
     const std::string maxName(nanovdb::GridData::MaxNameSize - 1, 'x');
     EXPECT_EQ(maxName, build(maxName));
+    // Over-long name (>= MaxNameSize) must be truncated to MaxNameSize-1 chars
+    // and stay null-terminated - never a non-terminated field that gridName()
+    // would over-read. The result is the max-length string, and reading it back
+    // as a C-string does not exceed MaxNameSize.
+    const std::string tooLong(nanovdb::GridData::MaxNameSize + 37, 'y');
+    const std::string got = build(tooLong);
+    EXPECT_EQ(size_t(nanovdb::GridData::MaxNameSize - 1), got.size());
+    EXPECT_EQ(std::string(nanovdb::GridData::MaxNameSize - 1, 'y'), got);
 }// GridName_CudaPointsToGrid
 
 // Regression test: PointsToGrid output must be byte-deterministic. Alignment

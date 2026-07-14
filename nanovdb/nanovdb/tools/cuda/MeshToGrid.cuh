@@ -889,7 +889,9 @@ void MeshToGrid<BuildT>::processGridTreeRoot()
     char *dst = mBuilder.data()->getGrid().mGridName;
     cudaCheck(cudaMemsetAsync(dst, 0, GridData::MaxNameSize, mStream));
     if (!mGridName.empty()) {
-        const size_t nameSize = std::min<size_t>(mGridName.size() + 1, GridData::MaxNameSize);
+        // Copy at most MaxNameSize-1 bytes so the memset's trailing '\0' always
+        // survives; a name >= MaxNameSize is truncated, never left unterminated.
+        const size_t nameSize = std::min<size_t>(mGridName.size(), GridData::MaxNameSize - 1);
         cudaCheck(cudaMemcpyAsync(dst, mGridName.c_str(), nameSize, cudaMemcpyHostToDevice, mStream));
     }
 
