@@ -3661,6 +3661,7 @@ TEST(TestNanoVDBCUDA, NonBlockingStreamDilate_ValueOnIndex)
     cudaCheck(cudaStreamCreateWithFlags(&nb, cudaStreamNonBlocking));
     const auto candidate = dilateOn(nb, /*occupyDefault=*/true);
     cudaCheck(cudaStreamSynchronize(nb));
+    cudaCheck(cudaDeviceSynchronize());// drain the default-stream busy-wait so it can't leak into later tests
     cudaCheck(cudaStreamDestroy(nb));
 
     EXPECT_EQ(reference.first, candidate.first);   // identical active-voxel count
