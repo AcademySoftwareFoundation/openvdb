@@ -885,8 +885,7 @@ void MeshToGrid<BuildT>::processGridTreeRoot()
     cudaCheckError();
 
     // Copy grid name into the output grid's name field. Zero the field first
-    // and copy only the actual string; see the matching fix in PointsToGrid.cuh
-    // (heap over-read of the name buffer).
+    // and copy only the actual string.
     char *dst = mBuilder.data()->getGrid().mGridName;
     cudaCheck(cudaMemsetAsync(dst, 0, GridData::MaxNameSize, mStream));
     if (!mGridName.empty()) {

@@ -909,8 +909,7 @@ inline void DistributedPointsToGrid<BuildT>::processGridTreeRoot(const PtrT poin
     util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, BuildGridTreeRootFunctor<BuildT, PtrT>(), mData, mPointType, pointCount);// lambdaKernel
     cudaCheckError();
 
-    // Zero the name field, then copy only the actual string (if any); see the
-    // matching fix in PointsToGrid.cuh (heap over-read of the name buffer).
+    // Zero the name field, then copy only the actual string (if any).
     char *dst = mData->getGrid().mGridName;
     cudaCheck(cudaMemsetAsync(dst, 0, GridData::MaxNameSize, stream));
     if (!mGridName.empty()) {
