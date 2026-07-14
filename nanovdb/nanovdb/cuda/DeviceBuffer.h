@@ -363,10 +363,13 @@ inline void DeviceBuffer::deviceUpload(int device, cudaStream_t stream, bool syn
     if (mGpuData[device] == nullptr) {
         if (mManaged==0) throw std::runtime_error("DeviceBuffer::deviceUpload called on externally managed memory that wasn\'t allocated.");
         cudaCheck(util::cuda::mallocAsync(mGpuData+device, mSize, stream)); // un-managed memory on the device, always 32B aligned!
-        mStreams[device] = stream;// remember this device's allocation stream so it is freed on it, not stream 0
     }
     checkPtr(mGpuData[device], "uninitialized gpu destination data");
     cudaCheck(cudaMemcpyAsync(mGpuData[device], mCpuData, mSize, cudaMemcpyHostToDevice, stream));
+    // This device buffer was last used on 'stream', so free it there (not on
+    // stream 0). Updated on every upload - not just first allocation - so a
+    // re-upload on a different stream still orders the free after its work.
+    if (mStreams) mStreams[device] = stream;
     if (sync) cudaCheck(cudaStreamSynchronize(stream));
 } // DeviceBuffer::deviceUpload
 
@@ -387,6 +390,7 @@ inline void DeviceBuffer::deviceDownload(int device, cudaStream_t stream, bool s
     }
     checkPtr(mCpuData, "uninitialized cpu destination data");
     cudaCheck(cudaMemcpyAsync(mCpuData, mGpuData[device], mSize, cudaMemcpyDeviceToHost, stream));
+    if (mStreams) mStreams[device] = stream;// last used on 'stream'; free this device buffer there so the free orders after this read
     if (sync) cudaCheck(cudaStreamSynchronize(stream));
 } // DeviceBuffer::deviceDownload
 
