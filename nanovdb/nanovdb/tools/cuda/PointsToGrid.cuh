@@ -1142,7 +1142,7 @@ inline void PointsToGrid<BuildT, ResourceT>::processLeafNodes(size_t pointCount)
     // Inactive voxel values are zero for every build type except Point (which
     // copies the previous active value for rank queries); the zero cases are
     // covered by the buffer memset in getBuffer, and for index grids this
-    // dense pass (nodeCount[0]<<9 threads) was a no-op to begin with.
+    // dense pass (nodeCount[0]<<9 threads) is a no-op.
     if constexpr(util::is_same<BuildT, Point>::value) {
         if (mVerbose==2) mTimer.restart("set inactive voxel values");
         const uint64_t denseVoxelCount = mData.nodeCount[0] << 9;
