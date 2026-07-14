@@ -87,8 +87,11 @@ void processRoot(NanoTree<BuildT> *d_tree, cudaStream_t stream = 0)
     using ChildT = RootChild<ValueT>;
     static const int dim = int(RootT::ChildNodeType::DIM);
 
-    // Ensure the node passes issued on 'stream' have completed before the synchronous copies below read d_tree
-    cudaCheck(cudaStreamSynchronize(stream));
+    // Ensure node passes issued on a non-default 'stream' have completed before
+    // the synchronous default-stream cudaMemcpy below reads d_tree. For the
+    // default stream (0) that blocking copy already orders after prior stream-0
+    // work, so the extra sync there is pure overhead - skip it.
+    if (stream != cudaStream_t{0}) cudaCheck(cudaStreamSynchronize(stream));
 
     // First copy the tree and root and then its tiles, which is of unknown size
     nanovdb::cuda::UnifiedBuffer uBuffer(sizeof(TreeT) + sizeof(RootT), sizeof(TreeT) + sizeof(RootT) + 64*sizeof(TileT));
