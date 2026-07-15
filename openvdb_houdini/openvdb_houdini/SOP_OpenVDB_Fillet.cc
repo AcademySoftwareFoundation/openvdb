@@ -328,6 +328,7 @@ public:
 
 protected:
     unsigned disableParms() override;
+    void resolveObsoleteParms(PRM_ParmList*) override;
 };
 
 
@@ -484,6 +485,14 @@ newSopOperator(OP_OperatorTable* table)
             " sampling artifacts.  Quadratic interpolation is slow but high-quality."
             " Linear interpolation is intermediate in speed and quality."));
 
+    // Obsolete parameters
+    hutil::ParmList obsoleteParms;
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "alpha", "Blend Radius")
+        .setDefault(10.f));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "beta", "Falloff Sharpness")
+        .setDefault(100.f));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "gamma", "Fillet Strength")
+        .setDefault(10.f));
 
     // Register this operator.
     // (See houdini_utils/Utils.h for OpFactory details.)
@@ -491,6 +500,7 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("A VDBs")
         .addOptionalInput("B VDBs")
         .addOptionalInput("Mask VDB")
+        .setObsoleteParms(obsoleteParms)
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Fillet::Cache; });
 }
 
@@ -510,6 +520,24 @@ SOP_OpenVDB_Fillet::SOP_OpenVDB_Fillet(OP_Network* net,
     const char* name, OP_Operator* op):
     hvdb::SOP_NodeVDB(net, name, op)
 {
+}
+
+
+////////////////////////////////////////
+
+
+void
+SOP_OpenVDB_Fillet::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    // Preserve values from scenes and presets saved before the controls were
+    // renamed from algorithm shorthand to user-facing parameter names.
+    resolveRenamedParm(*obsoleteParms, "alpha", "blend_radius");
+    resolveRenamedParm(*obsoleteParms, "beta", "falloff_sharpness");
+    resolveRenamedParm(*obsoleteParms, "gamma", "fillet_strength");
+
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
 }
 
 
