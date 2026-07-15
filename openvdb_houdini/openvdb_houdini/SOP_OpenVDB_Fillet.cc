@@ -215,8 +215,19 @@ struct ResampleOp {
         const openvdb::math::Transform& maskXform = mask->constTransform();
         const openvdb::math::Transform& aGrdXform = mAGrid->constTransform();
         if (maskXform != aGrdXform) {
-            typename GridT::ConstPtr maskRsmpl = this->resampleToMatch(*mask /* src */, *mAGrid /* ref */, mParms.mSamplingOrder);
-            mask = maskRsmpl;
+            // Alpha masks are scalar weights, not signed distance fields.  Even
+            // if the input grid class is set to level set, preserve its values
+            // with sampler-based resampling rather than rebuilding it as an SDF.
+            typename GridT::Ptr resampledMask = mask->copyWithNewTree();
+            resampledMask->setTransform(aGrdXform.copy());
+            using namespace openvdb;
+            switch (mParms.mSamplingOrder) {
+            case 0: tools::resampleToMatch<tools::PointSampler>(*mask, *resampledMask); break;
+            case 1: tools::resampleToMatch<tools::BoxSampler>(*mask, *resampledMask); break;
+            case 2: tools::resampleToMatch<tools::QuadraticSampler>(*mask, *resampledMask); break;
+            // note: no default case because sampling order is guaranteed to be 0, 1, or 2 in evalParms.
+            }
+            mask = resampledMask;
         }
     }
 
