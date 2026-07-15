@@ -339,9 +339,9 @@ SOP_OpenVDB_Fillet::Cache::evalParms(OP_Context& context, VDBFilletParms& parms)
 {
     const fpreal time = context.getTime();
 
-    parms.mAlpha = static_cast<float>(evalFloat("alpha", 0, time));
-    parms.mBeta  = static_cast<float>(evalFloat("beta", 0, time));
-    parms.mGamma = static_cast<float>(evalFloat("gamma", 0, time));
+    parms.mAlpha = static_cast<float>(evalFloat("blend_radius", 0, time));
+    parms.mBeta  = static_cast<float>(evalFloat("falloff_sharpness", 0, time));
+    parms.mGamma = static_cast<float>(evalFloat("fillet_strength", 0, time));
     parms.mResampleMode = asResampleMode(evalInt("resample", 0, time));
     parms.mSamplingOrder = static_cast<int>(evalInt("resampleinterp", 0, time));
 
@@ -433,8 +433,8 @@ newSopOperator(OP_OperatorTable* table)
         .setTooltip("Optional scalar VDB used for alpha masking\n\n"
             "Values are assumed to be between 0 and 1."));
 
-    // Blend radius of influence / falloff width, i.e. alpha
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "alpha", "Blend Radius")
+    // Blend radius of influence / falloff width
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "blend_radius", "Blend Radius")
         .setDefault(10.f)
         .setRange(PRM_RANGE_UI, 0.f, PRM_RANGE_UI, 1000.f)
         .setTooltip(
@@ -442,15 +442,15 @@ newSopOperator(OP_OperatorTable* table)
             "iso-contour of the intersection that is going to be modified.\n"
             "This is measured in world-space."));
 
-    // Exponent, i.e. beta
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "beta", "Falloff Sharpness")
+    // Exponent
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "falloff_sharpness", "Falloff Sharpness")
         .setDefault(100.f)
         .setRange(PRM_RANGE_UI, 0.f, PRM_RANGE_UI, 1000.f)
         .setTooltip(
             "Controls how sharply the fillet influence falls off."));
 
     // Amplitude
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "gamma", "Fillet Strength")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "fillet_strength", "Fillet Strength")
         .setDefault(10.f)
         .setRange(PRM_RANGE_UI, 0.f, PRM_RANGE_UI, 1000.f)
         .setTooltip(
