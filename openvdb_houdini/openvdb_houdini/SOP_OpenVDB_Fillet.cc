@@ -522,12 +522,19 @@ SOP_OpenVDB_Fillet::disableParms()
 {
     unsigned changed = 0;
 
-    // Disable parms.
-    //changed += enableParm("dummy",
-    //    evalInt("dummy", 0, /*time=*/0));
+    // Interpolation only affects grids that the SOP resamples.  When
+    // resampling is disabled, keep this control inactive to avoid implying
+    // that it changes the fillet result.
+    changed += enableParm("resampleinterp", evalInt("resample", 0, /*time=*/0) != RESAMPLE_OFF);
 
+    // The mask controls are meaningful only when the optional third input is
+    // wired and masking is enabled.  This mirrors the cook-time requirement
+    // that alpha masks come from input 3.
+    const bool hasMask = (this->nInputs() == 3);
+    const bool useMask = hasMask && bool(evalInt("mask", 0, /*time=*/0));
 
-    //setVisibleState("dummy", getEnableState("dummy"));
+    changed += enableParm("mask", hasMask);
+    changed += enableParm("maskname", useMask);
 
     return changed;
 }
