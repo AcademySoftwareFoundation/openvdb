@@ -487,11 +487,13 @@ newSopOperator(OP_OperatorTable* table)
             "quadratic", "Quadratic"
         })
         .setTooltip(
-            "Specify the type of interpolation to be used when\n"
-            "resampling one VDB to match the other's transform.")
+            "Specify the interpolation used when resampling alpha masks\n"
+            "or fallback value grids. Level set A/B inputs are rebuilt\n"
+            "to preserve valid signed distance fields.")
         .setDocumentation(
-            "The type of interpolation to be used when resampling one VDB"
-            " to match the other's transform\n\n"
+            "The type of interpolation to be used when resampling alpha masks"
+            " or fallback value grids. Level set A/B inputs are rebuilt to"
+            " preserve valid signed distance fields.\n\n"
             "Nearest neighbor interpolation is fast but can introduce noticeable"
             " sampling artifacts.  Quadratic interpolation is slow but high-quality."
             " Linear interpolation is intermediate in speed and quality."));
