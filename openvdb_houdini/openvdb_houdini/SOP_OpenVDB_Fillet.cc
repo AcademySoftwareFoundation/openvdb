@@ -216,8 +216,19 @@ struct ResampleOp {
         const openvdb::math::Transform& maskXform = mask->constTransform();
         const openvdb::math::Transform& aGrdXform = mAGrid->constTransform();
         if (maskXform != aGrdXform) {
-            typename GridT::ConstPtr maskRsmpl = this->resampleToMatch(*mask /* src */, *mAGrid /* ref */, mParms.mSamplingOrder);
-            mask = maskRsmpl;
+            // Alpha masks are scalar weights, not signed distance fields.  Even
+            // if the input grid class is set to level set, preserve its values
+            // with sampler-based resampling rather than rebuilding it as an SDF.
+            typename GridT::Ptr resampledMask = mask->copyWithNewTree();
+            resampledMask->setTransform(aGrdXform.copy());
+            using namespace openvdb;
+            switch (mParms.mSamplingOrder) {
+            case 0: tools::resampleToMatch<tools::PointSampler>(*mask, *resampledMask); break;
+            case 1: tools::resampleToMatch<tools::BoxSampler>(*mask, *resampledMask); break;
+            case 2: tools::resampleToMatch<tools::QuadraticSampler>(*mask, *resampledMask); break;
+            // note: no default case because sampling order is guaranteed to be 0, 1, or 2 in evalParms.
+            }
+            mask = resampledMask;
         }
     }
 
@@ -329,6 +340,7 @@ public:
 
 protected:
     unsigned disableParms() override;
+    void resolveObsoleteParms(PRM_ParmList*) override;
 };
 
 
@@ -340,9 +352,9 @@ SOP_OpenVDB_Fillet::Cache::evalParms(OP_Context& context, VDBFilletParms& parms)
 {
     const fpreal time = context.getTime();
 
-    parms.mAlpha = static_cast<float>(evalFloat("alpha", 0, time));
-    parms.mBeta  = static_cast<float>(evalFloat("beta", 0, time));
-    parms.mGamma = static_cast<float>(evalFloat("gamma", 0, time));
+    parms.mAlpha = static_cast<float>(evalFloat("blend_radius", 0, time));
+    parms.mBeta  = static_cast<float>(evalFloat("falloff_sharpness", 0, time));
+    parms.mGamma = static_cast<float>(evalFloat("fillet_strength", 0, time));
     parms.mDilation = static_cast<int>(evalInt("dilation", 0, time));
     parms.mResampleMode = asResampleMode(evalInt("resample", 0, time));
     parms.mSamplingOrder = static_cast<int>(evalInt("resampleinterp", 0, time));
@@ -440,29 +452,28 @@ newSopOperator(OP_OperatorTable* table)
         .setTooltip("Optional scalar VDB used for alpha masking\n\n"
             "Values are assumed to be between 0 and 1."));
 
-    // Band radius of influence / falloff width, i.e. alpha
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "alpha", "Band Radius")
+    // Blend radius of influence / falloff width
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "blend_radius", "Blend Radius")
         .setDefault(10.f)
         .setRange(PRM_RANGE_UI, 0.f, PRM_RANGE_UI, 1000.f)
         .setTooltip(
-            "Band radius of influence measures the distance from the zero\n"
+            "Blend radius of influence measures the distance from the zero\n"
             "iso-contour of the intersection that is going to be modified.\n"
             "This is measured in world-space."));
 
-    // Exponent, i.e. beta
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "beta", "Exponent")
+    // Exponent
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "falloff_sharpness", "Falloff Sharpness")
         .setDefault(100.f)
         .setRange(PRM_RANGE_UI, 0.f, PRM_RANGE_UI, 1000.f)
         .setTooltip(
-            "Blending curve exponential used in the model."));
+            "Controls how sharply the fillet influence falls off."));
 
     // Amplitude
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "gamma", "Multiplier")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "fillet_strength", "Fillet Strength")
         .setDefault(10.f)
         .setRange(PRM_RANGE_UI, 0.f, PRM_RANGE_UI, 1000.f)
         .setTooltip(
-            "Amplitude provides a multiplier to make the blended\n"
-            "influence weaker or stronger."));
+            "Controls the strength of the fillet offset."));
 
     // Number of voxels to dilate the local blend support.
     parms.add(hutil::ParmFactory(PRM_INT_J, "dilation", "Dilation")
@@ -494,15 +505,25 @@ newSopOperator(OP_OperatorTable* table)
             "quadratic", "Quadratic"
         })
         .setTooltip(
-            "Specify the type of interpolation to be used when\n"
-            "resampling one VDB to match the other's transform.")
+            "Specify the interpolation used when resampling alpha masks\n"
+            "or fallback value grids. Level set A/B inputs are rebuilt\n"
+            "to preserve valid signed distance fields.")
         .setDocumentation(
-            "The type of interpolation to be used when resampling one VDB"
-            " to match the other's transform\n\n"
+            "The type of interpolation to be used when resampling alpha masks"
+            " or fallback value grids. Level set A/B inputs are rebuilt to"
+            " preserve valid signed distance fields.\n\n"
             "Nearest neighbor interpolation is fast but can introduce noticeable"
             " sampling artifacts.  Quadratic interpolation is slow but high-quality."
             " Linear interpolation is intermediate in speed and quality."));
 
+    // Obsolete parameters
+    hutil::ParmList obsoleteParms;
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "alpha", "Blend Radius")
+        .setDefault(10.f));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "beta", "Falloff Sharpness")
+        .setDefault(100.f));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "gamma", "Fillet Strength")
+        .setDefault(10.f));
 
     // Register this operator.
     // (See houdini_utils/Utils.h for OpFactory details.)
@@ -510,6 +531,7 @@ newSopOperator(OP_OperatorTable* table)
         .addInput("A VDBs")
         .addOptionalInput("B VDBs")
         .addOptionalInput("Mask VDB")
+        .setObsoleteParms(obsoleteParms)
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Fillet::Cache; });
 }
 
@@ -535,18 +557,43 @@ SOP_OpenVDB_Fillet::SOP_OpenVDB_Fillet(OP_Network* net,
 ////////////////////////////////////////
 
 
+void
+SOP_OpenVDB_Fillet::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    // Preserve values from scenes and presets saved before the controls were
+    // renamed from algorithm shorthand to user-facing parameter names.
+    resolveRenamedParm(*obsoleteParms, "alpha", "blend_radius");
+    resolveRenamedParm(*obsoleteParms, "beta", "falloff_sharpness");
+    resolveRenamedParm(*obsoleteParms, "gamma", "fillet_strength");
+
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
+}
+
+
+////////////////////////////////////////
+
+
 // Enable/disable or show/hide parameters in the UI.
 unsigned
 SOP_OpenVDB_Fillet::disableParms()
 {
     unsigned changed = 0;
 
-    // Disable parms.
-    //changed += enableParm("dummy",
-    //    evalInt("dummy", 0, /*time=*/0));
+    // Interpolation only affects grids that the SOP resamples.  When
+    // resampling is disabled, keep this control inactive to avoid implying
+    // that it changes the fillet result.
+    changed += enableParm("resampleinterp", evalInt("resample", 0, /*time=*/0) != RESAMPLE_OFF);
 
+    // The mask controls are meaningful only when the optional third input is
+    // wired and masking is enabled.  This mirrors the cook-time requirement
+    // that alpha masks come from input 3.
+    const bool hasMask = (this->nInputs() == 3);
+    const bool useMask = hasMask && bool(evalInt("mask", 0, /*time=*/0));
 
-    //setVisibleState("dummy", getEnableState("dummy"));
+    changed += enableParm("mask", hasMask);
+    changed += enableParm("maskname", useMask);
 
     return changed;
 }
