@@ -17,6 +17,7 @@
 #define NVIDIA_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <cub/cub.cuh>
+#include <algorithm>// std::min in processGridTreeRoot's grid-name copy
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/GridHandle.h>

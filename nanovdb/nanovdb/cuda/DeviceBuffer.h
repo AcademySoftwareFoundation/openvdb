@@ -38,7 +38,7 @@ class DeviceBuffer
     uint64_t mSize; // total number of bytes managed by this buffer (assumed to be identical for host and device)
     void *mCpuData, **mGpuData; // raw pointers to the host and device buffers
     int   mDeviceCount, mManaged;// if mManaged is non-zero this class is responsible for allocating and freeing memory buffers. Otherwise this is assumed to be handled externally
-    cudaStream_t *mStreams = nullptr;// per-device stream each managed allocation was made on (parallel to mGpuData, length mDeviceCount). Frees (destructor, move-assign, clear) are ordered on the owning device's stream instead of the default stream 0, otherwise a buffer last used on a non-blocking stream could be freed while that stream's work is still in flight (use-after-free). One stream per device is required because a single DeviceBuffer can hold allocations on several devices (multi-GPU), each on its own device-bound stream. The caller must keep these streams alive until the buffer is destroyed.
+    cudaStream_t *mStreams = nullptr;// per-device stream each managed device buffer was last used on - set at allocation, then updated by every deviceUpload/deviceDownload (parallel to mGpuData, length mDeviceCount). Frees (destructor, move-assign, clear) are ordered on the owning device's stream instead of the default stream 0, otherwise a buffer last used on a non-blocking stream could be freed while that stream's work is still in flight (use-after-free). One stream per device is required because a single DeviceBuffer can hold allocations on several devices (multi-GPU), each on its own device-bound stream. The caller must keep these streams alive until the buffer is destroyed.
 
     /// @brief Initialize buffer
     /// @param size byte size of buffer to be initialized
@@ -145,8 +145,8 @@ public:
     }
 
      /// @brief Destructor frees memory on both the host and device
-    /// @note Each managed device allocation is freed on the stream it was
-    ///       allocated on (mStreams[device]), not the default stream, so device
+    /// @note Each managed device allocation is freed on the stream it was last
+    ///       used on (mStreams[device]), not the default stream, so device
     ///       frees are ordered after the last work issued on that stream.
     ~DeviceBuffer() { this->clear(); };
 
@@ -316,7 +316,7 @@ public:
 
 inline DeviceBuffer& DeviceBuffer::operator=(DeviceBuffer&& other) noexcept
 {
-    if (mManaged) {// first free all the managed data buffers, each on the stream its device was allocated on
+    if (mManaged) {// first free all the managed data buffers, each on the stream its device was last used on
         cudaCheck(cudaFreeHost(mCpuData));
         for (int i=0; i<mDeviceCount; ++i) cudaCheck(util::cuda::freeAsync(mGpuData[i], mStreams ? mStreams[i] : cudaStream_t{0}));
     }
@@ -350,7 +350,7 @@ inline void DeviceBuffer::init(uint64_t size, int device, cudaStream_t stream)
     } else {
         cudaCheck(util::cuda::mallocAsync(mGpuData+device, size, stream)); // un-managed memory on the device, always 32B aligned!
         checkPtr(mGpuData[device], "cuda::DeviceBuffer::init: failed to allocate device buffer");
-        mStreams[device] = stream;// remember this device's allocation stream so its free is ordered on it, not stream 0
+        mStreams[device] = stream;// record the stream this device buffer is used on so its free is ordered on it, not stream 0
     }
     mSize = size;
     mManaged = 1;// i.e. this instance is responsible for allocating and delete memory
@@ -403,7 +403,7 @@ inline void DeviceBuffer::deviceDownload(void* stream, bool sync)
 
 inline void DeviceBuffer::clear(cudaStream_t stream)
 {
-    if (mManaged) {// free all the managed data buffers, each on the stream its device was allocated on
+    if (mManaged) {// free all the managed data buffers, each on the stream its device was last used on
         cudaCheck(cudaFreeHost(mCpuData));
         for (int i=0; i<mDeviceCount; ++i) cudaCheck(util::cuda::freeAsync(mGpuData[i], mStreams ? mStreams[i] : stream));
     }
