@@ -1,0 +1,3 @@
+OpenVDB:
+  Bug Fixes:
+    - Fix a bug to deactivate mask leaf node values through a tree iterator.

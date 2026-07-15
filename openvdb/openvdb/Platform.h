@@ -42,19 +42,6 @@
     #define OPENVDB_HAS_CXX20
 #endif
 
-/// SIMD Intrinsic Headers
-#if defined(OPENVDB_USE_SSE42) || defined(OPENVDB_USE_AVX)
-    #if defined(_WIN32)
-        #include <intrin.h>
-    #elif defined(__GNUC__)
-        #if defined(__x86_64__) || defined(__i386__)
-            #include <x86intrin.h>
-        #elif defined(__ARM_NEON__)
-            #include <arm_neon.h>
-        #endif
-    #endif
-#endif
-
 /// Windows defines
 #ifdef _WIN32
     ///Disable the non-portable Windows definitions of min() and max() macros

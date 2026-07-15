@@ -11,6 +11,7 @@
 #include <algorithm> // for std::min()
 #include <cstring>
 #include <iostream>// for cout
+#include <openvdb/version.h>
 #include <openvdb/Platform.h>
 #include <openvdb/Types.h>
 #include <openvdb/util/Assert.h>

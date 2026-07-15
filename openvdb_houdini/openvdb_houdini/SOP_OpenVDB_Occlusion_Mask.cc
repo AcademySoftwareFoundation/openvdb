@@ -414,7 +414,7 @@ SOP_OpenVDB_Occlusion_Mask::Cache::cookVDBSop(OP_Context& context)
         if (cameraPath.isstring()) {
 #if SYS_VERSION_MAJOR_INT >= 21
             UT_Matrix4D      cameratosop;
-            OBJ_CameraParms  cameraParms;
+            UT_CameraParms   cameraParms;
             OBJ_Node        *meobj = cookparms()->getNode()
                                 ? cookparms()->getNode()->getCreator()->castToOBJNode()
                                 : nullptr;
@@ -433,7 +433,11 @@ SOP_OpenVDB_Occlusion_Mask::Cache::cookVDBSop(OP_Context& context)
             if (errstr.isstring())
                 throw std::runtime_error{"camera \"" + cameraPath.toStdString() + "\" was not found"};
 
+#if SYS_VERSION_MAJOR_INT >= 22
+            const float nearPlane = static_cast<float>(cameraParms.clipnear);
+#else
             const float nearPlane = static_cast<float>(cameraParms.mynear);
+#endif
             const float farPlane = static_cast<float>(nearPlane + evalFloat("depth", 0, time));
             const float voxelDepthSize = static_cast<float>(evalFloat("voxeldepthsize", 0, time));
             const int voxelCount = static_cast<int>(evalInt("voxelcount", 0, time));

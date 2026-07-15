@@ -800,9 +800,11 @@ Archive::readGridCompression(std::istream& is)
 {
     checkFormatVersion(is);
 
-    uint32_t c = COMPRESS_NONE;
-    is.read(reinterpret_cast<char*>(&c), sizeof(uint32_t));
-    io::setDataCompression(is, c);
+    if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+        uint32_t c = COMPRESS_NONE;
+        is.read(reinterpret_cast<char*>(&c), sizeof(uint32_t));
+        io::setDataCompression(is, c);
+    }
 }
 
 
@@ -978,6 +980,14 @@ Archive::readHeader(std::istream& is)
         // Prior to the introduction of Blosc, ZLIB was the default compression scheme.
         mCompression = (COMPRESS_ZIP | COMPRESS_ACTIVE_MASK);
     }
+    if (mFileVersion >= OPENVDB_FILE_VERSION_SELECTIVE_COMPRESSION &&
+        mFileVersion < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION)
+    {
+        char isCompressed;
+        is.read(&isCompressed, sizeof(char));
+        mCompression = (isCompressed != 0 ? COMPRESS_ZIP : COMPRESS_NONE);
+    }
+
 
     // 6) Read the 16-byte (128-bit) uuid.
     std::string oldUuid = mUuid;

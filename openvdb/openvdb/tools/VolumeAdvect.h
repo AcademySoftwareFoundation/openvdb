@@ -514,10 +514,27 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
                     Vec3d iPos = xform.worldToIndex(wPos);
                     Coord ijk  = Coord::floor( iPos );
                     BoxSampler::getValues(data, acc, ijk);
+                    // @warning  For vector fields, the cwiseLessThan than operator
+                    //   is used to determine the exrema values. Not that is this NOT
+                    //   a per component operator, it simply return true if ANY component
+                    //   in the first operand is less than the second.
+                    // @todo     This is most likely not the correct thing to do here. We
+                    //   ideally require more conetxt of the unit type of the vector field
+                    //   as to whether we should normalize based on min/max lengths or
+                    //   components. But either of these would be better default than what
+                    //   we're currently doing...
                     BoxSampler::extrema(data, vMin, vMax);
+
                     if ( doClamp ) {
-                        value = math::Clamp( value, vMin, vMax);
-                    } else if (value < vMin || value > vMax ) {
+                        if constexpr (VecTraits<ValueT>::IsVec) {
+                            for (size_t i = 0; i < ValueT::size; ++i) {
+                                value[i] = math::Clamp( value[i], vMin[i], vMax[i]);
+                            }
+                        }
+                        else {
+                            value = math::Clamp( value, vMin, vMax);
+                        }
+                    } else if (math::cwiseLessThan(value, vMin) || math::cwiseGreaterThan(value, vMax)) {
                         iPos -= Vec3R(ijk[0], ijk[1], ijk[2]);//unit coordinates
                         value = BoxSampler::trilinearInterpolation( data, iPos );
                     }

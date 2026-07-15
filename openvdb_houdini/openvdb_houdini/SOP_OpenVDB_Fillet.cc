@@ -55,6 +55,7 @@ struct VDBFilletParms {
     float mAlpha = 10.f; // Falloff
     float mBeta = 100.f; // Exponent
     float mGamma = 10.f; // Amplitude/Multiplier
+    int mDilation = 0; // Support dilation in voxels
     ResampleMode mResampleMode = ResampleMode::RESAMPLE_OFF; // Resample mode
     int mSamplingOrder = 0;
     hvdb::GridCPtr mABaseGrid = nullptr;
@@ -354,8 +355,14 @@ SOP_OpenVDB_Fillet::Cache::evalParms(OP_Context& context, VDBFilletParms& parms)
     parms.mAlpha = static_cast<float>(evalFloat("blend_radius", 0, time));
     parms.mBeta  = static_cast<float>(evalFloat("falloff_sharpness", 0, time));
     parms.mGamma = static_cast<float>(evalFloat("fillet_strength", 0, time));
+    parms.mDilation = static_cast<int>(evalInt("dilation", 0, time));
     parms.mResampleMode = asResampleMode(evalInt("resample", 0, time));
     parms.mSamplingOrder = static_cast<int>(evalInt("resampleinterp", 0, time));
+
+    if (parms.mDilation < 0) {
+        addWarning(SOP_MESSAGE, "Dilation should be greater than or equal to 0.");
+        return UT_ERROR_ABORT;
+    }
 
     if (parms.mSamplingOrder < 0 || parms.mSamplingOrder > 2) {
         addWarning(SOP_MESSAGE, "Sampling order should be 0, 1, or 2.");
@@ -467,6 +474,17 @@ newSopOperator(OP_OperatorTable* table)
         .setRange(PRM_RANGE_UI, 0.f, PRM_RANGE_UI, 1000.f)
         .setTooltip(
             "Controls the strength of the fillet offset."));
+
+    // Number of voxels to dilate the local blend support.
+    parms.add(hutil::ParmFactory(PRM_INT_J, "dilation", "Dilation")
+        .setDefault(PRMzeroDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
+        .setTooltip(
+            "Number of voxels by which to dilate the local blend support\n"
+            "region before extending both input level sets into that region.\n"
+            "When set to 0, no support-region extension is performed; in blend\n"
+            "region voxels where either input level set is inactive, no\n"
+            "fillet offset is applied and the result uses CSG union behavior."));
 
     // Menu of resampling options
     parms.add(hutil::ParmFactory(PRM_ORD, "resample", "Resample")
@@ -605,7 +623,7 @@ SOP_OpenVDB_Fillet::Cache::blendLevelSets(
     if (parms.mMaskPtr) rsmpl.resampleMask(parms.mMaskPtr);
 
     hvdb::GridPtr ret = openvdb::tools::unionFillet<openvdb::FloatGrid, typename openvdb::FloatGrid>(
-        *a, *b, parms.mMaskPtr, parms.mAlpha, parms.mBeta, parms.mGamma);
+        *a, *b, parms.mMaskPtr, parms.mAlpha, parms.mBeta, parms.mGamma, parms.mDilation);
 
     return ret;
 }
