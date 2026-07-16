@@ -31,6 +31,7 @@ option(NANOVDB_BUILD_PYTHON_MODULE "Build the nanovdb Python module" OFF)
 option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" OFF)
 option(NANOVDB_USE_CUDA "Build with CUDA support" OFF)
 option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
+option(NANOVDB_USE_OLD_ACCESSOR "Fix the caching bug in the ReadAccessor" ON)
 
 option(NANOVDB_USE_OPENVDB "Build with OpenVDB support" OFF)
 option(NANOVDB_USE_BLOSC "Build with BLOSC support" ${USE_BLOSC})
@@ -302,6 +303,12 @@ endif()
 
 if(NANOVDB_USE_INTRINSICS)
   target_compile_definitions(nanovdb INTERFACE -DNANOVDB_USE_INTRINSICS)
+endif()
+
+# NANOVDB_USE_OLD_ACCESSOR is enabled by default in NanoVDB.h; when the option
+# is OFF, define the negative macro that suppresses it (a -D cannot un-define).
+if(NOT NANOVDB_USE_OLD_ACCESSOR)
+  target_compile_definitions(nanovdb INTERFACE -DNANOVDB_NO_OLD_ACCESSOR)
 endif()
 
 if(NANOVDB_USE_OPENVDB)

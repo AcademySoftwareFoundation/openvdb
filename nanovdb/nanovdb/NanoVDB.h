@@ -145,7 +145,7 @@
 
 #define NANOVDB_MAJOR_VERSION_NUMBER 32 // reflects changes to the ABI and hence also the file format
 #define NANOVDB_MINOR_VERSION_NUMBER  9 // reflects changes to the API but not ABI
-#define NANOVDB_PATCH_VERSION_NUMBER  1 // reflects changes that does not affect the ABI or API
+#define NANOVDB_PATCH_VERSION_NUMBER  2 // reflects changes that do not affect the ABI or API
 
 #define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
 
@@ -158,6 +158,13 @@
 // Use this to switch between std::ofstream or FILE implementations
 //#define NANOVDB_USE_IOSTREAMS
 
+// Fix the caching bug in the ReadAccessor. Enabled by default; define
+// NANOVDB_NO_OLD_ACCESSOR (e.g. via CMake) to turn it off.
+#if !defined(NANOVDB_USE_OLD_ACCESSOR) && !defined(NANOVDB_NO_OLD_ACCESSOR)
+#define NANOVDB_USE_OLD_ACCESSOR
+#endif
+
+// Uncomment to use (slower) branched version of LeafData<FpN,...>::getValue
 #define NANOVDB_FPN_BRANCHLESS
 
 #if !defined(NANOVDB_ALIGN)
@@ -5180,7 +5187,11 @@ public:
 #endif
         if constexpr(OpT::LEVEL <= LEVEL0) {
             if (this->isCached1(dirty)) return mNode1->template getAndCache<OpT>(ijk, *this, args...);
-        } else if constexpr(OpT::LEVEL <= LEVEL1) {
+        }
+#ifdef NANOVDB_USE_OLD_ACCESSOR
+        else
+#endif
+        if constexpr(OpT::LEVEL <= LEVEL1) {
             if (this->isCached2(dirty)) return mNode2->template getAndCache<OpT>(ijk, *this, args...);
         }
         return mRoot->template getAndCache<OpT>(ijk, *this, args...);
@@ -5196,7 +5207,11 @@ public:
 #endif
         if constexpr(OpT::LEVEL <= LEVEL0) {
             if (this->isCached1(dirty)) return const_cast<Node1T*>(mNode1)->template setAndCache<OpT>(ijk, *this, args...);
-        } else if constexpr(OpT::LEVEL <= LEVEL1) {
+        }
+#ifdef NANOVDB_USE_OLD_ACCESSOR
+        else
+#endif
+        if constexpr(OpT::LEVEL <= LEVEL1) {
             if (this->isCached2(dirty)) return const_cast<Node2T*>(mNode2)->template setAndCache<OpT>(ijk, *this, args...);
         }
         return const_cast<RootT*>(mRoot)->template setAndCache<OpT>(ijk, *this, args...);
@@ -5354,7 +5369,7 @@ public:
     }
 #endif
 
-    __hostdev__ ValueType getValue(const CoordType& ijk) const {return this->template get<GetValue<BuildT>>(ijk);}
+    __hostdev__ ValueType    getValue(const CoordType& ijk) const {return this->template get<GetValue<BuildT>>(ijk);}
     __hostdev__ ValueType    getValue(int i, int j, int k) const { return this->template get<GetValue<BuildT>>(CoordType(i, j, k)); }
     __hostdev__ ValueType    operator()(const CoordType& ijk) const { return this->template get<GetValue<BuildT>>(ijk); }
     __hostdev__ ValueType    operator()(int i, int j, int k) const { return this->template get<GetValue<BuildT>>(CoordType(i, j, k)); }
@@ -5373,9 +5388,17 @@ public:
 #endif
         if constexpr(OpT::LEVEL <=0) {
             if (this->isCached<LeafT>(dirty)) return ((const LeafT*)mNode[0])->template getAndCache<OpT>(ijk, *this, args...);
-        } else if constexpr(OpT::LEVEL <= 1) {
+        }
+#ifdef NANOVDB_USE_OLD_ACCESSOR
+        else
+#endif
+        if constexpr(OpT::LEVEL <= 1) {
             if (this->isCached<NodeT1>(dirty)) return ((const NodeT1*)mNode[1])->template getAndCache<OpT>(ijk, *this, args...);
-        } else if constexpr(OpT::LEVEL <= 2) {
+        }
+#ifdef NANOVDB_USE_OLD_ACCESSOR
+        else
+#endif
+        if constexpr(OpT::LEVEL <= 2) {
             if (this->isCached<NodeT2>(dirty)) return ((const NodeT2*)mNode[2])->template getAndCache<OpT>(ijk, *this, args...);
         }
         return mRoot->template getAndCache<OpT>(ijk, *this, args...);
@@ -5391,9 +5414,14 @@ public:
 #endif
         if constexpr(OpT::LEVEL <= 0) {
             if (this->isCached<LeafT>(dirty)) return ((LeafT*)mNode[0])->template setAndCache<OpT>(ijk, *this, args...);
-        } else if constexpr(OpT::LEVEL <= 1) {
+        }
+        if constexpr(OpT::LEVEL <= 1) {
             if (this->isCached<NodeT1>(dirty)) return ((NodeT1*)mNode[1])->template setAndCache<OpT>(ijk, *this, args...);
-        } else if constexpr(OpT::LEVEL <= 2) {
+        }
+#ifdef NANOVDB_USE_OLD_ACCESSOR
+        else
+#endif
+        if constexpr(OpT::LEVEL <= 2) {
             if (this->isCached<NodeT2>(dirty)) return ((NodeT2*)mNode[2])->template setAndCache<OpT>(ijk, *this, args...);
         }
         return ((RootT*)mRoot)->template setAndCache<OpT>(ijk, *this, args...);
