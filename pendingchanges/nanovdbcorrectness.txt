@@ -1,0 +1,13 @@
+NanoVDB:
+  Bug Fixes:
+  - Fixed an out-of-bounds device read and host stack corruption in
+    tools::cuda::evalChecksum.
+  - Fixed tools::cuda::DilateGrid and signedFloodFill launching kernels on the
+    default stream instead of the caller's stream, corrupting output on
+    non-blocking streams.
+  - Fixed a host-heap over-read when copying grid names in the CUDA
+    PointsToGrid, DistributedPointsToGrid and MeshToGrid tools.
+  - Fixed nondeterministic output from the CUDA PointsToGrid and IndexToGrid tools.
+  - Fixed cuda::DeviceBuffer freeing device memory on the default stream rather
+    than the stream it was last used on, a latent use-after-free for
+    non-blocking-stream callers.
