@@ -123,12 +123,7 @@ endif()
 if(OPENVDB_TOOL_USE_EXR)
   target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_EXR")
   find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED)
-  # OpenEXR 3.x renamed the legacy 2.x "IlmImf" target to "OpenEXR" and split
-  # IlmBase into a standalone Imath package. The OpenEXR headers include
-  # <ImathBox.h> etc., so link Imath explicitly to put its include dir on the
-  # path (rather than relying on transitive propagation, which is missed when
-  # the OpenEXR header is picked up via an ambient include directory).
-  find_package(Imath CONFIG REQUIRED)
+  find_package(Imath ${MINIMUM_IMATH_VERSION} CONFIG REQUIRED)
   target_link_libraries(vdb_tool_common INTERFACE OpenEXR::OpenEXR Imath::Imath)
 endif()
 
