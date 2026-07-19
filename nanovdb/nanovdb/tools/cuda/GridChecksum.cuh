@@ -147,7 +147,7 @@ __global__ inline void crc32SlicedKernel(const void *d_data, uint32_t* d_blockCR
 }
 
 /// @brief y = M x over GF(2), M given as 32 column words
-__device__ inline uint32_t crc32Gf2MatTimes(const uint32_t *mat, uint32_t vec)
+__host__ __device__ inline uint32_t crc32Gf2MatTimes(const uint32_t *mat, uint32_t vec)
 {
     uint32_t sum = 0;
     while (vec) {
@@ -158,37 +158,35 @@ __device__ inline uint32_t crc32Gf2MatTimes(const uint32_t *mat, uint32_t vec)
     return sum;
 }
 
-/// @brief Single-thread kernel folding per-chunk CRCs into the CRC of the
-/// whole stream, using crc(A||B) = shift(crc(A), len(B)) ^ crc(B) where
-/// shift is the GF(2) operator advancing a CRC past len(B) zero bytes
-/// (zlib crc32_combine). All chunks share one length so a single operator
-/// (built once by binary exponentiation) serves every fold; the final,
-/// possibly shorter, chunk gets its own. O(chunkCount x 32) - negligible.
-/// Bit-identical to a serial crc32 over the concatenated stream.
-__global__ inline void crc32CombineKernel(const uint32_t *d_chunkCRC, uint64_t chunkCount, uint64_t chunkBytes, uint64_t lastChunkBytes, uint32_t *d_crc)
+/// @brief Build into @c dst[32] the GF(2) operator that advances a CRC past
+/// @c bits zero bits, by binary exponentiation of the single-bit operator
+/// (zlib crc32_combine construction). O(log bits x 32) - a few microseconds on
+/// the host, which is where it is called so the device combine stays a cheap fold.
+__host__ __device__ inline void crc32BuildShiftOp(uint32_t *dst, uint64_t bits)
 {
-    uint32_t oddBuf[32], evenBuf[32], acc[32], accLast[32];
-    auto buildOp = [&](uint32_t *dst, uint64_t bits) {
-        uint32_t *cur = oddBuf, *nxt = evenBuf;
-        cur[0] = 0xEDB88320u;// operator for a single zero bit
-        for (int n = 1; n < 32; ++n) cur[n] = 1u << (n - 1);
-        for (int n = 0; n < 32; ++n) dst[n] = 1u << n;// identity
-        while (bits) {
-            if (bits & 1ull) {
-                for (int n = 0; n < 32; ++n) dst[n] = crc32Gf2MatTimes(cur, dst[n]);
-            }
-            bits >>= 1;
-            if (bits) {
-                for (int n = 0; n < 32; ++n) nxt[n] = crc32Gf2MatTimes(cur, cur[n]);
-                uint32_t *t = cur; cur = nxt; nxt = t;
-            }
-        }
-    };
-    buildOp(acc, chunkBytes * 8ull);
-    if (lastChunkBytes != chunkBytes) buildOp(accLast, lastChunkBytes * 8ull);
+    uint32_t oddBuf[32], evenBuf[32];
+    uint32_t *cur = oddBuf, *nxt = evenBuf;
+    cur[0] = 0xEDB88320u;// operator for a single zero bit
+    for (int n = 1; n < 32; ++n) cur[n] = 1u << (n - 1);
+    for (int n = 0; n < 32; ++n) dst[n] = 1u << n;// identity
+    while (bits) {
+        if (bits & 1ull) for (int n = 0; n < 32; ++n) dst[n] = crc32Gf2MatTimes(cur, dst[n]);
+        bits >>= 1;
+        if (bits) { for (int n = 0; n < 32; ++n) nxt[n] = crc32Gf2MatTimes(cur, cur[n]); uint32_t *t = cur; cur = nxt; nxt = t; }
+    }
+}
+
+/// @brief Single-thread kernel folding per-chunk CRCs into the CRC of the whole
+/// stream, using crc(A||B) = shift(crc(A), len(B)) ^ crc(B). The two GF(2) shift
+/// operators - @c d_acc for a full chunk and @c d_accLast for the final,
+/// possibly shorter, chunk - are precomputed on the host, so this is just an
+/// O(chunkCount) fold. Bit-identical to a serial crc32 over the concatenated
+/// stream. (@c d_accLast equals @c d_acc when the last chunk is full.)
+__global__ inline void crc32CombineKernel(const uint32_t *d_chunkCRC, uint64_t chunkCount, const uint32_t *d_acc, const uint32_t *d_accLast, uint32_t *d_crc)
+{
     uint32_t crc = d_chunkCRC[0];
     for (uint64_t i = 1; i < chunkCount; ++i) {
-        const uint32_t *op = (i + 1 == chunkCount && lastChunkBytes != chunkBytes) ? accLast : acc;
+        const uint32_t *op = (i + 1 == chunkCount) ? d_accLast : d_acc;
         crc = crc32Gf2MatTimes(op, crc) ^ d_chunkCRC[i];
     }
     *d_crc = crc;
@@ -226,7 +224,17 @@ inline void blockedCRC32(const void *d_data, size_t size, const uint32_t *d_lut,
         crc32SlicedKernel<<<blocksPerGrid(chunkCount, threadsPerBlock), threadsPerBlock, 0, stream>>>(
             d_checksums, d_chunkCRC, chunkCount, log2ChunkSize, checksumBytes, d_lut);
         cudaCheckError();
-        crc32CombineKernel<<<1, 1, 0, stream>>>(d_chunkCRC, chunkCount, chunkSize, lastChunkBytes, d_crc);
+        // Precompute the two GF(2) shift operators on the host (data-independent,
+        // ~microseconds) and upload them, instead of rebuilding them on a single
+        // device thread inside the combine - that build dominated the checksum
+        // for small and medium grids.
+        uint32_t hOps[64];
+        crc32BuildShiftOp(hOps,      chunkSize      * 8ull);// operator for a full chunk
+        crc32BuildShiftOp(hOps + 32, lastChunkBytes * 8ull);// operator for the last chunk
+        unique_ptr<uint32_t> opBuffer(64, stream);
+        uint32_t *d_ops = opBuffer.get();
+        cudaCheck(cudaMemcpyAsync(d_ops, hOps, 64*sizeof(uint32_t), cudaMemcpyHostToDevice, stream));
+        crc32CombineKernel<<<1, 1, 0, stream>>>(d_chunkCRC, chunkCount, d_ops, d_ops + 32, d_crc);
         cudaCheckError();
     }
 }// void cudaBlockedCRC32(const void *d_data, size_t size, const uint32_t *d_lut, uint32_t *d_crc, cudaStream_t stream)
