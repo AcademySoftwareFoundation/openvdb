@@ -33,7 +33,7 @@ int main(int ac, char** av)
             throw std::runtime_error("Grid must be a level set");
         }
 
-        const int numIterations = 50;
+        const int numIterations = 200;
 
         const int width = 1024;
         const int height = 1024;
