@@ -22,7 +22,7 @@
 #include <vector>
 #include <tuple>
 #include <cinttypes>
-#include <algorithm>// std::min in processGridTreeRoot's grid-name copy
+#include <algorithm>
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/cuda/DeviceBuffer.h>
