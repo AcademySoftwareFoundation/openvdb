@@ -233,15 +233,12 @@ __global__ void processNodesKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
             if (srcGrid.hasStdDeviation()) dstNode.mStdDevi = srcValues[srcNode.mStdDevi];
         }
     }
-    // Cooperative, coalesced mask copies (upper-node masks are 4 KB each; a
-    // single thread used to copy them member-wise while the block idled)
-    for (int w = tid; w < SrcNodeT::SIZE/64; w += nThreads) {
+    // Cooperative, coalesced mask copies
+    for (int w = tid; w < srcNode.mValueMask.wordCount(); w += nThreads) {
         dstNode.mValueMask.words()[w] = srcNode.mValueMask.words()[w];
         dstNode.mChildMask.words()[w] = srcNode.mChildMask.words()[w];
     }
-    // Consecutive threads process consecutive table entries (coalesced); the
-    // former mapping gave each thread a consecutive RUN, i.e. a 32-entry
-    // stride across the warp on every iteration.
+    // Consecutive threads process consecutive table entries (coalesced)
     for (int i = tid; i < SrcNodeT::SIZE; i += nThreads) {
         if (srcNode.mChildMask.isOn(i)) {
             if constexpr(sizeof(SrcNodeT)==sizeof(DstNodeT) && sizeof(SrcChildT)==sizeof(DstChildT)) {
@@ -293,10 +290,8 @@ __global__ void processLeafsKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
             if (srcGrid.hasStdDeviation()) dstLeaf.mStdDevi = srcValues[srcLeaf.getDev()];
         }
     }
-    // Consecutive threads write consecutive values (coalesced); the former
-    // mapping gave each thread a consecutive run of 8, i.e. an 8-entry
-    // stride across the warp on every iteration.
-    for (int i = tid; i < 512; i += nThreads)
+    // Consecutive threads write consecutive values (coalesced)
+    for (int i = tid; i < NanoLeaf<DstBuildT>::SIZE; i += nThreads)
         dstLeaf.mValues[i] = srcValues[srcLeaf.getValue(i)];
 }// processLeafsKernel
 

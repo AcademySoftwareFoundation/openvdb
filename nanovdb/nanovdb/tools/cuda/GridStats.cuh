@@ -86,7 +86,7 @@ __global__ void processLeaf(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
             //    consecutive lanes touch consecutive slots on each stride.
             StatsT stats;
             const auto &mask = d_leaf.valueMask();
-            for (uint32_t i = lane; i < 512; i += 32)
+            for (uint32_t i = lane; i < NanoLeaf<BuildT>::SIZE; i += 32)
                 if (mask.isOn(i)) stats.add(d_leaf.getValue(i));
             // 2) Warp reduction: stage the 32 partials in this warp's slice of shared
             //    memory, then merge them pairwise in log2(32)=5 steps (16->8->4->2->1).
