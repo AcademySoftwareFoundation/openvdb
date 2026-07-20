@@ -1164,75 +1164,68 @@ inline void PointsToGrid<BuildT, ResourceT>::processLeafNodes(size_t pointCount)
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+// The point-encode kernels operate on device data and are independent of the
+// resource type; only the trailing d_indx deallocation routes through ResourceT.
+// Dispatching the encode with if constexpr keeps it reachable for any ResourceT.
 template<typename BuildT, typename ResourceT>
 template<typename PtrT>
-inline void PointsToGrid<BuildT, ResourceT>::processPoints(const PtrT, size_t pointCount)
+inline void PointsToGrid<BuildT, ResourceT>::processPoints(const PtrT points, size_t pointCount)
 {
-    mResource->deallocate_async(mData.d_indx, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-}
-
-//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-// Template specialization with BuildT = Point
-template<>
-template<typename PtrT>
-inline void PointsToGrid<Point>::processPoints(const PtrT points, size_t pointCount)
-{
-    switch (mPointType){
-    case PointType::Disable:
-        throw std::runtime_error("PointsToGrid<Point>::processPoints: mPointType == PointType::Disable\n");
-    case PointType::PointID:
-        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
-            d_data->template getPoint<uint32_t>(tid) = d_data->d_indx[tid];
-        }, mDeviceData); cudaCheckError();
-        break;
-    case PointType::World64:
-        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
-            d_data->template getPoint<Vec3d>(tid) = points[d_data->d_indx[tid]];
-        }, mDeviceData); cudaCheckError();
-        break;
-    case PointType::World32:
-        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
-            d_data->template getPoint<Vec3f>(tid) = points[d_data->d_indx[tid]];
-        }, mDeviceData); cudaCheckError();
-        break;
-    case PointType::Grid64:
-        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
-            d_data->template getPoint<Vec3d>(tid) = d_data->map.applyInverseMap(points[d_data->d_indx[tid]]);
-        }, mDeviceData); cudaCheckError();
-        break;
-    case PointType::Grid32:
-        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
-            d_data->template getPoint<Vec3f>(tid) = d_data->map.applyInverseMapF(points[d_data->d_indx[tid]]);
-        }, mDeviceData); cudaCheckError();
-        break;
-    case PointType::Voxel32:
-        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
-            worldToVoxel(d_data->template getPoint<Vec3f>(tid), points[d_data->d_indx[tid]], d_data->map);
-        }, mDeviceData); cudaCheckError();
-        break;
-    case PointType::Voxel16:
-        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
-            worldToVoxel(d_data->template getPoint<Vec3u16>(tid), points[d_data->d_indx[tid]], d_data->map);
-        }, mDeviceData); cudaCheckError();
-        break;
-    case PointType::Voxel8:
-        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
-            worldToVoxel(d_data->template getPoint<Vec3u8>(tid), points[d_data->d_indx[tid]], d_data->map);
-        }, mDeviceData); cudaCheckError();
-        break;
-    case PointType::Default:
-        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
-            d_data->template getPoint<typename pointer_traits<PtrT>::element_type>(tid) = points[d_data->d_indx[tid]];
-        }, mDeviceData); cudaCheckError();
-        break;
-    default:
-        printf("Internal error in PointsToGrid<Point>::processPoints\n");
+    if constexpr(util::is_same<BuildT, Point>::value) {
+        switch (mPointType){
+        case PointType::Disable:
+            throw std::runtime_error("PointsToGrid<Point, ResourceT>::processPoints: mPointType == PointType::Disable\n");
+        case PointType::PointID:
+            util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
+                d_data->template getPoint<uint32_t>(tid) = d_data->d_indx[tid];
+            }, mDeviceData); cudaCheckError();
+            break;
+        case PointType::World64:
+            util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
+                d_data->template getPoint<Vec3d>(tid) = points[d_data->d_indx[tid]];
+            }, mDeviceData); cudaCheckError();
+            break;
+        case PointType::World32:
+            util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
+                d_data->template getPoint<Vec3f>(tid) = points[d_data->d_indx[tid]];
+            }, mDeviceData); cudaCheckError();
+            break;
+        case PointType::Grid64:
+            util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
+                d_data->template getPoint<Vec3d>(tid) = d_data->map.applyInverseMap(points[d_data->d_indx[tid]]);
+            }, mDeviceData); cudaCheckError();
+            break;
+        case PointType::Grid32:
+            util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
+                d_data->template getPoint<Vec3f>(tid) = d_data->map.applyInverseMapF(points[d_data->d_indx[tid]]);
+            }, mDeviceData); cudaCheckError();
+            break;
+        case PointType::Voxel32:
+            util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
+                worldToVoxel(d_data->template getPoint<Vec3f>(tid), points[d_data->d_indx[tid]], d_data->map);
+            }, mDeviceData); cudaCheckError();
+            break;
+        case PointType::Voxel16:
+            util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
+                worldToVoxel(d_data->template getPoint<Vec3u16>(tid), points[d_data->d_indx[tid]], d_data->map);
+            }, mDeviceData); cudaCheckError();
+            break;
+        case PointType::Voxel8:
+            util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
+                worldToVoxel(d_data->template getPoint<Vec3u8>(tid), points[d_data->d_indx[tid]], d_data->map);
+            }, mDeviceData); cudaCheckError();
+            break;
+        case PointType::Default:
+            util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
+                d_data->template getPoint<typename pointer_traits<PtrT>::element_type>(tid) = points[d_data->d_indx[tid]];
+            }, mDeviceData); cudaCheckError();
+            break;
+        default:
+            printf("Internal error in PointsToGrid<Point, ResourceT>::processPoints\n");
+        }
     }
-    // This is the PointsToGrid<Point> (== <Point, DeviceResource>) member specialization,
-    // so ResourceT is not a name here; mResource is a DeviceResource* and the alignment is concrete.
-    mResource->deallocate_async(mData.d_indx, pointCount*sizeof(uint32_t), nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT, mStream);
-}// PointsToGrid<Point>::processPoints
+    mResource->deallocate_async(mData.d_indx, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+}// PointsToGrid<BuildT, ResourceT>::processPoints
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
