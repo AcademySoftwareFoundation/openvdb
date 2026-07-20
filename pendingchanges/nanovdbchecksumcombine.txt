@@ -1,5 +1,0 @@
-NanoVDB:
-  Improvements:
-  - Sped up the CUDA GridChecksum combine: the per-chunk CRCs are now folded with
-    GF(2) shift operators precomputed on the host, instead of rebuilding them on a
-    single device thread on every call (~1.7x faster on small and medium grids).
