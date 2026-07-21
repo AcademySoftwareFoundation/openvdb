@@ -2243,9 +2243,9 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_ValueOnIndex_Vec3f_SideCar)
         EXPECT_EQ("vec3s", openGrid->valueType());
         EXPECT_EQ(2u, openGrid->activeVoxelCount());
         auto openAcc = openGrid->getAccessor();
-        EXPECT_EQ(nanovdb::Vec3f(0.0f), openAcc.getValue(openvdb::Coord(0,  0, 0)));
-        EXPECT_EQ(nanovdb::Vec3f(1.0f), openAcc.getValue(openvdb::Coord(1,  2, 3)));
-        EXPECT_EQ(nanovdb::Vec3f(2.0f), openAcc.getValue(openvdb::Coord(2, -2, 9)));
+        EXPECT_EQ(nanovdb::Vec3f(0.0f), nanovdb::Vec3f(openAcc.getValue(openvdb::Coord(0,  0, 0))));
+        EXPECT_EQ(nanovdb::Vec3f(1.0f), nanovdb::Vec3f(openAcc.getValue(openvdb::Coord(1,  2, 3))));
+        EXPECT_EQ(nanovdb::Vec3f(2.0f), nanovdb::Vec3f(openAcc.getValue(openvdb::Coord(2, -2, 9))));
 
         const auto nanoBBox = idxGrid->indexBBox();
         const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
@@ -2263,9 +2263,9 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_ValueOnIndex_Vec3f_SideCar)
         EXPECT_EQ("vec3s", openGrid->valueType());
         EXPECT_EQ(2u, openGrid->activeVoxelCount());
         auto openAcc = openGrid->getAccessor();
-        EXPECT_EQ(nanovdb::Vec3f(0.0f), openAcc.getValue(openvdb::Coord(0,  0, 0)));
-        EXPECT_EQ(nanovdb::Vec3f(1.0f), openAcc.getValue(openvdb::Coord(1,  2, 3)));
-        EXPECT_EQ(nanovdb::Vec3f(2.0f), openAcc.getValue(openvdb::Coord(2, -2, 9)));
+        EXPECT_EQ(nanovdb::Vec3f(0.0f), nanovdb::Vec3f(openAcc.getValue(openvdb::Coord(0,  0, 0))));
+        EXPECT_EQ(nanovdb::Vec3f(1.0f), nanovdb::Vec3f(openAcc.getValue(openvdb::Coord(1,  2, 3))));
+        EXPECT_EQ(nanovdb::Vec3f(2.0f), nanovdb::Vec3f(openAcc.getValue(openvdb::Coord(2, -2, 9))));
 
         const auto nanoBBox = idxGrid->indexBBox();
         const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
@@ -2323,9 +2323,9 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_ValueIndex_Vec3f_SideCar)
         EXPECT_EQ("vec3s", openGrid->valueType());
         EXPECT_EQ(2u, openGrid->activeVoxelCount());
         auto openAcc = openGrid->getAccessor();
-        EXPECT_EQ(nanovdb::Vec3f(0.0f), openAcc.getValue(openvdb::Coord(0,  0, 0)));
-        EXPECT_EQ(nanovdb::Vec3f(1.0f), openAcc.getValue(openvdb::Coord(1,  2, 3)));
-        EXPECT_EQ(nanovdb::Vec3f(2.0f), openAcc.getValue(openvdb::Coord(2, -2, 9)));
+        EXPECT_EQ(nanovdb::Vec3f(0.0f), nanovdb::Vec3f(openAcc.getValue(openvdb::Coord(0,  0, 0))));
+        EXPECT_EQ(nanovdb::Vec3f(1.0f), nanovdb::Vec3f(openAcc.getValue(openvdb::Coord(1,  2, 3))));
+        EXPECT_EQ(nanovdb::Vec3f(2.0f), nanovdb::Vec3f(openAcc.getValue(openvdb::Coord(2, -2, 9))));
 
         const auto nanoBBox = idxGrid->indexBBox();
         const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
@@ -2343,9 +2343,9 @@ TEST_F(TestOpenVDB, NanoToOpenVDB_ValueIndex_Vec3f_SideCar)
         EXPECT_EQ("vec3s", openGrid->valueType());
         EXPECT_EQ(2u, openGrid->activeVoxelCount());
         auto openAcc = openGrid->getAccessor();
-        EXPECT_EQ(nanovdb::Vec3f(0.0f), openAcc.getValue(openvdb::Coord(0,  0, 0)));
-        EXPECT_EQ(nanovdb::Vec3f(1.0f), openAcc.getValue(openvdb::Coord(1,  2, 3)));
-        EXPECT_EQ(nanovdb::Vec3f(2.0f), openAcc.getValue(openvdb::Coord(2, -2, 9)));
+        EXPECT_EQ(nanovdb::Vec3f(0.0f), nanovdb::Vec3f(openAcc.getValue(openvdb::Coord(0,  0, 0))));
+        EXPECT_EQ(nanovdb::Vec3f(1.0f), nanovdb::Vec3f(openAcc.getValue(openvdb::Coord(1,  2, 3))));
+        EXPECT_EQ(nanovdb::Vec3f(2.0f), nanovdb::Vec3f(openAcc.getValue(openvdb::Coord(2, -2, 9))));
 
         const auto nanoBBox = idxGrid->indexBBox();
         const auto openBBox = openGrid->evalActiveVoxelBoundingBox();
