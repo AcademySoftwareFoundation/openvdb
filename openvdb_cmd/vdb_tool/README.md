@@ -13,6 +13,7 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **clip** | Clip a VDB grid against another grid, a bbox or frustum |
 | **close** | morphological closing, i.e. dilation followed by erosion, of level set surface by a fixed radius |
 | **config** | Import and process one or more configuration files |
+| **copy** | Deep-copy VDB grids and/or Geometry by index onto the top of their respective stacks |
 | **cpt** | generate a vector grid with the closest-point-transform to a level set surface |
 | **curl** | generate a vector grid with the curl of another vector grid |
 | **curvature** | generate scalar grid with the mean curvature of a level set surface |

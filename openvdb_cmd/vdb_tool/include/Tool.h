@@ -218,6 +218,9 @@ private:
     /// @brief Delete all queued Geometry, VDB grids, and local variables.
     void clear();
 
+    /// @brief Deep-copy VDB grids and/or Geometry by index onto their respective stacks.
+    void copy();
+
     /// @brief Clip an input VDB grid against another grid, a bbox, or a frustum.
     /// @tparam GridType Type of the input grid being clipped.
     /// @param v     Numeric parameters defining the clipping region (interpretation depends on mode).
@@ -641,6 +644,13 @@ void Tool::init()
      {"ascii", "false", "1|0|true|false", "for ascii vs binary output format when available (e.g. for ply files). Defaults to false, i.e. binary is preferred over ascii when available"},
      {"checksum", "", "none|partial|full", "specify the type of checksum to compute for NanoVDBs"}},
      [&](){mParser.setDefaults();}, [&](){this->write();}, 0);// anonymous options are treated as to the first option,i.e. "files"
+
+  mParser.addAction(
+     {"copy"}, "Deep-copy VDB grids and/or Geometry by index onto the top of their respective stacks",
+    {{"vdb",    "", "0|0,1,2|*", "comma-separated age index/indices of VDB grids to copy, or \"*\" for all (omit to skip VDB)"},
+     {"geo",    "", "0|0,1|*",   "comma-separated age index/indices of Geometry to copy, or \"*\" for all (omit to skip Geometry)"},
+     {"prefix", "", "copy_",     "prefix prepended to the name of each copy (default is empty, preserving the original name)"}},
+     [](){}, [&](){this->copy();});
 
   mParser.addAction(
      {"clear"}, "Deletes geometry, VDB grids and local variables",
@@ -1401,6 +1411,63 @@ void Tool::clear()
     mParser.processor.memory().clear();
   }
 }// Tool::clear
+
+// ==============================================================================================================
+
+void Tool::copy()
+{
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "copy");
+  mParser.printAction();
+  const std::string vdb_str = mParser.get<std::string>("vdb");
+  const std::string geo_str = mParser.get<std::string>("geo");
+  const std::string prefix  = mParser.get<std::string>("prefix");
+  if (vdb_str.empty() && geo_str.empty()) {
+    throw std::invalid_argument("copy: at least one of \"vdb\" or \"geo\" must be specified");
+  }
+  auto applyPrefix = [&](const std::string& name) { return prefix + name; };
+  if (!vdb_str.empty()) {
+    std::vector<GridBase::Ptr> copies;
+    if (vdb_str == "*") {
+      for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it)
+        copies.push_back((*it)->deepCopyGrid());
+    } else {
+      const auto indices = mParser.getVec<int>("vdb");
+      for (int a : indices) {
+        if (size_t(a) >= mGrid.size()) {
+          throw std::out_of_range("copy: vdb index " + std::to_string(a) +
+                                  " is out of range (stack size " + std::to_string(mGrid.size()) + ")");
+        }
+      }
+      copies.reserve(indices.size());
+      for (int a : indices) copies.push_back((*this->getGrid(a))->deepCopyGrid());
+    }
+    for (auto& c : copies) {
+      if (!prefix.empty()) c->setName(applyPrefix(c->getName()));
+      mGrid.push_back(c);
+    }
+  }
+  if (!geo_str.empty()) {
+    std::vector<Geometry::Ptr> copies;
+    if (geo_str == "*") {
+      for (auto it = mGeom.crbegin(); it != mGeom.crend(); ++it)
+        copies.push_back((*it)->deepCopy());
+    } else {
+      const auto indices = mParser.getVec<int>("geo");
+      for (int a : indices) {
+        if (size_t(a) >= mGeom.size()) {
+          throw std::out_of_range("copy: geo index " + std::to_string(a) +
+                                  " is out of range (stack size " + std::to_string(mGeom.size()) + ")");
+        }
+      }
+      copies.reserve(indices.size());
+      for (int a : indices) copies.push_back((*this->getGeom(a))->deepCopy());
+    }
+    for (auto& c : copies) {
+      if (!prefix.empty()) c->setName(applyPrefix(c->getName()));
+      mGeom.push_back(c);
+    }
+  }
+}// Tool::copy
 
 // ==============================================================================================================
 
