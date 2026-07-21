@@ -18,9 +18,11 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **curl** | generate a vector grid with the curl of another vector grid |
 | **curvature** | generate scalar grid with the mean curvature of a level set surface |
 | **debug** | print debugging information to the terminal |
+| **diagnose** | Run OpenVDB diagnostics checks on one or more VDB grids |
 | **default** | define default values to be used by subsequent actions |
 | **difference** | CSG difference of two level sets surfaces |
 | **dilate** | dilate level set surface by a fixed radius |
+| **divide** | Given grids A and B, compute a / b per voxel |
 | **div** | generate a scalar grid with the divergence of a vector grid |
 | **each** | start of each-loop over a user-defined loop variable and list of values. |
 | **end** | marks the end scope of "-for, -each, -files, -if, -switch and -case" control actions |
@@ -53,6 +55,7 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **mesh2ls** | Convert a watertight polygon surface into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
 | **min** | Given grids A and B, compute min(a, b) per voxel |
 | **movie** | Convert image and movie files to mpeg or animated gif files |
+| **multiply** | Given grids A and B, compute a * b per voxel |
 | **multires** | construct a LoD sequences of VDB trees with powers of two refinements |
 | **open** | morphological opening, i.e. erosion followed by dilation, of a level set surface by a fixed radius |
 | **platonic** | Create a level set shape with the specified number of polygon faces |
@@ -63,6 +66,7 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **quad2tri** | Convert all quads in mesh to triangles, assuming they are both planar and convex |
 | **quiet** | disable printing to the terminal |
 | **read** | Read one or more geometry or VDB files from disk or STDIN. |
+| **rename** | Rename a VDB grid and/or Geometry on the stack by age index |
 | **render** | ray-tracing of level set surfaces and volume rendering of fog volumes |
 | **resample** | resample one VDB grid into another VDB grid or a transformation of the input grid |
 | **scatter** | Scatter point into the active values of an input VDB grid |
@@ -72,7 +76,9 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **soup2offset** | Convert a polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
 | **soup2udf** | Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band |
 | **sphere** | Create a level set sphere, i.e. a narrow-band signed distance to a sphere |
+| **stats** | Print value statistics (min, max, mean, std. dev.) of active voxels for one or more VDB grids |
 | **sum** | Given grids A and B, compute sum(a, b) per voxel |
+| **swap** | Swap two VDB grids and/or two Geometry entries on their respective stacks |
 | **switch** | start of switch-scope. The selector value (on=) is compared against each enclosed -case's key; only the matching case body runs (or the '*'/'default' case if nothing else matched). Closed by -end. |
 | **transform** | apply affine transformations (uniform scale -> rotation -> translation) to a VDB grids and geometry |
 | **union** | CSG union of two level sets surfaces |

@@ -34,6 +34,8 @@
 #include <openvdb/util/Assert.h>
 #include <openvdb/tools/Composite.h>
 #include <openvdb/tools/Count.h>// for tools::minMax (used by -print level=2)
+#include <openvdb/tools/Diagnostics.h>
+#include <openvdb/tools/Statistics.h>
 #include <openvdb/tools/FastSweeping.h>
 #include <openvdb/tools/LevelSetAdvect.h>
 #include <openvdb/tools/LevelSetDilatedMesh.h>
@@ -111,6 +113,7 @@
 
 #ifdef VDB_TOOL_USE_MPEG
 #include <cstdlib>// for std::system
+#include <sstream>
 #endif
 
 #ifndef VDB_TOOL_FFMPEG_PATH
@@ -220,6 +223,18 @@ private:
 
     /// @brief Deep-copy VDB grids and/or Geometry by index onto their respective stacks.
     void copy();
+
+    /// @brief Run OpenVDB diagnostics checks on VDB grids on the stack.
+    void diagnose();
+
+    /// @brief Print value statistics (min, max, mean, std. dev.) for VDB grids on the stack.
+    void stats();
+
+    /// @brief Rename a VDB grid and/or Geometry on the stack by age index.
+    void rename();
+
+    /// @brief Swap two VDB grids and/or two Geometry entries on their respective stacks.
+    void swap();
 
     /// @brief Clip an input VDB grid against another grid, a bbox, or a frustum.
     /// @tparam GridType Type of the input grid being clipped.
@@ -646,6 +661,19 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->write();}, 0);// anonymous options are treated as to the first option,i.e. "files"
 
   mParser.addAction(
+     {"rename"}, "Rename a VDB grid and/or Geometry on the stack by age index",
+    {{"vdb",  "", "0",      "age index of the VDB grid to rename (omit to skip VDB)"},
+     {"geo",  "", "0",      "age index of the Geometry to rename (omit to skip Geometry)"},
+     {"name", "", "sphere", "new name to assign"}},
+     [](){}, [&](){this->rename();});
+
+  mParser.addAction(
+     {"swap"}, "Swap two VDB grids and/or two Geometry entries on their respective stacks",
+    {{"vdb", "", "0,1", "comma-separated pair of age indices of VDB grids to swap (omit to skip VDB)"},
+     {"geo", "", "0,1", "comma-separated pair of age indices of Geometry to swap (omit to skip Geometry)"}},
+     [](){}, [&](){this->swap();});
+
+  mParser.addAction(
      {"copy"}, "Deep-copy VDB grids and/or Geometry by index onto the top of their respective stacks",
     {{"vdb",    "", "0|0,1,2|*", "comma-separated age index/indices of VDB grids to copy, or \"*\" for all (omit to skip VDB)"},
      {"geo",    "", "0|0,1|*",   "comma-separated age index/indices of Geometry to copy, or \"*\" for all (omit to skip Geometry)"},
@@ -1029,6 +1057,18 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->composite();});
 
   mParser.addAction(
+     {"multiply", "mul"}, "Given grids A and B, compute a * b per voxel",
+    {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
+     {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
+     [&](){mParser.setDefaults();}, [&](){this->composite();});
+
+  mParser.addAction(
+     {"divide"}, "Given grids A and B, compute a / b per voxel",
+    {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
+     {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
+     [&](){mParser.setDefaults();}, [&](){this->composite();});
+
+  mParser.addAction(
      {"multires"}, "construct a LoD sequences of VDB trees with powers of two refinements",
     {{"levels", "2", "2", "number of multi-resolution grids in the output LoD sequence"},
      {"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
@@ -1136,6 +1176,17 @@ void Tool::init()
        {"mem", "0", "0|1|false|true", "print a list of all stored variables"},
        {"level", "0", "0|1|2", "detail level: 0=base table, 1=+bbox column, 2=+value range column"}},
       [](){}, [&](){this->print();});
+
+  mParser.addAction(
+      {"diagnose"}, "Run OpenVDB diagnostics checks on one or more VDB grids",
+     {{"vdb",   "*", "*|0|0,1,2", "comma-separated age indices of VDB grids to check, or \"*\" for all (default)"},
+      {"fatal", "0", "1|0|true|false", "if true, throw an exception when any check fails (default false)"}},
+     [](){}, [&](){this->diagnose();});
+
+  mParser.addAction(
+      {"stats"}, "Print value statistics (min, max, mean, std. dev.) of active voxels for one or more VDB grids",
+     {{"vdb", "*", "*|0|0,1,2", "comma-separated age indices of VDB grids to analyze, or \"*\" for all (default)"}},
+     [](){}, [&](){this->stats();});
 
   mParser.addAction(
       {"version"}, "write timing information to the terminal", {},
@@ -1468,6 +1519,190 @@ void Tool::copy()
     }
   }
 }// Tool::copy
+
+// ==============================================================================================================
+
+void Tool::rename()
+{
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "rename");
+  mParser.printAction();
+  const std::string vdb_str  = mParser.get<std::string>("vdb");
+  const std::string geo_str  = mParser.get<std::string>("geo");
+  const std::string new_name = mParser.get<std::string>("name");
+  if (vdb_str.empty() && geo_str.empty()) {
+    throw std::invalid_argument("rename: at least one of \"vdb\" or \"geo\" must be specified");
+  }
+  if (new_name.empty()) {
+    throw std::invalid_argument("rename: \"name\" must not be empty");
+  }
+  if (!vdb_str.empty()) {
+    const int a = mParser.get<int>("vdb");
+    if (size_t(a) >= mGrid.size()) {
+      throw std::out_of_range("rename: vdb index " + std::to_string(a) +
+                              " is out of range (stack size " + std::to_string(mGrid.size()) + ")");
+    }
+    (*this->getGrid(a))->setName(new_name);
+  }
+  if (!geo_str.empty()) {
+    const int a = mParser.get<int>("geo");
+    if (size_t(a) >= mGeom.size()) {
+      throw std::out_of_range("rename: geo index " + std::to_string(a) +
+                              " is out of range (stack size " + std::to_string(mGeom.size()) + ")");
+    }
+    (*this->getGeom(a))->setName(new_name);
+  }
+}// Tool::rename
+
+// ==============================================================================================================
+
+void Tool::diagnose()
+{
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "diagnose");
+  mParser.printAction();
+  const std::string vdb_str = mParser.get<std::string>("vdb");
+  const bool fatal = mParser.get<bool>("fatal");
+
+  std::vector<GridBase::Ptr> grids;
+  if (vdb_str == "*") {
+    for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it) grids.push_back(*it);
+  } else {
+    for (int a : mParser.getVec<int>("vdb")) {
+      if (size_t(a) >= mGrid.size())
+        throw std::out_of_range("diagnose: vdb index " + std::to_string(a) +
+                                " is out of range (stack size " + std::to_string(mGrid.size()) + ")");
+      grids.push_back(*this->getGrid(a));
+    }
+  }
+
+  if (grids.empty()) { std::clog << "diagnose: no grids on stack\n"; return; }
+
+  bool anyFailed = false;
+  for (auto& base : grids) {
+    const std::string& name = base->getName();
+    auto grid = gridPtrCast<FloatGrid>(base);
+    if (!grid) {
+      std::clog << "diagnose: [" << name << "] skipped (not a FloatGrid)\n";
+      continue;
+    }
+    std::string msg;
+    if (base->getGridClass() == GRID_LEVEL_SET) {
+      msg = tools::checkLevelSet(*grid);
+    } else if (base->getGridClass() == GRID_FOG_VOLUME) {
+      msg = tools::checkFogVolume(*grid);
+    } else {
+      // For generic float grids run NaN and infinity checks.
+      tools::Diagnose<FloatGrid> d(*grid);
+      tools::CheckNan<FloatGrid> checkNan;
+      tools::CheckInf<FloatGrid> checkInf;
+      msg += d.check(checkNan, /*updateMask*/false, /*voxels*/true, /*tiles*/true, /*background*/true);
+      msg += d.check(checkInf, /*updateMask*/false, /*voxels*/true, /*tiles*/true, /*background*/true);
+    }
+    if (msg.empty()) {
+      std::clog << "diagnose: [" << name << "] OK\n";
+    } else {
+      anyFailed = true;
+      std::clog << "diagnose: [" << name << "] FAILED\n";
+      // indent each line of the diagnostic message
+      std::istringstream ss(msg);
+      std::string line;
+      while (std::getline(ss, line))
+        if (!line.empty()) std::clog << "  " << line << "\n";
+    }
+  }
+  if (fatal && anyFailed)
+    throw std::runtime_error("diagnose: one or more grids failed validation");
+}// Tool::diagnose
+
+// ==============================================================================================================
+
+void Tool::stats()
+{
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "stats");
+  mParser.printAction();
+  const std::string vdb_str = mParser.get<std::string>("vdb");
+
+  std::vector<GridBase::Ptr> grids;
+  if (vdb_str == "*") {
+    for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it) grids.push_back(*it);
+  } else {
+    for (int a : mParser.getVec<int>("vdb")) {
+      if (size_t(a) >= mGrid.size())
+        throw std::out_of_range("stats: vdb index " + std::to_string(a) +
+                                " is out of range (stack size " + std::to_string(mGrid.size()) + ")");
+      grids.push_back(*this->getGrid(a));
+    }
+  }
+
+  if (grids.empty()) { std::clog << "stats: no grids on stack\n"; return; }
+
+  const int w = 14;
+  std::clog << std::left
+            << std::setw(24) << "name"
+            << std::setw(w)  << "active"
+            << std::setw(w)  << "min"
+            << std::setw(w)  << "max"
+            << std::setw(w)  << "mean"
+            << std::setw(w)  << "stddev"
+            << "\n" << std::string(24 + 5*w, '-') << "\n";
+
+  for (auto& base : grids) {
+    auto grid = gridPtrCast<FloatGrid>(base);
+    if (!grid) {
+      std::clog << std::setw(24) << base->getName() << "  (not a FloatGrid, skipped)\n";
+      continue;
+    }
+    const math::Stats s = tools::statistics(grid->cbeginValueOn());
+    std::clog << std::left  << std::setw(24) << grid->getName()
+              << std::right << std::setw(w)  << s.size()
+              << std::setw(w) << std::fixed << std::setprecision(6) << s.min()
+              << std::setw(w) << s.max()
+              << std::setw(w) << s.mean()
+              << std::setw(w) << s.stdDev()
+              << "\n";
+  }
+  std::clog << std::defaultfloat;
+}// Tool::stats
+
+// ==============================================================================================================
+
+void Tool::swap()
+{
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "swap");
+  mParser.printAction();
+  const std::string vdb_str = mParser.get<std::string>("vdb");
+  const std::string geo_str = mParser.get<std::string>("geo");
+  if (vdb_str.empty() && geo_str.empty()) {
+    throw std::invalid_argument("swap: at least one of \"vdb\" or \"geo\" must be specified");
+  }
+  if (!vdb_str.empty()) {
+    const auto idx = mParser.getVec<int>("vdb");
+    if (idx.size() != 2) {
+      throw std::invalid_argument("swap: \"vdb\" requires exactly two indices, e.g. vdb=0,1");
+    }
+    if (size_t(idx[0]) >= mGrid.size() || size_t(idx[1]) >= mGrid.size()) {
+      throw std::out_of_range("swap: vdb index out of range (stack size " + std::to_string(mGrid.size()) + ")");
+    }
+    if (idx[0] != idx[1]) {
+      auto it0 = this->getGrid(idx[0]);
+      auto it1 = this->getGrid(idx[1]);
+      std::iter_swap(std::next(it0).base(), std::next(it1).base());
+    }
+  }
+  if (!geo_str.empty()) {
+    const auto idx = mParser.getVec<int>("geo");
+    if (idx.size() != 2) {
+      throw std::invalid_argument("swap: \"geo\" requires exactly two indices, e.g. geo=0,1");
+    }
+    if (size_t(idx[0]) >= mGeom.size() || size_t(idx[1]) >= mGeom.size()) {
+      throw std::out_of_range("swap: geo index out of range (stack size " + std::to_string(mGeom.size()) + ")");
+    }
+    if (idx[0] != idx[1]) {
+      auto it0 = this->getGeom(idx[0]);
+      auto it1 = this->getGeom(idx[1]);
+      std::iter_swap(std::next(it0).base(), std::next(it1).base());
+    }
+  }
+}// Tool::swap
 
 // ==============================================================================================================
 
@@ -2630,7 +2865,7 @@ void Tool::compute()
 
 void Tool::composite()
 {
-  OPENVDB_ASSERT(findMatch(mParser.getAction().names[0], {"min","max","sum"}));
+  OPENVDB_ASSERT(findMatch(mParser.getAction().names[0], {"min","max","sum","multiply","divide"}));
   mParser.printAction();
   const std::string &action_name = mParser.getAction().names[0];
   const VecI ij = mParser.getVec<int>("vdb");
@@ -2661,6 +2896,10 @@ void Tool::composite()
     tools::compMax(*tmpA, *tmpB);// Store the result in the A grid and leave the B grid empty.
   } else if (action_name == "sum") {
     tools::compSum(*tmpA, *tmpB);// Store the result in the A grid and leave the B grid empty.
+  } else if (action_name == "multiply") {
+    tools::compMul(*tmpA, *tmpB);// Store the result in the A grid and leave the B grid empty.
+  } else if (action_name == "divide") {
+    tools::compDiv(*tmpA, *tmpB);// Store the result in the A grid and leave the B grid empty.
   } else {
     throw std::invalid_argument(action_name+": invalid operation");
   }
