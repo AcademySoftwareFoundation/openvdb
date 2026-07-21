@@ -675,10 +675,10 @@ void Tool::init()
 
   mParser.addAction(
      {"copy"}, "Deep-copy VDB grids and/or Geometry by index onto the top of their respective stacks",
-    {{"vdb",    "", "0|0,1,2|*", "comma-separated age index/indices of VDB grids to copy, or \"*\" for all (omit to skip VDB)"},
-     {"geo",    "", "0|0,1|*",   "comma-separated age index/indices of Geometry to copy, or \"*\" for all (omit to skip Geometry)"},
+    {{"vdb",    "0", "0|0,1,2|*", "comma-separated age index/indices of VDB grids to copy, or \"*\" for all (default: 0, i.e. the most recently added VDB)"},
+     {"geo",    "",  "0|0,1|*",  "comma-separated age index/indices of Geometry to copy, or \"*\" for all (omit to skip Geometry)"},
      {"prefix", "", "copy_",     "prefix prepended to the name of each copy (default is empty, preserving the original name)"}},
-     [](){}, [&](){this->copy();});
+     [&](){mParser.setDefaults();}, [&](){this->copy();});
 
   mParser.addAction(
      {"clear"}, "Deletes geometry, VDB grids and local variables",
@@ -1636,23 +1636,25 @@ void Tool::stats()
   if (grids.empty()) { std::clog << "stats: no grids on stack\n"; return; }
 
   const int w = 14;
-  std::clog << std::left
-            << std::setw(24) << "name"
-            << std::setw(w)  << "active"
-            << std::setw(w)  << "min"
-            << std::setw(w)  << "max"
-            << std::setw(w)  << "mean"
-            << std::setw(w)  << "stddev"
-            << "\n" << std::string(24 + 5*w, '-') << "\n";
+  int nw = 4;// minimum width for "name" header
+  for (auto& g : grids) nw = std::max(nw, (int)g->getName().size());
+  nw += 2;// two-space gap after the longest name
+  std::clog << std::left  << std::setw(nw) << "name"
+            << std::right << std::setw(w)  << "active"
+                          << std::setw(w)  << "min"
+                          << std::setw(w)  << "max"
+                          << std::setw(w)  << "mean"
+                          << std::setw(w)  << "stddev"
+            << "\n" << std::string(nw + 5*w, '-') << "\n";
 
   for (auto& base : grids) {
     auto grid = gridPtrCast<FloatGrid>(base);
     if (!grid) {
-      std::clog << std::setw(24) << base->getName() << "  (not a FloatGrid, skipped)\n";
+      std::clog << std::left << std::setw(nw) << base->getName() << "  (not a FloatGrid, skipped)\n";
       continue;
     }
     const math::Stats s = tools::statistics(grid->cbeginValueOn());
-    std::clog << std::left  << std::setw(24) << grid->getName()
+    std::clog << std::left  << std::setw(nw) << grid->getName()
               << std::right << std::setw(w)  << s.size()
               << std::setw(w) << std::fixed << std::setprecision(6) << s.min()
               << std::setw(w) << s.max()
@@ -1683,9 +1685,9 @@ void Tool::swap()
       throw std::out_of_range("swap: vdb index out of range (stack size " + std::to_string(mGrid.size()) + ")");
     }
     if (idx[0] != idx[1]) {
-      auto it0 = this->getGrid(idx[0]);
-      auto it1 = this->getGrid(idx[1]);
-      std::iter_swap(std::next(it0).base(), std::next(it1).base());
+      auto it0 = mGrid.rbegin(); std::advance(it0, idx[0]);
+      auto it1 = mGrid.rbegin(); std::advance(it1, idx[1]);
+      std::iter_swap(it0, it1);
     }
   }
   if (!geo_str.empty()) {
@@ -1697,9 +1699,9 @@ void Tool::swap()
       throw std::out_of_range("swap: geo index out of range (stack size " + std::to_string(mGeom.size()) + ")");
     }
     if (idx[0] != idx[1]) {
-      auto it0 = this->getGeom(idx[0]);
-      auto it1 = this->getGeom(idx[1]);
-      std::iter_swap(std::next(it0).base(), std::next(it1).base());
+      auto it0 = mGeom.rbegin(); std::advance(it0, idx[0]);
+      auto it1 = mGeom.rbegin(); std::advance(it1, idx[1]);
+      std::iter_swap(it0, it1);
     }
   }
 }// Tool::swap
