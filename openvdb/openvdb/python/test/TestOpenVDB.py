@@ -874,6 +874,38 @@ class TestOpenVDB(unittest.TestCase):
         self.assertFalse(hasattr(openvdb.Vec3SGrid, 'convertPolygonSoupToLevelSet'))
 
 
+    def testLevelSetSampler(self):
+        sphere = openvdb.createLevelSetSphere(
+            radius=10.0, center=(0.0, 0.0, 0.0), voxelSize=1.0, halfWidth=3.0)
+        sampler = openvdb.LevelSetSampler(sphere)
+
+        self.assertLess(sampler.sampleWS((0.0, 0.0, 0.0)), 0.0)
+        self.assertAlmostEqual(sampler.sampleWS((10.0, 0.0, 0.0)), 0.0, delta=1.0)
+        self.assertGreater(sampler.sampleWS((14.0, 0.0, 0.0)), 0.0)
+
+        points32 = np.array([
+            (0.0, 0.0, 0.0),
+            (10.0, 0.0, 0.0),
+            (14.0, 0.0, 0.0),
+        ], dtype=np.float32)
+        values32 = sampler.sampleBatchWS(points32)
+        self.assertEqual(values32.shape, (3,))
+        self.assertEqual(values32.dtype, np.float32)
+        self.assertLess(values32[0], 0.0)
+        self.assertAlmostEqual(values32[1], 0.0, delta=1.0)
+        self.assertGreater(values32[2], 0.0)
+
+        points64 = points32.astype(np.float64)
+        values64 = sampler.sampleBatchWS(points64)
+        self.assertEqual(values64.shape, (3,))
+        self.assertEqual(values64.dtype, np.float32)
+        np.testing.assert_allclose(values64, values32, rtol=1e-6, atol=1e-6)
+
+        fog = openvdb.FloatGrid()
+        fog.gridClass = openvdb.GridClass.FOG_VOLUME
+        self.assertRaises(TypeError, lambda: openvdb.LevelSetSampler(fog))
+
+
 if __name__ == '__main__':
     print('Testing %s' % os.path.dirname(openvdb.__file__))
     sys.stdout.flush()
@@ -887,4 +919,3 @@ if __name__ == '__main__':
     args = [a for a in args if a != '-t']
 
     unittest.main(argv=args)
-
