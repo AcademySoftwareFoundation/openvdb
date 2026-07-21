@@ -25,6 +25,7 @@
 ///   software doesn't need to provide compile time defines.
 #include <tbb/task_arena.h>
 #include <tbb/task_group.h>
+#include <tbb/version.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
