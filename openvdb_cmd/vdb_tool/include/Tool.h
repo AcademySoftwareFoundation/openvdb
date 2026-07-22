@@ -1174,14 +1174,15 @@ void Tool::init()
       {{"vdb", "*", "*", "print information about VDB grids"},
        {"geo", "*", "*", "print information about geometries"},
        {"mem", "0", "0|1|false|true", "print a list of all stored variables"},
-       {"level", "0", "0|1|2", "detail level: 0=base table, 1=+bbox column, 2=+value range column"}},
+       {"level", "0", "0|1", "detail level: 0=base table, 1=+bbox and node-count columns"}},
       [](){}, [&](){this->print();});
 
   mParser.addAction(
       {"diagnose"}, "Run OpenVDB diagnostics checks on one or more VDB grids",
-     {{"vdb",   "*", "*|0|0,1,2", "comma-separated age indices of VDB grids to check, or \"*\" for all (default)"},
-      {"fatal", "0", "1|0|true|false", "if true, throw an exception when any check fails (default false)"}},
-     [](){}, [&](){this->diagnose();});
+     {{"vdb",    "*", "*|0|0,1,2", "comma-separated age indices of VDB grids to check, or \"*\" for all (default)"},
+      {"checks", "9", "1|...|9",   "number of checks to run (level set: 1-9, fog volume: 1-6). Lower values skip slower or stricter checks"},
+      {"fatal",  "0", "1|0|true|false", "if true, throw an exception when any check fails (default false)"}},
+     [&](){mParser.setDefaults();}, [&](){this->diagnose();});
 
   mParser.addAction(
       {"stats"}, "Print value statistics (min, max, mean, std. dev.) of active voxels for one or more VDB grids",
@@ -1560,7 +1561,8 @@ void Tool::diagnose()
   OPENVDB_ASSERT(mParser.getAction().names[0] == "diagnose");
   mParser.printAction();
   const std::string vdb_str = mParser.get<std::string>("vdb");
-  const bool fatal = mParser.get<bool>("fatal");
+  const bool fatal    = mParser.get<bool>("fatal");
+  const size_t checks = static_cast<size_t>(mParser.get<int>("checks"));
 
   std::vector<GridBase::Ptr> grids;
   if (vdb_str == "*") {
@@ -1586,9 +1588,9 @@ void Tool::diagnose()
     }
     std::string msg;
     if (base->getGridClass() == GRID_LEVEL_SET) {
-      msg = tools::checkLevelSet(*grid);
+      msg = tools::checkLevelSet(*grid, checks);
     } else if (base->getGridClass() == GRID_FOG_VOLUME) {
-      msg = tools::checkFogVolume(*grid);
+      msg = tools::checkFogVolume(*grid, checks);
     } else {
       // For generic float grids run NaN and infinity checks.
       tools::Diagnose<FloatGrid> d(*grid);
@@ -1635,34 +1637,52 @@ void Tool::stats()
 
   if (grids.empty()) { std::clog << "stats: no grids on stack\n"; return; }
 
-  const int w = 14;
+  const int aw = 5, w = 14;
   int nw = 4;// minimum width for "name" header
   for (auto& g : grids) nw = std::max(nw, (int)g->getName().size());
   nw += 2;// two-space gap after the longest name
-  std::clog << std::left  << std::setw(nw) << "name"
-            << std::right << std::setw(w)  << "active"
+  std::clog << std::right << std::setw(aw) << "age"
+            << "  "
+            << std::left  << std::setw(nw) << "name"
+            << std::right << std::setw(w)  << "background"
                           << std::setw(w)  << "min"
                           << std::setw(w)  << "max"
                           << std::setw(w)  << "mean"
                           << std::setw(w)  << "stddev"
-            << "\n" << std::string(nw + 5*w, '-') << "\n";
+                          << std::setw(w)  << "area"
+                          << std::setw(w)  << "volume"
+            << "\n" << std::string(aw + 2 + nw + 7*w, '-') << "\n";
 
-  for (auto& base : grids) {
+  for (size_t i = 0; i < grids.size(); ++i) {
+    auto& base = grids[i];
+    const int age = vdb_str == "*" ? (int)i : mParser.getVec<int>("vdb")[i];
     auto grid = gridPtrCast<FloatGrid>(base);
     if (!grid) {
-      std::clog << std::left << std::setw(nw) << base->getName() << "  (not a FloatGrid, skipped)\n";
+      std::clog << std::right << std::setw(aw) << age << "  "
+                << std::left  << std::setw(nw) << base->getName() << "  (not a FloatGrid, skipped)\n";
       continue;
     }
     const math::Stats s = tools::statistics(grid->cbeginValueOn());
-    std::clog << std::left  << std::setw(nw) << grid->getName()
-              << std::right << std::setw(w)  << s.size()
-              << std::setw(w) << std::fixed << std::setprecision(6) << s.min()
+    std::clog << std::right << std::setw(aw) << age << "  "
+              << std::left  << std::setw(nw) << grid->getName()
+              << std::right << std::fixed << std::setprecision(6)
+              << std::setw(w) << grid->background()
+              << std::setw(w) << s.min()
               << std::setw(w) << s.max()
               << std::setw(w) << s.mean()
               << std::setw(w) << s.stdDev()
-              << "\n";
+              << std::defaultfloat;
+    // area and volume are only defined for float level sets
+    if (base->getGridClass() == GRID_LEVEL_SET) {
+      try { std::clog << std::setw(w) << tools::levelSetArea(*grid); }
+      catch (...) { std::clog << std::setw(w) << "(n/a)"; }
+      try { std::clog << std::setw(w) << tools::levelSetVolume(*grid); }
+      catch (...) { std::clog << std::setw(w) << "(n/a)"; }
+    } else {
+      std::clog << std::setw(w) << "(n/a)" << std::setw(w) << "(n/a)";
+    }
+    std::clog << "\n";
   }
-  std::clog << std::defaultfloat;
 }// Tool::stats
 
 // ==============================================================================================================
@@ -4352,7 +4372,6 @@ void Tool::print(std::ostream& os) const
     std::vector<std::string> geomHeaders = {"age", "name", "vtx", "tri", "quad", "size"};
     std::vector<Align>       geomAligns  = {RIGHT, LEFT,   RIGHT, RIGHT, RIGHT,  RIGHT};
     if (level >= 1) { geomHeaders.push_back("bbox"); geomAligns.push_back(LEFT); }
-    if (level >= 2) { geomHeaders.push_back("rgb");  geomAligns.push_back(RIGHT); }
 
     auto buildGeomRow = [&](int age, const Geometry& geom) {
         const std::uint64_t mem = sizeof(geom)
@@ -4369,7 +4388,6 @@ void Tool::print(std::ostream& os) const
             formatBytes(mem),
         };
         if (level >= 1) row.push_back(formatBBoxd(geom.bbox()));
-        if (level >= 2) row.push_back(formatCommas(geom.rgb().size()));
         return row;
     };
 
@@ -4396,10 +4414,6 @@ void Tool::print(std::ostream& os) const
     if (level >= 1) { headers.push_back("bbox(index)"); aligns.push_back(LEFT); }
     if (level >= 1) { headers.push_back("bbox(world)"); aligns.push_back(LEFT); }
     if (level >= 1) { headers.push_back("32->16->8");   aligns.push_back(RIGHT); }
-    if (level >= 2) { headers.push_back("background"); aligns.push_back(LEFT); }
-    if (level >= 2) { headers.push_back("range");      aligns.push_back(LEFT); }
-    if (level >= 2) { headers.push_back("area");       aligns.push_back(RIGHT); }
-    if (level >= 2) { headers.push_back("volume");     aligns.push_back(RIGHT); }
 
     auto buildRow = [&](int age, const GridBase& grid) {
         const auto bbox = grid.evalActiveVoxelBoundingBox();
@@ -4422,10 +4436,6 @@ void Tool::print(std::ostream& os) const
         if (level >= 1) row.push_back(formatBBox(bbox));
         if (level >= 1) row.push_back(formatBBoxd(grid.transform().indexToWorld(bbox)));
         if (level >= 1) row.push_back(formatNodes(grid));
-        if (level >= 2) row.push_back(formatBackground(grid));
-        if (level >= 2) row.push_back(formatRange(grid));
-        if (level >= 2) row.push_back(formatArea(grid));
-        if (level >= 2) row.push_back(formatVolume(grid));
         return row;
     };
 

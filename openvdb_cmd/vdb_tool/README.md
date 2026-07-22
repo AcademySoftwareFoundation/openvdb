@@ -61,7 +61,7 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **platonic** | Create a level set shape with the specified number of polygon faces |
 | **points2ls** | Convert geometry points into a narrow-band level set |
 | **points2vdb** | Encode geometry points into a VDB grid |
-| **print** | prints information to the terminal about the current stack of VDB grids and Geometry |
+| **print** | Print structural metadata (type, class, dimensions, memory, bounding box, tree topology) for the current stack of VDB grids and Geometry. Use `-stats` for value-derived information. |
 | **prune** | prune away inactive values in a VDB grid |
 | **quad2tri** | Convert all quads in mesh to triangles, assuming they are both planar and convex |
 | **quiet** | disable printing to the terminal |
@@ -76,7 +76,7 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **soup2offset** | Convert a polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
 | **soup2udf** | Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band |
 | **sphere** | Create a level set sphere, i.e. a narrow-band signed distance to a sphere |
-| **stats** | Print value statistics (min, max, mean, std. dev.) of active voxels for one or more VDB grids |
+| **stats** | Print value-derived information (background, min, max, mean, std. dev., and for level sets: surface area and enclosed volume) for one or more VDB grids. Use `-print` for structural metadata. |
 | **sum** | Given grids A and B, compute sum(a, b) per voxel |
 | **swap** | Swap two VDB grids and/or two Geometry entries on their respective stacks |
 | **switch** | start of switch-scope. The selector value (on=) is compared against each enclosed -case's key; only the matching case body runs (or the '*'/'default' case if nothing else matched). Closed by -end. |
@@ -110,6 +110,20 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 | png | optional write | Binary PNG image file |
 | jpg | optional write | Binary JPEG image file |
 | exr | optional write | Binary OpenEXR image file |
+
+# Inspecting grids: -print vs -stats
+
+Two actions are available for inspecting grids on the stack, and they are intentionally complementary and non-overlapping:
+
+- **`-print`** reports *structural* metadata that is independent of voxel values: grid name, value type, grid class, active voxel count, voxel size, memory usage, and (at `level=1`) the active-voxel bounding box in index and world space plus tree node counts. Nothing printed by `-print` requires reading voxel data.
+
+- **`-stats`** reports *value-derived* information computed from the voxels themselves: background value, min, max, mean, standard deviation of active voxels, and — for level set grids — the world-space surface area and enclosed volume. All columns require touching voxel data.
+
+```bash
+vdb_tool -sphere -print          # structural: type, class, dim, voxels, dx, size
+vdb_tool -sphere -print level=1  # + bounding box and tree topology
+vdb_tool -sphere -stats          # value: background, min, max, mean, stddev, area, volume
+```
 
 # Terminology
 
