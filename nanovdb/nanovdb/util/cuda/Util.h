@@ -16,6 +16,7 @@
 
 #include <cuda.h>
 #include <cuda_runtime_api.h>
+#include <vector>
 #include <nanovdb/util/Util.h> // for stderr and NANOVDB_ASSERT
 
 // change 1 -> 0 to only perform asserts during debug builds
@@ -70,42 +71,108 @@ namespace nanovdb {// =========================================================
 namespace util::cuda {// ======================================================
 
 //#define NANOVDB_USE_SYNC_CUDA_MALLOC
-// cudaMallocAsync and cudaFreeAsync were introduced in CUDA 11.2 so we introduce
-// custom implementations that map to cudaMalloc and cudaFree below. If NANOVDB_USE_SYNC_CUDA_MALLOC
-// is defined these implementations will also be defined, which is useful in virtualized environments
-// that slice up the GPU and share it between instances as vGPU's. GPU unified memory is usually disabled
-// out of security considerations. Asynchronous CUDA malloc/free depends on GPU unified memory, so it
-// is not possible to use cudaMallocAsync and cudaFreeAsync in such environments.
+// cudaMallocAsync and cudaFreeAsync were introduced in CUDA 11.2, and even on newer
+// toolkits a device may not expose stream-ordered memory pools at runtime — fractional
+// vGPU configurations commonly disable them, making cudaMallocAsync fail with
+// cudaErrorNotSupported. The wrappers below therefore behave in two modes: when
+// CUDA < 11.2 or NANOVDB_USE_SYNC_CUDA_MALLOC is defined they map to synchronous
+// cudaMalloc/cudaFree; otherwise they use cudaMallocAsync/cudaFreeAsync and, on a
+// device that lacks memory pools, fail with an actionable diagnostic rather than
+// silently substituting synchronous allocation (which would make an async resource
+// misrepresent its own semantics — the choice of a synchronous backend belongs to the
+// caller, not to a hidden runtime fallback). Callers select synchronous allocation by
+// defining NANOVDB_USE_SYNC_CUDA_MALLOC, which -- because the wrappers are inline
+// functions -- must be defined identically in every translation unit to avoid violating
+// the one-definition rule.
+
+/// @brief Synchronous allocation of device memory; the returned memory is
+///        immediately valid on every stream.
+/// @param d_ptr Device pointer to allocated device memory
+/// @param size  Number of bytes to allocate
+/// @return Cuda error code
+inline cudaError_t mallocSync(void** d_ptr, size_t size){return cudaMalloc(d_ptr, size);}
+
+/// @brief Synchronous deallocation of device memory allocated with mallocSync.
+/// @param d_ptr Device pointer that will be freed
+/// @return Cuda error code
+inline cudaError_t freeSync(void* d_ptr){return cudaFree(d_ptr);}
+
+/// @brief Returns true if @c device supports stream-ordered memory pools, i.e.
+///        cudaMallocAsync/cudaFreeAsync. Queried once per process for all
+///        devices and cached; out-of-range device ids return false.
+inline bool memoryPoolsSupported(int device)
+{
+#if (CUDART_VERSION < 11020)
+    (void)device;
+    return false;
+#else
+    static const auto supported = [] {
+        int count = 0;
+        if (cudaGetDeviceCount(&count) != cudaSuccess || count < 0) count = 0;
+        std::vector<char> s(static_cast<size_t>(count), 0);
+        for (int i = 0; i < count; ++i) {
+            int attr = 0;
+            if (cudaDeviceGetAttribute(&attr, cudaDevAttrMemoryPoolsSupported, i) == cudaSuccess)
+                s[static_cast<size_t>(i)] = char(attr != 0);
+        }
+        return s;
+    }();
+    return device >= 0 && static_cast<size_t>(device) < supported.size() && supported[static_cast<size_t>(device)] != 0;
+#endif
+}
 
 #if (CUDART_VERSION < 11020) || defined(NANOVDB_USE_SYNC_CUDA_MALLOC) // 11.2 introduced cudaMallocAsync and cudaFreeAsync
 
-/// @brief Simple wrapper that calls cudaMalloc
+/// @brief Wrapper forced to synchronous cudaMalloc; see the mode comment above.
 /// @param d_ptr Device pointer to allocated device memory
 /// @param size  Number of bytes to allocate
 /// @param dummy The stream establishing the stream ordering contract and the memory pool to allocate from (ignored)
 /// @return Cuda error code
-inline cudaError_t mallocAsync(void** d_ptr, size_t size, cudaStream_t){return cudaMalloc(d_ptr, size);}
+inline cudaError_t mallocAsync(void** d_ptr, size_t size, cudaStream_t){return mallocSync(d_ptr, size);}
 
-/// @brief Simple wrapper that calls cudaFree
+/// @brief Wrapper forced to synchronous cudaFree; see the mode comment above.
 /// @param d_ptr Device pointer that will be freed
 /// @param dummy The stream establishing the stream ordering promise (ignored)
 /// @return Cuda error code
-inline cudaError_t freeAsync(void* d_ptr, cudaStream_t){return cudaFree(d_ptr);}
+inline cudaError_t freeAsync(void* d_ptr, cudaStream_t){return freeSync(d_ptr);}
 
 #else
 
-/// @brief Simple wrapper that calls cudaMallocAsync
+/// @brief Wrapper that calls cudaMallocAsync. On a device without stream-ordered
+///        memory pools it emits an actionable diagnostic and returns
+///        cudaErrorNotSupported rather than silently allocating synchronously.
 /// @param d_ptr Device pointer to allocated device memory
 /// @param size  Number of bytes to allocate
 /// @param stream The stream establishing the stream ordering contract and the memory pool to allocate from
 /// @return Cuda error code
-inline cudaError_t mallocAsync(void** d_ptr, size_t size, cudaStream_t stream){return cudaMallocAsync(d_ptr, size, stream);}
+inline cudaError_t mallocAsync(void** d_ptr, size_t size, cudaStream_t stream)
+{
+    int device = 0;
+    if (const cudaError_t err = cudaGetDevice(&device); err != cudaSuccess) return err;
+    if (!memoryPoolsSupported(device)) {
+        fprintf(stderr,
+                "NanoVDB: device %d does not support stream-ordered CUDA memory pools required by "
+                "cudaMallocAsync. Define NANOVDB_USE_SYNC_CUDA_MALLOC to allocate synchronously with "
+                "cudaMalloc/cudaFree instead.\n",
+                device);
+        return cudaErrorNotSupported;
+    }
+    return cudaMallocAsync(d_ptr, size, stream);
+}
 
-/// @brief Simple wrapper that calls cudaFreeAsync
+/// @brief Wrapper that calls cudaFreeAsync. Mirrors mallocAsync's pool check so a
+///        device without memory pools reports cudaErrorNotSupported rather than
+///        calling cudaFreeAsync where it cannot succeed.
 /// @param d_ptr Device pointer that will be freed
 /// @param stream The stream establishing the stream ordering promise
 /// @return Cuda error code
-inline cudaError_t freeAsync(void* d_ptr, cudaStream_t stream){return cudaFreeAsync(d_ptr, stream);}
+inline cudaError_t freeAsync(void* d_ptr, cudaStream_t stream)
+{
+    int device = 0;
+    if (const cudaError_t err = cudaGetDevice(&device); err != cudaSuccess) return err;
+    if (!memoryPoolsSupported(device)) return cudaErrorNotSupported;
+    return cudaFreeAsync(d_ptr, stream);
+}
 
 #endif
 
