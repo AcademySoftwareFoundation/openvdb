@@ -906,6 +906,58 @@ class TestOpenVDB(unittest.TestCase):
         self.assertRaises(TypeError, lambda: openvdb.LevelSetSampler(fog))
 
 
+    def testLevelSetRayIntersector(self):
+        sphere = openvdb.createLevelSetSphere(
+            radius=5.0, center=(20.0, 0.0, 0.0), voxelSize=0.5, halfWidth=2.0)
+        intersector = openvdb.LevelSetRayIntersector(sphere)
+        self.assertEqual(intersector.isoValue, 0.0)
+
+        hit = intersector.intersectWS(((2.0, 0.0, 0.0), (1.0, 0.0, 0.0)))
+        self.assertIsNotNone(hit)
+        position, normal, time = hit
+        self.assertAlmostEqual(position[0], 15.0)
+        self.assertAlmostEqual(position[1], 0.0)
+        self.assertAlmostEqual(position[2], 0.0)
+        self.assertLess(normal[0], 0.0)
+        self.assertAlmostEqual(time, 13.0)
+
+        flatHit = intersector.intersectWS((2.0, 0.0, 0.0, 1.0, 0.0, 0.0))
+        self.assertIsNotNone(flatHit)
+        np.testing.assert_allclose(flatHit[0], position)
+
+        miss = intersector.intersectWS(((2.0, 10.0, 0.0), (1.0, 0.0, 0.0)))
+        self.assertIsNone(miss)
+
+        rays = np.array([
+            (2.0, 0.0, 0.0, 1.0, 0.0, 0.0),
+            (2.0, 10.0, 0.0, 1.0, 0.0, 0.0),
+        ], dtype=np.float64)
+        hits, positions, normals, times = intersector.intersectBatchWS(rays)
+        self.assertEqual(hits.dtype, np.bool_)
+        self.assertEqual(hits.shape, (2,))
+        self.assertEqual(positions.shape, (2, 3))
+        self.assertEqual(normals.shape, (2, 3))
+        self.assertEqual(times.shape, (2,))
+        self.assertTrue(hits[0])
+        self.assertFalse(hits[1])
+        np.testing.assert_allclose(positions[0], position)
+        self.assertAlmostEqual(times[0], time)
+        self.assertTrue(np.isnan(positions[1]).all())
+        self.assertTrue(np.isnan(normals[1]).all())
+        self.assertTrue(np.isnan(times[1]))
+
+        rays32 = rays.astype(np.float32)
+        hits32, positions32, normals32, times32 = intersector.intersectBatchWS(rays32)
+        np.testing.assert_array_equal(hits32, hits)
+        np.testing.assert_allclose(positions32[0], positions[0])
+        np.testing.assert_allclose(normals32[0], normals[0])
+        np.testing.assert_allclose(times32[0], times[0])
+
+        fog = openvdb.FloatGrid()
+        fog.gridClass = openvdb.GridClass.FOG_VOLUME
+        self.assertRaises(RuntimeError, lambda: openvdb.LevelSetRayIntersector(fog))
+
+
 if __name__ == '__main__':
     print('Testing %s' % os.path.dirname(openvdb.__file__))
     sys.stdout.flush()
