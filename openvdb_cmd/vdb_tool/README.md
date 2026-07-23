@@ -18,12 +18,12 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **curl** | generate a vector grid with the curl of another vector grid |
 | **curvature** | generate scalar grid with the mean curvature of a level set surface |
 | **debug** | print debugging information to the terminal |
-| **diagnose** | Run OpenVDB diagnostics checks on one or more VDB grids |
 | **default** | define default values to be used by subsequent actions |
+| **diagnose** | Run OpenVDB diagnostics checks on one or more VDB grids |
 | **difference** | CSG difference of two level sets surfaces |
 | **dilate** | dilate level set surface by a fixed radius |
-| **divide** | Given grids A and B, compute a / b per voxel |
 | **div** | generate a scalar grid with the divergence of a vector grid |
+| **divide** | Given grids A and B, compute a / b per voxel |
 | **each** | start of each-loop over a user-defined loop variable and list of values. |
 | **end** | marks the end scope of "-for, -each, -files, -if, -switch and -case" control actions |
 | **enright** | Performs Enright advection benchmark test on a level set |
@@ -61,7 +61,7 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **platonic** | Create a level set shape with the specified number of polygon faces |
 | **points2ls** | Convert geometry points into a narrow-band level set |
 | **points2vdb** | Encode geometry points into a VDB grid |
-| **print** | Print structural metadata (type, class, dimensions, memory, bounding box, tree topology) for the current stack of VDB grids and Geometry. Use `-stats` for value-derived information. |
+| **print** | prints information to the terminal about the current stack of VDB grids and Geometry |
 | **prune** | prune away inactive values in a VDB grid |
 | **quad2tri** | Convert all quads in mesh to triangles, assuming they are both planar and convex |
 | **quiet** | disable printing to the terminal |
@@ -76,7 +76,7 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **soup2offset** | Convert a polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
 | **soup2udf** | Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band |
 | **sphere** | Create a level set sphere, i.e. a narrow-band signed distance to a sphere |
-| **stats** | Print value-derived information (background, min, max, mean, std. dev., and for level sets: surface area and enclosed volume) for one or more VDB grids. Use `-print` for structural metadata. |
+| **stats** | Print value statistics (min, max, mean, std. dev.) of active voxels for one or more VDB grids |
 | **sum** | Given grids A and B, compute sum(a, b) per voxel |
 | **swap** | Swap two VDB grids and/or two Geometry entries on their respective stacks |
 | **switch** | start of switch-scope. The selector value (on=) is compared against each enclosed -case's key; only the matching case body runs (or the '*'/'default' case if nothing else matched). Closed by -end. |
@@ -150,6 +150,13 @@ The format is intentionally tiny and line-oriented:
 5. **Leading and trailing whitespace are ignored**, so indenting nested control-flow scopes (`-for` / `-each` / `-files` / `-if` / `-switch` / `-case`) for readability has no effect on behavior.
 6. **No shell quoting is needed** — the line is parsed verbatim. Characters that would otherwise need escaping on the command line (`*`, `{`, `}`, `$`, `(`, `)` etc.) are written plain.
 7. **Blank lines are skipped.**
+8. **Line continuation with `\`** — a line ending in `\` is joined to the next line before parsing, allowing long action invocations to be split across multiple lines for readability:
+   ```
+   sphere \
+     voxel=0.1 \
+     radius=2.0 \
+     name=mysphere
+   ```
 
 Example: the [switch-statement example above](#switch-statement-to-pick-one-of-n-branches) written as a config file demonstrates all of these rules &mdash; one action per line, no leading `-`, nested scopes indented, and `key=*` unquoted.
 
