@@ -13,14 +13,17 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **clip** | Clip a VDB grid against another grid, a bbox or frustum |
 | **close** | morphological closing, i.e. dilation followed by erosion, of level set surface by a fixed radius |
 | **config** | Import and process one or more configuration files |
+| **copy** | Deep-copy VDB grids and/or Geometry by index onto the top of their respective stacks |
 | **cpt** | generate a vector grid with the closest-point-transform to a level set surface |
 | **curl** | generate a vector grid with the curl of another vector grid |
 | **curvature** | generate scalar grid with the mean curvature of a level set surface |
 | **debug** | print debugging information to the terminal |
 | **default** | define default values to be used by subsequent actions |
+| **diagnose** | Run OpenVDB diagnostics checks on one or more VDB grids |
 | **difference** | CSG difference of two level sets surfaces |
 | **dilate** | dilate level set surface by a fixed radius |
 | **div** | generate a scalar grid with the divergence of a vector grid |
+| **divide** | Given grids A and B, compute a / b per voxel |
 | **each** | start of each-loop over a user-defined loop variable and list of values. |
 | **end** | marks the end scope of "-for, -each, -files, -if, -switch and -case" control actions |
 | **enright** | Performs Enright advection benchmark test on a level set |
@@ -52,6 +55,7 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **mesh2ls** | Convert a watertight polygon surface into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
 | **min** | Given grids A and B, compute min(a, b) per voxel |
 | **movie** | Convert image and movie files to mpeg or animated gif files |
+| **multiply** | Given grids A and B, compute a * b per voxel |
 | **multires** | construct a LoD sequences of VDB trees with powers of two refinements |
 | **open** | morphological opening, i.e. erosion followed by dilation, of a level set surface by a fixed radius |
 | **platonic** | Create a level set shape with the specified number of polygon faces |
@@ -62,6 +66,7 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **quad2tri** | Convert all quads in mesh to triangles, assuming they are both planar and convex |
 | **quiet** | disable printing to the terminal |
 | **read** | Read one or more geometry or VDB files from disk or STDIN. |
+| **rename** | Rename a VDB grid and/or Geometry on the stack by age index |
 | **render** | ray-tracing of level set surfaces and volume rendering of fog volumes |
 | **resample** | resample one VDB grid into another VDB grid or a transformation of the input grid |
 | **scatter** | Scatter point into the active values of an input VDB grid |
@@ -71,7 +76,9 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **soup2offset** | Convert a polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
 | **soup2udf** | Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band |
 | **sphere** | Create a level set sphere, i.e. a narrow-band signed distance to a sphere |
+| **stats** | Print value statistics (min, max, mean, std. dev.) of active voxels for one or more VDB grids |
 | **sum** | Given grids A and B, compute sum(a, b) per voxel |
+| **swap** | Swap two VDB grids and/or two Geometry entries on their respective stacks |
 | **switch** | start of switch-scope. The selector value (on=) is compared against each enclosed -case's key; only the matching case body runs (or the '*'/'default' case if nothing else matched). Closed by -end. |
 | **transform** | apply affine transformations (uniform scale -> rotation -> translation) to a VDB grids and geometry |
 | **union** | CSG union of two level sets surfaces |
@@ -104,6 +111,20 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 | jpg | optional write | Binary JPEG image file |
 | exr | optional write | Binary OpenEXR image file |
 
+# Inspecting grids: -print vs -stats
+
+Two actions are available for inspecting grids on the stack, and they are intentionally complementary and non-overlapping:
+
+- **`-print`** reports *structural* metadata that is independent of voxel values: grid name, value type, grid class, active voxel count, voxel size, memory usage, and (at `level=1`) the active-voxel bounding box in index and world space plus tree node counts. Nothing printed by `-print` requires reading voxel data.
+
+- **`-stats`** reports *value-derived* information computed from the voxels themselves: background value, min, max, mean, standard deviation of active voxels, and — for level set grids — the world-space surface area and enclosed volume. All columns require touching voxel data.
+
+```bash
+vdb_tool -sphere -print          # structural: type, class, dim, voxels, dx, size
+vdb_tool -sphere -print level=1  # + bounding box and tree topology
+vdb_tool -sphere -stats          # value: background, min, max, mean, stddev, area, volume
+```
+
 # Terminology
 
 We introduce the following terms: **actions**, **options**, **expressions**, and **instructions**. Actions are high-level openvdb tools, which each have unique options, e.g. -mesh2ls geo=1 voxel=0.1, where "-mesh2ls" is an action with two options "geo" and "voxel". Expressions are strings of code with one or more low-level instructions in our stack-based programming language (see below). These expressions start with "{" and ends with "}", and ":" is used to separate values and instructions. E.g. {1:2:+} is an expression with two values (1 and 2) and one instruction "+", and it reduces to the string value "3". See section on the "Stack-based string expressions" below for more details.
@@ -129,6 +150,13 @@ The format is intentionally tiny and line-oriented:
 5. **Leading and trailing whitespace are ignored**, so indenting nested control-flow scopes (`-for` / `-each` / `-files` / `-if` / `-switch` / `-case`) for readability has no effect on behavior.
 6. **No shell quoting is needed** — the line is parsed verbatim. Characters that would otherwise need escaping on the command line (`*`, `{`, `}`, `$`, `(`, `)` etc.) are written plain.
 7. **Blank lines are skipped.**
+8. **Line continuation with `\`** — a line ending in `\` is joined to the next line before parsing, allowing long action invocations to be split across multiple lines for readability:
+   ```
+   sphere \
+     voxel=0.1 \
+     radius=2.0 \
+     name=mysphere
+   ```
 
 Example: the [switch-statement example above](#switch-statement-to-pick-one-of-n-branches) written as a config file demonstrates all of these rules &mdash; one action per line, no leading `-`, nested scopes indented, and `key=*` unquoted.
 

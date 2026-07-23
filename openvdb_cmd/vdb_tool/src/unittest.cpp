@@ -3140,6 +3140,51 @@ TEST_F(Test_vdb_tool, ToolConfigHeader)
     std::remove(cfg.c_str());
 }
 
+TEST_F(Test_vdb_tool, ToolConfigLineContinuation)
+{
+    using namespace openvdb::vdb_tool;
+
+    const std::string cfg = "data/continuation_test.txt";
+    std::remove(cfg.c_str());
+
+    // Write a config that uses backslash line continuation to split a
+    // sphere action and its options across multiple lines.
+    {
+        std::ofstream out(cfg);
+        out << "vdb_tool " << Tool::version() << "\n";
+        out << "sphere \\\n";
+        out << "  radius=2.0 \\\n";
+        out << "  name=cont_sphere\n";
+        out << "stats\n";
+    }
+    ASSERT_TRUE(fileExists(cfg));
+
+    // The config must load and produce a grid named "cont_sphere".
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -config " + cfg);
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+
+    // Verify that comments on a continuation line are stripped before the
+    // backslash is checked, so the backslash must precede any comment.
+    std::remove(cfg.c_str());
+    {
+        std::ofstream out(cfg);
+        out << "vdb_tool " << Tool::version() << "\n";
+        out << "sphere \\\n";
+        out << "  radius=1.5 \\ # backslash before comment continues the line\n";
+        out << "  name=cont_sphere2\n";
+    }
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -config " + cfg);
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+
+    std::remove(cfg.c_str());
+}
+
 
 int main(int argc, char** argv)
 {
