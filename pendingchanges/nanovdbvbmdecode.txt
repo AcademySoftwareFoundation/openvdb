@@ -1,0 +1,5 @@
+NanoVDB:
+  Improvements:
+  - Replaced the CUDA VoxelBlockManager inverse-map decode's O(nLeaves x 512) per-block
+    sweep with an O(1)-per-slot select (jumpMap popcount rank + the leaf's 9-bit prefix
+    sums + an in-word bit select); byte-identical decode maps and ~2x faster decode.
