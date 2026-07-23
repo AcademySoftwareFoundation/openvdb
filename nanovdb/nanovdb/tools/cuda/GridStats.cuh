@@ -58,65 +58,156 @@ public:
 
 namespace {// define cuda kernels in an unnamed namespace
 
+// One warp per leaf: lanes stride the 512 voxel slots (mask-gated) and merge
+// their partial statistics through shared memory; lane 0 handles the bbox
+// update and the final store. Launch with 128 threads (4 warps) per block.
 template<typename BuildT, typename StatsT>
 __global__ void processLeaf(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
 {
-    const uint32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+    constexpr uint32_t WarpsPerBlock = 4;
+    __shared__ StatsT sStats[WarpsPerBlock * 32];
+
+    const uint32_t warpID = threadIdx.x >> 5, lane = threadIdx.x & 31u;
+    const uint32_t tid = blockIdx.x * WarpsPerBlock + warpID;// leaf index
     if (tid >= d_nodeMgr->leafCount()) return;
     auto &d_leaf = d_nodeMgr->leaf(tid);
 
-    if (d_leaf.updateBBox()) {// updates active bounding box (also updates data->mFlags) and return true if non-empty
+    bool nonEmpty = false;
+    // updates leaf's active bounding box (also updates data->mFlags), only run on lane 0
+    if (lane == 0) nonEmpty = d_leaf.updateBBox();
+    // broadcast nonEmpty value to all lanes; register-to-register warp shuffle with all lanes participating
+    nonEmpty = __shfl_sync(0xffffffffu, nonEmpty, 0); // 0xffffffffu is "all 32 lanes" mask
+
+    if (nonEmpty) {
         if constexpr(StatsT::hasStats()) {
+            // 1) Per-lane partial: each of the 32 lanes folds its strided share of the
+            //    512 voxel slots (lane L visits L, L+32, L+64, ...) into a local StatsT,
+            //    skipping inactive voxels via the value mask. This is the coalesced pass -
+            //    consecutive lanes touch consecutive slots on each stride.
             StatsT stats;
-            for (auto it = d_leaf.cbeginValueOn(); it; ++it) stats.add(*it);
-            if constexpr(StatsT::hasAverage()) {
-                d_stats[tid] = stats;
-                *reinterpret_cast<uint32_t*>(&d_leaf.mMinimum) = tid;
-            } else {
-                stats.setStats(d_leaf);
+            const auto &mask = d_leaf.valueMask();
+            for (uint32_t i = lane; i < NanoLeaf<BuildT>::SIZE; i += 32)
+                if (mask.isOn(i)) stats.add(d_leaf.getValue(i));
+            // 2) Warp reduction: stage the 32 partials in this warp's slice of shared
+            //    memory, then merge them pairwise in log2(32)=5 steps (16->8->4->2->1).
+            //    StatsT::add is an associative merge (exact for min/max; a Welford
+            //    combine for mean/variance), so the tree order is safe. __syncwarp
+            //    after each step orders the shared-memory writes within the warp.
+            StatsT *sWarp = sStats + (warpID << 5);// this warp's 32-slot scratch region
+            sWarp[lane] = stats;
+            __syncwarp();
+            // pairwise reduction
+            for (uint32_t d = 16; d; d >>= 1) {
+                if (lane < d) sWarp[lane].add(sWarp[lane + d]);
+                __syncwarp();
+            }
+            // 3) Publish: lane 0 now holds the leaf's fully merged stats in sWarp[0].
+            if (lane == 0) {
+                if constexpr(StatsT::hasAverage()) {
+                    // mean/variance: the parent lower node must Welford-merge this leaf's
+                    // full accumulator (count+mean+M2), not just its extrema, so publish
+                    // the whole StatsT into the per-node scratch array at this leaf's slot
+                    // and stash that slot index in mMinimum (reused as a uint32 handle) so
+                    // the parent kernel can locate it.
+                    d_stats[tid] = sWarp[0];
+                    *reinterpret_cast<uint32_t*>(&d_leaf.mMinimum) = tid;
+                } else {
+                    // min/max only: extrema compose directly from child to parent, so write
+                    // them straight into the leaf - no scratch slot needed.
+                    sWarp[0].setStats(d_leaf);
+                }
             }
         }
     }
-    d_leaf.mFlags &= ~uint8_t(1u);// enable rendering
+    if (lane == 0) d_leaf.mFlags &= ~uint8_t(1u);// enable rendering
 }// processLeaf
 
+// One block per internal node: threads stride the node's child table (4096 or
+// 32768 entries) and merge partial bboxes/statistics through shared memory -
+// the former one-thread-per-node kernel serialized up to 32768 child visits
+// per thread and left the device nearly empty at typical node counts.
 template<typename BuildT, typename StatsT, int LEVEL>
 __global__ void processInternal(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
 {
     using ChildT = typename NanoNode<BuildT,LEVEL-1>::type;
-    uint32_t nodeID = blockIdx.x * blockDim.x + threadIdx.x;// thread id (reused below to avoid compiler warning)
+    using NodeT = typename NanoNode<BuildT,LEVEL>::type;
+    constexpr uint32_t Threads = 128;
+    __shared__ StatsT sStats[Threads];
+    __shared__ CoordBBox sBBox[Threads];
+
+    const uint32_t nodeID = blockIdx.x;
+    const uint32_t tID = threadIdx.x;
     if (nodeID >= d_nodeMgr->nodeCount(LEVEL)) return;
     auto &d_node = d_nodeMgr->template node<LEVEL>(nodeID);
-    auto &bbox   = d_node.mBBox;
-    bbox         = CoordBBox();// empty bbox
-    StatsT stats;
 
-    for (auto it = d_node.beginChild(); it; ++it) {
-        auto &child = *it;
-        bbox.expand( child.bbox() );
-        if constexpr(StatsT::hasAverage()) {
-            nodeID = *reinterpret_cast<uint32_t*>(&child.mMinimum);
-            StatsT &s = d_stats[nodeID];
-            s.setStats(child);
-            stats.add(s);
-        } else if constexpr(StatsT::hasMinMax()) {
-            stats.add(child.minimum());
-            stats.add(child.maximum());
+    // 1) Per-thread partial: each thread folds its strided share of the child table
+    //    (NodeT::SIZE = 4096 for lower, 32768 for upper) into a local bbox + stats.
+    //    Children were finalized by an earlier launch (leaves, then lower, then upper),
+    //    so a child's bbox()/stats are valid to read here. Each entry is one of three:
+    CoordBBox bbox;// empty
+    StatsT stats;
+    for (uint32_t i = tID; i < NodeT::SIZE; i += Threads) {
+        if (d_node.childMask().isOn(i)) {
+            // (a) a child node: union its finalized bbox and merge its statistics.
+            auto &child = *d_node.getChild(i);
+            bbox.expand( child.bbox() );
+            if constexpr(StatsT::hasAverage()) {
+                // The child published its full accumulator into d_stats and stashed the
+                // slot index in its mMinimum. We must read that handle FIRST (to index
+                // d_stats), then setStats commits the child's real min/max/avg/std into
+                // the child node - which also overwrites the mMinimum-as-slot handle with
+                // the true minimum. Finally merge the child's accumulator into ours.
+                StatsT &s = d_stats[*reinterpret_cast<const uint32_t*>(&child.mMinimum)];
+                s.setStats(child);
+                stats.add(s);
+            } else if constexpr(StatsT::hasMinMax()) {
+                // min/max compose directly - the child already holds its final extrema.
+                stats.add(child.minimum());
+                stats.add(child.maximum());
+            }
+        } else if (d_node.valueMask().isOn(i)) {
+            // (b) an active tile: one constant value covering the whole child region
+            //     (no child node). Grow the bbox to span the tile's extent, and add the
+            //     value with multiplicity NUM_VALUES (the voxel count it stands in for)
+            //     so the mean/variance are weighted correctly.
+            const Coord ijk = d_node.offsetToGlobalCoord(i);
+            bbox[0].minComponent(ijk);
+            bbox[1].maxComponent(ijk + Coord(ChildT::DIM - 1));
+            if constexpr(StatsT::hasStats()) stats.add(d_node.data()->getValue(i), ChildT::NUM_VALUES);
         }
+        // (c) otherwise inactive - contributes nothing.
     }
-    for (auto it = d_node.cbeginValueOn(); it; ++it) {
-        const Coord ijk = it.getCoord();
-        bbox[0].minComponent(ijk);
-        bbox[1].maxComponent(ijk + Coord(ChildT::DIM - 1));
-        if constexpr(StatsT::hasStats()) stats.add(*it, ChildT::NUM_VALUES);
+    // 2) Block reduction: merge the 128 per-thread partials (both stats and bbox) via a
+    //    shared-memory tree in log2(128)=7 steps. This spans 4 warps, so it needs
+    //    __syncthreads (block-wide barrier), not the __syncwarp used in processLeaf.
+    sStats[tID] = stats;
+    sBBox[tID] = bbox;
+    __syncthreads();
+    for (uint32_t d = Threads >> 1; d; d >>= 1) {
+        if (tID < d) {
+            sStats[tID].add(sStats[tID + d]);
+            sBBox[tID].expand(sBBox[tID + d]);
+        }
+        __syncthreads();
     }
-    if constexpr(StatsT::hasAverage()) {
-        d_stats[nodeID] = stats;
-        *reinterpret_cast<uint32_t*>(&d_node.mMinimum) = nodeID;
-    } else if constexpr(StatsT::hasMinMax()) {
-        stats.setStats(d_node);
+    // 3) Publish: thread 0 now holds the node's merged bbox + stats.
+    if (tID == 0) {
+        d_node.mBBox = sBBox[0];
+        if constexpr(StatsT::hasAverage()) {
+            // Each node writes its OWN unique d_stats slot (leaves occupy
+            // [0, leafCount), then lower nodes, then upper nodes), so a node
+            // with no children still has a valid slot. The previous scheme
+            // reused a child's slot, writing d_stats[-1] for a childless
+            // (fully-tiled) internal node - an out-of-bounds write.
+            const uint32_t slot = d_nodeMgr->leafCount()
+                                + (LEVEL == 2 ? d_nodeMgr->nodeCount(1) : 0u) + nodeID;
+            d_stats[slot] = sStats[0];
+            *reinterpret_cast<uint32_t*>(&d_node.mMinimum) = slot;
+        } else if constexpr(StatsT::hasMinMax()) {
+            sStats[0].setStats(d_node);
+        }
+        d_node.mFlags &= ~uint64_t(1u);// enable rendering
     }
-    d_node.mFlags &= ~uint64_t(1u);// enable rendering
 }// processInternal
 
 template<typename BuildT, typename StatsT>
@@ -199,13 +290,16 @@ void GridStats<BuildT, StatsT>::update(NanoGrid<BuildT> *d_grid, cudaStream_t st
 
     StatsT *d_stats = nullptr;
 
-    if constexpr(StatsT::hasAverage()) cudaCheck(util::cuda::mallocAsync((void**)&d_stats, nodeCount[0]*sizeof(StatsT), stream));
+    // One d_stats slot per node (leaves, then lower, then upper) so every node
+    // has its own slot - see processInternal.
+    if constexpr(StatsT::hasAverage()) cudaCheck(util::cuda::mallocAsync((void**)&d_stats, (nodeCount[0]+nodeCount[1]+nodeCount[2])*sizeof(StatsT), stream));
 
-    processLeaf<BuildT><<<blocksPerGrid(nodeCount[0]), threadsPerBlock, 0, stream>>>(d_nodeMgr, d_stats);
+    // warp per leaf (4 warps per 128-thread block); block per internal node
+    if (nodeCount[0]) processLeaf<BuildT><<<blocksPerGrid(nodeCount[0]*32), threadsPerBlock, 0, stream>>>(d_nodeMgr, d_stats);
 
-    processInternal<BuildT, StatsT, 1><<<blocksPerGrid(nodeCount[1]), threadsPerBlock, 0, stream>>>(d_nodeMgr, d_stats);
+    if (nodeCount[1]) processInternal<BuildT, StatsT, 1><<<nodeCount[1], threadsPerBlock, 0, stream>>>(d_nodeMgr, d_stats);
 
-    processInternal<BuildT, StatsT, 2><<<blocksPerGrid(nodeCount[2]), threadsPerBlock, 0, stream>>>(d_nodeMgr, d_stats);
+    if (nodeCount[2]) processInternal<BuildT, StatsT, 2><<<nodeCount[2], threadsPerBlock, 0, stream>>>(d_nodeMgr, d_stats);
 
     processRootAndGrid<BuildT><<<1, 1, 0, stream>>>(d_nodeMgr, d_stats);
 
