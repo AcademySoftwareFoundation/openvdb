@@ -1,0 +1,10 @@
+NanoVDB:
+
+  New Features:
+  - Added new _hostdev_ function named nanovdb::math::isoCrossing, which intersects a ray against a user-defined iso-surface.
+
+  Improvements:
+  - TBD
+
+  Fixes:
+  - Deprecated nanovdb::math::ZeroCrossingNode and renamed it nanovdb::math::zeroCrossingNode to follow our naming convention.

@@ -996,10 +996,12 @@ private:
     {
         return this->evalFirstPred([&](const auto Idx) -> bool
             {
-                if constexpr(Idx < Start)             return false;
-                if constexpr(Idx > NumCacheLevels+1)  return false;
-                using NodeType = typename NodeLevelList::template Get<Idx>;
-                return this->isHashed<NodeType>(xyz);
+                if constexpr(Idx < Start)                  return false;
+                else if constexpr(Idx > NumCacheLevels+1)  return false;
+                else {
+                    using NodeType = typename NodeLevelList::template Get<Idx>;
+                    return this->isHashed<NodeType>(xyz);
+                }
             }, op);
     }
 
