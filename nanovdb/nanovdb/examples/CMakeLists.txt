@@ -115,6 +115,7 @@ nanovdb_example(NAME "ex_merge_nanovdb_cuda" OPENVDB)
 nanovdb_example(NAME "ex_refine_nanovdb_cuda" OPENVDB)
 nanovdb_example(NAME "ex_coarsen_nanovdb_cuda" OPENVDB)
 nanovdb_example(NAME "ex_mesh_to_grid_cuda" OPENVDB)
+nanovdb_example(NAME "ex_connected_components_cuda")
 
 if(CUDAToolkit_FOUND)
   nanovdb_example(NAME "ex_make_mgpu_nanovdb") # requires cuRAND
