@@ -19,7 +19,7 @@
         jumpMap on the GPU from a device-resident NanoGrid.
       - decodeInverseMaps (device): per-block SIMT decode of the inverse maps
         (sequential active-voxel index -> leaf ID + intra-leaf voxel offset),
-        executed cooperatively across a CUDA thread block.
+        with one thread per output slot across a CUDA thread block.
 */
 
 #ifndef NANOVDB_VOXELBLOCKMANAGER_CUH_HAS_BEEN_INCLUDED
@@ -87,42 +87,49 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
     {
         // Verify that the nodes can be accessed linearly
         NANOVDB_ASSERT(grid->isSequential());
-
-        int tID = threadIdx.x;
-
-        // Count how many additional leaves (following the one indicated by firstLeafID)
-        // overlap with this voxel block
-        int nExtraLeaves = 0;
-        for (int i = 0; i < JumpMapLength; i++)
-            nExtraLeaves += util::countOn(jumpMap[i]);
-
-        // Initialize leafIndex & voxelOffset to sentinel values
-        // for blocks that extend beyond the last active voxel in the grid
-        if (tID < BlockWidth)
-            #pragma unroll
-            for (int i = 0; i < BlockWidth; i += blockDim.x) {
-                smem_leafIndex[i+tID] = UnusedLeafIndex;
-                smem_voxelOffset[i+tID] = UnusedVoxelOffset;
-            }
-        __syncthreads();
-
         NANOVDB_ASSERT(blockDim.x <= 512);
-        const auto& tree = grid->tree();
-        // Loop through all leafNodes overlapping the voxel block
-        // with all threads in threadblock working collaboratively within each leafNode
-        for (int leafID = firstLeafID; leafID <= firstLeafID + nExtraLeaves; leafID++) {
-            const auto& leaf = tree.template getFirstNode<0>()[leafID];
-            if (leaf.data()->firstOffset() >= blockFirstOffset + BlockWidth) break;
-            const Coord origin = leaf.origin();
-            for (int threadOffset = 0; threadOffset < 512; threadOffset += blockDim.x) {
-                int localOffset = threadOffset + tID;
-                auto index = leaf.data()->getValue(localOffset);
-                if ((index >= blockFirstOffset) && (index < blockFirstOffset + BlockWidth)) {
-                    int blockOffset = index - blockFirstOffset;
-                    // Write inverse map to shared memory; no collisions
-                    smem_leafIndex[blockOffset] = leafID;
-                    smem_voxelOffset[blockOffset] = localOffset;
+
+        // Select-based decode: one thread per OUTPUT slot. Here each
+        // slot ranks itself into its leaf via the jumpMap popcount,
+        // then locates its voxel with the leaf's 9-bit prefix sums
+        // plus an in-word bit select - O(1) per slot.
+        int tID = threadIdx.x;
+        const auto *leaf0 = grid->tree().template getFirstNode<0>();
+        for (int blockOffset = tID; blockOffset < BlockWidth; blockOffset += blockDim.x) {
+            // rank this slot into its leaf: count leaves beginning at in-block positions
+            // [1, blockOffset] (bit 0 is never set) via the jumpMap popcount
+            uint32_t leafRank = 0;
+            const int jumpWord = blockOffset >> 6;
+            #pragma unroll
+            for (int i = 0; i < JumpMapLength; ++i) {
+                if (i < jumpWord) leafRank += util::countOn(jumpMap[i]);
+                else if (i == jumpWord) leafRank += util::countOn(jumpMap[i] & ((uint64_t(2) << (blockOffset & 63)) - 1u));
+            }
+            const uint32_t leafID = firstLeafID + leafRank;
+            const auto& leafData = *leaf0[leafID].data();
+            const uint64_t rankInLeaf = (blockFirstOffset + blockOffset) - leafData.firstOffset();// 0-based rank among the leaf's actives
+            if (rankInLeaf < leafData.valueCount()) {
+                // select the rankInLeaf-th active voxel: find its 64-bit mask word via the
+                // leaf's 9-bit prefix sums, then its bit within that word
+                uint32_t activesBeforeWord = 0;
+                int wordID = 0;
+                #pragma unroll
+                for (int candidateWord = 1; candidateWord < 8; ++candidateWord) {
+                    const uint32_t cumulative = uint32_t(leafData.mPrefixSum >> (9*(candidateWord-1))) & 0x1ffu;
+                    if (cumulative <= rankInLeaf) { wordID = candidateWord; activesBeforeWord = cumulative; }
                 }
+                uint32_t rankInWord = uint32_t(rankInLeaf) - activesBeforeWord;
+                const uint64_t maskWord = leafData.mValueMask.words()[wordID];
+                const uint32_t lowHalf = uint32_t(maskWord);
+                const uint32_t lowHalfCount = util::countOn(uint64_t(lowHalf));
+                int bit;
+                if (rankInWord < lowHalfCount) bit = __fns(lowHalf, 0, rankInWord + 1);
+                else                           bit = 32 + __fns(uint32_t(maskWord >> 32), 0, rankInWord - lowHalfCount + 1);
+                smem_leafIndex[blockOffset] = leafID;
+                smem_voxelOffset[blockOffset] = uint16_t((wordID << 6) + bit);
+            } else {// beyond the last active voxel in the grid
+                smem_leafIndex[blockOffset] = UnusedLeafIndex;
+                smem_voxelOffset[blockOffset] = UnusedVoxelOffset;
             }
         }
         __syncthreads();
