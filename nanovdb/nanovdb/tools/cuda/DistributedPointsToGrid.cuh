@@ -20,6 +20,7 @@
 #include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 #include <nanovdb/util/cuda/Util.h>
+#include <algorithm>
 
 namespace nanovdb {
 
@@ -909,11 +910,14 @@ inline void DistributedPointsToGrid<BuildT>::processGridTreeRoot(const PtrT poin
     util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, BuildGridTreeRootFunctor<BuildT, PtrT>(), mData, mPointType, pointCount);// lambdaKernel
     cudaCheckError();
 
+    // Zero the name field, then copy only the actual string (if any).
     char *dst = mData->getGrid().mGridName;
-    if (const char *src = mGridName.data()) {
-        cudaCheck(cudaMemcpyAsync(dst, src, GridData::MaxNameSize, cudaMemcpyHostToDevice, stream));
-    } else {
-        cudaCheck(cudaMemsetAsync(dst, 0, GridData::MaxNameSize, stream));
+    cudaCheck(cudaMemsetAsync(dst, 0, GridData::MaxNameSize, stream));
+    if (!mGridName.empty()) {
+        // Copy at most MaxNameSize-1 bytes so the memset's trailing '\0' always
+        // survives; a name >= MaxNameSize is truncated, never left unterminated.
+        const size_t nameSize = std::min<size_t>(mGridName.size(), GridData::MaxNameSize - 1);
+        cudaCheck(cudaMemcpyAsync(dst, mGridName.c_str(), nameSize, cudaMemcpyHostToDevice, stream));
     }
     cudaEventRecord(processGridTreeRootEvent);
 

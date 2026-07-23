@@ -38,6 +38,7 @@ class DeviceBuffer
     uint64_t mSize; // total number of bytes managed by this buffer (assumed to be identical for host and device)
     void *mCpuData, **mGpuData; // raw pointers to the host and device buffers
     int   mDeviceCount, mManaged;// if mManaged is non-zero this class is responsible for allocating and freeing memory buffers. Otherwise this is assumed to be handled externally
+    cudaStream_t *mStreams = nullptr;// per-device stream each managed device buffer was last used on - set at allocation, then updated by every deviceUpload/deviceDownload (parallel to mGpuData, length mDeviceCount). Frees (destructor, move-assign, clear) are ordered on the owning device's stream instead of the default stream 0, otherwise a buffer last used on a non-blocking stream could be freed while that stream's work is still in flight (use-after-free). One stream per device is required because a single DeviceBuffer can hold allocations on several devices (multi-GPU), each on its own device-bound stream. The caller must keep these streams alive until the buffer is destroyed.
 
     /// @brief Initialize buffer
     /// @param size byte size of buffer to be initialized
@@ -122,8 +123,10 @@ public:
         , mGpuData(other.mGpuData)
         , mDeviceCount(other.mDeviceCount)
         , mManaged(other.mManaged)
+        , mStreams(other.mStreams)
     {
         other.mCpuData = other.mGpuData = nullptr;
+        other.mStreams = nullptr;
         other.mSize = other.mDeviceCount = other.mManaged = 0;
     }
 
@@ -142,6 +145,9 @@ public:
     }
 
      /// @brief Destructor frees memory on both the host and device
+    /// @note Each managed device allocation is freed on the stream it was last
+    ///       used on (mStreams[device]), not the default stream, so device
+    ///       frees are ordered after the last work issued on that stream.
     ~DeviceBuffer() { this->clear(); };
 
     /// @brief Static factory method that return an instance of this buffer
@@ -310,18 +316,21 @@ public:
 
 inline DeviceBuffer& DeviceBuffer::operator=(DeviceBuffer&& other) noexcept
 {
-    if (mManaged) {// first free all the managed data buffers
+    if (mManaged) {// first free all the managed data buffers, each on the stream its device was last used on
         cudaCheck(cudaFreeHost(mCpuData));
-        for (int i=0; i<mDeviceCount; ++i) cudaCheck(util::cuda::freeAsync(mGpuData[i], 0));
+        for (int i=0; i<mDeviceCount; ++i) cudaCheck(util::cuda::freeAsync(mGpuData[i], mStreams ? mStreams[i] : cudaStream_t{0}));
     }
     delete [] mGpuData;
+    delete [] mStreams;
     mSize    = other.mSize;
     mCpuData = other.mCpuData;
     mGpuData = other.mGpuData;
     mDeviceCount = other.mDeviceCount;
     mManaged = other.mManaged;
+    mStreams = other.mStreams;
     other.mCpuData = nullptr;
     other.mGpuData = nullptr;
+    other.mStreams = nullptr;
     other.mSize = 0;
     other.mDeviceCount = 0;
     other.mManaged = 0;
@@ -333,6 +342,7 @@ inline void DeviceBuffer::init(uint64_t size, int device, cudaStream_t stream)
     if (size==0) return;
     cudaCheck(cudaGetDeviceCount(&mDeviceCount));
     mGpuData = new void*[mDeviceCount]();// NULL initialization
+    mStreams = new cudaStream_t[mDeviceCount]();// zero (default-stream) initialization
     NANOVDB_ASSERT(device >= cudaCpuDeviceId && device < mDeviceCount);
     if (device == cudaCpuDeviceId) {
         cudaCheck(cudaMallocHost((void**)&mCpuData, size)); // un-managed pinned memory on the host (can be slow to access!). Always 32B aligned
@@ -340,6 +350,7 @@ inline void DeviceBuffer::init(uint64_t size, int device, cudaStream_t stream)
     } else {
         cudaCheck(util::cuda::mallocAsync(mGpuData+device, size, stream)); // un-managed memory on the device, always 32B aligned!
         checkPtr(mGpuData[device], "cuda::DeviceBuffer::init: failed to allocate device buffer");
+        mStreams[device] = stream;// record the stream this device buffer is used on so its free is ordered on it, not stream 0
     }
     mSize = size;
     mManaged = 1;// i.e. this instance is responsible for allocating and delete memory
@@ -355,6 +366,10 @@ inline void DeviceBuffer::deviceUpload(int device, cudaStream_t stream, bool syn
     }
     checkPtr(mGpuData[device], "uninitialized gpu destination data");
     cudaCheck(cudaMemcpyAsync(mGpuData[device], mCpuData, mSize, cudaMemcpyHostToDevice, stream));
+    // This device buffer was last used on 'stream', so free it there (not on
+    // stream 0). Updated on every upload - not just first allocation - so a
+    // re-upload on a different stream still orders the free after its work.
+    if (mStreams) mStreams[device] = stream;
     if (sync) cudaCheck(cudaStreamSynchronize(stream));
 } // DeviceBuffer::deviceUpload
 
@@ -375,6 +390,7 @@ inline void DeviceBuffer::deviceDownload(int device, cudaStream_t stream, bool s
     }
     checkPtr(mCpuData, "uninitialized cpu destination data");
     cudaCheck(cudaMemcpyAsync(mCpuData, mGpuData[device], mSize, cudaMemcpyDeviceToHost, stream));
+    if (mStreams) mStreams[device] = stream;// last used on 'stream'; free this device buffer there so the free orders after this read
     if (sync) cudaCheck(cudaStreamSynchronize(stream));
 } // DeviceBuffer::deviceDownload
 
@@ -387,13 +403,15 @@ inline void DeviceBuffer::deviceDownload(void* stream, bool sync)
 
 inline void DeviceBuffer::clear(cudaStream_t stream)
 {
-    if (mManaged) {// free all the managed data buffers
+    if (mManaged) {// free all the managed data buffers, each on the stream its device was last used on
         cudaCheck(cudaFreeHost(mCpuData));
-        for (int i=0; i<mDeviceCount; ++i) cudaCheck(util::cuda::freeAsync(mGpuData[i], stream));
+        for (int i=0; i<mDeviceCount; ++i) cudaCheck(util::cuda::freeAsync(mGpuData[i], mStreams ? mStreams[i] : stream));
     }
     delete [] mGpuData;
+    delete [] mStreams;
     mCpuData = nullptr;
     mGpuData = nullptr;
+    mStreams = nullptr;
     mSize = 0;
     mDeviceCount = 0;
     mManaged = 0;
