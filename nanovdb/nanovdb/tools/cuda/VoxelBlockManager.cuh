@@ -89,40 +89,56 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
         NANOVDB_ASSERT(grid->isSequential());
         NANOVDB_ASSERT(blockDim.x <= 512);
 
-        // Select-based decode: one thread per OUTPUT slot. Here each
+        // Select-based decode: one thread per output slot. Here each
         // slot ranks itself into its leaf via the jumpMap popcount,
         // then locates its voxel with the leaf's 9-bit prefix sums
         // plus an in-word bit select - O(1) per slot.
-        int tID = threadIdx.x;
+        const int tID = threadIdx.x;
         const auto *leaf0 = grid->tree().template getFirstNode<0>();
         for (int blockOffset = tID; blockOffset < BlockWidth; blockOffset += blockDim.x) {
             // rank this slot into its leaf: count leaves beginning at in-block positions
             // [1, blockOffset] (bit 0 is never set) via the jumpMap popcount
             uint32_t leafRank = 0;
-            const int jumpWord = blockOffset >> 6;
+            const int jumpWord = blockOffset >> 6;  // index into jumpMap
+            // count the number of leaves that begin before blockOffset
             #pragma unroll
             for (int i = 0; i < JumpMapLength; ++i) {
-                if (i < jumpWord) leafRank += util::countOn(jumpMap[i]);
-                else if (i == jumpWord) leafRank += util::countOn(jumpMap[i] & ((uint64_t(2) << (blockOffset & 63)) - 1u));
+                if (i < jumpWord) leafRank += util::countOn(jumpMap[i]); // count leaves before the current jump word
+                else if (i == jumpWord) {
+                    // count leaves in the current jump word, masking those that are before blockOffset
+                    leafRank += util::countOn(jumpMap[i] & ((uint64_t(2) << (blockOffset & 63)) - 1u));
+                }
+
             }
             const uint32_t leafID = firstLeafID + leafRank;
             const auto& leafData = *leaf0[leafID].data();
-            const uint64_t rankInLeaf = (blockFirstOffset + blockOffset) - leafData.firstOffset();// 0-based rank among the leaf's actives
-            if (rankInLeaf < leafData.valueCount()) {
+            // 0-based rank among the leaf's actives
+            const uint64_t rankInLeaf = (blockFirstOffset + blockOffset) - leafData.firstOffset();
+            if (rankInLeaf < leafData.valueCount()) { // if the rank is within the leaf's active voxels (bounds check)
                 // select the rankInLeaf-th active voxel: find its 64-bit mask word via the
                 // leaf's 9-bit prefix sums, then its bit within that word
-                uint32_t activesBeforeWord = 0;
                 int wordID = 0;
+                uint32_t activesBeforeWord = 0;
                 #pragma unroll
                 for (int candidateWord = 1; candidateWord < 8; ++candidateWord) {
+                    // the number of active voxels before the candidateWord's mask word (& 0x1ffu masks to 9 bits)
                     const uint32_t cumulative = uint32_t(leafData.mPrefixSum >> (9*(candidateWord-1))) & 0x1ffu;
-                    if (cumulative <= rankInLeaf) { wordID = candidateWord; activesBeforeWord = cumulative; }
+                    if (cumulative <= rankInLeaf) {
+                        wordID = candidateWord; // word ID of the mask word that contains the rankInLeaf-th active voxel
+                        activesBeforeWord = cumulative; // the number of active voxels before the wordID's mask word
+                    }
                 }
-                uint32_t rankInWord = uint32_t(rankInLeaf) - activesBeforeWord;
+
+                uint32_t rankInWord = uint32_t(rankInLeaf) - activesBeforeWord; // active voxel's rank within the mask word (0-based)
+                // select the in-word bit position of the voxel using __fns (find n-th set bit)
+                // /__fns(mask, base, k) is the hardware find-nth-set-bit intrinsic - the k-th set bit (1-based) at/after base
+                // but it's a 32-bit op while `maskWord` is 64-bit, so we need to split it into two 32-bit halves
                 const uint64_t maskWord = leafData.mValueMask.words()[wordID];
-                const uint32_t lowHalf = uint32_t(maskWord);
+                const uint32_t lowHalf = uint32_t(maskWord);  // low 32 bits of the mask word
                 const uint32_t lowHalfCount = util::countOn(uint64_t(lowHalf));
                 int bit;
+                // if rank is less than the number of active voxels in the low half, __fns finds the bit in the lower half
+                // otherwise, shift maskWord by 32 bits and __fns finds the bit in the upper half
                 if (rankInWord < lowHalfCount) bit = __fns(lowHalf, 0, rankInWord + 1);
                 else                           bit = 32 + __fns(uint32_t(maskWord >> 32), 0, rankInWord - lowHalfCount + 1);
                 smem_leafIndex[blockOffset] = leafID;
