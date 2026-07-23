@@ -72,6 +72,8 @@ nanobind_add_module(openvdb_python ${NANOBIND_MODULE_ARGS} NB_STATIC
   pyMetadata.cc
   pyOpenVDBModule.cc
   pyPointGrid.cc
+  pyRayIntersector.cc
+  pySampler.cc
   pyTransform.cc
   pyVec3Grid.cc)
 unset(NANOBIND_MODULE_ARGS)
