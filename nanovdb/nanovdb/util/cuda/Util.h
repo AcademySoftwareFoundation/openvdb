@@ -85,18 +85,6 @@ namespace util::cuda {// ======================================================
 // functions -- must be defined identically in every translation unit to avoid violating
 // the one-definition rule.
 
-/// @brief Synchronous allocation of device memory; the returned memory is
-///        immediately valid on every stream.
-/// @param d_ptr Device pointer to allocated device memory
-/// @param size  Number of bytes to allocate
-/// @return Cuda error code
-inline cudaError_t mallocSync(void** d_ptr, size_t size){return cudaMalloc(d_ptr, size);}
-
-/// @brief Synchronous deallocation of device memory allocated with mallocSync.
-/// @param d_ptr Device pointer that will be freed
-/// @return Cuda error code
-inline cudaError_t freeSync(void* d_ptr){return cudaFree(d_ptr);}
-
 /// @brief Returns true if @c device supports stream-ordered memory pools, i.e.
 ///        cudaMallocAsync/cudaFreeAsync. Queried once per process for all
 ///        devices and cached; out-of-range device ids return false.
@@ -128,13 +116,13 @@ inline bool memoryPoolsSupported(int device)
 /// @param size  Number of bytes to allocate
 /// @param dummy The stream establishing the stream ordering contract and the memory pool to allocate from (ignored)
 /// @return Cuda error code
-inline cudaError_t mallocAsync(void** d_ptr, size_t size, cudaStream_t){return mallocSync(d_ptr, size);}
+inline cudaError_t mallocAsync(void** d_ptr, size_t size, cudaStream_t){return cudaMalloc(d_ptr, size);}
 
 /// @brief Wrapper forced to synchronous cudaFree; see the mode comment above.
 /// @param d_ptr Device pointer that will be freed
 /// @param dummy The stream establishing the stream ordering promise (ignored)
 /// @return Cuda error code
-inline cudaError_t freeAsync(void* d_ptr, cudaStream_t){return freeSync(d_ptr);}
+inline cudaError_t freeAsync(void* d_ptr, cudaStream_t){return cudaFree(d_ptr);}
 
 #else
 
