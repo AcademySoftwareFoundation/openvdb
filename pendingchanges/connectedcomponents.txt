@@ -1,0 +1,8 @@
+NanoVDB:
+
+  New Features:
+  - Added nanovdb::tools::cuda::ConnectedComponents, a CUDA connected-components
+    labeling of the active voxels of a NanoVDB ValueOnIndex grid (6-connectivity):
+    a hierarchical per-leaf Shiloach-Vishkin union-find, cross-leaf edge detection,
+    and a global union-find over the resulting component graph. Added a companion
+    ex_connected_components_cuda example and a ConnectedComponentsMultiSphere unit test.

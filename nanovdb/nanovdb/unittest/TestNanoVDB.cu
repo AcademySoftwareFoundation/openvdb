@@ -13,6 +13,7 @@
 #include <nanovdb/tools/cuda/SignedFloodFill.cuh>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 #include <nanovdb/tools/cuda/IndexToGrid.cuh>
+#include <nanovdb/tools/cuda/ConnectedComponents.cuh>
 #include <nanovdb/tools/cuda/AddBlindData.cuh>
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
 #include <nanovdb/tools/cuda/GridValidator.cuh>
@@ -3978,3 +3979,76 @@ TEST(TestNanoVDBCUDA, MeshToGrid_UnitTetrahedron)
     // getHandle() and getHandleAndUDF() must produce identical grids.
     EXPECT_EQ(grid->mChecksum.full(), topoChecksum);
 }// MeshToGrid_UnitTetrahedron
+
+TEST(TestNanoVDBCUDA, ConnectedComponentsMultiSphere)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+
+    // Run the full CC pipeline on a set of active voxels; return the number of distinct global
+    // components via the public contract (getVoxelLabelsAndCount()).
+    auto globalComponents = [](const std::vector<nanovdb::Coord>& coords) -> uint64_t {
+        nanovdb::Coord* d_coords = nullptr;
+        cudaCheck(cudaMalloc(&d_coords, coords.size() * sizeof(nanovdb::Coord)));
+        cudaCheck(cudaMemcpy(d_coords, coords.data(), coords.size() * sizeof(nanovdb::Coord),
+                             cudaMemcpyHostToDevice));
+        auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_coords, coords.size());
+        cudaCheck(cudaFree(d_coords));
+        const auto* d_grid = handle.template deviceGrid<BuildT>();
+
+        nanovdb::tools::cuda::ConnectedComponents<BuildT> cc(d_grid);
+        const uint64_t n = cc.getVoxelLabelsAndCount().second;   // full pipeline; returns component count N
+        cudaCheck(cudaDeviceSynchronize());
+        return n;
+    };
+
+    // Reproduce the connected-components pipeline's CC input: the rasterized *narrow band* of a
+    // closed surface with the surface shell removed. The example prunes voxels whose unsigned
+    // distance to the surface is within sqrt(3)/2 voxels (the barrier), leaving, for a solid sphere,
+    // two disjoint concentric shells (inner + outer) => 2 components. N well-separated spheres each
+    // contribute their own two shells (their narrow bands never touch) => 2N.
+    const float band  = 3.0f;        // narrow-band half-width (voxels), matches the default bandWidth
+    const float shell = 0.8660254f;  // sqrt(3)/2: the barrier shell the example removes
+
+    auto sphereShells = [&](int N, float R, int spacing) {
+        const int margin = int(band) + 2;
+        const int x0 = -int(R) - margin, x1 = (N - 1) * spacing + int(R) + margin;
+        const int yz = int(R) + margin;
+        std::vector<nanovdb::Coord> coords;
+        for (int x = x0; x <= x1; ++x)
+            for (int y = -yz; y <= yz; ++y)
+                for (int z = -yz; z <= yz; ++z)
+                    for (int i = 0; i < N; ++i) {  // a separated voxel is in <=1 sphere's band
+                        const float dx = float(x - i * spacing), dy = float(y), dz = float(z);
+                        const float dd = std::fabs(std::sqrt(dx * dx + dy * dy + dz * dz) - R);
+                        if (dd > shell && dd <= band) { coords.emplace_back(x, y, z); break; }
+                    }
+        return coords;
+    };
+
+    EXPECT_EQ(globalComponents(sphereShells(1, 8.f, 30)), 2u);  // inner shell + outer shell
+    EXPECT_EQ(globalComponents(sphereShells(2, 8.f, 30)), 4u);  // 2 disjoint spheres -> 2*2
+    EXPECT_EQ(globalComponents(sphereShells(3, 8.f, 30)), 6u);  // 3 disjoint spheres -> 2*3
+
+    // Two heavily-overlapping spheres are a single connected solid (a "peanut") with one boundary
+    // surface, so the pruned narrow band of its union is one inner shell + one outer shell => 2.
+    // The overlap merges what would be 4 (two separated spheres) down to 2. The narrow band follows
+    // the *union* surface, i.e. the union SDF min(sdfA,sdfB); a small center separation (D = R) keeps
+    // the neck fat so the inner shell does not pinch.
+    {
+        const float R = 8.f, D = 8.f;  // D < 2R => overlap
+        const int   margin = int(band) + 2;
+        const int   x0 = -int(R) - margin, x1 = int(D) + int(R) + margin;
+        const int   yz = int(R) + margin;
+        std::vector<nanovdb::Coord> coords;
+        for (int x = x0; x <= x1; ++x)
+            for (int y = -yz; y <= yz; ++y)
+                for (int z = -yz; z <= yz; ++z) {
+                    const float dxA = float(x), dxB = float(x) - D, fy = float(y), fz = float(z);
+                    const float sdfA = std::sqrt(dxA*dxA + fy*fy + fz*fz) - R;
+                    const float sdfB = std::sqrt(dxB*dxB + fy*fy + fz*fz) - R;
+                    const float a    = std::fabs(std::min(sdfA, sdfB));  // |union SDF|
+                    if (a > shell && a <= band) coords.emplace_back(x, y, z);
+                }
+        EXPECT_EQ(globalComponents(coords), 2u);  // overlap merges -> inner shell + outer shell
+    }
+}// ConnectedComponentsMultiSphere
