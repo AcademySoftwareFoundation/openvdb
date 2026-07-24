@@ -1,6 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
+//! [read_nanovdb_sphere_accessor_cuda_kernel]
 #include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessable on both the host and device
 #include <stdio.h> // for printf
 
@@ -34,3 +35,4 @@ extern "C" void launch_kernels(const nanovdb::NanoGrid<float>* deviceGrid,
     // Launch the host "kernel" (synchronously)
     cpu_kernel(cpuGrid);
 }
+//! [read_nanovdb_sphere_accessor_cuda_kernel]

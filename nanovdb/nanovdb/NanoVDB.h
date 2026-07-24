@@ -1519,7 +1519,7 @@ struct Map
     ///        e.g. inverse scale and inverse rotation WITHOUT translation.
     /// @note Typically this operation is used for scale and rotation from world -> index mapping
     /// @tparam Vec3T Template type of the 3D vector to be mapped
-    /// @param ijk 3D vector to be mapped - typically floating point index coordinates
+    /// @param xyz 3D vector to be mapped - typically floating point index coordinates
     /// @return linear inverse 3x3 mapping of the input vector i.e. xyz x mat^-1
     template<typename Vec3T>
     __hostdev__ Vec3T applyInverseJacobian(const Vec3T& xyz) const { return math::matMult(mInvMatD, xyz); }
@@ -1528,7 +1528,7 @@ struct Map
     ///        e.g. inverse scale and inverse rotation WITHOUT translation.
     /// @note Typically this operation is used for scale and rotation from world -> index mapping
     /// @tparam Vec3T Template type of the 3D vector to be mapped
-    /// @param ijk 3D vector to be mapped - typically floating point index coordinates
+    /// @param xyz 3D vector to be mapped - typically floating point index coordinates
     /// @return linear inverse 3x3 mapping of the input vector i.e. xyz x mat^-1
     template<typename Vec3T>
     __hostdev__ Vec3T applyInverseJacobianF(const Vec3T& xyz) const { return math::matMult(mInvMatF, xyz); }
@@ -1537,7 +1537,7 @@ struct Map
     ///        e.g. inverse scale and inverse rotation WITHOUT translation.
     /// @note Typically this operation is used for scale and rotation from world -> index mapping
     /// @tparam Vec3T Template type of the 3D vector to be mapped
-    /// @param ijk 3D vector to be mapped - typically floating point index coordinates
+    /// @param xyz 3D vector to be mapped - typically floating point index coordinates
     /// @return linear inverse 3x3 mapping of the input vector i.e. xyz x mat^-1
     template<typename Vec3T>
     __hostdev__ Vec3T applyIJT(const Vec3T& xyz) const { return math::matMultT(mInvMatD, xyz); }
@@ -4848,7 +4848,7 @@ public:
     }
 
     /// @brief Reset this access to its initial state, i.e. with an empty cache
-    /// @node Noop since this template specialization has no cache
+    /// @note Noop since this template specialization has no cache
     __hostdev__ void clear() {}
 
     __hostdev__ const RootT& root() const { return *mRoot; }
