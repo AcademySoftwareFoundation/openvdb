@@ -166,6 +166,38 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
             }
         }
     }
+
+    /// @brief Visit each 3x3x3 stencil index without materializing a 27-element array.
+    /// Consumers that reduce or accumulate taps should prefer this streaming form over
+    /// computeBoxStencil: the callback is device-inlined and receives (tap, index) in the
+    /// same deterministic tap order, so lookup and arithmetic stay fused (no 27-element
+    /// per-thread array, no stack spill). Keep computeBoxStencil for callers that need
+    /// random access to all taps. Like computeBoxStencil this accesses shared memory but
+    /// does not synchronize, so it may be called from divergent threads within a block.
+    /// @tparam BuildT Build type of the grid
+    /// @tparam OpT    Device-callable with signature op(int tap, uint64_t index)
+    template <class BuildT, class OpT>
+    __device__
+    static typename util::enable_if<BuildTraits<BuildT>::is_index, void>::type
+    forEachBoxStencil(
+        const NanoGrid<BuildT> *grid,
+        const uint32_t *smem_leafIndex,
+        const uint16_t *smem_voxelOffset,
+        OpT op)
+    {
+        NANOVDB_ASSERT(grid->isSequential());
+        const int tID = threadIdx.x;
+        const auto& tree = grid->tree();
+        if (smem_leafIndex[tID] == UnusedLeafIndex) return;
+        const auto& leaf = tree.template getFirstNode<0>()[smem_leafIndex[tID]];
+        const Coord coord = leaf.offsetToGlobalCoord(smem_voxelOffset[tID]);
+        for (int di = -1; di <= 1; ++di)
+        for (int dj = -1; dj <= 1; ++dj)
+        for (int dk = -1; dk <= 1; ++dk) {
+            const int tap = (di + 1) * 9 + (dj + 1) * 3 + dk + 1;
+            op(tap, tree.getValue(coord.offsetBy(di, dj, dk)));
+        }
+    }
 };
 
 /// @brief This functor calculates the firstLeafID and jumpMap for the
