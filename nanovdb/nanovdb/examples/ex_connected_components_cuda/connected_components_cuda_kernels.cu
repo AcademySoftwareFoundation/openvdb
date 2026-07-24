@@ -4,7 +4,7 @@
 /// @file  connected_components_cuda_kernels.cu
 ///
 /// @brief CUDA / NanoVDB side of the connected-components example. Rasterizes a triangle mesh into a
-///        ValueOnIndex narrow-band grid (nanovdb::tools::cuda::MeshToGrid), discards the
+///        ValueOnIndex narrow-band grid (nanovdb::tools::cuda::MeshToGrid), optionally discards the
 ///        surface/barrier shell (unsigned distance within sqrt(3)/2 voxels of the surface) with
 ///        nanovdb::tools::cuda::PruneGrid, and runs connected-components labeling with
 ///        nanovdb::tools::cuda::ConnectedComponents. A CPU union-find oracle independently verifies
@@ -172,7 +172,8 @@ bool validateAgainstOracle(const GridHandleT& derivedHandle, uint32_t leafCount,
 uint64_t connectedComponentsFromMesh(const std::vector<nanovdb::Vec3f>& points,
                                      const std::vector<nanovdb::Vec3i>& triangles,
                                      const nanovdb::Map&                map,
-                                     float                              bandWidth)
+                                     float                              bandWidth,
+                                     bool                               discardSurfaceVoxels)
 {
     const cudaStream_t stream = 0;
 
@@ -188,41 +189,46 @@ uint64_t connectedComponentsFromMesh(const std::vector<nanovdb::Vec3f>& points,
     auto [origHandle, udfSidecar] = converter.getHandleAndUDF();
     const auto* d_orig = origHandle.template deviceGrid<BuildT>();
 
-    // World-space voxel size from the map (uniform scale here, but read it generically).
-    const nanovdb::Vec3d w0 = map.applyMap(nanovdb::Vec3d(0.0, 0.0, 0.0));
-    const nanovdb::Vec3d wx = map.applyMap(nanovdb::Vec3d(1.0, 0.0, 0.0));
-    const float voxelSize   = float(wx[0] - w0[0]);
+    // ---- Step 2 (optional): discard the surface/barrier shell -> derived topology. ----
+    // With the shell removed, each closed surface's band splits into disjoint inner/outer shells;
+    // without it, connected components run on the full narrow band (one component per closed surface).
+    GridHandleT                      derivedHandle;   // stays empty unless we prune
+    const nanovdb::NanoGrid<BuildT>* d_cc = d_orig;    // grid connected components will label
+    if (discardSurfaceVoxels) {
+        // World-space voxel size from the map (uniform scale here, but read it generically).
+        const nanovdb::Vec3d w0 = map.applyMap(nanovdb::Vec3d(0.0, 0.0, 0.0));
+        const nanovdb::Vec3d wx = map.applyMap(nanovdb::Vec3d(1.0, 0.0, 0.0));
+        const float    voxelSize      = float(wx[0] - w0[0]);
+        const float    barrierSqWorld = 0.75f * voxelSize * voxelSize;  // (sqrt(3)/2 * voxelSize)^2
+        const uint32_t srcLeafCount   = Traits::getTreeData(d_orig).mNodeCount[0];
 
-    // ---- Step 2: discard the surface/barrier shell -> derived topology. ----
-    const float    barrierSqWorld = 0.75f * voxelSize * voxelSize;  // (sqrt(3)/2 * voxelSize)^2
-    const uint32_t srcLeafCount   = Traits::getTreeData(d_orig).mNodeCount[0];
+        auto  retainMask   = nanovdb::cuda::DeviceBuffer::create(
+            std::size_t(srcLeafCount) * sizeof(nanovdb::Mask<3>), nullptr, false);
+        auto* d_retainMask = static_cast<nanovdb::Mask<3>*>(retainMask.deviceData());
 
-    auto  retainMask   = nanovdb::cuda::DeviceBuffer::create(
-        std::size_t(srcLeafCount) * sizeof(nanovdb::Mask<3>), nullptr, false);
-    auto* d_retainMask = static_cast<nanovdb::Mask<3>*>(retainMask.deviceData());
+        nanovdb::util::cuda::operatorKernel<UDFBarrierPruneMaskFunctor>
+            <<<srcLeafCount, UDFBarrierPruneMaskFunctor::MaxThreadsPerBlock, 0, stream>>>(
+                d_orig, static_cast<const float*>(udfSidecar.deviceData()), barrierSqWorld, d_retainMask);
+        cudaCheckError();
 
-    nanovdb::util::cuda::operatorKernel<UDFBarrierPruneMaskFunctor>
-        <<<srcLeafCount, UDFBarrierPruneMaskFunctor::MaxThreadsPerBlock, 0, stream>>>(
-            d_orig, static_cast<const float*>(udfSidecar.deviceData()), barrierSqWorld, d_retainMask);
-    cudaCheckError();
+        nanovdb::tools::cuda::PruneGrid<BuildT> pruner(d_orig, d_retainMask, stream);
+        derivedHandle = pruner.getHandle();
+        d_cc          = derivedHandle.template deviceGrid<BuildT>();
+    }
 
-    nanovdb::tools::cuda::PruneGrid<BuildT> pruner(d_orig, d_retainMask, stream);
-    auto        derivedHandle = pruner.getHandle();
-    const auto* d_derived     = derivedHandle.template deviceGrid<BuildT>();
-
-    // ---- Step 3: connected-components labeling on the derived grid. ----
-    nanovdb::tools::cuda::ConnectedComponents<BuildT> cc(d_derived, stream);
+    // ---- Step 3: connected-components labeling on the selected grid. ----
+    nanovdb::tools::cuda::ConnectedComponents<BuildT> cc(d_cc, stream);
     auto [d_labels, numComponents] = cc.getVoxelLabelsAndCount();
     cudaCheck(cudaStreamSynchronize(stream));
 
-    // Diagnostics.
-    const uint64_t derivedActive = Traits::getActiveVoxelCount(d_derived);
-    const uint32_t derivedLeaves = Traits::getTreeData(d_derived).mNodeCount[0];
-    std::cout << "Derived (barrier-removed) grid: " << derivedActive << " active voxels, "
-              << derivedLeaves << " leaves.\n";
+    // Diagnostics + CPU-oracle self-check (on whichever grid was labeled).
+    const GridHandleT& ccHandle = discardSurfaceVoxels ? derivedHandle : origHandle;
+    const uint64_t     ccActive = Traits::getActiveVoxelCount(d_cc);
+    const uint32_t     ccLeaves = Traits::getTreeData(d_cc).mNodeCount[0];
+    std::cout << (discardSurfaceVoxels ? "Derived (barrier-removed) grid: " : "Full narrow-band grid: ")
+              << ccActive << " active voxels, " << ccLeaves << " leaves.\n";
 
-    // CPU-oracle self-check.
-    validateAgainstOracle(derivedHandle, derivedLeaves, derivedActive, d_labels, numComponents);
+    validateAgainstOracle(ccHandle, ccLeaves, ccActive, d_labels, numComponents);
 
     return numComponents;
 }

@@ -5,9 +5,10 @@
 ///
 /// @brief Host driver for the connected-components example (NanoVDB / CUDA only, no OpenVDB).
 ///
-///        Reads a triangle mesh from a Wavefront .obj file, builds the index<->world transform,
-///        and hands the mesh to the CUDA side, which rasterizes it into a ValueOnIndex narrow-band
-///        grid, discards the surface/barrier shell, and runs connected-components labeling
+///        Reads one or more Wavefront .obj meshes (concatenated into a single vertex/triangle list),
+///        builds the index<->world transform, and hands the mesh to the CUDA side, which rasterizes
+///        it into a ValueOnIndex narrow-band grid, optionally discards the surface/barrier shell
+///        (--discard-surface-voxels), and runs connected-components labeling
 ///        (nanovdb::tools::cuda::ConnectedComponents) on the result. The device side also runs a
 ///        CPU union-find oracle that independently verifies the GPU labeling.
 ///
@@ -27,14 +28,17 @@
 
 // ---- Host/device seam (implemented in connected_components_cuda_kernels.cu) -----------------------
 //
-// Rasterize the mesh -> ValueOnIndex narrow band, discard the barrier shell (unsigned distance
-// within sqrt(3)/2 voxels of the surface), and run connected-components labeling. Prints topology
-// diagnostics, the component count, and a CPU-oracle PASS/FAIL, and returns the number of
-// connected components.
+// Rasterize the mesh -> ValueOnIndex narrow band and run connected-components labeling. When
+// @a discardSurfaceVoxels is true, the surface/barrier shell (unsigned distance within sqrt(3)/2
+// voxels of the surface) is pruned first, splitting each closed surface's band into disjoint
+// inner/outer shells; otherwise labeling runs on the full narrow band (one component per closed
+// surface). Prints topology diagnostics, the component count, and a CPU-oracle PASS/FAIL, and
+// returns the number of connected components.
 uint64_t connectedComponentsFromMesh(const std::vector<nanovdb::Vec3f>& points,
                                      const std::vector<nanovdb::Vec3i>& triangles,
                                      const nanovdb::Map&                map,
-                                     float                              bandWidth);
+                                     float                              bandWidth,
+                                     bool                               discardSurfaceVoxels);
 
 /// @brief Minimal Wavefront .obj reader (vertices + faces) using NanoVDB types.
 ///
@@ -86,20 +90,47 @@ static void readOBJ(const std::string&            filename,
 int main(int argc, char* argv[])
 {
     try {
-        if (argc < 2)
-            throw std::runtime_error("usage: " + std::string(argv[0]) +
-                                     " <input.obj> [voxelSize] [bandWidth]");
+        // Parse args: any non-option token is an input .obj; options set the transform and the
+        // barrier-discard switch.
+        std::vector<std::string> objFiles;
+        float voxelSize            = 0.01f;
+        float bandWidth            = 3.0f;
+        bool  discardSurfaceVoxels = false;
 
-        const std::string inputFile = argv[1];
-        const float voxelSize = (argc > 2) ? std::stof(argv[2]) : 0.01f;
-        const float bandWidth = (argc > 3) ? std::stof(argv[3]) : 3.0f;
+        auto nextValue = [&](int& i, const char* opt) -> const char* {
+            if (i + 1 >= argc) throw std::runtime_error(std::string("missing value for ") + opt);
+            return argv[++i];
+        };
+        for (int i = 1; i < argc; ++i) {
+            const std::string a = argv[i];
+            if      (a == "--discard-surface-voxels") discardSurfaceVoxels = true;
+            else if (a == "--voxel-size")  voxelSize = std::stof(nextValue(i, "--voxel-size"));
+            else if (a == "--band-width")  bandWidth = std::stof(nextValue(i, "--band-width"));
+            else if (a.rfind("--", 0) == 0) throw std::runtime_error("unknown option: " + a);
+            else objFiles.push_back(a);
+        }
+        if (objFiles.empty())
+            throw std::runtime_error(
+                "usage: " + std::string(argv[0]) +
+                " <input.obj> [more.obj ...] [--voxel-size S] [--band-width W] [--discard-surface-voxels]");
 
+        // Read and merge all input meshes into one vertex/triangle list. Merging simply concatenates
+        // the meshes in their own coordinates (no repositioning), offsetting each mesh's triangle
+        // indices past the vertices already added.
         std::vector<nanovdb::Vec3f> points;
         std::vector<nanovdb::Vec3i> triangles;
-        std::cout << "Reading " << inputFile << "...\n";
-        readOBJ(inputFile, points, triangles);
-        std::cout << "Loaded " << points.size() << " vertices, "
-                  << triangles.size() << " triangles.\n";
+        for (const std::string& file : objFiles) {
+            std::vector<nanovdb::Vec3f> filePoints;
+            std::vector<nanovdb::Vec3i> fileTriangles;
+            std::cout << "Reading " << file << "...\n";
+            readOBJ(file, filePoints, fileTriangles);
+            const int offset = int(points.size());
+            points.insert(points.end(), filePoints.begin(), filePoints.end());
+            for (const nanovdb::Vec3i& t : fileTriangles)
+                triangles.emplace_back(t[0] + offset, t[1] + offset, t[2] + offset);
+        }
+        std::cout << "Loaded " << points.size() << " vertices, " << triangles.size()
+                  << " triangles from " << objFiles.size() << " mesh(es).\n";
         if (points.empty() || triangles.empty())
             throw std::runtime_error("mesh has no triangles");
 
@@ -107,8 +138,11 @@ int main(int argc, char* argv[])
         nanovdb::Map map;
         map.set(double(voxelSize), nanovdb::Vec3d(0.0), 1.0);
 
+        std::cout << "Surface voxels: "
+                  << (discardSurfaceVoxels ? "discarded (barrier shell pruned)"
+                                           : "kept (full narrow band)") << "\n";
         const uint64_t numComponents =
-            connectedComponentsFromMesh(points, triangles, map, bandWidth);
+            connectedComponentsFromMesh(points, triangles, map, bandWidth, discardSurfaceVoxels);
         std::cout << "Connected components: " << numComponents << "\n";
 
         return 0;
