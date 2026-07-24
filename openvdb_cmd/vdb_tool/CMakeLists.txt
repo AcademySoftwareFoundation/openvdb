@@ -123,16 +123,17 @@ endif()
 if(OPENVDB_TOOL_USE_EXR)
   target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_EXR")
   find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED)
-  if(TARGET OpenEXR::OpenEXR)
-    target_link_libraries(vdb_tool_common INTERFACE OpenEXR::OpenEXR)
-    # Imath was split from OpenEXR in v3; ensure its headers are on the include
-    # path since OpenEXR's own headers still use bare <ImathBox.h> includes.
-    find_package(Imath QUIET)
-    if(TARGET Imath::ImathConfig)
-      target_link_libraries(vdb_tool_common INTERFACE Imath::ImathConfig)
+  if(OPENVDB_TOOL_USE_EXR)
+    target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_EXR")
+
+    find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED)
+    find_package(Imath ${MINIMUM_IMATH_VERSION} CONFIG REQUIRED)
+
+    if(TARGET OpenEXR::OpenEXR)
+      target_link_libraries(vdb_tool_common INTERFACE OpenEXR::OpenEXR Imath::Imath)
+    else()
+      target_link_libraries(vdb_tool_common INTERFACE OpenEXR::IlmImf Imath::Imath)
     endif()
-  else()
-    target_link_libraries(vdb_tool_common INTERFACE OpenEXR::IlmImf)
   endif()
 endif()
 
