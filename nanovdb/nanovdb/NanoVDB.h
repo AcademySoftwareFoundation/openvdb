@@ -158,11 +158,9 @@
 // Use this to switch between std::ofstream or FILE implementations
 //#define NANOVDB_USE_IOSTREAMS
 
-// Fix the caching bug in the ReadAccessor. Enabled by default; define
-// NANOVDB_NO_OLD_ACCESSOR (e.g. via CMake) to turn it off.
-#if !defined(NANOVDB_USE_OLD_ACCESSOR) && !defined(NANOVDB_NO_OLD_ACCESSOR)
-#define NANOVDB_USE_OLD_ACCESSOR
-#endif
+// Define NANOVDB_USE_OLD_ACCESSOR before including this header to temporarily
+// restore legacy ReadAccessor behavior where value lookups fall back to root
+// after a leaf-cache miss.
 
 // Uncomment to use (slower) branched version of LeafData<FpN,...>::getValue
 #define NANOVDB_FPN_BRANCHLESS
