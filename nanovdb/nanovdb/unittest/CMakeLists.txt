@@ -62,6 +62,19 @@ if(NANOVDB_USE_CUDA)
   target_link_libraries(nanovdb_test_cuda_memory_resource PRIVATE nanovdb GTest::GTest GTest::Main)
   set_target_properties(nanovdb_test_cuda_memory_resource PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   add_test(nanovdb_cuda_memory_resource_unit_test nanovdb_test_cuda_memory_resource)
+
+  add_executable(nanovdb_test_cuda_util "TestUtilCuda.cu")
+  target_link_libraries(nanovdb_test_cuda_util PRIVATE nanovdb GTest::GTest GTest::Main)
+  set_target_properties(nanovdb_test_cuda_util PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+  add_test(nanovdb_cuda_util_unit_test nanovdb_test_cuda_util)
+
+  # Same tests with every allocation forced through cudaMalloc/cudaFree --
+  # the configuration a pool-less vGPU relies on.
+  add_executable(nanovdb_test_cuda_util_sync "TestUtilCuda.cu")
+  target_compile_definitions(nanovdb_test_cuda_util_sync PRIVATE NANOVDB_USE_SYNC_CUDA_MALLOC)
+  target_link_libraries(nanovdb_test_cuda_util_sync PRIVATE nanovdb GTest::GTest GTest::Main)
+  set_target_properties(nanovdb_test_cuda_util_sync PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+  add_test(nanovdb_cuda_util_sync_unit_test nanovdb_test_cuda_util_sync)
 endif()
 
 # -----------------------------------------------------------------------------
