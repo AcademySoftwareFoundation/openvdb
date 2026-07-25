@@ -1130,8 +1130,9 @@ PNANOVDB_FORCE_INLINE void pnanovdb_write_vec3(pnanovdb_buf_t buf, pnanovdb_addr
 #define PNANOVDB_GRID_CLASS_TOPOLOGY 6      // grid with active states only (no values)
 #define PNANOVDB_GRID_CLASS_VOXEL_VOLUME 7  // volume of geometric cubes, e.g. minecraft
 #define PNANOVDB_GRID_CLASS_INDEX_GRID 8    // grid whose values are offsets, e.g. into an external array
-#define PNANOVDB_GRID_CLASS_TENSOR_GRID 9 // grid which can have extra metadata and features
-#define PNANOVDB_GRID_CLASS_END 10
+#define PNANOVDB_GRID_CLASS_TENSOR_GRID 9   // grid which can have extra metadata and features
+#define PNANOVDB_GRID_CLASS_VOXEL_BVH 10    // grid where each voxel points to list of primitive ids
+#define PNANOVDB_GRID_CLASS_END 11
 
 #define PNANOVDB_GRID_FLAGS_HAS_LONG_GRID_NAME (1 << 0)
 #define PNANOVDB_GRID_FLAGS_HAS_BBOX (1 << 1)
@@ -1412,23 +1413,36 @@ PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_version_get_patch(pnanovdb_uint
 }
 
 #define PNANOVDB_GRIDBLINDMETADATA_CLASS_UNKNOWN 0
-#define PNANOVDB_GRIDBLINDMETADATA_CLASS_INDEX_ARRAY 1
-#define PNANOVDB_GRIDBLINDMETADATA_CLASS_ATTRIBUTE_ARRAY 2
-#define PNANOVDB_GRIDBLINDMETADATA_CLASS_GRID_NAME 3
-#define PNANOVDB_GRIDBLINDMETADATA_CLASS_CHANNEL_ARRAY 4
+#define PNANOVDB_GRIDBLINDMETADATA_CLASS_INDEX_ARRAY 1      // indices typically used for mapping into other arrays
+#define PNANOVDB_GRIDBLINDMETADATA_CLASS_ATTRIBUTE_ARRAY 2  // attributes typically associated with points
+#define PNANOVDB_GRIDBLINDMETADATA_CLASS_GRID_NAME 3        // grid names of length longer than 256 characters
+#define PNANOVDB_GRIDBLINDMETADATA_CLASS_CHANNEL_ARRAY 4    // channel of values typically used by index grids
 #define PNANOVDB_GRIDBLINDMETADATA_CLASS_END 5
 
 #define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_UNKNOWN 0
-#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_POSITION 1
-#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_COLOR 2
-#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_NORMAL 3
-#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_RADIUS 4
-#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_VELOCITY 5
-#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_ID 6
-#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_WORLD_COORDS 7
-#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_GRID_COORDS 8
-#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_VOXEL_COORDS 9
-#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_END 10
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_POSITION 1  // 3D coordinates in an unknown space
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_COLOR 2     // color associated with point
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_NORMAL 3    // normal associated with point
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_RADIUS 4    // radius of point
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_VELOCITY 5  // velocity associated with point
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_ID 6        // integer ID of point
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_WORLD_COORDS 7    // 3D coordinates in world space, e.g. (0.056, 0.8, 1,8)
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_GRID_COORDS 8     // 3D coordinates in grid space, e.g. (1.2, 4.0, 5.7), aka index-space
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_VOXEL_COORDS 9    // 3D coordinates in voxel space, e.g. (0.2, 0.0, 0.7)
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_LEVEL_SET 10      // narrow band level set, e.g. SDF
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_FOG_VOLUME 11     // fog volume, e.g. density
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_STAGGERED 12      // staggered MAC grid, e.g. velocity
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_OPACITY 13  // opacity associated with point
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_QUAT 14     // quaternion rotation, wxyz convention
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_SCALE 15    // vec3 scale
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_SH0 16      // spherical harmonics, DC component
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_POINT_SHN 17      // spherical haromnics, AC components
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_LINE_ID 18        // integer ID of line
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_TRIANGLE_ID 19    // integer ID of triangle
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_GAUSSIAN_ID 20    // integer ID of Gaussian
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_RANGE 21          // begin/end pair of indices
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_VOXEL_BVH 22      // voxelbvh 64-bit voxel value
+#define PNANOVDB_GRIDBLINDMETADATA_SEMANTIC_END 23
 
 struct pnanovdb_gridblindmetadata_t
 {
