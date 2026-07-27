@@ -64,6 +64,27 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
     // forEach<Name> streams (tap, index) to a device-inlined callback, which avoids the
     // per-thread array entirely for consumers that can take the taps in order.
 
+    /// @brief Number of distinct, consecutive leaves the block's decoded slots span, clamped
+    /// to MaxCachedLeaves. Shared preamble of the cached resolvers, which stage one table
+    /// entry group per spanned leaf. Must be called by all threads (uses __syncthreads).
+    /// @param smem_leafIndex Decoded leaf indices in shared memory
+    /// @param firstSpanned   Leaf index of slot 0, i.e. the first leaf the block spans
+    /// @param myLeaf         This thread's leaf index (UnusedLeafIndex past the last voxel)
+    template <int MaxCachedLeaves>
+    __device__
+    static int cachedLeafSpan(const uint32_t *smem_leafIndex, uint32_t firstSpanned, uint32_t myLeaf)
+    {
+        __shared__ int sSpannedCount;
+        const int tID = threadIdx.x;
+        if (tID == 0) sSpannedCount = 0;
+        __syncthreads();
+        // one atomicMax per distinct leaf: only the first slot of each run contributes
+        if (myLeaf != UnusedLeafIndex && (tID == 0 || smem_leafIndex[tID-1] != myLeaf))
+            atomicMax(&sSpannedCount, int(myLeaf - firstSpanned) + 1);
+        __syncthreads();
+        return sSpannedCount < MaxCachedLeaves ? sSpannedCount : MaxCachedLeaves;
+    }
+
     /// @brief Decode the inverse maps for a single voxel block on the device.
     ///
     /// Given the VBM metadata for one block (firstLeafID and the block's slice of
@@ -240,59 +261,11 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
         const uint16_t *smem_voxelOffset,
         uint64_t *stencilIndices)
     {
-        // Verify that the nodes can be accessed linearly
-        NANOVDB_ASSERT(grid->isSequential());
-
-        using LeafT = typename NanoTree<BuildT>::LeafNodeType;
-        constexpr int MaxCachedLeaves = 16;
-        __shared__ const LeafT* sNeighborLeaves[MaxCachedLeaves][27];
-
-        int tID = threadIdx.x;
-        const auto& tree = grid->tree();
-        const LeafT* leaf0 = tree.template getFirstNode<0>();
-
-        // Sequential voxels are grouped by (consecutive) leaves; distribute the
-        // spannedLeaves x 27 neighbor resolutions across ALL threads so no
-        // single thread serializes 27 root walks behind the barrier.
-        const uint32_t firstSpanned = smem_leafIndex[0];
-        const uint32_t myLeaf = smem_leafIndex[tID];
-        __shared__ int sSpannedCount;
-        if (tID == 0) sSpannedCount = 0;
-        __syncthreads();
-        if (myLeaf != UnusedLeafIndex && (tID == 0 || smem_leafIndex[tID-1] != myLeaf))
-            atomicMax(&sSpannedCount, int(myLeaf - firstSpanned) + 1);
-        __syncthreads();
-        const int nSpanned = sSpannedCount < MaxCachedLeaves ? sSpannedCount : MaxCachedLeaves;
-        for (int c = tID; c < nSpanned * 27; c += blockDim.x) {
-            const int slot = c / 27, n = c % 27;
-            if (n == 13) { sNeighborLeaves[slot][13] = leaf0 + (firstSpanned + slot); continue; }
-            const Coord origin = leaf0[firstSpanned + slot].origin();
-            const int di = n/9 - 1, dj = (n/3)%3 - 1, dk = n%3 - 1;
-            sNeighborLeaves[slot][n] = tree.root().probeLeaf(origin.offsetBy(di*8, dj*8, dk*8));
-        }
-        __syncthreads();
-
-        if (myLeaf != UnusedLeafIndex) {
-            const auto& leaf = leaf0[myLeaf];
-            const Coord coord = leaf.offsetToGlobalCoord( smem_voxelOffset[tID] );
-            const uint32_t slot = myLeaf - firstSpanned;
-            const bool cached = slot < MaxCachedLeaves;
-            const int vi = coord[0] & 7, vj = coord[1] & 7, vk = coord[2] & 7;
-            for (int di = -1; di <= 1; di++)
-            for (int dj = -1; dj <= 1; dj++)
-            for (int dk = -1; dk <= 1; dk++) {
-                const int spokeID = ( di + 1 ) * 9 + ( dj + 1 ) * 3 + dk + 1;
-                const Coord neighbor = coord.offsetBy( di, dj, dk );
-                if (cached) {
-                    // Which of the 27 leaf-neighborhood slots this tap lands in
-                    const int li = ((vi+di)>>3)+1, lj = ((vj+dj)>>3)+1, lk = ((vk+dk)>>3)+1;
-                    const LeafT* nl = sNeighborLeaves[slot][li*9+lj*3+lk];
-                    stencilIndices[spokeID] = nl ? nl->getValue(LeafT::CoordToOffset(neighbor)) : 0;
-                } else {
-                    stencilIndices[spokeID] = tree.getValue( neighbor );
-                }
-            }
-        }
+        // Identical resolution to forEachBoxStencilCached; the only difference is that the
+        // taps are stored rather than streamed, so express it as that traversal with a
+        // storing callback instead of duplicating the table staging and tap loop.
+        forEachBoxStencilCached<BuildT>(grid, smem_leafIndex, smem_voxelOffset,
+            [stencilIndices](int tap, uint64_t index) { stencilIndices[tap] = index; });
     }
 
     /// @brief Like computeBoxStencil, but resolves only the 7-point cross (center + 6 face
@@ -370,13 +343,7 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
 
         const uint32_t firstSpanned = smem_leafIndex[0];
         const uint32_t myLeaf = smem_leafIndex[tID];
-        __shared__ int sSpannedCount;
-        if (tID == 0) sSpannedCount = 0;
-        __syncthreads();
-        if (myLeaf != UnusedLeafIndex && (tID == 0 || smem_leafIndex[tID-1] != myLeaf))
-            atomicMax(&sSpannedCount, int(myLeaf - firstSpanned) + 1);
-        __syncthreads();
-        const int nSpanned = sSpannedCount < MaxCachedLeaves ? sSpannedCount : MaxCachedLeaves;
+        const int nSpanned = cachedLeafSpan<MaxCachedLeaves>(smem_leafIndex, firstSpanned, myLeaf);
         for (int c = tID; c < nSpanned * 7; c += blockDim.x) {
             const int slot = c / 7, n = c % 7;
             if (n == 6) { sFaceLeaves[slot][6] = leaf0 + (firstSpanned + slot); continue; }
@@ -438,7 +405,6 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
         using LeafT = typename NanoTree<BuildT>::LeafNodeType;
         constexpr int MaxCachedLeaves = 16;
         __shared__ const LeafT* sNeighborLeaves[MaxCachedLeaves][27];
-        __shared__ int sSpannedCount;
 
         const int tID = threadIdx.x;
         const auto& tree = grid->tree();
@@ -447,12 +413,7 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
         const uint32_t myLeaf = smem_leafIndex[tID];
 
         // Stage the spannedLeaves x 27 leaf-neighborhood table across ALL threads
-        if (tID == 0) sSpannedCount = 0;
-        __syncthreads();
-        if (myLeaf != UnusedLeafIndex && (tID == 0 || smem_leafIndex[tID-1] != myLeaf))
-            atomicMax(&sSpannedCount, int(myLeaf - firstSpanned) + 1);
-        __syncthreads();
-        const int nSpanned = sSpannedCount < MaxCachedLeaves ? sSpannedCount : MaxCachedLeaves;
+        const int nSpanned = cachedLeafSpan<MaxCachedLeaves>(smem_leafIndex, firstSpanned, myLeaf);
         for (int c = tID; c < nSpanned * 27; c += blockDim.x) {
             const int slot = c / 27, n = c % 27;
             if (n == 13) { sNeighborLeaves[slot][13] = leaf0 + (firstSpanned + slot); continue; }
