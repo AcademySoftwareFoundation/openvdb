@@ -198,6 +198,151 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
             op(tap, tree.getValue(coord.offsetBy(di, dj, dk)));
         }
     }
+
+    /// @brief Like computeBoxStencil, but the block cooperatively stages a leaf-pointer table
+    /// in shared memory: the block's voxels span few distinct (consecutive) leaves, so the
+    /// spannedLeaves x 27 leaf-neighborhood resolutions are distributed across ALL threads and
+    /// each stencil tap becomes a direct in-leaf lookup instead of a root-down tree traversal.
+    /// Blocks spanning more than MaxCachedLeaves leaves fall back to per-tap traversal for the
+    /// uncached leaves. Must be called by all threads in the block (uses __syncthreads).
+    ///
+    /// Use this for consumers that read all 27 taps: measured 1.1-1.6x over the naive per-tap
+    /// resolution on both sparse and dense topology, with the margin widening at larger block
+    /// widths and narrowing as the per-tap payload gather grows. For partial-tap consumers that
+    /// read only a subset of the 27, prefer the naive computeBoxStencil: tap-level dead-code
+    /// elimination already skips resolving the taps that are never read, so a right-sized table
+    /// has less to save (a 19-tap variant measured slower than the DCE'd naive path).
+    /// @tparam BuildT Build type of the grid
+    /// @param stencilIndices Output stencil indices, length >= 27 (the 3x3x3 stencil)
+    template <class BuildT>
+    __device__
+    static typename util::enable_if<BuildTraits<BuildT>::is_index, void>::type
+    computeBoxStencilCached(
+        const NanoGrid<BuildT> *grid,
+        const uint32_t *smem_leafIndex,
+        const uint16_t *smem_voxelOffset,
+        uint64_t *stencilIndices)
+    {
+        // Verify that the nodes can be accessed linearly
+        NANOVDB_ASSERT(grid->isSequential());
+
+        using LeafT = typename NanoTree<BuildT>::LeafNodeType;
+        constexpr int MaxCachedLeaves = 16;
+        __shared__ const LeafT* sNeighborLeaves[MaxCachedLeaves][27];
+
+        int tID = threadIdx.x;
+        const auto& tree = grid->tree();
+        const LeafT* leaf0 = tree.template getFirstNode<0>();
+
+        // Sequential voxels are grouped by (consecutive) leaves; distribute the
+        // spannedLeaves x 27 neighbor resolutions across ALL threads so no
+        // single thread serializes 27 root walks behind the barrier.
+        const uint32_t firstSpanned = smem_leafIndex[0];
+        const uint32_t myLeaf = smem_leafIndex[tID];
+        __shared__ int sSpannedCount;
+        if (tID == 0) sSpannedCount = 0;
+        __syncthreads();
+        if (myLeaf != UnusedLeafIndex && (tID == 0 || smem_leafIndex[tID-1] != myLeaf))
+            atomicMax(&sSpannedCount, int(myLeaf - firstSpanned) + 1);
+        __syncthreads();
+        const int nSpanned = sSpannedCount < MaxCachedLeaves ? sSpannedCount : MaxCachedLeaves;
+        for (int c = tID; c < nSpanned * 27; c += blockDim.x) {
+            const int slot = c / 27, n = c % 27;
+            if (n == 13) { sNeighborLeaves[slot][13] = leaf0 + (firstSpanned + slot); continue; }
+            const Coord origin = leaf0[firstSpanned + slot].origin();
+            const int di = n/9 - 1, dj = (n/3)%3 - 1, dk = n%3 - 1;
+            sNeighborLeaves[slot][n] = tree.root().probeLeaf(origin.offsetBy(di*8, dj*8, dk*8));
+        }
+        __syncthreads();
+
+        if (myLeaf != UnusedLeafIndex) {
+            const auto& leaf = leaf0[myLeaf];
+            const Coord coord = leaf.offsetToGlobalCoord( smem_voxelOffset[tID] );
+            const uint32_t slot = myLeaf - firstSpanned;
+            const bool cached = slot < MaxCachedLeaves;
+            const int vi = coord[0] & 7, vj = coord[1] & 7, vk = coord[2] & 7;
+            for (int di = -1; di <= 1; di++)
+            for (int dj = -1; dj <= 1; dj++)
+            for (int dk = -1; dk <= 1; dk++) {
+                const int spokeID = ( di + 1 ) * 9 + ( dj + 1 ) * 3 + dk + 1;
+                const Coord neighbor = coord.offsetBy( di, dj, dk );
+                if (cached) {
+                    // Which of the 27 leaf-neighborhood slots this tap lands in
+                    const int li = ((vi+di)>>3)+1, lj = ((vj+dj)>>3)+1, lk = ((vk+dk)>>3)+1;
+                    const LeafT* nl = sNeighborLeaves[slot][li*9+lj*3+lk];
+                    stencilIndices[spokeID] = nl ? nl->getValue(LeafT::CoordToOffset(neighbor)) : 0;
+                } else {
+                    stencilIndices[spokeID] = tree.getValue( neighbor );
+                }
+            }
+        }
+    }
+
+    /// @brief Like computeBoxStencil, but resolves only the 7-point cross (center + 6 face
+    /// neighbors), staging a 7-entry leaf table per spanned leaf (own leaf + 6 face-adjacent
+    /// leaves) - the right-sized variant for Laplacian/upwind-class stencils. Writes the
+    /// face+center slots of the 27-slot array (4, 22, 10, 16, 12, 14 and 13); the rest are left
+    /// untouched. Must be called by all threads in the block (uses __syncthreads).
+    template <class BuildT>
+    __device__
+    static typename util::enable_if<BuildTraits<BuildT>::is_index, void>::type
+    computeCrossStencil(
+        const NanoGrid<BuildT> *grid,
+        const uint32_t *smem_leafIndex,
+        const uint16_t *smem_voxelOffset,
+        uint64_t *stencilIndices)
+    {
+        NANOVDB_ASSERT(grid->isSequential());
+
+        using LeafT = typename NanoTree<BuildT>::LeafNodeType;
+        constexpr int MaxCachedLeaves = 16;
+        // Slots 0..5: -x,+x,-y,+y,-z,+z face neighbors; slot 6: own leaf
+        __shared__ const LeafT* sFaceLeaves[MaxCachedLeaves][7];
+
+        int tID = threadIdx.x;
+        const auto& tree = grid->tree();
+        const LeafT* leaf0 = tree.template getFirstNode<0>();
+
+        const uint32_t firstSpanned = smem_leafIndex[0];
+        const uint32_t myLeaf = smem_leafIndex[tID];
+        __shared__ int sSpannedCount;
+        if (tID == 0) sSpannedCount = 0;
+        __syncthreads();
+        if (myLeaf != UnusedLeafIndex && (tID == 0 || smem_leafIndex[tID-1] != myLeaf))
+            atomicMax(&sSpannedCount, int(myLeaf - firstSpanned) + 1);
+        __syncthreads();
+        const int nSpanned = sSpannedCount < MaxCachedLeaves ? sSpannedCount : MaxCachedLeaves;
+        for (int c = tID; c < nSpanned * 7; c += blockDim.x) {
+            const int slot = c / 7, n = c % 7;
+            if (n == 6) { sFaceLeaves[slot][6] = leaf0 + (firstSpanned + slot); continue; }
+            Coord nOrigin = leaf0[firstSpanned + slot].origin();
+            nOrigin[n >> 1] += (n & 1) ? 8 : -8;
+            sFaceLeaves[slot][n] = tree.root().probeLeaf(nOrigin);
+        }
+        __syncthreads();
+
+        if (myLeaf != UnusedLeafIndex) {
+            const auto& leaf = leaf0[myLeaf];
+            const Coord coord = leaf.offsetToGlobalCoord( smem_voxelOffset[tID] );
+            const uint32_t slot = myLeaf - firstSpanned;
+            const bool cached = slot < MaxCachedLeaves;
+            stencilIndices[13] = leaf.getValue( smem_voxelOffset[tID] );
+            for (int n = 0; n < 6; ++n) {
+                const int axis = n >> 1, dir = (n & 1) ? 1 : -1;
+                Coord neighbor = coord;
+                neighbor[axis] += dir;
+                // Standard 27-slot spoke id for this face tap
+                const int spokeID = 13 + dir * (axis == 0 ? 9 : axis == 1 ? 3 : 1);
+                if (cached) {
+                    const int v = coord[axis] & 7;
+                    const LeafT* nl = ((v + dir) & ~7) ? sFaceLeaves[slot][n] : sFaceLeaves[slot][6];
+                    stencilIndices[spokeID] = nl ? nl->getValue(LeafT::CoordToOffset(neighbor)) : 0;
+                } else {
+                    stencilIndices[spokeID] = tree.getValue( neighbor );
+                }
+            }
+        }
+    }
 };
 
 /// @brief This functor calculates the firstLeafID and jumpMap for the
