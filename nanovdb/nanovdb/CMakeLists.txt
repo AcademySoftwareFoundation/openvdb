@@ -305,10 +305,8 @@ if(NANOVDB_USE_INTRINSICS)
   target_compile_definitions(nanovdb INTERFACE -DNANOVDB_USE_INTRINSICS)
 endif()
 
-# NANOVDB_USE_OLD_ACCESSOR is enabled by default in NanoVDB.h; when the option
-# is OFF, define the negative macro that suppresses it (a -D cannot un-define).
-if(NOT NANOVDB_USE_OLD_ACCESSOR)
-  target_compile_definitions(nanovdb INTERFACE -DNANOVDB_NO_OLD_ACCESSOR)
+if(NANOVDB_USE_OLD_ACCESSOR)
+  target_compile_definitions(nanovdb INTERFACE -DNANOVDB_USE_OLD_ACCESSOR)
 endif()
 
 if(NANOVDB_USE_OPENVDB)
