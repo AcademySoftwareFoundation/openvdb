@@ -173,7 +173,9 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
     /// same deterministic tap order, so lookup and arithmetic stay fused (no 27-element
     /// per-thread array, no stack spill). Keep computeBoxStencil for callers that need
     /// random access to all taps. Like computeBoxStencil this accesses shared memory but
-    /// does not synchronize, so it may be called from divergent threads within a block.
+    /// does not synchronize, so it may be called from divergent threads within a block -
+    /// which is the reason to use this rather than the faster forEachBoxStencilCached,
+    /// whose cooperative leaf table requires all threads to participate.
     /// @tparam BuildT Build type of the grid
     /// @tparam OpT    Device-callable with signature op(int tap, uint64_t index)
     template <class BuildT, class OpT>
@@ -206,9 +208,12 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
     /// Blocks spanning more than MaxCachedLeaves leaves fall back to per-tap traversal for the
     /// uncached leaves. Must be called by all threads in the block (uses __syncthreads).
     ///
-    /// Use this for consumers that read all 27 taps: measured 1.1-1.6x over the naive per-tap
-    /// resolution on both sparse and dense topology, with the margin widening at larger block
-    /// widths and narrowing as the per-tap payload gather grows. For partial-tap consumers that
+    /// Use this for consumers that need all 27 taps materialized (random or repeated access):
+    /// measured 1.1-1.6x over the naive per-tap resolution on both sparse and dense topology,
+    /// with the margin widening at larger block widths and narrowing as the per-tap payload
+    /// gather grows. Consumers that can consume taps in order should prefer
+    /// forEachBoxStencilCached, which adds the streaming output for a larger win. For
+    /// partial-tap consumers that
     /// read only a subset of the 27, prefer the naive computeBoxStencil: tap-level dead-code
     /// elimination already skips resolving the taps that are never read, so a right-sized table
     /// has less to save (a 19-tap variant measured slower than the DCE'd naive path).
@@ -340,6 +345,80 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
                 } else {
                     stencilIndices[spokeID] = tree.getValue( neighbor );
                 }
+            }
+        }
+    }
+
+    /// @brief The cached leaf table of computeBoxStencilCached with the streaming output of
+    /// forEachBoxStencil: taps are resolved through the staged per-leaf neighbor table AND
+    /// handed to a device-inlined callback, so neither the 27 root-down traversals nor the
+    /// 27-element per-thread array is paid. This is the fastest path for consumers that read
+    /// all 27 taps and can consume them in tap order - measured ~1.8x (block width 128) to
+    /// ~2.6x (block width 512) over the naive computeBoxStencil, versus ~1.3-1.9x for either
+    /// technique alone. Blocks spanning more than MaxCachedLeaves leaves fall back to per-tap
+    /// traversal for the uncached leaves.
+    ///
+    /// @warning Unlike forEachBoxStencil, this stages a shared-memory table cooperatively, so
+    /// it must be called by all threads in the block (uses __syncthreads internally). Use
+    /// forEachBoxStencil when the call site may be divergent.
+    ///
+    /// @tparam BuildT Build type of the grid
+    /// @tparam OpT    Device-callable with signature op(int tap, uint64_t index)
+    template <class BuildT, class OpT>
+    __device__
+    static typename util::enable_if<BuildTraits<BuildT>::is_index, void>::type
+    forEachBoxStencilCached(
+        const NanoGrid<BuildT> *grid,
+        const uint32_t *smem_leafIndex,
+        const uint16_t *smem_voxelOffset,
+        OpT op)
+    {
+        NANOVDB_ASSERT(grid->isSequential());
+
+        using LeafT = typename NanoTree<BuildT>::LeafNodeType;
+        constexpr int MaxCachedLeaves = 16;
+        __shared__ const LeafT* sNeighborLeaves[MaxCachedLeaves][27];
+        __shared__ int sSpannedCount;
+
+        const int tID = threadIdx.x;
+        const auto& tree = grid->tree();
+        const LeafT* leaf0 = tree.template getFirstNode<0>();
+        const uint32_t firstSpanned = smem_leafIndex[0];
+        const uint32_t myLeaf = smem_leafIndex[tID];
+
+        // Stage the spannedLeaves x 27 leaf-neighborhood table across ALL threads
+        if (tID == 0) sSpannedCount = 0;
+        __syncthreads();
+        if (myLeaf != UnusedLeafIndex && (tID == 0 || smem_leafIndex[tID-1] != myLeaf))
+            atomicMax(&sSpannedCount, int(myLeaf - firstSpanned) + 1);
+        __syncthreads();
+        const int nSpanned = sSpannedCount < MaxCachedLeaves ? sSpannedCount : MaxCachedLeaves;
+        for (int c = tID; c < nSpanned * 27; c += blockDim.x) {
+            const int slot = c / 27, n = c % 27;
+            if (n == 13) { sNeighborLeaves[slot][13] = leaf0 + (firstSpanned + slot); continue; }
+            const Coord origin = leaf0[firstSpanned + slot].origin();
+            const int di = n/9 - 1, dj = (n/3)%3 - 1, dk = n%3 - 1;
+            sNeighborLeaves[slot][n] = tree.root().probeLeaf(origin.offsetBy(di*8, dj*8, dk*8));
+        }
+        __syncthreads();
+
+        if (myLeaf == UnusedLeafIndex) return;
+        const auto& leaf = leaf0[myLeaf];
+        const Coord coord = leaf.offsetToGlobalCoord( smem_voxelOffset[tID] );
+        const uint32_t slot = myLeaf - firstSpanned;
+        const bool cached = slot < MaxCachedLeaves;
+        const int vi = coord[0] & 7, vj = coord[1] & 7, vk = coord[2] & 7;
+        for (int di = -1; di <= 1; di++)
+        for (int dj = -1; dj <= 1; dj++)
+        for (int dk = -1; dk <= 1; dk++) {
+            const int spokeID = ( di + 1 ) * 9 + ( dj + 1 ) * 3 + dk + 1;
+            const Coord neighbor = coord.offsetBy( di, dj, dk );
+            if (cached) {
+                const int li = ((vi+di)>>3)+1, lj = ((vj+dj)>>3)+1, lk = ((vk+dk)>>3)+1;
+                const LeafT* nl = sNeighborLeaves[slot][li*9+lj*3+lk];
+                op(spokeID, nl ? nl->getValue(LeafT::CoordToOffset(neighbor)) : uint64_t(0));
+            } else {
+                op(spokeID, tree.getValue( neighbor ));
             }
         }
     }
