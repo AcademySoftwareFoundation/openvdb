@@ -68,54 +68,58 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
     /// to MaxCachedLeaves. Shared preamble of the cached resolvers, which stage one table
     /// entry group per spanned leaf. Must be called by all threads (uses __syncthreads).
     /// @param smem_leafIndex Decoded leaf indices in shared memory
-    /// @param firstSpanned   Leaf index of slot 0, i.e. the first leaf the block spans
+    /// @param firstLeaf      Leaf index of slot 0, i.e. the first leaf the block spans
     /// @param myLeaf         This thread's leaf index (UnusedLeafIndex past the last voxel)
     template <int MaxCachedLeaves>
     __device__
-    static int cachedLeafSpan(const uint32_t *smem_leafIndex, uint32_t firstSpanned, uint32_t myLeaf)
+    static int cachedLeafSpan(const uint32_t *smem_leafIndex, uint32_t firstLeaf, uint32_t myLeaf)
     {
-        __shared__ int sSpannedCount;
+        __shared__ int sSpannedLeafCount;
         const int tID = threadIdx.x;
-        if (tID == 0) sSpannedCount = 0;
+        if (tID == 0) sSpannedLeafCount = 0;
         __syncthreads();
         // one atomicMax per distinct leaf: only the first slot of each run contributes
         if (myLeaf != UnusedLeafIndex && (tID == 0 || smem_leafIndex[tID-1] != myLeaf))
-            atomicMax(&sSpannedCount, int(myLeaf - firstSpanned) + 1);
+            atomicMax(&sSpannedLeafCount, int(myLeaf - firstLeaf) + 1);
         __syncthreads();
-        return sSpannedCount < MaxCachedLeaves ? sSpannedCount : MaxCachedLeaves;
+        return sSpannedLeafCount < MaxCachedLeaves ? sSpannedLeafCount : MaxCachedLeaves;
     }
 
     /// @brief Stage the per-spanned-leaf neighbor table shared by the cached resolvers.
     ///
-    /// Fills table[slot*N + n] with the leaf node lying at neighbor position n of the slot-th
-    /// spanned leaf, or nullptr where no such leaf exists; entry SelfIndex stores the spanned
+    /// Fills table[leafSlot*N + neighborID] with the leaf lying at that neighbor position of
+    /// the leafSlot-th spanned leaf, or nullptr if absent; entry SelfIndex stores the spanned
     /// leaf itself rather than probing for it. Each resolver supplies the shift from a leaf
     /// origin to its n-th neighbor's origin, so it keeps whatever indexing its lookup expects.
-    /// The nSpanned x N entries are distributed across ALL threads, so no thread serializes
+    /// The spannedLeafCount x N entries are distributed across ALL threads, so no thread serializes
     /// the probes.
     ///
     /// Must be called by all threads in the block (ends in __syncthreads).
     ///
     /// @tparam N          Table entries per spanned leaf
     /// @tparam SelfIndex  Entry index holding the spanned leaf itself (not probed for)
-    /// @tparam OffsetT    Device-callable (Coord& origin, int n) shifting a leaf origin to the
-    ///                    origin of the leaf at entry n
-    /// @param table     Flattened [MaxCachedLeaves][N] table of leaf pointers in shared memory
-    /// @param nSpanned  Number of spanned leaves (from cachedLeafSpan)
+    /// @tparam OffsetT    Device-callable (Coord& origin, int neighborID) shifting a leaf origin
+    ///                    to the origin of the leaf at that neighbor position
+    /// @param table            Flattened [MaxCachedLeaves][N] leaf-pointer table in shared memory
+    /// @param spannedLeafCount Number of spanned leaves (from cachedLeafSpan)
+    /// @param firstLeaf        Leaf index of the block's first slot
     template <int N, int SelfIndex, class BuildT, class LeafT, class OffsetT>
     __device__
     static void stageLeafTable(const NanoGrid<BuildT> *grid, const LeafT **table,
-                               int nSpanned, uint32_t firstSpanned, OffsetT shiftToNeighbor)
+                               int spannedLeafCount, uint32_t firstLeaf, OffsetT shiftToNeighbor)
     {
         const int tID = threadIdx.x;
         const auto& tree = grid->tree();
         const LeafT* leaf0 = tree.template getFirstNode<0>();
-        for (int c = tID; c < nSpanned * N; c += blockDim.x) {
-            const int slot = c / N, n = c % N;
-            if (n == SelfIndex) { table[slot*N + n] = leaf0 + (firstSpanned + slot); continue; }
-            Coord origin = leaf0[firstSpanned + slot].origin();
-            shiftToNeighbor(origin, n);
-            table[slot*N + n] = tree.root().probeLeaf(origin);
+        for (int entry = tID; entry < spannedLeafCount * N; entry += blockDim.x) {
+            const int leafSlot = entry / N, neighborID = entry % N;
+            if (neighborID == SelfIndex) {// this spanned leaf itself; no probe needed
+                table[leafSlot*N + neighborID] = leaf0 + (firstLeaf + leafSlot);
+                continue;
+            }
+            Coord neighborOrigin = leaf0[firstLeaf + leafSlot].origin();
+            shiftToNeighbor(neighborOrigin, neighborID);
+            table[leafSlot*N + neighborID] = tree.root().probeLeaf(neighborOrigin);
         }
         __syncthreads();
     }
@@ -376,18 +380,18 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
         const auto& tree = grid->tree();
         const LeafT* leaf0 = tree.template getFirstNode<0>();
 
-        const uint32_t firstSpanned = smem_leafIndex[0];
+        const uint32_t firstLeaf = smem_leafIndex[0];// leaf owning the block's first slot
         const uint32_t myLeaf = smem_leafIndex[tID];
-        const int nSpanned = cachedLeafSpan<MaxCachedLeaves>(smem_leafIndex, firstSpanned, myLeaf);
+        const int spannedLeafCount = cachedLeafSpan<MaxCachedLeaves>(smem_leafIndex, firstLeaf, myLeaf);
         // Entry order 0..5 is -x,+x,-y,+y,-z,+z (axis*2 + dir), which the lookup below assumes.
-        stageLeafTable<7, 6>(grid, &sFaceLeaves[0][0], nSpanned, firstSpanned,
+        stageLeafTable<7, 6>(grid, &sFaceLeaves[0][0], spannedLeafCount, firstLeaf,
             [](Coord &o, int n) { o[n >> 1] += (n & 1) ? 8 : -8; });
 
         if (myLeaf != UnusedLeafIndex) {
             const auto& leaf = leaf0[myLeaf];
             const Coord coord = leaf.offsetToGlobalCoord( smem_voxelOffset[tID] );
-            const uint32_t slot = myLeaf - firstSpanned;
-            const bool cached = slot < MaxCachedLeaves;
+            const uint32_t leafSlot = myLeaf - firstLeaf;
+            const bool isCached = leafSlot < MaxCachedLeaves;
             stencilIndices[13] = leaf.getValue( smem_voxelOffset[tID] );
             for (int n = 0; n < 6; ++n) {
                 const int axis = n >> 1, dir = (n & 1) ? 1 : -1;
@@ -395,10 +399,12 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
                 neighbor[axis] += dir;
                 // Standard 27-slot spoke id for this face tap
                 const int spokeID = 13 + dir * (axis == 0 ? 9 : axis == 1 ? 3 : 1);
-                if (cached) {
-                    const int v = coord[axis] & 7;
-                    const LeafT* nl = ((v + dir) & ~7) ? sFaceLeaves[slot][n] : sFaceLeaves[slot][6];
-                    stencilIndices[spokeID] = nl ? nl->getValue(LeafT::CoordToOffset(neighbor)) : 0;
+                if (isCached) {
+                    const int voxelOnAxis = coord[axis] & 7;// 0..7 within the leaf
+                    // stepping off the leaf on this axis? then use the face neighbor, else self
+                    const LeafT* neighborLeaf = ((voxelOnAxis + dir) & ~7) ? sFaceLeaves[leafSlot][n]
+                                                                          : sFaceLeaves[leafSlot][6];
+                    stencilIndices[spokeID] = neighborLeaf ? neighborLeaf->getValue(LeafT::CoordToOffset(neighbor)) : 0;
                 } else {
                     stencilIndices[spokeID] = tree.getValue( neighbor );
                 }
@@ -439,30 +445,32 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
         const int tID = threadIdx.x;
         const auto& tree = grid->tree();
         const LeafT* leaf0 = tree.template getFirstNode<0>();
-        const uint32_t firstSpanned = smem_leafIndex[0];
+        const uint32_t firstLeaf = smem_leafIndex[0];// leaf owning the block's first slot
         const uint32_t myLeaf = smem_leafIndex[tID];
 
         // Stage the spannedLeaves x 27 leaf-neighborhood table across ALL threads
-        const int nSpanned = cachedLeafSpan<MaxCachedLeaves>(smem_leafIndex, firstSpanned, myLeaf);
+        const int spannedLeafCount = cachedLeafSpan<MaxCachedLeaves>(smem_leafIndex, firstLeaf, myLeaf);
         // The full box neighborhood: entry n is the 3x3x3 spoke n.
-        stageLeafTable<27, 13>(grid, &sNeighborLeaves[0][0], nSpanned, firstSpanned,
+        stageLeafTable<27, 13>(grid, &sNeighborLeaves[0][0], spannedLeafCount, firstLeaf,
             [](Coord &o, int n) { o = o.offsetBy((n/9-1)*8, ((n/3)%3-1)*8, (n%3-1)*8); });
 
         if (myLeaf == UnusedLeafIndex) return;
         const auto& leaf = leaf0[myLeaf];
         const Coord coord = leaf.offsetToGlobalCoord( smem_voxelOffset[tID] );
-        const uint32_t slot = myLeaf - firstSpanned;
-        const bool cached = slot < MaxCachedLeaves;
-        const int vi = coord[0] & 7, vj = coord[1] & 7, vk = coord[2] & 7;
+        const uint32_t leafSlot = myLeaf - firstLeaf;
+        const bool isCached = leafSlot < MaxCachedLeaves;
+        const int voxelX = coord[0] & 7, voxelY = coord[1] & 7, voxelZ = coord[2] & 7;
         for (int di = -1; di <= 1; di++)
         for (int dj = -1; dj <= 1; dj++)
         for (int dk = -1; dk <= 1; dk++) {
             const int spokeID = ( di + 1 ) * 9 + ( dj + 1 ) * 3 + dk + 1;
             const Coord neighbor = coord.offsetBy( di, dj, dk );
-            if (cached) {
-                const int li = ((vi+di)>>3)+1, lj = ((vj+dj)>>3)+1, lk = ((vk+dk)>>3)+1;
-                const LeafT* nl = sNeighborLeaves[slot][li*9+lj*3+lk];
-                op(spokeID, nl ? nl->getValue(LeafT::CoordToOffset(neighbor)) : uint64_t(0));
+            if (isCached) {
+                // which of the 3x3x3 neighboring leaves this tap falls into
+                const int leafX = ((voxelX+di)>>3)+1, leafY = ((voxelY+dj)>>3)+1, leafZ = ((voxelZ+dk)>>3)+1;
+                const LeafT* neighborLeaf = sNeighborLeaves[leafSlot][leafX*9 + leafY*3 + leafZ];
+                op(spokeID, neighborLeaf ? neighborLeaf->getValue(LeafT::CoordToOffset(neighbor))
+                                         : uint64_t(0));
             } else {
                 op(spokeID, tree.getValue( neighbor ));
             }
