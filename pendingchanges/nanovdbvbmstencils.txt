@@ -1,0 +1,12 @@
+NanoVDB:
+  Improvements:
+  - Added stencil resolvers to the CUDA VoxelBlockManager so stencil consumers need not pay a
+    root-down tree traversal per tap. Each shape has a plain form (no shared memory, callable
+    from divergent threads) and a "Cached" form in which the thread block cooperatively stages
+    a per-leaf neighbour table in shared memory and each tap becomes a direct in-leaf lookup:
+    computeBoxStencilCached for the 3x3x3 box, and computeCrossStencil /
+    computeCrossStencilCached for the 7-point cross used by Laplacian and upwind-class stencils.
+  - Added streaming forms of the box stencil, forEachBoxStencil and forEachBoxStencilCached,
+    which hand (tap, index) to a device-inlined callback instead of materializing a 27-element
+    per-thread array. forEachBoxStencilCached combines the cached table with the streaming
+    output and is the fastest way to resolve all 27 taps.
