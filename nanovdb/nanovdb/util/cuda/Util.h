@@ -140,8 +140,8 @@ inline cudaError_t mallocAsync(void** d_ptr, size_t size, cudaStream_t stream)
     if (!memoryPoolsSupported(device)) {
         fprintf(stderr,
                 "NanoVDB: device %d does not support stream-ordered CUDA memory pools required by "
-                "cudaMallocAsync. Define NANOVDB_USE_SYNC_CUDA_MALLOC to allocate synchronously with "
-                "cudaMalloc/cudaFree instead.\n",
+                "cudaMallocAsync. Define NANOVDB_USE_SYNC_CUDA_MALLOC when building to allocate "
+                "synchronously with cudaMalloc/cudaFree instead.\n",
                 device);
         return cudaErrorNotSupported;
     }
