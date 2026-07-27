@@ -162,7 +162,7 @@
 // restore legacy ReadAccessor behavior where value lookups fall back to root
 // after a leaf-cache miss.
 
-// Uncomment to use (slower) branched version of LeafData<FpN,...>::getValue
+// Comment out to use (slower) branched version of LeafData<FpN,...>::getValue
 #define NANOVDB_FPN_BRANCHLESS
 
 #if !defined(NANOVDB_ALIGN)
@@ -5413,6 +5413,9 @@ public:
         if constexpr(OpT::LEVEL <= 0) {
             if (this->isCached<LeafT>(dirty)) return ((LeafT*)mNode[0])->template setAndCache<OpT>(ijk, *this, args...);
         }
+#ifdef NANOVDB_USE_OLD_ACCESSOR
+        else
+#endif
         if constexpr(OpT::LEVEL <= 1) {
             if (this->isCached<NodeT1>(dirty)) return ((NodeT1*)mNode[1])->template setAndCache<OpT>(ijk, *this, args...);
         }
