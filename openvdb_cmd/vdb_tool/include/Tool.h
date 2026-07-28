@@ -53,11 +53,9 @@
 #include <openvdb/tools/PolySoupToLevelSet.h>
 #include <openvdb/tools/PointScatter.h>
 #include <openvdb/tools/PointsToMask.h>
-#include <openvdb/tools/Composite.h>
 #include <openvdb/tools/VolumeToMesh.h>
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/GridTransformer.h>
-#include <openvdb/tools/FastSweeping.h>
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tools/Clip.h>
 #include <openvdb/tools/Mask.h> // for tools::interiorMask()
