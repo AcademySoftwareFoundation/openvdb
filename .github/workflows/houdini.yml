@@ -81,7 +81,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: nanobind
-      run: ./ci/install_nanobind.sh 2.5.0
+      run: ./ci/install_nanobind.sh 2.9.2
     - name: install_gtest
       run: ./ci/install_gtest.sh latest
     - name: timestamp

@@ -158,7 +158,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: nanobind
-      run: ./ci/install_nanobind.sh 2.5.0
+      run: ./ci/install_nanobind.sh 2.9.2
       # 2026 images are broken with gtest/glfw/exr installs
     - name: deps
       if: contains(matrix.config.image, '2026')
@@ -201,7 +201,7 @@ jobs:
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
             sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev libgtest-dev libgmock-dev python3-numpy
-            ./ci/install_nanobind.sh 2.5.0
+            ./ci/install_nanobind.sh 2.9.2
           elif [ "$RUNNER_OS" == "macOS" ]; then
             ./ci/install_macos.sh 20
             ./ci/install_tbb_macos.sh
@@ -307,7 +307,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: nanobind
-        run: ./ci/install_nanobind.sh 2.5.0
+        run: ./ci/install_nanobind.sh 2.9.2
       - name: build
         run: >
           ./ci/build.sh -v

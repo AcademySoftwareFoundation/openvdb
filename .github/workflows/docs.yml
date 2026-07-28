@@ -44,7 +44,7 @@ jobs:
     - name: install_doxygen
       run: ./ci/install_doxygen.sh 1_14_0
     - name: nanobind
-      run: ./ci/install_nanobind.sh 2.5.0
+      run: ./ci/install_nanobind.sh 2.9.2
     - name: install_latex
       run: ./ci/install_texlive.sh
     - name: build
