@@ -18,6 +18,8 @@ on:
       - 'pendingchanges/**'
       - '**.md'
   pull_request:
+    # Add 'ready_for_review' to run CI when a draft PR is marked ready.
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - '**'
     paths-ignore:
@@ -44,10 +46,12 @@ concurrency:
 
 jobs:
   linux-nanovdb:
+    # push OR non-draft PR OR matching manual run
     if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'linux'
+      (github.event_name == 'push' ||
+       (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+       (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.type == 'all' || github.event.inputs.type == 'linux')))
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-nanovdb:cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
@@ -92,9 +96,10 @@ jobs:
 
   windows-nanovdb:
     if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'win'
+      (github.event_name == 'push' ||
+       (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+       (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.type == 'all' || github.event.inputs.type == 'win')))
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
     env:
       VCPKG_DEFAULT_TRIPLET: 'x64-windows'
@@ -139,9 +144,10 @@ jobs:
 
   macos-nanovdb:
     if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'mac'
+      (github.event_name == 'push' ||
+       (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+       (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.type == 'all' || github.event.inputs.type == 'mac')))
     runs-on: ${{ matrix.config.runner }}
     env:
       CXX: ${{ matrix.config.cxx }}
@@ -168,9 +174,10 @@ jobs:
 
   nanovdb-lite:
     if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'linux'
+      (github.event_name == 'push' ||
+       (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+       (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.type == 'all' || github.event.inputs.type == 'linux')))
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     container:
       image: aswf/ci-openvdb:2024-clang17.2

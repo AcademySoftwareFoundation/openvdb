@@ -124,7 +124,12 @@ if(OPENVDB_TOOL_USE_EXR)
   target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_EXR")
   find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED)
   find_package(Imath ${MINIMUM_IMATH_VERSION} CONFIG REQUIRED)
-  target_link_libraries(vdb_tool_common INTERFACE OpenEXR::OpenEXR Imath::Imath)
+
+  if(TARGET OpenEXR::OpenEXR)
+    target_link_libraries(vdb_tool_common INTERFACE OpenEXR::OpenEXR Imath::Imath)
+  else()
+    target_link_libraries(vdb_tool_common INTERFACE OpenEXR::IlmImf Imath::Imath)
+  endif()
 endif()
 
 if(OPENVDB_TOOL_USE_ABC)
