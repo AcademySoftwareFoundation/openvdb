@@ -145,6 +145,15 @@ public:
         mSize = mCapacity = 0;
     }
 
+    /// @brief Stream-accepting overload of clear(), so UnifiedBuffer satisfies the
+    ///        scratch-buffer interface used by the CUDA topology operators (which call
+    ///        clear(stream)). The stream is unused: this memory comes from
+    ///        cudaMallocManaged and must be released with the synchronous cudaFree
+    ///        (cudaFreeAsync only applies to the cudaMallocAsync pool). cudaFree itself
+    ///        blocks until all outstanding device work completes, so no preceding
+    ///        stream synchronization is required.
+    void clear(cudaStream_t) { this->clear(); }
+
     /// @brief Disallow copy assignment operation
     UnifiedBuffer& operator=(const UnifiedBuffer&) = delete;
 

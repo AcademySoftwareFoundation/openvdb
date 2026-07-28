@@ -33,7 +33,7 @@ namespace nanovdb {
 
 namespace tools::cuda {
 
-template <typename BuildT>
+template <typename BuildT, typename ScratchBufferT = nanovdb::cuda::DeviceBuffer>
 class MergeGrids
 {
     using GridT  = NanoGrid<BuildT>;
@@ -84,7 +84,7 @@ private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
-    TopologyBuilder<BuildT> mBuilder;
+    TopologyBuilder<BuildT, ScratchBufferT> mBuilder;
     cudaStream_t            mStream{0};
     util::cuda::Timer       mTimer;
     int                     mVerbose{0};
@@ -94,10 +94,10 @@ private:
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
+template<typename BuildT, typename ScratchBufferT>
 template<typename BufferT>
 GridHandle<BufferT>
-MergeGrids<BuildT>::getHandle(const BufferT &pool)
+MergeGrids<BuildT, ScratchBufferT>::getHandle(const BufferT &pool)
 {
     if (mDeviceSrcGrids.empty())
         throw std::runtime_error("MergeGrids: no input grids");
@@ -163,12 +163,12 @@ MergeGrids<BuildT>::getHandle(const BufferT &pool)
     cudaStreamSynchronize(mStream);
 
     return GridHandle<BufferT>(std::move(buffer));
-}// MergeGrids<BuildT>::getHandle
+}// MergeGrids<BuildT, ScratchBufferT>::getHandle
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void MergeGrids<BuildT>::mergeRoot()
+template<typename BuildT, typename ScratchBufferT>
+void MergeGrids<BuildT, ScratchBufferT>::mergeRoot()
 {
     // Creates a new merged tree root with the merged tiles of the two input root topologies
 
@@ -218,12 +218,12 @@ void MergeGrids<BuildT>::mergeRoot()
     for (const auto& [key, tile] : mergedTiles)
         *mergedRootPtr->tile(t++) = tile;
     mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
-}// MergeGrids<BuildT>::mergeRoot
+}// MergeGrids<BuildT, ScratchBufferT>::mergeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void MergeGrids<BuildT>::mergeInternalNodes()
+template<typename BuildT, typename ScratchBufferT>
+void MergeGrids<BuildT, ScratchBufferT>::mergeInternalNodes()
 {
     // Merges the masks of upper and lower nodes from both input topologies into the
     // densified, pre-allocated mask arrays of the merged result
@@ -236,12 +236,12 @@ void MergeGrids<BuildT>::mergeInternalNodes()
             <<<mSrcTreeData[i].mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
             (mDeviceSrcGrids[i], mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks());
     }
-}// MergeGrids<BuildT>::mergeInternalNodes
+}// MergeGrids<BuildT, ScratchBufferT>::mergeInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template <typename BuildT>
-void MergeGrids<BuildT>::processGridTreeRoot()
+template <typename BuildT, typename ScratchBufferT>
+void MergeGrids<BuildT, ScratchBufferT>::processGridTreeRoot()
 {
     // Copy GridData from the first source grid
     // TODO: Check for instances where extra processing is needed
@@ -249,12 +249,12 @@ void MergeGrids<BuildT>::processGridTreeRoot()
     cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrids.front()->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
     cudaCheckError();
-}// MergeGrids<BuildT>::processGridTreeRoot
+}// MergeGrids<BuildT, ScratchBufferT>::processGridTreeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void MergeGrids<BuildT>::mergeLeafNodes()
+template<typename BuildT, typename ScratchBufferT>
+void MergeGrids<BuildT, ScratchBufferT>::mergeLeafNodes()
 {
     using Op = util::morphology::cuda::MergeLeafNodesFunctor<BuildT>;
     // Each input ORs its leaf active masks into the merged leaf topology.
@@ -267,7 +267,7 @@ void MergeGrids<BuildT>::mergeLeafNodes()
 
     // Update leaf offsets and prefix sums
     mBuilder.processLeafOffsets(mStream);
-}// MergeGrids<BuildT>::mergeLeafNodes
+}// MergeGrids<BuildT, ScratchBufferT>::mergeLeafNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 

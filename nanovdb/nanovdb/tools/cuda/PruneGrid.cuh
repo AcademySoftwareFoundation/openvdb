@@ -30,7 +30,7 @@ namespace nanovdb {
 
 namespace tools::cuda {
 
-template <typename BuildT>
+template <typename BuildT, typename ScratchBufferT = nanovdb::cuda::DeviceBuffer>
 class PruneGrid
 {
     using GridT  = NanoGrid<BuildT>;
@@ -75,7 +75,7 @@ private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
-    TopologyBuilder<BuildT> mBuilder;
+    TopologyBuilder<BuildT, ScratchBufferT> mBuilder;
     cudaStream_t            mStream{0};
     util::cuda::Timer       mTimer;
     int                     mVerbose{0};
@@ -86,10 +86,10 @@ private:
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
+template<typename BuildT, typename ScratchBufferT>
 template<typename BufferT>
 GridHandle<BufferT>
-PruneGrid<BuildT>::getHandle(const BufferT &pool)
+PruneGrid<BuildT, ScratchBufferT>::getHandle(const BufferT &pool)
 {
     // Copy TreeData from GPU -> CPU
     cudaStreamSynchronize(mStream);
@@ -150,12 +150,12 @@ PruneGrid<BuildT>::getHandle(const BufferT &pool)
     cudaStreamSynchronize(mStream);
 
     return GridHandle<BufferT>(std::move(buffer));
-}// PruneGrid<BuildT>::getHandle
+}// PruneGrid<BuildT, ScratchBufferT>::getHandle
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void PruneGrid<BuildT>::pruneRoot()
+template<typename BuildT, typename ScratchBufferT>
+void PruneGrid<BuildT, ScratchBufferT>::pruneRoot()
 {
     // This method conservatively (and trivially) prunes the root tile table.
     // For this simple approximation, it is assumed that all root tiles currently present will presist,
@@ -200,12 +200,12 @@ void PruneGrid<BuildT>::pruneRoot()
     for (const auto& [key, tile] : prunedTiles)
         *prunedRootPtr->tile(t++) = tile;
     mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
-}// PruneGrid<BuildT>::pruneRoot
+}// PruneGrid<BuildT, ScratchBufferT>::pruneRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void PruneGrid<BuildT>::pruneInternalNodes()
+template<typename BuildT, typename ScratchBufferT>
+void PruneGrid<BuildT, ScratchBufferT>::pruneInternalNodes()
 {
     // Computes the masks of upper and (densified) lower internal nodes, as a result of the pruning operation
     // Masks of lower internal nodes are densified in the sense that a serialized array of them is allocated,
@@ -215,24 +215,24 @@ void PruneGrid<BuildT>::pruneInternalNodes()
             srcLeafCount, util::morphology::cuda::PruneInternalNodesFunctor<BuildT>(),
             mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mDeviceSrcLeafMask, mBuilder.mUpperMasks.deviceData(), mBuilder.mLowerMasks.deviceData() );
     }
-}// PruneGrid<BuildT>::pruneInternalNodes
+}// PruneGrid<BuildT, ScratchBufferT>::pruneInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template <typename BuildT>
-void PruneGrid<BuildT>::processGridTreeRoot()
+template <typename BuildT, typename ScratchBufferT>
+void PruneGrid<BuildT, ScratchBufferT>::processGridTreeRoot()
 {
     // Copy GridData from source grid
     // By convention: this will duplicate grid name and map. Others will be reset later
     cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrid->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
     cudaCheckError();
-}// PruneGrid<BuildT>::processGridTreeRoot
+}// PruneGrid<BuildT, ScratchBufferT>::processGridTreeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void PruneGrid<BuildT>::pruneLeafNodes()
+template<typename BuildT, typename ScratchBufferT>
+void PruneGrid<BuildT, ScratchBufferT>::pruneLeafNodes()
 {
     // Prunes the active masks of the source grid to the intersection with the leaf-mask sidecar
     // followed by rebuilding the leaf offsets
@@ -244,7 +244,7 @@ void PruneGrid<BuildT>::pruneLeafNodes()
 
     // Update leaf offsets and prefix sums
     mBuilder.processLeafOffsets(mStream);
-}// PruneGrid<BuildT>::pruneLeafNodes
+}// PruneGrid<BuildT, ScratchBufferT>::pruneLeafNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
