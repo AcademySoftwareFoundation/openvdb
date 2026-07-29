@@ -105,7 +105,7 @@ polySoupToLevelSet(
 /// @param bbox       Bounding box of the vertices of the polygon mesh
 /// @param vtx        Vector of world space vertex positions
 /// @param tri        Vector of triangle indices
-/// @param quads      Vector of quad indices
+/// @param quad       Vector of quad indices
 /// @param D          Functor mapping voxel size to maximum allowed surface deformation
 ///                   allowed by shrink wrapping as a function of the voxel size
 /// @param halfWidth  Half the width of the narrow band, in voxel units
@@ -140,7 +140,7 @@ polySoupToLevelSet(
 /// @param bbox         bounding box of the vertices of the polygon mesh
 /// @param vtx          vector of world space vertex positions
 /// @param tri          vector of triangle indies
-/// @param quads        vector of quad indices
+/// @param quad         vector of quad indices
 /// @param D            functor mapping voxel size to maximum allowed surface deformation
 ///                     allowed by shrink wrapping as a function of the voxel size
 /// @param halfWidth    half the width of the narrow band, in voxel units
