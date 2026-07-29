@@ -3526,10 +3526,10 @@ Houdini:
 - @vdblink::tools::volumeToMesh() tools::volumeToMesh@endlink now compiles
   for all grid types but throws an exception if the input grid does not
   have a scalar value type.
-- Added an @c openvdb::io::File::readGrid()
-  overload and @c openvdb::GridBase::readBuffers() overloads to the grid, tree
-  and node classes that allow one to specify a bounding box against which to
-  clip a grid while reading it.
+- Added an <TT>openvdb::io::File::readGrid(const Name&, const BBoxd&)</TT>
+  overload and <TT>openvdb::GridBase::readBuffers(std::istream&, const CoordBBox&)</TT>
+  overloads to the grid, tree and node classes that allow one to specify a
+  bounding box against which to clip a grid while reading it.
   For large grids, clipping while reading can result in significantly lower
   memory usage than clipping after reading.
 - Added @vdblink::GridBase::clipGrid() GridBase::clipGrid@endlink, which
@@ -3588,10 +3588,11 @@ Houdini:
 - Added constructors and methods to both
   @vdblink::math::RandInt RandInt@endlink and
   @vdblink::math::Rand01 Rand01@endlink to set and reset the random seed value.
-- Added convenience methods @c openvdb::math::Transform::indexToWorld(),
-  @c openvdb::math::Transform::worldToIndex() and
-  @c openvdb::math::Transform::worldToIndexCellCentered() for transforming
-  bounding boxes
+- Added convenience methods
+  <TT>openvdb::math::Transform::indexToWorld(const BBoxd&)</TT>,
+  <TT>openvdb::math::Transform::worldToIndex(const BBoxd&)</TT> and
+  <TT>openvdb::math::Transform::worldToIndexCellCentered(const BBoxd&)</TT>
+  for transforming bounding boxes
   to @vdblink::math::Transform math::Transform@endlink.
 - @c vdb_view is now compatible with both GLFW&nbsp;2 and GLFW&nbsp;3.
 - Made many small changes to address type conversion and other warnings
@@ -3611,7 +3612,8 @@ Houdini:
 
 @par
 API changes:
-- The addition of an @c openvdb::GridBase::readBuffers()
+- The addition of an
+  <TT>openvdb::GridBase::readBuffers(std::istream&, const CoordBBox&)</TT>
   virtual function overload and the
   @vdblink::GridBase::clip() GridBase::clip@endlink
   @vdblink::GridBase::readNonresidentBuffers()
@@ -3717,13 +3719,15 @@ Houdini:
   extractSparseTreeWithMask@endlink, which copies data from the index-space
   intersection of a sparse tree and a dense input grid.
 - Added copy constructors to the
-  @c openvdb::Grid::Grid(), @c openvdb::tree::Tree::Tree(),
-  @c openvdb::tree::RootNode::RootNode(),
-  @c openvdb::tree::InternalNode::InternalNode() and
-  @c openvdb::tree::LeafNode::LeafNode()
+  <TT>openvdb::Grid::Grid(const Grid&lt;OtherTreeType&gt;&)</TT>,
+  <TT>openvdb::tree::Tree::Tree(const Tree&lt;OtherRootType&gt;&)</TT>,
+  <TT>openvdb::tree::RootNode::RootNode(const RootNode&lt;OtherChildType&gt;&)</TT>,
+  <TT>openvdb::tree::InternalNode::InternalNode(const InternalNode&lt;OtherChildNodeType, Log2Dim&gt;&)</TT>
+  and
+  <TT>openvdb::tree::LeafNode::LeafNode(const LeafNode&lt;OtherValueType, Log2Dim&gt;&)</TT>
   classes, and an assignment operator overload to
-  @c openvdb::tree::RootNode::operator=(), that allow the source and
-  destination to have different
+  <TT>openvdb::tree::RootNode::operator=(const RootNode&lt;OtherChildType&gt;&)</TT>,
+  that allow the source and destination to have different
   value types.
 - Modified @vdblink::tree::Tree::combine2() Tree::combine2@endlink to permit
   combination of trees with different value types.
@@ -4251,9 +4255,9 @@ API changes:
   that relied on input and output grids having compatible tree topology.
 - @vdblink::math::Transform math::Transform@endlink now includes an
   @vdblink::math::Transform::isIdentity() isIdentity@endlink predicate
-  and methods @c openvdb::math::Transform::preMult() and
-  @c openvdb::math::Transform::postMult() to pre- and postmultiply
-  by a matrix.
+  and methods <TT>openvdb::math::Transform::preMult(const Mat4d&)</TT> and
+  <TT>openvdb::math::Transform::postMult(const Mat4d&)</TT>
+  to pre- and postmultiply by a matrix.
 - Modified the @link NodeMasks.h node mask@endlink classes to permit
   octree-like tree configurations (i.e., with a branching factor of two)
   and to use 64-bit operations instead of 32-bit operations.
@@ -4702,8 +4706,8 @@ API changes:
   math library and a method to return the
   @vdblink::math::Mat3::trace trace@endlink of a @c Mat3.
 - Fixed a bug in the
-  @c openvdb::tree::ValueAccessor::ValueAccessor() copy constructor that
-  caused the copy to reference
+  <TT>openvdb::tree::ValueAccessor::ValueAccessor(const ValueAccessor&)</TT>
+  copy constructor that caused the copy to reference
   the original.
 - Fixed a bug in @vdblink::tree::RootNode::setActiveState()
   RootNode::setActiveState@endlink that caused a crash
@@ -4711,7 +4715,7 @@ API changes:
 - Added a @c Tree::pruneLevelSet method that is similar to but faster than
   Tree::pruneInactive() for level set grids.
 - Added fast leaf node voxel access
-  @c openvdb::tree::LeafNode::getValue() methods
+  <TT>openvdb::tree::LeafNode::getValue(Index)</TT> methods
   that index by linear offset (as returned by
   @vdblink::tree::LeafNode::ValueOnIter::pos() ValueIter::pos@endlink)
   instead of by @ijk coordinates.
@@ -4827,8 +4831,8 @@ API changes:
   method that replaces a grid&rsquo;s tree with a new, empty tree of the
   correct type.
 - Fixed a crash in
-  @c openvdb::tree::Tree::setValueOff() when the new value was equal to the
-  background value.
+  <TT>openvdb::tree::Tree::setValueOff(const Coord& xyz, const ValueType& value)</TT>
+  when the new value was equal to the background value.
 - Fixed bugs in Tree::prune() that could result in output tiles with
   incorrect active states.
 - Added @c librt to the link dependencies to address build failures
