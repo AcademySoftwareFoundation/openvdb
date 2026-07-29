@@ -549,7 +549,7 @@ git clone https://github.com/PixarAnimationStudios/OpenUSD.git
 python3 OpenUSD/build_scripts/build_usd.py \
     --no-imaging --no-usdview --no-alembic --no-draco --no-openimageio \
     --no-tutorials --no-examples ~/dev/src/openusd
-cmake -DOPENVDB_TOOL_USE_USD=ON -Dpxr_DIR=$HOME/local/openusd/lib/cmake/pxr ..
+cmake -DOPENVDB_TOOL_USE_USD=ON -Dpxr_DIR=$HOME/dev/openusd/lib/cmake/pxr ..
 ```
 
 For a slimmer build (skips Alembic, Draco, OpenImageIO, materials, imaging, etc., cutting build time substantially), pass `--no-imaging --no-alembic --no-draco --no-openimageio` to `build_usd.py`. vdb_tool only needs the core USD libraries (`usd`, `usdGeom`, `sdf`, `gf`, `vt`, `tf`).
