@@ -63,11 +63,17 @@ def _make_test(script_name):
             openvdb_dll_directory = os.path.abspath(os.path.join(
                 os.getcwd(), os.pardir, os.pardir, os.pardir, os.pardir,
                 "openvdb", "openvdb", config))
-            env["NANOVDB_TEST_DLL_DIRECTORY"] = openvdb_dll_directory
+            dll_directories = [openvdb_dll_directory]
+            cuda_root = env.get("CUDA_PATH")
+            if cuda_root:
+                dll_directories.append(os.path.join(cuda_root, "bin"))
+            env["NANOVDB_TEST_DLL_DIRECTORIES"] = os.pathsep.join(
+                dll_directories)
             # Python imports sitecustomize during startup. Add this test
             # directory to the child's module path so sitecustomize.py can
-            # register the OpenVDB DLL directory before the example imports
-            # nanovdb, while still running the example as a normal script.
+            # register only the required OpenVDB and CUDA DLL directories
+            # before the example imports nanovdb, while still running the
+            # example as a normal script.
             test_directory = os.path.dirname(os.path.abspath(__file__))
             env["PYTHONPATH"] = os.pathsep.join(
                 (test_directory, env.get("PYTHONPATH", "")))
