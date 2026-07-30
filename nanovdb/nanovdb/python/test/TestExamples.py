@@ -51,6 +51,10 @@ def _make_test(script_name):
                         f"example script is missing: {script}")
         command = [sys.executable, script]
         env = os.environ.copy()
+        # Preserve output up to a native crash and ask Python to report the
+        # active frame for fatal signals and Windows exceptions.
+        env["PYTHONFAULTHANDLER"] = "1"
+        env["PYTHONUNBUFFERED"] = "1"
         if hasattr(os, "add_dll_directory"):
             # Match TestNanoVDB.py's in-tree OpenVDB DLL lookup. The child
             # starts in a temporary directory, so resolve this while the
