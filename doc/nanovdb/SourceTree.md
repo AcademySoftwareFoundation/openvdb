@@ -12,8 +12,8 @@
 * [math/HDDA.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/math/HDDA.h) HDDA related.
 * [math/SampleFromVoxels.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/math/SampleFromVoxels.h) interpolation.
 
-```bash
-foo@bar:~$ tree
+```
+$ tree
 .
 ├── CMakeLists.txt
 ├── cmd
@@ -176,3 +176,4 @@ foo@bar:~$ tree
     ├── Stencils.h
     ├── Timer.h
     └── Util.h
+```

@@ -1,20 +1,22 @@
-vdb_tool 10.6.1
+vdb_tool 10.8.0
 
-# This examples demonstrates how to read a polygon mesh from a ply file,
-# converting it into a narrow-band level set, converting the level set
-# into an adaptive polygon mesh and writing out the mesh to a binary ply file.
+# This example demonstrates how to simplify a polygon mesh by round-tripping
+# it through a narrow-band level set and re-meshing it with adaptive
+# decimation. Reading from a PLY file, converting to a level set, then
+# extracting an adaptive polygon mesh produces fewer, larger polygons in
+# flat regions while preserving detail near high-curvature features.
 
-# read OpenVDB file with points
+# Read polygon mesh from binary PLY file
 read bunny.ply
 
-# Mesh to level set conversion
-# dimension is 256 voxels
-# narrow-band level set width is 3 voxel units
+# Mesh to level set conversion:
+#   dimension is 256 voxels along the longest axis
+#   narrow-band half-width is 3 voxel units
 mesh2ls dim=256 width=3
 
-# Level set to polygon mesh conversion
-# Mesh adaptivity is 0.25 %
+# Level set to polygon mesh conversion:
+#   mesh adaptivity is 0.25 % (higher value = more aggressive simplification)
 ls2mesh adapt=0.25
 
-# write polygon mesh to binary ply file
-write bunny_smooth.ply
+# Write polygon mesh to binary PLY file
+write bunny_simplified.ply
