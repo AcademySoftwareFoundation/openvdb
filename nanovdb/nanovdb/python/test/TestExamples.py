@@ -14,6 +14,7 @@ examples/ are not executed.
 """
 
 import os
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -21,6 +22,7 @@ import unittest
 
 EXAMPLES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             os.pardir, "examples")
+RUN_EXAMPLE_ARG = "--run-example"
 
 EXAMPLE_SCRIPTS = [
     "build_grid.py",
@@ -44,17 +46,53 @@ class TestExamples(unittest.TestCase):
     pass
 
 
+def _run_example(script):
+    """Run one example after configuring dependent-DLL lookup on Windows."""
+    dll_directory_handles = []
+    if hasattr(os, "add_dll_directory"):
+        for path in os.environ.get("PATH", "").split(os.pathsep):
+            if os.path.isdir(path):
+                try:
+                    # Keep each handle alive until the example has finished.
+                    dll_directory_handles.append(os.add_dll_directory(path))
+                except OSError:
+                    pass
+
+    sys.argv = [script]
+    sys.path[0] = os.path.dirname(os.path.abspath(script))
+    runpy.run_path(script, run_name="__main__")
+
+
 def _make_test(script_name):
     def test(self):
         script = os.path.join(EXAMPLES_DIR, script_name)
         self.assertTrue(os.path.isfile(script),
                         f"example script is missing: {script}")
+        command = [sys.executable, script]
+        env = os.environ.copy()
+        if hasattr(os, "add_dll_directory"):
+            # Match TestNanoVDB.py's in-tree OpenVDB DLL lookup. The child
+            # starts in a temporary directory, so resolve this while the
+            # parent is still in the CMake configuration directory.
+            config = os.path.basename(os.getcwd())
+            openvdb_dll_directory = os.path.abspath(os.path.join(
+                os.getcwd(), os.pardir, os.pardir, os.pardir, os.pardir,
+                "openvdb", "openvdb", config))
+            env["PATH"] = os.pathsep.join(
+                (openvdb_dll_directory, env.get("PATH", "")))
+            # os.add_dll_directory() registrations are process-local, so run
+            # through this file's child mode to register them in the process
+            # that imports nanovdb.
+            command = [
+                sys.executable, os.path.abspath(__file__),
+                RUN_EXAMPLE_ARG, script,
+            ]
         # A fresh cwd per run keeps any output files out of the source
         # tree (the examples themselves also write to tempdirs).
         result = subprocess.run(
-            [sys.executable, script],
+            command,
             cwd=tempfile.mkdtemp(prefix="nanovdb_example_"),
-            env=os.environ.copy(),
+            env=env,
             capture_output=True,
             text=True,
             timeout=120,
@@ -74,4 +112,7 @@ for _name in EXAMPLE_SCRIPTS:
 
 
 if __name__ == "__main__":
-    unittest.main()
+    if len(sys.argv) == 3 and sys.argv[1] == RUN_EXAMPLE_ARG:
+        _run_example(sys.argv[2])
+    else:
+        unittest.main()
