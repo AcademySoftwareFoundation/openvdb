@@ -136,7 +136,8 @@ inline cudaError_t freeAsync(void* d_ptr, cudaStream_t){return cudaFree(d_ptr);}
 inline cudaError_t mallocAsync(void** d_ptr, size_t size, cudaStream_t stream)
 {
     int device = 0;
-    if (const cudaError_t err = cudaGetDevice(&device); err != cudaSuccess) return err;
+    const cudaError_t err = cudaGetDevice(&device);
+    if (err != cudaSuccess) return err;
     if (!memoryPoolsSupported(device)) {
         fprintf(stderr,
                 "NanoVDB: device %d does not support stream-ordered CUDA memory pools required by "
@@ -157,7 +158,8 @@ inline cudaError_t mallocAsync(void** d_ptr, size_t size, cudaStream_t stream)
 inline cudaError_t freeAsync(void* d_ptr, cudaStream_t stream)
 {
     int device = 0;
-    if (const cudaError_t err = cudaGetDevice(&device); err != cudaSuccess) return err;
+    const cudaError_t err = cudaGetDevice(&device);
+    if (err != cudaSuccess) return err;
     if (!memoryPoolsSupported(device)) return cudaErrorNotSupported;
     return cudaFreeAsync(d_ptr, stream);
 }
