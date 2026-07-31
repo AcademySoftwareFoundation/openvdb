@@ -63,6 +63,11 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
     // Independently, compute<Name> materializes the taps into a 27-slot array while
     // forEach<Name> streams (tap, index) to a device-inlined callback, which avoids the
     // per-thread array entirely for consumers that can take the taps in order.
+    //
+    // Every resolver resolves the taps of ONE decoded slot per thread - the slot with the
+    // thread's own index - so the block must be launched with blockDim.x == BlockWidth.
+    // (decodeInverseMaps itself is more permissive: it strides over the slots, so it fills
+    // the maps correctly for any blockDim.x.)
 
     /// @brief Number of distinct, consecutive leaves the block's decoded slots span, clamped
     /// to MaxCachedLeaves. Shared preamble of the cached resolvers, which stage one table
@@ -221,6 +226,7 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
     {
         // Verify that the nodes can be accessed linearly
         NANOVDB_ASSERT(grid->isSequential());
+        NANOVDB_ASSERT(blockDim.x == BlockWidth);// one thread per decoded slot
 
         int tID = threadIdx.x;
         const auto& tree = grid->tree();
@@ -260,6 +266,7 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
         OpT op)
     {
         NANOVDB_ASSERT(grid->isSequential());
+        NANOVDB_ASSERT(blockDim.x == BlockWidth);// one thread per decoded slot
         const int tID = threadIdx.x;
         const auto& tree = grid->tree();
         if (smem_leafIndex[tID] == UnusedLeafIndex) return;
@@ -330,6 +337,7 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
     {
         // Verify that the nodes can be accessed linearly
         NANOVDB_ASSERT(grid->isSequential());
+        NANOVDB_ASSERT(blockDim.x == BlockWidth);// one thread per decoded slot
 
         int tID = threadIdx.x;
         const auto& tree = grid->tree();
@@ -370,6 +378,7 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
         uint64_t *stencilIndices)
     {
         NANOVDB_ASSERT(grid->isSequential());
+        NANOVDB_ASSERT(blockDim.x == BlockWidth);// one thread per decoded slot
 
         using LeafT = typename NanoTree<BuildT>::LeafNodeType;
         constexpr int MaxCachedLeaves = 16;
@@ -437,6 +446,7 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
         OpT op)
     {
         NANOVDB_ASSERT(grid->isSequential());
+        NANOVDB_ASSERT(blockDim.x == BlockWidth);// one thread per decoded slot
 
         using LeafT = typename NanoTree<BuildT>::LeafNodeType;
         constexpr int MaxCachedLeaves = 16;
