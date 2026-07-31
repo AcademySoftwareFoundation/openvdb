@@ -78,12 +78,15 @@ public:
     /// @param count number of elements
     template<typename S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
     explicit Buffer(cudaStream_t stream, R resource, size_t count, NoInit)
-        : detail::StreamHolder<true>{stream}, mResource(std::move(resource))
+        : detail::StreamHolder<true>{stream}
+        , mResource(std::move(resource))
     {
         this->allocate(count, stream);
     }
 
     /// @brief Convenience c-tor using a default-constructed resource.
+    /// @param stream cuda stream the allocation is ordered on
+    /// @param count number of elements
     /// @note There is deliberately no count c-tor without NoInit: implicit
     ///       initialization of freshly allocated memory costs a hidden fill
     ///       pass that the dominant allocate-then-overwrite pattern wastes,
@@ -95,6 +98,8 @@ public:
     /// @brief C-tor allocating @c count uninitialized elements from a
     ///        synchronous resource: the stream-less analog of
     ///        (stream, resource, count, no_init).
+    /// @param resource resource instance the buffer takes ownership of
+    /// @param count number of elements
     template<typename S = R, std::enable_if_t<!is_async_resource<S>::value && is_resource<S>::value, int> = 0>
     explicit Buffer(R resource, size_t count, NoInit)
         : mResource(std::move(resource))
@@ -103,9 +108,11 @@ public:
     }
 
     /// @brief Convenience c-tor using a default-constructed resource.
+    /// @param count number of elements
     template<typename S = R, std::enable_if_t<!is_async_resource<S>::value && is_resource<S>::value, int> = 0>
     Buffer(size_t count, NoInit) : Buffer(R(), count, noInit) {}
 
+    /// @brief Explicitly disallow copy construction and assignment operation
     Buffer(const Buffer&) = delete;
     Buffer& operator=(const Buffer&) = delete;
 
@@ -140,6 +147,7 @@ public:
     /// @brief Returns a deep copy of this buffer, allocated from a copy of the
     ///        resource; the allocation and element copy are ordered on @c stream,
     ///        which becomes the copy's retained stream.
+    /// @param stream cuda stream the allocation and element copy are ordered on
     template<typename S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
     Buffer copy(cudaStream_t stream) const
     {
@@ -169,6 +177,7 @@ public:
 
     /// @brief Replaces the retained stream without synchronizing; subsequent
     ///        deallocation (and destruction) is ordered on @c stream instead.
+    /// @param stream cuda stream subsequent deallocation is ordered on
     /// @warning The caller is responsible for ordering @c stream after any
     ///          in-flight work that uses the buffer's memory.
     template<typename S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
@@ -180,6 +189,8 @@ public:
     ///        @c stream, which becomes the retained stream: the prefix copy is
     ///        the old block's last use, so that is the stream its free must be
     ///        ordered on.
+    /// @param count number of elements
+    /// @param stream cuda stream the reallocation is ordered on
     /// @warning The caller is responsible for ordering @c stream after any
     ///          in-flight work on the previously retained stream that uses the
     ///          buffer's memory.
@@ -214,15 +225,24 @@ public:
 
     /// @brief Resizes the buffer to @c count elements through the synchronous
     ///        resource, preserving the leading min(old, new) elements.
+    /// @param count number of elements
     template<typename S = R, std::enable_if_t<!is_async_resource<S>::value && is_resource<S>::value, int> = 0>
     void resize(size_t count)
     {
         if (count == mSize) return;
+        // No member is mutated until every throwing operation has succeeded,
+        // so a failed resize leaves the buffer untouched.
         T* newData = count ? static_cast<T*>(mResource.allocate(checkedBytes(count), R::DEFAULT_ALIGNMENT))
                            : nullptr;
         if (newData && mData) {
             const size_t prefix = count < mSize ? count : mSize;
-            cudaCheck(cudaMemcpy(newData, mData, prefix * sizeof(T), cudaMemcpyDefault));
+            try {
+                cudaCheck(cudaMemcpy(newData, mData, prefix * sizeof(T), cudaMemcpyDefault));
+            }
+            catch (...) {
+                mResource.deallocate(newData, checkedBytes(count), R::DEFAULT_ALIGNMENT);
+                throw;
+            }
         }
         this->deallocate(mData, mSize);
         mData = newData;
@@ -254,6 +274,7 @@ private:
     /// @brief Returns @c count * sizeof(T), throwing std::runtime_error if the
     ///        byte size would overflow size_t instead of silently wrapping into
     ///        a tiny allocation.
+    /// @param count number of elements
     static size_t checkedBytes(size_t count)
     {
         if (count > std::numeric_limits<size_t>::max() / sizeof(T))
@@ -262,8 +283,10 @@ private:
     }
 
     /// @brief Allocates @c count elements through the resource and records the
-    ///        new extent; @c stream is used by the stream-ordered form and
-    ///        ignored by the synchronous one. A zero count allocates nothing.
+    ///        new extent. A zero count allocates nothing.
+    /// @param count number of elements
+    /// @param stream cuda stream the allocation is ordered on; used by the
+    ///        stream-ordered form and ignored by the synchronous one
     void allocate(size_t count, cudaStream_t stream)
     {
         if (count) {
@@ -277,6 +300,8 @@ private:
 
     /// @brief Frees @c count elements at @c p through the resource; the
     ///        stream-ordered form frees on the retained stream. Null is a no-op.
+    /// @param p pointer to the elements to free
+    /// @param count number of elements
     void deallocate(T* p, size_t count)
     {
         if (!p) return;
@@ -302,8 +327,10 @@ public:
     /// @brief Default c-tor of an empty view.
     BufferView() = default;
 
-    /// @brief C-tor viewing @c count elements starting at @c data; the caller
-    ///        guarantees the underlying storage outlives every use of the view.
+    /// @brief C-tor viewing a contiguous range; the caller guarantees the
+    ///        underlying storage outlives every use of the view.
+    /// @param data pointer to the first element
+    /// @param count number of elements
     /// @throw std::runtime_error if @c data is null while @c count is non-zero.
     BufferView(T* data, size_t count) : mData(data), mSize(count)
     {
