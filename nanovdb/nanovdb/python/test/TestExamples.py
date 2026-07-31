@@ -49,12 +49,40 @@ def _make_test(script_name):
         script = os.path.join(EXAMPLES_DIR, script_name)
         self.assertTrue(os.path.isfile(script),
                         f"example script is missing: {script}")
+        command = [sys.executable, script]
+        env = os.environ.copy()
+        # Preserve output up to a native crash and ask Python to report the
+        # active frame for fatal signals and Windows exceptions.
+        env["PYTHONFAULTHANDLER"] = "1"
+        env["PYTHONUNBUFFERED"] = "1"
+        if hasattr(os, "add_dll_directory"):
+            # Match TestNanoVDB.py's in-tree OpenVDB DLL lookup. The child
+            # starts in a temporary directory, so resolve this while the
+            # parent is still in the CMake configuration directory.
+            config = os.path.basename(os.getcwd())
+            openvdb_dll_directory = os.path.abspath(os.path.join(
+                os.getcwd(), os.pardir, os.pardir, os.pardir, os.pardir,
+                "openvdb", "openvdb", config))
+            dll_directories = [openvdb_dll_directory]
+            cuda_root = env.get("CUDA_PATH")
+            if cuda_root:
+                dll_directories.append(os.path.join(cuda_root, "bin"))
+            env["NANOVDB_TEST_DLL_DIRECTORIES"] = os.pathsep.join(
+                dll_directories)
+            # Python imports sitecustomize during startup. Add this test
+            # directory to the child's module path so sitecustomize.py can
+            # register only the required OpenVDB and CUDA DLL directories
+            # before the example imports nanovdb, while still running the
+            # example as a normal script.
+            test_directory = os.path.dirname(os.path.abspath(__file__))
+            env["PYTHONPATH"] = os.pathsep.join(
+                (test_directory, env.get("PYTHONPATH", "")))
         # A fresh cwd per run keeps any output files out of the source
         # tree (the examples themselves also write to tempdirs).
         result = subprocess.run(
-            [sys.executable, script],
+            command,
             cwd=tempfile.mkdtemp(prefix="nanovdb_example_"),
-            env=os.environ.copy(),
+            env=env,
             capture_output=True,
             text=True,
             timeout=120,
