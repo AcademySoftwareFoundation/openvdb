@@ -75,6 +75,10 @@ if(NANOVDB_USE_CUDA)
   target_link_libraries(nanovdb_test_cuda_util_sync PRIVATE nanovdb GTest::GTest GTest::Main)
   set_target_properties(nanovdb_test_cuda_util_sync PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   add_test(nanovdb_cuda_util_sync_unit_test nanovdb_test_cuda_util_sync)
+  add_executable(nanovdb_test_cuda_buffer "TestBuffer.cu")
+  target_link_libraries(nanovdb_test_cuda_buffer PRIVATE nanovdb GTest::GTest GTest::Main)
+  set_target_properties(nanovdb_test_cuda_buffer PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+  add_test(nanovdb_cuda_buffer_unit_test nanovdb_test_cuda_buffer)
 endif()
 
 # -----------------------------------------------------------------------------
