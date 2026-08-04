@@ -2,6 +2,7 @@ NanoVDB:
 
   New Features:
   - Added new _hostdev_ function named nanovdb::math::isoCrossing, which intersects a ray against a user-defined iso-surface.
+  - Added doc/nanovdb/TEACHME, an interactive tutorial for the NanoVDB user API: lesson documents written to be loaded by an LLM coding agent, which then teaches the API interactively to a developer new to NanoVDB. Ships with a cheat sheet, a GPU ray-marching capstone, and a CI harness that compiles every code block in the lesson against the NanoVDB headers so the tutorial cannot drift from the API.
 
   Improvements:
   - The bug-fix to the nanovdb::ReadAccessor (see below) improves random-access performance in some use-cases (especially on the CPU).
