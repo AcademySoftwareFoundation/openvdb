@@ -285,6 +285,9 @@ PolySoupToLevelSet<GridType>::PolySoupToLevelSet(PolySoup &&poly, int dim, float
         OPENVDB_THROW(ArithmeticError, "polySoupToLevelSet: computed voxel size is not "
             "finite and positive (is dim too small for the given halfWidth?)");
     }
+    // NB: the 2*mMinVoxelSize <= mMaxVoxelSize relationship is a precondition of
+    // the coarse-to-fine hierarchy in process() only (not of offset()), so it is
+    // enforced there rather than in this shared constructor -- see process().
     OPENVDB_ASSERT(2*mMinVoxelSize <= mMaxVoxelSize);
 }// tools::PolySoupToLevelSet::PolySoupToLevelSet()
 
@@ -314,6 +317,9 @@ PolySoupToLevelSet<GridType>::PolySoupToLevelSet(PolySoup &&poly, float voxelSiz
     if (!math::isFinite(mMaxVoxelSize) || !(mMaxVoxelSize > 0.0f)) {
         OPENVDB_THROW(ArithmeticError, "polySoupToLevelSet: computed voxel size is not finite and positive");
     }
+    // NB: the 2*mMinVoxelSize <= mMaxVoxelSize relationship is a precondition of
+    // the coarse-to-fine hierarchy in process() only (not of offset()), so it is
+    // enforced there rather than in this shared constructor -- see process().
     OPENVDB_ASSERT(2*mMinVoxelSize <= mMaxVoxelSize);
 }// tools::PolySoupToLevelSet::PolySoupToLevelSet()
 
@@ -329,6 +335,17 @@ void PolySoupToLevelSet<GridType>::process(const ShrinkWrapT &D, ProgressT *prog
     for (float dx = mMinVoxelSize; dx <= mMaxVoxelSize; dx *= 2.0f) {
         myProgress("Offset: dx=" + std::to_string(dx)+", range: "+std::to_string(mMinVoxelSize)+" -> "+std::to_string(mMaxVoxelSize));
         mGrids.push_back(this->offset(dx, offset_mode));
+    }
+
+    // The loop above produces no grids when mMinVoxelSize > mMaxVoxelSize (i.e. the
+    // requested voxel size exceeds maxLength/2, half the largest bounding-box
+    // dimension). Guard against that here: mGrids.back() below is otherwise
+    // undefined behaviour on an empty vector and crashes in optimized builds.
+    if (mGrids.empty()) {
+        OPENVDB_THROW(ValueError, "PolySoupToLevelSet::process: voxel size (" +
+            std::to_string(mMinVoxelSize) + ") is too large for this mesh; it must not "
+            "exceed maxLength/2 = " + std::to_string(mMaxVoxelSize) +
+            " (half the largest bounding-box dimension)");
     }
 
     // Coarse to fine shrink wrap algorithm
