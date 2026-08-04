@@ -343,6 +343,17 @@ class TestGridHandleExchange(unittest.TestCase):
         dstFile.close()
         try:
             nanovdb.io.writeGrids(dstFile.name, handles)
+            # Verify that both grids actually made it into the file. Previously
+            # writeGrids re-opened the file per handle with std::ios::trunc, so
+            # only the final grid was retained on disk.
+            metadata = nanovdb.io.readGridMetaData(dstFile.name)
+            self.assertEqual(len(metadata), len(handles))
+            readHandles = nanovdb.io.readGrids(dstFile.name)
+            self.assertEqual(len(readHandles), len(handles))
+            for readHandle in readHandles:
+                self.assertEqual(readHandle.gridCount(), 1)
+                self.assertEqual(readHandle.gridType(0), nanovdb.GridType.Double)
+                self.assertIsNotNone(readHandle.doubleGrid())
         finally:
             os.unlink(dstFile.name)
 
@@ -509,6 +520,22 @@ class TestDeviceReadWriteGrids(unittest.TestCase):
             )
         except RuntimeError:
             print("ZIP compression codec not supported. Skipping...")
+
+    def test_device_write_grids_multi(self):
+        # Regression test for deviceWriteGrids: all grids in the list must end
+        # up in the output file, not just the last one.
+        handle = nanovdb.tools.cuda.createLevelSetSphere(
+            nanovdb.GridType.Float, name=self.gridName
+        )
+        handles = [handle, handle]
+        nanovdb.io.deviceWriteGrids(self.dstFile.name, handles)
+        metadata = nanovdb.io.readGridMetaData(self.dstFile.name)
+        self.assertEqual(len(metadata), len(handles))
+        readHandles = nanovdb.io.deviceReadGrids(self.dstFile.name)
+        self.assertEqual(len(readHandles), len(handles))
+        for readHandle in readHandles:
+            self.assertEqual(readHandle.gridCount(), 1)
+            self.assertEqual(readHandle.gridType(0), nanovdb.GridType.Float)
 
 
 @unittest.skipIf(

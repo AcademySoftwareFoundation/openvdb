@@ -2721,7 +2721,7 @@ private:
         return ValueType(std::sqrt(dist)) * mVoxelSize;
     }
 
-    /// @note   Returns true if the current voxel was updated and neighbouring
+    /// @note   Returns true if the current voxel was updated and neighboring
     ///         voxels need to be evaluated.
     bool
     updateVoxel(const Coord& ijk, const Int32 manhattanLimit,

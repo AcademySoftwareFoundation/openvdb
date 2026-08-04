@@ -53,7 +53,7 @@ drawFrustum(GU_Detail&, const openvdb::math::Transform&,
 #if SYS_VERSION_MAJOR_INT >= 21
 openvdb::math::Transform::Ptr
 frustumTransformFromCamera(
-    const OBJ_CameraParms&, const UT_Matrix4D&,
+    const UT_CameraParms&, const UT_Matrix4D&,
     float offset, float nearPlaneDist, float farPlaneDist,
     float voxelDepthSize = 1.0, int voxelCountX = 100);
 #else
