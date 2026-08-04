@@ -373,6 +373,13 @@ public:
     template<typename PtrT>
     void processPoints(const PtrT points, size_t pointCount);
 
+    // Only instantiated when BuildT == Point, from the corresponding branch of
+    // processPoints. Holds the encode kernels because nvcc rejects an extended
+    // lambda defined directly inside the block of an if constexpr statement on
+    // some host compilers.
+    template<typename PtrT>
+    void encodePoints(const PtrT points, size_t pointCount);
+
     void processBBox();
 
     // the following methods are only defined when BuildT == Point
@@ -1164,23 +1171,24 @@ inline void PointsToGrid<BuildT, ResourceT>::processLeafNodes(size_t pointCount)
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+// The point-encode kernels operate on device data and are independent of the
+// resource type; only the trailing d_indx deallocation routes through ResourceT.
+// Dispatching the encode with if constexpr keeps it reachable for any ResourceT.
 template<typename BuildT, typename ResourceT>
 template<typename PtrT>
-inline void PointsToGrid<BuildT, ResourceT>::processPoints(const PtrT, size_t pointCount)
+inline void PointsToGrid<BuildT, ResourceT>::processPoints(const PtrT points, size_t pointCount)
 {
+    if constexpr(util::is_same<BuildT, Point>::value) this->encodePoints(points, pointCount);
     mResource->deallocate_async(mData.d_indx, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-}
+}// PointsToGrid<BuildT, ResourceT>::processPoints
 
-//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-// Template specialization with BuildT = Point
-template<>
+template<typename BuildT, typename ResourceT>
 template<typename PtrT>
-inline void PointsToGrid<Point>::processPoints(const PtrT points, size_t pointCount)
+inline void PointsToGrid<BuildT, ResourceT>::encodePoints(const PtrT points, size_t pointCount)
 {
     switch (mPointType){
     case PointType::Disable:
-        throw std::runtime_error("PointsToGrid<Point>::processPoints: mPointType == PointType::Disable\n");
+        throw std::runtime_error("PointsToGrid<Point, ResourceT>::encodePoints: mPointType == PointType::Disable\n");
     case PointType::PointID:
         util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
             d_data->template getPoint<uint32_t>(tid) = d_data->d_indx[tid];
@@ -1227,12 +1235,9 @@ inline void PointsToGrid<Point>::processPoints(const PtrT points, size_t pointCo
         }, mDeviceData); cudaCheckError();
         break;
     default:
-        printf("Internal error in PointsToGrid<Point>::processPoints\n");
+        printf("Internal error in PointsToGrid<Point, ResourceT>::encodePoints\n");
     }
-    // This is the PointsToGrid<Point> (== <Point, DeviceResource>) member specialization,
-    // so ResourceT is not a name here; mResource is a DeviceResource* and the alignment is concrete.
-    mResource->deallocate_async(mData.d_indx, pointCount*sizeof(uint32_t), nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT, mStream);
-}// PointsToGrid<Point>::processPoints
+}// PointsToGrid<BuildT, ResourceT>::encodePoints
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
