@@ -610,112 +610,123 @@ void PointsToGrid<BuildT, ResourceT>::countNodes(const PtrT points, size_t point
         bool operator<(const Foo &rhs) const {return density < rhs.density || (density == rhs.density && dx < rhs.dx);}
     } min{0.0, 1}, max{0.0, 0};// min: as dx -> 0 density -> 1 point per voxel, max: density is 0 i.e. undefined
 
-jump:// this marks the beginning of the actual algorithm
-
-    mData.d_keys = static_cast<uint64_t*>(mResource->allocate_async(pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    mData.d_indx = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));// uint32_t can index 4.29 billion Coords, corresponding to 48 GB
-    cudaCheck(cudaMemcpyAsync(mDeviceData, &mData, sizeof(PointsToGridData<BuildT>), cudaMemcpyHostToDevice, mStream));// copy mData from CPU -> GPU
-
-    if (mVerbose==2) mTimer.start("\nAllocating arrays for keys and indices");
-    auto *d_keys = static_cast<uint64_t*>(mResource->allocate_async(pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    auto *d_indx = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-
-    if (mVerbose==2) mTimer.restart("Generate tile keys");
-    util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, TileKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_keys, d_indx);
-    cudaCheckError();
-    if (mVerbose==2) mTimer.restart("DeviceRadixSort of "+std::to_string(pointCount)+" tile keys");
-    CALL_CUBS(DeviceRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, pointCount, 0, 63);// 21 bits per coord
-    std::swap(d_indx, mData.d_indx);// sorted indices are now in d_indx
-
-    if (mVerbose==2) mTimer.restart("Allocate runs");
-    auto *d_points_per_tile = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    uint32_t *d_node_count  = static_cast<uint32_t*>(mResource->allocate_async(3*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-
-    if (mVerbose==2) mTimer.restart("DeviceRunLengthEncode tile keys");
-    CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, d_points_per_tile, d_node_count+2, pointCount);
-    cudaCheck(cudaMemcpyAsync(mData.nodeCount+2, d_node_count+2, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-    cudaCheck(cudaStreamSynchronize(mStream));
-    mData.d_tile_keys = static_cast<uint64_t*>(mResource->allocate_async(mData.nodeCount[2]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    cudaCheck(cudaMemcpyAsync(mData.d_tile_keys, d_keys, mData.nodeCount[2]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
-
-    static constexpr uint32_t SEGMENTED_SORT_TILE_THRESHOLD = 32;
-    if (mData.nodeCount[2] >= SEGMENTED_SORT_TILE_THRESHOLD) {
-        // Bulk segmented sort: one kernel launch + one segmented radix sort (faster for many tiles)
-        if (mVerbose==2) mTimer.restart("Segmented radix sort of " + std::to_string(pointCount) + " voxel keys in " + std::to_string(mData.nodeCount[2]) + " tiles");
-        auto *d_tile_offsets = static_cast<uint32_t*>(mResource->allocate_async((mData.nodeCount[2]+1)*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-        cudaCheck(cudaMemsetAsync(d_tile_offsets, 0, sizeof(uint32_t), mStream));
-        CALL_CUBS(DeviceScan::InclusiveSum, d_points_per_tile, d_tile_offsets + 1, mData.nodeCount[2]);
-        mResource->deallocate_async(d_points_per_tile, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-
-        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, BulkVoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_tile_offsets, mData.nodeCount[2], d_keys, d_indx, uint32_t(0));
-        cudaCheckError();
-        CALL_CUBS(DeviceSegmentedRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, (int)pointCount, (int)mData.nodeCount[2], d_tile_offsets, d_tile_offsets + 1, 0, 36);
-        mResource->deallocate_async(d_tile_offsets, (mData.nodeCount[2]+1)*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-    } else {
-        // Serial per-tile sort: individual kernel + sort per tile (lower overhead for few tiles)
-        if (mVerbose==2) mTimer.restart("DeviceRadixSort of " + std::to_string(pointCount) + " voxel keys in " + std::to_string(mData.nodeCount[2]) + " tiles");
-        uint32_t *points_per_tile = new uint32_t[mData.nodeCount[2]];
-        cudaCheck(cudaMemcpyAsync(points_per_tile, d_points_per_tile, mData.nodeCount[2]*sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-        mResource->deallocate_async(d_points_per_tile, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-        for (uint32_t id = 0, offset = 0; id < mData.nodeCount[2]; ++id) {
-            const uint32_t count = points_per_tile[id];
-            util::cuda::offsetLambdaKernel<<<numBlocks(count), mNumThreads, 0, mStream>>>(count, offset, VoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, id, d_keys, d_indx);
-            cudaCheckError();
-            CALL_CUBS(DeviceRadixSort::SortPairs, d_keys + offset, mData.d_keys + offset, d_indx + offset, mData.d_indx + offset, count, 0, 36);
-            offset += count;
-        }
-        delete [] points_per_tile;
-    }
-    mResource->deallocate_async(d_indx, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-
-    if (mVerbose==2) mTimer.restart("Count points per voxel");
-
+    // Declared ahead of the search loop below: d_keys and d_node_count carry
+    // results past it, and the event is recorded and re-used across iterations
+    // (previously it was re-created per iteration, leaking the prior handle).
+    uint64_t *d_keys = nullptr;
+    uint32_t *d_indx = nullptr, *d_points_per_tile = nullptr, *d_node_count = nullptr;
     cudaEvent_t copyEvent;
     cudaCheck(cudaEventCreate(&copyEvent));
-    mData.pointsPerVoxel    = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    uint32_t *d_voxel_count = static_cast<uint32_t*>(mResource->allocate_async(sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, mData.pointsPerVoxel, d_voxel_count, pointCount);
-    cudaCheck(cudaMemcpyAsync(&mData.voxelCount, d_voxel_count, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-    cudaCheck(cudaEventRecord(copyEvent, mStream));
-    mResource->deallocate_async(d_voxel_count, sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
 
-    if (util::is_same<BuildT, Point>::value) {
-        if (mVerbose==2) mTimer.restart("Count max points per voxel");
-        uint32_t *d_maxPointsPerVoxel = static_cast<uint32_t*>(mResource->allocate_async(sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream)), maxPointsPerVoxel;
-        cudaCheck(cudaEventSynchronize(copyEvent));
-        CALL_CUBS(DeviceReduce::Max, mData.pointsPerVoxel, d_maxPointsPerVoxel, mData.voxelCount);
-        cudaCheck(cudaMemcpyAsync(&maxPointsPerVoxel, d_maxPointsPerVoxel, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-        cudaCheck(cudaEventRecord(copyEvent, mStream));
-        mResource->deallocate_async(d_maxPointsPerVoxel, sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-        double dx = mData.map.getVoxelSize()[0];
-        cudaCheck(cudaEventSynchronize(copyEvent));
-        if (++iterCounter >= mMaxIterations || pointCount == 1u || math::Abs((int)maxPointsPerVoxel - (int)mMaxPointsPerVoxel) <= mTolerance) {
-            mMaxPointsPerVoxel = maxPointsPerVoxel;
+    // Bisection search for the voxel size dx that yields the target point
+    // density: each iteration builds tile and voxel keys at the current dx,
+    // then either converges or frees this iteration's buffers and retries.
+    while (true) {
+
+        mData.d_keys = static_cast<uint64_t*>(mResource->allocate_async(pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+        mData.d_indx = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));// uint32_t can index 4.29 billion Coords, corresponding to 48 GB
+        cudaCheck(cudaMemcpyAsync(mDeviceData, &mData, sizeof(PointsToGridData<BuildT>), cudaMemcpyHostToDevice, mStream));// copy mData from CPU -> GPU
+
+        if (mVerbose==2) mTimer.start("\nAllocating arrays for keys and indices");
+        d_keys = static_cast<uint64_t*>(mResource->allocate_async(pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+        d_indx = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+
+        if (mVerbose==2) mTimer.restart("Generate tile keys");
+        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, TileKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_keys, d_indx);
+        cudaCheckError();
+        if (mVerbose==2) mTimer.restart("DeviceRadixSort of "+std::to_string(pointCount)+" tile keys");
+        CALL_CUBS(DeviceRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, pointCount, 0, 63);// 21 bits per coord
+        std::swap(d_indx, mData.d_indx);// sorted indices are now in d_indx
+
+        if (mVerbose==2) mTimer.restart("Allocate runs");
+        d_points_per_tile = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+        d_node_count = static_cast<uint32_t*>(mResource->allocate_async(3*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+
+        if (mVerbose==2) mTimer.restart("DeviceRunLengthEncode tile keys");
+        CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, d_points_per_tile, d_node_count+2, pointCount);
+        cudaCheck(cudaMemcpyAsync(mData.nodeCount+2, d_node_count+2, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
+        cudaCheck(cudaStreamSynchronize(mStream));
+        mData.d_tile_keys = static_cast<uint64_t*>(mResource->allocate_async(mData.nodeCount[2]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+        cudaCheck(cudaMemcpyAsync(mData.d_tile_keys, d_keys, mData.nodeCount[2]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
+
+        static constexpr uint32_t SEGMENTED_SORT_TILE_THRESHOLD = 32;
+        if (mData.nodeCount[2] >= SEGMENTED_SORT_TILE_THRESHOLD) {
+            // Bulk segmented sort: one kernel launch + one segmented radix sort (faster for many tiles)
+            if (mVerbose==2) mTimer.restart("Segmented radix sort of " + std::to_string(pointCount) + " voxel keys in " + std::to_string(mData.nodeCount[2]) + " tiles");
+            auto *d_tile_offsets = static_cast<uint32_t*>(mResource->allocate_async((mData.nodeCount[2]+1)*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+            cudaCheck(cudaMemsetAsync(d_tile_offsets, 0, sizeof(uint32_t), mStream));
+            CALL_CUBS(DeviceScan::InclusiveSum, d_points_per_tile, d_tile_offsets + 1, mData.nodeCount[2]);
+            mResource->deallocate_async(d_points_per_tile, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+
+            util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, BulkVoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_tile_offsets, mData.nodeCount[2], d_keys, d_indx, uint32_t(0));
+            cudaCheckError();
+            CALL_CUBS(DeviceSegmentedRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, (int)pointCount, (int)mData.nodeCount[2], d_tile_offsets, d_tile_offsets + 1, 0, 36);
+            mResource->deallocate_async(d_tile_offsets, (mData.nodeCount[2]+1)*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
         } else {
-            const Foo tmp{dx, maxPointsPerVoxel};
-            if (maxPointsPerVoxel < mMaxPointsPerVoxel) {
-                if (min < tmp) min = tmp;
-            } else if (max.density == 0 || tmp < max) {
-                max = tmp;
+            // Serial per-tile sort: individual kernel + sort per tile (lower overhead for few tiles)
+            if (mVerbose==2) mTimer.restart("DeviceRadixSort of " + std::to_string(pointCount) + " voxel keys in " + std::to_string(mData.nodeCount[2]) + " tiles");
+            uint32_t *points_per_tile = new uint32_t[mData.nodeCount[2]];
+            cudaCheck(cudaMemcpyAsync(points_per_tile, d_points_per_tile, mData.nodeCount[2]*sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
+            mResource->deallocate_async(d_points_per_tile, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+            for (uint32_t id = 0, offset = 0; id < mData.nodeCount[2]; ++id) {
+                const uint32_t count = points_per_tile[id];
+                util::cuda::offsetLambdaKernel<<<numBlocks(count), mNumThreads, 0, mStream>>>(count, offset, VoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, id, d_keys, d_indx);
+                cudaCheckError();
+                CALL_CUBS(DeviceRadixSort::SortPairs, d_keys + offset, mData.d_keys + offset, d_indx + offset, mData.d_indx + offset, count, 0, 36);
+                offset += count;
             }
-            if (max.density) {
-                dx = (min.dx*(max.density - mMaxPointsPerVoxel) + max.dx*(mMaxPointsPerVoxel-min.density))/double(max.density-min.density);
-            } else if (maxPointsPerVoxel > 1u) {
-                dx *= (mMaxPointsPerVoxel-1.0)/(maxPointsPerVoxel-1.0);
-            } else {// maxPointsPerVoxel = 1 so increase dx significantly
-                dx *= 10.0;
-            }
-            if (mVerbose==2) printf("\ntarget density = %" PRIu32 ", current density = %" PRIu32 ", current dx = %f, next dx = %f\n", mMaxPointsPerVoxel, maxPointsPerVoxel, tmp.dx, dx);
-            mData.map = Map(dx);
-            mResource->deallocate_async(mData.d_keys, pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            mResource->deallocate_async(mData.d_indx, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            mResource->deallocate_async(d_keys, pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            mResource->deallocate_async(mData.d_tile_keys, mData.nodeCount[2]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            mResource->deallocate_async(d_node_count, 3*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            mResource->deallocate_async(mData.pointsPerVoxel, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            goto jump;
+            delete [] points_per_tile;
         }
-    }
+        mResource->deallocate_async(d_indx, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+
+        if (mVerbose==2) mTimer.restart("Count points per voxel");
+
+        mData.pointsPerVoxel    = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+        uint32_t *d_voxel_count = static_cast<uint32_t*>(mResource->allocate_async(sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+        CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, mData.pointsPerVoxel, d_voxel_count, pointCount);
+        cudaCheck(cudaMemcpyAsync(&mData.voxelCount, d_voxel_count, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
+        cudaCheck(cudaEventRecord(copyEvent, mStream));
+        mResource->deallocate_async(d_voxel_count, sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+
+        if (util::is_same<BuildT, Point>::value) {
+            if (mVerbose==2) mTimer.restart("Count max points per voxel");
+            uint32_t *d_maxPointsPerVoxel = static_cast<uint32_t*>(mResource->allocate_async(sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream)), maxPointsPerVoxel;
+            cudaCheck(cudaEventSynchronize(copyEvent));
+            CALL_CUBS(DeviceReduce::Max, mData.pointsPerVoxel, d_maxPointsPerVoxel, mData.voxelCount);
+            cudaCheck(cudaMemcpyAsync(&maxPointsPerVoxel, d_maxPointsPerVoxel, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
+            cudaCheck(cudaEventRecord(copyEvent, mStream));
+            mResource->deallocate_async(d_maxPointsPerVoxel, sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+            double dx = mData.map.getVoxelSize()[0];
+            cudaCheck(cudaEventSynchronize(copyEvent));
+            if (++iterCounter >= mMaxIterations || pointCount == 1u || math::Abs((int)maxPointsPerVoxel - (int)mMaxPointsPerVoxel) <= mTolerance) {
+                mMaxPointsPerVoxel = maxPointsPerVoxel;
+            } else {
+                const Foo tmp{dx, maxPointsPerVoxel};
+                if (maxPointsPerVoxel < mMaxPointsPerVoxel) {
+                    if (min < tmp) min = tmp;
+                } else if (max.density == 0 || tmp < max) {
+                    max = tmp;
+                }
+                if (max.density) {
+                    dx = (min.dx*(max.density - mMaxPointsPerVoxel) + max.dx*(mMaxPointsPerVoxel-min.density))/double(max.density-min.density);
+                } else if (maxPointsPerVoxel > 1u) {
+                    dx *= (mMaxPointsPerVoxel-1.0)/(maxPointsPerVoxel-1.0);
+                } else {// maxPointsPerVoxel = 1 so increase dx significantly
+                    dx *= 10.0;
+                }
+                if (mVerbose==2) printf("\ntarget density = %" PRIu32 ", current density = %" PRIu32 ", current dx = %f, next dx = %f\n", mMaxPointsPerVoxel, maxPointsPerVoxel, tmp.dx, dx);
+                mData.map = Map(dx);
+                mResource->deallocate_async(mData.d_keys, pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+                mResource->deallocate_async(mData.d_indx, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+                mResource->deallocate_async(d_keys, pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+                mResource->deallocate_async(mData.d_tile_keys, mData.nodeCount[2]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+                mResource->deallocate_async(d_node_count, 3*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+                mResource->deallocate_async(mData.pointsPerVoxel, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+                continue;
+            }
+        }
+        break;
+    }// while (true)
     if (iterCounter>1 && mVerbose) std::cerr << "Used " << iterCounter << " attempts to determine dx that produces a target dpoint denisty\n\n";
 
     if (mVerbose==2) mTimer.restart("Compute prefix sum of points per voxel");
