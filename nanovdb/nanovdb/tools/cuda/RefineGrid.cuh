@@ -225,7 +225,7 @@ void RefineGrid<BuildT>::refineInternalNodes()
     if (auto srcLeafCount = mSrcTreeData.mNodeCount[0]) { // Unless it's an empty grid
         util::cuda::lambdaKernel<<<numBlocks(srcLeafCount), mNumThreads, 0, mStream>>>(
             srcLeafCount, util::morphology::cuda::RefineInternalNodesFunctor<BuildT>(),
-            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.mUpperMasks.deviceData(), mBuilder.mLowerMasks.deviceData() );
+            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.mUpperMasks.data(), mBuilder.mLowerMasks.data() );
     }
 }// RefineGrid<BuildT>::refineInternalNodes
 
