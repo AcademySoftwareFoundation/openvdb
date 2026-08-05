@@ -53,7 +53,7 @@ namespace tools::cuda {
 /// @brief Index of each of the 6 leaf faces into a component's face-mask array. Each face is a
 ///        uint64_t bitmask over the 8x8 boundary plane; cross-leaf adjacency is one AND of the
 ///        touching faces (faceMasks[I][plusX] & faceMasks[J][minusX]). Bit index per axis:
-///          ±X: y*8+z    ±Y: x*8+z    ±Z: y*8+x
+///          +/-X: y*8+z    +/-Y: x*8+z    +/-Z: y*8+x
 enum LeafNeighborTap : int {
     minusX = 0,
     plusX  = 1,
@@ -136,18 +136,18 @@ private:
 
     uint64_t                     mLeafComponentAggregateCount{0}; // total leaf-local components across all leaves (= K = offsets[leafCount])
 
-    nanovdb::cuda::DeviceBuffer  mLeafComponentCounts;      // leafCount                    × uint16_t:      per-leaf component count
-    nanovdb::cuda::DeviceBuffer  mLeafComponentOffsets;     // (leafCount+1)                × uint64_t:      exclusive+inclusive prefix sums
-    nanovdb::cuda::DeviceBuffer  mLeafComponentMasks;       // mLeafComponentAggregateCount × Mask<3>:       per-component active-voxel footprint
-    nanovdb::cuda::DeviceBuffer  mLeafComponentFaceMasks;   // mLeafComponentAggregateCount × uint64_t[6]:   per-component face bitmasks (0=-X,1=+X,2=-Y,3=+Y,4=-Z,5=+Z)
+    nanovdb::cuda::DeviceBuffer  mLeafComponentCounts;      // leafCount                    x uint16_t:      per-leaf component count
+    nanovdb::cuda::DeviceBuffer  mLeafComponentOffsets;     // (leafCount+1)                x uint64_t:      exclusive+inclusive prefix sums
+    nanovdb::cuda::DeviceBuffer  mLeafComponentMasks;       // mLeafComponentAggregateCount x Mask<3>:       per-component active-voxel footprint
+    nanovdb::cuda::DeviceBuffer  mLeafComponentFaceMasks;   // mLeafComponentAggregateCount x uint64_t[6]:   per-component face bitmasks (0=-X,1=+X,2=-Y,3=+Y,4=-Z,5=+Z)
 
     uint64_t                     mCrossLeafEdgeCount{0};    // total cross-leaf edges (E)
-    nanovdb::cuda::DeviceBuffer  mCrossLeafEdgeOffsets;     // (leafCount+1) × uint64_t:  per-leaf edge prefix sums
-    nanovdb::cuda::DeviceBuffer  mCrossLeafEdges;           // E × CrossLeafEdge (a<b)
+    nanovdb::cuda::DeviceBuffer  mCrossLeafEdgeOffsets;     // (leafCount+1) x uint64_t:  per-leaf edge prefix sums
+    nanovdb::cuda::DeviceBuffer  mCrossLeafEdges;           // E x CrossLeafEdge (a<b)
 
-    nanovdb::cuda::DeviceBuffer  mComponentParent;          // K × uint64_t: per-component global representative
+    nanovdb::cuda::DeviceBuffer  mComponentParent;          // K x uint64_t: per-component global representative
 
-    nanovdb::cuda::DeviceBuffer  mVoxelLabel;               // (activeVoxelCount+1) × uint32_t: per-active-voxel dense component id in [0,N) (index by leaf.getValue(n); slot 0 = background)
+    nanovdb::cuda::DeviceBuffer  mVoxelLabel;               // (activeVoxelCount+1) x uint32_t: per-active-voxel dense component id in [0,N) (index by leaf.getValue(n); slot 0 = background)
     uint64_t                     mGlobalComponentCount{0};  // number of connected components N (distinct representatives)
 
 }; // tools::cuda::ConnectedComponents<BuildT>
@@ -362,7 +362,7 @@ struct LeafComponentMaskFunctor
             if (match) cur[tID] = CC_INACTIVE;
             __syncthreads();  // [SYNC1]: sMaskWords_u32 fully written + cur erases visible
 
-            // Coalesced write: first 8 threads store sMaskWords → mask.words(), one uint64_t each.
+            // Coalesced write: first 8 threads store sMaskWords -> mask.words(), one uint64_t each.
             if (tID < 8) {
                 d_masks[baseOffset + localCompIdx].words()[tID] = sMaskWords[tID];
             }
@@ -371,11 +371,11 @@ struct LeafComponentMaskFunctor
             if (tID == 0) {
                 uint64_t* face = d_faces[baseOffset + localCompIdx];
 
-                // ±X: whole word 0 / word 7 are exactly the minusX / plusX face planes.
+                // +/-X: whole word 0 / word 7 are exactly the minusX / plusX face planes.
                 face[minusX] = sMaskWords[0];
                 face[plusX]  = sMaskWords[7];
 
-                // ±Y: bottom byte (y=0) and top byte (y=7) of each word x;
+                // +/-Y: bottom byte (y=0) and top byte (y=7) of each word x;
                 //     shift-accumulate from x=7 down; result bit index = x*8 + z (x major, z minor).
                 uint64_t mY = sMaskWords[7] & 0xFF,  pY = (sMaskWords[7] >> 56) & 0xFF;
                 for (int x = 6; x >= 0; --x) {
@@ -385,7 +385,7 @@ struct LeafComponentMaskFunctor
                 face[minusY] = mY;
                 face[plusY]  = pY;
 
-                // ±Z: bit 0 (z=0) and bit 7 (z=7) of each byte in each word;
+                // +/-Z: bit 0 (z=0) and bit 7 (z=7) of each byte in each word;
                 //     shift-accumulate from x=7 down; result bit index = y*8 + x (y major, x minor).
                 uint64_t mZ = sMaskWords[7] & UINT64_C(0x0101010101010101);
                 uint64_t pZ = (sMaskWords[7] >> 7) & UINT64_C(0x0101010101010101);
@@ -539,7 +539,7 @@ __device__ inline void ccUnite(uint64_t* parent, uint64_t a, uint64_t b)
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Small element-wise functors driven by lambdaKernel. These are named structs (rather than inline
 // extended __device__ lambdas) so their enclosing ConnectedComponents member functions can have
-// private access — nvcc forbids extended __device__ lambdas inside private/protected methods — which
+// private access - nvcc forbids extended __device__ lambdas inside private/protected methods - which
 // also matches the sibling operators (PruneGrid/DilateGrid/... drive lambdaKernel with named functors).
 
 // offsets[i+1] = counts[i]: upcast the per-leaf uint16 component counts into the uint64 offset array.
@@ -660,7 +660,7 @@ void ConnectedComponents<BuildT>::processLeafConnectedComponents()
                               sizeof(uint64_t), cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaStreamSynchronize(mStream));
 
-    // Allocate mLeafComponentAggregateCount Mask<3> objects — one per leaf-local component.
+    // Allocate mLeafComponentAggregateCount Mask<3> objects - one per leaf-local component.
     // No zero-init needed: the mask-fill kernel writes all 16 uint32_t words of every mask
     // unconditionally via warp ballot (zero ballot = no component voxels in that warp).
     if (mVerbose==1) mTimer.start("Allocating per-component leaf masks");
