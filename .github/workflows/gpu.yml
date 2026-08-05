@@ -2,6 +2,9 @@ name: GPU
 
 on:
     workflow_dispatch: {}
+    push:
+        branches-ignore:
+          - gh-pages
 jobs:
   # ---------------------------------------------------------------------------
   # Linux GPU (AWS CodeBuild)
