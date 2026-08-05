@@ -156,88 +156,106 @@ private:
 
 namespace cc_detail {
 
-// Per-leaf connected-components via a Shiloach-Vishkin union-find run in shared memory,
-// one CUDA block per leaf, one thread per voxel offset n in [0, 512). The forest is stored
-// as a parent array of leaf-local voxel offsets: parent[n] = n for active roots, a smaller
-// active offset for non-roots, and -1 for inactive voxels. Connectivity is 6-connected and
-// strictly intra-leaf (cross-leaf edges are ignored at this stage).
-//
-// The three primitives are double-buffered (Jacobi): they read the "cur" buffer and write
-// the "nxt" buffer, then swap. Inactive entries (-1) are carried through unchanged. The
-// pointer swap is performed identically by every thread, so the register copies stay in sync.
-
-constexpr int LEAF_DIM  = 8;            // NanoLeaf DIM
 constexpr int LEAF_SIZE = 512;          // 8^3
-constexpr int CC_INACTIVE = -1;         // parent sentinel for inactive voxels
 
-// 3D view over a 512-entry parent buffer. The voxel offset is x-major
-// (n = (x<<6)|(y<<3)|z), so a row-major int[8][8][8] indexed [x][y][z] aliases the flat
-// buffer exactly: element [x][y][z] sits at linear offset x*64 + y*8 + z == n. Accessing
-// individual int elements through this view is well-defined (the storage really is int).
-using ParentsT = int[LEAF_DIM][LEAF_DIM][LEAF_DIM];
-
-// Smallest parent among the (up to 6) active in-leaf face neighbors of offset n, floored at
-// the supplied current value. Offset layout is x-major: n = (x<<6)|(y<<3)|z.
-__device__ inline int ccNeighborMin(const int* parentsPtr, int n, int current)
+// Leaf-local connected components via a Shiloach-Vishkin union-find run in shared memory, one CUDA
+// block per leaf, one thread per voxel offset n in [0, 512). The forest is stored as a parent array
+// of leaf-local voxel offsets: parent[n] = n for active roots, a smaller active offset for
+// non-roots, and INACTIVE for inactive voxels. Connectivity is 6-connected and strictly intra-leaf
+// (cross-leaf edges are a later stage).
+//
+// The primitives are double-buffered (Jacobi): they read the "cur" buffer and write the "nxt"
+// buffer, then swap. Inactive entries are carried through unchanged. The pointer swap is performed
+// identically by every thread, so the per-thread register copies stay in sync. Every method is
+// block-cooperative: all 512 threads must call it, since each contains __syncthreads().
+struct LeafUnionFind
 {
-    const auto& p = reinterpret_cast<const ParentsT&>(*parentsPtr);
-    const int x =  n >> 6       ;
-    const int y = (n >> 3) & 0x7;
-    const int z =       n  & 0x7;
-    int m = current;
-    if (x > 0 && p[x-1][y][z] != CC_INACTIVE) m = ::min(m, p[x-1][y][z]);   // -X
-    if (x < 7 && p[x+1][y][z] != CC_INACTIVE) m = ::min(m, p[x+1][y][z]);   // +X
-    if (y > 0 && p[x][y-1][z] != CC_INACTIVE) m = ::min(m, p[x][y-1][z]);   // -Y
-    if (y < 7 && p[x][y+1][z] != CC_INACTIVE) m = ::min(m, p[x][y+1][z]);   // +Y
-    if (z > 0 && p[x][y][z-1] != CC_INACTIVE) m = ::min(m, p[x][y][z-1]);   // -Z
-    if (z < 7 && p[x][y][z+1] != CC_INACTIVE) m = ::min(m, p[x][y][z+1]);   // +Z
-    return m;
-}
+    static constexpr int INACTIVE = -1;  // parent sentinel for inactive voxels
 
-// SV root hook: every vertex v whose smallest active neighbor label m is below parent[v]
-// lowers the slot of v's *parent* (its tree root, once flattened) toward m, via atomicMin.
-// Sets *changed (when non-null) iff some root slot was actually lowered.
-__device__ inline void ccHook(int*& cur, int*& nxt, int n, int* changed)
-{
-    const int pn = cur[n];
-    nxt[n] = pn;                                  // Phase A: seed nxt = cur (own slot, no race)
-    __syncthreads();
-    if (pn != CC_INACTIVE) {                      // active voxel
-        const int m = ccNeighborMin(cur, n, pn);
-        if (m < pn) {                             // root slot is data-dependent -> atomicMin
-            const int old = atomicMin_block(&nxt[pn], m);  // block scope: nxt[] is shared
-            if (changed && old > m) *changed = 1;
+    // Safety cap on the convergence loop, well above the worst case for an 8^3 leaf
+    // (~log2(depth) + log2(#local minima) <= ~18); guards against a non-terminating bug
+    // rather than limiting any legitimate input.
+    static constexpr int MaxConvergenceIters = 64;
+
+    // Minimum parent label over offset n and its (up to 6) active in-leaf face neighbors.
+    __device__ static int neighborMin(const int* parentsPtr, int n)
+    {
+        const auto& p = reinterpret_cast<const int(&)[8][8][8]>(*parentsPtr);  // 3D view of the 512-entry parent buffer
+        const int x =  n >> 6       ;
+        const int y = (n >> 3) & 0x7;
+        const int z =       n  & 0x7;
+        int m = p[x][y][z];
+        if (x > 0 && p[x-1][y][z] != INACTIVE) m = ::min(m, p[x-1][y][z]);   // -X
+        if (x < 7 && p[x+1][y][z] != INACTIVE) m = ::min(m, p[x+1][y][z]);   // +X
+        if (y > 0 && p[x][y-1][z] != INACTIVE) m = ::min(m, p[x][y-1][z]);   // -Y
+        if (y < 7 && p[x][y+1][z] != INACTIVE) m = ::min(m, p[x][y+1][z]);   // +Y
+        if (z > 0 && p[x][y][z-1] != INACTIVE) m = ::min(m, p[x][y][z-1]);   // -Z
+        if (z < 7 && p[x][y][z+1] != INACTIVE) m = ::min(m, p[x][y][z+1]);   // +Z
+        return m;
+    }
+
+    // SV hook: if the smallest parent m among v's active neighbors is below v's own parent p, lower
+    // the parent of p toward m via atomicMin (many vertices can target the same slot p).
+    // Sets *changed (when non-null) iff some slot was actually lowered.
+    __device__ static void hook(int*& cur, int*& nxt, int n, int* changed)
+    {
+        const int pn = cur[n];
+        nxt[n] = pn;                                  // Phase A: seed nxt = cur (own slot, no race)
+        __syncthreads();
+        if (pn != INACTIVE) {                         // active voxel
+            const int m = neighborMin(cur, n);
+            if (m < pn) {                             // root slot is data-dependent -> atomicMin
+                const int old = atomicMin_block(&nxt[pn], m);  // block scope: nxt[] is shared
+                if (changed && old > m) *changed = 1;
+            }
+        }
+        __syncthreads();
+        int* t = cur; cur = nxt; nxt = t;             // swap (identical on every thread)
+    }
+
+    // Pointer-jumping compress: parent[v] <- parent[parent[v]]. Halves tree depth per call.
+    // Sets *changed (when non-null) iff some entry actually moved.
+    __device__ static void compress(int*& cur, int*& nxt, int n, int* changed)
+    {
+        const int pn = cur[n];
+        int v = INACTIVE;
+        if (pn != INACTIVE) {                         // active: grandparent (cur[pn] is valid)
+            v = cur[pn];
+            if (changed && v != pn) *changed = 1;
+        }
+        nxt[n] = v;                                   // own slot, no race
+        __syncthreads();
+        int* t = cur; cur = nxt; nxt = t;             // swap
+    }
+
+    // Run the full schedule to convergence. On return cur[n] holds n's component root, and each
+    // component's root is the minimum voxel offset it contains. `changed` points at a shared int.
+    __device__ static void solve(int*& cur, int*& nxt, int n, int* changed)
+    {
+        // Unconditional warm-up: 1 hook + log2(DIM)=3 compresses.
+        hook    (cur, nxt, n, nullptr);
+        compress(cur, nxt, n, nullptr);
+        compress(cur, nxt, n, nullptr);
+        compress(cur, nxt, n, nullptr);
+
+        // Then alternate (hook, compress) until a full iteration changes nothing.
+        for (int it = 0; it < MaxConvergenceIters; ++it) {
+            if (n == 0) *changed = 0;
+            __syncthreads();
+            hook    (cur, nxt, n, changed);
+            compress(cur, nxt, n, changed);
+            __syncthreads();
+            if (*changed == 0) break;
+            __syncthreads();  // all threads have read *changed; safe for thread 0 to reset it next iteration
         }
     }
-    __syncthreads();
-    int* t = cur; cur = nxt; nxt = t;             // swap (identical on every thread)
-}
-
-// Pointer-jumping compress: parent[v] <- parent[parent[v]]. Halves tree depth per call.
-// Sets *changed (when non-null) iff some entry actually moved.
-__device__ inline void ccCompress(int*& cur, int*& nxt, int n, int* changed)
-{
-    const int pn = cur[n];
-    int v = CC_INACTIVE;
-    if (pn != CC_INACTIVE) {                      // active: grandparent (cur[pn] is valid)
-        v = cur[pn];
-        if (changed && v != pn) *changed = 1;
-    }
-    nxt[n] = v;                                   // own slot, no race
-    __syncthreads();
-    int* t = cur; cur = nxt; nxt = t;             // swap
-}
+}; // LeafUnionFind
 
 template <typename BuildT>
 struct LeafComponentCountFunctor
 {
     static constexpr int MaxThreadsPerBlock         = LEAF_SIZE;
     static constexpr int MinBlocksPerMultiprocessor = 1;
-
-    // Safety cap on the convergence loop, well above the worst case for an 8^3 leaf
-    // (~log2(depth) + log2(#local minima) <= ~18); guards against a non-terminating bug
-    // rather than limiting any legitimate input.
-    static constexpr int MaxConvergenceIters = 64;
 
     __device__ void operator()(const NanoGrid<BuildT>* d_grid, uint16_t* d_counts)
     {
@@ -253,26 +271,11 @@ struct LeafComponentCountFunctor
         int* cur = bufA;
         int* nxt = bufB;
 
-        // Init: active voxels label themselves, inactive get the sentinel.
-        cur[tID] = leaf.isActive(uint32_t(tID)) ? tID : CC_INACTIVE;
+        // Init: every active voxel starts as its own root, inactive ones get the sentinel.
+        cur[tID] = leaf.isActive(uint32_t(tID)) ? tID : LeafUnionFind::INACTIVE;
         __syncthreads();
 
-        // Unconditional warm-up: 1 hook + log2(DIM)=3 compresses.
-        ccHook    (cur, nxt, tID, nullptr);
-        ccCompress(cur, nxt, tID, nullptr);
-        ccCompress(cur, nxt, tID, nullptr);
-        ccCompress(cur, nxt, tID, nullptr);
-
-        // Then alternate (hook, compress) until a full iteration changes nothing.
-        for (int it = 0; it < MaxConvergenceIters; ++it) {
-            if (tID == 0) changed = 0;
-            __syncthreads();
-            ccHook    (cur, nxt, tID, &changed);
-            ccCompress(cur, nxt, tID, &changed);
-            __syncthreads();
-            if (changed == 0) break;
-            __syncthreads();  // all threads have read `changed`; safe for thread 0 to reset it next iteration
-        }
+        LeafUnionFind::solve(cur, nxt, tID, &changed);
 
         // Component count = number of surviving roots (cur[tID] == tID; inactive entries are -1).
         if (tID == 0) compCount = 0;
@@ -288,7 +291,6 @@ struct LeafComponentMaskFunctor
 {
     static constexpr int MaxThreadsPerBlock         = LEAF_SIZE;
     static constexpr int MinBlocksPerMultiprocessor = 1;
-    static constexpr int MaxConvergenceIters        = 64;
 
     __device__ void operator()(const NanoGrid<BuildT>* d_grid,
                                 const uint64_t*         d_offsets,
@@ -313,33 +315,20 @@ struct LeafComponentMaskFunctor
         int* cur = bufA;
         int* nxt = bufB;
 
-        // Init + SV convergence: identical schedule to LeafComponentCountFunctor.
-        cur[tID] = leaf.isActive(uint32_t(tID)) ? tID : CC_INACTIVE;
+        // Init: every active voxel starts as its own root, inactive ones get the sentinel.
+        cur[tID] = leaf.isActive(uint32_t(tID)) ? tID : LeafUnionFind::INACTIVE;
         __syncthreads();
 
-        ccHook    (cur, nxt, tID, nullptr);
-        ccCompress(cur, nxt, tID, nullptr);
-        ccCompress(cur, nxt, tID, nullptr);
-        ccCompress(cur, nxt, tID, nullptr);
-
-        for (int it = 0; it < MaxConvergenceIters; ++it) {
-            if (tID == 0) changed = 0;
-            __syncthreads();
-            ccHook    (cur, nxt, tID, &changed);
-            ccCompress(cur, nxt, tID, &changed);
-            __syncthreads();
-            if (changed == 0) break;
-            __syncthreads();
-        }
+        LeafUnionFind::solve(cur, nxt, tID, &changed);
 
         // Mask-fill: iterate over leaf-local components in ascending root-label order.
         //
         // Each iteration finds the smallest unprocessed root label via a block-wide unsigned
-        // min (CC_INACTIVE = -1 recasts to 0xFFFFFFFF and thus never wins), then collects
+        // min (INACTIVE = -1 recasts to 0xFFFFFFFF and thus never wins), then collects
         // matching voxels via __ballot_sync and writes the 32-bit result for each warp
         // directly into the Mask<3> word array recast as uint32_t* (each of the 16 warps
         // covers exactly one 32-bit word, so all words are written unconditionally).
-        // Processed entries are erased to CC_INACTIVE so they don't win a future min.
+        // Processed entries are erased to INACTIVE so they don't win a future min.
         // localCompIdx tracks the dense component index in lockstep across all threads.
 
         const uint64_t baseOffset = d_offsets[leafID];
@@ -353,13 +342,13 @@ struct LeafComponentMaskFunctor
                                     .Reduce(uint32_t(cur[tID]), ::cuda::minimum<uint32_t>{});
             if (tID == 0) sMinLabel = minLabel;
             __syncthreads();
-            if (sMinLabel == uint32_t(CC_INACTIVE)) break;
+            if (sMinLabel == uint32_t(LeafUnionFind::INACTIVE)) break;
 
             const bool     match  = (uint32_t(cur[tID]) == sMinLabel);
             const uint32_t ballot = __ballot_sync(0xFFFFFFFF, match);
             if (laneID == 0) sMaskWords_u32[warpID] = ballot;
 
-            if (match) cur[tID] = CC_INACTIVE;
+            if (match) cur[tID] = LeafUnionFind::INACTIVE;
             __syncthreads();  // [SYNC1]: sMaskWords_u32 fully written + cur erases visible
 
             // Coalesced write: first 8 threads store sMaskWords -> mask.words(), one uint64_t each.
