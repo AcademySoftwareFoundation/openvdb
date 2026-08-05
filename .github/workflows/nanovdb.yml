@@ -58,7 +58,7 @@ jobs:
     # Build in the same image used by the AWS CodeBuild GPU runner so the
     # uploaded build tree is binary/runtime compatible when executed there.
     container:
-      image: aswf/ci-openvdb:2026
+      image: aswf/ci-openvdb:2024-clang17.2
     env:
       CXX: ${{ matrix.config.cxx }}
     strategy:
@@ -100,7 +100,7 @@ jobs:
       # data files (e.g. data/*.nvdb) that the GPU tests consume, so it must
       # run before the build tree is uploaded.
       - name: test
-        run: cd build && sudo ctest -V -E ".*cuda.*|.*mgpu.*"
+        run: cd build && ctest -V -E ".*cuda.*|.*mgpu.*"
       - name: package_gpu_build
         # Record the absolute workspace path so the GPU runner can restore the
         # build tree to the same location, keeping RPATHs and CTest-generated
@@ -165,7 +165,7 @@ jobs:
         with:
           project-name: OpenVDB
           buildspec-override: buildspec.yml
-          image-override: aswf/ci-openvdb:2026
+          image-override: aswf/ci-openvdb:2024-clang17.2
           # GITHUB_* variables (GITHUB_RUN_ID, GITHUB_REPOSITORY, ...) are
           # forwarded automatically; ARTIFACT_NAME and GH_TOKEN are added here.
           env-vars-for-codebuild: ARTIFACT_NAME,GH_TOKEN
@@ -264,8 +264,8 @@ jobs:
       - name: build_and_test
         run: |
           cd nanovdb/nanovdb
-          sudo mkdir .build
+          mkdir .build
           cd .build
-          sudo cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF ../
-          sudo make -j8 install
-          sudo ctest -V
+          cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF -DCMAKE_INSTALL_PREFIX="$(pwd)/install" ../
+          make -j8 install
+          ctest -V
