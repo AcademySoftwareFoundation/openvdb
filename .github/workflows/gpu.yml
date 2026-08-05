@@ -32,6 +32,6 @@ jobs:
       - name: Run CodeBuild
         uses: aws-actions/aws-codebuild-run-build@v1
         with:
-          project-name: openvdb
+          project-name: OpenVDB
           buildspec-override: buildspec.yml
           image-override: aswf/ci-openvdb:2025
