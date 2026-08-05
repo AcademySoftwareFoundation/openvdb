@@ -13,7 +13,7 @@ phases:
     commands:
       # Verify the GPU and inspect CodeBuild's checked-out source
       - nvidia-smi
-      - echo "CODEBUILD_SRC_DIR: $CODEBUILD_SRC_DIR"
+      - 'echo "CODEBUILD_SRC_DIR: $CODEBUILD_SRC_DIR"'
       - cd "$CODEBUILD_SRC_DIR"
       - tree
 
