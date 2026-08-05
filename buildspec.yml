@@ -9,6 +9,10 @@ env:
     - CC
 
 phases:
+  install:
+    commands:
+      - dnf install -y tree
+
   pre_build:
     commands:
       # Verify the GPU and inspect CodeBuild's checked-out source

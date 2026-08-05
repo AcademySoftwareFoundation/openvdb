@@ -34,4 +34,4 @@ jobs:
         with:
           project-name: OpenVDB
           buildspec-override: buildspec.yml
-          image-override: aswf/ci-openvdb:2025
+          image-override: aswf/ci-openvdb:2026
