@@ -70,7 +70,7 @@ jobs:
           - { cxx: clang++, label: clang, build: 'Debug' }
       fail-fast: false
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: setup_cuda_12
         run: |
           echo "/usr/local/cuda-12/bin" >> $GITHUB_PATH
@@ -112,7 +112,7 @@ jobs:
           echo "CONFIG=${{ matrix.config.label }}-${{ matrix.config.build }}" >> "$META"
           cat "$META"
       - name: upload_gpu_build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nanovdb-gpu-build-${{ matrix.config.label }}-${{ matrix.config.build }}
           path: |
@@ -184,7 +184,7 @@ jobs:
     strategy:
       fail-fast: false
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v7
     - name: path
       run: |
         # note: system path must be modified in a previous step to it's use
@@ -234,7 +234,7 @@ jobs:
           - { runner: 'macos-14', cxx: 'clang++', build: 'Debug'   }
       fail-fast: false
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: install_deps
         run: |
           ./ci/install_macos.sh
@@ -258,7 +258,7 @@ jobs:
     container:
       image: aswf/ci-openvdb:2024-clang17.2
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: install_gtest
         run: ./ci/install_gtest.sh latest
       - name: build_and_test
