@@ -162,9 +162,10 @@ static_assert(nanovdb::cuda::is_async_resource<
 
 TEST(TestMemoryResource, PointsToGrid_RunsOnSynchronousResource)
 {
-    // The pool-less-device path: every builder allocation routes through
+    // The pool-less-device path: every scratch allocation routes through
     // cudaMalloc/cudaFree via AsyncFromSync, never touching cudaMallocAsync.
-    // The grid handle's own buffer is separate from the injected resource.
+    // The grid handle's output buffer is the exception -- getHandle allocates
+    // it through BufferT::create, not through the injected resource.
     using RefT  = nanovdb::cuda::ResourceRef<SyncCountingResource>;
     using VgpuT = nanovdb::cuda::AsyncFromSync<RefT>;
     SyncCountingResource base;

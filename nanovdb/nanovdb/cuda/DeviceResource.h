@@ -252,8 +252,10 @@ struct AsyncFromSync
 
     /// @brief Synchronizes @c stream, then frees through the synchronous
     ///        resource -- the synchronize makes the quiescence contract hold.
+    ///        Null is a no-op and skips the synchronize.
     void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream)
     {
+        if (p == nullptr) return;
         cudaCheck(cudaStreamSynchronize(stream));
         resource.deallocate(p, bytes, alignment);
     }
