@@ -136,6 +136,56 @@ TEST(TestMemoryResource, PinnedResource_DefaultResourceRoundTrip)
 // retained stream (the stream of the most recent reallocate), not the null stream.
 //======================================================================
 
+// Synchronous-only and stateful: the shape of a vGPU or arena backend.
+struct SyncCountingResource
+{
+    static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::MallocResource::DEFAULT_ALIGNMENT;
+    int allocs = 0, deallocs = 0;
+    void* allocate(size_t bytes, size_t alignment) {
+        void* p = nanovdb::cuda::MallocResource{}.allocate(bytes, alignment);
+        if (p) ++allocs;
+        return p;
+    }
+    void deallocate(void* p, size_t bytes, size_t alignment) {
+        if (p) ++deallocs;
+        nanovdb::cuda::MallocResource{}.deallocate(p, bytes, alignment);
+    }
+};
+
+static_assert(nanovdb::cuda::is_resource<nanovdb::cuda::MallocResource>::value,
+              "MallocResource must model the synchronous Resource concept");
+static_assert(!nanovdb::cuda::is_async_resource<nanovdb::cuda::MallocResource>::value,
+              "MallocResource must not claim the AsyncResource concept");
+static_assert(nanovdb::cuda::is_async_resource<
+                  nanovdb::cuda::AsyncFromSync<nanovdb::cuda::MallocResource>>::value,
+              "AsyncFromSync must lift a synchronous resource to AsyncResource");
+
+TEST(TestMemoryResource, PointsToGrid_RunsOnSynchronousResource)
+{
+    // The pool-less-device path: every builder allocation routes through
+    // cudaMalloc/cudaFree via AsyncFromSync, never touching cudaMallocAsync.
+    // The grid handle's own buffer is separate from the injected resource.
+    using RefT  = nanovdb::cuda::ResourceRef<SyncCountingResource>;
+    using VgpuT = nanovdb::cuda::AsyncFromSync<RefT>;
+    SyncCountingResource base;
+    VgpuT res{RefT(base)};
+
+    const std::vector<nanovdb::Coord> voxels = {{0,0,0},{1,2,3},{8,8,8},{100,100,100},{-50,20,7}};
+    nanovdb::Coord* d_voxels = nullptr;
+    ASSERT_EQ(cudaMalloc(&d_voxels, voxels.size()*sizeof(nanovdb::Coord)), cudaSuccess);
+    ASSERT_EQ(cudaMemcpy(d_voxels, voxels.data(), voxels.size()*sizeof(nanovdb::Coord), cudaMemcpyHostToDevice), cudaSuccess);
+    {
+        nanovdb::tools::cuda::PointsToGrid<nanovdb::ValueOnIndex, VgpuT> converter(nanovdb::Map(1.0), cudaStream_t{0}, res);
+        auto handle = converter.getHandle(d_voxels, voxels.size());
+        auto* grid = handle.deviceGrid<nanovdb::ValueOnIndex>();
+        EXPECT_NE(grid, nullptr);
+    }
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    ASSERT_EQ(cudaFree(d_voxels), cudaSuccess);
+    EXPECT_GT(base.allocs, 0);                  // scratch really routed through the sync resource
+    EXPECT_EQ(base.allocs, base.deallocs);      // and every allocation was freed through it
+}
+
 TEST(TestMemoryResource, TempPool_FreesOnRetainedStream)
 {
     cudaStream_t s = nullptr;

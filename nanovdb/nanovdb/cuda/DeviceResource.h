@@ -192,6 +192,77 @@ struct SyncFromAsync
     }
 };
 
+/// @brief Synchronous device memory resource backed by cudaMalloc/cudaFree.
+///        Models only the Resource concept: it never touches stream-ordered
+///        allocation, so it works on devices without memory-pool support
+///        (cudaDevAttrMemoryPoolsSupported == 0), where DeviceResource's
+///        cudaMallocAsync path fails by design. Pair with AsyncFromSync to
+///        drive the stream-ordered builders on such a device.
+class MallocResource
+{
+public:
+    // cudaMalloc aligns memory to 256 bytes by default
+    static constexpr size_t DEFAULT_ALIGNMENT = 256;
+
+    /// @brief Allocates @c bytes with cudaMalloc; valid on every stream when
+    ///        this returns. A zero request returns nullptr.
+    void* allocate(size_t bytes, size_t)
+    {
+        if (bytes == 0) return nullptr;
+        void* p = nullptr;
+        cudaCheck(cudaMalloc(&p, bytes));
+        return p;
+    }
+
+    /// @brief Frees @c p with cudaFree; the caller guarantees that device work
+    ///        touching the memory has completed.
+    void deallocate(void* p, size_t, size_t) { cudaCheck(cudaFree(p)); }
+};// MallocResource
+
+/// @brief Wrapper presenting a synchronous resource as a stream-ordered one,
+///        so it can drive components that require the AsyncResource concept
+///        (TempPool and the GPU builders).
+/// @tparam R the wrapped synchronous resource, held by value; wrap a
+///         ResourceRef<R> to borrow a stateful instance instead.
+/// @details The mirror of SyncFromAsync, and the analog of cuda::mr's
+///          synchronous_resource_adapter. allocate_async forwards to
+///          R::allocate, whose memory is immediately valid on every stream --
+///          a stronger guarantee than stream-ordering requires.
+///          deallocate_async synchronizes @c stream before R::deallocate,
+///          establishing the quiescence the synchronous contract demands.
+/// @warning Every deallocation synchronizes its stream, so expect
+///          serialization relative to a genuinely stream-ordered resource.
+///          That is the unavoidable cost of a synchronous backend under a
+///          stream-ordered algorithm; this wrapper exists so the cost is
+///          explicit and chosen by the caller -- e.g. on a device without
+///          memory-pool support -- rather than silently substituted.
+template<class R>
+struct AsyncFromSync
+{
+    static_assert(is_resource<R>::value,
+                  "AsyncFromSync requires R to model the synchronous Resource concept");
+
+    static constexpr size_t DEFAULT_ALIGNMENT = R::DEFAULT_ALIGNMENT;
+
+    R resource;
+
+    /// @brief Allocates through the synchronous resource; the result is valid
+    ///        on every stream, hence trivially valid on @c stream.
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t) { return resource.allocate(bytes, alignment); }
+
+    /// @brief Synchronizes @c stream, then frees through the synchronous
+    ///        resource -- the synchronize makes the quiescence contract hold.
+    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream)
+    {
+        cudaCheck(cudaStreamSynchronize(stream));
+        resource.deallocate(p, bytes, alignment);
+    }
+
+    /// @brief Synchronous pair, forwarding to the wrapped resource.
+    void* allocate(size_t bytes, size_t alignment) { return resource.allocate(bytes, alignment); }
+    void  deallocate(void* p, size_t bytes, size_t alignment) { resource.deallocate(p, bytes, alignment); }
+};// AsyncFromSync<R>
+
 /// @brief Non-owning reference to a memory resource that is itself a resource:
 ///        copying the ref shares the underlying resource rather than copying it.
 /// @tparam R the referenced resource type
