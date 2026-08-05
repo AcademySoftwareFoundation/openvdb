@@ -180,8 +180,8 @@ public:
     /// @param stream cuda stream subsequent deallocation is ordered on
     /// @warning The caller is responsible for ordering @c stream after any
     ///          in-flight work that uses the buffer's memory. This deliberately
-    ///          does not synchronize, matching cuda::buffer's
-    ///          set_stream_unsynchronized rather than its set_stream.
+    ///          does not synchronize, matching cuda::buffer's set_stream, which
+    ///          avoids implicit synchronization in fundamental primitives.
     template<typename S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
     void set_stream(cudaStream_t stream) { this->mStream = stream; }
 
