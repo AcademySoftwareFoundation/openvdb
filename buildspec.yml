@@ -1,0 +1,22 @@
+version: 0.2
+
+env:
+  variables:
+    CXX: g++
+    CC: gcc
+  exported-variables:
+    - CXX
+    - CC
+
+phases:
+  pre_build:
+    commands:
+      # Checkout
+      - git clone https://github.com/$GITHUB_REPOSITORY openvdb
+      - cd openvdb
+      - git checkout $GITHUB_SHA
+      # Print tree
+      - tree
+  nvidia-smi:
+    commands:
+      - nvidia-smi

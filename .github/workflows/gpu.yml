@@ -11,7 +11,7 @@ jobs:
   # ---------------------------------------------------------------------------
 
   linux_gpu:
-    name: 'Linux CentOS 7 VFX CY2020 GPU <GCC 6.3.1>'
+    name: 'VDB GPU Tester'
     # Don't run on OCIO forks
     if: github.repository == 'AcademySoftwareFoundation/openvdb'
     # GH-hosted VM. The build runs in CentOS 7 'container' hard-coded in
@@ -29,9 +29,9 @@ jobs:
       - name: Validate AWS Credentials
         run: |
             aws sts get-caller-identity
-    #   - name: Run CodeBuild
-    #     uses: aws-actions/aws-codebuild-run-build@v1
-    #     with:
-    #       project-name: OpenColorIO
-    #       buildspec-override: buildspec.yml
-    #       image-override: aswf/ci-ocio:2025
+      - name: Run CodeBuild
+        uses: aws-actions/aws-codebuild-run-build@v1
+        with:
+          project-name: openvdb
+          buildspec-override: buildspec.yml
+          image-override: aswf/ci-openvdb:2025
