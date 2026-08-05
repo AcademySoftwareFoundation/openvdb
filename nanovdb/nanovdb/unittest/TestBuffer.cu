@@ -306,6 +306,54 @@ TEST(TestBuffer, BufferWorksOverAMixinResource)
     ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
 }
 
+// State held inline, not behind a pointer: copying such a resource strands its
+// accounting, which is exactly what ResourceRef exists to avoid.
+struct StatefulInlineResource : nanovdb::cuda::SyncFromAsync<StatefulInlineResource>
+{
+    static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
+    int allocs = 0, deallocs = 0;
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream) {
+        ++allocs; return nanovdb::cuda::DeviceResource{}.allocate_async(bytes, alignment, stream);
+    }
+    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream) {
+        ++deallocs; nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
+    }
+};
+
+// A ref over an async resource models both tiers; over a synchronous-only
+// resource it models only the synchronous one -- it must not misreport.
+static_assert(nanovdb::cuda::is_async_resource<nanovdb::cuda::ResourceRef<nanovdb::cuda::DeviceResource>>::value,
+              "ref over an async resource must model AsyncResource");
+static_assert(nanovdb::cuda::is_resource<nanovdb::cuda::ResourceRef<nanovdb::cuda::DeviceResource>>::value,
+              "ref over an async resource must model Resource");
+static_assert(!nanovdb::cuda::is_async_resource<nanovdb::cuda::ResourceRef<nanovdb::cuda::PinnedResource>>::value,
+              "ref over a synchronous resource must not claim AsyncResource");
+static_assert(nanovdb::cuda::is_resource<nanovdb::cuda::ResourceRef<nanovdb::cuda::PinnedResource>>::value,
+              "ref over a synchronous resource must model Resource");
+
+TEST(TestBuffer, ResourceRefSharesTheUnderlyingResource)
+{
+    StatefulInlineResource res;   // the original; a by-value copy would strand these counters
+    {
+        nanovdb::cuda::Buffer<int, nanovdb::cuda::ResourceRef<StatefulInlineResource>> buf(
+            cudaStream_t{0}, nanovdb::cuda::ResourceRef<StatefulInlineResource>(res), 1024, nanovdb::cuda::noInit);
+        EXPECT_NE(buf.data(), nullptr);
+        EXPECT_EQ(res.allocs, 1);   // traffic reaches the original, not a copy
+        EXPECT_EQ(res.deallocs, 0);
+    }
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_EQ(res.allocs, 1);
+    EXPECT_EQ(res.deallocs, 1);
+}
+
+TEST(TestBuffer, ResourceRefEqualityIsIdentity)
+{
+    StatefulInlineResource a, b;
+    nanovdb::cuda::ResourceRef<StatefulInlineResource> ra(a), raAgain(a), rb(b);
+    EXPECT_TRUE(ra == raAgain);   // same underlying resource
+    EXPECT_TRUE(ra != rb);        // different underlying resources
+}
+
 TEST(TestBuffer, DestroyIsTheSpellingClearDelegatesTo)
 {
     Counters c;

@@ -190,6 +190,59 @@ struct SyncFromAsync
     }
 };
 
+/// @brief Non-owning reference to a memory resource that is itself a resource:
+///        copying the ref shares the underlying resource rather than copying it.
+/// @tparam R the referenced resource type
+/// @details Types that hold their resource by value -- cuda::Buffer, matching
+///          cuda::buffer -- select their ownership semantics by what is placed
+///          in that slot: a concrete resource is owned as a copy, while a
+///          ResourceRef borrows. This is the same division cuda::mr draws
+///          between any_resource (owning) and resource_ref (borrowing), and the
+///          same shape as std::pmr::polymorphic_allocator over memory_resource*.
+///          Use it when a resource is stateful or long-lived and a container
+///          must allocate through *that* instance rather than a copy of it.
+/// @warning The referenced resource must outlive every use of this ref and of
+///          all copies of it, including any container holding one.
+template <class R>
+struct ResourceRef
+{
+    static_assert(is_async_resource<R>::value || is_resource<R>::value,
+                  "ResourceRef requires R to model the AsyncResource or the Resource concept");
+
+    static constexpr size_t DEFAULT_ALIGNMENT = R::DEFAULT_ALIGNMENT;
+
+    /// @brief Constructs a ref borrowing @c resource.
+    /// @param resource resource to allocate from; must outlive this ref
+    ResourceRef(R& resource) : mResource(&resource) {}
+
+    /// @{
+    /// @brief Stream-ordered pair, present only when @c R models AsyncResource,
+    ///        so a ref over a synchronous resource does not misreport its tier.
+    template<class S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream)
+    {
+        return mResource->allocate_async(bytes, alignment, stream);
+    }
+    template<class S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
+    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream)
+    {
+        mResource->deallocate_async(p, bytes, alignment, stream);
+    }
+    /// @}
+
+    /// @brief Synchronous pair, forwarding to the referenced resource.
+    void* allocate(size_t bytes, size_t alignment) { return mResource->allocate(bytes, alignment); }
+    void  deallocate(void* p, size_t bytes, size_t alignment) { mResource->deallocate(p, bytes, alignment); }
+
+    /// @brief Two refs compare equal iff they reference the same resource, i.e.
+    ///        memory allocated through one may be deallocated through the other.
+    friend bool operator==(ResourceRef lhs, ResourceRef rhs) { return lhs.mResource == rhs.mResource; }
+    friend bool operator!=(ResourceRef lhs, ResourceRef rhs) { return lhs.mResource != rhs.mResource; }
+
+private:
+    R* mResource;
+};// ResourceRef<R>
+
 }
 
 } // namespace nanovdb::cuda
