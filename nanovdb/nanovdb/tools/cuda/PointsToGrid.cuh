@@ -1388,7 +1388,7 @@ inline void PointsToGrid<BuildT, ResourceT>::processBBox()
     // propagate bbox from lower -> upper/parent node
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[1]), mNumThreads, 0, mStream>>>(mData.nodeCount[1], PropagateLowerBBoxFunctor<BuildT>(), mDeviceData);
     mLowerKeysBuf.destroy(); mData.d_lower_keys = nullptr;
-    cudaCheckError()
+    cudaCheckError();
 
     // propagate bbox from upper -> root/parent node
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[2]), mNumThreads, 0, mStream>>>(mData.nodeCount[2], PropagateUpperBBoxFunctor<BuildT>(), mDeviceData);
