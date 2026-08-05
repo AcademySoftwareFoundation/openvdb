@@ -243,7 +243,7 @@ TEST(TestNanoVDBMultiGPU, DenseLeaf_DistributedCudaPointsToGrid_UnifiedBuffer)
     EXPECT_TRUE(data);
     grid = handle.grid<BuildT>();
     EXPECT_TRUE(grid);
-    EXPECT_TRUE(grid->activeVoxelCount() == 512);
+    EXPECT_EQ(voxelCount, grid->activeVoxelCount());
     EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
 
     cudaCheck(cudaFree(voxels));

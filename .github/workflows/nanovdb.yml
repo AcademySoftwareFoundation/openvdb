@@ -164,7 +164,7 @@ jobs:
         uses: aws-actions/aws-codebuild-run-build@v1
         with:
           project-name: OpenVDB
-          buildspec-override: buildspec.yml
+          buildspec-override: ci/buildspec_nanovdb.yml
           image-override: aswf/ci-openvdb:2024-clang17.2
           # GITHUB_* variables (GITHUB_RUN_ID, GITHUB_REPOSITORY, ...) are
           # forwarded automatically; ARTIFACT_NAME and GH_TOKEN are added here.

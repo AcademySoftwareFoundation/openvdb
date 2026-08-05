@@ -915,7 +915,7 @@ inline void DistributedPointsToGrid<BuildT>::processGridTreeRoot(const PtrT poin
     } else {
         cudaCheck(cudaMemsetAsync(dst, 0, GridData::MaxNameSize, stream));
     }
-    cudaEventRecord(processGridTreeRootEvent);
+    cudaCheck(cudaEventRecord(processGridTreeRootEvent, stream));
 
     for (const auto& [otherDeviceId, otherStream] : mDeviceMesh) {
         cudaSetDevice(otherDeviceId);
