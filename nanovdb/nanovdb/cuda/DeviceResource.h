@@ -145,6 +145,51 @@ struct is_resource<R, std::void_t<
     decltype(std::declval<R&>().deallocate(std::declval<void*>(), size_t{0}, size_t{0}))>>
     : std::true_type {};
 
+/// @brief CRTP base supplying the synchronous half of the resource concept in
+///        terms of the stream-ordered half, so a custom stream-ordered resource
+///        only has to write allocate_async and deallocate_async.
+/// @tparam Derived the resource deriving from this base
+/// @details A stream-ordered resource must also model the synchronous concept
+///          (is_async_resource implies is_resource), which means writing four
+///          methods where two would do. The synchronous pair is not a bare
+///          delegate: memory from allocate must be usable immediately on any
+///          stream, so the null-stream allocation has to be synchronized before
+///          it is returned. Omitting that synchronization yields memory that
+///          satisfies the concept but is not actually synchronous -- a race
+///          rather than a compile error -- so it lives here rather than being
+///          rewritten per resource.
+/// @code
+/// struct MyResource : nanovdb::cuda::SyncFromAsync<MyResource> {
+///     static constexpr size_t DEFAULT_ALIGNMENT = 256;
+///     void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream);
+///     void  deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream);
+/// };
+/// @endcode
+template <class Derived>
+struct SyncFromAsync
+{
+    /// @brief Allocates @c bytes usable on any stream when this returns.
+    /// @param bytes number of bytes to allocate
+    /// @param alignment requested alignment
+    void* allocate(size_t bytes, size_t alignment)
+    {
+        void* p = static_cast<Derived&>(*this).allocate_async(bytes, alignment, cudaStream_t{0});
+        cudaCheck(cudaStreamSynchronize(cudaStream_t{0}));
+        return p;
+    }
+
+    /// @brief Frees @c p on the null stream.
+    /// @param p pointer previously returned by allocate
+    /// @param bytes size passed to the matching allocate
+    /// @param alignment alignment passed to the matching allocate
+    /// @note No synchronization here: the synchronous concept's contract is
+    ///       that the memory is already quiescent when deallocate is called.
+    void deallocate(void* p, size_t bytes, size_t alignment)
+    {
+        static_cast<Derived&>(*this).deallocate_async(p, bytes, alignment, cudaStream_t{0});
+    }
+};
+
 }
 
 } // namespace nanovdb::cuda

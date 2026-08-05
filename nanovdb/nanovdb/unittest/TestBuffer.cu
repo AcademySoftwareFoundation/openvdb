@@ -258,6 +258,54 @@ TEST(TestBuffer, ClearFreesAndEmpties)
     ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
 }
 
+// A custom stream-ordered resource written the short way: two methods plus the
+// mixin, rather than four.
+struct MixinResource : nanovdb::cuda::SyncFromAsync<MixinResource>
+{
+    static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
+    Counters* counters = nullptr;
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream) {
+        void* p = nanovdb::cuda::DeviceResource{}.allocate_async(bytes, alignment, stream);
+        if (p) { ++counters->allocs; counters->allocBytes = bytes; }
+        return p;
+    }
+    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream) {
+        if (p) { ++counters->deallocs; counters->deallocBytes = bytes; }
+        nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
+    }
+};
+
+// The mixin supplies the synchronous half, so both concepts are satisfied.
+static_assert(nanovdb::cuda::is_async_resource<MixinResource>::value,
+              "SyncFromAsync user must still model AsyncResource");
+static_assert(nanovdb::cuda::is_resource<MixinResource>::value,
+              "SyncFromAsync must supply the synchronous half of the concept");
+
+TEST(TestBuffer, SyncFromAsyncSuppliesTheSynchronousPair)
+{
+    Counters c;
+    MixinResource r{{}, &c};
+    // the inherited synchronous pair routes through the derived async methods
+    void* p = r.allocate(1024, MixinResource::DEFAULT_ALIGNMENT);
+    ASSERT_NE(p, nullptr);
+    EXPECT_EQ(c.allocs, 1);
+    r.deallocate(p, 1024, MixinResource::DEFAULT_ALIGNMENT);
+    EXPECT_EQ(c.deallocs, 1);
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+}
+
+TEST(TestBuffer, BufferWorksOverAMixinResource)
+{
+    Counters c;
+    {
+        nanovdb::cuda::Buffer<float, MixinResource> buf(0, MixinResource{{}, &c}, 64, nanovdb::cuda::noInit);
+        EXPECT_EQ(c.allocs, 1);
+        EXPECT_NE(buf.data(), nullptr);
+    }
+    EXPECT_EQ(c.deallocs, 1);
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+}
+
 TEST(TestBuffer, DestroyIsTheSpellingClearDelegatesTo)
 {
     Counters c;

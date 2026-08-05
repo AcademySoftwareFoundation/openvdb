@@ -25,7 +25,7 @@ namespace {
 
 /// @brief Resource that counts (non-null) allocations and deallocations so
 ///        leaks can be asserted. Delegates the actual work to DeviceResource.
-struct CountingResource
+struct CountingResource : nanovdb::cuda::SyncFromAsync<CountingResource>
 {
     static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
     int allocs = 0;
@@ -43,7 +43,7 @@ struct CountingResource
 
 /// @brief Resource that records the stream of every allocation/deallocation,
 ///        to verify stream-ordered teardown. Delegates work to DeviceResource.
-struct StreamRecordingResource
+struct StreamRecordingResource : nanovdb::cuda::SyncFromAsync<StreamRecordingResource>
 {
     static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
     std::vector<cudaStream_t> allocStreams;
