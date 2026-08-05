@@ -58,6 +58,8 @@ class TopologyBuilder
 
     static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
                   "TopologyBuilder allocates stream-ordered scratch and requires an AsyncResource");
+    static_assert(ResourceT::DEFAULT_ALIGNMENT >= alignof(uint64_t),
+                  "TopologyBuilder reinterprets byte scratch as word-sized types and requires word-aligned allocations");
 
     /// @brief Device-only scratch storage, borrowing the injected resource
     ///        through a ResourceRef so all traffic reaches the caller's
