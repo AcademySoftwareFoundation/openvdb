@@ -11,12 +11,12 @@ env:
 phases:
   pre_build:
     commands:
-      # Checkout
-      - git clone https://github.com/$GITHUB_REPOSITORY openvdb
-      - cd openvdb
-      - git checkout $GITHUB_SHA
-      # Print tree
-      - tree
-  nvidia-smi:
-    commands:
+      # Verify the GPU and inspect CodeBuild's checked-out source
       - nvidia-smi
+      - echo "CODEBUILD_SRC_DIR: $CODEBUILD_SRC_DIR"
+      - cd "$CODEBUILD_SRC_DIR"
+      - tree
+
+  build:
+    commands:
+      - echo "Add build commands here"
