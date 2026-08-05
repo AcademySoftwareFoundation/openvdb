@@ -49,7 +49,7 @@ jobs:
     # push OR non-draft PR OR matching manual run
     if: |
       (github.event_name == 'push' ||
-       (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+       (github.event_name == 'pull_request_target' && github.event.pull_request.draft == false) ||
        (github.event_name == 'workflow_dispatch' &&
         (github.event.inputs.type == 'all' || github.event.inputs.type == 'linux')))
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
@@ -71,6 +71,8 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
       - name: setup_cuda_12
         run: |
           echo "/usr/local/cuda-12/bin" >> $GITHUB_PATH
@@ -129,7 +131,7 @@ jobs:
     if: |
       github.repository == 'AcademySoftwareFoundation/openvdb' &&
       (github.event_name == 'push' ||
-       (github.event_name == 'pull_request' &&
+       (github.event_name == 'pull_request_target' &&
         github.event.pull_request.draft == false &&
         github.event.pull_request.head.repo.full_name == github.repository) ||
        (github.event_name == 'workflow_dispatch' &&
@@ -174,7 +176,7 @@ jobs:
   windows-nanovdb:
     if: |
       (github.event_name == 'push' ||
-       (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+       (github.event_name == 'pull_request_target' && github.event.pull_request.draft == false) ||
        (github.event_name == 'workflow_dispatch' &&
         (github.event.inputs.type == 'all' || github.event.inputs.type == 'win')))
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
@@ -186,6 +188,8 @@ jobs:
       fail-fast: false
     steps:
     - uses: actions/checkout@v7
+      with:
+        ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
     - name: path
       run: |
         # note: system path must be modified in a previous step to it's use
@@ -222,7 +226,7 @@ jobs:
   macos-nanovdb:
     if: |
       (github.event_name == 'push' ||
-       (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+       (github.event_name == 'pull_request_target' && github.event.pull_request.draft == false) ||
        (github.event_name == 'workflow_dispatch' &&
         (github.event.inputs.type == 'all' || github.event.inputs.type == 'mac')))
     runs-on: ${{ matrix.config.runner }}
@@ -236,6 +240,8 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
       - name: install_deps
         run: |
           ./ci/install_macos.sh
@@ -252,7 +258,7 @@ jobs:
   nanovdb-lite:
     if: |
       (github.event_name == 'push' ||
-       (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+       (github.event_name == 'pull_request_target' && github.event.pull_request.draft == false) ||
        (github.event_name == 'workflow_dispatch' &&
         (github.event.inputs.type == 'all' || github.event.inputs.type == 'linux')))
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
@@ -260,6 +266,8 @@ jobs:
       image: aswf/ci-openvdb:2024-clang17.2
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
       - name: install_gtest
         run: ./ci/install_gtest.sh latest
       - name: build_and_test
