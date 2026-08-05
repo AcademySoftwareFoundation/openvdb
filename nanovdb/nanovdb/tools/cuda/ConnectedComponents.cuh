@@ -31,21 +31,20 @@
 
 #include <utility>  // std::pair
 
-// Private helper macro to call CUB functions that use dynamic temporary storage, in terms of the
-// enclosing class's mTempDevicePool + mStream members. Uniquely named and #undef'd at the end of
-// this header so it never leaks into or collides with similarly-named macros in other headers
-// (e.g. TopologyBuilder.cuh's own CALL_CUBS, which is written in terms of a local `stream`).
+// Define utility macro used to call cub functions that use dynamic temporary storage
+#ifndef CALL_CUBS
 #ifdef _WIN32
-#define NANOVDB_CC_CALL_CUBS(func, ...) \
+#define CALL_CUBS(func, ...) \
     cudaCheck(cub::func(nullptr, mTempDevicePool.requestedSize(), __VA_ARGS__, mStream)); \
     mTempDevicePool.reallocate(mStream); \
     cudaCheck(cub::func(mTempDevicePool.data(), mTempDevicePool.size(), __VA_ARGS__, mStream));
 #else
-#define NANOVDB_CC_CALL_CUBS(func, args...) \
+#define CALL_CUBS(func, args...) \
     cudaCheck(cub::func(nullptr, mTempDevicePool.requestedSize(), args, mStream)); \
     mTempDevicePool.reallocate(mStream); \
     cudaCheck(cub::func(mTempDevicePool.data(), mTempDevicePool.size(), args, mStream));
 #endif
+#endif // ifndef CALL_CUBS
 
 namespace nanovdb {
 
@@ -650,7 +649,7 @@ void ConnectedComponents<BuildT>::processLeafConnectedComponents()
 
     // In-place inclusive sum over offsets[1..leafCount]; offsets[leafCount] = K (total components).
     if (mVerbose==1) mTimer.start("Per-leaf component offset prefix sum");
-    NANOVDB_CC_CALL_CUBS(DeviceScan::InclusiveSum, d_offsets + 1, d_offsets + 1, int(leafCount));
+    CALL_CUBS(DeviceScan::InclusiveSum, d_offsets + 1, d_offsets + 1, int(leafCount));
     cudaCheckError();
     if (mVerbose==1) mTimer.stop();
 
@@ -715,7 +714,7 @@ void ConnectedComponents<BuildT>::processCrossLeafEdges()
 
     // Inclusive prefix sum over offsets[1..leafCount]; offsets[leafCount] = E.
     if (mVerbose==1) mTimer.start("Cross-leaf edge offset prefix sum");
-    NANOVDB_CC_CALL_CUBS(DeviceScan::InclusiveSum, d_offsets + 1, d_offsets + 1, int(leafCount));
+    CALL_CUBS(DeviceScan::InclusiveSum, d_offsets + 1, d_offsets + 1, int(leafCount));
     cudaCheckError();
     if (mVerbose==1) mTimer.stop();
 
@@ -799,7 +798,7 @@ void ConnectedComponents<BuildT>::processVoxelLabels()
     util::cuda::lambdaKernel<<<(unsigned int)((K + 255) / 256), 256, 0, mStream>>>(
         K, cc_detail::RootFlagFunctor{}, deviceComponentParent(), d_rank);
     cudaCheckError();
-    NANOVDB_CC_CALL_CUBS(DeviceScan::InclusiveSum, d_rank, d_rank, int(K));
+    CALL_CUBS(DeviceScan::InclusiveSum, d_rank, d_rank, int(K));
     cudaCheckError();
 
     uint32_t hN = 0;
@@ -822,6 +821,8 @@ void ConnectedComponents<BuildT>::processVoxelLabels()
 
 } // namespace nanovdb
 
-#undef NANOVDB_CC_CALL_CUBS  // don't leak the private helper macro
+#ifdef CALL_CUBS
+#undef CALL_CUBS
+#endif
 
 #endif // NVIDIA_TOOLS_CUDA_CONNECTEDCOMPONENTS_CUH_HAS_BEEN_INCLUDED
