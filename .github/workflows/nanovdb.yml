@@ -117,6 +117,7 @@ jobs:
           name: nanovdb-gpu-build-${{ matrix.config.label }}-${{ matrix.config.build }}
           path: |
             build
+            nanovdb/nanovdb/python/test/TestNanoVDB.py
             nanovdb-gpu-meta.env
           retention-days: 1
           if-no-files-found: error
@@ -160,6 +161,32 @@ jobs:
           aws-access-key-id: ${{ secrets.CODEBUILD_ID }}
           aws-secret-access-key: ${{ secrets.CODEBUILD_SECRET }}
           aws-region: us-west-2
+      - name: Inspect CodeBuild compute configuration
+        run: |
+          echo "OpenVDB project environment:"
+          aws codebuild batch-get-projects \
+            --region us-west-2 \
+            --names OpenVDB \
+            --query 'projects[0].environment.{type:type,computeType:computeType,image:image,fleet:fleet}' \
+            --output json ||
+            echo "::warning::Unable to describe the OpenVDB CodeBuild project"
+
+          echo "Configured CodeBuild fleets:"
+          fleet_json=$(aws codebuild list-fleets --region us-west-2 --output json) || {
+            echo "::warning::Unable to list CodeBuild fleets"
+            fleet_json='{"fleets":[]}'
+          }
+          mapfile -t fleet_names < <(jq -r '.fleets[]?' <<<"$fleet_json")
+          if (( ${#fleet_names[@]} )); then
+            aws codebuild batch-get-fleets \
+              --region us-west-2 \
+              --names "${fleet_names[@]}" \
+              --query 'fleets[].{name:name,arn:arn,status:status,environmentType:environmentType,computeType:computeType,computeConfiguration:computeConfiguration,baseCapacity:baseCapacity}' \
+              --output json ||
+              echo "::warning::Unable to describe configured CodeBuild fleets"
+          else
+            echo "No CodeBuild fleets found (or fleet listing is not permitted)."
+          fi
       - name: Run CodeBuild GPU tests
         uses: aws-actions/aws-codebuild-run-build@v1
         with:

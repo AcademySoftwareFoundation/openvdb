@@ -4,7 +4,7 @@ version: 0.2
 # This spec does NOT build the project. Instead it downloads the prebuilt
 # build tree produced by the matching GitHub Actions run (see the
 # linux-nanovdb / linux-nanovdb-gpu jobs in .github/workflows/nanovdb.yml),
-# restores it at its original absolute path, and executes the GPU-only tests.
+# restores it at its original absolute path, and executes the GPU and Python tests.
 #
 # Required environment variables (provided by aws-codebuild-run-build):
 #   ARTIFACT_NAME     - name of the GitHub Actions artifact to fetch
@@ -62,10 +62,14 @@ phases:
         set -a
         . /tmp/nanovdb-gpu-artifact/nanovdb-gpu-meta.env
         set +a
-        echo "Restoring build tree to ${BUILD_WORKSPACE}"
+        echo "Restoring build tree and Python tests to ${BUILD_WORKSPACE}"
         mkdir -p "${BUILD_WORKSPACE}"
         rm -rf "${BUILD_WORKSPACE}/build"
         mv /tmp/nanovdb-gpu-artifact/build "${BUILD_WORKSPACE}/build"
+        python_test_dir="${BUILD_WORKSPACE}/nanovdb/nanovdb/python/test"
+        mkdir -p "${python_test_dir}"
+        mv /tmp/nanovdb-gpu-artifact/nanovdb/nanovdb/python/test/TestNanoVDB.py \
+          "${python_test_dir}/TestNanoVDB.py"
 
   build:
     commands:
@@ -77,4 +81,4 @@ phases:
         export PATH="${CUDA_HOME}/bin:${PATH}"
         export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${BUILD_WORKSPACE}/build/openvdb/openvdb:${BUILD_WORKSPACE}/build/nanovdb/nanovdb:${LD_LIBRARY_PATH:-}"
         cd "${BUILD_WORKSPACE}/build"
-        ctest -V -R ".*cuda.*|.*mgpu.*" --output-on-failure
+        ctest -V -R ".*cuda.*|.*mgpu.*|pytest_nanovdb" --output-on-failure
