@@ -1632,8 +1632,9 @@ Grid<TreeT>::readTopology(std::istream& is)
 {
     tree().readTopology(is, saveFloatAsHalf());
     // When called from the legacy (non-codec) TopologyOnly path, the stream
-    // metadata carries a flag requesting allocation+zero-fill of leaf buffers
-    // (PartialCreate leaves them unallocated after readTopology).
+    // metadata carries a flag requesting that leaf buffers be allocated and
+    // filled with the background value (PartialCreate leaves them
+    // unallocated after readTopology).
     if (io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is)) {
         if (meta->allocateLeafBuffers()) {
             meta->setAllocateLeafBuffers(false);

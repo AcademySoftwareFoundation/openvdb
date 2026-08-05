@@ -28,6 +28,21 @@ Stream::Stream(std::istream& is)
 
 Stream::Stream(std::istream& is, const io::ReadOptions& readOptions)
 {
+    // Read modes that stop before consuming all of a grid's data are not
+    // supported, because a stream is read sequentially - the position after
+    // a partial read is still inside the previous grid's data, so the next
+    // grid header would be read from the wrong offset.
+    // TODO: Skip over the unread bytes of each grid instead of disallowing
+    // these read modes. This is best implemented alongside the extension that
+    // adds support for byte skipping in non-seekable streams.
+    if (readOptions.readMode == io::ReadMode::MetadataOnly ||
+        readOptions.readMode == io::ReadMode::TopologyOnly) {
+        OPENVDB_THROW(ValueError, "io::ReadMode::"
+            << (readOptions.readMode == io::ReadMode::MetadataOnly
+                ? "MetadataOnly" : "TopologyOnly")
+            << " is not supported when reading from a stream");
+    }
+
     if (!is) return;
 
     // Delayed loading has been removed - always read directly from the stream

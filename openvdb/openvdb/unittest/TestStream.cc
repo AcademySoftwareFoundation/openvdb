@@ -218,6 +218,51 @@ TestStream::testFileReadFromStream()
 TEST_F(TestStream, testFileReadFromStream) { testFileReadFromStream(); }
 
 
+TEST_F(TestStream, testUnsupportedReadModes)
+{
+    using namespace openvdb;
+
+    Int32Grid::Ptr grid1 = Int32Grid::create(0);
+    grid1->setName("first");
+    grid1->tree().setValue(Coord(0, 0, 0), 1);
+
+    FloatGrid::Ptr grid2 = FloatGrid::create(0.0f);
+    grid2->setName("second");
+    grid2->tree().setValue(Coord(1, 2, 3), 2.0f);
+
+    std::ostringstream ostr(std::ios_base::binary);
+    io::Stream(ostr).write(GridPtrVec{grid1, grid2});
+
+    // A stream is read sequentially, so read modes that leave part of a grid
+    // unread cannot be supported - the next grid header would be read from
+    // the wrong offset.
+    for (auto readMode: {io::ReadMode::MetadataOnly, io::ReadMode::TopologyOnly}) {
+        io::ReadOptions readOptions;
+        readOptions.readMode = readMode;
+
+        std::istringstream is(ostr.str(), std::ios_base::binary);
+        EXPECT_THROW({ io::Stream strm(is, readOptions); }, ValueError);
+    }
+
+    // Modes that read every byte of each grid are supported.
+    for (auto readMode: {io::ReadMode::Original, io::ReadMode::Half,
+        io::ReadMode::Bool, io::ReadMode::Mask})
+    {
+        io::ReadOptions readOptions;
+        readOptions.readMode = readMode;
+
+        std::istringstream is(ostr.str(), std::ios_base::binary);
+        io::Stream strm(is, readOptions);
+
+        GridPtrVecPtr grids = strm.getGrids();
+        ASSERT_TRUE(grids);
+        ASSERT_EQ(grids->size(), size_t(2));
+        EXPECT_EQ((*grids)[0]->getName(), std::string("first"));
+        EXPECT_EQ((*grids)[1]->getName(), std::string("second"));
+    }
+}
+
+
 TEST_F(TestStream, testAssignmentPreservesArchiveFlags)
 {
     using namespace openvdb;

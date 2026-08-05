@@ -29,6 +29,9 @@ public:
     /// @param is           The input stream to read from
     /// @param readOptions  Options controlling how grids are read (e.g. attribute
     ///                     skipping for point data grids)
+    /// @throw ValueError if @a readOptions requests @c io::ReadMode::MetadataOnly
+    ///     or @c io::ReadMode::TopologyOnly. These modes leave a grid's data
+    ///     partially unread, which a sequentially read stream cannot skip over.
     Stream(std::istream& is, const io::ReadOptions& readOptions);
 
     OPENVDB_DEPRECATED_MESSAGE("Use Stream(std::istream&) instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")

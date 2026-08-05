@@ -1021,13 +1021,25 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
         if (codec) {
             codec->readTopology(is, *codecData, readOptions, diagnostics);
         } else {
+            io::StreamMetadata::Ptr allocateLeafBuffersMeta;
             if (readOptions.readMode == io::ReadMode::TopologyOnly) {
-                // signal Grid<TreeT>::readTopology to allocate+zero-fill leaf buffers
-                if (auto meta = io::getStreamMetadataPtr(is)) {
-                    meta->setAllocateLeafBuffers(true);
+                // Signal Grid<TreeT>::readTopology to allocate leaf buffers and
+                // fill them with the background value.
+                allocateLeafBuffersMeta = io::getStreamMetadataPtr(is);
+                if (allocateLeafBuffersMeta) {
+                    allocateLeafBuffersMeta->setAllocateLeafBuffers(true);
                 }
             }
-            grid->readTopology(is);
+            try {
+                grid->readTopology(is);
+            } catch (...) {
+                // Grid<TreeT>::readTopology() clears the flag on success, but if
+                // it throws the flag must not leak into subsequent grid reads.
+                if (allocateLeafBuffersMeta) {
+                    allocateLeafBuffersMeta->setAllocateLeafBuffers(false);
+                }
+                throw;
+            }
         }
     }
     if (readBuffers) {

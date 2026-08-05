@@ -79,9 +79,10 @@ enum class ReadMode {
     Mask,
     /// Deserialize topology only; value buffers are skipped. The resulting
     /// grid has a valid tree structure (active/inactive state, node
-    /// hierarchy) and all leaf buffers are allocated and zero-filled.
-    /// Useful when only the active-voxel mask is needed and avoiding the
-    /// cost of reading large value buffers is desirable.
+    /// hierarchy) and all leaf buffers are allocated and filled with the
+    /// grid's background value. Useful when only the active-voxel mask is
+    /// needed and avoiding the cost of reading large value buffers is
+    /// desirable.
     TopologyOnly,
     /// Deserialize grid metadata and transform only; no topology, no value
     /// buffers. The codec is still used to construct the correct grid type,
