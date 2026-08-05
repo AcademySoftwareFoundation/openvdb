@@ -50,7 +50,7 @@ struct StreamHolder<true> { cudaStream_t mStream = 0; };
 ///         is_resource). When @c R provides both interfaces the stream-ordered
 ///         one is used.
 /// @details With a stream-ordered resource the Buffer retains the stream of
-///          the most recent allocation (or the one supplied via setStream)
+///          the most recent allocation (or the one supplied via set_stream)
 ///          and orders its deallocation on that stream. Buffer is move-only.
 template<typename T, typename R = DeviceResource>
 class Buffer : private detail::StreamHolder<is_async_resource<R>::value>
@@ -133,7 +133,7 @@ public:
     Buffer& operator=(Buffer&& other) noexcept
     {
         if (this != &other) {
-            this->clear();
+            this->destroy();
             static_cast<detail::StreamHolder<IsAsync>&>(*this) = other;
             mResource = std::move(other.mResource);
             mData = other.mData;
@@ -168,7 +168,7 @@ public:
 
     /// @brief D-tor. A stream-ordered resource frees on the retained stream;
     ///        a synchronous resource frees immediately.
-    ~Buffer() { this->clear(); }
+    ~Buffer() { this->destroy(); }
 
     /// @brief Returns the retained stream, i.e. the stream the buffer's memory
     ///        will be freed on.
@@ -179,9 +179,11 @@ public:
     ///        deallocation (and destruction) is ordered on @c stream instead.
     /// @param stream cuda stream subsequent deallocation is ordered on
     /// @warning The caller is responsible for ordering @c stream after any
-    ///          in-flight work that uses the buffer's memory.
+    ///          in-flight work that uses the buffer's memory. This deliberately
+    ///          does not synchronize, matching cuda::buffer's
+    ///          set_stream_unsynchronized rather than its set_stream.
     template<typename S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
-    void setStream(cudaStream_t stream) { this->mStream = stream; }
+    void set_stream(cudaStream_t stream) { this->mStream = stream; }
 
     /// @brief Resizes the buffer to @c count elements, preserving the leading
     ///        min(old, new) elements. Every operation — the new allocation, the
@@ -219,7 +221,7 @@ public:
             mSize = count;
         }
         else {
-            this->mStream = stream; // no reallocation: setStream semantics
+            this->mStream = stream; // no reallocation: set_stream semantics
         }
     }
 
@@ -263,11 +265,44 @@ public:
     bool empty() const { return mSize == 0; }
 
     /// @brief Frees the buffer memory (if any) and resets to the empty state.
-    void clear()
+    ///        A stream-ordered resource frees on the retained stream.
+    /// @note Spelled destroy to match cuda::buffer. This is the name to use.
+    void destroy()
     {
         this->deallocate(mData, mSize);
         mData = nullptr;
         mSize = 0;
+    }
+
+    /// @brief Frees the buffer memory (if any) and resets to the empty state.
+    /// @note Transitional, and not the name to use: it exists only because
+    ///       GridHandle::reset still calls clear() on its buffer. It goes away
+    ///       when the legacy dual buffers do and GridHandle moves to destroy().
+    void clear() { this->destroy(); }
+
+    /// @brief Frees the buffer memory (if any) on @c stream and resets to the
+    ///        empty state. @c stream becomes the retained stream.
+    /// @param stream cuda stream the deallocation is ordered on
+    /// @warning The caller is responsible for ordering @c stream after any
+    ///          in-flight work that uses the buffer's memory.
+    template<typename S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
+    void destroy(cudaStream_t stream)
+    {
+        this->mStream = stream;
+        this->destroy();
+    }
+
+    /// @brief Exchanges the contents of this buffer with @c other. Neither
+    ///        buffer allocates, frees, or copies element data.
+    /// @param other buffer to exchange contents with
+    void swap(Buffer& other) noexcept
+    {
+        auto& lhs = static_cast<detail::StreamHolder<IsAsync>&>(*this);
+        auto& rhs = static_cast<detail::StreamHolder<IsAsync>&>(other);
+        std::swap(lhs, rhs);
+        std::swap(mResource, other.mResource);
+        std::swap(mData, other.mData);
+        std::swap(mSize, other.mSize);
     }
 
 private:

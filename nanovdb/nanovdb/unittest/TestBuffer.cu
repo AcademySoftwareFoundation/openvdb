@@ -258,9 +258,65 @@ TEST(TestBuffer, ClearFreesAndEmpties)
     ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
 }
 
+TEST(TestBuffer, DestroyIsTheSpellingClearDelegatesTo)
+{
+    Counters c;
+    nanovdb::cuda::Buffer<float, CountingResource> buf(0, CountingResource{&c}, 64, nanovdb::cuda::noInit);
+    ASSERT_EQ(c.allocs, 1);
+    buf.destroy();               // cuda::buffer's spelling
+    EXPECT_EQ(buf.data(), nullptr);
+    EXPECT_EQ(buf.size(), 0u);
+    EXPECT_EQ(c.deallocs, 1);
+    buf.destroy();               // idempotent
+    EXPECT_EQ(c.deallocs, 1);
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+}
+
+TEST(TestBuffer, DestroyOnStreamRetargetsTheFree)
+{
+    cudaStream_t a, b;
+    ASSERT_EQ(cudaStreamCreate(&a), cudaSuccess);
+    ASSERT_EQ(cudaStreamCreate(&b), cudaSuccess);
+    {
+        StreamLog log;
+        nanovdb::cuda::Buffer<float, StreamRecordingResource> buf(a, StreamRecordingResource{&log}, 32, nanovdb::cuda::noInit);
+        ASSERT_EQ(log.allocStreams.size(), 1u);
+        EXPECT_EQ(log.allocStreams[0], a);   // allocated on a
+        buf.destroy(b);                      // explicit stream overload
+        ASSERT_EQ(log.deallocStreams.size(), 1u);
+        EXPECT_EQ(log.deallocStreams[0], b); // freed on b, not the retained stream a
+        EXPECT_EQ(buf.stream(), b);          // b is retained afterwards
+    }
+    ASSERT_EQ(cudaStreamSynchronize(a), cudaSuccess);
+    ASSERT_EQ(cudaStreamSynchronize(b), cudaSuccess);
+    cudaStreamDestroy(a);
+    cudaStreamDestroy(b);
+}
+
+TEST(TestBuffer, SwapExchangesWithoutAllocatingOrFreeing)
+{
+    Counters c;
+    nanovdb::cuda::Buffer<int, CountingResource> x(0, CountingResource{&c}, 128, nanovdb::cuda::noInit);
+    nanovdb::cuda::Buffer<int, CountingResource> y(0, CountingResource{&c},  64, nanovdb::cuda::noInit);
+    ASSERT_EQ(c.allocs, 2);
+    auto* px = x.data();
+    auto* py = y.data();
+    const int allocs = c.allocs, deallocs = c.deallocs;
+
+    x.swap(y);
+
+    EXPECT_EQ(c.allocs,   allocs);  // no allocation
+    EXPECT_EQ(c.deallocs, deallocs);// no free
+    EXPECT_EQ(x.data(), py);
+    EXPECT_EQ(y.data(), px);
+    EXPECT_EQ(x.size(), 64u);
+    EXPECT_EQ(y.size(), 128u);
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+}
+
 //======================================================================
 // Stream retention: the destructor and resize free on the retained stream
-// (stream of the most recent allocation, or the one supplied via setStream)
+// (stream of the most recent allocation, or the one supplied via set_stream)
 //======================================================================
 
 TEST(TestBuffer, DestructorFreesOnAllocationStream)
@@ -288,7 +344,7 @@ TEST(TestBuffer, SetStreamRedirectsTheFree)
     StreamLog log;
     {
         nanovdb::cuda::Buffer<float, StreamRecordingResource> buf(a, StreamRecordingResource{&log}, 32, nanovdb::cuda::noInit);
-        buf.setStream(b); // member update only, no synchronization
+        buf.set_stream(b); // member update only, no synchronization
         EXPECT_EQ(buf.stream(), b);
     }
     ASSERT_EQ(log.allocStreams.size(), 1u);
@@ -473,7 +529,7 @@ TEST(TestBuffer, AsyncPathIsGraphCapturable)
 template<class B, class = void>
 struct HasSetStream : std::false_type {};
 template<class B>
-struct HasSetStream<B, std::void_t<decltype(std::declval<B&>().setStream(cudaStream_t{0}))>> : std::true_type {};
+struct HasSetStream<B, std::void_t<decltype(std::declval<B&>().set_stream(cudaStream_t{0}))>> : std::true_type {};
 
 template<class B, class = void>
 struct HasStreamGetter : std::false_type {};
@@ -484,9 +540,9 @@ using PinnedBufferF = nanovdb::cuda::Buffer<float, nanovdb::cuda::PinnedResource
 using DeviceBufferF = nanovdb::cuda::Buffer<float, nanovdb::cuda::DeviceResource>;
 
 // A Buffer over a synchronous resource exposes no stream API at all.
-static_assert(!HasSetStream<PinnedBufferF>::value, "sync-resource Buffer must not expose setStream");
+static_assert(!HasSetStream<PinnedBufferF>::value, "sync-resource Buffer must not expose set_stream");
 static_assert(!HasStreamGetter<PinnedBufferF>::value, "sync-resource Buffer must not expose stream()");
-static_assert(HasSetStream<DeviceBufferF>::value, "async-resource Buffer exposes setStream");
+static_assert(HasSetStream<DeviceBufferF>::value, "async-resource Buffer exposes set_stream");
 static_assert(HasStreamGetter<DeviceBufferF>::value, "async-resource Buffer exposes stream()");
 
 TEST(TestBuffer, PinnedBufferIsPageLocked)
