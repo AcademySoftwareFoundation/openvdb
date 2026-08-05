@@ -55,17 +55,19 @@ jobs:
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-nanovdb:cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
+    # Build in the same image used by the AWS CodeBuild GPU runner so the
+    # uploaded build tree is binary/runtime compatible when executed there.
     container:
-      image: aswf/ci-openvdb:${{ matrix.config.image }}
+      image: aswf/ci-openvdb:2026
     env:
       CXX: ${{ matrix.config.cxx }}
     strategy:
       matrix:
         config:
-          - { cxx: g++,     image: '2024-clang17.2', build: 'Release' }
-          - { cxx: g++,     image: '2024-clang17.2', build: 'Debug' }
-          - { cxx: clang++, image: '2024-clang17.2', build: 'Release' }
-          - { cxx: clang++, image: '2024-clang17.2', build: 'Debug' }
+          - { cxx: g++,     label: gcc,   build: 'Release' }
+          - { cxx: g++,     label: gcc,   build: 'Debug' }
+          - { cxx: clang++, label: clang, build: 'Release' }
+          - { cxx: clang++, label: clang, build: 'Debug' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -78,6 +80,8 @@ jobs:
       - name: build
       # NOTE: CMAKE_POSITION_INDEPENDENT_CODE set to fix default behaviour change in clang 14
       #   https://github.com/AcademySoftwareFoundation/aswf-docker/issues/228
+      # NOTE: CUDA architecture 86 targets the AWS CodeBuild A10G GPUs used by
+      #   the linux-nanovdb-gpu test stage below.
         run: >
           ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
@@ -85,14 +89,86 @@ jobs:
           --cargs=\'
           -DUSE_EXPLICIT_INSTANTIATION=OFF
           -DNANOVDB_USE_CUDA=ON
-          -DCMAKE_CUDA_ARCHITECTURES="80"
+          -DCMAKE_CUDA_ARCHITECTURES="86"
           -DNANOVDB_USE_OPENVDB=ON
           -DCMAKE_INSTALL_PREFIX=`pwd`
           -DUSE_BLOSC=ON
           -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           \'
+      # Run the non-GPU tests here. GPU-only (cuda/mgpu) tests are executed in
+      # the linux-nanovdb-gpu job. This step also generates the shared test
+      # data files (e.g. data/*.nvdb) that the GPU tests consume, so it must
+      # run before the build tree is uploaded.
       - name: test
         run: cd build && sudo ctest -V -E ".*cuda.*|.*mgpu.*"
+      - name: package_gpu_build
+        # Record the absolute workspace path so the GPU runner can restore the
+        # build tree to the same location, keeping RPATHs and CTest-generated
+        # absolute paths valid.
+        run: |
+          META="$GITHUB_WORKSPACE/nanovdb-gpu-meta.env"
+          echo "BUILD_WORKSPACE=$GITHUB_WORKSPACE" > "$META"
+          echo "GITHUB_SHA=$GITHUB_SHA" >> "$META"
+          echo "CONFIG=${{ matrix.config.label }}-${{ matrix.config.build }}" >> "$META"
+          cat "$META"
+      - name: upload_gpu_build
+        uses: actions/upload-artifact@v4
+        with:
+          name: nanovdb-gpu-build-${{ matrix.config.label }}-${{ matrix.config.build }}
+          path: |
+            build
+            nanovdb-gpu-meta.env
+          retention-days: 1
+          if-no-files-found: error
+
+  linux-nanovdb-gpu:
+    # Execute the CUDA / multi-GPU tests on AWS CodeBuild (4x A10G) using the
+    # prebuilt artifacts from linux-nanovdb. Repository secrets are not shared
+    # with fork PRs, so restrict this job to same-repo events.
+    if: |
+      github.repository == 'AcademySoftwareFoundation/openvdb' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.draft == false &&
+        github.event.pull_request.head.repo.full_name == github.repository) ||
+       (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.type == 'all' || github.event.inputs.type == 'linux')))
+    needs: linux-nanovdb
+    runs-on: ubuntu-latest
+    name: >
+      linux-nanovdb-gpu:${{ matrix.config.label }}-${{ matrix.config.build }}
+    # GITHUB_TOKEN needs actions:read to fetch the workflow-run artifacts.
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      matrix:
+        config:
+          - { label: gcc,   build: 'Release' }
+          - { label: gcc,   build: 'Debug' }
+          - { label: clang, build: 'Release' }
+          - { label: clang, build: 'Debug' }
+      fail-fast: false
+    env:
+      # Consumed by buildspec.yml on the CodeBuild side.
+      ARTIFACT_NAME: nanovdb-gpu-build-${{ matrix.config.label }}-${{ matrix.config.build }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.CODEBUILD_ID }}
+          aws-secret-access-key: ${{ secrets.CODEBUILD_SECRET }}
+          aws-region: us-west-2
+      - name: Run CodeBuild GPU tests
+        uses: aws-actions/aws-codebuild-run-build@v1
+        with:
+          project-name: OpenVDB
+          buildspec-override: buildspec.yml
+          image-override: aswf/ci-openvdb:2026
+          # GITHUB_* variables (GITHUB_RUN_ID, GITHUB_REPOSITORY, ...) are
+          # forwarded automatically; ARTIFACT_NAME and GH_TOKEN are added here.
+          env-vars-for-codebuild: ARTIFACT_NAME,GH_TOKEN
 
   windows-nanovdb:
     if: |

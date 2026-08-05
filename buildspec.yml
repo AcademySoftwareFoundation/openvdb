@@ -1,27 +1,80 @@
 version: 0.2
 
+# Runs the NanoVDB CUDA / multi-GPU unit tests on AWS CodeBuild (4x A10G).
+# This spec does NOT build the project. Instead it downloads the prebuilt
+# build tree produced by the matching GitHub Actions run (see the
+# linux-nanovdb / linux-nanovdb-gpu jobs in .github/workflows/nanovdb.yml),
+# restores it at its original absolute path, and executes the GPU-only tests.
+#
+# Required environment variables (provided by aws-codebuild-run-build):
+#   ARTIFACT_NAME     - name of the GitHub Actions artifact to fetch
+#   GH_TOKEN          - ephemeral GITHUB_TOKEN with actions:read
+#   GITHUB_REPOSITORY - owner/repo (auto-forwarded GITHUB_* variable)
+#   GITHUB_RUN_ID     - workflow run that produced the artifact (auto-forwarded)
+
 env:
   variables:
-    CXX: g++
-    CC: gcc
-  exported-variables:
-    - CXX
-    - CC
+    CUDA_HOME: /usr/local/cuda-12
 
 phases:
   install:
     commands:
-      - dnf install -y tree
+      # Rocky Linux 8 image: tools required to fetch and unpack the artifact.
+      - dnf install -y jq unzip tree
 
   pre_build:
     commands:
-      # Verify the GPU and inspect CodeBuild's checked-out source
+      # Confirm the GPUs are visible (expect 4x A10G).
       - nvidia-smi
       - nvidia-smi topo -m
-      - 'echo "CODEBUILD_SRC_DIR: $CODEBUILD_SRC_DIR"'
-      - cd "$CODEBUILD_SRC_DIR"
-      - tree
+      # Locate, download and restore the prebuilt build tree.
+      - 'echo "Fetching artifact ${ARTIFACT_NAME} from run ${GITHUB_RUN_ID}"'
+      - |
+        set -euo pipefail
+        api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+        artifacts_json=$(curl -fsSL \
+          -H "Authorization: Bearer ${GH_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          "${api}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100")
+        count=$(echo "${artifacts_json}" | jq --arg n "${ARTIFACT_NAME}" \
+          '[.artifacts[] | select(.name==$n)] | length')
+        if [ "${count}" != "1" ]; then
+          echo "ERROR: expected exactly 1 artifact named '${ARTIFACT_NAME}', found ${count}"
+          exit 1
+        fi
+        artifact_id=$(echo "${artifacts_json}" | jq -r --arg n "${ARTIFACT_NAME}" \
+          '.artifacts[] | select(.name==$n) | .id')
+        echo "Resolved artifact id ${artifact_id}"
+        # The API returns a short-lived (60s) redirect to blob storage. Resolve
+        # the redirect first, then download without the Authorization header so
+        # it is not forwarded to the storage host.
+        download_url=$(curl -sS -o /dev/null -w '%{redirect_url}' \
+          -H "Authorization: Bearer ${GH_TOKEN}" \
+          -H "Accept: application/vnd.github+json" \
+          "${api}/actions/artifacts/${artifact_id}/zip")
+        curl -fsSL -o /tmp/nanovdb-gpu-build.zip "${download_url}"
+      - rm -rf /tmp/nanovdb-gpu-artifact
+      - mkdir -p /tmp/nanovdb-gpu-artifact
+      - unzip -q /tmp/nanovdb-gpu-build.zip -d /tmp/nanovdb-gpu-artifact
+      - |
+        set -euo pipefail
+        set -a
+        . /tmp/nanovdb-gpu-artifact/nanovdb-gpu-meta.env
+        set +a
+        echo "Restoring build tree to ${BUILD_WORKSPACE}"
+        mkdir -p "${BUILD_WORKSPACE}"
+        rm -rf "${BUILD_WORKSPACE}/build"
+        mv /tmp/nanovdb-gpu-artifact/build "${BUILD_WORKSPACE}/build"
 
   build:
     commands:
-      - echo "Add build commands here"
+      - |
+        set -euo pipefail
+        set -a
+        . /tmp/nanovdb-gpu-artifact/nanovdb-gpu-meta.env
+        set +a
+        export PATH="${CUDA_HOME}/bin:${PATH}"
+        export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${BUILD_WORKSPACE}/build/openvdb/openvdb:${BUILD_WORKSPACE}/build/nanovdb/nanovdb:${LD_LIBRARY_PATH:-}"
+        cd "${BUILD_WORKSPACE}/build"
+        ctest -V -R ".*cuda.*|.*mgpu.*" --output-on-failure
