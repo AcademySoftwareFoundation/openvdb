@@ -59,6 +59,9 @@ struct alignas(16) MeshToGridBoxTrianglePair { // sizeof = 16B
 template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class MeshToGrid
 {
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "MeshToGrid allocates stream-ordered scratch and requires an AsyncResource");
+
     using PointT = nanovdb::Vec3f;
     using TriangleIndexT = nanovdb::Vec3i;
     using TriangleT = Triangle;
