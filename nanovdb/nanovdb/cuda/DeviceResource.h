@@ -171,6 +171,8 @@ struct SyncFromAsync
     /// @brief Allocates @c bytes usable on any stream when this returns.
     /// @param bytes number of bytes to allocate
     /// @param alignment requested alignment
+    /// @note Every call synchronizes the null stream; on hot paths prefer the
+    ///       stream-ordered pair.
     void* allocate(size_t bytes, size_t alignment)
     {
         void* p = static_cast<Derived&>(*this).allocate_async(bytes, alignment, cudaStream_t{0});
