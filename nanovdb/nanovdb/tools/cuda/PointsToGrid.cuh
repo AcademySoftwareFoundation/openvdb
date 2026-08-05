@@ -294,6 +294,8 @@ struct PointsToGridData {
 template<typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class PointsToGrid
 {
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "PointsToGrid allocates stream-ordered scratch and requires an AsyncResource");
 public:
     /// @brief Map constructor, which other constructors might call
     /// @param map Map to be used for the output device grid
@@ -640,8 +642,16 @@ void PointsToGrid<BuildT, ResourceT>::countNodes(const PtrT points, size_t point
     BufT<uint32_t> nodeCountScratch(mStream, this->ref(), 0, nanovdb::cuda::noInit);
     uint64_t *d_keys = nullptr;
     uint32_t *d_indx = nullptr, *d_points_per_tile = nullptr, *d_node_count = nullptr;
-    cudaEvent_t copyEvent;
-    cudaCheck(cudaEventCreate(&copyEvent));
+    // Owns the copy event so the too-many-points-per-leaf throw below cannot
+    // leak the handle.
+    struct EventGuard {
+        cudaEvent_t event;
+        EventGuard() { cudaCheck(cudaEventCreate(&event)); }
+        ~EventGuard() { cudaCheck(cudaEventDestroy(event)); }
+        EventGuard(const EventGuard&) = delete;
+        EventGuard& operator=(const EventGuard&) = delete;
+    } eventGuard;
+    cudaEvent_t copyEvent = eventGuard.event;
 
     // Bisection search for the voxel size dx that yields the target point
     // density: each iteration builds tile and voxel keys at the current dx,
@@ -810,7 +820,6 @@ void PointsToGrid<BuildT, ResourceT>::countNodes(const PtrT points, size_t point
     cudaCheck(cudaMemcpyAsync(mData.d_lower_keys, d_keys, mData.nodeCount[1]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
 
     if (mVerbose==2) mTimer.stop();
-    cudaCheck(cudaEventDestroy(copyEvent));
 
     //printf("Leaf count = %u, lower count = %u, upper count = %u\n", mData.nodeCount[0], mData.nodeCount[1], mData.nodeCount[2]);
 }// PointsToGrid<BuildT, ResourceT>::countNodes
