@@ -833,6 +833,19 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         cudaCheck(cudaStreamSynchronize(stream));
     }
 
+    // Diagnostic for the intermittent DenseLeaf undercount: report the
+    // per-device stripe and voxel counts once they are final, so a failing
+    // run shows whether a stripe was already lost upstream of aggregation
+    // ([N,0,0,0] with a wrong total) or the counts were intact and the loss
+    // is downstream.
+    fprintf(stderr, "[DistributedPointsToGrid] per-device stripeCount/voxelCount:");
+    uint64_t diagnosticVoxelTotal = 0;
+    for (const auto& [deviceId, stream] : mDeviceMesh) {
+        fprintf(stderr, " dev%d=%zu/%u", deviceId, mStripeCounts[deviceId], mVoxelCounts[deviceId]);
+        diagnosticVoxelTotal += mVoxelCounts[deviceId];
+    }
+    fprintf(stderr, " voxelTotal=%llu\n", (unsigned long long)diagnosticVoxelTotal);
+
     for (const auto& [deviceId, stream] : mDeviceMesh) {
         cudaCheck(cudaSetDevice(deviceId));
         cudaEventDestroy(sortEvents[deviceId]);
