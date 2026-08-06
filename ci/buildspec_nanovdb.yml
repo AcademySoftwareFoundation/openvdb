@@ -31,7 +31,7 @@ phases:
       - dnf module reset -y nodejs
       - dnf module enable -y nodejs:20
       - dnf install -y nodejs
-      - npm install --prefix /tmp/actions-artifact-uploader --omit=dev --no-audit --no-fund @actions/artifact@6.2.2
+      - npm install --prefix /tmp/actions-artifact-uploader --omit=dev --no-audit --no-fund @actions/artifact@6.2.1
 
   pre_build:
     commands:
