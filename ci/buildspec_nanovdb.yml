@@ -38,6 +38,64 @@ phases:
       # Confirm the GPUs are visible (expect 4x A10G).
       - nvidia-smi
       - nvidia-smi topo -m
+      - |
+        echo "=== IOMMU diagnostics ==="
+
+        kernel_cmdline=$(cat /proc/cmdline)
+        echo "Kernel command line:"
+        echo "${kernel_cmdline}"
+
+        iommu_args=$(echo "${kernel_cmdline}" |
+          grep -Eo '(^|[[:space:]])(iommu|amd_iommu|intel_iommu)=[^[:space:]]+' |
+          xargs || true)
+        if [ -n "${iommu_args}" ]; then
+          echo "Explicit IOMMU kernel arguments: ${iommu_args}"
+        else
+          echo "No explicit IOMMU kernel arguments found"
+        fi
+
+        if dmesg_output=$(dmesg 2>&1); then
+          echo "IOMMU kernel messages:"
+          echo "${dmesg_output}" |
+            grep -Ei 'DMAR|IOMMU|AMD-Vi|amd_iommu|intel_iommu' ||
+            echo "No IOMMU kernel messages found"
+
+          echo "IOMMU passthrough messages:"
+          echo "${dmesg_output}" |
+            grep -Ei 'iommu.*(pt|passthrough)|default domain type.*passthrough' ||
+            echo "No IOMMU passthrough messages found"
+        else
+          echo "dmesg unavailable in this container: ${dmesg_output}"
+        fi
+
+        if compgen -G '/sys/kernel/iommu_groups/*/devices/*' >/dev/null; then
+          echo "Populated IOMMU groups are visible"
+          group_count=0
+          typed_group_count=0
+          for group in /sys/kernel/iommu_groups/*; do
+            [ -d "${group}" ] || continue
+            group_count=$((group_count + 1))
+            if [ -r "${group}/type" ]; then
+              typed_group_count=$((typed_group_count + 1))
+              echo "IOMMU group ${group##*/} type: $(cat "${group}/type")"
+            fi
+          done
+          echo "Visible IOMMU group count: ${group_count}"
+          if [ "${typed_group_count}" -eq 0 ]; then
+            echo "Per-group IOMMU domain types are not exposed by this kernel"
+          fi
+        else
+          echo "No populated IOMMU groups are visible"
+        fi
+
+        if compgen -G '/sys/class/iommu/*' >/dev/null; then
+          echo "IOMMU devices visible in /sys/class/iommu:"
+          for iommu in /sys/class/iommu/*; do
+            echo "  ${iommu##*/}"
+          done
+        else
+          echo "No IOMMU devices are visible in /sys/class/iommu"
+        fi
       # Locate, download and restore the prebuilt build tree.
       - 'echo "Fetching artifact ${ARTIFACT_NAME} from run ${GITHUB_RUN_ID}"'
       - |
