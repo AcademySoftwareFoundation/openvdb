@@ -151,6 +151,7 @@ phases:
         export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${BUILD_WORKSPACE}/build/openvdb/openvdb:${BUILD_WORKSPACE}/build/nanovdb/nanovdb:${LD_LIBRARY_PATH:-}"
         cd "${BUILD_WORKSPACE}/build"
         ctest -V -R ".*cuda.*|.*mgpu.*|pytest_nanovdb" --output-on-failure
+        ctest -V -R ".*mgpu.*" --repeat until-fail:20 --output-on-failure
 
   post_build:
     commands:
