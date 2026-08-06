@@ -90,6 +90,7 @@ jobs:
           --components=core,nano,nanotest,nanoexam,nanobench,nanotool,nanopython,nanopytest
           --cargs=\'
           -DUSE_EXPLICIT_INSTANTIATION=OFF
+          -DOPENVDB_CORE_STATIC=OFF
           -DNANOVDB_USE_CUDA=ON
           -DCMAKE_CUDA_ARCHITECTURES="86"
           -DNANOVDB_USE_OPENVDB=ON
@@ -164,61 +165,15 @@ jobs:
           aws-secret-access-key: ${{ secrets.CODEBUILD_SECRET }}
           aws-region: us-west-2
       - name: Run CodeBuild GPU tests
-        id: codebuild
         uses: aws-actions/aws-codebuild-run-build@v1
         with:
           project-name: OpenVDB
           buildspec-override: ci/buildspec_nanovdb.yml
           image-override: aswf/ci-openvdb:2024-clang17.2
           # GITHUB_* variables (GITHUB_RUN_ID, GITHUB_REPOSITORY, ...) are
-          # forwarded automatically; ARTIFACT_NAME and GH_TOKEN are added here.
-          env-vars-for-codebuild: ARTIFACT_NAME,GH_TOKEN
-      - name: Download CodeBuild diagnostic report
-        id: download-codebuild-report
-        if: always() && steps.codebuild.outputs.aws-build-id != ''
-        env:
-          CODEBUILD_BUILD_ID: ${{ steps.codebuild.outputs.aws-build-id }}
-        run: |
-          set -euo pipefail
-          artifact_location=$(aws codebuild batch-get-builds \
-            --ids "${CODEBUILD_BUILD_ID}" \
-            --query 'builds[0].artifacts.location' \
-            --output text)
-          case "${artifact_location}" in
-            arn:aws:s3:::*)
-              artifact_uri="s3://${artifact_location#arn:aws:s3:::}"
-              ;;
-            s3://*)
-              artifact_uri="${artifact_location}"
-              ;;
-            *)
-              echo "ERROR: CodeBuild did not return an S3 artifact location: ${artifact_location}"
-              exit 1
-              ;;
-          esac
-
-          download_dir="${RUNNER_TEMP}/codebuild-diagnostic"
-          report_dir="${RUNNER_TEMP}/nanovdb-gpu-report"
-          rm -rf "${download_dir}" "${report_dir}"
-          mkdir -p "${download_dir}" "${report_dir}"
-          aws s3 cp "${artifact_uri}" "${download_dir}/artifact"
-
-          # CodeBuild may package its primary artifact as a ZIP or store the
-          # report.tgz file directly, depending on the project configuration.
-          if unzip -tq "${download_dir}/artifact" >/dev/null 2>&1; then
-            unzip -q "${download_dir}/artifact" -d "${report_dir}"
-          else
-            mv "${download_dir}/artifact" "${report_dir}/report.tgz"
-          fi
-          test -f "${report_dir}/report.tgz"
-      - name: Upload GPU diagnostic report
-        if: always() && steps.download-codebuild-report.outcome == 'success'
-        uses: actions/upload-artifact@v7
-        with:
-          name: nanovdb-gpu-report-${{ matrix.config.label }}-${{ matrix.config.build }}
-          path: ${{ runner.temp }}/nanovdb-gpu-report/report.tgz
-          retention-days: 7
-          if-no-files-found: error
+          # forwarded automatically. The job-scoped Actions runtime values let
+          # CodeBuild upload report.tgz directly to this workflow run.
+          env-vars-for-codebuild: ARTIFACT_NAME,GH_TOKEN,ACTIONS_RUNTIME_TOKEN,ACTIONS_RESULTS_URL
 
   windows-nanovdb:
     if: |

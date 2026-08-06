@@ -11,6 +11,8 @@ version: 0.2
 #   GH_TOKEN          - ephemeral GITHUB_TOKEN with actions:read
 #   GITHUB_REPOSITORY - owner/repo (auto-forwarded GITHUB_* variable)
 #   GITHUB_RUN_ID     - workflow run that produced the artifact (auto-forwarded)
+#   ACTIONS_RUNTIME_TOKEN - job-scoped token used to upload the report
+#   ACTIONS_RESULTS_URL   - GitHub Actions artifact service endpoint
 
 env:
   variables:
@@ -26,6 +28,10 @@ phases:
       - dnf install -y jq unzip tree 'dnf-command(config-manager)'
       - dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
       - dnf install -y gh
+      - dnf module reset -y nodejs
+      - dnf module enable -y nodejs:20
+      - dnf install -y nodejs
+      - npm install --prefix /tmp/actions-artifact-uploader --omit=dev --no-audit --no-fund @actions/artifact@6.2.2
 
   pre_build:
     commands:
@@ -103,7 +109,7 @@ phases:
         diagnostic_status=0
         (
           cd "${diagnostic_dir}"
-          ./run_on_runner.sh
+          bash ./run_on_runner.sh
         ) || diagnostic_status=$?
 
         if [ -d "${diagnostic_dir}/report" ]; then
@@ -113,10 +119,32 @@ phases:
           echo "ERROR: the diagnostic did not produce report/"
           exit 1
         fi
-        exit "${diagnostic_status}"
 
-artifacts:
-  name: ${ARTIFACT_NAME}-diagnostic
-  files:
-    - report.tgz
-  discard-paths: yes
+        # Upload directly into the current GitHub Actions job. These values are
+        # short-lived and scoped to this job's artifact service.
+        : "${ACTIONS_RUNTIME_TOKEN:?ACTIONS_RUNTIME_TOKEN was not forwarded}"
+        : "${ACTIONS_RESULTS_URL:?ACTIONS_RESULTS_URL was not forwarded}"
+        cat > /tmp/actions-artifact-uploader/upload.mjs <<'EOF'
+        import {DefaultArtifactClient} from '@actions/artifact'
+
+        const reportPath = `${process.env.CODEBUILD_SRC_DIR}/report.tgz`
+        const artifactName = process.env.ARTIFACT_NAME.replace(
+          /^nanovdb-gpu-build-/,
+          'nanovdb-gpu-report-'
+        )
+        const client = new DefaultArtifactClient()
+        const result = await client.uploadArtifact(
+          artifactName,
+          [reportPath],
+          process.env.CODEBUILD_SRC_DIR,
+          {
+            retentionDays: 7,
+            compressionLevel: 0
+          }
+        )
+        console.log(
+          `Uploaded ${artifactName}: id=${result.id}, size=${result.size}, digest=${result.digest}`
+        )
+        EOF
+        node /tmp/actions-artifact-uploader/upload.mjs
+        exit "${diagnostic_status}"
