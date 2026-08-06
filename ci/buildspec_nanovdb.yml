@@ -15,12 +15,17 @@ version: 0.2
 env:
   variables:
     CUDA_HOME: /usr/local/cuda-12
+    DIAGNOSTIC_GIST_ID: c082e01bf80cd88d045e1e61bd78d43c
+    DIAGNOSTIC_GIST_REVISION: dcd46d4e3a65c5d36e1cde96ade0c102464d8a45
 
 phases:
   install:
     commands:
-      # Rocky Linux 8 image: tools required to fetch and unpack the artifact.
-      - dnf install -y jq unzip tree
+      # Rocky Linux 8 image: tools required to fetch and unpack artifacts and
+      # clone the multi-GPU diagnostic gist.
+      - dnf install -y jq unzip tree 'dnf-command(config-manager)'
+      - dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+      - dnf install -y gh
 
   pre_build:
     commands:
@@ -82,3 +87,36 @@ phases:
         export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${BUILD_WORKSPACE}/build/openvdb/openvdb:${BUILD_WORKSPACE}/build/nanovdb/nanovdb:${LD_LIBRARY_PATH:-}"
         cd "${BUILD_WORKSPACE}/build"
         ctest -V -R ".*cuda.*|.*mgpu.*|pytest_nanovdb" --output-on-failure
+
+  post_build:
+    commands:
+      - |
+        set -euo pipefail
+        diagnostic_dir="${CODEBUILD_SRC_DIR}/${DIAGNOSTIC_GIST_ID}"
+        rm -rf "${diagnostic_dir}" "${CODEBUILD_SRC_DIR}/report.tgz"
+        cd "${CODEBUILD_SRC_DIR}"
+        gh gist clone "${DIAGNOSTIC_GIST_ID}"
+        # Pin the executable diagnostic code rather than trusting the mutable
+        # head of the public gist on every CI run.
+        git -C "${diagnostic_dir}" checkout --detach "${DIAGNOSTIC_GIST_REVISION}"
+
+        diagnostic_status=0
+        (
+          cd "${diagnostic_dir}"
+          ./run_on_runner.sh
+        ) || diagnostic_status=$?
+
+        if [ -d "${diagnostic_dir}/report" ]; then
+          tar czf "${CODEBUILD_SRC_DIR}/report.tgz" \
+            -C "${diagnostic_dir}" report/
+        else
+          echo "ERROR: the diagnostic did not produce report/"
+          exit 1
+        fi
+        exit "${diagnostic_status}"
+
+artifacts:
+  name: ${ARTIFACT_NAME}-diagnostic
+  files:
+    - report.tgz
+  discard-paths: yes
