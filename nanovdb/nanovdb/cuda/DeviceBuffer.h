@@ -344,6 +344,10 @@ public:
     /// @}
 
     /// @brief De-allocate all memory managed by this allocator and set all pointers to NULL
+    /// @param stream Stream the device frees are issued on. The frees are additionally ordered
+    ///        after every stream the buffer was used on (via the per-device tracking event), so
+    ///        @a stream selects where the free is enqueued, not what it is ordered against - any
+    ///        stream is safe to pass here regardless of where the buffer was used.
     void clear(cudaStream_t stream = 0);
     void clear(void* stream){this->clear(cudaStream_t(stream));}
 
@@ -353,6 +357,7 @@ public:
 
 inline DeviceBuffer& DeviceBuffer::operator=(DeviceBuffer&& other) noexcept
 {
+    if (this == &other) return *this;// self-move would free our buffers and then read them back
     if (mManaged) {// first free all the managed data buffers, ordered after every use of each
         cudaCheck(cudaFreeHost(mCpuData));
         this->freeDeviceBuffers(cudaStream_t{0});
