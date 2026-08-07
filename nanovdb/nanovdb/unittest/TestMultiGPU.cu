@@ -201,6 +201,51 @@ TEST(TestNanoVDBMultiGPU, InclusiveSum)
     }
 }
 
+/// @brief Tests multi-GPU creation of a grid containing a single voxel
+TEST(TestNanoVDBMultiGPU, SingleVoxel_DistributedCudaPointsToGrid_UnifiedBuffer)
+{
+    int current = 0;
+    cudaCheck(cudaGetDevice(&current));
+
+    using BufferT = nanovdb::cuda::UnifiedBuffer;
+    using BuildT = nanovdb::ValueOnIndex;
+    const size_t voxelCount = 1;
+    nanovdb::Coord* voxels = nullptr;
+    const size_t voxelSize = voxelCount * sizeof(nanovdb::Coord);
+    cudaCheck(cudaMallocManaged(&voxels, voxelSize));
+    voxels[0] = nanovdb::Coord(1, 2, 3);
+
+    nanovdb::cuda::DeviceMesh deviceMesh;
+    nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
+    auto handle = converter.getHandle(voxels, voxelCount, BufferT());
+
+    EXPECT_TRUE(handle.deviceData());// grid exists on the GPU
+    EXPECT_TRUE(handle.deviceGrid<BuildT>());
+    EXPECT_FALSE(handle.deviceGrid<int>(0));
+    EXPECT_TRUE(handle.deviceGrid<BuildT>(0));
+    EXPECT_FALSE(handle.deviceGrid<BuildT>(1));
+    EXPECT_TRUE(handle.data());// grid also exists on the CPU
+
+    auto* grid = handle.grid<BuildT>();// grid also exists on the CPU
+    ASSERT_TRUE(grid);
+    handle.deviceDownload();// creates a copy on the CPU
+    EXPECT_TRUE(handle.deviceData());
+    EXPECT_TRUE(handle.data());
+    auto* data = handle.gridData();
+    EXPECT_TRUE(data);
+    grid = handle.grid<BuildT>();
+    ASSERT_TRUE(grid);
+    EXPECT_EQ(1u, grid->activeVoxelCount());
+    EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
+
+    auto acc = grid->getAccessor();
+    EXPECT_TRUE(acc.isActive(voxels[0]));
+    EXPECT_GT(acc.getValue(voxels[0]), 0u);
+
+    cudaCheck(cudaFree(voxels));
+    cudaSetDevice(current); // restore device so subsequent tests don't fail
+}// SingleVoxel_DistributedCudaPointsToGrid_UnifiedBuffer
+
 /// @brief Tests multi-GPU creation of grids for a single dense leaf
 TEST(TestNanoVDBMultiGPU, DenseLeaf_DistributedCudaPointsToGrid_UnifiedBuffer)
 {
