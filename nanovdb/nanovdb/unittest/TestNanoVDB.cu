@@ -3724,10 +3724,9 @@ TEST(TestNanoVDBCUDA, DeterministicOutput_CudaPointsToGrid)
     EXPECT_EQ(buildChecksum(), buildChecksum());
 }// DeterministicOutput_CudaPointsToGrid
 
-// Regression test: DeviceBuffer must free its device allocation on the stream it
-// was allocated on, not the default stream. Repeated allocate/use/free on a
-// non-blocking stream must complete without error (compute-sanitizer memcheck on
-// this path is the stronger gate).
+// Smoke test: repeated allocate/use/free on a non-blocking stream must complete without error.
+// Note this is only a smoke test - DeviceBufferMultiStreamFreeOrdering below is what actually
+// discriminates a premature free (compute-sanitizer memcheck on this path is a further gate).
 TEST(TestNanoVDBCUDA, DeviceBufferNonBlockingStreamLifetime)
 {
     cudaStream_t stream = nullptr;
@@ -3742,6 +3741,84 @@ TEST(TestNanoVDBCUDA, DeviceBufferNonBlockingStreamLifetime)
     cudaCheck(cudaStreamDestroy(stream));
     EXPECT_EQ(cudaSuccess, cudaGetLastError());
 }// DeviceBufferNonBlockingStreamLifetime
+
+__global__ void deviceBufferFillKernel(unsigned char *p, size_t n, unsigned char v)
+{
+    for (size_t i = blockIdx.x*(size_t)blockDim.x + threadIdx.x; i < n; i += (size_t)gridDim.x*blockDim.x) p[i] = v;
+}
+__global__ void deviceBufferCountKernel(const unsigned char *p, size_t n, unsigned char v, unsigned long long *bad)
+{
+    for (size_t i = blockIdx.x*(size_t)blockDim.x + threadIdx.x; i < n; i += (size_t)gridDim.x*blockDim.x)
+        if (p[i] != v) atomicAdd(bad, 1ull);
+}
+
+// Regression test: a DeviceBuffer can be used on more than one stream, so ordering its device
+// free on any single stream is not sufficient - it has to be ordered after every stream that
+// touched the buffer. A device-only buffer is used here on purpose: it owns no pinned host
+// memory, so clear()'s cudaFreeHost (which implicitly synchronizes) cannot mask the problem.
+//
+// 'user' is parked behind a spin kernel with a write to the buffer queued behind it, then the
+// buffer is destroyed. If the free is not ordered after 'user', the allocator recycles the block
+// into the next allocation and the late write corrupts it.
+TEST(TestNanoVDBCUDA, DeviceBufferMultiStreamFreeOrdering)
+{
+    const size_t N = size_t(64) << 20;// large enough that a recycled block is the same address
+    const unsigned char LATE = 0xAA, VICTIM = 0x55;
+    const unsigned long long CYCLES = 400000000ull;// parks 'user' for O(100 ms)
+
+    cudaStream_t user = nullptr, other = nullptr;
+    cudaCheck(cudaStreamCreate(&user));// blocking streams, i.e. the ones the legacy
+    cudaCheck(cudaStreamCreate(&other));// default stream implicitly synchronizes with
+    unsigned long long *bad = nullptr;
+    cudaCheck(cudaMallocManaged(&bad, sizeof(*bad)));
+
+    {// warm-up: on a cold context the first launches serialize, which would hide the race
+        unsigned char *w = nullptr;
+        cudaCheck(cudaMallocAsync((void**)&w, N, other));
+        streamBusyWaitKernel<<<1,1,0,user>>>(CYCLES/10);
+        deviceBufferFillKernel<<<1024,256,0,other>>>(w, N, 0);
+        deviceBufferCountKernel<<<1024,256,0,other>>>(w, N, 0, bad);
+        cudaCheck(cudaFreeAsync(w, other));
+        cudaCheck(cudaDeviceSynchronize());
+    }
+
+    void *devPtr = nullptr;
+    {
+        auto buf = nanovdb::cuda::DeviceBuffer::create(N, nullptr, 0, other);// device-only
+        devPtr = buf.deviceData(0);
+        ASSERT_TRUE(devPtr);
+        streamBusyWaitKernel<<<1,1,0,user>>>(CYCLES);// park 'user'
+        deviceBufferFillKernel<<<1024,256,0,user>>>((unsigned char*)devPtr, N, LATE);
+    }// destroyed here; the free must be ordered after 'user' as well as 'other'
+
+    unsigned char *victim = nullptr;
+    cudaCheck(cudaMallocAsync((void**)&victim, N, other));
+    deviceBufferFillKernel<<<1024,256,0,other>>>(victim, N, VICTIM);
+    cudaCheck(cudaStreamSynchronize(other));
+
+    // Diagnostics only. These are deliberately NOT preconditions: with a correctly ordered free
+    // the allocator cannot hand this block out again until 'user' has drained, so observing
+    // "not recycled" or "no longer pending" here is the fix working, not a reason to skip.
+    const bool stillPending = (cudaStreamQuery(user) == cudaErrorNotReady);
+    cudaGetLastError();// clear the cudaErrorNotReady left by the query above
+    const bool recycled = (victim == devPtr);
+
+    cudaCheck(cudaStreamSynchronize(user));// let the late write land
+    *bad = 0;
+    deviceBufferCountKernel<<<1024,256>>>(victim, N, VICTIM, bad);
+    cudaCheck(cudaDeviceSynchronize());
+    const unsigned long long clobbered = *bad;
+
+    cudaCheck(cudaFreeAsync(victim, other));
+    cudaCheck(cudaStreamSynchronize(other));
+    cudaCheck(cudaFree(bad));
+    cudaCheck(cudaStreamDestroy(user));
+    cudaCheck(cudaStreamDestroy(other));
+
+    EXPECT_EQ(0u, clobbered) << "device memory was freed while another stream still had work in "
+                                "flight (block recycled: " << recycled
+                             << ", work still pending when it was reused: " << stillPending << ")";
+}// DeviceBufferMultiStreamFreeOrdering
 
 TEST(TestNanoVDBCUDA, RefineCoarsen_ValueOnIndex)
 {
