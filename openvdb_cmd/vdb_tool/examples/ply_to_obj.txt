@@ -1,10 +1,10 @@
-vdb_tool 10.6.1
+vdb_tool 10.8.0
 
-# This example demonstrated how to convert a
-# binary ply mesh file into an ascii obj mesh file.
+# This example demonstrates how to convert a binary PLY mesh file
+# into an ASCII OBJ mesh file.
 
-# read polygon mesh from binary ply file
+# Read polygon mesh from binary PLY file
 read bunny.ply
 
-# write polygon mesh to ascii obj file
+# Write polygon mesh to ASCII OBJ file
 write bunny.obj

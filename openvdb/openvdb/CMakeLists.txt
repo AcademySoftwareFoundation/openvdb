@@ -515,6 +515,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/PointScatter.h
   tools/PointsToMask.h
   tools/PoissonSolver.h
+  tools/PolySoupToLevelSet.h
   tools/PotentialFlow.h
   tools/Prune.h
   tools/RayIntersector.h

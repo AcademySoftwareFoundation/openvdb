@@ -26,7 +26,7 @@
 
 * **Does NanoVDB depend on and require CUDA?**
 
-  No, NanoVDB is by design agnostic and works with most graphics APIs, e.g. OpenGL, OpenCL, OptiX, CUDA, HLSL, GLSL, DirectX, and even the CPU! The data structure itself (defined in [NanoVDB.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/NanoVDB.h) and [PNanoVDB.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/PNanoVDB.h)) only depends on C++11 or C99. However, some of the auxiliary math classes are optionally optimized with intrinsic CUDA calls (e.g. fma in Vec3) and some of the [Allocator](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/util/CudaDeviceBuffer.h) uses CUDA for explicit memory management. It should be straightforward to replace (or remove) these CUDA dependencies if you so desire.
+  No, NanoVDB is by design agnostic and works with most graphics APIs, e.g. OpenGL, OpenCL, OptiX, CUDA, HLSL, GLSL, DirectX, and even the CPU! The data structure itself (defined in [NanoVDB.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/NanoVDB.h) and [PNanoVDB.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/PNanoVDB.h)) only depends on C++11 or C99. However, some of the auxiliary math classes are optionally optimized with intrinsic CUDA calls (e.g. fma in Vec3) and the [DeviceBuffer](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/cuda/DeviceBuffer.h) allocator uses CUDA for explicit memory management. It should be straightforward to replace (or remove) these CUDA dependencies if you so desire.
 
 * **How does the data structure of NanoVDB compare to that of OpenVDB?**
 

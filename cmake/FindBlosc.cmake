@@ -419,9 +419,11 @@ if(NOT TARGET Blosc::blosc)
         set(${BLOSC_EXTERNAL_LIB}_LIBRARIES       ${${BLOSC_EXTERNAL_LIB}_LIBRARY_DEBUG})
       endif()
 
-      target_link_libraries(Blosc::blosc INTERFACE
-        $<$<CONFIG:Release>:${${BLOSC_EXTERNAL_LIB}_LIBRARY_RELEASE}>
-        $<$<CONFIG:Debug>:${${BLOSC_EXTERNAL_LIB}_LIBRARY_DEBUG}>)
+      if(${BLOSC_EXTERNAL_LIB}_LIBRARY_RELEASE OR ${BLOSC_EXTERNAL_LIB}_LIBRARY_DEBUG)
+        target_link_libraries(Blosc::blosc INTERFACE
+          $<$<CONFIG:Release>:${${BLOSC_EXTERNAL_LIB}_LIBRARY_RELEASE}>
+          $<$<CONFIG:Debug>:${${BLOSC_EXTERNAL_LIB}_LIBRARY_DEBUG}>)
+      endif()
 
     endforeach()
   endif()
