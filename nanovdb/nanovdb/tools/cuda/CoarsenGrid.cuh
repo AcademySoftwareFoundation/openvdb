@@ -30,9 +30,12 @@ namespace nanovdb {
 
 namespace tools::cuda {
 
-template <typename BuildT>
+template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class CoarsenGrid
 {
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "CoarsenGrid allocates stream-ordered scratch and requires an AsyncResource");
+
     using GridT  = NanoGrid<BuildT>;
     using TreeT  = NanoTree<BuildT>;
     using RootT  = NanoRoot<BuildT>;
@@ -43,8 +46,11 @@ public:
     /// @brief Constructor
     /// @param deviceGrid source device grid to be coarsened
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    CoarsenGrid(const GridT* d_srcGrid, cudaStream_t stream = 0)
-        : mBuilder(stream), mStream(stream), mTimer(stream), mDeviceSrcGrid(d_srcGrid) {}
+    /// @param resource resource instance all device scratch is allocated from;
+    ///        must outlive this operator (defaults to the per-type default resource)
+    CoarsenGrid(const GridT* d_srcGrid, cudaStream_t stream = 0,
+                ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
+        : mBuilder(stream, resource), mStream(stream), mTimer(stream), mDeviceSrcGrid(d_srcGrid) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -74,20 +80,20 @@ private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
-    TopologyBuilder<BuildT> mBuilder;
+    TopologyBuilder<BuildT, ResourceT> mBuilder;
     cudaStream_t            mStream{0};
     util::cuda::Timer       mTimer;
     int                     mVerbose{0};
     const GridT             *mDeviceSrcGrid;
     TreeData                mSrcTreeData;
-};// tools::cuda::CoarsenGrid<BuildT>
+};// tools::cuda::CoarsenGrid<BuildT, ResourceT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
+template<typename BuildT, typename ResourceT>
 template<typename BufferT>
 GridHandle<BufferT>
-CoarsenGrid<BuildT>::getHandle(const BufferT &pool)
+CoarsenGrid<BuildT, ResourceT>::getHandle(const BufferT &pool)
 {
     // Copy TreeData from GPU -> CPU
     cudaStreamSynchronize(mStream);
@@ -147,12 +153,12 @@ CoarsenGrid<BuildT>::getHandle(const BufferT &pool)
     cudaStreamSynchronize(mStream);
 
     return GridHandle<BufferT>(std::move(buffer));
-}// CoarsenGrid<BuildT>::getHandle
+}// CoarsenGrid<BuildT, ResourceT>::getHandle
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void CoarsenGrid<BuildT>::coarsenRoot()
+template<typename BuildT, typename ResourceT>
+void CoarsenGrid<BuildT, ResourceT>::coarsenRoot()
 {
     // This method coarsens the root tiles, to accommodate for the overall downsamping operation.
 
@@ -197,12 +203,12 @@ void CoarsenGrid<BuildT>::coarsenRoot()
     for (const auto& [key, tile] : coarsenedTiles)
         *coarsenedRootPtr->tile(t++) = tile;
     mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
-}// CoarsenGrid<BuildT>::coarsenRoot
+}// CoarsenGrid<BuildT, ResourceT>::coarsenRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void CoarsenGrid<BuildT>::coarsenInternalNodes()
+template<typename BuildT, typename ResourceT>
+void CoarsenGrid<BuildT, ResourceT>::coarsenInternalNodes()
 {
     // Computes the masks of upper and (densified) lower internal nodes, as a result of the coarsening operation
     // Masks of lower internal nodes are densified in the sense that a serialized array of them is allocated,
@@ -212,24 +218,24 @@ void CoarsenGrid<BuildT>::coarsenInternalNodes()
             srcLeafCount, util::morphology::cuda::CoarsenInternalNodesFunctor<BuildT>(),
             mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.mUpperMasks.data(), mBuilder.mLowerMasks.data() );
     }
-}// CoarsenGrid<BuildT>::coarsenInternalNodes
+}// CoarsenGrid<BuildT, ResourceT>::coarsenInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template <typename BuildT>
-void CoarsenGrid<BuildT>::processGridTreeRoot()
+template <typename BuildT, typename ResourceT>
+void CoarsenGrid<BuildT, ResourceT>::processGridTreeRoot()
 {
     // Copy GridData from source grid
     // By convention: this will duplicate grid name and map. Others will be reset later
     cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrid->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
     cudaCheckError();
-}// CoarsenGrid<BuildT>::processGridTreeRoot
+}// CoarsenGrid<BuildT, ResourceT>::processGridTreeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void CoarsenGrid<BuildT>::coarsenLeafNodes()
+template<typename BuildT, typename ResourceT>
+void CoarsenGrid<BuildT, ResourceT>::coarsenLeafNodes()
 {
     // Coarsens the active masks of the source grid (as indicated at the leaf level), into a new grid that
     // has been already topologically coarsened to include all necessary leaf nodes.
@@ -241,7 +247,7 @@ void CoarsenGrid<BuildT>::coarsenLeafNodes()
 
     // Update leaf offsets and prefix sums
     mBuilder.processLeafOffsets(mStream);
-}// CoarsenGrid<BuildT>::coarsenLeafNodes
+}// CoarsenGrid<BuildT, ResourceT>::coarsenLeafNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
