@@ -8,6 +8,9 @@ NanoVDB:
   - Fixed a host-heap over-read when copying grid names in the CUDA
     PointsToGrid, DistributedPointsToGrid and MeshToGrid tools.
   - Fixed nondeterministic output from the CUDA PointsToGrid and IndexToGrid tools.
-  - Fixed cuda::DeviceBuffer freeing device memory on the default stream rather
-    than the stream it was last used on, a latent use-after-free for
-    non-blocking-stream callers.
+  - Fixed cuda::DeviceBuffer freeing device memory without ordering the free
+    after work still outstanding on the buffer, a latent use-after-free for
+    callers using non-blocking streams. Each managed device allocation now
+    tracks its uses with an event, so a free is ordered after every stream the
+    buffer was used on rather than only those the freeing stream happens to
+    synchronize with.
