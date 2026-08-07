@@ -11,7 +11,11 @@
 #ifndef OPENVDB_TOOLS_LEVEL_SET_UTIL_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVEL_SET_UTIL_HAS_BEEN_INCLUDED
 
+#include "Count.h" // for minMax
+#include "LevelSetFilter.h" // for LevelSetFilter::normalize
 #include "MeshToVolume.h" // for traceExteriorBoundaries
+#include "Morphology.h" // for dilateActiveValues
+#include "Prune.h" // for pruneInactive
 #include "SignedFloodFill.h" // for signedFloodFillWithValues
 
 #include <openvdb/Types.h>
@@ -171,6 +175,33 @@ segmentActiveVoxels(const GridOrTreeType& volume,
 template<typename GridOrTreeType>
 void
 segmentSDF(const GridOrTreeType& volume, std::vector<typename GridOrTreeType::Ptr>& segments);
+
+
+/// @brief  Convert a distance field (unsigned or signed) into a proper signed
+///         distance field / level set.
+///
+/// @details Uses the same internal pipeline as meshToVolume to determine the
+///          sign of the distance field from the exterior boundary. The input
+///          values are first normalized into the squared index-space representation
+///          that the pipeline expects (boundary threshold = 0.75, i.e. (sqrt(3)/2)^2),
+///          then converted back to world-space signed distances.
+///
+/// @param grid         Distance field grid to convert in place. The grid's
+///                     transform is used to determine the voxel size.
+/// @param removeDisconnectedInterior  When enabled, deactivate interior
+///                     narrow-band voxels that are not topologically connected
+///                     to the exterior boundary. This removes interior surfaces
+///                     caused by overlapping or self-intersecting geometry.
+/// @param rebuildNarrowBand  When enabled,rebuild a symmetric narrow band from
+///                     the zero crossing via PDE renormalization.
+/// @param halfWidth     half the width of the narrow band, in voxel units (default: 3).
+template<class GridType>
+void
+distanceFieldToSDF(
+    GridType& grid,
+    bool removeDisconnectedInterior = false,
+    bool rebuildNarrowBand = true,
+    float halfWidth = 3.0f);
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2599,6 +2630,151 @@ segmentSDF(const GridOrTreeType& volume, std::vector<typename GridOrTreeType::Pt
 ////////////////////////////////////////
 
 
+template<class GridType>
+void
+distanceFieldToSDF(
+    GridType& grid,
+    bool removeDisconnectedInterior,
+    bool rebuildNarrowBand,
+    float halfWidth)
+{
+    using ValueType = typename GridType::ValueType;
+    using TreeType = typename GridType::TreeType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+
+    TreeType& distTree = grid.tree();
+    const ValueType voxelSize = ValueType(grid.transform().voxelSize()[0]);
+
+    // Normalize: world-space distance to squared index-space distance.
+    // The internal pipeline (traceExteriorBoundaries, ValidateIntersectingVoxels)
+    // operates on squared distances where the boundary threshold 0.75 =
+    // (sqrt(3)/2)^2 corresponds to the voxel half-diagonal.
+    ValueType maxSqDist(0);
+    {
+        std::vector<LeafNodeType*> nodes;
+        nodes.reserve(distTree.leafCount());
+        distTree.getNodes(nodes);
+
+        const ValueType invVoxel = ValueType(1) / voxelSize;
+
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+            [&](const tbb::blocked_range<size_t>& r) {
+                for (size_t i = r.begin(); i != r.end(); ++i) {
+                    for (auto iter = nodes[i]->beginValueOn(); iter; ++iter) {
+                        ValueType d = *iter * invVoxel;
+                        ValueType sign = d < ValueType(0) ? ValueType(-1) : ValueType(1);
+                        iter.setValue(sign * d * d);
+                    }
+                }
+            });
+
+        const auto mm = minMax(distTree);
+        maxSqDist = mm.max();
+    }
+
+    // Trim wide bands before flood-fill for performance.
+    // The squared 3-voxel half-diagonal in index-space units.
+    const ValueType voxelDistSqLimit(0.75*9);
+    if (maxSqDist > voxelDistSqLimit) {
+        std::vector<LeafNodeType*> nodes;
+        nodes.reserve(distTree.leafCount());
+        distTree.getNodes(nodes);
+
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+            [&](const tbb::blocked_range<size_t>& r) {
+                for (size_t i = r.begin(); i != r.end(); ++i) {
+                    for (auto iter = nodes[i]->beginValueOn(); iter; ++iter) {
+                        if (std::abs(*iter) > voxelDistSqLimit) {
+                            nodes[i]->setValueOff(iter.pos());
+                        }
+                    }
+                }
+            });
+
+        pruneInactive(distTree, /*threading=*/true);
+    }
+
+    // Sweep from exterior, negating reachable voxels. Stops at boundary
+    // voxels (value <= 0.75).
+    traceExteriorBoundaries(distTree);
+
+    // Remove interior narrow-band voxels not connected to the exterior.
+    if (removeDisconnectedInterior) {
+        std::vector<LeafNodeType*> nodes;
+        nodes.reserve(distTree.leafCount());
+        distTree.getNodes(nodes);
+
+        const tbb::blocked_range<size_t> nodeRange(0, nodes.size());
+
+        // Boundary voxels (0 < dist <= 0.75) with no negative neighbor
+        // are disconnected from the exterior, push past the threshold.
+        tbb::parallel_for(nodeRange,
+            mesh_to_volume_internal::ValidateIntersectingVoxels<TreeType>(
+                distTree, nodes));
+
+        // Deactivate voxels pushed past the boundary threshold.
+        tbb::parallel_for(nodeRange,
+            [&](const tbb::blocked_range<size_t>& r) {
+                for (size_t i = r.begin(); i != r.end(); ++i) {
+                    for (auto iter = nodes[i]->beginValueOn(); iter; ++iter) {
+                        if (*iter > ValueType(0.75)) nodes[i]->setValueOff(iter.pos());
+                    }
+                }
+            });
+
+        pruneInactive(distTree, /*threading=*/true);
+    }
+
+    // Denormalize: squared index-space to world-space signed distance.
+    {
+        std::vector<LeafNodeType*> nodes;
+        nodes.reserve(distTree.leafCount());
+        distTree.getNodes(nodes);
+
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+            mesh_to_volume_internal::TransformValues<TreeType>(
+                nodes, voxelSize, /*unsignedDist=*/false));
+    }
+
+    // Set background and flood-fill sign into tile regions.
+    const auto mm = minMax(distTree);
+    const ValueType exteriorWidth = mm.max();
+    const ValueType interiorWidth = mm.min();
+
+    distTree.root().setBackground(exteriorWidth, /*updateChildNodes=*/false);
+    signedFloodFillWithValues(distTree, exteriorWidth, interiorWidth);
+
+    grid.setGridClass(GRID_LEVEL_SET);
+
+    // Optionally rebuild a symmetric narrow band via PDE renormalization.
+    if (rebuildNarrowBand) {
+        const int dilationCount = static_cast<int>(math::RoundUp(halfWidth));
+        tools::dilateActiveValues(distTree, dilationCount,
+            tools::NN_FACE, tools::PRESERVE_TILES);
+
+        util::NullInterrupter interrupter;
+        LevelSetFilter<GridType, GridType, util::NullInterrupter> filter(grid, &interrupter);
+#if 1
+        filter.setSpatialScheme(math::FIRST_BIAS);
+        filter.setTemporalScheme(math::TVD_RK1);
+#else
+        filter.setSpatialScheme(math::HJWENO5_BIAS);
+        filter.setTemporalScheme(math::TVD_RK3);
+#endif
+        //filter.setSpatialScheme(math::FIRST_BIAS);// <-
+        filter.setNormCount(dilationCount);
+        filter.normalize();
+        filter.prune();
+
+        const ValueType bandWidth = voxelSize * ValueType(halfWidth);
+        tools::pruneLevelSet(distTree, bandWidth, -bandWidth);
+    }
+}// distanceFieldToSDF
+
+
+////////////////////////////////////////
+
+
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
@@ -2675,6 +2851,11 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 
 #define _FUNCTION(TreeT) \
     void segmentSDF(const Grid<TreeT>&, std::vector<Grid<TreeT>::Ptr>&)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void distanceFieldToSDF(Grid<TreeT>&, bool, bool, float)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 

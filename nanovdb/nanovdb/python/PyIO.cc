@@ -69,8 +69,15 @@ template<typename BufferT> nb::list readGrids(const std::string& fileName, int v
 
 template<typename BufferT> void writeGrids(const std::string& fileName, nb::list handles, io::Codec codec, int verbose)
 {
+    std::ofstream os(fileName, std::ios::out | std::ios::binary | std::ios::trunc);
+    if (!os.is_open()) {
+        throw std::ios_base::failure("Unable to open file named \"" + fileName + "\" for output");
+    }
     for (size_t i = 0; i < handles.size(); ++i) {
-        nanovdb::io::writeGrid(fileName, nb::cast<const GridHandle<BufferT>&>(handles[i]), codec, verbose);
+        nanovdb::io::writeGrid(os, nb::cast<const GridHandle<BufferT>&>(handles[i]), codec);
+    }
+    if (verbose) {
+        std::cout << "Wrote " << handles.size() << " nanovdb::Grid(s) to file named \"" << fileName << "\"" << std::endl;
     }
 }
 

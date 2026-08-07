@@ -17,6 +17,9 @@
 
 #include <cub/cub.cuh>
 
+#include <map>
+#include <vector>
+
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/tools/cuda/TopologyBuilder.cuh>
@@ -40,12 +43,18 @@ class MergeGrids
 
 public:
 
-    /// @brief Constructor
+    /// @brief Constructor for an N-ary merge
+    /// @param d_srcGrids list of source device grids to be merged (active-mask union)
+    /// @param stream optional CUDA stream (defaults to CUDA stream 0)
+    MergeGrids(const std::vector<const GridT*>& d_srcGrids, cudaStream_t stream = 0)
+        : mBuilder(stream), mStream(stream), mTimer(stream), mDeviceSrcGrids(d_srcGrids) {}
+
+    /// @brief Convenience constructor for the common binary merge
     /// @param d_srcGrid1 first source device grid to be merged
     /// @param d_srcGrid2 second source device grid to be merged
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
     MergeGrids(const GridT* d_srcGrid1, const GridT* d_srcGrid2, cudaStream_t stream = 0)
-        : mBuilder(stream), mStream(stream), mTimer(stream), mDeviceSrcGrid1(d_srcGrid1), mDeviceSrcGrid2(d_srcGrid2) {}
+        : MergeGrids(std::vector<const GridT*>{d_srcGrid1, d_srcGrid2}, stream) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -79,10 +88,8 @@ private:
     cudaStream_t            mStream{0};
     util::cuda::Timer       mTimer;
     int                     mVerbose{0};
-    const GridT             *mDeviceSrcGrid1;
-    const GridT             *mDeviceSrcGrid2;
-    TreeData                mSrcTreeData1;
-    TreeData                mSrcTreeData2;
+    std::vector<const GridT*> mDeviceSrcGrids;
+    std::vector<TreeData>     mSrcTreeData;
 };// tools::cuda::MergeGrids<BuildT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -92,15 +99,19 @@ template<typename BufferT>
 GridHandle<BufferT>
 MergeGrids<BuildT>::getHandle(const BufferT &pool)
 {
-    // Copy TreeData from GPU -> CPU
-    cudaStreamSynchronize(mStream);
-    mSrcTreeData1 = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid1);
-    mSrcTreeData2 = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid2);
+    if (mDeviceSrcGrids.empty())
+        throw std::runtime_error("MergeGrids: no input grids");
 
-    // Ensure that the input grid contains no tile values
-    if (mSrcTreeData1.mTileCount[2] || mSrcTreeData1.mTileCount[1] || mSrcTreeData1.mTileCount[0] ||
-        mSrcTreeData2.mTileCount[2] || mSrcTreeData2.mTileCount[1] || mSrcTreeData2.mTileCount[0])
-        throw std::runtime_error("Topological operations not supported on grids with value tiles");
+    // Copy TreeData from GPU -> CPU for every input grid
+    cudaStreamSynchronize(mStream);
+    mSrcTreeData.resize(mDeviceSrcGrids.size());
+    for (size_t i = 0; i < mDeviceSrcGrids.size(); ++i)
+        mSrcTreeData[i] = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrids[i]);
+
+    // Ensure that no input grid contains tile values
+    for (const auto& td : mSrcTreeData)
+        if (td.mTileCount[2] || td.mTileCount[1] || td.mTileCount[0])
+            throw std::runtime_error("Topological operations not supported on grids with value tiles");
 
     // Merge root nodes
     if (mVerbose==1) mTimer.start("\nMerging root nodes");
@@ -178,35 +189,23 @@ void MergeGrids<BuildT>::mergeRoot()
     // Make a host copy of the source root topology RootNode for both inputs
     // Then, merge tiles of two sources in a sorted container
 
-    if (mSrcTreeData1.mVoxelCount) { // If the first input is not a null grid
-        // Make a host copy of the Root topology
-        auto deviceSrcRoot1 = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid1, GridT::memUsage() + mSrcTreeData1.mNodeOffset[3]));
-        uint64_t rootSize1 = mSrcTreeData1.mNodeOffset[2] - mSrcTreeData1.mNodeOffset[3];
-        auto srcRootBuffer1 = nanovdb::HostBuffer::create(rootSize1);
-        cudaCheck(cudaMemcpyAsync(srcRootBuffer1.data(), deviceSrcRoot1, rootSize1, cudaMemcpyDeviceToHost, mStream));
-        auto srcRoot1 = static_cast<RootT*>(srcRootBuffer1.data());
+    // Union the root tiles of every (non-null) input into a sorted container.
+    // emplace dedups by spatial key, so any number of inputs combine naturally.
+    for (size_t i = 0; i < mDeviceSrcGrids.size(); ++i) {
+        if (!mSrcTreeData[i].mVoxelCount) continue; // skip null grids
+        // Make a host copy of this input's Root topology. The HostBuffer is
+        // pageable, so the async D2H copy is effectively synchronous and the
+        // host data is safe to read immediately below.
+        auto deviceSrcRoot = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrids[i], GridT::memUsage() + mSrcTreeData[i].mNodeOffset[3]));
+        uint64_t rootSize = mSrcTreeData[i].mNodeOffset[2] - mSrcTreeData[i].mNodeOffset[3];
+        auto srcRootBuffer = nanovdb::HostBuffer::create(rootSize);
+        cudaCheck(cudaMemcpyAsync(srcRootBuffer.data(), deviceSrcRoot, rootSize, cudaMemcpyDeviceToHost, mStream));
+        auto srcRoot = static_cast<RootT*>(srcRootBuffer.data());
 
         // Add all root tiles, reordering if necessary
-        for (uint32_t t = 0; t < srcRoot1->tileCount(); t++) {
-            auto tile = srcRoot1->tile(t);
-            auto sortKey = coordToKey(tile->origin());
-            mergedTiles.emplace(sortKey, *tile);
-        }
-    }
-
-    if (mSrcTreeData2.mVoxelCount) { // If the first input is not a null grid
-        // Make a host copy of the Root topology
-        auto deviceSrcRoot2 = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid2, GridT::memUsage() + mSrcTreeData2.mNodeOffset[3]));
-        uint64_t rootSize2 = mSrcTreeData2.mNodeOffset[2] - mSrcTreeData2.mNodeOffset[3];
-        auto srcRootBuffer2 = nanovdb::HostBuffer::create(rootSize2);
-        cudaCheck(cudaMemcpyAsync(srcRootBuffer2.data(), deviceSrcRoot2, rootSize2, cudaMemcpyDeviceToHost, mStream));
-        auto srcRoot2 = static_cast<RootT*>(srcRootBuffer2.data());
-
-        // Add all root tiles, reordering if necessary
-        for (uint32_t t = 0; t < srcRoot2->tileCount(); t++) {
-            auto tile = srcRoot2->tile(t);
-            auto sortKey = coordToKey(tile->origin());
-            mergedTiles.emplace(sortKey, *tile);
+        for (uint32_t t = 0; t < srcRoot->tileCount(); t++) {
+            auto tile = srcRoot->tile(t);
+            mergedTiles.emplace(coordToKey(tile->origin()), *tile);
         }
     }
 
@@ -229,15 +228,13 @@ void MergeGrids<BuildT>::mergeInternalNodes()
     // Merges the masks of upper and lower nodes from both input topologies into the
     // densified, pre-allocated mask arrays of the merged result
     using Op = util::morphology::cuda::MergeInternalNodesFunctor<BuildT>;
-    if (mSrcTreeData1.mNodeCount[1]) { // Unless the first grid to merge is empty
+    // Each input scatter-ORs its internal-node masks into the shared, union-sized
+    // accumulator; the merged root (built from all inputs) provides the slots.
+    for (size_t i = 0; i < mDeviceSrcGrids.size(); ++i) {
+        if (!mSrcTreeData[i].mNodeCount[1]) continue; // skip empty grids
         util::cuda::operatorKernel<Op>
-            <<<mSrcTreeData1.mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
-            (mDeviceSrcGrid1, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks());
-    }
-    if (mSrcTreeData2.mNodeCount[1]) { // Unless the second grid to merge is empty
-        util::cuda::operatorKernel<Op>
-            <<<mSrcTreeData2.mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
-            (mDeviceSrcGrid2, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks());
+            <<<mSrcTreeData[i].mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
+            (mDeviceSrcGrids[i], mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks());
     }
 }// MergeGrids<BuildT>::mergeInternalNodes
 
@@ -246,10 +243,10 @@ void MergeGrids<BuildT>::mergeInternalNodes()
 template <typename BuildT>
 void MergeGrids<BuildT>::processGridTreeRoot()
 {
-    // Copy GridData from first source grid
+    // Copy GridData from the first source grid
     // TODO: Check for instances where extra processing is needed
-    // TODO: check that the second grid input has consistent GridData, too
-    cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrid1->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
+    // TODO: check that the other grid inputs have consistent GridData, too
+    cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrids.front()->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
     cudaCheckError();
 }// MergeGrids<BuildT>::processGridTreeRoot
@@ -260,15 +257,12 @@ template<typename BuildT>
 void MergeGrids<BuildT>::mergeLeafNodes()
 {
     using Op = util::morphology::cuda::MergeLeafNodesFunctor<BuildT>;
-    if (mSrcTreeData1.mNodeCount[1]) { // Unless first input grid is empty
+    // Each input ORs its leaf active masks into the merged leaf topology.
+    for (size_t i = 0; i < mDeviceSrcGrids.size(); ++i) {
+        if (!mSrcTreeData[i].mNodeCount[1]) continue; // skip empty grids
         util::cuda::operatorKernel<Op>
-            <<<dim3(mSrcTreeData1.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-            (mDeviceSrcGrid1, static_cast<GridT*>(mBuilder.data()->d_bufferPtr));
-    }
-    if (mSrcTreeData2.mNodeCount[1]) { // Unless second input grid is empty
-        util::cuda::operatorKernel<Op>
-            <<<dim3(mSrcTreeData2.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-            (mDeviceSrcGrid2, static_cast<GridT*>(mBuilder.data()->d_bufferPtr));
+            <<<dim3(mSrcTreeData[i].mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
+            (mDeviceSrcGrids[i], static_cast<GridT*>(mBuilder.data()->d_bufferPtr));
     }
 
     // Update leaf offsets and prefix sums
