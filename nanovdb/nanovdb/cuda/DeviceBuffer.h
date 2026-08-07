@@ -54,30 +54,26 @@ class DeviceBuffer
         if (mEvents && mEvents[device]) cudaCheck(cudaStreamWaitEvent(stream, mEvents[device], 0));
     }
 
-    /// @brief Record that this device buffer has just been used on @a stream. Paired with
-    ///        orderAfterPriorUses this keeps a single event that covers all prior uses.
-    void recordUse(int device, cudaStream_t stream)
-    {
-        if (!mEvents) return;
-        if (mEvents[device] == nullptr) {// events are per-device, so create it on the right one
-            int current = 0;
-            cudaCheck(cudaGetDevice(&current));
-            if (current != device) cudaCheck(cudaSetDevice(device));
-            cudaCheck(cudaEventCreateWithFlags(&mEvents[device], cudaEventDisableTiming));
-            if (current != device) cudaCheck(cudaSetDevice(current));
-        }
-        cudaCheck(cudaEventRecord(mEvents[device], stream));
-    }
-
-    /// @brief Free every managed device allocation on @a stream, ordered after all outstanding
-    ///        work on the buffer, and destroy the tracking events.
+    /// @brief Free every managed device allocation, each ordered after all tracked uses of the
+    ///        buffer, and destroy the tracking events.
+    /// @param stream Stream the frees are issued on for allocations owned by the CURRENT device.
+    ///        A stream belongs to a single device, so it cannot carry frees for other devices'
+    ///        memory pools; allocations on other devices are freed on their own device's default
+    ///        stream, after switching to that device.
     /// @note Destroying an event with a pending wait is safe: CUDA releases it once the device
     ///       has completed it.
     void freeDeviceBuffers(cudaStream_t stream)
     {
+        int current = 0;
+        cudaCheck(cudaGetDevice(&current));
         for (int i = 0; i < mDeviceCount; ++i) {
-            this->orderAfterPriorUses(i, stream);
-            cudaCheck(util::cuda::freeAsync(mGpuData[i], stream));
+            if (mGpuData[i]) {
+                const cudaStream_t freeStream = (i == current) ? stream : cudaStream_t{0};
+                if (i != current) cudaCheck(cudaSetDevice(i));
+                this->orderAfterPriorUses(i, freeStream);
+                cudaCheck(util::cuda::freeAsync(mGpuData[i], freeStream));
+                if (i != current) cudaCheck(cudaSetDevice(current));
+            }
             if (mEvents && mEvents[i]) {
                 cudaCheck(cudaEventDestroy(mEvents[i]));
                 mEvents[i] = nullptr;
@@ -269,8 +265,33 @@ public:
 
     ///////////////////////////////////////////////////////////////////////
 
+    /// @brief Record that this buffer's device data was just used on @a stream, so that the
+    ///        buffer's device frees (destructor, move-assignment, clear) are ordered after that
+    ///        work. Uses issued through deviceUpload/deviceDownload are recorded automatically;
+    ///        callers that enqueue their own kernels or copies against the raw pointer returned
+    ///        by deviceData() should call this afterwards. Without it, such work is only safe if
+    ///        it is on a blocking stream (which the free, issued on the default stream, waits on
+    ///        implicitly) or if the caller synchronizes before the buffer is cleared/destroyed.
+    /// @param device Device whose buffer was used
+    /// @param stream Stream the work was issued on
+    void recordUse(int device, cudaStream_t stream)
+    {
+        if (!mEvents) return;
+        if (mEvents[device] == nullptr) {// events are per-device, so create it on the right one
+            int current = 0;
+            cudaCheck(cudaGetDevice(&current));
+            if (current != device) cudaCheck(cudaSetDevice(device));
+            cudaCheck(cudaEventCreateWithFlags(&mEvents[device], cudaEventDisableTiming));
+            if (current != device) cudaCheck(cudaSetDevice(current));
+        }
+        cudaCheck(cudaEventRecord(mEvents[device], stream));
+    }
+
     /// @brief Retuns a raw pointer to the specified device/GPU buffer managed by this allocator.
     /// @warning Note that the pointer can be NULL!
+    /// @note Work enqueued against this raw pointer is invisible to the buffer's lifetime
+    ///       tracking: on a non-blocking stream, call recordUse afterwards (or synchronize
+    ///       before the buffer is cleared/destroyed) so the device free is ordered after it.
     void* deviceData(int device) const {
         NANOVDB_ASSERT(device >= 0 && device < mDeviceCount);
         return mGpuData[device];
