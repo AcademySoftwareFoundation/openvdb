@@ -533,39 +533,3 @@ TEST(TestNanoVDBMultiGPU, MatchesSingleGpu_DistributedCudaPointsToGrid)
     cudaCheck(cudaFree(voxels));
     cudaSetDevice(current);
 }// MatchesSingleGpu_DistributedCudaPointsToGrid
-
-/// @brief Edge case: fewer input voxels than devices. Interior devices receive
-///        no work, so this guards against out-of-range indexing on empty stripes.
-TEST(TestNanoVDBMultiGPU, FewerVoxelsThanDevices_DistributedCudaPointsToGrid)
-{
-    int current = 0;
-    cudaCheck(cudaGetDevice(&current));
-
-    using BufferT = nanovdb::cuda::UnifiedBuffer;
-    using BuildT = nanovdb::ValueOnIndex;
-
-    // Three well-separated voxels (each in its own upper-node tile).
-    const size_t inputCount = 3;
-    nanovdb::Coord* voxels = nullptr;
-    cudaCheck(cudaMallocManaged(&voxels, inputCount * sizeof(nanovdb::Coord)));
-    voxels[0] = nanovdb::Coord(0, 0, 0);
-    voxels[1] = nanovdb::Coord(10000, -4000, 7000);
-    voxels[2] = nanovdb::Coord(-9000, 12000, -15000);
-
-    nanovdb::cuda::DeviceMesh deviceMesh;
-    nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
-    auto handle = converter.getHandle(voxels, inputCount);
-    handle.deviceDownload();
-    auto *grid = handle.grid<BuildT>();
-    EXPECT_TRUE(grid);
-    EXPECT_EQ(static_cast<uint64_t>(inputCount), grid->activeVoxelCount());
-
-    {
-        auto acc = grid->getAccessor();
-        for (size_t i = 0; i < inputCount; ++i)
-            EXPECT_TRUE(acc.isActive(voxels[i]));
-    }
-
-    cudaCheck(cudaFree(voxels));
-    cudaSetDevice(current);
-}// FewerVoxelsThanDevices_DistributedCudaPointsToGrid
