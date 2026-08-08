@@ -17,6 +17,7 @@
 #define NVIDIA_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <cub/cub.cuh>
+#include <algorithm>
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/GridHandle.h>
@@ -884,12 +885,15 @@ void MeshToGrid<BuildT>::processGridTreeRoot()
         topology::detail::InitGridTreeRootFunctor<BuildT>{mMap}, mBuilder.deviceData());
     cudaCheckError();
 
-    // Copy grid name into the output grid's name field
+    // Copy grid name into the output grid's name field. Zero the field first
+    // and copy only the actual string.
     char *dst = mBuilder.data()->getGrid().mGridName;
+    cudaCheck(cudaMemsetAsync(dst, 0, GridData::MaxNameSize, mStream));
     if (!mGridName.empty()) {
-        cudaCheck(cudaMemcpyAsync(dst, mGridName.data(), GridData::MaxNameSize, cudaMemcpyHostToDevice, mStream));
-    } else {
-        cudaCheck(cudaMemsetAsync(dst, 0, GridData::MaxNameSize, mStream));
+        // Copy at most MaxNameSize-1 bytes so the memset's trailing '\0' always
+        // survives; a name >= MaxNameSize is truncated, never left unterminated.
+        const size_t nameSize = std::min<size_t>(mGridName.size(), GridData::MaxNameSize - 1);
+        cudaCheck(cudaMemcpyAsync(dst, mGridName.c_str(), nameSize, cudaMemcpyHostToDevice, mStream));
     }
 
 } // MeshToGrid<BuildT>::processGridTreeRoot

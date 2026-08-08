@@ -279,7 +279,7 @@ void DilateGrid<BuildT>::dilateLeafNodes()
         else if (mOp == morphology::NN_FACE_EDGE_VERTEX) {
             using Op = util::morphology::cuda::DilateLeafNodesFunctor<BuildT, morphology::NN_FACE_EDGE_VERTEX>;
             util::cuda::operatorKernel<Op>
-                <<<dim3(mBuilder.data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock>>>
+                <<<dim3(mBuilder.data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
                 (mDeviceSrcGrid, static_cast<GridT*>(mBuilder.data()->d_bufferPtr)); }
     }
 
