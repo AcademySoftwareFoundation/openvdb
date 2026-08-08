@@ -275,6 +275,10 @@ public:
     }
 
     /// @brief Frees the buffer memory (if any) and resets to the empty state.
+    /// @deprecated Use destroy(). Documentation-level only for now: the
+    ///             [[deprecated]] attribute would fire from GridHandle::reset
+    ///             and NodeManager::reset, which must keep calling clear()
+    ///             until every buffer type provides destroy().
     /// @note Transitional, and not the name to use: it exists only because
     ///       GridHandle::reset still calls clear() on its buffer. It goes away
     ///       when the legacy dual buffers do and GridHandle moves to destroy().
