@@ -234,7 +234,7 @@ inline Checksum evalChecksum(const GridData *d_gridData, CheckMode mode, cudaStr
     if (mode != CheckMode::Empty) {
         auto d_lut = util::cuda::createCrc32Lut(1, stream);
         crc32Head(d_gridData, d_lut.get(), d_lut.get() + 256, stream);
-        cudaCheck(cudaMemcpyAsync(&(cs.head()), d_lut.get() + 256, headSize, cudaMemcpyDeviceToHost, stream));
+        cudaCheck(cudaMemcpyAsync(&(cs.head()), d_lut.get() + 256, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
         if (mode == CheckMode::Full) {
             std::unique_ptr<char[]> buffer(new char[headSize]);
             auto *gridData = (GridData*)(buffer.get());
@@ -244,7 +244,7 @@ inline Checksum evalChecksum(const GridData *d_gridData, CheckMode mode, cudaStr
             } else {
                 callNanoGrid<Crc32TailOld>(d_gridData, gridData, d_lut.get(), d_lut.get() + 256, stream);
             }
-            cudaCheck(cudaMemcpyAsync(&(cs.tail()), d_lut.get() + 256, headSize, cudaMemcpyDeviceToHost, stream));
+            cudaCheck(cudaMemcpyAsync(&(cs.tail()), d_lut.get() + 256, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
         }
     }
     return cs;
@@ -265,7 +265,7 @@ Checksum evalChecksum(const NanoGrid<BuildT> *d_grid, CheckMode mode, cudaStream
     if (mode != CheckMode::Empty) {
         auto d_lut = util::cuda::createCrc32Lut(1, stream);
         crc32Head(d_grid, d_lut.get(), d_lut.get() + 256, stream);
-        cudaCheck(cudaMemcpyAsync(&(cs.head()), d_lut.get() + 256, headSize, cudaMemcpyDeviceToHost, stream));
+        cudaCheck(cudaMemcpyAsync(&(cs.head()), d_lut.get() + 256, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
         if (mode == CheckMode::Full) {
             std::unique_ptr<char[]> buffer(new char[headSize]);
             auto *gridData = (GridData*)(buffer.get());
@@ -275,7 +275,7 @@ Checksum evalChecksum(const NanoGrid<BuildT> *d_grid, CheckMode mode, cudaStream
             } else {
                 crc32TailOld(d_grid, gridData, d_lut.get(), d_lut.get() + 256, stream);
             }
-            cudaCheck(cudaMemcpyAsync(&(cs.tail()), d_lut.get() + 256, headSize, cudaMemcpyDeviceToHost, stream));
+            cudaCheck(cudaMemcpyAsync(&(cs.tail()), d_lut.get() + 256, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
         }
     }
     return cs;
