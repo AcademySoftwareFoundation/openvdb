@@ -20,7 +20,7 @@
 #include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 #include <nanovdb/util/cuda/Util.h>
-#include <algorithm>// std::min in processGridTreeRoot's grid-name copy
+#include <algorithm>
 
 namespace nanovdb {
 

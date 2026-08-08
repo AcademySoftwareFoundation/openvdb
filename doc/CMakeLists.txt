@@ -25,6 +25,14 @@ option(OPENVDB_DOXYGEN_NANOVDB "Build NanoVDB documentation" ON)
 option(OPENVDB_DOXYGEN_INTERNAL [=[
 Enable documentation of methods and classes which have been explicitly marked as internal
 ]=] OFF)
+# When enabled, Doxygen's WARN_AS_ERROR=FAIL_ON_WARNINGS makes any warning fail
+# the docs build (it still generates the docs and writes the full warning log
+# first, then exits non-zero). CI turns this ON -- see .github/workflows/docs.yml
+# -- so net-new doc warnings fail the PR that introduces them. Defaults OFF so a
+# local doc build isn't blocked by a stray warning from a different Doxygen
+# version; pass -DOPENVDB_DOXYGEN_WARN_AS_ERROR=ON to gate locally too.
+option(OPENVDB_DOXYGEN_WARN_AS_ERROR
+  "Treat Doxygen warnings as errors" OFF)
 
 find_package(Doxygen 1.0...<1.15.0 REQUIRED doxygen)
 if(MINIMUM_DOXYGEN_VERSION)
@@ -64,9 +72,14 @@ if(OPENVDB_DOXYGEN_INTERNAL)
 endif()
 
 if(NOT OPENVDB_DOXYGEN_INTERNAL)
+  # Hide implementation-detail symbols in the lowercase `internal` namespaces
+  # (the project convention for non-public helpers). Note: do NOT add a
+  # capital-I "*Internal*" glob here -- it also matches the public
+  # tree::InternalNode (and nanovdb::InternalNode) class, silently dropping it
+  # from the docs and breaking every \link to it (e.g. InternalNode::childCount
+  # in doc/changes.txt) while its RootNode/LeafNode siblings resolve fine.
   set(DOXYGEN_EXCLUDE_SYMBOLS
-    "*internal*"
-    "*Internal*")
+    "*internal*")
 endif()
 
 set(DOXYGEN_PROJECT_NAME "OpenVDB")
@@ -77,14 +90,40 @@ set(DOXYGEN_FILE_PATTERNS *.h *h.in) # headers only
 set(DOXYGEN_EXTENSION_MAPPING .in=C) # parse CMake config headers as C
 set(DOXYGEN_IMAGE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/img")
 set(DOXYGEN_RECURSIVE NO)
-set(DOXYGEN_QUIET YES)
 set(DOXYGEN_NUM_PROC_THREADS 0) # detects from system
+
+# Enable \snippet resolution against the on-disk example sources. Paths in
+# \snippet directives are resolved relative to EXAMPLE_PATH, so referring to
+# `nanovdb/nanovdb/examples/ex_xxx/yyy.cc` from a doc page works as written.
+set(DOXYGEN_EXAMPLE_PATH "${CMAKE_SOURCE_DIR}")
+set(DOXYGEN_EXAMPLE_PATTERNS *.cc *.cpp *.cu *.cuh *.h *.txt)
+set(DOXYGEN_EXAMPLE_RECURSIVE YES)
+
+# Always capture Doxygen warnings to a logfile so CI can publish it as an
+# artifact and contributors can see exactly what's broken.
+set(DOXYGEN_WARN_LOGFILE "${CMAKE_CURRENT_BINARY_DIR}/doxygen.warnings.log")
+if(OPENVDB_DOXYGEN_WARN_AS_ERROR)
+  # FAIL_ON_WARNINGS keeps generating docs but exits non-zero at the end if
+  # any warning was emitted. Requires Doxygen >= 1.9.x.
+  set(DOXYGEN_WARN_AS_ERROR FAIL_ON_WARNINGS)
+  # Don't suppress messages so contributors can see warnings during the build.
+  set(DOXYGEN_QUIET NO)
+else()
+  set(DOXYGEN_QUIET YES)
+endif()
 
 set(DOXYGEN_GENERATE_HTML YES)
 set(DOXYGEN_GENERATE_MAN NO)
 set(DOXYGEN_GENERATE_LATEX NO)
 set(DOXYGEN_GENERATE_TODOLIST NO)
 set(DOXYGEN_HTML_TIMESTAMP NO) # for simpler website diffs
+
+# Render math formulas via MathJax instead of LaTeX -> PNG. This removes the
+# entire `latex`/`dvips`/`gs` toolchain dependency from both local doc builds
+# and CI (see .github/workflows/docs.yml), eliminates a class of cross-platform
+# install pain, and produces crisper, selectable math in the rendered HTML.
+set(DOXYGEN_USE_MATHJAX YES)
+set(DOXYGEN_MATHJAX_VERSION MathJax_3) # default JS bundle loaded from a CDN
 
 set(DOXYGEN_EXTRACT_ALL YES)
 set(DOXYGEN_EXTRACT_STATIC YES)
@@ -177,6 +216,11 @@ set(DOXYGEN_PREDEFINED
   "OPENVDB_VERSION_NAME=v${OpenVDB_MAJOR_VERSION}_${OpenVDB_MINOR_VERSION}"
   "OPENVDB_ABI_VERSION_NUMBER=${OpenVDB_MAJOR_VERSION}"
   [[__declspec(x):= __attribute__(x):=]]
+  # Strip the symbol-visibility/export macro so Doxygen doesn't fold it into a
+  # declaration's name. Doxygen tolerates `class OPENVDB_API X` but mis-parses
+  # `enum OPENVDB_API X` (e.g. half::FromBitsTag in ext/imath/.../Half.h),
+  # reporting the enum as a documented-but-undeclared symbol.
+  "OPENVDB_API="
   # Replace the deprecated macros with doxygen deprecated comments. This ensures
   # that every bit of deprecated C++ is listed in the doxygen deprecated list,
   # even if it was not properly tagged
@@ -240,7 +284,9 @@ if(OPENVDB_DOXYGEN_HOUDINI)
 endif()
 
 if(OPENVDB_DOXYGEN_AX)
-  set(DOXYGEN_EXTRA_PACKAGES amsmath) # for math formatting
+  # AX docs use @f$ inline and @f[ block math. Formula font size also applies
+  # under MathJax (set above). The amsmath package the AX docs assume is
+  # bundled by default in MathJax v3, so no extra extensions are required.
   set(DOXYGEN_FORMULA_FONTSIZE 14)
   list(APPEND DOXYGEN_ENABLED_SECTIONS "OPENVDB_AX")
 
