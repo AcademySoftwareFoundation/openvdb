@@ -959,7 +959,7 @@ inline void DistributedPointsToGrid<BuildT>::processGridTreeRoot(const PtrT poin
         const size_t nameSize = std::min<size_t>(mGridName.size(), GridData::MaxNameSize - 1);
         cudaCheck(cudaMemcpyAsync(dst, mGridName.c_str(), nameSize, cudaMemcpyHostToDevice, stream));
     }
-    cudaEventRecord(processGridTreeRootEvent);
+    cudaCheck(cudaEventRecord(processGridTreeRootEvent, stream));
 
     for (const auto& [otherDeviceId, otherStream] : mDeviceMesh) {
         cudaSetDevice(otherDeviceId);
@@ -1020,12 +1020,14 @@ inline void DistributedPointsToGrid<BuildT>::processNodes()
         std::vector<cudaEvent_t> leafCountEvents(mDeviceMesh.deviceCount());
         std::vector<cudaEvent_t> valueIndexPrefixSumEvents(mDeviceMesh.deviceCount());
 
+        auto lastDeviceId = cudaInvalidDeviceId;
         for (const auto& [deviceId, stream] : mDeviceMesh) {
             cudaSetDevice(deviceId);
             cudaEventCreateWithFlags(&leafCountEvents[deviceId], cudaEventDisableTiming);
             cudaEventCreateWithFlags(&valueIndexPrefixSumEvents[deviceId], cudaEventDisableTiming);
 
             if (deviceNodeCount(deviceId)[0]) {
+                lastDeviceId = deviceId;
                 kernels::fillValueIndexKernel<BuildT><<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], mValueIndex, mData);
                 cudaCheckError();
             }
@@ -1034,10 +1036,18 @@ inline void DistributedPointsToGrid<BuildT>::processNodes()
         LeafCountIterator leafCountIterator(mNodeCounts);
         inclusiveSumAsync(mDeviceMesh, mTempDevicePools, mValueIndex, mValueIndexPrefix, leafCountIterator, leafCountEvents.data(), valueIndexPrefixSumEvents.data());
 
+        // The first leaf on each device reads the last prefix value produced by the
+        // previous device, while the first leaf globally reads the final prefix value.
+        // Wait for the corresponding producer before launching each leaf-processing kernel.
+        auto previousDeviceId = cudaInvalidDeviceId;
         for (const auto& [deviceId, stream] : mDeviceMesh) {
             cudaSetDevice(deviceId);
-            cudaStreamWaitEvent(stream, valueIndexPrefixSumEvents.back());
             if (deviceNodeCount(deviceId)[0]) {
+                cudaStreamWaitEvent(stream, valueIndexPrefixSumEvents[lastDeviceId]);
+                if (previousDeviceId != cudaInvalidDeviceId) {
+                    cudaStreamWaitEvent(stream, valueIndexPrefixSumEvents[previousDeviceId]);
+                }
+                previousDeviceId = deviceId;
                 kernels::leafPrefixSumKernel<BuildT><<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], mValueIndexPrefix, mData);
                 cudaCheckError();
             }
