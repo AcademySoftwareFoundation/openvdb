@@ -273,17 +273,6 @@ void radixSortAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cuda::
                 NANOVDB_ASSERT(outputCount == counts[outputDevice]);
 
                 if (outputCount) {
-                    if (leftSegmentCount) {
-                        cudaCheck(util::cuda::memPrefetchAsync(leftKeys + leftBegin, leftSegmentCount * sizeof(KeyT), outputDevice, stream));
-                        cudaCheck(util::cuda::memPrefetchAsync(leftValues + leftBegin, leftSegmentCount * sizeof(ValueT), outputDevice, stream));
-                    }
-                    if (rightSegmentCount) {
-                        cudaCheck(util::cuda::memPrefetchAsync(rightKeys + rightBegin, rightSegmentCount * sizeof(KeyT), outputDevice, stream));
-                        cudaCheck(util::cuda::memPrefetchAsync(rightValues + rightBegin, rightSegmentCount * sizeof(ValueT), outputDevice, stream));
-                    }
-                    cudaCheck(util::cuda::memPrefetchAsync(nextKeys + offset(outputDevice), outputCount * sizeof(KeyT), outputDevice, stream));
-                    cudaCheck(util::cuda::memPrefetchAsync(nextValues + offset(outputDevice), outputCount * sizeof(ValueT), outputDevice, stream));
-
                     CUB_LAUNCH(DeviceMerge::MergePairs, pools[outputDevice], stream,
                         leftKeys + leftBegin, leftValues + leftBegin, leftSegmentCount,
                         rightKeys + rightBegin, rightValues + rightBegin, rightSegmentCount,
