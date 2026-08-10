@@ -163,8 +163,7 @@ constexpr int LEAF_SIZE = 512;          // 8^3
 // Leaf-local connected components via a Shiloach-Vishkin union-find run in shared memory, one CUDA
 // block per leaf, one thread per voxel offset n in [0, 512). The forest is stored as a parent array
 // of leaf-local voxel offsets: parent[n] = n for active roots, a smaller active offset for
-// non-roots, and INACTIVE for inactive voxels. Connectivity is 6-connected and strictly intra-leaf
-// (cross-leaf edges are a later stage).
+// non-roots, and INACTIVE for inactive voxels. Connectivity is 6-connected and strictly intra-leaf.
 //
 // The primitives are double-buffered (Jacobi): they read the "cur" buffer and write the "nxt"
 // buffer, then swap. Inactive entries are carried through unchanged. The pointer swap is performed
@@ -199,19 +198,19 @@ struct LeafUnionFind
         return m;
     }
 
-    // SV hook: if the smallest parent m among v's active neighbors is below v's own parent p, lower
-    // the parent of p toward m via atomicMin (many vertices can target the same slot p).
+    // Union-find hook: if the smallest parent m among v's active neighbors is below v's own parent
+    // p, lower the parent of p toward m via atomicMin (many vertices can target the same slot p).
+    // This is parent-connect in Liu & Tarjan, or parent-root-connect when rootsOnly is set.
     // Sets *changed -- the caller's block-shared flag, when non-null -- iff some slot was lowered.
     //
-    // @param rootsOnly hook only through parents that are themselves roots. This is the difference
-    //        between parent-connect and parent-root-connect in Liu & Tarjan, "Simple Concurrent
-    //        Connected Components Algorithms" (ACM TOPC 9(2), 2022): the restricted form cannot
-    //        move a subtree between trees, which makes the algorithm monotone -- the property their
-    //        O(lg n) bound rests on.
+    // @param rootsOnly hook only through parents that are themselves roots. The restricted form
+    //        cannot move a subtree between trees, which makes the algorithm monotone -- the
+    //        property that the O(lg n) bound in Liu & Tarjan, "Simple Concurrent Connected
+    //        Components Algorithms" (ACM TOPC 9(2), 2022), rests on.
     __device__ static void hook(int*& cur, int*& nxt, int n, int* changed, bool rootsOnly = false)
     {
         const int pn = cur[n];
-        nxt[n] = pn;                                  // Phase A: seed nxt = cur (own slot, no race)
+        nxt[n] = pn;                                  // seed nxt = cur (own slot, no race)
         __syncthreads();
         if (pn != INACTIVE && (!rootsOnly || cur[pn] == pn)) {   // active, and a root if required
             const int m = neighborMin(cur, n);
@@ -224,14 +223,15 @@ struct LeafUnionFind
         int* t = cur; cur = nxt; nxt = t;             // swap (identical on every thread)
     }
 
-    // Pointer-jumping compress: parent[v] <- parent[parent[v]]. Halves tree depth per call.
+    // Union-find compress: parent[v] <- parent[parent[v]], one round of pointer jumping applied to
+    // every node at once, halving tree depth per call. This is shortcut in Liu & Tarjan.
     // Sets *changed -- the caller's block-shared flag, when non-null -- iff some entry moved.
     __device__ static void compress(int*& cur, int*& nxt, int n, int* changed)
     {
         const int pn = cur[n];
         int v = INACTIVE;
-        if (pn != INACTIVE) {                         // active: grandparent (cur[pn] is valid)
-            v = cur[pn];
+        if (pn != INACTIVE) {                         // n is active
+            v = cur[pn];                              // n's grandparent (parents are always active)
             if (changed && v != pn) *changed = 1;
         }
         nxt[n] = v;                                   // own slot, no race
