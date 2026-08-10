@@ -621,9 +621,6 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
             uint64_t* deviceOutputKeys = mData->d_keys + deviceStripeOffset;
             uint32_t* deviceOutputIndices = mData->d_indx + deviceStripeOffset;
 
-            util::cuda::memAdvise(deviceCoords, deviceStripeCount * sizeof(nanovdb::Coord), cudaMemAdviseSetPreferredLocation, deviceId);
-            util::cuda::memAdvise(deviceCoords, deviceStripeCount * sizeof(nanovdb::Coord), cudaMemAdviseSetReadMostly, deviceId);
-
             util::cuda::memAdvise(deviceInputKeys, deviceStripeCount * sizeof(uint64_t), cudaMemAdviseSetPreferredLocation, deviceId);
             util::cuda::memAdvise(deviceInputIndices, deviceStripeCount * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
             util::cuda::memAdvise(deviceOutputKeys, deviceStripeCount * sizeof(uint64_t), cudaMemAdviseSetPreferredLocation, deviceId);
