@@ -204,8 +204,10 @@ void radixSortAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cuda::
     // Every GPU in the group merges one balanced output shard, including at the upper merge-tree levels.
     for (int runDeviceCount = 1; runDeviceCount < deviceCount; runDeviceCount *= 2) {
         for (int groupStart = 0; groupStart < deviceCount; groupStart += 2 * runDeviceCount) {
-            const int groupMiddle = groupStart + runDeviceCount;
-            const int groupEnd = groupStart + 2 * runDeviceCount;
+            const int groupMiddle = std::min(groupStart + runDeviceCount, deviceCount);
+            const int groupEnd = std::min(groupStart + 2 * runDeviceCount, deviceCount);
+            if (groupMiddle == groupEnd) continue;
+
             const CountT leftCount = offset(groupMiddle) - offset(groupStart);
             const CountT rightCount = offset(groupEnd) - offset(groupMiddle);
             const KeyT* leftKeys = currentKeys + offset(groupStart);
@@ -223,15 +225,34 @@ void radixSortAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cuda::
 
         // CUB needs the partition sizes on the host. Synchronize only the tiny merge-path kernels.
         for (int groupStart = 0; groupStart < deviceCount; groupStart += 2 * runDeviceCount) {
-            const int groupEnd = groupStart + 2 * runDeviceCount;
+            const int groupMiddle = std::min(groupStart + runDeviceCount, deviceCount);
+            const int groupEnd = std::min(groupStart + 2 * runDeviceCount, deviceCount);
+            if (groupMiddle == groupEnd) continue;
+
             for (int boundaryDevice = groupStart + 1; boundaryDevice < groupEnd; ++boundaryDevice) {
                 cudaCheck(cudaEventSynchronize(postEvents[boundaryDevice]));
             }
         }
 
         for (int groupStart = 0; groupStart < deviceCount; groupStart += 2 * runDeviceCount) {
-            const int groupMiddle = groupStart + runDeviceCount;
-            const int groupEnd = groupStart + 2 * runDeviceCount;
+            const int groupMiddle = std::min(groupStart + runDeviceCount, deviceCount);
+            const int groupEnd = std::min(groupStart + 2 * runDeviceCount, deviceCount);
+
+            // A trailing run without a merge partner must still be copied because the
+            // current and next buffers are swapped after every merge-tree level.
+            if (groupMiddle == groupEnd) {
+                for (int outputDevice = groupStart; outputDevice < groupEnd; ++outputDevice) {
+                    cudaCheck(cudaSetDevice(outputDevice));
+                    const auto stream = deviceMesh[outputDevice].stream;
+                    if (counts[outputDevice]) {
+                        cudaCheck(cudaMemcpyAsync(nextKeys + offset(outputDevice), currentKeys + offset(outputDevice), counts[outputDevice] * sizeof(KeyT), cudaMemcpyDefault, stream));
+                        cudaCheck(cudaMemcpyAsync(nextValues + offset(outputDevice), currentValues + offset(outputDevice), counts[outputDevice] * sizeof(ValueT), cudaMemcpyDefault, stream));
+                    }
+                    cudaCheck(cudaEventRecord(postEvents[outputDevice], stream));
+                }
+                continue;
+            }
+
             const CountT leftCount = offset(groupMiddle) - offset(groupStart);
             const CountT rightCount = offset(groupEnd) - offset(groupMiddle);
             const KeyT* leftKeys = currentKeys + offset(groupStart);
