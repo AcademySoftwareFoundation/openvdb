@@ -151,6 +151,50 @@ static_assert(nanovdb::cuda::is_resource<DualResource>::value,
 static_assert(nanovdb::cuda::is_async_resource<DualResource>::value,
               "DualResource must satisfy the AsyncResource concept");
 
+//======================================================================
+// The members required by the concepts are exercised directly: the trait
+// checks above detect them without odr-using them, and an unreferenced
+// member of a file-local struct is dead code to the compiler.
+
+TEST(TestBuffer, TestResourcesSynchronousPair)
+{
+    // The synchronous halves of the counting and stream-recording doubles are
+    // required by the AsyncResource refinement; verify they behave like their
+    // stream-ordered halves.
+    Counters c;
+    CountingResource counting{&c};
+    void* p = counting.allocate(256, CountingResource::DEFAULT_ALIGNMENT);
+    EXPECT_NE(p, nullptr);
+    EXPECT_EQ(c.allocs, 1);
+    counting.deallocate(p, 256, CountingResource::DEFAULT_ALIGNMENT);
+    EXPECT_EQ(c.deallocs, 1);
+
+    StreamLog log;
+    StreamRecordingResource recording{&log};
+    p = recording.allocate(256, StreamRecordingResource::DEFAULT_ALIGNMENT);
+    EXPECT_NE(p, nullptr);
+    ASSERT_EQ(log.allocStreams.size(), 1u);
+    EXPECT_EQ(log.allocStreams[0], cudaStream_t(0));// sync pair delegates through the null stream
+    recording.deallocate(p, 256, StreamRecordingResource::DEFAULT_ALIGNMENT);
+    ASSERT_EQ(log.deallocStreams.size(), 1u);
+    EXPECT_EQ(log.deallocStreams[0], cudaStream_t(0));
+}
+
+TEST(TestBuffer, TraitDoubleStubs)
+{
+    // DualResource and AsyncOnlyResource exist as concept probes; their stub
+    // members allocate nothing and are safe to call with null arguments.
+    DualResource dual;
+    EXPECT_EQ(dual.allocate(0, DualResource::DEFAULT_ALIGNMENT), nullptr);
+    dual.deallocate(nullptr, 0, DualResource::DEFAULT_ALIGNMENT);
+    EXPECT_EQ(dual.allocate_async(0, DualResource::DEFAULT_ALIGNMENT, cudaStream_t(0)), nullptr);
+    dual.deallocate_async(nullptr, 0, DualResource::DEFAULT_ALIGNMENT, cudaStream_t(0));
+
+    AsyncOnlyResource asyncOnly;
+    EXPECT_EQ(asyncOnly.allocate_async(0, AsyncOnlyResource::DEFAULT_ALIGNMENT, cudaStream_t(0)), nullptr);
+    asyncOnly.deallocate_async(nullptr, 0, AsyncOnlyResource::DEFAULT_ALIGNMENT, cudaStream_t(0));
+}
+
 TEST(TestBuffer, ResourceTraits)
 {
     // The static_asserts above are the real test; this anchors them in a
