@@ -339,7 +339,7 @@ void exclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cud
         if (counts[deviceId]) {
             auto segmentExclusiveSum = deviceOut[counts[deviceId] - 1] + deviceIn[counts[deviceId] - 1];
 
-            unsigned int numBlocks = ::cuda::ceil_div(counts[deviceId], NumThreads);
+            unsigned int numBlocks = ::cuda::ceil_div<int>(counts[deviceId], NumThreads);
             util::cuda::lambdaKernel<<<numBlocks, NumThreads, 0, stream>>>(counts[deviceId], [=] __device__ (size_t tid) { deviceOut[tid] += partialExclusiveSum; });
             cudaCheckError();
 
@@ -382,7 +382,7 @@ void inclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cud
         if (counts[deviceId]) {
             auto segmentInclusiveSum = deviceOut[counts[deviceId] - 1];
 
-            unsigned int numBlocks = ::cuda::ceil_div(counts[deviceId], NumThreads);
+            unsigned int numBlocks = ::cuda::ceil_div<int>(counts[deviceId], NumThreads);
             util::cuda::lambdaKernel<<<numBlocks, NumThreads, 0, stream>>>(counts[deviceId], [=] __device__ (size_t tid) { deviceOut[tid] += partialInclusiveSum; });
             cudaCheckError();
 
