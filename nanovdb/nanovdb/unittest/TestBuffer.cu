@@ -151,6 +151,50 @@ static_assert(nanovdb::cuda::is_resource<DualResource>::value,
 static_assert(nanovdb::cuda::is_async_resource<DualResource>::value,
               "DualResource must satisfy the AsyncResource concept");
 
+//======================================================================
+// The members required by the concepts are exercised directly: the trait
+// checks above detect them without odr-using them, and an unreferenced
+// member of a file-local struct is dead code to the compiler.
+
+TEST(TestBuffer, TestResourcesSynchronousPair)
+{
+    // The synchronous halves of the counting and stream-recording doubles are
+    // required by the AsyncResource refinement; verify they behave like their
+    // stream-ordered halves.
+    Counters c;
+    CountingResource counting{&c};
+    void* p = counting.allocate(256, CountingResource::DEFAULT_ALIGNMENT);
+    EXPECT_NE(p, nullptr);
+    EXPECT_EQ(c.allocs, 1);
+    counting.deallocate(p, 256, CountingResource::DEFAULT_ALIGNMENT);
+    EXPECT_EQ(c.deallocs, 1);
+
+    StreamLog log;
+    StreamRecordingResource recording{&log};
+    p = recording.allocate(256, StreamRecordingResource::DEFAULT_ALIGNMENT);
+    EXPECT_NE(p, nullptr);
+    ASSERT_EQ(log.allocStreams.size(), 1u);
+    EXPECT_EQ(log.allocStreams[0], cudaStream_t(0));// sync pair delegates through the null stream
+    recording.deallocate(p, 256, StreamRecordingResource::DEFAULT_ALIGNMENT);
+    ASSERT_EQ(log.deallocStreams.size(), 1u);
+    EXPECT_EQ(log.deallocStreams[0], cudaStream_t(0));
+}
+
+TEST(TestBuffer, TraitDoubleStubs)
+{
+    // DualResource and AsyncOnlyResource exist as concept probes; their stub
+    // members allocate nothing and are safe to call with null arguments.
+    DualResource dual;
+    EXPECT_EQ(dual.allocate(0, DualResource::DEFAULT_ALIGNMENT), nullptr);
+    dual.deallocate(nullptr, 0, DualResource::DEFAULT_ALIGNMENT);
+    EXPECT_EQ(dual.allocate_async(0, DualResource::DEFAULT_ALIGNMENT, cudaStream_t(0)), nullptr);
+    dual.deallocate_async(nullptr, 0, DualResource::DEFAULT_ALIGNMENT, cudaStream_t(0));
+
+    AsyncOnlyResource asyncOnly;
+    EXPECT_EQ(asyncOnly.allocate_async(0, AsyncOnlyResource::DEFAULT_ALIGNMENT, cudaStream_t(0)), nullptr);
+    asyncOnly.deallocate_async(nullptr, 0, AsyncOnlyResource::DEFAULT_ALIGNMENT, cudaStream_t(0));
+}
+
 TEST(TestBuffer, ResourceTraits)
 {
     // The static_asserts above are the real test; this anchors them in a
@@ -258,9 +302,65 @@ TEST(TestBuffer, ClearFreesAndEmpties)
     ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
 }
 
+TEST(TestBuffer, DestroyIsTheSpellingClearDelegatesTo)
+{
+    Counters c;
+    nanovdb::cuda::Buffer<float, CountingResource> buf(0, CountingResource{&c}, 64, nanovdb::cuda::noInit);
+    ASSERT_EQ(c.allocs, 1);
+    buf.destroy();               // cuda::buffer's spelling
+    EXPECT_EQ(buf.data(), nullptr);
+    EXPECT_EQ(buf.size(), 0u);
+    EXPECT_EQ(c.deallocs, 1);
+    buf.destroy();               // idempotent
+    EXPECT_EQ(c.deallocs, 1);
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+}
+
+TEST(TestBuffer, DestroyOnStreamRetargetsTheFree)
+{
+    cudaStream_t a, b;
+    ASSERT_EQ(cudaStreamCreate(&a), cudaSuccess);
+    ASSERT_EQ(cudaStreamCreate(&b), cudaSuccess);
+    {
+        StreamLog log;
+        nanovdb::cuda::Buffer<float, StreamRecordingResource> buf(a, StreamRecordingResource{&log}, 32, nanovdb::cuda::noInit);
+        ASSERT_EQ(log.allocStreams.size(), 1u);
+        EXPECT_EQ(log.allocStreams[0], a);   // allocated on a
+        buf.destroy(b);                      // explicit stream overload
+        ASSERT_EQ(log.deallocStreams.size(), 1u);
+        EXPECT_EQ(log.deallocStreams[0], b); // freed on b, not the retained stream a
+        EXPECT_EQ(buf.stream(), b);          // b is retained afterwards
+    }
+    ASSERT_EQ(cudaStreamSynchronize(a), cudaSuccess);
+    ASSERT_EQ(cudaStreamSynchronize(b), cudaSuccess);
+    cudaStreamDestroy(a);
+    cudaStreamDestroy(b);
+}
+
+TEST(TestBuffer, SwapExchangesWithoutAllocatingOrFreeing)
+{
+    Counters c;
+    nanovdb::cuda::Buffer<int, CountingResource> x(0, CountingResource{&c}, 128, nanovdb::cuda::noInit);
+    nanovdb::cuda::Buffer<int, CountingResource> y(0, CountingResource{&c},  64, nanovdb::cuda::noInit);
+    ASSERT_EQ(c.allocs, 2);
+    auto* px = x.data();
+    auto* py = y.data();
+    const int allocs = c.allocs, deallocs = c.deallocs;
+
+    x.swap(y);
+
+    EXPECT_EQ(c.allocs,   allocs);  // no allocation
+    EXPECT_EQ(c.deallocs, deallocs);// no free
+    EXPECT_EQ(x.data(), py);
+    EXPECT_EQ(y.data(), px);
+    EXPECT_EQ(x.size(), 64u);
+    EXPECT_EQ(y.size(), 128u);
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+}
+
 //======================================================================
 // Stream retention: the destructor and resize free on the retained stream
-// (stream of the most recent allocation, or the one supplied via setStream)
+// (stream of the most recent allocation, or the one supplied via set_stream)
 //======================================================================
 
 TEST(TestBuffer, DestructorFreesOnAllocationStream)
@@ -288,7 +388,7 @@ TEST(TestBuffer, SetStreamRedirectsTheFree)
     StreamLog log;
     {
         nanovdb::cuda::Buffer<float, StreamRecordingResource> buf(a, StreamRecordingResource{&log}, 32, nanovdb::cuda::noInit);
-        buf.setStream(b); // member update only, no synchronization
+        buf.set_stream(b); // member update only, no synchronization
         EXPECT_EQ(buf.stream(), b);
     }
     ASSERT_EQ(log.allocStreams.size(), 1u);
@@ -473,7 +573,7 @@ TEST(TestBuffer, AsyncPathIsGraphCapturable)
 template<class B, class = void>
 struct HasSetStream : std::false_type {};
 template<class B>
-struct HasSetStream<B, std::void_t<decltype(std::declval<B&>().setStream(cudaStream_t{0}))>> : std::true_type {};
+struct HasSetStream<B, std::void_t<decltype(std::declval<B&>().set_stream(cudaStream_t{0}))>> : std::true_type {};
 
 template<class B, class = void>
 struct HasStreamGetter : std::false_type {};
@@ -484,9 +584,9 @@ using PinnedBufferF = nanovdb::cuda::Buffer<float, nanovdb::cuda::PinnedResource
 using DeviceBufferF = nanovdb::cuda::Buffer<float, nanovdb::cuda::DeviceResource>;
 
 // A Buffer over a synchronous resource exposes no stream API at all.
-static_assert(!HasSetStream<PinnedBufferF>::value, "sync-resource Buffer must not expose setStream");
+static_assert(!HasSetStream<PinnedBufferF>::value, "sync-resource Buffer must not expose set_stream");
 static_assert(!HasStreamGetter<PinnedBufferF>::value, "sync-resource Buffer must not expose stream()");
-static_assert(HasSetStream<DeviceBufferF>::value, "async-resource Buffer exposes setStream");
+static_assert(HasSetStream<DeviceBufferF>::value, "async-resource Buffer exposes set_stream");
 static_assert(HasStreamGetter<DeviceBufferF>::value, "async-resource Buffer exposes stream()");
 
 TEST(TestBuffer, PinnedBufferIsPageLocked)

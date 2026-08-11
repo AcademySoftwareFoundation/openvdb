@@ -213,7 +213,7 @@ void PruneGrid<BuildT>::pruneInternalNodes()
     if (auto srcLeafCount = mSrcTreeData.mNodeCount[0]) { // Unless it's an empty grid
         util::cuda::lambdaKernel<<<numBlocks(srcLeafCount), mNumThreads, 0, mStream>>>(
             srcLeafCount, util::morphology::cuda::PruneInternalNodesFunctor<BuildT>(),
-            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mDeviceSrcLeafMask, mBuilder.mUpperMasks.deviceData(), mBuilder.mLowerMasks.deviceData() );
+            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mDeviceSrcLeafMask, mBuilder.mUpperMasks.data(), mBuilder.mLowerMasks.data() );
     }
 }// PruneGrid<BuildT>::pruneInternalNodes
 
