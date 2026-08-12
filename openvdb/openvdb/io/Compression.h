@@ -448,6 +448,7 @@ struct HalfWriter</*IsReal=*/true, double> {
 ///                   which positions in the buffer correspond to active values
 /// @param fromHalf   if true, read 16-bit half floats from the input stream
 ///                   and convert them to full floats
+/// @param background optional background value used when mask compressed
 template<typename ValueT, typename MaskT>
 inline void
 readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
@@ -619,6 +620,7 @@ writeCompressedValuesSize(ValueT* srcBuf, Index srcCount,
 /// @param childMask  a bitmask (typically, a node's child mask) indicating
 ///                   which positions in the buffer correspond to child node pointers
 /// @param toHalf     if true, convert floating-point values to 16-bit half floats
+/// @param background optional background value used when mask compressed
 template<typename ValueT, typename MaskT>
 inline void
 writeCompressedValues(std::ostream& os, const ValueT* srcBuf, Index srcCount,

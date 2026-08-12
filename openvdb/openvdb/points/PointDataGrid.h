@@ -94,7 +94,7 @@ makeDescriptorUnique(PointDataTreeT& tree);
 template <typename PointDataTreeT>
 OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
 inline void
-setStreamingMode(PointDataTreeT&, bool /*on*/ = true) { }
+setStreamingMode(PointDataTreeT& tree, bool on = true) { (void)tree; (void)on; }
 
 
 template <typename PointDataTreeT>

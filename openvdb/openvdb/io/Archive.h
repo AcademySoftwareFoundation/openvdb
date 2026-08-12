@@ -162,12 +162,14 @@ protected:
     /// Write the given grid descriptor and grid to an output stream
     /// and update the GridDescriptor offsets.
     /// @param seekable  if true, the output stream supports seek operations
+    /// @param writeOptions options controlling how grid data is written
     void writeGrid(GridDescriptor&, GridBase::ConstPtr, std::ostream&, bool seekable,
         const io::WriteOptions& writeOptions = io::WriteOptions{}) const;
     /// Write the given grid descriptor and grid metadata to an output stream
     /// and update the GridDescriptor offsets, but don't write the grid's tree,
     /// since it is shared with another grid.
     /// @param seekable  if true, the output stream supports seek operations
+    /// @param writeOptions options controlling how grid data is written
     void writeGridInstance(GridDescriptor&, GridBase::ConstPtr,
         std::ostream&, bool seekable, const io::WriteOptions& writeOptions = io::WriteOptions{}) const;
 
