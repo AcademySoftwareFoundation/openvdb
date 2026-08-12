@@ -31,6 +31,7 @@ option(NANOVDB_BUILD_PYTHON_MODULE "Build the nanovdb Python module" OFF)
 option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" OFF)
 option(NANOVDB_USE_CUDA "Build with CUDA support" OFF)
 option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
+option(NANOVDB_CUDA_WERROR "Treat all NVCC diagnostics as errors" ON)
 option(NANOVDB_USE_OLD_ACCESSOR "Use the old (buggy) ReadAccessor instead of the new fixed one" OFF)
 
 option(NANOVDB_USE_OPENVDB "Build with OpenVDB support" OFF)
@@ -95,6 +96,13 @@ if(NANOVDB_USE_CUDA)
   endif()
 
   set(CMAKE_CUDA_FLAGS "${NANOVDB_CUDA_EXTENDED_LAMBDA} -use_fast_math -lineinfo ${CMAKE_CUDA_FLAGS}")
+
+  if(NANOVDB_CUDA_WERROR OR OPENVDB_CXX_STRICT)
+    # Device-side analog of the host -Werror configured in OpenVDBCXX.cmake:
+    # every nvcc front-end diagnostic becomes an error. NANOVDB_CUDA_WERROR
+    # enables it independently of the host-side strict flags.
+    set(CMAKE_CUDA_FLAGS "--Werror=all-warnings ${CMAKE_CUDA_FLAGS}")
+  endif()
 
   # workaround for win32 bug when nvcc "--keep" is used.
   if(WIN32)

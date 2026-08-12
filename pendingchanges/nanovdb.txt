@@ -5,6 +5,7 @@ NanoVDB:
   - Added nanovdb::cuda::Buffer and nanovdb::cuda::BufferView (CUDA): a typed, resource-aware, stream-ordered container that allocates from an injectable memory resource and frees on its retained stream, and a non-owning view over externally managed memory that a GridHandle can wrap without copying. Member names follow cuda::buffer (destroy, set_stream, swap). Also added the synchronous resource concept nanovdb::cuda::is_resource alongside is_async_resource.
 
   Improvements:
+  - Added the CMake option NANOVDB_CUDA_WERROR (default ON, also implied by OPENVDB_CXX_STRICT) which passes --Werror=all-warnings to NVCC so that every device-side diagnostic becomes an error when building the NanoVDB tests, tools and examples. Disable it if a newer CUDA toolkit introduces diagnostics that block your build.
   - The bug-fix to the nanovdb::ReadAccessor (see below) improves random-access performance in some use-cases (especially on the CPU).
 
   Fixes:
