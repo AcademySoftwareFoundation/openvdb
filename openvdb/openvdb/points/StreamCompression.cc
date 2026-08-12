@@ -7,6 +7,7 @@
 #include <openvdb/util/logging.h>
 #include <openvdb/util/Assert.h>
 #include <map>
+#include <vector>
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
 #endif
@@ -347,7 +348,13 @@ Page::skipBuffers(std::istream& is)
     std::streamsize bytes = isCompressed ?
         mInfo->compressedBytes : -mInfo->compressedBytes;
 
-    is.seekg(bytes, std::ios_base::cur);
+    auto meta = io::getStreamMetadataPtr(is);
+    if (meta && meta->seekable()) {
+        is.seekg(bytes, std::ios_base::cur);
+    } else {
+        std::vector<char> tempData(bytes);
+        is.read(tempData.data(), bytes);
+    }
 
     mInfo.reset();
 }

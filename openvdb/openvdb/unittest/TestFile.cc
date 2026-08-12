@@ -557,6 +557,77 @@ TEST_F(TestFile, testWriteInstancedGrids)
 }
 
 
+// Verify that clipping an instanced grid uses the instance's own transform,
+// not the parent's.  The bug was that Archive::readGrid() converted the
+// world-space bbox to index space with the parent's transform before the
+// instance's transform was applied, so the clipped region was wrong when the
+// two transforms differed.
+TEST_F(TestFile, testReadClippedInstancedGrid)
+{
+    using namespace openvdb;
+
+    const char* filename = "testReadClippedInstancedGrid.vdb";
+    SharedPtr<const char> scopedFile(filename, ::remove);
+
+    // Parent grid: voxel size 1.0.  Fill index [-5, 5] with value 1.
+    FloatTree::Ptr tree(new FloatTree(0.0f));
+    tree->fill(CoordBBox(Coord(-5), Coord(5)), 1.0f, /*active=*/true);
+
+    GridBase::Ptr parent = FloatGrid::create(tree);
+    parent->setName("parent");
+    parent->setTransform(math::Transform::createLinearTransform(1.0));
+
+    // Instance grid: same tree, but voxel size 2.0.
+    // Index coord n  →  world coord 2n  (double the parent's world-space extent).
+    GridBase::Ptr instance = FloatGrid::create(tree);
+    instance->setName("instance");
+    instance->setTransform(math::Transform::createLinearTransform(2.0));
+
+    GridPtrVec grids;
+    grids.push_back(parent);
+    grids.push_back(instance);
+
+    {
+        io::File vdbfile(filename);
+        vdbfile.write(grids);
+    }
+
+    // World-space clip: [0, 6].
+    // Via parent transform (voxel 1.0): index [0, 6]  → voxels 0..5 survive.
+    // Via instance transform (voxel 2.0): index [0, 3] → voxels 0..3 survive.
+    // The correct answer uses the instance's transform.
+    const BBoxd clipBox(Vec3d(0.0), Vec3d(6.0));
+
+    io::File vdbfile(filename);
+    vdbfile.open();
+
+    GridBase::Ptr readGrid = vdbfile.readGrid("instance", clipBox);
+    EXPECT_TRUE(readGrid.get() != nullptr);
+    FloatGrid::Ptr clipped = gridPtrCast<FloatGrid>(readGrid);
+    EXPECT_TRUE(clipped.get() != nullptr);
+
+    const CoordBBox bbox = clipped->evalActiveVoxelBoundingBox();
+    // The instance's transform maps world [0,6] to index [0,3].
+    EXPECT_EQ(Coord(0, 0, 0), bbox.min());
+    EXPECT_EQ(Coord(3, 3, 3), bbox.max());
+
+    // No active voxels should survive outside [0,3] in any axis.
+    FloatGrid::ConstAccessor acc = clipped->getConstAccessor();
+    for (int i = -5; i <= 5; ++i) {
+        for (int j = -5; j <= 5; ++j) {
+            for (int k = -5; k <= 5; ++k) {
+                const Coord xyz(i, j, k);
+                if (i >= 0 && j >= 0 && k >= 0 && i <= 3 && j <= 3 && k <= 3) {
+                    EXPECT_EQ(1.0f, acc.getValue(xyz));
+                } else {
+                    EXPECT_EQ(0.0f, acc.getValue(xyz));
+                }
+            }
+        }
+    }
+}
+
+
 void
 TestFile::testReadGridDescriptors()
 {

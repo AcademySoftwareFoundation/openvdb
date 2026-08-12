@@ -26,10 +26,11 @@ struct ReadPointIndexBuffersOp
     using ValueT = typename TreeT::ValueType;
 
     ReadPointIndexBuffersOp(std::istream& _is, bool _saveFloatAsHalf,
-        const ValueT& _background)
+        const ValueT& _background, const ValueT* _storageBackground = nullptr)
         : is(_is)
         , saveFloatAsHalf(_saveFloatAsHalf)
-        , background(_background) { }
+        , background(_background)
+        , storageBackground(_storageBackground) { }
 
     template <typename NodeT>
     void operator()(NodeT&, size_t) { }
@@ -40,7 +41,7 @@ struct ReadPointIndexBuffersOp
 
         // Read the value mask and voxel data via base class
         BaseLeaf& baseLeaf = static_cast<BaseLeaf&>(leaf);
-        readScalarLeafBuffers(baseLeaf, is, saveFloatAsHalf, background, /*skip=*/false, /*clipBBox=*/nullptr);
+        readScalarLeafBuffers(baseLeaf, is, saveFloatAsHalf, background, /*skip=*/false, /*clipBBox=*/nullptr, storageBackground);
 
         // Read the number of indices.
         Index64 numIndices = Index64(0);
@@ -63,6 +64,7 @@ struct ReadPointIndexBuffersOp
     std::istream& is;
     const bool saveFloatAsHalf;
     const ValueT& background;
+    const ValueT* storageBackground = nullptr;
 }; // struct ReadPointIndexBuffersOp
 
 template <typename GridT>
@@ -114,7 +116,7 @@ struct PointIndexCodec final: public TopologyCodec<GridT>
 
     static inline std::string name() { return GridT::gridType(); }
 
-    void readBuffers(std::istream& is, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics& diagnostics) final
+    void readBuffers(std::istream& is, Index64 /*size*/, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics& diagnostics) final
     {
         OPENVDB_ASSERT(dynamic_cast<GridT*>(data.grid.get()));
 
@@ -135,7 +137,9 @@ struct PointIndexCodec final: public TopologyCodec<GridT>
             diagnostics.addWarning(grid.getName(), "bounding box clipping is not supported for PointIndexGrids");
         }
 
-        internal::ReadPointIndexBuffersOp<GridT> readBuffersOp(is, saveFloatAsHalf, tree.background());
+        using ValueT = typename GridT::TreeType::ValueType;
+        auto& topoData = static_cast<TopologyCodecData<ValueT>&>(data);
+        internal::ReadPointIndexBuffersOp<GridT> readBuffersOp(is, saveFloatAsHalf, tree.background(), &topoData.storageBackground);
         tools::visitNodesDepthFirst(grid.tree(), readBuffersOp, /*idx=*/0, /*topDown=*/false);
     }
 

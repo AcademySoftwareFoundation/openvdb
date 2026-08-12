@@ -55,6 +55,7 @@ struct RegisterConvertCodec {
 
 void initialize()
 {
+    CodecRegistry::clear();
     NumericGridTypes::foreach<RegisterCodec>();
     Vec3GridTypes::foreach<RegisterCodec>();
 

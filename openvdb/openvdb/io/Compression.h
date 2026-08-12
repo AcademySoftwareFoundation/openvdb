@@ -448,10 +448,11 @@ struct HalfWriter</*IsReal=*/true, double> {
 ///                   which positions in the buffer correspond to active values
 /// @param fromHalf   if true, read 16-bit half floats from the input stream
 ///                   and convert them to full floats
+/// @param background optional background value used when mask compressed
 template<typename ValueT, typename MaskT>
 inline void
 readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
-    const MaskT& valueMask, bool fromHalf)
+    const MaskT& valueMask, bool fromHalf, const ValueT* background = nullptr)
 {
     checkFormatVersion(is);
 
@@ -475,13 +476,15 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
         }
     }
 
-    ValueT background = zeroVal<ValueT>();
-    if (const void* bgPtr = getGridBackgroundValuePtr(is)) {
-        background = *static_cast<const ValueT*>(bgPtr);
+    ValueT bgValue = zeroVal<ValueT>();
+    if (background) {
+        bgValue = *background;
+    } else if (const void* bgPtr = getGridBackgroundValuePtr(is)) {
+        bgValue = *static_cast<const ValueT*>(bgPtr);
     }
-    ValueT inactiveVal1 = background;
+    ValueT inactiveVal1 = bgValue;
     ValueT inactiveVal0 =
-        ((metadata == NO_MASK_OR_INACTIVE_VALS) ? background : math::negative(background));
+        ((metadata == NO_MASK_OR_INACTIVE_VALS) ? bgValue : math::negative(bgValue));
 
     if (metadata == NO_MASK_AND_ONE_INACTIVE_VAL ||
         metadata == MASK_AND_ONE_INACTIVE_VAL ||
@@ -617,10 +620,12 @@ writeCompressedValuesSize(ValueT* srcBuf, Index srcCount,
 /// @param childMask  a bitmask (typically, a node's child mask) indicating
 ///                   which positions in the buffer correspond to child node pointers
 /// @param toHalf     if true, convert floating-point values to 16-bit half floats
+/// @param background optional background value used when mask compressed
 template<typename ValueT, typename MaskT>
 inline void
 writeCompressedValues(std::ostream& os, const ValueT* srcBuf, Index srcCount,
-    const MaskT& valueMask, const MaskT& childMask, bool toHalf)
+    const MaskT& valueMask, const MaskT& childMask, bool toHalf,
+    const ValueT* background = nullptr)
 {
     // Get the stream's compression settings.
     const uint32_t compress = getDataCompression(os);
@@ -642,12 +647,14 @@ writeCompressedValues(std::ostream& os, const ValueT* srcBuf, Index srcCount,
         // an inside/outside bitmask.
 
         const ValueT zero = zeroVal<ValueT>();
-        ValueT background = zero;
-        if (const void* bgPtr = getGridBackgroundValuePtr(os)) {
-            background = *static_cast<const ValueT*>(bgPtr);
+        ValueT bgValue = zero;
+        if (background) {
+            bgValue = *background;
+        } else if (const void* bgPtr = getGridBackgroundValuePtr(os)) {
+            bgValue = *static_cast<const ValueT*>(bgPtr);
         }
 
-        MaskCompress<ValueT, MaskT> maskCompressData(valueMask, childMask, srcBuf, background);
+        MaskCompress<ValueT, MaskT> maskCompressData(valueMask, childMask, srcBuf, bgValue);
         metadata = maskCompressData.metadata;
 
         os.write(reinterpret_cast<const char*>(&metadata), /*bytes=*/1);

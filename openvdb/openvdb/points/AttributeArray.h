@@ -1611,7 +1611,13 @@ AttributeArray::skipPagedBuffers(compression::PagedInputStream& is)
             std::istream& inputStream = is.getInputStream();
             uint8_t bloscCompressed(0);
             if (!mIsUniform)    inputStream.read(reinterpret_cast<char*>(&bloscCompressed), sizeof(uint8_t));
-            inputStream.seekg(mCompressedBytes, std::ios_base::cur);
+            auto meta = io::getStreamMetadataPtr(inputStream);
+            if (meta && meta->seekable()) {
+                inputStream.seekg(mCompressedBytes, std::ios_base::cur);
+            } else {
+                std::vector<char> tempData(mCompressedBytes);
+                inputStream.read(tempData.data(), mCompressedBytes);
+            }
             mCompressedBytes = 0;
             mFlags = static_cast<uint8_t>(mFlags & ~PARTIALREAD);
         }

@@ -13,7 +13,8 @@ namespace codecs {
 namespace internal {
 
 template <typename LeafT>
-void writeScalarLeafBuffers(const LeafT& leaf, std::ostream& os, bool saveFloatAsHalf)
+void writeScalarLeafBuffers(const LeafT& leaf, std::ostream& os, bool saveFloatAsHalf,
+    const typename LeafT::ValueType* background = nullptr)
 {
     using NodeMaskT = typename LeafT::NodeMaskType;
 
@@ -23,14 +24,15 @@ void writeScalarLeafBuffers(const LeafT& leaf, std::ostream& os, bool saveFloatA
     leaf.buffer().data(); // load values
 
     io::writeCompressedValues(os, leaf.buffer().data(), LeafT::SIZE,
-        leaf.getValueMask(), /*childMask=*/NodeMaskT(), saveFloatAsHalf);
+        leaf.getValueMask(), /*childMask=*/NodeMaskT(), saveFloatAsHalf, background);
 }
 
 
 template <typename LeafT, typename StorageLeafT = LeafT>
 void readScalarLeafBuffers(LeafT& leaf, std::istream& is, bool saveFloatAsHalf,
     const typename LeafT::ValueType& background, bool skip = false,
-    const math::CoordBBox* clipBBox = nullptr)
+    const math::CoordBBox* clipBBox = nullptr,
+    const typename StorageLeafT::ValueType* storageBackground = nullptr)
 {
     using ValueT = typename LeafT::ValueType;
     using NodeMaskT = typename LeafT::NodeMaskType;
@@ -65,10 +67,10 @@ void readScalarLeafBuffers(LeafT& leaf, std::istream& is, bool saveFloatAsHalf,
 
     if (skip) {
         if (seekable) {
-            io::readCompressedValues<StorageValueT, NodeMaskT>(is, nullptr, SIZE, valueMask, saveFloatAsHalf);
+            io::readCompressedValues<StorageValueT, NodeMaskT>(is, nullptr, SIZE, valueMask, saveFloatAsHalf, storageBackground);
         } else {
             StorageBufferT storageTemp;
-            io::readCompressedValues(is, storageTemp.data(), SIZE, valueMask, saveFloatAsHalf);
+            io::readCompressedValues(is, storageTemp.data(), SIZE, valueMask, saveFloatAsHalf, storageBackground);
         }
         // Clear the value mask so that the skipped leaf has no active
         // voxels. Without this, the leaf retains its on-disk active
@@ -81,18 +83,18 @@ void readScalarLeafBuffers(LeafT& leaf, std::istream& is, bool saveFloatAsHalf,
         // ValueMask leaf: value == active state, already captured in the value mask above.
         // Seek/consume past the storage buffer without populating any separate leaf buffer.
         if (seekable) {
-            io::readCompressedValues<StorageValueT, NodeMaskT>(is, nullptr, SIZE, valueMask, saveFloatAsHalf);
+            io::readCompressedValues<StorageValueT, NodeMaskT>(is, nullptr, SIZE, valueMask, saveFloatAsHalf, storageBackground);
         } else {
             StorageBufferT storageTemp;
-            io::readCompressedValues(is, storageTemp.data(), SIZE, valueMask, saveFloatAsHalf);
+            io::readCompressedValues(is, storageTemp.data(), SIZE, valueMask, saveFloatAsHalf, storageBackground);
         }
     } else if constexpr (std::is_same_v<ValueT, bool>) {
         // Bool leaf: must read storage values regardless of seekability, then convert.
         if constexpr (std::is_same_v<StorageValueT, bool>) {
-            io::readCompressedValues(is, leaf.buffer().data(), SIZE, valueMask, saveFloatAsHalf);
+            io::readCompressedValues(is, leaf.buffer().data(), SIZE, valueMask, saveFloatAsHalf, storageBackground);
         } else {
             StorageBufferT storageTemp;
-            io::readCompressedValues(is, storageTemp.data(), SIZE, valueMask, saveFloatAsHalf);
+            io::readCompressedValues(is, storageTemp.data(), SIZE, valueMask, saveFloatAsHalf, storageBackground);
             for (Index i = 0; i < SIZE; ++i) {
                 leaf.buffer().setValue(i, static_cast<bool>(storageTemp.getValue(i)));
             }
@@ -100,10 +102,10 @@ void readScalarLeafBuffers(LeafT& leaf, std::istream& is, bool saveFloatAsHalf,
     } else {
         leaf.buffer().allocate();
         if constexpr (std::is_same_v<StorageValueT, ValueT>) {
-            io::readCompressedValues(is, leaf.buffer().data(), SIZE, valueMask, saveFloatAsHalf);
+            io::readCompressedValues(is, leaf.buffer().data(), SIZE, valueMask, saveFloatAsHalf, storageBackground);
         } else {
             StorageBufferT storageTemp;
-            io::readCompressedValues(is, storageTemp.data(), SIZE, valueMask, saveFloatAsHalf);
+            io::readCompressedValues(is, storageTemp.data(), SIZE, valueMask, saveFloatAsHalf, storageBackground);
             for (Index i = 0; i < SIZE; ++i) {
                 leaf.buffer().setValue(i, static_cast<ValueT>(storageTemp.getValue(i)));
             }
