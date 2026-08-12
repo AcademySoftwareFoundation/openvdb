@@ -636,7 +636,6 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         deviceStripeCounts[deviceId] = deviceStripeCount;
 
         if (deviceStripeCount) {
-            nanovdb::Coord* deviceCoords = coords + deviceStripeOffset;
             uint64_t* deviceInputKeys = mKeys + deviceStripeOffset;
             uint32_t* deviceInputIndices = mIndices + deviceStripeOffset;
             uint64_t* deviceOutputKeys = mData->d_keys + deviceStripeOffset;

@@ -104,6 +104,14 @@ if(NANOVDB_USE_CUDA)
     set(CMAKE_CUDA_FLAGS "--Werror=all-warnings ${CMAKE_CUDA_FLAGS}")
   endif()
 
+  if(WIN32)
+    # NVCC analog of the /wd4251 and /wd4275 suppressions in OpenVDBCXX.cmake:
+    # it's not possible to use STL types in DLL interfaces in a portable and
+    # reliable way, so the dll-interface diagnostics (#1394 and #1388) fire on
+    # every include of the OpenVDB core headers from a CUDA source.
+    set(CMAKE_CUDA_FLAGS "--diag-suppress=1388,1394 ${CMAKE_CUDA_FLAGS}")
+  endif()
+
   # workaround for win32 bug when nvcc "--keep" is used.
   if(WIN32)
     if(NANOVDB_CUDA_KEEP_PTX)
