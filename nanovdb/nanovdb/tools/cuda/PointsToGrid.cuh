@@ -295,6 +295,8 @@ struct PointsToGridData {
 template<typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class PointsToGrid
 {
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "PointsToGrid allocates stream-ordered scratch and requires an AsyncResource");
 public:
     /// @brief Map constructor, which other constructors might call
     /// @param map Map to be used for the output device grid
@@ -304,10 +306,20 @@ public:
         , mResource(&resource)
         , mTimer(stream)
         , mPointType(util::is_same<BuildT,Point>::value ? PointType::Default : PointType::Disable)
+        , mDeviceDataBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 1, nanovdb::cuda::noInit)
+        , mKeysBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
+        , mTileKeysBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
+        , mLeafKeysBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
+        , mLowerKeysBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
+        , mIndxBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
+        , mPointsPerVoxelBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
+        , mPointsPerVoxelPrefixBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
+        , mPointsPerLeafBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
+        , mPointsPerLeafPrefixBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
         , mTempDevicePool(resource)
     {
         mData.map = map;
-        mDeviceData = static_cast<PointsToGridData<BuildT>*>(mResource->allocate_async(sizeof(PointsToGridData<BuildT>), ResourceT::DEFAULT_ALIGNMENT, mStream));
+        mDeviceData = mDeviceDataBuf.data();
     }
 
     /// @brief Default constructor that calls the Map constructor defined above
@@ -328,7 +340,6 @@ public:
         mMaxIterations = maxIterations;
     }
 
-    ~PointsToGrid(){ mResource->deallocate_async(mDeviceData, sizeof(PointsToGridData<BuildT>), ResourceT::DEFAULT_ALIGNMENT, mStream); }
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -393,13 +404,26 @@ private:
     static constexpr unsigned int mNumThreads = 128;// seems faster than the old value of 256!
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
+    template<typename T>
+    using BufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ResourceRef<ResourceT>>;
+    nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource); }
+
     cudaStream_t             mStream{0};
     ResourceT*               mResource;// non-owning; all device allocations (mDeviceData + scratch) route through this resource instance
     util::cuda::Timer        mTimer;
     PointType                mPointType;
     std::string              mGridName;
     int                      mVerbose{0};
-    PointsToGridData<BuildT> mData, *mDeviceData;
+    PointsToGridData<BuildT> mData, *mDeviceData;// mDeviceData views mDeviceDataBuf
+    // Owners of the device arrays that mData's raw pointers view. Raw views are
+    // refreshed immediately after every owner event (assign, swap, destroy), so
+    // the views -- including the device-visible fields inside mData -- are
+    // never stale. Members rather than locals because the pipeline frees them
+    // across member functions (countNodes allocates; processUpperNodes,
+    // processLeafNodes, processPoints and processBBox release).
+    BufT<PointsToGridData<BuildT>> mDeviceDataBuf;
+    BufT<uint64_t>           mKeysBuf, mTileKeysBuf, mLeafKeysBuf, mLowerKeysBuf;
+    BufT<uint32_t>           mIndxBuf, mPointsPerVoxelBuf, mPointsPerVoxelPrefixBuf, mPointsPerLeafBuf, mPointsPerLeafPrefixBuf;
     uint32_t                 mMaxPointsPerVoxel{0u}, mMaxPointsPerLeaf{0u};
     int                      mTolerance{1}, mMaxIterations{1};
     CheckMode                mChecksum{CheckMode::Disable};
@@ -611,126 +635,165 @@ void PointsToGrid<BuildT, ResourceT>::countNodes(const PtrT points, size_t point
         bool operator<(const Foo &rhs) const {return density < rhs.density || (density == rhs.density && dx < rhs.dx);}
     } min{0.0, 1}, max{0.0, 0};// min: as dx -> 0 density -> 1 point per voxel, max: density is 0 i.e. undefined
 
-jump:// this marks the beginning of the actual algorithm
+    // Declared ahead of the search loop below: d_keys and d_node_count carry
+    // results past it, and the event is recorded and re-used across iterations
+    // (previously it was re-created per iteration, leaking the prior handle).
+    BufT<uint64_t> keysScratch(mStream, this->ref(), 0, nanovdb::cuda::noInit);
+    BufT<uint32_t> indxScratch(mStream, this->ref(), 0, nanovdb::cuda::noInit);
+    BufT<uint32_t> nodeCountScratch(mStream, this->ref(), 0, nanovdb::cuda::noInit);
+    uint64_t *d_keys = nullptr;
+    uint32_t *d_indx = nullptr, *d_points_per_tile = nullptr, *d_node_count = nullptr;
+    // Owns the copy event so the too-many-points-per-leaf throw below cannot
+    // leak the handle.
+    struct EventGuard {
+        cudaEvent_t event;
+        EventGuard() { cudaCheck(cudaEventCreate(&event)); }
+        ~EventGuard() { cudaCheck(cudaEventDestroy(event)); }
+        EventGuard(const EventGuard&) = delete;
+        EventGuard& operator=(const EventGuard&) = delete;
+    } eventGuard;
+    cudaEvent_t copyEvent = eventGuard.event;
 
-    mData.d_keys = static_cast<uint64_t*>(mResource->allocate_async(pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    mData.d_indx = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));// uint32_t can index 4.29 billion Coords, corresponding to 48 GB
-    cudaCheck(cudaMemcpyAsync(mDeviceData, &mData, sizeof(PointsToGridData<BuildT>), cudaMemcpyHostToDevice, mStream));// copy mData from CPU -> GPU
+    // Bisection search for the voxel size dx that yields the target point
+    // density: each iteration builds tile and voxel keys at the current dx,
+    // then either converges or frees this iteration's buffers and retries.
+    while (true) {
 
-    if (mVerbose==2) mTimer.start("\nAllocating arrays for keys and indices");
-    auto *d_keys = static_cast<uint64_t*>(mResource->allocate_async(pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    auto *d_indx = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+        mKeysBuf = BufT<uint64_t>(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
+        mIndxBuf = BufT<uint32_t>(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);// uint32_t can index 4.29 billion Coords, corresponding to 48 GB
+        mData.d_keys = mKeysBuf.data();
+        mData.d_indx = mIndxBuf.data();
+        cudaCheck(cudaMemcpyAsync(mDeviceData, &mData, sizeof(PointsToGridData<BuildT>), cudaMemcpyHostToDevice, mStream));// copy mData from CPU -> GPU
 
-    if (mVerbose==2) mTimer.restart("Generate tile keys");
-    util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, TileKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_keys, d_indx);
-    cudaCheckError();
-    if (mVerbose==2) mTimer.restart("DeviceRadixSort of "+std::to_string(pointCount)+" tile keys");
-    CALL_CUBS(DeviceRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, pointCount, 0, 63);// 21 bits per coord
-    std::swap(d_indx, mData.d_indx);// sorted indices are now in d_indx
+        if (mVerbose==2) mTimer.start("\nAllocating arrays for keys and indices");
+        keysScratch = BufT<uint64_t>(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
+        indxScratch = BufT<uint32_t>(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
+        d_keys = keysScratch.data();
+        d_indx = indxScratch.data();
 
-    if (mVerbose==2) mTimer.restart("Allocate runs");
-    auto *d_points_per_tile = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    uint32_t *d_node_count  = static_cast<uint32_t*>(mResource->allocate_async(3*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-
-    if (mVerbose==2) mTimer.restart("DeviceRunLengthEncode tile keys");
-    CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, d_points_per_tile, d_node_count+2, pointCount);
-    cudaCheck(cudaMemcpyAsync(mData.nodeCount+2, d_node_count+2, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-    cudaCheck(cudaStreamSynchronize(mStream));
-    mData.d_tile_keys = static_cast<uint64_t*>(mResource->allocate_async(mData.nodeCount[2]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    cudaCheck(cudaMemcpyAsync(mData.d_tile_keys, d_keys, mData.nodeCount[2]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
-
-    static constexpr uint32_t SEGMENTED_SORT_TILE_THRESHOLD = 32;
-    if (mData.nodeCount[2] >= SEGMENTED_SORT_TILE_THRESHOLD) {
-        // Bulk segmented sort: one kernel launch + one segmented radix sort (faster for many tiles)
-        if (mVerbose==2) mTimer.restart("Segmented radix sort of " + std::to_string(pointCount) + " voxel keys in " + std::to_string(mData.nodeCount[2]) + " tiles");
-        auto *d_tile_offsets = static_cast<uint32_t*>(mResource->allocate_async((mData.nodeCount[2]+1)*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-        cudaCheck(cudaMemsetAsync(d_tile_offsets, 0, sizeof(uint32_t), mStream));
-        CALL_CUBS(DeviceScan::InclusiveSum, d_points_per_tile, d_tile_offsets + 1, mData.nodeCount[2]);
-        mResource->deallocate_async(d_points_per_tile, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-
-        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, BulkVoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_tile_offsets, mData.nodeCount[2], d_keys, d_indx, uint32_t(0));
+        if (mVerbose==2) mTimer.restart("Generate tile keys");
+        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, TileKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_keys, d_indx);
         cudaCheckError();
-        CALL_CUBS(DeviceSegmentedRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, (int)pointCount, (int)mData.nodeCount[2], d_tile_offsets, d_tile_offsets + 1, 0, 36);
-        mResource->deallocate_async(d_tile_offsets, (mData.nodeCount[2]+1)*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-    } else {
-        // Serial per-tile sort: individual kernel + sort per tile (lower overhead for few tiles)
-        if (mVerbose==2) mTimer.restart("DeviceRadixSort of " + std::to_string(pointCount) + " voxel keys in " + std::to_string(mData.nodeCount[2]) + " tiles");
-        uint32_t *points_per_tile = new uint32_t[mData.nodeCount[2]];
-        cudaCheck(cudaMemcpyAsync(points_per_tile, d_points_per_tile, mData.nodeCount[2]*sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-        mResource->deallocate_async(d_points_per_tile, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-        for (uint32_t id = 0, offset = 0; id < mData.nodeCount[2]; ++id) {
-            const uint32_t count = points_per_tile[id];
-            util::cuda::offsetLambdaKernel<<<numBlocks(count), mNumThreads, 0, mStream>>>(count, offset, VoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, id, d_keys, d_indx);
+        if (mVerbose==2) mTimer.restart("DeviceRadixSort of "+std::to_string(pointCount)+" tile keys");
+        CALL_CUBS(DeviceRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, pointCount, 0, 63);// 21 bits per coord
+        mIndxBuf.swap(indxScratch);// the sorted indices' owner is now indxScratch
+        d_indx = indxScratch.data();// sorted indices
+        mData.d_indx = mIndxBuf.data();// receives the voxel-sorted indices below
+
+        if (mVerbose==2) mTimer.restart("Allocate runs");
+        BufT<uint32_t> pointsPerTileScratch(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
+        d_points_per_tile = pointsPerTileScratch.data();
+        nodeCountScratch = BufT<uint32_t>(mStream, this->ref(), 3, nanovdb::cuda::noInit);
+        d_node_count = nodeCountScratch.data();
+
+        if (mVerbose==2) mTimer.restart("DeviceRunLengthEncode tile keys");
+        CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, d_points_per_tile, d_node_count+2, pointCount);
+        cudaCheck(cudaMemcpyAsync(mData.nodeCount+2, d_node_count+2, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
+        cudaCheck(cudaStreamSynchronize(mStream));
+        mTileKeysBuf = BufT<uint64_t>(mStream, this->ref(), mData.nodeCount[2], nanovdb::cuda::noInit);
+        mData.d_tile_keys = mTileKeysBuf.data();
+        cudaCheck(cudaMemcpyAsync(mData.d_tile_keys, d_keys, mData.nodeCount[2]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
+
+        static constexpr uint32_t SEGMENTED_SORT_TILE_THRESHOLD = 32;
+        if (mData.nodeCount[2] >= SEGMENTED_SORT_TILE_THRESHOLD) {
+            // Bulk segmented sort: one kernel launch + one segmented radix sort (faster for many tiles)
+            if (mVerbose==2) mTimer.restart("Segmented radix sort of " + std::to_string(pointCount) + " voxel keys in " + std::to_string(mData.nodeCount[2]) + " tiles");
+            BufT<uint32_t> tileOffsetsScratch(mStream, this->ref(), mData.nodeCount[2]+1, nanovdb::cuda::noInit);
+            auto *d_tile_offsets = tileOffsetsScratch.data();
+            cudaCheck(cudaMemsetAsync(d_tile_offsets, 0, sizeof(uint32_t), mStream));
+            CALL_CUBS(DeviceScan::InclusiveSum, d_points_per_tile, d_tile_offsets + 1, mData.nodeCount[2]);
+            pointsPerTileScratch.destroy(); d_points_per_tile = nullptr;
+
+            util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, BulkVoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_tile_offsets, mData.nodeCount[2], d_keys, d_indx, uint32_t(0));
             cudaCheckError();
-            CALL_CUBS(DeviceRadixSort::SortPairs, d_keys + offset, mData.d_keys + offset, d_indx + offset, mData.d_indx + offset, count, 0, 36);
-            offset += count;
-        }
-        delete [] points_per_tile;
-    }
-    mResource->deallocate_async(d_indx, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-
-    if (mVerbose==2) mTimer.restart("Count points per voxel");
-
-    cudaEvent_t copyEvent;
-    cudaCheck(cudaEventCreate(&copyEvent));
-    mData.pointsPerVoxel    = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    uint32_t *d_voxel_count = static_cast<uint32_t*>(mResource->allocate_async(sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, mData.pointsPerVoxel, d_voxel_count, pointCount);
-    cudaCheck(cudaMemcpyAsync(&mData.voxelCount, d_voxel_count, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-    cudaCheck(cudaEventRecord(copyEvent, mStream));
-    mResource->deallocate_async(d_voxel_count, sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-
-    if (util::is_same<BuildT, Point>::value) {
-        if (mVerbose==2) mTimer.restart("Count max points per voxel");
-        uint32_t *d_maxPointsPerVoxel = static_cast<uint32_t*>(mResource->allocate_async(sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream)), maxPointsPerVoxel;
-        cudaCheck(cudaEventSynchronize(copyEvent));
-        CALL_CUBS(DeviceReduce::Max, mData.pointsPerVoxel, d_maxPointsPerVoxel, mData.voxelCount);
-        cudaCheck(cudaMemcpyAsync(&maxPointsPerVoxel, d_maxPointsPerVoxel, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-        cudaCheck(cudaEventRecord(copyEvent, mStream));
-        mResource->deallocate_async(d_maxPointsPerVoxel, sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-        double dx = mData.map.getVoxelSize()[0];
-        cudaCheck(cudaEventSynchronize(copyEvent));
-        if (++iterCounter >= mMaxIterations || pointCount == 1u || math::Abs((int)maxPointsPerVoxel - (int)mMaxPointsPerVoxel) <= mTolerance) {
-            mMaxPointsPerVoxel = maxPointsPerVoxel;
+            CALL_CUBS(DeviceSegmentedRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, (int)pointCount, (int)mData.nodeCount[2], d_tile_offsets, d_tile_offsets + 1, 0, 36);
         } else {
-            const Foo tmp{dx, maxPointsPerVoxel};
-            if (maxPointsPerVoxel < mMaxPointsPerVoxel) {
-                if (min < tmp) min = tmp;
-            } else if (max.density == 0 || tmp < max) {
-                max = tmp;
+            // Serial per-tile sort: individual kernel + sort per tile (lower overhead for few tiles)
+            if (mVerbose==2) mTimer.restart("DeviceRadixSort of " + std::to_string(pointCount) + " voxel keys in " + std::to_string(mData.nodeCount[2]) + " tiles");
+            uint32_t *points_per_tile = new uint32_t[mData.nodeCount[2]];
+            cudaCheck(cudaMemcpyAsync(points_per_tile, d_points_per_tile, mData.nodeCount[2]*sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
+            pointsPerTileScratch.destroy(); d_points_per_tile = nullptr;
+            for (uint32_t id = 0, offset = 0; id < mData.nodeCount[2]; ++id) {
+                const uint32_t count = points_per_tile[id];
+                util::cuda::offsetLambdaKernel<<<numBlocks(count), mNumThreads, 0, mStream>>>(count, offset, VoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, id, d_keys, d_indx);
+                cudaCheckError();
+                CALL_CUBS(DeviceRadixSort::SortPairs, d_keys + offset, mData.d_keys + offset, d_indx + offset, mData.d_indx + offset, count, 0, 36);
+                offset += count;
             }
-            if (max.density) {
-                dx = (min.dx*(max.density - mMaxPointsPerVoxel) + max.dx*(mMaxPointsPerVoxel-min.density))/double(max.density-min.density);
-            } else if (maxPointsPerVoxel > 1u) {
-                dx *= (mMaxPointsPerVoxel-1.0)/(maxPointsPerVoxel-1.0);
-            } else {// maxPointsPerVoxel = 1 so increase dx significantly
-                dx *= 10.0;
-            }
-            if (mVerbose==2) printf("\ntarget density = %" PRIu32 ", current density = %" PRIu32 ", current dx = %f, next dx = %f\n", mMaxPointsPerVoxel, maxPointsPerVoxel, tmp.dx, dx);
-            mData.map = Map(dx);
-            mResource->deallocate_async(mData.d_keys, pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            mResource->deallocate_async(mData.d_indx, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            mResource->deallocate_async(d_keys, pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            mResource->deallocate_async(mData.d_tile_keys, mData.nodeCount[2]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            mResource->deallocate_async(d_node_count, 3*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            mResource->deallocate_async(mData.pointsPerVoxel, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            goto jump;
+            delete [] points_per_tile;
         }
-    }
+        indxScratch.destroy(); d_indx = nullptr;// tile-order copy, superseded by the voxel sort
+
+        if (mVerbose==2) mTimer.restart("Count points per voxel");
+
+        mPointsPerVoxelBuf = BufT<uint32_t>(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
+        mData.pointsPerVoxel = mPointsPerVoxelBuf.data();
+        BufT<uint32_t> voxelCountScratch(mStream, this->ref(), 1, nanovdb::cuda::noInit);
+        uint32_t *d_voxel_count = voxelCountScratch.data();
+        CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, mData.pointsPerVoxel, d_voxel_count, pointCount);
+        cudaCheck(cudaMemcpyAsync(&mData.voxelCount, d_voxel_count, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
+        cudaCheck(cudaEventRecord(copyEvent, mStream));
+        voxelCountScratch.destroy(); d_voxel_count = nullptr;
+
+        if (util::is_same<BuildT, Point>::value) {
+            if (mVerbose==2) mTimer.restart("Count max points per voxel");
+            BufT<uint32_t> maxPointsPerVoxelScratch(mStream, this->ref(), 1, nanovdb::cuda::noInit);
+            uint32_t *d_maxPointsPerVoxel = maxPointsPerVoxelScratch.data(), maxPointsPerVoxel;
+            cudaCheck(cudaEventSynchronize(copyEvent));
+            CALL_CUBS(DeviceReduce::Max, mData.pointsPerVoxel, d_maxPointsPerVoxel, mData.voxelCount);
+            cudaCheck(cudaMemcpyAsync(&maxPointsPerVoxel, d_maxPointsPerVoxel, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
+            cudaCheck(cudaEventRecord(copyEvent, mStream));
+            maxPointsPerVoxelScratch.destroy(); d_maxPointsPerVoxel = nullptr;
+            double dx = mData.map.getVoxelSize()[0];
+            cudaCheck(cudaEventSynchronize(copyEvent));
+            if (++iterCounter >= mMaxIterations || pointCount == 1u || math::Abs((int)maxPointsPerVoxel - (int)mMaxPointsPerVoxel) <= mTolerance) {
+                mMaxPointsPerVoxel = maxPointsPerVoxel;
+            } else {
+                const Foo tmp{dx, maxPointsPerVoxel};
+                if (maxPointsPerVoxel < mMaxPointsPerVoxel) {
+                    if (min < tmp) min = tmp;
+                } else if (max.density == 0 || tmp < max) {
+                    max = tmp;
+                }
+                if (max.density) {
+                    dx = (min.dx*(max.density - mMaxPointsPerVoxel) + max.dx*(mMaxPointsPerVoxel-min.density))/double(max.density-min.density);
+                } else if (maxPointsPerVoxel > 1u) {
+                    dx *= (mMaxPointsPerVoxel-1.0)/(maxPointsPerVoxel-1.0);
+                } else {// maxPointsPerVoxel = 1 so increase dx significantly
+                    dx *= 10.0;
+                }
+                if (mVerbose==2) printf("\ntarget density = %" PRIu32 ", current density = %" PRIu32 ", current dx = %f, next dx = %f\n", mMaxPointsPerVoxel, maxPointsPerVoxel, tmp.dx, dx);
+                mData.map = Map(dx);
+                // free before the next iteration reallocates, so peak device
+                // memory matches the pre-loop behavior
+                mKeysBuf.destroy();          mData.d_keys = nullptr;
+                mIndxBuf.destroy();          mData.d_indx = nullptr;
+                keysScratch.destroy();       d_keys = nullptr;
+                mTileKeysBuf.destroy();      mData.d_tile_keys = nullptr;
+                nodeCountScratch.destroy();  d_node_count = nullptr;
+                mPointsPerVoxelBuf.destroy();mData.pointsPerVoxel = nullptr;
+                continue;
+            }
+        }
+        break;
+    }// while (true)
     if (iterCounter>1 && mVerbose) std::cerr << "Used " << iterCounter << " attempts to determine dx that produces a target dpoint denisty\n\n";
 
     if (mVerbose==2) mTimer.restart("Compute prefix sum of points per voxel");
     cudaCheck(cudaEventSynchronize(copyEvent));
-    mData.pointsPerVoxelPrefix = static_cast<uint32_t*>(mResource->allocate_async(mData.voxelCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+    mPointsPerVoxelPrefixBuf = BufT<uint32_t>(mStream, this->ref(), mData.voxelCount, nanovdb::cuda::noInit);
+    mData.pointsPerVoxelPrefix = mPointsPerVoxelPrefixBuf.data();
     CALL_CUBS(DeviceScan::ExclusiveSum, mData.pointsPerVoxel, mData.pointsPerVoxelPrefix, mData.voxelCount);
 
-    mData.pointsPerLeaf = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+    mPointsPerLeafBuf = BufT<uint32_t>(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
+    mData.pointsPerLeaf = mPointsPerLeafBuf.data();
     CALL_CUBS(DeviceRunLengthEncode::Encode, thrust::make_transform_iterator(mData.d_keys, ShiftRight<9>()), d_keys, mData.pointsPerLeaf, d_node_count, pointCount);
     cudaCheck(cudaMemcpyAsync(mData.nodeCount, d_node_count, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaEventRecord(copyEvent, mStream));
 
     if constexpr(util::is_same<BuildT, Point>::value) {
-        uint32_t *d_maxPointsPerLeaf = static_cast<uint32_t*>(mResource->allocate_async(sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+        BufT<uint32_t> maxPointsPerLeafScratch(mStream, this->ref(), 1, nanovdb::cuda::noInit);
+        uint32_t *d_maxPointsPerLeaf = maxPointsPerLeafScratch.data();
         cudaCheck(cudaEventSynchronize(copyEvent));
         CALL_CUBS(DeviceReduce::Max, mData.pointsPerLeaf, d_maxPointsPerLeaf, mData.nodeCount[0]);
         cudaCheck(cudaMemcpyAsync(&mMaxPointsPerLeaf, d_maxPointsPerLeaf, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
@@ -738,27 +801,26 @@ jump:// this marks the beginning of the actual algorithm
         if (mMaxPointsPerLeaf > std::numeric_limits<uint16_t>::max()) {
             throw std::runtime_error("Too many points per leaf: "+std::to_string(mMaxPointsPerLeaf));
         }
-        mResource->deallocate_async(d_maxPointsPerLeaf, sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
     }
 
     cudaCheck(cudaEventSynchronize(copyEvent));
-    mData.pointsPerLeafPrefix = static_cast<uint32_t*>(mResource->allocate_async(mData.nodeCount[0]*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+    mPointsPerLeafPrefixBuf = BufT<uint32_t>(mStream, this->ref(), mData.nodeCount[0], nanovdb::cuda::noInit);
+    mData.pointsPerLeafPrefix = mPointsPerLeafPrefixBuf.data();
     CALL_CUBS(DeviceScan::ExclusiveSum, mData.pointsPerLeaf, mData.pointsPerLeafPrefix, mData.nodeCount[0]);
 
     cudaCheck(cudaStreamSynchronize(mStream));
-    mData.d_leaf_keys = static_cast<uint64_t*>(mResource->allocate_async(mData.nodeCount[0]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+    mLeafKeysBuf = BufT<uint64_t>(mStream, this->ref(), mData.nodeCount[0], nanovdb::cuda::noInit);
+    mData.d_leaf_keys = mLeafKeysBuf.data();
     cudaCheck(cudaMemcpyAsync(mData.d_leaf_keys, d_keys, mData.nodeCount[0]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
 
     CALL_CUBS(DeviceSelect::Unique, thrust::make_transform_iterator(mData.d_leaf_keys, ShiftRight<12>()), d_keys, d_node_count+1, mData.nodeCount[0]);// count lower nodes
     cudaCheck(cudaMemcpyAsync(mData.nodeCount+1, d_node_count+1, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaStreamSynchronize(mStream));
-    mData.d_lower_keys = static_cast<uint64_t*>(mResource->allocate_async(mData.nodeCount[1]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+    mLowerKeysBuf = BufT<uint64_t>(mStream, this->ref(), mData.nodeCount[1], nanovdb::cuda::noInit);
+    mData.d_lower_keys = mLowerKeysBuf.data();
     cudaCheck(cudaMemcpyAsync(mData.d_lower_keys, d_keys, mData.nodeCount[1]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
 
-    mResource->deallocate_async(d_keys, pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-    mResource->deallocate_async(d_node_count, 3*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
     if (mVerbose==2) mTimer.stop();
-    cudaCheck(cudaEventDestroy(copyEvent));
 
     //printf("Leaf count = %u, lower count = %u, upper count = %u\n", mData.nodeCount[0], mData.nodeCount[1], mData.nodeCount[2]);
 }// PointsToGrid<BuildT, ResourceT>::countNodes
@@ -1014,7 +1076,7 @@ inline void PointsToGrid<BuildT, ResourceT>::processUpperNodes()
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[2]), mNumThreads, 0, mStream>>>(mData.nodeCount[2], BuildUpperNodesFunctor<BuildT>(), mDeviceData);
     cudaCheckError();
 
-    mResource->deallocate_async(mData.d_tile_keys, mData.nodeCount[2]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+    mTileKeysBuf.destroy(); mData.d_tile_keys = nullptr;
 
 }// PointsToGrid<BuildT, ResourceT>::processUpperNodes
 
@@ -1143,11 +1205,11 @@ inline void PointsToGrid<BuildT, ResourceT>::processLeafNodes(size_t pointCount)
     util::cuda::lambdaKernel<<<numBlocks(mData.voxelCount), mNumThreads, 0, mStream>>>(mData.voxelCount, SetLeafActiveVoxelStateAndValuesFunctor<BuildT>(), mDeviceData);
     cudaCheckError();
 
-    mResource->deallocate_async(mData.d_keys, pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-    mResource->deallocate_async(mData.pointsPerVoxel, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-    mResource->deallocate_async(mData.pointsPerVoxelPrefix, mData.voxelCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-    mResource->deallocate_async(mData.pointsPerLeafPrefix, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-    mResource->deallocate_async(mData.pointsPerLeaf,mData.nodeCount[0]*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+    mKeysBuf.destroy();                mData.d_keys = nullptr;
+    mPointsPerVoxelBuf.destroy();      mData.pointsPerVoxel = nullptr;
+    mPointsPerVoxelPrefixBuf.destroy();mData.pointsPerVoxelPrefix = nullptr;
+    mPointsPerLeafPrefixBuf.destroy(); mData.pointsPerLeafPrefix = nullptr;
+    mPointsPerLeafBuf.destroy();       mData.pointsPerLeaf = nullptr;
 
     // Inactive voxel values are zero for every build type except Point (which
     // copies the previous active value for rank queries); the zero cases are
@@ -1162,15 +1224,16 @@ inline void PointsToGrid<BuildT, ResourceT>::processLeafNodes(size_t pointCount)
 
     if constexpr(BuildTraits<BuildT>::is_onindex) {
         if (mVerbose==2) mTimer.restart("prefix-sum for index grid");
-        auto devValueIndex = static_cast<uint64_t*>(mResource->allocate_async(mData.nodeCount[0]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-        auto devValueIndexPrefix = static_cast<uint64_t*>(mResource->allocate_async(mData.nodeCount[0]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+        BufT<uint64_t> valueIndexScratch(mStream, this->ref(), mData.nodeCount[0], nanovdb::cuda::noInit);
+        BufT<uint64_t> valueIndexPrefixScratch(mStream, this->ref(), mData.nodeCount[0], nanovdb::cuda::noInit);
+        auto devValueIndex = valueIndexScratch.data();
+        auto devValueIndexPrefix = valueIndexPrefixScratch.data();
         kernels::fillValueIndexKernel<BuildT><<<numBlocks(mData.nodeCount[0]), mNumThreads, 0, mStream>>>(mData.nodeCount[0], 0, devValueIndex, mDeviceData);
         cudaCheckError();
         CALL_CUBS(DeviceScan::InclusiveSum, devValueIndex, devValueIndexPrefix, mData.nodeCount[0]);
-        mResource->deallocate_async(devValueIndex, mData.nodeCount[0]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+        valueIndexScratch.destroy(); devValueIndex = nullptr;
         kernels::leafPrefixSumKernel<BuildT><<<numBlocks(mData.nodeCount[0]), mNumThreads, 0, mStream>>>(mData.nodeCount[0], 0, devValueIndexPrefix, mDeviceData);
         cudaCheckError();
-        mResource->deallocate_async(devValueIndexPrefix, mData.nodeCount[0]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
     }
 
     if (mVerbose==2) mTimer.stop();
@@ -1193,7 +1256,7 @@ template<typename PtrT>
 inline void PointsToGrid<BuildT, ResourceT>::processPoints(const PtrT points, size_t pointCount)
 {
     if constexpr(util::is_same<BuildT, Point>::value) this->encodePoints(points, pointCount);
-    mResource->deallocate_async(mData.d_indx, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+    mIndxBuf.destroy(); mData.d_indx = nullptr;
 }// PointsToGrid<BuildT, ResourceT>::processPoints
 
 template<typename BuildT, typename ResourceT>
@@ -1329,7 +1392,7 @@ inline void PointsToGrid<BuildT, ResourceT>::processBBox()
 
     // update and propagate bbox from leaf -> lower/parent nodes
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[0]), mNumThreads, 0, mStream>>>(mData.nodeCount[0], UpdateAndPropagateLeafBBoxFunctor<BuildT>(), mDeviceData);
-    mResource->deallocate_async(mData.d_leaf_keys, mData.nodeCount[0]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+    mLeafKeysBuf.destroy(); mData.d_leaf_keys = nullptr;
     cudaCheckError();
 
     // reset bbox in upper nodes
@@ -1338,8 +1401,8 @@ inline void PointsToGrid<BuildT, ResourceT>::processBBox()
 
     // propagate bbox from lower -> upper/parent node
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[1]), mNumThreads, 0, mStream>>>(mData.nodeCount[1], PropagateLowerBBoxFunctor<BuildT>(), mDeviceData);
-    mResource->deallocate_async(mData.d_lower_keys, mData.nodeCount[1]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-    cudaCheckError()
+    mLowerKeysBuf.destroy(); mData.d_lower_keys = nullptr;
+    cudaCheckError();
 
     // propagate bbox from upper -> root/parent node
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[2]), mNumThreads, 0, mStream>>>(mData.nodeCount[2], PropagateUpperBBoxFunctor<BuildT>(), mDeviceData);
