@@ -356,7 +356,7 @@ struct TopologyCodec : public io::Codec
     }
 
     void readTopology(std::istream& is, io::CodecData& data, const io::ReadOptions& options,
-        io::ReadDiagnostics& diagnostics) final
+        io::ReadDiagnostics& diagnostics) const final
     {
         // Warn when a conversion readMode was requested but this codec is a
         // non-conversion instance (GridT == StorageGridT), meaning no conversion
@@ -379,7 +379,7 @@ struct TopologyCodec : public io::Codec
         internal::topologyCodecReadTopology<GridT, StorageGridT>(*data.grid, is, options, diagnostics, topoData);
     }
 
-    void writeTopology(std::ostream& os, const GridBase& gridBase, const io::WriteOptions&) final
+    void writeTopology(std::ostream& os, const GridBase& gridBase, const io::WriteOptions&) const final
     {
         // Disable implementation when read only. The body must live inside the
         // negated if constexpr branch so it is not instantiated for read-only

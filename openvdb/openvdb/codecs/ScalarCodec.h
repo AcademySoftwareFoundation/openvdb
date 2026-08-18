@@ -159,7 +159,7 @@ struct ScalarCodec final: public TopologyCodec<GridT, StorageGridT, Mode>
         }
     }
 
-    void readBuffers(std::istream& is, Index64 /*size*/, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics&) final
+    void readBuffers(std::istream& is, int64_t /*size*/, io::CodecData& data, const io::ReadOptions& options, io::ReadDiagnostics&) const final
     {
         using StorageValueT = typename StorageGridT::TreeType::ValueType;
         GridT& grid = static_cast<GridT&>(*data.grid);
@@ -167,7 +167,7 @@ struct ScalarCodec final: public TopologyCodec<GridT, StorageGridT, Mode>
         internal::scalarCodecReadBuffers<GridT, StorageGridT>(grid, is, options, &topoData.storageBackground);
     }
 
-    void writeBuffers(std::ostream& os, const GridBase& gridBase, const io::WriteOptions&) final
+    void writeBuffers(std::ostream& os, const GridBase& gridBase, const io::WriteOptions&) const final
     {
         // Note: the write body must live inside the negated if constexpr branch
         // so it is not instantiated for read-only codecs. A bare

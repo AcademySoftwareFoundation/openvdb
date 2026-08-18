@@ -284,7 +284,7 @@ private:
 /// In the read and write methods, downcast the reference back to the concrete
 /// type to access the extra fields:
 /// @code
-/// void readBuffers(std::istream& is, io::CodecData& data, ...) override {
+/// void readBuffers(std::istream& is, int64_t size, io::CodecData& data, ...) const override {
 ///     auto& myData = static_cast<MyCodecData&>(data);
 ///     MyGridType& grid = static_cast<MyGridType&>(*myData.grid);
 ///     // Use myData.intermediateBuffer, grid, etc.
@@ -350,15 +350,15 @@ struct OPENVDB_API CodecData
 ///    @code
 ///    void readTopology(std::istream& is, io::CodecData& data,
 ///                      const io::ReadOptions& options,
-///                      io::ReadDiagnostics& diagnostics) override
+///                      io::ReadDiagnostics& diagnostics) const override
 ///    {
 ///        MyGridType& grid = static_cast<MyGridType&>(*data.grid);
 ///        // Deserialize the tree structure into grid...
 ///    }
 ///
-///    void readBuffers(std::istream& is, io::CodecData& data,
+///    void readBuffers(std::istream& is, int64_t size, CodecData& data,
 ///                     const io::ReadOptions& options,
-///                     io::ReadDiagnostics& diagnostics) override
+///                     io::ReadDiagnostics& diagnostics) const override
 ///    {
 ///        if (options.readMode == io::ReadMode::TopologyOnly) return;
 ///        MyGridType& grid = static_cast<MyGridType&>(*data.grid);
@@ -397,7 +397,7 @@ struct OPENVDB_API Codec
     /// @brief Deserialize the grid topology (tree structure and active-voxel
     ///   mask) from @a is into the grid held by @a data.
     virtual void readTopology(std::istream& /*is*/, CodecData& /*data*/,
-        const ReadOptions& /*options*/, ReadDiagnostics& /*diagnostics*/) { }
+        const ReadOptions& /*options*/, ReadDiagnostics& /*diagnostics*/) const { }
 
     /// @brief Deserialize all voxel-value buffers from @a is into the grid
     ///   held by @a data.
@@ -410,9 +410,11 @@ struct OPENVDB_API Codec
     /// restrict the loaded data to the region that intersects it; if the codec
     /// cannot honour clipping natively, fall back to a post-process and record
     /// a warning via @a diagnostics. The @c size argument is the number of bytes
-    /// occupied by the entire readBuffers data section.
-    virtual void readBuffers(std::istream& /*is*/, Index64 /*size*/, CodecData& /*data*/,
-        const ReadOptions& /*options*/, ReadDiagnostics& /*diagnostics*/) { }
+    /// occupied by the readBuffers data section, measured from the stream
+    /// position at which this method is called, or -1 when the size is not known
+    /// (a non-seekable stream, or a stream without grid offsets).
+    virtual void readBuffers(std::istream& /*is*/, int64_t /*size*/, CodecData& /*data*/,
+        const ReadOptions& /*options*/, ReadDiagnostics& /*diagnostics*/) const { }
 
     /// @brief Serialize the grid topology (tree structure and active-voxel
     ///   mask) from @a grid to @a os.
@@ -421,14 +423,14 @@ struct OPENVDB_API Codec
     /// topology as a distinct section that precedes the value buffers in the
     /// stream.
     virtual void writeTopology(std::ostream& /*os*/, const GridBase& /*grid*/,
-        const WriteOptions& /*options*/) { }
+        const WriteOptions& /*options*/) const { }
 
     /// @brief Serialize all voxel-value buffers from @a grid to @a os.
     ///
     /// The default implementation is a no-op. Override to write the leaf-node
     /// value buffers that follow the topology section.
     virtual void writeBuffers(std::ostream& /*os*/, const GridBase& /*grid*/,
-        const WriteOptions& /*options*/) { }
+        const WriteOptions& /*options*/) const { }
 }; // struct Codec
 
 /// @brief A thread-safe, process-global registry that maps codec names to
