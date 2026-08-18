@@ -11,6 +11,11 @@
 #include <nanovdb/cuda/PinnedResource.h>
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
+#include <nanovdb/tools/cuda/DilateGrid.cuh>
+#include <nanovdb/tools/cuda/MergeGrids.cuh>
+#include <nanovdb/tools/cuda/PruneGrid.cuh>
+#include <nanovdb/tools/cuda/RefineGrid.cuh>
+#include <nanovdb/tools/cuda/CoarsenGrid.cuh>
 
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
@@ -317,6 +322,140 @@ TEST(TestMemoryResource, PointsToGrid_PointEncodedWithCustomResource)
     }
 
     EXPECT_GT(res.allocs, 0);
+}
+
+//======================================================================
+// TopologyBuilder consumers (DilateGrid, MergeGrids, PruneGrid, RefineGrid,
+// CoarsenGrid) route their builder's stream-ordered scratch through an
+// injected resource instance (B5, openvdb #2232).
+//======================================================================
+
+/// @brief Build a small ValueOnIndex device grid from a handful of voxels.
+///        The default resource is fine for this setup step; the CountingResource
+///        of the op under test only observes that op's scratch.
+static nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer>
+buildIndexGrid(const std::vector<nanovdb::Coord>& voxels)
+{
+    nanovdb::Coord* d_voxels = nullptr;
+    cudaCheck(cudaMalloc(&d_voxels, voxels.size() * sizeof(nanovdb::Coord)));
+    cudaCheck(cudaMemcpy(d_voxels, voxels.data(), voxels.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    nanovdb::tools::cuda::PointsToGrid<nanovdb::ValueOnIndex> converter(nanovdb::Map(1.0));
+    auto handle = converter.getHandle(d_voxels, voxels.size());
+    cudaCheck(cudaFree(d_voxels));
+    return handle;
+}
+
+TEST(TestMemoryResource, DilateGrid_InjectedResourceSeam)
+{
+    // The dilated grid handle's output buffer goes through BufferT::create, and the
+    // dual-space mProcessedRoot / builder mData go through DeviceBuffer -- none of these
+    // is observed by the CountingResource; only the builder's stream-ordered scratch is.
+    auto src = buildIndexGrid({{0,0,0},{1,2,3},{4,4,4}});
+    auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_srcGrid, nullptr);
+
+    CountingResource res;
+    {
+        nanovdb::tools::cuda::DilateGrid<nanovdb::ValueOnIndex, CountingResource> op(d_srcGrid, 0, res);
+        auto handle = op.getHandle();
+        ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+        EXPECT_TRUE(handle.deviceData());
+    }
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_GT(res.allocs, 0);              // builder scratch routed through the injected instance
+    EXPECT_EQ(res.allocs, res.deallocs);   // and every allocation was freed through it
+}
+
+TEST(TestMemoryResource, MergeGrids_InjectedResourceSeam)
+{
+    // As above, the merged handle's output buffer and the dual-space mProcessedRoot / mData
+    // go through DeviceBuffer and are not counted -- only the builder's scratch is.
+    auto srcA = buildIndexGrid({{0,0,0},{1,1,1}});
+    auto srcB = buildIndexGrid({{5,5,5},{6,6,6}});
+    auto* gridA = srcA.deviceGrid<nanovdb::ValueOnIndex>();
+    auto* gridB = srcB.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(gridA, nullptr);
+    ASSERT_NE(gridB, nullptr);
+
+    CountingResource res;
+    {
+        nanovdb::tools::cuda::MergeGrids<nanovdb::ValueOnIndex, CountingResource> op(gridA, gridB, 0, res);
+        auto handle = op.getHandle();
+        ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+        EXPECT_TRUE(handle.deviceData());
+    }
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_GT(res.allocs, 0);
+    EXPECT_EQ(res.allocs, res.deallocs);
+}
+
+TEST(TestMemoryResource, PruneGrid_InjectedResourceSeam)
+{
+    // Voxels are kept within a single 8^3 leaf, so the source grid has exactly one leaf
+    // and the retain-mask sidecar is a single all-on Mask<3>. As above, only the builder's
+    // scratch is counted; the output buffer and dual-space mProcessedRoot / mData are not.
+    auto src = buildIndexGrid({{0,0,0},{1,1,1},{2,2,2}});
+    auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_srcGrid, nullptr);
+
+    nanovdb::Mask<3> hostMask;
+    hostMask.setOn(); // retain every voxel
+    nanovdb::Mask<3>* d_mask = nullptr;
+    ASSERT_EQ(cudaMalloc(&d_mask, sizeof(nanovdb::Mask<3>)), cudaSuccess);
+    ASSERT_EQ(cudaMemcpy(d_mask, &hostMask, sizeof(nanovdb::Mask<3>), cudaMemcpyHostToDevice), cudaSuccess);
+
+    CountingResource res;
+    {
+        nanovdb::tools::cuda::PruneGrid<nanovdb::ValueOnIndex, CountingResource> op(d_srcGrid, d_mask, 0, res);
+        auto handle = op.getHandle();
+        ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+        EXPECT_TRUE(handle.deviceData());
+    }
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    ASSERT_EQ(cudaFree(d_mask), cudaSuccess);
+    EXPECT_GT(res.allocs, 0);
+    EXPECT_EQ(res.allocs, res.deallocs);
+}
+
+TEST(TestMemoryResource, RefineGrid_InjectedResourceSeam)
+{
+    // As above, only the builder's scratch is counted; the output buffer and dual-space
+    // mProcessedRoot / mData go through DeviceBuffer and are not.
+    auto src = buildIndexGrid({{0,0,0},{1,2,3},{4,4,4}});
+    auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_srcGrid, nullptr);
+
+    CountingResource res;
+    {
+        nanovdb::tools::cuda::RefineGrid<nanovdb::ValueOnIndex, CountingResource> op(d_srcGrid, 0, res);
+        auto handle = op.getHandle();
+        ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+        EXPECT_TRUE(handle.deviceData());
+    }
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_GT(res.allocs, 0);
+    EXPECT_EQ(res.allocs, res.deallocs);
+}
+
+TEST(TestMemoryResource, CoarsenGrid_InjectedResourceSeam)
+{
+    // Voxels span a 2x2x2 block of leaves (leaf DIM = 8) so coarsening is non-degenerate.
+    // As above, only the builder's scratch is counted; the output buffer and dual-space
+    // mProcessedRoot / mData go through DeviceBuffer and are not.
+    auto src = buildIndexGrid({{0,0,0},{8,0,0},{0,8,0},{0,0,8},{8,8,0},{8,0,8},{0,8,8},{8,8,8}});
+    auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_srcGrid, nullptr);
+
+    CountingResource res;
+    {
+        nanovdb::tools::cuda::CoarsenGrid<nanovdb::ValueOnIndex, CountingResource> op(d_srcGrid, 0, res);
+        auto handle = op.getHandle();
+        ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+        EXPECT_TRUE(handle.deviceData());
+    }
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_GT(res.allocs, 0);
+    EXPECT_EQ(res.allocs, res.deallocs);
 }
 
 } // unnamed namespace
