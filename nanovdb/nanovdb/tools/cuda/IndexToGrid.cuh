@@ -218,11 +218,11 @@ __global__ void processNodesKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
     auto &srcNode = nodeAcc->template srcNode<LEVEL>(blockIdx.x);
     auto &dstNode = nodeAcc->template dstNode<DstBuildT, LEVEL>(blockIdx.x);
 
-    if (threadIdx.x == 0 && threadIdx.y == 0) {
+    const int tid = threadIdx.y*blockDim.x + threadIdx.x;
+    const int nThreads = blockDim.x*blockDim.y;
+    if (tid == 0) {
         dstNode.mBBox = srcNode.mBBox;
         dstNode.mFlags = srcNode.mFlags;
-        dstNode.mValueMask = srcNode.mValueMask;
-        dstNode.mChildMask = srcNode.mChildMask;
         auto &srcGrid = nodeAcc->srcGrid();
         if (srcGrid.hasMinMax()) {
             dstNode.mMinimum = srcValues[srcNode.mMinimum];
@@ -233,9 +233,13 @@ __global__ void processNodesKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
             if (srcGrid.hasStdDeviation()) dstNode.mStdDevi = srcValues[srcNode.mStdDevi];
         }
     }
-    const int off = blockDim.x*blockDim.y*threadIdx.x + blockDim.x*threadIdx.y;
-    for (int threadIdx_z=0; threadIdx_z<blockDim.x; ++threadIdx_z) {
-        const int i = off + threadIdx_z;
+    // Cooperative, coalesced mask copies
+    for (int w = tid; w < srcNode.mValueMask.wordCount(); w += nThreads) {
+        dstNode.mValueMask.words()[w] = srcNode.mValueMask.words()[w];
+        dstNode.mChildMask.words()[w] = srcNode.mChildMask.words()[w];
+    }
+    // Consecutive threads process consecutive table entries (coalesced)
+    for (int i = tid; i < SrcNodeT::SIZE; i += nThreads) {
         if (srcNode.mChildMask.isOn(i)) {
             if constexpr(sizeof(SrcNodeT)==sizeof(DstNodeT) && sizeof(SrcChildT)==sizeof(DstChildT)) {
                 dstNode.mTable[i].child = srcNode.mTable[i].child;
@@ -261,11 +265,20 @@ __global__ void processLeafsKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
     static_assert(!BuildTraits<DstBuildT>::is_special, "Invalid destination type!");
     auto &srcLeaf = nodeAcc->template srcNode<0>(blockIdx.x);
     auto &dstLeaf = nodeAcc->template dstNode<DstBuildT,0>(blockIdx.x);
-    if (threadIdx.x == 0 && threadIdx.y == 0) {
+    const int tid = threadIdx.y*blockDim.x + threadIdx.x;
+    const int nThreads = blockDim.x*blockDim.y;
+    if (tid == 0) {
         dstLeaf.mBBoxMin = srcLeaf.mBBoxMin;
         for (int i=0; i<3; ++i) dstLeaf.mBBoxDif[i] = srcLeaf.mBBoxDif[i];
         dstLeaf.mFlags = srcLeaf.mFlags;
         dstLeaf.mValueMask = srcLeaf.mValueMask;
+        // The leaf array is excluded from the buffer zero-init in getBuffer (it
+        // is the bulk of the grid and every mValues[i] is written below), so
+        // make the only otherwise-unwritten leaf bytes deterministic here: the
+        // stats fields (absent when the source has no stats) and any alignment
+        // padding before the 32-aligned mValues array. Real stats, if present,
+        // overwrite the zeros just below. Byte-identical to a full zero-init.
+        for (uint8_t *p = (uint8_t*)&dstLeaf.mMinimum, *e = (uint8_t*)dstLeaf.mValues; p < e; ++p) *p = 0;
         ///
         auto &srcGrid = nodeAcc->srcGrid();
         if (srcGrid.hasMinMax()) {
@@ -277,12 +290,9 @@ __global__ void processLeafsKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
             if (srcGrid.hasStdDeviation()) dstLeaf.mStdDevi = srcValues[srcLeaf.getDev()];
         }
     }
-    const int off = blockDim.x*blockDim.y*threadIdx.x + blockDim.x*threadIdx.y;
-    auto *dst = dstLeaf.mValues + off;
-    for (int threadIdx_z=0; threadIdx_z<blockDim.x; ++threadIdx_z) {
-        const int i = off + threadIdx_z;
-        *dst++ = srcValues[srcLeaf.getValue(i)];
-    }
+    // Consecutive threads write consecutive values (coalesced)
+    for (int i = tid; i < NanoLeaf<DstBuildT>::SIZE; i += nThreads)
+        dstLeaf.mValues[i] = srcValues[srcLeaf.getValue(i)];
 }// processLeafsKernel
 
 //================================================================================================
@@ -373,6 +383,15 @@ inline BufferT IndexToGrid<SrcBuildT>::getBuffer(const BufferT &pool)
     auto buffer = BufferT::create(mNodeAcc.size, &pool, device, mStream);
     mNodeAcc.d_dstPtr = buffer.deviceData();
     if (mNodeAcc.d_dstPtr == nullptr) throw std::runtime_error("Failed memory allocation on the device");
+    // Zero the non-leaf region: grid, tree, root, root tiles and the internal
+    // nodes. Bytes the kernels below do not explicitly write - stats fields
+    // absent from the source and struct alignment padding - would otherwise
+    // carry recycled allocator bytes, making the output nondeterministic and
+    // leaking heap contents into written files. The leaf array [node[0], size)
+    // is the bulk of the buffer and is fully overwritten by processLeafsKernel
+    // (values + header, which zeroes its own stats/padding gap), so it is
+    // excluded here to avoid a redundant multi-GB memset.
+    cudaCheck(cudaMemsetAsync(mNodeAcc.d_dstPtr, 0, mNodeAcc.node[0], mStream));
 
     if (size_t size = mGridName.size()) {
         cudaCheck(util::cuda::mallocAsync((void**)&mNodeAcc.d_gridName, size, mStream));
