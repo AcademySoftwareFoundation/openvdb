@@ -79,6 +79,18 @@ if(NANOVDB_USE_CUDA)
   target_link_libraries(nanovdb_test_cuda_buffer PRIVATE nanovdb GTest::GTest GTest::Main)
   set_target_properties(nanovdb_test_cuda_buffer PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   add_test(nanovdb_cuda_buffer_unit_test nanovdb_test_cuda_buffer)
+
+  if(WIN32)
+    # gtest's TEST macro declares each test's static test_info_ member with an
+    # unused-attribute on GCC/Clang but not under MSVC, so for tests defined
+    # inside an anonymous namespace the CUDA front end can prove it
+    # unreferenced and reports #177, which NANOVDB_CUDA_WERROR promotes to an
+    # error. Suppress #177 for the CUDA test sources that use that style.
+    foreach(_cuda_gtest nanovdb_test_cuda_buffer nanovdb_test_cuda_memory_resource
+            nanovdb_test_cuda_util nanovdb_test_cuda_util_sync)
+      target_compile_options(${_cuda_gtest} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:--diag-suppress=177>")
+    endforeach()
+  endif()
 endif()
 
 # -----------------------------------------------------------------------------

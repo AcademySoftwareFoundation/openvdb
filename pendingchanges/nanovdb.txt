@@ -6,8 +6,11 @@ NanoVDB:
 
   Improvements:
   - The GPU builders now allocate all scratch through an injectable memory resource: tools::cuda::TopologyBuilder and tools::cuda::MeshToGrid gained a ResourceT template parameter (defaulted, so existing code is unaffected), joining PointsToGrid. Added nanovdb::cuda::SyncFromAsync, a CRTP base that derives the synchronous half of the resource concept from the stream-ordered half, and nanovdb::cuda::ResourceRef, a non-owning reference to a resource that is itself a resource, for containers that hold their resource by value. PointsToGrid's device scratch and intermediate arrays are now owned by cuda::Buffer as well, replacing all of its hand-paired allocate/free calls.
+  - Added the CMake option NANOVDB_CUDA_WERROR (default ON, also implied by OPENVDB_CXX_STRICT) which passes --Werror=all-warnings to NVCC so that every device-side diagnostic becomes an error when building the NanoVDB tests, tools and examples. Disable it if a newer CUDA toolkit introduces diagnostics that block your build.
   - The bug-fix to the nanovdb::ReadAccessor (see below) improves random-access performance in some use-cases (especially on the CPU).
 
   Fixes:
   - Fixed a caching bug in nanovdb::ReadAccessor<LEVEL0, LEVEL1, LEVEL2>, e.g ReadAccessor<0,1,2> and ReadAccessor<0,1>: the accessors now cache nodes at all requested levels (matching the behaviour of openvdb::ValueAccessor) rather than caching only leaf nodes. This is the new default behaviour. The previous (buggy) behaviour can be restored by setting the CMake option -DNANOVDB_USE_OLD_ACCESSOR=ON, or by defining the macro NANOVDB_USE_OLD_ACCESSOR before including NanoVDB.h.
   - Deprecated nanovdb::math::ZeroCrossingNode and renamed it nanovdb::math::zeroCrossingNode to follow our naming convention.
+  - Fixed the nvcc #20054-D warnings emitted by the nanovdb::tools::cuda::GridStats kernels: the __shared__ statistics arrays now use constructor-free storage (cub::Uninitialized), since CUDA does not support dynamic initialization of __shared__ variables.
+  - Fixed the nvcc #20050-D warnings emitted by the nanovdb::tools::cuda::GridChecksum CRC32 kernels: the inline qualifier is ignored for __global__ functions, so the header-defined kernels are now static instead.

@@ -115,7 +115,7 @@ inline unique_ptr<uint32_t> createCrc32Lut(size_t extra = 0, cudaStream_t stream
 /// step hit shared memory and the dependent update chain advances four bytes
 /// per step instead of one. Bit-identical to the byte-serial crc32().
 /// The final block absorbs any remainder of @c totalSize.
-__global__ inline void crc32SlicedKernel(const void *d_data, uint32_t* d_blockCRC, uint64_t blockCount, uint32_t log2BlockSize, uint64_t totalSize, const uint32_t *d_lut)
+static __global__ void crc32SlicedKernel(const void *d_data, uint32_t* d_blockCRC, uint64_t blockCount, uint32_t log2BlockSize, uint64_t totalSize, const uint32_t *d_lut)
 {
     __shared__ uint32_t sLut[4][256];
     for (uint32_t i = threadIdx.x; i < 256; i += blockDim.x) sLut[0][i] = d_lut[i];
@@ -182,7 +182,7 @@ __host__ __device__ inline void crc32BuildShiftOp(uint32_t *dst, uint64_t bits)
 /// possibly shorter, chunk - are precomputed on the host, so this is just an
 /// O(chunkCount) fold. Bit-identical to a serial crc32 over the concatenated
 /// stream. (@c d_accLast equals @c d_acc when the last chunk is full.)
-__global__ inline void crc32CombineKernel(const uint32_t *d_chunkCRC, uint64_t chunkCount, const uint32_t *d_acc, const uint32_t *d_accLast, uint32_t *d_crc)
+static __global__ void crc32CombineKernel(const uint32_t *d_chunkCRC, uint64_t chunkCount, const uint32_t *d_acc, const uint32_t *d_accLast, uint32_t *d_crc)
 {
     uint32_t crc = d_chunkCRC[0];
     for (uint64_t i = 1; i < chunkCount; ++i) {
