@@ -2005,7 +2005,7 @@ class TestBuildGrid(unittest.TestCase):
         self.assertEqual(g.getValue(ijk), 3.5)
         self.assertTrue(g.isActive(ijk))
 
-    def test_to_nanovdb_roundtrip(self):
+    def test_tonanovdb_roundtrip(self):
         g = nanovdb.tools.build.FloatGrid(0.0, "trip", nanovdb.GridClass.FogVolume)
         g.setValue(nanovdb.math.Coord(0, 0, 0), 1.0)
         g.setValue(nanovdb.math.Coord(1, 0, 0), 2.0)
@@ -2018,7 +2018,7 @@ class TestBuildGrid(unittest.TestCase):
         self.assertEqual(ng.gridName(), "trip")
         self.assertEqual(ng.activeVoxelCount(), 3)
 
-    def test_to_nanovdb_does_not_consume_source(self):
+    def test_tonanovdb_does_not_consume_source(self):
         # Source build::Grid must remain usable after .toNanoVDB().
         g = nanovdb.tools.build.FloatGrid(0.0)
         g.setValue(nanovdb.math.Coord(0, 0, 0), 1.0)

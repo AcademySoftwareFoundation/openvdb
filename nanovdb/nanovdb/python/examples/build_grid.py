@@ -65,14 +65,14 @@ def main():
         print(f"  nodeCount (leaf, lower, upper) = {g.nodeCount()}")
 
         # Bake into a host NanoGrid<float>.
-        handle = g.to_nanovdb(sMode=nanovdb.tools.StatsMode.All)
+        handle = g.toNanoVDB(sMode=nanovdb.tools.StatsMode.All)
         ng = handle.grid()
         print(f"  baked NanoGrid: type={ng.gridType()}, "
               f"active={ng.activeVoxelCount()}, "
               f"worldBBox={ng.worldBBox()}")
 
         # The build grid is left untouched — we can bake again.
-        handle2 = g.to_nanovdb()
+        handle2 = g.toNanoVDB()
         assert handle2.grid().activeVoxelCount() == ng.activeVoxelCount()
 
 
