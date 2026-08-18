@@ -247,7 +247,7 @@ class Backend:
         if grid is None or grid.data_ptr() == 0:
             handle.deviceUpload(0, True)
             grid = handle.deviceGrid(0)
-        vbm = self.tc.buildVoxelBlockManager(grid, log2_block_width=LOG2_BLOCK_WIDTH)
+        vbm = self.tc.buildVoxelBlockManager(grid, log2BlockWidth=LOG2_BLOCK_WIDTH)
         n, bc = int(vbm.lastOffset()), int(vbm.blockCount())
         coords = cp.zeros((n + 1, 3), dtype=cp.int32)
         self.k_decode((bc,), (BLOCK_WIDTH,),

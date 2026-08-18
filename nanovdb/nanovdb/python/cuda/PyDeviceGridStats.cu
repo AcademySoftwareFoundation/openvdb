@@ -27,15 +27,15 @@ void defineDeviceUpdateGridStats(nb::module_& m, const char* name)
 {
     m.def(
         name,
-        [](nanovdb::NanoGrid<BuildT>* d_grid, nanovdb::tools::StatsMode mode, uintptr_t stream) {
+        [](nanovdb::NanoGrid<BuildT>* dGrid, nanovdb::tools::StatsMode mode, uintptr_t stream) {
             cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
             // updateGridStats launches kernels and synchronizes the stream;
             // pure CUDA touching no Python objects, so release the GIL. The
             // operation mutates the device grid in place.
             nb::gil_scoped_release release;
-            nanovdb::tools::cuda::updateGridStats<BuildT>(d_grid, mode, s);
+            nanovdb::tools::cuda::updateGridStats<BuildT>(dGrid, mode, s);
         },
-        "d_grid"_a,
+        "dGrid"_a,
         "mode"_a = nanovdb::tools::StatsMode::Default,
         "stream"_a = 0,
         "Recompute and write per-node statistics into the given device grid "

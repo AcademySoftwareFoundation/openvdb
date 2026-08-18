@@ -49,14 +49,14 @@ def main():
     coords = cp.ascontiguousarray(
         cp.stack([i.ravel(), j.ravel(), k.ravel()], axis=1))
     src = nanovdb.tools.cuda.voxelsToOnIndexGrid(coords, 1.0, 0)
-    src_grid = src.deviceGrid(0)
+    srcGrid = src.deviceGrid(0)
     src_active = _active(src)
     print(f"source block: {src_active} active voxels")
 
-    dil6 = nanovdb.tools.cuda.dilateGrid(src_grid, 6, 0)
-    dil26 = nanovdb.tools.cuda.dilateGrid(src_grid, 26, 0)
-    coarse = nanovdb.tools.cuda.coarsenGrid(src_grid, 0)
-    fine = nanovdb.tools.cuda.refineGrid(src_grid, 0)
+    dil6 = nanovdb.tools.cuda.dilateGrid(srcGrid, 6, 0)
+    dil26 = nanovdb.tools.cuda.dilateGrid(srcGrid, 26, 0)
+    coarse = nanovdb.tools.cuda.coarsenGrid(srcGrid, 0)
+    fine = nanovdb.tools.cuda.refineGrid(srcGrid, 0)
     a6, a26 = _active(dil6), _active(dil26)
     ac, af = _active(coarse), _active(fine)
     print(f"dilate(faces)     -> {a6} active")
@@ -71,7 +71,7 @@ def main():
     shifted = nanovdb.tools.cuda.voxelsToOnIndexGrid(
         cp.ascontiguousarray(coords + cp.asarray([4, 0, 0], dtype=cp.int32)),
         1.0, 0)
-    merged = nanovdb.tools.cuda.mergeGrids(src_grid, shifted.deviceGrid(0), 0)
+    merged = nanovdb.tools.cuda.mergeGrids(srcGrid, shifted.deviceGrid(0), 0)
     am = _active(merged)
     print(f"merge(block, block+4x) -> {am} active")
     assert am > src_active
@@ -81,7 +81,7 @@ def main():
     src.deviceDownload(0, True)
     leaf_count = src.grid(0).tree().nodeCount(0)
     retain_all = cp.full(leaf_count * 8, 0xFFFFFFFFFFFFFFFF, dtype=cp.uint64)
-    pruned = nanovdb.tools.cuda.pruneGrid(src_grid, retain_all, 0)
+    pruned = nanovdb.tools.cuda.pruneGrid(srcGrid, retain_all, 0)
     ap = _active(pruned)
     print(f"prune(retain-all, {leaf_count} leaves) -> {ap} active")
     assert ap == src_active

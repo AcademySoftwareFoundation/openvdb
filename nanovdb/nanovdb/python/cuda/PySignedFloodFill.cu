@@ -16,14 +16,14 @@ template<typename BuildT> void defineSignedFloodFill(nb::module_& m, const char*
 {
     m.def(
         name,
-        [](NanoGrid<BuildT>* d_grid, bool verbose, uintptr_t stream) {
+        [](NanoGrid<BuildT>* dGrid, bool verbose, uintptr_t stream) {
             cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
             // signedFloodFill launches kernels and synchronizes the stream;
             // pure CUDA touching no Python objects, so release the GIL.
             nb::gil_scoped_release release;
-            tools::cuda::signedFloodFill(d_grid, verbose, s);
+            tools::cuda::signedFloodFill(dGrid, verbose, s);
         },
-        "d_grid"_a,
+        "dGrid"_a,
         "verbose"_a = false,
         "stream"_a = 0,
         "Perform a signed flood fill on a device float/double grid in place. "

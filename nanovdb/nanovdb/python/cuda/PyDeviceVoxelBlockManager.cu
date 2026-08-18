@@ -28,7 +28,7 @@ namespace pynanovdb {
 // ----------------------- Log2BlockWidth dispatch --------------------------
 //
 // Mirrors the host dispatchLog2BlockWidth (PyVoxelBlockManager.cc): turn the
-// runtime log2_block_width into one of the four compile-time widths the
+// runtime log2BlockWidth into one of the four compile-time widths the
 // device builder is instantiated for (BlockWidth = 64, 128, 256, 512).
 template<typename F>
 static auto dispatchLog2BlockWidth(int log2BlockWidth, F&& fn)
@@ -40,15 +40,15 @@ static auto dispatchLog2BlockWidth(int log2BlockWidth, F&& fn)
         case 9: return fn(std::integral_constant<int, 9>{});
         default:
             throw nb::value_error(
-                "VoxelBlockManager: log2_block_width must be 6, 7, 8, or 9 "
+                "VoxelBlockManager: log2BlockWidth must be 6, 7, 8, or 9 "
                 "(BlockWidth = 64, 128, 256, or 512). Larger widths are not "
                 "bound in Python by default.");
     }
 }
 
 // PyDeviceVBMHandle wraps the device VoxelBlockManagerHandle and carries the
-// log2_block_width it was built with (parallel to the host PyVBMHandle). The
-// C++ handle does NOT store log2_block_width itself, so recording it once at
+// log2BlockWidth it was built with (parallel to the host PyVBMHandle). The
+// C++ handle does NOT store log2BlockWidth itself, so recording it once at
 // build time keeps the jumpMap view shape derivable from the handle rather
 // than from a caller who could spoof it.
 struct PyDeviceVBMHandle
@@ -81,7 +81,7 @@ static NanoGrid<ValueOnIndex>* castOnIndexDeviceGrid(nb::handle py_grid,
 {
     if (!nb::isinstance<NanoGrid<ValueOnIndex>>(py_grid)) {
         std::string msg(fn_name);
-        msg += ": device_grid must be a NanoVDB device grid of build type "
+        msg += ": deviceGrid must be a NanoVDB device grid of build type "
                "ValueOnIndex (OnIndexGrid), obtained from "
                "DeviceGridHandle.deviceGrid(n)";
         throw nb::type_error(msg.c_str());
@@ -100,12 +100,12 @@ static NanoGrid<ValueOnIndex>* castOnIndexDeviceGrid(nb::handle py_grid,
 // value indices beyond activeVoxelCount, so those writes run out of bounds (an
 // illegal memory access). Detect it cheaply (two D2H header reads) and raise a
 // clear error instead of crashing.
-static void requireContiguousIndexing(const NanoGrid<ValueOnIndex>* d_grid,
+static void requireContiguousIndexing(const NanoGrid<ValueOnIndex>* dGrid,
                                       const char* fn_name)
 {
     using Traits = nanovdb::util::cuda::DeviceGridTraits<ValueOnIndex>;
-    const uint64_t valueCount  = Traits::getValueCount(d_grid);
-    const uint64_t activeCount = Traits::getActiveVoxelCount(d_grid);
+    const uint64_t valueCount  = Traits::getValueCount(dGrid);
+    const uint64_t activeCount = Traits::getActiveVoxelCount(dGrid);
     if (valueCount != activeCount + 1) {
         std::string msg(fn_name);
         msg += ": requires an OnIndex grid with contiguous active-voxel indexing "
@@ -113,7 +113,7 @@ static void requireContiguousIndexing(const NanoGrid<ValueOnIndex>* d_grid,
                "grid has " + std::to_string(valueCount) + " values for " +
                std::to_string(activeCount) + " active voxels -- it carries "
                "per-node statistics and/or tile values. Rebuild it with "
-               "createOnIndexGrid(grid, include_stats=False, include_tiles=False) "
+               "createOnIndexGrid(grid, includeStats=False, includeTiles=False) "
                "or voxelsToOnIndexGrid.";
         throw nb::value_error(msg.c_str());
     }
@@ -140,13 +140,13 @@ static void defineHandle(nb::module_& m)
              "by this handle.")
         .def("reset",       &PyDeviceVBMHandle::reset,
              "Release this handle's device buffers and reset it to the empty state.")
-        .def_prop_ro("log2_block_width",
+        .def_prop_ro("log2BlockWidth",
              [](const PyDeviceVBMHandle& h) { return h.log2BlockWidth; },
-            "The log2_block_width this handle was built with. The jumpMap "
+            "The log2BlockWidth this handle was built with. The jumpMap "
             "view derives its shape from this value.")
-        .def_prop_ro("block_width", &PyDeviceVBMHandle::blockWidth,
-            "BlockWidth = 1 << log2_block_width (64, 128, 256, or 512).")
-        .def_prop_ro("jump_map_length", &PyDeviceVBMHandle::jumpMapLength,
+        .def_prop_ro("blockWidth", &PyDeviceVBMHandle::blockWidth,
+            "BlockWidth = 1 << log2BlockWidth (64, 128, 256, or 512).")
+        .def_prop_ro("jumpMapLength", &PyDeviceVBMHandle::jumpMapLength,
             "JumpMapLength = BlockWidth / 64 (1, 2, 4, or 8).")
         .def(
             "__bool__",
@@ -200,7 +200,7 @@ static void defineHandle(nb::module_& m)
         // ------------------- jumpMap device view -------------------
         // Zero-copy DEVICE view of the (blockCount, jumpMapLength) uint64
         // jumpMap. jumpMapLength derives from the handle's recorded
-        // log2_block_width, never the caller, so the view exactly covers the
+        // log2BlockWidth, never the caller, so the view exactly covers the
         // allocated buffer.
         .def(
             "jumpMap",
@@ -219,7 +219,7 @@ static void defineHandle(nb::module_& m)
             // not weak-referenceable; the py_self owner arg anchors lifetime.
             "Return a zero-copy (blockCount, jump_map_length) uint64 DEVICE "
             "array view of the jumpMap, consumable by CuPy / PyTorch / Numba. "
-            "The shape is determined by the log2_block_width the handle was "
+            "The shape is determined by the log2BlockWidth the handle was "
             "built with. Returns an empty (0, jump_map_length) array on a "
             "default-constructed or reset() handle. The view keeps this handle "
             "alive.")
@@ -279,25 +279,25 @@ static void defineBuild(nb::module_& m)
 {
     m.def("buildVoxelBlockManager",
         [](nb::handle py_grid,
-           int log2_block_width,
-           uint64_t first_offset,
-           uint64_t last_offset,
-           uint64_t n_blocks,
+           int log2BlockWidth,
+           uint64_t firstOffset,
+           uint64_t lastOffset,
+           uint64_t nBlocks,
            uintptr_t stream) -> PyDeviceVBMHandle {
-            auto* d_grid = castOnIndexDeviceGrid(py_grid, "buildVoxelBlockManager");
+            auto* dGrid = castOnIndexDeviceGrid(py_grid, "buildVoxelBlockManager");
             cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
-            return dispatchLog2BlockWidth(log2_block_width, [&](auto W) {
+            return dispatchLog2BlockWidth(log2BlockWidth, [&](auto W) {
                 constexpr int LBW = decltype(W)::value;
                 using Base = VoxelBlockManagerBase<LBW>;
                 constexpr uint64_t BlockWidth = Base::BlockWidth;
-                // first_offset, if nonzero, must satisfy first_offset == 1
+                // firstOffset, if nonzero, must satisfy firstOffset == 1
                 // (mod BlockWidth); the C++ builder only NANOVDB_ASSERTs this
                 // (a no-op in release), so validate it here for a clear error.
-                if (first_offset != 0 &&
-                    ((first_offset - 1) & (BlockWidth - 1)) != 0) {
+                if (firstOffset != 0 &&
+                    ((firstOffset - 1) & (BlockWidth - 1)) != 0) {
                     throw nb::value_error(
-                        "buildVoxelBlockManager: first_offset must satisfy "
-                        "first_offset == 1 (mod BlockWidth). Pass 0 (the "
+                        "buildVoxelBlockManager: firstOffset must satisfy "
+                        "firstOffset == 1 (mod BlockWidth). Pass 0 (the "
                         "default) to let the implementation use 1.");
                 }
                 VoxelBlockManagerHandle<nanovdb::cuda::DeviceBuffer> handle;
@@ -308,29 +308,29 @@ static void defineBuild(nb::module_& m)
                     nb::gil_scoped_release release;
                     handle = nanovdb::tools::cuda::buildVoxelBlockManager<
                         LBW, nanovdb::cuda::DeviceBuffer>(
-                            d_grid, first_offset, last_offset, n_blocks, s);
+                            dGrid, firstOffset, lastOffset, nBlocks, s);
                 }
                 return PyDeviceVBMHandle(std::move(handle), LBW);
             });
         },
-        "device_grid"_a,
-        "log2_block_width"_a = 6,
-        "first_offset"_a = 0,
-        "last_offset"_a = 0,
-        "n_blocks"_a = 0,
+        "deviceGrid"_a,
+        "log2BlockWidth"_a = 6,
+        "firstOffset"_a = 0,
+        "lastOffset"_a = 0,
+        "nBlocks"_a = 0,
         "stream"_a = 0,
         // The device builder reads the grid from device memory; keep the
         // device grid (and its owning DeviceGridHandle) alive for the duration
         // of the build. The returned handle owns its own device metadata
         // buffers, so it does NOT need to keep the grid alive afterwards.
         "Build a device-side VoxelBlockManager from an OnIndex DEVICE grid. "
-        "device_grid MUST be a device grid (from "
+        "deviceGrid MUST be a device grid (from "
         "DeviceGridHandle.deviceGrid(n)); passing a host grid is a usage "
-        "error. log2_block_width selects the per-block active-voxel count "
-        "(6=64, 7=128, 8=256, 9=512). Pass 0 for first_offset / last_offset / "
-        "n_blocks to use the full grid (first active voxel through "
+        "error. log2BlockWidth selects the per-block active-voxel count "
+        "(6=64, 7=128, 8=256, 9=512). Pass 0 for firstOffset / lastOffset / "
+        "nBlocks to use the full grid (first active voxel through "
         "activeVoxelCount, minimum block count); these are read from device "
-        "memory. first_offset, if nonzero, must satisfy first_offset == 1 "
+        "memory. firstOffset, if nonzero, must satisfy firstOffset == 1 "
         "(mod BlockWidth). stream is a raw CUDA stream handle (Python int; 0 = "
         "default stream).");
 }
@@ -385,40 +385,40 @@ template<typename T> void defineGatherBoxStencil(nb::module_& m, const char* nam
         [](nb::handle py_grid,
            nb::ndarray<const T, nb::ndim<1>, nb::c_contig, nb::device::cuda> values,
            nb::ndarray<T, nb::shape<-1, 27>, nb::c_contig, nb::device::cuda>  out,
-           int log2_block_width, uintptr_t stream) {
-            auto* d_grid = castOnIndexDeviceGrid(py_grid, "gatherBoxStencil");
-            requireContiguousIndexing(d_grid, "gatherBoxStencil");
+           int log2BlockWidth, uintptr_t stream) {
+            auto* dGrid = castOnIndexDeviceGrid(py_grid, "gatherBoxStencil");
+            requireContiguousIndexing(dGrid, "gatherBoxStencil");
             cudaStream_t s     = reinterpret_cast<cudaStream_t>(stream);
             const T*     dVals = values.data();
             T*           dOut  = out.data();
             // Build a transient VBM, then one block per VBM block decodes and
             // gathers the 27 neighbour values; pure CUDA, so release the GIL.
             nb::gil_scoped_release release;
-            dispatchLog2BlockWidth(log2_block_width, [&](auto W) {
+            dispatchLog2BlockWidth(log2BlockWidth, [&](auto W) {
                 constexpr int LBW = decltype(W)::value;
                 auto handle = nanovdb::tools::cuda::buildVoxelBlockManager<
-                    LBW, nanovdb::cuda::DeviceBuffer>(d_grid, 0, 0, 0, s);
+                    LBW, nanovdb::cuda::DeviceBuffer>(dGrid, 0, 0, 0, s);
                 const uint32_t bc = static_cast<uint32_t>(handle.blockCount());
                 if (bc)
                     gatherBoxStencilKernel<LBW, T><<<bc, (1 << LBW), 0, s>>>(
-                        d_grid, handle.deviceFirstLeafID(), handle.deviceJumpMap(),
+                        dGrid, handle.deviceFirstLeafID(), handle.deviceJumpMap(),
                         handle.firstOffset(), dVals, dOut);
                 cudaCheck(cudaStreamSynchronize(s));
                 return 0;
             });
         },
-        "device_grid"_a, "values"_a, "out"_a, "log2_block_width"_a = 9, "stream"_a = 0,
+        "deviceGrid"_a, "values"_a, "out"_a, "log2BlockWidth"_a = 9, "stream"_a = 0,
         "Gather the 3x3x3 box-stencil neighbour values of every active voxel "
         "into a dense (valueCount, 27) array -- the bridge that lets tile / "
         "array frameworks (CuPy, cuTile, ...) run VDB stencils without pointer-"
-        "chasing the tree. device_grid is an OnIndex device grid from "
+        "chasing the tree. deviceGrid is an OnIndex device grid from "
         "DeviceGridHandle.deviceGrid(n); values is a 1-D device array indexed by "
         "value index (the per-voxel sidecar; entry 0 is the background slot); out "
         "is a 2-D device array of shape (rows, 27) with rows >= valueCount, "
         "filled so out[k, j] is voxel k's neighbour value at 3x3x3 spoke "
         "j = (di+1)*9+(dj+1)*3+(dk+1) (centre j=13; the six faces are "
         "j = 4, 10, 12, 14, 16, 22). Inactive neighbours read values[0]. A "
-        "transient VoxelBlockManager is built internally at log2_block_width "
+        "transient VoxelBlockManager is built internally at log2BlockWidth "
         "(6/7/8/9). stream is a raw CUDA stream handle (Python int; 0 = default "
         "stream).");
 }
@@ -465,9 +465,9 @@ template<typename T> void defineGatherBoxStencilColumns(nb::module_& m, const ch
            nb::ndarray<const T, nb::ndim<1>, nb::c_contig, nb::device::cuda> values,
            nb::ndarray<T, nb::shape<-1, -1>, nb::c_contig, nb::device::cuda>  out,
            nb::ndarray<const int32_t, nb::ndim<1>, nb::c_contig>             spokes,
-           int log2_block_width, uintptr_t stream) {
-            auto* d_grid = castOnIndexDeviceGrid(py_grid, "gatherBoxStencilColumns");
-            requireContiguousIndexing(d_grid, "gatherBoxStencilColumns");
+           int log2BlockWidth, uintptr_t stream) {
+            auto* dGrid = castOnIndexDeviceGrid(py_grid, "gatherBoxStencilColumns");
+            requireContiguousIndexing(dGrid, "gatherBoxStencilColumns");
             const int K = static_cast<int>(spokes.shape(0));
             if (K < 1 || K > 27)
                 throw nb::value_error("gatherBoxStencilColumns: len(spokes) must be in [1, 27].");
@@ -484,20 +484,20 @@ template<typename T> void defineGatherBoxStencilColumns(nb::module_& m, const ch
             const T*     dVals = values.data();
             T*           dOut  = out.data();
             nb::gil_scoped_release release;
-            dispatchLog2BlockWidth(log2_block_width, [&](auto W) {
+            dispatchLog2BlockWidth(log2BlockWidth, [&](auto W) {
                 constexpr int LBW = decltype(W)::value;
                 auto handle = nanovdb::tools::cuda::buildVoxelBlockManager<
-                    LBW, nanovdb::cuda::DeviceBuffer>(d_grid, 0, 0, 0, s);
+                    LBW, nanovdb::cuda::DeviceBuffer>(dGrid, 0, 0, 0, s);
                 const uint32_t bc = static_cast<uint32_t>(handle.blockCount());
                 if (bc)
                     gatherBoxStencilColumnsKernel<LBW, T><<<bc, (1 << LBW), 0, s>>>(
-                        d_grid, handle.deviceFirstLeafID(), handle.deviceJumpMap(),
+                        dGrid, handle.deviceFirstLeafID(), handle.deviceJumpMap(),
                         handle.firstOffset(), dVals, dOut, sp, K);
                 cudaCheck(cudaStreamSynchronize(s));
                 return 0;
             });
         },
-        "device_grid"_a, "values"_a, "out"_a, "spokes"_a, "log2_block_width"_a = 9, "stream"_a = 0,
+        "deviceGrid"_a, "values"_a, "out"_a, "spokes"_a, "log2BlockWidth"_a = 9, "stream"_a = 0,
         "Like gatherBoxStencil, but gathers only a chosen SUBSET of the 27 box-"
         "stencil spokes into a dense (valueCount, K) array: out[k, col] is voxel "
         "k's neighbour value at spoke spokes[col], where spoke "
@@ -547,35 +547,35 @@ void defineActiveVoxelCoords(nb::module_& m, const char* name)
         name,
         [](nb::handle py_grid,
            nb::ndarray<int32_t, nb::shape<-1, 3>, nb::c_contig, nb::device::cuda> out,
-           int log2_block_width, uintptr_t stream) {
-            auto* d_grid = castOnIndexDeviceGrid(py_grid, "activeVoxelCoords");
-            requireContiguousIndexing(d_grid, "activeVoxelCoords");
+           int log2BlockWidth, uintptr_t stream) {
+            auto* dGrid = castOnIndexDeviceGrid(py_grid, "activeVoxelCoords");
+            requireContiguousIndexing(dGrid, "activeVoxelCoords");
             cudaStream_t s    = reinterpret_cast<cudaStream_t>(stream);
             int32_t*     dOut = out.data();
             nb::gil_scoped_release release;
-            dispatchLog2BlockWidth(log2_block_width, [&](auto W) {
+            dispatchLog2BlockWidth(log2BlockWidth, [&](auto W) {
                 constexpr int LBW = decltype(W)::value;
                 auto handle = nanovdb::tools::cuda::buildVoxelBlockManager<
-                    LBW, nanovdb::cuda::DeviceBuffer>(d_grid, 0, 0, 0, s);
+                    LBW, nanovdb::cuda::DeviceBuffer>(dGrid, 0, 0, 0, s);
                 const uint32_t bc = static_cast<uint32_t>(handle.blockCount());
                 if (bc)
                     activeVoxelCoordsKernel<LBW><<<bc, (1 << LBW), 0, s>>>(
-                        d_grid, handle.deviceFirstLeafID(), handle.deviceJumpMap(),
+                        dGrid, handle.deviceFirstLeafID(), handle.deviceJumpMap(),
                         handle.firstOffset(), dOut);
                 cudaCheck(cudaStreamSynchronize(s));
                 return 0;
             });
         },
-        "device_grid"_a, "out"_a, "log2_block_width"_a = 9, "stream"_a = 0,
+        "deviceGrid"_a, "out"_a, "log2BlockWidth"_a = 9, "stream"_a = 0,
         "Write each active voxel's index-space coordinate into a dense "
         "(rows, 3) int32 device array keyed by value index (rows >= valueCount); "
         "out[k] is the (i, j, k) coordinate of value index k (row 0, the "
         "background slot, is left untouched). The decode companion to "
         "gatherBoxStencil -- recovers per-voxel coordinates without a "
         "hand-written decode kernel (e.g. to bake a sidecar result back into a "
-        "grid). device_grid is an OnIndex device grid from "
+        "grid). deviceGrid is an OnIndex device grid from "
         "DeviceGridHandle.deviceGrid(n); a transient VoxelBlockManager is built "
-        "internally at log2_block_width (6/7/8/9). stream is a raw CUDA stream "
+        "internally at log2BlockWidth (6/7/8/9). stream is a raw CUDA stream "
         "handle (Python int; 0 = default stream).");
 }
 

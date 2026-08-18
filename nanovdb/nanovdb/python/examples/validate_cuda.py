@@ -46,25 +46,25 @@ def main():
     finally:
         os.unlink(tmp.name)
     handle.deviceUpload(0, True)
-    device_grid = handle.deviceGrid(0)
+    deviceGrid = handle.deviceGrid(0)
 
     # Structural validation on the device, partial and full.
-    partial = nanovdb.tools.cuda.isValid(device_grid, nanovdb.CheckMode.Partial)
-    full = nanovdb.tools.cuda.isValid(device_grid, nanovdb.CheckMode.Full)
+    partial = nanovdb.tools.cuda.isValid(deviceGrid, nanovdb.CheckMode.Partial)
+    full = nanovdb.tools.cuda.isValid(deviceGrid, nanovdb.CheckMode.Full)
     print(f"isValid: Partial={partial}, Full={full}")
     assert partial and full
 
     # Checksum round-trip: recompute in place, then verify it matches.
-    nanovdb.tools.cuda.updateChecksum(device_grid, nanovdb.CheckMode.Full)
-    checksum = nanovdb.tools.cuda.evalChecksum(device_grid, nanovdb.CheckMode.Full)
-    ok = nanovdb.tools.cuda.validateChecksum(device_grid, nanovdb.CheckMode.Full)
+    nanovdb.tools.cuda.updateChecksum(deviceGrid, nanovdb.CheckMode.Full)
+    checksum = nanovdb.tools.cuda.evalChecksum(deviceGrid, nanovdb.CheckMode.Full)
+    ok = nanovdb.tools.cuda.validateChecksum(deviceGrid, nanovdb.CheckMode.Full)
     print(f"checksum: {checksum} validateChecksum(Full)={ok}")
     assert ok
 
     # Recompute per-node statistics on the device.
-    nanovdb.tools.cuda.updateGridStats(device_grid)
+    nanovdb.tools.cuda.updateGridStats(deviceGrid)
     print("updateGridStats: OK")
-    assert nanovdb.tools.cuda.isValid(device_grid, nanovdb.CheckMode.Full)
+    assert nanovdb.tools.cuda.isValid(deviceGrid, nanovdb.CheckMode.Full)
 
     print("OK: device-side validation, checksum, and stats all pass")
 

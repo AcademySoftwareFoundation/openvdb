@@ -49,7 +49,7 @@ def main():
     finally:
         os.unlink(tmp.name)
     handle.deviceUpload(0, True)
-    device_grid = handle.deviceGrid(0)
+    deviceGrid = handle.deviceGrid(0)
 
     # Seed particles above the north pole of the sphere, falling down.
     rng = cp.random.RandomState(42)
@@ -68,7 +68,7 @@ def main():
         v[:, 1] += GRAVITY * DT
         next_p = cp.ascontiguousarray(p + v * DT)
 
-        nanovdb.tools.cuda.sampleFromVoxels(next_p, device_grid, values, grads, 0)
+        nanovdb.tools.cuda.sampleFromVoxels(next_p, deviceGrid, values, grads, 0)
         cp.cuda.Stream.null.synchronize()
 
         # A collision is a point inside the surface but still within the
@@ -95,7 +95,7 @@ def main():
     assert total_collisions > 0
 
     # No particle should end up deep inside the surface.
-    nanovdb.tools.cuda.sampleFromVoxels(cp.ascontiguousarray(p), device_grid, values, 0)
+    nanovdb.tools.cuda.sampleFromVoxels(cp.ascontiguousarray(p), deviceGrid, values, 0)
     cp.cuda.Stream.null.synchronize()
     in_band = (values > -BAND) & (values < BAND)
     if bool(in_band.any()):

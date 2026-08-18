@@ -478,9 +478,9 @@ class TestDeviceVoxelBlockManager(unittest.TestCase):
         dh, dg = _build_device_onindex_grid(100.0)
         vbm = nanovdb.tools.cuda.buildVoxelBlockManager(dg, 6, 0, 0, 0, 0)
         self.assertGreater(vbm.blockCount(), 0)
-        # block_width / log2_block_width / jump_map_length are PROPERTIES.
-        self.assertEqual(vbm.block_width, 64)
-        self.assertEqual(vbm.log2_block_width, 6)
+        # blockWidth / log2BlockWidth / jumpMapLength are PROPERTIES.
+        self.assertEqual(vbm.blockWidth, 64)
+        self.assertEqual(vbm.log2BlockWidth, 6)
         # firstOffset == 1 (mod BlockWidth) for a full grid.
         self.assertEqual(vbm.firstOffset(), 1)
         self.assertGreater(vbm.lastOffset(), 0)
@@ -538,8 +538,8 @@ class TestDeviceVoxelBlockManager(unittest.TestCase):
     def test_gather_rejects_noncontiguous_grid(self):
         """gatherBoxStencil / activeVoxelCoords raise a clear ValueError (rather
         than an illegal memory access) on a grid whose active-voxel indexing is
-        NOT contiguous -- e.g. createOnIndexGrid's default include_stats /
-        include_tiles, which add value slots past activeVoxelCount."""
+        NOT contiguous -- e.g. createOnIndexGrid's default includeStats /
+        includeTiles, which add value slots past activeVoxelCount."""
         cp = _require_cupy(self)
         dh, dg = _build_device_onindex_grid(20.0)   # createOnIndexGrid defaults: stats+tiles
         N = int(nanovdb.tools.cuda.buildVoxelBlockManager(dg, 9, 0, 0, 0, 0).lastOffset()) + 1

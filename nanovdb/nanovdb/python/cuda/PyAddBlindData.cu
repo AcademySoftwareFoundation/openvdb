@@ -24,7 +24,7 @@ void defineAddBlindData(nb::module_& m, const char* name)
 {
     m.def(
         name,
-        [](nanovdb::NanoGrid<BuildT>*                                   d_grid,
+        [](nanovdb::NanoGrid<BuildT>*                                   dGrid,
            nb::ndarray<BlindDataT, nb::ndim<1>, nb::c_contig, nb::device::cuda> blindData,
            nanovdb::GridBlindDataClass                                  blindClass,
            nanovdb::GridBlindDataSemantic                               semantics,
@@ -41,10 +41,10 @@ void defineAddBlindData(nb::module_& m, const char* name)
             // across the GIL release for the duration of this call frame.
             nb::gil_scoped_release release;
             return nanovdb::tools::cuda::addBlindData<BuildT, BlindDataT>(
-                d_grid, d_blindData, valueCount, blindClass, semantics,
+                dGrid, d_blindData, valueCount, blindClass, semantics,
                 dataName.c_str(), nanovdb::cuda::DeviceBuffer(), s);
         },
-        "d_grid"_a,
+        "dGrid"_a,
         "blindData"_a,
         "blindClass"_a = nanovdb::GridBlindDataClass::Unknown,
         "semantics"_a = nanovdb::GridBlindDataSemantic::Unknown,

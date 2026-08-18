@@ -92,7 +92,7 @@ class GatherBackend:
             handle.deviceUpload(0, True)
             grid = handle.deviceGrid(0)
         n = int(nanovdb.tools.cuda.buildVoxelBlockManager(
-            grid, log2_block_width=LOG2_BLOCK_WIDTH).lastOffset())
+            grid, log2BlockWidth=LOG2_BLOCK_WIDTH).lastOffset())
         return {"handle": handle, "grid": grid, "n": n}
 
     def active_coords(self, g):
@@ -141,7 +141,7 @@ def read_to_device(backend, path, band):
     tmp = None
     if gtype == nanovdb.GridType.Float:
         onh = T.createOnIndexGrid(host.grid(0), channels=1,
-                                  include_stats=False, include_tiles=False)
+                                  includeStats=False, includeTiles=False)
         sdf = np.array(onh.grid(0).getBlindData(0), dtype=np.float32)
         tmp = tempfile.NamedTemporaryFile(suffix=".nvdb", delete=False); tmp.close()
         io.writeGrid(tmp.name, onh)
@@ -157,7 +157,7 @@ def read_to_device(backend, path, band):
     if sdf.shape[0] != g["n"] + 1:
         raise SystemExit(f"{path}: SDF channel length {sdf.shape[0]} != activeVoxelCount+1 "
                          f"({g['n'] + 1}); the OnIndex grid must use contiguous voxel indexing "
-                         "(built with include_stats=False, include_tiles=False).")
+                         "(built with includeStats=False, includeTiles=False).")
     phi = cp.asarray(sdf)
     phi[0] = SENTINEL                              # inactive-neighbour marker
     if tmp is not None:
@@ -172,7 +172,7 @@ def sphere_on_device(backend, radius, voxel_size=1.0, band=BAND, name="sphere"):
     io, T = nanovdb.io, nanovdb.tools
     fg = T.createLevelSetSphere(radius=radius, voxelSize=voxel_size, name=name)
     onh = T.createOnIndexGrid(fg.grid(0), channels=1,
-                              include_stats=False, include_tiles=False)
+                              includeStats=False, includeTiles=False)
     sdf = np.array(onh.grid(0).getBlindData(0), dtype=np.float32)
     tmp = tempfile.NamedTemporaryFile(suffix=".nvdb", delete=False); tmp.close()
     io.writeGrid(tmp.name, onh)
@@ -194,9 +194,9 @@ def rebuild(backend, g, phi, vx, half_width):
     TC.inject(g["grid"], gd["grid"], phi, phi_d)   # carry old phi (intersection)
     phi_d = backend.extrapolate(gd, phi_d, vx)     # fill the freshly-dilated ring
     predicate = cp.abs(phi_d) <= half_width        # phi_d[0]=SENTINEL -> False
-    leaf_masks = cp.zeros(gd["n"] * 8, dtype=cp.uint64)
-    TC.injectPredicateToMask(gd["grid"], predicate, leaf_masks)
-    gp = backend.setup(TC.pruneGrid(gd["grid"], leaf_masks))
+    leafMasks = cp.zeros(gd["n"] * 8, dtype=cp.uint64)
+    TC.injectPredicateToMask(gd["grid"], predicate, leafMasks)
+    gp = backend.setup(TC.pruneGrid(gd["grid"], leafMasks))
     phi_p = cp.full(gp["n"] + 1, SENTINEL, dtype=cp.float32)
     TC.inject(gd["grid"], gp["grid"], phi_d, phi_p)
     return gp, phi_p
@@ -231,7 +231,7 @@ def write_output(backend, g, phi, vx, path, style, band, name="filtered"):
     fh = builder.toNanoVDB()
     if style == nanovdb.GridType.OnIndex:
         io.writeGrid(path, T.createOnIndexGrid(fh.grid(0), channels=1,
-                                               include_stats=False, include_tiles=False))
+                                               includeStats=False, includeTiles=False))
     else:
         io.writeGrid(path, fh)
 
@@ -294,7 +294,7 @@ def self_test(backend):
 
     sphere = T.createLevelSetSphere(radius=18.0, voxelSize=1.0, name="sphere")
     io.writeGrid(o_in, T.createOnIndexGrid(sphere.grid(0), channels=1,
-                                           include_stats=False, include_tiles=False))
+                                           includeStats=False, includeTiles=False))
     print(f"self-test 2 [{backend.NAME}]: OnIndex+SDF sphere -> filter -> OnIndex+SDF")
     r0b, rb, style2 = run_filter(backend, o_in, o_out, outer_iters=4)
     ro = io.readGrid(o_out)

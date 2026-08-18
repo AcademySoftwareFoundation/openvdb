@@ -20,16 +20,16 @@ template<typename BuildT> void defineDilateGrid(nb::module_& m, const char* name
 {
     m.def(
         name,
-        [](nanovdb::NanoGrid<BuildT>* d_grid, int op, uintptr_t stream) {
+        [](nanovdb::NanoGrid<BuildT>* dGrid, int op, uintptr_t stream) {
             cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
             // DilateGrid::getHandle launches kernels and synchronizes the
             // stream; pure CUDA touching no Python objects, so release the GIL.
             nb::gil_scoped_release release;
-            nanovdb::tools::cuda::DilateGrid<BuildT> dilator(d_grid, s);
+            nanovdb::tools::cuda::DilateGrid<BuildT> dilator(dGrid, s);
             dilator.setOperation(static_cast<nanovdb::tools::morphology::NearestNeighbors>(op));
             return dilator.getHandle();
         },
-        "d_grid"_a,
+        "dGrid"_a,
         "op"_a = static_cast<int>(nanovdb::tools::morphology::NN_FACE_EDGE_VERTEX),
         "stream"_a = 0,
         "Morphologically dilate a device OnIndex grid and return a fresh device "

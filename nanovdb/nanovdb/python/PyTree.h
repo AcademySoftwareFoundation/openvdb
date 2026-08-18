@@ -444,7 +444,7 @@ struct PyLeafValuesBinder<BuildT,
         using GridT = nanovdb::NanoGrid<BuildT>;
         using LeafT = nanovdb::NanoLeaf<BuildT>;
         using ValueT = typename LeafT::ValueType;
-        cls.def("leaf_values",
+        cls.def("leafValues",
             [](nb::handle py_self) -> nb::object {
                 auto& grid = nb::cast<GridT&>(py_self);
                 const auto& tree = grid.tree();

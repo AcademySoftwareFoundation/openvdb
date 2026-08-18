@@ -19,15 +19,15 @@ template<typename BuildT> void defineRefineGrid(nb::module_& m, const char* name
 {
     m.def(
         name,
-        [](nanovdb::NanoGrid<BuildT>* d_grid, uintptr_t stream) {
+        [](nanovdb::NanoGrid<BuildT>* dGrid, uintptr_t stream) {
             cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
             // RefineGrid::getHandle launches kernels and synchronizes the
             // stream; pure CUDA touching no Python objects, so release the GIL.
             nb::gil_scoped_release release;
-            nanovdb::tools::cuda::RefineGrid<BuildT> refiner(d_grid, s);
+            nanovdb::tools::cuda::RefineGrid<BuildT> refiner(dGrid, s);
             return refiner.getHandle();
         },
-        "d_grid"_a,
+        "dGrid"_a,
         "stream"_a = 0,
         "Topologically refine (2x upsample) a device OnIndex grid and return a "
         "fresh device GridHandle of the refined grid. stream is a raw CUDA "

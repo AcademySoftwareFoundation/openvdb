@@ -80,19 +80,19 @@ def main():
     # grid's data_ptr is a device address. The grid object itself cannot
     # tell them apart.
     host_grid = handle.grid(0)
-    device_grid = handle.deviceGrid(0)
+    deviceGrid = handle.deviceGrid(0)
     print(f"  host  grid.data_ptr() = {hex(host_grid.data_ptr())} (CPU)")
-    print(f"  device grid.data_ptr() = {hex(device_grid.data_ptr())} (GPU)")
+    print(f"  device grid.data_ptr() = {hex(deviceGrid.data_ptr())} (GPU)")
     print(f"  device grid.data_ptr() == handle.device_ptr(): "
-          f"{device_grid.data_ptr() == handle.device_ptr()}")
+          f"{deviceGrid.data_ptr() == handle.device_ptr()}")
 
     # The device grid is the input to nanovdb.tools.cuda.* ops. Validate
     # it entirely on the device.
-    print(f"  tools.cuda.isValid(device_grid) = "
-          f"{nanovdb.tools.cuda.isValid(device_grid)}")
+    print(f"  tools.cuda.isValid(deviceGrid) = "
+          f"{nanovdb.tools.cuda.isValid(deviceGrid)}")
 
     print("WARNING: calling a host-side accessor (e.g. "
-          "device_grid.getAccessor().getValue(...)) on a DEVICE grid "
+          "deviceGrid.getAccessor().getValue(...)) on a DEVICE grid "
           "dereferences GPU memory on the CPU and SEGFAULTS. Use host_grid "
           "for host reads.")
 

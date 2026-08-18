@@ -36,7 +36,7 @@ KERNEL_SRC = r"""
 #include <nanovdb/math/HDDA.h>
 
 extern "C" __global__
-void render_level_set(const nanovdb::NanoGrid<float>* d_grid,
+void render_level_set(const nanovdb::NanoGrid<float>* dGrid,
                       unsigned char* image, int res, float tan_fov,
                       float eye_x, float eye_y, float eye_z,
                       float lx, float ly, float lz)
@@ -48,7 +48,7 @@ void render_level_set(const nanovdb::NanoGrid<float>* d_grid,
     using Vec3T = nanovdb::math::Vec3f;
     using RayT = nanovdb::math::Ray<float>;
 
-    auto acc = d_grid->tree().getAccessor();
+    auto acc = dGrid->tree().getAccessor();
     const float px = (2.0f * (x + 0.5f) / res - 1.0f) * tan_fov;
     const float py = (2.0f * (y + 0.5f) / res - 1.0f) * tan_fov;
     const float inv = 1.0f / sqrtf(px * px + py * py + 1.0f);
@@ -56,7 +56,7 @@ void render_level_set(const nanovdb::NanoGrid<float>* d_grid,
     RayT ray(Vec3T(eye_x, eye_y, eye_z),
              Vec3T(px * inv, py * inv, -inv));
     unsigned char shade = 0;
-    if (ray.clip(d_grid->indexBBox())) {
+    if (ray.clip(dGrid->indexBBox())) {
         nanovdb::Coord ijk;
         float v = 0.0f, t = 0.0f;
         if (nanovdb::math::ZeroCrossing(ray, acc, ijk, v, t)) {
@@ -115,7 +115,7 @@ def main():
         nanovdb.GridType.Float, radius=100.0)
     handle.deviceUpload(0, True)
     handle.deviceDownload(0, True)
-    device_grid = handle.deviceGrid(0)
+    deviceGrid = handle.deviceGrid(0)
     bbox = handle.grid(0).indexBBox()
 
     import math
@@ -130,7 +130,7 @@ def main():
     block = (16, 16)
     grid = ((RES + 15) // 16, (RES + 15) // 16)
     kernel(grid, block,
-           (device_grid.data_ptr(), image, RES, cp.float32(tan_fov),
+           (deviceGrid.data_ptr(), image, RES, cp.float32(tan_fov),
             cp.float32(eye[0]), cp.float32(eye[1]), cp.float32(eye[2]),
             cp.float32(LIGHT[0]), cp.float32(LIGHT[1]), cp.float32(LIGHT[2])))
     cp.cuda.runtime.deviceSynchronize()

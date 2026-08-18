@@ -21,23 +21,23 @@ template<typename BuildT> void defineMergeGrids(nb::module_& m, const char* name
 {
     m.def(
         name,
-        [](nanovdb::NanoGrid<BuildT>* d_grid1,
-           nanovdb::NanoGrid<BuildT>* d_grid2,
+        [](nanovdb::NanoGrid<BuildT>* dGrid1,
+           nanovdb::NanoGrid<BuildT>* dGrid2,
            uintptr_t                  stream) {
             cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
             // MergeGrids::getHandle launches kernels and synchronizes the
             // stream; pure CUDA touching no Python objects, so release the GIL.
             nb::gil_scoped_release release;
-            nanovdb::tools::cuda::MergeGrids<BuildT> merger(d_grid1, d_grid2, s);
+            nanovdb::tools::cuda::MergeGrids<BuildT> merger(dGrid1, dGrid2, s);
             return merger.getHandle();
         },
-        "d_grid1"_a,
-        "d_grid2"_a,
+        "dGrid1"_a,
+        "dGrid2"_a,
         "stream"_a = 0,
         "Topologically merge (active-mask union) two device OnIndex grids and "
         "return a fresh device GridHandle of the union. The operation is "
         "strictly binary; chain calls to union more than two grids. Output "
-        "metadata is taken from d_grid1. stream is a raw CUDA stream handle "
+        "metadata is taken from dGrid1. stream is a raw CUDA stream handle "
         "(Python int; 0 = default stream).");
 
     // List overload: N-ary merge

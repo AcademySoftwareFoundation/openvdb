@@ -9,8 +9,8 @@ equivalent of the host ``createTrilinearSampler`` used by
 it writes trilinear samples into an ``(N,)`` array and (optionally)
 analytic gradients into an ``(N, 3)`` array, all on the GPU:
 
-    tools.cuda.sampleFromVoxels(points, d_grid, values, stream)
-    tools.cuda.sampleFromVoxels(points, d_grid, values, gradients, stream)
+    tools.cuda.sampleFromVoxels(points, dGrid, values, stream)
+    tools.cuda.sampleFromVoxels(points, dGrid, values, gradients, stream)
 
 Here we sample a level-set sphere along a ray crossing its surface,
 recover the surface normal from the normalized gradient, and cross-check
@@ -48,7 +48,7 @@ def main():
     finally:
         os.unlink(tmp.name)
     handle.deviceUpload(0, True)
-    device_grid = handle.deviceGrid(0)
+    deviceGrid = handle.deviceGrid(0)
 
     # Query points marching along +x across the surface (within the
     # narrow band, where the SDF is meaningful).
@@ -59,7 +59,7 @@ def main():
 
     values = cp.empty(xs.size, dtype=cp.float32)
     gradients = cp.empty((xs.size, 3), dtype=cp.float32)
-    nanovdb.tools.cuda.sampleFromVoxels(points, device_grid, values, gradients, 0)
+    nanovdb.tools.cuda.sampleFromVoxels(points, deviceGrid, values, gradients, 0)
     cp.cuda.Stream.null.synchronize()
 
     print(f"Sampling a radius-{radius:.0f} level set along +x:")

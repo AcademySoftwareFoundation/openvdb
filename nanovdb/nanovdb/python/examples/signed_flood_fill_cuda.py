@@ -8,7 +8,7 @@ inactive tiles inside the surface read as negative background and those
 outside read as positive background. It runs in place on a device
 ``FloatGrid`` (or ``DoubleGrid``):
 
-    tools.cuda.signedFloodFill(d_grid, verbose, stream)
+    tools.cuda.signedFloodFill(dGrid, verbose, stream)
 
 We upload a level-set sphere, run the flood fill on the device, then use
 ``tools.cuda.sampleFromVoxels`` to confirm the field is consistently
@@ -47,10 +47,10 @@ def main():
     finally:
         os.unlink(tmp.name)
     handle.deviceUpload(0, True)
-    device_grid = handle.deviceGrid(0)
+    deviceGrid = handle.deviceGrid(0)
 
     # Propagate signs across the whole grid on the device, in place.
-    nanovdb.tools.cuda.signedFloodFill(device_grid, False, 0)
+    nanovdb.tools.cuda.signedFloodFill(deviceGrid, False, 0)
     print("signedFloodFill: done on the device")
 
     # The interior sign is only meaningful right at the band; sample just
@@ -58,7 +58,7 @@ def main():
     points = cp.asarray([[radius - 2.0, 0.0, 0.0],
                          [radius + 2.0, 0.0, 0.0]], dtype=cp.float32)
     values = cp.empty(2, dtype=cp.float32)
-    nanovdb.tools.cuda.sampleFromVoxels(cp.ascontiguousarray(points), device_grid, values, 0)
+    nanovdb.tools.cuda.sampleFromVoxels(cp.ascontiguousarray(points), deviceGrid, values, 0)
     cp.cuda.Stream.null.synchronize()
     inside, outside = (float(v) for v in cp.asnumpy(values))
     print(f"  sdf just inside surface = {inside:+.3f} (expect < 0)")
@@ -66,7 +66,7 @@ def main():
     assert inside < 0.0 < outside
 
     # The flooded grid must still be structurally valid.
-    assert nanovdb.tools.cuda.isValid(device_grid, nanovdb.CheckMode.Full)
+    assert nanovdb.tools.cuda.isValid(deviceGrid, nanovdb.CheckMode.Full)
     print("OK: device signed flood fill produced a consistent, valid SDF")
 
 

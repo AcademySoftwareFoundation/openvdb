@@ -26,7 +26,7 @@ void defineDeviceIsValid(nb::module_& m, const char* name)
 {
     m.def(
         name,
-        [](const nanovdb::NanoGrid<BuildT>* d_grid, nanovdb::CheckMode mode,
+        [](const nanovdb::NanoGrid<BuildT>* dGrid, nanovdb::CheckMode mode,
            bool verbose, uintptr_t stream) -> bool {
             cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
             // isValid runs structural checks in a device kernel plus a device
@@ -34,9 +34,9 @@ void defineDeviceIsValid(nb::module_& m, const char* name)
             // optional verbose diagnostic goes to std::cerr), so release the
             // GIL.
             nb::gil_scoped_release release;
-            return nanovdb::tools::cuda::isValid<BuildT>(d_grid, mode, verbose, s);
+            return nanovdb::tools::cuda::isValid<BuildT>(dGrid, mode, verbose, s);
         },
-        "d_grid"_a,
+        "dGrid"_a,
         "mode"_a = nanovdb::CheckMode::Default,
         "verbose"_a = false,
         "stream"_a = 0,

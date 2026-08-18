@@ -22,7 +22,7 @@ template<typename BuildT> void definePruneGrid(nb::module_& m, const char* name)
 {
     m.def(
         name,
-        [](nanovdb::NanoGrid<BuildT>*                             d_grid,
+        [](nanovdb::NanoGrid<BuildT>*                             dGrid,
            nb::ndarray<uint64_t, nb::c_contig, nb::device::cuda>  leafMask,
            uintptr_t                                              stream) {
             // The sidecar is a device array of nanovdb::Mask<3> (one 512-bit /
@@ -42,10 +42,10 @@ template<typename BuildT> void definePruneGrid(nb::module_& m, const char* name)
             // PruneGrid::getHandle launches kernels and synchronizes the
             // stream; pure CUDA touching no Python objects, so release the GIL.
             nb::gil_scoped_release release;
-            nanovdb::tools::cuda::PruneGrid<BuildT> pruner(d_grid, d_mask, s);
+            nanovdb::tools::cuda::PruneGrid<BuildT> pruner(dGrid, d_mask, s);
             return pruner.getHandle();
         },
-        "d_grid"_a,
+        "dGrid"_a,
         "leafMask"_a,
         "stream"_a = 0,
         "Morphologically prune a device OnIndex grid against a per-leaf retain "

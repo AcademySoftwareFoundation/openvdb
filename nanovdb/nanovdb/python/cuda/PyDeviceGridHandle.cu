@@ -67,14 +67,14 @@ void defineDeviceGridHandle(nb::module_& m)
         .def(
             "__init__",
             [](GridHandle<BufferT>&                                 handle,
-               nb::ndarray<uint32_t, nb::ndim<1>, nb::device::cpu>  cpu_t,
-               nb::ndarray<uint32_t, nb::ndim<1>, nb::device::cuda> cuda_t) {
-                assert(cpu_t.size() == cuda_t.size());
-                BufferT buffer(cpu_t.size() * sizeof(uint32_t), cpu_t.data(), cuda_t.data());
+               nb::ndarray<uint32_t, nb::ndim<1>, nb::device::cpu>  cpuT,
+               nb::ndarray<uint32_t, nb::ndim<1>, nb::device::cuda> cudaT) {
+                assert(cpuT.size() == cudaT.size());
+                BufferT buffer(cpuT.size() * sizeof(uint32_t), cpuT.data(), cudaT.data());
                 new (&handle) GridHandle<BufferT>(std::move(buffer));
             },
-            "cpu_t"_a.noconvert(),
-            "cuda_t"_a.noconvert(),
+            "cpuT"_a.noconvert(),
+            "cudaT"_a.noconvert(),
             "Construct a DeviceGridHandle that wraps an existing pair of "
             "host and device uint32 arrays of equal length.")
         .def("deviceGrid", &pyDeviceGrid, "n"_a = 0,

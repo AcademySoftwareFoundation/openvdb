@@ -75,7 +75,7 @@ static void defineDeviceNodeManagerHandle(nb::module_& m)
     // kernel use.
     nb::class_<HandleT>(m, "DeviceNodeManagerHandle",
         "Owns the device memory backing a device-resident NodeManager. "
-        "Move-only. Obtain via nanovdb.cuda.createDeviceNodeManager(device_grid). "
+        "Move-only. Obtain via nanovdb.cuda.createDeviceNodeManager(deviceGrid). "
         "The NodeManager returned by mgr() is a device pointer: its node "
         "accessors must only be used from CUDA kernels, never dereferenced on "
         "the host.")
@@ -96,8 +96,8 @@ static void defineDeviceNodeManagerHandle(nb::module_& m)
 }
 
 // cuda::createNodeManager has one template instantiation per BuildT. We expose
-// a single polymorphic createDeviceNodeManager(device_grid, stream) that picks
-// the right one based on the runtime type of `device_grid` (any bound
+// a single polymorphic createDeviceNodeManager(deviceGrid, stream) that picks
+// the right one based on the runtime type of `deviceGrid` (any bound
 // NanoGrid<T> whose underlying pointer is a device pointer, e.g. from
 // DeviceGridHandle.deviceGrid(n)). The created handle stores a raw pointer back
 // to the device grid, so the handle must keep the grid alive.
@@ -109,12 +109,12 @@ static nb::object tryCreateDeviceNodeManager(nb::handle py_grid, cudaStream_t st
         return nb::object();  // sentinel: "not this BuildT, try next"
     }
     // &grid is the device pointer (the NanoGrid<T> object wraps a device this).
-    auto* d_grid = &nb::cast<GridT&>(py_grid);
+    auto* dGrid = &nb::cast<GridT&>(py_grid);
     NodeManagerHandle<nanovdb::cuda::DeviceBuffer> handle;
     {
         nb::gil_scoped_release release;
         handle = nanovdb::cuda::createNodeManager<BuildT, nanovdb::cuda::DeviceBuffer>(
-            d_grid, nanovdb::cuda::DeviceBuffer(), stream);
+            dGrid, nanovdb::cuda::DeviceBuffer(), stream);
     }
     return nb::cast(std::move(handle));
 }
@@ -147,14 +147,14 @@ static void defineCreateDeviceNodeManager(nb::module_& m)
                 "grid of any bound BuildT. Pass a device grid obtained from "
                 "DeviceGridHandle.deviceGrid(n).");
         },
-        "device_grid"_a, "stream"_a = 0,
+        "deviceGrid"_a, "stream"_a = 0,
         // The constructed NodeManager stores a raw pointer back to the device
         // grid; the handle must therefore keep the grid (and transitively the
         // DeviceGridHandle that owns the grid's device buffer) alive.
         nb::keep_alive<0, 1>(),
         "Build a device-resident NodeManager for the given DEVICE grid, "
         "returning a DeviceNodeManagerHandle that owns the underlying device "
-        "buffer. device_grid MUST be a device grid (from "
+        "buffer. deviceGrid MUST be a device grid (from "
         "DeviceGridHandle.deviceGrid(n)); passing a host grid is a usage "
         "error. stream is a raw CUDA stream handle (Python int; 0 = default "
         "stream). The handle's mgr() returns the typed device NodeManager and "

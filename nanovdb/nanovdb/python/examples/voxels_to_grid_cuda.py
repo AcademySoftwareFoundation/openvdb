@@ -55,13 +55,13 @@ def main():
 
     # Rasterize into a device OnIndex grid in one call.
     handle = nanovdb.tools.cuda.voxelsToOnIndexGrid(coords, 1.0, 0)
-    device_grid = handle.deviceGrid(0)
+    deviceGrid = handle.deviceGrid(0)
     print(f"voxelsToOnIndexGrid -> {handle.gridType(0)} handle, "
-          f"device_grid={type(device_grid).__name__}")
+          f"deviceGrid={type(deviceGrid).__name__}")
     print(f"  grid(0) before download = {handle.grid(0)} (device-built)")
 
     # Validate entirely on the device, then download for host-side metadata.
-    print(f"  tools.cuda.isValid(device_grid) = {nanovdb.tools.cuda.isValid(device_grid)}")
+    print(f"  tools.cuda.isValid(deviceGrid) = {nanovdb.tools.cuda.isValid(deviceGrid)}")
     handle.deviceDownload(0, True)
     host_grid = handle.grid(0)
     active = host_grid.activeVoxelCount()

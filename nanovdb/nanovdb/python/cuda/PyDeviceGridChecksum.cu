@@ -30,16 +30,16 @@ void defineDeviceGridChecksum(nb::module_& m)
 {
     m.def(
         "evalChecksum",
-        [](const nanovdb::NanoGrid<BuildT>* d_grid, nanovdb::CheckMode mode,
+        [](const nanovdb::NanoGrid<BuildT>* dGrid, nanovdb::CheckMode mode,
            uintptr_t stream) -> nanovdb::Checksum {
             cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
             const nanovdb::GridData* d_gridData =
-                reinterpret_cast<const nanovdb::GridData*>(d_grid);
+                reinterpret_cast<const nanovdb::GridData*>(dGrid);
             // Pure CUDA (CRC32 on device, header copied D2H); release the GIL.
             nb::gil_scoped_release release;
             return nanovdb::tools::cuda::evalChecksum(d_gridData, mode, s);
         },
-        "d_grid"_a,
+        "dGrid"_a,
         "mode"_a = nanovdb::CheckMode::Default,
         "stream"_a = 0,
         "Compute and return the Checksum of the device grid for the given "
@@ -48,15 +48,15 @@ void defineDeviceGridChecksum(nb::module_& m)
 
     m.def(
         "validateChecksum",
-        [](const nanovdb::NanoGrid<BuildT>* d_grid, nanovdb::CheckMode mode,
+        [](const nanovdb::NanoGrid<BuildT>* dGrid, nanovdb::CheckMode mode,
            uintptr_t stream) -> bool {
             cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
             const nanovdb::GridData* d_gridData =
-                reinterpret_cast<const nanovdb::GridData*>(d_grid);
+                reinterpret_cast<const nanovdb::GridData*>(dGrid);
             nb::gil_scoped_release release;
             return nanovdb::tools::cuda::validateChecksum(d_gridData, mode, s);
         },
-        "d_grid"_a,
+        "dGrid"_a,
         "mode"_a = nanovdb::CheckMode::Default,
         "stream"_a = 0,
         "Return True iff the device grid's stored checksum matches a freshly "
@@ -66,15 +66,15 @@ void defineDeviceGridChecksum(nb::module_& m)
 
     m.def(
         "updateChecksum",
-        [](nanovdb::NanoGrid<BuildT>* d_grid, nanovdb::CheckMode mode,
+        [](nanovdb::NanoGrid<BuildT>* dGrid, nanovdb::CheckMode mode,
            uintptr_t stream) {
             cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
             nanovdb::GridData* d_gridData =
-                reinterpret_cast<nanovdb::GridData*>(d_grid);
+                reinterpret_cast<nanovdb::GridData*>(dGrid);
             nb::gil_scoped_release release;
             nanovdb::tools::cuda::updateChecksum(d_gridData, mode, s);
         },
-        "d_grid"_a,
+        "dGrid"_a,
         "mode"_a = nanovdb::CheckMode::Default,
         "stream"_a = 0,
         "Recompute and write the checksum of the device grid in place using "
@@ -85,10 +85,10 @@ void defineDeviceGridChecksum(nb::module_& m)
 // One-thread kernel that overwrites the grid's GridClass field in place. Grid
 // publicly derives GridData, so mGridClass is reachable on the device pointer.
 template<typename BuildT>
-__global__ void setGridClassKernel(nanovdb::NanoGrid<BuildT>* d_grid,
+__global__ void setGridClassKernel(nanovdb::NanoGrid<BuildT>* dGrid,
                                    nanovdb::GridClass gridClass)
 {
-    if (blockIdx.x == 0 && threadIdx.x == 0) d_grid->mGridClass = gridClass;
+    if (blockIdx.x == 0 && threadIdx.x == 0) dGrid->mGridClass = gridClass;
 }
 
 // Device-side mutable grid-header metadata (the read-only counterparts already
@@ -98,20 +98,20 @@ void defineDeviceGridMetadata(nb::module_& m)
 {
     m.def(
         "setGridClass",
-        [](nanovdb::NanoGrid<BuildT>* d_grid, nanovdb::GridClass gridClass,
+        [](nanovdb::NanoGrid<BuildT>* dGrid, nanovdb::GridClass gridClass,
            uintptr_t stream) {
-            if (!d_grid) throw nb::value_error("setGridClass: d_grid is None.");
+            if (!dGrid) throw nb::value_error("setGridClass: dGrid is None.");
             cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
             nb::gil_scoped_release release;
-            setGridClassKernel<BuildT><<<1, 1, 0, s>>>(d_grid, gridClass);
+            setGridClassKernel<BuildT><<<1, 1, 0, s>>>(dGrid, gridClass);
             // Refresh the checksum (preserving its existing mode) so that
             // checksum-validating readers still accept the grid after the
             // class field changed; a no-op for grids with checksum disabled.
             nanovdb::tools::cuda::updateChecksum(
-                reinterpret_cast<nanovdb::GridData*>(d_grid), s);
+                reinterpret_cast<nanovdb::GridData*>(dGrid), s);
             cudaStreamSynchronize(s);
         },
-        "d_grid"_a,
+        "dGrid"_a,
         "gridClass"_a,
         "stream"_a = 0,
         "Set the device grid's GridClass (e.g. GridClass.LevelSet) in place and "

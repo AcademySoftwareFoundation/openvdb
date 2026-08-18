@@ -19,15 +19,15 @@ template<typename BuildT> void defineCoarsenGrid(nb::module_& m, const char* nam
 {
     m.def(
         name,
-        [](nanovdb::NanoGrid<BuildT>* d_grid, uintptr_t stream) {
+        [](nanovdb::NanoGrid<BuildT>* dGrid, uintptr_t stream) {
             cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
             // CoarsenGrid::getHandle launches kernels and synchronizes the
             // stream; pure CUDA touching no Python objects, so release the GIL.
             nb::gil_scoped_release release;
-            nanovdb::tools::cuda::CoarsenGrid<BuildT> coarsener(d_grid, s);
+            nanovdb::tools::cuda::CoarsenGrid<BuildT> coarsener(dGrid, s);
             return coarsener.getHandle();
         },
-        "d_grid"_a,
+        "dGrid"_a,
         "stream"_a = 0,
         "Topologically coarsen (2x downsample) a device OnIndex grid and return "
         "a fresh device GridHandle of the coarsened grid. stream is a raw CUDA "

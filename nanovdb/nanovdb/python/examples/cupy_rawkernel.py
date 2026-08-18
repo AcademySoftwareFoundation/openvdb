@@ -37,14 +37,14 @@ import nanovdb
 KERNEL_SRC = r"""
 #include <nanovdb/NanoVDB.h>
 
-// d_grid is the raw device pointer from FloatGrid.data_ptr(); out is a
+// dGrid is the raw device pointer from FloatGrid.data_ptr(); out is a
 // 2-float device buffer that receives [value@origin, activeVoxelCount].
 extern "C" __global__
-void inspect_float_grid(const nanovdb::NanoGrid<float>* d_grid, float* out)
+void inspect_float_grid(const nanovdb::NanoGrid<float>* dGrid, float* out)
 {
-    auto acc = d_grid->getAccessor();
+    auto acc = dGrid->getAccessor();
     out[0] = acc.getValue(nanovdb::Coord(0, 0, 0));
-    out[1] = static_cast<float>(d_grid->activeVoxelCount());
+    out[1] = static_cast<float>(dGrid->activeVoxelCount());
 }
 """
 
@@ -83,15 +83,15 @@ def main():
     # Build a float level-set sphere directly on the device.
     handle = nanovdb.tools.cuda.createLevelSetSphere(nanovdb.GridType.Float, 20)
     handle.deviceUpload(0, True)
-    device_grid = handle.deviceGrid(0)
-    print(f"Device FloatGrid at {hex(device_grid.data_ptr())}")
+    deviceGrid = handle.deviceGrid(0)
+    print(f"Device FloatGrid at {hex(deviceGrid.data_ptr())}")
 
     kernel = cp.RawKernel(
         KERNEL_SRC, "inspect_float_grid", options=options, backend="nvrtc")
 
     out = cp.zeros(2, dtype=cp.float32)
     # Launch with the raw device-grid pointer as the first argument.
-    kernel((1,), (1,), (device_grid.data_ptr(), out.data.ptr))
+    kernel((1,), (1,), (deviceGrid.data_ptr(), out.data.ptr))
     cp.cuda.runtime.deviceSynchronize()
 
     value, active = cp.asnumpy(out)
