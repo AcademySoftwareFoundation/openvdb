@@ -1,0 +1,4 @@
+NanoVDB:
+  Bug Fixes:
+  - Fixed tools::cuda::MeshToGrid leaving the CALL_CUBS macro defined past the end of
+    the header, unlike its sibling CUDA tools.
