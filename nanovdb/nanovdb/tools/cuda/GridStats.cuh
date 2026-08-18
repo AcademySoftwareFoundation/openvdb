@@ -18,6 +18,8 @@
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/tools/GridStats.h>
 
+#include <cub/util_type.cuh>// for cub::Uninitialized
+
 namespace nanovdb {
 
 namespace tools::cuda {
@@ -65,7 +67,11 @@ template<typename BuildT, typename StatsT>
 __global__ void processLeaf(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
 {
     constexpr uint32_t WarpsPerBlock = 4;
-    __shared__ StatsT sStats[WarpsPerBlock * 32];
+    // CUDA does not run constructors for __shared__ variables, so wrap the scratch
+    // array in cub::Uninitialized (raw, constructor-free storage). Safe here because
+    // every slot is fully assigned before it is read.
+    __shared__ cub::Uninitialized<StatsT[WarpsPerBlock * 32]> sStatsStorage;
+    StatsT (&sStats)[WarpsPerBlock * 32] = sStatsStorage.Alias();
 
     const uint32_t warpID = threadIdx.x >> 5, lane = threadIdx.x & 31u;
     const uint32_t tid = blockIdx.x * WarpsPerBlock + warpID;// leaf index
@@ -132,8 +138,12 @@ __global__ void processInternal(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
     using ChildT = typename NanoNode<BuildT,LEVEL-1>::type;
     using NodeT = typename NanoNode<BuildT,LEVEL>::type;
     constexpr uint32_t Threads = 128;
-    __shared__ StatsT sStats[Threads];
-    __shared__ CoordBBox sBBox[Threads];
+    // Constructor-free shared storage, as in processLeaf: every slot is assigned
+    // before it is read.
+    __shared__ cub::Uninitialized<StatsT[Threads]> sStatsStorage;
+    __shared__ cub::Uninitialized<CoordBBox[Threads]> sBBoxStorage;
+    StatsT (&sStats)[Threads] = sStatsStorage.Alias();
+    CoordBBox (&sBBox)[Threads] = sBBoxStorage.Alias();
 
     const uint32_t nodeID = blockIdx.x;
     const uint32_t tID = threadIdx.x;
