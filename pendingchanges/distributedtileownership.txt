@@ -1,0 +1,10 @@
+NanoVDB:
+  Bug Fixes:
+  - Fixed a cross-device race in tools::cuda::DistributedPointsToGrid. The
+    device segment boundaries were rebalanced by adjusting only adjacent pairs
+    of boundaries, which cannot consolidate an upper-node tile that spans three
+    or more GPUs, because a fully-interior device lies entirely within the tile.
+    Multiple devices then built the same leaf concurrently and raced on its
+    value mask, silently dropping active voxels. The boundaries are now snapped
+    globally and monotonically to tile boundaries, so every tile - and therefore
+    every lower node, leaf node and voxel - is owned by exactly one device.
