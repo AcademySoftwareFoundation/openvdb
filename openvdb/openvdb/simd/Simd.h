@@ -229,6 +229,33 @@ template <> struct SimdT<double, 8> { using Type = simd::Vec8d; };
 template <typename T>
 using SimdNativeT = SimdT<T, OPENVDB_MAX_REGISTER_SIZE/(sizeof(T)*CHAR_BIT)>;
 
+/// @brief  Native type selection for compatible POD types when there
+///   may not be an available Simd type. For example:
+///
+/// @code
+///    // compiled WITHOUT -msse2 (or higher)
+///    static_assert(std::is_same_v<NativeSimdOrScalar<double>::Type, double>);
+///    // compiled WITH -mavx
+///    static_assert(std::is_same_v<NativeSimdOrScalar<double>::Type, SimdT<double, 4>>);
+///@endcode
+template <typename T, typename = void>
+struct NativeSimdOrScalar
+{
+    using Type = T;
+    static constexpr size_t Size = 1;
+};
+
+template <typename T>
+struct NativeSimdOrScalar<T, std::void_t<typename SimdNativeT<T>::Type>>
+{
+    using Type = typename SimdNativeT<T>::Type;
+#ifdef OPENVDB_USE_VCL
+    static constexpr size_t Size = Type::size();
+#else
+    static constexpr size_t Size = Type::size;
+#endif
+};
+
 /// @brief  Traits for determining if a type is a SIMD type
 template <typename T> struct IsSimdMaskT : std::false_type {};
 template <typename T> struct IsSimdIntT : std::false_type {};
@@ -401,6 +428,18 @@ OPENVDB_ENABLE_IF_VCL_MASK inline auto horizontal_and(const T& a) { return openv
 OPENVDB_ENABLE_IF_VCL_MASK inline auto horizontal_or(const T& a) { return openvdb_ext_vcl::horizontal_or(a); }
 OPENVDB_ENABLE_IF_VCL_MASK inline int horizontal_count(const T& a) { return openvdb_ext_vcl::horizontal_count(a); }
 OPENVDB_ENABLE_IF_VCL_MASK inline int horizontal_find_first(const T& a) { return openvdb_ext_vcl::horizontal_find_first(a); }
+
+/// @brief  ostream operator for vcl types
+OPENVDB_ENABLE_IF_VCL inline std::ostream& operator<<(std::ostream& os, const T v)
+{
+    os << "[";
+    for (unsigned j(0); j < T::size(); j++) {
+        if (j) os << ", ";
+        os << PrintCast(v[j]);
+    }
+    os << "]";
+    return os;
+}
 
 #else
 
