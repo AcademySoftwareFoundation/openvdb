@@ -1852,7 +1852,7 @@ class TestGridStats(unittest.TestCase):
         g = nanovdb.tools.build.FloatGrid(0.0, "stats", nanovdb.GridClass.FogVolume)
         for i in range(5):
             g.setValue(nanovdb.math.Coord(i, 0, 0), float(i + 1))
-        return g.to_nanovdb(sMode=nanovdb.tools.StatsMode.All)
+        return g.toNanoVDB(sMode=nanovdb.tools.StatsMode.All)
 
     def test_extrema_default_and_add(self):
         ex = nanovdb.tools.FloatExtrema()
@@ -1907,7 +1907,7 @@ class TestGridStats(unittest.TestCase):
         g = nanovdb.tools.build.FloatGrid(0.0)
         for i in range(3):
             g.setValue(nanovdb.math.Coord(i, 0, 0), float(i + 10))
-        h = g.to_nanovdb(sMode=nanovdb.tools.StatsMode.Disable)
+        h = g.toNanoVDB(sMode=nanovdb.tools.StatsMode.Disable)
         ng = h.grid()
         nanovdb.tools.updateGridStats(ng, nanovdb.tools.StatsMode.All)
         # checkGrid still passes after writing stats.
@@ -2083,12 +2083,12 @@ class TestBuildGrid(unittest.TestCase):
         self.assertEqual(g.getValue(ijk), 3.5)
         self.assertTrue(g.isActive(ijk))
 
-    def test_to_nanovdb_roundtrip(self):
+    def test_tonanovdb_roundtrip(self):
         g = nanovdb.tools.build.FloatGrid(0.0, "trip", nanovdb.GridClass.FogVolume)
         g.setValue(nanovdb.math.Coord(0, 0, 0), 1.0)
         g.setValue(nanovdb.math.Coord(1, 0, 0), 2.0)
         g.setValue(nanovdb.math.Coord(2, 0, 0), 3.0)
-        h = g.to_nanovdb()
+        h = g.toNanoVDB()
         self.assertEqual(h.gridCount(), 1)
         ng = h.grid()
         self.assertEqual(ng.gridType(), nanovdb.GridType.Float)
@@ -2096,13 +2096,13 @@ class TestBuildGrid(unittest.TestCase):
         self.assertEqual(ng.gridName(), "trip")
         self.assertEqual(ng.activeVoxelCount(), 3)
 
-    def test_to_nanovdb_does_not_consume_source(self):
-        # Source build::Grid must remain usable after .to_nanovdb().
+    def test_tonanovdb_does_not_consume_source(self):
+        # Source build::Grid must remain usable after .toNanoVDB().
         g = nanovdb.tools.build.FloatGrid(0.0)
         g.setValue(nanovdb.math.Coord(0, 0, 0), 1.0)
-        _ = g.to_nanovdb()
+        _ = g.toNanoVDB()
         g.setValue(nanovdb.math.Coord(1, 0, 0), 2.0)
-        h2 = g.to_nanovdb()
+        h2 = g.toNanoVDB()
         self.assertEqual(h2.grid().activeVoxelCount(), 2)
 
     def test_int32_build_grid(self):
@@ -2111,7 +2111,7 @@ class TestBuildGrid(unittest.TestCase):
         g.setValue(nanovdb.math.Coord(1, 1, 1), -7)
         self.assertEqual(g.getValue(nanovdb.math.Coord(0, 0, 0)), 42)
         self.assertEqual(g.getValue(nanovdb.math.Coord(1, 1, 1)), -7)
-        h = g.to_nanovdb()
+        h = g.toNanoVDB()
         self.assertEqual(h.grid().gridType(), nanovdb.GridType.Int32)
         self.assertEqual(h.grid().activeVoxelCount(), 2)
 
@@ -2121,14 +2121,14 @@ class TestBuildGrid(unittest.TestCase):
         v = nanovdb.math.Vec3f(1.0, 2.0, 3.0)
         g.setValue(nanovdb.math.Coord(0, 0, 0), v)
         self.assertEqual(g.getValue(nanovdb.math.Coord(0, 0, 0)), v)
-        h = g.to_nanovdb()
+        h = g.toNanoVDB()
         self.assertEqual(h.grid().gridType(), nanovdb.GridType.Vec3f)
 
     def test_set_transform(self):
         g = nanovdb.tools.build.FloatGrid(0.0)
         g.setTransform(scale=0.5, translation=nanovdb.math.Vec3d(1.0, 2.0, 3.0))
         g.setValue(nanovdb.math.Coord(0, 0, 0), 1.0)
-        h = g.to_nanovdb()
+        h = g.toNanoVDB()
         ng = h.grid()
         vs = ng.voxelSize()
         self.assertAlmostEqual(vs[0], 0.5)

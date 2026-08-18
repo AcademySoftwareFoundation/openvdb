@@ -3607,6 +3607,289 @@ TEST(TestNanoVDBCUDA, DilateInjectPrune_ValueOnIndex)
     EXPECT_EQ(inputHandle.grid<BuildT>()->mChecksum.full(), prunedHandle.grid<BuildT>()->mChecksum.full());
 }// DilateInjectPrune_ValueOnIndex
 
+// Busy-wait on whatever stream it is launched on; used to occupy the default
+// stream so that a kernel mistakenly launched there (instead of the caller's
+// stream) is reordered relative to the rest of the operation.
+__global__ void streamBusyWaitKernel(unsigned long long cycles)
+{
+    const unsigned long long t0 = clock64();
+    while (clock64() - t0 < cycles) {}
+}
+
+// Regression test: the NN_FACE_EDGE_VERTEX (26-neighbour) leaf dilation kernel
+// must run on the caller's stream. It previously launched on the default stream,
+// silently corrupting the result when the caller used a non-blocking stream.
+// Dilating on the default stream and on a non-blocking stream (while the default
+// stream is occupied) must produce identical output.
+TEST(TestNanoVDBCUDA, NonBlockingStreamDilate_ValueOnIndex)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    std::vector<nanovdb::Coord> pts;
+    for (int i = 0; i < 64; ++i) pts.emplace_back(i * 3, (i * 7) % 40, (i * 13) % 50);
+    pts.emplace_back(127, 127, 127);
+    auto inBuf = nanovdb::cuda::DeviceBuffer::create(pts.size() * sizeof(nanovdb::Coord), nullptr, false);
+    cudaCheck(cudaMemcpy(inBuf.deviceData(), pts.data(), pts.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    nanovdb::tools::cuda::PointsToGrid<BuildT> conv;
+    conv.setChecksum(nanovdb::CheckMode::Full);
+    auto inHandle = conv.getHandle(static_cast<nanovdb::Coord*>(inBuf.deviceData()), pts.size());
+    auto* inGrid = inHandle.deviceGrid<BuildT>();
+    EXPECT_TRUE(inGrid);
+    cudaCheck(cudaDeviceSynchronize());
+
+    auto dilateOn = [&](cudaStream_t stream, bool occupyDefault) {
+        if (occupyDefault) {// keep the default stream busy for ~20 ms
+            int clockKHz = 0, dev = 0;
+            cudaCheck(cudaGetDevice(&dev));
+            cudaCheck(cudaDeviceGetAttribute(&clockKHz, cudaDevAttrClockRate, dev));
+            streamBusyWaitKernel<<<1, 1, 0, 0>>>(static_cast<unsigned long long>(clockKHz) * 20ull);
+            cudaCheck(cudaGetLastError());
+        }
+        nanovdb::tools::cuda::DilateGrid<BuildT> dilator(inGrid, stream);
+        dilator.setOperation(nanovdb::tools::morphology::NN_FACE_EDGE_VERTEX);
+        dilator.setChecksum(nanovdb::CheckMode::Full);
+        dilator.setVerbose(0);
+        auto handle = dilator.getHandle();
+        cudaCheck(cudaStreamSynchronize(stream));
+        const auto treeData = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(handle.deviceGrid<BuildT>());
+        handle.deviceDownload();
+        return std::make_pair(treeData.mVoxelCount, handle.grid<BuildT>()->mChecksum.full());
+    };
+
+    const auto reference = dilateOn(static_cast<cudaStream_t>(0), false);
+    cudaCheck(cudaDeviceSynchronize());
+    cudaStream_t nb = nullptr;
+    cudaCheck(cudaStreamCreateWithFlags(&nb, cudaStreamNonBlocking));
+    const auto candidate = dilateOn(nb, /*occupyDefault=*/true);
+    cudaCheck(cudaStreamSynchronize(nb));
+    cudaCheck(cudaDeviceSynchronize());// drain the default-stream busy-wait so it can't leak into later tests
+    cudaCheck(cudaStreamDestroy(nb));
+
+    EXPECT_EQ(reference.first, candidate.first);   // identical active-voxel count
+    EXPECT_EQ(reference.second, candidate.second); // identical full checksum
+}// NonBlockingStreamDilate_ValueOnIndex
+
+// Cross-stream determinism coverage: signedFloodFill must run entirely on the caller's stream.
+// Mirrors the dilation test above: repair the same corrupted level set once on the default
+// stream and once on a non-blocking stream while the default stream is occupied, reading each
+// result back on the stream that produced it (no default-stream rescue), and require identical
+// output. Node passes escaping to the occupied default stream show up as an unrepaired or
+// partially repaired grid.
+//
+// Scope note: this locks the observable contract but cannot discriminate processRoot's internal
+// ordering on constructible inputs - its root-tile scanline repair only does work when interior
+// root-level tiles exist, which needs a level set thousands of voxels across, and the pre-fix
+// code was accidentally host-synchronous for other topologies (a blocking legacy-stream memcpy).
+TEST(TestNanoVDBCUDA, NonBlockingStreamSignedFloodFill)
+{
+    using BufferT = nanovdb::cuda::DeviceBuffer;
+    auto runOn = [](cudaStream_t stream, bool occupyDefault) {
+        auto hdl = nanovdb::tools::createLevelSetSphere<float, BufferT>(100);
+        auto* grid = hdl.grid<float>();
+        auto acc = grid->getAccessor();
+        using OpT = nanovdb::SetVoxel<float>;
+        acc.set<OpT>(nanovdb::Coord(103,0,0), -1.0f);// flip sign and value of an inactive voxel
+        acc.set<OpT>(nanovdb::Coord( 97,0,0),  1.0f);// (the corruption CudaSignedFloodFill uses)
+        hdl.deviceUpload(0, stream, true);
+        if (occupyDefault) {// keep the default stream busy for ~20 ms
+            int clockKHz = 0, dev = 0;
+            cudaCheck(cudaGetDevice(&dev));
+            cudaCheck(cudaDeviceGetAttribute(&clockKHz, cudaDevAttrClockRate, dev));
+            streamBusyWaitKernel<<<1, 1, 0, 0>>>(static_cast<unsigned long long>(clockKHz) * 20ull);
+            cudaCheck(cudaGetLastError());
+        }
+        nanovdb::tools::cuda::signedFloodFill(hdl.deviceGrid<float>(), false, stream);
+        hdl.deviceDownload(0, stream, true);
+        auto* out = hdl.grid<float>();
+        auto outAcc = out->getAccessor();
+        EXPECT_EQ( 3.0f, outAcc(103,0,0));
+        EXPECT_EQ( 0.0f, outAcc(100,0,0));
+        EXPECT_EQ(-3.0f, outAcc( 97,0,0));
+        return out->mChecksum.full();
+    };
+    const uint64_t reference = runOn(static_cast<cudaStream_t>(0), false);
+    cudaCheck(cudaDeviceSynchronize());
+    cudaStream_t nb = nullptr;
+    cudaCheck(cudaStreamCreateWithFlags(&nb, cudaStreamNonBlocking));
+    const uint64_t candidate = runOn(nb, /*occupyDefault=*/true);
+    cudaCheck(cudaStreamSynchronize(nb));
+    cudaCheck(cudaDeviceSynchronize());// drain the default-stream busy-wait so it can't leak into later tests
+    cudaCheck(cudaStreamDestroy(nb));
+    EXPECT_EQ(reference, candidate);
+}// NonBlockingStreamSignedFloodFill
+
+// Regression test: the grid-name copy must not over-read the source string.
+// It previously copied a fixed MaxNameSize bytes from the (possibly shorter)
+// std::string, over-reading host heap into the grid; now it copies only
+// min(name.size()+1, MaxNameSize) bytes. Empty, short, and maximum-length
+// names must round-trip.
+TEST(TestNanoVDBCUDA, GridName_CudaPointsToGrid)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    const std::vector<nanovdb::Coord> pts{ {0, 0, 0}, {1, 2, 3} };
+    auto build = [&](const std::string& name) {
+        auto buf = nanovdb::cuda::DeviceBuffer::create(pts.size() * sizeof(nanovdb::Coord), nullptr, false);
+        cudaCheck(cudaMemcpy(buf.deviceData(), pts.data(), pts.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+        nanovdb::tools::cuda::PointsToGrid<BuildT> conv;
+        conv.setGridName(name);
+        conv.setChecksum(nanovdb::CheckMode::Full);
+        auto h = conv.getHandle(static_cast<nanovdb::Coord*>(buf.deviceData()), pts.size());
+        h.deviceDownload();
+        return std::string(h.template grid<BuildT>()->gridName());
+    };
+    EXPECT_EQ(std::string(""),    build(""));       // empty name
+    EXPECT_EQ(std::string("rho"), build("rho"));    // short name
+    // Maximum name that fits with a null terminator (MaxNameSize includes it).
+    const std::string maxName(nanovdb::GridData::MaxNameSize - 1, 'x');
+    EXPECT_EQ(maxName, build(maxName));
+    // Over-long name (>= MaxNameSize) must be truncated to MaxNameSize-1 chars
+    // and stay null-terminated - never a non-terminated field that gridName()
+    // would over-read. The result is the max-length string, and reading it back
+    // as a C-string does not exceed MaxNameSize.
+    const std::string tooLong(nanovdb::GridData::MaxNameSize + 37, 'y');
+    const std::string got = build(tooLong);
+    EXPECT_EQ(size_t(nanovdb::GridData::MaxNameSize - 1), got.size());
+    EXPECT_EQ(std::string(nanovdb::GridData::MaxNameSize - 1, 'y'), got);
+}// GridName_CudaPointsToGrid
+
+// Regression test: PointsToGrid output must be byte-deterministic. Alignment
+// padding and stats fields previously carried recycled pool bytes, so the output
+// (and its full checksum) was nondeterministic; the buffer-wide zero-init fixes
+// this. Two independent builds of the same input must have identical full
+// checksums.
+TEST(TestNanoVDBCUDA, DeterministicOutput_CudaPointsToGrid)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    std::vector<nanovdb::Coord> pts;
+    for (int i = 0; i < 256; ++i) pts.emplace_back((i * 5) % 97, (i * 11) % 53, (i * 17) % 71);
+    auto buildChecksum = [&]() {
+        auto buf = nanovdb::cuda::DeviceBuffer::create(pts.size() * sizeof(nanovdb::Coord), nullptr, false);
+        cudaCheck(cudaMemcpy(buf.deviceData(), pts.data(), pts.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+        nanovdb::tools::cuda::PointsToGrid<BuildT> conv;
+        conv.setChecksum(nanovdb::CheckMode::Full);
+        auto h = conv.getHandle(static_cast<nanovdb::Coord*>(buf.deviceData()), pts.size());
+        h.deviceDownload();
+        return h.template grid<BuildT>()->mChecksum.full();
+    };
+    EXPECT_EQ(buildChecksum(), buildChecksum());
+}// DeterministicOutput_CudaPointsToGrid
+
+// Smoke test: repeated allocate/use/free on a non-blocking stream must complete without error.
+// Note this is only a smoke test - DeviceBufferMultiStreamFreeOrdering below is what actually
+// discriminates a premature free (compute-sanitizer memcheck on this path is a further gate).
+TEST(TestNanoVDBCUDA, DeviceBufferNonBlockingStreamLifetime)
+{
+    cudaStream_t stream = nullptr;
+    cudaCheck(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+    for (int i = 0; i < 16; ++i) {
+        auto buf = nanovdb::cuda::DeviceBuffer::create(size_t(1) << 20, nullptr, 0, stream);// 1 MiB on stream
+        EXPECT_TRUE(buf.deviceData());
+        cudaCheck(cudaMemsetAsync(buf.deviceData(), i & 0xff, buf.size(), stream));
+        // buf is destroyed here and must free on 'stream' (still alive).
+    }
+    cudaCheck(cudaStreamSynchronize(stream));
+    cudaCheck(cudaStreamDestroy(stream));
+    EXPECT_EQ(cudaSuccess, cudaGetLastError());
+}// DeviceBufferNonBlockingStreamLifetime
+
+__global__ void deviceBufferFillKernel(unsigned char *p, size_t n, unsigned char v)
+{
+    for (size_t i = blockIdx.x*(size_t)blockDim.x + threadIdx.x; i < n; i += (size_t)gridDim.x*blockDim.x) p[i] = v;
+}
+__global__ void deviceBufferCountKernel(const unsigned char *p, size_t n, unsigned char v, unsigned long long *bad)
+{
+    for (size_t i = blockIdx.x*(size_t)blockDim.x + threadIdx.x; i < n; i += (size_t)gridDim.x*blockDim.x)
+        if (p[i] != v) atomicAdd(bad, 1ull);
+}
+
+// Shared body of the two free-ordering regression tests below. A device-only buffer is used on
+// purpose: it owns no pinned host memory, so clear()'s cudaFreeHost (which implicitly
+// synchronizes) cannot mask a premature free. A second stream 'user' is parked behind a
+// busy-wait with a write to the buffer's raw pointer queued behind it, then the buffer is
+// destroyed. If the free is not ordered after 'user', the allocator recycles the block into the
+// next allocation and the late write corrupts it.
+//
+// The two scenarios cover the two distinct ways the free can be ordered:
+//  - blocking 'user', write NOT registered: the free, issued on the legacy default stream, is
+//    implicitly ordered after all blocking streams. Freeing on any other single stream (e.g.
+//    the buffer's most recently used one) would drop that and fail here.
+//  - non-blocking 'user', write registered via recordUse: no implicit ordering exists for
+//    non-blocking streams, so only the recorded event orders the free. Freeing on the default
+//    stream without the event fails here.
+static void testDeviceBufferFreeOrdering(bool nonBlockingUser, bool registerUse)
+{
+    const size_t N = size_t(64) << 20;// large enough that a recycled block is the same address
+    const unsigned char LATE = 0xAA, VICTIM = 0x55;
+    const unsigned long long CYCLES = 400000000ull;// parks 'user' for O(100 ms)
+
+    cudaStream_t user = nullptr, other = nullptr;
+    if (nonBlockingUser) {
+        cudaCheck(cudaStreamCreateWithFlags(&user, cudaStreamNonBlocking));
+    } else {
+        cudaCheck(cudaStreamCreate(&user));
+    }
+    cudaCheck(cudaStreamCreate(&other));
+    unsigned long long *bad = nullptr;
+    cudaCheck(cudaMallocManaged(&bad, sizeof(*bad)));
+
+    {// warm-up: on a cold context the first launches serialize, which would hide the race
+        unsigned char *w = nullptr;
+        cudaCheck(cudaMallocAsync((void**)&w, N, other));
+        streamBusyWaitKernel<<<1,1,0,user>>>(CYCLES/10);
+        deviceBufferFillKernel<<<1024,256,0,other>>>(w, N, 0);
+        deviceBufferCountKernel<<<1024,256,0,other>>>(w, N, 0, bad);
+        cudaCheck(cudaFreeAsync(w, other));
+        cudaCheck(cudaDeviceSynchronize());
+    }
+
+    void *devPtr = nullptr;
+    {
+        auto buf = nanovdb::cuda::DeviceBuffer::create(N, nullptr, 0, other);// device-only
+        devPtr = buf.deviceData(0);
+        ASSERT_TRUE(devPtr);
+        streamBusyWaitKernel<<<1,1,0,user>>>(CYCLES);// park 'user'
+        deviceBufferFillKernel<<<1024,256,0,user>>>((unsigned char*)devPtr, N, LATE);
+        if (registerUse) buf.recordUse(0, user);// raw-pointer use: tell the buffer about it
+    }// destroyed here; the free must be ordered after 'user' as well as 'other'
+
+    unsigned char *victim = nullptr;
+    cudaCheck(cudaMallocAsync((void**)&victim, N, other));
+    deviceBufferFillKernel<<<1024,256,0,other>>>(victim, N, VICTIM);
+    cudaCheck(cudaStreamSynchronize(other));
+
+    // Diagnostics only. These are deliberately NOT preconditions: with a correctly ordered free
+    // the allocator cannot hand this block out again until 'user' has drained, so observing
+    // "not recycled" or "no longer pending" here is the fix working, not a reason to skip.
+    const bool stillPending = (cudaStreamQuery(user) == cudaErrorNotReady);
+    cudaGetLastError();// clear the cudaErrorNotReady left by the query above
+    const bool recycled = (victim == devPtr);
+
+    cudaCheck(cudaStreamSynchronize(user));// let the late write land
+    *bad = 0;
+    deviceBufferCountKernel<<<1024,256>>>(victim, N, VICTIM, bad);
+    cudaCheck(cudaDeviceSynchronize());
+    const unsigned long long clobbered = *bad;
+
+    cudaCheck(cudaFreeAsync(victim, other));
+    cudaCheck(cudaStreamSynchronize(other));
+    cudaCheck(cudaFree(bad));
+    cudaCheck(cudaStreamDestroy(user));
+    cudaCheck(cudaStreamDestroy(other));
+
+    EXPECT_EQ(0u, clobbered) << "device memory was freed while another stream still had work in "
+                                "flight (block recycled: " << recycled
+                             << ", work still pending when it was reused: " << stillPending << ")";
+}// testDeviceBufferFreeOrdering
+
+TEST(TestNanoVDBCUDA, DeviceBufferMultiStreamFreeOrdering)
+{
+    testDeviceBufferFreeOrdering(/*nonBlockingUser=*/false, /*registerUse=*/false);
+}// DeviceBufferMultiStreamFreeOrdering
+
+TEST(TestNanoVDBCUDA, DeviceBufferNonBlockingFreeOrdering)
+{
+    testDeviceBufferFreeOrdering(/*nonBlockingUser=*/true, /*registerUse=*/true);
+}// DeviceBufferNonBlockingFreeOrdering
+
 TEST(TestNanoVDBCUDA, RefineCoarsen_ValueOnIndex)
 {
     using BuildT = nanovdb::ValueOnIndex;

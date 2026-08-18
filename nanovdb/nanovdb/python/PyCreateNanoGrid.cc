@@ -13,7 +13,6 @@
 
 #include <cstring>
 #include <string>
-#include <vector>
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -107,6 +106,8 @@ nb::object tryQuantizeFpX(nb::handle       py_src,
         }
         return nb::cast(std::move(handle));
     }
+    // Invalid (not None) object signals "SrcBuildT didn't match"; the caller
+    // tests is_valid() and falls through to the next SrcBuildT.
     return nb::object();
 }
 
@@ -165,6 +166,8 @@ nb::object tryQuantizeFpN(nb::handle       py_src,
         }
         return nb::cast(std::move(handle));
     }
+    // Invalid (not None) object signals "SrcBuildT didn't match"; the caller
+    // tests is_valid() and falls through to the next SrcBuildT.
     return nb::object();
 }
 
@@ -220,6 +223,8 @@ nb::object tryIndexify(nb::handle py_src,
         }
         return nb::cast(std::move(handle));
     }
+    // Invalid (not None) object signals "SrcBuildT didn't match"; the caller
+    // tests is_valid() and falls through to the next SrcBuildT.
     return nb::object();
 }
 
@@ -362,6 +367,8 @@ private:
         using BuildSrcT = tools::build::Grid<SrcBuildT>;
         if (nb::isinstance<NanoSrcT>(mSrc)) return this->bake(nb::cast<const NanoSrcT&>(mSrc));
         if (nb::isinstance<BuildSrcT>(mSrc)) return this->bake(nb::cast<const BuildSrcT&>(mSrc));
+        // Invalid (not None) object signals "SrcBuildT didn't match"; the caller
+        // tests is_valid() and falls through to the next SrcBuildT.
         return nb::object();
     }
 

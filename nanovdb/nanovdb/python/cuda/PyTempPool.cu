@@ -21,8 +21,10 @@ void defineTempPool(nb::module_& m)
     using DeviceResource = nanovdb::cuda::DeviceResource;
     using TempDevicePool = nanovdb::cuda::TempDevicePool;
 
-    // DeviceResource: a stateless static async allocator over the current CUDA
-    // device. Exposed in its current shape only — raw pointers are Python ints.
+    // DeviceResource: a stateless async allocator over the current CUDA device.
+    // The C++ side is instance-based (the static allocateAsync / deallocateAsync
+    // are deprecated), but since it carries no state the binding stays static on
+    // the Python side. Raw pointers are Python ints.
     nb::class_<DeviceResource>(m, "DeviceResource",
         "Stateless CUDA async allocator: allocateAsync / deallocateAsync issue "
         "cudaMallocAsync / cudaFreeAsync on a stream. Pointers are raw Python "
@@ -34,7 +36,8 @@ void defineTempPool(nb::module_& m)
             [](size_t bytes, size_t alignment, uintptr_t stream) {
                 cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
                 nb::gil_scoped_release release;
-                void* p = DeviceResource::allocateAsync(bytes, alignment, s);
+                DeviceResource resource;
+                void* p = resource.allocate_async(bytes, alignment, s);
                 return reinterpret_cast<uintptr_t>(p);
             },
             "bytes"_a, "alignment"_a = DeviceResource::DEFAULT_ALIGNMENT, "stream"_a = 0,
@@ -46,8 +49,9 @@ void defineTempPool(nb::module_& m)
             [](uintptr_t ptr, size_t bytes, size_t alignment, uintptr_t stream) {
                 cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
                 nb::gil_scoped_release release;
-                DeviceResource::deallocateAsync(reinterpret_cast<void*>(ptr),
-                                                bytes, alignment, s);
+                DeviceResource resource;
+                resource.deallocate_async(reinterpret_cast<void*>(ptr),
+                                          bytes, alignment, s);
             },
             "ptr"_a, "bytes"_a = 0, "alignment"_a = DeviceResource::DEFAULT_ALIGNMENT,
             "stream"_a = 0,

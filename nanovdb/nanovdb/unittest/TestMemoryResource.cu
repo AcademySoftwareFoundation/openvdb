@@ -11,6 +11,11 @@
 #include <nanovdb/cuda/PinnedResource.h>
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
+#include <nanovdb/tools/cuda/DilateGrid.cuh>
+#include <nanovdb/tools/cuda/MergeGrids.cuh>
+#include <nanovdb/tools/cuda/PruneGrid.cuh>
+#include <nanovdb/tools/cuda/RefineGrid.cuh>
+#include <nanovdb/tools/cuda/CoarsenGrid.cuh>
 
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
@@ -25,7 +30,7 @@ namespace {
 
 /// @brief Resource that counts (non-null) allocations and deallocations so
 ///        leaks can be asserted. Delegates the actual work to DeviceResource.
-struct CountingResource
+struct CountingResource : nanovdb::cuda::SyncFromAsync<CountingResource>
 {
     static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
     int allocs = 0;
@@ -43,7 +48,7 @@ struct CountingResource
 
 /// @brief Resource that records the stream of every allocation/deallocation,
 ///        to verify stream-ordered teardown. Delegates work to DeviceResource.
-struct StreamRecordingResource
+struct StreamRecordingResource : nanovdb::cuda::SyncFromAsync<StreamRecordingResource>
 {
     static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
     std::vector<cudaStream_t> allocStreams;
@@ -136,6 +141,57 @@ TEST(TestMemoryResource, PinnedResource_DefaultResourceRoundTrip)
 // retained stream (the stream of the most recent reallocate), not the null stream.
 //======================================================================
 
+// Synchronous-only and stateful: the shape of a vGPU or arena backend.
+struct SyncCountingResource
+{
+    static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::MallocResource::DEFAULT_ALIGNMENT;
+    int allocs = 0, deallocs = 0;
+    void* allocate(size_t bytes, size_t alignment) {
+        void* p = nanovdb::cuda::MallocResource{}.allocate(bytes, alignment);
+        if (p) ++allocs;
+        return p;
+    }
+    void deallocate(void* p, size_t bytes, size_t alignment) {
+        if (p) ++deallocs;
+        nanovdb::cuda::MallocResource{}.deallocate(p, bytes, alignment);
+    }
+};
+
+static_assert(nanovdb::cuda::is_resource<nanovdb::cuda::MallocResource>::value,
+              "MallocResource must model the synchronous Resource concept");
+static_assert(!nanovdb::cuda::is_async_resource<nanovdb::cuda::MallocResource>::value,
+              "MallocResource must not claim the AsyncResource concept");
+static_assert(nanovdb::cuda::is_async_resource<
+                  nanovdb::cuda::AsyncFromSync<nanovdb::cuda::MallocResource>>::value,
+              "AsyncFromSync must lift a synchronous resource to AsyncResource");
+
+TEST(TestMemoryResource, PointsToGrid_RunsOnSynchronousResource)
+{
+    // The pool-less-device path: every scratch allocation routes through
+    // cudaMalloc/cudaFree via AsyncFromSync, never touching cudaMallocAsync.
+    // The grid handle's output buffer is the exception -- getHandle allocates
+    // it through BufferT::create, not through the injected resource.
+    using RefT  = nanovdb::cuda::ResourceRef<SyncCountingResource>;
+    using VgpuT = nanovdb::cuda::AsyncFromSync<RefT>;
+    SyncCountingResource base;
+    VgpuT res{RefT(base)};
+
+    const std::vector<nanovdb::Coord> voxels = {{0,0,0},{1,2,3},{8,8,8},{100,100,100},{-50,20,7}};
+    nanovdb::Coord* d_voxels = nullptr;
+    ASSERT_EQ(cudaMalloc(&d_voxels, voxels.size()*sizeof(nanovdb::Coord)), cudaSuccess);
+    ASSERT_EQ(cudaMemcpy(d_voxels, voxels.data(), voxels.size()*sizeof(nanovdb::Coord), cudaMemcpyHostToDevice), cudaSuccess);
+    {
+        nanovdb::tools::cuda::PointsToGrid<nanovdb::ValueOnIndex, VgpuT> converter(nanovdb::Map(1.0), cudaStream_t{0}, res);
+        auto handle = converter.getHandle(d_voxels, voxels.size());
+        auto* grid = handle.deviceGrid<nanovdb::ValueOnIndex>();
+        EXPECT_NE(grid, nullptr);
+    }
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    ASSERT_EQ(cudaFree(d_voxels), cudaSuccess);
+    EXPECT_GT(base.allocs, 0);                  // scratch really routed through the sync resource
+    EXPECT_EQ(base.allocs, base.deallocs);      // and every allocation was freed through it
+}
+
 TEST(TestMemoryResource, TempPool_FreesOnRetainedStream)
 {
     cudaStream_t s = nullptr;
@@ -207,6 +263,199 @@ TEST(TestMemoryResource, PointsToGrid_InjectedInstanceSeam)
     ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
     EXPECT_EQ(res.allocs, res.deallocs);       // every allocation through the resource was freed (no leak)
     ASSERT_EQ(cudaFree(d_coords), cudaSuccess);
+}
+
+//======================================================================
+// A Point grid built through a custom (non-default) resource must still
+// encode its point coordinates. The encode path must not depend on the
+// resource type; only allocation does.
+//======================================================================
+
+TEST(TestMemoryResource, PointsToGrid_PointEncodedWithCustomResource)
+{
+    using BuildT = nanovdb::Point;
+    using Vec3T  = nanovdb::Vec3d;
+
+    const size_t pointCount = 256;
+    std::vector<Vec3T> points;
+    points.reserve(pointCount);
+    std::srand(98765);
+    const int max = 128, min = -max;
+    auto op = [&]() { return double(std::rand() % (max - min) + min); };
+    while (points.size() < pointCount) points.emplace_back(op(), op(), op());
+
+    Vec3T* d_points = nullptr;
+    const size_t pointSize = points.size() * sizeof(Vec3T);
+    ASSERT_EQ(cudaMalloc(&d_points, pointSize), cudaSuccess);
+    ASSERT_EQ(cudaMemcpy(d_points, points.data(), pointSize, cudaMemcpyHostToDevice), cudaSuccess);
+
+    const double voxelSize = 8.0;
+    CountingResource res;
+    nanovdb::tools::cuda::PointsToGrid<BuildT, CountingResource> converter(voxelSize, nanovdb::Vec3d(0.0), 0, res);
+    auto handle = converter.getHandle(d_points, pointCount);
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    ASSERT_EQ(cudaFree(d_points), cudaSuccess);
+
+    EXPECT_TRUE(handle.deviceData());
+    EXPECT_TRUE(handle.deviceGrid<BuildT>());
+
+    handle.deviceDownload();
+    auto* grid = handle.grid<BuildT>();
+    ASSERT_TRUE(grid);
+    EXPECT_EQ(pointCount, grid->pointCount());
+
+    // Every input point must be recoverable from the encoded per-voxel point data.
+    nanovdb::PointAccessor<Vec3T, BuildT> acc(*grid);
+    ASSERT_TRUE(acc);
+    for (size_t i = 0; i < points.size(); ++i) {
+        const nanovdb::Coord ijk = grid->worldToIndex(points[i]).round();
+        ASSERT_TRUE(acc.probeLeaf(ijk) != nullptr);
+        ASSERT_TRUE(acc.isActive(ijk));
+        const Vec3T *start = nullptr, *stop = nullptr;
+        const uint64_t count = acc.voxelPoints(ijk, start, stop);
+        ASSERT_TRUE(start);
+        ASSERT_TRUE(stop);
+        bool found = false;
+        for (uint64_t j = 0; !found && j < count; ++j)
+            found = nanovdb::math::isApproxZero<double>((points[i] - start[j]).lengthSqr());
+        EXPECT_TRUE(found);
+    }
+
+    EXPECT_GT(res.allocs, 0);
+}
+
+//======================================================================
+// TopologyBuilder consumers (DilateGrid, MergeGrids, PruneGrid, RefineGrid,
+// CoarsenGrid) route their builder's stream-ordered scratch through an
+// injected resource instance (B5, openvdb #2232).
+//======================================================================
+
+/// @brief Build a small ValueOnIndex device grid from a handful of voxels.
+///        The default resource is fine for this setup step; the CountingResource
+///        of the op under test only observes that op's scratch.
+static nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer>
+buildIndexGrid(const std::vector<nanovdb::Coord>& voxels)
+{
+    nanovdb::Coord* d_voxels = nullptr;
+    cudaCheck(cudaMalloc(&d_voxels, voxels.size() * sizeof(nanovdb::Coord)));
+    cudaCheck(cudaMemcpy(d_voxels, voxels.data(), voxels.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    nanovdb::tools::cuda::PointsToGrid<nanovdb::ValueOnIndex> converter(nanovdb::Map(1.0));
+    auto handle = converter.getHandle(d_voxels, voxels.size());
+    cudaCheck(cudaFree(d_voxels));
+    return handle;
+}
+
+TEST(TestMemoryResource, DilateGrid_InjectedResourceSeam)
+{
+    // The dilated grid handle's output buffer goes through BufferT::create, and the
+    // dual-space mProcessedRoot / builder mData go through DeviceBuffer -- none of these
+    // is observed by the CountingResource; only the builder's stream-ordered scratch is.
+    auto src = buildIndexGrid({{0,0,0},{1,2,3},{4,4,4}});
+    auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_srcGrid, nullptr);
+
+    CountingResource res;
+    {
+        nanovdb::tools::cuda::DilateGrid<nanovdb::ValueOnIndex, CountingResource> op(d_srcGrid, 0, res);
+        auto handle = op.getHandle();
+        ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+        EXPECT_TRUE(handle.deviceData());
+    }
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_GT(res.allocs, 0);              // builder scratch routed through the injected instance
+    EXPECT_EQ(res.allocs, res.deallocs);   // and every allocation was freed through it
+}
+
+TEST(TestMemoryResource, MergeGrids_InjectedResourceSeam)
+{
+    // As above, the merged handle's output buffer and the dual-space mProcessedRoot / mData
+    // go through DeviceBuffer and are not counted -- only the builder's scratch is.
+    auto srcA = buildIndexGrid({{0,0,0},{1,1,1}});
+    auto srcB = buildIndexGrid({{5,5,5},{6,6,6}});
+    auto* gridA = srcA.deviceGrid<nanovdb::ValueOnIndex>();
+    auto* gridB = srcB.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(gridA, nullptr);
+    ASSERT_NE(gridB, nullptr);
+
+    CountingResource res;
+    {
+        nanovdb::tools::cuda::MergeGrids<nanovdb::ValueOnIndex, CountingResource> op(gridA, gridB, 0, res);
+        auto handle = op.getHandle();
+        ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+        EXPECT_TRUE(handle.deviceData());
+    }
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_GT(res.allocs, 0);
+    EXPECT_EQ(res.allocs, res.deallocs);
+}
+
+TEST(TestMemoryResource, PruneGrid_InjectedResourceSeam)
+{
+    // Voxels are kept within a single 8^3 leaf, so the source grid has exactly one leaf
+    // and the retain-mask sidecar is a single all-on Mask<3>. As above, only the builder's
+    // scratch is counted; the output buffer and dual-space mProcessedRoot / mData are not.
+    auto src = buildIndexGrid({{0,0,0},{1,1,1},{2,2,2}});
+    auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_srcGrid, nullptr);
+
+    nanovdb::Mask<3> hostMask;
+    hostMask.setOn(); // retain every voxel
+    nanovdb::Mask<3>* d_mask = nullptr;
+    ASSERT_EQ(cudaMalloc(&d_mask, sizeof(nanovdb::Mask<3>)), cudaSuccess);
+    ASSERT_EQ(cudaMemcpy(d_mask, &hostMask, sizeof(nanovdb::Mask<3>), cudaMemcpyHostToDevice), cudaSuccess);
+
+    CountingResource res;
+    {
+        nanovdb::tools::cuda::PruneGrid<nanovdb::ValueOnIndex, CountingResource> op(d_srcGrid, d_mask, 0, res);
+        auto handle = op.getHandle();
+        ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+        EXPECT_TRUE(handle.deviceData());
+    }
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    ASSERT_EQ(cudaFree(d_mask), cudaSuccess);
+    EXPECT_GT(res.allocs, 0);
+    EXPECT_EQ(res.allocs, res.deallocs);
+}
+
+TEST(TestMemoryResource, RefineGrid_InjectedResourceSeam)
+{
+    // As above, only the builder's scratch is counted; the output buffer and dual-space
+    // mProcessedRoot / mData go through DeviceBuffer and are not.
+    auto src = buildIndexGrid({{0,0,0},{1,2,3},{4,4,4}});
+    auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_srcGrid, nullptr);
+
+    CountingResource res;
+    {
+        nanovdb::tools::cuda::RefineGrid<nanovdb::ValueOnIndex, CountingResource> op(d_srcGrid, 0, res);
+        auto handle = op.getHandle();
+        ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+        EXPECT_TRUE(handle.deviceData());
+    }
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_GT(res.allocs, 0);
+    EXPECT_EQ(res.allocs, res.deallocs);
+}
+
+TEST(TestMemoryResource, CoarsenGrid_InjectedResourceSeam)
+{
+    // Voxels span a 2x2x2 block of leaves (leaf DIM = 8) so coarsening is non-degenerate.
+    // As above, only the builder's scratch is counted; the output buffer and dual-space
+    // mProcessedRoot / mData go through DeviceBuffer and are not.
+    auto src = buildIndexGrid({{0,0,0},{8,0,0},{0,8,0},{0,0,8},{8,8,0},{8,0,8},{0,8,8},{8,8,8}});
+    auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_srcGrid, nullptr);
+
+    CountingResource res;
+    {
+        nanovdb::tools::cuda::CoarsenGrid<nanovdb::ValueOnIndex, CountingResource> op(d_srcGrid, 0, res);
+        auto handle = op.getHandle();
+        ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+        EXPECT_TRUE(handle.deviceData());
+    }
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_GT(res.allocs, 0);
+    EXPECT_EQ(res.allocs, res.deallocs);
 }
 
 } // unnamed namespace

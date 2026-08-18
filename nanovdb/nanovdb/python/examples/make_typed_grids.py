@@ -44,7 +44,7 @@ def build_typed_grids():
         grid = cls(background, name, nanovdb.GridClass.Unknown)
         for ijk in solid_sphere_coords():
             grid.setValue(ijk, value)
-        handles.append(grid.to_nanovdb())
+        handles.append(grid.toNanoVDB())
         print(f"built {name} ({cls.__name__})")
     return handles
 

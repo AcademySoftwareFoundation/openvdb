@@ -228,7 +228,7 @@ def write_output(backend, g, phi, vx, path, style, band, name="filtered"):
     for k in range(1, g["n"] + 1):
         i, j, kk = coords[k]
         acc.setValue(Coord(int(i), int(j), int(kk)), float(v[k]))
-    fh = builder.to_nanovdb()
+    fh = builder.toNanoVDB()
     if style == nanovdb.GridType.OnIndex:
         io.writeGrid(path, T.createOnIndexGrid(fh.grid(0), channels=1,
                                                include_stats=False, include_tiles=False))
