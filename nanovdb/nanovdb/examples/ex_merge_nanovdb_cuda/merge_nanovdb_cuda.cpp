@@ -11,7 +11,7 @@
 #include <nanovdb/tools/CreateNanoGrid.h>
 
 template<typename BuildT>
-void mainMergeGrids(
+void mainTopologyUnion(
     nanovdb::NanoGrid<BuildT> *deviceSrcGrid1,
     nanovdb::NanoGrid<BuildT> *deviceSrcGrid2,
     nanovdb::NanoGrid<BuildT> *deviceDstReferenceGrid,
@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
             OPENVDB_THROW(openvdb::RuntimeError, "Failure while uploading indexGrids to GPU");
 
         // Launch benchmark
-        mainMergeGrids(
+        mainTopologyUnion(
             deviceSrcGrid1, deviceSrcGrid2, deviceDstReferenceGrid,
             srcIndexGrid1, srcIndexGrid2, dstReferenceGrid, benchmark_iters);
     }

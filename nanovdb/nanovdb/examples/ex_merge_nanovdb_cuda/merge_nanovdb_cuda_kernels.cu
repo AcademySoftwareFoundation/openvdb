@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
-#include <nanovdb/tools/cuda/MergeGrids.cuh>
+#include <nanovdb/tools/cuda/TopologyUnion.cuh>
 
 template<typename T>
 bool bufferCheck(const T* deviceBuffer, const T* hostBuffer, size_t elem_count) {
@@ -14,7 +14,7 @@ bool bufferCheck(const T* deviceBuffer, const T* hostBuffer, size_t elem_count) 
 }
 
 template<typename BuildT>
-void mainMergeGrids(
+void mainTopologyUnion(
     nanovdb::NanoGrid<BuildT> *deviceSrcGrid1,
     nanovdb::NanoGrid<BuildT> *deviceSrcGrid2,
     nanovdb::NanoGrid<BuildT> *deviceDstReferenceGrid,
@@ -26,7 +26,7 @@ void mainMergeGrids(
     nanovdb::util::cuda::Timer gpuTimer;
 
     // Initialize converter
-    nanovdb::tools::cuda::MergeGrids<BuildT> converter( deviceSrcGrid1, deviceSrcGrid2 );
+    nanovdb::tools::cuda::TopologyUnion<BuildT> converter( deviceSrcGrid1, deviceSrcGrid2 );
     converter.setChecksum(nanovdb::CheckMode::Default);
     converter.setVerbose(1);
 
@@ -35,9 +35,9 @@ void mainMergeGrids(
 
     // Check for correctness
     if (bufferCheck((char*)dstGrid, (char*)hostDstReferenceGrid->data(), hostDstReferenceGrid->gridSize()))
-        std::cout << "Result of MergeGrids check out CORRECT against reference" << std::endl;
+        std::cout << "Result of TopologyUnion check out CORRECT against reference" << std::endl;
     else
-        std::cout << "Result of MergeGrids compares INCORRECT against reference" << std::endl;
+        std::cout << "Result of TopologyUnion compares INCORRECT against reference" << std::endl;
 
     // Re-run warm-started iterations
     converter.setVerbose(0);
@@ -49,7 +49,7 @@ void mainMergeGrids(
 }
 
 template
-void mainMergeGrids(
+void mainTopologyUnion(
     nanovdb::NanoGrid<nanovdb::ValueOnIndex> *deviceSrcGrid1,
     nanovdb::NanoGrid<nanovdb::ValueOnIndex> *deviceSrcGrid2,
     nanovdb::NanoGrid<nanovdb::ValueOnIndex> *deviceDstReferenceGrid,
