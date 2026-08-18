@@ -8,9 +8,7 @@
 
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/NanoVDB.h>
-#include <nanovdb/tools/GridChecksum.h>  // for tools::updateGridCount
 
-#include <cstring>
 #include <vector>
 
 namespace nb = nanobind;
@@ -74,53 +72,18 @@ template<typename BufferT> void defineGridHandleUtilities(nb::module_& m)
     }, nb::arg("handle"),
        "Split a multi-grid handle into a list of single-grid handles, "
        "each owning a freshly-allocated buffer.");
-    // mergeGrids: walk the Python sequence by CONST ref to each handle and
-    // concatenate buffer bytes into a freshly-allocated output. The original
-    // nanovdb::mergeGrids takes a `const std::vector<GridHandle>&`, but
-    // building such a vector from a Python list requires moving from each
-    // wrapper (GridHandle is move-only) — which would silently empty the
-    // caller's `h1`/`h2` Python objects. Instead we inline the merge logic
-    // here so we never need to move from the inputs.
+    // mergeGrids: collect non-owning pointers to each handle and forward to
+    // the borrowing nanovdb::mergeGrids overload. The vector-of-handles
+    // overload is unusable from a Python list because GridHandle is move-only
+    // — building the vector would move from (and silently empty) the caller's
+    // Python objects.
     m.def("mergeGrids", [](nb::sequence handles) {
-        // Collect const refs so we touch each Python wrapper exactly once.
         std::vector<const HandleT*> sources;
         sources.reserve(nb::len(handles));
         for (nb::handle item : handles) {
             sources.push_back(&nb::cast<const HandleT&>(item));
         }
-
-        uint64_t totalSize = 0;
-        uint32_t totalGrids = 0;
-        for (const HandleT* h : sources) {
-            totalGrids += h->gridCount();
-            for (uint32_t n = 0; n < h->gridCount(); ++n) {
-                totalSize += h->gridSize(n);
-            }
-        }
-
-        // Nothing to merge (empty sequence, or only empty handles): return an
-        // empty handle. BufferT::create(0) is ill-defined — for HostBuffer it
-        // yields a non-null data() over a zero-byte region, and the
-        // GridHandle(buffer) ctor would then read a full GridData header out of
-        // it (heap overflow / "invalid host buffer" throw).
-        if (totalGrids == 0) return HandleT();
-
-        auto buffer = BufferT::create(totalSize);
-        uint8_t* dst = static_cast<uint8_t*>(buffer.data());
-        uint32_t writeIndex = 0;
-        for (const HandleT* h : sources) {
-            for (uint32_t n = 0; n < h->gridCount(); ++n) {
-                // gridData(n) is the authoritative per-grid start pointer (it
-                // applies mMetaData[n].offset), so we don't assume the source
-                // grids are laid out contiguously in the buffer.
-                const uint64_t gs = h->gridSize(n);
-                std::memcpy(dst, h->gridData(n), gs);
-                auto* gd = reinterpret_cast<nanovdb::GridData*>(dst);
-                nanovdb::tools::updateGridCount(gd, writeIndex++, totalGrids);
-                dst += gs;
-            }
-        }
-        return HandleT(std::move(buffer));
+        return nanovdb::mergeGrids<BufferT>(sources.data(), sources.size());
     }, nb::arg("handles"),
        "Combine a list of GridHandles into a single multi-grid GridHandle. "
        "Input handles are read by const reference; the new handle owns a "
