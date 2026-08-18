@@ -163,6 +163,11 @@ struct ScalarCodec final: public TopologyCodec<GridT, StorageGridT, Mode>
     {
         using StorageValueT = typename StorageGridT::TreeType::ValueType;
         GridT& grid = static_cast<GridT&>(*data.grid);
+
+        // readTopology() has already set the tiles and leaf buffers to the
+        // background, so there is nothing left to read.
+        if (options.readMode == io::ReadMode::TopologyOnly) return;
+
         auto& topoData = static_cast<TopologyCodecData<StorageValueT>&>(data);
         internal::scalarCodecReadBuffers<GridT, StorageGridT>(grid, is, options, &topoData.storageBackground);
     }
