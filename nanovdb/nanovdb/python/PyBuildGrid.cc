@@ -21,7 +21,7 @@ namespace pynanovdb {
 
 // Bind nanovdb::tools::build::Grid<BuildT> together with its
 // ValueAccessor<BuildT> and Tree<BuildT>::WriteAccessor proxies, plus a
-// .to_nanovdb() shortcut that bakes the build grid into a host NanoGrid
+// .toNanoVDB() shortcut that bakes the build grid into a host NanoGrid
 // via tools::createNanoGrid.
 //
 // One instantiation per writable BuildT in BuildTypes.def (scalars +
@@ -44,7 +44,7 @@ static void defineBuildGrid(nb::module_& m,
     // ----- build::Grid<BuildT> -----
     nb::class_<GridT>(m, gridName,
         "Mutable host-side grid builder for this BuildT. Write voxels via "
-        "setValue / getAccessor / getWriteAccessor, then call to_nanovdb() "
+        "setValue / getAccessor / getWriteAccessor, then call toNanoVDB() "
         "to bake a frozen NanoGrid GridHandle.")
         .def(nb::init<const ValueT&, const std::string&, GridClass>(),
             "background"_a,
@@ -133,7 +133,7 @@ static void defineBuildGrid(nb::module_& m,
         // Baking a large grid is the most expensive operation on this
         // class; release the GIL so other Python threads can run during
         // the conversion (the lambda only touches C++ state).
-        .def("to_nanovdb",
+        .def("toNanoVDB",
             [](const GridT& self,
                tools::StatsMode sMode,
                CheckMode        cMode,
@@ -220,7 +220,7 @@ void defineBuildGridModule(nb::module_& toolsModule)
         "Mutable, voxel-by-voxel CPU grid builder mirroring "
         "nanovdb::tools::build::*. Construct a typed Grid (e.g. "
         "FloatGrid(0.0, 'mygrid')), populate it with setValue / "
-        "ValueAccessor / WriteAccessor, then call .to_nanovdb() to bake "
+        "ValueAccessor / WriteAccessor, then call .toNanoVDB() to bake "
         "a host NanoGrid handle.";
 
     // X-macro instantiation over every writable BuildT: scalars (full
