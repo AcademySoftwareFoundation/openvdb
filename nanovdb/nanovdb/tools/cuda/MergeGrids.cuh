@@ -33,9 +33,12 @@ namespace nanovdb {
 
 namespace tools::cuda {
 
-template <typename BuildT>
+template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class MergeGrids
 {
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "MergeGrids allocates stream-ordered scratch and requires an AsyncResource");
+
     using GridT  = NanoGrid<BuildT>;
     using TreeT  = NanoTree<BuildT>;
     using RootT  = NanoRoot<BuildT>;
@@ -46,15 +49,21 @@ public:
     /// @brief Constructor for an N-ary merge
     /// @param d_srcGrids list of source device grids to be merged (active-mask union)
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    MergeGrids(const std::vector<const GridT*>& d_srcGrids, cudaStream_t stream = 0)
-        : mBuilder(stream), mStream(stream), mTimer(stream), mDeviceSrcGrids(d_srcGrids) {}
+    /// @param resource resource instance all device scratch is allocated from;
+    ///        must outlive this operator (defaults to the per-type default resource)
+    MergeGrids(const std::vector<const GridT*>& d_srcGrids, cudaStream_t stream = 0,
+               ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
+        : mBuilder(stream, resource), mStream(stream), mTimer(stream), mDeviceSrcGrids(d_srcGrids) {}
 
     /// @brief Convenience constructor for the common binary merge
     /// @param d_srcGrid1 first source device grid to be merged
     /// @param d_srcGrid2 second source device grid to be merged
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    MergeGrids(const GridT* d_srcGrid1, const GridT* d_srcGrid2, cudaStream_t stream = 0)
-        : MergeGrids(std::vector<const GridT*>{d_srcGrid1, d_srcGrid2}, stream) {}
+    /// @param resource resource instance all device scratch is allocated from;
+    ///        must outlive this operator (defaults to the per-type default resource)
+    MergeGrids(const GridT* d_srcGrid1, const GridT* d_srcGrid2, cudaStream_t stream = 0,
+               ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
+        : MergeGrids(std::vector<const GridT*>{d_srcGrid1, d_srcGrid2}, stream, resource) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -84,20 +93,20 @@ private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
-    TopologyBuilder<BuildT> mBuilder;
+    TopologyBuilder<BuildT, ResourceT> mBuilder;
     cudaStream_t            mStream{0};
     util::cuda::Timer       mTimer;
     int                     mVerbose{0};
     std::vector<const GridT*> mDeviceSrcGrids;
     std::vector<TreeData>     mSrcTreeData;
-};// tools::cuda::MergeGrids<BuildT>
+};// tools::cuda::MergeGrids<BuildT, ResourceT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
+template<typename BuildT, typename ResourceT>
 template<typename BufferT>
 GridHandle<BufferT>
-MergeGrids<BuildT>::getHandle(const BufferT &pool)
+MergeGrids<BuildT, ResourceT>::getHandle(const BufferT &pool)
 {
     if (mDeviceSrcGrids.empty())
         throw std::runtime_error("MergeGrids: no input grids");
@@ -163,12 +172,12 @@ MergeGrids<BuildT>::getHandle(const BufferT &pool)
     cudaStreamSynchronize(mStream);
 
     return GridHandle<BufferT>(std::move(buffer));
-}// MergeGrids<BuildT>::getHandle
+}// MergeGrids<BuildT, ResourceT>::getHandle
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void MergeGrids<BuildT>::mergeRoot()
+template<typename BuildT, typename ResourceT>
+void MergeGrids<BuildT, ResourceT>::mergeRoot()
 {
     // Creates a new merged tree root with the merged tiles of the two input root topologies
 
@@ -218,12 +227,12 @@ void MergeGrids<BuildT>::mergeRoot()
     for (const auto& [key, tile] : mergedTiles)
         *mergedRootPtr->tile(t++) = tile;
     mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
-}// MergeGrids<BuildT>::mergeRoot
+}// MergeGrids<BuildT, ResourceT>::mergeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void MergeGrids<BuildT>::mergeInternalNodes()
+template<typename BuildT, typename ResourceT>
+void MergeGrids<BuildT, ResourceT>::mergeInternalNodes()
 {
     // Merges the masks of upper and lower nodes from both input topologies into the
     // densified, pre-allocated mask arrays of the merged result
@@ -236,12 +245,12 @@ void MergeGrids<BuildT>::mergeInternalNodes()
             <<<mSrcTreeData[i].mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
             (mDeviceSrcGrids[i], mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks());
     }
-}// MergeGrids<BuildT>::mergeInternalNodes
+}// MergeGrids<BuildT, ResourceT>::mergeInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template <typename BuildT>
-void MergeGrids<BuildT>::processGridTreeRoot()
+template <typename BuildT, typename ResourceT>
+void MergeGrids<BuildT, ResourceT>::processGridTreeRoot()
 {
     // Copy GridData from the first source grid
     // TODO: Check for instances where extra processing is needed
@@ -249,12 +258,12 @@ void MergeGrids<BuildT>::processGridTreeRoot()
     cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrids.front()->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
     cudaCheckError();
-}// MergeGrids<BuildT>::processGridTreeRoot
+}// MergeGrids<BuildT, ResourceT>::processGridTreeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void MergeGrids<BuildT>::mergeLeafNodes()
+template<typename BuildT, typename ResourceT>
+void MergeGrids<BuildT, ResourceT>::mergeLeafNodes()
 {
     using Op = util::morphology::cuda::MergeLeafNodesFunctor<BuildT>;
     // Each input ORs its leaf active masks into the merged leaf topology.
@@ -267,7 +276,7 @@ void MergeGrids<BuildT>::mergeLeafNodes()
 
     // Update leaf offsets and prefix sums
     mBuilder.processLeafOffsets(mStream);
-}// MergeGrids<BuildT>::mergeLeafNodes
+}// MergeGrids<BuildT, ResourceT>::mergeLeafNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
