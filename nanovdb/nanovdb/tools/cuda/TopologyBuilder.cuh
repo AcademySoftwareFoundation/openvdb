@@ -56,11 +56,18 @@ class TopologyBuilder
     using LowerT = NanoLower<BuildT>;
     using LeafT  = NanoLeaf<BuildT>;
 
-    /// @brief Device-only scratch storage, allocated from the injected
-    ///        resource. These buffers are never read on the host, so they use
-    ///        the single-space Buffer rather than the dual DeviceBuffer, whose
-    ///        host pointer and per-device array they would leave unused.
-    using ScratchT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "TopologyBuilder allocates stream-ordered scratch and requires an AsyncResource");
+    static_assert(ResourceT::DEFAULT_ALIGNMENT >= alignof(uint64_t),
+                  "TopologyBuilder reinterprets byte scratch as word-sized types and requires word-aligned allocations");
+
+    /// @brief Device-only scratch storage, borrowing the injected resource
+    ///        through a ResourceRef so all traffic reaches the caller's
+    ///        instance (which may be stateful) rather than a copy. These
+    ///        buffers are never read on the host, so they use the single-space
+    ///        Buffer rather than the dual DeviceBuffer, whose host pointer and
+    ///        per-device array they would leave unused.
+    using ScratchT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
 
 public:
 
@@ -68,7 +75,15 @@ public:
     /// @param resource resource instance all device scratch is allocated from;
     ///        must outlive this builder
     TopologyBuilder(cudaStream_t stream, ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
-        : mResource(&resource)
+        : mUpperMasks(stream, resource, 0, nanovdb::cuda::noInit)
+        , mLowerMasks(stream, resource, 0, nanovdb::cuda::noInit)
+        , mUpperOffsets(stream, resource, 0, nanovdb::cuda::noInit)
+        , mLowerOffsets(stream, resource, 0, nanovdb::cuda::noInit)
+        , mLeafOffsets(stream, resource, 0, nanovdb::cuda::noInit)
+        , mVoxelOffsets(stream, resource, 0, nanovdb::cuda::noInit)
+        , mLowerParents(stream, resource, 0, nanovdb::cuda::noInit)
+        , mLeafParents(stream, resource, 0, nanovdb::cuda::noInit)
+        , mResource(&resource)
         , mTempDevicePool(resource)
     {
         mData = nanovdb::cuda::DeviceBuffer::create(sizeof(Data));
