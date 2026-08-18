@@ -109,6 +109,89 @@ inline unique_ptr<uint32_t> createCrc32Lut(size_t extra = 0, cudaStream_t stream
     return lut;
 }
 
+/// @brief Cuda kernel computing per-block CRC32 checksums via slicing-by-4.
+/// The 256-entry base LUT is staged into shared memory and three derived
+/// slice tables are built in place, so the four divergent lookups per 4-byte
+/// step hit shared memory and the dependent update chain advances four bytes
+/// per step instead of one. Bit-identical to the byte-serial crc32().
+/// The final block absorbs any remainder of @c totalSize.
+__global__ inline void crc32SlicedKernel(const void *d_data, uint32_t* d_blockCRC, uint64_t blockCount, uint32_t log2BlockSize, uint64_t totalSize, const uint32_t *d_lut)
+{
+    __shared__ uint32_t sLut[4][256];
+    for (uint32_t i = threadIdx.x; i < 256; i += blockDim.x) sLut[0][i] = d_lut[i];
+    __syncthreads();
+    for (int k = 1; k < 4; ++k) {
+        for (uint32_t i = threadIdx.x; i < 256; i += blockDim.x) {
+            const uint32_t c = sLut[k-1][i];
+            sLut[k][i] = (c >> 8) ^ sLut[0][c & 0xffu];
+        }
+        __syncthreads();
+    }
+    const uint64_t tid = blockIdx.x * (uint64_t)blockDim.x + threadIdx.x;
+    if (tid >= blockCount) return;
+    const uint8_t *p = (const uint8_t*)d_data + (tid << log2BlockSize);
+    uint64_t n = uint64_t(1) << log2BlockSize;
+    if (tid + 1 == blockCount) n += totalSize - (blockCount << log2BlockSize);
+    uint32_t crc = ~0u;
+    // blocks start at power-of-two offsets of a 32B-aligned buffer -> 4B aligned
+    const uint32_t *w = (const uint32_t*)p;
+    for (uint64_t i = 0, nw = n >> 2; i < nw; ++i) {
+        const uint32_t x = crc ^ w[i];
+        crc = sLut[3][x & 0xffu] ^ sLut[2][(x >> 8) & 0xffu] ^ sLut[1][(x >> 16) & 0xffu] ^ sLut[0][x >> 24];
+    }
+    for (uint64_t i = n & ~3ull; i < n; ++i) {
+        crc ^= p[i];
+        for (int j = 0; j < 8; ++j) crc = (crc >> 1) ^ (0xEDB88320u & (-(crc & 1u)));
+    }
+    d_blockCRC[tid] = ~crc;
+}
+
+/// @brief y = M x over GF(2), M given as 32 column words
+__host__ __device__ inline uint32_t crc32Gf2MatTimes(const uint32_t *mat, uint32_t vec)
+{
+    uint32_t sum = 0;
+    while (vec) {
+        if (vec & 1u) sum ^= *mat;
+        vec >>= 1;
+        ++mat;
+    }
+    return sum;
+}
+
+/// @brief Build into @c dst[32] the GF(2) operator that advances a CRC past
+/// @c bits zero bits, by binary exponentiation of the single-bit operator
+/// (zlib crc32_combine construction). O(log bits x 32) - a few microseconds on
+/// the host, which is where it is called so the device combine stays a cheap fold.
+__host__ __device__ inline void crc32BuildShiftOp(uint32_t *dst, uint64_t bits)
+{
+    uint32_t oddBuf[32], evenBuf[32];
+    uint32_t *cur = oddBuf, *nxt = evenBuf;
+    cur[0] = 0xEDB88320u;// operator for a single zero bit
+    for (int n = 1; n < 32; ++n) cur[n] = 1u << (n - 1);
+    for (int n = 0; n < 32; ++n) dst[n] = 1u << n;// identity
+    while (bits) {
+        if (bits & 1ull) for (int n = 0; n < 32; ++n) dst[n] = crc32Gf2MatTimes(cur, dst[n]);
+        bits >>= 1;
+        if (bits) { for (int n = 0; n < 32; ++n) nxt[n] = crc32Gf2MatTimes(cur, cur[n]); uint32_t *t = cur; cur = nxt; nxt = t; }
+    }
+}
+
+/// @brief Single-thread kernel folding per-chunk CRCs into the CRC of the whole
+/// stream, using crc(A||B) = shift(crc(A), len(B)) ^ crc(B). The two GF(2) shift
+/// operators - @c d_acc for a full chunk and @c d_accLast for the final,
+/// possibly shorter, chunk - are precomputed on the host, so this is just an
+/// O(chunkCount) fold. Bit-identical to a serial crc32 over the concatenated
+/// stream. (@c d_accLast equals @c d_acc when the last chunk is full.)
+__global__ inline void crc32CombineKernel(const uint32_t *d_chunkCRC, uint64_t chunkCount, const uint32_t *d_acc, const uint32_t *d_accLast, uint32_t *d_crc)
+{
+    uint32_t crc = d_chunkCRC[0];
+    for (uint64_t i = 1; i < chunkCount; ++i) {
+        const uint32_t *op = (i + 1 == chunkCount) ? d_accLast : d_acc;
+        crc = crc32Gf2MatTimes(op, crc) ^ d_chunkCRC[i];
+    }
+    *d_crc = crc;
+}
+
 /// @brief Compute CRC32 checksum of 4K block
 /// @param d_data device pointer to start of data
 /// @param size number of bytes
@@ -121,14 +204,39 @@ inline void blockedCRC32(const void *d_data, size_t size, const uint32_t *d_lut,
     const uint64_t checksumCount = size >> NANOVDB_CRC32_LOG2_BLOCK_SIZE;// 4 KB (4096 byte)
     unique_ptr<uint32_t> buffer(checksumCount, stream);// for checksums of 4 KB blocks
     uint32_t *d_checksums = buffer.get();
-    lambdaKernel<<<blocksPerGrid(checksumCount, threadsPerBlock), threadsPerBlock, 0, stream>>>(checksumCount, [=] __device__(size_t tid) {
-        uint32_t blockSize = 1 << NANOVDB_CRC32_LOG2_BLOCK_SIZE;
-        if (tid+1 == checksumCount) blockSize += size - (checksumCount<<NANOVDB_CRC32_LOG2_BLOCK_SIZE);
-        d_checksums[tid] = crc32((const uint8_t*)d_data + (tid<<NANOVDB_CRC32_LOG2_BLOCK_SIZE), blockSize, d_lut);
-    }); cudaCheckError();
-    lambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__(size_t) {// Compute CRC32 of all the 4K blocks
-        *d_crc = crc32((const uint8_t*)d_checksums, checksumCount*sizeof(uint32_t), d_lut);
-    }); cudaCheckError();
+    crc32SlicedKernel<<<blocksPerGrid(checksumCount, threadsPerBlock), threadsPerBlock, 0, stream>>>(
+        d_data, d_checksums, checksumCount, NANOVDB_CRC32_LOG2_BLOCK_SIZE, size, d_lut);
+    cudaCheckError();
+    // CRC of the block-checksum array itself. The former single-thread pass
+    // over checksumCount*4 bytes (megabytes for multi-GB grids) is replaced
+    // by parallel per-chunk CRCs plus a GF(2) combine - bit-identical result.
+    const uint64_t checksumBytes = checksumCount*sizeof(uint32_t);
+    constexpr uint64_t log2ChunkSize = 12, chunkSize = uint64_t(1) << log2ChunkSize;
+    if (checksumBytes <= 2*chunkSize) {// small: single-thread CRC is fine
+        lambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__(size_t) {
+            *d_crc = crc32((const uint8_t*)d_checksums, checksumBytes, d_lut);
+        }); cudaCheckError();
+    } else {
+        const uint64_t chunkCount = checksumBytes >> log2ChunkSize;// final chunk absorbs the remainder
+        const uint64_t lastChunkBytes = chunkSize + (checksumBytes - (chunkCount << log2ChunkSize));
+        unique_ptr<uint32_t> chunkBuffer(chunkCount, stream);
+        uint32_t *d_chunkCRC = chunkBuffer.get();
+        crc32SlicedKernel<<<blocksPerGrid(chunkCount, threadsPerBlock), threadsPerBlock, 0, stream>>>(
+            d_checksums, d_chunkCRC, chunkCount, log2ChunkSize, checksumBytes, d_lut);
+        cudaCheckError();
+        // Precompute the two GF(2) shift operators on the host (data-independent,
+        // ~microseconds) and upload them, instead of rebuilding them on a single
+        // device thread inside the combine - that build dominated the checksum
+        // for small and medium grids.
+        uint32_t hOps[64];
+        crc32BuildShiftOp(hOps,      chunkSize      * 8ull);// operator for a full chunk
+        crc32BuildShiftOp(hOps + 32, lastChunkBytes * 8ull);// operator for the last chunk
+        unique_ptr<uint32_t> opBuffer(64, stream);
+        uint32_t *d_ops = opBuffer.get();
+        cudaCheck(cudaMemcpyAsync(d_ops, hOps, 64*sizeof(uint32_t), cudaMemcpyHostToDevice, stream));
+        crc32CombineKernel<<<1, 1, 0, stream>>>(d_chunkCRC, chunkCount, d_ops, d_ops + 32, d_crc);
+        cudaCheckError();
+    }
 }// void cudaBlockedCRC32(const void *d_data, size_t size, const uint32_t *d_lut, uint32_t *d_crc, cudaStream_t stream)
 
 /// @brief Compute CRC32 checksum of 4K block
@@ -234,7 +342,7 @@ inline Checksum evalChecksum(const GridData *d_gridData, CheckMode mode, cudaStr
     if (mode != CheckMode::Empty) {
         auto d_lut = util::cuda::createCrc32Lut(1, stream);
         crc32Head(d_gridData, d_lut.get(), d_lut.get() + 256, stream);
-        cudaCheck(cudaMemcpyAsync(&(cs.head()), d_lut.get() + 256, headSize, cudaMemcpyDeviceToHost, stream));
+        cudaCheck(cudaMemcpyAsync(&(cs.head()), d_lut.get() + 256, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
         if (mode == CheckMode::Full) {
             std::unique_ptr<char[]> buffer(new char[headSize]);
             auto *gridData = (GridData*)(buffer.get());
@@ -244,7 +352,7 @@ inline Checksum evalChecksum(const GridData *d_gridData, CheckMode mode, cudaStr
             } else {
                 callNanoGrid<Crc32TailOld>(d_gridData, gridData, d_lut.get(), d_lut.get() + 256, stream);
             }
-            cudaCheck(cudaMemcpyAsync(&(cs.tail()), d_lut.get() + 256, headSize, cudaMemcpyDeviceToHost, stream));
+            cudaCheck(cudaMemcpyAsync(&(cs.tail()), d_lut.get() + 256, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
         }
     }
     return cs;
@@ -265,7 +373,7 @@ Checksum evalChecksum(const NanoGrid<BuildT> *d_grid, CheckMode mode, cudaStream
     if (mode != CheckMode::Empty) {
         auto d_lut = util::cuda::createCrc32Lut(1, stream);
         crc32Head(d_grid, d_lut.get(), d_lut.get() + 256, stream);
-        cudaCheck(cudaMemcpyAsync(&(cs.head()), d_lut.get() + 256, headSize, cudaMemcpyDeviceToHost, stream));
+        cudaCheck(cudaMemcpyAsync(&(cs.head()), d_lut.get() + 256, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
         if (mode == CheckMode::Full) {
             std::unique_ptr<char[]> buffer(new char[headSize]);
             auto *gridData = (GridData*)(buffer.get());
@@ -275,7 +383,7 @@ Checksum evalChecksum(const NanoGrid<BuildT> *d_grid, CheckMode mode, cudaStream
             } else {
                 crc32TailOld(d_grid, gridData, d_lut.get(), d_lut.get() + 256, stream);
             }
-            cudaCheck(cudaMemcpyAsync(&(cs.tail()), d_lut.get() + 256, headSize, cudaMemcpyDeviceToHost, stream));
+            cudaCheck(cudaMemcpyAsync(&(cs.tail()), d_lut.get() + 256, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
         }
     }
     return cs;
