@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #define _USE_MATH_DEFINES
+#include <algorithm>
 #include <cmath>
 #include <chrono>
+#include <vector>
 
 #if defined(NANOVDB_USE_CUDA)
 #include <nanovdb/cuda/DeviceBuffer.h>
@@ -17,6 +19,34 @@ using BufferT = nanovdb::HostBuffer;
 #include <nanovdb/math/HDDA.h>
 
 #include "common.h"
+
+// Number of untimed warmup iterations to run before the timed loop. These
+// pay the kernel cold-start, lazy module load and GPU clock ramp-up costs
+// that would otherwise contaminate the first measured iteration.
+static constexpr int NUM_WARMUP_ITERATIONS = 2;
+
+// Print min / median / mean / max instead of just mean. A single outlier
+// (context switch, OS jitter, thermal blip) pulls the mean noticeably but
+// leaves the median alone, so the median is the more trustworthy stat.
+static void
+reportStats(const char *label, const std::vector<float> &samples)
+{
+    if (samples.empty()) return;
+    std::vector<float> sorted(samples); // copy so we don't reorder the caller's data
+    std::sort(sorted.begin(), sorted.end());
+    const float minMs = sorted.front();
+    const float maxMs = sorted.back();
+    const float medianMs = sorted[sorted.size() / 2];
+    float sum = 0;
+    for (float s : sorted) sum += s;
+    const float meanMs = sum / float(sorted.size());
+    std::cout << label
+              << " min=" << minMs << " ms"
+              << "  median=" << medianMs << " ms"
+              << "  mean=" << meanMs << " ms"
+              << "  max=" << maxMs << " ms"
+              << "  (n=" << sorted.size() << ")" << std::endl;
+}
 
 void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int width, int height, BufferT& imageBuffer)
 {
@@ -69,14 +99,16 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
     };
 
     {
-        float durationAvg = 0;
-        for (int i = 0; i < numIterations; ++i) {
-            float duration = renderImage(false, renderOp, width, height, h_outImage, h_grid);
-            //std::cout << "Duration(NanoVDB-Host) = " << duration << " ms" << std::endl;
-            durationAvg += duration;
+        for (int i = 0; i < NUM_WARMUP_ITERATIONS; ++i) {
+            (void)renderImage(false, renderOp, width, height, h_outImage, h_grid);
         }
-        durationAvg /= numIterations;
-        std::cout << "Average Duration(NanoVDB-Host) = " << durationAvg << " ms" << std::endl;
+
+        std::vector<float> samples;
+        samples.reserve(numIterations);
+        for (int i = 0; i < numIterations; ++i) {
+            samples.push_back(renderImage(false, renderOp, width, height, h_outImage, h_grid));
+        }
+        reportStats("Duration(NanoVDB-Host):", samples);
 
         saveImage("raytrace_level_set-nanovdb-host.pfm", width, height, (float*)imageBuffer.data());
     }
@@ -92,14 +124,16 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
     float* d_outImage = reinterpret_cast<float*>(imageBuffer.deviceData());
 
     {
-        float durationAvg = 0;
-        for (int i = 0; i < numIterations; ++i) {
-            float duration = renderImage(true, renderOp, width, height, d_outImage, d_grid);
-            //std::cout << "Duration(NanoVDB-Cuda) = " << duration << " ms" << std::endl;
-            durationAvg += duration;
+        for (int i = 0; i < NUM_WARMUP_ITERATIONS; ++i) {
+            (void)renderImage(true, renderOp, width, height, d_outImage, d_grid);
         }
-        durationAvg /= numIterations;
-        std::cout << "Average Duration(NanoVDB-Cuda) = " << durationAvg << " ms" << std::endl;
+
+        std::vector<float> samples;
+        samples.reserve(numIterations);
+        for (int i = 0; i < numIterations; ++i) {
+            samples.push_back(renderImage(true, renderOp, width, height, d_outImage, d_grid));
+        }
+        reportStats("Duration(NanoVDB-Cuda):", samples);
 
         imageBuffer.deviceDownload();
         saveImage("raytrace_level_set-nanovdb-cuda.pfm", width, height, (float*)imageBuffer.data());
