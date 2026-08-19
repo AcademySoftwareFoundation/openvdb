@@ -1,0 +1,15 @@
+NanoVDB:
+
+  Bug fixes:
+  - cuda::DeviceBuffer::recordUse now chains: recording a use on a second
+    stream first orders that stream after the previously recorded use, so the
+    single per-device tracking event transitively covers every recorded use
+    instead of only the most recent one. Previously, concurrent uses recorded
+    on streams A then B left only B's event, and the buffer's device free
+    could run while A's work was still in flight.
+
+  Improvements:
+  - cuda::DeviceBuffer::orderAfterPriorUses is now public — the consume-side
+    companion of recordUse, letting external consumers (e.g. zero-copy
+    array-interface exports) order their own stream after the buffer's
+    tracked uses before reading.
