@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 #ifdef NANOVDB_USE_CUDA
 
-#include "../PyGridHandle.h"
+#include "PyGridHandle.h"
+#include "PyDeviceBuffer.h"  // for recordUseChecked / kRecordUseDoc
 #include <nanobind/ndarray.h>
 
 #include <cstdint>
@@ -54,7 +55,7 @@ static nb::object pyDeviceGrid(nb::handle py_handle, uint32_t n)
             return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle)   \
                         : nb::none();                                           \
         }
-#include "../BuildTypes.def"
+#include "BuildTypes.def"
         default:
             return nb::none();
     }
@@ -114,7 +115,17 @@ void defineDeviceGridHandle(nb::module_& m)
             },
             "Raw device pointer to the base of the whole device buffer as a "
             "Python int (0 if the handle has not been uploaded to the device "
-            "yet).")
+            "yet). Work you enqueue against this pointer on a non-blocking "
+            "stream is invisible to the buffer's lifetime tracking: call "
+            "recordUse(stream) afterwards, or synchronize before the handle "
+            "is destroyed.")
+        .def(
+            "recordUse",
+            [](GridHandle<BufferT>& handle, uintptr_t stream, int device) {
+                recordUseChecked(handle.buffer(), stream, device);
+            },
+            "stream"_a, "device"_a = -1,
+            kRecordUseDoc)
         .def_prop_ro(
             "__cuda_array_interface__",
             [](GridHandle<BufferT>& handle) {
@@ -133,7 +144,10 @@ void defineDeviceGridHandle(nb::module_& m)
             },
             "CUDA Array Interface (v3) view of the whole device buffer as 1-D "
             "uint8 — lets CuPy / Numba / PyTorch consume the serialized grid "
-            "bytes zero-copy. Returns a null data pointer until deviceUpload.")
+            "bytes zero-copy. Returns a null data pointer until deviceUpload. "
+            "After enqueuing work on this view from a non-blocking stream, "
+            "call recordUse(stream) so the buffer's device free is ordered "
+            "after it.")
         .def(
             "__dlpack_device__",
             [](GridHandle<BufferT>&) {

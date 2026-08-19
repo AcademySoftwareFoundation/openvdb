@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #ifdef NANOVDB_USE_CUDA
 
-#include "../PyTree.h"
+#include "PyTree.h"
 
 #include <cstdint>
 
@@ -56,7 +56,7 @@ static nb::object pyDeviceNodeMgr(nb::handle py_self)
     if (auto* m = handle.template deviceMgr<T>()) {                           \
         return nb::cast(m, nb::rv_policy::reference, py_self);                 \
     }
-#include "../BuildTypes.def"
+#include "BuildTypes.def"
     return nb::none();
 }
 
@@ -141,7 +141,7 @@ static void defineCreateDeviceNodeManager(nb::module_& m)
             if (auto obj = tryCreateDeviceNodeManager<T>(py_grid, s); obj.is_valid()) { \
                 return obj;                                                    \
             }
-#include "../BuildTypes.def"
+#include "BuildTypes.def"
             throw nb::type_error(
                 "createDeviceNodeManager: argument is not a NanoVDB device "
                 "grid of any bound BuildT. Pass a device grid obtained from "

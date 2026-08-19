@@ -9,8 +9,11 @@
 #include <nanobind/ndarray.h>
 
 #include <cstdint>
+#include <string>
 
 #include <cuda_runtime.h>
+
+#include <nanovdb/cuda/DeviceBuffer.h>
 #endif
 
 namespace nb = nanobind;
@@ -18,6 +21,39 @@ namespace nb = nanobind;
 namespace pynanovdb {
 
 #ifdef NANOVDB_USE_CUDA
+
+/// @brief Bounds-checked forwarder for DeviceBuffer::recordUse, shared by the
+///        DeviceBuffer and DeviceGridHandle bindings. device == -1 selects the
+///        current CUDA device. recordUse itself indexes per-device tracking
+///        state unchecked, so validate here where we can raise a Python
+///        exception instead.
+inline void recordUseChecked(nanovdb::cuda::DeviceBuffer& buf, uintptr_t stream, int device)
+{
+    int count = 0;
+    cudaCheck(cudaGetDeviceCount(&count));
+    if (device < 0) cudaCheck(cudaGetDevice(&device));
+    if (device >= count) {
+        const std::string msg = "recordUse: device id " + std::to_string(device) +
+                                " out of range [0, " + std::to_string(count) + ").";
+        throw nb::index_error(msg.c_str());
+    }
+    nb::gil_scoped_release release;
+    buf.recordUse(device, reinterpret_cast<cudaStream_t>(stream));
+}
+
+/// @brief Docstring shared by the DeviceBuffer and DeviceGridHandle recordUse
+///        bindings (the two forward to the same underlying buffer method).
+inline constexpr char kRecordUseDoc[] =
+    "Record that this buffer's device data was just used on `stream` (a raw "
+    "cudaStream_t as a Python int, e.g. cupy.cuda.Stream.ptr), so the device "
+    "free issued when the buffer is cleared or destroyed is ordered after "
+    "that work. Uploads/downloads record themselves automatically; call this "
+    "after enqueuing your own kernels or copies against device_ptr() / "
+    "__cuda_array_interface__ / __dlpack__ on a non-blocking stream — "
+    "without it such work is only safe if you synchronize before dropping "
+    "the buffer. device selects which device's buffer was used (-1 = the "
+    "current CUDA device). No-op on non-owning (from_external) buffers, "
+    "which never free their pointers.";
 
 /// @brief Bind the device-interop surface (CUDA Array Interface / DLPack, raw
 ///        device/host pointers, streams) onto a device-buffer-like class.
@@ -40,7 +76,11 @@ void addDeviceInterop(nb::class_<BufferT>& cls)
             return reinterpret_cast<uintptr_t>(buf.deviceData());
         },
         "Raw device pointer to the current device's buffer as a Python int "
-        "(0 if no device allocation exists yet).");
+        "(0 if no device allocation exists yet). Work you enqueue against "
+        "this pointer on a non-blocking stream is invisible to the buffer's "
+        "lifetime tracking: record it afterwards where the buffer supports "
+        "it (DeviceBuffer.recordUse / DeviceGridHandle.recordUse), or "
+        "synchronize before the buffer is destroyed.");
 
     cls.def(
         "host_ptr",

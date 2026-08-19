@@ -58,7 +58,10 @@ nanobind_add_module(nanovdb_python NB_STATIC
     cuda/PyDeviceGridChecksum.cu
 )
 
-target_include_directories(nanovdb_python PRIVATE ${CUDA_INCLUDE_DIRECTORY})
+# CMAKE_CURRENT_SOURCE_DIR lets sources in cuda/ include the shared binding
+# headers by their plain names ("PyGridHandle.h", "BuildTypes.def") instead of
+# "../"-relative paths, matching the include style used across the codebase.
+target_include_directories(nanovdb_python PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CUDA_INCLUDE_DIRECTORY})
 target_link_libraries(nanovdb_python PRIVATE nanovdb ${CUDA_LIBRARIES} ${NANOVDB_BLOSC} ${NANOVDB_ZLIB} ${NANOVDB_OPENVDB} ${NANOVDB_TBB})
 target_compile_definitions(nanovdb_python PRIVATE ${NANOVDB_USE_CUDA_FLAG} ${NANOVDB_USE_BLOSC_FLAG} ${NANOVDB_USE_ZLIB_FLAG} ${NANOVDB_USE_OPENVDB_FLAG} ${NANOVDB_USE_TBB_FLAG})
 set_target_properties(nanovdb_python PROPERTIES OUTPUT_NAME "nanovdb")

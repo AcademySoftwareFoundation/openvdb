@@ -301,6 +301,62 @@ class TestDeviceGridHandleInterop(unittest.TestCase):
 @unittest.skipIf(
     not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
 )
+class TestRecordUse(unittest.TestCase):
+    """DeviceBuffer/DeviceGridHandle.recordUse: order the buffer's device free
+    after work enqueued on external non-blocking streams (the CAI/DLPack
+    interop pattern, where kernels launched against device_ptr() are invisible
+    to the buffer's automatic upload/download tracking)."""
+
+    def test_free_ordered_after_external_stream_work(self):
+        cp = _require_cupy(self)
+        dh, _ = _build_device_onindex_grid(20.0)
+        # Baseline: reduce the serialized grid bytes while the handle is alive.
+        view = cp.asarray(dh)  # zero-copy CAI view of the device buffer
+        expected = int(view.sum())
+        # Enqueue the same reduction on a NON-BLOCKING stream, record the use,
+        # and drop the handle while the reduction may still be in flight. The
+        # buffer's cudaFreeAsync must be ordered after the recorded event; if
+        # it were not, the reduction would race the free and read freed memory.
+        s = cp.cuda.Stream(non_blocking=True)
+        with s:
+            pending = view.sum()  # device scalar; no host sync yet
+        dh.recordUse(s.ptr)
+        del dh, view
+        s.synchronize()
+        self.assertEqual(int(pending), expected)
+
+    def test_default_stream_and_explicit_device(self):
+        dh, _ = _build_device_onindex_grid(10.0)
+        # Default stream (0) and the current device, both explicit and implied.
+        dh.recordUse(0)
+        dh.recordUse(0, device=0)
+
+    def test_rejects_out_of_range_device(self):
+        dh, _ = _build_device_onindex_grid(10.0)
+        with self.assertRaises(IndexError):
+            dh.recordUse(0, device=1_000_000)
+
+    def test_noop_on_non_owning_buffer(self):
+        cp = _require_cupy(self)
+        prev = cp.cuda.get_allocator()
+        cp.cuda.set_allocator(cp.cuda.malloc_managed)
+        try:
+            mbuf = cp.zeros(256, dtype=cp.uint8)
+            ptr = int(mbuf.data.ptr)
+            ext = nanovdb.cuda.DeviceBuffer.from_external(256, ptr, ptr)
+            # Non-owning buffers never free their pointers, so recordUse has
+            # nothing to order — it must be accepted and be a no-op.
+            ext.recordUse(0)
+        finally:
+            cp.cuda.set_allocator(prev)
+
+
+@unittest.skipIf(
+    not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
+)
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
+)
 class TestUnifiedBufferInterop(unittest.TestCase):
     """UnifiedBuffer create / capacity / zero-copy."""
 

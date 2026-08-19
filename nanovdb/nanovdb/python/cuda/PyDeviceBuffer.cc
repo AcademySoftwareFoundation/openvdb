@@ -46,7 +46,9 @@ void defineDeviceBuffer(nb::module_& m)
             "does NOT take ownership: it will never free either pointer, so "
             "the caller must keep both allocations alive for the buffer's "
             "lifetime. The device pointer is associated with the current CUDA "
-            "device.");
+            "device.")
+        .def("recordUse", &recordUseChecked, "stream"_a, "device"_a = -1,
+             kRecordUseDoc);
 }
 
 } // namespace pynanovdb

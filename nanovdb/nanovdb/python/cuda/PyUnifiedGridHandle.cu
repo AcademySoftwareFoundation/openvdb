@@ -3,7 +3,7 @@
 #ifdef NANOVDB_USE_CUDA
 
 #include "PyUnifiedGridHandle.h"
-#include "../PyGridHandle.h"
+#include "PyGridHandle.h"
 
 #include <cstdint>
 
@@ -51,7 +51,7 @@ static nb::object pyUnifiedDeviceGrid(nb::handle py_handle, uint32_t n)
             return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle)   \
                         : nb::none();                                           \
         }
-#include "../BuildTypes.def"
+#include "BuildTypes.def"
         default:
             return nb::none();
     }
