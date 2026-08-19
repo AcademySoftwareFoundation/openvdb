@@ -16,6 +16,7 @@
 #define NANOVDB_TOOLS_CUDA_GRIDSTATS_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>
+#include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/tools/GridStats.h>
 
 #include <cub/util_type.cuh>// for cub::Uninitialized
@@ -26,18 +27,22 @@ namespace tools::cuda {
 
 /// @brief Update, i.e. re-compute, grid statistics like min/max, stats and bbox
 ///        information for an existing NanoVDB Grid.
-/// @param grid   Grid whose stats to update
+/// @tparam ResourceT Template type of optional resource used for internal temporary memory
+/// @param d_grid Grid whose stats to update
 /// @param mode   Mode of computation for the statistics.
 /// @param stream Optional cuda stream (defaults to zero)
-template<typename BuildT>
+template<typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 void updateGridStats(NanoGrid<BuildT> *d_grid, StatsMode mode = StatsMode::Default, cudaStream_t stream = 0);
 
 //================================================================================================
 
-/// @brief Allows for the construction of NanoVDB grids without any dependency
-template<typename BuildT, typename StatsT = Stats<typename NanoGrid<BuildT>::ValueType>>
+/// @brief Re-computes statistics (of type @c StatsT) for each node of an existing NanoVDB grid on the device
+template<typename BuildT, typename StatsT = Stats<typename NanoGrid<BuildT>::ValueType>, typename ResourceT = nanovdb::cuda::DeviceResource>
 class GridStats
 {
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "GridStats allocates stream-ordered scratch and requires an AsyncResource");
+
     using GridT  = NanoGrid<BuildT>;
     using TreeT  = typename GridT::TreeType;
     using ValueT = typename TreeT::ValueType;
@@ -48,10 +53,25 @@ class GridStats
     static_assert(util::is_same<ValueT, typename StatsT::ValueType>::value, "Mismatching type");
 
     ValueT mDelta; // skip rendering of node if: node.max < -mDelta || node.min > mDelta
+    ResourceT* mResource;// non-owning; all device scratch routes through this resource instance
+
+    template<typename T>
+    using BufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ResourceRef<ResourceT>>;
+    nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource); }
 
 public:
-    GridStats(ValueT delta = ValueT(0)) : mDelta(delta) {}
+    /// @brief Constructor
+    /// @param delta skip rendering of nodes when node.max < -delta or node.min > delta
+    /// @param resource resource instance all device scratch is allocated from;
+    ///        must outlive this instance (defaults to the per-type default resource)
+    GridStats(ValueT delta = ValueT(0), ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
+        : mDelta(delta), mResource(&resource) {}
 
+    /// @note The per-node statistics scratch is allocated through the injected
+    ///       resource. The temporary NodeManager this method builds still
+    ///       allocates through the dual-space DeviceBuffer, which does not yet
+    ///       accept a resource; that allocation bypasses @c ResourceT until the
+    ///       single-space handle work on the roadmap (openvdb #2232) lands.
     void update(GridT *d_grid, cudaStream_t stream = 0);
 
 }; // cuda::GridStats
@@ -285,8 +305,8 @@ __global__ void processRootAndGrid(NodeManager<BuildT> *d_nodeMgr, StatsT *d_sta
 
 //================================================================================================
 
-template<typename BuildT, typename StatsT>
-void GridStats<BuildT, StatsT>::update(NanoGrid<BuildT> *d_grid, cudaStream_t stream)
+template<typename BuildT, typename StatsT, typename ResourceT>
+void GridStats<BuildT, StatsT, ResourceT>::update(NanoGrid<BuildT> *d_grid, cudaStream_t stream)
 {
     static const uint32_t threadsPerBlock = 128;
     auto blocksPerGrid = [&](uint32_t count)->uint32_t{return (count + (threadsPerBlock - 1)) / threadsPerBlock;};
@@ -298,11 +318,12 @@ void GridStats<BuildT, StatsT>::update(NanoGrid<BuildT> *d_grid, cudaStream_t st
     cudaCheck(cudaMemcpyAsync(nodeCount, (char*)d_grid + sizeof(GridData) + 4*sizeof(uint64_t), 3*sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
     //cudaStreamSynchronize(stream);// finish all device tasks in stream
 
-    StatsT *d_stats = nullptr;
-
     // One d_stats slot per node (leaves, then lower, then upper) so every node
-    // has its own slot - see processInternal.
-    if constexpr(StatsT::hasAverage()) cudaCheck(util::cuda::mallocAsync((void**)&d_stats, (nodeCount[0]+nodeCount[1]+nodeCount[2])*sizeof(StatsT), stream));
+    // has its own slot - see processInternal. Zero elements when the mode has
+    // no average, so nothing is allocated.
+    BufT<StatsT> statsBuf(stream, this->ref(),
+                          StatsT::hasAverage() ? nodeCount[0]+nodeCount[1]+nodeCount[2] : 0, nanovdb::cuda::noInit);
+    StatsT *d_stats = statsBuf.data();
 
     // warp per leaf (4 warps per 128-thread block); block per internal node
     if (nodeCount[0]) processLeaf<BuildT><<<blocksPerGrid(nodeCount[0]*32), threadsPerBlock, 0, stream>>>(d_nodeMgr, d_stats);
@@ -313,25 +334,25 @@ void GridStats<BuildT, StatsT>::update(NanoGrid<BuildT> *d_grid, cudaStream_t st
 
     processRootAndGrid<BuildT><<<1, 1, 0, stream>>>(d_nodeMgr, d_stats);
 
-    if constexpr(StatsT::hasAverage()) cudaCheck(util::cuda::freeAsync(d_stats, stream));
+    statsBuf.destroy(stream);
 
 } // cuda::GridStats::update( Grid )
 
 //================================================================================================
 
-template<typename BuildT>
+template<typename BuildT, typename ResourceT>
 void updateGridStats(NanoGrid<BuildT> *d_grid, StatsMode mode, cudaStream_t stream)
 {
     if (d_grid == nullptr && mode == StatsMode::Disable) {
         return;
     } else if (mode == StatsMode::BBox || util::is_same<bool, BuildT>::value) {
-        GridStats<BuildT, NoopStats<BuildT> > stats;
+        GridStats<BuildT, NoopStats<BuildT>, ResourceT> stats;
         stats.update(d_grid, stream);
     } else if (mode == StatsMode::MinMax) {
-        GridStats<BuildT, Extrema<BuildT> > stats;
+        GridStats<BuildT, Extrema<BuildT>, ResourceT> stats;
         stats.update(d_grid, stream);
     } else if (mode == StatsMode::All) {
-        GridStats<BuildT, Stats<BuildT> > stats;
+        GridStats<BuildT, Stats<BuildT>, ResourceT> stats;
         stats.update(d_grid, stream);
     } else {
         throw std::runtime_error("GridStats: Unsupported statistics mode.");

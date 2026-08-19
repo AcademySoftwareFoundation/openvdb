@@ -23,6 +23,7 @@
 #define NANOVDB_TOOLS_CUDA_SIGNEDFLOODFILL_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>
+#include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/util/cuda/Timer.h>
@@ -36,19 +37,28 @@ namespace tools::cuda {
 
 /// @brief Performs signed flood-fill operation on the hierarchical tree structure on the device
 /// @tparam BuildT Build type of the grid to be flood-filled
+/// @tparam ResourceT Template type of optional resource used for internal temporary memory
 /// @param d_grid Non-const device pointer to the grid that will be flood-filled
 /// @param verbose If true timing information will be printed to the terminal
 /// @param stream optional cuda stream
-template<typename BuildT>
+template<typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 typename util::enable_if<BuildTraits<BuildT>::is_float, void>::type
 signedFloodFill(NanoGrid<BuildT> *d_grid, bool verbose = false, cudaStream_t stream = 0);
 
-template<typename BuildT>
+template<typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class SignedFloodFill
 {
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "SignedFloodFill allocates stream-ordered scratch and requires an AsyncResource");
 public:
-    SignedFloodFill(bool verbose = false, cudaStream_t stream = 0)
-        : mStream(stream), mVerbose(verbose) {}
+    /// @brief Constructor
+    /// @param verbose if true timing information is printed to the terminal
+    /// @param stream optional CUDA stream (defaults to CUDA stream 0)
+    /// @param resource resource instance all device scratch is allocated from;
+    ///        must outlive this instance (defaults to the per-type default resource)
+    SignedFloodFill(bool verbose = false, cudaStream_t stream = 0,
+                    ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
+        : mStream(stream), mVerbose(verbose), mResource(&resource) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param on if true verbose is turned on
@@ -60,6 +70,11 @@ private:
     cudaStream_t      mStream{0};
     util::cuda::Timer mTimer;
     bool              mVerbose{false};
+    ResourceT*        mResource;// non-owning; all device scratch routes through this resource instance
+
+    template<typename T>
+    using BufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ResourceRef<ResourceT>>;
+    nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource); }
 
 };// SignedFloodFill
 
@@ -185,17 +200,18 @@ __global__ void cpyNodeCountKernel(NanoGrid<BuildT> *d_grid, uint64_t *d_count)
 
 //================================================================================================
 
-template <typename BuildT>
-void SignedFloodFill<BuildT>::operator()(NanoGrid<BuildT> *d_grid)
+template <typename BuildT, typename ResourceT>
+void SignedFloodFill<BuildT, ResourceT>::operator()(NanoGrid<BuildT> *d_grid)
 {
     static_assert(BuildTraits<BuildT>::is_float, "cuda::SignedFloodFill only works on float grids");
     NANOVDB_ASSERT(d_grid);
-    uint64_t count[4], *d_count = nullptr;
-    cudaCheck(util::cuda::mallocAsync((void**)&d_count, 4*sizeof(uint64_t), mStream));
+    uint64_t count[4];
+    BufT<uint64_t> countBuf(mStream, this->ref(), 4, nanovdb::cuda::noInit);
+    uint64_t *d_count = countBuf.data();
     kernels::cpyNodeCountKernel<BuildT><<<1, 1, 0, mStream>>>(d_grid, d_count);
     cudaCheckError();
     cudaCheck(cudaMemcpyAsync(&count, d_count, 4*sizeof(uint64_t), cudaMemcpyDeviceToHost, mStream));
-    cudaCheck(util::cuda::freeAsync(d_count, mStream));
+    countBuf.destroy(mStream);
 
     static const int threadsPerBlock = 128;
     auto blocksPerGrid = [&](size_t count)->uint32_t{return (count + (threadsPerBlock - 1)) / threadsPerBlock;};
@@ -221,11 +237,11 @@ void SignedFloodFill<BuildT>::operator()(NanoGrid<BuildT> *d_grid)
 
 //================================================================================================
 
-template<typename BuildT>
+template<typename BuildT, typename ResourceT>
 typename util::enable_if<BuildTraits<BuildT>::is_float, void>::type
 signedFloodFill(NanoGrid<BuildT> *d_grid, bool verbose, cudaStream_t stream)
 {
-    SignedFloodFill<BuildT> sff(verbose, stream);
+    SignedFloodFill<BuildT, ResourceT> sff(verbose, stream);
     sff(d_grid);
     auto *d_gridData = d_grid->data();
     Checksum cs = getChecksum(d_gridData, stream);
