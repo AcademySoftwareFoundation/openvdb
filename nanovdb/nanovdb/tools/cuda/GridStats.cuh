@@ -67,6 +67,11 @@ public:
     GridStats(ValueT delta = ValueT(0), ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
         : mDelta(delta), mResource(&resource) {}
 
+    /// @note The per-node statistics scratch is allocated through the injected
+    ///       resource. The temporary NodeManager this method builds still
+    ///       allocates through the dual-space DeviceBuffer, which does not yet
+    ///       accept a resource; that allocation bypasses @c ResourceT until the
+    ///       single-space handle work on the roadmap (openvdb #2232) lands.
     void update(GridT *d_grid, cudaStream_t stream = 0);
 
 }; // cuda::GridStats
