@@ -47,6 +47,26 @@ uint32_t leafCountOf(const nanovdb::NanoGrid<nanovdb::ValueOnIndex>* dGrid)
     return Traits::getTreeData(dGrid).mNodeCount[0];
 }
 
+// The injection kernels index the sidecar / predicate arrays by each grid's
+// value indices, so an array shorter than the grid's value count is an
+// out-of-bounds device access. Verify (one D2H header read per grid) and
+// raise a Python exception instead.
+void requireValueCountRows(const nanovdb::NanoGrid<nanovdb::ValueOnIndex>* dGrid,
+                           size_t rows, const char* fnName, const char* arrayName)
+{
+    using Traits = nanovdb::util::cuda::DeviceGridTraits<nanovdb::ValueOnIndex>;
+    const uint64_t valueCount = Traits::getValueCount(dGrid);
+    if (rows < valueCount) {
+        std::string msg(fnName);
+        msg += ": ";
+        msg += arrayName;
+        msg += " covers " + std::to_string(rows) + " entries but its grid stores " +
+               std::to_string(valueCount) +
+               " value indices (grid.valueCount()); the array must cover all of them.";
+        throw nb::value_error(msg.c_str());
+    }
+}
+
 } // anonymous namespace
 
 template<typename T> void defineInject(nb::module_& m, const char* name)
@@ -59,6 +79,8 @@ template<typename T> void defineInject(nb::module_& m, const char* name)
            uintptr_t stream) {
             auto* src = castOnIndexDeviceGrid(srcGrid, "inject");
             auto* dst = castOnIndexDeviceGrid(dstGrid, "inject");
+            requireValueCountRows(src, srcSidecar.size(), "inject", "srcSidecar");
+            requireValueCountRows(dst, dstSidecar.size(), "inject", "dstSidecar");
             cudaStream_t   s    = reinterpret_cast<cudaStream_t>(stream);
             const T*       dSrc = srcSidecar.data();
             T*             dDst = dstSidecar.data();
@@ -101,6 +123,8 @@ template<typename T> void defineInjectFeatures(nb::module_& m, const char* name)
                 throw nb::value_error(
                     "inject: src and dst feature sidecars must share the same "
                     "feature dimension (shape[1]).");
+            requireValueCountRows(src, srcSidecar.shape(0), "inject", "srcSidecar");
+            requireValueCountRows(dst, dstSidecar.shape(0), "inject", "dstSidecar");
             cudaStream_t   s    = reinterpret_cast<cudaStream_t>(stream);
             const T*       dSrc = srcSidecar.data();
             T*             dDst = dstSidecar.data();
@@ -133,6 +157,8 @@ void defineInjectPredicateToMask(nb::module_& m, const char* name)
            nb::ndarray<uint64_t, nb::ndim<1>, nb::c_contig, nb::device::cuda>    leafMasks,
            uintptr_t stream) {
             auto* dGrid = castOnIndexDeviceGrid(grid, "injectPredicateToMask");
+            requireValueCountRows(dGrid, predicate.size(),
+                                  "injectPredicateToMask", "predicate");
             cudaStream_t   s         = reinterpret_cast<cudaStream_t>(stream);
             const uint32_t leafCount = leafCountOf(dGrid);
             constexpr size_t W = nanovdb::Mask<3>::WORD_COUNT;  // 8 uint64 / leaf

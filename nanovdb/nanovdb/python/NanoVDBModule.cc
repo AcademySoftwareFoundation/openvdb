@@ -26,6 +26,7 @@
 #endif
 #include "PyBuildGrid.h"
 #include "PyGridHandle.h"
+#include "PyValidate.h"
 #include "PyHostBuffer.h"
 #include "PyIO.h"
 #include "PyMath.h"
@@ -285,6 +286,9 @@ void defineGrid(nb::module_& m)
              "the checksum. Host twin of tools.cuda.setGridClass for device grids.")
         .def("setTransform",
              [](GridData& g, double voxelSize, const Vec3d& translation) {
+                 // Map::set only debug-asserts positivity, so validate here to
+                 // keep a singular / non-finite transform out of the header.
+                 requirePositiveFinite(voxelSize, "setTransform", "voxelSize");
                  // Uniform scale + translation index->world map, then recompute the
                  // world-space AABB from the index bbox under the new map (mirrors
                  // how GridStats sets mWorldBBox).

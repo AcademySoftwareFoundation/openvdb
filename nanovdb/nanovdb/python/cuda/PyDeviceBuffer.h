@@ -41,6 +41,53 @@ inline void recordUseChecked(nanovdb::cuda::DeviceBuffer& buf, uintptr_t stream,
     buf.recordUse(device, reinterpret_cast<cudaStream_t>(stream));
 }
 
+/// @brief Order the buffer's tracked prior uses (uploads / downloads /
+///        recordUse'd kernels) before work subsequently issued on @a stream,
+///        when the buffer type exposes use tracking. No-op overload for buffer
+///        types without it (UnifiedBuffer). Call with a trailing 0 so the
+///        tracking overload is preferred when available.
+/// @note  DeviceBuffer::orderAfterPriorUses is still private upstream, so the
+///        SFINAE currently selects the no-op for DeviceBuffer too — the
+///        CAI/DLPack exports below only gain real event ordering once the
+///        upstream change making it public (and chaining recordUse) lands and
+///        is merged in. The call sites are written against the final
+///        semantics so no binding change is needed at that point.
+template<typename BufferT>
+inline auto orderPriorUsesBefore(const BufferT& buf, cudaStream_t stream, int)
+    -> decltype(buf.orderAfterPriorUses(0, stream))
+{
+    int device = 0;
+    cudaCheck(cudaGetDevice(&device));
+    buf.orderAfterPriorUses(device, stream);
+}
+template<typename BufferT>
+inline void orderPriorUsesBefore(const BufferT&, cudaStream_t, long) {}
+
+/// @brief Resolve the DLPack-protocol `stream` argument to the cudaStream_t
+///        the export must be ordered on. Per the protocol: None/0/1 = the
+///        legacy default stream, 2 = the per-thread default stream, -1 = the
+///        consumer does its own synchronization (no ordering requested; return
+///        false), any other integer = a raw cudaStream_t handle.
+inline bool resolveDlpackStream(nb::handle stream, cudaStream_t& out)
+{
+    if (stream.is_none()) {
+        out = nullptr; // legacy default stream
+        return true;
+    }
+    const long long v = nb::cast<long long>(stream);
+    if (v == -1) return false;
+    if (v == 2) {
+        out = cudaStreamPerThread;
+        return true;
+    }
+    if (v == 0 || v == 1) {
+        out = nullptr; // legacy default stream
+        return true;
+    }
+    out = reinterpret_cast<cudaStream_t>(static_cast<uintptr_t>(v));
+    return true;
+}
+
 /// @brief Docstring shared by the DeviceBuffer and DeviceGridHandle recordUse
 ///        bindings (the two forward to the same underlying buffer method).
 inline constexpr char kRecordUseDoc[] =
@@ -95,7 +142,11 @@ void addDeviceInterop(nb::class_<BufferT>& cls)
         [](const BufferT& buf) {
             // Hand-rolled CUDA Array Interface (version 3) describing the whole
             // device buffer as a 1-D contiguous uint8 array. stream=1 selects
-            // the legacy default stream per the CAI v3 spec.
+            // the legacy default stream per the CAI v3 spec — make that claim
+            // true by ordering the legacy default stream after the buffer's
+            // tracked prior uses (async uploads, recordUse'd kernels), so a
+            // consumer that synchronizes on it per the spec sees complete data.
+            orderPriorUsesBefore(buf, cudaStream_t(0), 0);
             nb::dict iface;
             iface["shape"] = nb::make_tuple(buf.size());
             iface["typestr"] = "|u1";
@@ -123,8 +174,15 @@ void addDeviceInterop(nb::class_<BufferT>& cls)
 
     cls.def(
         "__dlpack__",
-        [](nb::handle self, nb::handle /*stream*/) {
+        [](nb::handle self, nb::handle stream) {
             const BufferT& buf = nb::cast<const BufferT&>(self);
+            // Honor the consumer-provided stream per the DLPack protocol:
+            // order it after the buffer's tracked prior uses so the consumer
+            // cannot read a partially-written buffer (e.g. after an async
+            // deviceUpload on another stream).
+            cudaStream_t consumer;
+            if (resolveDlpackStream(stream, consumer))
+                orderPriorUsesBefore(buf, consumer, 0);
             size_t shape[1] = {static_cast<size_t>(buf.size())};
             // Delegate the capsule construction to nanobind: build a device
             // ndarray view parented to this buffer (keep_alive via owner) and

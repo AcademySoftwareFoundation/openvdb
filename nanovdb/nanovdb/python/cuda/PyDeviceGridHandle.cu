@@ -131,7 +131,10 @@ void defineDeviceGridHandle(nb::module_& m)
             [](GridHandle<BufferT>& handle) {
                 // CUDA Array Interface (v3) over the whole device buffer as a
                 // 1-D contiguous uint8 array. stream=1 selects the legacy
-                // default stream per the CAI v3 spec.
+                // default stream per the CAI v3 spec — make that claim true by
+                // ordering the legacy default stream after the buffer's tracked
+                // prior uses (async uploads, recordUse'd kernels).
+                orderPriorUsesBefore(handle.buffer(), cudaStream_t(0), 0);
                 nb::dict iface;
                 iface["shape"] = nb::make_tuple(handle.buffer().size());
                 iface["typestr"] = "|u1";
@@ -158,8 +161,14 @@ void defineDeviceGridHandle(nb::module_& m)
             "DLPack device tuple (kDLCUDA, device_id) for the device buffer.")
         .def(
             "__dlpack__",
-            [](nb::handle self, nb::handle /*stream*/) {
+            [](nb::handle self, nb::handle stream) {
                 auto& handle = nb::cast<GridHandle<BufferT>&>(self);
+                // Honor the consumer-provided stream per the DLPack protocol:
+                // order it after the buffer's tracked prior uses so the
+                // consumer cannot read a partially-uploaded buffer.
+                cudaStream_t consumer;
+                if (resolveDlpackStream(stream, consumer))
+                    orderPriorUsesBefore(handle.buffer(), consumer, 0);
                 size_t shape[1] = {static_cast<size_t>(handle.buffer().size())};
                 nb::ndarray<nb::device::cuda, uint8_t, nb::ndim<1>> arr(
                     handle.buffer().deviceData(), 1, shape, self);

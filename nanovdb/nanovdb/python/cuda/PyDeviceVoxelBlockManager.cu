@@ -100,8 +100,10 @@ static NanoGrid<ValueOnIndex>* castOnIndexDeviceGrid(nb::handle py_grid,
 // value indices beyond activeVoxelCount, so those writes run out of bounds (an
 // illegal memory access). Detect it cheaply (two D2H header reads) and raise a
 // clear error instead of crashing.
-static void requireContiguousIndexing(const NanoGrid<ValueOnIndex>* dGrid,
-                                      const char* fn_name)
+// Returns the grid's value count so callers can also bounds-check their
+// value-indexed arrays without a second D2H read.
+static uint64_t requireContiguousIndexing(const NanoGrid<ValueOnIndex>* dGrid,
+                                          const char* fn_name)
 {
     using Traits = nanovdb::util::cuda::DeviceGridTraits<ValueOnIndex>;
     const uint64_t valueCount  = Traits::getValueCount(dGrid);
@@ -115,6 +117,24 @@ static void requireContiguousIndexing(const NanoGrid<ValueOnIndex>* dGrid,
                "per-node statistics and/or tile values. Rebuild it with "
                "createOnIndexGrid(grid, includeStats=False, includeTiles=False) "
                "or voxelsToOnIndexGrid.";
+        throw nb::value_error(msg.c_str());
+    }
+    return valueCount;
+}
+
+// The gather / decode kernels index their value-keyed arrays by every value
+// index in [0, valueCount), so a shorter array is an out-of-bounds device
+// access; reject it with a Python exception instead.
+static void requireValueCountRows(size_t rows, uint64_t valueCount,
+                                  const char* fn_name, const char* array_name)
+{
+    if (rows < valueCount) {
+        std::string msg(fn_name);
+        msg += ": ";
+        msg += array_name;
+        msg += " covers " + std::to_string(rows) + " rows but the grid stores " +
+               std::to_string(valueCount) +
+               " value indices (activeVoxelCount + 1); it must cover all of them.";
         throw nb::value_error(msg.c_str());
     }
 }
@@ -387,7 +407,9 @@ template<typename T> void defineGatherBoxStencil(nb::module_& m, const char* nam
            nb::ndarray<T, nb::shape<-1, 27>, nb::c_contig, nb::device::cuda>  out,
            int log2BlockWidth, uintptr_t stream) {
             auto* dGrid = castOnIndexDeviceGrid(py_grid, "gatherBoxStencil");
-            requireContiguousIndexing(dGrid, "gatherBoxStencil");
+            const uint64_t vc = requireContiguousIndexing(dGrid, "gatherBoxStencil");
+            requireValueCountRows(values.size(), vc, "gatherBoxStencil", "values");
+            requireValueCountRows(out.shape(0), vc, "gatherBoxStencil", "out");
             cudaStream_t s     = reinterpret_cast<cudaStream_t>(stream);
             const T*     dVals = values.data();
             T*           dOut  = out.data();
@@ -467,7 +489,10 @@ template<typename T> void defineGatherBoxStencilColumns(nb::module_& m, const ch
            nb::ndarray<const int32_t, nb::ndim<1>, nb::c_contig>             spokes,
            int log2BlockWidth, uintptr_t stream) {
             auto* dGrid = castOnIndexDeviceGrid(py_grid, "gatherBoxStencilColumns");
-            requireContiguousIndexing(dGrid, "gatherBoxStencilColumns");
+            const uint64_t vc =
+                requireContiguousIndexing(dGrid, "gatherBoxStencilColumns");
+            requireValueCountRows(values.size(), vc, "gatherBoxStencilColumns", "values");
+            requireValueCountRows(out.shape(0), vc, "gatherBoxStencilColumns", "out");
             const int K = static_cast<int>(spokes.shape(0));
             if (K < 1 || K > 27)
                 throw nb::value_error("gatherBoxStencilColumns: len(spokes) must be in [1, 27].");
@@ -549,7 +574,8 @@ void defineActiveVoxelCoords(nb::module_& m, const char* name)
            nb::ndarray<int32_t, nb::shape<-1, 3>, nb::c_contig, nb::device::cuda> out,
            int log2BlockWidth, uintptr_t stream) {
             auto* dGrid = castOnIndexDeviceGrid(py_grid, "activeVoxelCoords");
-            requireContiguousIndexing(dGrid, "activeVoxelCoords");
+            const uint64_t vc = requireContiguousIndexing(dGrid, "activeVoxelCoords");
+            requireValueCountRows(out.shape(0), vc, "activeVoxelCoords", "out");
             cudaStream_t s    = reinterpret_cast<cudaStream_t>(stream);
             int32_t*     dOut = out.data();
             nb::gil_scoped_release release;

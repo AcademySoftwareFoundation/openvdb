@@ -1,6 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 #include "PyPointsToGrid.h"
+#include "PyValidate.h"
 
 #include <nanobind/ndarray.h>
 
@@ -82,6 +83,9 @@ template<typename BuildT> void defineVoxelsToGrid(nb::module_& m, const char* na
         [](nb::ndarray<int32_t, nb::shape<-1, 3>, nb::c_contig, nb::device::cuda> tensor,
            double                                                                voxelSize,
            uintptr_t                                                             stream) {
+            // Map::set only debug-asserts positivity; reject a singular /
+            // non-finite transform before any CUDA work.
+            requirePositiveFinite(voxelSize, "voxelsToGrid", "voxelSize");
             cudaStream_t   s = reinterpret_cast<cudaStream_t>(stream);
             NdArrayCoordPtr points(tensor.data(), tensor.stride(0), tensor.stride(1));
             const size_t    count = tensor.shape(0);
@@ -107,6 +111,9 @@ template<typename BuildT> void definePointsToGrid(nb::module_& m, const char* na
         [](nb::ndarray<BuildT, nb::shape<-1, 3>, nb::c_contig, nb::device::cuda> tensor,
            double                                                               voxelSize,
            uintptr_t                                                            stream) {
+            // Map::set only debug-asserts positivity; reject a singular /
+            // non-finite transform before any CUDA work.
+            requirePositiveFinite(voxelSize, "pointsToGrid", "voxelSize");
             cudaStream_t            s = reinterpret_cast<cudaStream_t>(stream);
             NdArrayVec3Ptr<BuildT>  points(tensor.data(), tensor.stride(0), tensor.stride(1));
             const size_t            count = tensor.shape(0);

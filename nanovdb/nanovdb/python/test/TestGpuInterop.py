@@ -357,6 +357,156 @@ class TestRecordUse(unittest.TestCase):
 @unittest.skipIf(
     not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
 )
+class TestBindingValidation(unittest.TestCase):
+    """Negative tests: undersized value-indexed arrays and invalid geometric
+    parameters must raise Python exceptions instead of out-of-bounds device
+    accesses or silently-invalid grid transforms."""
+
+    BAD_SIZES = (0.0, -1.0, float("nan"), float("inf"))
+
+    def _grid(self, cp):
+        import numpy as np
+        ijk = np.stack(np.meshgrid(*([np.arange(8)] * 3), indexing="ij"),
+                       axis=-1).reshape(-1, 3).astype(np.int32)
+        return _device_onindex_from_coords(cp, ijk)  # (dh, dg, n, coords)
+
+    def test_voxels_to_grid_rejects_invalid_voxel_size(self):
+        cp = _require_cupy(self)
+        coords = cp.zeros((4, 3), dtype=cp.int32)
+        for bad in self.BAD_SIZES:
+            with self.assertRaises(ValueError):
+                nanovdb.tools.cuda.voxelsToOnIndexGrid(coords, bad)
+
+    def test_mesh_to_grid_rejects_invalid_geometry(self):
+        cp = _require_cupy(self)
+        pts = cp.asarray(
+            [[0.0, 0.0, 0.0], [8.0, 0.0, 0.0], [0.0, 8.0, 0.0]], dtype=cp.float32)
+        tris = cp.asarray([[0, 1, 2]], dtype=cp.int32)
+        for bad in self.BAD_SIZES:
+            with self.assertRaises(ValueError):
+                nanovdb.tools.cuda.meshToGrid(pts, tris, voxelSize=bad)
+            with self.assertRaises(ValueError):
+                nanovdb.tools.cuda.meshToGrid(pts, tris, halfWidth=bad)
+
+    def test_index_to_grid_rejects_short_values(self):
+        cp = _require_cupy(self)
+        dh, dg, n, _ = self._grid(cp)
+        with self.assertRaises(ValueError):
+            nanovdb.tools.cuda.indexToGrid(dg, cp.zeros(n, dtype=cp.float32))
+        # Exact valueCount (= n + 1) is accepted.
+        out = nanovdb.tools.cuda.indexToGrid(dg, cp.zeros(n + 1, dtype=cp.float32))
+        self.assertEqual(out.gridCount(), 1)
+
+    def test_inject_rejects_short_sidecars(self):
+        cp = _require_cupy(self)
+        dh, dg, n, _ = self._grid(cp)
+        good = cp.zeros(n + 1, dtype=cp.float32)
+        short = cp.zeros(n, dtype=cp.float32)
+        with self.assertRaises(ValueError):
+            nanovdb.tools.cuda.inject(dg, dg, short, good)
+        with self.assertRaises(ValueError):
+            nanovdb.tools.cuda.inject(dg, dg, good, short)
+        # 2-D (feature) overload: row counts are checked the same way.
+        good2 = cp.zeros((n + 1, 2), dtype=cp.float32)
+        short2 = cp.zeros((n, 2), dtype=cp.float32)
+        with self.assertRaises(ValueError):
+            nanovdb.tools.cuda.inject(dg, dg, short2, good2)
+
+    def test_predicate_to_mask_rejects_short_predicate(self):
+        cp = _require_cupy(self)
+        dh, dg, n, _ = self._grid(cp)
+        masks = cp.zeros((n + 1) * 8, dtype=cp.uint64)
+        with self.assertRaises(ValueError):
+            nanovdb.tools.cuda.injectPredicateToMask(
+                dg, cp.zeros(n, dtype=cp.bool_), masks)
+
+    def test_prune_grid_rejects_short_mask(self):
+        cp = _require_cupy(self)
+        import numpy as np
+        # 16^3 coords span 8 leaf nodes (2 per axis), so one 8-word Mask<3> is
+        # a valid multiple of 8 but covers only 1 of the 8 leaves — previously
+        # an out-of-bounds device read rather than a Python error.
+        ijk = np.stack(np.meshgrid(*([np.arange(16)] * 3), indexing="ij"),
+                       axis=-1).reshape(-1, 3).astype(np.int32)
+        dh, dg, n, _ = _device_onindex_from_coords(cp, ijk)
+        with self.assertRaises(ValueError):
+            nanovdb.tools.cuda.pruneGrid(dg, cp.zeros(8, dtype=cp.uint64))
+
+    def test_gather_and_coords_reject_short_arrays(self):
+        cp = _require_cupy(self)
+        dh, dg, n, _ = self._grid(cp)
+        good_vals = cp.zeros(n + 1, dtype=cp.float32)
+        with self.assertRaises(ValueError):
+            nanovdb.tools.cuda.gatherBoxStencil(
+                dg, cp.zeros(n, dtype=cp.float32), cp.zeros((n + 1, 27), dtype=cp.float32))
+        with self.assertRaises(ValueError):
+            nanovdb.tools.cuda.gatherBoxStencil(
+                dg, good_vals, cp.zeros((n, 27), dtype=cp.float32))
+        with self.assertRaises(ValueError):
+            nanovdb.tools.cuda.gatherBoxStencilColumns(
+                dg, good_vals, cp.zeros((n, 2), dtype=cp.float32),
+                cp.asnumpy(cp.asarray([13, 4], dtype=cp.int32)))
+        with self.assertRaises(ValueError):
+            nanovdb.tools.cuda.activeVoxelCoords(dg, cp.zeros((n, 3), dtype=cp.int32))
+
+
+@unittest.skipIf(
+    not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
+)
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
+)
+class TestExportStreamOrdering(unittest.TestCase):
+    """CAI / DLPack exports must order the consumer against the buffer's
+    tracked prior uses (async uploads on non-blocking streams)."""
+
+    def test_cai_after_async_upload(self):
+        cp = _require_cupy(self)
+        h = nanovdb.tools.createLevelSetSphere(radius=20.0, voxelSize=1.0)
+        tmp = tempfile.NamedTemporaryFile(suffix=".nvdb", delete=False)
+        tmp.close()
+        try:
+            nanovdb.io.writeGrid(tmp.name, h)
+            dh = nanovdb.io.deviceReadGrid(tmp.name)
+        finally:
+            os.unlink(tmp.name)
+        s = cp.cuda.Stream(non_blocking=True)
+        # Async upload on a non-blocking stream, then consume via CAI without
+        # ever synchronizing s explicitly: the export's stream ordering (CAI
+        # stream=1 backed by the tracked upload event) must make this safe.
+        dh.deviceUpload(s.ptr, False)
+        view = cp.asarray(dh)
+        host = bytes(cp.asnumpy(view))
+        self.assertEqual(len(host), dh.size())
+        self.assertNotEqual(host.count(0), len(host))  # real grid bytes arrived
+
+    def test_dlpack_accepts_protocol_stream_values(self):
+        cp = _require_cupy(self)
+        h = nanovdb.tools.createLevelSetSphere(radius=10.0, voxelSize=1.0)
+        tmp = tempfile.NamedTemporaryFile(suffix=".nvdb", delete=False)
+        tmp.close()
+        try:
+            nanovdb.io.writeGrid(tmp.name, h)
+            dh = nanovdb.io.deviceReadGrid(tmp.name)
+        finally:
+            os.unlink(tmp.name)
+        dh.deviceUpload(0, True)
+        s = cp.cuda.Stream(non_blocking=True)
+        # None / legacy default / per-thread / no-sync / raw handle must all
+        # be accepted per the DLPack protocol.
+        for stream in (None, 1, 2, -1, s.ptr):
+            capsule = dh.__dlpack__(stream=stream)
+            self.assertIsNotNone(capsule)
+        arr = cp.from_dlpack(dh)
+        self.assertEqual(arr.nbytes, dh.size())
+
+
+@unittest.skipIf(
+    not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
+)
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
+)
 class TestUnifiedBufferInterop(unittest.TestCase):
     """UnifiedBuffer create / capacity / zero-copy."""
 

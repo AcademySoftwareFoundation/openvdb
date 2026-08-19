@@ -478,6 +478,16 @@ class TestGridHeaderSetters(unittest.TestCase):
         self.assertEqual(g.voxelSize()[0], 0.5)
         self.assertEqual(g.applyMap(nanovdb.math.Vec3d(0, 0, 0)), nanovdb.math.Vec3d(0, 0, 0))
 
+    def test_set_transform_rejects_invalid_voxel_size(self):
+        # Map::set only debug-asserts positivity, so the binding must reject a
+        # singular / non-finite transform before it reaches the grid header.
+        h, g = self._sphere()
+        for bad in (0.0, -1.0, float("nan"), float("inf")):
+            with self.assertRaises(ValueError):
+                g.setTransform(bad)
+        # The transform is unchanged after the rejected calls.
+        self.assertEqual(g.voxelSize()[0], 1.0)
+
     def test_flag_and_name_setters_refresh_checksum(self):
         h, g = self._sphere()
         nanovdb.tools.updateChecksum(g, nanovdb.CheckMode.Full)

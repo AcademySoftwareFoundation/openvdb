@@ -5,8 +5,10 @@
 #include <nanobind/ndarray.h>
 
 #include <cstdint>
+#include <string>
 
 #include <nanovdb/tools/cuda/IndexToGrid.cuh>
+#include <nanovdb/util/cuda/DeviceGridTraits.cuh>  // value count of a device grid
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -16,6 +18,31 @@ using namespace nb::literals;
 // fails to compile. Fully qualify nanovdb:: instead (matches PyPointsToGrid.cu).
 
 namespace pynanovdb {
+
+namespace {
+
+// indexToGrid reads d_srcValues[i] for every value index stored in the source
+// grid (voxels, plus any per-node stats and tile slots), so the values array
+// must cover the grid's full value count. Verify with a D2H header read and
+// raise a Python exception instead of an out-of-bounds device read.
+template<typename SrcBuildT>
+void requireValueCountRows(const nanovdb::NanoGrid<SrcBuildT>* d_srcGrid,
+                           size_t rows, const char* fnName)
+{
+    using Traits = nanovdb::util::cuda::DeviceGridTraits<SrcBuildT>;
+    const uint64_t valueCount = Traits::getValueCount(d_srcGrid);
+    if (rows < valueCount) {
+        std::string msg(fnName);
+        msg += ": values array covers " + std::to_string(rows) +
+               " entries but the source IndexGrid stores " +
+               std::to_string(valueCount) +
+               " value indices (grid.valueCount()); the array must cover all "
+               "of them.";
+        throw nb::value_error(msg.c_str());
+    }
+}
+
+} // anonymous namespace
 
 // Scalar destination value type (e.g. float, double): d_srcValues is a flat,
 // 1-D device array indexed by the IndexGrid's per-element uint64 indices.
@@ -27,6 +54,7 @@ void defineIndexToGridScalar(nb::module_& m, const char* name)
         [](nanovdb::NanoGrid<SrcBuildT>*                              d_srcGrid,
            nb::ndarray<DstBuildT, nb::ndim<1>, nb::c_contig, nb::device::cuda> values,
            uintptr_t                                                  stream) {
+            requireValueCountRows(d_srcGrid, values.size(), "indexToGrid");
             cudaStream_t      s = reinterpret_cast<cudaStream_t>(stream);
             const DstBuildT*  d_values = values.data();
             // indexToGrid launches kernels and synchronizes the stream; pure
@@ -58,6 +86,7 @@ void defineIndexToGridVec3(nb::module_& m, const char* name)
         [](nanovdb::NanoGrid<SrcBuildT>* d_srcGrid,
            nb::ndarray<ScalarT, nb::shape<-1, 3>, nb::c_contig, nb::device::cuda> values,
            uintptr_t                     stream) {
+            requireValueCountRows(d_srcGrid, values.shape(0), "indexToGrid");
             cudaStream_t     s = reinterpret_cast<cudaStream_t>(stream);
             const DstBuildT* d_values = reinterpret_cast<const DstBuildT*>(values.data());
             // indexToGrid launches kernels and synchronizes the stream; pure

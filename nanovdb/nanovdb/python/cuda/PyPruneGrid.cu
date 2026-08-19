@@ -6,8 +6,10 @@
 
 #include <cstdint>
 #include <stdexcept>
+#include <string>
 
 #include <nanovdb/tools/cuda/PruneGrid.cuh>
+#include <nanovdb/util/cuda/DeviceGridTraits.cuh>  // leaf count of a device grid
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -36,6 +38,18 @@ template<typename BuildT> void definePruneGrid(nb::module_& m, const char* name)
                 throw std::invalid_argument(
                     "pruneGrid: leafMask uint64 word count must be a multiple of "
                     "Mask<3>::WORD_COUNT (8); supply one 512-bit mask per leaf node");
+            // PruneGrid indexes one Mask<3> per SOURCE leaf, so the sidecar
+            // must cover every leaf; a shorter multiple of 8 would pass the
+            // divisibility check but read out of bounds on the device.
+            using Traits = nanovdb::util::cuda::DeviceGridTraits<BuildT>;
+            const uint64_t leafCount = Traits::getTreeData(dGrid).mNodeCount[0];
+            if (totalWords < leafCount * wordsPerMask)
+                throw nb::value_error(
+                    ("pruneGrid: leafMask holds " +
+                     std::to_string(totalWords / wordsPerMask) +
+                     " masks but the grid has " + std::to_string(leafCount) +
+                     " leaf nodes; supply one Mask<3> (8 uint64) per leaf.")
+                        .c_str());
             cudaStream_t            s = reinterpret_cast<cudaStream_t>(stream);
             const nanovdb::Mask<3>* d_mask =
                 reinterpret_cast<const nanovdb::Mask<3>*>(leafMask.data());

@@ -1,6 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 #include "PyMeshToGrid.h"
+#include "PyValidate.h"
 
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/pair.h>
@@ -28,6 +29,11 @@ void defineMeshToGrid(nb::module_& m, const char* name)
            nb::ndarray<int32_t, nb::shape<-1, 3>, nb::c_contig, nb::device::cuda> triangles,
            double voxelSize, float halfWidth, const std::string& gridName,
            uintptr_t stream) {
+            // Map::set only debug-asserts a positive voxel size, and a
+            // non-positive halfWidth reverses the raster bounds; validate both
+            // before any CUDA work.
+            requirePositiveFinite(voxelSize, "meshToGrid", "voxelSize");
+            requirePositiveFinite(halfWidth, "meshToGrid", "halfWidth");
             cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
             // Vec3f / Vec3i are three contiguous scalars, so the c_contig
             // (N, 3) tensors reinterpret element-for-element.
