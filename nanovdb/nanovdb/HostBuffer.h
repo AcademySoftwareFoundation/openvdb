@@ -98,7 +98,8 @@ namespace nanovdb {
 template<typename BufferT>
 struct BufferTraits
 {
-    static constexpr bool hasDeviceDual = false;
+    static constexpr bool hasDeviceDual   = false;
+    static constexpr bool hasDeviceSingle = false;
 };
 
 // ----------------------------> HostBuffer <--------------------------------------

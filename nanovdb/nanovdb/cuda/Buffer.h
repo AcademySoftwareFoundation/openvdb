@@ -62,6 +62,13 @@ class Buffer : private detail::StreamHolder<is_async_resource<R>::value>
 
     static constexpr bool IsAsync = is_async_resource<R>::value;
 
+public:
+    /// @brief Element and resource types, for generic code that rebinds one
+    ///        or constructs sibling buffers over the same resource.
+    using ElementType  = T;
+    using ResourceType = R;
+
+private:
     R      mResource;
     T*     mData = nullptr;
     size_t mSize = 0; // element count
@@ -155,6 +162,11 @@ public:
         if (mData) cudaCheck(cudaMemcpyAsync(out.mData, mData, this->size_bytes(), cudaMemcpyDefault, stream));
         return out;
     }
+
+    /// @brief Returns a deep copy of this buffer ordered on the retained
+    ///        stream, i.e. copy(this->stream()).
+    template<typename S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
+    Buffer copy() const { return this->copy(this->stream()); }
 
     /// @brief Returns a deep copy of this buffer, allocated from a copy of the
     ///        synchronous resource.
@@ -254,6 +266,13 @@ public:
     /// @brief Returns a pointer to the elements, or nullptr if empty.
     T*       data()       { return mData; }
     const T* data() const { return mData; }
+
+    /// @brief Returns a copy of the resource; for a ResourceRef this refers
+    ///        to the same underlying instance.
+    /// @note Requires R to be copy-constructible (the cuda::mr convention:
+    ///       resources are cheap handles). A resource that owns its pool by
+    ///       value hands the caller an independent copy of that pool.
+    R resource() const { return mResource; }
 
     /// @brief Returns the number of elements.
     size_t size() const { return mSize; }
@@ -401,6 +420,36 @@ public:
 }; // BufferView<T> class
 
 } // namespace cuda
+
+// Primary template defined in HostBuffer.h; declared here so this header
+// stays self-contained without pulling in the host-buffer machinery.
+template<typename BufferT>
+struct BufferTraits;
+
+/// @brief GridHandle support for the single-space cuda::Buffer: the buffer
+///        owns exactly one allocation, resident on the device, so the handle
+///        parses metadata through a device read and exposes only the device
+///        accessors. Requires byte-addressed storage.
+/// @note A buffer whose trait sets hasDeviceSingle must provide the interface
+///       the single-space GridHandle constructor consumes: ElementType and
+///       ResourceType typedefs, data(), size_bytes(), resource(), stream()
+///       (stream-ordered resources), and the (stream, resource, count, noInit)
+///       constructor shape.
+template<typename T, typename R>
+struct BufferTraits<cuda::Buffer<T, R>>
+{
+    static constexpr bool hasDeviceDual   = false;
+    // Device-resident storage; the byte-addressed requirement is enforced by
+    // the single-space GridHandle constructor, so trait queries stay
+    // answerable for any element type.
+    static constexpr bool hasDeviceSingle = !cuda::is_host_accessible_resource<R>::value;
+    // A buffer over a host-accessible resource (e.g. PinnedResource) is
+    // host-readable, but GridHandle's host paths also require the create()
+    // static interface and byte-count size semantics that cuda::Buffer does
+    // not provide -- GridHandle rejects such buffers with a named error until
+    // that adaptation lands.
+    static constexpr bool hasHostSingle   = cuda::is_host_accessible_resource<R>::value;
+};
 
 } // namespace nanovdb
 
