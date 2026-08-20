@@ -4,12 +4,14 @@ NanoVDB:
     sweep with an O(1)-per-slot select (jumpMap popcount rank + the leaf's 9-bit prefix
     sums + an in-word bit select); byte-identical decode maps and ~2x faster decode.
   API Changes:
-  - Consolidated the CUDA VoxelBlockManager decode to a single thread-local API:
+  - Restructured the CUDA VoxelBlockManager decode around a thread-local primitive:
     decodeInverseMap decodes one slot into registers (no shared memory or
-    synchronization; callable from divergent threads) and replaces the cooperative
-    shared-memory decodeInverseMaps, which has been removed. computeBoxStencil now
-    takes the decoded (leafIndex, voxelOffset) by value instead of shared-memory
-    arrays. Block-level facts formerly read from the materialized maps derive
+    synchronization; callable from divergent threads). The cooperative
+    decodeInverseMaps keeps its pre-existing signature and is now a thin wrapper
+    that materializes all slots via decodeInverseMap; prefer the per-slot form for
+    consumers that only read their own slot. computeBoxStencil now takes the
+    decoded (leafIndex, voxelOffset) by value instead of shared-memory arrays.
+    Block-level facts formerly read from the materialized maps also derive
     directly from the VBM metadata: the block's first leaf is firstLeafID, slot p
     starts a new leaf iff jumpMap bit p is set, and the spanned-leaf count is
     1 + the jumpMap popcount.

@@ -3465,15 +3465,17 @@ __global__ void testComputeStencilNeighborsKernel(
     uint64_t *jumpMap = jumpMapArray + JumpMapLength * bID;
     int firstOffset = 1;
     int blockFirstOffset = firstOffset + bID * BlockWidth;
-    uint32_t leafIndex;
-    uint16_t voxelOffset;
+    // Decode through the cooperative wrapper (which exercises the per-slot
+    // decodeInverseMap internally), then resolve this thread's own slot.
+    __shared__ uint32_t leafIndex[BlockWidth];
+    __shared__ uint16_t voxelOffset[BlockWidth];
 
-    nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>::decodeInverseMap(
-        grid, firstLeafID, jumpMap, blockFirstOffset, tID, leafIndex, voxelOffset);
+    nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>::decodeInverseMaps(
+        grid, firstLeafID, jumpMap, blockFirstOffset, &leafIndex[0], &voxelOffset[0]);
 
     uint64_t localNeighbors[27] = {};
     nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>::computeBoxStencil(
-        grid, leafIndex, voxelOffset, localNeighbors);
+        grid, leafIndex[tID], voxelOffset[tID], localNeighbors);
 
     using StencilNeighborsType = uint64_t (*)[27];
     auto stencilNeighbors = reinterpret_cast<StencilNeighborsType>(stencilNeighborsArray+27*BlockWidth*bID);
