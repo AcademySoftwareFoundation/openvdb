@@ -47,20 +47,6 @@ class DeviceBuffer
     /// @warning size is expected to be non-zero. Use clear() clear buffer!
     void init(uint64_t size, int device, cudaStream_t stream);
 
-public:
-    /// @brief Order work subsequently issued on @a stream after every prior use of this
-    ///        device buffer, whichever stream those uses were issued on. The consume-side
-    ///        companion of recordUse: an external consumer (e.g. a zero-copy array-interface
-    ///        export) calls this with its own stream before reading, so it cannot observe a
-    ///        partially-written buffer after asynchronous uploads or recorded kernels.
-    /// @param device Device whose buffer is about to be read
-    /// @param stream Stream the consumer's work will be issued on
-    void orderAfterPriorUses(int device, cudaStream_t stream) const
-    {
-        if (mEvents && mEvents[device]) cudaCheck(cudaStreamWaitEvent(stream, mEvents[device], 0));
-    }
-
-private:
     /// @brief Free every managed device allocation, each ordered after all tracked uses of the
     ///        buffer, and destroy the tracking events.
     /// @param stream Stream the frees are issued on for allocations owned by the CURRENT device.
@@ -272,6 +258,18 @@ public:
 
     ///////////////////////////////////////////////////////////////////////
 
+    /// @brief Order work subsequently issued on @a stream after every prior use of this
+    ///        device buffer, whichever stream those uses were issued on. The consume-side
+    ///        companion of recordUse: an external consumer (e.g. a zero-copy array-interface
+    ///        export) calls this with its own stream before reading, so it cannot observe a
+    ///        partially-written buffer after asynchronous uploads or recorded kernels.
+    /// @param device Device whose buffer is about to be read
+    /// @param stream Stream the consumer's work will be issued on
+    void orderAfterPriorUses(int device, cudaStream_t stream) const
+    {
+        if (mEvents && mEvents[device]) cudaCheck(cudaStreamWaitEvent(stream, mEvents[device], 0));
+    }
+
     /// @brief Record that this buffer's device data was just used on @a stream, so that the
     ///        buffer's device frees (destructor, move-assignment, clear) are ordered after that
     ///        work. Uses issued through deviceUpload/deviceDownload are recorded automatically;
@@ -287,7 +285,10 @@ public:
     ///       then B would leave only B's event, and the device free could run while A's work
     ///       is still in flight. The side effect is that work subsequently issued on @a stream
     ///       also waits on the previously recorded use -- acceptable for a shared buffer, where
-    ///       later-recorded consumers observing earlier writes is the expected ordering.
+    ///       later-recorded consumers observing earlier writes is the expected ordering. Note
+    ///       this also serializes CONCURRENT READERS that record uses (the single event cannot
+    ///       distinguish read-read from write-read); if that ever matters in a profile, the
+    ///       upgrade path is a read/write-separated or per-record event scheme, not a revert.
     void recordUse(int device, cudaStream_t stream)
     {
         if (!mEvents) return;

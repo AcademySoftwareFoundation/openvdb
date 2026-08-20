@@ -3952,6 +3952,12 @@ TEST(TestNanoVDBCUDA, DeviceBufferChainedRecordUse)
     cudaCheck(cudaStreamDestroy(userB));
     cudaCheck(cudaStreamDestroy(other));
 
+    // Detection relies on the pool recycling the freed block into 'victim' (stream-ordered
+    // pools recycle WITH the dependency attached, so recycling is expected even with a
+    // correctly ordered free). If it did not recycle, the chain was never exercised -- make
+    // that visible instead of a vacuous pass.
+    if (!recycled) GTEST_SKIP() << "allocator did not recycle the block; ordering not exercised";
+
     EXPECT_EQ(0u, clobbered) << "a later recordUse on another stream discarded the tracking "
                                 "event covering in-flight work (block recycled: " << recycled
                              << ", work still pending when it was reused: " << stillPending << ")";
