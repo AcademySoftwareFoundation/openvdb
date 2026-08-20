@@ -12,6 +12,7 @@ NanoVDB:
   - The bug-fix to the nanovdb::ReadAccessor (see below) improves random-access performance in some use-cases (especially on the CPU).
 
   Fixes:
+  - tools::cuda::addBlindData and tools::cuda::indexToGrid now normalize the output grid's index and count fields (mGridIndex=0, mGridCount=1): both tools copy the source grid's header, so a source grid taken from a multi-grid buffer used to leave a stale index/count in the single-grid output, corrupting the metadata parse of the returned handle.
   - Fixed a caching bug in nanovdb::ReadAccessor<LEVEL0, LEVEL1, LEVEL2>, e.g ReadAccessor<0,1,2> and ReadAccessor<0,1>: the accessors now cache nodes at all requested levels (matching the behaviour of openvdb::ValueAccessor) rather than caching only leaf nodes. This is the new default behaviour. The previous (buggy) behaviour can be restored by setting the CMake option -DNANOVDB_USE_OLD_ACCESSOR=ON, or by defining the macro NANOVDB_USE_OLD_ACCESSOR before including NanoVDB.h.
   - Deprecated nanovdb::math::ZeroCrossingNode and renamed it nanovdb::math::zeroCrossingNode to follow our naming convention.
   - Fixed the nvcc #20054-D warnings emitted by the nanovdb::tools::cuda::GridStats kernels: the __shared__ statistics arrays now use constructor-free storage (cub::Uninitialized), since CUDA does not support dynamic initialization of __shared__ variables.
