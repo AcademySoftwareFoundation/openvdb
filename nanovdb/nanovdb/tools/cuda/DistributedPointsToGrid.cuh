@@ -71,6 +71,56 @@ void mergePathKernel(KeyIteratorIn keys1, size_t keys1Count, KeyIteratorIn keys2
     mergePath(keys1, keys1Count, keys2, keys2Count, key1Intervals, key2Intervals, combinedIndex);
 }
 
+/// @brief Snap each device boundary in stripeOffsets to the nearest edge of the run of equal
+/// keys containing it, so that no run (i.e. upper-node tile) straddles two devices. The keys
+/// must be globally sorted. The boundaries are adjusted monotonically from left to right, so a
+/// run spanning several stripes is consolidated onto one device and the fully-interior devices
+/// are left with empty stripes. Runs sequentially on a single thread: the boundary chain is a
+/// sequential dependence over deviceCount entries and each run extent is found by binary search.
+template<typename KeyT>
+__global__
+void snapBoundariesToRunsKernel(const KeyT* keys, ptrdiff_t keyCount, int deviceCount, ptrdiff_t* stripeOffsets, size_t* stripeCounts)
+{
+    ptrdiff_t previousBoundary = stripeOffsets[0]; // device 0 always starts at 0
+    for (int deviceId = 1; deviceId < deviceCount; ++deviceId) {
+        ptrdiff_t boundary = stripeOffsets[deviceId];
+        if (boundary >= keyCount) {
+            boundary = keyCount;
+        } else if (boundary > previousBoundary && keys[boundary] == keys[boundary - 1]) {
+            // The even-split boundary falls inside a run; binary search for the run's extent
+            // and snap to whichever end keeps the boundary closest to the even split without
+            // crossing the previous boundary.
+            const KeyT key = keys[boundary];
+            ptrdiff_t lo = previousBoundary, hi = boundary;
+            while (lo < hi) {
+                const ptrdiff_t mid = lo + (hi - lo) / 2;
+                if (keys[mid] < key) lo = mid + 1; else hi = mid;
+            }
+            const ptrdiff_t runStart = lo;
+            lo = boundary; hi = keyCount;
+            while (lo < hi) {
+                const ptrdiff_t mid = lo + (hi - lo) / 2;
+                if (keys[mid] <= key) lo = mid + 1; else hi = mid;
+            }
+            const ptrdiff_t runEnd = lo;
+            if (runStart <= previousBoundary) {
+                boundary = runEnd; // the run reaches the previous device, give the whole tile away
+            } else {
+                boundary = (boundary - runStart <= runEnd - boundary) ? runStart : runEnd;
+            }
+        }
+        if (boundary < previousBoundary) boundary = previousBoundary;
+        stripeOffsets[deviceId] = boundary;
+        previousBoundary = boundary;
+    }
+
+    // Recompute the per-device counts from the adjusted, monotonic offsets.
+    for (int deviceId = 0; deviceId < deviceCount; ++deviceId) {
+        const ptrdiff_t nextOffset = (deviceId + 1 < deviceCount) ? stripeOffsets[deviceId + 1] : keyCount;
+        stripeCounts[deviceId] = static_cast<size_t>(nextOffset - stripeOffsets[deviceId]);
+    }
+}
+
 } // namespace kernels
 
 // Define utility macro used to call cub functions that use dynamic temporary storage
@@ -614,52 +664,26 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     // boundaries cannot consolidate such a tile because a fully-interior device
     // lies entirely within it, so we compute the boundaries globally and
     // monotonically. mKeys is globally sorted at this point, so a tile boundary
-    // is simply a position where mKeys changes. Snapping is performed on the host
-    // over the (small) set of device boundaries; fully-interior devices are left
-    // empty, which the rest of the pipeline already handles.
-    for (const auto& [deviceId, stream] : mDeviceMesh) {
-        cudaCheck(cudaSetDevice(deviceId));
-        cudaCheck(cudaStreamSynchronize(stream));
-    }
-
+    // is simply a position where mKeys changes. Snapping runs in a single-thread
+    // kernel on one device (every device stream is already ordered after the
+    // whole sort by radixSortAsync's final stream merge) with binary searches for
+    // the run extents; the host only waits on its completion event before reading
+    // back the small offset/count arrays, mirroring how the sort's merge-path
+    // partitions are synchronized. Fully-interior devices are left with empty
+    // stripes, which the rest of the pipeline already handles.
     {
-        const int deviceCount = static_cast<int>(mDeviceMesh.deviceCount());
-        const ptrdiff_t keyCount = static_cast<ptrdiff_t>(coordCount);
-        ptrdiff_t previousBoundary = mStripeOffsets[0]; // device 0 always starts at 0
-        for (int deviceId = 1; deviceId < deviceCount; ++deviceId) {
-            ptrdiff_t boundary = mStripeOffsets[deviceId];
-            if (boundary >= keyCount) {
-                boundary = keyCount;
-            } else if (boundary > previousBoundary && mKeys[boundary] == mKeys[boundary - 1]) {
-                // The even-split boundary falls inside a tile run; find its extent
-                // and snap to whichever end keeps the boundary closest to the
-                // even split without crossing the previous boundary.
-                ptrdiff_t runStart = boundary;
-                while (runStart > previousBoundary && mKeys[runStart - 1] == mKeys[boundary]) --runStart;
-                ptrdiff_t runEnd = boundary;
-                while (runEnd < keyCount && mKeys[runEnd] == mKeys[boundary]) ++runEnd;
-                if (runStart <= previousBoundary) {
-                    boundary = runEnd; // the run reaches the previous device, give the whole tile away
-                } else {
-                    boundary = (boundary - runStart <= runEnd - boundary) ? runStart : runEnd;
-                }
-            }
-            if (boundary < previousBoundary) boundary = previousBoundary;
-            mStripeOffsets[deviceId] = boundary;
-            previousBoundary = boundary;
-        }
-
-        // Recompute the per-device counts from the adjusted, monotonic offsets.
-        for (int deviceId = 0; deviceId < deviceCount; ++deviceId) {
-            const ptrdiff_t nextOffset = (deviceId + 1 < deviceCount)
-                ? mStripeOffsets[deviceId + 1]
-                : keyCount;
-            mStripeCounts[deviceId] = static_cast<size_t>(nextOffset - mStripeOffsets[deviceId]);
-        }
+        static constexpr int snapDeviceId = 0;
+        cudaCheck(cudaSetDevice(snapDeviceId));
+        const auto snapStream = mDeviceMesh[snapDeviceId].stream;
+        kernels::snapBoundariesToRunsKernel<<<1, 1, 0, snapStream>>>(mKeys, static_cast<ptrdiff_t>(coordCount), static_cast<int>(mDeviceMesh.deviceCount()), mStripeOffsets, mStripeCounts);
+        cudaCheckError();
+        cudaCheck(cudaEventRecord(sortEvents[snapDeviceId], snapStream));
+        // CUB needs the rebalanced partition sizes on the host. Synchronize only the tiny snap kernel.
+        cudaCheck(cudaEventSynchronize(sortEvents[snapDeviceId]));
     }
 
     // Parallel RLE in order to obtain tiles. The device boundaries were finalized
-    // synchronously on the host above, so no per-device rebalance event is needed.
+    // above before the host read them back, so no per-device rebalance event is needed.
     for (const auto& [deviceId, stream] : mDeviceMesh) {
         cudaCheck(cudaSetDevice(deviceId));
 
