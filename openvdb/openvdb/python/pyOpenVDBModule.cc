@@ -27,6 +27,8 @@ void exportMetadata(nb::module_ m);
 void exportGridBase(nb::module_ m);
 void exportFloatGrid(nb::module_ m);
 void exportIntGrid(nb::module_ m);
+void exportLevelSetSampler(nb::module_ m);
+void exportLevelSetRayIntersector(nb::module_ m);
 void exportVec3Grid(nb::module_ m);
 void exportPointGrid(nb::module_ m);
 
@@ -366,6 +368,8 @@ NB_MODULE(openvdb, m)
     exportIntGrid(m);
     exportVec3Grid(m);
     exportPointGrid(m);
+    exportLevelSetSampler(m);
+    exportLevelSetRayIntersector(m);
 
 
     m.def("read",
