@@ -17,7 +17,6 @@
 #define NANOVDB_GRID_HANDLE_H_HAS_BEEN_INCLUDED
 
 #include <fstream> // for std::ifstream
-#include <type_traits> // for std::void_t
 #include <iostream> // for std::cerr/cout
 #include <vector>
 #include <initializer_list>
@@ -31,27 +30,6 @@ namespace nanovdb {
 // --------------------------> GridHandle <------------------------------------
 
 struct GridHandleMetaData {uint64_t offset, size; GridType gridType;};
-
-/// @brief Detects whether @c BufferTraits<BufferT> defines @c hasDeviceSingle,
-///        i.e. whether the buffer manages a single device-resident allocation.
-/// @details Defaults to false when the trait member is absent, so pre-existing
-///          BufferTraits specializations (in or out of tree) that only define
-///          hasDeviceDual keep compiling unchanged.
-template<typename BufferT, typename = void>
-struct BufferHasDeviceSingle { static constexpr bool value = false; };
-template<typename BufferT>
-struct BufferHasDeviceSingle<BufferT, std::void_t<decltype(BufferTraits<BufferT>::hasDeviceSingle)>>
-{ static constexpr bool value = BufferTraits<BufferT>::hasDeviceSingle; };
-
-/// @brief Companion detection for BufferTraits<...>::hasHostSingle: a
-///        single-space buffer whose storage is host-accessible (e.g. a
-///        pinned-resource cuda::Buffer). GridHandle does not support these
-///        yet and rejects them with a named error below.
-template<typename BufferT, typename = void>
-struct BufferHasHostSingle { static constexpr bool value = false; };
-template<typename BufferT>
-struct BufferHasHostSingle<BufferT, std::void_t<decltype(BufferTraits<BufferT>::hasHostSingle)>>
-{ static constexpr bool value = BufferTraits<BufferT>::hasHostSingle; };
 
 /// @brief This class serves to manage a buffer containing one or more NanoVDB Grids.
 ///
@@ -70,6 +48,16 @@ class GridHandle
 
     template <typename T>
     static T* no_const(const T* ptr) { return const_cast<T*>(ptr); }
+
+    /// @brief Shared lookup behind grid() and deviceGrid(): the @a n'th grid
+    ///        within @a base, or nullptr when @a base is null, @a n is out of
+    ///        range, or the value type does not match the grid.
+    template<typename ValueT>
+    const NanoGrid<ValueT>* gridAt(const void* base, uint32_t n) const
+    {
+        if (base == nullptr || n >= mMetaData.size() || mMetaData[n].gridType != toGridType<ValueT>()) return nullptr;
+        return util::PtrAdd<NanoGrid<ValueT>>(base, mMetaData[n].offset);
+    }
 
     /// @brief Adopts a buffer whose metadata is already known, so a deep copy
     ///        does not re-parse and a non-default-constructible buffer (e.g.
@@ -241,11 +229,7 @@ public:
     ///          or if the template parameter does not match the specified grid.
     template<typename ValueT, typename U = BufferT>
     typename util::enable_if<BufferHasDeviceSingle<U>::value, const NanoGrid<ValueT>*>::type
-    deviceGrid(uint32_t n=0) const {
-        const void *data = mBuffer.data();
-        if (data == nullptr || n >= mMetaData.size() || mMetaData[n].gridType != toGridType<ValueT>()) return nullptr;
-        return util::PtrAdd<NanoGrid<ValueT>>(data, mMetaData[n].offset);
-    }
+    deviceGrid(uint32_t n=0) const { return this->template gridAt<ValueT>(mBuffer.data(), n); }
     template<typename ValueT, typename U = BufferT>
     typename util::enable_if<BufferHasDeviceSingle<U>::value, NanoGrid<ValueT>*>::type
     deviceGrid(uint32_t n=0){return const_cast<NanoGrid<ValueT>*>(static_cast<const GridHandle*>(this)->template deviceGrid<ValueT>(n));}
@@ -463,11 +447,8 @@ template <typename OtherBufferT>
 inline GridHandle<OtherBufferT> GridHandle<BufferT>::copy(const OtherBufferT& other) const
 {
     if constexpr (BufferHasDeviceSingle<BufferT>::value || BufferHasDeviceSingle<OtherBufferT>::value) {
-        static_assert(util::is_same<OtherBufferT, BufferT>::value && BufferHasDeviceSingle<BufferT>::value,
-                      "GridHandle::copy to or from a single-space device buffer of a different buffer type "
-                      "is not supported yet: copy device-to-device with the same buffer type instead");
         (void)other;// the single-space copy allocates through the source's resource
-        return this->template copy<OtherBufferT>();
+        return this->template copy<OtherBufferT>();// the no-arg overload holds the supported-combination guard
     } else {
         if (mBuffer.size() == 0) return GridHandle<OtherBufferT>();// return an empty handle
         auto buffer = OtherBufferT::create(mBuffer.size(), &other);
@@ -498,9 +479,7 @@ template<typename BufferT>
 template<typename ValueT, typename U, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type>
 inline const NanoGrid<ValueT>* GridHandle<BufferT>::grid(uint32_t n) const
 {
-    const void *data = mBuffer.data();
-    if (data == nullptr || n >= mMetaData.size() || mMetaData[n].gridType != toGridType<ValueT>()) return nullptr;
-    return util::PtrAdd<NanoGrid<ValueT>>(data, mMetaData[n].offset);
+    return this->template gridAt<ValueT>(mBuffer.data(), n);
 }// const NanoGrid<ValueT>* GridHandle<BufferT>::grid(uint32_t n) const
 
 template<typename BufferT>
@@ -508,9 +487,7 @@ template<typename ValueT, typename U>
 inline typename util::enable_if<BufferTraits<U>::hasDeviceDual, const NanoGrid<ValueT>*>::type
 GridHandle<BufferT>::deviceGrid(uint32_t n) const
 {
-    const void *data = mBuffer.deviceData();
-    if (data == nullptr || n >= mMetaData.size() || mMetaData[n].gridType != toGridType<ValueT>()) return nullptr;
-    return util::PtrAdd<NanoGrid<ValueT>>(data, mMetaData[n].offset);
+    return this->template gridAt<ValueT>(mBuffer.deviceData(), n);
 }// GridHandle<BufferT>::deviceGrid(uint32_t n) cons
 
 template<typename BufferT>

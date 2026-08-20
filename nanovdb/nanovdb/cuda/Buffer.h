@@ -68,6 +68,11 @@ public:
     using ElementType  = T;
     using ResourceType = R;
 
+    /// @brief Alias for a sibling buffer over the same resource with a
+    ///        different element type.
+    template<typename U>
+    using rebind = Buffer<U, R>;
+
 private:
     R      mResource;
     T*     mData = nullptr;
@@ -430,11 +435,15 @@ struct BufferTraits;
 ///        owns exactly one allocation, resident on the device, so the handle
 ///        parses metadata through a device read and exposes only the device
 ///        accessors. Requires byte-addressed storage.
-/// @note A buffer whose trait sets hasDeviceSingle must provide the interface
-///       the single-space GridHandle constructor consumes: ElementType and
-///       ResourceType typedefs, data(), size_bytes(), resource(), stream()
-///       (stream-ordered resources), and the (stream, resource, count, noInit)
-///       constructor shape.
+/// @note This trait doubles as the definition of the single-space
+///       device-buffer concept: a buffer whose BufferTraits specialization
+///       sets hasDeviceSingle guarantees ElementType and ResourceType
+///       typedefs, data(), size() and size_bytes() (byte-addressed elements,
+///       enforced by the consumer), resource(), copy(), clear(), and stream()
+///       when the resource is stream-ordered. Any consumer of hasDeviceSingle
+///       may rely on exactly this interface and nothing more; in particular,
+///       scratch allocates through resource() as a cuda::Buffer, so a
+///       conforming buffer never needs to be constructible by a consumer.
 template<typename T, typename R>
 struct BufferTraits<cuda::Buffer<T, R>>
 {
