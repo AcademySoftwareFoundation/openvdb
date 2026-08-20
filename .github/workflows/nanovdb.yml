@@ -103,6 +103,9 @@ jobs:
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
     env:
       VCPKG_DEFAULT_TRIPLET: 'x64-windows'
+      # Cache built vcpkg packages in the GitHub Actions cache to avoid
+      # rebuilding every dependency from source on every run.
+      VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
       visual_studio: "Visual Studio 17 2022"
       cuda: "12.4.0"
     strategy:
@@ -114,12 +117,46 @@ jobs:
         # note: system path must be modified in a previous step to it's use
         echo "$Env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         echo "${{github.workspace}}\build\openvdb\openvdb\Release" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    # Expose the Actions cache endpoint/token to vcpkg for its x-gha
+    # binary caching backend (they are only available to javascript actions).
+    - name: export_gha_cache_env
+      uses: actions/github-script@v7
+      with:
+        script: |
+          core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+          core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+          core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+    # Cache the CUDA toolkit install to skip the (slow) NVIDIA network
+    # installer on cache hits.
+    - name: cache_cuda
+      id: cache-cuda
+      uses: actions/cache@v4
+      with:
+        path: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA
+        key: ${{ runner.os }}-cuda-${{ env.cuda }}-${{ hashFiles('ci/install_windows_cuda.ps1') }}
     - name: install_cuda
+      if: steps.cache-cuda.outputs.cache-hit != 'true'
       shell: powershell
       run: .\ci\install_windows_cuda.ps1
+    # On a cache hit the installer didn't run, so recreate what it would
+    # have done outside of the toolkit directory: the environment variables
+    # and the Visual Studio CUDA build customizations.
+    - name: restore_cuda_env
+      if: steps.cache-cuda.outputs.cache-hit == 'true'
+      shell: powershell
+      run: |
+        $ver = $env:cuda -replace '^([0-9]+)\.([0-9]+).*$','$1.$2'
+        $cudaPath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v$ver"
+        echo "CUDA_PATH=$cudaPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        echo "CUDA_PATH_V$($ver -replace '\.','_')=$cudaPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        echo "$cudaPath\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        Copy-Item "$cudaPath\extras\visual_studio_integration\MSBuildExtensions\*" "$vsPath\MSBuild\Microsoft\VC\v170\BuildCustomizations" -Force
+    # Only install the dependencies this job's components actually need
+    # (e.g. no openexr, cppunit, glfw3, glew, jemalloc or libpng).
     - name: install
       shell: powershell
-      run: .\ci\install_windows.ps1
+      run: .\ci\install_windows.ps1 -Packages zlib,blosc,tbb,gtest,boost-iostreams,boost-interprocess,boost-algorithm,python3,nanobind
     - name: install_numpy
       shell: powershell
       run: .\ci\install_windows_numpy.ps1
