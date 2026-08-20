@@ -153,10 +153,10 @@ jobs:
         $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
         Copy-Item "$cudaPath\extras\visual_studio_integration\MSBuildExtensions\*" "$vsPath\MSBuild\Microsoft\VC\v170\BuildCustomizations" -Force
     # Only install the dependencies this job's components actually need
-    # (e.g. no openexr, cppunit, glfw3, glew, jemalloc or libpng).
+    # (e.g. no openexr, cppunit, glfw3, glew or libpng).
     - name: install
       shell: powershell
-      run: .\ci\install_windows.ps1 -Packages zlib,blosc,tbb,gtest,boost-iostreams,boost-interprocess,boost-algorithm,python3,nanobind
+      run: .\ci\install_windows.ps1 -Packages zlib,blosc,tbb,gtest,jemalloc,boost-iostreams,boost-interprocess,boost-algorithm,python3,nanobind
     - name: install_numpy
       shell: powershell
       run: .\ci\install_windows_numpy.ps1
