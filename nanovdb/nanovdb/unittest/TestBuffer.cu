@@ -1003,7 +1003,7 @@ static_assert(nanovdb::BufferHasDeviceSingle<nanovdb::cuda::Buffer<std::byte, na
 TEST(TestBuffer, GridHandleSingleSpaceRejectsForgedChain)
 {
     // A valid first header whose mGridCount claims more grids than the buffer
-    // holds must be rejected on the host, not walked off the end on the device.
+    // holds must be rejected, never walked off the end of the allocation.
     auto host = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
     nanovdb::tools::updateGridCount(reinterpret_cast<nanovdb::GridData*>(host.data()), 0u, 2u);// forge: claims 2 grids
 

@@ -28,11 +28,6 @@ namespace cuda {
 
 namespace detail {
 
-static __global__ void cpyGridHandleMeta(const GridData *d_data, GridHandleMetaData *d_meta)
-{
-    nanovdb::cpyGridHandleMeta(d_data, d_meta);
-}
-
 static __global__ void updateGridCount(GridData *d_data, uint32_t gridIndex, uint32_t gridCount, bool *d_dirty)
 {
     NANOVDB_ASSERT(gridIndex < gridCount);
@@ -44,33 +39,91 @@ static __global__ void updateGridCount(GridData *d_data, uint32_t gridIndex, uin
     }
 }
 
-/// @brief Walks the grid chain with per-header device-to-host reads, checking
-///        that every header and every grid span lies inside the allocation, so
-///        the device-side metadata walk that follows can never read out of
-///        bounds from a truncated buffer or a forged header.
-/// @return the validated grid count
-inline uint32_t validGridChainCount(const GridData *d_head, uint64_t bytes, cudaStream_t stream)
+/// @brief Defect classes the device-side chain walk can report, mapped to
+///        exceptions on the host by parseGridChain.
+enum class ChainError : uint32_t { Ok = 0, Truncated, Invalid, Inconsistent, BadSize };
+
+/// @brief Result of the device-side chain walk: the defect class and the
+///        index of the grid the walk failed at.
+struct ChainStatus { ChainError error; uint32_t gridIndex; };
+
+/// @brief Validates every header of the grid chain and fills the metadata
+///        scratch in a single pass. Bounds are checked before every header
+///        read, so a truncated buffer or a forged header can never cause an
+///        out-of-bounds access.
+static __global__ void parseGridChainKernel(const GridData *d_head, uint64_t bytes, uint32_t count,
+                                            GridHandleMetaData *d_meta, ChainStatus *d_status)
 {
+    *d_status = ChainStatus{ChainError::Ok, 0u};
     uint64_t offset = 0;
-    uint32_t count = 0, expected = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        if (offset + sizeof(GridData) > bytes) { *d_status = {ChainError::Truncated, i}; return; }
+        const GridData *data = util::PtrAdd<GridData>(d_head, offset);
+        if (!data->isValid()) { *d_status = {ChainError::Invalid, i}; return; }
+        if (data->mGridIndex != i || data->mGridCount != count) { *d_status = {ChainError::Inconsistent, i}; return; }
+        if (data->mGridSize < sizeof(GridData) || data->mGridSize > bytes - offset) { *d_status = {ChainError::BadSize, i}; return; }
+        d_meta[i] = GridHandleMetaData{offset, data->mGridSize, data->mGridType};
+        offset += data->mGridSize;
+    }
+}
+
+/// @brief Reads and validates the head of the grid chain, returning the grid
+///        count the chain claims. This is the one synchronizing header read
+///        that sizing the metadata scratch requires; the rest of the chain is
+///        validated on the device by parseGridChain.
+inline uint32_t validGridChainHead(const GridData *d_head, uint64_t bytes, cudaStream_t stream)
+{
+    if (bytes < sizeof(GridData))
+        throw std::runtime_error("GridHandle: grid chain exceeds the device buffer (truncated or corrupt grid data)");
     GridData tmp;
-    do {
-        if (offset + sizeof(GridData) > bytes)
-            throw std::runtime_error("GridHandle: grid chain exceeds the device buffer (truncated or corrupt grid data)");
-        cudaCheck(cudaMemcpyAsync(&tmp, util::PtrAdd<GridData>(d_head, offset), sizeof(GridData), cudaMemcpyDeviceToHost, stream));
-        cudaCheck(cudaStreamSynchronize(stream));
-        if (!tmp.isValid()) throw std::runtime_error("GridHandle was constructed with an invalid device buffer");
-        if (count == 0) {
-            expected = tmp.mGridCount;
-            if (expected == 0) throw std::runtime_error("GridHandle: device buffer contains no grids");
-        }
-        if (tmp.mGridIndex != count || tmp.mGridCount != expected)
-            throw std::runtime_error("GridHandle: inconsistent grid index/count in the device buffer's grid chain");
-        if (tmp.mGridSize < sizeof(GridData) || tmp.mGridSize > bytes - offset)
-            throw std::runtime_error("GridHandle: grid size field exceeds the device buffer (truncated or corrupt grid data)");
-        offset += tmp.mGridSize;
-    } while (++count < expected);
-    return expected;
+    cudaCheck(cudaMemcpyAsync(&tmp, d_head, sizeof(GridData), cudaMemcpyDeviceToHost, stream));
+    cudaCheck(cudaStreamSynchronize(stream));
+    if (!tmp.isValid()) throw std::runtime_error("GridHandle was constructed with an invalid device buffer");
+    if (tmp.mGridCount == 0) throw std::runtime_error("GridHandle: device buffer contains no grids");
+    if (tmp.mGridIndex != 0)
+        throw std::runtime_error("GridHandle: inconsistent grid index/count in the device buffer's grid chain");
+    if (uint64_t(tmp.mGridCount) > bytes / sizeof(GridData))// every grid is at least one full header
+        throw std::runtime_error("GridHandle: grid chain exceeds the device buffer (truncated or corrupt grid data)");
+    return tmp.mGridCount;
+}
+
+/// @brief Bytes of device scratch parseGridChain needs for @c count grids:
+///        the metadata array followed by the status word.
+inline constexpr uint64_t chainScratchSize(uint32_t count)
+{
+    return count * sizeof(GridHandleMetaData) + sizeof(ChainStatus);
+}
+
+/// @brief Launches the combined validate-and-parse walk over the grid chain
+///        and fills @c meta from its scratch: one kernel, one readback and
+///        one synchronization regardless of the grid count.
+/// @param scratch device scratch of at least chainScratchSize(count) bytes
+/// @throw std::runtime_error naming the defect when any header fails validation
+template<typename ScratchBufferT>
+inline void parseGridChain(const GridData *d_head, uint64_t bytes, uint32_t count,
+                           ScratchBufferT &scratch, std::vector<GridHandleMetaData> &meta, cudaStream_t stream)
+{
+    auto *d_meta   = reinterpret_cast<GridHandleMetaData*>(scratch.data());
+    auto *d_status = reinterpret_cast<ChainStatus*>(scratch.data() + count * sizeof(GridHandleMetaData));
+    parseGridChainKernel<<<1, 1, 0, stream>>>(d_head, bytes, count, d_meta, d_status);
+    cudaCheckError();
+    meta.resize(count);
+    ChainStatus status;
+    cudaCheck(cudaMemcpyAsync(meta.data(), d_meta, count * sizeof(GridHandleMetaData), cudaMemcpyDeviceToHost, stream));
+    cudaCheck(cudaMemcpyAsync(&status, d_status, sizeof(ChainStatus), cudaMemcpyDeviceToHost, stream));
+    cudaCheck(cudaStreamSynchronize(stream));
+    switch (status.error) {
+    case ChainError::Ok:
+        return;
+    case ChainError::Truncated:
+        throw std::runtime_error("GridHandle: grid chain exceeds the device buffer (truncated or corrupt grid data)");
+    case ChainError::Inconsistent:
+        throw std::runtime_error("GridHandle: inconsistent grid index/count in the device buffer's grid chain");
+    case ChainError::BadSize:
+        throw std::runtime_error("GridHandle: grid size field exceeds the device buffer (truncated or corrupt grid data)");
+    default:
+        throw std::runtime_error("GridHandle was constructed with an invalid device buffer");
+    }
 }
 
 /// @brief The buffer's retained stream when its resource is stream-ordered,
@@ -85,7 +138,7 @@ inline cudaStream_t retainedStreamOrDefault(const BufferT& buf)
 /// @brief Constructs the metadata scratch through @c buf's resource, on
 ///        @c stream for a stream-ordered resource.
 template<typename ScratchT, typename BufferT>
-inline ScratchT makeMetaScratch(const BufferT& buf, uint32_t count, cudaStream_t stream)
+inline ScratchT makeMetaScratch(const BufferT& buf, uint64_t count, cudaStream_t stream)
 {
     if constexpr (is_async_resource<typename BufferT::ResourceType>::value)
         return ScratchT(stream, buf.resource(), count, noInit);
@@ -180,14 +233,11 @@ GridHandle<BufferT>::GridHandle(T&& buffer)
         cpyGridHandleMeta(data, mMetaData.data());
     } else {
         if (auto *d_data = reinterpret_cast<const GridData*>(mBuffer.deviceData())) {
-            const uint32_t count = cuda::detail::validGridChainCount(d_data, mBuffer.size(), cudaStream_t(0));
+            const uint32_t count = cuda::detail::validGridChainHead(d_data, mBuffer.size(), cudaStream_t(0));
             // MallocResource: plain cudaMalloc, so this long-standing parse path
             // keeps working on devices without memory-pool support.
-            cuda::Buffer<GridHandleMetaData, cuda::MallocResource> scratch(count, cuda::noInit);
-            cuda::detail::cpyGridHandleMeta<<<1,1>>>(d_data, scratch.data());
-            cudaCheckError();
-            mMetaData.resize(count);
-            cudaCheck(cudaMemcpy(mMetaData.data(), scratch.data(), count*sizeof(GridHandleMetaData), cudaMemcpyDeviceToHost));
+            cuda::Buffer<std::byte, cuda::MallocResource> scratch(cuda::detail::chainScratchSize(count), cuda::noInit);
+            cuda::detail::parseGridChain(d_data, mBuffer.size(), count, scratch, mMetaData, cudaStream_t(0));
         }
     }
 }// GridHandle(T&& buffer)
@@ -206,14 +256,10 @@ GridHandle<BufferT>::GridHandle(T&& buffer)
     using ResourceT = typename BufferT::ResourceType;
     if (const GridData *d_data = reinterpret_cast<const GridData*>(mBuffer.data())) {
         const cudaStream_t stream = cuda::detail::retainedStreamOrDefault(mBuffer);
-        const uint32_t count = cuda::detail::validGridChainCount(d_data, mBuffer.size_bytes(), stream);
-        using ScratchT = cuda::Buffer<GridHandleMetaData, ResourceT>;
-        ScratchT scratch = cuda::detail::makeMetaScratch<ScratchT>(mBuffer, count, stream);
-        cuda::detail::cpyGridHandleMeta<<<1, 1, 0, stream>>>(d_data, scratch.data());
-        cudaCheckError();
-        mMetaData.resize(count);
-        cudaCheck(cudaMemcpyAsync(mMetaData.data(), scratch.data(), count*sizeof(GridHandleMetaData), cudaMemcpyDeviceToHost, stream));
-        cudaCheck(cudaStreamSynchronize(stream));
+        const uint32_t count = cuda::detail::validGridChainHead(d_data, mBuffer.size_bytes(), stream);
+        using ScratchT = cuda::Buffer<std::byte, ResourceT>;
+        ScratchT scratch = cuda::detail::makeMetaScratch<ScratchT>(mBuffer, cuda::detail::chainScratchSize(count), stream);
+        cuda::detail::parseGridChain(d_data, mBuffer.size_bytes(), count, scratch, mMetaData, stream);
     }
 }// GridHandle(T&& buffer) for single-space device buffers
 
