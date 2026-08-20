@@ -117,8 +117,17 @@ nanovdb_example(NAME "ex_coarsen_nanovdb_cuda" OPENVDB)
 nanovdb_example(NAME "ex_mesh_to_grid_cuda" OPENVDB)
 
 if(CUDAToolkit_FOUND)
-  nanovdb_example(NAME "ex_make_mgpu_nanovdb") # requires cuRAND
-  target_link_libraries(ex_make_mgpu_nanovdb PRIVATE CUDA::curand)
+  # ex_make_mgpu_nanovdb uses TF32 WMMA which requires SM_80+ (Ampere or newer)
+  execute_process(
+    COMMAND bash -c "nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | sort -n | tail -1 | tr -d '.'"
+    OUTPUT_VARIABLE _max_cuda_arch OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(_max_cuda_arch GREATER_EQUAL 80)
+    nanovdb_example(NAME "ex_make_mgpu_nanovdb") # requires cuRAND and SM_80+ (TF32 WMMA)
+    target_link_libraries(ex_make_mgpu_nanovdb PRIVATE CUDA::curand)
+  else()
+    message(STATUS "Skipping ex_make_mgpu_nanovdb: requires SM_80+ (TF32), detected SM_${_max_cuda_arch}")
+  endif()
+  unset(_max_cuda_arch)
 endif()
 
 if(NANOVDB_USE_MAGICAVOXEL)
