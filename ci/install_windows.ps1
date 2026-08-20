@@ -1,3 +1,9 @@
+param(
+    # Optional subset of packages to install. Defaults to the full OpenVDB
+    # dependency list below when not provided.
+    [string[]]$Packages
+)
+
 # Enable verbose and stop on error
 $ErrorActionPreference = "Stop"
 $VerbosePreference = "Continue"
@@ -21,12 +27,17 @@ $vcpkgPackages = @(
     "nanobind"
 )
 
+if (-not $Packages) {
+    $Packages = $vcpkgPackages
+}
+Write-Host "Installing vcpkg packages: $Packages"
+
 # Update vcpkg
 vcpkg update
 
 # Allow the vcpkg command to fail once so we can retry with the latest
 try {
-    vcpkg install $vcpkgPackages
+    vcpkg install $Packages
 } catch {
     Write-Host "vcpkg install failed, retrying with latest ports..."
     # Retry the installation with updated ports
@@ -34,7 +45,7 @@ try {
     git pull
     Pop-Location
     vcpkg update
-    vcpkg install $vcpkgPackages
+    vcpkg install $Packages
 }
 
 Write-Host "vcpkg install completed successfully"
