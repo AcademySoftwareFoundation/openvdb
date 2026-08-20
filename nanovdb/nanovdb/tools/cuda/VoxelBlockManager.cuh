@@ -25,6 +25,9 @@
         VBM metadata: the block's first leaf is firstLeafID, slot p starts a
         new leaf iff jumpMap bit p is set, and the number of leaves spanned by
         the block is 1 + the jumpMap popcount.
+      - decodeInverseMaps (device): cooperative wrapper over decodeInverseMap
+        that materializes all BlockWidth slots into shared memory, preserving
+        the pre-existing signature for consumers that read across slots.
 */
 
 #ifndef NANOVDB_VOXELBLOCKMANAGER_CUH_HAS_BEEN_INCLUDED
@@ -55,9 +58,9 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
 
     // The decode is a rank + select over the VBM's bit-vectors and is
     // thread-local per output slot: decodeInverseMap requires no threadblock
-    // coordination. Consumers that need cross-slot information derive it from
-    // the VBM metadata (firstLeafID + jumpMap) rather than from a materialized
-    // per-block map.
+    // coordination. Consumers that need cross-slot information can derive it
+    // from the VBM metadata (firstLeafID + jumpMap), or materialize all slots
+    // in shared memory via the cooperative decodeInverseMaps wrapper.
 
     /// @brief Rank one output slot into its leaf: the number of leaves that
     /// begin at in-block positions [1, blockOffset] (bit 0 is never set),
@@ -170,6 +173,49 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
         const uint32_t leafRank = jumpMapRank(jumpMap, blockOffset);
         selectVoxelInLeaf(grid, firstLeafID + leafRank,
                           blockFirstOffset + blockOffset, leafIndex, voxelOffset);
+    }
+
+    /// @brief Decode the inverse maps for a single voxel block into shared memory.
+    ///
+    /// Cooperative form of decodeInverseMap, preserving the pre-existing signature:
+    /// fills smem_leafIndex[] and smem_voxelOffset[] so that for each position p in
+    /// [0, BlockWidth):
+    ///   - smem_leafIndex[p]   = index of the leaf node containing sequential voxel
+    ///                           (blockFirstOffset + p), or UnusedLeafIndex if that
+    ///                           index is beyond the last active voxel.
+    ///   - smem_voxelOffset[p] = local (0..511) offset of that voxel within its leaf,
+    ///                           or UnusedVoxelOffset.
+    ///
+    /// Each slot is decoded independently by decodeInverseMap; this wrapper only
+    /// materializes the results, striding over the slots so any blockDim.x <= 512
+    /// fills the maps correctly. Must be called by all threads in the block (ends
+    /// in __syncthreads); do not call from divergent threads. Consumers that only
+    /// read their own slot's result should prefer decodeInverseMap, which needs no
+    /// shared memory or barrier.
+    ///
+    /// @tparam BuildT  Build type of the grid (must be an index type)
+    /// @param grid              Device-accessible OnIndex grid
+    /// @param firstLeafID       Index of the first leaf overlapping this block
+    /// @param jumpMap           Pointer to the JumpMapLength words for this block
+    /// @param blockFirstOffset  Sequential index of the first voxel in this block
+    /// @param smem_leafIndex    Output array of length BlockWidth in shared memory
+    /// @param smem_voxelOffset  Output array of length BlockWidth in shared memory
+    template <class BuildT>
+    __device__
+    static typename util::enable_if<BuildTraits<BuildT>::is_index, void>::type
+    decodeInverseMaps(
+        const NanoGrid<BuildT> *grid,
+        const uint32_t firstLeafID,
+        const uint64_t *jumpMap,
+        const uint64_t blockFirstOffset,
+        uint32_t *smem_leafIndex,
+        uint16_t *smem_voxelOffset)
+    {
+        NANOVDB_ASSERT(blockDim.x <= 512);
+        for (int blockOffset = threadIdx.x; blockOffset < BlockWidth; blockOffset += blockDim.x)
+            decodeInverseMap(grid, firstLeafID, jumpMap, blockFirstOffset, blockOffset,
+                             smem_leafIndex[blockOffset], smem_voxelOffset[blockOffset]);
+        __syncthreads();
     }
 
     // Stencil resolver naming. Each stencil shape comes in two forms:
