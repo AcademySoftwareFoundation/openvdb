@@ -1,0 +1,539 @@
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: Apache-2.0
+
+/*!
+    \file nanovdb/tools/TopologyBuilder.h
+
+    \authors Efty Sifakis
+
+    \brief Shared functionality of (mostly morphology) operators that alter the voxel content of grids
+*/
+
+#ifndef NANOVDB_TOOLS_TOPOLOGYBUILDER_H_HAS_BEEN_INCLUDED
+#define NANOVDB_TOOLS_TOPOLOGYBUILDER_H_HAS_BEEN_INCLUDED
+
+#include <cstring>
+#include <nanovdb/NanoVDB.h>
+#include <nanovdb/HostBuffer.h>
+#include <nanovdb/tools/GridChecksum.h>
+#include <nanovdb/util/ForEach.h>
+#include <nanovdb/util/Morphology.h>
+#include <nanovdb/util/PrefixSum.h>
+
+namespace nanovdb {
+
+namespace tools {
+
+template <typename BuildT>
+class TopologyBuilder
+{
+    static_assert(nanovdb::BuildTraits<BuildT>::is_onindex);// For now, only OnIndexGrids supported
+
+    using GridT  = NanoGrid<BuildT>;
+    using TreeT  = NanoTree<BuildT>;
+    using RootT  = NanoRoot<BuildT>;
+    using UpperT = NanoUpper<BuildT>;
+    using LowerT = NanoLower<BuildT>;
+    using LeafT  = NanoLeaf<BuildT>;
+
+public:
+
+    // Storage policy for the transient host scratch (the speculative mProcessedRoot plus the
+    // mask/offset/parent arrays). These are built and consumed entirely on the host, so they are
+    // plain HostBuffer. Public so the operators allocating mProcessedRoot share this single
+    // definition rather than re-declaring their own. (mData migrates separately.)
+    using ScratchBufferT = nanovdb::HostBuffer;
+
+    TopologyBuilder()
+    {
+    }
+
+    struct Data {
+        void     *d_bufferPtr;
+        uint64_t grid, tree, root, upper, lower, leaf, size;// byte offsets to nodes in buffer
+        uint32_t nodeCount[3];// 0=leaf,1=lower, 2=upper
+        __hostdev__ GridT&  getGrid() const {return *util::PtrAdd<GridT>(d_bufferPtr, grid);}
+        __hostdev__ TreeT&  getTree() const {return *util::PtrAdd<TreeT>(d_bufferPtr, tree);}
+        __hostdev__ RootT&  getRoot() const {return *util::PtrAdd<RootT>(d_bufferPtr, root);}
+        __hostdev__ UpperT& getUpper(int i) const {return *(util::PtrAdd<UpperT>(d_bufferPtr, upper)+i);}
+        __hostdev__ LowerT& getLower(int i) const {return *(util::PtrAdd<LowerT>(d_bufferPtr, lower)+i);}
+        __hostdev__ LeafT&  getLeaf(int i) const {return *(util::PtrAdd<LeafT>(d_bufferPtr, leaf)+i);}
+    };// Data
+
+    void allocateInternalMaskBuffers();
+
+    void countNodes();
+
+    template<typename BufferT>
+    BufferT getBuffer(const BufferT &buffer);
+
+    void processUpperNodes();
+
+    void processLowerNodes();
+
+    void processLeafOffsets();
+
+    void processBBox();
+
+    void postProcessGridTree();
+
+    ScratchBufferT               mProcessedRoot;
+    ScratchBufferT               mUpperMasks;
+    ScratchBufferT               mLowerMasks;
+    ScratchBufferT               mUpperOffsets;
+    ScratchBufferT               mLowerOffsets;
+    ScratchBufferT               mLeafOffsets;
+    ScratchBufferT               mVoxelOffsets;
+    ScratchBufferT               mLowerParents;
+    ScratchBufferT               mLeafParents;
+    Data                         mData{};
+    CheckMode                    mChecksum{CheckMode::Disable};
+
+    auto hostProcessedRoot()   { return static_cast<RootT*>(mProcessedRoot.data()); }
+    Data* data()             { return &mData; }
+
+};// tools::TopologyBuilder<BuildT>
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename BuildT>
+void TopologyBuilder<BuildT>::allocateInternalMaskBuffers()
+{
+    if (hostProcessedRoot()->tileCount() == 0) return; // Processing empty grid(s); nothing to allocate
+
+    // Allocate (and zero-fill) buffers large enough to hold:
+    // (a) The serialized masks of all upper nodes, for all tiles in the updated root node, and
+    // (b) The serialized masks of all densified lower nodes, as if every upper node had a full set of 32^3 lower children
+    uint64_t upperSize = hostProcessedRoot()->tileCount() * sizeof(Mask<5>);
+    uint64_t lowerSize = hostProcessedRoot()->tileCount() * Mask<5>::SIZE * sizeof(Mask<4>);
+    mUpperMasks = ScratchBufferT::create(upperSize);
+    if (mUpperMasks.data() == nullptr) throw std::runtime_error("Failed to allocate upper mask buffer");
+    std::memset(mUpperMasks.data(), 0, upperSize);
+    mLowerMasks = ScratchBufferT::create(lowerSize);
+    if (mLowerMasks.data() == nullptr) throw std::runtime_error("Failed to allocate lower mask buffer");
+    std::memset(mLowerMasks.data(), 0, lowerSize);
+}// TopologyBuilder<BuildT>::allocateInternalMaskBuffers
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename BuildT>
+void TopologyBuilder<BuildT>::countNodes()
+{
+    auto processedTileCount = hostProcessedRoot()->tileCount();
+    if (processedTileCount == 0) { // Processing empty grid(s); zero nodes at all levels
+        data()->nodeCount[0] = data()->nodeCount[1] = data()->nodeCount[2] = 0;
+        return;
+    }
+
+    // Computes prefix sums of (a) non-empty lower nodes, (b) counts of their leaf children,
+    // and (c) count of the speculatively updated root tiles that have actually been used.
+    // These are used to reconstruct child offsets for the internal nodes of the updated tree,
+    // as well as the tile table at the root.
+    //
+    // Allocation strategy: only the offsets buffers (size N+1) are allocated. Each is laid out
+    // so that offsets[0] is the seeded 0 and offsets[1..N] is the inclusive-scan output. We
+    // therefore have the enumeration kernel and the upper-counts forEach write their per-element
+    // count values *directly* into offsets+1, then run an in-place inclusive scan over the same
+    // N-element region. Reading offsets from [0..N-1] gives the exclusive sum; reading from
+    // [1..N] gives the inclusive sum; offsets[N] is the total.
+    std::size_t size = processedTileCount*Mask<5>::SIZE;
+
+    mUpperOffsets = ScratchBufferT::create((processedTileCount+1)*sizeof(uint32_t));
+    mLowerOffsets = ScratchBufferT::create((size+1)*sizeof(uint32_t));
+    mLeafOffsets  = ScratchBufferT::create((size+1)*sizeof(uint32_t));
+
+    using CountType = uint32_t (*)[Mask<5>::SIZE];
+    auto upperOffsets          = static_cast<uint32_t*>(mUpperOffsets.data());
+    auto lowerOffsets          = static_cast<CountType>(mLowerOffsets.data());
+    auto leafOffsets           = static_cast<uint32_t*>(mLeafOffsets.data());
+    auto lowerOffsetsFlattened = static_cast<uint32_t*>(mLowerOffsets.data());
+
+    // Seed the leading zero of each offsets array (host writes; visible to the kernel via
+    // the implicit barrier at kernel launch). The kernel never touches index [0].
+    upperOffsets[0]          = 0;
+    lowerOffsetsFlattened[0] = 0;
+    leafOffsets[0]           = 0;
+
+    // The counts that the enumeration kernel and the upper-counts forEach produce land directly
+    // in the offsets+1 region; the subsequent in-place inclusive scan turns them into offsets.
+    auto upperCounts = upperOffsets + 1;
+    auto lowerCounts = reinterpret_cast<CountType>(lowerOffsetsFlattened + 1);
+    auto leafCounts  = reinterpret_cast<CountType>(leafOffsets + 1);
+
+
+    util::morphology::EnumerateNodes(
+        mUpperMasks.data(), mLowerMasks.data(),
+        lowerCounts, leafCounts,
+        processedTileCount);
+
+    // In-place inclusive prefix sums (TBB-backed when NANOVDB_USE_TBB is defined).
+    util::inclusiveScan(lowerOffsetsFlattened + 1, size, 0u, /*threaded=*/true, std::plus<uint32_t>{});
+    util::inclusiveScan(leafOffsets + 1,           size, 0u, /*threaded=*/true, std::plus<uint32_t>{});
+    data()->nodeCount[1] = lowerOffsetsFlattened[size];
+    data()->nodeCount[0] = leafOffsets[size];
+
+    // Host-side derivation of upperCounts from the (just-scanned) lower offsets.
+    util::forEach(0, processedTileCount, 1, [=](const util::Range1D &r) {
+        for (auto tileID = r.begin(); tileID != r.end(); ++tileID)
+            upperCounts[tileID] = (lowerOffsets[tileID+1][0] > lowerOffsets[tileID][0]) ? 1 : 0;
+    });
+
+    util::inclusiveScan(upperOffsets + 1, processedTileCount, 0u, /*threaded=*/true, std::plus<uint32_t>{});
+    data()->nodeCount[2] = upperOffsets[processedTileCount];
+}// TopologyBuilder<BuildT>::countNodes
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template <typename BuildT>
+template <typename BufferT>
+BufferT TopologyBuilder<BuildT>::getBuffer(const BufferT &pool)
+{
+    // Allocates the destination grid buffer, once the topology/size of the tree is known.
+    data()->grid  = 0;// grid is always stored at the start of the buffer!
+    data()->tree  = GridT::memUsage();// grid ends and tree begins
+    data()->root  = data()->tree  + TreeT::memUsage(); // tree ends and root node begins
+    data()->upper = data()->root  + RootT::memUsage(data()->nodeCount[2]);// root node ends and upper internal nodes begin
+    data()->lower = data()->upper + UpperT::memUsage()*data()->nodeCount[2];// upper internal nodes ends and lower internal nodes begin
+    data()->leaf  = data()->lower + LowerT::memUsage()*data()->nodeCount[1];// lower internal nodes ends and leaf nodes begin
+    data()->size  = data()->leaf  + LeafT::DataType::memUsage()*data()->nodeCount[0];// leaf nodes end and blind meta data begins
+
+    // Host-side allocation + zero-fill. Backend-agnostic: HostBuffer and UnifiedBuffer both expose
+    // create(size, &pool) and a host-writable data() (UnifiedBuffer's create places it CPU-side),
+    // so this works for both with no CUDA. The whole result grid is then built on the host.
+    auto buffer = BufferT::create(data()->size, &pool);
+    std::memset(buffer.data(), 0, data()->size);
+
+    data()->d_bufferPtr = buffer.data();
+    if (data()->d_bufferPtr == nullptr) throw std::runtime_error("Failed to allocate grid buffer");
+
+    return buffer;
+}// TopologyBuilder<BuildT>::getBuffer
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace topology::detail {
+
+template <typename BuildT>
+struct BuildGridTreeRootFunctor
+{
+    void operator()(size_t, typename TopologyBuilder<BuildT>::Data *d_data) {
+
+        // process Root
+        auto &root = d_data->getRoot();
+        root.mTableSize = d_data->nodeCount[2];
+        root.mBackground = typename NanoRoot<BuildT>::ValueType(0);// background_value
+        root.mMinimum = root.mMaximum = typename NanoRoot<BuildT>::ValueType(0);
+        root.mAverage = root.mStdDevi = typename NanoRoot<BuildT>::FloatType(0);
+        root.mBBox = CoordBBox(); // To be further updated after the leaf-level voxel update
+
+        // process Tree
+        auto &tree = d_data->getTree();
+        tree.setRoot(&root);
+        if (d_data->nodeCount[2]) {
+            tree.setFirstNode(&d_data->getUpper(0));
+            tree.setFirstNode(&d_data->getLower(0));
+            tree.setFirstNode(&d_data->getLeaf(0));
+        }
+        else {
+            tree.template setFirstNode<NanoUpper<BuildT>>(nullptr);
+            tree.template setFirstNode<NanoLower<BuildT>>(nullptr);
+            tree.template setFirstNode<NanoLeaf<BuildT>>(nullptr);
+        }
+        tree.mNodeCount[2] = d_data->nodeCount[2];
+        tree.mNodeCount[1] = d_data->nodeCount[1];
+        tree.mNodeCount[0] = d_data->nodeCount[0];
+        tree.mVoxelCount = 0; // Actual voxel count (for non-empty grids) will only be known
+                              // once leaf masks have been processed
+        tree.mTileCount[2] = tree.mTileCount[1] =  tree.mTileCount[0] = 0;
+
+        // process Grid
+        // The GridData header has already been copied from the input;
+        // reset what is necessary, and assert that others are at the expected values
+        auto &grid = d_data->getGrid();
+
+#ifdef NANOVDB_USE_NEW_MAGIC_NUMBERS
+        NANOVDB_ASSERT(grid.mMagic == NANOVDB_MAGIC_GRID);
+#else
+        NANOVDB_ASSERT(grid.mMagic == NANOVDB_MAGIC_NUMB);
+#endif
+        grid.mChecksum.disable(); // all 64 bits ON means checksum is disabled
+        NANOVDB_ASSERT(grid.mVersion == Version());
+        NANOVDB_ASSERT(grid.mFlags.isMaskOn(GridFlags::IsBreadthFirst));
+        grid.mFlags.initMask({GridFlags::IsBreadthFirst}); // expected flags (HasBBox will be set later if grid is non-empty)
+        grid.mGridIndex = 0u; // Possibly overwriting input; returned grid has batch size 1
+        grid.mGridCount = 1u; // Possibly overwriting input; returned grid has batch size 1
+        grid.mGridSize = d_data->size;
+        // grid.mGridName expected to have been copied verbatim from input
+        // grid.mMap expected to have been copied verbatim from input
+        grid.mWorldBBox = Vec3dBBox();// invalid bbox
+        grid.mVoxelSize = grid.mMap.getVoxelSize();
+        NANOVDB_ASSERT(grid.mGridClass == GridClass::IndexGrid);
+        NANOVDB_ASSERT(grid.mGridType == toGridType<BuildT>());
+        grid.mBlindMetadataOffset = d_data->size; // i.e. no blind data, even if the input grid had any
+        grid.mBlindMetadataCount = 0u; // i.e. no blind data
+        NANOVDB_ASSERT(grid.mData0 == 0u); // zero padding
+        grid.mData1 = 1u; // This will be updated (unless this is an empty grid) after voxels have been processed
+#ifdef NANOVDB_USE_NEW_MAGIC_NUMBERS
+        NANOVDB_ASSERT(grid.mData2 == 0u);
+#else
+        NANOVDB_ASSERT(grid.mData2 == NANOVDB_MAGIC_GRID);
+#endif
+    }
+};
+
+}// namespace topology::detail
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template <typename BuildT>
+inline void TopologyBuilder<BuildT>::processUpperNodes()
+{
+    // Connect all newly allocated upper nodes to their respective tiles
+    // Also fill in any necessary part of the preamble (in InternalData) of upper nodes
+    auto processedTileCount = hostProcessedRoot()->tileCount();
+    if (processedTileCount == 0) return; // output grid is empty
+
+
+    auto data          = this->data();
+    auto processedRoot = hostProcessedRoot();
+    auto &root         = data->getRoot();
+    auto upperOffsets  = static_cast<uint32_t*>(mUpperOffsets.data());
+
+    util::forEach(0, processedTileCount, 1, [=, &root](const util::Range1D &r) {
+        for (auto processedTileID = r.begin(); processedTileID != r.end(); ++processedTileID) {
+            const uint32_t tileID = upperOffsets[processedTileID];
+            // If the offsets are the same, this was a speculatively introduced tile which was
+            // not necessary.
+            if (tileID != upperOffsets[processedTileID+1]) {
+                auto &dstUpper      = data->getUpper(tileID);
+                auto &processedTile = *processedRoot->tile(processedTileID);
+                root.tile(tileID)->setChild(processedTile.origin(), &dstUpper, &root);
+                // mBBox will be further updated after the operation has been applied at leaf-level.
+                dstUpper.mBBox = CoordBBox();
+                // TODO: Is this accurate? Any other flags that should be set?
+                dstUpper.mFlags = (uint64_t)GridFlags::HasBBox;
+            }
+        }
+    });
+}// TopologyBuilder<BuildT>::processUpperNodes
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template <typename BuildT>
+inline void TopologyBuilder<BuildT>::processLowerNodes()
+{
+    // Fill out the contents of all newly allocated lower nodes (using the densified upper/lower mask arrays)
+    // Also fill in the preamble (most of LeafData) for their leaf children
+    auto processedTileCount = hostProcessedRoot()->tileCount();
+    using CountType = uint32_t (*)[Mask<5>::SIZE];
+ 
+    if (processedTileCount) { // Unless output grid is empty
+        std::size_t lowerCount = data()->nodeCount[1];
+        mLowerParents = ScratchBufferT::create(lowerCount*sizeof(uint32_t));
+        std::size_t leafCount = data()->nodeCount[0];
+        mLeafParents = ScratchBufferT::create(leafCount*sizeof(uint32_t));
+
+        util::morphology::ProcessLowerNodes<BuildT>(
+            mUpperMasks.data(),
+            mLowerMasks.data(),
+            static_cast<uint32_t*>(mUpperOffsets.data()),
+            static_cast<CountType>(mLowerOffsets.data()),
+            static_cast<CountType>(mLeafOffsets.data()),
+            static_cast<GridT*>(data()->d_bufferPtr),
+            static_cast<uint32_t*>(mLowerParents.data()),
+            static_cast<uint32_t*>(mLeafParents.data()),
+            processedTileCount
+        );
+    }
+
+    mProcessedRoot.clear();
+    mUpperMasks.clear();
+    mLowerMasks.clear();
+    mLowerOffsets.clear();
+    mLeafOffsets.clear();
+}// TopologyBuilder<BuildT>::processLowerNodes
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace topology::detail {
+
+template <typename BuildT>
+struct UpdateLeafVoxelCountsAndPrefixSumFunctor
+{
+    void operator()(size_t leafID, typename TopologyBuilder<BuildT>::Data *d_data, uint64_t *d_voxelCounts) {
+        auto &leaf = d_data->getGrid().tree().template getFirstNode<0>()[leafID];
+        const uint64_t *w = leaf.mValueMask.words();
+        uint64_t prefixSum = 0, sum = util::countOn(*w++);
+        prefixSum = sum;
+        for (int n = 9; n < 55; n += 9) {// n=i*9 where i=1,2,..6
+            sum += util::countOn(*w++);
+            prefixSum |= sum << n; }// each pre-fixed sum is encoded in 9 bits
+        sum += util::countOn(*w);
+        d_voxelCounts[leafID] = sum;
+        leaf.mPrefixSum = prefixSum; }
+};
+
+template <typename BuildT>
+struct UpdateLeafVoxelOffsetsFunctor
+{
+    void operator()(size_t leafID, typename TopologyBuilder<BuildT>::Data *d_data, uint64_t *d_voxelOffsets) {
+        auto &leaf = d_data->getGrid().tree().template getFirstNode<0>()[leafID];
+        leaf.mOffset = d_voxelOffsets[leafID]+1; }
+};
+
+}// namespace topology::detail
+
+template<typename BuildT>
+inline void TopologyBuilder<BuildT>::processLeafOffsets()
+{
+    std::size_t leafCount = data()->nodeCount[0];
+    if (leafCount) { // Unless output grid is empty
+        mVoxelOffsets = ScratchBufferT::create((leafCount+1)*sizeof(uint64_t));
+
+
+        // Layout mirrors countNodes: index [0] is the seeded 0, [1..leafCount] receives the
+        // per-leaf counts written below, then an in-place inclusive scan turns them into offsets.
+        auto voxelOffsets = static_cast<uint64_t*>(mVoxelOffsets.data());
+        voxelOffsets[0] = 0;
+        auto d_data = data();
+
+        // Per-leaf voxel counts (into voxelOffsets+1) and the packed intra-leaf prefix sums.
+        util::forEach(0, leafCount, 1, [=](const util::Range1D &r) {
+            topology::detail::UpdateLeafVoxelCountsAndPrefixSumFunctor<BuildT> op;
+            for (auto leafID = r.begin(); leafID != r.end(); ++leafID) op(leafID, d_data, voxelOffsets+1);
+        });
+
+        // In-place inclusive prefix sum (TBB-backed when NANOVDB_USE_TBB is defined).
+        util::inclusiveScan(voxelOffsets + 1, leafCount, uint64_t(0), /*threaded=*/true, std::plus<uint64_t>{});
+
+        // Write each leaf's global voxel start offset (1-based; voxel 0 is the background).
+        util::forEach(0, leafCount, 1, [=](const util::Range1D &r) {
+            topology::detail::UpdateLeafVoxelOffsetsFunctor<BuildT> op;
+            for (auto leafID = r.begin(); leafID != r.end(); ++leafID) op(leafID, d_data, voxelOffsets);
+        });
+    }
+}// TopologyBuilder<BuildT>::processLeafOffsets
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace topology::detail {
+
+template <typename BuildT>
+struct UpdateAndPropagateLeafBBoxFunctor
+{
+    void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data, const uint32_t* leafParents) {
+        auto &lower = d_data->getLower(leafParents[tid]);
+        auto &leaf = d_data->getLeaf(tid);
+        leaf.updateBBox();
+        lower.mBBox.expandAtomic(leaf.bbox());
+    }
+};
+
+template <typename BuildT>
+struct PropagateLowerBBoxFunctor
+{
+    void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data, const uint32_t* lowerParents) {
+        auto &upper = d_data->getUpper(lowerParents[tid]);
+        auto &lower = d_data->getLower(tid);
+        upper.mBBox.expandAtomic(lower.bbox()); }
+};
+
+template <typename BuildT>
+struct PropagateUpperBBoxFunctor
+{
+    void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data) {
+        d_data->getRoot().mBBox.expandAtomic(d_data->getUpper(tid).bbox());
+    }
+};
+
+template <typename BuildT>
+struct UpdateRootWorldBBoxFunctor
+{
+    void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data) {
+        // TODO: check that the correct semantics are followed in this transformation
+        auto BBox = d_data->getRoot().mBBox;
+        BBox.max() += 1;
+        d_data->getGrid().mFlags.setMaskOn(GridFlags::HasBBox);
+        d_data->getGrid().mWorldBBox = BBox.transform(d_data->getGrid().data()->mMap);
+    }
+};
+
+}// namespace topology::detail
+
+template <typename BuildT>
+inline void TopologyBuilder<BuildT>::processBBox()
+{
+    if (data()->nodeCount[0] == 0) return; // Output grid is empty; retain empty bounding box
+
+    // TODO: Do we need a special case when flags indicates no bounding box?
+
+
+    auto d_data       = data();
+    auto leafParents  = static_cast<uint32_t*>(mLeafParents.data());
+    auto lowerParents = static_cast<uint32_t*>(mLowerParents.data());
+
+    // update and propagate bbox from leaf -> lower/parent nodes. Concurrent children of a
+    // shared parent race into parent.mBBox via expandAtomic (now host-callable). The forEach
+    // barrier between levels ensures each level's bboxes are final before the next reads them.
+    util::forEach(0, d_data->nodeCount[0], 1, [=](const util::Range1D &r) {
+        topology::detail::UpdateAndPropagateLeafBBoxFunctor<BuildT> op;
+        for (auto tid = r.begin(); tid != r.end(); ++tid) op(tid, d_data, leafParents);
+    });
+    mLeafParents.clear();
+
+    // propagate bbox from lower -> upper/parent node
+    util::forEach(0, d_data->nodeCount[1], 1, [=](const util::Range1D &r) {
+        topology::detail::PropagateLowerBBoxFunctor<BuildT> op;
+        for (auto tid = r.begin(); tid != r.end(); ++tid) op(tid, d_data, lowerParents);
+    });
+    mLowerParents.clear();
+
+    // propagate bbox from upper -> root/parent node
+    util::forEach(0, d_data->nodeCount[2], 1, [=](const util::Range1D &r) {
+        topology::detail::PropagateUpperBBoxFunctor<BuildT> op;
+        for (auto tid = r.begin(); tid != r.end(); ++tid) op(tid, d_data);
+    });
+
+    // update the world-bbox in the root node (single element)
+    topology::detail::UpdateRootWorldBBoxFunctor<BuildT>()(0, d_data);
+}// TopologyBuilder<BuildT>::processBBox
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace topology::detail {
+
+template <typename BuildT>
+struct PostProcessGridTreeFunctor
+{
+    void operator()(size_t tid, typename TopologyBuilder<BuildT>::Data *d_data, uint64_t* d_voxelOffsets) {
+        auto& grid = d_data->getGrid();
+        auto& tree = grid.tree();
+        auto leafCount = tree.mNodeCount[0];
+        tree.mVoxelCount = d_voxelOffsets[leafCount];
+        grid.mData1 = tree.mVoxelCount+1;
+    }
+};
+
+}// namespace topology::detail
+
+template <typename BuildT>
+inline void TopologyBuilder<BuildT>::postProcessGridTree()
+{
+    // Finish updates to GridData/TreeData and (optionally) update checksum
+    if (data()->nodeCount[0]) { // if grid is empty, the default values are correct
+        topology::detail::PostProcessGridTreeFunctor<BuildT>()(0, data(), static_cast<uint64_t*>(mVoxelOffsets.data()));
+    }
+    mVoxelOffsets.clear();
+
+    // Host checksum over the managed output buffer (the grid was just written host-side,
+    // so this avoids the host->device page migration a device checksum would force).
+    tools::updateChecksum((GridData*)data()->d_bufferPtr, mChecksum);
+}// TopologyBuilder<BuildT>::postProcessGridTree
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+}// namespace tools
+
+}// namespace nanovdb
+
+#endif // NANOVDB_TOOLS_TOPOLOGYBUILDER_H_HAS_BEEN_INCLUDED

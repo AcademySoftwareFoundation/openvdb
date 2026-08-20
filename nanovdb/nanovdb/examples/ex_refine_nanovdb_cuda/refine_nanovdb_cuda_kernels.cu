@@ -40,7 +40,7 @@ void mainRefineGrid(
     // Re-run warm-started iterations
     refiner.setVerbose(0);
     for (int i = 0; i < benchmark_iters; i++) {
-        gpuTimer.start("Re-running entire refinment after warmstart");
+        gpuTimer.start("Re-running entire refinement after warmstart");
         auto dummyHandle = refiner.getHandle();
         gpuTimer.stop();
     }

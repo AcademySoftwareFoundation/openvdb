@@ -30,6 +30,7 @@
 #include <nanovdb/util/cuda/Util.h>
 #include <nanovdb/util/cuda/DeviceGridTraits.cuh>
 #include <nanovdb/tools/VoxelBlockManager.h>
+#include <nanovdb/math/Stencils.h>
 
 namespace nanovdb {
 
@@ -165,6 +166,144 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
                 stencilIndices[spokeID] = tree.getValue( neighbor );
             }
         }
+    }
+
+    /// @brief Auxiliary type holding the resolved neighbor leaf pointers for
+    /// the WENO5 stencil. ptrs[axis][0] is the lo neighbor along that axis
+    /// (nullptr if outside the narrow band), ptrs[axis][1] is always the
+    /// center leaf, and ptrs[axis][2] is the hi neighbor (nullptr if outside).
+    template<class BuildT>
+    struct WenoLeafPtrs {
+        const NanoLeaf<BuildT>* ptrs[3][3];
+    };
+
+    /// @brief Resolve the neighbor leaf pointers needed by computeWenoStencil.
+    /// Performs exactly one probeLeaf call per axis (three total). Safe to call
+    /// per-thread; does not synchronize.
+    /// @tparam BuildT Build type of the grid (must be an index type)
+    /// @param grid    Device-resident grid
+    /// @param leaf    Center leaf node for the current voxel
+    /// @param voxelOffset Intra-leaf voxel offset for the current voxel
+    /// @return WenoLeafPtrs with center entries set to &leaf and lo/hi entries
+    ///         set to the probeLeaf result (nullptr if outside the narrow band)
+    template<class BuildT>
+    __device__
+    static typename util::enable_if<BuildTraits<BuildT>::is_index, WenoLeafPtrs<BuildT>>::type
+    resolveWenoLeafPtrs(
+        const NanoGrid<BuildT>* grid,
+        const NanoLeaf<BuildT>& leaf,
+        uint16_t                voxelOffset)
+    {
+        WenoLeafPtrs<BuildT> result;
+        const auto coord      = leaf.offsetToGlobalCoord(voxelOffset);
+        const auto localCoord = leaf.OffsetToLocalCoord(voxelOffset);
+        const auto& tree      = grid->tree();
+
+        for (int axis = 0; axis < 3; ++axis) {
+            result.ptrs[axis][0] = nullptr;
+            result.ptrs[axis][1] = &leaf;
+            result.ptrs[axis][2] = nullptr;
+
+            auto neighborCoord = coord;
+            neighborCoord[axis] += (localCoord[axis] & 0x4) ? 4 : -4;
+            result.ptrs[axis][(localCoord[axis] & 0x4) >> 1] =
+                tree.root().probeLeaf(neighborCoord);
+        }
+        return result;
+    }
+
+    /// @brief Compute global sequential indices for the 19 WENO5 stencil
+    /// points of the given voxel, using pre-resolved leaf pointers.
+    ///
+    /// Output layout follows nanovdb::math::WenoPt<i,j,k>::idx. Note that
+    /// this convention differs from OpenVDB's NineteenPt<i,j,k>::idx.
+    ///
+    /// Entries for neighbors outside the narrow band are left unchanged;
+    /// the caller must zero-initialize data[] before calling this function.
+    /// Does not synchronize; safe to call from divergent threads.
+    ///
+    /// The voxelOffset arithmetic uses octal notation to exploit the fact that
+    /// the NanoVDB leaf layout encodes (x,y,z) as x*64 + y*8 + z, making x, y,
+    /// and z strides exactly 0100, 010, and 1 in octal respectively.
+    ///
+    /// @tparam BuildT Build type of the grid (must be an index type)
+    /// @param leaf        Center leaf node for the current voxel
+    /// @param voxelOffset Intra-leaf voxel offset for the current voxel
+    /// @param leafPtrs    Resolved neighbor leaf pointers from resolveWenoLeafPtrs
+    /// @param data        Output array of length >= 19, caller-zero-initialized
+    template<class BuildT>
+    __device__
+    static typename util::enable_if<BuildTraits<BuildT>::is_index, void>::type
+    computeWenoStencil(
+        const NanoLeaf<BuildT>&     leaf,
+        uint16_t                    voxelOffset,
+        const WenoLeafPtrs<BuildT>& leafPtrs,
+        uint64_t*                   data)
+    {
+        using math::WenoPt;
+        const auto lc = leaf.OffsetToLocalCoord(voxelOffset);
+
+        data[WenoPt< 0, 0, 0>::idx] = leaf.getValue(voxelOffset);
+
+        // x-axis: stride per step = 64 = 0100 octal; cross-leaf wrap = ±8*64 = ±0700
+        if (leafPtrs.ptrs[0][(lc.x() + 5) >> 3])
+            data[WenoPt<-3, 0, 0>::idx] = leafPtrs.ptrs[0][(lc.x() + 5) >> 3]->getValue(
+                voxelOffset + ((lc[0] < 3) ? 0500 : -0300));
+        if (leafPtrs.ptrs[0][(lc.x() + 6) >> 3])
+            data[WenoPt<-2, 0, 0>::idx] = leafPtrs.ptrs[0][(lc.x() + 6) >> 3]->getValue(
+                voxelOffset + ((lc[0] < 2) ? 0600 : -0200));
+        if (leafPtrs.ptrs[0][(lc.x() + 7) >> 3])
+            data[WenoPt<-1, 0, 0>::idx] = leafPtrs.ptrs[0][(lc.x() + 7) >> 3]->getValue(
+                voxelOffset + ((lc[0] < 1) ? 0700 : -0100));
+        if (leafPtrs.ptrs[0][(lc.x() + 9) >> 3])
+            data[WenoPt< 1, 0, 0>::idx] = leafPtrs.ptrs[0][(lc.x() + 9) >> 3]->getValue(
+                voxelOffset + ((lc[0] < 7) ? 0100 : -0700));
+        if (leafPtrs.ptrs[0][(lc.x() + 10) >> 3])
+            data[WenoPt< 2, 0, 0>::idx] = leafPtrs.ptrs[0][(lc.x() + 10) >> 3]->getValue(
+                voxelOffset + ((lc[0] < 6) ? 0200 : -0600));
+        if (leafPtrs.ptrs[0][(lc.x() + 11) >> 3])
+            data[WenoPt< 3, 0, 0>::idx] = leafPtrs.ptrs[0][(lc.x() + 11) >> 3]->getValue(
+                voxelOffset + ((lc[0] < 5) ? 0300 : -0500));
+
+        // y-axis: stride per step = 8 = 010 octal; cross-leaf wrap = ±8*8 = ±070
+        if (leafPtrs.ptrs[1][(lc.y() + 5) >> 3])
+            data[WenoPt< 0,-3, 0>::idx] = leafPtrs.ptrs[1][(lc.y() + 5) >> 3]->getValue(
+                voxelOffset + ((lc[1] < 3) ? 0050 : -0030));
+        if (leafPtrs.ptrs[1][(lc.y() + 6) >> 3])
+            data[WenoPt< 0,-2, 0>::idx] = leafPtrs.ptrs[1][(lc.y() + 6) >> 3]->getValue(
+                voxelOffset + ((lc[1] < 2) ? 0060 : -0020));
+        if (leafPtrs.ptrs[1][(lc.y() + 7) >> 3])
+            data[WenoPt< 0,-1, 0>::idx] = leafPtrs.ptrs[1][(lc.y() + 7) >> 3]->getValue(
+                voxelOffset + ((lc[1] < 1) ? 0070 : -0010));
+        if (leafPtrs.ptrs[1][(lc.y() + 9) >> 3])
+            data[WenoPt< 0, 1, 0>::idx] = leafPtrs.ptrs[1][(lc.y() + 9) >> 3]->getValue(
+                voxelOffset + ((lc[1] < 7) ? 0010 : -0070));
+        if (leafPtrs.ptrs[1][(lc.y() + 10) >> 3])
+            data[WenoPt< 0, 2, 0>::idx] = leafPtrs.ptrs[1][(lc.y() + 10) >> 3]->getValue(
+                voxelOffset + ((lc[1] < 6) ? 0020 : -0060));
+        if (leafPtrs.ptrs[1][(lc.y() + 11) >> 3])
+            data[WenoPt< 0, 3, 0>::idx] = leafPtrs.ptrs[1][(lc.y() + 11) >> 3]->getValue(
+                voxelOffset + ((lc[1] < 5) ? 0030 : -0050));
+
+        // z-axis: stride per step = 1; cross-leaf wrap = ±8
+        if (leafPtrs.ptrs[2][(lc.z() + 5) >> 3])
+            data[WenoPt< 0, 0,-3>::idx] = leafPtrs.ptrs[2][(lc.z() + 5) >> 3]->getValue(
+                voxelOffset + ((lc[2] < 3) ? 0005 : -0003));
+        if (leafPtrs.ptrs[2][(lc.z() + 6) >> 3])
+            data[WenoPt< 0, 0,-2>::idx] = leafPtrs.ptrs[2][(lc.z() + 6) >> 3]->getValue(
+                voxelOffset + ((lc[2] < 2) ? 0006 : -0002));
+        if (leafPtrs.ptrs[2][(lc.z() + 7) >> 3])
+            data[WenoPt< 0, 0,-1>::idx] = leafPtrs.ptrs[2][(lc.z() + 7) >> 3]->getValue(
+                voxelOffset + ((lc[2] < 1) ? 0007 : -0001));
+        if (leafPtrs.ptrs[2][(lc.z() + 9) >> 3])
+            data[WenoPt< 0, 0, 1>::idx] = leafPtrs.ptrs[2][(lc.z() + 9) >> 3]->getValue(
+                voxelOffset + ((lc[2] < 7) ? 0001 : -0007));
+        if (leafPtrs.ptrs[2][(lc.z() + 10) >> 3])
+            data[WenoPt< 0, 0, 2>::idx] = leafPtrs.ptrs[2][(lc.z() + 10) >> 3]->getValue(
+                voxelOffset + ((lc[2] < 6) ? 0002 : -0006));
+        if (leafPtrs.ptrs[2][(lc.z() + 11) >> 3])
+            data[WenoPt< 0, 0, 3>::idx] = leafPtrs.ptrs[2][(lc.z() + 11) >> 3]->getValue(
+                voxelOffset + ((lc[2] < 5) ? 0003 : -0005));
     }
 };
 

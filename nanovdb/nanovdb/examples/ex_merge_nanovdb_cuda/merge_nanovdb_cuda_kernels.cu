@@ -42,7 +42,7 @@ void mainMergeGrids(
     // Re-run warm-started iterations
     converter.setVerbose(0);
     for (int i = 0; i < benchmark_iters; i++) {
-        gpuTimer.start("Re-running entire dilation after warmstart");
+        gpuTimer.start("Re-running entire merge after warmstart");
         auto handle2 = converter.getHandle();
         gpuTimer.stop();
     }
