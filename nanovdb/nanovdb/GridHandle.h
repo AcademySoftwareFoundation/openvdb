@@ -42,6 +42,8 @@ class GridHandle
     static_assert(!BufferHasHostSingle<BufferT>::value,
                   "GridHandle over a cuda::Buffer with a host-accessible resource (e.g. PinnedResource) "
                   "is not supported yet: use HostBuffer or a dual-space buffer for host-readable grids");
+    static_assert(!BufferHasDeviceSingle<BufferT>::value || BufferHasByteElements<BufferT>::value,
+                  "GridHandle requires byte-addressed single-space storage, e.g. cuda::Buffer<std::byte, R>");
 
     std::vector<GridHandleMetaData> mMetaData;
     BufferT mBuffer;
@@ -122,16 +124,19 @@ public:
     ///         handle only copies to its own buffer type (device-to-device,
     ///         ordered on the source's retained stream), so call it as
     ///         copy<BufferT>() -- the default OtherBufferT does not compile.
-    /// @param buffer optional buffer used for allocation; ignored by the
-    ///        single-space path, which allocates through the source's resource
+    /// @param buffer optional buffer used for allocation; a compile error for
+    ///        single-space handles, which allocate through the source buffer's
+    ///        resource (use the no-argument overload)
     /// @return A new handle of the specified buffer type that contains a deep copy of the current handle
     template <typename OtherBufferT = HostBuffer>
     GridHandle<OtherBufferT> copy(const OtherBufferT& buffer) const;
 
-    /// @brief Deep copy without a pool argument. The single-space path never
-    ///        constructs a pool buffer (its allocation goes through the
-    ///        source's resource), so this also works for buffers that are not
-    ///        default-constructible, e.g. over a ResourceRef.
+    /// @brief Deep copy without a pool argument. The single-space path
+    ///        allocates through the source buffer's resource and never
+    ///        constructs a pool buffer, so it works for buffers that are not
+    ///        default-constructible, e.g. over a ResourceRef. The host path
+    ///        default-constructs the pool argument, so it requires a
+    ///        default-constructible OtherBufferT.
     template <typename OtherBufferT = HostBuffer>
     GridHandle<OtherBufferT> copy() const;
 
@@ -446,15 +451,13 @@ template<typename BufferT>
 template <typename OtherBufferT>
 inline GridHandle<OtherBufferT> GridHandle<BufferT>::copy(const OtherBufferT& other) const
 {
-    if constexpr (BufferHasDeviceSingle<BufferT>::value || BufferHasDeviceSingle<OtherBufferT>::value) {
-        (void)other;// the single-space copy allocates through the source's resource
-        return this->template copy<OtherBufferT>();// the no-arg overload holds the supported-combination guard
-    } else {
-        if (mBuffer.size() == 0) return GridHandle<OtherBufferT>();// return an empty handle
-        auto buffer = OtherBufferT::create(mBuffer.size(), &other);
-        std::memcpy(buffer.data(), mBuffer.data(), mBuffer.size());// deep copy of buffer
-        return GridHandle<OtherBufferT>(std::move(buffer));
-    }
+    static_assert(!(BufferHasDeviceSingle<BufferT>::value || BufferHasDeviceSingle<OtherBufferT>::value),
+                  "GridHandle::copy(pool) cannot honor a pool argument for a single-space device buffer, "
+                  "whose copy allocates through the source buffer's resource: use the no-argument copy()");
+    if (mBuffer.size() == 0) return GridHandle<OtherBufferT>();// return an empty handle
+    auto buffer = OtherBufferT::create(mBuffer.size(), &other);
+    std::memcpy(buffer.data(), mBuffer.data(), mBuffer.size());// deep copy of buffer
+    return GridHandle<OtherBufferT>(std::move(buffer));
 }// GridHandle<OtherBufferT> GridHandle<BufferT>::copy(const OtherBufferT& other) const
 
 template<typename BufferT>

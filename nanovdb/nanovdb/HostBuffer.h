@@ -123,6 +123,15 @@ template<typename BufferT>
 struct BufferHasHostSingle<BufferT, std::void_t<decltype(BufferTraits<BufferT>::hasHostSingle)>>
 { static constexpr bool value = BufferTraits<BufferT>::hasHostSingle; };
 
+/// @brief Detects whether a buffer's elements are byte-sized. Buffers that
+///        expose no ElementType (e.g. HostBuffer) address raw bytes by
+///        definition, so the primary defaults to true.
+template<typename BufferT, typename = void>
+struct BufferHasByteElements { static constexpr bool value = true; };
+template<typename BufferT>
+struct BufferHasByteElements<BufferT, std::void_t<typename BufferT::ElementType>>
+{ static constexpr bool value = sizeof(typename BufferT::ElementType) == 1; };
+
 // ----------------------------> HostBuffer <--------------------------------------
 
 /// @brief This is a buffer that contains a shared or private pool

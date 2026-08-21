@@ -22,6 +22,8 @@
 #include <nanovdb/tools/cuda/GridChecksum.cuh>// for cuda::updateChecksum
 #include <nanovdb/GridHandle.h>
 
+#include <string>// for the grid index in chain-validation error messages
+
 namespace nanovdb {
 
 namespace cuda {
@@ -112,17 +114,17 @@ inline void parseGridChain(const GridData *d_head, uint64_t bytes, uint32_t coun
     cudaCheck(cudaMemcpyAsync(meta.data(), d_meta, count * sizeof(GridHandleMetaData), cudaMemcpyDeviceToHost, stream));
     cudaCheck(cudaMemcpyAsync(&status, d_status, sizeof(ChainStatus), cudaMemcpyDeviceToHost, stream));
     cudaCheck(cudaStreamSynchronize(stream));
+    if (status.error == ChainError::Ok) return;
+    const std::string where = " (grid " + std::to_string(status.gridIndex) + " of " + std::to_string(count) + ")";
     switch (status.error) {
-    case ChainError::Ok:
-        return;
     case ChainError::Truncated:
-        throw std::runtime_error("GridHandle: grid chain exceeds the device buffer (truncated or corrupt grid data)");
+        throw std::runtime_error("GridHandle: grid chain exceeds the device buffer (truncated or corrupt grid data)" + where);
     case ChainError::Inconsistent:
-        throw std::runtime_error("GridHandle: inconsistent grid index/count in the device buffer's grid chain");
+        throw std::runtime_error("GridHandle: inconsistent grid index/count in the device buffer's grid chain" + where);
     case ChainError::BadSize:
-        throw std::runtime_error("GridHandle: grid size field exceeds the device buffer (truncated or corrupt grid data)");
+        throw std::runtime_error("GridHandle: grid size field exceeds the device buffer (truncated or corrupt grid data)" + where);
     default:
-        throw std::runtime_error("GridHandle was constructed with an invalid device buffer");
+        throw std::runtime_error("GridHandle was constructed with an invalid device buffer" + where);
     }
 }
 
@@ -251,8 +253,6 @@ GridHandle<BufferT>::GridHandle(T&& buffer)
     : mBuffer(std::move(buffer))
 {
     static_assert(util::is_same<T,BufferT>::value, "Expected U==BufferT");
-    static_assert(sizeof(typename BufferT::ElementType) == 1,
-                  "GridHandle requires byte-addressed single-space storage, e.g. cuda::Buffer<std::byte, R>");
     using ResourceT = typename BufferT::ResourceType;
     if (const GridData *d_data = reinterpret_cast<const GridData*>(mBuffer.data())) {
         const cudaStream_t stream = cuda::detail::retainedStreamOrDefault(mBuffer);
