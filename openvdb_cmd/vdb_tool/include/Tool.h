@@ -111,7 +111,6 @@
 
 #ifdef VDB_TOOL_USE_MPEG
 #include <cstdlib>// for std::system
-#include <sstream>
 #endif
 
 #ifndef VDB_TOOL_FFMPEG_PATH
@@ -673,7 +672,7 @@ void Tool::init()
 
   mParser.addAction(
      {"copy"}, "Deep-copy VDB grids and/or Geometry by index onto the top of their respective stacks",
-    {{"vdb",    "0", "0|0,1,2|*", "comma-separated age index/indices of VDB grids to copy, or \"*\" for all (default: 0, i.e. the most recently added VDB)"},
+    {{"vdb",    "", "0|0,1,2|*", "comma-separated age index/indices of VDB grids to copy, or \"*\" for all (omit to skip VDB)"},
      {"geo",    "",  "0|0,1|*",  "comma-separated age index/indices of Geometry to copy, or \"*\" for all (omit to skip Geometry)"},
      {"prefix", "", "copy_",     "prefix prepended to the name of each copy (default is empty, preserving the original name)"}},
      [&](){mParser.setDefaults();}, [&](){this->copy();});
@@ -1383,7 +1382,13 @@ void Tool::help()
         desc.replace(bar, 1, "\\|");
         bar += 2;
       }
-      std::clog << "| **" << a.names[0] << "** | " << desc << " |\n";
+      std::clog << "| **" << a.names[0] << "**";
+      if (a.names.size() > 1) {
+        std::clog << " (alias" << (a.names.size() > 2 ? "es" : "") << ": ";
+        for (size_t i = 1; i < a.names.size(); ++i) std::clog << (i>1 ? ", " : "") << a.names[i];
+        std::clog << ")";
+      }
+      std::clog << " | " << desc << " |\n";
     }
     if (stop) std::exit(EXIT_SUCCESS);
     return;
@@ -1622,14 +1627,20 @@ void Tool::stats()
   const std::string vdb_str = mParser.get<std::string>("vdb");
 
   std::vector<GridBase::Ptr> grids;
+  std::vector<int> ages;
   if (vdb_str == "*") {
-    for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it) grids.push_back(*it);
+    int age = 0;
+    for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it, ++age) {
+      grids.push_back(*it);
+      ages.push_back(age);
+    }
   } else {
     for (int a : mParser.getVec<int>("vdb")) {
       if (size_t(a) >= mGrid.size())
         throw std::out_of_range("stats: vdb index " + std::to_string(a) +
                                 " is out of range (stack size " + std::to_string(mGrid.size()) + ")");
       grids.push_back(*this->getGrid(a));
+      ages.push_back(a);
     }
   }
 
@@ -1651,27 +1662,49 @@ void Tool::stats()
                           << std::setw(w)  << "volume"
             << "\n" << std::string(aw + 2 + nw + 7*w, '-') << "\n";
 
+  // Background column: numeric grid types print their scalar background,
+  // Vec3SGrid prints "[x, y, z]", anything else is "(n/a)".
+  auto backgroundStr = [](const GridBase::Ptr& base) -> std::string {
+    std::stringstream ss;
+    if      (auto p = gridPtrCast<FloatGrid>(base))  ss << p->background();
+    else if (auto p = gridPtrCast<DoubleGrid>(base)) ss << p->background();
+    else if (auto p = gridPtrCast<Int32Grid>(base))  ss << p->background();
+    else if (auto p = gridPtrCast<Int64Grid>(base))  ss << p->background();
+    else if (auto p = gridPtrCast<BoolGrid>(base))   ss << p->background();
+    else if (auto p = gridPtrCast<Vec3SGrid>(base))  ss << p->background();
+    else return "(n/a)";
+    return ss.str();
+  };
+
+  // min/max/mean/stddev of active voxels, dispatched by value type. tools::statistics()
+  // returns a (non-templated) math::Stats regardless of the grid's value type, so this
+  // covers every scalar type the file formats can round-trip; Vec3S etc. print "(n/a)".
+  auto valueStatsStr = [&](const GridBase::Ptr& base) -> std::string {
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(6);
+    auto printFromStats = [&](const math::Stats& s) {
+      ss << std::setw(w) << s.min() << std::setw(w) << s.max()
+         << std::setw(w) << s.mean() << std::setw(w) << s.stdDev();
+    };
+    if      (auto p = gridPtrCast<FloatGrid>(base))  printFromStats(tools::statistics(p->cbeginValueOn()));
+    else if (auto p = gridPtrCast<DoubleGrid>(base)) printFromStats(tools::statistics(p->cbeginValueOn()));
+    else if (auto p = gridPtrCast<Int32Grid>(base))  printFromStats(tools::statistics(p->cbeginValueOn()));
+    else if (auto p = gridPtrCast<Int64Grid>(base))  printFromStats(tools::statistics(p->cbeginValueOn()));
+    else if (auto p = gridPtrCast<BoolGrid>(base))   printFromStats(tools::statistics(p->cbeginValueOn()));
+    else ss << std::setw(w) << "(n/a)" << std::setw(w) << "(n/a)" << std::setw(w) << "(n/a)" << std::setw(w) << "(n/a)";
+    return ss.str();
+  };
+
   for (size_t i = 0; i < grids.size(); ++i) {
     auto& base = grids[i];
-    const int age = vdb_str == "*" ? (int)i : mParser.getVec<int>("vdb")[i];
-    auto grid = gridPtrCast<FloatGrid>(base);
-    if (!grid) {
-      std::clog << std::right << std::setw(aw) << age << "  "
-                << std::left  << std::setw(nw) << base->getName() << "  (not a FloatGrid, skipped)\n";
-      continue;
-    }
-    const math::Stats s = tools::statistics(grid->cbeginValueOn());
+    const int age = ages[i];
     std::clog << std::right << std::setw(aw) << age << "  "
-              << std::left  << std::setw(nw) << grid->getName()
-              << std::right << std::fixed << std::setprecision(6)
-              << std::setw(w) << grid->background()
-              << std::setw(w) << s.min()
-              << std::setw(w) << s.max()
-              << std::setw(w) << s.mean()
-              << std::setw(w) << s.stdDev()
-              << std::defaultfloat;
+              << std::left  << std::setw(nw) << base->getName()
+              << std::right << std::setw(w)  << backgroundStr(base)
+                            << valueStatsStr(base);
     // area and volume are only defined for float level sets
-    if (base->getGridClass() == GRID_LEVEL_SET) {
+    auto grid = gridPtrCast<FloatGrid>(base);
+    if (grid && base->getGridClass() == GRID_LEVEL_SET) {
       try { std::clog << std::setw(w) << tools::levelSetArea(*grid); }
       catch (...) { std::clog << std::setw(w) << "(n/a)"; }
       try { std::clog << std::setw(w) << tools::levelSetVolume(*grid); }
@@ -1880,11 +1913,15 @@ void Tool::config()
             std::string accum;
             while (getline(file, line)) {
                 const size_t start = line.find_first_not_of(" \t"), stop = line.find_first_of("#%");
+                // A blank or comment-only line is skipped without touching accum, so a
+                // comment line in the middle of a backslash continuation is transparently
+                // absorbed rather than breaking (or being appended to) the continued line.
                 if (start >= stop) continue;// line is empty or starts with a comment
                 line = line.substr(start, stop - start);// remove leading whitespaces and tailing comments
                 line = line.substr(0, line.find_last_not_of(" \t") + 1);// remove tailing whitespaces
                 if (!line.empty() && line.back() == '\\') {
                     accum += line.substr(0, line.size() - 1);// strip \ and accumulate
+                    accum += ' ';// separate this line's tokens from the next line's
                     continue;
                 }
                 line = accum + line;
@@ -1896,6 +1933,9 @@ void Tool::config()
                     std::strcpy(c, s.c_str());
                     return c;
                 });
+            }
+            if (!accum.empty()) {
+                throw std::invalid_argument("readConf: unterminated line continuation at end of file \""+fileName+"\"");
             }
             file.close();
             mParser.parse(static_cast<int>(args.size()), args.data());
@@ -4215,80 +4255,6 @@ inline std::string formatBBoxd(const BBoxT& bbox)
     ss << "[" << mn[0] << "," << mn[1] << "," << mn[2] << "]->["
        << mx[0] << "," << mx[1] << "," << mx[2] << "]";
     return ss.str();
-}
-
-template <typename GridT>
-inline std::string gridRangeStr(const GridT& grid)
-{
-    if (grid.activeVoxelCount() == 0) return "(empty)";
-    const auto mm = tools::minMax(grid.tree());
-    std::stringstream ss;
-    ss << "[" << mm.min() << ", " << mm.max() << "]";
-    return ss.str();
-}
-
-// Dispatch min/max stringification across the scalar grid types we know how
-// to compare. Vec3-typed grids etc. get "(n/a)" because ordering isn't
-// well-defined for them.
-inline std::string formatRange(const openvdb::GridBase& grid)
-{
-    if (auto p = dynamic_cast<const openvdb::FloatGrid*>(&grid))  return gridRangeStr(*p);
-    if (auto p = dynamic_cast<const openvdb::DoubleGrid*>(&grid)) return gridRangeStr(*p);
-    if (auto p = dynamic_cast<const openvdb::Int32Grid*>(&grid))  return gridRangeStr(*p);
-    if (auto p = dynamic_cast<const openvdb::Int64Grid*>(&grid))  return gridRangeStr(*p);
-    if (auto p = dynamic_cast<const openvdb::BoolGrid*>(&grid))   return gridRangeStr(*p);
-    return "(n/a)";
-}
-
-// Background value, dispatched by grid type. Falls back to the typed grid's
-// own background() accessor, which prints scalars as numbers and Vec3s as
-// "[x, y, z]".
-template <typename GridT>
-inline std::string gridBgStr(const GridT& grid)
-{
-    std::stringstream ss;
-    ss << grid.background();
-    return ss.str();
-}
-inline std::string formatBackground(const openvdb::GridBase& grid)
-{
-    if (auto p = dynamic_cast<const openvdb::FloatGrid*>(&grid))  return gridBgStr(*p);
-    if (auto p = dynamic_cast<const openvdb::DoubleGrid*>(&grid)) return gridBgStr(*p);
-    if (auto p = dynamic_cast<const openvdb::Int32Grid*>(&grid))  return gridBgStr(*p);
-    if (auto p = dynamic_cast<const openvdb::Int64Grid*>(&grid))  return gridBgStr(*p);
-    if (auto p = dynamic_cast<const openvdb::BoolGrid*>(&grid))   return gridBgStr(*p);
-    if (auto p = dynamic_cast<const openvdb::Vec3SGrid*>(&grid))  return gridBgStr(*p);
-    return "(n/a)";
-}
-
-// World-space surface area / enclosed volume of a level set, via
-// tools::levelSetArea / tools::levelSetVolume. Both throw TypeError unless the
-// grid is a non-empty scalar float level set, so only Float GRID_LEVEL_SET
-// grids are measured; everything else (and any measurement failure) renders
-// as "(n/a)".
-inline std::string formatArea(const openvdb::GridBase& grid)
-{
-    auto p = dynamic_cast<const openvdb::FloatGrid*>(&grid);
-    if (p == nullptr || grid.getGridClass() != openvdb::GRID_LEVEL_SET) return "(n/a)";
-    try {
-        std::stringstream ss;
-        ss << openvdb::tools::levelSetArea(*p);
-        return ss.str();
-    } catch (const std::exception&) {
-        return "(n/a)";
-    }
-}
-inline std::string formatVolume(const openvdb::GridBase& grid)
-{
-    auto p = dynamic_cast<const openvdb::FloatGrid*>(&grid);
-    if (p == nullptr || grid.getGridClass() != openvdb::GRID_LEVEL_SET) return "(n/a)";
-    try {
-        std::stringstream ss;
-        ss << openvdb::tools::levelSetVolume(*p);
-        return ss.str();
-    } catch (const std::exception&) {
-        return "(n/a)";
-    }
 }
 
 // Per-level node counts, top-down, e.g. "2->10->58" = 2 upper-internal nodes,

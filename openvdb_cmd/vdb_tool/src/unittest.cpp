@@ -12,6 +12,7 @@
 #include <fstream>
 #include <set>
 #include <thread>
+#include <cmath>// for std::isinf, std::isnan
 
 #if defined(_WIN32)
 #include <direct.h>// for mkdir
@@ -3140,51 +3141,532 @@ TEST_F(Test_vdb_tool, ToolConfigHeader)
     std::remove(cfg.c_str());
 }
 
+// Runtime action failures are caught centrally by Parser::run() and logged
+// as "<action>: skipping due to: <what>" (see Tool's onActionError handler);
+// they do not propagate as C++ exceptions out of Tool::run() unless
+// -errorOnWarning is set, in which case Tool::run() reports the error and
+// calls std::exit() rather than throwing. So the way to observe an
+// action-level error from a test is to capture std::clog, not EXPECT_THROW.
+static std::string runCapturingClog(const std::string& cmd)
+{
+    using namespace openvdb::vdb_tool;
+    const auto tmp = tokenize(cmd, " ");
+    std::vector<std::unique_ptr<char[]>> owned;
+    std::vector<char*> args;
+    for (const auto& s : tmp) {
+        owned.emplace_back(new char[s.size()+1]);
+        std::strcpy(owned.back().get(), s.c_str());
+        args.push_back(owned.back().get());
+    }
+    std::ostringstream oss;
+    auto *old = std::clog.rdbuf(oss.rdbuf());
+    try {
+        Tool tool(int(args.size()), args.data());
+        tool.run();
+    } catch (...) {
+        std::clog.rdbuf(old);
+        throw;
+    }
+    std::clog.rdbuf(old);
+    return oss.str();
+}
+
+// Read back just the (single) grid name stored in a .vdb file, without
+// loading its tree.
+static std::string readGridName(const std::string& path)
+{
+    openvdb::io::File f(path);
+    f.open();
+    const std::string name = f.beginName().gridName();
+    f.close();
+    return name;
+}
+
 TEST_F(Test_vdb_tool, ToolConfigLineContinuation)
 {
     using namespace openvdb::vdb_tool;
 
     const std::string cfg = "data/continuation_test.txt";
-    std::remove(cfg.c_str());
+    const std::string out_vdb = "data/continuation_out.vdb";
+
+    // Reads back the single grid written by a config run and checks that
+    // the continuation actually joined the sphere's options: the grid must
+    // be named as given on the (continued) name= line, and its world-space
+    // active-voxel bbox must reflect the continued radius= line, not a
+    // truncated/ignored one. A no-op line-continuation implementation (one
+    // that dropped everything after the first backslash) would instead see
+    // a bare "sphere" action with default name/radius and fail these checks.
+    auto checkSphereOutput = [](const std::string& path, const std::string& expectedName, double expectedRadius) {
+        ASSERT_TRUE(openvdb::vdb_tool::fileExists(path));
+        openvdb::io::File f(path);
+        f.open();
+        std::vector<std::string> names;
+        for (auto it = f.beginName(); it != f.endName(); ++it) names.push_back(*it);
+        f.close();
+        ASSERT_EQ(size_t(1), names.size());
+        EXPECT_EQ(expectedName, names[0]);
+
+        openvdb::io::File f2(path);
+        f2.open();
+        auto grid = openvdb::gridPtrCast<openvdb::FloatGrid>(f2.readGrid(names[0]));
+        f2.close();
+        ASSERT_TRUE(grid != nullptr);
+        const auto bbox = grid->transform().indexToWorld(grid->evalActiveVoxelBoundingBox());
+        const double dx = bbox.max().x() - bbox.min().x();
+        // The active bbox spans roughly the diameter (plus narrow-band padding);
+        // a generous tolerance still clearly distinguishes this from other radii.
+        EXPECT_NEAR(2.0 * expectedRadius, dx, 0.5 * expectedRadius);
+    };
 
     // Write a config that uses backslash line continuation to split a
-    // sphere action and its options across multiple lines.
+    // sphere action and its options (including name=) across multiple lines.
+    std::remove(cfg.c_str());
+    std::remove(out_vdb.c_str());
     {
         std::ofstream out(cfg);
         out << "vdb_tool " << Tool::version() << "\n";
         out << "sphere \\\n";
+        out << "  dim=64 \\\n";
         out << "  radius=2.0 \\\n";
         out << "  name=cont_sphere\n";
-        out << "stats\n";
+        out << "write " << out_vdb << "\n";
     }
     ASSERT_TRUE(fileExists(cfg));
 
-    // The config must load and produce a grid named "cont_sphere".
+    // The config must load and produce a grid named "cont_sphere" with
+    // radius=2.0 actually applied.
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -config " + cfg);
       Tool tool(int(args.size()), args.data());
       tool.run();
     });
+    checkSphereOutput(out_vdb, "cont_sphere", 2.0);
+    std::remove(out_vdb.c_str());
 
     // Verify that comments on a continuation line are stripped before the
-    // backslash is checked, so the backslash must precede any comment.
+    // backslash is checked, so the backslash must precede any comment, and
+    // that the resulting sphere still gets its continued options (a
+    // different radius than the first case, so the two can't be confused).
     std::remove(cfg.c_str());
     {
         std::ofstream out(cfg);
         out << "vdb_tool " << Tool::version() << "\n";
         out << "sphere \\\n";
+        out << "  dim=64 \\\n";
         out << "  radius=1.5 \\ # backslash before comment continues the line\n";
         out << "  name=cont_sphere2\n";
+        out << "write " << out_vdb << "\n";
     }
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -config " + cfg);
       Tool tool(int(args.size()), args.data());
       tool.run();
     });
+    checkSphereOutput(out_vdb, "cont_sphere2", 1.5);
+
+    // A continuation joined without a space before the backslash (e.g.
+    // "radius=2.5\") must still get a token separator inserted, so it
+    // doesn't concatenate directly onto the next line's first token (which
+    // would produce a garbled "radius=2.5name=..." token and a confusing
+    // parse error).
+    std::remove(cfg.c_str());
+    std::remove(out_vdb.c_str());
+    {
+        std::ofstream out(cfg);
+        out << "vdb_tool " << Tool::version() << "\n";
+        out << "sphere dim=64 radius=2.5\\\n";
+        out << "name=cont_sphere3\n";
+        out << "write " << out_vdb << "\n";
+    }
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -config " + cfg);
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    checkSphereOutput(out_vdb, "cont_sphere3", 2.5);
+
+    // A trailing "\" on the last line of a config (nothing left to continue
+    // onto) must be reported, not silently dropped.
+    std::remove(cfg.c_str());
+    std::remove(out_vdb.c_str());
+    {
+        std::ofstream out(cfg);
+        out << "vdb_tool " << Tool::version() << "\n";
+        out << "sphere dim=64 radius=1.0\\\n";
+    }
+    EXPECT_THROW({
+      auto args = getArgs("vdb_tool -quiet -config " + cfg);
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    }, std::invalid_argument);
 
     std::remove(cfg.c_str());
+    std::remove(out_vdb.c_str());
 }
 
+TEST_F(Test_vdb_tool, ActionCopy)
+{
+    // -copy: "vdb" and "geo" both default to empty ("omit to skip"), so at
+    // least one must be given explicitly; specifying only one must not touch
+    // the other stack, even when it is empty.
+    using namespace openvdb::vdb_tool;
+
+    // Neither vdb= nor geo= given: the "at least one" guard must fire.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere dim=8 -copy");
+      EXPECT_NE(out.find("copy: skipping due to: copy: at least one of"), std::string::npos);
+    }
+
+    // geo=0 with no VDB grids on the stack must not touch (or throw over) the
+    // empty VDB stack, and must not implicitly copy a grid. Write to a .obj
+    // (not .vdb) file so the write actually exercises the Geometry stack.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere -ls2mesh -clear vdb=* geo="
+          " -copy geo=0 -write geo=0 keep=true data/test_copy_geo.obj");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+    ASSERT_TRUE(fileExists("data/test_copy_geo.obj"));
+    std::remove("data/test_copy_geo.obj");
+
+    // vdb=0 with a prefix produces a second, independently-named grid; the
+    // original grid must be left untouched.
+    std::remove("data/test_copy_vdb.vdb");
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -sphere name=orig dim=8"
+                          " -copy vdb=0 prefix=copy_"
+                          " -write vdb=* keep=true data/test_copy_vdb.vdb");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    ASSERT_TRUE(fileExists("data/test_copy_vdb.vdb"));
+    {
+      openvdb::io::File f("data/test_copy_vdb.vdb");
+      f.open();
+      std::set<std::string> names;
+      for (auto it = f.beginName(); it != f.endName(); ++it) names.insert(*it);
+      f.close();
+      EXPECT_EQ(size_t(2), names.size());
+      EXPECT_TRUE(names.count("orig"));
+      EXPECT_TRUE(names.count("copy_orig"));
+    }
+    std::remove("data/test_copy_vdb.vdb");
+
+    // copy must be an independent deep copy, not an alias: overwriting the
+    // copy's background via -forAllValues' explicit "background=" option
+    // must leave the original's background untouched.
+    std::remove("data/test_copy_indep_copy.vdb");
+    std::remove("data/test_copy_indep_orig.vdb");
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -sphere name=orig dim=16"
+                          " -copy vdb=0 prefix=copy_"
+                          " -forAllValues vdb=0 v background=999.0"
+                          " -write vdb=0 keep=true data/test_copy_indep_copy.vdb"
+                          " -write vdb=1 data/test_copy_indep_orig.vdb");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    {
+      openvdb::io::File cf("data/test_copy_indep_copy.vdb");
+      cf.open();
+      auto copyGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(cf.readGrid(cf.beginName().gridName()));
+      cf.close();
+      openvdb::io::File of("data/test_copy_indep_orig.vdb");
+      of.open();
+      auto origGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(of.readGrid(of.beginName().gridName()));
+      of.close();
+      ASSERT_TRUE(copyGrid != nullptr);
+      ASSERT_TRUE(origGrid != nullptr);
+      EXPECT_NEAR(999.0f, copyGrid->background(), 1e-4f);
+      EXPECT_NE(999.0f, origGrid->background());
+    }
+    std::remove("data/test_copy_indep_copy.vdb");
+    std::remove("data/test_copy_indep_orig.vdb");
+
+    // Indices are validated up front: an out-of-range index in the same
+    // vdb= list must abort the whole copy, leaving the stack untouched
+    // rather than applying the valid indices and skipping the bad one.
+    std::remove("data/test_copy_oob.vdb");
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=only dim=8"
+          " -copy vdb=0,5"
+          " -write vdb=* keep=true data/test_copy_oob.vdb");
+      EXPECT_NE(out.find("copy: skipping due to"), std::string::npos);
+    }
+    ASSERT_TRUE(fileExists("data/test_copy_oob.vdb"));
+    {
+      openvdb::io::File f("data/test_copy_oob.vdb");
+      f.open();
+      int count = 0;
+      for (auto it = f.beginName(); it != f.endName(); ++it) ++count;
+      f.close();
+      EXPECT_EQ(1, count);// no copy was made: still just "only" on the stack
+    }
+    std::remove("data/test_copy_oob.vdb");
+}// ActionCopy
+
+TEST_F(Test_vdb_tool, ActionRenameSwap)
+{
+    using namespace openvdb::vdb_tool;
+
+    std::remove("data/test_rename.vdb");
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -sphere name=a dim=8 -sphere name=b dim=8"
+                          " -rename vdb=0 name=renamed"
+                          " -write vdb=* keep=true data/test_rename.vdb");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    {
+      openvdb::io::File f("data/test_rename.vdb");
+      f.open();
+      std::set<std::string> names;
+      for (auto it = f.beginName(); it != f.endName(); ++it) names.insert(*it);
+      f.close();
+      // grid 0 (the most recently added, "b") was renamed; "a" is untouched.
+      EXPECT_TRUE(names.count("a"));
+      EXPECT_TRUE(names.count("renamed"));
+      EXPECT_FALSE(names.count("b"));
+    }
+    std::remove("data/test_rename.vdb");
+
+    // rename rejects an empty name and leaves the grid untouched.
+    std::remove("data/test_rename_empty.vdb");
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -rename vdb=0 name="
+          " -write vdb=0 data/test_rename_empty.vdb");
+      EXPECT_NE(out.find("rename: skipping due to"), std::string::npos);
+    }
+    ASSERT_TRUE(fileExists("data/test_rename_empty.vdb"));
+    EXPECT_EQ(std::string("a"), readGridName("data/test_rename_empty.vdb"));
+    std::remove("data/test_rename_empty.vdb");
+
+    // swap actually reorders the stack: before the swap, age 0 is "b" (most
+    // recently added) and age 1 is "a"; after "-swap vdb=0,1" the names at
+    // those two ages must be exchanged.
+    std::remove("data/test_swap_0.vdb");
+    std::remove("data/test_swap_1.vdb");
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -sphere name=a dim=8 -sphere name=b dim=8"
+                          " -swap vdb=0,1"
+                          " -write vdb=0 keep=true data/test_swap_0.vdb"
+                          " -write vdb=1 data/test_swap_1.vdb");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    ASSERT_TRUE(fileExists("data/test_swap_0.vdb"));
+    ASSERT_TRUE(fileExists("data/test_swap_1.vdb"));
+    EXPECT_EQ(std::string("a"), readGridName("data/test_swap_0.vdb"));
+    EXPECT_EQ(std::string("b"), readGridName("data/test_swap_1.vdb"));
+    std::remove("data/test_swap_0.vdb");
+    std::remove("data/test_swap_1.vdb");
+
+    // swap requires exactly two distinct ages; a single-entry stack must be
+    // reported as a (non-fatal, by default) action error, not crash the run.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere name=a dim=8 -swap vdb=0,1");
+      EXPECT_NE(out.find("swap: skipping due to"), std::string::npos);
+    }
+
+    // Since -difference is not commutative (A-B != B-A), swapping the two
+    // inputs beforehand must change the result. Two overlapping, differently
+    // sized/offset spheres on a shared transform (same voxel size) so the
+    // difference is purely a CSG effect, not a levelSetRebuild side-effect.
+    auto activeVoxelsAfterDifference = [](const std::string& cmd, const std::string& path) {
+        auto args = getArgs(cmd);
+        Tool tool(int(args.size()), args.data());
+        tool.run();
+        openvdb::io::File f(path);
+        f.open();
+        auto grid = openvdb::gridPtrCast<openvdb::FloatGrid>(f.readGrid(f.beginName().gridName()));
+        f.close();
+        return grid ? grid->activeVoxelCount() : openvdb::Index64(0);
+    };
+    const std::string spheres = " -sphere name=a voxel=0.05 radius=1.0 center=(0,0,0)"
+                                 " -sphere name=b voxel=0.05 radius=0.6 center=(0.5,0,0)";
+    std::remove("data/test_csg_noswap.vdb");
+    std::remove("data/test_csg_swap.vdb");
+    const auto noSwapCount = activeVoxelsAfterDifference(
+        "vdb_tool -quiet" + spheres + " -difference -write vdb=0 data/test_csg_noswap.vdb",
+        "data/test_csg_noswap.vdb");
+    const auto swapCount = activeVoxelsAfterDifference(
+        "vdb_tool -quiet" + spheres + " -swap vdb=0,1 -difference -write vdb=0 data/test_csg_swap.vdb",
+        "data/test_csg_swap.vdb");
+    EXPECT_NE(noSwapCount, swapCount);
+    std::remove("data/test_csg_noswap.vdb");
+    std::remove("data/test_csg_swap.vdb");
+}// ActionRenameSwap
+
+TEST_F(Test_vdb_tool, ActionDiagnose)
+{
+    // -diagnose runs OpenVDB's built-in level-set/fog-volume checks. Build a
+    // level set with an invalid (non-positive) background directly, since
+    // that violates the level-set invariant checkLevelSet() looks for.
+    using namespace openvdb::vdb_tool;
+    using GridT = openvdb::FloatGrid;
+
+    {
+      GridT::Ptr bad = GridT::create(/*background=*/0.0f);
+      bad->setGridClass(openvdb::GRID_LEVEL_SET);
+      bad->setName("bad_ls");
+      openvdb::io::File("data/test_diagnose_bad.vdb").write({bad});
+    }
+
+    // Default (fatal=false): a failing grid is reported as FAILED, and the
+    // action does not escalate to an error.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -read data/test_diagnose_bad.vdb -diagnose");
+      EXPECT_NE(out.find("bad_ls] FAILED"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    // fatal=true: a failing grid raises internally, which Tool::run() (via
+    // the default non-fatal onActionError policy) reports as a skipped action.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -read data/test_diagnose_bad.vdb -diagnose fatal=true");
+      EXPECT_NE(out.find("diagnose: skipping due to: diagnose: one or more grids failed validation"), std::string::npos);
+    }
+
+    // A valid level set must pass, even with fatal=true.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere dim=32 -diagnose fatal=true");
+      EXPECT_NE(out.find("] OK"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    std::remove("data/test_diagnose_bad.vdb");
+}// ActionDiagnose
+
+TEST_F(Test_vdb_tool, ActionStats)
+{
+    // -stats must not silently skip non-FloatGrid value types: background is
+    // reported for any numeric grid type, not just FloatGrid.
+    using namespace openvdb::vdb_tool;
+
+    {
+      openvdb::Int32Grid::Ptr grid = openvdb::Int32Grid::create(/*background=*/7);
+      grid->setName("int_grid");
+      auto acc = grid->getAccessor();
+      acc.setValue(openvdb::Coord(0, 0, 0), 3);
+      acc.setValue(openvdb::Coord(1, 0, 0), 9);
+      openvdb::io::File("data/test_stats_int.vdb").write({grid});
+    }
+
+    std::ostringstream oss;
+    auto *old = std::clog.rdbuf(oss.rdbuf());
+    try {
+      auto args = getArgs("vdb_tool -quiet -read data/test_stats_int.vdb -stats");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+      std::clog.rdbuf(old);
+    } catch (...) {
+      std::clog.rdbuf(old);
+      throw;
+    }
+    const std::string out = oss.str();
+    // Background (7) must be printed; the old "(not a FloatGrid, skipped)"
+    // fallback must be gone.
+    EXPECT_NE(out.find("int_grid"), std::string::npos);
+    EXPECT_NE(out.find("7"), std::string::npos);
+    EXPECT_EQ(out.find("skipped"), std::string::npos);
+
+    std::remove("data/test_stats_int.vdb");
+}// ActionStats
+
+TEST_F(Test_vdb_tool, ActionCompositeDivide)
+{
+    // -divide computes A/B in place via tools::compDiv, which is plain
+    // floating-point division: division by zero yields +/-inf rather than
+    // throwing. Exercise both the ordinary and the zero-divisor case.
+    using namespace openvdb::vdb_tool;
+    using GridT = openvdb::FloatGrid;
+
+    auto readResult = [](const std::string& path) {
+        openvdb::io::File f(path);
+        f.open();
+        return openvdb::gridPtrCast<GridT>(f.readGrid(f.beginName().gridName()));
+    };
+
+    // (0,0,0): ordinary division. (1,0,0): active-zero divisor. (2,0,0): A is
+    // active but B is left untouched (inactive, so B contributes its 0.0f
+    // background) -- the "inactive-B-voxel" case called out in review.
+    {
+      GridT::Ptr a = GridT::create(0.0f);
+      a->setName("A");
+      auto aAcc = a->getAccessor();
+      aAcc.setValue(openvdb::Coord(0, 0, 0), 10.0f);
+      aAcc.setValue(openvdb::Coord(1, 0, 0), 4.0f);
+      aAcc.setValue(openvdb::Coord(2, 0, 0), 6.0f);
+      openvdb::io::File("data/test_div_a.vdb").write({a});
+
+      GridT::Ptr b = GridT::create(0.0f);
+      b->setName("B");
+      auto bAcc = b->getAccessor();
+      bAcc.setValue(openvdb::Coord(0, 0, 0), 2.0f);
+      bAcc.setValue(openvdb::Coord(1, 0, 0), 0.0f);
+      // (2,0,0) intentionally left inactive in B.
+      openvdb::io::File("data/test_div_b.vdb").write({b});
+    }
+
+    EXPECT_NO_THROW({
+      // Stack after both reads (top=most recent): [A, B] => age 0 = B, age 1 = A.
+      auto args = getArgs("vdb_tool -quiet -read data/test_div_a.vdb -read data/test_div_b.vdb"
+                          " -divide vdb=1,0"
+                          " -write vdb=0 data/test_div_out.vdb");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+
+    auto result = readResult("data/test_div_out.vdb");
+    ASSERT_TRUE(result != nullptr);
+    auto acc = result->getConstAccessor();
+    EXPECT_NEAR(5.0f, acc.getValue(openvdb::Coord(0, 0, 0)), 1e-5f);// 10/2
+    EXPECT_TRUE(std::isinf(acc.getValue(openvdb::Coord(1, 0, 0))));// 4/0 (active zero)
+    EXPECT_TRUE(std::isinf(acc.getValue(openvdb::Coord(2, 0, 0))));// 6/0 (inactive-B background)
+
+    std::remove("data/test_div_a.vdb");
+    std::remove("data/test_div_b.vdb");
+    std::remove("data/test_div_out.vdb");
+}// ActionCompositeDivide
+
+TEST_F(Test_vdb_tool, ActionMultiply)
+{
+    // -multiply computes A*B per voxel in place via tools::compMul.
+    using namespace openvdb::vdb_tool;
+    using GridT = openvdb::FloatGrid;
+
+    GridT::Ptr a = GridT::create(0.0f);
+    a->setName("A");
+    a->getAccessor().setValue(openvdb::Coord(0, 0, 0), 3.0f);
+    openvdb::io::File("data/test_mul_a.vdb").write({a});
+
+    GridT::Ptr b = GridT::create(0.0f);
+    b->setName("B");
+    b->getAccessor().setValue(openvdb::Coord(0, 0, 0), 7.0f);
+    openvdb::io::File("data/test_mul_b.vdb").write({b});
+
+    EXPECT_NO_THROW({
+      // Stack after both reads (top=most recent): [A, B] => age 0 = B, age 1 = A.
+      auto args = getArgs("vdb_tool -quiet -read data/test_mul_a.vdb -read data/test_mul_b.vdb"
+                          " -multiply vdb=1,0"
+                          " -write vdb=0 data/test_mul_out.vdb");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+
+    openvdb::io::File f("data/test_mul_out.vdb");
+    f.open();
+    auto result = openvdb::gridPtrCast<GridT>(f.readGrid(f.beginName().gridName()));
+    f.close();
+    ASSERT_TRUE(result != nullptr);
+    EXPECT_NEAR(21.0f, result->getConstAccessor().getValue(openvdb::Coord(0, 0, 0)), 1e-5f);// 3*7
+
+    std::remove("data/test_mul_a.vdb");
+    std::remove("data/test_mul_b.vdb");
+    std::remove("data/test_mul_out.vdb");
+}// ActionMultiply
 
 int main(int argc, char** argv)
 {
