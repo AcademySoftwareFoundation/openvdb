@@ -310,10 +310,7 @@ struct WeightPosSumsTransfer
         auto& leaf = this->mManager.leaf(idx);
 
         {
-            // @todo add API to get the array from the group handle. The handle
-            //   calls loadData but not expand.
             auto& array = leaf.attributeArray(this->mIndices.mEllipsesGroupIndex.first);
-            array.loadData(); // so we can call setUnsafe/getUnsafe
             array.expand();
         }
 

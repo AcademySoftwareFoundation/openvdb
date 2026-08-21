@@ -46,9 +46,6 @@ OPENVDB_API void initialize();
 OPENVDB_API void uninitialize();
 
 
-// foward declare some default types
-namespace io { class DelayedLoadMetadata; }
-
 /// Common tree types
 using BoolTree     = tree::Tree4<bool,        5, 4, 3>::Type;
 using DoubleTree   = tree::Tree4<double,      5, 4, 3>::Type;
@@ -222,8 +219,7 @@ using MetaTypes = TypeList<
     Vec4SMetadata,
     Vec4DMetadata,
     Mat4SMetadata,
-    Mat4DMetadata,
-    io::DelayedLoadMetadata>;
+    Mat4DMetadata>;
 
 
 } // namespace OPENVDB_VERSION_NAME

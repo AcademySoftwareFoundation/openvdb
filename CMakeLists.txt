@@ -84,7 +84,6 @@ option(OPENVDB_ENABLE_VEC_RELATIONAL_OPERATIONS [=[
 Enabled deprecated relational < and > operators on Vector types. This option
 will be switched to OFF and the feature will be subsequently removed in future
 releases.]=] ON)
-option(OPENVDB_USE_DELAYED_LOADING "Build the core OpenVDB library with delayed-loading." ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
@@ -264,7 +263,6 @@ mark_as_advanced(
   OPENVDB_BUILD_HOUDINI_ABITESTS
   OPENVDB_CXX_STRICT
   OPENVDB_ENABLE_RPATH
-  OPENVDB_USE_DELAYED_LOADING
   OPENVDB_FUTURE_DEPRECATION
   OPENVDB_SIMD
   SYSTEM_LIBRARY_PATHS

@@ -109,7 +109,6 @@ convertHoudiniToPointDataGrid(
 ///                        (empty vector defaults to all)
 /// @param  excludeGroups  a vector of VDB Points groups to be excluded
 ///                        (empty vector defaults to none)
-/// @param inCoreOnly      true if out-of-core leaf nodes are to be ignored
 OPENVDB_HOUDINI_API
 void
 convertPointDataGridToHoudini(
@@ -117,8 +116,7 @@ convertPointDataGridToHoudini(
     const openvdb::points::PointDataGrid& grid,
     const std::vector<std::string>& attributes = {},
     const std::vector<std::string>& includeGroups = {},
-    const std::vector<std::string>& excludeGroups = {},
-    const bool inCoreOnly = false);
+    const std::vector<std::string>& excludeGroups = {});
 
 
 /// @brief Populate VDB Points grid metadata from Houdini detail attributes

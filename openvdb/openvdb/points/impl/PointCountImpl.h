@@ -17,16 +17,14 @@ namespace points {
 template <typename PointDataTreeT, typename FilterT>
 Index64 pointCount(const PointDataTreeT& tree,
                    const FilterT& filter,
-                   const bool inCoreOnly,
                    const bool threaded)
 {
     using LeafManagerT = tree::LeafManager<const PointDataTreeT>;
     using LeafRangeT = typename LeafManagerT::LeafRange;
 
     auto countLambda =
-        [&filter, &inCoreOnly] (const LeafRangeT& range, Index64 sum) -> Index64 {
+        [&filter] (const LeafRangeT& range, Index64 sum) -> Index64 {
             for (const auto& leaf : range) {
-                if (inCoreOnly && leaf.buffer().isOutOfCore())  continue;
                 auto state = filter.state(leaf);
                 if (state == index::ALL) {
                     sum += leaf.pointCount();
@@ -49,10 +47,20 @@ Index64 pointCount(const PointDataTreeT& tree,
 
 
 template <typename PointDataTreeT, typename FilterT>
+OPENVDB_DEPRECATED_MESSAGE("Use pointCount() without inCoreOnly parameter instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+Index64 pointCount(const PointDataTreeT& tree,
+                   const FilterT& filter,
+                   const bool /*inCoreOnly*/,
+                   const bool threaded)
+{
+    return pointCount(tree, filter, threaded);
+}
+
+
+template <typename PointDataTreeT, typename FilterT>
 Index64 pointOffsets(   std::vector<Index64>& pointOffsets,
                         const PointDataTreeT& tree,
                         const FilterT& filter,
-                        const bool inCoreOnly,
                         const bool threaded)
 {
     using LeafT = typename PointDataTreeT::LeafNodeType;
@@ -67,8 +75,7 @@ Index64 pointOffsets(   std::vector<Index64>& pointOffsets,
 
     LeafManagerT leafManager(tree);
     leafManager.foreach(
-        [&pointOffsets, &filter, &inCoreOnly](const LeafT& leaf, size_t pos) {
-            if (inCoreOnly && leaf.buffer().isOutOfCore())  return;
+        [&pointOffsets, &filter](const LeafT& leaf, size_t pos) {
             auto state = filter.state(leaf);
             if (state == index::ALL) {
                 pointOffsets[pos] = leaf.pointCount();
@@ -87,6 +94,18 @@ Index64 pointOffsets(   std::vector<Index64>& pointOffsets,
     }
 
     return pointOffset;
+}
+
+
+template <typename PointDataTreeT, typename FilterT>
+OPENVDB_DEPRECATED_MESSAGE("Use pointOffsets() without inCoreOnly parameter instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+Index64 pointOffsets(   std::vector<Index64>& pointOffsets,
+                        const PointDataTreeT& tree,
+                        const FilterT& filter,
+                        const bool /*inCoreOnly*/,
+                        const bool threaded)
+{
+    return pointOffsets(pointOffsets, tree, filter, threaded);
 }
 
 

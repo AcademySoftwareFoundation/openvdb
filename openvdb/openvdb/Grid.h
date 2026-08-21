@@ -9,6 +9,7 @@
 #include "Types.h"
 #include "io/io.h"
 #include "math/Transform.h"
+#include "tree/LeafManager.h"
 #include "tree/Tree.h"
 #include "util/Assert.h"
 #include "util/logging.h"
@@ -457,12 +458,12 @@ public:
     virtual void readBuffers(std::istream&) = 0;
     /// Read all of this grid's data buffers that intersect the given index-space bounding box.
     virtual void readBuffers(std::istream&, const CoordBBox&) = 0;
-    /// @brief Read all of this grid's data buffers that are not yet resident in memory
-    /// (because delayed loading is in effect).
-    /// @details If this grid was read from a memory-mapped file, this operation
-    /// disconnects the grid from the file.
-    /// @sa io::File::open, io::MappedFile
+
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     virtual void readNonresidentBuffers() const = 0;
+#endif
+
     /// Write out all data buffers for this grid.
     virtual void writeBuffers(std::ostream&) const = 0;
 
@@ -941,12 +942,12 @@ public:
     void readBuffers(std::istream&) override;
     /// Read all of this grid's data buffers that intersect the given index-space bounding box.
     void readBuffers(std::istream&, const CoordBBox&) override;
-    /// @brief Read all of this grid's data buffers that are not yet resident in memory
-    /// (because delayed loading is in effect).
-    /// @details If this grid was read from a memory-mapped file, this operation
-    /// disconnects the grid from the file.
-    /// @sa io::File::open, io::MappedFile
-    void readNonresidentBuffers() const override;
+
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    void readNonresidentBuffers() const override { }
+#endif
+
     /// Write out all data buffers for this grid.
     void writeBuffers(std::ostream&) const override;
 
@@ -1183,14 +1184,34 @@ struct TreeAdapter<tree::ValueAccessor<_TreeType> >
 ////////////////////////////////////////
 
 
+namespace points {
+
+template<typename T, Index Log2Dim> class PointDataLeafNode;
+
+/// @brief Type trait that evaluates to true only for @c PointDataLeafNode instantiations.
+template<typename T>
+struct IsPointDataLeafNode : std::false_type {};
+
+template<typename T, Index Log2Dim>
+struct IsPointDataLeafNode<PointDataLeafNode<T, Log2Dim>> : std::true_type {};
+
+} // namespace points
+
+
 /// @brief Metafunction that specifies whether a given leaf node, tree, or grid type
-/// requires multiple passes to read and write voxel data
-/// @details Multi-pass I/O allows one to optimize the data layout of leaf nodes
-/// for certain access patterns during delayed loading.
-/// @sa io::MultiPass
+/// requires multiple passes to read and write voxel data.
+/// @details Multi-pass I/O allows leaf nodes to optimize their serialization layout
+/// for delayed-load access patterns. Only @c PointDataLeafNode supports multi-pass I/O.
+/// Defining a custom leaf node that inherits @c io::PointDataGridMultiPass is no longer permitted.
+/// @sa points::IsPointDataLeafNode
 template<typename LeafNodeType>
 struct HasMultiPassIO {
-    static const bool value = std::is_base_of<io::MultiPass, LeafNodeType>::value;
+    static_assert(
+        !std::is_base_of<io::PointDataGridMultiPass, LeafNodeType>::value
+        || points::IsPointDataLeafNode<LeafNodeType>::value,
+        "Only PointDataLeafNode may inherit from io::PointDataGridMultiPass; "
+        "use points::IsPointDataLeafNode to test for multi-pass I/O support.");
+    static const bool value = points::IsPointDataLeafNode<LeafNodeType>::value;
 };
 
 // Partial specialization for Tree types
@@ -1612,6 +1633,28 @@ inline void
 Grid<TreeT>::readTopology(std::istream& is)
 {
     tree().readTopology(is, saveFloatAsHalf());
+    // When called from the legacy (non-codec) TopologyOnly path, the stream
+    // metadata carries a flag requesting that leaf buffers be allocated and
+    // filled with the background value (PartialCreate leaves them
+    // unallocated after readTopology).
+    if (io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is)) {
+        if (meta->allocateLeafBuffers()) {
+            meta->setAllocateLeafBuffers(false);
+            if constexpr (!std::is_void_v<typename TreeT::LeafNodeType>) {
+                const auto background = tree().root().background();
+                tree::LeafManager<TreeT> leafManager(tree());
+                leafManager.foreach([&background](auto& leaf, size_t) {
+                    using LeafType = std::decay_t<decltype(leaf)>;
+                    if constexpr (!std::is_same_v<typename LeafType::ValueType, bool>) {
+                        if (leaf.buffer().empty()) {
+                            leaf.buffer().allocate();
+                            leaf.buffer().fill(background);
+                        }
+                    }
+                });
+            }
+        }
+    }
 }
 
 
@@ -1669,14 +1712,6 @@ Grid<TreeT>::readBuffers(std::istream& is, const CoordBBox& bbox)
         // so instead clip afterwards.
         tree().clip(bbox);
     }
-}
-
-
-template<typename TreeT>
-inline void
-Grid<TreeT>::readNonresidentBuffers() const
-{
-    tree().readNonresidentBuffers();
 }
 
 

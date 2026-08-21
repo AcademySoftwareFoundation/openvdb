@@ -61,8 +61,18 @@ public:
     /// written out separately.
     void writeStreamPos(std::ostream&) const;
 
+    /// @brief Read this descriptor's header information (all data except for
+    /// stream offsets) from the given stream.
+    void readHeader(std::istream&);
+
+    /// @brief Read stream positions (grid, block, and end offsets) from the
+    /// given stream.
+    void readStreamPos(std::istream&);
+
     /// @brief Read a grid descriptor from the given stream.
     /// @return an empty grid of the type specified by the grid descriptor.
+    /// @deprecated Use readHeader() followed by readStreamPos() instead.
+    OPENVDB_DEPRECATED_MESSAGE("Use readHeader() followed by readStreamPos() instead.")
     GridBase::Ptr read(std::istream&);
 
     /// @brief Append the number @a n to the given name (separated by an ASCII
