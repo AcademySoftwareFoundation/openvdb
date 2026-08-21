@@ -197,7 +197,7 @@ struct pointer_traits {
 template<typename Vec3T>
 __hostdev__ inline static void worldToVoxel(Vec3u8 &voxel, const Vec3T &world, const Map &indexToWorld)
 {
-    const Vec3d ijk = indexToWorld.applyInverseMap(world);// world -> index
+    const Vec3d ijk = Vec3d(indexToWorld.applyInverseMap(world));// world -> index
     static constexpr double encode = double((1<<8) - 1);
     voxel[0] = uint8_t( encode*(ijk[0] - math::Floor(ijk[0] + 0.5) + 0.5) );
     voxel[1] = uint8_t( encode*(ijk[1] - math::Floor(ijk[1] + 0.5) + 0.5) );
@@ -212,7 +212,7 @@ __hostdev__ inline static void worldToVoxel(Vec3u8 &voxel, const Vec3T &world, c
 template<typename Vec3T>
 __hostdev__ inline static void worldToVoxel(Vec3u16 &voxel, const Vec3T &world, const Map &indexToWorld)
 {
-    const Vec3d ijk = indexToWorld.applyInverseMap(world);// world -> index
+    const Vec3d ijk = Vec3d(indexToWorld.applyInverseMap(world));// world -> index
     static constexpr double encode = double((1<<16) - 1);
     voxel[0] = uint16_t( encode*(ijk[0] - math::Floor(ijk[0] + 0.5) + 0.5) );
     voxel[1] = uint16_t( encode*(ijk[1] - math::Floor(ijk[1] + 0.5) + 0.5) );
@@ -227,7 +227,7 @@ __hostdev__ inline static void worldToVoxel(Vec3u16 &voxel, const Vec3T &world, 
 template<typename Vec3T>
 __hostdev__ inline static void worldToVoxel(Vec3f &voxel, const Vec3T &world, const Map &indexToWorld)
 {
-    const Vec3d ijk = indexToWorld.applyInverseMap(world);// world -> index
+    const Vec3d ijk = Vec3d(indexToWorld.applyInverseMap(world));// world -> index
     voxel[0] = float( ijk[0] - math::Floor(ijk[0] + 0.5) );
     voxel[1] = float( ijk[1] - math::Floor(ijk[1] + 0.5) );
     voxel[2] = float( ijk[2] - math::Floor(ijk[2] + 0.5) );
