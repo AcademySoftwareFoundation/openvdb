@@ -263,8 +263,12 @@ GridHandle<BufferT>::GridHandle(T&& buffer)
     }
 }// GridHandle(T&& buffer) for single-space device buffers
 
-// Dummy function that ensures instantiation of the move-constructor above when BufferT=cuda::DeviceBuffer
-namespace {auto __dummy(){return GridHandle<cuda::DeviceBuffer>(std::move(cuda::DeviceBuffer()));}}
+// Emit the dual-buffer move constructor from every CUDA translation unit, so
+// host-only translation units that construct GridHandle<cuda::DeviceBuffer>
+// (they see only the declaration) always find the symbol at link time. An
+// unused private function is not enough: the optimizer may drop the
+// complete-object constructor it instantiates.
+template GridHandle<cuda::DeviceBuffer>::GridHandle(cuda::DeviceBuffer&&);
 
 } // namespace nanovdb
 
