@@ -413,6 +413,11 @@ template<typename BuildT> void defineNodeManager(nb::module_& m, const char* nam
 
 void defineNodeManagerHandle(nb::module_& m);
 void defineCreateNodeManager(nb::module_& m);
+#ifdef NANOVDB_USE_CUDA
+// Device-side NodeManagerHandle + createDeviceNodeManager, registered on the
+// nanovdb.cuda submodule (defined in cuda/PyDeviceNodeManager.cu).
+void defineDeviceNodeManager(nb::module_& m);
+#endif
 
 // -------------------- grid.leaf_values() bulk extractor --------------------
 //
@@ -439,7 +444,7 @@ struct PyLeafValuesBinder<BuildT,
         using GridT = nanovdb::NanoGrid<BuildT>;
         using LeafT = nanovdb::NanoLeaf<BuildT>;
         using ValueT = typename LeafT::ValueType;
-        cls.def("leaf_values",
+        cls.def("leafValues",
             [](nb::handle py_self) -> nb::object {
                 auto& grid = nb::cast<GridT&>(py_self);
                 const auto& tree = grid.tree();

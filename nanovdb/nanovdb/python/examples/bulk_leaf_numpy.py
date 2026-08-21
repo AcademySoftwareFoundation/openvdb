@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Bulk per-leaf value access as a zero-copy NumPy array.
 
-grid.leaf_values() is the highest-bandwidth path from NanoVDB into
+grid.leafValues() is the highest-bandwidth path from NanoVDB into
 NumPy. It returns an (N_leaves, 512) view of every leaf's mValues
 without copying — modify it, slice it, feed it into a PyTorch tensor,
 hash it for cache lookup, whatever you need.
@@ -21,18 +21,18 @@ def main():
 
     # Build a fog volume sphere with stats so the leaves have meaningful
     # min/max attached (just for the printing below — not required by
-    # leaf_values itself).
+    # leafValues itself).
     handle = nanovdb.tools.createFogVolumeSphere(
         radius=20.0, name="bulk_demo")
     grid = handle.grid()
     print(f"Grid: {grid.gridType()}, active voxels = {grid.activeVoxelCount()}, "
           f"leaves = {grid.tree().nodeCount(0)}")
 
-    # leaf_values() is the zero-copy view. Modifying it modifies the grid.
-    bulk = grid.leaf_values()
+    # leafValues() is the zero-copy view. Modifying it modifies the grid.
+    bulk = grid.leafValues()
     # np.asarray adds a NumPy wrapper but doesn't copy.
     arr = np.asarray(bulk)
-    print(f"leaf_values: shape={arr.shape}, dtype={arr.dtype}, "
+    print(f"leafValues: shape={arr.shape}, dtype={arr.dtype}, "
           f"backed by grid memory (no copy).")
 
     # Global statistics across every voxel in every leaf, computed in C.
