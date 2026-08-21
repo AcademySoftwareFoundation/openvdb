@@ -109,8 +109,11 @@ public:
     /// @param firstOffset  Sequential index of the first voxel covered by this VBM
     /// @param lastOffset   Sequential index of the last voxel covered by this VBM
     /// @param leafCount    Number of leaf nodes in the source grid, or 0 if unknown.
-    ///                     Caching it here lets device rebuilds skip reading it back
-    ///                     from device memory (which would synchronize the stream).
+    ///                     A launch-sizing hint: caching it lets device rebuilds skip
+    ///                     reading it back from device memory (which would synchronize
+    ///                     the stream). The device build kernel bounds-checks against
+    ///                     the grid's own node count, so a stale value affects launch
+    ///                     geometry only, never correctness.
     VoxelBlockManagerHandle(BufferT&& firstLeafID, BufferT&& jumpMap,
         uint64_t blockCount, uint64_t firstOffset, uint64_t lastOffset,
         uint32_t leafCount = 0)
@@ -194,7 +197,8 @@ public:
     uint32_t leafCount() const { return mLeafCount; }
 
     /// @brief Caches the number of leaf nodes in the source grid, so device rebuilds
-    ///        need not read it back from device memory
+    ///        need not read it back from device memory. A launch-sizing hint only;
+    ///        a stale value cannot affect the correctness of a rebuild.
     void setLeafCount(uint32_t leafCount) { mLeafCount = leafCount; }
 
     /// @brief Returns a non-const pointer to the firstLeafID host-side data
