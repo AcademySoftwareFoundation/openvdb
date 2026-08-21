@@ -2594,6 +2594,83 @@ TEST(TestNanoVDBCUDA, cudaAddBlindData)
     for (size_t i=0; i<num_points; ++i) EXPECT_EQ(blind2[i], dataPtr2[i]);
 }// cudaAddBlindData
 
+TEST(TestNanoVDBCUDA, cudaAddBlindDataFromMultiGridSource)
+{
+    using BufferT = nanovdb::cuda::DeviceBuffer;
+    // two grids merged into one device buffer give source grids whose headers
+    // carry a non-trivial grid index/count, which the output must not inherit
+    std::vector<nanovdb::GridHandle<BufferT>> handles;
+    handles.emplace_back(nanovdb::tools::createLevelSetSphere<float, BufferT>(20, nanovdb::Vec3d(0), 1, 3, nanovdb::Vec3d(0), "a"));
+    handles.emplace_back(nanovdb::tools::createLevelSetSphere<float, BufferT>(30, nanovdb::Vec3d(0), 1, 3, nanovdb::Vec3d(0), "b"));
+    for (auto &h : handles) h.deviceUpload();
+    auto merged = nanovdb::cuda::mergeGridHandles<BufferT, std::vector>(handles);
+    EXPECT_EQ(2u, merged.gridCount());
+
+    const size_t num_values = 2;
+    float *d_blind = nullptr, blind[num_values] = {1.2f, 3.0f};
+    cudaCheck(cudaMalloc(&d_blind, num_values * sizeof(float)));
+    cudaCheck(cudaMemcpy(d_blind, blind, num_values * sizeof(float), cudaMemcpyHostToDevice));
+    for (uint32_t n = 0; n < merged.gridCount(); ++n) {// source header: mGridIndex=n, mGridCount=2
+        auto *d_grid = merged.deviceGrid<float>(n);
+        EXPECT_TRUE(d_grid);
+        auto out = nanovdb::tools::cuda::addBlindData(d_grid, d_blind, num_values);
+        EXPECT_EQ(1u, out.gridCount());
+        out.deviceDownload();
+        auto *gridData = out.gridData();
+        EXPECT_TRUE(gridData);
+        EXPECT_EQ(0u, gridData->mGridIndex);
+        EXPECT_EQ(1u, gridData->mGridCount);
+        auto *grid = out.grid<float>();
+        EXPECT_TRUE(grid);
+        EXPECT_EQ(1u, grid->blindDataCount());
+    }
+    cudaCheck(cudaFree(d_blind));
+}// cudaAddBlindDataFromMultiGridSource
+
+TEST(TestNanoVDBCUDA, cudaIndexToGridFromMultiGridSource)
+{
+    using BufferT = nanovdb::cuda::DeviceBuffer;
+    auto floatHdl = nanovdb::tools::createLevelSetSphere<float, nanovdb::HostBuffer>(20, nanovdb::Vec3d(0), 1, 3, nanovdb::Vec3d(0), "sphere");
+    auto *floatGrid = floatHdl.grid<float>();
+    EXPECT_TRUE(floatGrid);
+    std::vector<nanovdb::GridHandle<BufferT>> idxHandles;
+    idxHandles.emplace_back(nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, nanovdb::ValueIndex, BufferT>(*floatGrid, 0u, false, false));
+    idxHandles.emplace_back(nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, nanovdb::ValueIndex, BufferT>(*floatGrid, 0u, false, false));
+    auto *idxGrid = idxHandles[0].grid<nanovdb::ValueIndex>();
+    EXPECT_TRUE(idxGrid);
+
+    // host-side value list for the (identical) index grids
+    std::vector<float> values(idxGrid->valueCount(), 0.0f);
+    values[0] = floatGrid->tree().root().background();
+    auto acc = floatGrid->getAccessor();
+    for (auto it = floatGrid->indexBBox().begin(); it; ++it) {
+        const uint64_t idx = idxGrid->tree().getValue(*it);
+        if (idx > 0) values[idx] = acc.getValue(*it);
+    }
+    float *d_values = nullptr;
+    cudaCheck(cudaMalloc(&d_values, values.size() * sizeof(float)));
+    cudaCheck(cudaMemcpy(d_values, values.data(), values.size() * sizeof(float), cudaMemcpyHostToDevice));
+
+    for (auto &h : idxHandles) h.deviceUpload();
+    auto merged = nanovdb::cuda::mergeGridHandles<BufferT, std::vector>(idxHandles);
+    EXPECT_EQ(2u, merged.gridCount());
+    for (uint32_t n = 0; n < merged.gridCount(); ++n) {// source header: mGridIndex=n, mGridCount=2
+        auto *d_idxGrid = merged.deviceGrid<nanovdb::ValueIndex>(n);
+        EXPECT_TRUE(d_idxGrid);
+        auto out = nanovdb::tools::cuda::indexToGrid<float>(d_idxGrid, d_values);
+        EXPECT_EQ(1u, out.gridCount());
+        out.deviceDownload();
+        auto *gridData = out.gridData();
+        EXPECT_TRUE(gridData);
+        EXPECT_EQ(0u, gridData->mGridIndex);
+        EXPECT_EQ(1u, gridData->mGridCount);
+        auto *outGrid = out.grid<float>();
+        EXPECT_TRUE(outGrid);
+        EXPECT_EQ(floatGrid->indexBBox(), outGrid->indexBBox());
+    }
+    cudaCheck(cudaFree(d_values));
+}// cudaIndexToGridFromMultiGridSource
+
 TEST(TestNanoVDBCUDA, testGridHandleCopy)
 {
     auto cudaHandle = nanovdb::tools::createLevelSetSphere<float, nanovdb::cuda::DeviceBuffer>(100);

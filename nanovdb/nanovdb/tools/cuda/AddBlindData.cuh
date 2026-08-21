@@ -117,6 +117,8 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
     // increment grid size and blind data counter in output grid
     util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__(size_t) {
         auto &grid = *reinterpret_cast<NanoGrid<BuildT>*>(d_data);
+        grid.mGridIndex = 0u; // Possibly overwriting input; returned grid has batch size 1
+        grid.mGridCount = 1u;
         grid.mBlindMetadataCount += 1;
         grid.mBlindMetadataOffset = d_tmp[GRID];
         auto *meta = util::PtrAdd<GridBlindMetaData>(d_data, grid.mBlindMetadataOffset);// points to first blind meta data
