@@ -3,7 +3,9 @@
 
 #if defined(NANOVDB_USE_OPENVDB)
 
+#ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
+#endif
 #include <cmath>
 #include <chrono>
 

@@ -18,6 +18,7 @@
 #define NANOVDB_TOOLS_CUDA_ADDBLINDDATA_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>
+#include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/util/cuda/Util.h>
@@ -34,6 +35,7 @@ namespace tools::cuda {// ============================================
 /// @tparam BuildT Build type of the grid
 /// @tparam BlindDataT Type of the blind data
 /// @tparam BufferT Type of the buffer used for allocation
+/// @tparam ResourceT Template type of optional resource used for internal temporary memory
 /// @param d_grid Pointer to device grid
 /// @param d_blindData Pointer to device blind data
 /// @param valueCount number of values in the blind data
@@ -43,7 +45,7 @@ namespace tools::cuda {// ============================================
 /// @param pool optional pool used for allocation
 /// @param stream optional CUDA stream (defaults to CUDA stream 0)
 /// @return GridHandle with blind data appended
-template<typename BuildT, typename BlindDataT, typename BufferT = nanovdb::cuda::DeviceBuffer>
+template<typename BuildT, typename BlindDataT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 GridHandle<BufferT>
 addBlindData(const NanoGrid<BuildT> *d_grid,
              const BlindDataT *d_blindData,
@@ -60,11 +62,16 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
     //        old grid    old meta   new meta    old data    new data
 
     static_assert(BufferTraits<BufferT>::hasDeviceDual, "Expected BufferT to support device allocation");
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "addBlindData allocates stream-ordered scratch and requires an AsyncResource");
 
     // extract byte sizes of the grid, blind meta data and blind data
     enum {GRID=0, META=1, DATA=2, CHECKSUM=3};
-    uint64_t tmp[4], *d_tmp;
-    cudaCheck(util::cuda::mallocAsync((void**)&d_tmp, 4*sizeof(uint64_t), stream));
+    using ScratchT = nanovdb::cuda::Buffer<uint64_t, nanovdb::cuda::ResourceRef<ResourceT>>;
+    auto &resource = nanovdb::cuda::default_resource<ResourceT>();
+    uint64_t tmp[4];
+    ScratchT tmpBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 4, nanovdb::cuda::noInit);
+    uint64_t *d_tmp = tmpBuf.data();
     util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__(size_t) {
         if (auto count  = d_grid->blindDataCount()) {
             d_tmp[GRID] = util::PtrDiff(&d_grid->blindMetaData(0), d_grid);
@@ -116,7 +123,7 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
         for (uint32_t i=0, n=grid.mBlindMetadataCount-1; i<n; ++i, ++meta) meta->mDataOffset += sizeof(GridBlindMetaData);
         grid.mGridSize += sizeof(GridBlindMetaData) + meta->blindDataSize();// expansion with 32 byte alignment
     }); cudaCheckError();
-    cudaCheck(util::cuda::freeAsync(d_tmp, stream));
+    tmpBuf.destroy(stream);
 
     Checksum cs(tmp[CHECKSUM]);
     cuda::updateChecksum(reinterpret_cast<GridData*>(d_data), cs.mode(), stream);

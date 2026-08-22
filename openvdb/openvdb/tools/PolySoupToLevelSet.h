@@ -105,7 +105,7 @@ polySoupToLevelSet(
 /// @param bbox       Bounding box of the vertices of the polygon mesh
 /// @param vtx        Vector of world space vertex positions
 /// @param tri        Vector of triangle indices
-/// @param quads      Vector of quad indices
+/// @param quad       Vector of quad indices
 /// @param D          Functor mapping voxel size to maximum allowed surface deformation
 ///                   allowed by shrink wrapping as a function of the voxel size
 /// @param halfWidth  Half the width of the narrow band, in voxel units
@@ -140,7 +140,7 @@ polySoupToLevelSet(
 /// @param bbox         bounding box of the vertices of the polygon mesh
 /// @param vtx          vector of world space vertex positions
 /// @param tri          vector of triangle indies
-/// @param quads        vector of quad indices
+/// @param quad         vector of quad indices
 /// @param D            functor mapping voxel size to maximum allowed surface deformation
 ///                     allowed by shrink wrapping as a function of the voxel size
 /// @param halfWidth    half the width of the narrow band, in voxel units
@@ -285,6 +285,15 @@ PolySoupToLevelSet<GridType>::PolySoupToLevelSet(PolySoup &&poly, int dim, float
         OPENVDB_THROW(ArithmeticError, "polySoupToLevelSet: computed voxel size is not "
             "finite and positive (is dim too small for the given halfWidth?)");
     }
+    // The coarse-to-fine hierarchy in process() requires at least two resolution
+    // levels: the finest (dx = mMinVoxelSize) and one coarser (dx = 2*mMinVoxelSize).
+    // A single level would skip all upsample/shrinkWrap iterations and return only
+    // the raw coarse offset, defeating the purpose of the algorithm. The bound is
+    // therefore mMaxVoxelSize/2, not mMaxVoxelSize. Enforced here as an assert
+    // rather than a throw because a violation always reflects a bad constructor
+    // argument (geometry too small for the requested voxel size or dim), not a
+    // recoverable runtime condition. process() separately guards against the
+    // stricter mMinVoxelSize > mMaxVoxelSize case with an explicit throw.
     OPENVDB_ASSERT(2*mMinVoxelSize <= mMaxVoxelSize);
 }// tools::PolySoupToLevelSet::PolySoupToLevelSet()
 
@@ -314,6 +323,9 @@ PolySoupToLevelSet<GridType>::PolySoupToLevelSet(PolySoup &&poly, float voxelSiz
     if (!math::isFinite(mMaxVoxelSize) || !(mMaxVoxelSize > 0.0f)) {
         OPENVDB_THROW(ArithmeticError, "polySoupToLevelSet: computed voxel size is not finite and positive");
     }
+    // See note in the dim-based constructor above: the bound is mMaxVoxelSize/2
+    // (not mMaxVoxelSize) because one hierarchy level is not enough. Here that
+    // means voxelSize must not exceed maxLength/4 = mMaxVoxelSize/2.
     OPENVDB_ASSERT(2*mMinVoxelSize <= mMaxVoxelSize);
 }// tools::PolySoupToLevelSet::PolySoupToLevelSet()
 
@@ -329,6 +341,17 @@ void PolySoupToLevelSet<GridType>::process(const ShrinkWrapT &D, ProgressT *prog
     for (float dx = mMinVoxelSize; dx <= mMaxVoxelSize; dx *= 2.0f) {
         myProgress("Offset: dx=" + std::to_string(dx)+", range: "+std::to_string(mMinVoxelSize)+" -> "+std::to_string(mMaxVoxelSize));
         mGrids.push_back(this->offset(dx, offset_mode));
+    }
+
+    // The loop above produces no grids when mMinVoxelSize > mMaxVoxelSize (i.e. the
+    // requested voxel size exceeds maxLength/2, half the largest bounding-box
+    // dimension). Guard against that here: mGrids.back() below is otherwise
+    // undefined behaviour on an empty vector and crashes in optimized builds.
+    if (mGrids.empty()) {
+        OPENVDB_THROW(ValueError, "PolySoupToLevelSet::process: voxel size (" +
+            std::to_string(mMinVoxelSize) + ") is too large for this mesh; it must not "
+            "exceed maxLength/2 = " + std::to_string(mMaxVoxelSize) +
+            " (half the largest bounding-box dimension)");
     }
 
     // Coarse to fine shrink wrap algorithm

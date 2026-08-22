@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
-/// @file openvdb/version.h
+/// @file openvdb/version.h.in
 /// @brief Library and file format version numbers
 ///
 /// @details
