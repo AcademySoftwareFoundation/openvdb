@@ -3573,6 +3573,34 @@ TEST_F(Test_vdb_tool, ActionStats)
     EXPECT_EQ(out.find("skipped"), std::string::npos);
 
     std::remove("data/test_stats_int.vdb");
+
+    // A grid with no active voxels has no min/max/mean/stddev; -stats must
+    // print "(empty)" rather than the +-inf/NaN sentinels math::Stats
+    // initializes to when nothing was ever added to it.
+    {
+      openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(0.0f);
+      grid->setName("empty_grid");
+      openvdb::io::File("data/test_stats_empty.vdb").write({grid});
+    }
+
+    std::ostringstream oss2;
+    auto *old2 = std::clog.rdbuf(oss2.rdbuf());
+    try {
+      auto args = getArgs("vdb_tool -quiet -read data/test_stats_empty.vdb -stats");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+      std::clog.rdbuf(old2);
+    } catch (...) {
+      std::clog.rdbuf(old2);
+      throw;
+    }
+    const std::string out2 = oss2.str();
+    EXPECT_NE(out2.find("empty_grid"), std::string::npos);
+    EXPECT_NE(out2.find("(empty)"), std::string::npos);
+    EXPECT_EQ(out2.find("inf"), std::string::npos);
+    EXPECT_EQ(out2.find("nan"), std::string::npos);
+
+    std::remove("data/test_stats_empty.vdb");
 }// ActionStats
 
 TEST_F(Test_vdb_tool, ActionCompositeDivide)

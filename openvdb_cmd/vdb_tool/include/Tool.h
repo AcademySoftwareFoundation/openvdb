@@ -1683,8 +1683,15 @@ void Tool::stats()
     std::stringstream ss;
     ss << std::fixed << std::setprecision(6);
     auto printFromStats = [&](const math::Stats& s) {
-      ss << std::setw(w) << s.min() << std::setw(w) << s.max()
-         << std::setw(w) << s.mean() << std::setw(w) << s.stdDev();
+      // An empty grid (no active voxels) has no min/max/mean/stddev to report;
+      // math::Stats would otherwise print the ±inf/NaN sentinels it initializes to.
+      if (s.size() == 0) {
+        ss << std::setw(w) << "(empty)" << std::setw(w) << "(empty)"
+           << std::setw(w) << "(empty)" << std::setw(w) << "(empty)";
+      } else {
+        ss << std::setw(w) << s.min() << std::setw(w) << s.max()
+           << std::setw(w) << s.mean() << std::setw(w) << s.stdDev();
+      }
     };
     if      (auto p = gridPtrCast<FloatGrid>(base))  printFromStats(tools::statistics(p->cbeginValueOn()));
     else if (auto p = gridPtrCast<DoubleGrid>(base)) printFromStats(tools::statistics(p->cbeginValueOn()));
