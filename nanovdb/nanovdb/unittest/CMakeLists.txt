@@ -63,10 +63,34 @@ if(NANOVDB_USE_CUDA)
   set_target_properties(nanovdb_test_cuda_memory_resource PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   add_test(nanovdb_cuda_memory_resource_unit_test nanovdb_test_cuda_memory_resource)
 
+  add_executable(nanovdb_test_cuda_util "TestUtilCuda.cu")
+  target_link_libraries(nanovdb_test_cuda_util PRIVATE nanovdb GTest::GTest GTest::Main)
+  set_target_properties(nanovdb_test_cuda_util PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+  add_test(nanovdb_cuda_util_unit_test nanovdb_test_cuda_util)
+
+  # Same tests with every allocation forced through cudaMalloc/cudaFree --
+  # the configuration a pool-less vGPU relies on.
+  add_executable(nanovdb_test_cuda_util_sync "TestUtilCuda.cu")
+  target_compile_definitions(nanovdb_test_cuda_util_sync PRIVATE NANOVDB_USE_SYNC_CUDA_MALLOC)
+  target_link_libraries(nanovdb_test_cuda_util_sync PRIVATE nanovdb GTest::GTest GTest::Main)
+  set_target_properties(nanovdb_test_cuda_util_sync PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+  add_test(nanovdb_cuda_util_sync_unit_test nanovdb_test_cuda_util_sync)
   add_executable(nanovdb_test_cuda_buffer "TestBuffer.cu")
   target_link_libraries(nanovdb_test_cuda_buffer PRIVATE nanovdb GTest::GTest GTest::Main)
   set_target_properties(nanovdb_test_cuda_buffer PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   add_test(nanovdb_cuda_buffer_unit_test nanovdb_test_cuda_buffer)
+
+  if(WIN32)
+    # gtest's TEST macro declares each test's static test_info_ member with an
+    # unused-attribute on GCC/Clang but not under MSVC, so for tests defined
+    # inside an anonymous namespace the CUDA front end can prove it
+    # unreferenced and reports #177, which NANOVDB_CUDA_WERROR promotes to an
+    # error. Suppress #177 for the CUDA test sources that use that style.
+    foreach(_cuda_gtest nanovdb_test_cuda_buffer nanovdb_test_cuda_memory_resource
+            nanovdb_test_cuda_util nanovdb_test_cuda_util_sync)
+      target_compile_options(${_cuda_gtest} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:--diag-suppress=177>")
+    endforeach()
+  endif()
 endif()
 
 # -----------------------------------------------------------------------------

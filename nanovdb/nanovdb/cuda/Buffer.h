@@ -50,7 +50,7 @@ struct StreamHolder<true> { cudaStream_t mStream = 0; };
 ///         is_resource). When @c R provides both interfaces the stream-ordered
 ///         one is used.
 /// @details With a stream-ordered resource the Buffer retains the stream of
-///          the most recent allocation (or the one supplied via setStream)
+///          the most recent allocation (or the one supplied via set_stream)
 ///          and orders its deallocation on that stream. Buffer is move-only.
 template<typename T, typename R = DeviceResource>
 class Buffer : private detail::StreamHolder<is_async_resource<R>::value>
@@ -62,6 +62,18 @@ class Buffer : private detail::StreamHolder<is_async_resource<R>::value>
 
     static constexpr bool IsAsync = is_async_resource<R>::value;
 
+public:
+    /// @brief Element and resource types, for generic code that rebinds one
+    ///        or constructs sibling buffers over the same resource.
+    using ElementType  = T;
+    using ResourceType = R;
+
+    /// @brief Alias for a sibling buffer over the same resource with a
+    ///        different element type.
+    template<typename U>
+    using rebind = Buffer<U, R>;
+
+private:
     R      mResource;
     T*     mData = nullptr;
     size_t mSize = 0; // element count
@@ -133,7 +145,7 @@ public:
     Buffer& operator=(Buffer&& other) noexcept
     {
         if (this != &other) {
-            this->clear();
+            this->destroy();
             static_cast<detail::StreamHolder<IsAsync>&>(*this) = other;
             mResource = std::move(other.mResource);
             mData = other.mData;
@@ -156,6 +168,11 @@ public:
         return out;
     }
 
+    /// @brief Returns a deep copy of this buffer ordered on the retained
+    ///        stream, i.e. copy(this->stream()).
+    template<typename S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
+    Buffer copy() const { return this->copy(this->stream()); }
+
     /// @brief Returns a deep copy of this buffer, allocated from a copy of the
     ///        synchronous resource.
     template<typename S = R, std::enable_if_t<!is_async_resource<S>::value && is_resource<S>::value, int> = 0>
@@ -168,7 +185,7 @@ public:
 
     /// @brief D-tor. A stream-ordered resource frees on the retained stream;
     ///        a synchronous resource frees immediately.
-    ~Buffer() { this->clear(); }
+    ~Buffer() { this->destroy(); }
 
     /// @brief Returns the retained stream, i.e. the stream the buffer's memory
     ///        will be freed on.
@@ -179,9 +196,11 @@ public:
     ///        deallocation (and destruction) is ordered on @c stream instead.
     /// @param stream cuda stream subsequent deallocation is ordered on
     /// @warning The caller is responsible for ordering @c stream after any
-    ///          in-flight work that uses the buffer's memory.
+    ///          in-flight work that uses the buffer's memory. This deliberately
+    ///          does not synchronize, matching cuda::buffer's set_stream, which
+    ///          avoids implicit synchronization in fundamental primitives.
     template<typename S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
-    void setStream(cudaStream_t stream) { this->mStream = stream; }
+    void set_stream(cudaStream_t stream) { this->mStream = stream; }
 
     /// @brief Resizes the buffer to @c count elements, preserving the leading
     ///        min(old, new) elements. Every operation — the new allocation, the
@@ -219,7 +238,7 @@ public:
             mSize = count;
         }
         else {
-            this->mStream = stream; // no reallocation: setStream semantics
+            this->mStream = stream; // no reallocation: set_stream semantics
         }
     }
 
@@ -253,6 +272,13 @@ public:
     T*       data()       { return mData; }
     const T* data() const { return mData; }
 
+    /// @brief Returns a copy of the resource; for a ResourceRef this refers
+    ///        to the same underlying instance.
+    /// @note Requires R to be copy-constructible (the cuda::mr convention:
+    ///       resources are cheap handles). A resource that owns its pool by
+    ///       value hands the caller an independent copy of that pool.
+    R resource() const { return mResource; }
+
     /// @brief Returns the number of elements.
     size_t size() const { return mSize; }
 
@@ -263,11 +289,48 @@ public:
     bool empty() const { return mSize == 0; }
 
     /// @brief Frees the buffer memory (if any) and resets to the empty state.
-    void clear()
+    ///        A stream-ordered resource frees on the retained stream.
+    /// @note Spelled destroy to match cuda::buffer. This is the name to use.
+    void destroy()
     {
         this->deallocate(mData, mSize);
         mData = nullptr;
         mSize = 0;
+    }
+
+    /// @brief Frees the buffer memory (if any) and resets to the empty state.
+    /// @deprecated Use destroy(). Documentation-level only for now: the
+    ///             [[deprecated]] attribute would fire from GridHandle::reset
+    ///             and NodeManager::reset, which must keep calling clear()
+    ///             until every buffer type provides destroy().
+    /// @note Transitional, and not the name to use: it exists only because
+    ///       GridHandle::reset still calls clear() on its buffer. It goes away
+    ///       when the legacy dual buffers do and GridHandle moves to destroy().
+    void clear() { this->destroy(); }
+
+    /// @brief Frees the buffer memory (if any) on @c stream and resets to the
+    ///        empty state. @c stream becomes the retained stream.
+    /// @param stream cuda stream the deallocation is ordered on
+    /// @warning The caller is responsible for ordering @c stream after any
+    ///          in-flight work that uses the buffer's memory.
+    template<typename S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
+    void destroy(cudaStream_t stream)
+    {
+        this->mStream = stream;
+        this->destroy();
+    }
+
+    /// @brief Exchanges the contents of this buffer with @c other. Neither
+    ///        buffer allocates, frees, or copies element data.
+    /// @param other buffer to exchange contents with
+    void swap(Buffer& other) noexcept
+    {
+        auto& lhs = static_cast<detail::StreamHolder<IsAsync>&>(*this);
+        auto& rhs = static_cast<detail::StreamHolder<IsAsync>&>(other);
+        std::swap(lhs, rhs);
+        std::swap(mResource, other.mResource);
+        std::swap(mData, other.mData);
+        std::swap(mSize, other.mSize);
     }
 
 private:
@@ -362,6 +425,40 @@ public:
 }; // BufferView<T> class
 
 } // namespace cuda
+
+// Primary template defined in HostBuffer.h; declared here so this header
+// stays self-contained without pulling in the host-buffer machinery.
+template<typename BufferT>
+struct BufferTraits;
+
+/// @brief GridHandle support for the single-space cuda::Buffer: the buffer
+///        owns exactly one allocation, resident on the device, so the handle
+///        parses metadata through a device read and exposes only the device
+///        accessors. Requires byte-addressed storage.
+/// @note This trait doubles as the definition of the single-space
+///       device-buffer concept: a buffer whose BufferTraits specialization
+///       sets hasDeviceSingle guarantees ElementType and ResourceType
+///       typedefs, data(), size() and size_bytes() (byte-addressed elements,
+///       enforced by the consumer), resource(), copy(), clear(), and stream()
+///       when the resource is stream-ordered. Any consumer of hasDeviceSingle
+///       may rely on exactly this interface and nothing more; in particular,
+///       scratch allocates through resource() as a cuda::Buffer, so a
+///       conforming buffer never needs to be constructible by a consumer.
+template<typename T, typename R>
+struct BufferTraits<cuda::Buffer<T, R>>
+{
+    static constexpr bool hasDeviceDual   = false;
+    // Device-resident storage; the byte-addressed requirement is enforced by
+    // the single-space GridHandle constructor, so trait queries stay
+    // answerable for any element type.
+    static constexpr bool hasDeviceSingle = !cuda::is_host_accessible_resource<R>::value;
+    // A buffer over a host-accessible resource (e.g. PinnedResource) is
+    // host-readable, but GridHandle's host paths also require the create()
+    // static interface and byte-count size semantics that cuda::Buffer does
+    // not provide -- GridHandle rejects such buffers with a named error until
+    // that adaptation lands.
+    static constexpr bool hasHostSingle   = cuda::is_host_accessible_resource<R>::value;
+};
 
 } // namespace nanovdb
 
