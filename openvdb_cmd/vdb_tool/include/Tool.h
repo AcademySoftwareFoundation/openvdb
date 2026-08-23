@@ -227,6 +227,9 @@ private:
     /// @brief Print value statistics (min, max, mean, std. dev.) for VDB grids on the stack.
     void stats();
 
+    /// @brief Print an ASCII bar histogram of the active values of VDB grids on the stack.
+    void histogram();
+
     /// @brief Rename a VDB grid and/or Geometry on the stack by age index.
     void rename();
 
@@ -1188,6 +1191,16 @@ void Tool::init()
      [](){}, [&](){this->stats();});
 
   mParser.addAction(
+      {"histogram", "hist"}, "Print an ASCII bar histogram of the distribution of active values for one or more VDB grids",
+     {{"vdb",  "*",  "*|0|0,1,2", "comma-separated age indices of VDB grids to analyze, or \"*\" for all (default)"},
+      {"bins", "10", "10|20|50",  "number of histogram bins (defaults to 10)"},
+      {"min",  "",   "0.0",       "lower bound of the histogram range (defaults to the grid's smallest active value)"},
+      {"max",  "",   "1.0",       "upper bound of the histogram range (defaults to the grid's largest active value)"},
+      {"cols", "40", "40",        "width in characters of the longest bar (defaults to 40)"},
+      {"log",  "false", "1|0|true|false", "use a logarithmic scale for the bar lengths, which makes highly peaked distributions (common for level sets and fog volumes) readable. Defaults to false, i.e. a linear scale"}},
+     [](){}, [&](){this->histogram();});
+
+  mParser.addAction(
       {"version"}, "write timing information to the terminal", {},
       [&](){std::clog << mCmdName << ": version " << Tool::version() << std::endl;std::exit(EXIT_SUCCESS);}, [](){});
 
@@ -1723,6 +1736,132 @@ void Tool::stats()
     std::clog << "\n";
   }
 }// Tool::stats
+
+// ==============================================================================================================
+
+void Tool::histogram()
+{
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "histogram");
+  mParser.printAction();
+  const std::string vdb_str = mParser.get<std::string>("vdb");
+  const std::string min_str = mParser.get<std::string>("min");
+  const std::string max_str = mParser.get<std::string>("max");
+  const int  bins   = mParser.get<int>("bins");
+  const int  cols   = mParser.get<int>("cols");
+  const bool useLog = mParser.get<bool>("log");
+
+  if (bins < 1) throw std::invalid_argument("histogram: \"bins\" must be at least 1, got "+std::to_string(bins));
+  if (cols < 1) throw std::invalid_argument("histogram: \"cols\" must be at least 1, got "+std::to_string(cols));
+  // An explicit range is optional: either bound may be given on its own, in which
+  // case the other is still derived from the grid's own extrema.
+  const bool hasMin = !min_str.empty(), hasMax = !max_str.empty();
+  const double userMin = hasMin ? mParser.get<double>("min") : 0.0;
+  const double userMax = hasMax ? mParser.get<double>("max") : 0.0;
+  if (hasMin && hasMax && userMin >= userMax) {
+    throw std::invalid_argument("histogram: \"min\" must be less than \"max\", got min="+min_str+" max="+max_str);
+  }
+
+  std::vector<GridBase::Ptr> grids;
+  std::vector<int> ages;
+  if (vdb_str == "*") {
+    int age = 0;
+    for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it, ++age) {
+      grids.push_back(*it);
+      ages.push_back(age);
+    }
+  } else {
+    for (int a : mParser.getVec<int>("vdb")) {
+      if (size_t(a) >= mGrid.size())
+        throw std::out_of_range("histogram: vdb index " + std::to_string(a) +
+                                " is out of range (stack size " + std::to_string(mGrid.size()) + ")");
+      grids.push_back(*this->getGrid(a));
+      ages.push_back(a);
+    }
+  }
+
+  if (grids.empty()) { std::clog << "histogram: no grids on stack\n"; return; }
+
+  // Bin the active values of one typed grid. Returns null when there is nothing to
+  // plot, in which case @a n distinguishes the two degenerate cases for the caller:
+  // n==0 means no active voxels at all, whereas n>0 with lo>=hi means every active
+  // voxel shares a single value (tools::histogram requires a non-empty range).
+  auto build = [&](const auto &grid, double &lo, double &hi, uint64_t &n)
+      -> std::unique_ptr<math::Histogram> {
+    const math::Extrema ex = tools::extrema(grid.cbeginValueOn());
+    n = ex.size();
+    if (n == 0) return nullptr;
+    lo = hasMin ? userMin : ex.min();
+    hi = hasMax ? userMax : ex.max();
+    if (lo >= hi) return nullptr;
+    return std::make_unique<math::Histogram>(
+        tools::histogram(grid.cbeginValueOn(), lo, hi, static_cast<size_t>(bins)));
+  };
+
+  // Every value below is printed with an explicit format, since the per-bin rows
+  // switch std::clog to fixed/low precision and that state would otherwise leak
+  // into the next grid's summary line (and into whatever action runs next).
+  const std::ios_base::fmtflags oldFlags = std::clog.flags();
+  const std::streamsize oldPrecision = std::clog.precision();
+  auto summaryFmt = [](std::ostream &os) -> std::ostream& {
+    return os << std::defaultfloat << std::setprecision(6);
+  };
+
+  for (size_t i = 0; i < grids.size(); ++i) {
+    auto &base = grids[i];
+    if (i) std::clog << "\n";
+    std::clog << "histogram: [" << ages[i] << "] \"" << base->getName() << "\" ("
+              << base->valueType() << ")\n";
+
+    double lo = 0.0, hi = 0.0;
+    uint64_t n = 0;
+    std::unique_ptr<math::Histogram> hist;
+    if      (auto p = gridPtrCast<FloatGrid>(base))  hist = build(*p, lo, hi, n);
+    else if (auto p = gridPtrCast<DoubleGrid>(base)) hist = build(*p, lo, hi, n);
+    else if (auto p = gridPtrCast<Int32Grid>(base))  hist = build(*p, lo, hi, n);
+    else if (auto p = gridPtrCast<Int64Grid>(base))  hist = build(*p, lo, hi, n);
+    else if (auto p = gridPtrCast<BoolGrid>(base))   hist = build(*p, lo, hi, n);
+    else {
+      std::clog << "  (not a scalar numeric grid, skipped)\n";
+      continue;
+    }
+    if (n == 0)   { std::clog << "  (no active voxels)\n"; continue; }
+    if (!hist)    { summaryFmt(std::clog) << "  all " << n << " active voxels have the constant value "
+                                          << lo << "\n"; continue; }
+    if (hist->size() == 0) {// every value fell outside an explicitly requested range
+      summaryFmt(std::clog) << "  none of the " << n << " active voxels fall within the requested range ["
+                            << lo << ", " << hi << "]\n";
+      continue;
+    }
+
+    uint64_t peak = 0;
+    for (size_t b = 0; b < hist->numBins(); ++b) peak = std::max(peak, hist->count(b));
+
+    summaryFmt(std::clog) << "  " << hist->size() << " of " << n << " active voxels in "
+                          << hist->numBins() << " bins over [" << lo << ", " << hi << "]"
+                          << (useLog ? ", log scale" : "") << "\n";
+
+    for (size_t b = 0; b < hist->numBins(); ++b) {
+      const uint64_t c = hist->count(b);
+      // Scale bars against the tallest bin so the plot always spans "cols" characters.
+      // log1p keeps empty bins at zero length while compressing very peaked
+      // distributions (common for level sets and fog volumes) into a readable range.
+      int len = 0;
+      if (peak > 0 && c > 0) {
+        const double frac = useLog ? std::log1p(double(c)) / std::log1p(double(peak))
+                                   : double(c) / double(peak);
+        len = std::max(1, static_cast<int>(frac * cols + 0.5));
+      }
+      std::clog << "  [" << std::right << std::setw(12) << std::fixed << std::setprecision(4) << hist->min(int(b))
+                << ", " << std::setw(12) << hist->max(int(b))
+                << (b + 1 == hist->numBins() ? "] " : ") ")
+                << std::setw(10) << c << " "
+                << std::setw(5) << std::setprecision(1) << (100.0 * double(c) / double(hist->size())) << "% "
+                << std::defaultfloat << std::string(size_t(len), '#') << "\n";
+    }
+  }
+  std::clog.flags(oldFlags);
+  std::clog.precision(oldPrecision);
+}// Tool::histogram
 
 // ==============================================================================================================
 

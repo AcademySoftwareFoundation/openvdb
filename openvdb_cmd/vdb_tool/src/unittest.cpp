@@ -3696,6 +3696,104 @@ TEST_F(Test_vdb_tool, ActionMultiply)
     std::remove("data/test_mul_out.vdb");
 }// ActionMultiply
 
+TEST_F(Test_vdb_tool, ActionHistogram)
+{
+    // -histogram bins the active values of a grid and renders an ASCII bar chart.
+    using namespace openvdb::vdb_tool;
+
+    // A fog volume is the important case: its interior is exactly its maximum
+    // value, and every one of those voxels lands on the histogram's upper bound.
+    // (That used to overflow math::Histogram's bin array -- see TestStats.cc.)
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=32 -ls2fog -histogram bins=4");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("4 bins over"), std::string::npos);
+      EXPECT_NE(out.find("#"), std::string::npos);// at least one bar was drawn
+      // The last bin is inclusive ("]"), every other bin half-open (")").
+      EXPECT_NE(out.find("]"), std::string::npos);
+    }
+
+    // Bin counts must sum to the reported sample total.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=32 -histogram bins=5");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("5 bins over"), std::string::npos);
+    }
+
+    // A constant-valued grid has no range to bin, and must say so rather than
+    // throwing out of math::Histogram (which requires min < max).
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=16 -forOnValues v=1 -histogram");
+      EXPECT_NE(out.find("constant value"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    // Non-scalar grids are skipped with a note, not an error.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=16 -grad -histogram vdb=0");
+      EXPECT_NE(out.find("not a scalar numeric grid"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    // An explicit range clips the data, and the summary reports how many of the
+    // active voxels actually fell inside it.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=32 -ls2fog -histogram bins=2 min=0.9 max=1.0");
+      EXPECT_NE(out.find("2 bins over [0.9, 1]"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+    {// a range that excludes everything is reported, not silently empty
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=16 -ls2fog -histogram min=5 max=6");
+      EXPECT_NE(out.find("none of the"), std::string::npos);
+    }
+
+    // Degenerate bins/cols and an inverted range are rejected with clear errors.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere dim=16 -histogram bins=0");
+      EXPECT_NE(out.find("\"bins\" must be at least 1"), std::string::npos);
+    }
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere dim=16 -histogram cols=0");
+      EXPECT_NE(out.find("\"cols\" must be at least 1"), std::string::npos);
+    }
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere dim=16 -histogram min=1 max=0");
+      EXPECT_NE(out.find("\"min\" must be less than \"max\""), std::string::npos);
+    }
+
+    // An out-of-range age is reported like every other action's vdb= handling.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere dim=16 -histogram vdb=7");
+      EXPECT_NE(out.find("is out of range"), std::string::npos);
+    }
+
+    // With no grids on the stack the action is a no-op, not an error.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -histogram");
+      EXPECT_NE(out.find("no grids on stack"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    // Per-bin rows switch std::clog to fixed/low precision; that must not leak
+    // into the next grid's summary line (whose range must match its own bin edges).
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=32 name=a -sphere r=2 dim=32 name=b"
+          " -histogram vdb=* bins=2");
+      EXPECT_NE(out.find("\"a\""), std::string::npos);
+      EXPECT_NE(out.find("\"b\""), std::string::npos);
+      // Six significant digits in both summaries, i.e. not truncated to "[-0.2, 0.2]".
+      EXPECT_NE(out.find("over [-0.230769,"), std::string::npos);
+      EXPECT_NE(out.find("over [-0.461538,"), std::string::npos);
+    }
+}// ActionHistogram
+
 int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);

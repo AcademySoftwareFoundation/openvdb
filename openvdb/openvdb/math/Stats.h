@@ -309,7 +309,13 @@ public:
     inline bool add(double val, uint64_t n = 1)
     {
         if (val<mMin || val>mMax) return false;
-        mBins[size_t(mDelta*(val-mMin))] += n;
+        // Clamp the bin index to the last bin. The range test above admits values up
+        // to mMax, which is the upper bound plus a small epsilon, so a sample equal
+        // to (or within the epsilon of) that bound scales to exactly numBins -- one
+        // past the end of mBins. That is trivially reached in practice, e.g. by
+        // tools::histogram() over a fog volume whose interior is exactly its maximum.
+        const size_t i = size_t(mDelta*(val-mMin));
+        mBins[i < mBins.size() ? i : mBins.size()-1] += n;
         mSize += n;
         return true;
     }
