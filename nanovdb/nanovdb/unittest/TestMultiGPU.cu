@@ -71,6 +71,46 @@ TEST(TestNanoVDBMultiGPU, RadixSort)
     }
 }
 
+/// @brief Tests the merge path split for empty partitions. An empty side
+///        yields a trivial split where everything up to the diagonal comes
+///        from the non-empty side. Runs on a single GPU.
+TEST(TestNanoVDBMultiGPU, MergePathEmptyPartition)
+{
+    using KeyT = int;
+    constexpr size_t count = 4;
+    KeyT* keys = nullptr;
+    cudaCheck(cudaMallocManaged(&keys, 2 * count * sizeof(KeyT)));
+    for (size_t i = 0; i < count; ++i) keys[i] = 10 * (int(i) + 1);              // 10 20 30 40
+    for (size_t i = 0; i < count; ++i) keys[count + i] = 10 * (int(i) + 1) + 5;  // 15 25 35 45
+    ptrdiff_t* intervals = nullptr;
+    cudaCheck(cudaMallocManaged(&intervals, 2 * sizeof(ptrdiff_t)));
+
+    const auto expectMergePath = [&](const KeyT* keys1, size_t keys1Count,
+                                     const KeyT* keys2, size_t keys2Count,
+                                     size_t diagonal, ptrdiff_t expected1, ptrdiff_t expected2) {
+        intervals[0] = intervals[1] = -1;
+        nanovdb::tools::cuda::kernels::mergePathKernel<<<1, 1>>>(keys1, keys1Count, keys2, keys2Count, intervals, intervals + 1, diagonal);
+        cudaCheck(cudaDeviceSynchronize());
+        EXPECT_EQ(intervals[0], expected1);
+        EXPECT_EQ(intervals[1], expected2);
+    };
+
+    // With an empty right partition, all elements come from keys1.
+    expectMergePath(keys, count, keys + count, 0, count / 2, ptrdiff_t(count / 2), ptrdiff_t(0));
+
+    // With an empty left partition, all elements come from keys2.
+    expectMergePath(keys, 0, keys + count, count, count / 2, ptrdiff_t(0), ptrdiff_t(count / 2));
+
+    // Both partitions empty.
+    expectMergePath(keys, 0, keys + count, 0, 0, ptrdiff_t(0), ptrdiff_t(0));
+
+    // Merged head is 10 15 20 25, so the median splits both arrays at 2.
+    expectMergePath(keys, count, keys + count, count, count, ptrdiff_t(2), ptrdiff_t(2));
+
+    cudaCheck(cudaFree(intervals));
+    cudaCheck(cudaFree(keys));
+}
+
 /// @brief Tests the correctness of multi-GPU exclusive sums against an equivalent CPU implementation
 TEST(TestNanoVDBMultiGPU, ExclusiveSum)
 {
@@ -200,6 +240,51 @@ TEST(TestNanoVDBMultiGPU, InclusiveSum)
         cudaEventDestroy(preEvents[deviceId]);
     }
 }
+
+/// @brief Tests multi-GPU creation of a grid containing a single voxel
+TEST(TestNanoVDBMultiGPU, SingleVoxel_DistributedCudaPointsToGrid_UnifiedBuffer)
+{
+    int current = 0;
+    cudaCheck(cudaGetDevice(&current));
+
+    using BufferT = nanovdb::cuda::UnifiedBuffer;
+    using BuildT = nanovdb::ValueOnIndex;
+    const size_t voxelCount = 1;
+    nanovdb::Coord* voxels = nullptr;
+    const size_t voxelSize = voxelCount * sizeof(nanovdb::Coord);
+    cudaCheck(cudaMallocManaged(&voxels, voxelSize));
+    voxels[0] = nanovdb::Coord(1, 2, 3);
+
+    nanovdb::cuda::DeviceMesh deviceMesh;
+    nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
+    auto handle = converter.getHandle(voxels, voxelCount, BufferT());
+
+    EXPECT_TRUE(handle.deviceData());// grid exists on the GPU
+    EXPECT_TRUE(handle.deviceGrid<BuildT>());
+    EXPECT_FALSE(handle.deviceGrid<int>(0));
+    EXPECT_TRUE(handle.deviceGrid<BuildT>(0));
+    EXPECT_FALSE(handle.deviceGrid<BuildT>(1));
+    EXPECT_TRUE(handle.data());// grid also exists on the CPU
+
+    auto* grid = handle.grid<BuildT>();// grid also exists on the CPU
+    ASSERT_TRUE(grid);
+    handle.deviceDownload();// creates a copy on the CPU
+    EXPECT_TRUE(handle.deviceData());
+    EXPECT_TRUE(handle.data());
+    auto* data = handle.gridData();
+    EXPECT_TRUE(data);
+    grid = handle.grid<BuildT>();
+    ASSERT_TRUE(grid);
+    EXPECT_EQ(1u, grid->activeVoxelCount());
+    EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
+
+    auto acc = grid->getAccessor();
+    EXPECT_TRUE(acc.isActive(voxels[0]));
+    EXPECT_GT(acc.getValue(voxels[0]), 0u);
+
+    cudaCheck(cudaFree(voxels));
+    cudaSetDevice(current); // restore device so subsequent tests don't fail
+}// SingleVoxel_DistributedCudaPointsToGrid_UnifiedBuffer
 
 /// @brief Tests multi-GPU creation of grids for a single dense leaf
 TEST(TestNanoVDBMultiGPU, DenseLeaf_DistributedCudaPointsToGrid_UnifiedBuffer)

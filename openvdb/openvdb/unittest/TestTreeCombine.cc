@@ -102,14 +102,6 @@ inline float mulf(float a, float b) { return a * b; }
 inline float divf(float a, float b) { return a / b; }
 
 inline openvdb::Vec3f orderv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a+100.0f*b; }
-inline openvdb::Vec3f maxv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) {
-    const float aMag = a.lengthSqr(), bMag = b.lengthSqr();
-    return (aMag > bMag ? a : (bMag > aMag ? b : std::max(a, b)));
-}
-inline openvdb::Vec3f minv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) {
-    const float aMag = a.lengthSqr(), bMag = b.lengthSqr();
-    return (aMag < bMag ? a : (bMag < aMag ? b : std::min(a, b)));
-}
 inline openvdb::Vec3f sumv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a + b; }
 inline openvdb::Vec3f mulv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a * b; }
 inline openvdb::Vec3f divv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a / b; }
@@ -131,14 +123,14 @@ TEST_F(TestTreeCombine, testCombine)
 TEST_F(TestTreeCombine, testCompMax)
 {
     testComp<openvdb::FloatTree>(Local::compMax<openvdb::FloatTree>, Local::maxf);
-    testComp<openvdb::VectorTree>(Local::compMax<openvdb::VectorTree>, Local::maxv);
+    testComp<openvdb::VectorTree>(Local::compMax<openvdb::VectorTree>, openvdb::tools::composite::max<openvdb::VectorTree::ValueType>);
 }
 
 
 TEST_F(TestTreeCombine, testCompMin)
 {
     testComp<openvdb::FloatTree>(Local::compMin<openvdb::FloatTree>, Local::minf);
-    testComp<openvdb::VectorTree>(Local::compMin<openvdb::VectorTree>, Local::minv);
+    testComp<openvdb::VectorTree>(Local::compMin<openvdb::VectorTree>, openvdb::tools::composite::min<openvdb::VectorTree::ValueType>);
 }
 
 

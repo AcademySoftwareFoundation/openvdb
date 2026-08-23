@@ -36,6 +36,7 @@
 #include <GA/GA_AIFTuple.h>
 #include <GA/GA_AttributeFilter.h>
 #include <GA/GA_ElementWrangler.h>
+#include <GA/GA_GBMacros.h>
 #include <GA/GA_Handle.h>
 #include <GA/GA_PageHandle.h>
 #include <GA/GA_PageIterator.h>
@@ -47,6 +48,7 @@
 #include <UT/UT_MemoryCounter.h>
 #include <UT/UT_ParallelUtil.h>
 #include <UT/UT_UniquePtr.h>
+#include <UT/UT_JSONValue.h>
 
 #include <UT/UT_Singleton.h>
 
@@ -182,6 +184,77 @@ GU_PrimVDB::buildFromGridAdapter(GU_Detail& gdp, void* gridPtr,
     }
     return vdb;
 }
+
+GEO_PrimVDB *
+GU_PrimVDB::buildFromVDB(GU_Detail *gdp, UT_SharedPtr<const IMX_VDB> vdb)
+{
+    return buildFromVDB(gdp, std::const_pointer_cast<IMX_VDB>(vdb));
+}
+
+GEO_PrimVDB *
+GU_PrimVDB::buildFromVDB(GU_Detail *gdp, UT_SharedPtr<IMX_VDB> src)
+{
+    GU_PrimVDB *vdb = GU_PrimVDB::build(gdp);
+
+    UT_ASSERT(src && !src->isDirty());
+    if (!src || src->isDirty())
+        return vdb;
+
+    GEO_VolumeVis vis = GEO_VOLUMEVIS_SMOKE;
+    GEO_VolumeTypeInfo typeinfo = GEO_VOLUMETYPEINFO_NONE;
+
+    switch (src->typeInfo())
+    {
+        case IMX_TypeInfo::IMX_INVALID:
+        case IMX_TypeInfo::IMX_NONE:
+            typeinfo = GEO_VOLUMETYPEINFO_NONE;
+            break;
+        case IMX_TypeInfo::IMX_COLOR:
+            typeinfo = GEO_VOLUMETYPEINFO_COLOR;
+            break;
+        case IMX_TypeInfo::IMX_POSITION:
+            typeinfo = GEO_VOLUMETYPEINFO_POSITION;
+            break;
+        case IMX_TypeInfo::IMX_VECTOR:
+            typeinfo = GEO_VOLUMETYPEINFO_VECTOR;
+            break;
+        case IMX_TypeInfo::IMX_NORMAL:
+            typeinfo = GEO_VOLUMETYPEINFO_NORMAL;
+            break;
+        case IMX_TypeInfo::IMX_OFFSETNORMAL:
+            typeinfo = GEO_VOLUMETYPEINFO_OFFSETNORMAL;
+            break;
+        case IMX_TypeInfo::IMX_TEXTURE_COORD:
+            typeinfo = GEO_VOLUMETYPEINFO_TEXTURE_COORD;
+            break;
+        case IMX_TypeInfo::IMX_ID:
+            typeinfo = GEO_VOLUMETYPEINFO_ID;
+            break;
+        case IMX_TypeInfo::IMX_MASK:
+            typeinfo = GEO_VOLUMETYPEINFO_MASK;
+            break;
+        case IMX_TypeInfo::IMX_SDF:
+            // Switch to SDF for sdf.
+            vis = GEO_VOLUMEVIS_ISO;
+            typeinfo = GEO_VOLUMETYPEINFO_SDF;
+            break;
+        case IMX_TypeInfo::IMX_HEIGHT:
+            // Height field doesn't make sense for VDB.
+            // vis = GEO_VOLUMEVIS_HEIGHTFIELD;
+            typeinfo = GEO_VOLUMETYPEINFO_HEIGHT;
+            break;
+    }
+
+    vdb->setVisualization(vis, 0, 1);
+    vdb->setTypeInfo(typeinfo);
+    vdb->setBorrowedIMXVDB(src);
+    GA_Offset primoffset  = vdb->getMapOffset();
+    gdp->createAttributesFromOptions(src->properties().options(),
+                                     GA_ATTRIB_PRIMITIVE, primoffset);
+
+    return vdb;
+}
+
 
 int64
 GU_PrimVDB::getMemoryUsage() const
@@ -352,8 +425,8 @@ public:
     {
         if (myProgress.wasInterrupted())
             return;
-        UT_IF_ASSERT(int old_count = myGrid->activeVoxelCount();)
-        UT_IF_ASSERT(int other_count = other.myGrid->activeVoxelCount();)
+        UT_IF_ASSERT(exint old_count = myGrid->activeVoxelCount();)
+        UT_IF_ASSERT(exint other_count = other.myGrid->activeVoxelCount();)
         myGrid->merge(*other.myGrid);
         UT_ASSERT(myGrid->activeVoxelCount() == old_count + other_count);
     }
@@ -1943,6 +2016,42 @@ static void
 setStrAttr(GEO_Detail& geo, GA_AttributeOwner owner, GA_Offset elem,
     const char* name, const openvdb::Metadata& meta_base)
 {
+    if (UT_StringWrap(name).startsWith("dict_"))
+    {
+        // Construct a dictionary by loading the string.
+        UT_StringHolder         basename(name);
+        basename.substitute("dict_", "", 1);
+
+        GA_RWHandleDict handle(&geo, owner, basename);
+        if (!handle.isValid())
+        {
+            geo.addDictTuple(owner, basename, 1);
+            handle.bind(&geo, owner, basename);
+            if (!handle.isValid())
+                return;
+        }
+
+        const MetadataT& meta = static_cast<const MetadataT&>(meta_base);
+        const char *dictstring = MetaTuple<const char *, MetadataT, 0>::get(meta);
+        UT_OptionsHolder        dict;
+        if (dictstring)
+        {
+            dict.update([&](UT_Options &local)
+            {
+                UT_AutoJSONParser   r(dictstring, strlen(dictstring));
+                UT_JSONValue value;
+                value.parseValue(*r);
+                if (value.getMap())
+                {
+                    local.load(*value.getMap(), /*do_clear*/true,
+                               /*allow_Type*/true, /*allow_dict*/ true);
+                }
+            });
+        }
+
+        handle.set(elem, 0, dict);
+        return;
+    }
     GA_RWHandleS handle(&geo, owner, name);
     if (!handle.isValid())
     {
@@ -2291,8 +2400,26 @@ GU_PrimVDB::createMetadataFromAttrsAdapter(
             break;
         }
 
+        case GA_STORECLASS_DICT: {
+            GA_ROHandleDict handle(attrib);
+            if (entries == 1 && handle.isValid()) {
+                meta_map.removeMeta(name);
+                UT_OptionsHolder dict = handle.get(element);
+                UT_WorkBuffer    buf;
+                UT_AutoJSONWriter w(buf);
+                w->setPrettyPrint(false);
+                w->setPrettyCompact(true);
+                dict.options()->save(w, /*compact=*/false);
+                UT_StringHolder prefixed(name);
+                prefixed.prepend("dict_");
+                meta_map.insertMeta((const char *) prefixed, StringMetadata(buf.buffer()));
+            } else {
+                // @todo Add warning.
+            }
+            break;
+        }
+
         case GA_STORECLASS_INVALID: break;
-        case GA_STORECLASS_DICT: break;
         case GA_STORECLASS_OTHER: break;
         }
     }

@@ -132,7 +132,11 @@ gridToPositions(const PointDataGrid::Ptr& points, bool sort = true)
         }
     }
 
-    if (sort)   std::sort(positions.begin(), positions.end());
+    if (sort) {
+        std::sort(positions.begin(), positions.end(), [](auto a, auto b) {
+            return openvdb::math::cwiseLessThan(a,b);
+        });
+    }
     return positions;
 }
 
@@ -146,7 +150,10 @@ applyOffset(const std::vector<Vec3s>& positions, const Vec3s& offset)
         newPositions.emplace_back(it + offset);
     }
 
-    std::sort(newPositions.begin(), newPositions.end());
+    std::sort(newPositions.begin(), newPositions.end(), [](auto a, auto b) {
+        return openvdb::math::cwiseLessThan(a,b);
+    });
+
     return newPositions;
 }
 
@@ -492,7 +499,10 @@ TEST_F(TestPointMove, testMoveLocal)
         std::vector<Vec3s> desiredPositions(positions);
         desiredPositions[2] = Vec3s(positions[2] + offset);
 
-        std::sort(desiredPositions.begin(), desiredPositions.end());
+        std::sort(desiredPositions.begin(), desiredPositions.end(),
+            [](auto a, auto b) {
+                return openvdb::math::cwiseLessThan(a,b);
+            });
 
         PointDataGrid::Ptr points = positionsToGrid(positions, voxelSize);
 
@@ -635,7 +645,10 @@ TEST_F(TestPointMove, testMoveGlobal)
         std::vector<Vec3s> desiredPositions(positions);
         desiredPositions[2] = Vec3s(positions[2] + offset);
 
-        std::sort(desiredPositions.begin(), desiredPositions.end());
+        std::sort(desiredPositions.begin(), desiredPositions.end(),
+            [](auto a, auto b) {
+                return openvdb::math::cwiseLessThan(a,b);
+            });
 
         PointDataGrid::Ptr points = positionsToGrid(positions, voxelSize);
 
@@ -666,7 +679,10 @@ TEST_F(TestPointMove, testMoveGlobal)
         std::vector<Vec3s> desiredPositions;
         desiredPositions.emplace_back(positions[2]);
 
-        std::sort(desiredPositions.begin(), desiredPositions.end());
+        std::sort(desiredPositions.begin(), desiredPositions.end(),
+            [](auto a, auto b) {
+                return openvdb::math::cwiseLessThan(a,b);
+            });
 
         PointDataGrid::Ptr points = positionsToGrid(positions, voxelSize);
 
@@ -839,9 +855,6 @@ namespace {
 // Custom deformer that stores a map of current positions to new positions
 struct AssignDeformer
 {
-    AssignDeformer(const std::map<Vec3d, Vec3d>& _values)
-        : values(_values) { }
-
     template <typename LeafT>
     void reset(const LeafT&, size_t /*idx*/) { }
 
@@ -851,7 +864,10 @@ struct AssignDeformer
         position = values.at(position);
     }
 
-    std::map<Vec3d, Vec3d> values;
+    constexpr static auto cmp = [](auto a, auto b) {
+        return math::cwiseLessThan(a,b);
+    };
+    std::map<Vec3d, Vec3d, decltype(cmp)> values { cmp };
 }; // struct AssignDeformer
 
 }
@@ -872,13 +888,11 @@ TEST_F(TestPointMove, testPointData)
 
     // simple reversing deformer
 
-    std::map<Vec3d, Vec3d> remap;
-    remap.insert({positions[0], positions[3]});
-    remap.insert({positions[1], positions[2]});
-    remap.insert({positions[2], positions[1]});
-    remap.insert({positions[3], positions[0]});
-
-    AssignDeformer deformer(remap);
+    AssignDeformer deformer;
+    deformer.values.insert({positions[0], positions[3]});
+    deformer.values.insert({positions[1], positions[2]});
+    deformer.values.insert({positions[2], positions[1]});
+    deformer.values.insert({positions[3], positions[0]});
 
     { // reversing point positions results in the same iteration order due to spatial organisation
         PointDataGrid::Ptr points = positionsToGrid(positions, voxelSize);
@@ -909,8 +923,14 @@ TEST_F(TestPointMove, testPointData)
 
         std::vector<Vec3s> finalPositions2 = gridToPositions(points, /*sort=*/false);
 
-        std::sort(desiredPositions.begin(), desiredPositions.end());
-        std::sort(finalPositions2.begin(), finalPositions2.end());
+        std::sort(desiredPositions.begin(), desiredPositions.end(),
+            [](auto a, auto b) {
+                return openvdb::math::cwiseLessThan(a,b);
+            });
+        std::sort(finalPositions2.begin(), finalPositions2.end(),
+            [](auto a, auto b) {
+                return openvdb::math::cwiseLessThan(a,b);
+            });
 
         ASSERT_APPROX_EQUAL(desiredPositions, finalPositions2, __LINE__);
     }

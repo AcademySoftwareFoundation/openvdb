@@ -462,3 +462,219 @@ TEST_F(TestMath, testMinMaxImpl)
         EXPECT_EQ(&math::Min(c, d), &c);
     }
 }
+
+TEST_F(TestMath, testTupleFp)
+{
+    using namespace openvdb;
+
+    // Test fill constructor
+    const math::Tuple<2, float> a(2.5f);
+    EXPECT_EQ(a[0], 2.5f);
+    EXPECT_EQ(a[1], a[0]);
+
+    math::Tuple<2, float> b(-3.14f);
+    b[1] = 7.3f;
+    EXPECT_EQ(b[0], -3.14f);
+    EXPECT_EQ(b[1], 7.3f);
+
+    // Test binary ops
+    auto c = a-b;
+    EXPECT_EQ(c[0], 2.5f + 3.14f);
+    EXPECT_EQ(c[1], 2.5f - 7.3f);
+
+    c = a + b;
+    EXPECT_EQ(c[0], 2.5f - 3.14f);
+    EXPECT_EQ(c[1], 2.5f + 7.3f);
+
+    c = a * b;
+    EXPECT_EQ(c[0], 2.5f * -3.14f);
+    EXPECT_EQ(c[1], 2.5f *  7.3f);
+
+    c = a / b;
+    EXPECT_EQ(c[0], 2.5f / -3.14f);
+    EXPECT_EQ(c[1], 2.5f /  7.3f);
+
+    c = a;
+    EXPECT_EQ(c[0], 2.5f);
+    EXPECT_EQ(c[1], 2.5f);
+
+    c += b;
+    EXPECT_EQ(c[0], 2.5f - 3.14f);
+    EXPECT_EQ(c[1], 2.5f + 7.3f);
+
+    c = a;
+    c -= b;
+    EXPECT_EQ(c[0], 2.5f + 3.14f);
+    EXPECT_EQ(c[1], 2.5f - 7.3f);
+
+    c = a;
+    c *= b;
+    EXPECT_EQ(c[0], 2.5f * -3.14f);
+    EXPECT_EQ(c[1], 2.5f *  7.3f);
+
+    c = a;
+    c /= b;
+    EXPECT_EQ(c[0], 2.5f / -3.14f);
+    EXPECT_EQ(c[1], 2.5f /  7.3f);
+
+    // Test relational
+
+    auto r = a < b;
+    static_assert(std::is_same_v<decltype(r)::ValueType, bool>);
+
+    EXPECT_EQ(r[0], false);
+    EXPECT_EQ(r[1], true);
+
+    r = a > b;
+    EXPECT_EQ(r[0], true);
+    EXPECT_EQ(r[1], false);
+
+    r = a == b;
+    EXPECT_EQ(r[0], false);
+    EXPECT_EQ(r[1], false);
+
+    r = a != b;
+    EXPECT_EQ(r[0], true);
+    EXPECT_EQ(r[1], true);
+
+    r = a <= b;
+    EXPECT_EQ(r[0], false);
+    EXPECT_EQ(r[1], true);
+
+    r = a >= b;
+    EXPECT_EQ(r[0], true);
+    EXPECT_EQ(r[1], false);
+}
+
+TEST_F(TestMath, testTupleIntegral)
+{
+    using namespace openvdb;
+
+    // Test fill constructor
+    const math::Tuple<2, int> a(2);
+    EXPECT_EQ(a[0], 2);
+    EXPECT_EQ(a[1], a[0]);
+
+    math::Tuple<2, int> b(-3);
+    b[1] = 7;
+    EXPECT_EQ(b[0], -3);
+    EXPECT_EQ(b[1], 7);
+
+    // Test binary ops
+    auto c = a-b;
+    EXPECT_EQ(c[0], 2 + 3);
+    EXPECT_EQ(c[1], 2 - 7);
+
+    c = a + b;
+    EXPECT_EQ(c[0], 2 - 3);
+    EXPECT_EQ(c[1], 2 + 7);
+
+    c = a * b;
+    EXPECT_EQ(c[0], 2 * -3);
+    EXPECT_EQ(c[1], 2 *  7);
+
+    c = a / b;
+    EXPECT_EQ(c[0], 2 / -3);
+    EXPECT_EQ(c[1], 2 /  7);
+
+    c = a;
+    EXPECT_EQ(c[0], 2);
+    EXPECT_EQ(c[1], 2);
+
+    c += b;
+    EXPECT_EQ(c[0], 2 - 3);
+    EXPECT_EQ(c[1], 2 + 7);
+
+    c = a;
+    c -= b;
+    EXPECT_EQ(c[0], 2 + 3);
+    EXPECT_EQ(c[1], 2 - 7);
+
+    c = a;
+    c *= b;
+    EXPECT_EQ(c[0], 2 * -3);
+    EXPECT_EQ(c[1], 2 *  7);
+
+    c = a;
+    c /= b;
+    EXPECT_EQ(c[0], 2 / -3);
+    EXPECT_EQ(c[1], 2 /  7);
+
+    // Test bitwise
+
+    auto l = a & b;
+    static_assert(std::is_same_v<decltype(l)::ValueType, int>);
+
+    EXPECT_EQ(l[0], 2 & -3);
+    EXPECT_EQ(l[1], 2 & 7);
+
+    l = a | b;
+    EXPECT_EQ(l[0], 2 | -3);
+    EXPECT_EQ(l[1], 2 | 7);
+
+    l = a;
+    l &= b;
+    EXPECT_EQ(l[0], 2 & -3);
+    EXPECT_EQ(l[1], 2 & 7);
+
+    l = a;
+    l = a | b;
+    EXPECT_EQ(l[0], 2 | -3);
+    EXPECT_EQ(l[1], 2 | 7);
+
+    // Test relational
+
+    auto r = a < b;
+    static_assert(std::is_same_v<decltype(r)::ValueType, bool>);
+
+    EXPECT_EQ(r[0], false);
+    EXPECT_EQ(r[1], true);
+
+    r = a > b;
+    EXPECT_EQ(r[0], true);
+    EXPECT_EQ(r[1], false);
+
+    r = a == b;
+    EXPECT_EQ(r[0], false);
+    EXPECT_EQ(r[1], false);
+
+    r = a != b;
+    EXPECT_EQ(r[0], true);
+    EXPECT_EQ(r[1], true);
+
+    r = a <= b;
+    EXPECT_EQ(r[0], false);
+    EXPECT_EQ(r[1], true);
+
+    r = a >= b;
+    EXPECT_EQ(r[0], true);
+    EXPECT_EQ(r[1], false);
+}
+
+TEST_F(TestMath, testTupleBool)
+{
+    using namespace openvdb;
+
+    // Test fill constructor
+    const math::Tuple<2, bool> a(true);
+    EXPECT_EQ(a[0], true);
+    EXPECT_EQ(a[1], a[0]);
+
+    math::Tuple<2, bool> b(false);
+    b[1] = true;
+    EXPECT_EQ(b[0], false);
+    EXPECT_EQ(b[1], true);
+
+    // test logical ops
+
+    auto l = a && b;
+    static_assert(std::is_same_v<decltype(l)::ValueType, bool>);
+
+    EXPECT_EQ(l[0], false);
+    EXPECT_EQ(l[1], true);
+
+    l = a || b;
+
+    EXPECT_EQ(l[0], true);
+    EXPECT_EQ(l[1], true);
+}

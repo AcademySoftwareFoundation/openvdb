@@ -150,7 +150,8 @@ struct BoxSampler
     static inline bool probeValues(ValueT (&data)[N][N][N], const TreeT& inTree, Coord ijk);
 
     /// @brief Find the minimum and maximum values of the eight cell
-    /// values in @ data.
+    /// values in @ data. The default *component wise* less than
+    /// comparison operator is used.
     template<class ValueT, size_t N>
     static inline void extrema(ValueT (&data)[N][N][N], ValueT& vMin, ValueT& vMax);
 
@@ -691,20 +692,20 @@ inline void
 BoxSampler::extrema(ValueT (&data)[N][N][N], ValueT& vMin, ValueT &vMax)
 {
     vMin = vMax = data[0][0][0];
-    vMin = math::Min(vMin, data[0][0][1]);
-    vMax = math::Max(vMax, data[0][0][1]);
-    vMin = math::Min(vMin, data[0][1][0]);
-    vMax = math::Max(vMax, data[0][1][0]);
-    vMin = math::Min(vMin, data[0][1][1]);
-    vMax = math::Max(vMax, data[0][1][1]);
-    vMin = math::Min(vMin, data[1][0][0]);
-    vMax = math::Max(vMax, data[1][0][0]);
-    vMin = math::Min(vMin, data[1][0][1]);
-    vMax = math::Max(vMax, data[1][0][1]);
-    vMin = math::Min(vMin, data[1][1][0]);
-    vMax = math::Max(vMax, data[1][1][0]);
-    vMin = math::Min(vMin, data[1][1][1]);
-    vMax = math::Max(vMax, data[1][1][1]);
+    vMin = math::cwiseLessThan(vMin, data[0][0][1]) ? vMin : data[0][0][1];
+    vMax = math::cwiseLessThan(vMax, data[0][0][1]) ? data[0][0][1] : vMax;
+    vMin = math::cwiseLessThan(vMin, data[0][1][0]) ? vMin : data[0][1][0];
+    vMax = math::cwiseLessThan(vMax, data[0][1][0]) ? data[0][1][0] : vMax;
+    vMin = math::cwiseLessThan(vMin, data[0][1][1]) ? vMin : data[0][1][1];
+    vMax = math::cwiseLessThan(vMax, data[0][1][1]) ? data[0][1][1] : vMax;
+    vMin = math::cwiseLessThan(vMin, data[1][0][0]) ? vMin : data[1][0][0];
+    vMax = math::cwiseLessThan(vMax, data[1][0][0]) ? data[1][0][0] : vMax;
+    vMin = math::cwiseLessThan(vMin, data[1][0][1]) ? vMin : data[1][0][1];
+    vMax = math::cwiseLessThan(vMax, data[1][0][1]) ? data[1][0][1] : vMax;
+    vMin = math::cwiseLessThan(vMin, data[1][1][0]) ? vMin : data[1][1][0];
+    vMax = math::cwiseLessThan(vMax, data[1][1][0]) ? data[1][1][0] : vMax;
+    vMin = math::cwiseLessThan(vMin, data[1][1][1]) ? vMin : data[1][1][1];
+    vMax = math::cwiseLessThan(vMax, data[1][1][1]) ? data[1][1][1] : vMax;
 }
 
 

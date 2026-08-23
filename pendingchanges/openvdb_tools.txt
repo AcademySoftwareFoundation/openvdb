@@ -1,0 +1,15 @@
+tools:
+
+  New Features:
+  - Added a new tool PolySoupToLevelSet, which generates a LOD family of watertight shrink wrap
+    surfaces from a soup of polygons.
+
+  Fixes:
+  - Fixed a crash in PolySoupToLevelSet::process() when the requested voxel size is too coarse
+    relative to the input mesh (larger than maxLength/2, where maxLength is the largest bounding-box
+    dimension). Such input left the internal offset-grid list empty, and process() then dereferenced
+    an empty vector, segfaulting in optimized builds where the guarding assertion is compiled out.
+    process() now checks for this and throws a descriptive ValueError (naming the voxel size and the
+    maximum allowed) instead of crashing. The check is confined to process() so that offset() -- used
+    by the offset-only path -- continues to accept coarser voxel sizes unaffected.
+  - Fixed a floating-point false positive in "tools::CheckLevelSet::checkBackground()" in Diagnostics.h where the ratio "background / voxelSize" could compute to just below the expected half-width due to non-representable IEEE 754 values, causing a valid level set created with exactly LEVEL_SET_HALF_WIDTH voxels of narrow band to incorrectly fail check #4. The strict "<" comparison is now relaxed by a relative tolerance of 1e-6. A regression test covering this exact case was added to TestDiagnostics.cc.

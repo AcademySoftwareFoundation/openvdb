@@ -151,6 +151,13 @@ public:
         return GU_PrimVDB::buildFromGridAdapter(gdp, &grid, src, name);
     }
 
+    // Builds a vdb directly from an IMX_VDB
+    static GEO_PrimVDB       *buildFromVDB(GU_Detail *gdp,
+                                    UT_SharedPtr<IMX_VDB> vdb);
+    static GEO_PrimVDB       *buildFromVDB(GU_Detail *gdp,
+                                    UT_SharedPtr<const IMX_VDB> vdb);
+
+
     /// Create new VDB primitive from the given native volume primitive
     static GU_PrimVDB * buildFromPrimVolume(
                             GU_Detail &geo,

@@ -145,7 +145,7 @@
 
 #define NANOVDB_MAJOR_VERSION_NUMBER 32 // reflects changes to the ABI and hence also the file format
 #define NANOVDB_MINOR_VERSION_NUMBER  9 // reflects changes to the API but not ABI
-#define NANOVDB_PATCH_VERSION_NUMBER  1 // reflects changes that does not affect the ABI or API
+#define NANOVDB_PATCH_VERSION_NUMBER  2 // reflects changes that do not affect the ABI or API
 
 #define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
 
@@ -158,6 +158,11 @@
 // Use this to switch between std::ofstream or FILE implementations
 //#define NANOVDB_USE_IOSTREAMS
 
+// Define NANOVDB_USE_OLD_ACCESSOR before including this header to temporarily
+// restore legacy ReadAccessor behavior where value lookups fall back to root
+// after a leaf-cache miss.
+
+// Comment out to use (slower) branched version of LeafData<FpN,...>::getValue
 #define NANOVDB_FPN_BRANCHLESS
 
 #if !defined(NANOVDB_ALIGN)
@@ -290,7 +295,8 @@ enum class GridClass : uint32_t { Unknown = 0,
                                   VoxelVolume = 7, // volume of geometric cubes, e.g. colors cubes in Minecraft
                                   IndexGrid = 8, // grid whose values are offsets, e.g. into an external array
                                   TensorGrid = 9, // Index grid for indexing learnable tensor features
-                                  End = 10,// total number of types in this enum (excluding StrLen since it's not a type)
+                                  VoxelBVH = 10, // grid where each voxel points to list of primitive ids
+                                  End = 11,// total number of types in this enum (excluding StrLen since it's not a type)
                                   StrLen = End + 7};// this entry is used to determine the minimum size of c-string
 
 
@@ -310,6 +316,7 @@ __hostdev__ inline char* toStr(char *dst, GridClass gridClass)
         case GridClass::VoxelVolume: return util::strcpy(dst, "VOX");
         case GridClass::IndexGrid:   return util::strcpy(dst, "INDEX");
         case GridClass::TensorGrid:  return util::strcpy(dst, "TENSOR");
+        case GridClass::VoxelBVH:    return util::strcpy(dst, "VOXBVH");
         default:                     return util::strcpy(dst, "END");
     }
 }
@@ -421,7 +428,17 @@ enum class GridBlindDataSemantic : uint32_t { Unknown = 0,
                                               LevelSet = 10, // narrow band level set, e.g. SDF
                                               FogVolume = 11, // fog volume, e.g. density
                                               Staggered = 12, // staggered MAC grid, e.g. velocity
-                                              End = 13 };
+                                              PointOpacity = 13, // opacity associated with point
+                                              PointQuat = 14, // quaternion rotation, wxyz convention
+                                              PointScale = 15, // vec3 scale
+                                              PointSH0 = 16, // spherical harmonics, DC component
+                                              PointSHN = 17, // spherical haromnics, AC components
+                                              LineId = 18, // integer ID of line
+                                              TriangleId = 19, // integer ID of triangle
+                                              GaussianId = 20, // integer ID of Gaussian
+                                              Range = 21, // begin/end pair of indices
+                                              VoxelBVH = 22, // voxelbvh 64-bit voxel value
+                                              End = 23 };
 
 /// @brief Maps from GridBlindDataSemantic to GridClass
 /// @note Useful when converting an IndexGrid with blind data of type T into a Grid<T>
@@ -450,6 +467,8 @@ __hostdev__ inline GridClass toGridClass(GridBlindDataSemantic semantics,
         return GridClass::FogVolume;
     case GridBlindDataSemantic::Staggered:
         return GridClass::Staggered;
+    case GridBlindDataSemantic::VoxelBVH:
+        return GridClass::VoxelBVH;
     default:
         return defaultClass;
     }
@@ -472,6 +491,8 @@ __hostdev__ inline GridBlindDataSemantic toSemantic(GridClass gridClass,
         return GridBlindDataSemantic::FogVolume;
     case GridClass::Staggered:
         return GridBlindDataSemantic::Staggered;
+    case GridClass::VoxelBVH:
+        return GridBlindDataSemantic::VoxelBVH;
     default:
         return defaultSemantic;
     }
@@ -1503,7 +1524,7 @@ struct Map
     ///        e.g. inverse scale and inverse rotation WITHOUT translation.
     /// @note Typically this operation is used for scale and rotation from world -> index mapping
     /// @tparam Vec3T Template type of the 3D vector to be mapped
-    /// @param ijk 3D vector to be mapped - typically floating point index coordinates
+    /// @param xyz 3D vector to be mapped - typically floating point index coordinates
     /// @return linear inverse 3x3 mapping of the input vector i.e. xyz x mat^-1
     template<typename Vec3T>
     __hostdev__ Vec3T applyInverseJacobian(const Vec3T& xyz) const { return math::matMult(mInvMatD, xyz); }
@@ -1512,7 +1533,7 @@ struct Map
     ///        e.g. inverse scale and inverse rotation WITHOUT translation.
     /// @note Typically this operation is used for scale and rotation from world -> index mapping
     /// @tparam Vec3T Template type of the 3D vector to be mapped
-    /// @param ijk 3D vector to be mapped - typically floating point index coordinates
+    /// @param xyz 3D vector to be mapped - typically floating point index coordinates
     /// @return linear inverse 3x3 mapping of the input vector i.e. xyz x mat^-1
     template<typename Vec3T>
     __hostdev__ Vec3T applyInverseJacobianF(const Vec3T& xyz) const { return math::matMult(mInvMatF, xyz); }
@@ -1521,7 +1542,7 @@ struct Map
     ///        e.g. inverse scale and inverse rotation WITHOUT translation.
     /// @note Typically this operation is used for scale and rotation from world -> index mapping
     /// @tparam Vec3T Template type of the 3D vector to be mapped
-    /// @param ijk 3D vector to be mapped - typically floating point index coordinates
+    /// @param xyz 3D vector to be mapped - typically floating point index coordinates
     /// @return linear inverse 3x3 mapping of the input vector i.e. xyz x mat^-1
     template<typename Vec3T>
     __hostdev__ Vec3T applyIJT(const Vec3T& xyz) const { return math::matMultT(mInvMatD, xyz); }
@@ -2314,6 +2335,7 @@ public:
     __hostdev__ bool             isPointIndex() const { return DataType::mGridClass == GridClass::PointIndex; }
     __hostdev__ bool             isGridIndex() const { return DataType::mGridClass == GridClass::IndexGrid; }
     __hostdev__ bool             isPointData() const { return DataType::mGridClass == GridClass::PointData; }
+    __hostdev__ bool             isVoxelBVH() const { return DataType::mGridClass == GridClass::VoxelBVH; }
     __hostdev__ bool             isMask() const { return DataType::mGridClass == GridClass::Topology; }
     __hostdev__ bool             isUnknown() const { return DataType::mGridClass == GridClass::Unknown; }
     __hostdev__ bool             hasMinMax() const { return DataType::mFlags.isMaskOn(GridFlags::HasMinMax); }
@@ -4881,7 +4903,7 @@ using OnIndexGrid = Grid<OnIndexTree>;
 * @endcode
 */
 
-/// @brief Use this function, which depends a pointer to GridData, to call
+/// @brief Use this function, which depends on a pointer to GridData, to call
 ///        other functions that depend on a NanoGrid of a known ValueType.
 /// @details This function allows for generic programming by converting GridData
 ///          to a NanoGrid of the type encoded in GridData::mGridType.
@@ -4993,7 +5015,7 @@ public:
     }
 
     /// @brief Reset this access to its initial state, i.e. with an empty cache
-    /// @node Noop since this template specialization has no cache
+    /// @note Noop since this template specialization has no cache
     __hostdev__ void clear() {}
 
     __hostdev__ const RootT& root() const { return *mRoot; }
@@ -5365,7 +5387,11 @@ public:
 #endif
         if constexpr(OpT::LEVEL <= LEVEL0) {
             if (this->isCached1(dirty)) return mNode1->template getAndCache<OpT>(ijk, *this, args...);
-        } else if constexpr(OpT::LEVEL <= LEVEL1) {
+        }
+#ifdef NANOVDB_USE_OLD_ACCESSOR
+        else
+#endif
+        if constexpr(OpT::LEVEL <= LEVEL1) {
             if (this->isCached2(dirty)) return mNode2->template getAndCache<OpT>(ijk, *this, args...);
         }
         return mRoot->template getAndCache<OpT>(ijk, *this, args...);
@@ -5381,7 +5407,11 @@ public:
 #endif
         if constexpr(OpT::LEVEL <= LEVEL0) {
             if (this->isCached1(dirty)) return const_cast<Node1T*>(mNode1)->template setAndCache<OpT>(ijk, *this, args...);
-        } else if constexpr(OpT::LEVEL <= LEVEL1) {
+        }
+#ifdef NANOVDB_USE_OLD_ACCESSOR
+        else
+#endif
+        if constexpr(OpT::LEVEL <= LEVEL1) {
             if (this->isCached2(dirty)) return const_cast<Node2T*>(mNode2)->template setAndCache<OpT>(ijk, *this, args...);
         }
         return const_cast<RootT*>(mRoot)->template setAndCache<OpT>(ijk, *this, args...);
@@ -5539,7 +5569,7 @@ public:
     }
 #endif
 
-    __hostdev__ ValueType getValue(const CoordType& ijk) const {return this->template get<GetValue<BuildT>>(ijk);}
+    __hostdev__ ValueType    getValue(const CoordType& ijk) const {return this->template get<GetValue<BuildT>>(ijk);}
     __hostdev__ ValueType    getValue(int i, int j, int k) const { return this->template get<GetValue<BuildT>>(CoordType(i, j, k)); }
     __hostdev__ ValueType    operator()(const CoordType& ijk) const { return this->template get<GetValue<BuildT>>(ijk); }
     __hostdev__ ValueType    operator()(int i, int j, int k) const { return this->template get<GetValue<BuildT>>(CoordType(i, j, k)); }
@@ -5558,9 +5588,17 @@ public:
 #endif
         if constexpr(OpT::LEVEL <=0) {
             if (this->isCached<LeafT>(dirty)) return ((const LeafT*)mNode[0])->template getAndCache<OpT>(ijk, *this, args...);
-        } else if constexpr(OpT::LEVEL <= 1) {
+        }
+#ifdef NANOVDB_USE_OLD_ACCESSOR
+        else
+#endif
+        if constexpr(OpT::LEVEL <= 1) {
             if (this->isCached<NodeT1>(dirty)) return ((const NodeT1*)mNode[1])->template getAndCache<OpT>(ijk, *this, args...);
-        } else if constexpr(OpT::LEVEL <= 2) {
+        }
+#ifdef NANOVDB_USE_OLD_ACCESSOR
+        else
+#endif
+        if constexpr(OpT::LEVEL <= 2) {
             if (this->isCached<NodeT2>(dirty)) return ((const NodeT2*)mNode[2])->template getAndCache<OpT>(ijk, *this, args...);
         }
         return mRoot->template getAndCache<OpT>(ijk, *this, args...);
@@ -5576,9 +5614,17 @@ public:
 #endif
         if constexpr(OpT::LEVEL <= 0) {
             if (this->isCached<LeafT>(dirty)) return ((LeafT*)mNode[0])->template setAndCache<OpT>(ijk, *this, args...);
-        } else if constexpr(OpT::LEVEL <= 1) {
+        }
+#ifdef NANOVDB_USE_OLD_ACCESSOR
+        else
+#endif
+        if constexpr(OpT::LEVEL <= 1) {
             if (this->isCached<NodeT1>(dirty)) return ((NodeT1*)mNode[1])->template setAndCache<OpT>(ijk, *this, args...);
-        } else if constexpr(OpT::LEVEL <= 2) {
+        }
+#ifdef NANOVDB_USE_OLD_ACCESSOR
+        else
+#endif
+        if constexpr(OpT::LEVEL <= 2) {
             if (this->isCached<NodeT2>(dirty)) return ((NodeT2*)mNode[2])->template setAndCache<OpT>(ijk, *this, args...);
         }
         return ((RootT*)mRoot)->template setAndCache<OpT>(ijk, *this, args...);
@@ -5737,6 +5783,7 @@ public:
     __hostdev__ bool             isPointIndex() const { return mGridData.mGridClass == GridClass::PointIndex; }
     __hostdev__ bool             isGridIndex() const { return mGridData.mGridClass == GridClass::IndexGrid; }
     __hostdev__ bool             isPointData() const { return mGridData.mGridClass == GridClass::PointData; }
+    __hostdev__ bool             isVoxelBVH() const { return mGridData.mGridClass == GridClass::VoxelBVH; }
     __hostdev__ bool             isMask() const { return mGridData.mGridClass == GridClass::Topology; }
     __hostdev__ bool             isUnknown() const { return mGridData.mGridClass == GridClass::Unknown; }
     __hostdev__ bool             hasMinMax() const { return mGridData.mFlags.isMaskOn(GridFlags::HasMinMax); }
@@ -5985,6 +6032,26 @@ public:
     __hostdev__ T& getValue(const math::Coord& ijk, T* channelPtr) const { return channelPtr[BaseT::getValue(ijk)]; }
 
 }; // ChannelAccessor
+
+/// @brief Generic Accessor type that maps to either a ReadAccessor or ChannelAccessor
+/// @tparam BuildT Build type, e.g. float or ValueOnIndex
+/// @tparam ValueT Value type, e.g. float or Vec3f
+template <typename BuildT, typename ValueT>
+using AccType = typename util::conditional<BuildTraits<BuildT>::is_index,
+                ChannelAccessor<ValueT, BuildT>, DefaultReadAccessor<BuildT>>::type;
+
+/// @brief Generic template functions that return an Accessor to either an index grid or a regular grid
+template <typename GridT, typename ValueT>
+inline __hostdev__ auto getAccessor(const GridT &grid, ValueT *sideCar = nullptr)
+{
+    using BuildT = typename GridT::BuildType;
+    if constexpr(BuildTraits<BuildT>::is_index) {
+        return sideCar ? ChannelAccessor<ValueT, BuildT>(grid, sideCar) : ChannelAccessor<ValueT, BuildT>(grid);
+    } else {
+        static_assert(util::is_same<ValueT, typename GridT::ValueType>::value, "wrong ValueT for regular GridT");
+        return DefaultReadAccessor<BuildT>(grid);
+    }
+}
 
 #if 0
 // This MiniGridHandle class is only included as a stand-alone example. Note that aligned_alloc is a C++17 feature!

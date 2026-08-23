@@ -5807,7 +5807,7 @@ TEST_F(TestNanoVDB, GridValidator)
     EXPECT_FALSE(nanovdb::tools::isValid(grid, nanovdb::CheckMode::Full, false));
 } // GridValidator
 
-TEST_F(TestNanoVDB, RandomReadAccessor)
+TEST_F(TestNanoVDB, RandomReadAccessorGet)
 {
     const float background = 0.0f;
     const int voxelCount = 512, min = -10000, max = 10000;
@@ -5870,7 +5870,64 @@ TEST_F(TestNanoVDB, RandomReadAccessor)
             EXPECT_EQ( v, acc3c.getValue(ijk) );
         }
     }
-}
+}// RandomReadAccessorGet
+
+TEST_F(TestNanoVDB, RandomReadAccessorSet)
+{
+    // Mirror of RandomReadAccessor, but exercising the accessor's set() path
+    // (SetVoxel op) across every cache configuration. NanoVDB has static
+    // topology, so we build the topology first, bake a grid, then overwrite
+    // voxel VALUES in place through each accessor configuration and read them
+    // back. This covers the multi-level cache chaining in ReadAccessor::set()
+    // (which, like get(), is affected by NANOVDB_USE_OLD_ACCESSOR).
+    const float background = 0.0f;
+    const int voxelCount = 512, min = -10000, max = 10000;
+    std::srand(98765);
+    auto op = [&](){return rand() % (max - min) + min;};
+    using SrcGridT = nanovdb::tools::build::Grid<float>;
+    for (int i=0; i<10; ++i) {
+        SrcGridT srcGrid(background);
+        auto bacc = srcGrid.getAccessor();
+        std::vector<nanovdb::Coord> voxels(voxelCount);
+        for (int j=0; j<voxelCount; ++j) {
+            auto &ijk = voxels[j];
+            ijk[0] = op();
+            ijk[1] = op();
+            ijk[2] = op();
+            bacc.setValue(ijk, 1.0f*j);// establish topology + initial values
+        }
+        auto gridHdl = nanovdb::tools::createNanoGrid(srcGrid);
+        EXPECT_TRUE(gridHdl);
+        EXPECT_EQ(1u, gridHdl.gridCount());
+        auto grid = gridHdl.grid<float>();
+        EXPECT_TRUE(grid);
+        auto &root = grid->tree().root();// non-const: voxel values are modified below
+
+        // Write a distinct value through the given accessor, read it back through
+        // the SAME accessor, then confirm the write actually reached memory via
+        // an independent no-cache accessor. `base` is unique per configuration so
+        // a stale/failed write is detected (initial values are 1.0f*j << base).
+        auto writeReadCheck = [&](auto acc, float base) {
+            for (int j=0; j<voxelCount; ++j)
+                acc.template set<nanovdb::SetVoxel<float>>(voxels[j], base + 1.0f*j);
+            for (int j=0; j<voxelCount; ++j)
+                EXPECT_EQ(base + 1.0f*j, acc.getValue(voxels[j]));
+            auto raw = nanovdb::createAccessor<>(root);// no caching -> reads memory directly
+            for (int j=0; j<voxelCount; ++j)
+                EXPECT_EQ(base + 1.0f*j, raw.getValue(voxels[j]));
+        };
+
+        writeReadCheck(nanovdb::createAccessor<>(root),      1.0e5f);// no node caching
+        writeReadCheck(nanovdb::createAccessor<0>(root),     2.0e5f);// cache leaf only
+        writeReadCheck(nanovdb::createAccessor<1>(root),     3.0e5f);// cache lower internal only
+        writeReadCheck(nanovdb::createAccessor<2>(root),     4.0e5f);// cache upper internal only
+        writeReadCheck(nanovdb::createAccessor<0, 1>(root),  5.0e5f);// cache leaf + lower internal
+        writeReadCheck(nanovdb::createAccessor<1, 2>(root),  6.0e5f);// cache lower + upper internal
+        writeReadCheck(nanovdb::createAccessor<0, 2>(root),  7.0e5f);// cache leaf + upper internal
+        writeReadCheck(nanovdb::createAccessor<0, 1, 2>(root), 8.0e5f);// cache all levels
+        writeReadCheck(root.getAccessor(),                   9.0e5f);// default (all levels)
+    }
+}// RandomReadAccessorSet
 
 TEST_F(TestNanoVDB, StandardDeviation)
 {
@@ -5940,7 +5997,7 @@ TEST_F(TestNanoVDB, StandardDeviation)
 #endif
     }
 
-} // ReadAccessor
+} // StandardDeviation
 
 TEST_F(TestNanoVDB, BoxStencil)
 {
@@ -8486,6 +8543,38 @@ TEST_F(TestNanoVDB, CustomStreamGridHandleIO)
         EXPECT_TRUE(nanovdb::tools::validateChecksum(grid, nanovdb::CheckMode::Full));
     }
 }// CustomStreamGridHandleIO
+
+// make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*GridHandleReadMultiGridRawBuffer"
+TEST_F(TestNanoVDB, GridHandleReadMultiGridRawBuffer)
+{
+    std::vector<nanovdb::GridHandle<>> handles;
+    handles.emplace_back(nanovdb::tools::createLevelSetSphere<float>(20.0));
+    handles.emplace_back(nanovdb::tools::createLevelSetSphere<float>(40.0));
+    ASSERT_EQ(2u, handles.size());
+    ASSERT_NE(handles[0].bufferSize(), handles[1].bufferSize());
+
+    auto mergedHandle = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles);
+    ASSERT_EQ(2u, mergedHandle.gridCount());
+
+    std::stringstream stream(std::ios_base::in | std::ios_base::out | std::ios_base::binary);
+    mergedHandle.write(stream);
+    stream.seekg(0);
+
+    nanovdb::GridHandle<> handle;
+    handle.read(stream);
+
+    EXPECT_EQ(mergedHandle.bufferSize(), handle.bufferSize());
+    EXPECT_EQ(2u, handle.gridCount());
+    for (uint32_t i = 0; i < handle.gridCount(); ++i) {
+        const auto* grid = handle.grid<float>(i);
+        ASSERT_TRUE(grid);
+        EXPECT_EQ(i, grid->gridIndex());
+        EXPECT_EQ(2u, grid->gridCount());
+        EXPECT_EQ(handles[i].bufferSize(), grid->gridSize());
+        EXPECT_TRUE(nanovdb::tools::validateChecksum(grid));
+        EXPECT_TRUE(nanovdb::tools::validateChecksum(grid, nanovdb::CheckMode::Full));
+    }
+}// GridHandleReadMultiGridRawBuffer
 
 // make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*strcpy"
 TEST_F(TestNanoVDB, strcpy)

@@ -198,17 +198,25 @@ drawFrustum(
 #if SYS_VERSION_MAJOR_INT >= 21
 openvdb::math::Transform::Ptr
 frustumTransformFromCamera(
-    const OBJ_CameraParms& camparms,
+    const UT_CameraParms& camparms,
     const UT_Matrix4D &cameratosop,
     float offset, float nearPlaneDist, float farPlaneDist,
     float voxelDepthSize, int voxelCountX)
 {
     // Eval camera parms
+#if SYS_VERSION_MAJOR_INT >= 22
+    const fpreal camAspect = camparms.pixelaspect;
+    const fpreal camFocal = camparms.focal;
+    const fpreal camAperture = camparms.aperture;
+    const fpreal camXRes = camparms.resx;
+    const fpreal camYRes = camparms.resy;
+#else
     const fpreal camAspect = camparms.aspect;
     const fpreal camFocal = camparms.focal;
     const fpreal camAperture = camparms.aperture;
     const fpreal camXRes = camparms.xres;
     const fpreal camYRes = camparms.yres;
+#endif
 
     nearPlaneDist += offset;
     farPlaneDist += offset;

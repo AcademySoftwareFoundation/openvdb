@@ -48,13 +48,16 @@ using ::GEO_PrimVDB;
 #include <UT/UT_BoundingBox.h>
 #include "UT_VDBUtils.h"
 
+#include <IMX/IMX_VDB.h>
+
 #include <openvdb/Platform.h>
 #include <openvdb/openvdb.h>
 
 
 class   GEO_Detail;
 class   GEO_PrimVolume;
-class   GEO_PrimVolumeXform;
+class   GA_PrimVolumeXform;
+using   GEO_PrimVolumeXform = GA_PrimVolumeXform;
 class   UT_MemoryCounter;
 
 class CE_VDBGrid;
@@ -84,12 +87,24 @@ public:
     void                copyPrimitive(const GEO_Primitive *src) override;
     void                copySubclassData(const GA_Primitive *source) override;
 
+    int64               getDeviceMemoryUsage() const override;
+
     /// Acquire a CE grid and cache it on the GPU.  If marked for
     /// writing, the CPU version will be overwritten.
     /// Note that the getVoxelHandle does *NOT* auto-flush these!
     /// NOTE: If someone else fetches a non-read grid, and you fetch it
     /// as a read grid, you will not get any copied data.
     CE_VDBGrid          *getCEGrid(bool read, bool write) const;
+
+    /// Acquire an IMX layer for this volume. If marked for reading, it will
+    /// have identical data to this volume. If marked for writing, this volume's
+    /// data will be overwritten.
+    /// Note that the getGrid does *NOT* auto-flush these!
+    IMX_VDBPtr           getIMXVDB(bool read, bool write) const;
+    /// Set a proxy compute vdb that we may reference for our data.
+    /// Upon first cpu request, the data is then copied to the main VDB
+    /// structure.
+    void                setBorrowedIMXVDB(const UT_SharedPtr<IMX_VDB> &v);
 
     /// Any modified CE cache on the GPU will be copied back to the
     /// CPU.  Will leave result on GPU.
@@ -98,6 +113,9 @@ public:
     /// Remove all CE caches from the GPU, possibly writing back
     /// if necessary.
     void                flushCECaches() override;
+
+    /// Remove all CE caches from the GPU, without writing back.
+    void                clearCECaches() override;
 
     /// Steal the underlying CE buffer from the source.
     void                stealCEBuffers(const GA_Primitive *src) override;
@@ -324,6 +342,11 @@ public:
         ACTIVATE_COPY           // Set our activation to match source
     };
 
+    /// Densify a VDB. This converts all active tiles into active leaves
+    /// This can greatly increase memory, so it is better that algorithms
+    /// can pre-activate only the leaves they will expand into.
+    void                densify();
+
     /// Activates voxels given an *index* space bounding box.  This
     /// is an inclusive box.
     /// If this is Frustum VDB, the activation will be clipped by that.
@@ -423,6 +446,8 @@ public:
     fpreal              getVisIso() const           { return myVis.myIso; }
     fpreal              getVisDensity() const       { return myVis.myDensity; }
     GEO_VolumeVisLod    getVisLod() const           { return myVis.myLod; }
+    GEO_VolumeTypeInfo   getTypeInfo() const { return myVis.myTypeInfo; }
+    void                 setTypeInfo(GEO_VolumeTypeInfo info) { myVis.myTypeInfo = info; }
     /// @}
 
     /// Load the order from a JSON value
@@ -740,6 +765,9 @@ protected:
         SYS_FORCE_INLINE
         bool            hasGrid() const { return myGrid != 0; }
 
+        void            clearGridAndSetStorageType(UT_VDBType storage)
+        { myStorageType = storage;  myGrid.reset(); }
+
     private:
         void        updateGridTranslates(const GEO_PrimVDB &prim) const;
 
@@ -769,9 +797,11 @@ private:
 
     GEO_VolumeOptions       myVis;
 
-    mutable CE_VDBGrid                  *myCEGrid;
-    mutable bool                         myCEGridAuthorative;
-    mutable bool                         myCEGridIsOwned;
+    // While this is a shared pointer, we never actually share it
+    // Sharing of actual grid data is done at a lower level, so this
+    // the IMX_VDB should be copied by value between primitives.
+    mutable IMX_VDBPtr      myCEGrid;
+    mutable bool            myCEGridAuthorative;
 
     AtomicUniqueId          myUniqueId;
     AtomicUniqueId          myTreeUniqueId;

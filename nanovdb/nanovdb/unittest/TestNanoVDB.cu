@@ -23,6 +23,8 @@
 #include <nanovdb/tools/cuda/CoarsenGrid.cuh>
 #include <nanovdb/tools/cuda/RefineGrid.cuh>
 #include <nanovdb/util/cuda/Injection.cuh>
+#include <nanovdb/tools/cuda/MeshToGrid.cuh>
+#include <nanovdb/math/Proximity.h>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/Timer.h>
 #include <nanovdb/io/IO.h>
@@ -34,6 +36,7 @@
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
 #include <algorithm>// for std::sort
+#include <unordered_set>
 #include <iomanip> // for std::setw, std::setfill
 #include <thread> // for std::thread
 
@@ -2591,6 +2594,83 @@ TEST(TestNanoVDBCUDA, cudaAddBlindData)
     for (size_t i=0; i<num_points; ++i) EXPECT_EQ(blind2[i], dataPtr2[i]);
 }// cudaAddBlindData
 
+TEST(TestNanoVDBCUDA, cudaAddBlindDataFromMultiGridSource)
+{
+    using BufferT = nanovdb::cuda::DeviceBuffer;
+    // two grids merged into one device buffer give source grids whose headers
+    // carry a non-trivial grid index/count, which the output must not inherit
+    std::vector<nanovdb::GridHandle<BufferT>> handles;
+    handles.emplace_back(nanovdb::tools::createLevelSetSphere<float, BufferT>(20, nanovdb::Vec3d(0), 1, 3, nanovdb::Vec3d(0), "a"));
+    handles.emplace_back(nanovdb::tools::createLevelSetSphere<float, BufferT>(30, nanovdb::Vec3d(0), 1, 3, nanovdb::Vec3d(0), "b"));
+    for (auto &h : handles) h.deviceUpload();
+    auto merged = nanovdb::cuda::mergeGridHandles<BufferT, std::vector>(handles);
+    EXPECT_EQ(2u, merged.gridCount());
+
+    const size_t num_values = 2;
+    float *d_blind = nullptr, blind[num_values] = {1.2f, 3.0f};
+    cudaCheck(cudaMalloc(&d_blind, num_values * sizeof(float)));
+    cudaCheck(cudaMemcpy(d_blind, blind, num_values * sizeof(float), cudaMemcpyHostToDevice));
+    for (uint32_t n = 0; n < merged.gridCount(); ++n) {// source header: mGridIndex=n, mGridCount=2
+        auto *d_grid = merged.deviceGrid<float>(n);
+        EXPECT_TRUE(d_grid);
+        auto out = nanovdb::tools::cuda::addBlindData(d_grid, d_blind, num_values);
+        EXPECT_EQ(1u, out.gridCount());
+        out.deviceDownload();
+        auto *gridData = out.gridData();
+        EXPECT_TRUE(gridData);
+        EXPECT_EQ(0u, gridData->mGridIndex);
+        EXPECT_EQ(1u, gridData->mGridCount);
+        auto *grid = out.grid<float>();
+        EXPECT_TRUE(grid);
+        EXPECT_EQ(1u, grid->blindDataCount());
+    }
+    cudaCheck(cudaFree(d_blind));
+}// cudaAddBlindDataFromMultiGridSource
+
+TEST(TestNanoVDBCUDA, cudaIndexToGridFromMultiGridSource)
+{
+    using BufferT = nanovdb::cuda::DeviceBuffer;
+    auto floatHdl = nanovdb::tools::createLevelSetSphere<float, nanovdb::HostBuffer>(20, nanovdb::Vec3d(0), 1, 3, nanovdb::Vec3d(0), "sphere");
+    auto *floatGrid = floatHdl.grid<float>();
+    EXPECT_TRUE(floatGrid);
+    std::vector<nanovdb::GridHandle<BufferT>> idxHandles;
+    idxHandles.emplace_back(nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, nanovdb::ValueIndex, BufferT>(*floatGrid, 0u, false, false));
+    idxHandles.emplace_back(nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, nanovdb::ValueIndex, BufferT>(*floatGrid, 0u, false, false));
+    auto *idxGrid = idxHandles[0].grid<nanovdb::ValueIndex>();
+    EXPECT_TRUE(idxGrid);
+
+    // host-side value list for the (identical) index grids
+    std::vector<float> values(idxGrid->valueCount(), 0.0f);
+    values[0] = floatGrid->tree().root().background();
+    auto acc = floatGrid->getAccessor();
+    for (auto it = floatGrid->indexBBox().begin(); it; ++it) {
+        const uint64_t idx = idxGrid->tree().getValue(*it);
+        if (idx > 0) values[idx] = acc.getValue(*it);
+    }
+    float *d_values = nullptr;
+    cudaCheck(cudaMalloc(&d_values, values.size() * sizeof(float)));
+    cudaCheck(cudaMemcpy(d_values, values.data(), values.size() * sizeof(float), cudaMemcpyHostToDevice));
+
+    for (auto &h : idxHandles) h.deviceUpload();
+    auto merged = nanovdb::cuda::mergeGridHandles<BufferT, std::vector>(idxHandles);
+    EXPECT_EQ(2u, merged.gridCount());
+    for (uint32_t n = 0; n < merged.gridCount(); ++n) {// source header: mGridIndex=n, mGridCount=2
+        auto *d_idxGrid = merged.deviceGrid<nanovdb::ValueIndex>(n);
+        EXPECT_TRUE(d_idxGrid);
+        auto out = nanovdb::tools::cuda::indexToGrid<float>(d_idxGrid, d_values);
+        EXPECT_EQ(1u, out.gridCount());
+        out.deviceDownload();
+        auto *gridData = out.gridData();
+        EXPECT_TRUE(gridData);
+        EXPECT_EQ(0u, gridData->mGridIndex);
+        EXPECT_EQ(1u, gridData->mGridCount);
+        auto *outGrid = out.grid<float>();
+        EXPECT_TRUE(outGrid);
+        EXPECT_EQ(floatGrid->indexBBox(), outGrid->indexBBox());
+    }
+    cudaCheck(cudaFree(d_values));
+}// cudaIndexToGridFromMultiGridSource
+
 TEST(TestNanoVDBCUDA, testGridHandleCopy)
 {
     auto cudaHandle = nanovdb::tools::createLevelSetSphere<float, nanovdb::cuda::DeviceBuffer>(100);
@@ -3462,6 +3542,8 @@ __global__ void testComputeStencilNeighborsKernel(
     uint64_t *jumpMap = jumpMapArray + JumpMapLength * bID;
     int firstOffset = 1;
     int blockFirstOffset = firstOffset + bID * BlockWidth;
+    // Decode through the cooperative wrapper (which exercises the per-slot
+    // decodeInverseMap internally), then resolve this thread's own slot.
     __shared__ uint32_t leafIndex[BlockWidth];
     __shared__ uint16_t voxelOffset[BlockWidth];
 
@@ -3470,8 +3552,7 @@ __global__ void testComputeStencilNeighborsKernel(
 
     uint64_t localNeighbors[27] = {};
     nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>::computeBoxStencil(
-        grid, &leafIndex[0], &voxelOffset[0], localNeighbors);
-    __syncthreads();
+        grid, leafIndex[tID], voxelOffset[tID], localNeighbors);
 
     using StencilNeighborsType = uint64_t (*)[27];
     auto stencilNeighbors = reinterpret_cast<StencilNeighborsType>(stencilNeighborsArray+27*BlockWidth*bID);
@@ -3604,6 +3685,289 @@ TEST(TestNanoVDBCUDA, DilateInjectPrune_ValueOnIndex)
     EXPECT_EQ(inputHandle.grid<BuildT>()->mChecksum.full(), prunedHandle.grid<BuildT>()->mChecksum.full());
 }// DilateInjectPrune_ValueOnIndex
 
+// Busy-wait on whatever stream it is launched on; used to occupy the default
+// stream so that a kernel mistakenly launched there (instead of the caller's
+// stream) is reordered relative to the rest of the operation.
+__global__ void streamBusyWaitKernel(unsigned long long cycles)
+{
+    const unsigned long long t0 = clock64();
+    while (clock64() - t0 < cycles) {}
+}
+
+// Regression test: the NN_FACE_EDGE_VERTEX (26-neighbour) leaf dilation kernel
+// must run on the caller's stream. It previously launched on the default stream,
+// silently corrupting the result when the caller used a non-blocking stream.
+// Dilating on the default stream and on a non-blocking stream (while the default
+// stream is occupied) must produce identical output.
+TEST(TestNanoVDBCUDA, NonBlockingStreamDilate_ValueOnIndex)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    std::vector<nanovdb::Coord> pts;
+    for (int i = 0; i < 64; ++i) pts.emplace_back(i * 3, (i * 7) % 40, (i * 13) % 50);
+    pts.emplace_back(127, 127, 127);
+    auto inBuf = nanovdb::cuda::DeviceBuffer::create(pts.size() * sizeof(nanovdb::Coord), nullptr, false);
+    cudaCheck(cudaMemcpy(inBuf.deviceData(), pts.data(), pts.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    nanovdb::tools::cuda::PointsToGrid<BuildT> conv;
+    conv.setChecksum(nanovdb::CheckMode::Full);
+    auto inHandle = conv.getHandle(static_cast<nanovdb::Coord*>(inBuf.deviceData()), pts.size());
+    auto* inGrid = inHandle.deviceGrid<BuildT>();
+    EXPECT_TRUE(inGrid);
+    cudaCheck(cudaDeviceSynchronize());
+
+    auto dilateOn = [&](cudaStream_t stream, bool occupyDefault) {
+        if (occupyDefault) {// keep the default stream busy for ~20 ms
+            int clockKHz = 0, dev = 0;
+            cudaCheck(cudaGetDevice(&dev));
+            cudaCheck(cudaDeviceGetAttribute(&clockKHz, cudaDevAttrClockRate, dev));
+            streamBusyWaitKernel<<<1, 1, 0, 0>>>(static_cast<unsigned long long>(clockKHz) * 20ull);
+            cudaCheck(cudaGetLastError());
+        }
+        nanovdb::tools::cuda::DilateGrid<BuildT> dilator(inGrid, stream);
+        dilator.setOperation(nanovdb::tools::morphology::NN_FACE_EDGE_VERTEX);
+        dilator.setChecksum(nanovdb::CheckMode::Full);
+        dilator.setVerbose(0);
+        auto handle = dilator.getHandle();
+        cudaCheck(cudaStreamSynchronize(stream));
+        const auto treeData = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(handle.deviceGrid<BuildT>());
+        handle.deviceDownload();
+        return std::make_pair(treeData.mVoxelCount, handle.grid<BuildT>()->mChecksum.full());
+    };
+
+    const auto reference = dilateOn(static_cast<cudaStream_t>(0), false);
+    cudaCheck(cudaDeviceSynchronize());
+    cudaStream_t nb = nullptr;
+    cudaCheck(cudaStreamCreateWithFlags(&nb, cudaStreamNonBlocking));
+    const auto candidate = dilateOn(nb, /*occupyDefault=*/true);
+    cudaCheck(cudaStreamSynchronize(nb));
+    cudaCheck(cudaDeviceSynchronize());// drain the default-stream busy-wait so it can't leak into later tests
+    cudaCheck(cudaStreamDestroy(nb));
+
+    EXPECT_EQ(reference.first, candidate.first);   // identical active-voxel count
+    EXPECT_EQ(reference.second, candidate.second); // identical full checksum
+}// NonBlockingStreamDilate_ValueOnIndex
+
+// Cross-stream determinism coverage: signedFloodFill must run entirely on the caller's stream.
+// Mirrors the dilation test above: repair the same corrupted level set once on the default
+// stream and once on a non-blocking stream while the default stream is occupied, reading each
+// result back on the stream that produced it (no default-stream rescue), and require identical
+// output. Node passes escaping to the occupied default stream show up as an unrepaired or
+// partially repaired grid.
+//
+// Scope note: this locks the observable contract but cannot discriminate processRoot's internal
+// ordering on constructible inputs - its root-tile scanline repair only does work when interior
+// root-level tiles exist, which needs a level set thousands of voxels across, and the pre-fix
+// code was accidentally host-synchronous for other topologies (a blocking legacy-stream memcpy).
+TEST(TestNanoVDBCUDA, NonBlockingStreamSignedFloodFill)
+{
+    using BufferT = nanovdb::cuda::DeviceBuffer;
+    auto runOn = [](cudaStream_t stream, bool occupyDefault) {
+        auto hdl = nanovdb::tools::createLevelSetSphere<float, BufferT>(100);
+        auto* grid = hdl.grid<float>();
+        auto acc = grid->getAccessor();
+        using OpT = nanovdb::SetVoxel<float>;
+        acc.set<OpT>(nanovdb::Coord(103,0,0), -1.0f);// flip sign and value of an inactive voxel
+        acc.set<OpT>(nanovdb::Coord( 97,0,0),  1.0f);// (the corruption CudaSignedFloodFill uses)
+        hdl.deviceUpload(0, stream, true);
+        if (occupyDefault) {// keep the default stream busy for ~20 ms
+            int clockKHz = 0, dev = 0;
+            cudaCheck(cudaGetDevice(&dev));
+            cudaCheck(cudaDeviceGetAttribute(&clockKHz, cudaDevAttrClockRate, dev));
+            streamBusyWaitKernel<<<1, 1, 0, 0>>>(static_cast<unsigned long long>(clockKHz) * 20ull);
+            cudaCheck(cudaGetLastError());
+        }
+        nanovdb::tools::cuda::signedFloodFill(hdl.deviceGrid<float>(), false, stream);
+        hdl.deviceDownload(0, stream, true);
+        auto* out = hdl.grid<float>();
+        auto outAcc = out->getAccessor();
+        EXPECT_EQ( 3.0f, outAcc(103,0,0));
+        EXPECT_EQ( 0.0f, outAcc(100,0,0));
+        EXPECT_EQ(-3.0f, outAcc( 97,0,0));
+        return out->mChecksum.full();
+    };
+    const uint64_t reference = runOn(static_cast<cudaStream_t>(0), false);
+    cudaCheck(cudaDeviceSynchronize());
+    cudaStream_t nb = nullptr;
+    cudaCheck(cudaStreamCreateWithFlags(&nb, cudaStreamNonBlocking));
+    const uint64_t candidate = runOn(nb, /*occupyDefault=*/true);
+    cudaCheck(cudaStreamSynchronize(nb));
+    cudaCheck(cudaDeviceSynchronize());// drain the default-stream busy-wait so it can't leak into later tests
+    cudaCheck(cudaStreamDestroy(nb));
+    EXPECT_EQ(reference, candidate);
+}// NonBlockingStreamSignedFloodFill
+
+// Regression test: the grid-name copy must not over-read the source string.
+// It previously copied a fixed MaxNameSize bytes from the (possibly shorter)
+// std::string, over-reading host heap into the grid; now it copies only
+// min(name.size()+1, MaxNameSize) bytes. Empty, short, and maximum-length
+// names must round-trip.
+TEST(TestNanoVDBCUDA, GridName_CudaPointsToGrid)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    const std::vector<nanovdb::Coord> pts{ {0, 0, 0}, {1, 2, 3} };
+    auto build = [&](const std::string& name) {
+        auto buf = nanovdb::cuda::DeviceBuffer::create(pts.size() * sizeof(nanovdb::Coord), nullptr, false);
+        cudaCheck(cudaMemcpy(buf.deviceData(), pts.data(), pts.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+        nanovdb::tools::cuda::PointsToGrid<BuildT> conv;
+        conv.setGridName(name);
+        conv.setChecksum(nanovdb::CheckMode::Full);
+        auto h = conv.getHandle(static_cast<nanovdb::Coord*>(buf.deviceData()), pts.size());
+        h.deviceDownload();
+        return std::string(h.template grid<BuildT>()->gridName());
+    };
+    EXPECT_EQ(std::string(""),    build(""));       // empty name
+    EXPECT_EQ(std::string("rho"), build("rho"));    // short name
+    // Maximum name that fits with a null terminator (MaxNameSize includes it).
+    const std::string maxName(nanovdb::GridData::MaxNameSize - 1, 'x');
+    EXPECT_EQ(maxName, build(maxName));
+    // Over-long name (>= MaxNameSize) must be truncated to MaxNameSize-1 chars
+    // and stay null-terminated - never a non-terminated field that gridName()
+    // would over-read. The result is the max-length string, and reading it back
+    // as a C-string does not exceed MaxNameSize.
+    const std::string tooLong(nanovdb::GridData::MaxNameSize + 37, 'y');
+    const std::string got = build(tooLong);
+    EXPECT_EQ(size_t(nanovdb::GridData::MaxNameSize - 1), got.size());
+    EXPECT_EQ(std::string(nanovdb::GridData::MaxNameSize - 1, 'y'), got);
+}// GridName_CudaPointsToGrid
+
+// Regression test: PointsToGrid output must be byte-deterministic. Alignment
+// padding and stats fields previously carried recycled pool bytes, so the output
+// (and its full checksum) was nondeterministic; the buffer-wide zero-init fixes
+// this. Two independent builds of the same input must have identical full
+// checksums.
+TEST(TestNanoVDBCUDA, DeterministicOutput_CudaPointsToGrid)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    std::vector<nanovdb::Coord> pts;
+    for (int i = 0; i < 256; ++i) pts.emplace_back((i * 5) % 97, (i * 11) % 53, (i * 17) % 71);
+    auto buildChecksum = [&]() {
+        auto buf = nanovdb::cuda::DeviceBuffer::create(pts.size() * sizeof(nanovdb::Coord), nullptr, false);
+        cudaCheck(cudaMemcpy(buf.deviceData(), pts.data(), pts.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+        nanovdb::tools::cuda::PointsToGrid<BuildT> conv;
+        conv.setChecksum(nanovdb::CheckMode::Full);
+        auto h = conv.getHandle(static_cast<nanovdb::Coord*>(buf.deviceData()), pts.size());
+        h.deviceDownload();
+        return h.template grid<BuildT>()->mChecksum.full();
+    };
+    EXPECT_EQ(buildChecksum(), buildChecksum());
+}// DeterministicOutput_CudaPointsToGrid
+
+// Smoke test: repeated allocate/use/free on a non-blocking stream must complete without error.
+// Note this is only a smoke test - DeviceBufferMultiStreamFreeOrdering below is what actually
+// discriminates a premature free (compute-sanitizer memcheck on this path is a further gate).
+TEST(TestNanoVDBCUDA, DeviceBufferNonBlockingStreamLifetime)
+{
+    cudaStream_t stream = nullptr;
+    cudaCheck(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+    for (int i = 0; i < 16; ++i) {
+        auto buf = nanovdb::cuda::DeviceBuffer::create(size_t(1) << 20, nullptr, 0, stream);// 1 MiB on stream
+        EXPECT_TRUE(buf.deviceData());
+        cudaCheck(cudaMemsetAsync(buf.deviceData(), i & 0xff, buf.size(), stream));
+        // buf is destroyed here and must free on 'stream' (still alive).
+    }
+    cudaCheck(cudaStreamSynchronize(stream));
+    cudaCheck(cudaStreamDestroy(stream));
+    EXPECT_EQ(cudaSuccess, cudaGetLastError());
+}// DeviceBufferNonBlockingStreamLifetime
+
+__global__ void deviceBufferFillKernel(unsigned char *p, size_t n, unsigned char v)
+{
+    for (size_t i = blockIdx.x*(size_t)blockDim.x + threadIdx.x; i < n; i += (size_t)gridDim.x*blockDim.x) p[i] = v;
+}
+__global__ void deviceBufferCountKernel(const unsigned char *p, size_t n, unsigned char v, unsigned long long *bad)
+{
+    for (size_t i = blockIdx.x*(size_t)blockDim.x + threadIdx.x; i < n; i += (size_t)gridDim.x*blockDim.x)
+        if (p[i] != v) atomicAdd(bad, 1ull);
+}
+
+// Shared body of the two free-ordering regression tests below. A device-only buffer is used on
+// purpose: it owns no pinned host memory, so clear()'s cudaFreeHost (which implicitly
+// synchronizes) cannot mask a premature free. A second stream 'user' is parked behind a
+// busy-wait with a write to the buffer's raw pointer queued behind it, then the buffer is
+// destroyed. If the free is not ordered after 'user', the allocator recycles the block into the
+// next allocation and the late write corrupts it.
+//
+// The two scenarios cover the two distinct ways the free can be ordered:
+//  - blocking 'user', write NOT registered: the free, issued on the legacy default stream, is
+//    implicitly ordered after all blocking streams. Freeing on any other single stream (e.g.
+//    the buffer's most recently used one) would drop that and fail here.
+//  - non-blocking 'user', write registered via recordUse: no implicit ordering exists for
+//    non-blocking streams, so only the recorded event orders the free. Freeing on the default
+//    stream without the event fails here.
+static void testDeviceBufferFreeOrdering(bool nonBlockingUser, bool registerUse)
+{
+    const size_t N = size_t(64) << 20;// large enough that a recycled block is the same address
+    const unsigned char LATE = 0xAA, VICTIM = 0x55;
+    const unsigned long long CYCLES = 400000000ull;// parks 'user' for O(100 ms)
+
+    cudaStream_t user = nullptr, other = nullptr;
+    if (nonBlockingUser) {
+        cudaCheck(cudaStreamCreateWithFlags(&user, cudaStreamNonBlocking));
+    } else {
+        cudaCheck(cudaStreamCreate(&user));
+    }
+    cudaCheck(cudaStreamCreate(&other));
+    unsigned long long *bad = nullptr;
+    cudaCheck(cudaMallocManaged(&bad, sizeof(*bad)));
+
+    {// warm-up: on a cold context the first launches serialize, which would hide the race
+        unsigned char *w = nullptr;
+        cudaCheck(cudaMallocAsync((void**)&w, N, other));
+        streamBusyWaitKernel<<<1,1,0,user>>>(CYCLES/10);
+        deviceBufferFillKernel<<<1024,256,0,other>>>(w, N, 0);
+        deviceBufferCountKernel<<<1024,256,0,other>>>(w, N, 0, bad);
+        cudaCheck(cudaFreeAsync(w, other));
+        cudaCheck(cudaDeviceSynchronize());
+    }
+
+    void *devPtr = nullptr;
+    {
+        auto buf = nanovdb::cuda::DeviceBuffer::create(N, nullptr, 0, other);// device-only
+        devPtr = buf.deviceData(0);
+        ASSERT_TRUE(devPtr);
+        streamBusyWaitKernel<<<1,1,0,user>>>(CYCLES);// park 'user'
+        deviceBufferFillKernel<<<1024,256,0,user>>>((unsigned char*)devPtr, N, LATE);
+        if (registerUse) buf.recordUse(0, user);// raw-pointer use: tell the buffer about it
+    }// destroyed here; the free must be ordered after 'user' as well as 'other'
+
+    unsigned char *victim = nullptr;
+    cudaCheck(cudaMallocAsync((void**)&victim, N, other));
+    deviceBufferFillKernel<<<1024,256,0,other>>>(victim, N, VICTIM);
+    cudaCheck(cudaStreamSynchronize(other));
+
+    // Diagnostics only. These are deliberately NOT preconditions: with a correctly ordered free
+    // the allocator cannot hand this block out again until 'user' has drained, so observing
+    // "not recycled" or "no longer pending" here is the fix working, not a reason to skip.
+    const bool stillPending = (cudaStreamQuery(user) == cudaErrorNotReady);
+    cudaGetLastError();// clear the cudaErrorNotReady left by the query above
+    const bool recycled = (victim == devPtr);
+
+    cudaCheck(cudaStreamSynchronize(user));// let the late write land
+    *bad = 0;
+    deviceBufferCountKernel<<<1024,256>>>(victim, N, VICTIM, bad);
+    cudaCheck(cudaDeviceSynchronize());
+    const unsigned long long clobbered = *bad;
+
+    cudaCheck(cudaFreeAsync(victim, other));
+    cudaCheck(cudaStreamSynchronize(other));
+    cudaCheck(cudaFree(bad));
+    cudaCheck(cudaStreamDestroy(user));
+    cudaCheck(cudaStreamDestroy(other));
+
+    EXPECT_EQ(0u, clobbered) << "device memory was freed while another stream still had work in "
+                                "flight (block recycled: " << recycled
+                             << ", work still pending when it was reused: " << stillPending << ")";
+}// testDeviceBufferFreeOrdering
+
+TEST(TestNanoVDBCUDA, DeviceBufferMultiStreamFreeOrdering)
+{
+    testDeviceBufferFreeOrdering(/*nonBlockingUser=*/false, /*registerUse=*/false);
+}// DeviceBufferMultiStreamFreeOrdering
+
+TEST(TestNanoVDBCUDA, DeviceBufferNonBlockingFreeOrdering)
+{
+    testDeviceBufferFreeOrdering(/*nonBlockingUser=*/true, /*registerUse=*/true);
+}// DeviceBufferNonBlockingFreeOrdering
+
 TEST(TestNanoVDBCUDA, RefineCoarsen_ValueOnIndex)
 {
     using BuildT = nanovdb::ValueOnIndex;
@@ -3703,6 +4067,66 @@ TEST(TestNanoVDBCUDA, MergeGrids_ValueOnIndex)
     EXPECT_EQ(mergedTreeData.mVoxelCount, 42); // Each input grid has 27 active voxels, 12 shared between the two
 }// DilateInjectPrune_ValueOnIndex
 
+TEST(TestNanoVDBCUDA, MergeGridsNary_ValueOnIndex)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    using nanovdb::Coord;
+    using GridT = nanovdb::NanoGrid<BuildT>;
+    auto treeData = [](const GridT* g) {
+        return nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(g);
+    };
+
+    // Three inputs: A and B overlap (12 shared voxels, as in the binary test),
+    // C is disjoint and lives in a separate upper region.
+    std::vector<Coord> ptsA, ptsB, ptsC;
+    for (int i = 0; i <= 2; i++)
+        for (int j = 0; j <= 2; j++)
+            for (int k = 0; k <= 2; k++) {
+                ptsA.emplace_back(i - 1,    j * 8 - 1, k * 128);
+                ptsB.emplace_back(i,        j * 8 - 1, (k - 1) * 128);
+                ptsC.emplace_back(i + 4096, j,         k);
+            }
+
+    auto buildGrid = [](const std::vector<Coord>& pts, nanovdb::cuda::DeviceBuffer& buf) {
+        buf = nanovdb::cuda::DeviceBuffer::create(pts.size() * sizeof(Coord), nullptr, false);
+        cudaCheck(cudaMemcpy(buf.deviceData(), pts.data(), pts.size() * sizeof(Coord),
+                             cudaMemcpyHostToDevice));
+        return nanovdb::tools::cuda::voxelsToGrid<BuildT>(
+            static_cast<Coord*>(buf.deviceData()), pts.size());
+    };
+    nanovdb::cuda::DeviceBuffer bufA, bufB, bufC;
+    auto hA = buildGrid(ptsA, bufA); auto gA = hA.deviceGrid<BuildT>();
+    auto hB = buildGrid(ptsB, bufB); auto gB = hB.deviceGrid<BuildT>();
+    auto hC = buildGrid(ptsC, bufC); auto gC = hC.deviceGrid<BuildT>();
+
+    // N-ary merge of all three in a single call
+    auto naryH = nanovdb::tools::cuda::MergeGrids<BuildT>(
+        std::vector<const GridT*>{gA, gB, gC}).getHandle();
+    auto nary = treeData(naryH.deviceGrid<BuildT>());
+
+    // Chaining the binary form must yield byte-identical topology
+    auto abH = nanovdb::tools::cuda::MergeGrids<BuildT>(gA, gB).getHandle();
+    auto abcH = nanovdb::tools::cuda::MergeGrids<BuildT>(
+        abH.deviceGrid<BuildT>(), gC).getHandle();
+    auto chain = treeData(abcH.deviceGrid<BuildT>());
+    EXPECT_EQ(nary.mNodeCount[0], chain.mNodeCount[0]);
+    EXPECT_EQ(nary.mNodeCount[1], chain.mNodeCount[1]);
+    EXPECT_EQ(nary.mNodeCount[2], chain.mNodeCount[2]);
+    EXPECT_EQ(nary.mVoxelCount,   chain.mVoxelCount);
+
+    // Ground truth: |A u B| = 42, C disjoint (+27) => 69 unique voxels
+    EXPECT_EQ(nary.mVoxelCount, 69u);
+
+    // A single-element list returns a copy of that grid's topology
+    auto soloH = nanovdb::tools::cuda::MergeGrids<BuildT>(
+        std::vector<const GridT*>{gA}).getHandle();
+    EXPECT_EQ(treeData(soloH.deviceGrid<BuildT>()).mVoxelCount, treeData(gA).mVoxelCount);
+
+    // An empty input list is rejected
+    EXPECT_THROW(nanovdb::tools::cuda::MergeGrids<BuildT>(
+        std::vector<const GridT*>{}).getHandle(), std::runtime_error);
+}// MergeGridsNary_ValueOnIndex
+
 TEST(TestNanoVDBCUDA, GridHandle_from_HostBuffer)
 {
     using namespace nanovdb;
@@ -3740,3 +4164,178 @@ TEST(TestNanoVDBCUDA, GridHandle_from_HostBuffer)
     }
 }
 
+TEST(TestNanoVDBCUDA, MeshToGrid_EmptyMesh)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+
+    nanovdb::Map map;
+    map.set(0.1, nanovdb::Vec3d(0.0));
+
+    nanovdb::tools::cuda::MeshToGrid<BuildT> converter(nullptr, 0u, nullptr, 0u, map);
+    converter.setVerbose(0);
+    auto handle = converter.getHandle();
+    handle.deviceDownload();
+    const auto* grid = handle.grid<BuildT>();
+    ASSERT_NE(grid, nullptr);
+    EXPECT_EQ(grid->tree().activeVoxelCount(), 0);
+}// MeshToGrid_EmptyMesh
+
+TEST(TestNanoVDBCUDA, MeshToGrid_UnitTetrahedron)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+
+    // Unit tetrahedron: four vertices, four triangular faces.
+    // Vertex coordinates are in world space.
+    const std::vector<nanovdb::Vec3f> hostPoints = {
+        {0.f, 0.f, 0.f},  // p0
+        {1.f, 0.f, 0.f},  // p1
+        {0.f, 1.f, 0.f},  // p2
+        {0.f, 0.f, 1.f},  // p3
+    };
+    // t0: z=0 face, t1: x=0 face, t2: y=0 face, t3: diagonal face (x+y+z=1)
+    const std::vector<nanovdb::Vec3i> hostTriangles = {
+        {0, 1, 2},
+        {0, 2, 3},
+        {0, 3, 1},
+        {1, 2, 3},
+    };
+
+    auto nPoints = hostPoints.size();
+    auto nTriangles = hostTriangles.size();
+
+    // Upload points and triangles to device
+    auto pointsBuf = nanovdb::cuda::DeviceBuffer::create(nPoints * sizeof(nanovdb::Vec3f), nullptr, false);
+    ASSERT_TRUE(pointsBuf.deviceData());
+    cudaCheck(cudaMemcpy(pointsBuf.deviceData(), hostPoints.data(),
+                         nPoints * sizeof(nanovdb::Vec3f), cudaMemcpyHostToDevice));
+
+    auto trisBuf = nanovdb::cuda::DeviceBuffer::create(nTriangles * sizeof(nanovdb::Vec3i), nullptr, false);
+    ASSERT_TRUE(trisBuf.deviceData());
+    cudaCheck(cudaMemcpy(trisBuf.deviceData(), hostTriangles.data(),
+                         nTriangles * sizeof(nanovdb::Vec3i), cudaMemcpyHostToDevice));
+
+    auto dPoints = static_cast<const nanovdb::Vec3f*>(pointsBuf.deviceData());
+    auto dTriangles = static_cast<const nanovdb::Vec3i*>(trisBuf.deviceData());
+
+    // Uniform-scale map: world = dx * index
+    const double dx = 0.1;
+    nanovdb::Map map;
+    map.set(dx, nanovdb::Vec3d(0.0));
+
+    const float bandWidth = 3.0f;  // default, in voxels
+    const float bandWidthWorld = bandWidth * float(dx);
+
+    // CPU brute-force UDF in index space (matches GPU arithmetic exactly):
+    // transform world-space verts to index space, compute pointToTriangleDistSqr
+    // with integer voxel centers, scale result to world space.
+    std::array<nanovdb::Vec3f, 4> idxVerts;
+    for (uint32_t i = 0; i < nPoints; ++i)
+        idxVerts[i] = map.applyInverseMap(hostPoints[i]);
+
+    auto cpuUDF = [&](int ix, int iy, int iz) -> float {
+        const nanovdb::Vec3f p{float(ix), float(iy), float(iz)};
+        float minDistSqr = std::numeric_limits<float>::max();
+        for (const auto& tri : hostTriangles) {
+            const float d = nanovdb::math::pointToTriangleDistSqr<nanovdb::Vec3f>(
+                idxVerts[tri[0]], idxVerts[tri[1]], idxVerts[tri[2]], p);
+            minDistSqr = std::min(minDistSqr, d);
+        }
+        return std::sqrt(minDistSqr) * float(dx);  // world-space distance
+    };
+
+    // --- Topology-only path ---
+    uint64_t topoChecksum = 0;
+    {
+        nanovdb::tools::cuda::MeshToGrid<BuildT> conv(dPoints, nPoints, dTriangles, nTriangles, map);
+        conv.setVerbose(0);
+        conv.setChecksum(nanovdb::CheckMode::Full);
+        auto handle = conv.getHandle();
+        handle.deviceDownload();
+        const auto* topoGrid = handle.grid<BuildT>();
+        ASSERT_NE(topoGrid, nullptr);
+        topoChecksum = topoGrid->mChecksum.full();
+        EXPECT_GT(topoGrid->tree().activeVoxelCount(), uint64_t(0));
+    }
+
+    // --- UDF path ---
+    nanovdb::tools::cuda::MeshToGrid<BuildT> converter(dPoints, nPoints, dTriangles, nTriangles, map);
+    converter.setVerbose(0);
+    converter.setChecksum(nanovdb::CheckMode::Full);
+    auto [handle, sidecarBuf] = converter.getHandleAndUDF();
+
+    handle.deviceDownload();
+    const auto* grid = handle.grid<BuildT>();
+    ASSERT_NE(grid, nullptr);
+
+    const uint64_t sidecarCount = sidecarBuf.size() / sizeof(float);
+    std::vector<float> hostSidecar(sidecarCount);
+    cudaCheck(cudaMemcpy(hostSidecar.data(), sidecarBuf.deviceData(),
+                         sidecarBuf.size(), cudaMemcpyDeviceToHost));
+
+    // Per-voxel UDF correctness: every active voxel must lie inside the narrow band
+    // and its sidecar distance must match the CPU brute-force value within 1e-3 voxels.
+    const uint32_t nLeaves = grid->tree().nodeCount(0);
+    const auto* leaves  = grid->tree().getFirstLeaf();
+    uint64_t activeCount = 0;
+
+    for (uint32_t li = 0; li < nLeaves; ++li) {
+        const auto& leaf = leaves[li];
+        const auto  org  = leaf.origin();
+        for (int vi = 0; vi < 512; ++vi) {
+            if (!leaf.isActive(vi)) continue;
+            ++activeCount;
+
+            const auto local = nanovdb::NanoLeaf<BuildT>::OffsetToLocalCoord(vi);
+            const int ix = org[0]+local[0], iy = org[1]+local[1], iz = org[2]+local[2];
+
+            const float exactUDF = cpuUDF(ix, iy, iz);
+            ASSERT_LE(exactUDF, bandWidthWorld * (1.f + 1e-5f))
+                << "Active voxel at (" << ix << "," << iy << "," << iz
+                << ") is outside the narrow band (distance=" << exactUDF/float(dx) << " voxels)";
+
+            const uint64_t sIdx = leaf.getValue(vi);
+            ASSERT_LT(sIdx, sidecarCount) << "Sidecar index out of range";
+
+            const float ourUDF    = hostSidecar[sIdx];
+            const float errVoxels = std::abs(ourUDF - exactUDF) / float(dx);
+            EXPECT_LT(errVoxels, 1e-3f)
+                << "UDF error at (" << ix << "," << iy << "," << iz
+                << "): ours=" << ourUDF/float(dx) << " exact=" << exactUDF/float(dx) << " voxels";
+        }
+    }
+    EXPECT_GT(activeCount, uint64_t(0));
+
+    // Build a flat set of active coord keys from the leaf iteration
+    // Encode each (ix,iy,iz) as a uint64_t with 21 bits per axis, offset by 2^20.
+    auto encodeCoord = [](int x, int y, int z) -> uint64_t {
+        return (uint64_t(x + (1<<20)))
+             | (uint64_t(y + (1<<20)) << 21)
+             | (uint64_t(z + (1<<20)) << 42);
+    };
+    std::unordered_set<uint64_t> activeSet;
+    activeSet.reserve(activeCount);
+    for (uint32_t li = 0; li < nLeaves; ++li) {
+        const auto& leaf = leaves[li];
+        const auto  org  = leaf.origin();
+        for (int vi = 0; vi < 512; ++vi) {
+            if (!leaf.isActive(vi)) continue;
+            const auto local = nanovdb::NanoLeaf<BuildT>::OffsetToLocalCoord(vi);
+            activeSet.insert(encodeCoord(org[0]+local[0], org[1]+local[1], org[2]+local[2]));
+        }
+    }
+
+    // No false negatives: every voxel with CPU UDF strictly inside the band must be active.
+    const int ilo = (int)std::floor(-bandWidth) - 1;
+    const int ihi = (int)std::ceil(1.0 / dx + bandWidth) + 1;
+    uint64_t missedCount = 0;
+    for (int ix = ilo; ix <= ihi; ++ix)
+        for (int iy = ilo; iy <= ihi; ++iy)
+            for (int iz = ilo; iz <= ihi; ++iz)
+                if (cpuUDF(ix, iy, iz) < bandWidthWorld)
+                    if (activeSet.count(encodeCoord(ix, iy, iz)) == 0)
+                        ++missedCount;
+    EXPECT_EQ(missedCount, uint64_t(0));
+
+    // getHandle() and getHandleAndUDF() must produce identical grids.
+    EXPECT_EQ(grid->mChecksum.full(), topoChecksum);
+}// MeshToGrid_UnitTetrahedron

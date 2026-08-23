@@ -58,6 +58,11 @@ public:
         }
     }
 
+    /// @brief  Constructor that fills this tuple with a value
+    explicit Tuple(const T val) {
+        for (int i = 0; i < size; ++i) { mm[i] = val; }
+    }
+
     // @brief  const access to an element in the tuple. The offset idx must be
     //   an integral type. A copy of the tuple data is returned.
     template <typename IdxT,
@@ -104,6 +109,55 @@ public:
         return mm;
     }
     //@}  Compatibility
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    Tuple operator+(Tuple in) const {
+        Tuple r; for (int i = 0; i < SIZE; ++i) r[i] = mm[i] + in[i]; return r;
+    }
+    Tuple operator-(Tuple in) const {
+        Tuple r; for (int i = 0; i < SIZE; ++i) r[i] = mm[i] - in[i]; return r;
+    }
+    Tuple operator*(Tuple in) const {
+        Tuple r; for (int i = 0; i < SIZE; ++i) r[i] = mm[i] * in[i]; return r;
+    }
+    Tuple operator/(Tuple in) const {
+        Tuple r; for (int i = 0; i < SIZE; ++i) r[i] = mm[i] / in[i]; return r;
+    }
+    Tuple operator&(Tuple in) const {
+        Tuple r; for (int i = 0; i < SIZE; ++i) r[i] = mm[i] & in[i]; return r;
+    }
+    Tuple operator|(Tuple in) const {
+        Tuple r; for (int i = 0; i < SIZE; ++i) r[i] = mm[i] | in[i]; return r;
+    }
+
+    Tuple& operator+=(Tuple in) { for (int i = 0; i < SIZE; ++i) mm[i] += in[i]; return *this; }
+    Tuple& operator-=(Tuple in) { for (int i = 0; i < SIZE; ++i) mm[i] -= in[i]; return *this; }
+    Tuple& operator*=(Tuple in) { for (int i = 0; i < SIZE; ++i) mm[i] *= in[i]; return *this; }
+    Tuple& operator/=(Tuple in) { for (int i = 0; i < SIZE; ++i) mm[i] /= in[i]; return *this; }
+    Tuple& operator&=(Tuple in) { for (int i = 0; i < SIZE; ++i) mm[i] &= in[i]; return *this; }
+    Tuple& operator|=(Tuple in) { for (int i = 0; i < SIZE; ++i) mm[i] |= in[i]; return *this; }
+
+    Tuple<SIZE, bool> operator>=(Tuple in) const {
+        Tuple<SIZE, bool> r; for (int i = 0; i < SIZE; ++i) r[i] = mm[i] >= in[i]; return r;
+    }
+    Tuple<SIZE, bool> operator<=(Tuple in) const {
+        Tuple<SIZE, bool> r; for (int i = 0; i < SIZE; ++i) r[i] = mm[i] <= in[i]; return r;
+    }
+    Tuple<SIZE, bool> operator>(Tuple in) const {
+        Tuple<SIZE, bool> r; for (int i = 0; i < SIZE; ++i) r[i] = mm[i] > in[i]; return r;
+    }
+    Tuple<SIZE, bool> operator<(Tuple in) const {
+        Tuple<SIZE, bool> r; for (int i = 0; i < SIZE; ++i) r[i] = mm[i] < in[i]; return r;
+    }
+    Tuple<SIZE, bool> operator==(Tuple in) const {
+        Tuple<SIZE, bool> r; for (int i = 0; i < SIZE; ++i) r[i] = mm[i] == in[i]; return r;
+    }
+    Tuple<SIZE, bool> operator!=(Tuple in) const {
+        Tuple<SIZE, bool> r; for (int i = 0; i < SIZE; ++i) r[i] = mm[i] != in[i]; return r;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
 
     /// @return string representation of Classname
     std::string str() const {
@@ -165,36 +219,21 @@ protected:
     T mm[SIZE];
 };
 
+///////////////////////////////////////////////////////////////////////////
 
-////////////////////////////////////////
-
-
-/// @return true if t0 < t1, comparing components in order of significance.
-template<int SIZE, typename T0, typename T1>
-bool
-operator<(const Tuple<SIZE, T0>& t0, const Tuple<SIZE, T1>& t1)
+template<int SIZE>
+inline Tuple<SIZE, bool> operator&&(const Tuple<SIZE, bool> a, const Tuple<SIZE, bool> b)
 {
-    for (int i = 0; i < SIZE-1; ++i) {
-        if (!isExactlyEqual(t0[i], t1[i])) return t0[i] < t1[i];
-    }
-    return t0[SIZE-1] < t1[SIZE-1];
+    return a & b;
 }
 
-
-/// @return true if t0 > t1, comparing components in order of significance.
-template<int SIZE, typename T0, typename T1>
-bool
-operator>(const Tuple<SIZE, T0>& t0, const Tuple<SIZE, T1>& t1)
+template<int SIZE>
+inline Tuple<SIZE, bool> operator||(const Tuple<SIZE, bool> a, const Tuple<SIZE, bool> b)
 {
-    for (int i = 0; i < SIZE-1; ++i) {
-        if (!isExactlyEqual(t0[i], t1[i])) return t0[i] > t1[i];
-    }
-    return t0[SIZE-1] > t1[SIZE-1];
+    return a | b;
 }
 
-
-////////////////////////////////////////
-
+///////////////////////////////////////////////////////////////////////////
 
 /// @return the absolute value of the given Tuple.
 template<int SIZE, typename T>

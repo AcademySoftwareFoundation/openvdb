@@ -1,0 +1,8 @@
+Houdini:
+  Improvements:
+  - Synchronize UT_CameraParms with Houdini 22
+  - Add Assume Uniform Scale option to Filter tools to avoid scale
+    drift.
+  - Update reference files from Houdini 22
+  - format() supports UT type enum.
+  

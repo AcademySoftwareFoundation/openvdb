@@ -116,7 +116,7 @@ const typename std::enable_if<VecTraits<T>::IsVec, T>::type& // = T if T is a ve
 min(const T& a, const T& b)
 {
     const typename T::ValueType aMag = a.lengthSqr(), bMag = b.lengthSqr();
-    return (aMag < bMag ? a : (bMag < aMag ? b : std::min(a, b)));
+    return (aMag < bMag ? a : (bMag < aMag ? b : math::cwiseLessThan(a, b) ? a : b));
 }
 
 template<typename T> inline
@@ -124,7 +124,7 @@ const typename std::enable_if<VecTraits<T>::IsVec, T>::type&
 max(const T& a, const T& b)
 {
     const typename T::ValueType aMag = a.lengthSqr(), bMag = b.lengthSqr();
-    return (aMag < bMag ? b : (bMag < aMag ? a : std::max(a, b)));
+    return (aMag < bMag ? b : (bMag < aMag ? a : math::cwiseGreaterThan(a, b) ? a : b));
 }
 
 

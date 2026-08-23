@@ -21,6 +21,9 @@
 
 #include <UT/UT_Version.h>
 #include <GEO/GEO_PrimVolume.h>
+#if SYS_VERSION_MAJOR_INT >= 22
+#include <GEO/GEO_ImplicitSurfaceVDB.h>
+#endif
 #include <GU/GU_PrimVDB.h>
 #include <GU/GU_ConvexHull3D.h>
 #include <OP/OP_Node.h>
@@ -278,6 +281,13 @@ instead and activated as if they were specified as World Positions.)"));
                 .setTooltip("If turned on, activate with convex hull of points.")
                 .setDocumentation(
 R"(If turned on, only convex hull fo points are used for activation.)"));
+#if SYS_VERSION_MAJOR_INT >= 22
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "useimplicit", "Activate Using Implicit Surface")
+                .setDefault(PRMzeroDefaults)
+                .setTooltip("If turned on, activate with implicit surface from second input.")
+                .setDocumentation(
+R"(If turned on, the implicit surface from the second input is used for activation.)"));
+#endif
     parms.add(hutil::ParmFactory(PRM_STRING, "boundptgroup", "Convex Hull Group")
               .setChoiceList(&SOP_Node::pointGroupMenu)
               .setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_POINT,
@@ -418,10 +428,18 @@ SOP_VDBActivate::updateParmsFlags()
 #if UT_VERSION_INT >= 0x13050000        // 19.5 or later
     bool usevdb = evalInt("usevdb", 0, 0.0f);
     bool usehull = evalInt("usehull", 0, 0.0f);
-    changed += enableParm("usehull", has_bounds && !usevdb);
-    changed += enableParm("boundptgroup", has_bounds && !usevdb && usehull);
-    changed += enableParm("worldoffset", has_bounds && !usevdb && usehull);
-    changed += enableParm("voxeloffset", has_bounds && !usevdb && usehull);
+#if SYS_VERSION_MAJOR_INT >= 22
+    bool useimplicit = evalInt("useimplicit", 0, 0.0f);
+#else
+    bool useimplicit = false;
+#endif
+    changed += enableParm("usehull", has_bounds && !usevdb && !useimplicit);
+#if SYS_VERSION_MAJOR_INT >= 22
+    changed += enableParm("useimplicit", has_bounds && !usevdb && !usehull);
+#endif
+    changed += enableParm("boundptgroup", has_bounds && !usevdb && usehull && !useimplicit);
+    changed += enableParm("worldoffset", has_bounds && !usevdb && (usehull || useimplicit));
+    changed += enableParm("voxeloffset", has_bounds && !usevdb && (usehull || useimplicit));
 #endif
 
     changed += enableParm("operation", regionusesvalue);
@@ -1189,6 +1207,37 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
                                              evalInt("setvalue", 0, t),
                                              evalFloat("value", 0, t),
                                              hullbbox);
+                        }
+#endif
+#if SYS_VERSION_MAJOR_INT >= 22
+                        else if (evalInt("useimplicit", 0, t))
+                        {
+                            UT_BoundingBoxF bbox;
+                            bounds_src->getBBox(&bbox);
+                            bbox = UTvdbConvert(sopSopToIndexBBox(bbox, *vdb));
+
+                            GEO_ImplicitSurface<VEX_32> surface(*bounds_src);
+                            surface.applyIndexSpaceTransform(vdb->getIndexSpaceTransform());
+
+                            float voxelsize = vdb->getVoxelSize().maxComponent();
+                            float offset = evalFloat("voxeloffset", 0, t) + evalFloat("worldoffset", 0, t) / voxelsize;
+                            if (offset != 0.0)
+                            {
+                                // applying offset in voxelspace as we have already applied `applyIndexSpaceTransform`
+                                surface.applyOffset(offset);
+                            }
+
+                            float off = surface.offsetEstimate();
+                            bbox.expandBounds(off, off, off);
+
+                            UTvdbCallAllTopology(vdb->getStorageType(),
+                                             geoImplicitSurfaceActivateVDB,
+                                             vdb->getGrid(),
+                                             surface,
+                                             sopXlateOperation(OPERATION(t)),
+                                             evalInt("setvalue", 0, t),
+                                             evalFloat("value", 0, t),
+                                             bbox);
                         }
 #endif
                         else

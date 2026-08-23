@@ -1,6 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
+#ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
 #include <algorithm>
 #include <cmath>
@@ -50,15 +51,14 @@ reportStats(const char *label, const std::vector<float> &samples)
 
 void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int width, int height, BufferT& imageBuffer)
 {
-    using GridT = nanovdb::FloatGrid;
+    using GridT  = nanovdb::FloatGrid;
     using CoordT = nanovdb::Coord;
-    using RealT = float;
-    using Vec3T = nanovdb::math::Vec3<RealT>;
-    using RayT = nanovdb::math::Ray<RealT>;
+    using RealT  = float;
+    using Vec3T  = nanovdb::math::Vec3<RealT>;
+    using RayT   = nanovdb::math::Ray<RealT>;
 
     auto *h_grid = handle.grid<float>();
-    if (!h_grid)
-        throw std::runtime_error("GridHandle does not contain a valid host grid");
+    if (!h_grid) throw std::runtime_error("GridHandle does not contain a valid host grid");
 
     float* h_outImage = reinterpret_cast<float*>(imageBuffer.data());
 
@@ -88,7 +88,7 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
             float  t0;
             CoordT ijk;
             float  v;
-            if (nanovdb::math::ZeroCrossing(iRay, acc, ijk, v, t0)) {
+            if (nanovdb::math::zeroCrossing(iRay, acc, ijk, v, t0)) {
                 // write distance to surface. (we assume it is a uniform voxel)
                 float wT0 = t0 * float(grid->voxelSize()[0]);
                 compositeOp(image, i, width, height, wT0 / (wBBoxDimZ * 2), 1.0f);

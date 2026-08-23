@@ -527,6 +527,45 @@ inline Vec2<T> Exp(Vec2<T> v) { return v.exp(); }
 template <typename T>
 inline Vec2<T> Log(Vec2<T> v) { return v.log(); }
 
+/// @brief  Componentwise less than for Vec2 types.
+template <typename T1, typename T2>
+inline bool cwiseLessThan(const Vec2<T1>& a, const Vec2<T2>& b)
+{
+    if (!isExactlyEqual(a[0], b[0])) return a[0] < b[0];
+    return a[1] < b[1];
+}
+
+/// @brief  Componentwise greater than for Vec2 types.
+template <typename T1, typename T2>
+inline bool cwiseGreaterThan(const Vec2<T1>& a, const Vec2<T2>& b)
+{
+    if (!isExactlyEqual(a[0], b[0])) return a[0] > b[0];
+    return a[1] > b[1];
+}
+
+#ifndef OPENVDB_ENABLE_VEC_RELATIONAL_OPERATIONS
+template <typename T1, typename T2>
+inline bool operator<(const Vec2<T1>& a, const Vec2<T2>& b) = delete;
+template <typename T1, typename T2>
+inline bool operator>(const Vec2<T1>& a, const Vec2<T2>& b) = delete;
+#else
+/// @return true if a < b, comparing components in order of significance.
+template <typename T1, typename T2>
+OPENVDB_DEPRECATED_MESSAGE("relational operator< on vectors is ambiguous")
+inline bool operator<(const Vec2<T1>& a, const Vec2<T2>& b)
+{
+    return cwiseLessThan(a, b);
+}
+
+/// @return true if a > b, comparing components in order of significance.
+template <typename T1, typename T2>
+OPENVDB_DEPRECATED_MESSAGE("relational operator> on vectors is ambiguous")
+inline bool operator>(const Vec2<T1>& a, const Vec2<T2>& b)
+{
+    return cwiseGreaterThan(a, b);
+}
+#endif
+
 using Vec2i = Vec2<int32_t>;
 using Vec2ui = Vec2<uint32_t>;
 using Vec2s = Vec2<float>;
