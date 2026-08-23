@@ -2,6 +2,7 @@ NanoVDB:
 
   New Features:
   - Added new _hostdev_ function named nanovdb::math::isoCrossing, which intersects a ray against a user-defined iso-surface.
+  - Added doc/nanovdb/TEACHME, an interactive tutorial for the NanoVDB user API: lesson documents written to be loaded by an LLM coding agent, which then teaches the API interactively to a developer new to NanoVDB. Ships with a cheat sheet, a GPU ray-marching capstone, and a CI harness that compiles every code block in the lesson against the NanoVDB headers so the tutorial cannot drift from the API.
   - Added nanovdb::cuda::Buffer and nanovdb::cuda::BufferView (CUDA): a typed, resource-aware, stream-ordered container that allocates from an injectable memory resource and frees on its retained stream, and a non-owning view over externally managed memory that a GridHandle can wrap without copying. Member names follow cuda::buffer (destroy, set_stream, swap). Also added the synchronous resource concept nanovdb::cuda::is_resource alongside is_async_resource.
 
   Improvements:
