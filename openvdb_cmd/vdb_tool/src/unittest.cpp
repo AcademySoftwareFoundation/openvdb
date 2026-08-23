@@ -3696,6 +3696,70 @@ TEST_F(Test_vdb_tool, ActionMultiply)
     std::remove("data/test_mul_out.vdb");
 }// ActionMultiply
 
+TEST_F(Test_vdb_tool, StackOptionNameResolution)
+{
+    // "vdb"/"geo" options accept a grid/geometry name wherever a stack age is
+    // accepted: Tool::resolveStackOptions() rewrites the option in place (via
+    // Parser::beforeActionRun) before every action runs, translating non-numeric
+    // tokens into the ascending list of every stack age with that exact name.
+    using namespace openvdb::vdb_tool;
+
+    // A plain name resolves to its (single) age, same as the equivalent index.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -sphere name=b dim=8 -stats vdb=b");
+      EXPECT_NE(out.find("age"), std::string::npos);
+      // age 0 is "b" (most recently added); the name lookup must resolve to it,
+      // not to age 1 ("a").
+      EXPECT_NE(out.find("0  b"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    // An ambiguous name expands to EVERY matching age, ascending, not just the
+    // most recent: three grids named a/other/a (ages 2,1,0 respectively) with
+    // "vdb=1,a" must resolve to ages 1,0,2 (literal token order; "a" itself
+    // expands low-to-high).
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -sphere name=other dim=8 -sphere name=a dim=8"
+          " -stats vdb=1,a");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      // All three rows (other, and both "a" grids) must be present.
+      EXPECT_NE(out.find("1  other"), std::string::npos);
+      EXPECT_NE(out.find("0  a"), std::string::npos);
+      EXPECT_NE(out.find("2  a"), std::string::npos);
+    }
+
+    // A name that matches nothing on the stack is reported exactly like an
+    // out-of-range numeric index: a non-fatal, logged "skipping due to" error
+    // naming the culprit, not a silent no-op.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -stats vdb=nope");
+      EXPECT_NE(out.find("stats: skipping due to: stats: no VDB grid named \"nope\" on the stack"),
+                std::string::npos);
+    }
+
+    // "*" and "" (omitted) must still pass through untouched.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere name=a dim=8 -stats vdb=*");
+      EXPECT_NE(out.find("0  a"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    // "geo" resolves names against the Geometry stack independently of "vdb".
+    {
+      std::remove("data/test_geo_name.obj");
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere dim=8 -ls2mesh name=mesh_a"
+          " -rename geo=mesh_a name=renamed"
+          " -write geo=0 data/test_geo_name.obj");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_TRUE(fileExists("data/test_geo_name.obj"));
+      std::remove("data/test_geo_name.obj");
+    }
+}// StackOptionNameResolution
+
 int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);

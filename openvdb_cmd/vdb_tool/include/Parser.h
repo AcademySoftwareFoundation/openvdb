@@ -1100,6 +1100,11 @@ struct Parser {
     ///        If it returns false, the error is logged as a skip and execution continues.
     ///        The callback receives (action_name, exception_message).
     std::function<bool(const std::string&, const std::string&)> onActionError = nullptr;
+    /// @brief Optional callback invoked once per action, immediately before its run()
+    ///        callback fires (with getAction() already referring to that action). Lets a
+    ///        subclass/owner rewrite option values in place (e.g. resolving names to
+    ///        indices) using state that isn't available to the generic Parser.
+    std::function<void()> beforeActionRun = nullptr;
 };// Parser struct
 
 // ==============================================================================================================
@@ -1603,6 +1608,7 @@ void Parser::run()
         if (onActionError) {
             // Centralized error handling: wrap the action callback
             try {
+                if (beforeActionRun) beforeActionRun();
                 iter->run();
             } catch (const std::exception& e) {
                 const std::string &action_name = iter->names[0];
@@ -1615,6 +1621,7 @@ void Parser::run()
             }
         } else {
             // Fallback if no error handler is registered (original behavior)
+            if (beforeActionRun) beforeActionRun();
             iter->run();
         }
     }

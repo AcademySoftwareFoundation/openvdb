@@ -408,6 +408,21 @@ private:
     /// @throw std::invalid_argument if @a age exceeds the current stack depth.
     inline auto getGeom(size_t age) const;
 
+    /// @brief Rewrite the current action's "vdb" and "geo" options in place, translating
+    ///        any grid/geometry name tokens into their (possibly several) stack ages.
+    /// @details Installed as mParser.beforeActionRun so it runs automatically before every
+    ///          action, letting each action's existing numeric parsing and error handling
+    ///          (age lists, "*", out-of-range checks, etc.) operate unchanged downstream.
+    void resolveStackOptions();
+    /// @brief Translate one "vdb"/"geo" option value, expanding any non-numeric (name) token
+    ///        into the comma-separated, ascending list of every current stack age with that
+    ///        exact name.
+    /// @param optName Option name, either "vdb" or "geo" (selects which stack to search).
+    /// @param raw     Fully expression-resolved option value (i.e. after {} substitution).
+    /// @return The translated value: unchanged if empty or "*", otherwise every token is numeric.
+    /// @throw std::out_of_range if a name token matches no entry on the corresponding stack.
+    std::string resolveStackOption(const std::string &optName, const std::string &raw) const;
+
     /// @brief Convert the output of a VolumeToMesh pass into a Geometry instance.
     Geometry::Ptr mesherToGeometry(tools::VolumeToMesh&) const;
     /// @brief Adaptively mesh a scalar grid at @a isoValue and return the result as a Geometry.
@@ -451,6 +466,8 @@ Tool::Tool(int argc, char *argv[])
         mParser.onActionError = [this](const std::string&, const std::string&) {
             return mErrorOnWarning; // true = fatal (re-throw), false = skip
         };
+        // Translate "vdb"/"geo" name tokens into stack ages before every action runs.
+        mParser.beforeActionRun = [this](){ this->resolveStackOptions(); };
         mParser.parse(argc, argv);// extremely fast, but might throw
     } catch (const std::exception& e) {
         this->endLog();
@@ -533,6 +550,58 @@ auto Tool::getGeom(size_t age) const
     std::advance(it, age);
     return it;
 }// Tool::getGeom
+
+// ==============================================================================================================
+
+void Tool::resolveStackOptions()
+{
+    for (auto &opt : mParser.getAction().options) {
+        if (opt.name != "vdb" && opt.name != "geo") continue;
+        // Read via Parser::get (not opt.value directly) so any {} expression in the
+        // option is fully expanded before name resolution sees it.
+        opt.value = this->resolveStackOption(opt.name, mParser.get<std::string>(opt.name));
+    }
+}// Tool::resolveStackOptions
+
+// ==============================================================================================================
+
+std::string Tool::resolveStackOption(const std::string &optName, const std::string &raw) const
+{
+    if (raw.empty() || raw == "*") return raw;// unchanged: every action already special-cases these
+
+    const bool isVdb = optName == "vdb";
+    const size_t stackSize = isVdb ? mGrid.size() : mGeom.size();
+    const std::string &actionName = mParser.getAction().names[0];
+
+    VecS out;
+    for (const std::string &tok : tokenize(raw, "(),")) {
+        int age;
+        if (isInt(tok, age)) { out.push_back(tok); continue; }// already a stack age
+        // Name lookup: scan age 0 (top/most-recent) upward, collecting every match.
+        std::vector<int> matches;
+        int a = 0;
+        if (isVdb) {
+            for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it, ++a)
+                if ((*it)->getName() == tok) matches.push_back(a);
+        } else {
+            for (auto it = mGeom.crbegin(); it != mGeom.crend(); ++it, ++a)
+                if ((*it)->getName() == tok) matches.push_back(a);
+        }
+        if (matches.empty()) {
+            throw std::out_of_range(actionName + ": no " + (isVdb ? "VDB grid" : "Geometry") +
+                                    " named \"" + tok + "\" on the stack (stack size " +
+                                    std::to_string(stackSize) + ")");
+        }
+        for (int m : matches) out.push_back(std::to_string(m));// crbegin order is already ascending age
+    }
+
+    std::string result;
+    for (size_t i = 0; i < out.size(); ++i) {
+        if (i) result += ",";
+        result += out[i];
+    }
+    return result;
+}// Tool::resolveStackOption
 
 // ==============================================================================================================
 
