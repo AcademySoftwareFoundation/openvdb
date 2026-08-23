@@ -23,6 +23,7 @@
 #include <nanovdb/GridHandle.h>
 
 #include <string>// for the grid index in chain-validation error messages
+#include <type_traits>// for std::is_default_constructible in cuda::copyTo
 
 namespace nanovdb {
 
@@ -147,6 +148,39 @@ inline ScratchT makeMetaScratch(const BufferT& buf, uint64_t count, cudaStream_t
     else { (void)stream; return ScratchT(buf.resource(), count, noInit); }
 }
 
+/// @brief Allocates @c bytes of destination storage for a cross-space
+///        transfer: single-space buffers allocate through @c proto's resource
+///        (or a default-constructed resource without one), on @c stream when
+///        the resource is stream-ordered; buffers providing create() go
+///        through it.
+template<typename DstBufferT>
+inline DstBufferT makeTransferStorage(uint64_t bytes, cudaStream_t stream, const DstBufferT* proto)
+{
+    if constexpr (BufferHasDeviceSingle<DstBufferT>::value || BufferHasHostSingle<DstBufferT>::value) {
+        using ResourceT = typename DstBufferT::ResourceType;
+        if (!proto) {
+            // both branches of a plain conditional would instantiate the
+            // default-resource constructor, breaking non-default-constructible
+            // resources (e.g. ResourceRef) even for callers that pass a proto
+            if constexpr (std::is_default_constructible<ResourceT>::value) {
+                if constexpr (is_async_resource<ResourceT>::value) return DstBufferT(stream, bytes, noInit);
+                else                                               return DstBufferT(bytes, noInit);
+            } else {
+                throw std::runtime_error("cuda::copyTo: a destination buffer over a non-default-constructible "
+                                         "resource requires a prototype buffer");
+            }
+        }
+        if constexpr (is_async_resource<ResourceT>::value) {
+            return DstBufferT(stream, proto->resource(), bytes, noInit);
+        } else {
+            (void)stream;
+            return DstBufferT(proto->resource(), bytes, noInit);
+        }
+    } else {
+        return DstBufferT::create(bytes, proto);
+    }
+}
+
 }// namespace detail
 
 template<typename BufferT, template <class, class...> class VectorT = std::vector>
@@ -208,6 +242,79 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, const BufferT* oth
     }
     return GridHandle<BufferT>(std::move(buffer));
 }// cuda::mergeGridHandles
+
+/// @brief Deep-copies a grid handle into a different address space: the
+///        explicit, stream-carrying transfer between single-space device
+///        handles and host-readable handles (HostBuffer or a host-accessible
+///        single-space buffer such as a pinned-resource cuda::Buffer).
+/// @tparam DstBufferT destination buffer type (specify explicitly)
+/// @param src the handle to copy; must not be dual-space (use
+///        deviceUpload/deviceDownload on those)
+/// @param stream stream the copy is issued on; a device destination buffer
+///        with a stream-ordered resource retains it
+/// @warning Passing a stream other than the source buffer's retained stream
+///          makes the caller responsible for ordering: prior work on the
+///          source (and the source's later destruction, which frees on its
+///          own stream) must be ordered against @a stream by the caller,
+///          e.g. with cudaStreamWaitEvent or a synchronization. The
+///          stream-less overload below has no such requirement.
+/// @param proto optional buffer whose resource (or pool, for buffers
+///        providing create()) allocates the destination storage; without it
+///        the destination resource is default-constructed
+/// @return a handle of the destination buffer type with equal contents
+/// @details The returned handle is immediately usable: a host-readable
+///          destination synchronizes @c stream before returning, and a device
+///          destination parses (and validates) its metadata on the
+///          transferred bytes, which synchronizes internally. A pageable host
+///          source or destination (HostBuffer) degrades the copy to
+///          synchronous behavior; pinned single-space handles keep it
+///          asynchronous.
+template<typename DstBufferT, typename SrcBufferT>
+inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, cudaStream_t stream, const DstBufferT* proto = nullptr)
+{
+    constexpr bool srcDev = BufferHasDeviceSingle<SrcBufferT>::value;
+    constexpr bool dstDev = BufferHasDeviceSingle<DstBufferT>::value;
+    static_assert(!BufferTraits<SrcBufferT>::hasDeviceDual && !BufferTraits<DstBufferT>::hasDeviceDual,
+                  "cuda::copyTo does not support dual-space buffers: use deviceUpload/deviceDownload on the handle");
+    static_assert(srcDev || dstDev,
+                  "cuda::copyTo is for cross-space transfers involving a device buffer: use GridHandle::copy for host-to-host");
+    const uint64_t bytes = src.bufferSize();
+    if (bytes == 0u) {
+        if constexpr (std::is_default_constructible<DstBufferT>::value) {
+            return GridHandle<DstBufferT>();
+        } else {
+            throw std::runtime_error("cuda::copyTo: an empty handle cannot be copied to a buffer type "
+                                     "that is not default-constructible");
+        }
+    }
+    DstBufferT dst = detail::makeTransferStorage<DstBufferT>(bytes, stream, proto);
+    const void* srcPtr;
+    if constexpr (srcDev) srcPtr = src.deviceData();
+    else                  srcPtr = src.data();
+    constexpr cudaMemcpyKind kind = srcDev ? (dstDev ? cudaMemcpyDeviceToDevice : cudaMemcpyDeviceToHost)
+                                           : cudaMemcpyHostToDevice;
+    cudaCheck(cudaMemcpyAsync(dst.data(), srcPtr, bytes, kind, stream));
+    if constexpr (dstDev) {
+        // A synchronous destination resource retains no stream: order the
+        // metadata parse (which runs on the default stream) after the copy.
+        if constexpr (!is_async_resource<typename DstBufferT::ResourceType>::value)
+            cudaCheck(cudaStreamSynchronize(stream));
+    } else {
+        cudaCheck(cudaStreamSynchronize(stream));// the host-readable result is the postcondition
+    }
+    return GridHandle<DstBufferT>(std::move(dst));// the constructor parses (and validates) the metadata
+}// cuda::copyTo
+
+/// @brief Convenience overload issuing the copy on the source buffer's
+///        retained stream when it has one (any single-space source over a
+///        stream-ordered resource), the default stream otherwise.
+template<typename DstBufferT, typename SrcBufferT>
+inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, const DstBufferT* proto = nullptr)
+{
+    cudaStream_t stream = 0;
+    if constexpr (BufferHasStream<SrcBufferT>::value) stream = src.buffer().stream();
+    return copyTo<DstBufferT>(src, stream, proto);
+}// cuda::copyTo (retained stream)
 
 }// namespace cuda
 

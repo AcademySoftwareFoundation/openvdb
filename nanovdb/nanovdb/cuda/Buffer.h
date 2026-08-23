@@ -453,10 +453,9 @@ struct BufferTraits<cuda::Buffer<T, R>>
     // answerable for any element type.
     static constexpr bool hasDeviceSingle = !cuda::is_host_accessible_resource<R>::value;
     // A buffer over a host-accessible resource (e.g. PinnedResource) is
-    // host-readable, but GridHandle's host paths also require the create()
-    // static interface and byte-count size semantics that cuda::Buffer does
-    // not provide -- GridHandle rejects such buffers with a named error until
-    // that adaptation lands.
+    // host-readable single-space storage: GridHandle parses its metadata on
+    // the host, exposes the host accessors, and allocates reads and copies
+    // through the buffer's resource.
     static constexpr bool hasHostSingle   = cuda::is_host_accessible_resource<R>::value;
 };
 
