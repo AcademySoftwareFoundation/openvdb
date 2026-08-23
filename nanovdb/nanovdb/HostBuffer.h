@@ -87,6 +87,7 @@
 #include <cassert>//           for assert
 #include <sstream>//           for std::stringstream
 #include <cstring>//           for memcpy
+#include <type_traits>//       for std::void_t
 
 #define checkPtr(ptr, msg) \
     { \
@@ -98,8 +99,38 @@ namespace nanovdb {
 template<typename BufferT>
 struct BufferTraits
 {
-    static constexpr bool hasDeviceDual = false;
+    static constexpr bool hasDeviceDual   = false;
+    static constexpr bool hasDeviceSingle = false;
 };
+
+/// @brief Detects whether @c BufferTraits<BufferT> defines @c hasDeviceSingle,
+///        i.e. whether the buffer manages a single device-resident allocation.
+/// @details Defaults to false when the trait member is absent, so pre-existing
+///          BufferTraits specializations (in or out of tree) that only define
+///          hasDeviceDual keep compiling unchanged.
+template<typename BufferT, typename = void>
+struct BufferHasDeviceSingle { static constexpr bool value = false; };
+template<typename BufferT>
+struct BufferHasDeviceSingle<BufferT, std::void_t<decltype(BufferTraits<BufferT>::hasDeviceSingle)>>
+{ static constexpr bool value = BufferTraits<BufferT>::hasDeviceSingle; };
+
+/// @brief Companion detection for BufferTraits<...>::hasHostSingle: a
+///        single-space buffer whose storage is host-accessible (e.g. a
+///        pinned-resource cuda::Buffer).
+template<typename BufferT, typename = void>
+struct BufferHasHostSingle { static constexpr bool value = false; };
+template<typename BufferT>
+struct BufferHasHostSingle<BufferT, std::void_t<decltype(BufferTraits<BufferT>::hasHostSingle)>>
+{ static constexpr bool value = BufferTraits<BufferT>::hasHostSingle; };
+
+/// @brief Detects whether a buffer's elements are byte-sized. Buffers that
+///        expose no ElementType (e.g. HostBuffer) address raw bytes by
+///        definition, so the primary defaults to true.
+template<typename BufferT, typename = void>
+struct BufferHasByteElements { static constexpr bool value = true; };
+template<typename BufferT>
+struct BufferHasByteElements<BufferT, std::void_t<typename BufferT::ElementType>>
+{ static constexpr bool value = sizeof(typename BufferT::ElementType) == 1; };
 
 // ----------------------------> HostBuffer <--------------------------------------
 

@@ -163,6 +163,8 @@ __global__ void processGridTreeRootKernel(IndexToGridNodeAccessor<SrcBuildT> *no
     *dstGrid.data() = *srcGrid.data();
     dstGrid.mGridType = toGridType<DstBuildT>();
     dstGrid.mData1 = 0u;
+    dstGrid.mGridIndex = 0u; // Possibly overwriting input; returned grid has batch size 1
+    dstGrid.mGridCount = 1u;
     // we will recompute GridData::mChecksum later
 
     // process Tree
