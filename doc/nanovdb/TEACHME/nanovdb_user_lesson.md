@@ -1523,7 +1523,8 @@ __global__ void boxStencilKernel(nanovdb::NanoGrid<OnIdx>* grid,
 
     // Gather the 27 neighbor indices for each voxel of the block.
     uint64_t neighbors[27] = {};
-    VBM::computeBoxStencil(grid, leafIndex, voxelOffset, neighbors);
+    VBM::computeBoxStencil(
+        grid, leafIndex[threadIdx.x], voxelOffset[threadIdx.x], neighbors);
     __syncthreads();
 
     uint64_t* out = outNeighbors + 27 * BW * bID + 27 * threadIdx.x;
