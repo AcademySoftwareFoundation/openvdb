@@ -3,6 +3,7 @@
 
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
+#endif
 #include <algorithm>
 #include <cmath>
 #include <chrono>

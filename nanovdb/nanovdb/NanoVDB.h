@@ -1827,7 +1827,7 @@ struct DimAndActive
 {
     uint32_t packed{0u};
 
-    __hostdev__ DimAndActive() = default;
+    __hostdev__ DimAndActive() : packed(0u) {}
     __hostdev__ DimAndActive(uint32_t d, bool a)
         : packed((d & 0x7FFFFFFFu) | (uint32_t(a) << 31))
     {
