@@ -12,3 +12,4 @@ tools:
     process() now checks for this and throws a descriptive ValueError (naming the voxel size and the
     maximum allowed) instead of crashing. The check is confined to process() so that offset() -- used
     by the offset-only path -- continues to accept coarser voxel sizes unaffected.
+  - Fixed a floating-point false positive in "tools::CheckLevelSet::checkBackground()" in Diagnostics.h where the ratio "background / voxelSize" could compute to just below the expected half-width due to non-representable IEEE 754 values, causing a valid level set created with exactly LEVEL_SET_HALF_WIDTH voxels of narrow band to incorrectly fail check #4. The strict "<" comparison is now relaxed by a relative tolerance of 1e-6. A regression test covering this exact case was added to TestDiagnostics.cc.
