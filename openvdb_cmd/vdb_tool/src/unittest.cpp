@@ -3601,6 +3601,27 @@ TEST_F(Test_vdb_tool, ActionStats)
     EXPECT_EQ(out2.find("nan"), std::string::npos);
 
     std::remove("data/test_stats_empty.vdb");
+
+    // Vector grids report statistics of the vector MAGNITUDE (tools::statistics
+    // reduces a vector value to val.length()), rather than being skipped. The
+    // background column still shows the vector itself, so a legend explains the
+    // mixed interpretation.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=32 -grad -stats vdb=0");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("grad_sphere"), std::string::npos);
+      EXPECT_NE(out.find("[0, 0, 0]"), std::string::npos);// background, as a vector
+      EXPECT_NE(out.find("vector magnitude |v|"), std::string::npos);// legend
+      // The magnitude columns must hold real numbers, not the old "(n/a)" filler.
+      EXPECT_EQ(out.find("(n/a)      (n/a)"), std::string::npos);
+    }
+
+    // ...and the legend must NOT appear when only scalar grids were reported.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere r=1 dim=16 -stats vdb=0");
+      EXPECT_EQ(out.find("vector magnitude |v|"), std::string::npos);
+    }
 }// ActionStats
 
 TEST_F(Test_vdb_tool, ActionCompositeDivide)
@@ -3731,11 +3752,27 @@ TEST_F(Test_vdb_tool, ActionHistogram)
       EXPECT_EQ(out.find("skipping due to"), std::string::npos);
     }
 
-    // Non-scalar grids are skipped with a note, not an error.
+    // Vector grids are binned by magnitude (tools::histogram reduces a vector to
+    // val.length()), NOT skipped. The gradient of a level set is the useful case:
+    // |grad(phi)| should be ~1 for a true signed distance field, so the histogram
+    // doubles as an Eikonal-condition check.
     {
       const std::string out = runCapturingClog(
-          "vdb_tool -quiet -sphere r=1 dim=16 -grad -histogram vdb=0");
-      EXPECT_NE(out.find("not a scalar numeric grid"), std::string::npos);
+          "vdb_tool -quiet -sphere r=1 dim=32 -grad -histogram vdb=0 bins=4");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("(vec3s)"), std::string::npos);
+      // The summary must flag that the bins are magnitudes, not raw values.
+      EXPECT_NE(out.find("(by vector magnitude)"), std::string::npos);
+      EXPECT_NE(out.find("4 bins over"), std::string::npos);
+      EXPECT_EQ(out.find("unsupported value type"), std::string::npos);
+    }
+
+    // A genuinely unsupported value type (e.g. a point grid) is still skipped
+    // with a note rather than raising.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=16 -scatter count=64 -points2vdb -histogram vdb=0");
+      EXPECT_NE(out.find("unsupported value type"), std::string::npos);
       EXPECT_EQ(out.find("skipping due to"), std::string::npos);
     }
 

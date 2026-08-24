@@ -1676,8 +1676,9 @@ void Tool::stats()
                           << std::setw(w)  << "volume"
             << "\n" << std::string(aw + 2 + nw + 7*w, '-') << "\n";
 
-  // Background column: numeric grid types print their scalar background,
-  // Vec3SGrid prints "[x, y, z]", anything else is "(n/a)".
+  // Background column: numeric grid types print their scalar background, vector
+  // grids print the whole vector as "[x, y, z]" (NOT its magnitude, unlike the
+  // value columns below), anything else is "(n/a)".
   auto backgroundStr = [](const GridBase::Ptr& base) -> std::string {
     std::stringstream ss;
     if      (auto p = gridPtrCast<FloatGrid>(base))  ss << p->background();
@@ -1686,13 +1687,23 @@ void Tool::stats()
     else if (auto p = gridPtrCast<Int64Grid>(base))  ss << p->background();
     else if (auto p = gridPtrCast<BoolGrid>(base))   ss << p->background();
     else if (auto p = gridPtrCast<Vec3SGrid>(base))  ss << p->background();
+    else if (auto p = gridPtrCast<Vec3DGrid>(base))  ss << p->background();
+    else if (auto p = gridPtrCast<Vec3IGrid>(base))  ss << p->background();
     else return "(n/a)";
     return ss.str();
   };
 
+  /// @brief True if @a base is a vector-valued grid, whose value columns therefore
+  ///        report magnitudes rather than the values themselves.
+  auto isVectorGrid = [](const GridBase::Ptr& base) {
+    return gridPtrCast<Vec3SGrid>(base) || gridPtrCast<Vec3DGrid>(base) || gridPtrCast<Vec3IGrid>(base);
+  };
+
   // min/max/mean/stddev of active voxels, dispatched by value type. tools::statistics()
   // returns a (non-templated) math::Stats regardless of the grid's value type, so this
-  // covers every scalar type the file formats can round-trip; Vec3S etc. print "(n/a)".
+  // covers every scalar type the file formats can round-trip. For vector grids it
+  // reduces each value to its magnitude (see stats_internal::GetValImpl), so these
+  // four columns report statistics of |v| -- flagged by a legend under the table.
   auto valueStatsStr = [&](const GridBase::Ptr& base) -> std::string {
     std::stringstream ss;
     ss << std::fixed << std::setprecision(6);
@@ -1712,13 +1723,18 @@ void Tool::stats()
     else if (auto p = gridPtrCast<Int32Grid>(base))  printFromStats(tools::statistics(p->cbeginValueOn()));
     else if (auto p = gridPtrCast<Int64Grid>(base))  printFromStats(tools::statistics(p->cbeginValueOn()));
     else if (auto p = gridPtrCast<BoolGrid>(base))   printFromStats(tools::statistics(p->cbeginValueOn()));
+    else if (auto p = gridPtrCast<Vec3SGrid>(base))  printFromStats(tools::statistics(p->cbeginValueOn()));
+    else if (auto p = gridPtrCast<Vec3DGrid>(base))  printFromStats(tools::statistics(p->cbeginValueOn()));
+    else if (auto p = gridPtrCast<Vec3IGrid>(base))  printFromStats(tools::statistics(p->cbeginValueOn()));
     else ss << std::setw(w) << "(n/a)" << std::setw(w) << "(n/a)" << std::setw(w) << "(n/a)" << std::setw(w) << "(n/a)";
     return ss.str();
   };
 
+  bool anyVector = false;
   for (size_t i = 0; i < grids.size(); ++i) {
     auto& base = grids[i];
     const int age = ages[i];
+    anyVector |= isVectorGrid(base);
     std::clog << std::right << std::setw(aw) << age << "  "
               << std::left  << std::setw(nw) << base->getName()
               << std::right << std::setw(w)  << backgroundStr(base)
@@ -1734,6 +1750,10 @@ void Tool::stats()
       std::clog << std::setw(w) << "(n/a)" << std::setw(w) << "(n/a)";
     }
     std::clog << "\n";
+  }
+  if (anyVector) {
+    std::clog << "(for vector grids min/max/mean/stddev are of the vector magnitude |v|,"
+                 " while background is the vector itself)\n";
   }
 }// Tool::stats
 
@@ -1814,19 +1834,27 @@ void Tool::histogram()
 
     double lo = 0.0, hi = 0.0;
     uint64_t n = 0;
+    bool isVec = false;
     std::unique_ptr<math::Histogram> hist;
     if      (auto p = gridPtrCast<FloatGrid>(base))  hist = build(*p, lo, hi, n);
     else if (auto p = gridPtrCast<DoubleGrid>(base)) hist = build(*p, lo, hi, n);
     else if (auto p = gridPtrCast<Int32Grid>(base))  hist = build(*p, lo, hi, n);
     else if (auto p = gridPtrCast<Int64Grid>(base))  hist = build(*p, lo, hi, n);
     else if (auto p = gridPtrCast<BoolGrid>(base))   hist = build(*p, lo, hi, n);
+    // tools::histogram reduces a vector value to its magnitude (see
+    // stats_internal::GetValImpl), so vector grids are binned by |v|. This is what
+    // makes "-grad -histogram" a useful check of the Eikonal condition |grad(phi)|=1.
+    else if (auto p = gridPtrCast<Vec3SGrid>(base)) { hist = build(*p, lo, hi, n); isVec = true; }
+    else if (auto p = gridPtrCast<Vec3DGrid>(base)) { hist = build(*p, lo, hi, n); isVec = true; }
+    else if (auto p = gridPtrCast<Vec3IGrid>(base)) { hist = build(*p, lo, hi, n); isVec = true; }
     else {
-      std::clog << "  (not a scalar numeric grid, skipped)\n";
+      std::clog << "  (unsupported value type, skipped)\n";
       continue;
     }
+    const char *unit = isVec ? " (by vector magnitude)" : "";
     if (n == 0)   { std::clog << "  (no active voxels)\n"; continue; }
-    if (!hist)    { summaryFmt(std::clog) << "  all " << n << " active voxels have the constant value "
-                                          << lo << "\n"; continue; }
+    if (!hist)    { summaryFmt(std::clog) << "  all " << n << " active voxels have the constant "
+                                          << (isVec ? "magnitude " : "value ") << lo << "\n"; continue; }
     if (hist->size() == 0) {// every value fell outside an explicitly requested range
       summaryFmt(std::clog) << "  none of the " << n << " active voxels fall within the requested range ["
                             << lo << ", " << hi << "]\n";
@@ -1836,8 +1864,8 @@ void Tool::histogram()
     uint64_t peak = 0;
     for (size_t b = 0; b < hist->numBins(); ++b) peak = std::max(peak, hist->count(b));
 
-    summaryFmt(std::clog) << "  " << hist->size() << " of " << n << " active voxels in "
-                          << hist->numBins() << " bins over [" << lo << ", " << hi << "]"
+    summaryFmt(std::clog) << "  " << hist->size() << " of " << n << " active voxels" << unit
+                          << " in " << hist->numBins() << " bins over [" << lo << ", " << hi << "]"
                           << (useLog ? ", log scale" : "") << "\n";
 
     for (size_t b = 0; b < hist->numBins(); ++b) {
