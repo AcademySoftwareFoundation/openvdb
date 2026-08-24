@@ -408,19 +408,20 @@ private:
     /// @throw std::invalid_argument if @a age exceeds the current stack depth.
     inline auto getGeom(size_t age) const;
 
-    /// @brief Rewrite the current action's "vdb" and "geo" options in place, translating
-    ///        any grid/geometry name tokens into their (possibly several) stack ages.
-    /// @details Installed as mParser.beforeActionRun so it runs automatically before every
-    ///          action, letting each action's existing numeric parsing and error handling
+    /// @brief Translate one "vdb"/"geo" option value, replacing any non-numeric (name)
+    ///        token with the stack age of the entry carrying that exact name.
+    /// @details Installed as mParser.onGetOption so it runs on every read of a "vdb"/"geo"
+    ///          option, letting each action's existing numeric parsing and error handling
     ///          (age lists, "*", out-of-range checks, etc.) operate unchanged downstream.
-    void resolveStackOptions();
-    /// @brief Translate one "vdb"/"geo" option value, expanding any non-numeric (name) token
-    ///        into the comma-separated, ascending list of every current stack age with that
-    ///        exact name.
+    ///          Resolution happens per-read against the CURRENT stack rather than being
+    ///          written back into the option, so loop bodies re-resolve each iteration.
     /// @param optName Option name, either "vdb" or "geo" (selects which stack to search).
     /// @param raw     Fully expression-resolved option value (i.e. after {} substitution).
     /// @return The translated value: unchanged if empty or "*", otherwise every token is numeric.
-    /// @throw std::out_of_range if a name token matches no entry on the corresponding stack.
+    /// @throw std::out_of_range   if a name token matches no entry on the corresponding stack.
+    /// @throw std::invalid_argument if a name token matches more than one entry. A name must
+    ///        identify exactly one entry, since most actions read "vdb"/"geo" as a single age
+    ///        and those that read a list may mutate the stack while consuming it.
     std::string resolveStackOption(const std::string &optName, const std::string &raw) const;
 
     /// @brief Convert the output of a VolumeToMesh pass into a Geometry instance.
@@ -466,8 +467,14 @@ Tool::Tool(int argc, char *argv[])
         mParser.onActionError = [this](const std::string&, const std::string&) {
             return mErrorOnWarning; // true = fatal (re-throw), false = skip
         };
-        // Translate "vdb"/"geo" name tokens into stack ages before every action runs.
-        mParser.beforeActionRun = [this](){ this->resolveStackOptions(); };
+        // Translate "vdb"/"geo" name tokens into stack ages on every read of those options.
+        // "-soup2ls" is excluded because its "vdb" option selects an output resolution
+        // level of the shrink-wrap hierarchy, not an entry on the grid stack.
+        mParser.onGetOption = [this](const std::string &name, std::string &value) {
+            if (name != "vdb" && name != "geo") return;
+            if (mParser.getAction().names[0] == "soup2ls") return;
+            value = this->resolveStackOption(name, value);
+        };
         mParser.parse(argc, argv);// extremely fast, but might throw
     } catch (const std::exception& e) {
         this->endLog();
@@ -553,18 +560,6 @@ auto Tool::getGeom(size_t age) const
 
 // ==============================================================================================================
 
-void Tool::resolveStackOptions()
-{
-    for (auto &opt : mParser.getAction().options) {
-        if (opt.name != "vdb" && opt.name != "geo") continue;
-        // Read via Parser::get (not opt.value directly) so any {} expression in the
-        // option is fully expanded before name resolution sees it.
-        opt.value = this->resolveStackOption(opt.name, mParser.get<std::string>(opt.name));
-    }
-}// Tool::resolveStackOptions
-
-// ==============================================================================================================
-
 std::string Tool::resolveStackOption(const std::string &optName, const std::string &raw) const
 {
     if (raw.empty() || raw == "*") return raw;// unchanged: every action already special-cases these
@@ -587,12 +582,23 @@ std::string Tool::resolveStackOption(const std::string &optName, const std::stri
             for (auto it = mGeom.crbegin(); it != mGeom.crend(); ++it, ++a)
                 if ((*it)->getName() == tok) matches.push_back(a);
         }
+        const std::string what = isVdb ? "VDB grid" : "Geometry";
         if (matches.empty()) {
-            throw std::out_of_range(actionName + ": no " + (isVdb ? "VDB grid" : "Geometry") +
-                                    " named \"" + tok + "\" on the stack (stack size " +
-                                    std::to_string(stackSize) + ")");
+            throw std::out_of_range(actionName + ": no " + what + " named \"" + tok +
+                                    "\" on the stack (stack size " + std::to_string(stackSize) + ")");
         }
-        for (int m : matches) out.push_back(std::to_string(m));// crbegin order is already ascending age
+        // A name must identify exactly one entry. Expanding it to several ages would be
+        // unsafe: most actions read "vdb"/"geo" as a single age via get<int>() and cannot
+        // parse a list at all, and those that do read a list may erase entries by index
+        // while consuming it, so a multi-age expansion can delete the wrong grid.
+        if (matches.size() > 1) {
+            std::string ages;
+            for (size_t k = 0; k < matches.size(); ++k) ages += (k ? "," : "") + std::to_string(matches[k]);
+            throw std::invalid_argument(actionName + ": the name \"" + tok + "\" is ambiguous -- it matches " +
+                                        std::to_string(matches.size()) + " " + what + " entries at ages " +
+                                        ages + ". Use an explicit age index to select one.");
+        }
+        out.push_back(std::to_string(matches[0]));
     }
 
     std::string result;

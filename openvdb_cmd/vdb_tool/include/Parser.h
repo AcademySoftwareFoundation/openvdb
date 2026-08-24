@@ -1100,11 +1100,17 @@ struct Parser {
     ///        If it returns false, the error is logged as a skip and execution continues.
     ///        The callback receives (action_name, exception_message).
     std::function<bool(const std::string&, const std::string&)> onActionError = nullptr;
-    /// @brief Optional callback invoked once per action, immediately before its run()
-    ///        callback fires (with getAction() already referring to that action). Lets a
-    ///        subclass/owner rewrite option values in place (e.g. resolving names to
-    ///        indices) using state that isn't available to the generic Parser.
-    std::function<void()> beforeActionRun = nullptr;
+    /// @brief Optional callback applied to an option's value every time it is read,
+    ///        after {} expression expansion but before the caller sees it. Receives the
+    ///        option's name and its expanded value, which it may rewrite in place (e.g.
+    ///        resolving a grid name to a stack age) using state the generic Parser has
+    ///        no access to.
+    /// @note  This deliberately post-processes a COPY on each read rather than rewriting
+    ///        Option::value, so the stored source expression survives. Overwriting it
+    ///        would break loops, where the same Action is revisited and must re-evaluate
+    ///        its expressions each iteration (e.g. "-for v=0,3 -render vdb={$v} -end"),
+    ///        and would also corrupt the source form written out by -write to a config file.
+    std::function<void(const std::string&, std::string&)> onGetOption = nullptr;
 };// Parser struct
 
 // ==============================================================================================================
@@ -1116,6 +1122,8 @@ std::string Parser::getStr(const std::string &name) const
       if (opt.name != name) continue;// linear search
       std::string str = opt.value;// deep copy since it might get modified by map
       processor(str);
+      // Post-process the COPY, never opt.value itself -- see onGetOption's docstring.
+      if (onGetOption) onGetOption(name, str);
       return str;
   }
   throw std::invalid_argument(iter->names[0]+": Parser::getStr: no option named \""+name+"\"");
@@ -1608,7 +1616,6 @@ void Parser::run()
         if (onActionError) {
             // Centralized error handling: wrap the action callback
             try {
-                if (beforeActionRun) beforeActionRun();
                 iter->run();
             } catch (const std::exception& e) {
                 const std::string &action_name = iter->names[0];
@@ -1621,7 +1628,6 @@ void Parser::run()
             }
         } else {
             // Fallback if no error handler is registered (original behavior)
-            if (beforeActionRun) beforeActionRun();
             iter->run();
         }
     }

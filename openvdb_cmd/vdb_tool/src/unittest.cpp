@@ -3699,9 +3699,9 @@ TEST_F(Test_vdb_tool, ActionMultiply)
 TEST_F(Test_vdb_tool, StackOptionNameResolution)
 {
     // "vdb"/"geo" options accept a grid/geometry name wherever a stack age is
-    // accepted: Tool::resolveStackOptions() rewrites the option in place (via
-    // Parser::beforeActionRun) before every action runs, translating non-numeric
-    // tokens into the ascending list of every stack age with that exact name.
+    // accepted: Tool::resolveStackOption() (installed as Parser::onGetOption)
+    // translates each non-numeric token into the stack age of the entry with that
+    // exact name, on every read of the option.
     using namespace openvdb::vdb_tool;
 
     // A plain name resolves to its (single) age, same as the equivalent index.
@@ -3715,19 +3715,40 @@ TEST_F(Test_vdb_tool, StackOptionNameResolution)
       EXPECT_EQ(out.find("skipping due to"), std::string::npos);
     }
 
-    // An ambiguous name expands to EVERY matching age, ascending, not just the
-    // most recent: three grids named a/other/a (ages 2,1,0 respectively) with
-    // "vdb=1,a" must resolve to ages 1,0,2 (literal token order; "a" itself
-    // expands low-to-high).
+    // A name matching MORE than one entry is rejected rather than expanded to a
+    // list of ages. Expansion would be unsafe: most actions read "vdb"/"geo" as a
+    // single age via get<int>() and cannot parse a list, and list consumers such as
+    // -clear erase by index while iterating, so a multi-age value can delete the
+    // wrong grid. The error names the ambiguous ages so the user can pick one.
     {
       const std::string out = runCapturingClog(
           "vdb_tool -quiet -sphere name=a dim=8 -sphere name=other dim=8 -sphere name=a dim=8"
           " -stats vdb=1,a");
-      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
-      // All three rows (other, and both "a" grids) must be present.
-      EXPECT_NE(out.find("1  other"), std::string::npos);
-      EXPECT_NE(out.find("0  a"), std::string::npos);
-      EXPECT_NE(out.find("2  a"), std::string::npos);
+      EXPECT_NE(out.find("the name \"a\" is ambiguous"), std::string::npos);
+      EXPECT_NE(out.find("ages 0,2"), std::string::npos);
+    }
+
+    // ...and an ambiguous name must abort the action BEFORE it mutates the stack,
+    // so -clear leaves every grid in place rather than partially deleting.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -sphere name=x dim=8 -sphere name=mid dim=8 -sphere name=x dim=8"
+          " -clear vdb=x -print");
+      EXPECT_NE(out.find("is ambiguous"), std::string::npos);
+      // All three grids survive: two named "x" (ages 0 and 2) plus "mid".
+      EXPECT_NE(out.find("0  x"), std::string::npos);
+      EXPECT_NE(out.find("1  mid"), std::string::npos);
+      EXPECT_NE(out.find("2  x"), std::string::npos);
+    }
+
+    // A singleton consumer (rename reads get<int>("vdb")) rejects an ambiguous
+    // name with the same clear message rather than a raw "invalid int" parse error.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=x dim=8 -sphere name=mid dim=8 -sphere name=x dim=8"
+          " -rename vdb=x name=r");
+      EXPECT_NE(out.find("is ambiguous"), std::string::npos);
+      EXPECT_EQ(out.find("invalid int"), std::string::npos);
     }
 
     // A name that matches nothing on the stack is reported exactly like an
@@ -3757,6 +3778,33 @@ TEST_F(Test_vdb_tool, StackOptionNameResolution)
       EXPECT_EQ(out.find("skipping due to"), std::string::npos);
       EXPECT_TRUE(fileExists("data/test_geo_name.obj"));
       std::remove("data/test_geo_name.obj");
+    }
+
+    // REGRESSION: resolution must NOT be written back into the option. A loop body
+    // revisits the same Action every iteration, so the stored value has to remain the
+    // source expression "{$v}" and be re-expanded (and re-resolved) each time. Writing
+    // the first iteration's resolved age back into the option would pin every later
+    // iteration to that same grid.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -sphere name=b dim=8"
+          " -for v=0,2 -stats vdb={$v} -end");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      // Iteration v=0 reports age 0 ("b"), iteration v=1 reports age 1 ("a").
+      EXPECT_NE(out.find("0  b"), std::string::npos);
+      EXPECT_NE(out.find("1  a"), std::string::npos);
+    }
+
+    // Same guarantee for a NAME inside a loop body: it must be re-resolved against
+    // the current stack on every iteration, not frozen after the first.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -for v=0,2 -sphere name=b dim=8"
+          " -stats vdb=a -clear vdb=0 -end");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      // "a" sits at age 1 while the loop-created "b" is on top, both iterations.
+      EXPECT_NE(out.find("1  a"), std::string::npos);
+      EXPECT_EQ(out.find("0  a"), std::string::npos);
     }
 }// StackOptionNameResolution
 
