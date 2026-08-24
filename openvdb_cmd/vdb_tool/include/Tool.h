@@ -1801,18 +1801,26 @@ void Tool::histogram()
 
   if (grids.empty()) { std::clog << "histogram: no grids on stack\n"; return; }
 
-  // Bin the active values of one typed grid. Returns null when there is nothing to
-  // plot, in which case @a n distinguishes the two degenerate cases for the caller:
-  // n==0 means no active voxels at all, whereas n>0 with lo>=hi means every active
-  // voxel shares a single value (tools::histogram requires a non-empty range).
-  auto build = [&](const auto &grid, double &lo, double &hi, uint64_t &n)
+  // Bin the active values of one typed grid.
+  // Returns null when there is nothing to plot; the caller uses @a n and @a constant
+  // to distinguish cases: n==0 → no active voxels; n>0 && constant → every active
+  // voxel shares a single value; n>0 && !constant → user-supplied bounds exclude all
+  // grid values (tools::histogram requires a non-empty range).
+  auto build = [&](const auto &grid, double &lo, double &hi, uint64_t &n, bool &constant)
       -> std::unique_ptr<math::Histogram> {
     const math::Extrema ex = tools::extrema(grid.cbeginValueOn());
     n = ex.size();
     if (n == 0) return nullptr;
     lo = hasMin ? userMin : ex.min();
     hi = hasMax ? userMax : ex.max();
-    if (lo >= hi) return nullptr;
+    if (lo >= hi) {
+      // If neither bound came from the user, lo/hi equal ex.min()/ex.max(), so lo>=hi
+      // means the grid is truly constant.  If at least one bound is user-supplied the
+      // grid may span a valid range that simply doesn't intersect [lo, hi).
+      constant = !hasMin && !hasMax;
+      if (constant) lo = ex.min(); // report the actual constant, not a user value
+      return nullptr;
+    }
     return std::make_unique<math::Histogram>(
         tools::histogram(grid.cbeginValueOn(), lo, hi, static_cast<size_t>(bins)));
   };
@@ -1834,28 +1842,31 @@ void Tool::histogram()
 
     double lo = 0.0, hi = 0.0;
     uint64_t n = 0;
-    bool isVec = false;
+    bool isVec = false, constant = false;
     std::unique_ptr<math::Histogram> hist;
-    if      (auto p = gridPtrCast<FloatGrid>(base))  hist = build(*p, lo, hi, n);
-    else if (auto p = gridPtrCast<DoubleGrid>(base)) hist = build(*p, lo, hi, n);
-    else if (auto p = gridPtrCast<Int32Grid>(base))  hist = build(*p, lo, hi, n);
-    else if (auto p = gridPtrCast<Int64Grid>(base))  hist = build(*p, lo, hi, n);
-    else if (auto p = gridPtrCast<BoolGrid>(base))   hist = build(*p, lo, hi, n);
+    if      (auto p = gridPtrCast<FloatGrid>(base))  hist = build(*p, lo, hi, n, constant);
+    else if (auto p = gridPtrCast<DoubleGrid>(base)) hist = build(*p, lo, hi, n, constant);
+    else if (auto p = gridPtrCast<Int32Grid>(base))  hist = build(*p, lo, hi, n, constant);
+    else if (auto p = gridPtrCast<Int64Grid>(base))  hist = build(*p, lo, hi, n, constant);
+    else if (auto p = gridPtrCast<BoolGrid>(base))   hist = build(*p, lo, hi, n, constant);
     // tools::histogram reduces a vector value to its magnitude (see
     // stats_internal::GetValImpl), so vector grids are binned by |v|. This is what
     // makes "-grad -histogram" a useful check of the Eikonal condition |grad(phi)|=1.
-    else if (auto p = gridPtrCast<Vec3SGrid>(base)) { hist = build(*p, lo, hi, n); isVec = true; }
-    else if (auto p = gridPtrCast<Vec3DGrid>(base)) { hist = build(*p, lo, hi, n); isVec = true; }
-    else if (auto p = gridPtrCast<Vec3IGrid>(base)) { hist = build(*p, lo, hi, n); isVec = true; }
+    else if (auto p = gridPtrCast<Vec3SGrid>(base)) { hist = build(*p, lo, hi, n, constant); isVec = true; }
+    else if (auto p = gridPtrCast<Vec3DGrid>(base)) { hist = build(*p, lo, hi, n, constant); isVec = true; }
+    else if (auto p = gridPtrCast<Vec3IGrid>(base)) { hist = build(*p, lo, hi, n, constant); isVec = true; }
     else {
       std::clog << "  (unsupported value type, skipped)\n";
       continue;
     }
     const char *unit = isVec ? " (by vector magnitude)" : "";
-    if (n == 0)   { std::clog << "  (no active voxels)\n"; continue; }
-    if (!hist)    { summaryFmt(std::clog) << "  all " << n << " active voxels have the constant "
-                                          << (isVec ? "magnitude " : "value ") << lo << "\n"; continue; }
-    if (hist->size() == 0) {// every value fell outside an explicitly requested range
+    if (n == 0) { std::clog << "  (no active voxels)\n"; continue; }
+    if (!hist && constant) {
+      summaryFmt(std::clog) << "  all " << n << " active voxels have the constant "
+                            << (isVec ? "magnitude " : "value ") << lo << "\n";
+      continue;
+    }
+    if (!hist || hist->size() == 0) {// user-supplied range excludes all grid values
       summaryFmt(std::clog) << "  none of the " << n << " active voxels fall within the requested range ["
                             << lo << ", " << hi << "]\n";
       continue;
@@ -1879,8 +1890,8 @@ void Tool::histogram()
                                    : double(c) / double(peak);
         len = std::max(1, static_cast<int>(frac * cols + 0.5));
       }
-      std::clog << "  [" << std::right << std::setw(12) << std::fixed << std::setprecision(4) << hist->min(int(b))
-                << ", " << std::setw(12) << hist->max(int(b))
+      std::clog << "  [" << std::right << std::setw(12) << std::fixed << std::setprecision(4) << hist->min(b)
+                << ", " << std::setw(12) << hist->max(b)
                 << (b + 1 == hist->numBins() ? "] " : ") ")
                 << std::setw(10) << c << " "
                 << std::setw(5) << std::setprecision(1) << (100.0 * double(c) / double(hist->size())) << "% "

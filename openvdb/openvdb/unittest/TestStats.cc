@@ -353,15 +353,20 @@ TEST_F(TestStats, testHistogram)
         openvdb::math::Histogram h(0.0, 1.0, numBins);
         EXPECT_TRUE(h.add(1.0));// the upper bound itself
         EXPECT_EQ(uint64_t(1), h.size());
-        EXPECT_EQ(uint64_t(1), h.count(int(numBins)-1));// counted in the last bin
+        EXPECT_EQ(uint64_t(1), h.count(numBins-1));// counted in the last bin
         uint64_t total = 0;
-        for (size_t i=0; i<numBins; ++i) total += h.count(int(i));
+        for (size_t i=0; i<numBins; ++i) total += h.count(i);
         EXPECT_EQ(uint64_t(1), total);// and counted exactly once overall
         // The lower bound still lands in the first bin, and out-of-range is rejected.
         EXPECT_TRUE(h.add(0.0));
         EXPECT_EQ(uint64_t(1), h.count(0));
         EXPECT_FALSE(h.add(1.5));
         EXPECT_FALSE(h.add(-0.5));
+    }
+    {// NaN must be rejected without undefined behaviour (converting NaN to size_t is UB)
+        openvdb::math::Histogram h(0.0, 1.0, 8);
+        EXPECT_FALSE(h.add(std::numeric_limits<double>::quiet_NaN()));
+        EXPECT_EQ(uint64_t(0), h.size());
     }
 }
 

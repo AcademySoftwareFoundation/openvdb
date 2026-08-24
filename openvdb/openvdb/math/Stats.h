@@ -308,7 +308,7 @@ public:
     /// @return @c true if the sample value falls within this histogram's value range.
     inline bool add(double val, uint64_t n = 1)
     {
-        if (val<mMin || val>mMax) return false;
+        if (std::isnan(val) || val<mMin || val>mMax) return false;
         // Clamp the bin index to the last bin. The range test above admits values up
         // to mMax, which is the upper bound plus a small epsilon, so a sample equal
         // to (or within the epsilon of) that bound scales to exactly numBins -- one
@@ -338,11 +338,11 @@ public:
     /// Return the upper bound of this histogram's value range.
     inline double max() const { return mMax; }
     /// Return the minimum value in the <i>n</i>th bin.
-    inline double min(int n) const { return mMin+n/mDelta; }
+    inline double min(size_t n) const { return mMin+double(n)/mDelta; }
     /// Return the maximum value in the <i>n</i>th bin.
-    inline double max(int n) const { return mMin+(n+1)/mDelta; }
+    inline double max(size_t n) const { return mMin+double(n+1)/mDelta; }
     /// Return the number of samples in the <i>n</i>th bin.
-    inline uint64_t count(int n) const { return mBins[n]; }
+    inline uint64_t count(size_t n) const { return mBins[n]; }
     /// Return the population size, i.e., the total number of samples.
     inline uint64_t size() const { return mSize; }
 
