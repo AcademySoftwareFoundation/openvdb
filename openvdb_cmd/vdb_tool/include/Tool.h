@@ -1522,21 +1522,36 @@ std::string Tool::examples() const
 void Tool::clear()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "clear");
+  // Resolve every requested age to a stable list iterator BEFORE erasing anything.
+  // Erasing inside the loop instead would (a) leave earlier deletions in place when
+  // a later age turns out to be out of range, and (b) shift the remaining entries,
+  // since an age is a distance from the back of the list -- so "-clear vdb=0,2" on a
+  // three-grid stack erased age 0 and then failed on age 2, having already destroyed
+  // a grid. Duplicate ages are removed first: resolving one twice would yield the
+  // same iterator twice, and erasing it twice is undefined behaviour. This is safe
+  // because mGrid/mGeom are std::lists, whose iterators stay valid when *other*
+  // elements are erased.
+  auto resolveVictims = [](VecI ages, auto &stack, auto &&get) {
+    std::sort(ages.begin(), ages.end());
+    ages.erase(std::unique(ages.begin(), ages.end()), ages.end());
+    std::vector<typename std::decay_t<decltype(stack)>::const_iterator> victims;
+    victims.reserve(ages.size());
+    for (int a : ages) victims.push_back(std::next(get(a)).base());// throws if out of range
+    return victims;
+  };
   if (mParser.get<std::string>("geo") == "*") {
     mGeom.clear();
   } else {
-    for (int a : mParser.getVec<int>("geo")) {
-      auto it = this->getGeom(a);
-      mGeom.erase(std::next(it).base());
-    }
+    const auto victims = resolveVictims(mParser.getVec<int>("geo"), mGeom,
+                                        [this](int a){ return this->getGeom(a); });
+    for (auto it : victims) mGeom.erase(it);
   }
   if (mParser.get<std::string>("vdb")  == "*") {
     mGrid.clear();
   } else {
-    for (int a : mParser.getVec<int>("vdb")) {
-      auto it = this->getGrid(a);
-      mGrid.erase(std::next(it).base());
-    }
+    const auto victims = resolveVictims(mParser.getVec<int>("vdb"), mGrid,
+                                        [this](int a){ return this->getGrid(a); });
+    for (auto it : victims) mGrid.erase(it);
   }
   if (mParser.get<bool>("variables")) {
     mParser.processor.memory().clear();

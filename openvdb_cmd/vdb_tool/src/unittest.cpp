@@ -3808,6 +3808,61 @@ TEST_F(Test_vdb_tool, StackOptionNameResolution)
     }
 }// StackOptionNameResolution
 
+TEST_F(Test_vdb_tool, ActionClearMultipleAges)
+{
+    // -clear resolves every requested age to a list iterator before erasing any of
+    // them. Erasing inside the loop shifted the remaining entries (an age is a
+    // distance from the back of the stack) and left earlier deletions in place when
+    // a later age turned out to be invalid.
+    using namespace openvdb::vdb_tool;
+
+    // Stack [a,b,c] => age 0=c, 1=b, 2=a. Clearing 0 and 2 must remove c and a and
+    // leave exactly b. Previously age 0 was erased, the stack shrank to 2, and the
+    // action then failed on age 2 having already destroyed a grid.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -sphere name=a dim=8 -sphere name=b dim=8 -sphere name=c dim=8"
+          " -clear vdb=0,2 -print");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("0  b"), std::string::npos);
+      EXPECT_EQ(out.find("  a "), std::string::npos);
+      EXPECT_EQ(out.find("  c "), std::string::npos);
+    }
+
+    // An out-of-range age anywhere in the list must abort with NOTHING deleted,
+    // matching how -copy validates every index before making any copies.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -sphere name=a dim=8 -sphere name=b dim=8 -clear vdb=1,99 -print");
+      EXPECT_NE(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("0  b"), std::string::npos);
+      EXPECT_NE(out.find("1  a"), std::string::npos);
+    }
+
+    // A repeated age refers to one entry, so it must delete one grid -- and must not
+    // erase the same list iterator twice, which is undefined behaviour.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -sphere name=a dim=8 -sphere name=b dim=8 -sphere name=c dim=8"
+          " -clear vdb=0,0 -print");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("0  b"), std::string::npos);
+      EXPECT_NE(out.find("1  a"), std::string::npos);
+      EXPECT_EQ(out.find("  c "), std::string::npos);
+    }
+
+    // The Geometry stack takes the identical path.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -sphere dim=8 -ls2mesh name=m1 -sphere dim=8 -ls2mesh name=m2"
+          " -sphere dim=8 -ls2mesh name=m3 -clear vdb=* geo=0,2 -print");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("0  m2"), std::string::npos);
+      EXPECT_EQ(out.find("m1"), std::string::npos);
+      EXPECT_EQ(out.find("m3"), std::string::npos);
+    }
+}// ActionClearMultipleAges
+
 int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);
