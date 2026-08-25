@@ -1808,21 +1808,13 @@ struct ProbeValue;
 template<typename BuildT>
 struct GetNodeInfo;
 
-/// @brief Result of a fused ReadAccessor::getDimAndActive traversal: the HDDA
-/// step size returned by the ray-aware getDim descent (same semantics as
-/// getDim(ijk, ray)), paired with the active state of @a ijk. The exact
-/// semantics of @c active depend on the @c Policy tag used at the call site
-/// (ActiveExact vs. ActiveOnLeafOnly).
+/// @brief Result of a fused ReadAccessor::getDimAndActive traversal: the
+/// getDim(ijk, ray) step size and the policy-dependent active state of @a ijk.
 ///
-/// Storage is packed into a single uint32_t: low 31 bits hold @c dim
-/// (NanoVDB's max getDim return value is 4096 for the upper internal node
-/// in the default FloatTree hierarchy, well below the 2^31 limit), and the
-/// top bit (bit 31) encodes @c active (set = active). This packing saves one
-/// register at the function-return boundary vs. the otherwise natural
-/// {uint32_t, bool} layout, which matters for callers that hold the result
-/// live across other work. Aggregate-initialization style `return {dim,
-/// active}` is preserved via the explicit two-argument constructor; accessors
-/// @c dim() and @c active() decode on read.
+/// The low 31 bits store @c dim and bit 31 stores @c active, saving one live
+/// return register versus {uint32_t, bool}. The default FloatTree's upper-node
+/// maximum is 4096. The constructor supports `return {dim, active}`; dim() and
+/// active() decode the packed value.
 struct DimAndActive
 {
     uint32_t packed{0u};
@@ -1838,26 +1830,18 @@ struct DimAndActive
     __hostdev__ bool     active() const { return (packed >> 31) != 0u; }
 };
 
-/// @brief Policy tag for getDimAndActive: @c active reflects what isActive(ijk)
-///        would return regardless of any skip-flag short-circuit in the
-///        traversal. This matches the original separate getDim + isActive
-///        semantics byte-for-byte, at the cost of forcing a full Root->Leaf
-///        descent on InternalNodes whose skip-flag is set. Use this when the
-///        caller reads @c active unconditionally (e.g. HDDA iterators
-///        which observe per-tile activeness above the leaf level).
+/// @brief Policy that exactly matches separate getDim and isActive calls. A
+/// skip flag still controls @c dim but cannot stop the active-state descent:
+/// GridStats flags value range versus render delta, not activeness. This costs
+/// a full descent through skipped InternalNodes; use it when @c active is read
+/// unconditionally, such as by HDDA iterators observing upper-level activeness.
 struct ActiveExact {};
 
-/// @brief Policy tag for getDimAndActive: @c active is meaningful only when
-///        the returned @c dim corresponds to a true leaf-level descent --
-///        i.e. when @c dim is no larger than the dim() of the deepest level
-///        that was actually visited. When the descent short-circuits via
-///        the InternalNode skip-flag, @c active is unspecified (the caller
-///        MUST gate on @c dim before reading @c active). This recovers the
-///        cheap skip-flag fast path of standalone getDim while still fusing
-///        the leaf-level isActive read into the same descent on the rays
-///        that actually need it. Use this when the caller's logic is of the
-///        form `if (hdda.dim() > 1 || !active) continue;` -- the dim>1
-///        short-circuit makes the unspecified active value dead.
+/// @brief Policy that preserves getDim's skip-flag fast path. If an
+/// InternalNode short-circuits, @c active is unspecified and must be gated on
+/// @c dim. Otherwise the leaf-level active read is fused into the descent. Use
+/// for logic such as `if (hdda.dim() > 1 || !active) continue;`, where the
+/// short-circuit ensures @c active is read only after a leaf-level descent.
 struct ActiveOnLeafOnly {};
 
 // ----------------------------> CheckMode <----------------------------------
@@ -3188,17 +3172,9 @@ private:
         return ChildNodeType::dim(); // background
     }
 
-    /// @brief Fused variant of getDimAndCache that additionally reports the
-    /// active state of @a ijk in the same traversal. Shares the Root→Internal
-    /// →Leaf descent, the accessor cache update, and (at the terminating
-    /// level) the ValueMask / tile-state read between the two queries.
-    ///
-    /// The @c Policy tag controls how @c active is computed when an
-    /// InternalNode along the descent has its skip-flag set; see
-    /// ActiveExact and ActiveOnLeafOnly for the two contracts.
-    /// At the root level the skip-flag does not apply, so both policies
-    /// produce identical results here -- @c Policy is only forwarded to the
-    /// child descent.
+    /// @brief Returns dim and active state in one traversal, sharing cache and
+    /// terminal tile/mask reads. Root has no skip flag, so @c Policy affects
+    /// only the child descent; see ActiveExact and ActiveOnLeafOnly.
     template<typename Policy = ActiveExact, typename RayT, typename AccT>
     __hostdev__ DimAndActive getDimAndActiveAndCache(const CoordType& ijk, const RayT& ray, const AccT& acc) const
     {
@@ -3709,44 +3685,16 @@ private:
         return ChildNodeType::dim(); // tile value
     }
 
-    /// @brief Fused variant of getDimAndCache that additionally reports the
-    /// active state of @a ijk in the same traversal. The @c Policy tag
-    /// controls how @c active is resolved when this node's skip-flag is
-    /// set:
-    ///
-    ///   - @c ActiveExact (default): preserves exact semantics of
-    ///     getDimAndCache + getAndCache<GetState>. Even when the skip-flag
-    ///     is set we still descend into the child (or read this->mValueMask
-    ///     for tiles) so @c active reflects the same value a full
-    ///     getAndCache<GetState> descent would return. The dim half of the
-    ///     result mirrors getDimAndCache: skip-flag short-circuits to
-    ///     this->dim() so HDDA steps past the whole node, while the active
-    ///     half pays for the descent regardless. We must not skip the
-    ///     descent purely on the skip-flag here because skip is set based
-    ///     on value range vs. delta (see GridStats::setFlag), not on
-    ///     activeness, so callers like HDDA iterators that observe
-    ///     @c active even at HDDA-stable upper levels would be broken.
-    ///
-    ///   - @c ActiveOnLeafOnly: cheap-path variant. When the skip-flag is
-    ///     set we short-circuit to {this->dim(), false} just like a
-    ///     standalone getDimAndCache would (no child read, no leaf
-    ///     descent). The returned @c active is unspecified in that case
-    ///     and the caller is contractually required to gate on @c dim
-    ///     before reading @c active. This matches the pattern used by
-    ///     ZeroCrossing-style code: `if (hdda.dim() > 1 || !active)
-    ///     continue;`. When the skip-flag is not set the behaviour is
-    ///     identical to ActiveExact -- we still need the descent to
-    ///     compute the leaf-level active bit.
+    /// @brief Returns dim and active state in one traversal. On a skip flag,
+    /// ActiveExact resolves the true active state but returns this node's dim;
+    /// ActiveOnLeafOnly returns {dim, false} immediately. Without a skip flag
+    /// both policies are identical. See GridStats::setFlag.
     template<typename Policy = ActiveExact, typename RayT, typename AccT>
     __hostdev__ DimAndActive getDimAndActiveAndCache(const CoordType& ijk, const RayT& ray, const AccT& acc) const
     {
         //if (!ray.intersects( this->bbox() )) return {1<<TOTAL, ...};
-        // The policy paths are split below so that for ActiveOnLeafOnly we
-        // don't keep `skip` live across the recursive call -- once the
-        // short-circuit hasn't fired we know skip is false, and there's no
-        // reason to hold a register for it through the descent. This was
-        // worth ~2 reg/thread, which crosses the register/block-count
-        // occupancy cliff on modern hardware.
+        // Separate paths keep `skip` out of ActiveOnLeafOnly's recursion,
+        // saving ~2 registers/thread and avoiding an occupancy cliff.
         if constexpr (util::is_same<Policy, ActiveOnLeafOnly>::value) {
             if (DataType::mFlags & uint32_t(1u))
                 return {this->dim(), false}; // active unspecified per policy
@@ -4710,21 +4658,12 @@ private:
         return ChildNodeType::dim();
     }
 
-    /// @brief Fused variant of getDimAndCache that additionally reports the
-    /// active state of @a ijk in the same traversal. Preserves exact
-    /// semantics of getDimAndCache + getAndCache<GetState>: the dim mirrors
-    /// the ray-aware getDimAndCache path (skip-flag returns leaf dim for
-    /// HDDA to step past the whole leaf) while active always reflects
-    /// mValueMask.isOn(n), since setting the skip-flag from GridStats means
-    /// "value range outside the render delta band" -- which does not imply
-    /// individual voxels are inactive. The @c Policy parameter is accepted
-    /// for signature compatibility with the recursive call from
-    /// InternalNode but does not change behaviour at the leaf level: skip
-    /// flags on leaves are rare in practice (the upper-level skip-flag
-    /// short-circuit eats most of the cost), and adding a leaf-level
-    /// branch on Policy was observed to push @c parallelForKernel past a
-    /// register-occupancy cliff (64->66 reg/thread, 4->3 blocks/SM) that
-    /// negated the descent savings.
+    /// @brief Returns dim and active state in one traversal. @c Policy is
+    /// accepted for recursion but does not change leaf behavior: the skip flag
+    /// controls dim while active always comes from mValueMask. Branching here
+    /// raised parallelForKernel from 64 to 66 registers/thread and reduced
+    /// occupancy from four to three blocks/SM, negating the descent savings;
+    /// leaf skip flags are rare because upper-level flags usually short-circuit.
     template<typename Policy = ActiveExact, typename RayT, typename AccT>
     __hostdev__ DimAndActive getDimAndActiveAndCache(const CoordT& ijk, const RayT& /*ray*/, const AccT&) const
     {
