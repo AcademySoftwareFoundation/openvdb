@@ -519,27 +519,30 @@ TEST(TestMemoryResource, GridStats_InjectedResourceSeam)
     ASSERT_NE(d_grid, nullptr);
 
     CountingResource res;
-    {   // Stats has an average, so the per-node scratch is allocated
+    {   // Stats has an average, so the per-node scratch is allocated; the
+        // temporary NodeManager (storage + size scratch) routes through the
+        // resource as well
         nanovdb::tools::cuda::GridStats<float, nanovdb::tools::Stats<float>, CountingResource> stats(0.0f, res);
         stats.update(d_grid);
         ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
-        EXPECT_EQ(res.allocs, 1);
-        EXPECT_EQ(res.deallocs, 1);
+        EXPECT_EQ(res.allocs, 3);
+        EXPECT_EQ(res.deallocs, 3);
     }
-    {   // Extrema has no average: the zero-element buffer must not allocate
+    {   // Extrema has no average: the zero-element stats buffer must not
+        // allocate, leaving only the NodeManager pair
         nanovdb::tools::cuda::GridStats<float, nanovdb::tools::Extrema<float>, CountingResource> stats(0.0f, res);
         stats.update(d_grid);
         ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
-        EXPECT_EQ(res.allocs, 1);            // unchanged
-        EXPECT_EQ(res.deallocs, 1);
+        EXPECT_EQ(res.allocs, 5);
+        EXPECT_EQ(res.deallocs, 5);
     }
     {   // The free function forwards ResourceT to the per-type default instance
         auto& def = nanovdb::cuda::default_resource<CountingResource>();
         const int a0 = def.allocs, d0 = def.deallocs;
         nanovdb::tools::cuda::updateGridStats<float, CountingResource>(d_grid, nanovdb::tools::StatsMode::All);
         ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
-        EXPECT_EQ(def.allocs - a0, 1);
-        EXPECT_EQ(def.deallocs - d0, 1);
+        EXPECT_EQ(def.allocs - a0, 3);
+        EXPECT_EQ(def.deallocs - d0, 3);
     }
 }
 

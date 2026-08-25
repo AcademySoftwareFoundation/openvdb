@@ -288,17 +288,17 @@ TEST(TestBuffer, OversizedCountThrows)
     ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
 }
 
-TEST(TestBuffer, ClearFreesAndEmpties)
+TEST(TestBuffer, DestroyFreesAndEmpties)
 {
     Counters c;
     nanovdb::cuda::Buffer<float, CountingResource> buf(0, CountingResource{&c}, 64, nanovdb::cuda::noInit);
     ASSERT_EQ(c.allocs, 1);
-    buf.clear();
+    buf.destroy();
     EXPECT_EQ(buf.data(), nullptr);
     EXPECT_EQ(buf.size(), 0u);
     EXPECT_TRUE(buf.empty());
     EXPECT_EQ(c.deallocs, 1);
-    buf.clear();                 // idempotent: no second free
+    buf.destroy();               // idempotent: no second free
     EXPECT_EQ(c.deallocs, 1);
     ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
 }
@@ -738,7 +738,7 @@ TEST(TestBuffer, RawByteBufferRoundTrip)
     ASSERT_EQ(cudaMemcpyAsync(readback.data(), buf.data(), n, cudaMemcpyDeviceToHost, s), cudaSuccess);
     ASSERT_EQ(cudaStreamSynchronize(s), cudaSuccess);
     EXPECT_EQ(readback, pattern);
-    buf.clear();
+    buf.destroy();
     ASSERT_EQ(cudaStreamSynchronize(s), cudaSuccess);
     ASSERT_EQ(cudaStreamDestroy(s), cudaSuccess);
 }
@@ -769,7 +769,7 @@ TEST(TestBuffer, BufferViewWrapsHostArray)
     view.data()[2] = 42.f; // writable through the view
     EXPECT_EQ(host[2], 42.f);
 
-    view.clear(); // detaches, does not free
+    view.destroy(); // detaches, does not free
     EXPECT_EQ(view.data(), nullptr);
     EXPECT_TRUE(view.empty());
     EXPECT_EQ(host[2], 42.f); // underlying storage untouched
@@ -1053,6 +1053,38 @@ TEST(TestBuffer, GridHandleSingleSpaceBorrowedResource)
         EXPECT_EQ(3, counters.allocs);
         EXPECT_NE(copy.deviceData(), handle.deviceData());
         EXPECT_EQ(copy.gridCount(), 1u);
+    }
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+    EXPECT_EQ(counters.allocs, counters.deallocs);
+}
+
+TEST(TestBuffer, SingleSpaceNodeManager)
+{
+    // createNodeManager over an injected resource: the handle's storage and
+    // its size scratch both allocate through it, and deviceMgr() maps onto
+    // the single-space buffer.
+    auto host = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
+    using BufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
+    BufT buf(cudaStream_t(0), host.bufferSize(), nanovdb::cuda::noInit);
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(buf.data(), host.data(), host.bufferSize(), cudaMemcpyHostToDevice));
+    nanovdb::GridHandle<BufT> handle(std::move(buf));
+    auto *d_grid = handle.deviceGrid<float>();
+    ASSERT_NE(d_grid, nullptr);
+
+    Counters counters;
+    CountingResource res{&counters};
+    {
+        auto mgrHandle = nanovdb::cuda::createNodeManager(d_grid, res);
+        ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+        // a breadth-first grid takes the linear path: storage + size scratch only
+        EXPECT_EQ(2, counters.allocs);
+        EXPECT_EQ(1, counters.deallocs);// the size scratch
+        EXPECT_NE(mgrHandle.deviceMgr<float>(), nullptr);
+        EXPECT_EQ(mgrHandle.deviceMgr<nanovdb::Vec3f>(), nullptr);// wrong type: null, not garbage
+
+        mgrHandle.reset();// dispatches to destroy(), through the same resource
+        ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+        EXPECT_EQ(counters.allocs, counters.deallocs);
     }
     ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
     EXPECT_EQ(counters.allocs, counters.deallocs);

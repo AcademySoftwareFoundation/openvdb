@@ -67,11 +67,9 @@ public:
     GridStats(ValueT delta = ValueT(0), ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
         : mDelta(delta), mResource(&resource) {}
 
-    /// @note The per-node statistics scratch is allocated through the injected
-    ///       resource. The temporary NodeManager this method builds still
-    ///       allocates through the dual-space DeviceBuffer, which does not yet
-    ///       accept a resource; that allocation bypasses @c ResourceT until the
-    ///       single-space handle work on the roadmap (openvdb #2232) lands.
+    /// @note All device allocations this method makes -- the per-node
+    ///       statistics scratch and the temporary NodeManager -- go through
+    ///       the injected resource.
     void update(GridT *d_grid, cudaStream_t stream = 0);
 
 }; // cuda::GridStats
@@ -311,7 +309,7 @@ void GridStats<BuildT, StatsT, ResourceT>::update(NanoGrid<BuildT> *d_grid, cuda
     static const uint32_t threadsPerBlock = 128;
     auto blocksPerGrid = [&](uint32_t count)->uint32_t{return (count + (threadsPerBlock - 1)) / threadsPerBlock;};
 
-    auto nodeMgrHandle = nanovdb::cuda::createNodeManager(d_grid, nanovdb::cuda::DeviceBuffer(), stream);
+    auto nodeMgrHandle = nanovdb::cuda::createNodeManager(d_grid, *mResource, stream);
     auto *d_nodeMgr = nodeMgrHandle.template deviceMgr<BuildT>();
 
     uint32_t nodeCount[3];// {leaf, lower, upper}
