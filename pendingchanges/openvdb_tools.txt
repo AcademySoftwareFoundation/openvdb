@@ -5,6 +5,11 @@ tools:
     surfaces from a soup of polygons.
 
   Fixes:
+  - Fixed three bugs in "math::Histogram::add()" in Stats.h: (1) heap buffer overflow when a
+    sample equals the upper bound (bin index clamped to last bin); (2) NaN silently bypassing
+    the range check and causing undefined behaviour on conversion to size_t (explicit isnan
+    guard added); (3) "count()", "min()" and "max()" took "int" instead of "size_t", causing
+    narrowing-conversion warnings at call sites. Regression tests added to TestStats.cc.
   - Fixed a crash in PolySoupToLevelSet::process() when the requested voxel size is too coarse
     relative to the input mesh (larger than maxLength/2, where maxLength is the largest bounding-box
     dimension). Such input left the internal offset-grid list empty, and process() then dereferenced

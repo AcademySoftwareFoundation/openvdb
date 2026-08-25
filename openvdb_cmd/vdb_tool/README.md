@@ -42,6 +42,7 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **gauss** (alias: gaussLS) | gaussian convolution of a level set surface |
 | **grad** | generate a vector grid with the gradient of a scalar grid |
 | **help** (alias: h) | Print documentation for one, multiple or all available actions |
+| **histogram** (alias: hist) | Print an ASCII bar histogram of the distribution of active values for one or more VDB grids |
 | **if** | start of if-scope. If the value of its option, named test, evaluates to false the entire scope is skipped |
 | **intersection** | CSG intersection of two level sets surfaces |
 | **iso2ls** (aliases: lsRebuild, i2l) | Convert an iso-surface of a scalar field into a level set (i.e. SDF) |
