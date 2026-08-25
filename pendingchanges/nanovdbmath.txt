@@ -1,0 +1,20 @@
+NanoVDB:
+  Improvements:
+  - Refactored the math::Mat and math::Vec classes onto shared base classes
+    (MatBase and the new VecBase), giving every Mat/Vec type a complete and
+    consistent operator surface, bounds-checked element access, and constexpr
+    evaluation throughout Math.h and the Map API in NanoVDB.h. The
+    cross-template Vec conversion constructors are now explicit, so downstream
+    code relying on implicit Vec type conversions may need a one-line cast.
+
+  Bug Fixes:
+  - Fixed math::Min/Max for 32-bit integers routing through fminf/fmaxf, which
+    lost precision above 2^24 and could overflow near INT_MAX.
+  - Fixed integer division in the Vec and Mat scalar operator/, which previously
+    computed a reciprocal first, so e.g. Vec3i(6,8,10) / 2 returned (0,0,0).
+  - Fixed Mat2::inverse returning uninitialized values on singular input; it now
+    returns zero.
+  - Fixed Vec2 arithmetic against Coord silently dropping the z component; the
+    overloads now take Coord2.
+  - Fixed math::Round(Vec3<float>) disagreeing with the double overload at
+    half-integers; both now use floor(x + 0.5).
