@@ -40,21 +40,6 @@ private:
     uint32_t* mNodeCounts;
 };
 
-/// @brief Indicator functor that returns 1 if the input value matches the member value, 0 otherwise
-template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
-struct EqualityIndicator
-{
-    EqualityIndicator(const T* value) : mValue(value) {}
-
-    __hostdev__
-    T operator()(const T& x) const
-    {
-        return x == (*mValue);
-    }
-private:
-    const T* mValue;
-};
-
 /// @brief Find a partition at an arbitrary diagonal in the conceptual merge of two sorted input arrays.
 template<typename KeyIteratorIn>
 __device__
@@ -86,31 +71,53 @@ void mergePathKernel(KeyIteratorIn keys1, size_t keys1Count, KeyIteratorIn keys2
     mergePath(keys1, keys1Count, keys2, keys2Count, key1Intervals, key2Intervals, combinedIndex);
 }
 
-/// @brief Extends or shortens the left end of an array interval
-template<typename DistanceIteratorIn, typename CountIteratorOut, typename OffsetIteratorOut>
+/// @brief Snap each device boundary in stripeOffsets to the nearest edge of the run of equal
+/// keys containing it, so that no run (i.e. upper-node tile) straddles two devices. The keys
+/// must be globally sorted. The boundaries are adjusted monotonically from left to right, so a
+/// run spanning several stripes is consolidated onto one device and the fully-interior devices
+/// are left with empty stripes. Runs sequentially on a single thread: the boundary chain is a
+/// sequential dependence over deviceCount entries and each run extent is found by binary search.
+template<typename KeyT>
 __global__
-void leftRebalanceKernel(DistanceIteratorIn leftDistance, DistanceIteratorIn rightDistance, CountIteratorOut leftCount, OffsetIteratorOut leftOffset)
+void snapBoundariesToRunsKernel(const KeyT* keys, ptrdiff_t keyCount, int deviceCount, ptrdiff_t* stripeOffsets, size_t* stripeCounts)
 {
-    if (*leftDistance < *rightDistance) {
-        *leftCount -= *leftDistance;
+    ptrdiff_t previousBoundary = stripeOffsets[0]; // device 0 always starts at 0
+    for (int deviceId = 1; deviceId < deviceCount; ++deviceId) {
+        ptrdiff_t boundary = stripeOffsets[deviceId];
+        if (boundary >= keyCount) {
+            boundary = keyCount;
+        } else if (boundary > previousBoundary && keys[boundary] == keys[boundary - 1]) {
+            // The even-split boundary falls inside a run; binary search for the run's extent
+            // and snap to whichever end keeps the boundary closest to the even split without
+            // crossing the previous boundary.
+            const KeyT key = keys[boundary];
+            ptrdiff_t lo = previousBoundary, hi = boundary;
+            while (lo < hi) {
+                const ptrdiff_t mid = lo + (hi - lo) / 2;
+                if (keys[mid] < key) lo = mid + 1; else hi = mid;
+            }
+            const ptrdiff_t runStart = lo;
+            lo = boundary; hi = keyCount;
+            while (lo < hi) {
+                const ptrdiff_t mid = lo + (hi - lo) / 2;
+                if (keys[mid] <= key) lo = mid + 1; else hi = mid;
+            }
+            const ptrdiff_t runEnd = lo;
+            if (runStart <= previousBoundary) {
+                boundary = runEnd; // the run reaches the previous device, give the whole tile away
+            } else {
+                boundary = (boundary - runStart <= runEnd - boundary) ? runStart : runEnd;
+            }
+        }
+        if (boundary < previousBoundary) boundary = previousBoundary;
+        stripeOffsets[deviceId] = boundary;
+        previousBoundary = boundary;
     }
-    else {
-        *leftCount += *rightDistance;
-    }
-}
 
-/// @brief Extends or shortens the right end of an array interval
-template<typename DistanceIteratorIn, typename CountIteratorOut, typename OffsetIteratorOut>
-__global__
-void rightRebalanceKernel(DistanceIteratorIn leftDistance, DistanceIteratorIn rightDistance, CountIteratorOut rightCount, OffsetIteratorOut rightOffset)
-{
-    if (*leftDistance < *rightDistance) {
-        *rightCount += *leftDistance;
-        *rightOffset -= *leftDistance;
-    }
-    else {
-        *rightCount -= *rightDistance;
-        *rightOffset += *rightDistance;
+    // Recompute the per-device counts from the adjusted, monotonic offsets.
+    for (int deviceId = 0; deviceId < deviceCount; ++deviceId) {
+        const ptrdiff_t nextOffset = (deviceId + 1 < deviceCount) ? stripeOffsets[deviceId + 1] : keyCount;
+        stripeCounts[deviceId] = static_cast<size_t>(nextOffset - stripeOffsets[deviceId]);
     }
 }
 
@@ -580,8 +587,6 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     // to reduce overhead.
     std::vector<cudaEvent_t> sortEvents(mDeviceMesh.deviceCount());
     std::vector<cudaEvent_t> runLengthEncodeEvents(mDeviceMesh.deviceCount());
-    std::vector<cudaEvent_t> transformReduceEvents(mDeviceMesh.deviceCount());
-    std::vector<cudaEvent_t> rebalanceEvents(mDeviceMesh.deviceCount());
     std::vector<cudaEvent_t> tilePrefixSumEvents(mDeviceMesh.deviceCount());
     std::vector<cudaEvent_t> voxelCountEvents(mDeviceMesh.deviceCount());
     std::vector<cudaEvent_t> leafCountEvents(mDeviceMesh.deviceCount());
@@ -592,8 +597,6 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         cudaCheck(cudaSetDevice(deviceId));
         cudaEventCreateWithFlags(&sortEvents[deviceId], cudaEventDisableTiming);
         cudaEventCreateWithFlags(&runLengthEncodeEvents[deviceId], cudaEventDisableTiming);
-        cudaEventCreateWithFlags(&transformReduceEvents[deviceId], cudaEventDisableTiming);
-        cudaEventCreateWithFlags(&rebalanceEvents[deviceId], cudaEventDisableTiming);
         cudaEventCreateWithFlags(&tilePrefixSumEvents[deviceId], cudaEventDisableTiming);
         cudaEventCreateWithFlags(&voxelCountEvents[deviceId], cudaEventDisableTiming);
         cudaEventCreateWithFlags(&leafCountEvents[deviceId], cudaEventDisableTiming);
@@ -604,7 +607,6 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
 
     // Advise per-coord quantities to be split evenly across devices. Clamp each stripe to
     // the input range so that inputs smaller than the device count produce valid trailing empty stripes.
-    std::vector<size_t> deviceStripeCounts(mDeviceMesh.deviceCount());
     const size_t deviceStripeSize = ::cuda::ceil_div(coordCount, mDeviceMesh.deviceCount());
     for (const auto& [deviceId, stream] : mDeviceMesh) {
         cudaCheck(cudaSetDevice(deviceId));
@@ -614,7 +616,6 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
 
         mStripeCounts[deviceId] = deviceStripeCount;
         mStripeOffsets[deviceId] = deviceStripeOffset;
-        deviceStripeCounts[deviceId] = deviceStripeCount;
 
         if (deviceStripeCount) {
             uint64_t* deviceInputKeys = mKeys + deviceStripeOffset;
@@ -649,59 +650,41 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
 
     radixSortAsync(mDeviceMesh, mTempDevicePools, mData->d_keys, mKeys, mData->d_indx, mIndices, coordCount, mIntervals, mStripeOffsets, mStripeCounts, sortEvents.data(), sortEvents.data());
 
-    // For each segment of sorted keys on each device, we count how many of the leftmost key occur past the left boundary of the segment. The same is done for the rightmost key with the right boundary of the segment.
-    auto leftIntervals = mIntervals;
-    auto rightIntervals = mIntervals + mDeviceMesh.deviceCount() + 1;
-    for (const auto& [deviceId, stream] : mDeviceMesh) {
-        cudaCheck(cudaSetDevice(deviceId));
-
-        auto deviceStripeCount = mStripeCounts[deviceId];
-        auto deviceStripeOffset = mStripeOffsets[deviceId];
-        uint64_t* deviceInputKeys = mKeys + deviceStripeOffset;
-
-        if (deviceStripeCounts[deviceId] && deviceId > 0 && deviceStripeCounts[deviceId - 1]) {
-            cudaCheck(cudaStreamWaitEvent(stream, sortEvents[deviceId - 1]));
-            EqualityIndicator<uint64_t> indicator(deviceInputKeys - 1);
-            CUB_LAUNCH(DeviceReduce::TransformReduce, mTempDevicePools[deviceId], stream, deviceInputKeys, rightIntervals + deviceId, deviceStripeCount, ::cuda::std::plus(), indicator, 0);
-        } else {
-            rightIntervals[deviceId] = 0;
-        }
-
-        if (deviceStripeCounts[deviceId] && deviceId < static_cast<int>(mDeviceMesh.deviceCount() - 1) && deviceStripeCounts[deviceId + 1]) {
-            cudaCheck(cudaStreamWaitEvent(stream, sortEvents[deviceId + 1]));
-            EqualityIndicator<uint64_t> indicator(deviceInputKeys + deviceStripeCount);
-            CUB_LAUNCH(DeviceReduce::TransformReduce, mTempDevicePools[deviceId], stream, deviceInputKeys, leftIntervals + deviceId, deviceStripeCount, ::cuda::std::plus(), indicator, 0);
-        } else {
-            leftIntervals[deviceId] = 0;
-        }
-        cudaCheck(cudaEventRecord(transformReduceEvents[deviceId], stream));
+    // Rebalance the device segments so that a device boundary always coincides
+    // with a change in key value. Because TileKeyFunctor assigns identical keys
+    // to every point that falls in the same upper-node "tile", this aligns the
+    // device ownership boundaries with tile boundaries. Downstream construction
+    // assumes each tile (and therefore each lower node, leaf node, and voxel) is
+    // owned by exactly one device; if a tile straddled a boundary, multiple
+    // devices would concurrently build the same leaf and race on its value mask.
+    //
+    // A single tile can span three or more devices (e.g. one dense leaf whose
+    // points are split evenly across the mesh). Adjusting only adjacent pairs of
+    // boundaries cannot consolidate such a tile because a fully-interior device
+    // lies entirely within it, so we compute the boundaries globally and
+    // monotonically. mKeys is globally sorted at this point, so a tile boundary
+    // is simply a position where mKeys changes. Snapping runs in a single-thread
+    // kernel on one device (every device stream is already ordered after the
+    // whole sort by radixSortAsync's final stream merge) with binary searches for
+    // the run extents; the host only waits on its completion event before reading
+    // back the small offset/count arrays, mirroring how the sort's merge-path
+    // partitions are synchronized. Fully-interior devices are left with empty
+    // stripes, which the rest of the pipeline already handles.
+    {
+        static constexpr int snapDeviceId = 0;
+        cudaCheck(cudaSetDevice(snapDeviceId));
+        const auto snapStream = mDeviceMesh[snapDeviceId].stream;
+        kernels::snapBoundariesToRunsKernel<<<1, 1, 0, snapStream>>>(mKeys, static_cast<ptrdiff_t>(coordCount), static_cast<int>(mDeviceMesh.deviceCount()), mStripeOffsets, mStripeCounts);
+        cudaCheckError();
+        cudaCheck(cudaEventRecord(sortEvents[snapDeviceId], snapStream));
+        // CUB needs the rebalanced partition sizes on the host. Synchronize only the tiny snap kernel.
+        cudaCheck(cudaEventSynchronize(sortEvents[snapDeviceId]));
     }
 
-    // Rebalance the segments so that a device segment boundary also corresponds to a change in key value. Effectively, this aligns upper node boundaries with device ownership boundaries.
+    // Parallel RLE in order to obtain tiles. The device boundaries were finalized
+    // above before the host read them back, so no per-device rebalance event is needed.
     for (const auto& [deviceId, stream] : mDeviceMesh) {
         cudaCheck(cudaSetDevice(deviceId));
-
-        if (deviceId > 0 && deviceStripeCounts[deviceId] && deviceStripeCounts[deviceId - 1])
-        {
-            cudaCheck(cudaStreamWaitEvent(stream, transformReduceEvents[deviceId - 1]));
-            kernels::rightRebalanceKernel<<<1, 1, 0, stream>>>(leftIntervals + deviceId - 1, rightIntervals + deviceId, mStripeCounts + deviceId, mStripeOffsets + deviceId);
-            cudaCheckError();
-        }
-
-        if (deviceId < static_cast<int>(mDeviceMesh.deviceCount() - 1) && deviceStripeCounts[deviceId] && deviceStripeCounts[deviceId + 1])
-        {
-            cudaCheck(cudaStreamWaitEvent(stream, transformReduceEvents[deviceId + 1]));
-            kernels::leftRebalanceKernel<<<1, 1, 0, stream>>>(leftIntervals + deviceId, rightIntervals + deviceId + 1, mStripeCounts + deviceId, mStripeOffsets + deviceId);
-            cudaCheckError();
-        }
-        cudaCheck(cudaEventRecord(rebalanceEvents[deviceId], stream));
-    }
-
-    // Parallel RLE in order to obtain tiles
-    for (const auto& [deviceId, stream] : mDeviceMesh) {
-        cudaCheck(cudaSetDevice(deviceId));
-
-        cudaCheck(cudaEventSynchronize(rebalanceEvents[deviceId]));
 
         auto deviceStripeCount = mStripeCounts[deviceId];
         auto deviceStripeOffset = mStripeOffsets[deviceId];
@@ -876,8 +859,6 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         cudaCheck(cudaSetDevice(deviceId));
         cudaEventDestroy(sortEvents[deviceId]);
         cudaEventDestroy(runLengthEncodeEvents[deviceId]);
-        cudaEventDestroy(transformReduceEvents[deviceId]);
-        cudaEventDestroy(rebalanceEvents[deviceId]);
         cudaEventDestroy(tilePrefixSumEvents[deviceId]);
         cudaEventDestroy(voxelCountEvents[deviceId]);
         cudaEventDestroy(leafCountEvents[deviceId]);
