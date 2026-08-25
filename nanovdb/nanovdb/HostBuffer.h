@@ -132,6 +132,15 @@ template<typename BufferT>
 struct BufferHasByteElements<BufferT, std::void_t<typename BufferT::ElementType>>
 { static constexpr bool value = sizeof(typename BufferT::ElementType) == 1; };
 
+/// @brief Detects whether a buffer provides destroy(), the cuda::Buffer
+///        spelling for releasing its storage. Handle reset() dispatches to it
+///        when present and falls back to the legacy clear() otherwise.
+template<typename BufferT, typename = void>
+struct BufferHasDestroy { static constexpr bool value = false; };
+template<typename BufferT>
+struct BufferHasDestroy<BufferT, std::void_t<decltype(std::declval<BufferT&>().destroy())>>
+{ static constexpr bool value = true; };
+
 // ----------------------------> HostBuffer <--------------------------------------
 
 /// @brief This is a buffer that contains a shared or private pool

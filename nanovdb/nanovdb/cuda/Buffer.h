@@ -299,13 +299,8 @@ public:
     }
 
     /// @brief Frees the buffer memory (if any) and resets to the empty state.
-    /// @deprecated Use destroy(). Documentation-level only for now: the
-    ///             [[deprecated]] attribute would fire from GridHandle::reset
-    ///             and NodeManager::reset, which must keep calling clear()
-    ///             until every buffer type provides destroy().
-    /// @note Transitional, and not the name to use: it exists only because
-    ///       GridHandle::reset still calls clear() on its buffer. It goes away
-    ///       when the legacy dual buffers do and GridHandle moves to destroy().
+    /// @deprecated Use destroy(): the handles now dispatch to it directly.
+    [[deprecated("Use cuda::Buffer::destroy instead")]]
     void clear() { this->destroy(); }
 
     /// @brief Frees the buffer memory (if any) on @c stream and resets to the
@@ -414,14 +409,20 @@ public:
     bool empty() const { return mSize == 0; }
 
     /// @brief Detaches the view (nulls the pointer and zeroes the size)
-    ///        without touching the underlying storage. This is the one
-    ///        deliberate deviation from std::span, required by the buffer
-    ///        static interface: GridHandle::reset() calls buffer.clear().
-    void clear()
+    ///        without touching the underlying storage -- the view is
+    ///        non-owning, so "destroying" it releases nothing. This is the
+    ///        one deliberate deviation from std::span, required by the buffer
+    ///        static interface the handles consume through reset().
+    void destroy()
     {
         mData = nullptr;
         mSize = 0;
     }
+
+    /// @brief Detaches the view.
+    /// @deprecated Use destroy(): the handles now dispatch to it directly.
+    [[deprecated("Use cuda::BufferView::destroy instead")]]
+    void clear() { this->destroy(); }
 }; // BufferView<T> class
 
 } // namespace cuda
@@ -439,7 +440,7 @@ struct BufferTraits;
 ///       device-buffer concept: a buffer whose BufferTraits specialization
 ///       sets hasDeviceSingle guarantees ElementType and ResourceType
 ///       typedefs, data(), size() and size_bytes() (byte-addressed elements,
-///       enforced by the consumer), resource(), copy(), clear(), and stream()
+///       enforced by the consumer), resource(), copy(), destroy(), and stream()
 ///       when the resource is stream-ordered. Any consumer of hasDeviceSingle
 ///       may rely on exactly this interface and nothing more; in particular,
 ///       scratch allocates through resource() as a cuda::Buffer, so a

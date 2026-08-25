@@ -105,7 +105,8 @@ public:
 
     /// @brief clear this GridHandle to an empty handle
     void reset() {
-        mBuffer.clear();
+        if constexpr (BufferHasDestroy<BufferT>::value) mBuffer.destroy();
+        else mBuffer.clear();
         mMetaData.clear();
     }
 
