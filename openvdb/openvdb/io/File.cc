@@ -18,6 +18,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <sstream>
 #include <type_traits>
 
@@ -36,6 +37,9 @@ namespace {
 ///   caller keeps the original grid and @a diagnostics is set accordingly.
 GridBase::Ptr convertGridForReadMode(const GridBase& source, const ReadOptions& readOptions,
     Codec* codec, ReadDiagnostics& diagnostics);
+
+/// @brief Return the name used in diagnostics and log messages for @a mode.
+std::string readModeName(ReadMode mode);
 
 } // anonymous namespace
 
@@ -330,28 +334,43 @@ File::getGrids(const io::ReadOptions& readOptions) const
             ret = mGrids;
         } else {
             ret.reset(new GridPtrVec);
+
+            // Instances (grids sharing a source tree) share the converted tree
+            // too, unless instancing is disabled. Under a clip, share only
+            // when transforms agree, since a clip depends on each grid's own
+            // transform.
+            const bool shareConvertedTrees = isInstancingEnabled() &&
+                readOptions.readMode != io::ReadMode::MetadataOnly;
+            struct Resolved { GridBase::Ptr grid; math::Transform::ConstPtr transform; };
+            std::map<const TreeBase*, Resolved> resolvedBySourceTree;
+
             for (const auto& cachedGrid : *mGrids) {
-                io::Codec* codec = Archive::findCodec(cachedGrid->type(), readOptions);
-                GridBase::Ptr grid =
-                    convertGridForReadMode(*cachedGrid, readOptions, codec, mReadDiagnostics);
-                if (!grid) {
-                    grid = cachedGrid;
-                    if (readOptions.readMode == io::ReadMode::Half ||
-                        readOptions.readMode == io::ReadMode::Bool ||
-                        readOptions.readMode == io::ReadMode::Mask)
+                const TreeBase* sourceTree = &cachedGrid->constBaseTree();
+                GridBase::Ptr grid;
+
+                if (shareConvertedTrees) {
+                    auto it = resolvedBySourceTree.find(sourceTree);
+                    if (it != resolvedBySourceTree.end() &&
+                        (!clip || *it->second.transform == cachedGrid->transform()))
                     {
-                        OPENVDB_LOG_WARN(mFilename << ": grid \"" << cachedGrid->getName()
-                            << "\" requested a read mode conversion, but no conversion is "
-                            "available for grid type \"" << cachedGrid->type()
-                            << "\"; returning the original type");
+                        const GridBase::Ptr& resolved = it->second.grid;
+                        grid = resolved->copyGridWithNewTree();
+                        grid->clearMetadata();
+                        grid->insertMeta(*cachedGrid);
+                        grid->setTransform(cachedGrid->transformPtr());
+                        grid->setTree(resolved->baseTreePtr());
+                        ret->push_back(grid);
+                        continue;
                     }
                 }
-                if (clip) {
-                    if (grid == cachedGrid) {
-                        // Never mutate the cached grid in place; it stays owned by mGrids.
-                        grid = grid->deepCopyGrid();
-                    }
-                    grid->clipGrid(bbox);
+
+                grid = resolveCachedGrid(cachedGrid, readOptions, mReadDiagnostics);
+
+                if (shareConvertedTrees) {
+                    // Keep the first-seen entry as canonical, so a later
+                    // mismatched transform under clip doesn't overwrite it.
+                    resolvedBySourceTree.try_emplace(
+                        sourceTree, Resolved{grid, cachedGrid->transformPtr()});
                 }
                 ret->push_back(grid);
             }
@@ -505,42 +524,7 @@ File::readGrid(const Name& name, const io::ReadOptions& readOptions)
     GridBase::Ptr cachedGrid = retrieveCachedGrid(name);
     GridBase::Ptr grid;
     if (cachedGrid) {
-        grid = cachedGrid;
-
-        if (readOptions.readMode == io::ReadMode::TopologyOnly) {
-            mReadDiagnostics.addWarning(grid->getName(),
-                "ReadMode::TopologyOnly is not supported for cached grids; "
-                "reading as original type");
-            OPENVDB_LOG_WARN(mFilename << ": grid \"" << grid->getName()
-                << "\" requested ReadMode::TopologyOnly, but this file has no grid offsets "
-                "and the grid is already fully cached; returning the original type");
-        } else {
-            io::Codec* codec = Archive::findCodec(grid->type(), readOptions);
-            GridBase::Ptr converted =
-                convertGridForReadMode(*grid, readOptions, codec, mReadDiagnostics);
-            if (converted) {
-                grid = converted;
-            } else if (readOptions.readMode == io::ReadMode::Half ||
-                readOptions.readMode == io::ReadMode::Bool ||
-                readOptions.readMode == io::ReadMode::Mask)
-            {
-                OPENVDB_LOG_WARN(mFilename << ": grid \"" << grid->getName()
-                    << "\" requested a read mode conversion, but no conversion is "
-                    "available for grid type \"" << grid->type()
-                    << "\"; returning the original type");
-            }
-        }
-
-        const auto& bbox = readOptions.clipBBox;
-        const bool clip = bbox.isSorted();
-        if (clip) {
-            if (grid == cachedGrid) {
-                // Never mutate the cached grid in place; it stays owned by mNamedGrids.
-                grid = grid->deepCopyGrid();
-            }
-            grid->clipGrid(bbox);
-        }
-        return grid;
+        return resolveCachedGrid(cachedGrid, readOptions, mReadDiagnostics);
     }
 
     NameMapCIter it = findDescriptor(name);
@@ -720,6 +704,20 @@ convertToBuildType(const GridBase& source, const std::string& targetType)
 
 } // namespace convert_grid_internal
 
+/// @brief Return the name used in diagnostics and log messages for @a mode.
+std::string
+readModeName(ReadMode mode)
+{
+    switch (mode) {
+        case ReadMode::Half: return "Half";
+        case ReadMode::Bool: return "Bool";
+        case ReadMode::Mask: return "Mask";
+        case ReadMode::TopologyOnly: return "TopologyOnly";
+        case ReadMode::MetadataOnly: return "MetadataOnly";
+        default: return "Original";
+    }
+}
+
 GridBase::Ptr
 convertGridForReadMode(const GridBase& source, const ReadOptions& readOptions,
     Codec* codec, ReadDiagnostics& diagnostics)
@@ -731,9 +729,7 @@ convertGridForReadMode(const GridBase& source, const ReadOptions& readOptions,
         return GridBase::Ptr();
     }
 
-    const std::string modeStr =
-        readOptions.readMode == ReadMode::Half ? "Half" :
-        readOptions.readMode == ReadMode::Bool ? "Bool" : "Mask";
+    const std::string modeStr = readModeName(readOptions.readMode);
 
     CodecData::Ptr codecData = codec ? codec->createData() : CodecData::Ptr();
     const std::string targetType =
@@ -771,6 +767,57 @@ convertGridForReadMode(const GridBase& source, const ReadOptions& readOptions,
 }
 
 } // anonymous namespace
+
+
+GridBase::Ptr
+File::resolveCachedGrid(const GridBase::Ptr& cachedGrid, const io::ReadOptions& readOptions,
+    ReadDiagnostics& diagnostics) const
+{
+    if (readOptions.readMode == ReadMode::MetadataOnly) {
+        return cachedGrid->copyGridWithNewTree();
+    }
+
+    GridBase::Ptr grid = cachedGrid;
+
+    if (readOptions.readMode == ReadMode::TopologyOnly) {
+        diagnostics.addWarning(grid->getName(),
+            "ReadMode::TopologyOnly is not supported for grids cached from a file "
+            "without grid offsets; returning the original grid with values intact");
+        OPENVDB_LOG_WARN(mFilename << ": grid \"" << grid->getName()
+            << "\" requested ReadMode::TopologyOnly, but this file has no grid offsets "
+            "and the grid is already fully cached; returning the original grid "
+            "with values intact");
+    } else {
+        io::Codec* codec = Archive::findCodec(grid->type(), readOptions);
+        GridBase::Ptr converted = convertGridForReadMode(*grid, readOptions, codec, diagnostics);
+        if (converted) {
+            grid = converted;
+        } else if (readOptions.readMode == ReadMode::Half ||
+            readOptions.readMode == ReadMode::Bool ||
+            readOptions.readMode == ReadMode::Mask)
+        {
+            const std::string modeStr = readModeName(readOptions.readMode);
+            OPENVDB_LOG_WARN(mFilename << ": grid \"" << grid->getName()
+                << "\" requested ReadMode::" << modeStr << ", but no conversion is "
+                "available for grid type \"" << grid->type()
+                << "\"; returning the original type");
+        }
+    }
+
+    const auto& bbox = readOptions.clipBBox;
+    if (bbox.isSorted()) {
+        if (grid == cachedGrid) {
+            // Don't mutate the cached grid in place, it stays owned by the caller.
+            grid = grid->deepCopyGrid();
+        }
+        grid->clipGrid(bbox);
+        diagnostics.addWarning(cachedGrid->getName(),
+            "bounding box clipping was applied as a post-process because the grid "
+            "was cached from a file without grid offsets");
+    }
+
+    return grid;
+}
 
 
 } // namespace io

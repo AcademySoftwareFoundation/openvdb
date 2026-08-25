@@ -605,6 +605,7 @@ TEST_F(TestCodec, testClipBBoxInGetGridsNoGridOffsets)
 
     io::File f(path);
     f.open();
+    f.enableReadDiagnostics();
 
     ReadOptions clipOptions;
     clipOptions.clipBBox = clipBBox;
@@ -616,6 +617,7 @@ TEST_F(TestCodec, testClipBBoxInGetGridsNoGridOffsets)
         FloatGrid::Ptr clipped = gridPtrCast<FloatGrid>((*grids)[0]);
         ASSERT_TRUE(clipped);
         EXPECT_TRUE(srcClipped->tree().hasSameTopology(clipped->tree()));
+        EXPECT_EQ(size_t(1), f.readDiagnostics().diagnostics().size());
     }
 
     // mGrids must be unmutated: a default-options call still sees the full topology.
@@ -627,6 +629,46 @@ TEST_F(TestCodec, testClipBBoxInGetGridsNoGridOffsets)
         ASSERT_TRUE(full);
         EXPECT_TRUE(srcGrid->tree().hasSameTopology(full->tree()));
     }
+
+    f.close();
+    std::remove(path.c_str());
+}
+
+TEST_F(TestCodec, testClipOnOffsetsFileRecordsNoDiagnostic)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    CodecRegistry::clear();
+    io::internal::initialize();
+
+    FloatGrid::Ptr srcGrid = FloatGrid::create(0.0f);
+    srcGrid->setName("clip_grid_offsets");
+    srcGrid->fill(CoordBBox(Coord(-5), Coord(5)), 1.5f, true);
+
+    const std::string path = "test_clip_getgrids_offsets.vdb";
+    {
+        io::File f(path);
+        f.write(GridPtrVec{srcGrid});
+    }
+
+    const BBoxd clipBBox(Vec3d(0.0), Vec3d(3.5));
+
+    ReadOptions clipOptions;
+    clipOptions.clipBBox = clipBBox;
+
+    io::File f(path);
+    f.open();
+    f.enableReadDiagnostics();
+
+    GridPtrVecPtr grids = f.getGrids(clipOptions);
+    ASSERT_TRUE(grids);
+    ASSERT_EQ(size_t(1), grids->size());
+    EXPECT_EQ(size_t(0), f.readDiagnostics().diagnostics().size());
+
+    GridBase::Ptr grid = f.readGrid(srcGrid->getName(), clipOptions);
+    ASSERT_TRUE(grid);
+    EXPECT_EQ(size_t(0), f.readDiagnostics().diagnostics().size());
 
     f.close();
     std::remove(path.c_str());
@@ -660,6 +702,7 @@ TEST_F(TestCodec, testClipAndConversionTogetherNoGridOffsets)
     {
         io::File f(path);
         f.open();
+        f.enableReadDiagnostics();
         GridPtrVecPtr grids = f.getGrids(readOptions);
         ASSERT_TRUE(grids);
         ASSERT_EQ(size_t(1), grids->size());
@@ -667,6 +710,8 @@ TEST_F(TestCodec, testClipAndConversionTogetherNoGridOffsets)
         HalfGrid::Ptr clipped = gridPtrCast<HalfGrid>((*grids)[0]);
         ASSERT_TRUE(clipped);
         EXPECT_TRUE(srcClipped->tree().hasSameTopology(clipped->tree()));
+        // Only the clip diagnostic is expected, the Half conversion succeeded.
+        EXPECT_EQ(size_t(1), f.readDiagnostics().diagnostics().size());
         f.close();
     }
 
@@ -715,6 +760,273 @@ TEST_F(TestCodec, testTopologyOnlyWarnsAndIgnoresNoGridOffsets)
     ASSERT_TRUE(grid);
     EXPECT_TRUE(grid->isType<FloatGrid>());
     EXPECT_EQ(size_t(1), f.readDiagnostics().diagnostics().size());
+
+    f.close();
+    std::remove(path.c_str());
+}
+
+TEST_F(TestCodec, testGetGridsTopologyOnlyWarnsNoGridOffsets)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    CodecRegistry::clear();
+    io::internal::initialize();
+
+    FloatGrid::Ptr srcGrid = FloatGrid::create(0.0f);
+    srcGrid->setName("topology_only_grid");
+    srcGrid->fill(CoordBBox(Coord(-5), Coord(5)), 1.5f, true);
+
+    const std::string path = "test_getgrids_topology_only_no_offsets.vdb";
+    {
+        std::ofstream os(path, std::ios_base::out | std::ios_base::binary);
+        io::Stream(os).write(GridPtrVec{srcGrid});
+    }
+
+    ReadOptions readOptions;
+    readOptions.readMode = ReadMode::TopologyOnly;
+
+    // Pin getGrids() and readGrid() to the same diagnostic message.
+    std::string readGridMessage;
+    {
+        io::File f(path);
+        f.open();
+        f.enableReadDiagnostics();
+        GridBase::Ptr grid;
+        EXPECT_NO_THROW(grid = f.readGrid(srcGrid->getName(), readOptions));
+        ASSERT_TRUE(grid);
+        EXPECT_TRUE(grid->isType<FloatGrid>());
+        ASSERT_EQ(size_t(1), f.readDiagnostics().diagnostics().size());
+        readGridMessage = f.readDiagnostics().diagnostics()[0].message;
+        f.close();
+    }
+
+    {
+        io::File f(path);
+        f.open();
+        f.enableReadDiagnostics();
+        GridPtrVecPtr grids;
+        EXPECT_NO_THROW(grids = f.getGrids(readOptions));
+        ASSERT_TRUE(grids);
+        ASSERT_EQ(size_t(1), grids->size());
+        EXPECT_TRUE((*grids)[0]->isType<FloatGrid>());
+        ASSERT_EQ(size_t(1), f.readDiagnostics().diagnostics().size());
+        EXPECT_EQ(f.readDiagnostics().diagnostics()[0].message, readGridMessage);
+        f.close();
+    }
+
+    std::remove(path.c_str());
+}
+
+TEST_F(TestCodec, testMetadataOnlyNoGridOffsets)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    CodecRegistry::clear();
+    io::internal::initialize();
+
+    FloatGrid::Ptr srcGrid = FloatGrid::create(0.0f);
+    srcGrid->setName("metadata_only_grid");
+    srcGrid->insertMeta("author", StringMetadata("Einstein"));
+    srcGrid->fill(CoordBBox(Coord(-5), Coord(5)), 1.5f, true);
+
+    const std::string path = "test_metadata_only_no_offsets.vdb";
+    {
+        std::ofstream os(path, std::ios_base::out | std::ios_base::binary);
+        io::Stream(os).write(GridPtrVec{srcGrid});
+    }
+
+    ReadOptions readOptions;
+    readOptions.readMode = ReadMode::MetadataOnly;
+
+    GridBase::Ptr expected;
+    {
+        io::File f(path);
+        f.open();
+        expected = f.readGridMetadata(srcGrid->getName());
+        f.close();
+    }
+
+    {
+        io::File f(path);
+        f.open();
+        f.enableReadDiagnostics();
+        GridPtrVecPtr grids = f.getGrids(readOptions);
+        ASSERT_TRUE(grids);
+        ASSERT_EQ(size_t(1), grids->size());
+        GridBase::Ptr grid = (*grids)[0];
+        EXPECT_TRUE(grid->isType<FloatGrid>());
+        EXPECT_TRUE(gridPtrCast<FloatGrid>(grid)->tree().empty());
+        EXPECT_EQ(std::string("Einstein"), grid->metaValue<std::string>("author"));
+        EXPECT_EQ(expected->transform(), grid->transform());
+        EXPECT_EQ(size_t(0), f.readDiagnostics().diagnostics().size());
+        f.close();
+    }
+
+    {
+        io::File f(path);
+        f.open();
+        f.enableReadDiagnostics();
+        GridBase::Ptr grid = f.readGrid(srcGrid->getName(), readOptions);
+        ASSERT_TRUE(grid);
+        EXPECT_TRUE(grid->isType<FloatGrid>());
+        EXPECT_TRUE(gridPtrCast<FloatGrid>(grid)->tree().empty());
+        EXPECT_EQ(std::string("Einstein"), grid->metaValue<std::string>("author"));
+        EXPECT_EQ(expected->transform(), grid->transform());
+        EXPECT_EQ(size_t(0), f.readDiagnostics().diagnostics().size());
+        f.close();
+    }
+
+    std::remove(path.c_str());
+}
+
+TEST_F(TestCodec, testClipInstancingNoGridOffsets)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    CodecRegistry::clear();
+    io::internal::initialize();
+
+    FloatTree::Ptr tree(new FloatTree(0.0f));
+    tree->fill(CoordBBox(Coord(-5), Coord(5)), 1.5f, true);
+
+    GridBase::Ptr grid1 = createGrid(tree);
+    grid1->setName("parent");
+    GridBase::Ptr grid2 = createGrid(tree); // instance of grid1
+    grid2->setName("instance");
+
+    const std::string path = "test_clip_instancing_no_offsets.vdb";
+    {
+        std::ofstream os(path, std::ios_base::out | std::ios_base::binary);
+        io::Stream(os).write(GridPtrVec{grid1, grid2});
+    }
+
+    ReadOptions readOptions;
+    readOptions.clipBBox = BBoxd(Vec3d(0.0), Vec3d(3.5));
+
+    io::File f(path);
+    f.open();
+    GridPtrVecPtr grids = f.getGrids(readOptions);
+    ASSERT_TRUE(grids);
+    ASSERT_EQ(size_t(2), grids->size());
+
+    FloatGrid::Ptr resultParent = gridPtrCast<FloatGrid>(findGridByName(*grids, "parent"));
+    FloatGrid::Ptr resultInstance = gridPtrCast<FloatGrid>(findGridByName(*grids, "instance"));
+    ASSERT_TRUE(resultParent);
+    ASSERT_TRUE(resultInstance);
+
+    // Same transform, so the clipped tree is shared.
+    EXPECT_EQ(resultParent->treePtr(), resultInstance->treePtr());
+
+    f.close();
+    std::remove(path.c_str());
+}
+
+TEST_F(TestCodec, testConversionInstancingNoGridOffsets)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    CodecRegistry::clear();
+    io::internal::initialize();
+
+    FloatTree::Ptr tree(new FloatTree(0.0f));
+    tree->fill(CoordBBox(Coord(-5), Coord(5)), 1.5f, true);
+
+    GridBase::Ptr grid1 = createGrid(tree);
+    grid1->setName("parent");
+    GridBase::Ptr grid2 = createGrid(tree); // instance of grid1
+    grid2->setName("instance");
+
+    const std::string path = "test_conversion_instancing_no_offsets.vdb";
+    {
+        std::ofstream os(path, std::ios_base::out | std::ios_base::binary);
+        io::Stream(os).write(GridPtrVec{grid1, grid2});
+    }
+
+    ReadOptions readOptions;
+    readOptions.readMode = ReadMode::Half;
+
+    {
+        io::File f(path);
+        f.open();
+        GridPtrVecPtr grids = f.getGrids(readOptions);
+        ASSERT_TRUE(grids);
+        ASSERT_EQ(size_t(2), grids->size());
+
+        HalfGrid::Ptr resultParent = gridPtrCast<HalfGrid>(findGridByName(*grids, "parent"));
+        HalfGrid::Ptr resultInstance = gridPtrCast<HalfGrid>(findGridByName(*grids, "instance"));
+        ASSERT_TRUE(resultParent);
+        ASSERT_TRUE(resultInstance);
+
+        // Conversion doesn't break instancing, both results share the tree.
+        EXPECT_EQ(resultParent->treePtr(), resultInstance->treePtr());
+        f.close();
+    }
+
+    // Instancing disabled, so the two results don't share a tree.
+    {
+        io::File f(path);
+        f.setInstancingEnabled(false);
+        f.open();
+        GridPtrVecPtr grids = f.getGrids(readOptions);
+        ASSERT_TRUE(grids);
+        ASSERT_EQ(size_t(2), grids->size());
+
+        HalfGrid::Ptr resultParent = gridPtrCast<HalfGrid>(findGridByName(*grids, "parent"));
+        HalfGrid::Ptr resultInstance = gridPtrCast<HalfGrid>(findGridByName(*grids, "instance"));
+        ASSERT_TRUE(resultParent);
+        ASSERT_TRUE(resultInstance);
+        EXPECT_NE(resultParent->treePtr(), resultInstance->treePtr());
+        f.close();
+    }
+
+    std::remove(path.c_str());
+}
+
+TEST_F(TestCodec, testInstanceKeepsOwnTransformNoGridOffsets)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    CodecRegistry::clear();
+    io::internal::initialize();
+
+    FloatTree::Ptr tree(new FloatTree(0.0f));
+    tree->fill(CoordBBox(Coord(-5), Coord(5)), 1.5f, true);
+
+    GridBase::Ptr grid1 = createGrid(tree);
+    grid1->setName("parent");
+    grid1->setTransform(math::Transform::createLinearTransform(1.0));
+    GridBase::Ptr grid2 = createGrid(tree); // instance of grid1
+    grid2->setName("instance");
+    grid2->setTransform(math::Transform::createLinearTransform(2.0));
+
+    const std::string path = "test_instance_own_transform_no_offsets.vdb";
+    {
+        std::ofstream os(path, std::ios_base::out | std::ios_base::binary);
+        io::Stream(os).write(GridPtrVec{grid1, grid2});
+    }
+
+    ReadOptions readOptions;
+    readOptions.readMode = ReadMode::Half;
+
+    io::File f(path);
+    f.open();
+    GridPtrVecPtr grids = f.getGrids(readOptions);
+    ASSERT_TRUE(grids);
+    ASSERT_EQ(size_t(2), grids->size());
+
+    HalfGrid::Ptr resultParent = gridPtrCast<HalfGrid>(findGridByName(*grids, "parent"));
+    HalfGrid::Ptr resultInstance = gridPtrCast<HalfGrid>(findGridByName(*grids, "instance"));
+    ASSERT_TRUE(resultParent);
+    ASSERT_TRUE(resultInstance);
+
+    EXPECT_EQ(resultParent->treePtr(), resultInstance->treePtr());
+    EXPECT_EQ(1.0, resultParent->voxelSize()[0]);
+    EXPECT_EQ(2.0, resultInstance->voxelSize()[0]);
 
     f.close();
     std::remove(path.c_str());
