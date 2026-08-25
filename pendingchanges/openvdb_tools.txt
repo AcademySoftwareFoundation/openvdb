@@ -5,15 +5,11 @@ tools:
     surfaces from a soup of polygons.
 
   Fixes:
-  - Fixed a heap buffer overflow in "math::Histogram::add()" in Stats.h. The bin index is
-    computed as numBins*(val-min)/(max-min), while the range check admits values up to mMax,
-    which is the upper bound plus a small epsilon. A sample exactly equal to the upper bound
-    therefore scaled to exactly numBins and wrote one element past the end of the bin array,
-    silently corrupting the heap in optimized builds. This was trivially reachable through
-    "tools::histogram()", whose natural usage passes the data's own extrema as the range: any
-    fog volume, for instance, has an interior of exactly its maximum value. The bin index is
-    now clamped to the last bin, so such samples are counted in the top bin as intended. A
-    regression test was added to TestStats.cc.
+  - Fixed three bugs in "math::Histogram::add()" in Stats.h: (1) heap buffer overflow when a
+    sample equals the upper bound (bin index clamped to last bin); (2) NaN silently bypassing
+    the range check and causing undefined behaviour on conversion to size_t (explicit isnan
+    guard added); (3) "count()", "min()" and "max()" took "int" instead of "size_t", causing
+    narrowing-conversion warnings at call sites. Regression tests added to TestStats.cc.
   - Fixed a crash in PolySoupToLevelSet::process() when the requested voxel size is too coarse
     relative to the input mesh (larger than maxLength/2, where maxLength is the largest bounding-box
     dimension). Such input left the internal offset-grid list empty, and process() then dereferenced
