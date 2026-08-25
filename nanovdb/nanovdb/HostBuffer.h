@@ -123,6 +123,15 @@ template<typename BufferT>
 struct BufferHasHostSingle<BufferT, std::void_t<decltype(BufferTraits<BufferT>::hasHostSingle)>>
 { static constexpr bool value = BufferTraits<BufferT>::hasHostSingle; };
 
+/// @brief Detects whether a buffer exposes a retained stream (a stream()
+///        member), i.e. whether its resource is stream-ordered. Used to pick
+///        the buffer's stream-taking constructor without naming CUDA types.
+template<typename BufferT, typename = void>
+struct BufferHasStream { static constexpr bool value = false; };
+template<typename BufferT>
+struct BufferHasStream<BufferT, std::void_t<decltype(std::declval<const BufferT&>().stream())>>
+{ static constexpr bool value = true; };
+
 /// @brief Detects whether a buffer's elements are byte-sized. Buffers that
 ///        expose no ElementType (e.g. HostBuffer) address raw bytes by
 ///        definition, so the primary defaults to true.
