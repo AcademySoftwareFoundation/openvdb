@@ -1623,6 +1623,107 @@ TEST_F(TestNanoVDB, HDDA)
 #endif
 } // HDDA
 
+TEST_F(TestNanoVDB, GetDimAndActive)
+{
+    // Verifies that the fused ReadAccessor::getDimAndActive matches the result
+    // of the two separate queries it replaces -- getDim(ijk, ray) for the dim
+    // half and isActive(ijk) for the active half -- under both policy tags.
+    using GridT = nanovdb::FloatGrid;
+    using CoordT = nanovdb::Coord;
+    using RayT = nanovdb::math::Ray<float>;
+
+    const int    R = 50;
+    const double radius = double(R), voxelSize = 1.0, halfWidth = 3.0;
+    auto handle = nanovdb::tools::createLevelSetSphere(radius, nanovdb::Vec3d(0),
+                                                       voxelSize, halfWidth,
+                                                       nanovdb::Vec3d(0), "sphere");
+    auto* grid = handle.grid<float>();
+    ASSERT_TRUE(grid);
+    EXPECT_TRUE(grid->isLevelSet());
+
+    // The createLevelSetSphere path runs GridStats with delta=0, which leaves
+    // the InternalNode skip-flag (mFlags bit 0) clear everywhere. Re-run stats
+    // with delta=voxelSize so nodes whose value range falls entirely outside
+    // the [-delta, +delta] band get the skip-flag set; this is what makes
+    // getDim short-circuit above the leaf and exercises the skip-flag handling
+    // in both getDimAndActive policies below.
+    nanovdb::tools::GridStats<GridT> stats;
+    stats.update(*grid, float(voxelSize));
+
+    // The ray only feeds getDim's (currently disabled) bbox-intersection early
+    // out, so its direction does not affect any result checked here.
+    const RayT ray(RayT::Vec3T(0.0f), RayT::Vec3T(1.0f, 0.0f, 0.0f));
+
+    { // Sweep a box straddling interior, surface and exterior so the descent
+      // terminates at background, tile values, skip-flagged leaves and active
+      // leaf voxels. A single accessor is reused: its cache only changes the
+      // node a descent starts from, never the value it returns.
+        const nanovdb::CoordBBox bbox(CoordT(-R - 6), CoordT(R + 6));
+        auto acc = grid->getAccessor();
+        uint64_t nActive = 0, nLeafResolved = 0;
+        uint64_t exactDimBad = 0, exactActiveBad = 0, leafDimBad = 0, leafActiveBad = 0;
+        for (auto it = bbox.begin(); it; ++it) {
+            const CoordT   ijk    = *it;
+            const uint32_t dim    = acc.getDim(ijk, ray);
+            const bool     active = acc.isActive(ijk);
+            if (active) ++nActive;
+
+            // ActiveExact: both halves must equal the separate calls exactly.
+            const auto e = acc.getDimAndActive<nanovdb::ActiveExact>(ijk, ray);
+            if (e.dim() != dim) ++exactDimBad;
+            if (e.active() != active) ++exactActiveBad;
+
+            // ActiveOnLeafOnly: dim still matches getDim; active is only
+            // contractually defined when dim==1 (a true leaf-voxel descent).
+            const auto l = acc.getDimAndActive<nanovdb::ActiveOnLeafOnly>(ijk, ray);
+            if (l.dim() != dim) ++leafDimBad;
+            if (l.dim() == 1) {
+                ++nLeafResolved;
+                if (l.active() != active) ++leafActiveBad;
+            }
+        }
+        EXPECT_EQ(0u, exactDimBad);
+        EXPECT_EQ(0u, exactActiveBad);
+        EXPECT_EQ(0u, leafDimBad);
+        EXPECT_EQ(0u, leafActiveBad);
+        EXPECT_GT(nActive, 0u);       // we actually visited active voxels
+        EXPECT_GT(nLeafResolved, 0u); // ... and descents that reached leaf voxels
+    }
+
+    { // For a sphere the active narrow band is too thin to fill an InternalNode,
+      // so no skip-flagged internal node ever sits above an active voxel -- the
+      // headline divergence (getDim short-circuits at an internal node while
+      // active is still true) cannot arise from the geometry alone. Force it by
+      // setting the skip-flag on the lower node above a known-active voxel.
+        CoordT ijk0;
+        bool   found = false;
+        for (int x = R - 4; x <= R + 4 && !found; ++x) {
+            const CoordT c(x, 0, 0);
+            if (grid->getAccessor().isActive(c)) { ijk0 = c; found = true; }
+        }
+        ASSERT_TRUE(found);
+
+        const auto* lower = grid->getAccessor().get<nanovdb::GetLower<float>>(ijk0);
+        ASSERT_TRUE(lower);
+        const uint32_t lowerDim = lower->dim();
+        EXPECT_GT(lowerDim, 1u);
+        const_cast<nanovdb::NanoLower<float>::DataType*>(lower->data())->mFlags |= uint64_t(1u);
+
+        // Fresh accessors per query so a cached leaf can't bypass the lower-node
+        // descent where the skip-flag now lives.
+        EXPECT_EQ(lowerDim, grid->getAccessor().getDim(ijk0, ray));
+        EXPECT_TRUE(grid->getAccessor().isActive(ijk0));
+
+        const auto e = grid->getAccessor().getDimAndActive<nanovdb::ActiveExact>(ijk0, ray);
+        EXPECT_EQ(lowerDim, e.dim()); // dim short-circuits like getDim
+        EXPECT_TRUE(e.active());      // ... but active descends past the skip-flag
+
+        const auto l = grid->getAccessor().getDimAndActive<nanovdb::ActiveOnLeafOnly>(ijk0, ray);
+        EXPECT_EQ(lowerDim, l.dim());
+        EXPECT_FALSE(l.active());     // short-circuits: active is "unspecified" (false)
+    }
+} // GetDimAndActive
+
 TEST_F(TestNanoVDB, Mask)
 {
     using MaskT = nanovdb::Mask<3>;
