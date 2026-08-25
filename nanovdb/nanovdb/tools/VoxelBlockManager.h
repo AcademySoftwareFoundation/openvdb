@@ -142,7 +142,16 @@ public:
 
     ~VoxelBlockManagerHandle() { this->reset(); }
     /// @brief clear the buffer
-    void reset() { mFirstLeafID.clear(); mJumpMap.clear(); mBlockCount = 0; }
+    void reset() {
+        if constexpr (BufferHasDestroy<BufferT>::value) {
+            mFirstLeafID.destroy();
+            mJumpMap.destroy();
+        } else {
+            mFirstLeafID.clear();
+            mJumpMap.clear();
+        }
+        mBlockCount = 0;
+    }
 
     /// @brief Returns a non-const pointer to the firstLeafID device-hosted data
     ///

@@ -18,6 +18,7 @@
 
 #include <cstddef>
 #include <cstring>
+#include <sstream>// for the pinned-handle write/read round trip
 #include <limits>
 #include <stdexcept>
 #include <type_traits>
@@ -288,17 +289,17 @@ TEST(TestBuffer, OversizedCountThrows)
     ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
 }
 
-TEST(TestBuffer, ClearFreesAndEmpties)
+TEST(TestBuffer, DestroyFreesAndEmpties)
 {
     Counters c;
     nanovdb::cuda::Buffer<float, CountingResource> buf(0, CountingResource{&c}, 64, nanovdb::cuda::noInit);
     ASSERT_EQ(c.allocs, 1);
-    buf.clear();
+    buf.destroy();
     EXPECT_EQ(buf.data(), nullptr);
     EXPECT_EQ(buf.size(), 0u);
     EXPECT_TRUE(buf.empty());
     EXPECT_EQ(c.deallocs, 1);
-    buf.clear();                 // idempotent: no second free
+    buf.destroy();               // idempotent: no second free
     EXPECT_EQ(c.deallocs, 1);
     ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
 }
@@ -738,7 +739,7 @@ TEST(TestBuffer, RawByteBufferRoundTrip)
     ASSERT_EQ(cudaMemcpyAsync(readback.data(), buf.data(), n, cudaMemcpyDeviceToHost, s), cudaSuccess);
     ASSERT_EQ(cudaStreamSynchronize(s), cudaSuccess);
     EXPECT_EQ(readback, pattern);
-    buf.clear();
+    buf.destroy();
     ASSERT_EQ(cudaStreamSynchronize(s), cudaSuccess);
     ASSERT_EQ(cudaStreamDestroy(s), cudaSuccess);
 }
@@ -769,7 +770,7 @@ TEST(TestBuffer, BufferViewWrapsHostArray)
     view.data()[2] = 42.f; // writable through the view
     EXPECT_EQ(host[2], 42.f);
 
-    view.clear(); // detaches, does not free
+    view.destroy(); // detaches, does not free
     EXPECT_EQ(view.data(), nullptr);
     EXPECT_TRUE(view.empty());
     EXPECT_EQ(host[2], 42.f); // underlying storage untouched
@@ -903,14 +904,152 @@ TEST(TestBuffer, GridHandleSingleSpaceCopyIsDeviceDeep)
     EXPECT_EQ(0, std::memcmp(a.data(), b.data(), a.size()));// same bytes
 }
 
-// GridHandle over a pinned-resource cuda::Buffer is deliberately rejected (a
-// named static_assert at handle scope): the host paths would need create()
-// and byte-count size semantics cuda::Buffer does not provide. Classification
-// is still asserted at compile time:
 static_assert(!nanovdb::BufferHasDeviceSingle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::PinnedResource>>::value,
               "pinned storage is host-accessible, not device-single");
 static_assert(nanovdb::BufferHasHostSingle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::PinnedResource>>::value,
-              "pinned storage is host-single and rejected by GridHandle");
+              "pinned storage is a host-readable single-space buffer");
+
+TEST(TestBuffer, GridHandlePinnedHostReadable)
+{
+    auto host = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
+    ASSERT_NE(host.data(), nullptr);
+    using BufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::PinnedResource>;
+    BufT buf(host.bufferSize(), nanovdb::cuda::noInit);
+    std::memcpy(buf.data(), host.data(), host.bufferSize());// pinned memory is host-writable
+
+    nanovdb::GridHandle<BufT> handle(std::move(buf));// metadata parses on the host
+    EXPECT_EQ(1u, handle.gridCount());
+    EXPECT_EQ(nanovdb::GridType::Float, handle.gridType(0));
+    ASSERT_NE(handle.grid<float>(), nullptr);// the host accessors apply
+    EXPECT_EQ(std::string("sphere"), handle.grid<float>()->gridName());
+    EXPECT_NE(handle.gridData(), nullptr);
+    EXPECT_FALSE(handle.isPadded());
+
+    auto copy = handle.copy<BufT>();// host-side deep copy allocating through the buffer's resource
+    ASSERT_NE(copy.grid<float>(), nullptr);
+    EXPECT_NE(copy.data(), handle.data());
+    EXPECT_EQ(0, std::memcmp(copy.data(), handle.data(), handle.bufferSize()));
+
+    std::stringstream ss;
+    handle.write(ss);// host-accessible grids serialize directly
+    nanovdb::GridHandle<BufT> readBack;
+    readBack.read(ss);// and read back, allocating through the buffer's resource
+    EXPECT_EQ(1u, readBack.gridCount());
+    EXPECT_NE(readBack.grid<float>(), nullptr);
+    EXPECT_EQ(0, std::memcmp(readBack.data(), handle.data(), handle.bufferSize()));
+}
+
+TEST(TestBuffer, GridHandlePinnedAsyncResource)
+{
+    // A stream-ordered host-accessible resource (the shape of a pooled pinned
+    // allocator) takes the same host-readable handle paths; reads and copies
+    // allocate on the pool's retained stream.
+    auto host = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
+    using ResT = nanovdb::cuda::AsyncFromSync<nanovdb::cuda::PinnedResource>;
+    using BufT = nanovdb::cuda::Buffer<std::byte, ResT>;
+    static_assert(nanovdb::BufferHasHostSingle<BufT>::value, "an adapted pinned resource stays host-accessible");
+    static_assert(nanovdb::BufferHasStream<BufT>::value, "an async resource retains a stream");
+
+    BufT buf(cudaStream_t(0), host.bufferSize(), nanovdb::cuda::noInit);
+    std::memcpy(buf.data(), host.data(), host.bufferSize());// synchronous allocation: host-writable immediately
+    nanovdb::GridHandle<BufT> handle(std::move(buf));
+    EXPECT_EQ(1u, handle.gridCount());
+    ASSERT_NE(handle.grid<float>(), nullptr);
+
+    auto copy = handle.copy<BufT>();// allocates via (stream, resource, count, noInit)
+    ASSERT_NE(copy.grid<float>(), nullptr);
+    EXPECT_EQ(0, std::memcmp(copy.data(), handle.data(), handle.bufferSize()));
+
+    std::stringstream ss;
+    handle.write(ss);
+    nanovdb::GridHandle<BufT> readBack;
+    readBack.read(ss);
+    EXPECT_EQ(1u, readBack.gridCount());
+    EXPECT_NE(readBack.grid<float>(), nullptr);
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));// the buffers free on their retained default stream
+}
+
+TEST(TestBuffer, GridHandleCopyToHostAndBack)
+{
+    auto host = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
+    using DevBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
+    cudaStream_t stream = nullptr;
+    ASSERT_EQ(cudaSuccess, cudaStreamCreate(&stream));
+    {// the handles' buffers retain the stream and free on it: it must outlive them
+        DevBufT buf(stream, host.bufferSize(), nanovdb::cuda::noInit);
+        ASSERT_EQ(cudaSuccess, cudaMemcpyAsync(buf.data(), host.data(), host.bufferSize(), cudaMemcpyHostToDevice, stream));
+        nanovdb::GridHandle<DevBufT> devHandle(std::move(buf));
+
+        auto hostCopy = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(devHandle, stream);
+        EXPECT_EQ(1u, hostCopy.gridCount());// host-readable immediately: copyTo synchronized
+        ASSERT_NE(hostCopy.grid<float>(), nullptr);
+        EXPECT_EQ(0, std::memcmp(hostCopy.data(), host.data(), host.bufferSize()));
+
+        auto devAgain = nanovdb::cuda::copyTo<DevBufT>(hostCopy, stream);// re-parses (and validates) on the device
+        EXPECT_EQ(1u, devAgain.gridCount());
+        EXPECT_NE(devAgain.deviceGrid<float>(), nullptr);
+        EXPECT_NE(devAgain.deviceData(), devHandle.deviceData());
+
+        using SyncBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::MallocResource>;
+        auto syncDev = nanovdb::cuda::copyTo<SyncBufT>(hostCopy, stream);// synchronous destination resource
+        EXPECT_NE(syncDev.deviceGrid<float>(), nullptr);
+
+        ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(stream));
+    }
+    ASSERT_EQ(cudaSuccess, cudaStreamDestroy(stream));
+}
+
+TEST(TestBuffer, GridHandleCopyToPinnedRoundTrip)
+{
+    auto a = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "a");
+    auto b = nanovdb::tools::createLevelSetSphere<float>(10.0, nanovdb::Vec3d(2), 1.0, 3.0, nanovdb::Vec3d(0), "b");
+    std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> parts;
+    parts.push_back(std::move(a));
+    parts.push_back(std::move(b));
+    auto merged = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(parts);// explicit args: MSVC cannot deduce the template-template VectorT
+    ASSERT_EQ(2u, merged.gridCount());
+
+    using DevBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
+    using PinBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::PinnedResource>;
+    auto dev = nanovdb::cuda::copyTo<DevBufT>(merged, cudaStream_t(0));
+    EXPECT_EQ(2u, dev.gridCount());// multi-grid chains survive the transfer
+    EXPECT_NE(dev.deviceGrid<float>(1), nullptr);
+
+    auto pinned = nanovdb::cuda::copyTo<PinBufT>(dev, cudaStream_t(0));// device -> pinned stays on the transfer stream
+    EXPECT_EQ(2u, pinned.gridCount());
+    ASSERT_NE(pinned.grid<float>(0), nullptr);
+    ASSERT_NE(pinned.grid<float>(1), nullptr);
+    EXPECT_EQ(0, std::memcmp(pinned.data(), merged.data(), merged.bufferSize()));
+
+    auto dev2 = nanovdb::cuda::copyTo<DevBufT>(pinned, cudaStream_t(0));// pinned -> device is genuinely asynchronous
+    EXPECT_EQ(2u, dev2.gridCount());
+    EXPECT_NE(dev2.deviceGrid<float>(1), nullptr);
+}
+
+TEST(TestBuffer, GridHandleCopyToProtoResource)
+{
+    auto host = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
+    Counters counters;
+    CountingResource res{&counters};
+    using RefT = nanovdb::cuda::ResourceRef<CountingResource>;
+    using DevBufT = nanovdb::cuda::Buffer<std::byte, RefT>;
+    {
+        DevBufT proto(cudaStream_t(0), RefT(res), 16, nanovdb::cuda::noInit);// alloc #1: an exemplar carrying the borrowed resource
+        auto dev = nanovdb::cuda::copyTo<DevBufT>(host, cudaStream_t(0), &proto);
+        ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+        EXPECT_EQ(3, counters.allocs);// #2: the grid storage, #3: the metadata scratch, all through the proto's resource
+        EXPECT_NE(dev.deviceGrid<float>(), nullptr);
+
+        nanovdb::GridHandle<nanovdb::HostBuffer> empty;
+        EXPECT_THROW((nanovdb::cuda::copyTo<DevBufT>(empty, cudaStream_t(0), &proto)), std::runtime_error);// no empty handle over a non-default-constructible buffer
+    }
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+    EXPECT_EQ(counters.allocs, counters.deallocs);
+
+    nanovdb::GridHandle<nanovdb::HostBuffer> empty;
+    auto out = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>>(empty, cudaStream_t(0));
+    EXPECT_TRUE(out.isEmpty());// empty in, empty out for default-constructible targets
+}
 
 TEST(TestBuffer, GridHandleSingleSpaceEmptyAndInvalid)
 {
@@ -1053,6 +1192,38 @@ TEST(TestBuffer, GridHandleSingleSpaceBorrowedResource)
         EXPECT_EQ(3, counters.allocs);
         EXPECT_NE(copy.deviceData(), handle.deviceData());
         EXPECT_EQ(copy.gridCount(), 1u);
+    }
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+    EXPECT_EQ(counters.allocs, counters.deallocs);
+}
+
+TEST(TestBuffer, SingleSpaceNodeManager)
+{
+    // createNodeManager over an injected resource: the handle's storage and
+    // its size scratch both allocate through it, and deviceMgr() maps onto
+    // the single-space buffer.
+    auto host = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
+    using BufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
+    BufT buf(cudaStream_t(0), host.bufferSize(), nanovdb::cuda::noInit);
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(buf.data(), host.data(), host.bufferSize(), cudaMemcpyHostToDevice));
+    nanovdb::GridHandle<BufT> handle(std::move(buf));
+    auto *d_grid = handle.deviceGrid<float>();
+    ASSERT_NE(d_grid, nullptr);
+
+    Counters counters;
+    CountingResource res{&counters};
+    {
+        auto mgrHandle = nanovdb::cuda::createNodeManager(d_grid, res);
+        ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+        // a breadth-first grid takes the linear path: storage + size scratch only
+        EXPECT_EQ(2, counters.allocs);
+        EXPECT_EQ(1, counters.deallocs);// the size scratch
+        EXPECT_NE(mgrHandle.deviceMgr<float>(), nullptr);
+        EXPECT_EQ(mgrHandle.deviceMgr<nanovdb::Vec3f>(), nullptr);// wrong type: null, not garbage
+
+        mgrHandle.reset();// dispatches to destroy(), through the same resource
+        ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+        EXPECT_EQ(counters.allocs, counters.deallocs);
     }
     ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
     EXPECT_EQ(counters.allocs, counters.deallocs);

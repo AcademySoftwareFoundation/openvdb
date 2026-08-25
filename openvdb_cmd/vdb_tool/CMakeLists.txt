@@ -256,6 +256,9 @@ if(OPENVDB_BUILD_VDB_TOOL_UNITTESTS)
 
   add_executable(vdb_tool_test src/unittest.cpp)
   target_include_directories(vdb_tool_test PRIVATE vdb_tool_common)
-  target_link_libraries(vdb_tool_test PRIVATE vdb_tool_common GTest::gmock GTest::gtest GTest::gmock_main GTest::gtest_main)
+  # The test provides its own main() and uses only gtest (no gmock), so link just
+  # GTest::gtest. Listing gmock / *_main as well pulls gtest/gmock onto the link
+  # line multiple times, which the macOS linker flags as "ignoring duplicate libraries".
+  target_link_libraries(vdb_tool_test PRIVATE vdb_tool_common GTest::gtest)
   add_test(vdb_tool_unit_test vdb_tool_test)
 endif()

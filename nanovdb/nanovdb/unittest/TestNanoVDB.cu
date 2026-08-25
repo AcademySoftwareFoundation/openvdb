@@ -3968,6 +3968,79 @@ TEST(TestNanoVDBCUDA, DeviceBufferNonBlockingFreeOrdering)
     testDeviceBufferFreeOrdering(/*nonBlockingUser=*/true, /*registerUse=*/true);
 }// DeviceBufferNonBlockingFreeOrdering
 
+TEST(TestNanoVDBCUDA, DeviceBufferChainedRecordUse)
+{
+    // Regression: recordUse re-records the single per-device tracking event, and re-recording
+    // MOVES an event. Two non-blocking streams recording uses in sequence must therefore CHAIN
+    // (the second record first waits on the first capture); otherwise the second record
+    // discards the only coverage of the first stream's in-flight work and the free races it.
+    // Same shape as testDeviceBufferFreeOrdering, with the late writer recorded FIRST and an
+    // idle second stream recorded after it.
+    const size_t N = size_t(64) << 20;
+    const unsigned char LATE = 0xAA, VICTIM = 0x55;
+    const unsigned long long CYCLES = 400000000ull;// parks 'userA' for O(100 ms)
+
+    cudaStream_t userA = nullptr, userB = nullptr, other = nullptr;
+    cudaCheck(cudaStreamCreateWithFlags(&userA, cudaStreamNonBlocking));
+    cudaCheck(cudaStreamCreateWithFlags(&userB, cudaStreamNonBlocking));
+    cudaCheck(cudaStreamCreate(&other));
+    unsigned long long *bad = nullptr;
+    cudaCheck(cudaMallocManaged(&bad, sizeof(*bad)));
+
+    {// warm-up (see testDeviceBufferFreeOrdering)
+        unsigned char *w = nullptr;
+        cudaCheck(cudaMallocAsync((void**)&w, N, other));
+        streamBusyWaitKernel<<<1,1,0,userA>>>(CYCLES/10);
+        deviceBufferFillKernel<<<1024,256,0,other>>>(w, N, 0);
+        deviceBufferCountKernel<<<1024,256,0,other>>>(w, N, 0, bad);
+        cudaCheck(cudaFreeAsync(w, other));
+        cudaCheck(cudaDeviceSynchronize());
+    }
+
+    void *devPtr = nullptr;
+    {
+        auto buf = nanovdb::cuda::DeviceBuffer::create(N, nullptr, 0, other);// device-only
+        devPtr = buf.deviceData(0);
+        ASSERT_TRUE(devPtr);
+        streamBusyWaitKernel<<<1,1,0,userA>>>(CYCLES);// park 'userA'
+        deviceBufferFillKernel<<<1024,256,0,userA>>>((unsigned char*)devPtr, N, LATE);
+        buf.recordUse(0, userA);// covers the in-flight write...
+        buf.recordUse(0, userB);// ...and must NOT be discarded by a later record
+    }// destroyed here; the free must still be ordered after 'userA'
+
+    unsigned char *victim = nullptr;
+    cudaCheck(cudaMallocAsync((void**)&victim, N, other));
+    deviceBufferFillKernel<<<1024,256,0,other>>>(victim, N, VICTIM);
+    cudaCheck(cudaStreamSynchronize(other));
+
+    const bool stillPending = (cudaStreamQuery(userA) == cudaErrorNotReady);
+    cudaGetLastError();// clear the cudaErrorNotReady left by the query above
+    const bool recycled = (victim == devPtr);
+
+    cudaCheck(cudaStreamSynchronize(userA));// let the late write land
+    *bad = 0;
+    deviceBufferCountKernel<<<1024,256>>>(victim, N, VICTIM, bad);
+    cudaCheck(cudaDeviceSynchronize());
+    const unsigned long long clobbered = *bad;
+
+    cudaCheck(cudaFreeAsync(victim, other));
+    cudaCheck(cudaStreamSynchronize(other));
+    cudaCheck(cudaFree(bad));
+    cudaCheck(cudaStreamDestroy(userA));
+    cudaCheck(cudaStreamDestroy(userB));
+    cudaCheck(cudaStreamDestroy(other));
+
+    // Detection relies on the pool recycling the freed block into 'victim' (stream-ordered
+    // pools recycle WITH the dependency attached, so recycling is expected even with a
+    // correctly ordered free). If it did not recycle, the chain was never exercised -- make
+    // that visible instead of a vacuous pass.
+    if (!recycled) GTEST_SKIP() << "allocator did not recycle the block; ordering not exercised";
+
+    EXPECT_EQ(0u, clobbered) << "a later recordUse on another stream discarded the tracking "
+                                "event covering in-flight work (block recycled: " << recycled
+                             << ", work still pending when it was reused: " << stillPending << ")";
+}// DeviceBufferChainedRecordUse
+
 TEST(TestNanoVDBCUDA, RefineCoarsen_ValueOnIndex)
 {
     using BuildT = nanovdb::ValueOnIndex;
