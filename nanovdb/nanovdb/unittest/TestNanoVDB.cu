@@ -791,20 +791,31 @@ TEST(TestNanoVDBCUDA, FewTiles_CudaPointsToGrid)
 }// FewTiles_CudaPointsToGrid
 
 /// @brief Exercises the segmented sort path (>= 32 tiles) in PointsToGrid.
-///        Coordinates in [-8000, 8000] produce 4^3 = 64 upper internal node tiles
+///        Coordinates are placed in 4^3 = 64 upper internal node tiles
 ///        (each upper node covers 4096 voxels per dimension), exceeding the threshold of 32.
+///        Each tile contains 4^3 voxels in one leaf, giving every segment multiple keys to sort
+///        without creating the very large number of lower nodes produced by sparse random voxels.
 TEST(TestNanoVDBCUDA, ManyTiles_CudaPointsToGrid)
 {
     using BuildT = nanovdb::ValueOnIndex;
-    const size_t voxelCount = 1 << 20;// 1048576
     std::vector<nanovdb::Coord> voxels;
-    {
-        voxels.reserve(voxelCount);
-        std::srand(54321);
-        const int max = 8000, min = -max;
-        auto op = [&](){return rand() % (max - min) + min;};
-        while (voxels.size() < voxelCount) voxels.push_back(nanovdb::Coord(op(), op(), op()));
+    voxels.reserve(1 << 12);// 64 upper tiles * 64 voxels per tile = 4096
+    for (int tx = -2; tx < 2; ++tx) {
+        for (int ty = -2; ty < 2; ++ty) {
+            for (int tz = -2; tz < 2; ++tz) {
+                const nanovdb::Coord base(tx * 4096 + 64, ty * 4096 + 64, tz * 4096 + 64);
+                for (int x = 0; x < 4; ++x) {
+                    for (int y = 0; y < 4; ++y) {
+                        for (int z = 0; z < 4; ++z) {
+                            voxels.emplace_back(base + nanovdb::Coord(x, y, z));
+                        }
+                    }
+                }
+            }
+        }
     }
+    const size_t voxelCount = voxels.size();
+    ASSERT_EQ(size_t(1 << 12), voxelCount);
 
     nanovdb::Coord* d_coords;
     cudaCheck(cudaMalloc(&d_coords, voxels.size() * sizeof(nanovdb::Coord)));
@@ -819,6 +830,7 @@ TEST(TestNanoVDBCUDA, ManyTiles_CudaPointsToGrid)
     EXPECT_TRUE(grid);
     EXPECT_TRUE(grid->valueCount() > 0);
     EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
+    EXPECT_EQ(64u, grid->tree().nodeCount(2));
 
     nanovdb::util::forEach(voxels, [&](const nanovdb::util::Range1D &r){
         auto acc = grid->getAccessor();
