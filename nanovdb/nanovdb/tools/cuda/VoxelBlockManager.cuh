@@ -393,7 +393,8 @@ buildVoxelBlockManager(
     uint64_t                firstOffset = 0,
     uint64_t                lastOffset  = 0,
     uint64_t                nBlocks     = 0,
-    cudaStream_t            stream      = 0)
+    cudaStream_t            stream      = 0,
+    const BufferT*          proto       = nullptr)
 {
     static constexpr uint64_t BlockWidth    = uint64_t(1) << Log2BlockWidth;
     static constexpr uint64_t JumpMapLength = BlockWidth / 64;
@@ -401,15 +402,29 @@ buildVoxelBlockManager(
     using Traits = util::cuda::DeviceGridTraits<ValueOnIndex>;
     if (!firstOffset) firstOffset = 1;
     if (!lastOffset)  lastOffset  = Traits::getActiveVoxelCount(d_grid);
-    if (lastOffset < firstOffset) return nanovdb::tools::VoxelBlockManagerHandle<BufferT>{};
+    if (lastOffset < firstOffset) {// empty grid: an empty handle, through the pool's resource when one is needed
+        if constexpr (BufferIsDefaultConstructible<BufferT>::value) {
+            return nanovdb::tools::VoxelBlockManagerHandle<BufferT>{};
+        } else {
+            if (!proto)
+                throw std::runtime_error("buildVoxelBlockManager: an empty handle over a buffer type that is "
+                                         "not default-constructible requires a prototype buffer to take the resource from");
+            int device = 0;
+            cudaCheck(cudaGetDevice(&device));
+            return nanovdb::tools::VoxelBlockManagerHandle<BufferT>(
+                nanovdb::cuda::detail::createDeviceStorage<BufferT>(0, proto, device, stream),
+                nanovdb::cuda::detail::createDeviceStorage<BufferT>(0, proto, device, stream),
+                0, firstOffset, lastOffset);// zero-size buffers allocate nothing
+        }
+    }
     NANOVDB_ASSERT(!((firstOffset - 1) & (BlockWidth - 1))); // firstOffset == 1 (mod BlockWidth)
     if (!nBlocks)     nBlocks     = (lastOffset - firstOffset + BlockWidth) >> Log2BlockWidth;
 
     int device = 0;
     cudaCheck(cudaGetDevice(&device));
 
-    auto firstLeafIDBuf = nanovdb::cuda::detail::createDeviceStorage<BufferT>(nBlocks * sizeof(uint32_t),                static_cast<const BufferT*>(nullptr), device, stream);
-    auto jumpMapBuf     = nanovdb::cuda::detail::createDeviceStorage<BufferT>(nBlocks * JumpMapLength * sizeof(uint64_t), static_cast<const BufferT*>(nullptr), device, stream);
+    auto firstLeafIDBuf = nanovdb::cuda::detail::createDeviceStorage<BufferT>(nBlocks * sizeof(uint32_t),                proto, device, stream);
+    auto jumpMapBuf     = nanovdb::cuda::detail::createDeviceStorage<BufferT>(nBlocks * JumpMapLength * sizeof(uint64_t), proto, device, stream);
 
     nanovdb::tools::VoxelBlockManagerHandle<BufferT> handle(
         std::move(firstLeafIDBuf), std::move(jumpMapBuf),

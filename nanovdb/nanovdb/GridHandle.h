@@ -171,9 +171,9 @@ public:
     /// @brief Returns a pointer to the host data; not available for a
     ///        single-space device buffer, which has no host-readable bytes.
     /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized
-    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type = 0>
+    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value && !BufferHasHostSingle<U>::value, int>::type = 0>
     void* data() { return mBuffer.data(); }
-    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type = 0>
+    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value && !BufferHasHostSingle<U>::value, int>::type = 0>
     const void* data() const { return mBuffer.data(); }
     //@}
 
@@ -220,7 +220,7 @@ public:
     /// @param n Index of the (host) grid pointer to be returned
     /// @warning Note that the return pointer can be NULL if the GridHandle no host grid, @a n is invalid
     ///          or if the template parameter does not match the specified grid!
-    template<typename ValueT, typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type = 0>
+    template<typename ValueT, typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value && !BufferHasHostSingle<U>::value, int>::type = 0>
     const NanoGrid<ValueT>* grid(uint32_t n = 0) const;
 
     /// @brief Returns a host pointer to the @a n'th  NanoVDB grid encoded in this GridHandle.
@@ -228,7 +228,7 @@ public:
     /// @param n Index of the (host) grid pointer to be returned
     /// @warning Note that the return pointer can be NULL if the GridHandle no host grid, @a n is invalid
     ///          or if the template parameter does not match the specified grid!
-    template<typename ValueT, typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type = 0>
+    template<typename ValueT, typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value && !BufferHasHostSingle<U>::value, int>::type = 0>
     NanoGrid<ValueT>* grid(uint32_t n = 0) {return const_cast<NanoGrid<ValueT>*>(static_cast<const GridHandle*>(this)->template grid<ValueT>(n));}
 
     /// @brief Return a const pointer to the @a n'th grid encoded in this GridHandle on the device, e.g. GPU
@@ -322,20 +322,20 @@ public:
     /// @brief Access to the GridData of the n'th grid in the current handle
     /// @param n zero-based ID of the grid
     /// @return Const pointer to the n'th GridData in the current handle
-    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type = 0>
+    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value && !BufferHasHostSingle<U>::value, int>::type = 0>
     const GridData* gridData(uint32_t n = 0) const;
 
     /// @brief Returns a const point to the @a n'th grid meta data
     /// @param n zero-based ID of the grid
     /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized
-    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type = 0>
+    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value && !BufferHasHostSingle<U>::value, int>::type = 0>
     const GridMetaData* gridMetaData(uint32_t n = 0) const;
 
     /// @brief Write a specific grid in this buffer to an output stream
     /// @param os  output stream that the buffer will be written to
     /// @param n zero-based index of the grid to be written to stream
     void write(std::ostream& os, uint32_t n) const {
-        static_assert(!BufferHasDeviceSingle<BufferT>::value,
+        static_assert(!(BufferHasDeviceSingle<BufferT>::value && !BufferHasHostSingle<BufferT>::value),
                       "GridHandle::write requires host-accessible grids: cuda::copyTo a host-readable handle first");
         if (const GridData* data = this->gridData(n)) {
             os.write((const char*)data, data->mGridSize);
@@ -347,7 +347,7 @@ public:
     /// @brief Write the entire grid buffer to an output stream
     /// @param os output stream that the buffer will be written to
     void write(std::ostream& os) const {
-        static_assert(!BufferHasDeviceSingle<BufferT>::value,
+        static_assert(!(BufferHasDeviceSingle<BufferT>::value && !BufferHasHostSingle<BufferT>::value),
                       "GridHandle::write requires host-accessible grids: cuda::copyTo a host-readable handle first");
 
         for (uint32_t n=0; n<this->gridCount(); ++n) this->write(os, n);
@@ -427,7 +427,7 @@ public:
 // --------------------------> Implementation of private methods in GridHandle <------------------------------------
 
 template<typename BufferT>
-template<typename U, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type>
+template<typename U, typename util::disable_if<BufferHasDeviceSingle<U>::value && !BufferHasHostSingle<U>::value, int>::type>
 inline const GridData* GridHandle<BufferT>::gridData(uint32_t n) const
 {
     const void *data = this->data();
@@ -436,7 +436,7 @@ inline const GridData* GridHandle<BufferT>::gridData(uint32_t n) const
 }// const GridData* GridHandle<BufferT>::gridData(uint32_t n) const
 
 template<typename BufferT>
-template<typename U, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type>
+template<typename U, typename util::disable_if<BufferHasDeviceSingle<U>::value && !BufferHasHostSingle<U>::value, int>::type>
 inline const GridMetaData* GridHandle<BufferT>::gridMetaData(uint32_t n) const
 {
     const auto *data = this->data();
@@ -503,7 +503,7 @@ inline GridHandle<OtherBufferT> GridHandle<BufferT>::copy() const
 }// GridHandle<OtherBufferT> GridHandle<BufferT>::copy() const
 
 template<typename BufferT>
-template<typename ValueT, typename U, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type>
+template<typename ValueT, typename U, typename util::disable_if<BufferHasDeviceSingle<U>::value && !BufferHasHostSingle<U>::value, int>::type>
 inline const NanoGrid<ValueT>* GridHandle<BufferT>::grid(uint32_t n) const
 {
     return this->template gridAt<ValueT>(mBuffer.data(), n);
@@ -520,7 +520,7 @@ GridHandle<BufferT>::deviceGrid(uint32_t n) const
 template<typename BufferT>
 void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
 {
-    static_assert(!BufferHasDeviceSingle<BufferT>::value,
+    static_assert(!(BufferHasDeviceSingle<BufferT>::value && !BufferHasHostSingle<BufferT>::value),
                   "GridHandle::read requires a host-accessible buffer: read into a host-readable handle, then cuda::copyTo");
     const std::streampos start = is.tellg();// remember where the raw buffer begins
     GridData data;
@@ -545,7 +545,7 @@ void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
 template<typename BufferT>
 void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool)
 {
-    static_assert(!BufferHasDeviceSingle<BufferT>::value,
+    static_assert(!(BufferHasDeviceSingle<BufferT>::value && !BufferHasHostSingle<BufferT>::value),
                   "GridHandle::read requires a host-accessible buffer: read into a host-readable handle, then cuda::copyTo");
     GridData data;
     is.read((char*)&data, sizeof(GridData));
@@ -569,7 +569,7 @@ void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool
 template<typename BufferT>
 void GridHandle<BufferT>::read(std::istream& is, const std::string &gridName, const BufferT& pool)
 {
-    static_assert(!BufferHasDeviceSingle<BufferT>::value,
+    static_assert(!(BufferHasDeviceSingle<BufferT>::value && !BufferHasHostSingle<BufferT>::value),
                   "GridHandle::read requires a host-accessible buffer: read into a host-readable handle, then cuda::copyTo");
     static const std::streamsize byteSize = sizeof(GridData);
     GridData data;
@@ -603,7 +603,7 @@ template<typename BufferT, template <class, class...> class VectorT = std::vecto
 inline VectorT<GridHandle<BufferT>>
 splitGrids(const GridHandle<BufferT> &handle, const BufferT* other = nullptr)
 {
-    static_assert(!BufferHasDeviceSingle<BufferT>::value,
+    static_assert(!(BufferHasDeviceSingle<BufferT>::value && !BufferHasHostSingle<BufferT>::value),
                   "splitGrids requires a buffer type providing create(): cuda::copyTo a HostBuffer handle first");
     static_assert(!BufferHasHostSingle<BufferT>::value,
                   "splitGrids requires a buffer type providing create(): copy the handle to a HostBuffer first");
@@ -637,7 +637,7 @@ template<typename BufferT>
 inline GridHandle<BufferT>
 mergeGrids(const GridHandle<BufferT>* const* handles, size_t count, const BufferT* pool = nullptr)
 {
-    static_assert(!BufferHasDeviceSingle<BufferT>::value,
+    static_assert(!(BufferHasDeviceSingle<BufferT>::value && !BufferHasHostSingle<BufferT>::value),
                   "mergeGrids requires a buffer type providing create(): cuda::copyTo HostBuffer handles first");
     static_assert(!BufferHasHostSingle<BufferT>::value,
                   "mergeGrids requires a buffer type providing create(): copy the handles to HostBuffer first");

@@ -199,12 +199,16 @@ set(NANOVDB_INCLUDE_FILES
 
 # NanoVDB cuda header files
 set(NANOVDB_INCLUDE_CUDA_FILES
+  cuda/Buffer.h
   cuda/DeviceBuffer.h
   cuda/DeviceMesh.h
   cuda/DeviceResource.h
   cuda/DeviceStreamMap.h
   cuda/GridHandle.cuh
+  cuda/HandleStorage.h
+  cuda/ManagedResource.h
   cuda/NodeManager.cuh
+  cuda/PinnedResource.h
   cuda/TempPool.h
   cuda/UnifiedBuffer.h
 )

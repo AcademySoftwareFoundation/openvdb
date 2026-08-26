@@ -109,15 +109,18 @@ createNodeManager(const NanoGrid<BuildT> *d_grid,
 ///        as the builders.
 ///
 /// @param d_grid device grid pointer whose nodes will be accessed sequentially
-/// @param resource device-resident memory resource the handle's storage
-///        allocates through; a host-accessible resource (e.g. PinnedResource)
-///        is excluded, since the result would carry no device NodeManager
+/// @param resource memory resource with device-valid allocations the
+///        handle's storage allocates through: device-resident (e.g.
+///        DeviceResource) or host-and-device-accessible (ManagedResource).
+///        A host-only resource (e.g. PinnedResource) is excluded, since the
+///        result would carry no device NodeManager
 /// @param stream cuda stream
 /// @return Handle over cuda::Buffer<std::byte, ResourceRef<ResourceT>> that
 ///         contains a device NodeManager
 template <typename BuildT, typename ResourceT>
 inline typename util::enable_if<(is_resource<ResourceT>::value || is_async_resource<ResourceT>::value)
-                                    && !is_host_accessible_resource<ResourceT>::value,
+                                    && (!is_host_accessible_resource<ResourceT>::value
+                                        || is_device_accessible_resource<ResourceT>::value),
                                 NodeManagerHandle<Buffer<std::byte, ResourceRef<ResourceT>>>>::type
 createNodeManager(const NanoGrid<BuildT> *d_grid,
                   ResourceT& resource,

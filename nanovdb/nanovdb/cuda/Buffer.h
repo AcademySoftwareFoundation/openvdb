@@ -452,11 +452,15 @@ struct BufferTraits<cuda::Buffer<T, R>>
     // Device-resident storage; the byte-addressed requirement is enforced by
     // the single-space GridHandle constructor, so trait queries stay
     // answerable for any element type.
-    static constexpr bool hasDeviceSingle = !cuda::is_host_accessible_resource<R>::value;
+    static constexpr bool hasDeviceSingle = !cuda::is_host_accessible_resource<R>::value
+                                            || cuda::is_device_accessible_resource<R>::value;
     // A buffer over a host-accessible resource (e.g. PinnedResource) is
     // host-readable single-space storage: GridHandle parses its metadata on
     // the host, exposes the host accessors, and allocates reads and copies
-    // through the buffer's resource.
+    // through the buffer's resource. A resource that is host- AND
+    // device-accessible (ManagedResource) sets both members: the handle
+    // parses metadata through the device (a host parse could race producer
+    // kernels) and exposes both accessor families.
     static constexpr bool hasHostSingle   = cuda::is_host_accessible_resource<R>::value;
 };
 

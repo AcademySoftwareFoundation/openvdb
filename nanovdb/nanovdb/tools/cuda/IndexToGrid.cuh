@@ -381,6 +381,7 @@ GridHandle<BufferT> IndexToGrid<SrcBuildT, ResourceT>::getHandle(const typename 
     if (mVerbose) mTimer.stop();
 
     //cudaStreamSynchronize(mStream);// finish all device tasks in mStream
+    nanovdb::cuda::detail::orderBeforeHandleConstruction<BufferT>(mStream);
     return GridHandle<BufferT>(std::move(buffer));
 }// IndexToGrid::getHandle
 

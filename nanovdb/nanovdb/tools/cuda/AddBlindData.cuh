@@ -131,6 +131,7 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
     Checksum cs(tmp[CHECKSUM]);
     cuda::updateChecksum(reinterpret_cast<GridData*>(d_data), cs.mode(), stream);
 
+    nanovdb::cuda::detail::orderBeforeHandleConstruction<BufferT>(stream);
     return GridHandle<BufferT>(std::move(buffer));
 }// cudaAddBlindData
 

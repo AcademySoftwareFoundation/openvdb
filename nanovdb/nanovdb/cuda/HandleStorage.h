@@ -81,6 +81,23 @@ inline void* deviceStorageData(BufferT& buffer)
     else return buffer.deviceData();
 }
 
+/// @brief Orders the host after @c stream where a handle is about to be
+///        constructed from bytes still being written on it: a single-space
+///        buffer over a synchronous resource retains no stream, so the
+///        constructor's metadata parse (which runs on the default stream) is
+///        not otherwise ordered after the producer. A no-op for dual-space
+///        buffers (their constructor path predates this bridge) and for
+///        stream-ordered resources (the buffer retains the stream).
+template<typename BufferT>
+inline void orderBeforeHandleConstruction(cudaStream_t stream)
+{
+    if constexpr (BufferHasDeviceSingle<BufferT>::value) {
+        if constexpr (!is_async_resource<typename BufferT::ResourceType>::value)
+            cudaCheck(cudaStreamSynchronize(stream));
+    }
+    (void)stream;
+}
+
 }// namespace detail
 
 }// namespace cuda
