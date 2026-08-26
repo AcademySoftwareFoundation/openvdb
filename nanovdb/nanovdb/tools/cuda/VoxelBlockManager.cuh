@@ -38,6 +38,7 @@
 #include <nanovdb/util/cuda/Util.h>
 #include <nanovdb/util/cuda/DeviceGridTraits.cuh>
 #include <nanovdb/tools/VoxelBlockManager.h>
+#include <nanovdb/cuda/HandleStorage.h>
 
 namespace nanovdb {
 
@@ -407,8 +408,8 @@ buildVoxelBlockManager(
     int device = 0;
     cudaCheck(cudaGetDevice(&device));
 
-    auto firstLeafIDBuf = BufferT::create(nBlocks * sizeof(uint32_t),                nullptr, device, stream);
-    auto jumpMapBuf     = BufferT::create(nBlocks * JumpMapLength * sizeof(uint64_t), nullptr, device, stream);
+    auto firstLeafIDBuf = nanovdb::cuda::detail::createDeviceStorage<BufferT>(nBlocks * sizeof(uint32_t),                static_cast<const BufferT*>(nullptr), device, stream);
+    auto jumpMapBuf     = nanovdb::cuda::detail::createDeviceStorage<BufferT>(nBlocks * JumpMapLength * sizeof(uint64_t), static_cast<const BufferT*>(nullptr), device, stream);
 
     nanovdb::tools::VoxelBlockManagerHandle<BufferT> handle(
         std::move(firstLeafIDBuf), std::move(jumpMapBuf),

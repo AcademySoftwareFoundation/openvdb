@@ -495,6 +495,9 @@ inline GridHandle<OtherBufferT> GridHandle<BufferT>::copy() const
         // adopts it directly with no device re-parse.
         return GridHandle(mBuffer.copy(), mMetaData);
     } else {
+        static_assert(BufferIsDefaultConstructible<OtherBufferT>::value,
+                      "GridHandle::copy() without arguments default-constructs the target pool buffer: "
+                      "pass a prototype to copy(other) for a buffer over a non-default-constructible resource");
         return this->copy(OtherBufferT());
     }
 }// GridHandle<OtherBufferT> GridHandle<BufferT>::copy() const

@@ -21,6 +21,7 @@
 #include <nanovdb/cuda/DeviceResource.h>
 #include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/util/cuda/Morphology.cuh>
+#include <nanovdb/cuda/HandleStorage.h>
 
 namespace nanovdb {
 
@@ -252,10 +253,10 @@ BufferT TopologyBuilder<BuildT, ResourceT>::getBuffer(const BufferT &pool, cudaS
 
     int device = 0;
     cudaGetDevice(&device);
-    auto buffer = BufferT::create(data()->size, &pool, device, stream);// only allocate buffer on the device
-    cudaCheck(cudaMemsetAsync(buffer.deviceData(), 0, data()->size, stream));
+    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(data()->size, &pool, device, stream);// only allocate buffer on the device
+    cudaCheck(cudaMemsetAsync(nanovdb::cuda::detail::deviceStorageData(buffer), 0, data()->size, stream));
 
-    data()->d_bufferPtr = buffer.deviceData();
+    data()->d_bufferPtr = nanovdb::cuda::detail::deviceStorageData(buffer);
     if (data()->d_bufferPtr == nullptr) throw std::runtime_error("Failed to allocate grid buffer on the device");
     if (data()->nodeCount[2] != 0) // Unless the result is an empty grid
         data()->d_upperOffsets = reinterpret_cast<uint32_t*>(mUpperOffsets.data());

@@ -12,6 +12,7 @@
 #include <nanovdb/cuda/DeviceResource.h>
 #include <nanovdb/cuda/PinnedResource.h>
 #include <nanovdb/tools/CreatePrimitives.h>
+#include <nanovdb/tools/cuda/PointsToGrid.cuh>// for the voxelsToGrid entry-point test
 
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
@@ -1227,6 +1228,33 @@ TEST(TestBuffer, SingleSpaceNodeManager)
     }
     ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
     EXPECT_EQ(counters.allocs, counters.deallocs);
+}
+
+TEST(TestBuffer, SingleSpaceToolEntryPoints)
+{
+    // The builders allocate their result handle through createDeviceStorage,
+    // so a single-space buffer type works wherever a dual-space one does.
+    // voxelsToGrid stands in for the whole PointsToGrid family; the pool
+    // buffer supplies the resource for the handle storage.
+    nanovdb::Coord coords[2] = {nanovdb::Coord(1,2,3), nanovdb::Coord(10,20,8)}, *d_coords = nullptr;
+    ASSERT_EQ(cudaSuccess, cudaMalloc(&d_coords, 2*sizeof(nanovdb::Coord)));
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_coords, coords, 2*sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+
+    Counters counters;
+    CountingResource res{&counters};
+    using RefT = nanovdb::cuda::ResourceRef<CountingResource>;
+    using BufT = nanovdb::cuda::Buffer<std::byte, RefT>;
+    {
+        BufT pool(cudaStream_t(0), RefT(res), 16, nanovdb::cuda::noInit);// alloc #1: exemplar carrying the borrowed resource
+        auto handle = nanovdb::tools::cuda::voxelsToGrid<float, nanovdb::Coord*, BufT>(d_coords, 2, 1.0, pool);
+        ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+        EXPECT_EQ(1u, handle.gridCount());
+        EXPECT_NE(handle.deviceGrid<float>(), nullptr);
+        EXPECT_EQ(3, counters.allocs);// #2: the grid storage, #3: the handle's metadata scratch
+    }
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+    EXPECT_EQ(counters.allocs, counters.deallocs);
+    ASSERT_EQ(cudaSuccess, cudaFree(d_coords));
 }
 
 } // unnamed namespace

@@ -28,6 +28,7 @@
 #include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/GridHandle.h>
+#include <nanovdb/cuda/HandleStorage.h>
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
@@ -531,7 +532,7 @@ PointsToGrid<BuildT, ResourceT>::getHandle(const PtrT points,
     if (mVerbose==1) mTimer.stop();
 
     if (mVerbose==1) mTimer.restart("Computation of checksum");
-    tools::cuda::updateChecksum((GridData*)buffer.deviceData(), mChecksum, mStream);
+    tools::cuda::updateChecksum((GridData*)nanovdb::cuda::detail::deviceStorageData(buffer), mChecksum, mStream);
     if (mVerbose==1) mTimer.stop();
 
     cudaStreamSynchronize(mStream);
@@ -858,9 +859,9 @@ inline BufferT PointsToGrid<BuildT, ResourceT>::getBuffer(const PtrT, size_t poi
 
     int device = 0;
     cudaGetDevice(&device);
-    auto buffer = BufferT::create(mData.size, &pool, device, mStream);// only allocate buffer on the device
+    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(mData.size, &pool, device, mStream);// only allocate buffer on the device
 
-    mData.d_bufferPtr = buffer.deviceData();
+    mData.d_bufferPtr = nanovdb::cuda::detail::deviceStorageData(buffer);
     if (mData.d_bufferPtr == nullptr) throw std::runtime_error("Failed to allocate grid buffer on the device");
     // Zero the whole grid buffer up front. This (a) makes the dense background
     // fills (upper/lower value tables, inactive leaf values - all zero in this

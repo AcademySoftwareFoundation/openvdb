@@ -141,6 +141,15 @@ template<typename BufferT>
 struct BufferHasByteElements<BufferT, std::void_t<typename BufferT::ElementType>>
 { static constexpr bool value = sizeof(typename BufferT::ElementType) == 1; };
 
+/// @brief Detects whether a buffer type is default-constructible, so
+///        consumers can name that requirement in a static_assert instead of
+///        failing wherever the default construction happens to occur.
+template<typename BufferT, typename = void>
+struct BufferIsDefaultConstructible { static constexpr bool value = false; };
+template<typename BufferT>
+struct BufferIsDefaultConstructible<BufferT, std::void_t<decltype(BufferT())>>
+{ static constexpr bool value = true; };
+
 /// @brief Detects whether a buffer provides destroy(), the cuda::Buffer
 ///        spelling for releasing its storage. Handle reset() dispatches to it
 ///        when present and falls back to the legacy clear() otherwise.

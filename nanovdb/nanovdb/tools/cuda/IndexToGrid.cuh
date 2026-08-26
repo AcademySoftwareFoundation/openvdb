@@ -23,6 +23,7 @@
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
+#include <nanovdb/cuda/HandleStorage.h>
 
 namespace nanovdb {// ================================================================
 
@@ -400,8 +401,8 @@ inline BufferT IndexToGrid<SrcBuildT, ResourceT>::getBuffer(const BufferT &pool)
     mNodeAcc.size  = mNodeAcc.blind;// end of buffer
     int device = 0;
     cudaCheck(cudaGetDevice(&device));
-    auto buffer = BufferT::create(mNodeAcc.size, &pool, device, mStream);
-    mNodeAcc.d_dstPtr = buffer.deviceData();
+    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(mNodeAcc.size, &pool, device, mStream);
+    mNodeAcc.d_dstPtr = nanovdb::cuda::detail::deviceStorageData(buffer);
     if (mNodeAcc.d_dstPtr == nullptr) throw std::runtime_error("Failed memory allocation on the device");
     // Zero the non-leaf region: grid, tree, root, root tiles and the internal
     // nodes. Bytes the kernels below do not explicitly write - stats fields
