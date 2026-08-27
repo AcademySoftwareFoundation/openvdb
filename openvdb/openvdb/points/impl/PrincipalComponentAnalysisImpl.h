@@ -52,12 +52,16 @@ struct PcaTimer final : public TimerT
     util::NullInterrupter* const mInterrupt;
 };
 
-using WeightSumT = double;
-using WeightedPositionSumT = math::Vec3<WeightSumT>;
+// Precision of the kernel arithmetic
+using RealT = double;
+// Intermediate attributes, precision is allowed to differ but should
+// typically be the same as the kernel precision.
+using WeightSumT = RealT;
+using WeightedPositionSumT = math::Vec3<RealT>;
 using GroupIndexT = points::AttributeSet::Descriptor::GroupIndex;
-// Batched PCA types. Either double, or some simd type
+// Batched PCA types, always a Tuple/vcl simd type for doubles
 using NativeT = simd::NativeSimdOrScalar<WeightSumT>::Type;
-// 1 (for double) or the size of our simd type
+// size of our simd type (expect >= 2)
 inline constexpr size_t kPcaBatchSize = simd::NativeSimdOrScalar<WeightSumT>::Size;
 // Expect power of two
 static_assert((kPcaBatchSize > 0) &&
@@ -120,7 +124,7 @@ struct PcaTransfer
         , InterruptableTransfer(interrupt)
         , mIndices(indices)
         , mSettings(settings)
-        , mDxInv(1.0/vs)
+        , mDxInv(RealT(1.0)/RealT(vs))
         , mManager(manager)
         , mTargetPosition()
         , mSourcePosition() {
@@ -145,8 +149,8 @@ struct PcaTransfer
 
     static bool VoxelIntersectsSphere(const Coord& ijk, const Vec3d& PosIS, const Real r2)
     {
-        const Vec3d min = ijk.asVec3d() - 0.5;
-        const Vec3d max = ijk.asVec3d() + 0.5;
+        const Vec3d min = ijk.asVec3d() - RealT(0.5);
+        const Vec3d max = ijk.asVec3d() + RealT(0.5);
         Real dmin = 0;
         for (int i = 0; i < 3; ++i) {
             if (PosIS[i] < min[i])      dmin += math::Pow2(PosIS[i] - min[i]);
@@ -206,15 +210,20 @@ struct PcaTransfer
             for (Index i = start; i < end; i += step) {
                 ids[offset++] = int64_t(i);
                 if (offset == kPcaBatchSize) {
-                   this->rasterizeN2<kPcaBatchSize>(ijk, ids, bounds);
+                   this->rasterizeN2<kPcaBatchSize>(ids, bounds);
                     offset = 0;
                 }
             }
             if (offset == 0) return;
+            // @note for the case where most voxels contain a single point,
+            //   it would probably be ever so slightly more efficient to go
+            //   through rasterizePoint() - but when batching, this requires
+            //   care to not accidently broadcast to all lanes. For now just
+            //   padd and rasterizeN2, but may be worth investigating.
             for (; offset < kPcaBatchSize; ++offset) {
                 ids[offset] = int64_t(-1);
             }
-           this->rasterizeN2<kPcaBatchSize>(ijk, ids, bounds);
+           this->rasterizeN2<kPcaBatchSize>(ids, bounds);
         }
     }
 
@@ -222,24 +231,24 @@ struct PcaTransfer
 
 private:
     template <size_t N2>
-    inline void rasterizeN2(const Coord&,
+    inline void rasterizeN2(
         const std::array<int64_t, N2>& points,
         const CoordBBox& bounds)
     {
         // expected pow2 and at least 2 elements
         static_assert((N2 > 1) && !(N2 & (N2 - 1)));
-        using SimdT  = typename simd::SimdT<WeightSumT, N2>::Type;
+        using SimdT  = typename simd::SimdT<RealT, N2>::Type;
         using SimdIT = typename simd::SimdT<int64_t, N2>::Type;
         using SimdMT = typename simd::SimdTraits<SimdT>::MaskT;
 
         OPENVDB_ASSERT(points[0] != -1);
 
-        std::array<WeightSumT, 3*N2> cache;
-        math::Vec3<WeightSumT> tmp;
+        std::array<RealT, 3*N2> cache;
+        math::Vec3<RealT> tmp;
         // convert AoS to SoA
         for (size_t i = 0; i < N2; ++i) {
             if (points[i] != -1) {
-                tmp = math::Vec3<WeightSumT>(this->mSourcePosition->get(Index(points[i])));
+                tmp = math::Vec3<RealT>(this->mSourcePosition->get(Index(points[i])));
             }
             cache[i+(N2*0)] = tmp[0];
             cache[i+(N2*1)] = tmp[1];
@@ -264,17 +273,19 @@ private:
     ///   makes the arithmetic a bit simpler as we don't have to worry about
     ///   intermediately storing simdt's with accumulating scalars accidently
     ///   filling all lanes
-    inline void rasterizePoint(const Coord& ijk,
+    inline void rasterizePoint(const Coord&,
                     const Index id,
                     const CoordBBox& bounds)
     {
-        if (kPcaBatchSize > 1) {
-            this->rasterizePoints(ijk, id, id+1, bounds);
+        if constexpr(kPcaBatchSize == 1) {
+            const math::Vec3<RealT> Pws = math::Vec3<RealT>(this->mSourcePosition->get(id));
+            const math::Vec3<RealT> Pis = Pws * this->mDxInv;
+            this->derived().stamp(Pws.x(), Pws.y(), Pws.z(), Pis.x(), Pis.y(), Pis.z(), true, bounds);
         }
         else {
-            const Vec3d Pws = math::Vec3<WeightSumT>(this->mSourcePosition->get(id));
-            const Vec3d Pis = Pws * this->mDxInv;
-            this->derived().stamp(Pws.x(), Pws.y(), Pws.z(), Pis.x(), Pis.y(), Pis.z(), true, bounds);
+            // kPcaBatchSize > 1 should only ever go through rasterizePoints()
+            static_assert(!std::is_same_v<DerivedT, DerivedT>,
+                "Unexpected invocation of PcaTransfer::rasterizePoint");
         }
     }
 
@@ -285,7 +296,7 @@ private:
 protected:
     const AttrIndices& mIndices;
     const PcaSettings& mSettings;
-    const Real mDxInv;
+    const RealT mDxInv;
     const tree::LeafManager<PointDataTreeT>& mManager;
     std::unique_ptr<PositionHandleT> mTargetPosition;
     std::unique_ptr<PositionHandleT> mSourcePosition;
@@ -361,7 +372,7 @@ struct WeightPosSumsTransfer
         points::GroupWriteHandle group(leaf.groupWriteHandle(this->mIndices.mEllipsesGroupIndex));
 
         // Init the actual buffer data if we're batching
-        double* const weightedPositions = [&]() {
+        auto* const weightedPositions = [&]() {
             if constexpr (kPcaBatchSize > 1) {
                 OPENVDB_ASSERT(mWeightedPositions == mBatchedWeightedPositions.data());
                 // assume trivial type and contiguously allocated
@@ -382,7 +393,7 @@ struct WeightPosSumsTransfer
             }
 
             // If we were batching, hadd and set each dest component
-            double* const wp = &weightedPositions[i*3];
+            auto* const wp = &weightedPositions[i*3];
             if constexpr (kPcaBatchSize > 1)
             {
                 NativeT* const comp = &mWeightedPositions[i*3];
@@ -393,7 +404,7 @@ struct WeightPosSumsTransfer
             if (mCounts[i] <= 0) continue;
             // Normalize weights
             OPENVDB_ASSERT(mWeights[i] >= 0.0f);
-            mWeights[i] = 1.0 / mWeights[i];
+            mWeights[i] = WeightSumT(1.0) / mWeights[i];
             wp[0] *= mWeights[i];
             wp[1] *= mWeights[i];
             wp[2] *= mWeights[i];
@@ -418,7 +429,7 @@ private:
         // otherwise we can end up writing scalars to all lanes of a simdt
         // (e.g. wp[0] += (Pwx * weights), where wp is a simdt and Pwx is
         // a scalar - this ends up filing all the lanes).
-        static_assert(std::is_same_v<ScalarT, NativeT>);
+        static_assert(simd::IsSimdT<ScalarT>::value == simd::IsSimdT<NativeT>::value);
         OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Pwx)));
         OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Pwy)));
         OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Pwz)));
@@ -442,16 +453,16 @@ private:
         const Coord& a(intersection.min());
         const Coord& b(intersection.max());
         for (Coord c = a; c.x() <= b.x(); ++c.x()) {
-            const ScalarT minx(c.x() - 0.5);
-            const ScalarT maxx(c.x() + 0.5);
+            const ScalarT minx(RealT(c.x()) - RealT(0.5));
+            const ScalarT maxx(RealT(c.x()) + RealT(0.5));
             const ScalarT dminx =
                 (simd::select(Pix < minx, simd::pow2(Pix - minx),
                     (simd::select(Pix > maxx, simd::pow2(Pix - maxx), ScalarT(0)))));
             if (simd::horizontal_min(dminx) > searchRadiusIS2) continue;
             const Index i = ((c.x() & (DIM-1u)) << 2*LOG2DIM); // unsigned bit shift mult
             for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
-                const ScalarT miny(c.y() - 0.5);
-                const ScalarT maxy(c.y() + 0.5);
+                const ScalarT miny(RealT(c.y()) - RealT(0.5));
+                const ScalarT maxy(RealT(c.y()) + RealT(0.5));
                 const ScalarT dminxy = dminx +
                     (simd::select(Piy < miny, simd::pow2(Piy - miny),
                         (simd::select(Piy > maxy, simd::pow2(Piy - maxy), ScalarT(0)))));
@@ -461,8 +472,8 @@ private:
                     const Index offset = ij + /*k*/(c.z() & (DIM-1u));
                     if (!mask.isOn(offset)) continue; // next target voxel
 
-                    const ScalarT minz(c.z() - 0.5);
-                    const ScalarT maxz(c.z() + 0.5);
+                    const ScalarT minz(RealT(c.z()) - RealT(0.5));
+                    const ScalarT maxz(RealT(c.z()) + RealT(0.5));
                     const ScalarT dminxyz = dminxy +
                         (simd::select(Piz < minz, simd::pow2(Piz - minz),
                             (simd::select(Piz > maxz, simd::pow2(Piz - maxz), ScalarT(0)))));
@@ -502,13 +513,13 @@ private:
                         OPENVDB_ASSERT(simd::horizontal_min(weights) >= 0.0);
                         OPENVDB_ASSERT(simd::horizontal_max(weights) <= 1.0);
 
-                        const WeightSumT weight = simd::horizontal_add(weights);
+                        const WeightSumT weight = WeightSumT(simd::horizontal_add(weights));
                         mWeights[tgtid] += weight;
 
                         NativeT* const wp = &mWeightedPositions[tgtid*3];
-                        wp[0] += (Pwx * weights); // @note: world space position is weighted
-                        wp[1] += (Pwy * weights); // @note: world space position is weighted
-                        wp[2] += (Pwz * weights); // @note: world space position is weighted
+                        wp[0] += NativeT(Pwx * weights); // @note: world space position is weighted
+                        wp[1] += NativeT(Pwy * weights); // @note: world space position is weighted
+                        wp[2] += NativeT(Pwz * weights); // @note: world space position is weighted
                         mCounts[tgtid] += c;
                     } //point idx
                 }
@@ -587,22 +598,24 @@ struct CovarianceTransfer
     {
         // if we've written directly to the attribute buffer, return
         if constexpr (kPcaBatchSize == 1) return true;
+        else
+        {
+            OPENVDB_ASSERT(mCovComponents == mBatchedCovStorage.data());
+            auto& leaf = this->mManager.leaf(idx);
+            // now init the attribute buffer. no need to fill a value as we're
+            // overwriting everything
+            math::Mat3s* mats = initPcaArrayAttribute<math::Mat3s>(leaf, this->mIndices.mCovMatrixIndex, /*fill=*/false);
 
-        OPENVDB_ASSERT(mCovComponents == mBatchedCovStorage.data());
-        auto& leaf = this->mManager.leaf(idx);
-        // now init the attribute buffer. no need to fill a value as we're
-        // overwriting everything
-        math::Mat3s* mats = initPcaArrayAttribute<math::Mat3s>(leaf, this->mIndices.mCovMatrixIndex, /*fill=*/false);
-
-        for (Index i = 0; i < this->mTargetPosition->size(); ++i) {
-            float* const dst = mats[i].asPointer();
-            CovStorageT* const src = &mCovComponents[i*9];
-            for (size_t j = 0; j < 9; ++j) {
-                dst[j] = static_cast<float>(simd::horizontal_add(src[j]));
+            for (Index i = 0; i < this->mTargetPosition->size(); ++i) {
+                float* const dst = mats[i].asPointer();
+                CovStorageT* const src = &mCovComponents[i*9];
+                for (size_t j = 0; j < 9; ++j) {
+                    dst[j] = static_cast<float>(simd::horizontal_add(src[j]));
+                }
             }
-        }
 
-        return true;
+            return true;
+        }
     }
 
 private:
@@ -622,7 +635,7 @@ private:
         // otherwise we can end up writing scalars to all lanes of a simdt
         // (e.g. m[0] += (wx * tx), where wp is a simdt and wx is a scalar -
         //  this ends up filing all the lanes).
-        static_assert(std::is_same_v<ScalarT, NativeT>);
+        static_assert(simd::IsSimdT<ScalarT>::value == simd::IsSimdT<NativeT>::value);
         OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Pwx)));
         OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Pwy)));
         OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Pwz)));
@@ -646,16 +659,16 @@ private:
         const Coord& a(intersection.min());
         const Coord& b(intersection.max());
         for (Coord c = a; c.x() <= b.x(); ++c.x()) {
-            const ScalarT minx(c.x() - 0.5);
-            const ScalarT maxx(c.x() + 0.5);
+            const ScalarT minx(RealT(c.x()) - RealT(0.5));
+            const ScalarT maxx(RealT(c.x()) + RealT(0.5));
             const ScalarT dminx =
                 (simd::select(Pix < minx, simd::pow2(Pix - minx),
                     (simd::select(Pix > maxx, simd::pow2(Pix - maxx), ScalarT(0)))));
             if (simd::horizontal_min(dminx) > searchRadiusIS2) continue;
             const Index i = ((c.x() & (DIM-1u)) << 2*LOG2DIM); // unsigned bit shift mult
             for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
-                const ScalarT miny(c.y() - 0.5);
-                const ScalarT maxy(c.y() + 0.5);
+                const ScalarT miny(RealT(c.y()) - RealT(0.5));
+                const ScalarT maxy(RealT(c.y()) + RealT(0.5));
                 const ScalarT dminxy = dminx +
                     (simd::select(Piy < miny, simd::pow2(Piy - miny),
                         (simd::select(Piy > maxy, simd::pow2(Piy - maxy), ScalarT(0)))));
@@ -665,8 +678,8 @@ private:
                     const Index offset = ij + /*k*/(c.z() & (DIM-1u));
                     if (!mask.isOn(offset)) continue; // next target voxel
 
-                    const ScalarT minz(c.z() - 0.5);
-                    const ScalarT maxz(c.z() + 0.5);
+                    const ScalarT minz(RealT(c.z()) - RealT(0.5));
+                    const ScalarT maxz(RealT(c.z()) + RealT(0.5));
                     const ScalarT dminxyz = dminxy +
                         (simd::select(Piz < minz, simd::pow2(Piz - minz),
                             (simd::select(Piz > maxz, simd::pow2(Piz - maxz), ScalarT(0)))));
@@ -732,17 +745,17 @@ private:
                         // mat.setCol(0, mat.col(0) + (x * posMeanDiff[0]));
                         // mat.setCol(1, mat.col(1) + (x * posMeanDiff[1]));
                         // mat.setCol(2, mat.col(2) + (x * posMeanDiff[2]));
-                        m[0] += (wx * tx);
-                        m[1] += (wx * ty);
-                        m[2] += (wx * tz);
+                        m[0] += static_cast<CovStorageT>(wx * tx);
+                        m[1] += static_cast<CovStorageT>(wx * ty);
+                        m[2] += static_cast<CovStorageT>(wx * tz);
                         //
-                        m[3] += (wy * tx);
-                        m[4] += (wy * ty);
-                        m[5] += (wy * tz);
+                        m[3] += static_cast<CovStorageT>(wy * tx);
+                        m[4] += static_cast<CovStorageT>(wy * ty);
+                        m[5] += static_cast<CovStorageT>(wy * tz);
                         //
-                        m[6] += (wz * tx);
-                        m[7] += (wz * ty);
-                        m[8] += (wz * tz);
+                        m[6] += static_cast<CovStorageT>(wz * tx);
+                        m[7] += static_cast<CovStorageT>(wz * ty);
+                        m[8] += static_cast<CovStorageT>(wz * tz);
                     } //point idx
                 }
             }
@@ -1155,7 +1168,7 @@ OPENVDB_NO_DEPRECATION_WARNING_END
                 // @note  Technically possible for the weights to be valid
                 //   _and_ zero.
                 if (math::isApproxZero(weightedPosSumHandle.get(i),
-                    Vec3d(math::Tolerance<double>::value()))) {
+                    WeightedPositionSumT(math::Tolerance<double>::value()))) {
                     continue;
                 }
                 const Vec3d smoothedPosition = (1.0f - settings.averagePositions) *
