@@ -1230,6 +1230,65 @@ TEST(TestNanoVDBCUDA, CudaSignedFloodFill)
     EXPECT_TRUE(floatGrid->isBreadthFirst());
 }//  CudaSignedFloodFill
 
+// Regression test for https://github.com/AcademySoftwareFoundation/openvdb/issues/2300:
+// processRoot's z-scanline pass resolved Tile::child byte-offsets against the truncated
+// host/managed copy of the root (tree + root + tiles, no child-node data) instead of the
+// real device root, so RootT::getChild() computed a pointer far outside that small managed
+// allocation - an out-of-bounds device read. It rarely surfaced in practice because the only
+// existing coverage (CudaSignedFloodFill, NonBlockingStreamSignedFloodFill) builds a single
+// root child (an origin-centered sphere), which never reaches the scanline pass at all: that
+// pass only runs for two root children on the same z-scanline. This test builds exactly that:
+// two non-adjacent root children (upper nodes, 4096^3 each) on the same scanline, with an
+// explicit background tile sandwiched between them for the pass to (not) repair.
+//
+// Node b's near corner is deliberately left "outside" (background) rather than "inside", so the
+// correct outcome is that the sandwiched tile is left untouched - a stricter check than the
+// inside/inside case, where an all-zero read (e.g. from a freshly touched managed-memory page)
+// would coincidentally satisfy the "inside" test and mask the bug. Per the issue, the bad read
+// lands within the same coarse-grained managed-memory page a majority of the time, so it isn't
+// guaranteed to produce a wrong value or an invalid-access fault on every platform; this test
+// pins down the intended behavior of the fix, and should be run under compute-sanitizer in CI
+// to also catch the out-of-bounds access itself.
+TEST(TestNanoVDBCUDA, CudaSignedFloodFillNonAdjacentRootChildren)
+{
+    using BufferT = nanovdb::cuda::DeviceBuffer;
+    using RootT   = nanovdb::NanoRoot<float>;
+    static const int dim = int(RootT::ChildNodeType::DIM);// = 4096, size of a root child (upper) node
+    const float background = 1.0f;
+
+    nanovdb::tools::build::Grid<float> grid(background);
+    auto srcAcc = grid.getAccessor();
+    // last voxel of the root child at origin (0,0,0): drives RootChild::val[1] (getLastValue); inside
+    srcAcc.setValue(nanovdb::Coord(dim - 1, dim - 1, dim - 1), -1.0f);
+    // far corner of the root child at origin (0,0,2*dim), just to force that child node to exist;
+    // its near corner (0,0,2*dim), which drives RootChild::val[0] (getFirstValue), is left untouched
+    // and so stays at the background (outside) value - the scanline must NOT be filled
+    srcAcc.setValue(nanovdb::Coord(2 * dim - 1, 2 * dim - 1, 3 * dim - 1), -1.0f);
+    // explicit inactive background tile at the sandwiched root tile (0,0,dim), so the scanline
+    // pass has a tile entry available to (not) touch instead of throwing "missing internal tile"
+    grid.tree().root().addTile<3>(nanovdb::Coord(0, 0, dim), background, false);
+    ASSERT_EQ(3u, grid.tree().root().getTableSize());// the two children plus the sandwiched tile
+
+    auto floatHdl = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<float>, float, BufferT>(grid);
+    ASSERT_TRUE(floatHdl);
+    floatHdl.deviceUpload();
+    auto *d_floatGrid = floatHdl.deviceGrid<float>();
+    ASSERT_TRUE(d_floatGrid);
+
+    nanovdb::tools::cuda::signedFloodFill(d_floatGrid);
+
+    floatHdl.deviceDownload();
+    auto *floatGrid = floatHdl.grid<float>();
+    ASSERT_TRUE(floatGrid);
+    auto acc = floatGrid->getAccessor();
+    // node b is outside at its near corner, so the sandwiched tile must be left at background
+    EXPECT_EQ(background, acc.getValue(nanovdb::Coord(0, 0, dim)));
+    EXPECT_FALSE(acc.isActive(nanovdb::Coord(0, 0, dim)));
+    // sanity: the explicit voxels that drove the decision are unaffected
+    EXPECT_EQ(-1.0f, acc.getValue(nanovdb::Coord(dim - 1, dim - 1, dim - 1)));
+    EXPECT_EQ(background, acc.getValue(nanovdb::Coord(0, 0, 2 * dim)));
+}// CudaSignedFloodFillNonAdjacentRootChildren
+
 TEST(TestNanoVDBCUDA, OneVoxelToGrid)
 {
     using BuildT = float;
