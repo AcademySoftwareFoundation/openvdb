@@ -199,13 +199,12 @@ void PruneGrid<BuildT, ResourceT>::pruneRoot()
 
     // Package the duplicated root topology into a RootNode plus Tile list; upload to the GPU
     uint64_t rootSize = RootT::memUsage(prunedTiles.size());
-    mBuilder.mProcessedRoot = nanovdb::cuda::DeviceBuffer::create(rootSize);
-    auto prunedRootPtr = static_cast<RootT*>(mBuilder.mProcessedRoot.data());
+    auto prunedRootPtr = mBuilder.allocateProcessedRoot(rootSize);
     prunedRootPtr->mTableSize = prunedTiles.size();
     uint32_t t = 0;
     for (const auto& [key, tile] : prunedTiles)
         *prunedRootPtr->tile(t++) = tile;
-    mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
+    mBuilder.uploadProcessedRoot(mStream);
 }// PruneGrid<BuildT, ResourceT>::pruneRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

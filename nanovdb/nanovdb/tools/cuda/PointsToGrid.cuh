@@ -862,7 +862,7 @@ inline BufferT PointsToGrid<BuildT, ResourceT>::getBuffer(const PtrT, size_t poi
     auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(mData.size, &pool, device, mStream);// only allocate buffer on the device
 
     mData.d_bufferPtr = nanovdb::cuda::detail::deviceStorageData(buffer);
-    if (mData.d_bufferPtr == nullptr) throw std::runtime_error("Failed to allocate grid buffer on the device");
+    if (mData.d_bufferPtr == nullptr) throw std::runtime_error("The grid buffer type produced no device-accessible memory");
     // Zero the whole grid buffer up front. This (a) makes the dense background
     // fills (upper/lower value tables, inactive leaf values - all zero in this
     // builder) redundant, so those kernels are skipped, and (b) makes the

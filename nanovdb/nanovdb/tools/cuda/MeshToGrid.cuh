@@ -844,8 +844,7 @@ void MeshToGrid<BuildT, ResourceT>::buildRasterizedRoot()
     // Only the NanoVDB tile key is set here; child pointers and values are
     // filled by TopologyBuilder's subsequent pipeline stages.
     uint64_t rootSize = RootT::memUsage(tileCount);
-    mBuilder.mProcessedRoot = nanovdb::cuda::DeviceBuffer::create(rootSize);
-    auto *rootPtr = static_cast<RootT*>(mBuilder.mProcessedRoot.data());
+    auto *rootPtr = mBuilder.allocateProcessedRoot(rootSize);
     rootPtr->mTableSize = tileCount;
     rootPtr->mBackground = typename RootT::ValueType{};
 
@@ -856,7 +855,7 @@ void MeshToGrid<BuildT, ResourceT>::buildRasterizedRoot()
             tileCount * sizeof(nanovdb::Coord), cudaMemcpyDeviceToHost));
         for (uint32_t t = 0; t < tileCount; ++t)
             *rootPtr->tile(t) = typename RootT::DataType::Tile{RootT::CoordToKey(hostOrigins[t])};
-        mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
+        mBuilder.uploadProcessedRoot(mStream);
         mUniqueRootOriginsBuffer.clear(mStream);
     }
 } // MeshToGrid<BuildT, ResourceT>::buildRasterizedRoot

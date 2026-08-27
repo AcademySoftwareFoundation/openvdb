@@ -22,6 +22,7 @@
 #include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/util/cuda/Morphology.cuh>
 #include <nanovdb/cuda/HandleStorage.h>
+#include <nanovdb/cuda/PinnedResource.h>// for the pinned host staging of the processed root
 
 namespace nanovdb {
 
@@ -69,6 +70,7 @@ class TopologyBuilder
     ///        Buffer rather than the dual DeviceBuffer, whose host pointer and
     ///        per-device array they would leave unused.
     using ScratchT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
+    using HostStagingT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::PinnedResource>;
 
 public:
 
@@ -84,10 +86,11 @@ public:
         , mVoxelOffsets(stream, resource, 0, nanovdb::cuda::noInit)
         , mLowerParents(stream, resource, 0, nanovdb::cuda::noInit)
         , mLeafParents(stream, resource, 0, nanovdb::cuda::noInit)
+        , mDeviceRoot(stream, resource, 0, nanovdb::cuda::noInit)
+        , mDeviceData(stream, resource, 0, nanovdb::cuda::noInit)
         , mResource(&resource)
         , mTempDevicePool(resource)
     {
-        mData = nanovdb::cuda::DeviceBuffer::create(sizeof(Data));
     }
 
     using Data = TopologyBuilderData<BuildT>;
@@ -109,7 +112,8 @@ public:
 
     void postProcessGridTree(cudaStream_t stream);
 
-    nanovdb::cuda::DeviceBuffer  mProcessedRoot;
+    HostStagingT                 mHostRoot;// host staging for the processed root (pinned, so the upload is asynchronous)
+    ScratchT                     mDeviceRoot;// device copy, made by uploadProcessedRoot
     ScratchT                     mUpperMasks;
     ScratchT                     mLowerMasks;
     ScratchT                     mUpperOffsets;
@@ -118,15 +122,43 @@ public:
     ScratchT                     mVoxelOffsets;
     ScratchT                     mLowerParents;
     ScratchT                     mLeafParents;
-    nanovdb::cuda::DeviceBuffer  mData;
+    Data                         mHostData{};// host side of the builder parameters
+    ScratchT                     mDeviceData;// device copy, made by uploadData
     CheckMode                    mChecksum{CheckMode::Disable};
 
-    auto deviceProcessedRoot() { return static_cast<RootT*>(mProcessedRoot.deviceData()); }
-    auto hostProcessedRoot()   { return static_cast<RootT*>(mProcessedRoot.data()); }
+    auto deviceProcessedRoot() { return reinterpret_cast<RootT*>(mDeviceRoot.data()); }
+    auto hostProcessedRoot()   { return reinterpret_cast<RootT*>(mHostRoot.data()); }
+
+    /// @brief Allocates (pinned) host staging for the processed root and
+    ///        returns it for the caller to fill; any previous root is dropped.
+    RootT* allocateProcessedRoot(uint64_t bytes)
+    {
+        mHostRoot = HostStagingT(bytes, nanovdb::cuda::noInit);
+        return reinterpret_cast<RootT*>(mHostRoot.data());
+    }
+
+    /// @brief Copies the host-staged processed root to the device, allocating
+    ///        through the builder's resource when the device copy is missing
+    ///        or too small.
+    void uploadProcessedRoot(cudaStream_t stream)
+    {
+        if (mDeviceRoot.size() < mHostRoot.size())
+            mDeviceRoot = ScratchT(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResource), mHostRoot.size(), nanovdb::cuda::noInit);
+        cudaCheck(cudaMemcpyAsync(mDeviceRoot.data(), mHostRoot.data(), mHostRoot.size(), cudaMemcpyHostToDevice, stream));
+    }
+
+    /// @brief Copies the builder parameters to the device, allocating through
+    ///        the builder's resource on first use.
+    void uploadData(cudaStream_t stream)
+    {
+        if (mDeviceData.empty())
+            mDeviceData = ScratchT(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResource), sizeof(Data), nanovdb::cuda::noInit);
+        cudaCheck(cudaMemcpyAsync(mDeviceData.data(), &mHostData, sizeof(Data), cudaMemcpyHostToDevice, stream));
+    }
     void* deviceUpperMasks() { return mUpperMasks.data(); }
     void* deviceLowerMasks() { return mLowerMasks.data(); }
-    Data* data()             { return static_cast<Data*>(mData.data()); }
-    Data* deviceData()       { return static_cast<Data*>(mData.deviceData()); }
+    Data* data()             { return &mHostData; }
+    Data* deviceData()       { return reinterpret_cast<Data*>(mDeviceData.data()); }
 
 private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
@@ -260,7 +292,7 @@ BufferT TopologyBuilder<BuildT, ResourceT>::getBuffer(const BufferT &pool, cudaS
     if (data()->d_bufferPtr == nullptr) throw std::runtime_error("Failed to allocate grid buffer on the device");
     if (data()->nodeCount[2] != 0) // Unless the result is an empty grid
         data()->d_upperOffsets = reinterpret_cast<uint32_t*>(mUpperOffsets.data());
-    mData.deviceUpload(device, stream, false);
+    this->uploadData(stream);
 
     return buffer;
 }// TopologyBuilder<BuildT, ResourceT>::getBuffer
@@ -484,7 +516,8 @@ inline void TopologyBuilder<BuildT, ResourceT>::processLowerNodes(cudaStream_t s
         cudaCheckError();
     }
 
-    mProcessedRoot.clear(stream);
+    mHostRoot.destroy();
+    mDeviceRoot.destroy(stream);
     mUpperMasks.destroy(stream);
     mLowerMasks.destroy(stream);
     mLowerOffsets.destroy(stream);

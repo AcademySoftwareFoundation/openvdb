@@ -219,13 +219,12 @@ void DilateGrid<BuildT, ResourceT>::dilateRoot()
 
     // Package the new root topology into a RootNode plus Tile list; upload to the GPU
     uint64_t rootSize = RootT::memUsage(dilatedTiles.size());
-    mBuilder.mProcessedRoot = nanovdb::cuda::DeviceBuffer::create(rootSize);
-    auto dilatedRootPtr = static_cast<RootT*>(mBuilder.mProcessedRoot.data());
+    auto dilatedRootPtr = mBuilder.allocateProcessedRoot(rootSize);
     dilatedRootPtr->mTableSize = dilatedTiles.size();
     uint32_t t = 0;
     for (const auto& [key, tile] : dilatedTiles)
         *dilatedRootPtr->tile(t++) = tile;
-    mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
+    mBuilder.uploadProcessedRoot(mStream);
 }// DilateGrid<BuildT, ResourceT>::dilateRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

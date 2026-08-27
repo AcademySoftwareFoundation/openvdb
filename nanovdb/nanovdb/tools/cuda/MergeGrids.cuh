@@ -220,13 +220,12 @@ void MergeGrids<BuildT, ResourceT>::mergeRoot()
 
     // Package the new root topology into a RootNode plus Tile list; upload to the GPU
     uint64_t rootSize = RootT::memUsage(mergedTiles.size());
-    mBuilder.mProcessedRoot = nanovdb::cuda::DeviceBuffer::create(rootSize);
-    auto mergedRootPtr = static_cast<RootT*>(mBuilder.mProcessedRoot.data());
+    auto mergedRootPtr = mBuilder.allocateProcessedRoot(rootSize);
     mergedRootPtr->mTableSize = mergedTiles.size();
     uint32_t t = 0;
     for (const auto& [key, tile] : mergedTiles)
         *mergedRootPtr->tile(t++) = tile;
-    mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
+    mBuilder.uploadProcessedRoot(mStream);
 }// MergeGrids<BuildT, ResourceT>::mergeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
