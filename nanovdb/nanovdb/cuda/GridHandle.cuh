@@ -18,7 +18,7 @@
 #define NANOVDB_CUDA_GRIDHANDLE_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/cuda/Buffer.h>// for the resource-aware scratch buffers below
-#include <nanovdb/cuda/HandleStorage.h>// cuda::copyTo and the storage helpers live there (host-includable)
+#include <nanovdb/cuda/HandleStorage.h> // cuda::copyTo and the storage helpers live there (host-includable)
 #include <nanovdb/cuda/DeviceBuffer.h>// required for instantiation of move c-tor of GridHandle
 #include <nanovdb/tools/cuda/GridChecksum.cuh>// for cuda::updateChecksum
 #include <nanovdb/GridHandle.h>

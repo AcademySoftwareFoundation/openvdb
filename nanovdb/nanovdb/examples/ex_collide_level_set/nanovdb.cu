@@ -15,7 +15,7 @@
 #include "common.h"
 
 #if defined(NANOVDB_USE_CUDA)
-#include <nanovdb/cuda/GridHandle.cuh>// for cuda::copyTo, the explicit host->device grid transfer
+#include <nanovdb/cuda/GridHandle.cuh> // for cuda::copyTo, the explicit host->device grid transfer
 #endif
 using BufferT = nanovdb::HostBuffer;
 

@@ -5,7 +5,7 @@
 
 #include <nanovdb/tools/GridBuilder.h>
 #include <nanovdb/tools/CreateNanoGrid.h>
-#include <nanovdb/cuda/HandleStorage.h>// host-includable: cuda::copyTo transfers grids without any kernel
+#include <nanovdb/cuda/HandleStorage.h> // host-includable: cuda::copyTo transfers grids without any kernel
 
 #include <iostream>
 

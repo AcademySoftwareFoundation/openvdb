@@ -22,7 +22,7 @@
 #include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/util/cuda/Morphology.cuh>
 #include <nanovdb/cuda/HandleStorage.h>
-#include <nanovdb/cuda/PinnedResource.h>// for the pinned host staging of the processed root
+#include <nanovdb/cuda/PinnedResource.h> // for the pinned host staging of the processed root
 
 namespace nanovdb {
 
@@ -112,8 +112,8 @@ public:
 
     void postProcessGridTree(cudaStream_t stream);
 
-    HostStagingT                 mHostRoot;// host staging for the processed root (pinned, so the upload is asynchronous)
-    ScratchT                     mDeviceRoot;// device copy, made by uploadProcessedRoot
+    HostStagingT                 mHostRoot; // host staging for the processed root (pinned, so the upload is asynchronous)
+    ScratchT                     mDeviceRoot; // device copy, made by uploadProcessedRoot
     ScratchT                     mUpperMasks;
     ScratchT                     mLowerMasks;
     ScratchT                     mUpperOffsets;
@@ -122,8 +122,8 @@ public:
     ScratchT                     mVoxelOffsets;
     ScratchT                     mLowerParents;
     ScratchT                     mLeafParents;
-    Data                         mHostData{};// host side of the builder parameters
-    ScratchT                     mDeviceData;// device copy, made by uploadData
+    Data                         mHostData{}; // host side of the builder parameters
+    ScratchT                     mDeviceData; // device copy, made by uploadData
     CheckMode                    mChecksum{CheckMode::Disable};
 
     auto deviceProcessedRoot() { return reinterpret_cast<RootT*>(mDeviceRoot.data()); }
@@ -289,7 +289,7 @@ BufferT TopologyBuilder<BuildT, ResourceT>::getBuffer(const BufferT &pool, cudaS
 
     int device = 0;
     cudaGetDevice(&device);
-    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(data()->size, &pool, device, stream);// only allocate buffer on the device
+    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(data()->size, &pool, device, stream); // only allocate buffer on the device
     cudaCheck(cudaMemsetAsync(nanovdb::cuda::detail::deviceStorageData(buffer), 0, data()->size, stream));
 
     data()->d_bufferPtr = nanovdb::cuda::detail::deviceStorageData(buffer);

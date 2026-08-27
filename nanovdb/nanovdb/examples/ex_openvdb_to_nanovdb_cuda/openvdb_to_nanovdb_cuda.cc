@@ -3,7 +3,7 @@
 
 #include <openvdb/tools/LevelSetSphere.h> // replace with your own dependencies for generating the OpenVDB grid
 #include <nanovdb/tools/CreateNanoGrid.h> // converter from OpenVDB to NanoVDB (includes NanoVDB.h and GridManager.h)
-#include <nanovdb/cuda/HandleStorage.h>// host-includable: cuda::copyTo transfers grids without any kernel
+#include <nanovdb/cuda/HandleStorage.h> // host-includable: cuda::copyTo transfers grids without any kernel
 
 extern "C" void launch_kernels(const nanovdb::NanoGrid<float>*,
                                const nanovdb::NanoGrid<float>*,

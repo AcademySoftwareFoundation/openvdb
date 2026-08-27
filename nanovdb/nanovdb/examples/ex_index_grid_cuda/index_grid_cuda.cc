@@ -3,7 +3,7 @@
 
 #include <nanovdb/tools/CreateNanoGrid.h>
 #include <nanovdb/tools/CreatePrimitives.h>// for nanovdb::tools::createLevelSetSphere
-#include <nanovdb/cuda/HandleStorage.h>// host-includable: cuda::copyTo transfers grids without any kernel
+#include <nanovdb/cuda/HandleStorage.h> // host-includable: cuda::copyTo transfers grids without any kernel
 
 extern "C" void launch_kernels(const nanovdb::NanoGrid<nanovdb::ValueOnIndex>*,// device grid
                                const nanovdb::NanoGrid<nanovdb::ValueOnIndex>*,// host grid
@@ -20,7 +20,7 @@ int main(int, char**)
         auto *srcGrid = srcHandle.grid<float>();
 
         // Converts the FloatGrid to an IndexGrid in host memory.
-        auto idxHandle = nanovdb::tools::createNanoGrid<SrcGridT, DstBuildT>(*srcGrid, 1u, false , false);// 1 channel, no tiles or stats
+        auto idxHandle = nanovdb::tools::createNanoGrid<SrcGridT, DstBuildT>(*srcGrid, 1u, false , false); // 1 channel, no tiles or stats
 
         cudaStream_t stream; // stream that orders the transfer and the kernels below
         cudaStreamCreate(&stream);

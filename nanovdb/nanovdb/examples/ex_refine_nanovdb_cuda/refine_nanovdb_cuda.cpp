@@ -11,7 +11,7 @@
 
 // the following files are from NanoVDB
 #include <nanovdb/NanoVDB.h>
-#include <nanovdb/cuda/HandleStorage.h>// host-includable: cuda::copyTo transfers grids without any kernel
+#include <nanovdb/cuda/HandleStorage.h> // host-includable: cuda::copyTo transfers grids without any kernel
 #include <nanovdb/tools/CreateNanoGrid.h>
 
 template<typename BuildT>

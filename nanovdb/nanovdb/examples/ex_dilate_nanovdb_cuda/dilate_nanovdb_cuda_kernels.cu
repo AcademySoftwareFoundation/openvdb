@@ -4,7 +4,7 @@
 #include <nanovdb/tools/cuda/DilateGrid.cuh>
 #include <nanovdb/tools/cuda/PruneGrid.cuh>
 #include <nanovdb/util/cuda/Injection.cuh>
-#include <nanovdb/cuda/GridHandle.cuh>// for cuda::copyTo
+#include <nanovdb/cuda/GridHandle.cuh> // for cuda::copyTo
 
 template<typename T>
 bool bufferCheck(const T* deviceBuffer, const T* hostBuffer, size_t elem_count) {

@@ -20,16 +20,16 @@
 #ifndef NANOVDB_CUDA_HANDLESTORAGE_H_HAS_BEEN_INCLUDED
 #define NANOVDB_CUDA_HANDLESTORAGE_H_HAS_BEEN_INCLUDED
 
-#include <nanovdb/GridHandle.h>// for the handle cuda::copyTo transfers
-#include <nanovdb/HostBuffer.h>// for the BufferTraits detectors
-#include <nanovdb/cuda/Buffer.h>// for noInit and the resource concepts
-#include <nanovdb/util/cuda/Util.h>// for cudaCheck
+#include <nanovdb/GridHandle.h> // for the handle cuda::copyTo transfers
+#include <nanovdb/HostBuffer.h> // for the BufferTraits detectors
+#include <nanovdb/cuda/Buffer.h> // for noInit and the resource concepts
+#include <nanovdb/util/cuda/Util.h> // for cudaCheck
 
-#include <utility>// for std::move
-#include <vector>// for the adopted metadata
+#include <utility> // for std::move
+#include <vector> // for the adopted metadata
 
-#include <stdexcept>// for std::runtime_error
-#include <type_traits>// for std::is_default_constructible
+#include <stdexcept> // for std::runtime_error
+#include <type_traits> // for std::is_default_constructible
 
 namespace nanovdb {
 
@@ -212,7 +212,7 @@ inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, cudaStre
                                            : cudaMemcpyHostToDevice;
     cudaCheck(cudaMemcpyAsync(dst.data(), srcPtr, bytes, kind, stream));
     if constexpr (!dstDev)
-        cudaCheck(cudaStreamSynchronize(stream));// the host-readable result is the postcondition
+        cudaCheck(cudaStreamSynchronize(stream)); // the host-readable result is the postcondition
     // A handle-to-handle copy adopts the source's metadata, which was
     // validated when that handle was constructed from raw bytes -- no kernel
     // runs here, which is what keeps this header host-includable. A device

@@ -6,7 +6,7 @@
 #include <nanovdb/io/IO.h>
 #include <nanovdb/tools/CreatePrimitives.h>
 
-using BufferT = nanovdb::HostBuffer;// the handle lives in host memory; the CUDA side deep-copies it to the device
+using BufferT = nanovdb::HostBuffer; // the handle lives in host memory; the CUDA side deep-copies it to the device
 
 extern void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int numPoints, BufferT& positionBuffer, BufferT& velocityBuffer);
 #if defined(NANOVDB_USE_OPENVDB)

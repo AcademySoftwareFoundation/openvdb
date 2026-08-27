@@ -3,7 +3,7 @@
 
 #include <nanovdb/util/cuda/Util.h>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
-#include <nanovdb/cuda/GridHandle.cuh>// for cuda::copyTo, the explicit device->host grid transfer
+#include <nanovdb/cuda/GridHandle.cuh> // for cuda::copyTo, the explicit device->host grid transfer
 
 /// @brief Demonstrates how to create a NanoVDB grid from voxel coordinates on the GPU
 int main()
@@ -43,7 +43,6 @@ int main()
             printf("CPU: voxel # %zu, grid(%4i,%4i,%4i) = %5.1f\n", i, ijk[0], ijk[1], ijk[2], grid->tree().getValue(ijk));
         }
 
-        // the device arrays are owned by their buffers and freed on scope exit
     }
     catch (const std::exception& e) {
         std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <nanovdb/tools/cuda/MergeGrids.cuh>
-#include <nanovdb/cuda/GridHandle.cuh>// for cuda::copyTo
+#include <nanovdb/cuda/GridHandle.cuh> // for cuda::copyTo
 
 template<typename T>
 bool bufferCheck(const T* deviceBuffer, const T* hostBuffer, size_t elem_count) {

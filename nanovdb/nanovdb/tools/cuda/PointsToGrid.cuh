@@ -859,7 +859,7 @@ inline BufferT PointsToGrid<BuildT, ResourceT>::getBuffer(const PtrT, size_t poi
 
     int device = 0;
     cudaGetDevice(&device);
-    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(mData.size, &pool, device, mStream);// only allocate buffer on the device
+    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(mData.size, &pool, device, mStream); // only allocate buffer on the device
 
     mData.d_bufferPtr = nanovdb::cuda::detail::deviceStorageData(buffer);
     if (mData.d_bufferPtr == nullptr) throw std::runtime_error("The grid buffer type produced no device-accessible memory");

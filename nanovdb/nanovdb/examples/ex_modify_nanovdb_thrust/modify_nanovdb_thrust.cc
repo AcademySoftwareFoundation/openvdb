@@ -5,7 +5,7 @@
 ///        modified on the device. It depends on NanoVDB and CUDA thrust.
 
 #include <nanovdb/tools/CreatePrimitives.h>
-#include <nanovdb/cuda/HandleStorage.h>// host-includable: cuda::copyTo transfers grids without any kernel
+#include <nanovdb/cuda/HandleStorage.h> // host-includable: cuda::copyTo transfers grids without any kernel
 
 extern "C"  void scaleActiveVoxels(nanovdb::FloatGrid *grid_d, uint64_t leafCount, float scale);
 

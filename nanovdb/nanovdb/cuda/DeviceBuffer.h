@@ -33,6 +33,16 @@ namespace cuda {// =============================================================
 ///        allocator if you are not using CUDA.
 /// @note  While CUDA's pinned host memory allows for asynchronous memory copy between host and device
 ///        it is significantly slower then cached (un-pinned) memory on the host.
+/// @note  This is the implementation behind the deprecated DeviceBuffer alias
+///        below, renamed so the [[deprecated]] attribute reaches only code
+///        that spells the public name: the GPU tools' signature defaults
+///        reference this implementation, so default-using callers stay
+///        warning-free until the defaults change at removal. Transitional --
+///        do not adopt this name; it is deleted together with the alias. The
+///        header keeps its long-standing name and include path for the same
+///        reason: renaming a header breaks existing includes outright, and
+///        the old path is where external code will find the alias and its
+///        migration message.
 class DualDeviceBuffer
 {
     uint64_t mSize; // total number of bytes managed by this buffer (assumed to be identical for host and device)

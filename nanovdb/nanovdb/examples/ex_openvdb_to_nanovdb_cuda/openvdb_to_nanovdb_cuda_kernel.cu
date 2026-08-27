@@ -3,7 +3,13 @@
 
 #include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessable on both the host and device
 #include <nanovdb/cuda/GridHandle.cuh>
+#include <stdio.h> // for printf
 
+// This is called by the host only
+void cpu_kernel(const nanovdb::NanoGrid<float>* cpuGrid)
+{
+    printf("NanoVDB cpu; %4.2f\n", cpuGrid->tree().getValue(nanovdb::Coord(99, 0, 0)));
+}
 
 // This is called by the device only
 __global__ void gpu_kernel(const nanovdb::NanoGrid<float>* deviceGrid)

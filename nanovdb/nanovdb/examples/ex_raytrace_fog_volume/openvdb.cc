@@ -17,7 +17,7 @@
 
 #include "common.h"
 
-using BufferT = nanovdb::HostBuffer;// the handle lives in host memory; the CUDA side deep-copies it to the device
+using BufferT = nanovdb::HostBuffer; // the handle lives in host memory; the CUDA side deep-copies it to the device
 
 void runOpenVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int width, int height, BufferT& imageBuffer)
 {

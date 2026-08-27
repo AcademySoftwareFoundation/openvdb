@@ -3,7 +3,7 @@
 
 #include <openvdb/tools/LevelSetSphere.h> // replace with your own dependencies for generating the OpenVDB grid
 #include <nanovdb/tools/CreateNanoGrid.h> // converter from OpenVDB to NanoVDB (includes NanoVDB.h and GridManager.h)
-#include <nanovdb/cuda/HandleStorage.h>// host-includable: cuda::copyTo transfers grids without any kernel
+#include <nanovdb/cuda/HandleStorage.h> // host-includable: cuda::copyTo transfers grids without any kernel
 #include <nanovdb/cuda/DeviceResource.h>
 #include <nanovdb/NodeManager.h>
 
@@ -12,7 +12,7 @@ extern "C" void launch_kernels(const nanovdb::NodeManager<float>*,// device Naod
                                cudaStream_t stream);
 
 extern nanovdb::NodeManagerHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<nanovdb::cuda::DeviceResource>>>
-uploadNodeManager(const nanovdb::NanoGrid<float>* d_grid, cudaStream_t stream);// constructs a NodeManager for a device grid
+uploadNodeManager(const nanovdb::NanoGrid<float>* d_grid, cudaStream_t stream); // constructs a NodeManager for a device grid
 
 /// @brief This examples depends on OpenVDB, NanoVDB and CUDA.
 int main()
@@ -35,9 +35,9 @@ int main()
             throw std::runtime_error("GridHandle did not contain a grid with value type float");
         }
 
-        auto nodeHandle = nanovdb::createNodeManager<float>(*grid);// host NodeManager over the host grid
+        auto nodeHandle = nanovdb::createNodeManager<float>(*grid); // host NodeManager over the host grid
         auto *nodeMgr = nodeHandle.template mgr<float>();
-        auto nodeHandle2 = uploadNodeManager(deviceGrid, stream);// device NodeManager constructed for the device grid
+        auto nodeHandle2 = uploadNodeManager(deviceGrid, stream); // device NodeManager constructed for the device grid
         auto *deviceNodeMgr = nodeHandle2.template deviceMgr<float>();
         if (!deviceNodeMgr || !nodeMgr) {
             throw std::runtime_error("NodeManagerHandle did not contain a grid with value type float");

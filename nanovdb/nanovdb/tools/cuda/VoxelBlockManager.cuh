@@ -414,7 +414,7 @@ buildVoxelBlockManager(
             return nanovdb::tools::VoxelBlockManagerHandle<BufferT>(
                 nanovdb::cuda::detail::createDeviceStorage<BufferT>(0, proto, device, stream),
                 nanovdb::cuda::detail::createDeviceStorage<BufferT>(0, proto, device, stream),
-                0, firstOffset, lastOffset);// zero-size buffers allocate nothing
+                0, firstOffset, lastOffset); // zero-size buffers allocate nothing
         }
     }
     NANOVDB_ASSERT(!((firstOffset - 1) & (BlockWidth - 1))); // firstOffset == 1 (mod BlockWidth)
