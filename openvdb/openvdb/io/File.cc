@@ -34,9 +34,10 @@ namespace {
 ///   produced had it been read through @a codec (looked up by the caller via
 ///   the protected @c Archive::findCodec(), since this is a free function).
 ///   Returns null if no conversion is needed or possible, in which case the
-///   caller keeps the original grid and @a diagnostics is set accordingly.
+///   caller keeps the original grid.  A conversion that was requested but cannot
+///   be done is reported to @a diagnostics and logged against @a filename.
 GridBase::Ptr convertGridForReadMode(const GridBase& source, const ReadOptions& readOptions,
-    Codec* codec, ReadDiagnostics& diagnostics);
+    Codec* codec, ReadDiagnostics& diagnostics, const std::string& filename);
 
 /// @brief Return the name used in diagnostics and log messages for @a mode.
 std::string readModeName(ReadMode mode);
@@ -677,25 +678,42 @@ namespace {
 namespace convert_grid_internal {
 
 /// @brief Convert @a source to the grid type @c ValueConverter<TargetBuildT>::Type,
-///   provided the registry-reported @a targetType agrees and the value
-///   conversion is legal. Returns null otherwise.
+///   provided the registry-reported @a targetType agrees and the value conversion
+///   is legal.  Sets @a alreadyTargetType when @a source has that build type
+///   already.  Returns null in both cases, so the caller keeps the original grid.
 template<typename TargetBuildT>
 inline GridBase::Ptr
-convertToBuildType(const GridBase& source, const std::string& targetType)
+convertToTargetType(const GridBase& source, const std::string& targetType,
+    bool& alreadyTargetType)
 {
+    // A MaskGrid source is only visited when the target is itself a mask, where
+    // the build types match and the branch below attempts no conversion.  No
+    // LeafNode conversion constructor exists from ValueMask to another build type.
+    using SourceGridTypes = std::conditional_t<std::is_same_v<TargetBuildT, ValueMask>,
+        GridTypes, GridTypes::Remove<MaskGrid>>;
+
     GridBase::Ptr result;
-    source.apply<GridTypes>([&](const auto& typedSource) {
+    source.apply<SourceGridTypes>([&](const auto& typedSource) {
         using SourceGridT = std::decay_t<decltype(typedSource)>;
         using TargetGridT =
             typename SourceGridT::template ValueConverter<TargetBuildT>::Type;
-        // No LeafNode conversion constructor exists from ValueMask to any
-        // other build type, so exclude it here; nested if constexpr avoids
-        // instantiating the ambiguous CanConvertType<ValueMask, ValueMask>.
-        if constexpr (!std::is_same_v<typename SourceGridT::BuildType, ValueMask>) {
-            if constexpr (CanConvertType<typename SourceGridT::BuildType, TargetBuildT>::value) {
-                if (TargetGridT::gridType() == targetType) {
-                    result = typename TargetGridT::Ptr(new TargetGridT(typedSource));
-                }
+        if constexpr (std::is_same_v<typename SourceGridT::BuildType, TargetBuildT>) {
+            alreadyTargetType = true;
+        } else if constexpr (CanConvertType<typename SourceGridT::BuildType, TargetBuildT>::value) {
+            if (TargetGridT::gridType() != targetType)   return;
+            if constexpr (std::is_same_v<TargetBuildT, ValueMask>) {
+                // A mask records active state, not values, so copy the topology
+                // instead of casting values.  Casting would let a non-zero
+                // background or an inactive non-zero tile become true, which the
+                // codec path does not do.  create() takes the GridBase overload to
+                // copy the metadata and transform without converting the values.
+                auto target = TargetGridT::create(static_cast<const GridBase&>(typedSource));
+                target->setTree(typename TargetGridT::TreeType::Ptr(
+                    new typename TargetGridT::TreeType(typedSource.constTree(),
+                        /*inactiveValue=*/false, /*activeValue=*/true, TopologyCopy())));
+                result = target;
+            } else {
+                result = typename TargetGridT::Ptr(new TargetGridT(typedSource));
             }
         }
     });
@@ -720,7 +738,7 @@ readModeName(ReadMode mode)
 
 GridBase::Ptr
 convertGridForReadMode(const GridBase& source, const ReadOptions& readOptions,
-    Codec* codec, ReadDiagnostics& diagnostics)
+    Codec* codec, ReadDiagnostics& diagnostics, const std::string& filename)
 {
     if (readOptions.readMode != ReadMode::Half &&
         readOptions.readMode != ReadMode::Bool &&
@@ -729,38 +747,38 @@ convertGridForReadMode(const GridBase& source, const ReadOptions& readOptions,
         return GridBase::Ptr();
     }
 
-    const std::string modeStr = readModeName(readOptions.readMode);
-
+    // Ask the codec that would have read this grid which type it produces.
     CodecData::Ptr codecData = codec ? codec->createData() : CodecData::Ptr();
     const std::string targetType =
         (codecData && codecData->grid) ? codecData->grid->type() : std::string();
 
-    // No conversion codec registered for this grid type (falls through to the
-    // plain gridType codec), or the registry agrees the type is unchanged.
-    if (targetType.empty() || targetType == source.type()) {
-        diagnostics.addWarning(source.getName(),
-            "ReadMode::" + modeStr + " conversion is not supported for grid type '"
-            + source.type() + "'; reading as original type");
-        return GridBase::Ptr();
-    }
-
     GridBase::Ptr result;
+    bool alreadyTargetType = false;
     if (readOptions.readMode == ReadMode::Half) {
-        result = convert_grid_internal::convertToBuildType<Half>(source, targetType);
+        result = convert_grid_internal::convertToTargetType<Half>(
+            source, targetType, alreadyTargetType);
     } else if (readOptions.readMode == ReadMode::Bool) {
-        result = convert_grid_internal::convertToBuildType<bool>(source, targetType);
+        result = convert_grid_internal::convertToTargetType<bool>(
+            source, targetType, alreadyTargetType);
     } else {
-        result = convert_grid_internal::convertToBuildType<ValueMask>(source, targetType);
+        result = convert_grid_internal::convertToTargetType<ValueMask>(
+            source, targetType, alreadyTargetType);
     }
 
-    // The registry named a target type that this dispatch could not produce
-    // (e.g. a custom-registered grid type outside GridTypes, or the
-    // CanConvertType guard rejected the pair): fall through with a warning
-    // rather than silently diverging from what the registry reported.
-    if (!result) {
+    // Either no conversion codec is registered for this grid type (targetType is
+    // empty, or names the plain gridType codec), or the registry named a target
+    // type this dispatch cannot produce, such as a grid type outside GridTypes or
+    // a pair that CanConvertType rejects.  A grid that already has the requested
+    // build type is not a failure, so it is not reported.
+    if (!result && !alreadyTargetType) {
+        const std::string modeStr = readModeName(readOptions.readMode);
         diagnostics.addWarning(source.getName(),
             "ReadMode::" + modeStr + " conversion is not supported for grid type '"
             + source.type() + "'; reading as original type");
+        OPENVDB_LOG_WARN(filename << ": grid \"" << source.getName()
+            << "\" requested ReadMode::" << modeStr << ", but no conversion is "
+            "available for grid type \"" << source.type()
+            << "\"; returning the original type");
     }
 
     return result;
@@ -789,18 +807,10 @@ File::resolveCachedGrid(const GridBase::Ptr& cachedGrid, const io::ReadOptions& 
             "with values intact");
     } else {
         io::Codec* codec = Archive::findCodec(grid->type(), readOptions);
-        GridBase::Ptr converted = convertGridForReadMode(*grid, readOptions, codec, diagnostics);
-        if (converted) {
-            grid = converted;
-        } else if (readOptions.readMode == ReadMode::Half ||
-            readOptions.readMode == ReadMode::Bool ||
-            readOptions.readMode == ReadMode::Mask)
+        if (GridBase::Ptr converted =
+            convertGridForReadMode(*grid, readOptions, codec, diagnostics, mFilename))
         {
-            const std::string modeStr = readModeName(readOptions.readMode);
-            OPENVDB_LOG_WARN(mFilename << ": grid \"" << grid->getName()
-                << "\" requested ReadMode::" << modeStr << ", but no conversion is "
-                "available for grid type \"" << grid->type()
-                << "\"; returning the original type");
+            grid = converted;
         }
     }
 

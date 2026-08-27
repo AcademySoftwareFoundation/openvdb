@@ -1311,3 +1311,57 @@ TEST_F(TestCodec, testTopologyOnlyClearsBoolTiles)
 
     std::remove(path.c_str());
 }
+
+// ReadMode::Mask must record which voxels are active, not cast the source values.
+// A non-zero background and an inactive non-zero tile would both become true under
+// a value cast. Streamed files have no grid offsets, so this exercises the
+// in-memory conversion in File::resolveCachedGrid rather than the codec path.
+TEST_F(TestCodec, testCachedMaskConversionIgnoresValues)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    io::internal::initialize();
+
+    const std::string gridName = "nonzero_background";
+    const std::string path = "testCachedMaskConversion.vdb";
+
+    // A non-zero background, an inactive non-zero tile and an active region.
+    FloatGrid::Ptr src = FloatGrid::create(/*background=*/1.0f);
+    src->setName(gridName);
+    src->tree().addTile(/*level=*/2, Coord(4096), 0.1f, /*active=*/false);
+    src->fill(CoordBBox(Coord(0), Coord(6)), 5.0f, /*active=*/true);
+
+    const Index64 srcActiveVoxels = src->activeVoxelCount();
+    ASSERT_TRUE(srcActiveVoxels > 0);
+
+    // Write via io::Stream so the file has no grid offsets and every grid is
+    // cached up front on open().
+    {
+        std::ofstream os(path, std::ios_base::out | std::ios_base::binary);
+        io::Stream(os).write(GridPtrVec{src});
+    }
+
+    ReadOptions maskOpts;
+    maskOpts.readMode = ReadMode::Mask;
+
+    MaskGrid::Ptr readMask;
+    {
+        io::File f(path);
+        f.open();
+        readMask = gridPtrCast<MaskGrid>(f.readGrid(gridName, maskOpts));
+        f.close();
+    }
+    ASSERT_TRUE(readMask);
+
+    // Only the active voxels are on. A value cast would have activated nothing
+    // extra, but it would have set the background and the inactive tile to true.
+    EXPECT_EQ(readMask->activeVoxelCount(), srcActiveVoxels);
+    EXPECT_TRUE(src->tree().hasSameTopology(readMask->tree()));
+    EXPECT_FALSE(readMask->background());
+
+    // The inactive 0.1f tile must not have become an active or true tile.
+    EXPECT_FALSE(readMask->tree().getValue(Coord(4096)));
+
+    std::remove(path.c_str());
+}
