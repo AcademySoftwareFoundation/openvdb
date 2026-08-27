@@ -53,8 +53,15 @@ struct PcaTimer final : public TimerT
 };
 
 using WeightSumT = double;
-using WeightedPositionSumT = Vec3d;
+using WeightedPositionSumT = math::Vec3<WeightSumT>;
 using GroupIndexT = points::AttributeSet::Descriptor::GroupIndex;
+// Batched PCA types. Either double, or some simd type
+using NativeT = simd::NativeSimdOrScalar<WeightSumT>::Type;
+// 1 (for double) or the size of our simd type
+inline constexpr size_t kPcaBatchSize = simd::NativeSimdOrScalar<WeightSumT>::Size;
+// Expect power of two
+static_assert((kPcaBatchSize > 0) &&
+    !(kPcaBatchSize & (kPcaBatchSize - 1)));
 
 struct AttrIndices
 {
@@ -93,7 +100,7 @@ inline T* initPcaArrayAttribute(LeafNodeT& leaf, const size_t idx, const bool fi
 ///   it might be worth falling back to a gather stlye approach when the MPPV
 ///   and radius values are relatively small. We should investigate this in the
 ///   future.
-template <typename PointDataTreeT>
+template <typename DerivedT, typename PointDataTreeT> // CRTP for shared interface
 struct PcaTransfer
     : public VolumeTransfer<PointDataTreeT>
     , public InterruptableTransfer
@@ -162,6 +169,9 @@ struct PcaTransfer
         BaseT::initialize(origin, idx, bounds);
         auto& leaf = mManager.leaf(idx);
         mTargetPosition = std::make_unique<PositionHandleT>(leaf.constAttributeArray(mIndices.mPWsIndex));
+#if OPENVDB_PCA_SELF_CONTRIBUTION == 0
+        mCurrent = &leaf;
+#endif
         return &leaf;
     }
 
@@ -169,12 +179,108 @@ struct PcaTransfer
     {
         mSourcePosition = std::make_unique<PositionHandleT>(leaf.constAttributeArray(mIndices.mPWsIndex));
 #if OPENVDB_PCA_SELF_CONTRIBUTION == 0
-        mIsSameLeaf = this->mTargetPosition->array() == this->mSourcePosition->array();
+        mIsSameLeaf = (&leaf == mCurrent);
 #endif
         return true;
     }
 
+    /// @brief  Multi point rasterization
+    /// @note   This is the only allowed entry point from the transfer schemes
+    inline void rasterizePoints(const Coord& ijk,
+                    const Index start,
+                    const Index end,
+                    const CoordBBox& bounds)
+    {
+        const Index step = std::max(Index(1), Index((end - start) / this->maxSourcePointsPerVoxel()));
+
+        if constexpr(kPcaBatchSize == 1) {
+            // Fallback to per point rasterization as batch size is explicitly 1
+            // i.e. no simd containers in use
+            for (Index i = start; i < end; i += step) {
+                this->rasterizePoint(ijk, i, bounds);
+            }
+        }
+        else {
+            std::array<int64_t, kPcaBatchSize> ids;
+            Index offset = 0;
+            for (Index i = start; i < end; i += step) {
+                ids[offset++] = int64_t(i);
+                if (offset == kPcaBatchSize) {
+                   this->rasterizeN2<kPcaBatchSize>(ijk, ids, bounds);
+                    offset = 0;
+                }
+            }
+            if (offset == 0) return;
+            for (; offset < kPcaBatchSize; ++offset) {
+                ids[offset] = int64_t(-1);
+            }
+           this->rasterizeN2<kPcaBatchSize>(ijk, ids, bounds);
+        }
+    }
+
     bool endPointLeaf(const typename PointDataTreeT::LeafNodeType&) { return true; }
+
+private:
+    template <size_t N2>
+    inline void rasterizeN2(const Coord&,
+        const std::array<int64_t, N2>& points,
+        const CoordBBox& bounds)
+    {
+        // expected pow2 and at least 2 elements
+        static_assert((N2 > 1) && !(N2 & (N2 - 1)));
+        using SimdT  = typename simd::SimdT<WeightSumT, N2>::Type;
+        using SimdIT = typename simd::SimdT<int64_t, N2>::Type;
+        using SimdMT = typename simd::SimdTraits<SimdT>::MaskT;
+
+        OPENVDB_ASSERT(points[0] != -1);
+
+        std::array<WeightSumT, 3*N2> cache;
+        math::Vec3<WeightSumT> tmp;
+        // convert AoS to SoA
+        for (size_t i = 0; i < N2; ++i) {
+            if (points[i] != -1) {
+                tmp = math::Vec3<WeightSumT>(this->mSourcePosition->get(Index(points[i])));
+            }
+            cache[i+(N2*0)] = tmp[0];
+            cache[i+(N2*1)] = tmp[1];
+            cache[i+(N2*2)] = tmp[2];
+        }
+
+        const SimdT dxinv(this->mDxInv);
+        const SimdT pwx = simd::load<N2>(cache.data() + (N2*0));
+        const SimdT pwy = simd::load<N2>(cache.data() + (N2*1));
+        const SimdT pwz = simd::load<N2>(cache.data() + (N2*2));
+        const SimdT pix = pwx * dxinv;
+        const SimdT piy = pwy * dxinv;
+        const SimdT piz = pwz * dxinv;
+        const SimdIT ids = simd::load<N2>(points.data());
+        const SimdMT validMask = ids != SimdIT(-1);
+
+        this->derived().stamp(pwx, pwy, pwz, pix, piy, piz, validMask, bounds);
+    }
+
+    /// @brief   Single point rasterization
+    /// @warning If batching, we never invoke stamp() with a single scalar. This
+    ///   makes the arithmetic a bit simpler as we don't have to worry about
+    ///   intermediately storing simdt's with accumulating scalars accidently
+    ///   filling all lanes
+    inline void rasterizePoint(const Coord& ijk,
+                    const Index id,
+                    const CoordBBox& bounds)
+    {
+        if (kPcaBatchSize > 1) {
+            this->rasterizePoints(ijk, id, id+1, bounds);
+        }
+        else {
+            const Vec3d Pws = math::Vec3<WeightSumT>(this->mSourcePosition->get(id));
+            const Vec3d Pis = Pws * this->mDxInv;
+            this->derived().stamp(Pws.x(), Pws.y(), Pws.z(), Pis.x(), Pis.y(), Pis.z(), true, bounds);
+        }
+    }
+
+    inline DerivedT& derived() {
+        return *(static_cast<DerivedT*>(this));
+    }
 
 protected:
     const AttrIndices& mIndices;
@@ -185,14 +291,15 @@ protected:
     std::unique_ptr<PositionHandleT> mSourcePosition;
 #if OPENVDB_PCA_SELF_CONTRIBUTION == 0
     bool mIsSameLeaf {false};
+    LeafNodeType* mCurrent {nullptr};
 #endif
 };
 
 template <typename PointDataTreeT>
 struct WeightPosSumsTransfer
-    : public PcaTransfer<PointDataTreeT>
+    : public PcaTransfer<WeightPosSumsTransfer<PointDataTreeT>, PointDataTreeT>
 {
-    using BaseT = PcaTransfer<PointDataTreeT>;
+    using BaseT = PcaTransfer<WeightPosSumsTransfer<PointDataTreeT>, PointDataTreeT>;
 
     static const Index DIM = PointDataTreeT::LeafNodeType::DIM;
     static const Index LOG2DIM = PointDataTreeT::LeafNodeType::LOG2DIM;
@@ -204,104 +311,38 @@ struct WeightPosSumsTransfer
                           util::NullInterrupter* interrupt)
         : BaseT(indices, settings, vs, manager, interrupt)
         , mWeights()
-        , mWeightedPositions()
-        , mCounts() {}
+        , mCounts()
+        , mBatchedWeightedPositions()
+        , mWeightedPositions() {}
 
     WeightPosSumsTransfer(const WeightPosSumsTransfer& other)
         : BaseT(other)
         , mWeights()
-        , mWeightedPositions()
-        , mCounts() {}
+        , mCounts()
+        , mBatchedWeightedPositions()
+        , mWeightedPositions() {}
 
     inline void initialize(const Coord& origin, const size_t idx, const CoordBBox& bounds)
     {
         auto& leaf = (*BaseT::initialize(origin, idx, bounds));
         mWeights = initPcaArrayAttribute<WeightSumT>(leaf, this->mIndices.mWeightSumIndex);
-        mWeightedPositions = initPcaArrayAttribute<WeightedPositionSumT>(leaf, this->mIndices.mPosSumIndex);
+
+        // If we're batching, don't init the WeightedPositionSumT buffer yet.
+        // Instead create an intermediate buffer to avoid the horizontal
+        // accumulations until finalize.
+        // @warning  This does increase peak memory relative to the size of
+        //   the native simdt in use.
+        if constexpr (kPcaBatchSize > 1) {
+            mBatchedWeightedPositions.assign(this->mTargetPosition->size() * 3, NativeT(0));
+            mWeightedPositions = mBatchedWeightedPositions.data();
+        }
+        else {
+            auto* weightedPos = initPcaArrayAttribute<WeightedPositionSumT>(leaf, this->mIndices.mPosSumIndex);
+            mWeightedPositions = weightedPos[0].asPointer();
+        }
+
         // track neighbours
         mCounts.assign(this->mTargetPosition->size(), 0);
-    }
-
-    inline void rasterizePoints(const Coord&, const Index start, const Index end, const CoordBBox& bounds)
-    {
-        const Index step = std::max(Index(1), Index((end - start) / this->maxSourcePointsPerVoxel()));
-
-        const auto* const data = this->template buffer<0>();
-        const auto& mask = *(this->template mask<0>());
-
-        const float searchRadiusInv = 1.0f / this->searchRadius();
-        const Real searchRadius2 = math::Pow2(this->searchRadius());
-        const Real searchRadiusIS2 = math::Pow2(this->searchRadius() * this->mDxInv);
-
-        OPENVDB_ASSERT(std::isfinite(searchRadiusInv));
-        OPENVDB_ASSERT(std::isfinite(searchRadius2));
-        OPENVDB_ASSERT(std::isfinite(searchRadiusIS2));
-
-        const Coord& a(bounds.min());
-        const Coord& b(bounds.max());
-
-        for (Index srcid = start; srcid < end; srcid += step) {
-            const Vec3d Psrc(this->mSourcePosition->get(srcid));
-            const Vec3d PsrcIS = Psrc * this->mDxInv;
-
-            for (Coord c = a; c.x() <= b.x(); ++c.x()) {
-                const Real minx = c.x() - 0.5;
-                const Real maxx = c.x() + 0.5;
-                const Real dminx =
-                    (PsrcIS[0] < minx ? math::Pow2(PsrcIS[0] - minx) :
-                    (PsrcIS[0] > maxx ? math::Pow2(PsrcIS[0] - maxx) : 0));
-                if (dminx > searchRadiusIS2) continue; // next target voxel
-                const Index i = ((c.x() & (DIM-1u)) << 2*LOG2DIM); // unsigned bit shift mult
-                for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
-                    const Real miny = c.y() - 0.5;
-                    const Real maxy = c.y() + 0.5;
-                    const Real dminxy = dminx +
-                        (PsrcIS[1] < miny ? math::Pow2(PsrcIS[1] - miny) :
-                        (PsrcIS[1] > maxy ? math::Pow2(PsrcIS[1] - maxy) : 0));
-                    if (dminxy > searchRadiusIS2) continue; // next target voxel
-                    const Index ij = i + ((c.y() & (DIM-1u)) << LOG2DIM);
-                    for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
-                        const Index offset = ij + /*k*/(c.z() & (DIM-1u));
-                        if (!mask.isOn(offset)) continue; // next target voxel
-
-                        const Real minz = c.z() - 0.5;
-                        const Real maxz = c.z() + 0.5;
-                        const Real dminxyz = dminxy +
-                            (PsrcIS[2] < minz ? math::Pow2(PsrcIS[2] - minz) :
-                            (PsrcIS[2] > maxz ? math::Pow2(PsrcIS[2] - maxz) : 0));
-                        // Does this point's radius overlap the voxel c
-                        if (dminxyz > searchRadiusIS2) continue; // next target voxel
-
-                        // src point overlaps voxel c
-                        const Index targetEnd = data[offset];
-                        const Index targetStart = (offset == 0) ? 0 : Index(data[offset - 1]);
-                        const Index targetStep =
-                            std::max(Index(1), Index((targetEnd - targetStart) / this->maxTargetPointsPerVoxel()));
-
-                        /// @warning  stepping in this way does not guarantee
-                        ///   we get a self contribution, could guarantee this
-                        ///   by enabling the OPENVDB_PCA_SELF_CONTRIBUTION == 0
-                        ///   check and adding it afterwards.
-                        for (Index tgtid = targetStart; tgtid < targetEnd; tgtid += targetStep) {
-#if OPENVDB_PCA_SELF_CONTRIBUTION == 0
-                            if (OPENVDB_UNLIKELY(this->mIsSameLeaf && tgtid == srcid)) continue;
-#endif
-                            const Vec3d Ptgt(this->mTargetPosition->get(tgtid));
-                            const Real d2 = (Psrc - Ptgt).lengthSqr();
-                            if (d2 > searchRadius2) continue;
-
-                            // src point (srcid) reaches target point (tgtid)
-                            const float weight = 1.0f - math::Pow3(float(math::Sqrt(d2)) * searchRadiusInv);
-                            OPENVDB_ASSERT(weight >= 0.0f && weight <= 1.0f);
-
-                            mWeights[tgtid] += weight;
-                            mWeightedPositions[tgtid] += Psrc * weight; // @note: world space position is weighted
-                            ++mCounts[tgtid];
-                        }
-                    }
-                }
-            } // outer sdf voxel
-        } // point idx
     }
 
     bool finalize(const Coord&, size_t idx)
@@ -319,32 +360,180 @@ struct WeightPosSumsTransfer
 
         points::GroupWriteHandle group(leaf.groupWriteHandle(this->mIndices.mEllipsesGroupIndex));
 
+        // Init the actual buffer data if we're batching
+        double* const weightedPositions = [&]() {
+            if constexpr (kPcaBatchSize > 1) {
+                OPENVDB_ASSERT(mWeightedPositions == mBatchedWeightedPositions.data());
+                // assume trivial type and contiguously allocated
+                auto* wp = initPcaArrayAttribute<WeightedPositionSumT>(leaf, this->mIndices.mPosSumIndex, /*fill=*/false);
+                return wp[0].asPointer();
+            }
+            else {
+                return mWeightedPositions;
+            }
+        }();
+
         const int32_t threshold = int32_t(this->neighbourThreshold());
-        for (Index i = 0; i < this->mTargetPosition->size(); ++i) {
+        for (Index i = 0; i < this->mTargetPosition->size(); ++i)
+        {
             // turn points OFF if they are ON and don't meet max neighbour requirements
             if ((threshold == 0 || (mCounts[i] < threshold)) && group.getUnsafe(i)) {
                 group.setUnsafe(i, false);
+            }
+
+            // If we were batching, hadd and set each dest component
+            double* const wp = &weightedPositions[i*3];
+            if constexpr (kPcaBatchSize > 1)
+            {
+                NativeT* const comp = &mWeightedPositions[i*3];
+                for (size_t j = 0; j < 3; ++j) {
+                    wp[j] = simd::horizontal_add(comp[j]);
+                }
             }
             if (mCounts[i] <= 0) continue;
             // Normalize weights
             OPENVDB_ASSERT(mWeights[i] >= 0.0f);
             mWeights[i] = 1.0 / mWeights[i];
-            mWeightedPositions[i] *= mWeights[i];
+            wp[0] *= mWeights[i];
+            wp[1] *= mWeights[i];
+            wp[2] *= mWeights[i];
         }
         return true;
     }
 
 private:
+    friend BaseT;
+
+    template<typename ScalarT, typename MaskT> /// Real or SimdT
+    inline void stamp(const ScalarT& Pwx,
+                    const ScalarT& Pwy,
+                    const ScalarT& Pwz,
+                    const ScalarT& Pix,
+                    const ScalarT& Piy,
+                    const ScalarT& Piz,
+                    const MaskT& m,
+                    const CoordBBox& intersection)
+    {
+        // Some of the arithmetic in this function assumes these are the same,
+        // otherwise we can end up writing scalars to all lanes of a simdt
+        // (e.g. wp[0] += (Pwx * weights), where wp is a simdt and Pwx is
+        // a scalar - this ends up filing all the lanes).
+        static_assert(std::is_same_v<ScalarT, NativeT>);
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Pwx)));
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Pwy)));
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Pwz)));
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Pix)));
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Piy)));
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Piz)));
+
+        const auto* const data = this->template buffer<0>();
+        const auto& mask = *(this->template mask<0>());
+
+        const ScalarT searchRadiusInv(1.0f / this->searchRadius());
+        const ScalarT searchRadius2(math::Pow2(this->searchRadius()));
+        const Real searchRadiusIS2 = math::Pow2(this->searchRadius() * this->mDxInv);
+
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(searchRadiusInv)));
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(searchRadius2)));
+        OPENVDB_ASSERT(std::isfinite(searchRadiusIS2));
+
+        ScalarT tx, ty, tz;
+
+        const Coord& a(intersection.min());
+        const Coord& b(intersection.max());
+        for (Coord c = a; c.x() <= b.x(); ++c.x()) {
+            const ScalarT minx(c.x() - 0.5);
+            const ScalarT maxx(c.x() + 0.5);
+            const ScalarT dminx =
+                (simd::select(Pix < minx, simd::pow2(Pix - minx),
+                    (simd::select(Pix > maxx, simd::pow2(Pix - maxx), ScalarT(0)))));
+            if (simd::horizontal_min(dminx) > searchRadiusIS2) continue;
+            const Index i = ((c.x() & (DIM-1u)) << 2*LOG2DIM); // unsigned bit shift mult
+            for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
+                const ScalarT miny(c.y() - 0.5);
+                const ScalarT maxy(c.y() + 0.5);
+                const ScalarT dminxy = dminx +
+                    (simd::select(Piy < miny, simd::pow2(Piy - miny),
+                        (simd::select(Piy > maxy, simd::pow2(Piy - maxy), ScalarT(0)))));
+                if (simd::horizontal_min(dminxy) > searchRadiusIS2) continue;
+                const Index ij = i + ((c.y() & (DIM-1u)) << LOG2DIM);
+                for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
+                    const Index offset = ij + /*k*/(c.z() & (DIM-1u));
+                    if (!mask.isOn(offset)) continue; // next target voxel
+
+                    const ScalarT minz(c.z() - 0.5);
+                    const ScalarT maxz(c.z() + 0.5);
+                    const ScalarT dminxyz = dminxy +
+                        (simd::select(Piz < minz, simd::pow2(Piz - minz),
+                            (simd::select(Piz > maxz, simd::pow2(Piz - maxz), ScalarT(0)))));
+                    // Does this point's radius overlap the voxel c
+                    if (simd::horizontal_min(dminxyz) > searchRadiusIS2) continue;
+
+                    // src point overlaps voxel c
+                    const Index targetEnd = data[offset];
+                    const Index targetStart = (offset == 0) ? 0 : Index(data[offset - 1]);
+                    const Index targetStep =
+                        std::max(Index(1), Index((targetEnd - targetStart) / this->maxTargetPointsPerVoxel()));
+
+                    /// @warning  stepping in this way does not guarantee
+                    ///   we get a self contribution, could guarantee this
+                    ///   by enabling the OPENVDB_PCA_SELF_CONTRIBUTION == 0
+                    ///   check and adding it afterwards.
+                    for (Index tgtid = targetStart; tgtid < targetEnd; tgtid += targetStep)
+                    {
+#if OPENVDB_PCA_SELF_CONTRIBUTION == 0
+                        if (OPENVDB_UNLIKELY(this->mIsSameLeaf && tgtid == srcid)) continue;
+#endif
+                        const math::Vec3<WeightSumT> Ptgt(this->mTargetPosition->get(tgtid));
+                        // compute length to Ptgt and store in tx
+                        tx = Pwx - ScalarT(Ptgt[0]);
+                        ty = Pwy - ScalarT(Ptgt[1]);
+                        tz = Pwz - ScalarT(Ptgt[2]);
+                        tx = simd::pow2(tx) + simd::pow2(ty) + simd::pow2(tz);
+
+                        const auto pmask = ((tx <= searchRadius2) && m);
+                        const int c = simd::horizontal_count(pmask);
+                        if (c == 0) continue;
+
+                        // some of src point (srcid) reaches target point (tgtid)
+                        ScalarT weights = (ScalarT(1.0) - simd::pow3(simd::sqrt(tx) * searchRadiusInv));
+                        weights = simd::select(pmask, weights, ScalarT(0.0));
+                        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(weights)));
+                        OPENVDB_ASSERT(simd::horizontal_min(weights) >= 0.0);
+                        OPENVDB_ASSERT(simd::horizontal_max(weights) <= 1.0);
+
+                        const WeightSumT weight = simd::horizontal_add(weights);
+                        mWeights[tgtid] += weight;
+
+                        NativeT* const wp = &mWeightedPositions[tgtid*3];
+                        wp[0] += (Pwx * weights); // @note: world space position is weighted
+                        wp[1] += (Pwy * weights); // @note: world space position is weighted
+                        wp[2] += (Pwz * weights); // @note: world space position is weighted
+                        mCounts[tgtid] += c;
+                    } //point idx
+                }
+            }
+        } // outer loop
+    }
+
+private:
     WeightSumT* mWeights;
-    WeightedPositionSumT* mWeightedPositions;
     std::vector<int32_t> mCounts;
+    // For batched PCA, we avoid the horizontal reductions in the hot path with
+    // the intermediate SimdT storage. For non-batched, this is unused, and we
+    // write directly to the attribute buffer
+    std::vector<NativeT> mBatchedWeightedPositions;
+    // Points to either the array of doubles (direct write) or the batched data
+    // storage.
+    NativeT* mWeightedPositions;
 };
 
 template <typename PointDataTreeT>
 struct CovarianceTransfer
-    : public PcaTransfer<PointDataTreeT>
+    : public PcaTransfer<CovarianceTransfer<PointDataTreeT>, PointDataTreeT>
 {
-    using BaseT = PcaTransfer<PointDataTreeT>;
+    using BaseT = PcaTransfer<CovarianceTransfer<PointDataTreeT>, PointDataTreeT>;
+    using CovStorageT = std::conditional_t<kPcaBatchSize == 1, float, NativeT>;
 
     static const Index DIM = PointDataTreeT::LeafNodeType::DIM;
     static const Index LOG2DIM = PointDataTreeT::LeafNodeType::LOG2DIM;
@@ -358,14 +547,16 @@ struct CovarianceTransfer
         , mInclusionGroupHandle()
         , mWeights()
         , mWeightedPositions()
-        , mCovMats() {}
+        , mBatchedCovStorage()
+        , mCovComponents() {}
 
     CovarianceTransfer(const CovarianceTransfer& other)
         : BaseT(other)
         , mInclusionGroupHandle()
         , mWeights()
         , mWeightedPositions()
-        , mCovMats() {}
+        , mBatchedCovStorage()
+        , mCovComponents() {}
 
     inline void initialize(const Coord& origin, const size_t idx, const CoordBBox& bounds)
     {
@@ -373,123 +564,203 @@ struct CovarianceTransfer
         mInclusionGroupHandle = std::make_unique<points::GroupHandle>(leaf.groupHandle(this->mIndices.mEllipsesGroupIndex));
         mWeights = initPcaArrayAttribute<WeightSumT>(leaf, this->mIndices.mWeightSumIndex);
         mWeightedPositions = initPcaArrayAttribute<WeightedPositionSumT>(leaf, this->mIndices.mPosSumIndex);
-        mCovMats = initPcaArrayAttribute<math::Mat3s>(leaf, this->mIndices.mCovMatrixIndex);
+
+        // If we're batching, don't init the math::Mat3s buffer yet.
+        // Instead create an intermediate buffer to avoid the horizontal
+        // accumulations until finalize.
+        // @warning  This does increase peak memory relative to the size of
+        //   the native simdt in use.
+        if constexpr (kPcaBatchSize > 1) {
+            mCovComponents = [&]() { // force evaluate in templated context
+                mBatchedCovStorage.assign(this->mTargetPosition->size() * 9, NativeT(0));
+                return mBatchedCovStorage.data();
+            }();
+        }
+        else {
+            // assume contiguously allocated
+            auto* mats = initPcaArrayAttribute<math::Mat3s>(leaf, this->mIndices.mCovMatrixIndex);
+            mCovComponents = mats[0].asPointer();
+        }
     }
 
-    inline void rasterizePoints(const Coord&, const Index start, const Index end, const CoordBBox& bounds)
+    bool finalize(const Coord&, size_t idx)
     {
-        const Index step = std::max(Index(1), Index((end - start) / this->maxSourcePointsPerVoxel()));
+        // if we've written directly to the attribute buffer, return
+        if constexpr (kPcaBatchSize == 1) return true;
+
+        OPENVDB_ASSERT(mCovComponents == mBatchedCovStorage.data());
+        auto& leaf = this->mManager.leaf(idx);
+        // now init the attribute buffer. no need to fill a value as we're
+        // overwriting everything
+        math::Mat3s* mats = initPcaArrayAttribute<math::Mat3s>(leaf, this->mIndices.mCovMatrixIndex, /*fill=*/false);
+
+        for (Index i = 0; i < this->mTargetPosition->size(); ++i) {
+            float* const dst = mats[i].asPointer();
+            CovStorageT* const src = &mCovComponents[i*9];
+            for (size_t j = 0; j < 9; ++j) {
+                dst[j] = static_cast<float>(simd::horizontal_add(src[j]));
+            }
+        }
+
+        return true;
+    }
+
+private:
+    friend BaseT;
+
+    template<typename ScalarT, typename MaskT> /// Real or SimdT
+    inline void stamp(const ScalarT& Pwx,
+                    const ScalarT& Pwy,
+                    const ScalarT& Pwz,
+                    const ScalarT& Pix,
+                    const ScalarT& Piy,
+                    const ScalarT& Piz,
+                    const MaskT& m,
+                    const CoordBBox& intersection)
+    {
+        // Some of the arithmetic in this function assumes these are the same,
+        // otherwise we can end up writing scalars to all lanes of a simdt
+        // (e.g. m[0] += (wx * tx), where wp is a simdt and wx is a scalar -
+        //  this ends up filing all the lanes).
+        static_assert(std::is_same_v<ScalarT, NativeT>);
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Pwx)));
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Pwy)));
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Pwz)));
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Pix)));
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Piy)));
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(Piz)));
 
         const auto* const data = this->template buffer<0>();
         const auto& mask = *(this->template mask<0>());
 
-        const float searchRadiusInv = 1.0f/this->searchRadius();
-        const Real searchRadius2 = math::Pow2(this->searchRadius());
+        const ScalarT searchRadiusInv(1.0f / this->searchRadius());
+        const ScalarT searchRadius2(math::Pow2(this->searchRadius()));
         const Real searchRadiusIS2 = math::Pow2(this->searchRadius() * this->mDxInv);
 
-        OPENVDB_ASSERT(std::isfinite(searchRadiusInv));
-        OPENVDB_ASSERT(std::isfinite(searchRadius2));
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(searchRadiusInv)));
+        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(searchRadius2)));
         OPENVDB_ASSERT(std::isfinite(searchRadiusIS2));
 
-        const Coord& a(bounds.min());
-        const Coord& b(bounds.max());
+        ScalarT tx, ty, tz, wx, wy, wz;
 
-        for (Index srcid = start; srcid < end; srcid += step) {
-            const Vec3d Psrc(this->mSourcePosition->get(srcid));
-            const Vec3d PsrcIS = Psrc * this->mDxInv;
+        const Coord& a(intersection.min());
+        const Coord& b(intersection.max());
+        for (Coord c = a; c.x() <= b.x(); ++c.x()) {
+            const ScalarT minx(c.x() - 0.5);
+            const ScalarT maxx(c.x() + 0.5);
+            const ScalarT dminx =
+                (simd::select(Pix < minx, simd::pow2(Pix - minx),
+                    (simd::select(Pix > maxx, simd::pow2(Pix - maxx), ScalarT(0)))));
+            if (simd::horizontal_min(dminx) > searchRadiusIS2) continue;
+            const Index i = ((c.x() & (DIM-1u)) << 2*LOG2DIM); // unsigned bit shift mult
+            for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
+                const ScalarT miny(c.y() - 0.5);
+                const ScalarT maxy(c.y() + 0.5);
+                const ScalarT dminxy = dminx +
+                    (simd::select(Piy < miny, simd::pow2(Piy - miny),
+                        (simd::select(Piy > maxy, simd::pow2(Piy - maxy), ScalarT(0)))));
+                if (simd::horizontal_min(dminxy) > searchRadiusIS2) continue;
+                const Index ij = i + ((c.y() & (DIM-1u)) << LOG2DIM);
+                for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
+                    const Index offset = ij + /*k*/(c.z() & (DIM-1u));
+                    if (!mask.isOn(offset)) continue; // next target voxel
 
-            for (Coord c = a; c.x() <= b.x(); ++c.x()) {
-                const Real minx = c.x() - 0.5;
-                const Real maxx = c.x() + 0.5;
-                const Real dminx =
-                    (PsrcIS[0] < minx ? math::Pow2(PsrcIS[0] - minx) :
-                    (PsrcIS[0] > maxx ? math::Pow2(PsrcIS[0] - maxx) : 0));
-                if (dminx > searchRadiusIS2) continue;
-                const Index i = ((c.x() & (DIM-1u)) << 2*LOG2DIM); // unsigned bit shift mult
-                for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
-                    const Real miny = c.y() - 0.5;
-                    const Real maxy = c.y() + 0.5;
-                    const Real dminxy = dminx +
-                        (PsrcIS[1] < miny ? math::Pow2(PsrcIS[1] - miny) :
-                        (PsrcIS[1] > maxy ? math::Pow2(PsrcIS[1] - maxy) : 0));
-                    if (dminxy > searchRadiusIS2) continue;
-                    const Index ij = i + ((c.y() & (DIM-1u)) << LOG2DIM);
-                    for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
-                        const Index offset = ij + /*k*/(c.z() & (DIM-1u));
-                        if (!mask.isOn(offset)) continue;
+                    const ScalarT minz(c.z() - 0.5);
+                    const ScalarT maxz(c.z() + 0.5);
+                    const ScalarT dminxyz = dminxy +
+                        (simd::select(Piz < minz, simd::pow2(Piz - minz),
+                            (simd::select(Piz > maxz, simd::pow2(Piz - maxz), ScalarT(0)))));
+                    // Does this point's radius overlap the voxel c
+                    if (simd::horizontal_min(dminxyz) > searchRadiusIS2) continue;
 
-                        const Real minz = c.z() - 0.5;
-                        const Real maxz = c.z() + 0.5;
-                        const Real dminxyz = dminxy +
-                            (PsrcIS[2] < minz ? math::Pow2(PsrcIS[2] - minz) :
-                            (PsrcIS[2] > maxz ? math::Pow2(PsrcIS[2] - maxz) : 0));
-                        // Does this point's radius overlap the voxel c
-                        if (dminxyz > searchRadiusIS2) continue;
+                    const Index targetEnd = data[offset];
+                    const Index targetStart = (offset == 0) ? 0 : Index(data[offset - 1]);
+                    const Index targetStep =
+                        std::max(Index(1), Index((targetEnd - targetStart) / this->maxTargetPointsPerVoxel()));
 
-                        const Index targetEnd = data[offset];
-                        const Index targetStart = (offset == 0) ? 0 : Index(data[offset - 1]);
-                        const Index targetStep =
-                            std::max(Index(1), Index((targetEnd - targetStart) / this->maxTargetPointsPerVoxel()));
-
-                        for (Index tgtid = targetStart; tgtid < targetEnd; tgtid += targetStep) {
-                            if (!mInclusionGroupHandle->get(tgtid)) continue;
+                    for (Index tgtid = targetStart; tgtid < targetEnd; tgtid += targetStep) {
+                        if (!mInclusionGroupHandle->get(tgtid)) continue;
 #if OPENVDB_PCA_SELF_CONTRIBUTION == 0
-                            if (OPENVDB_UNLIKELY(this->mIsSameLeaf && tgtid == srcid)) continue;
+                        if (OPENVDB_UNLIKELY(this->mIsSameLeaf && tgtid == srcid)) continue;
 #endif
-                            const Vec3d Ptgt(this->mTargetPosition->get(tgtid));
-                            const Real d2 = (Psrc - Ptgt).lengthSqr();
-                            if (d2 > searchRadius2) continue;
+                        const math::Vec3<WeightSumT> Ptgt(this->mTargetPosition->get(tgtid));
+                        tx = Pwx - ScalarT(Ptgt[0]);
+                        ty = Pwy - ScalarT(Ptgt[1]);
+                        tz = Pwz - ScalarT(Ptgt[2]);
+                        tx = simd::pow2(tx) + simd::pow2(ty) + simd::pow2(tz);
 
-                            // @note  I've observed some performance degradation if
-                            //   we don't take copies of the buffers here (aliasing?)
-                            const WeightSumT totalWeightInv = mWeights[tgtid];
-                            const WeightedPositionSumT currWeightSum = mWeightedPositions[tgtid];
+                        const MaskT pmask = ((tx <= searchRadius2) && m);
+                        if (!simd::horizontal_or(pmask)) continue;
 
-                            // re-compute weight
-                            // @note  A gather style approach might be better,
-                            //   where each point appends weights/positions into
-                            //   a container. We lose some time having to re-
-                            //   iterate, but this is far more memory efficient.
-                            const WeightSumT weight = 1.0f - math::Pow3(float(math::Sqrt(d2)) * searchRadiusInv);
-                            const WeightedPositionSumT posMeanDiff = Psrc - currWeightSum;
-                            // @note  Could extract the mult by totalWeightInv
-                            //   and put it into a loop in finalize() - except
-                            //   it would be mat3*float rather than vec*float,
-                            //   which would probably better as maxppv increases
-                            const WeightedPositionSumT x = (totalWeightInv * weight) * posMeanDiff;
+                        // @note  I've observed some performance degradation if
+                        //   we don't take copies of the buffers here (aliasing?)
+                        const WeightSumT totalWeightInv = mWeights[tgtid];
+                        const WeightedPositionSumT currWeightSum = mWeightedPositions[tgtid];
 
-                            float* const m = mCovMats[tgtid].asPointer();
-                            /// @note: equal to:
-                            // mat.setCol(0, mat.col(0) + (x * posMeanDiff[0]));
-                            // mat.setCol(1, mat.col(1) + (x * posMeanDiff[1]));
-                            // mat.setCol(2, mat.col(2) + (x * posMeanDiff[2]));
-                            // @todo formalize precision of these methods
-                            m[0] += float(x[0] * posMeanDiff[0]);
-                            m[1] += float(x[0] * posMeanDiff[1]);
-                            m[2] += float(x[0] * posMeanDiff[2]);
-                            //
-                            m[3] += float(x[1] * posMeanDiff[0]);
-                            m[4] += float(x[1] * posMeanDiff[1]);
-                            m[5] += float(x[1] * posMeanDiff[2]);
-                            //
-                            m[6] += float(x[2] * posMeanDiff[0]);
-                            m[7] += float(x[2] * posMeanDiff[1]);
-                            m[8] += float(x[2] * posMeanDiff[2]);
-                        } //point idx
-                    }
+                        // re-compute weight
+                        // @note  A gather style approach might be better,
+                        //   where each point appends weights/positions into
+                        //   a container. We lose some time having to re-
+                        //   iterate, but this is far more memory efficient.
+                        ScalarT weights = ScalarT(1.0) - simd::pow3(simd::sqrt(tx) * searchRadiusInv);
+                        weights = simd::select(pmask, weights, ScalarT(0.0));
+                        OPENVDB_ASSERT(simd::horizontal_and(simd::is_finite(weights)));
+                        OPENVDB_ASSERT(simd::horizontal_min(weights) >= 0.0);
+                        OPENVDB_ASSERT(simd::horizontal_max(weights) <= 1.0);
+
+                        // posMeanDiff
+                        tx = Pwx - ScalarT(currWeightSum[0]);
+                        ty = Pwy - ScalarT(currWeightSum[1]);
+                        tz = Pwz - ScalarT(currWeightSum[2]);
+
+                        // @note  Could extract the mult by totalWeightInv
+                        //   and put it into a loop in finalize() - except
+                        //   it would be mat3*float rather than vec*float,
+                        //   which would probably better as maxppv increases
+                        weights = weights * ScalarT(totalWeightInv);
+                        wx = tx * weights;
+                        wy = ty * weights;
+                        wz = tz * weights;
+
+                        // Either float or SimdT
+                        // @todo  SimdT will be of double precision to avoid
+                        //   the casting backwards and fowards. Might be worth
+                        //   just making the resulting matrix double at some
+                        //   point
+                        auto* const m = &mCovComponents[tgtid * 9];
+                        /// @note: equal to:
+                        // mat.setCol(0, mat.col(0) + (x * posMeanDiff[0]));
+                        // mat.setCol(1, mat.col(1) + (x * posMeanDiff[1]));
+                        // mat.setCol(2, mat.col(2) + (x * posMeanDiff[2]));
+                        m[0] += (wx * tx);
+                        m[1] += (wx * ty);
+                        m[2] += (wx * tz);
+                        //
+                        m[3] += (wy * tx);
+                        m[4] += (wy * ty);
+                        m[5] += (wy * tz);
+                        //
+                        m[6] += (wz * tx);
+                        m[7] += (wz * ty);
+                        m[8] += (wz * tz);
+                    } //point idx
                 }
-            } // outer sdf voxel
-        } // point idx
+            }
+        } // outer sdf voxel
     }
-
-    bool finalize(const Coord&, size_t) { return true; }
 
 private:
     points::GroupHandle::UniquePtr mInclusionGroupHandle;
     const WeightSumT* mWeights;
     const WeightedPositionSumT* mWeightedPositions;
-    math::Mat3s* mCovMats;
     std::vector<int32_t> mCounts;
+    // For batched PCA, we avoid the horizontal reductions in the hot path with
+    // the intermediate SimdT storage. For non-batched, this is unused, and we
+    // write directly to the attribute buffer
+    std::vector<NativeT> mBatchedCovStorage;
+    // Points to either the array of floats (direct write) or the batched data
+    // storage.
+    CovStorageT* mCovComponents;
 };
 
 /// @brief Sort a vector into descending order and output a vector of the resulting order
