@@ -52,6 +52,18 @@ struct StreamHolder<true> { cudaStream_t mStream = 0; };
 /// @details With a stream-ordered resource the Buffer retains the stream of
 ///          the most recent allocation (or the one supplied via set_stream)
 ///          and orders its deallocation on that stream. Buffer is move-only.
+/// @note Cross-stream ordering is the caller's, expressed with ordinary CUDA
+///       events -- the buffer deliberately tracks nothing. To hand a buffer's
+///       contents to work on another stream (a consumer library, a wrapped
+///       tensor), record after the last write and make the consumer wait:
+/// @code
+///     cudaEvent_t ready;
+///     cudaEventCreateWithFlags(&ready, cudaEventDisableTiming);
+///     cudaEventRecord(ready, producerStream);     // after the last write
+///     cudaStreamWaitEvent(consumerStream, ready); // before the first read
+/// @endcode
+///       and order the buffer's destruction (which frees on its retained
+///       stream) after all consumers the same way, or synchronize.
 template<typename T, typename R = DeviceResource>
 class Buffer : private detail::StreamHolder<is_async_resource<R>::value>
 {

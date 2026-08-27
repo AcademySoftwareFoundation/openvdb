@@ -374,7 +374,7 @@ void buildVoxelBlockManager(
 ///        Returns a fully-constructed VoxelBlockManagerHandle backed by device memory.
 ///        Grid dimensions (when not supplied) are read from device memory via DeviceGridTraits.
 /// @tparam Log2BlockWidth  Log2 of the number of active voxels per VBM block
-/// @tparam BufferT         Device buffer type (default: nanovdb::cuda::DeviceBuffer)
+/// @tparam BufferT         Device buffer type (default: nanovdb::cuda::DualDeviceBuffer)
 /// @param d_grid       Device-side grid pointer
 /// @param firstOffset  First active-voxel offset covered by this VBM; must satisfy
 ///                     firstOffset == 1 (mod BlockWidth). Pass 0 (default) to use 1,
@@ -386,7 +386,7 @@ void buildVoxelBlockManager(
 ///                     (default) to use the minimum required capacity.
 /// @param stream       CUDA stream (default 0)
 /// @return A fully constructed VoxelBlockManagerHandle backed by device memory
-template<int Log2BlockWidth, typename BufferT = nanovdb::cuda::DeviceBuffer>
+template<int Log2BlockWidth, typename BufferT = nanovdb::cuda::DualDeviceBuffer>
 nanovdb::tools::VoxelBlockManagerHandle<BufferT>
 buildVoxelBlockManager(
     NanoGrid<ValueOnIndex>* d_grid,

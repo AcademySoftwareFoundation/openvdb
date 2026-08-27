@@ -77,7 +77,7 @@ public:
     /// @tparam BufferT Buffer type used for allocation of the grid handle
     /// @param buffer optional buffer (currently ignored)
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
-    template<typename BufferT = nanovdb::cuda::DeviceBuffer>
+    template<typename BufferT = nanovdb::cuda::DualDeviceBuffer>
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
 

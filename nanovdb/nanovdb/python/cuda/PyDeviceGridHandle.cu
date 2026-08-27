@@ -22,7 +22,7 @@ namespace pynanovdb {
 // or the BuildT is not Python-visible.
 static nb::object pyDeviceGrid(nb::handle py_handle, uint32_t n)
 {
-    using BufferT = nanovdb::cuda::DeviceBuffer;
+    using BufferT = nanovdb::cuda::DualDeviceBuffer;
     auto& handle = nb::cast<GridHandle<BufferT>&>(py_handle);
     if (n >= handle.gridCount()) return nb::none();
     switch (handle.gridType(n)) {
@@ -58,7 +58,7 @@ static nb::object pyDeviceGrid(nb::handle py_handle, uint32_t n)
 
 void defineDeviceGridHandle(nb::module_& m)
 {
-    using BufferT = nanovdb::cuda::DeviceBuffer;
+    using BufferT = nanovdb::cuda::DualDeviceBuffer;
     defineGridHandle<BufferT>(m, "DeviceGridHandle")
         .def(
             "__init__",

@@ -32,7 +32,7 @@ template<typename BufferT> void defineValidateGrids(nb::module_& m)
 
 template void defineValidateGrids<HostBuffer>(nb::module_&);
 #ifdef NANOVDB_USE_CUDA
-template void defineValidateGrids<cuda::DeviceBuffer>(nb::module_&);
+template void defineValidateGrids<cuda::DualDeviceBuffer>(nb::module_&);
 #endif
 
 namespace {
@@ -117,7 +117,7 @@ void defineGridValidatorModule(nb::module_& toolsModule)
         "whole handle.");
 #ifdef NANOVDB_USE_CUDA
     toolsModule.def("validateGrid",
-        &tools::validateGrid<GridHandle<cuda::DeviceBuffer>>,
+        &tools::validateGrid<GridHandle<cuda::DualDeviceBuffer>>,
         "handle"_a, "gridID"_a,
         "mode"_a = CheckMode::Default, "verbose"_a = false,
         nb::call_guard<nb::gil_scoped_release>(),

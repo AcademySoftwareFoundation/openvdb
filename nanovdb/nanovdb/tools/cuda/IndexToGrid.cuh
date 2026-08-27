@@ -44,12 +44,12 @@ namespace tools::cuda {// ======================================================
 ///       NanoRoot<DstBuildT>::FloatType, e.g. if DstBuildT=Vec3f then NanoRoot<DstBuildT>::FloatType=float,
 ///       in which case average and standard-deviation is undefined in the output grid.
 /// @return returns handle to grid that combined IndexGrid and values
-template<typename DstBuildT, typename SrcBuildT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename DstBuildT, typename SrcBuildT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type
 indexToGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues, const BufferT &pool = BufferT(), cudaStream_t stream = 0);
 
 
-template<typename DstBuildT, typename SrcBuildT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename DstBuildT, typename SrcBuildT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type
 createNanoGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues, const BufferT &pool = BufferT(), cudaStream_t stream = 0)
 {
@@ -91,7 +91,7 @@ public:
     /// @param srcValues pointer to values that will be inserted into the output grid
     /// @param buffer optional buffer used for memory allocation
     /// @return A new GridHandle with the grid of type @c DstBuildT
-    template<typename DstBuildT, typename BufferT = nanovdb::cuda::DeviceBuffer>
+    template<typename DstBuildT, typename BufferT = nanovdb::cuda::DualDeviceBuffer>
     GridHandle<BufferT> getHandle(const typename BuildToValueMap<DstBuildT>::type *srcValues, const BufferT &buffer = BufferT());
 
 private:
@@ -437,7 +437,7 @@ indexToGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap
 
 }// namespace tools::cuda  =============================================================
 
-template<typename DstBuildT, typename SrcBuildT, typename BufferT = cuda::DeviceBuffer>
+template<typename DstBuildT, typename SrcBuildT, typename BufferT = cuda::DualDeviceBuffer>
 [[deprecated("Use nanovdb::cuda::indexToGrid instead")]]
 typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type
 cudaIndexToGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues, const BufferT &pool = BufferT(), cudaStream_t stream = 0)
@@ -446,7 +446,7 @@ cudaIndexToGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValu
 }
 
 
-template<typename DstBuildT, typename SrcBuildT, typename BufferT = cuda::DeviceBuffer>
+template<typename DstBuildT, typename SrcBuildT, typename BufferT = cuda::DualDeviceBuffer>
 [[deprecated("Use nanovdb::cuda::indexToGrid instead")]]
 typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type
 cudaCreateNanoGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues, const BufferT &pool = BufferT(), cudaStream_t stream = 0)

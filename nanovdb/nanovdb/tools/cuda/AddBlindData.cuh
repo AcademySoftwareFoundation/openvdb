@@ -46,7 +46,7 @@ namespace tools::cuda {// ============================================
 /// @param pool optional pool used for allocation
 /// @param stream optional CUDA stream (defaults to CUDA stream 0)
 /// @return GridHandle with blind data appended
-template<typename BuildT, typename BlindDataT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename BuildT, typename BlindDataT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 GridHandle<BufferT>
 addBlindData(const NanoGrid<BuildT> *d_grid,
              const BlindDataT *d_blindData,
@@ -137,7 +137,7 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
 
 }// namespace tools::cuda
 
-template<typename BuildT, typename BlindDataT, typename BufferT = cuda::DeviceBuffer>
+template<typename BuildT, typename BlindDataT, typename BufferT = cuda::DualDeviceBuffer>
 [[deprecated("Use nanovdb::cuda::addBlindData instead")]]
 GridHandle<BufferT>
 cudaAddBlindData(const NanoGrid<BuildT> *d_grid,

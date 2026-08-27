@@ -19,7 +19,7 @@
 
 using BufferT = nanovdb::HostBuffer;
 
-void runOpenVDB(nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer>& handle, int numIterations, int width, int height, BufferT& imageBuffer)
+void runOpenVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int width, int height, BufferT& imageBuffer)
 {
     using GridT = openvdb::FloatGrid;
     using CoordT = openvdb::Coord;

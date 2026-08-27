@@ -192,7 +192,7 @@ void testConvolution()
     auto floatHandle = nanovdb::tools::createLevelSetSphere<float>(100, nanovdb::Vec3d(0), 1, 3, nanovdb::Vec3d(0), "test");
     nanovdb::FloatGrid* floatGrid = floatHandle.grid<float>();
 
-    using BufferT = nanovdb::cuda::DeviceBuffer;
+    using BufferT = nanovdb::cuda::DualDeviceBuffer;// migrates with the multi-GPU work that retires UnifiedBuffer
     auto indexHandle = nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, nanovdb::ValueOnIndex, BufferT>(*floatGrid, 0u, false, false, 1);
     std::for_each(deviceMesh.begin(), deviceMesh.end(), [&](const nanovdb::cuda::DeviceNode& node) {// copy host buffer to all the device buffers
         cudaCheck(cudaSetDevice(node.id));

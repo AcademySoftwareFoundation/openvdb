@@ -371,11 +371,11 @@ GridHandle<BufferT>::GridHandle(T&& buffer)
 }// GridHandle(T&& buffer) for single-space device buffers
 
 // Emit the dual-buffer move constructor from every CUDA translation unit, so
-// host-only translation units that construct GridHandle<cuda::DeviceBuffer>
+// host-only translation units that construct GridHandle<cuda::DualDeviceBuffer>
 // (they see only the declaration) always find the symbol at link time. An
 // unused private function is not enough: the optimizer may drop the
 // complete-object constructor it instantiates.
-template GridHandle<cuda::DeviceBuffer>::GridHandle(cuda::DeviceBuffer&&);
+template GridHandle<cuda::DualDeviceBuffer>::GridHandle(cuda::DualDeviceBuffer&&);
 
 } // namespace nanovdb
 

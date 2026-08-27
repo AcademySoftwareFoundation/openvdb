@@ -49,7 +49,7 @@ inline BufferT makeNodeManagerStorage(cudaStream_t stream, const RefT& ref, uint
 /// @param buffer buffer from which to allocate the output handle
 /// @param stream cuda stream
 /// @return Handle that contains a device NodeManager
-template <typename BuildT, typename BufferT = DeviceBuffer>
+template <typename BuildT, typename BufferT = DualDeviceBuffer>
 inline typename util::enable_if<BufferTraits<BufferT>::hasDeviceDual, NodeManagerHandle<BufferT>>::type
 createNodeManager(const NanoGrid<BuildT> *d_grid,
                   const BufferT& pool = BufferT(),
@@ -178,7 +178,7 @@ createNodeManager(const NanoGrid<BuildT> *d_grid,
 
 }// namespace cuda
 
-template <typename BuildT, typename BufferT = cuda::DeviceBuffer>
+template <typename BuildT, typename BufferT = cuda::DualDeviceBuffer>
 [[deprecated("Use cuda::createNodeManager instead")]]
 inline typename util::enable_if<BufferTraits<BufferT>::hasDeviceDual, NodeManagerHandle<BufferT>>::type
 cudaCreateNodeManager(const NanoGrid<BuildT> *d_grid,
