@@ -7,10 +7,7 @@
 
 // the following files are from NanoVDB
 #include <nanovdb/NanoVDB.h>
-#include <nanovdb/GridHandle.h>
-#include <nanovdb/cuda/Buffer.h>// both host-safe: they declare the handle and buffer types the .cu side returns
-
-extern nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>> uploadGrid(const nanovdb::GridHandle<nanovdb::HostBuffer>& handle);
+#include <nanovdb/cuda/HandleStorage.h>// host-includable: cuda::copyTo transfers grids without any kernel
 #include <nanovdb/tools/CreateNanoGrid.h>
 
 template<typename BuildT>
@@ -148,9 +145,9 @@ int main(int argc, char *argv[])
         }
 
         // Deep-copy all three NanoVDB grids to the GPU; the returned handles validate them there
-        auto deviceSrcHandle1 = uploadGrid(srcHandle1);
-        auto deviceSrcHandle2 = uploadGrid(srcHandle2);
-        auto deviceDstReferenceHandle = uploadGrid(dstReferenceHandle);
+        auto deviceSrcHandle1 = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(srcHandle1);
+        auto deviceSrcHandle2 = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(srcHandle2);
+        auto deviceDstReferenceHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(dstReferenceHandle);
         auto* deviceSrcGrid1 = deviceSrcHandle1.deviceGrid<BuildT>();
         auto* deviceSrcGrid2 = deviceSrcHandle2.deviceGrid<BuildT>();
         auto* deviceDstReferenceGrid = deviceDstReferenceHandle.deviceGrid<BuildT>();

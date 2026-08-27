@@ -31,6 +31,13 @@ namespace nanovdb {
 
 struct GridHandleMetaData {uint64_t offset, size; GridType gridType;};
 
+namespace cuda { namespace detail {
+// Defined in nanovdb/cuda/HandleStorage.h: the one gateway to constructing a
+// handle from a buffer plus already-validated metadata (handle-to-handle
+// transfers), so the trust boundary stays visible in a single place.
+struct HandleFactory;
+}}// namespace cuda::detail
+
 namespace detail {
 
 /// @brief Allocates @c bytes of host-readable storage for a GridHandle:
@@ -87,6 +94,8 @@ class GridHandle
     GridHandle(BufferT&& buffer, std::vector<GridHandleMetaData> meta)
         : mMetaData(std::move(meta))
         , mBuffer(std::move(buffer)) {}
+
+    friend struct cuda::detail::HandleFactory;
 
 public:
     using BufferType = BufferT;

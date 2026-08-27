@@ -4,19 +4,6 @@
 #include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessable on both the host and device
 #include <nanovdb/cuda/GridHandle.cuh>
 
-// Constructing a device grid handle validates the grid with a kernel, so the
-// transfer lives in this CUDA translation unit.
-nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>> uploadGrid(const nanovdb::GridHandle<nanovdb::HostBuffer>& handle, cudaStream_t stream)
-{
-    return nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle, stream);
-}// required since GridHandle<DeviceBuffer> has device code
-#include <stdio.h> // for printf
-
-// This is called by the host only
-void cpu_kernel(const nanovdb::NanoGrid<float>* cpuGrid)
-{
-    printf("NanoVDB cpu; %4.2f\n", cpuGrid->tree().getValue(nanovdb::Coord(99, 0, 0)));
-}
 
 // This is called by the device only
 __global__ void gpu_kernel(const nanovdb::NanoGrid<float>* deviceGrid)

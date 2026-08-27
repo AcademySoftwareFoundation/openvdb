@@ -3,9 +3,7 @@
 
 #include <openvdb/tools/LevelSetSphere.h> // replace with your own dependencies for generating the OpenVDB grid
 #include <nanovdb/tools/CreateNanoGrid.h> // converter from OpenVDB to NanoVDB (includes NanoVDB.h and GridManager.h)
-#include <nanovdb/cuda/Buffer.h>// host-safe: declares the device buffer type the .cu side returns
-
-extern nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>> uploadGrid(const nanovdb::GridHandle<nanovdb::HostBuffer>& handle, cudaStream_t stream);
+#include <nanovdb/cuda/HandleStorage.h>// host-includable: cuda::copyTo transfers grids without any kernel
 
 extern "C" void launch_kernels(const nanovdb::NanoGrid<float>*,
                                const nanovdb::NanoGrid<float>*,
@@ -26,7 +24,7 @@ int main(int, char**)
         cudaStreamCreate(&stream);
         {
         // deep-copy the grid to the GPU (implemented in the CUDA translation unit)
-        auto deviceHandle = uploadGrid(handle, stream);
+        auto deviceHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle, stream);
 
         auto* grid = handle.grid<float>(); // get a (raw) pointer to a NanoVDB grid of value type float on the CPU
         auto* deviceGrid = deviceHandle.deviceGrid<float>(); // get a (raw) pointer to a NanoVDB grid of value type float on the GPU

@@ -9,19 +9,6 @@
 
 #include <nanovdb/cuda/GridHandle.cuh>// for cuda::copyTo, the explicit host<->device grid transfer
 
-using DeviceGridHandle = nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>>;
-
-// Constructing a device grid handle validates the grid with a kernel, so the
-// transfers live in this CUDA translation unit; the host main only holds the
-// returned handles.
-DeviceGridHandle uploadGrid(const nanovdb::GridHandle<nanovdb::HostBuffer>& handle)
-{
-    return nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle);
-}
-nanovdb::GridHandle<nanovdb::HostBuffer> downloadGrid(const DeviceGridHandle& handle)
-{
-    return nanovdb::cuda::copyTo<nanovdb::HostBuffer>(handle);
-}
 
 extern "C"  void scaleActiveVoxels(nanovdb::FloatGrid *grid_d, uint64_t leafCount, float scale)
 {

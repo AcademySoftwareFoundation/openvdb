@@ -1040,7 +1040,7 @@ TEST(TestBuffer, GridHandleCopyToProtoResource)
         DevBufT proto(cudaStream_t(0), RefT(res), 16, nanovdb::cuda::noInit);// alloc #1: an exemplar carrying the borrowed resource
         auto dev = nanovdb::cuda::copyTo<DevBufT>(host, cudaStream_t(0), &proto);
         ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
-        EXPECT_EQ(3, counters.allocs);// #2: the grid storage, #3: the metadata scratch, all through the proto's resource
+        EXPECT_EQ(2, counters.allocs);// #2: the grid storage; the metadata is adopted from the source handle, so no scratch
         EXPECT_NE(dev.deviceGrid<float>(), nullptr);
 
         nanovdb::GridHandle<nanovdb::HostBuffer> empty;

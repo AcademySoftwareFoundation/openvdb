@@ -3,12 +3,11 @@
 
 #include <nanovdb/tools/CreateNanoGrid.h>
 #include <nanovdb/tools/CreatePrimitives.h>// for nanovdb::tools::createLevelSetSphere
-#include <nanovdb/cuda/Buffer.h>// host-safe: declares the device buffer type the .cu side returns
+#include <nanovdb/cuda/HandleStorage.h>// host-includable: cuda::copyTo transfers grids without any kernel
 
 extern "C" void launch_kernels(const nanovdb::NanoGrid<nanovdb::ValueOnIndex>*,// device grid
                                const nanovdb::NanoGrid<nanovdb::ValueOnIndex>*,// host grid
                                cudaStream_t stream);
-extern nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>> uploadGrid(const nanovdb::GridHandle<nanovdb::HostBuffer>& handle, cudaStream_t stream);
 
 /// @brief This examples depends on NanoVDB and CUDA.
 int main(int, char**)
@@ -27,7 +26,7 @@ int main(int, char**)
         cudaStreamCreate(&stream);
         {
             // deep-copy the grid to the GPU (implemented in the CUDA translation unit)
-            auto deviceHandle = uploadGrid(idxHandle, stream);
+            auto deviceHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(idxHandle, stream);
             auto* cpuGrid = idxHandle.grid<DstBuildT>();
             auto* gpuGrid = deviceHandle.deviceGrid<DstBuildT>();
 

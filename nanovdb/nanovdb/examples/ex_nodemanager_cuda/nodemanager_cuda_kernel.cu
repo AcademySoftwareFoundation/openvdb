@@ -30,11 +30,6 @@ extern "C" void launch_kernels(const nanovdb::NodeManager<float>* deviceMgr,
 }
 
 // Simple wrapper that makes sure nanovdb::cuda::createNodeManager is initiated
-nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>> uploadGrid(const nanovdb::GridHandle<nanovdb::HostBuffer>& handle, cudaStream_t stream)
-{
-    return nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle, stream);
-}
-
 // Constructs a NodeManager for a device grid, allocated through the default
 // device memory resource (a program-lifetime singleton the handle borrows).
 nanovdb::NodeManagerHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<nanovdb::cuda::DeviceResource>>>

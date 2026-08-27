@@ -3,7 +3,7 @@
 
 #include <openvdb/tools/LevelSetSphere.h> // replace with your own dependencies for generating the OpenVDB grid
 #include <nanovdb/tools/CreateNanoGrid.h> // converter from OpenVDB to NanoVDB (includes NanoVDB.h and GridManager.h)
-#include <nanovdb/cuda/Buffer.h>// host-safe: declares the buffer types the .cu side returns
+#include <nanovdb/cuda/HandleStorage.h>// host-includable: cuda::copyTo transfers grids without any kernel
 #include <nanovdb/cuda/DeviceResource.h>
 #include <nanovdb/NodeManager.h>
 
@@ -11,7 +11,6 @@ extern "C" void launch_kernels(const nanovdb::NodeManager<float>*,// device Naod
                                const nanovdb::NodeManager<float>*,// host NodeManager
                                cudaStream_t stream);
 
-extern nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>> uploadGrid(const nanovdb::GridHandle<nanovdb::HostBuffer>& handle, cudaStream_t stream);
 extern nanovdb::NodeManagerHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<nanovdb::cuda::DeviceResource>>>
 uploadNodeManager(const nanovdb::NanoGrid<float>* d_grid, cudaStream_t stream);// constructs a NodeManager for a device grid
 
@@ -29,7 +28,7 @@ int main()
 
         // Converts the OpenVDB to NanoVDB and returns a GridHandle that uses CUDA for memory management.
         auto gridHandle = nanovdb::tools::createNanoGrid<SrcGridT, float>(*srcGrid);
-        auto deviceGridHandle = uploadGrid(gridHandle, stream); // deep-copy the grid to the GPU (in the CUDA translation unit)
+        auto deviceGridHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(gridHandle, stream); // deep-copy the grid to the GPU
         auto* grid = gridHandle.grid<float>(); // a (raw) pointer to the grid on the CPU
         auto* deviceGrid = deviceGridHandle.deviceGrid<float>(); // and its deep copy on the GPU
         if (!deviceGrid || !grid) {
