@@ -24,6 +24,14 @@ __global__ void gpu_kernel(const nanovdb::NanoGrid<float>* deviceGrid)
 }
 
 // This is called by the client code on the host
+// Constructing a device grid handle validates the grid with a kernel, so the
+// transfer lives in this CUDA translation unit; the host main only holds the
+// returned handle.
+nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>> uploadGrid(const nanovdb::GridHandle<nanovdb::HostBuffer>& handle, cudaStream_t stream)
+{
+    return nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle, stream);
+}
+
 extern "C" void launch_kernels(const nanovdb::NanoGrid<float>* deviceGrid,
                                const nanovdb::NanoGrid<float>* cpuGrid,
                                cudaStream_t                    stream)

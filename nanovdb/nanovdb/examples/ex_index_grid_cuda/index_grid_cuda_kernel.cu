@@ -2,7 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessable on both the host and device
-#include <nanovdb/cuda/GridHandle.cuh>// required since GridHandle<DeviceBuffer> has device code
+#include <nanovdb/cuda/GridHandle.cuh>// for cuda::copyTo, the explicit host->device grid transfer
+
+// Constructing a device grid handle validates the grid with a kernel, so the
+// transfer lives in this CUDA translation unit; the host main only holds the
+// returned handle.
+nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>> uploadGrid(const nanovdb::GridHandle<nanovdb::HostBuffer>& handle, cudaStream_t stream)
+{
+    return nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle, stream);
+}
 #include <cstdio> // for printf
 #include <cinttypes>
 

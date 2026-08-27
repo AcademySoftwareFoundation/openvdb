@@ -10,11 +10,9 @@
 #include <vector>
 
 #if defined(NANOVDB_USE_CUDA)
-#include <nanovdb/cuda/DeviceBuffer.h>
-using BufferT = nanovdb::cuda::DeviceBuffer;
-#else
-using BufferT = nanovdb::HostBuffer;
+#include <nanovdb/cuda/GridHandle.cuh>// for cuda::copyTo, the explicit host->device grid transfer
 #endif
+using BufferT = nanovdb::HostBuffer;
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/io/IO.h>
 #include <nanovdb/math/Ray.h>
@@ -116,14 +114,15 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
     }
 
 #if defined(NANOVDB_USE_CUDA)
-    handle.deviceUpload();
+    // deep-copy the grid to the device; the returned handle validates it there
+    auto deviceHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle);
 
-    auto* d_grid = handle.deviceGrid<float>();
+    auto* d_grid = deviceHandle.deviceGrid<float>();
     if (!d_grid)
         throw std::runtime_error("GridHandle does not contain a valid device grid");
 
-    imageBuffer.deviceUpload();
-    float* d_outImage = reinterpret_cast<float*>(imageBuffer.deviceData());
+    nanovdb::cuda::Buffer<float> deviceImage(cudaStream_t(0), size_t(width) * height, nanovdb::cuda::noInit);
+    float* d_outImage = deviceImage.data();
 
     {
         for (int i = 0; i < NUM_WARMUP_ITERATIONS; ++i) {
@@ -137,7 +136,7 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
         }
         reportStats("Duration(NanoVDB-Cuda):", samples);
 
-        imageBuffer.deviceDownload();
+        cudaMemcpy(imageBuffer.data(), deviceImage.data(), size_t(width) * height * sizeof(float), cudaMemcpyDeviceToHost);
         saveImage("raytrace_level_set-nanovdb-cuda.pfm", width, height, (float*)imageBuffer.data());
     }
 #endif
