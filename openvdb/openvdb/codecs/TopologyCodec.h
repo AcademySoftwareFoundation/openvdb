@@ -312,17 +312,18 @@ void topologyCodecReadTopology(GridBase& gridBase, std::istream& is, const io::R
         internal::setTilesToBackground(grid.tree());
         // allocate leaf buffers in parallel and fill with the background value;
         // ReadTopologyOp uses PartialCreate which leaves buffers unallocated.
-        const auto background = grid.tree().root().background();
-        tree::LeafManager<typename GridT::TreeType> leafManager(grid.tree());
-        leafManager.foreach([&background](auto& leaf, size_t) {
-            using LeafType = std::decay_t<decltype(leaf)>;
-            if constexpr (!std::is_same_v<typename LeafType::ValueType, bool>) {
+        // (skip BoolGrids/MaskGrids whose buffers are bit masks that are always
+        // allocated and so provide no empty()/allocate())
+        if constexpr (!std::is_same_v<typename GridT::TreeType::ValueType, bool>) {
+            const auto background = grid.tree().root().background();
+            tree::LeafManager<typename GridT::TreeType> leafManager(grid.tree());
+            leafManager.foreach([&background](auto& leaf, size_t) {
                 if (leaf.buffer().empty()) {
                     leaf.buffer().allocate();
                     leaf.buffer().fill(background);
                 }
-            }
-        });
+            });
+        }
         return;
     }
 }

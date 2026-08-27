@@ -1196,3 +1196,118 @@ TEST_F(TestCodec, testInactiveValuesAfterReadBuffers)
         std::remove(path.c_str());
     }
 }
+
+// A MaskGrid has no ValueMask specialization of InternalNode or RootNode, so its
+// tiles carry a value separate from the active state. TopologyOnly resets those
+// values to the background, which must leave the active topology untouched.
+TEST_F(TestCodec, testTopologyOnlyPreservesMaskTiles)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    const std::string gridName = "mask_tiles";
+    const std::string path = "testTopologyOnlyMaskTiles.vdb";
+
+    // Active tiles at both internal levels and at the root, plus a region of
+    // individual voxels so that leaf nodes are exercised too.
+    MaskGrid::Ptr src = MaskGrid::create();
+    src->setName(gridName);
+    src->tree().addTile(/*level=*/1, Coord(0), true, /*active=*/true);
+    src->tree().addTile(/*level=*/2, Coord(4096), true, /*active=*/true);
+    src->tree().addTile(/*level=*/3, Coord(-8192), true, /*active=*/true);
+    src->fill(CoordBBox(Coord(1024), Coord(1030)), true, /*active=*/true);
+
+    const Index64 srcActiveVoxels = src->activeVoxelCount();
+    const Index64 srcActiveTiles = src->tree().activeTileCount();
+    ASSERT_TRUE(srcActiveTiles > 0);
+
+    {
+        io::File f(path);
+        f.write(GridPtrVec{src});
+    }
+
+    ReadOptions topoOpts;
+    topoOpts.readMode = ReadMode::TopologyOnly;
+
+    MaskGrid::Ptr readTopo, readOriginal;
+    {
+        io::File f(path);
+        f.open();
+        readTopo = gridPtrCast<MaskGrid>(f.readGrid(gridName, topoOpts));
+        readOriginal = gridPtrCast<MaskGrid>(f.readGrid(gridName, ReadOptions{}));
+        f.close();
+    }
+    ASSERT_TRUE(readTopo);
+    ASSERT_TRUE(readOriginal);
+
+    // TopologyOnly must not lose the active tiles.
+    EXPECT_EQ(readTopo->tree().activeTileCount(), srcActiveTiles);
+    EXPECT_EQ(readTopo->activeVoxelCount(), srcActiveVoxels);
+    EXPECT_TRUE(src->tree().hasSameTopology(readTopo->tree()));
+    EXPECT_TRUE(readOriginal->tree().hasSameTopology(readTopo->tree()));
+
+    // Leaf voxels keep their values because value and active state share one bit.
+    auto topoAcc = readTopo->getConstAccessor();
+    for (MaskGrid::ValueOnCIter it = readOriginal->cbeginValueOn(); it; ++it) {
+        if (it.isVoxelValue()) EXPECT_TRUE(topoAcc.isValueOn(it.getCoord()));
+    }
+
+    // Tile values are reset to the background, matching a TopologyCopy, while the
+    // tiles stay active.
+    for (MaskGrid::ValueOnCIter it = readTopo->cbeginValueOn(); it; ++it) {
+        if (!it.isVoxelValue()) EXPECT_FALSE(*it);
+    }
+
+    std::remove(path.c_str());
+}
+
+// A BoolGrid stores the value and the active state separately, so TopologyOnly is
+// expected to discard values while keeping topology.
+TEST_F(TestCodec, testTopologyOnlyClearsBoolTiles)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    const std::string gridName = "bool_tiles";
+    const std::string path = "testTopologyOnlyBoolTiles.vdb";
+
+    // Active tiles at both internal levels, plus a region of individual voxels.
+    BoolGrid::Ptr src = BoolGrid::create(/*background=*/false);
+    src->setName(gridName);
+    src->tree().addTile(/*level=*/1, Coord(0), true, /*active=*/true);
+    src->tree().addTile(/*level=*/2, Coord(4096), true, /*active=*/true);
+    src->fill(CoordBBox(Coord(1024), Coord(1030)), true, /*active=*/true);
+
+    const Index64 srcActiveVoxels = src->activeVoxelCount();
+    const Index64 srcActiveTiles = src->tree().activeTileCount();
+    ASSERT_TRUE(srcActiveTiles > 0);
+
+    {
+        io::File f(path);
+        f.write(GridPtrVec{src});
+    }
+
+    ReadOptions topoOpts;
+    topoOpts.readMode = ReadMode::TopologyOnly;
+
+    BoolGrid::Ptr readTopo;
+    {
+        io::File f(path);
+        f.open();
+        readTopo = gridPtrCast<BoolGrid>(f.readGrid(gridName, topoOpts));
+        f.close();
+    }
+    ASSERT_TRUE(readTopo);
+
+    // Topology is preserved, including active tiles.
+    EXPECT_EQ(readTopo->tree().activeTileCount(), srcActiveTiles);
+    EXPECT_EQ(readTopo->activeVoxelCount(), srcActiveVoxels);
+    EXPECT_TRUE(src->tree().hasSameTopology(readTopo->tree()));
+
+    // Values are discarded: tiles are reset to the background even where active.
+    for (BoolGrid::ValueAllCIter it = readTopo->cbeginValueAll(); it; ++it) {
+        if (!it.isVoxelValue()) EXPECT_FALSE(*it);
+    }
+
+    std::remove(path.c_str());
+}
