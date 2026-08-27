@@ -157,6 +157,10 @@ public:
     }
     void* deviceUpperMasks() { return mUpperMasks.data(); }
     void* deviceLowerMasks() { return mLowerMasks.data(); }
+    /// @brief A borrowing reference to the builder's resource, for consumers
+    ///        allocating sibling scratch from the same instance.
+    nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource); }
+
     Data* data()             { return &mHostData; }
     Data* deviceData()       { return reinterpret_cast<Data*>(mDeviceData.data()); }
 
