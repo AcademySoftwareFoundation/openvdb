@@ -411,6 +411,22 @@ private:
     /// @throw std::invalid_argument if @a age exceeds the current stack depth.
     inline auto getGeom(size_t age) const;
 
+    /// @brief Translate one "vdb"/"geo" option value, replacing any non-numeric (name)
+    ///        token with the stack age of the entry carrying that exact name.
+    /// @details Installed as mParser.onGetOption so it runs on every read of a "vdb"/"geo"
+    ///          option, letting each action's existing numeric parsing and error handling
+    ///          (age lists, "*", out-of-range checks, etc.) operate unchanged downstream.
+    ///          Resolution happens per-read against the CURRENT stack rather than being
+    ///          written back into the option, so loop bodies re-resolve each iteration.
+    /// @param optName Option name, either "vdb" or "geo" (selects which stack to search).
+    /// @param raw     Fully expression-resolved option value (i.e. after {} substitution).
+    /// @return The translated value: unchanged if empty or "*", otherwise every token is numeric.
+    /// @throw std::out_of_range   if a name token matches no entry on the corresponding stack.
+    /// @throw std::invalid_argument if a name token matches more than one entry. A name must
+    ///        identify exactly one entry, since most actions read "vdb"/"geo" as a single age
+    ///        and those that read a list may mutate the stack while consuming it.
+    std::string resolveStackOption(const std::string &optName, const std::string &raw) const;
+
     /// @brief Convert the output of a VolumeToMesh pass into a Geometry instance.
     Geometry::Ptr mesherToGeometry(tools::VolumeToMesh&) const;
     /// @brief Adaptively mesh a scalar grid at @a isoValue and return the result as a Geometry.
@@ -453,6 +469,13 @@ Tool::Tool(int argc, char *argv[])
         // Set up centralized error handler for action execution
         mParser.onActionError = [this](const std::string&, const std::string&) {
             return mErrorOnWarning; // true = fatal (re-throw), false = skip
+        };
+        // Translate "vdb"/"geo" name tokens into stack ages on every read of those
+        // options. Every option so named refers to an entry on one of the two stacks,
+        // so no action needs to opt out of this.
+        mParser.onGetOption = [this](const std::string &name, std::string &value) {
+            if (name != "vdb" && name != "geo") return;
+            value = this->resolveStackOption(name, value);
         };
         mParser.parse(argc, argv);// extremely fast, but might throw
     } catch (const std::exception& e) {
@@ -536,6 +559,57 @@ auto Tool::getGeom(size_t age) const
     std::advance(it, age);
     return it;
 }// Tool::getGeom
+
+// ==============================================================================================================
+
+std::string Tool::resolveStackOption(const std::string &optName, const std::string &raw) const
+{
+    if (raw.empty() || raw == "*") return raw;// unchanged: every action already special-cases these
+
+    const bool isVdb = optName == "vdb";
+    const size_t stackSize = isVdb ? mGrid.size() : mGeom.size();
+    const std::string &actionName = mParser.getAction().names[0];
+
+    VecS out;
+    for (const std::string &tok : tokenize(raw, "(),")) {
+        int age;
+        if (isInt(tok, age)) { out.push_back(tok); continue; }// already a stack age
+        // Name lookup: scan age 0 (top/most-recent) upward, collecting every match.
+        std::vector<int> matches;
+        int a = 0;
+        if (isVdb) {
+            for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it, ++a)
+                if ((*it)->getName() == tok) matches.push_back(a);
+        } else {
+            for (auto it = mGeom.crbegin(); it != mGeom.crend(); ++it, ++a)
+                if ((*it)->getName() == tok) matches.push_back(a);
+        }
+        const std::string what = isVdb ? "VDB grid" : "Geometry";
+        if (matches.empty()) {
+            throw std::out_of_range(actionName + ": no " + what + " named \"" + tok +
+                                    "\" on the stack (stack size " + std::to_string(stackSize) + ")");
+        }
+        // A name must identify exactly one entry. Expanding it to several ages would be
+        // unsafe: most actions read "vdb"/"geo" as a single age via get<int>() and cannot
+        // parse a list at all, and those that do read a list may erase entries by index
+        // while consuming it, so a multi-age expansion can delete the wrong grid.
+        if (matches.size() > 1) {
+            std::string ages;
+            for (size_t k = 0; k < matches.size(); ++k) ages += (k ? "," : "") + std::to_string(matches[k]);
+            throw std::invalid_argument(actionName + ": the name \"" + tok + "\" is ambiguous -- it matches " +
+                                        std::to_string(matches.size()) + " " + what + " entries at ages " +
+                                        ages + ". Use an explicit age index to select one.");
+        }
+        out.push_back(std::to_string(matches[0]));
+    }
+
+    std::string result;
+    for (size_t i = 0; i < out.size(); ++i) {
+        if (i) result += ",";
+        result += out[i];
+    }
+    return result;
+}// Tool::resolveStackOption
 
 // ==============================================================================================================
 
@@ -787,14 +861,14 @@ void Tool::init()
   // local build with: cmake -DCMAKE_CXX_FLAGS="-DVDB_TOOL_USE_SHRINKWRAP" ..
   mParser.addAction(
      {"soup2ls", "soup2sdf", "shrinkwrap"}, "Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
-    {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
+    {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
      {"mode", "0", "0", "mode of offset operator: 0) old method (using mesh -> UDF -> mesh -> SDF), 1) Mihai's signed-flood-fill and 2) Greg's createLevelSetDilatedMesh. Defaults to 0, i.e. paper."},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"erode", "8", "2", "number of iterations of constrained erosion. Defaults to 8."},
      {"thres", "0", "0.01", "closing (or engineering) threshold. Defaults to 0, i.e. it\'s diabled."},
-     {"vdb", "0", "0|0,1,2|*", "selects which of the level-set grids generated by the hierarchical shrink-wrap algorithm to output, by resolution level: 0 is the finest (highest-resolution) grid, 1 the next-finest, and so on. Accepts a single index (default 0, i.e. only the finest grid), a comma-separated list (e.g. \"0,1,2\" outputs the three finest grids), or \"*\" to output every generated grid. A runtime error is thrown if a requested level does not exist. Note: unlike other actions, here \"vdb\" selects outputs (not inputs)."},
+     {"levels", "0", "0|0,1,2|*", "selects which of the level-set grids generated by the hierarchical shrink-wrap algorithm to output, by resolution level: 0 is the finest (highest-resolution) grid, 1 the next-finest, and so on. Accepts a single index (default 0, i.e. only the finest grid), a comma-separated list (e.g. \"0,1,2\" outputs the three finest grids), or \"*\" to output every generated grid. A runtime error is thrown if a requested level does not exist. Note that these are resolution levels of the output hierarchy, not ages on the VDB stack, which is why this option is named \"levels\" rather than \"vdb\"."},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
      {"name", "", "soup2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
      [&](){mParser.setDefaults();}, [&](){this->soupToLevelSet();});
@@ -1460,21 +1534,36 @@ std::string Tool::examples() const
 void Tool::clear()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "clear");
+  // Resolve every requested age to a stable list iterator BEFORE erasing anything.
+  // Erasing inside the loop instead would (a) leave earlier deletions in place when
+  // a later age turns out to be out of range, and (b) shift the remaining entries,
+  // since an age is a distance from the back of the list -- so "-clear vdb=0,2" on a
+  // three-grid stack erased age 0 and then failed on age 2, having already destroyed
+  // a grid. Duplicate ages are removed first: resolving one twice would yield the
+  // same iterator twice, and erasing it twice is undefined behaviour. This is safe
+  // because mGrid/mGeom are std::lists, whose iterators stay valid when *other*
+  // elements are erased.
+  auto resolveVictims = [](VecI ages, auto &stack, auto &&get) {
+    std::sort(ages.begin(), ages.end());
+    ages.erase(std::unique(ages.begin(), ages.end()), ages.end());
+    std::vector<typename std::decay_t<decltype(stack)>::const_iterator> victims;
+    victims.reserve(ages.size());
+    for (int a : ages) victims.push_back(std::next(get(a)).base());// throws if out of range
+    return victims;
+  };
   if (mParser.get<std::string>("geo") == "*") {
     mGeom.clear();
   } else {
-    for (int a : mParser.getVec<int>("geo")) {
-      auto it = this->getGeom(a);
-      mGeom.erase(std::next(it).base());
-    }
+    const auto victims = resolveVictims(mParser.getVec<int>("geo"), mGeom,
+                                        [this](int a){ return this->getGeom(a); });
+    for (auto it : victims) mGeom.erase(it);
   }
   if (mParser.get<std::string>("vdb")  == "*") {
     mGrid.clear();
   } else {
-    for (int a : mParser.getVec<int>("vdb")) {
-      auto it = this->getGrid(a);
-      mGrid.erase(std::next(it).base());
-    }
+    const auto victims = resolveVictims(mParser.getVec<int>("vdb"), mGrid,
+                                        [this](int a){ return this->getGrid(a); });
+    for (auto it : victims) mGrid.erase(it);
   }
   if (mParser.get<bool>("variables")) {
     mParser.processor.memory().clear();
@@ -2737,7 +2826,7 @@ void Tool::soupToLevelSet()
   std::string grid_name = mParser.get<std::string>("name");
   // Output selector (NB: selects outputs, not inputs): "*" for all generated
   // grids, otherwise a list of resolution levels (0 = finest). Defaults to "0".
-  const std::string vdb_sel = mParser.get<std::string>("vdb");
+  const std::string level_sel = mParser.get<std::string>("levels");
 
   auto it = this->getGeom(geo_age);
   Geometry::Ptr mesh = *it;
@@ -2754,7 +2843,7 @@ void Tool::soupToLevelSet()
 
   // Build the LOD hierarchy directly (rather than the single-grid free function)
   // so we can output more than just the finest level. grids() is ordered
-  // finest(0) -> coarsest(size-1), matching the "vdb" level indices below.
+  // finest(0) -> coarsest(size-1), matching the "levels" indices below.
   using SW = tools::PolySoupToLevelSet<GridT>;
   auto sw = voxel > 0.0f ? std::make_unique<SW>(std::move(poly), voxel, width)
                          : std::make_unique<SW>(std::move(poly), dim, width);
@@ -2767,10 +2856,10 @@ void Tool::soupToLevelSet()
 
   // Resolve the selector into a list of level indices. "*" -> every level.
   std::vector<int> levels;
-  if (vdb_sel == "*") {
+  if (level_sel == "*") {
     for (int i = 0; i < count; ++i) levels.push_back(i);
   } else {
-    levels = mParser.getVec<int>("vdb");
+    levels = mParser.getVec<int>("levels");
     if (levels.empty()) levels.push_back(0);
   }
 
@@ -2778,7 +2867,7 @@ void Tool::soupToLevelSet()
   // index produces a clean error with no partial output on the stack.
   for (const int lvl : levels) {
     if (lvl < 0 || lvl >= count) {
-      throw std::invalid_argument("soup2ls: requested output grid vdb=" + std::to_string(lvl) +
+      throw std::invalid_argument("soup2ls: requested output grid levels=" + std::to_string(lvl) +
           " does not exist; the shrink-wrap hierarchy generated " + std::to_string(count) +
           " grid(s), so valid levels are 0 (finest) .. " + std::to_string(count - 1) + " (coarsest)");
     }
@@ -2789,7 +2878,7 @@ void Tool::soupToLevelSet()
   for (const int lvl : levels) {
     GridT::Ptr g = grids[lvl];
     // Disambiguate names only when several grids are output; a single output
-    // keeps the plain name (preserving the historical vdb=0 behavior).
+    // keeps the plain name (preserving the historical single-grid behavior).
     g->setName(multi ? grid_name + "_" + std::to_string(lvl) : grid_name);
     mGrid.push_back(g);
   }
