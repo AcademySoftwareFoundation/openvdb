@@ -1230,25 +1230,11 @@ TEST(TestNanoVDBCUDA, CudaSignedFloodFill)
     EXPECT_TRUE(floatGrid->isBreadthFirst());
 }//  CudaSignedFloodFill
 
-// Regression test for https://github.com/AcademySoftwareFoundation/openvdb/issues/2300:
-// processRoot's z-scanline pass resolved Tile::child byte-offsets against the truncated
-// host/managed copy of the root (tree + root + tiles, no child-node data) instead of the
-// real device root, so RootT::getChild() computed a pointer far outside that small managed
-// allocation - an out-of-bounds device read. It rarely surfaced in practice because the only
-// existing coverage (CudaSignedFloodFill, NonBlockingStreamSignedFloodFill) builds a single
-// root child (an origin-centered sphere), which never reaches the scanline pass at all: that
-// pass only runs for two root children on the same z-scanline. This test builds exactly that:
-// two non-adjacent root children (upper nodes, 4096^3 each) on the same scanline, with an
-// explicit background tile sandwiched between them for the pass to (not) repair.
-//
-// Node b's near corner is deliberately left "outside" (background) rather than "inside", so the
-// correct outcome is that the sandwiched tile is left untouched - a stricter check than the
-// inside/inside case, where an all-zero read (e.g. from a freshly touched managed-memory page)
-// would coincidentally satisfy the "inside" test and mask the bug. Per the issue, the bad read
-// lands within the same coarse-grained managed-memory page a majority of the time, so it isn't
-// guaranteed to produce a wrong value or an invalid-access fault on every platform; this test
-// pins down the intended behavior of the fix, and should be run under compute-sanitizer in CI
-// to also catch the out-of-bounds access itself.
+// Regression test for https://github.com/AcademySoftwareFoundation/openvdb/issues/2300: builds
+// two non-adjacent root children on the same z-scanline, with a background tile sandwiched
+// between them, to exercise processRoot's scanline-repair pass (untested until now). Node b's
+// near corner is left "outside" so the correct outcome is that the tile stays untouched - run
+// under compute-sanitizer to also catch the out-of-bounds read the bug caused.
 TEST(TestNanoVDBCUDA, CudaSignedFloodFillNonAdjacentRootChildren)
 {
     using BufferT = nanovdb::cuda::DeviceBuffer;
