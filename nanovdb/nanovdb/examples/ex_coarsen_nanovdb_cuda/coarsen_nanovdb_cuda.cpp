@@ -7,7 +7,10 @@
 
 // the following files are from NanoVDB
 #include <nanovdb/NanoVDB.h>
-#include <nanovdb/cuda/GridHandle.cuh>// for cuda::copyTo, the explicit host->device grid transfer
+#include <nanovdb/GridHandle.h>
+#include <nanovdb/cuda/Buffer.h>// both host-safe: they declare the handle and buffer types the .cu side returns
+
+extern nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>> uploadGrid(const nanovdb::GridHandle<nanovdb::HostBuffer>& handle);
 #include <nanovdb/tools/CreateNanoGrid.h>
 
 template<class CoordT>
@@ -134,8 +137,8 @@ int main(int argc, char *argv[])
 
         // Copy both NanoVDB grids to GPU
         // deep-copy both grids to the device; the returned handles validate them there
-        auto deviceHandleOriginal = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handleOriginal);
-        auto deviceHandleCoarsened = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handleCoarsened);
+        auto deviceHandleOriginal = uploadGrid(handleOriginal);
+        auto deviceHandleCoarsened = uploadGrid(handleCoarsened);
         auto* deviceGridOriginal = deviceHandleOriginal.deviceGrid<BuildT>();
         auto* deviceGridCoarsened = deviceHandleCoarsened.deviceGrid<BuildT>();
         if (!deviceGridOriginal || !deviceGridCoarsened)

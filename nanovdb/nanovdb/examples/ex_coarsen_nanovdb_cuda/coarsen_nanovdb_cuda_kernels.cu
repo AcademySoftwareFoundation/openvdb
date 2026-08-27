@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <nanovdb/tools/cuda/CoarsenGrid.cuh>
+#include <nanovdb/cuda/GridHandle.cuh>// for cuda::copyTo
 
 template<typename T>
 bool bufferCheck(const T* deviceBuffer, const T* hostBuffer, size_t elem_count) {
@@ -54,3 +55,11 @@ void mainCoarsenGrid(
     nanovdb::NanoGrid<nanovdb::ValueOnIndex> *indexGridCoarsened,
     uint32_t benchmark_iters
 );
+
+// Constructing a device grid handle validates the grid with a kernel, so the
+// transfer lives in this CUDA translation unit; the host main only holds the
+// returned handles.
+nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>> uploadGrid(const nanovdb::GridHandle<nanovdb::HostBuffer>& handle)
+{
+    return nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle);
+}
