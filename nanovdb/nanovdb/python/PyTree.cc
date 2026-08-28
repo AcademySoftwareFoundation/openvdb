@@ -10,75 +10,38 @@ using namespace nanovdb;
 
 namespace pynanovdb {
 
-// Polymorphic mgr() that returns the right typed NodeManager based on the
-// handle's stored gridType. Dispatch follows the same X-macro pattern as
-// pyHostGrid / pyDeviceGrid; unbound BuildTs return None rather than the
-// generic getMgr<BuildT>() ptr that would be reinterpreted.
-template<typename BufferT>
-static nb::object pyNodeMgr(nb::handle py_self)
-{
-    using HandleT = NodeManagerHandle<BufferT>;
-    auto& handle = nb::cast<HandleT&>(py_self);
-    if (!handle.data()) return nb::none();
-    // We need to read the stored gridType, but it's private. The public
-    // mgr<BuildT>() returns NULL for type mismatch, so iterate by BuildT.
-    // The X-macro produces one case per bound BuildT; first non-null wins.
-#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, GridTypeEnum)             \
-    if (auto* m = handle.template mgr<T>()) {                                  \
-        return nb::cast(m, nb::rv_policy::reference, py_self);                 \
-    }
-#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, GridTypeEnum) \
-    if (auto* m = handle.template mgr<T>()) {                                  \
-        return nb::cast(m, nb::rv_policy::reference, py_self);                 \
-    }
-#define NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix, GridTypeEnum)              \
-    if (auto* m = handle.template mgr<T>()) {                                  \
-        return nb::cast(m, nb::rv_policy::reference, py_self);                 \
-    }
-#define NANOVDB_PY_FOR_EACH_READONLY_BUILDT(T, Suffix, GridTypeEnum)           \
-    if (auto* m = handle.template mgr<T>()) {                                  \
-        return nb::cast(m, nb::rv_policy::reference, py_self);                 \
-    }
-#include "BuildTypes.def"
-    return nb::none();
-}
-
-void defineNodeManagerHandle(nb::module_& m)
-{
-    using HandleT = NodeManagerHandle<HostBuffer>;
-    nb::class_<HandleT>(m, "NodeManagerHandle",
-        "Owns the memory backing a NodeManager. Move-only. "
-        "Obtain via nanovdb.createNodeManager(grid).")
-        .def("size",
-             [](const HandleT& h) { return h.size(); },
-             "Byte size of the buffer backing this NodeManagerHandle.")
-        .def(
-            "__bool__",
-            [](const HandleT& h) { return h.data() != nullptr; },
-            nb::is_operator(),
-            "True iff this handle owns a non-empty buffer.")
-        .def("mgr", &pyNodeMgr<HostBuffer>,
-             nb::keep_alive<0, 1>(),
-             "Return the typed NodeManager for the grid this handle was "
-             "built from, or None if the BuildT is not Python-visible. The "
-             "returned NodeManager keeps this handle alive.");
-}
-
 // createNodeManager has one template instantiation per BuildT. We expose a
 // single polymorphic `createNodeManager(grid)` that picks the right one
-// based on the runtime type of `grid` (any nb::class_-bound NanoGrid<T>).
-// nb::isinstance is a fast type check that avoids the exception-on-mismatch
-// overhead that would come from trying nb::cast and catching cast_error for
-// every non-matching BuildT.
+// based on the runtime type of `grid` (any nb::class_-bound NanoGrid<T>)
+// and returns the typed NodeManager directly. nb::isinstance is a fast
+// type check that avoids the exception-on-mismatch overhead that would
+// come from trying nb::cast and catching cast_error for every
+// non-matching BuildT.
+//
+// Lifetime: the C++ NodeManagerHandle that owns the node-index buffer is
+// moved to the heap and owned by an nb::capsule; reference_internal
+// parents the returned NodeManager to that capsule, so the buffer lives
+// exactly as long as the manager (and, transitively, as long as any
+// leaf(i)/lower(i)/upper(i) node view, which are reference_internal to
+// the manager). The def-level keep_alive<0,1> on createNodeManager below
+// additionally ties the manager to the source grid, whose memory the
+// nodes point into.
 template<typename BuildT>
 static nb::object tryCreateNodeManager(nb::handle py_grid)
 {
     using GridT = NanoGrid<BuildT>;
+    using HandleT = NodeManagerHandle<HostBuffer>;
     if (!nb::isinstance<GridT>(py_grid)) {
         return nb::object();  // sentinel: "not this BuildT, try next"
     }
     auto& grid = nb::cast<GridT&>(py_grid);
-    return nb::cast(createNodeManager<BuildT, HostBuffer>(grid));
+    auto* handle = new HandleT(createNodeManager<BuildT, HostBuffer>(grid));
+    nb::capsule owner(handle, [](void* p) noexcept {
+        delete static_cast<HandleT*>(p);
+    });
+    // Non-null by construction: the handle was just built for this BuildT.
+    NodeManager<BuildT>* mgr = handle->template mgr<BuildT>();
+    return nb::cast(mgr, nb::rv_policy::reference_internal, owner);
 }
 
 void defineCreateNodeManager(nb::module_& m)
@@ -108,14 +71,14 @@ void defineCreateNodeManager(nb::module_& m)
                 "bound BuildT");
         },
         "grid"_a,
-        // The constructed NodeManager stores a raw pointer back to the
-        // grid; the handle must therefore keep the grid (and transitively
-        // the GridHandle that owns the grid's buffer) alive.
+        // The constructed NodeManager stores raw pointers back into the
+        // grid; the returned manager must therefore keep the grid (and
+        // transitively the GridHandle that owns the grid's buffer) alive.
         nb::keep_alive<0, 1>(),
-        "Build a NodeManager for the given grid, returning a "
-        "NodeManagerHandle that owns the underlying buffer. The handle's "
-        "mgr() method returns the typed NodeManager. The handle keeps the "
-        "source grid alive for as long as it lives.");
+        "Build and return the typed NodeManager (e.g. FloatNodeManager) "
+        "for the given grid. The manager owns its node-index buffer "
+        "internally and keeps the source grid (and transitively its "
+        "GridHandle) alive for as long as it lives.");
 }
 
 } // namespace pynanovdb

@@ -718,10 +718,7 @@ class TestTreeNodeWalking(unittest.TestCase):
             import numpy as np
         except ImportError:
             self.skipTest("numpy not installed")
-        handle = nanovdb.createNodeManager(self.g)
-        self.assertGreater(handle.size(), 0)
-        self.assertTrue(bool(handle))
-        nm = handle.mgr()
+        nm = nanovdb.createNodeManager(self.g)
         self.assertIsInstance(nm, nanovdb.FloatNodeManager)
         self.assertTrue(nm.isLinear())  # createNanoGrid produces breadth-first
         self.assertEqual(nm.leafCount(), self.tree.nodeCount(0))
@@ -748,8 +745,7 @@ class TestBoundsChecks(unittest.TestCase):
         cls.g = cls.h.grid()
         cls.tree = cls.g.tree()
         cls.leaf = cls.tree.getFirstLeaf()
-        cls.nm_handle = nanovdb.createNodeManager(cls.g)
-        cls.nm = cls.nm_handle.mgr()
+        cls.nm = nanovdb.createNodeManager(cls.g)
 
     def test_leaf_offset_bounds(self):
         n = nanovdb.FloatLeaf.voxelCount()
@@ -842,7 +838,7 @@ class TestZeroCopyViewLifetimes(unittest.TestCase):
         except ImportError:
             self.skipTest("numpy not installed")
         nm = nanovdb.createNodeManager(
-            nanovdb.tools.createFogVolumeSphere().grid()).mgr()
+            nanovdb.tools.createFogVolumeSphere().grid())
         self._force_gc()
         self.assertGreater(nm.leafCount(), 0)
         leaf0_vals = nm.leaf(0).values()
