@@ -95,7 +95,7 @@ template<typename BufferT> nb::class_<nanovdb::GridHandle<BufferT>> defineGridHa
     return nb::class_<nanovdb::GridHandle<BufferT>>(m, name,
             "Owns a buffer holding one or more serialized NanoVDB grids. "
             "Construct via nanovdb.tools.create* factories or nanovdb.io.readGrid(s); "
-            "access individual grids via handle.grid(n).")
+            "access individual grids via handle.grid(n), handle[i], or iteration.")
         .def(nb::init<>(),
             "Construct an empty handle. Use the nanovdb.tools.create* "
             "factories or nanovdb.io.readGrid(s) instead in normal use.")
@@ -124,6 +124,26 @@ template<typename BufferT> nb::class_<nanovdb::GridHandle<BufferT>> defineGridHa
              "Return the n-th grid as a typed Grid subclass selected by "
              "gridType(n), or None if the BuildT is not bound in Python. "
              "The returned grid keeps this handle alive.")
+        .def("__len__", &nanovdb::GridHandle<BufferT>::gridCount,
+            "Number of grids stored in this handle (same as gridCount()).")
+        .def(
+            "__getitem__",
+            [](nb::handle py_handle, Py_ssize_t i) {
+                auto& handle = nb::cast<nanovdb::GridHandle<BufferT>&>(py_handle);
+                const Py_ssize_t count = static_cast<Py_ssize_t>(handle.gridCount());
+                if (i < 0) i += count;
+                if (i < 0 || i >= count)
+                    throw nb::index_error("GridHandle index out of range [-gridCount(), gridCount()).");
+                return pyHostGrid<BufferT>(py_handle, static_cast<uint32_t>(i));
+            },
+            nb::arg("i"),
+            nb::keep_alive<0, 1>(),
+            "handle[i] -> the i-th grid as a typed Grid subclass (same "
+            "dispatch as grid(n)); negative indices count from the end. "
+            "Raises IndexError when out of range, which also makes handles "
+            "iterable via the sequence protocol (`for grid in handle`). "
+            "Grids whose BuildT is not bound in Python are returned as "
+            "None, matching grid(n).")
         .def("isPadded", &nanovdb::GridHandle<BufferT>::isPadded,
             "True iff this handle's buffer is aligned past the natural "
             "GridData alignment (used by the I/O code path).")
