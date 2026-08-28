@@ -17,9 +17,17 @@
       of an OnIndexGrid, independent of occupancy.  This file provides:
       - buildVoxelBlockManager (device): constructs the firstLeafID array and
         jumpMap on the GPU from a device-resident NanoGrid.
-      - decodeInverseMaps (device): per-block SIMT decode of the inverse maps
-        (sequential active-voxel index -> leaf ID + intra-leaf voxel offset),
-        executed cooperatively across a CUDA thread block.
+      - decodeInverseMap (device): per-slot, thread-local decode of one inverse
+        map entry (sequential active-voxel index -> leaf ID + intra-leaf voxel
+        offset) into registers; no shared memory or synchronization, callable
+        from divergent threads. Block-level facts a cooperative consumer might
+        otherwise read from a materialized map are derivable directly from the
+        VBM metadata: the block's first leaf is firstLeafID, slot p starts a
+        new leaf iff jumpMap bit p is set, and the number of leaves spanned by
+        the block is 1 + the jumpMap popcount.
+      - decodeInverseMaps (device): cooperative wrapper over decodeInverseMap
+        that materializes all BlockWidth slots into shared memory, preserving
+        the pre-existing signature for consumers that read across slots.
 */
 
 #ifndef NANOVDB_VOXELBLOCKMANAGER_CUH_HAS_BEEN_INCLUDED
@@ -48,15 +56,129 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
     using Base::UnusedLeafIndex;
     using Base::UnusedVoxelOffset;
 
-    // The efficiency of the functions in this class are contingent on
-    // threadblock-level coordination, which manifests either as using shared
-    // memory for synchronization, or warp-level shift operations.
+    // The decode is a rank + select over the VBM's bit-vectors and is
+    // thread-local per output slot: decodeInverseMap requires no threadblock
+    // coordination. Consumers that need cross-slot information can derive it
+    // from the VBM metadata (firstLeafID + jumpMap), or materialize all slots
+    // in shared memory via the cooperative decodeInverseMaps wrapper.
 
-    /// @brief Decode the inverse maps for a single voxel block on the device.
+    /// @brief Rank one output slot into its leaf: the number of leaves that
+    /// begin at in-block positions [1, blockOffset] (bit 0 is never set),
+    /// counted via popcounts over the block's jumpMap.
+    /// Thread-local; no synchronization.
+    __device__
+    static uint32_t jumpMapRank(const uint64_t *jumpMap, const int blockOffset)
+    {
+        uint32_t leafRank = 0;
+        const int jumpWord = blockOffset >> 6;  // index into jumpMap
+        #pragma unroll
+        for (int i = 0; i < JumpMapLength; ++i) {
+            if (i < jumpWord) leafRank += util::countOn(jumpMap[i]); // count leaves before the current jump word
+            else if (i == jumpWord) {
+                // count leaves in the current jump word, masking those that are at or before blockOffset
+                leafRank += util::countOn(jumpMap[i] & ((uint64_t(2) << (blockOffset & 63)) - 1u));
+            }
+        }
+        return leafRank;
+    }
+
+    /// @brief Select the voxel with sequential index @c globalOffset inside leaf
+    /// @c leafID: find its 64-bit mask word via the leaf's precomputed 9-bit
+    /// prefix sums (mPrefixSum), then its bit within that word via __fns.
+    /// Writes the sentinels if globalOffset lies beyond the leaf's last active
+    /// voxel (i.e. beyond the last active voxel of the grid).
+    /// Thread-local; no synchronization.
+    template <class BuildT>
+    __device__
+    static typename util::enable_if<BuildTraits<BuildT>::is_index, void>::type
+    selectVoxelInLeaf(
+        const NanoGrid<BuildT> *grid,
+        const uint32_t leafID,
+        const uint64_t globalOffset,
+        uint32_t &leafIndex,
+        uint16_t &voxelOffset)
+    {
+        const auto& leafData = *grid->tree().template getFirstNode<0>()[leafID].data();
+        // 0-based rank among the leaf's actives
+        const uint64_t rankInLeaf = globalOffset - leafData.firstOffset();
+        if (rankInLeaf < leafData.valueCount()) { // if the rank is within the leaf's active voxels (bounds check)
+            int wordID = 0;
+            uint32_t activesBeforeWord = 0;
+            #pragma unroll
+            for (int candidateWord = 1; candidateWord < 8; ++candidateWord) {
+                // the number of active voxels before the candidateWord's mask word (& 0x1ffu masks to 9 bits)
+                const uint32_t cumulative = uint32_t(leafData.mPrefixSum >> (9*(candidateWord-1))) & 0x1ffu;
+                if (cumulative <= rankInLeaf) {
+                    wordID = candidateWord; // word ID of the mask word that contains the rankInLeaf-th active voxel
+                    activesBeforeWord = cumulative; // the number of active voxels before the wordID's mask word
+                }
+            }
+            uint32_t rankInWord = uint32_t(rankInLeaf) - activesBeforeWord; // active voxel's rank within the mask word (0-based)
+            // select the in-word bit position of the voxel using __fns (find n-th set bit)
+            // __fns(mask, base, k) is the hardware find-nth-set-bit intrinsic - the k-th set bit (1-based) at/after base
+            // but it's a 32-bit op while `maskWord` is 64-bit, so we need to split it into two 32-bit halves
+            const uint64_t maskWord = leafData.mValueMask.words()[wordID];
+            const uint32_t lowHalf = uint32_t(maskWord);  // low 32 bits of the mask word
+            const uint32_t lowHalfCount = __popc(lowHalf);
+            int bit;
+            // if rank is less than the number of active voxels in the low half, __fns finds the bit in the lower half
+            // otherwise, shift maskWord by 32 bits and __fns finds the bit in the upper half
+            if (rankInWord < lowHalfCount) bit = __fns(lowHalf, 0, rankInWord + 1);
+            else                           bit = 32 + __fns(uint32_t(maskWord >> 32), 0, rankInWord - lowHalfCount + 1);
+            leafIndex = leafID;
+            voxelOffset = uint16_t((wordID << 6) + bit);
+        } else { // beyond the last active voxel in the grid
+            leafIndex = UnusedLeafIndex;
+            voxelOffset = UnusedVoxelOffset;
+        }
+    }
+
+    /// @brief Decode a single inverse-map entry into registers on the device.
     ///
     /// Given the VBM metadata for one block (firstLeafID and the block's slice of
-    /// the jumpMap) and the block's base sequential offset, fills smem_leafIndex[]
-    /// and smem_voxelOffset[] in shared memory so that for each position p in
+    /// the jumpMap), the block's base sequential offset, and a slot position
+    /// blockOffset in [0, BlockWidth), computes:
+    ///   - leafIndex   = index of the leaf node containing sequential voxel
+    ///                   (blockFirstOffset + blockOffset), or UnusedLeafIndex if
+    ///                   that index is beyond the last active voxel.
+    ///   - voxelOffset = local (0..511) offset of that voxel within its leaf,
+    ///                   or UnusedVoxelOffset.
+    ///
+    /// No shared memory or synchronization; may be called from divergent threads.
+    ///
+    /// @tparam BuildT  Build type of the grid (must be an index type)
+    /// @param grid              Device-accessible OnIndex grid
+    /// @param firstLeafID       Index of the first leaf overlapping this block
+    /// @param jumpMap           Pointer to the JumpMapLength words for this block
+    /// @param blockFirstOffset  Sequential index of the first voxel in this block
+    /// @param blockOffset       Slot position within the block, in [0, BlockWidth)
+    /// @param leafIndex         Output leaf index (register)
+    /// @param voxelOffset       Output intra-leaf voxel offset (register)
+    template <class BuildT>
+    __device__
+    static typename util::enable_if<BuildTraits<BuildT>::is_index, void>::type
+    decodeInverseMap(
+        const NanoGrid<BuildT> *grid,
+        const uint32_t firstLeafID,
+        const uint64_t *jumpMap,
+        const uint64_t blockFirstOffset,
+        const int blockOffset,
+        uint32_t &leafIndex,
+        uint16_t &voxelOffset)
+    {
+        // Verify that the nodes can be accessed linearly
+        NANOVDB_ASSERT(grid->isSequential());
+        NANOVDB_ASSERT(blockOffset >= 0 && blockOffset < BlockWidth);
+
+        const uint32_t leafRank = jumpMapRank(jumpMap, blockOffset);
+        selectVoxelInLeaf(grid, firstLeafID + leafRank,
+                          blockFirstOffset + blockOffset, leafIndex, voxelOffset);
+    }
+
+    /// @brief Decode the inverse maps for a single voxel block into shared memory.
+    ///
+    /// Cooperative form of decodeInverseMap, preserving the pre-existing signature:
+    /// fills smem_leafIndex[] and smem_voxelOffset[] so that for each position p in
     /// [0, BlockWidth):
     ///   - smem_leafIndex[p]   = index of the leaf node containing sequential voxel
     ///                           (blockFirstOffset + p), or UnusedLeafIndex if that
@@ -64,8 +186,12 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
     ///   - smem_voxelOffset[p] = local (0..511) offset of that voxel within its leaf,
     ///                           or UnusedVoxelOffset.
     ///
-    /// Must be called by all threads in the block (uses __syncthreads internally).
-    /// Do not call from divergent threads within a thread block.
+    /// Each slot is decoded independently by decodeInverseMap; this wrapper only
+    /// materializes the results, striding over the slots so any blockDim.x <= 512
+    /// fills the maps correctly. Must be called by all threads in the block (ends
+    /// in __syncthreads); do not call from divergent threads. Consumers that only
+    /// read their own slot's result should prefer decodeInverseMap, which needs no
+    /// shared memory or barrier.
     ///
     /// @tparam BuildT  Build type of the grid (must be an index type)
     /// @param grid              Device-accessible OnIndex grid
@@ -85,57 +211,22 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
         uint32_t *smem_leafIndex,
         uint16_t *smem_voxelOffset)
     {
-        // Verify that the nodes can be accessed linearly
-        NANOVDB_ASSERT(grid->isSequential());
-
-        int tID = threadIdx.x;
-
-        // Count how many additional leaves (following the one indicated by firstLeafID)
-        // overlap with this voxel block
-        int nExtraLeaves = 0;
-        for (int i = 0; i < JumpMapLength; i++)
-            nExtraLeaves += util::countOn(jumpMap[i]);
-
-        // Initialize leafIndex & voxelOffset to sentinel values
-        // for blocks that extend beyond the last active voxel in the grid
-        if (tID < BlockWidth)
-            #pragma unroll
-            for (int i = 0; i < BlockWidth; i += blockDim.x) {
-                smem_leafIndex[i+tID] = UnusedLeafIndex;
-                smem_voxelOffset[i+tID] = UnusedVoxelOffset;
-            }
-        __syncthreads();
-
         NANOVDB_ASSERT(blockDim.x <= 512);
-        const auto& tree = grid->tree();
-        // Loop through all leafNodes overlapping the voxel block
-        // with all threads in threadblock working collaboratively within each leafNode
-        for (int leafID = firstLeafID; leafID <= firstLeafID + nExtraLeaves; leafID++) {
-            const auto& leaf = tree.template getFirstNode<0>()[leafID];
-            if (leaf.data()->firstOffset() >= blockFirstOffset + BlockWidth) break;
-            const Coord origin = leaf.origin();
-            for (int threadOffset = 0; threadOffset < 512; threadOffset += blockDim.x) {
-                int localOffset = threadOffset + tID;
-                auto index = leaf.data()->getValue(localOffset);
-                if ((index >= blockFirstOffset) && (index < blockFirstOffset + BlockWidth)) {
-                    int blockOffset = index - blockFirstOffset;
-                    // Write inverse map to shared memory; no collisions
-                    smem_leafIndex[blockOffset] = leafID;
-                    smem_voxelOffset[blockOffset] = localOffset;
-                }
-            }
-        }
+        for (int blockOffset = threadIdx.x; blockOffset < BlockWidth; blockOffset += blockDim.x)
+            decodeInverseMap(grid, firstLeafID, jumpMap, blockFirstOffset, blockOffset,
+                             smem_leafIndex[blockOffset], smem_voxelOffset[blockOffset]);
         __syncthreads();
     }
 
-    /// @brief Given a grid and its decoded voxel map, compute the stencil.
-    /// This function accesses shared memory but does not synchronize threads
-    /// so it may be called from divergent threads within a thread block.
-    /// offsets for a 3x3x3 box stencil.
+    /// @brief Given a grid and one decoded inverse-map entry (from
+    /// decodeInverseMap), compute the stencil indices for a 3x3x3 box stencil.
+    /// Thread-local: no shared memory, no synchronization; may be called from
+    /// divergent threads within a thread block. Leaves stencilIndices untouched
+    /// when leafIndex is UnusedLeafIndex (a slot beyond the last active voxel).
     /// @tparam BuildT Build type of the grid
-    /// @param grid
-    /// @param smem_leafIndex Leaf indices stored in shared memory
-    /// @param smem_voxelOffset Voxel offsets stored in shared memory
+    /// @param grid         Device-accessible OnIndex grid
+    /// @param leafIndex    This thread's decoded leaf index (or UnusedLeafIndex)
+    /// @param voxelOffset  This thread's decoded intra-leaf voxel offset
     /// @param stencilIndices Pointer to output stencil indices. Must have
     /// length of at least 27 (corresponding to the 3x3x3 stencil)
     template <class BuildT>
@@ -143,20 +234,18 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
     static typename util::enable_if<BuildTraits<BuildT>::is_index, void>::type
     computeBoxStencil(
         const NanoGrid<BuildT> *grid,
-        const uint32_t *smem_leafIndex,
-        const uint16_t *smem_voxelOffset,
+        const uint32_t leafIndex,
+        const uint16_t voxelOffset,
         uint64_t *stencilIndices)
     {
         // Verify that the nodes can be accessed linearly
         NANOVDB_ASSERT(grid->isSequential());
 
-        int tID = threadIdx.x;
         const auto& tree = grid->tree();
-        if (smem_leafIndex[tID] != UnusedLeafIndex) {
+        if (leafIndex != UnusedLeafIndex) {
             // This presumes that leaf nodes are fixed-size and sequentially accessible in memory
-            const auto& leaf = tree.template getFirstNode<0>()[ smem_leafIndex[tID] ];
-            const Coord coord = leaf.offsetToGlobalCoord( smem_voxelOffset[tID] );
-            const auto index = leaf.getValue( smem_voxelOffset[tID] );
+            const auto& leaf = tree.template getFirstNode<0>()[ leafIndex ];
+            const Coord coord = leaf.offsetToGlobalCoord( voxelOffset );
             for (int di = -1; di <= 1; di++)
             for (int dj = -1; dj <= 1; dj++)
             for (int dk = -1; dk <= 1; dk++) {

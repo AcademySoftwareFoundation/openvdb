@@ -4,8 +4,9 @@
 /// @file TestMemoryResource.cu
 ///
 /// @brief Unit tests for the CUDA memory-resource concept (cuda::DeviceResource,
-///        cuda::PinnedResource) and the cuda::TempPool / tools::cuda::PointsToGrid
-///        resource plumbing.
+///        cuda::PinnedResource) and the resource plumbing of cuda::TempPool and
+///        the tools::cuda builders (PointsToGrid, the TopologyBuilder consumers,
+///        IndexToGrid, GridStats, SignedFloodFill, addBlindData).
 
 #include <nanovdb/cuda/DeviceResource.h>
 #include <nanovdb/cuda/PinnedResource.h>
@@ -16,6 +17,10 @@
 #include <nanovdb/tools/cuda/PruneGrid.cuh>
 #include <nanovdb/tools/cuda/RefineGrid.cuh>
 #include <nanovdb/tools/cuda/CoarsenGrid.cuh>
+#include <nanovdb/tools/cuda/IndexToGrid.cuh>
+#include <nanovdb/tools/cuda/SignedFloodFill.cuh>
+#include <nanovdb/tools/cuda/AddBlindData.cuh>
+#include <nanovdb/tools/cuda/GridStats.cuh>
 
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
@@ -330,20 +335,24 @@ TEST(TestMemoryResource, PointsToGrid_PointEncodedWithCustomResource)
 // injected resource instance (B5, openvdb #2232).
 //======================================================================
 
-/// @brief Build a small ValueOnIndex device grid from a handful of voxels.
+/// @brief Build a small device grid of type @c BuildT from a handful of voxels.
 ///        The default resource is fine for this setup step; the CountingResource
 ///        of the op under test only observes that op's scratch.
+template<typename BuildT>
 static nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer>
-buildIndexGrid(const std::vector<nanovdb::Coord>& voxels)
+buildGrid(const std::vector<nanovdb::Coord>& voxels)
 {
     nanovdb::Coord* d_voxels = nullptr;
     cudaCheck(cudaMalloc(&d_voxels, voxels.size() * sizeof(nanovdb::Coord)));
     cudaCheck(cudaMemcpy(d_voxels, voxels.data(), voxels.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
-    nanovdb::tools::cuda::PointsToGrid<nanovdb::ValueOnIndex> converter(nanovdb::Map(1.0));
+    nanovdb::tools::cuda::PointsToGrid<BuildT> converter(nanovdb::Map(1.0));
     auto handle = converter.getHandle(d_voxels, voxels.size());
     cudaCheck(cudaFree(d_voxels));
     return handle;
 }
+
+static nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer>
+buildIndexGrid(const std::vector<nanovdb::Coord>& voxels) { return buildGrid<nanovdb::ValueOnIndex>(voxels); }
 
 TEST(TestMemoryResource, DilateGrid_InjectedResourceSeam)
 {
@@ -456,6 +465,107 @@ TEST(TestMemoryResource, CoarsenGrid_InjectedResourceSeam)
     ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
     EXPECT_GT(res.allocs, 0);
     EXPECT_EQ(res.allocs, res.deallocs);
+}
+
+//======================================================================
+// Small builders (IndexToGrid, SignedFloodFill, GridStats, AddBlindData)
+// route their device scratch through cuda::Buffer over an injectable
+// resource instead of raw mallocAsync/freeAsync pairs (openvdb #2232).
+// Their scratch is small and fixed, so the counts are exact.
+//======================================================================
+
+TEST(TestMemoryResource, IndexToGrid_InjectedResourceSeam)
+{
+    auto src = buildIndexGrid({{0,0,0},{1,2,3},{4,4,4}});
+    auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_srcGrid, nullptr);
+
+    float* d_values = nullptr;// one value per index; over-provisioned
+    cudaCheck(cudaMalloc(&d_values, 64 * sizeof(float)));
+    cudaCheck(cudaMemset(d_values, 0, 64 * sizeof(float)));
+
+    CountingResource res;
+    {
+        nanovdb::tools::cuda::IndexToGrid<nanovdb::ValueOnIndex, CountingResource> op(d_srcGrid, 0, res);
+        op.setGridName("seam");// exercises the device grid-name buffer as well
+        auto handle = op.getHandle<float>(d_values);
+        ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+        EXPECT_TRUE(handle.deviceData());
+        EXPECT_EQ(res.allocs, 2);            // node accessor + grid name
+    }                                        // op destroyed -> node accessor freed via res
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_EQ(res.allocs, res.deallocs);
+    ASSERT_EQ(cudaFree(d_values), cudaSuccess);
+}
+
+TEST(TestMemoryResource, SignedFloodFill_InjectedResourceSeam)
+{
+    auto src = buildGrid<float>({{0,0,0},{1,2,3},{4,4,4}});
+    auto* d_grid = src.deviceGrid<float>();
+    ASSERT_NE(d_grid, nullptr);
+
+    CountingResource res;
+    nanovdb::tools::cuda::SignedFloodFill<float, CountingResource> op(false, 0, res);
+    op(d_grid);
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_EQ(res.allocs, 1);                // the node-count scratch
+    EXPECT_EQ(res.deallocs, 1);
+}
+
+TEST(TestMemoryResource, GridStats_InjectedResourceSeam)
+{
+    auto src = buildGrid<float>({{0,0,0},{1,2,3},{4,4,4}});
+    auto* d_grid = src.deviceGrid<float>();
+    ASSERT_NE(d_grid, nullptr);
+
+    CountingResource res;
+    {   // Stats has an average, so the per-node scratch is allocated; the
+        // temporary NodeManager (storage + size scratch) routes through the
+        // resource as well
+        nanovdb::tools::cuda::GridStats<float, nanovdb::tools::Stats<float>, CountingResource> stats(0.0f, res);
+        stats.update(d_grid);
+        ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+        EXPECT_EQ(res.allocs, 3);
+        EXPECT_EQ(res.deallocs, 3);
+    }
+    {   // Extrema has no average: the zero-element stats buffer must not
+        // allocate, leaving only the NodeManager pair
+        nanovdb::tools::cuda::GridStats<float, nanovdb::tools::Extrema<float>, CountingResource> stats(0.0f, res);
+        stats.update(d_grid);
+        ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+        EXPECT_EQ(res.allocs, 5);
+        EXPECT_EQ(res.deallocs, 5);
+    }
+    {   // The free function forwards ResourceT to the per-type default instance
+        auto& def = nanovdb::cuda::default_resource<CountingResource>();
+        const int a0 = def.allocs, d0 = def.deallocs;
+        nanovdb::tools::cuda::updateGridStats<float, CountingResource>(d_grid, nanovdb::tools::StatsMode::All);
+        ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+        EXPECT_EQ(def.allocs - a0, 3);
+        EXPECT_EQ(def.deallocs - d0, 3);
+    }
+}
+
+TEST(TestMemoryResource, AddBlindData_InjectedResourceSeam)
+{
+    auto src = buildGrid<float>({{0,0,0},{1,2,3},{4,4,4}});
+    auto* d_grid = src.deviceGrid<float>();
+    ASSERT_NE(d_grid, nullptr);
+
+    float* d_blind = nullptr;
+    cudaCheck(cudaMalloc(&d_blind, 8 * sizeof(float)));
+    cudaCheck(cudaMemset(d_blind, 0, 8 * sizeof(float)));
+
+    // The free function routes through the per-type default resource instance.
+    auto& res = nanovdb::cuda::default_resource<CountingResource>();
+    const int a0 = res.allocs, d0 = res.deallocs;
+    auto handle = nanovdb::tools::cuda::addBlindData<float, float, nanovdb::cuda::DeviceBuffer, CountingResource>(
+        d_grid, d_blind, 8);
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_TRUE(handle.deviceData());
+    EXPECT_EQ(res.allocs - a0, 1);           // the byte-size scratch
+    EXPECT_EQ(res.deallocs - d0, 1);
+    ASSERT_EQ(cudaFree(d_blind), cudaSuccess);
 }
 
 } // unnamed namespace

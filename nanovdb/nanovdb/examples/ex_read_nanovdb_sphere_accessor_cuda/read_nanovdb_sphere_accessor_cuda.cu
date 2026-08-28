@@ -17,7 +17,7 @@ int main(int, char**)
 {
     try {
         // returns a GridHandle using CUDA for memory management.
-        auto handle = nanovdb::io::readGrid<nanovdb::CudaDeviceBuffer>("data/sphere.nvdb");
+        auto handle = nanovdb::io::readGrid<nanovdb::cuda::DeviceBuffer>("data/sphere.nvdb");
 
         cudaStream_t stream; // Create a CUDA stream to allow for asynchronous copy of pinned CUDA memory.
         cudaStreamCreate(&stream);

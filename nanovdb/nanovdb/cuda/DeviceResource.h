@@ -123,6 +123,17 @@ struct is_async_resource<R, std::void_t<
     decltype(std::declval<R&>().deallocate(std::declval<void*>(), size_t{0}, size_t{0}))>>
     : std::true_type {};
 
+/// @brief Detection trait: @c is_host_accessible_resource<R>::value is true
+///        iff @c R declares `static constexpr bool HOST_ACCESSIBLE = true`,
+///        i.e. its allocations are mapped into the host address space (e.g.
+///        PinnedResource). Defaults to false: allocations are device-resident.
+/// @note Unlike the void_t detections above, this checks the member's VALUE:
+///       a resource declaring HOST_ACCESSIBLE = false stays device-resident.
+template<typename R, typename = void>
+struct is_host_accessible_resource : std::false_type {};
+template<typename R>
+struct is_host_accessible_resource<R, typename std::enable_if<bool(R::HOST_ACCESSIBLE)>::type> : std::true_type {};
+
 /// @brief Detection trait: @c is_resource<R>::value is true iff @c R models
 ///        the synchronous Resource concept, i.e. exposes
 ///        allocate(size_t, size_t) and deallocate(void*, size_t, size_t).
@@ -244,6 +255,9 @@ struct AsyncFromSync
 
     static constexpr size_t DEFAULT_ALIGNMENT = R::DEFAULT_ALIGNMENT;
 
+    /// @brief The adapter is host-accessible iff the adapted resource is.
+    static constexpr bool HOST_ACCESSIBLE = is_host_accessible_resource<R>::value;
+
     R resource;
 
     /// @brief Allocates through the synchronous resource; the result is valid
@@ -285,6 +299,9 @@ struct ResourceRef
                   "ResourceRef requires R to model the AsyncResource or the Resource concept");
 
     static constexpr size_t DEFAULT_ALIGNMENT = R::DEFAULT_ALIGNMENT;
+
+    /// @brief A reference is host-accessible iff the referenced resource is.
+    static constexpr bool HOST_ACCESSIBLE = is_host_accessible_resource<R>::value;
 
     /// @brief Constructs a ref borrowing @c resource.
     /// @param resource resource to allocate from; must outlive this ref

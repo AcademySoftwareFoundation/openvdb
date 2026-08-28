@@ -1808,6 +1808,42 @@ struct ProbeValue;
 template<typename BuildT>
 struct GetNodeInfo;
 
+/// @brief Result of a fused ReadAccessor::getDimAndActive traversal: the
+/// getDim(ijk, ray) step size and the policy-dependent active state of @a ijk.
+///
+/// The low 31 bits store @c dim and bit 31 stores @c active, saving one live
+/// return register versus {uint32_t, bool}. The default FloatTree's upper-node
+/// maximum is 4096. The constructor supports `return {dim, active}`; dim() and
+/// active() decode the packed value.
+struct DimAndActive
+{
+    uint32_t packed{0u};
+
+    __hostdev__ DimAndActive() : packed(0u) {}
+    __hostdev__ DimAndActive(uint32_t d, bool a)
+        : packed((d & 0x7FFFFFFFu) | (uint32_t(a) << 31))
+    {
+        NANOVDB_ASSERT(d < (uint32_t(1) << 31)); // dim must fit in 31 bits (bit 31 = active)
+    }
+
+    __hostdev__ uint32_t dim()    const { return packed & 0x7FFFFFFFu; }
+    __hostdev__ bool     active() const { return (packed >> 31) != 0u; }
+};
+
+/// @brief Policy that exactly matches separate getDim and isActive calls. A
+/// skip flag still controls @c dim but cannot stop the active-state descent:
+/// GridStats flags value range versus render delta, not activeness. This costs
+/// a full descent through skipped InternalNodes; use it when @c active is read
+/// unconditionally, such as by HDDA iterators observing upper-level activeness.
+struct ActiveExact {};
+
+/// @brief Policy that preserves getDim's skip-flag fast path. If an
+/// InternalNode short-circuits, @c active is unspecified and must be gated on
+/// @c dim. Otherwise the leaf-level active read is fused into the descent. Use
+/// for logic such as `if (hdda.dim() > 1 || !active) continue;`, where the
+/// short-circuit ensures @c active is read only after a leaf-level descent.
+struct ActiveOnLeafOnly {};
+
 // ----------------------------> CheckMode <----------------------------------
 
 /// @brief List of different modes for computing for a checksum
@@ -3136,6 +3172,23 @@ private:
         return ChildNodeType::dim(); // background
     }
 
+    /// @brief Returns dim and active state in one traversal, sharing cache and
+    /// terminal tile/mask reads. Root has no skip flag, so @c Policy affects
+    /// only the child descent; see ActiveExact and ActiveOnLeafOnly.
+    template<typename Policy = ActiveExact, typename RayT, typename AccT>
+    __hostdev__ DimAndActive getDimAndActiveAndCache(const CoordType& ijk, const RayT& ray, const AccT& acc) const
+    {
+        if (const Tile* tile = this->probeTile(ijk)) {
+            if (tile->isChild()) {
+                const auto* child = this->getChild(tile);
+                acc.insert(ijk, child);
+                return child->template getDimAndActiveAndCache<Policy>(ijk, ray, acc);
+            }
+            return {uint32_t(1) << ChildT::TOTAL, tile->state > 0u}; // tile value
+        }
+        return {ChildNodeType::dim(), false}; // background is never active
+    }
+
     template<typename OpT, typename AccT, typename... ArgsT>
     __hostdev__ typename OpT::Type getAndCache(const CoordType& ijk, const AccT& acc, ArgsT&&... args) const
     {
@@ -3630,6 +3683,39 @@ private:
             return child->getDimAndCache(ijk, ray, acc);
         }
         return ChildNodeType::dim(); // tile value
+    }
+
+    /// @brief Returns dim and active state in one traversal. On a skip flag,
+    /// ActiveExact resolves the true active state but returns this node's dim;
+    /// ActiveOnLeafOnly returns {dim, false} immediately. Without a skip flag
+    /// both policies are identical. See GridStats::setFlag.
+    template<typename Policy = ActiveExact, typename RayT, typename AccT>
+    __hostdev__ DimAndActive getDimAndActiveAndCache(const CoordType& ijk, const RayT& ray, const AccT& acc) const
+    {
+        //if (!ray.intersects( this->bbox() )) return {1<<TOTAL, ...};
+        // Separate paths keep `skip` out of ActiveOnLeafOnly's recursion,
+        // saving ~2 registers/thread and avoiding an occupancy cliff.
+        if constexpr (util::is_same<Policy, ActiveOnLeafOnly>::value) {
+            if (DataType::mFlags & uint32_t(1u))
+                return {this->dim(), false}; // active unspecified per policy
+            const uint32_t n = CoordToOffset(ijk);
+            if (DataType::mChildMask.isOn(n)) {
+                const ChildT* child = this->getChild(n);
+                acc.insert(ijk, child);
+                return child->template getDimAndActiveAndCache<Policy>(ijk, ray, acc);
+            }
+            return {ChildNodeType::dim(), DataType::mValueMask.isOn(n)};
+        } else {
+            const bool     skip = (DataType::mFlags & uint32_t(1u));
+            const uint32_t n    = CoordToOffset(ijk);
+            if (DataType::mChildMask.isOn(n)) {
+                const ChildT* child = this->getChild(n);
+                acc.insert(ijk, child);
+                const auto r = child->template getDimAndActiveAndCache<Policy>(ijk, ray, acc);
+                return {skip ? this->dim() : r.dim(), r.active()};
+            }
+            return {skip ? this->dim() : ChildNodeType::dim(), DataType::mValueMask.isOn(n)};
+        }
     }
 
     template<typename OpT, typename AccT, typename... ArgsT>
@@ -4572,6 +4658,21 @@ private:
         return ChildNodeType::dim();
     }
 
+    /// @brief Returns dim and active state in one traversal. @c Policy is
+    /// accepted for recursion but does not change leaf behavior: the skip flag
+    /// controls dim while active always comes from mValueMask. Branching here
+    /// raised parallelForKernel from 64 to 66 registers/thread and reduced
+    /// occupancy from four to three blocks/SM, negating the descent savings;
+    /// leaf skip flags are rare because upper-level flags usually short-circuit.
+    template<typename Policy = ActiveExact, typename RayT, typename AccT>
+    __hostdev__ DimAndActive getDimAndActiveAndCache(const CoordT& ijk, const RayT& /*ray*/, const AccT&) const
+    {
+        //if (!ray.intersects( this->bbox() )) return {1 << LOG2DIM, ...};
+        const uint32_t n      = CoordToOffset(ijk);
+        const uint32_t dimOut = (DataType::mFlags & uint8_t(1u)) ? this->dim() : ChildNodeType::dim();
+        return {dimOut, DataType::mValueMask.isOn(n)};
+    }
+
     template<typename OpT, typename AccT, typename... ArgsT>
     __hostdev__ auto
     //__hostdev__  decltype(OpT::get(util::declval<const LeafNode&>(), util::declval<uint32_t>(), util::declval<ArgsT>()...))
@@ -4878,6 +4979,15 @@ public:
     {
         return mRoot->getDimAndCache(ijk, ray, *this);
     }
+    /// @brief Fused getDim + isActive: one tree walk returns both the HDDA
+    /// step size and the active state of @a ijk, shaving the second descent
+    /// / cache-check / leaf ValueMask lookup. See @c ActiveExact /
+    /// @c ActiveOnLeafOnly for the @c Policy contract.
+    template<typename Policy = ActiveExact, typename RayT>
+    __hostdev__ DimAndActive getDimAndActive(const CoordType& ijk, const RayT& ray) const
+    {
+        return mRoot->template getDimAndActiveAndCache<Policy>(ijk, ray, *this);
+    }
     template<typename OpT, typename... ArgsT>
     __hostdev__ auto get(const CoordType& ijk, ArgsT&&... args) const
     {
@@ -4991,6 +5101,17 @@ public:
     {
         if (this->isCached(ijk)) return mNode->getDimAndCache(ijk, ray, *this);
         return mRoot->getDimAndCache(ijk, ray, *this);
+    }
+
+    /// @brief Fused getDim + isActive: one tree walk returns both the HDDA
+    /// step size and the active state of @a ijk, shaving the second descent
+    /// / cache-check / leaf ValueMask lookup. See @c ActiveExact /
+    /// @c ActiveOnLeafOnly for the @c Policy contract.
+    template<typename Policy = ActiveExact, typename RayT>
+    __hostdev__ DimAndActive getDimAndActive(const CoordType& ijk, const RayT& ray) const
+    {
+        if (this->isCached(ijk)) return mNode->template getDimAndActiveAndCache<Policy>(ijk, ray, *this);
+        return mRoot->template getDimAndActiveAndCache<Policy>(ijk, ray, *this);
     }
 
     template<typename OpT, typename... ArgsT>
@@ -5173,6 +5294,26 @@ public:
             return mNode2->getDimAndCache(ijk, ray, *this);
         }
         return mRoot->getDimAndCache(ijk, ray, *this);
+    }
+
+    /// @brief Fused getDim + isActive: one tree walk returns both the HDDA
+    /// step size and the active state of @a ijk, shaving the second descent
+    /// / cache-check / leaf ValueMask lookup. See @c ActiveExact /
+    /// @c ActiveOnLeafOnly for the @c Policy contract.
+    template<typename Policy = ActiveExact, typename RayT>
+    __hostdev__ DimAndActive getDimAndActive(const CoordType& ijk, const RayT& ray) const
+    {
+#ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
+        const CoordValueType dirty = this->computeDirty(ijk);
+#else
+        auto&& dirty = ijk;
+#endif
+        if (this->isCached1(dirty)) {
+            return mNode1->template getDimAndActiveAndCache<Policy>(ijk, ray, *this);
+        } else if (this->isCached2(dirty)) {
+            return mNode2->template getDimAndActiveAndCache<Policy>(ijk, ray, *this);
+        }
+        return mRoot->template getDimAndActiveAndCache<Policy>(ijk, ray, *this);
     }
 
     template<typename OpT, typename... ArgsT>
@@ -5444,6 +5585,28 @@ public:
             return ((NodeT2*)mNode[2])->getDimAndCache(ijk, ray, *this);
         }
         return mRoot->getDimAndCache(ijk, ray, *this);
+    }
+
+    /// @brief Fused getDim + isActive: one tree walk returns both the HDDA
+    /// step size and the active state of @a ijk, shaving the second descent
+    /// / cache-check / leaf ValueMask lookup. See @c ActiveExact /
+    /// @c ActiveOnLeafOnly for the @c Policy contract.
+    template<typename Policy = ActiveExact, typename RayT>
+    __hostdev__ DimAndActive getDimAndActive(const CoordType& ijk, const RayT& ray) const
+    {
+#ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
+        const CoordValueType dirty = this->computeDirty(ijk);
+#else
+        auto&& dirty = ijk;
+#endif
+        if (this->isCached<LeafT>(dirty)) {
+            return ((LeafT*)mNode[0])->template getDimAndActiveAndCache<Policy>(ijk, ray, *this);
+        } else if (this->isCached<NodeT1>(dirty)) {
+            return ((NodeT1*)mNode[1])->template getDimAndActiveAndCache<Policy>(ijk, ray, *this);
+        } else if (this->isCached<NodeT2>(dirty)) {
+            return ((NodeT2*)mNode[2])->template getDimAndActiveAndCache<Policy>(ijk, ray, *this);
+        }
+        return mRoot->template getDimAndActiveAndCache<Policy>(ijk, ray, *this);
     }
 
 private:

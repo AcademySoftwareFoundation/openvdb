@@ -53,10 +53,14 @@ struct NodeManagerData
 template<typename BufferT>
 class NodeManagerHandle
 {
+    static_assert(!(BufferHasDeviceSingle<BufferT>::value || BufferHasHostSingle<BufferT>::value)
+                      || BufferHasByteElements<BufferT>::value,
+                  "NodeManagerHandle requires byte-addressed single-space storage, e.g. cuda::Buffer<std::byte, R>");
+
     GridType mGridType{GridType::Unknown};
     BufferT  mBuffer;
 
-    template<typename BuildT>
+    template<typename BuildT, typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type = 0>
     const NodeManager<BuildT>* getMgr() const {
         return mGridType == toGridType<BuildT>() ? (const NodeManager<BuildT>*)mBuffer.data() : nullptr;
     }
@@ -72,7 +76,9 @@ class NodeManagerHandle
 
 public:
     /// @brief Move constructor from a buffer
-    NodeManagerHandle(GridType gridType, BufferT&& buffer) : mGridType(gridType) { mBuffer = std::move(buffer); }
+    NodeManagerHandle(GridType gridType, BufferT&& buffer)
+        : mGridType(gridType)
+        , mBuffer(std::move(buffer)) {}// member-initialized, so a non-default-constructible buffer works
     /// @brief Empty ctor
     NodeManagerHandle() = default;
     /// @brief Disallow copy-construction
@@ -87,15 +93,19 @@ public:
         return *this;
     }
     /// @brief Move copy-constructor
-    NodeManagerHandle(NodeManagerHandle&& other) noexcept {
-        mGridType = other.mGridType;
-        mBuffer = std::move(other.mBuffer);
+    NodeManagerHandle(NodeManagerHandle&& other) noexcept
+        : mGridType(other.mGridType)
+        , mBuffer(std::move(other.mBuffer))
+    {
         other.mGridType = GridType::Unknown;
     }
     /// @brief Default destructor
     ~NodeManagerHandle() { this->reset(); }
-    /// @brief clear the buffer
-    void reset() { mBuffer.clear(); }
+    /// @brief Release the buffer's storage
+    void reset() {
+        if constexpr (BufferHasDestroy<BufferT>::value) mBuffer.destroy();
+        else mBuffer.clear();
+    }
 
     /// @brief Return a reference to the buffer
     BufferT& buffer() { return mBuffer; }
@@ -103,15 +113,15 @@ public:
     /// @brief Return a const reference to the buffer
     const BufferT& buffer() const { return mBuffer; }
 
-    /// @brief Returns a non-const pointer to the data.
-    ///
+    //@{
+    /// @brief Returns a pointer to the host data; not available for a
+    ///        single-space device buffer, which has no host-readable bytes.
     /// @warning Note that the return pointer can be NULL if the NodeManagerHandle was not initialized
+    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type = 0>
     void* data() { return mBuffer.data(); }
-
-    /// @brief Returns a const pointer to the data.
-    ///
-    /// @warning Note that the return pointer can be NULL if the NodeManagerHandle was not initialized
+    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type = 0>
     const void* data() const { return mBuffer.data(); }
+    //@}
 
     /// @brief Returns the size in bytes of the raw memory buffer managed by this NodeManagerHandle's allocator.
     uint64_t size() const { return mBuffer.size(); }
@@ -141,6 +151,19 @@ public:
     template<typename BuildT, typename U = BufferT>
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, NodeManager<BuildT>*>::type
     deviceMgr() { return no_const(this->template getDeviceMgr<BuildT>()); }
+
+    //@{
+    /// @brief Return a pointer to the NodeManager of a single-space device buffer
+    /// @warning Note that the return pointer can be NULL if the template parameter does not match the specified grid!
+    template<typename BuildT, typename U = BufferT>
+    typename util::enable_if<BufferHasDeviceSingle<U>::value, const NodeManager<BuildT>*>::type
+    deviceMgr() const {
+        return mGridType == toGridType<BuildT>() ? (const NodeManager<BuildT>*)mBuffer.data() : nullptr;
+    }
+    template<typename BuildT, typename U = BufferT>
+    typename util::enable_if<BufferHasDeviceSingle<U>::value, NodeManager<BuildT>*>::type
+    deviceMgr() { return no_const(static_cast<const NodeManagerHandle*>(this)->template deviceMgr<BuildT>()); }
+    //@}
 
     /// @brief Upload the NodeManager to the device, e.g. from CPU to GPU
     ///

@@ -18,6 +18,7 @@
 #define NANOVDB_TOOLS_CUDA_INDEXTOGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>
+#include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/util/cuda/Timer.h>
@@ -31,42 +32,49 @@ namespace tools::cuda {// ======================================================
 /// @tparam DstBuildT Build time of the destination/output Grid
 /// @tparam SrcBuildT  Build type of the source/input IndexGrid
 /// @tparam BufferT Type of the buffer used for allocation of the destination Grid
+/// @tparam ResourceT Template type of optional resource used for internal temporary memory
 /// @param d_srcGrid Device pointer to source/input IndexGrid, i.e. SrcBuildT={ValueIndex,ValueOnIndex}
 /// @param d_srcValues Device pointer to an array of values
 /// @param pool Memory pool used to create a buffer for the destination/output Grid
-/// @param stream optional CUDA stream (defaults to CUDA stream 0
+/// @param stream optional CUDA stream (defaults to CUDA stream 0)
 /// @note If d_srcGrid has stats (min,max,avg,std-div), the d_srcValues is also assumed
 ///       to have the same information, all of which are then copied to the destination/output grid.
 ///       An exception to this rule is if the type of d_srcValues is different from the stats type
 ///       NanoRoot<DstBuildT>::FloatType, e.g. if DstBuildT=Vec3f then NanoRoot<DstBuildT>::FloatType=float,
 ///       in which case average and standard-deviation is undefined in the output grid.
 /// @return returns handle to grid that combined IndexGrid and values
-template<typename DstBuildT, typename SrcBuildT, typename BufferT = nanovdb::cuda::DeviceBuffer>
+template<typename DstBuildT, typename SrcBuildT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type
 indexToGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues, const BufferT &pool = BufferT(), cudaStream_t stream = 0);
 
 
-template<typename DstBuildT, typename SrcBuildT, typename BufferT = nanovdb::cuda::DeviceBuffer>
+template<typename DstBuildT, typename SrcBuildT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type
 createNanoGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues, const BufferT &pool = BufferT(), cudaStream_t stream = 0)
 {
-    return indexToGrid<DstBuildT, SrcBuildT, BufferT>(d_srcGrid, d_srcValues, pool, stream);
+    return indexToGrid<DstBuildT, SrcBuildT, BufferT, ResourceT>(d_srcGrid, d_srcValues, pool, stream);
 }
 
 namespace {// anonymous namespace
 
-template<typename SrcBuildT>
+template<typename SrcBuildT> struct IndexToGridNodeAccessor;
+
+template<typename SrcBuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class IndexToGrid
 {
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "IndexToGrid allocates stream-ordered scratch and requires an AsyncResource");
     using SrcGridT = NanoGrid<SrcBuildT>;
 public:
-    struct NodeAccessor;
+    using NodeAccessor = IndexToGridNodeAccessor<SrcBuildT>;
 
     /// @brief Constructor from a source IndeGrid
-    /// @param srcGrid Device pointer to IndexGrid used as the source
-    IndexToGrid(const SrcGridT *d_srcGrid, cudaStream_t stream = 0);
-
-    ~IndexToGrid() {cudaCheck(util::cuda::freeAsync(mDevNodeAcc, mStream));}
+    /// @param d_srcGrid Device pointer to IndexGrid used as the source
+    /// @param stream optional CUDA stream (defaults to CUDA stream 0)
+    /// @param resource resource instance all device scratch is allocated from;
+    ///        must outlive this instance (defaults to the per-type default resource)
+    IndexToGrid(const SrcGridT *d_srcGrid, cudaStream_t stream = 0,
+                ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>());
 
     /// @brief Toggle on and off verbose mode
     /// @param on if true verbose is turned on
@@ -90,7 +98,14 @@ private:
     util::cuda::Timer mTimer;
     std::string       mGridName;
     bool              mVerbose{false};
-    NodeAccessor      mNodeAcc, *mDevNodeAcc;
+    ResourceT*        mResource;// non-owning; all device scratch routes through this resource instance
+    template<typename T>
+    using BufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ResourceRef<ResourceT>>;
+    nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource); }
+    NodeAccessor      mNodeAcc;
+    BufT<NodeAccessor> mDevNodeAccBuf;
+    NodeAccessor      *mDevNodeAcc{nullptr};// view of mDevNodeAccBuf
+    BufT<char>        mGridNameBuf;// owns the device copy of mGridName
 
     template<typename DstBuildT, typename BufferT>
     BufferT getBuffer(const BufferT &pool);
@@ -99,8 +114,9 @@ private:
 //================================================================================================
 
 template<typename SrcBuildT>
-struct IndexToGrid<SrcBuildT>::NodeAccessor
+struct IndexToGridNodeAccessor
 {
+    using SrcGridT = NanoGrid<SrcBuildT>;
     uint64_t grid, tree, root, node[3], meta, blind, size;// byte offsets, node: 0=leaf,1=lower, 2=upper
     const SrcGridT *d_srcGrid;// device point to source IndexGrid
     void *d_dstPtr;// device pointer to buffer with destination Grid
@@ -125,12 +141,12 @@ struct IndexToGrid<SrcBuildT>::NodeAccessor
     __device__ typename NanoNode<DstBuildT, LEVEL>::type& dstNode(int i) const {
         return *(util::PtrAdd<typename NanoNode<DstBuildT,LEVEL>::type>(d_dstPtr, node[LEVEL])+i);
     }
-};// IndexToGrid<SrcBuildT>::NodeAccessor
+};// IndexToGridNodeAccessor<SrcBuildT>
 
 //================================================================================================
 
 template<typename SrcBuildT, typename DstBuildT>
-__global__ void processGridTreeRootKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor *nodeAcc,
+__global__ void processGridTreeRootKernel(IndexToGridNodeAccessor<SrcBuildT> *nodeAcc,
                                           const typename BuildToValueMap<DstBuildT>::type *srcValues)
 {
     using SrcValueT = typename BuildToValueMap<DstBuildT>::type;
@@ -155,6 +171,8 @@ __global__ void processGridTreeRootKernel(typename IndexToGrid<SrcBuildT>::NodeA
     dstGrid.mGridSize = nodeAcc->size;
     dstGrid.mBlindMetadataOffset = nodeAcc->size;
     dstGrid.mBlindMetadataCount = 0u;
+    dstGrid.mGridIndex = 0u; // Possibly overwriting input; returned grid has batch size 1
+    dstGrid.mGridCount = 1u;
     // we will recompute GridData::mChecksum later
 
     // process Tree
@@ -181,7 +199,7 @@ __global__ void processGridTreeRootKernel(typename IndexToGrid<SrcBuildT>::NodeA
 //================================================================================================
 
 template<typename SrcBuildT, typename DstBuildT>
-__global__ void processRootTilesKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor *nodeAcc,
+__global__ void processRootTilesKernel(IndexToGridNodeAccessor<SrcBuildT> *nodeAcc,
                                        const typename BuildToValueMap<DstBuildT>::type *srcValues)
 {
     const auto tileID = blockIdx.x, tileCount = nodeAcc->nodeCount[3];// note: tileID != childID!
@@ -213,7 +231,7 @@ __global__ void processRootTilesKernel(typename IndexToGrid<SrcBuildT>::NodeAcce
 //================================================================================================
 
 template<typename SrcBuildT, typename DstBuildT, int LEVEL>
-__global__ void processNodesKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor *nodeAcc,
+__global__ void processNodesKernel(IndexToGridNodeAccessor<SrcBuildT> *nodeAcc,
                                    const typename BuildToValueMap<DstBuildT>::type *srcValues)
 {
     using SrcNodeT  = typename NanoNode<SrcBuildT, LEVEL>::type;
@@ -265,7 +283,7 @@ __global__ void processNodesKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
 //================================================================================================
 
 template<typename SrcBuildT, typename DstBuildT>
-__global__ void processLeafsKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor *nodeAcc,
+__global__ void processLeafsKernel(IndexToGridNodeAccessor<SrcBuildT> *nodeAcc,
                                      const typename BuildToValueMap<DstBuildT>::type *srcValues)
 {
     using SrcValueT = typename BuildToValueMap<DstBuildT>::type;
@@ -307,7 +325,7 @@ __global__ void processLeafsKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
 
 template <typename SrcBuildT>
 __global__ void cpyNodeCountKernel(const NanoGrid<SrcBuildT> *srcGrid,
-                                   typename IndexToGrid<SrcBuildT>::NodeAccessor *nodeAcc)
+                                   IndexToGridNodeAccessor<SrcBuildT> *nodeAcc)
 {
     assert(srcGrid->isSequential());
     nodeAcc->d_srcGrid = srcGrid;
@@ -319,12 +337,14 @@ __global__ void cpyNodeCountKernel(const NanoGrid<SrcBuildT> *srcGrid,
 
 //================================================================================================
 
-template <typename SrcBuildT>
-IndexToGrid<SrcBuildT>::IndexToGrid(const SrcGridT *d_srcGrid, cudaStream_t stream)
-    : mStream(stream), mTimer(stream)
+template <typename SrcBuildT, typename ResourceT>
+IndexToGrid<SrcBuildT, ResourceT>::IndexToGrid(const SrcGridT *d_srcGrid, cudaStream_t stream, ResourceT& resource)
+    : mStream(stream), mTimer(stream), mResource(&resource),
+      mDevNodeAccBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 1, nanovdb::cuda::noInit),
+      mGridNameBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
 {
     NANOVDB_ASSERT(d_srcGrid);
-    cudaCheck(util::cuda::mallocAsync((void**)&mDevNodeAcc, sizeof(NodeAccessor), mStream));
+    mDevNodeAcc = mDevNodeAccBuf.data();
     cpyNodeCountKernel<SrcBuildT><<<1, 1, 0, mStream>>>(d_srcGrid, mDevNodeAcc);
     cudaCheckError();
     cudaCheck(cudaMemcpyAsync(&mNodeAcc, mDevNodeAcc, sizeof(NodeAccessor), cudaMemcpyDeviceToHost, mStream));// mNodeAcc = *mDevNodeAcc
@@ -332,9 +352,9 @@ IndexToGrid<SrcBuildT>::IndexToGrid(const SrcGridT *d_srcGrid, cudaStream_t stre
 
 //================================================================================================
 
-template <typename SrcBuildT>
+template <typename SrcBuildT, typename ResourceT>
 template <typename DstBuildT, typename BufferT>
-GridHandle<BufferT> IndexToGrid<SrcBuildT>::getHandle(const typename BuildToValueMap<DstBuildT>::type *srcValues,
+GridHandle<BufferT> IndexToGrid<SrcBuildT, ResourceT>::getHandle(const typename BuildToValueMap<DstBuildT>::type *srcValues,
                                                           const BufferT &pool)
 {
     if (mVerbose) mTimer.start("Initiate buffer");
@@ -348,7 +368,7 @@ GridHandle<BufferT> IndexToGrid<SrcBuildT>::getHandle(const typename BuildToValu
     processRootTilesKernel<SrcBuildT,DstBuildT><<<mNodeAcc.nodeCount[3], 1, 0, mStream>>>(mDevNodeAcc, srcValues);
     cudaCheckError();
 
-    cudaCheck(util::cuda::freeAsync(mNodeAcc.d_gridName, mStream));
+    mGridNameBuf.destroy(mStream);
 
     if (mVerbose) mTimer.restart("Process upper internal nodes");
     processNodesKernel<SrcBuildT,DstBuildT,2><<<mNodeAcc.nodeCount[2], dim3(32,32), 0, mStream>>>(mDevNodeAcc, srcValues);
@@ -373,9 +393,9 @@ GridHandle<BufferT> IndexToGrid<SrcBuildT>::getHandle(const typename BuildToValu
 
 //================================================================================================
 
-template <typename SrcBuildT>
+template <typename SrcBuildT, typename ResourceT>
 template <typename DstBuildT, typename BufferT>
-inline BufferT IndexToGrid<SrcBuildT>::getBuffer(const BufferT &pool)
+inline BufferT IndexToGrid<SrcBuildT, ResourceT>::getBuffer(const BufferT &pool)
 {
     mNodeAcc.grid  = 0;// grid is always stored at the start of the buffer!
     mNodeAcc.tree  = NanoGrid<DstBuildT>::memUsage(); // grid ends and tree begins
@@ -402,7 +422,8 @@ inline BufferT IndexToGrid<SrcBuildT>::getBuffer(const BufferT &pool)
     cudaCheck(cudaMemsetAsync(mNodeAcc.d_dstPtr, 0, mNodeAcc.node[0], mStream));
 
     if (size_t size = mGridName.size()) {
-        cudaCheck(util::cuda::mallocAsync((void**)&mNodeAcc.d_gridName, size, mStream));
+        mGridNameBuf = BufT<char>(mStream, this->ref(), size, nanovdb::cuda::noInit);
+        mNodeAcc.d_gridName = mGridNameBuf.data();
         cudaCheck(cudaMemcpyAsync(mNodeAcc.d_gridName, mGridName.data(), size, cudaMemcpyHostToDevice, mStream));
     } else {
         mNodeAcc.d_gridName = nullptr;
@@ -413,11 +434,11 @@ inline BufferT IndexToGrid<SrcBuildT>::getBuffer(const BufferT &pool)
 
 //================================================================================================
 
-template<typename DstBuildT, typename SrcBuildT, typename BufferT>
+template<typename DstBuildT, typename SrcBuildT, typename BufferT, typename ResourceT>
 typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type
 indexToGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues, const BufferT &pool, cudaStream_t stream)
 {
-    IndexToGrid<SrcBuildT> converter(d_srcGrid, stream);
+    IndexToGrid<SrcBuildT, ResourceT> converter(d_srcGrid, stream);
     return converter.template getHandle<DstBuildT>(d_srcValues, pool);
 }
 
