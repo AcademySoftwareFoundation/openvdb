@@ -16,17 +16,19 @@ import nanovdb
 
 
 def describe_handle(handle):
-    print(f"Handle contains {handle.gridCount()} grid(s).")
-    for i in range(handle.gridCount()):
+    # Handles are sequences: len(handle) == handle.gridCount(), and
+    # handle[i] / iteration return the same typed grids as handle.grid(i).
+    print(f"Handle contains {len(handle)} grid(s).")
+    for i in range(len(handle)):
         # GridType / gridSize are cheap to query on the handle itself.
         gtype = handle.gridType(i)
         gsize = handle.gridSize(i)
         print(f"  [{i}] type={gtype}, size={gsize} bytes")
 
-        # handle.grid(i) returns the matching <Suffix>Grid subclass
+        # handle[i] returns the matching <Suffix>Grid subclass
         # at runtime — no isinstance dispatch needed at the call site.
         # The grid name lives on the grid itself, not the handle.
-        grid = handle.grid(i)
+        grid = handle[i]
         print(f"      name={grid.gridName()!r}, "
               f"gridClass={grid.gridClass()}")
         print(f"      activeVoxelCount={grid.activeVoxelCount()}")
@@ -53,8 +55,7 @@ def main():
 
     print()
     print("Polymorphic dispatch from a runtime GridType:")
-    for i in range(handle.gridCount()):
-        grid = handle.grid(i)
+    for i, grid in enumerate(handle):
         # Each typed grid carries a getAccessor() that returns the
         # appropriate <Suffix>ReadAccessor — float for FloatGrid,
         # double for DoubleGrid, etc.

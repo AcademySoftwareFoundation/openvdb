@@ -493,6 +493,66 @@ class TestSplitMergeCopy(unittest.TestCase):
         self.assertEqual(cp.grid().gridName(), "orig")
 
 
+class TestGridHandleSequenceProtocol(unittest.TestCase):
+    """GridHandle supports len(), indexing (incl. negative), and iteration.
+    handle[i] uses the same polymorphic dispatch as handle.grid(i) but
+    raises IndexError out of range, where grid(i) returns None — that
+    contract (pinned by TestPolymorphicGridAccess) is unchanged."""
+
+    @classmethod
+    def setUpClass(cls):
+        h1 = nanovdb.tools.createFogVolumeSphere(name="a")
+        h2 = nanovdb.tools.createLevelSetTorus(nanovdb.GridType.Double, name="b")
+        cls.merged = nanovdb.mergeGrids([h1, h2])
+
+    def test_len_matches_grid_count(self):
+        self.assertEqual(len(self.merged), self.merged.gridCount())
+        self.assertEqual(len(self.merged), 2)
+        self.assertEqual(len(nanovdb.GridHandle()), 0)
+
+    def test_getitem_typed_dispatch(self):
+        self.assertIsInstance(self.merged[0], nanovdb.FloatGrid)
+        self.assertIsInstance(self.merged[1], nanovdb.DoubleGrid)
+        self.assertEqual(self.merged[0].gridName(), "a")
+        self.assertEqual(self.merged[1].gridName(), "b")
+
+    def test_negative_indices(self):
+        self.assertIsInstance(self.merged[-1], nanovdb.DoubleGrid)
+        self.assertEqual(self.merged[-2].gridName(), "a")
+
+    def test_out_of_range_raises_index_error(self):
+        for i in (2, 99, -3):
+            with self.assertRaises(IndexError):
+                self.merged[i]
+        with self.assertRaises(IndexError):
+            nanovdb.GridHandle()[0]
+
+    def test_iteration(self):
+        grids = list(self.merged)
+        self.assertEqual(len(grids), 2)
+        self.assertIsInstance(grids[0], nanovdb.FloatGrid)
+        self.assertIsInstance(grids[1], nanovdb.DoubleGrid)
+        self.assertEqual([g.gridName() for g in self.merged], ["a", "b"])
+
+    def test_iteration_keeps_temporary_handle_alive(self):
+        # Grids materialized by handle[i] carry a keep_alive on the handle,
+        # so views harvested from a temporary handle must survive its gc.
+        import gc
+
+        grids = list(
+            nanovdb.mergeGrids(
+                [
+                    nanovdb.tools.createFogVolumeSphere(name="tmp"),
+                    nanovdb.tools.createLevelSetTorus(nanovdb.GridType.Float),
+                ]
+            )
+        )
+        for _ in range(3):
+            gc.collect()
+        self.assertEqual(grids[0].gridName(), "tmp")
+        self.assertGreater(grids[1].activeVoxelCount(), 0)
+
+
 class TestBuildTRegistrations(unittest.TestCase):
     """Every BuildT we bind exposes the right shape — a Grid class, a
     ReadAccessor, and (for arithmetic-valued scalars) a NodeInfo. Accessor
@@ -1117,6 +1177,41 @@ class TestReadWriteGrids(unittest.TestCase):
             nanovdb.io.writeGrids(self.dstFile.name, handles, nanovdb.io.Codec.ZIP)
         except RuntimeError:
             print("ZIP compression codec not supported. Skipping...")
+
+
+@unittest.skipIf(
+    not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
+)
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
+)
+class TestDeviceGridHandleSequenceProtocol(unittest.TestCase):
+    """DeviceGridHandle shares the sequence protocol with GridHandle:
+    len(), handle[i] (negative indices, IndexError out of range), and
+    iteration. handle[i] returns the host-side typed grid view, same as
+    handle.grid(i); deviceGrid(i) is unaffected."""
+
+    def setUp(self):
+        self.handle = nanovdb.tools.cuda.createLevelSetSphere(nanovdb.GridType.Float)
+
+    def test_len(self):
+        self.assertEqual(len(self.handle), 1)
+        self.assertEqual(len(self.handle), self.handle.gridCount())
+
+    def test_getitem(self):
+        self.assertIsInstance(self.handle[0], nanovdb.FloatGrid)
+        self.assertIsInstance(self.handle[-1], nanovdb.FloatGrid)
+
+    def test_out_of_range_raises_index_error(self):
+        with self.assertRaises(IndexError):
+            self.handle[1]
+        with self.assertRaises(IndexError):
+            self.handle[-2]
+
+    def test_iteration(self):
+        grids = list(self.handle)
+        self.assertEqual(len(grids), 1)
+        self.assertIsInstance(grids[0], nanovdb.FloatGrid)
 
 
 @unittest.skipIf(
