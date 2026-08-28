@@ -1189,8 +1189,7 @@ NB_MODULE(nanovdb, m)
     defineAccessor<T>(m, #Suffix "ReadAccessor");
 #include "BuildTypes.def"
 
-    // Host-side NodeManagerHandle + module-scope createNodeManager.
-    defineNodeManagerHandle(m);
+    // Module-scope createNodeManager (returns the typed NodeManager).
     defineCreateNodeManager(m);
 
     // PointAccessor variants — PointIndex grids carry uint32 indices,
