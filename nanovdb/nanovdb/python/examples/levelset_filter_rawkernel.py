@@ -103,7 +103,8 @@ void laplacian_step(const NanoGrid<ValueOnIndex>* grid,
     if (smem_leafIndex[tID] == VBM::UnusedLeafIndex) return;
 
     uint64_t st[27];
-    VBM::computeBoxStencil<ValueOnIndex>(grid, smem_leafIndex, smem_voxelOffset, st);
+    VBM::computeBoxStencil<ValueOnIndex>(
+        grid, smem_leafIndex[tID], smem_voxelOffset[tID], st);
 
     const uint64_t c = st[13];
     const float vc = vin[c];
@@ -131,7 +132,8 @@ void godunov_step(const NanoGrid<ValueOnIndex>* grid,
     if (smem_leafIndex[tID] == VBM::UnusedLeafIndex) return;
 
     uint64_t st[27];
-    VBM::computeBoxStencil<ValueOnIndex>(grid, smem_leafIndex, smem_voxelOffset, st);
+    VBM::computeBoxStencil<ValueOnIndex>(
+        grid, smem_leafIndex[tID], smem_voxelOffset[tID], st);
 
     const uint64_t c = st[13];
     const float vc = vin[c];
@@ -176,7 +178,8 @@ void extrapolate(const NanoGrid<ValueOnIndex>* grid,
     if (smem_leafIndex[tID] == VBM::UnusedLeafIndex) return;
 
     uint64_t st[27];
-    VBM::computeBoxStencil<ValueOnIndex>(grid, smem_leafIndex, smem_voxelOffset, st);
+    VBM::computeBoxStencil<ValueOnIndex>(
+        grid, smem_leafIndex[tID], smem_voxelOffset[tID], st);
 
     const uint64_t c = st[13];
     const float vc = vin[c];

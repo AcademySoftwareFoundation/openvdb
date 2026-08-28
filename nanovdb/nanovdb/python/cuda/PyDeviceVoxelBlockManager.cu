@@ -382,17 +382,17 @@ __global__ void gatherBoxStencilKernel(
     constexpr int BW  = 1 << Log2BlockWidth;
     constexpr int JML = BW / 64;
     using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
-    __shared__ uint32_t smem_leafIndex[BW];
-    __shared__ uint16_t smem_voxelOffset[BW];
     const uint64_t blockFirstOffset = firstOffset + uint64_t(blockIdx.x) * BW;
-    VBM::template decodeInverseMaps<ValueOnIndex>(
-        grid, firstLeafID[blockIdx.x], &jumpMap[uint64_t(blockIdx.x) * JML],
-        blockFirstOffset, smem_leafIndex, smem_voxelOffset);
     const int tID = threadIdx.x;
-    if (smem_leafIndex[tID] == VBM::UnusedLeafIndex) return;
+    uint32_t leafIndex;
+    uint16_t voxelOffset;
+    VBM::template decodeInverseMap<ValueOnIndex>(
+        grid, firstLeafID[blockIdx.x], &jumpMap[uint64_t(blockIdx.x) * JML],
+        blockFirstOffset, tID, leafIndex, voxelOffset);
+    if (leafIndex == VBM::UnusedLeafIndex) return;
     uint64_t st[27];
     VBM::template computeBoxStencil<ValueOnIndex>(
-        grid, smem_leafIndex, smem_voxelOffset, st);
+        grid, leafIndex, voxelOffset, st);
     const uint64_t c = st[13];                              // centre value index
     #pragma unroll
     for (int j = 0; j < 27; ++j) out[c * 27 + j] = values[st[j]];  // 0 -> background
@@ -464,17 +464,17 @@ __global__ void gatherBoxStencilColumnsKernel(
     constexpr int BW  = 1 << Log2BlockWidth;
     constexpr int JML = BW / 64;
     using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
-    __shared__ uint32_t smem_leafIndex[BW];
-    __shared__ uint16_t smem_voxelOffset[BW];
     const uint64_t blockFirstOffset = firstOffset + uint64_t(blockIdx.x) * BW;
-    VBM::template decodeInverseMaps<ValueOnIndex>(
-        grid, firstLeafID[blockIdx.x], &jumpMap[uint64_t(blockIdx.x) * JML],
-        blockFirstOffset, smem_leafIndex, smem_voxelOffset);
     const int tID = threadIdx.x;
-    if (smem_leafIndex[tID] == VBM::UnusedLeafIndex) return;
+    uint32_t leafIndex;
+    uint16_t voxelOffset;
+    VBM::template decodeInverseMap<ValueOnIndex>(
+        grid, firstLeafID[blockIdx.x], &jumpMap[uint64_t(blockIdx.x) * JML],
+        blockFirstOffset, tID, leafIndex, voxelOffset);
+    if (leafIndex == VBM::UnusedLeafIndex) return;
     uint64_t st[27];
     VBM::template computeBoxStencil<ValueOnIndex>(
-        grid, smem_leafIndex, smem_voxelOffset, st);
+        grid, leafIndex, voxelOffset, st);
     const uint64_t c = st[13];                              // centre value index
     for (int col = 0; col < K; ++col) out[c * K + col] = values[st[spokes.s[col]]];
 }
