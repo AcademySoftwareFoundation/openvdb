@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /*!
-    \file DualDeviceBuffer.h
+    \file DeviceBuffer.h
 
     \author Ken Museth
 
