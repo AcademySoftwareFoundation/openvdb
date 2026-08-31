@@ -60,6 +60,39 @@ TEST_F(TestMeshToVolume, testUtils)
     EXPECT_TRUE( mZ == 9);
 }
 
+// Regression test for the checkNeighbours(pos, data, mask) overload in
+// mesh_to_volume_internal: each of its 26 branches hand-computes a flat-array
+// offset for one entry of util::COORD_OFFSETS from the node's i/j/k strides, so a
+// copy-paste slip in any single branch (as happened for i+1,j,k-1, which reused
+// the i+1,j,k offset and so silently ignored a negative neighbour on read) goes
+// undetected by callers that never place a negative value at that exact offset.
+// This checks all 26 branches against the offset table directly.
+TEST_F(TestMeshToVolume, testCheckNeighboursOffsets)
+{
+    using namespace openvdb;
+    using namespace openvdb::tools::mesh_to_volume_internal;
+
+    using LeafT = FloatTree::LeafNodeType;
+    struct IsNegative { static bool check(float v) { return v < 0.0f; } };
+
+    // interior voxel, far enough from every face that all 26 neighbours are in-node
+    const Coord center(LeafT::DIM / 2, LeafT::DIM / 2, LeafT::DIM / 2);
+    const Index pos = LeafT::coordToOffset(center);
+
+    for (int m = 0; m < 26; ++m) {
+        std::vector<float> data(LeafT::NUM_VALUES, /*background=*/1.0f);
+        const Coord neighbourIjk = center + util::COORD_OFFSETS[m];
+        data[LeafT::coordToOffset(neighbourIjk)] = -1.0f;
+
+        bool mask[26] = {false};
+        mask[m] = true;
+
+        EXPECT_TRUE((checkNeighbours<IsNegative, LeafT>(pos, data.data(), mask)))
+            << "checkNeighbours missed neighbour offset " << m
+            << " = " << util::COORD_OFFSETS[m];
+    }
+}
+
 TEST_F(TestMeshToVolume, testConversion)
 {
     using namespace openvdb;
