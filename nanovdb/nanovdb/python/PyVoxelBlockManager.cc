@@ -44,15 +44,15 @@ static auto dispatchLog2BlockWidth(int log2BlockWidth, F&& fn)
         case 9: return fn(std::integral_constant<int, 9>{});
         default:
             throw nb::value_error(
-                "VoxelBlockManager: log2_block_width must be 6, 7, 8, or 9 "
+                "VoxelBlockManager: log2BlockWidth must be 6, 7, 8, or 9 "
                 "(BlockWidth = 64, 128, 256, or 512). Larger widths are not "
                 "bound in Python by default.");
     }
 }
 
 // PyVBMHandle wraps the C++ VoxelBlockManagerHandle and carries the
-// log2_block_width the handle was built with. The C++ handle does NOT store
-// log2_block_width itself, so without this wrapper the Python binding would
+// log2BlockWidth the handle was built with. The C++ handle does NOT store
+// log2BlockWidth itself, so without this wrapper the Python binding would
 // have to ask the caller every time — which the user can lie about and
 // trigger out-of-bounds reads of the metadata buffers. Storing it once at
 // build time and consulting it in every accessor closes that hole.
@@ -188,12 +188,12 @@ static void defineHandle(nb::module_& toolsModule)
              "by this handle.")
         .def("reset",       &PyVBMHandle::reset,
              "Release this handle's buffers and reset it to the empty state.")
-        .def_prop_ro("log2_block_width", [](const PyVBMHandle& h) { return h.log2BlockWidth; },
-            "The log2_block_width this handle was built with. The jumpMap "
+        .def_prop_ro("log2BlockWidth", [](const PyVBMHandle& h) { return h.log2BlockWidth; },
+            "The log2BlockWidth this handle was built with. The jumpMap "
             "and decodeBlock outputs derive their shapes from this value.")
-        .def_prop_ro("block_width", &PyVBMHandle::blockWidth,
-            "BlockWidth = 1 << log2_block_width (64, 128, 256, or 512).")
-        .def_prop_ro("jump_map_length", &PyVBMHandle::jumpMapLength,
+        .def_prop_ro("blockWidth", &PyVBMHandle::blockWidth,
+            "BlockWidth = 1 << log2BlockWidth (64, 128, 256, or 512).")
+        .def_prop_ro("jumpMapLength", &PyVBMHandle::jumpMapLength,
             "JumpMapLength = BlockWidth / 64 (1, 2, 4, or 8).")
         .def(
             "__bool__",
@@ -224,7 +224,7 @@ static void defineHandle(nb::module_& toolsModule)
             "default-constructed or reset() handle. The view keeps this "
             "handle alive.")
         // jumpMap is uint64_t[blockCount * JumpMapLength]. JumpMapLength is
-        // determined by the log2_block_width recorded on the handle, not by
+        // determined by the log2BlockWidth recorded on the handle, not by
         // the caller — that way the returned view always covers exactly the
         // allocated buffer, with no risk of OOB reads.
         .def("jumpMap",
@@ -248,22 +248,22 @@ static void defineHandle(nb::module_& toolsModule)
             nb::keep_alive<0, 1>(),
             "Return a zero-copy (blockCount, jump_map_length) uint64 NumPy "
             "view of the jumpMap. The shape is determined by the "
-            "log2_block_width the handle was built with. Returns an empty "
+            "log2BlockWidth the handle was built with. Returns an empty "
             "(0, jump_map_length) array on a default-constructed or reset() "
             "handle. The view keeps this handle alive.")
         // Decode the inverse maps for a single block of this VBM. The
-        // log2_block_width is taken from the handle, so the caller cannot
+        // log2BlockWidth is taken from the handle, so the caller cannot
         // request a width that doesn't match what was built.
         .def("decodeBlock",
             [](PyVBMHandle& self,
                nb::handle py_grid,
-               uint64_t block_index) -> nb::object {
+               uint64_t blockIndex) -> nb::object {
                 const auto* grid = castOnIndexGrid(py_grid,
                     "VoxelBlockManagerHandle.decodeBlock");
-                if (block_index >= self.blockCount()) {
+                if (blockIndex >= self.blockCount()) {
                     throw nb::index_error(
-                        "VoxelBlockManagerHandle.decodeBlock(block_index): "
-                        "block_index out of range [0, blockCount).");
+                        "VoxelBlockManagerHandle.decodeBlock(blockIndex): "
+                        "blockIndex out of range [0, blockCount).");
                 }
                 // Defensive: NanoVDB's buildVoxelBlockManager doesn't always
                 // initialize firstLeafID for blocks where no leaf starts at
@@ -275,7 +275,7 @@ static void defineHandle(nb::module_& toolsModule)
                 // read of tree.getFirstNode<0>()[garbage]. Catch the case
                 // and raise rather than segfault.
                 const uint32_t firstLeafID =
-                    self.handle.hostFirstLeafID()[block_index];
+                    self.handle.hostFirstLeafID()[blockIndex];
                 const uint32_t nLeaves = grid->tree().nodeCount(0);
                 if (firstLeafID >= nLeaves) {
                     throw nb::value_error(
@@ -295,19 +295,19 @@ static void defineHandle(nb::module_& toolsModule)
                     constexpr int JumpMapLength =
                         VoxelBlockManagerBase<LBW>::JumpMapLength;
                     const uint64_t blockFirstOffset =
-                        self.firstOffset() + block_index * BlockWidth;
+                        self.firstOffset() + blockIndex * BlockWidth;
                     return pyDecodeInverseMapsImpl<LBW>(
                         *grid,
                         firstLeafID,
-                        self.handle.hostJumpMap() + block_index * JumpMapLength,
+                        self.handle.hostJumpMap() + blockIndex * JumpMapLength,
                         blockFirstOffset);
                 });
             },
-            "grid"_a, "block_index"_a,
-            "Decode the inverse maps for the block_index-th block of this "
+            "grid"_a, "blockIndex"_a,
+            "Decode the inverse maps for the blockIndex-th block of this "
             "VBM. Returns (leaf_index, voxel_offset) uint32 / uint16 NumPy "
-            "arrays of length BlockWidth = 1<<log2_block_width, using the "
-            "log2_block_width the handle was built with.");
+            "arrays of length BlockWidth = 1<<log2BlockWidth, using the "
+            "log2BlockWidth the handle was built with.");
 }
 
 // ------------------- buildVoxelBlockManager binding -----------------------
@@ -316,10 +316,10 @@ static void defineBuild(nb::module_& toolsModule)
 {
     toolsModule.def("buildVoxelBlockManager",
         [](nb::handle py_grid,
-           int log2_block_width,
-           uint64_t first_offset,
-           uint64_t last_offset,
-           uint64_t n_blocks) -> PyVBMHandle {
+           int log2BlockWidth,
+           uint64_t firstOffset,
+           uint64_t lastOffset,
+           uint64_t nBlocks) -> PyVBMHandle {
             const auto* grid = castOnIndexGrid(py_grid, "buildVoxelBlockManager");
             // The C++ implementation only NANOVDB_ASSERTs these preconditions,
             // which makes them no-ops in release builds. Validate them here
@@ -331,25 +331,25 @@ static void defineBuild(nb::module_& toolsModule)
                     "layout). NanoVDB grids constructed via "
                     "tools.createOnIndexGrid satisfy this by default.");
             }
-            return dispatchLog2BlockWidth(log2_block_width, [&](auto W) {
+            return dispatchLog2BlockWidth(log2BlockWidth, [&](auto W) {
                 constexpr int LBW = decltype(W)::value;
                 using Base = VoxelBlockManagerBase<LBW>;
                 constexpr uint64_t BlockWidth    = Base::BlockWidth;
                 constexpr uint64_t JumpMapLength = Base::JumpMapLength;
-                // first_offset must be 1 (mod BlockWidth). The single-arg
+                // firstOffset must be 1 (mod BlockWidth). The single-arg
                 // C++ helper would normalize a zero input to 1; we do the
                 // same here so the in-place builder below sees a valid
                 // value. Validate the nonzero case ourselves.
-                if (first_offset != 0 &&
-                    ((first_offset - 1) & (BlockWidth - 1)) != 0) {
+                if (firstOffset != 0 &&
+                    ((firstOffset - 1) & (BlockWidth - 1)) != 0) {
                     throw nb::value_error(
-                        "buildVoxelBlockManager: first_offset must satisfy "
-                        "first_offset == 1 (mod BlockWidth). Pass 0 (the "
+                        "buildVoxelBlockManager: firstOffset must satisfy "
+                        "firstOffset == 1 (mod BlockWidth). Pass 0 (the "
                         "default) to let the implementation use 1.");
                 }
-                if (first_offset == 0) first_offset = 1;
-                if (last_offset  == 0) last_offset  = grid->activeVoxelCount();
-                if (last_offset < first_offset) return PyVBMHandle();
+                if (firstOffset == 0) firstOffset = 1;
+                if (lastOffset  == 0) lastOffset  = grid->activeVoxelCount();
+                if (lastOffset < firstOffset) return PyVBMHandle();
                 // Capacity must hold at least ceil((last - first + 1) /
                 // BlockWidth) blocks; otherwise the handle's lastOffset
                 // would advertise more coverage than blockCount allows
@@ -357,18 +357,18 @@ static void defineBuild(nb::module_& toolsModule)
                 // below equals the ceil() above when BlockWidth is a
                 // power of two.
                 const uint64_t minBlocks =
-                    (last_offset - first_offset + BlockWidth) >> LBW;
-                if (n_blocks != 0 && n_blocks < minBlocks) {
+                    (lastOffset - firstOffset + BlockWidth) >> LBW;
+                if (nBlocks != 0 && nBlocks < minBlocks) {
                     std::string msg(
-                        "buildVoxelBlockManager: n_blocks must be at "
-                        "least ceil((last_offset - first_offset + 1) / "
+                        "buildVoxelBlockManager: nBlocks must be at "
+                        "least ceil((lastOffset - firstOffset + 1) / "
                         "BlockWidth) = ");
                     msg += std::to_string(minBlocks);
                     msg += ". Pass 0 (the default) to use the minimum "
                            "required capacity.";
                     throw nb::value_error(msg.c_str());
                 }
-                if (n_blocks == 0) n_blocks = minBlocks;
+                if (nBlocks == 0) nBlocks = minBlocks;
                 // Allocate the metadata buffers ourselves so we can
                 // pre-initialize firstLeafID with a sentinel value before
                 // the in-place builder runs. The C++ allocating overload
@@ -380,20 +380,20 @@ static void defineBuild(nb::module_& toolsModule)
                 // up front, every untouched slot deterministically trips
                 // the guard.
                 auto firstLeafIDBuf = HostBuffer::create(
-                    n_blocks * sizeof(uint32_t));
+                    nBlocks * sizeof(uint32_t));
                 auto jumpMapBuf = HostBuffer::create(
-                    n_blocks * JumpMapLength * sizeof(uint64_t));
+                    nBlocks * JumpMapLength * sizeof(uint64_t));
                 const uint32_t nLeaves = grid->tree().nodeCount(0);
                 {
                     uint32_t* slots = static_cast<uint32_t*>(
                         firstLeafIDBuf.data());
-                    for (uint64_t i = 0; i < n_blocks; ++i) {
+                    for (uint64_t i = 0; i < nBlocks; ++i) {
                         slots[i] = nLeaves;
                     }
                 }
                 VoxelBlockManagerHandle<HostBuffer> handle(
                     std::move(firstLeafIDBuf), std::move(jumpMapBuf),
-                    n_blocks, first_offset, last_offset);
+                    nBlocks, firstOffset, lastOffset);
                 // In-place builder zeros the jumpMap itself and only
                 // touches firstLeafID slots it actually visits. Release the
                 // GIL around it — it's pure C++ (touches no Python objects)
@@ -406,16 +406,16 @@ static void defineBuild(nb::module_& toolsModule)
             });
         },
         "grid"_a,
-        "log2_block_width"_a = 6,
-        "first_offset"_a = 0,
-        "last_offset"_a = 0,
-        "n_blocks"_a = 0,
+        "log2BlockWidth"_a = 6,
+        "firstOffset"_a = 0,
+        "lastOffset"_a = 0,
+        "nBlocks"_a = 0,
         "Build a host-side VoxelBlockManager from an OnIndexGrid. "
-        "log2_block_width selects the per-block active-voxel count "
-        "(6=64, 7=128, 8=256, 9=512). Pass 0 for first_offset / "
-        "last_offset / n_blocks to use the full grid (first active "
+        "log2BlockWidth selects the per-block active-voxel count "
+        "(6=64, 7=128, 8=256, 9=512). Pass 0 for firstOffset / "
+        "lastOffset / nBlocks to use the full grid (first active "
         "voxel through grid.activeVoxelCount(), minimum block count). "
-        "first_offset, if nonzero, must satisfy first_offset == 1 "
+        "firstOffset, if nonzero, must satisfy firstOffset == 1 "
         "(mod BlockWidth).");
 }
 
@@ -425,14 +425,14 @@ static void defineDecode(nb::module_& toolsModule)
 {
     toolsModule.def("decodeInverseMaps",
         [](nb::handle py_grid,
-           uint32_t first_leaf_id,
+           uint32_t firstLeafId,
            nb::ndarray<const uint64_t, nb::ndim<1>,
-                       nb::c_contig, nb::device::cpu> jump_map,
-           uint64_t block_first_offset,
-           int log2_block_width) -> nb::object {
+                       nb::c_contig, nb::device::cpu> jumpMap,
+           uint64_t blockFirstOffset,
+           int log2BlockWidth) -> nb::object {
             const auto* grid = castOnIndexGrid(py_grid, "decodeInverseMaps");
-            // The C++ helper indexes tree.getFirstNode<0>()[first_leaf_id]
-            // without a bounds check, so a stray first_leaf_id leads to an
+            // The C++ helper indexes tree.getFirstNode<0>()[firstLeafId]
+            // without a bounds check, so a stray firstLeafId leads to an
             // OOB read. Validate up front. (We also require isSequential();
             // getFirstNode only makes sense on a sequential tree.)
             if (!grid->isSequential()) {
@@ -441,37 +441,37 @@ static void defineDecode(nb::module_& toolsModule)
                     "grid.isSequential().");
             }
             const uint32_t nLeaves = grid->tree().nodeCount(0);
-            if (first_leaf_id >= nLeaves) {
+            if (firstLeafId >= nLeaves) {
                 throw nb::index_error(
-                    "decodeInverseMaps: first_leaf_id out of range "
+                    "decodeInverseMaps: firstLeafId out of range "
                     "[0, grid.tree().nodeCount(0)).");
             }
-            return dispatchLog2BlockWidth(log2_block_width, [&](auto W) {
+            return dispatchLog2BlockWidth(log2BlockWidth, [&](auto W) {
                 constexpr int LBW = decltype(W)::value;
                 constexpr int JumpMapLength =
                     VoxelBlockManagerBase<LBW>::JumpMapLength;
-                if (jump_map.shape(0) != JumpMapLength) {
-                    std::string msg("decodeInverseMaps: jump_map must have "
+                if (jumpMap.shape(0) != JumpMapLength) {
+                    std::string msg("decodeInverseMaps: jumpMap must have "
                                     "length JumpMapLength = ");
                     msg += std::to_string(JumpMapLength);
-                    msg += " for log2_block_width=";
+                    msg += " for log2BlockWidth=";
                     msg += std::to_string(LBW);
                     throw nb::value_error(msg.c_str());
                 }
                 return pyDecodeInverseMapsImpl<LBW>(
-                    *grid, first_leaf_id, jump_map.data(),
-                    block_first_offset);
+                    *grid, firstLeafId, jumpMap.data(),
+                    blockFirstOffset);
             });
         },
         "grid"_a,
-        "first_leaf_id"_a,
-        "jump_map"_a,
-        "block_first_offset"_a,
-        "log2_block_width"_a = 6,
+        "firstLeafId"_a,
+        "jumpMap"_a,
+        "blockFirstOffset"_a,
+        "log2BlockWidth"_a = 6,
         "Decode the inverse maps for a single voxel block of an OnIndexGrid. "
         "Returns a (leaf_index, voxel_offset) tuple of fresh NumPy arrays of "
-        "length BlockWidth = 1<<log2_block_width. jump_map must have length "
-        "BlockWidth/64. first_leaf_id must be in [0, grid.tree().nodeCount(0)).");
+        "length BlockWidth = 1<<log2BlockWidth. jumpMap must have length "
+        "BlockWidth/64. firstLeafId must be in [0, grid.tree().nodeCount(0)).");
 }
 
 // ----- createOnIndexGrid test-scaffold factory ----------------------------
@@ -483,8 +483,8 @@ static void defineDecode(nb::module_& toolsModule)
 template<typename SrcBuildT>
 static nb::object tryCreateOnIndexGrid(nb::handle py_grid,
                                        uint32_t channels,
-                                       bool include_stats,
-                                       bool include_tiles,
+                                       bool includeStats,
+                                       bool includeTiles,
                                        int verbose)
 {
     using SrcGridT = NanoGrid<SrcBuildT>;
@@ -494,7 +494,7 @@ static nb::object tryCreateOnIndexGrid(nb::handle py_grid,
     const SrcGridT& src = nb::cast<const SrcGridT&>(py_grid);
     return nb::cast(
         tools::createNanoGrid<SrcGridT, ValueOnIndex, HostBuffer>(
-            src, channels, include_stats, include_tiles, verbose));
+            src, channels, includeStats, includeTiles, verbose));
 }
 
 static void defineCreateOnIndexGrid(nb::module_& toolsModule)
@@ -502,31 +502,31 @@ static void defineCreateOnIndexGrid(nb::module_& toolsModule)
     toolsModule.def("createOnIndexGrid",
         [](nb::handle py_grid,
            uint32_t channels,
-           bool include_stats,
-           bool include_tiles,
+           bool includeStats,
+           bool includeTiles,
            int verbose) -> nb::object {
             // Try every source BuildT we accept.
             if (auto r = tryCreateOnIndexGrid<float>(
-                    py_grid, channels, include_stats, include_tiles, verbose);
+                    py_grid, channels, includeStats, includeTiles, verbose);
                 r.is_valid()) return r;
             if (auto r = tryCreateOnIndexGrid<double>(
-                    py_grid, channels, include_stats, include_tiles, verbose);
+                    py_grid, channels, includeStats, includeTiles, verbose);
                 r.is_valid()) return r;
             if (auto r = tryCreateOnIndexGrid<int32_t>(
-                    py_grid, channels, include_stats, include_tiles, verbose);
+                    py_grid, channels, includeStats, includeTiles, verbose);
                 r.is_valid()) return r;
             if (auto r = tryCreateOnIndexGrid<Vec3f>(
-                    py_grid, channels, include_stats, include_tiles, verbose);
+                    py_grid, channels, includeStats, includeTiles, verbose);
                 r.is_valid()) return r;
             throw nb::type_error(
                 "createOnIndexGrid: source grid must be a FloatGrid, "
                 "DoubleGrid, Int32Grid, or Vec3fGrid (other source BuildTs "
                 "are not yet bound).");
         },
-        "src_grid"_a,
+        "srcGrid"_a,
         "channels"_a = 0u,
-        "include_stats"_a = true,
-        "include_tiles"_a = true,
+        "includeStats"_a = true,
+        "includeTiles"_a = true,
         "verbose"_a = 0,
         "Convert a source grid into a NanoGrid<ValueOnIndex> "
         "(OnIndexGrid). Accepts FloatGrid / DoubleGrid / Int32Grid / "
