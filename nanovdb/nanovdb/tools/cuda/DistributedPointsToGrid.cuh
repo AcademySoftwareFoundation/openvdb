@@ -453,7 +453,7 @@ public:
     /// @param pointCount number of input points or voxels
     /// @param buffer Optional buffer to guide the allocation
     /// @return returns a handle with a grid of type NanoGrid<BuildT> in unified memory
-    template <typename PtrT, typename BufferT = nanovdb::cuda::UnifiedBuffer>
+    template <typename PtrT, typename BufferT = nanovdb::cuda::DualUnifiedBuffer>
     GridHandle<BufferT> getHandle(const PtrT points,
                                   size_t pointCount,
                                   const BufferT &buffer = BufferT());
@@ -461,7 +461,7 @@ public:
     template <typename PtrT>
     void countNodes(const PtrT coords, size_t coordCount);
 
-    template <typename PtrT, typename BufferT = nanovdb::cuda::UnifiedBuffer>
+    template <typename PtrT, typename BufferT = nanovdb::cuda::DualUnifiedBuffer>
     BufferT getBuffer(const PtrT, size_t pointCount, const BufferT &buffer);
 
     template <typename PtrT>
