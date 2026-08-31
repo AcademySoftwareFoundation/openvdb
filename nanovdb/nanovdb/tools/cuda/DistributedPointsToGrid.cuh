@@ -15,12 +15,21 @@
 #define NANOVDB_TOOLS_CUDA_DISTRIBUTEDPOINTSTOGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/GridHandle.h>
+#include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/DeviceMesh.h>
+#include <nanovdb/cuda/DeviceResource.h>
+#include <nanovdb/cuda/HandleStorage.h>
+#include <nanovdb/cuda/ManagedResource.h>
+#include <nanovdb/cuda/PinnedResource.h>
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 #include <nanovdb/util/cuda/Util.h>
 #include <algorithm>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <cuda/cmath>
 
@@ -164,8 +173,8 @@ inline void mergeStreams(const nanovdb::cuda::DeviceMesh& deviceMesh, cudaEvent_
     }
 }
 
-template<typename KeyT, typename ValueT, typename NumItemsT, typename OffsetT, typename CountT>
-void radixSortAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cuda::TempDevicePool* pools, KeyT* keysIn, KeyT* keysOut, ValueT* valuesIn, ValueT* valuesOut, NumItemsT numItems, OffsetT* mergeIntervals, const OffsetT* offsets, const CountT* counts, cudaEvent_t* preEvents, cudaEvent_t* postEvents)
+template<typename PoolT, typename KeyT, typename ValueT, typename NumItemsT, typename OffsetT, typename CountT>
+void radixSortAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, PoolT* pools, KeyT* keysIn, KeyT* keysOut, ValueT* valuesIn, ValueT* valuesOut, NumItemsT numItems, OffsetT* mergeIntervals, const OffsetT* offsets, const CountT* counts, cudaEvent_t* preEvents, cudaEvent_t* postEvents)
 {
     if (!numItems) return;
 
@@ -308,18 +317,16 @@ void radixSortAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cuda::
     mergeStreams(deviceMesh, postEvents);
 }
 
-template<typename KeyT, typename ValueT, typename NumItemsT, typename OffsetT, typename CountT>
-void radixSortAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cuda::TempDevicePool* pools, KeyT* keysIn, KeyT* keysOut, ValueT* valuesIn, ValueT* valuesOut, NumItemsT numItems, const OffsetT* offsets, const CountT* counts, cudaEvent_t* preEvents, cudaEvent_t* postEvents)
+template<typename PoolT, typename KeyT, typename ValueT, typename NumItemsT, typename OffsetT, typename CountT>
+void radixSortAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, PoolT* pools, KeyT* keysIn, KeyT* keysOut, ValueT* valuesIn, ValueT* valuesOut, NumItemsT numItems, const OffsetT* offsets, const CountT* counts, cudaEvent_t* preEvents, cudaEvent_t* postEvents)
 {
-    ptrdiff_t* mergeIntervals = nullptr;
-    cudaCheck(cudaMallocHost(&mergeIntervals, 2 * (deviceMesh.deviceCount() + 1) * sizeof(ptrdiff_t)));
-    radixSortAsync(deviceMesh, pools, keysIn, keysOut, valuesIn, valuesOut, numItems, mergeIntervals, offsets, counts, preEvents, postEvents);
-    cudaCheck(cudaFreeHost(mergeIntervals));
+    nanovdb::cuda::Buffer<ptrdiff_t, nanovdb::cuda::PinnedResource> mergeIntervals(2 * (deviceMesh.deviceCount() + 1), nanovdb::cuda::noInit);
+    radixSortAsync(deviceMesh, pools, keysIn, keysOut, valuesIn, valuesOut, numItems, mergeIntervals.data(), offsets, counts, preEvents, postEvents);
 }
 
 /// @brief Launches an async exclusive sum operation across multiple devices. The operator waits on the per-device preEvents[deviceId] before summing over that device's contributions and records postEvents[deviceId] when the device's contribution is summed.
-template<typename InputIteratorT, typename OutputIteratorT, typename CountIteratorT, int NumThreads = 128>
-void exclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cuda::TempDevicePool* pools, InputIteratorT in, OutputIteratorT out, CountIteratorT counts, cudaEvent_t* preEvents, cudaEvent_t* postEvents)
+template<typename PoolT, typename InputIteratorT, typename OutputIteratorT, typename CountIteratorT, int NumThreads = 128>
+void exclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, PoolT* pools, InputIteratorT in, OutputIteratorT out, CountIteratorT counts, cudaEvent_t* preEvents, cudaEvent_t* postEvents)
 {
     InputIteratorT deviceIn = in;
     OutputIteratorT deviceOut = out;
@@ -361,8 +368,8 @@ void exclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cud
 }
 
 /// @brief Launches an async inclusive sum operation across multiple devices. The operator waits on the per-device preEvents[deviceId] before summing over that device's contributions and records postEvents[deviceId] when the device's contribution is summed.
-template<typename InputIteratorT, typename OutputIteratorT, typename CountIteratorT, int NumThreads = 128>
-void inclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cuda::TempDevicePool* pools, InputIteratorT in, OutputIteratorT out, CountIteratorT counts, cudaEvent_t* preEvents, cudaEvent_t* postEvents)
+template<typename PoolT, typename InputIteratorT, typename OutputIteratorT, typename CountIteratorT, int NumThreads = 128>
+void inclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, PoolT* pools, InputIteratorT in, OutputIteratorT out, CountIteratorT counts, cudaEvent_t* preEvents, cudaEvent_t* postEvents)
 {
     InputIteratorT deviceIn = in;
     OutputIteratorT deviceOut = out;
@@ -404,27 +411,44 @@ void inclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cud
 }
 
 /// @brief This class implements a multiGPU approach for building NanoVDB grids from input arrays of points
-template <typename BuildT>
+/// @tparam BuildT Build type of the output grid, i.e NanoGrid<BuildT>
+/// @tparam ResourceT Memory resource type that device-local allocations (CUB scratch and
+///         per-device sort scratch) route through, one instance per device in the mesh.
+///         Metadata and arrays that the host and multiple devices read from the same
+///         allocation stay in managed memory and do not route through these resources.
+template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class DistributedPointsToGrid
 {
 public:
-    /// @brief Constructor that specifies the devices on which to execute and the map for the output grid
+    /// @brief Constructor that specifies the devices on which to execute and the map for the output grid,
+    ///        routing device-local allocations through the default instance of @c ResourceT on every device
     /// @param deviceMesh DeviceMesh on which to run/distribute the operation
     /// @param map Map to be used for the output grid
     DistributedPointsToGrid(const nanovdb::cuda::DeviceMesh& deviceMesh, const Map &map);
+    /// @brief Constructor that also supplies the per-device memory resources
+    /// @param deviceMesh DeviceMesh on which to run/distribute the operation
+    /// @param map Map to be used for the output grid
+    /// @param resources one non-null resource-instance pointer per device in the mesh,
+    ///        indexed by device id; each instance allocates on its device and must outlive this class
+    /// @throw std::invalid_argument if the resource count differs from the mesh's device count
+    ///        or any entry is null
+    DistributedPointsToGrid(const nanovdb::cuda::DeviceMesh& deviceMesh, const Map &map, const std::vector<ResourceT*>& resources);
     /// @brief Constructor that specifies the devices on which to execute and the scale and translation used to create the map for the output grid
     /// @param deviceMesh DeviceMesh on which to run/distribute the operation
     /// @param scale optional scale factor
     /// @param trans optional translation
     DistributedPointsToGrid(const nanovdb::cuda::DeviceMesh& deviceMesh, const double scale = 1.0, const Vec3d &trans = Vec3d(0.0));
-
-    /// @brief Destructor
-    ~DistributedPointsToGrid();
+    /// @brief Constructor that specifies the map as a scale and translation, and supplies the per-device
+    ///        memory resources; see the map-taking overload for the contract on @c resources
+    DistributedPointsToGrid(const nanovdb::cuda::DeviceMesh& deviceMesh, const double scale, const Vec3d &trans, const std::vector<ResourceT*>& resources);
 
     /// @brief Creates a handle to a grid with the specified build type from a list of points in index or world space
     /// @tparam BuildT Build type of the output grid, i.e NanoGrid<BuildT>
     /// @tparam PtrT Template type to a raw or fancy-pointer of point coordinates in world or index space.
-    /// @tparam BufferT Template type of buffer used for memory allocation on the device. Must support Unified Memory.
+    /// @tparam BufferT Template type of buffer used for memory allocation on the device. Must hold storage
+    ///         that every device in the mesh and the host can address, i.e. managed memory: the legacy
+    ///         UnifiedBuffer or a cuda::Buffer over a host- and device-accessible resource such as
+    ///         cuda::Buffer<std::byte, cuda::ManagedResource>.
     /// @param points device pointer to an array of points or voxels
     /// @param pointCount number of input points or voxels
     /// @param buffer Optional buffer to guide the allocation
@@ -458,13 +482,42 @@ private:
 
     uint32_t* deviceNodeOffset(int deviceId) const { return mNodeOffsets + 3 * deviceId; }
 
+    /// @brief Shared post-constructor setup: sizes the per-device pools off mResources
+    ///        and allocates the metadata arrays; mResources must already be filled.
+    void init(const Map &map);
+
+    // Storage that the host and several devices address through one allocation
+    // (the shared PointsToGridData struct, the device-striped key/index arrays
+    // and the per-device count/offset arrays) is managed memory by design and
+    // does not route through the injected resources, which are per-device.
+    template<typename T>
+    using ManagedBufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ManagedResource>;
+    template<typename T>
+    using DeviceBufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ResourceRef<ResourceT>>;
+
     const nanovdb::cuda::DeviceMesh& mDeviceMesh;
-    nanovdb::cuda::TempDevicePool* mTempDevicePools;
+    std::vector<ResourceT*> mResources;// non-owning, one per device; all device-local scratch routes through these
+    std::vector<nanovdb::cuda::TempPool<ResourceT>> mTempDevicePools;
 
     PointType mPointType;
     std::string mGridName;
-    PointsToGridData<BuildT> *mData;
     CheckMode mChecksum{CheckMode::Disable};
+
+    // Owners of the shared metadata that the raw-pointer views below (and the
+    // device-visible fields inside mData) address. The pipeline frees the
+    // countNodes-phase owners in processBBox once every stream has synchronized;
+    // the views are never read past that point.
+    ManagedBufT<PointsToGridData<BuildT>> mDataBuf;
+    ManagedBufT<size_t>    mStripeCountsBuf;
+    ManagedBufT<ptrdiff_t> mStripeOffsetsBuf;
+    ManagedBufT<uint32_t>  mNodeCountsBuf, mNodeOffsetsBuf, mVoxelCountsBuf, mVoxelOffsetsBuf;
+    nanovdb::cuda::Buffer<ptrdiff_t, nanovdb::cuda::PinnedResource> mIntervalsBuf;
+    ManagedBufT<uint64_t>  mKeysBuf, mValueIndexBuf, mValueIndexPrefixBuf;
+    ManagedBufT<uint32_t>  mIndicesBuf, mPointsPerTileBuf;
+    ManagedBufT<uint64_t>  mDataKeysBuf, mTileKeysBuf, mLowerKeysBuf, mLeafKeysBuf;
+    ManagedBufT<uint32_t>  mDataIndicesBuf, mPointsPerLeafBuf, mPointsPerLeafPrefixBuf, mPointsPerVoxelBuf, mPointsPerVoxelPrefixBuf;
+
+    PointsToGridData<BuildT> *mData;
 
     size_t* mStripeCounts;
     ptrdiff_t* mStripeOffsets;
@@ -481,57 +534,71 @@ private:
     uint64_t* mValueIndexPrefix;
 };
 
-template <typename BuildT>
-DistributedPointsToGrid<BuildT>::DistributedPointsToGrid(const nanovdb::cuda::DeviceMesh& deviceMesh, const Map &map)
+template <typename BuildT, typename ResourceT>
+DistributedPointsToGrid<BuildT, ResourceT>::DistributedPointsToGrid(const nanovdb::cuda::DeviceMesh& deviceMesh, const Map &map)
     : mDeviceMesh(deviceMesh), mPointType(PointType::Disable)
 {
-    mTempDevicePools = new nanovdb::cuda::TempDevicePool[mDeviceMesh.deviceCount()];
-
-    cudaCheck(cudaMallocManaged(&mData, sizeof(PointsToGridData<BuildT>)));
-    mData->map = map;
-
-    mStripeCounts = nullptr;
-    cudaCheck(cudaMallocManaged(&mStripeCounts, mDeviceMesh.deviceCount() * sizeof(size_t)));
-    mStripeOffsets = nullptr;
-    cudaCheck(cudaMallocManaged(&mStripeOffsets, mDeviceMesh.deviceCount() * sizeof(ptrdiff_t)));
-    mNodeCounts = nullptr;
-    cudaCheck(cudaMallocManaged(&mNodeCounts, 3 * mDeviceMesh.deviceCount() * sizeof(uint32_t)));
-    mNodeOffsets = nullptr;
-    cudaCheck(cudaMallocManaged(&mNodeOffsets, 3 * mDeviceMesh.deviceCount() * sizeof(uint32_t)));
-    mVoxelCounts = nullptr;
-    cudaCheck(cudaMallocManaged(&mVoxelCounts, mDeviceMesh.deviceCount() * sizeof(uint32_t)));
-    mVoxelOffsets = nullptr;
-    cudaCheck(cudaMallocManaged(&mVoxelOffsets, mDeviceMesh.deviceCount() * sizeof(uint32_t)));
-    mIntervals = nullptr;
-    cudaCheck(cudaMallocHost(&mIntervals, 2 * (mDeviceMesh.deviceCount() + 1) * sizeof(ptrdiff_t)));
+    mResources.assign(mDeviceMesh.deviceCount(), &nanovdb::cuda::default_resource<ResourceT>());
+    this->init(map);
 }
 
-template <typename BuildT>
-DistributedPointsToGrid<BuildT>::DistributedPointsToGrid(const nanovdb::cuda::DeviceMesh& deviceMesh, const double scale, const Vec3d &trans)
+template <typename BuildT, typename ResourceT>
+DistributedPointsToGrid<BuildT, ResourceT>::DistributedPointsToGrid(const nanovdb::cuda::DeviceMesh& deviceMesh, const Map &map, const std::vector<ResourceT*>& resources)
+    : mDeviceMesh(deviceMesh), mPointType(PointType::Disable)
+{
+    if (resources.size() != static_cast<size_t>(mDeviceMesh.deviceCount()))
+        throw std::invalid_argument("DistributedPointsToGrid: expected one memory resource per device in the mesh");
+    for (auto* resource : resources) {
+        if (!resource) throw std::invalid_argument("DistributedPointsToGrid: every per-device memory resource must be non-null");
+    }
+    mResources = resources;
+    this->init(map);
+}
+
+template <typename BuildT, typename ResourceT>
+void DistributedPointsToGrid<BuildT, ResourceT>::init(const Map &map)
+{
+    mTempDevicePools.reserve(mDeviceMesh.deviceCount());
+    for (const auto& [deviceId, stream] : mDeviceMesh) {
+        mTempDevicePools.emplace_back(*mResources[deviceId]);
+    }
+
+    mDataBuf = ManagedBufT<PointsToGridData<BuildT>>(1, nanovdb::cuda::noInit);
+    mData = mDataBuf.data();
+    mData->map = map;
+
+    mStripeCountsBuf = ManagedBufT<size_t>(mDeviceMesh.deviceCount(), nanovdb::cuda::noInit);
+    mStripeCounts = mStripeCountsBuf.data();
+    mStripeOffsetsBuf = ManagedBufT<ptrdiff_t>(mDeviceMesh.deviceCount(), nanovdb::cuda::noInit);
+    mStripeOffsets = mStripeOffsetsBuf.data();
+    mNodeCountsBuf = ManagedBufT<uint32_t>(3 * mDeviceMesh.deviceCount(), nanovdb::cuda::noInit);
+    mNodeCounts = mNodeCountsBuf.data();
+    mNodeOffsetsBuf = ManagedBufT<uint32_t>(3 * mDeviceMesh.deviceCount(), nanovdb::cuda::noInit);
+    mNodeOffsets = mNodeOffsetsBuf.data();
+    mVoxelCountsBuf = ManagedBufT<uint32_t>(mDeviceMesh.deviceCount(), nanovdb::cuda::noInit);
+    mVoxelCounts = mVoxelCountsBuf.data();
+    mVoxelOffsetsBuf = ManagedBufT<uint32_t>(mDeviceMesh.deviceCount(), nanovdb::cuda::noInit);
+    mVoxelOffsets = mVoxelOffsetsBuf.data();
+    mIntervalsBuf = nanovdb::cuda::Buffer<ptrdiff_t, nanovdb::cuda::PinnedResource>(2 * (mDeviceMesh.deviceCount() + 1), nanovdb::cuda::noInit);
+    mIntervals = mIntervalsBuf.data();
+}
+
+template <typename BuildT, typename ResourceT>
+DistributedPointsToGrid<BuildT, ResourceT>::DistributedPointsToGrid(const nanovdb::cuda::DeviceMesh& deviceMesh, const double scale, const Vec3d &trans)
     : DistributedPointsToGrid(deviceMesh, Map(scale, trans))
 {
 }
 
-template <typename BuildT>
-DistributedPointsToGrid<BuildT>::~DistributedPointsToGrid()
+template <typename BuildT, typename ResourceT>
+DistributedPointsToGrid<BuildT, ResourceT>::DistributedPointsToGrid(const nanovdb::cuda::DeviceMesh& deviceMesh, const double scale, const Vec3d &trans, const std::vector<ResourceT*>& resources)
+    : DistributedPointsToGrid(deviceMesh, Map(scale, trans), resources)
 {
-    cudaCheck(cudaFreeHost(mIntervals));
-    cudaCheck(cudaFree(mVoxelOffsets));
-    cudaCheck(cudaFree(mVoxelCounts));
-    cudaCheck(cudaFree(mNodeOffsets));
-    cudaCheck(cudaFree(mNodeCounts));
-    cudaCheck(cudaFree(mStripeOffsets));
-    cudaCheck(cudaFree(mStripeCounts));
-
-    cudaCheck(cudaFree(mData));
-
-    delete[] mTempDevicePools;
 }
 
-template<typename BuildT>
+template<typename BuildT, typename ResourceT>
 template<typename PtrT, typename BufferT>
 inline GridHandle<BufferT>
-DistributedPointsToGrid<BuildT>::getHandle(const PtrT points, size_t pointCount, const BufferT &pool)
+DistributedPointsToGrid<BuildT, ResourceT>::getHandle(const PtrT points, size_t pointCount, const BufferT &pool)
 {
     this->countNodes(points, pointCount);
 
@@ -549,38 +616,53 @@ DistributedPointsToGrid<BuildT>::getHandle(const PtrT points, size_t pointCount,
         int deviceId = 0;
         auto stream = mDeviceMesh[deviceId].stream;
         cudaCheck(cudaSetDevice(deviceId));
-        tools::cuda::updateChecksum((GridData*)buffer.deviceData(), mChecksum, stream);
+        tools::cuda::updateChecksum((GridData*)nanovdb::cuda::detail::deviceStorageData(buffer), mChecksum, stream);
         cudaCheck(cudaStreamSynchronize(stream));
     }
 
     return GridHandle<BufferT>(std::move(buffer));
-}// DistributedPointsToGrid<BuildT>::getHandle
+}// DistributedPointsToGrid<BuildT, ResourceT>::getHandle
 
-template <typename BuildT>
+template <typename BuildT, typename ResourceT>
 template <typename PtrT>
-void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coordCount)
+void DistributedPointsToGrid<BuildT, ResourceT>::countNodes(const PtrT coords, size_t coordCount)
 {
-    // Use cudaMallocManaged calls for now in order to share the PointsToGrid::Data structure
-    cudaCheck(cudaMallocManaged(&mData->d_keys, coordCount * sizeof(uint64_t)));
-    cudaCheck(cudaMallocManaged(&mData->d_tile_keys, coordCount * sizeof(uint64_t))); // oversubscribe to avoid sync point later
-    cudaCheck(cudaMallocManaged(&mData->d_lower_keys, coordCount * sizeof(uint64_t))); // oversubscribe to avoid sync point later
-    cudaCheck(cudaMallocManaged(&mData->d_leaf_keys, coordCount * sizeof(uint64_t))); // oversubscribe to avoid sync point later
-    cudaCheck(cudaMallocManaged(&mData->d_indx, coordCount * sizeof(uint32_t)));
+    // The host and several devices address these arrays through one allocation, so they
+    // stay managed; the owners are members because processBBox releases them later.
+    mDataKeysBuf = ManagedBufT<uint64_t>(coordCount, nanovdb::cuda::noInit);
+    mData->d_keys = mDataKeysBuf.data();
+    mTileKeysBuf = ManagedBufT<uint64_t>(coordCount, nanovdb::cuda::noInit); // oversubscribe to avoid sync point later
+    mData->d_tile_keys = mTileKeysBuf.data();
+    mLowerKeysBuf = ManagedBufT<uint64_t>(coordCount, nanovdb::cuda::noInit); // oversubscribe to avoid sync point later
+    mData->d_lower_keys = mLowerKeysBuf.data();
+    mLeafKeysBuf = ManagedBufT<uint64_t>(coordCount, nanovdb::cuda::noInit); // oversubscribe to avoid sync point later
+    mData->d_leaf_keys = mLeafKeysBuf.data();
+    mDataIndicesBuf = ManagedBufT<uint32_t>(coordCount, nanovdb::cuda::noInit);
+    mData->d_indx = mDataIndicesBuf.data();
 
-    cudaCheck(cudaMallocManaged(&mData->pointsPerLeaf, coordCount * sizeof(uint32_t)));
-    cudaCheck(cudaMallocManaged(&mData->pointsPerLeafPrefix, coordCount * sizeof(uint32_t)));
+    mPointsPerLeafBuf = ManagedBufT<uint32_t>(coordCount, nanovdb::cuda::noInit);
+    mData->pointsPerLeaf = mPointsPerLeafBuf.data();
+    mPointsPerLeafPrefixBuf = ManagedBufT<uint32_t>(coordCount, nanovdb::cuda::noInit);
+    mData->pointsPerLeafPrefix = mPointsPerLeafPrefixBuf.data();
 
-    cudaCheck(cudaMallocManaged(&mData->pointsPerVoxel, coordCount * sizeof(uint32_t)));
-    cudaCheck(cudaMallocManaged(&mData->pointsPerVoxelPrefix, coordCount * sizeof(uint32_t)));
+    mPointsPerVoxelBuf = ManagedBufT<uint32_t>(coordCount, nanovdb::cuda::noInit);
+    mData->pointsPerVoxel = mPointsPerVoxelBuf.data();
+    mPointsPerVoxelPrefixBuf = ManagedBufT<uint32_t>(coordCount, nanovdb::cuda::noInit);
+    mData->pointsPerVoxelPrefix = mPointsPerVoxelPrefixBuf.data();
 
-    cudaCheck(cudaMallocManaged(&mKeys, coordCount * sizeof(uint64_t)));
-    cudaCheck(cudaMallocManaged(&mIndices, coordCount * sizeof(uint32_t)));
+    mKeysBuf = ManagedBufT<uint64_t>(coordCount, nanovdb::cuda::noInit);
+    mKeys = mKeysBuf.data();
+    mIndicesBuf = ManagedBufT<uint32_t>(coordCount, nanovdb::cuda::noInit);
+    mIndices = mIndicesBuf.data();
 
-    cudaCheck(cudaMallocManaged(&mPointsPerTile, coordCount * sizeof(uint32_t)));
+    mPointsPerTileBuf = ManagedBufT<uint32_t>(coordCount, nanovdb::cuda::noInit);
+    mPointsPerTile = mPointsPerTileBuf.data();
 
     if constexpr(BuildTraits<BuildT>::is_onindex) {
-        cudaCheck(cudaMallocManaged(&mValueIndex, coordCount * sizeof(uint64_t))); // oversubscribe to avoid sync point later
-        cudaCheck(cudaMallocManaged(&mValueIndexPrefix, coordCount * sizeof(uint64_t))); // oversubscribe to avoid sync point later
+        mValueIndexBuf = ManagedBufT<uint64_t>(coordCount, nanovdb::cuda::noInit); // oversubscribe to avoid sync point later
+        mValueIndex = mValueIndexBuf.data();
+        mValueIndexPrefixBuf = ManagedBufT<uint64_t>(coordCount, nanovdb::cuda::noInit); // oversubscribe to avoid sync point later
+        mValueIndexPrefix = mValueIndexPrefixBuf.data();
     }
 
     // Create events required for host-device and cross-device synchronization. Disable timing if not needed in order
@@ -648,7 +730,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         }
     }
 
-    radixSortAsync(mDeviceMesh, mTempDevicePools, mData->d_keys, mKeys, mData->d_indx, mIndices, coordCount, mIntervals, mStripeOffsets, mStripeCounts, sortEvents.data(), sortEvents.data());
+    radixSortAsync(mDeviceMesh, mTempDevicePools.data(), mData->d_keys, mKeys, mData->d_indx, mIndices, coordCount, mIntervals, mStripeOffsets, mStripeCounts, sortEvents.data(), sortEvents.data());
 
     // Rebalance the device segments so that a device boundary always coincides
     // with a change in key value. Because TileKeyFunctor assigns identical keys
@@ -730,8 +812,11 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
 
         if (numDeviceTiles >= SEGMENTED_SORT_TILE_THRESHOLD) {
             // Bulk segmented sort: one kernel launch + one segmented radix sort (faster for many tiles)
-            uint32_t* d_tile_offsets = nullptr;
-            cudaCheck(cudaMallocManaged(&d_tile_offsets, (numDeviceTiles + 1) * sizeof(uint32_t)));
+            // Only this device's stream touches the offsets, so they come from the per-device
+            // resource, stream-ordered, and are freed on the same stream at scope exit (the
+            // synchronous cudaFree this replaces stalled the whole device mid-pipeline).
+            DeviceBufT<uint32_t> tileOffsetsBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResources[deviceId]), numDeviceTiles + 1, nanovdb::cuda::noInit);
+            uint32_t* d_tile_offsets = tileOffsetsBuf.data();
             cudaCheck(cudaMemsetAsync(d_tile_offsets, 0, sizeof(uint32_t), stream));
             CUB_LAUNCH(DeviceScan::InclusiveSum, mTempDevicePools[deviceId], stream, devicePointsPerTile, d_tile_offsets + 1, numDeviceTiles);
 
@@ -743,8 +828,6 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
             util::cuda::lambdaKernel<<<numBlocks(deviceStripeCount), mNumThreads, 0, stream>>>(deviceStripeCount, BulkVoxelKeyFunctor<BuildT, PtrT>(), mData, coords, d_tile_offsets, numDeviceTiles, deviceKeys, deviceIndices, tileIdOffset);
             cudaCheckError();
             CUB_LAUNCH(DeviceSegmentedRadixSort::SortPairs, mTempDevicePools[deviceId], stream, deviceKeys, deviceOutputKeys, deviceIndices, deviceOutputIndices, (int)deviceStripeCount, (int)numDeviceTiles, d_tile_offsets, d_tile_offsets + 1, 0, 36);
-
-            cudaCheck(cudaFree(d_tile_offsets));
         } else {
             // Serial per-tile sort: individual kernel + sort per tile (lower overhead for few tiles)
             for (uint32_t i = 0, tileOffset = 0, id = tileIdOffset; i < numDeviceTiles; ++i) {
@@ -802,9 +885,9 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         }
     }
 
-    exclusiveSumAsync(mDeviceMesh, mTempDevicePools, mData->pointsPerVoxel, mData->pointsPerVoxelPrefix, mVoxelCounts, voxelCountEvents.data(), voxelPrefixSumEvents.data());
+    exclusiveSumAsync(mDeviceMesh, mTempDevicePools.data(), mData->pointsPerVoxel, mData->pointsPerVoxelPrefix, mVoxelCounts, voxelCountEvents.data(), voxelPrefixSumEvents.data());
     LeafCountIterator leafCountIterator(mNodeCounts);
-    exclusiveSumAsync(mDeviceMesh, mTempDevicePools, mData->pointsPerLeaf, mData->pointsPerLeafPrefix, leafCountIterator, leafCountEvents.data(), leafPrefixSumEvents.data());
+    exclusiveSumAsync(mDeviceMesh, mTempDevicePools.data(), mData->pointsPerLeaf, mData->pointsPerLeafPrefix, leafCountIterator, leafCountEvents.data(), leafPrefixSumEvents.data());
 
     uint32_t leafOffset = 0;
     for (const auto& [deviceId, stream] : mDeviceMesh) {
@@ -866,11 +949,11 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         cudaEventDestroy(voxelPrefixSumEvents[deviceId]);
         cudaEventDestroy(leafPrefixSumEvents[deviceId]);
     }
-} // DistributedPointsToGrid<BuildT>::countNodes
+} // DistributedPointsToGrid<BuildT, ResourceT>::countNodes
 
-template <typename BuildT>
+template <typename BuildT, typename ResourceT>
 template <typename PtrT, typename BufferT>
-inline BufferT DistributedPointsToGrid<BuildT>::getBuffer(const PtrT, size_t pointCount, const BufferT &pool)
+inline BufferT DistributedPointsToGrid<BuildT, ResourceT>::getBuffer(const PtrT, size_t pointCount, const BufferT &pool)
 {
     auto sizeofPoint = [&]()->size_t{
         switch (mPointType){
@@ -909,16 +992,19 @@ inline BufferT DistributedPointsToGrid<BuildT>::getBuffer(const PtrT, size_t poi
     mData->blind = mData->meta  + sizeof(GridBlindMetaData)*int( mPointType!=PointType::Disable ); // meta data ends and blind data begins
     mData->size  = mData->blind + pointCount*sizeofPoint();// end of buffer
 
-    auto buffer = BufferT::create(mData->size, &pool);
-    mData->d_bufferPtr = buffer.deviceData();
+    // cudaCpuDeviceId keeps the legacy create(size, pool) behavior for the dual/managed
+    // family: pages start host-preferred and migrate to each writing device on first touch.
+    // Single-space buffers allocate through their resource and ignore the device argument.
+    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(mData->size, &pool, cudaCpuDeviceId, mDeviceMesh[0].stream);
+    mData->d_bufferPtr = nanovdb::cuda::detail::deviceStorageData(buffer);
     if (!mData->d_bufferPtr)
-        throw std::runtime_error("Failed to allocate grid buffer in Unified Memory");
+        throw std::runtime_error("The grid buffer type produced no device-accessible memory");
     return buffer;
-}// DistributedPointsToGrid<BuildT>::getBuffer
+}// DistributedPointsToGrid<BuildT, ResourceT>::getBuffer
 
-template <typename BuildT>
+template <typename BuildT, typename ResourceT>
 template <typename PtrT>
-inline void DistributedPointsToGrid<BuildT>::processGridTreeRoot(const PtrT points, size_t pointCount)
+inline void DistributedPointsToGrid<BuildT, ResourceT>::processGridTreeRoot(const PtrT points, size_t pointCount)
 {
     // Process root node on device 0. Other devices will wait until root node processing is complete.
     int deviceId = 0;
@@ -947,10 +1033,10 @@ inline void DistributedPointsToGrid<BuildT>::processGridTreeRoot(const PtrT poin
 
     cudaCheck(cudaSetDevice(deviceId));
     cudaEventDestroy(processGridTreeRootEvent);
-}// DistributedPointsToGrid<BuildT>::processGridTreeRoot
+}// DistributedPointsToGrid<BuildT, ResourceT>::processGridTreeRoot
 
-template <typename BuildT>
-inline void DistributedPointsToGrid<BuildT>::processNodes()
+template <typename BuildT, typename ResourceT>
+inline void DistributedPointsToGrid<BuildT, ResourceT>::processNodes()
 {
     // Parallel construction of upper, lower, and leaf nodes
     const uint8_t flags = (uint8_t) GridFlags::HasBBox;
@@ -1013,7 +1099,7 @@ inline void DistributedPointsToGrid<BuildT>::processNodes()
         }
 
         LeafCountIterator leafCountIterator(mNodeCounts);
-        inclusiveSumAsync(mDeviceMesh, mTempDevicePools, mValueIndex, mValueIndexPrefix, leafCountIterator, leafCountEvents.data(), valueIndexPrefixSumEvents.data());
+        inclusiveSumAsync(mDeviceMesh, mTempDevicePools.data(), mValueIndex, mValueIndexPrefix, leafCountIterator, leafCountEvents.data(), valueIndexPrefixSumEvents.data());
 
         // The first leaf on each device reads the last prefix value produced by the
         // previous device, while the first leaf globally reads the final prefix value.
@@ -1039,16 +1125,16 @@ inline void DistributedPointsToGrid<BuildT>::processNodes()
         }
     }
 
-}// DistributedPointsToGrid<BuildT>::processNodes
+}// DistributedPointsToGrid<BuildT, ResourceT>::processNodes
 
-template <typename BuildT>
+template <typename BuildT, typename ResourceT>
 template <typename PtrT>
-inline void DistributedPointsToGrid<BuildT>::processPoints(const PtrT, size_t)
+inline void DistributedPointsToGrid<BuildT, ResourceT>::processPoints(const PtrT, size_t)
 {
 }
 
-template <typename BuildT>
-inline void DistributedPointsToGrid<BuildT>::processBBox()
+template <typename BuildT, typename ResourceT>
+inline void DistributedPointsToGrid<BuildT, ResourceT>::processBBox()
 {
     // Compute and propagate bounding boxes for the upper nodes and their descendents belonging to each device in parallel.
     std::vector<cudaEvent_t> propagateLowerBBoxEvents(mDeviceMesh.deviceCount());
@@ -1108,27 +1194,43 @@ inline void DistributedPointsToGrid<BuildT>::processBBox()
         cudaStreamSynchronize(stream);
     }
 
+    // Release the countNodes-phase scratch now that every stream has synchronized,
+    // and null the raw views so nothing addresses the freed arrays.
     if constexpr(BuildTraits<BuildT>::is_onindex) {
-        cudaCheck(cudaFree(mValueIndexPrefix));
-        cudaCheck(cudaFree(mValueIndex));
+        mValueIndexPrefixBuf.destroy();
+        mValueIndexPrefix = nullptr;
+        mValueIndexBuf.destroy();
+        mValueIndex = nullptr;
     }
 
-    cudaCheck(cudaFree(mPointsPerTile));
-    cudaCheck(cudaFree(mIndices));
-    cudaCheck(cudaFree(mKeys));
+    mPointsPerTileBuf.destroy();
+    mPointsPerTile = nullptr;
+    mIndicesBuf.destroy();
+    mIndices = nullptr;
+    mKeysBuf.destroy();
+    mKeys = nullptr;
 
-    cudaCheck(cudaFree(mData->pointsPerLeafPrefix));
-    cudaCheck(cudaFree(mData->pointsPerLeaf));
+    mPointsPerLeafPrefixBuf.destroy();
+    mData->pointsPerLeafPrefix = nullptr;
+    mPointsPerLeafBuf.destroy();
+    mData->pointsPerLeaf = nullptr;
 
-    cudaCheck(cudaFree(mData->pointsPerVoxelPrefix));
-    cudaCheck(cudaFree(mData->pointsPerVoxel));
+    mPointsPerVoxelPrefixBuf.destroy();
+    mData->pointsPerVoxelPrefix = nullptr;
+    mPointsPerVoxelBuf.destroy();
+    mData->pointsPerVoxel = nullptr;
 
-    cudaCheck(cudaFree(mData->d_indx));
-    cudaCheck(cudaFree(mData->d_leaf_keys));
-    cudaCheck(cudaFree(mData->d_lower_keys));
-    cudaCheck(cudaFree(mData->d_tile_keys));
-    cudaCheck(cudaFree(mData->d_keys));
-}// DistributedPointsToGrid<BuildT>::processBBox
+    mDataIndicesBuf.destroy();
+    mData->d_indx = nullptr;
+    mLeafKeysBuf.destroy();
+    mData->d_leaf_keys = nullptr;
+    mLowerKeysBuf.destroy();
+    mData->d_lower_keys = nullptr;
+    mTileKeysBuf.destroy();
+    mData->d_tile_keys = nullptr;
+    mDataKeysBuf.destroy();
+    mData->d_keys = nullptr;
+}// DistributedPointsToGrid<BuildT, ResourceT>::processBBox
 
 } // namespace tools::cuda
 

@@ -289,6 +289,67 @@ TEST(TestNanoVDBMultiGPU, SingleVoxel_DistributedCudaPointsToGrid_UnifiedBuffer)
     cudaSetDevice(current); // restore device so subsequent tests don't fail
 }// SingleVoxel_DistributedCudaPointsToGrid_UnifiedBuffer
 
+/// @brief Resource that counts (non-null) allocations and deallocations so per-device
+///        routing and leaks can be asserted. Delegates the actual work to DeviceResource.
+struct CountingResource : nanovdb::cuda::SyncFromAsync<CountingResource>
+{
+    static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
+    int allocs = 0;
+    int deallocs = 0;
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream) {
+        void* p = nanovdb::cuda::DeviceResource{}.allocate_async(bytes, alignment, stream);
+        if (p) ++allocs;
+        return p;
+    }
+    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream) {
+        if (p) ++deallocs;
+        nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
+    }
+};
+
+/// @brief Tests that DistributedPointsToGrid routes its device-local allocations (CUB
+///        scratch and sort scratch) through caller-supplied per-device resource instances,
+///        and returns every allocation to the instance it came from.
+TEST(TestNanoVDBMultiGPU, PerDeviceResources_DistributedCudaPointsToGrid)
+{
+    int current = 0;
+    cudaCheck(cudaGetDevice(&current));
+
+    using BufferT = nanovdb::cuda::UnifiedBuffer;
+    using BuildT = nanovdb::ValueOnIndex;
+    // A 32^3 dense block spans several leaves, so with an even initial striping every
+    // device in the mesh runs the count-phase CUB pipeline through its own pool.
+    const size_t voxelCount = 32 * 32 * 32;
+    nanovdb::Coord* voxels = nullptr;
+    cudaCheck(cudaMallocManaged(&voxels, voxelCount * sizeof(nanovdb::Coord)));
+    for (int32_t i = 0; i < 32; ++i)
+        for (int32_t j = 0; j < 32; ++j)
+            for (int32_t k = 0; k < 32; ++k)
+                voxels[i * 32 * 32 + j * 32 + k] = nanovdb::Coord(i, j, k);
+
+    nanovdb::cuda::DeviceMesh deviceMesh;
+    std::vector<CountingResource> resources(deviceMesh.deviceCount());
+    std::vector<CountingResource*> resourcePtrs;
+    for (auto& resource : resources) resourcePtrs.push_back(&resource);
+
+    {
+        nanovdb::tools::cuda::DistributedPointsToGrid<BuildT, CountingResource> converter(deviceMesh, 1.0, nanovdb::Vec3d(0.0), resourcePtrs);
+        auto handle = converter.getHandle(voxels, voxelCount, BufferT());
+
+        auto* grid = handle.grid<BuildT>();
+        ASSERT_TRUE(grid);
+        EXPECT_EQ(voxelCount, grid->activeVoxelCount());
+    }// converter and handle destroyed: every pool has returned its scratch
+
+    for (const auto& resource : resources) {
+        EXPECT_GT(resource.allocs, 0);
+        EXPECT_EQ(resource.allocs, resource.deallocs);
+    }
+
+    cudaCheck(cudaFree(voxels));
+    cudaSetDevice(current); // restore device so subsequent tests don't fail
+}// PerDeviceResources_DistributedCudaPointsToGrid
+
 /// @brief Tests multi-GPU creation of grids for a single dense leaf
 TEST(TestNanoVDBMultiGPU, DenseLeaf_DistributedCudaPointsToGrid_UnifiedBuffer)
 {
