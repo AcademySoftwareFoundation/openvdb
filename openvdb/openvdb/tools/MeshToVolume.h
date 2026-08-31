@@ -1645,7 +1645,7 @@ checkNeighbours(const Index pos, const typename LeafNodeType::ValueType * data, 
     // i + 1, j, k
     if (mask[0] && Compare::check(data[pos + NodeT::DIM * NodeT::DIM]))                   return true;
     // i+1, j, k-1
-    if (mask[6] && Compare::check(data[pos + NodeT::DIM * NodeT::DIM]))                   return true;
+    if (mask[6] && Compare::check(data[pos + NodeT::DIM * NodeT::DIM - 1]))               return true;
     // i-1, j, k-1
     if (mask[7] && Compare::check(data[pos - NodeT::DIM * NodeT::DIM - 1]))               return true;
     // i+1, j, k+1

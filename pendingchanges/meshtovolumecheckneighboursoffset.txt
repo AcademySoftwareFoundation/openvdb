@@ -1,0 +1,5 @@
+OpenVDB:
+  Bug Fixes:
+  - Fixed an incorrect voxel offset in MeshToVolume.h's checkNeighbours() that caused the
+    (i+1, j, k-1) edge-adjacent neighbor to be checked at the wrong location, duplicating
+    the (i+1, j, k) neighbor instead.
