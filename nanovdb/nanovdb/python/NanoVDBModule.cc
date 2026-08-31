@@ -14,10 +14,8 @@
 
 #include <sstream>
 
-#include "cuda/PyDeviceBuffer.h"
 #include "PyBuildGrid.h"
 #include "PyGridHandle.h"
-#include "PyHostBuffer.h"
 #include "PyIO.h"
 #include "PyMath.h"
 #include "PyTools.h"
@@ -1189,8 +1187,7 @@ NB_MODULE(nanovdb, m)
     defineAccessor<T>(m, #Suffix "ReadAccessor");
 #include "BuildTypes.def"
 
-    // Host-side NodeManagerHandle + module-scope createNodeManager.
-    defineNodeManagerHandle(m);
+    // Module-scope createNodeManager (returns the typed NodeManager).
     defineCreateNodeManager(m);
 
     // PointAccessor variants — PointIndex grids carry uint32 indices,
@@ -1214,11 +1211,9 @@ NB_MODULE(nanovdb, m)
           "channel of an IndexGrid or OnIndexGrid, dispatching on the "
           "channel's recorded dataType. The accessor keeps the grid alive.");
 
-    defineHostBuffer(m);
     defineHostGridHandle(m);
 
 #ifdef NANOVDB_USE_CUDA
-    defineDeviceBuffer(m);
     defineDeviceGridHandle(m);
 #endif
 

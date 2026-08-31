@@ -1,0 +1,4 @@
+NanoVDB:
+
+  Improvements:
+  - The NanoVDB Python bindings shed their memory-management ceremony: GridHandle and DeviceGridHandle now support the sequence protocol (len(handle), handle[i] with negative indices and IndexError out of range, and iteration — same typed-grid dispatch as handle.grid(n)); nanovdb.createNodeManager(grid) returns the typed NodeManager directly (the NodeManagerHandle class and its mgr() hop are gone; the manager keeps its node-index buffer and the source grid alive internally); and the vestigial buffer= keyword was removed from nanovdb.io.readGrid(s)/deviceReadGrid(s) and the 13 tools.create* primitive factories along with the opaque zero-method HostBuffer and DeviceBuffer Python classes, aligning the Python vocabulary with the planned C++ HostBuffer/DeviceBuffer retirement (issue #2232). Factories still return GridHandles, keeping host/device and single/multi-grid usage uniform.
