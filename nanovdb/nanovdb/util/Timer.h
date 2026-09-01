@@ -44,14 +44,15 @@ public:
         mStop = std::chrono::high_resolution_clock::now();
     }
 
-    /// @brief Returns the time in milliseconds since record was called
+    /// @brief Returns the (fractional) time in milliseconds since record was called
     float milliseconds() const
     {
-        return std::chrono::duration_cast<std::chrono::milliseconds>(mStop - mStart).count();
+        return std::chrono::duration<float, std::milli>(mStop - mStart).count();
     }
 
     /// @brief call record and return the elapsed time (since start) in miliseconds
-    template <typename AccuracyT = std::chrono::milliseconds>
+    /// @note Default accuracy is fractional milliseconds, matching util::cuda::Timer's reporting.
+    template <typename AccuracyT = std::chrono::duration<float, std::milli>>
     auto elapsed()
     {
         this->record();
@@ -59,9 +60,12 @@ public:
     }
 
     /// @brief stop the timer and print elapsed time to a stream
-    /// @tparam AccuracyT Template parameter defining the accuracy of the reported times
+    /// @tparam AccuracyT Template parameter defining the accuracy of the reported times.
+    ///         Defaults to fractional milliseconds (double<milli>) so the host Timer's output
+    ///         granularity matches util::cuda::Timer (which prints fractional ms via
+    ///         cudaEventElapsedTime). Explicit integer std::chrono units still work.
     /// @param os output stream for the message above
-    template <typename AccuracyT = std::chrono::milliseconds>
+    template <typename AccuracyT = std::chrono::duration<double, std::milli>>
     void stop(std::ostream& os = std::cerr)
     {
         mStop = std::chrono::high_resolution_clock::now();
@@ -69,7 +73,8 @@ public:
         os << "completed in " << diff;
         if (std::is_same<AccuracyT, std::chrono::microseconds>::value) {// resolved at compile-time
             os << " microseconds" << std::endl;
-        } else if (std::is_same<AccuracyT, std::chrono::milliseconds>::value) {
+        } else if (std::is_same<AccuracyT, std::chrono::duration<double, std::milli>>::value ||
+                   std::is_same<AccuracyT, std::chrono::milliseconds>::value) {
             os << " milliseconds" << std::endl;
         } else if (std::is_same<AccuracyT, std::chrono::seconds>::value) {
             os << " seconds" << std::endl;
@@ -82,7 +87,7 @@ public:
     /// @tparam AccuracyT Template parameter defining the accuracy of the reported times
     /// @param msg string message to be printed when timer is started
     /// @param os output stream for the message above
-    template <typename AccuracyT = std::chrono::milliseconds>
+    template <typename AccuracyT = std::chrono::duration<double, std::milli>>
     void restart(const std::string &msg, std::ostream& os = std::cerr)
     {
         this->stop<AccuracyT>();

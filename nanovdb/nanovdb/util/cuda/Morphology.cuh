@@ -407,7 +407,7 @@ struct RefineInternalNodesFunctor
     void operator()(
         size_t srcLeafID,
         const NanoGrid<BuildT>* srcGrid,
-        const NanoRoot<BuildT>* prunedRoot,
+        const NanoRoot<BuildT>* refinedRoot,
         void *upperMasks_,
         void *lowerMasks_)
     {
@@ -432,9 +432,9 @@ struct RefineInternalNodesFunctor
                 const auto refinedOrigin = refineCoord(srcLeaf.origin()+nanovdb::Coord(di*4,dj*4,dk*4));
                 auto upperChildIndex = NanoUpper<BuildT>::CoordToOffset(refinedOrigin);
                 auto lowerChildIndex = NanoLower<BuildT>::CoordToOffset(refinedOrigin);
-                auto prunedTile = prunedRoot->probeTile(refinedOrigin);
+                auto refinedTile = refinedRoot->probeTile(refinedOrigin);
                 uint64_t tileChildIndex =
-                    util::PtrDiff(prunedTile, prunedRoot->tile(0))
+                    util::PtrDiff(refinedTile, refinedRoot->tile(0))
                     / sizeof(NanoRoot<BuildT>::Tile); // TODO: consider some faster integer division? or a way to avoid
                 auto& outputUpperMask = upperMasks[tileChildIndex];
                 outputUpperMask.setOnAtomic(upperChildIndex);
@@ -453,7 +453,7 @@ struct CoarsenInternalNodesFunctor
     void operator()(
         size_t srcLeafID,
         const NanoGrid<BuildT>* srcGrid,
-        const NanoRoot<BuildT>* prunedRoot,
+        const NanoRoot<BuildT>* coarsenedRoot,
         void *upperMasks_,
         void *lowerMasks_)
     {
@@ -467,9 +467,9 @@ struct CoarsenInternalNodesFunctor
             auto coarsenedOrigin = coarsenCoord(srcLeaf.origin()); // it's ok if this is not a multiple of 8
             auto upperChildIndex = NanoUpper<BuildT>::CoordToOffset(coarsenedOrigin);
             auto lowerChildIndex = NanoLower<BuildT>::CoordToOffset(coarsenedOrigin);
-            auto prunedTile = prunedRoot->probeTile(coarsenedOrigin);
+            auto coarsenedTile = coarsenedRoot->probeTile(coarsenedOrigin);
             uint64_t tileChildIndex =
-                util::PtrDiff(prunedTile, prunedRoot->tile(0))
+                util::PtrDiff(coarsenedTile, coarsenedRoot->tile(0))
                 / sizeof(NanoRoot<BuildT>::Tile); // TODO: consider some faster integer division? or a way to avoid
             auto& outputUpperMask = upperMasks[tileChildIndex];
             outputUpperMask.setOnAtomic(upperChildIndex);
@@ -543,8 +543,8 @@ struct ProcessLowerNodesFunctor
         uint32_t *lowerParents,
         uint32_t *leafParents)
     {
-        int dilatedTileID = blockIdx.x; // TODO: Rename this so it is not specific to dilation
-        int upperID = upperOffsets[dilatedTileID];
+        int processedTileID = blockIdx.x;
+        int upperID = upperOffsets[processedTileID];
         int sliceID = blockIdx.y;
         int threadInWarpID = threadIdx.x & 0x1f;
         int warpID = threadIdx.x >> 5;
@@ -559,19 +559,19 @@ struct ProcessLowerNodesFunctor
 
         const auto& dstTree = dstGrid->tree();
 
-        if (upperOffsets[dilatedTileID+1] > upperID) { // check that this particular dilated tile is not empty, i.e. it exists in the tree
+        if (upperOffsets[processedTileID+1] > upperID) { // check that this particular dilated tile is not empty, i.e. it exists in the tree
             const auto upperOrigin = dstTree.root().tile(upperID)->origin();
             auto& upper = const_cast<NanoUpper<BuildT>&>(dstTree.template getFirstNode<2>()[upperID]);
             for ( int jj = sliceID*LowerNodesPerSlice + warpID; jj < (sliceID+1)*LowerNodesPerSlice; jj += WarpsPerBlock ) {
-                if (upperMasks[dilatedTileID].isOn(jj)) {
+                if (upperMasks[processedTileID].isOn(jj)) {
                     const_cast<Mask<5>&>(upper.childMask()).setOnAtomic(jj);
-                    auto lowerID = lowerOffsets[dilatedTileID][jj];
+                    auto lowerID = lowerOffsets[processedTileID][jj];
                     auto& lower = const_cast<NanoLower<BuildT>&>(dstTree.template getFirstNode<1>()[lowerID]);
                     const auto lowerOrigin = upperOrigin + (NanoUpper<BuildT>::OffsetToLocalCoord(jj) << NanoUpper<BuildT>::ChildNodeType::TOTAL);
                     upper.setChild(jj, &lower);
                     lowerParents[lowerID] = upperID;
 
-                    auto lowerWords = lowerMasks[dilatedTileID][jj].words();
+                    auto lowerWords = lowerMasks[processedTileID][jj].words();
                     lower.mChildMask.words()[2*threadInWarpID  ] = lowerWords[2*threadInWarpID  ];
                     lower.mChildMask.words()[2*threadInWarpID+1] = lowerWords[2*threadInWarpID+1];
                     uint32_t prefixSum = util::countOn(lowerWords[2*threadInWarpID]) + util::countOn(lowerWords[2*threadInWarpID+1]);
@@ -580,7 +580,7 @@ struct ProcessLowerNodesFunctor
                         for ( int bitID = 0; bitID < 64; bitID++)
                             if ( lowerWords[wordID] & (1UL << bitID) ) {
                                 int kk = (wordID << 6) + bitID;
-                                int leafID = leafOffsets[dilatedTileID][jj] + prefixSum;
+                                int leafID = leafOffsets[processedTileID][jj] + prefixSum;
                                 auto& leaf = const_cast<NanoLeaf<BuildT>&>(dstTree.template getFirstNode<0>()[leafID]);
                                 lower.setChild(kk, &leaf);
                                 leafParents[leafID] = lowerID;
@@ -717,9 +717,13 @@ struct DilateLeafNodesFunctor<BuildT, tools::morphology::NN_FACE_EDGE_VERTEX>
                 auto& dstLeaf = *dstLower.data()->getChild(jj+tID);
                 const auto leafOrigin = dstLeaf.origin();
 
+                // [x-voxel offset][y-block offset][z-block offset], stored with a +1 bias so the
+                // logical ranges [-1,8]x[-1,1]x[-1,1] map to valid [0,10)x[0,3)x[0,3) indices.
+                // (A reinterpret_cast view anchored at [1][1][1] with negative indices is
+                // out-of-object pointer arithmetic = UB; host GCC at -O2+ miscompiles it.)
                 uint64_t originalWordsShifted[10][3][3] = {};
-                using WordStencilT = uint64_t (&)[10][3][3]; // Dimensions: [x-voxel offset][y-block offset][z-block offset]
-                auto& originalWords = reinterpret_cast<WordStencilT>(originalWordsShifted[1][1][1]); // Range: [-1,8][-1,1][-1,1]
+                auto originalWords = [&](int i, int j, int k) -> uint64_t& {
+                    return originalWordsShifted[i+1][j+1][k+1]; };
 
                 for (int dBi = -1; dBi <= 1; dBi++)
                 for (int dBj = -1; dBj <= 1; dBj++)
@@ -728,41 +732,41 @@ struct DilateLeafNodesFunctor<BuildT, tools::morphology::NN_FACE_EDGE_VERTEX>
                     if (auto neighborLeafPtr = srcTree.root().probeLeaf(neighborOrigin)) {
                         auto neighborWords = neighborLeafPtr->valueMask().words();
                         if (dBi == -1)
-                            originalWords[-1][dBj][dBk] = neighborWords[7];
+                            originalWords(-1,dBj,dBk) = neighborWords[7];
                         else if (dBi == 1)
-                            originalWords[8][dBj][dBk] = neighborWords[0];
+                            originalWords(8,dBj,dBk) = neighborWords[0];
                         else
                             for (int i = 0; i < 8; i++)
-                                originalWords[i][dBj][dBk] = neighborWords[i]; } }
+                                originalWords(i,dBj,dBk) = neighborWords[i]; } }
                 // Dilate along z-axis
                 for (int i = -1; i <= 8; i++)
                 for (int dBj = -1; dBj <= 1; dBj++) {
-                    uint64_t dilatedWord = originalWords[i][dBj][0];
+                    uint64_t dilatedWord = originalWords(i,dBj,0);
                     // Activate voxel if the neighbor at stencil offset ( 0, 0, 1) is active
-                    dilatedWord |= (originalWords[i][dBj][ 0] & 0xfefefefefefefefeUL) >> 1;
-                    dilatedWord |= (originalWords[i][dBj][ 1] & 0x0101010101010101UL) << 7;
+                    dilatedWord |= (originalWords(i,dBj, 0) & 0xfefefefefefefefeUL) >> 1;
+                    dilatedWord |= (originalWords(i,dBj, 1) & 0x0101010101010101UL) << 7;
                     // Activate voxel if the neighbor at stencil offset ( 0, 0,-1) is active
-                    dilatedWord |= (originalWords[i][dBj][ 0] & 0x7f7f7f7f7f7f7f7fUL) << 1;
-                    dilatedWord |= (originalWords[i][dBj][-1] & 0x8080808080808080UL) >> 7;
+                    dilatedWord |= (originalWords(i,dBj, 0) & 0x7f7f7f7f7f7f7f7fUL) << 1;
+                    dilatedWord |= (originalWords(i,dBj,-1) & 0x8080808080808080UL) >> 7;
                     // Replace original with dilation result
-                    originalWords[i][dBj][0] = dilatedWord; }
+                    originalWords(i,dBj,0) = dilatedWord; }
 
                 // Dilate along y-axis
                 for (int i = -1; i <= 8; i++) {
-                    uint64_t dilatedWord = originalWords[i][0][0];
+                    uint64_t dilatedWord = originalWords(i,0,0);
                     // Activate voxel if the neighbor at stencil offset ( 0, 1, 0) is active
-                    dilatedWord |= (originalWords[i][ 0][0] & 0xffffffffffffff00UL) >> 8;
-                    dilatedWord |= (originalWords[i][ 1][0] & 0x00000000000000ffUL) << 56;
+                    dilatedWord |= (originalWords(i, 0,0) & 0xffffffffffffff00UL) >> 8;
+                    dilatedWord |= (originalWords(i, 1,0) & 0x00000000000000ffUL) << 56;
                     // Activate voxel if the neighbor at stencil offset ( 0,-1, 0) is active
-                    dilatedWord |= (originalWords[i][ 0][0] & 0x00ffffffffffffffUL) << 8;
-                    dilatedWord |= (originalWords[i][-1][0] & 0xff00000000000000UL) >> 56;
+                    dilatedWord |= (originalWords(i, 0,0) & 0x00ffffffffffffffUL) << 8;
+                    dilatedWord |= (originalWords(i,-1,0) & 0xff00000000000000UL) >> 56;
                     // Replace original with dilation result
-                    originalWords[i][0][0] = dilatedWord; }
+                    originalWords(i,0,0) = dilatedWord; }
 
                 // Dilate along x-axis
                 auto dilatedWords = const_cast<Mask<3>&>(dstLeaf.valueMask()).words();
                 for (int i = 0; i <= 7; i++)
-                    dilatedWords[i] = originalWords[i-1][0][0] | originalWords[i][0][0] | originalWords[i+1][0][0];
+                    dilatedWords[i] = originalWords(i-1,0,0) | originalWords(i,0,0) | originalWords(i+1,0,0);
             }
         return;
     }
