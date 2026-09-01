@@ -1076,7 +1076,7 @@ ViewerImpl::windowRefreshCallback()
 bool
 ViewerImpl::needsDisplay()
 {
-    if (mUpdates < 2) {
+    if (mUpdates < 1) {
         mUpdates += 1;
         return true;
     }
