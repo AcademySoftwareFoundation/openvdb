@@ -1249,13 +1249,17 @@ TEST_F(TestCodec, testTopologyOnlyPreservesMaskTiles)
     // Leaf voxels keep their values because value and active state share one bit.
     auto topoAcc = readTopo->getConstAccessor();
     for (MaskGrid::ValueOnCIter it = readOriginal->cbeginValueOn(); it; ++it) {
-        if (it.isVoxelValue()) EXPECT_TRUE(topoAcc.isValueOn(it.getCoord()));
+        if (it.isVoxelValue()) {
+            EXPECT_TRUE(topoAcc.isValueOn(it.getCoord()));
+        }
     }
 
     // Tile values are reset to the background, matching a TopologyCopy, while the
     // tiles stay active.
     for (MaskGrid::ValueOnCIter it = readTopo->cbeginValueOn(); it; ++it) {
-        if (!it.isVoxelValue()) EXPECT_FALSE(*it);
+        if (!it.isVoxelValue()) {
+            EXPECT_FALSE(*it);
+        }
     }
 
     std::remove(path.c_str());
@@ -1306,7 +1310,9 @@ TEST_F(TestCodec, testTopologyOnlyClearsBoolTiles)
 
     // Values are discarded: tiles are reset to the background even where active.
     for (BoolGrid::ValueAllCIter it = readTopo->cbeginValueAll(); it; ++it) {
-        if (!it.isVoxelValue()) EXPECT_FALSE(*it);
+        if (!it.isVoxelValue()) {
+            EXPECT_FALSE(*it);
+        }
     }
 
     std::remove(path.c_str());
