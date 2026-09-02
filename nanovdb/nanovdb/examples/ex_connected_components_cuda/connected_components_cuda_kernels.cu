@@ -218,8 +218,8 @@ uint64_t connectedComponentsFromMesh(const std::vector<nanovdb::Vec3f>& points,
 
     // ---- Step 3: connected-components labeling on the selected grid. ----
     nanovdb::tools::cuda::ConnectedComponents<BuildT> cc(d_cc, stream);
-    auto [d_labels, numComponents] = cc.getVoxelLabelsAndCount();
-    cudaCheck(cudaStreamSynchronize(stream));
+    auto [labels, numComponents] = cc.getVoxelLabelsAndCount();
+    const uint32_t* d_labels = labels.data();
 
     // Diagnostics + CPU-oracle self-check (on whichever grid was labeled).
     const GridHandleT& ccHandle = discardSurfaceVoxels ? derivedHandle : origHandle;

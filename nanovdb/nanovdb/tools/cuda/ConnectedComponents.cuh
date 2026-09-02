@@ -21,7 +21,8 @@
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/GridHandle.h>
-#include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/cuda/Buffer.h>
+#include <nanovdb/cuda/DeviceResource.h>
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/util/cuda/DeviceGridTraits.cuh>
 #include <nanovdb/util/cuda/Timer.h>
@@ -68,38 +69,64 @@ enum LeafNeighborTap : int {
 ///        face, stored canonically with a < b. uint32_t: K <= 256*leafCount stays well below 2^32.
 struct CrossLeafEdge { uint32_t a, b; };
 
-template <typename BuildT>
+template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class ConnectedComponents
 {
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "ConnectedComponents allocates stream-ordered scratch and requires an AsyncResource");
+    static_assert(ResourceT::DEFAULT_ALIGNMENT >= alignof(uint64_t),
+                  "ConnectedComponents stores scratch up to uint64_t width and requires word-aligned allocations");
+
     using GridT = NanoGrid<BuildT>;
     using TreeT = NanoTree<BuildT>;
     using RootT = NanoRoot<BuildT>;
+
+    /// @brief Stream-ordered, device-only scratch storage borrowed from the injected resource.
+    template <typename T>
+    using BufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ResourceRef<ResourceT>>;
 
 public:
 
     /// @brief Constructor
     /// @param d_srcGrid source device indexGrid whose active voxels are to be labeled
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    ConnectedComponents(const GridT* d_srcGrid, cudaStream_t stream = 0)
-        : mStream(stream), mTimer(stream), mDeviceSrcGrid(d_srcGrid) {}
+    /// @param resource resource instance all device scratch is allocated from;
+    ///        must outlive this operator (defaults to the per-type default resource)
+    ConnectedComponents(const GridT* d_srcGrid, cudaStream_t stream = 0,
+                        ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
+        : mStream(stream), mTimer(stream), mDeviceSrcGrid(d_srcGrid)
+        , mResource(&resource)
+        , mTempDevicePool(resource)
+        , mLeafComponentCounts(stream, resource, 0, nanovdb::cuda::noInit)
+        , mLeafComponentOffsets(stream, resource, 0, nanovdb::cuda::noInit)
+        , mLeafComponentMasks(stream, resource, 0, nanovdb::cuda::noInit)
+        , mLeafComponentFaceMasks(stream, resource, 0, nanovdb::cuda::noInit)
+        , mCrossLeafEdgeOffsets(stream, resource, 0, nanovdb::cuda::noInit)
+        , mCrossLeafEdges(stream, resource, 0, nanovdb::cuda::noInit)
+        , mComponentParent(stream, resource, 0, nanovdb::cuda::noInit)
+        , mVoxelLabel(stream, resource, 0, nanovdb::cuda::noInit) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
     void setVerbose(int level = 1) { mVerbose = level; }
 
-    /// @brief Run the connected-components pipeline and return { d_labels, componentCount }:
-    ///          - d_labels: a device array of activeVoxelCount+1 uint32_t, indexed by leaf.getValue(n)
-    ///            (slot 0 = background, sentinel 0xFFFFFFFF). Each active voxel holds its component's
-    ///            dense id in [0, N), so two active voxels share a value iff they are in the same
-    ///            connected component. This is a non-owning view valid for this object's lifetime.
+    /// @brief Run the connected-components pipeline and return { labels, componentCount }:
+    ///          - labels: an owning buffer of activeVoxelCount+1 uint32_t, indexed by
+    ///            leaf.getValue(n) (slot 0 = background, sentinel 0xFFFFFFFF). Each active voxel
+    ///            holds its component's dense id in [0, N), so two active voxels share a value iff
+    ///            they are in the same connected component. Ownership passes to the caller: the
+    ///            buffer outlives this operator and frees itself on the stream it was allocated on.
+    ///            Only the injected resource, which the caller supplies, must outlive it.
     ///          - componentCount: the number of connected components N.
-    std::pair<uint32_t*, uint64_t> getVoxelLabelsAndCount()
+    /// @note The returned contents are complete: the stream is synchronized before returning.
+    std::pair<BufT<uint32_t>, uint64_t> getVoxelLabelsAndCount()
     {
         processLeafConnectedComponents();
         processCrossLeafEdges();
         processComponentLabels();
         processVoxelLabels();
-        return { static_cast<uint32_t*>(mVoxelLabel.deviceData()), mGlobalComponentCount };
+        cudaCheck(cudaStreamSynchronize(mStream));
+        return { std::move(mVoxelLabel), mGlobalComponentCount };
     }
 
 private:
@@ -121,38 +148,42 @@ private:
     // Build the per-voxel label sidecar + component count N from the parent array.
     void processVoxelLabels();
 
+    /// @brief Borrowed handle to the injected resource, for the scratch allocated after construction.
+    nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource); }
+
     // --- Internal device-array accessors (each valid after the stage that fills it). ---
-    auto deviceLeafComponentCounts()    { return static_cast<uint16_t*>(mLeafComponentCounts.deviceData()); }
-    auto deviceLeafComponentOffsets()   { return static_cast<uint64_t*>(mLeafComponentOffsets.deviceData()); }
-    auto deviceLeafComponentMasks()     { return static_cast<nanovdb::Mask<3>*>(mLeafComponentMasks.deviceData()); }
-    auto deviceLeafComponentFaceMasks() { return reinterpret_cast<uint64_t(*)[6]>(mLeafComponentFaceMasks.deviceData()); }
-    auto deviceCrossLeafEdges()         { return static_cast<CrossLeafEdge*>(mCrossLeafEdges.deviceData()); }
-    auto deviceComponentParent()        { return static_cast<uint64_t*>(mComponentParent.deviceData()); }
+    auto deviceLeafComponentCounts()    { return mLeafComponentCounts.data(); }
+    auto deviceLeafComponentOffsets()   { return mLeafComponentOffsets.data(); }
+    auto deviceLeafComponentMasks()     { return mLeafComponentMasks.data(); }
+    auto deviceLeafComponentFaceMasks() { return mLeafComponentFaceMasks.data(); }
+    auto deviceCrossLeafEdges()         { return mCrossLeafEdges.data(); }
+    auto deviceComponentParent()        { return mComponentParent.data(); }
 
     cudaStream_t                 mStream{0};
     util::cuda::Timer            mTimer;
     int                          mVerbose{0};
     uint32_t                     mLeavesOverIterationCap{0};  // leaves that ran out of union-find rounds
     const GridT                 *mDeviceSrcGrid;
-    nanovdb::cuda::TempDevicePool mTempDevicePool;
+    ResourceT                   *mResource;                   // non-owning; all device scratch routes through this instance
+    nanovdb::cuda::TempPool<ResourceT> mTempDevicePool;
 
     uint64_t                     mLeafComponentAggregateCount{0}; // total leaf-local components across all leaves (= K = offsets[leafCount])
 
-    nanovdb::cuda::DeviceBuffer  mLeafComponentCounts;      // leafCount                    x uint16_t:      per-leaf component count
-    nanovdb::cuda::DeviceBuffer  mLeafComponentOffsets;     // (leafCount+1)                x uint64_t:      exclusive+inclusive prefix sums
-    nanovdb::cuda::DeviceBuffer  mLeafComponentMasks;       // mLeafComponentAggregateCount x Mask<3>:       per-component active-voxel footprint
-    nanovdb::cuda::DeviceBuffer  mLeafComponentFaceMasks;   // mLeafComponentAggregateCount x uint64_t[6]:   per-component face bitmasks (0=-X,1=+X,2=-Y,3=+Y,4=-Z,5=+Z)
+    BufT<uint16_t>               mLeafComponentCounts;      // leafCount                    x uint16_t:      per-leaf component count
+    BufT<uint64_t>               mLeafComponentOffsets;     // (leafCount+1)                x uint64_t:      exclusive+inclusive prefix sums
+    BufT<nanovdb::Mask<3>>       mLeafComponentMasks;       // mLeafComponentAggregateCount x Mask<3>:       per-component active-voxel footprint
+    BufT<uint64_t[6]>            mLeafComponentFaceMasks;   // mLeafComponentAggregateCount x uint64_t[6]:   per-component face bitmasks (0=-X,1=+X,2=-Y,3=+Y,4=-Z,5=+Z)
 
     uint64_t                     mCrossLeafEdgeCount{0};    // total cross-leaf edges (E)
-    nanovdb::cuda::DeviceBuffer  mCrossLeafEdgeOffsets;     // (leafCount+1) x uint64_t:  per-leaf edge prefix sums
-    nanovdb::cuda::DeviceBuffer  mCrossLeafEdges;           // E x CrossLeafEdge (a<b)
+    BufT<uint64_t>               mCrossLeafEdgeOffsets;     // (leafCount+1) x uint64_t:  per-leaf edge prefix sums
+    BufT<CrossLeafEdge>          mCrossLeafEdges;           // E x CrossLeafEdge (a<b)
 
-    nanovdb::cuda::DeviceBuffer  mComponentParent;          // K x uint64_t: per-component global representative
+    BufT<uint64_t>               mComponentParent;          // K x uint64_t: per-component global representative
 
-    nanovdb::cuda::DeviceBuffer  mVoxelLabel;               // (activeVoxelCount+1) x uint32_t: per-active-voxel dense component id in [0,N) (index by leaf.getValue(n); slot 0 = background)
+    BufT<uint32_t>               mVoxelLabel;               // (activeVoxelCount+1) x uint32_t: per-active-voxel dense component id in [0,N) (index by leaf.getValue(n); slot 0 = background)
     uint64_t                     mGlobalComponentCount{0};  // number of connected components N (distinct representatives)
 
-}; // tools::cuda::ConnectedComponents<BuildT>
+}; // tools::cuda::ConnectedComponents<BuildT, ResourceT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -648,8 +679,8 @@ struct VoxelLabelScatterFunctor
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template <typename BuildT>
-void ConnectedComponents<BuildT>::processLeafConnectedComponents()
+template <typename BuildT, typename ResourceT>
+void ConnectedComponents<BuildT, ResourceT>::processLeafConnectedComponents()
 {
     const uint32_t leafCount =
         util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid).mNodeCount[0];
@@ -657,17 +688,15 @@ void ConnectedComponents<BuildT>::processLeafConnectedComponents()
     // Allocate one component-count per leaf (device-only). At most 256 components per 8^3
     // leaf (6-connected worst case), so uint16_t is sufficient.
     if (mVerbose==1) mTimer.start("Allocating per-leaf component counts");
-    mLeafComponentCounts = nanovdb::cuda::DeviceBuffer::create(
-        std::size_t(leafCount) * sizeof(uint16_t), nullptr, false);
+    mLeafComponentCounts = BufT<uint16_t>(mStream, this->ref(), leafCount, nanovdb::cuda::noInit);
     if (mVerbose==1) mTimer.stop();
 
     if (leafCount == 0) return;
 
     // Counter of leaves that run out of union-find rounds. Read back further down, alongside the
     // aggregate component count, so that check costs no extra synchronization.
-    nanovdb::cuda::DeviceBuffer capReached =
-        nanovdb::cuda::DeviceBuffer::create(sizeof(uint32_t), nullptr, false);
-    cudaCheck(cudaMemsetAsync(capReached.deviceData(), 0, sizeof(uint32_t), mStream));
+    BufT<uint32_t> capReached(mStream, this->ref(), 1, nanovdb::cuda::noInit);
+    cudaCheck(cudaMemsetAsync(capReached.data(), 0, capReached.size_bytes(), mStream));
 
     // One block per leaf, one thread per voxel offset; counts the distinct 6-connected
     // components of each leaf's active voxels (in isolation) into mLeafComponentCounts.
@@ -675,19 +704,17 @@ void ConnectedComponents<BuildT>::processLeafConnectedComponents()
     if (mVerbose==1) mTimer.start("Per-leaf connected-component counting");
     util::cuda::operatorKernel<Op>
         <<<leafCount, Op::MaxThreadsPerBlock, 0, mStream>>>(
-            mDeviceSrcGrid, deviceLeafComponentCounts(),
-            static_cast<uint32_t*>(capReached.deviceData()));
+            mDeviceSrcGrid, deviceLeafComponentCounts(), capReached.data());
     cudaCheckError();
     if (mVerbose==1) mTimer.stop();
 
     // Prefix sum: mLeafComponentOffsets[0]=0, mLeafComponentOffsets[1..leafCount] = inclusive sum
     // of mLeafComponentCounts. mLeafComponentOffsets[leafCount] = K (total leaf-local components).
     if (mVerbose==1) mTimer.start("Allocating per-leaf component offsets");
-    mLeafComponentOffsets = nanovdb::cuda::DeviceBuffer::create(
-        (std::size_t(leafCount) + 1) * sizeof(uint64_t), nullptr, false);
+    mLeafComponentOffsets = BufT<uint64_t>(mStream, this->ref(), std::size_t(leafCount) + 1, nanovdb::cuda::noInit);
     if (mVerbose==1) mTimer.stop();
 
-    cudaCheck(cudaMemsetAsync(mLeafComponentOffsets.deviceData(), 0, sizeof(uint64_t), mStream));
+    cudaCheck(cudaMemsetAsync(mLeafComponentOffsets.data(), 0, sizeof(uint64_t), mStream));
 
     // Upcast per-leaf uint16_t counts into offsets[1..leafCount] as uint64_t.
     uint16_t* d_counts  = deviceLeafComponentCounts();
@@ -707,7 +734,7 @@ void ConnectedComponents<BuildT>::processLeafConnectedComponents()
     // inadvertently synchronizing other streams.
     cudaCheck(cudaMemcpyAsync(&mLeafComponentAggregateCount, d_offsets + leafCount,
                               sizeof(uint64_t), cudaMemcpyDeviceToHost, mStream));
-    cudaCheck(cudaMemcpyAsync(&mLeavesOverIterationCap, capReached.deviceData(),
+    cudaCheck(cudaMemcpyAsync(&mLeavesOverIterationCap, capReached.data(),
                               sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaStreamSynchronize(mStream));
 
@@ -723,15 +750,15 @@ void ConnectedComponents<BuildT>::processLeafConnectedComponents()
     // No zero-init needed: the mask-fill kernel writes all 16 uint32_t words of every mask
     // unconditionally via warp ballot (zero ballot = no component voxels in that warp).
     if (mVerbose==1) mTimer.start("Allocating per-component leaf masks");
-    mLeafComponentMasks = nanovdb::cuda::DeviceBuffer::create(
-        mLeafComponentAggregateCount * sizeof(nanovdb::Mask<3>), nullptr, false);
+    mLeafComponentMasks = BufT<nanovdb::Mask<3>>(
+        mStream, this->ref(), mLeafComponentAggregateCount, nanovdb::cuda::noInit);
     if (mVerbose==1) mTimer.stop();
 
     // Allocate 6 uint64_t face masks per component (one per LeafNeighborTap entry).
     // The face-extraction kernel fills these; no zero-init needed for the same reason.
     if (mVerbose==1) mTimer.start("Allocating per-component face masks");
-    mLeafComponentFaceMasks = nanovdb::cuda::DeviceBuffer::create(
-        mLeafComponentAggregateCount * 6 * sizeof(uint64_t), nullptr, false);
+    mLeafComponentFaceMasks = BufT<uint64_t[6]>(
+        mStream, this->ref(), mLeafComponentAggregateCount, nanovdb::cuda::noInit);
     if (mVerbose==1) mTimer.stop();
 
     // Re-run SV per leaf and scatter each active voxel's bit into its component's Mask<3>.
@@ -743,12 +770,12 @@ void ConnectedComponents<BuildT>::processLeafConnectedComponents()
             deviceLeafComponentMasks(), deviceLeafComponentFaceMasks());
     cudaCheckError();
     if (mVerbose==1) mTimer.stop();
-}// ConnectedComponents<BuildT>::processLeafConnectedComponents
+}// ConnectedComponents<BuildT, ResourceT>::processLeafConnectedComponents
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template <typename BuildT>
-void ConnectedComponents<BuildT>::processCrossLeafEdges()
+template <typename BuildT, typename ResourceT>
+void ConnectedComponents<BuildT, ResourceT>::processCrossLeafEdges()
 {
     const uint32_t leafCount =
         util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid).mNodeCount[0];
@@ -757,9 +784,8 @@ void ConnectedComponents<BuildT>::processCrossLeafEdges()
 
     // Per-leaf edge offsets: offsets[0]=0, offsets[1..leafCount] filled by the count pass then
     // scanned in place; offsets[leafCount] = E (total cross-leaf edges).
-    mCrossLeafEdgeOffsets = nanovdb::cuda::DeviceBuffer::create(
-        (std::size_t(leafCount) + 1) * sizeof(uint64_t), nullptr, false);
-    uint64_t* d_offsets = static_cast<uint64_t*>(mCrossLeafEdgeOffsets.deviceData());
+    mCrossLeafEdgeOffsets = BufT<uint64_t>(mStream, this->ref(), std::size_t(leafCount) + 1, nanovdb::cuda::noInit);
+    uint64_t* d_offsets = mCrossLeafEdgeOffsets.data();
     cudaCheck(cudaMemsetAsync(d_offsets, 0, sizeof(uint64_t), mStream));
 
     // Count pass: one block per leaf, writing each leaf's edge count into offsets[leafID+1].
@@ -783,8 +809,7 @@ void ConnectedComponents<BuildT>::processCrossLeafEdges()
     if (mCrossLeafEdgeCount == 0) return;  // single-leaf grid / no touching components
 
     // Scatter pass: write each leaf's edges into [offsets[leafID], offsets[leafID+1]).
-    mCrossLeafEdges = nanovdb::cuda::DeviceBuffer::create(
-        mCrossLeafEdgeCount * sizeof(CrossLeafEdge), nullptr, false);
+    mCrossLeafEdges = BufT<CrossLeafEdge>(mStream, this->ref(), mCrossLeafEdgeCount, nanovdb::cuda::noInit);
     using ScatterOp = cc_detail::CrossLeafEdgeScatterFunctor<BuildT>;
     if (mVerbose==1) mTimer.start("Cross-leaf edge scatter");
     util::cuda::operatorKernel<ScatterOp>
@@ -793,16 +818,15 @@ void ConnectedComponents<BuildT>::processCrossLeafEdges()
             d_offsets, deviceCrossLeafEdges());
     cudaCheckError();
     if (mVerbose==1) mTimer.stop();
-}// ConnectedComponents<BuildT>::processCrossLeafEdges
+}// ConnectedComponents<BuildT, ResourceT>::processCrossLeafEdges
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template <typename BuildT>
-void ConnectedComponents<BuildT>::processComponentLabels()
+template <typename BuildT, typename ResourceT>
+void ConnectedComponents<BuildT, ResourceT>::processComponentLabels()
 {
     const uint64_t K = mLeafComponentAggregateCount;
-    mComponentParent = nanovdb::cuda::DeviceBuffer::create(
-        std::size_t(K ? K : 1) * sizeof(uint64_t), nullptr, false);  // avoid 0-byte alloc
+    mComponentParent = BufT<uint64_t>(mStream, this->ref(), K, nanovdb::cuda::noInit);
     if (K == 0) return;
     uint64_t* d_parent = deviceComponentParent();
 
@@ -830,12 +854,12 @@ void ConnectedComponents<BuildT>::processComponentLabels()
         K, cc_detail::LabelFlattenFunctor{}, d_parent);
     cudaCheckError();
     if (mVerbose==1) mTimer.stop();
-}// ConnectedComponents<BuildT>::processComponentLabels
+}// ConnectedComponents<BuildT, ResourceT>::processComponentLabels
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template <typename BuildT>
-void ConnectedComponents<BuildT>::processVoxelLabels()
+template <typename BuildT, typename ResourceT>
+void ConnectedComponents<BuildT, ResourceT>::processVoxelLabels()
 {
     const uint32_t leafCount =
         util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid).mNodeCount[0];
@@ -843,8 +867,8 @@ void ConnectedComponents<BuildT>::processVoxelLabels()
         util::cuda::DeviceGridTraits<BuildT>::getActiveVoxelCount(mDeviceSrcGrid);
 
     // Per-active-voxel dense-label sidecar (indexed by leaf.getValue(n); slot 0 = background).
-    mVoxelLabel = nanovdb::cuda::DeviceBuffer::create((activeCount + 1) * sizeof(uint32_t), nullptr, false);
-    cudaCheck(cudaMemsetAsync(mVoxelLabel.deviceData(), 0xFF, (activeCount + 1) * sizeof(uint32_t), mStream)); // background = 0xFFFFFFFF
+    mVoxelLabel = BufT<uint32_t>(mStream, this->ref(), activeCount + 1, nanovdb::cuda::noInit);
+    cudaCheck(cudaMemsetAsync(mVoxelLabel.data(), 0xFF, mVoxelLabel.size_bytes(), mStream)); // background = 0xFFFFFFFF
 
     mGlobalComponentCount = 0;
     const uint64_t K = mLeafComponentAggregateCount;
@@ -852,8 +876,9 @@ void ConnectedComponents<BuildT>::processVoxelLabels()
 
     // (a) Assign dense component ids: rank[s] = inclusive count of self-roots in [0,s], so a root's
     //     dense id is rank[root]-1 and rank[K-1] = N.
-    auto rankBuf = nanovdb::cuda::DeviceBuffer::create(K * sizeof(uint32_t), nullptr, false);
-    auto* d_rank = static_cast<uint32_t*>(rankBuf.deviceData());
+    //     rankBuf retains mStream, so the scatter below is ordered before the free at scope exit.
+    BufT<uint32_t> rankBuf(mStream, this->ref(), K, nanovdb::cuda::noInit);
+    auto* d_rank = rankBuf.data();
     util::cuda::lambdaKernel<<<(unsigned int)((K + 255) / 256), 256, 0, mStream>>>(
         K, cc_detail::RootFlagFunctor{}, deviceComponentParent(), d_rank);
     cudaCheckError();
@@ -871,10 +896,10 @@ void ConnectedComponents<BuildT>::processVoxelLabels()
     util::cuda::operatorKernel<ScatterOp>
         <<<leafCount, ScatterOp::MaxThreadsPerBlock, 0, mStream>>>(
             mDeviceSrcGrid, deviceLeafComponentOffsets(), deviceLeafComponentMasks(),
-            deviceComponentParent(), d_rank, static_cast<uint32_t*>(mVoxelLabel.deviceData()));
+            deviceComponentParent(), d_rank, mVoxelLabel.data());
     cudaCheckError();
     if (mVerbose==1) mTimer.stop();
-}// ConnectedComponents<BuildT>::processVoxelLabels
+}// ConnectedComponents<BuildT, ResourceT>::processVoxelLabels
 
 } // namespace tools::cuda
 
