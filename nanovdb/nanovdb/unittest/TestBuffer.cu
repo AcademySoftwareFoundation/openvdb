@@ -1029,6 +1029,20 @@ TEST(TestBuffer, GridHandleCopyToPinnedRoundTrip)
     EXPECT_NE(dev2.deviceGrid<float>(1), nullptr);
 }
 
+TEST(TestBuffer, GridHandleCopyToManagedSynchronizes)
+{
+    auto host = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
+    using ManagedBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
+    // A managed destination is host-readable, so copyTo synchronizes before
+    // returning: the host accessors must be valid immediately, with no
+    // synchronization by the caller.
+    auto managed = nanovdb::cuda::copyTo<ManagedBufT>(host, cudaStream_t(0));
+    EXPECT_EQ(1u, managed.gridCount());
+    ASSERT_NE(managed.grid<float>(), nullptr);
+    EXPECT_EQ(0, std::memcmp(managed.data(), host.data(), host.bufferSize()));
+    EXPECT_NE(managed.deviceGrid<float>(), nullptr);// the same allocation serves the device accessors
+}
+
 TEST(TestBuffer, GridHandleCopyToProtoResource)
 {
     auto host = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");

@@ -172,13 +172,22 @@ struct HandleFactory
 ///          source (and the source's later destruction, which frees on its
 ///          own stream) must be ordered against @a stream by the caller,
 ///          e.g. with cudaStreamWaitEvent or a synchronization. The
-///          stream-less overload below has no such requirement.
+///          stream-less overload below has no such requirement for a source
+///          with a retained stream. A source WITHOUT one (a synchronous
+///          resource, e.g. a pinned-resource buffer) is the caller's to keep
+///          alive under either overload: its destruction frees host memory
+///          immediately, unordered against the still-asynchronous copy, so
+///          synchronize @a stream before destroying such a source. (A
+///          pageable HostBuffer source is exempt: its copy degrades to
+///          synchronous behavior.)
 /// @param proto optional buffer whose resource (or pool, for buffers
 ///        providing create()) allocates the destination storage; without it
 ///        the destination resource is default-constructed
 /// @return a handle of the destination buffer type with equal contents
-/// @details A host-readable destination synchronizes @c stream before
-///          returning; a device destination is stream-ordered, so use its
+/// @details A host-readable destination -- HostBuffer, pinned, or a
+///          both-space managed buffer -- synchronizes @c stream before
+///          returning, so its host accessors are immediately valid; a
+///          device-only destination is stream-ordered, so use its
 ///          contents on @c stream or synchronize first. The metadata is
 ///          adopted from the source handle -- it was validated when that
 ///          handle was constructed from raw bytes -- so no kernel runs and
@@ -208,11 +217,12 @@ inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, cudaStre
     const void* srcPtr;
     if constexpr (srcDev) srcPtr = src.deviceData();
     else                  srcPtr = src.data();
-    constexpr cudaMemcpyKind kind = srcDev ? (dstDev ? cudaMemcpyDeviceToDevice : cudaMemcpyDeviceToHost)
-                                           : cudaMemcpyHostToDevice;
-    cudaCheck(cudaMemcpyAsync(dst.data(), srcPtr, bytes, kind, stream));
-    if constexpr (!dstDev)
-        cudaCheck(cudaStreamSynchronize(stream)); // the host-readable result is the postcondition
+    // Every pointer here is a UVA address (device, managed, pinned, or
+    // pageable host), so the runtime infers the copy direction from the
+    // addresses themselves.
+    cudaCheck(cudaMemcpyAsync(dst.data(), srcPtr, bytes, cudaMemcpyDefault, stream));
+    if constexpr (!dstDev || BufferHasHostSingle<DstBufferT>::value)
+        cudaCheck(cudaStreamSynchronize(stream)); // the host-readable result is the postcondition; covers the both-space (managed) destination, whose handle exposes host accessors immediately
     // A handle-to-handle copy adopts the source's metadata, which was
     // validated when that handle was constructed from raw bytes -- no kernel
     // runs here, which is what keeps this header host-includable. A device
