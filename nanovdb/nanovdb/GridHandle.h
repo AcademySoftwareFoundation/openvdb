@@ -498,7 +498,7 @@ inline GridHandle<OtherBufferT> GridHandle<BufferT>::copy() const
     if constexpr (BufferHasDeviceSingle<BufferT>::value || BufferHasDeviceSingle<OtherBufferT>::value) {
         static_assert(util::is_same<OtherBufferT, BufferT>::value && BufferHasDeviceSingle<BufferT>::value,
                       "GridHandle::copy is same-space only: a single-space device handle copies to its own "
-                      "buffer type; use cuda::copyTo (cuda/GridHandle.cuh) to move grids across address spaces");
+                      "buffer type; use cuda::copyTo (cuda/HandleStorage.h) to move grids across address spaces");
         // Device-to-device deep copy; for a stream-ordered resource it is
         // ordered on the source's retained stream, so synchronize that stream
         // before reading the result. Metadata is host-resident, so the copy
