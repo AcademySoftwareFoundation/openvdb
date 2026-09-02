@@ -217,9 +217,6 @@ inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, cudaStre
     const void* srcPtr;
     if constexpr (srcDev) srcPtr = src.deviceData();
     else                  srcPtr = src.data();
-    // Every pointer here is a UVA address (device, managed, pinned, or
-    // pageable host), so the runtime infers the copy direction from the
-    // addresses themselves.
     cudaCheck(cudaMemcpyAsync(dst.data(), srcPtr, bytes, cudaMemcpyDefault, stream));
     if constexpr (!dstDev || BufferHasHostSingle<DstBufferT>::value)
         cudaCheck(cudaStreamSynchronize(stream)); // the host-readable result is the postcondition; covers the both-space (managed) destination, whose handle exposes host accessors immediately
