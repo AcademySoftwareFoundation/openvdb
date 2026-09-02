@@ -406,15 +406,14 @@ public:
 /// @brief The dual-space device buffer under its long-standing public name.
 /// @deprecated Grid storage is moving to the single-space cuda::Buffer:
 ///             build or read into a host handle and move it with
-///             cuda::copyTo (see cuda/GridHandle.cuh), or allocate the
+///             cuda::copyTo (see cuda/HandleStorage.h), or allocate the
 ///             result of a GPU tool directly in a cuda::Buffer. Transfers
-///             construct the device handle with a validation kernel, so
-///             they belong in CUDA translation units: a host-only .cc
-///             holds the returned handle and lets a small helper in a .cu
-///             companion do the copy (see the CUDA examples). The dual
-///             buffer and this name are removed together after a
+///             adopt the source handle's already-validated metadata -- no
+///             kernel runs -- so copyTo is callable from host-only
+///             translation units directly (see the CUDA examples). The
+///             dual buffer and this name are removed together after a
 ///             deprecation window.
-using DeviceBuffer [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: build into a host handle and use cuda::copyTo (cuda/GridHandle.cuh); see the CUDA examples for the host-file recipe")]] = DualDeviceBuffer;
+using DeviceBuffer [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: build into a host handle and use cuda::copyTo (cuda/HandleStorage.h, host-callable); see the CUDA examples")]] = DualDeviceBuffer;
 
 // --------------------------> Implementations below <------------------------------------
 

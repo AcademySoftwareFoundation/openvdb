@@ -60,7 +60,7 @@ class NodeManagerHandle
     GridType mGridType{GridType::Unknown};
     BufferT  mBuffer;
 
-    template<typename BuildT, typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value && !BufferHasHostSingle<U>::value, int>::type = 0>
+    template<typename BuildT, typename U = BufferT, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type = 0>
     const NodeManager<BuildT>* getMgr() const {
         return mGridType == toGridType<BuildT>() ? (const NodeManager<BuildT>*)mBuffer.data() : nullptr;
     }
@@ -117,9 +117,9 @@ public:
     /// @brief Returns a pointer to the host data; not available for a
     ///        single-space device buffer, which has no host-readable bytes.
     /// @warning Note that the return pointer can be NULL if the NodeManagerHandle was not initialized
-    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value && !BufferHasHostSingle<U>::value, int>::type = 0>
+    template<typename U = BufferT, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type = 0>
     void* data() { return mBuffer.data(); }
-    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value && !BufferHasHostSingle<U>::value, int>::type = 0>
+    template<typename U = BufferT, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type = 0>
     const void* data() const { return mBuffer.data(); }
     //@}
 

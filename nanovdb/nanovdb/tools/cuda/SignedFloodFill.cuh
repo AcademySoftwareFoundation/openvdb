@@ -25,7 +25,6 @@
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/GridHandle.h>
-#include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/ManagedResource.h>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>

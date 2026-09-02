@@ -123,6 +123,14 @@ template<typename BufferT>
 struct BufferHasHostSingle<BufferT, std::void_t<decltype(BufferTraits<BufferT>::hasHostSingle)>>
 { static constexpr bool value = BufferTraits<BufferT>::hasHostSingle; };
 
+/// @brief A single-space buffer whose storage the host cannot read: the
+///        device-single family minus its host-accessible members (managed or
+///        pinned resources). This is the predicate that gates the handles'
+///        host accessors off.
+template<typename BufferT>
+struct BufferIsDeviceOnly
+{ static constexpr bool value = BufferHasDeviceSingle<BufferT>::value && !BufferHasHostSingle<BufferT>::value; };
+
 /// @brief Detects whether a buffer exposes a retained stream (a stream()
 ///        member), i.e. whether its resource is stream-ordered. Used to pick
 ///        the buffer's stream-taking constructor without naming CUDA types.
