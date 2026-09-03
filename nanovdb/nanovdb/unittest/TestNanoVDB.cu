@@ -1230,6 +1230,97 @@ TEST(TestNanoVDBCUDA, CudaSignedFloodFill)
     EXPECT_TRUE(floatGrid->isBreadthFirst());
 }//  CudaSignedFloodFill
 
+// Regression test for https://github.com/AcademySoftwareFoundation/openvdb/issues/2300: builds
+// two non-adjacent root children on the same z-scanline, with a background tile sandwiched
+// between them, to exercise processRoot's scanline-repair pass (untested until now). Node b's
+// near corner is left "outside" so the correct outcome is that the tile stays untouched - run
+// under compute-sanitizer to also catch the out-of-bounds read the bug caused.
+TEST(TestNanoVDBCUDA, CudaSignedFloodFillNonAdjacentRootChildren)
+{
+    using BufferT = nanovdb::cuda::DeviceBuffer;
+    using RootT   = nanovdb::NanoRoot<float>;
+    static const int dim = int(RootT::ChildNodeType::DIM);// = 4096, size of a root child (upper) node
+    const float background = 1.0f;
+
+    nanovdb::tools::build::Grid<float> grid(background);
+    auto srcAcc = grid.getAccessor();
+    // last voxel of the root child at origin (0,0,0): drives RootChild::val[1] (getLastValue); inside
+    srcAcc.setValue(nanovdb::Coord(dim - 1, dim - 1, dim - 1), -1.0f);
+    // far corner of the root child at origin (0,0,2*dim), explicitly active but still at the
+    // background value, just to force that child node to exist without flipping its sign - a
+    // single inside voxel would flood the whole (otherwise empty) node to inside during the
+    // leaf/internal passes that run before processRoot, which would also flip the near corner.
+    // The near corner (0,0,2*dim), which drives RootChild::val[0] (getFirstValue), thus stays at
+    // the background (outside) value - the scanline must NOT be filled
+    srcAcc.setValue(nanovdb::Coord(dim - 1, dim - 1, 3 * dim - 1), background);
+    // explicit inactive background tile at the sandwiched root tile (0,0,dim), so the scanline
+    // pass has a tile entry available to (not) touch instead of throwing "missing internal tile"
+    grid.tree().root().addTile<3>(nanovdb::Coord(0, 0, dim), background, false);
+    ASSERT_EQ(3u, grid.tree().root().getTableSize());// the two children plus the sandwiched tile
+
+    auto floatHdl = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<float>, float, BufferT>(grid);
+    ASSERT_TRUE(floatHdl);
+    floatHdl.deviceUpload();
+    auto *d_floatGrid = floatHdl.deviceGrid<float>();
+    ASSERT_TRUE(d_floatGrid);
+
+    nanovdb::tools::cuda::signedFloodFill(d_floatGrid);
+
+    floatHdl.deviceDownload();
+    auto *floatGrid = floatHdl.grid<float>();
+    ASSERT_TRUE(floatGrid);
+    auto acc = floatGrid->getAccessor();
+    // node b is outside at its near corner, so the sandwiched tile must be left at background
+    EXPECT_EQ(background, acc.getValue(nanovdb::Coord(0, 0, dim)));
+    EXPECT_FALSE(acc.isActive(nanovdb::Coord(0, 0, dim)));
+    // sanity: the explicit voxels that drove the decision are unaffected
+    EXPECT_EQ(-1.0f, acc.getValue(nanovdb::Coord(dim - 1, dim - 1, dim - 1)));
+    EXPECT_EQ(background, acc.getValue(nanovdb::Coord(0, 0, 2 * dim)));
+}// CudaSignedFloodFillNonAdjacentRootChildren
+
+// Companion to CudaSignedFloodFillNonAdjacentRootChildren: same two non-adjacent root children
+// on the same z-scanline, but node b's near corner is also "inside" this time, so the sandwiched
+// tile must be filled with the inside value. This deterministically verifies the repaired
+// scanline pass does the right thing, not just that it doesn't fault on garbage data.
+TEST(TestNanoVDBCUDA, CudaSignedFloodFillNonAdjacentRootChildrenFilled)
+{
+    using BufferT = nanovdb::cuda::DeviceBuffer;
+    using RootT   = nanovdb::NanoRoot<float>;
+    static const int dim = int(RootT::ChildNodeType::DIM);// = 4096, size of a root child (upper) node
+    const float background = 1.0f;
+
+    nanovdb::tools::build::Grid<float> grid(background);
+    auto srcAcc = grid.getAccessor();
+    // last voxel of the root child at origin (0,0,0): drives RootChild::val[1] (getLastValue); inside
+    srcAcc.setValue(nanovdb::Coord(dim - 1, dim - 1, dim - 1), -1.0f);
+    // near corner of the root child at origin (0,0,2*dim): drives RootChild::val[0]
+    // (getFirstValue); also inside, so both ends of the scanline are inside
+    srcAcc.setValue(nanovdb::Coord(0, 0, 2 * dim), -1.0f);
+    // explicit inactive background tile at the sandwiched root tile (0,0,dim), so the scanline
+    // pass has a tile entry available to fill instead of throwing "missing internal tile"
+    grid.tree().root().addTile<3>(nanovdb::Coord(0, 0, dim), background, false);
+    ASSERT_EQ(3u, grid.tree().root().getTableSize());// the two children plus the sandwiched tile
+
+    auto floatHdl = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<float>, float, BufferT>(grid);
+    ASSERT_TRUE(floatHdl);
+    floatHdl.deviceUpload();
+    auto *d_floatGrid = floatHdl.deviceGrid<float>();
+    ASSERT_TRUE(d_floatGrid);
+
+    nanovdb::tools::cuda::signedFloodFill(d_floatGrid);
+
+    floatHdl.deviceDownload();
+    auto *floatGrid = floatHdl.grid<float>();
+    ASSERT_TRUE(floatGrid);
+    auto acc = floatGrid->getAccessor();
+    // both ends of the scanline are inside, so the sandwiched tile must be filled to -background
+    EXPECT_EQ(-background, acc.getValue(nanovdb::Coord(0, 0, dim)));
+    EXPECT_FALSE(acc.isActive(nanovdb::Coord(0, 0, dim)));
+    // sanity: the explicit voxels that drove the decision are unaffected
+    EXPECT_EQ(-1.0f, acc.getValue(nanovdb::Coord(dim - 1, dim - 1, dim - 1)));
+    EXPECT_EQ(-1.0f, acc.getValue(nanovdb::Coord(0, 0, 2 * dim)));
+}// CudaSignedFloodFillNonAdjacentRootChildrenFilled
+
 TEST(TestNanoVDBCUDA, OneVoxelToGrid)
 {
     using BuildT = float;

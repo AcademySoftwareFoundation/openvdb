@@ -115,6 +115,10 @@ void processRoot(NanoTree<BuildT> *d_tree, cudaStream_t stream = 0)
     if ( uBuffer.data<TreeT>()->root().tileCount() == 0) return;// empty root node so nothing to do
     uBuffer.resize(sizeof(TreeT) + uBuffer.data<TreeT>()->root().memUsage());// likely does nothing since we reserved 64 tiles
     RootT *root = &uBuffer.data<TreeT>()->root();
+    // Device-resident root, used only to resolve Tile::child byte-offsets into valid child-node
+    // pointers. The 'root' buffer above is a truncated copy (tree + root + tiles, no child nodes),
+    // so offsets must be applied relative to the real device root, not the host/managed copy.
+    RootT *d_root = reinterpret_cast<RootT*>(d_tree + 1);
     cudaCheck(cudaMemcpy(root + 1, (char*)(d_tree + 1) + sizeof(RootT), root->tileCount()*sizeof(TileT), cudaMemcpyDeviceToHost));// copy tiles
 
     // Sort the child nodes of the root in lexicographic order
@@ -130,8 +134,11 @@ void processRoot(NanoTree<BuildT> *d_tree, cudaStream_t stream = 0)
         const Coord d = b->ijk - a->ijk;// coord delta of adjacent child nodes
         if (d[0]!=0 || d[1]!=0 || d[2]==dim) continue;// not same z-scanline or they are neighbors
         util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__(size_t) {
-            a->val[1] = root->getChild(root->tile(a->idx))->getLastValue();
-            b->val[0] = root->getChild(root->tile(b->idx))->getFirstValue();
+            // Tile::child is a byte offset relative to the root; resolve it against the real
+            // device root (d_root), not the truncated host/managed copy (root), since the
+            // latter's memory ends right after the tiles and holds no child-node data.
+            a->val[1] = d_root->getChild(root->tile(a->idx))->getLastValue();
+            b->val[0] = d_root->getChild(root->tile(b->idx))->getFirstValue();
         });
         cudaCheck(cudaStreamSynchronize(stream));// required for host access to RootChild::val[2]
         if (a->val[1] > 0 || b->val[0] > 0) continue; // scanline is not inside a surface
