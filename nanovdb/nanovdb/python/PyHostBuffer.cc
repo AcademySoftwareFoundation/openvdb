@@ -11,10 +11,7 @@ namespace pynanovdb {
 
 void defineHostBuffer(nb::module_& m)
 {
-    nb::class_<HostBuffer>(m, "HostBuffer",
-        "Default host-side buffer used to back a GridHandle. Memory is "
-        "owned by this buffer and freed when the handle (and therefore "
-        "the buffer) is destroyed.");
+    nb::class_<HostBuffer>(m, "HostBuffer");
 }
 
 } // namespace pynanovdb
