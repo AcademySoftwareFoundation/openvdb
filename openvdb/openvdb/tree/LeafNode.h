@@ -1009,7 +1009,11 @@ LeafNode<T, Log2Dim>::LeafNode(const LeafNode<OtherValueType, Log2Dim>& other)
 {
     struct Local {
         /// @todo Consider using a value conversion functor passed as an argument instead.
-        static inline ValueType convertValue(const OtherValueType& val) { return ValueType(val); }
+        static inline ValueType convertValue(const OtherValueType& val) {
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+            return ValueType(val);
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+        }
     };
 
     for (Index i = 0; i < SIZE; ++i) {

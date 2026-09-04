@@ -6,6 +6,7 @@
 #include "File.h"
 
 #include <openvdb/Exceptions.h>
+#include <openvdb/openvdb.h> // for GridTypes
 #include <openvdb/util/logging.h>
 #include <openvdb/util/Assert.h>
 #include <cstdint>
@@ -17,13 +18,31 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <map>
 #include <sstream>
+#include <type_traits>
 
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace io {
+
+namespace {
+
+/// @brief Convert @a source to the grid type that @a readOptions would have
+///   produced had it been read through @a codec (looked up by the caller via
+///   the protected @c Archive::findCodec(), since this is a free function).
+///   Returns null if no conversion is needed or possible, in which case the
+///   caller keeps the original grid.  A conversion that was requested but cannot
+///   be done is reported to @a diagnostics and logged against @a filename.
+GridBase::Ptr convertGridForReadMode(const GridBase& source, const ReadOptions& readOptions,
+    Codec* codec, ReadDiagnostics& diagnostics, const std::string& filename);
+
+/// @brief Return the name used in diagnostics and log messages for @a mode.
+std::string readModeName(ReadMode mode);
+
+} // anonymous namespace
 
 
 File::File(const std::string& filename)
@@ -308,7 +327,55 @@ File::getGrids(const io::ReadOptions& readOptions) const
     if (!inputHasGridOffsets()) {
         // If the input file doesn't have grid offsets, then all of the grids
         // have already been streamed in and stored in mGrids.
-        ret = mGrids;
+        const auto& bbox = readOptions.clipBBox;
+        const bool clip = bbox.isSorted();
+
+        if (readOptions.readMode == io::ReadMode::Original && !clip) {
+            // Nothing to convert or clip: preserve pointer identity with mGrids.
+            ret = mGrids;
+        } else {
+            ret.reset(new GridPtrVec);
+
+            // Instances (grids sharing a source tree) share the converted tree
+            // too, unless instancing is disabled. Under a clip, share only
+            // when transforms agree, since a clip depends on each grid's own
+            // transform.
+            const bool shareConvertedTrees = isInstancingEnabled() &&
+                readOptions.readMode != io::ReadMode::MetadataOnly;
+            struct Resolved { GridBase::Ptr grid; math::Transform::ConstPtr transform; };
+            std::map<const TreeBase*, Resolved> resolvedBySourceTree;
+
+            for (const auto& cachedGrid : *mGrids) {
+                const TreeBase* sourceTree = &cachedGrid->constBaseTree();
+                GridBase::Ptr grid;
+
+                if (shareConvertedTrees) {
+                    auto it = resolvedBySourceTree.find(sourceTree);
+                    if (it != resolvedBySourceTree.end() &&
+                        (!clip || *it->second.transform == cachedGrid->transform()))
+                    {
+                        const GridBase::Ptr& resolved = it->second.grid;
+                        grid = resolved->copyGridWithNewTree();
+                        grid->clearMetadata();
+                        grid->insertMeta(*cachedGrid);
+                        grid->setTransform(cachedGrid->transformPtr());
+                        grid->setTree(resolved->baseTreePtr());
+                        ret->push_back(grid);
+                        continue;
+                    }
+                }
+
+                grid = resolveCachedGrid(cachedGrid, readOptions, mReadDiagnostics);
+
+                if (shareConvertedTrees) {
+                    // Keep the first-seen entry as canonical, so a later
+                    // mismatched transform under clip doesn't overwrite it.
+                    resolvedBySourceTree.try_emplace(
+                        sourceTree, Resolved{grid, cachedGrid->transformPtr()});
+                }
+                ret->push_back(grid);
+            }
+        }
     } else {
         ret.reset(new GridPtrVec);
 
@@ -455,15 +522,10 @@ File::readGrid(const Name& name, const io::ReadOptions& readOptions)
     // If a grid with the given name was already read and cached
     // (along with the entire contents of the file, because the file
     // doesn't support random access), retrieve and return it.
-    GridBase::Ptr grid = retrieveCachedGrid(name);
-    if (grid) {
-        const auto& bbox = readOptions.clipBBox;
-        const bool clip = bbox.isSorted();
-        if (clip) {
-            grid = grid->deepCopyGrid();
-            grid->clipGrid(bbox);
-        }
-        return grid;
+    GridBase::Ptr cachedGrid = retrieveCachedGrid(name);
+    GridBase::Ptr grid;
+    if (cachedGrid) {
+        return resolveCachedGrid(cachedGrid, readOptions, mReadDiagnostics);
     }
 
     NameMapCIter it = findDescriptor(name);
@@ -605,6 +667,166 @@ File::NameIterator
 File::endName() const
 {
     return File::NameIterator(mGridDescriptors.end());
+}
+
+
+////////////////////////////////////////
+
+
+namespace {
+
+namespace convert_grid_internal {
+
+/// @brief Convert @a source to the grid type @c ValueConverter<TargetBuildT>::Type,
+///   provided the registry-reported @a targetType agrees and the value conversion
+///   is legal.  Sets @a alreadyTargetType when @a source has that build type
+///   already.  Returns null in both cases, so the caller keeps the original grid.
+template<typename TargetBuildT>
+inline GridBase::Ptr
+convertToTargetType(const GridBase& source, const std::string& targetType,
+    bool& alreadyTargetType)
+{
+    // A MaskGrid source is only visited when the target is itself a mask, where
+    // the build types match and the branch below attempts no conversion.  No
+    // LeafNode conversion constructor exists from ValueMask to another build type.
+    using SourceGridTypes = std::conditional_t<std::is_same_v<TargetBuildT, ValueMask>,
+        GridTypes, GridTypes::Remove<MaskGrid>>;
+
+    GridBase::Ptr result;
+    source.apply<SourceGridTypes>([&](const auto& typedSource) {
+        using SourceGridT = std::decay_t<decltype(typedSource)>;
+        using TargetGridT =
+            typename SourceGridT::template ValueConverter<TargetBuildT>::Type;
+        if constexpr (std::is_same_v<typename SourceGridT::BuildType, TargetBuildT>) {
+            alreadyTargetType = true;
+        } else if constexpr (CanConvertType<typename SourceGridT::BuildType, TargetBuildT>::value) {
+            if (TargetGridT::gridType() != targetType)   return;
+            if constexpr (std::is_same_v<TargetBuildT, ValueMask>) {
+                // A mask records active state, not values, so copy the topology
+                // instead of casting values.  Casting would let a non-zero
+                // background or an inactive non-zero tile become true, which the
+                // codec path does not do.  create() takes the GridBase overload to
+                // copy the metadata and transform without converting the values.
+                auto target = TargetGridT::create(static_cast<const GridBase&>(typedSource));
+                target->setTree(typename TargetGridT::TreeType::Ptr(
+                    new typename TargetGridT::TreeType(typedSource.constTree(),
+                        /*inactiveValue=*/false, /*activeValue=*/true, TopologyCopy())));
+                result = target;
+            } else {
+                result = typename TargetGridT::Ptr(new TargetGridT(typedSource));
+            }
+        }
+    });
+    return result;
+}
+
+} // namespace convert_grid_internal
+
+/// @brief Return the name used in diagnostics and log messages for @a mode.
+std::string
+readModeName(ReadMode mode)
+{
+    switch (mode) {
+        case ReadMode::Half: return "Half";
+        case ReadMode::Bool: return "Bool";
+        case ReadMode::Mask: return "Mask";
+        case ReadMode::TopologyOnly: return "TopologyOnly";
+        case ReadMode::MetadataOnly: return "MetadataOnly";
+        default: return "Original";
+    }
+}
+
+GridBase::Ptr
+convertGridForReadMode(const GridBase& source, const ReadOptions& readOptions,
+    Codec* codec, ReadDiagnostics& diagnostics, const std::string& filename)
+{
+    if (readOptions.readMode != ReadMode::Half &&
+        readOptions.readMode != ReadMode::Bool &&
+        readOptions.readMode != ReadMode::Mask)
+    {
+        return GridBase::Ptr();
+    }
+
+    // Ask the codec that would have read this grid which type it produces.
+    CodecData::Ptr codecData = codec ? codec->createData() : CodecData::Ptr();
+    const std::string targetType =
+        (codecData && codecData->grid) ? codecData->grid->type() : std::string();
+
+    GridBase::Ptr result;
+    bool alreadyTargetType = false;
+    if (readOptions.readMode == ReadMode::Half) {
+        result = convert_grid_internal::convertToTargetType<Half>(
+            source, targetType, alreadyTargetType);
+    } else if (readOptions.readMode == ReadMode::Bool) {
+        result = convert_grid_internal::convertToTargetType<bool>(
+            source, targetType, alreadyTargetType);
+    } else {
+        result = convert_grid_internal::convertToTargetType<ValueMask>(
+            source, targetType, alreadyTargetType);
+    }
+
+    // Either no conversion codec is registered for this grid type (targetType is
+    // empty, or names the plain gridType codec), or the registry named a target
+    // type this dispatch cannot produce, such as a grid type outside GridTypes or
+    // a pair that CanConvertType rejects.  A grid that already has the requested
+    // build type is not a failure, so it is not reported.
+    if (!result && !alreadyTargetType) {
+        const std::string modeStr = readModeName(readOptions.readMode);
+        diagnostics.addWarning(source.getName(),
+            "ReadMode::" + modeStr + " conversion is not supported for grid type '"
+            + source.type() + "'; reading as original type");
+        OPENVDB_LOG_WARN(filename << ": grid \"" << source.getName()
+            << "\" requested ReadMode::" << modeStr << ", but no conversion is "
+            "available for grid type \"" << source.type()
+            << "\"; returning the original type");
+    }
+
+    return result;
+}
+
+} // anonymous namespace
+
+
+GridBase::Ptr
+File::resolveCachedGrid(const GridBase::Ptr& cachedGrid, const io::ReadOptions& readOptions,
+    ReadDiagnostics& diagnostics) const
+{
+    if (readOptions.readMode == ReadMode::MetadataOnly) {
+        return cachedGrid->copyGridWithNewTree();
+    }
+
+    GridBase::Ptr grid = cachedGrid;
+
+    if (readOptions.readMode == ReadMode::TopologyOnly) {
+        diagnostics.addWarning(grid->getName(),
+            "ReadMode::TopologyOnly is not supported for grids cached from a file "
+            "without grid offsets; returning the original grid with values intact");
+        OPENVDB_LOG_WARN(mFilename << ": grid \"" << grid->getName()
+            << "\" requested ReadMode::TopologyOnly, but this file has no grid offsets "
+            "and the grid is already fully cached; returning the original grid "
+            "with values intact");
+    } else {
+        io::Codec* codec = Archive::findCodec(grid->type(), readOptions);
+        if (GridBase::Ptr converted =
+            convertGridForReadMode(*grid, readOptions, codec, diagnostics, mFilename))
+        {
+            grid = converted;
+        }
+    }
+
+    const auto& bbox = readOptions.clipBBox;
+    if (bbox.isSorted()) {
+        if (grid == cachedGrid) {
+            // Don't mutate the cached grid in place, it stays owned by the caller.
+            grid = grid->deepCopyGrid();
+        }
+        grid->clipGrid(bbox);
+        diagnostics.addWarning(cachedGrid->getName(),
+            "bounding box clipping was applied as a post-process because the grid "
+            "was cached from a file without grid offsets");
+    }
+
+    return grid;
 }
 
 

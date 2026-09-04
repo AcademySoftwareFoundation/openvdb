@@ -988,7 +988,9 @@ struct InternalNode<ChildT, Log2Dim>::DeepCopy
     void operator()(const tbb::blocked_range<Index> &r) const {
         for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
             if (s->mChildMask.isOff(i)) {
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
                 t->mNodes[i].setValue(ValueType(s->mNodes[i].getValue()));
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_END
             } else {
                 t->mNodes[i].setChild(new ChildNodeType(*(s->mNodes[i].getChild())));
             }
