@@ -55,22 +55,9 @@ namespace nanovdb {
 
 namespace tools::cuda {
 
-/// @brief Index of each of the 6 leaf faces into a component's face-mask array. Each face is a
-///        uint64_t bitmask over the 8x8 boundary plane; cross-leaf adjacency is one AND of the
-///        touching faces (faceMasks[I][plusX] & faceMasks[J][minusX]). Bit index per axis:
-///          +/-X: y*8+z    +/-Y: x*8+z    +/-Z: y*8+x
-enum LeafNeighborTap : int {
-    minusX = 0,
-    plusX  = 1,
-    minusY = 2,
-    plusY  = 3,
-    minusZ = 4,
-    plusZ  = 5
-};
-
 /// @brief Identifies a connected component. Must accommodate the total number of per-leaf
 ///        components created across the grid, which bounds every other use of it; enforced by
-///        ConnectedComponents::MaxLeafComponents.
+///        ConnectedComponents::MaxComponentCount.
 using ComponentLabelT = uint32_t;
 static_assert(std::is_unsigned<ComponentLabelT>::value,
               "ComponentLabelT must be unsigned: the background sentinel is its all-ones value");
@@ -97,10 +84,9 @@ class ConnectedComponents
 
 public:
 
-    /// @brief Largest leaf-local component count (K) this operator can index, and hence -- since
-    ///        N <= K -- the largest component count too. The scans take their item counts in the
-    ///        natural type, so ComponentLabelT is the only thing that bounds this.
-    static constexpr uint64_t MaxLeafComponents = uint64_t(std::numeric_limits<ComponentLabelT>::max());
+    /// @brief Maximum number of components, across the whole grid, this operator can label.
+    static constexpr uint64_t MaxComponentCount =
+        uint64_t(std::numeric_limits<ComponentLabelT>::max());
 
     /// @brief Constructor
     /// @param d_srcGrid source device indexGrid whose active voxels are to be labeled
@@ -126,12 +112,12 @@ public:
     void setVerbose(int level = 1) { mVerbose = level; }
 
     /// @brief Run the connected-components pipeline and return { labels, componentCount }:
-    ///          - labels: an owning buffer of activeVoxelCount+1 ComponentLabelT, indexed by
-    ///            leaf.getValue(n) (slot 0 = background, sentinel = all ones). Each active voxel
-    ///            holds its component's dense id in [0, N), so two active voxels share a value iff
-    ///            they are in the same connected component. Ownership passes to the caller: the
-    ///            buffer outlives this operator and frees itself on the stream it was allocated on.
-    ///            Only the injected resource, which the caller supplies, must outlive it.
+    ///          - labels: an owning per-voxel label sidecar. Each active voxel holds its
+    ///            component's dense id in [0, N), so two active voxels share a value iff they are
+    ///            in the same connected component; slot 0, the background, holds the all-ones
+    ///            sentinel. Ownership passes to the caller: the buffer outlives this operator and
+    ///            frees itself on the stream it was allocated on. Only that free needs the
+    ///            resource, which by default has program lifetime.
     ///          - componentCount: the number of connected components N.
     /// @note The returned contents are complete: the stream is synchronized before returning.
     std::pair<BufT<ComponentLabelT>, ComponentLabelT> getVoxelLabelsAndCount()
@@ -184,6 +170,10 @@ private:
 
     uint64_t                     mLeafComponentAggregateCount{0}; // total leaf-local components across all leaves (= K = offsets[leafCount])
 
+    // TODO: none of these is released before this operator is destroyed, though two die early:
+    // mLeafComponentFaceMasks after processCrossLeafEdges (48 B per leaf-local component) and
+    // mCrossLeafEdges after processComponentLabels (8 B per edge). Releasing each at its last use
+    // -- a move-assign of an empty buffer, stream-ordered, no host sync -- would cut peak memory.
     BufT<uint16_t>               mLeafComponentCounts;      // leafCount                    x uint16_t:      per-leaf component count
     BufT<uint64_t>               mLeafComponentOffsets;     // (leafCount+1)                x uint64_t:      exclusive+inclusive prefix sums
     BufT<nanovdb::Mask<3>>       mLeafComponentMasks;       // mLeafComponentAggregateCount x Mask<3>:       per-component active-voxel footprint
@@ -205,6 +195,16 @@ private:
 namespace cc_detail {
 
 constexpr int LEAF_SIZE = 512;          // 8^3
+
+/// @brief Index of each of the 6 leaf faces into a component's face-mask array.
+enum LeafNeighborTap : int {
+    minusX = 0,
+    plusX  = 1,
+    minusY = 2,
+    plusY  = 3,
+    minusZ = 4,
+    plusZ  = 5
+};
 
 // Leaf-local connected components via a Shiloach-Vishkin union-find run in shared memory, one CUDA
 // block per leaf, one thread per voxel offset n in [0, 512). The forest is stored as a parent array
@@ -521,13 +521,15 @@ __device__ inline void ccForEachCrossLeafEdge(
         if (countNeighbor == 0) continue;
 
         // Every (this leaf's component, neighbor's component) pair, flattened so the block can
-        // stride it; two components are adjacent iff their touching face masks intersect.
+        // stride it; two components are adjacent iff their touching face masks intersect. The
+        // slots narrow to ComponentLabelT, which is safe because the component count is checked
+        // against MaxComponentCount before any of them is produced.
         const int fLeaf = faceLeaf[axis], fNeighbor = faceNeighbor[axis];
         const int total = countLeaf * countNeighbor;
         for (int p = tID; p < total; p += nThreads) {
             const int i = p / countNeighbor, j = p % countNeighbor;
             if (d_faces[baseLeaf + i][fLeaf] & d_faces[baseNeighbor + j][fNeighbor])
-                emit(uint32_t(baseLeaf + i), uint32_t(baseNeighbor + j));
+                emit(ComponentLabelT(baseLeaf + i), ComponentLabelT(baseNeighbor + j));
         }
     }
 }
@@ -555,7 +557,7 @@ struct CrossLeafEdgeCountFunctor
         // The enumerator hands each edge to the callback as a pair of global component slots. This
         // pass only needs how many there are, so both are left unnamed and the body just tallies.
         ccForEachCrossLeafEdge<BuildT>(d_grid, d_offsets, d_faces, leafID, tID, blockDim.x,
-            [&] __device__ (uint32_t, uint32_t) { atomicAdd_block(&sEdges, 1); });
+            [&] __device__ (ComponentLabelT, ComponentLabelT) { atomicAdd_block(&sEdges, 1); });
         __syncthreads();
         if (tID == 0) d_outCount[leafID] = uint64_t(sEdges);
     }
@@ -582,7 +584,7 @@ struct CrossLeafEdgeScatterFunctor
         if (tID == 0) sWrite = (unsigned long long)d_edgeOffsets[leafID];
         __syncthreads();
         ccForEachCrossLeafEdge<BuildT>(d_grid, d_offsets, d_faces, leafID, tID, blockDim.x,
-            [&] __device__ (uint32_t ga, uint32_t gb) {
+            [&] __device__ (ComponentLabelT ga, ComponentLabelT gb) {
                 const unsigned long long slot = atomicAdd_block(&sWrite, 1ull);
                 CrossLeafEdge e;
                 e.a = (ga < gb) ? ga : gb;  // canonical a < b
@@ -769,7 +771,7 @@ void ConnectedComponents<BuildT, ResourceT>::processLeafConnectedComponents()
     // slots, the rank scan runs over K items, and the dense labels count them. K is carried as
     // uint64_t precisely so an out-of-range value survives to be tested here; past this point the
     // narrower types are known to fit, which is what lets N share ComponentLabelT with the labels.
-    if (mLeafComponentAggregateCount > MaxLeafComponents)
+    if (mLeafComponentAggregateCount > MaxComponentCount)
         throw std::runtime_error("nanovdb::tools::cuda::ConnectedComponents: leaf-local component "
                                  "count exceeds the indexable range");
 
@@ -781,7 +783,7 @@ void ConnectedComponents<BuildT, ResourceT>::processLeafConnectedComponents()
         mStream, this->ref(), mLeafComponentAggregateCount, nanovdb::cuda::noInit);
     if (mVerbose==1) mTimer.stop();
 
-    // Allocate 6 uint64_t face masks per component (one per LeafNeighborTap entry).
+    // Allocate 6 uint64_t face masks per component (one per cc_detail::LeafNeighborTap entry).
     // The face-extraction kernel fills these; no zero-init needed for the same reason.
     if (mVerbose==1) mTimer.start("Allocating per-component face masks");
     mLeafComponentFaceMasks = BufT<uint64_t[6]>(
