@@ -163,6 +163,7 @@ else()
     TestPointSample.cc
     TestPointScatter.cc
     TestPointStatistics.cc
+    TestPointTransfer.cc
     TestPointsToMask.cc
     TestPoissonSolver.cc
     TestPotentialFlow.cc

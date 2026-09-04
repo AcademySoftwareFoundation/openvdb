@@ -5,7 +5,7 @@
 ///
 /// @file PointRasterizeTrilinear.h
 ///
-/// @brief Transfer schemes for rasterizing point data
+/// @brief Weighted trilinear rasterization of point data
 ///
 
 #ifndef OPENVDB_POINTS_RASTERIZE_TRILINEAR_HAS_BEEN_INCLUDED
@@ -19,6 +19,7 @@
 #include <openvdb/tools/Morphology.h>
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/util/Assert.h>
+#include <openvdb/simd/Simd.h>
 
 #include "PointDataGrid.h"
 #include "PointMask.h"
@@ -31,21 +32,42 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace points {
 
-///
+/// @brief  Traits for staggered (MAC) trilinear rasterization. This method
+///   only works on scalar or Vec3 attribute types and only ever returns a Vec3
+///   tree. It is typically used for velocity rasterization in fluid
+///   simulations to avoid the pressure-velocity decoupling problem that occurs
+///   on collocated (cell-centered) grids. The resulting Vec3 tree effectively
+///   represents the velocity values on the cell faces rather than the cell
+///   centers.
 template <typename ValueT, bool Staggered = true>
 struct TrilinearTraits
 {
-    using ResultT = typename std::conditional<
-        VecTraits<ValueT>::IsVec, ValueT, math::Vec3<ValueT>>::type;
+private:
+    using FltT = typename types_internal::flt_t<sizeof(typename ValueTraits<ValueT>::ElementType)*CHAR_BIT>::type;
+    static_assert(ValueTraits<ValueT>::IsScalar ||
+        (ValueTraits<ValueT>::IsVec && ValueTraits<ValueT>::Size == 3),
+        "Source attribute type must be scalar or Vec3 for staggered rasterization.");
+public:
+    /// @brief  Resulting rasterized Tree ValueType (always Vec3)
+    using ResultT = math::Vec3<FltT>;
+    /// @brief  Resulting rasterized TreeType
     template <typename PointDataTreeT>
     using TreeT = typename PointDataTreeT::template ValueConverter<ResultT>::Type;
 };
 
-///
+/// @brief  Traits for collocated, cell-centered rasterization. Work for any
+///   scalar, vector or matrix attribute. Note that integer values are
+///   interpolated at their respective floating point precision and returned
+///   as trees at that precision.
 template <typename ValueT>
 struct TrilinearTraits<ValueT, false>
 {
-    using ResultT = ValueT;
+private:
+    using FltT = typename types_internal::flt_t<sizeof(typename ValueTraits<ValueT>::ElementType)*CHAR_BIT>::type;
+public:
+    /// @brief  Resulting rasterized Tree ValueType
+    using ResultT = typename ConvertElementType<ValueT, FltT>::Type;
+    /// @brief  Resulting rasterized TreeType
     template <typename PointDataTreeT>
     using TreeT = typename PointDataTreeT::template ValueConverter<ResultT>::Type;
 };
@@ -65,8 +87,11 @@ struct TrilinearTraits<ValueT, false>
 /// @tparam Staggered whether to perform a staggered or collocated rasterization
 /// @tparam ValueT    the value type of the point attribute to rasterize
 /// @param points     the point tree to be rasterized
-/// @param attribute  the name of the attribute to rasterize. Must be a scalar
-///   or Vec3 attribute.
+/// @param attribute  the name of the attribute to rasterize. Must be a Vec3
+///   attribute for Staggered rasterization. Otherwise, can be any scalar,
+///   Vector or Matrix type. Integer values are interpolated at their float
+///   bitwidth precision and returned as a tree at that precision e.g:
+///     int32 -> float, FloatTree.
 /// @param filter     an optional point filter to use
 template <bool Staggered,
     typename ValueT,

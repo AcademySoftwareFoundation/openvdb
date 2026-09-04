@@ -1,0 +1,3 @@
+Improvements:
+  - points::rasterizeTrilinear now supports integer and arbitrary sized openvdb 
+    vector and matrix attributes (for collocated transfers).
