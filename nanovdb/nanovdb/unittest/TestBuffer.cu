@@ -12,6 +12,9 @@
 #include <nanovdb/cuda/DeviceResource.h>
 #include <nanovdb/cuda/PinnedResource.h>
 #include <nanovdb/tools/CreatePrimitives.h>
+#include <nanovdb/tools/cuda/PointsToGrid.cuh> // for the voxelsToGrid entry-point test
+#include <nanovdb/cuda/ManagedResource.h>
+#include <nanovdb/tools/cuda/VoxelBlockManager.cuh> // for the single-space entry-point test
 
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
@@ -1026,6 +1029,20 @@ TEST(TestBuffer, GridHandleCopyToPinnedRoundTrip)
     EXPECT_NE(dev2.deviceGrid<float>(1), nullptr);
 }
 
+TEST(TestBuffer, GridHandleCopyToManagedSynchronizes)
+{
+    auto host = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
+    using ManagedBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
+    // A managed destination is host-readable, so copyTo synchronizes before
+    // returning: the host accessors must be valid immediately, with no
+    // synchronization by the caller.
+    auto managed = nanovdb::cuda::copyTo<ManagedBufT>(host, cudaStream_t(0));
+    EXPECT_EQ(1u, managed.gridCount());
+    ASSERT_NE(managed.grid<float>(), nullptr);
+    EXPECT_EQ(0, std::memcmp(managed.data(), host.data(), host.bufferSize()));
+    EXPECT_NE(managed.deviceGrid<float>(), nullptr);// the same allocation serves the device accessors
+}
+
 TEST(TestBuffer, GridHandleCopyToProtoResource)
 {
     auto host = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
@@ -1037,7 +1054,7 @@ TEST(TestBuffer, GridHandleCopyToProtoResource)
         DevBufT proto(cudaStream_t(0), RefT(res), 16, nanovdb::cuda::noInit);// alloc #1: an exemplar carrying the borrowed resource
         auto dev = nanovdb::cuda::copyTo<DevBufT>(host, cudaStream_t(0), &proto);
         ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
-        EXPECT_EQ(3, counters.allocs);// #2: the grid storage, #3: the metadata scratch, all through the proto's resource
+        EXPECT_EQ(2, counters.allocs); // #2: the grid storage; the metadata is adopted from the source handle, so no scratch
         EXPECT_NE(dev.deviceGrid<float>(), nullptr);
 
         nanovdb::GridHandle<nanovdb::HostBuffer> empty;
@@ -1227,6 +1244,106 @@ TEST(TestBuffer, SingleSpaceNodeManager)
     }
     ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
     EXPECT_EQ(counters.allocs, counters.deallocs);
+}
+
+TEST(TestBuffer, SingleSpaceToolEntryPoints)
+{
+    // The builders allocate their result handle through createDeviceStorage,
+    // so a single-space buffer type works wherever a dual-space one does.
+    // voxelsToGrid stands in for the whole PointsToGrid family; the pool
+    // buffer supplies the resource for the handle storage.
+    nanovdb::Coord coords[2] = {nanovdb::Coord(1,2,3), nanovdb::Coord(10,20,8)}, *d_coords = nullptr;
+    ASSERT_EQ(cudaSuccess, cudaMalloc(&d_coords, 2*sizeof(nanovdb::Coord)));
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_coords, coords, 2*sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+
+    Counters counters;
+    CountingResource res{&counters};
+    using RefT = nanovdb::cuda::ResourceRef<CountingResource>;
+    using BufT = nanovdb::cuda::Buffer<std::byte, RefT>;
+    {
+        BufT pool(cudaStream_t(0), RefT(res), 16, nanovdb::cuda::noInit); // alloc #1: exemplar carrying the borrowed resource
+        auto handle = nanovdb::tools::cuda::voxelsToGrid<float, nanovdb::Coord*, BufT>(d_coords, 2, 1.0, pool);
+        ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+        EXPECT_EQ(1u, handle.gridCount());
+        EXPECT_NE(handle.deviceGrid<float>(), nullptr);
+        EXPECT_EQ(3, counters.allocs); // #2: the grid storage, #3: the handle's metadata scratch
+    }
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+    EXPECT_EQ(counters.allocs, counters.deallocs);
+    ASSERT_EQ(cudaSuccess, cudaFree(d_coords));
+}
+
+static_assert(nanovdb::BufferHasDeviceSingle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>>::value,
+              "managed storage is device-accessible");
+static_assert(nanovdb::BufferHasHostSingle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>>::value,
+              "managed storage is host-accessible");
+
+TEST(TestBuffer, ManagedBufferBothSpaces)
+{
+    // A managed-resource buffer serves grids read on both sides: the handle
+    // parses metadata on the host and exposes BOTH accessor families over
+    // the same allocation.
+    auto host = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
+    using BufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
+    BufT buf(host.bufferSize(), nanovdb::cuda::noInit);
+    std::memcpy(buf.data(), host.data(), host.bufferSize()); // managed memory is host-writable
+
+    nanovdb::GridHandle<BufT> handle(std::move(buf));
+    EXPECT_EQ(1u, handle.gridCount());
+    ASSERT_NE(handle.grid<float>(), nullptr); // host accessor
+    ASSERT_NE(handle.deviceGrid<float>(), nullptr); // device accessor, same bytes
+    EXPECT_EQ((const void*)handle.grid<float>(), (const void*)handle.deviceGrid<float>());
+    EXPECT_EQ(std::string("sphere"), handle.grid<float>()->gridName());
+
+    // built on the device through a tool entry point, read back on the host
+    nanovdb::Coord coords[2] = {nanovdb::Coord(1,2,3), nanovdb::Coord(10,20,8)}, *d_coords = nullptr;
+    ASSERT_EQ(cudaSuccess, cudaMalloc(&d_coords, 2*sizeof(nanovdb::Coord)));
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_coords, coords, 2*sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    auto built = nanovdb::tools::cuda::voxelsToGrid<float, nanovdb::Coord*, BufT>(d_coords, 2);
+    ASSERT_EQ(cudaSuccess, cudaDeviceSynchronize()); // device writes must land before host reads
+    ASSERT_NE(built.grid<float>(), nullptr);
+    EXPECT_TRUE(built.grid<float>()->tree().isActive(nanovdb::Coord(1,2,3)));
+
+    nanovdb::cuda::ManagedResource managed;
+    auto mgr = nanovdb::cuda::createNodeManager(built.deviceGrid<float>(), managed);
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+    EXPECT_NE(mgr.deviceMgr<float>(), nullptr); // a managed NodeManager serves the device...
+    EXPECT_NE(mgr.mgr<float>(), nullptr); // ...and the host
+    ASSERT_EQ(cudaSuccess, cudaFree(d_coords));
+}
+
+TEST(TestBuffer, SingleSpaceVoxelBlockManager)
+{
+    // The VoxelBlockManager entry point allocates through createDeviceStorage
+    // and its handle maps the device accessors onto single-space buffers.
+    nanovdb::Coord coords[2] = {nanovdb::Coord(1,2,3), nanovdb::Coord(10,20,8)}, *d_coords = nullptr;
+    ASSERT_EQ(cudaSuccess, cudaMalloc(&d_coords, 2*sizeof(nanovdb::Coord)));
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_coords, coords, 2*sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    auto gridHandle = nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex, nanovdb::Coord*>(d_coords, 2);
+    auto* d_grid = gridHandle.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_grid, nullptr);
+
+    using BufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
+    auto vbm = nanovdb::tools::cuda::buildVoxelBlockManager<6, BufT>(d_grid);
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+    EXPECT_GT(vbm.blockCount(), 0u);
+    EXPECT_NE(vbm.deviceFirstLeafID(), nullptr);
+    EXPECT_NE(vbm.deviceJumpMap(), nullptr);
+
+    Counters counters;
+    CountingResource res{&counters};
+    using RefT = nanovdb::cuda::ResourceRef<CountingResource>;
+    using RefBufT = nanovdb::cuda::Buffer<std::byte, RefT>;
+    {
+        RefBufT proto(cudaStream_t(0), RefT(res), 16, nanovdb::cuda::noInit); // exemplar carrying the borrowed resource
+        auto vbm2 = nanovdb::tools::cuda::buildVoxelBlockManager<6, RefBufT>(d_grid, 0, 0, 0, cudaStream_t(0), &proto);
+        ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+        EXPECT_EQ(3, counters.allocs); // proto + firstLeafID + jumpMap, all through the resource
+        EXPECT_NE(vbm2.deviceFirstLeafID(), nullptr);
+    }
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+    EXPECT_EQ(counters.allocs, counters.deallocs);
+    ASSERT_EQ(cudaSuccess, cudaFree(d_coords));
 }
 
 } // unnamed namespace

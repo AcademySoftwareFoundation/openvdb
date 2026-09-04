@@ -28,6 +28,7 @@
 #include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/GridHandle.h>
+#include <nanovdb/cuda/HandleStorage.h>
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
@@ -54,7 +55,7 @@ namespace tools::cuda {// ======================================================
 /// @param stream optional CUDA stream (defaults to CUDA stream 0)
 /// @return Returns a handle with a grid of type NanoGrid<Point> where point information, e.g. coordinates,
 ///         are represented as blind data defined by @c type.
-template<typename PtrT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 GridHandle<BufferT>
 pointsToGrid(const PtrT dWorldPoints,
              int pointCount,
@@ -83,7 +84,7 @@ pointsToGrid(const PtrT dWorldPoints,
 /// @param stream optional CUDA stream (defaults to CUDA stream 0)
 /// @return Returns a handle with a grid of type NanoGrid<Point> where point information, e.g. coordinates,
 ///         are represented as blind data defined by @c type.
-template<typename PtrT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 GridHandle<BufferT>
 pointsToGrid(const PtrT dWorldPoints,
              int pointCount,
@@ -96,7 +97,7 @@ pointsToGrid(const PtrT dWorldPoints,
 
 //-----------------------------------------------------------------------------------------------------
 
-template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 GridHandle<BufferT>
 pointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> pointSet,
             const BufferT &buffer = BufferT(),
@@ -116,7 +117,7 @@ pointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> pointSe
 /// @param voxelSize Size of a voxel in world units used for the output grid
 /// @param buffer Instance of the device buffer used for memory allocation
 /// @return Returns a handle with the grid of type NanoGrid<BuildT>
-template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 GridHandle<BufferT>
 voxelsToGrid(const PtrT dGridVoxels,
              size_t voxelCount,
@@ -126,7 +127,7 @@ voxelsToGrid(const PtrT dGridVoxels,
 
 //-------------------------------------------------------------------------------------------------------
 
-template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 GridHandle<BufferT>
 voxelsToGrid(std::vector<std::tuple<const PtrT, size_t, double>> pointSet,
              const BufferT &buffer = BufferT(),
@@ -365,7 +366,7 @@ public:
     /// @param pointCount number of input points or voxels
     /// @param buffer optional buffer (currently ignored)
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
-    template<typename PtrT, typename BufferT = nanovdb::cuda::DeviceBuffer>
+    template<typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer>
     GridHandle<BufferT> getHandle(const PtrT points,
                                   size_t pointCount,
                                   const BufferT &buffer = BufferT());
@@ -531,7 +532,7 @@ PointsToGrid<BuildT, ResourceT>::getHandle(const PtrT points,
     if (mVerbose==1) mTimer.stop();
 
     if (mVerbose==1) mTimer.restart("Computation of checksum");
-    tools::cuda::updateChecksum((GridData*)buffer.deviceData(), mChecksum, mStream);
+    tools::cuda::updateChecksum((GridData*)nanovdb::cuda::detail::deviceStorageData(buffer), mChecksum, mStream);
     if (mVerbose==1) mTimer.stop();
 
     cudaStreamSynchronize(mStream);
@@ -858,10 +859,10 @@ inline BufferT PointsToGrid<BuildT, ResourceT>::getBuffer(const PtrT, size_t poi
 
     int device = 0;
     cudaGetDevice(&device);
-    auto buffer = BufferT::create(mData.size, &pool, device, mStream);// only allocate buffer on the device
+    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(mData.size, &pool, device, mStream); // only allocate buffer on the device
 
-    mData.d_bufferPtr = buffer.deviceData();
-    if (mData.d_bufferPtr == nullptr) throw std::runtime_error("Failed to allocate grid buffer on the device");
+    mData.d_bufferPtr = nanovdb::cuda::detail::deviceStorageData(buffer);
+    if (mData.d_bufferPtr == nullptr) throw std::runtime_error("The grid buffer type produced no device-accessible memory");
     // Zero the whole grid buffer up front. This (a) makes the dense background
     // fills (upper/lower value tables, inactive leaf values - all zero in this
     // builder) redundant, so those kernels are skipped, and (b) makes the
@@ -1460,7 +1461,7 @@ voxelsToGrid(std::vector<std::tuple<const PtrT,size_t,double>> vec, const Buffer
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename PtrT, typename BufferT = cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename PtrT, typename BufferT = cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 [[deprecated("Use cuda::pointsToGrid instead")]]
 GridHandle<BufferT>
 cudaPointsToGrid(const PtrT dWorldPoints,
@@ -1475,7 +1476,7 @@ cudaPointsToGrid(const PtrT dWorldPoints,
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT, typename PtrT, typename BufferT = cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename BuildT, typename PtrT, typename BufferT = cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 [[deprecated("Use cuda::pointsToGrid instead")]]
 GridHandle<BufferT>
 cudaPointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> pointSet,
@@ -1487,7 +1488,7 @@ cudaPointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> poi
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT, typename PtrT, typename BufferT = cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename BuildT, typename PtrT, typename BufferT = cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 [[deprecated("Use cuda::voxelsToGrid instead")]]
 GridHandle<BufferT>
 cudaVoxelsToGrid(const PtrT dGridVoxels,
@@ -1501,7 +1502,7 @@ cudaVoxelsToGrid(const PtrT dGridVoxels,
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT, typename PtrT, typename BufferT = cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename BuildT, typename PtrT, typename BufferT = cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 [[deprecated("Use cuda::voxelsToGrid instead")]]
 GridHandle<BufferT>
 cudaVoxelsToGrid(std::vector<std::tuple<const PtrT, size_t, double>> pointSet,

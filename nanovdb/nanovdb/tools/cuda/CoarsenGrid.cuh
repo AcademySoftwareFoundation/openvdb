@@ -64,7 +64,7 @@ public:
     /// @tparam BufferT Buffer type used for allocation of the grid handle
     /// @param buffer optional buffer (currently ignored)
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
-    template<typename BufferT = nanovdb::cuda::DeviceBuffer>
+    template<typename BufferT = nanovdb::cuda::DualDeviceBuffer>
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
 
@@ -196,13 +196,12 @@ void CoarsenGrid<BuildT, ResourceT>::coarsenRoot()
 
     // Package the new root topology into a RootNode plus Tile list; upload to the GPU
     uint64_t rootSize = RootT::memUsage(coarsenedTiles.size());
-    mBuilder.mProcessedRoot = nanovdb::cuda::DeviceBuffer::create(rootSize);
-    auto coarsenedRootPtr = static_cast<RootT*>(mBuilder.mProcessedRoot.data());
+    auto coarsenedRootPtr = mBuilder.allocateProcessedRoot(rootSize);
     coarsenedRootPtr->mTableSize = coarsenedTiles.size();
     uint32_t t = 0;
     for (const auto& [key, tile] : coarsenedTiles)
         *coarsenedRootPtr->tile(t++) = tile;
-    mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
+    mBuilder.uploadProcessedRoot(mStream);
 }// CoarsenGrid<BuildT, ResourceT>::coarsenRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

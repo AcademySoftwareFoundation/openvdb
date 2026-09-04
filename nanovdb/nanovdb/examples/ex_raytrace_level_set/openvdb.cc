@@ -17,14 +17,9 @@
 
 #include "common.h"
 
-#if defined(NANOVDB_USE_CUDA)
-#include <nanovdb/cuda/DeviceBuffer.h>
-using BufferT = nanovdb::cuda::DeviceBuffer;
-#else
 using BufferT = nanovdb::HostBuffer;
-#endif
 
-void runOpenVDB(nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer>& handle, int numIterations, int width, int height, BufferT& imageBuffer)
+void runOpenVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int width, int height, BufferT& imageBuffer)
 {
     using GridT = openvdb::FloatGrid;
     using CoordT = openvdb::Coord;

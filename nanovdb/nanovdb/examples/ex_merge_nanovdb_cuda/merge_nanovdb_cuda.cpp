@@ -7,7 +7,7 @@
 
 // the following files are from NanoVDB
 #include <nanovdb/NanoVDB.h>
-#include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/cuda/HandleStorage.h> // host-includable: cuda::copyTo transfers grids without any kernel
 #include <nanovdb/tools/CreateNanoGrid.h>
 
 template<typename BuildT>
@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
 
         // Convert to indexGrid
         cpuTimer.start("Converting openVDB input to indexGrid (first component)");
-        auto srcHandle1 = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::cuda::DeviceBuffer>(
+        auto srcHandle1 = nanovdb::tools::openToIndexVDB<BuildT>(
             grid1,
             0u,    // Don't copy data channel
             false, // No stats
@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
         cpuTimer.stop();
 
         cpuTimer.start("Converting openVDB input to indexGrid (second component)");
-        auto srcHandle2 = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::cuda::DeviceBuffer>(
+        auto srcHandle2 = nanovdb::tools::openToIndexVDB<BuildT>(
             grid2,
             0u,    // Don't copy data channel
             false, // No stats
@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
 
         // Convert to indexGrid
         cpuTimer.start("Converting merged openVDB output to indexGrid");
-        auto dstReferenceHandle = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::cuda::DeviceBuffer>(
+        auto dstReferenceHandle = nanovdb::tools::openToIndexVDB<BuildT>(
             mergedGrid,
             0u,    // Don't copy data channel
             false, // No stats
@@ -144,13 +144,13 @@ int main(int argc, char *argv[])
             std::cout << "Memory usage                          : " << dstReferenceGrid->gridSize() << " bytes" << std::endl;
         }
 
-        // Copy both NanoVDB grids to GPU
-        srcHandle1.deviceUpload();
-        srcHandle2.deviceUpload();
-        dstReferenceHandle.deviceUpload();
-        auto* deviceSrcGrid1 = srcHandle1.deviceGrid<BuildT>();
-        auto* deviceSrcGrid2 = srcHandle2.deviceGrid<BuildT>();
-        auto* deviceDstReferenceGrid = dstReferenceHandle.deviceGrid<BuildT>();
+        // Deep-copy all three NanoVDB grids to the GPU; the returned handles validate them there
+        auto deviceSrcHandle1 = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(srcHandle1);
+        auto deviceSrcHandle2 = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(srcHandle2);
+        auto deviceDstReferenceHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(dstReferenceHandle);
+        auto* deviceSrcGrid1 = deviceSrcHandle1.deviceGrid<BuildT>();
+        auto* deviceSrcGrid2 = deviceSrcHandle2.deviceGrid<BuildT>();
+        auto* deviceDstReferenceGrid = deviceDstReferenceHandle.deviceGrid<BuildT>();
         if (!deviceSrcGrid1 || !deviceSrcGrid2 || !deviceDstReferenceGrid)
             OPENVDB_THROW(openvdb::RuntimeError, "Failure while uploading indexGrids to GPU");
 

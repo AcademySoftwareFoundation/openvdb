@@ -531,7 +531,7 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
 
 template void definePrimitives<HostBuffer>(nb::module_&);
 #ifdef NANOVDB_USE_CUDA
-template void definePrimitives<cuda::DeviceBuffer>(nb::module_&);
+template void definePrimitives<cuda::DualDeviceBuffer>(nb::module_&);
 #endif
 
 } // namespace pynanovdb

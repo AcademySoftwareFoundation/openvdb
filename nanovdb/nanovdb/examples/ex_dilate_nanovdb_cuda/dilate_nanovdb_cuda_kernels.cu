@@ -4,6 +4,7 @@
 #include <nanovdb/tools/cuda/DilateGrid.cuh>
 #include <nanovdb/tools/cuda/PruneGrid.cuh>
 #include <nanovdb/util/cuda/Injection.cuh>
+#include <nanovdb/cuda/GridHandle.cuh> // for cuda::copyTo
 
 template<typename T>
 bool bufferCheck(const T* deviceBuffer, const T* hostBuffer, size_t elem_count) {
@@ -50,11 +51,11 @@ void mainDilateGrid(
     }
 
     uint32_t dstLeafCount = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(dstGrid).mNodeCount[0];
-    nanovdb::cuda::DeviceBuffer dstLeafMaskBuffer;
+    nanovdb::cuda::Buffer<std::byte> dstLeafMaskBuffer;
     nanovdb::Mask<3>* dstLeafMasks = nullptr;
     if (dstLeafCount) {
-        dstLeafMaskBuffer = nanovdb::cuda::DeviceBuffer::create( std::size_t(dstLeafCount) * sizeof(nanovdb::Mask<3>), nullptr, false );
-        dstLeafMasks = static_cast<nanovdb::Mask<3>*>(dstLeafMaskBuffer.deviceData());
+        dstLeafMaskBuffer = nanovdb::cuda::Buffer<std::byte>(cudaStream_t(0), std::size_t(dstLeafCount) * sizeof(nanovdb::Mask<3>), nanovdb::cuda::noInit);
+        dstLeafMasks = reinterpret_cast<nanovdb::Mask<3>*>(dstLeafMaskBuffer.data());
         if (!dstLeafMasks) throw std::runtime_error("No GPU buffer for dstLeafMask");
     }
 
@@ -100,3 +101,4 @@ void mainDilateGrid(
     uint32_t nnType,
     uint32_t benchmark_iters
 );
+

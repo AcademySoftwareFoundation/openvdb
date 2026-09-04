@@ -26,6 +26,7 @@
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
 
 #include <cstring> // for std::strcpy
+#include <nanovdb/cuda/HandleStorage.h>
 
 namespace nanovdb {// ================================================
 
@@ -45,7 +46,7 @@ namespace tools::cuda {// ============================================
 /// @param pool optional pool used for allocation
 /// @param stream optional CUDA stream (defaults to CUDA stream 0)
 /// @return GridHandle with blind data appended
-template<typename BuildT, typename BlindDataT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename BuildT, typename BlindDataT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 GridHandle<BufferT>
 addBlindData(const NanoGrid<BuildT> *d_grid,
              const BlindDataT *d_blindData,
@@ -61,7 +62,6 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
     // Out: |-----------|----------|----------|-----------|------------|
     //        old grid    old meta   new meta    old data    new data
 
-    static_assert(BufferTraits<BufferT>::hasDeviceDual, "Expected BufferT to support device allocation");
     static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
                   "addBlindData allocates stream-ordered scratch and requires an AsyncResource");
 
@@ -89,8 +89,9 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
                                sizeof(BlindDataT), semantics, blindClass, toGridType<BlindDataT>()};
     if (!metaData.isValid()) throw std::runtime_error("cudaAddBlindData: invalid combination of blind meta data");
     std::strcpy(metaData.mName, name);
-    auto buffer = BufferT::create(tmp[GRID] + tmp[META] + sizeof(GridBlindMetaData) + tmp[DATA] + metaData.blindDataSize(), &pool, false);
-    void *d_data = buffer.deviceData();
+    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(tmp[GRID] + tmp[META] + sizeof(GridBlindMetaData) + tmp[DATA] + metaData.blindDataSize(),
+                                                              &pool, util::cuda::currentDevice(), stream);
+    void *d_data = nanovdb::cuda::detail::deviceStorageData(buffer);
 
     // 1:   |-----------|----------|
     //        old grid    old meta
@@ -130,12 +131,13 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
     Checksum cs(tmp[CHECKSUM]);
     cuda::updateChecksum(reinterpret_cast<GridData*>(d_data), cs.mode(), stream);
 
+    nanovdb::cuda::detail::orderBeforeHandleConstruction<BufferT>(stream);
     return GridHandle<BufferT>(std::move(buffer));
 }// cudaAddBlindData
 
 }// namespace tools::cuda
 
-template<typename BuildT, typename BlindDataT, typename BufferT = cuda::DeviceBuffer>
+template<typename BuildT, typename BlindDataT, typename BufferT = cuda::DualDeviceBuffer>
 [[deprecated("Use nanovdb::cuda::addBlindData instead")]]
 GridHandle<BufferT>
 cudaAddBlindData(const NanoGrid<BuildT> *d_grid,

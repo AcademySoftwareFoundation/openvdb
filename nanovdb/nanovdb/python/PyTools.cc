@@ -53,9 +53,9 @@ void defineToolsModule(nb::module_& m)
     nb::module_ cudaModule = m.def_submodule("cuda");
     cudaModule.doc() = "A submodule that implements CUDA-accelerated tools";
 
-    defineValidateGrids<cuda::DeviceBuffer>(m);
+    defineValidateGrids<cuda::DualDeviceBuffer>(m);
 
-    definePrimitives<cuda::DeviceBuffer>(cudaModule);
+    definePrimitives<cuda::DualDeviceBuffer>(cudaModule);
 
     defineSignedFloodFill<float>(cudaModule, "signedFloodFill");
     defineSignedFloodFill<double>(cudaModule, "signedFloodFill");

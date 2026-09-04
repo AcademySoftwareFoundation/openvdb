@@ -143,7 +143,7 @@ void defineHostReadWriteGrid(nb::module_& m)
 #ifdef NANOVDB_USE_CUDA
 void defineDeviceReadWriteGrid(nb::module_& m)
 {
-    using BufferT = cuda::DeviceBuffer;
+    using BufferT = cuda::DualDeviceBuffer;
     defineReadWriteGrid<BufferT>(m);
 
     m.def("deviceWriteGrid",
