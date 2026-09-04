@@ -245,6 +245,7 @@ void testIOImpl(
     EXPECT_EQ(readTopo->tree().leafCount(), srcGrid->tree().leafCount());
     EXPECT_TRUE(readTopo->tree().leafCount() > 0);
     EXPECT_EQ(readTopo->activeVoxelCount(), srcGrid->activeVoxelCount());
+    EXPECT_TRUE(srcGrid->tree().hasSameTopology(readTopo->tree()));
     // verify leaf buffers are allocated (bool/mask buffers are always present, skip empty() check)
     if constexpr (!std::is_same_v<typename GridT::ValueType, bool>) {
         for (auto leafIter = readTopo->tree().cbeginLeaf(); leafIter; ++leafIter) {
@@ -761,6 +762,11 @@ TEST_F(TestCodec, testTopologyOnlyWarnsAndIgnoresNoGridOffsets)
     EXPECT_TRUE(grid->isType<FloatGrid>());
     EXPECT_EQ(size_t(1), f.readDiagnostics().diagnostics().size());
 
+    // Whatever happens to the values, the topology must match the source grid.
+    FloatGrid::Ptr floatGrid = gridPtrCast<FloatGrid>(grid);
+    ASSERT_TRUE(floatGrid);
+    EXPECT_TRUE(srcGrid->tree().hasSameTopology(floatGrid->tree()));
+
     f.close();
     std::remove(path.c_str());
 }
@@ -798,6 +804,9 @@ TEST_F(TestCodec, testGetGridsTopologyOnlyWarnsNoGridOffsets)
         EXPECT_TRUE(grid->isType<FloatGrid>());
         ASSERT_EQ(size_t(1), f.readDiagnostics().diagnostics().size());
         readGridMessage = f.readDiagnostics().diagnostics()[0].message;
+        FloatGrid::Ptr floatGrid = gridPtrCast<FloatGrid>(grid);
+        ASSERT_TRUE(floatGrid);
+        EXPECT_TRUE(srcGrid->tree().hasSameTopology(floatGrid->tree()));
         f.close();
     }
 
@@ -812,6 +821,9 @@ TEST_F(TestCodec, testGetGridsTopologyOnlyWarnsNoGridOffsets)
         EXPECT_TRUE((*grids)[0]->isType<FloatGrid>());
         ASSERT_EQ(size_t(1), f.readDiagnostics().diagnostics().size());
         EXPECT_EQ(f.readDiagnostics().diagnostics()[0].message, readGridMessage);
+        FloatGrid::Ptr floatGrid = gridPtrCast<FloatGrid>((*grids)[0]);
+        ASSERT_TRUE(floatGrid);
+        EXPECT_TRUE(srcGrid->tree().hasSameTopology(floatGrid->tree()));
         f.close();
     }
 
