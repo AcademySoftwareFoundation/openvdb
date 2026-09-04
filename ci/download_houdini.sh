@@ -46,7 +46,7 @@ if [[ $PLATFORM =~ "linux" ]]; then
     mv dsolib/libz* ../hou/dsolib/.
     mv dsolib/libbz2* ../hou/dsolib/.
     mv dsolib/libtbb* ../hou/dsolib/.
-    mv dsolib/libjemalloc* ../hou/dsolib/.
+    mv dsolib/libjemalloc* ../hou/dsolib/. || :
     mv dsolib/liblzma* ../hou/dsolib/.
     mv dsolib/libIex* ../hou/dsolib/.
     mv dsolib/libImath* ../hou/dsolib/.
@@ -54,7 +54,7 @@ if [[ $PLATFORM =~ "linux" ]]; then
     cd ..
 
 elif [[ $PLATFORM =~ "macos" ]]; then
-    # Exract files by mounting the downloaded dmg (we only really want to
+    # Extract files by mounting the downloaded dmg (we only really want to
     # expand Houdini.framework)
     hdiutil attach hou.dmg
     pkgutil --expand-full /Volumes/Houdini/Houdini.pkg Houdini
