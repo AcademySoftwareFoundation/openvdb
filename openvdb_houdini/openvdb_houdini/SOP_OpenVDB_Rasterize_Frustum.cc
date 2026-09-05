@@ -516,58 +516,23 @@ struct GridsToRasterize
 
     struct Grid
     {
-    private:
-        static bool isTreeOutOfCore(const TreeType& tree)
-        {
-            using LeafManagerT = openvdb::tree::LeafManager<const TreeType>;
-            using LeafRangeT = typename LeafManagerT::LeafRange;
-            LeafManagerT leafManager(tree);
-            return tbb::parallel_reduce(leafManager.leafRange(), true,
-                [] (const LeafRangeT& range, bool result) -> bool {
-                    for (const auto& leaf : range) {
-                        if (!leaf.buffer().isOutOfCore()) return false;
-                    }
-                    return result;
-                },
-                [] (bool n, bool m) -> bool { return n || m; });
-        }
-
     public:
         explicit Grid(const ConstPtr& grid)
-            : mGrid(grid)
-            , mOutOfCore(isTreeOutOfCore(grid->constTree())) { }
-
-        inline bool isOutOfCore() const { return mOutOfCore; }
+            : mGrid(grid) { }
 
         template <typename RasterizerT>
         void addToRasterizer(RasterizerT& rasterizer)
         {
-            if (mOutOfCore) {
-                auto newGrid = mGrid->deepCopy();
-                rasterizer.addPoints(newGrid, /*stream=*/true);
-            }
-            else {
-                rasterizer.addPoints(mGrid);
-            }
+            rasterizer.addPoints(mGrid);
         }
 
     private:
         ConstPtr mGrid;
-        const bool mOutOfCore;
     }; // struct Grid
 
     void push_back(ConstPtr& grid) { mGrids.emplace_back(grid); }
     size_t size() const { return mGrids.size(); }
     bool empty() const { return mGrids.empty(); }
-
-    // return true if any of the grids is out-of-core
-    bool streaming() const
-    {
-        for (auto& grid : mGrids) {
-            if (grid.isOutOfCore()) return true;
-        }
-        return false;
-    }
 
     template <typename RasterizerT>
     void addGridToRasterizer(RasterizerT& rasterizer, size_t index)
@@ -885,8 +850,7 @@ Rasterizing can be performed into cartesian and frustum grids (otherwise referre
 grids). For frustum grids, approximations are used by default to accelerate the rasterization.\n\
 This can be disabled to achieve a more accurate result.\n\
 \n\
-This node supports streaming of VDB points and attributes if one or more delayed-load VDB is\n\
-provided as an input.\n\
+This node supports streaming of VDB points and attributes\n\
 \n\
 @related\n\
 - [OpenVDB Rasterize Points|Node:sop/DW_OpenVDBRasterizePoints]\n\
@@ -1257,8 +1221,6 @@ SOP_OpenVDB_Rasterize_Frustum::cookVDBSop(OP_Context& context)
                     iterations = 1;
                 }
 
-                bool streaming = pointGrids.streaming();
-
                 for (size_t i = 0; i < iterations; i++) {
 
                     if (!mergeVDBPoints) {
@@ -1274,12 +1236,6 @@ SOP_OpenVDB_Rasterize_Frustum::cookVDBSop(OP_Context& context)
                     if (std::find(vectorAttribNames.begin(), vectorAttribNames.end(), velocityAttribute) !=
                         vectorAttribNames.end()) {
                         velocity = rasterizer.rasterizeAttribute(velocityAttribute, vectorMode, reduceMemory, scale, rasterGroups);
-
-                        // need to deep-copy input grids again if caches are being discarded
-                        if (streaming && reduceMemory) {
-                            if (mergeVDBPoints)     pointGrids.addGridsToRasterizer(rasterizer);
-                            else                    pointGrids.addGridToRasterizer(rasterizer, i);
-                        }
                     }
 
                     // rasterize density
@@ -1287,12 +1243,6 @@ SOP_OpenVDB_Rasterize_Frustum::cookVDBSop(OP_Context& context)
                     if (createDensity) {
                         auto density = rasterizer.rasterizeDensity(densityAttribute, densityMode, reduceMemory, densityScale, rasterGroups);
                         outputGrids.push_back(density);
-
-                        // need to deep-copy input grids again if caches are being discarded
-                        if (streaming && reduceMemory) {
-                            if (mergeVDBPoints)     pointGrids.addGridsToRasterizer(rasterizer);
-                            else                    pointGrids.addGridToRasterizer(rasterizer, i);
-                        }
                     }
 
                     // rasterize mask
@@ -1307,12 +1257,6 @@ SOP_OpenVDB_Rasterize_Frustum::cookVDBSop(OP_Context& context)
                     for (const auto& name : scalarAttribNames) {
                         auto scalar = rasterizer.rasterizeAttribute(name, scalarMode, reduceMemory, scale, rasterGroups);
                         outputGrids.push_back(scalar);
-
-                        // need to deep-copy input grids again if caches are being discarded
-                        if (streaming && reduceMemory) {
-                            if (mergeVDBPoints)     pointGrids.addGridsToRasterizer(rasterizer);
-                            else                    pointGrids.addGridToRasterizer(rasterizer, i);
-                        }
                     }
 
                     // rasterize vector attributes
@@ -1327,12 +1271,6 @@ SOP_OpenVDB_Rasterize_Frustum::cookVDBSop(OP_Context& context)
                         else {
                             auto vector = rasterizer.rasterizeAttribute(name, vectorMode, reduceMemory, scale, rasterGroups);
                             outputGrids.push_back(vector);
-
-                            // need to deep-copy input grids again if caches are being discarded
-                            if (streaming && reduceMemory) {
-                                if (mergeVDBPoints)     pointGrids.addGridsToRasterizer(rasterizer);
-                                else                    pointGrids.addGridToRasterizer(rasterizer, i);
-                            }
                         }
                     }
                 }

@@ -5,11 +5,14 @@
 #define OPENVDB_IO_ARCHIVE_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
-#include "Compression.h" // for COMPRESS_ZIP, etc.
 #include <openvdb/Grid.h>
 #include <openvdb/MetaMap.h>
 #include <openvdb/Platform.h>
 #include <openvdb/version.h> // for VersionId
+
+#include "Codec.h"
+#include "Compression.h" // for COMPRESS_ZIP, etc.
+
 #include <cstdint>
 #include <iosfwd>
 #include <map>
@@ -89,14 +92,23 @@ public:
     void setGridStatsMetadataEnabled(bool b) { mEnableGridStats = b; }
 
     /// @brief Write the grids in the given container to this archive's output stream.
-    virtual void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const {}
+    virtual void write(const GridCPtrVec&, const MetaMap& = MetaMap(),
+        const io::WriteOptions& = io::WriteOptions{}) const {}
 
-    /// @brief Return @c true if delayed loading is enabled.
-    /// @details If enabled, delayed loading can be disabled for individual files,
-    /// but not vice-versa.
-    /// @note Define the environment variable @c OPENVDB_DISABLE_DELAYED_LOAD
-    /// to disable delayed loading unconditionally.
-    static bool isDelayedLoadingEnabled();
+    /// @brief Return @c false (delayed loading has been removed).
+    static bool isDelayedLoadingEnabled() { return false; }
+
+    /// @brief Enable collection of read diagnostics (warnings, etc.) during I/O operations.
+    void enableReadDiagnostics();
+
+    /// @brief Disable collection of read diagnostics.
+    void disableReadDiagnostics();
+
+    /// @brief Return a const reference to the diagnostics collector.
+    const ReadDiagnostics& readDiagnostics() const;
+
+    /// @brief Clear the diagnostics list while keeping collection active.
+    void clearReadDiagnostics();
 
 protected:
     /// @brief Return @c true if the input stream contains grid offsets
@@ -131,14 +143,15 @@ protected:
     /// Read in and return the number of grids on the input stream.
     static int32_t readGridCount(std::istream&);
 
-    /// Populate the given grid from the input stream.
-    static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&);
-    /// @brief Populate the given grid from the input stream, but only where it
-    /// intersects the given world-space bounding box.
-    static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&, const BBoxd&);
-    /// @brief Populate the given grid from the input stream, but only where it
-    /// intersects the given index-space bounding box.
-    static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&, const CoordBBox&);
+    /// @brief Find the codec for the given grid type and options.
+    static io::Codec* findCodec(const std::string& gridType, const io::ReadOptions& options = io::ReadOptions{});
+
+    /// @brief Read in and create the grid represented by the given grid descriptor using the
+    /// given input stream, using the provided options if given.
+    static GridBase::Ptr readGrid(const GridDescriptor&, std::istream&,
+        const io::ReadOptions& readOptions, ReadDiagnostics& diagnostics);
+    static GridBase::Ptr readGrid(const GridDescriptor&, std::istream&,
+        const io::ReadOptions& readOptions = io::ReadOptions{});
 
     using NamedGridMap = std::map<Name /*uniqueName*/, GridBase::Ptr>;
 
@@ -149,13 +162,16 @@ protected:
     /// Write the given grid descriptor and grid to an output stream
     /// and update the GridDescriptor offsets.
     /// @param seekable  if true, the output stream supports seek operations
-    void writeGrid(GridDescriptor&, GridBase::ConstPtr, std::ostream&, bool seekable) const;
+    /// @param writeOptions options controlling how grid data is written
+    void writeGrid(GridDescriptor&, GridBase::ConstPtr, std::ostream&, bool seekable,
+        const io::WriteOptions& writeOptions = io::WriteOptions{}) const;
     /// Write the given grid descriptor and grid metadata to an output stream
     /// and update the GridDescriptor offsets, but don't write the grid's tree,
     /// since it is shared with another grid.
     /// @param seekable  if true, the output stream supports seek operations
+    /// @param writeOptions options controlling how grid data is written
     void writeGridInstance(GridDescriptor&, GridBase::ConstPtr,
-        std::ostream&, bool seekable) const;
+        std::ostream&, bool seekable, const io::WriteOptions& writeOptions = io::WriteOptions{}) const;
 
     /// @brief Read the magic number, version numbers, UUID, etc. from the given input stream.
     /// @return @c true if the input UUID differs from the previously-read UUID.
@@ -167,9 +183,14 @@ protected:
 
     //@{
     /// Write the given grids to an output stream.
-    void write(std::ostream&, const GridPtrVec&, bool seekable, const MetaMap& = MetaMap()) const;
-    void write(std::ostream&, const GridCPtrVec&, bool seekable, const MetaMap& = MetaMap()) const;
+    void write(std::ostream&, const GridPtrVec&, bool seekable, const MetaMap&,
+        const io::WriteOptions& writeOptions = io::WriteOptions{}) const;
+    void write(std::ostream&, const GridCPtrVec&, bool seekable, const MetaMap&,
+        const io::WriteOptions& writeOptions = io::WriteOptions{}) const;
     //@}
+
+    /// Diagnostics collector for read operations (always valid; enabled/disabled via flag)
+    mutable ReadDiagnostics mReadDiagnostics;
 
 private:
     friend class ::TestFile;

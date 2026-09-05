@@ -34,7 +34,7 @@ public:
     using NameMapCIter = NameMap::const_iterator;
 
     explicit File(const std::string& filename);
-    ~File() override;
+    ~File() override { }
 
     /// @brief Copy constructor
     /// @details The copy will be closed and will not reference the same
@@ -54,20 +54,16 @@ public:
     /// @details The file does not necessarily exist on disk yet.
     const std::string& filename() const;
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
     /// @brief Open the file, read the file header and the file-level metadata,
     /// and populate the grid descriptors, but do not load any grids into memory.
-    /// @details If @a delayLoad is true, map the file into memory and enable delayed loading
-    /// of grids, and if a notifier is provided, call it when the file gets unmapped.
-    /// @note Define the environment variable @c OPENVDB_DISABLE_DELAYED_LOAD to disable
-    /// delayed loading unconditionally.
     /// @throw IoError if the file is not a valid VDB file.
     /// @return @c true if the file's UUID has changed since it was last read.
-    /// @see setCopyMaxBytes
-    bool open(bool delayLoad = true, const MappedFile::Notifier& = MappedFile::Notifier());
-#else
-    bool open(bool /*delayLoad*/ = false);
-#endif
+    bool open();
+
+    OPENVDB_DEPRECATED_MESSAGE("Use File::open() instead.This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    bool open(bool /*delayLoad*/) { return open(); }
+    OPENVDB_DEPRECATED_MESSAGE("Use File::open() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    bool open(bool /*delayLoad*/, const MappedFile::Notifier& /*notifier*/) { return open(); }
 
     /// Return @c true if the file has been opened for reading.
     bool isOpen() const;
@@ -79,23 +75,10 @@ public:
     /// @throw IoError if the file size cannot be determined.
     Index64 getSize() const;
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    /// @brief Return the size in bytes above which this file will not be
-    /// automatically copied during delayed loading.
-    Index64 copyMaxBytes() const;
-    /// @brief If this file is opened with delayed loading enabled, make a private copy
-    /// of the file if its size in bytes is less than the specified value.
-    /// @details Making a private copy ensures that the file can't change on disk
-    /// before it has been fully read.
-    /// @warning If the file is larger than this size, it is the user's responsibility
-    /// to ensure that it does not change on disk before it has been fully read.
-    /// Undefined behavior and/or a crash might result otherwise.
-    /// @note Copying is enabled by default, but it can be disabled for individual files
-    /// by setting the maximum size to zero bytes.  A default size limit can be specified
-    /// by setting the environment variable @c OPENVDB_DELAYED_LOAD_COPY_MAX_BYTES
-    /// to the desired number of bytes.
-    void setCopyMaxBytes(Index64 bytes);
-#endif
+    OPENVDB_DEPRECATED_MESSAGE("Always returns 0. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    Index64 copyMaxBytes() const { return 0; }
+    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    void setCopyMaxBytes(Index64 /*bytes*/) { }
 
     /// Return @c true if a grid of the given name exists in this file.
     bool hasGrid(const Name&) const;
@@ -104,7 +87,7 @@ public:
     MetaMap::Ptr getMetadata() const;
 
     /// Read the entire contents of the file and return a list of grid pointers.
-    GridPtrVecPtr getGrids() const;
+    GridPtrVecPtr getGrids(const io::ReadOptions& readOptions = io::ReadOptions{}) const;
 
     /// @brief Read just the grid metadata and transforms from the file and return a list
     /// of pointers to grids that are empty except for their metadata and transforms.
@@ -117,8 +100,8 @@ public:
     /// @throw KeyError if no grid with the given name exists in this file.
     GridBase::Ptr readGridMetadata(const Name&);
 
-    /// Read an entire grid, including all of its data blocks.
-    GridBase::Ptr readGrid(const Name&);
+    /// Read an entire grid, including all of its data blocks, using the provided options if given.
+    GridBase::Ptr readGrid(const Name&, const io::ReadOptions& readOptions = io::ReadOptions{});
     /// @brief Read a grid, including its data blocks, but only where it
     /// intersects the given world-space bounding box.
     GridBase::Ptr readGrid(const Name&, const BBoxd&);
@@ -127,12 +110,14 @@ public:
 
     /// @brief Write the grids in the given container to the file whose name
     /// was given in the constructor.
-    void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const override;
+    void write(const GridCPtrVec&, const MetaMap& = MetaMap(),
+        const io::WriteOptions& = io::WriteOptions{}) const override;
 
     /// @brief Write the grids in the given container to the file whose name
     /// was given in the constructor.
     template<typename GridPtrContainerT>
-    void write(const GridPtrContainerT&, const MetaMap& = MetaMap()) const;
+    void write(const GridPtrContainerT&, const MetaMap& = MetaMap(),
+        const io::WriteOptions& = io::WriteOptions{}) const;
 
     /// A const iterator that iterates over all names in the file. This is only
     /// valid once the file has been opened.
@@ -163,42 +148,16 @@ public:
     NameIterator endName() const;
 
 private:
-    /// Read in all grid descriptors that are stored in the given stream.
-    void readGridDescriptors(std::istream&);
-
     /// @brief Return an iterator to the descriptor for the grid with the given name.
     /// If the name is non-unique, return an iterator to the first matching descriptor.
     NameMapCIter findDescriptor(const Name&) const;
-
-    /// Return a newly created, empty grid of the type specified by the given grid descriptor.
-    GridBase::Ptr createGrid(const GridDescriptor&) const;
-
-    /// @brief Read a grid, including its data blocks, but only where it
-    /// intersects the given world-space bounding box.
-    GridBase::Ptr readGridByName(const Name&, const BBoxd&);
-
-    /// Read in and return the partially-populated grid specified by the given grid descriptor.
-    GridBase::ConstPtr readGridPartial(const GridDescriptor&, bool readTopology) const;
-
-    /// Read in and return the grid specified by the given grid descriptor.
-    GridBase::Ptr readGrid(const GridDescriptor&) const;
-    /// Read in and return the region of the grid specified by the given grid descriptor
-    /// that intersects the given world-space bounding box.
-    GridBase::Ptr readGrid(const GridDescriptor&, const BBoxd&) const;
-    /// Read in and return the region of the grid specified by the given grid descriptor
-    /// that intersects the given index-space bounding box.
-    GridBase::Ptr readGrid(const GridDescriptor&, const CoordBBox&) const;
-
-    /// @brief Partially populate the given grid by reading its metadata and transform and,
-    /// if the grid is not an instance, its tree structure, but not the tree's leaf nodes.
-    void readGridPartial(GridBase::Ptr, std::istream&, bool isInstance, bool readTopology) const;
 
     /// @brief Retrieve a grid from @c mNamedGrids.  Return a null pointer
     /// if @c mNamedGrids was not populated (because this file is random-access).
     /// @throw KeyError if no grid with the given name exists in this file.
     GridBase::Ptr retrieveCachedGrid(const Name&) const;
 
-    void writeGrids(const GridCPtrVec&, const MetaMap&) const;
+    void writeGrids(const GridCPtrVec&, const MetaMap&, const io::WriteOptions&) const;
 
     MetaMap::Ptr fileMetadata();
     MetaMap::ConstPtr fileMetadata() const;
@@ -211,8 +170,22 @@ private:
     friend class ::TestFile;
     friend class ::TestStream;
 
-    struct Impl;
-    std::unique_ptr<Impl> mImpl;
+    std::string mFilename;
+    // The file-level metadata
+    MetaMap::Ptr mMeta;
+    // The file stream that is open for reading
+    std::unique_ptr<std::istream> mInStream;
+    // File-level stream metadata (file format, compression, etc.)
+    StreamMetadata::Ptr mStreamMetadata;
+    // Flag indicating if we have read in the global information (header,
+    // metadata, and grid descriptors) for this VDB file
+    bool mIsOpen = false;
+    // Grid descriptors for all grids stored in the file, indexed by grid name
+    NameMap mGridDescriptors;
+    // All grids, indexed by unique name (used only when mHasGridOffsets is false)
+    Archive::NamedGridMap mNamedGrids;
+    // All grids stored in the file (used only when mHasGridOffsets is false)
+    GridPtrVecPtr mGrids;
 };
 
 
@@ -220,19 +193,21 @@ private:
 
 
 inline void
-File::write(const GridCPtrVec& grids, const MetaMap& meta) const
+File::write(const GridCPtrVec& grids, const MetaMap& meta,
+    const io::WriteOptions& writeOptions) const
 {
-    this->writeGrids(grids, meta);
+    this->writeGrids(grids, meta, writeOptions);
 }
 
 
 template<typename GridPtrContainerT>
 inline void
-File::write(const GridPtrContainerT& container, const MetaMap& meta) const
+File::write(const GridPtrContainerT& container, const MetaMap& meta,
+    const io::WriteOptions& writeOptions) const
 {
     GridCPtrVec grids;
     std::copy(container.begin(), container.end(), std::back_inserter(grids));
-    this->writeGrids(grids, meta);
+    this->writeGrids(grids, meta, writeOptions);
 }
 
 } // namespace io

@@ -1,7 +1,6 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
-#include <openvdb/io/TempFile.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointAttribute.h>

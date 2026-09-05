@@ -1,0 +1,8 @@
+OpenVDB:
+  API changes:
+  - GridDescriptor::read() has been deprecated, use GridDescriptor::readHeader()
+    followed by GridDescriptor::readStreamPos() instead.
+
+  Improvements:
+  - Large refactor of I/O classes, many private and protected member functions have
+    been modified. No change in behavior for io::File and io::Stream.

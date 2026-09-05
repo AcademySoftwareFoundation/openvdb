@@ -204,40 +204,20 @@ newSopOperator(OP_OperatorTable* table)
         .setCallbackFunc(&reloadCB)
         .setTooltip("Reread the VDB file."));
 
-    parms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep1", "Sep"));
-
-    // Delayed loading
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "delayload", "Delay Loading")
-        .setDefault(PRMoneDefaults)
-        .setTooltip(
-            "Don't allocate memory for or read voxel values until the values"
-            " are actually accessed.\n\n"
-            "Delayed loading can significantly lower memory usage, but\n"
-            "note that viewport visualization of a volume usually requires\n"
-            "the entire volume to be loaded into memory."));
-
-    // Localization file size slider
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "copylimit", "Copy If Smaller Than")
+    // Obsolete parameters
+    hutil::ParmList obsoleteParms;
+    obsoleteParms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep1", "Sep"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "delayload", "Delay Loading")
+        .setDefault(PRMoneDefaults));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "copylimit", "Copy If Smaller Than")
         .setTypeExtended(PRM_TYPE_JOIN_PAIR)
-        .setDefault(0.5f)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
-        .setTooltip(
-            "When delayed loading is enabled, a file must not be modified on disk before\n"
-            "it has been fully read.  For safety, files smaller than the given size (in GB)\n"
-            "will be copied to a private, temporary location (either $OPENVDB_TEMP_DIR,\n"
-            "$TMPDIR or a system default temp directory).")
-        .setDocumentation(
-            "When delayed loading is enabled, a file must not be modified on disk before"
-            " it has been fully read.  For safety, files smaller than the given size (in GB)"
-            " will be copied to a private, temporary location (either `$OPENVDB_TEMP_DIR`,"
-            " `$TMPDIR` or a system default temp directory)."));
-
-    parms.add(hutil::ParmFactory(PRM_LABEL, "copylimitlabel", "GB")
-        .setDocumentation(nullptr));
+        .setDefault(0.5f));
+    obsoleteParms.add(hutil::ParmFactory(PRM_LABEL, "copylimitlabel", "GB"));
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Read", SOP_OpenVDB_Read::factory, parms, *table)
         .setNativeName("")
+        .setObsoleteParms(obsoleteParms)
         .addOptionalInput("Optional Bounding Geometry")
         .setDocumentation("\
 #icon: COMMON/openvdb\n\
@@ -248,13 +228,7 @@ newSopOperator(OP_OperatorTable* table)
 @overview\n\
 \n\
 This node reads VDB volumes from a `.vdb` file.\n\
-It is usually preferable to use Houdini's native [File|Node:sop/file] node,\n\
-however unlike the native node, this node allows one to take advantage of\n\
-delayed loading, meaning that only those portions of a volume that are\n\
-actually accessed in a scene get loaded into memory.\n\
-Delayed loading can significantly reduce memory usage when working\n\
-with large volumes (but note that viewport visualization of a volume\n\
-usually requires the entire volume to be loaded into memory).\n\
+It is usually preferable to use Houdini's native [File|Node:sop/file] node.\n\
 \n\
 @related\n\
 - [OpenVDB Write|Node:sop/DW_OpenVDBWrite]\n\
@@ -296,10 +270,6 @@ SOP_OpenVDB_Read::updateParmsFlags()
     float t = 0.0;
 
     changed |= enableParm("group", bool(evalInt("enable_grouping", 0, t)));
-
-    const bool delayedLoad = evalInt("delayload", 0, t);
-    changed |= enableParm("copylimit", delayedLoad);
-    changed |= enableParm("copylimitlabel", delayedLoad);
 
     return changed;
 }
@@ -344,10 +314,6 @@ SOP_OpenVDB_Read::cookVDBSop(OP_Context& context)
             //}
         }
 
-        const bool delayedLoad = evalInt("delayload", 0, t);
-        const openvdb::Index64 copyMaxBytes =
-            openvdb::Index64(1.0e9 * evalFloat("copylimit", 0, t));
-
         openvdb::BBoxd clipBBox;
         bool clip = evalInt("clip", 0, t);
         if (clip) {
@@ -370,8 +336,7 @@ SOP_OpenVDB_Read::cookVDBSop(OP_Context& context)
         openvdb::MetaMap::Ptr fileMetadata;
         try {
             // Open the VDB file, but don't read any grids yet.
-            file.setCopyMaxBytes(copyMaxBytes);
-            file.open(delayedLoad);
+            file.open();
 
             // Read the file-level metadata.
             fileMetadata = file.getMetadata();

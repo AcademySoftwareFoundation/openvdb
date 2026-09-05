@@ -108,7 +108,7 @@ GEO_VDBTranslator::fileStat(const char *filename, GA_Stat &stat, uint /*level*/)
     try {
         openvdb::io::File file(filename);
 
-        file.open(/*delayLoad*/false);
+        file.open();
 
         int             nprim = 0;
         UT_BoundingBox  bbox;
@@ -204,7 +204,7 @@ GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, bool /*ate_magic
 
     try {
         // Create and open a VDB file, but don't read any grids yet.
-        openvdb::io::Stream file(*stdstream, /*delayLoad*/false);
+        openvdb::io::Stream file(*stdstream);
 
         // Read the file-level metadata into global attributes.
         openvdb::MetaMap::Ptr fileMetadata = file.getMetadata();

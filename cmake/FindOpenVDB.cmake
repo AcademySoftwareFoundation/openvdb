@@ -64,8 +64,6 @@ This will define the following variables:
   True if the OpenVDB Library has been built with log4cplus support
 ``OpenVDB_USES_IMATH_HALF``
   True if the OpenVDB Library has been built with Imath half support
-``OpenVDB_USES_DELAYED_LOADING``
-  True if the OpenVDB Library has been built with delayed-loading
 ``OpenVDB_ABI``
   Set if this module was able to determine the ABI number the located
   OpenVDB Library was built against. Unset otherwise.
@@ -522,7 +520,6 @@ set(OpenVDB_USES_BLOSC ${USE_BLOSC})
 set(OpenVDB_USES_ZLIB ${USE_ZLIB})
 set(OpenVDB_USES_LOG4CPLUS ${USE_LOG4CPLUS})
 set(OpenVDB_USES_IMATH_HALF ${USE_IMATH_HALF})
-set(OpenVDB_USES_DELAYED_LOADING ${OPENVDB_USE_DELAYED_LOADING})
 set(OpenVDB_DEFINITIONS)
 
 if(WIN32)
@@ -555,7 +552,6 @@ if(_OPENVDB_HAS_NEW_VERSION_HEADER)
   OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_IMATH_HALF" OpenVDB_USES_IMATH_HALF)
   OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_BLOSC" OpenVDB_USES_BLOSC)
   OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_ZLIB" OpenVDB_USES_ZLIB)
-  OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_DELAYED_LOADING" OpenVDB_USES_DELAYED_LOADING)
 elseif(NOT OPENVDB_USE_STATIC_LIBS)
   # Use GetPrerequisites to see which libraries this OpenVDB lib has linked to
   # which we can query for optional deps. This basically runs ldd/otoll/objdump
@@ -602,11 +598,6 @@ elseif(NOT OPENVDB_USE_STATIC_LIBS)
     if(NOT ${_HAS_DEP} EQUAL -1)
       set(OpenVDB_USES_IMATH_HALF ON)
     endif()
-
-    string(FIND ${PREREQUISITE} "boost_iostreams" _HAS_DEP)
-    if(NOT ${_HAS_DEP} EQUAL -1)
-      set(OpenVDB_USES_DELAYED_LOADING ON)
-    endif()
   endforeach()
 
   unset(_OPENVDB_PREREQUISITE_LIST)
@@ -628,10 +619,6 @@ if(OpenVDB_USES_IMATH_HALF)
   find_package(Imath REQUIRED CONFIG)
 endif()
 
-if(OpenVDB_USES_DELAYED_LOADING)
-  find_package(Boost REQUIRED COMPONENTS iostreams)
-endif()
-
 if(UNIX)
   find_package(Threads REQUIRED)
 endif()
@@ -642,11 +629,6 @@ endif()
 # from shared installs (including houdini) may pull in the wrong headers
 
 set(_OPENVDB_VISIBLE_DEPENDENCIES "")
-
-if(OpenVDB_USES_DELAYED_LOADING)
-  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES Boost::iostreams)
-  list(APPEND OpenVDB_DEFINITIONS OPENVDB_USE_DELAYED_LOADING)
-endif()
 
 if(OpenVDB_USES_IMATH_HALF)
   list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES Imath::Imath)

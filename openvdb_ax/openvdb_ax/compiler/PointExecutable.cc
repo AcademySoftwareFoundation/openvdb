@@ -362,7 +362,6 @@ struct PointFunctionArguments
         // @todo  if the array is shared we should probably make it unique?
 
         if (mData.mUseBufferKernel) {
-            const_cast<points::AttributeArray&>(array).loadData();
             const char* data = array.constDataAsByteArray();
             void* ptr = static_cast<void*>(const_cast<char*>(data));
             mHandlesOrBuffers.emplace_back(ptr);
@@ -387,14 +386,13 @@ struct PointFunctionArguments
         array.expand();
 
         if (mData.mUseBufferKernel) {
-            array.loadData();
             const char* data = array.constDataAsByteArray();
             void* ptr = static_cast<void*>(const_cast<char*>(data));
             mHandlesOrBuffers.emplace_back(ptr);
             const codegen::Codec* codec =
                 codegen::getCodec(ast::tokens::tokenFromTypeString(array.valueType()), array.codecType());
             if (codec) flag |= codec->flag();
-            OPENVDB_ASSERT(array.isDataLoaded() && !array.isUniform());
+            OPENVDB_ASSERT(!array.isUniform());
         }
         else {
             typename WriteHandle<ValueT>::UniquePtr handle(new WriteHandle<ValueT>(leaf, Index(pos)));

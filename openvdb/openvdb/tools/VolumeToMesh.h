@@ -616,8 +616,8 @@ template<>
 inline bool isInsideValue<bool>(bool value, bool /*isovalue*/) { return value; }
 
 
-/// @brief  Minor wrapper around the Leaf API to avoid atomic access with
-///   delayed loading.
+/// @brief  Minor wrapper around the Leaf API. This was originally added to avoid
+// atomic access with delayed loading, however delayed loading is no longer supported.
 template <typename LeafT,
     bool IsBool = std::is_same<typename LeafT::ValueType, bool>::value>
 struct LeafBufferAccessor

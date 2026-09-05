@@ -1073,8 +1073,7 @@ convertPointDataGridToHoudini(
     const PointDataGrid& grid,
     const std::vector<std::string>& attributes,
     const std::vector<std::string>& includeGroups,
-    const std::vector<std::string>& excludeGroups,
-    const bool inCoreOnly)
+    const std::vector<std::string>& excludeGroups)
 {
     using namespace openvdb::math;
 
@@ -1096,14 +1095,14 @@ convertPointDataGridToHoudini(
     // obtain cumulative point offsets and total points
     std::vector<Index64> offsets;
     MultiGroupFilter filter(includeGroups, excludeGroups, leafIter->attributeSet());
-    const Index64 total = pointOffsets(offsets, tree, filter, inCoreOnly);
+    const Index64 total = pointOffsets(offsets, tree, filter);
 
     // a block's global offset is needed to transform its point offsets to global offsets
     const Index64 startOffset = detail.appendPointBlock(total);
 
     HoudiniWriteAttribute<Vec3f> positionAttribute(*detail.getP());
     convertPointDataGridPosition(positionAttribute, grid, offsets, startOffset,
-        filter, inCoreOnly);
+        filter);
 
     // add other point attributes to the hdk detail
     const AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor.map();
@@ -1186,87 +1185,87 @@ convertPointDataGridToHoudini(
         if (valueType == "string") {
             HoudiniWriteAttribute<Name> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "bool") {
             HoudiniWriteAttribute<bool> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "int8") {
             HoudiniWriteAttribute<int8_t> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "int16") {
             HoudiniWriteAttribute<int16_t> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "int32") {
             HoudiniWriteAttribute<int32_t> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "int64") {
             HoudiniWriteAttribute<int64_t> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "float") {
             HoudiniWriteAttribute<float> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "double") {
             HoudiniWriteAttribute<double> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "vec3i") {
             HoudiniWriteAttribute<Vec3<int> > attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "vec3s") {
             HoudiniWriteAttribute<Vec3<float> > attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "vec3d") {
             HoudiniWriteAttribute<Vec3<double> > attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "quats") {
             HoudiniWriteAttribute<Quat<float> > attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "quatd") {
             HoudiniWriteAttribute<Quat<double> > attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "mat3s") {
             HoudiniWriteAttribute<Mat3<float> > attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "mat3d") {
             HoudiniWriteAttribute<Mat3<double> > attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "mat4s") {
             HoudiniWriteAttribute<Mat4<float> > attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else if (valueType == "mat4d") {
             HoudiniWriteAttribute<Mat4<double> > attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, offsets, startOffset, index, stride,
-                filter, inCoreOnly);
+                filter);
         }
         else {
             throw std::runtime_error("Unknown Attribute Type for Conversion: " + valueType);
@@ -1288,7 +1287,7 @@ convertPointDataGridToHoudini(
             attributeSet.groupIndex(name);
 
         HoudiniGroup group(*pointGroup, startOffset, total);
-        convertPointDataGridGroup(group, tree, offsets, startOffset, index, filter, inCoreOnly);
+        convertPointDataGridGroup(group, tree, offsets, startOffset, index, filter);
     }
 }
 
@@ -1615,32 +1614,7 @@ collectPointInfo(const PointDataGrid& grid,
 
     const PointDataTree& tree = grid.constTree();
 
-    // iterate through all leaf nodes to find out if all are out-of-core
-    bool allOutOfCore = true;
-    for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
-        if (!iter->buffer().isOutOfCore()) {
-            allOutOfCore = false;
-            break;
-        }
-    }
-
-    openvdb::Index64 totalPointCount = 0;
-
-    // it is more technically correct to rely on the voxel count as this may be
-    // out of sync with the attribute size, however for faster node preview when
-    // the voxel buffers are all out-of-core, count up the sizes of the first
-    // attribute array instead
-
-    if (allOutOfCore) {
-        for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
-            if (iter->attributeSet().size() > 0) {
-                totalPointCount += iter->constAttributeArray(0).size();
-            }
-        }
-    }
-    else {
-        totalPointCount = openvdb::points::pointCount(tree);
-    }
+    openvdb::Index64 totalPointCount = openvdb::points::pointCount(tree);
 
     std::ostringstream os;
     os << openvdb::util::formattedInt(totalPointCount);
@@ -1674,16 +1648,8 @@ collectPointInfo(const PointDataGrid& grid,
 
         os << it.first << "(";
 
-        // for faster node preview when all the voxel buffers are out-of-core,
-        // don't load the group arrays to display the group sizes, just print
-        // "out-of-core" instead @todo - put the group sizes into the grid
-        // metadata on write for this use case
-
-        if (allOutOfCore) os << "out-of-core";
-        else {
-            const openvdb::points::GroupFilter filter(it.first, attributeSet);
-            os << openvdb::util::formattedInt(pointCount(tree, filter));
-        }
+        const openvdb::points::GroupFilter filter(it.first, attributeSet);
+        os << openvdb::util::formattedInt(pointCount(tree, filter));
         os << ")";
     }
 
