@@ -121,10 +121,6 @@ File::inputStream() const
 Index64
 File::getSize() const
 {
-    /// @internal boost::filesystem::file_size() would be a more portable alternative,
-    /// but as of 9/2014, Houdini ships without the Boost.Filesystem library,
-    /// which makes it much less convenient to use that library.
-
     Index64 result = std::numeric_limits<Index64>::max();
 
     std::string mesg = "could not get size of file " + mFilename;

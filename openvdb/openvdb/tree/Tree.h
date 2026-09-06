@@ -1990,7 +1990,6 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
 {
     if (verboseLevel <= 0) return;
 
-    /// @todo Consider using boost::io::ios_precision_saver instead.
     struct OnExit {
         std::ostream& os;
         std::streamsize savedPrecision;

@@ -299,15 +299,12 @@ Optional:
   - @b USE_DEFAULT_HOUDINI_INSTALL =`ON` # Use the above default locations if
   @b OPENVDB_HOUDINI_INSTALL_PREFIX is not specified. If `OFF`, uses the value
   of @b CMAKE_INSTALL_PREFIX.
-  - @b BOOST_ROOT =`/path/to/boost/install` # Path to boost. May not be required,
- CMake may find it automatically
 
 For example on MacOS and where the build folder has been created inside the
 OpenVDB source root:
 
 @code
-cmake -D BOOST_ROOT=/path/to/boost/install \
-      -D Houdini_ROOT=/Applications/Houdini/Houdini17.0.506/ \
+cmake -D Houdini_ROOT=/Applications/Houdini/Houdini17.0.506/ \
       -D USE_HOUDINI=ON \
       ../
 @endcode
@@ -343,7 +340,6 @@ Package        | Description                                                    
 -------------- | ---------------------------------------------------------------   | -------------------------------- |
 CMake          | Cross-platform family of tools designed to help build software    | All                              |
 C++17 Compiler | Matching Houdini compiler and version                             | All                              |
-Boost          | Components: iostreams                                             | All                              |
 ZLIB           | Compression library for disk serialization compression            | All                              |
 Blosc          | Recommended dependency for improved disk compression              | All*                             |
 GoogleTest     | A unit testing framework module for C++                           | Unit Tests                       |
@@ -358,7 +354,7 @@ LLVM           | Target-independent code generation                             
 
 * See [blosc support](@ref buildBloscSupport)
 
-At a minimum, boost, a matching C++17 compiler, ZLIB, blosc and CMake will be
+At a minimum, a matching C++17 compiler, ZLIB, blosc and CMake will be
 required. See the full [dependency list](@ref dependencies) for help with
 downloading and installing the above software.
 
@@ -386,15 +382,12 @@ Optional:
  the link for default values.
   - @b OPENVDB_MAYA_INSTALL_PREFIX =`/path/to/install/dir` # The location to
  install the Maya plugin to. Defaults to the value of `${CMAKE_INSTALL_PREFIX}/maya${Maya_VERSION}`
-  - @b BOOST_ROOT =`/path/to/boost/install` # Path to boost. May not be required,
- CMake may find it automatically
 
 For example on MacOS and where the build folder has been created inside the
 OpenVDB source root:
 
 @code
-cmake -D BOOST_ROOT=/path/to/boost/install \
-      -D Maya_ROOT=/Applications/Autodesk/maya2019/ \
+cmake -D Maya_ROOT=/Applications/Autodesk/maya2019/ \
       -D USE_MAYA=ON \
       ../
 @endcode
