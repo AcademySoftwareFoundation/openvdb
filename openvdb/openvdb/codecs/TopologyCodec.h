@@ -117,6 +117,11 @@ struct ReadTopologyOp
     using LeafT = typename TreeT::LeafNodeType;
     using StorageValueT = typename StorageTreeT::ValueType;
 
+    // A ValueMask target records active state, not cast storage values: value
+    // must equal active state at every level, so the background and tile/node
+    // values are forced from activity instead of being converted from storage.
+    static constexpr bool isMaskTarget = std::is_same_v<typename TreeT::BuildType, ValueMask>;
+
     ReadTopologyOp(std::istream& _is, bool _saveFloatAsHalf, io::ReadDiagnostics& _diagnostics,
             const std::string& _gridName)
         : is(_is)
@@ -140,7 +145,11 @@ struct ReadTopologyOp
         // Read a RootNode that was stored in the current format.
 
         is.read(reinterpret_cast<char*>(&storageBackground), sizeof(StorageValueT));
-        background = static_cast<ValueT>(storageBackground);
+        if constexpr (isMaskTarget) {
+            background = false;
+        } else {
+            background = static_cast<ValueT>(storageBackground);
+        }
 
         Index numTiles = 0, numChildren = 0;
         is.read(reinterpret_cast<char*>(&numTiles), sizeof(Index));
@@ -156,7 +165,9 @@ struct ReadTopologyOp
             is.read(reinterpret_cast<char*>(&value), sizeof(StorageValueT));
             is.read(reinterpret_cast<char*>(&active), sizeof(bool));
             Coord origin(vec);
-            if constexpr (std::is_same_v<ValueT, StorageValueT>) {
+            if constexpr (isMaskTarget) {
+                root.addTile(origin, active, active);
+            } else if constexpr (std::is_same_v<ValueT, StorageValueT>) {
                 root.addTile(origin, value, active);
             } else {
                 root.addTile(origin, static_cast<ValueT>(value), active);
@@ -194,7 +205,10 @@ struct ReadTopologyOp
             StorageValueT* values = valuePtr.get();
             io::readCompressedValues(is, values, numValues, valueMask, saveFloatAsHalf, &storageBackground);
 
-            // Copy values from the array into this node's table.
+            // Copy values from the array into this node's table.  For a
+            // ValueMask target the decoded values array is only read to keep
+            // the stream position correct; the value comes from the value
+            // mask instead, so that value equals active state.
             if (oldVersion) {
                 // The node's member child mask is still empty at this point
                 // (PartialCreate; setChildUnsafe runs below), so iterate the
@@ -202,12 +216,21 @@ struct ReadTopologyOp
                 // avoid over-reading the countOff-sized values array.
                 Index n = 0;
                 for (auto iter = childMask.beginOff(); iter; ++iter) {
-                    node.setValueOnlyUnsafe(iter.pos(), static_cast<ValueT>(values[n++]));
+                    if constexpr (isMaskTarget) {
+                        node.setValueOnlyUnsafe(iter.pos(), valueMask.isOn(iter.pos()));
+                    } else {
+                        node.setValueOnlyUnsafe(iter.pos(), static_cast<ValueT>(values[n]));
+                    }
+                    ++n;
                 }
                 OPENVDB_ASSERT(n == numValues);
             } else {
                 for (auto iter = node.beginValueAll(); iter; ++iter) {
-                    node.setValueOnlyUnsafe(iter.pos(), static_cast<ValueT>(values[iter.pos()]));
+                    if constexpr (isMaskTarget) {
+                        node.setValueOnlyUnsafe(iter.pos(), valueMask.isOn(iter.pos()));
+                    } else {
+                        node.setValueOnlyUnsafe(iter.pos(), static_cast<ValueT>(values[iter.pos()]));
+                    }
                 }
             }
         }

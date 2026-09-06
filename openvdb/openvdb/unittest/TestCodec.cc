@@ -1330,56 +1330,207 @@ TEST_F(TestCodec, testTopologyOnlyClearsBoolTiles)
     std::remove(path.c_str());
 }
 
-// ReadMode::Mask must record which voxels are active, not cast the source values.
-// A non-zero background and an inactive non-zero tile would both become true under
-// a value cast. Streamed files have no grid offsets, so this exercises the
-// in-memory conversion in File::resolveCachedGrid rather than the codec path.
-TEST_F(TestCodec, testCachedMaskConversionIgnoresValues)
+// Compare two grids of the same type for background, topology, values and active
+// states, so that a conversion done on read can be checked against a reference.
+template <typename GridT>
+void expectGridsMatch(const GridT& reference, const GridT& other, const std::string& context)
+{
+    using namespace openvdb;
+
+    SCOPED_TRACE(context);
+
+    EXPECT_EQ(reference.background(), other.background());
+    EXPECT_TRUE(reference.constTree().hasSameTopology(other.constTree()));
+    EXPECT_EQ(reference.activeVoxelCount(), other.activeVoxelCount());
+    EXPECT_EQ(reference.constTree().activeTileCount(), other.constTree().activeTileCount());
+
+    // Walk each grid against an accessor on the other so that a tile or voxel
+    // present in only one of them is still compared.
+    auto otherAccessor = other.getConstAccessor();
+    for (typename GridT::ValueAllCIter it = reference.cbeginValueAll(); it; ++it) {
+        const Coord ijk = it.getCoord();
+        EXPECT_EQ(*it, otherAccessor.getValue(ijk));
+        EXPECT_EQ(it.isValueOn(), otherAccessor.isValueOn(ijk));
+    }
+    auto referenceAccessor = reference.getConstAccessor();
+    for (typename GridT::ValueAllCIter it = other.cbeginValueAll(); it; ++it) {
+        const Coord ijk = it.getCoord();
+        EXPECT_EQ(*it, referenceAccessor.getValue(ijk));
+        EXPECT_EQ(it.isValueOn(), referenceAccessor.isValueOn(ijk));
+    }
+}
+
+// A conversion readMode must produce the same grid as reading the grid in its
+// original type and converting it in memory.  That in-memory conversion is the
+// reference for the conversion codec (files with grid offsets) and for the cached
+// conversion in File::resolveCachedGrid (files without).  This holds for Bool and
+// Half, whose targets have genuine values distinct from their active state; Mask
+// is the exception and is tested separately in testMaskConversionMatchesInMemory.
+template <typename DstGridT, openvdb::io::ReadMode mode>
+void testConversionMatchesInMemoryImpl(const std::string& label)
 {
     using namespace openvdb;
     using namespace openvdb::io;
 
+    CodecRegistry::clear();
     io::internal::initialize();
 
-    const std::string gridName = "nonzero_background";
-    const std::string path = "testCachedMaskConversion.vdb";
+    const std::string gridName = "conversion_parity";
 
-    // A non-zero background, an inactive non-zero tile and an active region.
+    // A non-zero background, an inactive non-zero tile, an active zero tile and a
+    // region of active voxels.  Casting values and copying activity disagree on
+    // the background and on both tiles, which is what makes this a useful case.
+    // The two tiles sit in different internal nodes so that neither node holds
+    // more than two distinct inactive values, keeping them exact under the
+    // default active mask compression.
     FloatGrid::Ptr src = FloatGrid::create(/*background=*/1.0f);
     src->setName(gridName);
     src->tree().addTile(/*level=*/2, Coord(4096), 0.1f, /*active=*/false);
+    src->tree().addTile(/*level=*/2, Coord(8192), 0.0f, /*active=*/true);
     src->fill(CoordBBox(Coord(0), Coord(6)), 5.0f, /*active=*/true);
 
-    const Index64 srcActiveVoxels = src->activeVoxelCount();
-    ASSERT_TRUE(srcActiveVoxels > 0);
-
-    // Write via io::Stream so the file has no grid offsets and every grid is
-    // cached up front on open().
+    // io::File writes grid offsets, so a conversion readMode goes through the
+    // conversion codec.  io::Stream writes none, so every grid is cached on open()
+    // and converted in memory instead.
+    const std::string offsetsPath = "test_conversion_parity_offsets_" + label + ".vdb";
+    const std::string noOffsetsPath = "test_conversion_parity_no_offsets_" + label + ".vdb";
     {
-        std::ofstream os(path, std::ios_base::out | std::ios_base::binary);
+        io::File f(offsetsPath);
+        f.write(GridPtrVec{src});
+    }
+    {
+        std::ofstream os(noOffsetsPath, std::ios_base::out | std::ios_base::binary);
         io::Stream(os).write(GridPtrVec{src});
     }
 
-    ReadOptions maskOpts;
-    maskOpts.readMode = ReadMode::Mask;
+    ReadOptions convertOptions;
+    convertOptions.readMode = mode;
 
-    MaskGrid::Ptr readMask;
-    {
-        io::File f(path);
-        f.open();
-        readMask = gridPtrCast<MaskGrid>(f.readGrid(gridName, maskOpts));
-        f.close();
+    for (const std::string& path : {offsetsPath, noOffsetsPath}) {
+        FloatGrid::Ptr readOriginal;
+        typename DstGridT::Ptr readConverted;
+        {
+            io::File f(path);
+            f.open();
+            readOriginal = gridPtrCast<FloatGrid>(f.readGrid(gridName, ReadOptions{}));
+            readConverted = gridPtrCast<DstGridT>(f.readGrid(gridName, convertOptions));
+            f.close();
+        }
+        ASSERT_TRUE(readOriginal);
+        ASSERT_TRUE(readConverted);
+
+        // Read as the original type, then convert in memory: the reference.
+        const DstGridT reference(*readOriginal);
+
+        // Pin the reference semantics for the bool-valued targets, so that a change
+        // to the core grid conversion is caught here rather than silently redefining
+        // what the read paths are compared against.  Values come from a cast, active
+        // state from the source topology, and the two disagree on both tiles.
+        if constexpr (std::is_same_v<typename DstGridT::ValueType, bool>) {
+            auto accessor = reference.getConstAccessor();
+            EXPECT_TRUE(reference.background());                    // bool(1.0f)
+            EXPECT_TRUE(accessor.getValue(Coord(4096)));            // bool(0.1f)
+            EXPECT_FALSE(accessor.isValueOn(Coord(4096)));
+            EXPECT_FALSE(accessor.getValue(Coord(8192)));           // bool(0.0f)
+            EXPECT_TRUE(accessor.isValueOn(Coord(8192)));
+            EXPECT_TRUE(accessor.getValue(Coord(0)));               // bool(5.0f)
+            EXPECT_TRUE(accessor.isValueOn(Coord(0)));
+        }
+
+        expectGridsMatch(reference, *readConverted, path);
     }
-    ASSERT_TRUE(readMask);
 
-    // Only the active voxels are on. A value cast would have activated nothing
-    // extra, but it would have set the background and the inactive tile to true.
-    EXPECT_EQ(readMask->activeVoxelCount(), srcActiveVoxels);
-    EXPECT_TRUE(src->tree().hasSameTopology(readMask->tree()));
-    EXPECT_FALSE(readMask->background());
+    std::remove(offsetsPath.c_str());
+    std::remove(noOffsetsPath.c_str());
+}
 
-    // The inactive 0.1f tile must not have become an active or true tile.
-    EXPECT_FALSE(readMask->tree().getValue(Coord(4096)));
+// ReadMode::Mask does not match MaskGrid(readOriginal): a mask records active
+// state rather than a cast value, so the reference here is a topology copy of
+// the source rather than the in-memory conversion used for Bool and Half.
+TEST_F(TestCodec, testMaskConversionMatchesInMemory)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
 
-    std::remove(path.c_str());
+    CodecRegistry::clear();
+    io::internal::initialize();
+
+    const std::string gridName = "conversion_parity";
+
+    // Same source grid as the generic parity test: a non-zero background, an
+    // inactive non-zero tile and an active zero tile disagree between a value
+    // cast and a topology copy, which is the case worth pinning here.
+    FloatGrid::Ptr src = FloatGrid::create(/*background=*/1.0f);
+    src->setName(gridName);
+    src->tree().addTile(/*level=*/2, Coord(4096), 0.1f, /*active=*/false);
+    src->tree().addTile(/*level=*/2, Coord(8192), 0.0f, /*active=*/true);
+    src->fill(CoordBBox(Coord(0), Coord(6)), 5.0f, /*active=*/true);
+
+    const std::string offsetsPath = "test_conversion_parity_offsets_mask.vdb";
+    const std::string noOffsetsPath = "test_conversion_parity_no_offsets_mask.vdb";
+    {
+        io::File f(offsetsPath);
+        f.write(GridPtrVec{src});
+    }
+    {
+        std::ofstream os(noOffsetsPath, std::ios_base::out | std::ios_base::binary);
+        io::Stream(os).write(GridPtrVec{src});
+    }
+
+    ReadOptions maskOptions;
+    maskOptions.readMode = ReadMode::Mask;
+
+    for (const std::string& path : {offsetsPath, noOffsetsPath}) {
+        FloatGrid::Ptr readOriginal;
+        MaskGrid::Ptr readConverted;
+        {
+            io::File f(path);
+            f.open();
+            readOriginal = gridPtrCast<FloatGrid>(f.readGrid(gridName, ReadOptions{}));
+            readConverted = gridPtrCast<MaskGrid>(f.readGrid(gridName, maskOptions));
+            f.close();
+        }
+        ASSERT_TRUE(readOriginal);
+        ASSERT_TRUE(readConverted);
+
+        // The reference is a topology copy of the source, not MaskGrid(readOriginal):
+        // value equals active state everywhere, background is false, and inactive
+        // tiles are preserved rather than dropped.
+        MaskGrid::Ptr reference = MaskGrid::create(static_cast<const GridBase&>(*readOriginal));
+        reference->setTree(MaskGrid::TreeType::Ptr(
+            new MaskGrid::TreeType(readOriginal->constTree(),
+                /*inactiveValue=*/false, /*activeValue=*/true, TopologyCopy())));
+
+        auto accessor = reference->getConstAccessor();
+        EXPECT_FALSE(reference->background());
+        EXPECT_FALSE(accessor.getValue(Coord(4096)));
+        EXPECT_FALSE(accessor.isValueOn(Coord(4096)));
+        EXPECT_TRUE(accessor.getValue(Coord(8192)));
+        EXPECT_TRUE(accessor.isValueOn(Coord(8192)));
+        EXPECT_TRUE(accessor.getValue(Coord(0)));
+        EXPECT_TRUE(accessor.isValueOn(Coord(0)));
+        EXPECT_EQ(reference->activeVoxelCount(), readOriginal->activeVoxelCount());
+        EXPECT_EQ(reference->constTree().activeTileCount(), readOriginal->constTree().activeTileCount());
+
+        // Value equals active state at every position for a mask, which is what
+        // the topology-copy reference buys over a plain value cast.
+        for (auto it = reference->cbeginValueAll(); it; ++it) {
+            EXPECT_EQ(*it, it.isValueOn());
+        }
+
+        expectGridsMatch(*reference, *readConverted, path);
+    }
+
+    std::remove(offsetsPath.c_str());
+    std::remove(noOffsetsPath.c_str());
+}
+
+TEST_F(TestCodec, testBoolConversionMatchesInMemory)
+{
+    testConversionMatchesInMemoryImpl<openvdb::BoolGrid, openvdb::io::ReadMode::Bool>("bool");
+}
+
+TEST_F(TestCodec, testHalfConversionMatchesInMemory)
+{
+    testConversionMatchesInMemoryImpl<openvdb::HalfGrid, openvdb::io::ReadMode::Half>("half");
 }
