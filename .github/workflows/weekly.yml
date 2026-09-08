@@ -70,6 +70,7 @@ jobs:
     strategy:
       matrix:
         config:
+          - { houdini_version: '22.0', platform: 'linux_x86_64_gcc14.2', hou_hash: '22_0' }
           - { houdini_version: '21.0', platform: 'linux_x86_64_gcc11.2', hou_hash: '21_0' }
           - { houdini_version: '20.5', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_5' }
       fail-fast: false

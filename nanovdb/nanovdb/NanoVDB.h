@@ -1182,11 +1182,7 @@ public:
     }
 
     /// @brief Copy constructor
-    __hostdev__ Mask(const Mask& other)
-    {
-        for (uint32_t i = 0; i < WORD_COUNT; ++i)
-            mWords[i] = other.mWords[i];
-    }
+    Mask(const Mask&) = default;
 
     /// @brief Return a pointer to the list of words of the bit mask
     __hostdev__ uint64_t*       words() { return mWords; }

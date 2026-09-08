@@ -24,6 +24,7 @@
 #include <openvdb/thread/Threading.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Assert.h>
+#include <openvdb/simd/Simd.h>
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointGroup.h>
 #include <openvdb/points/PointTransfer.h>

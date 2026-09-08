@@ -3717,6 +3717,172 @@ TEST_F(Test_vdb_tool, ActionMultiply)
     std::remove("data/test_mul_out.vdb");
 }// ActionMultiply
 
+TEST_F(Test_vdb_tool, StackOptionNameResolution)
+{
+    // "vdb"/"geo" options accept a grid/geometry name wherever a stack age is
+    // accepted: Tool::resolveStackOption() (installed as Parser::onGetOption)
+    // translates each non-numeric token into the stack age of the entry with that
+    // exact name, on every read of the option.
+    using namespace openvdb::vdb_tool;
+
+    // A plain name resolves to its (single) age, same as the equivalent index.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -sphere name=b dim=8 -stats vdb=b");
+      EXPECT_NE(out.find("age"), std::string::npos);
+      // age 0 is "b" (most recently added); the name lookup must resolve to it,
+      // not to age 1 ("a").
+      EXPECT_NE(out.find("0  b"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    // A name matching MORE than one entry is rejected rather than expanded to a
+    // list of ages. Expansion would be unsafe: most actions read "vdb"/"geo" as a
+    // single age via get<int>() and cannot parse a list, and list consumers such as
+    // -clear erase by index while iterating, so a multi-age value can delete the
+    // wrong grid. The error names the ambiguous ages so the user can pick one.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -sphere name=other dim=8 -sphere name=a dim=8"
+          " -stats vdb=1,a");
+      EXPECT_NE(out.find("the name \"a\" is ambiguous"), std::string::npos);
+      EXPECT_NE(out.find("ages 0,2"), std::string::npos);
+    }
+
+    // ...and an ambiguous name must abort the action BEFORE it mutates the stack,
+    // so -clear leaves every grid in place rather than partially deleting.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -sphere name=x dim=8 -sphere name=mid dim=8 -sphere name=x dim=8"
+          " -clear vdb=x -print");
+      EXPECT_NE(out.find("is ambiguous"), std::string::npos);
+      // All three grids survive: two named "x" (ages 0 and 2) plus "mid".
+      EXPECT_NE(out.find("0  x"), std::string::npos);
+      EXPECT_NE(out.find("1  mid"), std::string::npos);
+      EXPECT_NE(out.find("2  x"), std::string::npos);
+    }
+
+    // A singleton consumer (rename reads get<int>("vdb")) rejects an ambiguous
+    // name with the same clear message rather than a raw "invalid int" parse error.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=x dim=8 -sphere name=mid dim=8 -sphere name=x dim=8"
+          " -rename vdb=x name=r");
+      EXPECT_NE(out.find("is ambiguous"), std::string::npos);
+      EXPECT_EQ(out.find("invalid int"), std::string::npos);
+    }
+
+    // A name that matches nothing on the stack is reported exactly like an
+    // out-of-range numeric index: a non-fatal, logged "skipping due to" error
+    // naming the culprit, not a silent no-op.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -stats vdb=nope");
+      EXPECT_NE(out.find("stats: skipping due to: stats: no VDB grid named \"nope\" on the stack"),
+                std::string::npos);
+    }
+
+    // "*" and "" (omitted) must still pass through untouched.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere name=a dim=8 -stats vdb=*");
+      EXPECT_NE(out.find("0  a"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    // "geo" resolves names against the Geometry stack independently of "vdb".
+    {
+      std::remove("data/test_geo_name.obj");
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere dim=8 -ls2mesh name=mesh_a"
+          " -rename geo=mesh_a name=renamed"
+          " -write geo=0 data/test_geo_name.obj");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_TRUE(fileExists("data/test_geo_name.obj"));
+      std::remove("data/test_geo_name.obj");
+    }
+
+    // REGRESSION: resolution must NOT be written back into the option. A loop body
+    // revisits the same Action every iteration, so the stored value has to remain the
+    // source expression "{$v}" and be re-expanded (and re-resolved) each time. Writing
+    // the first iteration's resolved age back into the option would pin every later
+    // iteration to that same grid.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -sphere name=b dim=8"
+          " -for v=0,2 -stats vdb={$v} -end");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      // Iteration v=0 reports age 0 ("b"), iteration v=1 reports age 1 ("a").
+      EXPECT_NE(out.find("0  b"), std::string::npos);
+      EXPECT_NE(out.find("1  a"), std::string::npos);
+    }
+
+    // Same guarantee for a NAME inside a loop body: it must be re-resolved against
+    // the current stack on every iteration, not frozen after the first.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -for v=0,2 -sphere name=b dim=8"
+          " -stats vdb=a -clear vdb=0 -end");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      // "a" sits at age 1 while the loop-created "b" is on top, both iterations.
+      EXPECT_NE(out.find("1  a"), std::string::npos);
+      EXPECT_EQ(out.find("0  a"), std::string::npos);
+    }
+}// StackOptionNameResolution
+
+TEST_F(Test_vdb_tool, ActionClearMultipleAges)
+{
+    // -clear resolves every requested age to a list iterator before erasing any of
+    // them. Erasing inside the loop shifted the remaining entries (an age is a
+    // distance from the back of the stack) and left earlier deletions in place when
+    // a later age turned out to be invalid.
+    using namespace openvdb::vdb_tool;
+
+    // Stack [a,b,c] => age 0=c, 1=b, 2=a. Clearing 0 and 2 must remove c and a and
+    // leave exactly b. Previously age 0 was erased, the stack shrank to 2, and the
+    // action then failed on age 2 having already destroyed a grid.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -sphere name=a dim=8 -sphere name=b dim=8 -sphere name=c dim=8"
+          " -clear vdb=0,2 -print");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("0  b"), std::string::npos);
+      EXPECT_EQ(out.find("  a "), std::string::npos);
+      EXPECT_EQ(out.find("  c "), std::string::npos);
+    }
+
+    // An out-of-range age anywhere in the list must abort with NOTHING deleted,
+    // matching how -copy validates every index before making any copies.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -sphere name=a dim=8 -sphere name=b dim=8 -clear vdb=1,99 -print");
+      EXPECT_NE(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("0  b"), std::string::npos);
+      EXPECT_NE(out.find("1  a"), std::string::npos);
+    }
+
+    // A repeated age refers to one entry, so it must delete one grid -- and must not
+    // erase the same list iterator twice, which is undefined behaviour.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -sphere name=a dim=8 -sphere name=b dim=8 -sphere name=c dim=8"
+          " -clear vdb=0,0 -print");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("0  b"), std::string::npos);
+      EXPECT_NE(out.find("1  a"), std::string::npos);
+      EXPECT_EQ(out.find("  c "), std::string::npos);
+    }
+
+    // The Geometry stack takes the identical path.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -sphere dim=8 -ls2mesh name=m1 -sphere dim=8 -ls2mesh name=m2"
+          " -sphere dim=8 -ls2mesh name=m3 -clear vdb=* geo=0,2 -print");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("0  m2"), std::string::npos);
+      EXPECT_EQ(out.find("m1"), std::string::npos);
+      EXPECT_EQ(out.find("m3"), std::string::npos);
+    }
+}// ActionClearMultipleAges
 TEST_F(Test_vdb_tool, ActionHistogram)
 {
     // -histogram bins the active values of a grid and renders an ASCII bar chart.

@@ -224,6 +224,7 @@ set(NANOVDB_INCLUDE_MATH_FILES
   math/DitherLUT.h
   math/HDDA.h
   math/Math.h
+  math/Proximity.h
   math/Ray.h
   math/SampleFromVoxels.h
   math/Stencils.h
@@ -258,6 +259,7 @@ set(NANOVDB_INCLUDE_TOOLS_CUDA_FILES
   tools/cuda/DilateGrid.cuh
   tools/cuda/CoarsenGrid.cuh
   tools/cuda/VoxelBlockManager.cuh
+  tools/cuda/MeshToGrid.cuh
 )
 
 # NanoVDB util header files
@@ -287,6 +289,7 @@ set(NANOVDB_INCLUDE_UTIL_FILES
   util/Timer.h
   util/Util.h
   util/MorphologyHelpers.h
+  util/MaskPrefixSum.h
 )
 
 # NanoVDB util/cuda header files
@@ -309,6 +312,7 @@ set(NANOVDB_INCLUDE_UTIL_CUDA_FILES
   util/cuda/MorphologyHelpers.cuh
   util/cuda/DeviceGridTraits.cuh
   util/cuda/Injection.cuh
+  util/cuda/Rasterization.cuh
 )
 
 add_library(nanovdb INTERFACE)

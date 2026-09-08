@@ -1,0 +1,7 @@
+NanoVDB:
+  Bug Fixes:
+  - Fixed six public headers missing from the install lists in nanovdb/CMakeLists.txt:
+    cuda/Buffer.h, cuda/PinnedResource.h, math/Proximity.h, tools/cuda/MeshToGrid.cuh,
+    util/MaskPrefixSum.h and util/cuda/Rasterization.cuh. Installed headers included two of
+    them, so including a header such as nanovdb/cuda/GridHandle.cuh from an installed
+    NanoVDB failed to compile.

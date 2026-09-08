@@ -1,0 +1,5 @@
+NanoVDB:
+  Improvements:
+  - nanovdb::Mask is now trivially copyable: its copy constructor, which duplicated the
+    implicit memberwise copy of its sole data member, is defaulted like the copy assignment
+    operator beside it.
