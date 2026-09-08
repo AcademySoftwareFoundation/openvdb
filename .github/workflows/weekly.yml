@@ -201,7 +201,7 @@ jobs:
       - name: install_deps
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev libgtest-dev libgmock-dev python3-numpy
+            sudo apt-get -q install -y libtbb-dev libblosc-dev libgtest-dev libgmock-dev python3-numpy
             ./ci/install_nanobind.sh 2.5.0
           elif [ "$RUNNER_OS" == "macOS" ]; then
             ./ci/install_macos.sh 20
@@ -560,7 +560,7 @@ jobs:
         echo "Using major version: ${VDB_MAJOR_VERSION}"
         echo "VDB_MAJOR_VERSION=${VDB_MAJOR_VERSION}" >> "$GITHUB_ENV"
     - name: install_deps
-      run: sudo apt-get -q install -y libboost-iostreams-dev libtbb-dev libblosc-dev elfutils
+      run: sudo apt-get -q install -y libtbb-dev libblosc-dev elfutils
     - name: install_abi_checker
       run: sudo apt-get -q install -y abi-dumper abi-compliance-checker
     - name: build_new

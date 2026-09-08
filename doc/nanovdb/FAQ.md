@@ -30,7 +30,7 @@
 
 * **How does the data structure of NanoVDB compare to that of OpenVDB?**
 
-  Conceptually they are essentially identical (NanoVDB uses the exact same tree configuration), but there are some implementation differences to minimize dependencies on external libraries in NanoVDB (e.g. no boost and std containers), and more importantly, NanoVDB has additional meta-data encoded in tree nodes specifically to accelerate ray-tracing (e.g. min/max values and AABB of active values). Also, NanoVDB is pointer-less and occupies a contiguous block of memory, i.e. de-fragmentized relative to OpenVDB. Effectively, NanoVDB is a linearized version of the well-known OpenVDB data structure with a few additional information baked into the tree nodes!
+  Conceptually they are essentially identical (NanoVDB uses the exact same tree configuration), but there are some implementation differences to minimize dependencies on external libraries in NanoVDB (e.g. no std containers), and more importantly, NanoVDB has additional meta-data encoded in tree nodes specifically to accelerate ray-tracing (e.g. min/max values and AABB of active values). Also, NanoVDB is pointer-less and occupies a contiguous block of memory, i.e. de-fragmentized relative to OpenVDB. Effectively, NanoVDB is a linearized version of the well-known OpenVDB data structure with a few additional information baked into the tree nodes!
 
 * **Are there known issues with NanoVDB?**
 

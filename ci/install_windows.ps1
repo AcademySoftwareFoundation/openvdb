@@ -15,9 +15,6 @@ $vcpkgPackages = @(
     "glew",
     "python3",
     "jemalloc",
-    "boost-iostreams",
-    "boost-interprocess",
-    "boost-algorithm",
     "nanobind"
 )
 
