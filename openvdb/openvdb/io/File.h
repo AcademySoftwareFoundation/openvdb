@@ -157,6 +157,12 @@ private:
     /// @throw KeyError if no grid with the given name exists in this file.
     GridBase::Ptr retrieveCachedGrid(const Name&) const;
 
+    /// @brief Return the grid that @a readOptions asks for, given the already
+    /// cached @a cachedGrid. Doesn't mutate @a cachedGrid, and returns it
+    /// unchanged when no option applies.
+    GridBase::Ptr resolveCachedGrid(const GridBase::Ptr& cachedGrid,
+        const io::ReadOptions& readOptions, ReadDiagnostics& diagnostics) const;
+
     void writeGrids(const GridCPtrVec&, const MetaMap&, const io::WriteOptions&) const;
 
     MetaMap::Ptr fileMetadata();
