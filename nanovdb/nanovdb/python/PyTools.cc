@@ -16,7 +16,6 @@
 #include "PyNanoToOpenVDB.h"
 #ifdef NANOVDB_USE_CUDA
 #include "cuda/PyPointsToGrid.h"
-#include "cuda/PySampleFromVoxels.h"
 #include "cuda/PySignedFloodFill.h"
 #endif
 
@@ -32,17 +31,12 @@ void defineToolsModule(nb::module_& m)
 
     defineStatsMode(m);
 
-    defineGridStatsModule(m);
-    defineGridValidatorModule(m);
-    defineEvalChecksumModule(m);
-
-    defineCreateNanoGridConversions(m);
-
     definePrimitives<HostBuffer>(m);
 
-#define NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix) \
-    defineCreateNanoGrid<T>(m, "create" #Suffix "Grid");
-#include "BuildTypes.def"
+    defineCreateNanoGrid<float>(m, "createFloatGrid");
+    defineCreateNanoGrid<double>(m, "createDoubleGrid");
+    defineCreateNanoGrid<int32_t>(m, "createInt32Grid");
+    defineCreateNanoGrid<Vec3f>(m, "createVec3fGrid");
 
 #ifdef NANOVDB_USE_OPENVDB
     defineOpenToNanoVDB<HostBuffer>(m);
@@ -61,9 +55,6 @@ void defineToolsModule(nb::module_& m)
     defineSignedFloodFill<double>(cudaModule, "signedFloodFill");
 
     definePointsToGrid<math::Rgba8>(cudaModule, "pointsToRGBA8Grid");
-
-    defineSampleFromVoxels<float>(cudaModule, "sampleFromVoxels");
-    defineSampleFromVoxels<double>(cudaModule, "sampleFromVoxels");
 #endif
 }
 
