@@ -22,7 +22,6 @@ nanobind_add_module(nanovdb_python NB_STATIC
     PyGridHandle.cc
     PyGridStats.cc
     PyGridValidator.cc
-    PyHostBuffer.cc
     PyIO.cc
     PyMath.cc
     PyNanoToOpenVDB.cc
@@ -31,7 +30,6 @@ nanobind_add_module(nanovdb_python NB_STATIC
     PyTools.cc
     PyTree.cc
     PyVoxelBlockManager.cc
-    cuda/PyDeviceBuffer.cc
     cuda/PyDeviceGridHandle.cu
     cuda/PyPointsToGrid.cu
     cuda/PySampleFromVoxels.cu

@@ -19,8 +19,9 @@ def main():
     grid = handle.grid()
     tree = grid.tree()
 
-    nmh = nanovdb.createNodeManager(grid)
-    nm = nmh.mgr()
+    # createNodeManager returns the typed NodeManager directly; it owns
+    # its node-index buffer internally and keeps `grid` alive.
+    nm = nanovdb.createNodeManager(grid)
     print(f"NodeManager over {grid.gridName()!r} (linear={nm.isLinear()}):")
     print(f"  leaves={nm.leafCount()}, lower={nm.lowerCount()}, "
           f"upper={nm.upperCount()}")

@@ -84,9 +84,9 @@ template<typename BufferT> void defineReadWriteGrid(nb::module_& m)
           "Return a FileGridMetaDataVector describing every grid stored in the .nvdb file.");
 }
 
-template<typename BufferT> nb::list readGrids(const std::string& fileName, int verbose, const BufferT& buffer)
+template<typename BufferT> nb::list readGrids(const std::string& fileName, int verbose)
 {
-    auto     handles = nanovdb::io::readGrids(fileName, verbose, buffer);
+    auto     handles = nanovdb::io::readGrids<BufferT>(fileName, verbose);
     nb::list handleList;
     for (size_t i = 0; i < handles.size(); ++i) {
         handleList.append(std::move(handles[i]));
@@ -123,20 +123,22 @@ void defineHostReadWriteGrid(nb::module_& m)
     m.def("writeGrids", &writeGrids<BufferT>, "fileName"_a, "handles"_a, "codec"_a = io::Codec::NONE, "verbose"_a = 0,
           "Write every GridHandle in the handles list to the .nvdb file at fileName.");
     m.def("readGrid",
-          nb::overload_cast<const std::string&, int, int, const BufferT&>(&io::template readGrid<BufferT>),
+          [](const std::string& fileName, int n, int verbose) {
+              return io::template readGrid<BufferT>(fileName, n, verbose);
+          },
           "fileName"_a,
           "n"_a = 0,
           "verbose"_a = 0,
-          "buffer"_a = BufferT(),
           "Read the n-th grid from the .nvdb file at fileName into a fresh GridHandle.");
     m.def("readGrid",
-          nb::overload_cast<const std::string&, const std::string&, int, const BufferT&>(&io::template readGrid<BufferT>),
+          [](const std::string& fileName, const std::string& gridName, int verbose) {
+              return io::template readGrid<BufferT>(fileName, gridName, verbose);
+          },
           "fileName"_a,
           "gridName"_a,
           "verbose"_a = 0,
-          "buffer"_a = BufferT(),
           "Read the grid named gridName from the .nvdb file at fileName into a fresh GridHandle.");
-    m.def("readGrids", &readGrids<BufferT>, "fileName"_a, "verbose"_a = 0, "buffer"_a = BufferT(),
+    m.def("readGrids", &readGrids<BufferT>, "fileName"_a, "verbose"_a = 0,
           "Read every grid from the .nvdb file at fileName, returning a list of GridHandles.");
 }
 
@@ -156,20 +158,22 @@ void defineDeviceReadWriteGrid(nb::module_& m)
     m.def("deviceWriteGrids", &writeGrids<BufferT>, "fileName"_a, "handles"_a, "codec"_a = io::Codec::NONE, "verbose"_a = 0,
           "Write every device-backed GridHandle in handles to the .nvdb file at fileName.");
     m.def("deviceReadGrid",
-          nb::overload_cast<const std::string&, int, int, const BufferT&>(&io::template readGrid<BufferT>),
+          [](const std::string& fileName, int n, int verbose) {
+              return io::template readGrid<BufferT>(fileName, n, verbose);
+          },
           "fileName"_a,
           "n"_a = 0,
           "verbose"_a = 0,
-          "buffer"_a = BufferT(),
           "Read the n-th grid from the .nvdb file at fileName into a fresh DeviceGridHandle.");
     m.def("deviceReadGrid",
-          nb::overload_cast<const std::string&, const std::string&, int, const BufferT&>(&io::template readGrid<BufferT>),
+          [](const std::string& fileName, const std::string& gridName, int verbose) {
+              return io::template readGrid<BufferT>(fileName, gridName, verbose);
+          },
           "fileName"_a,
           "gridName"_a,
           "verbose"_a = 0,
-          "buffer"_a = BufferT(),
           "Read the grid named gridName from the .nvdb file at fileName into a fresh DeviceGridHandle.");
-    m.def("deviceReadGrids", &readGrids<BufferT>, "fileName"_a, "verbose"_a = 0, "buffer"_a = BufferT(),
+    m.def("deviceReadGrids", &readGrids<BufferT>, "fileName"_a, "verbose"_a = 0,
           "Read every grid from the .nvdb file at fileName into device-backed handles.");
 }
 #endif

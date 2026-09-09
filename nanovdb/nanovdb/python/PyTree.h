@@ -340,12 +340,12 @@ template<typename BuildT> void defineNanoTree(nb::module_& m, const char* name)
 
 // -------------------- NodeManager<BuildT> --------------------
 //
-// NodeManager is heap-managed by a NodeManagerHandle (move-only, owns the
-// underlying memory). We bind one NodeManager class per BuildT and one
-// host-side NodeManagerHandle class. Users get a handle from
-// nanovdb.createNodeManager(grid); they then call handle.mgr() to obtain a
-// borrowed pointer to the typed NodeManager — its lifetime is anchored to
-// the handle via reference_internal.
+// NodeManager is heap-managed by a C++ NodeManagerHandle (move-only, owns
+// the underlying memory), which is deliberately NOT bound in Python. We
+// bind one NodeManager class per BuildT; users get the typed NodeManager
+// directly from nanovdb.createNodeManager(grid) — its lifetime is anchored
+// to an internal capsule owning the node-index buffer and, via keep_alive,
+// to the source grid.
 template<typename BuildT> void defineNodeManager(nb::module_& m, const char* name)
 {
     using NMT = nanovdb::NodeManager<BuildT>;
@@ -411,7 +411,6 @@ template<typename BuildT> void defineNodeManager(nb::module_& m, const char* nam
              "Return the i-th upper internal node in breadth-first order.");
 }
 
-void defineNodeManagerHandle(nb::module_& m);
 void defineCreateNodeManager(nb::module_& m);
 
 // -------------------- grid.leaf_values() bulk extractor --------------------

@@ -26,12 +26,11 @@ GridHandle<BufferT> createLevelSetSphere(GridType           gridType,
                                          const Vec3d&       origin,
                                          const std::string& name,
                                          tools::StatsMode   sMode,
-                                         CheckMode          cMode,
-                                         const BufferT&     buffer)
+                                         CheckMode          cMode)
 {
     switch (gridType) {
-    case GridType::Float: return createLevelSetSphere<float, BufferT>(radius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
-    case GridType::Double: return createLevelSetSphere<double, BufferT>(radius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+    case GridType::Float: return createLevelSetSphere<float, BufferT>(radius, center, voxelSize, halfWidth, origin, name, sMode, cMode);
+    case GridType::Double: return createLevelSetSphere<double, BufferT>(radius, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     default:
         throw std::runtime_error(
             "createLevelSetSphere: only float and double grid types are supported");
@@ -48,14 +47,13 @@ GridHandle<BufferT> createLevelSetTorus(GridType           gridType,
                                         const Vec3d&       origin,
                                         const std::string& name,
                                         tools::StatsMode   sMode,
-                                        CheckMode          cMode,
-                                        const BufferT&     buffer)
+                                        CheckMode          cMode)
 {
     switch (gridType) {
     case GridType::Float:
-        return createLevelSetTorus<float, BufferT>(majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+        return createLevelSetTorus<float, BufferT>(majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     case GridType::Double:
-        return createLevelSetTorus<double, BufferT>(majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+        return createLevelSetTorus<double, BufferT>(majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     default:
         throw std::runtime_error(
             "createLevelSetTorus: only float and double grid types are supported");
@@ -71,12 +69,11 @@ GridHandle<BufferT> createFogVolumeSphere(GridType           gridType,
                                           const Vec3d&       origin,
                                           const std::string& name,
                                           tools::StatsMode   sMode,
-                                          CheckMode          cMode,
-                                          const BufferT&     buffer)
+                                          CheckMode          cMode)
 {
     switch (gridType) {
-    case GridType::Float: return createFogVolumeSphere<float, BufferT>(radius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
-    case GridType::Double: return createFogVolumeSphere<double, BufferT>(radius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+    case GridType::Float: return createFogVolumeSphere<float, BufferT>(radius, center, voxelSize, halfWidth, origin, name, sMode, cMode);
+    case GridType::Double: return createFogVolumeSphere<double, BufferT>(radius, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     default:
         throw std::runtime_error(
             "createFogVolumeSphere: only float and double grid types are supported");
@@ -93,14 +90,13 @@ GridHandle<BufferT> createFogVolumeTorus(GridType           gridType,
                                          const Vec3d&       origin,
                                          const std::string& name,
                                          tools::StatsMode   sMode,
-                                         CheckMode          cMode,
-                                         const BufferT&     buffer)
+                                         CheckMode          cMode)
 {
     switch (gridType) {
     case GridType::Float:
-        return createFogVolumeTorus<float, BufferT>(majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+        return createFogVolumeTorus<float, BufferT>(majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     case GridType::Double:
-        return createFogVolumeTorus<double, BufferT>(majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+        return createFogVolumeTorus<double, BufferT>(majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     default:
         throw std::runtime_error(
             "createFogVolumeTorus: only float and double grid types are supported");
@@ -124,16 +120,15 @@ GridHandle<BufferT> createLevelSetBox(GridType           gridType,
                                       const Vec3d&       origin,
                                       const std::string& name,
                                       tools::StatsMode   sMode,
-                                      CheckMode          cMode,
-                                      const BufferT&     buffer)
+                                      CheckMode          cMode)
 {
     switch (gridType) {
     case GridType::Float:
         return tools::createLevelSetBox<float, BufferT>(
-            width, height, depth, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+            width, height, depth, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     case GridType::Double:
         return tools::createLevelSetBox<double, BufferT>(
-            width, height, depth, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+            width, height, depth, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     default:
         throw std::runtime_error(
             "createLevelSetBox: only float and double grid types are supported");
@@ -152,16 +147,15 @@ GridHandle<BufferT> createLevelSetBBox(GridType           gridType,
                                        const Vec3d&       origin,
                                        const std::string& name,
                                        tools::StatsMode   sMode,
-                                       CheckMode          cMode,
-                                       const BufferT&     buffer)
+                                       CheckMode          cMode)
 {
     switch (gridType) {
     case GridType::Float:
         return tools::createLevelSetBBox<float, BufferT>(
-            width, height, depth, thickness, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+            width, height, depth, thickness, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     case GridType::Double:
         return tools::createLevelSetBBox<double, BufferT>(
-            width, height, depth, thickness, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+            width, height, depth, thickness, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     default:
         throw std::runtime_error(
             "createLevelSetBBox: only float and double grid types are supported");
@@ -177,16 +171,15 @@ GridHandle<BufferT> createLevelSetOctahedron(GridType           gridType,
                                              const Vec3d&       origin,
                                              const std::string& name,
                                              tools::StatsMode   sMode,
-                                             CheckMode          cMode,
-                                             const BufferT&     buffer)
+                                             CheckMode          cMode)
 {
     switch (gridType) {
     case GridType::Float:
         return tools::createLevelSetOctahedron<float, BufferT>(
-            scale, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+            scale, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     case GridType::Double:
         return tools::createLevelSetOctahedron<double, BufferT>(
-            scale, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+            scale, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     default:
         throw std::runtime_error(
             "createLevelSetOctahedron: only float and double grid types are supported");
@@ -204,16 +197,15 @@ GridHandle<BufferT> createFogVolumeBox(GridType           gridType,
                                        const Vec3d&       origin,
                                        const std::string& name,
                                        tools::StatsMode   sMode,
-                                       CheckMode          cMode,
-                                       const BufferT&     buffer)
+                                       CheckMode          cMode)
 {
     switch (gridType) {
     case GridType::Float:
         return tools::createFogVolumeBox<float, BufferT>(
-            width, height, depth, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+            width, height, depth, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     case GridType::Double:
         return tools::createFogVolumeBox<double, BufferT>(
-            width, height, depth, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+            width, height, depth, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     default:
         throw std::runtime_error(
             "createFogVolumeBox: only float and double grid types are supported");
@@ -229,16 +221,15 @@ GridHandle<BufferT> createFogVolumeOctahedron(GridType           gridType,
                                               const Vec3d&       origin,
                                               const std::string& name,
                                               tools::StatsMode   sMode,
-                                              CheckMode          cMode,
-                                              const BufferT&     buffer)
+                                              CheckMode          cMode)
 {
     switch (gridType) {
     case GridType::Float:
         return tools::createFogVolumeOctahedron<float, BufferT>(
-            scale, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+            scale, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     case GridType::Double:
         return tools::createFogVolumeOctahedron<double, BufferT>(
-            scale, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer);
+            scale, center, voxelSize, halfWidth, origin, name, sMode, cMode);
     default:
         throw std::runtime_error(
             "createFogVolumeOctahedron: only float and double grid types are supported");
@@ -259,11 +250,10 @@ GridHandle<BufferT> createPointSphere(int                pointsPerVoxel,
                                       double             voxelSize,
                                       const Vec3d&       origin,
                                       const std::string& name,
-                                      CheckMode          mode,
-                                      const BufferT&     buffer)
+                                      CheckMode          mode)
 {
     return tools::createPointSphere<float, BufferT>(
-        pointsPerVoxel, radius, center, voxelSize, origin, name, mode, buffer);
+        pointsPerVoxel, radius, center, voxelSize, origin, name, mode);
 }
 
 template<typename BufferT>
@@ -274,11 +264,10 @@ GridHandle<BufferT> createPointTorus(int                pointsPerVoxel,
                                      double             voxelSize,
                                      const Vec3d&       origin,
                                      const std::string& name,
-                                     CheckMode          cMode,
-                                     const BufferT&     buffer)
+                                     CheckMode          cMode)
 {
     return tools::createPointTorus<float, BufferT>(
-        pointsPerVoxel, majorRadius, minorRadius, center, voxelSize, origin, name, cMode, buffer);
+        pointsPerVoxel, majorRadius, minorRadius, center, voxelSize, origin, name, cMode);
 }
 
 template<typename BufferT>
@@ -290,11 +279,10 @@ GridHandle<BufferT> createPointBox(int                pointsPerVoxel,
                                    double             voxelSize,
                                    const Vec3d&       origin,
                                    const std::string& name,
-                                   CheckMode          mode,
-                                   const BufferT&     buffer)
+                                   CheckMode          mode)
 {
     return tools::createPointBox<float, BufferT>(
-        pointsPerVoxel, width, height, depth, center, voxelSize, origin, name, mode, buffer);
+        pointsPerVoxel, width, height, depth, center, voxelSize, origin, name, mode);
 }
 
 // createPointScatter takes an existing level set as its source. We bind
@@ -306,11 +294,10 @@ template<typename BufferT>
 GridHandle<BufferT> createPointScatter(const NanoGrid<float>& srcGrid,
                                        int                    pointsPerVoxel,
                                        const std::string&     name,
-                                       CheckMode              mode,
-                                       const BufferT&         buffer)
+                                       CheckMode              mode)
 {
     return tools::createPointScatter<float, BufferT>(
-        srcGrid, pointsPerVoxel, name, mode, buffer);
+        srcGrid, pointsPerVoxel, name, mode);
 }
 
 } // namespace
@@ -318,7 +305,7 @@ GridHandle<BufferT> createPointScatter(const NanoGrid<float>& srcGrid,
 template<typename BufferT> void definePrimitives(nb::module_& m)
 {
     m.def("createLevelSetSphere",
-          nb::overload_cast<GridType, double, const Vec3d&, double, double, const Vec3d&, const std::string&, tools::StatsMode, CheckMode, const BufferT&>(
+          nb::overload_cast<GridType, double, const Vec3d&, double, double, const Vec3d&, const std::string&, tools::StatsMode, CheckMode>(
               &createLevelSetSphere<BufferT>),
           "gridType"_a = GridType::Float,
           "radius"_a = 100.0,
@@ -329,7 +316,6 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "sphere_ls",
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT(),
           "Narrow-band level set of a sphere of the given radius and center.");
 
     m.def("createLevelSetTorus",
@@ -342,8 +328,7 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
                             const Vec3d&,
                             const std::string&,
                             tools::StatsMode,
-                            CheckMode,
-                            const BufferT&>(&createLevelSetTorus<BufferT>),
+                            CheckMode>(&createLevelSetTorus<BufferT>),
           "gridType"_a = GridType::Float,
           "majorRadius"_a = 100.0,
           "minorRadius"_a = 50.0,
@@ -354,11 +339,10 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "torus_ls",
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT(),
           "Narrow-band level set of a torus with the given major and minor radii.");
 
     m.def("createFogVolumeSphere",
-          nb::overload_cast<GridType, double, const Vec3d&, double, double, const Vec3d&, const std::string&, tools::StatsMode, CheckMode, const BufferT&>(
+          nb::overload_cast<GridType, double, const Vec3d&, double, double, const Vec3d&, const std::string&, tools::StatsMode, CheckMode>(
               &createFogVolumeSphere<BufferT>),
           "gridType"_a = GridType::Float,
           "radius"_a = 100.0,
@@ -369,7 +353,6 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "sphere_fog",
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT(),
           "Sparse fog volume of a sphere of the given radius and center.");
 
     m.def("createFogVolumeTorus",
@@ -382,8 +365,7 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
                             const Vec3d&,
                             const std::string&,
                             tools::StatsMode,
-                            CheckMode,
-                            const BufferT&>(&createFogVolumeTorus<BufferT>),
+                            CheckMode>(&createFogVolumeTorus<BufferT>),
           "gridType"_a = GridType::Float,
           "majorRadius"_a = 100.0,
           "minorRadius"_a = 50.0,
@@ -394,7 +376,6 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "torus_fog",
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT(),
           "Sparse fog volume of a torus with the given major and minor radii.");
 
     // ---------- Level-set / fog-volume box / bbox / octahedron primitives ----
@@ -410,7 +391,6 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "box_ls",
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT(),
           "Narrow-band level set of an axis-aligned box.");
 
     m.def("createLevelSetBBox", &createLevelSetBBox<BufferT>,
@@ -426,7 +406,6 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "bbox_ls",
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT(),
           "Narrow-band level set of a hollow box wireframe (BBox = bounding "
           "box edges with the given thickness).");
 
@@ -443,7 +422,6 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "octahedron_ls",
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT(),
           "Narrow-band level set of an octahedron.");
 
     m.def("createFogVolumeBox", &createFogVolumeBox<BufferT>,
@@ -458,7 +436,6 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "box_fog",
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT(),
           "Sparse fog volume of a box (exterior 0/inactive, interior active "
           "with values smoothly varying from 0 at the surface to 1 inside).");
 
@@ -472,7 +449,6 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "name"_a = "octahedron_fog",
           "sMode"_a = tools::StatsMode::Default,
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT(),
           "Sparse fog volume of an octahedron.");
 
     // ---------- Point primitives ----------
@@ -484,7 +460,6 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "origin"_a = Vec3d(0.0),
           "name"_a = "sphere_points",
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT(),
           "PointDataGrid of points scattered on the surface of a sphere. "
           "The output grid is always a UInt32 PointDataGrid; the "
           "intermediate level-set's value type is hard-coded to float.");
@@ -498,7 +473,6 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "origin"_a = Vec3d(0.0),
           "name"_a = "torus_points",
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT(),
           "PointDataGrid of points scattered on the surface of a torus. "
           "Always returns a UInt32 PointDataGrid.");
 
@@ -512,7 +486,6 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "origin"_a = Vec3d(0.0),
           "name"_a = "box_points",
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT(),
           "PointDataGrid of points scattered on the surface of a box. "
           "Always returns a UInt32 PointDataGrid.");
 
@@ -521,7 +494,6 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
           "pointsPerVoxel"_a = 1,
           "name"_a = "point_scatter",
           "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT(),
           "Scatter a PointDataGrid into the active voxels of a "
           "NanoGrid<float> level set. The source grid must satisfy "
           "srcGrid.isLevelSet() and have an active bounding box; "
