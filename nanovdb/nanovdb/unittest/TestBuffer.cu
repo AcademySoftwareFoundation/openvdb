@@ -1029,6 +1029,32 @@ TEST(TestBuffer, GridHandleCopyToPinnedRoundTrip)
     EXPECT_NE(dev2.deviceGrid<float>(1), nullptr);
 }
 
+TEST(TestBuffer, GridHandleRejectsMalformedDeviceChain)
+{
+    auto host = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
+    const uint64_t bytes = host.bufferSize();
+    using DevBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
+    // Uploads the valid grid with one header field edited, then constructs a device handle over
+    // the raw bytes so the device-side chain parse is what judges them.
+    auto forge = [&](auto&& corrupt) {
+        std::vector<std::byte> bytesCopy(bytes);
+        std::memcpy(bytesCopy.data(), host.data(), bytes);
+        corrupt(*reinterpret_cast<nanovdb::GridData*>(bytesCopy.data()));
+        DevBufT dev(cudaStream_t(0), bytes, nanovdb::cuda::noInit);
+        cudaCheck(cudaMemcpyAsync(dev.data(), bytesCopy.data(), bytes, cudaMemcpyHostToDevice, cudaStream_t(0)));
+        return nanovdb::GridHandle<DevBufT>(std::move(dev));
+    };
+    {// a faithful copy parses and reports the same metadata
+        auto ok = forge([](nanovdb::GridData&) {});
+        EXPECT_EQ(1u, ok.gridCount());
+        EXPECT_EQ(bytes, ok.gridSize(0));
+    }
+    EXPECT_THROW(forge([](nanovdb::GridData& d) { d.mGridSize *= 2; }), std::runtime_error);// claims twice the allocation
+    EXPECT_THROW(forge([](nanovdb::GridData& d) { d.mGridIndex = 7; }), std::runtime_error);// index disagrees with its chain position
+    EXPECT_THROW(forge([](nanovdb::GridData& d) { d.mGridCount = 2; }), std::runtime_error);// claims a second grid the buffer does not hold
+    EXPECT_THROW(forge([](nanovdb::GridData& d) { d.mGridCount = 2; d.mGridSize = sizeof(nanovdb::GridData) + 1; }), std::runtime_error);// a second header read from an unaligned offset into grid bytes: rejected as invalid, never dereferenced in place
+}
+
 TEST(TestBuffer, GridHandleCopyToManagedSynchronizes)
 {
     auto host = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");

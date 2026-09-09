@@ -18,6 +18,9 @@
 
 #include <fstream> // for std::ifstream
 #include <iostream> // for std::cerr/cout
+#include <cstring> // for std::memcpy
+#include <stdexcept> // for std::runtime_error
+#include <string> // for std::to_string
 #include <vector>
 #include <initializer_list>
 
@@ -55,6 +58,44 @@ inline BufferT createHostStorage(uint64_t bytes, const BufferT& pool)
         return BufferT(pool.resource(), bytes, {});
     } else {
         return BufferT::create(bytes, &pool);
+    }
+}
+
+/// @brief Validates the grid chain in @a bytes of host-readable memory headed
+///        by @a head and fills @a meta with one entry per grid: every header
+///        must be valid, carry its expected index and the chain's total count,
+///        and fit inside the buffer, so a truncated buffer or a forged header
+///        is rejected before its metadata is trusted. This is the host
+///        counterpart of the device-side chain parse, and it is what makes a
+///        handle's metadata safe to adopt without re-validation (cuda::copyTo).
+inline void parseHostGridChain(const GridData* head, uint64_t bytes, std::vector<GridHandleMetaData>& meta)
+{
+    if (bytes < sizeof(GridData))
+        throw std::runtime_error("GridHandle: grid chain exceeds the host buffer (truncated or corrupt grid data)");
+    if (!head->isValid()) throw std::runtime_error("GridHandle was constructed with an invalid host buffer");
+    const uint32_t count = head->mGridCount;
+    if (count == 0) throw std::runtime_error("GridHandle: host buffer contains no grids");
+    if (uint64_t(count) > bytes / sizeof(GridData))// every grid is at least one full header
+        throw std::runtime_error("GridHandle: grid chain exceeds the host buffer (truncated or corrupt grid data)");
+    meta.resize(count);
+    uint64_t offset = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        auto where = [&] { return " (grid " + std::to_string(i) + " of " + std::to_string(count) + ")"; };
+        if (offset + sizeof(GridData) > bytes)
+            throw std::runtime_error("GridHandle: grid chain exceeds the host buffer (truncated or corrupt grid data)" + where());
+        // Read through a copy: a forged size in the preceding header can place this one at an
+        // unaligned offset, where dereferencing a GridData pointer would be undefined behavior.
+        alignas(GridData) unsigned char raw[sizeof(GridData)];
+        std::memcpy(raw, util::PtrAdd<const void>(head, offset), sizeof(GridData));
+        const GridData* data = reinterpret_cast<const GridData*>(raw);
+        if (!data->isValid())
+            throw std::runtime_error("GridHandle was constructed with an invalid host buffer" + where());
+        if (data->mGridIndex != i || data->mGridCount != count)
+            throw std::runtime_error("GridHandle: inconsistent grid index/count in the host buffer's grid chain" + where());
+        if (data->mGridSize < sizeof(GridData) || data->mGridSize > bytes - offset)
+            throw std::runtime_error("GridHandle: grid size field exceeds the host buffer (truncated or corrupt grid data)" + where());
+        meta[i] = GridHandleMetaData{offset, data->mGridSize, data->mGridType};
+        offset += data->mGridSize;
     }
 }
 
@@ -453,16 +494,6 @@ inline const GridMetaData* GridHandle<BufferT>::gridMetaData(uint32_t n) const
     return util::PtrAdd<GridMetaData>(data, mMetaData[n].offset);
 }// const GridMetaData* GridHandle<BufferT>::gridMetaData(uint32_t n) const
 
-inline __hostdev__ void cpyGridHandleMeta(const GridData *data, GridHandleMetaData *meta)
-{
-    uint64_t offset = 0;
-    for (auto *p=meta, *q=p+data->mGridCount; p!=q; ++p) {
-        *p = {offset,  data->mGridSize, data->mGridType};
-        offset += p->size;
-        data = util::PtrAdd<GridData>(data, p->size);
-    }
-}// void cpyGridHandleMeta(const GridData *data, GridHandleMetaData *meta)
-
 // template specialization of move constructor from a host buffer
 template<typename BufferT>
 template<typename T, typename util::disable_if<BufferTraits<T>::hasDeviceDual || BufferHasDeviceSingle<T>::value, int>::type>
@@ -471,9 +502,7 @@ GridHandle<BufferT>::GridHandle(T&& buffer)
 {
     static_assert(util::is_same<T,BufferT>::value, "Expected U==BufferT");
     if (auto *data = reinterpret_cast<const GridData*>(mBuffer.data())) {
-        if (!data->isValid()) throw std::runtime_error("GridHandle was constructed with an invalid host buffer");
-        mMetaData.resize(data->mGridCount);
-        cpyGridHandleMeta(data, mMetaData.data());
+        detail::parseHostGridChain(data, mBuffer.size(), mMetaData);
     }
 }// GridHandle<BufferT>::GridHandle(T&& buffer)
 

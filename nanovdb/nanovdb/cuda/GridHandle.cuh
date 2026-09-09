@@ -62,7 +62,11 @@ static __global__ void parseGridChainKernel(const GridData *d_head, uint64_t byt
     uint64_t offset = 0;
     for (uint32_t i = 0; i < count; ++i) {
         if (offset + sizeof(GridData) > bytes) { *d_status = {ChainError::Truncated, i}; return; }
-        const GridData *data = util::PtrAdd<GridData>(d_head, offset);
+        // Read through a copy: a forged size in the preceding header can place this one at an
+        // unaligned offset, where dereferencing a GridData pointer would fault.
+        alignas(GridData) unsigned char raw[sizeof(GridData)];
+        memcpy(raw, util::PtrAdd<const void>(d_head, offset), sizeof(GridData));
+        const GridData *data = reinterpret_cast<const GridData*>(raw);
         if (!data->isValid()) { *d_status = {ChainError::Invalid, i}; return; }
         if (data->mGridIndex != i || data->mGridCount != count) { *d_status = {ChainError::Inconsistent, i}; return; }
         if (data->mGridSize < sizeof(GridData) || data->mGridSize > bytes - offset) { *d_status = {ChainError::BadSize, i}; return; }
@@ -232,9 +236,7 @@ GridHandle<BufferT>::GridHandle(T&& buffer)
 {
     static_assert(util::is_same<T,BufferT>::value, "Expected U==BufferT");
     if (auto *data = reinterpret_cast<const GridData*>(mBuffer.data())) {
-        if (!data->isValid()) throw std::runtime_error("GridHandle was constructed with an invalid host buffer");
-        mMetaData.resize(data->mGridCount);
-        cpyGridHandleMeta(data, mMetaData.data());
+        detail::parseHostGridChain(data, mBuffer.size(), mMetaData);
     } else {
         if (auto *d_data = reinterpret_cast<const GridData*>(mBuffer.deviceData())) {
             const uint32_t count = cuda::detail::validGridChainHead(d_data, mBuffer.size(), cudaStream_t(0));
