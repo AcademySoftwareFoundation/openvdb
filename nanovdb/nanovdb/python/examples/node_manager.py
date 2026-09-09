@@ -7,7 +7,7 @@ builds linearized arrays of the tree's leaf, lower, and upper nodes so
 they can be visited by index instead of by tree traversal. Each node
 exposes its origin, per-node stats, and (on leaves) the raw 512-value
 buffer. For bulk NumPy analytics over every leaf at once, see
-bulk_leaf_numpy.py's grid.leaf_values() instead.
+bulk_leaf_numpy.py's grid.leafValues() instead.
 
 Run with: python node_manager.py
 """

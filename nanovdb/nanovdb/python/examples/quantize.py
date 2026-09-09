@@ -20,9 +20,9 @@ def gridSize_in_kb(handle):
 def main():
     # Source: a 50-radius sphere fog volume at full float precision.
     src_handle = nanovdb.tools.createFogVolumeSphere(radius=50.0)
-    src_grid = src_handle.grid()
+    srcGrid = src_handle.grid()
     print(f"Source FloatGrid: {gridSize_in_kb(src_handle):.1f} KB, "
-          f"active voxels = {src_grid.activeVoxelCount()}")
+          f"active voxels = {srcGrid.activeVoxelCount()}")
 
     # Fixed-width quantization. Each subsequent format roughly halves
     # the per-voxel storage cost; dithering optional.
@@ -31,7 +31,7 @@ def main():
         ("createNanoGridFp8",  "Fp8  (8-bit fixed)"),
         ("createNanoGridFp4",  "Fp4  (4-bit fixed)"),
     ]:
-        h = getattr(nanovdb.tools, fn_name)(src_grid, ditherOn=True)
+        h = getattr(nanovdb.tools, fn_name)(srcGrid, ditherOn=True)
         print(f"  {label}: {gridSize_in_kb(h):.1f} KB, "
               f"active voxels = {h.grid().activeVoxelCount()}")
 
@@ -40,11 +40,11 @@ def main():
     # relative error. -1 tolerance means "uninitialized" so we pass
     # an explicit value.
     abs_oracle = nanovdb.tools.AbsDiff(0.05)  # ±0.05 per voxel
-    h_fpn_abs = nanovdb.tools.createNanoGridFpN(src_grid, abs_oracle)
+    h_fpn_abs = nanovdb.tools.createNanoGridFpN(srcGrid, abs_oracle)
     print(f"  FpN (AbsDiff 0.05): {gridSize_in_kb(h_fpn_abs):.1f} KB")
 
     rel_oracle = nanovdb.tools.RelDiff(0.1)   # 10% relative error
-    h_fpn_rel = nanovdb.tools.createNanoGridFpN(src_grid, rel_oracle)
+    h_fpn_rel = nanovdb.tools.createNanoGridFpN(srcGrid, rel_oracle)
     print(f"  FpN (RelDiff 0.10): {gridSize_in_kb(h_fpn_rel):.1f} KB")
 
     # The output is a regular NanoGrid<FpN> — read-only, but exposes

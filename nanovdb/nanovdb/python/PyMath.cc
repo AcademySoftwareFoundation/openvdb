@@ -486,7 +486,7 @@ template<typename CoordT> void defineBBoxInteger(nb::module_& m, const char* nam
                     "Construct a cube of side dim voxels anchored at the min Coord.")
         .def_static("createCube", nb::overload_cast<ValueType, ValueType>(&math::BBox<CoordT>::createCube), "min"_a, "max"_a,
                     "Construct a cube spanning [min, max] in every axis.")
-        .def("is_divisible", &math::BBox<CoordT>::is_divisible,
+        .def("isDivisible", &math::BBox<CoordT>::is_divisible,
              "True iff this CoordBBox has more than one voxel in every axis.")
         .def("empty", &math::BBox<CoordT>::empty,
              "True iff this CoordBBox is empty (any min component > the matching max).")

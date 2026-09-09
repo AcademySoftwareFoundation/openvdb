@@ -17,15 +17,15 @@ import nanovdb
 
 def index_grid_with_channel():
     src = nanovdb.tools.createLevelSetSphere(radius=50.0, name="sphere")
-    src_grid = src.grid()
+    srcGrid = src.grid()
 
     # channels=1 copies the source values into blind-data channel 0,
     # indexed by the per-voxel uint64 indices the OnIndex grid stores.
-    handle = nanovdb.tools.createNanoGridOnIndex(src_grid, channels=1)
+    handle = nanovdb.tools.createNanoGridOnIndex(srcGrid, channels=1)
     grid = handle.grid()
     print(f"OnIndex grid: valueCount={grid.valueCount()}, "
-          f"source activeVoxelCount={src_grid.activeVoxelCount()}")
-    assert grid.valueCount() >= src_grid.activeVoxelCount()
+          f"source activeVoxelCount={srcGrid.activeVoxelCount()}")
+    assert grid.valueCount() >= srcGrid.activeVoxelCount()
 
     # createChannelAccessor inspects the channel's recorded dataType and
     # returns the matching typed accessor (here: OnIndexFloat...).
@@ -33,7 +33,7 @@ def index_grid_with_channel():
     print(f"channel accessor: {type(channel).__name__}, "
           f"valueCount={channel.valueCount()}")
 
-    src_acc = src_grid.getAccessor()
+    src_acc = srcGrid.getAccessor()
     for ijk in (nanovdb.math.Coord(48, 0, 0), nanovdb.math.Coord(0, 50, 0),
                 nanovdb.math.Coord(0, 0, 52)):
         via_channel = channel.getValue(ijk)

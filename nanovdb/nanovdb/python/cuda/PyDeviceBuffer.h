@@ -5,11 +5,217 @@
 
 #include <nanobind/nanobind.h>
 
+#ifdef NANOVDB_USE_CUDA
+#include <nanobind/ndarray.h>
+
+#include <cstdint>
+#include <string>
+
+#include <cuda_runtime.h>
+
+#include <nanovdb/cuda/DeviceBuffer.h>
+#endif
+
 namespace nb = nanobind;
 
 namespace pynanovdb {
 
 #ifdef NANOVDB_USE_CUDA
+
+/// @brief Bounds-checked forwarder for DeviceBuffer::recordUse, shared by the
+///        DeviceBuffer and DeviceGridHandle bindings. device == -1 selects the
+///        current CUDA device. recordUse itself indexes per-device tracking
+///        state unchecked, so validate here where we can raise a Python
+///        exception instead.
+inline void recordUseChecked(nanovdb::cuda::DeviceBuffer& buf, uintptr_t stream, int device)
+{
+    int count = 0;
+    cudaCheck(cudaGetDeviceCount(&count));
+    if (device < 0) cudaCheck(cudaGetDevice(&device));
+    if (device >= count) {
+        const std::string msg = "recordUse: device id " + std::to_string(device) +
+                                " out of range [0, " + std::to_string(count) + ").";
+        throw nb::index_error(msg.c_str());
+    }
+    nb::gil_scoped_release release;
+    buf.recordUse(device, reinterpret_cast<cudaStream_t>(stream));
+}
+
+/// @brief Order the buffer's tracked prior uses (uploads / downloads /
+///        recordUse'd kernels) before work subsequently issued on @a stream,
+///        when the buffer type exposes use tracking. No-op overload for buffer
+///        types without it (UnifiedBuffer). Call with a trailing 0 so the
+///        tracking overload is preferred when available.
+/// @note  DeviceBuffer::orderAfterPriorUses is still private upstream, so the
+///        SFINAE currently selects the no-op for DeviceBuffer too — the
+///        CAI/DLPack exports below only gain real event ordering once the
+///        upstream change making it public (and chaining recordUse) lands and
+///        is merged in. The call sites are written against the final
+///        semantics so no binding change is needed at that point.
+template<typename BufferT>
+inline auto orderPriorUsesBefore(const BufferT& buf, cudaStream_t stream, int)
+    -> decltype(buf.orderAfterPriorUses(0, stream))
+{
+    int device = 0;
+    cudaCheck(cudaGetDevice(&device));
+    buf.orderAfterPriorUses(device, stream);
+}
+template<typename BufferT>
+inline void orderPriorUsesBefore(const BufferT&, cudaStream_t, long) {}
+
+/// @brief Resolve the DLPack-protocol `stream` argument to the cudaStream_t
+///        the export must be ordered on. Per the protocol: None/0/1 = the
+///        legacy default stream, 2 = the per-thread default stream, -1 = the
+///        consumer does its own synchronization (no ordering requested; return
+///        false), any other integer = a raw cudaStream_t handle.
+inline bool resolveDlpackStream(nb::handle stream, cudaStream_t& out)
+{
+    if (stream.is_none()) {
+        out = nullptr; // legacy default stream
+        return true;
+    }
+    const long long v = nb::cast<long long>(stream);
+    if (v == -1) return false;
+    if (v == 2) {
+        out = cudaStreamPerThread;
+        return true;
+    }
+    if (v == 0 || v == 1) {
+        out = nullptr; // legacy default stream
+        return true;
+    }
+    out = reinterpret_cast<cudaStream_t>(static_cast<uintptr_t>(v));
+    return true;
+}
+
+/// @brief Docstring shared by the DeviceBuffer and DeviceGridHandle recordUse
+///        bindings (the two forward to the same underlying buffer method).
+inline constexpr char kRecordUseDoc[] =
+    "Record that this buffer's device data was just used on `stream` (a raw "
+    "cudaStream_t as a Python int, e.g. cupy.cuda.Stream.ptr), so the device "
+    "free issued when the buffer is cleared or destroyed is ordered after "
+    "that work. Uploads/downloads record themselves automatically; call this "
+    "after enqueuing your own kernels or copies against device_ptr() / "
+    "__cuda_array_interface__ / __dlpack__ on a non-blocking stream — "
+    "without it such work is only safe if you synchronize before dropping "
+    "the buffer. device selects which device's buffer was used (-1 = the "
+    "current CUDA device). No-op on non-owning (from_external) buffers, "
+    "which never free their pointers.";
+
+/// @brief Bind the device-interop surface (CUDA Array Interface / DLPack, raw
+///        device/host pointers, streams) onto a device-buffer-like class.
+///
+/// @details This is the Phase-B interop hook. It is templated only on the
+///          duck-typed buffer surface (size()/data()/deviceData()) so it can
+///          be reused for any DeviceBuffer-like type; it must NOT reference
+///          DeviceBuffer-specific members. It exposes the whole device buffer
+///          as 1-D bytes through the CUDA Array Interface and DLPack so it can
+///          be consumed zero-copy by CuPy / PyTorch / Numba, plus the raw
+///          device/host pointers as Python ints.
+template<typename BufferT>
+void addDeviceInterop(nb::class_<BufferT>& cls)
+{
+    cls.def("size", &BufferT::size, "Total number of bytes managed by this buffer.");
+
+    cls.def(
+        "device_ptr",
+        [](const BufferT& buf) {
+            return reinterpret_cast<uintptr_t>(buf.deviceData());
+        },
+        "Raw device pointer to the current device's buffer as a Python int "
+        "(0 if no device allocation exists yet). Work you enqueue against "
+        "this pointer on a non-blocking stream is invisible to the buffer's "
+        "lifetime tracking: record it afterwards where the buffer supports "
+        "it (DeviceBuffer.recordUse / DeviceGridHandle.recordUse), or "
+        "synchronize before the buffer is destroyed.");
+
+    cls.def(
+        "host_ptr",
+        [](const BufferT& buf) {
+            return reinterpret_cast<uintptr_t>(buf.data());
+        },
+        "Raw host pointer to the buffer's host mirror as a Python int "
+        "(0 if no host allocation exists).");
+
+    cls.def_prop_ro(
+        "__cuda_array_interface__",
+        [](const BufferT& buf) {
+            // Hand-rolled CUDA Array Interface (version 3) describing the whole
+            // device buffer as a 1-D contiguous uint8 array. stream=1 selects
+            // the legacy default stream per the CAI v3 spec — make that claim
+            // true by ordering the legacy default stream after the buffer's
+            // tracked prior uses (async uploads, recordUse'd kernels), so a
+            // consumer that synchronizes on it per the spec sees complete data.
+            orderPriorUsesBefore(buf, cudaStream_t(0), 0);
+            nb::dict iface;
+            iface["shape"] = nb::make_tuple(buf.size());
+            iface["typestr"] = "|u1";
+            iface["data"] =
+                nb::make_tuple(reinterpret_cast<uintptr_t>(buf.deviceData()), false);
+            iface["version"] = 3;
+            iface["strides"] = nb::none();
+            iface["stream"] = 1;
+            return iface;
+        },
+        "CUDA Array Interface (v3) view of the whole device buffer as 1-D "
+        "uint8. Lets CuPy / Numba / PyTorch consume the device bytes "
+        "zero-copy. Returns a null data pointer until the buffer is populated "
+        "on the device.");
+
+    cls.def(
+        "__dlpack_device__",
+        [](const BufferT&) {
+            int device = 0;
+            cudaGetDevice(&device);
+            // 2 == kDLCUDA.
+            return nb::make_tuple(2, device);
+        },
+        "DLPack device tuple (kDLCUDA, device_id) for the device buffer.");
+
+    cls.def(
+        "__dlpack__",
+        [](nb::handle self, nb::handle stream) {
+            const BufferT& buf = nb::cast<const BufferT&>(self);
+            // Honor the consumer-provided stream per the DLPack protocol:
+            // order it after the buffer's tracked prior uses so the consumer
+            // cannot read a partially-written buffer (e.g. after an async
+            // deviceUpload on another stream).
+            cudaStream_t consumer;
+            if (resolveDlpackStream(stream, consumer))
+                orderPriorUsesBefore(buf, consumer, 0);
+            size_t shape[1] = {static_cast<size_t>(buf.size())};
+            // Delegate the capsule construction to nanobind: build a device
+            // ndarray view parented to this buffer (keep_alive via owner) and
+            // forward to its own __dlpack__ producer.
+            nb::ndarray<nb::device::cuda, uint8_t, nb::ndim<1>> arr(
+                buf.deviceData(), 1, shape, self);
+            // nb::cast of a no-framework device ndarray IS the "dltensor"
+            // PyCapsule (nanobind ndarray_export), which is exactly what
+            // __dlpack__ must return — so return it directly (do NOT call
+            // .attr("__dlpack__") on it; a capsule has no such attribute).
+            // ndarray_inc_ref + owner=self keep the device memory alive.
+            return nb::cast(arr, nb::rv_policy::reference);
+        },
+        nb::arg("stream") = nb::none(),
+        "DLPack capsule exporting the whole device buffer as 1-D uint8. "
+        "Delegates to a nanobind device ndarray view parented to this "
+        "buffer.");
+}
+
+/// @brief Create an @c nb::class_ for a device-buffer-like type, attach the
+///        shared device-interop surface via addDeviceInterop, and return it so
+///        callers may chain additional @c .def() bindings.
+template<typename BufferT>
+nb::class_<BufferT> defineDeviceBufferLike(nb::module_& m, const char* name)
+{
+    nb::class_<BufferT> cls(m, name,
+        "CUDA device-side buffer used to back a DeviceGridHandle. Holds a "
+        "host mirror and a device pointer; deviceUpload / deviceDownload on "
+        "the handle move bytes between the two.");
+    addDeviceInterop(cls);
+    return cls;
+}
+
 void defineDeviceBuffer(nb::module_& m);
 #endif
 
