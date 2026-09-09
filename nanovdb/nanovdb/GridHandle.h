@@ -630,6 +630,10 @@ template<typename BufferT, template <class, class...> class VectorT>
 inline GridHandle<BufferT>
 mergeGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* pool = nullptr)
 {
+    static_assert(!BufferHasDeviceSingle<BufferT>::value,
+                  "mergeGrids requires a buffer type providing create(): cuda::copyTo HostBuffer handles first");
+    static_assert(!BufferHasHostSingle<BufferT>::value,
+                  "mergeGrids requires a buffer type providing create(): copy the handles to HostBuffer first");
     uint64_t size = 0u;
     uint32_t counter = 0u, gridCount = 0u;
     for (auto &h : handles) {
