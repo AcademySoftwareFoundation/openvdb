@@ -40,14 +40,24 @@ nanobind_add_module(nanovdb_python NB_STATIC
 
 target_include_directories(nanovdb_python PRIVATE ${CUDA_INCLUDE_DIRECTORY})
 if(NANOVDB_USE_CUDA)
-  # nanobind's own headers trip nvcc front-end diagnostics (nb_func.h as of
-  # nanobind 3.0.0), which --Werror=all-warnings turns into errors. Third-party
-  # code isn't ours to fix: hand nvcc the nanobind include as a system
-  # directory, which exempts its headers from the front end's diagnostics.
-  # Passed as a raw option because the Visual Studio generator flattens
-  # CMake-level SYSTEM include directories to ordinary ones for CUDA sources.
+  # nanobind's own headers trip compiler diagnostics (nb_func.h as of nanobind
+  # 3.0.0), which --Werror=all-warnings turns into errors in the binding CUDA
+  # TUs. Third-party code isn't ours to fix, so exempt it, which takes one
+  # mechanism per platform:
+  # - -isystem marks nanobind's headers as system headers, which silences both
+  #   nvcc passes with a GCC/Clang host. Passed as a raw option because the
+  #   Visual Studio generator flattens CMake-level SYSTEM include directories
+  #   to ordinary ones for CUDA sources.
+  # - With an MSVC host, nvcc confers no system-header status at all (the
+  #   header also arrives via nanobind's own -I, which wins there), so the two
+  #   diagnostics nanobind's headers trip -- #177 (unused variable) and #550
+  #   (set but never used) -- are suppressed by number for these TUs.
   target_compile_options(nanovdb_python PRIVATE
     "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-isystem ${NB_DIR}/include>")
+  if(WIN32)
+    target_compile_options(nanovdb_python PRIVATE
+      $<$<COMPILE_LANGUAGE:CUDA>:--diag-suppress=177,550>)
+  endif()
 endif()
 target_link_libraries(nanovdb_python PRIVATE nanovdb ${CUDA_LIBRARIES} ${NANOVDB_BLOSC} ${NANOVDB_ZLIB} ${NANOVDB_OPENVDB} ${NANOVDB_TBB})
 target_compile_definitions(nanovdb_python PRIVATE ${NANOVDB_USE_CUDA_FLAG} ${NANOVDB_USE_BLOSC_FLAG} ${NANOVDB_USE_ZLIB_FLAG} ${NANOVDB_USE_OPENVDB_FLAG} ${NANOVDB_USE_TBB_FLAG})
