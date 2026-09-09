@@ -21,6 +21,7 @@
 #include <nanovdb/tools/cuda/SignedFloodFill.cuh>
 #include <nanovdb/tools/cuda/AddBlindData.cuh>
 #include <nanovdb/tools/cuda/GridStats.cuh>
+#include <nanovdb/tools/cuda/ConnectedComponents.cuh>
 
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
@@ -566,6 +567,86 @@ TEST(TestMemoryResource, AddBlindData_InjectedResourceSeam)
     EXPECT_EQ(res.allocs - a0, 1);           // the byte-size scratch
     EXPECT_EQ(res.deallocs - d0, 1);
     ASSERT_EQ(cudaFree(d_blind), cudaSuccess);
+}
+
+TEST(TestMemoryResource, ConnectedComponents_InjectedResourceSeam)
+{
+    // Every one of the operator's buffers is device-only scratch, so unlike the
+    // TopologyBuilder consumers there is no dual-space buffer bypassing the resource:
+    // all of it, plus the cub temp pool, is observed by the CountingResource.
+    auto src = buildIndexGrid({{0,0,0},{1,2,3},{4,4,4}});
+    auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_srcGrid, nullptr);
+
+    CountingResource res;
+    {
+        nanovdb::tools::cuda::ConnectedComponents<nanovdb::ValueOnIndex, CountingResource>
+            op(d_srcGrid, 0, res);
+        auto [labels, n] = op.getVoxelLabelsAndCount();
+        ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+        EXPECT_NE(labels.data(), nullptr);
+        EXPECT_GT(n, 0u);
+        EXPECT_GT(res.allocs, 0);
+    }                                        // op and labels destroyed -> everything freed via res
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_EQ(res.allocs, res.deallocs);
+}
+
+TEST(TestMemoryResource, ConnectedComponents_LabelsOutliveTheOperator)
+{
+    // getVoxelLabelsAndCount hands ownership of the label buffer to the caller, so it stays
+    // valid after the operator is gone; only the injected resource has to outlive it.
+    auto src = buildIndexGrid({{0,0,0},{1,2,3},{4,4,4}});
+    auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_srcGrid, nullptr);
+
+    CountingResource res;
+    auto result = [&] {
+        nanovdb::tools::cuda::ConnectedComponents<nanovdb::ValueOnIndex, CountingResource>
+            op(d_srcGrid, 0, res);
+        return op.getVoxelLabelsAndCount();
+    }();                                     // operator destroyed here; labels survive it
+
+    EXPECT_NE(result.first.data(), nullptr);
+    EXPECT_GT(result.first.size(), 0u);      // element count, not bytes
+    EXPECT_GT(result.second, 0u);
+    EXPECT_GT(res.allocs, res.deallocs);     // the label buffer is still held
+
+    result.first.destroy();                  // release it explicitly
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_EQ(res.allocs, res.deallocs);
+}
+
+TEST(TestMemoryResource, ConnectedComponents_NonBlockingStream)
+{
+    // Regression test for buffer lifetime on a non-blocking stream. The legacy
+    // cuda::DeviceBuffer destructor freed on the NULL stream, which is ordered against a
+    // blocking stream only by the legacy default-stream rules -- and not at all against a
+    // cudaStreamNonBlocking one. cuda::Buffer instead retains its allocation stream and
+    // frees on that, so the operator's scratch (in particular the rank buffer read by the
+    // final voxel-label scatter) cannot be recycled while that kernel is still in flight.
+    cudaStream_t stream;
+    ASSERT_EQ(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking), cudaSuccess);
+
+    auto src = buildIndexGrid({{0,0,0},{1,2,3},{4,4,4},{8,0,0},{9,0,0}});
+    auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_srcGrid, nullptr);
+
+    CountingResource res;
+    uint64_t n = 0;
+    {
+        nanovdb::tools::cuda::ConnectedComponents<nanovdb::ValueOnIndex, CountingResource>
+            op(d_srcGrid, stream, res);
+        auto result = op.getVoxelLabelsAndCount();
+        n = result.second;
+        ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+        EXPECT_NE(result.first.data(), nullptr);
+    }
+    ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+    EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+    EXPECT_GT(n, 0u);
+    EXPECT_EQ(res.allocs, res.deallocs);
+    ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
 }
 
 } // unnamed namespace
