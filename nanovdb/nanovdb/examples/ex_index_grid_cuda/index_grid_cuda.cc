@@ -33,7 +33,7 @@ int main(int, char**)
         if (!gpuGrid) throw std::runtime_error("GridHandle did not contain a device grid with value type float");
         if (!cpuGrid) throw std::runtime_error("GridHandle did not contain a host grid with value type float");
 
-        launch_kernels(cpuGrid, cpuGrid, stream); // Call a host method to print a grid value on both the CPU and GPU
+        launch_kernels(gpuGrid, cpuGrid, stream); // Call a host method to print a grid value on both the CPU and GPU
 
         cudaStreamDestroy(stream); // Destroy the CUDA stream
     }
