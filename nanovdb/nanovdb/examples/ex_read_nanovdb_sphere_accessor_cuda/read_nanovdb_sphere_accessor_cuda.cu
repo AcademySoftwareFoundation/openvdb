@@ -3,8 +3,7 @@
 
 //! [read_nanovdb_sphere_accessor_cuda]
 #include <nanovdb/io/IO.h> // this is required to read (and write) NanoVDB files on the host
-#include <nanovdb/cuda/DeviceBuffer.h> // required for CUDA memory management
-#include <nanovdb/GridHandle.h>
+#include <nanovdb/cuda/GridHandle.cuh> // for cuda::copyTo, the explicit host<->device grid transfer
 
 extern "C" void launch_kernels(const nanovdb::NanoGrid<float>*,
                                const nanovdb::NanoGrid<float>*,
@@ -16,23 +15,27 @@ extern "C" void launch_kernels(const nanovdb::NanoGrid<float>*,
 int main(int, char**)
 {
     try {
-        // returns a GridHandle using CUDA for memory management.
-        auto handle = nanovdb::io::readGrid<nanovdb::cuda::DeviceBuffer>("data/sphere.nvdb");
+        // read the grid into host memory (HostBuffer is the default buffer type)
+        auto handle = nanovdb::io::readGrid("data/sphere.nvdb");
 
-        cudaStream_t stream; // Create a CUDA stream to allow for asynchronous copy of pinned CUDA memory.
+        cudaStream_t stream; // stream that orders the transfer and the kernels below
         cudaStreamCreate(&stream);
+        {
+            // Deep-copy the grid to the GPU: the copy is ordered on the stream, and the
+            // returned handle validates the transferred grid on the device.
+            auto deviceHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle, stream);
 
-        handle.deviceUpload(stream, false); // Copy the NanoVDB grid to the GPU asynchronously
+            auto* cpuGrid = handle.grid<float>(); // a (raw) pointer to the grid of value type float on the CPU
+            auto* deviceGrid = deviceHandle.deviceGrid<float>(); // and its deep copy on the GPU
 
-        auto* cpuGrid = handle.grid<float>(); // get a (raw) pointer to a NanoVDB grid of value type float on the CPU
-        auto* deviceGrid = handle.deviceGrid<float>(); // get a (raw) pointer to a NanoVDB grid of value type float on the GPU
+            if (!deviceGrid || !cpuGrid)
+                throw std::runtime_error("GridHandle did not contain a grid with value type float");
 
-        if (!deviceGrid || !cpuGrid)
-            throw std::runtime_error("GridHandle did not contain a grid with value type float");
+            launch_kernels(deviceGrid, cpuGrid, stream); // print grid values on both the CPU and GPU
 
-        launch_kernels(deviceGrid, cpuGrid, stream); // Call a host method to print a grid values on both the CPU and GPU
-
-        cudaStreamDestroy(stream); // Destroy the CUDA stream
+            cudaStreamSynchronize(stream); // the kernels must finish before the device handle (whose buffer frees on this stream) goes away
+        }
+        cudaStreamDestroy(stream); // safe: nothing outlives the stream now
     }
     catch (const std::exception& e) {
         std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;

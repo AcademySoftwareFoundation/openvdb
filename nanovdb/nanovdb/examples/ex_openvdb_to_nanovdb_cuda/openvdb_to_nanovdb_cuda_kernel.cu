@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessable on both the host and device
-#include <nanovdb/cuda/GridHandle.cuh>// required since GridHandle<DeviceBuffer> has device code
+#include <nanovdb/cuda/GridHandle.cuh>
 #include <stdio.h> // for printf
 
 // This is called by the host only

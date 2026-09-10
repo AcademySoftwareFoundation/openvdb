@@ -26,6 +26,16 @@ nanobind_add_module(nanovdb_python NB_STATIC
 )
 
 target_include_directories(nanovdb_python PRIVATE ${CUDA_INCLUDE_DIRECTORY})
+if(NANOVDB_USE_CUDA)
+  # nanobind's own headers trip nvcc front-end diagnostics (nb_func.h as of
+  # nanobind 3.0.0), which --Werror=all-warnings turns into errors. Third-party
+  # code isn't ours to fix: hand nvcc the nanobind include as a system
+  # directory, which exempts its headers from the front end's diagnostics.
+  # Passed as a raw option because the Visual Studio generator flattens
+  # CMake-level SYSTEM include directories to ordinary ones for CUDA sources.
+  target_compile_options(nanovdb_python PRIVATE
+    "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-isystem ${NB_DIR}/include>")
+endif()
 target_link_libraries(nanovdb_python PRIVATE nanovdb ${CUDA_LIBRARIES} ${NANOVDB_BLOSC} ${NANOVDB_ZLIB} ${NANOVDB_OPENVDB} ${NANOVDB_TBB})
 target_compile_definitions(nanovdb_python PRIVATE ${NANOVDB_USE_CUDA_FLAG} ${NANOVDB_USE_BLOSC_FLAG} ${NANOVDB_USE_ZLIB_FLAG} ${NANOVDB_USE_OPENVDB_FLAG} ${NANOVDB_USE_TBB_FLAG})
 set_target_properties(nanovdb_python PROPERTIES OUTPUT_NAME "nanovdb")

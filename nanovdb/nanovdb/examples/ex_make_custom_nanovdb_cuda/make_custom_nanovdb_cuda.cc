@@ -5,7 +5,7 @@
 
 #include <nanovdb/tools/GridBuilder.h>
 #include <nanovdb/tools/CreateNanoGrid.h>
-#include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/cuda/HandleStorage.h> // host-includable: cuda::copyTo transfers grids without any kernel
 
 #include <iostream>
 
@@ -26,20 +26,23 @@ int main()
         printf("build::Grid: (%i,%i,%i)=%4.2f\n", 1, 2,-3, acc.getValue(nanovdb::Coord(1, 2,-3)));
         printf("build::Grid: (%i,%i,%i)=%4.2f\n", 1, 2, 3, acc.getValue(nanovdb::Coord(1, 2, 3)));
 
-        // convert build::grid to a nanovdb::GridHandle using a Cuda buffer
-        auto handle = nanovdb::tools::createNanoGrid<GridT, float, nanovdb::cuda::DeviceBuffer>(grid);
+        // convert build::grid to a nanovdb::GridHandle in host memory
+        auto handle = nanovdb::tools::createNanoGrid<GridT, float>(grid);
 
         auto* cpuGrid = handle.grid<float>(); //get a (raw) pointer to a NanoVDB grid of value type float on the CPU
         if (!cpuGrid) throw std::runtime_error("GridHandle does not contain a grid with value type float");
 
-        cudaStream_t stream; // Create a CUDA stream to allow for asynchronous copy of pinned CUDA memory.
+        cudaStream_t stream; // stream that orders the transfer and the kernels below
         cudaStreamCreate(&stream);
+        {
+            // deep-copy the grid to the GPU (implemented in the CUDA translation unit)
+            auto deviceHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle, stream);
+            auto* gpuGrid = deviceHandle.deviceGrid<float>();
 
-        handle.deviceUpload(stream, false); // Copy the NanoVDB grid to the GPU asynchronously
-        auto* gpuGrid = handle.deviceGrid<float>(); // get a (raw) pointer to a NanoVDB grid of value type float on the GPU
-
-        launch_kernels(gpuGrid, cpuGrid, stream); // Call a host method to print a grid values on both the CPU and GPU
-        cudaStreamDestroy(stream); // Destroy the CUDA stream
+            launch_kernels(gpuGrid, cpuGrid, stream); // print grid values on both the CPU and GPU
+            cudaStreamSynchronize(stream); // the kernels must finish before the device handle (whose buffer frees on this stream) goes away
+        }
+        cudaStreamDestroy(stream);
     }
     catch (const std::exception& e) {
         std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;

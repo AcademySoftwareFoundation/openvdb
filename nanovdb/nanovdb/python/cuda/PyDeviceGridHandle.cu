@@ -15,7 +15,7 @@ namespace pynanovdb {
 
 void defineDeviceGridHandle(nb::module_& m)
 {
-    using BufferT = nanovdb::cuda::DeviceBuffer;
+    using BufferT = nanovdb::cuda::DualDeviceBuffer;
     defineGridHandle<BufferT>(m, "DeviceGridHandle")
         .def(
             "__init__",

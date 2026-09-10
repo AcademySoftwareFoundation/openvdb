@@ -18,6 +18,9 @@
 
 #include <fstream> // for std::ifstream
 #include <iostream> // for std::cerr/cout
+#include <cstring> // for std::memcpy
+#include <stdexcept> // for std::runtime_error
+#include <string> // for std::to_string
 #include <vector>
 #include <initializer_list>
 
@@ -30,6 +33,13 @@ namespace nanovdb {
 // --------------------------> GridHandle <------------------------------------
 
 struct GridHandleMetaData {uint64_t offset, size; GridType gridType;};
+
+namespace cuda { namespace detail {
+// Defined in nanovdb/cuda/HandleStorage.h: the one gateway to constructing a
+// handle from a buffer plus already-validated metadata (handle-to-handle
+// transfers), so the trust boundary stays visible in a single place.
+struct HandleFactory;
+}}// namespace cuda::detail
 
 namespace detail {
 
@@ -48,6 +58,44 @@ inline BufferT createHostStorage(uint64_t bytes, const BufferT& pool)
         return BufferT(pool.resource(), bytes, {});
     } else {
         return BufferT::create(bytes, &pool);
+    }
+}
+
+/// @brief Validates the grid chain in @a bytes of host-readable memory headed
+///        by @a head and fills @a meta with one entry per grid: every header
+///        must be valid, carry its expected index and the chain's total count,
+///        and fit inside the buffer, so a truncated buffer or a forged header
+///        is rejected before its metadata is trusted. This is the host
+///        counterpart of the device-side chain parse, and it is what makes a
+///        handle's metadata safe to adopt without re-validation (cuda::copyTo).
+inline void parseHostGridChain(const GridData* head, uint64_t bytes, std::vector<GridHandleMetaData>& meta)
+{
+    if (bytes < sizeof(GridData))
+        throw std::runtime_error("GridHandle: grid chain exceeds the host buffer (truncated or corrupt grid data)");
+    if (!head->isValid()) throw std::runtime_error("GridHandle was constructed with an invalid host buffer");
+    const uint32_t count = head->mGridCount;
+    if (count == 0) throw std::runtime_error("GridHandle: host buffer contains no grids");
+    if (uint64_t(count) > bytes / sizeof(GridData))// every grid is at least one full header
+        throw std::runtime_error("GridHandle: grid chain exceeds the host buffer (truncated or corrupt grid data)");
+    meta.resize(count);
+    uint64_t offset = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        auto where = [&] { return " (grid " + std::to_string(i) + " of " + std::to_string(count) + ")"; };
+        if (offset + sizeof(GridData) > bytes)
+            throw std::runtime_error("GridHandle: grid chain exceeds the host buffer (truncated or corrupt grid data)" + where());
+        // Read through a copy: a forged size in the preceding header can place this one at an
+        // unaligned offset, where dereferencing a GridData pointer would be undefined behavior.
+        alignas(GridData) unsigned char raw[sizeof(GridData)];
+        std::memcpy(raw, util::PtrAdd<const void>(head, offset), sizeof(GridData));
+        const GridData* data = reinterpret_cast<const GridData*>(raw);
+        if (!data->isValid())
+            throw std::runtime_error("GridHandle was constructed with an invalid host buffer" + where());
+        if (data->mGridIndex != i || data->mGridCount != count)
+            throw std::runtime_error("GridHandle: inconsistent grid index/count in the host buffer's grid chain" + where());
+        if (data->mGridSize < sizeof(GridData) || data->mGridSize > bytes - offset)
+            throw std::runtime_error("GridHandle: grid size field exceeds the host buffer (truncated or corrupt grid data)" + where());
+        meta[i] = GridHandleMetaData{offset, data->mGridSize, data->mGridType};
+        offset += data->mGridSize;
     }
 }
 
@@ -87,6 +135,8 @@ class GridHandle
     GridHandle(BufferT&& buffer, std::vector<GridHandleMetaData> meta)
         : mMetaData(std::move(meta))
         , mBuffer(std::move(buffer)) {}
+
+    friend struct cuda::detail::HandleFactory;
 
 public:
     using BufferType = BufferT;
@@ -171,9 +221,9 @@ public:
     /// @brief Returns a pointer to the host data; not available for a
     ///        single-space device buffer, which has no host-readable bytes.
     /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized
-    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type = 0>
+    template<typename U = BufferT, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type = 0>
     void* data() { return mBuffer.data(); }
-    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type = 0>
+    template<typename U = BufferT, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type = 0>
     const void* data() const { return mBuffer.data(); }
     //@}
 
@@ -220,7 +270,7 @@ public:
     /// @param n Index of the (host) grid pointer to be returned
     /// @warning Note that the return pointer can be NULL if the GridHandle no host grid, @a n is invalid
     ///          or if the template parameter does not match the specified grid!
-    template<typename ValueT, typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type = 0>
+    template<typename ValueT, typename U = BufferT, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type = 0>
     const NanoGrid<ValueT>* grid(uint32_t n = 0) const;
 
     /// @brief Returns a host pointer to the @a n'th  NanoVDB grid encoded in this GridHandle.
@@ -228,7 +278,7 @@ public:
     /// @param n Index of the (host) grid pointer to be returned
     /// @warning Note that the return pointer can be NULL if the GridHandle no host grid, @a n is invalid
     ///          or if the template parameter does not match the specified grid!
-    template<typename ValueT, typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type = 0>
+    template<typename ValueT, typename U = BufferT, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type = 0>
     NanoGrid<ValueT>* grid(uint32_t n = 0) {return const_cast<NanoGrid<ValueT>*>(static_cast<const GridHandle*>(this)->template grid<ValueT>(n));}
 
     /// @brief Return a const pointer to the @a n'th grid encoded in this GridHandle on the device, e.g. GPU
@@ -322,20 +372,20 @@ public:
     /// @brief Access to the GridData of the n'th grid in the current handle
     /// @param n zero-based ID of the grid
     /// @return Const pointer to the n'th GridData in the current handle
-    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type = 0>
+    template<typename U = BufferT, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type = 0>
     const GridData* gridData(uint32_t n = 0) const;
 
     /// @brief Returns a const point to the @a n'th grid meta data
     /// @param n zero-based ID of the grid
     /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized
-    template<typename U = BufferT, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type = 0>
+    template<typename U = BufferT, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type = 0>
     const GridMetaData* gridMetaData(uint32_t n = 0) const;
 
     /// @brief Write a specific grid in this buffer to an output stream
     /// @param os  output stream that the buffer will be written to
     /// @param n zero-based index of the grid to be written to stream
     void write(std::ostream& os, uint32_t n) const {
-        static_assert(!BufferHasDeviceSingle<BufferT>::value,
+        static_assert(!(BufferIsDeviceOnly<BufferT>::value),
                       "GridHandle::write requires host-accessible grids: cuda::copyTo a host-readable handle first");
         if (const GridData* data = this->gridData(n)) {
             os.write((const char*)data, data->mGridSize);
@@ -347,7 +397,7 @@ public:
     /// @brief Write the entire grid buffer to an output stream
     /// @param os output stream that the buffer will be written to
     void write(std::ostream& os) const {
-        static_assert(!BufferHasDeviceSingle<BufferT>::value,
+        static_assert(!(BufferIsDeviceOnly<BufferT>::value),
                       "GridHandle::write requires host-accessible grids: cuda::copyTo a host-readable handle first");
 
         for (uint32_t n=0; n<this->gridCount(); ++n) this->write(os, n);
@@ -427,7 +477,7 @@ public:
 // --------------------------> Implementation of private methods in GridHandle <------------------------------------
 
 template<typename BufferT>
-template<typename U, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type>
+template<typename U, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type>
 inline const GridData* GridHandle<BufferT>::gridData(uint32_t n) const
 {
     const void *data = this->data();
@@ -436,23 +486,13 @@ inline const GridData* GridHandle<BufferT>::gridData(uint32_t n) const
 }// const GridData* GridHandle<BufferT>::gridData(uint32_t n) const
 
 template<typename BufferT>
-template<typename U, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type>
+template<typename U, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type>
 inline const GridMetaData* GridHandle<BufferT>::gridMetaData(uint32_t n) const
 {
     const auto *data = this->data();
     if (data == nullptr || n >= mMetaData.size()) return nullptr;
     return util::PtrAdd<GridMetaData>(data, mMetaData[n].offset);
 }// const GridMetaData* GridHandle<BufferT>::gridMetaData(uint32_t n) const
-
-inline __hostdev__ void cpyGridHandleMeta(const GridData *data, GridHandleMetaData *meta)
-{
-    uint64_t offset = 0;
-    for (auto *p=meta, *q=p+data->mGridCount; p!=q; ++p) {
-        *p = {offset,  data->mGridSize, data->mGridType};
-        offset += p->size;
-        data = util::PtrAdd<GridData>(data, p->size);
-    }
-}// void cpyGridHandleMeta(const GridData *data, GridHandleMetaData *meta)
 
 // template specialization of move constructor from a host buffer
 template<typename BufferT>
@@ -462,9 +502,7 @@ GridHandle<BufferT>::GridHandle(T&& buffer)
 {
     static_assert(util::is_same<T,BufferT>::value, "Expected U==BufferT");
     if (auto *data = reinterpret_cast<const GridData*>(mBuffer.data())) {
-        if (!data->isValid()) throw std::runtime_error("GridHandle was constructed with an invalid host buffer");
-        mMetaData.resize(data->mGridCount);
-        cpyGridHandleMeta(data, mMetaData.data());
+        detail::parseHostGridChain(data, mBuffer.size(), mMetaData);
     }
 }// GridHandle<BufferT>::GridHandle(T&& buffer)
 
@@ -474,7 +512,8 @@ inline GridHandle<OtherBufferT> GridHandle<BufferT>::copy(const OtherBufferT& ot
 {
     static_assert(!(BufferHasDeviceSingle<BufferT>::value || BufferHasDeviceSingle<OtherBufferT>::value),
                   "GridHandle::copy(pool) cannot honor a pool argument for a single-space device buffer, "
-                  "whose copy allocates through the source buffer's resource: use the no-argument copy()");
+                  "whose copy allocates through the source buffer's resource: use the no-argument copy() "
+                  "for a same-space deep copy, or cuda::copyTo (cuda/HandleStorage.h) to cross address spaces");
     if (mBuffer.size() == 0) return GridHandle<OtherBufferT>();// return an empty handle
     auto buffer = detail::createHostStorage<OtherBufferT>(mBuffer.size(), other);
     std::memcpy(buffer.data(), mBuffer.data(), mBuffer.size());// deep copy of buffer
@@ -488,19 +527,22 @@ inline GridHandle<OtherBufferT> GridHandle<BufferT>::copy() const
     if constexpr (BufferHasDeviceSingle<BufferT>::value || BufferHasDeviceSingle<OtherBufferT>::value) {
         static_assert(util::is_same<OtherBufferT, BufferT>::value && BufferHasDeviceSingle<BufferT>::value,
                       "GridHandle::copy is same-space only: a single-space device handle copies to its own "
-                      "buffer type; use cuda::copyTo (cuda/GridHandle.cuh) to move grids across address spaces");
+                      "buffer type; use cuda::copyTo (cuda/HandleStorage.h) to move grids across address spaces");
         // Device-to-device deep copy; for a stream-ordered resource it is
         // ordered on the source's retained stream, so synchronize that stream
         // before reading the result. Metadata is host-resident, so the copy
         // adopts it directly with no device re-parse.
         return GridHandle(mBuffer.copy(), mMetaData);
     } else {
+        static_assert(BufferIsDefaultConstructible<OtherBufferT>::value,
+                      "GridHandle::copy() without arguments default-constructs the target pool buffer: "
+                      "pass a prototype to copy(other) for a buffer over a non-default-constructible resource");
         return this->copy(OtherBufferT());
     }
 }// GridHandle<OtherBufferT> GridHandle<BufferT>::copy() const
 
 template<typename BufferT>
-template<typename ValueT, typename U, typename util::disable_if<BufferHasDeviceSingle<U>::value, int>::type>
+template<typename ValueT, typename U, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type>
 inline const NanoGrid<ValueT>* GridHandle<BufferT>::grid(uint32_t n) const
 {
     return this->template gridAt<ValueT>(mBuffer.data(), n);
@@ -517,7 +559,7 @@ GridHandle<BufferT>::deviceGrid(uint32_t n) const
 template<typename BufferT>
 void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
 {
-    static_assert(!BufferHasDeviceSingle<BufferT>::value,
+    static_assert(!(BufferIsDeviceOnly<BufferT>::value),
                   "GridHandle::read requires a host-accessible buffer: read into a host-readable handle, then cuda::copyTo");
     const std::streampos start = is.tellg();// remember where the raw buffer begins
     GridData data;
@@ -542,7 +584,7 @@ void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
 template<typename BufferT>
 void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool)
 {
-    static_assert(!BufferHasDeviceSingle<BufferT>::value,
+    static_assert(!(BufferIsDeviceOnly<BufferT>::value),
                   "GridHandle::read requires a host-accessible buffer: read into a host-readable handle, then cuda::copyTo");
     GridData data;
     is.read((char*)&data, sizeof(GridData));
@@ -566,7 +608,7 @@ void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool
 template<typename BufferT>
 void GridHandle<BufferT>::read(std::istream& is, const std::string &gridName, const BufferT& pool)
 {
-    static_assert(!BufferHasDeviceSingle<BufferT>::value,
+    static_assert(!(BufferIsDeviceOnly<BufferT>::value),
                   "GridHandle::read requires a host-accessible buffer: read into a host-readable handle, then cuda::copyTo");
     static const std::streamsize byteSize = sizeof(GridData);
     GridData data;
@@ -600,7 +642,7 @@ template<typename BufferT, template <class, class...> class VectorT = std::vecto
 inline VectorT<GridHandle<BufferT>>
 splitGrids(const GridHandle<BufferT> &handle, const BufferT* other = nullptr)
 {
-    static_assert(!BufferHasDeviceSingle<BufferT>::value,
+    static_assert(!(BufferIsDeviceOnly<BufferT>::value),
                   "splitGrids requires a buffer type providing create(): cuda::copyTo a HostBuffer handle first");
     static_assert(!BufferHasHostSingle<BufferT>::value,
                   "splitGrids requires a buffer type providing create(): copy the handle to a HostBuffer first");

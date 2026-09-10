@@ -23,7 +23,7 @@ template<typename BufferT> void defineValidateGrids(nb::module_& m)
 
 template void defineValidateGrids<HostBuffer>(nb::module_&);
 #ifdef NANOVDB_USE_CUDA
-template void defineValidateGrids<cuda::DeviceBuffer>(nb::module_&);
+template void defineValidateGrids<cuda::DualDeviceBuffer>(nb::module_&);
 #endif
 
 } // namespace pynanovdb

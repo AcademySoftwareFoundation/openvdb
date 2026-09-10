@@ -13,7 +13,7 @@ namespace pynanovdb {
 
 void defineDeviceBuffer(nb::module_& m)
 {
-    nb::class_<cuda::DeviceBuffer>(m, "DeviceBuffer");
+    nb::class_<cuda::DualDeviceBuffer>(m, "DeviceBuffer");
 }
 
 } // namespace pynanovdb

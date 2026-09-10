@@ -40,6 +40,21 @@
 #include <iomanip> // for std::setw, std::setfill
 #include <thread> // for std::thread
 
+// These tests deliberately keep exercising the deprecated dual-space
+// DeviceBuffer surface until its removal; the deprecation warnings are
+// suppressed for this translation unit only. New code must use
+// cuda::Buffer and cuda::copyTo instead.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#if defined(_MSC_VER)
+#pragma warning(disable : 4996)
+#endif
+#if defined(__CUDACC__)
+#pragma nv_diag_suppress 20199
+#endif
+
+
 namespace nanovdb {// this namespace is required by gtest
 
 namespace test {

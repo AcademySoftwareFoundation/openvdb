@@ -8790,6 +8790,32 @@ TEST_F(TestNanoVDB, VoxelBlockManager)
     }
 }// VoxelBlockManager
 
+TEST_F(TestNanoVDB, GridHandleRejectsMalformedHostChain)
+{
+    auto handle = nanovdb::tools::createLevelSetSphere<float>(20.0f, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
+    ASSERT_TRUE(handle);
+    const uint64_t bytes = handle.bufferSize();
+    // Copies the valid grid into a fresh host buffer, applies a header edit, and constructs a handle over it.
+    auto forge = [&](auto&& corrupt) {
+        auto buffer = nanovdb::HostBuffer::create(bytes);
+        std::memcpy(buffer.data(), handle.data(), bytes);
+        corrupt(*reinterpret_cast<nanovdb::GridData*>(buffer.data()));
+        return nanovdb::GridHandle<nanovdb::HostBuffer>(std::move(buffer));
+    };
+    {// a faithful copy constructs and reports the same metadata
+        auto ok = forge([](nanovdb::GridData&) {});
+        EXPECT_EQ(1u, ok.gridCount());
+        EXPECT_EQ(bytes, ok.gridSize(0));
+    }
+    // A header whose claims do not fit the allocation must be rejected at construction, so
+    // no consumer -- including a metadata-adopting transfer -- ever trusts its size or offsets.
+    EXPECT_THROW(forge([](nanovdb::GridData& d) { d.mGridSize *= 2; }), std::runtime_error);// claims twice the allocation
+    EXPECT_THROW(forge([](nanovdb::GridData& d) { d.mGridIndex = 7; }), std::runtime_error);// index disagrees with its chain position
+    EXPECT_THROW(forge([](nanovdb::GridData& d) { d.mGridCount = 2; }), std::runtime_error);// claims a second grid the buffer does not hold
+    EXPECT_THROW(forge([](nanovdb::GridData& d) { d.mMagic = 0; }), std::runtime_error);// corrupted magic
+    EXPECT_THROW(forge([](nanovdb::GridData& d) { d.mGridCount = 2; d.mGridSize = sizeof(nanovdb::GridData) + 1; }), std::runtime_error);// a second header read from an unaligned offset into grid bytes: rejected as invalid, never dereferenced in place
+}// GridHandleRejectsMalformedHostChain
+
 int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);

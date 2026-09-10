@@ -181,6 +181,23 @@ public:
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, const uint64_t*>::type
     deviceJumpMap() const { return static_cast<const uint64_t*>(mJumpMap.deviceData()); }
 
+    //@{
+    /// @brief For a single-space buffer the device data is the buffer itself.
+    /// @warning Note that the return pointer can be NULL if the VoxelBlockManagerHandle was not initialized
+    template<typename U = BufferT>
+    typename util::enable_if<BufferHasDeviceSingle<U>::value, uint32_t*>::type
+    deviceFirstLeafID() { return reinterpret_cast<uint32_t*>(mFirstLeafID.data()); }
+    template<typename U = BufferT>
+    typename util::enable_if<BufferHasDeviceSingle<U>::value, const uint32_t*>::type
+    deviceFirstLeafID() const { return reinterpret_cast<const uint32_t*>(mFirstLeafID.data()); }
+    template<typename U = BufferT>
+    typename util::enable_if<BufferHasDeviceSingle<U>::value, uint64_t*>::type
+    deviceJumpMap() { return reinterpret_cast<uint64_t*>(mJumpMap.data()); }
+    template<typename U = BufferT>
+    typename util::enable_if<BufferHasDeviceSingle<U>::value, const uint64_t*>::type
+    deviceJumpMap() const { return reinterpret_cast<const uint64_t*>(mJumpMap.data()); }
+    //@}
+
     /// @brief Returns the number of voxel blocks in the VoxelBlockManager
     uint64_t blockCount() const { return mBlockCount; }
 
