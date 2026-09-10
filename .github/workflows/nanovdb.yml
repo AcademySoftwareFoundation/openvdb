@@ -58,21 +58,29 @@ jobs:
     container:
       image: aswf/ci-openvdb:${{ matrix.config.image }}
     env:
+      # nvcc defaults to g++ regardless of CXX, and clang and g++ mangle
+      # GridHandle's dual-buffer constructor differently, so the .cu and .cc
+      # halves of the python module stop agreeing. Point nvcc at CXX.
+      CUDAHOSTCXX: ${{ matrix.config.cudahostcxx }}
       CXX: ${{ matrix.config.cxx }}
     strategy:
       matrix:
         config:
-          - { cxx: g++,     image: '2024-clang17.2', build: 'Release' }
-          - { cxx: g++,     image: '2024-clang17.2', build: 'Debug' }
-          - { cxx: clang++, image: '2024-clang17.2', build: 'Release' }
-          - { cxx: clang++, image: '2024-clang17.2', build: 'Debug' }
+          - { cxx: g++,       cudahostcxx: g++,     image: '2026-clang19.6', build: 'Release' }
+          - { cxx: clang++,   cudahostcxx: clang++, image: '2026-clang19.6', build: 'Release' }
+          - { cxx: clang++,   cudahostcxx: clang++, image: '2026-clang19.6', build: 'Debug' }
+          # nvcc 12.6's front end has no __is_scoped_enum (12.8 adds it), but
+          # under a clang host CCCL's __is_identifier probe decides it exists
+          # and the CCCL headers stop parsing. g++ as the nvcc host sidesteps
+          # the probe, and clang 17 mangles as g++ does, so python still links.
+          - { cxx: clang++,   cudahostcxx: g++,     image: '2024-clang17.2', build: 'Release' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
-      - name: setup_cuda_12
+      - name: setup_cuda
         run: |
-          echo "/usr/local/cuda-12/bin" >> $GITHUB_PATH
-          echo "LD_LIBRARY_PATH=/usr/local/cuda-12/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "/usr/local/cuda/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
       - name: nanobind
         run: ./ci/install_nanobind.sh 2.5.0
       - name: build
@@ -92,7 +100,7 @@ jobs:
           -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           \'
       - name: test
-        run: cd build && sudo ctest -V -E ".*cuda.*|.*mgpu.*"
+        run: cd build && ctest -V -E ".*cuda.*|.*mgpu.*"
 
   windows-nanovdb:
     if: |
@@ -104,7 +112,7 @@ jobs:
     env:
       VCPKG_DEFAULT_TRIPLET: 'x64-windows'
       visual_studio: "Visual Studio 17 2022"
-      cuda: "12.4.0"
+      cuda: "12.9.1"
     strategy:
       fail-fast: false
     steps:
@@ -154,8 +162,8 @@ jobs:
     strategy:
       matrix:
         config:
-          - { runner: 'macos-14', cxx: 'clang++', build: 'Release' }
-          - { runner: 'macos-14', cxx: 'clang++', build: 'Debug'   }
+          - { runner: 'macos-26', cxx: 'clang++', build: 'Release' }
+          - { runner: 'macos-26', cxx: 'clang++', build: 'Debug'   }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -180,7 +188,7 @@ jobs:
         (github.event.inputs.type == 'all' || github.event.inputs.type == 'linux')))
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     container:
-      image: aswf/ci-openvdb:2024-clang17.2
+      image: aswf/ci-openvdb:2026-clang19.6
     steps:
       - uses: actions/checkout@v3
       - name: install_gtest
@@ -188,8 +196,9 @@ jobs:
       - name: build_and_test
         run: |
           cd nanovdb/nanovdb
-          sudo mkdir .build
+          mkdir .build
           cd .build
-          sudo cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF ../
-          sudo make -j8 install
-          sudo ctest -V
+          cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF ../
+          make -j8
+          sudo make install
+          ctest -V

@@ -455,7 +455,7 @@ jobs:
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
       visual_studio: "Visual Studio 17 2022"
-      cuda: "12.4.0"
+      cuda: "12.9.1"
     strategy:
       matrix:
         config:
@@ -528,7 +528,7 @@ jobs:
         --build-type=Release
         --components=\"core,test\"
     - name: test
-      run: cd build && sudo ctest -V
+      run: cd build && ctest -V
 
   #############################################################################
   ################################## ABI ######################################
