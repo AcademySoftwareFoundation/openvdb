@@ -66,12 +66,12 @@ public:
     /// @brief Disallow copy-construction
     DeviceMesh(const DeviceMesh&) = delete;
     /// @brief Move constructor.  Underlying CUDA streams and NCCL communicators are not reinitialized.
-    /// @param DeviceMesh instance that will be moved into this DeviceMesh.
+    /// @param other DeviceMesh instance that will be moved into this DeviceMesh.
     DeviceMesh(DeviceMesh&&) noexcept;
     /// @brief Disallow copy-assignment
     DeviceMesh& operator=(const DeviceMesh&) = delete;
     /// @brief Move assignment. Underlying CUDA streams and NCCL communicators are not reinitialized.
-    /// @param DeviceMesh instance that will be moved into this DeviceMesh.
+    /// @param other DeviceMesh instance that will be moved into this DeviceMesh.
     DeviceMesh& operator=(DeviceMesh&&) noexcept;
 
     /// @brief Returns the number of devices

@@ -315,7 +315,13 @@ if(OPENVDB_DOXYGEN_NANOVDB)
     doc/nanovdb/HowToBuild.md
     doc/nanovdb/HelloWorld.md
     nanovdb/nanovdb
+    nanovdb/nanovdb/cuda
+    nanovdb/nanovdb/io
+    nanovdb/nanovdb/math
+    nanovdb/nanovdb/putil
+    nanovdb/nanovdb/tools
     nanovdb/nanovdb/util
+    nanovdb/nanovdb/util/cuda
     nanovdb/nanovdb/examples/ex_bump_pool_buffer
     nanovdb/nanovdb/examples/ex_collide_level_set
     nanovdb/nanovdb/examples/ex_make_custom_nanovdb

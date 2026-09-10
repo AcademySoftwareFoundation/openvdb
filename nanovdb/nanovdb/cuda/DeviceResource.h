@@ -61,6 +61,8 @@ public:
     /// @brief Synchronous deallocation; the caller guarantees that device
     ///        work touching the memory has completed.
     /// @param p pointer previously returned by allocate or allocate_async
+    /// @param bytes size of the allocation in bytes
+    /// @param alignment alignment of the allocation in bytes
     void deallocate(void* p, size_t bytes, size_t alignment) {
         this->deallocate_async(p, bytes, alignment, cudaStream_t(0));
     }
