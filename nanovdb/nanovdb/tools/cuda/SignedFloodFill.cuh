@@ -127,8 +127,8 @@ void processRoot(NanoTree<BuildT> *d_tree, cudaStream_t stream = 0)
     cudaCheck(cudaMemcpy(root + 1, (char*)(d_tree + 1) + sizeof(RootT), root->tileCount()*sizeof(TileT), cudaMemcpyDeviceToHost));// copy tiles
 
     // Sort the child nodes of the root in lexicographic order
-    ManagedBufT nodeBuffer(root->tileCount()*sizeof(ChildT), nanovdb::cuda::noInit); // potential over-allocation
-    auto *first = reinterpret_cast<ChildT*>(nodeBuffer.data()), *last = first;
+    nanovdb::cuda::Buffer<ChildT, nanovdb::cuda::ManagedResource> nodeBuffer(root->tileCount(), nanovdb::cuda::noInit); // potential over-allocation
+    auto *first = nodeBuffer.data(), *last = first;
     for (auto it=root->beginChild(); it; ++it) *last++ = ChildT(it.getCoord(), it.pos());
     if (last - first < 2) return;// zero or one child node so nothing to do!
     std::sort(first, last, ChildT());// lexicographic ordering
