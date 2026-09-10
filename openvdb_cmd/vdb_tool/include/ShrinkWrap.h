@@ -3,7 +3,7 @@
 
 /// @author Ken Museth
 ///
-/// @file Shrinkwrap.h
+/// @file ShrinkWrap.h
 ///
 /// @brief Generates a LOD family of watertight shrink wrap level set surfaces
 ///        (or meshes) from a soup of polygons.
@@ -55,7 +55,7 @@ class ShrinkWrapLimit;
 /// @brief Class that implements the actual shrink wrap algorithm
 /// @tparam GridType Template parameter of the desired shrink wrap grids
 template <typename GridType = FloatGrid>
-class Shrinkwrap;
+class ShrinkWrap;
 
 /// @brief Convert a soup of polygons to a shrink wrapped level set volume. This version
 ///        takes a PolySoup struct and optional voxel dimension and/or voxel size. If the
@@ -166,7 +166,7 @@ shrinkWrap(
 ///        function called above should be used instead of this class.
 /// @tparam GridType Grid type of the generated level set surfaces (defaults to FloatGrid)
 template<typename GridType>
-class Shrinkwrap
+class ShrinkWrap
 {
 public:
 
@@ -174,13 +174,13 @@ public:
     /// @param poly  Polygon soup that will be moved to this instance.
     /// @param dim   Desired voxel dimension of the output level set.
     /// @param width Half-width of the output narrow-band level set, in voxel units.
-    Shrinkwrap(PolySoup &&poly, int dim, float width = float(LEVEL_SET_HALF_WIDTH));
+    ShrinkWrap(PolySoup &&poly, int dim, float width = float(LEVEL_SET_HALF_WIDTH));
 
     /// @brief Constructor from a desired voxel size.
     /// @param poly      Polygon soup that will be moved to this instance.
     /// @param voxelSize Desired voxel size of the output level set in world units.
     /// @param width     Half-width of the output narrow-band level set, in voxel units.
-    Shrinkwrap(PolySoup &&poly, float voxelSize, float width = float(LEVEL_SET_HALF_WIDTH));
+    ShrinkWrap(PolySoup &&poly, float voxelSize, float width = float(LEVEL_SET_HALF_WIDTH));
 
     /// @brief Performs the actual processing to generate the shrink wrap surfaces.
     /// @tparam  ShrinkWrapT Optional template parameter of the functor controlling
@@ -253,28 +253,28 @@ private:
     /// @brief Performs the shrink wrap operation as a constrained level set erosion.
     auto shrinkWrapStep(GridType &grid, const GridType &gridB, float &d);
 
-};// Shrinkwrap<GridType>
+};// ShrinkWrap<GridType>
 
 /////////////////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
-Shrinkwrap<GridType>::Shrinkwrap(PolySoup &&poly, int dim, float width)
+ShrinkWrap<GridType>::ShrinkWrap(PolySoup &&poly, int dim, float width)
     : mPoly(poly), mHalfWidth(width)
 {
     if constexpr(!std::is_floating_point<typename GridType::ValueType>::value) {
-        OPENVDB_THROW(TypeError, "Shrinkwrap: supported only for scalar floating-point grids");
+        OPENVDB_THROW(TypeError, "ShrinkWrap: supported only for scalar floating-point grids");
     }
     if (!(mHalfWidth > 0.0f)) {
-        OPENVDB_THROW(ValueError, "Shrinkwrap: halfWidth must be positive");
+        OPENVDB_THROW(ValueError, "ShrinkWrap: halfWidth must be positive");
     }
-    if (!mPoly.bbox) mPoly.bbox = Shrinkwrap::getBBox(mPoly.vtx);
+    if (!mPoly.bbox) mPoly.bbox = ShrinkWrap::getBBox(mPoly.vtx);
     // The largest extent is what the algorithm divides by; requiring it to be
     // positive rejects both empty geometry (an unpopulated bbox has a negative
     // extent) and a single degenerate point, while still allowing a flat/planar
     // mesh (zero extent along one axis is fine for shrink wrapping).
     const float maxLength = mPoly.bbox.extents()[mPoly.bbox.maxExtent()];
     if (!(maxLength > 0.0f)) {
-        OPENVDB_THROW(ValueError, "Shrinkwrap: bounding box has non-positive extent (no input geometry?)");
+        OPENVDB_THROW(ValueError, "ShrinkWrap: bounding box has non-positive extent (no input geometry?)");
     }
     mMinVoxelSize = maxLength/(float(dim) - 2.0f*(mHalfWidth + 1.0f));// +1 since final surface is dilated by dx
     mMaxVoxelSize = maxLength / 2.0f;
@@ -282,7 +282,7 @@ Shrinkwrap<GridType>::Shrinkwrap(PolySoup &&poly, int dim, float width)
     // or negative, yielding a non-finite or non-positive voxel size.
     if (!math::isFinite(mMinVoxelSize) || !(mMinVoxelSize > 0.0f) ||
         !math::isFinite(mMaxVoxelSize) || !(mMaxVoxelSize > 0.0f)) {
-        OPENVDB_THROW(ArithmeticError, "Shrinkwrap: computed voxel size is not "
+        OPENVDB_THROW(ArithmeticError, "ShrinkWrap: computed voxel size is not "
             "finite and positive (is dim too small for the given halfWidth?)");
     }
     // The coarse-to-fine hierarchy in process() requires at least two resolution
@@ -295,45 +295,45 @@ Shrinkwrap<GridType>::Shrinkwrap(PolySoup &&poly, int dim, float width)
     // recoverable runtime condition. process() separately guards against the
     // stricter mMinVoxelSize > mMaxVoxelSize case with an explicit throw.
     OPENVDB_ASSERT(2*mMinVoxelSize <= mMaxVoxelSize);
-}// vdb_tool::Shrinkwrap::Shrinkwrap()
+}// vdb_tool::ShrinkWrap::ShrinkWrap()
 
 /////////////////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
-Shrinkwrap<GridType>::Shrinkwrap(PolySoup &&poly, float voxelSize, float width)
+ShrinkWrap<GridType>::ShrinkWrap(PolySoup &&poly, float voxelSize, float width)
     : mPoly(poly), mMinVoxelSize(voxelSize), mHalfWidth(width)
 {
     if constexpr(!std::is_floating_point<typename GridType::ValueType>::value) {
-        OPENVDB_THROW(TypeError, "Shrinkwrap: supported only for scalar floating-point grids");
+        OPENVDB_THROW(TypeError, "ShrinkWrap: supported only for scalar floating-point grids");
     }
     if (!(mHalfWidth > 0.0f)) {
-        OPENVDB_THROW(ValueError, "Shrinkwrap: halfWidth must be positive");
+        OPENVDB_THROW(ValueError, "ShrinkWrap: halfWidth must be positive");
     }
     if (!math::isFinite(mMinVoxelSize) || !(mMinVoxelSize > 0.0f)) {
-        OPENVDB_THROW(ValueError, "Shrinkwrap: voxelSize must be finite and positive");
+        OPENVDB_THROW(ValueError, "ShrinkWrap: voxelSize must be finite and positive");
     }
-    if (!mPoly.bbox) mPoly.bbox = Shrinkwrap::getBBox(mPoly.vtx);
+    if (!mPoly.bbox) mPoly.bbox = ShrinkWrap::getBBox(mPoly.vtx);
     // See note in the dim-based constructor: the largest extent must be positive
     // (rejects empty/degenerate geometry) but a flat/planar mesh is allowed.
     const float maxLength = mPoly.bbox.extents()[mPoly.bbox.maxExtent()];
     if (!(maxLength > 0.0f)) {
-        OPENVDB_THROW(ValueError, "Shrinkwrap: bounding box has non-positive extent (no input geometry?)");
+        OPENVDB_THROW(ValueError, "ShrinkWrap: bounding box has non-positive extent (no input geometry?)");
     }
     mMaxVoxelSize = maxLength / 2.0f;
     if (!math::isFinite(mMaxVoxelSize) || !(mMaxVoxelSize > 0.0f)) {
-        OPENVDB_THROW(ArithmeticError, "Shrinkwrap: computed voxel size is not finite and positive");
+        OPENVDB_THROW(ArithmeticError, "ShrinkWrap: computed voxel size is not finite and positive");
     }
     // See note in the dim-based constructor above: the bound is mMaxVoxelSize/2
     // (not mMaxVoxelSize) because one hierarchy level is not enough. Here that
     // means voxelSize must not exceed maxLength/4 = mMaxVoxelSize/2.
     OPENVDB_ASSERT(2*mMinVoxelSize <= mMaxVoxelSize);
-}// vdb_tool::Shrinkwrap::Shrinkwrap()
+}// vdb_tool::ShrinkWrap::ShrinkWrap()
 
 /////////////////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
 template<class ShrinkWrapT, class ProgressT>
-void Shrinkwrap<GridType>::process(const ShrinkWrapT &D, ProgressT *progress, int offset_mode)
+void ShrinkWrap<GridType>::process(const ShrinkWrapT &D, ProgressT *progress, int offset_mode)
 {
     auto myProgress = [&](const std::string &s){if constexpr(!std::is_same<ProgressT,void>::value) if (progress) (*progress)(s);};
 
@@ -348,7 +348,7 @@ void Shrinkwrap<GridType>::process(const ShrinkWrapT &D, ProgressT *progress, in
     // dimension). Guard against that here: mGrids.back() below is otherwise
     // undefined behaviour on an empty vector and crashes in optimized builds.
     if (mGrids.empty()) {
-        OPENVDB_THROW(ValueError, "Shrinkwrap::process: voxel size (" +
+        OPENVDB_THROW(ValueError, "ShrinkWrap::process: voxel size (" +
             std::to_string(mMinVoxelSize) + ") is too large for this mesh; it must not "
             "exceed maxLength/2 = " + std::to_string(mMaxVoxelSize) +
             " (half the largest bounding-box dimension)");
@@ -372,12 +372,12 @@ void Shrinkwrap<GridType>::process(const ShrinkWrapT &D, ProgressT *progress, in
       *iter = grid;
     }// loop from coarse to fine voxel sizes
 
-}// vdb_tool::Shrinkwrap::process()
+}// vdb_tool::ShrinkWrap::process()
 
 //////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
-math::BBox<Vec3f> Shrinkwrap<GridType>::getBBox(const std::vector<Vec3s> &vtx)
+math::BBox<Vec3f> ShrinkWrap<GridType>::getBBox(const std::vector<Vec3s> &vtx)
 {
     using RangeT = tbb::blocked_range<std::vector<Vec3s>::const_iterator>;
     RangeT range(vtx.begin(), vtx.end(), 1024);
@@ -394,12 +394,12 @@ math::BBox<Vec3f> Shrinkwrap<GridType>::getBBox(const std::vector<Vec3s> &vtx)
     tbb::parallel_reduce(range, tmp);// parallel
 #endif
     return tmp.bbox;
-}// vdb_tool::Shrinkwrap::getBBox
+}// vdb_tool::ShrinkWrap::getBBox
 
 //////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
-auto Shrinkwrap<GridType>::offset(float dx, int mode)
+auto ShrinkWrap<GridType>::offset(float dx, int mode)
 {
     auto xform = math::Transform::createLinearTransform(dx);
     typename GridType::Ptr grid(nullptr);
@@ -423,27 +423,27 @@ auto Shrinkwrap<GridType>::offset(float dx, int mode)
         //tools::distanceFieldToSDF(*grid, /*removeDisconnectedInterior*/true, /*rebuildNarrowBand*/false);
         break;
     default:
-        OPENVDB_THROW(TypeError, "Shrinkwrap::offset: invalid mode(" + std::to_string(mode) + ")");
+        OPENVDB_THROW(TypeError, "ShrinkWrap::offset: invalid mode(" + std::to_string(mode) + ")");
         break;
     }// end of switch
     return grid;
-}// vdb_tool::Shrinkwrap<GridType>::offset
+}// vdb_tool::ShrinkWrap<GridType>::offset
 
 //////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
-auto Shrinkwrap<GridType>::upsample(const GridType &inGrid)
+auto ShrinkWrap<GridType>::upsample(const GridType &inGrid)
 {
     auto outGrid = createLevelSet<GridType>(inGrid.voxelSize()[0]/2, mHalfWidth);
     tools::resampleToMatch<tools::BoxSampler>(inGrid, *outGrid);
     mIsGridSDF = true;
     return outGrid;
-}// vdb_tool::Shrinkwrap<GridType>::upsample
+}// vdb_tool::ShrinkWrap<GridType>::upsample
 
 //////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
-auto Shrinkwrap<GridType>::shrinkWrapStep(GridType &grid, const GridType &gridB, float &d)
+auto ShrinkWrap<GridType>::shrinkWrapStep(GridType &grid, const GridType &gridB, float &d)
 {
     const float maxDist = 2.0f;
     tools::LevelSetFilter<GridType> filter(grid);
@@ -463,7 +463,7 @@ auto Shrinkwrap<GridType>::shrinkWrapStep(GridType &grid, const GridType &gridB,
     mIsGridSDF = false;// the CSG operation messed up the SDF
     d += maxDist;
     return tools::csgUnionCopy(grid, gridB);
-}// vdb_tool::Shrinkwrap<GridType>::shrinkWrapStep
+}// vdb_tool::ShrinkWrap<GridType>::shrinkWrapStep
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -491,7 +491,7 @@ shrinkWrap(
 {
     static_assert(std::is_floating_point<typename GridType::ValueType>::value,
         "shrinkWrap requires an SDF grid with floating-point values");
-    using T = Shrinkwrap<GridType>;
+    using T = ShrinkWrap<GridType>;
     auto ptr = voxelSize > 0.0f ? std::make_unique<T>(std::move(poly), voxelSize, halfWidth) :
                                   std::make_unique<T>(std::move(poly), dim, halfWidth);
     ptr->process(D, progress, offset_mode);
@@ -516,7 +516,7 @@ shrinkWrap(
     static_assert(std::is_floating_point<typename GridType::ValueType>::value,
         "shrinkWrap requires an SDF grid with floating-point values");
     PolySoup poly{std::move(vtx), std::move(tri), std::move(quad), bbox};
-    Shrinkwrap<GridType> tmp(std::move(poly), dim, halfWidth);
+    ShrinkWrap<GridType> tmp(std::move(poly), dim, halfWidth);
     tmp.process(D, progress, offset_mode);
     return tmp.grids();
 }
@@ -539,7 +539,7 @@ shrinkWrap(
     static_assert(std::is_floating_point<typename GridType::ValueType>::value,
         "shrinkWrap requires an SDF grid with floating-point values");
     PolySoup poly{std::move(vtx), std::move(tri), std::move(quad), bbox};
-    Shrinkwrap<GridType> tmp(std::move(poly), minVoxelSize, halfWidth);
+    ShrinkWrap<GridType> tmp(std::move(poly), minVoxelSize, halfWidth);
     tmp.process(D, progress, offset_mode);
     return tmp.grids();
 }// shrinkWrap

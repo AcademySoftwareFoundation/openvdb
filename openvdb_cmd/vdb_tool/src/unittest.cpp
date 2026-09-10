@@ -4000,10 +4000,10 @@ TEST_F(Test_vdb_tool, ActionHistogram)
     }
 }// ActionHistogram
 
-// Exercises the Shrinkwrap.h API directly (PolySoup, ShrinkWrapLimit, the
-// Shrinkwrap<GridType> class and the shrinkWrap() free-function overloads),
+// Exercises the ShrinkWrap.h API directly (PolySoup, ShrinkWrapLimit, the
+// ShrinkWrap<GridType> class and the shrinkWrap() free-function overloads),
 // independent of the vdb_tool command-line action.
-TEST_F(Test_vdb_tool, ShrinkwrapClassAPI)
+TEST_F(Test_vdb_tool, ShrinkWrapClassAPI)
 {
     using namespace openvdb::vdb_tool;
     using GridT = openvdb::FloatGrid;
@@ -4036,10 +4036,10 @@ TEST_F(Test_vdb_tool, ShrinkwrapClassAPI)
         EXPECT_LT(D2(1.5f), 8.0f);
     }
 
-    // Shrinkwrap<GridT>::getBBox()
+    // ShrinkWrap<GridT>::getBBox()
     {
         const PolySoup poly = makeCubeSoup();
-        const auto bbox = Shrinkwrap<GridT>::getBBox(poly.vtx);
+        const auto bbox = ShrinkWrap<GridT>::getBBox(poly.vtx);
         EXPECT_TRUE(bbox.isSorted());
         EXPECT_EQ(bbox.min(), openvdb::Vec3f(0, 0, 0));
         EXPECT_EQ(bbox.max(), openvdb::Vec3f(2, 2, 2));
@@ -4047,7 +4047,7 @@ TEST_F(Test_vdb_tool, ShrinkwrapClassAPI)
 
     // dim-based constructor + process() + LOD accessors (grid/grids/gridCount/mesh).
     {
-        Shrinkwrap<GridT> sw(makeCubeSoup(), /*dim*/24, /*width*/3.0f);
+        ShrinkWrap<GridT> sw(makeCubeSoup(), /*dim*/24, /*width*/3.0f);
         EXPECT_GT(sw.minVoxelSize(), 0.0f);
         EXPECT_GT(sw.maxVoxelSize(), sw.minVoxelSize());
         EXPECT_FLOAT_EQ(sw.halfWidth(), 3.0f);
@@ -4067,7 +4067,7 @@ TEST_F(Test_vdb_tool, ShrinkwrapClassAPI)
 
     // voxelSize-based constructor + offset() for all three offset modes.
     for (int mode = 0; mode < 3; ++mode) {
-        Shrinkwrap<GridT> sw(makeCubeSoup(), /*voxelSize*/0.25f, /*width*/3.0f);
+        ShrinkWrap<GridT> sw(makeCubeSoup(), /*voxelSize*/0.25f, /*width*/3.0f);
         auto grid = sw.offset(sw.minVoxelSize(), mode);
         ASSERT_TRUE(grid != nullptr) << "mode " << mode;
         EXPECT_GT(grid->activeVoxelCount(), openvdb::Index64(0)) << "mode " << mode;
@@ -4075,19 +4075,19 @@ TEST_F(Test_vdb_tool, ShrinkwrapClassAPI)
 
     // offset() throws TypeError on an invalid mode.
     {
-        Shrinkwrap<GridT> sw(makeCubeSoup(), 0.25f, 3.0f);
+        ShrinkWrap<GridT> sw(makeCubeSoup(), 0.25f, 3.0f);
         EXPECT_THROW(sw.offset(sw.minVoxelSize(), /*mode*/99), openvdb::TypeError);
     }
 
     // Constructor validation.
-    EXPECT_THROW((Shrinkwrap<GridT>(makeCubeSoup(), 64, /*width*/0.0f)), openvdb::ValueError);
-    EXPECT_THROW((Shrinkwrap<GridT>(PolySoup(), 64, 3.0f)), openvdb::ValueError);// no geometry
-    EXPECT_THROW((Shrinkwrap<GridT>(makeCubeSoup(), /*dim*/4, /*width*/3.0f)), openvdb::ArithmeticError);// dim too small
+    EXPECT_THROW((ShrinkWrap<GridT>(makeCubeSoup(), 64, /*width*/0.0f)), openvdb::ValueError);
+    EXPECT_THROW((ShrinkWrap<GridT>(PolySoup(), 64, 3.0f)), openvdb::ValueError);// no geometry
+    EXPECT_THROW((ShrinkWrap<GridT>(makeCubeSoup(), /*dim*/4, /*width*/3.0f)), openvdb::ArithmeticError);// dim too small
 
     // Non-floating-point grid types are rejected at runtime by the class
     // (the free-standing shrinkWrap() functions instead reject them at
     // compile time via static_assert, so they're not exercised here).
-    EXPECT_THROW((Shrinkwrap<openvdb::Int32Grid>(makeCubeSoup(), 64, 3.0f)), openvdb::TypeError);
+    EXPECT_THROW((ShrinkWrap<openvdb::Int32Grid>(makeCubeSoup(), 64, 3.0f)), openvdb::TypeError);
 
     // Free function shrinkWrap(): single-grid convenience overload.
     {
@@ -4117,13 +4117,13 @@ TEST_F(Test_vdb_tool, ShrinkwrapClassAPI)
         ASSERT_GT(grids.size(), size_t(0));
         EXPECT_NEAR(grids.front()->voxelSize()[0], 0.25, 0.05);
     }
-}// ShrinkwrapClassAPI
+}// ShrinkWrapClassAPI
 
 // Exercises the vdb_tool "-shrinkwrap" action end-to-end: the deprecated
 // "-soup2ls"/"-soup2sdf" aliases (with their one-line deprecation warning),
 // the "levels" LOD-selection option, and the sibling "-soup2offset" action
-// (which also builds on Shrinkwrap<GridT> internally).
-TEST_F(Test_vdb_tool, ActionShrinkwrap)
+// (which also builds on ShrinkWrap<GridT> internally).
+TEST_F(Test_vdb_tool, ActionShrinkWrap)
 {
     using namespace openvdb::vdb_tool;
 
@@ -4172,7 +4172,7 @@ TEST_F(Test_vdb_tool, ActionShrinkwrap)
     std::remove("data/shrinkwrap_lod.vdb");
 
     // Sibling action -soup2offset, unaffected by the rename other than
-    // internally using Shrinkwrap<GridT> instead of PolySoupToLevelSet<GridT>.
+    // internally using ShrinkWrap<GridT> instead of PolySoupToLevelSet<GridT>.
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -sphere r=1 dim=32 -ls2mesh"
                           " -soup2offset voxel=0.2 width=3"
@@ -4215,7 +4215,7 @@ TEST_F(Test_vdb_tool, ActionShrinkwrap)
       EXPECT_EQ(oss.str().find("deprecated"), std::string::npos);
     }
     std::remove("data/shrinkwrap_nowarn.vdb");
-}// ActionShrinkwrap
+}// ActionShrinkWrap
 
 int main(int argc, char** argv)
 {
