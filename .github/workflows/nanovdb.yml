@@ -59,6 +59,7 @@ jobs:
       image: aswf/ci-openvdb:${{ matrix.config.image }}
     env:
       CXX: ${{ matrix.config.cxx }}
+      CUDAHOSTCXX: ${{ matrix.config.cxx }}
     strategy:
       matrix:
         config:
