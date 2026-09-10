@@ -63,9 +63,9 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: g++,       image: '2026', build: 'Release' }
-          - { cxx: clang++,   image: '2026', build: 'Release' }
-          - { cxx: clang++,   image: '2026', build: 'Debug' }
+          - { cxx: g++,       image: '2026-clang19.6', build: 'Release' }
+          - { cxx: clang++,   image: '2026-clang19.6', build: 'Release' }
+          - { cxx: clang++,   image: '2026-clang19.6', build: 'Debug' }
           - { cxx: clang++,   image: '2024-clang17.2', build: 'Release' }
       fail-fast: false
     steps:
@@ -181,7 +181,7 @@ jobs:
         (github.event.inputs.type == 'all' || github.event.inputs.type == 'linux')))
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     container:
-      image: aswf/ci-openvdb:2026
+      image: aswf/ci-openvdb:2026-clang19.6
     steps:
       - uses: actions/checkout@v3
       - name: install_gtest
