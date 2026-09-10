@@ -58,15 +58,22 @@ jobs:
     container:
       image: aswf/ci-openvdb:${{ matrix.config.image }}
     env:
+      # nvcc defaults to g++ regardless of CXX, and clang and g++ mangle
+      # GridHandle's dual-buffer constructor differently, so the .cu and .cc
+      # halves of the python module stop agreeing. Point nvcc at CXX.
+      CUDAHOSTCXX: ${{ matrix.config.cudahostcxx }}
       CXX: ${{ matrix.config.cxx }}
-      CUDAHOSTCXX: ${{ matrix.config.cxx }}
     strategy:
       matrix:
         config:
-          - { cxx: g++,       image: '2026-clang19.6', build: 'Release' }
-          - { cxx: clang++,   image: '2026-clang19.6', build: 'Release' }
-          - { cxx: clang++,   image: '2026-clang19.6', build: 'Debug' }
-          - { cxx: clang++,   image: '2024-clang17.2', build: 'Release' }
+          - { cxx: g++,       cudahostcxx: g++,     image: '2026-clang19.6', build: 'Release' }
+          - { cxx: clang++,   cudahostcxx: clang++, image: '2026-clang19.6', build: 'Release' }
+          - { cxx: clang++,   cudahostcxx: clang++, image: '2026-clang19.6', build: 'Debug' }
+          # nvcc 12.6's front end has no __is_scoped_enum (12.8 adds it), but
+          # under a clang host CCCL's __is_identifier probe decides it exists
+          # and the CCCL headers stop parsing. g++ as the nvcc host sidesteps
+          # the probe, and clang 17 mangles as g++ does, so python still links.
+          - { cxx: clang++,   cudahostcxx: g++,     image: '2024-clang17.2', build: 'Release' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
