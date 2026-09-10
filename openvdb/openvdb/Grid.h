@@ -443,10 +443,10 @@ public:
 
     /// @}
 
-
     /// @name I/O
     /// @{
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     /// @brief Read the grid topology from a stream.
     /// This will read only the grid structure, not the actual data buffers.
     virtual void readTopology(std::istream&) = 0;
@@ -459,13 +459,12 @@ public:
     /// Read all of this grid's data buffers that intersect the given index-space bounding box.
     virtual void readBuffers(std::istream&, const CoordBBox&) = 0;
 
-#if OPENVDB_ABI_VERSION_NUMBER < 14
     OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     virtual void readNonresidentBuffers() const = 0;
-#endif
 
     /// Write out all data buffers for this grid.
     virtual void writeBuffers(std::ostream&) const = 0;
+#endif
 
     /// Read in the transform for this grid.
     void readTransform(std::istream& is) { transform().read(is); }
@@ -931,6 +930,7 @@ public:
     /// @name I/O
     /// @{
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     /// @brief Read the grid topology from a stream.
     /// This will read only the grid structure, not the actual data buffers.
     void readTopology(std::istream&) override;
@@ -943,13 +943,13 @@ public:
     /// Read all of this grid's data buffers that intersect the given index-space bounding box.
     void readBuffers(std::istream&, const CoordBBox&) override;
 
-#if OPENVDB_ABI_VERSION_NUMBER < 14
     OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     void readNonresidentBuffers() const override { }
-#endif
 
     /// Write out all data buffers for this grid.
     void writeBuffers(std::ostream&) const override;
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     /// Output a human-readable description of this grid.
     void print(std::ostream& = std::cout, int verboseLevel = 1) const override;
@@ -1624,6 +1624,7 @@ Grid<TreeT>::evalActiveVoxelDim() const
 
 ////////////////////////////////////////
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
 
 /// @internal Consider using the stream tagging mechanism (see io::Archive)
 /// to specify the float precision, but note that the setting is per-grid.
@@ -1741,6 +1742,8 @@ Grid<TreeT>::writeBuffers(std::ostream& os) const
         }
     }
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
 //static

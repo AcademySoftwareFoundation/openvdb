@@ -831,6 +831,8 @@ TEST_F(TestTree, testIO)
 }
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 TEST_F(TestTree, testTreeIO)
 {
     const char* filename = "testTreeIO.dbg";
@@ -881,6 +883,8 @@ TEST_F(TestTree, testTreeIO)
         ASSERT_DOUBLES_EXACTLY_EQUAL(sum, (0.234f + 4.5678f));
     }
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
 TEST_F(TestTree, testNegativeIndexing)

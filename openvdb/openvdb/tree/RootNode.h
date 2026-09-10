@@ -13,7 +13,6 @@
 #include <openvdb/io/Compression.h> // for truncateRealToHalf()
 #include <openvdb/math/Math.h> // for isZero(), isExactlyEqual(), etc.
 #include <openvdb/math/BBox.h>
-#include <openvdb/util/NodeMasks.h> // for backward compatibility only (see readTopology())
 #include <openvdb/util/Assert.h>
 #include <openvdb/version.h>
 #include <tbb/parallel_for.h>
@@ -575,6 +574,7 @@ public:
     void copyToDense(const CoordBBox& bbox, DenseT& dense) const;
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     //
     // I/O
     //
@@ -584,6 +584,7 @@ public:
     void writeBuffers(std::ostream&, bool toHalf = false) const;
     void readBuffers(std::istream&, bool fromHalf = false);
     void readBuffers(std::istream&, const CoordBBox&, bool fromHalf = false);
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
     //
@@ -2347,6 +2348,8 @@ RootNode<ChildT>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
 ////////////////////////////////////////
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 template<typename ChildT>
 inline bool
 RootNode<ChildT>::writeTopology(std::ostream& os, bool toHalf) const
@@ -2467,6 +2470,8 @@ RootNode<ChildT>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool 
     // Clip root-level tiles and prune children that were clipped.
     this->clip(clipBBox);
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
 ////////////////////////////////////////

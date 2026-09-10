@@ -1,6 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
+#include <openvdb/points/PointDataIO.h>
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/io/io.h>
@@ -1276,6 +1277,8 @@ TEST_F(TestPointDataLeaf, testIO)
 }
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 TEST_F(TestPointDataLeaf, testTreeIO)
 {
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
@@ -1365,6 +1368,8 @@ TEST_F(TestPointDataLeaf, testTreeIO)
         EXPECT_EQ(leaf2.attributeSet().size(), size_t(2));
     }
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
 TEST_F(TestPointDataLeaf, testSwap)

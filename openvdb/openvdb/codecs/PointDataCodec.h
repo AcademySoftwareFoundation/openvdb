@@ -8,6 +8,7 @@
 
 #include <openvdb/tools/Clip.h>
 
+#include <openvdb/points/PointDataIO.h> // io::readCompressedValues(), io::writeCompressedValues(), io::writeCompressedValuesSize()
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/AttributeSet.h>
 #include <openvdb/points/StreamCompression.h>
@@ -181,7 +182,14 @@ inline Index countPointDataPasses(const std::vector<const LeafT*>& leaves)
 {
     Index maxRequiredPasses = 0;
     for (const auto* leaf : leaves) {
-        const Index requiredPasses = leaf->buffers();
+        const Index attributes = leaf->attributeSet().size();
+        const Index requiredPasses =
+            /*voxel buffer sizes*/          1 +
+            /*voxel buffers*/               1 +
+            /*attribute metadata*/          1 +
+            /*attribute uniform values*/    attributes +
+            /*attribute buffers*/           attributes +
+            /*cleanup*/                     1;
         if (requiredPasses > maxRequiredPasses) {
             maxRequiredPasses = requiredPasses;
         }

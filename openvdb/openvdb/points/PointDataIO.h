@@ -4,6 +4,10 @@
 #ifndef OPENVDB_POINTS_POINT_DATA_IO_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_DATA_IO_HAS_BEEN_INCLUDED
 
+#include <openvdb/io/Compression.h> // for io::readCompressedValues(), etc
+#include <openvdb/points/StreamCompression.h>
+#include <openvdb/util/NodeMasks.h>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

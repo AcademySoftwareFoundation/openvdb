@@ -115,6 +115,11 @@ public:
 };
 
 
+// These tests round-trip through Archive using an ad hoc grid type built directly
+// from tree/node templates, so no codec is ever registered for it and the read/write
+// falls back to raw Tree I/O, which is disabled for ABI >= 14.
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 TEST_F(TestLeafIOTest, testBufferInt) { TestLeafIO<int>::testBuffer(); }
 TEST_F(TestLeafIOTest, testBufferFloat) { TestLeafIO<float>::testBuffer(); }
 TEST_F(TestLeafIOTest, testBufferDouble) { TestLeafIO<double>::testBuffer(); }
@@ -175,6 +180,7 @@ TEST_F(TestLeafIOTest, testBufferVec3R)
     }
 }
 
+
 TEST_F(TestLeafIOTest, testTreeIOInt) { TestLeafIO<int>::testTreeIO(); }
 TEST_F(TestLeafIOTest, testTreeIOFloat) { TestLeafIO<float>::testTreeIO(); }
 TEST_F(TestLeafIOTest, testTreeIODouble) { TestLeafIO<double>::testTreeIO(); }
@@ -207,3 +213,5 @@ TEST_F(TestLeafIOTest, testTreeIOVec3R)
 
     EXPECT_TRUE(leaf.onVoxelCount() == 2);
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14

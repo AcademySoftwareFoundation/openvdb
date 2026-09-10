@@ -458,6 +458,7 @@ public:
     /// Mark all values (both tiles and voxels) as active.
     void setValuesOn();
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     //
     // I/O
     //
@@ -466,7 +467,7 @@ public:
     void writeBuffers(std::ostream&, bool toHalf = false) const;
     void readBuffers(std::istream&, bool fromHalf = false);
     void readBuffers(std::istream&, const CoordBBox&, bool fromHalf = false);
-
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     //
     // Unsafe methods
@@ -2394,6 +2395,8 @@ InternalNode<ChildT, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense)
 ////////////////////////////////////////
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::writeTopology(std::ostream& os, bool toHalf) const
@@ -2462,6 +2465,8 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         child->readTopology(is, fromHalf);
     }
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
 ////////////////////////////////////////
@@ -3218,6 +3223,8 @@ InternalNode<ChildT, Log2Dim>::combine2(const InternalNode& other, const OtherVa
 ////////////////////////////////////////
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
@@ -3258,6 +3265,8 @@ InternalNode<ChildT, Log2Dim>::readBuffers(std::istream& is,
     }
     this->clip(clipBBox, background);
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
 ////////////////////////////////////////
