@@ -3,31 +3,31 @@
 
 /// @author Ken Museth
 ///
-/// @file tools/PolySoupToLevelSet.h
+/// @file Shrinkwrap.h
 ///
 /// @brief Generates a LOD family of watertight shrink wrap level set surfaces
 ///        (or meshes) from a soup of polygons.
 ///
 /// @details Details of this algorithm are given in an upcoming publication.
 
-#ifndef OPENVDB_TOOLS_POLYSOUP_TO_LEVELSET_HAS_BEEN_INCLUDED
-#define OPENVDB_TOOLS_POLYSOUP_TO_LEVELSET_HAS_BEEN_INCLUDED
+#ifndef VDB_TOOL_SHRINKWRAP_HAS_BEEN_INCLUDED
+#define VDB_TOOL_SHRINKWRAP_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/util/Assert.h>
 
-#include "Composite.h" // for csgUnion
-#include "ValueTransformer.h"// for tools::foreach
-#include "GridTransformer.h" // for resampleToMatch
-#include "MeshToVolume.h"// for meshToLevelSet
-#include "VolumeToMesh.h"// for volumeToMesh
-#include "LevelSetDilatedMesh.h"// for createLevelSetDilatedMesh
-#include "LevelSetFilter.h"// for Filter
-#include "LevelSetMeasure.h"// for levelSetVolume
-#include "FastSweeping.h"// for fogToSdf
-#include "LevelSetUtil.h" // for distanceFieldToSDF
+#include <openvdb/tools/Composite.h> // for csgUnion
+#include <openvdb/tools/ValueTransformer.h>// for tools::foreach
+#include <openvdb/tools/GridTransformer.h> // for resampleToMatch
+#include <openvdb/tools/MeshToVolume.h>// for meshToLevelSet
+#include <openvdb/tools/VolumeToMesh.h>// for volumeToMesh
+#include <openvdb/tools/LevelSetDilatedMesh.h>// for createLevelSetDilatedMesh
+#include <openvdb/tools/LevelSetFilter.h>// for Filter
+#include <openvdb/tools/LevelSetMeasure.h>// for levelSetVolume
+#include <openvdb/tools/FastSweeping.h>// for fogToSdf
+#include <openvdb/tools/LevelSetUtil.h> // for distanceFieldToSDF
 
 #include <iostream>
 #include <vector>
@@ -35,7 +35,7 @@
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
-namespace tools {
+namespace vdb_tool {
 
 /// @brief Simple structure for a polygon soup
 /// @details bbox is allowed to be invalid, in which case it will be derived from vtx
@@ -55,7 +55,7 @@ class ShrinkWrapLimit;
 /// @brief Class that implements the actual shrink wrap algorithm
 /// @tparam GridType Template parameter of the desired shrink wrap grids
 template <typename GridType = FloatGrid>
-class PolySoupToLevelSet;
+class Shrinkwrap;
 
 /// @brief Convert a soup of polygons to a shrink wrapped level set volume. This version
 ///        takes a PolySoup struct and optional voxel dimension and/or voxel size. If the
@@ -81,7 +81,7 @@ class PolySoupToLevelSet;
 ///                    future. It should only be used by experts!
 template<typename GridType, class ShrinkWrapT = ShrinkWrapLimit, class ProgressT = void>
 typename GridType::Ptr
-polySoupToLevelSet(
+shrinkWrap(
     PolySoup &&poly,
     int dim = 256,
     float voxelSize = 0.0,// invalid so use dim instead
@@ -114,7 +114,7 @@ polySoupToLevelSet(
 ///                    future. It should only be used by experts!
 template<typename GridType, class ShrinkWrapT = ShrinkWrapLimit, class ProgressT = void>
 std::vector<typename GridType::Ptr>
-polySoupToLevelSet(
+shrinkWrap(
     int dim,
     const math::BBox<Vec3f> &bbox,
     std::vector<Vec3s>& vtx,
@@ -149,7 +149,7 @@ polySoupToLevelSet(
 ///                    future. It should only be used by experts!
 template<typename GridType, class ShrinkWrapT = ShrinkWrapLimit, class ProgressT = void>
 std::vector<typename GridType::Ptr>
-polySoupToLevelSet(
+shrinkWrap(
     float minVoxelSize,
     const math::BBox<Vec3f> &bbox,
     std::vector<Vec3s>& vtx,
@@ -166,7 +166,7 @@ polySoupToLevelSet(
 ///        function called above should be used instead of this class.
 /// @tparam GridType Grid type of the generated level set surfaces (defaults to FloatGrid)
 template<typename GridType>
-class PolySoupToLevelSet
+class Shrinkwrap
 {
 public:
 
@@ -174,13 +174,13 @@ public:
     /// @param poly  Polygon soup that will be moved to this instance.
     /// @param dim   Desired voxel dimension of the output level set.
     /// @param width Half-width of the output narrow-band level set, in voxel units.
-    PolySoupToLevelSet(PolySoup &&poly, int dim, float width = float(LEVEL_SET_HALF_WIDTH));
+    Shrinkwrap(PolySoup &&poly, int dim, float width = float(LEVEL_SET_HALF_WIDTH));
 
     /// @brief Constructor from a desired voxel size.
     /// @param poly      Polygon soup that will be moved to this instance.
     /// @param voxelSize Desired voxel size of the output level set in world units.
     /// @param width     Half-width of the output narrow-band level set, in voxel units.
-    PolySoupToLevelSet(PolySoup &&poly, float voxelSize, float width = float(LEVEL_SET_HALF_WIDTH));
+    Shrinkwrap(PolySoup &&poly, float voxelSize, float width = float(LEVEL_SET_HALF_WIDTH));
 
     /// @brief Performs the actual processing to generate the shrink wrap surfaces.
     /// @tparam  ShrinkWrapT Optional template parameter of the functor controlling
@@ -215,7 +215,7 @@ public:
     /// @return Reference to the internal PolySoup populated with the generated mesh.
     const PolySoup& mesh(int n = 0, float adaptivity = 0.005f, float isoValue = 0.0f)
     {
-        volumeToMesh(*mGrids[n], mPoly.vtx, mPoly.tri, mPoly.quad, isoValue, adaptivity);
+        tools::volumeToMesh(*mGrids[n], mPoly.vtx, mPoly.tri, mPoly.quad, isoValue, adaptivity);
         return mPoly;
     }
 
@@ -251,30 +251,30 @@ private:
     auto upsample(const GridType &inGrid);
 
     /// @brief Performs the shrink wrap operation as a constrained level set erosion.
-    auto shrinkWrap(GridType &grid, const GridType &gridB, float &d);
+    auto shrinkWrapStep(GridType &grid, const GridType &gridB, float &d);
 
-};// PolySoupToLevelSet<GridType>
+};// Shrinkwrap<GridType>
 
 /////////////////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
-PolySoupToLevelSet<GridType>::PolySoupToLevelSet(PolySoup &&poly, int dim, float width)
+Shrinkwrap<GridType>::Shrinkwrap(PolySoup &&poly, int dim, float width)
     : mPoly(poly), mHalfWidth(width)
 {
     if constexpr(!std::is_floating_point<typename GridType::ValueType>::value) {
-        OPENVDB_THROW(TypeError, "polySoupToLevelSet: supported only for scalar floating-point grids");
+        OPENVDB_THROW(TypeError, "Shrinkwrap: supported only for scalar floating-point grids");
     }
     if (!(mHalfWidth > 0.0f)) {
-        OPENVDB_THROW(ValueError, "polySoupToLevelSet: halfWidth must be positive");
+        OPENVDB_THROW(ValueError, "Shrinkwrap: halfWidth must be positive");
     }
-    if (!mPoly.bbox) mPoly.bbox = PolySoupToLevelSet::getBBox(mPoly.vtx);
+    if (!mPoly.bbox) mPoly.bbox = Shrinkwrap::getBBox(mPoly.vtx);
     // The largest extent is what the algorithm divides by; requiring it to be
     // positive rejects both empty geometry (an unpopulated bbox has a negative
     // extent) and a single degenerate point, while still allowing a flat/planar
     // mesh (zero extent along one axis is fine for shrink wrapping).
     const float maxLength = mPoly.bbox.extents()[mPoly.bbox.maxExtent()];
     if (!(maxLength > 0.0f)) {
-        OPENVDB_THROW(ValueError, "polySoupToLevelSet: bounding box has non-positive extent (no input geometry?)");
+        OPENVDB_THROW(ValueError, "Shrinkwrap: bounding box has non-positive extent (no input geometry?)");
     }
     mMinVoxelSize = maxLength/(float(dim) - 2.0f*(mHalfWidth + 1.0f));// +1 since final surface is dilated by dx
     mMaxVoxelSize = maxLength / 2.0f;
@@ -282,7 +282,7 @@ PolySoupToLevelSet<GridType>::PolySoupToLevelSet(PolySoup &&poly, int dim, float
     // or negative, yielding a non-finite or non-positive voxel size.
     if (!math::isFinite(mMinVoxelSize) || !(mMinVoxelSize > 0.0f) ||
         !math::isFinite(mMaxVoxelSize) || !(mMaxVoxelSize > 0.0f)) {
-        OPENVDB_THROW(ArithmeticError, "polySoupToLevelSet: computed voxel size is not "
+        OPENVDB_THROW(ArithmeticError, "Shrinkwrap: computed voxel size is not "
             "finite and positive (is dim too small for the given halfWidth?)");
     }
     // The coarse-to-fine hierarchy in process() requires at least two resolution
@@ -295,45 +295,45 @@ PolySoupToLevelSet<GridType>::PolySoupToLevelSet(PolySoup &&poly, int dim, float
     // recoverable runtime condition. process() separately guards against the
     // stricter mMinVoxelSize > mMaxVoxelSize case with an explicit throw.
     OPENVDB_ASSERT(2*mMinVoxelSize <= mMaxVoxelSize);
-}// tools::PolySoupToLevelSet::PolySoupToLevelSet()
+}// vdb_tool::Shrinkwrap::Shrinkwrap()
 
 /////////////////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
-PolySoupToLevelSet<GridType>::PolySoupToLevelSet(PolySoup &&poly, float voxelSize, float width)
+Shrinkwrap<GridType>::Shrinkwrap(PolySoup &&poly, float voxelSize, float width)
     : mPoly(poly), mMinVoxelSize(voxelSize), mHalfWidth(width)
 {
     if constexpr(!std::is_floating_point<typename GridType::ValueType>::value) {
-        OPENVDB_THROW(TypeError, "polySoupToLevelSet: supported only for scalar floating-point grids");
+        OPENVDB_THROW(TypeError, "Shrinkwrap: supported only for scalar floating-point grids");
     }
     if (!(mHalfWidth > 0.0f)) {
-        OPENVDB_THROW(ValueError, "polySoupToLevelSet: halfWidth must be positive");
+        OPENVDB_THROW(ValueError, "Shrinkwrap: halfWidth must be positive");
     }
     if (!math::isFinite(mMinVoxelSize) || !(mMinVoxelSize > 0.0f)) {
-        OPENVDB_THROW(ValueError, "polySoupToLevelSet: voxelSize must be finite and positive");
+        OPENVDB_THROW(ValueError, "Shrinkwrap: voxelSize must be finite and positive");
     }
-    if (!mPoly.bbox) mPoly.bbox = PolySoupToLevelSet::getBBox(mPoly.vtx);
+    if (!mPoly.bbox) mPoly.bbox = Shrinkwrap::getBBox(mPoly.vtx);
     // See note in the dim-based constructor: the largest extent must be positive
     // (rejects empty/degenerate geometry) but a flat/planar mesh is allowed.
     const float maxLength = mPoly.bbox.extents()[mPoly.bbox.maxExtent()];
     if (!(maxLength > 0.0f)) {
-        OPENVDB_THROW(ValueError, "polySoupToLevelSet: bounding box has non-positive extent (no input geometry?)");
+        OPENVDB_THROW(ValueError, "Shrinkwrap: bounding box has non-positive extent (no input geometry?)");
     }
     mMaxVoxelSize = maxLength / 2.0f;
     if (!math::isFinite(mMaxVoxelSize) || !(mMaxVoxelSize > 0.0f)) {
-        OPENVDB_THROW(ArithmeticError, "polySoupToLevelSet: computed voxel size is not finite and positive");
+        OPENVDB_THROW(ArithmeticError, "Shrinkwrap: computed voxel size is not finite and positive");
     }
     // See note in the dim-based constructor above: the bound is mMaxVoxelSize/2
     // (not mMaxVoxelSize) because one hierarchy level is not enough. Here that
     // means voxelSize must not exceed maxLength/4 = mMaxVoxelSize/2.
     OPENVDB_ASSERT(2*mMinVoxelSize <= mMaxVoxelSize);
-}// tools::PolySoupToLevelSet::PolySoupToLevelSet()
+}// vdb_tool::Shrinkwrap::Shrinkwrap()
 
 /////////////////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
 template<class ShrinkWrapT, class ProgressT>
-void PolySoupToLevelSet<GridType>::process(const ShrinkWrapT &D, ProgressT *progress, int offset_mode)
+void Shrinkwrap<GridType>::process(const ShrinkWrapT &D, ProgressT *progress, int offset_mode)
 {
     auto myProgress = [&](const std::string &s){if constexpr(!std::is_same<ProgressT,void>::value) if (progress) (*progress)(s);};
 
@@ -348,7 +348,7 @@ void PolySoupToLevelSet<GridType>::process(const ShrinkWrapT &D, ProgressT *prog
     // dimension). Guard against that here: mGrids.back() below is otherwise
     // undefined behaviour on an empty vector and crashes in optimized builds.
     if (mGrids.empty()) {
-        OPENVDB_THROW(ValueError, "PolySoupToLevelSet::process: voxel size (" +
+        OPENVDB_THROW(ValueError, "Shrinkwrap::process: voxel size (" +
             std::to_string(mMinVoxelSize) + ") is too large for this mesh; it must not "
             "exceed maxLength/2 = " + std::to_string(mMaxVoxelSize) +
             " (half the largest bounding-box dimension)");
@@ -365,19 +365,19 @@ void PolySoupToLevelSet<GridType>::process(const ShrinkWrapT &D, ProgressT *prog
       grid = this->upsample(*grid);// grid(dx) -> grid(dx/2)
       for (float d = 0.0f, dx = float(grid->voxelSize()[0]), Ddx = D(dx); d < Ddx; vol[0] = vol[1]) {
         myProgress("Shrink wrap d=" + std::to_string(d) + ", D("+std::to_string(dx) + ")=" + std::to_string(Ddx));
-        grid = this->shrinkWrap(*grid, **iter, d);
-        vol[1] = levelSetVolume(*grid);
+        grid = this->shrinkWrapStep(*grid, **iter, d);
+        vol[1] = tools::levelSetVolume(*grid);
         if (d>0.0f && math::isApproxZero(vol[0]-vol[1])) break;
       }
       *iter = grid;
     }// loop from coarse to fine voxel sizes
 
-}// tools::PolySoupToLevelSet::process()
+}// vdb_tool::Shrinkwrap::process()
 
 //////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
-math::BBox<Vec3f> PolySoupToLevelSet<GridType>::getBBox(const std::vector<Vec3s> &vtx)
+math::BBox<Vec3f> Shrinkwrap<GridType>::getBBox(const std::vector<Vec3s> &vtx)
 {
     using RangeT = tbb::blocked_range<std::vector<Vec3s>::const_iterator>;
     RangeT range(vtx.begin(), vtx.end(), 1024);
@@ -394,23 +394,23 @@ math::BBox<Vec3f> PolySoupToLevelSet<GridType>::getBBox(const std::vector<Vec3s>
     tbb::parallel_reduce(range, tmp);// parallel
 #endif
     return tmp.bbox;
-}// tools::PolySoupToLevelSet::getBBox
+}// vdb_tool::Shrinkwrap::getBBox
 
 //////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
-auto PolySoupToLevelSet<GridType>::offset(float dx, int mode)
+auto Shrinkwrap<GridType>::offset(float dx, int mode)
 {
     auto xform = math::Transform::createLinearTransform(dx);
     typename GridType::Ptr grid(nullptr);
     switch (mode) {
     case 0:// algorithm presented in the paper, using mesh<-> VDB round-trip
-        grid = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> UDF
-        volumeToMesh(*grid, mPoly.vtx, mPoly.tri, mPoly.quad, /*iso*/dx, /*adapt*/0.0);// UDF -> mesh (clears and re-allocates mesh)
-        grid = meshToLevelSet<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> SDF
+        grid = tools::meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> UDF
+        tools::volumeToMesh(*grid, mPoly.vtx, mPoly.tri, mPoly.quad, /*iso*/dx, /*adapt*/0.0);// UDF -> mesh (clears and re-allocates mesh)
+        grid = tools::meshToLevelSet<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth);// mesh -> SDF
         break;
     case 1:// algorithm using Mihai's signed flood-fill algorithm
-        grid = meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth + 1);// mesh -> UDF
+        grid = tools::meshToUnsignedDistanceField<GridType>(*xform, mPoly.vtx, mPoly.tri, mPoly.quad, mHalfWidth + 1);// mesh -> UDF
         tools::foreach(grid->beginValueOn(), [dx](const typename GridType::ValueOnIter& it){it.setValue(*it - dx);}, /*threaded*/true, /*share functor*/true);
         //tools::changeBackground(grid->tree(), mHalfWidth*dx);
         tools::changeLevelSetBackground(grid->tree(), mHalfWidth);
@@ -423,30 +423,30 @@ auto PolySoupToLevelSet<GridType>::offset(float dx, int mode)
         //tools::distanceFieldToSDF(*grid, /*removeDisconnectedInterior*/true, /*rebuildNarrowBand*/false);
         break;
     default:
-        OPENVDB_THROW(TypeError, "polySoupToLevelSet::offset: invalid mode(" + std::to_string(mode) + ")");
+        OPENVDB_THROW(TypeError, "Shrinkwrap::offset: invalid mode(" + std::to_string(mode) + ")");
         break;
     }// end of switch
     return grid;
-}// tools::PolySoupToLevelSet<GridType>::offset
+}// vdb_tool::Shrinkwrap<GridType>::offset
 
 //////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
-auto PolySoupToLevelSet<GridType>::upsample(const GridType &inGrid)
+auto Shrinkwrap<GridType>::upsample(const GridType &inGrid)
 {
     auto outGrid = createLevelSet<GridType>(inGrid.voxelSize()[0]/2, mHalfWidth);
-    resampleToMatch<BoxSampler>(inGrid, *outGrid);
+    tools::resampleToMatch<tools::BoxSampler>(inGrid, *outGrid);
     mIsGridSDF = true;
     return outGrid;
-}// tools::PolySoupToLevelSet<GridType>::upsample
+}// vdb_tool::Shrinkwrap<GridType>::upsample
 
 //////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
-auto PolySoupToLevelSet<GridType>::shrinkWrap(GridType &grid, const GridType &gridB, float &d)
+auto Shrinkwrap<GridType>::shrinkWrapStep(GridType &grid, const GridType &gridB, float &d)
 {
     const float maxDist = 2.0f;
-    LevelSetFilter<GridType> filter(grid);
+    tools::LevelSetFilter<GridType> filter(grid);
     filter.setNormCount(3);// halfWidth
 #if 1//first-order
     filter.setSpatialScheme(math::FIRST_BIAS);
@@ -462,8 +462,8 @@ auto PolySoupToLevelSet<GridType>::shrinkWrap(GridType &grid, const GridType &gr
     filter.offset(static_cast<typename GridType::ValueType>(maxDist * grid.voxelSize()[0]));// erode by maxDist * dx
     mIsGridSDF = false;// the CSG operation messed up the SDF
     d += maxDist;
-    return csgUnionCopy(grid, gridB);
-}// tools::PolySoupToLevelSet<GridType>::shrinkWrap
+    return tools::csgUnionCopy(grid, gridB);
+}// vdb_tool::Shrinkwrap<GridType>::shrinkWrapStep
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -480,7 +480,7 @@ public:
 
 template<typename GridType, class ShrinkWrapT, class ProgressT>
 typename GridType::Ptr
-polySoupToLevelSet(
+shrinkWrap(
     PolySoup &&poly,
     int dim,
     float voxelSize,
@@ -490,8 +490,8 @@ polySoupToLevelSet(
     int offset_mode)
 {
     static_assert(std::is_floating_point<typename GridType::ValueType>::value,
-        "polySoupToLevelSet requires an SDF grid with floating-point values");
-    using T = PolySoupToLevelSet<GridType>;
+        "shrinkWrap requires an SDF grid with floating-point values");
+    using T = Shrinkwrap<GridType>;
     auto ptr = voxelSize > 0.0f ? std::make_unique<T>(std::move(poly), voxelSize, halfWidth) :
                                   std::make_unique<T>(std::move(poly), dim, halfWidth);
     ptr->process(D, progress, offset_mode);
@@ -502,7 +502,7 @@ polySoupToLevelSet(
 
 template<typename GridType, class ShrinkWrapT, class ProgressT>
 std::vector<typename GridType::Ptr>
-polySoupToLevelSet(
+shrinkWrap(
     int dim,
     const math::BBox<Vec3f> &bbox,
     std::vector<Vec3s>& vtx,
@@ -514,9 +514,9 @@ polySoupToLevelSet(
     int offset_mode)
 {
     static_assert(std::is_floating_point<typename GridType::ValueType>::value,
-        "polySoupToLevelSet requires an SDF grid with floating-point values");
+        "shrinkWrap requires an SDF grid with floating-point values");
     PolySoup poly{std::move(vtx), std::move(tri), std::move(quad), bbox};
-    PolySoupToLevelSet<GridType> tmp(std::move(poly), dim, halfWidth);
+    Shrinkwrap<GridType> tmp(std::move(poly), dim, halfWidth);
     tmp.process(D, progress, offset_mode);
     return tmp.grids();
 }
@@ -525,7 +525,7 @@ polySoupToLevelSet(
 
 template<typename GridType, class ShrinkWrapT, class ProgressT>
 std::vector<typename GridType::Ptr>
-polySoupToLevelSet(
+shrinkWrap(
     float minVoxelSize,
     const math::BBox<Vec3f> &bbox,
     std::vector<Vec3s>& vtx,
@@ -537,15 +537,15 @@ polySoupToLevelSet(
     int offset_mode)
 {
     static_assert(std::is_floating_point<typename GridType::ValueType>::value,
-        "polySoupToLevelSet requires an SDF grid with floating-point values");
+        "shrinkWrap requires an SDF grid with floating-point values");
     PolySoup poly{std::move(vtx), std::move(tri), std::move(quad), bbox};
-    PolySoupToLevelSet<GridType> tmp(std::move(poly), minVoxelSize, halfWidth);
+    Shrinkwrap<GridType> tmp(std::move(poly), minVoxelSize, halfWidth);
     tmp.process(D, progress, offset_mode);
     return tmp.grids();
-}// polySoupToLevelSet
+}// shrinkWrap
 
-} // namespace tools
+} // namespace vdb_tool
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif // OPENVDB_TOOLS_POLYSOUP_TO_LEVELSET_HAS_BEEN_INCLUDED
+#endif // VDB_TOOL_SHRINKWRAP_HAS_BEEN_INCLUDED

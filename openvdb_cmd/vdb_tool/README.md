@@ -73,8 +73,8 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **scatter** | Scatter point into the active values of an input VDB grid |
 | **sdf2udf** | Converts a signed distance field into an unsigned distance field, i.e. performs the Abs of all values and changes GridClass to UNKNOWN. |
 | **segment** | segment an input VDB into a list if topologically disconnected VDB grids |
+| **shrinkwrap** (aliases: soup2ls, soup2sdf; the aliases are deprecated) | Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
 | **slice** | Generate images of slices of a VDB grid |
-| **soup2ls** (aliases: soup2sdf, shrinkwrap) | Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
 | **soup2offset** | Convert a polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
 | **soup2udf** (alias: mesh2udf) | Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band |
 | **sphere** | Create a level set sphere, i.e. a narrow-band signed distance to a sphere |
