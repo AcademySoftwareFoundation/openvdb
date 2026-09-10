@@ -70,6 +70,8 @@ class TopologyBuilder
     ///        Buffer rather than the dual DeviceBuffer, whose host pointer and
     ///        per-device array they would leave unused.
     using ScratchT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
+    using UpperMaskBufT = nanovdb::cuda::Buffer<Mask<5>, nanovdb::cuda::ResourceRef<ResourceT>>;
+    using LowerMaskBufT = nanovdb::cuda::Buffer<Mask<4>, nanovdb::cuda::ResourceRef<ResourceT>>;
     using HostStagingT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::PinnedResource>;
 
 public:
@@ -114,8 +116,8 @@ public:
 
     HostStagingT                 mHostRoot; // host staging for the processed root (pinned, so the upload is asynchronous)
     ScratchT                     mDeviceRoot; // device copy, made by uploadProcessedRoot
-    ScratchT                     mUpperMasks;
-    ScratchT                     mLowerMasks;
+    UpperMaskBufT                mUpperMasks;
+    LowerMaskBufT                mLowerMasks;
     ScratchT                     mUpperOffsets;
     ScratchT                     mLowerOffsets;
     ScratchT                     mLeafOffsets;
@@ -155,8 +157,11 @@ public:
             mDeviceData = ScratchT(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResource), sizeof(Data), nanovdb::cuda::noInit);
         cudaCheck(cudaMemcpyAsync(mDeviceData.data(), &mHostData, sizeof(Data), cudaMemcpyHostToDevice, stream));
     }
-    void* deviceUpperMasks() { return mUpperMasks.data(); }
-    void* deviceLowerMasks() { return mLowerMasks.data(); }
+    Mask<5>* deviceUpperMasks() { return mUpperMasks.data(); }
+    /// @brief The densified lower masks: one row of Mask<5>::SIZE Mask<4> per upper node,
+    ///        indexed [upper node][lower node offset]. The row shape is fixed here, beside the
+    ///        allocation that defines it, so consumers never re-derive the stride.
+    Mask<4> (*deviceLowerMasks())[Mask<5>::SIZE] { return reinterpret_cast<Mask<4>(*)[Mask<5>::SIZE]>(mLowerMasks.data()); }
     /// @brief A borrowing reference to the builder's resource, for consumers
     ///        allocating sibling scratch from the same instance.
     nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource); }
@@ -196,17 +201,17 @@ void TopologyBuilder<BuildT, ResourceT>::allocateInternalMaskBuffers(cudaStream_
 {
     if (hostProcessedRoot()->tileCount() == 0) return; // Processing empty grid(s); nothing to allocate
 
-    // Allocate (and zero-fill) buffers large enough to hold:
-    // (a) The serialized masks of all upper nodes, for all tiles in the updated root node, and
-    // (b) The serialized masks of all densified lower nodes, as if every upper node had a full set of 32^3 lower children
-    uint64_t upperSize = hostProcessedRoot()->tileCount() * sizeof(Mask<5>);
-    uint64_t lowerSize = hostProcessedRoot()->tileCount() * Mask<5>::SIZE * sizeof(Mask<4>);
-    mUpperMasks = ScratchT(stream, *mResource, upperSize, nanovdb::cuda::noInit);
+    // Allocate (and zero-fill) the mask arrays:
+    // (a) one Mask<5> per tile of the updated root node, and
+    // (b) Mask<5>::SIZE Mask<4> per tile, as if every upper node had a full set of 32^3 lower children
+    const uint64_t upperMaskCount = hostProcessedRoot()->tileCount();
+    const uint64_t lowerMaskCount = upperMaskCount * Mask<5>::SIZE;
+    mUpperMasks = UpperMaskBufT(stream, *mResource, upperMaskCount, nanovdb::cuda::noInit);
     if (mUpperMasks.data() == nullptr) throw std::runtime_error("Failed to allocate upper mask buffer on device");
-    cudaCheck(cudaMemsetAsync(mUpperMasks.data(), 0, upperSize, stream));
-    mLowerMasks = ScratchT(stream, *mResource, lowerSize, nanovdb::cuda::noInit);
+    cudaCheck(cudaMemsetAsync(mUpperMasks.data(), 0, mUpperMasks.size_bytes(), stream));
+    mLowerMasks = LowerMaskBufT(stream, *mResource, lowerMaskCount, nanovdb::cuda::noInit);
     if (mLowerMasks.data() == nullptr) throw std::runtime_error("Failed to allocate lower mask buffer on device");
-    cudaCheck(cudaMemsetAsync(mLowerMasks.data(), 0, lowerSize, stream));
+    cudaCheck(cudaMemsetAsync(mLowerMasks.data(), 0, mLowerMasks.size_bytes(), stream));
 }// TopologyBuilder<BuildT, ResourceT>::allocateInternalMaskBuffers
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

@@ -12,6 +12,7 @@
 */
 
 #include <cub/cub.cuh>
+#include <cstddef> // for std::size_t
 
 #include <nanovdb/util/MorphologyHelpers.h>
 
@@ -38,8 +39,8 @@ struct DilateInternalNodesFunctor
     operator()(
         const NanoGrid<BuildT> *srcGrid,
         const NanoRoot<BuildT> *dilatedRoot,
-        void *upperMasks_,
-        void *lowerMasks_)
+        Mask<5> *upperMasks,
+        Mask<4> (*lowerMasks)[Mask<5>::SIZE])
     {
         int tID = threadIdx.x;
         int lowerID = blockIdx.x;
@@ -47,10 +48,6 @@ struct DilateInternalNodesFunctor
         int threadInWarpID = threadIdx.x & 0x1f;
         int warpID = threadIdx.x >> 5;
 
-        using UpperMaskArrayT = Mask<5>*;
-        using LowerMaskArrayT = Mask<4>(*)[Mask<5>::SIZE];
-        auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
-        auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
 
         using LowerMaskT = Mask<4>;
         using LowerMaskStencilT = LowerMaskT (&)[3][3][3];
@@ -329,16 +326,12 @@ struct MergeInternalNodesFunctor
     operator()(
         const NanoGrid<BuildT> *srcGrid,
         const NanoRoot<BuildT> *mergedRoot,
-        void *upperMasks_,
-        void *lowerMasks_)
+        Mask<5> *upperMasks,
+        Mask<4> (*lowerMasks)[Mask<5>::SIZE])
     {
         int tID = threadIdx.x;
         int lowerID = blockIdx.x;
 
-        using UpperMaskArrayT = Mask<5>*;
-        using LowerMaskArrayT = Mask<4>(*)[Mask<5>::SIZE];
-        auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
-        auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
 
         using LowerMaskT = Mask<4>;
         const auto& srcTree = srcGrid->tree();
@@ -371,13 +364,9 @@ struct PruneInternalNodesFunctor
         const NanoGrid<BuildT>* srcGrid,
         const NanoRoot<BuildT>* prunedRoot,
         const Mask<3>* srcLeafMask,
-        void *upperMasks_,
-        void *lowerMasks_)
+        Mask<5> *upperMasks,
+        Mask<4> (*lowerMasks)[Mask<5>::SIZE])
     {
-        using UpperMaskArrayT = Mask<5>*;
-        using LowerMaskArrayT = Mask<4>(*)[Mask<5>::SIZE];
-        auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
-        auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
 
         const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
         const auto& leafMask = srcLeafMask[srcLeafID];
@@ -408,13 +397,9 @@ struct RefineInternalNodesFunctor
         size_t srcLeafID,
         const NanoGrid<BuildT>* srcGrid,
         const NanoRoot<BuildT>* prunedRoot,
-        void *upperMasks_,
-        void *lowerMasks_)
+        Mask<5> *upperMasks,
+        Mask<4> (*lowerMasks)[Mask<5>::SIZE])
     {
-        using UpperMaskArrayT = Mask<5>*;
-        using LowerMaskArrayT = Mask<4>(*)[Mask<5>::SIZE];
-        auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
-        auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
 
         const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
         uint64_t octantPresent[2][2][2] = {};
@@ -454,13 +439,9 @@ struct CoarsenInternalNodesFunctor
         size_t srcLeafID,
         const NanoGrid<BuildT>* srcGrid,
         const NanoRoot<BuildT>* prunedRoot,
-        void *upperMasks_,
-        void *lowerMasks_)
+        Mask<5> *upperMasks,
+        Mask<4> (*lowerMasks)[Mask<5>::SIZE])
     {
-        using UpperMaskArrayT = Mask<5>*;
-        using LowerMaskArrayT = Mask<4>(*)[Mask<5>::SIZE];
-        auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
-        auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
 
         const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
         if (!srcLeaf.valueMask().isOff()) { // Gratuitous check; leaf should have at least one active voxel
@@ -490,8 +471,8 @@ struct EnumerateNodesFunctor
 
     void __device__
     operator()(
-        const void *upperMasks_,
-        const void *lowerMasks_,
+        const Mask<5> *upperMasks,
+        const Mask<4> (*lowerMasks)[Mask<5>::SIZE],
         uint32_t (*lowerCounts)[Mask<5>::SIZE],
         uint32_t (*leafCounts)[Mask<5>::SIZE] )
     {
@@ -500,10 +481,6 @@ struct EnumerateNodesFunctor
         int threadInWarpID = threadIdx.x & 0x1f;
         int warpID = threadIdx.x >> 5;
 
-        using UpperMaskArrayT = const Mask<5>*;
-        using LowerMaskArrayT = const Mask<4>(*)[Mask<5>::SIZE];
-        auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
-        auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
 
         using WarpReduce = cub::WarpReduce<uint32_t>;
         __shared__ typename WarpReduce::TempStorage temp_storage[WarpsPerBlock];
@@ -534,8 +511,8 @@ struct ProcessLowerNodesFunctor
 
     void __device__
     operator()(
-        const void *upperMasks_,
-        const void *lowerMasks_,
+        const Mask<5> *upperMasks,
+        const Mask<4> (*lowerMasks)[Mask<5>::SIZE],
         const uint32_t *upperOffsets,
         const uint32_t (*lowerOffsets)[Mask<5>::SIZE],
         const uint32_t (*leafOffsets)[Mask<5>::SIZE],
@@ -549,10 +526,6 @@ struct ProcessLowerNodesFunctor
         int threadInWarpID = threadIdx.x & 0x1f;
         int warpID = threadIdx.x >> 5;
 
-        using UpperMaskArrayT = const Mask<5>*;
-        using LowerMaskArrayT = const Mask<4>(*)[Mask<5>::SIZE];
-        auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
-        auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
 
         using WarpScan = cub::WarpScan<uint32_t>;
         __shared__ typename WarpScan::TempStorage temp_storage[WarpsPerBlock];

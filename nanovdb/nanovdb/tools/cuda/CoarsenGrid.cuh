@@ -215,7 +215,7 @@ void CoarsenGrid<BuildT, ResourceT>::coarsenInternalNodes()
     if (auto srcLeafCount = mSrcTreeData.mNodeCount[0]) { // Unless it's an empty grid
         util::cuda::lambdaKernel<<<numBlocks(srcLeafCount), mNumThreads, 0, mStream>>>(
             srcLeafCount, util::morphology::cuda::CoarsenInternalNodesFunctor<BuildT>(),
-            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.mUpperMasks.data(), mBuilder.mLowerMasks.data() );
+            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks() );
     }
 }// CoarsenGrid<BuildT, ResourceT>::coarsenInternalNodes
 

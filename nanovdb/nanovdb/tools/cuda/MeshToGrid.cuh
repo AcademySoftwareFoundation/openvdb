@@ -18,6 +18,8 @@
 
 #include <cub/cub.cuh>
 #include <algorithm>
+#include <cstddef> // for std::byte
+#include <stdexcept> // for std::runtime_error
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/GridHandle.h>
@@ -65,6 +67,7 @@ class MeshToGrid
 
     using PointT = nanovdb::Vec3f;
     using ScratchT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
+    using MaskBufT = nanovdb::cuda::Buffer<nanovdb::Mask<3>, nanovdb::cuda::ResourceRef<ResourceT>>;
 
     nanovdb::cuda::ResourceRef<ResourceT> ref() { return mBuilder.ref(); }
 
@@ -315,12 +318,12 @@ GridHandle<BufferT> MeshToGrid<BuildT, ResourceT>::getHandle(const BufferT &buff
     const uint32_t leafCount = mBuilder.data()->nodeCount[0];
     auto handle = GridHandle<BufferT>(std::move(gridBuffer));
     if (leafCount) {
-        ScratchT retainMaskBuffer = ScratchT(mStream, this->ref(), uint64_t(leafCount) * sizeof(nanovdb::Mask<3>), nanovdb::cuda::noInit);
-        cudaCheck(cudaMemsetAsync(retainMaskBuffer.data(), 0xFF,
-            uint64_t(leafCount) * sizeof(nanovdb::Mask<3>), mStream));
+        MaskBufT retainMaskBuffer = MaskBufT(mStream, this->ref(), leafCount, nanovdb::cuda::noInit);
+        if (retainMaskBuffer.data() == nullptr) throw std::runtime_error("Failed to allocate retain mask buffer");
+        cudaCheck(cudaMemsetAsync(retainMaskBuffer.data(), 0xFF, retainMaskBuffer.size_bytes(), mStream));
         tools::cuda::PruneGrid<BuildT> pruner(
             static_cast<const GridT*>(handle.deviceData()),
-            reinterpret_cast<nanovdb::Mask<3>*>(retainMaskBuffer.data()),
+            retainMaskBuffer.data(),
             mStream);
         handle = pruner.template getHandle<BufferT>(buffer);
     }
@@ -869,8 +872,8 @@ void MeshToGrid<BuildT, ResourceT>::rasterizeInternalNodes()
 
     using RasterizerT = util::rasterization::cuda::RasterizeInternalNodesFunctor<BuildT, BoxTrianglePair>;
 
-    auto *dUpperMasks = static_cast<Mask<5>*>(mBuilder.deviceUpperMasks());
-    auto *dLowerMasks = static_cast<Mask<4>(*)[Mask<5>::SIZE]>(mBuilder.deviceLowerMasks());
+    auto *dUpperMasks = mBuilder.deviceUpperMasks();
+    auto *dLowerMasks = mBuilder.deviceLowerMasks();
 
     util::cuda::lambdaKernel<<<numBlocks(mBoxTrianglePairCount), mNumThreads, 0, mStream>>>(
         mBoxTrianglePairCount,
@@ -935,12 +938,11 @@ void MeshToGrid<BuildT, ResourceT>::processLeafTrianglePairs()
 
     for (int pass = 0; pass < 3; ++pass) {
         // Allocate Mask<3> buffer for the CTA hit results
-        // Size: mBoxTrianglePairCount * sizeof(nanovdb::Mask<3>)
-        ScratchT maskBuffer = ScratchT(mStream, this->ref(), mBoxTrianglePairCount * sizeof(nanovdb::Mask<3>), nanovdb::cuda::noInit);
+        MaskBufT maskBuffer = MaskBufT(mStream, this->ref(), mBoxTrianglePairCount, nanovdb::cuda::noInit);
         if (maskBuffer.data() == nullptr) {
             throw std::runtime_error("Failed to allocate mask buffer for subdivision pass");
         }
-        auto* dMasks = reinterpret_cast<nanovdb::Mask<3>*>(maskBuffer.data());
+        auto* dMasks = maskBuffer.data();
 
         // Allocate Counts buffer for Prefix Sum
         // Size: mBoxTrianglePairCount * sizeof(uint64_t)
@@ -1125,12 +1127,12 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
     const uint32_t leafCount = mBuilder.data()->nodeCount[0];
     auto handle = GridHandle<GridBufferT>(std::move(gridBuffer));
     if (leafCount) {
-        ScratchT retainMaskBuffer = ScratchT(mStream, this->ref(), uint64_t(leafCount) * sizeof(nanovdb::Mask<3>), nanovdb::cuda::noInit);
-        cudaCheck(cudaMemsetAsync(retainMaskBuffer.data(), 0xFF,
-            uint64_t(leafCount) * sizeof(nanovdb::Mask<3>), mStream));
+        MaskBufT retainMaskBuffer = MaskBufT(mStream, this->ref(), leafCount, nanovdb::cuda::noInit);
+        if (retainMaskBuffer.data() == nullptr) throw std::runtime_error("Failed to allocate retain mask buffer");
+        cudaCheck(cudaMemsetAsync(retainMaskBuffer.data(), 0xFF, retainMaskBuffer.size_bytes(), mStream));
         tools::cuda::PruneGrid<BuildT> pruner(
             static_cast<const GridT*>(handle.deviceData()),
-            reinterpret_cast<nanovdb::Mask<3>*>(retainMaskBuffer.data()),
+            retainMaskBuffer.data(),
             mStream);
         handle = pruner.template getHandle<GridBufferT>(buffer);
     }
