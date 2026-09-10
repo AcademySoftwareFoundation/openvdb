@@ -62,17 +62,17 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: g++,     image: '2024-clang17.2', build: 'Release' }
-          - { cxx: g++,     image: '2024-clang17.2', build: 'Debug' }
-          - { cxx: clang++, image: '2024-clang17.2', build: 'Release' }
-          - { cxx: clang++, image: '2024-clang17.2', build: 'Debug' }
+          - { cxx: g++,       image: '2026', build: 'Release' }
+          - { cxx: clang++,   image: '2026', build: 'Release' }
+          - { cxx: clang++,   image: '2026', build: 'Debug' }
+          - { cxx: clang++,   image: '2024-clang17.2', build: 'Release' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
-      - name: setup_cuda_12
+      - name: setup_cuda
         run: |
-          echo "/usr/local/cuda-12/bin" >> $GITHUB_PATH
-          echo "LD_LIBRARY_PATH=/usr/local/cuda-12/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "/usr/local/cuda/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
       - name: nanobind
         run: ./ci/install_nanobind.sh 2.5.0
       - name: build
@@ -104,7 +104,7 @@ jobs:
     env:
       VCPKG_DEFAULT_TRIPLET: 'x64-windows'
       visual_studio: "Visual Studio 17 2022"
-      cuda: "12.4.0"
+      cuda: "12.9.2"
     strategy:
       fail-fast: false
     steps:
@@ -154,8 +154,8 @@ jobs:
     strategy:
       matrix:
         config:
-          - { runner: 'macos-14', cxx: 'clang++', build: 'Release' }
-          - { runner: 'macos-14', cxx: 'clang++', build: 'Debug'   }
+          - { runner: 'macos-26', cxx: 'clang++', build: 'Release' }
+          - { runner: 'macos-26', cxx: 'clang++', build: 'Debug'   }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -180,7 +180,7 @@ jobs:
         (github.event.inputs.type == 'all' || github.event.inputs.type == 'linux')))
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     container:
-      image: aswf/ci-openvdb:2024-clang17.2
+      image: aswf/ci-openvdb:2026
     steps:
       - uses: actions/checkout@v3
       - name: install_gtest
