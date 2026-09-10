@@ -2729,11 +2729,14 @@ TEST_F(Test_vdb_tool, Processor)
     EXPECT_EQ(std::to_string(tan(2.0f)), proc("{2:tan}"));
     EXPECT_EQ(std::to_string(tan(2.0f)), proc("{2.0:tan}"));
 
-    EXPECT_EQ(std::to_string(asin(2.0f)), proc("{2:asin}"));
-    EXPECT_EQ(std::to_string(asin(2.0f)), proc("{2.0:asin}"));
+    // asin(2)/acos(2) are domain errors; libm does not guarantee the sign bit of the
+    // resulting NaN, so strip a leading '-' before comparing (e.g. "-nan" vs "nan").
+    auto stripNegNan = [](std::string s) { return s == "-nan" ? s.substr(1) : s; };
+    EXPECT_EQ(stripNegNan(std::to_string(asin(2.0f))), stripNegNan(proc("{2:asin}")));
+    EXPECT_EQ(stripNegNan(std::to_string(asin(2.0f))), stripNegNan(proc("{2.0:asin}")));
 
-    EXPECT_EQ(std::to_string(acos(2.0f)), proc("{2:acos}"));
-    EXPECT_EQ(std::to_string(acos(2.0f)), proc("{2.0:acos}"));
+    EXPECT_EQ(stripNegNan(std::to_string(acos(2.0f))), stripNegNan(proc("{2:acos}")));
+    EXPECT_EQ(stripNegNan(std::to_string(acos(2.0f))), stripNegNan(proc("{2.0:acos}")));
 
     EXPECT_EQ(std::to_string(atan(2.0f)), proc("{2:atan}"));
     EXPECT_EQ(std::to_string(atan(2.0f)), proc("{2.0:atan}"));
