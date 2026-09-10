@@ -1,0 +1,6 @@
+# Build + editor + render artifacts (not source)
+build/
+compile_commands.json
+.clangd
+*.ppm
+sphere.png

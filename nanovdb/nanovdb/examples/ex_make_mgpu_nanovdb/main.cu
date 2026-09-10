@@ -1,9 +1,12 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 #include <nanovdb/tools/CreatePrimitives.h>
-#include <nanovdb/cuda/UnifiedBuffer.h>
+#include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/DeviceMesh.h>
+#include <nanovdb/cuda/HandleStorage.h> // for cuda::copyTo
+#include <nanovdb/cuda/ManagedResource.h>
 #include <nanovdb/util/cuda/Timer.h>
+#include <nanovdb/util/cuda/Util.h> // for util::cuda::memAdvise and memPrefetchAsync
 
 #include <cassert>
 #include <cinttypes>
@@ -192,11 +195,16 @@ void testConvolution()
     auto floatHandle = nanovdb::tools::createLevelSetSphere<float>(100, nanovdb::Vec3d(0), 1, 3, nanovdb::Vec3d(0), "test");
     nanovdb::FloatGrid* floatGrid = floatHandle.grid<float>();
 
-    using BufferT = nanovdb::cuda::DeviceBuffer;
-    auto indexHandle = nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, nanovdb::ValueOnIndex, BufferT>(*floatGrid, 0u, false, false, 1);
-    std::for_each(deviceMesh.begin(), deviceMesh.end(), [&](const nanovdb::cuda::DeviceNode& node) {// copy host buffer to all the device buffers
+    // The index grid is read by every device: hold it in one managed allocation and
+    // let read-mostly advice replicate its pages per device on first read, instead of
+    // keeping an explicit copy per device.
+    using GridBufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
+    auto hostIndexHandle = nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, nanovdb::ValueOnIndex>(*floatGrid, 0u, false, false, 1);
+    auto indexHandle = nanovdb::cuda::copyTo<GridBufferT>(hostIndexHandle);
+    cudaCheck(nanovdb::util::cuda::memAdvise(indexHandle.deviceData(), indexHandle.bufferSize(), cudaMemAdviseSetReadMostly, 0));
+    std::for_each(deviceMesh.begin(), deviceMesh.end(), [&](const nanovdb::cuda::DeviceNode& node) {// replicate the grid's pages on every device
         cudaCheck(cudaSetDevice(node.id));
-        indexHandle.deviceUpload(node.id, node.stream, true);
+        cudaCheck(nanovdb::util::cuda::memPrefetchAsync(indexHandle.deviceData(), indexHandle.bufferSize(), node.id, node.stream));
     });
     auto* indexGrid = indexHandle.grid<nanovdb::ValueOnIndex>();
 
@@ -206,8 +214,11 @@ void testConvolution()
     const size_t inputAllocationSize  = valueCount * sizeof(InputBufferType);
     const size_t outputAllocationSize = valueCount * sizeof(OutputBufferType);
 
-    nanovdb::cuda::UnifiedBuffer inputBuffer(inputAllocationSize, 2*inputAllocationSize);// over-allocate
-    nanovdb::cuda::UnifiedBuffer outputBuffer(outputAllocationSize);
+    // Feature values live in managed memory, striped across the devices below by advice
+    // and prefetch; nothing ever grows these, so no capacity is reserved beyond the size.
+    using FeatureBufferT = nanovdb::cuda::Buffer<float, nanovdb::cuda::ManagedResource>;
+    FeatureBufferT inputBuffer(inputAllocationSize / sizeof(float), nanovdb::cuda::noInit);
+    FeatureBufferT outputBuffer(outputAllocationSize / sizeof(float), nanovdb::cuda::noInit);
 
     const size_t deviceValueCount = valueCount / deviceCount;
 
@@ -216,8 +227,8 @@ void testConvolution()
     std::for_each(deviceMesh.begin(), deviceMesh.end(), [&](const nanovdb::cuda::DeviceNode& node) {
         threads.emplace_back([&](int device, cudaStream_t stream) {
             cudaCheck(cudaSetDevice(device));
-            float* inputStripePtr  =  inputBuffer.data<float>(deviceValueCount * Di * device);
-            float* outputStripePtr = outputBuffer.data<float>(deviceValueCount * Do * device);
+            float* inputStripePtr  =  inputBuffer.data() + deviceValueCount * Di * device;
+            float* outputStripePtr = outputBuffer.data() + deviceValueCount * Do * device;
 
             unsigned long long seed = 42u;
             curandGenerator_t rng;
@@ -234,14 +245,17 @@ void testConvolution()
             // If we use managed memory, we need to advise about the usage of the memory range in order to obtain an
             // equivalently optimal paging strategy. cudaMemAdviseSetReadMostly instructs the "paging policy" that data
             // is far more likely to be read than written, cudaMemAdviseSetPreferredLocation suggests the preferred device to place the data on, and cudaMemAdviseSetAccessedBy is a hint about the which devices are accessing the data.
-            const size_t inPageSize  = deviceValueCount * Di * sizeof(float), inPageOffset  =  inPageSize * device;// in bytes
-            const size_t outPageSize = deviceValueCount * Do * sizeof(float), outPageOffset = outPageSize * device;// in bytes
-            inputBuffer.advise(inPageOffset, inPageSize, device, {cudaMemAdviseSetReadMostly, cudaMemAdviseSetPreferredLocation});
-            inputBuffer.prefetch(inPageOffset, inPageSize, device, stream);
-            outputBuffer.advise(outPageOffset, outPageSize, device, cudaMemAdviseSetPreferredLocation);
+            const size_t inPageSize  = deviceValueCount * Di * sizeof(float);// in bytes
+            const size_t outPageSize = deviceValueCount * Do * sizeof(float);// in bytes
+            float* inPage  = inputStripePtr;
+            float* outPage = outputStripePtr;
+            cudaCheck(nanovdb::util::cuda::memAdvise(inPage, inPageSize, cudaMemAdviseSetReadMostly, device));
+            cudaCheck(nanovdb::util::cuda::memAdvise(inPage, inPageSize, cudaMemAdviseSetPreferredLocation, device));
+            cudaCheck(nanovdb::util::cuda::memPrefetchAsync(inPage, inPageSize, device, stream));
+            cudaCheck(nanovdb::util::cuda::memAdvise(outPage, outPageSize, cudaMemAdviseSetPreferredLocation, device));
             std::for_each(deviceMesh.begin(), deviceMesh.end(), [&](const nanovdb::cuda::DeviceNode& otherNode) {
-                inputBuffer.advise(  inPageOffset,  inPageSize, otherNode.id, cudaMemAdviseSetAccessedBy);
-                outputBuffer.advise(outPageOffset, outPageSize, otherNode.id, cudaMemAdviseSetAccessedBy);
+                cudaCheck(nanovdb::util::cuda::memAdvise(inPage, inPageSize, cudaMemAdviseSetAccessedBy, otherNode.id));
+                cudaCheck(nanovdb::util::cuda::memAdvise(outPage, outPageSize, cudaMemAdviseSetAccessedBy, otherNode.id));
             });
         }, node.id, node.stream);
     });
@@ -265,19 +279,19 @@ void testConvolution()
             size_t deviceLeafNodeCount = (leafNodeCount + deviceCount - 1) / deviceCount;
             const size_t deviceLeafNodeOffset = deviceLeafNodeCount * device;
             deviceLeafNodeCount = std::min(deviceLeafNodeCount, leafNodeCount - deviceLeafNodeOffset);
-            auto deviceIndexGrid =  reinterpret_cast<nanovdb::OnIndexGrid*>(indexHandle.deviceData(device));
+            auto deviceIndexGrid =  reinterpret_cast<nanovdb::OnIndexGrid*>(indexHandle.deviceData());
 
             // Run 10 warmup iterations
             float* stencilPtr = (float*)stencilDevicePtr;
             dim3 blockDim(256);
             for (int k = 0; k < 10; ++k) {
                 stencilConvolve_v7<<<deviceLeafNodeCount * 2 * 4 * 4, blockDim, 0, stream>>>(
-                    deviceIndexGrid, deviceLeafNodeOffset, inputBuffer.data<float>(), nullptr, nullptr, stencilPtr, outputBuffer.data<float>(), nullptr);
+                    deviceIndexGrid, deviceLeafNodeOffset, inputBuffer.data(), nullptr, nullptr, stencilPtr, outputBuffer.data(), nullptr);
             }
 
             timers[device]->start();
             stencilConvolve_v7<<<deviceLeafNodeCount * 2 * 4 * 4, blockDim, 0, stream>>>(
-                deviceIndexGrid, deviceLeafNodeOffset, inputBuffer.data<float>(), nullptr, nullptr, stencilPtr, outputBuffer.data<float>(), nullptr);
+                deviceIndexGrid, deviceLeafNodeOffset, inputBuffer.data(), nullptr, nullptr, stencilPtr, outputBuffer.data(), nullptr);
             timers[device]->record();
             cudaCheck(nanovdb::util::cuda::freeAsync(stencilDevicePtr, stream));
             cudaCheck(cudaStreamSynchronize(stream));

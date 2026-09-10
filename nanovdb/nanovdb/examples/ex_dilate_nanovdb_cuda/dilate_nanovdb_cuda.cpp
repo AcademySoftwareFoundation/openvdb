@@ -7,7 +7,7 @@
 
 // the following files are from NanoVDB
 #include <nanovdb/NanoVDB.h>
-#include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/cuda/HandleStorage.h> // host-includable: cuda::copyTo transfers grids without any kernel
 #include <nanovdb/tools/CreateNanoGrid.h>
 
 template<typename BuildT>
@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 
         // Convert to indexGrid (original, un-dilated)
         cpuTimer.start("Converting openVDB input to indexGrid (original version)");
-        auto handleOriginal = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::cuda::DeviceBuffer>(
+        auto handleOriginal = nanovdb::tools::openToIndexVDB<BuildT>(
             grid,
             0u,    // Don't copy data channel
             false, // No stats
@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
 
         // Convert to indexGrid (dilated)
         cpuTimer.start("Converting openVDB input to indexGrid (dilated version)");
-        auto handleDilated = nanovdb::tools::openToIndexVDB<BuildT, nanovdb::cuda::DeviceBuffer>(
+        auto handleDilated = nanovdb::tools::openToIndexVDB<BuildT>(
             grid,
             0u,    // Don't copy data channel
             false, // No stats
@@ -115,10 +115,11 @@ int main(int argc, char *argv[])
         }
 
         // Copy both NanoVDB grids to GPU
-        handleOriginal.deviceUpload();
-        handleDilated.deviceUpload();
-        auto* deviceGridOriginal = handleOriginal.deviceGrid<BuildT>();
-        auto* deviceGridDilated = handleDilated.deviceGrid<BuildT>();
+        // deep-copy both grids to the device; the returned handles validate them there
+        auto deviceHandleOriginal = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handleOriginal);
+        auto deviceHandleDilated = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handleDilated);
+        auto* deviceGridOriginal = deviceHandleOriginal.deviceGrid<BuildT>();
+        auto* deviceGridDilated = deviceHandleDilated.deviceGrid<BuildT>();
         if (!deviceGridOriginal || !deviceGridDilated)
             OPENVDB_THROW(openvdb::RuntimeError, "Failure while uploading indexGrids to GPU");
 

@@ -10,6 +10,7 @@
 #ifndef NANOVDB_CUDA_TEMPPOOL_H_HAS_BEEN_INCLUDED
 #define NANOVDB_CUDA_TEMPPOOL_H_HAS_BEEN_INCLUDED
 
+#include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/DeviceResource.h>
 
 #include <cstddef>
@@ -21,31 +22,33 @@ namespace cuda {
 
 template <class Resource>
 class TempPool {
+    static_assert(is_async_resource<Resource>::value,
+                  "TempPool allocates stream-ordered scratch and requires an AsyncResource");
+    // The buffer borrows the pool's resource through a ResourceRef rather than
+    // copying it, preserving the pool's contract that all traffic reaches the
+    // caller's resource instance (which may be stateful).
+    using BufferT = Buffer<std::byte, ResourceRef<Resource>>;
 public:
 
     /// @brief Default c-tor of an empty memory pool that uses the default
     ///        instance of @c Resource for all allocations.
-    TempPool() : mResource(&default_resource<Resource>()), mData(nullptr), mSize(0), mRequestedSize(0), mStream(nullptr) {}
+    TempPool() : TempPool(default_resource<Resource>()) {}
 
     /// @brief C-tor of an empty memory pool that routes all allocations through
     ///        the supplied @c Resource instance.
     /// @param resource resource instance to allocate from; must outlive this pool.
-    explicit TempPool(Resource& resource) : mResource(&resource), mData(nullptr), mSize(0), mRequestedSize(0), mStream(nullptr) {}
-
-    /// @brief Destructor. Frees the managed memory on the stream of the most
-    ///        recent reallocate(), so the stream-ordered free is ordered after
-    ///        the work that used the memory (rather than on the null stream).
-    ~TempPool() {
-        mRequestedSize = 0;
-        mResource->deallocate_async(mData, mSize, Resource::DEFAULT_ALIGNMENT, mStream);
-        mData = nullptr;
-        mSize = 0;
+    explicit TempPool(Resource& resource)
+        : mResource(&resource)
+        , mBuffer(cudaStream_t{0}, ResourceRef<Resource>(resource), 0, noInit)
+    {
     }
 
     /// @brief Returns a non-const void pointer to the data managed by this instance.
-    void* data() {return mData;}
+    void* data() {return mBuffer.data();}
 
     /// @brief Returns a non-const reference to the actual size of the data managed by this instance.
+    /// @note Returned by reference because cub's two-pass API takes the storage
+    ///       size as a size_t&, so this cannot forward Buffer::size() by value.
     size_t& size() {return mSize;}
 
     /// @brief Returns a non-const reference to the requested size of the data managed by this instance.
@@ -54,25 +57,27 @@ public:
 
     /// @brief Returns the stream that the managed memory was last (re)allocated on,
     ///        i.e. the stream this pool will free on at destruction.
-    cudaStream_t stream() const {return mStream;}
+    cudaStream_t stream() const {return mBuffer.stream();}
 
     /// @brief Re-allocation of the data managed by this instance. Only has affect if the pool in empty or
     ///        the requested memory is larger than the existing size.
     /// @param stream cuda stream used for asynchronous de-allocation and allocation.
+    /// @note Scratch is discarded, never resized: preserving a prefix of
+    ///       temporary storage would be a wasted copy.
     void reallocate(cudaStream_t stream) {
-        if (!mData || mRequestedSize > mSize) {
-            mResource->deallocate_async(mData, mSize, Resource::DEFAULT_ALIGNMENT, stream);
-            mData = mResource->allocate_async(mRequestedSize, Resource::DEFAULT_ALIGNMENT, stream);
-            mSize = mRequestedSize;
+        if (mBuffer.empty() || mRequestedSize > mSize) {
+            mBuffer.destroy(stream);// free the outgrown block on this stream
+            mBuffer = BufferT(stream, ResourceRef<Resource>(*mResource), mRequestedSize, noInit);
+            mSize = mBuffer.size();
+        } else {
+            mBuffer.set_stream(stream);// retained so the d-tor frees on the most-recently-used stream
         }
-        mStream = stream;// retained so the destructor frees on the most-recently-used stream
     }
 private:
-    Resource    *mResource;
-    void        *mData;
-    size_t       mSize;
-    size_t       mRequestedSize;
-    cudaStream_t mStream;
+    Resource *mResource;// non-owning; must outlive this pool and its buffer
+    BufferT   mBuffer;
+    size_t    mSize{0};
+    size_t    mRequestedSize{0};
 };// TempPool<Resource> class
 
 using TempDevicePool = TempPool<DeviceResource>;

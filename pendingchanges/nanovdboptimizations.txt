@@ -1,0 +1,9 @@
+NanoVDB:
+  Improvements:
+  - Parallelized the CUDA GridChecksum CRC32 with a slicing-by-4 table lookup and
+    an associative GF(2) combine (fold operators precomputed on the host); results
+    are bit-identical and measured 17x faster on large grids.
+  - Reworked the CUDA GridStats into cooperative reductions (warp-per-leaf and
+    block-per-internal-node), replacing the one-thread-per-node kernel.
+  - Made the CUDA IndexToGrid node and leaf remapping cooperative and coalesced, so
+    masks and tables are copied by the whole block rather than a single thread.

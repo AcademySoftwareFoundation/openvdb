@@ -82,7 +82,6 @@
 #include "pdal/PipelineManager.hpp"
 #include "pdal/PipelineReaderJSON.hpp"
 #include "pdal/util/FileUtils.hpp"
-#include <sstream>
 #endif
 
 #if defined(_WIN32)

@@ -117,8 +117,28 @@ nanovdb_example(NAME "ex_coarsen_nanovdb_cuda" OPENVDB)
 nanovdb_example(NAME "ex_mesh_to_grid_cuda" OPENVDB)
 
 if(CUDAToolkit_FOUND)
-  nanovdb_example(NAME "ex_make_mgpu_nanovdb") # requires cuRAND
-  target_link_libraries(ex_make_mgpu_nanovdb PRIVATE CUDA::curand)
+  # ex_make_mgpu_nanovdb uses TF32 WMMA which requires SM_80+ (Ampere or newer).
+  # Gate on CMAKE_CUDA_ARCHITECTURES (what the build actually targets) rather than
+  # probing the configure-time machine's GPU: the two can differ (cross-compiling,
+  # building on one machine to run on another, CI runners without a GPU), and
+  # probing via "bash -c nvidia-smi ..." isn't portable to Windows either way.
+  set(_nanovdb_has_sm80 OFF)
+  foreach(_cuda_arch IN LISTS CMAKE_CUDA_ARCHITECTURES)
+    string(REGEX MATCH "^[0-9]+" _cuda_arch_number "${_cuda_arch}")
+    if(_cuda_arch_number GREATER_EQUAL 80)
+      set(_nanovdb_has_sm80 ON)
+    endif()
+  endforeach()
+
+  if(_nanovdb_has_sm80)
+    nanovdb_example(NAME "ex_make_mgpu_nanovdb") # requires cuRAND and SM_80+ (TF32 WMMA)
+    target_link_libraries(ex_make_mgpu_nanovdb PRIVATE CUDA::curand)
+  else()
+    message(STATUS "Skipping ex_make_mgpu_nanovdb: requires CUDA architecture 80 or newer (CMAKE_CUDA_ARCHITECTURES=${CMAKE_CUDA_ARCHITECTURES})")
+  endif()
+  unset(_nanovdb_has_sm80)
+  unset(_cuda_arch_number)
+  unset(_cuda_arch)
 endif()
 
 if(NANOVDB_USE_MAGICAVOXEL)

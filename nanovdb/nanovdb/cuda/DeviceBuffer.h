@@ -8,7 +8,7 @@
 
     \date January 8, 2020
 
-    \brief DeviceBuffer has one pinned host buffer and multiple device CUDA buffers
+    \brief DualDeviceBuffer has one pinned host buffer and multiple device CUDA buffers
 
     \note This file has no device-only kernel functions,
           which explains why it's a .h and not .cuh file.
@@ -26,18 +26,29 @@ namespace nanovdb {// ==========================================================
 
 namespace cuda {// ===================================================================
 
-// ----------------------------> DeviceBuffer <--------------------------------------
+// ----------------------------> DualDeviceBuffer <--------------------------------------
 
 /// @brief Simple memory buffer using un-managed pinned host memory when compiled with NVCC.
 ///        Obviously this class is making explicit used of CUDA so replace it with your own memory
 ///        allocator if you are not using CUDA.
 /// @note  While CUDA's pinned host memory allows for asynchronous memory copy between host and device
 ///        it is significantly slower then cached (un-pinned) memory on the host.
-class DeviceBuffer
+/// @note  This is the implementation behind the deprecated DeviceBuffer alias
+///        below, renamed so the [[deprecated]] attribute reaches only code
+///        that spells the public name: the GPU tools' signature defaults
+///        reference this implementation, so default-using callers stay
+///        warning-free until the defaults change at removal. Transitional --
+///        do not adopt this name; it is deleted together with the alias. The
+///        header keeps its long-standing name and include path for the same
+///        reason: renaming a header breaks existing includes outright, and
+///        the old path is where external code will find the alias and its
+///        migration message.
+class DualDeviceBuffer
 {
     uint64_t mSize; // total number of bytes managed by this buffer (assumed to be identical for host and device)
     void *mCpuData, **mGpuData; // raw pointers to the host and device buffers
     int   mDeviceCount, mManaged;// if mManaged is non-zero this class is responsible for allocating and freeing memory buffers. Otherwise this is assumed to be handled externally
+    cudaEvent_t *mEvents = nullptr;// per-device event marking the last use of each managed device buffer (parallel to mGpuData, length mDeviceCount). Every use waits on this event before issuing work and re-records it afterwards, so the single event transitively covers EVERY stream the buffer has been used on. Frees then wait on it, which orders them after all outstanding work: freeing on the default stream alone is only safe for blocking streams, and freeing on the last-used stream alone is only safe when just one stream was used.
 
     /// @brief Initialize buffer
     /// @param size byte size of buffer to be initialized
@@ -46,18 +57,45 @@ class DeviceBuffer
     /// @warning size is expected to be non-zero. Use clear() clear buffer!
     void init(uint64_t size, int device, cudaStream_t stream);
 
+    /// @brief Free every managed device allocation, each ordered after all tracked uses of the
+    ///        buffer, and destroy the tracking events.
+    /// @param stream Stream the frees are issued on for allocations owned by the CURRENT device.
+    ///        A stream belongs to a single device, so it cannot carry frees for other devices'
+    ///        memory pools; allocations on other devices are freed on their own device's default
+    ///        stream, after switching to that device.
+    /// @note Destroying an event with a pending wait is safe: CUDA releases it once the device
+    ///       has completed it.
+    void freeDualDeviceBuffers(cudaStream_t stream)
+    {
+        int current = 0;
+        cudaCheck(cudaGetDevice(&current));
+        for (int i = 0; i < mDeviceCount; ++i) {
+            if (mGpuData[i]) {
+                const cudaStream_t freeStream = (i == current) ? stream : cudaStream_t{0};
+                if (i != current) cudaCheck(cudaSetDevice(i));
+                this->orderAfterPriorUses(i, freeStream);
+                cudaCheck(util::cuda::freeAsync(mGpuData[i], freeStream));
+                if (i != current) cudaCheck(cudaSetDevice(current));
+            }
+            if (mEvents && mEvents[i]) {
+                cudaCheck(cudaEventDestroy(mEvents[i]));
+                mEvents[i] = nullptr;
+            }
+        }
+    }
+
 public:
 
-    using PtrT = std::shared_ptr<DeviceBuffer>;
+    using PtrT = std::shared_ptr<DualDeviceBuffer>;
 
     /// @brief Default constructor of an empty buffer
-    DeviceBuffer() : mSize(0), mCpuData(nullptr), mGpuData(nullptr), mDeviceCount(0), mManaged(0){}
+    DualDeviceBuffer() : mSize(0), mCpuData(nullptr), mGpuData(nullptr), mDeviceCount(0), mManaged(0){}
 
     /// @brief Constructor with a specified device and size
     /// @param size byte size of buffer to be initialized
     /// @param device id of the device on which to initialize the buffer
     /// @param stream cuda stream
-    DeviceBuffer(uint64_t size, int device = cudaCpuDeviceId, cudaStream_t stream = 0) : DeviceBuffer()
+    DualDeviceBuffer(uint64_t size, int device = cudaCpuDeviceId, cudaStream_t stream = 0) : DualDeviceBuffer()
     {
         this->init(size, device, stream);
     }
@@ -66,7 +104,7 @@ public:
     /// @param size byte size of buffer to be initialized
     /// @param host If true buffer is initialized only on the host/CPU, else on the current device/GPU
     /// @param stream optional stream argument (defaults to stream NULL)
-    DeviceBuffer(uint64_t size, bool host, void* stream) : DeviceBuffer()
+    DualDeviceBuffer(uint64_t size, bool host, void* stream) : DualDeviceBuffer()
     {
         int device = cudaCpuDeviceId;
         if (!host) cudaCheck(cudaGetDevice(&device));
@@ -79,7 +117,7 @@ public:
     /// @param gpuData device buffer, assumed to NOT be NULL;
     /// @note The device buffer, @c gpuData, will be associated
     ///       with the current device ID given by cudaGetDevice
-    DeviceBuffer(uint64_t size, void* cpuData, void* gpuData)
+    DualDeviceBuffer(uint64_t size, void* cpuData, void* gpuData)
         : mSize(size)
         , mCpuData(cpuData)
         , mManaged(0)
@@ -97,7 +135,7 @@ public:
     /// @param size byte size of the two external buffers
     /// @param cpuData host buffer, assumed to NOT be NULL
     /// @param list list of device IDs and external device buffers, all assumed to not be NULL
-    DeviceBuffer(uint64_t size, void* cpuData, std::initializer_list<std::pair<int,void*>> list)
+    DualDeviceBuffer(uint64_t size, void* cpuData, std::initializer_list<std::pair<int,void*>> list)
         : mSize(size)
         , mCpuData(cpuData)
         , mManaged(0)
@@ -113,17 +151,19 @@ public:
     }
 
     /// @brief Disallow copy-construction
-    DeviceBuffer(const DeviceBuffer&) = delete;
+    DualDeviceBuffer(const DualDeviceBuffer&) = delete;
 
     /// @brief Move copy-constructor
-    DeviceBuffer(DeviceBuffer&& other) noexcept
+    DualDeviceBuffer(DualDeviceBuffer&& other) noexcept
         : mSize(other.mSize)
         , mCpuData(other.mCpuData)
         , mGpuData(other.mGpuData)
         , mDeviceCount(other.mDeviceCount)
         , mManaged(other.mManaged)
+        , mEvents(other.mEvents)
     {
         other.mCpuData = other.mGpuData = nullptr;
+        other.mEvents = nullptr;
         other.mSize = other.mDeviceCount = other.mManaged = 0;
     }
 
@@ -131,8 +171,8 @@ public:
     /// @param buffer host buffer from which to copy data
     /// @param device id of the device on which to initialize the buffer
     /// @param stream cuda stream
-    DeviceBuffer(const HostBuffer& buffer, int device = cudaCpuDeviceId, cudaStream_t stream = 0)
-        : DeviceBuffer(buffer.size(), device, stream)
+    DualDeviceBuffer(const HostBuffer& buffer, int device = cudaCpuDeviceId, cudaStream_t stream = 0)
+        : DualDeviceBuffer(buffer.size(), device, stream)
     {
         if (mCpuData) {
             cudaCheck(cudaMemcpy(mCpuData, buffer.data(), mSize, cudaMemcpyHostToHost));
@@ -142,7 +182,9 @@ public:
     }
 
      /// @brief Destructor frees memory on both the host and device
-    ~DeviceBuffer() { this->clear(); };
+    /// @note Each managed device free waits on that device's tracking event first, so it is
+    ///       ordered after every stream the buffer was used on, not just the most recent one.
+    ~DualDeviceBuffer() { this->clear(); };
 
     /// @brief Static factory method that return an instance of this buffer
     /// @param size byte size of buffer to be initialized
@@ -150,51 +192,51 @@ public:
     /// @param host If true buffer is initialized only on the host/CPU, else only on the device/GPU
     /// @param stream optional stream argument (defaults to stream NULL)
     /// @return An instance of this class using move semantics
-    static DeviceBuffer create(uint64_t size, const DeviceBuffer* dummy, bool host, void* stream){return DeviceBuffer(size, host, stream);}
+    static DualDeviceBuffer create(uint64_t size, const DualDeviceBuffer* dummy, bool host, void* stream){return DualDeviceBuffer(size, host, stream);}
 
     /// @brief Static factory method that returns an instance of this buffer
     /// @param size byte size of buffer to be initialized
     /// @param dummy this argument is currently ignored but required to match the API of the HostBuffer
     /// @param device id of the device on which to initialize the buffer
     /// @param stream cuda stream
-    static DeviceBuffer create(uint64_t size, const DeviceBuffer* dummy = nullptr, int device = cudaCpuDeviceId, cudaStream_t stream = 0){return DeviceBuffer(size, device, stream);}
+    static DualDeviceBuffer create(uint64_t size, const DualDeviceBuffer* dummy = nullptr, int device = cudaCpuDeviceId, cudaStream_t stream = 0){return DualDeviceBuffer(size, device, stream);}
 
     /// @brief Static factory method that returns an instance of this buffer that wraps externally managed memory
     /// @param size byte size of buffer specified by external memory
     /// @param cpuData pointer to externally managed host memory
     /// @param gpuData pointer to externally managed device memory
     /// @return An instance of this class using move semantics
-    static DeviceBuffer create(uint64_t size, void* cpuData, void* gpuData) {return DeviceBuffer(size, cpuData, gpuData);}
+    static DualDeviceBuffer create(uint64_t size, void* cpuData, void* gpuData) {return DualDeviceBuffer(size, cpuData, gpuData);}
 
     /// @brief  Static factory method that returns an instance of this buffer that wraps externally managed host and device memory
     /// @param size byte size of buffer to be initialized
     /// @param cpuData  pointer to externally managed host memory
     /// @param list list of device IDs and device memory pointers
-    static DeviceBuffer create(uint64_t size, void* cpuData, std::initializer_list<std::pair<int,void*>> list) {return DeviceBuffer(size, cpuData, list);}
+    static DualDeviceBuffer create(uint64_t size, void* cpuData, std::initializer_list<std::pair<int,void*>> list) {return DualDeviceBuffer(size, cpuData, list);}
 
     /// @brief Static factory method that returns an instance of this buffer constructed from a HostBuffer
     /// @param buffer host buffer from which to copy data
     /// @param device id of the device on which to initialize the buffer
     /// @param stream cuda stream
-    static DeviceBuffer create(const HostBuffer& buffer, int device = cudaCpuDeviceId, cudaStream_t stream = 0) {return DeviceBuffer(buffer, device, stream);}
+    static DualDeviceBuffer create(const HostBuffer& buffer, int device = cudaCpuDeviceId, cudaStream_t stream = 0) {return DualDeviceBuffer(buffer, device, stream);}
 
     ///////////////////////////////////////////////////////////////////////
 
     /// @{
-    /// @brief Factory methods that create a shared pointer to an DeviceBuffer instance
-    static PtrT createPtr(uint64_t size, const DeviceBuffer* = nullptr, int device = cudaCpuDeviceId, cudaStream_t stream = 0) {return std::make_shared<DeviceBuffer>(size, device, stream);}
-    static PtrT createPtr(uint64_t size, void* cpuData, void* gpuData) {return std::make_shared<DeviceBuffer>(size, cpuData, gpuData);}
-    static PtrT createPtr(uint64_t size, void* cpuData, std::initializer_list<std::pair<int,void*>> list) {return std::make_shared<DeviceBuffer>(size, cpuData, list);}
-    static PtrT createPtr(const HostBuffer& buffer, int device = cudaCpuDeviceId, cudaStream_t stream = 0) {return std::make_shared<DeviceBuffer>(buffer, device, stream);}
+    /// @brief Factory methods that create a shared pointer to an DualDeviceBuffer instance
+    static PtrT createPtr(uint64_t size, const DualDeviceBuffer* = nullptr, int device = cudaCpuDeviceId, cudaStream_t stream = 0) {return std::make_shared<DualDeviceBuffer>(size, device, stream);}
+    static PtrT createPtr(uint64_t size, void* cpuData, void* gpuData) {return std::make_shared<DualDeviceBuffer>(size, cpuData, gpuData);}
+    static PtrT createPtr(uint64_t size, void* cpuData, std::initializer_list<std::pair<int,void*>> list) {return std::make_shared<DualDeviceBuffer>(size, cpuData, list);}
+    static PtrT createPtr(const HostBuffer& buffer, int device = cudaCpuDeviceId, cudaStream_t stream = 0) {return std::make_shared<DualDeviceBuffer>(buffer, device, stream);}
     /// @}
 
     ///////////////////////////////////////////////////////////////////////
 
     /// @brief Disallow copy assignment operation
-    DeviceBuffer& operator=(const DeviceBuffer&) = delete;
+    DualDeviceBuffer& operator=(const DualDeviceBuffer&) = delete;
 
     /// @brief Move copy assignment operation
-    DeviceBuffer& operator=(DeviceBuffer&& other) noexcept;
+    DualDeviceBuffer& operator=(DualDeviceBuffer&& other) noexcept;
 
     ///////////////////////////////////////////////////////////////////////
 
@@ -226,8 +268,59 @@ public:
 
     ///////////////////////////////////////////////////////////////////////
 
+    /// @brief Order work subsequently issued on @a stream after every prior use of this
+    ///        device buffer, whichever stream those uses were issued on. The consume-side
+    ///        companion of recordUse: an external consumer (e.g. a zero-copy array-interface
+    ///        export) calls this with its own stream before reading, so it cannot observe a
+    ///        partially-written buffer after asynchronous uploads or recorded kernels.
+    /// @param device Device whose buffer is about to be read
+    /// @param stream Stream the consumer's work will be issued on
+    void orderAfterPriorUses(int device, cudaStream_t stream) const
+    {
+        if (mEvents && mEvents[device]) cudaCheck(cudaStreamWaitEvent(stream, mEvents[device], 0));
+    }
+
+    /// @brief Record that this buffer's device data was just used on @a stream, so that the
+    ///        buffer's device frees (destructor, move-assignment, clear) are ordered after that
+    ///        work. Uses issued through deviceUpload/deviceDownload are recorded automatically;
+    ///        callers that enqueue their own kernels or copies against the raw pointer returned
+    ///        by deviceData() should call this afterwards. Without it, such work is only safe if
+    ///        it is on a blocking stream (which the free, issued on the default stream, waits on
+    ///        implicitly) or if the caller synchronizes before the buffer is cleared/destroyed.
+    /// @param device Device whose buffer was used
+    /// @param stream Stream the work was issued on
+    /// @note Recording chains across streams: @a stream is first ordered after the previously
+    ///       recorded use (if any) so the single per-device event transitively covers every
+    ///       recorded use, not just the last one. Without this, concurrent uses on streams A
+    ///       then B would leave only B's event, and the device free could run while A's work
+    ///       is still in flight. The side effect is that work subsequently issued on @a stream
+    ///       also waits on the previously recorded use -- acceptable for a shared buffer, where
+    ///       later-recorded consumers observing earlier writes is the expected ordering. Note
+    ///       this also serializes CONCURRENT READERS that record uses (the single event cannot
+    ///       distinguish read-read from write-read); if that ever matters in a profile, the
+    ///       upgrade path is a read/write-separated or per-record event scheme, not a revert.
+    void recordUse(int device, cudaStream_t stream)
+    {
+        if (!mEvents) return;
+        if (mEvents[device] == nullptr) {// events are per-device, so create it on the right one
+            int current = 0;
+            cudaCheck(cudaGetDevice(&current));
+            if (current != device) cudaCheck(cudaSetDevice(device));
+            cudaCheck(cudaEventCreateWithFlags(&mEvents[device], cudaEventDisableTiming));
+            if (current != device) cudaCheck(cudaSetDevice(current));
+        } else {
+            // Re-recording MOVES the event; chain first so the new capture also covers the
+            // prior recorded use (waiting on a never-recorded or completed event is a no-op).
+            cudaCheck(cudaStreamWaitEvent(stream, mEvents[device], 0));
+        }
+        cudaCheck(cudaEventRecord(mEvents[device], stream));
+    }
+
     /// @brief Retuns a raw pointer to the specified device/GPU buffer managed by this allocator.
     /// @warning Note that the pointer can be NULL!
+    /// @note Work enqueued against this raw pointer is invisible to the buffer's lifetime
+    ///       tracking: on a non-blocking stream, call recordUse afterwards (or synchronize
+    ///       before the buffer is cleared/destroyed) so the device free is ordered after it.
     void* deviceData(int device) const {
         NANOVDB_ASSERT(device >= 0 && device < mDeviceCount);
         return mGpuData[device];
@@ -301,110 +394,140 @@ public:
     /// @}
 
     /// @brief De-allocate all memory managed by this allocator and set all pointers to NULL
+    /// @param stream Stream the device frees are issued on. The frees are additionally ordered
+    ///        after every stream the buffer was used on (via the per-device tracking event), so
+    ///        @a stream selects where the free is enqueued, not what it is ordered against - any
+    ///        stream is safe to pass here regardless of where the buffer was used.
     void clear(cudaStream_t stream = 0);
     void clear(void* stream){this->clear(cudaStream_t(stream));}
 
-}; // DeviceBuffer class
+}; // DualDeviceBuffer class
+
+/// @brief The dual-space device buffer under its long-standing public name.
+/// @deprecated Grid storage is moving to the single-space cuda::Buffer:
+///             build or read into a host handle and move it with
+///             cuda::copyTo (see cuda/HandleStorage.h), or allocate the
+///             result of a GPU tool directly in a cuda::Buffer. Transfers
+///             adopt the source handle's already-validated metadata -- no
+///             kernel runs -- so copyTo is callable from host-only
+///             translation units directly (see the CUDA examples). The
+///             dual buffer and this name are removed together after a
+///             deprecation window.
+using DeviceBuffer [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: build into a host handle and use cuda::copyTo (cuda/HandleStorage.h, host-callable); see the CUDA examples")]] = DualDeviceBuffer;
 
 // --------------------------> Implementations below <------------------------------------
 
-inline DeviceBuffer& DeviceBuffer::operator=(DeviceBuffer&& other) noexcept
+inline DualDeviceBuffer& DualDeviceBuffer::operator=(DualDeviceBuffer&& other) noexcept
 {
-    if (mManaged) {// first free all the managed data buffers
+    if (this == &other) return *this;// self-move would free our buffers and then read them back
+    if (mManaged) {// first free all the managed data buffers, ordered after every use of each
         cudaCheck(cudaFreeHost(mCpuData));
-        for (int i=0; i<mDeviceCount; ++i) cudaCheck(util::cuda::freeAsync(mGpuData[i], 0));
+        this->freeDualDeviceBuffers(cudaStream_t{0});
     }
     delete [] mGpuData;
+    delete [] mEvents;
     mSize    = other.mSize;
     mCpuData = other.mCpuData;
     mGpuData = other.mGpuData;
     mDeviceCount = other.mDeviceCount;
     mManaged = other.mManaged;
+    mEvents = other.mEvents;
     other.mCpuData = nullptr;
     other.mGpuData = nullptr;
+    other.mEvents = nullptr;
     other.mSize = 0;
     other.mDeviceCount = 0;
     other.mManaged = 0;
     return *this;
 }
 
-inline void DeviceBuffer::init(uint64_t size, int device, cudaStream_t stream)
+inline void DualDeviceBuffer::init(uint64_t size, int device, cudaStream_t stream)
 {
     if (size==0) return;
     cudaCheck(cudaGetDeviceCount(&mDeviceCount));
     mGpuData = new void*[mDeviceCount]();// NULL initialization
+    mEvents = new cudaEvent_t[mDeviceCount]();// NULL initialization; created lazily on first use
     NANOVDB_ASSERT(device >= cudaCpuDeviceId && device < mDeviceCount);
     if (device == cudaCpuDeviceId) {
         cudaCheck(cudaMallocHost((void**)&mCpuData, size)); // un-managed pinned memory on the host (can be slow to access!). Always 32B aligned
-        checkPtr(mCpuData, "cuda::DeviceBuffer::init: failed to allocate host buffer");
+        checkPtr(mCpuData, "cuda::DualDeviceBuffer::init: failed to allocate host buffer");
     } else {
         cudaCheck(util::cuda::mallocAsync(mGpuData+device, size, stream)); // un-managed memory on the device, always 32B aligned!
-        checkPtr(mGpuData[device], "cuda::DeviceBuffer::init: failed to allocate device buffer");
+        checkPtr(mGpuData[device], "cuda::DualDeviceBuffer::init: failed to allocate device buffer");
+        this->recordUse(device, stream);// the free must be ordered after this allocation
     }
     mSize = size;
     mManaged = 1;// i.e. this instance is responsible for allocating and delete memory
-} // DeviceBuffer::init
+} // DualDeviceBuffer::init
 
-inline void DeviceBuffer::deviceUpload(int device, cudaStream_t stream, bool sync)
+inline void DualDeviceBuffer::deviceUpload(int device, cudaStream_t stream, bool sync)
 {
     NANOVDB_ASSERT(device >= 0 && device < mDeviceCount);// should be device and not the host
     checkPtr(mCpuData, "uninitialized cpu source data");
     if (mGpuData[device] == nullptr) {
-        if (mManaged==0) throw std::runtime_error("DeviceBuffer::deviceUpload called on externally managed memory that wasn\'t allocated.");
+        if (mManaged==0) throw std::runtime_error("DualDeviceBuffer::deviceUpload called on externally managed memory that wasn\'t allocated.");
         cudaCheck(util::cuda::mallocAsync(mGpuData+device, mSize, stream)); // un-managed memory on the device, always 32B aligned!
     }
     checkPtr(mGpuData[device], "uninitialized gpu destination data");
+    // Order this transfer after any use of the buffer on another stream, then mark it as the
+    // latest use, so the tracking event keeps covering every stream the buffer has seen.
+    this->orderAfterPriorUses(device, stream);
     cudaCheck(cudaMemcpyAsync(mGpuData[device], mCpuData, mSize, cudaMemcpyHostToDevice, stream));
+    this->recordUse(device, stream);
     if (sync) cudaCheck(cudaStreamSynchronize(stream));
-} // DeviceBuffer::deviceUpload
+} // DualDeviceBuffer::deviceUpload
 
-inline void DeviceBuffer::deviceUpload(cudaStream_t stream, bool sync)
+inline void DualDeviceBuffer::deviceUpload(cudaStream_t stream, bool sync)
 {
     int device = 0;
     cudaGetDevice(&device);
     this->deviceUpload(device, stream, sync);
-} // DeviceBuffer::deviceUpload
+} // DualDeviceBuffer::deviceUpload
 
-inline void DeviceBuffer::deviceDownload(int device, cudaStream_t stream, bool sync)
+inline void DualDeviceBuffer::deviceDownload(int device, cudaStream_t stream, bool sync)
 {
     NANOVDB_ASSERT(device >= 0 && device < mDeviceCount);
     checkPtr(mGpuData[device], "uninitialized gpu source data");// no source data on the specified device
     if (mCpuData == nullptr) {
-        if (mManaged==0) throw std::runtime_error("DeviceBuffer::deviceDownload called on uninitialized cpu destination memory that is externally managed.");
+        if (mManaged==0) throw std::runtime_error("DualDeviceBuffer::deviceDownload called on uninitialized cpu destination memory that is externally managed.");
         cudaCheck(cudaMallocHost((void**)&mCpuData, mSize)); // un-managed pinned memory on the host (can be slow to access!). Always 32B aligned
     }
     checkPtr(mCpuData, "uninitialized cpu destination data");
+    this->orderAfterPriorUses(device, stream);
     cudaCheck(cudaMemcpyAsync(mCpuData, mGpuData[device], mSize, cudaMemcpyDeviceToHost, stream));
+    this->recordUse(device, stream);
     if (sync) cudaCheck(cudaStreamSynchronize(stream));
-} // DeviceBuffer::deviceDownload
+} // DualDeviceBuffer::deviceDownload
 
-inline void DeviceBuffer::deviceDownload(void* stream, bool sync)
+inline void DualDeviceBuffer::deviceDownload(void* stream, bool sync)
 {
     int device = 0;
     cudaCheck(cudaGetDevice(&device));
     this->deviceDownload(device, cudaStream_t(stream), sync);
-} // DeviceBuffer::deviceDownload
+} // DualDeviceBuffer::deviceDownload
 
-inline void DeviceBuffer::clear(cudaStream_t stream)
+inline void DualDeviceBuffer::clear(cudaStream_t stream)
 {
-    if (mManaged) {// free all the managed data buffers
+    if (mManaged) {// free all the managed data buffers, ordered after every use of each
         cudaCheck(cudaFreeHost(mCpuData));
-        for (int i=0; i<mDeviceCount; ++i) cudaCheck(util::cuda::freeAsync(mGpuData[i], stream));
+        this->freeDualDeviceBuffers(stream);
     }
     delete [] mGpuData;
+    delete [] mEvents;
     mCpuData = nullptr;
     mGpuData = nullptr;
+    mEvents = nullptr;
     mSize = 0;
     mDeviceCount = 0;
     mManaged = 0;
-} // DeviceBuffer::clear
+} // DualDeviceBuffer::clear
 
 }// namespace cuda
 
-using CudaDeviceBuffer [[deprecated("Use nanovdb::cuda::DeviceBuffer instead")]] = cuda::DeviceBuffer;
+using CudaDeviceBuffer [[deprecated("Use GridHandle<cuda::Buffer<std::byte>> with cuda::copyTo instead")]] = cuda::DualDeviceBuffer;
 
 template<>
-struct BufferTraits<cuda::DeviceBuffer>
+struct BufferTraits<cuda::DualDeviceBuffer>
 {
     static constexpr bool hasDeviceDual = true;
 };

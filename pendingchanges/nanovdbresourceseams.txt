@@ -1,0 +1,4 @@
+NanoVDB:
+
+  Improvements:
+  - The five tools::cuda::TopologyBuilder consumers -- DilateGrid, MergeGrids, PruneGrid, RefineGrid and CoarsenGrid -- gained a ResourceT template parameter (defaulted to nanovdb::cuda::DeviceResource, so existing code is unaffected) and a trailing defaulted resource constructor argument, forwarded to their TopologyBuilder. This routes each operator's stream-ordered device scratch through an injected memory resource, mirroring the seam added to PointsToGrid and MeshToGrid (openvdb #2232, B5). The grid handle's output buffer and the dual-space mProcessedRoot / builder mData buffers still allocate through DeviceBuffer and are left for a later step.
