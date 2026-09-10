@@ -208,6 +208,8 @@ TEST_F(TestMultiResGrid, testIO)
 {
     using namespace openvdb;
 
+    openvdb::initialize();
+
     const float radius = 1.0f;
     const Vec3f center(0.0f, 0.0f, 0.0f);
     const float voxelSize = 0.01f;
@@ -243,7 +245,6 @@ TEST_F(TestMultiResGrid, testIO)
     outputFile.close();
 
     // Read grids
-    openvdb::initialize();
     openvdb::io::File file( filename );
     file.open();
     GridPtrVecPtr grids = file.getGrids();
@@ -280,7 +281,7 @@ TEST_F(TestMultiResGrid, testModels)
             << "\" =====================" << std::endl;
         std::cerr << "Reading \"" << filenames[i] << "\" ...";
         io::File file( path + filenames[i] );
-        file.open(false);//disable delayed loading
+        file.open();
         FloatGrid::Ptr model = gridPtrCast<FloatGrid>(file.getGrids()->at(0));
         std::cerr << " done\nProcessing \"" << filenames[i] << "\" ...";
         timer.start("\nMultiResGrid processing");

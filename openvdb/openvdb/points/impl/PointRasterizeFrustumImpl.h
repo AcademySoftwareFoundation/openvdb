@@ -948,7 +948,7 @@ public:
         // generate leaf offsets (if necessary)
         if (mLeafOffsets.empty()) {
             openvdb::points::pointOffsets(mLeafOffsets, mGrid->constTree(), resolvedFilter,
-                /*inCoreOnly=*/false, mSettings.threaded);
+                mSettings.threaded);
         }
 
         // set streaming arbitrary attribute array flags

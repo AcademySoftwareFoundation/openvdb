@@ -133,15 +133,13 @@ struct ConvertPointDataGridPositionOp {
                                     const Index64 startOffset,
                                     const math::Transform& transform,
                                     const size_t index,
-                                    const FilterT& filter,
-                                    const bool inCoreOnly)
+                                    const FilterT& filter)
         : mAttribute(attribute)
         , mPointOffsets(pointOffsets)
         , mStartOffset(startOffset)
         , mTransform(transform)
         , mIndex(index)
         , mFilter(filter)
-        , mInCoreOnly(inCoreOnly)
     {
         // only accept Vec3f as ValueType
         static_assert(VecTraits<ValueType>::Size == 3 &&
@@ -169,8 +167,6 @@ struct ConvertPointDataGridPositionOp {
 
             OPENVDB_ASSERT(leaf.pos() < mPointOffsets.size());
 
-            if (mInCoreOnly && leaf->buffer().isOutOfCore())    continue;
-
             Index64 offset = mStartOffset;
 
             if (leaf.pos() > 0) offset += mPointOffsets[leaf.pos() - 1];
@@ -196,7 +192,6 @@ struct ConvertPointDataGridPositionOp {
     const math::Transform&                  mTransform;
     const size_t                            mIndex;
     const FilterT&                          mFilter;
-    const bool                              mInCoreOnly;
 }; // ConvertPointDataGridPositionOp
 
 
@@ -215,15 +210,13 @@ struct ConvertPointDataGridAttributeOp {
                                     const Index64 startOffset,
                                     const size_t index,
                                     const Index stride,
-                                    const FilterT& filter,
-                                    const bool inCoreOnly)
+                                    const FilterT& filter)
         : mAttribute(attribute)
         , mPointOffsets(pointOffsets)
         , mStartOffset(startOffset)
         , mIndex(index)
         , mStride(stride)
-        , mFilter(filter)
-        , mInCoreOnly(inCoreOnly) { }
+        , mFilter(filter) { }
 
     template <typename IterT>
     void convert(IterT& iter, HandleT& targetHandle,
@@ -257,8 +250,6 @@ struct ConvertPointDataGridAttributeOp {
 
             OPENVDB_ASSERT(leaf.pos() < mPointOffsets.size());
 
-            if (mInCoreOnly && leaf->buffer().isOutOfCore())    continue;
-
             Index64 offset = mStartOffset;
 
             if (leaf.pos() > 0) offset += mPointOffsets[leaf.pos() - 1];
@@ -284,7 +275,6 @@ struct ConvertPointDataGridAttributeOp {
     const size_t                            mIndex;
     const Index                             mStride;
     const FilterT&                          mFilter;
-    const bool                              mInCoreOnly;
 }; // ConvertPointDataGridAttributeOp
 
 template<typename PointDataTreeType, typename Group, typename FilterT>
@@ -299,14 +289,12 @@ struct ConvertPointDataGridGroupOp {
                                 const std::vector<Index64>& pointOffsets,
                                 const Index64 startOffset,
                                 const AttributeSet::Descriptor::GroupIndex index,
-                                const FilterT& filter,
-                                const bool inCoreOnly)
+                                const FilterT& filter)
         : mGroup(group)
         , mPointOffsets(pointOffsets)
         , mStartOffset(startOffset)
         , mIndex(index)
-        , mFilter(filter)
-        , mInCoreOnly(inCoreOnly) { }
+        , mFilter(filter) { }
 
     template <typename IterT>
     void convert(IterT& iter, const GroupAttributeArray& groupArray, Index64& offset) const
@@ -337,8 +325,6 @@ struct ConvertPointDataGridGroupOp {
 
             OPENVDB_ASSERT(leaf.pos() < mPointOffsets.size());
 
-            if (mInCoreOnly && leaf->buffer().isOutOfCore())    continue;
-
             Index64 offset = mStartOffset;
 
             if (leaf.pos() > 0)     offset += mPointOffsets[leaf.pos() - 1];
@@ -365,7 +351,6 @@ struct ConvertPointDataGridGroupOp {
     const Index64                           mStartOffset;
     const GroupIndex                        mIndex;
     const FilterT&                          mFilter;
-    const bool                              mInCoreOnly;
 }; // ConvertPointDataGridGroupOp
 
 template<typename PositionArrayT, typename VecT = Vec3R>
@@ -582,8 +567,7 @@ convertPointDataGridPosition(   PositionAttribute& positionAttribute,
                                 const PointDataGridT& grid,
                                 const std::vector<Index64>& pointOffsets,
                                 const Index64 startOffset,
-                                const FilterT& filter,
-                                const bool inCoreOnly)
+                                const FilterT& filter)
 {
     using TreeType      = typename PointDataGridT::TreeType;
     using LeafManagerT  = typename tree::LeafManager<const TreeType>;
@@ -601,9 +585,23 @@ convertPointDataGridPosition(   PositionAttribute& positionAttribute,
     LeafManagerT leafManager(tree);
     ConvertPointDataGridPositionOp<TreeType, PositionAttribute, FilterT> convert(
                     positionAttribute, pointOffsets, startOffset, grid.transform(), positionIndex,
-                    filter, inCoreOnly);
+                    filter);
     tbb::parallel_for(leafManager.leafRange(), convert);
     positionAttribute.compact();
+}
+
+
+template <typename PositionAttribute, typename PointDataGridT, typename FilterT>
+OPENVDB_DEPRECATED_MESSAGE("Use convertPointDataGridPosition() without inCoreOnly parameter instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+void
+convertPointDataGridPosition(   PositionAttribute& positionAttribute,
+                                const PointDataGridT& grid,
+                                const std::vector<Index64>& pointOffsets,
+                                const Index64 startOffset,
+                                const FilterT& filter,
+                                const bool /*inCoreOnly*/)
+{
+    convertPointDataGridPosition(positionAttribute, grid, pointOffsets, startOffset, filter);
 }
 
 
@@ -618,8 +616,7 @@ convertPointDataGridAttribute(  TypedAttribute& attribute,
                                 const Index64 startOffset,
                                 const unsigned arrayIndex,
                                 const Index stride,
-                                const FilterT& filter,
-                                const bool inCoreOnly)
+                                const FilterT& filter)
 {
     using LeafManagerT = typename tree::LeafManager<const PointDataTreeT>;
 
@@ -633,9 +630,25 @@ convertPointDataGridAttribute(  TypedAttribute& attribute,
     LeafManagerT leafManager(tree);
     ConvertPointDataGridAttributeOp<PointDataTreeT, TypedAttribute, FilterT> convert(
                         attribute, pointOffsets, startOffset, arrayIndex, stride,
-                        filter, inCoreOnly);
+                        filter);
         tbb::parallel_for(leafManager.leafRange(), convert);
     attribute.compact();
+}
+
+
+template <typename TypedAttribute, typename PointDataTreeT, typename FilterT>
+OPENVDB_DEPRECATED_MESSAGE("Use convertPointDataGridAttribute() without inCoreOnly parameter instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+void
+convertPointDataGridAttribute(  TypedAttribute& attribute,
+                                const PointDataTreeT& tree,
+                                const std::vector<Index64>& pointOffsets,
+                                const Index64 startOffset,
+                                const unsigned arrayIndex,
+                                const Index stride,
+                                const FilterT& filter,
+                                const bool /*inCoreOnly*/)
+{
+    convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, arrayIndex, stride, filter);
 }
 
 
@@ -649,8 +662,7 @@ convertPointDataGridGroup(  Group& group,
                             const std::vector<Index64>& pointOffsets,
                             const Index64 startOffset,
                             const AttributeSet::Descriptor::GroupIndex index,
-                            const FilterT& filter,
-                            const bool inCoreOnly)
+                            const FilterT& filter)
 {
     using LeafManagerT= typename tree::LeafManager<const PointDataTreeT>;
 
@@ -662,13 +674,29 @@ convertPointDataGridGroup(  Group& group,
     LeafManagerT leafManager(tree);
     ConvertPointDataGridGroupOp<PointDataTreeT, Group, FilterT> convert(
                     group, pointOffsets, startOffset, index,
-                    filter, inCoreOnly);
+                    filter);
     tbb::parallel_for(leafManager.leafRange(), convert);
 
     // must call this after modifying point groups in parallel
 
     group.finalize();
 }
+
+
+template <typename Group, typename PointDataTreeT, typename FilterT>
+OPENVDB_DEPRECATED_MESSAGE("Use convertPointDataGridGroup() without inCoreOnly parameter instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+void
+convertPointDataGridGroup(  Group& group,
+                            const PointDataTreeT& tree,
+                            const std::vector<Index64>& pointOffsets,
+                            const Index64 startOffset,
+                            const AttributeSet::Descriptor::GroupIndex index,
+                            const FilterT& filter,
+                            const bool /*inCoreOnly*/)
+{
+    convertPointDataGridGroup(group, tree, pointOffsets, startOffset, index, filter);
+}
+
 
 template<typename PositionWrapper, typename InterrupterT, typename VecT>
 inline float

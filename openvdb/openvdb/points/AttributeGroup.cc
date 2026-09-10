@@ -23,10 +23,6 @@ GroupHandle::GroupHandle(const GroupAttributeArray& array, const GroupType& offs
         , mBitMask(static_cast<GroupType>(1 << offset))
 {
     OPENVDB_ASSERT(isGroup(mArray));
-
-    // load data if delay-loaded
-
-    mArray.loadData();
 }
 
 
@@ -36,10 +32,6 @@ GroupHandle::GroupHandle(const GroupAttributeArray& array, const GroupType& bitM
     , mBitMask(bitMask)
 {
     OPENVDB_ASSERT(isGroup(mArray));
-
-    // load data if delay-loaded
-
-    mArray.loadData();
 }
 
 

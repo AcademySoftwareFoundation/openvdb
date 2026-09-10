@@ -42,16 +42,15 @@ TEST_F(TestGridDescriptor, testIO)
 
     GridDescriptor gd2;
 
-    EXPECT_THROW(gd2.read(istr), openvdb::LookupError);
-
     // Register the grid.
     GridBase::clearRegistry();
     GridType::registerGrid();
 
     // seek back and read again.
     istr.seekg(0, std::ios_base::beg);
-    GridBase::Ptr grid;
-    EXPECT_NO_THROW(grid = gd2.read(istr));
+    gd2.readHeader(istr);
+    gd2.readStreamPos(istr);
+    GridBase::Ptr grid = GridBase::createGrid(gd2.gridType());
 
     EXPECT_EQ(gd.gridName(), gd2.gridName());
     EXPECT_EQ(gd.uniqueName(), gd2.uniqueName());

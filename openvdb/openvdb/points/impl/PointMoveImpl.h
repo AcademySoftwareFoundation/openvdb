@@ -319,7 +319,6 @@ struct GlobalMovePointsOp
         // extract target array and ensure data is out-of-core and non-uniform
 
         auto& targetArray = leaf.attributeArray(mAttributeIndex);
-        targetArray.loadData();
         targetArray.expand();
 
         // perform the copy
@@ -344,7 +343,6 @@ struct GlobalMovePointsOp
 
                 const LeafT& sourceLeaf = mSourceLeafManager.leaf(sourceLeafIndex);
                 const auto& sourceArray = sourceLeaf.constAttributeArray(mAttributeIndex);
-                sourceArray.loadData();
 
                 targetArray.copyValuesUnsafe(sourceArray, copyIterator);
 
@@ -427,12 +425,10 @@ struct LocalMovePointsOp
         const Index sourceLeafOffset(mSourceIndices[idx]);
         LeafT& sourceLeaf = mSourceLeafManager.leaf(sourceLeafOffset);
         const auto& sourceArray = sourceLeaf.constAttributeArray(mAttributeIndex);
-        sourceArray.loadData();
 
         // extract target array and ensure data is out-of-core and non-uniform
 
         auto& targetArray = leaf.attributeArray(mAttributeIndex);
-        targetArray.loadData();
         targetArray.expand();
 
         // perform the copy

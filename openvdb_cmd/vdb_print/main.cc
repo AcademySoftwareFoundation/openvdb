@@ -209,14 +209,9 @@ printShortListing(const StringVec& filenames, bool metadata)
 
             // Print the grid's size, in bytes
 
-            // no support for memUsageIfLoaded until ABI >= 10 for points::PointDataGrid types
             using ListT = openvdb::GridTypes;
             grid->apply<ListT>([&](const auto& typed){
-                // @todo combine these methods to avoid iterating across the tree twice
-                const openvdb::Index64 incore = openvdb::tools::memUsage(typed.tree());
-                const openvdb::Index64 total = openvdb::tools::memUsageIfLoaded(typed.tree());
-
-                std::cout << " " << std::right << std::setw(6) << bytesAsString(incore) << " (In Core)";
+                const openvdb::Index64 total = openvdb::tools::memUsage(typed.tree());
                 std::cout << " " << std::right << std::setw(6) << bytesAsString(total) << " (Total)";
             });
 

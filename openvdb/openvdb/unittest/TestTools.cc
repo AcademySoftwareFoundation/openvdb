@@ -1762,7 +1762,7 @@ TEST_F(TestTools, testPrune)
         util::CpuTimer timer;
         initialize();//required whenever I/O of OpenVDB files is performed!
         io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/crawler.vdb");
-        sourceFile.open(false);//disable delayed loading
+        sourcefile.open();
         FloatGrid::Ptr grid = gridPtrCast<FloatGrid>(sourceFile.getGrids()->at(0));
         const Index64 leafCount = grid->tree().leafCount();
 
@@ -1775,7 +1775,7 @@ TEST_F(TestTools, testPrune)
         util::CpuTimer timer;
         initialize();//required whenever I/O of OpenVDB files is performed!
         io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/crawler.vdb");
-        sourceFile.open(false);//disable delayed loading
+        sourcefile.open();
         FloatGrid::Ptr grid = gridPtrCast<FloatGrid>(sourceFile.getGrids()->at(0));
         const Index64 leafCount = grid->tree().leafCount();
 

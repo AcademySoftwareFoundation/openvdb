@@ -61,7 +61,6 @@ AttributeArray::AttributeArray(const AttributeArray& rhs, const tbb::spin_mutex:
     : mIsUniform(rhs.mIsUniform)
     , mFlags(rhs.mFlags)
     , mUsePagedRead(rhs.mUsePagedRead)
-    , mOutOfCore(rhs.mOutOfCore.load())
     , mPageHandle()
 {
     if (mFlags & PARTIALREAD)       mCompressedBytes = rhs.mCompressedBytes;
@@ -78,7 +77,6 @@ AttributeArray::operator=(const AttributeArray& rhs)
     mIsUniform = rhs.mIsUniform;
     mFlags = rhs.mFlags;
     mUsePagedRead = rhs.mUsePagedRead;
-    mOutOfCore.store(rhs.mOutOfCore);
     if (mFlags & PARTIALREAD)       mCompressedBytes = rhs.mCompressedBytes;
     else if (rhs.mPageHandle)       mPageHandle = rhs.mPageHandle->copy();
     else                            mPageHandle.reset();
@@ -190,9 +188,6 @@ AttributeArray::setConstantStride(bool state)
 bool
 AttributeArray::operator==(const AttributeArray& other) const
 {
-    this->loadData();
-    other.loadData();
-
     if (this->mUsePagedRead != other.mUsePagedRead ||
         this->mFlags != other.mFlags) return false;
     return this->isEqual(other);

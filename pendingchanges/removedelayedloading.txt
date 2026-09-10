@@ -1,0 +1,20 @@
+OpenVDB:
+  API changes:
+  - Delayed loading has been removed. The OPENVDB_USE_DELAYED_LOADING CMake option,
+    MappedFile support and DelayedLoadMetadata have all been removed.
+  - io::File::open() and io::Stream constructors that accepted delayed-loading
+    parameters are deprecated and now behave as their non-delayed-loading
+    equivalents.
+  - Out-of-core tree APIs are deprecated, including LeafBuffer::isOutOfCore(),
+    memUsageIfLoaded() and readNonResidentBuffers(). The latter are now no-ops
+    and memUsageIfLoaded() forwards to memUsage().
+  - Free functions that previously accepted an inCoreOnly parameter are deprecated
+    in favor of overloads without that parameter.
+
+  Improvements:
+  - OpenVDB no longer depends on Boost. The boost::iostreams and Boost
+    interprocess optional dependencies have been removed along with io::TempFile.
+
+  Build:
+  - Removed the OPENVDB_USE_DELAYED_LOADING CMake option.
+  - OpenVDB no longer requires or links against Boost.

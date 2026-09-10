@@ -16,7 +16,7 @@ NanoVDB is now a module of the larger OpenVDB project. A user can build both lib
   ```console
   foo@bar:~$ mkdir build
   foo@bar:~$ cd build
-  foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DTBB_ROOT=/path/to/tbb -DBOOST_ROOT=/path/to/boost -DBLOSC_ROOT=/path/to/blosc -DCMAKE_INSTALL_PREFIX=/install/path
+  foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DTBB_ROOT=/path/to/tbb -DBLOSC_ROOT=/path/to/blosc -DCMAKE_INSTALL_PREFIX=/install/path
   foo@bar:~$ make -j 4 && make install
   ```
 Note that the default value of `NANOVDB_USE_OPENVDB` is linked to `OPENVDB_BUILD_CORE` option and can be overriden by passing on `-DNANOVDB_USE_OPENVDB=OFF`. The `Boost` library is included because it is a requirement for building OpenVDB.
@@ -49,7 +49,7 @@ From the root OpenVDB directory:
   ```console
   foo@bar:~$ mkdir build
   foo@bar:~$ cd build
-  foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_BUILD_EXAMPLES=ON -DNANOVDB_BUILD_BENCHMARK=ON -DNANOVDB_USE_INTRINSICS=ON -DNANOVDB_USE_CUDA=ON -DNANOVDB_CUDA_KEEP_PTX=ON -DTBB_ROOT=/path/to/tbb -DBOOST_ROOT=/path/to/boost -DBLOSC_ROOT=/path/to/blosc -DGTEST_ROOT=/path/to/gtest -DCMAKE_INSTALL_PREFIX=/install/path
+  foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_BUILD_EXAMPLES=ON -DNANOVDB_BUILD_BENCHMARK=ON -DNANOVDB_USE_INTRINSICS=ON -DNANOVDB_USE_CUDA=ON -DNANOVDB_CUDA_KEEP_PTX=ON -DTBB_ROOT=/path/to/tbb -DBLOSC_ROOT=/path/to/blosc -DGTEST_ROOT=/path/to/gtest -DCMAKE_INSTALL_PREFIX=/install/path
   foo@bar:~$ make -j 4 && make install
   ```
 Note that if you already have the correct version of OpenVDB pre-installed, you can configure CMake to link against that library by passing the arguments `-DOPENVDB_BUILD_CORE=OFF -DOPENVDB_BUILD_BINARIES=OFF -DOPENVDB_ROOT=/path/to/openvdb` when invoking `cmake`.

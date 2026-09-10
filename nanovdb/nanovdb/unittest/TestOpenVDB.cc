@@ -140,7 +140,7 @@ protected:
                 mTimer.start("Reading grid from the file \"" + fileName + "\"");
             try {
                 openvdb::io::File file(fileName);
-                file.open(false); //disable delayed loading
+                file.open();
                 grid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.readGrid(file.beginName().gridName()));
             } catch(const std::exception& e) {
                 std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;
@@ -2860,7 +2860,7 @@ TEST_F(TestOpenVDB, LevelSetFiles)
         //mTimer.start("\nReading grid from the file \"" + fileName + "\"");
         try {
             openvdb::io::File file(fileName);
-            file.open(false); //disable delayed loading
+            file.open();
             auto srcGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.readGrid(file.beginName().gridName()));
 
             const size_t pos = fileName.find_last_of("/\\") + 1;
@@ -2938,7 +2938,7 @@ TEST_F(TestOpenVDB, FogFiles)
         //mTimer.start("Reading grid from the file \"" + fileName + "\"");
         try {
             openvdb::io::File file(fileName);
-            file.open(false); //disable delayed loading
+            file.open();
             auto srcGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.readGrid(file.beginName().gridName()));
 
             const size_t pos = fileName.find_last_of("/\\") + 1;
@@ -3008,7 +3008,7 @@ TEST_F(TestOpenVDB, PointFiles)
         //mTimer.start("Reading grid from the file \"" + fileName + "\"");
         try {
             openvdb::io::File file(fileName);
-            file.open(false); //disable delayed loading
+            file.open();
 
             auto srcGrid = openvdb::gridPtrCast<openvdb::points::PointDataGrid>(file.readGrid(file.beginName().gridName()));
             //std::cerr << "Read PointDataGrid named \"" << srcGrid->getName() << "\"" << std::endl;

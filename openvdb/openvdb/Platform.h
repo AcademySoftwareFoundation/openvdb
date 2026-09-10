@@ -219,6 +219,14 @@
 #if defined __INTEL_COMPILER
     #define OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
     #define OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+#elif defined __clang__
+    #define OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN \
+        _Pragma("clang diagnostic push") \
+        _Pragma("clang diagnostic ignored \"-Wconversion\"") \
+        _Pragma("clang diagnostic ignored \"-Wfloat-conversion\"") \
+        _Pragma("clang diagnostic ignored \"-Wimplicit-float-conversion\"")
+    #define OPENVDB_NO_TYPE_CONVERSION_WARNING_END \
+        _Pragma("clang diagnostic pop")
 #elif defined __GNUC__
     // -Wfloat-conversion was only introduced in GCC 4.9
     #define OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN \

@@ -2034,7 +2034,7 @@ Bug fixes:
 New features:
 - Added @vdblink{tools::FindActiveValues,FindActiveValues}, which counts
   the active values in a tree that intersect a given bounding box.
-- Added @vdblink{io::DelayedLoadMetadata,DelayedLoadMetadata}, which stores
+- Added @c io::DelayedLoadMetadata, which stores
   mask offsets and compression sizes on write to accelerate delayed load
   reading.
 
@@ -2933,7 +2933,7 @@ New features:
 - Added a toggle to the @vdblink::tools::clip() clip@endlink tool
   to invert the clipping mask.
 - Custom leaf node implementations may now optimize their file layout
-  by inheriting from @vdblink::io::MultiPass io::MultiPass@endlink.
+  by inheriting from @c io::MultiPass.
   Voxel data for grids with such leaf nodes will be written and read in
   multiple passes, allowing blocks of related data to be stored contiguously.
   <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>

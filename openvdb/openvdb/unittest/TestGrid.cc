@@ -65,7 +65,9 @@ public:
 
     void readBuffers(std::istream& is,
         const openvdb::CoordBBox&, bool /*saveFloatAsHalf*/=false) override { is.seekg(0); }
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     void readNonresidentBuffers() const override {}
+#endif
     void readBuffers(std::istream& is, bool /*saveFloatAsHalf*/=false) override { is.seekg(0); }
     void writeBuffers(std::ostream& os, bool /*saveFloatAsHalf*/=false) const override
         { os.seekp(0, std::ios::beg); }

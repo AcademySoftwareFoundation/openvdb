@@ -5,6 +5,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/tools/Filter.h>
 #include <openvdb/util/logging.h>
+#include <openvdb/io/io.h>
 #include "util.h" // for unittest_util::makeSphere()
 #include <gtest/gtest.h>
 #include <set>
@@ -293,6 +294,60 @@ TEST_F(TestLeafBool, testIO)
     leaf.setValueOn(openvdb::Coord(0, 1, 0));
     leaf.setValueOn(openvdb::Coord(1, 0, 0));
 
+    // read and write topology to disk
+
+    {
+        // create a grid with the leaf for topology testing
+        typedef openvdb::Grid<openvdb::tree::Tree<openvdb::tree::RootNode<
+            openvdb::tree::InternalNode<openvdb::tree::InternalNode<LeafType, 4>, 5>>>> BoolGrid;
+        BoolGrid::Ptr grid = BoolGrid::create();
+        grid->setName("bool_leaf");
+        grid->tree().addLeaf(new LeafType(leaf));
+
+        openvdb::GridCPtrVec grids;
+        grids.push_back(grid);
+
+        // write to file
+        {
+            openvdb::io::File file("leaf_bool.vdb");
+            file.write(grids);
+            file.close();
+        }
+
+        // read grid from file
+        BoolGrid::Ptr gridFromDisk;
+        {
+            openvdb::io::File file("leaf_bool.vdb");
+            file.open();
+            openvdb::GridBase::Ptr baseGrid = file.readGrid("bool_leaf");
+            file.close();
+
+            gridFromDisk = openvdb::gridPtrCast<BoolGrid>(baseGrid);
+        }
+
+        LeafType* leaf2 = gridFromDisk->tree().probeLeaf(origin);
+        EXPECT_TRUE(leaf2);
+
+        // check topology and values match
+
+        EXPECT_EQ(origin, leaf2->origin());
+        EXPECT_TRUE(leaf2->isValueOn(openvdb::Coord(0, 1, 0)));
+        EXPECT_TRUE(leaf2->isValueOn(openvdb::Coord(1, 0, 0)));
+        EXPECT_TRUE(leaf2->onVoxelCount() == 2);
+
+        remove("leaf_bool.vdb");
+    }
+}
+
+
+TEST_F(TestLeafBool, testTreeIO)
+{
+    LeafType leaf(openvdb::Coord(1, 3, 5));
+    const openvdb::Coord origin = leaf.origin();
+
+    leaf.setValueOn(openvdb::Coord(0, 1, 0));
+    leaf.setValueOn(openvdb::Coord(1, 0, 0));
+
     std::ostringstream ostr(std::ios_base::binary);
 
     leaf.writeBuffers(ostr);
@@ -301,8 +356,6 @@ TEST_F(TestLeafBool, testIO)
     leaf.setValueOn(openvdb::Coord(0, 1, 1));
 
     std::istringstream istr(ostr.str(), std::ios_base::binary);
-    // Since the input stream doesn't include a VDB header with file format version info,
-    // tag the input stream explicitly with the current version number.
     openvdb::io::setCurrentVersion(istr);
 
     leaf.readBuffers(istr);

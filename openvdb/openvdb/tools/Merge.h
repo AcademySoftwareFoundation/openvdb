@@ -581,16 +581,14 @@ struct UnallocatedBuffer
     static void allocateAndFill(BufferT& buffer, const ValueT& background)
     {
         if (buffer.empty()) {
-            if (!buffer.isOutOfCore()) {
-                buffer.allocate();
-                buffer.fill(background);
-            }
+            buffer.allocate();
+            buffer.fill(background);
         }
     }
 
     static bool isPartiallyConstructed(const BufferT& buffer)
     {
-        return !buffer.isOutOfCore() && buffer.empty();
+        return buffer.empty();
     }
 }; // struct AllocateAndFillBuffer
 
