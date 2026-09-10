@@ -92,7 +92,7 @@ jobs:
           -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           \'
       - name: test
-        run: cd build && sudo ctest -V -E ".*cuda.*|.*mgpu.*"
+        run: cd build && ctest -V -E ".*cuda.*|.*mgpu.*"
 
   windows-nanovdb:
     if: |
