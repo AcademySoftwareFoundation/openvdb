@@ -349,6 +349,26 @@ TEST(TestNanoVDBMultiGPU, PerDeviceResources_DistributedCudaPointsToGrid)
     cudaSetDevice(current); // restore device so subsequent tests don't fail
 }// PerDeviceResources_DistributedCudaPointsToGrid
 
+/// @brief Tests that DistributedPointsToGrid rejects a per-device resource array that does not
+///        match the mesh: a wrong count, or a null entry.
+TEST(TestNanoVDBMultiGPU, PerDeviceResourcesRejected_DistributedCudaPointsToGrid)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    nanovdb::cuda::DeviceMesh deviceMesh;
+    std::vector<CountingResource> resources(deviceMesh.deviceCount() + 1);
+
+    std::vector<CountingResource*> tooMany;
+    for (auto& resource : resources) tooMany.push_back(&resource);// one more than the mesh has devices
+    EXPECT_THROW((nanovdb::tools::cuda::DistributedPointsToGrid<BuildT, CountingResource>(deviceMesh, 1.0, nanovdb::Vec3d(0.0), tooMany)), std::invalid_argument);
+
+    std::vector<CountingResource*> tooFew(tooMany.begin(), tooMany.end() - 2);// one fewer than the mesh has devices
+    EXPECT_THROW((nanovdb::tools::cuda::DistributedPointsToGrid<BuildT, CountingResource>(deviceMesh, 1.0, nanovdb::Vec3d(0.0), tooFew)), std::invalid_argument);
+
+    std::vector<CountingResource*> withNull(tooMany.begin(), tooMany.end() - 1);// right count, but a null entry
+    withNull.front() = nullptr;
+    EXPECT_THROW((nanovdb::tools::cuda::DistributedPointsToGrid<BuildT, CountingResource>(deviceMesh, 1.0, nanovdb::Vec3d(0.0), withNull)), std::invalid_argument);
+}// PerDeviceResourcesRejected_DistributedCudaPointsToGrid
+
 /// @brief Tests multi-GPU creation of grids for a single dense leaf
 TEST(TestNanoVDBMultiGPU, DenseLeaf_DistributedCudaPointsToGrid_ManagedBuffer)
 {
