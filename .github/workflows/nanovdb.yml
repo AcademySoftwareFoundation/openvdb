@@ -104,7 +104,7 @@ jobs:
     env:
       VCPKG_DEFAULT_TRIPLET: 'x64-windows'
       visual_studio: "Visual Studio 17 2022"
-      cuda: "12.9.2"
+      cuda: "12.9.1"
     strategy:
       fail-fast: false
     steps:
@@ -188,8 +188,9 @@ jobs:
       - name: build_and_test
         run: |
           cd nanovdb/nanovdb
-          sudo mkdir .build
+          mkdir .build
           cd .build
-          sudo cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF ../
-          sudo make -j8 install
-          sudo ctest -V
+          cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF ../
+          make -j8
+          sudo make install
+          ctest -V
