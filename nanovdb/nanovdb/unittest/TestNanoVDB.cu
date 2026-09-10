@@ -2859,7 +2859,6 @@ TEST(TestNanoVDBCUDA, compareNodeOrdering)
     //EXPECT_FALSE(grid1->isLexicographic());
 
     {// check that nodes are arranged breath-first in memory
-        float min = std::numeric_limits<float>::max(), max = -min;
         int n2=0, n1=0, n0=0;
         for (auto it2 = grid1->tree().root().beginChild(); it2; ++it2) {
             EXPECT_EQ(grid1->tree().getFirstUpper() + n2++, &(*it2));

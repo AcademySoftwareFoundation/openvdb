@@ -42,7 +42,11 @@
 #endif
 
 
-namespace {
+// Named rather than anonymous: gtest marks each test class's static test_info_
+// [[maybe_unused]], an attribute the CUDA front end ignores. Under internal
+// linkage it proves the member unreferenced and reports #177, which
+// NANOVDB_CUDA_WERROR promotes to an error.
+namespace nanovdb_test {
 
 //======================================================================
 // Shared test doubles
@@ -583,4 +587,4 @@ TEST(TestMemoryResource, AddBlindData_InjectedResourceSeam)
     ASSERT_EQ(cudaFree(d_blind), cudaSuccess);
 }
 
-} // unnamed namespace
+} // namespace nanovdb_test
