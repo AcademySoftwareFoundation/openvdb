@@ -52,6 +52,18 @@ struct StreamHolder<true> { cudaStream_t mStream = 0; };
 /// @details With a stream-ordered resource the Buffer retains the stream of
 ///          the most recent allocation (or the one supplied via set_stream)
 ///          and orders its deallocation on that stream. Buffer is move-only.
+/// @note Cross-stream ordering is the caller's, expressed with ordinary CUDA
+///       events -- the buffer deliberately tracks nothing. To hand a buffer's
+///       contents to work on another stream (a consumer library, a wrapped
+///       tensor), record after the last write and make the consumer wait:
+/// @code
+///     cudaEvent_t ready;
+///     cudaEventCreateWithFlags(&ready, cudaEventDisableTiming);
+///     cudaEventRecord(ready, producerStream);     // after the last write
+///     cudaStreamWaitEvent(consumerStream, ready); // before the first read
+/// @endcode
+///       and order the buffer's destruction (which frees on its retained
+///       stream) after all consumers the same way, or synchronize.
 template<typename T, typename R = DeviceResource>
 class Buffer : private detail::StreamHolder<is_async_resource<R>::value>
 {
@@ -62,6 +74,18 @@ class Buffer : private detail::StreamHolder<is_async_resource<R>::value>
 
     static constexpr bool IsAsync = is_async_resource<R>::value;
 
+public:
+    /// @brief Element and resource types, for generic code that rebinds one
+    ///        or constructs sibling buffers over the same resource.
+    using ElementType  = T;
+    using ResourceType = R;
+
+    /// @brief Alias for a sibling buffer over the same resource with a
+    ///        different element type.
+    template<typename U>
+    using rebind = Buffer<U, R>;
+
+private:
     R      mResource;
     T*     mData = nullptr;
     size_t mSize = 0; // element count
@@ -155,6 +179,11 @@ public:
         if (mData) cudaCheck(cudaMemcpyAsync(out.mData, mData, this->size_bytes(), cudaMemcpyDefault, stream));
         return out;
     }
+
+    /// @brief Returns a deep copy of this buffer ordered on the retained
+    ///        stream, i.e. copy(this->stream()).
+    template<typename S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
+    Buffer copy() const { return this->copy(this->stream()); }
 
     /// @brief Returns a deep copy of this buffer, allocated from a copy of the
     ///        synchronous resource.
@@ -255,6 +284,13 @@ public:
     T*       data()       { return mData; }
     const T* data() const { return mData; }
 
+    /// @brief Returns a copy of the resource; for a ResourceRef this refers
+    ///        to the same underlying instance.
+    /// @note Requires R to be copy-constructible (the cuda::mr convention:
+    ///       resources are cheap handles). A resource that owns its pool by
+    ///       value hands the caller an independent copy of that pool.
+    R resource() const { return mResource; }
+
     /// @brief Returns the number of elements.
     size_t size() const { return mSize; }
 
@@ -275,13 +311,8 @@ public:
     }
 
     /// @brief Frees the buffer memory (if any) and resets to the empty state.
-    /// @deprecated Use destroy(). Documentation-level only for now: the
-    ///             [[deprecated]] attribute would fire from GridHandle::reset
-    ///             and NodeManager::reset, which must keep calling clear()
-    ///             until every buffer type provides destroy().
-    /// @note Transitional, and not the name to use: it exists only because
-    ///       GridHandle::reset still calls clear() on its buffer. It goes away
-    ///       when the legacy dual buffers do and GridHandle moves to destroy().
+    /// @deprecated Use destroy(): the handles now dispatch to it directly.
+    [[deprecated("Use cuda::Buffer::destroy instead")]]
     void clear() { this->destroy(); }
 
     /// @brief Frees the buffer memory (if any) on @c stream and resets to the
@@ -390,17 +421,60 @@ public:
     bool empty() const { return mSize == 0; }
 
     /// @brief Detaches the view (nulls the pointer and zeroes the size)
-    ///        without touching the underlying storage. This is the one
-    ///        deliberate deviation from std::span, required by the buffer
-    ///        static interface: GridHandle::reset() calls buffer.clear().
-    void clear()
+    ///        without touching the underlying storage -- the view is
+    ///        non-owning, so "destroying" it releases nothing. This is the
+    ///        one deliberate deviation from std::span, required by the buffer
+    ///        static interface the handles consume through reset().
+    void destroy()
     {
         mData = nullptr;
         mSize = 0;
     }
+
+    /// @brief Detaches the view.
+    /// @deprecated Use destroy(): the handles now dispatch to it directly.
+    [[deprecated("Use cuda::BufferView::destroy instead")]]
+    void clear() { this->destroy(); }
 }; // BufferView<T> class
 
 } // namespace cuda
+
+// Primary template defined in HostBuffer.h; declared here so this header
+// stays self-contained without pulling in the host-buffer machinery.
+template<typename BufferT>
+struct BufferTraits;
+
+/// @brief GridHandle support for the single-space cuda::Buffer: the buffer
+///        owns exactly one allocation, resident on the device, so the handle
+///        parses metadata through a device read and exposes only the device
+///        accessors. Requires byte-addressed storage.
+/// @note This trait doubles as the definition of the single-space
+///       device-buffer concept: a buffer whose BufferTraits specialization
+///       sets hasDeviceSingle guarantees ElementType and ResourceType
+///       typedefs, data(), size() and size_bytes() (byte-addressed elements,
+///       enforced by the consumer), resource(), copy(), destroy(), and stream()
+///       when the resource is stream-ordered. Any consumer of hasDeviceSingle
+///       may rely on exactly this interface and nothing more; in particular,
+///       scratch allocates through resource() as a cuda::Buffer, so a
+///       conforming buffer never needs to be constructible by a consumer.
+template<typename T, typename R>
+struct BufferTraits<cuda::Buffer<T, R>>
+{
+    static constexpr bool hasDeviceDual   = false;
+    // Device-resident storage; the byte-addressed requirement is enforced by
+    // the single-space GridHandle constructor, so trait queries stay
+    // answerable for any element type.
+    static constexpr bool hasDeviceSingle = !cuda::is_host_accessible_resource<R>::value
+                                            || cuda::is_device_accessible_resource<R>::value;
+    // A buffer over a host-accessible resource (e.g. PinnedResource) is
+    // host-readable single-space storage: GridHandle parses its metadata on
+    // the host, exposes the host accessors, and allocates reads and copies
+    // through the buffer's resource. A resource that is host- AND
+    // device-accessible (ManagedResource) sets both members: the handle
+    // parses metadata through the device (a host parse could race producer
+    // kernels) and exposes both accessor families.
+    static constexpr bool hasHostSingle   = cuda::is_host_accessible_resource<R>::value;
+};
 
 } // namespace nanovdb
 

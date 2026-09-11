@@ -136,11 +136,14 @@ if(NANOVDB_USE_CUDA)
 
   include(../../cmake/CPM.cmake)
 
-  # This will automatically clone CCCL from GitHub and make the exported cmake targets available
+  # Clones CCCL from GitHub and makes the exported cmake targets available.
+  # Pinned to a release so an upstream commit cannot change what CI builds;
+  # bump it deliberately.
+  set(NANOVDB_CCCL_TAG "v3.4.2" CACHE STRING "Git tag of the CCCL release to build against")
   CPMAddPackage(
       NAME CCCL
       GITHUB_REPOSITORY nvidia/cccl
-      GIT_TAG main # Fetches the latest commit on the main branch
+      GIT_TAG ${NANOVDB_CCCL_TAG}
   )
 
   find_package(NCCL)
@@ -199,12 +202,16 @@ set(NANOVDB_INCLUDE_FILES
 
 # NanoVDB cuda header files
 set(NANOVDB_INCLUDE_CUDA_FILES
+  cuda/Buffer.h
   cuda/DeviceBuffer.h
   cuda/DeviceMesh.h
   cuda/DeviceResource.h
   cuda/DeviceStreamMap.h
   cuda/GridHandle.cuh
+  cuda/HandleStorage.h
+  cuda/ManagedResource.h
   cuda/NodeManager.cuh
+  cuda/PinnedResource.h
   cuda/TempPool.h
   cuda/UnifiedBuffer.h
 )
@@ -220,6 +227,7 @@ set(NANOVDB_INCLUDE_MATH_FILES
   math/DitherLUT.h
   math/HDDA.h
   math/Math.h
+  math/Proximity.h
   math/Ray.h
   math/SampleFromVoxels.h
   math/Stencils.h
@@ -254,6 +262,7 @@ set(NANOVDB_INCLUDE_TOOLS_CUDA_FILES
   tools/cuda/DilateGrid.cuh
   tools/cuda/CoarsenGrid.cuh
   tools/cuda/VoxelBlockManager.cuh
+  tools/cuda/MeshToGrid.cuh
 )
 
 # NanoVDB util header files
@@ -283,6 +292,7 @@ set(NANOVDB_INCLUDE_UTIL_FILES
   util/Timer.h
   util/Util.h
   util/MorphologyHelpers.h
+  util/MaskPrefixSum.h
 )
 
 # NanoVDB util/cuda header files
@@ -305,6 +315,7 @@ set(NANOVDB_INCLUDE_UTIL_CUDA_FILES
   util/cuda/MorphologyHelpers.cuh
   util/cuda/DeviceGridTraits.cuh
   util/cuda/Injection.cuh
+  util/cuda/Rasterization.cuh
 )
 
 add_library(nanovdb INTERFACE)

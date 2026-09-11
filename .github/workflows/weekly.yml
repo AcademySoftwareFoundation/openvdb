@@ -70,6 +70,7 @@ jobs:
     strategy:
       matrix:
         config:
+          - { houdini_version: '22.0', platform: 'linux_x86_64_gcc14.2', hou_hash: '22_0' }
           - { houdini_version: '21.0', platform: 'linux_x86_64_gcc11.2', hou_hash: '21_0' }
           - { houdini_version: '20.5', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_5' }
       fail-fast: false
@@ -454,7 +455,7 @@ jobs:
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
       visual_studio: "Visual Studio 17 2022"
-      cuda: "12.4.0"
+      cuda: "12.9.1"
     strategy:
       matrix:
         config:
@@ -527,7 +528,7 @@ jobs:
         --build-type=Release
         --components=\"core,test\"
     - name: test
-      run: cd build && sudo ctest -V
+      run: cd build && ctest -V
 
   #############################################################################
   ################################## ABI ######################################

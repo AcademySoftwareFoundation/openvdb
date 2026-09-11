@@ -180,6 +180,7 @@ jobs:
         config:
           - { image: macos-14 }
           - { image: macos-15 }
+          - { image: macos-26 }
     steps:
     - uses: actions/checkout@v3
     - name: install

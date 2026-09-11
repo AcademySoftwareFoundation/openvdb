@@ -8,7 +8,7 @@
 
     \date October 15, 2024
 
-    \brief nanovdb::cuda::UnifiedBuffer that uses unified memory management
+    \brief nanovdb::cuda::DualUnifiedBuffer that uses unified memory management
 
     \note This file has no device-only kernel functions,
           which explains why it's a .h and not .cuh file.
@@ -18,6 +18,8 @@
 #define NANOVDB_CUDA_UNIFIEDBUFFER_H_HAS_BEEN_INCLUDED
 
 #include <cuda.h>
+#include <cassert> // for assert
+#include <initializer_list> // for std::initializer_list
 #include <memory>// for std::shared_ptr
 #include <nanovdb/HostBuffer.h>// for BufferTraits
 #include <nanovdb/util/cuda/Util.h>// for cudaCheck
@@ -28,37 +30,49 @@ namespace cuda {// =============================================================
 
 /// @brief  buffer, used for instance by the GridHandle, to allocate unified memory that
 ///         can be resized and shared between multiple devices and the host.
-class UnifiedBuffer
+/// @note  This is the implementation behind the deprecated UnifiedBuffer alias
+///        below, renamed so the [[deprecated]] attribute reaches only code
+///        that spells the public name: DistributedPointsToGrid's signature
+///        defaults reference this implementation, so default-using callers
+///        stay warning-free until the defaults change at removal. The Dual
+///        prefix marks the deprecated dual-accessor buffer family (this
+///        buffer satisfies that concept from a single managed allocation).
+///        Transitional -- do not adopt this name; it is deleted together
+///        with the alias. The header keeps its long-standing name and
+///        include path for the same reason: renaming a header breaks
+///        existing includes outright, and the old path is where external
+///        code will find the alias and its migration message.
+class DualUnifiedBuffer
 {
     void *mPtr;
     size_t mSize, mCapacity;
 public:
 
-    using PtrT = std::shared_ptr<UnifiedBuffer>;
+    using PtrT = std::shared_ptr<DualUnifiedBuffer>;
 
     /// @brief Default constructor of an empty buffer
-    UnifiedBuffer() : mPtr(nullptr), mSize(0), mCapacity(0){}
+    DualUnifiedBuffer() : mPtr(nullptr), mSize(0), mCapacity(0){}
 
     /// @brief Constructor that specifies both the size and capacity
     /// @param size size of the buffer in bytes, indication what is actually used
     /// @param capacity number of bytes in the virtual page table, i.e max size for growing
     /// @note Capacity can be over-estimated to allow for future growth. Memory is not allocated
     ///       with this constructor, only a page table. Allocation happens on usage or when calling prefetch
-    UnifiedBuffer(size_t size, size_t capacity) : mPtr(nullptr), mSize(size), mCapacity(capacity)
+    DualUnifiedBuffer(size_t size, size_t capacity) : mPtr(nullptr), mSize(size), mCapacity(capacity)
     {
         assert(mSize <= mCapacity);
         cudaCheck(cudaMallocManaged(&mPtr, mCapacity, cudaMemAttachGlobal));
     }
 
      /// @brief Similar to the constructor above except the size and capacity are equal, so no future growth is supported
-    UnifiedBuffer(size_t size) : UnifiedBuffer(size, size){}
+    DualUnifiedBuffer(size_t size) : DualUnifiedBuffer(size, size){}
 
     /// @brief Constructor that specifies the size, capacity, and device (for prefetching)
     /// @param size
     /// @param capacity
     /// @param device
     /// @param stream
-    UnifiedBuffer(uint64_t size, uint64_t capacity, int device, cudaStream_t stream = 0) : mPtr(nullptr), mSize(size), mCapacity(size)
+    DualUnifiedBuffer(uint64_t size, uint64_t capacity, int device, cudaStream_t stream = 0) : mPtr(nullptr), mSize(size), mCapacity(size)
     {
         assert(mSize <= mCapacity);
         cudaCheck(cudaMallocManaged(&mPtr, mCapacity, cudaMemAttachGlobal));
@@ -70,13 +84,13 @@ public:
     /// @param size
     /// @param device
     /// @param stream
-    UnifiedBuffer(uint64_t size, int device, cudaStream_t stream = 0) : UnifiedBuffer(size, size, device, stream){}
+    DualUnifiedBuffer(uint64_t size, int device, cudaStream_t stream = 0) : DualUnifiedBuffer(size, size, device, stream){}
 
      /// @brief Disallow copy-construction
-    UnifiedBuffer(const UnifiedBuffer&) = delete;
+    DualUnifiedBuffer(const DualUnifiedBuffer&) = delete;
 
     /// @brief Move copy-constructor
-    UnifiedBuffer(UnifiedBuffer&& other) noexcept
+    DualUnifiedBuffer(DualUnifiedBuffer&& other) noexcept
         : mPtr(other.mPtr)
         , mSize(other.mSize)
         , mCapacity(other.mCapacity)
@@ -86,33 +100,33 @@ public:
     }
 
     /// @brief Destructor
-    ~UnifiedBuffer(){cudaCheck(cudaFree(mPtr));}
+    ~DualUnifiedBuffer(){cudaCheck(cudaFree(mPtr));}
 
     ///////////////////////////////////////////////////////////////////////
 
     //@{
-    /// @brief Factory methods that create an UnifiedBuffer instance and returns it with move semantics
-    static UnifiedBuffer create(size_t size, size_t capacity) {return UnifiedBuffer(size, capacity);}
-    static UnifiedBuffer create(size_t size) {return UnifiedBuffer(size);}
+    /// @brief Factory methods that create an DualUnifiedBuffer instance and returns it with move semantics
+    static DualUnifiedBuffer create(size_t size, size_t capacity) {return DualUnifiedBuffer(size, capacity);}
+    static DualUnifiedBuffer create(size_t size) {return DualUnifiedBuffer(size);}
     ///@}
 
     //@{
-    /// @brief Factory methods that create a shared pointer to an UnifiedBuffer instance
-    static PtrT createPtr(size_t size, size_t capacity) {return std::make_shared<UnifiedBuffer>(size, capacity);}
-    static PtrT createPtr(size_t size) {return std::make_shared<UnifiedBuffer>(size);}
+    /// @brief Factory methods that create a shared pointer to an DualUnifiedBuffer instance
+    static PtrT createPtr(size_t size, size_t capacity) {return std::make_shared<DualUnifiedBuffer>(size, capacity);}
+    static PtrT createPtr(size_t size) {return std::make_shared<DualUnifiedBuffer>(size);}
     ///@}
 
-    /// @brief Legacy factory method that mirrors DeviceBuffer. It creates a UnifiedBuffer from a size and a reference buffer.
+    /// @brief Legacy factory method that mirrors DeviceBuffer. It creates a DualUnifiedBuffer from a size and a reference buffer.
     ///        If a reference buffer is provided and its non-empty, it is used to defined the capacity of the new buffer
     /// @param size Size on bytes of the new buffer
     /// @param reference reference buffer optionally used to define the capacity
     /// @param host Ignored for now
     /// @param stream cuda stream
-    /// @return An instance of a new UnifiedBuffer using move semantics
-    static UnifiedBuffer create(size_t size, const UnifiedBuffer* reference, int device, cudaStream_t stream)
+    /// @return An instance of a new DualUnifiedBuffer using move semantics
+    static DualUnifiedBuffer create(size_t size, const DualUnifiedBuffer* reference, int device, cudaStream_t stream)
     {
         const size_t capacity = (reference && reference->capacity()) ? reference->capacity() : size;
-        UnifiedBuffer buffer(size, capacity);
+        DualUnifiedBuffer buffer(size, capacity);
         cudaCheck(util::cuda::memAdvise(buffer.mPtr, size, cudaMemAdviseSetPreferredLocation, device));
         cudaCheck(util::cuda::memPrefetchAsync(buffer.mPtr, size, device, stream));
         return buffer;
@@ -122,7 +136,7 @@ public:
     ///        reference buffer has a capacity it is used. Also the buffer is prefetched to the host
     /// @param size byte size of buffer initiated on the host
     /// @param reference optional reference buffer from which the capacity is derived
-    static UnifiedBuffer create(size_t size, const UnifiedBuffer* reference){return create(size, reference, cudaCpuDeviceId, (cudaStream_t)0);}
+    static DualUnifiedBuffer create(size_t size, const DualUnifiedBuffer* reference){return create(size, reference, cudaCpuDeviceId, (cudaStream_t)0);}
 
     /// @brief Factory method that created a buffer on the host or device of the specified size. If the
     ///        reference buffer has a capacity it is used. Also the buffer is prefetched to the host or (current) device
@@ -130,7 +144,7 @@ public:
     /// @param reference optional reference buffer from which the capacity is derived
     /// @param host If true the buffer will be prefetched to the host, else to the current device
     /// @param stream optional cuda stream
-    static UnifiedBuffer create(size_t size, const UnifiedBuffer* reference, bool host, void* stream = nullptr)
+    static DualUnifiedBuffer create(size_t size, const DualUnifiedBuffer* reference, bool host, void* stream = nullptr)
     {
         int device = cudaCpuDeviceId;
         if (!host) cudaGetDevice(&device);
@@ -146,10 +160,10 @@ public:
     }
 
     /// @brief Disallow copy assignment operation
-    UnifiedBuffer& operator=(const UnifiedBuffer&) = delete;
+    DualUnifiedBuffer& operator=(const DualUnifiedBuffer&) = delete;
 
     /// @brief Allow move assignment operation
-    UnifiedBuffer& operator=(UnifiedBuffer&& other)
+    DualUnifiedBuffer& operator=(DualUnifiedBuffer&& other)
     {
         cudaCheck(cudaFree(mPtr));
         mPtr = other.mPtr;
@@ -311,12 +325,27 @@ public:
     inline bool isEmpty() const { return this->empty(); }
     //@}
 
-};// UnifiedBuffer
+};// DualUnifiedBuffer
+
+/// @brief The managed-memory buffer under its long-standing public name.
+/// @deprecated Managed grid storage is moving to the single-space
+///             cuda::Buffer over cuda::ManagedResource, whose GridHandle
+///             exposes the same host and device accessors from the one
+///             managed allocation: pass cuda::Buffer<std::byte,
+///             cuda::ManagedResource> to the multi-GPU builders, or build
+///             into a host handle and move it with cuda::copyTo (see
+///             cuda/HandleStorage.h). For a standalone managed allocation,
+///             use cuda::Buffer<T, cuda::ManagedResource> with explicit
+///             util::cuda::memAdvise / memPrefetchAsync calls in place of
+///             this class's advise and prefetch members (the multi-GPU
+///             examples show both patterns). This buffer and the name are
+///             removed together after a deprecation window.
+using UnifiedBuffer [[deprecated("managed grid storage is moving to cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/Buffer.h): pass it to the multi-GPU builders, or build into a host handle and use cuda::copyTo (cuda/HandleStorage.h); see the multi-GPU examples")]] = DualUnifiedBuffer;
 
 }// namespace cuda
 
 template<>
-struct BufferTraits<cuda::UnifiedBuffer>
+struct BufferTraits<cuda::DualUnifiedBuffer>
 {
     static constexpr bool hasDeviceDual = true;
 };

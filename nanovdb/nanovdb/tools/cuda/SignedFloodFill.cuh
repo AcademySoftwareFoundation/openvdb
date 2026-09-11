@@ -25,7 +25,7 @@
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/GridHandle.h>
-#include <nanovdb/cuda/UnifiedBuffer.h>
+#include <nanovdb/cuda/ManagedResource.h>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
@@ -108,18 +108,27 @@ void processRoot(NanoTree<BuildT> *d_tree, cudaStream_t stream = 0)
     // work, so the extra sync there is pure overhead - skip it.
     if (stream != cudaStream_t{0}) cudaCheck(cudaStreamSynchronize(stream));
 
-    // First copy the tree and root and then its tiles, which is of unknown size
-    nanovdb::cuda::UnifiedBuffer uBuffer(sizeof(TreeT) + sizeof(RootT), sizeof(TreeT) + sizeof(RootT) + 64*sizeof(TileT));
-    cudaCheck(cudaMemcpy(uBuffer.data(), d_tree, uBuffer.size(), cudaMemcpyDeviceToHost));// copy Tree and Root (minus tiles)
-    if (!uBuffer.data<TreeT>()->isRootNext()) throw std::runtime_error("ERROR: expected no padding between tree and root!");
-    if ( uBuffer.data<TreeT>()->root().tileCount() == 0) return;// empty root node so nothing to do
-    uBuffer.resize(sizeof(TreeT) + uBuffer.data<TreeT>()->root().memUsage());// likely does nothing since we reserved 64 tiles
-    RootT *root = &uBuffer.data<TreeT>()->root();
+    // First copy the tree and root and then its tiles, which is of unknown size;
+    // managed memory, because the scanline pass below interleaves host access
+    // with device reads of the same bytes
+    using ManagedBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
+    ManagedBufT uBuffer(sizeof(TreeT) + sizeof(RootT) + 64*sizeof(TileT), nanovdb::cuda::noInit);
+    cudaCheck(cudaMemcpy(uBuffer.data(), d_tree, sizeof(TreeT) + sizeof(RootT), cudaMemcpyDeviceToHost)); // copy Tree and Root (minus tiles)
+    auto *tree = reinterpret_cast<TreeT*>(uBuffer.data());
+    if (!tree->isRootNext()) throw std::runtime_error("ERROR: expected no padding between tree and root!");
+    if ( tree->root().tileCount() == 0) return; // empty root node so nothing to do
+    uBuffer.resize(sizeof(TreeT) + tree->root().memUsage()); // grows (with a copy) past the 64 reserved tiles
+    tree = reinterpret_cast<TreeT*>(uBuffer.data()); // resize may reallocate
+    RootT *root = &tree->root();
+    // Device-resident root, used only to resolve Tile::child byte-offsets into valid child-node
+    // pointers. The 'root' buffer above is a truncated copy (tree + root + tiles, no child nodes),
+    // so offsets must be applied relative to the real device root, not the host/managed copy.
+    RootT *d_root = reinterpret_cast<RootT*>(d_tree + 1);
     cudaCheck(cudaMemcpy(root + 1, (char*)(d_tree + 1) + sizeof(RootT), root->tileCount()*sizeof(TileT), cudaMemcpyDeviceToHost));// copy tiles
 
     // Sort the child nodes of the root in lexicographic order
-    nanovdb::cuda::UnifiedBuffer nodeBuffer(root->tileCount()*sizeof(ChildT));// potential over-allocation
-    auto *first = nodeBuffer.data<ChildT>(), *last = first;
+    ManagedBufT nodeBuffer(root->tileCount()*sizeof(ChildT), nanovdb::cuda::noInit); // potential over-allocation
+    auto *first = reinterpret_cast<ChildT*>(nodeBuffer.data()), *last = first;
     for (auto it=root->beginChild(); it; ++it) *last++ = ChildT(it.getCoord(), it.pos());
     if (last - first < 2) return;// zero or one child node so nothing to do!
     std::sort(first, last, ChildT());// lexicographic ordering
@@ -130,8 +139,11 @@ void processRoot(NanoTree<BuildT> *d_tree, cudaStream_t stream = 0)
         const Coord d = b->ijk - a->ijk;// coord delta of adjacent child nodes
         if (d[0]!=0 || d[1]!=0 || d[2]==dim) continue;// not same z-scanline or they are neighbors
         util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__(size_t) {
-            a->val[1] = root->getChild(root->tile(a->idx))->getLastValue();
-            b->val[0] = root->getChild(root->tile(b->idx))->getFirstValue();
+            // Tile::child is a byte offset relative to the root; resolve it against the real
+            // device root (d_root), not the truncated host/managed copy (root), since the
+            // latter's memory ends right after the tiles and holds no child-node data.
+            a->val[1] = d_root->getChild(root->tile(a->idx))->getLastValue();
+            b->val[0] = d_root->getChild(root->tile(b->idx))->getFirstValue();
         });
         cudaCheck(cudaStreamSynchronize(stream));// required for host access to RootChild::val[2]
         if (a->val[1] > 0 || b->val[0] > 0) continue; // scanline is not inside a surface

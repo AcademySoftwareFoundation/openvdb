@@ -282,7 +282,25 @@ OPENVDB_NO_DEPRECATION_WARNING_BEGIN
 ///   point. Typically (for our intended surfacing) these transformations are
 ///   built by analysing each points neighbourhood distributions and
 ///   constructing tight ellipsoids that orient themselves to follow these
-///   point distributions.
+///   point distributions. Example:
+/// @code
+///    auto vs = points->voxelSize()[0];
+///
+///    points::PcaSettings s;
+///    s.searchRadius = vs*2.0f;
+///    s.nonAnisotropicStretch = 0.2f;
+///
+///    // could alternatively use stretch as the radius
+///    points::PcaAttributes a;
+///    a.xformOutput = points::PcaAttributes::XformOutput::COMBINED_TRANSFORM;
+///    points::pca(*points,s, a);
+
+///    points::EllipsoidSettings<> es;
+///    es.xform = a.xform;
+///    es.pws = a.positionWS;
+///    es.radiusScale = Vec3f(vs);
+///    auto outgrids = points::rasterizeSdf(*points, es);
+/// @endcode
 /// @note  Protected inheritance prevents accidental struct slicing
 template <typename AttributeTs = TypeList<>,
     typename RadiusAttributeT = Vec3f,

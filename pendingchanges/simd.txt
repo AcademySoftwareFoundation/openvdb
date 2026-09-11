@@ -1,6 +1,6 @@
 OpenVDB:
   New features:
-  - Significant performance improvements across many tools with the introduction
+  - Significant performance improvements across some tools with the introduction
     of targeted SIMD support to the core library. The main framework advancement
     is the introduction of Agner Fog's vectorclass library (VCL) as an optional
     dependency, specifically for x86 instruction set architecture intrinsic support.
@@ -19,8 +19,10 @@ OpenVDB:
     acceleration library in use.
 
   Improvements:
-  - Vectorized rasterizeSdf(SphereSettings), improving performance upwards of 2x
-    on x86 and 1.5x on other platforms.
+  - Vectorized points::rasterizeSdf(SphereSettings), improving performance
+    upwards of 2x on x86 and 1.5x on other platforms.
+  - Vectorized points::pca, improving performance upwards of 2x on x86 and
+    1.5x on other platforms.
   - Introduced new component wise arithmetic and relational operators for
     math::Tuple instantiations for use with fallback SIMD support.
   - Using Limiter::CLAMP when advecting vector fields through VolumeAdvect now

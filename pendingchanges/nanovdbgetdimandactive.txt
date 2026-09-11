@@ -1,0 +1,7 @@
+NanoVDB:
+  New Features:
+  - Added ReadAccessor::getDimAndActive(), which returns the ray-aware traversal
+    step size and voxel active state in a single tree descent. The ActiveExact
+    and ActiveOnLeafOnly policy tags let callers choose between an exact active
+    state and a cheaper leaf-only query, and the result is packed into 32 bits
+    to reduce register pressure.
