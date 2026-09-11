@@ -144,7 +144,7 @@ public:
     /// Return the total amount of memory in bytes occupied by this tree.
     virtual Index64 memUsage() const { return 0; }
 
-
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     //
     // I/O methods
     //
@@ -162,12 +162,12 @@ public:
     /// Read all of this tree's data buffers that intersect the given bounding box.
     virtual void readBuffers(std::istream&, const CoordBBox&, bool saveFloatAsHalf = false) = 0;
 
-#if OPENVDB_ABI_VERSION_NUMBER < 14
     OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     virtual void readNonresidentBuffers() const = 0;
-#endif
+
     /// Write out all the data buffers for this tree.
     virtual void writeBuffers(std::ostream&, bool saveFloatAsHalf = false) const = 0;
+#endif
 
     /// @brief Print statistics, memory usage and other information about this tree.
     /// @param os            a stream to which to write textual information
@@ -316,7 +316,7 @@ public:
     /// @note Because RootNodes are resizable, the RootNode Log2Dim is 0 for all trees.
     static void getNodeLog2Dims(std::vector<Index>& dims);
 
-
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     //
     // I/O methods
     //
@@ -333,13 +333,12 @@ public:
     /// Read all of this tree's data buffers that intersect the given bounding box.
     void readBuffers(std::istream&, const CoordBBox&, bool saveFloatAsHalf = false) override;
 
-#if OPENVDB_ABI_VERSION_NUMBER < 14
     OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     void readNonresidentBuffers() const override { }
-#endif
 
     /// Write out all data buffers for this tree.
     void writeBuffers(std::ostream&, bool saveFloatAsHalf = false) const override;
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     void print(std::ostream& os = std::cout, int verboseLevel = 1) const override;
 
@@ -1251,6 +1250,8 @@ Tree<RootNodeType>::cbegin() const
 ////////////////////////////////////////
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 template<typename RootNodeType>
 void
 Tree<RootNodeType>::readTopology(std::istream& is, bool saveFloatAsHalf)
@@ -1297,6 +1298,8 @@ Tree<RootNodeType>::writeBuffers(std::ostream &os, bool saveFloatAsHalf) const
 {
     mRoot.writeBuffers(os, saveFloatAsHalf);
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
 template<typename RootNodeType>
