@@ -855,7 +855,9 @@ inline BufferT PointsToGrid<BuildT, ResourceT>::getBuffer(const PtrT, size_t poi
     mData.leaf  = mData.lower + NanoLower<BuildT>::memUsage()*mData.nodeCount[1]; // lower internal nodes ends and leaf nodes begin
     mData.meta  = mData.leaf  + NanoLeaf<BuildT>::DataType::memUsage()*mData.nodeCount[0];// leaf nodes end and blind meta data begins
     mData.blind = mData.meta  + sizeof(GridBlindMetaData)*int( mPointType!=PointType::Disable ); // meta data ends and blind data begins
-    mData.size  = mData.blind + pointCount*sizeofPoint();// end of buffer
+    // padded like GridBlindMetaData::blindDataSize, so the grid size stays a multiple of
+    // NANOVDB_DATA_ALIGNMENT and the next grid in a multi-grid buffer starts aligned
+    mData.size  = mData.blind + math::AlignUp<NANOVDB_DATA_ALIGNMENT>(pointCount*sizeofPoint());// end of buffer
 
     int device = 0;
     cudaGetDevice(&device);
@@ -1437,13 +1439,37 @@ pointsToGrid(const PtrT d_xyz, int pointCount, int maxPointsPerVoxel, int tolera
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+template<typename PtrT, typename BufferT, typename ResourceT>
+GridHandle<BufferT>// Grid<Point> with PointType coordinates as blind data
+pointsToGrid(const PtrT d_xyz, int pointCount, double voxelSize, PointType type, const BufferT &buffer, cudaStream_t stream)
+{
+    PointsToGrid<Point, ResourceT> converter(voxelSize, Vec3d(0.0), stream);
+    converter.setPointType(type);
+    return converter.getHandle(d_xyz, pointCount, buffer);
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace detail {
+
+template<typename BufferT>
+GridHandle<BufferT> mergeHandlesOnStream(const std::vector<GridHandle<BufferT>> &handles, const BufferT &buffer, cudaStream_t stream)
+{
+    static_assert(BufferTraits<BufferT>::hasDeviceDual,
+                  "the std::vector entry points merge their per-set grids with cuda::mergeGridHandles, which "
+                  "supports dual-space buffers only: build the sets one at a time for a single-space buffer");
+    return nanovdb::cuda::mergeGridHandles<BufferT, std::vector>(handles, &buffer, stream);
+}
+
+}// namespace detail
+
 template<typename BuildT, typename PtrT, typename BufferT, typename ResourceT>
 GridHandle<BufferT>
 pointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> vec, const BufferT &buffer, cudaStream_t stream)
 {
     std::vector<GridHandle<BufferT>> handles;
-    for (auto &p : vec) handles.push_back(pointsToGrid<BuildT, PtrT, BufferT, ResourceT>(std::get<0>(p), std::get<1>(p), std::get<2>(p), std::get<3>(p), buffer, stream));
-    return mergeDeviceGrids(handles, stream);
+    for (auto &p : vec) handles.push_back(pointsToGrid<PtrT, BufferT, ResourceT>(std::get<0>(p), int(std::get<1>(p)), std::get<2>(p), std::get<3>(p), buffer, stream));
+    return detail::mergeHandlesOnStream(handles, buffer, stream);
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1454,7 +1480,7 @@ voxelsToGrid(std::vector<std::tuple<const PtrT,size_t,double>> vec, const Buffer
 {
     std::vector<GridHandle<BufferT>> handles;
     for (auto &p : vec) handles.push_back(voxelsToGrid<BuildT, PtrT, BufferT, ResourceT>(std::get<0>(p), std::get<1>(p), std::get<2>(p), buffer, stream));
-    return mergeDeviceGrids(handles, stream);
+    return detail::mergeHandlesOnStream(handles, buffer, stream);
 }
 
 }// namespace tools::cuda ======================================================================================================================================
