@@ -304,8 +304,8 @@ private:
     /// @brief Convert an arbitrary (possibly non-watertight) polygon soup into a narrow-band level set.
     void shrinkWrap();
 
-    /// @brief Generate a dx-offset surface from a polygon soup.
-    void soupToOffset();
+    /// @brief Generate a dx-offset surface from a polygon mesh or polygon soup.
+    void meshToOffset();
 
 #ifdef VDB_TOOL_USE_AX
     /// @brief Run an OpenVDB AX code snippet over one or more selected grids.
@@ -842,7 +842,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
 
   mParser.addAction(
-     {"soup2udf", "mesh2udf"}, "Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band",
+     {"mesh2udf", "soup2udf"}, "Convert a polygon mesh or polygon soup into a to a unsigned distance field with an symmetrical narrow band",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
@@ -867,7 +867,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->shrinkWrap();});
 
   mParser.addAction(
-     {"soup2offset"}, "Convert a polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+     {"mesh2offset", "soup2offset"}, "Convert a polygon mesh or polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      //{"offset", "1.0", "1.0", "Offset in voxel units. Defaults to one, i.e. offset surface corresponds to one voxel dilation from mesh."},
@@ -875,8 +875,8 @@ void Tool::init()
      {"mode", "0", "0", "mode of offset operator: 0) old method (using mesh -> UDF -> mesh -> SDF), 1) Mihai's signed-flood-fill and 2) Greg's createLevelSetDilatedMesh. Defaults to 0, i.e. paper."},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
-     {"name", "", "soup2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
-     [&](){mParser.setDefaults();}, [&](){this->soupToOffset();});
+     {"name", "", "mesh2offset_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
+     [&](){mParser.setDefaults();}, [&](){this->meshToOffset();});
 
   mParser.addAction(
      {"vol2mesh", "vdb2mesh"}, "Convert a scalar volume to an adaptive polygon mesh",
@@ -2771,6 +2771,9 @@ void Tool::meshToLevelSet()
 void Tool::meshToUnsignedDistanceField()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "mesh2udf");
+  if (mParser.getAction().matchedName == "soup2udf") {
+    std::cerr << "Warning: action \"-soup2udf\" is deprecated; use \"-mesh2udf\" instead.\n";
+  }
   mParser.printAction();
   const int dim = mParser.get<int>("dim");
   float voxel = mParser.get<float>("voxel");
@@ -2882,9 +2885,12 @@ void Tool::shrinkWrap()
 
 // ==============================================================================================================
 
-void Tool::soupToOffset()
+void Tool::meshToOffset()
 {
-  OPENVDB_ASSERT(mParser.getAction().names[0] == "soup2offset");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "mesh2offset");
+  if (mParser.getAction().matchedName == "soup2offset") {
+    std::cerr << "Warning: action \"-soup2offset\" is deprecated; use \"-mesh2offset\" instead.\n";
+  }
   mParser.printAction();
   const int dim = mParser.get<int>("dim");// final dimension
   float voxel = mParser.get<float>("voxel");// final voxel size
@@ -2903,7 +2909,7 @@ void Tool::soupToOffset()
     throw std::invalid_argument("got points, expected mesh! Hint: use -points2ls instead!");
   }
   if (keep) mesh = mesh->deepCopy();// deep copy since mesh will be modified below
-  if (mParser.verbose) mTimer.start("Soup -> Offset");
+  if (mParser.verbose) mTimer.start("Mesh -> Offset");
 
   PolySoup poly{std::move(mesh->vtx()), std::move(mesh->tri()), std::move(mesh->quad()), mesh->bbox()};
   ShrinkWrap<GridT> tmp(std::move(poly), voxel, width);
@@ -2911,11 +2917,11 @@ void Tool::soupToOffset()
 
   if (mParser.verbose) mTimer.stop();
 
-  if (grid_name.empty()) grid_name = "soup2offset_" + mesh->getName();
+  if (grid_name.empty()) grid_name = "mesh2offset_" + mesh->getName();
   grid->setName(grid_name);
   mGrid.push_back(grid);
   if (!keep) mGeom.erase(std::next(it).base());
-}// Tool::soupToOffset
+}// Tool::meshToOffset
 
 // ==============================================================================================================
 

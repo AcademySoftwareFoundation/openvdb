@@ -4121,7 +4121,7 @@ TEST_F(Test_vdb_tool, ShrinkWrapClassAPI)
 
 // Exercises the vdb_tool "-shrinkwrap" action end-to-end: the deprecated
 // "-soup2ls"/"-soup2sdf" aliases (with their one-line deprecation warning),
-// the "levels" LOD-selection option, and the sibling "-soup2offset" action
+// the "levels" LOD-selection option, and the sibling "-mesh2offset" action
 // (which also builds on ShrinkWrap<GridT> internally).
 TEST_F(Test_vdb_tool, ActionShrinkWrap)
 {
@@ -4130,6 +4130,7 @@ TEST_F(Test_vdb_tool, ActionShrinkWrap)
     std::remove("data/shrinkwrap_out.vdb");
     std::remove("data/shrinkwrap_lod.vdb");
     std::remove("data/shrinkwrap_offset.vdb");
+    std::remove("data/shrinkwrap_offset_dep.vdb");
     std::remove("data/shrinkwrap_dep.vdb");
     std::remove("data/shrinkwrap_nowarn.vdb");
 
@@ -4171,16 +4172,35 @@ TEST_F(Test_vdb_tool, ActionShrinkWrap)
     }
     std::remove("data/shrinkwrap_lod.vdb");
 
-    // Sibling action -soup2offset, unaffected by the rename other than
-    // internally using ShrinkWrap<GridT> instead of PolySoupToLevelSet<GridT>.
+    // Sibling action -mesh2offset (formerly -soup2offset), unaffected by the
+    // ShrinkWrap rename other than internally using ShrinkWrap<GridT> instead
+    // of PolySoupToLevelSet<GridT>.
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -sphere r=1 dim=32 -ls2mesh"
-                          " -soup2offset voxel=0.2 width=3"
+                          " -mesh2offset voxel=0.2 width=3"
                           " -write data/shrinkwrap_offset.vdb");
       Tool tool(int(args.size()), args.data());
       tool.run();
     });
     std::remove("data/shrinkwrap_offset.vdb");
+
+    // Deprecated alias -soup2offset: still works and prints a one-line
+    // warning pointing at -mesh2offset.
+    {
+      std::ostringstream oss;
+      auto *old = std::cerr.rdbuf(oss.rdbuf());
+      EXPECT_NO_THROW({
+        auto args = getArgs("vdb_tool -quiet -sphere r=1 dim=32 -ls2mesh"
+                            " -soup2offset voxel=0.2 width=3"
+                            " -write data/shrinkwrap_offset_dep.vdb");
+        Tool tool(int(args.size()), args.data());
+        tool.run();
+      });
+      std::cerr.rdbuf(old);
+      EXPECT_NE(oss.str().find("deprecated"), std::string::npos);
+      EXPECT_NE(oss.str().find("-mesh2offset"), std::string::npos);
+    }
+    std::remove("data/shrinkwrap_offset_dep.vdb");
 
     // Deprecated alias -soup2ls: still works and prints a one-line warning
     // (to std::cerr) pointing at -shrinkwrap.
