@@ -44,7 +44,7 @@ namespace tools {// ===================================================
 ///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
 ///          argument is only used when BuildT is set to FpN.
 template<typename BuildT = float, typename BufferT = HostBuffer>
-typename util::enable_if<util::is_same<BuildT, float,  double>::value, GridHandle<BufferT>>::type
+typename util::enable_if<util::is_same<BuildT, float,  double, nanovdb::Half>::value, GridHandle<BufferT>>::type
 createLevelSetSphere(double              radius = 100.0,
                      const Vec3d&        center = Vec3d(0),
                      double              voxelSize = 1.0,
@@ -1014,7 +1014,7 @@ initOctahedron(double       scale, // scale of the octahedron in world units
 //================================================================================================
 
 template<typename BuildT, typename BufferT>
-typename util::enable_if<util::is_same<BuildT, float, double>::value, GridHandle<BufferT>>::type
+typename util::enable_if<util::is_same<BuildT, float, double, nanovdb::Half>::value, GridHandle<BufferT>>::type
 createLevelSetSphere(double              radius, // radius of sphere in world units
                      const Vec3d&        center, // center of sphere in world units
                      double              voxelSize, // size of a voxel in world units
