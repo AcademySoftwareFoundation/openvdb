@@ -1571,7 +1571,7 @@ InternalNode<ChildT, Log2Dim>::addLeafAndCache(LeafNodeType* leaf, AccessorT& ac
 
 template<typename ChildT, Index Log2Dim>
 inline bool
-InternalNode<ChildT, Log2Dim>::addChild(ChildT* child)
+InternalNode<ChildT, Log2Dim>::addChild(ChildNodeType* child)
 {
     OPENVDB_ASSERT(child);
     const Coord& xyz = child->origin();
