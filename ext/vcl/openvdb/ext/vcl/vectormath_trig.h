@@ -22,16 +22,23 @@
 *
 * (c) Copyright 2014-2022 Agner Fog.
 * Apache License version 2.0 or later.
+*
+* -----------------------------------------------------------------------------
+*
+* This file has been modified from the original in the following ways:
+*  > Various defines and guards have been prefixed with OPENVDB_VCL_.
+*  > VCL_NAMESPACE has been removed in favour of an explicit OPENVDB_VCL_NAMESPACE.
+* Copyright Contributors to the OpenVDB Project
+* SPDX-License-Identifier: Apache-2.0*
+*
 ******************************************************************************/
 
-#ifndef VECTORMATH_TRIG_H
-#define VECTORMATH_TRIG_H  202
+#ifndef OPENVDB_VCL_VECTORMATH_TRIG_H
+#define OPENVDB_VCL_VECTORMATH_TRIG_H  202
 
 #include "vectormath_common.h"
 
-#ifdef VCL_NAMESPACE
-namespace VCL_NAMESPACE {
-#endif
+namespace OPENVDB_VCL_NAMESPACE {
 
 
 // *************************************************************
@@ -1033,8 +1040,6 @@ static inline Vec16f atan(Vec16f const y) {
 
 #endif // MAX_VECTOR_SIZE >= 512
 
-#ifdef VCL_NAMESPACE
 }
-#endif
 
 #endif

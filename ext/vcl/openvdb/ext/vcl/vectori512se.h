@@ -24,28 +24,35 @@
 *
 * (c) Copyright 2012-2022 Agner Fog.
 * Apache License version 2.0 or later.
+*
+* -----------------------------------------------------------------------------
+*
+* This file has been modified from the original in the following ways:
+*  > Various defines and guards have been prefixed with OPENVDB_VCL_.
+*  > VCL_NAMESPACE has been removed in favour of an explicit OPENVDB_VCL_NAMESPACE.
+* Copyright Contributors to the OpenVDB Project
+* SPDX-License-Identifier: Apache-2.0*
+*
 ******************************************************************************/
 
-#ifndef VECTORI512SE_H
-#define VECTORI512SE_H
+#ifndef OPENVDB_VCL_VECTORI512SE_H
+#define OPENVDB_VCL_VECTORI512SE_H
 
-#ifndef VECTORCLASS_H
+#ifndef OPENVDB_VCL_VECTORCLASS_H
 #include "vectorclass.h"
 #endif
 
-#if VECTORCLASS_H < 20200
+#if OPENVDB_VCL_VECTORCLASS_H < 20200
 #error Incompatible versions of vector class library mixed
 #endif
 
 // check combination of header files
-#ifdef VECTORI512S_H
+#ifdef OPENVDB_VCL_VECTORI512S_H
 #error Two different versions of vectorf256.h included
 #endif
 
 
-#ifdef VCL_NAMESPACE
-namespace VCL_NAMESPACE {
-#endif
+namespace OPENVDB_VCL_NAMESPACE {
 
 
 /*****************************************************************************
@@ -2088,8 +2095,6 @@ static inline Vec64uc & operator /= (Vec64uc & a, Const_int_t<d> b) {
     return a;
 }
 
-#ifdef VCL_NAMESPACE
 }
-#endif
 
-#endif // VECTORI512S_H
+#endif // OPENVDB_VCL_VECTORI512S_H

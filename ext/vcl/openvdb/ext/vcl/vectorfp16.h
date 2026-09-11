@@ -25,16 +25,25 @@
 *
 * (c) Copyright 2012-2026 Agner Fog.
 * Apache License version 2.0 or later.
+*
+* -----------------------------------------------------------------------------
+*
+* This file has been modified from the original in the following ways:
+*  > Various defines and guards have been prefixed with OPENVDB_VCL_.
+*  > VCL_NAMESPACE has been removed in favour of an explicit OPENVDB_VCL_NAMESPACE.
+* Copyright Contributors to the OpenVDB Project
+* SPDX-License-Identifier: Apache-2.0*
+*
 *****************************************************************************/
 
-#ifndef VECTORFP16_H
-#define VECTORFP16_H
+#ifndef OPENVDB_VCL_VECTORFP16_H
+#define OPENVDB_VCL_VECTORFP16_H
 
-#ifndef VECTORCLASS_H
+#ifndef OPENVDB_VCL_VECTORCLASS_H
 #include "vectorclass.h"
 #endif
 
-#if VECTORCLASS_H < 20200
+#if OPENVDB_VCL_VECTORCLASS_H < 20200
 #error Incompatible versions of vector class library mixed
 #endif
 
@@ -43,9 +52,7 @@
 #include "vectorfp16e.h"
 #else
 
-#ifdef VCL_NAMESPACE
-namespace VCL_NAMESPACE {
-#endif
+namespace OPENVDB_VCL_NAMESPACE {
 
 // type Float16 emulates _Float16 in vectorfp16e.h if _Float16 not defined
 #ifdef __STDCPP_FLOAT16_T__
@@ -2663,10 +2670,8 @@ static inline Vec32h tanpi(Vec32h const x) {
 #endif  // MAX_VECTOR_SIZE >= 512
 
 
-#ifdef VCL_NAMESPACE
 }
-#endif
 
 #endif // defined(__AVX512FP16__)
 
-#endif // VECTORFP16_H
+#endif // OPENVDB_VCL_VECTORFP16_H

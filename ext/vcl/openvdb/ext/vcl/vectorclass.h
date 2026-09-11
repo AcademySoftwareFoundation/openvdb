@@ -24,10 +24,19 @@
 *
 * (c) Copyright 2012-2026 Agner Fog.
 * Apache License version 2.0 or later.
+*
+* -----------------------------------------------------------------------------
+*
+* This file has been modified from the original in the following ways:
+*  > Various defines and guards have been prefixed with OPENVDB_VCL_.
+*  > VCL_NAMESPACE has been removed in favour of an explicit OPENVDB_VCL_NAMESPACE.
+* Copyright Contributors to the OpenVDB Project
+* SPDX-License-Identifier: Apache-2.0*
+*
 ******************************************************************************/
 
-#ifndef VECTORCLASS_H
-#define VECTORCLASS_H  20203
+#ifndef OPENVDB_VCL_VECTORCLASS_H
+#define OPENVDB_VCL_VECTORCLASS_H  20203
 
 // Maximum vector size, bits. Allowed values are 128, 256, 512
 #ifndef MAX_VECTOR_SIZE
@@ -78,10 +87,10 @@
 #endif  // INSTRSET >= 2
 
 
-#else   // VECTORCLASS_H
+#else   // OPENVDB_VCL_VECTORCLASS_H
 
-#if VECTORCLASS_H < 20000
+#if OPENVDB_VCL_VECTORCLASS_H < 20000
 #error Mixed versions of vector class library
 #endif
 
-#endif  // VECTORCLASS_H
+#endif  // OPENVDB_VCL_VECTORCLASS_H

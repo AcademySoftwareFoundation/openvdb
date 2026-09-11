@@ -25,14 +25,24 @@
 
 #if defined(OPENVDB_USE_VCL)
 #if defined(INSTRSET) && INSTRSET != OPENVDB_X86_INSTRSET
-    // If the user has imported their own version of VCL and it's already detected
-    // an architecture, disregard it and select the one OpenVDB was configured for.
-    #pragma message "Mismatching ISA's detected during downstream compilation."
-    #undef INSTRSET
+    // If we're here, then the value of INSTRSET does not match what OpenVDB
+    // was configured with. This can only happen if VCL is included before
+    // simd/Simd.h and detects different x86 compiler flags than what
+    // OPENVDB_X86_INSTRSET was configured for. It's not clear what to do in
+    // this situation as, technically, you can instrument openvdb libs with
+    // ISA A and recompile downstream with ISA B, so long as both are valid for
+    // the target architecture.
+    //
+    // For now we simply use the value of INSTRSET for VCL's selection of
+    // intrinsics, but we continue to use the value of OPENVDB_X86_INSTRSET
+    // for VDB's native vector size selection. Use a #warning directive which
+    // will error with -Werror but can ultimately be suppressed (pragmas won't
+    // show up with isystem etc).
+    #warning "OpenVDB: Mismatching requested ISA's detected during downstream compilation."
+#else
+    /// Tell VCL what instruction set to use.
+    #define INSTRSET OPENVDB_X86_INSTRSET
 #endif
-#define INSTRSET OPENVDB_X86_INSTRSET
-/// Import VCL and wrap it within our private namespace
-#define VCL_NAMESPACE OPENVDB_VCL_NAMESPACE
 #include <openvdb/ext/vcl/vectorclass.h>
 #include <openvdb/ext/vcl/vectorfp16.h>
 #else
