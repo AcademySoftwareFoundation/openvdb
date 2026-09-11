@@ -182,7 +182,7 @@ inline Index countPointDataPasses(const std::vector<const LeafT*>& leaves)
 {
     Index maxRequiredPasses = 0;
     for (const auto* leaf : leaves) {
-        const Index attributes = leaf->attributeSet().size();
+        const Index attributes = static_cast<Index>(leaf->attributeSet().size());
         const Index requiredPasses =
             /*voxel buffer sizes*/          1 +
             /*voxel buffers*/               1 +
