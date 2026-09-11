@@ -251,7 +251,7 @@ private:
     auto upsample(const GridType &inGrid);
 
     /// @brief Performs the shrink wrap operation as a constrained level set erosion.
-    auto shrinkWrapStep(GridType &grid, const GridType &gridB, float &d);
+    auto constrainedErode(GridType &grid, const GridType &gridB, float &d);
 
 };// ShrinkWrap<GridType>
 
@@ -365,7 +365,7 @@ void ShrinkWrap<GridType>::process(const ShrinkWrapT &D, ProgressT *progress, in
       grid = this->upsample(*grid);// grid(dx) -> grid(dx/2)
       for (float d = 0.0f, dx = float(grid->voxelSize()[0]), Ddx = D(dx); d < Ddx; vol[0] = vol[1]) {
         myProgress("Shrink wrap d=" + std::to_string(d) + ", D("+std::to_string(dx) + ")=" + std::to_string(Ddx));
-        grid = this->shrinkWrapStep(*grid, **iter, d);
+        grid = this->constrainedErode(*grid, **iter, d);
         vol[1] = tools::levelSetVolume(*grid);
         if (d>0.0f && math::isApproxZero(vol[0]-vol[1])) break;
       }
@@ -443,7 +443,7 @@ auto ShrinkWrap<GridType>::upsample(const GridType &inGrid)
 //////////////////////////////////////////////////////////////////////////
 
 template<typename GridType>
-auto ShrinkWrap<GridType>::shrinkWrapStep(GridType &grid, const GridType &gridB, float &d)
+auto ShrinkWrap<GridType>::constrainedErode(GridType &grid, const GridType &gridB, float &d)
 {
     const float maxDist = 2.0f;
     tools::LevelSetFilter<GridType> filter(grid);
@@ -463,7 +463,7 @@ auto ShrinkWrap<GridType>::shrinkWrapStep(GridType &grid, const GridType &gridB,
     mIsGridSDF = false;// the CSG operation messed up the SDF
     d += maxDist;
     return tools::csgUnionCopy(grid, gridB);
-}// vdb_tool::ShrinkWrap<GridType>::shrinkWrapStep
+}// vdb_tool::ShrinkWrap<GridType>::constrainedErode
 
 //////////////////////////////////////////////////////////////////////////
 
