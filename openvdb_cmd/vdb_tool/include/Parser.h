@@ -132,6 +132,7 @@ struct Action {
     void print(std::ostream& os = std::clog) const;
 
     std::vector<std::string> names;         ///< Names/aliases of the action, e.g. {"read", "import", "load", "i"}.
+    std::string              matchedName;   ///< The literal alias typed on the command line for this invocation (set during parsing).
     std::string              documentation; ///< One-line description shown in usage output.
     size_t                   anonymous;     ///< Index of the option receiving un-named values, or -1 if disallowed.
     bool                     greedy;        ///< If true, tokens with an unrecognized "name=" prefix also go to the anonymous option (see constructor docstring).
@@ -1700,6 +1701,7 @@ void Parser::parse(int argc, char *argv[])
             const int actionIdx = i;// remember the action keyword's position for diagnostics
             actions.push_back(*search->second);// copy construction of Action
             iter = std::prev(actions.end());// important
+            iter->matchedName = str.substr(pos);// literal alias typed by the user
             while(i+1<argc && argv[i+1][0] != '-') {
                 const int badIdx = i + 1;
                 try {

@@ -54,6 +54,8 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **mean** (alias: meanLS) | mean value filtering of a level set surface |
 | **median** (alias: medianLS) | median value filtering of a level set surface |
 | **mesh2ls** (alias: mesh2sdf) | Convert a watertight polygon surface into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
+| **mesh2offset** (alias: soup2offset; deprecated) | Convert a polygon mesh or polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
+| **mesh2udf** (alias: soup2udf; deprecated) | Convert a polygon mesh or polygon soup into a to a unsigned distance field with an symmetrical narrow band |
 | **min** | Given grids A and B, compute min(a, b) per voxel |
 | **movie** (aliases: img2mpeg, mov2mpeg, mov2gif, img2gif) | Convert image and movie files to mpeg or animated gif files |
 | **multiply** (alias: mul) | Given grids A and B, compute a * b per voxel |
@@ -73,10 +75,8 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **scatter** | Scatter point into the active values of an input VDB grid |
 | **sdf2udf** | Converts a signed distance field into an unsigned distance field, i.e. performs the Abs of all values and changes GridClass to UNKNOWN. |
 | **segment** | segment an input VDB into a list if topologically disconnected VDB grids |
+| **shrinkwrap** (aliases: soup2ls, soup2sdf; the aliases are deprecated) | Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
 | **slice** | Generate images of slices of a VDB grid |
-| **soup2ls** (aliases: soup2sdf, shrinkwrap) | Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
-| **soup2offset** | Convert a polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
-| **soup2udf** (alias: mesh2udf) | Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band |
 | **sphere** | Create a level set sphere, i.e. a narrow-band signed distance to a sphere |
 | **stats** | Print value statistics (min, max, mean, std. dev.) of active voxels for one or more VDB grids |
 | **sum** | Given grids A and B, compute sum(a, b) per voxel |
