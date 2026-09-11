@@ -988,6 +988,79 @@ TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
     //timer.stop();
 }//  mergeSplitDeviceGrids
 
+TEST(TestNanoVDBCUDA, pointsToGridVectorOverloads)
+{
+    // The std::vector<tuple> entry points build one grid per tuple and merge
+    // them. Voxel8 points are 3 bytes each, so this also checks that a Point
+    // grid's size is padded to the data alignment: the second grid in the
+    // merged buffer must start on an aligned address.
+    using nanovdb::Coord;
+    using nanovdb::Vec3f;
+    using nanovdb::Point;
+    using nanovdb::PointType;
+    const std::vector<Coord> voxelsA = {Coord(1,2,3), Coord(10,20,8)}, voxelsB = {Coord(-5,0,0), Coord(-5,0,1), Coord(4,4,4)};
+    const std::vector<Vec3f> pointsA = {Vec3f(0.5f, 1.5f, 2.5f), Vec3f(3.0f, 3.0f, 3.0f)}, pointsB = {Vec3f(-1.0f, -2.0f, -3.0f)};
+    Coord *d_voxA = nullptr, *d_voxB = nullptr;
+    Vec3f *d_ptsA = nullptr, *d_ptsB = nullptr;
+    ASSERT_EQ(cudaSuccess, cudaMalloc(&d_voxA, voxelsA.size() * sizeof(Coord)));
+    ASSERT_EQ(cudaSuccess, cudaMalloc(&d_voxB, voxelsB.size() * sizeof(Coord)));
+    ASSERT_EQ(cudaSuccess, cudaMalloc(&d_ptsA, pointsA.size() * sizeof(Vec3f)));
+    ASSERT_EQ(cudaSuccess, cudaMalloc(&d_ptsB, pointsB.size() * sizeof(Vec3f)));
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_voxA, voxelsA.data(), voxelsA.size() * sizeof(Coord), cudaMemcpyHostToDevice));
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_voxB, voxelsB.data(), voxelsB.size() * sizeof(Coord), cudaMemcpyHostToDevice));
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_ptsA, pointsA.data(), pointsA.size() * sizeof(Vec3f), cudaMemcpyHostToDevice));
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_ptsB, pointsB.data(), pointsB.size() * sizeof(Vec3f), cudaMemcpyHostToDevice));
+
+    {   // voxel sets
+        std::vector<std::tuple<Coord* const, size_t, double>> voxelSets;
+        voxelSets.emplace_back(d_voxA, voxelsA.size(), 1.0);
+        voxelSets.emplace_back(d_voxB, voxelsB.size(), 0.5);
+        auto handle = nanovdb::tools::cuda::voxelsToGrid<float, Coord*>(voxelSets);
+        ASSERT_EQ(2u, handle.gridCount());
+        handle.deviceDownload();
+        EXPECT_EQ(0u, handle.gridData(0)->mGridIndex);
+        EXPECT_EQ(2u, handle.gridData(0)->mGridCount);
+        EXPECT_EQ(1u, handle.gridData(1)->mGridIndex);
+        EXPECT_EQ(2u, handle.gridData(1)->mGridCount);
+        auto *g0 = handle.grid<float>(0), *g1 = handle.grid<float>(1);
+        ASSERT_NE(g0, nullptr);
+        ASSERT_NE(g1, nullptr);
+        EXPECT_EQ(2u, g0->activeVoxelCount());
+        EXPECT_TRUE(g0->tree().isActive(Coord(10,20,8)));
+        EXPECT_EQ(3u, g1->activeVoxelCount());
+        EXPECT_TRUE(g1->tree().isActive(Coord(-5,0,1)));
+        EXPECT_EQ(0.5, g1->voxelSize()[0]);
+    }
+    {   // point sets, and the voxel-size form of the single-set entry point
+        std::vector<std::tuple<Vec3f* const, size_t, double, PointType>> pointSets;
+        pointSets.emplace_back(d_ptsA, pointsA.size(), 1.0, PointType::Voxel8);
+        pointSets.emplace_back(d_ptsB, pointsB.size(), 1.0, PointType::Voxel8);
+        auto handle = nanovdb::tools::cuda::pointsToGrid<Point, Vec3f*>(pointSets);
+        ASSERT_EQ(2u, handle.gridCount());
+        EXPECT_EQ(0u, handle.gridSize(0) % NANOVDB_DATA_ALIGNMENT);
+        EXPECT_EQ(0u, handle.gridSize(1) % NANOVDB_DATA_ALIGNMENT);
+        handle.deviceDownload();
+        EXPECT_EQ(1u, handle.gridData(1)->mGridIndex);
+        EXPECT_EQ(2u, handle.gridData(1)->mGridCount);
+        ASSERT_NE(handle.grid<Point>(0), nullptr);
+        ASSERT_NE(handle.grid<Point>(1), nullptr);
+        EXPECT_EQ(2u, handle.grid<Point>(0)->pointCount());
+        EXPECT_EQ(1u, handle.grid<Point>(1)->pointCount());
+
+        auto single = nanovdb::tools::cuda::pointsToGrid<Vec3f*>(d_ptsA, int(pointsA.size()), 0.5, PointType::Voxel8);
+        single.deviceDownload();
+        ASSERT_EQ(1u, single.gridCount());
+        EXPECT_EQ(0u, single.gridSize(0) % NANOVDB_DATA_ALIGNMENT);
+        ASSERT_NE(single.grid<Point>(), nullptr);
+        EXPECT_EQ(2u, single.grid<Point>()->pointCount());
+        EXPECT_EQ(0.5, single.grid<Point>()->voxelSize()[0]);
+    }
+    ASSERT_EQ(cudaSuccess, cudaFree(d_voxA));
+    ASSERT_EQ(cudaSuccess, cudaFree(d_voxB));
+    ASSERT_EQ(cudaSuccess, cudaFree(d_ptsA));
+    ASSERT_EQ(cudaSuccess, cudaFree(d_ptsB));
+}//  pointsToGridVectorOverloads
+
 // make -j 4 testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*Cuda*" --gtest_break_on_failure
 TEST(TestNanoVDBCUDA, CudaIndexGridToGrid_basic)
 {
@@ -1425,7 +1498,7 @@ TEST(TestNanoVDBCUDA, ThreePointsToGrid)
                           sizeof(GridT::LowerNodeType) +
                           sizeof(GridT::LeafNodeType) +
                           sizeof(nanovdb::GridBlindMetaData) +
-                          num_points*sizeof(Vec3T);
+                          nanovdb::math::AlignUp<NANOVDB_DATA_ALIGNMENT>(num_points*sizeof(Vec3T));// blind data is padded
     EXPECT_EQ(handle.size(), size);
 
     GridT *grid = handle.grid<BuildT>();// no grid on the CPU
