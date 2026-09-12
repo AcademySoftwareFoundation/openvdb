@@ -11,22 +11,31 @@
 *
 * (c) Copyright 2014-2022 Agner Fog.
 * Apache License version 2.0 or later.
+*
+* -----------------------------------------------------------------------------
+*
+* This file has been modified from the original in the following ways:
+*  > Various defines and guards have been prefixed with OPENVDB_VCL_.
+*  > VCL_NAMESPACE has been removed in favour of an explicit OPENVDB_VCL_NAMESPACE.
+* Copyright Contributors to the OpenVDB Project
+* SPDX-License-Identifier: Apache-2.0*
+*
 ******************************************************************************/
 
-#ifndef VECTORMATH_COMMON_H
-#define VECTORMATH_COMMON_H  2
+#ifndef OPENVDB_VCL_VECTORMATH_COMMON_H
+#define OPENVDB_VCL_VECTORMATH_COMMON_H  2
 
-#ifdef VECTORMATH_LIB_H
+#ifdef OPENVDB_VCL_VECTORMATH_LIB_H
 #error conflicting header files. More than one implementation of mathematical functions included
 #endif
 
 #include <cmath>
 
-#ifndef VECTORCLASS_H
+#ifndef OPENVDB_VCL_VECTORCLASS_H
 #include "vectorclass.h"
 #endif
 
-#if VECTORCLASS_H < 20200
+#if OPENVDB_VCL_VECTORCLASS_H < 20200
 #error Incompatible versions of vector class library mixed
 #endif
 
@@ -55,9 +64,7 @@
 #define VM_SMALLEST_NORMALF 1.17549435E-38f          // smallest normal number, float
 
 
-#ifdef VCL_NAMESPACE
-namespace VCL_NAMESPACE {
-#endif
+namespace OPENVDB_VCL_NAMESPACE {
 
 /******************************************************************************
       templates for producing infinite and nan in desired vector type
@@ -320,8 +327,6 @@ static inline VTYPE polynomial_13m(VTYPE const x, CTYPE c2, CTYPE c3, CTYPE c4, 
         mul_add(mul_add(mul_add(c7, x, c6), x2, mul_add(c5, x, c4)), x4, mul_add(mul_add(c3, x, c2), x2, x)));
 }
 
-#ifdef VCL_NAMESPACE
 }
-#endif
 
 #endif

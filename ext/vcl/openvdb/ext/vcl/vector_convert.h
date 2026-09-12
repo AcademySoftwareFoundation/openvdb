@@ -10,22 +10,29 @@
 *
 * (c) Copyright 2012-2022 Agner Fog.
 * Apache License version 2.0 or later.
+*
+* -----------------------------------------------------------------------------
+*
+* This file has been modified from the original in the following ways:
+*  > Various defines and guards have been prefixed with OPENVDB_VCL_.
+*  > VCL_NAMESPACE has been removed in favour of an explicit OPENVDB_VCL_NAMESPACE.
+* Copyright Contributors to the OpenVDB Project
+* SPDX-License-Identifier: Apache-2.0*
+*
 *****************************************************************************/
 
-#ifndef VECTOR_CONVERT_H
-#define VECTOR_CONVERT_H
+#ifndef OPENVDB_VCL_VECTOR_CONVERT_H
+#define OPENVDB_VCL_VECTOR_CONVERT_H
 
-#ifndef VECTORCLASS_H
+#ifndef OPENVDB_VCL_VECTORCLASS_H
 #include "vectorclass.h"
 #endif
 
-#if VECTORCLASS_H < 20200
+#if OPENVDB_VCL_VECTORCLASS_H < 20200
 #error Incompatible versions of vector class library mixed
 #endif
 
-#ifdef VCL_NAMESPACE
-namespace VCL_NAMESPACE {
-#endif
+namespace OPENVDB_VCL_NAMESPACE {
 
 #if MAX_VECTOR_SIZE >= 256
 
@@ -821,8 +828,6 @@ static inline V fmodulo(V const numerator, double const denominator) {
     }
 }
 
-#ifdef VCL_NAMESPACE
 }
-#endif
 
-#endif // VECTOR_CONVERT_H
+#endif // OPENVDB_VCL_VECTOR_CONVERT_H
