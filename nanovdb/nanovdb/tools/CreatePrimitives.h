@@ -44,7 +44,7 @@ namespace tools {// ===================================================
 ///          FpN overload also takes a @c tolerance argument that sets the
 ///          global error tolerance.
 template<typename BuildT = float, typename BufferT = HostBuffer>
-typename util::enable_if<util::is_same<BuildT, float,  double>::value, GridHandle<BufferT>>::type
+typename util::enable_if<util::is_same<BuildT, float,  double, nanovdb::Half>::value, GridHandle<BufferT>>::type
 createLevelSetSphere(double              radius = 100.0,
                      const Vec3d&        center = Vec3d(0),
                      double              voxelSize = 1.0,
@@ -1014,7 +1014,7 @@ initOctahedron(double       scale, // scale of the octahedron in world units
 //================================================================================================
 
 template<typename BuildT, typename BufferT>
-typename util::enable_if<util::is_same<BuildT, float, double>::value, GridHandle<BufferT>>::type
+typename util::enable_if<util::is_same<BuildT, float, double, nanovdb::Half>::value, GridHandle<BufferT>>::type
 createLevelSetSphere(double              radius, // radius of sphere in world units
                      const Vec3d&        center, // center of sphere in world units
                      double              voxelSize, // size of a voxel in world units
