@@ -596,6 +596,7 @@ struct SimdTraits
 
 OPENVDB_ENABLE_IF_ARITHMETIC inline T max(const T& a, const T& b) { return std::max(a, b); }
 OPENVDB_ENABLE_IF_ARITHMETIC inline T min(const T& a, const T& b) { return std::min(a, b); }
+OPENVDB_ENABLE_IF_ARITHMETIC inline auto abs(const T& a) { return std::abs(a); }
 OPENVDB_ENABLE_IF_ARITHMETIC inline auto sqrt(const T& a) { return std::sqrt(a); }
 OPENVDB_ENABLE_IF_ARITHMETIC inline T pow2(const T& a) { return math::Pow2(a); }
 OPENVDB_ENABLE_IF_ARITHMETIC inline T pow3(const T& a) { return math::Pow3(a); }

@@ -9,7 +9,8 @@ OpenVDB:
     vectorized math library. See https://github.com/vectorclass/version2.
 
     Using VCL can be controlled via the USE_VCL build option. The desired x86
-    ISA can be provided via OPENVDB_X86_INSTRSET.
+    ISA can be provided via OPENVDB_X86_INSTRSET (OpenVDB does not perform
+    automatic host ISA selection).
 
     To support other platforms and plan for future transitions, a generic SIMD
     interface has been introduced in simd/Simd.h. When VCL is not in use, this
@@ -18,11 +19,16 @@ OpenVDB:
     code which can be auto-vectorized, regardless of the underlying SIMD
     acceleration library in use.
 
+    More tools and algorithms will continue to be instrumented with the new
+    simd tooling in future releases.
+
   Improvements:
   - Vectorized points::rasterizeSdf(SphereSettings), improving performance
-    upwards of 2x on x86 and 1.5x on other platforms.
-  - Vectorized points::pca, improving performance upwards of 2x on x86 and
-    1.5x on other platforms.
+    upwards of 2x on x86 with VCL and 1.5x otherwise.
+  - Vectorized points::pca, improving performance upwards of 2x on x86 with
+    VCL or 1.5x otherwise.
+  - Vectorized points::rasterizeTrilinear, improving performance upwards of
+    2x on x86 with VCL, and 1.5x otherwise.
   - Introduced new component wise arithmetic and relational operators for
     math::Tuple instantiations for use with fallback SIMD support.
   - Using Limiter::CLAMP when advecting vector fields through VolumeAdvect now
