@@ -117,8 +117,8 @@ struct TrilinearTransfer :
                     const Index end,
                     const CoordBBox& bounds)
     {
-        constexpr auto N2 = simd::SimdTraits<NativeT>::size;
-        if constexpr(N2 == 1) {
+        constexpr auto kBatchSize = simd::SimdTraits<NativeT>::size;
+        if constexpr(kBatchSize == 1) {
             // Fallback to per point rasterization
             for (Index i = start; i < end; ++i) {
                 if (!FilterTransferT::filter(i)) continue;
@@ -128,22 +128,22 @@ struct TrilinearTransfer :
         else {
             // Batched/vectorized rasterization. Expect power of two for
             // batched size
-            static_assert((N2 > 1) && !(N2 & (N2 - 1)));
-            std::array<int64_t, N2> ids;
+            static_assert((kBatchSize > 1) && !(kBatchSize & (kBatchSize - 1)));
+            std::array<int64_t, kBatchSize> ids;
             Index offset = 0;
             for (Index i = start; i < end; ++i) {
                 if (!FilterTransferT::filter(i)) continue;
                 ids[offset++] = int64_t(i);
-                if (offset == N2) {
-                    this->rasterizeN2<N2>(ijk, ids, bounds);
+                if (offset == kBatchSize) {
+                    this->rasterizeN2<kBatchSize>(ijk, ids, bounds);
                     offset = 0;
                 }
             }
             if (offset == 0) return;
-            else {
-                for (; offset < N2; ++offset) ids[offset] = int64_t(-1);
-                this->rasterizeN2<N2>(ijk, ids, bounds);
+            for (; offset < kBatchSize; ++offset) {
+                ids[offset] = int64_t(-1);
             }
+            this->rasterizeN2<kBatchSize>(ijk, ids, bounds);
         }
     }
 

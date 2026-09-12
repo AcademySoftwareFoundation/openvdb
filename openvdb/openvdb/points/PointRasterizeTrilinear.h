@@ -87,10 +87,10 @@ public:
 /// @tparam Staggered whether to perform a staggered or collocated rasterization
 /// @tparam ValueT    the value type of the point attribute to rasterize
 /// @param points     the point tree to be rasterized
-/// @param attribute  the name of the attribute to rasterize. Must be a Vec3
-///   attribute for Staggered rasterization. Otherwise, can be any scalar,
-///   Vector or Matrix type. Integer values are interpolated at their float
-///   bitwidth precision and returned as a tree at that precision e.g:
+/// @param attribute  the name of the attribute to rasterize. Must be a scalar
+///   or Vec3 attribute for Staggered rasterization. Otherwise, can be any
+///   scalar, Vector or Matrix type. Integer values are interpolated at their
+///   float bitwidth precision and returned as a tree at that precision e.g:
 ///     int32 -> float, FloatTree.
 /// @param filter     an optional point filter to use
 template <bool Staggered,
