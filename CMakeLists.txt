@@ -105,20 +105,16 @@ option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)."
 cmake_dependent_option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON "NOT WIN32" OFF)
 option(USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
-When enabled, you do not need to provide dependency locations for TBB, Blosc, Imath and OpenEXR. Boost must be
+When enabled, you do not need to provide dependency locations for TBB, Imath and OpenEXR. Boost must be
 provided. Imath/OpenEXR can optionally be provided.]=] OFF)
 option(USE_MAYA [=[
 Build the library against a Maya installation. Turns on automatically if OPENVDB_BUILD_MAYA_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB. All other dependencies must be provided.]=] OFF)
 option(USE_TBB [=[
 Use TBB in building the NanoVDB library.]=] ON)
-option(USE_BLOSC [=[
-Use blosc while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
-openvdb build configuration to decide on blosc support. You may set this to on to force blosc to be used if you
-know it to be required.]=] ON)
 option(USE_ZLIB [=[
 Use zlib while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
-openvdb build configuration to decide on zlib support. ZLib can only be disabled if Blosc is also disabled. ]=] ON)
+openvdb build configuration to decide on zlib support.]=] ON)
 option(USE_LOG4CPLUS [=[
 Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
 located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
@@ -197,10 +193,6 @@ if(NOT CONCURRENT_MALLOC)
 elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
   message(WARNING "Unrecognized value for CONCURRENT_MALLOC, using Auto instead.")
   set(CONCURRENT_MALLOC Auto CACHE STRING FORCE)
-endif()
-
-if(USE_BLOSC AND NOT USE_ZLIB)
-  message(WARNING "ZLib can only be disabled if Blosc is also disabled. Enabling ZLib.")
 endif()
 
 if(USE_NANOVDB)
@@ -331,7 +323,6 @@ endif()
 
 if(OPENVDB_INSTALL_CMAKE_MODULES)
   set(OPENVDB_CMAKE_MODULES
-    cmake/FindBlosc.cmake
     cmake/FindJemalloc.cmake
     cmake/FindLog4cplus.cmake
     cmake/FindOpenEXR.cmake
@@ -444,7 +435,6 @@ endif()
 # Configure our cmake modules to only search for static libraries
 
 if(USE_STATIC_DEPENDENCIES)
-  set(BLOSC_USE_STATIC_LIBS ON)
   set(OPENEXR_USE_STATIC_LIBS ON)
   set(TBB_USE_STATIC_LIBS ON)
   set(LOG4CPLUS_USE_STATIC_LIBS ON)
