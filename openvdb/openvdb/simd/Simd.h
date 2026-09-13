@@ -40,7 +40,7 @@
     // for VDB's native vector size selection. Use a #warning directive which
     // will error with -Werror but can ultimately be suppressed (pragmas won't
     // show up with isystem etc).
-    #warning "OpenVDB: Mismatching requested ISA's detected during downstream compilation."
+    PRAGMA(message("OpenVDB: Mismatching requested ISA's detected during downstream compilation."))
 #else
     /// Tell VCL what instruction set to use.
     #define INSTRSET OPENVDB_X86_INSTRSET

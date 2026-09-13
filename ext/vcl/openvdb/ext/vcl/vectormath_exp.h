@@ -624,7 +624,7 @@ static inline Vec2d fraction_2(Vec2d const a) {
 #if MAX_VECTOR_SIZE >= 256
 
 static inline Vec8f fraction_2(Vec8f const a) {
-#if defined (VECTORI256_H) && VECTORI256_H > 2             // 256 bit integer vectors are available, AVX2
+#if defined (OPENVDB_VCL_VECTORI256_H) && OPENVDB_VCL_VECTORI256_H > 2             // 256 bit integer vectors are available, AVX2
     Vec8ui t1 = _mm256_castps_si256(a);                    // reinterpret as 32-bit integer
     Vec8ui t2 = (t1 & 0x007FFFFF) | 0x3F000000;            // set exponent to 0 + bias
     return _mm256_castsi256_ps(t2);
@@ -634,7 +634,7 @@ static inline Vec8f fraction_2(Vec8f const a) {
 }
 
 static inline Vec4d fraction_2(Vec4d const a) {
-#if VECTORI256_H > 1  // AVX2
+#if OPENVDB_VCL_VECTORI256_H > 1  // AVX2
     Vec4uq t1 = _mm256_castpd_si256(a);                    // reinterpret as 64-bit integer
     Vec4uq t2 = Vec4uq((t1 & 0x000FFFFFFFFFFFFFll) | 0x3FE0000000000000ll); // set exponent to 0 + bias
     return _mm256_castsi256_pd(t2);

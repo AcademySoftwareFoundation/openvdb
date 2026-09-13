@@ -24,6 +24,7 @@
 * This file has been modified from the original in the following ways:
 *  > Various defines and guards have been prefixed with OPENVDB_VCL_.
 *  > VCL_NAMESPACE has been removed in favour of an explicit OPENVDB_VCL_NAMESPACE.
+*  > The const_int and const_uint macros have been removed
 * Copyright Contributors to the OpenVDB Project
 * SPDX-License-Identifier: Apache-2.0*
 *
@@ -370,9 +371,6 @@ constexpr int bit_scan_reverse_const(uint64_t const n) {
 
 template <int32_t  n> class Const_int_t {};                // represent compile-time signed integer constant
 template <uint32_t n> class Const_uint_t {};               // represent compile-time unsigned integer constant
-#define const_int(n)  (OPENVDB_VCL_NAMESPACE:: Const_int_t <n>())  // n must be compile-time integer constant
-#define const_uint(n) (OPENVDB_VCL_NAMESPACE:: Const_uint_t<n>())  // n must be compile-time unsigned integer constant
-
 
 // template for producing quiet NAN
 template <class VTYPE>

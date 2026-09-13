@@ -645,7 +645,7 @@ static inline Vec2d cdfnorminv (Vec2d const x) { // inverse cumulative normal di
 
 #if defined (MAX_VECTOR_SIZE) && MAX_VECTOR_SIZE >= 256  // 256 bit vectors
 
-#if defined (VECTORF256_H)  // 256-bit vector registers supported
+#if defined (OPENVDB_VCL_VECTORF256_H)  // 256-bit vector registers supported
 
 #ifdef USE_SVML_INTRINSICS
 /*****************************************************************************
@@ -1425,7 +1425,7 @@ static inline Vec4d cdfnorminv (Vec4d const x) { // inverse cumulative normal di
 
 #if defined (MAX_VECTOR_SIZE) && MAX_VECTOR_SIZE >= 512    // 512 bit vectors
 
-#if defined (VECTORF512_H)  // 512-bit vector registers supported
+#if defined (OPENVDB_VCL_VECTORF512_H)  // 512-bit vector registers supported
 
 #ifdef USE_SVML_INTRINSICS
 /*****************************************************************************

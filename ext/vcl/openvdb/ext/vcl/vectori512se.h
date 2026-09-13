@@ -94,7 +94,7 @@ public:
             i48, i49, i50, i51, i52, i53, i54, i55, i56, i57, i58, i59, i60, i61, i62, i63 };
         load(aa);
     }
-#ifdef VECTORI512_H
+#ifdef OPENVDB_VCL_VECTORI512_H
     // Constructor to convert from type __m512i used in intrinsics:
     Vec64c(__m512i const x) {
         z0 = Vec16i(x).get_low();
@@ -674,7 +674,7 @@ public:
         load(aa);
     }
 
-#ifdef VECTORI512_H
+#ifdef OPENVDB_VCL_VECTORI512_H
    // Constructor to convert from type __m512i used in intrinsics:
    Vec64uc(__m512i const x) : Vec64c(x) {};
 
@@ -887,7 +887,7 @@ public:
     Vec32s(Vec16s const a0, Vec16s const a1) {
         z0 = a0;  z1 = a1;
     }
-#ifdef VECTORI512_H
+#ifdef OPENVDB_VCL_VECTORI512_H
     // Constructor to convert from type __m512i used in intrinsics:
     Vec32s(__m512i const x) {
         Vec16i zz(x);
@@ -1420,7 +1420,7 @@ public:
     Vec32us(Vec16us const a0, Vec16us const a1) {
         z0 = a0;  z1 = a1;
     }
-#ifdef VECTORI512_H
+#ifdef OPENVDB_VCL_VECTORI512_H
     // Constructor to convert from type __m512i used in intrinsics:
     Vec32us(__m512i const x) : Vec32s(x) {
     }

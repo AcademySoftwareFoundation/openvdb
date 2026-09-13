@@ -72,7 +72,7 @@ public:
     }
     // Constructor from two Vec8fb
     Vec16fb (Vec8fb const x0, Vec8fb const x1) {
-#ifdef VECTORF256E_H
+#ifdef OPENVDB_VCL_VECTORF256E_H
         z0 = reinterpret_i(x0);
         z1 = reinterpret_i(x1);
 #else
@@ -190,7 +190,7 @@ public:
     }
     // Constructor from two Vec4db
     Vec8db (Vec4db const x0, Vec4db const x1) {
-#ifdef VECTORF256E_H
+#ifdef OPENVDB_VCL_VECTORF256E_H
         z0 = reinterpret_i(x0);
         z1 = reinterpret_i(x1);
 #else
