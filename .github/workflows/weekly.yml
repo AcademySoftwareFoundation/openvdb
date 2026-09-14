@@ -61,7 +61,7 @@ jobs:
       (github.event_name != 'workflow_dispatch' ||
        github.event.inputs.type == 'all' ||
        github.event.inputs.type == 'houdini')
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-latest-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-houdini:${{ matrix.config.hou_hash }}
     env:
       CXX: clang++
@@ -137,7 +137,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'extra'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-latest-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-extra:${{ matrix.config.name }}
     container:
       image: aswf/ci-openvdb:${{ matrix.config.image }}
@@ -189,10 +189,10 @@ jobs:
     strategy:
       matrix:
         config:
-          # llvm-17 is currently the default which has symbol issues with the python module
-          - { runson: ubuntu-latest, cxx: g++, cmake: '-DOPENVDB_PYTHON_USE_AX=OFF' }
-          # Disable the clang job for now. See https://github.com/actions/runner-images/issues/8659
-          # - { runson: ubuntu-latest, cxx: clang++, cmake: '' }
+          # Note that ubuntu-latest currently points to ubuntu-24.04,
+          # when this link has been updated, use ubuntu-latest instead
+          - { runson: ubuntu-26.04, cxx: g++, cmake: '' }
+          - { runson: ubuntu-26.04, cxx: clang++, cmake: '' }
           # @todo gcc on macos
           - { runson: macos-latest, cxx: '', cmake: '-DLLVM_DIR=/opt/homebrew/opt/llvm@20/lib/cmake/llvm' }
       fail-fast: false
@@ -215,7 +215,7 @@ jobs:
           --build-type=Release
           --components=\"core,axcore,python,bin,render,test,axbin\"
           --cargs=\'
-          -DCMAKE_CXX_STANDARD=20
+          -DCMAKE_CXX_STANDARD=23
           -DOPENVDB_USE_DELAYED_LOADING=OFF
           -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
           ${{ matrix.config.cmake }}
@@ -291,7 +291,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'ax'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-latest-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-ax:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
@@ -510,7 +510,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'blosc'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-latest-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-blosc:${{ matrix.blosc }}
     container:
       image: aswf/ci-openvdb:2025-clang19.1
@@ -539,7 +539,7 @@ jobs:
       github.event_name == 'workflow_dispatch' &&
       (github.event.inputs.type == 'all' ||
        github.event.inputs.type == 'abi')
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     env:
       # The 'abicheck' build type sets these, but older versions of the library
       # may not have this build type. See OpenVDBCXX.cmake

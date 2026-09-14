@@ -1,3 +1,0 @@
-NanoVDB:
-  Bug Fixes:
-  - Fixed seek offset over-counting in NanoVDB GridHandle read for cases with multiple grids per handle.

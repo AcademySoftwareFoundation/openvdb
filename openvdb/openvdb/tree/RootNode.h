@@ -696,7 +696,7 @@ public:
     /// the new node in its place (i.e. ownership of the new child node is transferred
     /// to this RootNode).
     /// @return @c true (for consistency with InternalNode::addChild)
-    bool addChild(ChildType* child);
+    bool addChild(ChildNodeType* child);
 
     /// @brief Add a tile containing voxel (x, y, z) at the root level,
     /// deleting the existing branch if necessary.
@@ -2621,7 +2621,7 @@ RootNode<ChildT>::addLeafAndCache(LeafNodeType* leaf, AccessorT& acc)
 
 template<typename ChildT>
 inline bool
-RootNode<ChildT>::addChild(ChildT* child)
+RootNode<ChildT>::addChild(ChildNodeType* child)
 {
     if (!child) return false;
     const Coord& xyz = child->origin();

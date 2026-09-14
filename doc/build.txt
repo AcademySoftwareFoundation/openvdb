@@ -10,6 +10,7 @@
   - @ref buildBloscSupport
   - @ref buildZLibSupport
   - @ref buildVCPKG
+  - @ref buildSimd
 - @ref buildComponents
 - @ref buildGuide
   - @ref buildBuildTypes
@@ -169,6 +170,49 @@ You can disable ZLib using `-D USE_ZLIB=OFF` if Blosc is also disabled using `-D
 It is recommended to set the VCPKG_DEFAULT_TRIPLET=x64-windows environment
 variable to use 64-bit libraries by default as even on a 64-bit Windows OS,
 VCPKG builds and installs 32-bit libraries by default.
+
+@subsection buildSimd Building With Target ISA Support
+
+@warning OpenVDB does not perform host CPU ISA detection during configuration
+or build. The selected ISA is treated as a deployment target and must be chosen
+explicitly by the user.
+
+OpenVDB currently only natively supports targeted ISA selection on x86. You can
+continue to provide any flags you like via `-DCXXFLAGS`, but we recommend using
+the available options to better specify intent, when building for a specific
+x86 ISA. The following table lists the available x86 ISA controls.
+
+Build Flag                    | Description                                               |
+----------------------------- | --------------------------------------------------------- |
+`-DUSE_VCL=ON`                | Use the internal copy of Agner Fog's VCL                  |
+`-DOPENVDB_X86_INSTRSET=0`    | Unknown or unspecified                                    |
+`-DOPENVDB_X86_INSTRSET=1`    | SSE, `-msse`                                              |
+`-DOPENVDB_X86_INSTRSET=2`    | ^, SSE2, `-msse2` # Minimum on x86_64                     |
+`-DOPENVDB_X86_INSTRSET=3`    | ^, SSE3, `-msse3`                                         |
+`-DOPENVDB_X86_INSTRSET=4`    | ^, SSSE3, `-mssse3`                                       |
+`-DOPENVDB_X86_INSTRSET=5`    | ^, SSE4.1, `-msse4.1`                                     |
+`-DOPENVDB_X86_INSTRSET=6`    | ^, SSE4.2, `-msse4.2`                                     |
+`-DOPENVDB_X86_INSTRSET=7`    | ^, AVX, `-mavx`                                           |
+`-DOPENVDB_X86_INSTRSET=8`    | ^, AVX2, `-mavx2`                                         |
+`-DOPENVDB_X86_INSTRSET=9`    | ^, AVX512F, `-mavx512f`                                   |
+`-DOPENVDB_X86_INSTRSET=10`   | ^, AVX512BW/DQ/VL, `-mavx512bw` `-mavx512dq` `-mavx512vl` |
+
+The recommended configuration depends on the intended deployment target. See also the
+section on [SIMD in OpenVDB](@ref simdInOpenVDB) for more details.
+
+Deployment Target                        | Recommended Options                        |
+---------------------------------------- | -------------------------------------------|
+Maximum runtime deployment compatibility | Default configuration                      |
+Modern x86 CPUs                          | `-DOPENVDB_X86_INSTRSET=6`                 |
+Explicit SIMD on x86                     | `-DUSE_VCL=ON` `-DOPENVDB_X86_INSTRSET=6`  |
+Explicit SIMD on AVX hardware            | `-DUSE_VCL=ON` `-DOPENVDB_X86_INSTRSET=7`  |
+Explicit SIMD on AVX2 hardware           | `-DUSE_VCL=ON` `-DOPENVDB_X86_INSTRSET=8`  |
+Explicit SIMD on AVX512 hardware         | `-DUSE_VCL=ON` `-DOPENVDB_X86_INSTRSET=10` |
+
+In general, users are encouraged to target the oldest ISA that is known to be
+available on all deployment systems. Building for a newer ISA than is supported
+by the target CPU may result in illegal instruction at runtime.
+
 
 @section buildComponents OpenVDB Components
 

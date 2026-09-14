@@ -247,6 +247,7 @@ public:
     /// @brief Returns an offset pointer of a specific type from the allocated host memory
     /// @tparam T Type of the pointer returned
     /// @param count Numbers of elements of @c parameter type T to skip
+    /// @param device Device whose buffer is returned, or cudaCpuDeviceId for the host buffer
     /// @warning might return NULL
     template <typename T>
     T* data(ptrdiff_t count = 0, int device = cudaCpuDeviceId) const
@@ -258,6 +259,7 @@ public:
 
     /// @brief Returns a byte offset void pointer from the allocated host memory
     /// @param byteOffset offset of return pointer in units of bytes
+    /// @param device Device whose buffer is returned, or cudaCpuDeviceId for the host buffer
     /// @warning assumes that this instance is not empty!
     void* data(ptrdiff_t byteOffset, int device = cudaCpuDeviceId) const
     {
