@@ -35,15 +35,13 @@ using BuildT      = nanovdb::ValueOnIndex;
 using GridHandleT = nanovdb::GridHandle<nanovdb::cuda::DualDeviceBuffer>;
 using Traits      = nanovdb::util::cuda::DeviceGridTraits<BuildT>;
 
-constexpr int LEAF_SIZE = 512;  // 8^3
-
 // Per-leaf retain-mask functor: a voxel is kept iff its unsigned distance to the surface exceeds the
 // barrier threshold sqrt(3)/2 voxels (i.e. UDF^2 >= 0.75 * voxelSize^2 in world units). Removing the
 // barrier shell splits each closed surface's narrow band into disjoint inner/outer shells, which is
 // what connected components then labels. One CUDA block per leaf, one thread per voxel offset.
 struct UDFBarrierPruneMaskFunctor
 {
-    static constexpr int MaxThreadsPerBlock         = LEAF_SIZE;
+    static constexpr int MaxThreadsPerBlock         = nanovdb::NanoLeaf<BuildT>::SIZE;
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
     __device__ void operator()(const nanovdb::NanoGrid<BuildT>* d_grid,
@@ -108,7 +106,7 @@ bool validateAgainstOracle(const GridHandleT& derivedHandle, uint32_t leafCount,
     const auto* leaves = h_grid->tree().getFirstLeaf();
     for (uint32_t li = 0; li < leafCount; ++li) {
         const auto& leaf = leaves[li];
-        for (uint32_t n = 0; n < uint32_t(LEAF_SIZE); ++n) {
+        for (uint32_t n = 0; n < nanovdb::NanoLeaf<BuildT>::SIZE; ++n) {
             if (!leaf.isActive(n)) continue;
             const nanovdb::Coord c = leaf.origin() + nanovdb::NanoLeaf<BuildT>::OffsetToLocalCoord(n);
             const uint64_t       slot = leaf.getValue(n);
