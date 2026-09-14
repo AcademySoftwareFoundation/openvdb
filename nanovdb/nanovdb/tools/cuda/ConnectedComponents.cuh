@@ -209,28 +209,19 @@ private:
 
 namespace components::detail {
 
-// Every kernel payload below is a named struct rather than an inline extended __device__ lambda, so
-// that the ConnectedComponents member functions driving them can stay private - nvcc forbids
-// extended __device__ lambdas inside private/protected methods - which also matches the sibling
-// operators (PruneGrid/DilateGrid/... drive lambdaKernel with named functors). The helpers are
-// grouped by the pipeline stage that launches them, in the order getVoxelLabelsAndCount runs them,
-// each stage's device code sitting immediately above the member function that drives it.
-
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Stage 1: leaf-local connected components.
 
-// Leaf-local connected components via a Shiloach-Vishkin union-find run in shared memory, one CUDA
-// block per leaf, one thread per voxel offset n in [0, 512). The forest is stored as a parent array
-// of leaf-local voxel offsets: parent[n] = n for active roots, a smaller active offset for
-// non-roots, and INACTIVE for inactive voxels. Connectivity is 6-connected and strictly intra-leaf.
+// Leaf-local connected components in shared memory, one CUDA block per leaf and one thread per
+// voxel offset, over a parent array of leaf-local offsets (INACTIVE marks an inactive voxel).
+// Connectivity is 6-connected and strictly intra-leaf. The primitives are algorithm P of S. C. Liu
+// and R. E. Tarjan, "Simple Concurrent Connected Components Algorithms", ACM Transactions on
+// Parallel Computing 9(2), 2022, becoming their algorithm R once solve() restricts hooking to roots.
 //
-// The primitives are double-buffered (Jacobi): they read the "cur" buffer and write the "nxt"
-// buffer, then swap. Inactive entries are carried through unchanged. The pointer swap is performed
-// identically by every thread, so the per-thread register copies stay in sync. Every method is
-// block-cooperative: all 512 threads must call it, since each contains __syncthreads().
-//
-// The `changed` flag the primitives take points at a __shared__ int owned by the caller. Any number
-// of threads may raise it in the same step; they all write the same value, so no atomic is needed.
+// They are double-buffered (Jacobi): read "cur", write "nxt", then swap -- identically in every
+// thread, so the per-thread pointer copies stay in sync. Every thread must call each of them, as
+// each contains __syncthreads(). Their `changed` flag is a caller-owned __shared__ int; concurrent
+// raisers write the same value, so no atomic is needed.
 struct LeafUnionFind
 {
     static constexpr int INACTIVE = -1;  // parent sentinel for inactive voxels
@@ -264,8 +255,7 @@ struct LeafUnionFind
     //
     // @param rootsOnly hook only through parents that are themselves roots. The restricted form
     //        cannot move a subtree between trees, which makes the algorithm monotone -- the
-    //        property that the O(lg n) bound in Liu & Tarjan, "Simple Concurrent Connected
-    //        Components Algorithms" (ACM TOPC 9(2), 2022), rests on.
+    //        property that the O(lg n) bound in Liu & Tarjan rests on.
     __device__ static void hook(int*& cur, int*& nxt, int n, int* changed, bool rootsOnly = false)
     {
         const int pn = cur[n];
@@ -584,7 +574,7 @@ void ConnectedComponents<BuildT, ResourceT>::processLeafConnectedComponents()
         mStream, this->ref(), mLeafComponentAggregateCount, nanovdb::cuda::noInit);
     if (mVerbose==1) mTimer.stop();
 
-    // Re-run SV per leaf and scatter each active voxel's bit into its component's Mask<3>.
+    // Re-run the leaf union-find and scatter each active voxel's bit into its component's Mask<3>.
     using MaskOp = components::detail::LeafComponentMaskFunctor<BuildT>;
     if (mVerbose==1) mTimer.start("Per-leaf component mask fill");
     util::cuda::operatorKernel<MaskOp>
