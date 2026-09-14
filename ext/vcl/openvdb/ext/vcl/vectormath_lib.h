@@ -19,21 +19,28 @@
 *
 * (c) Copyright 2012-2022 Agner Fog.
 * Apache License version 2.0 or later.
+*
+* -----------------------------------------------------------------------------
+*
+* This file has been modified from the original in the following ways:
+*  > Various defines and guards have been prefixed with OPENVDB_VCL_.
+*  > VCL_NAMESPACE has been removed in favour of an explicit OPENVDB_VCL_NAMESPACE.
+* Copyright Contributors to the OpenVDB Project
+* SPDX-License-Identifier: Apache-2.0*
+*
 \*****************************************************************************/
 
 // check combination of header files
-#ifndef VECTORMATH_LIB_H
-#define VECTORMATH_LIB_H  202
+#ifndef OPENVDB_VCL_VECTORMATH_LIB_H
+#define OPENVDB_VCL_VECTORMATH_LIB_H  202
 
-#ifdef VECTORMATH_COMMON_H
+#ifdef OPENVDB_VCL_VECTORMATH_COMMON_H
 #error conflicting header files. More than one implementation of mathematical functions included
 #else
 
 #include "vectorclass.h"     // make sure vector classes are defined first
 
-#ifdef   VCL_NAMESPACE
-namespace VCL_NAMESPACE {    // optional name space
-#endif
+namespace OPENVDB_VCL_NAMESPACE {
 
 #if defined(__INTEL_COMPILER) || defined(__INTEL_LLVM_COMPILER)
 #define USE_SVML_INTRINSICS  // Intel compilers have intrinsic functions of access to SVML library
@@ -638,7 +645,7 @@ static inline Vec2d cdfnorminv (Vec2d const x) { // inverse cumulative normal di
 
 #if defined (MAX_VECTOR_SIZE) && MAX_VECTOR_SIZE >= 256  // 256 bit vectors
 
-#if defined (VECTORF256_H)  // 256-bit vector registers supported
+#if defined (OPENVDB_VCL_VECTORF256_H)  // 256-bit vector registers supported
 
 #ifdef USE_SVML_INTRINSICS
 /*****************************************************************************
@@ -1418,7 +1425,7 @@ static inline Vec4d cdfnorminv (Vec4d const x) { // inverse cumulative normal di
 
 #if defined (MAX_VECTOR_SIZE) && MAX_VECTOR_SIZE >= 512    // 512 bit vectors
 
-#if defined (VECTORF512_H)  // 512-bit vector registers supported
+#if defined (OPENVDB_VCL_VECTORF512_H)  // 512-bit vector registers supported
 
 #ifdef USE_SVML_INTRINSICS
 /*****************************************************************************
@@ -2202,10 +2209,8 @@ static inline Vec8d cdfnorminv (Vec8d const x) {  // inverse cumulative normal d
 
 #endif   // MAX_VECTOR_SIZE >= 512
 
-#ifdef   VCL_NAMESPACE
-}
-#endif   // VCL_NAMESPACE
+} // namespace OPENVDB_VCL_NAMESPACE
 
-#endif   // VECTORMATH_COMMON_H
+#endif   // OPENVDB_VCL_VECTORMATH_COMMON_H
 
-#endif   // VECTORMATH_LIB_H
+#endif   // OPENVDB_VCL_VECTORMATH_LIB_H
