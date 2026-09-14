@@ -55,19 +55,38 @@ namespace nanovdb {
 
 namespace tools::cuda {
 
-/// @brief Identifies a connected component. Must accommodate the total number of per-leaf
-///        components created across the grid, which bounds every other use of it; enforced by
-///        ConnectedComponents::MaxComponentCount.
-using ComponentLabelT = uint32_t;
-static_assert(std::is_unsigned<ComponentLabelT>::value,
-              "ComponentLabelT must be unsigned: the background sentinel is its all-ones value");
+/// @brief Vocabulary shared by ConnectedComponents and the device code implementing it.
+struct ConnectedComponentsBase
+{
+    /// @brief Identifies a connected component. Must accommodate the total number of per-leaf
+    ///        components created across the grid; enforced by MaxComponentCount.
+    using ComponentLabelT = uint32_t;
+    static_assert(std::is_unsigned<ComponentLabelT>::value,
+                  "ComponentLabelT must be unsigned: the background sentinel is its all-ones value");
 
-/// @brief Undirected edge between two leaf-local components (global slots) touching across a leaf
-///        face, stored canonically with a < b.
-struct CrossLeafEdge { ComponentLabelT a, b; };
+    /// @brief Undirected edge between two leaf-local components (global slots) touching across a
+    ///        leaf face, stored canonically with a < b.
+    struct CrossLeafEdge { ComponentLabelT a, b; };
+
+    /// @brief Index of each of the 6 leaf faces into a component's face-mask array.
+    enum LeafNeighborTap : int {
+        minusX = 0,
+        plusX  = 1,
+        minusY = 2,
+        plusY  = 3,
+        minusZ = 4,
+        plusZ  = 5
+    };
+
+    /// @brief Maximum number of components, across the whole grid, this operator can label.
+    static constexpr uint64_t MaxComponentCount =
+        uint64_t(std::numeric_limits<ComponentLabelT>::max());
+};// tools::cuda::ConnectedComponentsBase
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
-class ConnectedComponents
+class ConnectedComponents : public ConnectedComponentsBase
 {
     static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
                   "ConnectedComponents allocates stream-ordered scratch and requires an AsyncResource");
@@ -83,10 +102,6 @@ class ConnectedComponents
     using BufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ResourceRef<ResourceT>>;
 
 public:
-
-    /// @brief Maximum number of components, across the whole grid, this operator can label.
-    static constexpr uint64_t MaxComponentCount =
-        uint64_t(std::numeric_limits<ComponentLabelT>::max());
 
     /// @brief Constructor
     /// @param d_srcGrid source device indexGrid whose active voxels are to be labeled
@@ -202,16 +217,6 @@ namespace cc_detail {
 // each stage's device code sitting immediately above the member function that drives it.
 
 constexpr int LEAF_SIZE = 512;          // 8^3
-
-/// @brief Index of each of the 6 leaf faces into a component's face-mask array.
-enum LeafNeighborTap : int {
-    minusX = 0,
-    plusX  = 1,
-    minusY = 2,
-    plusY  = 3,
-    minusZ = 4,
-    plusZ  = 5
-};
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Stage 1: leaf-local connected components.
@@ -377,6 +382,8 @@ struct LeafComponentCountFunctor
 template <typename BuildT>
 struct LeafComponentMaskFunctor
 {
+    using LeafNeighborTap = ConnectedComponentsBase::LeafNeighborTap;
+
     static constexpr int MaxThreadsPerBlock         = LEAF_SIZE;
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
@@ -449,8 +456,8 @@ struct LeafComponentMaskFunctor
                 uint64_t* face = d_faces[baseOffset + localCompIdx];
 
                 // +/-X: whole word 0 / word 7 are exactly the minusX / plusX face planes.
-                face[minusX] = sMaskWords[0];
-                face[plusX]  = sMaskWords[7];
+                face[LeafNeighborTap::minusX] = sMaskWords[0];
+                face[LeafNeighborTap::plusX]  = sMaskWords[7];
 
                 // +/-Y: bottom byte (y=0) and top byte (y=7) of each word x;
                 //     shift-accumulate from x=7 down; result bit index = x*8 + z (x major, z minor).
@@ -459,8 +466,8 @@ struct LeafComponentMaskFunctor
                     mY = (mY << 8) | (sMaskWords[x] & 0xFF);
                     pY = (pY << 8) | ((sMaskWords[x] >> 56) & 0xFF);
                 }
-                face[minusY] = mY;
-                face[plusY]  = pY;
+                face[LeafNeighborTap::minusY] = mY;
+                face[LeafNeighborTap::plusY]  = pY;
 
                 // +/-Z: bit 0 (z=0) and bit 7 (z=7) of each byte in each word;
                 //     shift-accumulate from x=7 down; result bit index = y*8 + x (y major, x minor).
@@ -470,8 +477,8 @@ struct LeafComponentMaskFunctor
                     mZ = (mZ << 1) | (sMaskWords[x] & UINT64_C(0x0101010101010101));
                     pZ = (pZ << 1) | ((sMaskWords[x] >> 7) & UINT64_C(0x0101010101010101));
                 }
-                face[minusZ] = mZ;
-                face[plusZ]  = pZ;
+                face[LeafNeighborTap::minusZ] = mZ;
+                face[LeafNeighborTap::plusZ]  = pZ;
             }
             __syncthreads();  // [SYNC2]: mask + face writes done; all threads safe for next BlockReduce
 
@@ -572,7 +579,7 @@ void ConnectedComponents<BuildT, ResourceT>::processLeafConnectedComponents()
         mStream, this->ref(), mLeafComponentAggregateCount, nanovdb::cuda::noInit);
     if (mVerbose==1) mTimer.stop();
 
-    // Allocate 6 uint64_t face masks per component (one per cc_detail::LeafNeighborTap entry).
+    // Allocate 6 uint64_t face masks per component (one per LeafNeighborTap entry).
     // The face-extraction kernel fills these; no zero-init needed for the same reason.
     if (mVerbose==1) mTimer.start("Allocating per-component face masks");
     mLeafComponentFaceMasks = BufT<uint64_t[6]>(
@@ -625,6 +632,9 @@ __device__ inline void ccForEachCrossLeafEdge(
     const NanoGrid<BuildT>* d_grid, const uint64_t* d_offsets, const uint64_t (*d_faces)[6],
     int leafID, int tID, int nThreads, EdgeFn&& emit)
 {
+    using LeafNeighborTap = ConnectedComponentsBase::LeafNeighborTap;
+    using ComponentLabelT = ConnectedComponentsBase::ComponentLabelT;
+
     // base* is a leaf's first global component slot, count* how many components it has.
     const auto&    leaf      = d_grid->tree().template getFirstNode<0>()[leafID];
     const uint64_t baseLeaf  = d_offsets[leafID];
@@ -633,8 +643,8 @@ __device__ inline void ccForEachCrossLeafEdge(
 
     // Only the +axis faces are walked; the neighbor on its -axis side covers the other direction,
     // so every adjacent pair is visited exactly once, by the lower leaf.
-    const int faceLeaf[3]     = { plusX,  plusY,  plusZ  };  // this leaf's +axis face
-    const int faceNeighbor[3] = { minusX, minusY, minusZ };  // neighbor's matching -axis face
+    const int faceLeaf[3]     = { LeafNeighborTap::plusX,  LeafNeighborTap::plusY,  LeafNeighborTap::plusZ  };  // this leaf's +axis face
+    const int faceNeighbor[3] = { LeafNeighborTap::minusX, LeafNeighborTap::minusY, LeafNeighborTap::minusZ };  // neighbor's matching -axis face
 
     for (int axis = 0; axis < 3; ++axis) {
         const int neighborID = ccNeighborLeafIndex<BuildT>(d_grid, leaf, axis);
@@ -663,6 +673,8 @@ template <typename BuildT>
 ///        edges -- which is why both drive ccForEachCrossLeafEdge instead of repeating its test.
 struct CrossLeafEdgeCountFunctor
 {
+    using ComponentLabelT = ConnectedComponentsBase::ComponentLabelT;
+
     static constexpr int MaxThreadsPerBlock         = 128;
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
@@ -693,6 +705,9 @@ template <typename BuildT>
 ///        global union-find sees one canonical form per pair.
 struct CrossLeafEdgeScatterFunctor
 {
+    using ComponentLabelT = ConnectedComponentsBase::ComponentLabelT;
+    using CrossLeafEdge   = ConnectedComponentsBase::CrossLeafEdge;
+
     static constexpr int MaxThreadsPerBlock         = 128;
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
@@ -806,6 +821,8 @@ struct LabelInitFunctor {
 
 // Union-find unite: link the two endpoints of cross-leaf edge e (each ccUnite has its own CAS-retry).
 struct LabelUniteFunctor {
+    using CrossLeafEdge = ConnectedComponentsBase::CrossLeafEdge;
+
     __device__ void operator()(size_t e, uint64_t* p, const CrossLeafEdge* edges) const {
         ccUnite(p, uint64_t(edges[e].a), uint64_t(edges[e].b));
     }
