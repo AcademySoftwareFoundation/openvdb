@@ -51,11 +51,11 @@ void mainDilateGrid(
     }
 
     uint32_t dstLeafCount = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(dstGrid).mNodeCount[0];
-    nanovdb::cuda::Buffer<std::byte> dstLeafMaskBuffer;
+    nanovdb::cuda::Buffer<nanovdb::Mask<3>> dstLeafMaskBuffer;
     nanovdb::Mask<3>* dstLeafMasks = nullptr;
     if (dstLeafCount) {
-        dstLeafMaskBuffer = nanovdb::cuda::Buffer<std::byte>(cudaStream_t(0), std::size_t(dstLeafCount) * sizeof(nanovdb::Mask<3>), nanovdb::cuda::noInit);
-        dstLeafMasks = reinterpret_cast<nanovdb::Mask<3>*>(dstLeafMaskBuffer.data());
+        dstLeafMaskBuffer = nanovdb::cuda::Buffer<nanovdb::Mask<3>>(cudaStream_t(0), std::size_t(dstLeafCount), nanovdb::cuda::noInit);
+        dstLeafMasks = dstLeafMaskBuffer.data();
         if (!dstLeafMasks) throw std::runtime_error("No GPU buffer for dstLeafMask");
     }
 

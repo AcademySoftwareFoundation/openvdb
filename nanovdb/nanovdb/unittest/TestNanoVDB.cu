@@ -28,6 +28,7 @@
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/Timer.h>
 #include <nanovdb/io/IO.h>
+#include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/cuda/DeviceStreamMap.h>
 #include <nanovdb/cuda/DeviceMesh.h>
@@ -3764,9 +3765,9 @@ TEST(TestNanoVDBCUDA, DilateInjectPrune_ValueOnIndex)
     EXPECT_EQ(dilatedTreeData.mVoxelCount, 73);
 
     // Create a prune mask (set bits correspond to retained voxels) from the occupancy of the original grid
-    auto maskBuffer = nanovdb::cuda::DeviceBuffer::create( dilatedTreeData.mNodeCount[0] * sizeof(nanovdb::Mask<3>), nullptr, false);
-    EXPECT_TRUE(maskBuffer.deviceData());
-    auto leafMasks = static_cast<nanovdb::Mask<3>*>(maskBuffer.deviceData());
+    nanovdb::cuda::Buffer<nanovdb::Mask<3>> maskBuffer(cudaStream_t(0), dilatedTreeData.mNodeCount[0], nanovdb::cuda::noInit);
+    EXPECT_TRUE(maskBuffer.data());
+    auto leafMasks = maskBuffer.data();
     constexpr unsigned int num_threads = 128;
     unsigned int num_blocks = (static_cast<unsigned int>(dilatedTreeData.mNodeCount[0]) + num_threads - 1) / num_threads;
     nanovdb::util::cuda::lambdaKernel<<<num_blocks, num_threads>>>(dilatedTreeData.mNodeCount[0],
