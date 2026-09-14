@@ -36,13 +36,13 @@ namespace tools {// ===================================================
 /// @param name      Name of the grid
 /// @param sMode     Mode of computation for the statistics.
 /// @param cMode     Mode of computation for the checksum.
-/// @param tolerance Global error tolerance use when VoxelT = FpN
-/// @param ditherOn  If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer    Buffer used for memory allocation by the handle
 ///
 /// @details The @c BuildT template parameter must be one of the following:
-///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
-///          argument is only used when BuildT is set to FpN.
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The Fp4, Fp8,
+///          Fp16 and FpN overloads take an extra @c ditherOn argument, and the
+///          FpN overload also takes a @c tolerance argument that sets the
+///          global error tolerance.
 template<typename BuildT = float, typename BufferT = HostBuffer>
 typename util::enable_if<util::is_same<BuildT, float,  double>::value, GridHandle<BufferT>>::type
 createLevelSetSphere(double              radius = 100.0,
@@ -97,13 +97,13 @@ createLevelSetSphere(double              radius = 100.0,
 /// @param name      Name of the grid
 /// @param sMode     Mode of computation for the statistics.
 /// @param cMode     Mode of computation for the checksum.
-/// @param tolerance Global error tolerance use when VoxelT = FpN
-/// @param ditherOn  If true dithering will be applied when BuildT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer    Buffer used for memory allocation by the handle
 ///
 /// @details The @c BuildT template parameter must be one of the following:
-///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
-///          argument is only used when BuildT is set to FpN.
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The Fp4, Fp8,
+///          Fp16 and FpN overloads take an extra @c ditherOn argument, and the
+///          FpN overload also takes a @c tolerance argument that sets the
+///          global error tolerance.
 template<typename BuildT = float, typename BufferT = HostBuffer>
 typename util::disable_if<util::is_same<FpN, BuildT>::value, GridHandle<BufferT>>::type
 createFogVolumeSphere(double              radius = 100.0,
@@ -169,13 +169,13 @@ createPointSphere(int                 pointsPerVoxel = 1,
 /// @param name        Name of the grid
 /// @param sMode       Mode of computation for the statistics.
 /// @param cMode       Mode of computation for the checksum.
-/// @param tolerance   Global error tolerance use when VoxelT = FpN
-/// @param ditherOn    If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer      Buffer used for memory allocation by the handle
 ///
 /// @details The @c BuildT template parameter must be one of the following:
-///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
-///          argument is only used when BuildT is set to FpN.
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The Fp4, Fp8,
+///          Fp16 and FpN overloads take an extra @c ditherOn argument, and the
+///          FpN overload also takes a @c tolerance argument that sets the
+///          global error tolerance.
 template<typename BuildT = float, typename BufferT = HostBuffer>
 typename util::disable_if<util::is_same<FpN, BuildT>::value, GridHandle<BufferT>>::type
 createLevelSetTorus(double              majorRadius = 100.0,
@@ -220,13 +220,13 @@ createLevelSetTorus(double              majorRadius = 100.0,
 /// @param name        Name of the grid
 /// @param sMode       Mode of computation for the statistics.
 /// @param cMode       Mode of computation for the checksum.
-/// @param tolerance   Global error tolerance use when VoxelT = FpN
-/// @param ditherOn    If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer      Buffer used for memory allocation by the handle
 ///
 /// @details The @c BuildT template parameter must be one of the following:
-///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
-///          argument is only used when BuildT is set to FpN.
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The Fp4, Fp8,
+///          Fp16 and FpN overloads take an extra @c ditherOn argument, and the
+///          FpN overload also takes a @c tolerance argument that sets the
+///          global error tolerance.
 template<typename BuildT = float, typename BufferT = HostBuffer>
 typename util::disable_if<util::is_same<FpN, BuildT>::value, GridHandle<BufferT>>::type
 createFogVolumeTorus(double              majorRadius = 100.0,
@@ -297,13 +297,13 @@ createPointTorus(int                 pointsPerVoxel = 1, // half-width of narrow
 /// @param name      Name of the grid
 /// @param sMode     Mode of computation for the statistics.
 /// @param cMode     Mode of computation for the checksum.
-/// @param tolerance Global error tolerance use when VoxelT = FpN
-/// @param ditherOn  If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer    Buffer used for memory allocation by the handle
 ///
 /// @details The @c BuildT template parameter must be one of the following:
-///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
-///          argument is only used when BuildT is set to FpN.
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The Fp4, Fp8,
+///          Fp16 and FpN overloads take an extra @c ditherOn argument, and the
+///          FpN overload also takes a @c tolerance argument that sets the
+///          global error tolerance.
 template<typename BuildT = float, typename BufferT = HostBuffer>
 typename util::disable_if<util::is_same<FpN, BuildT>::value, GridHandle<BufferT>>::type
 createLevelSetBox(double              width = 40.0,
@@ -351,13 +351,13 @@ createLevelSetBox(double              width = 40.0,
 /// @param name      Name of the grid
 /// @param sMode     Mode of computation for the statistics.
 /// @param cMode     Mode of computation for the checksum.
-/// @param tolerance Global error tolerance use when VoxelT = FpN
-/// @param ditherOn  If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer    Buffer used for memory allocation by the handle
 ///
 /// @details The @c BuildT template parameter must be one of the following:
-///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
-///          argument is only used when BuildT is set to FpN.
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The Fp4, Fp8,
+///          Fp16 and FpN overloads take an extra @c ditherOn argument, and the
+///          FpN overload also takes a @c tolerance argument that sets the
+///          global error tolerance.
 template<typename BuildT = float, typename BufferT = HostBuffer>
 typename util::disable_if<util::is_same<FpN, BuildT>::value, GridHandle<BufferT>>::type
 createFogVolumeBox(double              width = 40.0,
@@ -400,13 +400,13 @@ createFogVolumeBox(double              width = 40.0,
 /// @param name      Name of the grid
 /// @param sMode     Mode of computation for the statistics.
 /// @param cMode     Mode of computation for the checksum.
-/// @param tolerance Global error tolerance use when VoxelT = FpN
-/// @param ditherOn  If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer    Buffer used for memory allocation by the handle
 ///
 /// @details The @c BuildT template parameter must be one of the following:
-///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
-///          argument is only used when BuildT is set to FpN.
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The Fp4, Fp8,
+///          Fp16 and FpN overloads take an extra @c ditherOn argument, and the
+///          FpN overload also takes a @c tolerance argument that sets the
+///          global error tolerance.
 template<typename BuildT = float, typename BufferT = HostBuffer>
 typename util::disable_if<util::is_same<FpN, BuildT>::value, GridHandle<BufferT>>::type
 createLevelSetOctahedron(double              scale = 100.0,
@@ -448,13 +448,13 @@ createLevelSetOctahedron(double              scale = 100.0,
 /// @param name      Name of the grid
 /// @param sMode     Mode of computation for the statistics.
 /// @param cMode     Mode of computation for the checksum.
-/// @param tolerance Global error tolerance use when VoxelT = FpN
-/// @param ditherOn  If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer    Buffer used for memory allocation by the handle
 ///
 /// @details The @c BuildT template parameter must be one of the following:
-///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
-///          argument is only used when BuildT is set to FpN.
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The Fp4, Fp8,
+///          Fp16 and FpN overloads take an extra @c ditherOn argument, and the
+///          FpN overload also takes a @c tolerance argument that sets the
+///          global error tolerance.
 template<typename BuildT = float, typename BufferT = HostBuffer>
 typename util::disable_if<util::is_same<FpN, BuildT>::value, GridHandle<BufferT>>::type
 createFogVolumeOctahedron(double              scale = 100.0,
@@ -496,13 +496,13 @@ createFogVolumeOctahedron(double              scale = 100.0,
 /// @param name      Name of the grid
 /// @param sMode     Mode of computation for the statistics.
 /// @param cMode     Mode of computation for the checksum.
-/// @param tolerance Global error tolerance use when VoxelT = FpN
-/// @param ditherOn  If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer    Buffer used for memory allocation by the handle
 ///
 /// @details The @c BuildT template parameter must be one of the following:
-///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
-///          argument is only used when BuildT is set to FpN.
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The Fp4, Fp8,
+///          Fp16 and FpN overloads take an extra @c ditherOn argument, and the
+///          FpN overload also takes a @c tolerance argument that sets the
+///          global error tolerance.
 template<typename BuildT = float, typename BufferT = HostBuffer>
 typename util::disable_if<util::is_same<FpN, BuildT>::value, GridHandle<BufferT>>::type
 createLevelSetBBox(double              width = 40.0,

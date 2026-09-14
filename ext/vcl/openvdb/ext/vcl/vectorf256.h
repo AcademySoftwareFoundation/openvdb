@@ -20,27 +20,34 @@
 *
 * (c) Copyright 2012-2023 Agner Fog.
 * Apache License version 2.0 or later.
+*
+* -----------------------------------------------------------------------------
+*
+* This file has been modified from the original in the following ways:
+*  > Various defines and guards have been prefixed with OPENVDB_VCL_.
+*  > VCL_NAMESPACE has been removed in favour of an explicit OPENVDB_VCL_NAMESPACE.
+* Copyright Contributors to the OpenVDB Project
+* SPDX-License-Identifier: Apache-2.0*
+*
 *****************************************************************************/
 
-#ifndef VECTORF256_H
-#define VECTORF256_H  1
+#ifndef OPENVDB_VCL_VECTORF256_H
+#define OPENVDB_VCL_VECTORF256_H  1
 
-#ifndef VECTORCLASS_H
+#ifndef OPENVDB_VCL_VECTORCLASS_H
 #include "vectorclass.h"
 #endif
 
-#if VECTORCLASS_H < 20200
+#if OPENVDB_VCL_VECTORCLASS_H < 20200
 #error Incompatible versions of vector class library mixed
 #endif
 
-#ifdef VECTORF256E_H
+#ifdef OPENVDB_VCL_VECTORF256E_H
 #error Two different versions of vectorf256.h included
 #endif
 
 
-#ifdef VCL_NAMESPACE
-namespace VCL_NAMESPACE {
-#endif
+namespace OPENVDB_VCL_NAMESPACE {
 
 
 /*****************************************************************************
@@ -3051,8 +3058,6 @@ static inline void scatter(Vec4i const index, uint32_t limit, Vec4d const data, 
 }
 
 
-#ifdef VCL_NAMESPACE
 }
-#endif
 
-#endif // VECTORF256_H
+#endif // OPENVDB_VCL_VECTORF256_H

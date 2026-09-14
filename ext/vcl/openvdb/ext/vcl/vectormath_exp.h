@@ -31,16 +31,23 @@
 *
 * (c) Copyright 2014-2022 Agner Fog.
 * Apache License version 2.0 or later.
+*
+* -----------------------------------------------------------------------------
+*
+* This file has been modified from the original in the following ways:
+*  > Various defines and guards have been prefixed with OPENVDB_VCL_.
+*  > VCL_NAMESPACE has been removed in favour of an explicit OPENVDB_VCL_NAMESPACE.
+* Copyright Contributors to the OpenVDB Project
+* SPDX-License-Identifier: Apache-2.0*
+*
 ******************************************************************************/
 
-#ifndef VECTORMATH_EXP_H
-#define VECTORMATH_EXP_H  202
+#ifndef OPENVDB_VCL_VECTORMATH_EXP_H
+#define OPENVDB_VCL_VECTORMATH_EXP_H  202
 
 #include "vectormath_common.h"
 
-#ifdef VCL_NAMESPACE
-namespace VCL_NAMESPACE {
-#endif
+namespace OPENVDB_VCL_NAMESPACE {
 
 /******************************************************************************
 *                 Exponential functions
@@ -617,7 +624,7 @@ static inline Vec2d fraction_2(Vec2d const a) {
 #if MAX_VECTOR_SIZE >= 256
 
 static inline Vec8f fraction_2(Vec8f const a) {
-#if defined (VECTORI256_H) && VECTORI256_H > 2             // 256 bit integer vectors are available, AVX2
+#if defined (OPENVDB_VCL_VECTORI256_H) && OPENVDB_VCL_VECTORI256_H > 2             // 256 bit integer vectors are available, AVX2
     Vec8ui t1 = _mm256_castps_si256(a);                    // reinterpret as 32-bit integer
     Vec8ui t2 = (t1 & 0x007FFFFF) | 0x3F000000;            // set exponent to 0 + bias
     return _mm256_castsi256_ps(t2);
@@ -627,7 +634,7 @@ static inline Vec8f fraction_2(Vec8f const a) {
 }
 
 static inline Vec4d fraction_2(Vec4d const a) {
-#if VECTORI256_H > 1  // AVX2
+#if OPENVDB_VCL_VECTORI256_H > 1  // AVX2
     Vec4uq t1 = _mm256_castpd_si256(a);                    // reinterpret as 64-bit integer
     Vec4uq t2 = Vec4uq((t1 & 0x000FFFFFFFFFFFFFll) | 0x3FE0000000000000ll); // set exponent to 0 + bias
     return _mm256_castsi256_pd(t2);
@@ -2166,8 +2173,6 @@ V power_rational (V const x) {
 }
 
 
-#ifdef VCL_NAMESPACE
 }
-#endif
 
-#endif  // VECTORMATH_EXP_H
+#endif  // OPENVDB_VCL_VECTORMATH_EXP_H

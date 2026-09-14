@@ -156,7 +156,8 @@ TEST_F(TestPointRasterizeFrustum, testScaleByVoxelVolume)
     EXPECT_EQ(Coord(0,0,0), iter.getCoord());
     float scaledSum = scale * densities[0] + scale * densities[1] +
         scale * densities[2] + scale * densities[4];
-    EXPECT_NEAR(scaledSum / static_cast<float>(voxelVolume), *iter, tolerance);
+    float scaledSumOverVolume = scaledSum / static_cast<float>(voxelVolume);
+    EXPECT_NEAR(scaledSumOverVolume, *iter, tolerance * std::abs(scaledSumOverVolume));
 
     // add temperature attribute (an arbitrary float attribute)
 
@@ -222,9 +223,9 @@ TEST_F(TestPointRasterizeFrustum, testScaleByVoxelVolume)
     EXPECT_EQ(Coord(0,0,0), iterV.getCoord());
     auto scaledSumV = (scale * velocities[0] + scale * velocities[1] +
         scale * velocities[2] + scale * velocities[4]) / voxelVolume;
-    EXPECT_NEAR(scaledSumV[0], (*iterV)[0], tolerance);
-    EXPECT_NEAR(scaledSumV[1], (*iterV)[1], tolerance);
-    EXPECT_NEAR(scaledSumV[2], (*iterV)[2], tolerance);
+    EXPECT_NEAR(scaledSumV[0], (*iterV)[0], tolerance * std::abs(scaledSumV[0]));
+    EXPECT_NEAR(scaledSumV[1], (*iterV)[1], tolerance * std::abs(scaledSumV[1]));
+    EXPECT_NEAR(scaledSumV[2], (*iterV)[2], tolerance * std::abs(scaledSumV[2]));
 #endif
 
     ////////////////////////////
@@ -431,7 +432,7 @@ TEST_F(TestPointRasterizeFrustum, testPointRasterization)
     EXPECT_EQ(Coord(0,0,0), iter.getCoord());
     float scaledSum = scale * densities[0] + scale * densities[1] +
         scale * densities[2] + scale * densities[4];
-    EXPECT_NEAR(scaledSum, *iter, tolerance);
+    EXPECT_NEAR(scaledSum, *iter, tolerance * std::abs(scaledSum));
 
     // average density
 
@@ -602,9 +603,9 @@ TEST_F(TestPointRasterizeFrustum, testPointRasterization)
     EXPECT_EQ(Coord(0,0,0), iterV.getCoord());
     auto scaledSumV = (scale * velocities[0] + scale * velocities[1] +
         scale * velocities[2] + scale * velocities[4]);
-    EXPECT_NEAR(scaledSumV[0], (*iterV)[0], tolerance);
-    EXPECT_NEAR(scaledSumV[1], (*iterV)[1], tolerance);
-    EXPECT_NEAR(scaledSumV[2], (*iterV)[2], tolerance);
+    EXPECT_NEAR(scaledSumV[0], (*iterV)[0], tolerance * std::abs(scaledSumV[0]));
+    EXPECT_NEAR(scaledSumV[1], (*iterV)[1], tolerance * std::abs(scaledSumV[1]));
+    EXPECT_NEAR(scaledSumV[2], (*iterV)[2], tolerance * std::abs(scaledSumV[2]));
 
     // explicitly specify Vec3f grid
 
@@ -626,9 +627,9 @@ TEST_F(TestPointRasterizeFrustum, testPointRasterization)
     EXPECT_EQ(Index64(2), velocity->tree().activeVoxelCount());
     iterV = velocity->tree().cbeginLeaf()->cbeginValueOn();
     EXPECT_EQ(Coord(0,0,0), iter.getCoord());
-    EXPECT_NEAR(scaledSumV[0], (*iterV)[0], tolerance);
-    EXPECT_NEAR(scaledSumV[1], (*iterV)[1], tolerance);
-    EXPECT_NEAR(scaledSumV[2], (*iterV)[2], tolerance);
+    EXPECT_NEAR(scaledSumV[0], (*iterV)[0], tolerance * std::abs(scaledSumV[0]));
+    EXPECT_NEAR(scaledSumV[1], (*iterV)[1], tolerance * std::abs(scaledSumV[1]));
+    EXPECT_NEAR(scaledSumV[2], (*iterV)[2], tolerance * std::abs(scaledSumV[2]));
 
     // rasterize float attribute into double grid
 

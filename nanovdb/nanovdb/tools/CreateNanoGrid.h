@@ -172,6 +172,7 @@ createNanoGrid(const SrcGridT &srcGrid,
 /// @tparam DstBuildT If ValueIndex all (active and inactive) values are indexed and if
 ///         it is ValueOnIndex only active values are indexed.
 /// @tparam BufferT BufferT Type of the buffer used ti allocate the destination grid
+/// @param srcGrid Input (source) grid to be converted
 /// @param channels If non-zero the values (active or all) in @c srcGrid are encoded as blind
 ///                 data in the output index grid. @c channels indicates the number of copies
 ///                 of these blind data
@@ -859,7 +860,7 @@ struct CreateNanoGrid<SrcGridT>::OrderedBlindMetaData
         return type;
     }
     /// @brief Maps from string names of point attributes in openvdb to GridBlindDataSemantic
-    /// @param String name, typically used for point attributes in OpenVDB
+    /// @param name Attribute name, typically used for point attributes in OpenVDB
     /// @return GridBlindDataSemantic
     static GridBlindDataSemantic mapToSemantics(const std::string& name)
     {
