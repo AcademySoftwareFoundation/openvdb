@@ -32,7 +32,7 @@
 namespace {
 
 using BuildT      = nanovdb::ValueOnIndex;
-using GridHandleT = nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer>;
+using GridHandleT = nanovdb::GridHandle<nanovdb::cuda::DualDeviceBuffer>;
 using Traits      = nanovdb::util::cuda::DeviceGridTraits<BuildT>;
 
 constexpr int LEAF_SIZE = 512;  // 8^3
@@ -202,7 +202,7 @@ uint64_t connectedComponentsFromMesh(const std::vector<nanovdb::Vec3f>& points,
         const float    barrierSqWorld = 0.75f * voxelSize * voxelSize;  // (sqrt(3)/2 * voxelSize)^2
         const uint32_t srcLeafCount   = Traits::getTreeData(d_orig).mNodeCount[0];
 
-        auto  retainMask   = nanovdb::cuda::DeviceBuffer::create(
+        auto  retainMask   = nanovdb::cuda::DualDeviceBuffer::create(
             std::size_t(srcLeafCount) * sizeof(nanovdb::Mask<3>), nullptr, false);
         auto* d_retainMask = static_cast<nanovdb::Mask<3>*>(retainMask.deviceData());
 

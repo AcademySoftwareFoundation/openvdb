@@ -17,7 +17,7 @@
 
 #include <nanovdb/NanoVDB.h>          // host-usable: Vec3f, Vec3i, Vec3d, Map
 #include <nanovdb/GridHandle.h>       // GridHandle (header-only, host-usable)
-#include <nanovdb/cuda/DeviceBuffer.h>// nanovdb::cuda::DeviceBuffer
+#include <nanovdb/cuda/DeviceBuffer.h>// nanovdb::cuda::DualDeviceBuffer
 
 #include <cstdint>
 #include <fstream>
