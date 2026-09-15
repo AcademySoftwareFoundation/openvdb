@@ -4125,7 +4125,8 @@ static nanovdb::Half float_to_half(float val)
         (uint32_t(raw32 & 0x007FFFFF) >> (23-10)); // mantissa
     if ((raw32 & 0x7F800000) == 0u) { raw16 &= 0x8000u; } // flush denorms to zero
     if ((raw32 & 0x7F800000) == 0x7F800000) { raw16 |= 0x7C00u; } // preserve inf and NaN
-    nanovdb::Half ret = { uint16_t(raw16) };
+    nanovdb::Half ret;
+    ret.raw = uint16_t(raw16);
     return ret;
 }
 
@@ -4217,6 +4218,39 @@ TEST_F(TestNanoVDB, GridBuilder_Half)
         EXPECT_EQ(dstGrid->tree().nodeCount(0), n[2]);
         EXPECT_EQ(dstGrid->tree().nodeCount(1), n[1]);
         EXPECT_EQ(dstGrid->tree().nodeCount(2), n[0]);
+    }
+    {// Sphere
+        const double voxelSize = 0.1, halfWidth = 3.0, radius = 10.0f;
+        const nanovdb::Vec3d center(0), origin(0);
+        const float tolerance = 0.005f * voxelSize;
+
+        auto handleFloat = nanovdb::tools::createLevelSetSphere<float>(radius, center,
+                                                            voxelSize, halfWidth,
+                                                            origin, "sphere",
+                                                            nanovdb::tools::StatsMode::Default,
+                                                            nanovdb::CheckMode::Default);
+        auto* nanoGridFloat = handleFloat.grid<float>();
+        EXPECT_TRUE(nanoGridFloat);
+
+        auto handle = nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, nanovdb::Half>(*nanoGridFloat);
+        auto *nanoGrid = handle.grid<nanovdb::Half>();
+
+        Sphere<float> sphere(center, radius, float(voxelSize), float(halfWidth));
+        auto kernel = [&](const nanovdb::CoordBBox& bbox) {
+            auto nanoAcc = nanoGrid->getAccessor();
+            for (auto it = bbox.begin(); it; ++it) {
+                const nanovdb::Coord p = *it;
+                EXPECT_NEAR(half_to_float(nanoAcc.getValue(p)), sphere(p), tolerance);
+            }
+        };
+        nanovdb::util::forEach(nanoGrid->indexBBox(), kernel);
+
+        nanovdb::io::writeGrid("data/sphere_half.nvdb", handle);
+        handle = nanovdb::io::readGrid("data/sphere_half.nvdb");
+        nanoGrid = handle.grid<nanovdb::Half>();
+        EXPECT_TRUE(nanoGrid);
+
+        nanovdb::util::forEach(nanoGrid->indexBBox(), kernel);
     }
 } // GridBuilder_Half
 
