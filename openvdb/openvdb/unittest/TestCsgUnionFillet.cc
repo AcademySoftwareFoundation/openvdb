@@ -3,7 +3,7 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/io/File.h>
-#include <openvdb/tools/Blend.h>
+#include <openvdb/tools/CsgUnionFillet.h>
 #include <openvdb/tools/Composite.h>
 #include <openvdb/tools/MeshToVolume.h>
 
@@ -13,7 +13,7 @@
 #include <vector>
 
 
-class TestBlend: public ::testing::Test
+class TestCsgUnionFillet: public ::testing::Test
 {
 public:
     void SetUp() override { openvdb::initialize(); }
@@ -146,7 +146,7 @@ makeTwoBoxLevelSets(float voxelSize, float exteriorBand, float interiorBand)
 ////////////////////////////////////////
 
 
-TEST_F(TestBlend, testBlendTwoBoxes)
+TEST_F(TestCsgUnionFillet, testCsgUnionFilletTwoBoxes)
 {
     using namespace openvdb;
 
@@ -154,9 +154,9 @@ TEST_F(TestBlend, testBlendTwoBoxes)
     const float exteriorBand = 6.0f;
     const float interiorBand = 3.0f;
 
-    const float alpha = 2.0f;   // band radius
-    const float beta  = 80.0f;  // exponent
-    const float gamma = 1.0f;   // multiplier
+    const float blendRadius = 2.0f;
+    const float falloffSharpness = 80.0f;
+    const float filletStrength = 1.0f;
 
     TwoBoxLevelSets boxes = makeTwoBoxLevelSets(voxelSize, exteriorBand, interiorBand);
     ASSERT_TRUE(boxes.gridA);
@@ -164,7 +164,8 @@ TEST_F(TestBlend, testBlendTwoBoxes)
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr blendResult =
-        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma);
+        tools::csgUnionFillet<FloatGrid>(
+            *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength);
     ASSERT_TRUE(blendResult);
     EXPECT_TRUE(blendResult->activeVoxelCount() > 0);
 
@@ -194,15 +195,15 @@ TEST_F(TestBlend, testBlendTwoBoxes)
     }
 }
 
-TEST_F(TestBlend, testUnionFilletRequiresActiveInputSamples)
+TEST_F(TestCsgUnionFillet, testCsgUnionFilletRequiresActiveInputSamples)
 {
     using namespace openvdb;
 
     const Coord ijk(0, 0, 0);
     const float background = 2.0f;
-    const float alpha = 2.0f;
-    const float beta = 1.0f;
-    const float gamma = 1.0f;
+    const float blendRadius = 2.0f;
+    const float falloffSharpness = 1.0f;
+    const float filletStrength = 1.0f;
 
     math::Transform::Ptr xform = math::Transform::createLinearTransform(1.0);
 
@@ -221,14 +222,15 @@ TEST_F(TestBlend, testUnionFilletRequiresActiveInputSamples)
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr blendResult =
-        tools::unionFillet<FloatGrid>(*gridA, *gridB, noMask, alpha, beta, gamma);
+        tools::csgUnionFillet<FloatGrid>(
+            *gridA, *gridB, noMask, blendRadius, falloffSharpness, filletStrength);
     ASSERT_TRUE(blendResult);
 
     const float blendVal = blendResult->tree().getValue(ijk);
     EXPECT_NEAR(blendVal, 0.1f, 1.0e-6f); // should be the same as gridA
 }
 
-TEST_F(TestBlend, testUnionFilletZeroSupportDilationPreservesDefault)
+TEST_F(TestCsgUnionFillet, testCsgUnionFilletZeroSupportDilationPreservesDefault)
 {
     using namespace openvdb;
 
@@ -236,9 +238,9 @@ TEST_F(TestBlend, testUnionFilletZeroSupportDilationPreservesDefault)
     const float exteriorBand = 6.0f;
     const float interiorBand = 3.0f;
 
-    const float alpha = 2.0f;
-    const float beta  = 80.0f;
-    const float gamma = 1.0f;
+    const float blendRadius = 2.0f;
+    const float falloffSharpness = 80.0f;
+    const float filletStrength = 1.0f;
 
     TwoBoxLevelSets boxes = makeTwoBoxLevelSets(voxelSize, exteriorBand, interiorBand);
     ASSERT_TRUE(boxes.gridA);
@@ -246,11 +248,13 @@ TEST_F(TestBlend, testUnionFilletZeroSupportDilationPreservesDefault)
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr defaultResult =
-        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma);
+        tools::csgUnionFillet<FloatGrid>(
+            *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength);
     ASSERT_TRUE(defaultResult);
 
     FloatGrid::Ptr zeroDilationResult =
-        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma, 0);
+        tools::csgUnionFillet<FloatGrid>(
+            *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength, 0);
     ASSERT_TRUE(zeroDilationResult);
 
     EXPECT_EQ(defaultResult->activeVoxelCount(), zeroDilationResult->activeVoxelCount());
@@ -271,7 +275,7 @@ TEST_F(TestBlend, testUnionFilletZeroSupportDilationPreservesDefault)
     }
 }
 
-TEST_F(TestBlend, testUnionFilletSupportDilationExtendsInputSamples)
+TEST_F(TestCsgUnionFillet, testCsgUnionFilletSupportDilationExtendsInputSamples)
 {
     using namespace openvdb;
 
@@ -279,9 +283,9 @@ TEST_F(TestBlend, testUnionFilletSupportDilationExtendsInputSamples)
     const float exteriorBand = 1.0f;
     const float interiorBand = 0.5f;
 
-    const float alpha = 2.0f;
-    const float beta = 80.0f;
-    const float gamma = 1.0f;
+    const float blendRadius = 2.0f;
+    const float falloffSharpness = 80.0f;
+    const float filletStrength = 1.0f;
 
     TwoBoxLevelSets boxes = makeTwoBoxLevelSets(voxelSize, exteriorBand, interiorBand);
     ASSERT_TRUE(boxes.gridA);
@@ -289,11 +293,13 @@ TEST_F(TestBlend, testUnionFilletSupportDilationExtendsInputSamples)
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr defaultResult =
-        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma);
+        tools::csgUnionFillet<FloatGrid>(
+            *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength);
     ASSERT_TRUE(defaultResult);
 
     FloatGrid::Ptr dilatedResult =
-        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma, 2);
+        tools::csgUnionFillet<FloatGrid>(
+            *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength, 2);
     ASSERT_TRUE(dilatedResult);
 
     CoordBBox bbox;
@@ -312,7 +318,7 @@ TEST_F(TestBlend, testUnionFilletSupportDilationExtendsInputSamples)
     EXPECT_GT(improvedVoxelCount, Index64(0));
 }
 
-TEST_F(TestBlend, testUnionFilletNoHolesInUnion)
+TEST_F(TestCsgUnionFillet, testCsgUnionFilletNoHolesInUnion)
 {
     using namespace openvdb;
 
@@ -320,9 +326,9 @@ TEST_F(TestBlend, testUnionFilletNoHolesInUnion)
     const float exteriorBand = 6.0f;
     const float interiorBand = 3.0f;
 
-    const float alpha = 2.0f;
-    const float beta  = 80.0f;
-    const float gamma = 1.0f;
+    const float blendRadius = 2.0f;
+    const float falloffSharpness = 80.0f;
+    const float filletStrength = 1.0f;
 
     TwoBoxLevelSets boxes = makeTwoBoxLevelSets(voxelSize, exteriorBand, interiorBand);
     ASSERT_TRUE(boxes.gridA);
@@ -330,7 +336,8 @@ TEST_F(TestBlend, testUnionFilletNoHolesInUnion)
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr blendResult =
-        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma);
+        tools::csgUnionFillet<FloatGrid>(
+            *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength);
     ASSERT_TRUE(blendResult);
 
     FloatGrid::Ptr csgResult = tools::csgUnionCopy(*boxes.gridA, *boxes.gridB);
@@ -354,11 +361,11 @@ TEST_F(TestBlend, testUnionFilletNoHolesInUnion)
     EXPECT_TRUE(solidVoxelCount > 0);
 }
 
-TEST_F(TestBlend, testUnionFilletMismatchedTransformsThrow)
+TEST_F(TestCsgUnionFillet, testCsgUnionFilletMismatchedTransformsThrow)
 {
     using namespace openvdb;
 
-    // Two tiny grids with different transforms -- unionFillet must throw.
+    // Two tiny grids with different transforms -- csgUnionFillet must throw.
     math::Transform::Ptr xformA = math::Transform::createLinearTransform(0.1);
     math::Transform::Ptr xformB = math::Transform::createLinearTransform(0.2);
 
@@ -372,6 +379,6 @@ TEST_F(TestBlend, testUnionFilletMismatchedTransformsThrow)
 
     FloatGrid::ConstPtr noMask;
     EXPECT_THROW(
-        tools::unionFillet<FloatGrid>(*gridA, *gridB, noMask, 3.0f, 2.0f, 1.0f),
+        tools::csgUnionFillet<FloatGrid>(*gridA, *gridB, noMask, 3.0f, 2.0f, 1.0f),
         std::runtime_error);
 }

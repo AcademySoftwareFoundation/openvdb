@@ -498,11 +498,11 @@ set(OPENVDB_LIBRARY_POINTS_IMPL_INCLUDE_FILES
 
 set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/Activate.h
-  tools/Blend.h
   tools/ChangeBackground.h
   tools/Clip.h
   tools/Composite.h
   tools/Count.h
+  tools/CsgUnionFillet.h
   tools/Dense.h
   tools/DenseSparseTools.h
   tools/Diagnostics.h

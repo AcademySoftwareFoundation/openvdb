@@ -81,12 +81,12 @@ else()
     TestAttributeGroup.cc
     TestAttributeSet.cc
     TestBBox.cc
-    TestBlend.cc
     TestClip.cc
     TestConjGradient.cc
     TestCoord.cc
     TestCount.cc
     TestCpt.cc
+    TestCsgUnionFillet.cc
     TestCurl.cc
     TestDelayedLoadMetadata.cc
     TestDense.cc
