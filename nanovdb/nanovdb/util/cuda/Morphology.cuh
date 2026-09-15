@@ -509,6 +509,7 @@ struct ProcessLowerNodesFunctor
     static constexpr int SlicesPerUpperNode = 256;
     static constexpr int LowerNodesPerSlice = 32768 / SlicesPerUpperNode;
 
+    /// @brief Single-grid form: node offsets index the destination grid directly
     void __device__
     operator()(
         const Mask<5> *upperMasks,
@@ -520,8 +521,48 @@ struct ProcessLowerNodesFunctor
         uint32_t *lowerParents,
         uint32_t *leafParents)
     {
-        int dilatedTileID = blockIdx.x; // TODO: Rename this so it is not specific to dilation
-        int upperID = upperOffsets[dilatedTileID];
+        process(upperMasks, lowerMasks, upperOffsets, lowerOffsets, leafOffsets, dstGrid, 0u, 0u, 0u, lowerParents, leafParents);
+    }
+
+    /// @brief Batched form: the block's processed tile belongs to grid tileToGrid[blockIdx.x]
+    ///        (grid 0 when tileToGrid is null), whose builder data supplies the destination grid
+    ///        and the bases that turn batch-wide node offsets into that grid's own indices.
+    ///        DataT is tools::cuda::TopologyBuilderData<BuildT>.
+    template<typename DataT>
+    void __device__
+    operator()(
+        const Mask<5> *upperMasks,
+        const Mask<4> (*lowerMasks)[Mask<5>::SIZE],
+        const uint32_t *upperOffsets,
+        const uint32_t (*lowerOffsets)[Mask<5>::SIZE],
+        const uint32_t (*leafOffsets)[Mask<5>::SIZE],
+        const DataT *d_data,
+        const uint32_t *tileToGrid,
+        uint32_t *lowerParents,
+        uint32_t *leafParents)
+    {
+        const DataT &d = d_data[tileToGrid ? tileToGrid[blockIdx.x] : 0u];
+        process(upperMasks, lowerMasks, upperOffsets, lowerOffsets, leafOffsets, &d.getGrid(),
+                d.upperBase, d.lowerBase, d.leafBase, lowerParents, leafParents);
+    }
+
+private:
+    static void __device__
+    process(
+        const Mask<5> *upperMasks,
+        const Mask<4> (*lowerMasks)[Mask<5>::SIZE],
+        const uint32_t *upperOffsets,
+        const uint32_t (*lowerOffsets)[Mask<5>::SIZE],
+        const uint32_t (*leafOffsets)[Mask<5>::SIZE],
+        NanoGrid<BuildT> *dstGrid,
+        uint32_t upperBase,
+        uint32_t lowerBase,
+        uint32_t leafBase,
+        uint32_t *lowerParents,
+        uint32_t *leafParents)
+    {
+        int processedTileID = blockIdx.x;
+        int upperID = upperOffsets[processedTileID];// batch-wide, like the parent tables below
         int sliceID = blockIdx.y;
         int threadInWarpID = threadIdx.x & 0x1f;
         int warpID = threadIdx.x >> 5;
@@ -532,19 +573,21 @@ struct ProcessLowerNodesFunctor
 
         const auto& dstTree = dstGrid->tree();
 
-        if (upperOffsets[dilatedTileID+1] > upperID) { // check that this particular dilated tile is not empty, i.e. it exists in the tree
-            const auto upperOrigin = dstTree.root().tile(upperID)->origin();
-            auto& upper = const_cast<NanoUpper<BuildT>&>(dstTree.template getFirstNode<2>()[upperID]);
+        if (upperOffsets[processedTileID+1] > upperID) { // check that this particular processed tile is not empty, i.e. it exists in the tree
+            const int localUpperID = upperID - upperBase;
+            const auto upperOrigin = dstTree.root().tile(localUpperID)->origin();
+            auto& upper = const_cast<NanoUpper<BuildT>&>(dstTree.template getFirstNode<2>()[localUpperID]);
             for ( int jj = sliceID*LowerNodesPerSlice + warpID; jj < (sliceID+1)*LowerNodesPerSlice; jj += WarpsPerBlock ) {
-                if (upperMasks[dilatedTileID].isOn(jj)) {
+                if (upperMasks[processedTileID].isOn(jj)) {
                     const_cast<Mask<5>&>(upper.childMask()).setOnAtomic(jj);
-                    auto lowerID = lowerOffsets[dilatedTileID][jj];
-                    auto& lower = const_cast<NanoLower<BuildT>&>(dstTree.template getFirstNode<1>()[lowerID]);
+                    auto lowerID = lowerOffsets[processedTileID][jj];
+                    const auto localLowerID = lowerID - lowerBase;
+                    auto& lower = const_cast<NanoLower<BuildT>&>(dstTree.template getFirstNode<1>()[localLowerID]);
                     const auto lowerOrigin = upperOrigin + (NanoUpper<BuildT>::OffsetToLocalCoord(jj) << NanoUpper<BuildT>::ChildNodeType::TOTAL);
                     upper.setChild(jj, &lower);
-                    lowerParents[lowerID] = upperID;
+                    lowerParents[lowerID] = localUpperID;
 
-                    auto lowerWords = lowerMasks[dilatedTileID][jj].words();
+                    auto lowerWords = lowerMasks[processedTileID][jj].words();
                     lower.mChildMask.words()[2*threadInWarpID  ] = lowerWords[2*threadInWarpID  ];
                     lower.mChildMask.words()[2*threadInWarpID+1] = lowerWords[2*threadInWarpID+1];
                     uint32_t prefixSum = util::countOn(lowerWords[2*threadInWarpID]) + util::countOn(lowerWords[2*threadInWarpID+1]);
@@ -553,16 +596,16 @@ struct ProcessLowerNodesFunctor
                         for ( int bitID = 0; bitID < 64; bitID++)
                             if ( lowerWords[wordID] & (1UL << bitID) ) {
                                 int kk = (wordID << 6) + bitID;
-                                int leafID = leafOffsets[dilatedTileID][jj] + prefixSum;
-                                auto& leaf = const_cast<NanoLeaf<BuildT>&>(dstTree.template getFirstNode<0>()[leafID]);
+                                int leafID = leafOffsets[processedTileID][jj] + prefixSum;
+                                auto& leaf = const_cast<NanoLeaf<BuildT>&>(dstTree.template getFirstNode<0>()[leafID - leafBase]);
                                 lower.setChild(kk, &leaf);
-                                leafParents[leafID] = lowerID;
+                                leafParents[leafID] = localLowerID;
                                 const auto leafOrigin = lowerOrigin + (NanoLower<BuildT>::OffsetToLocalCoord(kk) << NanoLower<BuildT>::ChildNodeType::TOTAL);
-                                leaf.mBBoxMin = leafOrigin; // To be further updated after the leaf-level dilation is complete
+                                leaf.mBBoxMin = leafOrigin; // To be further updated after the leaf-level operation is complete
                                 prefixSum++;
                                 // TODO: Is this accurate? Any other flags that should be set?
                                 leaf.mFlags = (uint64_t)GridFlags::HasBBox; }
-                    lower.mBBox = CoordBBox(); // To be further updated after the leaf-level dilation is complete
+                    lower.mBBox = CoordBBox(); // To be further updated after the leaf-level operation is complete
                     // TODO: Is this accurate? Any other flags that should be set?
                     lower.mFlags = (uint64_t)GridFlags::HasBBox;
                 }
