@@ -37,7 +37,7 @@
 #include <cstring> // for std::memset
 #include <map> // for the processed tile maps
 #include <stdexcept> // for std::runtime_error
-#include <vector>
+#include <vector> // for the tile counts handed to allocateProcessedRoots and the per-grid byte offsets
 
 namespace nanovdb {
 
@@ -132,6 +132,42 @@ inline void packProcessedRoot(const ProcessedTileMap<RootT> &tiles, RootT *root)
 
 }// namespace topology::detail
 
+/// @brief Shared middle of the CUDA topology tools: given speculative root tiles and the
+///        densified child masks a consumer fills in, it counts nodes, allocates the output and
+///        writes every node except the leaf value masks. Builds one grid, or B grids into one
+///        buffer laid out back to back (see the file comment).
+///
+/// Call sequence, single grid or batch (a consumer such as RefineGrid follows it exactly):
+/// @code
+///   TopologyBuilder<BuildT, ResourceT> builder(stream, resource);
+///   // 1. speculative roots on the host, one per grid, tiles in tileSortKey order
+///   builder.allocateProcessedRoots(tileCounts);            // or allocateProcessedRoot(bytes) for one grid
+///   for (g...) topology::detail::packProcessedRoot(tiles[g], builder.hostProcessedRoot(g));
+///   builder.uploadProcessedRoot(stream);
+///   // 2. densified child masks, filled by the consumer's *InternalNodesFunctor
+///   builder.allocateInternalMaskBuffers(stream);
+///   ...  launch with (deviceProcessedRoot(g), deviceUpperMasks() + data(g)->tileBase, deviceLowerMasks() + data(g)->tileBase)
+///   // 3. node counts: enqueued, not ready until the stream is synchronized
+///   builder.countNodes(stream);
+///   cudaStreamSynchronize(stream);                          // data(g)->nodeCount is valid from here
+///   // 4. output buffer and every node except the leaf value masks
+///   auto buffer = builder.getBuffer(BufferT(), stream);
+///   ...  copy each source GridData header to &builder.data(g)->getGrid()
+///   builder.processGridTreeRoot(stream);
+///   builder.processUpperNodes(stream);
+///   builder.processLowerNodes(stream);                      // releases the processed roots and masks
+///   ...  launch the consumer's *LeafMasksFunctor against &builder.data(g)->getGrid()
+///   builder.processLeafOffsets(stream);
+///   builder.processBBox(stream);
+///   builder.postProcessGridTree(stream);
+///   GridHandle<BufferT> handle(std::move(buffer));          // after the stream has drained
+/// @endcode
+///
+/// Synchronization: every method is stream-ordered on the stream it is given and none of them
+/// synchronizes. The one point the caller must synchronize is between countNodes and getBuffer,
+/// because getBuffer sizes the output from data(g)->nodeCount on the host. The processed roots
+/// and mask buffers are released by processLowerNodes; deviceProcessedRoot() and the mask
+/// pointers are invalid after it.
 template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class TopologyBuilder
 {
@@ -161,15 +197,13 @@ class TopologyBuilder
     using UpperMaskBufT = BufT<Mask<5>>;
     using LowerMaskBufT = BufT<Mask<4>>;
     using HostStagingT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::PinnedResource>;
+    template<typename T>
+    using HostBufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::PinnedResource>;
+    using HostDataT = HostBufT<TopologyBuilderData<BuildT>>;
 
 public:
 
     using Data = TopologyBuilderData<BuildT>;
-
-private:
-    using HostDataT = nanovdb::cuda::Buffer<Data, nanovdb::cuda::PinnedResource>;
-
-public:
 
     /// @param stream cuda stream the scratch allocations are ordered on
     /// @param resource resource instance all device scratch is allocated from;
@@ -190,13 +224,20 @@ public:
         , mResource(&resource)
         , mTempDevicePool(resource)
     {
-        this->resetHostData(1);
+        resetHostData(1);
     }
 
+    /// @brief Allocates and zeroes the densified upper and lower child masks for every processed
+    ///        tile in the batch; the consumer's *InternalNodesFunctor fills them
     void allocateInternalMaskBuffers(cudaStream_t stream);
 
+    /// @brief Enumerates the nodes of every grid from the child masks and copies each grid's node
+    ///        counts and node bases into data(g). The copy is asynchronous: synchronize the stream
+    ///        before reading data(g)->nodeCount or calling getBuffer
     void countNodes(cudaStream_t stream);
 
+    /// @brief Allocates one device buffer for all grids (sized on the host from the node counts
+    ///        countNodes produced), lays the grids out back to back and uploads data(g)
     template<typename BufferT>
     BufferT getBuffer(const BufferT &buffer, cudaStream_t stream);
 
@@ -205,14 +246,21 @@ public:
     ///        kept); single-grid consumers may keep launching BuildGridTreeRootFunctor themselves.
     void processGridTreeRoot(cudaStream_t stream);
 
+    /// @brief Links each surviving processed tile to its upper node in the grid's root table
     void processUpperNodes(cudaStream_t stream);
 
+    /// @brief Writes the upper and lower child masks and the leaf preambles from the densified
+    ///        masks, then releases the processed roots and the mask buffers
     void processLowerNodes(cudaStream_t stream);
 
+    /// @brief Computes each leaf's prefix sums and value offset (restarting at 1 in every grid);
+    ///        call after the consumer has written the leaf value masks
     void processLeafOffsets(cudaStream_t stream);
 
+    /// @brief Propagates bounding boxes leaf -> lower -> upper -> root and sets each grid's world bbox
     void processBBox(cudaStream_t stream);
 
+    /// @brief Finishes each grid's voxel count and (optionally) checksum
     void postProcessGridTree(cudaStream_t stream);
 
     HostStagingT                 mHostRoot; // host staging for the processed roots, back to back (pinned, so the upload is asynchronous)
@@ -225,6 +273,7 @@ public:
     BufT<uint64_t>               mVoxelOffsets;
     BufT<uint32_t>               mLowerParents;
     BufT<uint32_t>               mLeafParents;
+    HostBufT<uint32_t>           mHostTileToGrid; // pinned staging for mTileToGrid, so its upload is asynchronous
     BufT<uint32_t>               mTileToGrid; // owning grid of every processed tile; left empty for a single grid
     HostDataT                    mHostData; // host side of the builder parameters, one per grid
     BufT<Data>                   mDeviceData; // device copy, made by uploadData
@@ -233,36 +282,35 @@ public:
     /// @brief Number of grids in the batch (1 unless allocateProcessedRoots was given more)
     uint32_t gridCount() const { return static_cast<uint32_t>(mHostData.size()); }
 
-    RootT* deviceProcessedRoot(uint32_t g = 0) { return mDeviceRoot.empty() ? nullptr : util::PtrAdd<RootT>(mDeviceRoot.data(), this->data(g)->processedRootOffset); }
-    RootT* hostProcessedRoot(uint32_t g = 0)   { return mHostRoot.empty()   ? nullptr : util::PtrAdd<RootT>(mHostRoot.data(), this->data(g)->processedRootOffset); }
+    RootT* deviceProcessedRoot(uint32_t g = 0) { return mDeviceRoot.empty() ? nullptr : util::PtrAdd<RootT>(mDeviceRoot.data(), data(g)->processedRootOffset); }
+    RootT* hostProcessedRoot(uint32_t g = 0)   { return mHostRoot.empty()   ? nullptr : util::PtrAdd<RootT>(mHostRoot.data(), data(g)->processedRootOffset); }
 
     /// @brief Allocates (pinned) host staging for one processed root of @a bytes and returns it
     ///        for the caller to fill (including mTableSize); any previous roots are dropped and
     ///        the builder is reset to a single grid.
     RootT* allocateProcessedRoot(uint64_t bytes)
     {
-        this->resetHostData(1);
+        resetHostData(1);
         mHostRoot = HostStagingT(bytes, nanovdb::cuda::noInit);
-        return this->hostProcessedRoot(0);
+        return hostProcessedRoot(0);
     }
 
     /// @brief Allocates (pinned) host staging for the processed roots of a batch, one root
     ///        of @a tileCounts[g] tiles per grid, and resets the builder to that batch size.
     ///        Each root's mTableSize is set; the caller fills the tiles, in tileSortKey
-    ///        order, through hostProcessedRoot(g). Returns the root of grid 0.
-    RootT* allocateProcessedRoots(const std::vector<uint32_t> &tileCounts)
+    ///        order, through hostProcessedRoot(g).
+    void allocateProcessedRoots(const std::vector<uint32_t> &tileCounts)
     {
         const uint32_t count = static_cast<uint32_t>(tileCounts.size());
         if (count == 0) throw std::runtime_error("TopologyBuilder::allocateProcessedRoots requires at least one grid");
-        this->resetHostData(count);
+        resetHostData(count);
         uint64_t bytes = 0;
         for (uint32_t g = 0; g < count; ++g) {
-            this->data(g)->processedRootOffset = bytes;
+            data(g)->processedRootOffset = bytes;
             bytes += RootT::memUsage(tileCounts[g]);// a multiple of NANOVDB_DATA_ALIGNMENT, so every root stays aligned
         }
         mHostRoot = HostStagingT(bytes, nanovdb::cuda::noInit);
-        for (uint32_t g = 0; g < count; ++g) this->hostProcessedRoot(g)->mTableSize = tileCounts[g];
-        return this->hostProcessedRoot(0);
+        for (uint32_t g = 0; g < count; ++g) hostProcessedRoot(g)->mTableSize = tileCounts[g];
     }
 
     /// @brief Copies the host-staged processed roots to the device, allocating
@@ -270,17 +318,16 @@ public:
     ///        or too small, and records which grid owns each processed tile.
     void uploadProcessedRoot(cudaStream_t stream)
     {
-        const uint32_t tileTotal = this->totalTileCount();
+        const uint32_t tileTotal = updateTileLayout();
         if (mDeviceRoot.size() < mHostRoot.size())
             mDeviceRoot = ScratchT(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResource), mHostRoot.size(), nanovdb::cuda::noInit);
         cudaCheck(cudaMemcpyAsync(mDeviceRoot.data(), mHostRoot.data(), mHostRoot.size(), cudaMemcpyHostToDevice, stream));
-        if (this->gridCount() > 1 && tileTotal) {
-            std::vector<uint32_t> tileToGrid(tileTotal);
-            for (uint32_t g = 0; g < this->gridCount(); ++g)
-                std::fill_n(tileToGrid.begin() + this->data(g)->tileBase, this->data(g)->tileCount, g);
+        if (gridCount() > 1 && tileTotal) {
+            mHostTileToGrid = HostBufT<uint32_t>(tileTotal, nanovdb::cuda::noInit);
+            for (uint32_t g = 0; g < gridCount(); ++g)
+                std::fill_n(mHostTileToGrid.data() + data(g)->tileBase, data(g)->tileCount, g);
             mTileToGrid = BufT<uint32_t>(stream, *mResource, tileTotal, nanovdb::cuda::noInit);
-            // the source is pageable, so this copy completes before it returns and the vector may go out of scope
-            cudaCheck(cudaMemcpyAsync(mTileToGrid.data(), tileToGrid.data(), tileTotal * sizeof(uint32_t), cudaMemcpyHostToDevice, stream));
+            cudaCheck(cudaMemcpyAsync(mTileToGrid.data(), mHostTileToGrid.data(), mHostTileToGrid.size_bytes(), cudaMemcpyHostToDevice, stream));
         }
     }
 
@@ -288,8 +335,8 @@ public:
     ///        the builder's resource on first use or when the batch size changed.
     void uploadData(cudaStream_t stream)
     {
-        if (mDeviceData.size() != this->gridCount())
-            mDeviceData = BufT<Data>(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResource), this->gridCount(), nanovdb::cuda::noInit);
+        if (mDeviceData.size() != gridCount())
+            mDeviceData = BufT<Data>(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResource), gridCount(), nanovdb::cuda::noInit);
         cudaCheck(cudaMemcpyAsync(mDeviceData.data(), mHostData.data(), mHostData.size_bytes(), cudaMemcpyHostToDevice, stream));
     }
     Mask<5>* deviceUpperMasks() { return mUpperMasks.data(); }
@@ -313,25 +360,11 @@ public:
     /// @brief Device copy of the parameters of every grid, gridCount() entries
     Data* deviceData()          { return mDeviceData.data(); }
 
-    /// @brief Processed tiles over the whole batch; also refreshes every grid's tileCount and tileBase
-    uint32_t totalTileCount()
-    {
-        if (mHostRoot.empty()) return mTileTotal;// roots already released; keep the last layout
-        uint32_t base = 0;
-        for (uint32_t g = 0; g < this->gridCount(); ++g) {
-            Data *d = this->data(g);
-            d->tileCount = this->hostProcessedRoot(g)->tileCount();
-            d->tileBase  = base;
-            base += d->tileCount;
-        }
-        return mTileTotal = base;
-    }
-
-    /// @brief Nodes at @a level (0=leaf, 1=lower, 2=upper) over the whole batch
+    /// @brief Nodes at @a level (0=leaf, 1=lower, 2=upper) over the whole batch, as counted by countNodes
     uint32_t totalNodeCount(int level) const
     {
         uint32_t total = 0;
-        for (uint32_t g = 0; g < this->gridCount(); ++g) total += mHostData.data()[g].nodeCount[level];
+        for (uint32_t g = 0; g < gridCount(); ++g) total += mHostData.data()[g].nodeCount[level];
         return total;
     }
 
@@ -345,13 +378,29 @@ private:
         if (mHostData.size() != count) mHostData = HostDataT(count, nanovdb::cuda::noInit);
         std::memset(mHostData.data(), 0, mHostData.size_bytes());
         for (uint32_t g = 0; g < count; ++g) {
-            this->data(g)->gridIndex = g;
-            this->data(g)->gridCount = count;
+            data(g)->gridIndex = g;
+            data(g)->gridCount = count;
         }
         mTileTotal = 0;
     }
 
     const uint32_t* tileToGrid() const { return mTileToGrid.empty() ? nullptr : mTileToGrid.data(); }
+
+    /// @brief Re-reads every grid's tile count from its processed root, assigns the grids
+    ///        consecutive tile ranges (tileBase) and returns the batch-wide tile total
+    uint32_t updateTileLayout()
+    {
+        if (mHostRoot.empty()) return mTileTotal;// roots already released; keep the last layout
+        uint32_t base = 0;
+        for (uint32_t g = 0; g < gridCount(); ++g) {
+            Data *d = data(g);
+            d->tileCount = hostProcessedRoot(g)->tileCount();
+            d->tileBase  = base;
+            base += d->tileCount;
+        }
+        return mTileTotal = base;
+    }
+
 
     uint32_t                          mTileTotal{0};
     ResourceT*                        mResource;// non-owning; all device scratch routes through this instance
@@ -380,7 +429,7 @@ private:
 template<typename BuildT, typename ResourceT>
 void TopologyBuilder<BuildT, ResourceT>::allocateInternalMaskBuffers(cudaStream_t stream)
 {
-    const uint32_t tileTotal = this->totalTileCount();
+    const uint32_t tileTotal = updateTileLayout();
     if (tileTotal == 0) return; // Processing empty grid(s); nothing to allocate
 
     // Allocate (and zero-fill) the mask arrays:
@@ -425,10 +474,10 @@ struct GatherNodeCountsFunctor
 template<typename BuildT, typename ResourceT>
 void TopologyBuilder<BuildT, ResourceT>::countNodes(cudaStream_t stream)
 {
-    const uint32_t processedTileCount = this->totalTileCount();
+    const uint32_t processedTileCount = updateTileLayout();
     if (processedTileCount == 0) { // Processing empty grid(s); zero nodes at all levels
-        for (uint32_t g = 0; g < this->gridCount(); ++g) {
-            Data *d = this->data(g);
+        for (uint32_t g = 0; g < gridCount(); ++g) {
+            Data *d = data(g);
             d->nodeCount[0] = d->nodeCount[1] = d->nodeCount[2] = 0;
             d->upperBase = d->lowerBase = d->leafBase = 0;
         }
@@ -486,9 +535,9 @@ void TopologyBuilder<BuildT, ResourceT>::countNodes(cudaStream_t stream)
 
     // One gather over the grids and one copy back replace per-level scalar readbacks;
     // the caller synchronizes before reading data()->nodeCount, as before.
-    this->uploadData(stream);
-    util::cuda::lambdaKernel<<<numBlocks(this->gridCount()), mNumThreads, 0, stream>>>(
-        this->gridCount(), topology::detail::GatherNodeCountsFunctor<BuildT>(), deviceData(),
+    uploadData(stream);
+    util::cuda::lambdaKernel<<<numBlocks(gridCount()), mNumThreads, 0, stream>>>(
+        gridCount(), topology::detail::GatherNodeCountsFunctor<BuildT>(), deviceData(),
         mUpperOffsets.data(), mLowerOffsets.data(), mLeafOffsets.data());
     cudaCheckError();
     cudaCheck(cudaMemcpyAsync(mHostData.data(), mDeviceData.data(), mHostData.size_bytes(), cudaMemcpyDeviceToHost, stream));
@@ -503,9 +552,9 @@ BufferT TopologyBuilder<BuildT, ResourceT>::getBuffer(const BufferT &pool, cudaS
     // Allocates one device buffer for the destination grids, once the topology/size of every tree is known.
     // Grids are laid out back to back; each grid's offsets below are relative to its own start.
     uint64_t totalSize = 0;
-    std::vector<uint64_t> gridOffsets(this->gridCount());
-    for (uint32_t g = 0; g < this->gridCount(); ++g) {
-        Data *d = this->data(g);
+    std::vector<uint64_t> gridOffsets(gridCount());
+    for (uint32_t g = 0; g < gridCount(); ++g) {
+        Data *d = data(g);
         d->grid  = 0;// grid is always stored at the start of its section
         d->tree  = GridT::memUsage();// grid ends and tree begins
         d->root  = d->tree  + TreeT::memUsage(); // tree ends and root node begins
@@ -524,12 +573,12 @@ BufferT TopologyBuilder<BuildT, ResourceT>::getBuffer(const BufferT &pool, cudaS
     if (base == nullptr) throw std::runtime_error("Failed to allocate grid buffer on the device");
     cudaCheck(cudaMemsetAsync(base, 0, totalSize, stream));
 
-    for (uint32_t g = 0; g < this->gridCount(); ++g) {
-        Data *d = this->data(g);
+    for (uint32_t g = 0; g < gridCount(); ++g) {
+        Data *d = data(g);
         d->d_bufferPtr = util::PtrAdd(base, gridOffsets[g]);
         d->d_upperOffsets = mUpperOffsets.data();// batch-wide; never read for a grid without tiles
     }
-    this->uploadData(stream);
+    uploadData(stream);
 
     return buffer;
 }// TopologyBuilder<BuildT, ResourceT>::getBuffer
@@ -688,8 +737,8 @@ struct InitGridTreeRootFunctor
 template<typename BuildT, typename ResourceT>
 inline void TopologyBuilder<BuildT, ResourceT>::processGridTreeRoot(cudaStream_t stream)
 {
-    util::cuda::lambdaKernel<<<numBlocks(this->gridCount()), mNumThreads, 0, stream>>>(
-        this->gridCount(), topology::detail::BuildGridTreeRootFunctor<BuildT>(), deviceData());
+    util::cuda::lambdaKernel<<<numBlocks(gridCount()), mNumThreads, 0, stream>>>(
+        gridCount(), topology::detail::BuildGridTreeRootFunctor<BuildT>(), deviceData());
     cudaCheckError();
 }// TopologyBuilder<BuildT, ResourceT>::processGridTreeRoot
 
@@ -727,12 +776,12 @@ inline void TopologyBuilder<BuildT, ResourceT>::processUpperNodes(cudaStream_t s
 {
     // Connect all newly allocated upper nodes to their respective tiles
     // Also fill in any necessary part of the preamble (in InternalData) of upper nodes
-    const uint32_t processedTileCount = this->totalTileCount();
+    const uint32_t processedTileCount = updateTileLayout();
 
     if (processedTileCount) { // Unless output grid is empty
         util::cuda::lambdaKernel<<<numBlocks(processedTileCount), mNumThreads, 0, stream>>>(
             processedTileCount, topology::detail::BuildUpperNodesFunctor<BuildT>(), deviceData(),
-            static_cast<void*>(mDeviceRoot.data()), this->tileToGrid());
+            static_cast<void*>(mDeviceRoot.data()), tileToGrid());
         cudaCheckError();
     }
 }// TopologyBuilder<BuildT, ResourceT>::processUpperNodes
@@ -744,12 +793,12 @@ inline void TopologyBuilder<BuildT, ResourceT>::processLowerNodes(cudaStream_t s
 {
     // Fill out the contents of all newly allocated lower nodes (using the densified upper/lower mask arrays)
     // Also fill in the preamble (most of LeafData) for their leaf children
-    const uint32_t processedTileCount = this->totalTileCount();
+    const uint32_t processedTileCount = updateTileLayout();
 
     if (processedTileCount) { // Unless output grid is empty
-        std::size_t lowerCount = this->totalNodeCount(1);
+        std::size_t lowerCount = totalNodeCount(1);
         mLowerParents = BufT<uint32_t>(stream, *mResource, lowerCount, nanovdb::cuda::noInit);
-        std::size_t leafCount = this->totalNodeCount(0);
+        std::size_t leafCount = totalNodeCount(0);
         mLeafParents = BufT<uint32_t>(stream, *mResource, leafCount, nanovdb::cuda::noInit);
 
         using Op = util::morphology::cuda::ProcessLowerNodesFunctor<BuildT>;
@@ -761,7 +810,7 @@ inline void TopologyBuilder<BuildT, ResourceT>::processLowerNodes(cudaStream_t s
                 lowerOffsetRows(),
                 leafOffsetRows(),
                 deviceData(),
-                this->tileToGrid(),
+                tileToGrid(),
                 mLowerParents.data(),
                 mLeafParents.data()
             );
@@ -769,6 +818,7 @@ inline void TopologyBuilder<BuildT, ResourceT>::processLowerNodes(cudaStream_t s
     }
 
     mHostRoot.destroy();
+    mHostTileToGrid.destroy();
     mDeviceRoot.destroy(stream);
     mUpperMasks.destroy(stream);
     mLowerMasks.destroy(stream);
@@ -814,18 +864,18 @@ struct UpdateLeafVoxelOffsetsFunctor
 template<typename BuildT, typename ResourceT>
 inline void TopologyBuilder<BuildT, ResourceT>::processLeafOffsets(cudaStream_t stream)
 {
-    std::size_t leafCount = this->totalNodeCount(0);
+    std::size_t leafCount = totalNodeCount(0);
     if (leafCount) { // Unless output grid is empty
         mVoxelOffsets = BufT<uint64_t>(stream, *mResource, leafCount+1, nanovdb::cuda::noInit);
         cudaCheck(cudaMemsetAsync(mVoxelOffsets.data(), 0, sizeof(uint64_t), stream));
         util::cuda::lambdaKernel<<<numBlocks(leafCount), mNumThreads, 0, stream>>>(
-            leafCount, topology::detail::UpdateLeafVoxelCountsAndPrefixSumFunctor<BuildT>(), deviceData(), this->gridCount(), mVoxelOffsets.data()+1);
+            leafCount, topology::detail::UpdateLeafVoxelCountsAndPrefixSumFunctor<BuildT>(), deviceData(), gridCount(), mVoxelOffsets.data()+1);
         CALL_CUBS(DeviceScan::InclusiveSum,
             mVoxelOffsets.data()+1,
             mVoxelOffsets.data()+1,
             leafCount);
         util::cuda::lambdaKernel<<<numBlocks(leafCount), mNumThreads, 0, stream>>>(
-            leafCount, topology::detail::UpdateLeafVoxelOffsetsFunctor<BuildT>(), deviceData(), this->gridCount(), mVoxelOffsets.data());
+            leafCount, topology::detail::UpdateLeafVoxelOffsetsFunctor<BuildT>(), deviceData(), gridCount(), mVoxelOffsets.data());
     }
 }// TopologyBuilder<BuildT, ResourceT>::processLeafOffsets
 
@@ -894,33 +944,33 @@ struct UpdateRootWorldBBoxFunctor
 template<typename BuildT, typename ResourceT>
 inline void TopologyBuilder<BuildT, ResourceT>::processBBox(cudaStream_t stream)
 {
-    const uint32_t leafCount = this->totalNodeCount(0);
+    const uint32_t leafCount = totalNodeCount(0);
     if (leafCount == 0) return; // Output grid(s) empty; retain empty bounding boxes
 
     // TODO: Do we need a special case when flags indicates no bounding box?
 
     // update and propagate bbox from leaf -> lower/parent nodes
     util::cuda::lambdaKernel<<<numBlocks(leafCount), mNumThreads, 0, stream>>>(
-        leafCount, topology::detail::UpdateAndPropagateLeafBBoxFunctor<BuildT>(), deviceData(), this->gridCount(), mLeafParents.data());
+        leafCount, topology::detail::UpdateAndPropagateLeafBBoxFunctor<BuildT>(), deviceData(), gridCount(), mLeafParents.data());
     mLeafParents.destroy(stream);
     cudaCheckError();
 
     // propagate bbox from lower -> upper/parent node
-    const uint32_t lowerCount = this->totalNodeCount(1);
+    const uint32_t lowerCount = totalNodeCount(1);
     util::cuda::lambdaKernel<<<numBlocks(lowerCount), mNumThreads, 0, stream>>>(
-        lowerCount, topology::detail::PropagateLowerBBoxFunctor<BuildT>(), deviceData(), this->gridCount(), mLowerParents.data());
+        lowerCount, topology::detail::PropagateLowerBBoxFunctor<BuildT>(), deviceData(), gridCount(), mLowerParents.data());
     mLowerParents.destroy(stream);
     cudaCheckError();
 
     // propagate bbox from upper -> root/parent node
-    const uint32_t upperCount = this->totalNodeCount(2);
+    const uint32_t upperCount = totalNodeCount(2);
     util::cuda::lambdaKernel<<<numBlocks(upperCount), mNumThreads, 0, stream>>>(
-        upperCount, topology::detail::PropagateUpperBBoxFunctor<BuildT>(), deviceData(), this->gridCount());
+        upperCount, topology::detail::PropagateUpperBBoxFunctor<BuildT>(), deviceData(), gridCount());
     cudaCheckError();
 
     // update the world-bbox in the root node of every grid
-    util::cuda::lambdaKernel<<<numBlocks(this->gridCount()), mNumThreads, 0, stream>>>(
-        this->gridCount(), topology::detail::UpdateRootWorldBBoxFunctor<BuildT>(), deviceData());
+    util::cuda::lambdaKernel<<<numBlocks(gridCount()), mNumThreads, 0, stream>>>(
+        gridCount(), topology::detail::UpdateRootWorldBBoxFunctor<BuildT>(), deviceData());
     cudaCheckError();
 }// TopologyBuilder<BuildT, ResourceT>::processBBox
 
@@ -948,14 +998,14 @@ template<typename BuildT, typename ResourceT>
 inline void TopologyBuilder<BuildT, ResourceT>::postProcessGridTree(cudaStream_t stream)
 {
     // Finish updates to GridData/TreeData and (optionally) update checksums
-    if (this->totalNodeCount(0)) // if every grid is empty, the default values are correct
-        util::cuda::lambdaKernel<<<numBlocks(this->gridCount()), mNumThreads, 0, stream>>>(
-            this->gridCount(), topology::detail::PostProcessGridTreeFunctor<BuildT>(), deviceData(), mVoxelOffsets.data());
+    if (totalNodeCount(0)) // if every grid is empty, the default values are correct
+        util::cuda::lambdaKernel<<<numBlocks(gridCount()), mNumThreads, 0, stream>>>(
+            gridCount(), topology::detail::PostProcessGridTreeFunctor<BuildT>(), deviceData(), mVoxelOffsets.data());
     cudaCheckError();
     mVoxelOffsets.destroy(stream);
 
-    for (uint32_t g = 0; g < this->gridCount(); ++g)
-        tools::cuda::updateChecksum((GridData*)this->data(g)->d_bufferPtr, mChecksum, stream);
+    for (uint32_t g = 0; g < gridCount(); ++g)
+        tools::cuda::updateChecksum((GridData*)data(g)->d_bufferPtr, mChecksum, stream);
 }// TopologyBuilder<BuildT, ResourceT>::postProcessGridTree
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

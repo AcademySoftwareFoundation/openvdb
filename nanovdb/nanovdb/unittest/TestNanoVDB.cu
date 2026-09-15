@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cstring>
+#include <type_traits>
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/util/ForEach.h>
 #include <nanovdb/tools/GridBuilder.h>
@@ -4246,7 +4247,8 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
     using BuildT  = nanovdb::ValueOnIndex;
     using GridT   = nanovdb::NanoGrid<BuildT>;
     using RootT   = nanovdb::NanoRoot<BuildT>;
-    using BufferT = nanovdb::cuda::DeviceBuffer;
+    using DevBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;// single-space device handles throughout
+    using PinBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::PinnedResource>;// host-readable copies for the byte comparison
     namespace topo = nanovdb::tools::cuda::topology::detail;
     const cudaStream_t stream = 0;
 
@@ -4258,18 +4260,18 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
         {{-1,-1,-1}, {4095,0,0}, {4096,0,0}, {-4097,8,8}, {7,-4096,2047}} };
     const uint32_t gridCount = static_cast<uint32_t>(members.size());
 
-    std::vector<nanovdb::GridHandle<BufferT>> inputs;
+    std::vector<nanovdb::GridHandle<DevBufT>> inputs;
     for (const auto &points : members) {
         if (points.empty()) {
             nanovdb::tools::build::Grid<float> buildGrid(0.0f);
-            auto handle = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<float>, BuildT, BufferT>(buildGrid);
-            handle.deviceUpload();
-            inputs.push_back(std::move(handle));
+            auto hostHandle = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<float>, BuildT, nanovdb::HostBuffer>(buildGrid);
+            inputs.push_back(nanovdb::cuda::copyTo<DevBufT>(hostHandle, stream));
         } else {
-            auto pointBuffer = BufferT::create(points.size() * sizeof(nanovdb::Coord), nullptr, false);
-            cudaCheck(cudaMemcpy(pointBuffer.deviceData(), points.data(), points.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
-            nanovdb::tools::cuda::PointsToGrid<BuildT> converter;
-            inputs.push_back(converter.getHandle(static_cast<nanovdb::Coord*>(pointBuffer.deviceData()), points.size()));
+            nanovdb::cuda::Buffer<nanovdb::Coord> pointBuffer(stream, points.size(), nanovdb::cuda::noInit);
+            cudaCheck(cudaMemcpyAsync(pointBuffer.data(), points.data(), pointBuffer.size_bytes(), cudaMemcpyHostToDevice, stream));
+            nanovdb::tools::cuda::PointsToGrid<BuildT> converter(1.0, nanovdb::Vec3d(0), stream);
+            inputs.push_back(converter.getHandle<nanovdb::Coord*, DevBufT>(pointBuffer.data(), points.size()));
+            cudaCheck(cudaStreamSynchronize(stream));// the point buffer is released at the end of this iteration
         }
     }
     std::vector<const GridT*> srcGrids(gridCount);
@@ -4283,13 +4285,14 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
     }
     const uint32_t srcLeafCount = leafStart[gridCount];
 
-    // Reference: refine each member on its own
-    std::vector<nanovdb::GridHandle<BufferT>> refs;
+    // Reference: refine each member on its own, copied to pinned memory for the byte comparison
+    std::vector<nanovdb::GridHandle<PinBufT>> refs;
     for (uint32_t g = 0; g < gridCount; ++g) {
         nanovdb::tools::cuda::RefineGrid<BuildT> refiner(srcGrids[g], stream);
-        refs.push_back(refiner.getHandle());
-        refs.back().deviceDownload();
+        auto deviceRef = refiner.getHandle<DevBufT>();
+        refs.push_back(nanovdb::cuda::copyTo<PinBufT>(deviceRef, stream));
     }
+    cudaCheck(cudaStreamSynchronize(stream));
 
     // Batched: speculative roots per grid, exactly as RefineGrid::refineRoot derives them
     nanovdb::tools::cuda::TopologyBuilder<BuildT> builder(stream);
@@ -4320,9 +4323,10 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
 
     // Per-grid dispatch tables for the mask and leaf kernels: source grid, processed root,
     // mask row base, and destination grid of every member
-    auto upload = [&](const void *src, size_t bytes) {
-        auto buf = BufferT::create(bytes, nullptr, false);
-        cudaCheck(cudaMemcpy(buf.deviceData(), src, bytes, cudaMemcpyHostToDevice));
+    auto upload = [&](const auto &host) {// std::vector<T> -> device cuda::Buffer<T>; pageable source, so the copy completes before returning
+        using T = typename std::decay_t<decltype(host)>::value_type;
+        nanovdb::cuda::Buffer<T> buf(stream, host.size(), nanovdb::cuda::noInit);
+        cudaCheck(cudaMemcpyAsync(buf.data(), host.data(), buf.size_bytes(), cudaMemcpyHostToDevice, stream));
         return buf;
     };
     std::vector<const RootT*> roots(gridCount);
@@ -4331,14 +4335,14 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
         roots[g] = builder.deviceProcessedRoot(g);
         tileBase[g] = builder.data(g)->tileBase;
     }
-    auto dSrcGrids  = upload(srcGrids.data(),  gridCount * sizeof(const GridT*));
-    auto dRoots     = upload(roots.data(),     gridCount * sizeof(const RootT*));
-    auto dTileBase  = upload(tileBase.data(),  gridCount * sizeof(uint32_t));
-    auto dLeafStart = upload(leafStart.data(), (gridCount + 1) * sizeof(uint32_t));
-    const GridT* const* d_srcGrids  = static_cast<const GridT* const*>(dSrcGrids.deviceData());
-    const RootT* const* d_roots     = static_cast<const RootT* const*>(dRoots.deviceData());
-    const uint32_t*     d_tileBase  = static_cast<const uint32_t*>(dTileBase.deviceData());
-    const uint32_t*     d_leafStart = static_cast<const uint32_t*>(dLeafStart.deviceData());
+    auto dSrcGrids  = upload(srcGrids);
+    auto dRoots     = upload(roots);
+    auto dTileBase  = upload(tileBase);
+    auto dLeafStart = upload(leafStart);
+    const GridT* const* d_srcGrids  = dSrcGrids.data();
+    const RootT* const* d_roots     = dRoots.data();
+    const uint32_t*     d_tileBase  = dTileBase.data();
+    const uint32_t*     d_leafStart = dLeafStart.data();
 
     auto *upperMasks = builder.deviceUpperMasks();
     auto  lowerMasks = builder.deviceLowerMasks();
@@ -4356,7 +4360,7 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
     EXPECT_EQ(builder.data(1)->nodeCount[0], 0u);
     EXPECT_EQ(builder.data(1)->nodeCount[2], 0u);
 
-    auto buffer = builder.getBuffer(BufferT(), stream);
+    auto buffer = builder.getBuffer(DevBufT(), stream);
     for (uint32_t g = 0; g < gridCount; ++g)
         cudaCheck(cudaMemcpyAsync(&builder.data(g)->getGrid(), srcGrids[g]->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, stream));
     builder.processGridTreeRoot(stream);
@@ -4365,8 +4369,8 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
 
     std::vector<GridT*> dstGrids(gridCount);
     for (uint32_t g = 0; g < gridCount; ++g) dstGrids[g] = &builder.data(g)->getGrid();
-    auto dDstGrids = upload(dstGrids.data(), gridCount * sizeof(GridT*));
-    GridT* const* d_dstGrids = static_cast<GridT* const*>(dDstGrids.deviceData());
+    auto dDstGrids = upload(dstGrids);
+    GridT* const* d_dstGrids = dDstGrids.data();
     if (srcLeafCount) {
         nanovdb::util::cuda::lambdaKernel<<<(srcLeafCount + 127) / 128, 128, 0, stream>>>(srcLeafCount,
             BatchRefineLeafMasks<BuildT>{d_srcGrids, d_dstGrids, d_leafStart});
@@ -4377,10 +4381,12 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
     builder.postProcessGridTree(stream);
     cudaCheck(cudaStreamSynchronize(stream));
 
-    // The buffer holds a valid chain of gridCount grids
-    nanovdb::GridHandle<BufferT> batch(std::move(buffer));
+    // The device buffer holds a valid chain of gridCount grids (the single-space handle ctor validates it)
+    nanovdb::GridHandle<DevBufT> device(std::move(buffer));
+    ASSERT_EQ(device.gridCount(), gridCount);
+    auto batch = nanovdb::cuda::copyTo<PinBufT>(device, stream);
+    cudaCheck(cudaStreamSynchronize(stream));
     ASSERT_EQ(batch.gridCount(), gridCount);
-    batch.deviceDownload();
 
     for (uint32_t g = 0; g < gridCount; ++g) {
         ASSERT_EQ(batch.gridSize(g), refs[g].gridSize());
