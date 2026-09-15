@@ -154,9 +154,9 @@ TEST_F(TestBlend, testBlendTwoBoxes)
     const float exteriorBand = 6.0f;
     const float interiorBand = 3.0f;
 
-    const float alpha = 2.0f;   // band radius
-    const float beta  = 80.0f;  // exponent
-    const float gamma = 1.0f;   // multiplier
+    const float blendRadius = 2.0f;
+    const float falloffSharpness = 80.0f;
+    const float filletStrength = 1.0f;
 
     TwoBoxLevelSets boxes = makeTwoBoxLevelSets(voxelSize, exteriorBand, interiorBand);
     ASSERT_TRUE(boxes.gridA);
@@ -164,7 +164,8 @@ TEST_F(TestBlend, testBlendTwoBoxes)
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr blendResult =
-        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma);
+        tools::unionFillet<FloatGrid>(
+            *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength);
     ASSERT_TRUE(blendResult);
     EXPECT_TRUE(blendResult->activeVoxelCount() > 0);
 
@@ -200,9 +201,9 @@ TEST_F(TestBlend, testUnionFilletRequiresActiveInputSamples)
 
     const Coord ijk(0, 0, 0);
     const float background = 2.0f;
-    const float alpha = 2.0f;
-    const float beta = 1.0f;
-    const float gamma = 1.0f;
+    const float blendRadius = 2.0f;
+    const float falloffSharpness = 1.0f;
+    const float filletStrength = 1.0f;
 
     math::Transform::Ptr xform = math::Transform::createLinearTransform(1.0);
 
@@ -221,7 +222,8 @@ TEST_F(TestBlend, testUnionFilletRequiresActiveInputSamples)
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr blendResult =
-        tools::unionFillet<FloatGrid>(*gridA, *gridB, noMask, alpha, beta, gamma);
+        tools::unionFillet<FloatGrid>(
+            *gridA, *gridB, noMask, blendRadius, falloffSharpness, filletStrength);
     ASSERT_TRUE(blendResult);
 
     const float blendVal = blendResult->tree().getValue(ijk);
@@ -236,9 +238,9 @@ TEST_F(TestBlend, testUnionFilletZeroSupportDilationPreservesDefault)
     const float exteriorBand = 6.0f;
     const float interiorBand = 3.0f;
 
-    const float alpha = 2.0f;
-    const float beta  = 80.0f;
-    const float gamma = 1.0f;
+    const float blendRadius = 2.0f;
+    const float falloffSharpness = 80.0f;
+    const float filletStrength = 1.0f;
 
     TwoBoxLevelSets boxes = makeTwoBoxLevelSets(voxelSize, exteriorBand, interiorBand);
     ASSERT_TRUE(boxes.gridA);
@@ -246,11 +248,13 @@ TEST_F(TestBlend, testUnionFilletZeroSupportDilationPreservesDefault)
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr defaultResult =
-        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma);
+        tools::unionFillet<FloatGrid>(
+            *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength);
     ASSERT_TRUE(defaultResult);
 
     FloatGrid::Ptr zeroDilationResult =
-        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma, 0);
+        tools::unionFillet<FloatGrid>(
+            *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength, 0);
     ASSERT_TRUE(zeroDilationResult);
 
     EXPECT_EQ(defaultResult->activeVoxelCount(), zeroDilationResult->activeVoxelCount());
@@ -279,9 +283,9 @@ TEST_F(TestBlend, testUnionFilletSupportDilationExtendsInputSamples)
     const float exteriorBand = 1.0f;
     const float interiorBand = 0.5f;
 
-    const float alpha = 2.0f;
-    const float beta = 80.0f;
-    const float gamma = 1.0f;
+    const float blendRadius = 2.0f;
+    const float falloffSharpness = 80.0f;
+    const float filletStrength = 1.0f;
 
     TwoBoxLevelSets boxes = makeTwoBoxLevelSets(voxelSize, exteriorBand, interiorBand);
     ASSERT_TRUE(boxes.gridA);
@@ -289,11 +293,13 @@ TEST_F(TestBlend, testUnionFilletSupportDilationExtendsInputSamples)
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr defaultResult =
-        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma);
+        tools::unionFillet<FloatGrid>(
+            *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength);
     ASSERT_TRUE(defaultResult);
 
     FloatGrid::Ptr dilatedResult =
-        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma, 2);
+        tools::unionFillet<FloatGrid>(
+            *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength, 2);
     ASSERT_TRUE(dilatedResult);
 
     CoordBBox bbox;
@@ -320,9 +326,9 @@ TEST_F(TestBlend, testUnionFilletNoHolesInUnion)
     const float exteriorBand = 6.0f;
     const float interiorBand = 3.0f;
 
-    const float alpha = 2.0f;
-    const float beta  = 80.0f;
-    const float gamma = 1.0f;
+    const float blendRadius = 2.0f;
+    const float falloffSharpness = 80.0f;
+    const float filletStrength = 1.0f;
 
     TwoBoxLevelSets boxes = makeTwoBoxLevelSets(voxelSize, exteriorBand, interiorBand);
     ASSERT_TRUE(boxes.gridA);
@@ -330,7 +336,8 @@ TEST_F(TestBlend, testUnionFilletNoHolesInUnion)
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr blendResult =
-        tools::unionFillet<FloatGrid>(*boxes.gridA, *boxes.gridB, noMask, alpha, beta, gamma);
+        tools::unionFillet<FloatGrid>(
+            *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength);
     ASSERT_TRUE(blendResult);
 
     FloatGrid::Ptr csgResult = tools::csgUnionCopy(*boxes.gridA, *boxes.gridB);

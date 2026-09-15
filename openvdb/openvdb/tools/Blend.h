@@ -13,6 +13,15 @@
 ///          a 2007 SIGGRAPH talk titled "Levelsets in production: Spider-man 3"
 ///          by Allen et al. Paper is available here:
 ///          https://dl.acm.org/doi/10.1145/1278780.1278815
+///
+///          The paper defines the blended level set as
+///          @c C=max(A,B)+m^beta*gamma. Since OpenVDB level sets use a
+///          negative-inside convention, the implementation instead computes
+///          @c C=min(A,B)-m^beta*gamma.
+///          In the API below, @c alpha, @c beta, and @c gamma
+///          correspond to @c blendRadius, @c falloffSharpness, and
+///          @c filletStrength, respectively. @c m is the derived falloff weight
+///          calculated from @c blendRadius and the two level-set samples.
 
 #ifndef OPENVDB_TOOLS_BLEND_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_BLEND_HAS_BEEN_INCLUDED
@@ -40,11 +49,11 @@ namespace tools {
 ///
 /// @param mask Optional float grid that controls the strength of the blending.
 ///
-/// @param alpha Controls the blend-radius.
+/// @param blendRadius Controls the blend radius.
 ///
-/// @param beta Controls the exponent used to control the strength of the blend.
+/// @param falloffSharpness Controls how sharply the fillet influence falls off.
 ///
-/// @param gamma Controls the strength of the blend by providing a multiplier component.
+/// @param filletStrength Controls the strength of the fillet offset.
 ///
 /// @param supportDilation Optional number of voxels by which to dilate the
 ///        local blend support region before extending both inputs into that
@@ -59,9 +68,9 @@ typename GridT::Ptr
 unionFillet(const GridT& lhs,
      const GridT& rhs,
      typename MaskT::ConstPtr mask,
-     typename GridT::ValueType alpha,
-     typename GridT::ValueType beta,
-     typename GridT::ValueType gamma,
+     typename GridT::ValueType blendRadius,
+     typename GridT::ValueType falloffSharpness,
+     typename GridT::ValueType filletStrength,
      int supportDilation = 0);
 
 //
@@ -84,16 +93,16 @@ struct UnionWithFillet {
     UnionWithFillet(const GridT& lhsGrid,
                     const GridT& rhsGrid,
                     typename MaskT::ConstPtr mask,
-                    const ValueType& bandwidth,
-                    const ValueType& exponent,
-                    const ValueType& multiplier)
+                    const ValueType& blendRadius,
+                    const ValueType& falloffSharpness,
+                    const ValueType& filletStrength)
         : mLhsGrid(&lhsGrid)
         , mRhsGrid(&rhsGrid)
         , mLhsTree(&(lhsGrid.tree()))
         , mRhsTree(&(rhsGrid.tree()))
-        , mBandwidth(bandwidth)
-        , mExponent(exponent)
-        , mMultiplier(multiplier)
+        , mBlendRadius(blendRadius)
+        , mFalloffSharpness(falloffSharpness)
+        , mFilletStrength(filletStrength)
     {
         mMaskTree = mask ? mask->treePtr() : nullptr;
         static_assert(std::is_floating_point<typename TreeT::ValueType>::value,
@@ -108,9 +117,9 @@ struct UnionWithFillet {
 
 private:
     struct FilletParms {
-        float mAlpha; // Bandwidth Falloff
-        float mBeta; // Exponent
-        float mGamma; // Amplitude/Multiplier
+        float mBlendRadius;
+        float mFalloffSharpness;
+        float mFilletStrength;
     };
 
     struct BuildPrimarySegment;
@@ -123,23 +132,23 @@ private:
     TreeT const * const mLhsTree;
     TreeT const * const mRhsTree;
     typename MaskT::TreeType::ConstPtr mMaskTree = nullptr;
-    ValueType mBandwidth;
-    ValueType mExponent;
-    ValueType mMultiplier;
+    ValueType mBlendRadius;
+    ValueType mFalloffSharpness;
+    ValueType mFilletStrength;
 };
 
 template<typename GridT>
 MaskGrid::Ptr
 createBlendSupportMask(const GridT& lhs,
                        const GridT& rhs,
-                       typename GridT::ValueType alpha,
+                       typename GridT::ValueType blendRadius,
                        int supportDilation)
 {
     MaskGrid::Ptr supportMask = MaskGrid::create();
     supportMask->setTransform(lhs.transform().copy());
 
     const typename GridT::ValueType supportRadius =
-        alpha + typename GridT::ValueType(supportDilation * lhs.voxelSize()[0]);
+        blendRadius + typename GridT::ValueType(supportDilation * lhs.voxelSize()[0]);
 
     typename GridT::ConstAccessor lhsAcc = lhs.getConstAccessor();
     typename GridT::ConstAccessor rhsAcc = rhs.getConstAccessor();
@@ -330,19 +339,20 @@ private:
                     const ValueType * rhsData = rhsNodePt->buffer().data();
                     const NodeMaskType& rhsMask = rhsNodePt->getValueMask();
 
-                    const float alpha = mParms.mAlpha;
-                    const float beta = mParms.mBeta;
-                    const float gamma = mParms.mGamma;
+                    const float blendRadius = mParms.mBlendRadius;
+                    const float falloffSharpness = mParms.mFalloffSharpness;
+                    const float filletStrength = mParms.mFilletStrength;
 
                     for (openvdb::Index pos = 0; pos < LeafNodeType::SIZE; ++pos) {
                         const float A = lhsData[pos];
                         const float B = rhsData[pos];
-                        const float m = openvdb::math::Clamp((alpha - A) / alpha, 0.f, 1.f) *
-                                        openvdb::math::Clamp((alpha - B) / alpha, 0.f, 1.f);
+                        const float m =
+                            openvdb::math::Clamp((blendRadius - A) / blendRadius, 0.f, 1.f) *
+                            openvdb::math::Clamp((blendRadius - B) / blendRadius, 0.f, 1.f);
                         // Only use offset if both lhs and rhs are on, else defaults to regular union
                         const bool hasValidFilletSamples = lhsMask.isOn(pos) && rhsMask.isOn(pos);
                         const float offset = hasValidFilletSamples ?
-                            openvdb::math::Pow(m, beta) * gamma : 0.0f;
+                            openvdb::math::Pow(m, falloffSharpness) * filletStrength : 0.0f;
                         const bool isAMin = A < B;
                         // - sign here. Otherwise, we'll get empty space between geos
                         outputData[pos] = isAMin ? A - offset : B - offset;
@@ -416,9 +426,9 @@ private:
                     const ValueType* rhsData = rhsNodePt->buffer().data();
                     const NodeMaskType& rhsMask = rhsNodePt->getValueMask();
 
-                    const float alpha = mParms.mAlpha;
-                    const float beta = mParms.mBeta;
-                    const float gamma = mParms.mGamma;
+                    const float blendRadius = mParms.mBlendRadius;
+                    const float falloffSharpness = mParms.mFalloffSharpness;
+                    const float filletStrength = mParms.mFilletStrength;
 
                     MaskValueType const * maskData = nullptr;
                     if (maskNodePt) maskData = maskNodePt->buffer().data();
@@ -426,12 +436,13 @@ private:
                     for (openvdb::Index pos = 0; pos < LeafNodeType::SIZE; ++pos) {
                         const float A = lhsData[pos];
                         const float B = rhsData[pos];
-                        const float m = openvdb::math::Clamp((alpha - A) / alpha, 0.f, 1.f) *
-                                        openvdb::math::Clamp((alpha - B) / alpha, 0.f, 1.f);
+                        const float m =
+                            openvdb::math::Clamp((blendRadius - A) / blendRadius, 0.f, 1.f) *
+                            openvdb::math::Clamp((blendRadius - B) / blendRadius, 0.f, 1.f);
                         // Only use offset if both lhs and rhs are on, else defaults to regular union
                         const bool hasValidFilletSamples = lhsMask.isOn(pos) && rhsMask.isOn(pos);
                         const float offset = hasValidFilletSamples ?
-                            openvdb::math::Pow(m, beta) * gamma : 0.0f;
+                            openvdb::math::Pow(m, falloffSharpness) * filletStrength : 0.0f;
                         const bool isAMin = A < B;
                         // multiply by mask value if it exists
                         const float multiplier = maskData ? maskData[pos] : maskBackground;
@@ -845,9 +856,9 @@ private:
             openvdb::tree::ValueAccessor<const TreeT> rhsAcc(*mRhsTree);
             openvdb::tree::ValueAccessor<TreeT> outputAcc(*mOutputTree);
 
-            const float alpha = mParms.mAlpha;
-            const float beta = mParms.mBeta;
-            const float gamma = mParms.mGamma;
+            const float blendRadius = mParms.mBlendRadius;
+            const float falloffSharpness = mParms.mFalloffSharpness;
+            const float filletStrength = mParms.mFilletStrength;
             const size_t primarySize = mPrimaryLeafNodes.size();
 
             for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
@@ -869,11 +880,12 @@ private:
                         for (openvdb::Index pos = 0; pos < LeafNodeType::SIZE; ++pos) {
                             const float A = lhsData[pos];
                             const float B = rhsData[pos];
-                            const float m = openvdb::math::Clamp((alpha - A) / alpha, 0.f, 1.f) *
-                                            openvdb::math::Clamp((alpha - B) / alpha, 0.f, 1.f);
+                            const float m =
+                                openvdb::math::Clamp((blendRadius - A) / blendRadius, 0.f, 1.f) *
+                                openvdb::math::Clamp((blendRadius - B) / blendRadius, 0.f, 1.f);
                             const bool hasValidFilletSamples = lhsMask.isOn(pos) && rhsMask.isOn(pos);
                             const float offset = hasValidFilletSamples ?
-                                openvdb::math::Pow(m, beta) * gamma : 0.0f;
+                                openvdb::math::Pow(m, falloffSharpness) * filletStrength : 0.0f;
                             const bool isAMin = A < B;
                             outputData[pos] = isAMin ? A - offset : B - offset;
                             outputMask.set(pos, isAMin ? lhsMask.isOn(pos) : rhsMask.isOn(pos));
@@ -943,9 +955,9 @@ private:
             openvdb::tree::ValueAccessor<const MaskTreeType> maskAcc(*mMaskTree);
             openvdb::tree::ValueAccessor<TreeT> outputAcc(*mOutputTree);
 
-            const float alpha = mParms.mAlpha;
-            const float beta = mParms.mBeta;
-            const float gamma = mParms.mGamma;
+            const float blendRadius = mParms.mBlendRadius;
+            const float falloffSharpness = mParms.mFalloffSharpness;
+            const float filletStrength = mParms.mFilletStrength;
             const float maskBackground = mMaskTree->background();
             const size_t primarySize = mPrimaryLeafNodes.size();
 
@@ -970,11 +982,12 @@ private:
                         for (openvdb::Index pos = 0; pos < LeafNodeType::SIZE; ++pos) {
                             const float A = lhsData[pos];
                             const float B = rhsData[pos];
-                            const float m = openvdb::math::Clamp((alpha - A) / alpha, 0.f, 1.f) *
-                                            openvdb::math::Clamp((alpha - B) / alpha, 0.f, 1.f);
+                            const float m =
+                                openvdb::math::Clamp((blendRadius - A) / blendRadius, 0.f, 1.f) *
+                                openvdb::math::Clamp((blendRadius - B) / blendRadius, 0.f, 1.f);
                             const bool hasValidFilletSamples = lhsMask.isOn(pos) && rhsMask.isOn(pos);
                             const float offset = hasValidFilletSamples ?
-                                openvdb::math::Pow(m, beta) * gamma : 0.0f;
+                                openvdb::math::Pow(m, falloffSharpness) * filletStrength : 0.0f;
                             const bool isAMin = A < B;
                             const float multiplier = maskData ? maskData[pos] : maskBackground;
                             outputData[pos] = isAMin ? (A - offset * multiplier) : (B - offset * multiplier);
@@ -1016,9 +1029,9 @@ private:
 template<typename GridT, typename MaskT>
 typename GridT::Ptr UnionWithFillet<GridT, MaskT>::blend() {
     FilletParms parms;
-    parms.mAlpha = mBandwidth;
-    parms.mBeta = mExponent;
-    parms.mGamma = mMultiplier;
+    parms.mBlendRadius = mBlendRadius;
+    parms.mFalloffSharpness = mFalloffSharpness;
+    parms.mFilletStrength = mFilletStrength;
     BuildFusedSegment fused(mLhsTree, mRhsTree, mMaskTree, parms);
 
     fused();
@@ -1041,9 +1054,9 @@ typename GridT::Ptr
 unionFillet(const GridT& lhs,
      const GridT& rhs,
      typename MaskT::ConstPtr mask,
-     typename GridT::ValueType alpha,
-     typename GridT::ValueType beta,
-     typename GridT::ValueType gamma,
+     typename GridT::ValueType blendRadius,
+     typename GridT::ValueType falloffSharpness,
+     typename GridT::ValueType filletStrength,
      int supportDilation)
 {
     static_assert(std::is_floating_point<typename GridT::ValueType>::value,
@@ -1061,9 +1074,10 @@ unionFillet(const GridT& lhs,
 
     if (supportDilation > 0) {
         MaskGrid::Ptr supportMask =
-            createBlendSupportMask(lhs, rhs, alpha, supportDilation);
+            createBlendSupportMask(lhs, rhs, blendRadius, supportDilation);
         if (supportMask->activeVoxelCount() == 0) {
-            UnionWithFillet<GridT, MaskT> uf(lhs, rhs, mask, alpha, beta, gamma);
+            UnionWithFillet<GridT, MaskT> uf(
+                lhs, rhs, mask, blendRadius, falloffSharpness, filletStrength);
             return uf.blend();
         }
 
@@ -1072,11 +1086,13 @@ unionFillet(const GridT& lhs,
         typename GridT::Ptr rhsExtended =
             tools::maskSdf(rhs, *supportMask);
 
-        UnionWithFillet<GridT, MaskT> uf(*lhsExtended, *rhsExtended, mask, alpha, beta, gamma);
+        UnionWithFillet<GridT, MaskT> uf(
+            *lhsExtended, *rhsExtended, mask, blendRadius, falloffSharpness, filletStrength);
         return uf.blend();
     }
 
-    UnionWithFillet<GridT, MaskT> uf(lhs, rhs, mask, alpha, beta, gamma);
+    UnionWithFillet<GridT, MaskT> uf(
+        lhs, rhs, mask, blendRadius, falloffSharpness, filletStrength);
     return uf.blend();
 }
 } // tools

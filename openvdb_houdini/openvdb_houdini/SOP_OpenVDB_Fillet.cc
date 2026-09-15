@@ -52,9 +52,9 @@ enum { RESAMPLE_MODE_FIRST = RESAMPLE_OFF, RESAMPLE_MODE_LAST = RESAMPLE_LO_RES 
 // VDBFilletParms struct to be used in SOP
 //
 struct VDBFilletParms {
-    float mAlpha = 10.f; // Falloff
-    float mBeta = 100.f; // Exponent
-    float mGamma = 10.f; // Amplitude/Multiplier
+    float mBlendRadius = 10.f;
+    float mFalloffSharpness = 100.f;
+    float mFilletStrength = 10.f;
     int mDilation = 0; // Support dilation in voxels
     ResampleMode mResampleMode = ResampleMode::RESAMPLE_OFF; // Resample mode
     int mSamplingOrder = 0;
@@ -352,9 +352,9 @@ SOP_OpenVDB_Fillet::Cache::evalParms(OP_Context& context, VDBFilletParms& parms)
 {
     const fpreal time = context.getTime();
 
-    parms.mAlpha = static_cast<float>(evalFloat("blend_radius", 0, time));
-    parms.mBeta  = static_cast<float>(evalFloat("falloff_sharpness", 0, time));
-    parms.mGamma = static_cast<float>(evalFloat("fillet_strength", 0, time));
+    parms.mBlendRadius = static_cast<float>(evalFloat("blend_radius", 0, time));
+    parms.mFalloffSharpness = static_cast<float>(evalFloat("falloff_sharpness", 0, time));
+    parms.mFilletStrength = static_cast<float>(evalFloat("fillet_strength", 0, time));
     parms.mDilation = static_cast<int>(evalInt("dilation", 0, time));
     parms.mResampleMode = asResampleMode(evalInt("resample", 0, time));
     parms.mSamplingOrder = static_cast<int>(evalInt("resampleinterp", 0, time));
@@ -623,7 +623,8 @@ SOP_OpenVDB_Fillet::Cache::blendLevelSets(
     if (parms.mMaskPtr) rsmpl.resampleMask(parms.mMaskPtr);
 
     hvdb::GridPtr ret = openvdb::tools::unionFillet<openvdb::FloatGrid, typename openvdb::FloatGrid>(
-        *a, *b, parms.mMaskPtr, parms.mAlpha, parms.mBeta, parms.mGamma, parms.mDilation);
+        *a, *b, parms.mMaskPtr, parms.mBlendRadius, parms.mFalloffSharpness,
+        parms.mFilletStrength, parms.mDilation);
 
     return ret;
 }
