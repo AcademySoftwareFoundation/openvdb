@@ -3,7 +3,7 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/io/File.h>
-#include <openvdb/tools/Blend.h>
+#include <openvdb/tools/CsgUnionFillet.h>
 #include <openvdb/tools/Composite.h>
 #include <openvdb/tools/MeshToVolume.h>
 
@@ -13,7 +13,7 @@
 #include <vector>
 
 
-class TestBlend: public ::testing::Test
+class TestCsgUnionFillet: public ::testing::Test
 {
 public:
     void SetUp() override { openvdb::initialize(); }
@@ -146,7 +146,7 @@ makeTwoBoxLevelSets(float voxelSize, float exteriorBand, float interiorBand)
 ////////////////////////////////////////
 
 
-TEST_F(TestBlend, testBlendTwoBoxes)
+TEST_F(TestCsgUnionFillet, testCsgUnionFilletTwoBoxes)
 {
     using namespace openvdb;
 
@@ -164,7 +164,7 @@ TEST_F(TestBlend, testBlendTwoBoxes)
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr blendResult =
-        tools::unionFillet<FloatGrid>(
+        tools::csgUnionFillet<FloatGrid>(
             *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength);
     ASSERT_TRUE(blendResult);
     EXPECT_TRUE(blendResult->activeVoxelCount() > 0);
@@ -195,7 +195,7 @@ TEST_F(TestBlend, testBlendTwoBoxes)
     }
 }
 
-TEST_F(TestBlend, testUnionFilletRequiresActiveInputSamples)
+TEST_F(TestCsgUnionFillet, testCsgUnionFilletRequiresActiveInputSamples)
 {
     using namespace openvdb;
 
@@ -222,7 +222,7 @@ TEST_F(TestBlend, testUnionFilletRequiresActiveInputSamples)
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr blendResult =
-        tools::unionFillet<FloatGrid>(
+        tools::csgUnionFillet<FloatGrid>(
             *gridA, *gridB, noMask, blendRadius, falloffSharpness, filletStrength);
     ASSERT_TRUE(blendResult);
 
@@ -230,7 +230,7 @@ TEST_F(TestBlend, testUnionFilletRequiresActiveInputSamples)
     EXPECT_NEAR(blendVal, 0.1f, 1.0e-6f); // should be the same as gridA
 }
 
-TEST_F(TestBlend, testUnionFilletZeroSupportDilationPreservesDefault)
+TEST_F(TestCsgUnionFillet, testCsgUnionFilletZeroSupportDilationPreservesDefault)
 {
     using namespace openvdb;
 
@@ -248,12 +248,12 @@ TEST_F(TestBlend, testUnionFilletZeroSupportDilationPreservesDefault)
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr defaultResult =
-        tools::unionFillet<FloatGrid>(
+        tools::csgUnionFillet<FloatGrid>(
             *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength);
     ASSERT_TRUE(defaultResult);
 
     FloatGrid::Ptr zeroDilationResult =
-        tools::unionFillet<FloatGrid>(
+        tools::csgUnionFillet<FloatGrid>(
             *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength, 0);
     ASSERT_TRUE(zeroDilationResult);
 
@@ -275,7 +275,7 @@ TEST_F(TestBlend, testUnionFilletZeroSupportDilationPreservesDefault)
     }
 }
 
-TEST_F(TestBlend, testUnionFilletSupportDilationExtendsInputSamples)
+TEST_F(TestCsgUnionFillet, testCsgUnionFilletSupportDilationExtendsInputSamples)
 {
     using namespace openvdb;
 
@@ -293,12 +293,12 @@ TEST_F(TestBlend, testUnionFilletSupportDilationExtendsInputSamples)
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr defaultResult =
-        tools::unionFillet<FloatGrid>(
+        tools::csgUnionFillet<FloatGrid>(
             *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength);
     ASSERT_TRUE(defaultResult);
 
     FloatGrid::Ptr dilatedResult =
-        tools::unionFillet<FloatGrid>(
+        tools::csgUnionFillet<FloatGrid>(
             *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength, 2);
     ASSERT_TRUE(dilatedResult);
 
@@ -318,7 +318,7 @@ TEST_F(TestBlend, testUnionFilletSupportDilationExtendsInputSamples)
     EXPECT_GT(improvedVoxelCount, Index64(0));
 }
 
-TEST_F(TestBlend, testUnionFilletNoHolesInUnion)
+TEST_F(TestCsgUnionFillet, testCsgUnionFilletNoHolesInUnion)
 {
     using namespace openvdb;
 
@@ -336,7 +336,7 @@ TEST_F(TestBlend, testUnionFilletNoHolesInUnion)
 
     FloatGrid::ConstPtr noMask;
     FloatGrid::Ptr blendResult =
-        tools::unionFillet<FloatGrid>(
+        tools::csgUnionFillet<FloatGrid>(
             *boxes.gridA, *boxes.gridB, noMask, blendRadius, falloffSharpness, filletStrength);
     ASSERT_TRUE(blendResult);
 
@@ -361,11 +361,11 @@ TEST_F(TestBlend, testUnionFilletNoHolesInUnion)
     EXPECT_TRUE(solidVoxelCount > 0);
 }
 
-TEST_F(TestBlend, testUnionFilletMismatchedTransformsThrow)
+TEST_F(TestCsgUnionFillet, testCsgUnionFilletMismatchedTransformsThrow)
 {
     using namespace openvdb;
 
-    // Two tiny grids with different transforms -- unionFillet must throw.
+    // Two tiny grids with different transforms -- csgUnionFillet must throw.
     math::Transform::Ptr xformA = math::Transform::createLinearTransform(0.1);
     math::Transform::Ptr xformB = math::Transform::createLinearTransform(0.2);
 
@@ -379,6 +379,6 @@ TEST_F(TestBlend, testUnionFilletMismatchedTransformsThrow)
 
     FloatGrid::ConstPtr noMask;
     EXPECT_THROW(
-        tools::unionFillet<FloatGrid>(*gridA, *gridB, noMask, 3.0f, 2.0f, 1.0f),
+        tools::csgUnionFillet<FloatGrid>(*gridA, *gridB, noMask, 3.0f, 2.0f, 1.0f),
         std::runtime_error);
 }

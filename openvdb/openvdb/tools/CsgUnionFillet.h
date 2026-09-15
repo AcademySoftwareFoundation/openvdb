@@ -1,15 +1,13 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 //
-/// @file    Blend.h
+/// @file    CsgUnionFillet.h
 ///
 /// @author  Andre Pradhana
 ///
-/// @brief   Define methods to blend two level-sets together. One such approach
-///          is by carving an excess fillet so that the resulting blended
-///          level-sets can appear to be smoother than a regular union.
+/// @brief   CSG union with fillet for two signed distance fields (level sets).
 ///
-/// @details The algorithm used in the function unionFillet is based on
+/// @details The algorithm used in the function csgUnionFillet is based on
 ///          a 2007 SIGGRAPH talk titled "Levelsets in production: Spider-man 3"
 ///          by Allen et al. Paper is available here:
 ///          https://dl.acm.org/doi/10.1145/1278780.1278815
@@ -23,8 +21,8 @@
 ///          @c filletStrength, respectively. @c m is the derived falloff weight
 ///          calculated from @c blendRadius and the two level-set samples.
 
-#ifndef OPENVDB_TOOLS_BLEND_HAS_BEEN_INCLUDED
-#define OPENVDB_TOOLS_BLEND_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_TOOLS_CSG_UNION_FILLET_HAS_BEEN_INCLUDED
+#define OPENVDB_TOOLS_CSG_UNION_FILLET_HAS_BEEN_INCLUDED
 
 #include <openvdb/Grid.h>
 #include <openvdb/Types.h>
@@ -40,8 +38,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-/// @brief  Threaded VDB union with fillet that produces a new grid or tree from
-///         immutable inputs.
+/// @brief  Threaded CSG union with fillet that produces a new level-set grid
+///         from immutable level-set inputs.
 ///
 /// @param lhs Level-set grid to be combined with a second input.
 ///
@@ -59,13 +57,13 @@ namespace tools {
 ///        local blend support region before extending both inputs into that
 ///        region. A value of zero preserves the default behavior.
 ///
-/// @return The filleted union of the @lhs and @rhs level set inputs.
+/// @return The filleted union of the @a lhs and @a rhs level-set inputs.
 ///
-/// @throw  If the transforms of @lsh, @rhs, and @mask do not match.
+/// @throw std::runtime_error if the transforms of @a lhs, @a rhs, and @a mask do not match.
 template<typename GridT,
          typename MaskT = typename GridT::template ValueConverter<float>::Type>
 typename GridT::Ptr
-unionFillet(const GridT& lhs,
+csgUnionFillet(const GridT& lhs,
      const GridT& rhs,
      typename MaskT::ConstPtr mask,
      typename GridT::ValueType blendRadius,
@@ -74,11 +72,11 @@ unionFillet(const GridT& lhs,
      int supportDilation = 0);
 
 //
-// Main class to handle UnionWithFillet
+// Main class to handle CsgUnionFillet
 //
 template<typename GridT,
          typename MaskT = typename GridT::template ValueConverter<float>::Type>
-struct UnionWithFillet {
+struct CsgUnionFillet {
     using TreeT = typename GridT::TreeType;
     using ValueType = typename TreeT::ValueType;
     using TreePtrType = typename TreeT::Ptr;
@@ -90,7 +88,7 @@ struct UnionWithFillet {
     using MaskTreeType = typename MaskT::TreeType;
     using MaskValueType = typename MaskT::ValueType;
 
-    UnionWithFillet(const GridT& lhsGrid,
+    CsgUnionFillet(const GridT& lhsGrid,
                     const GridT& rhsGrid,
                     typename MaskT::ConstPtr mask,
                     const ValueType& blendRadius,
@@ -106,7 +104,7 @@ struct UnionWithFillet {
     {
         mMaskTree = mask ? mask->treePtr() : nullptr;
         static_assert(std::is_floating_point<typename TreeT::ValueType>::value,
-                      "assert in UnionFillet Constructor: "
+                      "assert in CsgUnionFillet Constructor: "
                       "level set grids must have scalar/floating-point value types.");
     }
 
@@ -181,7 +179,7 @@ createBlendSupportMask(const GridT& lhs,
 /// @brief Go through the lhs nodes (both internal and leaf nodes).
 // TODO: should just be only for float
 template<typename TreeT, typename MaskT>
-struct UnionWithFillet<TreeT, MaskT>::BuildPrimarySegment {
+struct CsgUnionFillet<TreeT, MaskT>::BuildPrimarySegment {
     using MaskTreeType = typename MaskT::TreeType;
     using ValueType = typename TreeT::ValueType;
     using TreePtrType = typename TreeT::Ptr;
@@ -477,7 +475,7 @@ private:
 
 
 template<typename TreeT, typename MaskT>
-struct UnionWithFillet<TreeT, MaskT>::BuildSecondarySegment {
+struct CsgUnionFillet<TreeT, MaskT>::BuildSecondarySegment {
     using MaskTreeType = typename MaskT::TreeType;
     using ValueType = typename TreeT::ValueType;
     using TreePtrType = typename TreeT::Ptr;
@@ -645,7 +643,7 @@ private:
 };
 
 template<typename TreeT, typename MaskT>
-struct UnionWithFillet<TreeT, MaskT>::BuildFusedSegment {
+struct CsgUnionFillet<TreeT, MaskT>::BuildFusedSegment {
     using MaskTreeType = typename MaskT::TreeType;
     using ValueType = typename TreeT::ValueType;
     using TreePtrType = typename TreeT::Ptr;
@@ -1027,7 +1025,7 @@ private:
 
 
 template<typename GridT, typename MaskT>
-typename GridT::Ptr UnionWithFillet<GridT, MaskT>::blend() {
+typename GridT::Ptr CsgUnionFillet<GridT, MaskT>::blend() {
     FilletParms parms;
     parms.mBlendRadius = mBlendRadius;
     parms.mFalloffSharpness = mFalloffSharpness;
@@ -1051,7 +1049,7 @@ typename GridT::Ptr UnionWithFillet<GridT, MaskT>::blend() {
 template<typename GridT,
          typename MaskT>
 typename GridT::Ptr
-unionFillet(const GridT& lhs,
+csgUnionFillet(const GridT& lhs,
      const GridT& rhs,
      typename MaskT::ConstPtr mask,
      typename GridT::ValueType blendRadius,
@@ -1060,7 +1058,7 @@ unionFillet(const GridT& lhs,
      int supportDilation)
 {
     static_assert(std::is_floating_point<typename GridT::ValueType>::value,
-        "assert in unionFillet: "
+        "assert in csgUnionFillet: "
         "level set grids must have scalar/floating-point value types.");
 
     // sanitizer
@@ -1076,7 +1074,7 @@ unionFillet(const GridT& lhs,
         MaskGrid::Ptr supportMask =
             createBlendSupportMask(lhs, rhs, blendRadius, supportDilation);
         if (supportMask->activeVoxelCount() == 0) {
-            UnionWithFillet<GridT, MaskT> uf(
+            CsgUnionFillet<GridT, MaskT> uf(
                 lhs, rhs, mask, blendRadius, falloffSharpness, filletStrength);
             return uf.blend();
         }
@@ -1086,12 +1084,12 @@ unionFillet(const GridT& lhs,
         typename GridT::Ptr rhsExtended =
             tools::maskSdf(rhs, *supportMask);
 
-        UnionWithFillet<GridT, MaskT> uf(
+        CsgUnionFillet<GridT, MaskT> uf(
             *lhsExtended, *rhsExtended, mask, blendRadius, falloffSharpness, filletStrength);
         return uf.blend();
     }
 
-    UnionWithFillet<GridT, MaskT> uf(
+    CsgUnionFillet<GridT, MaskT> uf(
         lhs, rhs, mask, blendRadius, falloffSharpness, filletStrength);
     return uf.blend();
 }
@@ -1099,4 +1097,4 @@ unionFillet(const GridT& lhs,
 } // OPENVDB_VERSION_NAME
 } // openvdb
 
-#endif // OPENVDB_TOOLS_BLEND_HAS_BEEN_INCLUDED
+#endif // OPENVDB_TOOLS_CSG_UNION_FILLET_HAS_BEEN_INCLUDED

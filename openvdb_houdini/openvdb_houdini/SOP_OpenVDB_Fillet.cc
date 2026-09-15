@@ -18,7 +18,7 @@
 #include <openvdb/tools/Composite.h>
 #include <openvdb/tools/GridTransformer.h> // for resampleToMatch()
 #include <openvdb/tools/LevelSetRebuild.h> // for levelSetRebuild()
-#include <openvdb/tools/Blend.h>
+#include <openvdb/tools/CsgUnionFillet.h>
 #include <openvdb/tools/Prune.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
@@ -622,7 +622,7 @@ SOP_OpenVDB_Fillet::Cache::blendLevelSets(
     rsmpl.resampleGrids();
     if (parms.mMaskPtr) rsmpl.resampleMask(parms.mMaskPtr);
 
-    hvdb::GridPtr ret = openvdb::tools::unionFillet<openvdb::FloatGrid, typename openvdb::FloatGrid>(
+    hvdb::GridPtr ret = openvdb::tools::csgUnionFillet<openvdb::FloatGrid, typename openvdb::FloatGrid>(
         *a, *b, parms.mMaskPtr, parms.mBlendRadius, parms.mFalloffSharpness,
         parms.mFilletStrength, parms.mDilation);
 
