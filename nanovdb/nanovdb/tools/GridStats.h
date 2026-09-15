@@ -539,8 +539,7 @@ public:
             ((uint64_t(v.raw & 0x7C00) + ((1023 - 15) << 10)) << (52-10)) | // exponent
             (uint64_t(v.raw & 0x03FF) << (42)); // mantissa
         if ((v.raw & 0x7C00) == 0u) { raw64 &= 0x8000000000000000llu; } // flush denorms to zero
-        if (v.raw == 0x7C00) { raw64 = 0x7FF0000000000000llu; } // preserve pos inf
-        if (v.raw == 0xFC00) { raw64 = 0xFFF0000000000000llu; } // preserve neg inf
+        if ((v.raw & 0x7C00) == 0x7C00) { raw64 |= 0x7FF0000000000000llu; } // preserve inf and NaN
         return *((double*)&raw64);
     }
     __hostdev__ Stats()
