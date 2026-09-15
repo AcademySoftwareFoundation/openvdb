@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <vector>
+#include <cstring>
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/util/ForEach.h>
 #include <nanovdb/tools/GridBuilder.h>
@@ -4197,6 +4198,210 @@ TEST(TestNanoVDBCUDA, RefineCoarsen_ValueOnIndex)
     EXPECT_TRUE(coarsenedHandle.grid<BuildT>());
     EXPECT_EQ(inputHandle.grid<BuildT>()->mChecksum.full(), coarsenedHandle.grid<BuildT>()->mChecksum.full());
 }// RefineCoarsen_ValueOnIndex
+
+namespace {
+
+/// Drives RefineInternalNodesFunctor over every source leaf of a batch: the leaf's member is
+/// found from the per-grid leaf offsets, and the member's processed root and mask rows are
+/// selected by pointer offset.
+template <typename BuildT>
+struct BatchRefineInternalNodes
+{
+    const nanovdb::NanoGrid<BuildT>* const* srcGrids;
+    const nanovdb::NanoRoot<BuildT>* const* roots;
+    const uint32_t* tileBase;
+    const uint32_t* leafStart;
+    nanovdb::Mask<5>* upperMasks;
+    nanovdb::Mask<4> (*lowerMasks)[nanovdb::Mask<5>::SIZE];
+
+    __device__ void operator()(size_t leaf) const {
+        uint32_t g = 0;
+        while (leafStart[g + 1] <= leaf) ++g;
+        nanovdb::util::morphology::cuda::RefineInternalNodesFunctor<BuildT>()(
+            leaf - leafStart[g], srcGrids[g], roots[g], upperMasks + tileBase[g], lowerMasks + tileBase[g]);
+    }
+};
+
+/// Drives RefineLeafMasksFunctor over every source leaf of a batch into that member's destination grid
+template <typename BuildT>
+struct BatchRefineLeafMasks
+{
+    const nanovdb::NanoGrid<BuildT>* const* srcGrids;
+    nanovdb::NanoGrid<BuildT>* const* dstGrids;
+    const uint32_t* leafStart;
+
+    __device__ void operator()(size_t leaf) const {
+        uint32_t g = 0;
+        while (leafStart[g + 1] <= leaf) ++g;
+        nanovdb::util::morphology::cuda::RefineLeafMasksFunctor<BuildT>()(leaf - leafStart[g], srcGrids[g], dstGrids[g]);
+    }
+};
+
+}// anonymous namespace
+
+// Builds three grids in one TopologyBuilder pass (refinement, driven directly through the
+// batch API) and checks every member against RefineGrid on that member alone.
+TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
+{
+    using BuildT  = nanovdb::ValueOnIndex;
+    using GridT   = nanovdb::NanoGrid<BuildT>;
+    using RootT   = nanovdb::NanoRoot<BuildT>;
+    using BufferT = nanovdb::cuda::DeviceBuffer;
+    namespace topo = nanovdb::tools::cuda::topology::detail;
+    const cudaStream_t stream = 0;
+
+    // Member 0: the RefineCoarsen fixture. Member 1: empty. Member 2: voxels across the
+    // +-4096 tile boundaries and in negative octants.
+    std::vector<std::vector<nanovdb::Coord>> members = {
+        {{0,0,0}, {4,0,0}, {0,64,0}, {0,0,2048}},
+        {},
+        {{-1,-1,-1}, {4095,0,0}, {4096,0,0}, {-4097,8,8}, {7,-4096,2047}} };
+    const uint32_t gridCount = static_cast<uint32_t>(members.size());
+
+    std::vector<nanovdb::GridHandle<BufferT>> inputs;
+    for (const auto &points : members) {
+        if (points.empty()) {
+            nanovdb::tools::build::Grid<float> buildGrid(0.0f);
+            auto handle = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<float>, BuildT, BufferT>(buildGrid);
+            handle.deviceUpload();
+            inputs.push_back(std::move(handle));
+        } else {
+            auto pointBuffer = BufferT::create(points.size() * sizeof(nanovdb::Coord), nullptr, false);
+            cudaCheck(cudaMemcpy(pointBuffer.deviceData(), points.data(), points.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+            nanovdb::tools::cuda::PointsToGrid<BuildT> converter;
+            inputs.push_back(converter.getHandle(static_cast<nanovdb::Coord*>(pointBuffer.deviceData()), points.size()));
+        }
+    }
+    std::vector<const GridT*> srcGrids(gridCount);
+    std::vector<nanovdb::TreeData> srcTrees(gridCount);
+    std::vector<uint32_t> leafStart(gridCount + 1, 0);
+    for (uint32_t g = 0; g < gridCount; ++g) {
+        srcGrids[g] = inputs[g].deviceGrid<BuildT>();
+        ASSERT_TRUE(srcGrids[g]);
+        srcTrees[g] = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(srcGrids[g]);
+        leafStart[g + 1] = leafStart[g] + srcTrees[g].mNodeCount[0];
+    }
+    const uint32_t srcLeafCount = leafStart[gridCount];
+
+    // Reference: refine each member on its own
+    std::vector<nanovdb::GridHandle<BufferT>> refs;
+    for (uint32_t g = 0; g < gridCount; ++g) {
+        nanovdb::tools::cuda::RefineGrid<BuildT> refiner(srcGrids[g], stream);
+        refs.push_back(refiner.getHandle());
+        refs.back().deviceDownload();
+    }
+
+    // Batched: speculative roots per grid, exactly as RefineGrid::refineRoot derives them
+    nanovdb::tools::cuda::TopologyBuilder<BuildT> builder(stream);
+    std::vector<topo::ProcessedTileMap<RootT>> tiles(gridCount);
+    std::vector<uint32_t> tileCounts(gridCount);
+    for (uint32_t g = 0; g < gridCount; ++g) {
+        if (srcTrees[g].mVoxelCount) {
+            auto deviceSrcRoot = static_cast<const RootT*>(nanovdb::util::PtrAdd(srcGrids[g], GridT::memUsage() + srcTrees[g].mNodeOffset[3]));
+            const uint64_t rootAndUpperSize = srcTrees[g].mNodeOffset[1] - srcTrees[g].mNodeOffset[3];
+            auto hostCopy = nanovdb::HostBuffer::create(rootAndUpperSize);
+            cudaCheck(cudaMemcpy(hostCopy.data(), deviceSrcRoot, rootAndUpperSize, cudaMemcpyDeviceToHost));
+            auto srcRoot = static_cast<RootT*>(hostCopy.data());
+            for (uint32_t t = 0; t < srcRoot->tileCount(); ++t) {
+                const auto bbox = srcRoot->getChild(srcRoot->tile(t))->bbox();
+                topo::insertProcessedTiles<RootT>(tiles[g], nanovdb::CoordBBox(
+                    nanovdb::util::morphology::refineCoord(bbox.min()),
+                    nanovdb::util::morphology::refineCoord(bbox.max()).offsetBy(1)));
+            }
+        }
+        tileCounts[g] = static_cast<uint32_t>(tiles[g].size());
+    }
+    EXPECT_EQ(tileCounts[1], 0u);
+    EXPECT_GT(tileCounts[2], 1u);
+    builder.allocateProcessedRoots(tileCounts);
+    for (uint32_t g = 0; g < gridCount; ++g) topo::packProcessedRoot(tiles[g], builder.hostProcessedRoot(g));
+    builder.uploadProcessedRoot(stream);
+    builder.allocateInternalMaskBuffers(stream);
+
+    // Per-grid dispatch tables for the mask and leaf kernels: source grid, processed root,
+    // mask row base, and destination grid of every member
+    auto upload = [&](const void *src, size_t bytes) {
+        auto buf = BufferT::create(bytes, nullptr, false);
+        cudaCheck(cudaMemcpy(buf.deviceData(), src, bytes, cudaMemcpyHostToDevice));
+        return buf;
+    };
+    std::vector<const RootT*> roots(gridCount);
+    std::vector<uint32_t> tileBase(gridCount);
+    for (uint32_t g = 0; g < gridCount; ++g) {
+        roots[g] = builder.deviceProcessedRoot(g);
+        tileBase[g] = builder.data(g)->tileBase;
+    }
+    auto dSrcGrids  = upload(srcGrids.data(),  gridCount * sizeof(const GridT*));
+    auto dRoots     = upload(roots.data(),     gridCount * sizeof(const RootT*));
+    auto dTileBase  = upload(tileBase.data(),  gridCount * sizeof(uint32_t));
+    auto dLeafStart = upload(leafStart.data(), (gridCount + 1) * sizeof(uint32_t));
+    const GridT* const* d_srcGrids  = static_cast<const GridT* const*>(dSrcGrids.deviceData());
+    const RootT* const* d_roots     = static_cast<const RootT* const*>(dRoots.deviceData());
+    const uint32_t*     d_tileBase  = static_cast<const uint32_t*>(dTileBase.deviceData());
+    const uint32_t*     d_leafStart = static_cast<const uint32_t*>(dLeafStart.deviceData());
+
+    auto *upperMasks = builder.deviceUpperMasks();
+    auto  lowerMasks = builder.deviceLowerMasks();
+    if (srcLeafCount) {
+        nanovdb::util::cuda::lambdaKernel<<<(srcLeafCount + 127) / 128, 128, 0, stream>>>(srcLeafCount,
+            BatchRefineInternalNodes<BuildT>{d_srcGrids, d_roots, d_tileBase, d_leafStart, upperMasks, lowerMasks});
+        cudaCheckError();
+    }
+
+    builder.countNodes(stream);
+    cudaCheck(cudaStreamSynchronize(stream));
+    EXPECT_EQ(builder.data(0)->nodeCount[0], 4u);
+    EXPECT_EQ(builder.data(0)->nodeCount[1], 3u);
+    EXPECT_EQ(builder.data(0)->nodeCount[2], 2u);
+    EXPECT_EQ(builder.data(1)->nodeCount[0], 0u);
+    EXPECT_EQ(builder.data(1)->nodeCount[2], 0u);
+
+    auto buffer = builder.getBuffer(BufferT(), stream);
+    for (uint32_t g = 0; g < gridCount; ++g)
+        cudaCheck(cudaMemcpyAsync(&builder.data(g)->getGrid(), srcGrids[g]->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, stream));
+    builder.processGridTreeRoot(stream);
+    builder.processUpperNodes(stream);
+    builder.processLowerNodes(stream);
+
+    std::vector<GridT*> dstGrids(gridCount);
+    for (uint32_t g = 0; g < gridCount; ++g) dstGrids[g] = &builder.data(g)->getGrid();
+    auto dDstGrids = upload(dstGrids.data(), gridCount * sizeof(GridT*));
+    GridT* const* d_dstGrids = static_cast<GridT* const*>(dDstGrids.deviceData());
+    if (srcLeafCount) {
+        nanovdb::util::cuda::lambdaKernel<<<(srcLeafCount + 127) / 128, 128, 0, stream>>>(srcLeafCount,
+            BatchRefineLeafMasks<BuildT>{d_srcGrids, d_dstGrids, d_leafStart});
+        cudaCheckError();
+    }
+    builder.processLeafOffsets(stream);
+    builder.processBBox(stream);
+    builder.postProcessGridTree(stream);
+    cudaCheck(cudaStreamSynchronize(stream));
+
+    // The buffer holds a valid chain of gridCount grids
+    nanovdb::GridHandle<BufferT> batch(std::move(buffer));
+    ASSERT_EQ(batch.gridCount(), gridCount);
+    batch.deviceDownload();
+
+    for (uint32_t g = 0; g < gridCount; ++g) {
+        ASSERT_EQ(batch.gridSize(g), refs[g].gridSize());
+        std::vector<uint8_t> expected(refs[g].gridSize());
+        std::memcpy(expected.data(), refs[g].gridData(), expected.size());
+        auto *header = reinterpret_cast<nanovdb::GridData*>(expected.data());
+        header->mGridIndex = g;
+        header->mGridCount = gridCount;
+        EXPECT_EQ(0, std::memcmp(batch.gridData(g), expected.data(), expected.size())) << "grid " << g << " differs from its single-grid refinement";
+        EXPECT_EQ(batch.gridData(g)->mGridIndex, g);
+        EXPECT_EQ(batch.gridData(g)->mGridCount, gridCount);
+    }
+    auto *grid0 = batch.grid<BuildT>(0);
+    ASSERT_TRUE(grid0);
+    EXPECT_EQ(grid0->tree().nodeCount(0), 4u);
+    EXPECT_EQ(grid0->tree().nodeCount(1), 3u);
+    EXPECT_EQ(grid0->tree().nodeCount(2), 2u);
+    EXPECT_EQ(grid0->tree().activeVoxelCount(), 32u);
+    EXPECT_EQ(batch.grid<BuildT>(1)->tree().activeVoxelCount(), 0u);
+    EXPECT_EQ(batch.grid<BuildT>(2)->tree().activeVoxelCount(), 8u * members[2].size());
+}// TopologyBuilderBatch_ValueOnIndex
 
 TEST(TestNanoVDBCUDA, MergeGrids_ValueOnIndex)
 {
