@@ -785,6 +785,27 @@ private:
     std::vector<uint64_t>    mValIdx[3];// store id of first value in node
 }; // CreateNanoGrid
 
+template <typename DstT, typename SrcT>
+inline DstT CreateNanoGrid_valueCast(const SrcT val)
+{
+    return static_cast<DstT>(val);
+}
+
+template <>
+inline nanovdb::Half CreateNanoGrid_valueCast<nanovdb::Half, float>(const float val)
+{
+    uint32_t raw32 = *((uint32_t*)&val);
+    uint32_t raw16 =
+        (uint32_t(raw32 & 0x80000000) >> (31-15)) | // sign bit
+        ((uint32_t(raw32 & 0x7F800000) - ((127 - 15) << 23)) >> (23-10)) | // exponent
+        (uint32_t(raw32 & 0x007FFFFF) >> (23-10)); // mantissa
+    if ((raw32 & 0x7F800000) == 0u) { raw16 &= 0x8000u; } // flush denorms to zero
+    if ((raw32 & 0x7F800000) == 0x7F800000) { raw16 |= 0x7C00u; } // preserve inf and NaN
+    nanovdb::Half ret;
+    ret.raw = uint16_t(raw16);
+    return ret;
+}
+
 //================================================================================================
 
 template <typename SrcGridT>
@@ -1215,7 +1236,7 @@ CreateNanoGrid<SrcGridT>::processLeafs()
                     dst[3] = src[3];
                 }
             } else {
-                for (uint32_t j=0; j<512u; ++j) *dst++ = static_cast<DstValueT>(srcLeaf.getValue(j));
+                for (uint32_t j=0; j<512u; ++j) *dst++ = CreateNanoGrid_valueCast<DstValueT>(srcLeaf.getValue(j));
             }
         }
     });
@@ -1517,7 +1538,7 @@ CreateNanoGrid<SrcGridT>::processInternalNodes()
                     DstChildT *dstChild = this->template dstNode<DstBuildT,LEVEL-1>(childID++);// might be Leaf<FpN>
                     dstNode->setChild(it.pos(), dstChild);
                 } else {
-                    dstNode->setValue(it.pos(), static_cast<DstValueT>(value));
+                    dstNode->setValue(it.pos(), CreateNanoGrid_valueCast<DstValueT>(value));
                 }
             }
         }
@@ -1596,7 +1617,7 @@ CreateNanoGrid<SrcGridT>::processRoot()
     const uint32_t tableSize = srcRoot.getTableSize();
     if (DstRootT::DataType::padding()>0) util::memzero(dstRoot, DstRootT::memUsage(tableSize));
     dstRoot->mTableSize = tableSize;
-    dstRoot->mMinimum = dstRoot->mMaximum = dstRoot->mBackground = srcRoot.background();
+    dstRoot->mMinimum = dstRoot->mMaximum = dstRoot->mBackground = CreateNanoGrid_valueCast<DstValueT>(srcRoot.background());
     dstRoot->mBBox = CoordBBox(); // // set to an empty bounding box
     if (tableSize==0) return;
     auto *dstChild = this->template dstNode<DstBuildT, 2>(0);// fixed size and linear in memory
@@ -1606,7 +1627,7 @@ CreateNanoGrid<SrcGridT>::processRoot()
         if (it.probeChild(value)) {
             dstTile->setChild(it.getCoord(), dstChild++, dstRoot);
         } else {
-            dstTile->setValue(it.getCoord(), it.isValueOn(), static_cast<DstValueT>(value));
+            dstTile->setValue(it.getCoord(), it.isValueOn(), CreateNanoGrid_valueCast<DstValueT>(value));
         }
     }
 } // CreateNanoGrid::processRoot<T>
