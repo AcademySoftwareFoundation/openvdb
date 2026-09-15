@@ -4218,37 +4218,6 @@ TEST_F(TestNanoVDB, GridBuilder_Half)
         EXPECT_EQ(dstGrid->tree().nodeCount(1), n[1]);
         EXPECT_EQ(dstGrid->tree().nodeCount(2), n[0]);
     }
-#if 0
-    {// Sphere
-        const double voxelSize = 0.1, halfWidth = 3.0, radius = 10.0f;
-        const nanovdb::Vec3d center(0), origin(0);
-        const float tolerance = 0.005f * voxelSize;
-
-        auto handle = nanovdb::tools::createLevelSetSphere<VoxelT>(radius, center,
-                                                            voxelSize, halfWidth,
-                                                            origin, "sphere",
-                                                            nanovdb::tools::StatsMode::Default,
-                                                            nanovdb::CheckMode::Default);
-        auto* nanoGrid = handle.grid<VoxelT>();
-        EXPECT_TRUE(nanoGrid);
-        Sphere<float> sphere(center, radius, float(voxelSize), float(halfWidth));
-        auto kernel = [&](const nanovdb::CoordBBox& bbox) {
-            auto nanoAcc = nanoGrid->getAccessor();
-            for (auto it = bbox.begin(); it; ++it) {
-                const nanovdb::Coord p = *it;
-                EXPECT_NEAR(nanoAcc.getValue(p), sphere(p), tolerance);
-            }
-        };
-        nanovdb::util::forEach(nanoGrid->indexBBox(), kernel);
-
-        nanovdb::io::writeGrid("data/sphere_half.nvdb", handle);
-        handle = nanovdb::io::readGrid("data/sphere_half.nvdb");
-        nanoGrid = handle.grid<VoxelT>();
-        EXPECT_TRUE(nanoGrid);
-
-        nanovdb::util::forEach(nanoGrid->indexBBox(), kernel);
-    }
-#endif
 } // GridBuilder_Half
 
 TEST_F(TestNanoVDB, GridBuilder_FpN_Basic1)
