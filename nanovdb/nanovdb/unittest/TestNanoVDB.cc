@@ -4105,32 +4105,28 @@ TEST_F(TestNanoVDB, GridBuilder_Fp16)
     }
 } // GridBuilder_Fp16
 
-#include <immintrin.h>
-
-static float half_to_float(nanovdb::Half half)
+// Disclaimer: This is not trying to cover all corner cases of IEEE 754
+static float half_to_float(nanovdb::Half v)
 {
-    // 1. Pack the 16-bit float into the lowest 16 bits of a 128-bit vector
-    __m128i m128_hp = _mm_set1_epi16(half.raw);
-
-    // 2. Convert the lowest FP16 element to an FP32 vector
-    __m128 m128_sp = _mm_cvtph_ps(m128_hp);
-
-    // 3. Extract the float value from the vector
-    return _mm_cvtss_f32(m128_sp);
+    uint32_t raw32 =
+        (uint32_t(v.raw & 0x8000) << (31-15)) | // sign bit
+        ((uint32_t(v.raw & 0x7C00) + ((127 - 15) << 10)) << (23-10)) | // exponent
+        (uint32_t(v.raw & 0x03FF) << (23-10)); // mantissa
+    if ((v.raw & 0x7C00) == 0u) { raw32 &= 0x80000000llu; } // flush denorms to zero
+    if ((v.raw & 0x7C00) == 0x7C00) { raw32 |= 0x7F800000llu; } // preserve inf and NaN
+    return *((float*)&raw32);
 }
 static nanovdb::Half float_to_half(float val)
 {
-    // 1. Load the single float into the lowest element of a 128-bit vector
-    __m128 v_float = _mm_set_ss(val);
-
-    // 2. Convert the vector to 16-bit floats.
-    // _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC rounds to nearest even
-    __m128i v_fp16 = _mm_cvtps_ph(v_float, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
-
-    // 3. Extract the lower 16 bits containing our converted value
-    nanovdb::Half half;
-    half.raw = (uint16_t)_mm_cvtsi128_si32(v_fp16);
-    return half;
+    uint32_t raw32 = *((uint32_t*)&val);
+    uint32_t raw16 =
+        (uint32_t(raw32 & 0x80000000) >> (31-15)) | // sign bit
+        ((uint32_t(raw32 & 0x7F800000) - ((127 - 15) << 23)) >> (23-10)) | // exponent
+        (uint32_t(raw32 & 0x007FFFFF) >> (23-10)); // mantissa
+    if ((raw32 & 0x7F800000) == 0u) { raw16 &= 0x8000u; } // flush denorms to zero
+    if ((raw32 & 0x7F800000) == 0x7F800000) { raw16 |= 0x7C00u; } // preserve inf and NaN
+    nanovdb::Half ret = { uint16_t(raw16) };
+    return ret;
 }
 
 TEST_F(TestNanoVDB, GridBuilder_Half)

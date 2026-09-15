@@ -537,7 +537,7 @@ public:
         uint64_t raw64 =
             (uint64_t(v.raw & 0x8000) << (63-15)) | // sign bit
             ((uint64_t(v.raw & 0x7C00) + ((1023 - 15) << 10)) << (52-10)) | // exponent
-            (uint64_t(v.raw & 0x03FF) << (42)); // mantissa
+            (uint64_t(v.raw & 0x03FF) << (52-10)); // mantissa
         if ((v.raw & 0x7C00) == 0u) { raw64 &= 0x8000000000000000llu; } // flush denorms to zero
         if ((v.raw & 0x7C00) == 0x7C00) { raw64 |= 0x7FF0000000000000llu; } // preserve inf and NaN
         return *((double*)&raw64);
