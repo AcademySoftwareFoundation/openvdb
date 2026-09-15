@@ -566,7 +566,7 @@ struct RootNode
     }
 
     template<typename T>
-    typename util::enable_if<std::is_floating_point<T>::value>::type
+    typename util::enable_if<util::is_floating_point<T>::value>::type
     signedFloodFill(T outside);
 
 }; // tools::build::RootNode
@@ -575,7 +575,7 @@ struct RootNode
 
 template<typename ChildT>
 template<typename T>
-inline typename util::enable_if<std::is_floating_point<T>::value>::type
+inline typename util::enable_if<util::is_floating_point<T>::value>::type
 RootNode<ChildT>::signedFloodFill(T outside)
 {
     std::map<Coord, ChildT*> nodeKeys;
@@ -1047,7 +1047,7 @@ struct InternalNode
     }
 
     template<typename T>
-    typename util::enable_if<std::is_floating_point<T>::value>::type
+    typename util::enable_if<util::is_floating_point<T>::value>::type
     signedFloodFill(T outside);
 
 }; // tools::build::InternalNode
@@ -1056,7 +1056,7 @@ struct InternalNode
 
 template<typename ChildT>
 template<typename T>
-inline typename util::enable_if<std::is_floating_point<T>::value>::type
+inline typename util::enable_if<util::is_floating_point<T>::value>::type
 InternalNode<ChildT>::signedFloodFill(T outside)
 {
     const uint32_t first = *mChildMask.beginOn();
@@ -1277,7 +1277,7 @@ struct LeafNode
     }
 
     template<typename T>
-    typename util::enable_if<std::is_floating_point<T>::value>::type
+    typename util::enable_if<util::is_floating_point<T>::value>::type
     signedFloodFill(T outside);
 
 }; // tools::build::LeafNode<T>
@@ -1636,7 +1636,7 @@ struct LeafNode<bool>
 
 template<typename BuildT>
 template<typename T>
-inline typename util::enable_if<std::is_floating_point<T>::value>::type
+inline typename util::enable_if<util::is_floating_point<T>::value>::type
 LeafNode<BuildT>::signedFloodFill(T outside)
 {
     const uint32_t first = *mValueMask.beginOn();
