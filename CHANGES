@@ -1,7 +1,483 @@
 OpenVDB Version History
 =======================
 
-Version 13.0.1 - In Development
+Version 13.1.0 - September 16, 2026
+
+  Highlights:
+  - Introduction of a SIMD framework for targeted ISA vectorization support,
+    including explicit intrinsic support on x86 and significant performance
+    gains on a small initial set of tools.
+  - Significant NanoVDB enhancements including improved CUDA resource
+    management, faster kernels and many correctness fixes.
+  - Expanded the capabilities of the vdb_tool command line binary, including
+    support for diagnostics, statistics, mesh/volume conversion utilities,
+    advanced expression based processing and enhanced file format support.
+
+  OpenVDB:
+    New features:
+    - Introduced targeted SIMD support to the core library. The main framework
+      advancement is the introduction of Agner Fog's vectorclass library (VCL) as
+      an optional dependency, specifically for x86 instruction set architecture
+      intrinsic support. This allows for programmatic selection of desired SIMD
+      widths, independent of the targets supported SIMD extension, as well as
+      access to a comprehensive vectorized math library. See:
+      https://github.com/vectorclass/version2.
+
+      Using VCL can be controlled via the USE_VCL build option. The desired x86
+      ISA can be provided via OPENVDB_X86_INSTRSET.
+
+      To support other platforms and plan for future transitions, a generic SIMD
+      interface has been introduced in simd/Simd.h. When VCL is not in use, this
+      interface falls back to representing SIMD types as math::Tuple<> containers
+      of an equal or fallback size. This encourages the design of SIMD compatible
+      code which can be auto-vectorized, regardless of the underlying SIMD
+      acceleration library in use.
+
+    Improvements:
+    - Added a new root ext/ folder to house imported third-party tools, along
+      with a THIRD-PARTY.md document detailing all imported licenses.
+    - Improved the interruptibility of tools::meshToVolume
+      [Reported by @RustyLooks]
+    - Extend tools::visitNodesDepthFirst() to be able to perform bottom-up
+      traversal in addition to top-down traversal.
+    - Incorporated doxygen-awesome to OpenVDB's doxygen builds to modernise
+      and improve the html output.
+    - Vectorized points::rasterizeSdf(SphereSettings), improving performance
+      upwards of 2x on x86 and 1.5x on other platforms.
+    - Vectorized points::pca, improving performance upwards of 2x on x86 and
+      1.5x on other platforms.
+    - Introduced new component wise arithmetic and relational operators for
+      math::Tuple instantiations for use with fallback SIMD support.
+    - Using Limiter::CLAMP when advecting vector fields through VolumeAdvect
+      now clamps each vector component individually rather than resetting
+      out-of-range vector values to the entire min or max value.
+    - Deprecated the relational Vec2, Vec3 and Vec4 less than and greater than
+      class operators, as their behaviour is ambiguous and can lead to generic
+      code which is not correct. Note that these operators primary use was to
+      easily support stl container and algorithm usage (e.g. std::map<Vec, Other>,
+      std::sort(), etc). In these cases, the deprecation warning will NOT fire.
+      You can disable the operators entirely via OPENVDB_ENABLE_VEC_RELATIONAL_OPERATIONS=OFF
+      to find any instances you may be relying on. This new build option will
+      switch to OFF in the future and the operators will subsequently be removed.
+
+    Bug Fixes:
+    - Re-added support for reading OpenVDB files with file format number 221,
+      which was mistakenly removed in OpenVDB 13.0.0.
+    - Fixed a bug where calling setValueOff() on tree iterators would not work
+      on MaskTree types.
+    - Fixed a bug in the I/O for the Point Index Grid when reading without
+      providing a CoordBBox, which would result in undefined behaviour.
+    - Fixed three bugs in "math::Histogram::add()" in Stats.h: (1) heap buffer
+      overflow when a sample equals the upper bound (bin index clamped to last
+      bin); (2) NaN silently bypassing the range check and causing undefined
+      behaviour on conversion to size_t (explicit isnan guard added); (3)
+      "count()", "min()" and "max()" took "int" instead of "size_t", causing
+      narrowing-conversion warnings at call sites.
+    - Fixed a floating-point false positive in
+      "tools::CheckLevelSet::checkBackground()" in Diagnostics.h where the
+      ratio "background / voxelSize" could compute to below the expected half-
+      width due to non-representable values, causing a valid level set created
+      with exactly LEVEL_SET_HALF_WIDTH voxels of narrow band to incorrectly
+      fail check #4. The strict "<" comparison is now relaxed by a relative
+      tolerance.
+    - Fixed an index error in "mesh_to_volume_internal::checkNeighbours()" in
+      MeshToVolume.h where the i+1,j,k-1 neighbour reused the i+1,j,k offset,
+      silently missing that neighbour's value during self-intersection checks.
+      [Contributed by hexuejun]
+
+    Build:
+    - Fixed missing header installs for openvdb/points/PointReplicate.h and
+      openvdb/points/PrincipalComponentAnalysis.h.
+    - Fixed a build issue with newer TBB versions where tbb/version.h was not
+      being indirectly included.
+      [Contributed by Maciej Małecki]
+    - Added support for building against TBB 2023.
+    - Fixed an issue in FindBlosc.cmake when building static libs on Windows.
+    - Introduced OPENVDB_X86_INSTRSET to supersede the OPENVDB_SIMD build define.
+      This option takes an integer which corresponds to a suite of x86 ISA flags.
+      Defaults to 0 if not provided. OPENVDB_SIMD is still supported and will set
+      the appropriate value of OPENVDB_X86_INSTRSET, but its use is deprecated.
+      See the root CMakeLists for all available values.
+    - New build options to control x86 ISA targeting. USE_VCL controls the use
+      Agner Fog's VCL SIMD wrapper library and will automatically compute
+      OPENVDB_X86_INSTRSET based on the compiler and provided CXX flags if unset.
+      OPENVDB_X86_INSTRSET should typically be set by the installer.
+
+  OpenVDB AX:
+    Fixes:
+    - Fixed a unit-test, TestStreamCompression, that could fail when building
+      with ABI=13. Note that core library functionality was unaffected.
+
+  Houdini:
+    Improvements:
+    - Synchronize UT_CameraParms with Houdini 22
+    - Add 'Assume Uniform Scale' option to Filter tools to avoid scale drift.
+    - Update reference files from Houdini 22
+    - Houdini's format() method supports UT type enum.
+
+  NanoVDB:
+    New Features:
+    - Added nanovdb::math::isoCrossing, a __hostdev__ function that intersects
+      a ray against a user-defined iso-surface. Demonstrated in the new
+      ex_raytrace_iso_surface example, which renders float, ValueOnIndex and
+      ValueIndex grids from a persistent CUDA kernel.
+    - Added doc/nanovdb/TEACHME, an interactive tutorial for the NanoVDB user
+      API designed to be taught by an LLM coding agent. Includes a cheat sheet,
+      a GPU ray-marching capstone, and a CI harness that compiles every code
+      block against the NanoVDB headers so the tutorial cannot drift from the
+      API.
+    - Added a new resource-aware buffer family for single-space (device-only or
+      host-only) allocations: nanovdb::cuda::Buffer/BufferView allocate from an
+      injectable memory resource and free on their retained stream, and
+      nanovdb::cuda::ManagedResource is a cudaMallocManaged-backed resource
+      exposing both host and device accessors over one allocation, the
+      migration target for UnifiedBuffer users. GPU tool entry points can now
+      return either buffer family via a new bridge header,
+      nanovdb/cuda/HandleStorage.h.
+    - Added nanovdb::cuda::copyTo, an explicit stream-ordered transfer
+      between grid handles in different address spaces  (device-to-host-readable
+      and device-to-device across resources), callable directly from host-only
+      code since it adopts the source's already-validated metadata.
+    - Added ReadAccessor::getDimAndActive(), which returns the ray-aware
+      traversal step size and voxel active state in a single tree descent.
+      ActiveExact and ActiveOnLeafOnly policy tags trade exactness for a
+      cheaper leaf-only query, packed into 32 bits to reduce register pressure.
+    - Added nanovdb::tools::cuda::MeshToGrid, which converts a triangle mesh
+      into a sparse NanoVDB grid on the GPU, returning a ValueOnIndex topology
+      grid and optionally a sidecar of per-voxel unsigned distances.
+    - Added a CPU implementation of tools::VoxelBlockManager:
+      buildVoxelBlockManager constructs it from a NanoGrid on the host via
+      util::forEach, sharing VoxelBlockManagerBase with the CUDA path.
+    - Added the VoxelBVH grid class and matching GridBlindDataSemantic, for
+      grids where each voxel points into a list of primitive ids, with
+      GridClass/semantic conversions and Grid::isVoxelBVH().
+
+    Improvements:
+    - Most GPU tools now allocate their device scratch through a
+      defaulted, injectable ResourceT template parameter instead of hand-paired
+      allocate/free calls, so existing code is unaffected. New adapters support
+      this: nanovdb::cuda::SyncFromAsync/AsyncFromSync bridge between
+      synchronous and stream-ordered resource concepts, ResourceRef is a non-
+      owning reference to a resource, and MallocResource is a synchronous
+      cudaMalloc-backed fallback for devices without memory-pool support.
+    - nanovdb::GridHandle and NodeManagerHandle can now manage a single-space
+      buffer (e.g. GridHandle<cuda::Buffer<std::byte, R>>): device-only buffers
+      parse metadata and deep-copy through the device, while host-accessible
+      resources (e.g. PinnedResource) behave as host-readable single-space
+      handles. GridHandle::reset, NodeManagerHandle::reset and
+      tools::VoxelBlockManager::reset now release storage via the buffer's
+      destroy() when available; cuda::Buffer::clear/BufferView::clear are
+      deprecated in its favor.
+    - CNanoVDB gained integer (I) grid support, setValue methods to write
+      voxels, and getLeaf methods to acquire raw leaf pointers.
+    - nanovdb::Mask is now trivially copyable: its copy constructor is
+      defaulted instead of hand-duplicating the memberwise copy.
+    - Several CUDA kernels were rewritten for better parallelism:
+      GridChecksum's CRC32 now uses a slicing-by-4 table lookup with an
+      associative GF(2) combine (6.5-17x faster, bit-identical); GridStats uses
+      cooperative warp/block reductions instead of one thread per node;
+      IndexToGrid's node/leaf remapping is now cooperative and coalesced.
+    - cuda::DeviceBuffer::orderAfterPriorUses is now public, the consume-side
+      companion of recordUse, letting external consumers (e.g. zero-copy
+      array-interface exports) order their stream after the buffer's tracked
+      uses.
+    - Replaced the CUDA VoxelBlockManager inverse-map decode's O(nLeaves x 512)
+      per-block sweep with an O(1)-per-slot select, giving byte-identical
+      decode maps that are ~2x faster (see API Changes).
+    - Added the CMake option NANOVDB_CUDA_WERROR (default ON, also implied by
+      OPENVDB_CXX_STRICT), which passes --Werror=all-warnings to NVCC so
+      device-side diagnostics fail the NanoVDB tests/tools/examples build.
+    - The device scratch of tools::cuda::TopologyBuilder,
+      tools::cuda::MeshToGrid and tools::cuda::SignedFloodFill is now typed
+      cuda::Buffer<T> () instead of
+      byte buffers reinterpreted at every use, with allocations sized in
+      elements; TopologyBuilder's accessors return typed pointers, the
+      lower/leaf offsets and masks expose their per-upper-node row shape once
+      beside the allocation, and the morphology functors take the typed
+      pointers. The dilation example and test use cuda::Buffer<Mask<3>>
+      likewise (possible since Mask became trivially copyable).
+      TopologyBuilder's variable-length root staging stays a byte buffer, being
+      a serialized node image.
+    - tools::cuda::MergeGrids now accepts any number of input grids via a
+      std::vector<const GridT*> constructor, computing the N-ary topology union
+      in a single accumulator pass instead of chaining pairwise merges.
+    - PointsToGrid::countNodes and DistributedPointsToGrid use a segmented
+      radix sort when a build spans more than 32 tiles, replacing a per-tile
+      sort loop that scaled poorly with tile count.
+    - GridChecksum's CRC32 kernels precompute the GF(2) combine operators on
+      the host, a further 1.02-1.69x over the parallel slicing-by-4
+      implementation.
+    - util::cuda::mallocAsync/freeAsync now detect devices without stream-
+      ordered memory pools (e.g. fractional vGPUs), print a diagnostic pointing
+      at NANOVDB_USE_SYNC_CUDA_MALLOC and return cudaErrorNotSupported instead
+      of silently substituting cudaMalloc. Added
+      util::cuda::memoryPoolsSupported(), mallocSync and freeSync.
+
+    API Changes:
+    - The VoxelBlockManager decode is now built around decodeInverseMap, a
+      thread-local primitive that decodes one slot into registers with no
+      shared memory or synchronization. The cooperative decodeInverseMaps keeps
+      its old signature as a thin wrapper; computeBoxStencil now takes the
+      decoded (leafIndex, voxelOffset) by value instead of shared-memory
+      arrays.
+
+    Deprecations:
+    - nanovdb::cuda::DeviceBuffer is deprecated in favor of the single-space
+      nanovdb::cuda::Buffer plus explicit nanovdb::cuda::copyTo transfers. Only
+      code naming DeviceBuffer directly is warned; the GPU tools' default
+      buffer type (now the transitional DualDeviceBuffer) is unaffected until
+      removal.
+    - nanovdb::cuda::UnifiedBuffer is deprecated in favor of
+      nanovdb::cuda::Buffer<std::byte, cuda::ManagedResource>, whose GridHandle
+      exposes the same host/device accessors over one managed allocation.
+      Standalone managed allocations should use explicit util::cuda::memAdvise/
+      memPrefetchAsync in place of the old advise/prefetch members.
+    - Deprecated nanovdb::math::ZeroCrossing and
+      nanovdb::math::ZeroCrossingNode in favor of zeroCrossing and
+      zeroCrossingNode, following the naming convention. zeroCrossing and
+      isoCrossing now static_assert that the grid's value type is floating
+      point.
+
+    Fixes:
+    - Fixed an out-of-bounds device read in SignedFloodFill's root-tile
+      scanline pass, where child-node lookups resolved against a truncated host
+      copy of the root instead of the real device root. Only manifested for
+      grids with multiple non-adjacent root children on the same z-scanline.
+    - Fixed DilateGrid and signedFloodFill launching kernels on the default
+      stream instead of the caller's stream, corrupting output on non-blocking
+      streams.
+    - Fixed a cross-device race in DistributedPointsToGrid: device segment
+      boundaries were rebalanced by adjusting only adjacent pairs, which cannot
+      consolidate a tile spanning three or more GPUs and let multiple devices
+      race on the same leaf's value mask. Boundaries are now snapped globally
+      and monotonically to tile boundaries so every leaf is owned by exactly
+      one device.
+    - Fixed cuda::DeviceBuffer freeing device memory without ordering the free
+      after outstanding work on non-blocking streams; each allocation now
+      tracks its uses with an event. recordUse itself now chains uses across
+      streams so the single tracking event transitively covers every recorded
+      use, not just the most recent.
+    - Fixed nondeterministic output and a host-heap over-read (when copying
+      grid names) in the CUDA PointsToGrid, DistributedPointsToGrid,
+      IndexToGrid and MeshToGrid tools.
+    - Fixed an out-of-bounds device read and host stack corruption in
+      tools::cuda::evalChecksum.
+    - addBlindData and indexToGrid now normalize the output grid's index/count
+      fields; both copy the source header, so a
+      source taken from a multi-grid buffer used to leave a stale index/count
+      corrupting the output handle's metadata parse.
+    - Fixed a caching bug in nanovdb::ReadAccessor it now caches nodes at all
+      requested levels, matching openvdb::ValueAccessor, instead of only leaf
+      nodes, also improving random-access performance in some cases (especially
+      on the CPU). Restore the old behavior via -DNANOVDB_USE_OLD_ACCESSOR=ON
+      if needed.
+    - createNodeManager now synchronizes the stream before reading back the
+      device-computed NodeManager size, instead of relying on an unordered read
+      that happened to work only for pageable-memory copies.
+    - Fixed GridHandle read seek-offset over-counting for handles containing
+      multiple grids.
+    - Fixed tools::cuda::MeshToGrid leaving the CALL_CUBS macro defined past
+      the end of its header.
+    - Fixed six public headers missing from nanovdb/CMakeLists.txt's install
+      lists (cuda/Buffer.h, cuda/PinnedResource.h, math/Proximity.h,
+      tools/cuda/MeshToGrid.cuh, util/MaskPrefixSum.h,
+      util/cuda/Rasterization.cuh).
+    - Fixed two nvcc diagnostics in header-defined CUDA kernels: GridStats's
+      __shared__ statistics arrays now use constructor-free storage
+      (cub::Uninitialized, since CUDA forbids dynamic initialization of
+      __shared__ variables), and GridChecksum's CRC32 kernels are now static
+      instead of inline (ignored for __global__ functions).
+    - Fixed three CNanoVDB issues: local kernel methods needed static,
+      auto-computed reserved sizes were replaced with hard-coded ones (C99
+      forbids zero-sized arrays, crashing some compilers), and accessor key
+      values are now initialized at construction (previously undefined, putting
+      some compilers into a bad state).
+    - Fixed load balancing, empty-partition handling and a merge-path out-of-
+      bounds read in DistributedPointsToGrid for non-power-of-two GPU counts.
+
+    Python:
+    - FileGridMetaData.padding is renamed to blindDataCount to match the C++
+      field. Scripts reading .padding must be updated.
+    - Fixed io.writeGrids and io.deviceWriteGrids writing only the last grid of
+      a list; each iteration reopened the file with truncation.
+    - Fixed the nanoToOpenVDB binding, which still passed a verbose argument
+      the C++ function had dropped.
+
+  OpenVDB Tool:
+    New Features:
+    - Added action "-diagnose", which runs OpenVDB's built-in diagnostics
+      (tools::checkLevelSet for level sets, tools::checkFogVolume for fog
+      volumes, NaN/infinity checks for other float grids) on one or more VDB
+      grids, printing OK/FAILED with details. "checks=N" limits how many checks
+      run, and "fatal=true" throws on any failure to abort the pipeline.
+    - Added action "-stats", which prints background value, active-voxel min/
+      max/mean/stddev, and (for Float level sets) surface area and enclosed
+      volume in a column-aligned table. Complements "-print" (structural
+      metadata) by covering value-derived information.
+    - Added action "-histogram" (alias "-hist"), which prints an ASCII bar
+      chart of the distribution of active values, with "bins", "cols", "min"/
+      "max" and "log=true" options. Vector grids are binned by magnitude, and
+      degenerate cases (no active voxels, constant grid, empty range) are
+      reported explicitly.
+    - Added actions "-multiply" (alias "-mul") and "-divide", which compute the
+      per-voxel product and quotient of two scalar VDB grids via tools::compMul/
+      compDiv, complementing "-min", "-max" and "-sum".
+    - Added action "-rename", which renames a VDB grid and/or Geometry on the
+      stack by age index via the "vdb"/"geo" options (at least one required).
+      Both may be given together to assign the same "name" to a grid and a
+      geometry in one call.
+    - Added action "-swap", which swaps two VDB grids and/or two Geometry
+      entries via comma-separated age pairs (e.g. "vdb=0,1"), useful for
+      reordering the stack before non-commutative CSG operations like
+      "-difference". The swap is O(1) and copies no data.
+    - Added action "-copy", which deep-copies one or more VDB grids and/or
+      Geometry (via "vdb"/"geo" age lists or "*" for all) onto the top of their
+      respective stacks, validating all indices up front so an out-of-range one
+      fails cleanly with no partial copies. An optional "prefix" is prepended
+      to each copy's name, useful when branching a pipeline.
+    - Added action "-files", a control-flow scope (closed by -end) that
+      iterates over files in a directory, binding each match to "{$file}";
+      "recursive=1" descends into sub-directories. Matches are filtered by
+      "extension", "include"/"exclude" patterns, and "min_size"/"max_size".
+    - Added action "-mesh2udf", which converts a polygon mesh or soup into an
+      unsigned distance field without requiring watertight or consistently
+      oriented input. Resolution is set via "dim" or "voxel", "width" controls
+      the narrow-band half-width, and the transform can instead be inherited
+      from an existing grid via "vdb".
+    - Added action "-quad2tri" (alias "-q2t"), which triangulates every quad
+      face in a mesh via a naive fan from vertex 0, assuming each quad is
+      planar and convex (not verified). Existing triangles are left untouched.
+    - Added actions "-vol2mesh" (alias "-vdb2mesh") and "-fog2mesh", which
+      extract a polygon mesh from a scalar or fog-volume VDB grid respectively
+      by meshing an iso-surface ("iso" defaults to 0 and 0.5 respectively).
+      Both support adaptive meshing via "adapt" and an optional "mask" grid
+      (with "invert=true" for its complement) to restrict the meshed region.
+    - Added action "-slice", which writes PPM images of axis-aligned planar
+      slices through a scalar VDB grid at normalized positions given by "X"/
+      "Y"/"Z" (default 0.5, the mid-plane), so one invocation can emit many
+      slices. "scale" sets image size and "force" recomputes true min/max for
+      color mapping instead of assuming level-set/fog-volume ranges.
+    - Added action "-img2mpeg", which converts image files to an mpeg movie
+      when vdb_tool is built with ffmpeg.
+    - Added action "-log", which mirrors the tool's diagnostic output (clog/
+      cerr/cout) to a log file for the remainder of the pipeline, with a
+      self-describing header (date, version, command line) and unit-buffered
+      writes for real-time "tail -f". "append" and "tee" (default true, also
+      echo to terminal) control the output mode.
+    - Added action "-sdf2udf", which converts a signed distance field into an
+      unsigned distance field by taking the absolute value of every voxel,
+      changing the grid class to UNKNOWN since the sign is discarded. Useful
+      when only proximity to the surface matters, not which side you're on.
+    - Added actions "-forAllValues"/"-forOnValues"/"-forOffValues", which
+      apply a math kernel (RPN or infix, via the Calculator) to all, active, or
+      inactive grid values, binding "v" to the voxel value and other
+      identifiers to scalars from earlier in the pipeline. Stencil kernels like
+      "v(1,0,0)-v(-1,0,0)" read neighbor voxels via a per-thread accessor, and
+      "use="/"vdb=" accept comma-separated lists so a kernel can read from
+      multiple grids in one pass.
+    - Added action “-shrinkwrap”, which robustly converts a soup of polygons
+      into a watertight shrinkwrapped  surface, represented as a narrow-band
+      level set.
+    - Added the Calculator class, a compact bytecode interpreter for math
+      expressions (RPN, infix, or multi-statement with assignment) over named
+      float inputs, and the "-calc" action that runs a Calculator expression at
+      command-line scope. Both accept a bare positional kernel in addition to
+      "kernel="; "-calc" also writes intermediate/trailing-LHS values back to
+      the Processor's string memory so later actions can read them by name.
+    - Added actions "-switch" and "-case", a multi-way control-flow construct
+      (closed by -end) analogous to -if: each "-case key=<value>" inside a
+      "-switch on=<selector>" scope runs only if its key matches, with "key=*"/
+      "default" as a catch-all. Keys and the selector both accept {...}
+      template expressions.
+    - Added the optional action "-ax", which runs an OpenVDB AX expression over
+      one or more grids (gated behind CMake option OPENVDB_TOOL_USE_AX, off by
+      default), complementing the built-in Calculator with the full AX language
+      and point-attribute access. Code may come from an inline "code=" string
+      or a "file=", and "bindings=axname:gridname,..." remaps AX names to
+      actual grid names.
+    - Added triangulation of N-gons to Geometry::readOBJ and Geometry::readSTL,
+      assuming they are convex and planar.
+    - Added the string-similarity helpers vdb_tool::levenshtein and
+      vdb_tool::fuzzyMatch to power "Did you mean ...?" suggestions for
+      mistyped action names, option names, and Calculator identifiers/functions.
+      The same routine backs matching in the Parser, Action and Calculator so
+      suggestions stay consistent.
+
+    Improvements:
+    - Every "vdb"/"geo" option now also accepts grid/geometry names in addition
+      to stack ages (e.g. "vdb=density"), resolved to ages on every read
+      including inside loop bodies. An unmatched or ambiguous name reports a
+      clean error rather than silently expanding.
+    - Action "-read" gained optional support for OpenUSD (.usd/.usda/.usdc/
+      .usdz meshes and points, enable with VDB_TOOL_USE_USD), glTF/binary glTF
+      (.gltf/.glb triangle meshes via tinygltf, enable with VDB_TOOL_USE_GLTF),
+      and ASCII XYZ point files (.xyz, one point per line, also readable from
+      stdin). Each of these minimal readers skips unsupported features (e.g.
+      instancing, materials, non-triangle primitives) rather than failing
+      outright.
+    - Action "-mesh2ls/mesh2sdf" now supports generation of asymmetric narrow
+      bands.
+    - Improved error reporting and handling throughout vdb_tool: unsupported
+      actions/options and other failures now print clearer diagnostic messages,
+      and the tool recovers from non-fatal errors instead of aborting the whole
+      pipeline.
+    - Actions can now have multiple names (or aliases), e.g. "-read", "-import",
+      "-load", "-i".
+    - Added cutoff option to "-ls2fog" action.
+    - Improved parsing of configuration files (tabs and trailing comments are
+      now ignored).
+    - Improved unit-tests and Doxygen documentation for all files related to
+      the vdb_tool.
+    - Reformatted "-print" as a column-aligned Unicode table reporting only
+      structural metadata (age, name, type, class, dim, active voxel count,
+      voxel size, memory, and at level=1 the bounding box and per-level node
+      counts); value-derived info (background, min/max, area, volume) moved to
+      the new "-stats" action. BREAKING CHANGE: the old level=2 (which reported
+      that value-derived info via "-print") was removed, so scripts passing
+      level=2 must switch to "-stats".
+    - Action "-if" now accepts infix and RPN test expressions via the
+      Calculator, in addition to 0/1/true/false literals and {...} expressions,
+      e.g. "-if 'n > 0'".
+    - The Calculator now supports compound-assignment operators (+=, -=, *=,
+      /=, %=), desugaring to "x = x <op> (rhs)" with the right-hand side
+      parenthesized to preserve precedence. A compound operator with a
+      non-identifier target still reports an invalid-assignment-target error.
+    - The Calculator now accepts OpenVDB AX-style attribute/grid sigils (e.g.
+      "f@sphere" or "@density"), making simple scalar kernels portable between
+      -forValues and -ax, including neighbor access by grid name. This is a
+      one-directional convergence of the common scalar subset; AX-only features
+      remain exclusive to -ax.
+    - The expression-based actions "-calc", "-forAllValues/forOnValues/
+      forOffValues" and "-ax" gained a "file=" option that reads the kernel/
+      expression/code from a file instead of the inline option; "file" takes
+      precedence if both are given.
+    - Actions "-for", "-each" and "-files" gained a "quiet" option (default
+      false) that suppresses the per-iteration "Processing: ..." line for that
+      loop without silencing the rest of the pipeline.
+    - Action "-log" now also redirects std::cerr and std::cout (not just
+      std::clog) so warnings and "-print" output land in the log file too, with
+      unit-buffered writes, a self-describing header, and new "append"/"tee"
+      Options.
+
+    Fixes:
+    - Fixed "-clear" erasing requested ages one at a time, which could shift
+      ages and partially delete the stack given several ages; all requested
+      ages are now resolved and de-duplicated up front.
+    - Fixed issues in Geometry::readSTL so it works on all files in Thingi10K,
+      and fixed a bug reading ASCII PLY and OFF files with normals.
+    - Fixed several typos in the documentation of vdb_tool.
+    - Fixed vdb_tool::uuid to generate a proper 36-character RFC 4122 v4 UUID,
+      and fixed corner cases in getFile/getName/getPath/getExt/replacePath/
+      replaceExt by adopting std::filesystem.
+    - Made halfWidth parameter configurable in distanceFieldToSDF(): float in
+      voxel units (default 3.0, matches meshToVolume pattern), with proper
+      rounding via math::RoundUp() for dilation iterations.
+    - Refactored Geometry::readPLY() to use Geometry::triangulate() for N-gon
+      triangulation (both binary and ASCII formats), matching the approach used
+      by readOBJ() for consistency and code reuse.
+    - Consolidated error handling across all 29 Tool action methods into a
+      centralized handler in Parser::run().
+
 
 Version 13.0.0 - November 3, 2025
 
