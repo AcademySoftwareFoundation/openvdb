@@ -1164,7 +1164,7 @@ struct TestCollection
 
             if (mTest.testSymmetricNarrowBand) {
 
-                if (std::is_floating_point<ValueType>::value) {
+                if constexpr (std::is_floating_point<ValueType>::value) {
                     const ValueType background = openvdb::math::Abs(tree.background());
                     AbsApproxEqual<ValueType> bgTest(background);
                     InRange valueTest(-toFloat(background), toFloat(background));
@@ -1207,7 +1207,7 @@ struct TestCollection
 
             if (mTest.testClosedSurface) {
 
-                if (std::is_floating_point<ValueType>::value) {
+                if constexpr (std::is_floating_point<ValueType>::value) {
                     typename GridType::Ptr levelSet = openvdb::tools::levelSetRebuild(
                         grid, 0.0f, 2.0f, 2.0f, nullptr, mInterrupter);
 
@@ -1229,7 +1229,7 @@ struct TestCollection
 
             if (mTest.testGradientMagnitude) {
 
-                if (std::is_floating_point<ValueType>::value) {
+                if constexpr (std::is_floating_point<ValueType>::value) {
 
                     GradientNorm<TreeType> test(tree, voxelSize,
                         ValueType(mTest.gradientTolerance));
