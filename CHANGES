@@ -3,6 +3,16 @@ OpenVDB Version History
 
 Version 13.1.0 - September 16, 2026
 
+  Highlights:
+  - Introduction of a SIMD framework for targeted ISA vectorization support,
+    including explicit intrinsic support on x86 and significant performance
+    gains on a small initial set of tools.
+  - Significant NanoVDB enhancements including improved CUDA resource
+    management, faster kernels and many correctness fixes.
+  - Expanded the capabilities of the vdb_tool command line binary, including
+    support for diagnostics, statistics, mesh/volume conversion utilities,
+    advanced expression based processing and enhanced file format support.
+
   OpenVDB:
     New features:
     - Introduced targeted SIMD support to the core library. The main framework
