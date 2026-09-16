@@ -75,18 +75,26 @@ endif()
 # that ships with nanobind 2.x; silently skipped on older nanobind where the
 # helper does not exist.
 if(NANOVDB_BUILD_PYTHON_STUBS AND COMMAND nanobind_add_stub)
-  set(NANOVDB_STUB_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+  # Recursive generation writes stubs/nanovdb/{__init__,io,math}.pyi plus
+  # stubs/nanovdb/tools/{__init__,build,cuda}.pyi, one file per submodule.
+  set(NANOVDB_STUB_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/stubs")
   nanobind_add_stub(nanovdb_python_stub
     MODULE nanovdb
-    OUTPUT "${NANOVDB_STUB_OUTPUT_DIR}/nanovdb.pyi"
+    RECURSIVE
+    OUTPUT_PATH "${NANOVDB_STUB_OUTPUT_DIR}"
+    OUTPUT "${NANOVDB_STUB_OUTPUT_DIR}/nanovdb/__init__.pyi"
     PYTHON_PATH $<TARGET_FILE_DIR:nanovdb_python>
     DEPENDS nanovdb_python
     MARKER_FILE "${NANOVDB_STUB_OUTPUT_DIR}/py.typed"
     INCLUDE_PRIVATE)
   if(SKBUILD)
-    install(FILES
-        "${NANOVDB_STUB_OUTPUT_DIR}/nanovdb.pyi"
-        "${NANOVDB_STUB_OUTPUT_DIR}/py.typed"
+    # The wheel imports nanovdb/__init__.py, which re-exports the extension
+    # installed at nanovdb/lib/nanovdb.*.so. The generated stub package must
+    # sit beside that extension as nanovdb/lib/nanovdb/, and the package
+    # level __init__.pyi re-exports it under the public nanovdb name.
+    install(DIRECTORY "${NANOVDB_STUB_OUTPUT_DIR}/nanovdb"
+      DESTINATION ${NANOVDB_INSTALL_LIBDIR})
+    install(FILES __init__.pyi "${NANOVDB_STUB_OUTPUT_DIR}/py.typed"
       DESTINATION nanovdb)
   endif()
 elseif(NANOVDB_BUILD_PYTHON_STUBS)

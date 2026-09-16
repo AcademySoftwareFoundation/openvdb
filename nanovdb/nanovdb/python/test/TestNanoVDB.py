@@ -984,6 +984,18 @@ class TestVoxelBlockManager(unittest.TestCase):
             nanovdb.tools.decodeInverseMaps(
                 g, n_leaves, jm0, vbm.firstOffset(), log2_block_width=6)
 
+    def test_decode_inverse_maps_rejects_offset_outside_leaf_range(self):
+        # A block window that starts past the selected leaf's active range
+        # would make the C++ kernel's intersection length underflow.
+        import numpy as np
+        bbox = nanovdb.math.CoordBBox(nanovdb.math.Coord(0), nanovdb.math.Coord(0))
+        src = nanovdb.tools.createFloatGrid(
+            0.0, "one", nanovdb.GridClass.Unknown, lambda ijk: 1.0, bbox)
+        g = nanovdb.tools.createNanoGridOnIndex(src.grid()).grid()
+        with self.assertRaises(ValueError):
+            nanovdb.tools.decodeInverseMaps(
+                g, 0, np.zeros(1, dtype=np.uint64), 65, log2_block_width=6)
+
     def test_build_voxel_block_manager_rejects_undersized_n_blocks(self):
         # Caller-supplied n_blocks must hold at least
         # ceil((last_offset - first_offset + 1) / BlockWidth) blocks;
@@ -1093,6 +1105,17 @@ class TestGridMetaDataGuards(unittest.TestCase):
         m = nanovdb.GridMetaData(h.grid())
         self.assertTrue(m.isValid())
         self.assertTrue(nanovdb.GridMetaData.safeCast(h.grid()))
+
+    def test_level_arguments_are_range_checked(self):
+        m = nanovdb.GridMetaData(nanovdb.tools.createFogVolumeSphere().grid())
+        self.assertGreaterEqual(m.activeTileCount(3), 0)
+        self.assertGreater(m.nodeCount(0), 0)
+        for level in (0, 4):
+            with self.assertRaises(ValueError):
+                m.activeTileCount(level)
+        for level in (3, 10**6):
+            with self.assertRaises(ValueError):
+                m.nodeCount(level)
 
 
 class TestReadWriteGrids(unittest.TestCase):
@@ -2074,6 +2097,21 @@ class TestBuildGrid(unittest.TestCase):
         self.assertEqual(g.getValue(ijk), 9.0)
         self.assertTrue(g.isActive(ijk))
 
+    def test_write_accessor_reusable_after_merge(self):
+        # merge() hands the accessor's private leaves to the parent, or
+        # deletes them when the parent already owns that leaf. Writes after
+        # an explicit merge must not go through those stale cached nodes.
+        g = nanovdb.tools.build.FloatGrid(0.0)
+        a, b, c = (nanovdb.math.Coord(1, 1, 1), nanovdb.math.Coord(2, 2, 2),
+                   nanovdb.math.Coord(3, 3, 3))
+        wa = g.getWriteAccessor()
+        wa.setValue(a, 1.0)
+        g.setValue(b, 2.0)  # parent already owns the leaf covering a, b, c
+        wa.merge()
+        wa.setValue(c, 3.0)
+        wa.merge()
+        self.assertEqual([g.getValue(p) for p in (a, b, c)], [1.0, 2.0, 3.0])
+
     def test_write_accessor_merges_on_destruction(self):
         # When the Python wrapper for a WriteAccessor is collected, the
         # C++ destructor runs merge() automatically. Force collection by
@@ -2382,6 +2420,21 @@ class TestCreateNanoGridClass(unittest.TestCase):
         view[:] = np.arange(100, dtype=np.float32)
         again = grid.getBlindData(n)
         self.assertTrue(np.array_equal(again, np.arange(100, dtype=np.float32)))
+
+    def test_full_checksum_covers_zeroed_channel(self):
+        # The authored channel is zero-filled after the C++ converter has
+        # already computed the checksum, so it must be recomputed. Bake
+        # repeatedly and dirty each channel so recycled allocations are
+        # likely to hand back nonzero memory.
+        src = self._build_source()
+        for _ in range(20):
+            conv = nanovdb.tools.CreateNanoGrid(src)
+            conv.addBlindData("uv", count=4096)
+            conv.setChecksum(nanovdb.CheckMode.Full)
+            grid = conv.getHandle().grid()
+            self.assertTrue(
+                nanovdb.tools.validateChecksum(grid, nanovdb.CheckMode.Full))
+            grid.getBlindData(0)[:] = 7.0
 
     def test_author_vec3f_channel_with_semantic(self):
         conv = nanovdb.tools.CreateNanoGrid(self._build_source())

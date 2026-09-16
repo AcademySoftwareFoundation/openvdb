@@ -1685,6 +1685,14 @@ struct ValueAccessor
     }
     ValueAccessor(ValueAccessor&&) = default; // allow move construction
     ValueAccessor(const ValueAccessor&) = delete; // disallow copy construction
+    /// @brief Drop all cached nodes, e.g. after the tree they point into was modified externally
+    void clear()
+    {
+        for (int i = 0; i < 3; ++i) {
+            mKeys[i] = Coord(math::Maximum<int>::value());
+            mNode[i] = nullptr;
+        }
+    }
     ValueType getValue(int i, int j, int k) const {return this->getValue(Coord(i,j,k));}
     template<typename NodeT>
     bool isCached(const Coord& ijk) const
@@ -1866,6 +1874,9 @@ struct Tree<BuildT>::WriteAccessor
         mMutex.lock();
         mParent.merge(mRoot);
         mMutex.unlock();
+        // merge() hands mRoot's nodes to the parent or deletes them, so any
+        // node still cached in mAcc is now foreign or freed.
+        mAcc.clear();
     }
     inline void setValueOn(const Coord& ijk) {mAcc.setValueOn(ijk);}
     inline void setValue(const Coord& ijk, const ValueType &value) {mAcc.setValue(ijk, value);}

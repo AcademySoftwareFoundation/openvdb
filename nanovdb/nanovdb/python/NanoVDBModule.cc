@@ -906,9 +906,26 @@ void defineGridMetaData(nb::module_& m)
              "Number of blind-data channels attached to the wrapped grid.")
         .def("activeVoxelCount", &GridMetaData::activeVoxelCount,
              "Total active voxel count of the wrapped grid.")
-        .def("activeTileCount", &GridMetaData::activeTileCount, "level"_a,
+        // The C++ accessors index fixed-size arrays unchecked.
+        .def("activeTileCount",
+             [](const GridMetaData& m, uint32_t level) -> uint32_t {
+                 if (level < 1 || level > 3) {
+                     throw nb::value_error(
+                         "GridMetaData.activeTileCount(level): level must be 1, 2, or 3");
+                 }
+                 return m.activeTileCount(level);
+             },
+             "level"_a,
              "Number of active tiles at the given tree level (1=lower, 2=upper, 3=root).")
-        .def("nodeCount", &GridMetaData::nodeCount, "level"_a,
+        .def("nodeCount",
+             [](const GridMetaData& m, uint32_t level) -> uint32_t {
+                 if (level >= 3) {
+                     throw nb::value_error(
+                         "GridMetaData.nodeCount(level): level must be 0, 1, or 2");
+                 }
+                 return m.nodeCount(level);
+             },
+             "level"_a,
              "Number of nodes at the given tree level (0=leaf, 1=lower, 2=upper).")
         .def("checksum", &GridMetaData::checksum, nb::rv_policy::reference_internal,
              "Checksum stored in the wrapped grid's header.")

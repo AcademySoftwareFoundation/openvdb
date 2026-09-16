@@ -312,6 +312,8 @@ private:
         // the NumPy view starts deterministic. The authored channels are
         // the first mBlind.size() blind-data entries — any converter-
         // added channel (e.g. a long grid name) is appended after them.
+        // The converter's checksum covered the uncleared bytes, so
+        // recompute it afterwards.
         if (!mBlind.empty()) {
             if (auto* dst = const_cast<GridData*>(handle.gridData())) {
                 for (size_t i = 0; i < mBlind.size(); ++i) {
@@ -319,6 +321,7 @@ private:
                     std::memset(const_cast<void*>(meta->blindData()), 0,
                                 meta->blindDataSize());
                 }
+                tools::updateChecksum(dst, mChecksum);
             }
         }
         return handle;

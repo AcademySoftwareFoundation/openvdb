@@ -110,6 +110,23 @@ static nb::object pyDecodeInverseMapsImpl(const NanoGrid<ValueOnIndex>& grid,
             "either corrupt or was paired with a different grid.");
     }
 
+    // The C++ kernel intersects each visited leaf's active-index range with
+    // the block window [blockFirstOffset, blockFirstOffset + BlockWidth) and
+    // assumes the ranges overlap; a leaf that ends before the window makes
+    // the intersection length underflow into a huge copy. Reject that here.
+    const auto* leaves = grid.tree().template getFirstNode<0>();
+    const uint64_t blockEnd = blockFirstOffset + uint64_t(BlockWidth);
+    for (uint32_t leafID = firstLeafID; leafID <= firstLeafID + nExtraLeaves; ++leafID) {
+        const uint64_t leafFirst = leaves[leafID].data()->firstOffset();
+        if (leafFirst >= blockEnd) break;
+        if (leafFirst + leaves[leafID].valueMask().countOn() <= blockFirstOffset) {
+            throw nb::value_error(
+                "decodeInverseMaps: blockFirstOffset lies outside the "
+                "active-index range of the leaves selected by firstLeafID "
+                "and jumpMap.");
+        }
+    }
+
     // Each call allocates fresh BlockWidth-sized output arrays for the
     // leaf-index and voxel-offset results. We use plain new[] (rather than
     // a numpy-allocated buffer) because the produced ndarrays are returned
