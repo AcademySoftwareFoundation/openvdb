@@ -36,6 +36,7 @@ EXAMPLE_SCRIPTS = [
     "quantize.py",
     "raytrace_fog_volume.py",
     "raytrace_level_set.py",
+    "tree_stats.py",
     "validate.py",
 ]
 

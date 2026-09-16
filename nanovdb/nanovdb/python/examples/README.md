@@ -35,6 +35,7 @@ PYTHONPATH=. python /path/to/<example>.py
 | [`collide_level_set.py`](collide_level_set.py) | Particles colliding with a level set: `worldToIndexF`, `tree.isActive` narrow-band test, accessor distance reads, and `sampler.gradient()` collision normals. Port of `ex_collide_level_set` (host path). |
 | [`index_grid_channels.py`](index_grid_channels.py) | `tools.createNanoGridOnIndex(src, channels=1)`, `grid.valueCount()`, coordinate reads through `createChannelAccessor`, and blind-data authoring with `tools.CreateNanoGrid.addBlindData` + the writable `getBlindData` view. Extends the host half of `ex_index_grid_cuda`. Requires NumPy for the authoring section. |
 | [`node_manager.py`](node_manager.py) | Linearized node iteration with `createNodeManager` (returns the typed NodeManager directly): per-level counts, `leaf(i)` / `lower(i)` access, node origins, masks, and stats. Port of the host half of `ex_nodemanager_cuda`. |
+| [`tree_stats.py`](tree_stats.py) | Real top-down tree walk via `Upper.getChild(n)` / `Lower.getChild(n)` and `isChild(n)` — pretty-prints per-upper lower-child counts and per-lower leaf-child counts, unlike `node_manager.py`'s flat per-level lists. |
 | [`openvdb_interop.py`](openvdb_interop.py) | `tools.openToNanoVDB` / `nanoToOpenVDB` round-trip with accessor comparison on both sides. Self-skips unless built with `NANOVDB_USE_OPENVDB` and `openvdb` is importable. Port of `ex_openvdb_to_nanovdb_accessor`. |
 
 Scripts that produce files write them to a fresh temporary directory

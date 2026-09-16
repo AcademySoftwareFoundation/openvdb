@@ -164,6 +164,37 @@ void defineInternalNodeBase(nb::class_<InternalT>& cls)
             "Reference to the node's active-tile mask.")
        .def("childMask",    &InternalT::childMask, nb::rv_policy::reference_internal,
             "Reference to the node's child-pointer mask (1 where a child node exists).")
+       .def("isChild",
+            [](const InternalT& node, uint32_t n) {
+                // node.isChild(n) is unchecked (mChildMask.isOn(n) reads
+                // mWords[n>>6] directly); release builds skip the C++
+                // NANOVDB_ASSERT and would silently read OOB.
+                if (n >= InternalT::SIZE) {
+                    throw nb::index_error(
+                        "isChild(n): n out of range [0, SIZE)");
+                }
+                return node.isChild(n);
+            },
+            nb::arg("n"),
+            "True iff linear offset n (0..SIZE-1) holds a child node "
+            "rather than a tile value; same bit childMask().isOn(n) reads.")
+       .def("getChild",
+            [](nb::handle py_self, uint32_t n) -> nb::object {
+                const auto& node = nb::cast<const InternalT&>(py_self);
+                if (n >= InternalT::SIZE) {
+                    throw nb::index_error(
+                        "getChild(n): n out of range [0, SIZE)");
+                }
+                if (!node.isChild(n)) return nb::none();
+                return nb::cast(node.getChild(n), nb::rv_policy::reference, py_self);
+            },
+            nb::arg("n"),
+            nb::keep_alive<0, 1>(),
+            "Return the child node at linear offset n (0..SIZE-1), or None "
+            "if that slot holds a tile value instead (isChild(n) is "
+            "False). Raises IndexError if n is out of range. The returned "
+            "node keeps this node alive. Lower.getChild(n) returns a "
+            "Leaf; Upper.getChild(n) returns a Lower.")
        .def("getValue",
             nb::overload_cast<const CoordT&>(&InternalT::getValue, nb::const_),
             nb::arg("ijk"),
