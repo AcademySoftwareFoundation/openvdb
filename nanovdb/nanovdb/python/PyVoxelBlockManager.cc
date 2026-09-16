@@ -7,7 +7,6 @@
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/HostBuffer.h>
-#include <nanovdb/tools/CreateNanoGrid.h>
 #include <nanovdb/tools/VoxelBlockManager.h>
 #include <nanovdb/util/Util.h>
 
@@ -329,7 +328,7 @@ static void defineBuild(nb::module_& toolsModule)
                     "buildVoxelBlockManager: grid must satisfy "
                     "grid.isSequential() (fixed-size, breadth-first node "
                     "layout). NanoVDB grids constructed via "
-                    "tools.createOnIndexGrid satisfy this by default.");
+                    "tools.createNanoGridOnIndex satisfy this by default.");
             }
             return dispatchLog2BlockWidth(log2_block_width, [&](auto W) {
                 constexpr int LBW = decltype(W)::value;
@@ -474,74 +473,11 @@ static void defineDecode(nb::module_& toolsModule)
         "BlockWidth/64. first_leaf_id must be in [0, grid.tree().nodeCount(0)).");
 }
 
-// ----- createOnIndexGrid test-scaffold factory ----------------------------
-//
-// Narrow source-coverage factory used by the VoxelBlockManager unit tests.
-// New code should prefer tools.createNanoGridOnIndex (in PyCreateNanoGrid.cc)
-// which accepts a wider source set.
-
-template<typename SrcBuildT>
-static nb::object tryCreateOnIndexGrid(nb::handle py_grid,
-                                       uint32_t channels,
-                                       bool include_stats,
-                                       bool include_tiles,
-                                       int verbose)
-{
-    using SrcGridT = NanoGrid<SrcBuildT>;
-    if (!nb::isinstance<SrcGridT>(py_grid)) {
-        return nb::object();
-    }
-    const SrcGridT& src = nb::cast<const SrcGridT&>(py_grid);
-    return nb::cast(
-        tools::createNanoGrid<SrcGridT, ValueOnIndex, HostBuffer>(
-            src, channels, include_stats, include_tiles, verbose));
-}
-
-static void defineCreateOnIndexGrid(nb::module_& toolsModule)
-{
-    toolsModule.def("createOnIndexGrid",
-        [](nb::handle py_grid,
-           uint32_t channels,
-           bool include_stats,
-           bool include_tiles,
-           int verbose) -> nb::object {
-            // Try every source BuildT we accept.
-            if (auto r = tryCreateOnIndexGrid<float>(
-                    py_grid, channels, include_stats, include_tiles, verbose);
-                r.is_valid()) return r;
-            if (auto r = tryCreateOnIndexGrid<double>(
-                    py_grid, channels, include_stats, include_tiles, verbose);
-                r.is_valid()) return r;
-            if (auto r = tryCreateOnIndexGrid<int32_t>(
-                    py_grid, channels, include_stats, include_tiles, verbose);
-                r.is_valid()) return r;
-            if (auto r = tryCreateOnIndexGrid<Vec3f>(
-                    py_grid, channels, include_stats, include_tiles, verbose);
-                r.is_valid()) return r;
-            throw nb::type_error(
-                "createOnIndexGrid: source grid must be a FloatGrid, "
-                "DoubleGrid, Int32Grid, or Vec3fGrid (other source BuildTs "
-                "are not yet bound).");
-        },
-        "src_grid"_a,
-        "channels"_a = 0u,
-        "include_stats"_a = true,
-        "include_tiles"_a = true,
-        "verbose"_a = 0,
-        "Convert a source grid into a NanoGrid<ValueOnIndex> "
-        "(OnIndexGrid). Accepts FloatGrid / DoubleGrid / Int32Grid / "
-        "Vec3fGrid. This is a narrow helper kept alongside "
-        "buildVoxelBlockManager; for general index conversion (broader "
-        "source coverage, blind-data channels) prefer "
-        "nanovdb.tools.createNanoGridOnIndex.");
-}
-
 void defineVoxelBlockManagerModule(nb::module_& toolsModule)
 {
     defineHandle(toolsModule);
     defineBuild(toolsModule);
     defineDecode(toolsModule);
-    defineCreateOnIndexGrid(toolsModule);
 }
 
 } // namespace pynanovdb

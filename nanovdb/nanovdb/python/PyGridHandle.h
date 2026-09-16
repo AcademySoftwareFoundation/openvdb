@@ -9,6 +9,8 @@
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/NanoVDB.h>
 
+#include "PyBuildTypes.h"
+
 #include <vector>
 
 namespace nb = nanobind;
@@ -16,44 +18,27 @@ namespace nb = nanobind;
 namespace pynanovdb {
 
 // Polymorphic host-side `handle.grid(n)`: dispatch on gridType(n) to the
-// matching NanoGrid<BuildT> subclass currently bound in Python. Returns
-// None when the underlying BuildT is not bound in this build — see the
-// list of bound types in BuildTypes.def. The returned object is parented
+// matching NanoGrid<BuildT> subclass bound in Python. Returns None when the
+// BuildT is not bound (see BuildTypes.def). The returned object is parented
 // to the handle so the handle is kept alive at least as long as the grid.
+template<typename BufferT>
+struct PyHostGridOp
+{
+    template<typename BuildT>
+    static nb::object known(nb::handle py_handle, nanovdb::GridHandle<BufferT>& handle, uint32_t n)
+    {
+        auto* grid = handle.template grid<BuildT>(n);
+        return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle) : nb::none();
+    }
+    static nb::object unknown(nb::handle, nanovdb::GridHandle<BufferT>&, uint32_t) { return nb::none(); }
+};
+
 template<typename BufferT>
 inline nb::object pyHostGrid(nb::handle py_handle, uint32_t n)
 {
     auto& handle = nb::cast<nanovdb::GridHandle<BufferT>&>(py_handle);
     if (n >= handle.gridCount()) return nb::none();
-    switch (handle.gridType(n)) {
-#define NANOVDB_PY_FOR_EACH_SCALAR_BUILDT(T, Suffix, GridTypeEnum)             \
-        case nanovdb::GridType::GridTypeEnum: {                                \
-            auto* grid = handle.template grid<T>(n);                           \
-            return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle)  \
-                        : nb::none();                                          \
-        }
-#define NANOVDB_PY_FOR_EACH_VECTOR_BUILDT(T, Suffix, AccessorName, GridTypeEnum) \
-        case nanovdb::GridType::GridTypeEnum: {                                \
-            auto* grid = handle.template grid<T>(n);                           \
-            return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle)  \
-                        : nb::none();                                          \
-        }
-#define NANOVDB_PY_FOR_EACH_POINT_BUILDT(T, Suffix, GridTypeEnum)              \
-        case nanovdb::GridType::GridTypeEnum: {                                \
-            auto* grid = handle.template grid<T>(n);                           \
-            return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle)  \
-                        : nb::none();                                          \
-        }
-#define NANOVDB_PY_FOR_EACH_READONLY_BUILDT(T, Suffix, GridTypeEnum)           \
-        case nanovdb::GridType::GridTypeEnum: {                                \
-            auto* grid = handle.template grid<T>(n);                           \
-            return grid ? nb::cast(grid, nb::rv_policy::reference, py_handle)  \
-                        : nb::none();                                          \
-        }
-#include "BuildTypes.def"
-        default:
-            return nb::none();
-    }
+    return callPyBuildT<PyHostGridOp<BufferT>>(handle.gridType(n), py_handle, handle, n);
 }
 
 // Free functions splitGrids / mergeGrids exposed at module scope. Templated
@@ -81,13 +66,20 @@ template<typename BufferT> void defineGridHandleUtilities(nb::module_& m)
         std::vector<const HandleT*> sources;
         sources.reserve(nb::len(handles));
         for (nb::handle item : handles) {
+            if (!nb::isinstance<HandleT>(item)) {
+                throw nb::type_error(
+                    "mergeGrids: every element must be a host GridHandle; "
+                    "device handles are not supported — copy them to host "
+                    "handles first.");
+            }
             sources.push_back(&nb::cast<const HandleT&>(item));
         }
         return nanovdb::mergeGrids<BufferT>(sources.data(), sources.size());
     }, nb::arg("handles"),
        "Combine a list of GridHandles into a single multi-grid GridHandle. "
        "Input handles are read by const reference; the new handle owns a "
-       "freshly-allocated buffer and the inputs are left untouched.");
+       "freshly-allocated buffer and the inputs are left untouched. An "
+       "empty list yields an empty handle.");
 }
 
 template<typename BufferT> nb::class_<nanovdb::GridHandle<BufferT>> defineGridHandle(nb::module_& m, const char* name)

@@ -64,27 +64,26 @@ static void defineBuildGrid(nb::module_& m,
             },
             "ijk"_a, "value"_a,
             "Set the voxel value at ijk and mark the voxel active.")
-        // build::Grid has no top-level isActive(ijk); the read path is via
-        // ValueAccessor. Spin up a fresh accessor for the single query so
-        // Python callers don't have to.
+        // build::Grid has no top-level isActive / setValueOn; both go through
+        // a ValueAccessor. The accessor is a small stack object (a root
+        // reference plus three empty cache slots), so each call costs one
+        // uncached tree descent, the same as getValue / setValue above.
         .def("isActive",
             [](GridT& self, const Coord& ijk) {
-                AccT acc = self.getAccessor();
-                return acc.isActive(ijk);
+                return self.getAccessor().isActive(ijk);
             },
             "ijk"_a,
-            "Return True iff ijk is in an active voxel. Equivalent to "
-            "self.getAccessor().isActive(ijk), but allocates a fresh "
-            "accessor for each call — for repeated queries use "
-            "self.getAccessor() and reuse it.")
+            "Return True iff ijk is in an active voxel. Each call walks the "
+            "tree from the root; for many nearby queries, hold one "
+            "self.getAccessor() and query through it instead.")
         .def("setValueOn",
             [](GridT& self, const Coord& ijk) {
-                AccT acc = self.getAccessor();
-                acc.setValueOn(ijk);
+                self.getAccessor().setValueOn(ijk);
             },
             "ijk"_a,
-            "Mark ijk active without changing the stored value. Equivalent "
-            "to self.getAccessor().setValueOn(ijk).")
+            "Mark ijk active without changing the stored value. Each call "
+            "walks the tree from the root; for many nearby writes, hold one "
+            "self.getAccessor() and write through it instead.")
         .def("nodeCount",
             [](const GridT& self) -> std::array<size_t, 3> {
                 return self.nodeCount();

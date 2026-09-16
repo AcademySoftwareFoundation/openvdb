@@ -855,14 +855,14 @@ class TestZeroCopyViewLifetimes(unittest.TestCase):
 
 class TestVoxelBlockManager(unittest.TestCase):
     """nanovdb.tools.buildVoxelBlockManager + VoxelBlockManagerHandle +
-    decodeInverseMaps and the createOnIndexGrid test-scaffold factory.
+    decodeInverseMaps.
 
     NOTE: end-to-end decode verification across every block is intentionally
     deferred until the Phase 4 build::Grid bindings land. The C++
     buildVoxelBlockManager has an algorithmic gap when the source OnIndex
     grid is tile-compressed (blocks not reached by any leaf's iteration
     sweep are left with uninitialized firstLeafID). The current host-side
-    createFloatGrid + createOnIndexGrid path triggers tile compression on
+    createFloatGrid + createNanoGridOnIndex path triggers tile compression on
     uniform regions, so we only exercise decodeBlock(0) here — that block
     is guaranteed to be covered when the grid's firstOffset is 1. The
     bindings include a defensive check that raises ValueError if a
@@ -876,8 +876,8 @@ class TestVoxelBlockManager(unittest.TestCase):
         float_h = nanovdb.tools.createFloatGrid(
             0.0, "cube", nanovdb.GridClass.Unknown,
             lambda ijk: 1.0, bbox)
-        return nanovdb.tools.createOnIndexGrid(
-            float_h.grid(), include_stats=False, include_tiles=False)
+        return nanovdb.tools.createNanoGridOnIndex(
+            float_h.grid(), includeStats=False, includeTiles=False)
 
     def test_create_on_index_grid(self):
         h = self._make_cube_on_index_grid()
@@ -886,13 +886,6 @@ class TestVoxelBlockManager(unittest.TestCase):
         self.assertEqual(g.gridClass(), nanovdb.GridClass.IndexGrid)
         self.assertGreater(g.activeVoxelCount(), 0)
         self.assertTrue(g.isSequential())
-
-    def test_create_on_index_grid_rejects_unsupported_source(self):
-        # createOnIndexGrid only accepts {float, double, int32, Vec3f}
-        # source grids; passing None (or any non-grid object) should raise
-        # TypeError at the first BuildT-isinstance check.
-        with self.assertRaises(TypeError):
-            nanovdb.tools.createOnIndexGrid(None)
 
     def test_build_voxel_block_manager_handle(self):
         h = self._make_cube_on_index_grid()
@@ -1935,7 +1928,7 @@ class TestGridStats(unittest.TestCase):
             nanovdb.math.Coord(0), nanovdb.math.Coord(4))
         h_float = nanovdb.tools.createFloatGrid(
             0.0, "src", nanovdb.GridClass.Unknown, lambda ijk: 1.0, bbox)
-        h_index = nanovdb.tools.createOnIndexGrid(h_float.grid())
+        h_index = nanovdb.tools.createNanoGridOnIndex(h_float.grid())
         ng = h_index.grid()
         with self.assertRaises(ValueError):
             nanovdb.tools.updateGridStats(ng, nanovdb.tools.StatsMode.MinMax)

@@ -438,6 +438,10 @@ struct PyLeafValuesBinder<BuildT,
         using GridT = nanovdb::NanoGrid<BuildT>;
         using LeafT = nanovdb::NanoLeaf<BuildT>;
         using ValueT = typename LeafT::ValueType;
+        static_assert(sizeof(LeafT) % sizeof(ValueT) == 0,
+                      "leaf_values() expresses the per-leaf stride in ValueT "
+                      "units, so sizeof(NanoLeaf<BuildT>) must be a multiple "
+                      "of sizeof(ValueT)");
         cls.def("leaf_values",
             [](nb::handle py_self) -> nb::object {
                 auto& grid = nb::cast<GridT&>(py_self);

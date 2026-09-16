@@ -13,6 +13,7 @@
 
 #include <cstring>
 #include <string>
+#include <type_traits>
 
 namespace nb = nanobind;
 using namespace nb::literals;
@@ -63,54 +64,49 @@ template<typename BufferT> void defineOpenToNanoVDB(nb::module_& m)
 
 namespace {
 
-// ----- Quantized (Fp4/Fp8/Fp16) -----
-//
-// C++ signature: createNanoGrid<SrcGridT, DstBuildT, BufferT>(srcGrid,
-// sMode, cMode, ditherOn, verbose, buffer).
-//
-// Try SrcBuildT against both NanoGrid<SrcBuildT> and build::Grid<SrcBuildT>
-// and return an empty nb::object on no match so the caller can fall through
-// to the next SrcBuildT.
-//
-// GIL is held for the isinstance / cast dispatch (which touches the Python
-// object's type and reference graph) but released around the underlying
-// tools::createNanoGrid traversal — the source data lives in stable C++
-// storage whose lifetime is anchored by the Python wrapper passed in via
-// py_src, so it's safe to read without holding the GIL.
-template<typename SrcBuildT, typename DstBuildT>
-nb::object tryQuantizeFpX(nb::handle       py_src,
-                          tools::StatsMode sMode,
-                          CheckMode        cMode,
-                          bool             ditherOn,
-                          int              verbose)
+// Python class names of the source grids accepted by the index converters
+// and by tools.CreateNanoGrid, as one comma-terminated literal
+// ("FloatGrid, DoubleGrid, ..., ").
+constexpr const char* kSampleableSourceGrids =
+#define NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix) #Suffix "Grid, "
+#include "BuildTypes.def"
+    ;
+
+std::string unsupportedSourceMessage(const char* pyFnName)
 {
+    return std::string(pyFnName) + ": source must be a " + kSampleableSourceGrids +
+           "or the matching nanovdb.tools.build.* mutable grid.";
+}
+
+// Casts py_src to NanoGrid<SrcBuildT> or build::Grid<SrcBuildT> and returns
+// convert(src) wrapped as a Python GridHandle. The GIL stays held for the
+// isinstance / cast dispatch and is released around convert(): the source
+// data lives in C++ storage kept alive by py_src, so it can be read without
+// the GIL. Returns an invalid nb::object when py_src is neither type, so a
+// caller can fall through to the next SrcBuildT.
+template<typename SrcBuildT, typename ConvertT>
+nb::object convertSourceGrid(nb::handle py_src, ConvertT&& convert)
+{
+    auto run = [&](const auto& src) {
+        GridHandle<HostBuffer> handle;
+        {
+            nb::gil_scoped_release release;
+            handle = convert(src);
+        }
+        return nb::cast(std::move(handle));
+    };
     using NanoSrcT  = NanoGrid<SrcBuildT>;
     using BuildSrcT = tools::build::Grid<SrcBuildT>;
-    if (nb::isinstance<NanoSrcT>(py_src)) {
-        const auto& src = nb::cast<const NanoSrcT&>(py_src);
-        GridHandle<HostBuffer> handle;
-        {
-            nb::gil_scoped_release release;
-            handle = tools::createNanoGrid<NanoSrcT, DstBuildT, HostBuffer>(
-                src, sMode, cMode, ditherOn, verbose);
-        }
-        return nb::cast(std::move(handle));
-    }
-    if (nb::isinstance<BuildSrcT>(py_src)) {
-        const auto& src = nb::cast<const BuildSrcT&>(py_src);
-        GridHandle<HostBuffer> handle;
-        {
-            nb::gil_scoped_release release;
-            handle = tools::createNanoGrid<BuildSrcT, DstBuildT, HostBuffer>(
-                src, sMode, cMode, ditherOn, verbose);
-        }
-        return nb::cast(std::move(handle));
-    }
-    // Invalid (not None) object signals "SrcBuildT didn't match"; the caller
-    // tests is_valid() and falls through to the next SrcBuildT.
+    if (nb::isinstance<NanoSrcT>(py_src))  return run(nb::cast<const NanoSrcT&>(py_src));
+    if (nb::isinstance<BuildSrcT>(py_src)) return run(nb::cast<const BuildSrcT&>(py_src));
     return nb::object();
 }
 
+// ----- Quantized (Fp4/Fp8/Fp16) -----
+//
+// C++ signature: createNanoGrid<SrcGridT, DstBuildT, BufferT>(srcGrid,
+// sMode, cMode, ditherOn, verbose, buffer). The Fp* preProcess
+// static_asserts SrcValueT == float, so only float sources are accepted.
 template<typename DstBuildT>
 nb::object createNanoGridFpX(nb::handle       py_src,
                              tools::StatsMode sMode,
@@ -119,10 +115,12 @@ nb::object createNanoGridFpX(nb::handle       py_src,
                              int              verbose,
                              const char*      pyFnName)
 {
-    // The C++ Fp{4,8,16,N} preProcess static_asserts SrcValueT == float;
-    // double sources hit a compile-time error, so we accept float only.
-    if (auto r = tryQuantizeFpX<float, DstBuildT>(
-            py_src, sMode, cMode, ditherOn, verbose); r.is_valid()) return r;
+    auto r = convertSourceGrid<float>(py_src, [&](const auto& src) {
+        using SrcGridT = std::decay_t<decltype(src)>;
+        return tools::createNanoGrid<SrcGridT, DstBuildT, HostBuffer>(
+            src, sMode, cMode, ditherOn, verbose);
+    });
+    if (r.is_valid()) return r;
     std::string msg(pyFnName);
     msg += ": source must be a FloatGrid or nanovdb.tools.build.FloatGrid "
            "(Fp4/Fp8/Fp16/FpN require a float source value type).";
@@ -134,43 +132,6 @@ nb::object createNanoGridFpX(nb::handle       py_src,
 // C++ signature: createNanoGrid<SrcGridT, FpN, OracleT, BufferT>(srcGrid,
 // sMode, cMode, ditherOn, verbose, oracle, buffer). OracleT is AbsDiff or
 // RelDiff; the binding exposes both as separate Python overloads.
-template<typename SrcBuildT, typename OracleT>
-nb::object tryQuantizeFpN(nb::handle       py_src,
-                          tools::StatsMode sMode,
-                          CheckMode        cMode,
-                          bool             ditherOn,
-                          int              verbose,
-                          const OracleT&   oracle)
-{
-    using NanoSrcT  = NanoGrid<SrcBuildT>;
-    using BuildSrcT = tools::build::Grid<SrcBuildT>;
-    // Same GIL pattern as tryQuantizeFpX: hold the GIL through the
-    // isinstance / cast dispatch, release it for the conversion.
-    if (nb::isinstance<NanoSrcT>(py_src)) {
-        const auto& src = nb::cast<const NanoSrcT&>(py_src);
-        GridHandle<HostBuffer> handle;
-        {
-            nb::gil_scoped_release release;
-            handle = tools::createNanoGrid<NanoSrcT, FpN, OracleT, HostBuffer>(
-                src, sMode, cMode, ditherOn, verbose, oracle);
-        }
-        return nb::cast(std::move(handle));
-    }
-    if (nb::isinstance<BuildSrcT>(py_src)) {
-        const auto& src = nb::cast<const BuildSrcT&>(py_src);
-        GridHandle<HostBuffer> handle;
-        {
-            nb::gil_scoped_release release;
-            handle = tools::createNanoGrid<BuildSrcT, FpN, OracleT, HostBuffer>(
-                src, sMode, cMode, ditherOn, verbose, oracle);
-        }
-        return nb::cast(std::move(handle));
-    }
-    // Invalid (not None) object signals "SrcBuildT didn't match"; the caller
-    // tests is_valid() and falls through to the next SrcBuildT.
-    return nb::object();
-}
-
 template<typename OracleT>
 nb::object createNanoGridFpNImpl(nb::handle       py_src,
                                  const OracleT&   oracle,
@@ -179,8 +140,12 @@ nb::object createNanoGridFpNImpl(nb::handle       py_src,
                                  bool             ditherOn,
                                  int              verbose)
 {
-    if (auto r = tryQuantizeFpN<float, OracleT>(
-            py_src, sMode, cMode, ditherOn, verbose, oracle); r.is_valid()) return r;
+    auto r = convertSourceGrid<float>(py_src, [&](const auto& src) {
+        using SrcGridT = std::decay_t<decltype(src)>;
+        return tools::createNanoGrid<SrcGridT, FpN, OracleT, HostBuffer>(
+            src, sMode, cMode, ditherOn, verbose, oracle);
+    });
+    if (r.is_valid()) return r;
     throw nb::type_error(
         "createNanoGridFpN: source must be a FloatGrid or "
         "nanovdb.tools.build.FloatGrid (FpN requires a float source value type).");
@@ -190,44 +155,9 @@ nb::object createNanoGridFpNImpl(nb::handle       py_src,
 //
 // C++ signature: createNanoGrid<SrcGridT, DstBuildT, BufferT>(srcGrid,
 // channels, includeStats, includeTiles, verbose, buffer). DstBuildT is
-// ValueIndex or ValueOnIndex; the binding exposes both as separate
-// named functions. Source set is wider than the quantized variants —
-// any arithmetic or vector source can be re-cast as an index grid.
-template<typename SrcBuildT, typename DstBuildT>
-nb::object tryIndexify(nb::handle py_src,
-                       uint32_t   channels,
-                       bool       includeStats,
-                       bool       includeTiles,
-                       int        verbose)
-{
-    using NanoSrcT  = NanoGrid<SrcBuildT>;
-    using BuildSrcT = tools::build::Grid<SrcBuildT>;
-    // Same GIL pattern as tryQuantizeFpX.
-    if (nb::isinstance<NanoSrcT>(py_src)) {
-        const auto& src = nb::cast<const NanoSrcT&>(py_src);
-        GridHandle<HostBuffer> handle;
-        {
-            nb::gil_scoped_release release;
-            handle = tools::createNanoGrid<NanoSrcT, DstBuildT, HostBuffer>(
-                src, channels, includeStats, includeTiles, verbose);
-        }
-        return nb::cast(std::move(handle));
-    }
-    if (nb::isinstance<BuildSrcT>(py_src)) {
-        const auto& src = nb::cast<const BuildSrcT&>(py_src);
-        GridHandle<HostBuffer> handle;
-        {
-            nb::gil_scoped_release release;
-            handle = tools::createNanoGrid<BuildSrcT, DstBuildT, HostBuffer>(
-                src, channels, includeStats, includeTiles, verbose);
-        }
-        return nb::cast(std::move(handle));
-    }
-    // Invalid (not None) object signals "SrcBuildT didn't match"; the caller
-    // tests is_valid() and falls through to the next SrcBuildT.
-    return nb::object();
-}
-
+// ValueIndex or ValueOnIndex; the binding exposes both as separate named
+// functions. Every sampleable BuildT in BuildTypes.def is accepted as a
+// source.
 template<typename DstBuildT>
 nb::object createIndexImpl(nb::handle  py_src,
                            uint32_t    channels,
@@ -236,14 +166,15 @@ nb::object createIndexImpl(nb::handle  py_src,
                            int         verbose,
                            const char* pyFnName)
 {
-    if (auto r = tryIndexify<float,    DstBuildT>(py_src, channels, includeStats, includeTiles, verbose); r.is_valid()) return r;
-    if (auto r = tryIndexify<double,   DstBuildT>(py_src, channels, includeStats, includeTiles, verbose); r.is_valid()) return r;
-    if (auto r = tryIndexify<int32_t,  DstBuildT>(py_src, channels, includeStats, includeTiles, verbose); r.is_valid()) return r;
-    if (auto r = tryIndexify<Vec3f,    DstBuildT>(py_src, channels, includeStats, includeTiles, verbose); r.is_valid()) return r;
-    std::string msg(pyFnName);
-    msg += ": source must be a FloatGrid, DoubleGrid, Int32Grid, "
-           "Vec3fGrid, or the matching nanovdb.tools.build.* mutable grid.";
-    throw nb::type_error(msg.c_str());
+    auto indexify = [&](const auto& src) {
+        using SrcGridT = std::decay_t<decltype(src)>;
+        return tools::createNanoGrid<SrcGridT, DstBuildT, HostBuffer>(
+            src, channels, includeStats, includeTiles, verbose);
+    };
+#define NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix) \
+    if (auto r = convertSourceGrid<T>(py_src, indexify); r.is_valid()) return r;
+#include "BuildTypes.def"
+    throw nb::type_error(unsupportedSourceMessage(pyFnName).c_str());
 }
 
 // ----- tools.CreateNanoGrid: converter class with blind-data authoring -----
@@ -302,12 +233,12 @@ public:
     explicit PyCreateNanoGrid(nb::object src)
         : mSrc(std::move(src))
     {
-        if (!(matches<float>() || matches<double>() ||
-              matches<int32_t>() || matches<Vec3f>())) {
-            throw nb::type_error(
-                "CreateNanoGrid: source must be a FloatGrid, DoubleGrid, "
-                "Int32Grid, Vec3fGrid, or the matching "
-                "nanovdb.tools.build.* mutable grid.");
+        bool supported = false;
+#define NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix) \
+        supported = supported || matches<T>();
+#include "BuildTypes.def"
+        if (!supported) {
+            throw nb::type_error(unsupportedSourceMessage("CreateNanoGrid").c_str());
         }
     }
 
@@ -347,10 +278,10 @@ public:
 
     nb::object getHandle() const
     {
-        if (auto r = tryGetHandle<float>();   r.is_valid()) return r;
-        if (auto r = tryGetHandle<double>();  r.is_valid()) return r;
-        if (auto r = tryGetHandle<int32_t>(); r.is_valid()) return r;
-        if (auto r = tryGetHandle<Vec3f>();   r.is_valid()) return r;
+        auto convert = [this](const auto& src) { return this->bake(src); };
+#define NANOVDB_PY_FOR_EACH_SAMPLEABLE_BUILDT(T, Suffix) \
+        if (auto r = convertSourceGrid<T>(mSrc, convert); r.is_valid()) return r;
+#include "BuildTypes.def"
         throw nb::type_error("CreateNanoGrid: unsupported source grid type.");
     }
 
@@ -361,52 +292,36 @@ private:
                nb::isinstance<tools::build::Grid<SrcBuildT>>(mSrc);
     }
 
-    template<typename SrcBuildT> nb::object tryGetHandle() const
+    // Runs without the GIL (convertSourceGrid releases it); mSrc anchors the
+    // source's lifetime.
+    template<typename SrcGridT> GridHandle<HostBuffer> bake(const SrcGridT& src) const
     {
-        using NanoSrcT  = NanoGrid<SrcBuildT>;
-        using BuildSrcT = tools::build::Grid<SrcBuildT>;
-        if (nb::isinstance<NanoSrcT>(mSrc)) return this->bake(nb::cast<const NanoSrcT&>(mSrc));
-        if (nb::isinstance<BuildSrcT>(mSrc)) return this->bake(nb::cast<const BuildSrcT&>(mSrc));
-        // Invalid (not None) object signals "SrcBuildT didn't match"; the caller
-        // tests is_valid() and falls through to the next SrcBuildT.
-        return nb::object();
-    }
-
-    // Same GIL pattern as tryQuantizeFpX: the dispatch above runs with the
-    // GIL held, the traversal runs without it (the source's lifetime is
-    // anchored by mSrc).
-    template<typename SrcGridT> nb::object bake(const SrcGridT& src) const
-    {
-        GridHandle<HostBuffer> handle;
-        {
-            nb::gil_scoped_release release;
-            tools::CreateNanoGrid<SrcGridT> converter(src);
-            converter.setStats(mStats);
-            converter.setChecksum(mChecksum);
-            converter.setVerbose(mVerbose);
-            converter.enableDithering(mDither);
-            for (const auto& b : mBlind) {
-                converter.addBlindData(b.name, b.semantic, b.dataClass, b.dataType,
-                                       static_cast<size_t>(b.count),
-                                       static_cast<size_t>(b.size));
-            }
-            handle = converter.getHandle();
-            // The C++ converter allocates authored channels without clearing
-            // them (C++ callers memcpy their payload in). Zero-fill here so
-            // the NumPy view starts deterministic. The authored channels are
-            // the first mBlind.size() blind-data entries — any converter-
-            // added channel (e.g. a long grid name) is appended after them.
-            if (!mBlind.empty()) {
-                if (auto* dst = const_cast<GridData*>(handle.gridData())) {
-                    for (size_t i = 0; i < mBlind.size(); ++i) {
-                        const GridBlindMetaData* meta = dst->blindMetaData(uint32_t(i));
-                        std::memset(const_cast<void*>(meta->blindData()), 0,
-                                    meta->blindDataSize());
-                    }
+        tools::CreateNanoGrid<SrcGridT> converter(src);
+        converter.setStats(mStats);
+        converter.setChecksum(mChecksum);
+        converter.setVerbose(mVerbose);
+        converter.enableDithering(mDither);
+        for (const auto& b : mBlind) {
+            converter.addBlindData(b.name, b.semantic, b.dataClass, b.dataType,
+                                   static_cast<size_t>(b.count),
+                                   static_cast<size_t>(b.size));
+        }
+        GridHandle<HostBuffer> handle = converter.getHandle();
+        // The C++ converter allocates authored channels without clearing
+        // them (C++ callers memcpy their payload in). Zero-fill here so
+        // the NumPy view starts deterministic. The authored channels are
+        // the first mBlind.size() blind-data entries — any converter-
+        // added channel (e.g. a long grid name) is appended after them.
+        if (!mBlind.empty()) {
+            if (auto* dst = const_cast<GridData*>(handle.gridData())) {
+                for (size_t i = 0; i < mBlind.size(); ++i) {
+                    const GridBlindMetaData* meta = dst->blindMetaData(uint32_t(i));
+                    std::memset(const_cast<void*>(meta->blindData()), 0,
+                                meta->blindDataSize());
                 }
             }
         }
-        return nb::cast(std::move(handle));
+        return handle;
     }
 
     nb::object                 mSrc;
@@ -518,11 +433,6 @@ void defineCreateNanoGridConversions(nb::module_& toolsModule)
         "FpN overload accepting a RelDiff oracle for relative error.");
 
     // ------ Index / OnIndex ------
-    //
-    // createNanoGridIndex / createNanoGridOnIndex are the canonical names
-    // for the broad-source-coverage index conversion bindings. A narrower
-    // createOnIndexGrid factory still lives in PyVoxelBlockManager.cc as
-    // the test scaffolding entry point used by the VBM unit tests.
     toolsModule.def("createNanoGridIndex",
         [](nb::handle src, uint32_t channels, bool includeStats,
            bool includeTiles, int verbose) {

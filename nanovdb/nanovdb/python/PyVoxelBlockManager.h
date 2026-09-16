@@ -10,9 +10,8 @@ namespace nb = nanobind;
 namespace pynanovdb {
 
 /// @brief Bind VoxelBlockManagerHandle<HostBuffer>,
-///        tools.buildVoxelBlockManager, tools.decodeInverseMaps, and the
-///        test-scaffold tools.createOnIndexGrid factory under the given
-///        Python submodule (expected to be the existing nanovdb.tools).
+///        tools.buildVoxelBlockManager and tools.decodeInverseMaps under the
+///        given Python submodule (expected to be the existing nanovdb.tools).
 void defineVoxelBlockManagerModule(nb::module_& toolsModule);
 
 } // namespace pynanovdb
