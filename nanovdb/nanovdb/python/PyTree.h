@@ -443,13 +443,18 @@ template<typename BuildT> void defineNodeManager(nb::module_& m, const char* nam
 }
 
 void defineCreateNodeManager(nb::module_& m);
+#ifdef NANOVDB_USE_CUDA
+// Device-side createDeviceNodeManager, registered on the
+// nanovdb.cuda submodule (defined in cuda/PyDeviceNodeManager.cu).
+void defineDeviceNodeManager(nb::module_& m);
+#endif
 
-// -------------------- grid.leaf_values() bulk extractor --------------------
+// -------------------- grid.leafValues() bulk extractor --------------------
 //
 // For non-special BuildTs with breadth-first, fixed-size leaves, the leaf
 // values can be reached as a contiguous (N_leaves, 512) array — every leaf
 // occupies sizeof(NanoLeaf<T>) bytes and mValues starts at a known offset
-// inside each leaf. We bind this on NanoGrid<T> as leaf_values() for
+// inside each leaf. We bind this on NanoGrid<T> as leafValues() for
 // efficient bulk analytics from Python.
 template<typename BuildT, typename = void>
 struct PyLeafValuesBinder
@@ -470,17 +475,17 @@ struct PyLeafValuesBinder<BuildT,
         using LeafT = nanovdb::NanoLeaf<BuildT>;
         using ValueT = typename LeafT::ValueType;
         static_assert(sizeof(LeafT) % sizeof(ValueT) == 0,
-                      "leaf_values() expresses the per-leaf stride in ValueT "
+                      "leafValues() expresses the per-leaf stride in ValueT "
                       "units, so sizeof(NanoLeaf<BuildT>) must be a multiple "
                       "of sizeof(ValueT)");
-        cls.def("leaf_values",
+        cls.def("leafValues",
             [](nb::handle py_self) -> nb::object {
                 auto& grid = nb::cast<GridT&>(py_self);
                 const auto& tree = grid.tree();
                 const uint32_t nLeaves = tree.template nodeCount<LeafT>();
                 if (!grid.isBreadthFirst()) {
                     throw nb::value_error(
-                        "leaf_values() requires a breadth-first grid "
+                        "leafValues() requires a breadth-first grid "
                         "layout; rebuild via "
                         "nanovdb.tools.createNanoGrid(...).");
                 }

@@ -7,7 +7,7 @@ that mirrors nanovdb::tools::build::Grid<T>. This example shows the
 three construction loops you'll typically reach for (setValue
 directly, the cached ValueAccessor, and the thread-safe
 WriteAccessor), then bakes each build grid into a host NanoGrid via
-.to_nanovdb() and reads it back through the regular polymorphic
+.toNanoVDB() and reads it back through the regular polymorphic
 handle.grid() API.
 
 Run with: python build_grid.py

@@ -7,10 +7,29 @@
 
 #include <nanovdb/NanoVDB.h> // for NANOVDB_DATA_ALIGNMENT
 
+#include <cmath>
 #include <cstdint>
 #include <string>
 
 namespace pynanovdb {
+
+/// @brief Raise a Python ValueError unless @a value is a finite, strictly
+///        positive number. Used to validate geometric parameters (voxelSize,
+///        narrow-band halfWidth) before they reach nanovdb::Map::set and the
+///        grid builders, which only debug-assert positivity — release builds
+///        would otherwise persist a singular / non-finite transform in the
+///        grid header.
+inline void requirePositiveFinite(double value, const char* fnName, const char* paramName)
+{
+    if (!(std::isfinite(value) && value > 0.0)) {
+        std::string msg(fnName);
+        msg += ": ";
+        msg += paramName;
+        msg += " must be a finite, strictly positive number; got ";
+        msg += std::to_string(value);
+        throw nanobind::value_error(msg.c_str());
+    }
+}
 
 /// @brief Raise a Python ValueError unless @a ptr is non-null and aligned to
 ///        NANOVDB_DATA_ALIGNMENT (32 bytes), the alignment every NanoVDB
