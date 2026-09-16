@@ -479,6 +479,9 @@ template<typename BuildT> void defineNanoGrid(nb::module_& m, const char* name)
     }
     // Add leaf_values() only for BuildTs whose LeafData carries T mValues[512].
     PyLeafValuesBinder<BuildT>::apply(cls);
+    // leaf_active_masks() has no such restriction — every LeafData carries
+    // a fixed-size value mask regardless of BuildT.
+    PyLeafActiveMasksBinder<BuildT>::apply(cls);
 }
 
 void defineGridBlindData(nb::module_& m)

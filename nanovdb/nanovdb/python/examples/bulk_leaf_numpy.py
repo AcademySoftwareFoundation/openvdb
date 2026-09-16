@@ -1,11 +1,17 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: Apache-2.0
-"""Bulk per-leaf value access as a zero-copy NumPy array.
+"""Bulk per-leaf value and active-mask access as zero-copy NumPy arrays.
 
 grid.leaf_values() is the highest-bandwidth path from NanoVDB into
 NumPy. It returns an (N_leaves, 512) view of every leaf's mValues
 without copying — modify it, slice it, feed it into a PyTorch tensor,
 hash it for cache lookup, whatever you need.
+
+grid.leaf_active_masks() is the same idea for activity: an
+(N_leaves, 8) uint64 view of every leaf's 512-bit active-value mask.
+Active and value are independent in VDB — a voxel can be active with
+value 0.0, or inactive with a stale nonzero value — so filtering by
+value (`arr != 0.0`) is not a substitute for checking the mask.
 
 Run with: python bulk_leaf_numpy.py
 """
@@ -35,12 +41,25 @@ def main():
     print(f"leaf_values: shape={arr.shape}, dtype={arr.dtype}, "
           f"backed by grid memory (no copy).")
 
-    # Global statistics across every voxel in every leaf, computed in C.
-    # 0.0 voxels (background) are excluded by using a mask.
-    nonzero = arr[arr != 0.0]
-    print(f"  non-background voxels = {nonzero.size}")
-    print(f"  min = {nonzero.min()}, max = {nonzero.max()}, "
-          f"mean = {nonzero.mean()}")
+    # leaf_active_masks() is the activity counterpart: (N_leaves, 8)
+    # uint64, one 512-bit mask per leaf, same row order as leaf_values().
+    # Unpack it into a (N_leaves, 512) bool array so it lines up with arr.
+    mask_words = np.asarray(grid.leaf_active_masks())
+    active = np.unpackbits(mask_words.view(np.uint8),
+                            bitorder="little").reshape(arr.shape).astype(bool)
+
+    # Global statistics across every active voxel, computed in C for the
+    # bulk read and in NumPy for the filter. This is the correct way to
+    # exclude background/inactive voxels — filtering by value (arr != 0.0)
+    # would also drop legitimately active voxels whose value happens to be
+    # 0.0, and would keep inactive voxels with stale nonzero values.
+    active_values = arr[active]
+    print(f"  active leaf voxels = {active_values.size} "
+          f"(grid.activeVoxelCount() = {grid.activeVoxelCount()} — larger "
+          f"here because this sphere also has active *tiles* on internal "
+          f"nodes, which leaf_active_masks() does not cover)")
+    print(f"  min = {active_values.min()}, max = {active_values.max()}, "
+          f"mean = {active_values.mean()}")
 
     # Per-leaf reductions: each row of `arr` is one leaf's 512 voxels.
     per_leaf_max = arr.max(axis=1)

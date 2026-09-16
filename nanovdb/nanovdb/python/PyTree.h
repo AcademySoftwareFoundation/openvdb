@@ -484,6 +484,72 @@ struct PyLeafValuesBinder<BuildT,
     }
 };
 
+// -------------------- grid.leaf_active_masks() bulk extractor --------------------
+//
+// Every LeafData<BuildT, ...> specialization carries a fixed-size
+// Mask<3> mValueMask (512 bits / 8 uint64 words) at a fixed offset,
+// regardless of how (or whether) values are stored. Unlike
+// leaf_values(), this needs no is_special / is_arithmetic gate — it
+// binds unconditionally for every BuildT.
+template<typename BuildT>
+struct PyLeafActiveMasksBinder
+{
+    template<typename ClsT>
+    static void apply(ClsT& cls)
+    {
+        using GridT = nanovdb::NanoGrid<BuildT>;
+        using LeafT = nanovdb::NanoLeaf<BuildT>;
+        using MaskT = nanovdb::Mask<3>;
+        static_assert(sizeof(LeafT) % sizeof(uint64_t) == 0,
+                      "leaf_active_masks() expresses the per-leaf stride in "
+                      "uint64 words, so sizeof(NanoLeaf<BuildT>) must be a "
+                      "multiple of sizeof(uint64_t)");
+        cls.def("leaf_active_masks",
+            [](nb::handle py_self) -> nb::object {
+                auto& grid = nb::cast<GridT&>(py_self);
+                const auto& tree = grid.tree();
+                const uint32_t nLeaves = tree.template nodeCount<LeafT>();
+                if (!grid.isBreadthFirst()) {
+                    throw nb::value_error(
+                        "leaf_active_masks() requires a breadth-first grid "
+                        "layout; rebuild via "
+                        "nanovdb.tools.createNanoGrid(...).");
+                }
+                // Same empty-grid convention as leaf_values(): shape
+                // (0, WORD_COUNT) backed by a dummy non-null pointer.
+                LeafT* first = const_cast<LeafT*>(tree.getFirstLeaf());
+                size_t  shape[2]   = {nLeaves, MaskT::WORD_COUNT};
+                int64_t strides[2] = {
+                    static_cast<int64_t>(sizeof(LeafT) / sizeof(uint64_t)),
+                    1
+                };
+                void* data = (first != nullptr)
+                    ? static_cast<void*>(first->data()->mValueMask.words())
+                    : static_cast<void*>(&grid);
+                return nb::cast(
+                    nb::ndarray<nb::numpy, uint64_t, nb::ndim<2>, nb::device::cpu>(
+                        data, size_t(2), shape, py_self, strides),
+                    nb::rv_policy::reference);
+            },
+            nb::keep_alive<0, 1>(),
+            "Return a zero-copy (N_leaves, 8) uint64 NumPy view of every "
+            "leaf's 512-bit active-value mask, in breadth-first leaf "
+            "order. Bit n of leaf row `r` (word r[n // 64], bit n % 64) is "
+            "set iff that leaf's n-th voxel is active — this is the same "
+            "bit leaf.isActive(n) reads. Available for every BuildT "
+            "(including Fp*, Index, Mask, bool, and Point) since every "
+            "leaf layout carries a mask regardless of value storage, but "
+            "only on breadth-first grids. Returns an empty (0, 8) array "
+            "for grids with no leaves. The view keeps the grid alive. "
+            "NOTE: this covers only leaf-resident voxels. A grid can also "
+            "carry active *tiles* on internal (non-leaf) nodes — entire "
+            "constant-value regions with no backing leaf — which this "
+            "view does not see; summing its popcount will then read lower "
+            "than grid.activeVoxelCount(). Use activeVoxelCount() for the "
+            "true total.");
+    }
+};
+
 } // namespace pynanovdb
 
 #endif
