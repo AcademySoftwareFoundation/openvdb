@@ -35,10 +35,8 @@
 #ifndef _WIN32
 #include <unistd.h>
 #endif
-#ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
 #include <cstring> // for memset()
-#endif
 
 
 class TestFile: public ::testing::Test
@@ -1786,18 +1784,10 @@ TEST_F(TestFile, testCompression)
     // and verify that they can be read back successfully.
     // See io/Compression.h for the flag values.
 
-#ifdef OPENVDB_USE_BLOSC
-    #ifdef OPENVDB_USE_ZLIB
-        std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3,0x4,0x6};
-    #else
-        std::vector<uint32_t> validFlags{0x0,0x2,0x4,0x6};
-    #endif
+#ifdef OPENVDB_USE_ZLIB
+    std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3,0x4,0x6};
 #else
-    #ifdef OPENVDB_USE_ZLIB
-        std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3};
-    #else
-        std::vector<uint32_t> validFlags{0x0,0x2};
-    #endif
+    std::vector<uint32_t> validFlags{0x0,0x2,0x4,0x6};
 #endif
     for (uint32_t flags : validFlags) {
 
@@ -2062,7 +2052,6 @@ TEST_F(TestFile, testAsync)
 }
 
 
-#ifdef OPENVDB_USE_BLOSC
 // This tests for a data corruption bug that existed in versions of Blosc prior to 1.5.0
 // (see https://github.com/Blosc/c-blosc/pull/63).
 TEST_F(TestFile, testBlosc)
@@ -2175,4 +2164,3 @@ TEST_F(TestFile, testBlosc)
         }
     }
 }
-#endif

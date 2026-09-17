@@ -10,9 +10,7 @@
 #include <atomic>
 #include <mutex>
 
-#ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
-#endif
 
 #if OPENVDB_ABI_VERSION_NUMBER <= 10
     #error ABI <= 10 is no longer supported
@@ -92,9 +90,7 @@ initialize()
     // Register types associated with point data grids.
     points::internal::initialize();
 
-#ifdef OPENVDB_USE_BLOSC
     blosc_init();
-#endif
 
 #ifdef __ICC
 // Disable ICC "assignment to statically allocated variable" warning.

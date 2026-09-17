@@ -9,9 +9,7 @@
 #ifdef OPENVDB_USE_ZLIB
 #include <zlib.h>
 #endif
-#ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
-#endif
 
 
 namespace openvdb {
@@ -173,7 +171,6 @@ unzipFromStream(std::istream& is, char* data, size_t numBytes)
 
 namespace {
 
-#ifdef OPENVDB_USE_BLOSC
 int bloscCompress(size_t inBytes, const char* data, char* compressedData, int outBytes)
 {
     return blosc_compress_ctx(
@@ -188,18 +185,10 @@ int bloscCompress(size_t inBytes, const char* data, char* compressedData, int ou
         /*blocksize=*/inBytes,//previously set to 256 (in v3.x)
         /*numthreads=*/1);
 }
-#endif
 
 } // namespace
 
 
-#ifndef OPENVDB_USE_BLOSC
-size_t
-bloscToStreamSize(const char*, size_t, size_t)
-{
-    OPENVDB_THROW(IoError, "Blosc encoding is not supported");
-}
-#else
 size_t
 bloscToStreamSize(const char* data, size_t valSize, size_t numVals)
 {
@@ -216,16 +205,8 @@ bloscToStreamSize(const char* data, size_t valSize, size_t numVals)
 
     return size_t(outBytes);
 }
-#endif
 
 
-#ifndef OPENVDB_USE_BLOSC
-void
-bloscToStream(std::ostream&, const char*, size_t, size_t)
-{
-    OPENVDB_THROW(IoError, "Blosc encoding is not supported");
-}
-#else
 void
 bloscToStream(std::ostream& os, const char* data, size_t valSize, size_t numVals)
 {
@@ -257,16 +238,8 @@ bloscToStream(std::ostream& os, const char* data, size_t valSize, size_t numVals
         os.write(reinterpret_cast<char*>(compressedData.get()), outBytes);
     }
 }
-#endif
 
 
-#ifndef OPENVDB_USE_BLOSC
-void
-bloscFromStream(std::istream&, char*, size_t)
-{
-    OPENVDB_THROW(IoError, "Blosc decoding is not supported");
-}
-#else
 void
 bloscFromStream(std::istream& is, char* data, size_t numBytes)
 {
@@ -313,7 +286,6 @@ bloscFromStream(std::istream& is, char* data, size_t numBytes)
         }
     }
 }
-#endif
 
 } // namespace io
 } // namespace OPENVDB_VERSION_NAME
