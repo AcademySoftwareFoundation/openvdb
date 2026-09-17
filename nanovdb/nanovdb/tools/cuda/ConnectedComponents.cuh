@@ -31,7 +31,6 @@
 #include <cub/cub.cuh>
 
 #include <utility>      // std::pair
-#include <cstdio>       // std::fprintf
 #include <limits>       // std::numeric_limits
 #include <stdexcept>    // std::runtime_error
 #include <type_traits>  // std::is_unsigned
@@ -178,7 +177,6 @@ private:
     cudaStream_t                 mStream{0};
     util::cuda::Timer            mTimer;
     int                          mVerbose{0};
-    uint32_t                     mLeavesOverIterationCap{0};  // leaves that ran out of union-find rounds
     const GridT                 *mDeviceSrcGrid;
     ResourceT                   *mResource;                   // non-owning; all device scratch routes through this instance
     nanovdb::cuda::TempPool<ResourceT> mTempDevicePool;
@@ -226,11 +224,6 @@ struct LeafUnionFind
 {
     static constexpr int INACTIVE = -1;  // parent sentinel for inactive voxels
 
-    // Safety cap on the convergence loop, set far above the rounds any leaf is observed to need.
-    // It guards against a non-terminating bug rather than limiting legitimate input; a leaf that
-    // reached it would be left under-labeled, which leavesOverIterationCap() reports.
-    static constexpr int MaxConvergenceIters = 64;
-
     // Minimum parent label over offset n and its (up to 6) active in-leaf face neighbors.
     __device__ static int neighborMin(const int* parentsPtr, int n)
     {
@@ -250,12 +243,12 @@ struct LeafUnionFind
 
     // Union-find hook: if the smallest parent m among v's active neighbors is below v's own parent
     // p, lower the parent of p toward m via atomicMin (many vertices can target the same slot p).
-    // This is parent-connect in Liu & Tarjan, or parent-root-connect when rootsOnly is set.
     // Sets *changed -- the caller's block-shared flag, when non-null -- iff some slot was lowered.
     //
-    // @param rootsOnly hook only through parents that are themselves roots. The restricted form
-    //        cannot move a subtree between trees, which makes the algorithm monotone -- the
-    //        property that the O(lg n) bound in Liu & Tarjan rests on.
+    // @param rootsOnly picks which of Liu & Tarjan's connect operations this performs:
+    //        parent-connect when false, parent-root-connect when true, which hooks only through
+    //        parents that are themselves roots. That restriction cannot move a subtree between
+    //        trees, making the algorithm monotone -- the property their O(lg n) bound rests on.
     __device__ static void hook(int*& cur, int*& nxt, int n, int* changed, bool rootsOnly = false)
     {
         const int pn = cur[n];
@@ -298,9 +291,7 @@ struct LeafUnionFind
     // Run the full schedule to convergence. On return cur[n] holds n's component root, and each
     // component's root is the minimum voxel offset it contains. `changed` points at a block-shared
     // int, which this resets between rounds.
-    // Returns false if the loop ran out of rounds, leaving this leaf under-labeled; callers must
-    // not ignore that, since nothing downstream would notice.
-    __device__ static bool solve(int*& cur, int*& nxt, int n, int* changed)
+    __device__ static void solve(int*& cur, int*& nxt, int n, int* changed)
     {
         // Unconditional warm-up: one hook, then enough compresses to flatten the forest rather
         // than merely halve its depth (a leaf is DIM=8 across). Flatness keeps the
@@ -313,17 +304,20 @@ struct LeafUnionFind
         compress(cur, nxt, n, nullptr);
 
         // Then alternate (hook, compress) until a full iteration changes nothing, as algorithm P
-        // and then as algorithm R once SwitchToRootAfter rounds have passed.
+        // and then as algorithm R once SwitchToRootAfter rounds have passed. The bound is a
+        // backstop, not the mechanism that ends the loop: algorithm R converges within its O(lg n)
+        // step bound, so only a bug could exhaust it.
+        constexpr int MaxConvergenceIters = 64;
         for (int it = 0; it < MaxConvergenceIters; ++it) {
             if (n == 0) *changed = 0;
             __syncthreads();
             hook    (cur, nxt, n, changed, it >= SwitchToRootAfter);
             compress(cur, nxt, n, changed);
             __syncthreads();
-            if (*changed == 0) return true;
+            if (*changed == 0) return;
             __syncthreads();  // all threads have read *changed; safe for thread 0 to reset it next iteration
         }
-        return false;   // ran out of rounds; this leaf's labels are incomplete
+        NANOVDB_ASSERT(false);  // exhausted the backstop: algorithm R's bound was not met
     }
 }; // LeafUnionFind
 
@@ -333,11 +327,7 @@ struct LeafComponentCountFunctor
     static constexpr int MaxThreadsPerBlock         = NanoLeaf<BuildT>::SIZE;
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
-    /// @param d_capReached incremented once per leaf whose union-find ran out of rounds. Only this
-    ///        kernel reports it; the mask kernel repeats the same solve over the same leaves, so it
-    ///        fails on exactly those leaves or on none.
-    __device__ void operator()(const NanoGrid<BuildT>* d_grid, uint16_t* d_counts,
-                               uint32_t* d_capReached)
+    __device__ void operator()(const NanoGrid<BuildT>* d_grid, uint16_t* d_counts)
     {
         __shared__ int bufA[NanoLeaf<BuildT>::SIZE];
         __shared__ int bufB[NanoLeaf<BuildT>::SIZE];
@@ -355,8 +345,7 @@ struct LeafComponentCountFunctor
         cur[tID] = leaf.isActive(uint32_t(tID)) ? tID : LeafUnionFind::INACTIVE;
         __syncthreads();
 
-        if (!LeafUnionFind::solve(cur, nxt, tID, &changed) && tID == 0)
-            atomicAdd(d_capReached, 1u);
+        LeafUnionFind::solve(cur, nxt, tID, &changed);
 
         // Component count = number of surviving roots (cur[tID] == tID; inactive entries are -1).
         if (tID == 0) compCount = 0;
@@ -498,18 +487,13 @@ void ConnectedComponents<BuildT, ResourceT>::processLeafConnectedComponents()
 
     if (leafCount == 0) return;
 
-    // Counter of leaves that run out of union-find rounds. Read back further down, alongside the
-    // aggregate component count, so that check costs no extra synchronization.
-    BufT<uint32_t> capReached(mStream, this->ref(), 1, nanovdb::cuda::noInit);
-    cudaCheck(cudaMemsetAsync(capReached.data(), 0, capReached.size_bytes(), mStream));
-
     // One block per leaf, one thread per voxel offset; counts the distinct 6-connected
     // components of each leaf's active voxels (in isolation) into mLeafComponentCounts.
     using Op = components::detail::LeafComponentCountFunctor<BuildT>;
     if (mVerbose==1) mTimer.start("Per-leaf connected-component counting");
     util::cuda::operatorKernel<Op>
         <<<leafCount, Op::MaxThreadsPerBlock, 0, mStream>>>(
-            mDeviceSrcGrid, deviceLeafComponentCounts(), capReached.data());
+            mDeviceSrcGrid, deviceLeafComponentCounts());
     cudaCheckError();
     if (mVerbose==1) mTimer.stop();
 
@@ -539,17 +523,7 @@ void ConnectedComponents<BuildT, ResourceT>::processLeafConnectedComponents()
     // inadvertently synchronizing other streams.
     cudaCheck(cudaMemcpyAsync(&mLeafComponentAggregateCount, d_offsets + leafCount,
                               sizeof(uint64_t), cudaMemcpyDeviceToHost, mStream));
-    cudaCheck(cudaMemcpyAsync(&mLeavesOverIterationCap, capReached.data(),
-                              sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaStreamSynchronize(mStream));
-
-    // Not gated on mVerbose: these labels are wrong, not merely slow to produce.
-    if (mLeavesOverIterationCap)
-        std::fprintf(stderr,
-                     "nanovdb::tools::cuda::ConnectedComponents: %u of %u leaves did not converge "
-                     "within %d rounds; their labels are incomplete\n",
-                     mLeavesOverIterationCap, uint32_t(leafCount),
-                     components::detail::LeafUnionFind::MaxConvergenceIters);
 
     // Everything downstream indexes the leaf-local components: the cross-leaf edges store global
     // slots, the rank scan runs over K items, and the dense labels count them. K is carried as
