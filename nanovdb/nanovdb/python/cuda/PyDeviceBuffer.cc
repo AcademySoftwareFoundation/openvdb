@@ -3,6 +3,7 @@
 #ifdef NANOVDB_USE_CUDA
 
 #include "PyDeviceBuffer.h"
+#include "PyValidate.h"
 
 #include <cstdint>
 
@@ -25,14 +26,8 @@ void defineDeviceBuffer(nb::module_& m)
                 // DeviceBuffer (mManaged == 0). The buffer will NOT free either
                 // pointer on destruction, upload, or download — the caller
                 // retains ownership of both allocations.
-                if (gpuPtr == 0)
-                    throw nb::value_error(
-                        "from_external: gpuPtr must be a non-null device pointer.");
-                if (cpuPtr == 0)
-                    throw nb::value_error(
-                        "from_external: cpuPtr must be a non-null host pointer; the "
-                        "externally-managed DeviceBuffer constructor requires both a "
-                        "host and a device pointer.");
+                requireAlignedBuffer(reinterpret_cast<const void*>(gpuPtr), "from_external", "gpuPtr");
+                requireAlignedBuffer(reinterpret_cast<const void*>(cpuPtr), "from_external", "cpuPtr");
                 return BufferT::create(size,
                                        reinterpret_cast<void*>(cpuPtr),
                                        reinterpret_cast<void*>(gpuPtr));
@@ -46,7 +41,8 @@ void defineDeviceBuffer(nb::module_& m)
             "does NOT take ownership: it will never free either pointer, so "
             "the caller must keep both allocations alive for the buffer's "
             "lifetime. The device pointer is associated with the current CUDA "
-            "device.")
+            "device. Both pointers must be non-null and aligned to "
+            "NANOVDB_DATA_ALIGNMENT (32 bytes), otherwise ValueError is raised.")
         .def("recordUse", &recordUseChecked, "stream"_a, "device"_a = -1,
              kRecordUseDoc);
 }

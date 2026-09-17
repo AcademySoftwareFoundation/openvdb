@@ -3,7 +3,8 @@
 #ifdef NANOVDB_USE_CUDA
 
 #include "PyGridHandle.h"
-#include "PyDeviceBuffer.h"  // for recordUseChecked / kRecordUseDoc
+#include "PyDeviceBuffer.h"
+#include "PyValidate.h"  // for recordUseChecked / kRecordUseDoc
 #include <nanobind/ndarray.h>
 
 #include <cstdint>
@@ -53,14 +54,28 @@ void defineDeviceGridHandle(nb::module_& m)
             [](GridHandle<BufferT>&                                 handle,
                nb::ndarray<uint32_t, nb::ndim<1>, nb::device::cpu>  cpuT,
                nb::ndarray<uint32_t, nb::ndim<1>, nb::device::cuda> cudaT) {
-                assert(cpuT.size() == cudaT.size());
+                if (cpuT.size() != cudaT.size())
+                    throw nb::value_error("DeviceGridHandle: cpuT and cudaT must have the same length.");
+                requireAlignedBuffer(cpuT.data(), "DeviceGridHandle", "cpuT");
+                requireAlignedBuffer(cudaT.data(), "DeviceGridHandle", "cudaT");
                 BufferT buffer(cpuT.size() * sizeof(uint32_t), cpuT.data(), cudaT.data());
                 new (&handle) GridHandle<BufferT>(std::move(buffer));
             },
             "cpuT"_a.noconvert(),
             "cudaT"_a.noconvert(),
-            "Construct a DeviceGridHandle that wraps an existing pair of "
-            "host and device uint32 arrays of equal length.")
+            // The DualDeviceBuffer is non-owning, so the handle must keep
+            // both source arrays alive for as long as it exists.
+            nb::keep_alive<1, 2>(),
+            nb::keep_alive<1, 3>(),
+            "Construct a DeviceGridHandle that wraps an existing pair of host "
+            "and device uint32 arrays of equal length. The handle does not "
+            "copy or own either allocation: it keeps both arrays alive for "
+            "its own lifetime, reads the host grid in place, and moves bytes "
+            "between the two with deviceUpload()/deviceDownload(). Both data "
+            "pointers must be aligned to NANOVDB_DATA_ALIGNMENT (32 bytes); a "
+            "plain NumPy allocation is usually only 16-byte aligned and raises "
+            "ValueError. Raises RuntimeError if the host bytes do not form a "
+            "valid grid.")
         .def("deviceGrid", &pyDeviceGrid, "n"_a = 0,
              nb::keep_alive<0, 1>(),
              "Return the n-th device-resident grid as a typed Grid subclass "

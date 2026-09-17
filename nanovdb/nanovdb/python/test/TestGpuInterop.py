@@ -150,6 +150,18 @@ class TestDeviceBufferInterop(unittest.TestCase):
         with self.assertRaises(ValueError):
             nanovdb.cuda.DeviceBuffer.from_external(256, 0, 12345)
 
+    def test_from_external_rejects_misaligned_pointers(self):
+        # NanoVDB buffers must be 32-byte aligned; DualDeviceBuffer only
+        # asserts this (and exits the process) at transfer time.
+        cp = _require_cupy(self)
+        buf = cp.zeros(512, dtype=cp.uint8)
+        ptr = int(buf.data.ptr)
+        self.assertEqual(ptr % 32, 0)
+        with self.assertRaises(ValueError):
+            nanovdb.cuda.DeviceBuffer.from_external(256, ptr + 16, ptr)
+        with self.assertRaises(ValueError):
+            nanovdb.cuda.DeviceBuffer.from_external(256, ptr, ptr + 16)
+
     def test_cuda_array_interface_v3(self):
         cp = _require_cupy(self)
         prev = cp.cuda.get_allocator()
@@ -298,6 +310,98 @@ class TestDeviceGridHandleInterop(unittest.TestCase):
                 nanovdb.cuda.DeviceGridHandle.from_buffer(ext)
         finally:
             cp.cuda.set_allocator(prev)
+
+
+class TestDeviceGridHandleWrapConstructor(unittest.TestCase):
+    """DeviceGridHandle(cpuT, cudaT) wraps a caller-owned host/device array
+    pair without copying. The C++ DualDeviceBuffer only checks the pointers
+    with an exit(1) assertion at transfer time, so the binding must reject
+    misaligned or mismatched arrays up front, and must keep both arrays
+    alive for the handle's lifetime."""
+
+    @staticmethod
+    def _grid_words(np):
+        h = nanovdb.tools.createFogVolumeSphere(name="wrapped")
+        return np.frombuffer(h.gridData(0), dtype=np.uint32)
+
+    @staticmethod
+    def _aligned_copy(np, words, alignment=32, offset=0):
+        # Carve a view whose data pointer sits at `offset` bytes past a
+        # 32-byte boundary, then fill it with the grid words.
+        slack = alignment // words.itemsize
+        raw = np.empty(words.size + 2 * slack, dtype=np.uint32)
+        base = raw.ctypes.data % alignment
+        start = ((alignment - base) % alignment + offset) // words.itemsize
+        view = raw[start:start + words.size]
+        assert view.ctypes.data % alignment == offset
+        view[:] = words
+        return view
+
+    def setUp(self):
+        self.cp = _require_cupy(self)
+        import numpy as np
+        self.np = np
+
+    def test_aligned_pair_round_trips_through_device(self):
+        cp, np = self.cp, self.np
+        host = self._aligned_copy(np, self._grid_words(np))
+        dev = cp.zeros(host.size, dtype=cp.uint32)  # CuPy allocations are 512-aligned
+        dh = nanovdb.cuda.DeviceGridHandle(host, dev)
+        self.assertEqual(dh.gridCount(), 1)
+        self.assertEqual(dh.grid(0).gridName(), "wrapped")
+        self.assertEqual(dh.device_ptr(), int(dev.data.ptr))
+        dh.deviceUpload(0, True)
+        np.testing.assert_array_equal(cp.asnumpy(dev), host)
+        # Clobber the host copy and pull the device copy back over it. This
+        # is the call that used to abort the process on a 16-byte-aligned
+        # NumPy array.
+        host[:] = 0
+        dh.deviceDownload(0, True)
+        self.assertEqual(dh.grid(0).gridName(), "wrapped")
+        np.testing.assert_array_equal(host, self._grid_words(np))
+
+    def test_misaligned_host_array_raises_value_error(self):
+        cp, np = self.cp, self.np
+        host = self._aligned_copy(np, self._grid_words(np), offset=16)
+        dev = cp.zeros(host.size, dtype=cp.uint32)
+        with self.assertRaises(ValueError) as cm:
+            nanovdb.cuda.DeviceGridHandle(host, dev)
+        self.assertIn("cpuT", str(cm.exception))
+
+    def test_misaligned_device_array_raises_value_error(self):
+        cp, np = self.cp, self.np
+        host = self._aligned_copy(np, self._grid_words(np))
+        dev = cp.zeros(host.size + 4, dtype=cp.uint32)[4:]  # +16 bytes
+        self.assertEqual(int(dev.data.ptr) % 32, 16)
+        with self.assertRaises(ValueError) as cm:
+            nanovdb.cuda.DeviceGridHandle(host, dev)
+        self.assertIn("cudaT", str(cm.exception))
+
+    def test_length_mismatch_raises_value_error(self):
+        cp, np = self.cp, self.np
+        host = self._aligned_copy(np, self._grid_words(np))
+        dev = cp.zeros(host.size + 8, dtype=cp.uint32)
+        with self.assertRaises(ValueError):
+            nanovdb.cuda.DeviceGridHandle(host, dev)
+
+    def test_handle_keeps_both_arrays_alive(self):
+        import gc
+        cp, np = self.cp, self.np
+
+        def make():
+            host = self._aligned_copy(np, self._grid_words(np))
+            dev = cp.zeros(host.size, dtype=cp.uint32)
+            return nanovdb.cuda.DeviceGridHandle(host, dev)
+
+        dh = make()
+        for _ in range(3):
+            gc.collect()
+        # Neither array is reachable from Python any more; only the handle's
+        # keep_alive links hold them. Transfers in both directions must not
+        # touch freed memory.
+        dh.deviceUpload(0, True)
+        dh.deviceDownload(0, True)
+        self.assertEqual(dh.grid(0).gridName(), "wrapped")
 
 
 @unittest.skipIf(
