@@ -94,10 +94,6 @@ initialize()
 
 #ifdef OPENVDB_USE_BLOSC
     blosc_init();
-    if (blosc_set_compressor("lz4") < 0) {
-        OPENVDB_LOG_WARN("Blosc LZ4 compressor is unavailable");
-    }
-    /// @todo blosc_set_nthreads(int nthreads);
 #endif
 
 #ifdef __ICC
@@ -135,12 +131,6 @@ __pragma(warning(default:1711))
     math::MapRegistry::clear();
     io::internal::uninitialize();
     points::internal::uninitialize();
-
-#ifdef OPENVDB_USE_BLOSC
-    // We don't want to destroy Blosc, because it might have been
-    // initialized by some other library.
-    //blosc_destroy();
-#endif
 }
 
 } // namespace OPENVDB_VERSION_NAME
