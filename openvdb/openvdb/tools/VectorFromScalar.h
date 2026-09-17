@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-/// @file VectorMerge.h
+/// @file VectorFromScalar.h
 ///
 /// @brief Functions to produce a vector-valued grid
 /// from separate scalar grids
@@ -139,6 +139,10 @@ private:
 /// @param x                    Grid to use as the first vector component.
 /// @param y                    Grid to use as the second vector component.
 /// @param z                    Grid to use as the third vector component.
+/// @param copyInactiveValues   When only some of the source grids are active at a location,
+///                             this decides whether inactive locations are used exactly or are
+///                             replaced with background values. In all cases, locations where
+///                             all source grids are inactive will result in background values.
 template<typename ScalarGridT>
 typename ScalarToVectorConverter<ScalarGridT>::Type::Ptr
 vectorFromScalar(const ScalarGridT& x, const ScalarGridT& y, const ScalarGridT& z, bool copyInactiveValues = false)
