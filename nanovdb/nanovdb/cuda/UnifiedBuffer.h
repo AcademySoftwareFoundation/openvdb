@@ -104,13 +104,13 @@ public:
 
     ///////////////////////////////////////////////////////////////////////
 
-    //@{
+    ///@{
     /// @brief Factory methods that create an DualUnifiedBuffer instance and returns it with move semantics
     static DualUnifiedBuffer create(size_t size, size_t capacity) {return DualUnifiedBuffer(size, capacity);}
     static DualUnifiedBuffer create(size_t size) {return DualUnifiedBuffer(size);}
     ///@}
 
-    //@{
+    ///@{
     /// @brief Factory methods that create a shared pointer to an DualUnifiedBuffer instance
     static PtrT createPtr(size_t size, size_t capacity) {return std::make_shared<DualUnifiedBuffer>(size, capacity);}
     static PtrT createPtr(size_t size) {return std::make_shared<DualUnifiedBuffer>(size);}
@@ -120,7 +120,7 @@ public:
     ///        If a reference buffer is provided and its non-empty, it is used to defined the capacity of the new buffer
     /// @param size Size on bytes of the new buffer
     /// @param reference reference buffer optionally used to define the capacity
-    /// @param host Ignored for now
+    /// @param device Device whose preferred memory location is set for the new buffer
     /// @param stream cuda stream
     /// @return An instance of a new DualUnifiedBuffer using move semantics
     static DualUnifiedBuffer create(size_t size, const DualUnifiedBuffer* reference, int device, cudaStream_t stream)

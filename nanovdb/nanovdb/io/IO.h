@@ -125,6 +125,7 @@ using fileSize_t = uint64_t;
 /// @brief Internal functions for compressed read/write of a NanoVDB GridHandle into a stream
 ///
 /// @warning These functions should never be called directly by client code
+/// @cond
 namespace Internal {
 static constexpr fileSize_t MAX_SIZE = 1UL << 30; // size is 1 GB
 
@@ -136,6 +137,7 @@ static void read(std::istream& is, BufferT& buffer, Codec codec);
 
 static void read(std::istream& is, char* data, fileSize_t size, Codec codec);
 } // namespace Internal
+/// @endcond
 
 /// @brief Standard hash function to use on strings; std::hash may vary by
 ///        platform/implementation and is know to produce frequent collisions.
@@ -210,6 +212,8 @@ std::vector<FileGridMetaData> readGridMetaData(const std::string& fileName);
 std::vector<FileGridMetaData> readGridMetaData(std::istream& is);
 
 // --------------------------> Implementations for Internal <------------------------------------
+
+/// @cond
 
 template<typename BufferT>
 fileSize_t Internal::write(std::ostream& os, const GridHandle<BufferT>& handle, Codec codec, unsigned int n)
@@ -315,6 +319,7 @@ void Internal::read(std::istream& is, char* data, fileSize_t residual, Codec cod
     }
     if (!is) throw std::runtime_error("Failed to read Tree from file");
 } // Internal::read
+/// @endcond
 
 // --------------------------> Implementations for FileGridMetaData <------------------------------------
 

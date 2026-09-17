@@ -18,10 +18,20 @@
 *
 * (c) Copyright 2012-2023 Agner Fog.
 * Apache License version 2.0 or later.
+*
+* -----------------------------------------------------------------------------
+*
+* This file has been modified from the original in the following ways:
+*  > Various defines and guards have been prefixed with OPENVDB_VCL_.
+*  > VCL_NAMESPACE has been removed in favour of an explicit OPENVDB_VCL_NAMESPACE.
+*  > The const_int and const_uint macros have been removed
+* Copyright Contributors to the OpenVDB Project
+* SPDX-License-Identifier: Apache-2.0*
+*
 ******************************************************************************/
 
-#ifndef INSTRSET_H
-#define INSTRSET_H 20200
+#ifndef OPENVDB_VCL_INSTRSET_H
+#define OPENVDB_VCL_INSTRSET_H 20200
 
 // check if compiled for C++17
 #if defined(_MSVC_LANG)  // MS compiler has its own version of __cplusplus with different value
@@ -172,9 +182,7 @@ We need different version checks with and whithout __apple_build_version__
 #endif
 
 
-#ifdef VCL_NAMESPACE
-namespace VCL_NAMESPACE {
-#endif
+namespace OPENVDB_VCL_NAMESPACE {
 
 // Constant for indicating don't care in permute and blend functions.
 // V_DC is -256 in Vector class library version 1.xx
@@ -361,17 +369,8 @@ constexpr int bit_scan_reverse_const(uint64_t const n) {
 *
 *****************************************************************************/
 
-#ifdef VCL_NAMESPACE
-#define NAMESPACEPREFIX VCL_NAMESPACE::
-#else 
-#define NAMESPACEPREFIX
-#endif
-
 template <int32_t  n> class Const_int_t {};                // represent compile-time signed integer constant
 template <uint32_t n> class Const_uint_t {};               // represent compile-time unsigned integer constant
-#define const_int(n)  (NAMESPACEPREFIX Const_int_t <n>())  // n must be compile-time integer constant
-#define const_uint(n) (NAMESPACEPREFIX Const_uint_t<n>())  // n must be compile-time unsigned integer constant
-
 
 // template for producing quiet NAN
 template <class VTYPE>
@@ -1446,9 +1445,7 @@ auto blend_half(W const& a, W const& b) {
 }
 
 
-#ifdef VCL_NAMESPACE
 }
-#endif
 
 
-#endif // INSTRSET_H
+#endif // OPENVDB_VCL_INSTRSET_H

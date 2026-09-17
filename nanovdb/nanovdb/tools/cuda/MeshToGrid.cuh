@@ -18,6 +18,10 @@
 
 #include <cub/cub.cuh>
 #include <algorithm>
+#include <cstddef> // for std::size_t
+#include <string> // for std::string
+#include <vector> // for std::vector
+#include <stdexcept> // for std::runtime_error
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/GridHandle.h>
@@ -62,9 +66,12 @@ class MeshToGrid
 {
     static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
                   "MeshToGrid allocates stream-ordered scratch and requires an AsyncResource");
+    static_assert(ResourceT::DEFAULT_ALIGNMENT >= alignof(MeshToGridBoxTrianglePair),
+                  "MeshToGrid's box-triangle pairs are 16-byte aligned and require allocations at least that aligned");
 
     using PointT = nanovdb::Vec3f;
-    using ScratchT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
+    template<typename T>
+    using BufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ResourceRef<ResourceT>>;
 
     nanovdb::cuda::ResourceRef<ResourceT> ref() { return mBuilder.ref(); }
 
@@ -185,16 +192,16 @@ private:
     const uint32_t               mTriangleCount;
     const nanovdb::Map           mMap;
 
-    ScratchT                     mXformedTriangles;
-    ScratchT                     mBoxTrianglePairsBuffer;
+    BufT<TriangleT>              mXformedTriangles;
+    BufT<BoxTrianglePair>        mBoxTrianglePairsBuffer;
     uint64_t                     mBoxTrianglePairCount{0};
-    ScratchT                     mUniqueRootOriginsBuffer;
+    BufT<nanovdb::Coord>         mUniqueRootOriginsBuffer;
     uint64_t                     mUniqueRootTileCount{0};
 
-    auto deviceXformedTriangles()  { return reinterpret_cast<TriangleT*>(mXformedTriangles.data()); }
-    auto deviceBoxTrianglePairs()  { return reinterpret_cast<BoxTrianglePair*>(mBoxTrianglePairsBuffer.data()); }
-    auto deviceUniqueRootOrigins()       { return reinterpret_cast<nanovdb::Coord*>(mUniqueRootOriginsBuffer.data()); }
-    auto deviceUniqueRootOrigins() const { return reinterpret_cast<const nanovdb::Coord*>(mUniqueRootOriginsBuffer.data()); }
+    auto deviceXformedTriangles()  { return mXformedTriangles.data(); }
+    auto deviceBoxTrianglePairs()  { return mBoxTrianglePairsBuffer.data(); }
+    auto deviceUniqueRootOrigins()       { return mUniqueRootOriginsBuffer.data(); }
+    auto deviceUniqueRootOrigins() const { return mUniqueRootOriginsBuffer.data(); }
 
     nanovdb::cuda::TempPool<ResourceT> mTempDevicePool;
 }; // tools::cuda::MeshToGrid<BuildT, ResourceT>
@@ -315,12 +322,12 @@ GridHandle<BufferT> MeshToGrid<BuildT, ResourceT>::getHandle(const BufferT &buff
     const uint32_t leafCount = mBuilder.data()->nodeCount[0];
     auto handle = GridHandle<BufferT>(std::move(gridBuffer));
     if (leafCount) {
-        ScratchT retainMaskBuffer = ScratchT(mStream, this->ref(), uint64_t(leafCount) * sizeof(nanovdb::Mask<3>), nanovdb::cuda::noInit);
-        cudaCheck(cudaMemsetAsync(retainMaskBuffer.data(), 0xFF,
-            uint64_t(leafCount) * sizeof(nanovdb::Mask<3>), mStream));
+        BufT<nanovdb::Mask<3>> retainMaskBuffer = BufT<nanovdb::Mask<3>>(mStream, this->ref(), leafCount, nanovdb::cuda::noInit);
+        if (retainMaskBuffer.data() == nullptr) throw std::runtime_error("Failed to allocate retain mask buffer");
+        cudaCheck(cudaMemsetAsync(retainMaskBuffer.data(), 0xFF, retainMaskBuffer.size_bytes(), mStream));
         tools::cuda::PruneGrid<BuildT> pruner(
             static_cast<const GridT*>(handle.deviceData()),
-            reinterpret_cast<nanovdb::Mask<3>*>(retainMaskBuffer.data()),
+            retainMaskBuffer.data(),
             mStream);
         handle = pruner.template getHandle<BufferT>(buffer);
     }
@@ -359,7 +366,7 @@ void MeshToGrid<BuildT, ResourceT>::transformTriangles()
     int device = 0;
     cudaGetDevice(&device);
 
-    mXformedTriangles = ScratchT(mStream, this->ref(), mTriangleCount*sizeof(TriangleT), nanovdb::cuda::noInit);
+    mXformedTriangles = BufT<TriangleT>(mStream, this->ref(), mTriangleCount, nanovdb::cuda::noInit);
     if (mXformedTriangles.data() == nullptr) throw std::runtime_error("Failed to allocate transofmed upper mask buffer on device");
 
     util::cuda::lambdaKernel<<<numBlocks(mTriangleCount), mNumThreads, 0, mStream>>>(
@@ -497,15 +504,14 @@ void MeshToGrid<BuildT, ResourceT>::processRootTrianglePairs()
 
     // Pass 1: Count intersecting root boxes per triangle
 
-    ScratchT
-        rootBoxCounts = ScratchT(mStream, this->ref(), mTriangleCount * sizeof(uint64_t), nanovdb::cuda::noInit);
+    BufT<uint64_t> rootBoxCounts = BufT<uint64_t>(mStream, this->ref(), mTriangleCount, nanovdb::cuda::noInit);
     if (rootBoxCounts.data() == nullptr) throw std::runtime_error("Failed to allocate root box counts buffer");
 
     util::cuda::lambdaKernel<<<numBlocks(mTriangleCount), mNumThreads, 0, mStream>>>(
         mTriangleCount,
         topology::detail::CountRootBoxesFunctor<BuildT>{
             deviceXformedTriangles(),
-            reinterpret_cast<uint64_t*>(rootBoxCounts.data()),
+            rootBoxCounts.data(),
             mBandWidth
         }
     );
@@ -513,27 +519,27 @@ void MeshToGrid<BuildT, ResourceT>::processRootTrianglePairs()
 
     // Pass 2: InclusiveSum Scan to compute offsets and total allocations
 
-    ScratchT rootBoxOffsets = ScratchT(mStream, this->ref(), (mTriangleCount+1)*sizeof(uint64_t), nanovdb::cuda::noInit);
+    BufT<uint64_t> rootBoxOffsets = BufT<uint64_t>(mStream, this->ref(), mTriangleCount+1, nanovdb::cuda::noInit);
     if (rootBoxOffsets.data() == nullptr) throw std::runtime_error("Failed to allocate root box offsets buffer");
 
     cudaCheck(cudaMemsetAsync(rootBoxOffsets.data(), 0, sizeof(uint64_t), mStream));
     CALL_CUBS(DeviceScan::InclusiveSum,
-        reinterpret_cast<uint64_t*>(rootBoxCounts.data()),
-        reinterpret_cast<uint64_t*>(rootBoxOffsets.data())+1,
+        rootBoxCounts.data(),
+        rootBoxOffsets.data()+1,
         mTriangleCount);
-    cudaCheck(cudaMemcpyAsync(&mBoxTrianglePairCount, reinterpret_cast<uint64_t*>(rootBoxOffsets.data())+mTriangleCount, sizeof(uint64_t), cudaMemcpyDeviceToHost, mStream));
+    cudaCheck(cudaMemcpyAsync(&mBoxTrianglePairCount, rootBoxOffsets.data()+mTriangleCount, sizeof(uint64_t), cudaMemcpyDeviceToHost, mStream));
     cudaStreamSynchronize(mStream);
 
     // Pass 3: Re-enumerate intersections of (padded) root boxes and triangles, and scatter to allocated list
 
-    mBoxTrianglePairsBuffer = ScratchT(mStream, this->ref(), mBoxTrianglePairCount * sizeof(MeshToGridBoxTrianglePair), nanovdb::cuda::noInit);
+    mBoxTrianglePairsBuffer = BufT<BoxTrianglePair>(mStream, this->ref(), mBoxTrianglePairCount, nanovdb::cuda::noInit);
     if (mBoxTrianglePairsBuffer.data() == nullptr) throw std::runtime_error("Failed to allocate pairs buffer");
 
     util::cuda::lambdaKernel<<<numBlocks(mTriangleCount), mNumThreads, 0, mStream>>>(
         mTriangleCount,
         topology::detail::ScatterRootTrianglePairsFunctor<BuildT>{
             deviceXformedTriangles(),
-            reinterpret_cast<uint64_t*>(rootBoxOffsets.data()),
+            rootBoxOffsets.data(),
             deviceBoxTrianglePairs(),
             mBandWidth
         }
@@ -786,8 +792,8 @@ void MeshToGrid<BuildT, ResourceT>::enumerateRootTiles()
     cudaGetDevice(&device);
 
     // Step 1: Encode each pair's root origin as a sortable uint64_t key
-    ScratchT keysBuffer = ScratchT(mStream, this->ref(), mBoxTrianglePairCount * sizeof(uint64_t), nanovdb::cuda::noInit);
-    auto *dKeys = reinterpret_cast<uint64_t*>(keysBuffer.data());
+    BufT<uint64_t> keysBuffer = BufT<uint64_t>(mStream, this->ref(), mBoxTrianglePairCount, nanovdb::cuda::noInit);
+    auto *dKeys = keysBuffer.data();
 
     util::cuda::lambdaKernel<<<numBlocks(mBoxTrianglePairCount), mNumThreads, 0, mStream>>>(
         mBoxTrianglePairCount,
@@ -796,17 +802,17 @@ void MeshToGrid<BuildT, ResourceT>::enumerateRootTiles()
     cudaCheckError();
 
     // Step 2: Sort keys (SortKeys requires separate in/out buffers)
-    ScratchT sortedKeysBuffer = ScratchT(mStream, this->ref(), mBoxTrianglePairCount * sizeof(uint64_t), nanovdb::cuda::noInit);
-    auto *dSortedKeys = reinterpret_cast<uint64_t*>(sortedKeysBuffer.data());
+    BufT<uint64_t> sortedKeysBuffer = BufT<uint64_t>(mStream, this->ref(), mBoxTrianglePairCount, nanovdb::cuda::noInit);
+    auto *dSortedKeys = sortedKeysBuffer.data();
 
     CALL_CUBS(DeviceRadixSort::SortKeys, dKeys, dSortedKeys, (int)mBoxTrianglePairCount, 0, 64);
 
     // Step 3: Select unique keys
-    ScratchT uniqueKeysBuffer = ScratchT(mStream, this->ref(), mBoxTrianglePairCount * sizeof(uint64_t), nanovdb::cuda::noInit);
-    auto *dUniqueKeys = reinterpret_cast<uint64_t*>(uniqueKeysBuffer.data());
+    BufT<uint64_t> uniqueKeysBuffer = BufT<uint64_t>(mStream, this->ref(), mBoxTrianglePairCount, nanovdb::cuda::noInit);
+    auto *dUniqueKeys = uniqueKeysBuffer.data();
 
-    ScratchT numSelectedBuffer = ScratchT(mStream, this->ref(), sizeof(int32_t), nanovdb::cuda::noInit);
-    auto *dNumSelected = reinterpret_cast<int32_t*>(numSelectedBuffer.data());
+    BufT<int32_t> numSelectedBuffer = BufT<int32_t>(mStream, this->ref(), 1, nanovdb::cuda::noInit);
+    auto *dNumSelected = numSelectedBuffer.data();
 
     CALL_CUBS(DeviceSelect::Unique, dSortedKeys, dUniqueKeys, dNumSelected, (int)mBoxTrianglePairCount);
 
@@ -816,7 +822,7 @@ void MeshToGrid<BuildT, ResourceT>::enumerateRootTiles()
     mUniqueRootTileCount = static_cast<uint64_t>(uniqueCount);
 
     // Step 4: Decode unique keys back to Coord origins
-    mUniqueRootOriginsBuffer = ScratchT(mStream, this->ref(), mUniqueRootTileCount * sizeof(nanovdb::Coord), nanovdb::cuda::noInit);
+    mUniqueRootOriginsBuffer = BufT<nanovdb::Coord>(mStream, this->ref(), mUniqueRootTileCount, nanovdb::cuda::noInit);
     auto *dOrigins = deviceUniqueRootOrigins();
 
     util::cuda::lambdaKernel<<<numBlocks(mUniqueRootTileCount), mNumThreads, 0, mStream>>>(
@@ -869,8 +875,8 @@ void MeshToGrid<BuildT, ResourceT>::rasterizeInternalNodes()
 
     using RasterizerT = util::rasterization::cuda::RasterizeInternalNodesFunctor<BuildT, BoxTrianglePair>;
 
-    auto *dUpperMasks = static_cast<Mask<5>*>(mBuilder.deviceUpperMasks());
-    auto *dLowerMasks = static_cast<Mask<4>(*)[Mask<5>::SIZE]>(mBuilder.deviceLowerMasks());
+    auto *dUpperMasks = mBuilder.deviceUpperMasks();
+    auto *dLowerMasks = mBuilder.deviceLowerMasks();
 
     util::cuda::lambdaKernel<<<numBlocks(mBoxTrianglePairCount), mNumThreads, 0, mStream>>>(
         mBoxTrianglePairCount,
@@ -935,20 +941,18 @@ void MeshToGrid<BuildT, ResourceT>::processLeafTrianglePairs()
 
     for (int pass = 0; pass < 3; ++pass) {
         // Allocate Mask<3> buffer for the CTA hit results
-        // Size: mBoxTrianglePairCount * sizeof(nanovdb::Mask<3>)
-        ScratchT maskBuffer = ScratchT(mStream, this->ref(), mBoxTrianglePairCount * sizeof(nanovdb::Mask<3>), nanovdb::cuda::noInit);
+        BufT<nanovdb::Mask<3>> maskBuffer = BufT<nanovdb::Mask<3>>(mStream, this->ref(), mBoxTrianglePairCount, nanovdb::cuda::noInit);
         if (maskBuffer.data() == nullptr) {
             throw std::runtime_error("Failed to allocate mask buffer for subdivision pass");
         }
-        auto* dMasks = reinterpret_cast<nanovdb::Mask<3>*>(maskBuffer.data());
+        auto* dMasks = maskBuffer.data();
 
         // Allocate Counts buffer for Prefix Sum
-        // Size: mBoxTrianglePairCount * sizeof(uint64_t)
-        ScratchT countsBuffer = ScratchT(mStream, this->ref(), mBoxTrianglePairCount * sizeof(uint64_t), nanovdb::cuda::noInit);
+        BufT<uint64_t> countsBuffer = BufT<uint64_t>(mStream, this->ref(), mBoxTrianglePairCount, nanovdb::cuda::noInit);
         if (countsBuffer.data() == nullptr) {
             throw std::runtime_error("Failed to allocate counts buffer for subdivision pass");
         }
-        auto* dCounts = reinterpret_cast<uint64_t*>(countsBuffer.data());
+        auto* dCounts = countsBuffer.data();
 
         // Evaluate & Count: 1 CTA per parent pair, 512 threads per CTA.
         // Uses AABB-only test for large child scales (>= mSATThreshold), full SAT below.
@@ -968,10 +972,10 @@ void MeshToGrid<BuildT, ResourceT>::processLeafTrianglePairs()
 
         // Prefix Sum: element [i+1] = exclusive write offset for parent i's children,
         // element [0] = 0, element [mBoxTrianglePairCount] = total child pair count.
-        ScratchT offsetsBuffer = ScratchT(mStream, this->ref(), (mBoxTrianglePairCount + 1) * sizeof(uint64_t), nanovdb::cuda::noInit);
+        BufT<uint64_t> offsetsBuffer = BufT<uint64_t>(mStream, this->ref(), mBoxTrianglePairCount + 1, nanovdb::cuda::noInit);
         if (offsetsBuffer.data() == nullptr)
             throw std::runtime_error("Failed to allocate offsets buffer for subdivision pass");
-        auto* dOffsets = reinterpret_cast<uint64_t*>(offsetsBuffer.data());
+        auto* dOffsets = offsetsBuffer.data();
 
         cudaCheck(cudaMemsetAsync(dOffsets, 0, sizeof(uint64_t), mStream));
         CALL_CUBS(DeviceScan::InclusiveSum,
@@ -985,10 +989,10 @@ void MeshToGrid<BuildT, ResourceT>::processLeafTrianglePairs()
         cudaStreamSynchronize(mStream);
 
         // Allocate new child pair buffer
-        ScratchT newPairsBuffer = ScratchT(mStream, this->ref(), newPairCount * sizeof(BoxTrianglePair), nanovdb::cuda::noInit);
+        BufT<BoxTrianglePair> newPairsBuffer = BufT<BoxTrianglePair>(mStream, this->ref(), newPairCount, nanovdb::cuda::noInit);
         if (newPairsBuffer.data() == nullptr)
             throw std::runtime_error("Failed to allocate child pairs buffer for subdivision pass");
-        auto* dNewPairs = reinterpret_cast<BoxTrianglePair*>(newPairsBuffer.data());
+        auto* dNewPairs = newPairsBuffer.data();
 
         // Scatter surviving child pairs into the new buffer
         util::cuda::lambdaKernel<<<numBlocks(mBoxTrianglePairCount), mNumThreads, 0, mStream>>>(
@@ -1125,12 +1129,12 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
     const uint32_t leafCount = mBuilder.data()->nodeCount[0];
     auto handle = GridHandle<GridBufferT>(std::move(gridBuffer));
     if (leafCount) {
-        ScratchT retainMaskBuffer = ScratchT(mStream, this->ref(), uint64_t(leafCount) * sizeof(nanovdb::Mask<3>), nanovdb::cuda::noInit);
-        cudaCheck(cudaMemsetAsync(retainMaskBuffer.data(), 0xFF,
-            uint64_t(leafCount) * sizeof(nanovdb::Mask<3>), mStream));
+        BufT<nanovdb::Mask<3>> retainMaskBuffer = BufT<nanovdb::Mask<3>>(mStream, this->ref(), leafCount, nanovdb::cuda::noInit);
+        if (retainMaskBuffer.data() == nullptr) throw std::runtime_error("Failed to allocate retain mask buffer");
+        cudaCheck(cudaMemsetAsync(retainMaskBuffer.data(), 0xFF, retainMaskBuffer.size_bytes(), mStream));
         tools::cuda::PruneGrid<BuildT> pruner(
             static_cast<const GridT*>(handle.deviceData()),
-            reinterpret_cast<nanovdb::Mask<3>*>(retainMaskBuffer.data()),
+            retainMaskBuffer.data(),
             mStream);
         handle = pruner.template getHandle<GridBufferT>(buffer);
     }

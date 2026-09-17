@@ -5,7 +5,7 @@
 #include "../PyGridHandle.h"
 #include <nanobind/ndarray.h>
 
-#include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/cuda/GridHandle.cuh>
 
 namespace nb = nanobind;
 using namespace nb::literals;

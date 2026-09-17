@@ -30,28 +30,35 @@
 *
 * (c) Copyright 2012-2023 Agner Fog.
 * Apache License version 2.0 or later.
+*
+* -----------------------------------------------------------------------------
+*
+* This file has been modified from the original in the following ways:
+*  > Various defines and guards have been prefixed with OPENVDB_VCL_.
+*  > VCL_NAMESPACE has been removed in favour of an explicit OPENVDB_VCL_NAMESPACE.
+* Copyright Contributors to the OpenVDB Project
+* SPDX-License-Identifier: Apache-2.0*
+*
 *****************************************************************************/
 
-#ifndef VECTORI256_H
-#define VECTORI256_H 1
+#ifndef OPENVDB_VCL_VECTORI256_H
+#define OPENVDB_VCL_VECTORI256_H 1
 
-#ifndef VECTORCLASS_H
+#ifndef OPENVDB_VCL_VECTORCLASS_H
 #include "vectorclass.h"
 #endif
 
-#if VECTORCLASS_H < 20200
+#if OPENVDB_VCL_VECTORCLASS_H < 20200
 #error Incompatible versions of vector class library mixed
 #endif
 
 // check combination of header files
-#if defined (VECTORI256E_H)
+#if defined (OPENVDB_VCL_VECTORI256E_H)
 #error Two different versions of vectori256.h included
 #endif
 
 
-#ifdef VCL_NAMESPACE
-namespace VCL_NAMESPACE {
-#endif
+namespace OPENVDB_VCL_NAMESPACE {
 
 // Generate a constant vector of 8 integers stored in memory.
 template <uint32_t i0, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t i4, uint32_t i5, uint32_t i6, uint32_t i7 >
@@ -5848,8 +5855,6 @@ static inline uint8_t to_bits(Vec4qb const x) {
 
 #endif
 
-#ifdef VCL_NAMESPACE
 }
-#endif
 
-#endif // VECTORI256_H
+#endif // OPENVDB_VCL_VECTORI256_H

@@ -65,8 +65,6 @@ public:
     }
 
     /// @brief Start the timer
-    /// @param stream CUDA stream to be timed (defaults to stream 0)
-    /// @param os output stream for the message above
     /// @warning @c cudaEventRecord requires that the event and stream are
     ///          associated with the same device. So it's important to call
     ///          @c cudaSetDevice(device) so @c device matches the one used
@@ -75,7 +73,6 @@ public:
 
     /// @brief Start the timer
     /// @param msg string message to be printed when timer is started
-
     /// @param os output stream for the message above
     void start(const std::string &msg, std::ostream& os = std::cerr)
     {
@@ -148,6 +145,7 @@ public:
 
     /// @brief stop and start the timer
     /// @param msg string message to be printed when timer is started
+    /// @param os output stream for the message above
     /// @warning Remember to call start before restart
     inline void restart(const std::string &msg, std::ostream& os = std::cerr)
     {
