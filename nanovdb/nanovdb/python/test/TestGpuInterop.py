@@ -315,6 +315,12 @@ class TestDeviceGridHandleInterop(unittest.TestCase):
             cp.cuda.set_allocator(prev)
 
 
+@unittest.skipIf(
+    not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
+)
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
+)
 class TestDeviceGridHandleWrapConstructor(unittest.TestCase):
     """DeviceGridHandle(cpuT, cudaT) wraps a caller-owned host/device array
     pair without copying. The C++ DualDeviceBuffer only checks the pointers
@@ -407,6 +413,12 @@ class TestDeviceGridHandleWrapConstructor(unittest.TestCase):
         self.assertEqual(dh.grid(0).gridName(), "wrapped")
 
 
+@unittest.skipIf(
+    not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
+)
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
+)
 class TestTransferPreconditions(unittest.TestCase):
     """deviceUpload/deviceDownload must raise ValueError when the side they
     read from does not exist. DualDeviceBuffer only checkPtr-asserts the
