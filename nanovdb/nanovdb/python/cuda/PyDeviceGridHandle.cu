@@ -85,6 +85,7 @@ void defineDeviceGridHandle(nb::module_& m)
         .def(
             "deviceUpload",
             [](GridHandle<BufferT>& handle, uintptr_t stream, bool sync) {
+                requireHostCopy(handle.buffer().data(), "deviceUpload");
                 cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
                 // Use the current-device overload (void*, bool) — NOT the
                 // (int device, void*, bool) form — so the targeted device
@@ -92,20 +93,26 @@ void defineDeviceGridHandle(nb::module_& m)
                 handle.deviceUpload(reinterpret_cast<void*>(s), sync);
             },
             "stream"_a = 0, "sync"_a = true,
-            "Copy the host-side buffer to the device. stream is a raw CUDA "
-            "stream handle (Python int; 0 = default stream). If sync is True "
-            "the call blocks until the transfer completes.")
+            "Copy the host-side buffer to the device, allocating the device "
+            "copy on first use. stream is a raw CUDA stream handle (Python "
+            "int; 0 = default stream). If sync is True the call blocks until "
+            "the transfer completes. Raises ValueError if the handle has no "
+            "host copy (e.g. a grid built on the device by tools.cuda).")
         .def(
             "deviceDownload",
             [](GridHandle<BufferT>& handle, uintptr_t stream, bool sync) {
+                requireDeviceCopy(handle.buffer().deviceData(), "deviceDownload");
                 cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
                 // Current-device overload, matching deviceData() (see deviceUpload).
                 handle.deviceDownload(reinterpret_cast<void*>(s), sync);
             },
             "stream"_a = 0, "sync"_a = true,
-            "Copy the device-side buffer back to the host. stream is a raw "
-            "CUDA stream handle (Python int; 0 = default stream). If sync is "
-            "True the call blocks until the transfer completes.")
+            "Copy the device-side buffer back to the host, allocating the host "
+            "copy on first use. stream is a raw CUDA stream handle (Python "
+            "int; 0 = default stream). If sync is True the call blocks until "
+            "the transfer completes. Raises ValueError if the handle has no "
+            "device copy yet (e.g. a handle from tools.cuda.createLevelSetSphere "
+            "before deviceUpload()).")
         .def(
             "device_ptr",
             [](GridHandle<BufferT>& handle) {

@@ -42,8 +42,13 @@ void defineDeviceIsValid(nb::module_& m, const char* name)
         "stream"_a = 0,
         "Return True iff the device grid passes structural validation for the "
         "given CheckMode AND its stored checksum matches a freshly computed "
-        "one. If verbose, the first failure is printed to stderr. stream is a "
-        "raw CUDA stream handle (Python int; 0 = default stream).");
+        "one. The comparison only covers what the stored checksum covers: a "
+        "grid carrying a Partial checksum (the default for every builder and "
+        "tool) is checked against the header/tree/root CRC alone even when "
+        "mode is CheckMode.Full; call updateChecksum(dGrid, CheckMode.Full) "
+        "first to have node data verified. If verbose, the first failure is "
+        "printed to stderr. stream is a raw CUDA stream handle (Python int; "
+        "0 = default stream).");
 }
 
 // Instantiate for the same BuildT set the host isValid covers via

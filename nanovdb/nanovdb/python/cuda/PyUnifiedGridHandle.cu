@@ -4,6 +4,7 @@
 
 #include "PyUnifiedGridHandle.h"
 #include "PyGridHandle.h"
+#include "PyValidate.h"
 
 #include <cstdint>
 
@@ -70,6 +71,7 @@ void defineUnifiedGridHandle(nb::module_& m)
         .def(
             "deviceUpload",
             [](nanovdb::GridHandle<BufferT>& handle, uintptr_t stream, bool sync) {
+                requireNonEmptyBuffer(handle.buffer().size(), "deviceUpload");
                 cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
                 nb::gil_scoped_release release;
                 handle.deviceUpload(reinterpret_cast<void*>(s), sync);
@@ -81,6 +83,7 @@ void defineUnifiedGridHandle(nb::module_& m)
         .def(
             "deviceDownload",
             [](nanovdb::GridHandle<BufferT>& handle, uintptr_t stream, bool sync) {
+                requireNonEmptyBuffer(handle.buffer().size(), "deviceDownload");
                 cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
                 nb::gil_scoped_release release;
                 handle.deviceDownload(reinterpret_cast<void*>(s), sync);

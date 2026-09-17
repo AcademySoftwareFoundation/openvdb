@@ -404,6 +404,63 @@ class TestDeviceGridHandleWrapConstructor(unittest.TestCase):
         self.assertEqual(dh.grid(0).gridName(), "wrapped")
 
 
+class TestTransferPreconditions(unittest.TestCase):
+    """deviceUpload/deviceDownload must raise ValueError when the side they
+    read from does not exist. DualDeviceBuffer only checkPtr-asserts the
+    source pointer, which exits the interpreter; the unified classes hand a
+    null pointer to cudaMemPrefetchAsync and die in cudaCheck."""
+
+    def test_download_without_device_copy_raises(self):
+        # Host-side builders return a DeviceGridHandle whose grid lives on
+        # the host only until deviceUpload().
+        h = nanovdb.tools.cuda.createLevelSetSphere(nanovdb.GridType.Float, 20)
+        self.assertEqual(h.device_ptr(), 0)
+        self.assertIsNone(h.deviceGrid(0))
+        with self.assertRaises(ValueError) as cm:
+            h.deviceDownload(0, True)
+        self.assertIn("deviceUpload", str(cm.exception))
+        h.deviceUpload(0, True)
+        self.assertNotEqual(h.device_ptr(), 0)
+        h.deviceDownload(0, True)
+        self.assertEqual(h.grid(0).gridType(), nanovdb.GridType.Float)
+
+    def test_upload_without_host_copy_raises(self):
+        # Device-side builders return a handle with no host mirror.
+        cp = _require_cupy(self)
+        import numpy as np
+        ijk = np.stack(np.meshgrid(*([np.arange(8)] * 3), indexing="ij"),
+                       axis=-1).reshape(-1, 3).astype(np.int32)
+        dh = nanovdb.tools.cuda.voxelsToOnIndexGrid(cp.asarray(ijk), 1.0)
+        self.assertIsNone(dh.grid(0))
+        with self.assertRaises(ValueError) as cm:
+            dh.deviceUpload(0, True)
+        self.assertIn("host copy", str(cm.exception))
+        # deviceDownload allocates the host mirror, after which both
+        # directions work.
+        dh.deviceDownload(0, True)
+        self.assertEqual(dh.grid(0).gridType(), nanovdb.GridType.OnIndex)
+        dh.deviceUpload(0, True)
+
+    def test_empty_unified_handle_raises(self):
+        u = nanovdb.cuda.UnifiedGridHandle()
+        self.assertTrue(u.isEmpty())
+        with self.assertRaises(ValueError):
+            u.deviceUpload(0, True)
+        with self.assertRaises(ValueError):
+            u.deviceDownload(0, True)
+
+    def test_cleared_unified_buffer_raises(self):
+        ub = nanovdb.cuda.UnifiedBuffer(256)
+        ub.clear()
+        self.assertEqual(ub.size(), 0)
+        with self.assertRaises(ValueError):
+            ub.deviceUpload(0, 0, True)
+        with self.assertRaises(ValueError):
+            ub.deviceDownload(0, True)
+        with self.assertRaises(ValueError):
+            ub.prefetch()
+
+
 @unittest.skipIf(
     not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
 )

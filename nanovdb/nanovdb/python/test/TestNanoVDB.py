@@ -2210,7 +2210,7 @@ class TestGridChecksum(unittest.TestCase):
             self.skipTest("numpy not installed")
         ng = nanovdb.tools.createLevelSetSphere(radius=10.0, voxelSize=1.0).grid()
         self.assertTrue(ng.checksum().isHalf())
-        vals = ng.leaf_values()
+        vals = ng.leafValues()
         vals[0, 0] += 1.0
         self.assertTrue(nanovdb.tools.validateChecksum(ng, nanovdb.CheckMode.Full))
         self.assertTrue(nanovdb.tools.isValid(ng, nanovdb.CheckMode.Full))

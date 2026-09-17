@@ -61,7 +61,11 @@ void defineDeviceGridChecksum(nb::module_& m)
         "stream"_a = 0,
         "Return True iff the device grid's stored checksum matches a freshly "
         "computed one for the given CheckMode. A grid with an empty stored "
-        "checksum is considered valid. stream is a raw CUDA stream handle "
+        "checksum is considered valid. The comparison only covers what the "
+        "stored checksum covers: a grid carrying a Partial checksum (the "
+        "default) is checked against the header/tree/root CRC alone even when "
+        "mode is CheckMode.Full; call updateChecksum(dGrid, CheckMode.Full) "
+        "first to have node data verified. stream is a raw CUDA stream handle "
         "(Python int; 0 = default stream).");
 
     m.def(

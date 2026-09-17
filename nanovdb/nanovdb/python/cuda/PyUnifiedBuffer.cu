@@ -3,6 +3,7 @@
 #ifdef NANOVDB_USE_CUDA
 
 #include "PyUnifiedBuffer.h"
+#include "PyValidate.h"
 #include "PyDeviceBuffer.h"  // for defineDeviceBufferLike (shared interop)
 
 #include <cstdint>
@@ -95,6 +96,7 @@ void defineUnifiedBuffer(nb::module_& m)
             "prefetch",
             [](const BufferT& buf, ptrdiff_t byteOffset, size_t size, int device,
                uintptr_t stream) {
+                requireNonEmptyBuffer(buf.size(), "prefetch");
                 cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
                 nb::gil_scoped_release release;
                 buf.prefetch(byteOffset, size, device, s);
@@ -107,6 +109,7 @@ void defineUnifiedBuffer(nb::module_& m)
         .def(
             "deviceUpload",
             [](const BufferT& buf, int device, uintptr_t stream, bool sync) {
+                requireNonEmptyBuffer(buf.size(), "deviceUpload");
                 cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
                 nb::gil_scoped_release release;
                 buf.deviceUpload(device, s, sync);
@@ -119,6 +122,7 @@ void defineUnifiedBuffer(nb::module_& m)
         .def(
             "deviceDownload",
             [](const BufferT& buf, uintptr_t stream, bool sync) {
+                requireNonEmptyBuffer(buf.size(), "deviceDownload");
                 cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
                 nb::gil_scoped_release release;
                 buf.deviceDownload(s, sync);

@@ -58,6 +58,43 @@ inline void requireAlignedBuffer(const void* ptr, const char* fnName, const char
     }
 }
 
+/// @brief Raise a Python ValueError when an operation needs the host copy of
+///        a dual host/device buffer and the handle has none. The C++ transfer
+///        path only checkPtr-asserts this, which exits the process.
+inline void requireHostCopy(const void* ptr, const char* fnName)
+{
+    if (ptr != nullptr) return;
+    std::string msg(fnName);
+    msg += ": the handle has no host copy (data() is null). Construct it from "
+           "host data or call deviceDownload() on a handle that owns its "
+           "buffer before using the host side.";
+    throw nanobind::value_error(msg.c_str());
+}
+
+/// @brief Raise a Python ValueError when an operation needs the device copy
+///        of a dual host/device buffer and the handle has none. Handles built
+///        by the host-side tools (tools.cuda.createLevelSetSphere and
+///        friends) start out host-only and need deviceUpload() first.
+inline void requireDeviceCopy(const void* ptr, const char* fnName)
+{
+    if (ptr != nullptr) return;
+    std::string msg(fnName);
+    msg += ": the handle has no device copy (device_ptr() is 0). Call "
+           "deviceUpload() first.";
+    throw nanobind::value_error(msg.c_str());
+}
+
+/// @brief Raise a Python ValueError when a buffer or handle is empty and the
+///        operation would hand a null pointer to the CUDA runtime, which the
+///        C++ side only cudaCheck-asserts (and exits the process).
+inline void requireNonEmptyBuffer(uint64_t size, const char* fnName)
+{
+    if (size != 0) return;
+    std::string msg(fnName);
+    msg += ": the buffer is empty (size() == 0); there is nothing to transfer.";
+    throw nanobind::value_error(msg.c_str());
+}
+
 } // namespace pynanovdb
 
 #endif
