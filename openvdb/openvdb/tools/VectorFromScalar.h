@@ -22,7 +22,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-template<typename ScalarTreeT>
+template<typename ScalarTreeT, bool CopyInactiveValues>
 struct VectorFromScalarOp
 {
     using ScalarT = typename ScalarTreeT::ValueType;
@@ -41,17 +41,25 @@ struct VectorFromScalarOp
     void operator()(VectorRootT& root) const {
         for (auto i = root.beginValueOn(); i; ++i)
         {
-            i.setValue(VectorT(
-                mXTree->getValue(i.getCoord()),
-                mYTree->getValue(i.getCoord()),
-                mZTree->getValue(i.getCoord())
-            ));
+            ScalarT x, y, z;
+
+            if constexpr (CopyInactiveValues)
+            {
+                x = mXTree->getValue(i.getCoord());
+                y = mYTree->getValue(i.getCoord());
+                z = mZTree->getValue(i.getCoord());
+            }
+            else
+            {
+                if (!mXTree->probeValue(i.getCoord(), x)) { x = mXTree->background(); }
+                if (!mYTree->probeValue(i.getCoord(), y)) { y = mYTree->background(); }
+                if (!mZTree->probeValue(i.getCoord(), z)) { z = mZTree->background(); }
+            }
+
+
+            i.setValue(VectorT(x, y, z));
         }
     }
-
-    // void operator()(VectorLeafT& leaf) const {
-    //     // TODO
-    // }
 
     template<typename VectorNodeT>
     void operator()(VectorNodeT& node) const {
@@ -70,11 +78,45 @@ struct VectorFromScalarOp
 
         for (auto i = node.beginValueOn(); i; ++i)
         {
-            i.setValue(VectorT(
-                xNode ? xNode->getValueUnsafe(i.offset()) : mXTree->getValue(i.getCoord()),
-                yNode ? yNode->getValueUnsafe(i.offset()) : mYTree->getValue(i.getCoord()),
-                zNode ? zNode->getValueUnsafe(i.offset()) : mZTree->getValue(i.getCoord())
-            ));
+            ScalarT x, y, z;
+
+            if constexpr (CopyInactiveValues)
+            {
+                x = xNode ? xNode->getValueUnsafe(i.offset()) : mXTree->getValue(i.getCoord());
+                y = yNode ? yNode->getValueUnsafe(i.offset()) : mYTree->getValue(i.getCoord());
+                z = zNode ? zNode->getValueUnsafe(i.offset()) : mZTree->getValue(i.getCoord());
+            }
+            else
+            {
+                if (xNode)
+                {
+                    x = xNode->isValueOn(i.offset()) ? xNode->getValueUnsafe(i.offset()) : mXTree->background();
+                }
+                else
+                {
+                    x = mXTree->getValue(i.getCoord());
+                }
+
+                if (yNode)
+                {
+                    y = yNode->isValueOn(i.offset()) ? yNode->getValueUnsafe(i.offset()) : mYTree->background();
+                }
+                else
+                {
+                    y = mYTree->getValue(i.getCoord());
+                }
+
+                if (zNode)
+                {
+                    z = zNode->isValueOn(i.offset()) ? zNode->getValueUnsafe(i.offset()) : mZTree->background();
+                }
+                else
+                {
+                    z = mZTree->getValue(i.getCoord());
+                }
+            }
+
+            i.setValue(VectorT(x, y, z));
         }
     }
 
@@ -99,7 +141,7 @@ private:
 /// @param z                    Grid to use as the third vector component.
 template<typename ScalarGridT>
 typename ScalarToVectorConverter<ScalarGridT>::Type::Ptr
-vectorFromScalar(const ScalarGridT& x, const ScalarGridT& y, const ScalarGridT& z)
+vectorFromScalar(const ScalarGridT& x, const ScalarGridT& y, const ScalarGridT& z, bool copyInactiveValues = false)
 {
     using ScalarT = typename ScalarGridT::ValueType;
     using VectorT = math::Vec3<ScalarT>;
@@ -127,8 +169,16 @@ vectorFromScalar(const ScalarGridT& x, const ScalarGridT& y, const ScalarGridT& 
 
     // Write the grid values
     auto nodeManager = tree::NodeManager<VectorTreeT>(vectorGrid->tree());
-    auto op = VectorFromScalarOp<ScalarTreeT>(&x.tree(), &y.tree(), &z.tree());
-    nodeManager.foreachTopDown(op);
+    if (copyInactiveValues)
+    {
+        auto op = VectorFromScalarOp<ScalarTreeT, /* CopyInactiveValues = */ true>(&x.tree(), &y.tree(), &z.tree());
+        nodeManager.foreachTopDown(op);
+    }
+    else
+    {
+        auto op = VectorFromScalarOp<ScalarTreeT, /* CopyInactiveValues = */ false>(&x.tree(), &y.tree(), &z.tree());
+        nodeManager.foreachTopDown(op);
+    }
 
     return vectorGrid;
 }

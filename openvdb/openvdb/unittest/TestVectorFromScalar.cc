@@ -566,3 +566,101 @@ TEST_F(TestVectorFromScalar, testMergeDoubleGrids)
     EXPECT_EQ(vectorTree.getValue(Coord(1, 1, 0)), Vec3R( 1.0,  2.0,  3.0));
     EXPECT_EQ(vectorTree.getValue(Coord(1, 1, 1)), Vec3R( 1.0,  2.0,  3.0));
 }
+
+TEST_F(TestVectorFromScalar, testCopyInactiveVoxels)
+{
+    auto xGrid = createGrid<FloatGrid>(-0.1f);
+    auto yGrid = createGrid<FloatGrid>(-0.2f);
+    auto zGrid = createGrid<FloatGrid>(-0.3f);
+
+    auto& xTree = xGrid->tree();
+    auto& yTree = yGrid->tree();
+    auto& zTree = zGrid->tree();
+
+    // Create various overlapping and non-overlapping voxels
+    // (inactive) [active]
+    // voxel   |
+    // index   |   0    1    2    3    4    5    6    7
+    // --------|------------------------------------------
+    // x grid  |      (1.1)     (3.1)     (5.1)     (7.1)
+    // y grid  |           (2.2)(3.2)          (6.2)(7.2)
+    // z grid  |                     [0.3][1.3][2.3][3.3]
+
+    xTree.setValueOff(Coord(1, 0, 0), 1.1f);
+    xTree.setValueOff(Coord(3, 0, 0), 3.1f);
+    xTree.setValueOff(Coord(5, 0, 0), 5.1f);
+    xTree.setValueOff(Coord(7, 0, 0), 7.1f);
+
+    yTree.setValueOff(Coord(2, 0, 0), 2.2f);
+    yTree.setValueOff(Coord(3, 0, 0), 3.2f);
+    yTree.setValueOff(Coord(6, 0, 0), 6.2f);
+    yTree.setValueOff(Coord(7, 0, 0), 7.2f);
+
+    zTree.setValueOn(Coord(4, 0, 0), 4.3f);
+    zTree.setValueOn(Coord(5, 0, 0), 5.3f);
+    zTree.setValueOn(Coord(6, 0, 0), 6.3f);
+    zTree.setValueOn(Coord(7, 0, 0), 7.3f);
+
+    const auto background = Vec3f(-0.1f, -0.2f, -0.3f);
+
+    // copyInactiveValues=false: any inactive values should be ignored and background
+    // value should appear in their place
+    {
+
+        auto vectorGrid = tools::vectorFromScalar(*xGrid, *yGrid, *zGrid, /* copyInactiveValues = */ false);
+        auto& vectorTree = vectorGrid->tree();
+
+        EXPECT_EQ(vectorTree.isValueOn(Coord(-1, 0, 0)), false);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 0, 0, 0)), false);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 1, 0, 0)), false);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 2, 0, 0)), false);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 3, 0, 0)), false);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 4, 0, 0)), true);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 5, 0, 0)), true);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 6, 0, 0)), true);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 7, 0, 0)), true);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 8, 0, 0)), false);
+
+        EXPECT_EQ(vectorTree.getValue(Coord(-1, 0, 0)), background);
+        EXPECT_EQ(vectorTree.getValue(Coord( 0, 0, 0)), background);
+        EXPECT_EQ(vectorTree.getValue(Coord( 1, 0, 0)), background);
+        EXPECT_EQ(vectorTree.getValue(Coord( 2, 0, 0)), background);
+        EXPECT_EQ(vectorTree.getValue(Coord( 3, 0, 0)), background);
+        EXPECT_EQ(vectorTree.getValue(Coord( 4, 0, 0)), Vec3f(-0.1f, -0.2f, 4.3f));
+        EXPECT_EQ(vectorTree.getValue(Coord( 5, 0, 0)), Vec3f(-0.1f, -0.2f, 5.3f));
+        EXPECT_EQ(vectorTree.getValue(Coord( 6, 0, 0)), Vec3f(-0.1f, -0.2f, 6.3f));
+        EXPECT_EQ(vectorTree.getValue(Coord( 7, 0, 0)), Vec3f(-0.1f, -0.2f, 7.3f));
+        EXPECT_EQ(vectorTree.getValue(Coord( 8, 0, 0)), background);
+    }
+
+    // copyInactiveValues=true: inactive values are used where they coincide with
+    // active values from other grids. All inactive values accross the input grids
+    // should result in the background value.
+    {
+
+        auto vectorGrid = tools::vectorFromScalar(*xGrid, *yGrid, *zGrid, /* copyInactiveValues = */ true);
+        auto& vectorTree = vectorGrid->tree();
+
+        EXPECT_EQ(vectorTree.isValueOn(Coord(-1, 0, 0)), false);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 0, 0, 0)), false);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 1, 0, 0)), false);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 2, 0, 0)), false);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 3, 0, 0)), false);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 4, 0, 0)), true);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 5, 0, 0)), true);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 6, 0, 0)), true);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 7, 0, 0)), true);
+        EXPECT_EQ(vectorTree.isValueOn(Coord( 8, 0, 0)), false);
+
+        EXPECT_EQ(vectorTree.getValue(Coord(-1, 0, 0)), background);
+        EXPECT_EQ(vectorTree.getValue(Coord( 0, 0, 0)), background);
+        EXPECT_EQ(vectorTree.getValue(Coord( 1, 0, 0)), background);
+        EXPECT_EQ(vectorTree.getValue(Coord( 2, 0, 0)), background);
+        EXPECT_EQ(vectorTree.getValue(Coord( 3, 0, 0)), background);
+        EXPECT_EQ(vectorTree.getValue(Coord( 4, 0, 0)), Vec3f(-0.1f, -0.2f,  4.3f));
+        EXPECT_EQ(vectorTree.getValue(Coord( 5, 0, 0)), Vec3f( 5.1f, -0.2f,  5.3f));
+        EXPECT_EQ(vectorTree.getValue(Coord( 6, 0, 0)), Vec3f(-0.1f,  6.2f,  6.3f));
+        EXPECT_EQ(vectorTree.getValue(Coord( 7, 0, 0)), Vec3f( 7.1f,  7.2f,  7.3f));
+        EXPECT_EQ(vectorTree.getValue(Coord( 8, 0, 0)), background);
+    }
+}
