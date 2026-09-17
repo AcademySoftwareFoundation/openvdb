@@ -134,6 +134,75 @@ typedef unsigned long long uint64_t;
 // A portable implementation of offsetof - unfortunately it doesn't work with static_assert
 #define NANOVDB_OFFSETOF(CLASS, MEMBER) ((int)(size_t)((char*)&((CLASS*)0)->MEMBER - (char*)0))
 
+#include <immintrin.h>
+
+namespace nanovdb
+{
+class Half
+{
+    uint16_t raw;
+public:
+    constexpr Half(): raw(0u) {}
+    operator float() const
+    {
+        // 1. Pack the 16-bit float into the lowest 16 bits of a 128-bit vector
+        __m128i m128_hp = _mm_set1_epi16(raw);
+
+        // 2. Convert the lowest FP16 element to an FP32 vector
+        __m128 m128_sp = _mm_cvtph_ps(m128_hp);
+
+        // 3. Extract the float value from the vector
+        return _mm_cvtss_f32(m128_sp);
+    }
+    Half& operator=(float val)
+    {
+        // 1. Load the single float into the lowest element of a 128-bit vector
+        __m128 v_float = _mm_set_ss(val);
+
+        // 2. Convert the vector to 16-bit floats.
+        // _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC rounds to nearest even
+        __m128i v_fp16 = _mm_cvtps_ph(v_float, (_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
+
+        // 3. Extract the lower 16 bits containing our converted value
+        raw = (uint16_t)_mm_cvtsi128_si32(v_fp16);
+        return *this;
+    }
+    Half operator-()
+    {
+        return Half(-(this->operator float()));
+    }
+    Half(const float&& val): raw(0u)
+    {
+        operator=(val);
+    }
+    static constexpr Half max() noexcept {
+        Half ret;
+        ret.raw = 0x7BFF;
+        return ret;
+    }
+    static constexpr Half lowest() noexcept {
+        Half ret;
+        ret.raw = 0xFBFF;
+        return ret;
+    }
+};
+}
+// Needed for correct GridStats behavior
+namespace std
+{
+template<>
+struct numeric_limits<nanovdb::Half>
+{
+    static constexpr bool is_specialized = true;
+    static constexpr nanovdb::Half max() noexcept {
+        return nanovdb::Half::max();
+    }
+    static constexpr nanovdb::Half lowest() noexcept {
+        return nanovdb::Half::lowest();
+    }
+};
+}
+
 namespace nanovdb {// =================================================================
 
 namespace util {// ====================================================================
@@ -341,7 +410,7 @@ static constexpr bool is_same_v = is_same<T0, T1, T...>::value;
 
 /// @brief C++11 implementation of std::is_floating_point
 template<typename T>
-struct is_floating_point {static constexpr bool value = is_same<T, float, double>::value;};
+struct is_floating_point {static constexpr bool value = is_same<T, float, double, nanovdb::Half>::value;};
 
 template<typename T>
 static constexpr bool is_floating_point_v = is_floating_point<T>::value;

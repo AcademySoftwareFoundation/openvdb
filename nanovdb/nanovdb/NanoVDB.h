@@ -183,7 +183,7 @@ class ValueOnIndex{};
 class ValueMask{};
 
 /// @brief Dummy type for a 16 bit floating point values (placeholder for IEEE 754 Half)
-class Half{};
+// class Half;
 
 /// @brief Dummy type for a 4bit quantization of float point values
 class Fp4{};
@@ -547,13 +547,6 @@ struct BuildToValueMap<ValueMask>
 {
     using Type = bool;
     using type = bool;
-};
-
-template<>
-struct BuildToValueMap<Half>
-{
-    using Type = float;
-    using type = float;
 };
 
 template<>

@@ -42,6 +42,13 @@ endif()
 # -----------------------------------------------------------------------------
 
 add_executable(nanovdb_test_nanovdb "TestNanoVDB.cc")
+
+# AVX2
+target_compile_options(nanovdb_test_nanovdb PRIVATE
+  "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-march=native>"
+  "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/arch:AVX2>")
+
+
 target_link_libraries(nanovdb_test_nanovdb PRIVATE nanovdb GTest::GTest GTest::Main)
 add_test(nanovdb_unit_test nanovdb_test_nanovdb)
 
