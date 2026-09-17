@@ -230,7 +230,7 @@ endif()
 list(APPEND OPENVDB_CORE_DEPENDENT_LIBS TBB::tbb)
 
 if(USE_LOG4CPLUS)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Log4cplus::log4cplus)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS log4cplus::log4cplus)
 endif()
 
 # @todo blosc and zlib should be hidden (privately linked in):
