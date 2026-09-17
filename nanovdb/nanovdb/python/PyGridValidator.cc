@@ -154,7 +154,12 @@ void defineGridValidatorModule(nb::module_& toolsModule)
         nb::call_guard<nb::gil_scoped_release>(),
         "Return True iff the grid passes structural validation AND its "
         "stored checksum matches a freshly computed one for the given "
-        "CheckMode.");
+        "CheckMode. The comparison only covers what the stored checksum "
+        "covers: if the grid carries a Partial checksum (the default for "
+        "every builder and tool), CheckMode.Full still compares just the "
+        "header/tree/root CRC and leaves node data unchecked. Call "
+        "updateChecksum(grid, CheckMode.Full) first to make a Full check "
+        "meaningful.");
 }
 
 } // namespace pynanovdb

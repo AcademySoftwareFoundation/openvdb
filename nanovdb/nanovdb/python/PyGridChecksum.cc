@@ -85,7 +85,12 @@ void defineEvalChecksumModule(nb::module_& toolsModule)
         nb::call_guard<nb::gil_scoped_release>(),
         "Return True iff the grid's stored checksum matches a freshly "
         "computed one for the given CheckMode. A grid with no stored "
-        "checksum (Checksum.isEmpty()) is considered valid.");
+        "checksum (Checksum.isEmpty()) is considered valid. The comparison "
+        "only covers what the stored checksum covers: a grid carrying a "
+        "Partial checksum (the default) is checked against the header/"
+        "tree/root CRC alone even when mode is CheckMode.Full; call "
+        "updateChecksum(grid, CheckMode.Full) first to have node data "
+        "verified.");
 }
 
 } // namespace pynanovdb

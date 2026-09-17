@@ -2111,6 +2111,31 @@ class TestGridChecksum(unittest.TestCase):
         self.assertTrue(
             nanovdb.tools.validateChecksum(h.grid(), nanovdb.CheckMode.Default))
 
+    def test_full_check_only_covers_stored_partial_checksum(self):
+        # Builders store a Partial checksum by default. Validating it with
+        # CheckMode.Full compares only the header/tree/root CRC, so a
+        # corrupted leaf value goes unnoticed until the grid carries a
+        # Full checksum.
+        try:
+            import numpy  # noqa: F401
+        except ImportError:
+            self.skipTest("numpy not installed")
+        ng = nanovdb.tools.createLevelSetSphere(radius=10.0, voxelSize=1.0).grid()
+        self.assertTrue(ng.checksum().isHalf())
+        vals = ng.leaf_values()
+        vals[0, 0] += 1.0
+        self.assertTrue(nanovdb.tools.validateChecksum(ng, nanovdb.CheckMode.Full))
+        self.assertTrue(nanovdb.tools.isValid(ng, nanovdb.CheckMode.Full))
+
+        nanovdb.tools.updateChecksum(ng, nanovdb.CheckMode.Full)
+        self.assertTrue(ng.checksum().isFull())
+        self.assertTrue(nanovdb.tools.validateChecksum(ng, nanovdb.CheckMode.Full))
+        vals[0, 0] += 1.0
+        self.assertFalse(nanovdb.tools.validateChecksum(ng, nanovdb.CheckMode.Full))
+        self.assertFalse(nanovdb.tools.isValid(ng, nanovdb.CheckMode.Full))
+        # A Partial request still passes: leaf data is outside its scope.
+        self.assertTrue(nanovdb.tools.validateChecksum(ng, nanovdb.CheckMode.Partial))
+
 
 class TestBuildGrid(unittest.TestCase):
     """nanovdb.tools.build.* — mutable voxel-by-voxel CPU grid builder."""
