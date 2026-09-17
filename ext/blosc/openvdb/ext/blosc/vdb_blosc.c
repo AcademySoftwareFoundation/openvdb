@@ -228,16 +228,20 @@ static int get_accel(const struct blosc_context* context) {
 }
 
 
-/* Shuffle a block of data by type size. */
-static void shuffle_block(const size_t typesize, const size_t blocksize,
-                          const uint8_t* const source, uint8_t* const destination)
+/* Shuffle a block of data by type size. `vectorizable_blocksize` is the
+   portion already handled by a vectorized shuffle (0 if none), so this
+   only processes the remaining elements plus any sub-element tail. */
+static void shuffle_block(const size_t typesize, const size_t vectorizable_blocksize,
+                          const size_t blocksize, const uint8_t* const source,
+                          uint8_t* const destination)
 {
   const size_t elements = blocksize / typesize;
+  const size_t vectorizable_elements = vectorizable_blocksize / typesize;
   const size_t remainder = blocksize % typesize;
   size_t i, j;
 
   for (j = 0; j < typesize; j++) {
-    for (i = 0; i < elements; i++) {
+    for (i = vectorizable_elements; i < elements; i++) {
       destination[j * elements + i] = source[i * typesize + j];
     }
   }
@@ -247,14 +251,16 @@ static void shuffle_block(const size_t typesize, const size_t blocksize,
 }
 
 /* Reverse shuffle_block(). */
-static void unshuffle_block(const size_t typesize, const size_t blocksize,
-                            const uint8_t* const source, uint8_t* const destination)
+static void unshuffle_block(const size_t typesize, const size_t vectorizable_blocksize,
+                            const size_t blocksize, const uint8_t* const source,
+                            uint8_t* const destination)
 {
   const size_t elements = blocksize / typesize;
+  const size_t vectorizable_elements = vectorizable_blocksize / typesize;
   const size_t remainder = blocksize % typesize;
   size_t i, j;
 
-  for (i = 0; i < elements; i++) {
+  for (i = vectorizable_elements; i < elements; i++) {
     for (j = 0; j < typesize; j++) {
       destination[i * typesize + j] = source[j * elements + i];
     }
@@ -262,6 +268,133 @@ static void unshuffle_block(const size_t typesize, const size_t blocksize,
 
   /* Copy any leftover bytes that don't fill a whole element. */
   memcpy(destination + (blocksize - remainder), source + (blocksize - remainder), remainder);
+}
+
+/* MSVC does not define __SSE2__ even when SSE2 is the target. */
+#if !defined(__SSE2__) && defined(_MSC_VER) && \
+    (defined(_M_X64) || (defined(_M_IX86) && _M_IX86_FP >= 2))
+  #define __SSE2__
+#endif
+
+#if defined(__SSE2__)
+#include <emmintrin.h>
+
+/* Routine optimized for shuffling a buffer for a type size of 4 bytes. */
+static void shuffle4_sse2(uint8_t* const dest, const uint8_t* const src,
+                          const size_t vectorizable_elements, const size_t total_elements)
+{
+  static const size_t bytesoftype = 4;
+  size_t i;
+  int j;
+  uint8_t* dest_for_ith_element;
+  __m128i xmm0[4], xmm1[4];
+
+  for (i = 0; i < vectorizable_elements; i += sizeof(__m128i)) {
+    /* Fetch 16 elements (64 bytes) then transpose bytes and words. */
+    for (j = 0; j < 4; j++) {
+      xmm0[j] = _mm_loadu_si128((__m128i*)(src + (i * bytesoftype) + (j * sizeof(__m128i))));
+      xmm1[j] = _mm_shuffle_epi32(xmm0[j], 0xd8);
+      xmm0[j] = _mm_shuffle_epi32(xmm0[j], 0x8d);
+      xmm0[j] = _mm_unpacklo_epi8(xmm1[j], xmm0[j]);
+      xmm1[j] = _mm_shuffle_epi32(xmm0[j], 0x04e);
+      xmm0[j] = _mm_unpacklo_epi16(xmm0[j], xmm1[j]);
+    }
+    /* Transpose double words */
+    for (j = 0; j < 2; j++) {
+      xmm1[j*2] = _mm_unpacklo_epi32(xmm0[j*2], xmm0[j*2+1]);
+      xmm1[j*2+1] = _mm_unpackhi_epi32(xmm0[j*2], xmm0[j*2+1]);
+    }
+    /* Transpose quad words */
+    for (j = 0; j < 2; j++) {
+      xmm0[j*2] = _mm_unpacklo_epi64(xmm1[j], xmm1[j+2]);
+      xmm0[j*2+1] = _mm_unpackhi_epi64(xmm1[j], xmm1[j+2]);
+    }
+    /* Store the result vectors */
+    dest_for_ith_element = dest + i;
+    for (j = 0; j < 4; j++) {
+      _mm_storeu_si128((__m128i*)(dest_for_ith_element + (j * total_elements)), xmm0[j]);
+    }
+  }
+}
+
+/* Routine optimized for unshuffling a buffer for a type size of 4 bytes. */
+static void unshuffle4_sse2(uint8_t* const dest, const uint8_t* const src,
+                            const size_t vectorizable_elements, const size_t total_elements)
+{
+  static const size_t bytesoftype = 4;
+  size_t i;
+  int j;
+  __m128i xmm0[4], xmm1[4];
+
+  for (i = 0; i < vectorizable_elements; i += sizeof(__m128i)) {
+    /* Load 16 elements (64 bytes) into 4 XMM registers. */
+    const uint8_t* const src_for_ith_element = src + i;
+    for (j = 0; j < 4; j++) {
+      xmm0[j] = _mm_loadu_si128((__m128i*)(src_for_ith_element + (j * total_elements)));
+    }
+    /* Shuffle bytes */
+    for (j = 0; j < 2; j++) {
+      /* Compute the low 32 bytes */
+      xmm1[j] = _mm_unpacklo_epi8(xmm0[j*2], xmm0[j*2+1]);
+      /* Compute the hi 32 bytes */
+      xmm1[2+j] = _mm_unpackhi_epi8(xmm0[j*2], xmm0[j*2+1]);
+    }
+    /* Shuffle 2-byte words */
+    for (j = 0; j < 2; j++) {
+      /* Compute the low 32 bytes */
+      xmm0[j] = _mm_unpacklo_epi16(xmm1[j*2], xmm1[j*2+1]);
+      /* Compute the hi 32 bytes */
+      xmm0[2+j] = _mm_unpackhi_epi16(xmm1[j*2], xmm1[j*2+1]);
+    }
+    /* Store the result vectors in proper order */
+    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (0 * sizeof(__m128i))), xmm0[0]);
+    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (1 * sizeof(__m128i))), xmm0[2]);
+    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (2 * sizeof(__m128i))), xmm0[1]);
+    _mm_storeu_si128((__m128i*)(dest + (i * bytesoftype) + (3 * sizeof(__m128i))), xmm0[3]);
+  }
+}
+#endif /* defined(__SSE2__) */
+
+/* Shuffle a block, dispatching to the vectorized path when the type size
+   and block size allow it. The scalar shuffle_block() handles the tail
+   (and the whole buffer when no vectorized path applies). */
+static void shuffle(const size_t typesize, const size_t blocksize,
+                    const uint8_t* const source, uint8_t* const destination)
+{
+#if defined(__SSE2__)
+  const size_t chunk = typesize * sizeof(__m128i);
+
+  if (typesize == 4 && blocksize >= chunk) {
+    const size_t vectorizable_bytes = blocksize - (blocksize % chunk);
+    const size_t vectorizable_elements = vectorizable_bytes / typesize;
+    const size_t total_elements = blocksize / typesize;
+
+    shuffle4_sse2(destination, source, vectorizable_elements, total_elements);
+    shuffle_block(typesize, vectorizable_bytes, blocksize, source, destination);
+    return;
+  }
+#endif
+  shuffle_block(typesize, 0, blocksize, source, destination);
+}
+
+/* Reverse shuffle(). */
+static void unshuffle(const size_t typesize, const size_t blocksize,
+                      const uint8_t* const source, uint8_t* const destination)
+{
+#if defined(__SSE2__)
+  const size_t chunk = typesize * sizeof(__m128i);
+
+  if (typesize == 4 && blocksize >= chunk) {
+    const size_t vectorizable_bytes = blocksize - (blocksize % chunk);
+    const size_t vectorizable_elements = vectorizable_bytes / typesize;
+    const size_t total_elements = blocksize / typesize;
+
+    unshuffle4_sse2(destination, source, vectorizable_elements, total_elements);
+    unshuffle_block(typesize, vectorizable_bytes, blocksize, source, destination);
+    return;
+  }
+#endif
+  unshuffle_block(typesize, 0, blocksize, source, destination);
 }
 
 /* Shuffle & compress a single block */
@@ -282,7 +415,7 @@ static int blosc_c(const struct blosc_context* context, int32_t blocksize,
 
   if (doshuffle) {
     /* Byte shuffling only makes sense if typesize > 1 */
-    shuffle_block(typesize, blocksize, src, tmp);
+    shuffle(typesize, blocksize, src, tmp);
     _tmp = tmp;
   }
 
@@ -404,7 +537,7 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize,
   } /* Closes j < nsplits */
 
   if (doshuffle) {
-    unshuffle_block(typesize, blocksize, tmp, dest);
+    unshuffle(typesize, blocksize, tmp, dest);
   }
 
   /* Return the number of uncompressed bytes */
