@@ -81,7 +81,6 @@ newSopOperator(OP_OperatorTable* table)
             nullptr
         };
 
-#ifdef OPENVDB_USE_BLOSC
         parms.add(hutil::ParmFactory(PRM_ORD, "compression", "Compression")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
             .setDefault("blosc")
@@ -94,23 +93,6 @@ newSopOperator(OP_OperatorTable* table)
                 " For most cases Blosc is the recommended compression type."));
 
         obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "compress_zip", "Zip Compression"));
-#else
-#ifdef OPENVDB_USE_ZLIB
-        parms.add(hutil::ParmFactory(PRM_TOGGLE, "compress_zip", "Zip Compression")
-            .setDefault(true)
-            .setTooltip(
-                "Apply Zip \"deflate\" compression to non-SDF and non-fog grids.\n"
-                "(Zip compression can be slow for large volumes.)"));
-
-        obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "compression", "Compression")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
-#else
-        // no compression available
-        obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "compress_zip", "Zip Compression"));
-        obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "compression", "Compression")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
-#endif
-#endif
     }
 
     // Write mode (manual/auto)
@@ -187,23 +169,12 @@ SOP_OpenVDB_Write::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
 {
     if (!obsoleteParms) return;
 
-#ifdef OPENVDB_USE_BLOSC
     PRM_Parm* parm = obsoleteParms->getParmPtr("compress_zip");
     if (parm && !parm->isFactoryDefault()) {
         const bool zip = obsoleteParms->evalInt("compress_zip", 0, /*time=*/0.0);
         const UT_String compression(zip ? "zip" : "none");
         setString(compression, CH_STRING_LITERAL, "compression", 0, 0.0);
     }
-#else
-#ifdef OPENVDB_USE_ZLIB
-    if (nullptr != obsoleteParms->getParmPtr("compression")
-        && !obsoleteParms->getParmPtr("compression")->isFactoryDefault()) {
-        UT_String compression;
-        obsoleteParms->evalString(compression, "compression", 0, /*time=*/0.0);
-        setInt("compress_zip", 0, 0.0, (compression == "zip" ? 1 : 0));
-    }
-#endif
-#endif
 
     // Delegate to the base class.
     hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
@@ -330,14 +301,8 @@ SOP_OpenVDB_Write::doCook(const fpreal time)
     }
 
     // Get compression options.
-#ifdef OPENVDB_USE_BLOSC
     UT_String compression;
     evalString(compression, "compression", 0, time);
-#else
-#ifdef OPENVDB_USE_ZLIB
-    const bool zip = evalInt("compress_zip", 0, time);
-#endif
-#endif
 
     UT_AutoInterrupt progress(("Writing " + filename).c_str());
 
@@ -399,7 +364,6 @@ SOP_OpenVDB_Write::doCook(const fpreal time)
     // Create a VDB file object.
     openvdb::io::File file(filename);
 
-#ifdef OPENVDB_USE_BLOSC
     uint32_t compressionFlags = file.compression();
     if (compression == "none") {
         compressionFlags &= ~(openvdb::io::COMPRESS_ZIP | openvdb::io::COMPRESS_BLOSC);
@@ -410,12 +374,6 @@ SOP_OpenVDB_Write::doCook(const fpreal time)
         compressionFlags |= openvdb::io::COMPRESS_ZIP;
         compressionFlags &= ~openvdb::io::COMPRESS_BLOSC;
     }
-#else
-    uint32_t compressionFlags = openvdb::io::COMPRESS_ACTIVE_MASK;
-#ifdef OPENVDB_USE_ZLIB
-    if (zip) compressionFlags |= openvdb::io::COMPRESS_ZIP;
-#endif
-#endif // OPENVDB_USE_BLOSC
     file.setCompression(compressionFlags);
 
     file.write(outGrids, outMeta);
