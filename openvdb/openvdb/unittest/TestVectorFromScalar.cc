@@ -6,6 +6,8 @@
 
 #include <gtest/gtest.h>
 
+#include <type_traits>
+
 using namespace openvdb;
 
 class TestVectorFromScalar: public ::testing::Test
@@ -19,6 +21,8 @@ TEST_F(TestVectorFromScalar, testEmptyGrids)
     auto zGrid = createGrid<FloatGrid>(3.3f);
 
     auto vectorGrid = tools::vectorFromScalar(*xGrid, *yGrid, *zGrid);
+
+    static_assert(std::is_same_v<std::decay_t<decltype(*vectorGrid)>, Vec3SGrid>);
 
     EXPECT_EQ(vectorGrid->background(), Vec3f(1.1f, 2.2f, 3.3f));
 }
@@ -57,6 +61,9 @@ TEST_F(TestVectorFromScalar, testMergeVoxels)
     zTree.setValue(Coord(7, 0, 0), 7.3f);
 
     auto vectorGrid = tools::vectorFromScalar(*xGrid, *yGrid, *zGrid);
+
+    static_assert(std::is_same_v<std::decay_t<decltype(*vectorGrid)>, Vec3SGrid>);
+
     auto& vectorTree = vectorGrid->tree();
 
     EXPECT_EQ(vectorGrid->background(), Vec3f(-0.1f, -0.2f, -0.3f));
@@ -129,6 +136,9 @@ TEST_F(TestVectorFromScalar, testMergeRootTiles)
     zTree.addTile(ROOT_LEVEL, Coord(7 * ROOT_STRIDE, 0, 0), 7.3f, true);
 
     auto vectorGrid = tools::vectorFromScalar(*xGrid, *yGrid, *zGrid);
+
+    static_assert(std::is_same_v<std::decay_t<decltype(*vectorGrid)>, Vec3SGrid>);
+
     auto& vectorTree = vectorGrid->tree();
 
     EXPECT_EQ(vectorGrid->background(), Vec3f(-0.1f, -0.2f, -0.3f));
@@ -203,6 +213,9 @@ TEST_F(TestVectorFromScalar, testMergeMixedLevelTiles)
     zTree.addTile(ROOT_LEVEL, Coord(3 * ROOT_STRIDE, 0, 0), 6.3f, true);
 
     auto vectorGrid = tools::vectorFromScalar(*xGrid, *yGrid, *zGrid);
+
+    static_assert(std::is_same_v<std::decay_t<decltype(*vectorGrid)>, Vec3SGrid>);
+
     auto& vectorTree = vectorGrid->tree();
 
     EXPECT_EQ(vectorGrid->background(), Vec3f(-0.1f, -0.2f, -0.3f));
@@ -319,7 +332,6 @@ TEST_F(TestVectorFromScalar, testMergeTilesAndVoxels)
     const Index L1_STRIDE = L1NodeType::getChildDim();
     const Index L2_LEVEL = L2NodeType::getLevel();
     const Index L2_STRIDE = L2NodeType::getChildDim();
-    const Index LEAF_LEVEL = LeafNodeType::getLevel();
 
     // x grid (voxels)   | [0][1][...][6][7]                 [0][1][...][6][7] ...  [0][1][...][6][7][0][1][...][6][7]
     // y grid (l2 tiles  | [       3       ][       9       ]                  ...                   [       4       ]
@@ -368,6 +380,9 @@ TEST_F(TestVectorFromScalar, testMergeTilesAndVoxels)
     zTree.addTile(L1_LEVEL, Coord(0 * L1_STRIDE, 0, 0), 5.0f, true);
 
     auto vectorGrid = tools::vectorFromScalar(*xGrid, *yGrid, *zGrid);
+
+    static_assert(std::is_same_v<std::decay_t<decltype(*vectorGrid)>, Vec3SGrid>);
+
     auto& vectorTree = vectorGrid->tree();
 
     EXPECT_EQ(vectorGrid->background(), Vec3f(-0.1f, -0.2f, -0.3f));
@@ -524,18 +539,21 @@ TEST_F(TestVectorFromScalar, testMergeIntGrids)
     zTree.setValue(Coord(0, 0, 1), 30);
 
     auto vectorGrid = tools::vectorFromScalar(*xGrid, *yGrid, *zGrid);
+
+    static_assert(std::is_same_v<std::decay_t<decltype(*vectorGrid)>, Vec3IGrid>);
+
     auto& vectorTree = vectorGrid->tree();
 
     EXPECT_EQ(vectorGrid->background(), Vec3I(1, 2, 3));
 
-    EXPECT_EQ(vectorTree.getValue(Coord(0, 0, 0)), Vec3I( 1,  2,  3));
-    EXPECT_EQ(vectorTree.getValue(Coord(0, 0, 1)), Vec3I( 1,  2, 30));
-    EXPECT_EQ(vectorTree.getValue(Coord(0, 1, 0)), Vec3I( 1, 20,  3));
-    EXPECT_EQ(vectorTree.getValue(Coord(0, 1, 1)), Vec3I( 1,  2,  3));
-    EXPECT_EQ(vectorTree.getValue(Coord(1, 0, 0)), Vec3I(10,  2,  3));
-    EXPECT_EQ(vectorTree.getValue(Coord(1, 0, 1)), Vec3I( 1,  2,  3));
-    EXPECT_EQ(vectorTree.getValue(Coord(1, 1, 0)), Vec3I( 1,  2,  3));
-    EXPECT_EQ(vectorTree.getValue(Coord(1, 1, 1)), Vec3I( 1,  2,  3));
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 0, 0)), Vec3i( 1,  2,  3));
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 0, 1)), Vec3i( 1,  2, 30));
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 1, 0)), Vec3i( 1, 20,  3));
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 1, 1)), Vec3i( 1,  2,  3));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 0, 0)), Vec3i(10,  2,  3));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 0, 1)), Vec3i( 1,  2,  3));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 1, 0)), Vec3i( 1,  2,  3));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 1, 1)), Vec3i( 1,  2,  3));
 }
 
 TEST_F(TestVectorFromScalar, testMergeDoubleGrids)
@@ -553,18 +571,21 @@ TEST_F(TestVectorFromScalar, testMergeDoubleGrids)
     zTree.setValue(Coord(0, 0, 1), 30.0);
 
     auto vectorGrid = tools::vectorFromScalar(*xGrid, *yGrid, *zGrid);
+
+    static_assert(std::is_same_v<std::decay_t<decltype(*vectorGrid)>, Vec3dGrid>);
+
     auto& vectorTree = vectorGrid->tree();
 
     EXPECT_EQ(vectorGrid->background(), Vec3R(1, 2, 3));
 
-    EXPECT_EQ(vectorTree.getValue(Coord(0, 0, 0)), Vec3R( 1.0,  2.0,  3.0));
-    EXPECT_EQ(vectorTree.getValue(Coord(0, 0, 1)), Vec3R( 1.0,  2.0, 30.0));
-    EXPECT_EQ(vectorTree.getValue(Coord(0, 1, 0)), Vec3R( 1.0, 20.0,  3.0));
-    EXPECT_EQ(vectorTree.getValue(Coord(0, 1, 1)), Vec3R( 1.0,  2.0,  3.0));
-    EXPECT_EQ(vectorTree.getValue(Coord(1, 0, 0)), Vec3R(10.0,  2.0,  3.0));
-    EXPECT_EQ(vectorTree.getValue(Coord(1, 0, 1)), Vec3R( 1.0,  2.0,  3.0));
-    EXPECT_EQ(vectorTree.getValue(Coord(1, 1, 0)), Vec3R( 1.0,  2.0,  3.0));
-    EXPECT_EQ(vectorTree.getValue(Coord(1, 1, 1)), Vec3R( 1.0,  2.0,  3.0));
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 0, 0)), Vec3d( 1.0,  2.0,  3.0));
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 0, 1)), Vec3d( 1.0,  2.0, 30.0));
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 1, 0)), Vec3d( 1.0, 20.0,  3.0));
+    EXPECT_EQ(vectorTree.getValue(Coord(0, 1, 1)), Vec3d( 1.0,  2.0,  3.0));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 0, 0)), Vec3d(10.0,  2.0,  3.0));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 0, 1)), Vec3d( 1.0,  2.0,  3.0));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 1, 0)), Vec3d( 1.0,  2.0,  3.0));
+    EXPECT_EQ(vectorTree.getValue(Coord(1, 1, 1)), Vec3d( 1.0,  2.0,  3.0));
 }
 
 TEST_F(TestVectorFromScalar, testCopyInactiveVoxels)
@@ -608,6 +629,9 @@ TEST_F(TestVectorFromScalar, testCopyInactiveVoxels)
     {
 
         auto vectorGrid = tools::vectorFromScalar(*xGrid, *yGrid, *zGrid, /* copyInactiveValues = */ false);
+
+        static_assert(std::is_same_v<std::decay_t<decltype(*vectorGrid)>, Vec3SGrid>);
+
         auto& vectorTree = vectorGrid->tree();
 
         EXPECT_EQ(vectorTree.isValueOn(Coord(-1, 0, 0)), false);
@@ -639,6 +663,9 @@ TEST_F(TestVectorFromScalar, testCopyInactiveVoxels)
     {
 
         auto vectorGrid = tools::vectorFromScalar(*xGrid, *yGrid, *zGrid, /* copyInactiveValues = */ true);
+
+        static_assert(std::is_same_v<std::decay_t<decltype(*vectorGrid)>, Vec3SGrid>);
+
         auto& vectorTree = vectorGrid->tree();
 
         EXPECT_EQ(vectorTree.isValueOn(Coord(-1, 0, 0)), false);
