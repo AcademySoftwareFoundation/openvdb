@@ -622,6 +622,10 @@ endif()
 
 if(OpenVDB_USES_LOG4CPLUS)
   find_package(Log4cplus REQUIRED)
+  # Older FindLog4cplus modules only define Log4cplus::log4cplus
+  if(TARGET Log4cplus::log4cplus AND NOT TARGET log4cplus::log4cplus)
+    add_library(log4cplus::log4cplus ALIAS Log4cplus::log4cplus)
+  endif()
 endif()
 
 if(OpenVDB_USES_IMATH_HALF)
@@ -653,7 +657,7 @@ if(OpenVDB_USES_IMATH_HALF)
 endif()
 
 if(OpenVDB_USES_LOG4CPLUS)
-  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES Log4cplus::log4cplus)
+  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES log4cplus::log4cplus)
   list(APPEND OpenVDB_DEFINITIONS OPENVDB_USE_LOG4CPLUS)
 endif()
 
