@@ -63,8 +63,11 @@
 
 /* lz4 is compiled directly into this translation unit so that its symbols
    stay hidden rather than appearing in the shared library's export table -
-   override the visibility macro before lz4.h defines it. */
+   override the visibility macro before lz4.h defines it. MSVC has no
+   equivalent attribute and already hides symbols not marked for export. */
+#if defined(__GNUC__) && (__GNUC__ >= 4)
 #define LZ4LIB_VISIBILITY __attribute__((visibility("hidden")))
+#endif
 #include "lz4/lz4.h"
 #include "lz4/lz4.c"
 
