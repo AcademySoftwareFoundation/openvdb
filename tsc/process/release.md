@@ -13,25 +13,26 @@ The following assumes that the current OpenVDB library version number is 6.0.0 a
     * 2e. Click the "Save draft" button. DO NOT publish the release at this stage.
 3. Check out the `v6.1.0_rc` branch.
 4. Ensure the root `CMakeLists.txt` has the correct version number at the top.
-5. Update `CHANGES` and `doc/changes.txt` with release notes. Include any outstanding changes from the /pendingchanges directory. Run the files through a spell-check tool.
-6. Update the "Version 6.1.0 - In development" section in `CHANGES` and `doc/changes.txt` to replace "In development" with the planned release date.
-7. Merge these changes to `v6.1.0_rc` in a new pull request and verify that the build CI runs successfully.
-8. Manually dispatch the weekly CI workflow from the `v6.1.0_rc` branch and verify that the additional checks run successfully.
-9. Go to the [GitHub docs actions](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/docs.yml?query=workflow%3ADocs) for OpenVDB and manually dispatch the workflow for the `v6.1.0_rc` branch and set deploy to "docs". This will generate and add the documentation to the [OpenVDB website](https://github.com/AcademySoftwareFoundation/openvdb-website) repo and typically takes around 15 mins. When the action completes, check over the documentation on the `master` branch in the [OpenVDB website](https://github.com/AcademySoftwareFoundation/openvdb-website) repo. Fix any errors through pull request and re-dispatch the workflow if necessary.
-10. Publish the GitHub draft release from the [GitHub releases](https://github.com/AcademySoftwareFoundation/openvdb/releases) page.
-11. Merge the `v6.1.0_rc` branch back into `master` in a new pull request to ensure edits to release notes or any other fixes go back to master.
-12. Delete the `v6.1.0_rc` branch.
+5. Ensure the root `pyproject.toml` has the correct version number at the top.
+6. Update `CHANGES` and `doc/changes.txt` with release notes. Include any outstanding changes from the /pendingchanges directory. Run the files through a spell-check tool.
+7. Update the "Version 6.1.0 - In development" section in `CHANGES` and `doc/changes.txt` to replace "In development" with the planned release date.
+8. Merge these changes to `v6.1.0_rc` in a new pull request and verify that the build CI runs successfully.
+9. Manually dispatch the weekly CI workflow from the `v6.1.0_rc` branch and verify that the additional checks run successfully.
+10. Go to the [GitHub docs actions](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/docs.yml?query=workflow%3ADocs) for OpenVDB and manually dispatch the workflow for the `v6.1.0_rc` branch and set deploy to "docs". This will generate and add the documentation to the [OpenVDB website](https://github.com/AcademySoftwareFoundation/openvdb-website) repo and typically takes around 15 mins. When the action completes, check over the documentation on the `master` branch in the [OpenVDB website](https://github.com/AcademySoftwareFoundation/openvdb-website) repo. Fix any errors through pull request and re-dispatch the workflow if necessary.
+11. Publish the GitHub draft release from the [GitHub releases](https://github.com/AcademySoftwareFoundation/openvdb/releases) page.
+12. Merge the `v6.1.0_rc` branch back into `master` in a new pull request to ensure edits to release notes or any other fixes go back to master.
+13. Delete the `v6.1.0_rc` branch.
 
 ## Updating master for the subsequent release
 
-13. Fetch the latest changes in your local repository and check out the `master` branch.
-14. Change one or more of `OpenVDB_MAJOR_VERSION`, `OpenVDB_MINOR_VERSION` and `OpenVDB_PATCH_VERSION` in the root `CMakeLists.txt`.  Unless it is known that the next release will include API- or ABI-breaking changes, increment only the patch number to begin with (in this case, from 6.1.0 to 6.1.1).
-15. Add a "Version 6.1.1 - In development" section to `CHANGES` and to `doc/changes.txt`.
-16. Merge these changes to `master` in a new pull request.
+14. Fetch the latest changes in your local repository and check out the `master` branch.
+15. Change one or more of `OpenVDB_MAJOR_VERSION`, `OpenVDB_MINOR_VERSION` and `OpenVDB_PATCH_VERSION` in the root `CMakeLists.txt`.  Unless it is known that the next release will include API- or ABI-breaking changes, increment only the patch number to begin with (in this case, from 6.1.0 to 6.1.1).
+16. Add a "Version 6.1.1 - In development" section to `CHANGES` and to `doc/changes.txt`.
+17. Merge these changes to `master` in a new pull request.
 
 ## Announcing the release
 
-17. Update the [OpenVDB website](https://github.com/AcademySoftwareFoundation/openvdb-website) with a news item announcing the release, and delete the oldest news item.  Open that page in a browser and check that the website renders correctly and that there are no broken links.
-18. For major and minor releases, post a release announcement to the [OpenVDB forum](https://groups.google.com/forum/#!forum/openvdb-forum). Ken typically sends out the announcement.
+18. Update the [OpenVDB website](https://github.com/AcademySoftwareFoundation/openvdb-website) with a news item announcing the release, and delete the oldest news item.  Open that page in a browser and check that the website renders correctly and that there are no broken links.
+19. For major and minor releases, post a release announcement to the [OpenVDB forum](https://groups.google.com/forum/#!forum/openvdb-forum). Ken typically sends out the announcement.
 
 END
