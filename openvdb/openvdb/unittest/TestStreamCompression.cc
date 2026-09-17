@@ -12,7 +12,7 @@
 #include <fstream>
 #include <numeric> // for std::iota()
 
-#include <blosc.h>
+#include <openvdb_blosc.h>
 
 #ifdef _WIN32
 #include <windows.h>

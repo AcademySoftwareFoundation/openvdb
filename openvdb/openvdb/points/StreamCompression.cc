@@ -8,7 +8,7 @@
 #include <openvdb/util/Assert.h>
 #include <map>
 #include <vector>
-#include <blosc.h>
+#include <openvdb_blosc.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
