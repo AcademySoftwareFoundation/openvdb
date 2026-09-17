@@ -293,8 +293,11 @@ class TestDeviceGridHandleInterop(unittest.TestCase):
             adopted = nanovdb.cuda.DeviceGridHandle.from_buffer(ext)
             self.assertEqual(adopted.gridType(0), nanovdb.GridType.OnIndex)
             self.assertEqual(adopted.size(), dh.size())
-            # from_buffer MOVES the buffer; the source is left empty.
+            # from_buffer MOVES the buffer; the source is left empty and its
+            # pointer reads must stay safe (the per-device array is gone).
             self.assertEqual(ext.size(), 0)
+            self.assertEqual(ext.device_ptr(), 0)
+            self.assertEqual(ext.__cuda_array_interface__["data"], (0, False))
         finally:
             cp.cuda.set_allocator(prev)
 
@@ -440,6 +443,21 @@ class TestTransferPreconditions(unittest.TestCase):
         dh.deviceDownload(0, True)
         self.assertEqual(dh.grid(0).gridType(), nanovdb.GridType.OnIndex)
         dh.deviceUpload(0, True)
+
+    def test_default_constructed_device_handle_is_inert(self):
+        # An empty DualDeviceBuffer has no per-device pointer array at all, so
+        # every device-pointer read must short-circuit rather than index it.
+        h = nanovdb.cuda.DeviceGridHandle()
+        self.assertTrue(h.isEmpty())
+        self.assertEqual(h.device_ptr(), 0)
+        cai = h.__cuda_array_interface__
+        self.assertEqual(cai["shape"], (0,))
+        self.assertEqual(cai["data"], (0, False))
+        self.assertIsNotNone(h.__dlpack__())
+        with self.assertRaises(ValueError):
+            h.deviceUpload(0, True)
+        with self.assertRaises(ValueError):
+            h.deviceDownload(0, True)
 
     def test_empty_unified_handle_raises(self):
         u = nanovdb.cuda.UnifiedGridHandle()

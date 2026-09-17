@@ -101,7 +101,7 @@ void defineDeviceGridHandle(nb::module_& m)
         .def(
             "deviceDownload",
             [](GridHandle<BufferT>& handle, uintptr_t stream, bool sync) {
-                requireDeviceCopy(handle.buffer().deviceData(), "deviceDownload");
+                requireDeviceCopy(deviceDataOrNull(handle.buffer()), "deviceDownload");
                 cudaStream_t s = reinterpret_cast<cudaStream_t>(stream);
                 // Current-device overload, matching deviceData() (see deviceUpload).
                 handle.deviceDownload(reinterpret_cast<void*>(s), sync);
@@ -116,7 +116,7 @@ void defineDeviceGridHandle(nb::module_& m)
         .def(
             "device_ptr",
             [](GridHandle<BufferT>& handle) {
-                return reinterpret_cast<uintptr_t>(handle.buffer().deviceData());
+                return reinterpret_cast<uintptr_t>(deviceDataOrNull(handle.buffer()));
             },
             "Raw device pointer to the base of the whole device buffer as a "
             "Python int (0 if the handle has not been uploaded to the device "
@@ -144,7 +144,7 @@ void defineDeviceGridHandle(nb::module_& m)
                 iface["shape"] = nb::make_tuple(handle.buffer().size());
                 iface["typestr"] = "|u1";
                 iface["data"] = nb::make_tuple(
-                    reinterpret_cast<uintptr_t>(handle.buffer().deviceData()), false);
+                    reinterpret_cast<uintptr_t>(deviceDataOrNull(handle.buffer())), false);
                 iface["version"] = 3;
                 iface["strides"] = nb::none();
                 iface["stream"] = 1;
@@ -176,7 +176,7 @@ void defineDeviceGridHandle(nb::module_& m)
                     orderPriorUsesBefore(handle.buffer(), consumer, 0);
                 size_t shape[1] = {static_cast<size_t>(handle.buffer().size())};
                 nb::ndarray<nb::device::cuda, uint8_t, nb::ndim<1>> arr(
-                    handle.buffer().deviceData(), 1, shape, self);
+                    deviceDataOrNull(handle.buffer()), 1, shape, self);
                 // nb::cast of a no-framework device ndarray IS the "dltensor"
                 // capsule (what __dlpack__ must return); return it directly.
                 return nb::cast(arr, nb::rv_policy::reference);

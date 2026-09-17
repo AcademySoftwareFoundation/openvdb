@@ -102,6 +102,17 @@ inline constexpr char kRecordUseDoc[] =
     "current CUDA device). No-op on non-owning (from_external) buffers, "
     "which never free their pointers.";
 
+/// @brief Current-device pointer of a buffer, or nullptr when the buffer is
+///        empty. DualDeviceBuffer::deviceData() indexes its per-device pointer
+///        array unconditionally, and that array is null on a default-constructed,
+///        moved-from or cleared buffer, so calling it there segfaults. Every
+///        binding that reads the device pointer goes through this instead.
+template<typename BufferT>
+inline void* deviceDataOrNull(const BufferT& buf)
+{
+    return buf.size() == 0 ? nullptr : buf.deviceData();
+}
+
 /// @brief Bind the device-interop surface (CUDA Array Interface / DLPack, raw
 ///        device/host pointers, streams) onto a device-buffer-like class.
 ///
@@ -120,7 +131,7 @@ void addDeviceInterop(nb::class_<BufferT>& cls)
     cls.def(
         "device_ptr",
         [](const BufferT& buf) {
-            return reinterpret_cast<uintptr_t>(buf.deviceData());
+            return reinterpret_cast<uintptr_t>(deviceDataOrNull(buf));
         },
         "Raw device pointer to the current device's buffer as a Python int "
         "(0 if no device allocation exists yet). Work you enqueue against "
@@ -151,7 +162,7 @@ void addDeviceInterop(nb::class_<BufferT>& cls)
             iface["shape"] = nb::make_tuple(buf.size());
             iface["typestr"] = "|u1";
             iface["data"] =
-                nb::make_tuple(reinterpret_cast<uintptr_t>(buf.deviceData()), false);
+                nb::make_tuple(reinterpret_cast<uintptr_t>(deviceDataOrNull(buf)), false);
             iface["version"] = 3;
             iface["strides"] = nb::none();
             iface["stream"] = 1;
@@ -188,7 +199,7 @@ void addDeviceInterop(nb::class_<BufferT>& cls)
             // ndarray view parented to this buffer (keep_alive via owner) and
             // forward to its own __dlpack__ producer.
             nb::ndarray<nb::device::cuda, uint8_t, nb::ndim<1>> arr(
-                buf.deviceData(), 1, shape, self);
+                deviceDataOrNull(buf), 1, shape, self);
             // nb::cast of a no-framework device ndarray IS the "dltensor"
             // PyCapsule (nanobind ndarray_export), which is exactly what
             // __dlpack__ must return — so return it directly (do NOT call
