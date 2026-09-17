@@ -553,6 +553,76 @@ class TestGridHandleSequenceProtocol(unittest.TestCase):
         self.assertGreater(grids[1].activeVoxelCount(), 0)
 
 
+class TestGridHandleWrapConstructor(unittest.TestCase):
+    """GridHandle(t) wraps a caller-owned uint32 array without copying. The
+    binding must reject misaligned memory up front (NanoVDB requires 32-byte
+    aligned buffers and the C++ side only asserts it) and must keep the
+    source array alive for the handle's lifetime."""
+
+    @staticmethod
+    def _grid_words(np):
+        h = nanovdb.tools.createFogVolumeSphere(name="wrapped")
+        return np.frombuffer(h.gridData(0), dtype=np.uint32)
+
+    @staticmethod
+    def _aligned_copy(np, words, alignment=32, offset=0):
+        # Carve a view whose data pointer sits at `offset` bytes past a
+        # 32-byte boundary, then fill it with the grid words.
+        slack = alignment // words.itemsize
+        raw = np.empty(words.size + 2 * slack, dtype=np.uint32)
+        base = raw.ctypes.data % alignment
+        start = ((alignment - base) % alignment + offset) // words.itemsize
+        view = raw[start:start + words.size]
+        assert view.ctypes.data % alignment == offset
+        view[:] = words
+        return view
+
+    def setUp(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy not installed")
+        self.np = np
+
+    def test_aligned_array_wraps_in_place(self):
+        np = self.np
+        words = self._aligned_copy(np, self._grid_words(np))
+        h = nanovdb.GridHandle(words)
+        self.assertEqual(h.gridCount(), 1)
+        self.assertEqual(h.grid().gridName(), "wrapped")
+        # No copy: the grid is read in place, so editing the array's copy of
+        # the GridData name field (byte offset 40) shows through the handle.
+        name = words[10:10 + 64].view(np.uint8)
+        self.assertEqual(bytes(name[:7]), b"wrapped")
+        name[0] = ord("W")
+        self.assertEqual(h.grid().gridName(), "Wrapped")
+
+    def test_misaligned_array_raises_value_error(self):
+        np = self.np
+        words = self._aligned_copy(np, self._grid_words(np), offset=16)
+        with self.assertRaises(ValueError) as cm:
+            nanovdb.GridHandle(words)
+        self.assertIn("aligned", str(cm.exception))
+
+    def test_handle_keeps_source_array_alive(self):
+        import gc
+        np = self.np
+        h = nanovdb.GridHandle(self._aligned_copy(np, self._grid_words(np)))
+        for _ in range(3):
+            gc.collect()
+        # The temporary array is unreachable from Python; only the handle's
+        # keep_alive link holds it. Reading through the handle must not
+        # touch freed memory.
+        self.assertEqual(h.grid().gridName(), "wrapped")
+        self.assertGreater(h.grid().activeVoxelCount(), 0)
+
+    def test_garbage_raises_runtime_error(self):
+        np = self.np
+        words = self._aligned_copy(np, np.zeros(1024, dtype=np.uint32))
+        with self.assertRaises(RuntimeError):
+            nanovdb.GridHandle(words)
+
+
 class TestBuildTRegistrations(unittest.TestCase):
     """Every BuildT we bind exposes the right shape — a Grid class, a
     ReadAccessor, and (for arithmetic-valued scalars) a NodeInfo. Accessor
