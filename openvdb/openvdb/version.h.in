@@ -128,9 +128,9 @@
 #cmakedefine OPENVDB_IMATH_VERSION
 #endif
 
-/* Denotes whether VDB was built with Blosc support */
+/* OpenVDB is always built with Blosc support */
 #ifndef OPENVDB_USE_BLOSC
-#cmakedefine OPENVDB_USE_BLOSC
+#define OPENVDB_USE_BLOSC
 #endif
 
 /* Denotes whether VDB was built with ZLIB support */
