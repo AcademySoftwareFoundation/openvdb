@@ -60,13 +60,11 @@ for help with installations.
 # @note If your distribution does not have required versions, consider using
 #   apt pinning. See the dependency documentation for more details.
 apt-get install -y libtbb-dev
-apt-get install -y libblosc-dev
 
 # MacOS
 # @note We are using homebrew in this example to install requried dependencies
 #  https://brew.sh/
 brew install tbb
-brew install c-blosc
 ```
 
 ```bash
@@ -90,7 +88,6 @@ dependencies.
 
 ```bash
 vcpkg install zlib:x64-windows
-vcpkg install blosc:x64-windows
 vcpkg install tbb:x64-windows
 ```
 

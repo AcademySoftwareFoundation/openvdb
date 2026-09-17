@@ -57,7 +57,7 @@ This will define the following variables:
 ``OpenVDB_${COMPONENT}_FOUND``
   True if the system has the named OpenVDB component.
 ``OpenVDB_USES_BLOSC``
-  True if the OpenVDB Library has been built with blosc support
+  True. The OpenVDB Library is always built with blosc support.
 ``OpenVDB_USES_ZLIB``
   True if the OpenVDB Library has been built with zlib support
 ``OpenVDB_USES_LOG4CPLUS``

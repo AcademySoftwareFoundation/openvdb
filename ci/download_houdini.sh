@@ -41,7 +41,6 @@ if [[ $PLATFORM =~ "linux" ]]; then
     mv toolkit/include ../hou/toolkit/.
     mv dsolib/libHoudini* ../hou/dsolib/.
     mv dsolib/libopenvdb_sesi* ../hou/dsolib/.
-    mv dsolib/libblosc* ../hou/dsolib/.
     mv dsolib/libhboost* ../hou/dsolib/.
     mv dsolib/libz* ../hou/dsolib/.
     mv dsolib/libbz2* ../hou/dsolib/.
@@ -88,7 +87,6 @@ elif [[ $PLATFORM =~ "macos" ]]; then
     unused_libraries=$(ls | \
         grep -e libHoudini \
              -e libopenvdb_sesi \
-             -e libblosc \
              -e libhboost \
              -e libz \
              -e libbz2 \

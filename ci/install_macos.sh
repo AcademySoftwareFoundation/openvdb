@@ -14,7 +14,6 @@ rm /usr/local/bin/python3* || :
 brew update
 brew install bash gnu-getopt # for CI scripts
 brew install boost
-brew install c-blosc
 brew install cmake
 brew install glfw
 brew install googletest

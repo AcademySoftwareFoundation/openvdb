@@ -306,7 +306,7 @@ auto byName = nanovdb::io::readGrid("multi_grid.nvdb", "density");
 // Single grid
 nanovdb::io::writeGrid("out.nvdb", handle);
 
-// With compression (requires NANOVDB_USE_BLOSC=ON at build time)
+// With compression
 nanovdb::io::writeGrid("out.nvdb", handle, nanovdb::io::Codec::BLOSC);
 
 // Multiple grids

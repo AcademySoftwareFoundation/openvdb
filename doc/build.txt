@@ -7,7 +7,6 @@
 - @ref buildCmakeStructure
   - @ref buildDependencies
   - @ref buildMixingDepInstalls
-  - @ref buildBloscSupport
   - @ref buildZLibSupport
   - @ref buildVCPKG
   - @ref buildSimd
@@ -52,7 +51,7 @@ CMake is expected to provide their own configuration files which dependent
 software will locate and use. Not all of OpenVDB's dependencies provide CMake
 support and therefore do not deploy with CMake configurations that OpenVDB can
 use. OpenVDB provides a set of `FindModules` in the `cmake` folder for finding
-these various dependencies e.g. `FindBlosc.cmake`. These are designed such
+these various dependencies. These are designed such
 that they can theoretically be used by any project that needs to locate the
 given library and are invoked by the `find_package()` call. For more
 information on FindModules and locating packages with CMake, see the following
@@ -75,7 +74,7 @@ Each CMake FindModule provides a description of the possible inputs which can
 be provided to help drive the search for OpenVDB dependencies (as well as the
 resulting outputs). They have been homogenized such that these variables
 follow a set convention, typically followed by most CMake projects. For a
-given FindModule e.g. `FindBlosc.cmake`:
+given FindModule:
 
   - FindXxx.cmake provides the module interface where Xxx becomes the library
   name
@@ -88,7 +87,7 @@ given FindModule e.g. `FindBlosc.cmake`:
    - @b Xxx_ROOT - Preferred installation prefix. The given dependency is
    expected to follow a folder structure `Xxx_ROOT/include` and `Xxx_ROOT/lib`
    exist. Note that unlike the above, this is the case matching name of the
-   find package .i.e. Blosc_ROOT, TBB_ROOT etc.
+   find package .i.e. TBB_ROOT etc.
    - @b XXX_INCLUDEDIR / @b XXX_LIBRARYDIR - Preferred include and library
    directories
    - @b SYSTEM_LIBRARY_PATHS - A list of paths appended to all include and lib
@@ -144,26 +143,12 @@ respectively.
 In summary try to stick to a single installation workflow and, if in doubt,
 provide direct include/lib paths to isolated software locations.
 
-@subsection buildBloscSupport Blosc Support
-
-Blosc is an optional dependency of all OpenVDB components. The documented
-build steps below treat blosc as a required dependency. There are two reasons
-for this:
-
- - Blosc produces significantly smaller `.vdb` files
- - If Blosc is disabled, you will not be able to read or use any `.vdb` files
-   that were created using blosc compression. This includes OpenVDB files from
-   Houdini.
-
-See the note in the [known issues list](@ref depKnownIssues) regarding supported
-versions of blosc.
-
 @subsection buildZLibSupport ZLIB Support
 
 ZLIB is an optional dependency of all OpenVDB components. The documented build
 steps below treat ZLib as a required dependency.
 
-You can disable ZLib using `-D USE_ZLIB=OFF` if Blosc is also disabled using `-D USE_BLOSC=OFF`.
+You can disable ZLib using `-D USE_ZLIB=OFF`.
 
 @subsection buildVCPKG Building Dependencies using VCPKG
 
@@ -268,8 +253,8 @@ Developers may wish to build a standalone version of OpenVDB to take advantage
 of newer dependencies and newer library features. See
 [here](@ref buildBuildStandalone) for more information.
 
-@b Note: Blosc and ZLib are treated as required dependencies in these install
-instructions. See the [blosc support](@ref buildBloscSupport) and
+@b Note: ZLib is treated as a required dependency in these install
+instructions. See the
 [zlib support](@ref buildZLibSupport) sections for more information.
 
 @subsection buildBuildHouMaya Building Against Houdini/Maya
@@ -309,8 +294,8 @@ LLVM           | Target-independent code generation                             
 
 At a minimum a matching C++17 compiler and CMake will be required. See
 the full [dependency list](@ref dependencies) for help with downloading and
-installing the above software. Note that as Blosc and ZLib are provided as part
-of the Houdini installation `USE_BLOSC` and `USE_ZLIB` should be left `ON`.
+installing the above software. Note that as ZLib is provided as part
+of the Houdini installation `USE_ZLIB` should be left `ON`.
 
 With the necessary dependencies installed, create and enter a directory for
 cmake to write to. It's generally useful to create this in the location you've
@@ -385,7 +370,6 @@ Package        | Description                                                    
 CMake          | Cross-platform family of tools designed to help build software    | All                              |
 C++17 Compiler | Matching Houdini compiler and version                             | All                              |
 ZLIB           | Compression library for disk serialization compression            | All                              |
-Blosc          | Recommended dependency for improved disk compression              | All*                             |
 GoogleTest     | A unit testing framework module for C++                           | Unit Tests                       |
 GLFW           | Simple API for OpenGL development                                 | OpenVDB View                     |
 Doxygen        | Documentation generation from C++                                 | Documentation                    |
@@ -396,9 +380,7 @@ nanobind       | C++/python bindings                                            
 LLVM           | Target-independent code generation                                | OpenVDB AX                       |
 
 
-* See [blosc support](@ref buildBloscSupport)
-
-At a minimum, a matching C++17 compiler, ZLIB, blosc and CMake will be
+At a minimum, a matching C++17 compiler, ZLIB and CMake will be
 required. See the full [dependency list](@ref dependencies) for help with
 downloading and installing the above software.
 
