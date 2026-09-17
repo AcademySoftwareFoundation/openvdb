@@ -47,7 +47,7 @@
 #ifdef NANOVDB_USE_ZIP
 #include <zlib.h> // for ZIP compression
 #endif
-#include <blosc.h> // for BLOSC compression
+#include <nanovdb_blosc.h> // for BLOSC compression
 
 // Due to a bug in older versions of gcc, including fstream might
 // define "major" and "minor" which are used as member data below.

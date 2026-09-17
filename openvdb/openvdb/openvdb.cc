@@ -10,7 +10,7 @@
 #include <atomic>
 #include <mutex>
 
-#include <blosc.h>
+#include <openvdb_blosc.h>
 
 #if OPENVDB_ABI_VERSION_NUMBER <= 10
     #error ABI <= 10 is no longer supported

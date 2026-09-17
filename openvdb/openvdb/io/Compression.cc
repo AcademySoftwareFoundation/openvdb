@@ -9,7 +9,7 @@
 #ifdef OPENVDB_USE_ZLIB
 #include <zlib.h>
 #endif
-#include <blosc.h>
+#include <openvdb_blosc.h>
 
 
 namespace openvdb {
