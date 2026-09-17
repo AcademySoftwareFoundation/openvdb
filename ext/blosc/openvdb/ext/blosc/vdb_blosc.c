@@ -10,57 +10,68 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <string.h>
-#include <sys/types.h>
 #include <assert.h>
 
-#include "blosc.h"
-#include "lz4.h"
+/* Version numbers */
+#define BLOSC_VERSION_MAJOR    1    /* for major interface/format changes  */
+#define BLOSC_VERSION_MINOR    21   /* for minor interface/format changes  */
+#define BLOSC_VERSION_RELEASE  6    /* for tweaks, bug-fixes, or development */
 
-#if defined(_WIN32) && !defined(__MINGW32__)
-  #include <malloc.h>
-  #include <stdint.h>
-#else
-  #include <stdint.h>
-  #include <unistd.h>
-  #include <inttypes.h>
-#endif  /* _WIN32 */
+#define BLOSC_VERSION_STRING   "1.21.6"  /* string version.  Sync with above! */
+#define BLOSC_VERSION_REVISION "$Rev$"   /* revision version */
+#define BLOSC_VERSION_DATE     "$Date:: 2024-06-24 #$"    /* date version */
 
-#ifdef __GNUC__
-#define BLOSC_GCC_VERSION (__GNUC__ * 100 + __GNUC_MINOR__)
-#endif  /* __GNUC__ */
+/* The *_FORMAT symbols should be just 1-byte long */
+#define BLOSC_VERSION_FORMAT    2   /* Blosc format version, starting at 1 */
 
-/* Detect if the architecture is fine with unaligned access. */
-#if !defined(BLOSC_STRICT_ALIGN)
-#define BLOSC_STRICT_ALIGN
-#if defined(__i386__) || defined(__386) || defined (__amd64)  /* GNU C, Sun Studio */
-#undef BLOSC_STRICT_ALIGN
-#elif defined(__i486__) || defined(__i586__) || defined(__i686__)  /* GNU C */
-#undef BLOSC_STRICT_ALIGN
-#elif defined(_M_IX86) || defined(_M_X64)   /* Intel, MSVC */
-#undef BLOSC_STRICT_ALIGN
-#elif defined(__386)
-#undef BLOSC_STRICT_ALIGN
-#elif defined(_X86_) /* MinGW */
-#undef BLOSC_STRICT_ALIGN
-#elif defined(__I86__) /* Digital Mars */
-#undef BLOSC_STRICT_ALIGN
-/* Seems like unaligned access in ARM (at least ARMv6) is pretty
-   expensive, so we are going to always enforce strict alignment in ARM.
-   If anybody suggest that newer ARMs are better, we can revisit this. */
-/* #elif defined(__ARM_FEATURE_UNALIGNED) */  /* ARM, GNU C */
-/* #undef BLOSC_STRICT_ALIGN */
-#elif defined(_ARCH_PPC) || defined(__PPC__)
-/* Modern PowerPC systems (like POWER8) should support unaligned access
-   quite efficiently. */
-#undef BLOSC_STRICT_ALIGN
-#endif
-#endif
+
+
+/* Maximum typesize before considering source buffer as a stream of bytes */
+#define BLOSC_MAX_TYPESIZE 255         /* Cannot be larger than 255 */
+
+/* Codes for shuffling (see blosc_compress) */
+#define BLOSC_NOSHUFFLE   0  /* no shuffle */
+#define BLOSC_SHUFFLE     1  /* byte-wise shuffle */
+
+/* Codes for internal flags */
+#define BLOSC_DOSHUFFLE    0x1	/* byte-wise shuffle */
+#define BLOSC_MEMCPYED     0x2	/* plain copy */
+
+/* Code for the only compressor shipped with Blosc */
+#define BLOSC_LZ4       1
+
+/* Name for the only compressor shipped with Blosc */
+#define BLOSC_LZ4_COMPNAME       "lz4"
+
+/* Code for the compression library shipped with Blosc (code must be < 8) */
+#define BLOSC_LZ4_LIB       1
+
+/* Name for the compression library shipped with Blosc */
+#define BLOSC_LZ4_LIBNAME       "LZ4"
+
+/* The code for the compressor format shipped with Blosc */
+#define BLOSC_LZ4_FORMAT      BLOSC_LZ4_LIB
+
+/* The version format for the compressor shipped with Blosc (starts at 1) */
+#define BLOSC_LZ4_VERSION_FORMAT      1
+
+/* Split mode used for blocks.  Kept internal; there is only one mode. */
+#define BLOSC_FORWARD_COMPAT_SPLIT 4
+
+#include "vdb_blosc.h"
+
+/* lz4 is compiled directly into this translation unit so that its symbols
+   stay hidden rather than appearing in the shared library's export table -
+   override the visibility macro before lz4.h defines it. */
+#define LZ4LIB_VISIBILITY __attribute__((visibility("hidden")))
+#include "lz4/lz4.h"
+#include "lz4/lz4.c"
+
+#include <stdint.h>
 
 /* Some useful units */
-#define KB 1024
-#define MB (1024 * (KB))
+#define _KB 1024
 
 /* Minimum buffer size to be compressed */
 #define MIN_BUFFERSIZE 128       /* Cannot be smaller than 66 */
@@ -69,7 +80,7 @@
 #define MAX_SPLITS 16            /* Cannot be larger than 128 */
 
 /* The size of L1 cache.  32 KB is quite common nowadays. */
-#define L1 (32 * (KB))
+#define L1 (32 * (_KB))
 
 struct blosc_context {
   int32_t compress;               /* 1 if we are doing compression 0 if decompress */
@@ -91,9 +102,6 @@ struct blosc_context {
   int clevel;                     /* Compression level (1-9) */
 };
 
-/* Global context for non-contextual API */
-static struct blosc_context* g_global_context;
-static int32_t g_compressor = BLOSC_LZ4;  /* the compressor to use by default */
 static int32_t g_initlib = 0;
 
 
@@ -171,35 +179,6 @@ static void _sw32(uint8_t* dest, int32_t a)
  * Conversion routines between compressor and compression libraries
  */
 
-/* Return the library name associated with the compressor code */
-static const char *clibcode_to_clibname(int clibcode)
-{
-  if (clibcode == BLOSC_LZ4_LIB) return BLOSC_LZ4_LIBNAME;
-  return NULL;                  /* should never happen */
-}
-
-
-/*
- * Conversion routines between compressor names and compressor codes
- */
-
-/* Get the compressor name associated with the compressor code */
-int blosc_compcode_to_compname(int compcode, const char **compname)
-{
-  int code = -1;    /* -1 means non-existent compressor code */
-  const char *name = NULL;
-
-  /* Map the compressor code */
-  if (compcode == BLOSC_LZ4) {
-    name = BLOSC_LZ4_COMPNAME;
-    code = BLOSC_LZ4;
-  }
-
-  *compname = name;
-
-  return code;
-}
-
 /* Get the compressor code for the compressor name. -1 if it is not available */
 static int blosc_compname_to_compcode(const char *compname)
 {
@@ -248,248 +227,6 @@ static int get_accel(const struct blosc_context* context) {
   return 10 - context->clevel;
 }
 
-
-/*
- * fastcopy: a memcpy() replacement, heavily based on memcopy.h from the
- * zlib-ng compression library (https://github.com/zlib-ng/zlib-ng).
- */
-
-static inline unsigned char *copy_1_bytes(unsigned char *out, const unsigned char *from) {
-  *out++ = *from;
-  return out;
-}
-
-static inline unsigned char *copy_2_bytes(unsigned char *out, const unsigned char *from) {
-#if defined(BLOSC_STRICT_ALIGN)
-  uint16_t chunk;
-  memcpy(&chunk, from, 2);
-  memcpy(out, &chunk, 2);
-#else
-  *(uint16_t *) out = *(uint16_t *) from;
-#endif
-  return out + 2;
-}
-
-static inline unsigned char *copy_3_bytes(unsigned char *out, const unsigned char *from) {
-  out = copy_1_bytes(out, from);
-  return copy_2_bytes(out, from + 1);
-}
-
-static inline unsigned char *copy_4_bytes(unsigned char *out, const unsigned char *from) {
-#if defined(BLOSC_STRICT_ALIGN)
-  uint32_t chunk;
-  memcpy(&chunk, from, 4);
-  memcpy(out, &chunk, 4);
-#else
-  *(uint32_t *) out = *(uint32_t *) from;
-#endif
-  return out + 4;
-}
-
-static inline unsigned char *copy_5_bytes(unsigned char *out, const unsigned char *from) {
-  out = copy_1_bytes(out, from);
-  return copy_4_bytes(out, from + 1);
-}
-
-static inline unsigned char *copy_6_bytes(unsigned char *out, const unsigned char *from) {
-  out = copy_2_bytes(out, from);
-  return copy_4_bytes(out, from + 2);
-}
-
-static inline unsigned char *copy_7_bytes(unsigned char *out, const unsigned char *from) {
-  out = copy_3_bytes(out, from);
-  return copy_4_bytes(out, from + 3);
-}
-
-static inline unsigned char *copy_8_bytes(unsigned char *out, const unsigned char *from) {
-#if defined(BLOSC_STRICT_ALIGN)
-  uint64_t chunk;
-  memcpy(&chunk, from, 8);
-  memcpy(out, &chunk, 8);
-#else
-  *(uint64_t *) out = *(uint64_t *) from;
-#endif
-  return out + 8;
-}
-
-static inline unsigned char *copy_16_bytes(unsigned char *out, const unsigned char *from) {
-#if !defined(BLOSC_STRICT_ALIGN)
-  *(uint64_t*)out = *(uint64_t*)from;
-   from += 8; out += 8;
-   *(uint64_t*)out = *(uint64_t*)from;
-   from += 8; out += 8;
-#else
-   int i;
-   for (i = 0; i < 16; i++) {
-     *out++ = *from++;
-   }
-#endif
-  return out;
-}
-
-static inline unsigned char *copy_32_bytes(unsigned char *out, const unsigned char *from) {
-#if !defined(BLOSC_STRICT_ALIGN)
-  *(uint64_t*)out = *(uint64_t*)from;
-  from += 8; out += 8;
-  *(uint64_t*)out = *(uint64_t*)from;
-  from += 8; out += 8;
-  *(uint64_t*)out = *(uint64_t*)from;
-  from += 8; out += 8;
-  *(uint64_t*)out = *(uint64_t*)from;
-  from += 8; out += 8;
-#else
-  int i;
-  for (i = 0; i < 32; i++) {
-    *out++ = *from++;
-  }
-#endif
-  return out;
-}
-
-/* Copy LEN bytes (7 or fewer) from FROM into OUT. Return OUT + LEN. */
-static inline unsigned char *copy_bytes(unsigned char *out, const unsigned char *from, unsigned len) {
-  assert(len < 8);
-
-#ifdef BLOSC_STRICT_ALIGN
-  while (len--) {
-    *out++ = *from++;
-  }
-#else
-  switch (len) {
-    case 7:
-      return copy_7_bytes(out, from);
-    case 6:
-      return copy_6_bytes(out, from);
-    case 5:
-      return copy_5_bytes(out, from);
-    case 4:
-      return copy_4_bytes(out, from);
-    case 3:
-      return copy_3_bytes(out, from);
-    case 2:
-      return copy_2_bytes(out, from);
-    case 1:
-      return copy_1_bytes(out, from);
-    case 0:
-      return out;
-    default:
-      assert(0);
-  }
-#endif /* BLOSC_STRICT_ALIGN */
-  return out;
-}
-
-// Define a symbol for avoiding fall-through warnings emitted by gcc >= 7.0
-#if ((defined(__GNUC__) && BLOSC_GCC_VERSION >= 700) && !defined(__clang__) && \
-     !defined(__ICC) && !defined(__ICL))
-#define AVOID_FALLTHROUGH_WARNING
-#endif
-
-/* Byte by byte semantics: copy LEN bytes from FROM and write them to OUT. Return OUT + LEN. */
-static inline unsigned char *chunk_memcpy(unsigned char *out, const unsigned char *from, unsigned len) {
-  unsigned sz = sizeof(uint64_t);
-  unsigned rem = len % sz;
-  unsigned by8;
-
-  assert(len >= sz);
-
-  /* Copy a few bytes to make sure the loop below has a multiple of SZ bytes to be copied. */
-  copy_8_bytes(out, from);
-
-  len /= sz;
-  out += rem;
-  from += rem;
-
-  by8 = len % 8;
-  len -= by8;
-  switch (by8) {
-    case 7:
-      out = copy_8_bytes(out, from);
-      from += sz;
-      #ifdef AVOID_FALLTHROUGH_WARNING
-      __attribute__ ((fallthrough));  // Shut-up -Wimplicit-fallthrough warning in GCC
-      #endif
-    case 6:
-      out = copy_8_bytes(out, from);
-      from += sz;
-      #ifdef AVOID_FALLTHROUGH_WARNING
-      __attribute__ ((fallthrough));
-      #endif
-    case 5:
-      out = copy_8_bytes(out, from);
-      from += sz;
-      #ifdef AVOID_FALLTHROUGH_WARNING
-      __attribute__ ((fallthrough));
-      #endif
-    case 4:
-      out = copy_8_bytes(out, from);
-      from += sz;
-      #ifdef AVOID_FALLTHROUGH_WARNING
-      __attribute__ ((fallthrough));
-      #endif
-    case 3:
-      out = copy_8_bytes(out, from);
-      from += sz;
-      #ifdef AVOID_FALLTHROUGH_WARNING
-      __attribute__ ((fallthrough));
-      #endif
-    case 2:
-      out = copy_8_bytes(out, from);
-      from += sz;
-      #ifdef AVOID_FALLTHROUGH_WARNING
-      __attribute__ ((fallthrough));
-      #endif
-    case 1:
-      out = copy_8_bytes(out, from);
-      from += sz;
-      #ifdef AVOID_FALLTHROUGH_WARNING
-      __attribute__ ((fallthrough));
-      #endif
-    default:
-      break;
-  }
-
-  while (len) {
-    out = copy_8_bytes(out, from);
-    from += sz;
-    out = copy_8_bytes(out, from);
-    from += sz;
-    out = copy_8_bytes(out, from);
-    from += sz;
-    out = copy_8_bytes(out, from);
-    from += sz;
-    out = copy_8_bytes(out, from);
-    from += sz;
-    out = copy_8_bytes(out, from);
-    from += sz;
-    out = copy_8_bytes(out, from);
-    from += sz;
-    out = copy_8_bytes(out, from);
-    from += sz;
-
-    len -= 8;
-  }
-
-  return out;
-}
-
-/* Byte by byte semantics: copy LEN bytes from FROM and write them to OUT. Return OUT + LEN. */
-static unsigned char *fastcopy(unsigned char *out, const unsigned char *from, unsigned len) {
-  switch (len) {
-    case 32:
-      return copy_32_bytes(out, from);
-    case 16:
-      return copy_16_bytes(out, from);
-    case 8:
-      return copy_8_bytes(out, from);
-    default: {
-    }
-  }
-  if (len < 8) {
-    return copy_bytes(out, from, len);
-  }
-  return chunk_memcpy(out, from, len);
-}
 
 /* Shuffle a block of data by type size. */
 static void shuffle_block(const size_t typesize, const size_t blocksize,
@@ -590,7 +327,7 @@ static int blosc_c(const struct blosc_context* context, int32_t blocksize,
       if ((ntbytes+neblock) > maxbytes) {
         return 0;    /* Non-compressible data */
       }
-      fastcopy(dest, _tmp + j * neblock, neblock);
+      memcpy(dest, _tmp + j * neblock, neblock);
       cbytes = neblock;
     }
     _sw32(dest - 4, cbytes);
@@ -650,7 +387,7 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize,
     src = base_src + src_offset;
     /* Uncompress */
     if (cbytes == neblock) {
-      fastcopy(_tmp, src, neblock);
+      memcpy(_tmp, src, neblock);
       nbytes = neblock;
     }
     else {
@@ -697,8 +434,8 @@ static int serial_blosc(struct blosc_context* context)
     if (context->compress) {
       if (*(context->header_flags) & BLOSC_MEMCPYED) {
         /* We want to memcpy only */
-        fastcopy(context->dest + BLOSC_MAX_OVERHEAD + j * context->blocksize,
-                 context->src + j * context->blocksize, bsize);
+        memcpy(context->dest + BLOSC_MAX_OVERHEAD + j * context->blocksize,
+               context->src + j * context->blocksize, bsize);
         cbytes = bsize;
       }
       else {
@@ -715,8 +452,8 @@ static int serial_blosc(struct blosc_context* context)
     else {
       if (*(context->header_flags) & BLOSC_MEMCPYED) {
         /* We want to memcpy only */
-        fastcopy(context->dest + j * context->blocksize,
-                 context->src + BLOSC_MAX_OVERHEAD + j * context->blocksize, bsize);
+        memcpy(context->dest + j * context->blocksize,
+               context->src + BLOSC_MAX_OVERHEAD + j * context->blocksize, bsize);
         cbytes = bsize;
       }
       else {
@@ -929,12 +666,7 @@ static int write_compression_header(struct blosc_context* context, int clevel, i
     context->dest[1] = BLOSC_LZ4_VERSION_FORMAT;  /* lz4 format version */
   }
   else {
-    const char *compname;
-    compname = clibcode_to_clibname(compformat);
-    if (compname == NULL) {
-        compname = "(null)";
-    }
-    fprintf(stderr, "Blosc has not been compiled with '%s' ", compname);
+    fprintf(stderr, "Blosc has not been compiled with the requested ");
     fprintf(stderr, "compression support.  Please use one having it.");
     return -5;    /* signals no compression support */
   }
@@ -972,7 +704,7 @@ static int write_compression_header(struct blosc_context* context, int clevel, i
 }
 
 
-int blosc_compress_context(struct blosc_context* context)
+static int blosc_compress_context(struct blosc_context* context)
 {
   int32_t ntbytes = 0;
 
@@ -1023,66 +755,6 @@ int blosc_compress_ctx(int clevel, int doshuffle, size_t typesize,
   if (error <= 0) { return error; }
 
   result = blosc_compress_context(&context);
-
-  return result;
-}
-
-/* The public routine for compression.  See blosc.h for docstrings. */
-int blosc_compress(int clevel, int doshuffle, size_t typesize, size_t nbytes,
-                   const void *src, void *dest, size_t destsize)
-{
-  int result;
-  char* envvar;
-
-  /* Check if should initialize */
-  if (!g_initlib) blosc_init();
-
-  /* Check for environment variables */
-  envvar = getenv("BLOSC_CLEVEL");
-  if (envvar != NULL) {
-    long value;
-    value = strtol(envvar, NULL, 10);
-    if ((value != EINVAL) && (value >= 0)) {
-      clevel = (int)value;
-    }
-  }
-
-  envvar = getenv("BLOSC_SHUFFLE");
-  if (envvar != NULL) {
-    if (strcmp(envvar, "NOSHUFFLE") == 0) {
-      doshuffle = BLOSC_NOSHUFFLE;
-    }
-    if (strcmp(envvar, "SHUFFLE") == 0) {
-      doshuffle = BLOSC_SHUFFLE;
-    }
-  }
-
-  envvar = getenv("BLOSC_TYPESIZE");
-  if (envvar != NULL) {
-    long value;
-    value = strtol(envvar, NULL, 10);
-    if ((value != EINVAL) && (value > 0)) {
-      typesize = (int)value;
-    }
-  }
-
-  envvar = getenv("BLOSC_COMPRESSOR");
-  if (envvar != NULL) {
-    result = blosc_set_compressor(envvar);
-    if (result < 0) { return result; }
-  }
-
-  do {
-    result = initialize_context_compression(g_global_context, clevel, doshuffle,
-                                           typesize, nbytes, src, dest, destsize,
-                                           g_compressor, 0);
-    if (result <= 0) { break; }
-
-    result = write_compression_header(g_global_context, clevel, doshuffle);
-    if (result <= 0) { break; }
-
-    result = blosc_compress_context(g_global_context);
-  } while (0);
 
   return result;
 }
@@ -1179,30 +851,6 @@ int blosc_decompress_ctx(const void* src, void* dest, size_t destsize,
   return result;
 }
 
-int blosc_decompress(const void* src, void* dest, size_t destsize) {
-  int result;
-
-  /* Check if should initialize */
-  if (!g_initlib) blosc_init();
-
-  result = blosc_run_decompression_with_context(g_global_context, src, dest,
-                                                destsize);
-
-  return result;
-}
-
-int blosc_set_compressor(const char *compname)
-{
-  int code = blosc_compname_to_compcode(compname);
-
-  g_compressor = code;
-
-  /* Check if should initialize */
-  if (!g_initlib) blosc_init();
-
-  return code;
-}
-
 /* Return `nbytes`, `cbytes` and `blocksize` from a compressed buffer. */
 void blosc_cbuffer_sizes(const void *cbuffer, size_t *nbytes,
                          size_t *cbytes, size_t *blocksize)
@@ -1225,8 +873,6 @@ void blosc_init(void)
 {
   /* Return if we are already initialized */
   if (g_initlib) return;
-
-  g_global_context = (struct blosc_context*)my_malloc(sizeof(struct blosc_context));
 
   g_initlib = 1;
 }
