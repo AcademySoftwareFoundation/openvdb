@@ -317,6 +317,27 @@ elseif(WIN32)
   list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.lib")
 endif()
 
+# OpenVDB - point FindOpenVDB at Houdini's installation
+
+if(NOT OPENVDB_LIBRARYDIR)
+  set(OPENVDB_LIBRARYDIR ${HOUDINI_LIB_DIR})
+endif()
+if(NOT OPENVDB_INCLUDEDIR)
+  set(OPENVDB_INCLUDEDIR ${HOUDINI_INCLUDE_DIR})
+endif()
+
+# On Windows, Houdini ships its OpenVDB library as openvdb_sesi.lib/dll
+# rather than openvdb.lib/dll. FindOpenVDB only searches for the component
+# name verbatim, so pre-set the cache variable here so it resolves correctly
+# without requiring -DOpenVDB_openvdb_LIBRARY on the command line.
+if(WIN32 AND NOT OpenVDB_openvdb_LIBRARY)
+  find_library(OpenVDB_openvdb_LIBRARY
+    NAMES openvdb_sesi openvdb
+    PATHS ${HOUDINI_LIB_DIR}
+    NO_DEFAULT_PATH
+  )
+endif()
+
 # ------------------------------------------------------------------------
 #  Configure OpenVDB ABI
 # ------------------------------------------------------------------------
