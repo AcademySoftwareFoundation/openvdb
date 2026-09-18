@@ -338,6 +338,8 @@ TEST_F(TestLeafMask, testIO)
 }
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 TEST_F(TestLeafMask, testTreeIO)
 {
     LeafType leaf(openvdb::Coord(1, 3, 5));
@@ -365,6 +367,8 @@ TEST_F(TestLeafMask, testTreeIO)
 
     EXPECT_TRUE(leaf.onVoxelCount() == 2);
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
 TEST_F(TestLeafMask, testTopologyCopy)

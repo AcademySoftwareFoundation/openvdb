@@ -200,6 +200,7 @@ public:
     const Buffer& buffer() const { return mBuffer; }
     Buffer& buffer() { return mBuffer; }
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     //
     // I/O methods
     //
@@ -213,6 +214,7 @@ public:
     void readBuffers(std::istream& is, const CoordBBox&, bool fromHalf = false);
     /// Write out the topology and the origin.
     void writeBuffers(std::ostream&, bool toHalf = false) const;
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     //
     // Accessor methods
@@ -976,6 +978,8 @@ LeafNode<bool, Log2Dim>::offsetToGlobalCoord(Index n) const
 ////////////////////////////////////////
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 template<Index Log2Dim>
 inline void
 LeafNode<bool, Log2Dim>::readTopology(std::istream& is, bool /*fromHalf*/)
@@ -1037,6 +1041,8 @@ LeafNode<bool, Log2Dim>::writeBuffers(std::ostream& os, bool /*toHalf*/) const
     // Write out the voxel values.
     mBuffer.mData.save(os);
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
 ////////////////////////////////////////
