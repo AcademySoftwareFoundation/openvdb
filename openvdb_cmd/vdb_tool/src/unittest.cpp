@@ -4712,6 +4712,42 @@ CliResult runCli(const std::vector<std::string>& args, const std::string& input 
 
 } // namespace
 
+TEST_F(Test_vdb_tool, CliFilesLoopInvalidPaths)
+{
+    CliTempDir dir;
+    const auto empty = dir.path / "empty";
+    const auto populated = dir.path / "populated";
+    ASSERT_TRUE(std::filesystem::create_directory(empty));
+    ASSERT_TRUE(std::filesystem::create_directory(populated));
+    const auto regularFile = populated / "not a directory.txt";
+    {
+        std::ofstream file(regularFile);
+        ASSERT_TRUE(file.is_open());
+        file << "test";
+    }
+    for (const std::string recursive : {"false", "true"}) {
+        for (const auto& invalid : {dir.path / "missing", regularFile}) {
+            const std::string afterPopulated = populated.string() + "," + invalid.string();
+            for (const auto& paths : {invalid.string(), empty.string() + "," + invalid.string(),
+                                      afterPopulated}) {
+                SCOPED_TRACE(paths + ", recursive=" + recursive);
+                const auto result = runCli({"-quiet", "-files", paths, "recursive=" + recursive,
+                                            "-eval", "BODY", "-end", "-eval", "AFTER"});
+                ASSERT_FALSE(result.timedOut);
+                EXPECT_EQ(1, result.exitCode) << result.error;
+                EXPECT_NE(std::string::npos, result.error.find("is not a directory")) << result.error;
+                EXPECT_NE(std::string::npos, result.error.find(invalid.string())) << result.error;
+                EXPECT_EQ(std::string::npos, result.error.find("AFTER")) << result.error;
+                if (paths == afterPopulated) {
+                    EXPECT_EQ(0u, result.error.find("BODY\n")) << result.error;
+                } else {
+                    EXPECT_EQ(std::string::npos, result.error.find("BODY")) << result.error;
+                }
+            }
+        }
+    }
+}
+
 TEST_F(Test_vdb_tool, CliFailures)
 {
     CliTempDir dir;

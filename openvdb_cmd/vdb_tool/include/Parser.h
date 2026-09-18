@@ -869,6 +869,7 @@ public:
     /// @param excludePattern Substring patterns; if non-empty, file name must contain none of them.
     /// @param minFileSize    Minimum file size in bytes (inclusive).
     /// @param maxFileSize    Maximum file size in bytes (inclusive).
+    /// @throw std::invalid_argument if a path being opened is not a directory.
     FilesLoop(Memory &s, ActIterT i, const std::string &name,
               std::vector<std::string> &&pathString,
               std::vector<std::string> &&fileExt,
@@ -885,7 +886,9 @@ public:
     {
         for (mPathIter = mPathNames.begin(); mPathIter != mPathNames.end(); ++mPathIter) {
             mFilePath = std::filesystem::path(*mPathIter);
-            OPENVDB_ASSERT(std::filesystem::is_directory(mFilePath));
+            if (!std::filesystem::is_directory(mFilePath)) {
+                throw std::invalid_argument("FilesLoop: path \"" + mFilePath.string() + "\" is not a directory");
+            }
             mIter = IterT(mFilePath);
             mEnd  = std::filesystem::end(mIter);
             for(; !this->valid() && mIter != mEnd; ++mIter);
@@ -935,6 +938,7 @@ public:
     }
     /// @brief Advance to the next matching file, spanning directories if needed.
     /// @return true if another valid file was found.
+    /// @throw std::invalid_argument if a subsequent path is not a directory.
     bool next() override {
         if (mPathIter == mPathNames.end()) return false;
         ++pos;
@@ -945,7 +949,9 @@ public:
             ++mPathIter;
             if (mPathIter != mPathNames.end()) {
                 mFilePath = std::filesystem::path(*mPathIter);
-                OPENVDB_ASSERT(std::filesystem::is_directory(mFilePath));
+                if (!std::filesystem::is_directory(mFilePath)) {
+                    throw std::invalid_argument("FilesLoop: path \"" + mFilePath.string() + "\" is not a directory");
+                }
                 mIter = IterT(mFilePath);
                 mEnd  = std::filesystem::end(mIter);
             }

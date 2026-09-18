@@ -4,6 +4,8 @@ vdb_tool:
   - Preserve rebuilt CSG results when replacing input grids.
   - Return a failing exit status after action errors and stop immediately on
     control-flow errors instead of entering invalid scopes.
+  - Report invalid files-loop directories as errors instead of aborting when
+    assertions are enabled, including when advancing to subsequent directories.
   - Preserve input grids after failed VDB/NanoVDB writes and avoid changing
     the grid stack or names when voxel-kernel variable validation fails.
   - Preserve modulo expressions and loop counters in configuration files.
