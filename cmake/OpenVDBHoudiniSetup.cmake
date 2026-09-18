@@ -305,9 +305,6 @@ if(NOT OPENEXR_LIBRARYDIR)
   set(OPENEXR_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
-# Boost - currently must be provided as VDB is not fully configured to
-# use Houdini's namespaced hboost
-
 # Add the required suffix as part of the cmake lib suffix searches
 if(APPLE)
   list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.dylib")
