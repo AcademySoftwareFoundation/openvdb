@@ -793,7 +793,9 @@ inline void Geometry::readOFF(std::istream &is)
 {
     // read header
     std::string line;
-    if (!std::getline(is, line) || (line != "OFF" && line != "NOFF")) {// NOFF includes normals after the x y z coordinates
+    std::getline(is, line);
+    if (!line.empty() && line.back() == '\r') line.pop_back();// CRLF on binary stdin
+    if (!is || (line != "OFF" && line != "NOFF")) {// NOFF includes normals after the x y z coordinates
         throw std::invalid_argument("Geometry::readOFF: expected header \"OFF\" but read \"" + line + "\"");
     }
 

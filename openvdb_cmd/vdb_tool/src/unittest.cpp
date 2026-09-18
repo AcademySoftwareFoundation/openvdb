@@ -4792,6 +4792,72 @@ TEST_F(Test_vdb_tool, CliFailures)
     EXPECT_EQ(1, truncated.exitCode) << truncated.error;
 }
 
+TEST_F(Test_vdb_tool, CliBinaryStreams)
+{
+    using namespace openvdb;
+    initialize();
+    // Text-mode input can translate CRLF or stop at Ctrl-Z; output can expand LF.
+    const std::string marker = "LF\nCRLF\r\n\x1a" "after ctrl-z";
+    auto grid = FloatGrid::create();
+    grid->setName("binary_io");
+    grid->insertMeta("marker", StringMetadata(marker));
+    grid->tree().setValue(Coord(1, 2, 3), 3.25f);
+    std::ostringstream binary;
+    io::Stream stream(binary);
+    stream.setCompression(io::COMPRESS_NONE);
+    stream.write(GridPtrVec{grid});
+    ASSERT_NE(std::string::npos, binary.str().find(marker));
+
+    CliTempDir dir;
+    const auto path = (dir.path / "binary.vdb").string();
+    const auto reader = runCli({"-quiet", "-read", "stdin.vdb", "-write", path}, binary.str());
+    ASSERT_FALSE(reader.timedOut);
+    ASSERT_EQ(0, reader.exitCode) << reader.error;
+
+    // Validate stdin independently, so a second text-mode stream cannot hide corruption.
+    io::File file(path);
+    file.open();
+    const auto fromFile = gridPtrCast<FloatGrid>(file.readGrid("binary_io"));
+    ASSERT_TRUE(fromFile);
+    EXPECT_EQ(marker, fromFile->metaValue<std::string>("marker"));
+    EXPECT_EQ(3.25f, fromFile->tree().getValue(Coord(1, 2, 3)));
+    file.close();
+
+    const auto writer = runCli({"-quiet", "-read", path, "-write", "stdout.vdb"});
+    ASSERT_FALSE(writer.timedOut);
+    ASSERT_EQ(0, writer.exitCode) << writer.error;
+    EXPECT_NE(std::string::npos, writer.output.find(marker));
+    std::istringstream input(writer.output);
+    GridPtrVecPtr grids;
+    ASSERT_NO_THROW({
+        io::Stream outputStream(input);
+        grids = outputStream.getGrids();
+    });
+    ASSERT_TRUE(grids);
+    ASSERT_EQ(1u, grids->size());
+    const auto fromStdout = gridPtrCast<FloatGrid>(grids->front());
+    ASSERT_TRUE(fromStdout);
+    EXPECT_EQ(marker, fromStdout->metaValue<std::string>("marker"));
+    EXPECT_EQ(3.25f, fromStdout->tree().getValue(Coord(1, 2, 3)));
+}
+
+TEST_F(Test_vdb_tool, CliOffCrlfInput)
+{
+    const auto result = runCli({"-quiet", "-read", "stdin.off", "-write", "stdout.obj"},
+        "OFF\r\n3 1 0\r\n0 0 0\r\n1 0 0\r\n0 1 0\r\n3 0 1 2\r\n");
+    ASSERT_FALSE(result.timedOut);
+    ASSERT_EQ(0, result.exitCode) << result.error;
+    openvdb::vdb_tool::Geometry geometry;
+    std::istringstream input(result.output);
+    ASSERT_NO_THROW(geometry.readOBJ(input));
+    ASSERT_EQ(3u, geometry.vtxCount());
+    ASSERT_EQ(1u, geometry.triCount());
+    EXPECT_EQ(openvdb::Vec3f(0, 0, 0), geometry.vtx()[0]);
+    EXPECT_EQ(openvdb::Vec3f(1, 0, 0), geometry.vtx()[1]);
+    EXPECT_EQ(openvdb::Vec3f(0, 1, 0), geometry.vtx()[2]);
+    EXPECT_EQ(openvdb::Vec3I(0, 1, 2), geometry.tri()[0]);
+}
+
 TEST_F(Test_vdb_tool, CliLoggingPipeline)
 {
     CliTempDir dir;

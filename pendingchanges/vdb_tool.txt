@@ -17,3 +17,5 @@ vdb_tool:
     their count; continue rejecting partial records and extra data. Accept small STL files.
   - Support descending loops and reject zero or non-progressing steps.
   - Keep binary stdout separate from diagnostic logs in both logging modes.
+  - Use binary stdin/stdout on Windows to prevent piped data corruption, while
+    retaining CRLF support for OFF text input.
