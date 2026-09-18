@@ -82,12 +82,12 @@ else()
     TestAttributeSet.cc
     TestBBox.cc
     TestClip.cc
+    TestCodec.cc
     TestConjGradient.cc
     TestCoord.cc
     TestCount.cc
     TestCpt.cc
     TestCurl.cc
-    TestDelayedLoadMetadata.cc
     TestDense.cc
     TestDenseSparseTools.cc
     TestDiagnostics.cc
@@ -146,6 +146,7 @@ else()
     TestPCA.cc
     TestPointAdvect.cc
     TestPointAttribute.cc
+    TestPointCodec.cc
     TestPointConversion.cc
     TestPointCount.cc
     TestPointDataLeaf.cc

@@ -44,7 +44,7 @@
 class TestFile: public ::testing::Test
 {
 public:
-    void SetUp() override {}
+    void SetUp() override { openvdb::initialize(); }
     void TearDown() override { openvdb::uninitialize(); }
 
     void testHeader();
@@ -53,7 +53,6 @@ public:
     void testReadGridDescriptors();
     void testEmptyGridIO();
     void testOpen();
-    void testDelayedLoadMetadata();
     void testNonVdbOpen();
 };
 
@@ -127,8 +126,6 @@ TestFile::testWriteGrid()
     tree.setValue(Coord(0, 0, 0), 5);
 
     // Add some metadata.
-    Metadata::clearRegistry();
-    StringMetadata::registerType();
     const std::string meta0Val, meta1Val("Hello, world.");
     Metadata::Ptr stringMetadata = Metadata::createMetadata(typeNameAsString<std::string>());
     EXPECT_TRUE(stringMetadata);
@@ -157,43 +154,14 @@ TestFile::testWriteGrid()
     // it doesn't have a header), set the file format version number explicitly.
     io::setCurrentVersion(istr);
 
-    GridBase::Ptr gd2_grid;
-    EXPECT_THROW(gd2.read(istr), openvdb::LookupError);
-
-    // Register the grid and the transform and the blocks.
-    GridBase::clearRegistry();
-    GridType::registerGrid();
-
-    // Register transform maps
-    math::MapRegistry::clear();
-    math::AffineMap::registerMap();
-    math::ScaleMap::registerMap();
-    math::UniformScaleMap::registerMap();
-    math::TranslationMap::registerMap();
-    math::ScaleTranslateMap::registerMap();
-    math::UniformScaleTranslateMap::registerMap();
-    math::NonlinearFrustumMap::registerMap();
-
     istr.seekg(0, std::ios_base::beg);
-    EXPECT_NO_THROW(gd2_grid = gd2.read(istr));
+    gd2.readHeader(istr);
+    gd2.readStreamPos(istr);
 
-    EXPECT_EQ(gd.gridName(), gd2.gridName());
-    EXPECT_EQ(GridType::gridType(), gd2_grid->type());
-    EXPECT_EQ(gd.getGridPos(), gd2.getGridPos());
-    EXPECT_EQ(gd.getBlockPos(), gd2.getBlockPos());
-    EXPECT_EQ(gd.getEndPos(), gd2.getEndPos());
+    GridBase::Ptr gd2_grid = Archive::readGrid(gd2, istr);
 
-    // Position the stream to beginning of the grid storage and read the grid.
-    gd2.seekToGrid(istr);
-    Archive::readGridCompression(istr);
-    gd2_grid->readMeta(istr);
-    gd2_grid->readTransform(istr);
-    gd2_grid->readTopology(istr);
-
-    // Remove delay load metadata if it exists.
-    if ((*gd2_grid)["file_delayed_load"]) {
-        gd2_grid->removeMeta("file_delayed_load");
-    }
+    // Delay load metadata should not exist.
+    ASSERT_FALSE(bool((*gd2_grid)["file_delayed_load"]));
 
     // Ensure that we have the same metadata.
     EXPECT_EQ(grid->metaCount(), gd2_grid->metaCount());
@@ -210,23 +178,12 @@ TestFile::testWriteGrid()
     EXPECT_EQ(
         grid->baseTree().treeDepth(), gd2_grid->baseTree().treeDepth());
 
-    //EXPECT_EQ(0.1, gd2_grid->getTransform()->getVoxelSizeX());
-    //EXPECT_EQ(0.1, gd2_grid->getTransform()->getVoxelSizeY());
-    //EXPECT_EQ(0.1, gd2_grid->getTransform()->getVoxelSizeZ());
-
-    // Read in the data blocks.
-    gd2.seekToBlocks(istr);
-    gd2_grid->readBuffers(istr);
     TreeType::Ptr tree2 = DynamicPtrCast<TreeType>(gd2_grid->baseTreePtr());
     EXPECT_TRUE(tree2.get() != nullptr);
     EXPECT_EQ(10, tree2->getValue(Coord(10, 1, 2)));
     EXPECT_EQ(5, tree2->getValue(Coord(0, 0, 0)));
 
     EXPECT_EQ(1, tree2->getValue(Coord(1000, 1000, 16000)));
-    // Clear registries.
-    GridBase::clearRegistry();
-    Metadata::clearRegistry();
-    math::MapRegistry::clear();
 
     remove("something.vdb2");
 }
@@ -279,27 +236,15 @@ TestFile::testWriteMultipleGrids()
     EXPECT_TRUE(gd2.getBlockPos() != 0);
     EXPECT_TRUE(gd2.getEndPos() != 0);
 
-    // register the grid
-    GridBase::clearRegistry();
-    GridType::registerGrid();
-
-    // register maps
-    math::MapRegistry::clear();
-    math::AffineMap::registerMap();
-    math::ScaleMap::registerMap();
-    math::UniformScaleMap::registerMap();
-    math::TranslationMap::registerMap();
-    math::ScaleTranslateMap::registerMap();
-    math::UniformScaleTranslateMap::registerMap();
-    math::NonlinearFrustumMap::registerMap();
-
     // Read in the first grid descriptor.
     GridDescriptor gd_in;
     std::istringstream istr(ostr.str(), std::ios_base::binary);
     io::setCurrentVersion(istr);
 
-    GridBase::Ptr gd_in_grid;
-    EXPECT_NO_THROW(gd_in_grid = gd_in.read(istr));
+    gd_in.readHeader(istr);
+    gd_in.readStreamPos(istr);
+
+    GridBase::Ptr gd_in_grid = Archive::readGrid(gd_in, istr);
 
     // Ensure read in the right values.
     EXPECT_EQ(gd.gridName(), gd_in.gridName());
@@ -307,13 +252,6 @@ TestFile::testWriteMultipleGrids()
     EXPECT_EQ(gd.getGridPos(), gd_in.getGridPos());
     EXPECT_EQ(gd.getBlockPos(), gd_in.getBlockPos());
     EXPECT_EQ(gd.getEndPos(), gd_in.getEndPos());
-
-    // Position the stream to beginning of the grid storage and read the grid.
-    gd_in.seekToGrid(istr);
-    Archive::readGridCompression(istr);
-    gd_in_grid->readMeta(istr);
-    gd_in_grid->readTransform(istr);
-    gd_in_grid->readTopology(istr);
 
     // Ensure that we have the same topology and transform.
     EXPECT_EQ(
@@ -328,8 +266,6 @@ TestFile::testWriteMultipleGrids()
     // EXPECT_EQ(0.1, gd_in_grid->getTransform()->getVoxelSizeZ());
 
     // Read in the data blocks.
-    gd_in.seekToBlocks(istr);
-    gd_in_grid->readBuffers(istr);
     TreeType::Ptr grid_in = DynamicPtrCast<TreeType>(gd_in_grid->baseTreePtr());
     EXPECT_TRUE(grid_in.get() != nullptr);
     EXPECT_EQ(10, grid_in->getValue(Coord(10, 1, 2)));
@@ -343,8 +279,9 @@ TestFile::testWriteMultipleGrids()
     gd_in.seekToEnd(istr);
 
     GridDescriptor gd2_in;
-    GridBase::Ptr gd2_in_grid;
-    EXPECT_NO_THROW(gd2_in_grid = gd2_in.read(istr));
+    gd2_in.readHeader(istr);
+    gd2_in.readStreamPos(istr);
+    GridBase::Ptr gd2_in_grid = Archive::readGrid(gd2_in, istr);
 
     // Ensure that we read in the right values.
     EXPECT_EQ(gd2.gridName(), gd2_in.gridName());
@@ -352,13 +289,6 @@ TestFile::testWriteMultipleGrids()
     EXPECT_EQ(gd2.getGridPos(), gd2_in.getGridPos());
     EXPECT_EQ(gd2.getBlockPos(), gd2_in.getBlockPos());
     EXPECT_EQ(gd2.getEndPos(), gd2_in.getEndPos());
-
-    // Position the stream to beginning of the grid storage and read the grid.
-    gd2_in.seekToGrid(istr);
-    Archive::readGridCompression(istr);
-    gd2_in_grid->readMeta(istr);
-    gd2_in_grid->readTransform(istr);
-    gd2_in_grid->readTopology(istr);
 
     // Ensure that we have the same topology and transform.
     EXPECT_EQ(
@@ -371,19 +301,12 @@ TestFile::testWriteMultipleGrids()
     // EXPECT_EQ(0.2, gd2_in_grid->getTransform()->getVoxelSizeY());
     // EXPECT_EQ(0.2, gd2_in_grid->getTransform()->getVoxelSizeZ());
 
-    // Read in the data blocks.
-    gd2_in.seekToBlocks(istr);
-    gd2_in_grid->readBuffers(istr);
     TreeType::Ptr grid2_in = DynamicPtrCast<TreeType>(gd2_in_grid->baseTreePtr());
     EXPECT_TRUE(grid2_in.get() != nullptr);
     EXPECT_EQ(50, grid2_in->getValue(Coord(1000, 1000, 1000)));
     EXPECT_EQ(10, grid2_in->getValue(Coord(0, 0, 0)));
     EXPECT_EQ(2, grid2_in->getValue(Coord(100000, 100000, 16000)));
 
-    // Clear registries.
-    GridBase::clearRegistry();
-
-    math::MapRegistry::clear();
     remove("something.vdb2");
 }
 TEST_F(TestFile, testWriteMultipleGrids) { testWriteMultipleGrids(); }
@@ -396,12 +319,6 @@ TEST_F(TestFile, testWriteFloatAsHalf)
 
     using TreeType = Vec3STree;
     using GridType = Grid<TreeType>;
-
-    // Register all grid types.
-    initialize();
-    // Ensure that the registry is cleared on exit.
-    struct Local { static void uninitialize(char*) { openvdb::uninitialize(); } };
-    SharedPtr<char> onExit(nullptr, Local::uninitialize);
 
     // Create two test grids.
     GridType::Ptr grid1 = createGrid<GridType>(/*bg=*/Vec3s(1, 1, 1));
@@ -462,9 +379,6 @@ TEST_F(TestFile, testWriteFloatAsHalf)
 TEST_F(TestFile, testWriteInstancedGrids)
 {
     using namespace openvdb;
-
-    // Register data types.
-    openvdb::initialize();
 
     // Remove something.vdb2 when done. We must declare this here before the
     // other grid smart_ptr's because we re-use them in the test several times.
@@ -622,10 +536,6 @@ TEST_F(TestFile, testWriteInstancedGrids)
     EXPECT_TRUE(grid.get() != nullptr);
     density = gridPtrCast<Int32Grid>(grid)->treePtr();
     EXPECT_TRUE(density.get() != nullptr);
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    EXPECT_TRUE(density->unallocatedLeafCount() > 0);
-    EXPECT_EQ(density->leafCount(), density->unallocatedLeafCount());
-#endif // OPENVDB_USE_DELAYED_LOADING
     grid = findGridByName(*grids, "density_copy");
     EXPECT_TRUE(grid.get() != nullptr);
     EXPECT_TRUE(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
@@ -644,6 +554,77 @@ TEST_F(TestFile, testWriteInstancedGrids)
     EXPECT_TRUE(grid.get() != nullptr);
     EXPECT_TRUE(gridPtrCast<FloatGrid>(grid)->treePtr().get() != nullptr);
     EXPECT_TRUE(gridPtrCast<FloatGrid>(grid)->treePtr() != temperature);
+}
+
+
+// Verify that clipping an instanced grid uses the instance's own transform,
+// not the parent's.  The bug was that Archive::readGrid() converted the
+// world-space bbox to index space with the parent's transform before the
+// instance's transform was applied, so the clipped region was wrong when the
+// two transforms differed.
+TEST_F(TestFile, testReadClippedInstancedGrid)
+{
+    using namespace openvdb;
+
+    const char* filename = "testReadClippedInstancedGrid.vdb";
+    SharedPtr<const char> scopedFile(filename, ::remove);
+
+    // Parent grid: voxel size 1.0.  Fill index [-5, 5] with value 1.
+    FloatTree::Ptr tree(new FloatTree(0.0f));
+    tree->fill(CoordBBox(Coord(-5), Coord(5)), 1.0f, /*active=*/true);
+
+    GridBase::Ptr parent = FloatGrid::create(tree);
+    parent->setName("parent");
+    parent->setTransform(math::Transform::createLinearTransform(1.0));
+
+    // Instance grid: same tree, but voxel size 2.0.
+    // Index coord n  →  world coord 2n  (double the parent's world-space extent).
+    GridBase::Ptr instance = FloatGrid::create(tree);
+    instance->setName("instance");
+    instance->setTransform(math::Transform::createLinearTransform(2.0));
+
+    GridPtrVec grids;
+    grids.push_back(parent);
+    grids.push_back(instance);
+
+    {
+        io::File vdbfile(filename);
+        vdbfile.write(grids);
+    }
+
+    // World-space clip: [0, 6].
+    // Via parent transform (voxel 1.0): index [0, 6]  → voxels 0..5 survive.
+    // Via instance transform (voxel 2.0): index [0, 3] → voxels 0..3 survive.
+    // The correct answer uses the instance's transform.
+    const BBoxd clipBox(Vec3d(0.0), Vec3d(6.0));
+
+    io::File vdbfile(filename);
+    vdbfile.open();
+
+    GridBase::Ptr readGrid = vdbfile.readGrid("instance", clipBox);
+    EXPECT_TRUE(readGrid.get() != nullptr);
+    FloatGrid::Ptr clipped = gridPtrCast<FloatGrid>(readGrid);
+    EXPECT_TRUE(clipped.get() != nullptr);
+
+    const CoordBBox bbox = clipped->evalActiveVoxelBoundingBox();
+    // The instance's transform maps world [0,6] to index [0,3].
+    EXPECT_EQ(Coord(0, 0, 0), bbox.min());
+    EXPECT_EQ(Coord(3, 3, 3), bbox.max());
+
+    // No active voxels should survive outside [0,3] in any axis.
+    FloatGrid::ConstAccessor acc = clipped->getConstAccessor();
+    for (int i = -5; i <= 5; ++i) {
+        for (int j = -5; j <= 5; ++j) {
+            for (int k = -5; k <= 5; ++k) {
+                const Coord xyz(i, j, k);
+                if (i >= 0 && j >= 0 && k >= 0 && i <= 3 && j <= 3 && k <= 3) {
+                    EXPECT_EQ(1.0f, acc.getValue(xyz));
+                } else {
+                    EXPECT_EQ(0.0f, acc.getValue(xyz));
+                }
+            }
+        }
+    }
 }
 
 
@@ -687,28 +668,31 @@ TestFile::testReadGridDescriptors()
     file.writeGrid(gd, grid, ostr, /*seekable=*/true);
     file.writeGrid(gd2, grid2, ostr, /*seekable=*/true);
 
-    // Register the grid and the transform and the blocks.
-    GridBase::clearRegistry();
-    GridType::registerGrid();
-    // register maps
-    math::MapRegistry::clear();
-    math::AffineMap::registerMap();
-    math::ScaleMap::registerMap();
-    math::UniformScaleMap::registerMap();
-    math::TranslationMap::registerMap();
-    math::ScaleTranslateMap::registerMap();
-    math::UniformScaleTranslateMap::registerMap();
-    math::NonlinearFrustumMap::registerMap();
-
     // Read in the grid descriptors.
     File file2("something.vdb2");
     std::istringstream istr(ostr.str(), std::ios_base::binary);
     io::setCurrentVersion(istr);
-    file2.readGridDescriptors(istr);
+    // file2.readGridDescriptors(istr);
+    ////////////////////////////
+    file2.mGridDescriptors.clear();
+
+    for (int32_t i = 0, N = file2.readGridCount(istr); i < N; ++i) {
+        // Read the grid descriptor.
+        GridDescriptor gd;
+        gd.readHeader(istr);
+        gd.readStreamPos(istr);
+
+        // Add the descriptor to the dictionary.
+        file2.mGridDescriptors.insert(std::make_pair(gd.gridName(), gd));
+
+        // Skip forward to the next descriptor.
+        gd.seekToEnd(istr);
+    }
+    ////////////////////////////
 
     // Compare with the initial grid descriptors.
     File::NameMapCIter it = file2.findDescriptor("temperature");
-    EXPECT_TRUE(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.mGridDescriptors.end());
     GridDescriptor file2gd = it->second;
     EXPECT_EQ(gd.gridName(), file2gd.gridName());
     EXPECT_EQ(gd.getGridPos(), file2gd.getGridPos());
@@ -716,16 +700,12 @@ TestFile::testReadGridDescriptors()
     EXPECT_EQ(gd.getEndPos(), file2gd.getEndPos());
 
     it = file2.findDescriptor("density");
-    EXPECT_TRUE(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.mGridDescriptors.end());
     file2gd = it->second;
     EXPECT_EQ(gd2.gridName(), file2gd.gridName());
     EXPECT_EQ(gd2.getGridPos(), file2gd.getGridPos());
     EXPECT_EQ(gd2.getBlockPos(), file2gd.getBlockPos());
     EXPECT_EQ(gd2.getEndPos(), file2gd.getEndPos());
-
-    // Clear registries.
-    GridBase::clearRegistry();
-    math::MapRegistry::clear();
 
     remove("something.vdb2");
 }
@@ -738,9 +718,6 @@ TEST_F(TestFile, testGridNaming)
     using namespace openvdb::io;
 
     using TreeType = Int32Tree;
-
-    // Register data types.
-    openvdb::initialize();
 
     logging::LevelScope suppressLogging{logging::Level::Fatal};
 
@@ -954,35 +931,34 @@ TestFile::testEmptyGridIO()
     EXPECT_EQ(gd.getEndPos(), gd.getBlockPos());
     EXPECT_EQ(gd2.getEndPos(), gd2.getBlockPos());
 
-    // Register the grid and the transform and the blocks.
-    GridBase::clearRegistry();
-    GridType::registerGrid();
-    // register maps
-    math::MapRegistry::clear();
-    math::AffineMap::registerMap();
-    math::ScaleMap::registerMap();
-    math::UniformScaleMap::registerMap();
-    math::TranslationMap::registerMap();
-    math::ScaleTranslateMap::registerMap();
-    math::UniformScaleTranslateMap::registerMap();
-    math::NonlinearFrustumMap::registerMap();
-
     // Read in the grid descriptors.
     File file2(filename);
     std::istringstream istr(ostr.str(), std::ios_base::binary);
     io::setCurrentVersion(istr);
-    file2.readGridDescriptors(istr);
+    // file2.readGridDescriptors(istr);
+    ////////////////////////////
+    file2.mGridDescriptors.clear();
+
+    for (int32_t i = 0, N = file2.readGridCount(istr); i < N; ++i) {
+        // Read the grid descriptor.
+        GridDescriptor gd;
+        gd.readHeader(istr);
+        gd.readStreamPos(istr);
+
+        // Add the descriptor to the dictionary.
+        file2.mGridDescriptors.insert(std::make_pair(gd.gridName(), gd));
+
+        // Skip forward to the next descriptor.
+        gd.seekToEnd(istr);
+    }
+    ////////////////////////////
 
     // Compare with the initial grid descriptors.
     File::NameMapCIter it = file2.findDescriptor("temperature");
-    EXPECT_TRUE(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.mGridDescriptors.end());
     GridDescriptor file2gd = it->second;
     file2gd.seekToGrid(istr);
-    GridBase::Ptr gd_grid = GridBase::createGrid(file2gd.gridType());
-    Archive::readGridCompression(istr);
-    gd_grid->readMeta(istr);
-    gd_grid->readTransform(istr);
-    gd_grid->readTopology(istr);
+    GridBase::Ptr gd_grid = Archive::readGrid(file2gd, istr);
     EXPECT_EQ(gd.gridName(), file2gd.gridName());
     EXPECT_TRUE(gd_grid.get() != nullptr);
     EXPECT_EQ(0, int(gd_grid->baseTree().leafCount()));
@@ -993,14 +969,10 @@ TestFile::testEmptyGridIO()
     EXPECT_EQ(gd.getEndPos(), file2gd.getEndPos());
 
     it = file2.findDescriptor("density");
-    EXPECT_TRUE(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.mGridDescriptors.end());
     file2gd = it->second;
     file2gd.seekToGrid(istr);
-    gd_grid = GridBase::createGrid(file2gd.gridType());
-    Archive::readGridCompression(istr);
-    gd_grid->readMeta(istr);
-    gd_grid->readTransform(istr);
-    gd_grid->readTopology(istr);
+    gd_grid = Archive::readGrid(file2gd, istr);
     EXPECT_EQ(gd2.gridName(), file2gd.gridName());
     EXPECT_TRUE(gd_grid.get() != nullptr);
     EXPECT_EQ(0, int(gd_grid->baseTree().leafCount()));
@@ -1009,10 +981,6 @@ TestFile::testEmptyGridIO()
     EXPECT_EQ(gd2.getGridPos(), file2gd.getGridPos());
     EXPECT_EQ(gd2.getBlockPos(), file2gd.getBlockPos());
     EXPECT_EQ(gd2.getEndPos(), file2gd.getEndPos());
-
-    // Clear registries.
-    GridBase::clearRegistry();
-    math::MapRegistry::clear();
 }
 TEST_F(TestFile, testEmptyGridIO) { testEmptyGridIO(); }
 
@@ -1062,23 +1030,6 @@ void TestFile::testOpen()
     EXPECT_TRUE(meta.metaValue<std::string>("author") == "Einstein");
     EXPECT_EQ(2009, meta.metaValue<int32_t>("year"));
 
-    // Register grid and transform.
-    GridBase::clearRegistry();
-    IntGrid::registerGrid();
-    FloatGrid::registerGrid();
-    Metadata::clearRegistry();
-    StringMetadata::registerType();
-    Int32Metadata::registerType();
-    // register maps
-    math::MapRegistry::clear();
-    math::AffineMap::registerMap();
-    math::ScaleMap::registerMap();
-    math::UniformScaleMap::registerMap();
-    math::TranslationMap::registerMap();
-    math::ScaleTranslateMap::registerMap();
-    math::UniformScaleTranslateMap::registerMap();
-    math::NonlinearFrustumMap::registerMap();
-
     // Write the vdb out to a file.
     io::File vdbfile("something.vdb2");
     vdbfile.write(grids, meta);
@@ -1109,16 +1060,16 @@ void TestFile::testOpen()
     EXPECT_EQ(2009, vdbfile.getMetadata()->metaValue<int32_t>("year"));
 
     // Ensure we got the grid descriptors.
-    EXPECT_EQ(1, int(vdbfile.gridDescriptors().count("density")));
-    EXPECT_EQ(1, int(vdbfile.gridDescriptors().count("temperature")));
+    EXPECT_EQ(1, int(vdbfile.mGridDescriptors.count("density")));
+    EXPECT_EQ(1, int(vdbfile.mGridDescriptors.count("temperature")));
 
     io::File::NameMapCIter it = vdbfile.findDescriptor("density");
-    EXPECT_TRUE(it != vdbfile.gridDescriptors().end());
+    EXPECT_TRUE(it != vdbfile.mGridDescriptors.end());
     io::GridDescriptor gd = it->second;
     EXPECT_EQ(IntTree::treeType(), gd.gridType());
 
     it = vdbfile.findDescriptor("temperature");
-    EXPECT_TRUE(it != vdbfile.gridDescriptors().end());
+    EXPECT_TRUE(it != vdbfile.mGridDescriptors.end());
     gd = it->second;
     EXPECT_EQ(FloatTree::treeType(), gd.gridType());
 
@@ -1127,16 +1078,11 @@ void TestFile::testOpen()
     EXPECT_THROW(vdbfile2.open(), openvdb::IoError);
     EXPECT_THROW(vdbfile2.inputStream(), openvdb::IoError);
 
-    // Clear registries.
-    GridBase::clearRegistry();
-    Metadata::clearRegistry();
-    math::MapRegistry::clear();
-
     // Test closing the file.
     vdbfile.close();
     EXPECT_TRUE(vdbfile.isOpen() == false);
-    EXPECT_TRUE(vdbfile.fileMetadata().get() == nullptr);
-    EXPECT_EQ(0, int(vdbfile.gridDescriptors().size()));
+    EXPECT_TRUE(vdbfile.mMeta.get() == nullptr);
+    EXPECT_EQ(0, int(vdbfile.mGridDescriptors.size()));
     EXPECT_THROW(vdbfile.inputStream(), openvdb::IoError);
 
     remove("something.vdb2");
@@ -1173,11 +1119,6 @@ TEST_F(TestFile, testGetMetadata)
     meta.insertMeta("author", StringMetadata("Einstein"));
     meta.insertMeta("year", Int32Metadata(2009));
 
-    // Adjust registry before writing.
-    Metadata::clearRegistry();
-    StringMetadata::registerType();
-    Int32Metadata::registerType();
-
     // Write the vdb out to a file.
     io::File vdbfile("something.vdb2");
     vdbfile.write(grids, meta);
@@ -1193,9 +1134,6 @@ TEST_F(TestFile, testGetMetadata)
 
     EXPECT_TRUE(meta2->metaValue<std::string>("author") == "Einstein");
     EXPECT_EQ(2009, meta2->metaValue<int32_t>("year"));
-
-    // Clear registry.
-    Metadata::clearRegistry();
 
     remove("something.vdb2");
 }
@@ -1241,9 +1179,6 @@ TEST_F(TestFile, testReadAll)
     grids.push_back(grid1);
     grids.push_back(grid2);
 
-    // Register grid and transform.
-    openvdb::initialize();
-
     // Write the vdb out to a file.
     io::File vdbfile("something.vdb2");
     vdbfile.write(grids, meta);
@@ -1283,11 +1218,6 @@ TEST_F(TestFile, testReadAll)
     EXPECT_NEAR(10, temperature->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
     EXPECT_NEAR(11, temperature->getValue(Coord(0, 100, 0)), /*tolerance=*/0);
 
-    // Clear registries.
-    GridBase::clearRegistry();
-    Metadata::clearRegistry();
-    math::MapRegistry::clear();
-
     vdbfile2.close();
 
     remove("something.vdb2");
@@ -1301,11 +1231,6 @@ TEST_F(TestFile, testWriteOpenFile)
     MetaMap::Ptr meta(new MetaMap);
     meta->insertMeta("author", StringMetadata("Einstein"));
     meta->insertMeta("year", Int32Metadata(2009));
-
-    // Register metadata
-    Metadata::clearRegistry();
-    StringMetadata::registerType();
-    Int32Metadata::registerType();
 
     // Write the metadata out to a file.
     io::File vdbfile("something.vdb2");
@@ -1337,9 +1262,6 @@ TEST_F(TestFile, testWriteOpenFile)
 
     EXPECT_NO_THROW(vdbfile2.write(*grids));
 
-    // Clear registries.
-    Metadata::clearRegistry();
-
     remove("something.vdb2");
 }
 
@@ -1347,8 +1269,6 @@ TEST_F(TestFile, testWriteOpenFile)
 TEST_F(TestFile, testReadGridMetadata)
 {
     using namespace openvdb;
-
-    openvdb::initialize();
 
     const char* filename = "testReadGridMetadata.vdb2";
     SharedPtr<const char> scopedFile(filename, ::remove);
@@ -1462,10 +1382,8 @@ TEST_F(TestFile, testReadGridMetadata)
                 if ((*statsMetadata)[it->first]) {
                     otherMetadata->removeMeta(it->first);
                 }
-                // Remove delay load metadata if it exists.
-                if ((*otherMetadata)["file_delayed_load"]) {
-                    otherMetadata->removeMeta("file_delayed_load");
-                }
+                // Delay load metadata should not exist.
+                ASSERT_FALSE(bool((*otherMetadata)["file_delayed_load"]));
             }
             EXPECT_EQ(srcGrid->str(), otherMetadata->str());
 
@@ -1521,9 +1439,6 @@ TEST_F(TestFile, testReadGrid)
     grids.push_back(grid);
     grids.push_back(grid2);
 
-    // Register grid and transform.
-    openvdb::initialize();
-
     // Write the vdb out to a file.
     io::File vdbfile("something.vdb2");
     vdbfile.write(grids, meta);
@@ -1557,11 +1472,6 @@ TEST_F(TestFile, testReadGrid)
 
     EXPECT_NEAR(5,typedDensity->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
     EXPECT_NEAR(6,typedDensity->getValue(Coord(100, 0, 0)), /*tolerance=*/0);
-
-    // Clear registries.
-    GridBase::clearRegistry();
-    Metadata::clearRegistry();
-    math::MapRegistry::clear();
 
     vdbfile2.close();
 
@@ -1612,9 +1522,6 @@ validateClippedGrid(const GridT& clipped, const typename GridT::ValueType& fg)
 TEST_F(TestFile, testReadClippedGrid)
 {
     using namespace openvdb;
-
-    // Register types.
-    openvdb::initialize();
 
     // World-space clipping region
     const BBoxd clipBox(Vec3d(4.0, 4.0, -6.0), Vec3d(4.9, 4.9, 6.0));
@@ -1686,246 +1593,6 @@ TEST_F(TestFile, testReadClippedGrid)
 ////////////////////////////////////////
 
 
-namespace {
-
-template<typename T, openvdb::Index Log2Dim> struct MultiPassLeafNode; // forward declaration
-
-// Dummy value type
-using MultiPassValue = openvdb::PointIndex<openvdb::Index32, 1000>;
-
-// Tree configured to match the default OpenVDB configuration
-using MultiPassTree = openvdb::tree::Tree<
-    openvdb::tree::RootNode<
-    openvdb::tree::InternalNode<
-    openvdb::tree::InternalNode<
-    MultiPassLeafNode<MultiPassValue, 3>, 4>, 5>>>;
-
-using MultiPassGrid = openvdb::Grid<MultiPassTree>;
-
-
-template<typename T, openvdb::Index Log2Dim>
-struct MultiPassLeafNode: public openvdb::tree::LeafNode<T, Log2Dim>, openvdb::io::MultiPass
-{
-    // The following had to be copied from the LeafNode class
-    // to make the derived class compatible with the tree structure.
-
-    using LeafNodeType  = MultiPassLeafNode;
-    using Ptr           = openvdb::SharedPtr<MultiPassLeafNode>;
-    using BaseLeaf      = openvdb::tree::LeafNode<T, Log2Dim>;
-    using NodeMaskType  = openvdb::util::NodeMask<Log2Dim>;
-    using ValueType     = T;
-    using ValueOnCIter  = typename BaseLeaf::template ValueIter<typename NodeMaskType::OnIterator,
-        const MultiPassLeafNode, const ValueType, typename BaseLeaf::ValueOn>;
-    using ChildOnIter = typename BaseLeaf::template ChildIter<typename NodeMaskType::OnIterator,
-        MultiPassLeafNode, typename BaseLeaf::ChildOn>;
-    using ChildOnCIter = typename BaseLeaf::template ChildIter<
-        typename NodeMaskType::OnIterator, const MultiPassLeafNode, typename BaseLeaf::ChildOn>;
-
-    MultiPassLeafNode(const openvdb::Coord& coords, const T& value, bool active = false)
-        : BaseLeaf(coords, value, active) {}
-    MultiPassLeafNode(openvdb::PartialCreate, const openvdb::Coord& coords, const T& value,
-        bool active = false): BaseLeaf(openvdb::PartialCreate(), coords, value, active) {}
-    MultiPassLeafNode(const MultiPassLeafNode& rhs): BaseLeaf(rhs) {}
-
-    ValueOnCIter cbeginValueOn() const { return ValueOnCIter(this->getValueMask().beginOn(),this); }
-    ChildOnCIter cbeginChildOn() const { return ChildOnCIter(this->getValueMask().endOn(), this); }
-    ChildOnIter   beginChildOn()       { return ChildOnIter(this->getValueMask().endOn(), this); }
-
-    // Methods in use for reading and writing multiple buffers
-
-    void readBuffers(std::istream& is, const openvdb::CoordBBox&, bool fromHalf = false)
-    {
-        this->readBuffers(is, fromHalf);
-    }
-
-    void readBuffers(std::istream& is, bool /*fromHalf*/ = false)
-    {
-        const openvdb::io::StreamMetadata::Ptr meta = openvdb::io::getStreamMetadataPtr(is);
-        if (!meta) {
-            OPENVDB_THROW(openvdb::IoError,
-                "Cannot write out a MultiBufferLeaf without StreamMetadata.");
-        }
-
-        // clamp pass to 16-bit integer
-        const uint32_t pass(static_cast<uint16_t>(meta->pass()));
-
-        // Read in the stored pass number.
-        uint32_t readPass;
-        is.read(reinterpret_cast<char*>(&readPass), sizeof(uint32_t));
-        EXPECT_EQ(pass, readPass);
-        // Record the pass number.
-        mReadPasses.push_back(readPass);
-
-        if (pass == 0) {
-            // Read in the node's origin.
-            openvdb::Coord origin;
-            is.read(reinterpret_cast<char*>(&origin), sizeof(openvdb::Coord));
-            EXPECT_EQ(origin, this->origin());
-        }
-    }
-
-    void writeBuffers(std::ostream& os, bool /*toHalf*/ = false) const
-    {
-        const openvdb::io::StreamMetadata::Ptr meta = openvdb::io::getStreamMetadataPtr(os);
-        if (!meta) {
-            OPENVDB_THROW(openvdb::IoError,
-                "Cannot read in a MultiBufferLeaf without StreamMetadata.");
-        }
-
-        // clamp pass to 16-bit integer
-        const uint32_t pass(static_cast<uint16_t>(meta->pass()));
-
-        // Leaf traversal analysis deduces the number of passes to perform for this leaf
-        // then updates the leaf traversal value to ensure all passes will be written.
-        if (meta->countingPasses()) {
-            if (mNumPasses > pass) meta->setPass(mNumPasses);
-            return;
-        }
-
-        // Record the pass number.
-        EXPECT_TRUE(mWritePassesPtr);
-        const_cast<std::vector<int>&>(*mWritePassesPtr).push_back(pass);
-
-        // Write out the pass number.
-        os.write(reinterpret_cast<const char*>(&pass), sizeof(uint32_t));
-        if (pass == 0) {
-            // Write out the node's origin and the pass number.
-            const auto origin = this->origin();
-            os.write(reinterpret_cast<const char*>(&origin), sizeof(openvdb::Coord));
-        }
-    }
-
-
-    uint32_t mNumPasses = 0;
-    // Pointer to external vector in which to record passes as they are written
-    std::vector<int>* mWritePassesPtr = nullptr;
-    // Vector in which to record passes as they are read
-    // (this needs to be internal, because leaf nodes are constructed as a grid is read)
-    std::vector<int> mReadPasses;
-}; // struct MultiPassLeafNode
-
-} // anonymous namespace
-
-
-TEST_F(TestFile, testMultiPassIO)
-{
-    using namespace openvdb;
-
-    openvdb::initialize();
-    MultiPassGrid::registerGrid();
-
-    // Create a multi-buffer grid.
-    const MultiPassGrid::Ptr grid = openvdb::createGrid<MultiPassGrid>();
-    grid->setName("test");
-    grid->setTransform(math::Transform::createLinearTransform(1.0));
-    MultiPassGrid::TreeType& tree = grid->tree();
-    tree.setValue(Coord(0, 0, 0), 5);
-    tree.setValue(Coord(0, 10, 0), 5);
-    EXPECT_EQ(2, int(tree.leafCount()));
-
-    const GridPtrVec grids{grid};
-
-    // Vector in which to record pass numbers (to ensure blocked ordering)
-    std::vector<int> writePasses;
-    {
-        // Specify the required number of I/O passes for each leaf node.
-        MultiPassGrid::TreeType::LeafIter leafIter = tree.beginLeaf();
-        leafIter->mNumPasses = 3;
-        leafIter->mWritePassesPtr = &writePasses;
-        ++leafIter;
-        leafIter->mNumPasses = 2;
-        leafIter->mWritePassesPtr = &writePasses;
-    }
-
-    const char* filename = "testMultiPassIO.vdb";
-    SharedPtr<const char> scopedFile(filename, ::remove);
-    {
-        // Verify that passes are written to a file in the correct order.
-        io::File(filename).write(grids);
-        EXPECT_EQ(6, int(writePasses.size()));
-        EXPECT_EQ(0, writePasses[0]); // leaf 0
-        EXPECT_EQ(0, writePasses[1]); // leaf 1
-        EXPECT_EQ(1, writePasses[2]); // leaf 0
-        EXPECT_EQ(1, writePasses[3]); // leaf 1
-        EXPECT_EQ(2, writePasses[4]); // leaf 0
-        EXPECT_EQ(2, writePasses[5]); // leaf 1
-    }
-    {
-        // Verify that passes are read in the correct order.
-        io::File file(filename);
-        file.open();
-        const auto newGrid = GridBase::grid<MultiPassGrid>(file.readGrid("test"));
-
-        auto leafIter = newGrid->tree().beginLeaf();
-        EXPECT_EQ(3, int(leafIter->mReadPasses.size()));
-        EXPECT_EQ(0, leafIter->mReadPasses[0]);
-        EXPECT_EQ(1, leafIter->mReadPasses[1]);
-        EXPECT_EQ(2, leafIter->mReadPasses[2]);
-        ++leafIter;
-        EXPECT_EQ(3, int(leafIter->mReadPasses.size()));
-        EXPECT_EQ(0, leafIter->mReadPasses[0]);
-        EXPECT_EQ(1, leafIter->mReadPasses[1]);
-        EXPECT_EQ(2, leafIter->mReadPasses[2]);
-    }
-    {
-        // Verify that when using multi-pass and bbox clipping that each leaf node
-        // is still being read before being clipped
-        io::File file(filename);
-        file.open();
-        const auto newGrid = GridBase::grid<MultiPassGrid>(
-            file.readGrid("test", BBoxd(Vec3d(0), Vec3d(1))));
-        EXPECT_EQ(Index64(1), newGrid->tree().leafCount());
-
-        auto leafIter = newGrid->tree().beginLeaf();
-        EXPECT_EQ(3, int(leafIter->mReadPasses.size()));
-        EXPECT_EQ(0, leafIter->mReadPasses[0]);
-        EXPECT_EQ(1, leafIter->mReadPasses[1]);
-        EXPECT_EQ(2, leafIter->mReadPasses[2]);
-        ++leafIter;
-        EXPECT_TRUE(!leafIter); // second leaf node has now been clipped
-    }
-
-    // Clear the pass data.
-    writePasses.clear();
-
-    {
-        // Verify that passes are written to and read from a non-seekable stream
-        // in the correct order.
-        std::ostringstream ostr(std::ios_base::binary);
-        io::Stream(ostr).write(grids);
-
-        EXPECT_EQ(6, int(writePasses.size()));
-        EXPECT_EQ(0, writePasses[0]); // leaf 0
-        EXPECT_EQ(0, writePasses[1]); // leaf 1
-        EXPECT_EQ(1, writePasses[2]); // leaf 0
-        EXPECT_EQ(1, writePasses[3]); // leaf 1
-        EXPECT_EQ(2, writePasses[4]); // leaf 0
-        EXPECT_EQ(2, writePasses[5]); // leaf 1
-
-        std::istringstream is(ostr.str(), std::ios_base::binary);
-        io::Stream strm(is);
-        const auto streamedGrids = strm.getGrids();
-        EXPECT_EQ(1, int(streamedGrids->size()));
-
-        const auto newGrid = gridPtrCast<MultiPassGrid>(*streamedGrids->begin());
-        EXPECT_TRUE(bool(newGrid));
-        auto leafIter = newGrid->tree().beginLeaf();
-        EXPECT_EQ(3, int(leafIter->mReadPasses.size()));
-        EXPECT_EQ(0, leafIter->mReadPasses[0]);
-        EXPECT_EQ(1, leafIter->mReadPasses[1]);
-        EXPECT_EQ(2, leafIter->mReadPasses[2]);
-        ++leafIter;
-        EXPECT_EQ(3, int(leafIter->mReadPasses.size()));
-        EXPECT_EQ(0, leafIter->mReadPasses[0]);
-        EXPECT_EQ(1, leafIter->mReadPasses[1]);
-        EXPECT_EQ(2, leafIter->mReadPasses[2]);
-    }
-}
-
-
-////////////////////////////////////////
-
-
 TEST_F(TestFile, testHasGrid)
 {
     using namespace openvdb;
@@ -1967,23 +1634,6 @@ TEST_F(TestFile, testHasGrid)
     grids.push_back(grid);
     grids.push_back(grid2);
 
-    // Register grid and transform.
-    GridBase::clearRegistry();
-    IntGrid::registerGrid();
-    FloatGrid::registerGrid();
-    Metadata::clearRegistry();
-    StringMetadata::registerType();
-    Int32Metadata::registerType();
-    // register maps
-    math::MapRegistry::clear();
-    math::AffineMap::registerMap();
-    math::ScaleMap::registerMap();
-    math::UniformScaleMap::registerMap();
-    math::TranslationMap::registerMap();
-    math::ScaleTranslateMap::registerMap();
-    math::UniformScaleTranslateMap::registerMap();
-    math::NonlinearFrustumMap::registerMap();
-
     // Write the vdb out to a file.
     io::File vdbfile("something.vdb2");
     vdbfile.write(grids, meta);
@@ -1998,11 +1648,6 @@ TEST_F(TestFile, testHasGrid)
     EXPECT_TRUE(vdbfile2.hasGrid("temperature"));
     EXPECT_TRUE(!vdbfile2.hasGrid("Temperature"));
     EXPECT_TRUE(!vdbfile2.hasGrid("densitY"));
-
-    // Clear registries.
-    GridBase::clearRegistry();
-    Metadata::clearRegistry();
-    math::MapRegistry::clear();
 
     vdbfile2.close();
 
@@ -2048,9 +1693,6 @@ TEST_F(TestFile, testNameIterator)
     grid = createGrid(ftree);
     grid->setName("level_set");
     grids.push_back(grid);
-
-    // Register types.
-    openvdb::initialize();
 
     const char* filename = "testNameIterator.vdb2";
     SharedPtr<const char> scopedFile(filename, ::remove);
@@ -2098,9 +1740,6 @@ TEST_F(TestFile, testCompression)
     using namespace openvdb::io;
 
     using IntGrid = openvdb::Int32Grid;
-
-    // Register types.
-    openvdb::initialize();
 
     // Create reference grids.
     IntGrid::Ptr intGrid = IntGrid::create(/*background=*/0);
@@ -2311,9 +1950,6 @@ TEST_F(TestFile, testAsync)
 {
     using namespace openvdb;
 
-    // Register types.
-    openvdb::initialize();
-
     // Create a grid.
     FloatGrid::Ptr lsGrid = createLevelSet<FloatGrid>();
     unittest_util::makeSphere(/*dim=*/Coord(100), /*ctr=*/Vec3f(50, 50, 50), /*r=*/20.0,
@@ -2431,8 +2067,6 @@ TEST_F(TestFile, testAsync)
 // (see https://github.com/Blosc/c-blosc/pull/63).
 TEST_F(TestFile, testBlosc)
 {
-    openvdb::initialize();
-
     const unsigned char rawdata[] = {
         0x93, 0xb0, 0x49, 0xaf, 0x62, 0xad, 0xe3, 0xaa, 0xe4, 0xa5, 0x43, 0x20, 0x24,
         0x29, 0xc9, 0xaf, 0xee, 0xad, 0x0b, 0xac, 0x3d, 0xa8, 0x1f, 0x99, 0x53, 0x27,
@@ -2542,147 +2176,3 @@ TEST_F(TestFile, testBlosc)
     }
 }
 #endif
-
-
-void
-TestFile::testDelayedLoadMetadata()
-{
-    openvdb::initialize();
-
-    using namespace openvdb;
-
-    io::File file("something.vdb2");
-
-    // Create a level set grid.
-    auto lsGrid = createLevelSet<FloatGrid>();
-    lsGrid->setName("sphere");
-    unittest_util::makeSphere(/*dim=*/Coord(100), /*ctr=*/Vec3f(50, 50, 50), /*r=*/20.0,
-        *lsGrid, unittest_util::SPHERE_SPARSE_NARROW_BAND);
-
-    // Write the VDB to a string stream.
-    std::ostringstream ostr(std::ios_base::binary);
-
-    // Create the grid descriptor out of this grid.
-    io::GridDescriptor gd(Name("sphere"), lsGrid->type());
-
-    // Write out the grid.
-    file.writeGrid(gd, lsGrid, ostr, /*seekable=*/true);
-
-    // Duplicate VDB string stream.
-    std::ostringstream ostr2(std::ios_base::binary);
-
-    { // Read back in, clip and write out again to verify metadata is rebuilt.
-        std::istringstream istr(ostr.str(), std::ios_base::binary);
-        io::setVersion(istr, file.libraryVersion(), file.fileVersion());
-
-        io::GridDescriptor gd2;
-        GridBase::Ptr grid = gd2.read(istr);
-        gd2.seekToGrid(istr);
-
-        const BBoxd clipBbox(Vec3d(-10.0,-10.0,-10.0), Vec3d(10.0,10.0,10.0));
-        io::Archive::readGrid(grid, gd2, istr, clipBbox);
-
-        // Verify clipping is working as expected.
-        EXPECT_TRUE(grid->baseTreePtr()->leafCount() < lsGrid->tree().leafCount());
-
-        file.writeGrid(gd, grid, ostr2, /*seekable=*/true);
-    }
-
-    // Since the input is only a fragment of a VDB file (in particular,
-    // it doesn't have a header), set the file format version number explicitly.
-    // On read, the delayed load metadata for OpenVDB library versions less than 6.1
-    // should be removed to ensure correctness as it possible for the metadata to
-    // have been treated as unknown and blindly copied over when read and re-written
-    // using this library version resulting in out-of-sync metadata.
-
-    // By default, DelayedLoadMetadata is dropped from the grid during read so
-    // as not to be exposed to the user.
-
-    { // read using current library version
-        std::istringstream istr(ostr2.str(), std::ios_base::binary);
-        io::setVersion(istr, file.libraryVersion(), file.fileVersion());
-
-        io::GridDescriptor gd2;
-        GridBase::Ptr grid = gd2.read(istr);
-        gd2.seekToGrid(istr);
-        io::Archive::readGrid(grid, gd2, istr);
-
-        EXPECT_TRUE(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
-    }
-
-    // To test the version mechanism, a stream metadata object is created with
-    // a non-zero test value and set on the input stream. This disables the
-    // behaviour where the DelayedLoadMetadata is dropped from the grid.
-
-    io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
-    streamMetadata->__setTest(uint32_t(1));
-
-    { // read using current library version
-        std::istringstream istr(ostr2.str(), std::ios_base::binary);
-        io::setVersion(istr, file.libraryVersion(), file.fileVersion());
-        io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
-
-        io::GridDescriptor gd2;
-        GridBase::Ptr grid = gd2.read(istr);
-        gd2.seekToGrid(istr);
-        io::Archive::readGrid(grid, gd2, istr);
-
-        EXPECT_TRUE(((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
-    }
-
-    { // read using library version of 5.0
-        std::istringstream istr(ostr2.str(), std::ios_base::binary);
-        io::setVersion(istr, VersionId(5,0), file.fileVersion());
-        io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
-
-        io::GridDescriptor gd2;
-        GridBase::Ptr grid = gd2.read(istr);
-        gd2.seekToGrid(istr);
-        io::Archive::readGrid(grid, gd2, istr);
-
-        EXPECT_TRUE(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
-    }
-
-    { // read using library version of 4.9
-        std::istringstream istr(ostr2.str(), std::ios_base::binary);
-        io::setVersion(istr, VersionId(4,9), file.fileVersion());
-        io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
-
-        io::GridDescriptor gd2;
-        GridBase::Ptr grid = gd2.read(istr);
-        gd2.seekToGrid(istr);
-        io::Archive::readGrid(grid, gd2, istr);
-
-        EXPECT_TRUE(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
-    }
-
-    { // read using library version of 6.1
-        std::istringstream istr(ostr2.str(), std::ios_base::binary);
-        io::setVersion(istr, VersionId(6,1), file.fileVersion());
-        io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
-
-        io::GridDescriptor gd2;
-        GridBase::Ptr grid = gd2.read(istr);
-        gd2.seekToGrid(istr);
-        io::Archive::readGrid(grid, gd2, istr);
-
-        EXPECT_TRUE(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
-    }
-
-    { // read using library version of 6.2
-        std::istringstream istr(ostr2.str(), std::ios_base::binary);
-        io::setVersion(istr, VersionId(6,2), file.fileVersion());
-        io::setStreamMetadataPtr(istr, streamMetadata, /*transfer=*/false);
-
-        io::GridDescriptor gd2;
-        GridBase::Ptr grid = gd2.read(istr);
-        gd2.seekToGrid(istr);
-        io::Archive::readGrid(grid, gd2, istr);
-
-        EXPECT_TRUE(((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
-    }
-
-    remove("something.vdb2");
-}
-TEST_F(TestFile, testDelayedLoadMetadata) { testDelayedLoadMetadata(); }
-

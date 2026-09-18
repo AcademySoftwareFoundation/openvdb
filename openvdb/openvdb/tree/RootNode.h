@@ -1178,7 +1178,11 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
 
         struct Local {
             /// @todo Consider using a value conversion functor passed as an argument instead.
-            static inline ValueT convertValue(const OtherValueT& val) { return ValueT(val); }
+            static inline ValueT convertValue(const OtherValueT& val) {
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+                return ValueT(val);
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+            }
         };
 
         self.mBackground = Local::convertValue(other.mBackground);

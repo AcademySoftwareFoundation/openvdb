@@ -1,0 +1,5 @@
+OpenVDB:
+  New features:
+  - io::ReadOptions now supports read-time grid type conversion, allowing a grid
+    to be read as a different registered type than the one stored in the file
+    (for example, reading a FloatGrid as a HalfGrid).

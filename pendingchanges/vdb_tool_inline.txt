@@ -1,0 +1,4 @@
+vdb_tool:
+
+  Improvements:
+  - Marked the 130 out-of-line member, constructor and free-function definitions in Tool.h, Geometry.h, Parser.h and Util.h (and the explicit specializations of vectorize<> and Parser::get<>/getVec<>) as inline, so the headers can be included from more than one translation unit without duplicate-symbol link errors. Spelled out the deduced return types of Tool::getGrid/getGeom. No behaviour change.

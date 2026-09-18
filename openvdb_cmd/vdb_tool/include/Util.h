@@ -517,14 +517,14 @@ std::vector<T> vectorize(const std::string &line, const char *delimiters = " ");
 
 /// @brief Specialization of vectorize for std::string (identical to tokenize).
 template <>
-std::vector<std::string> vectorize<std::string>(const std::string &line, const char *delimiters)
+inline std::vector<std::string> vectorize<std::string>(const std::string &line, const char *delimiters)
 {
     return tokenize(line, delimiters);
 }
 
 /// @brief Specialization of vectorize for int.
 template <>
-std::vector<int> vectorize<int>(const std::string &line, const char *delimiters)
+inline std::vector<int> vectorize<int>(const std::string &line, const char *delimiters)
 {
     std::vector<char> buffer(line.c_str(), line.c_str() + line.size() + 1);
     std::vector<int> tokens;
@@ -538,7 +538,7 @@ std::vector<int> vectorize<int>(const std::string &line, const char *delimiters)
 
 /// @brief Specialization of vectorize for float.
 template <>
-std::vector<float> vectorize<float>(const std::string &line, const char *delimiters)
+inline std::vector<float> vectorize<float>(const std::string &line, const char *delimiters)
 {
     std::vector<char> buffer(line.c_str(), line.c_str() + line.size() + 1);
     std::vector<float> tokens;
@@ -552,7 +552,7 @@ std::vector<float> vectorize<float>(const std::string &line, const char *delimit
 
 /// @brief Specialization of vectorize for bool (accepts "0/1" or "true/false").
 template <>
-std::vector<bool> vectorize<bool>(const std::string &line, const char *delimiters)
+inline std::vector<bool> vectorize<bool>(const std::string &line, const char *delimiters)
 {
     std::vector<char> buffer(line.c_str(), line.c_str() + line.size() + 1);
     std::vector<bool> tokens;
@@ -591,7 +591,7 @@ inline std::vector<int> findIntN(const std::vector<std::string> &args, const std
 
 /// @brief Find "option=1.3,-3.1,6.0" in @b args and return std::vector<float>{1.3f,-3.1f,6.0f}.
 /// @throw std::invalid_argument if @b option is missing or any token fails to parse as a float.
-std::vector<float> findFltN(const std::vector<std::string> &args, const std::string &option)
+inline std::vector<float> findFltN(const std::vector<std::string> &args, const std::string &option)
 {
     const auto t = tokenize(findArg(args, option), " ,");
     std::vector<float> v(t.size());
