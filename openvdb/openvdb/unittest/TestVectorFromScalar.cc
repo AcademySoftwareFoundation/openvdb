@@ -326,7 +326,6 @@ TEST_F(TestVectorFromScalar, testMergeTilesAndVoxels)
     using RootNodeType = typename FloatTree::RootNodeType;
     using L1NodeType = typename RootNodeType::ChildNodeType;
     using L2NodeType = typename L1NodeType::ChildNodeType;
-    using LeafNodeType = typename FloatTree::LeafNodeType;
 
     const Index L1_LEVEL = L1NodeType::getLevel();
     const Index L1_STRIDE = L1NodeType::getChildDim();
