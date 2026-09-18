@@ -4422,7 +4422,7 @@ TEST_F(Test_vdb_tool, CsgRebuiltResults)
     using namespace openvdb;
     auto readGrid = [](const std::string &path) {
         io::File file(path);
-        file.open(false);
+        file.open();
         return gridPtrCast<FloatGrid>(file.readGrid(file.beginName().gridName()));
     };
     for (const std::string action : {"union", "intersection", "difference"}) {
@@ -4533,7 +4533,7 @@ TEST_F(Test_vdb_tool, MalformedPly)
         std::istringstream input(data.substr(0, data.size() - missing));
         EXPECT_THROW(geometry.readPLY(input), std::invalid_argument);
     }
-    for (const unsigned char count : {0, 255}) {
+    for (const int count : {0, 255}) {
         auto invalid = data;
         invalid[invalid.size() - 13] = static_cast<char>(count);// uchar before 3 int indices
         Geometry geometry;
