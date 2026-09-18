@@ -6014,7 +6014,7 @@ namespace io {
 ///
 /// @note NONE is the default, ZIP is slow but compact and BLOSC offers a great balance.
 ///
-/// @throw NanoVDB optionally supports ZIP and BLOSC compression and will throw an exception
+/// @throw NanoVDB optionally supports ZIP and will throw an exception
 ///        if its support is required but missing.
 enum class Codec : uint16_t { NONE = 0,
                               ZIP = 1,

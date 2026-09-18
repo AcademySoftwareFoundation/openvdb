@@ -71,7 +71,6 @@ jobs:
         --build-type=Release
         --components="core,python,doc"
         --cargs=\"
-        -DUSE_BLOSC=OFF
         -DOPENVDB_CORE_STATIC=OFF
         -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON
         -DUSE_EXPLICIT_INSTANTIATION=OFF

@@ -27,6 +27,10 @@ get_filename_component(REPO_ROOT    "${_doc_dir}" DIRECTORY)                  # 
 set(NANOVDB_INCLUDE_ROOT "${REPO_ROOT}/nanovdb")
 set(OPENVDB_INCLUDE_ROOT "${REPO_ROOT}/openvdb")
 
+# nanovdb/io/IO.h includes <nanovdb_blosc.h>, which lives with the vendored
+# blosc sources rather than under NANOVDB_INCLUDE_ROOT.
+set(BLOSC_INCLUDE_ROOT "${REPO_ROOT}/ext/blosc/openvdb/ext/blosc")
+
 message(STATUS "NanoVDB include root: ${NANOVDB_INCLUDE_ROOT}")
 
 # Generated TUs + manifest live in ${GEN_DIR} (passed in, defaults to ./gen).
@@ -62,7 +66,7 @@ endforeach()
 if(_core_srcs)
   add_library(teachme_blocks OBJECT ${_core_srcs})
   target_include_directories(teachme_blocks PRIVATE
-    "${NANOVDB_INCLUDE_ROOT}" "${GEN_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
+    "${NANOVDB_INCLUDE_ROOT}" "${BLOSC_INCLUDE_ROOT}" "${GEN_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
   list(LENGTH _core_srcs _n_core)
   message(STATUS "teachme_blocks: ${_n_core} core TU(s)")
 endif()
@@ -74,7 +78,7 @@ if(_ovdb_srcs)
     add_library(teachme_blocks_openvdb OBJECT ${_ovdb_srcs})
     target_compile_definitions(teachme_blocks_openvdb PRIVATE NANOVDB_USE_OPENVDB)
     target_include_directories(teachme_blocks_openvdb PRIVATE
-      "${NANOVDB_INCLUDE_ROOT}" "${OPENVDB_INCLUDE_ROOT}"
+      "${NANOVDB_INCLUDE_ROOT}" "${OPENVDB_INCLUDE_ROOT}" "${BLOSC_INCLUDE_ROOT}"
       "${GEN_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(teachme_blocks_openvdb PRIVATE OpenVDB::openvdb)
     list(LENGTH _ovdb_srcs _n_ovdb)

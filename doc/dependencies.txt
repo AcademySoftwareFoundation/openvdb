@@ -36,14 +36,14 @@ Reference Platform, but for those that do, their specified versions are
 
 Component               | Requirements                                    | Optional
 ----------------------- | ----------------------------------------------- | --------
-OpenVDB Core Library    | CMake, C++17 compiler, TBB::tbb                 | Blosc, ZLib, Log4cplus, Imath::Imath (included), Boost::iostream, VCL (included)
+OpenVDB Core Library    | CMake, C++17 compiler, TBB::tbb                 | ZLib, Log4cplus, Imath::Imath (included), Boost::iostream, VCL (included)
 OpenVDB Print           | Core Library dependencies                       | -
 OpenVDB LOD             | Core Library dependencies                       | -
 OpenVDB Render          | Core Library dependencies                       | OpenEXR, Imath::Imath, libpng
 OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW* | -
 OpenVDB Python          | Core Library dependencies, Python, nanobind     | -
 OpenVDB AX              | Core Library dependencies, LLVM                 | Bison, Flex
-NanoVDB                 | -                                               | Core Library, CUDA, TBB, Blosc, ZLib
+NanoVDB                 | -                                               | Core Library, CUDA, TBB, ZLib
 OpenVDB UnitTests       | Core Library dependencies, GoogleTest, numpy*   | -
 OpenVDB Documentation   | Doxygen, Doxygen Awesome (included)             | -
 
@@ -80,7 +80,6 @@ Flex            | 2.6.4   | 2.6.4       | Fast lexical analyzer generator       
 Python          | 3.10    | 3.11        | The python interpreter and libraries                              | Y       | Y        | https://www.python.org
 nanobind**      | 2.0.0   | >= 2.5.0    | C++/python bindings                                               | Y       | Y        | https://nanobind.readthedocs.io
 GoogleTest      | 1.10    | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
-Blosc           | 1.17.0* | Latest      | Recommended dependency for improved disk compression              | Y       | Y        | https://github.com/Blosc/c-blosc/releases
 Log4cplus       | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus
 libpng          | -       | Latest      | Library for manipulating PNG images                               | Y       | Y        | http://www.libpng.org/pub/png/libpng.html
 GLFW            | 3.3     | Latest      | Simple API for OpenGL development                                 | Y       | Y        | https://www.glfw.org
@@ -90,7 +89,7 @@ CUDA            | -       | Latest      | Parallel computing platform for graphi
 Doxygen         | 1.8.8   | <= 1.14.0   | Documentation generation from C++                                 | Y       | Y        | http://www.doxygen.nl
 Doxygen Awesome | 2.0.0   | >= 2.0.0    | Documentation generation from C++                                 | Y       | Y        | https://github.com/jothepro/doxygen-awesome-css
 
- - @b *  See the note in [known issues](@ref depKnownIssues) regarding supported blosc/llvm versions.
+ - @b *  See the note in [known issues](@ref depKnownIssues) regarding supported llvm versions.
  - @b ** See the note in [known issues](@ref depKnownIssues) regarding supported nanobind build issues.
 
 @subsection depKnownIssues Known Issues
@@ -101,21 +100,6 @@ Doxygen Awesome | 2.0.0   | >= 2.0.0    | Documentation generation from C++     
 
  - @b GLFW: Crash with GLFW 3.2.1 when used with EGL on Linux. OpenVDB View may
  segfault on closure. Fixed in GLFW 3.3
-
- - @b Blosc: OpenVDB has historically used an old version of blosc (1.5.0) to
- serialize .vdb files. OpenVDB has moved to a new blosc version minimum of
- 1.17.0. We have tested a range of blosc versions and found that the following
- versions are NOT compatible with OpenVDB caches written using blosc 1.5.0.
- Additionally these versions of blosc may generally not be compatible with OpenVDB
- itself. Avoid using these versions and upgrade to the new minimum of 1.17.0 where
- possible.
-  - All versions from 1.11.0 through to, but excluding, 1.14.0.
-  - Versions 1.16.0 and 1.16.1.
-  .
- For more information see:
-  - https://www.blosc.org/posts/new-forward-compat-policy/
-  - https://github.com/Blosc/c-blosc/issues/260
-  - https://github.com/Blosc/c-blosc/issues/261
 
  - @b nanobind: Nanobind requires a fast-hash-map implementation library called
  tsl-robin-map. If you're installing nanobind through homebrew, this library
@@ -152,7 +136,6 @@ other package managers.
 apt-get install cmake                   # CMake
 apt-get install libtbb-dev              # TBB
 apt-get install zlibc                   # zlib
-apt-get install libblosc-dev            # Blosc
 # AX
 apt-get install llvm-15-dev             # LLVM
 # Python
@@ -182,7 +165,6 @@ an alternative to apt-get or manual installation from source.
 brew install cmake                     # CMake
 brew install tbb                       # TBB
 brew install zlib                      # zlib
-brew install c-blosc                   # blosc
 # AX
 brew install llvm                      # LLVM
 # Python

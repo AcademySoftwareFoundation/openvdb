@@ -47,9 +47,7 @@
 #ifdef NANOVDB_USE_ZIP
 #include <zlib.h> // for ZIP compression
 #endif
-#ifdef NANOVDB_USE_BLOSC
-#include <blosc.h> // for BLOSC compression
-#endif
+#include <nanovdb_blosc.h> // for BLOSC compression
 
 // Due to a bug in older versions of gcc, including fstream might
 // define "major" and "minor" which are used as member data below.
@@ -239,7 +237,6 @@ fileSize_t Internal::write(std::ostream& os, const GridHandle<BufferT>& handle, 
         break;
     }
     case Codec::BLOSC: {
-#ifdef NANOVDB_USE_BLOSC
         do {
             fileSize_t              chunk = residual < MAX_SIZE ? residual : MAX_SIZE, size = chunk + BLOSC_MAX_OVERHEAD;
             std::unique_ptr<char[]> tmp(new char[size]);
@@ -252,9 +249,6 @@ fileSize_t Internal::write(std::ostream& os, const GridHandle<BufferT>& handle, 
             data += chunk;
             residual -= chunk;
         } while (residual > 0);
-#else
-        throw std::runtime_error("BLOSC compression codec was disabled during build");
-#endif
         break;
     }
     default:
@@ -296,7 +290,6 @@ void Internal::read(std::istream& is, char* data, fileSize_t residual, Codec cod
         break;
     }
     case Codec::BLOSC: {
-#ifdef NANOVDB_USE_BLOSC
         do {
             fileSize_t size;
             is.read(reinterpret_cast<char*>(&size), sizeof(fileSize_t));
@@ -309,9 +302,6 @@ void Internal::read(std::istream& is, char* data, fileSize_t residual, Codec cod
             data += size_t(chunk);
             residual -= chunk;
         } while (residual > 0);
-#else
-        throw std::runtime_error("BLOSC compression codec was disabled during build");
-#endif
         break;
     }
     default:

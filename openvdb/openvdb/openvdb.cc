@@ -10,9 +10,7 @@
 #include <atomic>
 #include <mutex>
 
-#ifdef OPENVDB_USE_BLOSC
-#include <blosc.h>
-#endif
+#include <openvdb_blosc.h>
 
 #if OPENVDB_ABI_VERSION_NUMBER <= 10
     #error ABI <= 10 is no longer supported
@@ -92,13 +90,7 @@ initialize()
     // Register types associated with point data grids.
     points::internal::initialize();
 
-#ifdef OPENVDB_USE_BLOSC
     blosc_init();
-    if (blosc_set_compressor("lz4") < 0) {
-        OPENVDB_LOG_WARN("Blosc LZ4 compressor is unavailable");
-    }
-    /// @todo blosc_set_nthreads(int nthreads);
-#endif
 
 #ifdef __ICC
 // Disable ICC "assignment to statically allocated variable" warning.
@@ -135,12 +127,6 @@ __pragma(warning(default:1711))
     math::MapRegistry::clear();
     io::internal::uninitialize();
     points::internal::uninitialize();
-
-#ifdef OPENVDB_USE_BLOSC
-    // We don't want to destroy Blosc, because it might have been
-    // initialized by some other library.
-    //blosc_destroy();
-#endif
 }
 
 } // namespace OPENVDB_VERSION_NAME

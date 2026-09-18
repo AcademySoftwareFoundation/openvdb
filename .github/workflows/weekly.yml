@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       type:
-        description: 'The type of CI to run (all, houdini, latest, extra, ax, blosc, abi)'
+        description: 'The type of CI to run (all, houdini, latest, extra, ax, abi)'
         required: true
         default: 'all'
 
@@ -146,12 +146,12 @@ jobs:
     strategy:
       matrix:
         config:
-          - { name: 'all',    image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
-          - { name: 'lite',   image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF' }
-          - { name: 'half',   image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
+          - { name: 'all',    image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
+          - { name: 'lite',   image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF' }
+          - { name: 'half',   image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_IMATH_HALF=ON' }
           - { name: 'simd',   image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_X86_INSTRSET=7 -DUSE_VCL=ON' } # 7=AVX
           - { name: 'pygrid', image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
-          - { name: 'asan',   image: '2026', build: 'asan',    components: 'core,test',                        cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF -DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
+          - { name: 'asan',   image: '2026', build: 'asan',    components: 'core,test',                        cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF' }
           - { name: 'ubsan',  image: '2026', build: 'ubsan',   components: 'core,test',                        cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" ' }
           - { name: 'c++20',  image: '2026', build: 'Release', components: 'core,test',                        cmake: '-DCMAKE_CXX_STANDARD=20' }
           - { name: 'abi14',  image: '2026',           build: 'Release', components: 'core,test',              cmake: '-DOPENVDB_USE_FUTURE_ABI_14=ON -DOPENVDB_ENABLE_ASSERTS=ON' }
@@ -202,7 +202,7 @@ jobs:
       - name: install_deps
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get -q install -y libtbb-dev libblosc-dev libgtest-dev libgmock-dev python3-numpy
+            sudo apt-get -q install -y libtbb-dev libgtest-dev libgmock-dev python3-numpy
             ./ci/install_nanobind.sh 2.5.0
           elif [ "$RUNNER_OS" == "macOS" ]; then
             ./ci/install_macos.sh 20
@@ -236,12 +236,11 @@ jobs:
     strategy:
       matrix:
         config:
-          # static build of blosc from vcpkg does not build internal sources.
           # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
           # Boost as both shared and static libs are installed.
           # USE_EXPLICIT_INSTANTIATION is disabled for debug static libraries
           # due to disk space constraints
-          - { vc: 'x64-windows-static', components: 'core,bin,view,render,test',       build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows-static', components: 'core,bin,view,render,test',       build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON' }
           - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
           - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
       fail-fast: false
@@ -392,7 +391,6 @@ jobs:
     strategy:
       matrix:
         config:
-          # static build of blosc from vcpkg does not build internal sources.
           # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
           # Boost as both shared and static libs are installed.
           # @todo  We don't currently run the axtests with shared builds of ax
@@ -400,10 +398,10 @@ jobs:
           # option on Windows).
           # @note  currently only test static builds with MT as building LLVM as
           # a shared lib on windows is a bit dicey
-          - { vc: 'x64-windows-static', llvm: '18.1.0', crt: 'MultiThreaded',      components: 'core,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
-          - { vc: 'x64-windows-static', llvm: '18.1.0', crt: 'MultiThreadedDebug', components: 'core,axcore,axbin,axtest', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows-static', llvm: '18.1.0', crt: 'MultiThreaded',      components: 'core,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON' }
+          - { vc: 'x64-windows-static', llvm: '18.1.0', crt: 'MultiThreadedDebug', components: 'core,axcore,axbin,axtest', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON' }
           - { vc: 'x64-windows',        llvm: '18.1.0', crt: 'MultiThreadedDLL',   components: 'core,axcore,axbin',        build: 'Release', cmake: '-DOPENVDB_CORE_STATIC=OFF -DOPENVDB_AX_STATIC=OFF' }
-          - { vc: 'x64-windows-static', llvm: '15.0.0', crt: 'MultiThreaded',      components: 'core,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows-static', llvm: '15.0.0', crt: 'MultiThreaded',      components: 'core,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
@@ -421,7 +419,6 @@ jobs:
         --components="${{ matrix.config.components }}"
         --cargs=\'
         -A x64 -G \"Visual Studio 17 2022\"
-        -DUSE_BLOSC=OFF \
         -DUSE_ZLIB=OFF \
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
         -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
@@ -442,7 +439,7 @@ jobs:
       run: cd build && ctest -V -C ${{ matrix.config.build }}
 
   #############################################################################
-  ################################## Blosc ####################################
+  ################################# NanoVDB ###################################
   #############################################################################
 
   windows-nanovdb:
@@ -458,11 +455,10 @@ jobs:
     strategy:
       matrix:
         config:
-          # static build of blosc from vcpkg does not build internal sources.
           # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
           # Boost as both shared and static libs are installed.
-          - { vc: 'x64-windows-static', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded' }
-          - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug' }
+          - { vc: 'x64-windows-static', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded' }
+          - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug' }
           - { vc: 'x64-windows',        build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
           - { vc: 'x64-windows',        build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
       fail-fast: false
@@ -501,35 +497,6 @@ jobs:
       run: cd build && ctest -V -E ".*cuda.*|.*mgpu.*"
 
   #############################################################################
-  ################################## Blosc ####################################
-  #############################################################################
-
-  linux-blosc:
-    if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'blosc'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-latest-8c-32g-300h') || 'ubuntu-latest' }}
-    name: linux-blosc:${{ matrix.blosc }}
-    container:
-      image: aswf/ci-openvdb:2025-clang19.1
-    strategy:
-      matrix:
-        blosc: ['1.21.0', 'latest']
-      fail-fast: false
-    steps:
-    - uses: actions/checkout@v3
-    - name: install_blosc
-      run: sudo ./ci/install_blosc.sh ${{ matrix.blosc }}
-    - name: build
-      run: >
-        sudo ./ci/build.sh -v
-        --build-type=Release
-        --components=\"core,test\"
-    - name: test
-      run: cd build && ctest -V
-
-  #############################################################################
   ################################## ABI ######################################
   #############################################################################
 
@@ -561,7 +528,7 @@ jobs:
         echo "Using major version: ${VDB_MAJOR_VERSION}"
         echo "VDB_MAJOR_VERSION=${VDB_MAJOR_VERSION}" >> "$GITHUB_ENV"
     - name: install_deps
-      run: sudo apt-get -q install -y libtbb-dev libblosc-dev elfutils
+      run: sudo apt-get -q install -y libtbb-dev elfutils
     - name: install_abi_checker
       run: sudo apt-get -q install -y abi-dumper abi-compliance-checker
     - name: build_new

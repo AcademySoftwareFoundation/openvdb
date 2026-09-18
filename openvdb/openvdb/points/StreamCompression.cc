@@ -8,17 +8,12 @@
 #include <openvdb/util/Assert.h>
 #include <map>
 #include <vector>
-#ifdef OPENVDB_USE_BLOSC
-#include <blosc.h>
-#endif
+#include <openvdb_blosc.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace compression {
-
-
-#ifdef OPENVDB_USE_BLOSC
 
 
 bool
@@ -217,66 +212,6 @@ bloscDecompress(const char* buffer, const size_t expectedBytes, const bool resiz
 }
 
 
-#else
-
-
-bool
-bloscCanCompress()
-{
-    OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
-    return false;
-}
-
-
-size_t
-bloscUncompressedSize(const char*)
-{
-    OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
-}
-
-
-void
-bloscCompress(char*, size_t& compressedBytes, const size_t, const char*, const size_t)
-{
-    OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
-    compressedBytes = 0;
-}
-
-
-std::unique_ptr<char[]>
-bloscCompress(const char*, const size_t, size_t& compressedBytes, const bool)
-{
-    OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
-    compressedBytes = 0;
-    return nullptr;
-}
-
-
-size_t
-bloscCompressedSize(const char*, const size_t)
-{
-    OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
-    return 0;
-}
-
-
-void
-bloscDecompress(char*, const size_t, const size_t, const char*)
-{
-    OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
-}
-
-
-std::unique_ptr<char[]>
-bloscDecompress(const char*, const size_t, const bool)
-{
-    OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
-}
-
-
-#endif // OPENVDB_USE_BLOSC
-
-
 ////////////////////////////////////////
 
 
@@ -373,9 +308,7 @@ Page::decompress(const std::unique_ptr<char[]>& temp)
 {
     size_t uncompressedBytes = bloscUncompressedSize(temp.get());
     size_t tempBytes = uncompressedBytes;
-#ifdef OPENVDB_USE_BLOSC
     tempBytes += uncompressedBytes;
-#endif
     mData.reset(new char[tempBytes]);
 
     bloscDecompress(mData.get(), uncompressedBytes, tempBytes, temp.get());
@@ -482,18 +415,14 @@ PagedInputStream::skip(PageHandle::Ptr& pageHandle, std::streamsize n)
 
 PagedOutputStream::PagedOutputStream()
 {
-#ifdef OPENVDB_USE_BLOSC
     mCompressedData.reset(new char[PageSize + BLOSC_MAX_OVERHEAD]);
-#endif
 }
 
 
 PagedOutputStream::PagedOutputStream(std::ostream& os)
     : mOs(&os)
 {
-#ifdef OPENVDB_USE_BLOSC
     mCompressedData.reset(new char[PageSize + BLOSC_MAX_OVERHEAD]);
-#endif
 }
 
 
@@ -539,14 +468,10 @@ PagedOutputStream::compressAndWrite(const char* buffer, size_t size)
 
     size_t compressedBytes(0);
     if (mSizeOnly) {
-#ifdef OPENVDB_USE_BLOSC
         compressedBytes = bloscCompressedSize(buffer, size);
-#endif
     }
     else {
-#ifdef OPENVDB_USE_BLOSC
         bloscCompress(mCompressedData.get(), compressedBytes, mCapacity + BLOSC_MAX_OVERHEAD, buffer, size);
-#endif
     }
 
     if (compressedBytes == 0) {
@@ -564,11 +489,7 @@ PagedOutputStream::compressAndWrite(const char* buffer, size_t size)
             mOs->write(reinterpret_cast<const char*>(&size), sizeof(int));
         }
         else {
-#ifdef OPENVDB_USE_BLOSC
             mOs->write(mCompressedData.get(), compressedBytes);
-#else
-            OPENVDB_THROW(RuntimeError, "Cannot write out compressed data without Blosc.");
-#endif
         }
     }
 }
@@ -585,9 +506,7 @@ PagedOutputStream::resize(size_t size)
     if (requiredSize > mCapacity) {
         mCapacity = requiredSize;
         mData.reset(new char[mCapacity]);
-#ifdef OPENVDB_USE_BLOSC
         mCompressedData.reset(new char[mCapacity + BLOSC_MAX_OVERHEAD]);
-#endif
     }
 }
 
