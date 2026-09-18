@@ -28,27 +28,38 @@ namespace points {
 /// @brief Count the total number of points in a PointDataTree
 /// @param tree         the PointDataTree in which to count the points
 /// @param filter       an optional index filter
-/// @param inCoreOnly   if true, points in out-of-core leaf nodes are not counted
 /// @param threaded     enable or disable threading  (threading is enabled by default)
 template <typename PointDataTreeT, typename FilterT = NullFilter>
 inline Index64 pointCount(  const PointDataTreeT& tree,
                             const FilterT& filter = NullFilter(),
-                            const bool inCoreOnly = false,
                             const bool threaded = true);
+
+template <typename PointDataTreeT, typename FilterT = NullFilter>
+OPENVDB_DEPRECATED_MESSAGE("Use pointCount() without inCoreOnly parameter instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+inline Index64 pointCount(  const PointDataTreeT& tree,
+                            const FilterT& filter,
+                            const bool /*inCoreOnly*/,
+                            const bool threaded);
 
 /// @brief Populate an array of cumulative point offsets per leaf node.
 /// @param pointOffsets     array of offsets to be populated
 /// @param tree             the PointDataTree from which to populate the offsets
 /// @param filter           an optional index filter
-/// @param inCoreOnly       if true, points in out-of-core leaf nodes are ignored
 /// @param threaded         enable or disable threading  (threading is enabled by default)
 /// @return The final cumulative point offset.
 template <typename PointDataTreeT, typename FilterT = NullFilter>
 inline Index64 pointOffsets(std::vector<Index64>& pointOffsets,
                             const PointDataTreeT& tree,
                             const FilterT& filter = NullFilter(),
-                            const bool inCoreOnly = false,
                             const bool threaded = true);
+
+template <typename PointDataTreeT, typename FilterT = NullFilter>
+OPENVDB_DEPRECATED_MESSAGE("Use pointOffsets() without inCoreOnly parameter instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+inline Index64 pointOffsets(std::vector<Index64>& pointOffsets,
+                            const PointDataTreeT& tree,
+                            const FilterT& filter,
+                            const bool /*inCoreOnly*/,
+                            const bool threaded);
 
 /// @brief Generate a new grid with voxel values to store the number of points per voxel
 /// @param grid             the PointDataGrid to use to compute the count grid

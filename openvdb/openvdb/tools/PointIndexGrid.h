@@ -1491,7 +1491,8 @@ public:
 
 
     Index64 memUsage() const;
-    Index64 memUsageIfLoaded() const;
+    OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    Index64 memUsageIfLoaded() const { return memUsage(); }
 
 
     ////////////////////////////////////////
@@ -1796,13 +1797,6 @@ inline Index64
 PointIndexLeafNode<T, Log2Dim>::memUsage() const
 {
     return BaseLeaf::memUsage() + Index64((sizeof(T)*mIndices.capacity()) + sizeof(mIndices));
-}
-
-template<typename T, Index Log2Dim>
-inline Index64
-PointIndexLeafNode<T, Log2Dim>::memUsageIfLoaded() const
-{
-    return BaseLeaf::memUsageIfLoaded() + Index64((sizeof(T)*mIndices.capacity()) + sizeof(mIndices));
 }
 
 } // namespace tools

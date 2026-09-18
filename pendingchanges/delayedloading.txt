@@ -1,0 +1,6 @@
+OpenVDB:
+  Highlights:
+  - Completely removed support for out-of-core / delayed loading across OpenVDB core,
+    including removal of the OPENVDB_USE_DELAYED_LOADING build option, DelayedLoadMetadata,
+    and TempFile. This was done to improve performance, reduce codebase complexity and to
+    entirely eliminate the optional Boost dependency.

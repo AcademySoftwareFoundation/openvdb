@@ -73,7 +73,6 @@ Imath           | 3.2     | >= 3.3      | Half precision floating points        
 OpenEXR         | 3.2     | >= 3.3      | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
 TBB             | 2020.3  | >= 2021     | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
 ZLIB            | 1.2.7   | Latest      | Compression library for disk serialization compression            | Y       | Y        | https://www.zlib.net
-Boost           | 1.82    | >= 1.85     | Components: iostreams                                             | Y       | Y        | https://www.boost.org
 VCL             | 2.02.0  | >= 2.02.0   | x86 intrinsics and SIMD class wrappers and                        | Y       | Y        | https://github.com/vectorclass/version2
 LLVM            | 15.0.0* | 18.0.0      | Target-independent code generation                                | Y       | Y        | https://llvm.org/
 Bison           | 3.7.0   | 3.7.0       | General-purpose parser generator                                  | Y       | Y        | https://www.gnu.org/software/gcc
@@ -153,7 +152,6 @@ other package managers.
 apt-get install cmake                   # CMake
 apt-get install libtbb-dev              # TBB
 apt-get install zlibc                   # zlib
-apt-get install libboost-iostreams-dev  # Boost::iostream
 apt-get install libblosc-dev            # Blosc
 # AX
 apt-get install llvm-15-dev             # LLVM
@@ -184,7 +182,6 @@ an alternative to apt-get or manual installation from source.
 brew install cmake                     # CMake
 brew install tbb                       # TBB
 brew install zlib                      # zlib
-brew install boost                     # Boost
 brew install c-blosc                   # blosc
 # AX
 brew install llvm                      # LLVM

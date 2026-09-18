@@ -1058,76 +1058,93 @@ TEST_F(TestPointDataLeaf, testIO)
     // read and write topology to disk
 
     {
-        LeafType leaf2(openvdb::Coord(0, 0, 0));
+        // create a grid with the leaf for topology testing
+        PointDataGrid::Ptr grid = PointDataGrid::create();
+        grid->setName("points");
+        grid->tree().addLeaf(new LeafType(leaf));
 
-        std::ostringstream ostr(std::ios_base::binary);
-        leaf.writeTopology(ostr);
+        openvdb::GridCPtrVec grids;
+        grids.push_back(grid);
 
-        std::istringstream istr(ostr.str(), std::ios_base::binary);
-        leaf2.readTopology(istr);
+        // write to file
+        {
+            io::File file("leaf_topology.vdb");
+            file.write(grids);
+            file.close();
+        }
+
+        // read grid from file
+        PointDataGrid::Ptr gridFromDisk;
+        {
+            io::File file("leaf_topology.vdb");
+            file.open();
+            openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
+            file.close();
+
+            gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
+        }
+
+        LeafType* leaf2 = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
+        EXPECT_TRUE(leaf2);
 
         // check topology matches
 
-        EXPECT_EQ(leaf.onVoxelCount(), leaf2.onVoxelCount());
-        EXPECT_TRUE(leaf2.isValueOn(4));
-        EXPECT_TRUE(!leaf2.isValueOn(5));
+        EXPECT_EQ(leaf.onVoxelCount(), leaf2->onVoxelCount());
+        EXPECT_TRUE(leaf2->isValueOn(4));
+        EXPECT_TRUE(!leaf2->isValueOn(5));
 
-        // check only topology (values and attributes still empty)
+        // check that values and attributes are correctly read
 
-        EXPECT_EQ(leaf2.getValue(4), ValueType(0));
-        EXPECT_EQ(leaf2.attributeSet().size(), size_t(0));
+        EXPECT_EQ(leaf2->getValue(4), ValueType(20));
+        EXPECT_EQ(leaf2->attributeSet().size(), size_t(2));
+
+        remove("leaf_topology.vdb");
     }
 
     // read and write buffers to disk
 
     {
-        LeafType leaf2(openvdb::Coord(0, 0, 0));
+        // create a grid with the leaf for buffer testing
+        PointDataGrid::Ptr grid = PointDataGrid::create();
+        grid->setName("points");
+        grid->tree().addLeaf(new LeafType(leaf));
 
-        io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
+        openvdb::GridCPtrVec grids;
+        grids.push_back(grid);
 
-        std::ostringstream ostr(std::ios_base::binary);
-        io::setStreamMetadataPtr(ostr, streamMetadata);
-        io::setDataCompression(ostr, io::COMPRESS_BLOSC);
-        leaf.writeTopology(ostr);
-        for (Index b = 0; b < leaf.buffers(); b++) {
-            uint32_t pass = (uint32_t(leaf.buffers()) << 16) | uint32_t(b);
-            streamMetadata->setPass(pass);
-            leaf.writeBuffers(ostr);
-        }
-        { // error checking
-            streamMetadata->setPass(1000);
-            leaf.writeBuffers(ostr);
-
-            io::StreamMetadata::Ptr meta;
-            io::setStreamMetadataPtr(ostr, meta);
-            EXPECT_THROW(leaf.writeBuffers(ostr), openvdb::IoError);
+        // write to file
+        {
+            io::File file("leaf_buffers.vdb");
+            file.write(grids);
+            file.close();
         }
 
-        std::istringstream istr(ostr.str(), std::ios_base::binary);
-        io::setStreamMetadataPtr(istr, streamMetadata);
-        io::setDataCompression(istr, io::COMPRESS_BLOSC);
+        // read grid from file
+        PointDataGrid::Ptr gridFromDisk;
+        {
+            io::File file("leaf_buffers.vdb");
+            file.open();
+            openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
+            file.close();
 
-        // Since the input stream doesn't include a VDB header with file format version info,
-        // tag the input stream explicitly with the current version number.
-        io::setCurrentVersion(istr);
-
-        leaf2.readTopology(istr);
-        for (Index b = 0; b < leaf.buffers(); b++) {
-            uint32_t pass = (uint32_t(leaf.buffers()) << 16) | uint32_t(b);
-            streamMetadata->setPass(pass);
-            leaf2.readBuffers(istr);
+            gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
         }
+
+        LeafType* leaf2 = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
+        EXPECT_TRUE(leaf2);
 
         // check topology matches
 
-        EXPECT_EQ(leaf.onVoxelCount(), leaf2.onVoxelCount());
-        EXPECT_TRUE(leaf2.isValueOn(4));
-        EXPECT_TRUE(!leaf2.isValueOn(5));
+        EXPECT_EQ(leaf.onVoxelCount(), leaf2->onVoxelCount());
+        EXPECT_TRUE(leaf2->isValueOn(4));
+        EXPECT_TRUE(!leaf2->isValueOn(5));
 
-        // check only topology (values and attributes still empty)
+        // check values and attributes are correctly read
 
-        EXPECT_EQ(leaf2.getValue(4), ValueType(20));
-        EXPECT_EQ(leaf2.attributeSet().size(), size_t(2));
+        EXPECT_EQ(leaf2->getValue(4), ValueType(20));
+        EXPECT_EQ(leaf2->attributeSet().size(), size_t(2));
+
+        remove("leaf_buffers.vdb");
     }
 
     { // test multi-buffer IO
@@ -1165,111 +1182,6 @@ TEST_F(TestPointDataLeaf, testIO)
 
             EXPECT_TRUE(leaf == *leafFromDisk);
         }
-
-#ifdef OPENVDB_USE_DELAYED_LOADING
-        { // read grids from file and pre-fetch
-            PointDataGrid::Ptr gridFromDisk;
-
-            {
-                io::File file("leaf.vdb");
-                file.open();
-                openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
-                file.close();
-
-                gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
-            }
-
-            LeafType* leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
-            EXPECT_TRUE(leafFromDisk);
-
-            const AttributeVec3s& position(
-                AttributeVec3s::cast(leafFromDisk->constAttributeArray("P")));
-            const AttributeF& density(
-                AttributeF::cast(leafFromDisk->constAttributeArray("density")));
-
-            EXPECT_TRUE(leafFromDisk->buffer().isOutOfCore());
-#ifdef OPENVDB_USE_BLOSC
-            EXPECT_TRUE(position.isOutOfCore());
-            EXPECT_TRUE(density.isOutOfCore());
-#else
-            // delayed-loading is only available on attribute arrays when using Blosc
-            EXPECT_TRUE(!position.isOutOfCore());
-            EXPECT_TRUE(!density.isOutOfCore());
-#endif
-
-            // prefetch voxel data only
-            prefetch(gridFromDisk->tree(), /*position=*/false, /*attributes=*/false);
-
-            // ensure out-of-core data is now in-core after pre-fetching
-
-            EXPECT_TRUE(!leafFromDisk->buffer().isOutOfCore());
-#ifdef OPENVDB_USE_BLOSC
-            EXPECT_TRUE(position.isOutOfCore());
-            EXPECT_TRUE(density.isOutOfCore());
-#else
-            EXPECT_TRUE(!position.isOutOfCore());
-            EXPECT_TRUE(!density.isOutOfCore());
-#endif
-
-            { // re-open
-                io::File file("leaf.vdb");
-                file.open();
-                openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
-                file.close();
-
-                gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
-            }
-
-            leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
-            EXPECT_TRUE(leafFromDisk);
-
-            const AttributeVec3s& position2(
-                AttributeVec3s::cast(leafFromDisk->constAttributeArray("P")));
-            const AttributeF& density2(
-                AttributeF::cast(leafFromDisk->constAttributeArray("density")));
-
-            // prefetch voxel and position attribute data
-            prefetch(gridFromDisk->tree(), /*position=*/true, /*attribute=*/false);
-
-            // ensure out-of-core voxel and position data is now in-core after pre-fetching
-
-            EXPECT_TRUE(!leafFromDisk->buffer().isOutOfCore());
-            EXPECT_TRUE(!position2.isOutOfCore());
-#ifdef OPENVDB_USE_BLOSC
-            EXPECT_TRUE(density2.isOutOfCore());
-#else
-            EXPECT_TRUE(!density2.isOutOfCore());
-#endif
-
-            { // re-open
-                io::File file("leaf.vdb");
-                file.open();
-                openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
-                file.close();
-
-                gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
-            }
-
-            leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
-            EXPECT_TRUE(leafFromDisk);
-
-            const AttributeVec3s& position3(
-                AttributeVec3s::cast(leafFromDisk->constAttributeArray("P")));
-            const AttributeF& density3(
-                AttributeF::cast(leafFromDisk->constAttributeArray("density")));
-
-            // prefetch all data
-            prefetch(gridFromDisk->tree());
-
-            // ensure out-of-core voxel and position data is now in-core after pre-fetching
-
-            EXPECT_TRUE(!leafFromDisk->buffer().isOutOfCore());
-            EXPECT_TRUE(!position3.isOutOfCore());
-            EXPECT_TRUE(!density3.isOutOfCore());
-        }
-
-        remove("leaf.vdb");
-#endif // OPENVDB_USE_DELAYED_LOADING
     }
 
     { // test multi-buffer IO with varying attribute storage per-leaf
@@ -1360,6 +1272,97 @@ TEST_F(TestPointDataLeaf, testIO)
         }
 
         remove("leaf.vdb");
+    }
+}
+
+
+TEST_F(TestPointDataLeaf, testTreeIO)
+{
+    using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
+    using AttributeF        = TypedAttributeArray<float>;
+
+    using Descriptor = AttributeSet::Descriptor;
+
+    Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
+
+    const size_t size = LeafType::NUM_VOXELS;
+
+    LeafType leaf(openvdb::Coord(0, 0, 0));
+    leaf.initializeAttributes(descrA, /*arrayLength=*/size/2);
+
+    descrA = descrA->duplicateAppend("density", AttributeF::attributeType());
+    leaf.appendAttribute(leaf.attributeSet().descriptor(), descrA, descrA->find("density"));
+
+    leaf.setOffsetOn(1, 10);
+    leaf.setOffsetOn(4, 20);
+    leaf.setOffsetOn(7, 5);
+
+    TypedAttributeArray<float>& attr =
+        TypedAttributeArray<float>::cast(leaf.attributeArray("density"));
+
+    attr.set(0, 5.0f);
+    attr.set(50, 2.0f);
+    attr.set(51, 8.1f);
+
+    {
+        LeafType leaf2(openvdb::Coord(0, 0, 0));
+
+        std::ostringstream ostr(std::ios_base::binary);
+        leaf.writeTopology(ostr);
+
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        leaf2.readTopology(istr);
+
+        EXPECT_EQ(leaf.onVoxelCount(), leaf2.onVoxelCount());
+        EXPECT_TRUE(leaf2.isValueOn(4));
+        EXPECT_TRUE(!leaf2.isValueOn(5));
+
+        EXPECT_EQ(leaf2.getValue(4), ValueType(0));
+        EXPECT_EQ(leaf2.attributeSet().size(), size_t(0));
+    }
+
+    {
+        LeafType leaf2(openvdb::Coord(0, 0, 0));
+
+        io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
+
+        std::ostringstream ostr(std::ios_base::binary);
+        io::setStreamMetadataPtr(ostr, streamMetadata);
+        io::setDataCompression(ostr, io::COMPRESS_BLOSC);
+        leaf.writeTopology(ostr);
+        for (Index b = 0; b < leaf.buffers(); b++) {
+            uint32_t pass = (uint32_t(leaf.buffers()) << 16) | uint32_t(b);
+            streamMetadata->setPass(pass);
+            leaf.writeBuffers(ostr);
+        }
+        {
+            streamMetadata->setPass(1000);
+            leaf.writeBuffers(ostr);
+
+            io::StreamMetadata::Ptr meta;
+            io::setStreamMetadataPtr(ostr, meta);
+            EXPECT_THROW(leaf.writeBuffers(ostr), openvdb::IoError);
+        }
+
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        io::setStreamMetadataPtr(istr, streamMetadata);
+        io::setDataCompression(istr, io::COMPRESS_BLOSC);
+
+        io::setCurrentVersion(istr);
+
+        leaf2.readTopology(istr);
+        for (Index b = 0; b < leaf.buffers(); b++) {
+            uint32_t pass = (uint32_t(leaf.buffers()) << 16) | uint32_t(b);
+            streamMetadata->setPass(pass);
+            leaf2.readBuffers(istr);
+        }
+
+        EXPECT_EQ(leaf.onVoxelCount(), leaf2.onVoxelCount());
+        EXPECT_TRUE(leaf2.isValueOn(4));
+        EXPECT_TRUE(!leaf2.isValueOn(5));
+
+        EXPECT_EQ(leaf2.getValue(4), ValueType(20));
+        EXPECT_EQ(leaf2.attributeSet().size(), size_t(2));
     }
 }
 

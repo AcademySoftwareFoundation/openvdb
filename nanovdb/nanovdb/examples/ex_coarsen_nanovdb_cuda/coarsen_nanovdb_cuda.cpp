@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
         cpuTimer.start("Read input VDB file");
         openvdb::initialize();
         openvdb::io::File inFile(argv[1]);
-        inFile.open(false); // disable delayed loading
+        inFile.open();
         auto baseGrids = inFile.getGrids();
         inFile.close();
         auto grid = openvdb::gridPtrCast<GridT>(baseGrids->at(0));

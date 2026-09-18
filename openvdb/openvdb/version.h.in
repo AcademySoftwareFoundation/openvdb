@@ -138,11 +138,6 @@
 #cmakedefine OPENVDB_USE_ZLIB
 #endif
 
-/* Denotes whether VDB was built with Delayed Loading support */
-#ifndef OPENVDB_USE_DELAYED_LOADING
-#cmakedefine OPENVDB_USE_DELAYED_LOADING
-#endif
-
 /* Denotes whether VDB was built asserts enabled in VDB code */
 #ifndef OPENVDB_ENABLE_ASSERTS
 #cmakedefine OPENVDB_ENABLE_ASSERTS
