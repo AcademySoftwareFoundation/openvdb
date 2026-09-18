@@ -11,5 +11,7 @@ vdb_tool:
   - Reject truncated or malformed PLY data instead of hanging or reading
     incomplete records.
   - Read tab-indented ASCII STL files instead of silently loading empty geometry.
+  - Recover complete binary STL triangles with a warning when the header overstates
+    their count; continue rejecting partial records and extra data. Accept small STL files.
   - Support descending loops and reject zero or non-progressing steps.
   - Keep binary stdout separate from diagnostic logs in both logging modes.

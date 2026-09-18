@@ -1000,6 +1000,80 @@ TEST_F(Test_vdb_tool, GeometrySTLAsciiWhitespace)
     std::remove(fileName.c_str());
 }
 
+TEST_F(Test_vdb_tool, GeometrySTLBinaryTriangleCount)
+{
+    using namespace openvdb::vdb_tool;
+    if (!isLittleEndian()) GTEST_SKIP() << "Binary STL requires a little-endian host";
+
+    Geometry source;
+    source.vtx() = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    source.tri() = {{0, 1, 2}, {0, 3, 1}, {0, 2, 3}, {1, 3, 2}};
+    std::ostringstream os;
+    source.writeSTL(os);
+    const std::string binary = os.str();
+    const std::string fileName = "data/test_binary_triangle_count.stl";
+    auto writeFile = [&](const std::string& data) {
+        std::ofstream file(fileName, std::ios::binary);
+        file.write(data.data(), static_cast<std::streamsize>(data.size()));
+        file.close();
+        return bool(file);
+    };
+
+    struct Counts { uint32_t declared, available; };
+    const Counts cases[] = {
+        {4, 4}, {4, 3}, {4, 1}, {4, 0}, {1, 1}, {0, 0},
+        {std::numeric_limits<uint32_t>::max(), 1}
+    };
+    for (const auto& counts : cases) {
+        SCOPED_TRACE(::testing::Message() << "declared=" << counts.declared
+                                         << " available=" << counts.available);
+        std::string data = binary.substr(0, 84 + 50 * counts.available);
+        std::memcpy(&data[80], &counts.declared, sizeof(counts.declared));
+        ASSERT_TRUE(writeFile(data));
+
+        Geometry geo;
+        std::ostringstream warning;
+        auto* old = std::clog.rdbuf(warning.rdbuf());
+        EXPECT_NO_THROW(geo.read(fileName, /*verbose=*/0));
+        std::clog.rdbuf(old);
+
+        ASSERT_EQ(3 * counts.available, geo.vtxCount());
+        ASSERT_EQ(counts.available, geo.triCount());
+        EXPECT_EQ(0u, geo.quadCount());
+        for (uint32_t i = 0; i < counts.available; ++i) {
+            EXPECT_EQ(openvdb::Vec3I(3 * i, 3 * i + 1, 3 * i + 2), geo.tri()[i]);
+            for (int j = 0; j < 3; ++j) {
+                EXPECT_EQ(source.vtx()[source.tri()[i][j]], geo.vtx()[3 * i + j]);
+            }
+        }
+        if (counts.declared == counts.available) {
+            EXPECT_TRUE(warning.str().empty());
+        } else {
+            EXPECT_NE(std::string::npos, warning.str().find(
+                "header declares " + std::to_string(counts.declared) + " triangles"));
+            EXPECT_NE(std::string::npos, warning.str().find(
+                "contains " + std::to_string(counts.available)));
+            EXPECT_NE(std::string::npos, warning.str().find("geometry may be incomplete"));
+        }
+    }
+
+    // Keep rejecting partial headers/records, trailing bytes and understated counts.
+    std::string understated = binary;
+    const uint32_t fewerTriangles = 3;
+    std::memcpy(&understated[80], &fewerTriangles, sizeof(fewerTriangles));
+    for (const auto& malformed : {binary.substr(0, 83), binary.substr(0, binary.size() - 1),
+                                 binary.substr(0, 84 + 50 + 1), binary + " ", understated}) {
+        ASSERT_TRUE(writeFile(malformed));
+        Geometry geo;
+        geo.vtx().emplace_back(2, 3, 4);
+        EXPECT_THROW(geo.read(fileName), std::invalid_argument);
+        ASSERT_EQ(1u, geo.vtxCount());
+        EXPECT_EQ(openvdb::Vec3f(2, 3, 4), geo.vtx()[0]);
+        EXPECT_EQ(0u, geo.triCount());
+    }
+    std::remove(fileName.c_str());
+}
+
 #ifdef VDB_TOOL_USE_USD
 // Hand-author a minimal USD ASCII (.usda) file containing one Mesh inside an Xform
 // (translated by +10 along X) and one Points prim at the root, then read it back via

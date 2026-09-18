@@ -221,6 +221,9 @@ public:
     ///        binary buffer allocation fails, or polygons exceed the supported maximum.
     void readPLY(const std::string &fileName);
     /// @brief Read a binary or ASCII STL file (format auto-detected).
+    /// @note If the binary header overstates the triangle count, read the available
+    ///       complete records and warn that geometry may be incomplete. Partial records
+    ///       and data beyond the declared triangle count are rejected.
     /// @throw std::runtime_error if the file cannot be opened or is unexpectedly empty.
     /// @throw std::invalid_argument if the binary file is malformed, host is big-endian,
     ///        or the ASCII file contains unsupported n-gons.
@@ -1197,13 +1200,15 @@ inline void Geometry::readSTL(const std::string &fileName)
     if (!infile.is_open()) throw std::runtime_error("Geometry::readSTL: Error opening STL file \""+fileName+"\"");
     PosT xyz;
     std::array<char, 256> buffer{};
-    if (!infile.read(buffer.data(), buffer.size())) {
-        throw std::runtime_error("Geometry::readSTL: Failed to read 256B in \""+fileName+"\" so this must be an empty STL file");
+    infile.read(buffer.data(), buffer.size());
+    const std::streamsize bytesRead = infile.gcount();
+    if (infile.bad() || bytesRead == 0) {
+        throw std::runtime_error("Geometry::readSTL: Failed to read header in \""+fileName+"\"");
     }
     infile.clear();
     infile.seekg(0, std::ios_base::beg);// rewind
     auto isAscii = [&]()->bool{
-        std::string str(buffer.data(), infile.gcount());
+        std::string str(buffer.data(), static_cast<size_t>(bytesRead));
         toLowerCase(str);
         return contains(str, "solid") && contains(str, '\n') && contains(str, "facet") && contains(str, "normal");
     };
@@ -1250,7 +1255,19 @@ inline void Geometry::readSTL(const std::string &fileName)
         uint32_t numTri;
         if (!infile.read((char*)&numTri, sizeof(numTri))) throw std::invalid_argument("Geometry::readSTL binary: Failed to read triangle count in \""+fileName+"\"");
         infile.seekg (0, infile.end);
-        if (infile.tellg() != 80 + 4 + 50*numTri) throw std::invalid_argument("Geometry::readSTL binary: Unexpected file size in \""+fileName+"\"");
+        const std::streamoff fileSize = infile.tellg();
+        // Recover only complete records when the header overstates the count.
+        // Derive the count from the size without multiplying the untrusted header count.
+        if (fileSize < 84 || (fileSize - 84) % 50 != 0 || (fileSize - 84) / 50 > numTri) {
+            throw std::invalid_argument("Geometry::readSTL binary: Unexpected file size in \""+fileName+"\"");
+        }
+        const uint32_t availableTri = static_cast<uint32_t>((fileSize - 84) / 50);
+        if (availableTri < numTri) {
+            std::clog << "Warning: Geometry::readSTL binary: header declares " << numTri
+                      << " triangles, but \"" << fileName << "\" contains " << availableTri
+                      << ". Loading available triangles; geometry may be incomplete.\n";
+            numTri = availableTri;
+        }
         infile.seekg(80 + 4, infile.beg);
         uint32_t vtxBegin = static_cast<uint32_t>(mVtx.size()), triBegin = static_cast<uint32_t>(mTri.size());
         mVtx.resize(vtxBegin + 3*numTri);
