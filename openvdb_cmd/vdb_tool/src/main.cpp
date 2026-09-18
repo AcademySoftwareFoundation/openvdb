@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
     try {
 
         openvdb::vdb_tool::Tool tool(argc, argv);
-        tool.run();
+        if (!tool.run()) exitStatus = EXIT_FAILURE;
 
     } catch (const std::exception& e) {
 

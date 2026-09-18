@@ -7,18 +7,31 @@
 #include "Parser.h"
 #include "Util.h"
 
-#include <stdio.h>// for std::remove
+#include <cstdio>// for std::remove and subprocess streams
+#include <climits>
 #include <string>
 #include <fstream>
 #include <set>
 #include <thread>
 #include <cmath>// for std::isinf, std::isnan
+#include <chrono>
+#include <filesystem>
+#include <memory>
 
 #if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <io.h>
 #include <direct.h>// for mkdir
 int mkdir_wrapper(const char *dirname) { return _mkdir(dirname); }
 #else
+#include <cerrno>
+#include <csignal>
 #include <sys/stat.h>// for mkdir
+#include <sys/wait.h>
+#include <unistd.h>
 int mkdir_wrapper(const char *dirname) { return mkdir(dirname, 0777); }
 #endif
 
@@ -3146,11 +3159,9 @@ TEST_F(Test_vdb_tool, ToolConfigHeader)
 
 // Runtime action failures are caught centrally by Parser::run() and logged
 // as "<action>: skipping due to: <what>" (see Tool's onActionError handler);
-// they do not propagate as C++ exceptions out of Tool::run() unless
-// -errorOnWarning is set, in which case Tool::run() reports the error and
-// calls std::exit() rather than throwing. So the way to observe an
-// action-level error from a test is to capture std::clog, not EXPECT_THROW.
-static std::string runCapturingClog(const std::string& cmd)
+// Ordinary failures return false from Tool::run(); control-flow errors and
+// errors under -errorOnWarning propagate as exceptions.
+static std::string runCapturingClog(const std::string& cmd, bool* success = nullptr)
 {
     using namespace openvdb::vdb_tool;
     const auto tmp = tokenize(cmd, " ");
@@ -3165,7 +3176,8 @@ static std::string runCapturingClog(const std::string& cmd)
     auto *old = std::clog.rdbuf(oss.rdbuf());
     try {
         Tool tool(int(args.size()), args.data());
-        tool.run();
+        const bool result = tool.run();
+        if (success) *success = result;
     } catch (...) {
         std::clog.rdbuf(old);
         throw;
@@ -4236,6 +4248,422 @@ TEST_F(Test_vdb_tool, ActionShrinkWrap)
     }
     std::remove("data/shrinkwrap_nowarn.vdb");
 }// ActionShrinkWrap
+
+TEST_F(Test_vdb_tool, ActionFailureStatus)
+{
+    bool success = true;
+    const auto out = runCapturingClog(
+        "vdb_tool -quiet -read data/nonexistent_failure_test.vdb -eval continued", &success);
+    EXPECT_FALSE(success);
+    EXPECT_NE(std::string::npos, out.find("continued"));
+    EXPECT_THROW(runCapturingClog(
+        "vdb_tool -quiet -errorOnWarning -read data/nonexistent_failure_test.vdb"),
+        std::invalid_argument);
+
+    for (const std::string scope : {"-if missing>0", "-files data/nonexistent_failure_dir",
+                                    "-for i=0", "-switch {$missing}", "-case key=x"}) {
+        EXPECT_THROW(runCapturingClog("vdb_tool -quiet " + scope + " -eval body -end"),
+                     std::invalid_argument) << scope;
+    }
+}
+
+TEST_F(Test_vdb_tool, FailedActionsPreserveStack)
+{
+    using namespace openvdb::vdb_tool;
+    std::vector<std::string> failures = {
+        "-write data/nonexistent_failure_dir/out.vdb bits=16",
+        "-write data/nonexistent_failure_dir/out.vdb vdb=0 bits=16",
+        "-write data/failure_unused.vdb codec=invalid",
+        "-forOnValues v+missing keep=true",
+        "-forOnValues v+missing keep=false"
+    };
+#ifdef VDB_TOOL_USE_NANO
+    failures.push_back("-write data/nonexistent_failure_dir/out.nvdb");
+#endif
+    for (const auto &failure : failures) {
+        bool success = true;
+        const auto out = runCapturingClog(
+            "vdb_tool -quiet -sphere dim=16 name=original " + failure +
+            " -eval str=count:{gridCount},name:{0:gridName}"
+            " -write data/recovered.vdb", &success);
+        EXPECT_FALSE(success) << failure;
+        EXPECT_NE(std::string::npos, out.find("count:1,name:original")) << out;
+        openvdb::io::File file("data/recovered.vdb");
+        file.open();
+        auto grids = file.getGrids();
+        ASSERT_EQ(1u, grids->size());
+        EXPECT_EQ("original", grids->front()->getName());
+        EXPECT_FALSE(grids->front()->saveFloatAsHalf());
+        file.close();
+        std::remove("data/recovered.vdb");
+    }
+}
+
+TEST_F(Test_vdb_tool, CsgRebuiltResults)
+{
+    using namespace openvdb;
+    auto readGrid = [](const std::string &path) {
+        io::File file(path);
+        file.open(false);
+        return gridPtrCast<FloatGrid>(file.readGrid(file.beginName().gridName()));
+    };
+    for (const std::string action : {"union", "intersection", "difference"}) {
+        for (const std::string voxel : {"0.25", "0.5"}) {
+            for (const std::string rebuild : {"false", "true"}) {
+                SCOPED_TRACE(action + ", voxel=" + voxel + ", rebuild=" + rebuild);
+                const std::string cmd = "vdb_tool -quiet -sphere radius=1 voxel=0.25 name=A"
+                    " -sphere radius=1 center=1,0,0 name=B voxel=" + voxel +
+                    " -" + action + " vdb=0,1 rebuild=" + rebuild;
+                bool success = false;
+                runCapturingClog(cmd + " keep=false -write data/csg_inplace.vdb", &success);
+                ASSERT_TRUE(success);
+                runCapturingClog(cmd + " keep=true -write data/csg_copy.vdb vdb=0", &success);
+                ASSERT_TRUE(success);
+                const auto actual = readGrid("data/csg_inplace.vdb");
+                const auto expected = readGrid("data/csg_copy.vdb");
+                ASSERT_TRUE(actual && expected);
+                EXPECT_EQ(action + "_B", actual->getName());
+                EXPECT_EQ(expected->transform(), actual->transform());
+                EXPECT_EQ(expected->activeVoxelCount(), actual->activeVoxelCount());
+                EXPECT_EQ(expected->evalActiveVoxelBoundingBox(), actual->evalActiveVoxelBoundingBox());
+                const auto acc = actual->getConstAccessor();
+                for (auto it = expected->cbeginValueOn(); it; ++it) {
+                    EXPECT_NEAR(*it, acc.getValue(it.getCoord()), 1.0e-5f);
+                }
+            }
+        }
+    }
+    std::remove("data/csg_inplace.vdb");
+    std::remove("data/csg_copy.vdb");
+}
+
+TEST_F(Test_vdb_tool, ConfigExpressionComments)
+{
+    using namespace openvdb::vdb_tool;
+    const std::string path = "data/expression_comments.txt";
+    {
+        std::ofstream file(path);
+        file << "vdb_tool " << Tool::version() << "\n"
+                "% full-line comment\n"
+                "calc n = 5 % 2 # inline comment\n"
+                "eval {$n}\n"
+                "for i=3,0,-1\n"
+                "  eval value:{$i},counter:{$#i} # loop counter\n"
+                "end\n"
+                "calc m = 7 % \\\n"
+                "# comment between continued lines\n"
+                "  3\n"
+                "eval {$m}\n";
+    }
+    bool success = false;
+    const auto out = runCapturingClog("vdb_tool -quiet -config " + path, &success);
+    EXPECT_TRUE(success);
+    EXPECT_EQ("1.000000\nvalue:3,counter:0\nvalue:2,counter:1\nvalue:1,counter:2\n1.000000\n", out);
+    EXPECT_EQ("eval {$#i} ", stripConfigComment("eval {$#i} # comment"));
+    EXPECT_EQ("eval '{a#b}' ", stripConfigComment("eval '{a#b}' # comment"));
+    std::remove(path.c_str());
+}
+
+TEST_F(Test_vdb_tool, LoopProgress)
+{
+    EXPECT_EQ("3\n2\n1\n", runCapturingClog("vdb_tool -quiet -for i=3,0,-1 -eval {$i} -end"));
+    EXPECT_EQ("1.000000\n0.500000\n", runCapturingClog(
+        "vdb_tool -quiet -for i=1,0,-0.5 -eval {$i} -end"));
+    EXPECT_EQ("", runCapturingClog("vdb_tool -quiet -for i=0,0 -eval unexpected -end"));
+    // Advancing beyond an int endpoint must terminate without signed overflow.
+    EXPECT_EQ("2147483646\n", runCapturingClog(
+        "vdb_tool -quiet -for i=2147483646,2147483647,2 -eval {$i} -end"));
+    EXPECT_EQ("-2147483647\n", runCapturingClog(
+        "vdb_tool -quiet -for i=-2147483647,-2147483648,-2 -eval {$i} -end"));
+    for (const std::string range : {"0,2,0", "0,2,-1", "2,0,1", "0,inf,1",
+                                    "0,2,nan", "16777216,16777220,0.5"}) {
+        EXPECT_THROW(runCapturingClog("vdb_tool -quiet -for i=" + range + " -end"),
+                     std::invalid_argument) << range;
+    }
+}
+
+TEST_F(Test_vdb_tool, MalformedPly)
+{
+    using openvdb::vdb_tool::Geometry;
+    const std::string ascii = "ply\nformat ascii 1.0\n";
+    const std::string coords = "property float x\nproperty float y\nproperty float z\n";
+    const std::string face = "element face 1\nproperty list uchar int vertex_indices\nend_header\n";
+    const std::vector<std::string> malformed = {
+        ascii + "element vertex 1\nproperty float x\n",
+        ascii + "element vertex\n",
+        ascii + "element vertex -1\n",
+        ascii + "element vertex 2147483648\n",
+        ascii + "element vertex 1\nproperty float x\nend_header\n",
+        ascii + "element vertex 1\n" + coords + "end_header\n0 0\n",
+        ascii + "element vertex 1\n" + coords + face + "0 0 0\n3 0 0\n",
+        ascii + "element vertex 1\n" + coords + face + "0 0 0\n3 0 0 1\n",
+        "ply\nformat binary_little_endian 1.0\nelement vertex 1\n" + coords + "end_header\n"
+    };
+    for (const auto &data : malformed) {
+        Geometry geometry;
+        std::istringstream input(data);
+        EXPECT_THROW(geometry.readPLY(input), std::exception) << data;
+    }
+    Geometry source;
+    source.vtx() = {openvdb::Vec3s(0,0,0), openvdb::Vec3s(1,0,0), openvdb::Vec3s(0,1,0)};
+    source.tri().emplace_back(0,1,2);
+    std::ostringstream binary;
+    source.writePLY(binary, false);
+    const auto data = binary.str();
+    for (const size_t missing : {size_t(1), size_t(8), size_t(14)}) {
+        Geometry geometry;
+        std::istringstream input(data.substr(0, data.size() - missing));
+        EXPECT_THROW(geometry.readPLY(input), std::invalid_argument);
+    }
+    for (const unsigned char count : {0, 255}) {
+        auto invalid = data;
+        invalid[invalid.size() - 13] = static_cast<char>(count);// uchar before 3 int indices
+        Geometry geometry;
+        std::istringstream input(invalid);
+        EXPECT_THROW(geometry.readPLY(input), std::invalid_argument);
+    }
+
+    // PLY permits packed records whose doubles are not naturally aligned.
+    std::ostringstream packed;
+    packed << "ply\nformat binary_"
+           << (openvdb::vdb_tool::isLittleEndian() ? "little" : "big")
+           << "_endian 1.0\nelement vertex 1\nproperty uchar red\n"
+              "property double x\nproperty double y\nproperty double z\nend_header\n";
+    packed.put(char(127));
+    const double position[] = {1.25, 2.5, 3.75};
+    packed.write(reinterpret_cast<const char*>(position), sizeof(position));
+    Geometry geometry;
+    std::istringstream input(packed.str());
+    ASSERT_NO_THROW(geometry.readPLY(input));
+    ASSERT_EQ(1u, geometry.vtxCount());
+    EXPECT_EQ(openvdb::Vec3s(1.25f, 2.5f, 3.75f), geometry.vtx()[0]);
+}
+
+TEST_F(Test_vdb_tool, LogPreservesStdout)
+{
+    using namespace openvdb::vdb_tool;
+    for (const bool tee : {false, true}) {
+        const std::string path = "data/diagnostics.log";
+        std::ostringstream output;
+        auto *old = std::cout.rdbuf(output.rdbuf());
+        {
+            auto args = getArgs("vdb_tool -quiet");
+            Tool tool(int(args.size()), args.data());
+            for (auto *arg : args) delete[] arg;
+            tool.startLog(path, false, tee);
+            EXPECT_EQ(output.rdbuf(), std::cout.rdbuf());
+            std::cout << "binary-data";
+            std::clog << "diagnostic-message\n";
+        }
+        std::cout.rdbuf(old);
+        EXPECT_EQ("binary-data", output.str());
+        const auto log = readFileToString(path);
+        EXPECT_NE(std::string::npos, log.find("diagnostic-message"));
+        EXPECT_EQ(std::string::npos, log.find("binary-data"));
+        std::remove(path.c_str());
+    }
+}
+
+namespace {
+
+struct CliTempDir {
+    const std::filesystem::path path = std::filesystem::temp_directory_path() /
+        ("vdb_tool_cli_" + openvdb::vdb_tool::uuid());
+    CliTempDir() {
+        if (!std::filesystem::create_directory(path))
+            throw std::runtime_error("Cannot create a unique CLI test directory");
+    }
+    ~CliTempDir() {
+        std::error_code error;
+        std::filesystem::remove_all(path, error);
+    }
+};
+
+struct CliResult {
+    int exitCode = -1;// signals and abnormal termination must not count as ordinary errors
+    bool timedOut = false;
+    std::string output, error;
+};
+
+// Launch the actual executable without a shell. File-backed streams preserve
+// binary output and avoid pipe-buffer deadlocks. Every child is waited on and
+// killed on timeout, so a CLI regression cannot hang the unit-test process.
+CliResult runCli(const std::vector<std::string>& args, const std::string& input = {},
+                 std::chrono::milliseconds timeout = std::chrono::seconds(15))
+{
+    CliTempDir dir;
+    const auto inPath = dir.path / "stdin.bin", outPath = dir.path / "stdout.bin",
+               errPath = dir.path / "stderr.txt";
+    {
+        std::ofstream stream(inPath, std::ios::binary);
+        stream.exceptions(std::ios::failbit | std::ios::badbit);
+        stream.write(input.data(), static_cast<std::streamsize>(input.size()));
+        stream.close();
+    }
+    using File = std::unique_ptr<FILE, decltype(&std::fclose)>;
+    File in(std::fopen(inPath.string().c_str(), "rb"), &std::fclose);
+    File out(std::fopen(outPath.string().c_str(), "wb"), &std::fclose);
+    File err(std::fopen(errPath.string().c_str(), "wb"), &std::fclose);
+    if (!in || !out || !err) throw std::runtime_error("Cannot open CLI test streams");
+    CliResult result;
+
+#if defined(_WIN32)
+    // Quote according to the Windows CRT argv rules, including trailing backslashes.
+    auto quote = [](const std::string& arg) {
+        std::string value = "\"";
+        size_t slashes = 0;
+        for (char c : arg) {
+            if (c == '\\') { ++slashes; continue; }
+            value.append(c == '"' ? 2 * slashes + 1 : slashes, '\\');
+            slashes = 0;
+            value += c;
+        }
+        value.append(2 * slashes, '\\');
+        return value + '"';
+    };
+    std::string command = quote(VDB_TOOL_TEST_EXECUTABLE);
+    for (const auto& arg : args) command += " " + quote(arg);
+    STARTUPINFOA startup{};
+    startup.cb = sizeof(startup);
+    startup.dwFlags = STARTF_USESTDHANDLES;
+    startup.hStdInput = reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(in.get())));
+    startup.hStdOutput = reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(out.get())));
+    startup.hStdError = reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(err.get())));
+    for (HANDLE handle : {startup.hStdInput, startup.hStdOutput, startup.hStdError}) {
+        if (!SetHandleInformation(handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT))
+            throw std::runtime_error("Cannot inherit CLI test streams");
+    }
+    PROCESS_INFORMATION process{};
+    if (!CreateProcessA(VDB_TOOL_TEST_EXECUTABLE, command.data(), nullptr, nullptr,
+                        TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process))
+        throw std::runtime_error("Cannot launch vdb_tool: " + std::to_string(GetLastError()));
+    CloseHandle(process.hThread);
+    const DWORD wait = WaitForSingleObject(process.hProcess, static_cast<DWORD>(timeout.count()));
+    if (wait != WAIT_OBJECT_0) {
+        result.timedOut = wait == WAIT_TIMEOUT;
+        TerminateProcess(process.hProcess, 1);
+        WaitForSingleObject(process.hProcess, INFINITE);
+    }
+    DWORD code = 0;
+    const bool gotCode = GetExitCodeProcess(process.hProcess, &code) != 0;
+    CloseHandle(process.hProcess);
+    if (wait == WAIT_FAILED || !gotCode) throw std::runtime_error("Cannot wait for vdb_tool");
+    if (!result.timedOut && code <= INT_MAX) result.exitCode = static_cast<int>(code);
+#else
+    // Build argv before fork: only async-signal-safe calls are made in the child,
+    // since earlier tests may already have started TBB worker threads.
+    std::string executable = VDB_TOOL_TEST_EXECUTABLE;
+    std::vector<char*> argv{executable.data()};
+    for (const auto& arg : args) argv.push_back(const_cast<char*>(arg.c_str()));
+    argv.push_back(nullptr);
+    const int inFd = fileno(in.get()), outFd = fileno(out.get()), errFd = fileno(err.get());
+    const pid_t pid = fork();
+    if (pid < 0) throw std::runtime_error("Cannot fork vdb_tool");
+    if (pid == 0) {
+        if (dup2(inFd, STDIN_FILENO) == -1 || dup2(outFd, STDOUT_FILENO) == -1 ||
+            dup2(errFd, STDERR_FILENO) == -1) _exit(127);
+        execv(argv[0], argv.data());
+        _exit(127);
+    }
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    int status = 0;
+    for (;;) {
+        const pid_t waited = waitpid(pid, &status, WNOHANG);
+        if (waited == pid) break;
+        if (waited < 0 && errno != EINTR) throw std::runtime_error("Cannot wait for vdb_tool");
+        if (std::chrono::steady_clock::now() >= deadline) {
+            result.timedOut = true;
+            kill(pid, SIGKILL);
+            while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    if (!result.timedOut && WIFEXITED(status)) result.exitCode = WEXITSTATUS(status);
+#endif
+    in.reset();
+    out.reset();
+    err.reset();
+    result.output = openvdb::vdb_tool::readFileToString(outPath.string());
+    result.error = openvdb::vdb_tool::readFileToString(errPath.string());
+    // Normalize diagnostics across platforms, leaving binary stdout unchanged.
+    for (size_t pos = 0; (pos = result.error.find("\r\n", pos)) != std::string::npos; ++pos)
+        result.error.erase(pos, 1);
+    return result;
+}
+
+} // namespace
+
+TEST_F(Test_vdb_tool, CliFailures)
+{
+    CliTempDir dir;
+    const std::string literal = "literal \"quotes\" & trailing\\";
+    const auto echoed = runCli({"-quiet", "-eval", "str=" + literal});
+    ASSERT_FALSE(echoed.timedOut);
+    EXPECT_EQ(0, echoed.exitCode) << echoed.error;
+    EXPECT_EQ(literal + "\n", echoed.error);
+    const auto missing = (dir.path / "missing.vdb").string();
+    const auto continued = runCli({"-quiet", "-read", missing, "-eval", "CONTINUED"});
+    ASSERT_FALSE(continued.timedOut);
+    EXPECT_EQ(1, continued.exitCode) << continued.error;
+    EXPECT_NE(std::string::npos, continued.error.find("CONTINUED"));
+
+    const std::vector<std::vector<std::string>> failures = {
+        {"-quiet", "-errorOnWarning", "-read", missing, "-eval", "BODY"},
+        {"-quiet", "-if", "undefinedVariable > 0", "-eval", "BODY", "-end"},
+        {"-quiet", "-files", (dir.path / "missing-directory").string(), "-eval", "BODY", "-end"},
+        {"-quiet", "-for", "i=0,2,0", "-end"},
+        {"-quiet", "-for", "i=16777216,16777220,0.5", "-end"},
+        {"-quiet", "-for", "i=0,2", "-if", "missing > 0", "-eval", "BODY", "-end", "-end"},
+        {"-quiet", "-errorOnWarning", "-for", "i=0,2", "-read", missing, "-end"}
+    };
+    for (const auto& args : failures) {
+        const auto result = runCli(args);
+        ASSERT_FALSE(result.timedOut);
+        EXPECT_EQ(1, result.exitCode) << result.error;
+        EXPECT_EQ(std::string::npos, result.error.find("BODY")) << result.error;
+    }
+    const auto descending = runCli({"-quiet", "-for", "i=3,0,-1", "-eval", "{$i}", "-end"});
+    ASSERT_FALSE(descending.timedOut);
+    EXPECT_EQ(0, descending.exitCode) << descending.error;
+    EXPECT_EQ("3\n2\n1\n", descending.error);
+
+    const auto ply = dir.path / "truncated.ply";
+    {
+        std::ofstream file(ply);
+        file << "ply\nformat ascii 1.0\nelement vertex 1\nproperty float x\n";
+    }
+    const auto truncated = runCli({"-quiet", "-read", ply.string()});
+    ASSERT_FALSE(truncated.timedOut);
+    EXPECT_EQ(1, truncated.exitCode) << truncated.error;
+}
+
+TEST_F(Test_vdb_tool, CliLoggingPipeline)
+{
+    CliTempDir dir;
+    for (const std::string tee : {"true", "false"}) {
+        const auto log = (dir.path / ("stream " + tee + ".log")).string();
+        const auto writer = runCli({"-quiet", "-log", "file=" + log, "tee=" + tee,
+                                    "-sphere", "dim=16", "-write", "stdout.vdb"});
+        ASSERT_FALSE(writer.timedOut);
+        ASSERT_EQ(0, writer.exitCode) << writer.error;
+        const auto reader = runCli({"-quiet", "-read", "stdin.vdb", "-eval", "{gridCount}"},
+                                    writer.output);
+        ASSERT_FALSE(reader.timedOut);
+        EXPECT_EQ(0, reader.exitCode) << reader.error;
+        EXPECT_EQ("1\n", reader.error);
+        EXPECT_LT(std::filesystem::file_size(log), 4096u);// binary data must not enter the log
+    }
+}
+
+TEST_F(Test_vdb_tool, CliTimeout)
+{
+    // Exercise the watchdog itself with a valid loop that cannot finish in time.
+    const auto result = runCli({"-quiet", "-for", "i=0,2147483647", "-end"}, {},
+                              std::chrono::milliseconds(100));
+    EXPECT_TRUE(result.timedOut);
+    EXPECT_EQ(-1, result.exitCode);
+}
 
 int main(int argc, char** argv)
 {
