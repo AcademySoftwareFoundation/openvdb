@@ -956,6 +956,50 @@ TEST_F(Test_vdb_tool, Geometry)
   }
 }// Geometry
 
+TEST_F(Test_vdb_tool, GeometrySTLAsciiWhitespace)
+{
+    using namespace openvdb::vdb_tool;
+    const std::string fileName = "data/test_ascii_whitespace.stl";
+    const std::vector<openvdb::Vec3f> vertices = {
+        {0, 0, 0}, {1, 0, 0}, {0, 1, 0},
+        {1, 0, 0}, {1, 1, 0}, {0, 1, 0}
+    };
+    for (const std::string indent : {"  ", "\t", " \t"}) {
+        for (const std::string newline : {"\n", "\r\n"}) {
+            SCOPED_TRACE(::testing::Message() << "indent=" << indent << " newline=" << newline);
+            {
+                // Use binary mode to preserve the chosen line endings on every platform.
+                std::ofstream os(fileName, std::ios::binary);
+                ASSERT_TRUE(os.is_open());
+                os << "solid whitespace_test" << newline << std::scientific;
+                for (size_t i = 0; i < vertices.size(); i += 3) {
+                    os << indent << "facet normal 0 0 1" << newline
+                       << indent << indent << "outer loop" << newline;
+                    for (size_t j = 0; j < 3; ++j) {
+                        const auto& p = vertices[i + j];
+                        os << indent << indent << indent << "vertex "
+                           << p[0] << ' ' << p[1] << ' ' << p[2] << newline;
+                    }
+                    os << indent << indent << "endloop" << newline
+                       << indent << "endfacet" << newline;
+                }
+                os << "endsolid whitespace_test" << newline;
+            }
+            Geometry geo;
+            ASSERT_NO_THROW(geo.read(fileName));
+            ASSERT_EQ(vertices.size(), geo.vtxCount());
+            ASSERT_EQ(2u, geo.triCount());
+            EXPECT_EQ(0u, geo.quadCount());
+            for (size_t i = 0; i < vertices.size(); ++i) {
+                EXPECT_EQ(vertices[i], geo.vtx()[i]);
+            }
+            EXPECT_EQ(openvdb::Vec3I(0, 1, 2), geo.tri()[0]);
+            EXPECT_EQ(openvdb::Vec3I(3, 4, 5), geo.tri()[1]);
+        }
+    }
+    std::remove(fileName.c_str());
+}
+
 #ifdef VDB_TOOL_USE_USD
 // Hand-author a minimal USD ASCII (.usda) file containing one Mesh inside an Xform
 // (translated by +10 along X) and one Points prim at the root, then read it back via

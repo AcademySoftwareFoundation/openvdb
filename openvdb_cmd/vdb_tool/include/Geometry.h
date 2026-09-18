@@ -1212,12 +1212,12 @@ inline void Geometry::readSTL(const std::string &fileName)
         std::getline(infile, line);// read the first line, which completes the header
         std::istringstream iss;
         while(std::getline(infile, line)) {
-            std::string tmp = trim(line, " ");// remove leading (and trailing) white spaces
+            std::string tmp = trim(line);// remove leading (and trailing) whitespace
             if (tmp.compare(0, 5, "facet")==0) {
-                while (std::getline(infile, line) && trim(line, " ").compare(0, 10, "outer loop"));
+                while (std::getline(infile, line) && trim(line).compare(0, 10, "outer loop"));
                 int nGon = 0;
                 while(std::getline(infile, line)) {// loop over vertices of the facet
-                    tmp = trim(line, " ");
+                    tmp = trim(line);
                     if (tmp.compare(0, 7, "endloop")==0) break;
                     OPENVDB_ASSERT(tmp.compare(0, 6, "vertex")==0);
                     iss.clear();
