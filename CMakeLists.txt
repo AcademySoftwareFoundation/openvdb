@@ -30,7 +30,7 @@
   library and the vdb_print binary are enabled.
 
   Note that various packages have inbuilt CMake module support. See the
-  CMake documentation for more ZLib, Doxygen, OpenGL, Boost and Python
+  CMake documentation for more ZLib, Doxygen, OpenGL and Python
   controls:
 
     https://cmake.org/cmake/help/latest/manual/cmake-modules.7.html
@@ -105,8 +105,8 @@ option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)."
 cmake_dependent_option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON "NOT WIN32" OFF)
 option(USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
-When enabled, you do not need to provide dependency locations for TBB, Blosc, Imath and OpenEXR. Boost must be
-provided. Imath/OpenEXR can optionally be provided.]=] OFF)
+When enabled, you do not need to provide dependency locations for TBB, Blosc, Imath and OpenEXR.
+Imath/OpenEXR can optionally be provided.]=] OFF)
 option(USE_MAYA [=[
 Build the library against a Maya installation. Turns on automatically if OPENVDB_BUILD_MAYA_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB. All other dependencies must be provided.]=] OFF)
@@ -159,8 +159,6 @@ preceeding flags. If you need more granular control you can provide your
 desired flags via CXX_FLAGS. Only applicable which compiling for x86 targets.
 ]=])
 
-cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
-  "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
 option(USE_STATIC_DEPENDENCIES [=[
 Only search for and use static libraries. If OFF the shared versions of requried libraries are prioritised, falling
 back to static libraries. Forcing individual static dependencies can be enabled by setting XXX_USE_STATIC_LIBS
@@ -450,7 +448,6 @@ if(USE_STATIC_DEPENDENCIES)
   set(LOG4CPLUS_USE_STATIC_LIBS ON)
   set(JEMALLOC_USE_STATIC_LIBS ON)
   set(GTEST_USE_STATIC_LIBS ON)
-  set(Boost_USE_STATIC_LIBS ON)
   # @todo  glfw needs custom support.
   # set(GLFW_USE_STATIC_LIBS ON)
 endif()

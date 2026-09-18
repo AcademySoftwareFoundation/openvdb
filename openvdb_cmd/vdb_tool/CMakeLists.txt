@@ -241,7 +241,7 @@ else()
     target_link_libraries(vdb_tool_common INTERFACE TBB::tbb OpenVDB::openvdb)
 endif()
 
-target_include_directories(vdb_tool_common INTERFACE "${Boost_INCLUDE_DIRS}" "${OpenVDB_INCLUDE_DIRS}" "include")
+target_include_directories(vdb_tool_common INTERFACE "${OpenVDB_INCLUDE_DIRS}" "include")
 
 # vdb_tool
 add_executable(vdb_tool src/main.cpp)
