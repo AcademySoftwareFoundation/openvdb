@@ -1133,12 +1133,12 @@ std::string Parser::getStr(const std::string &name) const
 // ==============================================================================================================
 
 template <>
-std::string Parser::get<std::string>(const std::string &name) const {return this->getStr(name);}
+inline std::string Parser::get<std::string>(const std::string &name) const {return this->getStr(name);}
 
 // ==============================================================================================================
 
 template <>
-std::vector<std::string> Parser::getVec<std::string>(const std::string &name, const char* delimiters) const
+inline std::vector<std::string> Parser::getVec<std::string>(const std::string &name, const char* delimiters) const
 {
     return tokenize(this->getStr(name), delimiters);
 }// Parser::getVec
@@ -1166,7 +1166,7 @@ math::Vec3<T> Parser::getVec3(const std::string &name, const char* delimiters) c
 
 // ==============================================================================================================
 
-std::multimap<size_t, std::string> Parser::closeMatches(const std::string &str) const
+inline std::multimap<size_t, std::string> Parser::closeMatches(const std::string &str) const
 {// Returns sorted map of available actions that look "close" to str. Leading
  // '-' is stripped before matching; the actual scoring (substring + Lev) lives
  // in Util.h's fuzzyMatch and is shared with Action::closeOptionMatches and
@@ -1181,7 +1181,7 @@ std::multimap<size_t, std::string> Parser::closeMatches(const std::string &str) 
 
 // ==============================================================================================================
 
-void Action::setOption(const std::string &str)
+inline void Action::setOption(const std::string &str)
 {
     // Greedy mode (set on actions whose anonymous option may take a value
     // containing '=', e.g. the kernel string in -calc / forValues): when no
@@ -1251,7 +1251,7 @@ void Action::setOption(const std::string &str)
     }
 }// Action::setOption
 
-std::multimap<size_t, std::string> Action::closeOptionMatches(const std::string &name) const
+inline std::multimap<size_t, std::string> Action::closeOptionMatches(const std::string &name) const
 {// Returns option names that look "close" to the user's input — handles both
  // typo (`radiuss=` → `radius`) and truncation (`rad=` → `radius`). Scoring
  // logic lives in Util.h's fuzzyMatch.
@@ -1263,7 +1263,7 @@ std::multimap<size_t, std::string> Action::closeOptionMatches(const std::string 
 
 // ==============================================================================================================
 
-void Action::print(std::ostream& os) const
+inline void Action::print(std::ostream& os) const
 {
     os << "-" << names[0];
     for (auto &a : options) os << " " << a.name << "=" << a.value;
@@ -1272,7 +1272,7 @@ void Action::print(std::ostream& os) const
 
 // ==============================================================================================================
 
-Parser::Parser(std::vector<Option> &&def)
+inline Parser::Parser(std::vector<Option> &&def)
   : available()// vector of all available actions
   , actions()//   vector of all selected actions
   , iter()// iterator pointing to the current actions being processed
@@ -1649,7 +1649,7 @@ void Parser::finalize()
 
 // ==============================================================================================================
 
-void Parser::parse(int argc, char *argv[])
+inline void Parser::parse(int argc, char *argv[])
 {
     OPENVDB_ASSERT(!hashMap.empty());
     if (argc <= 1) throw std::invalid_argument("Parser: No arguments provided, try \"" + getFile(argv[0]) + " -help\"");
@@ -1749,7 +1749,7 @@ void Parser::parse(int argc, char *argv[])
 
 // ==============================================================================================================
 
-void Parser::usage(const VecS &actions, bool brief) const
+inline void Parser::usage(const VecS &actions, bool brief) const
 {
     for (const std::string &str : actions) {
         auto search = hashMap.find(str);
@@ -1775,7 +1775,7 @@ void Parser::usage(const VecS &actions, bool brief) const
 
 // ==============================================================================================================
 
-std::string Parser::usage(const Action &action, bool brief) const
+inline std::string Parser::usage(const Action &action, bool brief) const
 {
     std::stringstream ss;
     const static int w = 17;
