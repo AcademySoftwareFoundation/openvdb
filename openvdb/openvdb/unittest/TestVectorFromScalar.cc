@@ -544,7 +544,7 @@ TEST_F(TestVectorFromScalar, testMergeIntGrids)
 
     auto& vectorTree = vectorGrid->tree();
 
-    EXPECT_EQ(vectorGrid->background(), Vec3I(1, 2, 3));
+    EXPECT_EQ(vectorGrid->background(), Vec3i(1, 2, 3));
 
     EXPECT_EQ(vectorTree.getValue(Coord(0, 0, 0)), Vec3i( 1,  2,  3));
     EXPECT_EQ(vectorTree.getValue(Coord(0, 0, 1)), Vec3i( 1,  2, 30));
