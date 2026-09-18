@@ -3,8 +3,8 @@
 //
 /// @file VectorFromScalar.h
 ///
-/// @brief Functions to produce a vector-valued grid
-/// from separate scalar grids
+/// @brief Functions to produce a vector-valued tree
+/// from separate scalar trees
 ///
 /// @author Tim Straubigner
 
@@ -12,7 +12,6 @@
 #define OPENVDB_TOOLS_VECTOR_FROM_SCALAR_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
-#include <openvdb/Grid.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/GridOperators.h> // for ScalarToVectorConverter
 #include <openvdb/tree/NodeManager.h>
@@ -126,65 +125,56 @@ private:
     const ScalarTreeT* mZTree;
 };
 
-/// @brief Threaded method to convert three scalar-valued grids into a single vector-valued grid.
-///        The transforms and resolutions of the three input grids must be equal. The new vector
-///        grid topology is the union of all scalar grid topologies.
+/// @brief Threaded method to convert three scalar-valued trees into a single vector-valued tree.
+///        The new vector tree topology is the union of all scalar tree topologies.
 ///
-/// @return A shared pointer to a new grid with the same tree configuration, transform, and
-///         resolution as the input grids. Each voxel of the new grid is a vector whose
-///         component values are taken from the input grids at the corresponding voxel
-///         location, using background values when one of the source grids has no voxels
+/// @return A shared pointer to a new tree with the same tree configuration, transform, and
+///         resolution as the input trees. Each voxel of the new tree is a vector whose
+///         component values are taken from the input trees at the corresponding voxel
+///         location, using background values when one of the source trees has no voxels
 ///         defined there.
 ///
-/// @param x                    Grid to use as the first vector component.
-/// @param y                    Grid to use as the second vector component.
-/// @param z                    Grid to use as the third vector component.
-/// @param copyInactiveValues   When only some of the source grids are active at a location,
+/// @param x                    Tree to use as the first vector component.
+/// @param y                    Tree to use as the second vector component.
+/// @param z                    Tree to use as the third vector component.
+/// @param copyInactiveValues   When only some of the source trees are active at a location,
 ///                             this decides whether inactive locations are used exactly or are
 ///                             replaced with background values. In all cases, locations where
-///                             all source grids are inactive will result in background values.
-template<typename ScalarGridT>
-typename ScalarToVectorConverter<ScalarGridT>::Type::Ptr
-vectorFromScalar(const ScalarGridT& x, const ScalarGridT& y, const ScalarGridT& z, bool copyInactiveValues = false)
+///                             all source trees are inactive will result in background values.
+template<typename ScalarTreeT>
+typename ScalarToVectorConverter<ScalarTreeT>::Type::Ptr
+vectorFromScalar(const ScalarTreeT& x, const ScalarTreeT& y, const ScalarTreeT& z, bool copyInactiveValues = false)
 {
-    using ScalarT = typename ScalarGridT::ValueType;
+    using ScalarT = typename ScalarTreeT::ValueType;
     using VectorT = math::Vec3<ScalarT>;
-    using ScalarTreeT = typename ScalarGridT::TreeType;
-    using VectorGridT = typename ScalarToVectorConverter<ScalarGridT>::Type;
-    using VectorTreeT = typename VectorGridT::TreeType;
-
-    math::Transform transform = x.transform();
-    if (transform != y.transform() || transform != z.transform())
-    {
-        OPENVDB_THROW(ValueError, "vectorFromScalar: all input grids must have the same transform");
-    }
+    using VectorTreeT = typename ScalarToVectorConverter<ScalarTreeT>::Type;
 
     auto background = VectorT(x.background(), y.background(), z.background());
 
-    // Create an empty grid
-    auto vectorGrid = createGrid<VectorGridT>(background);
+    // Create an empty tree
+    auto vectorTree = typename VectorTreeT::Ptr(new VectorTreeT(background));
 
-    // Perform a topology union with each of the source scalar grids.
-    // This leaves the combined grid whose tile and voxel depth is the
-    // maximum of all the source grids.
-    vectorGrid->topologyUnion(x);
-    vectorGrid->topologyUnion(y);
-    vectorGrid->topologyUnion(z);
+    // Perform a topology union with each of the source scalar trees.
+    // This leaves the combined tree whose tile and voxel depth is the
+    // maximum of all the source trees.
+    vectorTree->topologyUnion(x);
+    vectorTree->topologyUnion(y);
+    vectorTree->topologyUnion(z);
 
-    // Write the grid values
-    auto nodeManager = tree::NodeManager<VectorTreeT>(vectorGrid->tree());
+    // Write the tree values
+    auto nodeManager = tree::NodeManager<VectorTreeT>(*vectorTree);
     if (copyInactiveValues)
     {
-        auto op = VectorFromScalarOp<ScalarTreeT, /* CopyInactiveValues = */ true>(&x.tree(), &y.tree(), &z.tree());
+        auto op = VectorFromScalarOp<ScalarTreeT, /* CopyInactiveValues = */ true>(&x, &y, &z);
         nodeManager.foreachTopDown(op);
     }
     else
     {
-        auto op = VectorFromScalarOp<ScalarTreeT, /* CopyInactiveValues = */ false>(&x.tree(), &y.tree(), &z.tree());
+        auto op = VectorFromScalarOp<ScalarTreeT, /* CopyInactiveValues = */ false>(&x, &y, &z);
         nodeManager.foreachTopDown(op);
     }
 
-    return vectorGrid;
+    return vectorTree;
 }
 
 
