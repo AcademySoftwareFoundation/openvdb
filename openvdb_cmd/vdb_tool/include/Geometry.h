@@ -29,6 +29,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <limits>
+#include <cstring>
 #include <cstdlib> // for std::malloc and std::free
 
 #include <tbb/parallel_for.h>
@@ -219,6 +221,9 @@ public:
     ///        binary buffer allocation fails, or polygons exceed the supported maximum.
     void readPLY(const std::string &fileName);
     /// @brief Read a binary or ASCII STL file (format auto-detected).
+    /// @note If the binary header overstates the triangle count, read the available
+    ///       complete records and warn that geometry may be incomplete. Partial records
+    ///       and data beyond the declared triangle count are rejected.
     /// @throw std::runtime_error if the file cannot be opened or is unexpectedly empty.
     /// @throw std::invalid_argument if the binary file is malformed, host is big-endian,
     ///        or the ASCII file contains unsupported n-gons.
@@ -788,7 +793,9 @@ inline void Geometry::readOFF(std::istream &is)
 {
     // read header
     std::string line;
-    if (!std::getline(is, line) || (line != "OFF" && line != "NOFF")) {// NOFF includes normals after the x y z coordinates
+    std::getline(is, line);
+    if (!line.empty() && line.back() == '\r') line.pop_back();// CRLF on binary stdin
+    if (!is || (line != "OFF" && line != "NOFF")) {// NOFF includes normals after the x y z coordinates
         throw std::invalid_argument("Geometry::readOFF: expected header \"OFF\" but read \"" + line + "\"");
     }
 
@@ -877,11 +884,12 @@ inline void Geometry::readPLY(std::istream &is)
 {
     auto tokenize_line = [&is]() {
         std::string line, token;
-        std::getline(is, line);
+        if (!std::getline(is, line))
+            throw std::invalid_argument("Geometry::readPLY: unexpected end of file");
         std::istringstream iss(line);
         std::vector<std::string> tokens;
         while (iss >> token) tokens.push_back(token);
-        if (tokens.empty()) tokens.emplace_back("comment empty");
+        if (tokens.empty()) tokens = {"comment", "empty"};
         return tokens;// move semantics
     };
     auto tokens = tokenize_line();
@@ -903,6 +911,20 @@ inline void Geometry::readPLY(std::istream &is)
         if ( test(i, {"uchar", "int8"}) )     return 1;
         error("vdb_tool::readPLY: unsupported type");
         return 0;
+    };
+    auto count = [&tokens, error](size_t limit) {
+        if (tokens.size() != 3) error("Geometry::readPLY: expected an element name and count");
+        size_t pos = 0;
+        const auto n = std::stoll(tokens[2], &pos);
+        if (pos != tokens[2].size() || n < 0 || static_cast<uint64_t>(n) > limit)
+            error("Geometry::readPLY: invalid element count");
+        return static_cast<size_t>(n);
+    };
+    auto readExact = [&is](void *buffer, size_t bytes) {
+        if (bytes > static_cast<size_t>(std::numeric_limits<std::streamsize>::max()))
+            throw std::invalid_argument("Geometry::readPLY: binary record is too large");
+        if (bytes && !is.read(static_cast<char*>(buffer), static_cast<std::streamsize>(bytes)))
+            throw std::invalid_argument("Geometry::readPLY: truncated binary data");
     };
 
     // check header
@@ -926,7 +948,7 @@ inline void Geometry::readPLY(std::istream &is)
     // header: https://www.mathworks.com/help/vision/ug/the-ply-format.html
     size_t vtxCount = 0, faceCount = 0;
     int vtxStride=0, vtxProps=0;// byte size of all vtx properties, number of vertex properties
-    struct Triplet {int offset, id, size;} xyz[3];// byte offset, id#, byte size
+    struct Triplet {int offset, id, size;} xyz[3] = {};// byte offset, id#, byte size
     struct Skip {int count, bytes;} faceSkip[2]={{0,0},{0,0}};// head, {faces}, tail
 
     // parse header with vertex, face and property information
@@ -935,7 +957,8 @@ inline void Geometry::readPLY(std::istream &is)
     while(run) {
         if ( test(0, {"element"}) ) {
             if ( test(1, {"vertex"}) ) {
-                vtxCount = std::stoll(tokens[2]);
+                vtxCount = count(std::min(mVtx.max_size(),
+                    static_cast<size_t>(std::numeric_limits<int>::max())));
                 const std::string axis[3] = {"x", "y", "z"};
                 while(true) {
                     tokens = tokenize_line();
@@ -945,15 +968,18 @@ inline void Geometry::readPLY(std::istream &is)
                     } else if ( test(0, {"element"}) ) {
                         break;
                     } else if ( test(0, {"property"}) ) {
+                        if (tokens.size() != 3) error("Geometry::readPLY: invalid vertex property");
                         Triplet t{vtxStride, vtxProps++, sizeOf(1)};
                         for (int i=0; i<3; ++i) if (test(2, {axis[i]})) xyz[i] = t;
+                        if (vtxStride > std::numeric_limits<int>::max() - t.size)
+                            error("Geometry::readPLY: vertex record is too large");
                         vtxStride += t.size;
                     }
                 }
                 for (int i=0; i<3; ++i) if (xyz[i].size!=4 && xyz[i].size!=8) error("vdb_tool::readPLY: missing "+axis[i]+
                                                                                     " vertex coordinates or unsupported size "+std::to_string(xyz[i].size));
             } else if ( test(1, {"face"}) ) {
-                faceCount = std::stoll(tokens[2]);
+                faceCount = count(mTri.max_size());
                 int n = 0;// 0 is head and 1 is tail
                 while (true) {
                     tokens = tokenize_line();
@@ -976,6 +1002,7 @@ inline void Geometry::readPLY(std::istream &is)
                         }
                     }
                 }
+                if (faceCount && n == 0) error("Geometry::readPLY: missing face vertex indices");
             } else if ( test(1, {"edge", "material"}) ) {
                 while(true) {
                     tokens = tokenize_line();
@@ -1000,25 +1027,26 @@ inline void Geometry::readPLY(std::istream &is)
     mVtx.resize(vtxCount);
     if (format) {// binary
         if (xyz[0].offset==0 && xyz[1].offset==4 && xyz[2].offset==8 && vtxStride==12) {// most common case
-            is.read((char *)(mVtx.data()), vtxCount * 3 * sizeof(float));
+            if (vtxCount > std::numeric_limits<size_t>::max() / (3 * sizeof(float)))
+                error("Geometry::readPLY: vertex data is too large");
+            readExact(mVtx.data(), vtxCount * 3 * sizeof(float));
             if (reverseBytes) for (Vec3f &v : mVtx) swapBytes(&v[0], 3);
         } else {
-            char *buffer = static_cast<char*>(std::malloc(vtxCount*vtxStride)), *p = buffer;// uninitialized
-            if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate buffer");
-            is.read(buffer, vtxCount*vtxStride);
+            std::vector<char> buffer(vtxStride);
             for (Vec3f &vtx : mVtx) {
+                readExact(buffer.data(), buffer.size());
                 for (int i=0; i<3; ++i) {
                     if (xyz[i].size == 4) {
-                        float v = *(float*)(p + xyz[i].offset);
+                        float v;
+                        std::memcpy(&v, buffer.data() + xyz[i].offset, sizeof(v));
                         vtx[i] = reverseBytes ? swapBytes(v) : v;
                     } else {
-                        double v = *(double*)(p + xyz[i].offset);
+                        double v;
+                        std::memcpy(&v, buffer.data() + xyz[i].offset, sizeof(v));
                         vtx[i] = float(reverseBytes ? swapBytes(v) : v);
                     }
                 }
-                p += vtxStride;
             }
-            std::free(buffer);
         }
 
     } else {// ascii vertices
@@ -1032,49 +1060,44 @@ inline void Geometry::readPLY(std::istream &is)
     // read polygon vertex lists
     static const int nGon = 10;// maximum allowed nGon
     uint32_t vtx[nGon];
+    auto appendFace = [&](int n) {
+        for (int i = 0; i < n; ++i) {
+            if (vtx[i] >= vtxCount) error("Geometry::readPLY: face vertex index out of range");
+        }
+        if (n == 3) mTri.emplace_back(vtx);
+        else if (n == 4) mQuad.emplace_back(vtx);
+        else Geometry::triangulate(reinterpret_cast<const int*>(vtx), n, mTri);
+    };
     if (format) {// binary
-        char *buffer = static_cast<char*>(std::malloc(faceSkip[0].bytes + 1));// uninitialized
-        if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate buffer");
+        std::vector<char> buffer(static_cast<size_t>(faceSkip[0].bytes) + 1);
         for (size_t i=0; i<faceCount; ++i) {
-            is.read(buffer, faceSkip[0].bytes + 1);// polygon size is encoded as a single char
-            const int n = (int)buffer[faceSkip[0].bytes];// char -> int
-            switch (n) {
-            case 3:
-                is.read((char*)vtx, 3*sizeof(uint32_t));
-                if (reverseBytes) swapBytes(vtx, 3);
-                mTri.emplace_back(vtx);
-                break;
-            case 4:
-                is.read((char*)vtx, 4*sizeof(uint32_t));
-                if (reverseBytes) swapBytes(vtx, 4);
-                mQuad.emplace_back(vtx);
-                break;
-            default:
-                if (n > nGon) throw std::invalid_argument("Geometry::readPLY: binary " + std::to_string(n) + "-gons are not supported");
-                if (mVerbose) std::clog << "Geometry::readPLY: binary triangulating " << n << "-gon\n";
-                is.read((char*)vtx, n*sizeof(uint32_t));
-                if (reverseBytes) swapBytes(vtx, n);
-                Geometry::triangulate(reinterpret_cast<const int*>(vtx), n, mTri);
-                break;
-            }
+            readExact(buffer.data(), buffer.size());// polygon size is an unsigned byte
+            const int n = static_cast<unsigned char>(buffer.back());
+            if (n < 3 || n > nGon)
+                throw std::invalid_argument("Geometry::readPLY: unsupported binary polygon size " + std::to_string(n));
+            readExact(vtx, n * sizeof(uint32_t));
+            if (reverseBytes) swapBytes(vtx, n);
+            appendFace(n);
             is.ignore(faceSkip[1].bytes);
+            if (is.gcount() != faceSkip[1].bytes)
+                throw std::invalid_argument("Geometry::readPLY: truncated face properties");
         }// loop over polygons
-        std::free(buffer);
     } else {// ascii format faces
         for (size_t i=0; i<faceCount; ++i) {
             tokens = tokenize_line();
+            if (tokens.size() <= static_cast<size_t>(faceSkip[0].count))
+                error("Geometry::readPLY: missing polygon size");
             const std::string polySize = tokens[faceSkip[0].count];
             const int n = std::stoi(polySize);
             if ( n < 3 || n > nGon) throw std::invalid_argument("Geometry::readPLY: ascii " + polySize + "-gons are not supported");
-            for (int i = 0, j=1+faceSkip[0].count; i<n; ++i, ++j) vtx[i] = static_cast<uint32_t>(std::stoll(tokens[j]));
-            if (n==3) {
-                mTri.emplace_back(vtx);
-            } else if (n==4) {
-                mQuad.emplace_back(vtx);
-            } else {
-                if (mVerbose) std::clog << "Geometry::readPLY: ascii triangulating " << n << "-gon\n";
-                Geometry::triangulate(reinterpret_cast<const int*>(vtx), n, mTri);
+            if (tokens.size() < static_cast<size_t>(faceSkip[0].count + 1 + n + faceSkip[1].count))
+                error("Geometry::readPLY: truncated ascii face");
+            for (int i = 0, j=1+faceSkip[0].count; i<n; ++i, ++j) {
+                const int index = strToInt(tokens[j]);
+                if (index < 0) error("Geometry::readPLY: negative face vertex index");
+                vtx[i] = static_cast<uint32_t>(index);
             }
+            appendFace(n);
         }// loop over polygons
     }
     mBBox = BBoxT();//invalidate BBox
@@ -1179,13 +1202,15 @@ inline void Geometry::readSTL(const std::string &fileName)
     if (!infile.is_open()) throw std::runtime_error("Geometry::readSTL: Error opening STL file \""+fileName+"\"");
     PosT xyz;
     std::array<char, 256> buffer{};
-    if (!infile.read(buffer.data(), buffer.size())) {
-        throw std::runtime_error("Geometry::readSTL: Failed to read 256B in \""+fileName+"\" so this must be an empty STL file");
+    infile.read(buffer.data(), buffer.size());
+    const std::streamsize bytesRead = infile.gcount();
+    if (infile.bad() || bytesRead == 0) {
+        throw std::runtime_error("Geometry::readSTL: Failed to read header in \""+fileName+"\"");
     }
     infile.clear();
     infile.seekg(0, std::ios_base::beg);// rewind
     auto isAscii = [&]()->bool{
-        std::string str(buffer.data(), infile.gcount());
+        std::string str(buffer.data(), static_cast<size_t>(bytesRead));
         toLowerCase(str);
         return contains(str, "solid") && contains(str, '\n') && contains(str, "facet") && contains(str, "normal");
     };
@@ -1194,12 +1219,12 @@ inline void Geometry::readSTL(const std::string &fileName)
         std::getline(infile, line);// read the first line, which completes the header
         std::istringstream iss;
         while(std::getline(infile, line)) {
-            std::string tmp = trim(line, " ");// remove leading (and trailing) white spaces
+            std::string tmp = trim(line);// remove leading (and trailing) whitespace
             if (tmp.compare(0, 5, "facet")==0) {
-                while (std::getline(infile, line) && trim(line, " ").compare(0, 10, "outer loop"));
+                while (std::getline(infile, line) && trim(line).compare(0, 10, "outer loop"));
                 int nGon = 0;
                 while(std::getline(infile, line)) {// loop over vertices of the facet
-                    tmp = trim(line, " ");
+                    tmp = trim(line);
                     if (tmp.compare(0, 7, "endloop")==0) break;
                     OPENVDB_ASSERT(tmp.compare(0, 6, "vertex")==0);
                     iss.clear();
@@ -1232,7 +1257,19 @@ inline void Geometry::readSTL(const std::string &fileName)
         uint32_t numTri;
         if (!infile.read((char*)&numTri, sizeof(numTri))) throw std::invalid_argument("Geometry::readSTL binary: Failed to read triangle count in \""+fileName+"\"");
         infile.seekg (0, infile.end);
-        if (infile.tellg() != 80 + 4 + 50*numTri) throw std::invalid_argument("Geometry::readSTL binary: Unexpected file size in \""+fileName+"\"");
+        const std::streamoff fileSize = infile.tellg();
+        // Recover only complete records when the header overstates the count.
+        // Derive the count from the size without multiplying the untrusted header count.
+        if (fileSize < 84 || (fileSize - 84) % 50 != 0 || (fileSize - 84) / 50 > numTri) {
+            throw std::invalid_argument("Geometry::readSTL binary: Unexpected file size in \""+fileName+"\"");
+        }
+        const uint32_t availableTri = static_cast<uint32_t>((fileSize - 84) / 50);
+        if (availableTri < numTri) {
+            std::clog << "Warning: Geometry::readSTL binary: header declares " << numTri
+                      << " triangles, but \"" << fileName << "\" contains " << availableTri
+                      << ". Loading available triangles; geometry may be incomplete.\n";
+            numTri = availableTri;
+        }
         infile.seekg(80 + 4, infile.beg);
         uint32_t vtxBegin = static_cast<uint32_t>(mVtx.size()), triBegin = static_cast<uint32_t>(mTri.size());
         mVtx.resize(vtxBegin + 3*numTri);

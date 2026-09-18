@@ -57,6 +57,33 @@ inline bool contains(const std::string &str, const std::string &pattern, size_t 
     return str.find(pattern, pos) != std::string::npos;
 }
 
+/// @brief Remove config comments without truncating expressions or quoted text.
+/// @details '%' only introduces full-line comments, since it is also modulo.
+///          Inline '#' comments must be outside {...} expressions and quotes.
+inline std::string stripConfigComment(const std::string &line)
+{
+    const size_t start = line.find_first_not_of(" \t\r");
+    if (start == std::string::npos || line[start] == '#' || line[start] == '%') return {};
+    int braces = 0;
+    char quote = 0;
+    for (size_t i = start; i < line.size(); ++i) {
+        const char c = line[i];
+        if (quote) {
+            if (c == '\\' && i + 1 < line.size()) ++i;
+            else if (c == quote) quote = 0;
+        } else if (c == '\'' || c == '"') {
+            quote = c;
+        } else if (c == '{') {
+            ++braces;
+        } else if (c == '}' && braces > 0) {
+            --braces;
+        } else if (c == '#' && braces == 0) {
+            return line.substr(0, i);
+        }
+    }
+    return line;
+}
+
 /// @brief Levenshtein edit distance between @a a and @a b. Counts the minimum
 ///        number of single-character insertions, deletions, or substitutions
 ///        needed to turn one string into the other. Used to rank "did you

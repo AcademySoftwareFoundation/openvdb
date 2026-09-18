@@ -1,0 +1,21 @@
+vdb_tool:
+
+  Bug Fixes:
+  - Preserve rebuilt CSG results when replacing input grids.
+  - Return a failing exit status after action errors and stop immediately on
+    control-flow errors instead of entering invalid scopes.
+  - Report invalid files-loop directories as errors instead of aborting when
+    assertions are enabled, including when advancing to subsequent directories.
+  - Preserve input grids after failed VDB/NanoVDB writes and avoid changing
+    the grid stack or names when voxel-kernel variable validation fails.
+  - Preserve modulo expressions and loop counters in configuration files.
+    Inline comments now use '#'; '%' still supports full-line comments.
+  - Reject truncated or malformed PLY data instead of hanging or reading
+    incomplete records.
+  - Read tab-indented ASCII STL files instead of silently loading empty geometry.
+  - Recover complete binary STL triangles with a warning when the header overstates
+    their count; continue rejecting partial records and extra data. Accept small STL files.
+  - Support descending loops and reject zero or non-progressing steps.
+  - Keep binary stdout separate from diagnostic logs in both logging modes.
+  - Use binary stdin/stdout on Windows to prevent piped data corruption, while
+    retaining CRLF support for OFF text input.
