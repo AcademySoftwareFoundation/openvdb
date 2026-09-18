@@ -156,6 +156,67 @@ Note that rule 2 is emulating OpenVDB behaviour rather than inventing it: in
 OpenVDB, inactive voxels inside an allocated leaf already hold correctly signed
 `+/- background`, so dilation activates voxels that are already correct.
 
+### 3.4 One implemented scheme pair; the rest are hooks that throw
+
+The API keeps the **full** scheme matrix visible, but only
+**HJ-WENO5 + TVD-RK2** is implemented.  Every other requested combination
+throws a "not implemented" error at the host-side dispatch.
+
+This is deliberate: the enum, the dispatch skeleton and the error arms are cheap
+now and make adding a scheme later a pure addition rather than an API change.
+On GPU it is also *free* -- an unimplemented arm never instantiates a kernel, so
+the hooks cost nothing in compile time or code size.  (Compare: every
+*implemented* pair is a distinct kernel instantiation, which is the real reason
+not to open the matrix speculatively.)
+
+`throw std::runtime_error` is the established NanoVDB convention for host-side
+tool errors (`tools/cuda/PointsToGrid.cuh`, `tools/cuda/DilateGrid.cuh`, and
+most other tool headers), so the unimplemented arms should use it rather than
+inventing a mechanism.
+
+#### The enums have to be defined in NanoVDB
+
+OpenVDB owns the scheme type tags, in `openvdb/openvdb/math/FiniteDifference.h`:
+
+    enum BiasedGradientScheme {          // :164
+        UNKNOWN_BIAS = -1, FIRST_BIAS = 0, SECOND_BIAS, THIRD_BIAS,
+        WENO5_BIAS, HJWENO5_BIAS };
+
+    enum TemporalIntegrationScheme {     // :233
+        UNKNOWN_TIS = -1, TVD_RK1, TVD_RK2, TVD_RK3 };
+
+**NanoVDB has no equivalent -- a grep for `BiasedGradientScheme`,
+`TemporalIntegrationScheme`, `TVD_RK`, `WENO5_BIAS` or `DScheme` across all of
+`nanovdb/` returns nothing.**  And we cannot simply reuse OpenVDB's: NanoVDB is
+a standalone header library in which OpenVDB is an *optional* dependency
+(`NANOVDB_USE_OPENVDB`), pulled in only by the conversion utilities
+(`CreateNanoGrid.h`, `NanoToOpenVDB.h`).  A core tool header must not include
+OpenVDB.
+
+So we declare our own.  Proposal:
+
+* Mirror OpenVDB's **enumerator names and values exactly**.  Matching values
+  make an OpenVDB <-> NanoVDB translation a `static_cast` guarded by
+  `static_assert`s -- which is precisely what the cross-validation harness needs,
+  and it keeps the two from silently drifting apart.
+* Use **unscoped** enums in a dedicated namespace, following NanoVDB's own
+  precedent for an operator-selection enum used as a template argument:
+  `nanovdb::tools::morphology::NearestNeighbors`
+  (`nanovdb/util/MorphologyHelpers.h:22`).  Placing them in `nanovdb::math`
+  keeps the call sites reading the same as OpenVDB's.
+* Mirror only the two user-facing enums.  OpenVDB's lower-level `DScheme`
+  (`FD_HJWENO5`, `BD_WENO5`, ...) is an implementation layer that NanoVDB does
+  not need: `WenoStencil` bakes in the HJ form (§6).
+* Declare the full OpenVDB set even though four of five spatial and two of three
+  temporal values throw, so that translation is total and the API is stable.
+
+Open: whether the pair is carried as **runtime enums** (mirroring OpenVDB's
+`State` + `normalize -> normalize1<S> -> normalize2<S,T>` dispatch ladder, which
+exists precisely to turn runtime enums into template arguments) or as
+**compile-time tags** with a thin runtime shim at the boundary.  The runtime-enum
+form is friendlier to a host-side caller; the tag form avoids generating the
+dispatch ladder at all while only one pair is live.
+
 ## 4. Scope questions still open
 
 * **Renormalization only, or all of `track()`?**  Renormalization is
@@ -279,6 +340,11 @@ stacks therefore agree on the scheme.  A scheme mismatch is *not* the
 explanation for the tolerance gap below.
 
 ### Resolved: why OpenVDB and NanoVDB disagree at 5e-3
+
+> **Priority: secondary.**  These are constant/precision discrepancies, not
+> algorithmic ones.  They are recorded here so they are not rediscovered, and
+> so that the two choices they force are made deliberately -- but they do not
+> gate the high-level design, and nothing below should be read as a blocker.
 
 The tandem harness uses two tolerances (`LevelSetTrackerNew.h:351-355` in the
 `f8ab0ca` revision): `5e-5` with `USE_NANOVDB_IMPLEMENTATION_FOR_NORMGRAD`
