@@ -428,6 +428,19 @@ Inherited from the reference and not to be carried into NanoVDB as-is:
 * **Hardcoded `UnifiedBuffer`**, including the RK temporary that the CUDA path
   never touches from the host — conceded in a TODO at
   `Benchmark/src/Benchmark.cu:441-448`.  `cuda::Buffer<T>` landed upstream in `0ab0a81e7`.
+  Note this is a *regression introduced by the CPU port*: the earlier
+  `benchmark-add-lateral-ratio @ f8ab0ca` revision used
+  `BufferT = nanovdb::cuda::DeviceBuffer`, and `0b207e7` switched it to
+  `UnifiedBuffer` purely so a future host path could share the allocation.  For
+  a CUDA-only implementation, `f8ab0ca` is the better reference on this one
+  point.  See `Benchmark/PROVENANCE.md`.
+* **CPU scaffolding inside the CUDA path.**  Since only CUDA is in scope, the
+  `ExecutionPolicy` template parameter comes off every entry point, and
+  `Benchmark/src/Benchmark.cpp` (entirely `ExecutionPolicy::CPU`) has no counterpart in
+  the promoted code.  Most pointedly, the CUDA specializations of
+  `dilateActiveValues` and `pruneNarrowBand` contain a `getInstance().onCPU()`
+  branch that can call the *host* VBM builder (`Benchmark/src/Benchmark.cu:144`,
+  `:534`) -- a nominally-CUDA entry point with a runtime escape into host code.
 * **Misnamed axis variables** in the dilate seeder (`Benchmark/src/Benchmark.cu:110-115`):
   `oldIdx_pX` is `offsetBy(0,0,1)` (+Z), `oldIdx_mZ` is `offsetBy(-1,0,0)` (-X),
   etc.  Behaviour is unaffected — it is an unordered scan of all six face

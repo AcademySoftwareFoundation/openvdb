@@ -17,10 +17,70 @@ no code was changed.
 | Date | 2026-06-16 |
 | Subject | `Benchmark: route CPU prune mask through BufferT (drop hardcoded UnifiedBuffer)` |
 
-`nanovdb-cpu-port` was chosen over the other candidate branches because it is the
-most recent and structurally the most advanced: it carries the dual host/CUDA
-`ExecutionPolicy` dispatch, the `BenchmarkIO.cpp` split, an out-of-bounds fix in
-`DilateNarrowBandFunctor`, and the `BufferT`-templated prune mask.
+## Why this branch, for CUDA specifically
+
+Only the CUDA implementation is in scope.  `nanovdb-cpu-port` carries host-port
+work as well, so the branch choice was re-verified against the other candidate,
+`benchmark-add-lateral-ratio @ f8ab0ca`, restricted to `Benchmark.cu`:
+
+**The numerics are identical.**  Diffing `f8ab0ca..67ce360` over `Benchmark.cu`
+and filtering to WENO / Godunov / Euler-step lines yields changes in comments
+only.  The renormalization kernel was not touched by the CPU port.
+
+**The newer branch has CUDA-only improvements the older one lacks:**
+
+* `21cd3a0` -- **fixes an out-of-bounds read in `DilateNarrowBandFunctor`**.  The
+  old code dereferenced `newTree.getFirstNode<0>()[leafID]` and
+  `newLeaf.origin()` *before* testing `leafID < leafCount`, so padding warps in
+  the last block read unmapped memory.  A real CUDA bug, fixed only here.
+* `f986965` -- updates to the `VoxelBlockManager` API of PR#2189, i.e. the API we
+  would be building against.
+* `9573926` -- Doxygen documentation of the CUDA kernels.
+* Buffer-templated calls: `dilator.getHandle<BufferT>()`,
+  `buildVoxelBlockManager<BlockWidthLog2, BufferT>(...)`.
+
+**The CPU scaffolding it also carries is additive and easy to strip:**
+
+* an `ExecutionPolicy` template parameter on every entry point
+  (`dilateActiveValues<ExecutionPolicy::CUDA>` and friends);
+* `src/Benchmark.cpp`, which is *entirely* `ExecutionPolicy::CPU`
+  specializations;
+* a `getInstance().onCPU()` branch **inside** the CUDA specialization of
+  `dilateActiveValues` (`src/Benchmark.cu:145-148`), which lets a nominally-CUDA
+  entry point call the host VBM builder.  Odd, and slated for removal.
+
+**One CPU-motivated regression to be aware of.**  Commit `0b207e7` switched the
+persistent state from `DeviceBuffer` to `UnifiedBuffer` *for the benefit of the
+future CPU port*:
+
+    f8ab0ca:  using BufferT = nanovdb::cuda::DeviceBuffer;
+    67ce360:  using BufferT = nanovdb::cuda::UnifiedBuffer;
+
+For a pure CUDA implementation that is a step backwards, and it is the same
+issue as the TODO at `src/Benchmark.cu:441-448`.  `f8ab0ca` is the better
+reference for *this one aspect*; see `../RENORMALIZATION_DESIGN.md` §7.
+
+Net: taking `f8ab0ca` instead would have meant giving up a CUDA bug fix, the
+current VBM API and the kernel documentation in order to avoid scaffolding that
+deletes cleanly.  `nanovdb-cpu-port` stands as the right source.
+
+## What matters here, and what to ignore
+
+In scope (CUDA):
+
+| File | Role |
+|---|---|
+| `src/Benchmark.cu` | **the CUDA kernels -- the subject of this effort** |
+| `include/Stencils.h` | the shadowed header; carries the two static WENO overloads |
+| `include/Benchmark.h` | type aliases, VBM constants, state declarations |
+| `src/BenchmarkIO.cpp` | OpenVDB bridge + the comparison routines used for validation |
+| `src/main.cpp` | driver; selects HJWENO5_BIAS + TVD_RK2 + normCount 3 |
+| `include/LevelSetTrackerNew.h` | the OpenVDB reference implementation |
+
+Out of scope, retained only so the snapshot stays verbatim and buildable:
+`src/Benchmark.cpp` (all `ExecutionPolicy::CPU`), `CPU_PORT_PLAN.md`,
+`include/LevelSetPropagate.h` and `include/VelocityExtension.h` (interface
+propagation, not renormalization), `include/GridHelpers.cuh`.
 
 ## What is deliberately NOT here
 
