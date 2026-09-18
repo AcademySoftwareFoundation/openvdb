@@ -193,22 +193,42 @@ a standalone header library in which OpenVDB is an *optional* dependency
 (`CreateNanoGrid.h`, `NanoToOpenVDB.h`).  A core tool header must not include
 OpenVDB.
 
-So we declare our own.  Proposal:
+So we declare our own, in **`nanovdb/math/FiniteDifference.h`** (new header,
+namespace `nanovdb::math`, registered in `nanovdb/CMakeLists.txt`).  Decided:
 
-* Mirror OpenVDB's **enumerator names and values exactly**.  Matching values
-  make an OpenVDB <-> NanoVDB translation a `static_cast` guarded by
-  `static_assert`s -- which is precisely what the cross-validation harness needs,
-  and it keeps the two from silently drifting apart.
-* Use **unscoped** enums in a dedicated namespace, following NanoVDB's own
-  precedent for an operator-selection enum used as a template argument:
-  `nanovdb::tools::morphology::NearestNeighbors`
-  (`nanovdb/util/MorphologyHelpers.h:22`).  Placing them in `nanovdb::math`
-  keeps the call sites reading the same as OpenVDB's.
+* **Declare only the schemes we implement, plus the `UNKNOWN` sentinels.**  Not
+  the full OpenVDB set.  An unsupported scheme then cannot be *named* at all,
+  which is a stronger guarantee than accepting it and throwing -- the error moves
+  from run time to compile time.  The §3.4 "hooks that throw" arms therefore only
+  need to cover `UNKNOWN_*` and out-of-range integers arriving from a cast.
+* **Pin the values explicitly to their OpenVDB numbers**, which OpenVDB assigns
+  implicitly:
+
+      UNKNOWN_BIAS = -1   FIRST_BIAS = 0  SECOND_BIAS = 1  THIRD_BIAS = 2
+      WENO5_BIAS   =  3   HJWENO5_BIAS = 4
+      UNKNOWN_TIS  = -1   TVD_RK1    = 0  TVD_RK2     = 1  TVD_RK3     = 2
+
+  so NanoVDB declares `UNKNOWN_BIAS = -1`, **`HJWENO5_BIAS = 4`**,
+  `UNKNOWN_TIS = -1`, **`TVD_RK2 = 1`**.  The gaps in the numbering are
+  intentional; adding a scheme later means adding its label *at its OpenVDB
+  value*, never renumbering an existing one.  Matching numbers make translation
+  across the boundary a `static_cast` rather than a mapping table, and let a
+  `static_assert` catch drift.
+* **`HJWENO5_BIAS` (4), not `WENO5_BIAS` (3).**  Worth stating loudly because the
+  two are easy to conflate in conversation but are different operators (§6), and
+  picking the wrong one silently changes the constant.
 * Mirror only the two user-facing enums.  OpenVDB's lower-level `DScheme`
   (`FD_HJWENO5`, `BD_WENO5`, ...) is an implementation layer that NanoVDB does
   not need: `WenoStencil` bakes in the HJ form (§6).
-* Declare the full OpenVDB set even though four of five spatial and two of three
-  temporal values throw, so that translation is total and the API is stable.
+* Use **unscoped** enums, following NanoVDB's own precedent for an
+  operator-selection enum used as a template argument,
+  `nanovdb::tools::morphology::NearestNeighbors`
+  (`nanovdb/util/MorphologyHelpers.h:22`).  `nanovdb::math` keeps call sites
+  reading the same as OpenVDB's.
+
+Consequence accepted: OpenVDB -> NanoVDB translation is now *partial* rather than
+total -- only `HJWENO5_BIAS` and `TVD_RK2` have NanoVDB counterparts.  The
+boundary shim must reject the rest rather than cast blindly.
 
 Open: whether the pair is carried as **runtime enums** (mirroring OpenVDB's
 `State` + `normalize -> normalize1<S> -> normalize2<S,T>` dispatch ladder, which

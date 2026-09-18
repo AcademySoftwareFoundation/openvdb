@@ -225,6 +225,7 @@ set(NANOVDB_INCLUDE_IO_FILES
 set(NANOVDB_INCLUDE_MATH_FILES
   math/CSampleFromVoxels.h
   math/DitherLUT.h
+  math/FiniteDifference.h
   math/HDDA.h
   math/Math.h
   math/Proximity.h
