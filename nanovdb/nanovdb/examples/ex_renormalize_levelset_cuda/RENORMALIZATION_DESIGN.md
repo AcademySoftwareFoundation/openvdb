@@ -165,10 +165,14 @@ OpenVDB, inactive voxels inside an allocated leaf already hold correctly signed
   `track()` is the natural follow-on.
 * **How much of OpenVDB's feature matrix?**  Upstream has 5 spatial x 3 temporal
   schemes, masked `normalize(&mask)`, `TrimMode`, `dilate`/`erode`/`resize`.  the reference
-  implements exactly one point of that space: WENO5 + TVD-RK2, unmasked, no
-  trimming (its copy of the masked branch throws).  Mirror the
-  `State`/scheme-dispatch API with one instantiation, or ship a narrow free
-  function?
+  implements exactly one point of that space -- **HJ-WENO5 + TVD-RK2, unmasked,
+  no trimming, `normCount = 3`** (see §6) -- and its copy of the masked branch
+  throws.  Mirror the `State`/scheme-dispatch API with one instantiation, or ship
+  a narrow free function?  Note that OpenVDB's runtime dispatch
+  (`normalize` -> `normalize1<SpatialScheme>` -> `normalize2<...,TemporalScheme>`)
+  exists to turn two runtime enums into template arguments; on GPU each
+  combination is a distinct kernel, so the cost of keeping the matrix open is
+  compile time and code size, not just API surface.
 * **Host path in scope?**  Precedent in this tree (`DilateGrid.h` /
   `DilateGrid.cuh`) says host+device.  the reference's `ExecutionPolicy` templating was
   built for exactly that, and `normalizeLevelSet<ExecutionPolicy::CPU>` exists
@@ -247,21 +251,86 @@ This implies two tiers:
    interleaves both stacks and calls `compareOpenVDBDataToNanoVDBSidecar` after
    each stage.
 
-### Open item inherited from the reference
+### Resolved: the scheme the reference actually uses
 
-The tandem harness uses two different tolerances
-(`LevelSetTrackerNew.h:351-355` in the `f8ab0ca` revision):
+`Benchmark/src/main.cpp:113-117` selects, for both the propagator and the tracker:
 
-* `5e-5` with `USE_NANOVDB_IMPLEMENTATION_FOR_NORMGRAD` — OpenVDB forced to use
-  NanoVDB's `WenoStencil::normSqGrad`;
-* `5e-3` without it — OpenVDB using its own `ISGradientNormSqrd<WENO5_BIAS>`.
+    setSpatialScheme(HJWENO5_BIAS)
+    setTemporalScheme(TVD_RK2)
+    setNormCount(3)
 
-Both are nominally the same WENO5 + Godunov scheme, so `5e-3` is larger than
-floating-point reassociation alone should explain.  Encouragingly, this also
-bounds the *boundary-condition* contribution at `5e-5` on the reference model — i.e.
-the sign-extrapolation heuristic agrees closely with OpenVDB's tile-value
-treatment there.  But if NanoVDB's WENO is to be the reference implementation,
-we should understand which of the two is right before blessing it.
+So the target configuration is **HJ-WENO5 in space, TVD-RK2 in pseudo-time,
+three renormalization sweeps per call**.  (`LevelSetTrackerNew::State` defaults
+to `HJWENO5_BIAS` + `TVD_RK1` + `normCount = LEVEL_SET_HALF_WIDTH`; `main.cpp`
+overrides the temporal scheme and the count.)
+
+This matters because OpenVDB distinguishes two fifth-order WENO variants, and
+they are genuinely different operators
+(`openvdb/openvdb/math/FiniteDifference.h:1079`, `:1178`):
+
+    FD_WENO5    WENO5(xp3,xp2,xp1,xp0,xm1) - WENO5(xp2,xp1,xp0,xm1,xm2)
+                  -- WENO reconstruction of the function, then differenced
+    FD_HJWENO5  WENO5(xp3-xp2, xp2-xp1, xp1-xp0, xp0-xm1, xm1-xm2)
+                  -- WENO applied to the divided differences (Hamilton-Jacobi form)
+
+NanoVDB's `WenoStencil::normSqGrad` feeds `WENO5` with *differences*
+(`nanovdb/math/Stencils.h:650-656`), i.e. it implements **HJ-WENO5**.  The two
+stacks therefore agree on the scheme.  A scheme mismatch is *not* the
+explanation for the tolerance gap below.
+
+### Resolved: why OpenVDB and NanoVDB disagree at 5e-3
+
+The tandem harness uses two tolerances (`LevelSetTrackerNew.h:351-355` in the
+`f8ab0ca` revision): `5e-5` with `USE_NANOVDB_IMPLEMENTATION_FOR_NORMGRAD`
+(OpenVDB forced to use NanoVDB's `normSqGrad`) and `5e-3` without it.  Since the
+schemes match, the residual has to come from the shared `WENO5` kernel.  The
+algebra is identical line for line; **two things differ**:
+
+**1. The regularization epsilon differs by 100x.**  Both compute
+`eps = 1e-6 * scale2`, but:
+
+* OpenVDB's `WENO5` defaults to `scale2 = 0.01f`
+  (`openvdb/math/FiniteDifference.h:304`), and `D1<FD_HJWENO5>::difference`
+  never passes one -- so `eps = 1e-8`, unconditionally, independent of `dx`.
+* NanoVDB's `WENO5` defaults to `scale2 = 1.0` and carries the comment
+  "openvdb uses scale2 = 0.01" (`nanovdb/math/Stencils.h:42`), so the divergence
+  is deliberate and known.  Its `normSqGrad` member passes `mDx2` (= dx^2), but
+  the reference's static overload is called as `normSqGrad(stencil, 1.f, 1.f)`
+  (`Benchmark/src/Benchmark.cu:358`) -- so `eps = 1e-6`.
+
+This is not cosmetic.  `eps` sets the floor of the WENO smoothness indicators
+`beta`, and the ratio `eps/beta` decides how far the nonlinear weights drift from
+the linear optimal weights.  For the HJ form the arguments are *differences* of
+phi across one voxel, so with `|grad phi| ~ 1` they are `O(dx_world)` and
+`beta = O(dx_world^2)`.  Scaling `eps` by `dx^2` (what NanoVDB's member version
+does) is therefore dimensionally consistent for HJ-WENO, and OpenVDB's fixed
+`1e-8` is a dx-independent magic number -- but **the reference's `dx2 = 1.f` gets neither**.
+If `dx_world^2` approaches `1e-6`, `eps` starts to dominate `beta` and the scheme
+degenerates toward plain fifth-order linear upwinding, silently losing the WENO
+non-oscillatory property exactly where it is needed.
+
+**2. The working precision differs.**  OpenVDB computes `C`, `eps`, `A1..A3` and
+the final combination in **`double`** (`FiniteDifference.h:306-320`), then casts
+down.  NanoVDB is templated: `WenoStencil<GridT, RealT = typename
+GridT::ValueType>` (`nanovdb/math/Stencils.h:614`), so `WenoStencil<FloatGrid>`
+does the entire weight computation in **`float`**.  The `A_k` are reciprocals of
+fourth powers of small quantities -- the worst possible shape for single
+precision.
+
+Both hypotheses are cheaply testable in isolation (build the reference harness with
+NanoVDB's `WENO5` instantiated at `RealT = double`; separately, pass
+`scale2 = 0.01` / `dx_world^2` instead of `1.f`).  Doing so should say how much of
+the `5e-3` is epsilon and how much is precision.
+
+Decisions this forces before we bless NanoVDB's version as the reference:
+
+* **What should `scale2` be?**  Fixed `0.01` (bug-compatible with OpenVDB),
+  `dx^2` (dimensionally consistent for HJ-WENO, what NanoVDB's member version
+  already does), or caller-supplied with no default?
+* **What should `RealT` be?**  Defaulting it to `ValueType` means a `float` grid
+  silently gets `float` WENO weights.  Defaulting to `double` for `float` grids
+  costs registers in a GPU kernel but matches OpenVDB.  This should be an
+  explicit choice, not an inherited default.
 
 ## 7. Cleanup required during promotion
 
