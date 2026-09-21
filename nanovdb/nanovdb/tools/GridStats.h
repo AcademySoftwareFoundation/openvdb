@@ -532,7 +532,7 @@ protected:
 
 public:
     using ValueType = ValueT;
-    double raw_to_double(const ValueT& v)
+    __hostdev__ double raw_to_double(const ValueT& v)
     {
         uint64_t raw64 =
             (uint64_t(v.raw & 0x8000) << (63-15)) | // sign bit
