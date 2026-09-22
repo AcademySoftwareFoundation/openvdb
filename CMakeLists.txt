@@ -120,9 +120,12 @@ option(USE_ZLIB [=[
 Use zlib while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
 openvdb build configuration to decide on zlib support. ZLib can only be disabled if Blosc is also disabled. ]=] ON)
 option(USE_LOG4CPLUS [=[
-Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
-located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
-to be used if you know it to be required.]=] OFF)
+Deprecated, has no effect. OpenVDB no longer depends on log4cplus. See openvdb::logging::Sink
+for the replacement API.]=] OFF)
+if(USE_LOG4CPLUS)
+  message(DEPRECATION "The USE_LOG4CPLUS option has no effect. OpenVDB no longer depends on "
+    "log4cplus. See openvdb::logging::Sink for the replacement API.")
+endif()
 option(USE_EXR [=[
 Use OpenEXR while building openvdb components. If enabled, this also switches USE_IMATH_HALF to ON unless
 it too was provided and set to OFF.]=] OFF)
@@ -333,7 +336,6 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
   set(OPENVDB_CMAKE_MODULES
     cmake/FindBlosc.cmake
     cmake/FindJemalloc.cmake
-    cmake/FindLog4cplus.cmake
     cmake/FindOpenEXR.cmake
     cmake/FindOpenVDB.cmake
     cmake/FindTBB.cmake
@@ -447,7 +449,6 @@ if(USE_STATIC_DEPENDENCIES)
   set(BLOSC_USE_STATIC_LIBS ON)
   set(OPENEXR_USE_STATIC_LIBS ON)
   set(TBB_USE_STATIC_LIBS ON)
-  set(LOG4CPLUS_USE_STATIC_LIBS ON)
   set(JEMALLOC_USE_STATIC_LIBS ON)
   set(GTEST_USE_STATIC_LIBS ON)
   set(Boost_USE_STATIC_LIBS ON)

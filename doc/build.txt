@@ -303,7 +303,6 @@ Boost          | Components: iostreams                                          
 GoogleTest     | A unit testing framework module for C++                         | Unit Tests         |
 GLFW           | Simple API for OpenGL development                               | OpenVDB View       |
 Doxygen        | Documentation generation from C++                               | Documentation      |
-Log4cplus      | An optional dependency for improved OpenVDB Logging             | Optional (All)     |
 nanobind       | C++/python bindings                                             | Optional (Python)  |
 LLVM           | Target-independent code generation                              | OpenVDB AX         |
 
@@ -391,7 +390,6 @@ GLFW           | Simple API for OpenGL development                              
 Doxygen        | Documentation generation from C++                                 | Documentation                    |
 OpenEXR        | EXR serialization support                                         | OpenVDB Render                   |
 Imath          | Used half precision floating points and EXR serialization support | Optional (All)                   |
-Log4cplus      | An optional dependency for improved OpenVDB Logging               | Optional (All)                   |
 nanobind       | C++/python bindings                                               | Optional (Python)                |
 LLVM           | Target-independent code generation                                | OpenVDB AX                       |
 

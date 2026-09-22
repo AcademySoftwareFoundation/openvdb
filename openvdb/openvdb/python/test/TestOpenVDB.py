@@ -86,6 +86,19 @@ class TestOpenVDB(unittest.TestCase):
             self.assertEqual(grid.activeVoxelCount(), 1)
 
 
+    def testLogging(self):
+        savedLevel = openvdb.getLoggingLevel()
+        try:
+            for level in ("debug", "info", "warn", "error", "fatal"):
+                openvdb.setLoggingLevel(level)
+                self.assertEqual(openvdb.getLoggingLevel(), level)
+
+            with self.assertRaises(ValueError):
+                openvdb.setLoggingLevel("not_a_level")
+        finally:
+            openvdb.setLoggingLevel(savedLevel)
+
+
     def testAX(self):
         if not ax_is_enabled():
             return

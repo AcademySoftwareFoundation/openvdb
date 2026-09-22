@@ -60,8 +60,6 @@ This will define the following variables:
   True if the OpenVDB Library has been built with blosc support
 ``OpenVDB_USES_ZLIB``
   True if the OpenVDB Library has been built with zlib support
-``OpenVDB_USES_LOG4CPLUS``
-  True if the OpenVDB Library has been built with log4cplus support
 ``OpenVDB_USES_IMATH_HALF``
   True if the OpenVDB Library has been built with Imath half support
 ``OpenVDB_ABI``
@@ -518,7 +516,6 @@ endif()
 # to manually identify the requirements of OpenVDB builds if they know them.
 set(OpenVDB_USES_BLOSC ${USE_BLOSC})
 set(OpenVDB_USES_ZLIB ${USE_ZLIB})
-set(OpenVDB_USES_LOG4CPLUS ${USE_LOG4CPLUS})
 set(OpenVDB_USES_IMATH_HALF ${USE_IMATH_HALF})
 set(OpenVDB_DEFINITIONS)
 
@@ -589,11 +586,6 @@ elseif(NOT OPENVDB_USE_STATIC_LIBS)
       set(OpenVDB_USES_ZLIB ON)
     endif()
 
-    string(FIND ${PREREQUISITE} "log4cplus" _HAS_DEP)
-    if(NOT ${_HAS_DEP} EQUAL -1)
-      set(OpenVDB_USES_LOG4CPLUS ON)
-    endif()
-
     string(FIND ${PREREQUISITE} "Half" _HAS_DEP)
     if(NOT ${_HAS_DEP} EQUAL -1)
       set(OpenVDB_USES_IMATH_HALF ON)
@@ -609,10 +601,6 @@ endif()
 
 if(OpenVDB_USES_ZLIB)
   find_package(ZLIB REQUIRED)
-endif()
-
-if(OpenVDB_USES_LOG4CPLUS)
-  find_package(Log4cplus REQUIRED)
 endif()
 
 if(OpenVDB_USES_IMATH_HALF)
@@ -632,11 +620,6 @@ set(_OPENVDB_VISIBLE_DEPENDENCIES "")
 
 if(OpenVDB_USES_IMATH_HALF)
   list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES Imath::Imath)
-endif()
-
-if(OpenVDB_USES_LOG4CPLUS)
-  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES Log4cplus::log4cplus)
-  list(APPEND OpenVDB_DEFINITIONS OPENVDB_USE_LOG4CPLUS)
 endif()
 
 list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES

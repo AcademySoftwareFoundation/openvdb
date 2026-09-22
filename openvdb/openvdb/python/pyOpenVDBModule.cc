@@ -204,7 +204,6 @@ void axrun(const std::string& code, GridPtrVec& grids)
 
 std::string getLoggingLevel();
 void setLoggingLevel(const std::string& loggingLevel);
-void setProgramName(const std::string& name, bool color);
 
 
 std::string
@@ -243,13 +242,6 @@ setLoggingLevel(const std::string& loggingLevel)
         "expected logging level \"debug\", \"info\", \"warn\", \"error\", or \"fatal\","
         " got \"%s\"", levelStr.c_str());
     throw nb::python_error();
-}
-
-
-void
-setProgramName(const std::string& name, bool color)
-{
-    logging::setProgramName(name, color);
 }
 
 
@@ -428,10 +420,6 @@ NB_MODULE(openvdb, m)
         "or \"fatal\") for error messages.  Messages of lower severity "
         "will be suppressed.",
         nb::arg("level"));
-    m.def("setProgramName", &_openvdbmodule::setProgramName,
-        "Specify the program name to be displayed in error messages, "
-        "and optionally specify whether to print error messages in color.",
-        nb::arg("name"), nb::arg("color") = true);
 
     // Add some useful module-level constants.
     m.attr("LIBRARY_VERSION") = std::make_tuple(
