@@ -31,7 +31,11 @@
 #include <utility> // std::pair, std::make_pair
 #include <vector>
 
+// This header is only needed when PointData I/O methods are present (ie ABI<14)
+// otherwise, this header is included in the PointDataCodec instead.
+#if OPENVDB_ABI_VERSION_NUMBER < 14
 #include <openvdb/points/PointDataIO.h> // io::readCompressedValues(), io::writeCompressedValues(), io::writeCompressedValuesSize()
+#endif
 
 class TestPointDataLeaf;
 
@@ -363,6 +367,7 @@ public:
 
     // I/O methods
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     void readTopology(std::istream& is, bool fromHalf = false);
     void writeTopology(std::ostream& os, bool toHalf = false) const;
 
@@ -372,10 +377,11 @@ public:
     void readBuffers(std::istream& is, const CoordBBox&, bool fromHalf = false);
     void writeBuffers(std::ostream& os, bool toHalf = false) const;
 
-
-    Index64 memUsage() const;
     OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
     Index64 memUsageIfLoaded() const { return memUsage(); }
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
+
+    Index64 memUsage() const;
 
     void evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels = true) const;
 
@@ -987,6 +993,8 @@ PointDataLeafNode<T, Log2Dim>::setOffsetOnly(Index offset, const ValueType& val)
     this->buffer().setValue(offset, val);
 }
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
@@ -1385,6 +1393,8 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
         Local::destroyPagedStream(meta->auxData(), attributeIndex);
     }
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 template<typename T, Index Log2Dim>
 inline Index64

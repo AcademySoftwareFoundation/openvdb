@@ -381,6 +381,7 @@ public:
     const Buffer& buffer() const { return mBuffer; }
     Buffer& buffer() { return mBuffer; }
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     //
     // I/O methods
     //
@@ -406,6 +407,7 @@ public:
     /// @param os      the stream to which to write
     /// @param toHalf  if true, output floating-point values as 16-bit half floats
     void writeBuffers(std::ostream& os, bool toHalf = false) const;
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     size_t streamingSize(bool toHalf = false) const;
 
@@ -924,7 +926,10 @@ protected:
     void setValueMaskOn(Index n)  { mValueMask.setOn(n); }
     void setValueMaskOff(Index n) { mValueMask.setOff(n); }
 
+
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     inline void skipCompressedValues(bool seekable, std::istream&, bool fromHalf);
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     /// Compute the origin of the leaf node that contains the voxel with the given coordinates.
     static void evalNodeOrigin(Coord& xyz) { xyz &= ~(DIM - 1); }
@@ -1326,6 +1331,8 @@ LeafNode<T, Log2Dim>::copyFromDense(const CoordBBox& bbox, const DenseT& dense,
 ////////////////////////////////////////
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 template<typename T, Index Log2Dim>
 inline void
 LeafNode<T, Log2Dim>::readTopology(std::istream& is, bool /*fromHalf*/)
@@ -1340,10 +1347,6 @@ LeafNode<T, Log2Dim>::writeTopology(std::ostream& os, bool /*toHalf*/) const
 {
     mValueMask.save(os);
 }
-
-
-////////////////////////////////////////
-
 
 
 template<typename T, Index Log2Dim>
@@ -1439,6 +1442,8 @@ LeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
     io::writeCompressedValues(os, mBuffer.mData, SIZE,
         mValueMask, /*childMask=*/NodeMaskType(), toHalf);
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
 ////////////////////////////////////////

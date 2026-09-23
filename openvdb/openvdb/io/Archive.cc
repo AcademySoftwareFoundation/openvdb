@@ -1021,6 +1021,7 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
         if (codec) {
             codec->readTopology(is, *codecData, readOptions, diagnostics);
         } else {
+#if OPENVDB_ABI_VERSION_NUMBER < 14
             io::StreamMetadata::Ptr allocateLeafBuffersMeta;
             if (readOptions.readMode == io::ReadMode::TopologyOnly) {
                 // Signal Grid<TreeT>::readTopology to allocate leaf buffers and
@@ -1040,6 +1041,7 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
                 }
                 throw;
             }
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
         }
     }
     if (readBuffers) {
@@ -1049,6 +1051,7 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
             const Index64 size = static_cast<Index64>(gd.getEndPos() - gd.getGridPos());
             codec->readBuffers(is, size, *codecData, readOptions, diagnostics);
         } else {
+#if OPENVDB_ABI_VERSION_NUMBER < 14
             const auto& worldBBox = readOptions.clipBBox;
             const bool clip = worldBBox.isSorted();
             if (clip) {
@@ -1057,6 +1060,7 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
             } else {
                 grid->readBuffers(is);
             }
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
         }
     }
 
@@ -1242,7 +1246,9 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     if (codec) {
         codec->writeTopology(os, *grid, writeOptions);
     } else {
+#if OPENVDB_ABI_VERSION_NUMBER < 14
         grid->writeTopology(os);
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
     }
 
     // Now we know the grid block storage position.
@@ -1252,7 +1258,9 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     if (codec) {
         codec->writeBuffers(os, *grid, writeOptions);
     } else {
+#if OPENVDB_ABI_VERSION_NUMBER < 14
         grid->writeBuffers(os);
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
     }
 
     // Now we know the end position of this grid.
