@@ -40,7 +40,9 @@ __global__ void sampleFromVoxels(unsigned int numPoints, const BuildT* points, c
         math::SampleFromVoxels<TreeT, 1, false> sampler(d_grid->tree());
         values[i] = sampler(indexPos);
 
-        Vec3T inv2Dx = (BuildT).5 / d_grid->voxelSize();
+        // voxelSize() returns Vec3d; explicit conversion to Vec3T preserves the existing
+        // "compute reciprocal in double, then narrow to BuildT" semantics.
+        Vec3T inv2Dx = Vec3T((BuildT).5 / d_grid->voxelSize());
         Vec3T gradient = Vec3T(sampler(indexPos + Vec3T(1, 0, 0)) - sampler(indexPos - Vec3T(1, 0, 0)),
                                sampler(indexPos + Vec3T(0, 1, 0)) - sampler(indexPos - Vec3T(0, 1, 0)),
                                sampler(indexPos + Vec3T(0, 0, 1)) - sampler(indexPos - Vec3T(0, 0, 1))) *
