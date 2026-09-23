@@ -395,6 +395,14 @@ its members was examined; the outcome is three categories, not two.
 | `InterruptT`, `startInterrupter`/`endInterrupter`/`checkInterrupter` | A host-application integration point (Houdini/Maya progress + cancel).  Its polling sites are *inside* the parallel work -- once per leaf range in `euler()` -- and the CUDA equivalent of that loop body is a kernel launch, which cannot be polled or unwound.  The only feasible check is between launches, of which `normalize()` has `2*normCount`; cancellation granularity would be a whole sweep.  Launches are async anyway, so "cancel" is just "don't enqueue the rest" -- a plain predicate, no policy template.  The progress half is served by `util::cuda::Timer` spans.  No NanoVDB tool has any such concept, and OpenVDB itself only ever instantiates `NullInterrupter`. |
 | `grainSize`, `getGrainSize`/`setGrainSize` | Meaningful only as a `tbb::blocked_range` granularity; there is no `parallel_for` in the CUDA path.  The GPU analogue is `Log2BlockWidth`, which is a *compile-time* template parameter of `VoxelBlockManager` (and feeds `__launch_bounds__`), so a runtime setter would be a lie -- and, since the block width is not encoded in the VBM handle's type (§3.5), a dangerous one.  The knob does not disappear; it moves to a template parameter (B2).  `grainSize == 0` ("run serially") has no counterpart worth keeping: our Euler step writes one slot per voxel with no atomics or reductions, so results are already scheduling-independent. |
 | `TrimMode` (the enum), `trimming()`/`setTrimming()`, nested `Trim` | See below -- the *capability* survives, the sticky mode does not. |
+| `LeafManagerType`, `LeafRange`, `BufferType`, `leafs()`, `mLeafs` | Three separable jobs; none survives as a class.  See §3.8. |
+| `getGridClass() != GRID_LEVEL_SET` check in the ctor | **Not expressible.**  An IndexGrid carries `GridClass::IndexGrid` -- `ChannelAccessor` asserts exactly that -- so it can never also be `LevelSet`, and the level-set-ness lives in a sidecar with no metadata at all.  A genuine loss of type safety, not a simplification: a fog-volume or uninitialized sidecar is undiagnosable.  Strengthens the case for B8. |
+| `OPENVDB_USE_EXPLICIT_INSTANTIATION` / `OPENVDB_INSTANTIATE_CLASS` block | NanoVDB is header-only and has no such mechanism.  Also removes the reason OpenVDB's header is structured declarations-then-definitions with an instantiation guard at the tail; ours can be definitions throughout. |
+| `virtual ~LevelSetTracker()` | Non-virtual -- nothing else in the class is virtual. |
+| `LevelSetTracker(const LevelSetTracker&); // not implemented` | Pre-C++11 idiom; `= delete`.  Ours is move-only anyway (§3.5). |
+| `namespace lstrack` | Existed only to host `TrimMode`. |
+| `mLeafs` as a raw owning `new`/`delete` pointer | Value members (§3.5). |
+| `Normalizer::mTask` (`std::function<void(Normalizer*, const LeafRange&)>`) | OpenVDB's runtime stage dispatch.  On GPU we launch `euler01`/`euler12` directly, as the reference does.  Related to A2. |
 
 #### Deferred -- understood, out of scope for the first implementation
 
@@ -408,7 +416,7 @@ workflow below) and a known implementation path.
 | `dilate(n)` with band growth | OpenVDB's `dilate` is, per shell: dilate topology, grow the background by `dx`, masked-normalize *only the new shell*.  That is the band-growth primitive. |
 | `changeLevelSetBackground` | **Nearly free for us.**  In OpenVDB it must rewrite every inactive voxel and every tile from `±old` to `±new`.  Inactive voxels have no storage in a `ValueOnIndex` grid, so it is a single store to sidecar slot 0 plus the tracker's `mBackground`.  The cost argument against it does not apply. |
 | `offset(c)` -- shift all active values by a constant | No counterpart in OpenVDB's tracker; trivial for us (`phi[i] += c`), with one trap: **slot 0 must not be shifted**, since it is a band magnitude, not a value. |
-| `erode()` / `resize()` | Follow once `dilate` and `changeLevelSetBackground` exist. |
+| `erode()` / `resize()` | Cheaper than they look.  Note OpenVDB's `erode()` does **no** renormalization -- shrinking a valid band needs no new data.  NanoVDB has no `ErodeGrid` at all, but for a valid SDF it needs none: the active set is `{|phi| <= gamma}`, so eroding `n` shells **is** pruning at `gamma - n*dx`.  Threshold-based shrinking is also geometrically exact where topological erosion is voxel-quantized.  So `erode(n)` = `prune(gamma - n*dx)` + shrink slot 0, and `resize()` is a dispatch between `dilate` and that.  Both collapse into machinery already planned. |
 
 #### Driving use case: offsetting an SDF by D
 
@@ -476,6 +484,130 @@ A cheap debug assertion that active values respect the invariant before
 `normalize()`/`dilate()` would turn a silent wrong answer into a loud one, and is
 the only real defence against a knob of this kind.
 
+### 3.8 What replaces LeafManager, and the buffer discipline
+
+`LeafManager` is doing **three separable jobs**.  Two are replaced and one is
+dropped; none of them needs a class.
+
+#### Job 1 -- linearizing leaf nodes.  Not needed.
+
+OpenVDB needs a flat leaf array to get an integer interval to parallelize over.
+NanoVDB already has one: under `isSequential()` the leaves are a contiguous,
+fixed-size array reachable as `tree.getFirstNode<0>()[leafID]`.  `NodeManager`
+exists for the *non*-linear case and knows it -- `NodeManagerData` carries a
+`mLinear` flag and a `union {int64_t *mPtr[3], mOff[3]}`, storing mere offsets
+when linear.  For us it would degenerate to arithmetic, minus an allocation.
+
+Linearity is guaranteed along our whole pipeline, not merely likely:
+`TopologyBuilder.cuh:371-372` both asserts and sets `GridFlags::IsBreadthFirst`,
+and every grid out of `DilateGrid`/`PruneGrid`/`MergeGrids` is built through it;
+`CreateNanoGrid.h:1706` sets it on the OpenVDB->NanoVDB path that produces our
+input; `GridData::init()` defaults to it.  The reference already depends on this
+silently, both in the normalize kernel and in `buildVoxelBlockManager`.
+
+So linearization is not *replaced* by the VBM -- it is **presupposed** by it.
+The VBM sits one level below `LeafManager`'s job, mapping CUDA blocks onto runs
+of *active voxels*, which only means anything once leaves are linearly
+addressable.
+
+**Therefore: assert it, do not manage it.**  A constructor precondition that
+throws (caller-supplied data, exactly like OpenVDB's uniform-voxel check), using
+the level-templated form `grid.isSequential<0>()` -- level 0 is the precise
+requirement, since neighbour lookups go through `root().probeLeaf()` which needs
+no linearity.  The constructor therefore validates:
+
+    if (!isotropic voxels)       throw;   // kept from OpenVDB; mInvDx/mDx2 assume it
+    if (!grid.isSequential<0>()) throw;   // new; getFirstNode<0>()[i] and the VBM require it
+
+A pleasing symmetry: we lose OpenVDB's "is this a level set?" check, which is
+unexpressible, and gain one OpenVDB has no need for.
+
+#### Job 2 -- a registry of auxiliary buffers.  Replaced, and unconstrained.
+
+In OpenVDB the aux buffers are severely limited: usable only **point-by-point**,
+or else **swapped into buffer 0** so that accessor-facilitated lookups can see
+them.  `eval()` shows the split exactly -- values enter by two routes and only
+two:
+
+    const ValueType normSqGradPhi = GradientT::result(stencil);  // neighbourhood -> accessor -> buffer 0
+    const ValueType phi0          = stencil.getValue();          //      "
+    result[n] = Nominator ? alpha * phi[n] + beta * v : v;       // point-by-point, aux buffers, by index n
+
+The stencil never touches an aux buffer; the aux buffers are never addressed by
+coordinate.  `swapLeafBuffer` is the only redirection available, and `cook()`
+performs it after every RK stage.
+
+The cause is representational: OpenVDB's values live *inside* the tree, so
+`accessor.getValue(ijk)` walks to a leaf and reads `leaf.buffer()[offset]` --
+buffer 0, structurally.  There is no way to say "traverse this tree, read that
+buffer."
+
+**IndexGrid + sidecar has already performed that separation.**  The tree yields
+an *index*; the value comes from whichever array the kernel is handed.  There is
+no privileged buffer: every sidecar is equally usable for any lookup, at any
+time.  The reference already exploits this -- the functor takes three
+independent pointers, `stencilBuffer`, `phiBuffer`, `resultBuffer`, and the two
+stages bind them differently:
+
+| stage | stencil | phi (blend term) | result |
+|---|---|---|---|
+| `euler01` | `b0` | `b0` | `b1` |
+| `euler12` | **`b1`** | `b0` | `b0` |
+
+`euler12` gathers its stencil *from the temp buffer*.  In OpenVDB that requires a
+swap; here it is a different argument.  Consequences: the swap protocol
+disappears entirely (and it was not free -- `swapLeafBuffer` is itself a parallel
+pass over all leaves, once per RK stage); the 1-based aux indexing and
+`leafIter.buffer(n)` indirection become typed pointers; and one contiguous
+allocation over the whole band replaces per-leaf buffer objects.
+
+#### Job 3 -- `leafRange(grainSize)`.  Dropped with `grainSize`.
+
+#### Buffer discipline
+
+**The one rule constraining stage bindings:** a stage's result must not alias its
+**stencil source** -- the gather reads *neighbours*, which other threads are
+concurrently writing.  It *may* alias the point-wise `phi` source, since that is
+read and written at the same index by the same thread.  Worth a `static_assert`.
+
+**No swapping is required, for our scheme.**  Following where each stage lands:
+
+| scheme | stages | final result in |
+|---|---|---|
+| TVD-RK1 | `b0 -> b1` | **scratch** -- would need a terminal swap |
+| **TVD-RK2** | `b0->b1`, `b1->b0` | **`phi`** |
+| TVD-RK3 | `b0->b1`, `b1->b2`, `b2->b0` | **`phi`** |
+
+RK1 is the only scheme that strands the result, and OpenVDB handles precisely
+that with `cook("...TVD_RK1", 1)` -> `swapLeafBuffer(0,1)`.  Since §3.4 makes
+`TVD_RK2` the only nameable temporal scheme, the ping-pong is closed and
+**`mPhi`'s identity is invariant across `normalize()`**.
+
+That matters beyond tidiness.  §3.5 has the tracker owning `mPhi` and returning
+it from `release()`; if buffers were swapped, "which one is the real phi?"
+becomes live state that must be right or `release()` hands back scratch.  Not
+swapping deletes the failure mode.
+
+**Decision: no swap protocol.**  Instead a compile-time stage->buffer table
+derived from the scheme, with the aliasing `static_assert`.  If a scheme is ever
+added that strands the result, introduce the swap then, encapsulated so `mPhi`
+always names the live data.
+
+**Non-obvious invariant:** since scratch *is* a stencil source in `euler12`, and
+a missing neighbour gathers `stencilBuffer[0]`, **every buffer that can serve as
+a stencil source must have slot 0 holding the background** -- scratch included.
+The reference does this (`initializeGPUSidecarAndBackgroundValue` on
+`tempBuffer`) in a way that reads as incidental.  It is not: omit it and the
+boundary extrapolation silently reads garbage on every odd RK stage.  This
+belongs in the scratch allocation path as an invariant.
+
+**Scratch management:** count is a compile-time function of the temporal scheme
+(RK2 -> 1, RK3 -> 2), never hardcoded, so an added scheme cannot under-allocate;
+owned by the tracker and reallocated only when `valueCount` changes (never, for
+v1, since renormalization is topology-preserving); device-only (`cuda::Buffer<T>`)
+rather than the reference's `UnifiedBuffer`, which was a CPU-port concession
+(§7); and its contents are **undefined** after `normalize()` returns.
+
 ## 4. Open questions (resumption register)
 
 Everything not yet decided, with enough context to decide it.  Rough priority
@@ -502,7 +634,10 @@ carried.  Two forms:
   Avoids generating the ladder at all while only one pair is live.
 
 Leaning: runtime enums, for familiarity.  Note the ladder is nearly degenerate
-while only one pair exists.
+while only one pair exists.  Whatever is chosen, OpenVDB's `Normalizer::mTask`
+(`std::function<void(Normalizer*, const LeafRange&)>`) has no GPU counterpart --
+we launch `euler01`/`euler12` directly, as the reference does.  The per-stage
+buffer bindings are a compile-time table either way (§3.8).
 
 ### A3. Naming and placement (largely settled)
 
@@ -627,6 +762,10 @@ precision.
   `nanovdb/math/FiniteDifference.h`
 * The tracker owns grid, sidecar, scratch and VBM -- §3.5
 * First implementation is unmasked `normalize()` alone -- §3.6
+* `LeafManager` has no replacement class: leaf linearization is asserted rather
+  than managed, aux buffers become tracker-owned sidecars, TBB ranges die with
+  `grainSize` -- §3.8
+* No buffer-swap protocol; TVD-RK2's ping-pong closes on `phi` -- §3.8
 * Interrupter, `grainSize` and the `TrimMode` enum are dropped permanently;
   masked normalize, band growth, asymmetric prune and `offset()` are deferred,
   not rejected -- §3.7
@@ -830,7 +969,8 @@ Inherited from the reference and not to be carried into NanoVDB as-is:
 2. **Settle B1** -- write the boundary rule down as one specification.
 3. **Settle A3 and A1** -- name and scope, since they fix the header's shape.
 4. **The renormalizer itself**: IndexGrid + sidecar, owning grid/sidecar/scratch/
-   VBM (§3.5), explicit stream, templated `BufferT`, HJ-WENO5 + TVD-RK2 only.
+   VBM (§3.5), explicit stream, templated `BufferT`, HJ-WENO5 + TVD-RK2 only,
+   constructor validating isotropic voxels and `isSequential<0>()` (§3.8).
    Resolve B4 (reuse `gatherIndices` or re-derive) on the way in.
 5. **`ex_renormalize_levelset_cuda` proper** (B6): analytic ground-truth cases
    plus the recovered OpenVDB cross-check.
