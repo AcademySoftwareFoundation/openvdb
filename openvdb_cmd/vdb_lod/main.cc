@@ -41,6 +41,8 @@ usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
 "                       and N is the level number, e.g., \"density_level_0\")\n" <<
 "    -nopreserve        cancel an earlier -p or -preserve option\n" <<
 "    -version           print version information\n" <<
+"    -debug|-info|-warn|-error|-fatal\n" <<
+"        set the diagnostic message threshold (default: warn)\n" <<
 "\n" <<
 "Mip level 0 is the input grid.  Each successive integer level is half\n" <<
 "the resolution of the previous level.  Fractional levels are supported.\n" <<
