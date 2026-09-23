@@ -29,7 +29,9 @@ usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
 "Options:\n" <<
 "    -l, -stats     long printout, including grid statistics\n" <<
 "    -m, -metadata  print per-file and per-grid metadata\n" <<
-"    -version       print version information\n";
+"    -version       print version information\n" <<
+"    -debug|-info|-warn|-error|-fatal\n" <<
+"        set the diagnostic message threshold (default: warn)\n";
     exit(exitStatus);
 }
 
