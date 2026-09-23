@@ -370,20 +370,124 @@ argument for settling ownership *now* rather than shipping a reference-based API
 and breaking it later -- but it also means the renormalizer can be built and
 validated before any replacement logic exists.
 
+### 3.6 First implementation: unmasked `normalize()` only
+
+Of everything discussed in §3.7, exactly one operation is self-contained:
+**unmasked renormalization of a band that already satisfies the invariant.**  It
+is topology-preserving, so nothing is replaced (§3.5); it needs no decision that
+is not already settled; and it is the prerequisite for validating anything else.
+
+So the first header implements `normalize()` and nothing else.  Operations that
+are understood but not yet built are **absent from the class, not stubbed and
+throwing** -- consistent with §3.4, where we preferred that an unsupported
+option not be nameable.  The file is named for what it will become; the API
+stays honest about what exists.
+
+### 3.7 The tracker's API surface versus OpenVDB's
+
+`openvdb::tools::LevelSetTracker` is the model, but not the template.  Each of
+its members was examined; the outcome is three categories, not two.
+
+#### Dropped -- will not come back
+
+| OpenVDB member | Why |
+|---|---|
+| `InterruptT`, `startInterrupter`/`endInterrupter`/`checkInterrupter` | A host-application integration point (Houdini/Maya progress + cancel).  Its polling sites are *inside* the parallel work -- once per leaf range in `euler()` -- and the CUDA equivalent of that loop body is a kernel launch, which cannot be polled or unwound.  The only feasible check is between launches, of which `normalize()` has `2*normCount`; cancellation granularity would be a whole sweep.  Launches are async anyway, so "cancel" is just "don't enqueue the rest" -- a plain predicate, no policy template.  The progress half is served by `util::cuda::Timer` spans.  No NanoVDB tool has any such concept, and OpenVDB itself only ever instantiates `NullInterrupter`. |
+| `grainSize`, `getGrainSize`/`setGrainSize` | Meaningful only as a `tbb::blocked_range` granularity; there is no `parallel_for` in the CUDA path.  The GPU analogue is `Log2BlockWidth`, which is a *compile-time* template parameter of `VoxelBlockManager` (and feeds `__launch_bounds__`), so a runtime setter would be a lie -- and, since the block width is not encoded in the VBM handle's type (§3.5), a dangerous one.  The knob does not disappear; it moves to a template parameter (B2).  `grainSize == 0` ("run serially") has no counterpart worth keeping: our Euler step writes one slot per voxel with no atomics or reductions, so results are already scheduling-independent. |
+| `TrimMode` (the enum), `trimming()`/`setTrimming()`, nested `Trim` | See below -- the *capability* survives, the sticky mode does not. |
+
+#### Deferred -- understood, out of scope for the first implementation
+
+These are **not** rejected.  Each has a concrete use case (see the offset
+workflow below) and a known implementation path.
+
+| Capability | Notes |
+|---|---|
+| Asymmetric / one-sided `prune` | Keep the capability, drop the enum: `prune(insideWidth, outsideWidth)` as **call-site arguments, never a sticky mode**.  A persistent `setTrimming(kExterior)` is dangerous precisely because it persists -- set once, and a later `track()` silently seeds a shell at `±γ` against retained values at `−3γ`.  Two thresholds also subsume all four OpenVDB modes *and* express graded asymmetry, which the enum cannot (`kExterior` = `insideWidth` unbounded, `kNone` = both unbounded or simply do not call). |
+| `normalize(mask)` | Semantically: the mask is the **solve set**; its complement within the band is held fixed and acts as **Dirichlet data**.  Reads are unrestricted -- only the *update* is confined -- which is what lets settled values feed the region being solved.  "Skip the write" and "impose Dirichlet" coincide only because the scheme is explicit.  This converts renormalization from a global *repair* into a boundary-value *extension*: the iterative cousin of fast marching. |
+| `dilate(n)` with band growth | OpenVDB's `dilate` is, per shell: dilate topology, grow the background by `dx`, masked-normalize *only the new shell*.  That is the band-growth primitive. |
+| `changeLevelSetBackground` | **Nearly free for us.**  In OpenVDB it must rewrite every inactive voxel and every tile from `±old` to `±new`.  Inactive voxels have no storage in a `ValueOnIndex` grid, so it is a single store to sidecar slot 0 plus the tracker's `mBackground`.  The cost argument against it does not apply. |
+| `offset(c)` -- shift all active values by a constant | No counterpart in OpenVDB's tracker; trivial for us (`phi[i] += c`), with one trap: **slot 0 must not be shifted**, since it is a band magnitude, not a value. |
+| `erode()` / `resize()` | Follow once `dilate` and `changeLevelSetBackground` exist. |
+
+#### Driving use case: offsetting an SDF by D
+
+The workflow that justifies most of the deferred list.  Given a valid symmetric
+SDF of half-width `γ`, produce the surface offset outward by `D`:
+
+| step | band | slot 0 |
+|---|---|---|
+| start | `φ ∈ [−γ, +γ]` | `γ` |
+| (a) dilate `N = ceil(D/dx)` shells | topology grows `N` voxels each way; new voxels saturated | `γ + D` |
+| (b) `normalize()` | `φ ∈ [−(γ+D), +(γ+D)]`, Eikonal restored by extrapolation | `γ + D` |
+| (c) `offset(−D)` | `ψ ∈ [−(γ+2D), +γ]` -- interior now far outside the invariant | `γ + D` |
+| (d) prune the **interior** side at `−γ` | `ψ ∈ [−γ, +γ]` -- invariant restored | `γ` |
+| (e) `normalize()` | heals shocks | `γ` |
+| (f) prune symmetric | final cleanup | `γ` |
+
+Notes that fall out of it, each of which constrains the design:
+
+* **(a)+(b) are OpenVDB's `dilate(N)`.**  Done unmasked, step (b) requires
+  `normCount >= N`: renormalization is hyperbolic with `dt = 0.9*dx`, so
+  information travels about one voxel per RK2 step, and with fewer sweeps the
+  outer shells simply keep their saturated seed values.  Masked, it is `N`
+  sweeps of one shell each.
+* **(c) does not break the Eikonal property** -- a constant shift preserves
+  `|grad| = 1`.  Step (e) is needed because offsetting moves the medial axis:
+  where the offset surface would exceed curvature `1/D`, `φ − D` stops being a
+  distance function.  Plus accumulated error from extrapolating across `N` shells.
+* **(d) is why one-sided pruning earns its place.**  After (c) the exterior tops
+  out at *exactly* `+γ`, so a symmetric prune would raggedly nibble the outermost
+  exterior shell on floating-point ties.
+* **(d) is also why the prune threshold cannot come from slot 0.**  At that point
+  slot 0 holds `γ + D`, not `γ`, so a prune reading `d_value[0]` would trim
+  nothing.  The threshold must be a parameter.  (The reference already has this
+  latent inconsistency: `pruneNarrowBand()` takes a `background` argument and
+  then ignores it in favour of `d_value[0]`.)
+* **The sequence is safe because it prunes back to the invariant *before*
+  renormalizing.**  That discipline is the whole story -- see below.
+
+#### The band invariant, and deliberately stepping outside it
+
+The operators assume `|phi| <= background` for every active voxel, because the
+out-of-band reconstruction (§3.3) substitutes `background * Sign(...)` for a
+missing tap.  An asymmetric prune deliberately violates that: retained values
+exceed the substituted magnitude, so a reconstructed tap lands on the wrong side
+of its neighbour and manufactures a large spurious one-sided difference.
+
+The resulting grid is therefore **read-valid but not operator-valid**:
+
+* **Safe** -- point sampling, gradients and curvature away from the band edge,
+  isosurfacing near `phi = 0`, measurement, CSG.  The PDE itself is untroubled by
+  large `|phi|`: `S(phi_0) = phi_0/sqrt(phi_0^2 + |grad phi|^2)` merely saturates
+  toward `±1`.
+* **Unsafe** -- anything that reconstructs a missing tap.  That is `normalize()`
+  **and `dilate()`** (whose seeding writes `background * Sign(...)` into the new
+  shell, `Benchmark.cu:108-116`), and therefore `track()`.
+
+If a *persistent* asymmetric band is ever wanted -- as opposed to the terminal
+state above -- it needs two magnitudes, selected by the sign the extrapolation
+already computes: `sign > 0 ? +outsideWidth : -insideWidth`.  That needs no
+sidecar layout change (missing-ness is still `index == 0`; the substituted value
+is computed, not read from slot 0), but B1 must be *specified* in those terms
+even while only one magnitude is implemented.
+
+A cheap debug assertion that active values respect the invariant before
+`normalize()`/`dilate()` would turn a silent wrong answer into a loud one, and is
+the only real defence against a knob of this kind.
+
 ## 4. Open questions (resumption register)
 
 Everything not yet decided, with enough context to decide it.  Rough priority
 order: A-blockers shape the API, B-items are implementation choices, C-items are
 deferrable.
 
-### A1. Scope -- renormalization only, or all of `track()`?
+### A1. Scope -- ~~renormalization only, or all of `track()`?~~ SETTLED
 
-Renormalization is topology-preserving: one kernel pair, one scratch buffer, no
-handle churn, nothing replaced (§3.5).  `track()` adds dilate -> prune, a VBM
-rebuild per topology change, sidecar re-indexing, and grid-handle replacement.
-
-Leaning: ship renormalization first as a self-contained unit; `track()` as the
-natural follow-on.  Not yet confirmed.
+Unmasked `normalize()` first, alone; see §3.6.  Everything else is catalogued in
+§3.7 as deferred-but-understood, with the offset workflow as its driving use
+case.  What remains open is only the *order* in which the deferred items get
+built, which should be demand-driven.
 
 ### A2. Dispatch form -- runtime enums or compile-time tags?
 
@@ -400,7 +504,15 @@ carried.  Two forms:
 Leaning: runtime enums, for familiarity.  Note the ladder is nearly degenerate
 while only one pair exists.
 
-### A3. Naming and placement
+### A3. Naming and placement (largely settled)
+
+`nanovdb/tools/cuda/LevelSetTracker.cuh`, class
+`nanovdb::tools::cuda::LevelSetTracker`.  It owns CUDA buffers and launches
+kernels, so it is GPU-contingent; the namespace keeps it clear of
+`openvdb::tools::LevelSetTracker` while the shared name aids recognition.  Per
+§3.6 the class is named for what it will become, and unimplemented operations
+are absent rather than stubbed.  Remaining detail below.
+
 
 Working names used in this document, none of them decided:
 
@@ -461,6 +573,23 @@ Open: cherry-pick those two commits onto this branch, or re-derive.  Related:
 `vbm-cpu-port` is 157 commits ahead of the fork's `master` and un-upstreamed, so
 cherry-picking narrowly is probably right.
 
+### B7. VBM over a mask
+
+A masked `normalize()` (§3.7) is trivial to *implement* -- test the bit, skip the
+store -- but delivers no speedup as things stand: the VBM enumerates all active
+voxels of the grid, so the kernel still launches over the whole band and idles
+most threads.  The O(shell) win needs a VBM built from a mask rather than from a
+grid's active-voxel numbering, which the current one cannot do.  Open whether
+that is worth building, or whether the mask is worth having for its *accuracy*
+benefit alone (not perturbing settled values across a multi-shell dilation).
+
+### B8. Invariant checking
+
+Whether to add a debug-only assertion that active values satisfy
+`|phi| <= background` before `normalize()`/`dilate()`.  Cheap, and the only real
+defence against the read-valid-but-not-operator-valid state that an asymmetric
+prune produces (§3.7).
+
 ### B5. Validation cases
 
 §6 sets the posture; the concrete cases are not chosen.  Needed: analytic SDFs
@@ -497,6 +626,10 @@ precision.
 * HJ-WENO5 + TVD-RK2 only, other schemes unnameable -- §3.4,
   `nanovdb/math/FiniteDifference.h`
 * The tracker owns grid, sidecar, scratch and VBM -- §3.5
+* First implementation is unmasked `normalize()` alone -- §3.6
+* Interrupter, `grainSize` and the `TrimMode` enum are dropped permanently;
+  masked normalize, band growth, asymmetric prune and `offset()` are deferred,
+  not rejected -- §3.7
 * CUDA only; no host path at this stage
 * Interface propagation and velocity extension are out of scope entirely
 
