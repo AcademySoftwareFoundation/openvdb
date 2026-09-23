@@ -474,7 +474,7 @@ versus example-only.
 The imported `Benchmark/` tree is deliberately unregistered (`Benchmark/PROVENANCE.md`).
 The eventual `ex_renormalize_levelset_cuda` proper needs a flat file layout --
 `nanovdb_example()`'s glob is non-recursive -- and must resolve the shadowed
-`Stencils.h` (which §5's first work item removes).
+`Stencils.h` (already removed; see §5).
 
 ### C1. The WENO5 constants (§6)
 
@@ -520,17 +520,14 @@ Everything `Benchmark/src/Benchmark.cu` includes is satisfied by ASWF `master`:
 
 ### The actual delta the reference carries
 
-1. **`Benchmark/include/Stencils.h`** — 30 diff lines against `nanovdb/math/Stencils.h`:
-   two **static, array-based** overloads,
-   `WenoStencil::normSqGrad(const ValueType* v, invDx2, dx2, iso)`
-   (`Benchmark/include/Stencils.h:665`) and
-   `WenoStencil::gradient(const ValueType* v, inv2Dx)`
-   (`Benchmark/include/Stencils.h:710`).  They exist because a GPU kernel gathers the
+1. ~~**`Benchmark/include/Stencils.h`**~~ — **DONE.**  Two **static, array-based**
+   overloads, `WenoStencil::normSqGrad(const ValueType* v, invDx2, dx2, iso)` and
+   `WenoStencil::gradient(const ValueType* v, inv2Dx)`, now live in
+   `nanovdb/math/Stencils.h`; the member forms delegate to them, so the WENO
+   formula exists in one place.  They exist because a GPU kernel gathers the
    stencil into registers itself and cannot use the stencil object's accessor.
-   This is the entire reason the reference shadows the upstream header (source commit
-   `f8ab0ca`, "include local Stencils.h before upstream to win guard race").
-   **Upstreaming these two functions dissolves the hack** and is the natural
-   first commit — small, independently useful, no design commitments.
+   The reference's shadowed copy — and the include-guard race it relied on
+   (source commit `f8ab0ca`) — have been deleted.
 2. **The 19-point gather** (`Benchmark/src/Benchmark.cu:286-327`) — the `leafPtrs[3][3]`
    + octal-offset block.  The only genuinely new GPU machinery.  Note this has
    been solved once already: `vbm-cpu-port` commit `158e3df53`
@@ -696,9 +693,7 @@ Inherited from the reference and not to be carried into NanoVDB as-is:
 
 ## 8. Proposed order of work
 
-1. **Upstream the two static `WenoStencil` overloads** into
-   `nanovdb/math/Stencils.h` (§5) and drop the reference's shadowed header.  Small,
-   independently useful, commits to nothing.
+1. ~~**Upstream the two static `WenoStencil` overloads**~~ — **DONE** (§5).
 2. **Settle B1** -- write the boundary rule down as one specification.
 3. **Settle A3 and A1** -- name and scope, since they fix the header's shape.
 4. **The renormalizer itself**: IndexGrid + sidecar, owning grid/sidecar/scratch/
@@ -725,7 +720,7 @@ propagation, velocity extension, and the remaining scheme combinations.
 | RK2 driver | `Benchmark/src/Benchmark.cu:436` |
 | CUDA dilation + sidecar seeding | `Benchmark/src/Benchmark.cu:80`, `:108-116` |
 | CUDA narrow-band prune | `Benchmark/src/Benchmark.cu:474` |
-| Static WENO overloads (the delta) | `Benchmark/include/Stencils.h:665`, `:710` |
+| Static WENO overloads (upstreamed) | `nanovdb/math/Stencils.h`, `WenoStencil` |
 | Host `ExecutionPolicy::CPU` paths | `Benchmark/src/Benchmark.cpp` |
 | OpenVDB/NanoVDB bridge + comparisons | `Benchmark/src/BenchmarkIO.cpp` |
 | OpenVDB reference tracker (forked) | `Benchmark/include/LevelSetTrackerNew.h` |

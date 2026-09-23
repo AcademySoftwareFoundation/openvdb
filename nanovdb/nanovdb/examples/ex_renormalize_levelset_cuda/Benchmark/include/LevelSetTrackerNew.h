@@ -34,7 +34,7 @@
 
 #include "Benchmark.h"
 #include <nanovdb/NanoVDB.h>
-#include "Stencils.h"
+#include <nanovdb/math/Stencils.h>
 
 #define USE_NANOVDB_IMPLEMENTATION_FOR_NORMGRAD
 

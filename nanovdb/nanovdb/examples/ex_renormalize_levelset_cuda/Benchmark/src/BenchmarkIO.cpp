@@ -16,7 +16,7 @@
 #include <openvdb/math/Operators.h>
 #include <openvdb/util/CpuTimer.h>
 
-#include "Stencils.h"
+#include <nanovdb/math/Stencils.h>
 #include "Benchmark.h"
 
 // the following files are from NanoVDB

@@ -34,11 +34,7 @@
 #include <cuda.h>  // must come before other includes
 #include <cuda_runtime.h>
 
-// Local extension of WenoStencil with static normSqGrad/gradient overloads.
-// Must precede Benchmark.h / any <nanovdb/...> include, because upstream
-// <nanovdb/math/Stencils.h> shares the same include guard; whichever is
-// seen first wins. We want the local (superset) version to win.
-#include "Stencils.h"
+#include <nanovdb/math/Stencils.h>  // WenoStencil
 
 #include "Benchmark.h"
 

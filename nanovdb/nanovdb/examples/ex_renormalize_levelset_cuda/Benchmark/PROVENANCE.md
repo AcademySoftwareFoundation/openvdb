@@ -4,9 +4,17 @@ Everything under this `Benchmark/` directory is a **near-verbatim copy** of the
 `Benchmark/` tree from an internal NVIDIA benchmark repository.  It is checked in as a
 reference baseline for the native NanoVDB renormalization work described in
 `../RENORMALIZATION_DESIGN.md`.  Nothing here is built by the NanoVDB CMake
-system; see "Build status" below.  The only edits to the imported sources
-are the removal of source-project names from two comments in `src/main.cpp`;
-no code was changed.
+system; see "Build status" below.
+
+Edits to the imported sources, kept to a minimum and listed here so the
+remainder can be trusted as verbatim:
+
+* the removal of source-project names from two comments in `src/main.cpp`;
+* `include/Stencils.h` **deleted**, and its three include sites repointed at
+  `<nanovdb/math/Stencils.h>`.  That file was a copy of the NanoVDB header
+  carrying two extra static `WenoStencil` overloads, relied upon to win an
+  include-guard race against upstream.  The overloads now live upstream, so the
+  copy and the race are gone.  No other code was changed.
 
 ## Source
 
@@ -71,7 +79,6 @@ In scope (CUDA):
 | File | Role |
 |---|---|
 | `src/Benchmark.cu` | **the CUDA kernels -- the subject of this effort** |
-| `include/Stencils.h` | the shadowed header; carries the two static WENO overloads |
 | `include/Benchmark.h` | type aliases, VBM constants, state declarations |
 | `src/BenchmarkIO.cpp` | OpenVDB bridge + the comparison routines used for validation |
 | `src/main.cpp` | driver; selects HJWENO5_BIAS + TVD_RK2 + normCount 3 |
@@ -106,13 +113,16 @@ imported benchmark as-is.
 ## Build status
 
 This tree is **not** wired into `nanovdb/examples/CMakeLists.txt`.  It is a
-self-contained application with its own `main.cpp`, its own `Makefile`, a hard
-dependency on OpenVDB, and a local `include/Stencils.h` that deliberately
-shadows `nanovdb/math/Stencils.h` (see the design document, §3).  Registering it
-via `nanovdb_example()` would require flattening `include/`+`src/` into the
-example root — the CMake glob is non-recursive — and resolving the shadowed
-header.  Both are tracked as work items rather than done silently on import, so
-that `upstream/master` continues to configure and build unchanged.
+self-contained application with its own `main.cpp`, its own `Makefile` and a
+hard dependency on OpenVDB.  Registering it via `nanovdb_example()` would
+require flattening `include/`+`src/` into the example root, since the CMake glob
+is non-recursive; that is tracked as a work item rather than done silently, so
+that upstream continues to configure and build unchanged.
+
+`src/Benchmark.cu`, `src/BenchmarkIO.cpp` and `src/main.cpp` compile against
+this repository's NanoVDB.  `src/Benchmark.cpp` does not: it needs
+`nanovdb/tools/DilateGrid.h`, a host-port header that is not upstream.  That
+predates this import and is out of scope -- only the CUDA path matters here.
 
 To build it standalone, set `NANOVDB_ROOT` and `OPENVDB_ROOT` and run `make` in
 this directory, exactly as in the source repository.
