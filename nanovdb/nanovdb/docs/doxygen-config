@@ -47,7 +47,6 @@ PREDEFINED += NANOVDB_ABI_VERSION_NUMBER=0
 
 PREDEFINED += __declspec(x):= __attribute__(x):=
 PREDEFINED += NANOVDB_STATIC_SPECIALIZATION=""
-PREDEFINED += NANOVDB_USE_LOG4CPLUS=
 
 # Using the PROJECT_BRIEF tag one can provide an optional one line description
 # for a project that appears at the top of each page and should give viewer a

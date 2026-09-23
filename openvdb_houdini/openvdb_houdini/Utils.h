@@ -259,11 +259,9 @@ openvdb::CoordBBox makeCoordBBox(const UT_BoundingBox&, const openvdb::math::Tra
 /// @details Typically, log forwarding is enabled for specific operator types
 /// during initialization of the openvdb_houdini library, and there's no need
 /// for client code to call this function.
-/// @details This function has no effect unless OpenVDB was built with
-/// <A HREF="http://log4cplus.sourceforge.net/">log4cplus</A>.
 /// @note OpenVDB messages are typically logged to the console as well.
 /// This function has no effect on console logging.
-/// @sa stopLogForwarding(), isLogForwarding()
+/// @sa stopLogForwarding(), isLogForwarding(), openvdb::logging::Sink
 OPENVDB_HOUDINI_API
 void startLogForwarding(OP_OpTypeId);
 
@@ -272,11 +270,9 @@ void startLogForwarding(OP_OpTypeId);
 /// @details Typically, log forwarding is enabled for specific operator types
 /// during initialization of the openvdb_houdini library, and there's no need
 /// for client code to disable it.
-/// @details This function has no effect unless OpenVDB was built with
-/// <A HREF="http://log4cplus.sourceforge.net/">log4cplus</A>.
 /// @note OpenVDB messages are typically logged to the console as well.
 /// This function has no effect on console logging.
-/// @sa startLogForwarding(), isLogForwarding()
+/// @sa startLogForwarding(), isLogForwarding(), openvdb::logging::Sink
 OPENVDB_HOUDINI_API
 void stopLogForwarding(OP_OpTypeId);
 

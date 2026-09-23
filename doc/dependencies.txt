@@ -36,7 +36,7 @@ Reference Platform, but for those that do, their specified versions are
 
 Component               | Requirements                                    | Optional
 ----------------------- | ----------------------------------------------- | --------
-OpenVDB Core Library    | CMake, C++17 compiler, TBB::tbb                 | Blosc, ZLib, Log4cplus, Imath::Imath (included), Boost::iostream, VCL (included)
+OpenVDB Core Library    | CMake, C++17 compiler, TBB::tbb                 | Blosc, ZLib, Imath::Imath (included), Boost::iostream, VCL (included)
 OpenVDB Print           | Core Library dependencies                       | -
 OpenVDB LOD             | Core Library dependencies                       | -
 OpenVDB Render          | Core Library dependencies                       | OpenEXR, Imath::Imath, libpng
@@ -81,7 +81,6 @@ Python          | 3.10    | 3.11        | The python interpreter and libraries  
 nanobind**      | 2.0.0   | >= 2.5.0    | C++/python bindings                                               | Y       | Y        | https://nanobind.readthedocs.io
 GoogleTest      | 1.10    | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
 Blosc           | 1.17.0* | Latest      | Recommended dependency for improved disk compression              | Y       | Y        | https://github.com/Blosc/c-blosc/releases
-Log4cplus       | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus
 libpng          | -       | Latest      | Library for manipulating PNG images                               | Y       | Y        | http://www.libpng.org/pub/png/libpng.html
 GLFW            | 3.3     | Latest      | Simple API for OpenGL development                                 | Y       | Y        | https://www.glfw.org
 OpenGL          | 3.2     | Latest      | Environment for developing portable graphics applications         | Y       | Y        | https://www.opengl.org
@@ -161,7 +160,6 @@ pip install nanobind                    # nanobind
 # Optional
 apt-get install libpng-dev              # libpng
 apt-get install libopenexr-dev          # OpenEXR
-apt-get install liblog4cplus-dev        # Log4cplus
 apt-get install googletest              # GoogleTest
 # vdb_view
 apt-get install libglfw3-dev            # GLFW
