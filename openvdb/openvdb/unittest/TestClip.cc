@@ -4,6 +4,7 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/math/Maps.h> // for math::NonlinearFrustumMap
 #include <openvdb/tools/Clip.h>
+#include <openvdb/tools/LevelSetSphere.h>
 
 #include <gtest/gtest.h>
 
@@ -135,6 +136,38 @@ TEST_F(TestClip, testFrustum)
             const auto xyz = frustum.applyInverseMap(it.getCoord().asVec3d());
             EXPECT_TRUE(!frustumIndexBBox.isInside(xyz));
         }
+    }
+}
+
+
+// Test that clipping a level set does not change its grid class.
+TEST_F(TestClip, testLevelSetGridClass)
+{
+    using namespace openvdb;
+
+    auto sphere = tools::createLevelSetSphere<FloatGrid>(
+        /*radius=*/10.0f, /*center=*/Vec3f(0.0f), /*voxelSize=*/1.0f);
+    ASSERT_EQ(GRID_LEVEL_SET, sphere->getGridClass());
+
+    {
+        const math::NonlinearFrustumMap frustum{
+            /*position=*/Vec3d{0.0, 0.0, 50.0},
+            /*direction=*/Vec3d{0.0, 0.0, -1.0},
+            /*up=*/Vec3d{0.0, 5.0, 0.0},
+            /*aspect=*/1.0,
+            /*near=*/41.0,
+            /*depth=*/19.0,
+            /*x_count=*/100,
+            /*z_count=*/100};
+        auto clipped = tools::clip(*sphere, frustum);
+        EXPECT_TRUE(!clipped->empty());
+        EXPECT_EQ(GRID_LEVEL_SET, clipped->getGridClass());
+    }
+    {
+        const BBoxd clipBox(Vec3d(0.0, -20.0, -20.0), Vec3d(20.0));
+        auto clipped = tools::clip(*sphere, clipBox);
+        EXPECT_TRUE(!clipped->empty());
+        EXPECT_EQ(GRID_LEVEL_SET, clipped->getGridClass());
     }
 }
 
