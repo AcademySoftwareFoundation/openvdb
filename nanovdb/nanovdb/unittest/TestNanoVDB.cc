@@ -1545,6 +1545,95 @@ TEST_F(TestNanoVDB, VecMatDerivation)
     EXPECT_EQ(nanovdb::math::Mat2<float>(7, 10, 15, 22), DerivedMat2(1, 2, 3, 4) * DerivedMat2(1, 2, 3, 4));
 }// VecMatDerivation
 
+namespace {
+// Node field offsets are part of the file format and must match PNanoVDB's table.
+// Node value arrays also start on a 32-byte boundary.
+template<typename BuildT>
+void testNodeLayout()
+{
+    using RootT  = typename nanovdb::NanoRoot<BuildT>::DataType;
+    using TileT  = typename RootT::Tile;
+    using UpperT = typename nanovdb::NanoUpper<BuildT>::DataType;
+    using LowerT = typename nanovdb::NanoLower<BuildT>::DataType;
+    using LeafT  = typename nanovdb::NanoLeaf<BuildT>::DataType;
+    static_assert(offsetof(UpperT, mTable) % 32 == 0, "");
+    static_assert(offsetof(LowerT, mTable) % 32 == 0, "");
+    static_assert(offsetof(LeafT, mValues) % 32 == 0, "");
+    static_assert(sizeof(LeafT) % 32 == 0, "");
+
+    const pnanovdb_grid_type_constants_t& c = pnanovdb_grid_type_constants[uint32_t(nanovdb::toGridType<BuildT>())];
+    SCOPED_TRACE("grid type " + std::to_string(uint32_t(nanovdb::toGridType<BuildT>())));
+    EXPECT_EQ(c.root_off_background, offsetof(RootT, mBackground));
+    EXPECT_EQ(c.root_off_min,        offsetof(RootT, mMinimum));
+    EXPECT_EQ(c.root_off_max,        offsetof(RootT, mMaximum));
+    EXPECT_EQ(c.root_off_ave,        offsetof(RootT, mAverage));
+    EXPECT_EQ(c.root_off_stddev,     offsetof(RootT, mStdDevi));
+    EXPECT_EQ(c.root_size,           sizeof(RootT));
+    EXPECT_EQ(c.root_tile_off_value, offsetof(TileT, value));
+    EXPECT_EQ(c.root_tile_size,      sizeof(TileT));
+    EXPECT_EQ(c.upper_off_min,       offsetof(UpperT, mMinimum));
+    EXPECT_EQ(c.upper_off_max,       offsetof(UpperT, mMaximum));
+    EXPECT_EQ(c.upper_off_ave,       offsetof(UpperT, mAverage));
+    EXPECT_EQ(c.upper_off_stddev,    offsetof(UpperT, mStdDevi));
+    EXPECT_EQ(c.upper_off_table,     offsetof(UpperT, mTable));
+    EXPECT_EQ(c.upper_size,          sizeof(UpperT));
+    EXPECT_EQ(c.lower_off_min,       offsetof(LowerT, mMinimum));
+    EXPECT_EQ(c.lower_off_max,       offsetof(LowerT, mMaximum));
+    EXPECT_EQ(c.lower_off_ave,       offsetof(LowerT, mAverage));
+    EXPECT_EQ(c.lower_off_stddev,    offsetof(LowerT, mStdDevi));
+    EXPECT_EQ(c.lower_off_table,     offsetof(LowerT, mTable));
+    EXPECT_EQ(c.lower_size,          sizeof(LowerT));
+    EXPECT_EQ(c.leaf_off_min,        offsetof(LeafT, mMinimum));
+    EXPECT_EQ(c.leaf_off_max,        offsetof(LeafT, mMaximum));
+    EXPECT_EQ(c.leaf_off_ave,        offsetof(LeafT, mAverage));
+    EXPECT_EQ(c.leaf_off_stddev,     offsetof(LeafT, mStdDevi));
+    EXPECT_EQ(c.leaf_off_table,      offsetof(LeafT, mValues));
+    EXPECT_EQ(c.leaf_size,           sizeof(LeafT));
+}
+}// anonymous namespace
+
+TEST_F(TestNanoVDB, NodeLayout)
+{
+    testNodeLayout<float>();
+    testNodeLayout<double>();
+    testNodeLayout<int32_t>();
+    testNodeLayout<int64_t>();
+    testNodeLayout<uint32_t>();
+    testNodeLayout<nanovdb::Vec3f>();
+    testNodeLayout<nanovdb::Vec3d>();
+    testNodeLayout<nanovdb::Vec4f>();
+    testNodeLayout<nanovdb::Vec4d>();
+
+    // Vec4 keeps its natural alignment, so its grid layout is unchanged.
+    static_assert(alignof(nanovdb::Vec4f) == alignof(float), "");
+    static_assert(alignof(nanovdb::Vec4d) == alignof(double), "");
+    static_assert(alignof(nanovdb::math::Vec2<float>) == alignof(float), "");
+    static_assert(alignof(nanovdb::math::Mat2<float>) == alignof(float), "");
+    static_assert(alignof(nanovdb::math::Mat4<float>) == alignof(float), "");
+}// NodeLayout
+
+TEST_F(TestNanoVDB, VecAlignedTypes)
+{
+    using namespace nanovdb::math;
+    static_assert(sizeof(Vec2Aligned<float>)  == 8  && alignof(Vec2Aligned<float>)  == 8,  "");
+    static_assert(sizeof(Vec2Aligned<double>) == 16 && alignof(Vec2Aligned<double>) == 16, "");
+    static_assert(sizeof(Vec3Aligned<float>)  == 16 && alignof(Vec3Aligned<float>)  == 16, "");
+    static_assert(sizeof(Vec3Aligned<double>) == 32 && alignof(Vec3Aligned<double>) == 32, "");
+    static_assert(sizeof(Vec4Aligned<float>)  == 16 && alignof(Vec4Aligned<float>)  == 16, "");
+    static_assert(sizeof(Vec4Aligned<double>) == 32 && alignof(Vec4Aligned<double>) == 32, "");
+    static_assert(std::is_standard_layout<Vec3Aligned<float>>::value, "");
+    static_assert(std::is_trivially_copyable<Vec3Aligned<float>>::value, "");
+    static_assert(std::is_trivially_copyable<Vec4Aligned<double>>::value, "");
+
+    Vec3Aligned<float> a(1, 2, 3);
+    Vec3Aligned<float> b = a + Vec3<float>(1, 1, 1); // Vec operators return the plain Vec
+    EXPECT_EQ(Vec3<float>(2, 3, 4), b);
+    Vec4Aligned<double> arr[2] = {Vec4<double>(1, 2, 3, 4), Vec4<double>(5, 6, 7, 8)};
+    EXPECT_EQ(0u, reinterpret_cast<uintptr_t>(&arr[1]) % 32u);
+    EXPECT_EQ(70.0, arr[0].dot(arr[1]));
+    EXPECT_EQ(Vec2<float>(0.6f, 0.8f), Vec2Aligned<float>(3, 4).normalized());
+}// VecAlignedTypes
+
 TEST_F(TestNanoVDB, Vec2)
 {
     using Vec2d  = nanovdb::math::Vec2<double>;

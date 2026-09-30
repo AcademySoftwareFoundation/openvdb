@@ -1184,10 +1184,11 @@ public:
 
 /// @brief A simple vector class with two components, similar to openvdb::math::Vec2
 ///
-/// Aligned to 2*alignof(T) so the whole class fits in one SIMD-friendly
-/// chunk (e.g. 8 bytes for Vec2<float>, 16 bytes for Vec2<double>)
+/// Naturally aligned (@c alignof(T)), like all Vec/Mat classes. Raising the
+/// alignment would change the layout of every struct and buffer that holds one;
+/// use @c Vec2Aligned for over-aligned arrays.
 template<typename T>
-class alignas(alignof(T) * 2) Vec2 : public VecBase<T, 2>
+class Vec2 : public VecBase<T, 2>
 {
     using Base = VecBase<T, 2>;
 
@@ -1539,12 +1540,10 @@ template<typename T> class Vec4;
 
 
 /// @brief 2x2 row-major matrix.
-/// @details Aligned to 4*alignof(T) — @c Mat2 stores 4 elements (2x2), which is
-/// already a power-of-2 multiple of @c alignof(T), so this is free in size
-/// and gives SIMD-friendly placement (16 bytes for @c Mat2<float>, 32 bytes
-/// for @c Mat2<double>).
+/// @details Naturally aligned (@c alignof(T)), like all Vec/Mat classes, so the
+/// layout of structs and buffers that hold one does not depend on this class.
 template <typename T>
-class alignas(alignof(T) * 4) Mat2 : public MatBase<T, 2, 2> {
+class Mat2 : public MatBase<T, 2, 2> {
     using Base = MatBase<T, 2, 2>;
 public:
     /// @brief Default-construct (entries left uninitialized for fundamental @c T).
@@ -1764,15 +1763,11 @@ public:
 };
 
 /// @brief 4x4 row-major matrix.
-/// @details Aligned to 16*alignof(T) — @c Mat4 stores 16 elements (4x4), which is
-/// already a power-of-2 multiple of @c alignof(T), so the alignment is free
-/// in size. Whole-matrix alignment (64 bytes for @c Mat4<float>, 128 bytes
-/// for @c Mat4<double>) is heavy compared to row-alignment (4*alignof(T))
-/// but matches the per-class "align to full size" rule used for @c Vec2 /
-/// @c Vec4 / @c Mat2 above and lets a @c Mat4<float> load with a single
-/// AVX-512 instruction.
+/// @details Naturally aligned (@c alignof(T)), like all Vec/Mat classes. Code may
+/// place a @c Mat4 at any multiple of @c alignof(T), e.g. when packing matrices
+/// into shared memory, so raising the alignment would make such placements invalid.
 template <typename T>
-class alignas(alignof(T) * 16) Mat4 : public MatBase<T, 4, 4> {
+class Mat4 : public MatBase<T, 4, 4> {
     using Base = MatBase<T, 4, 4>;
 public:
     /// @brief Default-construct (entries left uninitialized for fundamental @c T).
@@ -1863,7 +1858,8 @@ __hostdev__ [[nodiscard]] constexpr Mat3x2<T> operator*(const Mat3<T>& lhs, cons
 /// Vec3 is intentionally NOT alignas-elevated: its byte size
 /// (3*sizeof(T)) is not a power-of-2 multiple of alignof(T), so any
 /// alignas(N > alignof(T)) would force tail padding and break
-/// packed-array layout plus on-disk format compatibility.
+/// packed-array layout plus on-disk format compatibility. Use @c Vec3Aligned
+/// for padded, over-aligned user arrays.
 template<typename T>
 class Vec3 : public VecBase<T, 3>
 {
@@ -2030,12 +2026,11 @@ __hostdev__ [[nodiscard]] inline constexpr Vec3<double> Coord::asVec3d() const n
 
 /// @brief A simple vector class with four components, similar to openvdb::math::Vec4
 ///
-/// Aligned to 4*alignof(T) so the whole class fits in one SIMD register
-/// (16 bytes for Vec4<float>, 32 bytes for Vec4<double>), without any
-/// tail padding because the byte size is already a power-of-2 multiple
-/// of alignof(T).
+/// Naturally aligned (@c alignof(T)). @c Vec4 is a grid value type, so its
+/// alignment sets field offsets in the NanoVDB file format and in PNanoVDB.
+/// Use @c Vec4Aligned for over-aligned user arrays.
 template<typename T>
-class alignas(alignof(T) * 4) Vec4 : public VecBase<T, 4>
+class Vec4 : public VecBase<T, 4>
 {
     using Base = VecBase<T, 4>;
 
@@ -2146,6 +2141,42 @@ public:
         return Vec4(scalar / vec[0], scalar / vec[1], scalar / vec[2], scalar / vec[3]);
     }
 }; // Vec4<T>
+
+// ----------------------------> Vec2Aligned / Vec3Aligned / Vec4Aligned <------------
+
+/// @brief Opt-in over-aligned vectors for user-owned arrays, so each element can load
+/// with one full-width vector instruction (e.g. 128 bits for @c Vec4Aligned<float>).
+/// Whether that is faster depends on the access pattern and the GPU, so measure.
+/// @details Each derives from its Vec class and converts to and from it, so the Vec
+/// operators work unchanged and return the plain Vec type. @c Vec3Aligned is padded
+/// to four components, so an array of them is not layout-compatible with an array of
+/// @c Vec3. The plain Vec classes stay naturally aligned; see @c Vec4.
+template<typename T>
+struct alignas(2 * sizeof(T)) Vec2Aligned : Vec2<T>
+{
+    using Vec2<T>::Vec2;
+    Vec2Aligned() noexcept = default;
+    __hostdev__ constexpr Vec2Aligned(const Vec2<T>& v) noexcept : Vec2<T>(v) {}
+};
+
+/// @brief Padded, over-aligned @c Vec3 for user-owned arrays; see @c Vec2Aligned.
+template<typename T>
+struct alignas(4 * sizeof(T)) Vec3Aligned : Vec3<T>
+{
+    using Vec3<T>::Vec3;
+    Vec3Aligned() noexcept = default;
+    __hostdev__ constexpr Vec3Aligned(const Vec3<T>& v) noexcept : Vec3<T>(v) {}
+};
+
+/// @brief Over-aligned @c Vec4 for user-owned arrays; see @c Vec2Aligned.
+template<typename T>
+struct alignas(4 * sizeof(T)) Vec4Aligned : Vec4<T>
+{
+    using Vec4<T>::Vec4;
+    Vec4Aligned() noexcept = default;
+    __hostdev__ constexpr Vec4Aligned(const Vec4<T>& v) noexcept : Vec4<T>(v) {}
+};
+
 // ----------------------------> matMult <--------------------------------------
 //
 // The matMult / matMultT overloads use plain arithmetic instead of fma / fmaf,

@@ -9,6 +9,9 @@ NanoVDB:
     The scalar-times-Vec/Mat operators are now hidden friends and Mat4 * Vec4
     is a member, so expressions like 2.f * v and m * v are unchanged, but a
     fully qualified call such as math::operator*(2.f, v) must be rewritten.
+  - Added opt-in over-aligned math::Vec2Aligned, Vec3Aligned and Vec4Aligned
+    for user-owned arrays. The Vec and Mat classes stay naturally aligned, so
+    grid layouts and the file format are unchanged.
 
   Bug Fixes:
   - Fixed math::Min/Max for 32-bit integers routing through fminf/fmaxf, which
