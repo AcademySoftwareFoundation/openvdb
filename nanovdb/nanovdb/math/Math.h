@@ -942,6 +942,20 @@ protected:
         static_assert(sizeof...(Args) == N, "VecBase: wrong number of constructor arguments");
     }
 
+    /// @brief Return a @c Derived whose component @c i is @c f(i), built through its
+    /// N-component constructor. This is constexpr-valid in C++17 without first
+    /// value-initializing a result and overwriting it.
+    template<typename Derived, typename F, int... I>
+    __hostdev__ static constexpr Derived generate(F f, std::integer_sequence<int, I...>) noexcept
+    {
+        return Derived(typename Derived::ValueType(f(I))...);
+    }
+    template<typename Derived, typename F>
+    __hostdev__ static constexpr Derived generate(F f) noexcept
+    {
+        return generate<Derived>(f, std::make_integer_sequence<int, N>{});
+    }
+
 public:
     /// @brief Indexed element access. Asserts 0 <= i < N in debug builds.
     __hostdev__ constexpr const T& operator[](int i) const noexcept { NANOVDB_ASSERT(i >= 0 && i < N); return mVec[i]; }
@@ -965,52 +979,43 @@ public:
     /// @brief Return @c *this + @a rhs as a @c Derived.
     template<typename Derived>
     __hostdev__ [[nodiscard]] constexpr Derived plus(const Derived& rhs) const noexcept {
-        Derived out{};
-        for (int i = 0; i < N; ++i) out[i] = mVec[i] + rhs[i];
-        return out;
+        return generate<Derived>([&](int i) { return mVec[i] + rhs[i]; });
     }
     /// @brief Return @c *this - @a rhs as a @c Derived.
     template<typename Derived>
     __hostdev__ [[nodiscard]] constexpr Derived minus(const Derived& rhs) const noexcept {
-        Derived out{};
-        for (int i = 0; i < N; ++i) out[i] = mVec[i] - rhs[i];
-        return out;
+        return generate<Derived>([&](int i) { return mVec[i] - rhs[i]; });
     }
     /// @brief Return component-wise @c *this * @a rhs as a @c Derived (Hadamard product).
     template<typename Derived>
     __hostdev__ [[nodiscard]] constexpr Derived mul(const Derived& rhs) const noexcept {
-        Derived out{};
-        for (int i = 0; i < N; ++i) out[i] = mVec[i] * rhs[i];
-        return out;
+        return generate<Derived>([&](int i) { return mVec[i] * rhs[i]; });
     }
     /// @brief Return component-wise @c *this / @a rhs as a @c Derived.
     template<typename Derived>
     __hostdev__ [[nodiscard]] constexpr Derived div(const Derived& rhs) const noexcept {
-        Derived out{};
-        for (int i = 0; i < N; ++i) out[i] = mVec[i] / rhs[i];
-        return out;
+        return generate<Derived>([&](int i) { return mVec[i] / rhs[i]; });
     }
     /// @brief Return @c -(*this) as a @c Derived.
     template<typename Derived>
     __hostdev__ [[nodiscard]] constexpr Derived negate() const noexcept {
-        Derived out{};
-        for (int i = 0; i < N; ++i) out[i] = -mVec[i];
-        return out;
+        return generate<Derived>([&](int i) { return -mVec[i]; });
     }
     /// @brief Return @c s * (*this) as a @c Derived (scalar broadcast).
     template<typename Derived>
-    __hostdev__ [[nodiscard]] constexpr Derived scale(const T& s) const noexcept {
-        Derived out{};
-        for (int i = 0; i < N; ++i) out[i] = mVec[i] * s;
-        return out;
+    __hostdev__ [[nodiscard]] constexpr Derived scale(T s) const noexcept {
+        return generate<Derived>([&](int i) { return mVec[i] * s; });
     }
-    /// @brief Return @c (*this) / @a s element-wise as a @c Derived. Uses per-element
-    /// division (correct for integer @c T, unlike multiplying by 1/s).
+    /// @brief Return @c (*this) / @a s element-wise as a @c Derived. Floating-point
+    /// @c T multiplies by the reciprocal @c 1/s; integer @c T divides each element,
+    /// since @c 1/s would truncate to zero.
     template<typename Derived>
-    __hostdev__ [[nodiscard]] constexpr Derived divideBy(const T& s) const noexcept {
-        Derived out{};
-        for (int i = 0; i < N; ++i) out[i] = mVec[i] / s;
-        return out;
+    __hostdev__ [[nodiscard]] constexpr Derived divideBy(T s) const noexcept {
+        if constexpr (std::is_floating_point<T>::value) {
+            return this->template scale<Derived>(T(1) / s);
+        } else {
+            return generate<Derived>([&](int i) { return mVec[i] / s; });
+        }
     }
     /// @brief Return a unit-length copy (@c *this divided by @c length()) as a @c Derived.
     /// Const, non-mutating counterpart of the derived @c normalize(). Not @c constexpr —
@@ -1043,15 +1048,21 @@ public:
         return *this;
     }
     /// @brief Multiply every component by scalar @a s in place; return @c *this.
-    __hostdev__ constexpr VecBase& scaleAssign(const T& s) noexcept {
+    /// @a s is taken by value so @c v *= v[0] scales every component by the original value.
+    __hostdev__ constexpr VecBase& scaleAssign(T s) noexcept {
         for (int i = 0; i < N; ++i) mVec[i] *= s;
         return *this;
     }
-    /// @brief Divide every component by scalar @a s in place (per-element, integer-safe);
-    /// return @c *this.
-    __hostdev__ constexpr VecBase& divideAssignScalar(const T& s) noexcept {
-        for (int i = 0; i < N; ++i) mVec[i] /= s;
-        return *this;
+    /// @brief Divide every component by scalar @a s in place; return @c *this.
+    /// Uses the same floating-point reciprocal / integer per-element split as
+    /// @c divideBy. @a s is taken by value so @c v /= v[0] is safe.
+    __hostdev__ constexpr VecBase& divideAssignScalar(T s) noexcept {
+        if constexpr (std::is_floating_point<T>::value) {
+            return this->scaleAssign(T(1) / s);
+        } else {
+            for (int i = 0; i < N; ++i) mVec[i] /= s;
+            return *this;
+        }
     }
 
     /// @brief Return @c true iff every component compares equal to @a rhs.
@@ -1063,17 +1074,19 @@ public:
     // ---- reductions ----
 
     /// @brief dot product. @a V must have @c operator[] valid for 0..N-1.
+    /// Sums in the promoted type of the element products and converts to @c T
+    /// once on return, so e.g. @c Vec3i::dot(Vec3d) does not truncate partial sums.
     template<typename V>
     __hostdev__ [[nodiscard]] constexpr T dot(const V& v) const noexcept {
-        T s = T(0);
-        for (int i = 0; i < N; ++i) s += mVec[i] * v[i];
-        return s;
+        auto s = mVec[0] * v[0];
+        for (int i = 1; i < N; ++i) s += mVec[i] * v[i];
+        return T(s);
     }
     /// @brief Squared L2 length (sum of squared components). Constexpr, no sqrt.
     __hostdev__ [[nodiscard]] constexpr T lengthSqr() const noexcept {
-        T s = T(0);
-        for (int i = 0; i < N; ++i) s += mVec[i] * mVec[i];
-        return s;
+        auto s = mVec[0] * mVec[0];
+        for (int i = 1; i < N; ++i) s += mVec[i] * mVec[i];
+        return T(s);
     }
     /// @brief L2 length (Euclidean norm). Not @c constexpr — calls @c Sqrt.
     __hostdev__ [[nodiscard]] T length() const noexcept { return Sqrt(this->lengthSqr()); }
@@ -1321,11 +1334,11 @@ public:
     using ValueType = T;
 
     /// @brief Compile-time row count.
-    [[nodiscard]] static constexpr int rows() noexcept { return ROWS; }
+    __hostdev__ [[nodiscard]] static constexpr int rows() noexcept { return ROWS; }
     /// @brief Compile-time column count.
-    [[nodiscard]] static constexpr int cols() noexcept { return COLS; }
+    __hostdev__ [[nodiscard]] static constexpr int cols() noexcept { return COLS; }
     /// @brief Compile-time element count, i.e. @c ROWS * @c COLS.
-    [[nodiscard]] static constexpr int size() noexcept { return ROWS * COLS; }
+    __hostdev__ [[nodiscard]] static constexpr int size() noexcept { return ROWS * COLS; }
 
     /// @brief Default-construct (entries are left uninitialized for trivially-default-constructible @c T).
     MatBase() noexcept = default;
@@ -1349,6 +1362,20 @@ protected:
     __hostdev__ explicit constexpr MatBase(Args... args) noexcept : mData{T(args)...}
     {
         static_assert(sizeof...(Args) == ROWS * COLS, "MatBase: wrong number of constructor arguments");
+    }
+
+    /// @brief Return a @c Result whose row-major element @c idx is @c f(idx), built
+    /// through its @a Count-element constructor. This is constexpr-valid in C++17
+    /// without first value-initializing a result and overwriting it.
+    template<typename Result, typename F, int... I>
+    __hostdev__ static constexpr Result generate(F f, std::integer_sequence<int, I...>) noexcept
+    {
+        return Result(typename Result::ValueType(f(I))...);
+    }
+    template<typename Result, int Count = ROWS * COLS, typename F>
+    __hostdev__ static constexpr Result generate(F f) noexcept
+    {
+        return generate<Result>(f, std::make_integer_sequence<int, Count>{});
     }
 
 public:
@@ -1376,33 +1403,25 @@ public:
     /// @brief return @c *this + @a rhs as a @c Derived
     template<typename Derived>
     __hostdev__ [[nodiscard]] constexpr Derived plus(const Derived& rhs) const noexcept {
-        Derived out{};
-        for (int i = 0; i < size(); ++i) out.data()[i] = mData[i] + rhs.data()[i];
-        return out;
+        return generate<Derived>([&](int i) { return mData[i] + rhs.data()[i]; });
     }
 
     /// @brief return @c *this - @a rhs as a @c Derived
     template<typename Derived>
     __hostdev__ [[nodiscard]] constexpr Derived minus(const Derived& rhs) const noexcept {
-        Derived out{};
-        for (int i = 0; i < size(); ++i) out.data()[i] = mData[i] - rhs.data()[i];
-        return out;
+        return generate<Derived>([&](int i) { return mData[i] - rhs.data()[i]; });
     }
 
     /// @brief return -(*this) as a @c Derived
     template<typename Derived>
     __hostdev__ [[nodiscard]] constexpr Derived negate() const noexcept {
-        Derived out{};
-        for (int i = 0; i < size(); ++i) out.data()[i] = -mData[i];
-        return out;
+        return generate<Derived>([&](int i) { return -mData[i]; });
     }
 
     /// @brief return @a s * (*this) as a @c Derived
     template<typename Derived>
-    __hostdev__ [[nodiscard]] constexpr Derived scale(const T& s) const noexcept {
-        Derived out{};
-        for (int i = 0; i < size(); ++i) out.data()[i] = mData[i] * s;
-        return out;
+    __hostdev__ [[nodiscard]] constexpr Derived scale(T s) const noexcept {
+        return generate<Derived>([&](int i) { return mData[i] * s; });
     }
 
     /// @brief Element-wise add @a rhs into @c *this and return @c *this.
@@ -1416,23 +1435,33 @@ public:
         return *this;
     }
     /// @brief Multiply every element by scalar @a s in place; return @c *this.
-    __hostdev__ constexpr MatBase& scaleAssign(const T& s) noexcept {
+    /// @a s is taken by value so @c m *= m[0][0] scales every element by the original value.
+    __hostdev__ constexpr MatBase& scaleAssign(T s) noexcept {
         for (int i = 0; i < size(); ++i) mData[i] *= s;
         return *this;
     }
 
-    /// @brief return (*this) / @a s element-wise as a @c Derived. Uses
-    /// per-element division (correct for integer @c T, unlike multiplying by 1/s).
+    /// @brief return (*this) / @a s element-wise as a @c Derived. Floating-point
+    /// @c T multiplies by the reciprocal @c 1/s; integer @c T divides each element,
+    /// since @c 1/s would truncate to zero.
     template<typename Derived>
-    __hostdev__ [[nodiscard]] constexpr Derived divideBy(const T& s) const noexcept {
-        Derived out{};
-        for (int i = 0; i < size(); ++i) out.data()[i] = mData[i] / s;
-        return out;
+    __hostdev__ [[nodiscard]] constexpr Derived divideBy(T s) const noexcept {
+        if constexpr (std::is_floating_point<T>::value) {
+            return this->template scale<Derived>(T(1) / s);
+        } else {
+            return generate<Derived>([&](int i) { return mData[i] / s; });
+        }
     }
     /// @brief Divide every element by scalar @a s in place; return @c *this.
-    __hostdev__ constexpr MatBase& divideAssignScalar(const T& s) noexcept {
-        for (int i = 0; i < size(); ++i) mData[i] /= s;
-        return *this;
+    /// Uses the same floating-point reciprocal / integer per-element split as
+    /// @c divideBy. @a s is taken by value so @c m /= m[0][0] is safe.
+    __hostdev__ constexpr MatBase& divideAssignScalar(T s) noexcept {
+        if constexpr (std::is_floating_point<T>::value) {
+            return this->scaleAssign(T(1) / s);
+        } else {
+            for (int i = 0; i < size(); ++i) mData[i] /= s;
+            return *this;
+        }
     }
 
     /// @brief Return @c true iff every element compares equal to @a rhs.
@@ -1449,11 +1478,8 @@ public:
     __hostdev__ [[nodiscard]] constexpr Result transposeAs() const noexcept {
         static_assert(Result::rows() == COLS && Result::cols() == ROWS,
                       "transposeAs: result dims must be (COLS, ROWS)");
-        Result r{};
-        for (int i = 0; i < ROWS; ++i)
-            for (int j = 0; j < COLS; ++j)
-                r[j][i] = mData[i * COLS + j];
-        return r;
+        // Result element (j, i) sits at row-major index j * ROWS + i.
+        return generate<Result>([&](int idx) { return mData[(idx % ROWS) * COLS + idx / ROWS]; });
     }
 
     // ---- generic matrix * matrix ----
@@ -1466,16 +1492,12 @@ public:
         static_assert(COLS == Rhs::rows(), "multiply: lhs.cols must equal rhs.rows");
         static_assert(Result::rows() == ROWS && Result::cols() == Rhs::cols(),
                       "multiply: result dims mismatch");
-        Result r{};
-        for (int i = 0; i < ROWS; ++i) {
-            for (int j = 0; j < Rhs::cols(); ++j) {
-                T sum = T(0);
-                for (int k = 0; k < COLS; ++k)
-                    sum += mData[i * COLS + k] * rhs[k][j];
-                r[i][j] = sum;
-            }
-        }
-        return r;
+        return generate<Result, ROWS * Rhs::cols()>([&](int idx) {
+            const int i = idx / Rhs::cols(), j = idx % Rhs::cols();
+            T sum = mData[i * COLS] * rhs[0][j];
+            for (int k = 1; k < COLS; ++k) sum += mData[i * COLS + k] * rhs[k][j];
+            return sum;
+        });
     }
 
     // ---- generic matrix * vector ----
@@ -1487,13 +1509,11 @@ public:
     __hostdev__ [[nodiscard]] constexpr VecResult multiplyVec(const VecRhs& v) const noexcept {
         static_assert(VecRhs::SIZE == COLS && VecResult::SIZE == ROWS,
                       "multiplyVec: dim mismatch");
-        VecResult r{};
-        for (int i = 0; i < ROWS; ++i) {
-            T sum = T(0);
-            for (int k = 0; k < COLS; ++k) sum += mData[i * COLS + k] * v[k];
-            r[i] = sum;
-        }
-        return r;
+        return generate<VecResult, ROWS>([&](int i) {
+            T sum = mData[i * COLS] * v[0];
+            for (int k = 1; k < COLS; ++k) sum += mData[i * COLS + k] * v[k];
+            return sum;
+        });
     }
 };
 

@@ -1355,6 +1355,7 @@ TEST_F(TestNanoVDB, Vec4)
 // The tests below cover behaviour added/changed by the MatBase/VecBase refactors:
 //   - integer Min/Max precision (no fminf/fmaxf trap)
 //   - math::Round float/double parity at half-integers
+//   - Vec/Mat scalar aliasing, reciprocal division, and mixed-type dot promotion
 //   - Vec2 (no prior test) plus extended Vec3/Vec4 operator coverage
 //   - All five matrix classes' constructors/operators/transpose/inverse
 //   - Cross-shape matrix products (Mat2x3*Mat3x2, Mat3*Mat3x2, Mat4*Mat4, ...)
@@ -1407,6 +1408,59 @@ TEST_F(TestNanoVDB, Round)
     EXPECT_EQ( 0, rf[1]);
     EXPECT_EQ( 2, rf[2]);
 }// Round
+
+TEST_F(TestNanoVDB, VecMatScalarAliasing)
+{
+    using namespace nanovdb::math;
+
+    // The scalar operand may alias an element of the vector or matrix being
+    // updated; every element must use the original scalar value.
+    Vec2<float> v2(2, 4);        v2 /= v2[0]; EXPECT_EQ(Vec2<float>(1, 2), v2);
+    Vec3<float> v3(2, 4, 6);     v3 /= v3[0]; EXPECT_EQ(Vec3<float>(1, 2, 3), v3);
+    Vec4<float> v4(2, 4, 6, 8);  v4 /= v4[0]; EXPECT_EQ(Vec4<float>(1, 2, 3, 4), v4);
+    Vec3<int>   v3i(2, 4, 6);    v3i /= v3i[0]; EXPECT_EQ(Vec3<int>(1, 2, 3), v3i);
+    Vec3<float> s3(2, 3, 4);     s3 *= s3[0]; EXPECT_EQ(Vec3<float>(4, 6, 8), s3);
+
+    Mat2<float> m2(2, 4, 6, 8);  m2 /= m2[0][0]; EXPECT_EQ(Mat2<float>(1, 2, 3, 4), m2);
+    Mat2<int>   m2i(2, 4, 6, 8); m2i /= m2i[0][0]; EXPECT_EQ(Mat2<int>(1, 2, 3, 4), m2i);
+    Mat2<float> s2(2, 3, 4, 5);  s2 *= s2[0][0]; EXPECT_EQ(Mat2<float>(4, 6, 8, 10), s2);
+}// VecMatScalarAliasing
+
+TEST_F(TestNanoVDB, VecMatScalarDivision)
+{
+    using namespace nanovdb::math;
+
+    // Floating-point division multiplies by the reciprocal, matching v * (1/s).
+    const Vec3<float> v(3, 7, 9);
+    const float s = 10.0f;
+    EXPECT_EQ(v * (1.0f / s), v / s);
+    Vec3<float> acc = v; acc /= s;
+    EXPECT_EQ(v * (1.0f / s), acc);
+
+    const Mat2<double> m(3, 7, 9, 11);
+    const double sd = 10.0;
+    EXPECT_EQ(m * (1.0 / sd), m / sd);
+
+    // Integer division stays per-element.
+    EXPECT_EQ(Vec3<int>(3, 4, 5), Vec3<int>(6, 8, 10) / 2);
+    EXPECT_EQ(Mat2<int>(3, 4, 5, 6), Mat2<int>(6, 8, 10, 12) / 2);
+}// VecMatScalarDivision
+
+TEST_F(TestNanoVDB, VecDotPromotion)
+{
+    using namespace nanovdb::math;
+
+    // Mixed-type dot products accumulate in the promoted type and convert once.
+    // Truncating each partial sum to int would give 0 here instead of 1.
+    EXPECT_EQ(1, Vec2<int>(1, 1).dot(Vec2<double>(0.6, 0.6)));
+    EXPECT_EQ(1, Vec3<int>(1, 1, 1).dot(Vec3<double>(0.4, 0.4, 0.4)));
+    EXPECT_EQ(1, Vec4<int>(1, 1, 1, 1).dot(Vec4<double>(0.3, 0.3, 0.3, 0.3)));
+
+    // A float receiver keeps double precision in the partial sums: 1 + 1e-9
+    // rounds to 1 in float, which would cancel to 0 after adding -1.
+    const float d = Vec3<float>(1, 1, 1).dot(Vec3<double>(1.0, 1e-9, -1.0));
+    EXPECT_FLOAT_EQ(float((1.0 + 1e-9) - 1.0), d);
+}// VecDotPromotion
 
 TEST_F(TestNanoVDB, Vec2)
 {

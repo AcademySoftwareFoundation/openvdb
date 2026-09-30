@@ -12,6 +12,9 @@ NanoVDB:
     lost precision above 2^24 and could overflow near INT_MAX.
   - Fixed integer division in the Vec and Mat scalar operator/, which previously
     computed a reciprocal first, so e.g. Vec3i(6,8,10) / 2 returned (0,0,0).
+  - Fixed the Vec scalar operator*= when the scalar is one of the vector's own
+    components, e.g. v *= v[0], which scaled later components by the updated
+    value.
   - Fixed Mat2::inverse returning uninitialized values on singular input; it now
     returns zero.
   - Fixed Vec2 arithmetic against Coord silently dropping the z component; the
