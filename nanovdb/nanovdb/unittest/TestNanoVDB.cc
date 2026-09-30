@@ -1462,6 +1462,37 @@ TEST_F(TestNanoVDB, VecDotPromotion)
     EXPECT_FLOAT_EQ(float((1.0 + 1e-9) - 1.0), d);
 }// VecDotPromotion
 
+namespace {
+// Each overload must sum right-to-left so the two large terms cancel before
+// the small one is added: 1 + (big + -big) == 1. Summing left-to-right loses
+// the 1 because big is far above the ulp of 1.
+template<typename T>
+void testMatMultCancellation(T big)
+{
+    using namespace nanovdb::math;
+    const Vec3<T> xyz(1, big, -big);
+    const T zero[3] = {0, 0, 0};
+    const T rows[9] = {1, 1, 1,  0, 1, 0,  0, 0, 1}; // row 0 is all ones
+    const T cols[9] = {1, 0, 0,  1, 1, 0,  1, 0, 1}; // column 0 is all ones
+    EXPECT_EQ(T(1), matMult(rows, xyz)[0]);
+    EXPECT_EQ(T(1), matMult(rows, zero, xyz)[0]);
+    EXPECT_EQ(T(1), matMultT(cols, xyz)[0]);
+    EXPECT_EQ(T(1), matMultT(cols, zero, xyz)[0]);
+}
+}// anonymous namespace
+
+TEST_F(TestNanoVDB, MatMultAssociation)
+{
+    testMatMultCancellation<float>(1e8f);
+    testMatMultCancellation<double>(1e17);
+
+    // The overloads stay usable in constant expressions.
+    constexpr float m[9] = {1, 1, 1,  0, 1, 0,  0, 0, 1};
+    constexpr float t[3] = {1, 2, 3};
+    static_assert(nanovdb::math::matMult(m, t, nanovdb::math::Vec3<float>(1, 2, 3))
+                  == nanovdb::math::Vec3<float>(7, 4, 6), "");
+}// MatMultAssociation
+
 TEST_F(TestNanoVDB, Vec2)
 {
     using Vec2d  = nanovdb::math::Vec2<double>;

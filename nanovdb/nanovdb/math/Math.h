@@ -2137,17 +2137,17 @@ public:
 }; // Vec4<T>
 // ----------------------------> matMult <--------------------------------------
 //
-// All six matMult / matMultT overloads were originally written with
-// fma / fmaf for the single-rounding precision benefit. Those stdlib
-// functions are not constexpr in C++17, which transitively blocked
-// Map::applyMap and BBox<CoordT,false>::transform<Map> from being
-// constexpr. Switching to plain `a * b + c` form gives back the
-// constexpr-eligibility (worth ~1 ulp of rounding accuracy in the
-// worst case, well below NanoVDB's geometric precision) and the
-// device-side codegen is unchanged in practice — nvcc contracts
-// `a * b + c` back into a hardware FMA by default (-fmad=true).
+// The matMult / matMultT overloads use plain arithmetic instead of fma / fmaf,
+// which are not constexpr before C++23, so Map::applyMap and
+// BBox<CoordT,false>::transform<Map> can be constexpr.
 //
-// (C++23's constexpr fma will eventually obviate this trade-off.)
+// The parentheses fix the accumulation order to right-to-left,
+// x * m0 + (y * m1 + z * m2). With FP contraction and hardware FMA (nvcc's
+// default -fmad=true, or GCC/Clang targeting an FMA-capable CPU) each step
+// fuses into fma(x, m0, fma(y, m1, z * m2)). Without contraction each step
+// rounds separately, and results may differ from the fused chain by ~1 ulp.
+// Removing the parentheses reassociates the sum and loses the small terms
+// under cancellation.
 
 /// @brief Multiply a 3x3 matrix and a 3d vector using 32bit floating point arithmetics
 /// @note This corresponds to a linear mapping, e.g. scaling, rotation etc.
@@ -2161,9 +2161,9 @@ __hostdev__ [[nodiscard]] inline constexpr Vec3T matMult(const float* mat, const
     const float x = static_cast<float>(xyz[0]);
     const float y = static_cast<float>(xyz[1]);
     const float z = static_cast<float>(xyz[2]);
-    return Vec3T(x * mat[0] + y * mat[1] + z * mat[2],
-                 x * mat[3] + y * mat[4] + z * mat[5],
-                 x * mat[6] + y * mat[7] + z * mat[8]);
+    return Vec3T(x * mat[0] + (y * mat[1] + z * mat[2]),
+                 x * mat[3] + (y * mat[4] + z * mat[5]),
+                 x * mat[6] + (y * mat[7] + z * mat[8]));
 }
 
 /// @brief Multiply a 3x3 matrix and a 3d vector using 64bit floating point arithmetics
@@ -2178,9 +2178,9 @@ __hostdev__ [[nodiscard]] inline constexpr Vec3T matMult(const double* mat, cons
     const double x = static_cast<double>(xyz[0]);
     const double y = static_cast<double>(xyz[1]);
     const double z = static_cast<double>(xyz[2]);
-    return Vec3T(x * mat[0] + y * mat[1] + z * mat[2],
-                 x * mat[3] + y * mat[4] + z * mat[5],
-                 x * mat[6] + y * mat[7] + z * mat[8]);
+    return Vec3T(x * mat[0] + (y * mat[1] + z * mat[2]),
+                 x * mat[3] + (y * mat[4] + z * mat[5]),
+                 x * mat[6] + (y * mat[7] + z * mat[8]));
 }
 
 /// @brief Multiply a 3x3 matrix to a 3d vector and add another 3d vector using 32bit floating point arithmetics
@@ -2196,9 +2196,9 @@ __hostdev__ [[nodiscard]] inline constexpr Vec3T matMult(const float* mat, const
     const float x = static_cast<float>(xyz[0]);
     const float y = static_cast<float>(xyz[1]);
     const float z = static_cast<float>(xyz[2]);
-    return Vec3T(x * mat[0] + y * mat[1] + z * mat[2] + vec[0],
-                 x * mat[3] + y * mat[4] + z * mat[5] + vec[1],
-                 x * mat[6] + y * mat[7] + z * mat[8] + vec[2]);
+    return Vec3T(x * mat[0] + (y * mat[1] + (z * mat[2] + vec[0])),
+                 x * mat[3] + (y * mat[4] + (z * mat[5] + vec[1])),
+                 x * mat[6] + (y * mat[7] + (z * mat[8] + vec[2])));
 }
 
 /// @brief Multiply a 3x3 matrix to a 3d vector and add another 3d vector using 64bit floating point arithmetics
@@ -2214,9 +2214,9 @@ __hostdev__ [[nodiscard]] inline constexpr Vec3T matMult(const double* mat, cons
     const double x = static_cast<double>(xyz[0]);
     const double y = static_cast<double>(xyz[1]);
     const double z = static_cast<double>(xyz[2]);
-    return Vec3T(x * mat[0] + y * mat[1] + z * mat[2] + vec[0],
-                 x * mat[3] + y * mat[4] + z * mat[5] + vec[1],
-                 x * mat[6] + y * mat[7] + z * mat[8] + vec[2]);
+    return Vec3T(x * mat[0] + (y * mat[1] + (z * mat[2] + vec[0])),
+                 x * mat[3] + (y * mat[4] + (z * mat[5] + vec[1])),
+                 x * mat[6] + (y * mat[7] + (z * mat[8] + vec[2])));
 }
 
 /// @brief Multiply the transposed of a 3x3 matrix and a 3d vector using 32bit floating point arithmetics
@@ -2231,9 +2231,9 @@ __hostdev__ [[nodiscard]] inline constexpr Vec3T matMultT(const float* mat, cons
     const float x = static_cast<float>(xyz[0]);
     const float y = static_cast<float>(xyz[1]);
     const float z = static_cast<float>(xyz[2]);
-    return Vec3T(x * mat[0] + y * mat[3] + z * mat[6],
-                 x * mat[1] + y * mat[4] + z * mat[7],
-                 x * mat[2] + y * mat[5] + z * mat[8]);
+    return Vec3T(x * mat[0] + (y * mat[3] + z * mat[6]),
+                 x * mat[1] + (y * mat[4] + z * mat[7]),
+                 x * mat[2] + (y * mat[5] + z * mat[8]));
 }
 
 /// @brief Multiply the transposed of a 3x3 matrix and a 3d vector using 64bit floating point arithmetics
@@ -2248,9 +2248,9 @@ __hostdev__ [[nodiscard]] inline constexpr Vec3T matMultT(const double* mat, con
     const double x = static_cast<double>(xyz[0]);
     const double y = static_cast<double>(xyz[1]);
     const double z = static_cast<double>(xyz[2]);
-    return Vec3T(x * mat[0] + y * mat[3] + z * mat[6],
-                 x * mat[1] + y * mat[4] + z * mat[7],
-                 x * mat[2] + y * mat[5] + z * mat[8]);
+    return Vec3T(x * mat[0] + (y * mat[3] + z * mat[6]),
+                 x * mat[1] + (y * mat[4] + z * mat[7]),
+                 x * mat[2] + (y * mat[5] + z * mat[8]));
 }
 
 /// @brief Multiply the transpose of a 3x3 matrix by @a xyz and add @a vec (32-bit floats).
@@ -2262,9 +2262,9 @@ __hostdev__ [[nodiscard]] inline constexpr Vec3T matMultT(const float* mat, cons
     const float x = static_cast<float>(xyz[0]);
     const float y = static_cast<float>(xyz[1]);
     const float z = static_cast<float>(xyz[2]);
-    return Vec3T(x * mat[0] + y * mat[3] + z * mat[6] + vec[0],
-                 x * mat[1] + y * mat[4] + z * mat[7] + vec[1],
-                 x * mat[2] + y * mat[5] + z * mat[8] + vec[2]);
+    return Vec3T(x * mat[0] + (y * mat[3] + (z * mat[6] + vec[0])),
+                 x * mat[1] + (y * mat[4] + (z * mat[7] + vec[1])),
+                 x * mat[2] + (y * mat[5] + (z * mat[8] + vec[2])));
 }
 
 /// @brief Multiply the transpose of a 3x3 matrix by @a xyz and add @a vec (64-bit floats).
@@ -2276,9 +2276,9 @@ __hostdev__ [[nodiscard]] inline constexpr Vec3T matMultT(const double* mat, con
     const double x = static_cast<double>(xyz[0]);
     const double y = static_cast<double>(xyz[1]);
     const double z = static_cast<double>(xyz[2]);
-    return Vec3T(x * mat[0] + y * mat[3] + z * mat[6] + vec[0],
-                 x * mat[1] + y * mat[4] + z * mat[7] + vec[1],
-                 x * mat[2] + y * mat[5] + z * mat[8] + vec[2]);
+    return Vec3T(x * mat[0] + (y * mat[3] + (z * mat[6] + vec[0])),
+                 x * mat[1] + (y * mat[4] + (z * mat[7] + vec[1])),
+                 x * mat[2] + (y * mat[5] + (z * mat[8] + vec[2])));
 }
 
 // ----------------------------> BBox <-------------------------------------
