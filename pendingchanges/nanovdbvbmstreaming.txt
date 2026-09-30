@@ -1,0 +1,6 @@
+NanoVDB:
+  Improvements:
+  - Added VoxelBlockManager::forEachBoxStencil, a streaming 3x3x3 box-stencil callback that
+    visits (tap, index) in the standard tap order without materializing a 27-element per-thread
+    array; consumers that reduce or accumulate taps avoid the register and stack cost of the
+    materialized computeBoxStencil.
