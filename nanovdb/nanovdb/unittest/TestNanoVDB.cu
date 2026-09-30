@@ -2075,7 +2075,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel32)
                 EXPECT_LE(voxel[0],  0.5f);
                 EXPECT_LE(voxel[1],  0.5f);
                 EXPECT_LE(voxel[2],  0.5f);
-                test = (begin[i] - nanovdb::voxelToWorld<Vec3T>(voxel, ijk, grid->map())).length() < 1e-9;
+                test = (begin[i] - Vec3T(nanovdb::voxelToWorld(voxel, ijk, grid->map()))).length() < 1e-9;
             }
             EXPECT_TRUE(test);
         }
@@ -2200,10 +2200,13 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel16)
             EXPECT_TRUE(stop);
             EXPECT_LT(start, stop);
             EXPECT_LE(count, maxPointsPerVoxel);
+            // 16-bit offsets truncate, so each axis can be off by up to one step of
+            // voxelSize/65535 = 7.6e-6, i.e. a distance of up to sqrt(3) * 7.6e-6 = 1.32e-5.
             bool test = false;
             for (uint64_t j=0; test == false && j<count; ++j) {
-                test = (begin[i] - nanovdb::voxelToWorld<Vec3T>(start[j], ijk, grid->map())).length() < 1e-6;
+                test = (begin[i] - Vec3T(nanovdb::voxelToWorld(start[j], ijk, grid->map()))).length() < 2e-5;
             }
+            EXPECT_TRUE(test);
         }
     });
 
@@ -2331,7 +2334,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel8)
             EXPECT_LE(count, maxPointsPerVoxel);
             bool test = false;
             for (uint64_t j=0; test == false && j<count; ++j) {
-                test = (begin[i] - nanovdb::voxelToWorld<Vec3T>(start[j], ijk, grid->map())).length() < 1e-2;
+                test = (begin[i] - Vec3T(nanovdb::voxelToWorld(start[j], ijk, grid->map()))).length() < 1e-2;
             }
             EXPECT_TRUE(test);
         }

@@ -1202,8 +1202,8 @@ public:
     /// @brief Component-wise construction.
     __hostdev__ constexpr Vec2(T x, T y) noexcept                : Base(x, y) {}
 
-    /// @brief Cross-template converting ctor (e.g. from @c openvdb::Vec2). Implicit
-    /// to preserve foreign-type interop; same-class ctor below is @c explicit.
+    /// @brief Explicit cross-template converting ctor (e.g. from @c openvdb::Vec2).
+    /// Convert a foreign vector with a cast, e.g. @c Vec2<float>(v).
     template<template<class> class Vec2T, class T2>
     __hostdev__ explicit constexpr Vec2(const Vec2T<T2>& v) noexcept : Base(v[0], v[1])
     {
@@ -1880,8 +1880,8 @@ public:
     /// @brief Component-wise construction.
     __hostdev__ constexpr Vec3(T x, T y, T z) noexcept           : Base(x, y, z) {}
 
-    /// @brief Cross-template converting ctor (e.g. from @c openvdb::Vec3). Implicit
-    /// to preserve foreign-type interop; same-class ctor below is @c explicit.
+    /// @brief Explicit cross-template converting ctor (e.g. from @c openvdb::Vec3).
+    /// Convert a foreign vector with a cast, e.g. @c Vec3<float>(v).
     template<template<class> class Vec3T, class T2>
     __hostdev__ explicit constexpr Vec3(const Vec3T<T2>& v) noexcept : Base(v[0], v[1], v[2])
     {
@@ -2053,8 +2053,8 @@ public:
     /// @brief Explicit cross-precision conversion within nanovdb (e.g. @c Vec4d → @c Vec4f).
     template<typename T2>
     __hostdev__ explicit constexpr Vec4(const Vec4<T2>& v) noexcept : Base(v[0], v[1], v[2], v[3]) {}
-    /// @brief Cross-template converting ctor (e.g. from @c openvdb::Vec4). Implicit
-    /// to preserve foreign-type interop.
+    /// @brief Explicit cross-template converting ctor (e.g. from @c openvdb::Vec4).
+    /// Convert a foreign vector with a cast, e.g. @c Vec4<float>(v).
     template<template<class> class Vec4T, class T2>
     __hostdev__ explicit constexpr Vec4(const Vec4T<T2>& v) noexcept : Base(v[0], v[1], v[2], v[3])
     {
