@@ -6,6 +6,9 @@ NanoVDB:
     evaluation throughout Math.h and the Map API in NanoVDB.h. The
     cross-template Vec conversion constructors are now explicit, so downstream
     code relying on implicit Vec type conversions may need a one-line cast.
+    The scalar-times-Vec/Mat operators are now hidden friends and Mat4 * Vec4
+    is a member, so expressions like 2.f * v and m * v are unchanged, but a
+    fully qualified call such as math::operator*(2.f, v) must be rewritten.
 
   Bug Fixes:
   - Fixed math::Min/Max for 32-bit integers routing through fminf/fmaxf, which

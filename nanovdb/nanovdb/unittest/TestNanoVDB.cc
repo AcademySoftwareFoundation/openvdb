@@ -1515,6 +1515,36 @@ TEST_F(TestNanoVDB, MatMultAssociation)
                   == nanovdb::math::Vec3<float>(7, 4, 6), "");
 }// MatMultAssociation
 
+namespace {
+// Downstream code derives from the Vec/Mat classes, e.g. fvdb-core's
+// over-aligned wrappers for vectorized loads, so they must stay non-final.
+template<typename T>
+struct alignas(4 * sizeof(T)) DerivedVec4 : nanovdb::math::Vec4<T>
+{
+    using Base = nanovdb::math::Vec4<T>;
+    DerivedVec4() : Base(T(0), T(0), T(0), T(0)) {}
+    DerivedVec4(const Base& b) : Base(b) {}
+};
+struct DerivedVec2 : nanovdb::math::Vec2<float> { using Vec2::Vec2; };
+struct DerivedVec3 : nanovdb::math::Vec3<float> { using Vec3::Vec3; };
+struct DerivedMat2 : nanovdb::math::Mat2<float> { using Mat2::Mat2; };
+struct DerivedMat4 : nanovdb::math::Mat4<float> { using Mat4::Mat4; };
+}// anonymous namespace
+
+TEST_F(TestNanoVDB, VecMatDerivation)
+{
+    static_assert(alignof(DerivedVec4<float>) == 16, "");
+    static_assert(std::is_standard_layout<DerivedVec4<float>>::value, "");
+    static_assert(std::is_trivially_copyable<DerivedVec4<float>>::value, "");
+    static_assert(std::is_standard_layout<DerivedMat4>::value, "");
+
+    const DerivedVec4<float> v(nanovdb::math::Vec4<float>(1, 2, 3, 4));
+    EXPECT_EQ(nanovdb::math::Vec4<float>(2, 4, 6, 8), v + v);
+    EXPECT_EQ(nanovdb::math::Vec2<float>(3, 4), DerivedVec2(1, 2) + DerivedVec2(2, 2));
+    EXPECT_EQ(14.0f, DerivedVec3(1, 2, 3).dot(DerivedVec3(1, 2, 3)));
+    EXPECT_EQ(nanovdb::math::Mat2<float>(7, 10, 15, 22), DerivedMat2(1, 2, 3, 4) * DerivedMat2(1, 2, 3, 4));
+}// VecMatDerivation
+
 TEST_F(TestNanoVDB, Vec2)
 {
     using Vec2d  = nanovdb::math::Vec2<double>;

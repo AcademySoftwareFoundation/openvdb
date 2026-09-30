@@ -1187,7 +1187,7 @@ public:
 /// Aligned to 2*alignof(T) so the whole class fits in one SIMD-friendly
 /// chunk (e.g. 8 bytes for Vec2<float>, 16 bytes for Vec2<double>)
 template<typename T>
-class alignas(alignof(T) * 2) Vec2 final : public VecBase<T, 2>
+class alignas(alignof(T) * 2) Vec2 : public VecBase<T, 2>
 {
     using Base = VecBase<T, 2>;
 
@@ -1544,7 +1544,7 @@ template<typename T> class Vec4;
 /// and gives SIMD-friendly placement (16 bytes for @c Mat2<float>, 32 bytes
 /// for @c Mat2<double>).
 template <typename T>
-class alignas(alignof(T) * 4) Mat2 final : public MatBase<T, 2, 2> {
+class alignas(alignof(T) * 4) Mat2 : public MatBase<T, 2, 2> {
     using Base = MatBase<T, 2, 2>;
 public:
     /// @brief Default-construct (entries left uninitialized for fundamental @c T).
@@ -1607,7 +1607,7 @@ public:
 /// @c alignas(N > alignof(T)) would force tail padding and break
 /// packed-array layout plus on-disk format compatibility.
 template <typename T>
-class Mat2x3 final : public MatBase<T, 2, 3> {
+class Mat2x3 : public MatBase<T, 2, 3> {
     using Base = MatBase<T, 2, 3>;
 public:
     /// @brief Default-construct (entries left uninitialized for fundamental @c T).
@@ -1659,7 +1659,7 @@ public:
 /// @c alignas(N > alignof(T)) would force tail padding and break
 /// packed-array layout plus on-disk format compatibility.
 template <typename T>
-class Mat3x2 final : public MatBase<T, 3, 2> {
+class Mat3x2 : public MatBase<T, 3, 2> {
     using Base = MatBase<T, 3, 2>;
 public:
     /// @brief Default-construct (entries left uninitialized for fundamental @c T).
@@ -1712,7 +1712,7 @@ public:
 /// @c alignas(N > alignof(T)) would force tail padding and break
 /// packed-array layout plus on-disk format compatibility.
 template <typename T>
-class Mat3 final : public MatBase<T, 3, 3> {
+class Mat3 : public MatBase<T, 3, 3> {
     using Base = MatBase<T, 3, 3>;
 public:
     /// @brief Default-construct (entries left uninitialized for fundamental @c T).
@@ -1772,7 +1772,7 @@ public:
 /// @c Vec4 / @c Mat2 above and lets a @c Mat4<float> load with a single
 /// AVX-512 instruction.
 template <typename T>
-class alignas(alignof(T) * 16) Mat4 final : public MatBase<T, 4, 4> {
+class alignas(alignof(T) * 16) Mat4 : public MatBase<T, 4, 4> {
     using Base = MatBase<T, 4, 4>;
 public:
     /// @brief Default-construct (entries left uninitialized for fundamental @c T).
@@ -1865,7 +1865,7 @@ __hostdev__ [[nodiscard]] constexpr Mat3x2<T> operator*(const Mat3<T>& lhs, cons
 /// alignas(N > alignof(T)) would force tail padding and break
 /// packed-array layout plus on-disk format compatibility.
 template<typename T>
-class Vec3 final : public VecBase<T, 3>
+class Vec3 : public VecBase<T, 3>
 {
     using Base = VecBase<T, 3>;
 
@@ -2035,7 +2035,7 @@ __hostdev__ [[nodiscard]] inline constexpr Vec3<double> Coord::asVec3d() const n
 /// tail padding because the byte size is already a power-of-2 multiple
 /// of alignof(T).
 template<typename T>
-class alignas(alignof(T) * 4) Vec4 final : public VecBase<T, 4>
+class alignas(alignof(T) * 4) Vec4 : public VecBase<T, 4>
 {
     using Base = VecBase<T, 4>;
 
