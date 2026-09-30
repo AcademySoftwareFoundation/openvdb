@@ -299,33 +299,45 @@ __hostdev__ [[nodiscard]] inline int Abs(int x) noexcept
     return abs(x);
 }
 
+//@{
+/// @brief Round @c x to the nearest 32-bit signed integer, with halfway cases
+/// rounded toward +inf.
+/// @details Exact for every input, because @c x - floor(x) has no rounding
+/// error. The shorter @c floor(x + 0.5) rounds the sum first, which moves
+/// e.g. @c 0.49999997f to 1 and @c 8388609.f to 8388610.
+__hostdev__ [[nodiscard]] inline int32_t Round(float x) noexcept
+{
+    const float f = floorf(x);
+    return int32_t(f) + (x - f >= 0.5f);
+}
+__hostdev__ [[nodiscard]] inline int32_t Round(double x) noexcept
+{
+    const double f = floor(x);
+    return int32_t(f) + (x - f >= 0.5);
+}
+//@}
+
 /// @brief Round each component of @c xyz to its closest integer coordinate.
 /// @details Forward declaration of the primary template — there is no
 /// definition here. Callers resolve to one of the @c float / @c double
-/// overloads below, both of which use the @c floor(x+0.5) rule
-/// (round-half-toward-+inf), so a @c float and @c double input with the
-/// same value yield the same integer coordinate.
+/// overloads below. Both use the scalar @c Round rule (nearest, halfway cases
+/// toward +inf), so float and double inputs with the same value yield the
+/// same integer coordinate.
 template<typename CoordT, typename RealT, template<typename> class Vec3T>
 __hostdev__ [[nodiscard]] inline CoordT Round(const Vec3T<RealT>& xyz) noexcept;
 
-/// @brief Round each component to its closest integer (round-half-toward-+inf)
-/// using @c floor(x+0.5). Same rule is applied to both single and double
-/// precision so float and double inputs yield the same integer coords.
+/// @brief Round each component to its closest integer, halfway cases toward +inf.
 template<typename CoordT, template<typename> class Vec3T>
 __hostdev__ [[nodiscard]] inline CoordT Round(const Vec3T<float>& xyz) noexcept
 {
-    return CoordT(int32_t(floorf(xyz[0] + 0.5f)),
-                  int32_t(floorf(xyz[1] + 0.5f)),
-                  int32_t(floorf(xyz[2] + 0.5f)));
+    return CoordT(Round(xyz[0]), Round(xyz[1]), Round(xyz[2]));
 }
 
 /// @brief Double-precision variant of @c Round — see the @c float overload above.
 template<typename CoordT, template<typename> class Vec3T>
 __hostdev__ [[nodiscard]] inline CoordT Round(const Vec3T<double>& xyz) noexcept
 {
-    return CoordT(int32_t(floor(xyz[0] + 0.5)),
-                  int32_t(floor(xyz[1] + 0.5)),
-                  int32_t(floor(xyz[2] + 0.5)));
+    return CoordT(Round(xyz[0]), Round(xyz[1]), Round(xyz[2]));
 }
 
 /// @brief Round each component of @c xyz down (toward -inf) into a @c CoordT.
@@ -1152,16 +1164,15 @@ public:
         }
         return r;
     }
-    /// @brief nearest-integer rounding using floor(x + 0.5) for floating @c T
-    /// (round-half-toward-positive-infinity). Unifies behaviour between
-    /// float, double, and long double; pass-through for integer @c T.
+    /// @brief nearest-integer rounding for floating @c T via the scalar
+    /// @c math::Round (halfway cases toward +inf, exact for every input), so
+    /// float and double agree; pass-through for integer @c T.
     /// @note See @c floorAs — only the integer-@c T branch is constexpr-usable.
     template<typename Result>
     __hostdev__ [[nodiscard]] constexpr Result roundAs() const noexcept {
         Result r{};
         if constexpr (std::is_floating_point<T>::value) {
-            const T half = T(0.5);
-            for (int i = 0; i < N; ++i) r[i] = math::Floor(mVec[i] + half);
+            for (int i = 0; i < N; ++i) r[i] = math::Round(mVec[i]);
         } else {
             for (int i = 0; i < N; ++i) r[i] = static_cast<int32_t>(mVec[i]);
         }
@@ -1287,7 +1298,7 @@ public:
     __hostdev__ [[nodiscard]] constexpr Coord2 ceil()  const noexcept { return Base::template ceilAs<Coord2>(); }
     /// @brief Round each component to its closest integer value
     /// @return integer Coord2
-    /// @note Only constexpr for integer @c T (roundAs uses non-constexpr math::Floor for floating point).
+    /// @note Only constexpr for integer @c T (roundAs uses non-constexpr math::Round for floating point).
     __hostdev__ [[nodiscard]] constexpr Coord2 round() const noexcept { return Base::template roundAs<Coord2>(); }
 
     // ---- scalar * Vec / scalar / Vec (hidden friends — found only via ADL on Vec2,
@@ -1965,7 +1976,7 @@ public:
     __hostdev__ [[nodiscard]] constexpr Coord ceil()  const noexcept { return Base::template ceilAs<Coord>(); }
     /// @brief Round each component to its closest integer value
     /// @return integer Coord
-    /// @note Only constexpr for integer @c T (roundAs uses non-constexpr math::Floor for floating point).
+    /// @note Only constexpr for integer @c T (roundAs uses non-constexpr math::Round for floating point).
     __hostdev__ [[nodiscard]] constexpr Coord round() const noexcept { return Base::template roundAs<Coord>(); }
 
     // ---- 3D-specific ----
@@ -2116,7 +2127,7 @@ public:
     __hostdev__ [[nodiscard]] constexpr Vec4<int32_t> ceil()  const noexcept { return Base::template ceilAs<Vec4<int32_t>>(); }
     /// @brief Round each component to its closest integer value
     /// @return Vec4<int32_t>
-    /// @note Only constexpr for integer @c T (roundAs uses non-constexpr math::Floor for floating point).
+    /// @note Only constexpr for integer @c T (roundAs uses non-constexpr math::Round for floating point).
     __hostdev__ [[nodiscard]] constexpr Vec4<int32_t> round() const noexcept { return Base::template roundAs<Vec4<int32_t>>(); }
 
     // ---- scalar * Vec / scalar / Vec (hidden friends — found only via ADL on Vec4,

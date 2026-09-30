@@ -1389,10 +1389,8 @@ TEST_F(TestNanoVDB, IntegerMinMax)
 
 TEST_F(TestNanoVDB, Round)
 {
-    // math::Round(Vec3<float>) used rintf (round-half-to-even) while the
-    // double overload used floor(x + 0.5). They disagreed at -1.5:
-    //   rintf(-1.5) -> -2,  floor(-1) -> -1.
-    // After the unification both use floor(x + 0.5).
+    // Float and double round to the nearest integer with halfway cases toward
+    // +inf, so they agree at ties: -1.5 -> -1, -0.5 -> 0, 1.5 -> 2.
     nanovdb::Vec3f vf(-1.5f, -0.5f, 1.5f);
     nanovdb::Vec3d vd(-1.5,  -0.5,  1.5);
 
@@ -1403,10 +1401,34 @@ TEST_F(TestNanoVDB, Round)
     EXPECT_EQ(rf[1], rd[1]);
     EXPECT_EQ(rf[2], rd[2]);
 
-    // floor(x + 0.5): -1.5 -> -1, -0.5 -> 0, 1.5 -> 2
     EXPECT_EQ(-1, rf[0]);
     EXPECT_EQ( 0, rf[1]);
     EXPECT_EQ( 2, rf[2]);
+    EXPECT_EQ(nanovdb::Coord(-1, 0, 2), vf.round());
+    EXPECT_EQ(nanovdb::Coord(-1, 0, 2), vd.round());
+
+    // Rounding must be exact. floor(x + 0.5) rounds the sum first, which moves
+    // the float just below 0.5 up to 1 and the odd integer 2^23 + 1 up to 2^23 + 2.
+    using nanovdb::math::Round;
+    const float  belowHalfF = std::nextafter(0.5f, 0.0f);
+    const double belowHalfD = std::nextafter(0.5, 0.0);
+    EXPECT_EQ(0, Round(belowHalfF));
+    EXPECT_EQ(0, Round(belowHalfD));
+    EXPECT_EQ(0, Round(-belowHalfF));
+    EXPECT_EQ(8388609,  Round(8388609.0f));
+    EXPECT_EQ(-8388609, Round(-8388609.0f));
+    EXPECT_EQ(nanovdb::Coord(0, 8388609, -8388609),
+              nanovdb::Vec3f(belowHalfF, 8388609.0f, -8388609.0f).round());
+    EXPECT_EQ(nanovdb::Coord(0, 8388609, -8388609),
+              nanovdb::math::Round<nanovdb::Coord>(nanovdb::Vec3f(belowHalfF, 8388609.0f, -8388609.0f)));
+    EXPECT_EQ(nanovdb::math::Coord2(0, 8388609), nanovdb::math::Vec2<float>(belowHalfF, 8388609.0f).round());
+
+    // Float and double agree on every float input, including values next to ties.
+    for (float x : {-2.5f, -1.5f, -0.5f, 0.5f, 1.5f, 2.5f, 4194304.5f}) {
+        for (float y : {std::nextafter(x, -1e9f), x, std::nextafter(x, 1e9f)}) {
+            EXPECT_EQ(Round(double(y)), Round(y)) << "x = " << y;
+        }
+    }
 }// Round
 
 TEST_F(TestNanoVDB, VecMatScalarAliasing)

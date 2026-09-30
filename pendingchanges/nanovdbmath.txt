@@ -20,4 +20,7 @@ NanoVDB:
   - Fixed Vec2 arithmetic against Coord silently dropping the z component; the
     overloads now take Coord2.
   - Fixed math::Round(Vec3<float>) disagreeing with the double overload at
-    half-integers; both now use floor(x + 0.5).
+    half-integers, and Vec2/Vec3::round() moving some floats to the wrong
+    integer (e.g. 0.49999997f to 1, 8388609.f to 8388610). All of them, and
+    the new scalar math::Round(float/double), now round exactly to the nearest
+    integer with halfway cases toward +inf.
