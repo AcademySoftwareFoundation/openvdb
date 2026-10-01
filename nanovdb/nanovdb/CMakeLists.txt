@@ -264,6 +264,7 @@ set(NANOVDB_INCLUDE_TOOLS_CUDA_FILES
   tools/cuda/CoarsenGrid.cuh
   tools/cuda/VoxelBlockManager.cuh
   tools/cuda/MeshToGrid.cuh
+  tools/cuda/LevelSetTracker.cuh
 )
 
 # NanoVDB util header files
