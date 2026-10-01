@@ -1,0 +1,1003 @@
+# Native NanoVDB Level-Set Renormalization — Design Notes
+
+**Status:** design settled on the points below; no implementation written yet.
+The `Benchmark/` subtree is a verbatim reference import (see `Benchmark/PROVENANCE.md`).
+
+**Branch:** `levelset-renormalization`, based on ASWF `master`.
+
+### Picking this up cold
+
+This document is meant to be sufficient on its own.  Read in this order:
+
+* **§3** -- the settled scope.  Five decisions, each with its rationale; treat
+  these as fixed unless explicitly revisited.
+* **§4** -- the open-question register.  Everything not yet decided, with enough
+  context to decide it.  This is the to-do list.
+* **§5** -- what NanoVDB already provides versus the delta the reference carries.  Start
+  here to size the work.
+* **§8** -- proposed order of work.
+* **§9** -- `file:line` map into the imported reference code.
+
+Landed on this branch so far: the reference import (`Benchmark/`), this document, and
+`nanovdb/math/FiniteDifference.h` (§3.4).  Nothing else exists yet.
+
+**Scope reminder:** CUDA only.  A host path is explicitly *not* in scope at this
+stage, notwithstanding the `ExecutionPolicy::CPU` code present in the reference
+import.
+
+---
+
+## 1. Objective
+
+Provide a native NanoVDB implementation of **level-set renormalization**
+(reinitialization / redistancing): restoring the Eikonal property `|grad phi| = 1`
+to a narrow-band level set that has drifted away from being a true signed
+distance function.
+
+The starting point is the CUDA implementation in the reference benchmark
+(imported under `Benchmark/`), which today lives outside NanoVDB and shadows one of
+its headers.  The goal is to promote that code into NanoVDB proper, as a
+first-class tool, with the scope restrictions recorded in §3.
+
+This is strictly a **repair** operator on an existing level set.  It does not
+move the interface.  Interface motion under a speed function is a separate
+concern (`Benchmark/include/LevelSetPropagate.h`) and is **out of scope** here, even
+though the imported tree contains it.
+
+## 2. The operator
+
+Renormalization solves, in pseudo-time `tau`, to steady state:
+
+    d(phi)/d(tau) = S(phi_0) * (1 - |grad phi|)
+
+The zero isocontour is a fixed point; everything else relaxes toward unit
+gradient magnitude.  The discretization inherited from OpenVDB and the reference is:
+
+* `S` in the smoothed Peng et al. form `phi_0 / sqrt(phi_0^2 + |grad phi|^2)`
+  (self-scaling, rather than a fixed epsilon);
+* `|grad phi|^2` by **WENO5 upwinding + Godunov's scheme**, evaluated in index
+  space (`invDx2 = dx2 = 1`), with the physical scale reintroduced through
+  `mInvDx` in the update;
+* **TVD-RK2** in pseudo-time, as a pair of Euler stages combined by the
+  `<Numerator, Denominator>` template pair (`alpha = N/D`, `beta = 1 - alpha`);
+* `dt = 0.9 * dx`, matching OpenVDB's `TVD_RK2` constant.
+
+The per-voxel update is identical in the two implementations:
+
+    ValueType v = phi0 / ( Sqrt(Pow2(phi0) + normSqGradPhi) + Tolerance );
+    v = phi0 - mDt * v * (Sqrt(normSqGradPhi) * mInvDx - 1.0f);
+    result[n] = Nominator ? alpha * phi[n] + beta * v : v;
+
+* OpenVDB: `openvdb/openvdb/tools/LevelSetTracker.h:637-642`
+* Reference/CUDA: `Benchmark/src/Benchmark.cu:347-355`
+
+### Relationship to OpenVDB
+
+`Benchmark/include/LevelSetTrackerNew.h` is a fork of
+`openvdb/openvdb/tools/LevelSetTracker.h` with NanoVDB calls interleaved into
+`track()`.  Upstream OpenVDB's `track()` is the standard narrow-band maintenance
+cycle (`LevelSetTracker.h:305-316`):
+
+    dilateActiveValues(..., NN_FACE)   // grow the band
+    normalize()                        // renormalize (this operator)
+    prune()                            // drop voxels outside the band
+
+Renormalization proper is the middle step and is **topology-preserving**.
+
+OpenVDB also offers `tools/FastSweeping.h` (same Eikonal equation by parallel
+fast sweeping) and `tools/LevelSetRebuild.h` (mesh + re-rasterize).  Both are
+alternative routes to the same objective and are out of scope.
+
+## 3. Scope decisions (settled)
+
+### 3.1 IndexGrid + sidecar only
+
+The operator targets a **`ValueOnIndex` IndexGrid with a separate value
+sidecar**, not a `NanoGrid<float>`.  This matches the reference implementation and is
+the representation the rest of the pipeline already speaks: `DilateGrid` and
+`PruneGrid` natively emit and consume IndexGrids, and a TVD-RK temporary is a
+plain `ValueT*` allocation rather than a second grid.
+
+No `FloatGrid` overload is planned.
+
+Consequences:
+
+* `BuildT` (topology encoding, fixed at `ValueOnIndex`) and `ValueT` (sidecar
+  element type) become **independent** template parameters.  The reference code
+  currently uses `WenoStencil<nanovdb::FloatGrid>` purely as a carrier for
+  `SIZE` and the `WenoPt<>` index map (`Benchmark/src/Benchmark.cu:335`), which is the
+  awkwardness that the `WenoStencil: ValueType-templated` work on the
+  `vbm-cpu-port` branch (`9b2ef25f9`) was addressing.  That refactor is on the
+  critical path.
+* **The slot-0 convention is part of the published contract**, not an internal
+  trick: index `0` means "no value", sidecar element `0` holds the background,
+  and every kernel depends on it.  It must be documented in the header.
+* **Sidecar re-indexing is ours to own.**  Dilation and pruning renumber every
+  active voxel, so a sidecar is not merely resized across a topology change —
+  it must be scattered through the old-to-new index mapping
+  (`nanovdb/util/cuda/Injection.cuh`).  A sidecar is meaningless without the
+  handle that indexes it; consider binding them in one small owning type rather
+  than passing two loose arguments, since "this buffer matches that grid's
+  numbering" is otherwise an invariant that can be violated silently.
+
+### 3.2 Pure narrow-band: no background sign information
+
+We assume knowledge of `phi` **only on active voxels**.  We do **not** presume
+any sign information on inactive voxels.
+
+This is a real departure from OpenVDB.  A `FloatGrid` level set can carry sign
+information beyond the active set, because *tile values* exist at grid locations
+outside the narrow band, and OpenVDB's stencil reads them through its accessor
+to obtain a correctly signed `+/- background` at the band edge.  A `ValueOnIndex`
+grid has no value at all for an inactive voxel, and we are choosing not to
+reintroduce one.
+
+Instead we depend on the **sign-extrapolation heuristic** already used by the reference: a
+missing neighbor reads as `background * Sign(<nearer known value>)` — i.e.
+truncation at the narrow-band half-width, carrying the sign of the nearest
+in-band voxel.
+
+Rationale: a narrow-band level set that carries sign information only where it
+carries distance information is self-consistent, and the operator then cannot
+silently degrade when out-of-band information is stale or absent — no operator
+in this pipeline maintains it.
+
+This also settles the `ValueIndex` question: numbering inactive in-leaf voxels
+would only be worth it in order to store signed backgrounds, which this decision
+rules out.  **`ValueOnIndex`, active voxels only.**
+
+Consequences:
+
+* No `changeLevelSetBackground`, no `TrimMode` (trimming reduces to the
+  `|phi| >= background` prune already implemented), no interior/exterior tile
+  bookkeeping.  The API shrinks accordingly.
+* The validation posture inverts — see §6.
+
+### 3.3 The heuristic is currently two rules; it must become one specification
+
+The same question ("what sign does a voxel just outside the known band have?")
+is answered twice, with different tie-breaking:
+
+1. **Stencil gather** (`Benchmark/src/Benchmark.cu:328-345`): a missing neighbor takes
+   `background * Sign(next-inner ring value)`, cascading outward 1 -> 2 -> 3.
+   This is **order-dependent** — ring 2 consumes the already-repaired ring 1 —
+   so any refactor must preserve the sequencing or it silently changes results.
+2. **Dilation seeding** (`Benchmark/src/Benchmark.cu:108-116`): a newly activated voxel
+   takes `background * Sign(first active old face-neighbor)` under a fixed
+   six-way priority order.
+
+In a library these should be one documented rule with one implementation.  It is
+also worth deciding deliberately between first-hit priority and something
+sign-symmetric (majority / nearest-magnitude vote): first-hit makes the result
+depend on traversal order, which is fine if documented and bad if discovered
+later.
+
+Note that rule 2 is emulating OpenVDB behaviour rather than inventing it: in
+OpenVDB, inactive voxels inside an allocated leaf already hold correctly signed
+`+/- background`, so dilation activates voxels that are already correct.
+
+### 3.4 One implemented scheme pair; the rest are hooks that throw
+
+The API keeps the **full** scheme matrix visible, but only
+**HJ-WENO5 + TVD-RK2** is implemented.  Every other requested combination
+throws a "not implemented" error at the host-side dispatch.
+
+This is deliberate: the enum, the dispatch skeleton and the error arms are cheap
+now and make adding a scheme later a pure addition rather than an API change.
+On GPU it is also *free* -- an unimplemented arm never instantiates a kernel, so
+the hooks cost nothing in compile time or code size.  (Compare: every
+*implemented* pair is a distinct kernel instantiation, which is the real reason
+not to open the matrix speculatively.)
+
+`throw std::runtime_error` is the established NanoVDB convention for host-side
+tool errors (`tools/cuda/PointsToGrid.cuh`, `tools/cuda/DilateGrid.cuh`, and
+most other tool headers), so the unimplemented arms should use it rather than
+inventing a mechanism.
+
+#### The enums have to be defined in NanoVDB
+
+OpenVDB owns the scheme type tags, in `openvdb/openvdb/math/FiniteDifference.h`:
+
+    enum BiasedGradientScheme {          // :164
+        UNKNOWN_BIAS = -1, FIRST_BIAS = 0, SECOND_BIAS, THIRD_BIAS,
+        WENO5_BIAS, HJWENO5_BIAS };
+
+    enum TemporalIntegrationScheme {     // :233
+        UNKNOWN_TIS = -1, TVD_RK1, TVD_RK2, TVD_RK3 };
+
+**NanoVDB has no equivalent -- a grep for `BiasedGradientScheme`,
+`TemporalIntegrationScheme`, `TVD_RK`, `WENO5_BIAS` or `DScheme` across all of
+`nanovdb/` returns nothing.**  And we cannot simply reuse OpenVDB's: NanoVDB is
+a standalone header library in which OpenVDB is an *optional* dependency
+(`NANOVDB_USE_OPENVDB`), pulled in only by the conversion utilities
+(`CreateNanoGrid.h`, `NanoToOpenVDB.h`).  A core tool header must not include
+OpenVDB.
+
+So we declare our own, in **`nanovdb/math/FiniteDifference.h`** (new header,
+namespace `nanovdb::math`, registered in `nanovdb/CMakeLists.txt`).  Decided:
+
+* **Declare only the schemes we implement, plus the `UNKNOWN` sentinels.**  Not
+  the full OpenVDB set.  An unsupported scheme then cannot be *named* at all,
+  which is a stronger guarantee than accepting it and throwing -- the error moves
+  from run time to compile time.  The §3.4 "hooks that throw" arms therefore only
+  need to cover `UNKNOWN_*` and out-of-range integers arriving from a cast.
+* **Pin the values explicitly to their OpenVDB numbers**, which OpenVDB assigns
+  implicitly:
+
+      UNKNOWN_BIAS = -1   FIRST_BIAS = 0  SECOND_BIAS = 1  THIRD_BIAS = 2
+      WENO5_BIAS   =  3   HJWENO5_BIAS = 4
+      UNKNOWN_TIS  = -1   TVD_RK1    = 0  TVD_RK2     = 1  TVD_RK3     = 2
+
+  so NanoVDB declares `UNKNOWN_BIAS = -1`, **`HJWENO5_BIAS = 4`**,
+  `UNKNOWN_TIS = -1`, **`TVD_RK2 = 1`**.  The gaps in the numbering are
+  intentional; adding a scheme later means adding its label *at its OpenVDB
+  value*, never renumbering an existing one.  Matching numbers make translation
+  across the boundary a `static_cast` rather than a mapping table, and let a
+  `static_assert` catch drift.
+* **`HJWENO5_BIAS` (4), not `WENO5_BIAS` (3).**  Worth stating loudly because the
+  two are easy to conflate in conversation but are different operators (§6), and
+  picking the wrong one silently changes the constant.
+* Mirror only the two user-facing enums.  OpenVDB's lower-level `DScheme`
+  (`FD_HJWENO5`, `BD_WENO5`, ...) is an implementation layer that NanoVDB does
+  not need: `WenoStencil` bakes in the HJ form (§6).
+* Use **unscoped** enums, following NanoVDB's own precedent for an
+  operator-selection enum used as a template argument,
+  `nanovdb::tools::morphology::NearestNeighbors`
+  (`nanovdb/util/MorphologyHelpers.h:22`).  `nanovdb::math` keeps call sites
+  reading the same as OpenVDB's.
+
+Consequence accepted: OpenVDB -> NanoVDB translation is now *partial* rather than
+total -- only `HJWENO5_BIAS` and `TVD_RK2` have NanoVDB counterparts.  The
+boundary shim must reject the rest rather than cast blindly.
+
+Open: whether the pair is carried as **runtime enums** (mirroring OpenVDB's
+`State` + `normalize -> normalize1<S> -> normalize2<S,T>` dispatch ladder, which
+exists precisely to turn runtime enums into template arguments) or as
+**compile-time tags** with a thin runtime shim at the boundary.  The runtime-enum
+form is friendlier to a host-side caller; the tag form avoids generating the
+dispatch ladder at all while only one pair is live.
+
+### 3.5 The tracker owns all of its state
+
+**Decision: the tracker owns the grid handle, the value sidecar, the
+time-stepping scratch, and the VoxelBlockManager.  None of the four is injected
+from outside.**
+
+#### Why this is not the OpenVDB arrangement
+
+`LevelSetTracker` holds `GridT& mGrid` plus a `LeafManager*`, and that suffices
+because of three properties NanoVDB does not have:
+
+1. **Topology mutation is in-place**, so grid *identity* is stable across
+   `dilate`/`prune`.  A NanoVDB grid is an immutable linear buffer; a topology
+   change produces a *new* buffer, and the previous device pointer is garbage,
+   not merely stale.
+2. **Values live inside the tree**, so data follows topology automatically.  Our
+   sidecar does not merely need resizing: dilation and pruning renumber every
+   active voxel, so its contents must be *scattered through the old-to-new index
+   map* (`nanovdb/util/cuda/Injection.cuh`).
+3. **RK temporaries come from `LeafManager::rebuildAuxBuffers(n)`**, which owns
+   the shadow buffers and keeps them alive.  We have no analogue.
+
+So in place of one stable reference we have **four artifacts keyed to a single
+active-voxel numbering** -- grid handle, sidecar, scratch, VBM -- that must be
+replaced *atomically* on any topology change.  Every one of them produces
+silently wrong answers rather than crashing when it falls out of sync.  That is
+the whole reason ownership is centralized.
+
+#### Shape
+
+    template<typename BuildT, typename ValueT, typename BufferT>
+    class LevelSetRenormalizer {           // name TBD, see §4
+        GridHandle<BufferT>              mGrid;       // owned; replaced on topology change
+        BufferT                          mPhi;        // owned sidecar; slot 0 == background
+        BufferT                          mScratch;    // RK temporaries; cached across calls
+        VoxelBlockManagerHandle<BufferT> mVBM;        // owned, derived, never injected
+        ValueT                           mBackground; // no home in the grid; see below
+    };
+
+Construction moves a grid handle and sidecar in; `release()` moves them back
+out.  Ownership then is structural rather than documented, and the four-way
+invariant cannot be violated from outside.
+
+#### Why move-in/move-out rather than references
+
+The reference form -- `LevelSetRenormalizer(GridHandle<BufferT>& grid,
+BufferT& phi)` -- is closer to OpenVDB and was rejected.  It reseats the
+caller's handle behind their back, and unlike OpenVDB the caller's cached
+`deviceGrid<BuildT>()` pointer is then **dangling, not stale**.  The trap only
+springs once topology operations land, i.e. after the API has hardened, so it
+has to be avoided up front.
+
+#### Why the VBM specifically must never be injected
+
+* **`Log2BlockWidth` is not part of the handle type.**
+  `VoxelBlockManagerHandle` is `template<typename BufferT>` only
+  (`nanovdb/tools/VoxelBlockManager.h:94`), while the block width lives on
+  `VoxelBlockManagerBase<Log2BlockWidth>` (`:229`).  A VBM built with
+  `buildVoxelBlockManager<6, BufferT>` and consumed by a kernel calling
+  `VoxelBlockManager<7>::decodeInverseMaps` type-checks, compiles, links, and
+  yields garbage.  An injected VBM is an unverifiable precondition.  This
+  argument alone is decisive.
+* **Cache invalidation is only decidable under ownership.**  The VBM is pure
+  derived state, stale iff topology changed.  If the tracker owns the grid,
+  nothing else *can* change topology, so it knows its cached VBM is valid.  With
+  an external grid it must either rebuild unconditionally or trust the caller.
+* **The handle is already move-only** (copy constructor and copy assignment are
+  `= delete`, `:119-120`), so the library itself expects single ownership.
+
+The one real counter-argument is amortization: `dilate -> renormalize -> prune`
+under separate owners rebuilds the VBM three times.  That should be answered
+*inside* a future `track()` composite -- which owns one VBM and passes it to its
+internal steps -- rather than by exposing injection in the public API.  For the
+renormalize-only scope the cost is zero anyway: renormalization is
+topology-preserving, so it is one build per call regardless.
+
+#### The scratch buffer is tracker state, not a local
+
+The reference allocates it fresh inside every call (`Benchmark/src/Benchmark.cu:450-451`): a full
+allocation plus `initializeGPUSidecarAndBackgroundValue`, which performs a D2H
+read of `valueCount` *and* a one-element H2D memcpy -- two synchronizations per
+call, in a per-frame function.  Held on the tracker it is reallocated only when
+`valueCount` changes.
+
+The *number* of temporaries is a function of the temporal scheme, not a
+constant: OpenVDB uses `rebuildAuxBuffers(TemporalScheme == TVD_RK3 ? 2 : 1)`.
+Derive it at compile time from the scheme so that filling in the TVD-RK3 hook
+later cannot silently under-allocate.
+
+#### What has to live on the tracker because the grid cannot hold it
+
+`BuildToValueMap<ValueOnIndex>::Type` is `uint64_t`
+(`nanovdb/NanoVDB.h:539-542`), so an IndexGrid's "background" is an *index*, not
+a distance.  OpenVDB reads `mGrid->background()`; we must carry the float
+background and the half-width as tracker state.  `dx` is recoverable from the
+grid's map and need not be stored.
+
+Because every sidecar reallocation must re-establish the `slot 0 == background`
+contract (§3.1), that too becomes automatic under ownership and an extra
+invariant for the caller to break otherwise.
+
+#### Renormalization alone never replaces anything
+
+Tracing the RK2 ping-pong (`Benchmark/src/Benchmark.cu:370-429`): `euler01` reads phi
+and writes scratch; `euler12` reads scratch for the stencil and phi for the
+convex combination, and writes phi.  Each pair therefore ends with the result
+back in phi, and grid, sidecar and VBM are all stable across the entire call.
+
+The replacement machinery is exercised only once `track()` lands.  This is an
+argument for settling ownership *now* rather than shipping a reference-based API
+and breaking it later -- but it also means the renormalizer can be built and
+validated before any replacement logic exists.
+
+### 3.6 First implementation: unmasked `normalize()` only
+
+Of everything discussed in §3.7, exactly one operation is self-contained:
+**unmasked renormalization of a band that already satisfies the invariant.**  It
+is topology-preserving, so nothing is replaced (§3.5); it needs no decision that
+is not already settled; and it is the prerequisite for validating anything else.
+
+So the first header implements `normalize()` and nothing else.  Operations that
+are understood but not yet built are **absent from the class, not stubbed and
+throwing** -- consistent with §3.4, where we preferred that an unsupported
+option not be nameable.  The file is named for what it will become; the API
+stays honest about what exists.
+
+### 3.7 The tracker's API surface versus OpenVDB's
+
+`openvdb::tools::LevelSetTracker` is the model, but not the template.  Each of
+its members was examined; the outcome is three categories, not two.
+
+#### Dropped -- will not come back
+
+| OpenVDB member | Why |
+|---|---|
+| `InterruptT`, `startInterrupter`/`endInterrupter`/`checkInterrupter` | A host-application integration point (Houdini/Maya progress + cancel).  Its polling sites are *inside* the parallel work -- once per leaf range in `euler()` -- and the CUDA equivalent of that loop body is a kernel launch, which cannot be polled or unwound.  The only feasible check is between launches, of which `normalize()` has `2*normCount`; cancellation granularity would be a whole sweep.  Launches are async anyway, so "cancel" is just "don't enqueue the rest" -- a plain predicate, no policy template.  The progress half is served by `util::cuda::Timer` spans.  No NanoVDB tool has any such concept, and OpenVDB itself only ever instantiates `NullInterrupter`. |
+| `grainSize`, `getGrainSize`/`setGrainSize` | Meaningful only as a `tbb::blocked_range` granularity; there is no `parallel_for` in the CUDA path.  The GPU analogue is `Log2BlockWidth`, which is a *compile-time* template parameter of `VoxelBlockManager` (and feeds `__launch_bounds__`), so a runtime setter would be a lie -- and, since the block width is not encoded in the VBM handle's type (§3.5), a dangerous one.  The knob does not disappear; it moves to a template parameter (B2).  `grainSize == 0` ("run serially") has no counterpart worth keeping: our Euler step writes one slot per voxel with no atomics or reductions, so results are already scheduling-independent. |
+| `TrimMode` (the enum), `trimming()`/`setTrimming()`, nested `Trim` | See below -- the *capability* survives, the sticky mode does not. |
+| `LeafManagerType`, `LeafRange`, `BufferType`, `leafs()`, `mLeafs` | Three separable jobs; none survives as a class.  See §3.8. |
+| `getGridClass() != GRID_LEVEL_SET` check in the ctor | **Not expressible.**  An IndexGrid carries `GridClass::IndexGrid` -- `ChannelAccessor` asserts exactly that -- so it can never also be `LevelSet`, and the level-set-ness lives in a sidecar with no metadata at all.  A genuine loss of type safety, not a simplification: a fog-volume or uninitialized sidecar is undiagnosable.  Strengthens the case for B8. |
+| `OPENVDB_USE_EXPLICIT_INSTANTIATION` / `OPENVDB_INSTANTIATE_CLASS` block | NanoVDB is header-only and has no such mechanism.  Also removes the reason OpenVDB's header is structured declarations-then-definitions with an instantiation guard at the tail; ours can be definitions throughout. |
+| `virtual ~LevelSetTracker()` | Non-virtual -- nothing else in the class is virtual. |
+| `LevelSetTracker(const LevelSetTracker&); // not implemented` | Pre-C++11 idiom; `= delete`.  Ours is move-only anyway (§3.5). |
+| `namespace lstrack` | Existed only to host `TrimMode`. |
+| `mLeafs` as a raw owning `new`/`delete` pointer | Value members (§3.5). |
+| `Normalizer::mTask` (`std::function<void(Normalizer*, const LeafRange&)>`) | OpenVDB's runtime stage dispatch.  On GPU we launch `euler01`/`euler12` directly, as the reference does.  Related to A2. |
+
+#### Deferred -- understood, out of scope for the first implementation
+
+These are **not** rejected.  Each has a concrete use case (see the offset
+workflow below) and a known implementation path.
+
+| Capability | Notes |
+|---|---|
+| Asymmetric / one-sided `prune` | Keep the capability, drop the enum: `prune(insideWidth, outsideWidth)` as **call-site arguments, never a sticky mode**.  A persistent `setTrimming(kExterior)` is dangerous precisely because it persists -- set once, and a later `track()` silently seeds a shell at `±γ` against retained values at `−3γ`.  Two thresholds also subsume all four OpenVDB modes *and* express graded asymmetry, which the enum cannot (`kExterior` = `insideWidth` unbounded, `kNone` = both unbounded or simply do not call). |
+| `normalize(mask)` | Semantically: the mask is the **solve set**; its complement within the band is held fixed and acts as **Dirichlet data**.  Reads are unrestricted -- only the *update* is confined -- which is what lets settled values feed the region being solved.  "Skip the write" and "impose Dirichlet" coincide only because the scheme is explicit.  This converts renormalization from a global *repair* into a boundary-value *extension*: the iterative cousin of fast marching. |
+| `dilate(n)` with band growth | OpenVDB's `dilate` is, per shell: dilate topology, grow the background by `dx`, masked-normalize *only the new shell*.  That is the band-growth primitive. |
+| `changeLevelSetBackground` | **Nearly free for us.**  In OpenVDB it must rewrite every inactive voxel and every tile from `±old` to `±new`.  Inactive voxels have no storage in a `ValueOnIndex` grid, so it is a single store to sidecar slot 0 plus the tracker's `mBackground`.  The cost argument against it does not apply. |
+| `offset(c)` -- shift all active values by a constant | No counterpart in OpenVDB's tracker; trivial for us (`phi[i] += c`), with one trap: **slot 0 must not be shifted**, since it is a band magnitude, not a value. |
+| `erode()` / `resize()` | Cheaper than they look.  Note OpenVDB's `erode()` does **no** renormalization -- shrinking a valid band needs no new data.  NanoVDB has no `ErodeGrid` at all, but for a valid SDF it needs none: the active set is `{|phi| <= gamma}`, so eroding `n` shells **is** pruning at `gamma - n*dx`.  Threshold-based shrinking is also geometrically exact where topological erosion is voxel-quantized.  So `erode(n)` = `prune(gamma - n*dx)` + shrink slot 0, and `resize()` is a dispatch between `dilate` and that.  Both collapse into machinery already planned. |
+
+#### Driving use case: offsetting an SDF by D
+
+The workflow that justifies most of the deferred list.  Given a valid symmetric
+SDF of half-width `γ`, produce the surface offset outward by `D`:
+
+| step | band | slot 0 |
+|---|---|---|
+| start | `φ ∈ [−γ, +γ]` | `γ` |
+| (a) dilate `N = ceil(D/dx)` shells | topology grows `N` voxels each way; new voxels saturated | `γ + D` |
+| (b) `normalize()` | `φ ∈ [−(γ+D), +(γ+D)]`, Eikonal restored by extrapolation | `γ + D` |
+| (c) `offset(−D)` | `ψ ∈ [−(γ+2D), +γ]` -- interior now far outside the invariant | `γ + D` |
+| (d) prune the **interior** side at `−γ` | `ψ ∈ [−γ, +γ]` -- invariant restored | `γ` |
+| (e) `normalize()` | heals shocks | `γ` |
+| (f) prune symmetric | final cleanup | `γ` |
+
+Notes that fall out of it, each of which constrains the design:
+
+* **(a)+(b) are OpenVDB's `dilate(N)`.**  Done unmasked, step (b) requires
+  `normCount >= N`: renormalization is hyperbolic with `dt = 0.9*dx`, so
+  information travels about one voxel per RK2 step, and with fewer sweeps the
+  outer shells simply keep their saturated seed values.  Masked, it is `N`
+  sweeps of one shell each.
+* **(c) does not break the Eikonal property** -- a constant shift preserves
+  `|grad| = 1`.  Step (e) is needed because offsetting moves the medial axis:
+  where the offset surface would exceed curvature `1/D`, `φ − D` stops being a
+  distance function.  Plus accumulated error from extrapolating across `N` shells.
+* **(d) is why one-sided pruning earns its place.**  After (c) the exterior tops
+  out at *exactly* `+γ`, so a symmetric prune would raggedly nibble the outermost
+  exterior shell on floating-point ties.
+* **(d) is also why the prune threshold cannot come from slot 0.**  At that point
+  slot 0 holds `γ + D`, not `γ`, so a prune reading `d_value[0]` would trim
+  nothing.  The threshold must be a parameter.  (The reference already has this
+  latent inconsistency: `pruneNarrowBand()` takes a `background` argument and
+  then ignores it in favour of `d_value[0]`.)
+* **The sequence is safe because it prunes back to the invariant *before*
+  renormalizing.**  That discipline is the whole story -- see below.
+
+#### The band invariant, and deliberately stepping outside it
+
+The operators assume `|phi| <= background` for every active voxel, because the
+out-of-band reconstruction (§3.3) substitutes `background * Sign(...)` for a
+missing tap.  An asymmetric prune deliberately violates that: retained values
+exceed the substituted magnitude, so a reconstructed tap lands on the wrong side
+of its neighbour and manufactures a large spurious one-sided difference.
+
+The resulting grid is therefore **read-valid but not operator-valid**:
+
+* **Safe** -- point sampling, gradients and curvature away from the band edge,
+  isosurfacing near `phi = 0`, measurement, CSG.  The PDE itself is untroubled by
+  large `|phi|`: `S(phi_0) = phi_0/sqrt(phi_0^2 + |grad phi|^2)` merely saturates
+  toward `±1`.
+* **Unsafe** -- anything that reconstructs a missing tap.  That is `normalize()`
+  **and `dilate()`** (whose seeding writes `background * Sign(...)` into the new
+  shell, `Benchmark.cu:108-116`), and therefore `track()`.
+
+If a *persistent* asymmetric band is ever wanted -- as opposed to the terminal
+state above -- it needs two magnitudes, selected by the sign the extrapolation
+already computes: `sign > 0 ? +outsideWidth : -insideWidth`.  That needs no
+sidecar layout change (missing-ness is still `index == 0`; the substituted value
+is computed, not read from slot 0), but B1 must be *specified* in those terms
+even while only one magnitude is implemented.
+
+A cheap debug assertion that active values respect the invariant before
+`normalize()`/`dilate()` would turn a silent wrong answer into a loud one, and is
+the only real defence against a knob of this kind.
+
+### 3.8 What replaces LeafManager, and the buffer discipline
+
+`LeafManager` is doing **three separable jobs**.  Two are replaced and one is
+dropped; none of them needs a class.
+
+#### Job 1 -- linearizing leaf nodes.  Not needed.
+
+OpenVDB needs a flat leaf array to get an integer interval to parallelize over.
+NanoVDB already has one: under `isSequential()` the leaves are a contiguous,
+fixed-size array reachable as `tree.getFirstNode<0>()[leafID]`.  `NodeManager`
+exists for the *non*-linear case and knows it -- `NodeManagerData` carries a
+`mLinear` flag and a `union {int64_t *mPtr[3], mOff[3]}`, storing mere offsets
+when linear.  For us it would degenerate to arithmetic, minus an allocation.
+
+Linearity is guaranteed along our whole pipeline, not merely likely:
+`TopologyBuilder.cuh:371-372` both asserts and sets `GridFlags::IsBreadthFirst`,
+and every grid out of `DilateGrid`/`PruneGrid`/`MergeGrids` is built through it;
+`CreateNanoGrid.h:1706` sets it on the OpenVDB->NanoVDB path that produces our
+input; `GridData::init()` defaults to it.  The reference already depends on this
+silently, both in the normalize kernel and in `buildVoxelBlockManager`.
+
+So linearization is not *replaced* by the VBM -- it is **presupposed** by it.
+The VBM sits one level below `LeafManager`'s job, mapping CUDA blocks onto runs
+of *active voxels*, which only means anything once leaves are linearly
+addressable.
+
+**Therefore: assert it, do not manage it.**  A constructor precondition that
+throws (caller-supplied data, exactly like OpenVDB's uniform-voxel check), using
+the level-templated form `grid.isSequential<0>()` -- level 0 is the precise
+requirement, since neighbour lookups go through `root().probeLeaf()` which needs
+no linearity.  The constructor therefore validates:
+
+    if (!isotropic voxels)       throw;   // kept from OpenVDB; mInvDx/mDx2 assume it
+    if (!grid.isSequential<0>()) throw;   // new; getFirstNode<0>()[i] and the VBM require it
+
+A pleasing symmetry: we lose OpenVDB's "is this a level set?" check, which is
+unexpressible, and gain one OpenVDB has no need for.
+
+#### Job 2 -- a registry of auxiliary buffers.  Replaced, and unconstrained.
+
+In OpenVDB the aux buffers are severely limited: usable only **point-by-point**,
+or else **swapped into buffer 0** so that accessor-facilitated lookups can see
+them.  `eval()` shows the split exactly -- values enter by two routes and only
+two:
+
+    const ValueType normSqGradPhi = GradientT::result(stencil);  // neighbourhood -> accessor -> buffer 0
+    const ValueType phi0          = stencil.getValue();          //      "
+    result[n] = Nominator ? alpha * phi[n] + beta * v : v;       // point-by-point, aux buffers, by index n
+
+The stencil never touches an aux buffer; the aux buffers are never addressed by
+coordinate.  `swapLeafBuffer` is the only redirection available, and `cook()`
+performs it after every RK stage.
+
+The cause is representational: OpenVDB's values live *inside* the tree, so
+`accessor.getValue(ijk)` walks to a leaf and reads `leaf.buffer()[offset]` --
+buffer 0, structurally.  There is no way to say "traverse this tree, read that
+buffer."
+
+**IndexGrid + sidecar has already performed that separation.**  The tree yields
+an *index*; the value comes from whichever array the kernel is handed.  There is
+no privileged buffer: every sidecar is equally usable for any lookup, at any
+time.  The reference already exploits this -- the functor takes three
+independent pointers, `stencilBuffer`, `phiBuffer`, `resultBuffer`, and the two
+stages bind them differently:
+
+| stage | stencil | phi (blend term) | result |
+|---|---|---|---|
+| `euler01` | `b0` | `b0` | `b1` |
+| `euler12` | **`b1`** | `b0` | `b0` |
+
+`euler12` gathers its stencil *from the temp buffer*.  In OpenVDB that requires a
+swap; here it is a different argument.  Consequences: the swap protocol
+disappears entirely (and it was not free -- `swapLeafBuffer` is itself a parallel
+pass over all leaves, once per RK stage); the 1-based aux indexing and
+`leafIter.buffer(n)` indirection become typed pointers; and one contiguous
+allocation over the whole band replaces per-leaf buffer objects.
+
+#### Job 3 -- `leafRange(grainSize)`.  Dropped with `grainSize`.
+
+#### Buffer discipline
+
+**The one rule constraining stage bindings:** a stage's result must not alias its
+**stencil source** -- the gather reads *neighbours*, which other threads are
+concurrently writing.  It *may* alias the point-wise `phi` source, since that is
+read and written at the same index by the same thread.  Worth a `static_assert`.
+
+**No swapping is required, for our scheme.**  Following where each stage lands:
+
+| scheme | stages | final result in |
+|---|---|---|
+| TVD-RK1 | `b0 -> b1` | **scratch** -- would need a terminal swap |
+| **TVD-RK2** | `b0->b1`, `b1->b0` | **`phi`** |
+| TVD-RK3 | `b0->b1`, `b1->b2`, `b2->b0` | **`phi`** |
+
+RK1 is the only scheme that strands the result, and OpenVDB handles precisely
+that with `cook("...TVD_RK1", 1)` -> `swapLeafBuffer(0,1)`.  Since §3.4 makes
+`TVD_RK2` the only nameable temporal scheme, the ping-pong is closed and
+**`mPhi`'s identity is invariant across `normalize()`**.
+
+That matters beyond tidiness.  §3.5 has the tracker owning `mPhi` and returning
+it from `release()`; if buffers were swapped, "which one is the real phi?"
+becomes live state that must be right or `release()` hands back scratch.  Not
+swapping deletes the failure mode.
+
+**Decision: no swap protocol.**  Instead a compile-time stage->buffer table
+derived from the scheme, with the aliasing `static_assert`.  If a scheme is ever
+added that strands the result, introduce the swap then, encapsulated so `mPhi`
+always names the live data.
+
+**Non-obvious invariant:** since scratch *is* a stencil source in `euler12`, and
+a missing neighbour gathers `stencilBuffer[0]`, **every buffer that can serve as
+a stencil source must have slot 0 holding the background** -- scratch included.
+The reference does this (`initializeGPUSidecarAndBackgroundValue` on
+`tempBuffer`) in a way that reads as incidental.  It is not: omit it and the
+boundary extrapolation silently reads garbage on every odd RK stage.  This
+belongs in the scratch allocation path as an invariant.
+
+**Scratch management:** count is a compile-time function of the temporal scheme
+(RK2 -> 1, RK3 -> 2), never hardcoded, so an added scheme cannot under-allocate;
+owned by the tracker and reallocated only when `valueCount` changes (never, for
+v1, since renormalization is topology-preserving); device-only (`cuda::Buffer<T>`)
+rather than the reference's `UnifiedBuffer`, which was a CPU-port concession
+(§7); and its contents are **undefined** after `normalize()` returns.
+
+## 4. Open questions (resumption register)
+
+Everything not yet decided, with enough context to decide it.  Rough priority
+order: A-blockers shape the API, B-items are implementation choices, C-items are
+deferrable.
+
+### A1. Scope -- ~~renormalization only, or all of `track()`?~~ SETTLED
+
+Unmasked `normalize()` first, alone; see §3.6.  Everything else is catalogued in
+§3.7 as deferred-but-understood, with the offset workflow as its driving use
+case.  What remains open is only the *order* in which the deferred items get
+built, which should be demand-driven.
+
+### A2. Dispatch form -- runtime enums or compile-time tags?
+
+§3.4 settles *which* schemes exist; it does not settle how the selection is
+carried.  Two forms:
+
+* **Runtime enums**, mirroring OpenVDB's `State` plus the
+  `normalize -> normalize1<SpatialScheme> -> normalize2<...,TemporalScheme>`
+  ladder, which exists precisely to turn runtime enums into template arguments.
+  Friendlier to a host-side caller, familiar to OpenVDB users.
+* **Compile-time tags** with a thin runtime shim only at the API boundary.
+  Avoids generating the ladder at all while only one pair is live.
+
+Leaning: runtime enums, for familiarity.  Note the ladder is nearly degenerate
+while only one pair exists.  Whatever is chosen, OpenVDB's `Normalizer::mTask`
+(`std::function<void(Normalizer*, const LeafRange&)>`) has no GPU counterpart --
+we launch `euler01`/`euler12` directly, as the reference does.  The per-stage
+buffer bindings are a compile-time table either way (§3.8).
+
+### A3. Naming and placement (largely settled)
+
+`nanovdb/tools/cuda/LevelSetTracker.cuh`, class
+`nanovdb::tools::cuda::LevelSetTracker`.  It owns CUDA buffers and launches
+kernels, so it is GPU-contingent; the namespace keeps it clear of
+`openvdb::tools::LevelSetTracker` while the shared name aids recognition.  Per
+§3.6 the class is named for what it will become, and unimplemented operations
+are absent rather than stubbed.  Remaining detail below.
+
+
+Working names used in this document, none of them decided:
+
+* Header: `nanovdb/tools/cuda/LevelSetRenormalize.cuh`?  `LevelSetTracker.cuh`
+  reads better if A1 goes the `track()` way, but would then collide conceptually
+  with OpenVDB's class of the same name.
+* Class: `LevelSetRenormalizer`?  Existing NanoVDB tools are noun-ish operator
+  classes (`DilateGrid`, `PruneGrid`, `MergeGrids`, `PointsToGrid`), which
+  argues for something like `RenormalizeLevelSet`.
+* Free-function entry point alongside the class, as `DilateGrid` does?
+
+Note `nanovdb/tools/` currently has **no** `LevelSet*` header at all; the
+nearest relative is `tools/cuda/SignedFloodFill.cuh`.
+
+### A4. Should `{handle, channels}` be a named reusable type?
+
+The "grid handle plus one or more value sidecars, re-indexed together on
+topology change" pairing recurs throughout this pipeline -- phi, speed, and any
+future extended field -- and propagation would want the same thing.  It is the
+natural home for the slot-0 contract (§3.1) and the `Injection` scatter.
+
+Broader than renormalization, so possibly out of scope; but if it is going to
+exist, the tracker should be built on it rather than retrofitted.  Open.
+
+### B1. Unify the sign-extrapolation rule (§3.3)
+
+Two implementations of one semantic today.  Needs to become one specification
+plus one implementation.  Sub-decision: first-hit priority (current, traversal-
+order dependent) versus something sign-symmetric such as a majority or
+nearest-magnitude vote.
+
+### B2. Where does `Log2BlockWidth` live?
+
+Currently `Benchmark::BlockWidthLog2 = 7` (128 active voxels per CUDA block), a
+constant of the benchmark rather than of the data.  Options: a template
+parameter of the tracker defaulting to 7; a fixed implementation detail; or
+tuned per-kernel.  Note §3.5: because the value is *not* encoded in
+`VoxelBlockManagerHandle`, whatever is chosen must be enforced by construction
+rather than by convention.
+
+### B3. Stream and buffer discipline
+
+The reference hardcodes the default stream and `UnifiedBuffer` (§7).  The promoted code
+should take an explicit `cudaStream_t` and be templated on `BufferT`, with
+`cuda::Buffer<T>` (upstream `0ab0a81e7`) for device-only scratch.  Mechanical,
+but decide the signatures before writing kernels rather than after.
+
+### B4. Reuse the existing `gatherIndices` refactor?
+
+The 19-point gather is currently open-coded in the functor
+(`Benchmark/src/Benchmark.cu:286-327`).  It has already been solved once, on this
+repository's `origin/vbm-cpu-port` branch, as
+`158e3df53 "WenoStencil: absorb gather as static gatherIndices(); drop
+LegacyStencilAccessor"`, together with `9b2ef25f9` making `WenoStencil`
+`ValueType`-templated (which §3.1 puts on the critical path anyway).
+
+Open: cherry-pick those two commits onto this branch, or re-derive.  Related:
+`vbm-cpu-port` is 157 commits ahead of the fork's `master` and un-upstreamed, so
+cherry-picking narrowly is probably right.
+
+### B7. VBM over a mask
+
+A masked `normalize()` (§3.7) is trivial to *implement* -- test the bit, skip the
+store -- but delivers no speedup as things stand: the VBM enumerates all active
+voxels of the grid, so the kernel still launches over the whole band and idles
+most threads.  The O(shell) win needs a VBM built from a mask rather than from a
+grid's active-voxel numbering, which the current one cannot do.  Open whether
+that is worth building, or whether the mask is worth having for its *accuracy*
+benefit alone (not perturbing settled values across a multi-shell dilation).
+
+### B8. Invariant checking
+
+Whether to add a debug-only assertion that active values satisfy
+`|phi| <= background` before `normalize()`/`dilate()`.  Cheap, and the only real
+defence against the read-valid-but-not-operator-valid state that an asymmetric
+prune produces (§3.7).
+
+### B5. Validation cases
+
+§6 sets the posture; the concrete cases are not chosen.  Needed: analytic SDFs
+where the exact answer is known (sphere, torus, a thin sheet to exercise the
+band-edge extrapolation), plus recovery of the OpenVDB tandem harness from
+the source repository at `f8ab0ca`.  Also undecided: unit test in `nanovdb/unittest`
+versus example-only.
+
+### B6. Wiring the example into CMake
+
+The imported `Benchmark/` tree is deliberately unregistered (`Benchmark/PROVENANCE.md`).
+The eventual `ex_renormalize_levelset_cuda` proper needs a flat file layout --
+`nanovdb_example()`'s glob is non-recursive -- and must resolve the shadowed
+`Stencils.h` (already removed; see §5).
+
+### C1. The WENO5 constants (§6)
+
+`scale2` (100x epsilon discrepancy) and `RealT` (float versus double weights).
+Secondary: they do not gate the design, but both defaults should be chosen
+deliberately rather than inherited, and the apportionment experiment described
+in §6 should be run before NanoVDB's `WENO5` is blessed as the reference.
+
+### C2. Apportion the 5e-3
+
+The experiment itself: build the reference harness with NanoVDB's `WENO5` instantiated
+at `RealT = double`, and separately with `scale2 = 0.01` / `dx_world^2` instead
+of `1.f`, to see how much of the discrepancy is epsilon and how much is
+precision.
+
+### Settled elsewhere, recorded here so they are not reopened
+
+* IndexGrid + sidecar only, `ValueOnIndex` -- §3.1
+* Pure narrow-band, no tile sign information -- §3.2
+* HJ-WENO5 + TVD-RK2 only, other schemes unnameable -- §3.4,
+  `nanovdb/math/FiniteDifference.h`
+* The tracker owns grid, sidecar, scratch and VBM -- §3.5
+* First implementation is unmasked `normalize()` alone -- §3.6
+* `LeafManager` has no replacement class: leaf linearization is asserted rather
+  than managed, aux buffers become tracker-owned sidecars, TBB ranges die with
+  `grainSize` -- §3.8
+* No buffer-swap protocol; TVD-RK2's ping-pong closes on `phi` -- §3.8
+* Interrupter, `grainSize` and the `TrimMode` enum are dropped permanently;
+  masked normalize, band growth, asymmetric prune and `offset()` are deferred,
+  not rejected -- §3.7
+* CUDA only; no host path at this stage
+* Interface propagation and velocity extension are out of scope entirely
+
+## 5. Dependency inventory
+
+### Already upstream — no work needed
+
+Everything `Benchmark/src/Benchmark.cu` includes is satisfied by ASWF `master`:
+
+| Header | Provides |
+|---|---|
+| `nanovdb/tools/VoxelBlockManager.h`, `tools/cuda/VoxelBlockManager.cuh` | block -> CUDA-block mapping, `decodeInverseMaps` |
+| `nanovdb/tools/cuda/DilateGrid.cuh` | topological dilation of an IndexGrid |
+| `nanovdb/tools/cuda/PruneGrid.cuh` | topological pruning of an IndexGrid |
+| `nanovdb/util/cuda/Injection.cuh` | sidecar scatter across a topology change |
+| `nanovdb/math/Stencils.h` | `WenoStencil`, `WenoPt<>`, `WENO5`, `GodunovsNormSqrd` |
+| `nanovdb/util/cuda/Util.h` | `dynamicSharedMemoryLauncher`, `operatorKernel` |
+
+`nanovdb/tools/` has **no** `LevelSet*` header today; the nearest relative is
+`tools/cuda/SignedFloodFill.cuh`.
+
+### The actual delta the reference carries
+
+1. ~~**`Benchmark/include/Stencils.h`**~~ — **DONE.**  Two **static, array-based**
+   overloads, `WenoStencil::normSqGrad(const ValueType* v, invDx2, dx2, iso)` and
+   `WenoStencil::gradient(const ValueType* v, inv2Dx)`, now live in
+   `nanovdb/math/Stencils.h`; the member forms delegate to them, so the WENO
+   formula exists in one place.  They exist because a GPU kernel gathers the
+   stencil into registers itself and cannot use the stencil object's accessor.
+   The reference's shadowed copy — and the include-guard race it relied on
+   (source commit `f8ab0ca`) — have been deleted.
+2. **The 19-point gather** (`Benchmark/src/Benchmark.cu:286-327`) — the `leafPtrs[3][3]`
+   + octal-offset block.  The only genuinely new GPU machinery.  Note this has
+   been solved once already: `vbm-cpu-port` commit `158e3df53`
+   ("WenoStencil: absorb gather as static gatherIndices(); drop
+   LegacyStencilAccessor").
+3. **The narrow-band boundary rule** (`Benchmark/src/Benchmark.cu:328-345`), per §3.2/§3.3.
+4. **The Euler step** (`Benchmark/src/Benchmark.cu:347-355`) — already line-for-line
+   identical to OpenVDB.
+
+### Related un-upstreamed work
+
+`origin/vbm-cpu-port` in this repository (157 commits ahead of the fork's
+`master`) carries host counterparts and refactors that overlap heavily with this
+effort: `tools/DilateGrid.h`, `util/Morphology.h`, `util/Injection.h`, the
+`ValueType`-templated `WenoStencil` with `gatherIndices()`, `util/Simd.h`,
+`util/BatchAccessor.h`.  Whether to build on that branch or cherry-pick from it
+is an open question; this branch currently takes the second route (based on ASWF
+`master`, importing nothing but the reference tree).
+
+## 6. Validation strategy
+
+Because of §3.2, **OpenVDB is no longer a bit-exact oracle.**  It becomes a
+reference that should agree wherever both are well-defined.  OpenVDB reads
+`+/- background` from tile values at the band edge; we reconstruct the sign.
+Those coincide wherever the band is locally thick and single-signed, and
+legitimately differ on thin or under-resolved features.  A residual discrepancy
+against OpenVDB is therefore an expected property, not a defect to chase.
+
+This implies two tiers:
+
+1. **Analytic ground truth** — sphere, torus, a thin sheet — where the exact SDF
+   is known and the band-edge cases can be measured rather than compared.
+2. **OpenVDB cross-check** — the existing harness.  The tandem call sites were
+   stripped from the imported snapshot; recover them from
+   the source repository at `f8ab0ca:Benchmark/include/LevelSetTrackerNew.h:340-372`, which
+   interleaves both stacks and calls `compareOpenVDBDataToNanoVDBSidecar` after
+   each stage.
+
+### Resolved: the scheme the reference actually uses
+
+`Benchmark/src/main.cpp:113-117` selects, for both the propagator and the tracker:
+
+    setSpatialScheme(HJWENO5_BIAS)
+    setTemporalScheme(TVD_RK2)
+    setNormCount(3)
+
+So the target configuration is **HJ-WENO5 in space, TVD-RK2 in pseudo-time,
+three renormalization sweeps per call**.  (`LevelSetTrackerNew::State` defaults
+to `HJWENO5_BIAS` + `TVD_RK1` + `normCount = LEVEL_SET_HALF_WIDTH`; `main.cpp`
+overrides the temporal scheme and the count.)
+
+This matters because OpenVDB distinguishes two fifth-order WENO variants, and
+they are genuinely different operators
+(`openvdb/openvdb/math/FiniteDifference.h:1079`, `:1178`):
+
+    FD_WENO5    WENO5(xp3,xp2,xp1,xp0,xm1) - WENO5(xp2,xp1,xp0,xm1,xm2)
+                  -- WENO reconstruction of the function, then differenced
+    FD_HJWENO5  WENO5(xp3-xp2, xp2-xp1, xp1-xp0, xp0-xm1, xm1-xm2)
+                  -- WENO applied to the divided differences (Hamilton-Jacobi form)
+
+NanoVDB's `WenoStencil::normSqGrad` feeds `WENO5` with *differences*
+(`nanovdb/math/Stencils.h:650-656`), i.e. it implements **HJ-WENO5**.  The two
+stacks therefore agree on the scheme.  A scheme mismatch is *not* the
+explanation for the tolerance gap below.
+
+### Resolved: why OpenVDB and NanoVDB disagree at 5e-3
+
+> **Priority: secondary.**  These are constant/precision discrepancies, not
+> algorithmic ones.  They are recorded here so they are not rediscovered, and
+> so that the two choices they force are made deliberately -- but they do not
+> gate the high-level design, and nothing below should be read as a blocker.
+
+The tandem harness uses two tolerances (`LevelSetTrackerNew.h:351-355` in the
+`f8ab0ca` revision): `5e-5` with `USE_NANOVDB_IMPLEMENTATION_FOR_NORMGRAD`
+(OpenVDB forced to use NanoVDB's `normSqGrad`) and `5e-3` without it.  Since the
+schemes match, the residual has to come from the shared `WENO5` kernel.  The
+algebra is identical line for line; **two things differ**:
+
+**1. The regularization epsilon differs by 100x.**  Both compute
+`eps = 1e-6 * scale2`, but:
+
+* OpenVDB's `WENO5` defaults to `scale2 = 0.01f`
+  (`openvdb/math/FiniteDifference.h:304`), and `D1<FD_HJWENO5>::difference`
+  never passes one -- so `eps = 1e-8`, unconditionally, independent of `dx`.
+* NanoVDB's `WENO5` defaults to `scale2 = 1.0` and carries the comment
+  "openvdb uses scale2 = 0.01" (`nanovdb/math/Stencils.h:42`), so the divergence
+  is deliberate and known.  Its `normSqGrad` member passes `mDx2` (= dx^2), but
+  the reference's static overload is called as `normSqGrad(stencil, 1.f, 1.f)`
+  (`Benchmark/src/Benchmark.cu:358`) -- so `eps = 1e-6`.
+
+This is not cosmetic.  `eps` sets the floor of the WENO smoothness indicators
+`beta`, and the ratio `eps/beta` decides how far the nonlinear weights drift from
+the linear optimal weights.  For the HJ form the arguments are *differences* of
+phi across one voxel, so with `|grad phi| ~ 1` they are `O(dx_world)` and
+`beta = O(dx_world^2)`.  Scaling `eps` by `dx^2` (what NanoVDB's member version
+does) is therefore dimensionally consistent for HJ-WENO, and OpenVDB's fixed
+`1e-8` is a dx-independent magic number -- but **the reference's `dx2 = 1.f` gets neither**.
+If `dx_world^2` approaches `1e-6`, `eps` starts to dominate `beta` and the scheme
+degenerates toward plain fifth-order linear upwinding, silently losing the WENO
+non-oscillatory property exactly where it is needed.
+
+**2. The working precision differs.**  OpenVDB computes `C`, `eps`, `A1..A3` and
+the final combination in **`double`** (`FiniteDifference.h:306-320`), then casts
+down.  NanoVDB is templated: `WenoStencil<GridT, RealT = typename
+GridT::ValueType>` (`nanovdb/math/Stencils.h:614`), so `WenoStencil<FloatGrid>`
+does the entire weight computation in **`float`**.  The `A_k` are reciprocals of
+fourth powers of small quantities -- the worst possible shape for single
+precision.
+
+Both hypotheses are cheaply testable in isolation (build the reference harness with
+NanoVDB's `WENO5` instantiated at `RealT = double`; separately, pass
+`scale2 = 0.01` / `dx_world^2` instead of `1.f`).  Doing so should say how much of
+the `5e-3` is epsilon and how much is precision.
+
+Decisions this forces before we bless NanoVDB's version as the reference:
+
+* **What should `scale2` be?**  Fixed `0.01` (bug-compatible with OpenVDB),
+  `dx^2` (dimensionally consistent for HJ-WENO, what NanoVDB's member version
+  already does), or caller-supplied with no default?
+* **What should `RealT` be?**  Defaulting it to `ValueType` means a `float` grid
+  silently gets `float` WENO weights.  Defaulting to `double` for `float` grids
+  costs registers in a GPU kernel but matches OpenVDB.  This should be an
+  explicit choice, not an inherited default.
+
+## 7. Cleanup required during promotion
+
+Inherited from the reference and not to be carried into NanoVDB as-is:
+
+* **Hardcoded default stream** — every launch passes `cudaStream_t(0)` and the
+  driver ends in `cudaStreamSynchronize(0)` (`Benchmark/src/Benchmark.cu:459`).
+  Upstream convention wants an explicit `cudaStream_t` parameter.
+* **Hardcoded `UnifiedBuffer`**, including the RK temporary that the CUDA path
+  never touches from the host — conceded in a TODO at
+  `Benchmark/src/Benchmark.cu:441-448`.  `cuda::Buffer<T>` landed upstream in `0ab0a81e7`.
+  Note this is a *regression introduced by the CPU port*: the earlier
+  `benchmark-add-lateral-ratio @ f8ab0ca` revision used
+  `BufferT = nanovdb::cuda::DeviceBuffer`, and `0b207e7` switched it to
+  `UnifiedBuffer` purely so a future host path could share the allocation.  For
+  a CUDA-only implementation, `f8ab0ca` is the better reference on this one
+  point.  See `Benchmark/PROVENANCE.md`.
+* **CPU scaffolding inside the CUDA path.**  Since only CUDA is in scope, the
+  `ExecutionPolicy` template parameter comes off every entry point, and
+  `Benchmark/src/Benchmark.cpp` (entirely `ExecutionPolicy::CPU`) has no counterpart in
+  the promoted code.  Most pointedly, the CUDA specializations of
+  `dilateActiveValues` and `pruneNarrowBand` contain a `getInstance().onCPU()`
+  branch that can call the *host* VBM builder (`Benchmark/src/Benchmark.cu:144`,
+  `:534`) -- a nominally-CUDA entry point with a runtime escape into host code.
+* **Misnamed axis variables** in the dilate seeder (`Benchmark/src/Benchmark.cu:110-115`):
+  `oldIdx_pX` is `offsetBy(0,0,1)` (+Z), `oldIdx_mZ` is `offsetBy(-1,0,0)` (-X),
+  etc.  Behaviour is unaffected — it is an unordered scan of all six face
+  neighbors — but the names are actively misleading.
+* **No terminal `else`** in that same chain.  An `NN_FACE`-dilated voxel is
+  guaranteed at least one active old face-neighbor, so it cannot miss today, but
+  in library code that invariant deserves an assert rather than an
+  uninitialized sidecar slot.
+* **Singleton state.**  `Benchmark` is a singleton so that NanoVDB calls could be
+  injected into an existing OpenVDB control flow without restructuring it.  A
+  NanoVDB tool must not be.
+* **`gridHandle.reset()` / `phiBuffer.clear()` before move-assign**
+  (`Benchmark/src/Benchmark.cu:164-166`), worked around with
+  "TODO: Remove after memory leak in move constructor is fixed".  Needs to be
+  diagnosed rather than inherited.
+
+## 8. Proposed order of work
+
+1. ~~**Upstream the two static `WenoStencil` overloads**~~ — **DONE** (§5).
+2. **Settle B1** -- write the boundary rule down as one specification.
+3. **Settle A3 and A1** -- name and scope, since they fix the header's shape.
+4. **The renormalizer itself**: IndexGrid + sidecar, owning grid/sidecar/scratch/
+   VBM (§3.5), explicit stream, templated `BufferT`, HJ-WENO5 + TVD-RK2 only,
+   constructor validating isotropic voxels and `isSequential<0>()` (§3.8).
+   Resolve B4 (reuse `gatherIndices` or re-derive) on the way in.
+5. **`ex_renormalize_levelset_cuda` proper** (B6): analytic ground-truth cases
+   plus the recovered OpenVDB cross-check.
+6. **Unit test** in `nanovdb/unittest` (B5).
+7. **Then, separately:** `track()` (dilate -> renormalize -> prune), which is
+   where §3.5's replacement machinery first gets exercised.
+
+Deferred indefinitely unless scope changes: the host path, interface
+propagation, velocity extension, and the remaining scheme combinations.
+
+## 9. Reference map
+
+| What | Where |
+|---|---|
+| CUDA renormalization functor | `Benchmark/src/Benchmark.cu:245` |
+| — VBM block decode | `Benchmark/src/Benchmark.cu:283` |
+| — 19-point stencil gather | `Benchmark/src/Benchmark.cu:286-327` |
+| — sign-extrapolation cascade | `Benchmark/src/Benchmark.cu:328-345` |
+| — Euler step | `Benchmark/src/Benchmark.cu:347-355` |
+| RK2 driver | `Benchmark/src/Benchmark.cu:436` |
+| CUDA dilation + sidecar seeding | `Benchmark/src/Benchmark.cu:80`, `:108-116` |
+| CUDA narrow-band prune | `Benchmark/src/Benchmark.cu:474` |
+| Static WENO overloads (upstreamed) | `nanovdb/math/Stencils.h`, `WenoStencil` |
+| Host `ExecutionPolicy::CPU` paths | `Benchmark/src/Benchmark.cpp` |
+| OpenVDB/NanoVDB bridge + comparisons | `Benchmark/src/BenchmarkIO.cpp` |
+| OpenVDB reference tracker (forked) | `Benchmark/include/LevelSetTrackerNew.h` |
+| OpenVDB upstream `track()` | `openvdb/openvdb/tools/LevelSetTracker.h:305-316` |
+| OpenVDB upstream Euler step | `openvdb/openvdb/tools/LevelSetTracker.h:637-642` |
+| OpenVDB upstream `dt` constants | `openvdb/openvdb/tools/LevelSetTracker.h:521-522` |
+| Out of scope: propagation | `Benchmark/include/LevelSetPropagate.h`, `Benchmark/include/VelocityExtension.h` |
