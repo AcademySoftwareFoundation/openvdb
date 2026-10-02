@@ -1,0 +1,10 @@
+OpenVDB:
+  API changes:
+  - Added io::File::readGrids(name, readOptions), which reads all grids whose
+    stored name is exactly the given name. This allows loading duplicate grids
+    that are hidden by a grid literally named with a suffix, such as "density[1]".
+  - Added openvdb.readGrids(filename, gridname) to the Python module.
+
+  Bug fixes:
+  - Fixed io::File::readGrid() returning the wrong tree for an instance whose
+    parent grid has the same name as a grid literally named with a suffix.

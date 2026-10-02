@@ -106,7 +106,13 @@ public:
     /// intersects the given world-space bounding box.
     GridBase::Ptr readGrid(const Name&, const BBoxd&);
 
-    /// @todo GridPtrVec readAllGrids(const Name&)
+    /// @brief Read all grids whose stored name is exactly @a name, in file order.
+    /// @details The name is compared as stored, so "density[1]" matches only a grid
+    /// literally named "density[1]", not the second grid named "density".
+    /// Instances share trees as they do with getGrids().
+    /// @return An empty list if no grid has this name.
+    /// @throw IoError if this file is not open for reading.
+    GridPtrVecPtr readGrids(const Name& name, const io::ReadOptions& readOptions = io::ReadOptions{});
 
     /// @brief Write the grids in the given container to the file whose name
     /// was given in the constructor.
@@ -151,6 +157,15 @@ private:
     /// @brief Return an iterator to the descriptor for the grid with the given name.
     /// If the name is non-unique, return an iterator to the first matching descriptor.
     NameMapCIter findDescriptor(const Name&) const;
+
+    /// @brief Return an iterator to the descriptor whose unique name is exactly the given name,
+    /// or the end iterator if there is none. Unlike findDescriptor(), "[N]" is not parsed.
+    NameMapCIter findDescriptorByUniqueName(const Name&) const;
+
+    /// @brief Read the grid for the given descriptor, including its instance parent's tree.
+    /// @note This method should not be called for files that don't contain grid offsets.
+    /// @throw KeyError if the grid is an instance and its parent is missing.
+    GridBase::Ptr readGridFromDescriptor(const GridDescriptor&, const io::ReadOptions&);
 
     /// @brief Retrieve a grid from @c mNamedGrids.  Return a null pointer
     /// if @c mNamedGrids was not populated (because this file is random-access).
