@@ -25,6 +25,21 @@ namespace morphology {
 
 namespace cuda {
 
+/// @brief Finds the grid that owns batch-wide index @a index, given the per-grid base
+///        offsets at member @a base of @a d_data (tools::cuda::TopologyBuilderData). Returns
+///        the last grid whose base does not exceed the index; empty grids share their
+///        successor's base and are skipped that way.
+template <typename DataT>
+__device__ inline uint32_t gridOfIndex(const DataT *d_data, uint32_t gridCount, uint32_t index, uint32_t DataT::*base)
+{
+    uint32_t lo = 0, hi = gridCount;
+    while (lo < hi) {
+        const uint32_t mid = (lo + hi) >> 1;
+        if (d_data[mid].*base <= index) lo = mid + 1; else hi = mid;
+    }
+    return lo - 1;
+}
+
 template<class BuildT, tools::morphology::NearestNeighbors nnType>
 struct DilateInternalNodesFunctor
 {
@@ -509,25 +524,10 @@ struct ProcessLowerNodesFunctor
     static constexpr int SlicesPerUpperNode = 256;
     static constexpr int LowerNodesPerSlice = 32768 / SlicesPerUpperNode;
 
-    /// @brief Single-grid form: node offsets index the destination grid directly
-    void __device__
-    operator()(
-        const Mask<5> *upperMasks,
-        const Mask<4> (*lowerMasks)[Mask<5>::SIZE],
-        const uint32_t *upperOffsets,
-        const uint32_t (*lowerOffsets)[Mask<5>::SIZE],
-        const uint32_t (*leafOffsets)[Mask<5>::SIZE],
-        NanoGrid<BuildT> *dstGrid,
-        uint32_t *lowerParents,
-        uint32_t *leafParents)
-    {
-        process(upperMasks, lowerMasks, upperOffsets, lowerOffsets, leafOffsets, dstGrid, 0u, 0u, 0u, lowerParents, leafParents);
-    }
-
-    /// @brief Batched form: the block's processed tile belongs to grid tileToGrid[blockIdx.x]
-    ///        (grid 0 when tileToGrid is null), whose builder data supplies the destination grid
-    ///        and the bases that turn batch-wide node offsets into that grid's own indices.
-    ///        DataT is tools::cuda::TopologyBuilderData<BuildT>.
+    /// @brief The block's processed tile (blockIdx.x) belongs to the grid whose tile range
+    ///        holds it; that grid's builder data supplies the destination grid and the bases
+    ///        that turn batch-wide node offsets into the grid's own indices. A single grid is
+    ///        a batch of one. DataT is tools::cuda::TopologyBuilderData<BuildT>.
     template<typename DataT>
     void __device__
     operator()(
@@ -537,11 +537,11 @@ struct ProcessLowerNodesFunctor
         const uint32_t (*lowerOffsets)[Mask<5>::SIZE],
         const uint32_t (*leafOffsets)[Mask<5>::SIZE],
         const DataT *d_data,
-        const uint32_t *tileToGrid,
+        uint32_t gridCount,
         uint32_t *lowerParents,
         uint32_t *leafParents)
     {
-        const DataT &d = d_data[tileToGrid ? tileToGrid[blockIdx.x] : 0u];
+        const DataT &d = d_data[gridOfIndex(d_data, gridCount, blockIdx.x, &DataT::tileBase)];
         process(upperMasks, lowerMasks, upperOffsets, lowerOffsets, leafOffsets, &d.getGrid(),
                 d.upperBase, d.lowerBase, d.leafBase, lowerParents, leafParents);
     }
