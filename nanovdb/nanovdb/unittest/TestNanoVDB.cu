@@ -4353,7 +4353,7 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
     }
 
     builder.countNodes(stream);
-    cudaCheck(cudaStreamSynchronize(stream));
+    builder.waitForNodeCounts();
     EXPECT_EQ(builder.data(0)->nodeCount[0], 4u);
     EXPECT_EQ(builder.data(0)->nodeCount[1], 3u);
     EXPECT_EQ(builder.data(0)->nodeCount[2], 2u);

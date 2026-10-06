@@ -147,11 +147,10 @@ inline void packProcessedRoot(const ProcessedTileMap<RootT> &tiles, RootT *root)
 ///   // 2. densified child masks, filled by the consumer's *InternalNodesFunctor
 ///   builder.allocateInternalMaskBuffers(stream);
 ///   ...  launch with (deviceProcessedRoot(g), deviceUpperMasks() + data(g)->tileBase, deviceLowerMasks() + data(g)->tileBase)
-///   // 3. node counts: enqueued, not ready until the stream is synchronized
+///   // 3. node counts: enqueued; getBuffer waits for them before sizing the output
 ///   builder.countNodes(stream);
-///   cudaStreamSynchronize(stream);                          // data(g)->nodeCount is valid from here
 ///   // 4. output buffer and every node except the leaf value masks
-///   auto buffer = builder.getBuffer(BufferT(), stream);
+///   auto buffer = builder.getBuffer(BufferT(), stream);     // data(g)->nodeCount is valid from here
 ///   ...  copy each source GridData header to &builder.data(g)->getGrid()
 ///   builder.processGridTreeRoot(stream);
 ///   builder.processUpperNodes(stream);
@@ -163,11 +162,13 @@ inline void packProcessedRoot(const ProcessedTileMap<RootT> &tiles, RootT *root)
 ///   GridHandle<BufferT> handle(std::move(buffer));          // after the stream has drained
 /// @endcode
 ///
-/// Synchronization: every method is stream-ordered on the stream it is given and none of them
-/// synchronizes. The one point the caller must synchronize is between countNodes and getBuffer,
-/// because getBuffer sizes the output from data(g)->nodeCount on the host. The processed roots
-/// and mask buffers are released by processLowerNodes; deviceProcessedRoot() and the mask
-/// pointers are invalid after it.
+/// Synchronization: every method is stream-ordered on the stream it is given. getBuffer is the
+/// one method that blocks the host, because it sizes the output from data(g)->nodeCount; it
+/// waits on an event countNodes records, so no work queued on the stream after countNodes is
+/// waited for. A caller that reads data(g)->nodeCount or nodeCount(level) before getBuffer
+/// must call waitForNodeCounts() (or synchronize the stream) first. The processed roots and
+/// mask buffers are released by processLowerNodes; deviceProcessedRoot() and the mask pointers
+/// are invalid after it.
 template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class TopologyBuilder
 {
@@ -225,19 +226,28 @@ public:
         , mTempDevicePool(resource)
     {
         resetHostData(1);
+        cudaCheck(cudaEventCreateWithFlags(&mNodeCountsReady, cudaEventDisableTiming));
     }
+
+    ~TopologyBuilder() { cudaEventDestroy(mNodeCountsReady); }
+
+    TopologyBuilder(const TopologyBuilder&) = delete;
+    TopologyBuilder& operator=(const TopologyBuilder&) = delete;
 
     /// @brief Allocates and zeroes the densified upper and lower child masks for every processed
     ///        tile in the batch; the consumer's *InternalNodesFunctor fills them
     void allocateInternalMaskBuffers(cudaStream_t stream);
 
     /// @brief Enumerates the nodes of every grid from the child masks and copies each grid's node
-    ///        counts and node bases into data(g). The copy is asynchronous: synchronize the stream
-    ///        before reading data(g)->nodeCount or calling getBuffer
+    ///        counts and node bases into data(g). The copy is asynchronous; getBuffer waits for
+    ///        it, and any other host read of the counts must follow waitForNodeCounts()
     void countNodes(cudaStream_t stream);
 
-    /// @brief Allocates one device buffer for all grids (sized on the host from the node counts
-    ///        countNodes produced), lays the grids out back to back and uploads data(g)
+    /// @brief Blocks the host until the node counts countNodes enqueued have landed in data(g)
+    void waitForNodeCounts() { cudaCheck(cudaEventSynchronize(mNodeCountsReady)); }
+
+    /// @brief Waits for the node counts countNodes produced, allocates one device buffer for all
+    ///        grids sized from them on the host, lays the grids out back to back and uploads data(g)
     template<typename BufferT>
     BufferT getBuffer(const BufferT &buffer, cudaStream_t stream);
 
@@ -277,6 +287,7 @@ public:
     BufT<uint32_t>               mTileToGrid; // owning grid of every processed tile; left empty for a single grid
     HostDataT                    mHostData; // host side of the builder parameters, one per grid
     BufT<Data>                   mDeviceData; // device copy, made by uploadData
+    cudaEvent_t                  mNodeCountsReady; // recorded by countNodes once the node counts are in mHostData
     CheckMode                    mChecksum{CheckMode::Disable};
 
     /// @brief Number of grids in the batch (1 unless allocateProcessedRoots was given more)
@@ -328,6 +339,9 @@ public:
                 std::fill_n(mHostTileToGrid.data() + data(g)->tileBase, data(g)->tileCount, g);
             mTileToGrid = BufT<uint32_t>(stream, *mResource, tileTotal, nanovdb::cuda::noInit);
             cudaCheck(cudaMemcpyAsync(mTileToGrid.data(), mHostTileToGrid.data(), mHostTileToGrid.size_bytes(), cudaMemcpyHostToDevice, stream));
+        } else { // a single grid or an empty batch resolves every tile to grid 0
+            mHostTileToGrid.destroy();
+            mTileToGrid.destroy(stream);
         }
     }
 
@@ -372,7 +386,8 @@ private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
-    /// @brief Zeroes the host parameters of @a count grids and numbers them
+    /// @brief Zeroes the host parameters of @a count grids and numbers them; drops the
+    ///        tile-to-grid table of any previous batch (it is rebuilt by uploadProcessedRoot)
     void resetHostData(uint32_t count)
     {
         if (mHostData.size() != count) mHostData = HostDataT(count, nanovdb::cuda::noInit);
@@ -382,6 +397,8 @@ private:
             data(g)->gridCount = count;
         }
         mTileTotal = 0;
+        mHostTileToGrid.destroy();
+        mTileToGrid.destroy();
     }
 
     const uint32_t* tileToGrid() const { return mTileToGrid.empty() ? nullptr : mTileToGrid.data(); }
@@ -481,6 +498,7 @@ void TopologyBuilder<BuildT, ResourceT>::countNodes(cudaStream_t stream)
             d->nodeCount[0] = d->nodeCount[1] = d->nodeCount[2] = 0;
             d->upperBase = d->lowerBase = d->leafBase = 0;
         }
+        cudaCheck(cudaEventRecord(mNodeCountsReady, stream));
         return;
     }
 
@@ -533,14 +551,15 @@ void TopologyBuilder<BuildT, ResourceT>::countNodes(cudaStream_t stream)
         mUpperOffsets.data()+1,
         processedTileCount);
 
-    // One gather over the grids and one copy back replace per-level scalar readbacks;
-    // the caller synchronizes before reading data()->nodeCount, as before.
+    // One gather over the grids and one copy back replace per-level scalar readbacks.
+    // The event marks when the counts have landed on the host; getBuffer waits on it.
     uploadData(stream);
     util::cuda::lambdaKernel<<<numBlocks(gridCount()), mNumThreads, 0, stream>>>(
         gridCount(), topology::detail::GatherNodeCountsFunctor<BuildT>(), deviceData(),
         mUpperOffsets.data(), mLowerOffsets.data(), mLeafOffsets.data());
     cudaCheckError();
     cudaCheck(cudaMemcpyAsync(mHostData.data(), mDeviceData.data(), mHostData.size_bytes(), cudaMemcpyDeviceToHost, stream));
+    cudaCheck(cudaEventRecord(mNodeCountsReady, stream));
 }// TopologyBuilder<BuildT, ResourceT>::countNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -551,6 +570,7 @@ BufferT TopologyBuilder<BuildT, ResourceT>::getBuffer(const BufferT &pool, cudaS
 {
     // Allocates one device buffer for the destination grids, once the topology/size of every tree is known.
     // Grids are laid out back to back; each grid's offsets below are relative to its own start.
+    waitForNodeCounts();
     uint64_t totalSize = 0;
     std::vector<uint64_t> gridOffsets(gridCount());
     for (uint32_t g = 0; g < gridCount(); ++g) {
