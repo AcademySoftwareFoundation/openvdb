@@ -184,9 +184,6 @@ class TopologyBuilder
     using UpperMaskBufT = BufT<Mask<5>>;
     using LowerMaskBufT = BufT<Mask<4>>;
     using HostStagingT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::PinnedResource>;
-    template<typename T>
-    using HostBufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::PinnedResource>;
-    using HostDataT = HostBufT<TopologyBuilderData<BuildT>>;
 
 public:
 
@@ -205,12 +202,10 @@ public:
         , mVoxelOffsets(stream, resource, 0, nanovdb::cuda::noInit)
         , mLowerParents(stream, resource, 0, nanovdb::cuda::noInit)
         , mLeafParents(stream, resource, 0, nanovdb::cuda::noInit)
-        , mHostData(1, nanovdb::cuda::noInit)
         , mDeviceData(stream, resource, 0, nanovdb::cuda::noInit)
         , mResource(&resource)
         , mTempDevicePool(resource)
     {
-        resetHostData(1);
         cudaCheck(cudaEventCreateWithFlags(&mNodeCountsReady, cudaEventDisableTiming));
     }
 
@@ -258,7 +253,11 @@ public:
     /// @brief Finishes each grid's voxel count and (optionally) checksum
     void postProcessGridTree(cudaStream_t stream);
 
-    HostStagingT                 mHostRoot; // host staging for the processed roots, back to back (pinned, so the upload is asynchronous)
+    HostStagingT                 mHostStaging; // one pinned block, so every transfer is asynchronous and one cudaMallocHost serves a build: the processed roots back to back, then the per-grid parameters, then the tile bases; grown on demand by allocateProcessedRoot(s), never shrunk
+    uint64_t                     mRootBytes{0}; // bytes of processed roots at the start of mHostStaging; 0 before allocateProcessedRoot(s) and after processLowerNodes releases them
+    uint64_t                     mHostDataOffset{0}; // byte offset of the per-grid parameters in mHostStaging
+    uint64_t                     mTileBasesOffset{0}; // byte offset of the gridCount()+1 tile bases countNodes uploads
+    uint32_t                     mGridCount{0}; // grids in the batch; 0 until allocateProcessedRoot(s)
     ScratchT                     mDeviceRoot; // device copy, made by uploadProcessedRoot
     UpperMaskBufT                mUpperMasks;
     LowerMaskBufT                mLowerMasks;
@@ -268,25 +267,23 @@ public:
     BufT<uint64_t>               mVoxelOffsets;
     BufT<uint32_t>               mLowerParents;
     BufT<uint32_t>               mLeafParents;
-    HostDataT                    mHostData; // host side of the builder parameters, one per grid
-    HostBufT<uint32_t>           mHostTileBases; // pinned staging of the gridCount()+1 tile bases countNodes uploads
-    BufT<Data>                   mDeviceData; // device copy, made by uploadData
-    cudaEvent_t                  mNodeCountsReady; // recorded by countNodes once the node counts are in mHostData
+    BufT<Data>                   mDeviceData; // device copy of the per-grid parameters, made by uploadData
+    cudaEvent_t                  mNodeCountsReady; // recorded by countNodes once the node counts are in data(g)
     CheckMode                    mChecksum{CheckMode::Disable};
 
-    /// @brief Number of grids in the batch (1 unless allocateProcessedRoots was given more)
-    uint32_t gridCount() const { return static_cast<uint32_t>(mHostData.size()); }
+    /// @brief Number of grids in the batch: 0 until allocateProcessedRoot(s), 1 after
+    ///        allocateProcessedRoot, the batch size after allocateProcessedRoots
+    uint32_t gridCount() const { return mGridCount; }
 
     RootT* deviceProcessedRoot(uint32_t g = 0) { return mDeviceRoot.empty() ? nullptr : util::PtrAdd<RootT>(mDeviceRoot.data(), data(g)->processedRootOffset); }
-    RootT* hostProcessedRoot(uint32_t g = 0)   { return mHostRoot.empty()   ? nullptr : util::PtrAdd<RootT>(mHostRoot.data(), data(g)->processedRootOffset); }
+    RootT* hostProcessedRoot(uint32_t g = 0)   { return mRootBytes == 0    ? nullptr : util::PtrAdd<RootT>(mHostStaging.data(), data(g)->processedRootOffset); }
 
     /// @brief Allocates (pinned) host staging for one processed root of @a bytes and returns it
     ///        for the caller to fill (including mTableSize); any previous roots are dropped and
     ///        the builder is reset to a single grid.
     RootT* allocateProcessedRoot(uint64_t bytes)
     {
-        resetHostData(1);
-        mHostRoot = HostStagingT(bytes, nanovdb::cuda::noInit);
+        allocateHostStaging(1, bytes);
         return hostProcessedRoot(0);
     }
 
@@ -298,14 +295,17 @@ public:
     {
         const uint32_t count = static_cast<uint32_t>(tileCounts.size());
         if (count == 0) throw std::runtime_error("TopologyBuilder::allocateProcessedRoots requires at least one grid");
-        resetHostData(count);
+        std::vector<uint64_t> rootOffsets(count);
         uint64_t bytes = 0;
         for (uint32_t g = 0; g < count; ++g) {
-            data(g)->processedRootOffset = bytes;
+            rootOffsets[g] = bytes;
             bytes += RootT::memUsage(tileCounts[g]);// a multiple of NANOVDB_DATA_ALIGNMENT, so every root stays aligned
         }
-        mHostRoot = HostStagingT(bytes, nanovdb::cuda::noInit);
-        for (uint32_t g = 0; g < count; ++g) hostProcessedRoot(g)->mTableSize = tileCounts[g];
+        allocateHostStaging(count, bytes);
+        for (uint32_t g = 0; g < count; ++g) {
+            data(g)->processedRootOffset = rootOffsets[g];
+            hostProcessedRoot(g)->mTableSize = tileCounts[g];
+        }
     }
 
     /// @brief Fixes the batch's tile layout from the roots' table sizes (data(g)->tileBase
@@ -315,9 +315,9 @@ public:
     void uploadProcessedRoot(cudaStream_t stream)
     {
         updateTileLayout();
-        if (mDeviceRoot.size() < mHostRoot.size())
-            mDeviceRoot = ScratchT(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResource), mHostRoot.size(), nanovdb::cuda::noInit);
-        cudaCheck(cudaMemcpyAsync(mDeviceRoot.data(), mHostRoot.data(), mHostRoot.size(), cudaMemcpyHostToDevice, stream));
+        if (mDeviceRoot.size() < mRootBytes)
+            mDeviceRoot = ScratchT(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResource), mRootBytes, nanovdb::cuda::noInit);
+        cudaCheck(cudaMemcpyAsync(mDeviceRoot.data(), mHostStaging.data(), mRootBytes, cudaMemcpyHostToDevice, stream));
     }
 
     /// @brief Copies the builder parameters of every grid to the device, allocating through
@@ -326,7 +326,7 @@ public:
     {
         if (mDeviceData.size() != gridCount())
             mDeviceData = BufT<Data>(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResource), gridCount(), nanovdb::cuda::noInit);
-        cudaCheck(cudaMemcpyAsync(mDeviceData.data(), mHostData.data(), mHostData.size_bytes(), cudaMemcpyHostToDevice, stream));
+        cudaCheck(cudaMemcpyAsync(mDeviceData.data(), data(0), gridCount() * sizeof(Data), cudaMemcpyHostToDevice, stream));
     }
     Mask<5>* deviceUpperMasks() { return mUpperMasks.data(); }
     /// @brief The densified lower masks: one row of Mask<5>::SIZE Mask<4> per upper node,
@@ -345,7 +345,8 @@ public:
     nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource); }
 
     /// @brief Builder parameters of grid @a g (grid 0 by default, the whole grid for single-grid builds)
-    Data* data(uint32_t g = 0)  { return mHostData.data() + g; }
+    Data* data(uint32_t g = 0)             { return util::PtrAdd<Data>(mHostStaging.data(), mHostDataOffset) + g; }
+    const Data* data(uint32_t g = 0) const { return util::PtrAdd<const Data>(mHostStaging.data(), mHostDataOffset) + g; }
     /// @brief Device copy of the parameters of every grid, gridCount() entries
     Data* deviceData()          { return mDeviceData.data(); }
 
@@ -353,7 +354,7 @@ public:
     uint32_t totalNodeCount(int level) const
     {
         uint32_t total = 0;
-        for (uint32_t g = 0; g < gridCount(); ++g) total += mHostData.data()[g].nodeCount[level];
+        for (uint32_t g = 0; g < gridCount(); ++g) total += data(g)->nodeCount[level];
         return total;
     }
 
@@ -361,17 +362,27 @@ private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
-    /// @brief Zeroes the host parameters of @a count grids and numbers them
-    void resetHostData(uint32_t count)
+    /// @brief Lays out the pinned staging block for @a count grids with @a rootBytes of
+    ///        processed roots, growing it when the current block is too small, and resets the
+    ///        per-grid parameters: zeroed, numbered, no tiles yet
+    void allocateHostStaging(uint32_t count, uint64_t rootBytes)
     {
-        if (mHostData.size() != count) mHostData = HostDataT(count, nanovdb::cuda::noInit);
-        std::memset(mHostData.data(), 0, mHostData.size_bytes());
+        constexpr uint64_t A = NANOVDB_DATA_ALIGNMENT;
+        mRootBytes       = rootBytes;
+        mHostDataOffset  = (rootBytes + A - 1) & ~(A - 1);
+        mTileBasesOffset = mHostDataOffset + uint64_t(count) * sizeof(Data);
+        const uint64_t bytes = mTileBasesOffset + uint64_t(count + 1) * sizeof(uint32_t);
+        if (mHostStaging.size() < bytes) mHostStaging = HostStagingT(bytes, nanovdb::cuda::noInit);
+        mGridCount = count;
+        std::memset(data(0), 0, count * sizeof(Data));
         for (uint32_t g = 0; g < count; ++g) {
             data(g)->gridIndex = g;
             data(g)->gridCount = count;
         }
         mTileTotal = 0;
     }
+
+    uint32_t* hostTileBases() { return util::PtrAdd<uint32_t>(mHostStaging.data(), mTileBasesOffset); }
 
     /// @brief Reads every grid's tile count from its processed root and assigns the grids
     ///        consecutive tile ranges; called once, by uploadProcessedRoot
@@ -529,12 +540,12 @@ void TopologyBuilder<BuildT, ResourceT>::countNodes(cudaStream_t stream)
     // counts are on the host; getBuffer waits on it.
     static_assert(offsetof(Data, leafBase) - offsetof(Data, nodeCount) == (Data::CountFieldCount - 1) * sizeof(uint32_t),
                   "countNodes copies nodeCount[3], upperBase, lowerBase and leafBase as one block; keep them adjacent");
-    if (mHostTileBases.size() != gridCount() + 1) mHostTileBases = HostBufT<uint32_t>(gridCount() + 1, nanovdb::cuda::noInit);
-    for (uint32_t g = 0; g < gridCount(); ++g) mHostTileBases.data()[g] = data(g)->tileBase;
-    mHostTileBases.data()[gridCount()] = processedTileCount;
+    uint32_t *hostBases = hostTileBases();
+    for (uint32_t g = 0; g < gridCount(); ++g) hostBases[g] = data(g)->tileBase;
+    hostBases[gridCount()] = processedTileCount;
     BufT<uint32_t> tileBases(stream, *mResource, gridCount() + 1, nanovdb::cuda::noInit);
     BufT<uint32_t> counts(stream, *mResource, std::size_t(gridCount()) * Data::CountFieldCount, nanovdb::cuda::noInit);
-    cudaCheck(cudaMemcpyAsync(tileBases.data(), mHostTileBases.data(), mHostTileBases.size_bytes(), cudaMemcpyHostToDevice, stream));
+    cudaCheck(cudaMemcpyAsync(tileBases.data(), hostBases, (gridCount() + 1) * sizeof(uint32_t), cudaMemcpyHostToDevice, stream));
     util::cuda::lambdaKernel<<<numBlocks(gridCount()), mNumThreads, 0, stream>>>(
         gridCount(), topology::detail::GatherNodeCountsFunctor<BuildT>(), tileBases.data(), counts.data(),
         mUpperOffsets.data(), mLowerOffsets.data(), mLeafOffsets.data());
@@ -819,7 +830,7 @@ inline void TopologyBuilder<BuildT, ResourceT>::processLowerNodes(cudaStream_t s
         cudaCheckError();
     }
 
-    mHostRoot.destroy();
+    mRootBytes = 0;// the processed roots are released; the pinned block itself stays for reuse
     mDeviceRoot.destroy(stream);
     mUpperMasks.destroy(stream);
     mLowerMasks.destroy(stream);
