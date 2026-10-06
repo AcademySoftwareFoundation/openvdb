@@ -51,11 +51,12 @@ struct TopologyBuilderData {
     void     *d_bufferPtr;// start of this grid in the output buffer
     uint64_t grid, tree, root, upper, lower, leaf, size;// byte offsets to nodes, relative to d_bufferPtr
     uint32_t nodeCount[3];// 0=leaf,1=lower, 2=upper
+    uint32_t upperBase, lowerBase, leafBase;// this grid's first index into the batch-wide node arrays
     uint32_t *d_upperOffsets;// batch-wide, indexed by processed tile; shared by every grid
     uint32_t gridIndex, gridCount;// position of this grid in the batch (0 of 1 for a single grid)
     uint32_t tileCount, tileBase;// this grid's processed tiles, and its first index into the batch-wide tile arrays
-    uint32_t upperBase, lowerBase, leafBase;// this grid's first index into the batch-wide node arrays
     uint64_t processedRootOffset;// byte offset of this grid's processed root in the staging buffer
+    static constexpr uint32_t CountFieldCount = 6;// nodeCount[3], upperBase, lowerBase, leafBase: the fields countNodes writes back, kept adjacent
     __hostdev__ NanoGrid<BuildT>&  getGrid() const {return *util::PtrAdd<NanoGrid<BuildT>>(d_bufferPtr, grid);}
     __hostdev__ NanoTree<BuildT>&  getTree() const {return *util::PtrAdd<NanoTree<BuildT>>(d_bufferPtr, tree);}
     __hostdev__ NanoRoot<BuildT>&  getRoot() const {return *util::PtrAdd<NanoRoot<BuildT>>(d_bufferPtr, root);}
@@ -166,9 +167,10 @@ inline void packProcessedRoot(const ProcessedTileMap<RootT> &tiles, RootT *root)
 /// one method that blocks the host, because it sizes the output from data(g)->nodeCount; it
 /// waits on an event countNodes records, so no work queued on the stream after countNodes is
 /// waited for. A caller that reads data(g)->nodeCount or nodeCount(level) before getBuffer
-/// must call waitForNodeCounts() (or synchronize the stream) first. The processed roots and
-/// mask buffers are released by processLowerNodes; deviceProcessedRoot() and the mask pointers
-/// are invalid after it.
+/// must call waitForNodeCounts() (or synchronize the stream) first. countNodes writes only
+/// the node counts and node bases of data(g); every other field is the caller's to set until
+/// getBuffer uploads data(g). The processed roots and mask buffers are released by
+/// processLowerNodes; deviceProcessedRoot() and the mask pointers are invalid after it.
 template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class TopologyBuilder
 {
@@ -286,6 +288,7 @@ public:
     HostBufT<uint32_t>           mHostTileToGrid; // pinned staging for mTileToGrid, so its upload is asynchronous
     BufT<uint32_t>               mTileToGrid; // owning grid of every processed tile; left empty for a single grid
     HostDataT                    mHostData; // host side of the builder parameters, one per grid
+    HostBufT<uint32_t>           mHostTileBases; // pinned staging of the gridCount()+1 tile bases countNodes uploads
     BufT<Data>                   mDeviceData; // device copy, made by uploadData
     cudaEvent_t                  mNodeCountsReady; // recorded by countNodes once the node counts are in mHostData
     CheckMode                    mChecksum{CheckMode::Disable};
@@ -471,18 +474,22 @@ namespace topology::detail {
 template <typename BuildT>
 struct GatherNodeCountsFunctor
 {
+    /// @param tileBases gridCount+1 entries; grid g owns processed tiles [tileBases[g], tileBases[g+1])
+    /// @param counts    CountFieldCount entries per grid, in the order of the fields they land in:
+    ///                  nodeCount[0..2], upperBase, lowerBase, leafBase
     __device__
-    void operator()(size_t g, TopologyBuilderData<BuildT> *d_data,
+    void operator()(size_t g, const uint32_t *tileBases, uint32_t *counts,
                     const uint32_t *upperOffsets, const uint32_t *lowerOffsets, const uint32_t *leafOffsets) {
-        auto &d = d_data[g];
-        const size_t t0 = d.tileBase, t1 = t0 + d.tileCount;
+        const size_t t0 = tileBases[g], t1 = tileBases[g + 1];
         constexpr size_t S = Mask<5>::SIZE;
-        d.upperBase = upperOffsets[t0];
-        d.lowerBase = lowerOffsets[t0 * S];
-        d.leafBase  = leafOffsets[t0 * S];
-        d.nodeCount[2] = upperOffsets[t1] - d.upperBase;
-        d.nodeCount[1] = lowerOffsets[t1 * S] - d.lowerBase;
-        d.nodeCount[0] = leafOffsets[t1 * S] - d.leafBase;
+        uint32_t *c = counts + g * TopologyBuilderData<BuildT>::CountFieldCount;
+        const uint32_t upperBase = upperOffsets[t0], lowerBase = lowerOffsets[t0 * S], leafBase = leafOffsets[t0 * S];
+        c[0] = leafOffsets[t1 * S] - leafBase;
+        c[1] = lowerOffsets[t1 * S] - lowerBase;
+        c[2] = upperOffsets[t1] - upperBase;
+        c[3] = upperBase;
+        c[4] = lowerBase;
+        c[5] = leafBase;
     }
 };
 
@@ -551,14 +558,24 @@ void TopologyBuilder<BuildT, ResourceT>::countNodes(cudaStream_t stream)
         mUpperOffsets.data()+1,
         processedTileCount);
 
-    // One gather over the grids and one copy back replace per-level scalar readbacks.
-    // The event marks when the counts have landed on the host; getBuffer waits on it.
-    uploadData(stream);
+    // One gather over the grids and one strided copy back land each grid's counts and bases
+    // in their own fields of data(g); nothing else in data(g) is read or written here, so the
+    // host struct stays the caller's until getBuffer uploads it. The event marks when the
+    // counts are on the host; getBuffer waits on it.
+    static_assert(offsetof(Data, leafBase) - offsetof(Data, nodeCount) == (Data::CountFieldCount - 1) * sizeof(uint32_t),
+                  "countNodes copies nodeCount[3], upperBase, lowerBase and leafBase as one block; keep them adjacent");
+    if (mHostTileBases.size() != gridCount() + 1) mHostTileBases = HostBufT<uint32_t>(gridCount() + 1, nanovdb::cuda::noInit);
+    for (uint32_t g = 0; g < gridCount(); ++g) mHostTileBases.data()[g] = data(g)->tileBase;
+    mHostTileBases.data()[gridCount()] = processedTileCount;
+    BufT<uint32_t> tileBases(stream, *mResource, gridCount() + 1, nanovdb::cuda::noInit);
+    BufT<uint32_t> counts(stream, *mResource, std::size_t(gridCount()) * Data::CountFieldCount, nanovdb::cuda::noInit);
+    cudaCheck(cudaMemcpyAsync(tileBases.data(), mHostTileBases.data(), mHostTileBases.size_bytes(), cudaMemcpyHostToDevice, stream));
     util::cuda::lambdaKernel<<<numBlocks(gridCount()), mNumThreads, 0, stream>>>(
-        gridCount(), topology::detail::GatherNodeCountsFunctor<BuildT>(), deviceData(),
+        gridCount(), topology::detail::GatherNodeCountsFunctor<BuildT>(), tileBases.data(), counts.data(),
         mUpperOffsets.data(), mLowerOffsets.data(), mLeafOffsets.data());
     cudaCheckError();
-    cudaCheck(cudaMemcpyAsync(mHostData.data(), mDeviceData.data(), mHostData.size_bytes(), cudaMemcpyDeviceToHost, stream));
+    constexpr std::size_t rowBytes = Data::CountFieldCount * sizeof(uint32_t);
+    cudaCheck(cudaMemcpy2DAsync(data(0)->nodeCount, sizeof(Data), counts.data(), rowBytes, rowBytes, gridCount(), cudaMemcpyDeviceToHost, stream));
     cudaCheck(cudaEventRecord(mNodeCountsReady, stream));
 }// TopologyBuilder<BuildT, ResourceT>::countNodes
 
