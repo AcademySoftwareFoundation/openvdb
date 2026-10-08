@@ -861,6 +861,146 @@ TEST_F(TestFile, testGridNaming)
 }
 
 
+TEST_F(TestFile, testReadGrids)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    logging::LevelScope suppressLogging{logging::Level::Fatal};
+
+    auto makeTree = [](int base) {
+        Int32Tree::Ptr tree(new Int32Tree(0));
+        tree->setValue(Coord(0, 0, 0), base);
+        tree->setValue(Coord(100, 0, 0), base + 1000);
+        return tree;
+    };
+
+    const Int32Tree::Ptr
+        tree0 = makeTree(100),
+        tree1 = makeTree(101),
+        tree2 = makeTree(102),
+        tree4 = makeTree(104),
+        pairTree = makeTree(105);
+
+    // Grid 3 is an instance of grid 1, and grids 5 and 6 share a tree.
+    const char* names[] = { "density", "density", "density[1]", "other", "", "pair", "pair" };
+    const Int32Tree::Ptr trees[] = { tree0, tree1, tree2, tree1, tree4, pairTree, pairTree };
+    const int expectedValues[] = { 100, 101, 102, 101, 104, 105, 105 };
+
+    GridPtrVec srcGrids;
+    for (int index = 0; index < 7; ++index) {
+        GridBase::Ptr grid = createGrid(trees[index]);
+        grid->setName(names[index]);
+        grid->insertMeta("index", Int32Metadata(index));
+        srcGrids.push_back(grid);
+    }
+
+    auto indexOf = [](const GridBase::ConstPtr& grid) {
+        return grid->metaValue<Int32>("index");
+    };
+    auto valueOf = [](const GridBase::Ptr& grid) {
+        return gridPtrCast<Int32Grid>(grid)->tree().getValue(Coord(0, 0, 0));
+    };
+    auto indicesOf = [&](const GridPtrVecPtr& grids) {
+        std::vector<int> indices;
+        for (const auto& grid : *grids) indices.push_back(indexOf(grid));
+        return indices;
+    };
+
+    const char* filename = "testReadGrids.vdb2";
+    SharedPtr<const char> scopedFile(filename, ::remove);
+
+    enum { OUTPUT_TO_FILE = 0, OUTPUT_TO_STREAM = 1 };
+    for (int outputMethod = OUTPUT_TO_FILE; outputMethod <= OUTPUT_TO_STREAM; ++outputMethod) {
+        for (int instancing = 0; instancing <= 1; ++instancing) {
+            if (outputMethod == OUTPUT_TO_FILE) {
+                File file(filename);
+                file.setInstancingEnabled(instancing);
+                file.write(srcGrids);
+            } else {
+                // Stream the grids to a file (i.e., without file offsets).
+                std::ofstream ostream(filename, std::ios_base::binary);
+                Stream stream(ostream);
+                stream.setInstancingEnabled(instancing);
+                stream.write(srcGrids);
+            }
+
+            File file(filename);
+            file.setInstancingEnabled(instancing);
+
+            // Reading from an unopened file generates an exception.
+            EXPECT_THROW(file.readGrids("density"), IoError);
+
+            file.open();
+
+            // Grids with the same stored name are returned in file order, and
+            // a name with a suffix matches only a grid literally named that.
+            EXPECT_EQ((std::vector<int>{0, 1}), indicesOf(file.readGrids("density")));
+            EXPECT_EQ((std::vector<int>{2}), indicesOf(file.readGrids("density[1]")));
+            EXPECT_EQ((std::vector<int>{4}), indicesOf(file.readGrids("")));
+            EXPECT_EQ((std::vector<int>{5, 6}), indicesOf(file.readGrids("pair")));
+            EXPECT_TRUE(file.readGrids("missing")->empty());
+            EXPECT_TRUE(file.readGrids("density[2]")->empty());
+
+            // An instance gets the tree of its parent grid.
+            GridPtrVecPtr other = file.readGrids("other");
+            ASSERT_EQ(1, int(other->size()));
+            EXPECT_EQ(3, indexOf((*other)[0]));
+            EXPECT_EQ(101, valueOf((*other)[0]));
+            EXPECT_EQ(101, valueOf(file.readGrid("other")));
+
+            GridPtrVecPtr density = file.readGrids("density");
+            EXPECT_EQ(100, valueOf((*density)[0]));
+            EXPECT_EQ(101, valueOf((*density)[1]));
+
+            // Grids sharing a tree share it on read only if instancing is enabled.
+            GridPtrVecPtr pair = file.readGrids("pair");
+            ASSERT_EQ(2, int(pair->size()));
+            if (instancing) {
+                EXPECT_EQ((*pair)[0]->baseTreePtr(), (*pair)[1]->baseTreePtr());
+            } else {
+                EXPECT_NE((*pair)[0]->baseTreePtr(), (*pair)[1]->baseTreePtr());
+            }
+            EXPECT_EQ(105, valueOf((*pair)[0]));
+            EXPECT_EQ(105, valueOf((*pair)[1]));
+
+            // Metadata only.
+            io::ReadOptions metadataOptions;
+            metadataOptions.readMode = io::ReadMode::MetadataOnly;
+            GridPtrVecPtr metadata = file.readGrids("density", metadataOptions);
+            ASSERT_EQ(2, int(metadata->size()));
+            EXPECT_EQ(0, indexOf((*metadata)[0]));
+            EXPECT_EQ(1, indexOf((*metadata)[1]));
+            EXPECT_EQ(Index64(0), (*metadata)[0]->activeVoxelCount());
+            EXPECT_EQ(Index64(0), (*metadata)[1]->activeVoxelCount());
+
+            // Clipping gives the same result as readGrid() for the grids it can reach.
+            const BBoxd clipBox(Vec3d(-1.0), Vec3d(10.0));
+            io::ReadOptions clipOptions;
+            clipOptions.clipBBox = clipBox;
+            // Duplicate names need an explicit index for readGrid(), which
+            // cannot resolve a bare duplicate name in a file without grid offsets.
+            std::vector<std::pair<Name, Name>> clipNames{
+                {"density", "density[0]"}, {"other", "other"},
+                {"pair", "pair[0]"}, {"", "[0]"}};
+            // Without grid offsets, readGrid() resolves "density[1]" to the second "density".
+            if (outputMethod == OUTPUT_TO_FILE) clipNames.emplace_back("density[1]", "density[1]");
+            for (const auto& [name, readGridName] : clipNames) {
+                GridBase::Ptr expected = file.readGrid(readGridName, clipBox);
+                GridPtrVecPtr clipped = file.readGrids(name, clipOptions);
+                ASSERT_FALSE(clipped->empty()) << name;
+                GridBase::Ptr actual = (*clipped)[0];
+                EXPECT_EQ(indexOf(expected), indexOf(actual)) << name;
+                EXPECT_EQ(Index64(1), actual->activeVoxelCount()) << name;
+                EXPECT_EQ(expected->activeVoxelCount(), actual->activeVoxelCount()) << name;
+                EXPECT_EQ(valueOf(expected), valueOf(actual)) << name;
+                EXPECT_EQ(expectedValues[indexOf(actual)], valueOf(actual)) << name;
+            }
+        }
+    }
+}
+
+
 TEST_F(TestFile, testEmptyFile)
 {
     using namespace openvdb;
