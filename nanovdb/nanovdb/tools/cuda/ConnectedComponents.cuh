@@ -514,7 +514,8 @@ void ConnectedComponents<BuildT, ResourceT>::processLeafConnectedComponents()
     // Upcast per-leaf uint16_t counts into offsets[1..leafCount] as uint64_t.
     uint16_t* d_counts  = deviceLeafComponentCounts();
     uint64_t* d_offsets = deviceLeafComponentOffsets();
-    util::cuda::lambdaKernel<<<(leafCount + 255) / 256, 256, 0, mStream>>>(
+    static constexpr unsigned int threadsPerBlock = 256;
+    util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(leafCount, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
         leafCount, components::detail::UpcastCountsFunctor{}, d_counts, d_offsets);
     cudaCheckError();
 
@@ -813,11 +814,11 @@ void ConnectedComponents<BuildT, ResourceT>::processComponentLabels()
     if (K == 0) return;
     uint64_t* d_parent = deviceComponentParent();
 
-    auto blocks = [](uint64_t n) { return (unsigned int)((n + 255) / 256); };
+    static constexpr unsigned int threadsPerBlock = 256;
 
     // (a) init: every component is its own root.
     if (mVerbose==1) mTimer.start("Component-label init");
-    util::cuda::lambdaKernel<<<blocks(K), 256, 0, mStream>>>(
+    util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(K, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
         K, components::detail::LabelInitFunctor{}, d_parent);
     cudaCheckError();
     if (mVerbose==1) mTimer.stop();
@@ -825,7 +826,7 @@ void ConnectedComponents<BuildT, ResourceT>::processComponentLabels()
     // (b) unite: one thread per edge; each unite has its own CAS-retry, so one pass suffices.
     if (mCrossLeafEdgeCount) {
         if (mVerbose==1) mTimer.start("Component-label unite");
-        util::cuda::lambdaKernel<<<blocks(mCrossLeafEdgeCount), 256, 0, mStream>>>(
+        util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(mCrossLeafEdgeCount, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
             mCrossLeafEdgeCount, components::detail::LabelUniteFunctor{}, d_parent, deviceCrossLeafEdges());
         cudaCheckError();
         if (mVerbose==1) mTimer.stop();
@@ -833,7 +834,7 @@ void ConnectedComponents<BuildT, ResourceT>::processComponentLabels()
 
     // (c) flatten: point every component directly at its representative (class minimum slot).
     if (mVerbose==1) mTimer.start("Component-label flatten");
-    util::cuda::lambdaKernel<<<blocks(K), 256, 0, mStream>>>(
+    util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(K, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
         K, components::detail::LabelFlattenFunctor{}, d_parent);
     cudaCheckError();
     if (mVerbose==1) mTimer.stop();
@@ -908,7 +909,8 @@ void ConnectedComponents<BuildT, ResourceT>::processVoxelLabels()
     //     rankBuf retains mStream, so the scatter below is ordered before the free at scope exit.
     BufT<ComponentLabelT> rankBuf(mStream, this->ref(), K, nanovdb::cuda::noInit);
     auto* d_rank = rankBuf.data();
-    util::cuda::lambdaKernel<<<(unsigned int)((K + 255) / 256), 256, 0, mStream>>>(
+    static constexpr unsigned int threadsPerBlock = 256;
+    util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(K, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
         K, components::detail::RootFlagFunctor{}, deviceComponentParent(), d_rank);
     cudaCheckError();
     if (mVerbose==1) mTimer.start("Component-rank prefix sum");
