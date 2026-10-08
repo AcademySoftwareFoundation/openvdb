@@ -82,7 +82,11 @@ jobs:
           echo "/usr/local/cuda/bin" >> $GITHUB_PATH
           echo "LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
       - name: nanobind
-        run: ./ci/install_nanobind.sh 2.5.0
+        # The NanoVDB Python bindings (CUDA interop, DLPack) track a newer
+        # nanobind than the repo-wide 2.5.0 floor. Bump here only; the shared
+        # build.yml still co-compiles the bindings against 2.5.0, so the
+        # binding code must stay >=2.5.0 source-compatible.
+        run: ./ci/install_nanobind.sh 2.12.0
       - name: build
       # NOTE: CMAKE_POSITION_INDEPENDENT_CODE set to fix default behaviour change in clang 14
       #   https://github.com/AcademySoftwareFoundation/aswf-docker/issues/228
@@ -128,6 +132,9 @@ jobs:
     - name: install
       shell: powershell
       run: .\ci\install_windows.ps1
+    - name: install_numpy
+      shell: powershell
+      run: .\ci\install_windows_numpy.ps1
     - name: build
     # nvcc doesn't set _WIN32 when run in bash so we need to set it manually
       shell: bash

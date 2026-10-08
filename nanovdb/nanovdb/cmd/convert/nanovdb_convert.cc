@@ -265,6 +265,7 @@ int main(int argc, char* argv[])
                         if (verbose) std::cout << "Converting OpenVDB grid named \"" << grid->getName() << "\" to NanoVDB" << std::endl;
                         handles.push_back(openToNano(grid));
                     } // loop over OpenVDB grids in file
+                    if (handles.empty()) throw std::runtime_error("No grids found in \"" + inputFile + "\"");
                     auto handle = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles);
                     nanovdb::io::writeGrid(os, handle, codec);
                 } else {// convert only grid with matching name
