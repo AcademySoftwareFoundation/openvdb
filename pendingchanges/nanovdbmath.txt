@@ -1,0 +1,32 @@
+NanoVDB:
+  Improvements:
+  - Refactored the math::Mat and math::Vec classes onto shared base classes
+    (MatBase and the new VecBase), giving every Mat/Vec type a complete and
+    consistent operator surface, bounds-checked element access, and constexpr
+    evaluation throughout Math.h and the Map API in NanoVDB.h. The
+    cross-template Vec conversion constructors are now explicit, so downstream
+    code relying on implicit Vec type conversions may need a one-line cast.
+    The scalar-times-Vec/Mat operators are now hidden friends and Mat4 * Vec4
+    is a member, so expressions like 2.f * v and m * v are unchanged, but a
+    fully qualified call such as math::operator*(2.f, v) must be rewritten.
+  - Added opt-in over-aligned math::Vec2Aligned, Vec3Aligned and Vec4Aligned
+    for user-owned arrays. The Vec and Mat classes stay naturally aligned, so
+    grid layouts and the file format are unchanged.
+
+  Bug Fixes:
+  - Fixed math::Min/Max for 32-bit integers routing through fminf/fmaxf, which
+    lost precision above 2^24 and could overflow near INT_MAX.
+  - Fixed integer division in the Vec and Mat scalar operator/, which previously
+    computed a reciprocal first, so e.g. Vec3i(6,8,10) / 2 returned (0,0,0).
+  - Fixed the Vec scalar operator*= when the scalar is one of the vector's own
+    components, e.g. v *= v[0], which scaled later components by the updated
+    value.
+  - Fixed Mat2::inverse returning uninitialized values on singular input; it now
+    returns zero.
+  - Fixed Vec2 arithmetic against Coord silently dropping the z component; the
+    overloads now take Coord2.
+  - Fixed math::Round(Vec3<float>) disagreeing with the double overload at
+    half-integers, and Vec2/Vec3::round() moving some floats to the wrong
+    integer (e.g. 0.49999997f to 1, 8388609.f to 8388610). All of them, and
+    the new scalar math::Round(float/double), now round exactly to the nearest
+    integer with halfway cases toward +inf.
