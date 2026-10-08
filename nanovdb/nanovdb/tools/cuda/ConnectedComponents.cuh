@@ -321,6 +321,9 @@ struct LeafUnionFind
     }
 }; // LeafUnionFind
 
+/// @brief Counts the 6-connected components of one leaf's active voxels, taken in isolation from
+///        neighboring leaves. One block per leaf, one thread per voxel. The counts size the
+///        per-leaf component slices that LeafComponentMaskFunctor then fills.
 template <typename BuildT>
 struct LeafComponentCountFunctor
 {
@@ -356,6 +359,9 @@ struct LeafComponentCountFunctor
     }
 }; // LeafComponentCountFunctor
 
+/// @brief Re-solves one leaf's components and fills its slice [d_offsets[leafID], d_offsets[leafID+1]),
+///        in ascending root order: each component's voxel Mask<3>, and its 6 face masks (the voxels
+///        it has on each leaf face, which the cross-leaf edge stage intersects with the neighbor's).
 template <typename BuildT>
 struct LeafComponentMaskFunctor
 {
@@ -365,9 +371,9 @@ struct LeafComponentMaskFunctor
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
     __device__ void operator()(const NanoGrid<BuildT>* d_grid,
-                                const uint64_t*         d_offsets,
-                                nanovdb::Mask<3>*       d_masks,
-                                uint64_t              (*d_faces)[6])
+                               const uint64_t*         d_offsets,
+                               nanovdb::Mask<3>*       d_masks,
+                               uint64_t                (*d_faces)[6])
     {
         __shared__ int   bufA[NanoLeaf<BuildT>::SIZE];
         __shared__ int   bufB[NanoLeaf<BuildT>::SIZE];
@@ -629,10 +635,10 @@ __device__ inline void forEachCrossLeafEdge(
     }
 }
 
-template <typename BuildT>
 /// @brief Counts one leaf's cross-leaf edges, one block per leaf. This sizes the edge array that
 ///        CrossLeafEdgeScatterFunctor then fills, so the two must agree on exactly which pairs are
 ///        edges -- which is why both drive forEachCrossLeafEdge instead of repeating its test.
+template <typename BuildT>
 struct CrossLeafEdgeCountFunctor
 {
     using ComponentLabelT = ConnectedComponentsBase::ComponentLabelT;
@@ -660,11 +666,11 @@ struct CrossLeafEdgeCountFunctor
     }
 };
 
-template <typename BuildT>
 /// @brief Writes one leaf's cross-leaf edges into the slice the count pass reserved for it,
 ///        [d_edgeOffsets[leafID], d_edgeOffsets[leafID+1]). Order within the slice is arbitrary --
 ///        a block-scoped atomic hands out slots -- and each edge is stored with a < b, so the
 ///        global union-find sees one canonical form per pair.
+template <typename BuildT>
 struct CrossLeafEdgeScatterFunctor
 {
     using ComponentLabelT = ConnectedComponentsBase::ComponentLabelT;
