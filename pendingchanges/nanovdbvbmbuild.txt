@@ -1,0 +1,14 @@
+NanoVDB:
+  Improvements:
+  - Reworked the CUDA VoxelBlockManager build to launch one thread per leaf over the
+    dense leaf array instead of one thread per lower-node child slot gated on the
+    childMask, and removed the synchronous device read of the node count from the
+    in-place rebuild path by caching the leaf count in the handle. Rebuilds are now
+    fully stream-asynchronous and measured 1.6-2x faster; outputs are byte-identical.
+    The cached count is a launch-sizing hint only: the kernel reads the authoritative
+    leaf count from the device-resident tree and iterates with a grid-stride loop, so
+    a stale cache cannot cause out-of-bounds access or wrong output.
+  API Changes:
+  - VoxelBlockManagerHandle gained an optional trailing leafCount constructor
+    parameter and leafCount()/setLeafCount() accessors (defaulted; existing callers
+    unaffected).
