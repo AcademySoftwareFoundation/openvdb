@@ -19,9 +19,11 @@ Use this module by invoking find_package with the form::
 IMPORTED Targets
 ^^^^^^^^^^^^^^^^
 
-``Log4cplus::Log4cplus``
-  This module defines IMPORTED target Log4cplus::log4cplus, if Log4cplus has been
-  found.
+``log4cplus::log4cplus``
+  This module defines IMPORTED target log4cplus::log4cplus, if Log4cplus has been
+  found. The name matches the target exported by log4cplus's own CMake config.
+``Log4cplus::log4cplus``
+  Alias of log4cplus::log4cplus, retained for compatibility.
 
 Result Variables
 ^^^^^^^^^^^^^^^^
@@ -307,38 +309,42 @@ endif()
 
 get_filename_component(Log4cplus_LIBRARY_DIRS ${Log4cplus_LIBRARY_RELEASE} DIRECTORY)
 
-if(NOT TARGET Log4cplus::log4cplus)
-  add_library(Log4cplus::log4cplus ${LOG4CPLUS_LIB_TYPE} IMPORTED)
-  set_target_properties(Log4cplus::log4cplus PROPERTIES
+if(NOT TARGET log4cplus::log4cplus)
+  add_library(log4cplus::log4cplus ${LOG4CPLUS_LIB_TYPE} IMPORTED)
+  set_target_properties(log4cplus::log4cplus PROPERTIES
     INTERFACE_COMPILE_OPTIONS "${PC_Log4cplus_CFLAGS_OTHER}"
     INTERFACE_INCLUDE_DIRECTORIES "${Log4cplus_INCLUDE_DIRS}")
 
   # Standard location
-  set_target_properties(Log4cplus::log4cplus PROPERTIES
+  set_target_properties(log4cplus::log4cplus PROPERTIES
     IMPORTED_LINK_INTERFACE_LANGUAGES "CXX;RC"
     IMPORTED_LOCATION "${Log4cplus_LIBRARY}")
 
   # WIN32 APIs
   if(WIN32)
-    set_target_properties(Log4cplus::log4cplus PROPERTIES
+    set_target_properties(log4cplus::log4cplus PROPERTIES
       IMPORTED_LINK_INTERFACE_LIBRARIES "ws2_32;advapi32")
   endif()
 
   # Release location
   if(EXISTS "${Log4cplus_LIBRARY_RELEASE}")
-    set_property(TARGET Log4cplus::log4cplus APPEND PROPERTY
+    set_property(TARGET log4cplus::log4cplus APPEND PROPERTY
       IMPORTED_CONFIGURATIONS RELEASE)
-    set_target_properties(Log4cplus::log4cplus PROPERTIES
+    set_target_properties(log4cplus::log4cplus PROPERTIES
       IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "CXX;RC"
       IMPORTED_LOCATION_RELEASE "${Log4cplus_LIBRARY_RELEASE}")
   endif()
 
   # Debug location
   if(EXISTS "${Log4cplus_LIBRARY_DEBUG}")
-    set_property(TARGET Log4cplus::log4cplus APPEND PROPERTY
+    set_property(TARGET log4cplus::log4cplus APPEND PROPERTY
       IMPORTED_CONFIGURATIONS DEBUG)
-    set_target_properties(Log4cplus::log4cplus PROPERTIES
+    set_target_properties(log4cplus::log4cplus PROPERTIES
       IMPORTED_LINK_INTERFACE_LANGUAGES_DEBUG "CXX;RC"
       IMPORTED_LOCATION_DEBUG "${Log4cplus_LIBRARY_DEBUG}")
   endif()
+endif()
+
+if(NOT TARGET Log4cplus::log4cplus)
+  add_library(Log4cplus::log4cplus ALIAS log4cplus::log4cplus)
 endif()

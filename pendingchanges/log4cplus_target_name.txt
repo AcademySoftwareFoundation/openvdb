@@ -1,0 +1,6 @@
+OpenVDB:
+  Build:
+  - FindLog4cplus.cmake now defines the log4cplus::log4cplus target, matching the name
+    exported by log4cplus's own CMake config, and OpenVDB links against it. This fixes
+    builds that resolve log4cplus through a CMake config package. Log4cplus::log4cplus
+    is retained as an alias.
