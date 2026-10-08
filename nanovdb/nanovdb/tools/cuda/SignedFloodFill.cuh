@@ -169,11 +169,16 @@ __global__ void processNode(NanoTree<BuildT> *d_tree, size_t count)
     const auto &mask = node.childMask();
     if (mask.isOn(nValue)) return;// ignore if child
     auto value = d_tree->background();// initiate to outside value
-    auto n = mask.template findNext<true>(nValue);
-    if (n < NodeT::SIZE) {
-        if (node.getChild(n)->getFirstValue() < 0) value = -value;
-    } else if ((n = mask.template findPrev<true>(nValue)) < NodeT::SIZE) {
+    const uint32_t dim = 1u << NodeT::LOG2DIM;
+    uint32_t n = nValue;
+    // step back one tile at a time, along -z to z=0, then along -y to y=0, then along -x,
+    // until a child is found (same choice as build::InternalNode::signedFloodFill)
+    while (n && !mask.isOn(n)) n -= (n & (dim - 1u)) ? 1u : (n & (dim*dim - 1u)) ? dim : dim*dim;
+    // sign of the last value of that child, else of the first value of the first child, else of tile 0
+    if (mask.isOn(n)) {
         if (node.getChild(n)->getLastValue()  < 0) value = -value;
+    } else if ((n = mask.template findFirst<true>()) < NodeT::SIZE) {
+        if (node.getChild(n)->getFirstValue() < 0) value = -value;
     } else if (node.getValue(0)<0) {
         value = -value;
     }
@@ -193,8 +198,13 @@ __global__ void processLeaf(NanoTree<BuildT> *d_tree, size_t count)
     const auto &mask = leaf->valueMask();
     if (mask.isOn(nVoxel)) return;
     auto *buffer = leaf->mValues;
-    auto n = mask.template findNext<true>(nVoxel);
-    if (n == LeafT::SIZE && (n = mask.template findPrev<true>(nVoxel)) == LeafT::SIZE) n = 0u;
+    const uint32_t dim = 1u << LeafT::LOG2DIM;
+    uint32_t n = nVoxel;
+    // step back one voxel at a time, along -z to z=0, then along -y to y=0, then along -x,
+    // until an active voxel is found (same choice as build::LeafNode::signedFloodFill)
+    while (n && !mask.isOn(n)) n -= (n & (dim - 1u)) ? 1u : (n & (dim*dim - 1u)) ? dim : dim*dim;
+    // none found down to voxel 0: use the first active voxel instead, or voxel 0 if the leaf has none
+    if (!mask.isOn(n) && (n = mask.template findFirst<true>()) == LeafT::SIZE) n = 0u;
     buffer[nVoxel] = buffer[n]<0 ? -d_tree->background() : d_tree->background();
 }// processLeaf
 
