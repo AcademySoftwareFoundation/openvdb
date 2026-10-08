@@ -134,11 +134,15 @@ public:
     ///            resource, which by default has program lifetime.
     ///          - componentCount: the number of connected components N.
     /// @note The returned contents are complete: the stream is synchronized before returning.
+    /// @warning The source grid must already be complete on the device when this is called: its
+    ///          tree header is read synchronously on the host, not in stream order. All NanoVDB CUDA
+    ///          tools guarantee this when they return a grid; after an asynchronous upload
+    ///          (e.g. deviceUpload with sync=false), synchronize before calling.
     std::pair<BufT<ComponentLabelT>, ComponentLabelT> getVoxelLabelsAndCount()
     {
         processLeafConnectedComponents();
-        processCrossLeafEdges();
-        processComponentLabels();
+        collectCrossLeafEdges();
+        processGlobalConnectedComponents();
         processVoxelLabels();
         cudaCheck(cudaStreamSynchronize(mStream));
         return { std::move(mVoxelLabel), mGlobalComponentCount };
@@ -154,11 +158,11 @@ private:
 
     // Stage 2: emit one edge (a<b) per pair of face-adjacent leaf-local components whose touching
     // face masks intersect. Unordered.
-    void processCrossLeafEdges();
+    void collectCrossLeafEdges();
 
-    // Stage 3: union-find over the edges -> deviceComponentParent()[s] = component s's representative
-    // (its class's minimum global slot).
-    void processComponentLabels();
+    // Stage 3: global union-find over the cross-leaf edges -> deviceComponentParent()[s] = component
+    // s's representative (its class's minimum global slot).
+    void processGlobalConnectedComponents();
 
     // Build the per-voxel label sidecar + component count N from the parent array.
     void processVoxelLabels();
@@ -184,15 +188,20 @@ private:
     uint64_t                     mLeafComponentAggregateCount{0}; // total leaf-local components across all leaves (= K = offsets[leafCount])
 
     // TODO: none of these is released before this operator is destroyed, though two die early:
-    // mLeafComponentFaceMasks after processCrossLeafEdges (48 B per leaf-local component) and
-    // mCrossLeafEdges after processComponentLabels (8 B per edge). Releasing each at its last use
-    // -- a move-assign of an empty buffer, stream-ordered, no host sync -- would cut peak memory.
+    // mLeafComponentFaceMasks after collectCrossLeafEdges (48 B per leaf-local component) and
+    // mCrossLeafEdges after processGlobalConnectedComponents (8 B per edge). Releasing each at its
+    // last use -- a move-assign of an empty buffer, stream-ordered, no host sync -- would cut peak
+    // memory.
     BufT<uint16_t>               mLeafComponentCounts;      // leafCount                    x uint16_t:      per-leaf component count
     BufT<uint64_t>               mLeafComponentOffsets;     // (leafCount+1)                x uint64_t:      exclusive+inclusive prefix sums
     BufT<nanovdb::Mask<3>>       mLeafComponentMasks;       // mLeafComponentAggregateCount x Mask<3>:       per-component active-voxel footprint
     BufT<uint64_t[6]>            mLeafComponentFaceMasks;   // mLeafComponentAggregateCount x uint64_t[6]:   per-component face bitmasks (0=-X,1=+X,2=-Y,3=+Y,4=-Z,5=+Z)
 
     uint64_t                     mCrossLeafEdgeCount{0};    // total cross-leaf edges (E)
+    // Each edge belongs to the leaf on its -side: leaf i's slice [offsets[i], offsets[i+1]) holds the
+    // edges joining leaf i's components to those of its +X/+Y/+Z neighbors. The grouping is only a
+    // write partition for the scatter; Stage 3 reads the edges as one flat list. Edges are stored
+    // (min,max) by global slot, so neither endpoint is reliably the owning leaf's.
     BufT<uint64_t>               mCrossLeafEdgeOffsets;     // (leafCount+1) x uint64_t:  per-leaf edge prefix sums
     BufT<CrossLeafEdge>          mCrossLeafEdges;           // E x CrossLeafEdge (a<b)
 
@@ -580,16 +589,16 @@ namespace components::detail {
 /// @brief Linear leaf index of leaf's +axis neighbor (axis: 0=+X, 1=+Y, 2=+Z), or -1 if none.
 template <typename BuildT>
 __device__ inline int neighborLeafIndex(const NanoGrid<BuildT>* d_grid,
-                                           const NanoLeaf<BuildT>&  leaf, int axis)
+                                        const NanoLeaf<BuildT>&  leaf, int axis)
 {
-    const nanovdb::Coord o  = leaf.origin();
-    const nanovdb::Coord no = (axis == 0) ? o.offsetBy(8, 0, 0)
-                            : (axis == 1) ? o.offsetBy(0, 8, 0)
-                                          : o.offsetBy(0, 0, 8);
-    const auto* nptr = d_grid->tree().root().probeLeaf(no);
-    if (!nptr) return -1;
-    const auto* base = d_grid->tree().template getFirstNode<0>();
-    return int(nptr - base);  // leaves are contiguous breadth-first; typed diff = linear index
+    const nanovdb::Coord leafOrigin     = leaf.origin();
+    const nanovdb::Coord neighborOrigin = (axis == 0) ? leafOrigin.offsetBy(8, 0, 0)
+                                        : (axis == 1) ? leafOrigin.offsetBy(0, 8, 0)
+                                                      : leafOrigin.offsetBy(0, 0, 8);
+    const auto* neighborLeaf = d_grid->tree().root().probeLeaf(neighborOrigin);
+    if (!neighborLeaf) return -1;
+    const auto* firstLeaf = d_grid->tree().template getFirstNode<0>();
+    return int(neighborLeaf - firstLeaf);  // leaves are contiguous breadth-first; typed diff = linear index
 }
 
 /// @brief Enumerate this leaf's cross-leaf component pairs whose touching faces intersect, invoking
@@ -705,7 +714,7 @@ struct CrossLeafEdgeScatterFunctor
 } // namespace components::detail
 
 template <typename BuildT, typename ResourceT>
-void ConnectedComponents<BuildT, ResourceT>::processCrossLeafEdges()
+void ConnectedComponents<BuildT, ResourceT>::collectCrossLeafEdges()
 {
     const uint32_t leafCount =
         util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid).mNodeCount[0];
@@ -748,16 +757,26 @@ void ConnectedComponents<BuildT, ResourceT>::processCrossLeafEdges()
             d_offsets, deviceCrossLeafEdges());
     cudaCheckError();
     if (mVerbose==1) mTimer.stop();
-}// ConnectedComponents<BuildT, ResourceT>::processCrossLeafEdges
+}// ConnectedComponents<BuildT, ResourceT>::collectCrossLeafEdges
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 namespace components::detail {
 
 // Stage 3: global union-find over the cross-leaf edge list (representative = min slot in the class).
+//
+// Design choice: this is a different algorithm from Stage 1's LeafUnionFind. A leaf's graph is an
+// implicit 8^3 lattice owned by one block, so synchronous hook/compress rounds cost only a few
+// __syncthreads(). Here the graph is an irregular, explicit edge list spanning the whole grid, where
+// a synchronous round would need a grid-wide barrier (a kernel launch plus a host convergence check
+// per round). An asynchronous lock-free union-find (one thread per edge, CAS root-to-root links)
+// reaches the same answer in a single pass.
 
 /// @brief Walk parent pointers to the root of x. Links always point larger->smaller slot, so the
 ///        forest is acyclic and this terminates; the root is the minimum slot in x's class.
+///        No path compression: the walk length is the tree depth, which is data-dependent and
+///        diverges across a warp. Trees are shallow in practice, but long chains of components
+///        united in an unlucky order can deepen them; path halving here would be the remedy.
 __device__ inline uint64_t find(const uint64_t* parent, uint64_t x)
 {
     while (parent[x] != x) x = parent[x];
@@ -807,7 +826,7 @@ struct LabelFlattenFunctor {
 } // namespace components::detail
 
 template <typename BuildT, typename ResourceT>
-void ConnectedComponents<BuildT, ResourceT>::processComponentLabels()
+void ConnectedComponents<BuildT, ResourceT>::processGlobalConnectedComponents()
 {
     const uint64_t K = mLeafComponentAggregateCount;
     mComponentParent = BufT<uint64_t>(mStream, this->ref(), K, nanovdb::cuda::noInit);
@@ -817,7 +836,7 @@ void ConnectedComponents<BuildT, ResourceT>::processComponentLabels()
     static constexpr unsigned int threadsPerBlock = 256;
 
     // (a) init: every component is its own root.
-    if (mVerbose==1) mTimer.start("Component-label init");
+    if (mVerbose==1) mTimer.start("Global union-find init");
     util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(K, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
         K, components::detail::LabelInitFunctor{}, d_parent);
     cudaCheckError();
@@ -825,7 +844,7 @@ void ConnectedComponents<BuildT, ResourceT>::processComponentLabels()
 
     // (b) unite: one thread per edge; each unite has its own CAS-retry, so one pass suffices.
     if (mCrossLeafEdgeCount) {
-        if (mVerbose==1) mTimer.start("Component-label unite");
+        if (mVerbose==1) mTimer.start("Global union-find unite");
         util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(mCrossLeafEdgeCount, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
             mCrossLeafEdgeCount, components::detail::LabelUniteFunctor{}, d_parent, deviceCrossLeafEdges());
         cudaCheckError();
@@ -833,12 +852,12 @@ void ConnectedComponents<BuildT, ResourceT>::processComponentLabels()
     }
 
     // (c) flatten: point every component directly at its representative (class minimum slot).
-    if (mVerbose==1) mTimer.start("Component-label flatten");
+    if (mVerbose==1) mTimer.start("Global union-find flatten");
     util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(K, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
         K, components::detail::LabelFlattenFunctor{}, d_parent);
     cudaCheckError();
     if (mVerbose==1) mTimer.stop();
-}// ConnectedComponents<BuildT, ResourceT>::processComponentLabels
+}// ConnectedComponents<BuildT, ResourceT>::processGlobalConnectedComponents
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
