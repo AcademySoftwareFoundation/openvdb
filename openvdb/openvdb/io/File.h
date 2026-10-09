@@ -106,9 +106,12 @@ public:
     /// intersects the given world-space bounding box.
     GridBase::Ptr readGrid(const Name&, const BBoxd&);
 
-    /// @brief Read all grids whose stored name is exactly @a name, in file order.
-    /// @details The name is compared as stored, so "density[1]" matches only a grid
-    /// literally named "density[1]", not the second grid named "density".
+    /// @brief Read all grids whose grid name is exactly @a name, in file order.
+    /// @details Grids have a name, such as "density", which may not be unique in a file.
+    /// When more than one grid share the same name, these names are made unique by adding
+    /// a [N] suffix. For example, the first "density" grid becomes "density[0]", the second
+    /// becomes "density[1]", etc. This method ignores the unique name and returns all grids
+    /// whose grid name exactly matches the given name.
     /// Instances share trees as they do with getGrids().
     /// @return An empty list if no grid has this name.
     /// @throw IoError if this file is not open for reading.
@@ -155,11 +158,15 @@ public:
 
 private:
     /// @brief Return an iterator to the descriptor for the grid with the given name.
-    /// If the name is non-unique, return an iterator to the first matching descriptor.
+    /// @details If "density" is searched and there is more than one "density" grid,
+    /// returns an iterator to the first matching grid. If "density[1]" is searched,
+    /// it is tested against the unique name, so it matches the second "density" grid.
     NameMapCIter findDescriptor(const Name&) const;
 
     /// @brief Return an iterator to the descriptor whose unique name is exactly the given name,
-    /// or the end iterator if there is none. Unlike findDescriptor(), "[N]" is not parsed.
+    /// or the end iterator if there is none.
+    /// @details Only the unique name is searched. "density" does not match a grid that was
+    /// made unique as "density[1]", "density[1]" must be used instead.
     NameMapCIter findDescriptorByUniqueName(const Name&) const;
 
     /// @brief Read the grid for the given descriptor, including its instance parent's tree.
