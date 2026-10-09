@@ -139,6 +139,21 @@ Note that this tool maintains two stacks of primitives, namely geometry (i.e. po
 
 This tool supports its own light-weight stack-oriented programming language that is (very loosely) inspired by Forth. Specifically, it uses Reverse Polish Notation (RPN) to define instructions that are evaluated during paring of the command-line arguments (options to be precise). All such expressions start with the character "{", ends with "}", and arguments are separated by ":". Variables starting with "\$" are substituted by its (previously) defined values, and variables starting with "@" are stored in memory. So, "{1:2:+:@x}" is conceptually equivalent to "x = 1 + 2". Conversely, "{\$x:++}" is conceptually equivalent "2 + 1 = 3" since "x=2" was already saved to memory. This is especially useful in combination with loops, e.g. "-quiet -for i=1,3,1 -eval {\$i:++} -end" will print 2 and 3 to the terminal. Branching is also supported, e.g. "radius={$x:1:>:if(0.5:sin?0.3:cos)}" is conceptually equal to "if (x>1) radius=sin(0.5) else radius=cos(0.3)". See the root-searching example below or run vdb_tool -eval help="*" to see a list of all instructions currently supported by this scripting language. Note that since this language uses characters that are interpreted by most shells it is necessary to use single quotes around strings! This is of course not the case when using config files.
 
+# Execution and logging
+
+Ordinary action failures are reported and subsequent actions continue, but the
+process exits with a nonzero status if any action failed. `-errorOnWarning` stops
+at the first action failure. Errors in control-flow actions (`for`, `each`,
+`files`, `if`, `switch`, `case`, and `end`) always stop execution.
+
+Numeric `for` loops use an inclusive start and exclusive end. Positive and
+negative steps are supported, for example `-for i=3,0,-1` visits 3, 2, and 1.
+Steps must be finite, nonzero, and advance toward the end; a step too small to
+change the current value is reported as an error.
+
+Logging redirects diagnostic streams only. Binary stdout remains available to
+pipelines with either `-log tee=true` or `-log tee=false`.
+
 # Configuration file format
 
 vdb_tool can read and write configuration files (any extension is accepted, but the convention is `.txt`) that capture an entire action pipeline for replay or sharing. Run a saved config with `vdb_tool -config <file>`; produce one from the current command line by piping it to `-write file.txt`.
@@ -148,7 +163,7 @@ The format is intentionally tiny and line-oriented:
 1. **The first line must be a version header**: `vdb_tool MAJOR.MINOR.PATCH` (e.g. `vdb_tool 10.8.0`). Loading fails if it's missing or the major version doesn't match the running tool.
 2. **One action per line**. The first non-whitespace token on each line is the action name; the leading `-` used on the command line is **implicit and must be omitted**.
 3. **Subsequent tokens on the same line are that action's options/values**, separated by whitespace. E.g. `sphere r=2 voxel=0.05` is a single action with two options.
-4. **Comments**: any text from `#` or `%` to the end of the line is stripped. A line whose first non-whitespace character is `#` or `%` is treated as a full-line comment.
+4. **Comments**: a line whose first non-whitespace character is `#` or `%` is a full-line comment. Inline `#` comments are stripped only outside `{...}` expressions and quoted text, preserving loop counters such as `{$#i}`. Within an action, `%` is the modulo operator, so `calc n = 5 % 2` evaluates to 1. Use `#` for inline comments previously introduced with `%`.
 5. **Leading and trailing whitespace are ignored**, so indenting nested control-flow scopes (`-for` / `-each` / `-files` / `-if` / `-switch` / `-case`) for readability has no effect on behavior.
 6. **No shell quoting is needed** — the line is parsed verbatim. Characters that would otherwise need escaping on the command line (`*`, `{`, `}`, `$`, `(`, `)` etc.) are written plain.
 7. **Blank lines are skipped.**
@@ -959,4 +974,3 @@ end
 render spiral.ppm image=1024x1024 translate=(0,0,40)
 ```
 ---
-

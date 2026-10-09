@@ -35,6 +35,8 @@
 #include <sstream>
 #include <string> // for std::string, std::stof and std::stoi
 #include <algorithm> // std::sort
+#include <cmath>
+#include <limits>
 #include <filesystem>
 #include <random>
 #include <functional>
@@ -773,22 +775,41 @@ public:
     /// @param i Iterator pointing at the -for action.
     /// @param n Name of the loop variable.
     /// @param v Vector containing {start, end} or {start, end, step}. Step defaults to 1.
-    /// @throw std::invalid_argument if @a v has any size other than 2 or 3.
+    /// @throw std::invalid_argument for non-finite bounds, zero or misdirected steps,
+    ///        or if @a v has any size other than 2 or 3.
     ForLoop(Memory &s, ActIterT i, const std::string &n, const std::vector<T> &v) : BaseLoop(s, i, n), vec(1) {
         if (v.size()!=2 && v.size()!=3)  throw std::invalid_argument("ForLoop: expected two or three arguments, i=1,9 or i=1,9,2");
         for (size_t i=0; i<v.size(); ++i) vec[i] = v[i];
+        for (int i = 0; i < 3; ++i) {
+            if (!std::isfinite(static_cast<double>(vec[i])))
+                throw std::invalid_argument("ForLoop: bounds and step must be finite");
+        }
+        if (vec[2] == T(0)) throw std::invalid_argument("ForLoop: step must be non-zero");
+        if ((vec[0] < vec[1] && vec[2] < T(0)) ||
+            (vec[0] > vec[1] && vec[2] > T(0)))
+            throw std::invalid_argument("ForLoop: step must advance toward the end bound");
         if (this->valid()) this->set(vec[0]);
     }
     virtual ~ForLoop() {}
-    /// @brief Returns true if the current value is still strictly less than the upper bound.
-    bool valid() override {return vec[0] < vec[1];}
+    /// @brief Returns true if the current value has not reached the exclusive end bound.
+    bool valid() override {return vec[2] > T(0) ? vec[0] < vec[1] : vec[0] > vec[1];}
     /// @brief Advance the loop variable by the step and publish it to Memory.
     /// @return true if the new value is still in range.
     bool next() override {
         ++pos;
-        vec[0] = this->template get<T>() + vec[2];// read from memory
-        if (vec[0] < vec[1]) this->set(vec[0]);
-        return vec[0] < vec[1];
+        const T current = this->template get<T>();// loop bodies may update the variable
+        // Widen before addition to avoid signed integer overflow at the end of a range.
+        const long double sum = static_cast<long double>(current) + vec[2];
+        if (!std::isfinite(sum)) throw std::invalid_argument("ForLoop: non-finite loop value");
+        if (vec[2] > T(0) ? sum >= vec[1] : sum <= vec[1]) return false;
+        if (sum < std::numeric_limits<T>::lowest() || sum > std::numeric_limits<T>::max())
+            throw std::invalid_argument("ForLoop: loop value out of range");
+        const T next = static_cast<T>(sum);
+        if (vec[2] > T(0) ? next <= vec[0] : next >= vec[0])
+            throw std::invalid_argument("ForLoop: step does not advance the loop value");
+        vec[0] = next;
+        if (this->valid()) this->set(vec[0]);
+        return this->valid();
     }
 
 private:
@@ -848,6 +869,7 @@ public:
     /// @param excludePattern Substring patterns; if non-empty, file name must contain none of them.
     /// @param minFileSize    Minimum file size in bytes (inclusive).
     /// @param maxFileSize    Maximum file size in bytes (inclusive).
+    /// @throw std::invalid_argument if a path being opened is not a directory.
     FilesLoop(Memory &s, ActIterT i, const std::string &name,
               std::vector<std::string> &&pathString,
               std::vector<std::string> &&fileExt,
@@ -864,7 +886,9 @@ public:
     {
         for (mPathIter = mPathNames.begin(); mPathIter != mPathNames.end(); ++mPathIter) {
             mFilePath = std::filesystem::path(*mPathIter);
-            OPENVDB_ASSERT(std::filesystem::is_directory(mFilePath));
+            if (!std::filesystem::is_directory(mFilePath)) {
+                throw std::invalid_argument("FilesLoop: path \"" + mFilePath.string() + "\" is not a directory");
+            }
             mIter = IterT(mFilePath);
             mEnd  = std::filesystem::end(mIter);
             for(; !this->valid() && mIter != mEnd; ++mIter);
@@ -914,6 +938,7 @@ public:
     }
     /// @brief Advance to the next matching file, spanning directories if needed.
     /// @return true if another valid file was found.
+    /// @throw std::invalid_argument if a subsequent path is not a directory.
     bool next() override {
         if (mPathIter == mPathNames.end()) return false;
         ++pos;
@@ -924,7 +949,9 @@ public:
             ++mPathIter;
             if (mPathIter != mPathNames.end()) {
                 mFilePath = std::filesystem::path(*mPathIter);
-                OPENVDB_ASSERT(std::filesystem::is_directory(mFilePath));
+                if (!std::filesystem::is_directory(mFilePath)) {
+                    throw std::invalid_argument("FilesLoop: path \"" + mFilePath.string() + "\" is not a directory");
+                }
                 mIter = IterT(mFilePath);
                 mEnd  = std::filesystem::end(mIter);
             }
@@ -1009,6 +1036,8 @@ struct Parser {
     /// @brief Constructor.
     /// @param def Global default options (applied to every matching action unless overridden).
     Parser(std::vector<Option> &&def);
+    /// @brief Destroy active scopes while their referenced Processor memory is still alive.
+    ~Parser() { loops.clear(); }
     /// @brief Parse argv into the @c actions list, dispatching each token to an action's options.
     /// @throw std::invalid_argument if no arguments are supplied, an unknown action is encountered,
     ///        or "-for/-each/-files/-if" actions are not balanced by matching "-end" actions.
@@ -1016,7 +1045,8 @@ struct Parser {
     /// @brief Validate the parsed action list (loop matching, etc.) and prepare for run().
     inline void finalize();
     /// @brief Execute every action in @c actions, in order, honoring loops and if-blocks.
-    inline void run();
+    /// @return false if an action failed and the error handler allowed execution to continue.
+    inline bool run();
     /// @brief Apply currently-stored defaults to the option list of the action at @c iter.
     inline void setDefaults();
     /// @brief Print every selected action in canonical form (useful for config-file output).
@@ -1098,7 +1128,8 @@ struct Parser {
     mutable int         mCurrentArgIdx = -1;
     /// @brief Optional callback to handle action errors. Called when an action throws.
     ///        If the callback returns true, the error is treated as fatal (re-thrown).
-    ///        If it returns false, the error is logged as a skip and execution continues.
+    ///        If it returns false, ordinary action errors are logged and execution continues.
+    ///        Control-flow errors always propagate to avoid executing an invalid scope.
     ///        The callback receives (action_name, exception_message).
     std::function<bool(const std::string&, const std::string&)> onActionError = nullptr;
     /// @brief Optional callback applied to an option's value every time it is read,
@@ -1599,6 +1630,7 @@ inline Parser::Parser(std::vector<Option> &&def)
         },
         [&](){
             OPENVDB_ASSERT(iter->names[0] == "end");
+            if (loops.empty()) throw std::invalid_argument("-end has no active scope");
             auto loop = loops.back();// current loop
             if (loop->next()) {// rewind loop
                 iter = loop->begin;
@@ -1611,8 +1643,9 @@ inline Parser::Parser(std::vector<Option> &&def)
 
 // ==============================================================================================================
 
-void Parser::run()
+bool Parser::run()
 {
+    bool success = true;
     for (iter=actions.begin(); iter!=actions.end(); ++iter) {
         if (onActionError) {
             // Centralized error handling: wrap the action callback
@@ -1620,10 +1653,14 @@ void Parser::run()
                 iter->run();
             } catch (const std::exception& e) {
                 const std::string &action_name = iter->names[0];
-                const bool isFatal = onActionError(action_name, e.what());
+                const bool controlFlow = findMatch(action_name,
+                    {"for", "each", "files", "if", "switch", "case", "end"}) != 0;
+                const bool isFatal = controlFlow || onActionError(action_name, e.what());
                 if (isFatal) {
+                    loops.clear();
                     throw std::invalid_argument(action_name + ": " + e.what());
                 } else {
+                    success = false;
                     std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
                 }
             }
@@ -1632,6 +1669,7 @@ void Parser::run()
             iter->run();
         }
     }
+    return success;
 }// Parser::run(
 
 // ==============================================================================================================
