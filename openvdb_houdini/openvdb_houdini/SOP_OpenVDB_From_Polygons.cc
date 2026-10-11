@@ -5,7 +5,7 @@
 ///
 /// @author FX R&D OpenVDB team
 ///
-/// @brief Converts a closed mesh of trinagles and/or quads into different VDB volumes.
+/// @brief Converts a closed mesh of triangles and/or quads into different VDB volumes.
 /// The supported volumes are: Signed distance field / level-set, closest primitive grid
 /// and grids with different mesh attributes (closest UVW, Normal etc.)
 
