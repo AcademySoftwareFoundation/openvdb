@@ -5,235 +5,142 @@
 #define OPENVDB_UTIL_LOGGING_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
+#include <openvdb/Platform.h>
 
-#ifdef OPENVDB_USE_LOG4CPLUS
-
-#include <log4cplus/appender.h>
-#include <log4cplus/configurator.h>
-#include <log4cplus/consoleappender.h>
-#include <log4cplus/layout.h>
-#include <log4cplus/logger.h>
-#include <log4cplus/spi/loggingevent.h>
-#include <algorithm> // for std::remove()
-#include <cstring> // for ::strrchr()
+#include <atomic>
 #include <memory>
 #include <sstream>
 #include <string>
-#include <vector>
-
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace logging {
 
-/// @brief Message severity level
-enum class Level {
-    Debug = log4cplus::DEBUG_LOG_LEVEL,
-    Info =  log4cplus::INFO_LOG_LEVEL,
-    Warn =  log4cplus::WARN_LOG_LEVEL,
-    Error = log4cplus::ERROR_LOG_LEVEL,
-    Fatal = log4cplus::FATAL_LOG_LEVEL
+/// @brief Message severity level, in increasing order of severity.
+enum class Level { Debug = 0, Info, Warn, Error, Fatal };
+
+/// @brief Return the current severity threshold. Messages below this are dropped.
+OPENVDB_API Level getLevel();
+
+/// @brief Set the severity threshold. Messages below this are dropped.
+OPENVDB_API void setLevel(Level);
+
+/// @brief Return true if a message of the given level would be logged.
+/// @details Used by the logging macros to skip formatting a message that would
+///   be discarded. This is a single relaxed atomic load.
+OPENVDB_API bool isEnabledFor(Level);
+
+/// @brief If "-debug", "-info", "-warn", "-error" or "-fatal" is found
+/// in the given array of command-line arguments, set the logging level
+/// appropriately and remove the relevant argument(s) from the array.
+OPENVDB_API void setLevel(int& argc, char* argv[]);
+
+/// @brief Receives formatted log messages. Subclass this to route OpenVDB
+///   diagnostics into a host application.
+/// @details Sinks are called on the thread that logged the message, so an
+///   implementation must be thread safe. A sink must not throw.
+///
+/// @par Example
+/// @code
+/// class MySink: public openvdb::logging::Sink
+/// {
+/// public:
+///     MySink(): Sink("mysink") {}
+///     void append(openvdb::logging::Level level, const std::string& message,
+///         const char* file, int line) override
+///     {
+///         // forward to the host application's own logging system
+///     }
+/// };
+///
+/// openvdb::logging::addSink(std::make_shared<MySink>());
+/// @endcode
+class OPENVDB_API Sink
+{
+public:
+    using Ptr = std::shared_ptr<Sink>;
+
+    /// @param name       Unique identifier, used by removeSink() and findSink().
+    /// @param threshold  Messages below this level are not delivered to this sink,
+    ///   in addition to the global threshold from setLevel().
+    explicit Sink(const std::string& name, Level threshold = Level::Debug);
+    virtual ~Sink();
+
+    const std::string& name() const;
+
+    Level threshold() const;
+    void setThreshold(Level);
+
+    /// @param level    Severity of the message.
+    /// @param message  The formatted message text, without a trailing newline.
+    /// @param file     Source file the message was logged from, may be null.
+    /// @param line     Line in @a file, or 0 if unknown.
+    virtual void append(Level level, const std::string& message,
+        const char* file, int line) = 0;
+
+private:
+    const std::string mName;
+    std::atomic<Level> mThreshold;
+};
+
+/// @brief Register a sink. Replaces any existing sink with the same name.
+OPENVDB_API void addSink(const Sink::Ptr&);
+
+/// @brief Remove the sink with the given name. Returns true if one was removed.
+OPENVDB_API bool removeSink(const std::string& name);
+
+/// @brief Return the sink with the given name, or nullptr.
+OPENVDB_API Sink::Ptr findSink(const std::string& name);
+
+/// @brief The sink installed by default, writing to std::cerr.
+class OPENVDB_API ConsoleSink: public Sink
+{
+public:
+    /// The name under which this sink is registered.
+    static const char* defaultName();
+
+    /// @brief Return true if stderr is connected to a terminal.
+    static bool stderrIsTerminal();
+
+    explicit ConsoleSink(bool useColor = stderrIsTerminal());
+
+    bool useColor() const;
+    void setUseColor(bool);
+
+    void append(Level, const std::string& message, const char* file, int line) override;
+
+private:
+    std::atomic<bool> mUseColor;
+};
+
+/// @brief Install the default console sink if no sink has been installed yet.
+/// @details By default, color is enabled only if stderr is connected to a terminal.
+OPENVDB_API void initialize(bool useColor = ConsoleSink::stderrIsTerminal());
+
+/// @brief Initialize and then apply any level flags found in the arguments.
+/// @details By default, color is enabled only if stderr is connected to a terminal.
+OPENVDB_API void initialize(int& argc, char* argv[], bool useColor = ConsoleSink::stderrIsTerminal());
+
+/// @brief Sets the level on construction and restores the previous level on
+/// destruction.
+struct LevelScope
+{
+    Level level;
+    explicit LevelScope(Level newLevel): level(getLevel()) { setLevel(newLevel); }
+    ~LevelScope() { setLevel(level); }
 };
 
 /// @cond OPENVDB_DOCS_INTERNAL
 
 namespace internal {
 
-/// @brief log4cplus layout that outputs text in different colors
-/// for different log levels, using ANSI escape codes
-class ColoredPatternLayout: public log4cplus::PatternLayout
-{
-public:
-    explicit ColoredPatternLayout(const std::string& progName_, bool useColor = true)
-        : log4cplus::PatternLayout(
-            progName_.empty() ? std::string{"%5p: %m%n"} : (progName_ + " %5p: %m%n"))
-        , mUseColor(useColor)
-        , mProgName(progName_)
-    {
-    }
-
-    ~ColoredPatternLayout() override {}
-
-    const std::string& progName() const { return mProgName; }
-
-    void formatAndAppend(log4cplus::tostream& strm,
-        const log4cplus::spi::InternalLoggingEvent& event) override
-    {
-        if (!mUseColor) {
-            log4cplus::PatternLayout::formatAndAppend(strm, event);
-            return;
-        }
-        log4cplus::tostringstream s;
-        switch (event.getLogLevel()) {
-            case log4cplus::DEBUG_LOG_LEVEL: s << "\033[32m"; break; // green
-            case log4cplus::ERROR_LOG_LEVEL:
-            case log4cplus::FATAL_LOG_LEVEL: s << "\033[31m"; break; // red
-            case log4cplus::INFO_LOG_LEVEL:  s << "\033[36m"; break; // cyan
-            case log4cplus::WARN_LOG_LEVEL:  s << "\033[35m"; break; // magenta
-        }
-        log4cplus::PatternLayout::formatAndAppend(s, event);
-        strm << s.str() << "\033[0m" << std::flush;
-    }
-
-// Disable deprecation warnings for std::auto_ptr.
-#if defined(__ICC)
-  #pragma warning push
-  #pragma warning disable:1478
-#elif defined(__clang__)
-  #pragma clang diagnostic push
-  #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#elif defined(__GNUC__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-
-#if defined(LOG4CPLUS_VERSION) && defined(LOG4CPLUS_MAKE_VERSION)
-  #if LOG4CPLUS_VERSION >= LOG4CPLUS_MAKE_VERSION(2, 0, 0)
-    // In log4cplus 2.0.0, std::auto_ptr was replaced with std::unique_ptr.
-    using Ptr = std::unique_ptr<log4cplus::Layout>;
-  #else
-    using Ptr = std::auto_ptr<log4cplus::Layout>;
-  #endif
-#else
-    using Ptr = std::auto_ptr<log4cplus::Layout>;
-#endif
-
-    static Ptr create(const std::string& progName_, bool useColor = true)
-    {
-        return Ptr{new ColoredPatternLayout{progName_, useColor}};
-    }
-
-#if defined(__ICC)
-  #pragma warning pop
-#elif defined(__clang__)
-  #pragma clang diagnostic pop
-#elif defined(__GNUC__)
-  #pragma GCC diagnostic pop
-#endif
-
-private:
-    bool mUseColor = true;
-    std::string mProgName;
-}; // class ColoredPatternLayout
-
-
-inline log4cplus::Logger
-getLogger()
-{
-    return log4cplus::Logger::getInstance(LOG4CPLUS_TEXT("openvdb"));
-}
-
-
-inline log4cplus::SharedAppenderPtr
-getAppender()
-{
-    return getLogger().getAppender(LOG4CPLUS_TEXT("OPENVDB"));
-}
+OPENVDB_API void dispatch(Level level, const std::string& message,
+    const char* file, int line);
 
 } // namespace internal
 
 /// @endcond
-
-
-/// @brief Return the current logging level.
-inline Level
-getLevel()
-{
-    switch (internal::getLogger().getLogLevel()) {
-        case log4cplus::DEBUG_LOG_LEVEL: return Level::Debug;
-        case log4cplus::INFO_LOG_LEVEL:  return Level::Info;
-        case log4cplus::WARN_LOG_LEVEL:  return Level::Warn;
-        case log4cplus::ERROR_LOG_LEVEL: return Level::Error;
-        case log4cplus::FATAL_LOG_LEVEL: break;
-    }
-    return Level::Fatal;
-}
-
-
-/// @brief Set the logging level.  (Lower-level messages will be suppressed.)
-inline void
-setLevel(Level lvl)
-{
-    internal::getLogger().setLogLevel(static_cast<log4cplus::LogLevel>(lvl));
-}
-
-
-/// @brief If "-debug", "-info", "-warn", "-error" or "-fatal" is found
-/// in the given array of command-line arguments, set the logging level
-/// appropriately and remove the relevant argument(s) from the array.
-inline void
-setLevel(int& argc, char* argv[])
-{
-    for (int i = 1; i < argc; ++i) { // note: skip argv[0]
-        const std::string arg{argv[i]};
-        bool remove = true;
-        if (arg == "-debug")      { setLevel(Level::Debug); }
-        else if (arg == "-error") { setLevel(Level::Error); }
-        else if (arg == "-fatal") { setLevel(Level::Fatal); }
-        else if (arg == "-info")  { setLevel(Level::Info); }
-        else if (arg == "-warn")  { setLevel(Level::Warn); }
-        else { remove = false; }
-        if (remove) argv[i] = nullptr;
-    }
-    auto end = std::remove(argv + 1, argv + argc, nullptr);
-    argc = static_cast<int>(end - argv);
-}
-
-
-/// @brief Specify a program name to be displayed in log messages.
-inline void
-setProgramName(const std::string& progName, bool useColor = true)
-{
-    // Change the layout of the OpenVDB appender to use colored text
-    // and to incorporate the supplied program name.
-    if (auto appender = internal::getAppender()) {
-        appender->setLayout(internal::ColoredPatternLayout::create(progName, useColor));
-    }
-}
-
-
-/// @brief Initialize the logging system if it is not already initialized.
-inline void
-initialize(bool useColor = true)
-{
-    log4cplus::initialize();
-
-    if (internal::getAppender()) return; // already initialized
-
-    // Create the OpenVDB logger if it doesn't already exist.
-    auto logger = internal::getLogger();
-
-    // Disable "additivity", so that OpenVDB-related messages are directed
-    // to the OpenVDB logger only and are not forwarded up the logger tree.
-    logger.setAdditivity(false);
-
-    // Attach a console appender to the OpenVDB logger.
-    if (auto appender = log4cplus::SharedAppenderPtr{new log4cplus::ConsoleAppender}) {
-        appender->setName(LOG4CPLUS_TEXT("OPENVDB"));
-        logger.addAppender(appender);
-    }
-
-    setLevel(Level::Warn);
-    setProgramName("", useColor);
-}
-
-
-/// @brief Initialize the logging system from command-line arguments.
-/// @details If "-debug", "-info", "-warn", "-error" or "-fatal" is found
-/// in the given array of command-line arguments, set the logging level
-/// appropriately and remove the relevant argument(s) from the array.
-inline void
-initialize(int& argc, char* argv[], bool useColor = true)
-{
-    initialize();
-
-    setLevel(argc, argv);
-
-    auto progName = (argc > 0 ? argv[0] : "");
-    if (const char* ptr = ::strrchr(progName, '/')) progName = ptr + 1;
-    setProgramName(progName, useColor);
-}
 
 } // namespace logging
 } // namespace OPENVDB_VERSION_NAME
@@ -242,81 +149,31 @@ initialize(int& argc, char* argv[], bool useColor = true)
 
 #define OPENVDB_LOG(level, message) \
     do { \
-        auto _log = openvdb::logging::internal::getLogger(); \
-        if (_log.isEnabledFor(log4cplus::level##_LOG_LEVEL)) { \
+        if (openvdb::logging::isEnabledFor(openvdb::logging::Level::level)) { \
             std::ostringstream _buf; \
             _buf << message; \
-            _log.forcedLog(log4cplus::level##_LOG_LEVEL, _buf.str(), __FILE__, __LINE__); \
+            openvdb::logging::internal::dispatch( \
+                openvdb::logging::Level::level, _buf.str(), __FILE__, __LINE__); \
         } \
-    } while (0);
+    } while (0)
 
 /// Log an info message of the form '<TT>someVar << "some text" << ...</TT>'.
-#define OPENVDB_LOG_INFO(message)           OPENVDB_LOG(INFO, message)
+#define OPENVDB_LOG_INFO(message)   OPENVDB_LOG(Info, message)
 /// Log a warning message of the form '<TT>someVar << "some text" << ...</TT>'.
-#define OPENVDB_LOG_WARN(message)           OPENVDB_LOG(WARN, message)
+#define OPENVDB_LOG_WARN(message)   OPENVDB_LOG(Warn, message)
 /// Log an error message of the form '<TT>someVar << "some text" << ...</TT>'.
-#define OPENVDB_LOG_ERROR(message)          OPENVDB_LOG(ERROR, message)
+#define OPENVDB_LOG_ERROR(message)  OPENVDB_LOG(Error, message)
 /// Log a fatal error message of the form '<TT>someVar << "some text" << ...</TT>'.
-#define OPENVDB_LOG_FATAL(message)          OPENVDB_LOG(FATAL, message)
-#ifdef DEBUG
-/// In debug builds only, log a debugging message of the form '<TT>someVar << "text" << ...</TT>'.
-#define OPENVDB_LOG_DEBUG(message)          OPENVDB_LOG(DEBUG, message)
-#else
+#define OPENVDB_LOG_FATAL(message)  OPENVDB_LOG(Fatal, message)
+#ifdef NDEBUG
 /// In debug builds only, log a debugging message of the form '<TT>someVar << "text" << ...</TT>'.
 #define OPENVDB_LOG_DEBUG(message)
+#else
+/// In debug builds only, log a debugging message of the form '<TT>someVar << "text" << ...</TT>'.
+#define OPENVDB_LOG_DEBUG(message)  OPENVDB_LOG(Debug, message)
 #endif
 /// @brief Log a debugging message in both debug and optimized builds.
 /// @warning Don't use this in performance-critical code.
-#define OPENVDB_LOG_DEBUG_RUNTIME(message)  OPENVDB_LOG(DEBUG, message)
-
-#else // ifdef OPENVDB_USE_LOG4CPLUS
-
-#include <iostream>
-
-#define OPENVDB_LOG_INFO(mesg)
-#define OPENVDB_LOG_WARN(mesg)      do { std::cerr << "WARNING: " << mesg << std::endl; } while (0);
-#define OPENVDB_LOG_ERROR(mesg)     do { std::cerr << "ERROR: " << mesg << std::endl; } while (0);
-#define OPENVDB_LOG_FATAL(mesg)     do { std::cerr << "FATAL: " << mesg << std::endl; } while (0);
-#define OPENVDB_LOG_DEBUG(mesg)
-#define OPENVDB_LOG_DEBUG_RUNTIME(mesg)
-
-namespace openvdb {
-OPENVDB_USE_VERSION_NAMESPACE
-namespace OPENVDB_VERSION_NAME {
-namespace logging {
-
-enum class Level { Debug, Info, Warn, Error, Fatal };
-
-inline Level getLevel() { return Level::Warn; }
-inline void setLevel(Level) {}
-inline void setLevel(int&, char*[]) {}
-inline void setProgramName(const std::string&, bool = true) {}
-inline void initialize() {}
-inline void initialize(int&, char*[], bool = true) {}
-
-} // namespace logging
-} // namespace OPENVDB_VERSION_NAME
-} // namespace openvdb
-
-#endif // OPENVDB_USE_LOG4CPLUS
-
-
-namespace openvdb {
-OPENVDB_USE_VERSION_NAMESPACE
-namespace OPENVDB_VERSION_NAME {
-namespace logging {
-
-/// @brief A LevelScope object sets the logging level to a given level
-/// and restores it to the current level when the object goes out of scope.
-struct LevelScope
-{
-    Level level;
-    explicit LevelScope(Level newLevel): level(getLevel()) { setLevel(newLevel); }
-    ~LevelScope() { setLevel(level); }
-};
-
-} // namespace logging
-} // namespace OPENVDB_VERSION_NAME
-} // namespace openvdb
+#define OPENVDB_LOG_DEBUG_RUNTIME(message)  OPENVDB_LOG(Debug, message)
 
 #endif // OPENVDB_UTIL_LOGGING_HAS_BEEN_INCLUDED

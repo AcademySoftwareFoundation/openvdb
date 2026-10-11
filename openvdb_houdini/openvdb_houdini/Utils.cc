@@ -12,7 +12,6 @@
 #include <GU/GU_Detail.h>
 #include <UT/UT_String.h>
 #include <UT/UT_Version.h>
-#ifdef OPENVDB_USE_LOG4CPLUS
 #include <openvdb/util/logging.h>
 #include <UT/UT_ErrorManager.h>
 #include <CHOP/CHOP_Error.h> // for CHOP_ERROR_MESSAGE
@@ -24,7 +23,6 @@
 #include <VOP/VOP_Error.h> // for VOP_MESSAGE
 #include <VOPNET/VOPNET_Error.h> // for VOPNET_MESSAGE
 #include <string>
-#endif
 
 
 namespace openvdb_houdini {
@@ -251,74 +249,54 @@ makeCoordBBox(const UT_BoundingBox& b, const openvdb::math::Transform& t)
 ////////////////////////////////////////
 
 
-#ifndef OPENVDB_USE_LOG4CPLUS
-
-void startLogForwarding(OP_OpTypeId) {}
-void stopLogForwarding(OP_OpTypeId) {}
-bool isLogForwarding(OP_OpTypeId) { return false; }
-
-#else
-
 namespace {
 
-namespace l4c = log4cplus;
-
-/// @brief log4cplus appender that directs log messages to UT_ErrorManager
-class HoudiniAppender: public l4c::Appender
+/// @brief Sink that directs log messages to UT_ErrorManager
+class HoudiniSink: public openvdb::logging::Sink
 {
 public:
+    /// @param name    Unique sink name, from getSinkName().
     /// @param opType  SOP_OPTYPE_NAME, ROP_OPTYPE_NAME, etc. (see OP_Node.h)
     /// @param code    SOP_MESSAGE, SOP_VEX_ERROR, ROP_MESSAGE, etc.
     ///                (see SOP_Error.h, ROP_Error.h, etc.)
-    HoudiniAppender(const char* opType, int code): mOpType(opType), mCode(code) {}
-
-    ~HoudiniAppender() override
+    HoudiniSink(const std::string& name, const char* opType, int code)
+        : Sink(name, openvdb::logging::Level::Info)
+        , mOpType(opType)
+        , mCode(code)
     {
-        close();
-        destructorImpl(); // must be called by Appender subclasses
     }
 
-    void append(const l4c::spi::InternalLoggingEvent& event) override
+    void append(openvdb::logging::Level level, const std::string& message,
+        const char* file, int line) override
     {
-        if (mClosed) return;
-
         auto* errMgr = UTgetErrorManager();
         if (!errMgr || errMgr->isDisabled()) return;
 
-        const l4c::LogLevel level = event.getLogLevel();
-        const std::string& msg = event.getMessage();
-        const std::string& file = event.getFile();
-        const int line = event.getLine();
-
         const UT_SourceLocation
-            loc{file.c_str(), line},
-            *locPtr = (file.empty() ? nullptr : &loc);
+            loc{file, line},
+            *locPtr = (file && *file ? &loc : nullptr);
 
         UT_ErrorSeverity severity = UT_ERROR_NONE;
         switch (level) {
-            case l4c::DEBUG_LOG_LEVEL: severity = UT_ERROR_MESSAGE; break;
-            case l4c::INFO_LOG_LEVEL: severity = UT_ERROR_MESSAGE; break;
-            case l4c::WARN_LOG_LEVEL: severity = UT_ERROR_WARNING; break;
-            case l4c::ERROR_LOG_LEVEL: severity = UT_ERROR_ABORT; break;
-            case l4c::FATAL_LOG_LEVEL: severity = UT_ERROR_FATAL; break;
+            case openvdb::logging::Level::Debug: severity = UT_ERROR_MESSAGE; break;
+            case openvdb::logging::Level::Info:  severity = UT_ERROR_MESSAGE; break;
+            case openvdb::logging::Level::Warn:  severity = UT_ERROR_WARNING; break;
+            case openvdb::logging::Level::Error: severity = UT_ERROR_ABORT; break;
+            case openvdb::logging::Level::Fatal: severity = UT_ERROR_FATAL; break;
         }
-        errMgr->addGeneric(mOpType.c_str(), mCode, msg.c_str(), severity, locPtr);
+        errMgr->addGeneric(mOpType.c_str(), mCode, message.c_str(), severity, locPtr);
     }
-
-    void close() override { mClosed = true; }
 
 private:
     std::string mOpType = INVALID_OPTYPE_NAME;
     int mCode = 0;
-    bool mClosed = false;
 };
 
 
-inline l4c::tstring
-getAppenderName(const OP_TypeInfo& opInfo)
+inline std::string
+getSinkName(const OP_TypeInfo& opInfo)
 {
-    return LOG4CPLUS_STRING_TO_TSTRING(
-        std::string{"HOUDINI_"} + static_cast<const char*>(opInfo.myOptypeName));
+    return std::string{"HOUDINI_"} + static_cast<const char*>(opInfo.myOptypeName);
 }
 
 
@@ -348,23 +326,15 @@ setLogForwarding(OP_OpTypeId opId, bool enable)
     const auto* opInfo = OP_Node::getOpInfoFromOpTypeID(opId);
     if (!opInfo) return;
 
-    const auto appenderName = getAppenderName(*opInfo);
+    const auto sinkName = getSinkName(*opInfo);
 
-    auto logger = openvdb::logging::internal::getLogger();
-    auto appender = logger.getAppender(appenderName);
-
-    if (appender && !enable) {
-        // If an appender for the given operator type exists, remove it.
-        logger.removeAppender(appender);
-    } else if (!appender && enable) {
-        // If an appender for the given operator type doesn't already exist, create one.
-        // Otherwise, do nothing: operators of the same type can share a single appender.
-        appender = log4cplus::SharedAppenderPtr{
-            new HoudiniAppender{opInfo->myOptypeName, getGenericMessageCode(opId)}};
-        appender->setName(appenderName);
-        // Don't forward debug or lower-level messages.
-        appender->setThreshold(log4cplus::INFO_LOG_LEVEL);
-        logger.addAppender(appender);
+    if (!enable) {
+        openvdb::logging::removeSink(sinkName);
+    } else if (!openvdb::logging::findSink(sinkName)) {
+        // If a sink for the given operator type doesn't already exist, create one.
+        // Otherwise, do nothing: operators of the same type can share a single sink.
+        openvdb::logging::addSink(std::make_shared<HoudiniSink>(
+            sinkName, opInfo->myOptypeName, getGenericMessageCode(opId)));
     }
 }
 
@@ -389,12 +359,9 @@ bool
 isLogForwarding(OP_OpTypeId opId)
 {
     if (const auto* opInfo = OP_Node::getOpInfoFromOpTypeID(opId)) {
-        return openvdb::logging::internal::getLogger().getAppender(
-            getAppenderName(*opInfo));
+        return openvdb::logging::findSink(getSinkName(*opInfo)) != nullptr;
     }
     return false;
 }
-
-#endif // OPENVDB_USE_LOG4CPLUS
 
 } // namespace openvdb_houdini
