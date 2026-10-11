@@ -4520,7 +4520,7 @@ TEST(TestNanoVDBCUDA, MeshToGrid_UnitTetrahedron)
     EXPECT_EQ(grid->mChecksum.full(), topoChecksum);
 }// MeshToGrid_UnitTetrahedron
 
-TEST(TestNanoVDBCUDA, ConnectedComponentsMultiSphere)
+TEST(TestNanoVDBCUDA, ConnectedComponents_MultiSphere)
 {
     using BuildT = nanovdb::ValueOnIndex;
 
@@ -4591,4 +4591,4 @@ TEST(TestNanoVDBCUDA, ConnectedComponentsMultiSphere)
                 }
         EXPECT_EQ(globalComponents(coords), 2u);  // overlap merges -> inner shell + outer shell
     }
-}// ConnectedComponentsMultiSphere
+}// ConnectedComponents_MultiSphere
