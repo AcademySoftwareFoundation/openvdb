@@ -140,10 +140,19 @@ public:
     ///          (e.g. deviceUpload with sync=false), synchronize before calling.
     std::pair<BufT<ComponentLabelT>, ComponentLabelT> getVoxelLabelsAndCount()
     {
+        // Each scratch buffer is released right after its last use, to cut peak memory. The
+        // frees are ordered on mStream behind the kernels that read them, so no host sync.
         processLeafConnectedComponents();
+        mLeafComponentCounts.destroy();
         collectCrossLeafEdges();
+        mLeafComponentFaceMasks.destroy();
+        mCrossLeafEdgeOffsets.destroy();
         processGlobalConnectedComponents();
+        mCrossLeafEdges.destroy();
         processVoxelLabels();
+        mLeafComponentOffsets.destroy();
+        mLeafComponentMasks.destroy();
+        mComponentParent.destroy();
         cudaCheck(cudaStreamSynchronize(mStream));
         return { std::move(mVoxelLabel), mGlobalComponentCount };
     }
@@ -187,11 +196,7 @@ private:
 
     uint64_t                     mLeafComponentAggregateCount{0}; // total leaf-local components across all leaves (= K = offsets[leafCount])
 
-    // TODO: none of these is released before this operator is destroyed, though two die early:
-    // mLeafComponentFaceMasks after collectCrossLeafEdges (48 B per leaf-local component) and
-    // mCrossLeafEdges after processGlobalConnectedComponents (8 B per edge). Releasing each at its
-    // last use -- a move-assign of an empty buffer, stream-ordered, no host sync -- would cut peak
-    // memory.
+    // Scratch: getVoxelLabelsAndCount() releases each of these after its last use.
     BufT<uint16_t>               mLeafComponentCounts;      // leafCount                    x uint16_t:      per-leaf component count
     BufT<uint64_t>               mLeafComponentOffsets;     // (leafCount+1)                x uint64_t:      exclusive+inclusive prefix sums
     BufT<nanovdb::Mask<3>>       mLeafComponentMasks;       // mLeafComponentAggregateCount x Mask<3>:       per-component active-voxel footprint
