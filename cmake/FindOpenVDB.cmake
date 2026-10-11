@@ -516,7 +516,7 @@ endif()
 # As the way we resolve optional libraries relies on library file names, use
 # the configuration options from the main CMakeLists.txt to allow users
 # to manually identify the requirements of OpenVDB builds if they know them.
-set(OpenVDB_USES_BLOSC ${USE_BLOSC})
+set(OpenVDB_USES_BLOSC ON)
 set(OpenVDB_USES_ZLIB ${USE_ZLIB})
 set(OpenVDB_USES_LOG4CPLUS ${USE_LOG4CPLUS})
 set(OpenVDB_USES_IMATH_HALF ${USE_IMATH_HALF})
@@ -550,7 +550,6 @@ endif()
 
 if(_OPENVDB_HAS_NEW_VERSION_HEADER)
   OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_IMATH_HALF" OpenVDB_USES_IMATH_HALF)
-  OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_BLOSC" OpenVDB_USES_BLOSC)
   OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_ZLIB" OpenVDB_USES_ZLIB)
 elseif(NOT OPENVDB_USE_STATIC_LIBS)
   # Use GetPrerequisites to see which libraries this OpenVDB lib has linked to
@@ -579,11 +578,6 @@ elseif(NOT OPENVDB_USE_STATIC_LIBS)
     set(_HAS_DEP)
     get_filename_component(PREREQUISITE ${PREREQUISITE} NAME)
 
-    string(FIND ${PREREQUISITE} "blosc" _HAS_DEP)
-    if(NOT ${_HAS_DEP} EQUAL -1)
-      set(OpenVDB_USES_BLOSC ON)
-    endif()
-
     string(FIND ${PREREQUISITE} "zlib" _HAS_DEP)
     if(NOT ${_HAS_DEP} EQUAL -1)
       set(OpenVDB_USES_ZLIB ON)
@@ -601,10 +595,6 @@ elseif(NOT OPENVDB_USE_STATIC_LIBS)
   endforeach()
 
   unset(_OPENVDB_PREREQUISITE_LIST)
-endif()
-
-if(OpenVDB_USES_BLOSC)
-  find_package(Blosc REQUIRED)
 endif()
 
 if(OpenVDB_USES_ZLIB)
@@ -651,9 +641,6 @@ endif()
 set(_OPENVDB_HIDDEN_DEPENDENCIES)
 
 if(NOT OPENVDB_USE_STATIC_LIBS)
-  if(OpenVDB_USES_BLOSC)
-    list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES Blosc::blosc)
-  endif()
   if(OpenVDB_USES_ZLIB)
     list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES ZLIB::ZLIB)
   endif()
