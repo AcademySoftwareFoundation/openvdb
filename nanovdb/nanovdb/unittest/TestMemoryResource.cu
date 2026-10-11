@@ -6,7 +6,7 @@
 /// @brief Unit tests for the CUDA memory-resource concept (cuda::DeviceResource,
 ///        cuda::PinnedResource) and the resource plumbing of cuda::TempPool and
 ///        the tools::cuda builders (PointsToGrid, the TopologyBuilder consumers,
-///        IndexToGrid, GridStats, SignedFloodFill, addBlindData).
+///        IndexToGrid, GridStats, SignedFloodFill, addBlindData, ConnectedComponents).
 
 #include <nanovdb/cuda/DeviceResource.h>
 #include <nanovdb/cuda/PinnedResource.h>
@@ -587,6 +587,13 @@ TEST(TestMemoryResource, AddBlindData_InjectedResourceSeam)
     EXPECT_EQ(res.deallocs - d0, 1);
     ASSERT_EQ(cudaFree(d_blind), cudaSuccess);
 }
+
+//======================================================================
+// ConnectedComponents routes all of its device scratch, its cub temp pool
+// and the label buffer it returns through an injected resource instance.
+// The number of allocations depends on the input, so the counts are
+// checked for balance rather than exact values.
+//======================================================================
 
 TEST(TestMemoryResource, ConnectedComponents_InjectedResourceSeam)
 {
