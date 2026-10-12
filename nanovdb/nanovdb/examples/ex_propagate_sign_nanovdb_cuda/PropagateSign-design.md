@@ -25,12 +25,37 @@ planned example while the PR is in draft. To be removed before the PR leaves dra
 
 None is checked by the operator; all must be guaranteed by how the input is built.
 
-1. **No empty leaves.** Every leaf in the input tree contains at least one active voxel.
+1. **No empty nodes.** Every leaf contains at least one active voxel, every lower node has at least one
+   leaf child, and every upper node has at least one lower child. (With no active tiles, this is the same
+   as: every node has at least one active voxel below it, i.e. the tree is pruned.)
 
-   *If violated:* an empty leaf's mask stays all zeros: the leaf fill only seeds from the leaf's own
-   active voxels, and no later stage writes leaf masks. In its parent lower node the leaf is a child
-   slot, so it is also a wall for the lower fill. An empty leaf therefore acts as a solid block of
-   outside, even when it lies entirely inside.
+   *If a leaf is empty:* its mask stays all zeros: the leaf fill only seeds from the leaf's own active
+   voxels, and no later stage writes leaf masks. In its parent lower node the leaf is a child slot, so it
+   is also a wall for the lower fill. An empty leaf therefore acts as a solid block of outside, even when
+   it lies entirely inside.
+
+   *If a lower (or upper) node is empty:* its childless slots form one region that borders no child, so
+   it can only be seeded by finer nodes of *neighboring* nodes across its faces. If those neighbors offer
+   only childless slots, nothing seeds it; its parent treats it as a wall, so its slots stay unlabeled.
+   `needsRootPropagation` (`mRootMask.size() > mUpperInteriorMasks.size()`) also assumes every upper node
+   lies inside the active bbox, which holds when no upper node is empty.
+
+   *Which builders guarantee it:*
+   - `TopologyBuilder` alone does **not**. It drops upper nodes with no lower child (`countNodes`), but
+     creates a lower node for every bit set in the densified upper masks, even when that node's leaf mask
+     is all zeros (`EnumerateNodesFunctor`, `util/cuda/Morphology.cuh`), and creates a leaf for every bit
+     set in the densified lower masks without checking that its voxel mask, filled in later by the caller,
+     ends up non-empty. Whether a given caller (`DilateGrid`, `RefineGrid`, ...) can produce empty nodes
+     depends on how it sets those masks.
+   - **`PruneGrid` output does.** `PruneInternalNodesFunctor` keeps a leaf only if its active mask
+     intersected with the retain mask is non-empty, and only then sets the leaf's bit in its lower mask
+     and the lower node's bit in its upper mask. `PruneLeafMasksFunctor` sets the output leaf mask to that
+     same non-empty intersection. So every leaf has an active voxel, every lower node has a leaf, and (by
+     `TopologyBuilder`'s rule) every upper node has a lower node.
+   - `MeshToGrid` ends with exactly such a `PruneGrid` pass ("Pruning empty leaves", with an all-ones
+     retain mask), so narrow bands from `MeshToGrid` satisfy precondition 1.
+   - Any `TopologyBuilder`-based output has only child tiles at the root (`root.mTableSize =
+     nodeCount[2]`, each tile `setChild`), so it never contains root value tiles.
 
 2. **Two-sided shielding.** Over face-connected paths (which may pass through any voxels):
    - (a) any path from an inactive *outside* voxel to a negative active voxel transits through at least
@@ -54,6 +79,12 @@ None is checked by the operator; all must be guaranteed by how the input is buil
 
    Neither side can be checked by the operator, since both refer to the labels of inactive voxels,
    which are what the operator computes.
+
+3. **The unbounded region is outside.** No negative active voxel is face-connected, through inactive
+   voxels, to the inactive space outside the bbox of the active voxels (this is 2(a) with "infinity"
+   counted as outside). Then every inside voxel lies within the active bbox: anything outside it is
+   inactive and connected to infinity. This justifies restricting the root flood to the root tiles that
+   cover the active bbox, and it means an inside root region never touches the boundary of that array.
 
 ## Results
 
@@ -81,6 +112,39 @@ None is checked by the operator; all must be guaranteed by how the input is buil
 
   Without 2(b), walls could force serpentine paths of hundreds of voxels; the only hard bound would be
   the 511 inactive voxels, which is what the current code's `MaxPropagationSweeps = 512` covers.
+
+- **Hierarchy completeness.** Under preconditions 1-3 (and no active tiles, no root value tiles; see
+  open points), propagating only upward, level by level (leaf -> lower -> upper -> root), labels every
+  inside childless slot. No downward or same-level propagation is needed.
+
+  *Lemma (inside faces).* If a child node C is face-adjacent to an inside childless slot s, every voxel
+  on C's face toward s is inside: an inactive face voxel touches an inactive inside voxel of s, so it
+  shares the label; an active face voxel must be negative, by 2(b).
+
+  *Lower slots.* Let K be a connected set of inside childless slots of a lower node N (child slots
+  are walls). N has a leaf (precondition 1), so K is not all of N; N's slot grid is connected, so some
+  slot bordering K is outside K, i.e. holds a leaf L. By the lemma, L's face toward K is all inside, and
+  by leaf locality L's mask has those bits on. `FaceSeedFunctor<0>` probes the block across that face,
+  which is a slot of K, and seeds it. The lower fill spreads from that seed over all of K.
+
+  *Upper slots.* Same argument: K borders a lower child N of U, and N's face toward K is all inside.
+  That face is a 16x16 grid of 8^3 patches. A leaf patch seeds K directly (its `FaceSeedFunctor<0>`
+  probe returns level 2); a childless lower-slot patch is inside, so it was already labeled at the lower
+  level, and `FaceSeedFunctor<1>` seeds K from it. This is why leaves seed every coarser level directly:
+  `FaceSeedFunctor<1>` skips N's child slots, so a lower face covered entirely by leaves would otherwise
+  seed nothing.
+
+  *Root.* Same argument one level up. An inside root region K borders some upper node U (precondition 3:
+  K never reaches the boundary of the root array, so it is not all of it); U's face toward K is all
+  inside, and each of its patches (childless upper slot, childless lower slot, or leaf) seeds K in
+  stage 6, 4 or 2 respectively.
+
+  *Soundness.* A slot is seeded only when it touches an inside voxel, and the slots joined during a fill
+  share faces, so every labeled slot is truly inside.
+
+  *Stage order.* Each level's seeds come only from finer levels that are already final, and each fill
+  runs after all its seeds have been written (seeds in stages 2 and 4, upper fill in stage 5, root fill in
+  stage 7).
 
 ## Unified node-local propagator (proposed)
 
@@ -147,9 +211,14 @@ fill can replace the shared fill function without changing its interface.
 
 ## Open points
 
-- **Coarser levels.** Leaf locality justifies the leaf stage. Still to examine: whether the upward-only
-  seeding (leaf faces -> lower/upper/root slots, lower faces -> upper/root, upper faces -> root) and the
-  per-node fills at the lower and upper levels reproduce the reference labels for childless slots.
+- **Bug: root value tiles are never seeded.** `probeChildlessSlot` returns 0 for a root tile that is not
+  a child, so no face seeds it; but `RootWallFunctor` does not treat it as a wall either. An inside value
+  tile is then labeled only if the root fill reaches it from another seeded position; one that can only
+  be seeded directly by an upper face (e.g. wedged between upper nodes) stays unlabeled. Fix: return 3
+  for any non-child root tile; the level-3 branch of `seedAcrossFace` already derives the array position
+  from `ijk`. Latent for `TopologyBuilder`-based inputs, which have no root value tiles.
+- **No active tiles** is still an unchecked assumption: the internal fills treat every childless slot as
+  passable inactive space.
 - **Sweep counts at the coarser levels.** In lower and upper nodes the walls are child slots, which are
   not lined with seeds (seeds arrive only through faces from finer levels), so the leaf sweep-bound
   argument does not carry over. Without detours a Jacobi fill needs up to 45 (lower) or 93 (upper)
