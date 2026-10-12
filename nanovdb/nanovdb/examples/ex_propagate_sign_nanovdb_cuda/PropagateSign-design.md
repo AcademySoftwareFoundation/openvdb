@@ -223,3 +223,33 @@ fill can replace the shared fill function without changing its interface.
   not lined with seeds (seeds arrive only through faces from finer levels), so the leaf sweep-bound
   argument does not carry over. Without detours a Jacobi fill needs up to 45 (lower) or 93 (upper)
   sweeps; detours around children could add more.
+
+## Code-level review findings
+
+Smaller items noted against `PropagateSign.cuh` as of commit `668691585`:
+
+- **Sign convention docs.** The constructor's `@param deviceSigns` says "-1 inside and +1 outside", but
+  the code tests `== int8_t(-1)`, so any other value (including 0) is outside. Document it as "-1 for
+  inside (negative), anything else for outside (nonnegative)", and that mapping zero to nonnegative is
+  the caller's job.
+- **Preconditions undocumented.** None of preconditions 1-3 appear in the header; the class `@details`
+  should state them as the caller contract.
+- **Leaf sweep limit.** `MaxPropagationSweeps = 512` (leaf) could be 22 under the preconditions; the
+  `NANOVDB_ASSERT` after the loop would then also catch inputs whose detours violate 2(b).
+- **Stale comments.**
+  - The leaf-fill comment weighs a scanline fill against Jacobi for "long corridors"; under the
+    preconditions corridors cannot occur inside a leaf.
+  - The stage 3/5 section comment says the lower/upper fills use "sweeps like those of the leaf fill",
+    but the leaf fill is Jacobi (barrier between read and write) while the lower/upper and root fills are
+    asynchronous (no barrier within a sweep).
+- **Formal races.** The asynchronous fills read words that other threads update in the same sweep
+  (plain loads against `setOnAtomic`; plain byte loads/stores in the root fill). Benign, since every
+  racing writer stores 1, but avoidable with the proposed unified fill.
+- **Open `todo`s:** naming of the interior / invert masks, `probeChildlessSlot`'s name, and renaming
+  `signs` to `signSidecar`.
+- **Packaging.**
+  - `tools/cuda/PropagateSign.cuh` is not in the install list in `nanovdb/nanovdb/CMakeLists.txt` (unlike
+    `tools/cuda/SignedFloodFill.cuh`), so it will not be installed.
+  - No unit test. A GPU regression test from the earlier draft exists
+    (`examples/propagate_sign_test/propagate_sign_test.cu` in commit `4e2e13a41` on `sifakis/mesh-to-sdf`).
+  - No example yet; this directory is reserved for it (needs a `nanovdb_example(NAME ...)` entry).
