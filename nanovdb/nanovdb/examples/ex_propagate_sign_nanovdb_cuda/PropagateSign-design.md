@@ -14,7 +14,9 @@ planned example while the PR is in draft. To be removed before the PR leaves dra
   2. a childless slot of a lower node, i.e. an 8^3 block (lower mask bit);
   3. a childless slot of an upper node, i.e. a 128^3 block (upper mask bit);
   4. a root value tile or absent root space, i.e. a 4096^3 block (root-tile origin list).
-- The grid is assumed to have no active tiles: every active value is a leaf voxel.
+- Every active value is a leaf voxel, and the root holds only child tiles (precondition 4). Childless
+  slots of lower and upper nodes are still inactive tiles in NanoVDB's sense (in a `ValueOnIndex` grid
+  their value is index 0, the background); those are exactly the inactive blocks of items 2 and 3.
 - **Reference labeling.** The correct labels are those of a uniform flood fill over all of space at voxel
   resolution: start from the negative active voxels, treat nonnegative active voxels as walls, and spread
   across faces through inactive (and negative active) voxels. Inactive voxels reached are inside; all
@@ -86,6 +88,17 @@ None is checked by the operator; all must be guaranteed by how the input is buil
    inactive and connected to infinity. This justifies restricting the root flood to the root tiles that
    cover the active bbox, and it means an inside root region never touches the boundary of that array.
 
+4. **Active values are voxels only, and the root holds only child tiles.**
+   - (a) No active tiles at any level: every active domain is a leaf voxel. *If violated:* an active tile
+     carries a sign that the code never reads; at the lower/upper levels it is a childless slot and at the
+     root a non-child tile, so the fills treat it as passable inactive space. A nonnegative active tile
+     then fails to block the flood, breaking 2(a).
+   - (b) Every root tile is a child tile (no root value tiles, active or inactive). *If violated:* see the
+     root value-tile seeding gap under Open points.
+
+   Both hold for any `TopologyBuilder`-based output (including `PruneGrid` and `MeshToGrid`), whose root
+   has only child tiles and whose active values are leaf voxels.
+
 ## Results
 
 - **Leaf locality.** Under preconditions 1 and 2(b), flood filling each leaf in isolation (seeds: its
@@ -113,8 +126,7 @@ None is checked by the operator; all must be guaranteed by how the input is buil
   Without 2(b), walls could force serpentine paths of hundreds of voxels; the only hard bound would be
   the 511 inactive voxels, which is what the current code's `MaxPropagationSweeps = 512` covers.
 
-- **Hierarchy completeness.** Under preconditions 1-3 (and no active tiles, no root value tiles; see
-  open points), propagating only upward, level by level (leaf -> lower -> upper -> root), labels every
+- **Hierarchy completeness.** Under preconditions 1-4, propagating only upward, level by level (leaf -> lower -> upper -> root), labels every
   inside childless slot. No downward or same-level propagation is needed.
 
   *Lemma (inside faces).* If a child node C is face-adjacent to an inside childless slot s, every voxel
@@ -211,14 +223,14 @@ fill can replace the shared fill function without changing its interface.
 
 ## Open points
 
-- **Bug: root value tiles are never seeded.** `probeChildlessSlot` returns 0 for a root tile that is not
-  a child, so no face seeds it; but `RootWallFunctor` does not treat it as a wall either. An inside value
-  tile is then labeled only if the root fill reaches it from another seeded position; one that can only
-  be seeded directly by an upper face (e.g. wedged between upper nodes) stays unlabeled. Fix: return 3
-  for any non-child root tile; the level-3 branch of `seedAcrossFace` already derives the array position
-  from `ijk`. Latent for `TopologyBuilder`-based inputs, which have no root value tiles.
-- **No active tiles** is still an unchecked assumption: the internal fills treat every childless slot as
-  passable inactive space.
+- **Root value tiles are never seeded (excluded by precondition 4(b)).** `probeChildlessSlot` returns 0
+  for a root tile that is not a child, so no face seeds it; but `RootWallFunctor` does not treat it as a
+  wall either. An inside value tile is then labeled only if the root fill reaches it from another seeded
+  position; one that can only be seeded directly by an upper face (e.g. a single value tile enclosed by
+  upper nodes) stays unlabeled, although absent space in the same place would be labeled. With 4(b) in
+  the contract this branch is unreachable: replace it with an assert (or, to support root value tiles
+  later, return 3 for any non-child root tile; the level-3 branch of `seedAcrossFace` already derives
+  the array position from `ijk`).
 - **Sweep counts at the coarser levels.** In lower and upper nodes the walls are child slots, which are
   not lined with seeds (seeds arrive only through faces from finer levels), so the leaf sweep-bound
   argument does not carry over. Without detours a Jacobi fill needs up to 45 (lower) or 93 (upper)
@@ -232,7 +244,7 @@ Smaller items noted against `PropagateSign.cuh` as of commit `668691585`:
   the code tests `== int8_t(-1)`, so any other value (including 0) is outside. Document it as "-1 for
   inside (negative), anything else for outside (nonnegative)", and that mapping zero to nonnegative is
   the caller's job.
-- **Preconditions undocumented.** None of preconditions 1-3 appear in the header; the class `@details`
+- **Preconditions undocumented.** None of preconditions 1-4 appear in the header; the class `@details`
   should state them as the caller contract.
 - **Leaf sweep limit.** `MaxPropagationSweeps = 512` (leaf) could be 22 under the preconditions; the
   `NANOVDB_ASSERT` after the loop would then also catch inputs whose detours violate 2(b).
