@@ -1,0 +1,109 @@
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
+#
+# OpenVDB package configuration.
+#
+# Usage:
+#   find_package(OpenVDB CONFIG REQUIRED)
+#   target_link_libraries(my_target PRIVATE OpenVDB::openvdb)
+#
+# Imported targets:
+#   OpenVDB::openvdb         Shared library if installed, otherwise static
+#   OpenVDB::openvdb_shared  Shared library, if installed
+#   OpenVDB::openvdb_static  Static library, if installed
+#
+# Components:
+#   openvdb                  The core library, always available
+#
+# Variables:
+#   OpenVDB_VERSION, OpenVDB_ABI
+
+@PACKAGE_INIT@
+
+# The installed Find modules (such as FindTBB) live next to this file
+set(_openvdb_original_module_path ${CMAKE_MODULE_PATH})
+list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
+
+# Like find_dependency, but restores CMAKE_MODULE_PATH before returning
+# when a dependency is missing
+macro(_openvdb_find_dependency dependency)
+  set(_openvdb_find_arguments ${ARGN})
+  if(OpenVDB_FIND_QUIETLY)
+    list(APPEND _openvdb_find_arguments QUIET)
+  endif()
+  if(OpenVDB_FIND_REQUIRED)
+    list(APPEND _openvdb_find_arguments REQUIRED)
+  endif()
+  find_package(${dependency} ${_openvdb_find_arguments})
+  if(NOT ${dependency}_FOUND)
+    set(CMAKE_MODULE_PATH ${_openvdb_original_module_path})
+    set(OpenVDB_NOT_FOUND_MESSAGE
+      "OpenVDB could not be found because dependency ${dependency} could not be found.")
+    set(OpenVDB_FOUND FALSE)
+    return()
+  endif()
+endmacro()
+
+set(OpenVDB_ABI @OpenVDB_ABI@)
+
+_openvdb_find_dependency(TBB @MINIMUM_TBB_VERSION@ COMPONENTS tbb)
+
+if(@USE_IMATH_HALF@)
+  _openvdb_find_dependency(Imath @MINIMUM_IMATH_VERSION@ CONFIG)
+endif()
+
+if(UNIX)
+  _openvdb_find_dependency(Threads)
+endif()
+
+# zlib and zstd are private dependencies, but a static library does not carry
+# them, so they are only needed when the static library was installed.
+if(@OPENVDB_CORE_STATIC@)
+  if(@USE_ZLIB@)
+    _openvdb_find_dependency(ZLIB @MINIMUM_ZLIB_VERSION@)
+  endif()
+
+  if(@USE_ZSTD@)
+    if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/FindZstd.cmake")
+      _openvdb_find_dependency(Zstd @MINIMUM_ZSTD_VERSION@)
+    else()
+      _openvdb_find_dependency(zstd @MINIMUM_ZSTD_VERSION@ CONFIG)
+    endif()
+
+    # The exported target links to the zstd target that was used at build
+    # time. Provide that name if this zstd install uses a different one.
+    set(_openvdb_zstd_exported_target "@OPENVDB_EXPORTED_ZSTD_TARGET@")
+    if(NOT TARGET ${_openvdb_zstd_exported_target})
+      foreach(_openvdb_zstd_candidate
+          Zstd::zstd zstd::libzstd_static zstd::libzstd_shared zstd::libzstd)
+        if(TARGET ${_openvdb_zstd_candidate})
+          add_library(${_openvdb_zstd_exported_target} ALIAS ${_openvdb_zstd_candidate})
+          break()
+        endif()
+      endforeach()
+      unset(_openvdb_zstd_candidate)
+    endif()
+    unset(_openvdb_zstd_exported_target)
+  endif()
+endif()
+
+set(CMAKE_MODULE_PATH ${_openvdb_original_module_path})
+unset(_openvdb_original_module_path)
+unset(_openvdb_find_arguments)
+
+include("${CMAKE_CURRENT_LIST_DIR}/OpenVDBTargets.cmake")
+
+if(NOT TARGET OpenVDB::openvdb)
+  add_library(OpenVDB::openvdb INTERFACE IMPORTED)
+  if(TARGET OpenVDB::openvdb_shared)
+    set_target_properties(OpenVDB::openvdb PROPERTIES
+      INTERFACE_LINK_LIBRARIES OpenVDB::openvdb_shared)
+  else()
+    set_target_properties(OpenVDB::openvdb PROPERTIES
+      INTERFACE_LINK_LIBRARIES OpenVDB::openvdb_static)
+  endif()
+endif()
+
+set(OpenVDB_openvdb_FOUND TRUE)
+
+check_required_components(OpenVDB)
