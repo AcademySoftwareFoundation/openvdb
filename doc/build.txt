@@ -533,9 +533,9 @@ these options directly, they both default to `ON`. This ensures that OpenVDB
 has installed the required CMake modules that your application will need to
 use.
 
-@b Note: Typically, projects provide a @b Config-file rather than a
-@b Find-module for downstream use. OpenVDB currently provides a @b Find-module.
-This may change in the future. Further information
+OpenVDB installs both a @b Config-file and a @b Find-module. The Config-file
+is preferred, as it provides the imported targets together with their include
+paths, definitions and dependencies. Further information
 [here](https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html#using-packages).
 
 You can add the below CMake snippet to your main `CMakeLists.txt` to bring in
@@ -543,15 +543,31 @@ OpenVDB as a dependency:
 
 @code{.cmake}
 cmake_minimum_required(VERSION 3.24)
-list(APPEND CMAKE_MODULE_PATH "/location/of/openvdb/install/lib/cmake/OpenVDB")
-find_package(OpenVDB REQUIRED)
+list(APPEND CMAKE_PREFIX_PATH "/location/of/openvdb/install")
+find_package(OpenVDB CONFIG REQUIRED)
 target_link_libraries(myapp OpenVDB::openvdb)
 @endcode
 
+`OpenVDB::openvdb` is the shared library if it was installed, otherwise the
+static library. `OpenVDB::openvdb_shared` and `OpenVDB::openvdb_static` select
+a library explicitly. When the static library is installed, the zlib and zstd
+libraries it was built with must also be available to your project.
+
+Without the `CONFIG` keyword, CMake uses the Find-module if the OpenVDB CMake
+module directory is in `CMAKE_MODULE_PATH`, and the Config-file otherwise:
+
+@code{.cmake}
+list(APPEND CMAKE_MODULE_PATH "/location/of/openvdb/install/lib/cmake/OpenVDB")
+find_package(OpenVDB REQUIRED)
+@endcode
+
+The Find-module is required for the `openvdb_ax`, `nanovdb` and Houdini
+components, which the Config-file does not provide.
+
 `myapp` in the above is a CMake target, usually created with `add_library()`
-or `add_executable()`. You can optionally provide `CMAKE_MODULE_PATH` as a
-`-D` argument to the cmake command line instead of specifying it in your
-`CMakeLists.txt`.
+or `add_executable()`. You can optionally provide `CMAKE_PREFIX_PATH` (or
+`CMAKE_MODULE_PATH` when using the Find-module) as a `-D` argument to the
+cmake command line instead of specifying it in your `CMakeLists.txt`.
 
 Note that the `FindOpenVDB.cmake` module relies on the other `FindModules`
 provided in the OpenVDB installation to find it's own dependencies. This may
