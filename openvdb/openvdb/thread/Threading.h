@@ -13,21 +13,7 @@
     #define OPENVDB_THREAD_THREADING_RESTORE_DEPRECATION_MESSAGE_TASK
 #endif
 
-/// @warning  the below changes what includes are available from this header
-///   depending on whether version.h is available
-#if __has_include(<tbb/version.h>)
-    #include <tbb/version.h>
-#else
-    /// @note tbb/task_arena.h is the ONLY include that persists from TBB 2020
-    ///   to TBB 2021 to TBB 2023 that itself includes the TBB specific version
-    ///   header files.
-    ///   In TBB 2020, the version header was called tbb/stddef.h. In 2021+, it's
-    ///   called tbb/version.h. We include tbb/task_arena.h here to indirectly
-    ///   access the version defines in a consistent way so that downstream
-    ///   software doesn't need to provide compile time defines.
-    #include <tbb/task_arena.h>
-#endif
-
+#include <tbb/version.h>
 #include <tbb/task_group.h>
 #include <tbb/blocked_range.h>
 #include <tbb/task.h>
@@ -37,30 +23,16 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace thread {
 
-/// @note  This UBSAN suppression may not be needed when we transition to TBB21
 inline OPENVDB_UBSAN_SUPPRESS("vptr") bool cancelGroupExecution()
 {
-    // @note 12000 was the 2021.1-beta05 release. The 2021.1-beta08 release
-    //   introduced current_context().
-#if TBB_INTERFACE_VERSION >= 12002
     auto ctx = tbb::task::current_context();
     return ctx ? ctx->cancel_group_execution() : false;
-#else
-    return tbb::task::self().cancel_group_execution();
-#endif
 }
 
-/// @note  This UBSAN suppression may not be needed when we transition to TBB21
 inline OPENVDB_UBSAN_SUPPRESS("vptr") bool isGroupExecutionCancelled()
 {
-    // @note 12000 was the 2021.1-beta05 release. The 2021.1-beta08 release
-    //   introduced current_context().
-#if TBB_INTERFACE_VERSION >= 12002
     auto ctx = tbb::task::current_context();
     return ctx ? ctx->is_group_execution_cancelled() : false;
-#else
-    return tbb::task::self().is_cancelled();
-#endif
 }
 
 } // namespace thread
