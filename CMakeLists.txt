@@ -507,12 +507,21 @@ if(OPENVDB_BUILD_PYTHON_MODULE OR (OPENVDB_BUILD_NANOVDB AND NANOVDB_BUILD_PYTHO
     endif()
   endif()
 
+  # nanobind's config file only accepts the same major version as requested,
+  # so the minimum is checked below rather than passed to find_package.
   find_package(nanobind REQUIRED CONFIG)
   include(FindPackageHandleStandardArgs)
   find_package_handle_standard_args(nanobind
     FOUND_VAR nanobind_FOUND
     REQUIRED_VARS NB_DIR
     VERSION_VAR nanobind_VERSION)
+
+  if(MINIMUM_NANOBIND_VERSION)
+    if(nanobind_VERSION VERSION_LESS ${MINIMUM_NANOBIND_VERSION})
+      message(FATAL_ERROR "nanobind version ${nanobind_VERSION} is too old, "
+        "version ${MINIMUM_NANOBIND_VERSION} or newer is required.")
+    endif()
+  endif()
 
   if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_NANOBIND_VERSION)
     if(nanobind_VERSION VERSION_LESS ${FUTURE_MINIMUM_NANOBIND_VERSION})
