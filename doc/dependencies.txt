@@ -77,7 +77,7 @@ VCL             | 2.02.0  | >= 2.02.0   | x86 intrinsics and SIMD class wrappers
 LLVM            | 15.0.0* | 18.0.0      | Target-independent code generation                                | Y       | Y        | https://llvm.org/
 Bison           | 3.7.0   | 3.7.0       | General-purpose parser generator                                  | Y       | Y        | https://www.gnu.org/software/gcc
 Flex            | 2.6.4   | 2.6.4       | Fast lexical analyzer generator                                   | Y       | Y        | https://github.com/westes/flex
-Python          | 3.10    | 3.11        | The python interpreter and libraries                              | Y       | Y        | https://www.python.org
+Python          | 3.11    | 3.11        | The python interpreter and libraries                              | Y       | Y        | https://www.python.org
 nanobind**      | 2.0.0   | >= 2.5.0    | C++/python bindings                                               | Y       | Y        | https://nanobind.readthedocs.io
 GoogleTest      | 1.10    | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
 libpng          | -       | Latest      | Library for manipulating PNG images                               | Y       | Y        | http://www.libpng.org/pub/png/libpng.html
