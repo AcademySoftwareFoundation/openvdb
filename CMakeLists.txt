@@ -504,7 +504,7 @@ if(OPENVDB_BUILD_PYTHON_MODULE OR (OPENVDB_BUILD_NANOVDB AND NANOVDB_BUILD_PYTHO
   find_package(Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Development Interpreter)
   if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_PYTHON_VERSION)
     if(Python_VERSION VERSION_LESS ${FUTURE_MINIMUM_PYTHON_VERSION})
-      message(DEPRECATION "Support for Python versions < ${FUTURE_MINIMUM_GLFW_VERSION} "
+      message(DEPRECATION "Support for Python versions < ${FUTURE_MINIMUM_PYTHON_VERSION} "
         "is deprecated and will be removed.")
     endif()
   endif()
