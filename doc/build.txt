@@ -150,6 +150,15 @@ steps below treat ZLib as a required dependency.
 
 You can disable ZLib using `-D USE_ZLIB=OFF`.
 
+@subsection buildZstdSupport Zstd Support
+
+Zstd is an optional dependency of the OpenVDB core library. The documented
+build steps below treat Zstd as a required dependency.
+
+You can disable Zstd using `-D USE_ZSTD=OFF`. The zstd CMake config files are used
+if found, otherwise zstd is located manually. Use `-D Zstd_ROOT=<prefix>` to
+point at a specific installation.
+
 @subsection buildVCPKG Building Dependencies using VCPKG
 
 It is recommended to set the VCPKG_DEFAULT_TRIPLET=x64-windows environment
