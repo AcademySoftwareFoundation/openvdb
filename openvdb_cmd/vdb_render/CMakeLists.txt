@@ -22,6 +22,12 @@ endif()
 
 if(USE_EXR)
   find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} CONFIG REQUIRED)
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_OPENEXR_VERSION)
+    if(OpenEXR_VERSION VERSION_LESS FUTURE_MINIMUM_OPENEXR_VERSION)
+      message(DEPRECATION "Support for OpenEXR versions < ${FUTURE_MINIMUM_OPENEXR_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
+  endif()
 endif()
 
 set(SOURCE_FILES main.cc)
