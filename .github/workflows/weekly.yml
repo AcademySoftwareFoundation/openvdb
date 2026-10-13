@@ -75,7 +75,7 @@ jobs:
           - { houdini_version: '20.5', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_5' }
       fail-fast: false
     container:
-      image: aswf/ci-base:2024
+      image: aswf/ci-base:2027
     steps:
     - uses: actions/checkout@v3
     - name: timestamp
@@ -146,29 +146,21 @@ jobs:
     strategy:
       matrix:
         config:
-          - { name: 'all',    image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
-          - { name: 'lite',   image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF' }
-          - { name: 'half',   image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_IMATH_HALF=ON' }
-          - { name: 'simd',   image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_X86_INSTRSET=7 -DUSE_VCL=ON' } # 7=AVX
-          - { name: 'pygrid', image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
-          - { name: 'asan',   image: '2026', build: 'asan',    components: 'core,test',                        cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF' }
-          - { name: 'ubsan',  image: '2026', build: 'ubsan',   components: 'core,test',                        cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" ' }
-          - { name: 'c++20',  image: '2026', build: 'Release', components: 'core,test',                        cmake: '-DCMAKE_CXX_STANDARD=20' }
-          - { name: 'abi14',  image: '2026',           build: 'Release', components: 'core,test',              cmake: '-DOPENVDB_USE_FUTURE_ABI_14=ON -DOPENVDB_ENABLE_ASSERTS=ON' }
-          - { name: 'conf',   image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON' }
+          - { name: 'all',    image: '2027', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
+          - { name: 'lite',   image: '2027', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF' }
+          - { name: 'half',   image: '2027', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_IMATH_HALF=ON' }
+          - { name: 'simd',   image: '2027', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_X86_INSTRSET=7 -DUSE_VCL=ON' } # 7=AVX
+          - { name: 'pygrid', image: '2027', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
+          - { name: 'asan',   image: '2027', build: 'asan',    components: 'core,test',                        cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF' }
+          - { name: 'ubsan',  image: '2027', build: 'ubsan',   components: 'core,test',                        cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" ' }
+          - { name: 'c++20',  image: '2027', build: 'Release', components: 'core,test',                        cmake: '-DCMAKE_CXX_STANDARD=20' }
+          - { name: 'abi14',  image: '2027', build: 'Release', components: 'core,test',                        cmake: '-DOPENVDB_USE_FUTURE_ABI_14=ON -DOPENVDB_ENABLE_ASSERTS=ON' }
+          - { name: 'conf',   image: '2027', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
     - name: nanobind
       run: ./ci/install_nanobind.sh 2.5.0
-      # 2026 images are broken with gtest/glfw/exr installs
-    - name: deps
-      if: contains(matrix.config.image, '2026')
-      run: |
-        ./ci/install_gtest.sh latest
-        ./ci/install_glfw.sh latest
-        ./ci/install_imath.sh v3.2.2
-        ./ci/install_exr.sh v3.2.2
     - name: build
       run: >
         ./ci/build.sh -v
@@ -300,9 +292,7 @@ jobs:
     strategy:
       matrix:
         config:
-          - { image: '2025-clang18.1', cxx: 'clang++', build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
-          # @note  LLVM 17 builds are incompatible with the vdb python plugin on linux
-          - { image: '2024-clang17.2', cxx: 'clang++', build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '-DOPENVDB_PYTHON_USE_AX=OFF' }
+          - { image: '2027', cxx: 'clang++', build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -401,7 +391,6 @@ jobs:
           - { vc: 'x64-windows-static', llvm: '18.1.0', crt: 'MultiThreaded',      components: 'core,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON' }
           - { vc: 'x64-windows-static', llvm: '18.1.0', crt: 'MultiThreadedDebug', components: 'core,axcore,axbin,axtest', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON' }
           - { vc: 'x64-windows',        llvm: '18.1.0', crt: 'MultiThreadedDLL',   components: 'core,axcore,axbin',        build: 'Release', cmake: '-DOPENVDB_CORE_STATIC=OFF -DOPENVDB_AX_STATIC=OFF' }
-          - { vc: 'x64-windows-static', llvm: '15.0.0', crt: 'MultiThreaded',      components: 'core,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
