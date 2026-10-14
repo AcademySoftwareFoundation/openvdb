@@ -1342,7 +1342,7 @@ TEST(TestNanoVDBCUDA, CudaSignedFloodFillNonAdjacentRootChildrenFilled)
 // (build::sdfToLevelSet), and checks that the device flood fill gives each of them the host value again
 TEST(TestNanoVDBCUDA, CudaSignedFloodFillMatchesHost)
 {
-    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
+    using DevBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
     auto refHdl = nanovdb::tools::createLevelSetSphere<float>(100.0, nanovdb::Vec3d(64.0));
     auto hdl = refHdl.copy<nanovdb::HostBuffer>();
     const auto &refTree = refHdl.grid<float>()->tree();
@@ -1363,14 +1363,14 @@ TEST(TestNanoVDBCUDA, CudaSignedFloodFillMatchesHost)
     flipTiles(tree.getFirstLower(), tree.nodeCount(1));
     flipTiles(tree.getFirstUpper(), tree.nodeCount(2));
 
-auto devHdl = nanovdb::cuda::copyTo<DevBufT>(hdl, cudaStream_t(0));
-nanovdb::tools::cuda::signedFloodFill(devHdl.deviceGrid<float>());
-auto outHdl = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(devHdl, cudaStream_t(0)); // synchronizes before returning
-// then compare outHdl's tree with refTree, as now
+    auto devHdl = nanovdb::cuda::copyTo<DevBufT>(hdl, cudaStream_t(0));
+    nanovdb::tools::cuda::signedFloodFill(devHdl.deviceGrid<float>());
+    auto outHdl = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(devHdl, cudaStream_t(0)); // synchronizes before returning
+    const auto &outTree = outHdl.grid<float>()->tree();
 
     uint64_t wrongVoxels = 0;
-    for (uint32_t i = 0; i < tree.nodeCount(0); ++i) {
-        const auto &leaf = tree.getFirstLeaf()[i], &ref = refTree.getFirstLeaf()[i];
+    for (uint32_t i = 0; i < outTree.nodeCount(0); ++i) {
+        const auto &leaf = outTree.getFirstLeaf()[i], &ref = refTree.getFirstLeaf()[i];
         for (uint32_t n = 0; n < leaf.SIZE; ++n) wrongVoxels += leaf.getValue(n) != ref.getValue(n);
     }
     auto wrongTiles = [](const auto *node, const auto *ref, uint32_t count) {
@@ -1383,8 +1383,8 @@ auto outHdl = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(devHdl, cudaStream_t(0)
         return wrong;
     };
     EXPECT_EQ(0u, wrongVoxels);
-    EXPECT_EQ(0u, wrongTiles(tree.getFirstLower(), refTree.getFirstLower(), tree.nodeCount(1)));
-    EXPECT_EQ(0u, wrongTiles(tree.getFirstUpper(), refTree.getFirstUpper(), tree.nodeCount(2)));
+    EXPECT_EQ(0u, wrongTiles(outTree.getFirstLower(), refTree.getFirstLower(), outTree.nodeCount(1)));
+    EXPECT_EQ(0u, wrongTiles(outTree.getFirstUpper(), refTree.getFirstUpper(), outTree.nodeCount(2)));
 }// CudaSignedFloodFillMatchesHost
 
 TEST(TestNanoVDBCUDA, OneVoxelToGrid)
