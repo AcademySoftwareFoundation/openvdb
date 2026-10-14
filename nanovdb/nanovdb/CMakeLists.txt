@@ -410,13 +410,11 @@ set(NANOVDB_INSTALL_TOOLS_CUDA_DIR ${NANOVDB_INSTALL_TOOLS_DIR}/cuda)
 set(NANOVDB_INSTALL_UTIL_DIR ${NANOVDB_INSTALL_ROOT_DIR}/util)
 set(NANOVDB_INSTALL_UTIL_CUDA_DIR ${NANOVDB_INSTALL_UTIL_DIR}/cuda)
 
-# nanovdb/io/IO.h includes <nanovdb_blosc.h>, which in turn includes the
-# vendored vdb_blosc.h - install both alongside NanoVDB.h so downstream
-# consumers of an installed NanoVDB (with or without CMake) can resolve
-# them without needing an OpenVDB source checkout.
+# nanovdb/io/IO.h includes <nanovdb_blosc.h> - install it alongside NanoVDB.h
+# so downstream consumers of an installed NanoVDB (with or without CMake) can
+# resolve it without needing an OpenVDB source checkout.
 install(FILES
   ${CMAKE_CURRENT_LIST_DIR}/../../ext/blosc/openvdb/ext/blosc/nanovdb_blosc.h
-  ${CMAKE_CURRENT_LIST_DIR}/../../ext/blosc/openvdb/ext/blosc/vdb_blosc.h
   DESTINATION ${NANOVDB_INSTALL_ROOT_DIR}
 )
 
