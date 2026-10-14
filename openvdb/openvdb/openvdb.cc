@@ -90,7 +90,7 @@ initialize()
     // Register types associated with point data grids.
     points::internal::initialize();
 
-    blosc_init();
+    openvdb_blosc_init();
 
 #ifdef __ICC
 // Disable ICC "assignment to statically allocated variable" warning.

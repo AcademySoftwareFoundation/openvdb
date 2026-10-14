@@ -173,7 +173,7 @@ namespace {
 
 int bloscCompress(size_t inBytes, const char* data, char* compressedData, int outBytes)
 {
-    return blosc_compress_ctx(
+    return openvdb_blosc_compress_ctx(
         /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
         /*doshuffle=*/true,
         /*typesize=*/sizeof(float), //for optimal float and Vec3f compression
@@ -181,7 +181,7 @@ int bloscCompress(size_t inBytes, const char* data, char* compressedData, int ou
         /*src=*/data,
         /*dest=*/compressedData,
         /*destsize=*/outBytes,
-        BLOSC_LZ4_COMPNAME,
+        OPENVDB_BLOSC_LZ4_COMPNAME,
         /*blocksize=*/inBytes,//previously set to 256 (in v3.x)
         /*numthreads=*/1);
 }
@@ -194,7 +194,7 @@ bloscToStreamSize(const char* data, size_t valSize, size_t numVals)
 {
     const size_t inBytes = valSize * numVals;
 
-    int outBytes = int(inBytes) + BLOSC_MAX_OVERHEAD;
+    int outBytes = int(inBytes) + OPENVDB_BLOSC_MAX_OVERHEAD;
     std::unique_ptr<char[]> compressedData(new char[outBytes]);
 
     outBytes = bloscCompress(inBytes, data, compressedData.get(), outBytes);
@@ -214,7 +214,7 @@ bloscToStream(std::ostream& os, const char* data, size_t valSize, size_t numVals
     // inBytes expected to be <= the max value + 1 of a signed int64
     OPENVDB_ASSERT(inBytes < size_t(std::numeric_limits<Int64>::max()));
 
-    int outBytes = int(inBytes) + BLOSC_MAX_OVERHEAD;
+    int outBytes = int(inBytes) + OPENVDB_BLOSC_MAX_OVERHEAD;
     std::unique_ptr<char[]> compressedData(new char[outBytes]);
 
     outBytes = bloscCompress(inBytes, data, compressedData.get(), outBytes);
@@ -272,10 +272,10 @@ bloscFromStream(std::istream& is, char* data, size_t numBytes)
             std::unique_ptr<char[]> compressedData(new char[numCompressedBytes]);
             is.read(reinterpret_cast<char*>(compressedData.get()), numCompressedBytes);
             // Uncompress the data.
-            const int numUncompressedBytes = blosc_decompress_ctx(
+            const int numUncompressedBytes = openvdb_blosc_decompress_ctx(
                 /*src=*/compressedData.get(), /*dest=*/data, numBytes, /*numthreads=*/1);
             if (numUncompressedBytes < 1) {
-                OPENVDB_LOG_DEBUG("blosc_decompress() returned error code "
+                OPENVDB_LOG_DEBUG("openvdb_blosc_decompress_ctx() returned error code "
                     << numUncompressedBytes);
             }
             if (numUncompressedBytes != Int64(numBytes)) {

@@ -108,7 +108,7 @@ TEST_F(TestStreamCompression, testBlosc)
             EXPECT_EQ(compressedSizeBytes, compressedBytes);
 
             // no compression performed due to buffer being too small
-            if (paddedCount <= BLOSC_MINIMUM_BYTES) {
+            if (paddedCount <= OPENVDB_BLOSC_MINIMUM_BYTES) {
                 EXPECT_TRUE(!compressedBuffer);
             }
             else {
