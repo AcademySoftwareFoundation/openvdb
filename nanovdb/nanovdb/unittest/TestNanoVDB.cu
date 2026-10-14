@@ -1363,10 +1363,10 @@ TEST(TestNanoVDBCUDA, CudaSignedFloodFillMatchesHost)
     flipTiles(tree.getFirstLower(), tree.nodeCount(1));
     flipTiles(tree.getFirstUpper(), tree.nodeCount(2));
 
-    BufferT buffer(cudaStream_t(0), hdl.bufferSize(), nanovdb::cuda::noInit);
-    ASSERT_EQ(cudaSuccess, cudaMemcpy(buffer.data(), hdl.data(), hdl.bufferSize(), cudaMemcpyHostToDevice));
-    nanovdb::tools::cuda::signedFloodFill(reinterpret_cast<nanovdb::NanoGrid<float>*>(buffer.data()));
-    ASSERT_EQ(cudaSuccess, cudaMemcpy(hdl.data(), buffer.data(), hdl.bufferSize(), cudaMemcpyDeviceToHost));
+auto devHdl = nanovdb::cuda::copyTo<DevBufT>(hdl, cudaStream_t(0));
+nanovdb::tools::cuda::signedFloodFill(devHdl.deviceGrid<float>());
+auto outHdl = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(devHdl, cudaStream_t(0)); // synchronizes before returning
+// then compare outHdl's tree with refTree, as now
 
     uint64_t wrongVoxels = 0;
     for (uint32_t i = 0; i < tree.nodeCount(0); ++i) {
