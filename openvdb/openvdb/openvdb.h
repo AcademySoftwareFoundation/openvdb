@@ -42,7 +42,8 @@ OPENVDB_API void initialize();
 ///   times.
 /// @warning  This method does *not* uninitialize blosc. This is to avoid
 ///   changing program states should another library also be using blosc. If
-///   blosc is enabled, consider calling blosc_destroy() in your application.
+///   blosc is enabled, consider calling the destroy function of that blosc
+///   in your application.
 OPENVDB_API void uninitialize();
 
 

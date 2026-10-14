@@ -238,9 +238,9 @@ fileSize_t Internal::write(std::ostream& os, const GridHandle<BufferT>& handle, 
     }
     case Codec::BLOSC: {
         do {
-            fileSize_t              chunk = residual < MAX_SIZE ? residual : MAX_SIZE, size = chunk + BLOSC_MAX_OVERHEAD;
+            fileSize_t              chunk = residual < MAX_SIZE ? residual : MAX_SIZE, size = chunk + NANOVDB_BLOSC_MAX_OVERHEAD;
             std::unique_ptr<char[]> tmp(new char[size]);
-            const int               count = blosc_compress_ctx(9, 1, sizeof(float), chunk, data, tmp.get(), size, BLOSC_LZ4_COMPNAME, 1 << 18, 1);
+            const int               count = nanovdb_blosc_compress_ctx(9, 1, sizeof(float), chunk, data, tmp.get(), size, NANOVDB_BLOSC_LZ4_COMPNAME, 1 << 18, 1);
             if (count <= 0) throw std::runtime_error("Internal write error in BLOSC");
             const fileSize_t outBytes = count;
             os.write(reinterpret_cast<const char*>(&outBytes), sizeof(fileSize_t));
@@ -296,7 +296,7 @@ void Internal::read(std::istream& is, char* data, fileSize_t residual, Codec cod
             std::unique_ptr<char[]> tmp(new char[size]);// temp buffer for compressed data
             is.read(reinterpret_cast<char*>(tmp.get()), size);
             const fileSize_t chunk = residual < MAX_SIZE ? residual : MAX_SIZE;
-            const int        count = blosc_decompress_ctx(tmp.get(), data, size_t(chunk), 1); //fails with more threads :(
+            const int        count = nanovdb_blosc_decompress_ctx(tmp.get(), data, size_t(chunk), 1); //fails with more threads :(
             if (count < 1) throw std::runtime_error("Internal read error in BLOSC");
             if (count != int(chunk)) throw std::runtime_error("BLOSC failed on byte size");
             data += size_t(chunk);
