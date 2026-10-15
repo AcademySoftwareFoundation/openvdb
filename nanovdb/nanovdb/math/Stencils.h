@@ -646,15 +646,30 @@ public:
     /// buffer has been populated via a call to moveTo(ijk).
     __hostdev__ inline ValueType normSqGrad(ValueType isoValue = ValueType(0)) const
     {
-        const ValueType* v = mValues;
+        return normSqGrad(mValues, mInvDx2, mDx2, isoValue);
+    }
+
+    /// @brief Return the norm-square of the WENO upwind gradient (computed via
+    /// WENO upwinding and Godunov's scheme) for a caller-supplied stencil buffer.
+    ///
+    /// @param v        19 stencil values laid out per the WenoPt map above, i.e.
+    ///                 v[WenoPt<i,j,k>::idx] holds the tap at offset (i,j,k).
+    /// @param invDx2   1/dx^2, applied to the result.
+    /// @param dx2      Reference scale (squared) passed on to WENO5.
+    /// @param isoValue Iso-value deciding the upwind direction in Godunov's scheme.
+    __hostdev__ static inline ValueType normSqGrad(const ValueType* v,
+                                                   const ValueType  invDx2,
+                                                   const ValueType  dx2,
+                                                   ValueType        isoValue = ValueType(0))
+    {
         const RealT
-            dP_xm = WENO5<RealT>(v[ 2]-v[ 1],v[ 3]-v[ 2],v[ 0]-v[ 3],v[ 4]-v[ 0],v[ 5]-v[ 4],mDx2),
-            dP_xp = WENO5<RealT>(v[ 6]-v[ 5],v[ 5]-v[ 4],v[ 4]-v[ 0],v[ 0]-v[ 3],v[ 3]-v[ 2],mDx2),
-            dP_ym = WENO5<RealT>(v[ 8]-v[ 7],v[ 9]-v[ 8],v[ 0]-v[ 9],v[10]-v[ 0],v[11]-v[10],mDx2),
-            dP_yp = WENO5<RealT>(v[12]-v[11],v[11]-v[10],v[10]-v[ 0],v[ 0]-v[ 9],v[ 9]-v[ 8],mDx2),
-            dP_zm = WENO5<RealT>(v[14]-v[13],v[15]-v[14],v[ 0]-v[15],v[16]-v[ 0],v[17]-v[16],mDx2),
-            dP_zp = WENO5<RealT>(v[18]-v[17],v[17]-v[16],v[16]-v[ 0],v[ 0]-v[15],v[15]-v[14],mDx2);
-        return mInvDx2*static_cast<ValueType>(
+            dP_xm = WENO5<RealT>(v[ 2]-v[ 1],v[ 3]-v[ 2],v[ 0]-v[ 3],v[ 4]-v[ 0],v[ 5]-v[ 4],dx2),
+            dP_xp = WENO5<RealT>(v[ 6]-v[ 5],v[ 5]-v[ 4],v[ 4]-v[ 0],v[ 0]-v[ 3],v[ 3]-v[ 2],dx2),
+            dP_ym = WENO5<RealT>(v[ 8]-v[ 7],v[ 9]-v[ 8],v[ 0]-v[ 9],v[10]-v[ 0],v[11]-v[10],dx2),
+            dP_yp = WENO5<RealT>(v[12]-v[11],v[11]-v[10],v[10]-v[ 0],v[ 0]-v[ 9],v[ 9]-v[ 8],dx2),
+            dP_zm = WENO5<RealT>(v[14]-v[13],v[15]-v[14],v[ 0]-v[15],v[16]-v[ 0],v[17]-v[16],dx2),
+            dP_zp = WENO5<RealT>(v[18]-v[17],v[17]-v[16],v[16]-v[ 0],v[ 0]-v[15],v[15]-v[14],dx2);
+        return invDx2*static_cast<ValueType>(
             GodunovsNormSqrd(v[0]>isoValue, dP_xm, dP_xp, dP_ym, dP_yp, dP_zm, dP_zp));
     }
 
@@ -681,9 +696,21 @@ public:
     /// buffer has been populated via a call to moveTo(ijk).
     __hostdev__ inline Vec3<ValueType> gradient() const
     {
-        return mInv2Dx * Vec3<ValueType>(mValues[ 4] - mValues[ 3],
-                                         mValues[10] - mValues[ 9],
-                                         mValues[16] - mValues[15]);
+        return gradient(mValues, mInv2Dx);
+    }
+
+    /// @brief Return the second-order central-difference gradient for a
+    ///        caller-supplied stencil buffer.
+    ///
+    /// @param v       19 stencil values laid out per the WenoPt map above.  Only
+    ///                the six face neighbours are read.
+    /// @param inv2Dx  1/(2*dx), applied to the result.
+    __hostdev__ static inline Vec3<ValueType> gradient(const ValueType* v,
+                                                       const ValueType  inv2Dx)
+    {
+        return inv2Dx * Vec3<ValueType>(v[ 4] - v[ 3],
+                                        v[10] - v[ 9],
+                                        v[16] - v[15]);
     }
 
     /// Return the Laplacian computed at the previously buffered
