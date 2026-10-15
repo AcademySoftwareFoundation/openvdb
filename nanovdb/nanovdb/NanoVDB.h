@@ -182,7 +182,7 @@ class ValueOnIndex{};
 /// @brief Dummy type for a voxel whose value equals its binary active state
 class ValueMask{};
 
-/// @brief Dummy type for a 16 bit floating point values (placeholder for IEEE 754 Half)
+/// @brief Type containing raw 16 bits for half precision floating point values (placeholder for IEEE 754 Half)
 class Half
 {
     public:
