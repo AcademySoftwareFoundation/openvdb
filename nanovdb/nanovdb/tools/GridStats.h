@@ -16,6 +16,7 @@
 #define NANOVDB_TOOLS_GRIDSTATS_H_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>
+#include <nanovdb/math/HalfLite.h>
 
 #ifdef NANOVDB_USE_TBB
 #include <memory>
@@ -252,19 +253,14 @@ public:
         , mMax(b)
     {
     }
-    __hostdev__ uint16_t raw_to_key(const ValueT& v)
-    {
-        uint32_t mask = (-(int32_t(v.raw >> 15))) | 0x8000;
-        return uint16_t(uint32_t(v.raw) ^ mask);
-    }
     __hostdev__ Extrema& min(const ValueT& v)
     {
-        if (raw_to_key(v) < raw_to_key(mMin)) mMin = v;
+        if (math::HalfToFloat(v.raw) < math::HalfToFloat(mMin.raw)) mMin = v;
         return *this;
     }
     __hostdev__ Extrema& max(const ValueT& v)
     {
-        if (raw_to_key(v) > raw_to_key(mMax)) mMax = v;
+        if (math::HalfToFloat(v.raw) > math::HalfToFloat(mMax.raw)) mMax = v;
         return *this;
     }
     __hostdev__ Extrema& add(const ValueT& v)
@@ -534,13 +530,8 @@ public:
     using ValueType = ValueT;
     __hostdev__ double raw_to_double(const ValueT& v)
     {
-        uint64_t raw64 =
-            (uint64_t(v.raw & 0x8000) << (63-15)) | // sign bit
-            ((uint64_t(v.raw & 0x7C00) + ((1023 - 15) << 10)) << (52-10)) | // exponent
-            (uint64_t(v.raw & 0x03FF) << (52-10)); // mantissa
-        if ((v.raw & 0x7C00) == 0u) { raw64 &= 0x8000000000000000llu; } // flush denorms to zero
-        if ((v.raw & 0x7C00) == 0x7C00) { raw64 |= 0x7FF0000000000000llu; } // preserve inf and NaN
-        return *((double*)&raw64);
+        float vf = math::HalfToFloat(v.raw);
+        return double(vf);
     }
     __hostdev__ Stats()
         : BaseT()

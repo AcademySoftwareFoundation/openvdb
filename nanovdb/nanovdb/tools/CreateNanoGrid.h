@@ -92,6 +92,7 @@
 #include <nanovdb/util/Reduce.h>
 #include <nanovdb/util/PrefixSum.h>
 #include <nanovdb/math/DitherLUT.h>// for nanovdb::math::DitherLUT
+#include <nanovdb/math/HalfLite.h>
 
 #include <limits>
 #include <vector>
@@ -793,15 +794,8 @@ inline DstT CreateNanoGrid_valueCast(const SrcT val)
 template <>
 inline nanovdb::Half CreateNanoGrid_valueCast<nanovdb::Half, float>(const float val)
 {
-    uint32_t raw32 = *((uint32_t*)&val);
-    uint32_t raw16 =
-        (uint32_t(raw32 & 0x80000000) >> (31-15)) | // sign bit
-        ((uint32_t(raw32 & 0x7F800000) - ((127 - 15) << 23)) >> (23-10)) | // exponent
-        (uint32_t(raw32 & 0x007FFFFF) >> (23-10)); // mantissa
-    if ((raw32 & 0x7F800000) == 0u) { raw16 &= 0x8000u; } // flush denorms to zero
-    if ((raw32 & 0x7F800000) == 0x7F800000) { raw16 |= 0x7C00u; } // preserve inf and NaN
     nanovdb::Half ret;
-    ret.raw = uint16_t(raw16);
+    ret.raw = math::FloatToHalf(val);
     return ret;
 }
 

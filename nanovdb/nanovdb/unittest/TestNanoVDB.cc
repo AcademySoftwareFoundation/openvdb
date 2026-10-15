@@ -33,6 +33,7 @@
 #include <nanovdb/NodeManager.h>
 #include <nanovdb/util/Timer.h>
 #include <nanovdb/tools/VoxelBlockManager.h>
+#include <nanovdb/math/HalfLite.h>
 
 #if !defined(_MSC_VER) // does not compile in msvc c++ due to zero-sized arrays.
 #include <nanovdb/CNanoVDB.h>
@@ -4105,28 +4106,14 @@ TEST_F(TestNanoVDB, GridBuilder_Fp16)
     }
 } // GridBuilder_Fp16
 
-// Disclaimer: This is not trying to cover all corner cases of IEEE 754
-static float half_to_float(nanovdb::Half v)
+static float HalfToFloat(nanovdb::Half v)
 {
-    uint32_t raw32 =
-        (uint32_t(v.raw & 0x8000) << (31-15)) | // sign bit
-        ((uint32_t(v.raw & 0x7C00) + ((127 - 15) << 10)) << (23-10)) | // exponent
-        (uint32_t(v.raw & 0x03FF) << (23-10)); // mantissa
-    if ((v.raw & 0x7C00) == 0u) { raw32 &= 0x80000000llu; } // flush denorms to zero
-    if ((v.raw & 0x7C00) == 0x7C00) { raw32 |= 0x7F800000llu; } // preserve inf and NaN
-    return *((float*)&raw32);
+    return nanovdb::math::HalfToFloat(v.raw);
 }
-static nanovdb::Half float_to_half(float val)
+static nanovdb::Half FloatToHalf(float val)
 {
-    uint32_t raw32 = *((uint32_t*)&val);
-    uint32_t raw16 =
-        (uint32_t(raw32 & 0x80000000) >> (31-15)) | // sign bit
-        ((uint32_t(raw32 & 0x7F800000) - ((127 - 15) << 23)) >> (23-10)) | // exponent
-        (uint32_t(raw32 & 0x007FFFFF) >> (23-10)); // mantissa
-    if ((raw32 & 0x7F800000) == 0u) { raw16 &= 0x8000u; } // flush denorms to zero
-    if ((raw32 & 0x7F800000) == 0x7F800000) { raw16 |= 0x7C00u; } // preserve inf and NaN
-    nanovdb::Half ret;
-    ret.raw = uint16_t(raw16);
+    nanovdb::Half ret = {};
+    ret.raw = nanovdb::math::FloatToHalf(val);
     return ret;
 }
 
@@ -4136,16 +4123,16 @@ TEST_F(TestNanoVDB, GridBuilder_Half)
     EXPECT_EQ(96u + 512u*2, sizeof(nanovdb::NanoLeaf<VoxelT>));
     { // 3 grid point
         using SrcGridT = nanovdb::tools::build::Grid<VoxelT>;
-        SrcGridT srcGrid(float_to_half(0.0f));
+        SrcGridT srcGrid(FloatToHalf(0.0f));
         auto srcAcc = srcGrid.getAccessor();
-        srcAcc.setValue(nanovdb::Coord(  1,  2,  3), float_to_half(1.0f));
-        srcAcc.setValue(nanovdb::Coord(-10, 20,-50), float_to_half(2.0f));
-        srcAcc.setValue(nanovdb::Coord( 50,-12, 30), float_to_half(3.0f));
+        srcAcc.setValue(nanovdb::Coord(  1,  2,  3), FloatToHalf(1.0f));
+        srcAcc.setValue(nanovdb::Coord(-10, 20,-50), FloatToHalf(2.0f));
+        srcAcc.setValue(nanovdb::Coord( 50,-12, 30), FloatToHalf(3.0f));
         EXPECT_TRUE(srcAcc.isActive(nanovdb::Coord(1, 2, 3)));
         EXPECT_TRUE(srcAcc.isValueOn(nanovdb::Coord(1, 2, 3)));
-        EXPECT_EQ(1.0f, half_to_float(srcAcc.getValue(nanovdb::Coord(  1,  2,  3))));
-        EXPECT_EQ(2.0f, half_to_float(srcAcc.getValue(nanovdb::Coord(-10, 20,-50))));
-        EXPECT_EQ(3.0f, half_to_float(srcAcc.getValue(nanovdb::Coord( 50,-12, 30))));
+        EXPECT_EQ(1.0f, HalfToFloat(srcAcc.getValue(nanovdb::Coord(  1,  2,  3))));
+        EXPECT_EQ(2.0f, HalfToFloat(srcAcc.getValue(nanovdb::Coord(-10, 20,-50))));
+        EXPECT_EQ(3.0f, HalfToFloat(srcAcc.getValue(nanovdb::Coord( 50,-12, 30))));
 
         auto handle = nanovdb::tools::createNanoGrid<SrcGridT, VoxelT>(srcGrid, nanovdb::tools::StatsMode::All);
         EXPECT_TRUE(handle);
@@ -4162,8 +4149,8 @@ TEST_F(TestNanoVDB, GridBuilder_Half)
         EXPECT_TRUE(dstGrid);
         EXPECT_EQ("", std::string(dstGrid->gridName()));
         EXPECT_EQ((const char*)handle.data(), (const char*)dstGrid);
-        EXPECT_EQ(1.0f, half_to_float(dstGrid->tree().root().minimum()));
-        EXPECT_EQ(3.0f, half_to_float(dstGrid->tree().root().maximum()));
+        EXPECT_EQ(1.0f, HalfToFloat(dstGrid->tree().root().minimum()));
+        EXPECT_EQ(3.0f, HalfToFloat(dstGrid->tree().root().maximum()));
         EXPECT_EQ(2.0f, dstGrid->tree().root().average());
         EXPECT_TRUE(dstGrid->isBreadthFirst());
         using GridT = std::remove_pointer<decltype(dstGrid)>::type;
@@ -4185,12 +4172,12 @@ TEST_F(TestNanoVDB, GridBuilder_Half)
         //std::cerr << "code = " <<  int(leaf->data()->mCode[offset>>1]) << std::endl;
         //std::cerr << "code = " <<  int(leaf->data()->mCode[offset>>1] >> 4) << std::endl;
 
-        EXPECT_EQ(1.0f, half_to_float(dstGrid->tree().getValue(nanovdb::Coord(1, 2, 3))));
+        EXPECT_EQ(1.0f, HalfToFloat(dstGrid->tree().getValue(nanovdb::Coord(1, 2, 3))));
         auto dstAcc = dstGrid->getAccessor();
         EXPECT_TRUE(dstAcc.isActive(nanovdb::Coord(1, 2, 3)));
-        EXPECT_EQ(1.0f, half_to_float(dstAcc.getValue(nanovdb::Coord(  1,  2,  3))));
-        EXPECT_EQ(2.0f, half_to_float(dstAcc.getValue(nanovdb::Coord(-10, 20,-50))));
-        EXPECT_EQ(3.0f, half_to_float(dstAcc.getValue(nanovdb::Coord( 50,-12, 30))));
+        EXPECT_EQ(1.0f, HalfToFloat(dstAcc.getValue(nanovdb::Coord(  1,  2,  3))));
+        EXPECT_EQ(2.0f, HalfToFloat(dstAcc.getValue(nanovdb::Coord(-10, 20,-50))));
+        EXPECT_EQ(3.0f, HalfToFloat(dstAcc.getValue(nanovdb::Coord( 50,-12, 30))));
         //std::cerr << dstGrid->indexBBox() << std::endl;
         EXPECT_EQ(nanovdb::Coord(-10,-12,-50), dstGrid->indexBBox()[0]);
         EXPECT_EQ(nanovdb::Coord( 50, 20, 30), dstGrid->indexBBox()[1]);
@@ -4240,7 +4227,7 @@ TEST_F(TestNanoVDB, GridBuilder_Half)
             auto nanoAcc = nanoGrid->getAccessor();
             for (auto it = bbox.begin(); it; ++it) {
                 const nanovdb::Coord p = *it;
-                EXPECT_NEAR(half_to_float(nanoAcc.getValue(p)), sphere(p), tolerance);
+                EXPECT_NEAR(HalfToFloat(nanoAcc.getValue(p)), sphere(p), tolerance);
             }
         };
         nanovdb::util::forEach(nanoGrid->indexBBox(), kernel);
