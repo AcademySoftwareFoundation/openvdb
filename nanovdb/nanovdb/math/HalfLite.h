@@ -1,11 +1,16 @@
-//
-// SPDX-License-Identifier: BSD-3-Clause
-// Copyright Contributors to the OpenEXR Project.
-//
-// Primary original authors:
-//     Florian Kainz <kainz@ilm.com>
-//     Rod Bogart <rgb@ilm.com>
-//
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: Apache-2.0
+
+/*!
+    \file   HalfLite.h
+
+    \author Andrew Reidmeyer
+
+    \date  October 15, 2026
+
+    \brief Extremely portable but not fast Half/Float conversion
+
+*/
 
 #ifndef NANOVDB_MATH_HALF_LITE_HAS_BEEN_INCLUDED
 #define NANOVDB_MATH_HALF_LITE_HAS_BEEN_INCLUDED

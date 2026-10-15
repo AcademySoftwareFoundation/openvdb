@@ -787,13 +787,13 @@ private:
 }; // CreateNanoGrid
 
 template <typename DstT, typename SrcT>
-inline DstT CreateNanoGrid_valueCast(const SrcT val)
+inline DstT CreateNanoGridValueCast(const SrcT val)
 {
     return static_cast<DstT>(val);
 }
 
 template <>
-inline nanovdb::Half CreateNanoGrid_valueCast<nanovdb::Half, float>(const float val)
+inline nanovdb::Half CreateNanoGridValueCast<nanovdb::Half, float>(const float val)
 {
     nanovdb::Half ret;
     ret.raw = math::FloatToHalf(val);
@@ -1230,7 +1230,7 @@ CreateNanoGrid<SrcGridT>::processLeafs()
                     dst[3] = src[3];
                 }
             } else {
-                for (uint32_t j=0; j<512u; ++j) *dst++ = CreateNanoGrid_valueCast<DstValueT>(srcLeaf.getValue(j));
+                for (uint32_t j=0; j<512u; ++j) *dst++ = CreateNanoGridValueCast<DstValueT>(srcLeaf.getValue(j));
             }
         }
     });
@@ -1532,7 +1532,7 @@ CreateNanoGrid<SrcGridT>::processInternalNodes()
                     DstChildT *dstChild = this->template dstNode<DstBuildT,LEVEL-1>(childID++);// might be Leaf<FpN>
                     dstNode->setChild(it.pos(), dstChild);
                 } else {
-                    dstNode->setValue(it.pos(), CreateNanoGrid_valueCast<DstValueT>(value));
+                    dstNode->setValue(it.pos(), CreateNanoGridValueCast<DstValueT>(value));
                 }
             }
         }
@@ -1611,7 +1611,7 @@ CreateNanoGrid<SrcGridT>::processRoot()
     const uint32_t tableSize = srcRoot.getTableSize();
     if (DstRootT::DataType::padding()>0) util::memzero(dstRoot, DstRootT::memUsage(tableSize));
     dstRoot->mTableSize = tableSize;
-    dstRoot->mMinimum = dstRoot->mMaximum = dstRoot->mBackground = CreateNanoGrid_valueCast<DstValueT>(srcRoot.background());
+    dstRoot->mMinimum = dstRoot->mMaximum = dstRoot->mBackground = CreateNanoGridValueCast<DstValueT>(srcRoot.background());
     dstRoot->mBBox = CoordBBox(); // // set to an empty bounding box
     if (tableSize==0) return;
     auto *dstChild = this->template dstNode<DstBuildT, 2>(0);// fixed size and linear in memory
@@ -1621,7 +1621,7 @@ CreateNanoGrid<SrcGridT>::processRoot()
         if (it.probeChild(value)) {
             dstTile->setChild(it.getCoord(), dstChild++, dstRoot);
         } else {
-            dstTile->setValue(it.getCoord(), it.isValueOn(), CreateNanoGrid_valueCast<DstValueT>(value));
+            dstTile->setValue(it.getCoord(), it.isValueOn(), CreateNanoGridValueCast<DstValueT>(value));
         }
     }
 } // CreateNanoGrid::processRoot<T>
