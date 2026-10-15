@@ -13,6 +13,8 @@
 #include <nanovdb/cuda/PinnedResource.h>
 #include <nanovdb/tools/CreatePrimitives.h>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh> // for the voxelsToGrid entry-point test
+#include <nanovdb/cuda/GridHandle.cuh> // for cuda::mergeGridHandles / splitGridHandles
+#include <nanovdb/tools/GridChecksum.h> // for validateChecksum on the merged headers
 #include <nanovdb/cuda/ManagedResource.h>
 #include <nanovdb/tools/cuda/VoxelBlockManager.cuh> // for the single-space entry-point test
 
@@ -1300,6 +1302,157 @@ TEST(TestBuffer, SingleSpaceToolEntryPoints)
     }
     ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
     EXPECT_EQ(counters.allocs, counters.deallocs);
+    ASSERT_EQ(cudaSuccess, cudaFree(d_coords));
+}
+
+namespace {
+
+/// @brief Host copy of every grid header in @a handle, for checking the
+///        index, count, name and checksum the device-side merge/split wrote.
+template<typename BufT>
+nanovdb::GridHandle<nanovdb::HostBuffer> toHost(const nanovdb::GridHandle<BufT>& handle, cudaStream_t stream)
+{
+    return nanovdb::cuda::copyTo<nanovdb::HostBuffer>(handle, stream);
+}
+
+} // namespace
+
+TEST(TestBuffer, SingleSpaceMergeSplitGridHandles)
+{
+    // Sources live on one stream, the merge and split run on another, and the
+    // sources are released right after each call returns.
+    const char* names[3] = {"a", "b", "c"};
+    std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> hosts;
+    for (int i = 0; i < 3; ++i) {
+        hosts.push_back(nanovdb::tools::createLevelSetSphere<float>(10.0 + 5.0*i, nanovdb::Vec3d(i), 1.0, 3.0, nanovdb::Vec3d(0), names[i]));
+        ASSERT_FALSE(hosts.back().gridData()->mChecksum.isEmpty());// so the merge must refresh it
+    }
+    cudaStream_t srcStream, stream;
+    ASSERT_EQ(cudaSuccess, cudaStreamCreateWithFlags(&srcStream, cudaStreamNonBlocking));
+    ASSERT_EQ(cudaSuccess, cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+
+    Counters counters;
+    CountingResource res{&counters};
+    using RefT = nanovdb::cuda::ResourceRef<CountingResource>;
+    using BufT = nanovdb::cuda::Buffer<std::byte, RefT>;
+    {
+        const BufT proto(stream, RefT(res), 0, nanovdb::cuda::noInit);
+        uint64_t size = 0u;
+        auto merged = [&] {
+            const BufT srcProto(srcStream, RefT(res), 0, nanovdb::cuda::noInit);
+            std::vector<nanovdb::GridHandle<BufT>> sources;
+            for (auto &h : hosts) {
+                sources.push_back(nanovdb::cuda::copyTo<BufT>(h, srcStream, &srcProto));
+                size += h.bufferSize();
+            }
+            return nanovdb::cuda::mergeGridHandles<BufT, std::vector>(sources, stream, &proto);
+        }();// sources freed on return, on srcStream
+        ASSERT_EQ(3u, merged.gridCount());
+        EXPECT_EQ(size, merged.bufferSize());
+        EXPECT_FALSE(merged.isPadded());
+        EXPECT_EQ(stream, merged.buffer().stream());
+
+        auto mergedHost = toHost(merged, stream);
+        for (uint32_t i = 0; i < 3; ++i) {
+            const nanovdb::GridData* data = mergedHost.gridData(i);
+            ASSERT_NE(nullptr, data);
+            EXPECT_EQ(i, data->mGridIndex);
+            EXPECT_EQ(3u, data->mGridCount);
+            EXPECT_STREQ(names[i], data->mGridName);
+            EXPECT_TRUE(nanovdb::tools::validateChecksum(data, nanovdb::CheckMode::Full));
+            EXPECT_EQ(hosts[i].gridSize(), merged.gridSize(i));
+            EXPECT_EQ(nanovdb::GridType::Float, merged.gridType(i));
+        }
+
+        auto parts = nanovdb::cuda::splitGridHandles<BufT, std::vector>(merged, stream, &proto);
+        merged.reset();// released right away
+        ASSERT_EQ(3u, parts.size());
+        for (uint32_t i = 0; i < 3; ++i) {
+            ASSERT_EQ(1u, parts[i].gridCount());
+            EXPECT_EQ(hosts[i].bufferSize(), parts[i].bufferSize());
+            auto partHost = toHost(parts[i], stream);
+            const nanovdb::GridData* data = partHost.gridData();
+            ASSERT_NE(nullptr, data);
+            EXPECT_EQ(0u, data->mGridIndex);
+            EXPECT_EQ(1u, data->mGridCount);
+            EXPECT_STREQ(names[i], data->mGridName);
+            EXPECT_TRUE(nanovdb::tools::validateChecksum(data, nanovdb::CheckMode::Full));
+            EXPECT_EQ(0, std::memcmp(hosts[i].data(), partHost.data(), hosts[i].bufferSize()));
+        }
+    }
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(stream));
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(srcStream));
+    EXPECT_GT(counters.allocs, 0);
+    EXPECT_EQ(counters.allocs, counters.deallocs);
+    ASSERT_EQ(cudaSuccess, cudaStreamDestroy(stream));
+    ASSERT_EQ(cudaSuccess, cudaStreamDestroy(srcStream));
+}
+
+TEST(TestBuffer, SingleSpaceMergeSplitSynchronousResource)
+{
+    // A synchronous resource retains no stream, so the results are complete
+    // when the calls return.
+    using BufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::MallocResource>;
+    std::vector<nanovdb::GridHandle<BufT>> sources;
+    for (int i = 0; i < 2; ++i) {
+        auto host = nanovdb::tools::createLevelSetSphere<float>(10.0 + 5.0*i, nanovdb::Vec3d(i), 1.0, 3.0, nanovdb::Vec3d(0), "s");
+        sources.push_back(nanovdb::cuda::copyTo<BufT>(host, cudaStream_t(0)));
+    }
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));// sources without a retained stream are the caller's to order
+    cudaStream_t stream;
+    ASSERT_EQ(cudaSuccess, cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+    auto merged = nanovdb::cuda::mergeGridHandles<BufT, std::vector>(sources, stream);
+    EXPECT_EQ(cudaSuccess, cudaStreamQuery(stream));
+    ASSERT_EQ(2u, merged.gridCount());
+    auto parts = nanovdb::cuda::splitGridHandles<BufT, std::vector>(merged, stream);
+    EXPECT_EQ(cudaSuccess, cudaStreamQuery(stream));
+    ASSERT_EQ(2u, parts.size());
+    for (uint32_t i = 0; i < 2; ++i) {
+        auto host = toHost(parts[i], stream);
+        EXPECT_EQ(0u, host.gridData()->mGridIndex);
+        EXPECT_EQ(1u, host.gridData()->mGridCount);
+        EXPECT_TRUE(nanovdb::tools::validateChecksum(host.gridData(), nanovdb::CheckMode::Full));
+    }
+    EXPECT_TRUE((nanovdb::cuda::splitGridHandles<BufT, std::vector>(nanovdb::GridHandle<BufT>(), stream).empty()));
+    EXPECT_TRUE((nanovdb::cuda::mergeGridHandles<BufT, std::vector>(std::vector<nanovdb::GridHandle<BufT>>(), stream).empty()));
+    ASSERT_EQ(cudaSuccess, cudaStreamDestroy(stream));
+}
+
+TEST(TestBuffer, SingleSpacePointSetEntryPoints)
+{
+    // The point-set overloads build one grid per set and merge them.
+    nanovdb::Coord coords[3] = {nanovdb::Coord(1,2,3), nanovdb::Coord(10,20,8), nanovdb::Coord(-5,0,7)}, *d_coords = nullptr;
+    nanovdb::Vec3f points[2] = {nanovdb::Vec3f(0.5f), nanovdb::Vec3f(4.25f, -1.0f, 2.0f)}, *d_points = nullptr;
+    ASSERT_EQ(cudaSuccess, cudaMalloc(&d_coords, sizeof(coords)));
+    ASSERT_EQ(cudaSuccess, cudaMalloc(&d_points, sizeof(points)));
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_coords, coords, sizeof(coords), cudaMemcpyHostToDevice));
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_points, points, sizeof(points), cudaMemcpyHostToDevice));
+    using BufT = nanovdb::cuda::Buffer<std::byte>;
+    {
+        std::vector<std::tuple<const nanovdb::Coord* const, size_t, double>> voxelSets{{d_coords, 2, 1.0}, {d_coords + 2, 1, 0.5}};
+        auto handle = nanovdb::tools::cuda::voxelsToGrid<float, const nanovdb::Coord*, BufT>(voxelSets, BufT(), cudaStream_t(0));
+        ASSERT_EQ(2u, handle.gridCount());
+        auto host = toHost(handle, cudaStream_t(0));
+        EXPECT_EQ(2u, host.grid<float>(0)->activeVoxelCount());
+        EXPECT_EQ(1u, host.grid<float>(1)->activeVoxelCount());
+        EXPECT_EQ(1u, host.gridData(1)->mGridIndex);
+        EXPECT_EQ(2u, host.gridData(1)->mGridCount);
+    }
+    {
+        std::vector<std::tuple<nanovdb::Vec3f* const, size_t, double, nanovdb::PointType>> pointSets{
+            {d_points, 2, 1.0, nanovdb::PointType::Default}, {d_points, 1, 0.5, nanovdb::PointType::Default}};
+        auto handle = nanovdb::tools::cuda::pointsToGrid<nanovdb::Point, nanovdb::Vec3f*, BufT>(pointSets, BufT(), cudaStream_t(0));
+        ASSERT_EQ(2u, handle.gridCount());
+        auto host = toHost(handle, cudaStream_t(0));
+        EXPECT_EQ(2u, host.grid<nanovdb::Point>(0)->pointCount());
+        EXPECT_EQ(1u, host.grid<nanovdb::Point>(1)->pointCount());
+    }
+    {
+        auto handle = nanovdb::tools::cuda::pointsToGrid<nanovdb::Vec3f*, BufT>(d_points, 2, 1.0, nanovdb::PointType::Default, BufT(), cudaStream_t(0));
+        ASSERT_EQ(1u, handle.gridCount());
+        EXPECT_EQ(2u, toHost(handle, cudaStream_t(0)).grid<nanovdb::Point>()->pointCount());
+    }
+    ASSERT_EQ(cudaSuccess, cudaFree(d_points));
     ASSERT_EQ(cudaSuccess, cudaFree(d_coords));
 }
 

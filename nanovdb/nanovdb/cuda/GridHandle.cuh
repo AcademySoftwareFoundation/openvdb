@@ -23,8 +23,13 @@
 #include <nanovdb/tools/cuda/GridChecksum.cuh>// for cuda::updateChecksum
 #include <nanovdb/GridHandle.h>
 
+#include <limits>// for the grid-count bound in cuda::mergeGridHandles
+#include <memory>// for the host copy of the dirty flags
+#include <stdexcept>// for std::runtime_error
 #include <string>// for the grid index in chain-validation error messages
-#include <type_traits>// for std::is_default_constructible in cuda::copyTo
+#include <type_traits>// for std::is_default_constructible in cuda::mergeGridHandles
+#include <utility>// for std::move
+#include <vector>// for the per-grid destinations and metadata
 
 namespace nanovdb {
 
@@ -153,6 +158,49 @@ inline ScratchT makeMetaScratch(const BufferT& buf, uint64_t count, cudaStream_t
     else { (void)stream; return ScratchT(buf.resource(), count, noInit); }
 }
 
+/// @brief Orders @c stream after all work already issued on @c buf's
+///        retained stream, using @c event; a no-op for a buffer that retains
+///        no stream or retains @c stream itself.
+template<typename BufferT>
+inline void orderAfterRetainedStream(const BufferT& buf, cudaStream_t stream, cudaEvent_t event)
+{
+    if constexpr (BufferHasStream<BufferT>::value) {
+        if (buf.stream() == stream) return;
+        cudaCheck(cudaEventRecord(event, buf.stream()));
+        cudaCheck(cudaStreamWaitEvent(stream, event, 0));
+    } else {
+        (void)buf; (void)stream; (void)event;
+    }
+}
+
+/// @brief Rewrites the grid index and count of the @c dst[i]'th grid header
+///        and refreshes the checksum of every header that changed. One
+///        readback and one synchronization of @c stream cover all grids, so
+///        every copy issued on @c stream before the call has completed when
+///        it returns.
+/// @param dirty device scratch of at least dst.size() flags
+inline void rewriteGridCounts(const std::vector<GridData*>& dst, const std::vector<uint32_t>& gridIndex,
+                              uint32_t gridCount, bool* dirty, cudaStream_t stream)
+{
+    const size_t n = dst.size();
+    if (gridIndex.size() != n)
+        throw std::invalid_argument("rewriteGridCounts: expected one grid index per destination");
+    for (size_t i = 0; i < n; ++i) {
+        if (gridIndex[i] >= gridCount)
+            throw std::invalid_argument("rewriteGridCounts: grid index out of range of the grid count");
+    }
+    for (size_t i = 0; i < n; ++i) {
+        updateGridCount<<<1, 1, 0, stream>>>(dst[i], gridIndex[i], gridCount, dirty + i);
+        cudaCheckError();
+    }
+    std::unique_ptr<bool[]> hostDirty(new bool[n]);
+    cudaCheck(cudaMemcpyAsync(hostDirty.get(), dirty, n * sizeof(bool), cudaMemcpyDeviceToHost, stream));
+    cudaCheck(cudaStreamSynchronize(stream));
+    for (size_t i = 0; i < n; ++i) {
+        if (hostDirty[i]) tools::cuda::updateChecksum(dst[i], CheckMode::Partial, stream);
+    }
+}
+
 }// namespace detail
 
 template<typename BufferT, template <class, class...> class VectorT = std::vector>
@@ -213,6 +261,133 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, const BufferT* oth
         }
     }
     return GridHandle<BufferT>(std::move(buffer));
+}// cuda::mergeGridHandles
+
+/// @brief Splits a single-space device handle into one handle per grid.
+/// @param handle source handle containing one or more grids
+/// @param stream stream every copy and allocation is ordered on; it is first
+///        ordered after the source buffer's retained stream, if any
+/// @warning A source buffer WITHOUT a retained stream (a synchronous
+///          resource) is not ordered by this call: work that produced its
+///          contents on another stream must be ordered before @a stream by
+///          the caller, e.g. with cudaStreamWaitEvent or a synchronization.
+/// @param proto optional buffer whose resource allocates each output buffer;
+///        without it the resource is default-constructed
+/// @return one handle per grid, each with grid index 0 and grid count 1
+/// @details The copies have completed when this returns, so the caller may
+///          release @a handle immediately. Each output handle adopts the
+///          metadata of its grid in @a handle, so no device chain is parsed.
+///          Outputs over a stream-ordered resource retain @a stream; any
+///          remaining checksum updates are ordered on it. Outputs over a
+///          synchronous resource are complete on return.
+template<typename BufferT, template <class, class...> class VectorT = std::vector>
+inline typename util::enable_if<BufferHasDeviceSingle<BufferT>::value, VectorT<GridHandle<BufferT>>>::type
+splitGridHandles(const GridHandle<BufferT> &handle, cudaStream_t stream, const BufferT* proto = nullptr)
+{
+    VectorT<GridHandle<BufferT>> handles;
+    const uint32_t gridCount = handle.gridCount();
+    if (gridCount == 0u) return handles;
+    const auto &meta = detail::HandleFactory::meta(handle);
+
+    cudaEvent_t event;
+    cudaCheck(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
+    detail::orderAfterRetainedStream(handle.buffer(), stream, event);
+    cudaCheck(cudaEventDestroy(event));
+
+    const int device = util::cuda::currentDevice();
+    std::vector<BufferT> buffers;
+    std::vector<GridData*> dst;
+    buffers.reserve(gridCount);
+    dst.reserve(gridCount);
+    const void *src = handle.deviceData();
+    for (uint32_t n = 0; n < gridCount; ++n) {
+        buffers.push_back(detail::createDeviceStorage<BufferT>(meta[n].size, proto, device, stream));
+        dst.push_back(reinterpret_cast<GridData*>(detail::deviceStorageData(buffers.back())));
+        cudaCheck(cudaMemcpyAsync(dst.back(), util::PtrAdd(src, meta[n].offset), meta[n].size, cudaMemcpyDeviceToDevice, stream));
+    }
+    using DirtyT = Buffer<bool, typename BufferT::ResourceType>;
+    {
+        DirtyT dirty = detail::makeMetaScratch<DirtyT>(buffers.front(), gridCount, stream);
+        detail::rewriteGridCounts(dst, std::vector<uint32_t>(gridCount, 0u), 1u, dirty.data(), stream);
+    }
+    if constexpr (!is_async_resource<typename BufferT::ResourceType>::value) cudaCheck(cudaStreamSynchronize(stream));
+
+    handles.reserve(gridCount);
+    for (uint32_t n = 0; n < gridCount; ++n) {
+        std::vector<GridHandleMetaData> gridMeta{GridHandleMetaData{0u, meta[n].size, meta[n].gridType}};
+        handles.push_back(detail::HandleFactory::make(std::move(buffers[n]), std::move(gridMeta)));
+    }
+    return handles;
+}// cuda::splitGridHandles
+
+/// @brief Merges single-space device handles into one handle containing all
+///        of their grids, in order.
+/// @param handles source handles, each containing one or more grids
+/// @param stream stream every copy and the allocation are ordered on; it is
+///        first ordered after each source buffer's retained stream, if any
+/// @warning A source buffer WITHOUT a retained stream (a synchronous
+///          resource) is not ordered by this call: work that produced its
+///          contents on another stream must be ordered before @a stream by
+///          the caller, e.g. with cudaStreamWaitEvent or a synchronization.
+/// @param proto optional buffer whose resource allocates the output buffer;
+///        without it the resource is default-constructed
+/// @return a handle whose grids carry their merged index and total count
+/// @details The copies have completed when this returns, so the caller may
+///          release @a handles immediately. The output adopts the metadata
+///          of its source grids at their merged offsets, so no device chain
+///          is parsed. An output over a stream-ordered resource retains
+///          @a stream; any remaining checksum updates are ordered on it. An
+///          output over a synchronous resource is complete on return.
+template<typename BufferT, template <class, class...> class VectorT>
+inline typename util::enable_if<BufferHasDeviceSingle<BufferT>::value, GridHandle<BufferT>>::type
+mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, cudaStream_t stream, const BufferT* proto = nullptr)
+{
+    std::vector<GridHandleMetaData> meta;
+    uint64_t size = 0u;
+    for (auto &h : handles) {
+        for (auto &m : detail::HandleFactory::meta(h)) {
+            meta.push_back(GridHandleMetaData{size, m.size, m.gridType});
+            size += m.size;
+        }
+    }
+    if (size == 0u) {
+        if constexpr (std::is_default_constructible<BufferT>::value) {
+            return GridHandle<BufferT>();
+        } else {
+            throw std::runtime_error("cuda::mergeGridHandles: merging empty handles requires a "
+                                     "default-constructible buffer type");
+        }
+    }
+
+    cudaEvent_t event;
+    cudaCheck(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
+    for (auto &h : handles) detail::orderAfterRetainedStream(h.buffer(), stream, event);
+    cudaCheck(cudaEventDestroy(event));
+
+    if (meta.size() > std::numeric_limits<uint32_t>::max())
+        throw std::runtime_error("cuda::mergeGridHandles: the merged handle would exceed the maximum grid count");
+    const uint32_t gridCount = static_cast<uint32_t>(meta.size());
+    BufferT buffer = detail::createDeviceStorage<BufferT>(size, proto, util::cuda::currentDevice(), stream);
+    std::vector<GridData*> dst;
+    std::vector<uint32_t> gridIndex;
+    dst.reserve(gridCount);
+    gridIndex.reserve(gridCount);
+    uint32_t counter = 0u;
+    for (auto &h : handles) {
+        const void *src = h.deviceData();
+        for (auto &m : detail::HandleFactory::meta(h)) {
+            dst.push_back(util::PtrAdd<GridData>(detail::deviceStorageData(buffer), meta[counter].offset));
+            gridIndex.push_back(counter++);
+            cudaCheck(cudaMemcpyAsync(dst.back(), util::PtrAdd(src, m.offset), m.size, cudaMemcpyDeviceToDevice, stream));
+        }
+    }
+    using DirtyT = Buffer<bool, typename BufferT::ResourceType>;
+    {
+        DirtyT dirty = detail::makeMetaScratch<DirtyT>(buffer, gridCount, stream);
+        detail::rewriteGridCounts(dst, gridIndex, gridCount, dirty.data(), stream);
+    }
+    if constexpr (!is_async_resource<typename BufferT::ResourceType>::value) cudaCheck(cudaStreamSynchronize(stream));
+    return detail::HandleFactory::make(std::move(buffer), std::move(meta));
 }// cuda::mergeGridHandles
 
 }// namespace cuda
