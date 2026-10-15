@@ -123,6 +123,14 @@ template<typename BufferT>
 struct BufferHasHostSingle<BufferT, std::void_t<decltype(BufferTraits<BufferT>::hasHostSingle)>>
 { static constexpr bool value = BufferTraits<BufferT>::hasHostSingle; };
 
+/// @brief A single-space buffer whose storage the host cannot read: the
+///        device-single family minus its host-accessible members (managed or
+///        pinned resources). This is the predicate that gates the handles'
+///        host accessors off.
+template<typename BufferT>
+struct BufferIsDeviceOnly
+{ static constexpr bool value = BufferHasDeviceSingle<BufferT>::value && !BufferHasHostSingle<BufferT>::value; };
+
 /// @brief Detects whether a buffer exposes a retained stream (a stream()
 ///        member), i.e. whether its resource is stream-ordered. Used to pick
 ///        the buffer's stream-taking constructor without naming CUDA types.
@@ -140,6 +148,15 @@ struct BufferHasByteElements { static constexpr bool value = true; };
 template<typename BufferT>
 struct BufferHasByteElements<BufferT, std::void_t<typename BufferT::ElementType>>
 { static constexpr bool value = sizeof(typename BufferT::ElementType) == 1; };
+
+/// @brief Detects whether a buffer type is default-constructible, so
+///        consumers can name that requirement in a static_assert instead of
+///        failing wherever the default construction happens to occur.
+template<typename BufferT, typename = void>
+struct BufferIsDefaultConstructible { static constexpr bool value = false; };
+template<typename BufferT>
+struct BufferIsDefaultConstructible<BufferT, std::void_t<decltype(BufferT())>>
+{ static constexpr bool value = true; };
 
 /// @brief Detects whether a buffer provides destroy(), the cuda::Buffer
 ///        spelling for releasing its storage. Handle reset() dispatches to it

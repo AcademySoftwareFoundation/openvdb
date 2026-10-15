@@ -136,11 +136,14 @@ if(NANOVDB_USE_CUDA)
 
   include(../../cmake/CPM.cmake)
 
-  # This will automatically clone CCCL from GitHub and make the exported cmake targets available
+  # Clones CCCL from GitHub and makes the exported cmake targets available.
+  # Pinned to a release so an upstream commit cannot change what CI builds;
+  # bump it deliberately.
+  set(NANOVDB_CCCL_TAG "v3.4.2" CACHE STRING "Git tag of the CCCL release to build against")
   CPMAddPackage(
       NAME CCCL
       GITHUB_REPOSITORY nvidia/cccl
-      GIT_TAG main # Fetches the latest commit on the main branch
+      GIT_TAG ${NANOVDB_CCCL_TAG}
   )
 
   find_package(NCCL)
@@ -205,6 +208,8 @@ set(NANOVDB_INCLUDE_CUDA_FILES
   cuda/DeviceResource.h
   cuda/DeviceStreamMap.h
   cuda/GridHandle.cuh
+  cuda/HandleStorage.h
+  cuda/ManagedResource.h
   cuda/NodeManager.cuh
   cuda/PinnedResource.h
   cuda/TempPool.h

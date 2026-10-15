@@ -15,10 +15,9 @@
 #include "common.h"
 
 #if defined(NANOVDB_USE_CUDA)
-using BufferT = nanovdb::cuda::DeviceBuffer;
-#else
-using BufferT = nanovdb::HostBuffer;
+#include <nanovdb/cuda/GridHandle.cuh> // for cuda::copyTo, the explicit host->device grid transfer
 #endif
+using BufferT = nanovdb::HostBuffer;
 
 using namespace nanovdb;
 
@@ -131,17 +130,20 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int num
 
 #if defined(NANOVDB_USE_CUDA)
 
-    handle.deviceUpload();
+    // deep-copy the grid and the particle state to the device
+    auto deviceHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle);
 
-    auto* d_grid = handle.deviceGrid<float>();
+    auto* d_grid = deviceHandle.deviceGrid<float>();
     if (!d_grid)
         throw std::runtime_error("GridHandle does not contain a valid device grid");
 
-    positionBuffer.deviceUpload();
-    Vec3f* d_positions = reinterpret_cast<Vec3f*>(positionBuffer.deviceData());
+    nanovdb::cuda::Buffer<Vec3f> devicePositions(cudaStream_t(0), size_t(numPoints), nanovdb::cuda::noInit);
+    cudaMemcpy(devicePositions.data(), positionBuffer.data(), size_t(numPoints) * sizeof(Vec3f), cudaMemcpyHostToDevice);
+    Vec3f* d_positions = devicePositions.data();
 
-    velocityBuffer.deviceUpload();
-    Vec3f* d_velocities = reinterpret_cast<Vec3f*>(velocityBuffer.deviceData());
+    nanovdb::cuda::Buffer<Vec3f> deviceVelocities(cudaStream_t(0), size_t(numPoints), nanovdb::cuda::noInit);
+    cudaMemcpy(deviceVelocities.data(), velocityBuffer.data(), size_t(numPoints) * sizeof(Vec3f), cudaMemcpyHostToDevice);
+    Vec3f* d_velocities = deviceVelocities.data();
 
     {
         float durationAvg = 0;

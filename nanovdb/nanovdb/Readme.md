@@ -8,7 +8,6 @@ A lightweight GPU friendly version of VDB initially targeting rendering applicat
 * [Source tree](../../doc/nanovdb/SourceTree.md)
 * [Examples](../../doc/nanovdb/HelloWorld.md)
 * [TEACHME — learn NanoVDB by prompting an LLM coding agent](../../doc/nanovdb/TEACHME/README.md)
-* [Python examples](python/examples/)
 
 ### Copyright Contributors to the OpenVDB Project
 ### SPDX-License-Identifier: Apache-2.0

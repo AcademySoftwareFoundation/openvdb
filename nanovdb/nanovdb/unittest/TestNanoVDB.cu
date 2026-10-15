@@ -28,6 +28,7 @@
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/Timer.h>
 #include <nanovdb/io/IO.h>
+#include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/cuda/DeviceStreamMap.h>
 #include <nanovdb/cuda/DeviceMesh.h>
@@ -39,6 +40,21 @@
 #include <unordered_set>
 #include <iomanip> // for std::setw, std::setfill
 #include <thread> // for std::thread
+
+// These tests deliberately keep exercising the deprecated dual-space
+// DeviceBuffer surface until its removal; the deprecation warnings are
+// suppressed for this translation unit only. New code must use
+// cuda::Buffer and cuda::copyTo instead.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#if defined(_MSC_VER)
+#pragma warning(disable : 4996)
+#endif
+#if defined(__CUDACC__)
+#pragma nv_diag_suppress 20199
+#endif
+
 
 namespace nanovdb {// this namespace is required by gtest
 
@@ -2844,7 +2860,6 @@ TEST(TestNanoVDBCUDA, compareNodeOrdering)
     //EXPECT_FALSE(grid1->isLexicographic());
 
     {// check that nodes are arranged breath-first in memory
-        float min = std::numeric_limits<float>::max(), max = -min;
         int n2=0, n1=0, n0=0;
         for (auto it2 = grid1->tree().root().beginChild(); it2; ++it2) {
             EXPECT_EQ(grid1->tree().getFirstUpper() + n2++, &(*it2));
@@ -3750,9 +3765,9 @@ TEST(TestNanoVDBCUDA, DilateInjectPrune_ValueOnIndex)
     EXPECT_EQ(dilatedTreeData.mVoxelCount, 73);
 
     // Create a prune mask (set bits correspond to retained voxels) from the occupancy of the original grid
-    auto maskBuffer = nanovdb::cuda::DeviceBuffer::create( dilatedTreeData.mNodeCount[0] * sizeof(nanovdb::Mask<3>), nullptr, false);
-    EXPECT_TRUE(maskBuffer.deviceData());
-    auto leafMasks = static_cast<nanovdb::Mask<3>*>(maskBuffer.deviceData());
+    nanovdb::cuda::Buffer<nanovdb::Mask<3>> maskBuffer(cudaStream_t(0), dilatedTreeData.mNodeCount[0], nanovdb::cuda::noInit);
+    EXPECT_TRUE(maskBuffer.data());
+    auto leafMasks = maskBuffer.data();
     constexpr unsigned int num_threads = 128;
     unsigned int num_blocks = (static_cast<unsigned int>(dilatedTreeData.mNodeCount[0]) + num_threads - 1) / num_threads;
     nanovdb::util::cuda::lambdaKernel<<<num_blocks, num_threads>>>(dilatedTreeData.mNodeCount[0],

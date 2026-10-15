@@ -50,7 +50,6 @@
 #include <openvdb/tools/RayTracer.h>
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/tools/ParticlesToLevelSet.h>
-#include <openvdb/tools/PolySoupToLevelSet.h>
 #include <openvdb/tools/PointScatter.h>
 #include <openvdb/tools/PointsToMask.h>
 #include <openvdb/tools/VolumeToMesh.h>
@@ -102,6 +101,7 @@
 #include "Calculator.h"
 #include "Parser.h"
 #include "Geometry.h"
+#include "ShrinkWrap.h"
 
 #if defined(_WIN32)
 #include <io.h>
@@ -301,15 +301,11 @@ private:
     /// @brief Convert a polygon mesh into a symmetric narrow-band unsigned distance field.
     void meshToUnsignedDistanceField();
 
-#ifdef VDB_TOOL_USE_SHRINKWRAP
     /// @brief Convert an arbitrary (possibly non-watertight) polygon soup into a narrow-band level set.
-    /// @note  Gated behind VDB_TOOL_USE_SHRINKWRAP (temporarily disabled; not exposed via CMake).
-    ///        Enable a local build with: cmake -DCMAKE_CXX_FLAGS="-DVDB_TOOL_USE_SHRINKWRAP" ..
-    void soupToLevelSet();
-#endif
+    void shrinkWrap();
 
-    /// @brief Generate a dx-offset surface from a polygon soup.
-    void soupToOffset();
+    /// @brief Generate a dx-offset surface from a polygon mesh or polygon soup.
+    void meshToOffset();
 
 #ifdef VDB_TOOL_USE_AX
     /// @brief Run an OpenVDB AX code snippet over one or more selected grids.
@@ -406,10 +402,10 @@ private:
 
     /// @brief Return an iterator to the VDB grid at stack age @a age (0 = most recent).
     /// @throw std::invalid_argument if @a age exceeds the current stack depth.
-    inline auto getGrid(size_t age) const;
+    inline std::list<GridBase::Ptr>::const_reverse_iterator getGrid(size_t age) const;
     /// @brief Return an iterator to the Geometry at stack age @a age (0 = most recent).
     /// @throw std::invalid_argument if @a age exceeds the current stack depth.
-    inline auto getGeom(size_t age) const;
+    inline std::list<Geometry::Ptr>::const_reverse_iterator getGeom(size_t age) const;
 
     /// @brief Translate one "vdb"/"geo" option value, replacing any non-numeric (name)
     ///        token with the stack age of the entry carrying that exact name.
@@ -439,7 +435,7 @@ private:
 
 // ==============================================================================================================
 
-Tool::Tool(int argc, char *argv[])
+inline Tool::Tool(int argc, char *argv[])
     : mTimer(std::clog)
     , mCmdName(getBase(argv[0]))// name of executable
     , mRawCmdLine([&]{
@@ -486,7 +482,7 @@ Tool::Tool(int argc, char *argv[])
 
 // ==============================================================================================================
 
-void Tool::startLog(std::string logFile, bool append, bool tee)
+inline void Tool::startLog(std::string logFile, bool append, bool tee)
 {
     if (mOldClogBuffer != nullptr) return;// handles repeated calls
     if (logFile.empty()) logFile = "vdb_tool_" + dateStamp() + ".log";
@@ -538,7 +534,7 @@ void Tool::startLog(std::string logFile, bool append, bool tee)
 
 // ==============================================================================================================
 
-auto Tool::getGrid(size_t age) const
+inline std::list<GridBase::Ptr>::const_reverse_iterator Tool::getGrid(size_t age) const
 {
     if (age>=mGrid.size()) {
       throw std::invalid_argument("-"+mParser.getAction().names[0]+" called getGrid("+std::to_string(age)+"), but grid count = "+std::to_string(mGrid.size()));
@@ -550,7 +546,7 @@ auto Tool::getGrid(size_t age) const
 
 // ==============================================================================================================
 
-auto Tool::getGeom(size_t age) const
+inline std::list<Geometry::Ptr>::const_reverse_iterator Tool::getGeom(size_t age) const
 {
     if (age>=mGeom.size()) {
       throw std::invalid_argument("-"+mParser.getAction().names[0]+" called getGeom("+std::to_string(age)+"), but geometry count = "+std::to_string(mGeom.size()));
@@ -562,7 +558,7 @@ auto Tool::getGeom(size_t age) const
 
 // ==============================================================================================================
 
-std::string Tool::resolveStackOption(const std::string &optName, const std::string &raw) const
+inline std::string Tool::resolveStackOption(const std::string &optName, const std::string &raw) const
 {
     if (raw.empty() || raw == "*") return raw;// unchanged: every action already special-cases these
 
@@ -613,7 +609,7 @@ std::string Tool::resolveStackOption(const std::string &optName, const std::stri
 
 // ==============================================================================================================
 
-void Tool::run()
+inline void Tool::run()
 {
     if (mParser.verbose>1) this->print_args();
     try {
@@ -626,7 +622,7 @@ void Tool::run()
 
 // ==============================================================================================================
 
-void Tool::warning(const std::string &msg, std::ostream& os) const
+inline void Tool::warning(const std::string &msg, std::ostream& os) const
 {
     if (mParser.verbose) {
         os << "\n" << std::setw(static_cast<int>(msg.size())) << std::setfill('*') << "\n" << msg
@@ -688,7 +684,7 @@ struct Tool::Points {
 
 // ==============================================================================================================
 
-void Tool::init()
+inline void Tool::init()
 {
   // note, the following actions were added when mParser was constructed: -quiet,-verbose,-debug,-default,-for,-each,-end
 
@@ -714,8 +710,7 @@ void Tool::init()
   mParser.addAction(
      {"read", "import", "load", "i"}, "Read one or more geometry or VDB files from disk or STDIN.",
     {{"files", "", "{file|stdin}.{obj|ply|abc|stl|off|pts|xyz|e57|vdb|nvdb|gltf|glb|geo|usd|usda|usdc|usdz}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
-     {"grids", "*", "*|grid_name,...", "list of VDB grids name to be imported (defaults to \"*\", i.e. import all available grids)"},
-     {"delayed", "true", "1|0|true|false", "toggle delayed loading of VDB grids (enabled by default). This option is ignored by other file types"}},
+     {"grids", "*", "*|grid_name,...", "list of VDB grids name to be imported (defaults to \"*\", i.e. import all available grids)"}},
      [](){}, [&](){this->read();}, 0);//  anonymous options are treated as to the first option,i.e. "files"
 
   mParser.addAction(
@@ -846,7 +841,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
 
   mParser.addAction(
-     {"soup2udf", "mesh2udf"}, "Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band",
+     {"mesh2udf", "soup2udf"}, "Convert a polygon mesh or polygon soup into a to a unsigned distance field with an symmetrical narrow band",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
@@ -856,26 +851,22 @@ void Tool::init()
      {"name", "", "mesh2udf_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
      [&](){mParser.setDefaults();}, [&](){this->meshToUnsignedDistanceField();});
 
-#ifdef VDB_TOOL_USE_SHRINKWRAP
-  // Temporarily gated out of the PR. Not exposed via CMake by design; enable a
-  // local build with: cmake -DCMAKE_CXX_FLAGS="-DVDB_TOOL_USE_SHRINKWRAP" ..
   mParser.addAction(
-     {"soup2ls", "soup2sdf", "shrinkwrap"}, "Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+     {"shrinkwrap", "soup2ls", "soup2sdf"}, "Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
      {"mode", "0", "0", "mode of offset operator: 0) old method (using mesh -> UDF -> mesh -> SDF), 1) Mihai's signed-flood-fill and 2) Greg's createLevelSetDilatedMesh. Defaults to 0, i.e. paper."},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
-     {"erode", "8", "2", "number of iterations of constrained erosion. Defaults to 8."},
+     {"erode", "8", "2", "maximum constrained-erosion distance, in units of the 2-voxel erosion step used per shrink-wrap iteration (need not be an integer). Defaults to 8."},
      {"thres", "0", "0.01", "closing (or engineering) threshold. Defaults to 0, i.e. it\'s diabled."},
      {"levels", "0", "0|0,1,2|*", "selects which of the level-set grids generated by the hierarchical shrink-wrap algorithm to output, by resolution level: 0 is the finest (highest-resolution) grid, 1 the next-finest, and so on. Accepts a single index (default 0, i.e. only the finest grid), a comma-separated list (e.g. \"0,1,2\" outputs the three finest grids), or \"*\" to output every generated grid. A runtime error is thrown if a requested level does not exist. Note that these are resolution levels of the output hierarchy, not ages on the VDB stack, which is why this option is named \"levels\" rather than \"vdb\"."},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
-     {"name", "", "soup2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
-     [&](){mParser.setDefaults();}, [&](){this->soupToLevelSet();});
-#endif
+     {"name", "", "shrinkwrap_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
+     [&](){mParser.setDefaults();}, [&](){this->shrinkWrap();});
 
   mParser.addAction(
-     {"soup2offset"}, "Convert a polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+     {"mesh2offset", "soup2offset"}, "Convert a polygon mesh or polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      //{"offset", "1.0", "1.0", "Offset in voxel units. Defaults to one, i.e. offset surface corresponds to one voxel dilation from mesh."},
@@ -883,8 +874,8 @@ void Tool::init()
      {"mode", "0", "0", "mode of offset operator: 0) old method (using mesh -> UDF -> mesh -> SDF), 1) Mihai's signed-flood-fill and 2) Greg's createLevelSetDilatedMesh. Defaults to 0, i.e. paper."},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
-     {"name", "", "soup2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
-     [&](){mParser.setDefaults();}, [&](){this->soupToOffset();});
+     {"name", "", "mesh2offset_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
+     [&](){mParser.setDefaults();}, [&](){this->meshToOffset();});
 
   mParser.addAction(
      {"vol2mesh", "vdb2mesh"}, "Convert a scalar volume to an adaptive polygon mesh",
@@ -1423,7 +1414,7 @@ void Tool::init()
 
 // ==============================================================================================================
 
-void Tool::help()
+inline void Tool::help()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "help");
   mParser.printAction();
@@ -1519,7 +1510,7 @@ void Tool::help()
 
 // ==============================================================================================================
 
-std::string Tool::examples() const
+inline std::string Tool::examples() const
 {
     const int w = 16;
     std::stringstream ss;
@@ -1531,7 +1522,7 @@ std::string Tool::examples() const
 
 // ==============================================================================================================
 
-void Tool::clear()
+inline void Tool::clear()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "clear");
   // Resolve every requested age to a stable list iterator BEFORE erasing anything.
@@ -1572,7 +1563,7 @@ void Tool::clear()
 
 // ==============================================================================================================
 
-void Tool::copy()
+inline void Tool::copy()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "copy");
   mParser.printAction();
@@ -1629,7 +1620,7 @@ void Tool::copy()
 
 // ==============================================================================================================
 
-void Tool::rename()
+inline void Tool::rename()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "rename");
   mParser.printAction();
@@ -1662,7 +1653,7 @@ void Tool::rename()
 
 // ==============================================================================================================
 
-void Tool::diagnose()
+inline void Tool::diagnose()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "diagnose");
   mParser.printAction();
@@ -1723,7 +1714,7 @@ void Tool::diagnose()
 
 // ==============================================================================================================
 
-void Tool::stats()
+inline void Tool::stats()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "stats");
   mParser.printAction();
@@ -1848,7 +1839,7 @@ void Tool::stats()
 
 // ==============================================================================================================
 
-void Tool::histogram()
+inline void Tool::histogram()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "histogram");
   mParser.printAction();
@@ -1993,7 +1984,7 @@ void Tool::histogram()
 
 // ==============================================================================================================
 
-void Tool::swap()
+inline void Tool::swap()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "swap");
   mParser.printAction();
@@ -2034,7 +2025,7 @@ void Tool::swap()
 
 // ==============================================================================================================
 
-void Tool::read()
+inline void Tool::read()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
   for (auto &fileName : mParser.getVec<std::string>("files")) {
@@ -2063,7 +2054,7 @@ void Tool::read()
 
 // ==============================================================================================================
 
-void Tool::readGeo(const std::string &fileName)
+inline void Tool::readGeo(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
   if (mParser.verbose>1) std::clog << "Reading geometry from \"" << fileName << "\"\n";
@@ -2082,7 +2073,7 @@ void Tool::readGeo(const std::string &fileName)
 
 // ==============================================================================================================
 
-void Tool::readVDB(const std::string &fileName)
+inline void Tool::readVDB(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
   const VecS gridNames = mParser.getVec<std::string>("grids");
@@ -2096,7 +2087,7 @@ void Tool::readVDB(const std::string &fileName)
   } else {
     if (mParser.verbose) mTimer.start("Reading VDB grid(s) from file named \""+fileName+"\"");
     io::File file(fileName);
-    file.open(mParser.get<bool>("delayed"));
+    file.open();
     grids = file.getGrids();
   }
   const size_t count = mGrid.size();
@@ -2117,7 +2108,7 @@ void Tool::readVDB(const std::string &fileName)
 // ==============================================================================================================
 
 #ifdef VDB_TOOL_USE_NANO
-void Tool::readNVDB(const std::string &fileName)
+inline void Tool::readNVDB(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
   const VecS gridNames = mParser.getVec<std::string>("grids");
@@ -2147,7 +2138,7 @@ void Tool::readNVDB(const std::string &fileName)
   }
 }// Tool::readNVDB
 #else
-void Tool::readNVDB(const std::string&)
+inline void Tool::readNVDB(const std::string&)
 {
     throw std::runtime_error("NanoVDB support was disabled during compilation!");
 }// Tool::readNVDB
@@ -2155,7 +2146,7 @@ void Tool::readNVDB(const std::string&)
 
 // ==============================================================================================================
 
-void Tool::config()
+inline void Tool::config()
 {
     OPENVDB_ASSERT(mParser.getAction().names[0] == "config");
     const bool update  = mParser.get<bool>("update");
@@ -2221,7 +2212,7 @@ void Tool::config()
 
 // ==============================================================================================================
 
-void Tool::write()
+inline void Tool::write()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
   for (std::string &fileName : mParser.getVec<std::string>("files")) {
@@ -2247,7 +2238,7 @@ void Tool::write()
 
 // ==============================================================================================================
 
-void Tool::writeVDB(const std::string &fileName)
+inline void Tool::writeVDB(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
   try {
@@ -2312,7 +2303,7 @@ void Tool::writeVDB(const std::string &fileName)
 // ==============================================================================================================
 
 #ifdef VDB_TOOL_USE_NANO
-void Tool::writeNVDB(const std::string &fileName)
+inline void Tool::writeNVDB(const std::string &fileName)
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "write");
@@ -2429,7 +2420,7 @@ void Tool::writeNVDB(const std::string &fileName)
   }
 }// Tool::writeNVDB
 #else
-void Tool::writeNVDB(const std::string&)
+inline void Tool::writeNVDB(const std::string&)
 {
     throw std::runtime_error("NanoVDB support was disabled during compilation!");
 }// Tool::writeNVDB
@@ -2437,7 +2428,7 @@ void Tool::writeNVDB(const std::string&)
 
 // ==============================================================================================================
 
-void Tool::writeGeo(const std::string &fileName)
+inline void Tool::writeGeo(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
   const int age = mParser.get<int>("geo");
@@ -2453,7 +2444,7 @@ void Tool::writeGeo(const std::string &fileName)
 
 // ==============================================================================================================
 
-void Tool::writeConf(const std::string &fileName)
+inline void Tool::writeConf(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
   if (mParser.verbose>1) std::clog << "Writing configuration to \"" << fileName << "\"\n";
@@ -2469,7 +2460,7 @@ void Tool::writeConf(const std::string &fileName)
 
 // ==============================================================================================================
 
-void Tool::vdbToPoints()
+inline void Tool::vdbToPoints()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "vdb2points");
   mParser.printAction();
@@ -2508,7 +2499,7 @@ void Tool::vdbToPoints()
 
 // ==============================================================================================================
 
-void Tool::pointsToVdb()
+inline void Tool::pointsToVdb()
 {
   const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "points2vdb");
@@ -2582,7 +2573,7 @@ void Tool::pointsToVdb()
 
 // ==============================================================================================================
 
-void Tool::transform()
+inline void Tool::transform()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "transform");
   mParser.printAction();
@@ -2636,7 +2627,7 @@ void Tool::transform()
 
 // ==============================================================================================================
 
-void Tool::levelSetToFog()
+inline void Tool::levelSetToFog()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "ls2fog");
   mParser.printAction();
@@ -2662,7 +2653,7 @@ void Tool::levelSetToFog()
 
 // ==============================================================================================================
 
-void Tool::isoToLevelSet()
+inline void Tool::isoToLevelSet()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "iso2ls");
   mParser.printAction();
@@ -2694,7 +2685,7 @@ void Tool::isoToLevelSet()
 
 // ==============================================================================================================
 
-float Tool::estimateVoxelSize(int maxDim,  float exWidth, float inWidth, int geo_age)
+inline float Tool::estimateVoxelSize(int maxDim,  float exWidth, float inWidth, int geo_age)
 {
   auto it = this->getGeom(geo_age);
   const auto bbox = (*it)->bbox();
@@ -2709,7 +2700,7 @@ float Tool::estimateVoxelSize(int maxDim,  float exWidth, float inWidth, int geo
 
 // ==============================================================================================================
 
-void Tool::quadsToTriangles()
+inline void Tool::quadsToTriangles()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "quad2tri");
   mParser.printAction();
@@ -2729,7 +2720,7 @@ void Tool::quadsToTriangles()
 
 // ==============================================================================================================
 
-void Tool::meshToLevelSet()
+inline void Tool::meshToLevelSet()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "mesh2ls");
   mParser.printAction();
@@ -2776,9 +2767,12 @@ void Tool::meshToLevelSet()
 
 // ==============================================================================================================
 
-void Tool::meshToUnsignedDistanceField()
+inline void Tool::meshToUnsignedDistanceField()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "mesh2udf");
+  if (mParser.getAction().matchedName == "soup2udf") {
+    std::cerr << "Warning: action \"-soup2udf\" is deprecated; use \"-mesh2udf\" instead.\n";
+  }
   mParser.printAction();
   const int dim = mParser.get<int>("dim");
   float voxel = mParser.get<float>("voxel");
@@ -2810,17 +2804,20 @@ void Tool::meshToUnsignedDistanceField()
 
 // ==============================================================================================================
 
-#ifdef VDB_TOOL_USE_SHRINKWRAP
-void Tool::soupToLevelSet()
+inline void Tool::shrinkWrap()
 {
-  OPENVDB_ASSERT(mParser.getAction().names[0] == "soup2ls");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "shrinkwrap");
+  const std::string &matched = mParser.getAction().matchedName;
+  if (matched == "soup2ls" || matched == "soup2sdf") {
+    std::cerr << "Warning: action \"-" << matched << "\" is deprecated; use \"-shrinkwrap\" instead.\n";
+  }
   mParser.printAction();
   const int dim = mParser.get<int>("dim");// final dimension
   float voxel = mParser.get<float>("voxel");// final voxel size
   const float width = mParser.get<float>("width");
   const int offset_mode = mParser.get<int>("mode");
   const int geo_age = mParser.get<int>("geo");
-  const int nErode = mParser.get<int>("erode");
+  const float erode = mParser.get<float>("erode");
   const float thres = mParser.get<float>("thres");
   const bool keep = mParser.get<bool>("keep");
   std::string grid_name = mParser.get<std::string>("name");
@@ -2835,16 +2832,16 @@ void Tool::soupToLevelSet()
     throw std::invalid_argument("got points, expected mesh! Hint: use -points2ls instead!");
   }
   if (keep) mesh = mesh->deepCopy();// deep copy since mesh will be modified below
-  if (mParser.verbose) mTimer.start("Soup -> SDF");
+  if (mParser.verbose) mTimer.start("ShrinkWrap -> SDF");
 
   Spinner spin, *progress = mParser.verbose ? &spin : nullptr;
-  const tools::ShrinkWrapLimit D(nErode, thres);
-  tools::PolySoup poly{std::move(mesh->vtx()), std::move(mesh->tri()), std::move(mesh->quad()), mesh->bbox()};
+  const ShrinkWrapLimit D(erode, thres);
+  PolySoup poly{std::move(mesh->vtx()), std::move(mesh->tri()), std::move(mesh->quad()), mesh->bbox()};
 
   // Build the LOD hierarchy directly (rather than the single-grid free function)
   // so we can output more than just the finest level. grids() is ordered
   // finest(0) -> coarsest(size-1), matching the "levels" indices below.
-  using SW = tools::PolySoupToLevelSet<GridT>;
+  using SW = ShrinkWrap<GridT>;
   auto sw = voxel > 0.0f ? std::make_unique<SW>(std::move(poly), voxel, width)
                          : std::make_unique<SW>(std::move(poly), dim, width);
   sw->process(D, progress, offset_mode);
@@ -2867,13 +2864,13 @@ void Tool::soupToLevelSet()
   // index produces a clean error with no partial output on the stack.
   for (const int lvl : levels) {
     if (lvl < 0 || lvl >= count) {
-      throw std::invalid_argument("soup2ls: requested output grid levels=" + std::to_string(lvl) +
+      throw std::invalid_argument("shrinkwrap: requested output grid levels=" + std::to_string(lvl) +
           " does not exist; the shrink-wrap hierarchy generated " + std::to_string(count) +
           " grid(s), so valid levels are 0 (finest) .. " + std::to_string(count - 1) + " (coarsest)");
     }
   }
 
-  if (grid_name.empty()) grid_name = "soup2ls_" + mesh->getName();
+  if (grid_name.empty()) grid_name = "shrinkwrap_" + mesh->getName();
   const bool multi = levels.size() > 1;
   for (const int lvl : levels) {
     GridT::Ptr g = grids[lvl];
@@ -2883,14 +2880,16 @@ void Tool::soupToLevelSet()
     mGrid.push_back(g);
   }
   if (!keep) mGeom.erase(std::next(it).base());
-}// Tool::soupToLevelSet
-#endif// VDB_TOOL_USE_SHRINKWRAP
+}// Tool::shrinkWrap
 
 // ==============================================================================================================
 
-void Tool::soupToOffset()
+inline void Tool::meshToOffset()
 {
-  OPENVDB_ASSERT(mParser.getAction().names[0] == "soup2offset");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "mesh2offset");
+  if (mParser.getAction().matchedName == "soup2offset") {
+    std::cerr << "Warning: action \"-soup2offset\" is deprecated; use \"-mesh2offset\" instead.\n";
+  }
   mParser.printAction();
   const int dim = mParser.get<int>("dim");// final dimension
   float voxel = mParser.get<float>("voxel");// final voxel size
@@ -2909,19 +2908,19 @@ void Tool::soupToOffset()
     throw std::invalid_argument("got points, expected mesh! Hint: use -points2ls instead!");
   }
   if (keep) mesh = mesh->deepCopy();// deep copy since mesh will be modified below
-  if (mParser.verbose) mTimer.start("Soup -> Offset");
+  if (mParser.verbose) mTimer.start("Mesh -> Offset");
 
-  tools::PolySoup poly{std::move(mesh->vtx()), std::move(mesh->tri()), std::move(mesh->quad()), mesh->bbox()};
-  tools::PolySoupToLevelSet<GridT> tmp(std::move(poly), voxel, width);
+  PolySoup poly{std::move(mesh->vtx()), std::move(mesh->tri()), std::move(mesh->quad()), mesh->bbox()};
+  ShrinkWrap<GridT> tmp(std::move(poly), voxel, width);
   auto grid = tmp.offset(voxel, offset_mode);
 
   if (mParser.verbose) mTimer.stop();
 
-  if (grid_name.empty()) grid_name = "soup2offset_" + mesh->getName();
+  if (grid_name.empty()) grid_name = "mesh2offset_" + mesh->getName();
   grid->setName(grid_name);
   mGrid.push_back(grid);
   if (!keep) mGeom.erase(std::next(it).base());
-}// Tool::soupToOffset
+}// Tool::meshToOffset
 
 // ==============================================================================================================
 
@@ -2995,7 +2994,7 @@ void Tool::ax()
 // ==============================================================================================================
 #endif// VDB_TOOL_USE_AX
 
-void Tool::particlesToLevelSet()
+inline void Tool::particlesToLevelSet()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "points2ls");
   mParser.printAction();
@@ -3022,7 +3021,7 @@ void Tool::particlesToLevelSet()
 
 // ==============================================================================================================
 
-typename Tool::FilterT Tool::createFilter(GridT &grid, int space, int time)
+inline typename Tool::FilterT Tool::createFilter(GridT &grid, int space, int time)
 {
   auto filter = std::make_unique<tools::LevelSetFilter<GridT>>(grid);
 
@@ -3065,7 +3064,7 @@ typename Tool::FilterT Tool::createFilter(GridT &grid, int space, int time)
 
 // ==============================================================================================================
 
-void Tool::offsetLevelSet()
+inline void Tool::offsetLevelSet()
 {
   OPENVDB_ASSERT(findMatch(mParser.getAction().names[0], {"dilate", "erode", "open", "close"}));
   mParser.printAction();
@@ -3106,7 +3105,7 @@ void Tool::offsetLevelSet()
 
 // ==============================================================================================================
 
-void Tool::filterLevelSet()
+inline void Tool::filterLevelSet()
 {
   OPENVDB_ASSERT(findMatch(mParser.getAction().names[0], {"gauss", "mean", "median"}));
   mParser.printAction();
@@ -3143,7 +3142,7 @@ void Tool::filterLevelSet()
 
 // ==============================================================================================================
 
-void Tool::pruneLevelSet()
+inline void Tool::pruneLevelSet()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "prune");
   mParser.printAction();
@@ -3161,7 +3160,7 @@ void Tool::pruneLevelSet()
 
 // ==============================================================================================================
 
-void Tool::floodLevelSet()
+inline void Tool::floodLevelSet()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "flood");
   mParser.printAction();
@@ -3179,7 +3178,7 @@ void Tool::floodLevelSet()
 
 // ==============================================================================================================
 
-void Tool::compute()
+inline void Tool::compute()
 {
   OPENVDB_ASSERT(findMatch(mParser.getAction().names[0], {"cpt","div","curl","length","grad","curvature"}));
   mParser.printAction();
@@ -3243,7 +3242,7 @@ void Tool::compute()
 
 // ==============================================================================================================
 
-void Tool::composite()
+inline void Tool::composite()
 {
   OPENVDB_ASSERT(findMatch(mParser.getAction().names[0], {"min","max","sum","multiply","divide"}));
   mParser.printAction();
@@ -3288,7 +3287,7 @@ void Tool::composite()
 
 // ==============================================================================================================
 
-void Tool::csg()
+inline void Tool::csg()
 {
   OPENVDB_ASSERT(findMatch(mParser.getAction().names[0], {"union", "intersection", "difference"}));
   mParser.printAction();
@@ -3365,7 +3364,7 @@ void Tool::csg()
 
 // ==============================================================================================================
 
-void Tool::volumeToMesh()
+inline void Tool::volumeToMesh()
 {
   const int mode = findMatch(mParser.getAction().names[0], {"ls2mesh", "fog2mesh", "vol2mesh"});// 1-based index
   OPENVDB_ASSERT(mode);// mode = 0 for no match
@@ -3416,7 +3415,7 @@ void Tool::volumeToMesh()
 
 // ==============================================================================================================
 
-void Tool::forValues()
+inline void Tool::forValues()
 {
   OPENVDB_ASSERT(findMatch(mParser.getAction().names[0], {"forAllValues", "forOnValues", "forOffValues"}));
   mParser.printAction();
@@ -3682,7 +3681,7 @@ void Tool::forValues()
 
 // ==============================================================================================================
 
-void Tool::sdf2udf()
+inline void Tool::sdf2udf()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(findMatch(action_name, {"sdf2udf"}));// mode = 0 for no match
@@ -3720,7 +3719,7 @@ void Tool::sdf2udf()
 
 // ==============================================================================================================
 
-void Tool::levelSetSphere()
+inline void Tool::levelSetSphere()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "sphere");
@@ -3741,7 +3740,7 @@ void Tool::levelSetSphere()
 
 // ==============================================================================================================
 
-void Tool::levelSetPlatonic()
+inline void Tool::levelSetPlatonic()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "platonic");
   mParser.printAction();
@@ -3775,7 +3774,7 @@ void Tool::levelSetPlatonic()
 
 // ==============================================================================================================
 
-void Tool::multires()
+inline void Tool::multires()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "multires");
@@ -3800,7 +3799,7 @@ void Tool::multires()
 
 // ==============================================================================================================
 
-void Tool::expandLevelSet()
+inline void Tool::expandLevelSet()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "expand");
@@ -3824,7 +3823,7 @@ void Tool::expandLevelSet()
 
 // ==============================================================================================================
 
-void Tool::segment()
+inline void Tool::segment()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "segment");
@@ -3853,7 +3852,7 @@ void Tool::segment()
 // ==============================================================================================================
 
 // for simplicity we are restricting this resampler to only work on float grids!
-void Tool::resample()
+inline void Tool::resample()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "resample");
@@ -3902,7 +3901,7 @@ void Tool::resample()
 
 // ==============================================================================================================
 
-void Tool::scatter()
+inline void Tool::scatter()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "scatter");
@@ -3949,7 +3948,7 @@ void Tool::scatter()
 
 // ==============================================================================================================
 
-void Tool::slice()
+inline void Tool::slice()
 {
   using RangeT = tbb::blocked_range2d<int>;
   struct Axis {
@@ -4031,7 +4030,7 @@ void Tool::slice()
 /// @brief Convert multiple image files to a mpeg movie file
 // vdb_tool -sphere -for x=0,1,0.01 -slice X='{$x}' -end -img2mpeg input="slice_*.ppm" output=slices.mp4
 // vdb_tool -sphere -for x=0,1,0.01 -slice X='{$x}' -end -img2mpeg && open slices.mp4
-void Tool::movie()
+inline void Tool::movie()
 {
 #ifdef VDB_TOOL_USE_MPEG
   OPENVDB_ASSERT(mParser.getAction().names[0] == "movie");
@@ -4080,7 +4079,7 @@ void Tool::movie()
 // ==============================================================================================================
 // LeVeque, R., High-Resolution Conservative Algorithms For Advection In Incompressible Flow, SIAM J. Numer. Anal. 33, 627–665 (1996)
 // https://faculty.washington.edu/rjl/pubs/hiresadv/0733033.pdf
-void Tool::enright()
+inline void Tool::enright()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "enright");
@@ -4170,7 +4169,7 @@ GridBase::Ptr Tool::clip(const VecF &v, int age, const GridType &input)
 
 // ==============================================================================================================
 
-void Tool::clip()
+inline void Tool::clip()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "clip");
   mParser.printAction();
@@ -4200,7 +4199,7 @@ void Tool::clip()
 // ==============================================================================================================
 
 #ifdef VDB_TOOL_USE_PNG
-void savePNG(const std::string& fname, const tools::Film& film)
+inline void savePNG(const std::string& fname, const tools::Film& film)
 {
   png_structp png = png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
   if (!png) OPENVDB_THROW(RuntimeError, "png_create_write_struct failed");
@@ -4251,7 +4250,7 @@ void savePNG(const std::string& fname, const tools::Film& film)
   png_destroy_write_struct(&png, &info);
 }// savePNG
 #else
-void savePNG(const std::string&, const tools::Film&)
+inline void savePNG(const std::string&, const tools::Film&)
 {
   OPENVDB_THROW(RuntimeError, "vdb_tool has not been compiled with .png support.");
 }// savePNG
@@ -4260,7 +4259,7 @@ void savePNG(const std::string&, const tools::Film&)
 // ==============================================================================================================
 
 #ifdef VDB_TOOL_USE_JPG
-void saveJPG(const std::string& fname, const tools::Film& film)
+inline void saveJPG(const std::string& fname, const tools::Film& film)
 {
   jpeg_error_mgr jerr;
   jpeg_compress_struct cinfo;
@@ -4287,7 +4286,7 @@ void saveJPG(const std::string& fname, const tools::Film& film)
   std::fclose(fp);
 }// saveJPG
 #else
-void saveJPG(const std::string&, const tools::Film&)
+inline void saveJPG(const std::string&, const tools::Film&)
 {
   OPENVDB_THROW(RuntimeError, "vdb_tool has not been compiled with .jpg support.");
 }// saveJPG
@@ -4296,7 +4295,7 @@ void saveJPG(const std::string&, const tools::Film&)
 // ==============================================================================================================
 
 #ifdef VDB_TOOL_USE_EXR
-void saveEXR(const std::string& filename, const tools::Film& film, const std::string &compression = "zip")
+inline void saveEXR(const std::string& filename, const tools::Film& film, const std::string &compression = "zip")
 {
     Imf::setGlobalThreadCount(8);
     Imf::Header header(int(film.width()), int(film.height()));
@@ -4332,7 +4331,7 @@ void saveEXR(const std::string& filename, const tools::Film& film, const std::st
     imgFile.writePixels(int(film.height()));
 }// saveEXR
 #else
-void saveEXR(const std::string&, const tools::Film&, const std::string& = "zip")
+inline void saveEXR(const std::string&, const tools::Film&, const std::string& = "zip")
 {
     OPENVDB_THROW(RuntimeError, "vdb_tool has not been compiled with .exr support.");
 }// saveEXR
@@ -4340,7 +4339,7 @@ void saveEXR(const std::string&, const tools::Film&, const std::string& = "zip")
 
 // ==============================================================================================================
 
-void Tool::render()
+inline void Tool::render()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "render");
@@ -4496,7 +4495,7 @@ void Tool::render()
 
 // ==============================================================================================================
 
-void Tool::print_args(std::ostream& os) const
+inline void Tool::print_args(std::ostream& os) const
 {
   os << "\n" << std::setw(40) << std::setfill('=') << "> Actions <" << std::setw(40) << "\n";
   mParser.print(os);
@@ -4630,7 +4629,7 @@ inline void printTable(std::ostream& os,
 }// namespace print_detail
 // ----- end helpers ---------------------------------------------------------
 
-void Tool::print(std::ostream& os) const
+inline void Tool::print(std::ostream& os) const
 {
   using namespace print_detail;
   OPENVDB_ASSERT(mParser.getAction().names[0] == "print");
@@ -4753,7 +4752,7 @@ void Tool::print(std::ostream& os) const
 
 // ==============================================================================================================
 
-Geometry::Ptr Tool::mesherToGeometry(tools::VolumeToMesh &mesher) const
+inline Geometry::Ptr Tool::mesherToGeometry(tools::VolumeToMesh &mesher) const
 {
   Geometry::Ptr geom(new Geometry());
 
@@ -4789,7 +4788,7 @@ Geometry::Ptr Tool::mesherToGeometry(tools::VolumeToMesh &mesher) const
 
 // ==============================================================================================================
 
-Geometry::Ptr Tool::volumeToGeometry(const GridT &grid, float isoValue, float adaptivity) const
+inline Geometry::Ptr Tool::volumeToGeometry(const GridT &grid, float isoValue, float adaptivity) const
 {
   tools::VolumeToMesh mesher(isoValue, adaptivity, /*relaxDisorientedTriangles*/true);
   mesher(grid);

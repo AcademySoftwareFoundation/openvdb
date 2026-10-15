@@ -1,0 +1,7 @@
+OpenVDB:
+  Features:
+  - Introduced new openvdb::codecs subsystem and CodecRegistry for stream encoding and decoding.
+  - Added support for implicit codec conversion fallback (e.g. float to half, scalar to mask)
+    and ReadDiagnostics.
+  API changes:
+  - Extracted Point Data I/O function overloads from PointDataGrid.h into new openvdb/points/PointDataIO.h header.

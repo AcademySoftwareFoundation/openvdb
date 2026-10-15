@@ -83,6 +83,9 @@ public:
     /// @param value   a value with which to fill the buffer
     /// @param active  the active state to which to initialize all voxels
     /// @details This constructor does not allocate memory for voxel values.
+    /// Call @c buffer().allocate() before accessing voxel data. The valid
+    /// advanced pattern is: create all leaves single-threaded, then call
+    /// @c allocate() in parallel across distinct leaves.
     LeafNode(PartialCreate,
              const Coord& coords,
              const ValueType& value = zeroVal<ValueType>(),
@@ -152,13 +155,14 @@ public:
     /// Return @c true if this node contains only active voxels.
     bool isDense() const { return mValueMask.isOn(); }
     /// Return @c true if memory for this node's buffer has been allocated.
-    bool isAllocated() const { return !mBuffer.isOutOfCore() && !mBuffer.empty(); }
+    bool isAllocated() const { return !mBuffer.empty(); }
     /// Allocate memory for this node's buffer if it has not already been allocated.
     bool allocate() { return mBuffer.allocate(); }
 
     /// Return the memory in bytes occupied by this node.
     Index64 memUsage() const;
-    Index64 memUsageIfLoaded() const;
+    OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    Index64 memUsageIfLoaded() const { return memUsage(); }
 
     /// Expand the given bounding box so that it includes this leaf node's active voxels.
     /// If visitVoxels is false this LeafNode will be approximated as dense, i.e. with all
@@ -377,6 +381,7 @@ public:
     const Buffer& buffer() const { return mBuffer; }
     Buffer& buffer() { return mBuffer; }
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     //
     // I/O methods
     //
@@ -402,6 +407,7 @@ public:
     /// @param os      the stream to which to write
     /// @param toHalf  if true, output floating-point values as 16-bit half floats
     void writeBuffers(std::ostream& os, bool toHalf = false) const;
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     size_t streamingSize(bool toHalf = false) const;
 
@@ -466,7 +472,6 @@ public:
     template<typename ModifyOp>
     void modifyValue(Index offset, const ModifyOp& op)
     {
-        mBuffer.loadValues();
         if (!mBuffer.empty()) {
             // in-place modify value
             ValueType& val = const_cast<ValueType&>(mBuffer[offset]);
@@ -487,7 +492,6 @@ public:
     template<typename ModifyOp>
     void modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op)
     {
-        mBuffer.loadValues();
         if (!mBuffer.empty()) {
             const Index offset = this->coordToOffset(xyz);
             bool state = mValueMask.isOn(offset);
@@ -922,7 +926,10 @@ protected:
     void setValueMaskOn(Index n)  { mValueMask.setOn(n); }
     void setValueMaskOff(Index n) { mValueMask.setOff(n); }
 
+
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     inline void skipCompressedValues(bool seekable, std::istream&, bool fromHalf);
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     /// Compute the origin of the leaf node that contains the voxel with the given coordinates.
     static void evalNodeOrigin(Coord& xyz) { xyz &= ~(DIM - 1); }
@@ -1007,7 +1014,11 @@ LeafNode<T, Log2Dim>::LeafNode(const LeafNode<OtherValueType, Log2Dim>& other)
 {
     struct Local {
         /// @todo Consider using a value conversion functor passed as an argument instead.
-        static inline ValueType convertValue(const OtherValueType& val) { return ValueType(val); }
+        static inline ValueType convertValue(const OtherValueType& val) {
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+            return ValueType(val);
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+        }
     };
 
     for (Index i = 0; i < SIZE; ++i) {
@@ -1262,8 +1273,6 @@ template<typename DenseT>
 inline void
 LeafNode<T, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
 {
-    mBuffer.loadValues();
-
     using DenseValueType = typename DenseT::ValueType;
 
     const size_t xStride = dense.xStride(), yStride = dense.yStride(), zStride = dense.zStride();
@@ -1322,6 +1331,8 @@ LeafNode<T, Log2Dim>::copyFromDense(const CoordBBox& bbox, const DenseT& dense,
 ////////////////////////////////////////
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 template<typename T, Index Log2Dim>
 inline void
 LeafNode<T, Log2Dim>::readTopology(std::istream& is, bool /*fromHalf*/)
@@ -1336,10 +1347,6 @@ LeafNode<T, Log2Dim>::writeTopology(std::ostream& os, bool /*toHalf*/) const
 {
     mValueMask.save(os);
 }
-
-
-////////////////////////////////////////
-
 
 
 template<typename T, Index Log2Dim>
@@ -1375,10 +1382,6 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
     SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
     const bool seekable = meta && meta->seekable();
 
-#ifdef OPENVDB_USE_DELAYED_LOADING
-    std::streamoff maskpos = is.tellg();
-#endif
-
     if (seekable) {
         // Seek over the value mask.
         mValueMask.seek(is);
@@ -1401,37 +1404,16 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
         // This node lies completely outside the clipping region.
         skipCompressedValues(seekable, is, fromHalf);
         mValueMask.setOff();
-        mBuffer.setOutOfCore(false);
     } else {
-#ifdef OPENVDB_USE_DELAYED_LOADING
-        // If this node lies completely inside the clipping region and it is being read
-        // from a memory-mapped file, delay loading of its buffer until the buffer
-        // is actually accessed.  (If this node requires clipping, its buffer
-        // must be accessed and therefore must be loaded.)
-        io::MappedFile::Ptr mappedFile = io::getMappedFilePtr(is);
-        const bool delayLoad = ((mappedFile.get() != nullptr) && clipBBox.isInside(nodeBBox));
+        mBuffer.allocate();
+        io::readCompressedValues(is, mBuffer.mData, SIZE, mValueMask, fromHalf);
 
-        if (delayLoad) {
-            // Save the offset to the value mask (maskpos), because the in-memory copy
-            // might change before the value buffer gets read.
-            mBuffer.enableOutOfCore(meta, is.tellg(), mappedFile, maskpos);
-            // Skip over voxel values.
-            skipCompressedValues(seekable, is, fromHalf);
-        } else {
-#endif
-            mBuffer.allocate();
-            io::readCompressedValues(is, mBuffer.mData, SIZE, mValueMask, fromHalf);
-            mBuffer.setOutOfCore(false);
-
-            // Get this tree's background value.
-            T background = zeroVal<T>();
-            if (const void* bgPtr = io::getGridBackgroundValuePtr(is)) {
-                background = *static_cast<const T*>(bgPtr);
-            }
-            this->clip(clipBBox, background);
-#ifdef OPENVDB_USE_DELAYED_LOADING
+        // Get this tree's background value.
+        T background = zeroVal<T>();
+        if (const void* bgPtr = io::getGridBackgroundValuePtr(is)) {
+            background = *static_cast<const T*>(bgPtr);
         }
-#endif
+        this->clip(clipBBox, background);
     }
 
     if (numBuffers > 1) {
@@ -1447,9 +1429,6 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
             }
         }
     }
-
-    // increment the leaf number
-    if (meta)   meta->setLeaf(meta->leaf() + 1);
 }
 
 
@@ -1460,11 +1439,11 @@ LeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
     // Write out the value mask.
     mValueMask.save(os);
 
-    mBuffer.loadValues();
-
     io::writeCompressedValues(os, mBuffer.mData, SIZE,
         mValueMask, /*childMask=*/NodeMaskType(), toHalf);
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
 ////////////////////////////////////////
@@ -1487,16 +1466,6 @@ LeafNode<T, Log2Dim>::memUsage() const
     // Use sizeof(*this) to capture alignment-related padding
     // (but note that sizeof(*this) includes sizeof(mBuffer)).
     return sizeof(*this) + mBuffer.memUsage() - sizeof(mBuffer);
-}
-
-
-template<typename T, Index Log2Dim>
-inline Index64
-LeafNode<T, Log2Dim>::memUsageIfLoaded() const
-{
-    // Use sizeof(*this) to capture alignment-related padding
-    // (but note that sizeof(*this) includes sizeof(mBuffer)).
-    return sizeof(*this) + mBuffer.memUsageIfLoaded() - sizeof(mBuffer);
 }
 
 

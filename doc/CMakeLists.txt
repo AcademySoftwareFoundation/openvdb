@@ -103,9 +103,10 @@ set(DOXYGEN_EXAMPLE_RECURSIVE YES)
 # artifact and contributors can see exactly what's broken.
 set(DOXYGEN_WARN_LOGFILE "${CMAKE_CURRENT_BINARY_DIR}/doxygen.warnings.log")
 if(OPENVDB_DOXYGEN_WARN_AS_ERROR)
-  # FAIL_ON_WARNINGS keeps generating docs but exits non-zero at the end if
-  # any warning was emitted. Requires Doxygen >= 1.9.x.
-  set(DOXYGEN_WARN_AS_ERROR FAIL_ON_WARNINGS)
+  # FAIL_ON_WARNINGS_PRINT keeps generating docs but exits non-zero at the end
+  # if any warning was generated, and importantly prints them at the end of
+  # the generartion step. Requires Doxygen >= 1.9.7.
+  set(DOXYGEN_WARN_AS_ERROR FAIL_ON_WARNINGS_PRINT)
   # Don't suppress messages so contributors can see warnings during the build.
   set(DOXYGEN_QUIET NO)
 else()
@@ -315,7 +316,13 @@ if(OPENVDB_DOXYGEN_NANOVDB)
     doc/nanovdb/HowToBuild.md
     doc/nanovdb/HelloWorld.md
     nanovdb/nanovdb
+    nanovdb/nanovdb/cuda
+    nanovdb/nanovdb/io
+    nanovdb/nanovdb/math
+    nanovdb/nanovdb/putil
+    nanovdb/nanovdb/tools
     nanovdb/nanovdb/util
+    nanovdb/nanovdb/util/cuda
     nanovdb/nanovdb/examples/ex_bump_pool_buffer
     nanovdb/nanovdb/examples/ex_collide_level_set
     nanovdb/nanovdb/examples/ex_make_custom_nanovdb

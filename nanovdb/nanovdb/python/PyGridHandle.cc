@@ -22,7 +22,6 @@ void defineHostGridHandle(nb::module_& m)
                 new (&handle) GridHandle<BufferT>(std::move(buffer));
             },
             "t"_a.noconvert());
-    defineGridHandleUtilities<BufferT>(m);
 }
 
 } // namespace pynanovdb

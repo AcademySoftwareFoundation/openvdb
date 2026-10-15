@@ -61,13 +61,12 @@ inline Checksum getChecksum(const GridData *gridData)
 
 /// @brief Return true if the checksum of @c gridData matches the expected
 ///        value already encoded into the grid's meta data.
-/// @tparam BuildT Template parameter used to build NanoVDB grid.
-/// @param grid Grid whose checksum is validated.
+/// @param gridData Base pointer to the grid whose checksum is validated.
 /// @param mode Defines the mode of computation for the checksum.
 bool validateChecksum(const GridData *gridData, CheckMode mode = CheckMode::Default);
 
 /// @brief Updates the checksum of a grid
-/// @param grid Grid whose checksum will be updated.
+/// @param gridData Base pointer to the grid whose checksum will be updated.
 /// @param mode Defines the mode of computation for the checksum.
 inline void updateChecksum(GridData *gridData, CheckMode mode)
 {
@@ -127,7 +126,7 @@ inline __hostdev__ uint32_t crc32(const void* data, size_t size, uint32_t crc = 
 
 /// @brief Compute crc32 checksum of data between @c begin and @c end
 /// @param begin points to beginning of data
-/// @param end points to end of @data, (exclusive)
+/// @param end points to end of @c data, (exclusive)
 /// @param crc initial value of crc32 checksum
 /// @return return crc32 checksum
 inline __hostdev__ uint32_t crc32(const void *begin, const void *end, uint32_t crc = 0)
@@ -153,7 +152,7 @@ inline __hostdev__ uint32_t crc32(const void *data, size_t size, const uint32_t 
 
 /// @brief Compute crc32 checksum of data between @c begin and @c end using a lookup table
 /// @param begin points to beginning of data
-/// @param end points to end of @data, (exclusive)
+/// @param end points to end of @c data, (exclusive)
 /// @param lut pointer to loopup table for accelerated crc32 computation
 /// @param crc initial value of crc32 checksum
 /// @return return crc32 checksum
@@ -205,11 +204,12 @@ namespace tools {// ============================================================
 
 // ----------------------------> crc32Head <--------------------------------------
 
-/// @brief
-/// @tparam ValueT
-/// @param grid
-/// @param mode
-/// @return
+/// @brief Compute the crc32 checksum of a grid's head, i.e. its GridData and
+///        TreeData, using a lookup table. GridData::mMagic and
+///        GridData::mChecksum are excluded.
+/// @param gridData Base pointer to the grid.
+/// @param lut Pointer to the lookup table for accelerated crc32 computation.
+/// @return crc32 checksum of the grid's head.
 inline __hostdev__ uint32_t crc32Head(const GridData *gridData, const uint32_t *lut)
 {
     NANOVDB_ASSERT(gridData);
@@ -365,11 +365,6 @@ bool validateChecksum(const NanoGrid<ValueT> *grid, CheckMode mode)
     }
 }
 
-/// @brief
-/// @tparam ValueT
-/// @param grid
-/// @param mode
-/// @return
 inline bool validateChecksum(const GridData *gridData, CheckMode mode)
 {
     if (gridData->mChecksum.isEmpty()|| mode == CheckMode::Empty) return true;

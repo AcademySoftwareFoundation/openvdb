@@ -436,10 +436,6 @@ clip(const GridType& inGrid, const math::NonlinearFrustumMap& frustumMap, bool k
 
     // Construct an output grid with the same transform and metadata as the input grid.
     auto outGrid = inGrid.copyWithNewTree();
-    if (outGrid->getGridClass() == GRID_LEVEL_SET) {
-        // After clipping, a level set grid might no longer be a valid SDF.
-        outGrid->setGridClass(GRID_UNKNOWN);
-    }
 
     const auto& bg = outGrid->background();
 

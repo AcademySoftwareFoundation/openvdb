@@ -61,6 +61,8 @@ public:
     /// @brief Synchronous deallocation; the caller guarantees that device
     ///        work touching the memory has completed.
     /// @param p pointer previously returned by allocate or allocate_async
+    /// @param bytes size of the allocation in bytes
+    /// @param alignment alignment of the allocation in bytes
     void deallocate(void* p, size_t bytes, size_t alignment) {
         this->deallocate_async(p, bytes, alignment, cudaStream_t(0));
     }
@@ -133,6 +135,18 @@ template<typename R, typename = void>
 struct is_host_accessible_resource : std::false_type {};
 template<typename R>
 struct is_host_accessible_resource<R, typename std::enable_if<bool(R::HOST_ACCESSIBLE)>::type> : std::true_type {};
+
+/// @brief Companion detection: @c is_device_accessible_resource<R>::value is
+///        true iff @c R declares `static constexpr bool DEVICE_ACCESSIBLE =
+///        true`, i.e. its allocations are also valid device addresses even
+///        though they are host-accessible (e.g. ManagedResource). A handle
+///        over such a resource exposes both accessor families. Purely
+///        device-resident resources do not need the marker: not being
+///        host-accessible already implies device residency.
+template<typename R, typename = void>
+struct is_device_accessible_resource : std::false_type {};
+template<typename R>
+struct is_device_accessible_resource<R, typename std::enable_if<bool(R::DEVICE_ACCESSIBLE)>::type> : std::true_type {};
 
 /// @brief Detection trait: @c is_resource<R>::value is true iff @c R models
 ///        the synchronous Resource concept, i.e. exposes
@@ -257,6 +271,7 @@ struct AsyncFromSync
 
     /// @brief The adapter is host-accessible iff the adapted resource is.
     static constexpr bool HOST_ACCESSIBLE = is_host_accessible_resource<R>::value;
+    static constexpr bool DEVICE_ACCESSIBLE = is_device_accessible_resource<R>::value;
 
     R resource;
 
@@ -302,6 +317,7 @@ struct ResourceRef
 
     /// @brief A reference is host-accessible iff the referenced resource is.
     static constexpr bool HOST_ACCESSIBLE = is_host_accessible_resource<R>::value;
+    static constexpr bool DEVICE_ACCESSIBLE = is_device_accessible_resource<R>::value;
 
     /// @brief Constructs a ref borrowing @c resource.
     /// @param resource resource to allocate from; must outlive this ref

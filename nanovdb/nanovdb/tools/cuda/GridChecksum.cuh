@@ -288,7 +288,7 @@ template <typename ValueT>
 void crc32TailOld(const NanoGrid<ValueT> *d_grid, const GridData *gridData, const uint32_t *d_lut, uint32_t *d_crc, cudaStream_t stream)
 {
     static constexpr unsigned int threadsPerBlock = 128;// seems faster than the old value of 256!
-    auto nodeMgrHandle = nanovdb::cuda::createNodeManager<ValueT, nanovdb::cuda::DeviceBuffer>(d_grid, nanovdb::cuda::DeviceBuffer(), stream);
+    auto nodeMgrHandle = nanovdb::cuda::createNodeManager<ValueT, nanovdb::cuda::DualDeviceBuffer>(d_grid, nanovdb::cuda::DualDeviceBuffer(), stream);
     auto *d_nodeMgr = nodeMgrHandle.template deviceMgr<ValueT>();
     NANOVDB_ASSERT(isAligned(d_nodeMgr));
     const uint32_t nodeCount[3]={gridData->template nodeCount<0>(), gridData->template nodeCount<1>(), gridData->template nodeCount<2>()};

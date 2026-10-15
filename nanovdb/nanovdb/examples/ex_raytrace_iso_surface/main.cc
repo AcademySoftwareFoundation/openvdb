@@ -6,13 +6,8 @@
 #include <iostream>
 #include <nanovdb/io/IO.h>
 #include <nanovdb/tools/CreatePrimitives.h>
-#include <nanovdb/cuda/DeviceBuffer.h>
 
-#if defined(NANOVDB_USE_CUDA)
-using BufferT = nanovdb::cuda::DeviceBuffer;
-#else
-using BufferT = nanovdb::HostBuffer;
-#endif
+using BufferT = nanovdb::HostBuffer; // the handle lives in host memory; the CUDA side deep-copies it to the device
 
 extern void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int width, int height, BufferT& imageBuffer, bool usePersistentThreads);
 

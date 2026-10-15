@@ -20,23 +20,30 @@
 *
 * (c) Copyright 2012-2023 Agner Fog.
 * Apache License version 2.0 or later.
+*
+* -----------------------------------------------------------------------------
+*
+* This file has been modified from the original in the following ways:
+*  > Various defines and guards have been prefixed with OPENVDB_VCL_.
+*  > VCL_NAMESPACE has been removed in favour of an explicit OPENVDB_VCL_NAMESPACE.
+* Copyright Contributors to the OpenVDB Project
+* SPDX-License-Identifier: Apache-2.0*
+*
 *****************************************************************************/
 
-#ifndef VECTORF128_H
-#define VECTORF128_H
+#ifndef OPENVDB_VCL_VECTORF128_H
+#define OPENVDB_VCL_VECTORF128_H
 
-#ifndef VECTORCLASS_H
+#ifndef OPENVDB_VCL_VECTORCLASS_H
 #include "vectorclass.h"
 #endif
 
-#if VECTORCLASS_H < 20200
+#if OPENVDB_VCL_VECTORCLASS_H < 20200
 #error Incompatible versions of vector class library mixed
 #endif
 
 
-#ifdef VCL_NAMESPACE
-namespace VCL_NAMESPACE {
-#endif
+namespace OPENVDB_VCL_NAMESPACE {
 
 /*****************************************************************************
 *
@@ -1180,11 +1187,7 @@ static inline Vec4f pow(Vec4f const a, Const_int_t<n>) {
 }
 
 // implement the same as macro pow_const(vector, int)
-#ifdef VCL_NAMESPACE
-#define pow_const(x,n) pow(x, VCL_NAMESPACE::Const_int_t<n>())
-#else
-#define pow_const(x,n) pow(x,Const_int_t<n>())
-#endif
+#define pow_const(x,n) pow(x, OPENVDB_VCL_NAMESPACE::Const_int_t<n>())
 
 static inline Vec4f round(Vec4f const a) {
 #if INSTRSET >= 5   // SSE4.1 supported
@@ -2974,8 +2977,6 @@ static inline uint8_t to_bits(Vec2db const x) {
 #endif  // INSTRSET < 10
 
 
-#ifdef VCL_NAMESPACE
 }
-#endif
 
-#endif // VECTORF128_H
+#endif // OPENVDB_VCL_VECTORF128_H

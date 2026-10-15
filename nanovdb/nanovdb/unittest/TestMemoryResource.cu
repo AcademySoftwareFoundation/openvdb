@@ -27,7 +27,26 @@
 
 #include <vector>
 
-namespace {
+// These tests deliberately keep exercising the deprecated dual-space
+// DeviceBuffer surface until its removal; the deprecation warnings are
+// suppressed for this translation unit only. New code must use
+// cuda::Buffer and cuda::copyTo instead.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#if defined(_MSC_VER)
+#pragma warning(disable : 4996)
+#endif
+#if defined(__CUDACC__)
+#pragma nv_diag_suppress 20199
+#endif
+
+
+// Named rather than anonymous: gtest marks each test class's static test_info_
+// [[maybe_unused]], an attribute the CUDA front end ignores. Under internal
+// linkage it proves the member unreferenced and reports #177, which
+// NANOVDB_CUDA_WERROR promotes to an error.
+namespace nanovdb_test {
 
 //======================================================================
 // Shared test doubles
@@ -568,4 +587,4 @@ TEST(TestMemoryResource, AddBlindData_InjectedResourceSeam)
     ASSERT_EQ(cudaFree(d_blind), cudaSuccess);
 }
 
-} // unnamed namespace
+} // namespace nanovdb_test

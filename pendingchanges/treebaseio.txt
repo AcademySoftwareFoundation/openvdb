@@ -1,0 +1,4 @@
+  OpenVDB:
+    API changes:
+    - TreeBase::readTopology() and TreeBase::writeTopology() are now pure virtual. Derived
+      classes of TreeBase now need to read and write int32_t(1) to remain backwards-compatible.

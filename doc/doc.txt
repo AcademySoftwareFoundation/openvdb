@@ -66,7 +66,7 @@ Contributors, please familiarize yourselves with our
   - @ref subsecTreeIter
   - @ref subsecNodeIter
   - @ref subsecValueAccessor
-  - @ref subsecTraversal
+- @ref simdInOpenVDB
 - @subpage transformsAndMaps "Transforms and Maps"
 
 
@@ -529,8 +529,60 @@ a callback mechanism, but developers must be careful to call
 whenever deleting nodes directly.
 
 
-@subsection subsecTraversal Tree Traversal
+@section simdInOpenVDB SIMD in OpenVDB
 
-<I>To be written</I>
+Many data structures and tools provided with OpenVDB either inherently exhibit
+Single Instruction Multiple Data (SIMD) control flow patterns or are
+purposefully written in such a way that allows them to utilize SIMD
+instructions. OpenVDB provides a unified interface that encourages algorithms
+to be written in a vectorization-friendly manner such that SIMD instructions
+can be heavily utilized. However, to support all hardware and platforms, this
+interface allows for aliasing to the underlying ISA in use. This provides a
+common point of entry for targeted SIMD emission while allowing the underlying
+implementation to vary between scalar code paths and ISA specific SIMD
+implementations. In other words, tools can be written once while generating
+code for the most appropriate instruction set, depending on the target
+hardware.
+
+In this way, OpenVDB targets SIMD instruction generation both implicitly and
+explicitly. The implicit approach simply relies entirely on the compiler's
+auto-vectorizer. However, because use of the SIMD interface is inherently
+auto-vectorizable, improved code generation can often be observed in tools that
+utilize said interface. You can then simply provide your desired ISA flags
+at compile time, with the idea being that C++ compilers can often recognise the
+vectorization patterns exposed by the SIMD interface and can generate efficient
+instructions when appropriate ISA flags are enabled.
+
+This works well for simple usage and typically guarantees a speed-up for tools
+that are already very easy to vectorize. It falls down for more complicated
+programs, especially for programs that rely on more involved mathematical
+operations. For the best performance possible, the SIMD interface also allows
+for explicit instruction set implementations. This means directly calling the inbuilt
+intrinsics that are provided from the various vendors to achieve the most
+optimal code generation possible for the desired ISA.
+
+OpenVDB currently only supports explicit SIMD emission on x86 via the use of
+Agner Fog's Vectorclass (VCL) library. This library provides an extensive set
+of SIMD compatible vector types and mathematical operations that automatically
+map to the selected x86 instruction set at compile time. For example, the
+table below demonstrates what a simd::Vec4f (4 x floats) and a simd::Vec8f
+(8 x floats) represent with various build configurations.
+
+Build Flags                                | OPENVDB_X86_INSTRSET  | simd::Vec4f            | simd::Vec8f            | Notes                                       |
+------------------------------------------ | --------------------- | ---------------------- | ---------------------- | ------------------------------------------- |
+Vanilla CMake Build                        | 0 (Unspecified)       | `math::Tuple<4,float>` | `math::Tuple<8,float>` | No targeting, relies on auto-vectorizer     |
+`-DOPENVDB_X86_INSTRSET=6`                 | 6 (SSE42)             | `math::Tuple<4,float>` | `math::Tuple<8,float>` | `-msse42` relies on auto-vectorizer         |
+`-DUSE_VCL=ON`                             | 2 (SSE2)              | VCL's Vec4f            | VCL's Vec8f (emulated) | `-msse` `-msse2`                            |
+`-DUSE_VCL=ON` `-DOPENVDB_X86_INSTRSET=6`  | 6 (SSE42)             | VCL's Vec4f            | VCL's Vec8f (emulated) | ^, `-msse3` `-mssse3` `-msse4.1` `-msse4.2` |
+`-DUSE_VCL=ON` `-DOPENVDB_X86_INSTRSET=7`  | 7 (AVX)               | VCL's Vec4f            | VCL's Vec8f            | ^, `-mavx`                                  |
+
+Importantly, OpenVDB's CMake performs @b NO host ISA detection at build time.
+It is expected that the user selects the x86 ISA they know to be compatible for
+their deployment and provide it via the `OPENVDB_X86_INSTRSET` enumerated type.
+USE_VCL is OFF by default. When enabled, OpenVDB's CMake will determine the
+available ISA from either the value of `OPENVDB_X86_INSTRSET` or any manually
+provided CXXFLAGS. Note that `OPENVDB_X86_INSTRSET` is never automatically
+inferred and is only defined when explicitly supplied.
+
 
 */

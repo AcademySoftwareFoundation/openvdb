@@ -141,17 +141,6 @@ AttributeSet::memUsage() const
 
 
 size_t
-AttributeSet::memUsageIfLoaded() const
-{
-    size_t bytes = sizeof(*this) + mDescr->memUsage();
-    for (const auto& attr : mAttrs) {
-        bytes += attr->memUsageIfLoaded();
-    }
-    return bytes;
-}
-
-
-size_t
 AttributeSet::find(const std::string& name) const
 {
     return mDescr->find(name);

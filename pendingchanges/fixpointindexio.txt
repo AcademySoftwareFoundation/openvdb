@@ -1,2 +1,0 @@
-Bug Fixes:
-  - Fixed a bug in the I/O for the Point Index Grid when reading without providing a CoordBBox

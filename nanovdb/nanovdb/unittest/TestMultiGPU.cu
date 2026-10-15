@@ -245,12 +245,12 @@ TEST(TestNanoVDBMultiGPU, InclusiveSum)
 }
 
 /// @brief Tests multi-GPU creation of a grid containing a single voxel
-TEST(TestNanoVDBMultiGPU, SingleVoxel_DistributedCudaPointsToGrid_UnifiedBuffer)
+TEST(TestNanoVDBMultiGPU, SingleVoxel_DistributedCudaPointsToGrid_ManagedBuffer)
 {
     int current = 0;
     cudaCheck(cudaGetDevice(&current));
 
-    using BufferT = nanovdb::cuda::UnifiedBuffer;
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
     using BuildT = nanovdb::ValueOnIndex;
     const size_t voxelCount = 1;
     nanovdb::Coord* voxels = nullptr;
@@ -271,7 +271,6 @@ TEST(TestNanoVDBMultiGPU, SingleVoxel_DistributedCudaPointsToGrid_UnifiedBuffer)
 
     auto* grid = handle.grid<BuildT>();// grid also exists on the CPU
     ASSERT_TRUE(grid);
-    handle.deviceDownload();// creates a copy on the CPU
     EXPECT_TRUE(handle.deviceData());
     EXPECT_TRUE(handle.data());
     auto* data = handle.gridData();
@@ -287,15 +286,96 @@ TEST(TestNanoVDBMultiGPU, SingleVoxel_DistributedCudaPointsToGrid_UnifiedBuffer)
 
     cudaCheck(cudaFree(voxels));
     cudaSetDevice(current); // restore device so subsequent tests don't fail
-}// SingleVoxel_DistributedCudaPointsToGrid_UnifiedBuffer
+}// SingleVoxel_DistributedCudaPointsToGrid_ManagedBuffer
 
-/// @brief Tests multi-GPU creation of grids for a single dense leaf
-TEST(TestNanoVDBMultiGPU, DenseLeaf_DistributedCudaPointsToGrid_UnifiedBuffer)
+/// @brief Resource that counts (non-null) allocations and deallocations so per-device
+///        routing and leaks can be asserted. Delegates the actual work to DeviceResource.
+struct CountingResource : nanovdb::cuda::SyncFromAsync<CountingResource>
+{
+    static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
+    int allocs = 0;
+    int deallocs = 0;
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream) {
+        void* p = nanovdb::cuda::DeviceResource{}.allocate_async(bytes, alignment, stream);
+        if (p) ++allocs;
+        return p;
+    }
+    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream) {
+        if (p) ++deallocs;
+        nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
+    }
+};
+
+/// @brief Tests that DistributedPointsToGrid routes its device-local allocations (CUB
+///        scratch and sort scratch) through caller-supplied per-device resource instances,
+///        and returns every allocation to the instance it came from.
+TEST(TestNanoVDBMultiGPU, PerDeviceResources_DistributedCudaPointsToGrid)
 {
     int current = 0;
     cudaCheck(cudaGetDevice(&current));
 
-    using BufferT = nanovdb::cuda::UnifiedBuffer;
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
+    using BuildT = nanovdb::ValueOnIndex;
+    // A 32^3 dense block spans several leaves, so with an even initial striping every
+    // device in the mesh runs the count-phase CUB pipeline through its own pool.
+    const size_t voxelCount = 32 * 32 * 32;
+    nanovdb::Coord* voxels = nullptr;
+    cudaCheck(cudaMallocManaged(&voxels, voxelCount * sizeof(nanovdb::Coord)));
+    for (int32_t i = 0; i < 32; ++i)
+        for (int32_t j = 0; j < 32; ++j)
+            for (int32_t k = 0; k < 32; ++k)
+                voxels[i * 32 * 32 + j * 32 + k] = nanovdb::Coord(i, j, k);
+
+    nanovdb::cuda::DeviceMesh deviceMesh;
+    std::vector<CountingResource> resources(deviceMesh.deviceCount());
+    std::vector<CountingResource*> resourcePtrs;
+    for (auto& resource : resources) resourcePtrs.push_back(&resource);
+
+    {
+        nanovdb::tools::cuda::DistributedPointsToGrid<BuildT, CountingResource> converter(deviceMesh, 1.0, nanovdb::Vec3d(0.0), resourcePtrs);
+        auto handle = converter.getHandle(voxels, voxelCount, BufferT());
+
+        auto* grid = handle.grid<BuildT>();
+        ASSERT_TRUE(grid);
+        EXPECT_EQ(voxelCount, grid->activeVoxelCount());
+    }// converter and handle destroyed: every pool has returned its scratch
+
+    for (const auto& resource : resources) {
+        EXPECT_GT(resource.allocs, 0);
+        EXPECT_EQ(resource.allocs, resource.deallocs);
+    }
+
+    cudaCheck(cudaFree(voxels));
+    cudaSetDevice(current); // restore device so subsequent tests don't fail
+}// PerDeviceResources_DistributedCudaPointsToGrid
+
+/// @brief Tests that DistributedPointsToGrid rejects a per-device resource array that does not
+///        match the mesh: a wrong count, or a null entry.
+TEST(TestNanoVDBMultiGPU, PerDeviceResourcesRejected_DistributedCudaPointsToGrid)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    nanovdb::cuda::DeviceMesh deviceMesh;
+    std::vector<CountingResource> resources(deviceMesh.deviceCount() + 1);
+
+    std::vector<CountingResource*> tooMany;
+    for (auto& resource : resources) tooMany.push_back(&resource);// one more than the mesh has devices
+    EXPECT_THROW((nanovdb::tools::cuda::DistributedPointsToGrid<BuildT, CountingResource>(deviceMesh, 1.0, nanovdb::Vec3d(0.0), tooMany)), std::invalid_argument);
+
+    std::vector<CountingResource*> tooFew(tooMany.begin(), tooMany.end() - 2);// one fewer than the mesh has devices
+    EXPECT_THROW((nanovdb::tools::cuda::DistributedPointsToGrid<BuildT, CountingResource>(deviceMesh, 1.0, nanovdb::Vec3d(0.0), tooFew)), std::invalid_argument);
+
+    std::vector<CountingResource*> withNull(tooMany.begin(), tooMany.end() - 1);// right count, but a null entry
+    withNull.front() = nullptr;
+    EXPECT_THROW((nanovdb::tools::cuda::DistributedPointsToGrid<BuildT, CountingResource>(deviceMesh, 1.0, nanovdb::Vec3d(0.0), withNull)), std::invalid_argument);
+}// PerDeviceResourcesRejected_DistributedCudaPointsToGrid
+
+/// @brief Tests multi-GPU creation of grids for a single dense leaf
+TEST(TestNanoVDBMultiGPU, DenseLeaf_DistributedCudaPointsToGrid_ManagedBuffer)
+{
+    int current = 0;
+    cudaCheck(cudaGetDevice(&current));
+
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
     using BuildT = nanovdb::ValueOnIndex;
     // Initialize coordinates corresponding to a single dense leaf. In
     // DistributedPointsToGrid, individual leaf nodes are resident and
@@ -312,7 +392,7 @@ TEST(TestNanoVDBMultiGPU, DenseLeaf_DistributedCudaPointsToGrid_UnifiedBuffer)
 
     nanovdb::cuda::DeviceMesh deviceMesh;
     nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
-    auto handle = converter.getHandle(voxels, voxelCount);
+    auto handle = converter.getHandle(voxels, voxelCount, BufferT());
 
     EXPECT_TRUE(handle.deviceData());// grid exists on the GPU
     EXPECT_TRUE(handle.deviceGrid<BuildT>());
@@ -324,7 +404,6 @@ TEST(TestNanoVDBMultiGPU, DenseLeaf_DistributedCudaPointsToGrid_UnifiedBuffer)
     //timer.start("Allocating and copying grid from GPU to CPU");
     auto *grid = handle.grid<BuildT>();// grid also exists on the CPU
     EXPECT_TRUE(grid);
-    handle.deviceDownload();// creates a copy on the CPU
     EXPECT_TRUE(handle.deviceData());
     EXPECT_TRUE(handle.data());
     auto *data = handle.gridData();
@@ -336,15 +415,15 @@ TEST(TestNanoVDBMultiGPU, DenseLeaf_DistributedCudaPointsToGrid_UnifiedBuffer)
 
     cudaCheck(cudaFree(voxels));
     cudaSetDevice(current); // restore device so subsequent tests don't fail
-}// Large_DistributedCudaPointsToGrid_UnifiedBuffer
+}// DenseLeaf_DistributedCudaPointsToGrid_ManagedBuffer
 
 /// @brief Tests multi-GPU creation of grids for a large number of randomly sampled voxels
-TEST(TestNanoVDBMultiGPU, Large_DistributedCudaPointsToGrid_UnifiedBuffer)
+TEST(TestNanoVDBMultiGPU, Large_DistributedCudaPointsToGrid_ManagedBuffer)
 {
     int current = 0;
     cudaCheck(cudaGetDevice(&current));
 
-    using BufferT = nanovdb::cuda::UnifiedBuffer;
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
     using BuildT = nanovdb::ValueOnIndex;
     nanovdb::util::Timer timer;
     const size_t voxelCount = 1 << 20;// 1048576
@@ -361,7 +440,7 @@ TEST(TestNanoVDBMultiGPU, Large_DistributedCudaPointsToGrid_UnifiedBuffer)
 
     nanovdb::cuda::DeviceMesh deviceMesh;
     nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
-    auto handle = converter.getHandle(voxels, voxelCount);
+    auto handle = converter.getHandle(voxels, voxelCount, BufferT());
     // auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT, nanovdb::Coord*, BufferT>(voxels, voxelCount);
 
     EXPECT_TRUE(handle.deviceData());// grid exists on the GPU
@@ -374,7 +453,6 @@ TEST(TestNanoVDBMultiGPU, Large_DistributedCudaPointsToGrid_UnifiedBuffer)
     //timer.start("Allocating and copying grid from GPU to CPU");
     auto *grid = handle.grid<BuildT>();// grid also exists on the CPU
     EXPECT_TRUE(grid);
-    handle.deviceDownload();// creates a copy on the CPU
     EXPECT_TRUE(handle.deviceData());
     EXPECT_TRUE(handle.data());
     auto *data = handle.gridData();
@@ -401,7 +479,7 @@ TEST(TestNanoVDBMultiGPU, Large_DistributedCudaPointsToGrid_UnifiedBuffer)
 
     cudaCheck(cudaFree(voxels));
     cudaSetDevice(current); // restore device so subsequent tests don't fail
-}// Large_DistributedCudaPointsToGrid_UnifiedBuffer
+}// Large_DistributedCudaPointsToGrid_ManagedBuffer
 
 /// @brief Exercises the serial per-tile sort path (< 32 tiles per device) in DistributedPointsToGrid.
 ///        Coordinates in [-512, 512] produce at most 2^3 = 8 upper internal node tiles
@@ -513,12 +591,12 @@ TEST(TestNanoVDBMultiGPU, ManyTiles_DistributedCudaPointsToGrid)
 ///        construction would drop a device's contribution and undercount the
 ///        active voxels, which the exact-count assertion below catches
 ///        deterministically.
-TEST(TestNanoVDBMultiGPU, SingleUpperNode_DistributedCudaPointsToGrid_UnifiedBuffer)
+TEST(TestNanoVDBMultiGPU, SingleUpperNode_DistributedCudaPointsToGrid_ManagedBuffer)
 {
     int current = 0;
     cudaCheck(cudaGetDevice(&current));
 
-    using BufferT = nanovdb::cuda::UnifiedBuffer;
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
     using BuildT = nanovdb::ValueOnIndex;
 
     const size_t inputCount = 1 << 18;// 262144
@@ -538,11 +616,10 @@ TEST(TestNanoVDBMultiGPU, SingleUpperNode_DistributedCudaPointsToGrid_UnifiedBuf
 
     nanovdb::cuda::DeviceMesh deviceMesh;
     nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
-    auto handle = converter.getHandle(voxels, inputCount);
+    auto handle = converter.getHandle(voxels, inputCount, BufferT());
 
     EXPECT_TRUE(handle.deviceData());
     EXPECT_TRUE(handle.deviceGrid<BuildT>());
-    handle.deviceDownload();
     auto *grid = handle.grid<BuildT>();
     EXPECT_TRUE(grid);
     EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
@@ -564,7 +641,7 @@ TEST(TestNanoVDBMultiGPU, SingleUpperNode_DistributedCudaPointsToGrid_UnifiedBuf
 
     cudaCheck(cudaFree(voxels));
     cudaSetDevice(current);
-}// SingleUpperNode_DistributedCudaPointsToGrid_UnifiedBuffer
+}// SingleUpperNode_DistributedCudaPointsToGrid_ManagedBuffer
 
 /// @brief Cross-checks the distributed builder against the trusted single-GPU
 ///        PointsToGrid on an input that forces a single tile to be split across
@@ -576,7 +653,7 @@ TEST(TestNanoVDBMultiGPU, MatchesSingleGpu_DistributedCudaPointsToGrid)
     int current = 0;
     cudaCheck(cudaGetDevice(&current));
 
-    using BufferT = nanovdb::cuda::UnifiedBuffer;
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
     using BuildT = nanovdb::ValueOnIndex;
 
     const size_t inputCount = 1 << 17;// 131072, all within a single upper node
@@ -589,14 +666,12 @@ TEST(TestNanoVDBMultiGPU, MatchesSingleGpu_DistributedCudaPointsToGrid)
 
     nanovdb::cuda::DeviceMesh deviceMesh;
     nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
-    auto distributedHandle = converter.getHandle(voxels, inputCount);
-    distributedHandle.deviceDownload();
+    auto distributedHandle = converter.getHandle(voxels, inputCount, BufferT());
     auto *distributedGrid = distributedHandle.grid<BuildT>();
     EXPECT_TRUE(distributedGrid);
 
     cudaSetDevice(current);
     auto referenceHandle = nanovdb::tools::cuda::voxelsToGrid<BuildT, nanovdb::Coord*, BufferT>(voxels, inputCount);
-    referenceHandle.deviceDownload();
     auto *referenceGrid = referenceHandle.grid<BuildT>();
     EXPECT_TRUE(referenceGrid);
 
