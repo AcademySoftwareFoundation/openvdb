@@ -13,15 +13,8 @@
 #include <UT/UT_String.h>
 #include <UT/UT_Version.h>
 #include <openvdb/util/logging.h>
-#include <UT/UT_ErrorManager.h>
-#include <CHOP/CHOP_Error.h> // for CHOP_ERROR_MESSAGE
-#include <DOP/DOP_Error.h> // for DOP_MESSAGE
-#if UT_VERSION_INT < 0x11050000 // earlier than 17.5.0
-#include <POP/POP_Error.h> // for POP_MESSAGE
-#endif
-#include <ROP/ROP_Error.h> // for ROP_MESSAGE
-#include <VOP/VOP_Error.h> // for VOP_MESSAGE
-#include <VOPNET/VOPNET_Error.h> // for VOPNET_MESSAGE
+#include <UT/UT_StringHolder.h>
+#include <UT/UT_UniversalLogGenericSource.h>
 #include <string>
 
 
@@ -251,35 +244,26 @@ makeCoordBBox(const UT_BoundingBox& b, const openvdb::math::Transform& t)
 
 namespace {
 
-/// @brief Sink that directs log messages to UT_ErrorManager
+const char* const sLogSourceName = "OpenVDB";
+const char* const sSinkName = "HOUDINI";
+
+
+/// @brief Sink that directs log messages to the Houdini Universal Log
 class HoudiniSink: public openvdb::logging::Sink
 {
 public:
-    /// @param name    Unique sink name, from getSinkName().
-    /// @param opType  SOP_OPTYPE_NAME, ROP_OPTYPE_NAME, etc. (see OP_Node.h)
-    /// @param code    SOP_MESSAGE, SOP_VEX_ERROR, ROP_MESSAGE, etc.
-    ///                (see SOP_Error.h, ROP_Error.h, etc.)
-    HoudiniSink(const std::string& name, const char* opType, int code)
-        : Sink(name, openvdb::logging::Level::Info)
-        , mOpType(opType)
-        , mCode(code)
-    {
-    }
+    HoudiniSink(): Sink(sSinkName, openvdb::logging::Level::Info) {}
 
     void append(openvdb::logging::Level level, const std::string& message,
         const char* file, int line) override
     {
-        auto* errMgr = UTgetErrorManager();
-        if (!errMgr || errMgr->isDisabled()) return;
-
-        const UT_SourceLocation
-            loc{file, line},
-            *locPtr = (file && *file ? &loc : nullptr);
+        // Entries are dropped unless a log viewer is connected to the source.
+        const UT_StringHolder sourceName(sLogSourceName);
+        if (!UTlogSourceExists(sourceName)) return;
 
         // Error and Fatal are reported as warnings. A log call cannot abort a
-        // cook, only a thrown exception can. The sink also has no way to know
-        // which node the message belongs to, and an abort on the wrong node
-        // can break cooking. The original level is kept in the text.
+        // cook, only a thrown exception can. The original level is kept in
+        // the text.
         UT_ErrorSeverity severity = UT_ERROR_MESSAGE;
         const char* prefix = "";
         switch (level) {
@@ -295,85 +279,41 @@ public:
                 prefix = "Fatal: ";
                 break;
         }
-        const std::string text = prefix + message;
-        errMgr->addGeneric(mOpType.c_str(), mCode, text.c_str(), severity, locPtr);
-    }
 
-private:
-    std::string mOpType = INVALID_OPTYPE_NAME;
-    int mCode = 0;
+        const UT_SourceLocation location(
+            (file && *file) ? file : "", line);
+        const UT_StringHolder text(prefix + message);
+        UTlogEntry(UT_UniversalLogEntry(
+            sourceName, text, UT_StringHolder::theEmptyString, severity, 0, location),
+            sourceName);
+    }
 };
-
-
-inline std::string
-getSinkName(const OP_TypeInfo& opInfo)
-{
-    return std::string{"HOUDINI_"} + static_cast<const char*>(opInfo.myOptypeName);
-}
-
-
-/// @brief Return the error code for user-supplied messages in operators of the given type.
-inline int
-getGenericMessageCode(OP_OpTypeId opId)
-{
-    switch (opId) {
-        case CHOP_OPTYPE_ID:   return CHOP_ERROR_MESSAGE;
-        case DOP_OPTYPE_ID:    return DOP_MESSAGE;
-#if UT_VERSION_INT < 0x11050000 // earlier than 17.5.0
-        case POP_OPTYPE_ID:    return POP_MESSAGE;
-#endif
-        case ROP_OPTYPE_ID:    return ROP_MESSAGE;
-        case SOP_OPTYPE_ID:    return SOP_MESSAGE;
-        case VOP_OPTYPE_ID:    return VOP_MESSAGE;
-        case VOPNET_OPTYPE_ID: return VOPNET_MESSAGE;
-        default: break;
-    }
-    return 0;
-}
-
-
-inline void
-setLogForwarding(OP_OpTypeId opId, bool enable)
-{
-    const auto* opInfo = OP_Node::getOpInfoFromOpTypeID(opId);
-    if (!opInfo) return;
-
-    const auto sinkName = getSinkName(*opInfo);
-
-    if (!enable) {
-        openvdb::logging::removeSink(sinkName);
-    } else if (!openvdb::logging::findSink(sinkName)) {
-        // If a sink for the given operator type doesn't already exist, create one.
-        // Otherwise, do nothing: operators of the same type can share a single sink.
-        openvdb::logging::addSink(std::make_shared<HoudiniSink>(
-            sinkName, opInfo->myOptypeName, getGenericMessageCode(opId)));
-    }
-}
 
 } // anonymous namespace
 
 
 void
-startLogForwarding(OP_OpTypeId opId)
+startLogForwarding()
 {
-    setLogForwarding(opId, true);
+    // Register the source now, so log viewers can list it before the first message.
+    UTlogSourceExists(UT_StringHolder(sLogSourceName));
+    if (!openvdb::logging::findSink(sSinkName)) {
+        openvdb::logging::addSink(std::make_shared<HoudiniSink>());
+    }
 }
 
 
 void
-stopLogForwarding(OP_OpTypeId opId)
+stopLogForwarding()
 {
-    setLogForwarding(opId, false);
+    openvdb::logging::removeSink(sSinkName);
 }
 
 
 bool
-isLogForwarding(OP_OpTypeId opId)
+isLogForwarding()
 {
-    if (const auto* opInfo = OP_Node::getOpInfoFromOpTypeID(opId)) {
-        return openvdb::logging::findSink(getSinkName(*opInfo)) != nullptr;
-    }
-    return false;
+    return openvdb::logging::findSink(sSinkName) != nullptr;
 }
 
 } // namespace openvdb_houdini

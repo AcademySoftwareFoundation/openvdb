@@ -254,32 +254,31 @@ openvdb::CoordBBox makeCoordBBox(const UT_BoundingBox&, const openvdb::math::Tra
 
 
 /// @{
-/// @brief Start forwarding OpenVDB log messages to the Houdini error manager
-/// for all operators of the given type.
+/// @brief Start forwarding OpenVDB log messages to the Houdini Universal Log,
+/// under the source name "OpenVDB".
 /// @details Log forwarding is off by default. Build with the CMake option
 /// OPENVDB_HOUDINI_LOG_FORWARDING to enable it for all SOPs, or call this
-/// function for other operator types.
+/// function.
+/// @note Error and Fatal messages are reported as warnings with an "Error: "
+/// or "Fatal: " prefix, since a log message cannot abort a cook.
 /// @note OpenVDB messages are typically logged to the console as well.
 /// This function has no effect on console logging.
 /// @sa stopLogForwarding(), isLogForwarding(), openvdb::logging::Sink
 OPENVDB_HOUDINI_API
-void startLogForwarding(OP_OpTypeId);
+void startLogForwarding();
 
-/// @brief Stop forwarding OpenVDB log messages to the Houdini error manager
-/// for all operators of the given type.
+/// @brief Stop forwarding OpenVDB log messages to the Houdini Universal Log.
 /// @details Only needed to undo startLogForwarding() or the
 /// OPENVDB_HOUDINI_LOG_FORWARDING build option.
-/// @note OpenVDB messages are typically logged to the console as well.
-/// This function has no effect on console logging.
 /// @sa startLogForwarding(), isLogForwarding(), openvdb::logging::Sink
 OPENVDB_HOUDINI_API
-void stopLogForwarding(OP_OpTypeId);
+void stopLogForwarding();
 
-/// @brief Return @c true if OpenVDB messages logged by operators
-/// of the given type are forwarded to the Houdini error manager.
+/// @brief Return @c true if OpenVDB messages are forwarded to the
+/// Houdini Universal Log.
 /// @sa startLogForwarding(), stopLogForwarding()
 OPENVDB_HOUDINI_API
-bool isLogForwarding(OP_OpTypeId);
+bool isLogForwarding();
 /// @}
 
 
