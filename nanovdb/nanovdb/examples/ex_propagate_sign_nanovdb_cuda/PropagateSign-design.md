@@ -124,10 +124,13 @@ None is checked by the operator; all must be guaranteed by how the input is buil
   and inside (consistent with all preconditions).
 
   Without 2(b), walls could force serpentine paths of hundreds of voxels; the only hard bound would be
-  the 511 inactive voxels, which is what the current code's `MaxPropagationSweeps = 512` covers.
+  the 511 inactive voxels, which is what the current code's backstop (`SlotCount + 1` sweeps) covers.
 
-- **Hierarchy completeness.** Under preconditions 1-4, propagating only upward, level by level (leaf -> lower -> upper -> root), labels every
-  inside childless slot. No downward or same-level propagation is needed.
+- **Hierarchy completeness.** Under preconditions 1-4, propagating only upward, level by level
+  (leaf -> lower -> upper -> root), labels every inside childless slot. No downward or same-level
+  propagation is needed. (Code names below are as of `700ebd682`: `BitFloodFunctor<BuildT, Level>` fills
+  each node and then seeds across its faces with `seedAcrossFace<BuildT, Level>`; stages 1-3 are the
+  leaf, lower and upper kernels, stage 4 the root fill.)
 
   *Lemma (inside faces).* If a child node C is face-adjacent to an inside childless slot s, every voxel
   on C's face toward s is inside: an inactive face voxel touches an inactive inside voxel of s, so it
@@ -136,90 +139,260 @@ None is checked by the operator; all must be guaranteed by how the input is buil
   *Lower slots.* Let K be a connected set of inside childless slots of a lower node N (child slots
   are walls). N has a leaf (precondition 1), so K is not all of N; N's slot grid is connected, so some
   slot bordering K is outside K, i.e. holds a leaf L. By the lemma, L's face toward K is all inside, and
-  by leaf locality L's mask has those bits on. `FaceSeedFunctor<0>` probes the block across that face,
-  which is a slot of K, and seeds it. The lower fill spreads from that seed over all of K.
+  by leaf locality L's mask has those bits on. The leaf kernel's `seedAcrossFace<BuildT, 0>` probes the
+  block across that face, which is a slot of K, and seeds it. The lower fill spreads from that seed over
+  all of K.
 
   *Upper slots.* Same argument: K borders a lower child N of U, and N's face toward K is all inside.
-  That face is a 16x16 grid of 8^3 patches. A leaf patch seeds K directly (its `FaceSeedFunctor<0>`
-  probe returns level 2); a childless lower-slot patch is inside, so it was already labeled at the lower
-  level, and `FaceSeedFunctor<1>` seeds K from it. This is why leaves seed every coarser level directly:
-  `FaceSeedFunctor<1>` skips N's child slots, so a lower face covered entirely by leaves would otherwise
-  seed nothing.
+  That face is a 16x16 grid of 8^3 patches. A leaf patch seeds K directly (its level-0 probe returns
+  level 2); a childless lower-slot patch is inside, so it was already labeled at the lower level, and the
+  lower kernel seeds K from it. This is why leaves seed every coarser level directly: a lower node's face
+  test only sees its childless slots (its interior mask is restricted to them), so a lower face covered
+  entirely by leaves would otherwise seed nothing.
 
   *Root.* Same argument one level up. An inside root region K borders some upper node U (precondition 3:
   K never reaches the boundary of the root array, so it is not all of it); U's face toward K is all
-  inside, and each of its patches (childless upper slot, childless lower slot, or leaf) seeds K in
-  stage 6, 4 or 2 respectively.
+  inside, and each of its patches (childless upper slot, childless lower slot, or leaf) seeds K from the
+  upper, lower or leaf kernel respectively.
 
   *Soundness.* A slot is seeded only when it touches an inside voxel, and the slots joined during a fill
   share faces, so every labeled slot is truly inside.
 
   *Stage order.* Each level's seeds come only from finer levels that are already final, and each fill
-  runs after all its seeds have been written (seeds in stages 2 and 4, upper fill in stage 5, root fill in
-  stage 7).
+  runs after all its seeds have been written: the leaf kernel (stage 1) seeds lower, upper and root; the
+  lower kernel (stage 2) fills, then seeds upper and root; the upper kernel (stage 3) fills, then seeds
+  the root; the root fill is stage 4. A kernel only seeds strictly coarser levels, so it never writes a
+  mask that another warp of the same launch is filling.
 
-## Unified node-local propagator (proposed)
+## Node fills
 
-### Current code
+### Current code (`700ebd682`)
 
-There are three separate fill implementations:
+One template, `BitFloodFunctor<BuildT, Level>`, fills leaf (0), lower (1) and upper (2) nodes, one warp per
+node and 4 nodes per block. The warp holds the node's mask in registers as a `WarpSlicedMask<Log2Dim>`:
+lane x holds x-slice x, i.e. `WordsPerSlice` = 1, 4 or 16 consecutive words of the `Mask` (y major, z
+minor within the slice). Each sweep is `interior | (open & interior.faceNeighbors())`:
 
-| | threads | state | updates | seeds | walls |
-| :-- | :-- | :-- | :-- | :-- | :-- |
-| `LeafPropagationFunctor` | 1 per voxel (512) | 1 byte/voxel, shared | Jacobi (barrier between read and write) | active, sign -1 | active, sign >= 0 |
-| `InternalPropagationFunctor<1/2>` | 512, each looping over 8 or 64 slots | bitmask words, shared, `setOnAtomic` | asynchronous (no barrier within a sweep) | slots seeded by `FaceSeedFunctor` | `childMask()` |
-| `RootPropagationFunctor` | 1 block of 256 | 1 byte/position, global | asynchronous, plain byte stores | slots seeded by `FaceSeedFunctor` | `RootWallFunctor` (upper children) |
+- z neighbors: 1-bit shifts within each word, masked so they do not cross from one y to the next;
+- y neighbors: shifts by `Dim` bits, carrying the edge y in from the neighboring word of the slice;
+- x neighbors: `__shfl_up_sync` / `__shfl_down_sync` from lanes x - 1 and x + 1;
+- stop: `__any_sync` reports that no lane's words changed.
 
-The asynchronous fills still converge to the same fixed point (updates only turn bits on, so every
-order reaches the same reachable set), and their stopping test is sound (a sweep that writes nothing
-reads a consistent state). Only the sweep count is nondeterministic. But the inconsistency with the
-leaf fill, the atomics, and the formal races (plain loads of words updated with `atomicOr`; plain byte
-stores at the root) are avoidable.
+The leaf's seeds are built with `fromSlots`: 16 `__ballot_sync`s over all 32 lanes, each testing
+`signs[getValue(n)] == -1` for 32 consecutive voxels. After storing its mask, the warp votes which faces
+hold an inside bit (`facesWithBits`), and lanes 0-5 each call `seedAcrossFace` for one face, so seeding
+runs in the same kernel and the pipeline has four stages (leaf, lower, upper, root). The root fill is
+unchanged: a single block, asynchronous sweeps over a dense byte array.
 
-### Proposal
+Properties: deterministic Jacobi at every node level, no atomics or races inside the node fills, and
+5-9x faster `propagate()` on MeshToSDF output for 10 meshes, with identical masks (per the commit
+message). Lane use: the sign gather uses all 32 lanes; the sweeps use `Dim` lanes, i.e. 8 (leaf),
+16 (lower) or 32 (upper), so leaf and lower sweeps run at 25% and 50% lane utilization.
 
-The leaf and internal fills solve the same problem: given `Mask<Log2Dim>`-shaped seeds and walls, compute
-everything reachable from the seeds without crossing a wall. Only the setup differs per level. So:
+Superseded earlier ideas: a byte-per-slot shared-memory fill with one thread per slot (proposed in this
+review before `700ebd682`), and a word-parallel fill, which `700ebd682` effectively implemented.
 
-- **One fill, templated on `Log2Dim`**, shared by leaf (3), lower (4) and upper (5) nodes.
-- **State: one byte per slot in shared memory** (inside / not inside): 512 B for a leaf, 4 KB for a lower
-  node, 32 KB for an upper node. This is the only shared array.
-- **Thread per slot.** At most 1024 threads fit in a block, so internal nodes cannot be one thread per
-  slot; each thread owns a fixed set of slots (1, 8 or 64), strided by the block size.
-- **Walls stay in registers.** A slot's update needs only its own wall bit and whether any neighbor is
-  inside; it never asks whether a neighbor is a wall. So a thread holds the wall bits of the slots it owns
-  in one `uint64_t` register (leaf: a single flag, as `isActive` today; lower/upper: read straight from
-  `childMask().words()`).
-- **Deterministic Jacobi sweeps.** Each thread records the decisions for its slots in a `uint64_t`
-  register, then a barrier, then it writes the bytes it owns. No atomics, since every byte has a single
-  owner. Stop on a sweep with no change, as today.
-- **Output** packed into the `Mask` words with `__ballot_sync`, as the leaf does today.
-- **Per-level setup**, done in the same launch with the same thread-to-slot mapping:
-  - leaf: thread n reads `signs[leaf.getValue(n)]` and sets its seed byte and wall flag directly (no
-    separate pass to build masks);
-  - lower/upper: seed bytes from the bits `FaceSeedFunctor` set, wall bits from `childMask()`.
+### Proposal: a thread-agnostic `Mask2D` with `MaskShift` as the shift vocabulary
 
-The root keeps its own fill: it is a dense array of arbitrary size, not a `Mask<n>`. It could adopt the
-same Jacobi-with-register-decisions pattern to remove its races.
+**Motivation.** `WarpSlicedMask` exposes the thread structure in the type: its data is a plain
+(y, z) slice (its only non-static member is `uint64_t words[WordsPerSlice]`, so it is trivial and
+standard-layout), but its member functions read `threadIdx.x` (`lane()`, `ownsSlice()`), so even its
+simple operations depend on which lane runs them (`~` keeps lanes `>= Dim` empty). By contrast,
+`util::morphology::cuda::MaskShift<di, dj, dk>` (DilateGrid) takes a plain `Mask<4>`; the lane mapping
+lives inside the function, computed from `threadIdx.x` and discarded. The proposal applies the same
+separation here: a plain data type for one slice, plus warp-level functions that coordinate slices.
+It also reuses `MaskShift`, a concept the library already has and DilateGrid has exercised, instead of
+introducing new vocabulary such as "face neighbors" or "in-plane neighbors".
 
-### Alternative considered: word-parallel bitwise fill
+**`Mask2D<Log2Dim>` (in `nanovdb/util/`, `__hostdev__`).** One x-slice of a `Mask<Log2Dim>`: the
+Dim x Dim plane of slots (y, z), in the mask's own layout (slot (y, z) is bit y * Dim + z of the slice;
+the Dim slots of one y are contiguous bits, and every 64-bit word holds whole y's). A plain aggregate
+(`Mask2D m{}` is all off) with no notion of threads and no intrinsics. Its interface mirrors `Mask`:
 
-Each thread owns whole 64-bit mask words and spreads them with shifts: since `n = (x << 2L) | (y << L) | z`,
-a word is a contiguous slab (`Mask<3>`: word = x, ±y = shift by 8; `Mask<4>`: word = 4x + y/4, ±y = shift
-by 16 with carry from word ±1, ±x = word ±4; `Mask<5>`: word = 16x + y/2, ±y = shift by 32 with carry,
-±x = word ±16; ±z = shift by 1 with the wrap masked out). One sweep is `new = (I | spread(I)) & ~walls`,
-with 64 slots per instruction, no atomics, deterministic.
+- `load(const Mask<L>&, int x)` / `store(Mask<L>&, int x)`: the slice index is explicit;
+- `isOn()`, `isOff()`, `setOn()`, `setOff()`, `toggle()`, `==`, `!=`, `&=`, `|=`, as in `Mask`;
+- value-returning `&` and `|` in addition, for slices held in registers (`Mask` has only the compound
+  forms).
 
-Not pursued for now:
-- the fills are probably not the bottleneck: the leaf stage is likely dominated by the per-voxel global
-  reads `leaf.getValue(n)` / `signs[...]`, and lower/upper nodes are few;
-- a leaf has only 8 words, so leaves would need packing several per warp or block, while the sign lookup
-  is inherently per voxel: setup and fill would need different thread mappings and an extra mask-building
-  step;
-- more complex shift/carry logic per level.
+Probing which edges of a slice hold bits is algorithm-specific (it serves the face seeding) and has no
+counterpart on `Mask`, so it is a free function on the algorithm side, not a member.
 
-Measure first (`setVerbose(1)` times each stage). If the lower/upper fills ever matter, the word-parallel
-fill can replace the shared fill function without changing its interface.
+**`MaskShift<dj, dk, combine>` on `Mask2D` (same file).** `out(y, z) |= in(y + dj, z + dk)` (or `=` if
+`!combine`), with zeros from outside the slice: the same convention as the 3D `MaskShift`. Plain
+per-thread code; any offset with `|dj|, |dk| < Dim`; `in` and `out` may alias. A z shift moves each
+word by `dk` bits and masks off what crossed from one y into the next; a y shift moves whole y's, i.e.
+whole words plus a carried remainder, and needs no masking.
+
+**`detail::zShiftBits<Log2Dim, dk>`.** The bits of a word, in every y of the word, whose slot z has a
+source under a z shift by dk (0 <= z + dk < Dim): the slots `MaskShift` does not zero-fill. A single
+compile-time expression: one y's worth, `(yBits >> max(dk, 0)) & (yBits << max(-dk, 0))`, replicated
+to every y of the word by multiplying with `~0 / yBits` (exact, since Dim divides 64). The slice's z
+edges are its complements for unit shifts: z = 0 is `~zShiftBits<L, -1>`, z = Dim - 1 is
+`~zShiftBits<L, +1>`.
+
+**Warp layer (in `util/cuda/MorphologyHelpers.cuh`, next to the existing `MaskShift`).** Everything that
+crosses lanes, documented as warp collectives:
+
+- the x part of a shift: shuffles by `di` lanes within groups of `Dim` lanes (`width = Dim`), with an
+  explicit mapping `x = lane % Dim`, `node = lane / Dim`; together with the 2D shift this gives a 3D
+  `MaskShift<di, dj, dk>` over a warp of slices, and the fill's face pass is the OR of the six unit shifts;
+- votes: any-differs (stopping test) and face flags (x faces from slices 0 and Dim - 1 being non-empty,
+  y/z faces from the edge probe of every slice);
+- building slices from per-slot predicates with ballots (today's `fromSlots`).
+
+Lanes without a slice are ignored by the votes and stores; the rule lives with the code that defines
+the mapping instead of in the data type.
+
+**Payoffs.**
+- `PropagateSign.cuh` loses `repeatBits` and `WarpSlicedMask` (about 160 of ~710 lines) and keeps only
+  the algorithm.
+- Packing comes almost for free: with `width = Dim` shuffles and per-group votes, a warp can fill 4
+  leaves or 2 lower nodes, recovering the idle lanes (the stopping vote can stay warp-wide; converged
+  nodes just run no-op sweeps).
+- `Mask2D` and the 2D `MaskShift` run on the host, so they can be tested exhaustively on the CPU
+  (`nanovdb_test_nanovdb`), and a CPU reference or CPU implementation of the fill can reuse them (the warp
+  layer's "slice at x +/- d" becomes `slices[x +/- d]`).
+- One shift vocabulary across DilateGrid and PropagateSign; ConnectedComponents already builds masks
+  from ballots (`ConnectedComponents.cuh:420-440`), a candidate for the shared slice builder.
+
+**Prototype (validated).** The code below was compiled and tested outside the repo: g++ (`-O2` and `-O0`,
+`-Wall -Wextra -Werror`) and nvcc 13.3 host code, all with 0 mismatches against slot-by-slot references
+for every (dj, dk) in range at all three sizes (combine and in-place overwrite), `zShiftBits` for every
+dk, the edge probe, the `Mask`-style members, and `load`/`store` (slot (x, y, z) of the `Mask` is slot
+(y, z) of slice x). A device kernel doing one fill step (four in-plane shifts, `s | (open & n)`, the edge
+probe) compiles for sm_120 with all warnings as errors, no spills, 20 / 33 / 40 registers for `Mask<3>` /
+`<4>` / `<5>`.
+
+```cpp
+namespace nanovdb::util {
+
+/// @brief One x-slice of a Mask<Log2Dim>: the Dim x Dim plane of slots (x, y, z) with x fixed, in the
+///        mask's own layout. Slot (y, z) is bit y * Dim + z of the slice, so the Dim slots of one y are
+///        contiguous bits, and every 64-bit word holds whole y's. A plain aggregate with no notion of
+///        threads: Mask2D m{} is all off.
+template<int Log2Dim>
+struct Mask2D
+{
+    static_assert(Log2Dim >= 3 && Log2Dim <= 5, "every 64-bit word must hold whole y's of the slice");
+    static constexpr int Dim       = 1 << Log2Dim;   // slots per axis: 8, 16, 32
+    static constexpr int WordCount = Dim * Dim / 64; // 1, 4, 16
+
+    uint64_t words[WordCount];
+
+    /// @brief Slice @a x of @a mask, and its inverse.
+    __hostdev__ static Mask2D load(const Mask<Log2Dim>& mask, int x)
+    {
+        Mask2D s;
+        for (int j = 0; j < WordCount; ++j) s.words[j] = mask.words()[x * WordCount + j];
+        return s;
+    }
+    __hostdev__ void store(Mask<Log2Dim>& mask, int x) const
+    {
+        for (int j = 0; j < WordCount; ++j) mask.words()[x * WordCount + j] = words[j];
+    }
+
+    // Whole-slice queries and updates, named as in Mask.
+    __hostdev__ bool isOn() const  { uint64_t a = ~uint64_t(0); for (int j = 0; j < WordCount; ++j) a &= words[j]; return a == ~uint64_t(0); }
+    __hostdev__ bool isOff() const { uint64_t a = 0; for (int j = 0; j < WordCount; ++j) a |= words[j]; return a == 0; }
+    __hostdev__ void setOn()       { for (int j = 0; j < WordCount; ++j) words[j] = ~uint64_t(0); }
+    __hostdev__ void setOff()      { for (int j = 0; j < WordCount; ++j) words[j] = 0; }
+    __hostdev__ void toggle()      { for (int j = 0; j < WordCount; ++j) words[j] = ~words[j]; }
+
+    __hostdev__ bool operator==(const Mask2D& o) const { bool eq = true; for (int j = 0; j < WordCount; ++j) eq &= words[j] == o.words[j]; return eq; }
+    __hostdev__ bool operator!=(const Mask2D& o) const { return !(*this == o); }
+    __hostdev__ Mask2D& operator&=(const Mask2D& o)    { for (int j = 0; j < WordCount; ++j) words[j] &= o.words[j]; return *this; }
+    __hostdev__ Mask2D& operator|=(const Mask2D& o)    { for (int j = 0; j < WordCount; ++j) words[j] |= o.words[j]; return *this; }
+
+    // Value-returning forms, for slices held in registers (Mask has only the compound forms).
+    __hostdev__ Mask2D operator&(const Mask2D& o) const { Mask2D r = *this; return r &= o; }
+    __hostdev__ Mask2D operator|(const Mask2D& o) const { Mask2D r = *this; return r |= o; }
+}; // Mask2D<Log2Dim>
+
+namespace detail {
+
+/// @brief The bits of one y of a Mask2D<Log2Dim> word (its Dim low bits).
+template<int Log2Dim>
+inline constexpr uint64_t yBits = (uint64_t(1) << (1 << Log2Dim)) - 1;
+
+/// @brief The bits of a Mask2D<Log2Dim> word, in every y of the word, whose slot z has a source under
+///        a z shift by dk, i.e. 0 <= z + dk < Dim: the slots that MaskShift<dj, dk> does not zero-fill.
+template<int Log2Dim, int dk>
+inline constexpr uint64_t zShiftBits =
+    ((yBits<Log2Dim> >> (dk > 0 ? dk : 0)) & (yBits<Log2Dim> << (dk < 0 ? -dk : 0))) // one y: z in [-dk, Dim - dk)
+    * (~uint64_t(0) / yBits<Log2Dim>);                                               // repeated for every y
+
+} // namespace detail
+
+/// @brief out(y, z) |= in(y + dj, z + dk), or = if !combine, with zeros from outside the slice: the 2D,
+///        per-thread counterpart of util::morphology::cuda::MaskShift. @a in and @a out may be the same slice.
+template<int dj, int dk, bool combine = true, int Log2Dim>
+__hostdev__ void MaskShift(const Mask2D<Log2Dim>& in, Mask2D<Log2Dim>& out)
+{
+    using SliceT = Mask2D<Log2Dim>;
+    constexpr int Dim = SliceT::Dim, WordCount = SliceT::WordCount;
+    static_assert(dj > -Dim && dj < Dim && dk > -Dim && dk < Dim, "the shift must stay within the slice");
+
+    // z: shift every word, then clear the slots whose source lies outside the slice (they received bits
+    // from the neighboring y instead).
+    uint64_t t[WordCount];
+    for (int j = 0; j < WordCount; ++j) {
+        if constexpr (dk > 0)      t[j] = (in.words[j] >>  dk) & detail::zShiftBits<Log2Dim, dk>;
+        else if constexpr (dk < 0) t[j] = (in.words[j] << -dk) & detail::zShiftBits<Log2Dim, dk>;
+        else                       t[j] = in.words[j];
+    }
+
+    // y: whole y's, so the slice moves as one (64 * WordCount)-bit integer by |dj| * Dim bits,
+    // i.e. Q whole words plus R bits carried in from the next word over.
+    constexpr int Q = (dj < 0 ? -dj : dj) * Dim / 64;
+    constexpr int R = (dj < 0 ? -dj : dj) * Dim % 64;
+    SliceT r;
+    for (int i = 0; i < WordCount; ++i) {
+        uint64_t w = 0;
+        if constexpr (dj >= 0) { // toward lower bits: out bit b = t bit b + |dj| * Dim
+            if (i + Q < WordCount) w = t[i + Q] >> R;
+            if constexpr (R != 0) { if (i + Q + 1 < WordCount) w |= t[i + Q + 1] << (64 - R); }
+        } else {                 // toward higher bits: out bit b = t bit b - |dj| * Dim
+            if (i - Q >= 0) w = t[i - Q] << R;
+            if constexpr (R != 0) { if (i - Q - 1 >= 0) w |= t[i - Q - 1] >> (64 - R); }
+        }
+        r.words[i] = w;
+    }
+    for (int i = 0; i < WordCount; ++i) out.words[i] = combine ? (out.words[i] | r.words[i]) : r.words[i];
+}
+
+} // namespace nanovdb::util
+```
+
+The algorithm-side edge probe (would live in `PropagateSign.cuh`):
+
+```cpp
+/// @brief Bits 0-3: whether slice @a s has an on slot with y = 0, y = Dim - 1, z = 0 or z = Dim - 1.
+///        The z edges are the slots a unit z shift zero-fills: z = 0 has no source under dk = -1, and
+///        z = Dim - 1 none under dk = +1.
+template<int Log2Dim>
+__hostdev__ uint32_t edgesWithBits(const nanovdb::util::Mask2D<Log2Dim>& s)
+{
+    using namespace nanovdb::util;
+    constexpr int      Dim     = Mask2D<Log2Dim>::Dim, WordCount = Mask2D<Log2Dim>::WordCount;
+    constexpr uint64_t FirstY  = detail::yBits<Log2Dim>;               // y = 0: the low Dim bits of the first word
+    constexpr uint64_t LastY   = detail::yBits<Log2Dim> << (64 - Dim); // y = Dim - 1: the high Dim bits of the last word
+    constexpr uint64_t FirstZ  = ~detail::zShiftBits<Log2Dim, -1>;     // z = 0, in every y of a word
+    constexpr uint64_t LastZ   = ~detail::zShiftBits<Log2Dim, +1>;     // z = Dim - 1, in every y of a word
+    uint64_t firstZ = 0, lastZ = 0;
+    for (int j = 0; j < WordCount; ++j) { firstZ |= s.words[j] & FirstZ; lastZ |= s.words[j] & LastZ; }
+    return uint32_t((s.words[0] & FirstY) != 0) | uint32_t((s.words[WordCount - 1] & LastY) != 0) << 1 |
+           uint32_t(firstZ != 0) << 2 | uint32_t(lastZ != 0) << 3;
+}
+```
+
+**Still open.**
+- The warp layer is not prototyped yet (x shuffles with `width = Dim`, votes, ballot-built slices).
+- Naming: overload `MaskShift` (the argument types disambiguate `MaskShift<dj, dk>` on `Mask2D` from
+  `MaskShift<di, dj, dk>` on `Mask<4>`) or call it `MaskShift2D`; leaning towards the overload.
+- Scope: `Mask2D` changes shared utilities, so it may be better as a separate small PR (with its CPU unit
+  test) that 2361 builds on, or a separate commit within 2361 while it is a draft.
+- Later: express DilateGrid's `Mask<4>` `MaskShift` through the same pieces, or at least cross-reference
+  the two (its layout spreads `Mask<4>` over all 32 lanes, 2 words each; `Mask2D` uses one slice per lane).
 
 ## Open points
 
@@ -238,25 +411,31 @@ fill can replace the shared fill function without changing its interface.
 
 ## Code-level review findings
 
-Smaller items noted against `PropagateSign.cuh` as of commit `668691585`:
+Smaller items, first noted against `668691585` and re-checked against `700ebd682`:
 
 - **Sign convention docs.** The constructor's `@param deviceSigns` says "-1 inside and +1 outside", but
   the code tests `== int8_t(-1)`, so any other value (including 0) is outside. Document it as "-1 for
   inside (negative), anything else for outside (nonnegative)", and that mapping zero to nonnegative is
-  the caller's job.
+  the caller's job. Still open.
 - **Preconditions undocumented.** None of preconditions 1-4 appear in the header; the class `@details`
-  should state them as the caller contract.
-- **Leaf sweep limit.** `MaxPropagationSweeps = 512` (leaf) could be 22 under the preconditions; the
-  `NANOVDB_ASSERT` after the loop would then also catch inputs whose detours violate 2(b).
-- **Stale comments.**
-  - The leaf-fill comment weighs a scanline fill against Jacobi for "long corridors"; under the
-    preconditions corridors cannot occur inside a leaf.
-  - The stage 3/5 section comment says the lower/upper fills use "sweeps like those of the leaf fill",
-    but the leaf fill is Jacobi (barrier between read and write) while the lower/upper and root fills are
-    asynchronous (no barrier within a sweep).
-- **Formal races.** The asynchronous fills read words that other threads update in the same sweep
-  (plain loads against `setOnAtomic`; plain byte loads/stores in the root fill). Benign, since every
-  racing writer stores 1, but avoidable with the proposed unified fill.
+  should state them as the caller contract. Still open.
+- **Leaf sweep limit.** The backstop is `SlotCount + 1` sweeps (513 for a leaf; `MaxPropagationSweeps = 512`
+  before `700ebd682`). It could be 22 for leaves under the preconditions; the `NANOVDB_ASSERT` after the
+  loop would then also catch inputs whose detours violate 2(b).
+- **Stale comment.** The stage 1-3 comment still weighs a scanline fill against Jacobi for "long
+  corridors"; under the preconditions corridors cannot occur inside a leaf. (The earlier mismatch, where
+  the lower/upper fills were asynchronous while the comment called them "like the leaf fill", is resolved:
+  all node fills are Jacobi now.)
+- **Formal races.** Resolved for the node fills by `700ebd682`. The root fill still reads and writes plain
+  bytes that other threads update in the same sweep; benign (every racing writer stores 1), but avoidable.
+- **Register pressure.** For upper nodes a sweep keeps several 16-word `WarpSlicedMask`s live; check for
+  spills with `-Xptxas -v`.
+- **Not compiled anywhere.** No unit test, example or installed header includes `PropagateSign.cuh`, so
+  neither CI nor `NANOVDB_CUDA_WERROR` sees it.
+- **Lane utilization.** The leaf and lower sweeps use 8 and 16 of 32 lanes; packing 4 leaves or 2 lower
+  nodes per warp would recover them (see the `Mask2D` proposal).
+- **Cross-reference `MaskShift`.** `WarpSlicedMask::faceNeighbors()` is the OR of six unit
+  `MaskShift`s; at least point to `util/cuda/MorphologyHelpers.cuh` (see the `Mask2D` proposal).
 - **Open `todo`s:** naming of the interior / invert masks, `probeChildlessSlot`'s name, and renaming
   `signs` to `signSidecar`.
 - **Packaging.**
