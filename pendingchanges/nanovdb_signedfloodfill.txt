@@ -1,0 +1,6 @@
+NanoVDB:
+  Fixes:
+  - Fixed tools::cuda::signedFloodFill giving many inactive leaf voxels and internal-node tiles the wrong sign.
+    An inactive entry took its sign from the next active entry in linear index order, which can lie on another
+    z-scanline across the surface. It now picks the same entry as the host z-scanline sweep
+    (tools::build::sdfToLevelSet), so the device and host flood fills agree. [Issue #2357]
