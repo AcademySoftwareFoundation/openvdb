@@ -276,15 +276,27 @@ public:
             loc{file, line},
             *locPtr = (file && *file ? &loc : nullptr);
 
-        UT_ErrorSeverity severity = UT_ERROR_NONE;
+        // Error and Fatal are reported as warnings. A log call cannot abort a
+        // cook, only a thrown exception can. The sink also has no way to know
+        // which node the message belongs to, and an abort on the wrong node
+        // can break cooking. The original level is kept in the text.
+        UT_ErrorSeverity severity = UT_ERROR_MESSAGE;
+        const char* prefix = "";
         switch (level) {
-            case openvdb::logging::Level::Debug: severity = UT_ERROR_MESSAGE; break;
-            case openvdb::logging::Level::Info:  severity = UT_ERROR_MESSAGE; break;
+            case openvdb::logging::Level::Debug: break;
+            case openvdb::logging::Level::Info:  break;
             case openvdb::logging::Level::Warn:  severity = UT_ERROR_WARNING; break;
-            case openvdb::logging::Level::Error: severity = UT_ERROR_ABORT; break;
-            case openvdb::logging::Level::Fatal: severity = UT_ERROR_FATAL; break;
+            case openvdb::logging::Level::Error:
+                severity = UT_ERROR_WARNING;
+                prefix = "Error: ";
+                break;
+            case openvdb::logging::Level::Fatal:
+                severity = UT_ERROR_WARNING;
+                prefix = "Fatal: ";
+                break;
         }
-        errMgr->addGeneric(mOpType.c_str(), mCode, message.c_str(), severity, locPtr);
+        const std::string text = prefix + message;
+        errMgr->addGeneric(mOpType.c_str(), mCode, text.c_str(), severity, locPtr);
     }
 
 private:
