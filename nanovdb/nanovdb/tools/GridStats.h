@@ -278,7 +278,7 @@ public:
     }
     __hostdev__ const ValueT& min() const { return mMin; }
     __hostdev__ const ValueT& max() const { return mMax; }
-    __hostdev__ operator bool() const { return mMin.raw <= mMax.raw; }
+    __hostdev__ operator bool() const { return math::HalfToFloat(mMin.raw) <= math::HalfToFloat(mMax.raw); }
     __hostdev__ static constexpr bool hasMinMax() { return !util::is_same<bool, ValueT>::value; }
     __hostdev__ static constexpr bool hasAverage() { return false; }
     __hostdev__ static constexpr bool hasStdDeviation() { return false; }
