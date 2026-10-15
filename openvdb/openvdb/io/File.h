@@ -185,6 +185,11 @@ private:
     GridBase::Ptr resolveCachedGrid(const GridBase::Ptr& cachedGrid,
         const io::ReadOptions& readOptions, ReadDiagnostics& diagnostics) const;
 
+    /// @brief Resolve each of @a cachedGrids as resolveCachedGrid() does. Grids that
+    /// share a source tree share the resolved tree when instancing is enabled.
+    GridPtrVecPtr resolveCachedGrids(const GridPtrVec& cachedGrids,
+        const io::ReadOptions& readOptions) const;
+
     void writeGrids(const GridCPtrVec&, const MetaMap&, const io::WriteOptions&) const;
 
     MetaMap::Ptr fileMetadata();

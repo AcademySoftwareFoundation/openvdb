@@ -330,47 +330,7 @@ File::getGrids(const io::ReadOptions& readOptions) const
             // Nothing to convert or clip: preserve pointer identity with mGrids.
             ret = mGrids;
         } else {
-            ret.reset(new GridPtrVec);
-
-            // Instances (grids sharing a source tree) share the converted tree
-            // too, unless instancing is disabled. Under a clip, share only
-            // when transforms agree, since a clip depends on each grid's own
-            // transform.
-            const bool shareConvertedTrees = isInstancingEnabled() &&
-                readOptions.readMode != io::ReadMode::MetadataOnly;
-            struct Resolved { GridBase::Ptr grid; math::Transform::ConstPtr transform; };
-            std::map<const TreeBase*, Resolved> resolvedBySourceTree;
-
-            for (const auto& cachedGrid : *mGrids) {
-                const TreeBase* sourceTree = &cachedGrid->constBaseTree();
-                GridBase::Ptr grid;
-
-                if (shareConvertedTrees) {
-                    auto it = resolvedBySourceTree.find(sourceTree);
-                    if (it != resolvedBySourceTree.end() &&
-                        (!clip || *it->second.transform == cachedGrid->transform()))
-                    {
-                        const GridBase::Ptr& resolved = it->second.grid;
-                        grid = resolved->copyGridWithNewTree();
-                        grid->clearMetadata();
-                        grid->insertMeta(*cachedGrid);
-                        grid->setTransform(cachedGrid->transformPtr());
-                        grid->setTree(resolved->baseTreePtr());
-                        ret->push_back(grid);
-                        continue;
-                    }
-                }
-
-                grid = resolveCachedGrid(cachedGrid, readOptions, mReadDiagnostics);
-
-                if (shareConvertedTrees) {
-                    // Keep the first-seen entry as canonical, so a later
-                    // mismatched transform under clip doesn't overwrite it.
-                    resolvedBySourceTree.try_emplace(
-                        sourceTree, Resolved{grid, cachedGrid->transformPtr()});
-                }
-                ret->push_back(grid);
-            }
+            ret = this->resolveCachedGrids(*mGrids, readOptions);
         }
     } else {
         ret.reset(new GridPtrVec);
@@ -545,10 +505,17 @@ File::readGrids(const Name& name, const io::ReadOptions& readOptions)
 
     if (!inputHasGridOffsets()) {
         // All grids are already cached and connected.
+        GridPtrVec cachedGrids;
         for (NameMapCIter it = range.first; it != range.second; ++it) {
             const auto cachedIt = mNamedGrids.find(it->second.uniqueName());
             if (cachedIt == mNamedGrids.end()) continue;
-            ret->push_back(resolveCachedGrid(cachedIt->second, readOptions, mReadDiagnostics));
+            cachedGrids.push_back(cachedIt->second);
+        }
+        if (readOptions.readMode == io::ReadMode::Original && !readOptions.clipBBox.isSorted()) {
+            // Nothing to convert or clip: preserve pointer identity with the cached grids.
+            ret.reset(new GridPtrVec(cachedGrids));
+        } else {
+            ret = this->resolveCachedGrids(cachedGrids, readOptions);
         }
     } else if (readOptions.clipBBox.isSorted()) {
         // A clip depends on each grid's own transform, so instances do not share trees.
@@ -856,6 +823,55 @@ convertGridForReadMode(const GridBase& source, const ReadOptions& readOptions,
 }
 
 } // anonymous namespace
+
+
+GridPtrVecPtr
+File::resolveCachedGrids(const GridPtrVec& cachedGrids, const io::ReadOptions& readOptions) const
+{
+    GridPtrVecPtr ret(new GridPtrVec);
+    const bool clip = readOptions.clipBBox.isSorted();
+
+    // Instances (grids sharing a source tree) share the converted tree
+    // too, unless instancing is disabled. Under a clip, share only
+    // when transforms agree, since a clip depends on each grid's own
+    // transform.
+    const bool shareConvertedTrees = this->isInstancingEnabled() &&
+        readOptions.readMode != io::ReadMode::MetadataOnly;
+    struct Resolved { GridBase::Ptr grid; math::Transform::ConstPtr transform; };
+    std::map<const TreeBase*, Resolved> resolvedBySourceTree;
+
+    for (const auto& cachedGrid : cachedGrids) {
+        const TreeBase* sourceTree = &cachedGrid->constBaseTree();
+        GridBase::Ptr grid;
+
+        if (shareConvertedTrees) {
+            auto it = resolvedBySourceTree.find(sourceTree);
+            if (it != resolvedBySourceTree.end() &&
+                (!clip || *it->second.transform == cachedGrid->transform()))
+            {
+                const GridBase::Ptr& resolved = it->second.grid;
+                grid = resolved->copyGridWithNewTree();
+                grid->clearMetadata();
+                grid->insertMeta(*cachedGrid);
+                grid->setTransform(cachedGrid->transformPtr());
+                grid->setTree(resolved->baseTreePtr());
+                ret->push_back(grid);
+                continue;
+            }
+        }
+
+        grid = this->resolveCachedGrid(cachedGrid, readOptions, mReadDiagnostics);
+
+        if (shareConvertedTrees) {
+            // Keep the first-seen entry as canonical, so a later
+            // mismatched transform under clip doesn't overwrite it.
+            resolvedBySourceTree.try_emplace(
+                sourceTree, Resolved{grid, cachedGrid->transformPtr()});
+        }
+        ret->push_back(grid);
+    }
+    return ret;
+}
 
 
 GridBase::Ptr

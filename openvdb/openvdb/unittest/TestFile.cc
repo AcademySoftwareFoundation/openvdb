@@ -996,6 +996,15 @@ TEST_F(TestFile, testReadGrids)
                 EXPECT_EQ(valueOf(expected), valueOf(actual)) << name;
                 EXPECT_EQ(expectedValues[indexOf(actual)], valueOf(actual)) << name;
             }
+
+            // Grids that shared a tree and have equal transforms share the clipped tree.
+            GridPtrVecPtr clippedPair = file.readGrids("pair", clipOptions);
+            ASSERT_EQ(2, int(clippedPair->size()));
+            if (instancing) {
+                EXPECT_EQ((*clippedPair)[0]->baseTreePtr(), (*clippedPair)[1]->baseTreePtr());
+            } else {
+                EXPECT_NE((*clippedPair)[0]->baseTreePtr(), (*clippedPair)[1]->baseTreePtr());
+            }
         }
     }
 }
