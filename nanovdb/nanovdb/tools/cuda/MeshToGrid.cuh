@@ -269,7 +269,7 @@ GridHandle<BufferT> MeshToGrid<BuildT, ResourceT>::getHandle(const BufferT &buff
     // Count nodes at all levels from the filled masks
     if (mVerbose==1) mTimer.start("Counting nodes");
     mBuilder.countNodes(mStream);
-    cudaStreamSynchronize(mStream); // node counts written async; sync before reading or passing to getBuffer
+    cudaStreamSynchronize(mStream); // node counts are written asynchronously; getBuffer waits for them itself
     if (mVerbose==1) mTimer.stop();
 
     // Allocate output grid buffer
