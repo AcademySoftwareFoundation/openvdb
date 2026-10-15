@@ -256,9 +256,9 @@ openvdb::CoordBBox makeCoordBBox(const UT_BoundingBox&, const openvdb::math::Tra
 /// @{
 /// @brief Start forwarding OpenVDB log messages to the Houdini error manager
 /// for all operators of the given type.
-/// @details Typically, log forwarding is enabled for specific operator types
-/// during initialization of the openvdb_houdini library, and there's no need
-/// for client code to call this function.
+/// @details Log forwarding is off by default. Build with the CMake option
+/// OPENVDB_HOUDINI_LOG_FORWARDING to enable it for all SOPs, or call this
+/// function for other operator types.
 /// @note OpenVDB messages are typically logged to the console as well.
 /// This function has no effect on console logging.
 /// @sa stopLogForwarding(), isLogForwarding(), openvdb::logging::Sink
@@ -267,9 +267,8 @@ void startLogForwarding(OP_OpTypeId);
 
 /// @brief Stop forwarding OpenVDB log messages to the Houdini error manager
 /// for all operators of the given type.
-/// @details Typically, log forwarding is enabled for specific operator types
-/// during initialization of the openvdb_houdini library, and there's no need
-/// for client code to disable it.
+/// @details Only needed to undo startLogForwarding() or the
+/// OPENVDB_HOUDINI_LOG_FORWARDING build option.
 /// @note OpenVDB messages are typically logged to the console as well.
 /// This function has no effect on console logging.
 /// @sa startLogForwarding(), isLogForwarding(), openvdb::logging::Sink
