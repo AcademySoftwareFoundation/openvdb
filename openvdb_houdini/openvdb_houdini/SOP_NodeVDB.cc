@@ -184,9 +184,9 @@ SOP_NodeVDB::SOP_NodeVDB(OP_Network* net, const char* name, OP_Operator* op):
     // Initialize the OpenVDB library
     openvdb::initialize();
 #ifdef OPENVDB_HOUDINI_LOG_FORWARDING
-    // Forward OpenVDB log messages to the UT_ErrorManager (for all SOPs).
+    // Forward OpenVDB log messages to the Houdini Universal Log.
     // Off by default since messages can land on an unrelated node.
-    startLogForwarding(SOP_OPTYPE_ID);
+    startLogForwarding();
 #endif
 #endif
 
