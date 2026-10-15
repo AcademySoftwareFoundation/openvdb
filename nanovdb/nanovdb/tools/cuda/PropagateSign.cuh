@@ -100,31 +100,19 @@ public:
         // Root propagation is needed when the active bounds contain positions without an Upper child.
         const bool needsRootPropagation = mRootMask.size() > mUpperInteriorMasks.size();
 
-        if (mVerbose==1) mTimer.start("Leaf interior fill");
-        fillLeafInteriorMasks();
+        if (mVerbose==1) mTimer.start("Leaf interior fill and seeding coarser levels");
+        fillLeafAndSeedCoarserLevels();
         if (mVerbose==1) mTimer.stop();
 
-        if (mVerbose==1) mTimer.start("Seeding coarser levels from leaf faces");
-        emitSeedsToCoarserLevels<0>();
+        if (mVerbose==1) mTimer.start("Lower interior fill and seeding coarser levels");
+        fillLowerAndSeedCoarserLevels();
         if (mVerbose==1) mTimer.stop();
 
-        if (mVerbose==1) mTimer.start("Lower interior fill");
-        fillLowerInteriorMasks();
-        if (mVerbose==1) mTimer.stop();
-
-        if (mVerbose==1) mTimer.start("Seeding coarser levels from lower faces");
-        emitSeedsToCoarserLevels<1>();
-        if (mVerbose==1) mTimer.stop();
-
-        if (mVerbose==1) mTimer.start("Upper interior fill");
-        fillUpperInteriorMasks();
+        if (mVerbose==1) mTimer.start("Upper interior fill and seeding root tiles");
+        fillUpperAndSeedCoarserLevels();
         if (mVerbose==1) mTimer.stop();
 
         if (needsRootPropagation) {
-            if (mVerbose==1) mTimer.start("Seeding root tiles from upper faces");
-            emitSeedsToCoarserLevels<2>();
-            if (mVerbose==1) mTimer.stop();
-
             if (mVerbose==1) mTimer.start("Root interior fill");
             fillRootInteriorMasks();
             if (mVerbose==1) mTimer.stop();
@@ -138,27 +126,21 @@ public:
 private:
 
     // --- Pipeline stages (run in order by propagate). ---
-    // Stages 6-7 run only when the active root bounds contain positions without Upper children.
+    // Stage 4 runs only when the active root bounds contain positions without Upper children.
 
     // Setup: allocate per-node masks and a dense root mask.
     void initializeMasks();
 
-    // Stage 1: propagate active inside signs through inactive voxels within each leaf.
-    void fillLeafInteriorMasks();
+    // Stage 1: fill leaf interiors and seed coarser childless slots from their faces.
+    void fillLeafAndSeedCoarserLevels();
 
-    // Stages 2, 4, 6: seed childless slots at coarser levels from the inside faces of
-    // filled leaf (0), lower (1), or upper (2) nodes.
-    // Here, we do not need to emit seed to same level.
-    template <int Level>
-    void emitSeedsToCoarserLevels();
+    // Stage 2: fill lower interiors and seed coarser childless slots from their faces.
+    void fillLowerAndSeedCoarserLevels();
 
-    // Stage 3: fill childless slots within each lower node from its interior seeds.
-    void fillLowerInteriorMasks();
+    // Stage 3: fill upper interiors and seed coarser childless slots from their faces.
+    void fillUpperAndSeedCoarserLevels();
 
-    // Stage 5: fill childless slots within each upper node from its interior seeds.
-    void fillUpperInteriorMasks();
-
-    // Stage 7: fill root positions with Upper children as walls, then collect interior tile origins.
+    // Stage 4: fill root positions with Upper children as walls, then collect interior tile origins.
     void fillRootInteriorMasks();
 
     /// @brief Borrowed handle to the injected resource, for the scratch allocated after construction.
@@ -231,101 +213,183 @@ void PropagateSign<BuildT, ResourceT>::initializeMasks()
 }// PropagateSign<BuildT, ResourceT>::initializeMasks
 
 //----------------------------------------------------------------------------------------------------------------------
-// Stage 1: fill each leaf from its active voxels.
-//
-// Active voxels keep their own sign and act as walls; the inside ones seed a flood through the leaf's
-// inactive voxels. The flood is Jacobi style: in each sweep every unreached inactive voxel turns on if a
-// face neighbor is already on, so a sweep is one parallel step with no ordering between threads. A
-// scanline fill, which runs to the end of an open row in one sweep, needs fewer sweeps only when the
-// inside region winds through long corridors; next to a surface the flood crosses a node in a few
-// sweeps, so the simpler Jacobi sweep is no slower there.
 
 namespace signing::detail {
 
-/// @brief Fills one leaf's interior mask from the signs of its active voxels, one block per leaf and one
-///        thread per voxel. FaceSeedFunctor<BuildT, 0> then seeds coarser levels from the filled leaf.
-template <typename BuildT>
-struct LeafPropagationFunctor
-{
-    static constexpr int MaxThreadsPerBlock         = NanoLeaf<BuildT>::SIZE;
-    static constexpr int MinBlocksPerMultiprocessor = 1;
+// Stages 1, 2 and 3: fill each leaf, lower or upper node, then seed coarser levels across its faces.
+//
+// In a leaf, active voxels keep their own sign and act as walls; the inside ones seed a flood through the
+// leaf's inactive voxels. In a lower or upper node, slots with a child are walls, and the seeds are the
+// slots that the faces of finer nodes set in the previous stages. The flood is Jacobi style: in each sweep
+// every unreached open slot turns on if a face neighbor is already on, so a sweep is one parallel step with
+// no ordering between threads. A scanline fill, which runs to the end of an open row in one sweep, needs
+// fewer sweeps only when the inside region winds through long corridors; next to a surface the flood
+// crosses a node in a few sweeps, so the simpler Jacobi sweep is no slower there.
+//
+// One kernel per level, one warp per node: the warp holds the node's mask in registers as a WarpSlicedMask,
+// fills it, stores it, and then seeds coarser levels across the node's faces (seedAcrossFace).
 
-    // True if any of the six face neighbors of local within this leaf is interior.
-    __device__ static bool hasInteriorNeighbor(const uint8_t* interior, const nanovdb::Coord& local)
+/// @brief Repeat the low @a period bits of @a unit across a 64-bit word,
+///        e.g. repeatBits(0x01, 8) == 0x0101010101010101.
+constexpr uint64_t repeatBits(uint64_t unit, int period)
+{
+    uint64_t r = 0;
+    for (int i = 0; i < 64; i += period) r |= unit << i;
+    return r;
+}
+
+/// @brief A node mask (Mask<Log2Dim>, a Dim^3 cube of bits) spread over one warp. Lane x holds x-slice x,
+///        which is WordsPerSlice consecutive words of the mask (leaf: 1, lower: 4, upper: 16); bit
+///        (x * Dim + y) * Dim + z of the mask is slot (x, y, z). Lanes x >= Dim hold no slots and stay empty.
+///
+///        |, &, ~, load and store work on each lane's own words. fromSlots, faceNeighbors, facesWithBits and
+///        differsAnywhere exchange data across the warp (shuffles and votes), so all 32 lanes of the warp must
+///        call them together.
+template <int Log2Dim>
+struct WarpSlicedMask
+{
+    static constexpr int      Dim           = 1 << Log2Dim;   // slots per axis: 8, 16 or 32
+    static constexpr int      WordsPerSlice = Dim * Dim / 64; // words per lane: 1, 4 or 16
+    static constexpr int      SlotCount     = Dim * Dim * Dim;
+    static constexpr unsigned FullMask      = 0xFFFFFFFFu;    // all 32 lanes take part
+    static_assert(Dim <= 32, "WarpSlicedMask assigns one lane per x-slice");
+
+    uint64_t words[WordsPerSlice];
+
+    __device__ static int  lane() { return threadIdx.x & 31; }
+    __device__ static bool ownsSlice() { return lane() < Dim; }
+
+    __device__ static WarpSlicedMask empty()
     {
-        const auto& inside = reinterpret_cast<const uint8_t(&)[8][8][8]>(*interior);
-        const int x = local[0], y = local[1], z = local[2];
-        return (x > 0 && inside[x-1][y][z]) || (x < 7 && inside[x+1][y][z]) ||
-               (y > 0 && inside[x][y-1][z]) || (y < 7 && inside[x][y+1][z]) ||
-               (z > 0 && inside[x][y][z-1]) || (z < 7 && inside[x][y][z+1]);
+        WarpSlicedMask m;
+#pragma unroll
+        for (int j = 0; j < WordsPerSlice; ++j) m.words[j] = 0;
+        return m;
     }
 
-    // TODO: Rename signs to signSidecar?
-    __device__ void operator()(const NanoGrid<BuildT>* grid, const int8_t* signs,
-                               nanovdb::Mask<3>* masks)
+    __device__ static WarpSlicedMask load(const nanovdb::Mask<Log2Dim>& mask)
     {
-        const int leafID = blockIdx.x;
-        const int tID = threadIdx.x;
-        const auto& leaf = grid->tree().template getFirstNode<0>()[leafID];
+        WarpSlicedMask m;
+#pragma unroll
+        for (int j = 0; j < WordsPerSlice; ++j)
+            m.words[j] = ownsSlice() ? mask.words()[lane() * WordsPerSlice + j] : 0;
+        return m;
+    }
 
-        __shared__ uint8_t interior[NanoLeaf<BuildT>::SIZE]; // 1 = interior; 0 = active exterior or unreached inactive voxel.
-        __shared__ int changed; // Set when a sweep reaches a new interior voxel.
+    __device__ void store(nanovdb::Mask<Log2Dim>& mask) const
+    {
+        if (!ownsSlice()) return;
+#pragma unroll
+        for (int j = 0; j < WordsPerSlice; ++j) mask.words()[lane() * WordsPerSlice + j] = words[j];
+    }
 
-        const bool isActive = leaf.isActive(uint32_t(tID));
-
-        // Active inside voxels seed the fill; active outside voxels remain walls.
-        interior[tID] = isActive && (signs[leaf.getValue(uint32_t(tID))] == int8_t(-1));
-        __syncthreads();
-
-        const nanovdb::Coord local = NanoLeaf<BuildT>::OffsetToLocalCoord(tID);
-
-        // Synchronous flood fill: each sweep reads the previous mask before any writes.
-        // Every sweep but the last turns on at least one of the at most SIZE - 1 unreached voxels, so the
-        // bound is a backstop, not the mechanism that ends the loop.
-        constexpr int MaxPropagationSweeps = NanoLeaf<BuildT>::SIZE; // 512
-
-        int iteration = 0;
-        for (; iteration < MaxPropagationSweeps; ++iteration) {
-            if (tID == 0) changed = 0;
-            __syncthreads();
-
-            bool turnOn = false;
-            // Active signs are fixed; only unreached inactive voxels can become interior.
-            if (!isActive && !interior[tID]) turnOn = hasInteriorNeighbor(interior, local);
-
-            __syncthreads(); // finish this sweep's reads before updating the shared mask
-            if (turnOn) {
-                interior[tID] = 1;
-                changed = 1; // benign race: every writer stores 1
-            }
-            __syncthreads();
-            const bool done = changed == 0;
-            __syncthreads(); // all threads read changed before the next reset
-            if (done) break;
+    /// @brief The mask whose slot n is on iff isOn(n). The warp asks about 32 slots at a time (slot 32k + lane),
+    ///        and __ballot_sync packs the 32 answers into half of word k/2, which the lane holding that word keeps.
+    template <typename PredicateT>
+    __device__ static WarpSlicedMask fromSlots(PredicateT isOn)
+    {
+        WarpSlicedMask m = empty();
+        for (int k = 0; k < SlotCount / 32; ++k) {
+            const uint32_t ballot = __ballot_sync(FullMask, isOn(uint32_t(32 * k + lane())));
+            const int      word   = k >> 1;
+#pragma unroll
+            for (int j = 0; j < WordsPerSlice; ++j)
+                if (word == lane() * WordsPerSlice + j) m.words[j] |= uint64_t(ballot) << (32 * (k & 1));
         }
-        NANOVDB_ASSERT(iteration < MaxPropagationSweeps); // exhausted the backstop: the fill did not converge
-
-        // Thread tID owns bit tID of the leaf mask, so each warp's ballot is exactly the mask's
-        // 32-bit word (tID >> 5); warps write disjoint words, so no atomics are needed.
-        const uint32_t ballot = __ballot_sync(0xFFFFFFFFu, interior[tID]);
-        if ((tID & 31) == 0) reinterpret_cast<uint32_t*>(masks[leafID].words())[tID >> 5] = ballot;
+        return m;
     }
-}; // LeafPropagationFunctor
 
-} // namespace signing::detail
+    __device__ WarpSlicedMask operator|(const WarpSlicedMask& other) const
+    {
+        WarpSlicedMask r;
+#pragma unroll
+        for (int j = 0; j < WordsPerSlice; ++j) r.words[j] = words[j] | other.words[j];
+        return r;
+    }
 
-template <typename BuildT, typename ResourceT>
-void PropagateSign<BuildT, ResourceT>::fillLeafInteriorMasks()
-{
-    if (mLeafInteriorMasks.size() == 0) return; // a kernel launch with zero blocks is an error
-    using Op = signing::detail::LeafPropagationFunctor<BuildT>;
-    util::cuda::operatorKernel<Op><<<unsigned(mLeafInteriorMasks.size()), Op::MaxThreadsPerBlock, 0, mStream>>>(
-        mDeviceGrid, mDeviceSigns, mLeafInteriorMasks.data());
-    cudaCheckError();
-}// PropagateSign<BuildT, ResourceT>::fillLeafInteriorMasks
+    __device__ WarpSlicedMask operator&(const WarpSlicedMask& other) const
+    {
+        WarpSlicedMask r;
+#pragma unroll
+        for (int j = 0; j < WordsPerSlice; ++j) r.words[j] = words[j] & other.words[j];
+        return r;
+    }
 
-//----------------------------------------------------------------------------------------------------------------------
-// Stages 2, 4 and 6: seed coarser levels across node faces.
+    /// @brief The complement within the cube; lanes without a slice stay empty.
+    __device__ WarpSlicedMask operator~() const
+    {
+        WarpSlicedMask r;
+#pragma unroll
+        for (int j = 0; j < WordsPerSlice; ++j) r.words[j] = ownsSlice() ? ~words[j] : 0;
+        return r;
+    }
+
+    /// @brief Every slot that has an on face neighbor (-x, +x, -y, +y, -z, +z) in this mask.
+    ///
+    /// Within a word, the rows of Dim bits run along z and consecutive rows along y:
+    ///   z +/- 1 : shift by 1 bit. The last slot of a row (z = Dim - 1) would land on the first slot of the
+    ///             next row (z = 0), which is not its neighbor, so the +z result is masked with NotZ0 (clears
+    ///             z = 0 of every row) and the -z result with NotZLast (clears z = Dim - 1 of every row).
+    ///   y +/- 1 : shift by Dim bits (one row). The lowest and highest rows of a word take their neighbor
+    ///             row from the previous and next word of the same slice.
+    ///   x +/- 1 : the same word of the neighboring x-slice, held by lane - 1 or lane + 1.
+    __device__ WarpSlicedMask faceNeighbors() const
+    {
+        WarpSlicedMask r;
+#pragma unroll
+        for (int j = 0; j < WordsPerSlice; ++j) {
+            const uint64_t fromLowerX = __shfl_up_sync(FullMask, words[j], 1);
+            const uint64_t fromUpperX = __shfl_down_sync(FullMask, words[j], 1);
+            uint64_t n = ((words[j] << 1) & NotZ0) | ((words[j] >> 1) & NotZLast)
+                       | (words[j] << Dim) | (words[j] >> Dim);
+            if (j > 0)                 n |= words[j - 1] >> (64 - Dim);
+            if (j < WordsPerSlice - 1) n |= words[j + 1] << (64 - Dim);
+            if (lane() >= 1)           n |= fromLowerX;
+            if (lane() < Dim - 1)      n |= fromUpperX;
+            r.words[j] = ownsSlice() ? n : 0;
+        }
+        return r;
+    }
+
+    /// @brief Bit f is set if face f (0-5: -x, +x, -y, +y, -z, +z) of the cube holds an on slot:
+    ///   -x / +x : x-slice 0 / Dim - 1, held by lane 0 / lane Dim - 1
+    ///   -y / +y : the lowest row of the first word / the highest row of the last word, in every lane
+    ///   -z / +z : the first / last bit of every row, in every word of every lane
+    __device__ uint32_t facesWithBits() const
+    {
+        bool anyOn = false, zFirst = false, zLast = false;
+#pragma unroll
+        for (int j = 0; j < WordsPerSlice; ++j) {
+            anyOn  |= words[j] != 0;
+            zFirst |= (words[j] & ZFirst) != 0;
+            zLast  |= (words[j] & ZLast) != 0;
+        }
+        return uint32_t(__any_sync(FullMask, lane() == 0 && anyOn)) << 0 |
+               uint32_t(__any_sync(FullMask, lane() == Dim - 1 && anyOn)) << 1 |
+               uint32_t(__any_sync(FullMask, (words[0] & FirstRow) != 0)) << 2 |
+               uint32_t(__any_sync(FullMask, (words[WordsPerSlice - 1] >> (64 - Dim)) != 0)) << 3 |
+               uint32_t(__any_sync(FullMask, zFirst)) << 4 |
+               uint32_t(__any_sync(FullMask, zLast)) << 5;
+    }
+
+    /// @brief Whether any lane's words differ from @a other's.
+    __device__ bool differsAnywhere(const WarpSlicedMask& other) const
+    {
+        bool differs = false;
+#pragma unroll
+        for (int j = 0; j < WordsPerSlice; ++j) differs |= words[j] != other.words[j];
+        return __any_sync(FullMask, differs);
+    }
+
+private:
+    static constexpr uint64_t NotZ0    = repeatBits(((1ull << Dim) - 1) & ~1ull, Dim); // all but z = 0 of every row
+    static constexpr uint64_t NotZLast = repeatBits((1ull << (Dim - 1)) - 1, Dim);     // all but z = Dim - 1 of every row
+    static constexpr uint64_t ZFirst   = repeatBits(1ull, Dim);                        // z = 0 of every row
+    static constexpr uint64_t ZLast    = repeatBits(1ull << (Dim - 1), Dim);           // z = Dim - 1 of every row
+    static constexpr uint64_t FirstRow = (1ull << Dim) - 1;                            // lowest row of a word
+}; // WarpSlicedMask
+
+// Seeding coarser levels across node faces.
 //
 // Each face of a filled node that has an inside slot seeds the region across that face, if that region is
 // a childless slot of a coarser level: a lower or upper slot, or a root-tile position. Pushing seeds from
@@ -334,25 +398,10 @@ void PropagateSign<BuildT, ResourceT>::fillLeafInteriorMasks()
 // slot can border many finer nodes. One probe per face suffices: nodes are aligned to their size, so the
 // block of the same size across a face lies inside a single slot of every coarser level.
 
-namespace signing::detail {
-
+/// @brief A face of a node. WarpSlicedMask::facesWithBits sets bit f for face f.
 enum Face : int { minusX, plusX, minusY, plusY, minusZ, plusZ, faceCount };
 
-template <int Log2Dim>
-__device__ inline uint32_t faceSlotIndex(Face face, int u, int v)
-{
-    constexpr int LastSlot = (1 << Log2Dim) - 1;
-    switch (face) {
-    case minusX: return (0        << (2 * Log2Dim)) | (u << Log2Dim) | v;
-    case plusX:  return (LastSlot << (2 * Log2Dim)) | (u << Log2Dim) | v;
-    case minusY: return (u        << (2 * Log2Dim)) | (0 << Log2Dim) | v;
-    case plusY:  return (u        << (2 * Log2Dim)) | (LastSlot << Log2Dim) | v;
-    case minusZ: return (u        << (2 * Log2Dim)) | (v << Log2Dim);
-    case plusZ:
-    default:     return (u        << (2 * Log2Dim)) | (v << Log2Dim) | LastSlot;
-    }
-}
-
+/// @brief The coordinate @a distance away from @a origin across @a face.
 __device__ inline nanovdb::Coord faceNeighbor(nanovdb::Coord origin, Face face, int distance)
 {
     switch (face) {
@@ -366,7 +415,9 @@ __device__ inline nanovdb::Coord faceNeighbor(nanovdb::Coord origin, Face face, 
     }
 }
 
+/// @brief Finds the childless element that contains @a ijk, i.e. where the tree stops descending.
 /// @return 0 for a root value tile or leaf, 1 for lower, 2 for upper, and 3 for absent root space.
+///         For 1 and 2, @a nodeID and @a slot say which node and which of its slots.
 template <typename BuildT>
 __hostdev__ inline int probeChildlessSlot(const NanoGrid<BuildT>& grid, const nanovdb::Coord& ijk,
                                           uint64_t& nodeID, uint32_t& slot) //todo: is there any better name for this?
@@ -409,6 +460,10 @@ __hostdev__ inline uint64_t rootTileIndex(const nanovdb::Coord& p, const nanovdb
     return (uint64_t(p[0]) * tileDims[1] + p[1]) * tileDims[2] + p[2];
 }
 
+/// @brief Seeds the region across @a face of the Level node at @a origin, if it is a childless slot of a
+///        coarser level: its bit in @a lowerMasks or @a upperMasks, set atomically since neighboring nodes
+///        may seed the same slot, or its entry of @a rootMask if it is absent root space inside the dense
+///        root-tile array.
 template <typename BuildT, int Level>
 __device__ inline void seedAcrossFace(const NanoGrid<BuildT>& grid, const nanovdb::Coord& origin, Face face,
                                       nanovdb::Mask<4>* lowerMasks, nanovdb::Mask<5>* upperMasks,
@@ -434,186 +489,116 @@ __device__ inline void seedAcrossFace(const NanoGrid<BuildT>& grid, const nanovd
     }
 }
 
-/// @brief For one filled leaf (Level 0), lower (1) or upper (2) node, one block per node, seeds the coarser
-///        childless slot across each face that has an inside slot: a bit of @a lowerMasks or @a upperMasks,
-///        which InternalPropagationFunctor then floods, or an entry of @a rootMask.
+/// @brief Fills one leaf (Level 0), lower (1) or upper (2) node's interior mask in @a masks, one warp per
+///        node, then seeds the childless slots of coarser levels across the node's inside faces.
 template <typename BuildT, int Level>
-struct FaceSeedFunctor
+struct BitFloodFunctor
 {
-    static_assert(Level >= 0 && Level <= 2, "FaceSeedFunctor requires a leaf, lower or upper node");
-
     using NodeT = typename NanoNode<BuildT, Level>::type;
     using MaskT = nanovdb::Mask<NodeT::LOG2DIM>;
-    static constexpr int Log2Dim  = NodeT::LOG2DIM;
-    static constexpr int FaceSize = 1 << (2 * Log2Dim);
-    // A leaf has one thread per face voxel; in a lower or upper node each thread covers several face slots.
-    static constexpr int MaxThreadsPerBlock         = Level == 0 ? faceCount * FaceSize : 512;
+    using SlicedMaskT = WarpSlicedMask<NodeT::LOG2DIM>;
+
+    static constexpr int NodesPerBlock              = 4;
+    static constexpr int MaxThreadsPerBlock         = 32 * NodesPerBlock;
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
-    __device__ void operator()(const NanoGrid<BuildT>* grid, const MaskT* masks,
+    // TODO: Rename signs to signSidecar?
+    __device__ void operator()(const NanoGrid<BuildT>* grid, const int8_t* signs, MaskT* masks, uint32_t nodeCount,
                                nanovdb::Mask<4>* lowerMasks, nanovdb::Mask<5>* upperMasks, uint8_t* rootMask,
                                nanovdb::Coord tileMin, nanovdb::Coord tileDims)
     {
-        const int nodeID = blockIdx.x;
-        const int tID = threadIdx.x;
-        const auto& node = grid->tree().template getFirstNode<Level>()[nodeID];
+        // One warp per node; the block's last warps may have no node, and leave together.
+        const int      lane   = threadIdx.x & 31;
+        const uint32_t nodeID = blockIdx.x * NodesPerBlock + (threadIdx.x >> 5);
+        if (nodeID >= nodeCount) return;
+        const auto& node  = grid->tree().template getFirstNode<Level>()[nodeID];
 
-        __shared__ int faceHasInside[faceCount];
-        if (tID < faceCount) faceHasInside[tID] = 0;
-        __syncthreads();
-
-        for (int i = tID; i < faceCount * FaceSize; i += blockDim.x) {
-            const Face face = static_cast<Face>(i >> (2 * Log2Dim));
-            const int u = (i >> Log2Dim) & ((1 << Log2Dim) - 1);
-            const int v = i & ((1 << Log2Dim) - 1);
-            const uint32_t n = faceSlotIndex<Log2Dim>(face, u, v);
-            if constexpr (Level > 0) {
-                if (node.childMask().isOn(n)) continue;
-            }
-            if (masks[nodeID].isOn(n)) faceHasInside[face] = 1; // all writers store 1
+        // Interior starts as the seeds; open slots are those the interior may spread into.
+        SlicedMaskT interior, open;
+        if constexpr (Level == 0) {
+            // Leaf: seeds are active voxels whose sign is -1; inactive voxels are open.
+            interior = SlicedMaskT::fromSlots([&](uint32_t n) {
+                return node.isActive(n) && signs[node.getValue(n)] == int8_t(-1);
+            });
+            open = ~SlicedMaskT::load(node.valueMask());
+        } else {
+            // Lower/upper: seeds were written into masks by the finer level; childless slots are open.
+            open     = ~SlicedMaskT::load(node.childMask());
+            interior = SlicedMaskT::load(masks[nodeID]) & open;
         }
-        __syncthreads();
 
-        if (tID < faceCount && faceHasInside[tID])
-            seedAcrossFace<BuildT, Level>(*grid, node.origin(), static_cast<Face>(tID),
+        // Each sweep adds the open face neighbors of the previous interior. A sweep that changes nothing
+        // ends the fill; any other sweep adds at least one slot, so SlotCount + 1 sweeps suffice.
+        int sweep = 0;
+        for (; sweep <= SlicedMaskT::SlotCount; ++sweep) {
+            const SlicedMaskT next = interior | (open & interior.faceNeighbors());
+            if (!next.differsAnywhere(interior)) break;
+            interior = next;
+        }
+        NANOVDB_ASSERT(sweep <= SlicedMaskT::SlotCount); // exhausted the backstop: the fill did not converge
+        interior.store(masks[nodeID]);
+
+        const uint32_t faceHasInside = interior.facesWithBits();
+
+        // Lane f seeds across face f if that face has an inside slot.
+        if (lane < faceCount && ((faceHasInside >> lane) & 1u))
+            seedAcrossFace<BuildT, Level>(*grid, node.origin(), Face(lane),
                                           lowerMasks, upperMasks, rootMask, tileMin, tileDims);
     }
-}; // FaceSeedFunctor
+}; // BitFloodFunctor
 
 } // namespace signing::detail
 
 template <typename BuildT, typename ResourceT>
-template <int Level>
-void PropagateSign<BuildT, ResourceT>::emitSeedsToCoarserLevels()
+void PropagateSign<BuildT, ResourceT>::fillLeafAndSeedCoarserLevels()
 {
-    auto launch = [&](const auto& interiorMasks) {
-        if (interiorMasks.size() == 0) return; // a kernel launch with zero blocks is an error
-        using Op = signing::detail::FaceSeedFunctor<BuildT, Level>;
-        util::cuda::operatorKernel<Op><<<unsigned(interiorMasks.size()), Op::MaxThreadsPerBlock, 0, mStream>>>(
-            mDeviceGrid, interiorMasks.data(), mLowerInteriorMasks.data(), mUpperInteriorMasks.data(),
-            mRootMask.data(), mRootTileMin, mRootTileDims);
-        cudaCheckError();
-    };
-    if constexpr (Level == 0)
-        launch(mLeafInteriorMasks);
-    else if constexpr (Level == 1)
-        launch(mLowerInteriorMasks);
-    else
-        launch(mUpperInteriorMasks);
-}// PropagateSign<BuildT, ResourceT>::emitSeedsToCoarserLevels
+    if (mLeafInteriorMasks.size() == 0) return; // a kernel launch with zero blocks is an error
+    using Op = signing::detail::BitFloodFunctor<BuildT, 0>;
+    const uint32_t count = uint32_t(mLeafInteriorMasks.size());
+    util::cuda::operatorKernel<Op>
+        <<<(count + Op::NodesPerBlock - 1) / Op::NodesPerBlock, Op::MaxThreadsPerBlock, 0, mStream>>>(
+        mDeviceGrid, mDeviceSigns, mLeafInteriorMasks.data(), count,
+        mLowerInteriorMasks.data(), mUpperInteriorMasks.data(), mRootMask.data(), mRootTileMin, mRootTileDims);
+    cudaCheckError();
+}// PropagateSign<BuildT, ResourceT>::fillLeafAndSeedCoarserLevels
+
+template <typename BuildT, typename ResourceT>
+void PropagateSign<BuildT, ResourceT>::fillLowerAndSeedCoarserLevels()
+{
+    if (mLowerInteriorMasks.size() == 0) return; // a kernel launch with zero blocks is an error
+    using Op = signing::detail::BitFloodFunctor<BuildT, 1>;
+    const uint32_t count = uint32_t(mLowerInteriorMasks.size());
+    const int8_t*  noSigns = nullptr;
+    util::cuda::operatorKernel<Op>
+        <<<(count + Op::NodesPerBlock - 1) / Op::NodesPerBlock, Op::MaxThreadsPerBlock, 0, mStream>>>(
+        mDeviceGrid, noSigns, mLowerInteriorMasks.data(), count,
+        mLowerInteriorMasks.data(), mUpperInteriorMasks.data(), mRootMask.data(), mRootTileMin, mRootTileDims);
+    cudaCheckError();
+}// PropagateSign<BuildT, ResourceT>::fillLowerAndSeedCoarserLevels
+
+template <typename BuildT, typename ResourceT>
+void PropagateSign<BuildT, ResourceT>::fillUpperAndSeedCoarserLevels()
+{
+    if (mUpperInteriorMasks.size() == 0) return; // a kernel launch with zero blocks is an error
+    using Op = signing::detail::BitFloodFunctor<BuildT, 2>;
+    const uint32_t count = uint32_t(mUpperInteriorMasks.size());
+    const int8_t*  noSigns = nullptr;
+    util::cuda::operatorKernel<Op>
+        <<<(count + Op::NodesPerBlock - 1) / Op::NodesPerBlock, Op::MaxThreadsPerBlock, 0, mStream>>>(
+        mDeviceGrid, noSigns, mUpperInteriorMasks.data(), count,
+        mLowerInteriorMasks.data(), mUpperInteriorMasks.data(), mRootMask.data(), mRootTileMin, mRootTileDims);
+    cudaCheckError();
+}// PropagateSign<BuildT, ResourceT>::fillUpperAndSeedCoarserLevels
 
 //----------------------------------------------------------------------------------------------------------------------
-// Stages 3 and 5: fill each lower or upper node from its seeds.
-//
-// Slots with a child are walls; the seeds set by FaceSeedFunctor spread through the childless slots with
-// sweeps like those of the leaf fill.
 
 namespace signing::detail {
 
-/// @brief Fills one lower (Level 1) or upper (Level 2) node's interior mask in place, one block per node,
-///        from the seeds FaceSeedFunctor set in it.
-template <typename BuildT, int Level>
-struct InternalPropagationFunctor
-{
-    static_assert(Level == 1 || Level == 2, "InternalPropagationFunctor requires a lower or upper node");
-
-    static constexpr int Log2Dim = Level == 1 ? NanoLower<BuildT>::LOG2DIM : NanoUpper<BuildT>::LOG2DIM;
-    static constexpr int Dim     = 1 << Log2Dim;
-    static constexpr int SlotCount = 1 << (3 * Log2Dim);
-    static constexpr int WordCount = SlotCount >> 6;
-    using MaskT = nanovdb::Mask<Log2Dim>;
-
-    static constexpr int MaxThreadsPerBlock         = 512;
-    static constexpr int MinBlocksPerMultiprocessor = 1;
-
-    __device__ void operator()(const NanoGrid<BuildT>* grid, MaskT* masks)
-    {
-        const int nodeID = blockIdx.x;
-        const int tID = threadIdx.x;
-        const auto& node = grid->tree().template getFirstNode<Level>()[nodeID];
-
-        // A __shared__ variable cannot run Mask's zero-filling constructor, so the masks live in
-        // raw shared words that are viewed as MaskT.
-        __shared__ uint64_t wallWords[WordCount];
-        __shared__ uint64_t interiorWords[WordCount];
-        __shared__ int changed;
-        const auto& walls = reinterpret_cast<const MaskT&>(wallWords);
-        auto& interior = reinterpret_cast<MaskT&>(interiorWords);
-
-        for (int word = tID; word < WordCount; word += blockDim.x) {
-            wallWords[word] = node.childMask().words()[word];
-            interiorWords[word] = masks[nodeID].words()[word] & ~wallWords[word];
-        }
-        __syncthreads();
-
-        // Once a bit turns on it is final, so same-sweep reads may only accelerate the flood.
-        // Every sweep but the last turns on at least one of the SlotCount slots, so the bound is a backstop.
-        constexpr int MaxPropagationSweeps = SlotCount + 1;
-
-        int iteration = 0;
-        for (; iteration < MaxPropagationSweeps; ++iteration) {
-            if (tID == 0) changed = 0;
-            __syncthreads();
-
-            bool any = false;
-            for (int n = tID; n < SlotCount; n += blockDim.x) {
-                if (walls.isOn(n) || interior.isOn(n)) continue;
-                const nanovdb::Coord local = node.OffsetToLocalCoord(uint32_t(n));
-                constexpr int dx = 1 << (2 * Log2Dim);
-                constexpr int dy = 1 << Log2Dim;
-                if ((local[0] > 0       && interior.isOn(n - dx)) ||
-                    (local[0] < Dim - 1 && interior.isOn(n + dx)) ||
-                    (local[1] > 0       && interior.isOn(n - dy)) ||
-                    (local[1] < Dim - 1 && interior.isOn(n + dy)) ||
-                    (local[2] > 0       && interior.isOn(n - 1))  ||
-                    (local[2] < Dim - 1 && interior.isOn(n + 1))) {
-                    interior.setOnAtomic(n);
-                    any = true;
-                }
-            }
-            if (any) changed = 1;
-            __syncthreads();
-            const bool done = changed == 0;
-            __syncthreads(); // all threads read changed before the next reset
-            if (done) break;
-        }
-        NANOVDB_ASSERT(iteration < MaxPropagationSweeps); // exhausted the backstop: the fill did not converge
-
-        for (int word = tID; word < WordCount; word += blockDim.x)
-            masks[nodeID].words()[word] = interiorWords[word];
-    }
-}; // InternalPropagationFunctor
-
-} // namespace signing::detail
-
-template <typename BuildT, typename ResourceT>
-void PropagateSign<BuildT, ResourceT>::fillLowerInteriorMasks()
-{
-    if (mLowerInteriorMasks.size() == 0) return; // a kernel launch with zero blocks is an error
-    using Op = signing::detail::InternalPropagationFunctor<BuildT, 1>;
-    util::cuda::operatorKernel<Op><<<unsigned(mLowerInteriorMasks.size()), Op::MaxThreadsPerBlock, 0, mStream>>>(
-        mDeviceGrid, mLowerInteriorMasks.data());
-    cudaCheckError();
-}// PropagateSign<BuildT, ResourceT>::fillLowerInteriorMasks
-
-template <typename BuildT, typename ResourceT>
-void PropagateSign<BuildT, ResourceT>::fillUpperInteriorMasks()
-{
-    if (mUpperInteriorMasks.size() == 0) return; // a kernel launch with zero blocks is an error
-    using Op = signing::detail::InternalPropagationFunctor<BuildT, 2>;
-    util::cuda::operatorKernel<Op><<<unsigned(mUpperInteriorMasks.size()), Op::MaxThreadsPerBlock, 0, mStream>>>(
-        mDeviceGrid, mUpperInteriorMasks.data());
-    cudaCheckError();
-}// PropagateSign<BuildT, ResourceT>::fillUpperInteriorMasks
-
-//----------------------------------------------------------------------------------------------------------------------
-// Stage 7: fill the root-tile positions.
+// Stage 4: fill the root-tile positions.
 //
 // Positions with an upper child are walls; the seeds from upper-node faces spread through the other
 // positions of the dense root-tile array (see PropagateSign::mRootMask). A single block floods the whole
 // array, so this stage is meant for active bounds that span few root tiles.
-
-namespace signing::detail {
 
 /// @brief Marks entry @a n of the dense root-tile array as a wall if an upper node exists at that position.
 template <typename BuildT>
@@ -628,8 +613,8 @@ struct RootWallFunctor
     }
 }; // RootWallFunctor
 
-/// @brief Fills the dense root-tile array in place, in a single block, from the seeds FaceSeedFunctor set
-///        in it, around the walls from RootWallFunctor.
+/// @brief Fills the dense root-tile array in place, in a single block, from the seeds that
+///        BitFloodFunctor<BuildT, 2> set in it, around the walls from RootWallFunctor.
 struct RootPropagationFunctor
 {
     static constexpr int MaxThreadsPerBlock         = 256;
@@ -716,6 +701,8 @@ void PropagateSign<BuildT, ResourceT>::fillRootInteriorMasks()
     cudaCheck(cudaMemcpyAsync(mRootInteriorTileOrigins.data(), origins.data(), mRootInteriorTileOrigins.size_bytes(),
                               cudaMemcpyHostToDevice, mStream));
 }// PropagateSign<BuildT, ResourceT>::fillRootInteriorMasks
+
+//----------------------------------------------------------------------------------------------------------------------
 
 } // namespace tools::cuda
 
