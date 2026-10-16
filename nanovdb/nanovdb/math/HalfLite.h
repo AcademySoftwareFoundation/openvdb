@@ -1,16 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
-
-/*!
-    \file   HalfLite.h
-
-    \author Andrew Reidmeyer
-
-    \date  October 15, 2026
-
-    \brief Extremely portable but not fast Half/Float conversion
-
-*/
+//
+// The functions HalfToFloat and FloatToHalf are derived from Imath's
+// imath_half_to_float / imath_float_to_half (Imath/half.h):
+//   Copyright Contributors to the OpenEXR Project
+//   SPDX-License-Identifier: BSD-3-Clause
+//   Primary original authors: Florian Kainz, Rod Bogart
 
 #ifndef NANOVDB_MATH_HALF_LITE_HAS_BEEN_INCLUDED
 #define NANOVDB_MATH_HALF_LITE_HAS_BEEN_INCLUDED
