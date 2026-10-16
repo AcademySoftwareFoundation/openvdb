@@ -625,6 +625,18 @@ TEST_F(TestFile, testReadClippedInstancedGrid)
             }
         }
     }
+
+    // getGrids() must clip the instance with its own transform too.
+    io::ReadOptions clipOptions;
+    clipOptions.clipBBox = clipBox;
+    GridPtrVecPtr allGrids = vdbfile.getGrids(clipOptions);
+    ASSERT_EQ(2, int(allGrids->size()));
+    for (const GridBase::Ptr& grid : *allGrids) {
+        const CoordBBox gridBBox = grid->evalActiveVoxelBoundingBox();
+        EXPECT_EQ(Coord(0, 0, 0), gridBBox.min()) << grid->getName();
+        const int expectedMax = (grid->getName() == "instance") ? 3 : 5;
+        EXPECT_EQ(Coord(expectedMax), gridBBox.max()) << grid->getName();
+    }
 }
 
 
@@ -997,13 +1009,16 @@ TEST_F(TestFile, testReadGrids)
                 EXPECT_EQ(expectedValues[indexOf(actual)], valueOf(actual)) << name;
             }
 
-            // Grids that shared a tree and have equal transforms share the clipped tree.
+            // Without grid offsets, grids that shared a tree and have equal transforms
+            // share the clipped tree. With offsets, each grid is clipped on its own.
             GridPtrVecPtr clippedPair = file.readGrids("pair", clipOptions);
             ASSERT_EQ(2, int(clippedPair->size()));
-            if (instancing) {
-                EXPECT_EQ((*clippedPair)[0]->baseTreePtr(), (*clippedPair)[1]->baseTreePtr());
-            } else {
-                EXPECT_NE((*clippedPair)[0]->baseTreePtr(), (*clippedPair)[1]->baseTreePtr());
+            if (outputMethod == OUTPUT_TO_STREAM) {
+                if (instancing) {
+                    EXPECT_EQ((*clippedPair)[0]->baseTreePtr(), (*clippedPair)[1]->baseTreePtr());
+                } else {
+                    EXPECT_NE((*clippedPair)[0]->baseTreePtr(), (*clippedPair)[1]->baseTreePtr());
+                }
             }
         }
     }

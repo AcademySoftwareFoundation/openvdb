@@ -86,7 +86,9 @@ public:
     /// Return (in a newly created MetaMap) the file-level metadata.
     MetaMap::Ptr getMetadata() const;
 
-    /// Read the entire contents of the file and return a list of grid pointers.
+    /// @brief Read the entire contents of the file and return a list of grid pointers.
+    /// @details Instances share trees, except when clipping a file that has grid offsets,
+    /// where each grid is clipped independently.
     GridPtrVecPtr getGrids(const io::ReadOptions& readOptions = io::ReadOptions{}) const;
 
     /// @brief Read just the grid metadata and transforms from the file and return a list
@@ -112,7 +114,8 @@ public:
     /// a [N] suffix. For example, the first "density" grid becomes "density[0]", the second
     /// becomes "density[1]", etc. This method ignores the unique name and returns all grids
     /// whose grid name exactly matches the given name.
-    /// Instances share trees as they do with getGrids().
+    /// Instances share trees as they do with getGrids(), except that a clip on a file
+    /// with grid offsets does a clip on each grid independently.
     /// @return An empty list if no grid has this name.
     /// @throw IoError if this file is not open for reading.
     GridPtrVecPtr readGrids(const Name& name, const io::ReadOptions& readOptions = io::ReadOptions{});
@@ -172,7 +175,7 @@ private:
     /// @brief Read the grid for the given descriptor, including its instance parent's tree.
     /// @note This method should not be called for files that don't contain grid offsets.
     /// @throw KeyError if the grid is an instance and its parent is missing.
-    GridBase::Ptr readGridFromDescriptor(const GridDescriptor&, const io::ReadOptions&);
+    GridBase::Ptr readGridFromDescriptor(const GridDescriptor&, const io::ReadOptions&) const;
 
     /// @brief Retrieve a grid from @c mNamedGrids.  Return a null pointer
     /// if @c mNamedGrids was not populated (because this file is random-access).

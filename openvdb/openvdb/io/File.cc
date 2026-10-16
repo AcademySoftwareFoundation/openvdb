@@ -332,6 +332,12 @@ File::getGrids(const io::ReadOptions& readOptions) const
         } else {
             ret = this->resolveCachedGrids(*mGrids, readOptions);
         }
+    } else if (readOptions.clipBBox.isSorted()) {
+        // A clip depends on each grid's own transform, so instances do not share trees.
+        ret.reset(new GridPtrVec);
+        for (NameMapCIter i = mGridDescriptors.begin(), e = mGridDescriptors.end(); i != e; ++i) {
+            ret->push_back(this->readGridFromDescriptor(i->second, readOptions));
+        }
     } else {
         ret.reset(new GridPtrVec);
 
@@ -560,7 +566,7 @@ File::readGrids(const Name& name, const io::ReadOptions& readOptions)
 
 
 GridBase::Ptr
-File::readGridFromDescriptor(const GridDescriptor& gd, const io::ReadOptions& readOptions)
+File::readGridFromDescriptor(const GridDescriptor& gd, const io::ReadOptions& readOptions) const
 {
     // This method should not be called for files that don't contain grid offsets.
     OPENVDB_ASSERT(inputHasGridOffsets());
