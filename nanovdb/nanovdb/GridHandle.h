@@ -167,6 +167,11 @@ public:
         }
     }
 
+    /// @brief Reject anything other than a BufferT rvalue, e.g. a size or a different buffer
+    ///        type that would otherwise implicitly convert to BufferT. Never instantiated,
+    ///        so it emits no symbol.
+    template<typename U> GridHandle(U&&) = delete;
+
     /// @brief Constructs an empty GridHandle
     GridHandle() = default;
 
