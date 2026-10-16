@@ -175,13 +175,7 @@ protected:
 
     nanovdb::io::Codec getCodec() const
     {
-#if defined(NANOVDB_USE_BLOSC)
         return nanovdb::io::Codec::BLOSC;
-#elif defined(NANOVDB_USE_ZIP)
-        return nanovdb::io::Codec::ZIP;
-#else
-        return nanovdb::io::Codec::NONE;
-#endif
     }
 
     openvdb::util::CpuTimer mTimer;

@@ -21,7 +21,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
 /// @brief  Global registration of native Grid, Transform, Metadata and Point
-///   attribute types. Also initializes blosc (if enabled).
+///   attribute types. Also initializes blosc.
 /// @details  Calling this methods registers factory callbacks for the set of
 ///   native grid, transform, metadata and point attribute types that OpenVDB
 ///   supports by default. For most types, calling openvdb::initialize is only
@@ -42,7 +42,8 @@ OPENVDB_API void initialize();
 ///   times.
 /// @warning  This method does *not* uninitialize blosc. This is to avoid
 ///   changing program states should another library also be using blosc. If
-///   blosc is enabled, consider calling blosc_destroy() in your application.
+///   blosc is enabled, consider calling the destroy function of that blosc
+///   in your application.
 OPENVDB_API void uninitialize();
 
 

@@ -6371,13 +6371,7 @@ TEST_F(TestNanoVDB, MultiFile)
         acc.setValue(nanovdb::Coord(6000), 1.0);
         handles.push_back(nanovdb::tools::createNanoGrid(grid));
     }
-#if defined(NANOVDB_USE_BLOSC)
     nanovdb::io::writeGrids<nanovdb::HostBuffer, std::vector>("data/multi1.nvdb", handles, nanovdb::io::Codec::BLOSC);
-#elif defined(NANOVDB_USE_ZIP)
-    nanovdb::io::writeGrids<nanovdb::HostBuffer, std::vector>("data/multi1.nvdb", handles, nanovdb::io::Codec::ZIP);
-#else
-    nanovdb::io::writeGrids<nanovdb::HostBuffer, std::vector>("data/multi1.nvdb", handles, nanovdb::io::Codec::NONE);
-#endif
     { // read grid meta data and test it
         //mTimer.start("nanovdb::io::readGridMetaData");
         auto meta = nanovdb::io::readGridMetaData("data/multi1.nvdb");
@@ -8284,13 +8278,7 @@ TEST_F(TestNanoVDB, mergeSplitGrids)
     EXPECT_TRUE(mergedHandle.empty());
     EXPECT_EQ(6u, handles1.size());
 
-#if defined(NANOVDB_USE_BLOSC)
     nanovdb::io::writeGrids<nanovdb::HostBuffer, std::vector>("data/merge1.nvdb", handles1, nanovdb::io::Codec::BLOSC);
-#elif defined(NANOVDB_USE_ZIP)
-    nanovdb::io::writeGrids<nanovdb::HostBuffer, std::vector>("data/merge1.nvdb", handles1, nanovdb::io::Codec::ZIP);
-#else
-    nanovdb::io::writeGrids<nanovdb::HostBuffer, std::vector>("data/merge1.nvdb", handles1, nanovdb::io::Codec::NONE);
-#endif
     auto meta = nanovdb::io::readGridMetaData("data/merge1.nvdb");
     EXPECT_EQ(10u, meta.size());
     EXPECT_EQ(std::string("sphere_190"), meta.back().gridName);
