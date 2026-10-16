@@ -484,9 +484,9 @@ File::readGrid(const Name& name, const io::ReadOptions& readOptions)
     // If a grid with the given name was already read and cached
     // (along with the entire contents of the file, because the file
     // doesn't support random access), retrieve and return it.
-    GridBase::Ptr cachedGrid = retrieveCachedGrid(name);
+    GridBase::Ptr cachedGrid = this->retrieveCachedGrid(name);
     if (cachedGrid) {
-        return resolveCachedGrid(cachedGrid, readOptions, mReadDiagnostics);
+        return this->resolveCachedGrid(cachedGrid, readOptions, mReadDiagnostics);
     }
 
     NameMapCIter it = findDescriptor(name);
@@ -494,7 +494,7 @@ File::readGrid(const Name& name, const io::ReadOptions& readOptions)
         OPENVDB_THROW(KeyError, mFilename << " has no grid named \"" << name << "\"");
     }
 
-    return readGridFromDescriptor(it->second, readOptions);
+    return this->readGridFromDescriptor(it->second, readOptions);
 }
 
 
@@ -509,7 +509,7 @@ File::readGrids(const Name& name, const io::ReadOptions& readOptions)
 
     const std::pair<NameMapCIter, NameMapCIter> range = mGridDescriptors.equal_range(name);
 
-    if (!inputHasGridOffsets()) {
+    if (!this->inputHasGridOffsets()) {
         // All grids are already cached and connected.
         GridPtrVec cachedGrids;
         for (NameMapCIter it = range.first; it != range.second; ++it) {
@@ -526,15 +526,15 @@ File::readGrids(const Name& name, const io::ReadOptions& readOptions)
     } else if (readOptions.clipBBox.isSorted()) {
         // A clip depends on each grid's own transform, so instances do not share trees.
         for (NameMapCIter it = range.first; it != range.second; ++it) {
-            ret->push_back(readGridFromDescriptor(it->second, readOptions));
+            ret->push_back(this->readGridFromDescriptor(it->second, readOptions));
         }
     } else {
         Archive::NamedGridMap namedGrids;
 
         for (NameMapCIter it = range.first; it != range.second; ++it) {
             const GridDescriptor& gd = it->second;
-            gd.seekToGrid(inputStream());
-            GridBase::Ptr grid = Archive::readGrid(gd, inputStream(), readOptions, mReadDiagnostics);
+            gd.seekToGrid(this->inputStream());
+            GridBase::Ptr grid = Archive::readGrid(gd, this->inputStream(), readOptions, mReadDiagnostics);
             ret->push_back(grid);
             namedGrids[gd.uniqueName()] = grid;
         }
@@ -545,16 +545,16 @@ File::readGrids(const Name& name, const io::ReadOptions& readOptions)
             const GridDescriptor& gd = it->second;
             if (!gd.isInstance() || namedGrids.count(gd.instanceParentName()) > 0) continue;
 
-            const NameMapCIter parentIt = findDescriptorByUniqueName(gd.instanceParentName());
+            const NameMapCIter parentIt = this->findDescriptorByUniqueName(gd.instanceParentName());
             if (parentIt == mGridDescriptors.end()) {
                 OPENVDB_THROW(KeyError, "missing instance parent \""
                     << GridDescriptor::nameAsString(gd.instanceParentName())
                     << "\" for grid " << GridDescriptor::nameAsString(gd.uniqueName())
                     << " in file " << mFilename);
             }
-            parentIt->second.seekToGrid(inputStream());
+            parentIt->second.seekToGrid(this->inputStream());
             namedGrids[gd.instanceParentName()] =
-                Archive::readGrid(parentIt->second, inputStream(), readOptions, mReadDiagnostics);
+                Archive::readGrid(parentIt->second, this->inputStream(), readOptions, mReadDiagnostics);
         }
 
         for (NameMapCIter it = range.first; it != range.second; ++it) {
@@ -569,15 +569,15 @@ GridBase::Ptr
 File::readGridFromDescriptor(const GridDescriptor& gd, const io::ReadOptions& readOptions) const
 {
     // This method should not be called for files that don't contain grid offsets.
-    OPENVDB_ASSERT(inputHasGridOffsets());
+    OPENVDB_ASSERT(this->inputHasGridOffsets());
 
     // Seek to and read in the grid from the file.
-    gd.seekToGrid(inputStream());
-    GridBase::Ptr grid = Archive::readGrid(gd, inputStream(), readOptions, mReadDiagnostics);
+    gd.seekToGrid(this->inputStream());
+    GridBase::Ptr grid = Archive::readGrid(gd, this->inputStream(), readOptions, mReadDiagnostics);
 
     if (gd.isInstance()) {
         /// @todo Refactor to share code with Archive::connectInstance()?
-        NameMapCIter parentIt = findDescriptorByUniqueName(gd.instanceParentName());
+        NameMapCIter parentIt = this->findDescriptorByUniqueName(gd.instanceParentName());
         if (parentIt == mGridDescriptors.end()) {
             OPENVDB_THROW(KeyError, "missing instance parent \""
                 << GridDescriptor::nameAsString(gd.instanceParentName())
@@ -595,9 +595,9 @@ File::readGridFromDescriptor(const GridDescriptor& gd, const io::ReadOptions& re
         parentOptions.clipBBox = BBoxd();
 
         GridBase::Ptr parent;
-        OPENVDB_ASSERT(inputHasGridOffsets());
-        parentIt->second.seekToGrid(inputStream());
-        parent = Archive::readGrid(parentIt->second, inputStream(), parentOptions, mReadDiagnostics);
+        OPENVDB_ASSERT(this->inputHasGridOffsets());
+        parentIt->second.seekToGrid(this->inputStream());
+        parent = Archive::readGrid(parentIt->second, this->inputStream(), parentOptions, mReadDiagnostics);
         if (parent) {
             grid->setTree(parent->baseTreePtr());
             const auto& clipBBox = readOptions.clipBBox;
