@@ -48,7 +48,8 @@ struct StreamHolder<true> { cudaStream_t mStream = 0; };
 /// @tparam R memory resource, either stream-ordered (AsyncResource concept,
 ///         see is_async_resource) or synchronous (Resource concept, see
 ///         is_resource). When @c R provides both interfaces the stream-ordered
-///         one is used.
+///         one is used. A resource without operator== / operator!= is
+///         deprecated; 14.0 requires them.
 /// @details With a stream-ordered resource the Buffer retains the stream of
 ///          the most recent allocation (or the one supplied via set_stream)
 ///          and orders its deallocation on that stream. Buffer is move-only.
@@ -197,7 +198,11 @@ public:
 
     /// @brief D-tor. A stream-ordered resource frees on the retained stream;
     ///        a synchronous resource frees immediately.
-    ~Buffer() { this->destroy(); }
+    ~Buffer()
+    {
+        detail::checkResourceEquality<R>(); // every Buffer<T, R> destructs, whatever allocated it
+        this->destroy();
+    }
 
     /// @brief Returns the retained stream, i.e. the stream the buffer's memory
     ///        will be freed on.
@@ -379,7 +384,6 @@ private:
     ///        stream-ordered form and ignored by the synchronous one
     void allocate(size_t count, cudaStream_t stream)
     {
-        detail::checkResourceEquality<R>();
         if (count) {
             if constexpr (IsAsync)
                 mData = static_cast<T*>(mResource.allocate_async(checkedBytes(count), R::DEFAULT_ALIGNMENT, stream));
