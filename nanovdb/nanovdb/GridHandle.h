@@ -152,8 +152,8 @@ public:
     /// @param buffer buffer containing one or more NanoGrids that will be moved into this GridHandle
     /// @throw Will throw and error with the buffer does not contain a valid NanoGrid!
     /// @note The device variants are implemented in nanovdb/cuda/GridHandle.cuh since they require CUDA.
-    ///       This is deliberately not a template, since the mangled name of a SFINAE constructor differs
-    ///       between clang and g++, which breaks a clang build linked against nvcc with a g++ host compiler.
+    ///       This is deliberately not a template: clang >= 17 mangles the dependent type of a SFINAE
+    ///       template parameter while g++ does not, which breaks a clang build linked against nvcc with a g++ host compiler.
     GridHandle(BufferT&& buffer)
         : mBuffer(std::move(buffer))
     {
