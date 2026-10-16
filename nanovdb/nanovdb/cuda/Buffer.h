@@ -258,11 +258,21 @@ public:
     /// @brief Resizes the buffer to @c count elements on @c stream.
     /// @deprecated Use resize(stream, count), the stream-first order.
     /// @note The count is a template so a call with two literal zeros, which
-    ///       convert equally well to either parameter, is not ambiguous.
+    ///       convert equally well to either parameter, is not ambiguous. It
+    ///       accepts whatever converted to the old size_t parameter, except
+    ///       bool, and rejects a negative count rather than wrapping it.
+    /// @throw std::invalid_argument if @c count is negative
     template<typename CountT, typename S = R,
-             std::enable_if_t<std::is_integral<CountT>::value && is_async_resource<S>::value, int> = 0>
+             std::enable_if_t<std::is_convertible<CountT, size_t>::value && !std::is_same<CountT, bool>::value
+                              && is_async_resource<S>::value, int> = 0>
     [[deprecated("use resize(stream, count), the stream-first order")]]
-    void resize(CountT count, cudaStream_t stream) { this->resize(stream, size_t(count)); }
+    void resize(CountT count, cudaStream_t stream)
+    {
+        if constexpr (std::is_arithmetic<CountT>::value && std::is_signed<CountT>::value) {
+            if (count < 0) throw std::invalid_argument("nanovdb::cuda::Buffer::resize: negative count");
+        }
+        this->resize(stream, static_cast<size_t>(count));
+    }
 
     /// @brief Resizes the buffer to @c count elements through the synchronous
     ///        resource, preserving the leading min(old, new) elements.

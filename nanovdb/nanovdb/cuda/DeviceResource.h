@@ -177,7 +177,8 @@ struct is_resource<R, std::void_t<
     : std::true_type {};
 
 /// @brief Detection trait: @c is_equality_comparable_resource<R>::value is
-///        true iff @c R provides operator== and operator!=, which cuda::mr's
+///        true iff @c R models a resource concept and provides operator== and
+///        operator!=, which cuda::mr's
 ///        resource concepts require: two resources compare equal when memory
 ///        allocated through one may be deallocated through the other.
 template <class R, class = void>
@@ -185,6 +186,7 @@ struct is_equality_comparable_resource : std::false_type {};
 
 template <class R>
 struct is_equality_comparable_resource<R, std::void_t<
+    std::enable_if_t<is_resource<R>::value || is_async_resource<R>::value>,
     decltype(bool(std::declval<const R&>() == std::declval<const R&>())),
     decltype(bool(std::declval<const R&>() != std::declval<const R&>()))>>
     : std::true_type {};

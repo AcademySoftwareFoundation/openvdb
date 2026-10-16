@@ -1,8 +1,9 @@
 NanoVDB:
 
   New Features:
-  - Every built-in CUDA memory resource (DeviceResource, MallocResource, PinnedResource, ManagedResource, and AsyncFromSync<R> when R has it) now provides operator== and operator!=, as CCCL's cuda::mr resource concepts require: instances compare equal when memory allocated through one may be deallocated through the other. The stateless resources always compare equal; AsyncFromSync compares its wrapped resources. ResourceRef now compares the referenced resources when they provide operator==, as cuda::mr::resource_ref does, rather than only their addresses; the new trait nanovdb::cuda::is_equality_comparable_resource detects the operators.
+  - Every built-in CUDA memory resource (DeviceResource, MallocResource, PinnedResource, ManagedResource, and AsyncFromSync<R> when R has it) now provides operator== and operator!=, as CCCL's cuda::mr resource concepts require: instances compare equal when memory allocated through one may be deallocated through the other. The stateless resources always compare equal; AsyncFromSync compares its wrapped resources. The new trait nanovdb::cuda::is_equality_comparable_resource detects the operators.
   - nanovdb::cuda::Buffer::resize(stream, count) resizes a buffer over a stream-ordered resource with the stream first, matching the (stream, resource, count, noInit) constructor and cuda::buffer's constructors.
 
   API Changes:
+  - nanovdb::cuda::ResourceRef<R>::operator== now also compares the referenced resources when R provides operator==, as cuda::mr::resource_ref does; previously it compared only their addresses. Refs to two distinct instances of a stateless resource now compare equal, since memory allocated through either may be deallocated through the other.
   - nanovdb::cuda::Buffer::resize(count, stream) is deprecated in favor of resize(stream, count), and will be removed in 14.0.

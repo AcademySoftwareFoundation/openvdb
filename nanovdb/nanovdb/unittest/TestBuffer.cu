@@ -399,8 +399,10 @@ TEST(TestBuffer, ResourceRefSharesTheUnderlyingResource)
     EXPECT_EQ(res.deallocs, 1);
 }
 
-TEST(TestBuffer, ResourceRefEqualityIsIdentity)
+TEST(TestBuffer, ResourceRefWithoutResourceEqualityFallsBackToIdentity)
 {
+    // StatefulInlineResource has no operator==, so identity is the only way
+    // to know memory from one ref may be freed through another.
     StatefulInlineResource a, b;
     nanovdb::cuda::ResourceRef<StatefulInlineResource> ra(a), raAgain(a), rb(b);
     EXPECT_TRUE(ra == raAgain);   // same underlying resource
@@ -626,6 +628,63 @@ TEST(TestBuffer, BuiltInResourcesCompareEqual)
     using Adapted = nanovdb::cuda::AsyncFromSync<RefT>;
     EXPECT_TRUE((Adapted{RefT(ma)} == Adapted{RefT(mb)}));
 }
+
+/// @brief Stateful resource whose instances are interchangeable only when
+///        they share a pool id, the case where value equality decides.
+struct PoolIdResource : nanovdb::cuda::SyncFromAsync<PoolIdResource>
+{
+    static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
+    int id = 0;
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream) {
+        return nanovdb::cuda::DeviceResource{}.allocate_async(bytes, alignment, stream);
+    }
+    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream) {
+        nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
+    }
+    friend bool operator==(const PoolIdResource& a, const PoolIdResource& b) { return a.id == b.id; }
+    friend bool operator!=(const PoolIdResource& a, const PoolIdResource& b) { return a.id != b.id; }
+};
+
+TEST(TestBuffer, ResourceRefComparesReferencedResources)
+{
+    PoolIdResource p1{{}, 1}, p1Too{{}, 1}, p2{{}, 2};
+    using RefT = nanovdb::cuda::ResourceRef<PoolIdResource>;
+    EXPECT_TRUE(RefT(p1) == RefT(p1Too));   // distinct instances, same pool
+    EXPECT_TRUE(RefT(p1) != RefT(p2));      // different pools
+    EXPECT_FALSE(RefT(p1) == RefT(p2));
+}
+
+static_assert(!nanovdb::cuda::is_equality_comparable_resource<int>::value,
+              "the trait reports only resources");
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+#if defined(__CUDACC__)
+#pragma nv_diagnostic push
+#pragma nv_diag_suppress 1444
+#pragma nv_diag_suppress 20199
+#endif
+TEST(TestBuffer, ResizeDeprecatedOrderRejectsNegativeCount)
+{
+    nanovdb::cuda::Buffer<std::byte> buf(cudaStream_t(0), 8, nanovdb::cuda::noInit);
+    EXPECT_THROW(buf.resize(-1, cudaStream_t(0)), std::invalid_argument);
+    EXPECT_EQ(8u, buf.size()); // untouched
+}
+#if defined(__CUDACC__)
+#pragma nv_diagnostic pop
+#endif
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 //======================================================================
 // Move semantics (Buffer is move-only) and explicit deep copy
