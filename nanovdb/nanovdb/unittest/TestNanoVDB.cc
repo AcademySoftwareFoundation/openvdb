@@ -1351,6 +1351,931 @@ TEST_F(TestNanoVDB, Vec4)
     EXPECT_NE(nanovdb::Vec4f(1, 2, 3, 4), nanovdb::Vec4f(1, 2, 3, 5));
 }// Vec4
 
+// ===========================> Math.h refactor tests <===========================
+// The tests below cover behaviour added/changed by the MatBase/VecBase refactors:
+//   - integer Min/Max precision (no fminf/fmaxf trap)
+//   - math::Round float/double parity at half-integers
+//   - Vec/Mat scalar aliasing, reciprocal division, and mixed-type dot promotion
+//   - Vec2 (no prior test) plus extended Vec3/Vec4 operator coverage
+//   - All five matrix classes' constructors/operators/transpose/inverse
+//   - Cross-shape matrix products (Mat2x3*Mat3x2, Mat3*Mat3x2, Mat4*Mat4, ...)
+//   - Public shape/value introspection on MatBase and VecBase
+
+TEST_F(TestNanoVDB, IntegerMinMax)
+{
+    // 2^24 + 1 cannot be represented exactly as float; the old fminf-based
+    // overload would round both inputs to the same float and return a value
+    // that is neither of the inputs.
+    const int32_t a32 = 16777217; // 2^24 + 1
+    const int32_t b32 = 16777218; // 2^24 + 2
+    EXPECT_EQ(a32, nanovdb::math::Min(a32, b32));
+    EXPECT_EQ(b32, nanovdb::math::Max(a32, b32));
+
+    // INT32_MAX through float can round up to 2^31 and convert back to INT_MIN
+    // (UB on x86). The ternary path returns the correct value.
+    const int32_t hi = (std::numeric_limits<int32_t>::max)();
+    EXPECT_EQ(hi, nanovdb::math::Max(hi, 0));
+    EXPECT_EQ(0,  nanovdb::math::Min(hi, 0));
+
+    // Same risk on the unsigned side: float(UINT_MAX) rounds to 2^32.
+    const uint32_t uhi = (std::numeric_limits<uint32_t>::max)();
+    EXPECT_EQ(uhi, nanovdb::math::Max(uhi, 0u));
+    EXPECT_EQ(0u,  nanovdb::math::Min(uhi, 0u));
+
+    // Sanity: float/double overloads still work.
+    EXPECT_EQ(1.0f, nanovdb::math::Min(1.0f, 2.0f));
+    EXPECT_EQ(2.0,  nanovdb::math::Max(1.0, 2.0));
+}// IntegerMinMax
+
+TEST_F(TestNanoVDB, Round)
+{
+    // Float and double round to the nearest integer with halfway cases toward
+    // +inf, so they agree at ties: -1.5 -> -1, -0.5 -> 0, 1.5 -> 2.
+    nanovdb::Vec3f vf(-1.5f, -0.5f, 1.5f);
+    nanovdb::Vec3d vd(-1.5,  -0.5,  1.5);
+
+    const auto rf = nanovdb::math::Round<nanovdb::Coord>(vf);
+    const auto rd = nanovdb::math::Round<nanovdb::Coord>(vd);
+
+    EXPECT_EQ(rf[0], rd[0]);
+    EXPECT_EQ(rf[1], rd[1]);
+    EXPECT_EQ(rf[2], rd[2]);
+
+    EXPECT_EQ(-1, rf[0]);
+    EXPECT_EQ( 0, rf[1]);
+    EXPECT_EQ( 2, rf[2]);
+    EXPECT_EQ(nanovdb::Coord(-1, 0, 2), vf.round());
+    EXPECT_EQ(nanovdb::Coord(-1, 0, 2), vd.round());
+
+    // Rounding must be exact. floor(x + 0.5) rounds the sum first, which moves
+    // the float just below 0.5 up to 1 and the odd integer 2^23 + 1 up to 2^23 + 2.
+    using nanovdb::math::Round;
+    const float  belowHalfF = std::nextafter(0.5f, 0.0f);
+    const double belowHalfD = std::nextafter(0.5, 0.0);
+    EXPECT_EQ(0, Round(belowHalfF));
+    EXPECT_EQ(0, Round(belowHalfD));
+    EXPECT_EQ(0, Round(-belowHalfF));
+    EXPECT_EQ(8388609,  Round(8388609.0f));
+    EXPECT_EQ(-8388609, Round(-8388609.0f));
+    EXPECT_EQ(nanovdb::Coord(0, 8388609, -8388609),
+              nanovdb::Vec3f(belowHalfF, 8388609.0f, -8388609.0f).round());
+    EXPECT_EQ(nanovdb::Coord(0, 8388609, -8388609),
+              nanovdb::math::Round<nanovdb::Coord>(nanovdb::Vec3f(belowHalfF, 8388609.0f, -8388609.0f)));
+    EXPECT_EQ(nanovdb::math::Coord2(0, 8388609), nanovdb::math::Vec2<float>(belowHalfF, 8388609.0f).round());
+
+    // Float and double agree on every float input, including values next to ties.
+    for (float x : {-2.5f, -1.5f, -0.5f, 0.5f, 1.5f, 2.5f, 4194304.5f}) {
+        for (float y : {std::nextafter(x, -1e9f), x, std::nextafter(x, 1e9f)}) {
+            EXPECT_EQ(Round(double(y)), Round(y)) << "x = " << y;
+        }
+    }
+}// Round
+
+TEST_F(TestNanoVDB, VecMatScalarAliasing)
+{
+    using namespace nanovdb::math;
+
+    // The scalar operand may alias an element of the vector or matrix being
+    // updated; every element must use the original scalar value.
+    Vec2<float> v2(2, 4);        v2 /= v2[0]; EXPECT_EQ(Vec2<float>(1, 2), v2);
+    Vec3<float> v3(2, 4, 6);     v3 /= v3[0]; EXPECT_EQ(Vec3<float>(1, 2, 3), v3);
+    Vec4<float> v4(2, 4, 6, 8);  v4 /= v4[0]; EXPECT_EQ(Vec4<float>(1, 2, 3, 4), v4);
+    Vec3<int>   v3i(2, 4, 6);    v3i /= v3i[0]; EXPECT_EQ(Vec3<int>(1, 2, 3), v3i);
+    Vec3<float> s3(2, 3, 4);     s3 *= s3[0]; EXPECT_EQ(Vec3<float>(4, 6, 8), s3);
+
+    Mat2<float> m2(2, 4, 6, 8);  m2 /= m2[0][0]; EXPECT_EQ(Mat2<float>(1, 2, 3, 4), m2);
+    Mat2<int>   m2i(2, 4, 6, 8); m2i /= m2i[0][0]; EXPECT_EQ(Mat2<int>(1, 2, 3, 4), m2i);
+    Mat2<float> s2(2, 3, 4, 5);  s2 *= s2[0][0]; EXPECT_EQ(Mat2<float>(4, 6, 8, 10), s2);
+}// VecMatScalarAliasing
+
+TEST_F(TestNanoVDB, VecMatScalarDivision)
+{
+    using namespace nanovdb::math;
+
+    // Floating-point division multiplies by the reciprocal, matching v * (1/s).
+    const Vec3<float> v(3, 7, 9);
+    const float s = 10.0f;
+    EXPECT_EQ(v * (1.0f / s), v / s);
+    Vec3<float> acc = v; acc /= s;
+    EXPECT_EQ(v * (1.0f / s), acc);
+
+    const Mat2<double> m(3, 7, 9, 11);
+    const double sd = 10.0;
+    EXPECT_EQ(m * (1.0 / sd), m / sd);
+
+    // Integer division stays per-element.
+    EXPECT_EQ(Vec3<int>(3, 4, 5), Vec3<int>(6, 8, 10) / 2);
+    EXPECT_EQ(Mat2<int>(3, 4, 5, 6), Mat2<int>(6, 8, 10, 12) / 2);
+}// VecMatScalarDivision
+
+TEST_F(TestNanoVDB, VecDotPromotion)
+{
+    using namespace nanovdb::math;
+
+    // Mixed-type dot products accumulate in the promoted type and convert once.
+    // Truncating each partial sum to int would give 0 here instead of 1.
+    EXPECT_EQ(1, Vec2<int>(1, 1).dot(Vec2<double>(0.6, 0.6)));
+    EXPECT_EQ(1, Vec3<int>(1, 1, 1).dot(Vec3<double>(0.4, 0.4, 0.4)));
+    EXPECT_EQ(1, Vec4<int>(1, 1, 1, 1).dot(Vec4<double>(0.3, 0.3, 0.3, 0.3)));
+
+    // A float receiver keeps double precision in the partial sums: 1 + 1e-9
+    // rounds to 1 in float, which would cancel to 0 after adding -1.
+    const float d = Vec3<float>(1, 1, 1).dot(Vec3<double>(1.0, 1e-9, -1.0));
+    EXPECT_FLOAT_EQ(float((1.0 + 1e-9) - 1.0), d);
+}// VecDotPromotion
+
+namespace {
+// Each overload must sum right-to-left so the two large terms cancel before
+// the small one is added: 1 + (big + -big) == 1. Summing left-to-right loses
+// the 1 because big is far above the ulp of 1.
+template<typename T>
+void testMatMultCancellation(T big)
+{
+    using namespace nanovdb::math;
+    const Vec3<T> xyz(1, big, -big);
+    const T zero[3] = {0, 0, 0};
+    const T rows[9] = {1, 1, 1,  0, 1, 0,  0, 0, 1}; // row 0 is all ones
+    const T cols[9] = {1, 0, 0,  1, 1, 0,  1, 0, 1}; // column 0 is all ones
+    EXPECT_EQ(T(1), matMult(rows, xyz)[0]);
+    EXPECT_EQ(T(1), matMult(rows, zero, xyz)[0]);
+    EXPECT_EQ(T(1), matMultT(cols, xyz)[0]);
+    EXPECT_EQ(T(1), matMultT(cols, zero, xyz)[0]);
+}
+}// anonymous namespace
+
+TEST_F(TestNanoVDB, MatMultAssociation)
+{
+    testMatMultCancellation<float>(1e8f);
+    testMatMultCancellation<double>(1e17);
+
+    // The overloads stay usable in constant expressions.
+    constexpr float m[9] = {1, 1, 1,  0, 1, 0,  0, 0, 1};
+    constexpr float t[3] = {1, 2, 3};
+    static_assert(nanovdb::math::matMult(m, t, nanovdb::math::Vec3<float>(1, 2, 3))
+                  == nanovdb::math::Vec3<float>(7, 4, 6), "");
+}// MatMultAssociation
+
+namespace {
+// Downstream code derives from the Vec/Mat classes, e.g. fvdb-core's
+// over-aligned wrappers for vectorized loads, so they must stay non-final.
+template<typename T>
+struct alignas(4 * sizeof(T)) DerivedVec4 : nanovdb::math::Vec4<T>
+{
+    using Base = nanovdb::math::Vec4<T>;
+    DerivedVec4() : Base(T(0), T(0), T(0), T(0)) {}
+    DerivedVec4(const Base& b) : Base(b) {}
+};
+struct DerivedVec2 : nanovdb::math::Vec2<float> { using Vec2::Vec2; };
+struct DerivedVec3 : nanovdb::math::Vec3<float> { using Vec3::Vec3; };
+struct DerivedMat2 : nanovdb::math::Mat2<float> { using Mat2::Mat2; };
+struct DerivedMat4 : nanovdb::math::Mat4<float> { using Mat4::Mat4; };
+}// anonymous namespace
+
+TEST_F(TestNanoVDB, VecMatDerivation)
+{
+    static_assert(alignof(DerivedVec4<float>) == 16, "");
+    static_assert(std::is_standard_layout<DerivedVec4<float>>::value, "");
+    static_assert(std::is_trivially_copyable<DerivedVec4<float>>::value, "");
+    static_assert(std::is_standard_layout<DerivedMat4>::value, "");
+
+    const DerivedVec4<float> v(nanovdb::math::Vec4<float>(1, 2, 3, 4));
+    EXPECT_EQ(nanovdb::math::Vec4<float>(2, 4, 6, 8), v + v);
+    EXPECT_EQ(nanovdb::math::Vec2<float>(3, 4), DerivedVec2(1, 2) + DerivedVec2(2, 2));
+    EXPECT_EQ(14.0f, DerivedVec3(1, 2, 3).dot(DerivedVec3(1, 2, 3)));
+    EXPECT_EQ(nanovdb::math::Mat2<float>(7, 10, 15, 22), DerivedMat2(1, 2, 3, 4) * DerivedMat2(1, 2, 3, 4));
+}// VecMatDerivation
+
+namespace {
+// Node field offsets are part of the file format and must match PNanoVDB's table.
+// Node value arrays also start on a 32-byte boundary.
+template<typename BuildT>
+void testNodeLayout()
+{
+    using RootT  = typename nanovdb::NanoRoot<BuildT>::DataType;
+    using TileT  = typename RootT::Tile;
+    using UpperT = typename nanovdb::NanoUpper<BuildT>::DataType;
+    using LowerT = typename nanovdb::NanoLower<BuildT>::DataType;
+    using LeafT  = typename nanovdb::NanoLeaf<BuildT>::DataType;
+    static_assert(offsetof(UpperT, mTable) % 32 == 0, "");
+    static_assert(offsetof(LowerT, mTable) % 32 == 0, "");
+    static_assert(offsetof(LeafT, mValues) % 32 == 0, "");
+    static_assert(sizeof(LeafT) % 32 == 0, "");
+
+    const pnanovdb_grid_type_constants_t& c = pnanovdb_grid_type_constants[uint32_t(nanovdb::toGridType<BuildT>())];
+    SCOPED_TRACE("grid type " + std::to_string(uint32_t(nanovdb::toGridType<BuildT>())));
+    EXPECT_EQ(c.root_off_background, offsetof(RootT, mBackground));
+    EXPECT_EQ(c.root_off_min,        offsetof(RootT, mMinimum));
+    EXPECT_EQ(c.root_off_max,        offsetof(RootT, mMaximum));
+    EXPECT_EQ(c.root_off_ave,        offsetof(RootT, mAverage));
+    EXPECT_EQ(c.root_off_stddev,     offsetof(RootT, mStdDevi));
+    EXPECT_EQ(c.root_size,           sizeof(RootT));
+    EXPECT_EQ(c.root_tile_off_value, offsetof(TileT, value));
+    EXPECT_EQ(c.root_tile_size,      sizeof(TileT));
+    EXPECT_EQ(c.upper_off_min,       offsetof(UpperT, mMinimum));
+    EXPECT_EQ(c.upper_off_max,       offsetof(UpperT, mMaximum));
+    EXPECT_EQ(c.upper_off_ave,       offsetof(UpperT, mAverage));
+    EXPECT_EQ(c.upper_off_stddev,    offsetof(UpperT, mStdDevi));
+    EXPECT_EQ(c.upper_off_table,     offsetof(UpperT, mTable));
+    EXPECT_EQ(c.upper_size,          sizeof(UpperT));
+    EXPECT_EQ(c.lower_off_min,       offsetof(LowerT, mMinimum));
+    EXPECT_EQ(c.lower_off_max,       offsetof(LowerT, mMaximum));
+    EXPECT_EQ(c.lower_off_ave,       offsetof(LowerT, mAverage));
+    EXPECT_EQ(c.lower_off_stddev,    offsetof(LowerT, mStdDevi));
+    EXPECT_EQ(c.lower_off_table,     offsetof(LowerT, mTable));
+    EXPECT_EQ(c.lower_size,          sizeof(LowerT));
+    EXPECT_EQ(c.leaf_off_min,        offsetof(LeafT, mMinimum));
+    EXPECT_EQ(c.leaf_off_max,        offsetof(LeafT, mMaximum));
+    EXPECT_EQ(c.leaf_off_ave,        offsetof(LeafT, mAverage));
+    EXPECT_EQ(c.leaf_off_stddev,     offsetof(LeafT, mStdDevi));
+    EXPECT_EQ(c.leaf_off_table,      offsetof(LeafT, mValues));
+    EXPECT_EQ(c.leaf_size,           sizeof(LeafT));
+}
+}// anonymous namespace
+
+TEST_F(TestNanoVDB, NodeLayout)
+{
+    testNodeLayout<float>();
+    testNodeLayout<double>();
+    testNodeLayout<int32_t>();
+    testNodeLayout<int64_t>();
+    testNodeLayout<uint32_t>();
+    testNodeLayout<nanovdb::Vec3f>();
+    testNodeLayout<nanovdb::Vec3d>();
+    testNodeLayout<nanovdb::Vec4f>();
+    testNodeLayout<nanovdb::Vec4d>();
+
+    // Vec4 keeps its natural alignment, so its grid layout is unchanged.
+    static_assert(alignof(nanovdb::Vec4f) == alignof(float), "");
+    static_assert(alignof(nanovdb::Vec4d) == alignof(double), "");
+    static_assert(alignof(nanovdb::math::Vec2<float>) == alignof(float), "");
+    static_assert(alignof(nanovdb::math::Mat2<float>) == alignof(float), "");
+    static_assert(alignof(nanovdb::math::Mat4<float>) == alignof(float), "");
+}// NodeLayout
+
+TEST_F(TestNanoVDB, VecAlignedTypes)
+{
+    using namespace nanovdb::math;
+    static_assert(sizeof(Vec2Aligned<float>)  == 8  && alignof(Vec2Aligned<float>)  == 8,  "");
+    static_assert(sizeof(Vec2Aligned<double>) == 16 && alignof(Vec2Aligned<double>) == 16, "");
+    static_assert(sizeof(Vec3Aligned<float>)  == 16 && alignof(Vec3Aligned<float>)  == 16, "");
+    static_assert(sizeof(Vec3Aligned<double>) == 32 && alignof(Vec3Aligned<double>) == 32, "");
+    static_assert(sizeof(Vec4Aligned<float>)  == 16 && alignof(Vec4Aligned<float>)  == 16, "");
+    static_assert(sizeof(Vec4Aligned<double>) == 32 && alignof(Vec4Aligned<double>) == 32, "");
+    static_assert(std::is_standard_layout<Vec3Aligned<float>>::value, "");
+    static_assert(std::is_trivially_copyable<Vec3Aligned<float>>::value, "");
+    static_assert(std::is_trivially_copyable<Vec4Aligned<double>>::value, "");
+
+    Vec3Aligned<float> a(1, 2, 3);
+    Vec3Aligned<float> b = a + Vec3<float>(1, 1, 1); // Vec operators return the plain Vec
+    EXPECT_EQ(Vec3<float>(2, 3, 4), b);
+    Vec4Aligned<double> arr[2] = {Vec4<double>(1, 2, 3, 4), Vec4<double>(5, 6, 7, 8)};
+    EXPECT_EQ(0u, reinterpret_cast<uintptr_t>(&arr[1]) % 32u);
+    EXPECT_EQ(70.0, arr[0].dot(arr[1]));
+    EXPECT_EQ(Vec2<float>(0.6f, 0.8f), Vec2Aligned<float>(3, 4).normalized());
+}// VecAlignedTypes
+
+TEST_F(TestNanoVDB, Vec2)
+{
+    using Vec2d  = nanovdb::math::Vec2<double>;
+    using Vec2i  = nanovdb::math::Vec2<int>;
+    using Coord2 = nanovdb::math::Coord2;
+
+    static_assert(Vec2d::SIZE == 2, "");
+    static_assert(Vec2d::size == 2, ""); // openvdb::math::Tuple-compat alias
+    bool tt = nanovdb::util::is_same<double, Vec2d::ValueType>::value;
+    EXPECT_TRUE(tt);
+
+    Vec2d a(1.0, 2.0);
+    EXPECT_EQ(1.0, a[0]);
+    EXPECT_EQ(2.0, a[1]);
+
+    // construction from single scalar
+    EXPECT_EQ(Vec2d(5.0, 5.0), Vec2d(5.0));
+
+    // copy from Coord2
+    Coord2 c(3, 4);
+    Vec2d  fromC(c);
+    EXPECT_EQ(3.0, fromC[0]);
+    EXPECT_EQ(4.0, fromC[1]);
+
+    // equality
+    EXPECT_EQ(Vec2d(1, 2), Vec2d(1, 2));
+    EXPECT_NE(Vec2d(1, 2), Vec2d(1, 3));
+
+    // arithmetic
+    Vec2d b(3.0, 4.0);
+    EXPECT_EQ(Vec2d(4, 6),     a + b);
+    EXPECT_EQ(Vec2d(-2, -2),   a - b);
+    EXPECT_EQ(Vec2d(3, 8),     a * b);
+    EXPECT_EQ(Vec2d(2, 2),     b / Vec2d(1.5, 2.0));
+    EXPECT_EQ(Vec2d(-1, -2),   -a);
+    EXPECT_EQ(Vec2d(2, 4),     a * 2.0);
+    EXPECT_EQ(Vec2d(0.5, 1.0), a / 2.0);
+
+    Vec2d acc = a; acc += b;       EXPECT_EQ(Vec2d(4, 6), acc);
+    acc = a; acc -= b;             EXPECT_EQ(Vec2d(-2, -2), acc);
+    acc = a; acc *= 3.0;           EXPECT_EQ(Vec2d(3, 6), acc);
+    acc = Vec2d(8, 4); acc /= 2.0; EXPECT_EQ(Vec2d(4, 2), acc);
+
+    // mixed Vec2 / Coord2 (these used to take a 3D Coord -- bug #2)
+    EXPECT_EQ(Vec2d(4, 6),  a + c);
+    EXPECT_EQ(Vec2d(-2, -2), a - c);
+    acc = a; acc += c; EXPECT_EQ(Vec2d(4, 6), acc);
+    acc = a; acc -= c; EXPECT_EQ(Vec2d(-2, -2), acc);
+
+    // scalar*Vec free function
+    EXPECT_EQ(Vec2d(2, 4), 2.0 * a);
+
+    // dot/length
+    EXPECT_EQ(1.0 + 4.0,         a.lengthSqr());
+    EXPECT_EQ(std::sqrt(5.0),    a.length());
+    EXPECT_EQ(1.0*3.0 + 2.0*4.0, a.dot(b));
+
+    // normalized() — const, non-mutating, unit length
+    const Vec2d e(3, 4);
+    EXPECT_NEAR(1.0, e.normalized().length(), 1e-12);
+    EXPECT_EQ(Vec2d(3, 4), e);// source unchanged
+
+    // min/max scalar reductions
+    EXPECT_EQ(1.0, a.min());
+    EXPECT_EQ(2.0, a.max());
+
+    // minComponent / maxComponent (mutating)
+    Vec2d p(5.0, 1.0);
+    Vec2d q(2.0, 7.0);
+    Vec2d mn = p; mn.minComponent(q); EXPECT_EQ(Vec2d(2, 1), mn);
+    Vec2d mx = p; mx.maxComponent(q); EXPECT_EQ(Vec2d(5, 7), mx);
+
+    // floor / ceil / round
+    Vec2d r(-0.5, 1.5);
+    EXPECT_EQ(Coord2(-1, 1), r.floor());
+    EXPECT_EQ(Coord2( 0, 2), r.ceil());
+    // floor(x + 0.5): -0.5 -> 0, 1.5 -> 2
+    EXPECT_EQ(Coord2( 0, 2), r.round());
+
+    // asPointer
+    Vec2d u(7.0, 9.0);
+    EXPECT_EQ(7.0, u.asPointer()[0]);
+    EXPECT_EQ(9.0, u.asPointer()[1]);
+
+    // integer-T division must be per-element (not 1/s, which would give 0)
+    Vec2i vi(6, 8);
+    EXPECT_EQ(Vec2i(3, 4), vi / 2);
+    Vec2i vid = vi; vid /= 2;
+    EXPECT_EQ(Vec2i(3, 4), vid);
+}// Vec2
+
+TEST_F(TestNanoVDB, Vec3Ops)
+{
+    using Vec3d = nanovdb::math::Vec3<double>;
+    using Vec3i = nanovdb::math::Vec3<int>;
+
+    Vec3d a(1.0, 2.0, 3.0);
+    Vec3d b(4.0, 5.0, 6.0);
+
+    EXPECT_EQ(Vec3d(5,7,9),  a + b);
+    EXPECT_EQ(Vec3d(3,3,3),  b - a);
+    EXPECT_EQ(Vec3d(4,10,18), a * b);
+    EXPECT_EQ(Vec3d(2,1,1),  b / Vec3d(2.0, 5.0, 6.0));
+    EXPECT_EQ(Vec3d(-1,-2,-3), -a);
+    EXPECT_EQ(Vec3d(2,4,6),  a * 2.0);
+    EXPECT_EQ(Vec3d(0.5,1,1.5), a / 2.0);
+    EXPECT_EQ(Vec3d(2,4,6),  2.0 * a);
+
+    Vec3d acc = a; acc += b; EXPECT_EQ(Vec3d(5,7,9), acc);
+    acc = b; acc -= a;       EXPECT_EQ(Vec3d(3,3,3), acc);
+    acc = a; acc *= 2.0;     EXPECT_EQ(Vec3d(2,4,6), acc);
+    acc = Vec3d(8,4,2); acc /= 2.0; EXPECT_EQ(Vec3d(4,2,1), acc);
+
+    EXPECT_EQ(1.0*4 + 2*5 + 3*6, a.dot(b));
+
+    // cross and outer (3D-only)
+    Vec3d ex(1,0,0), ey(0,1,0);
+    EXPECT_EQ(Vec3d(0,0,1), ex.cross(ey));
+    auto M = ex.outer(ey);
+    EXPECT_EQ(0.0, M[0][0]);
+    EXPECT_EQ(1.0, M[0][1]);
+    EXPECT_EQ(0.0, M[2][2]);
+
+    // min/max scalar reductions
+    Vec3d p(3, 1, 4);
+    EXPECT_EQ(1.0, p.min());
+    EXPECT_EQ(4.0, p.max());
+
+    // minComponent / maxComponent
+    Vec3d q(2, 7, 1);
+    Vec3d mn = p; mn.minComponent(q); EXPECT_EQ(Vec3d(2,1,1), mn);
+    Vec3d mx = p; mx.maxComponent(q); EXPECT_EQ(Vec3d(3,7,4), mx);
+
+    // floor / ceil
+    Vec3d r(-1.4, 2.7, 3.0);
+    EXPECT_EQ(nanovdb::Coord(-2, 2, 3), r.floor());
+    EXPECT_EQ(nanovdb::Coord(-1, 3, 3), r.ceil());
+    // floor(x + 0.5)
+    Vec3d s(-1.5, -0.5, 1.5);
+    EXPECT_EQ(nanovdb::Coord(-1, 0, 2), s.round());
+
+    // mixed Vec3/Coord (3D Coord is correct here)
+    nanovdb::Coord ijk(1, 2, 3);
+    EXPECT_EQ(Vec3d(2, 4, 6), a + ijk);
+    EXPECT_EQ(Vec3d(0, 0, 0), a - ijk);
+    Vec3d acc2 = a; acc2 += ijk; EXPECT_EQ(Vec3d(2, 4, 6), acc2);
+    acc2 = a; acc2 -= ijk;       EXPECT_EQ(Vec3d(0, 0, 0), acc2);
+
+    // asPointer
+    const double* dp = a.asPointer();
+    EXPECT_EQ(1.0, dp[0]);
+    EXPECT_EQ(3.0, dp[2]);
+
+    // integer-T division per-element
+    Vec3i vi(6, 8, 10);
+    EXPECT_EQ(Vec3i(3, 4, 5), vi / 2);
+
+    // normalize
+    Vec3d n(3, 0, 4);
+    n.normalize();
+    EXPECT_NEAR(1.0, n.length(), 1e-12);
+
+    // normalized() — const, non-mutating counterpart; callable on a const vector
+    const Vec3d c(3, 0, 4);
+    const Vec3d u = c.normalized();
+    EXPECT_NEAR(1.0, u.length(), 1e-12);
+    EXPECT_NEAR(0.6, u[0], 1e-12);
+    EXPECT_NEAR(0.0, u[1], 1e-12);
+    EXPECT_NEAR(0.8, u[2], 1e-12);
+    EXPECT_EQ(Vec3d(3, 0, 4), c);// source unchanged
+}// Vec3Ops
+
+TEST_F(TestNanoVDB, Vec4Ops)
+{
+    using Vec4d = nanovdb::math::Vec4<double>;
+    using Vec4i = nanovdb::math::Vec4<int>;
+
+    Vec4d a(1, 2, 3, 4);
+    Vec4d b(4, 5, 6, 7);
+
+    EXPECT_EQ(Vec4d(5,7,9,11),  a + b);
+    EXPECT_EQ(Vec4d(3,3,3,3),   b - a);
+    EXPECT_EQ(Vec4d(4,10,18,28), a * b);
+    EXPECT_EQ(Vec4d(-1,-2,-3,-4), -a);
+    EXPECT_EQ(Vec4d(2,4,6,8),    a * 2.0);
+    EXPECT_EQ(Vec4d(0.5,1,1.5,2), a / 2.0);
+    EXPECT_EQ(Vec4d(2,4,6,8),    2.0 * a);
+
+    Vec4d acc = a; acc += b; EXPECT_EQ(Vec4d(5,7,9,11), acc);
+    acc = b; acc -= a;       EXPECT_EQ(Vec4d(3,3,3,3),  acc);
+    acc = a; acc *= 2.0;     EXPECT_EQ(Vec4d(2,4,6,8),  acc);
+    acc = Vec4d(8,4,2,1); acc /= 2.0; EXPECT_EQ(Vec4d(4,2,1,0.5), acc);
+
+    // ---- Vec4 API gaps that the refactor closed ----
+
+    // min / max scalar reductions (Vec4 did not have these before)
+    Vec4d p(3, 1, 4, 1);
+    EXPECT_EQ(1.0, p.min());
+    EXPECT_EQ(4.0, p.max());
+
+    // asPointer (was missing on Vec4)
+    const double* dp = a.asPointer();
+    EXPECT_EQ(1.0, dp[0]);
+    EXPECT_EQ(4.0, dp[3]);
+
+    // floor / ceil / round (was missing on Vec4) -> Vec4<int32_t>
+    Vec4d r(-1.4, 2.7, 3.0, 0.5);
+    EXPECT_EQ(nanovdb::math::Vec4<int32_t>(-2, 2, 3, 0), r.floor());
+    EXPECT_EQ(nanovdb::math::Vec4<int32_t>(-1, 3, 3, 1), r.ceil());
+    // floor(x + 0.5)
+    EXPECT_EQ(nanovdb::math::Vec4<int32_t>(-1, 3, 3, 1), r.round());
+
+    // integer-T per-element division
+    Vec4i vi(6, 8, 10, 12);
+    EXPECT_EQ(Vec4i(3, 4, 5, 6), vi / 2);
+
+    // normalize
+    Vec4d n(1, 0, 0, 0);
+    n.normalize();
+    EXPECT_NEAR(1.0, n.length(), 1e-12);
+
+    // normalized() — const, non-mutating counterpart; callable on a const vector
+    const Vec4d c(0, 3, 0, 4);
+    const Vec4d u = c.normalized();
+    EXPECT_NEAR(1.0, u.length(), 1e-12);
+    EXPECT_EQ(Vec4d(0, 3, 0, 4), c);// source unchanged
+}// Vec4Ops
+
+TEST_F(TestNanoVDB, Mat2)
+{
+    using Mat2d = nanovdb::math::Mat2<double>;
+
+    EXPECT_EQ(2, Mat2d::rows());
+    EXPECT_EQ(2, Mat2d::cols());
+    EXPECT_EQ(4, Mat2d::size());
+
+    Mat2d a(1, 2,
+            3, 4);
+    EXPECT_EQ(1.0, a[0][0]); EXPECT_EQ(2.0, a[0][1]);
+    EXPECT_EQ(3.0, a[1][0]); EXPECT_EQ(4.0, a[1][1]);
+
+    // negation, transpose, equality
+    Mat2d neg = -a;
+    EXPECT_EQ(-1.0, neg[0][0]);
+    EXPECT_EQ(-4.0, neg[1][1]);
+
+    Mat2d t = a.transpose();
+    EXPECT_EQ(1.0, t[0][0]); EXPECT_EQ(3.0, t[0][1]);
+    EXPECT_EQ(2.0, t[1][0]); EXPECT_EQ(4.0, t[1][1]);
+
+    EXPECT_TRUE (a == Mat2d(1, 2, 3, 4));
+    EXPECT_FALSE(a == Mat2d(1, 2, 3, 5));
+    EXPECT_TRUE (a != Mat2d(0, 0, 0, 0));
+
+    // arithmetic
+    Mat2d b(5, 6, 7, 8);
+    Mat2d sum = a + b;  EXPECT_EQ(Mat2d(6, 8, 10, 12), sum);
+    Mat2d dif = b - a;  EXPECT_EQ(Mat2d(4, 4, 4, 4),  dif);
+    Mat2d ac = a; ac += b; EXPECT_EQ(Mat2d(6, 8, 10, 12), ac);
+    ac = b; ac -= a;       EXPECT_EQ(Mat2d(4, 4, 4, 4),  ac);
+
+    // scalar
+    Mat2d twoA = a * 2.0;       EXPECT_EQ(Mat2d(2, 4, 6, 8),   twoA);
+    Mat2d twoA2 = 2.0 * a;      EXPECT_EQ(Mat2d(2, 4, 6, 8),   twoA2);
+    Mat2d halfA = a / 2.0;      EXPECT_EQ(Mat2d(0.5, 1, 1.5, 2), halfA);
+    Mat2d ac2 = a; ac2 *= 0.5;  EXPECT_EQ(Mat2d(0.5, 1, 1.5, 2), ac2);
+    Mat2d ac3 = a; ac3 /= 2.0;  EXPECT_EQ(Mat2d(0.5, 1, 1.5, 2), ac3);
+
+    // Mat2 * Mat2
+    // [1 2][5 6] = [1*5+2*7 1*6+2*8] = [19 22]
+    // [3 4][7 8]   [3*5+4*7 3*6+4*8]   [43 50]
+    Mat2d prod = a * b;
+    EXPECT_EQ(Mat2d(19, 22, 43, 50), prod);
+
+    // Mat2 * Vec2  (newly added member)
+    nanovdb::math::Vec2<double> v(1, 2);
+    nanovdb::math::Vec2<double> mv = a * v;
+    // [1 2][1] = [5]
+    // [3 4][2]   [11]
+    EXPECT_EQ(nanovdb::math::Vec2<double>(5, 11), mv);
+
+    // inverse: non-singular roundtrip + singular returns explicit zero
+    Mat2d inv = a.inverse();
+    // det(a) = 1*4 - 2*3 = -2; invDet = -0.5
+    // [a^-1] = [-2  1; 1.5 -0.5]
+    EXPECT_EQ(Mat2d(-2.0, 1.0, 1.5, -0.5), inv);
+
+    Mat2d singular(1, 1, 1, 1);
+    Mat2d zinv = singular.inverse();
+    EXPECT_EQ(Mat2d(0, 0, 0, 0), zinv);
+}// Mat2
+
+TEST_F(TestNanoVDB, Mat3)
+{
+    using Mat3d = nanovdb::math::Mat3<double>;
+    using Vec3d = nanovdb::math::Vec3<double>;
+
+    EXPECT_EQ(3, Mat3d::rows());
+    EXPECT_EQ(3, Mat3d::cols());
+    EXPECT_EQ(9, Mat3d::size());
+
+    // Mixed-literal construction now works (Source->T unification)
+    Mat3d m(1, 2.0, 3,
+            4.0, 5, 6.0,
+            7, 8.0, 9);
+    EXPECT_EQ(1.0, m[0][0]);
+    EXPECT_EQ(5.0, m[1][1]);
+    EXPECT_EQ(9.0, m[2][2]);
+
+    // transpose
+    Mat3d mt = m.transpose();
+    EXPECT_EQ(1.0, mt[0][0]); EXPECT_EQ(4.0, mt[0][1]); EXPECT_EQ(7.0, mt[0][2]);
+    EXPECT_EQ(2.0, mt[1][0]); EXPECT_EQ(5.0, mt[1][1]); EXPECT_EQ(8.0, mt[1][2]);
+
+    // ==, !=, +/-, scalar, +=, -=, *=, /=
+    EXPECT_TRUE (m == m);
+    EXPECT_FALSE(m != m);
+
+    Mat3d twoM = m * 2.0;
+    EXPECT_EQ(2.0,  twoM[0][0]);
+    EXPECT_EQ(18.0, twoM[2][2]);
+
+    Mat3d sum = m + m;
+    EXPECT_EQ(twoM, sum);
+
+    Mat3d dif = sum - m;
+    EXPECT_EQ(m, dif);
+
+    Mat3d acc = m; acc += m; EXPECT_EQ(twoM, acc);
+    acc = sum; acc -= m;     EXPECT_EQ(m, acc);
+    acc = m; acc *= 2.0;     EXPECT_EQ(twoM, acc);
+    acc = twoM; acc /= 2.0;  EXPECT_EQ(m, acc);
+
+    Mat3d neg = -m;
+    EXPECT_EQ(-1.0, neg[0][0]);
+    EXPECT_EQ(-9.0, neg[2][2]);
+
+    // scalar*Mat free function
+    EXPECT_EQ(twoM, 2.0 * m);
+
+    // Mat3 * Mat3
+    Mat3d id(1, 0, 0, 0, 1, 0, 0, 0, 1);
+    EXPECT_EQ(m, m * id);
+    Mat3d sq = m * m;
+    // Row 0, col 0: 1*1 + 2*4 + 3*7 = 30
+    EXPECT_EQ(30.0, sq[0][0]);
+
+    // Mat3 * Vec3
+    Vec3d v(1, 2, 3);
+    Vec3d r = m * v;
+    // Row 0: 1+4+9 = 14, Row 1: 4+10+18 = 32, Row 2: 7+16+27 = 50
+    EXPECT_EQ(Vec3d(14, 32, 50), r);
+}// Mat3
+
+TEST_F(TestNanoVDB, Mat4)
+{
+    using Mat4d = nanovdb::math::Mat4<double>;
+    using Vec4d = nanovdb::math::Vec4<double>;
+
+    EXPECT_EQ(4,  Mat4d::rows());
+    EXPECT_EQ(4,  Mat4d::cols());
+    EXPECT_EQ(16, Mat4d::size());
+
+    // Mixed-literal construction (Source->T unification)
+    Mat4d m( 1,  2.0,  3,  4.0,
+             5,  6.0,  7,  8.0,
+             9, 10.0, 11, 12.0,
+            13, 14.0, 15, 16.0);
+    EXPECT_EQ(1.0,  m[0][0]);
+    EXPECT_EQ(16.0, m[3][3]);
+
+    // transpose
+    Mat4d mt = m.transpose();
+    EXPECT_EQ(1.0,  mt[0][0]); EXPECT_EQ(5.0,  mt[0][1]);
+    EXPECT_EQ(4.0,  mt[3][0]); EXPECT_EQ(16.0, mt[3][3]);
+
+    // ==/!=, +/-, +=, -=, scalar, *=, /=, unary minus
+    EXPECT_TRUE(m == m);
+    EXPECT_TRUE(m != Mat4d(0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1));
+    Mat4d twoM = m * 2.0;
+    EXPECT_EQ(32.0, twoM[3][3]);
+    EXPECT_EQ(twoM, 2.0 * m);
+    Mat4d sum = m + m; EXPECT_EQ(twoM, sum);
+    Mat4d dif = sum - m; EXPECT_EQ(m, dif);
+    Mat4d acc = m; acc += m; EXPECT_EQ(twoM, acc);
+    acc = sum; acc -= m;     EXPECT_EQ(m, acc);
+    acc = m; acc *= 2.0;     EXPECT_EQ(twoM, acc);
+    acc = twoM; acc /= 2.0;  EXPECT_EQ(m, acc);
+
+    Mat4d neg = -m;
+    EXPECT_EQ(-1.0, neg[0][0]);
+
+    // Mat4 * Mat4 (newly added)
+    Mat4d id(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1);
+    EXPECT_EQ(m, m * id);
+    Mat4d sq = m * m;
+    // Row 0, col 0: 1*1 + 2*5 + 3*9 + 4*13 = 1 + 10 + 27 + 52 = 90
+    EXPECT_EQ(90.0, sq[0][0]);
+
+    // Mat4 * Vec4 (now a member, replacing the old standalone)
+    Vec4d v(1, 2, 3, 4);
+    Vec4d r = m * v;
+    // Row 0: 1+4+9+16 = 30
+    // Row 1: 5+12+21+32 = 70
+    // Row 2: 9+20+33+48 = 110
+    // Row 3: 13+28+45+64 = 150
+    EXPECT_EQ(Vec4d(30, 70, 110, 150), r);
+}// Mat4
+
+TEST_F(TestNanoVDB, Mat2x3_Mat3x2)
+{
+    using Mat2x3d = nanovdb::math::Mat2x3<double>;
+    using Mat3x2d = nanovdb::math::Mat3x2<double>;
+    using Vec2d   = nanovdb::math::Vec2<double>;
+    using Vec3d   = nanovdb::math::Vec3<double>;
+
+    EXPECT_EQ(2, Mat2x3d::rows()); EXPECT_EQ(3, Mat2x3d::cols()); EXPECT_EQ(6, Mat2x3d::size());
+    EXPECT_EQ(3, Mat3x2d::rows()); EXPECT_EQ(2, Mat3x2d::cols()); EXPECT_EQ(6, Mat3x2d::size());
+
+    Mat2x3d a(1, 2, 3,
+              4, 5, 6);
+    Mat3x2d b(1, 2,
+              3, 4,
+              5, 6);
+
+    // transpose round-trip between the two shapes
+    Mat3x2d at = a.transpose();
+    EXPECT_EQ(1.0, at[0][0]); EXPECT_EQ(4.0, at[0][1]);
+    EXPECT_EQ(2.0, at[1][0]); EXPECT_EQ(5.0, at[1][1]);
+    EXPECT_EQ(3.0, at[2][0]); EXPECT_EQ(6.0, at[2][1]);
+    EXPECT_TRUE(a == at.transpose());
+
+    Mat2x3d bt = b.transpose();
+    EXPECT_EQ(1.0, bt[0][0]); EXPECT_EQ(3.0, bt[0][1]); EXPECT_EQ(5.0, bt[0][2]);
+    EXPECT_EQ(2.0, bt[1][0]); EXPECT_EQ(4.0, bt[1][1]); EXPECT_EQ(6.0, bt[1][2]);
+
+    // element-wise (only Mat2x3 had + and += previously; Mat3x2 now has them too)
+    Mat2x3d a2 = a + a; EXPECT_EQ(Mat2x3d(2,4,6,8,10,12), a2);
+    Mat2x3d ac = a; ac += a; EXPECT_EQ(a2, ac);
+    Mat2x3d ad = a; ad -= a; EXPECT_EQ(Mat2x3d(0,0,0,0,0,0), ad);
+
+    Mat3x2d b2 = b + b; EXPECT_EQ(Mat3x2d(2,4,6,8,10,12), b2);
+    Mat3x2d bc = b; bc += b; EXPECT_EQ(b2, bc);
+    Mat3x2d bd = b; bd -= b; EXPECT_EQ(Mat3x2d(0,0,0,0,0,0), bd);
+
+    // scalar
+    EXPECT_EQ(Mat2x3d(2,4,6,8,10,12), a * 2.0);
+    EXPECT_EQ(Mat2x3d(2,4,6,8,10,12), 2.0 * a);
+    EXPECT_EQ(a, (a * 2.0) / 2.0);
+
+    EXPECT_EQ(Mat3x2d(2,4,6,8,10,12), b * 2.0);
+    EXPECT_EQ(Mat3x2d(2,4,6,8,10,12), 2.0 * b);
+
+    // unary minus
+    EXPECT_EQ(Mat2x3d(-1,-2,-3,-4,-5,-6), -a);
+    EXPECT_EQ(Mat3x2d(-1,-2,-3,-4,-5,-6), -b);
+
+    // ==, !=
+    EXPECT_TRUE(a == Mat2x3d(1,2,3,4,5,6));
+    EXPECT_TRUE(a != Mat2x3d(1,2,3,4,5,7));
+
+    // Mat2x3 * Vec3 (newly added member) -> Vec2
+    Vec3d v3(1, 2, 3);
+    Vec2d r1 = a * v3;
+    // Row 0: 1+4+9 = 14, Row 1: 4+10+18 = 32
+    EXPECT_EQ(Vec2d(14, 32), r1);
+
+    // Mat3x2 * Vec2 (newly added member) -> Vec3
+    Vec2d v2(1, 2);
+    Vec3d r2 = b * v2;
+    // Row 0: 1+4 = 5, Row 1: 3+8 = 11, Row 2: 5+12 = 17
+    EXPECT_EQ(Vec3d(5, 11, 17), r2);
+}// Mat2x3_Mat3x2
+
+TEST_F(TestNanoVDB, MatMul)
+{
+    using namespace nanovdb::math;
+    using Mat2d   = Mat2<double>;
+    using Mat3d   = Mat3<double>;
+    using Mat4d   = Mat4<double>;
+    using Mat2x3d = Mat2x3<double>;
+    using Mat3x2d = Mat3x2<double>;
+
+    Mat2d   m22(1, 2, 3, 4);
+    Mat3d   m33(1, 2, 3, 4, 5, 6, 7, 8, 9);
+    Mat4d   m44(1,2,3,4, 5,6,7,8, 9,10,11,12, 13,14,15,16);
+    Mat2x3d m23(1, 2, 3,
+                4, 5, 6);
+    Mat3x2d m32(1, 2,
+                3, 4,
+                5, 6);
+
+    // Square * Square (member form)
+    EXPECT_EQ(Mat2d(7, 10, 15, 22), m22 * m22);
+    // [1 2 3][1 2 3]   [30 36 42]
+    // [4 5 6][4 5 6] = [66 81 96]
+    // [7 8 9][7 8 9]   [102 126 150]
+    Mat3d m33sq = m33 * m33;
+    EXPECT_EQ(30.0,  m33sq[0][0]);
+    EXPECT_EQ(150.0, m33sq[2][2]);
+
+    Mat4d m44sq = m44 * m44;
+    EXPECT_EQ(90.0,  m44sq[0][0]);  // 1+10+27+52
+    EXPECT_EQ(600.0, m44sq[3][3]);  // 13*4 + 14*8 + 15*12 + 16*16
+
+    // Rectangular: Mat2x3 * Mat3x2 -> Mat2
+    // [1 2 3][1 2]   [22 28]
+    // [4 5 6][3 4] = [49 64]
+    //        [5 6]
+    EXPECT_EQ(Mat2d(22, 28, 49, 64), m23 * m32);
+
+    // Mat3x2 * Mat2x3 -> Mat3
+    // Each entry: lhs.row[i] dotted with rhs.col[j]
+    // Row 0, col 0: 1*1 + 2*4 = 9
+    Mat3d m32x23 = m32 * m23;
+    EXPECT_EQ(9.0,  m32x23[0][0]);
+    EXPECT_EQ(51.0, m32x23[2][2]);  // 5*3 + 6*6 = 51
+
+    // Mat2 * Mat2x3 -> Mat2x3 (identity-passes test)
+    Mat2d id2(1, 0, 0, 1);
+    EXPECT_EQ(m23, id2 * m23);
+
+    // Mat3x2 * Mat2 -> Mat3x2
+    EXPECT_EQ(m32, m32 * id2);
+
+    // Mat2x3 * Mat3 -> Mat2x3
+    Mat3d id3(1, 0, 0, 0, 1, 0, 0, 0, 1);
+    EXPECT_EQ(m23, m23 * id3);
+
+    // Mat3 * Mat3x2 -> Mat3x2  (the consistency-pass addition)
+    Mat3x2d r = m33 * m32;
+    // Row 0: [1*1+2*3+3*5 1*2+2*4+3*6] = [22 28]
+    EXPECT_EQ(22.0, r[0][0]); EXPECT_EQ(28.0, r[0][1]);
+    EXPECT_EQ(49.0, r[1][0]); EXPECT_EQ(64.0, r[1][1]);
+    EXPECT_EQ(76.0, r[2][0]); EXPECT_EQ(100.0, r[2][1]);
+
+    // identity-on-the-left passes through for the rectangular shapes too
+    EXPECT_EQ(m32, id3 * m32);
+
+    // Mat3 * Vec3 (member)
+    Vec3<double> v3(1, 2, 3);
+    EXPECT_EQ(Vec3<double>(14, 32, 50), m33 * v3);
+
+    // Mat4 * Vec4 (member after the consistency pass)
+    Vec4<double> v4(1, 2, 3, 4);
+    EXPECT_EQ(Vec4<double>(30, 70, 110, 150), m44 * v4);
+
+    // Mat2 * Vec2 (member, new)
+    EXPECT_EQ(Vec2<double>(5, 11), m22 * Vec2<double>(1, 2));
+
+    // Mat2x3 * Vec3 (member, new) -> Vec2
+    EXPECT_EQ(Vec2<double>(14, 32), m23 * v3);
+
+    // Mat3x2 * Vec2 (member, new) -> Vec3
+    EXPECT_EQ(Vec3<double>(5, 11, 17), m32 * Vec2<double>(1, 2));
+}// MatMul
+
+TEST_F(TestNanoVDB, MatVecIntrospection)
+{
+    using namespace nanovdb::math;
+
+    // MatBase / Mat* shape and type introspection (public after refactor)
+    static_assert(Mat2<float>::rows()   == 2,  "");
+    static_assert(Mat2<float>::cols()   == 2,  "");
+    static_assert(Mat2<float>::size()   == 4,  "");
+    static_assert(Mat3<float>::rows()   == 3,  "");
+    static_assert(Mat3<float>::cols()   == 3,  "");
+    static_assert(Mat3<float>::size()   == 9,  "");
+    static_assert(Mat4<float>::rows()   == 4,  "");
+    static_assert(Mat4<float>::cols()   == 4,  "");
+    static_assert(Mat4<float>::size()   == 16, "");
+    static_assert(Mat2x3<float>::rows() == 2,  "");
+    static_assert(Mat2x3<float>::cols() == 3,  "");
+    static_assert(Mat3x2<float>::rows() == 3,  "");
+    static_assert(Mat3x2<float>::cols() == 2,  "");
+
+    bool tm = nanovdb::util::is_same<float, Mat3<float>::ValueType>::value;
+    EXPECT_TRUE(tm);
+    tm = nanovdb::util::is_same<double, Mat4<double>::ValueType>::value;
+    EXPECT_TRUE(tm);
+
+    // VecBase / Vec* shape and type introspection
+    static_assert(Vec2<float>::SIZE == 2, "");
+    static_assert(Vec3<float>::SIZE == 3, "");
+    static_assert(Vec4<float>::SIZE == 4, "");
+    // openvdb::math::Tuple-compat lowercase alias
+    static_assert(Vec3<float>::size == 3, "");
+
+    bool tv = nanovdb::util::is_same<double, Vec3<double>::ValueType>::value;
+    EXPECT_TRUE(tv);
+    tv = nanovdb::util::is_same<float,  Vec4<float>::ValueType>::value;
+    EXPECT_TRUE(tv);
+
+    // data() on Mat lays out row-major
+    Mat3<double> m(1, 2, 3, 4, 5, 6, 7, 8, 9);
+    EXPECT_EQ(1.0, m.data()[0]);
+    EXPECT_EQ(5.0, m.data()[4]);
+    EXPECT_EQ(9.0, m.data()[8]);
+
+    // asPointer() on Vec lays out left-to-right
+    Vec4<double> v(10, 20, 30, 40);
+    EXPECT_EQ(10.0, v.asPointer()[0]);
+    EXPECT_EQ(40.0, v.asPointer()[3]);
+
+    // Named component accessors x()/y()/z()/w(). x() is available on every
+    // Vec*; y() requires N >= 2; z() requires N >= 3; w() requires N >= 4.
+    // Each is exercised here at compile time (constexpr) and at runtime
+    // (read + write through the non-const overload).
+    {
+        constexpr Vec2<int> v2(11, 22);
+        static_assert(v2.x() == 11, "");
+        static_assert(v2.y() == 22, "");
+    }
+    {
+        constexpr Vec3<int> v3(31, 32, 33);
+        static_assert(v3.x() == 31, "");
+        static_assert(v3.y() == 32, "");
+        static_assert(v3.z() == 33, "");
+    }
+    {
+        constexpr Vec4<int> v4(41, 42, 43, 44);
+        static_assert(v4.x() == 41, "");
+        static_assert(v4.y() == 42, "");
+        static_assert(v4.z() == 43, "");
+        static_assert(v4.w() == 44, "");
+    }
+    {
+        // Non-const overloads return mutable references.
+        Vec4<double> vw(0.0, 0.0, 0.0, 0.0);
+        vw.x() = 1.0; vw.y() = 2.0; vw.z() = 3.0; vw.w() = 4.0;
+        EXPECT_EQ(1.0, vw[0]);
+        EXPECT_EQ(2.0, vw[1]);
+        EXPECT_EQ(3.0, vw[2]);
+        EXPECT_EQ(4.0, vw[3]);
+    }
+    // The static_asserts in the bodies of y()/z()/w() guarantee that calling
+    // e.g. Vec2<T>::w() fails with a clear compile-time error
+    // ("VecBase::w() requires N >= 4"); we don't exercise the negative
+    // case here because there's no way to assert "must fail to compile"
+    // inside a gtest TU.
+}// MatVecIntrospection
+
 TEST_F(TestNanoVDB, Map)
 {
     EXPECT_EQ(264u, sizeof(nanovdb::Map));
