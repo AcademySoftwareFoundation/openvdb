@@ -76,6 +76,12 @@ public:
     static void deallocateAsync(void *p, size_t bytes, size_t alignment, cudaStream_t stream) {
         DeviceResource().deallocate_async(p, bytes, alignment, stream);
     }
+
+    /// @brief Stateless: memory allocated through one instance may be
+    ///        deallocated through any other, so every two instances compare
+    ///        equal (the equality cuda::mr's resource concepts require).
+    friend bool operator==(const DeviceResource&, const DeviceResource&) { return true; }
+    friend bool operator!=(const DeviceResource&, const DeviceResource&) { return false; }
 };
 
 /// @brief Returns a program-lifetime, address-stable reference to a default
@@ -242,6 +248,12 @@ public:
     /// @brief Frees @c p with cudaFree; the caller guarantees that device work
     ///        touching the memory has completed.
     void deallocate(void* p, size_t, size_t) { cudaCheck(cudaFree(p)); }
+
+    /// @brief Stateless: memory allocated through one instance may be
+    ///        deallocated through any other, so every two instances compare
+    ///        equal (the equality cuda::mr's resource concepts require).
+    friend bool operator==(const MallocResource&, const MallocResource&) { return true; }
+    friend bool operator!=(const MallocResource&, const MallocResource&) { return false; }
 };// MallocResource
 
 /// @brief Wrapper presenting a synchronous resource as a stream-ordered one,
@@ -292,6 +304,10 @@ struct AsyncFromSync
     /// @brief Synchronous pair, forwarding to the wrapped resource.
     void* allocate(size_t bytes, size_t alignment) { return resource.allocate(bytes, alignment); }
     void  deallocate(void* p, size_t bytes, size_t alignment) { resource.deallocate(p, bytes, alignment); }
+
+    /// @brief Two adapters compare equal iff their wrapped resources do.
+    friend bool operator==(const AsyncFromSync& lhs, const AsyncFromSync& rhs) { return lhs.resource == rhs.resource; }
+    friend bool operator!=(const AsyncFromSync& lhs, const AsyncFromSync& rhs) { return !(lhs == rhs); }
 };// AsyncFromSync<R>
 
 /// @brief Non-owning reference to a memory resource that is itself a resource:

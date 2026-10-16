@@ -289,7 +289,7 @@ TEST(TestBuffer, OversizedCountThrows)
     nanovdb::cuda::Buffer<int> buf(0, 8, nanovdb::cuda::noInit);
     cudaStream_t other = nullptr;
     ASSERT_EQ(cudaStreamCreate(&other), cudaSuccess);
-    EXPECT_THROW(buf.resize(oversized, other), std::runtime_error);
+    EXPECT_THROW(buf.resize(other, oversized), std::runtime_error);
     EXPECT_EQ(buf.size(), 8u);                // failed resize leaves the buffer untouched --
     EXPECT_EQ(buf.stream(), cudaStream_t(0)); // including its retained stream
     ASSERT_EQ(cudaStreamDestroy(other), cudaSuccess);
@@ -520,7 +520,7 @@ TEST(TestBuffer, ResizePreservesPrefixAndRetainsNewStream)
         ASSERT_EQ(cudaMemcpyAsync(buf.data(), pattern.data(), n * sizeof(int), cudaMemcpyHostToDevice, a), cudaSuccess);
         ASSERT_EQ(cudaStreamSynchronize(a), cudaSuccess);
 
-        buf.resize(m, c); // grow on stream c
+        buf.resize(c, m); // grow on stream c
         EXPECT_EQ(buf.size(), m);
         EXPECT_EQ(buf.stream(), c);
         ASSERT_EQ(log.allocStreams.size(), 2u);
@@ -537,7 +537,7 @@ TEST(TestBuffer, ResizePreservesPrefixAndRetainsNewStream)
         for (size_t i = 0; i < n; ++i)
             ASSERT_EQ(readback[i], pattern[i]) << "prefix element " << i << " lost across resize";
 
-        buf.resize(n / 2, c); // shrink: keeps the min(old,new) prefix
+        buf.resize(c, n / 2); // shrink: keeps the min(old,new) prefix
         std::vector<int> shrunk(n / 2, -1);
         ASSERT_EQ(cudaMemcpyAsync(shrunk.data(), buf.data(), (n / 2) * sizeof(int), cudaMemcpyDeviceToHost, c), cudaSuccess);
         ASSERT_EQ(cudaStreamSynchronize(c), cudaSuccess);
@@ -549,6 +549,78 @@ TEST(TestBuffer, ResizePreservesPrefixAndRetainsNewStream)
     ASSERT_EQ(cudaStreamSynchronize(c), cudaSuccess);
     ASSERT_EQ(cudaStreamDestroy(a), cudaSuccess);
     ASSERT_EQ(cudaStreamDestroy(c), cudaSuccess);
+}
+
+// The deprecated (count, stream) order still resizes until its removal.
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+#if defined(__CUDACC__)
+#pragma nv_diagnostic push
+#pragma nv_diag_suppress 1444
+#endif
+TEST(TestBuffer, ResizeDeprecatedArgumentOrderForwards)
+{
+    StreamLog log;
+    cudaStream_t c = nullptr;
+    ASSERT_EQ(cudaStreamCreate(&c), cudaSuccess);
+    {
+        nanovdb::cuda::Buffer<int, StreamRecordingResource> buf(0, StreamRecordingResource{&log}, 8, nanovdb::cuda::noInit);
+        buf.resize(size_t(16), c);
+        EXPECT_EQ(buf.size(), 16u);
+        EXPECT_EQ(buf.stream(), c);
+        EXPECT_EQ(log.allocStreams.back(), c);
+    }
+    ASSERT_EQ(cudaStreamSynchronize(c), cudaSuccess);
+    ASSERT_EQ(cudaStreamDestroy(c), cudaSuccess);
+}
+#if defined(__CUDACC__)
+#pragma nv_diagnostic pop
+#endif
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
+
+//======================================================================
+// Resource equality, as cuda::mr's resource concepts require
+//======================================================================
+
+template<typename R, typename = void>
+struct IsEqualityComparable : std::false_type {};
+template<typename R>
+struct IsEqualityComparable<R, std::void_t<decltype(std::declval<const R&>() == std::declval<const R&>()),
+                                           decltype(std::declval<const R&>() != std::declval<const R&>())>>
+    : std::true_type {};
+
+static_assert(IsEqualityComparable<nanovdb::cuda::DeviceResource>::value, "DeviceResource needs ==");
+static_assert(IsEqualityComparable<nanovdb::cuda::MallocResource>::value, "MallocResource needs ==");
+static_assert(IsEqualityComparable<nanovdb::cuda::PinnedResource>::value, "PinnedResource needs ==");
+static_assert(IsEqualityComparable<nanovdb::cuda::ManagedResource>::value, "ManagedResource needs ==");
+static_assert(IsEqualityComparable<nanovdb::cuda::AsyncFromSync<nanovdb::cuda::MallocResource>>::value, "AsyncFromSync needs ==");
+
+TEST(TestBuffer, BuiltInResourcesCompareEqual)
+{
+    // Stateless resources: memory from any instance may be freed through any other.
+    EXPECT_TRUE(nanovdb::cuda::DeviceResource{} == nanovdb::cuda::DeviceResource{});
+    EXPECT_FALSE(nanovdb::cuda::DeviceResource{} != nanovdb::cuda::DeviceResource{});
+    EXPECT_TRUE(nanovdb::cuda::MallocResource{} == nanovdb::cuda::MallocResource{});
+    EXPECT_TRUE(nanovdb::cuda::PinnedResource{} == nanovdb::cuda::PinnedResource{});
+    EXPECT_TRUE(nanovdb::cuda::ManagedResource{} == nanovdb::cuda::ManagedResource{});
+    // The adapter compares its wrapped resources.
+    using Adapted = nanovdb::cuda::AsyncFromSync<nanovdb::cuda::ResourceRef<nanovdb::cuda::MallocResource>>;
+    nanovdb::cuda::MallocResource ma, mb;
+    EXPECT_TRUE((Adapted{nanovdb::cuda::ResourceRef<nanovdb::cuda::MallocResource>(ma)} ==
+                 Adapted{nanovdb::cuda::ResourceRef<nanovdb::cuda::MallocResource>(ma)}));
+    EXPECT_TRUE((Adapted{nanovdb::cuda::ResourceRef<nanovdb::cuda::MallocResource>(ma)} !=
+                 Adapted{nanovdb::cuda::ResourceRef<nanovdb::cuda::MallocResource>(mb)}));
 }
 
 //======================================================================
