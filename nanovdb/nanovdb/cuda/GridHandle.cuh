@@ -203,9 +203,14 @@ inline void rewriteGridCounts(const std::vector<GridData*>& dst, const std::vect
 
 }// namespace detail
 
+namespace detail {
+
+/// @brief Implementation behind the deprecated dual-space splitGridHandles,
+///        kept warning-free for in-tree callers until the dual buffers are
+///        removed.
 template<typename BufferT, template <class, class...> class VectorT = std::vector>
-inline typename util::enable_if<BufferTraits<BufferT>::hasDeviceDual, VectorT<GridHandle<BufferT>>>::type
-splitGridHandles(const GridHandle<BufferT> &handle, const BufferT* other = nullptr, cudaStream_t stream = 0)
+inline VectorT<GridHandle<BufferT>>
+splitDualGridHandles(const GridHandle<BufferT> &handle, const BufferT* other, cudaStream_t stream)
 {
     const void *ptr = handle.deviceData();
     if (ptr == nullptr) return VectorT<GridHandle<BufferT>>();
@@ -228,11 +233,14 @@ splitGridHandles(const GridHandle<BufferT> &handle, const BufferT* other = nullp
         ptr = util::PtrAdd(ptr, handle.gridSize(n));
     }
     return handles;
-}// cuda::splitGridHandles
+}// cuda::detail::splitDualGridHandles
 
+/// @brief Implementation behind the deprecated dual-space mergeGridHandles,
+///        kept warning-free for in-tree callers until the dual buffers are
+///        removed.
 template<typename BufferT, template <class, class...> class VectorT>
-inline typename util::enable_if<BufferTraits<BufferT>::hasDeviceDual, GridHandle<BufferT>>::type
-mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, const BufferT* other = nullptr, cudaStream_t stream = 0)
+inline GridHandle<BufferT>
+mergeDualGridHandles(const VectorT<GridHandle<BufferT>> &handles, const BufferT* other, cudaStream_t stream)
 {
     uint64_t size = 0u;
     uint32_t counter = 0u, gridCount = 0u;
@@ -261,7 +269,31 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, const BufferT* oth
         }
     }
     return GridHandle<BufferT>(std::move(buffer));
-}// cuda::mergeGridHandles
+}// cuda::detail::mergeDualGridHandles
+
+}// namespace detail
+
+/// @deprecated The dual-space buffers are removed in a future release: hold
+///             grids in GridHandle<cuda::Buffer<std::byte>> and use the
+///             single-space overload splitGridHandles(handle, stream, proto).
+template<typename BufferT, template <class, class...> class VectorT = std::vector>
+[[deprecated("dual-space buffers are being removed: use GridHandle<cuda::Buffer<std::byte>> with splitGridHandles(handle, stream, proto)")]]
+inline typename util::enable_if<BufferTraits<BufferT>::hasDeviceDual, VectorT<GridHandle<BufferT>>>::type
+splitGridHandles(const GridHandle<BufferT> &handle, const BufferT* other = nullptr, cudaStream_t stream = 0)
+{
+    return detail::splitDualGridHandles<BufferT, VectorT>(handle, other, stream);
+}
+
+/// @deprecated The dual-space buffers are removed in a future release: hold
+///             grids in GridHandle<cuda::Buffer<std::byte>> and use the
+///             single-space overload mergeGridHandles(handles, stream, proto).
+template<typename BufferT, template <class, class...> class VectorT>
+[[deprecated("dual-space buffers are being removed: use GridHandle<cuda::Buffer<std::byte>> with mergeGridHandles(handles, stream, proto)")]]
+inline typename util::enable_if<BufferTraits<BufferT>::hasDeviceDual, GridHandle<BufferT>>::type
+mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, const BufferT* other = nullptr, cudaStream_t stream = 0)
+{
+    return detail::mergeDualGridHandles<BufferT, VectorT>(handles, other, stream);
+}
 
 /// @brief Splits a single-space device handle into one handle per grid.
 /// @param handle source handle containing one or more grids
@@ -393,16 +425,16 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, cudaStream_t strea
 }// namespace cuda
 
 template<typename BufferT, template <class, class...> class VectorT = std::vector>
-[[deprecated("Use nanovdb::cuda::splitGridHandles instead")]]
+[[deprecated("dual-space buffers are being removed: use GridHandle<cuda::Buffer<std::byte>> with nanovdb::cuda::splitGridHandles(handle, stream, proto)")]]
 inline typename util::enable_if<BufferTraits<BufferT>::hasDeviceDual, VectorT<GridHandle<BufferT>>>::type
 splitDeviceGrids(const GridHandle<BufferT> &handle, const BufferT* other = nullptr, cudaStream_t stream = 0)
-{ return cuda::splitGridHandles(handle, other, stream); }
+{ return cuda::detail::splitDualGridHandles<BufferT, VectorT>(handle, other, stream); }
 
 template<typename BufferT, template <class, class...> class VectorT>
-[[deprecated("Use nanovdb::cuda::mergeGridHandles instead")]]
+[[deprecated("dual-space buffers are being removed: use GridHandle<cuda::Buffer<std::byte>> with nanovdb::cuda::mergeGridHandles(handles, stream, proto)")]]
 inline typename util::enable_if<BufferTraits<BufferT>::hasDeviceDual, GridHandle<BufferT>>::type
 mergeDeviceGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* other = nullptr, cudaStream_t stream = 0)
-{ return cuda::mergeGridHandles<BufferT, VectorT>(handles, other, stream); }
+{ return cuda::detail::mergeDualGridHandles<BufferT, VectorT>(handles, other, stream); }
 
 template<typename BufferT>
 template<typename T, typename util::enable_if<BufferTraits<T>::hasDeviceDual, int>::type>

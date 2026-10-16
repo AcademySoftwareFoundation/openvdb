@@ -1427,7 +1427,7 @@ GridHandle<BufferT> mergeBuiltHandles(const std::vector<GridHandle<BufferT>> &ha
     static_assert(BufferHasDeviceSingle<BufferT>::value || BufferTraits<BufferT>::hasDeviceDual,
                   "the point-set overloads build into a device buffer");
     if constexpr (BufferHasDeviceSingle<BufferT>::value) return nanovdb::cuda::mergeGridHandles(handles, stream, &buffer);
-    else return nanovdb::cuda::mergeGridHandles(handles, &buffer, stream);
+    else return nanovdb::cuda::detail::mergeDualGridHandles(handles, &buffer, stream);
 }
 
 }// namespace detail
