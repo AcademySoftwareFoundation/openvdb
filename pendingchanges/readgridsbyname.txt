@@ -8,3 +8,5 @@ OpenVDB:
   Bug fixes:
   - Fixed io::File::readGrid() returning the wrong tree for an instance whose
     parent grid has the same name as a grid literally named with a suffix.
+  - Fixed io::File::getGrids() sharing a clipped tree between instanced grids
+    with different transforms. Each grid is now clipped independently.
