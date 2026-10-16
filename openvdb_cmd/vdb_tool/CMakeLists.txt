@@ -117,6 +117,12 @@ endif()
 if(OPENVDB_TOOL_USE_EXR)
   target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_EXR")
   find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED)
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_OPENEXR_VERSION)
+    if(OpenEXR_VERSION VERSION_LESS FUTURE_MINIMUM_OPENEXR_VERSION)
+      message(DEPRECATION "Support for OpenEXR versions < ${FUTURE_MINIMUM_OPENEXR_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
+  endif()
   find_package(Imath ${MINIMUM_IMATH_VERSION} CONFIG REQUIRED)
 
   if(TARGET OpenEXR::OpenEXR)
