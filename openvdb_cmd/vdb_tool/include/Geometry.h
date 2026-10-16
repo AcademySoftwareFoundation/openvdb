@@ -799,36 +799,51 @@ inline void Geometry::readOFF(std::istream &is)
         throw std::invalid_argument("Geometry::readOFF: expected header \"OFF\" but read \"" + line + "\"");
     }
 
+    // Read the next line that is neither blank nor a comment. Binary stdin keeps the
+    // CR of CRLF line endings, so a blank line can arrive as "\r".
+    auto nextLine = [&is, &line]() {
+        while (std::getline(is, line)) {
+            const size_t start = line.find_first_not_of(" \t\r");
+            if (start != std::string::npos && line[start] != '#') return true;
+        }
+        throw std::invalid_argument("Geometry::readOFF: unexpected end of file");
+    };
+
     // read vertex and face counts
     size_t vtxCount=0, faceCount=0, edgeCount=0, nGon=0;
-    while (vtxCount == 0 && std::getline(is, line)) {
-        if (line.empty() || line[0] == '#') continue;
+    nextLine();
+    {
         std::istringstream iss(line);
-        iss >> vtxCount >> faceCount >> edgeCount;
+        if (!(iss >> vtxCount >> faceCount)) {
+            throw std::invalid_argument("Geometry::readOFF: invalid vertex and face counts \"" + line + "\"");
+        }
+        iss >> edgeCount;// optional and unused
     }
 
     // read vertices
     Vec3f p;
     vtxCount += mVtx.size();
-    while (mVtx.size() < vtxCount && std::getline(is, line)) {
-        if (line.empty() || line[0] == '#') continue;
+    while (mVtx.size() < vtxCount) {
+        nextLine();
         std::istringstream iss(line);
-        iss >> p[0] >> p[1] >> p[2];
+        if (!(iss >> p[0] >> p[1] >> p[2])) {
+            throw std::invalid_argument("Geometry::readOFF: invalid vertex \"" + line + "\"");
+        }
         mVtx.push_back(p);
     }
 
     // read faces
     int f[4];
     faceCount += mTri.size() + mQuad.size();
-    while (mTri.size() + mQuad.size() < faceCount && std::getline(is, line)) {
-        if (line.empty() || line[0] == '#') continue;
+    while (mTri.size() + mQuad.size() < faceCount) {
+        nextLine();
         std::istringstream iss(line);
-        iss >> nGon;
+        if (!(iss >> nGon)) throw std::invalid_argument("Geometry::readOFF: invalid face \"" + line + "\"");
         if (nGon == 3) {
-            iss >> f[0] >> f[1] >> f[2];
+            if (!(iss >> f[0] >> f[1] >> f[2])) throw std::invalid_argument("Geometry::readOFF: invalid face \"" + line + "\"");
             mTri.emplace_back(f[0],f[1],f[2]);
         } else if (nGon == 4) {
-            iss >> f[0] >> f[1] >> f[2] >> f[3];
+            if (!(iss >> f[0] >> f[1] >> f[2] >> f[3])) throw std::invalid_argument("Geometry::readOFF: invalid face \"" + line + "\"");
             mQuad.emplace_back(f[0],f[1],f[2],f[3]);
         } else {
             throw std::invalid_argument("Geometry::readOFF: " + std::to_string(nGon) + "-gons are not supported");
@@ -857,7 +872,8 @@ inline void Geometry::readXYZ(std::istream &is)
     std::string line;
     Vec3f p;
     while (std::getline(is, line)) {
-        if (line.empty() || line[0] == '#') continue;
+        const size_t start = line.find_first_not_of(" \t\r");// binary stdin keeps CR of CRLF
+        if (start == std::string::npos || line[start] == '#') continue;
         std::istringstream iss(line);
         if (iss >> p[0] >> p[1] >> p[2]) {
             mVtx.push_back(p);
@@ -948,7 +964,7 @@ inline void Geometry::readPLY(std::istream &is)
     // header: https://www.mathworks.com/help/vision/ug/the-ply-format.html
     size_t vtxCount = 0, faceCount = 0;
     int vtxStride=0, vtxProps=0;// byte size of all vtx properties, number of vertex properties
-    struct Triplet {int offset, id, size;} xyz[3] = {};// byte offset, id#, byte size
+    struct Triplet {int offset, id, size; bool isInt;} xyz[3] = {};// byte offset, id#, byte size, int32 vs float type
     struct Skip {int count, bytes;} faceSkip[2]={{0,0},{0,0}};// head, {faces}, tail
 
     // parse header with vertex, face and property information
@@ -969,7 +985,7 @@ inline void Geometry::readPLY(std::istream &is)
                         break;
                     } else if ( test(0, {"property"}) ) {
                         if (tokens.size() != 3) error("Geometry::readPLY: invalid vertex property");
-                        Triplet t{vtxStride, vtxProps++, sizeOf(1)};
+                        Triplet t{vtxStride, vtxProps++, sizeOf(1), test(1, {"int", "int32"})};
                         for (int i=0; i<3; ++i) if (test(2, {axis[i]})) xyz[i] = t;
                         if (vtxStride > std::numeric_limits<int>::max() - t.size)
                             error("Geometry::readPLY: vertex record is too large");
@@ -1026,7 +1042,8 @@ inline void Geometry::readPLY(std::istream &is)
     // read vertex coordinates
     mVtx.resize(vtxCount);
     if (format) {// binary
-        if (xyz[0].offset==0 && xyz[1].offset==4 && xyz[2].offset==8 && vtxStride==12) {// most common case
+        if (xyz[0].offset==0 && xyz[1].offset==4 && xyz[2].offset==8 && vtxStride==12 &&
+            !xyz[0].isInt && !xyz[1].isInt && !xyz[2].isInt) {// most common case, i.e. 3 floats
             if (vtxCount > std::numeric_limits<size_t>::max() / (3 * sizeof(float)))
                 error("Geometry::readPLY: vertex data is too large");
             readExact(mVtx.data(), vtxCount * 3 * sizeof(float));
@@ -1036,7 +1053,11 @@ inline void Geometry::readPLY(std::istream &is)
             for (Vec3f &vtx : mVtx) {
                 readExact(buffer.data(), buffer.size());
                 for (int i=0; i<3; ++i) {
-                    if (xyz[i].size == 4) {
+                    if (xyz[i].isInt) {
+                        int32_t v;
+                        std::memcpy(&v, buffer.data() + xyz[i].offset, sizeof(v));
+                        vtx[i] = float(reverseBytes ? swapBytes(v) : v);
+                    } else if (xyz[i].size == 4) {
                         float v;
                         std::memcpy(&v, buffer.data() + xyz[i].offset, sizeof(v));
                         vtx[i] = reverseBytes ? swapBytes(v) : v;

@@ -189,7 +189,7 @@ public:
 private:
 
     static const int sMajor = 10; ///< Major version: incremented on incompatible option/file changes.
-    static const int sMinor =  8; ///< Minor version: incremented on backwards-compatible new features.
+    static const int sMinor =  9; ///< Minor version: incremented on backwards-compatible new features.
     static const int sPatch =  0; ///< Patch version: incremented on backwards-compatible bug fixes.
 
     using GridT   = FloatGrid;                                       ///< Scalar grid type used by most level-set operations.
@@ -601,7 +601,14 @@ inline std::string Tool::resolveStackOption(const std::string &optName, const st
 inline bool Tool::run()
 {
     if (mParser.verbose>1) this->print_args();
-    return mParser.run();
+    try {
+        return mParser.run();
+    } catch (const std::exception& e) {
+        // The destructor closes the log before main() reports the error, so record it
+        // here. Writing to the file directly avoids printing it twice when tee=true.
+        if (mLogFile.is_open()) mLogFile << "Fatal error in " << mCmdName << ":\n\t" << e.what() << std::endl;
+        throw;
+    }
 }// Tool::run
 
 // ==============================================================================================================
@@ -624,7 +631,7 @@ struct Tool::Header {
     /// @brief Construct a header for the current tool version.
     Header() : mMagic("vdb_tool"), mMajor(sMajor), mMinor(sMinor), mPatch(sPatch) {}
     /// @brief Parse a header from the first line of a config file.
-    /// @param line First line of the config file, e.g. "vdb_tool 10.8.0".
+    /// @param line First line of the config file, e.g. "vdb_tool 10.9.0".
     /// @throw std::invalid_argument if @a line does not match "vdb_tool MAJOR.MINOR.PATCH".
     Header(const std::string &line) : mMagic("vdb_tool") {
       const VecS header = tokenize(line, " .");
@@ -704,7 +711,7 @@ inline void Tool::init()
      {"vdb", "*", "0,1,...", "list of VDB grids to write (defaults to \"*\", i.e. all available grids)."},
      {"keep", "", "1|0|true|false", "toggle wether to preserved or deleted geometry and grids after they have been written."},
      {"codec", "", "none|zip|blosc|active", "compression codec for the file or stream"},
-     {"bits", "32", "32|16|8|4|N", "bit-width of floating point numbers during quantization of VDB and NanoVDB grids, i.e. 32 is full, 16, is half (defaults to 32). NanoVDB also supports 8, 4 and N which is adaptive bit-width"},// VDB: 32, 16 + for NVDB 8, 4 or N
+     {"bits", "", "32|16|8|4|N", "bit-width of floating point numbers during quantization of VDB and NanoVDB grids, i.e. 32 is full, 16, is half. By default VDB grids keep their current precision (e.g. half grids that were read from a file) and NanoVDB grids use 32. NanoVDB also supports 8, 4 and N which is adaptive bit-width"},// VDB: 32, 16 + for NVDB 8, 4 or N
      {"dither", "false", "1|0|true|false", "toggle dithering of quantized NanoVDB grids (disabled by default)"},
      {"absolute", "true", "1|0|true|false", "toggle absolute or relative error tolerance during quantization of NanoVDBs. Only used if bits=N. Defaults to absolute"},// absolute or relative error for N bits in NVDB
      {"tolerance", "-1", "1.0", "absolute or relative error tolerance used during quantization of NanoVDBs. Only used if bits=N."},// error tolerance for N bits in NVDB
@@ -791,8 +798,8 @@ inline void Tool::init()
   mParser.addAction(
      {"sdf2udf"}, "Converts a signed distance field into an unsigned distance field, i.e. performs the Abs of all values and changes GridClass to UNKNOWN.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
-     {"vdb", "0", "0|0,1", "age(s) (i.e. stack index) of grid(s) to be processed. Defaults to 0, i.e. most recently inserted VDB. Accepts a comma-separated list to use multiple grids in the kernel: the FIRST grid is written (iterated), the rest are read-only inputs. Length must match use=."},
-     {"name", "sphere", "sphere", "name assigned to the output volume"}},
+     {"vdb", "0", "0", "age (i.e. stack index) of the level set to be converted. Defaults to 0, i.e. most recently inserted VDB."},
+     {"name", "", "udf", "name assigned to the output volume. Defaults to \"sdf2udf_\" followed by the name of the input volume"}},
      [&](){mParser.setDefaults();}, [&](){this->sdf2udf();});
 
   mParser.addAction(
@@ -2227,14 +2234,11 @@ inline void Tool::writeVDB(const std::string &fileName)
     const std::string age = mParser.get<std::string>("vdb");
     const bool keep = mParser.get<bool>("keep");
     const std::string codec = toLowerCase(mParser.get<std::string>("codec"));
-    bool half;
-    switch (mParser.get<int>("bits")) {
-      case 16:
-        half = true; break;
-      case 32:
-        half = false; break;
-      default:
-        throw std::invalid_argument("writeVDB: bits should either be 32 or 16, not "+mParser.get<std::string>("bits"));
+    // An empty bits option preserves each grid's own half-float setting, so
+    // e.g. half grids read from a file are written back as half grids.
+    const std::string bits = mParser.get<std::string>("bits");
+    if (!bits.empty() && bits != "16" && bits != "32") {
+        throw std::invalid_argument("writeVDB: bits should either be 32 or 16, not "+bits);
     }
     GridPtrVec grids;// vector of grids to be written and possibly removed from mGrid
     if (age == "*") {
@@ -2263,7 +2267,7 @@ inline void Tool::writeVDB(const std::string &fileName)
     GridPtrVec output;
     for (const auto &grid : grids) {
       output.push_back(grid->copyGrid());
-      output.back()->setSaveFloatAsHalf(half);
+      if (!bits.empty()) output.back()->setSaveFloatAsHalf(bits == "16");
     }
     if (fileName=="stdout.vdb") {
       if (isatty(fileno(stdout)))  throw std::invalid_argument("writeVDB: stdout is not connected to the terminal");
@@ -3591,8 +3595,10 @@ inline void Tool::forValues()
     // Snapshot the OUTPUT grid if the kernel reads non-zero offsets from it
     // (directly or via any alias): otherwise parallel writes to the iterator's
     // grid would race with neighbor reads from the same grid. Check pointer
-    // identity to catch all aliases, not just the primary gridIdx == 0.
-    const GridT::ConstPtr outputGridPtr = grids[0].grid;
+    // identity to catch all aliases, not just the primary gridIdx == 0. With
+    // keep=true the output is a private copy, so neighbor reads use the
+    // untouched input and no snapshot is needed.
+    const GridT::ConstPtr outputGridPtr = grid;
     const bool needSnapshot = std::any_of(neighbors.begin(), neighbors.end(),
         [outputGridPtr, &grids](const NeighborBinding &n) {
             return grids[n.gridIdx].grid.get() == outputGridPtr.get() &&
@@ -3681,36 +3687,29 @@ inline void Tool::sdf2udf()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(findMatch(action_name, {"sdf2udf"}));// mode = 0 for no match
-  try {
-    const int age = mParser.get<int>("vdb");
-    const bool keep = mParser.get<bool>("keep");
-    std::string grid_name = mParser.get<std::string>("name");
+  // Errors propagate to Parser::run, which reports them and sets the exit status.
+  const int age = mParser.get<int>("vdb");
+  const bool keep = mParser.get<bool>("keep");
+  std::string grid_name = mParser.get<std::string>("name");
 
-    /// get the relevant grid to be processed
-    auto it = this->getGrid(age);// will throw if grid doesn't exist
-    GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid) throw std::invalid_argument("no FloatGrid with age " + std::to_string(age));
-    if (keep) {
-      GridT::Ptr tmp = grid->deepCopy();
-      mGrid.push_back(tmp);
-      grid = tmp;
-    }
-    if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
-    grid->setName(grid_name);
-    if (grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("no level set with age "+std::to_string(age));
-    grid->setGridClass(GRID_UNKNOWN);// GRID_LEVEL_SET -> GRID_UNKNOW
-
-    if (mParser.verbose) mTimer.start(action_name);
-    tools::foreach(grid->beginValueAll(), [](auto &it){it.setValue(math::Abs(*it));});
-    if (mParser.verbose) mTimer.stop();
-
-  } catch (const std::exception& e) {
-    if (mErrorOnWarning) {
-      throw std::invalid_argument(action_name+": "+e.what());
-    } else {
-      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
-    }
+  /// get the relevant grid to be processed
+  auto it = this->getGrid(age);// will throw if grid doesn't exist
+  GridT::Ptr grid = gridPtrCast<GridT>(*it);
+  if (!grid) throw std::invalid_argument("no FloatGrid with age " + std::to_string(age));
+  // validate before copying or renaming, so a failure leaves the grid stack unchanged
+  if (grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("no level set with age "+std::to_string(age));
+  if (keep) {
+    GridT::Ptr tmp = grid->deepCopy();
+    mGrid.push_back(tmp);
+    grid = tmp;
   }
+  if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
+  grid->setName(grid_name);
+  grid->setGridClass(GRID_UNKNOWN);// GRID_LEVEL_SET -> GRID_UNKNOW
+
+  if (mParser.verbose) mTimer.start(action_name);
+  tools::foreach(grid->beginValueAll(), [](auto &it){it.setValue(math::Abs(*it));});
+  if (mParser.verbose) mTimer.stop();
 }// Tool::sdf2udf
 
 // ==============================================================================================================

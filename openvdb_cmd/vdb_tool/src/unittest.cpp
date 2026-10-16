@@ -4493,6 +4493,9 @@ TEST_F(Test_vdb_tool, LoopProgress)
         "vdb_tool -quiet -for i=2147483646,2147483647,2 -eval {$i} -end"));
     EXPECT_EQ("-2147483647\n", runCapturingClog(
         "vdb_tool -quiet -for i=-2147483647,-2147483648,-2 -eval {$i} -end"));
+    // A loop body may move the loop variable backward, e.g. to retry an iteration.
+    EXPECT_EQ("0\n1\n1\n2\n", runCapturingClog("vdb_tool -quiet -eval {0:@r} -for i=0,3 -eval {$i}"
+        " -if {$i:$r:+:1:==} -eval {$i:1:-:@i} -eval {1:@r} -end -end"));
     for (const std::string range : {"0,2,0", "0,2,-1", "2,0,1", "0,inf,1",
                                     "0,2,nan", "16777216,16777220,0.5"}) {
         EXPECT_THROW(runCapturingClog("vdb_tool -quiet -for i=" + range + " -end"),
@@ -4555,6 +4558,25 @@ TEST_F(Test_vdb_tool, MalformedPly)
     ASSERT_NO_THROW(geometry.readPLY(input));
     ASSERT_EQ(1u, geometry.vtxCount());
     EXPECT_EQ(openvdb::Vec3s(1.25f, 2.5f, 3.75f), geometry.vtx()[0]);
+
+    // Binary int32 coordinates are converted rather than reinterpreted as floats,
+    // both for the packed x,y,z layout and with additional properties.
+    for (const bool extra : {false, true}) {
+        std::ostringstream ints;
+        ints << "ply\nformat binary_"
+             << (openvdb::vdb_tool::isLittleEndian() ? "little" : "big")
+             << "_endian 1.0\nelement vertex 1\n"
+             << (extra ? "property uchar red\n" : "")
+             << "property int x\nproperty int32 y\nproperty int z\nend_header\n";
+        if (extra) ints.put(char(127));
+        const int32_t ijk[] = {-3, 4, 70000};
+        ints.write(reinterpret_cast<const char*>(ijk), sizeof(ijk));
+        Geometry intGeometry;
+        std::istringstream intInput(ints.str());
+        ASSERT_NO_THROW(intGeometry.readPLY(intInput)) << extra;
+        ASSERT_EQ(1u, intGeometry.vtxCount());
+        EXPECT_EQ(openvdb::Vec3s(-3.0f, 4.0f, 70000.0f), intGeometry.vtx()[0]) << extra;
+    }
 }
 
 TEST_F(Test_vdb_tool, LogPreservesStdout)
@@ -4856,6 +4878,95 @@ TEST_F(Test_vdb_tool, CliOffCrlfInput)
     EXPECT_EQ(openvdb::Vec3f(1, 0, 0), geometry.vtx()[1]);
     EXPECT_EQ(openvdb::Vec3f(0, 1, 0), geometry.vtx()[2]);
     EXPECT_EQ(openvdb::Vec3I(0, 1, 2), geometry.tri()[0]);
+}
+
+TEST_F(Test_vdb_tool, OffBlankLinesAndTruncation)
+{
+    using openvdb::vdb_tool::Geometry;
+    {// blank CRLF lines, as delivered by binary stdin on Windows, and indented comments
+        Geometry geometry;
+        std::istringstream input("OFF\r\n\r\n3 1 0\r\n\r\n0 0 0\r\n  # comment\r\n1 0 0\r\n"
+                                 "0 1 0\r\n \t\r\n3 0 1 2\r\n\r\n");
+        ASSERT_NO_THROW(geometry.readOFF(input));
+        ASSERT_EQ(3u, geometry.vtxCount());
+        ASSERT_EQ(1u, geometry.triCount());
+        EXPECT_EQ(openvdb::Vec3f(1, 0, 0), geometry.vtx()[1]);
+        EXPECT_EQ(openvdb::Vec3I(0, 1, 2), geometry.tri()[0]);
+    }
+    for (const std::string data : {"OFF\n", "OFF\nx 1 0\n", "OFF\n3 1 0\n0 0 0\n1 0 0\n",
+                                   "OFF\n3 1 0\n0 0 0\n1 0\n0 1 0\n3 0 1 2\n",
+                                   "OFF\n3 1 0\n0 0 0\n1 0 0\n0 1 0\n",
+                                   "OFF\n3 1 0\n0 0 0\n1 0 0\n0 1 0\n3 0 1\n",
+                                   "OFF\n3 1 0\n0 0 0\n1 0 0\n0 1 0\nx 0 1 2\n"}) {
+        Geometry geometry;
+        std::istringstream input(data);
+        EXPECT_THROW(geometry.readOFF(input), std::invalid_argument) << data;
+    }
+    {// XYZ input with CRLF blank lines
+        Geometry geometry;
+        std::istringstream input("0 0 0\r\n\r\n1 2 3\r\n");
+        ASSERT_NO_THROW(geometry.readXYZ(input));
+        ASSERT_EQ(2u, geometry.vtxCount());
+        EXPECT_EQ(openvdb::Vec3f(1, 2, 3), geometry.vtx()[1]);
+    }
+}
+
+TEST_F(Test_vdb_tool, WriteVdbPreservesHalf)
+{
+    auto isHalf = [](const std::string &path) {
+        openvdb::io::File file(path);
+        file.open();
+        auto grids = file.getGrids();
+        file.close();
+        EXPECT_EQ(1u, grids->size());
+        return !grids->empty() && grids->front()->saveFloatAsHalf();
+    };
+    bool success = false;
+    runCapturingClog("vdb_tool -quiet -sphere dim=16 -write bits=16 data/half_in.vdb", &success);
+    ASSERT_TRUE(success);
+    ASSERT_TRUE(isHalf("data/half_in.vdb"));
+    // the default keeps the precision of the input grid
+    runCapturingClog("vdb_tool -quiet -read data/half_in.vdb -write data/half_out.vdb", &success);
+    ASSERT_TRUE(success);
+    EXPECT_TRUE(isHalf("data/half_out.vdb"));
+    // an explicit bit-width overrides it
+    runCapturingClog("vdb_tool -quiet -read data/half_in.vdb -write bits=32 data/half_out.vdb", &success);
+    ASSERT_TRUE(success);
+    EXPECT_FALSE(isHalf("data/half_out.vdb"));
+    runCapturingClog("vdb_tool -quiet -sphere dim=16 -write data/half_out.vdb", &success);
+    ASSERT_TRUE(success);
+    EXPECT_FALSE(isHalf("data/half_out.vdb"));
+    runCapturingClog("vdb_tool -quiet -sphere dim=16 -write bits=8 data/half_out.vdb", &success);
+    EXPECT_FALSE(success);
+    std::remove("data/half_in.vdb");
+    std::remove("data/half_out.vdb");
+}
+
+TEST_F(Test_vdb_tool, Sdf2UdfFailure)
+{
+    bool success = true;
+    const auto out = runCapturingClog("vdb_tool -quiet -sphere dim=16 name=original -sdf2udf"
+        " -sdf2udf keep=true -eval str=count:{gridCount},name:{0:gridName}", &success);
+    EXPECT_FALSE(success);// the second -sdf2udf fails since its input is no longer a level set
+    EXPECT_NE(std::string::npos, out.find("count:1,name:sdf2udf_original")) << out;
+    EXPECT_THROW(runCapturingClog("vdb_tool -quiet -errorOnWarning -sdf2udf"), std::invalid_argument);
+}
+
+TEST_F(Test_vdb_tool, CliLogFatalError)
+{
+    CliTempDir dir;
+    for (const std::string tee : {"true", "false"}) {
+        const auto log = (dir.path / ("fatal " + tee + ".log")).string();
+        const auto result = runCli({"-quiet", "-log", "file=" + log, "tee=" + tee, "-for", "i=0", "-end"});
+        ASSERT_FALSE(result.timedOut);
+        EXPECT_NE(0, result.exitCode);
+        const auto text = openvdb::vdb_tool::readFileToString(log);
+        EXPECT_NE(std::string::npos, text.find("ForLoop: expected two or three arguments")) << text;
+        // main() still reports the error on stderr after the log is closed, exactly once
+        const auto first = result.error.find("ForLoop: expected two or three arguments");
+        ASSERT_NE(std::string::npos, first) << result.error;
+        EXPECT_EQ(std::string::npos, result.error.find("ForLoop: expected", first + 1)) << result.error;
+    }
 }
 
 TEST_F(Test_vdb_tool, CliLoggingPipeline)

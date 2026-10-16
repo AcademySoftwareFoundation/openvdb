@@ -805,7 +805,9 @@ public:
         if (sum < std::numeric_limits<T>::lowest() || sum > std::numeric_limits<T>::max())
             throw std::invalid_argument("ForLoop: loop value out of range");
         const T next = static_cast<T>(sum);
-        if (vec[2] > T(0) ? next <= vec[0] : next >= vec[0])
+        // Compare with the current value, not the previous loop value, since loop bodies
+        // may move the variable backward, e.g. to retry an iteration.
+        if (vec[2] > T(0) ? next <= current : next >= current)
             throw std::invalid_argument("ForLoop: step does not advance the loop value");
         vec[0] = next;
         if (this->valid()) this->set(vec[0]);

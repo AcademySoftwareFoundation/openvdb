@@ -160,7 +160,7 @@ vdb_tool can read and write configuration files (any extension is accepted, but 
 
 The format is intentionally tiny and line-oriented:
 
-1. **The first line must be a version header**: `vdb_tool MAJOR.MINOR.PATCH` (e.g. `vdb_tool 10.8.0`). Loading fails if it's missing or the major version doesn't match the running tool.
+1. **The first line must be a version header**: `vdb_tool MAJOR.MINOR.PATCH` (e.g. `vdb_tool 10.9.0`). Loading fails if it's missing or the major version doesn't match the running tool.
 2. **One action per line**. The first non-whitespace token on each line is the action name; the leading `-` used on the command line is **implicit and must be omitted**.
 3. **Subsequent tokens on the same line are that action's options/values**, separated by whitespace. E.g. `sphere r=2 voxel=0.05` is a single action with two options.
 4. **Comments**: a line whose first non-whitespace character is `#` or `%` is a full-line comment. Inline `#` comments are stripped only outside `{...}` expressions and quoted text, preserving loop counters such as `{$#i}`. Within an action, `%` is the modulo operator, so `calc n = 5 % 2` evaluates to 1. Use `#` for inline comments previously introduced with `%`.
@@ -794,7 +794,7 @@ Each `-case` opens its own scope closed by `-end`, and the outer `-switch` is cl
 The same example as a configuration file (`switch.txt`, run with `vdb_tool -config switch.txt`):
 
 ```
-vdb_tool 10.8.0
+vdb_tool 10.9.0
 for c=0,4
    switch {$c}
       case 0
@@ -886,7 +886,7 @@ vdb_tool -read mesh_mask.obj -mesh2ls voxel=0.1 width=3 -for n=200,300,1 -read p
 
 ## Example of a configuration file performing Particle-to-Mesh generation
 ```
-vdb_tool 10.8.0
+vdb_tool 10.9.0
 
 # 1. LOAD A MASK (Optional)
 # Used to clip the fluid so it doesn't leak out of the container
@@ -939,7 +939,7 @@ or as a config file:
 
 Same 200-sphere phyllotaxis spiral as the RPN config above, written with the more readable infix `-calc` syntax (one multi-statement kernel replaces seven sequential `-eval` calls). Notice how `x` and `y` already include the radial factor (`x = r*cos(a)`), so the sphere's `center=` doesn't need to multiply by `r` again as the RPN version does — the two examples are mathematically equivalent.
 ```
-vdb_tool 10.8.0
+vdb_tool 10.9.0
 for n=0,200,1
     # Multi-statement calc kernel. Reads `n` from for-loop memory; writes
     # back a, r, x, y. The final assignment `r = 0.5*(5+r)^0.25` reuses
@@ -957,7 +957,7 @@ render spiral.ppm image=1024x1024 translate=(0,0,40)
 ## Production example with complex math in a configuration file using RPN syntax
 This example, based on -eval vs -calc, is only included for completion! The example above using -calc is much more user-friendly.
 ```
-vdb_tool 10.8.0
+vdb_tool 10.9.0
 for n=0,200,1
     eval {$n:137.5:*:@deg}  # deg = 137.5 * n
     eval {$deg:d2r:@radian} # radian = d2r(deg)
