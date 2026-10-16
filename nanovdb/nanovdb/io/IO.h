@@ -42,6 +42,7 @@
 #include <string> // for std::string
 #include <sstream> // for std::stringstream
 #include <cstring> // for std::strcmp
+#include <type_traits> // for std::is_unsigned
 #include <memory> // for std::unique_ptr
 #include <vector> // for std::vector
 #ifdef NANOVDB_USE_ZIP
@@ -128,6 +129,18 @@ using fileSize_t = uint64_t;
 /// @cond
 namespace Internal {
 static constexpr fileSize_t MAX_SIZE = 1UL << 30; // size is 1 GB
+
+/// @brief Add a grid size read from a stream to a running byte count
+/// @throw std::runtime_error if the sum wraps around
+template<typename SizeT>
+inline void addGridSize(SizeT& total, SizeT gridSize)
+{
+    static_assert(std::is_unsigned<SizeT>::value,
+                  "addGridSize relies on unsigned wrap-around to detect overflow");
+    const SizeT sum = total + gridSize;// unsigned wrap-around is well defined
+    if (sum < total) throw std::runtime_error("Grid sizes in stream overflow a byte count");
+    total = sum;
+}
 
 template<typename BufferT>
 static fileSize_t write(std::ostream& os, const GridHandle<BufferT>& handle, Codec codec, uint32_t n);
@@ -509,7 +522,7 @@ GridHandle<BufferT> readGrid(std::istream& is, int n, const BufferT& pool)
                 std::streamoff skipSize = 0;
                 for (auto& m : seg.meta) {
                     ++gridCount;
-                    bufferSize += m.gridSize;
+                    Internal::addGridSize(bufferSize, m.gridSize);
                     skipSize   += m.fileSize;
                 }// loop over grids in segment
                 is.seekg(skipSize, std::ios_base::cur); // skip forward from the current position
@@ -637,7 +650,7 @@ VecT<GridHandle<BufferT>> readGrids(std::istream& is, const BufferT& pool = Buff
         Segment seg;
         while (seg.read(is)) {
             uint64_t bufferSize = 0;
-            for (auto& m : seg.meta) bufferSize += m.gridSize;
+            for (auto& m : seg.meta) Internal::addGridSize(bufferSize, m.gridSize);
             auto buffer = BufferT::create(bufferSize, &pool);
             uint64_t bufferOffset = 0;
             for (uint16_t i = 0; i < seg.header.gridCount; ++i) {
