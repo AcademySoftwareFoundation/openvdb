@@ -990,6 +990,23 @@ TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
 }//  mergeSplitDeviceGrids
 
 // make -j 4 testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*Cuda*" --gtest_break_on_failure
+TEST(TestNanoVDBCUDA, voxelSetsToDeviceGrids)
+{
+    using BufferT = nanovdb::cuda::DeviceBuffer;
+    nanovdb::Coord coords[3] = {nanovdb::Coord(1,2,3), nanovdb::Coord(10,20,8), nanovdb::Coord(-5,0,7)}, *d_coords = nullptr;
+    ASSERT_EQ(cudaSuccess, cudaMalloc(&d_coords, sizeof(coords)));
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_coords, coords, sizeof(coords), cudaMemcpyHostToDevice));
+    std::vector<std::tuple<const nanovdb::Coord* const, size_t, double>> voxelSets{{d_coords, 2, 1.0}, {d_coords + 2, 1, 0.5}};
+    auto handle = nanovdb::tools::cuda::voxelsToGrid<float, const nanovdb::Coord*, BufferT>(voxelSets);
+    ASSERT_EQ(2u, handle.gridCount());
+    handle.deviceDownload();
+    EXPECT_EQ(2u, handle.grid<float>(0)->activeVoxelCount());
+    EXPECT_EQ(1u, handle.grid<float>(1)->activeVoxelCount());
+    EXPECT_EQ(1u, handle.gridData(1)->mGridIndex);
+    EXPECT_EQ(2u, handle.gridData(1)->mGridCount);
+    ASSERT_EQ(cudaSuccess, cudaFree(d_coords));
+}// voxelSetsToDeviceGrids
+
 TEST(TestNanoVDBCUDA, CudaIndexGridToGrid_basic)
 {
     using BufferT = nanovdb::cuda::DeviceBuffer;
