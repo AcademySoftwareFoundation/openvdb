@@ -466,7 +466,9 @@ void shortManPage [[noreturn]] (const ProgOptions& opts, int exitStatus = EXIT_F
     "usage: " << gProgName << " [command] [--help|-h] [-v] [<args>]\n" <<
     '\n' <<
     "CLI utility for processing OpenVDB data using AX.\n" <<
-    "Available [command] modes are: [execute|analyze|functions] (Default: execute).\n";
+    "Available [command] modes are: [execute|analyze|functions] (Default: execute).\n" <<
+    "    -debug|-info|-warn|-error|-fatal\n" <<
+    "        set the diagnostic message threshold (default: warn)\n";
     openvdb::ax::cli::usage(std::cerr, opts.mHelp.opts(), opts.mHelp.doc(), false);
     openvdb::ax::cli::usage(std::cerr, opts.mVerbose.opts(), opts.mVerbose.doc(), false);
     std::cerr << '\n';

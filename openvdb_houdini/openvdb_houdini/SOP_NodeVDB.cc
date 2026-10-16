@@ -183,8 +183,11 @@ SOP_NodeVDB::SOP_NodeVDB(OP_Network* net, const char* name, OP_Operator* op):
 #ifndef SESI_OPENVDB
     // Initialize the OpenVDB library
     openvdb::initialize();
-    // Forward OpenVDB log messages to the UT_ErrorManager (for all SOPs).
-    startLogForwarding(SOP_OPTYPE_ID);
+#ifdef OPENVDB_HOUDINI_LOG_FORWARDING
+    // Forward OpenVDB log messages to the Houdini Universal Log.
+    // Off by default since messages can land on an unrelated node.
+    startLogForwarding();
+#endif
 #endif
 
     // Register grid-specific info text for Point Data Grids
