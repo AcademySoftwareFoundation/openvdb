@@ -29,7 +29,7 @@
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/cuda/HandleStorage.h>
-#include <nanovdb/cuda/GridHandle.cuh> // for cuda::mergeGridHandles in the point-set overloads
+#include <nanovdb/cuda/GridHandle.cuh> // for merging the per-set grids in the point-set overloads
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>

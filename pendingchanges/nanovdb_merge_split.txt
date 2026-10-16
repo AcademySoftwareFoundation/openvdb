@@ -7,5 +7,5 @@ NanoVDB:
   - The dual-space overloads of nanovdb::cuda::mergeGridHandles and nanovdb::cuda::splitGridHandles (and the older nanovdb::mergeDeviceGrids / splitDeviceGrids) are deprecated, to be removed together with the dual-space buffers: hold grids in GridHandle<cuda::Buffer<std::byte>> and use the single-space overloads. In-tree callers, including the point-set builder overloads at their default buffer type, stay warning-free until the removal.
 
   Bug Fixes:
-  - The point-set overloads of nanovdb::tools::cuda::pointsToGrid and voxelsToGrid, which build one grid per set and merge the results, failed to compile for every buffer type; they now merge through cuda::mergeGridHandles and work for both buffer families.
+  - The point-set overloads of nanovdb::tools::cuda::pointsToGrid and voxelsToGrid, which build one grid per set and merge the results, failed to compile for every buffer type; they now build each set directly and merge the results, for both buffer families.
   - Defined nanovdb::tools::cuda::pointsToGrid(points, pointCount, voxelSize, type, buffer, stream), which was declared but had no definition, so any call failed to link.

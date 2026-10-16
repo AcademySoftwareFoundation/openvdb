@@ -184,6 +184,7 @@ template<typename BufferT>
 inline void rewriteGridCounts(const std::vector<GridData*>& dst, const std::vector<uint32_t>& gridIndex,
                               uint32_t gridCount, const BufferT& storage, cudaStream_t stream)
 {
+    static_assert(BufferHasDeviceSingle<BufferT>::value, "rewriteGridCounts requires single-space device storage");
     const size_t n = dst.size();
     if (gridIndex.size() != n)
         throw std::invalid_argument("rewriteGridCounts: expected one grid index per destination");
@@ -205,10 +206,6 @@ inline void rewriteGridCounts(const std::vector<GridData*>& dst, const std::vect
     }
 }
 
-}// namespace detail
-
-namespace detail {
-
 /// @brief Implementation behind the deprecated dual-space splitGridHandles,
 ///        kept warning-free for in-tree callers until the dual buffers are
 ///        removed.
@@ -216,6 +213,7 @@ template<typename BufferT, template <class, class...> class VectorT = std::vecto
 inline VectorT<GridHandle<BufferT>>
 splitDualGridHandles(const GridHandle<BufferT> &handle, const BufferT* other, cudaStream_t stream)
 {
+    static_assert(BufferTraits<BufferT>::hasDeviceDual, "splitDualGridHandles requires a dual-space buffer");
     const void *ptr = handle.deviceData();
     if (ptr == nullptr) return VectorT<GridHandle<BufferT>>();
     VectorT<GridHandle<BufferT>> handles(handle.gridCount());
@@ -246,6 +244,7 @@ template<typename BufferT, template <class, class...> class VectorT>
 inline GridHandle<BufferT>
 mergeDualGridHandles(const VectorT<GridHandle<BufferT>> &handles, const BufferT* other, cudaStream_t stream)
 {
+    static_assert(BufferTraits<BufferT>::hasDeviceDual, "mergeDualGridHandles requires a dual-space buffer");
     uint64_t size = 0u;
     uint32_t counter = 0u, gridCount = 0u;
     for (auto &h : handles) {
