@@ -330,47 +330,13 @@ File::getGrids(const io::ReadOptions& readOptions) const
             // Nothing to convert or clip: preserve pointer identity with mGrids.
             ret = mGrids;
         } else {
-            ret.reset(new GridPtrVec);
-
-            // Instances (grids sharing a source tree) share the converted tree
-            // too, unless instancing is disabled. Under a clip, share only
-            // when transforms agree, since a clip depends on each grid's own
-            // transform.
-            const bool shareConvertedTrees = isInstancingEnabled() &&
-                readOptions.readMode != io::ReadMode::MetadataOnly;
-            struct Resolved { GridBase::Ptr grid; math::Transform::ConstPtr transform; };
-            std::map<const TreeBase*, Resolved> resolvedBySourceTree;
-
-            for (const auto& cachedGrid : *mGrids) {
-                const TreeBase* sourceTree = &cachedGrid->constBaseTree();
-                GridBase::Ptr grid;
-
-                if (shareConvertedTrees) {
-                    auto it = resolvedBySourceTree.find(sourceTree);
-                    if (it != resolvedBySourceTree.end() &&
-                        (!clip || *it->second.transform == cachedGrid->transform()))
-                    {
-                        const GridBase::Ptr& resolved = it->second.grid;
-                        grid = resolved->copyGridWithNewTree();
-                        grid->clearMetadata();
-                        grid->insertMeta(*cachedGrid);
-                        grid->setTransform(cachedGrid->transformPtr());
-                        grid->setTree(resolved->baseTreePtr());
-                        ret->push_back(grid);
-                        continue;
-                    }
-                }
-
-                grid = resolveCachedGrid(cachedGrid, readOptions, mReadDiagnostics);
-
-                if (shareConvertedTrees) {
-                    // Keep the first-seen entry as canonical, so a later
-                    // mismatched transform under clip doesn't overwrite it.
-                    resolvedBySourceTree.try_emplace(
-                        sourceTree, Resolved{grid, cachedGrid->transformPtr()});
-                }
-                ret->push_back(grid);
-            }
+            ret = this->resolveCachedGrids(*mGrids, readOptions);
+        }
+    } else if (readOptions.clipBBox.isSorted()) {
+        // A clip depends on each grid's own transform, so instances do not share trees.
+        ret.reset(new GridPtrVec);
+        for (NameMapCIter i = mGridDescriptors.begin(), e = mGridDescriptors.end(); i != e; ++i) {
+            ret->push_back(this->readGridFromDescriptor(i->second, readOptions));
         }
     } else {
         ret.reset(new GridPtrVec);
@@ -518,10 +484,9 @@ File::readGrid(const Name& name, const io::ReadOptions& readOptions)
     // If a grid with the given name was already read and cached
     // (along with the entire contents of the file, because the file
     // doesn't support random access), retrieve and return it.
-    GridBase::Ptr cachedGrid = retrieveCachedGrid(name);
-    GridBase::Ptr grid;
+    GridBase::Ptr cachedGrid = this->retrieveCachedGrid(name);
     if (cachedGrid) {
-        return resolveCachedGrid(cachedGrid, readOptions, mReadDiagnostics);
+        return this->resolveCachedGrid(cachedGrid, readOptions, mReadDiagnostics);
     }
 
     NameMapCIter it = findDescriptor(name);
@@ -529,18 +494,90 @@ File::readGrid(const Name& name, const io::ReadOptions& readOptions)
         OPENVDB_THROW(KeyError, mFilename << " has no grid named \"" << name << "\"");
     }
 
-    // Seek to and read in the grid from the file.
-    const GridDescriptor& gd = it->second;
+    return this->readGridFromDescriptor(it->second, readOptions);
+}
+
+
+GridPtrVecPtr
+File::readGrids(const Name& name, const io::ReadOptions& readOptions)
+{
+    if (!mIsOpen) {
+        OPENVDB_THROW(IoError, mFilename << " is not open for reading.");
+    }
+
+    GridPtrVecPtr ret(new GridPtrVec);
+
+    const std::pair<NameMapCIter, NameMapCIter> range = mGridDescriptors.equal_range(name);
+
+    if (!this->inputHasGridOffsets()) {
+        // All grids are already cached and connected.
+        GridPtrVec cachedGrids;
+        for (NameMapCIter it = range.first; it != range.second; ++it) {
+            const auto cachedIt = mNamedGrids.find(it->second.uniqueName());
+            if (cachedIt == mNamedGrids.end()) continue;
+            cachedGrids.push_back(cachedIt->second);
+        }
+        if (readOptions.readMode == io::ReadMode::Original && !readOptions.clipBBox.isSorted()) {
+            // Nothing to convert or clip: preserve pointer identity with the cached grids.
+            ret.reset(new GridPtrVec(cachedGrids));
+        } else {
+            ret = this->resolveCachedGrids(cachedGrids, readOptions);
+        }
+    } else if (readOptions.clipBBox.isSorted()) {
+        // A clip depends on each grid's own transform, so instances do not share trees.
+        for (NameMapCIter it = range.first; it != range.second; ++it) {
+            ret->push_back(this->readGridFromDescriptor(it->second, readOptions));
+        }
+    } else {
+        Archive::NamedGridMap namedGrids;
+
+        for (NameMapCIter it = range.first; it != range.second; ++it) {
+            const GridDescriptor& gd = it->second;
+            gd.seekToGrid(this->inputStream());
+            GridBase::Ptr grid = Archive::readGrid(gd, this->inputStream(), readOptions, mReadDiagnostics);
+            ret->push_back(grid);
+            namedGrids[gd.uniqueName()] = grid;
+        }
+
+        // Read any instance parents that were not matched by name. They are
+        // used to connect instances and are not returned.
+        for (NameMapCIter it = range.first; it != range.second; ++it) {
+            const GridDescriptor& gd = it->second;
+            if (!gd.isInstance() || namedGrids.count(gd.instanceParentName()) > 0) continue;
+
+            const NameMapCIter parentIt = this->findDescriptorByUniqueName(gd.instanceParentName());
+            if (parentIt == mGridDescriptors.end()) {
+                OPENVDB_THROW(KeyError, "missing instance parent \""
+                    << GridDescriptor::nameAsString(gd.instanceParentName())
+                    << "\" for grid " << GridDescriptor::nameAsString(gd.uniqueName())
+                    << " in file " << mFilename);
+            }
+            parentIt->second.seekToGrid(this->inputStream());
+            namedGrids[gd.instanceParentName()] =
+                Archive::readGrid(parentIt->second, this->inputStream(), readOptions, mReadDiagnostics);
+        }
+
+        for (NameMapCIter it = range.first; it != range.second; ++it) {
+            Archive::connectInstance(it->second, namedGrids);
+        }
+    }
+    return ret;
+}
+
+
+GridBase::Ptr
+File::readGridFromDescriptor(const GridDescriptor& gd, const io::ReadOptions& readOptions) const
+{
     // This method should not be called for files that don't contain grid offsets.
-    OPENVDB_ASSERT(inputHasGridOffsets());
-    // Seek to the grid in the file.
-    gd.seekToGrid(inputStream());
-    grid = Archive::readGrid(gd, inputStream(), readOptions, mReadDiagnostics);
+    OPENVDB_ASSERT(this->inputHasGridOffsets());
+
+    // Seek to and read in the grid from the file.
+    gd.seekToGrid(this->inputStream());
+    GridBase::Ptr grid = Archive::readGrid(gd, this->inputStream(), readOptions, mReadDiagnostics);
 
     if (gd.isInstance()) {
         /// @todo Refactor to share code with Archive::connectInstance()?
-        NameMapCIter parentIt =
-            findDescriptor(GridDescriptor::nameAsString(gd.instanceParentName()));
+        NameMapCIter parentIt = this->findDescriptorByUniqueName(gd.instanceParentName());
         if (parentIt == mGridDescriptors.end()) {
             OPENVDB_THROW(KeyError, "missing instance parent \""
                 << GridDescriptor::nameAsString(gd.instanceParentName())
@@ -558,9 +595,9 @@ File::readGrid(const Name& name, const io::ReadOptions& readOptions)
         parentOptions.clipBBox = BBoxd();
 
         GridBase::Ptr parent;
-        OPENVDB_ASSERT(inputHasGridOffsets());
-        parentIt->second.seekToGrid(inputStream());
-        parent = Archive::readGrid(parentIt->second, inputStream(), parentOptions, mReadDiagnostics);
+        OPENVDB_ASSERT(this->inputHasGridOffsets());
+        parentIt->second.seekToGrid(this->inputStream());
+        parent = Archive::readGrid(parentIt->second, this->inputStream(), parentOptions, mReadDiagnostics);
         if (parent) {
             grid->setTree(parent->baseTreePtr());
             const auto& clipBBox = readOptions.clipBBox;
@@ -643,6 +680,17 @@ File::findDescriptor(const Name& name) const
         }
     }
     return ret;
+}
+
+
+File::NameMapCIter
+File::findDescriptorByUniqueName(const Name& uniqueName) const
+{
+    const auto range = mGridDescriptors.equal_range(GridDescriptor::stripSuffix(uniqueName));
+    for (NameMapCIter it = range.first; it != range.second; ++it) {
+        if (it->second.uniqueName() == uniqueName) return it;
+    }
+    return mGridDescriptors.end();
 }
 
 
@@ -781,6 +829,55 @@ convertGridForReadMode(const GridBase& source, const ReadOptions& readOptions,
 }
 
 } // anonymous namespace
+
+
+GridPtrVecPtr
+File::resolveCachedGrids(const GridPtrVec& cachedGrids, const io::ReadOptions& readOptions) const
+{
+    GridPtrVecPtr ret(new GridPtrVec);
+    const bool clip = readOptions.clipBBox.isSorted();
+
+    // Instances (grids sharing a source tree) share the converted tree
+    // too, unless instancing is disabled. Under a clip, share only
+    // when transforms agree, since a clip depends on each grid's own
+    // transform.
+    const bool shareConvertedTrees = this->isInstancingEnabled() &&
+        readOptions.readMode != io::ReadMode::MetadataOnly;
+    struct Resolved { GridBase::Ptr grid; math::Transform::ConstPtr transform; };
+    std::map<const TreeBase*, Resolved> resolvedBySourceTree;
+
+    for (const auto& cachedGrid : cachedGrids) {
+        const TreeBase* sourceTree = &cachedGrid->constBaseTree();
+        GridBase::Ptr grid;
+
+        if (shareConvertedTrees) {
+            auto it = resolvedBySourceTree.find(sourceTree);
+            if (it != resolvedBySourceTree.end() &&
+                (!clip || *it->second.transform == cachedGrid->transform()))
+            {
+                const GridBase::Ptr& resolved = it->second.grid;
+                grid = resolved->copyGridWithNewTree();
+                grid->clearMetadata();
+                grid->insertMeta(*cachedGrid);
+                grid->setTransform(cachedGrid->transformPtr());
+                grid->setTree(resolved->baseTreePtr());
+                ret->push_back(grid);
+                continue;
+            }
+        }
+
+        grid = this->resolveCachedGrid(cachedGrid, readOptions, mReadDiagnostics);
+
+        if (shareConvertedTrees) {
+            // Keep the first-seen entry as canonical, so a later
+            // mismatched transform under clip doesn't overwrite it.
+            resolvedBySourceTree.try_emplace(
+                sourceTree, Resolved{grid, cachedGrid->transformPtr()});
+        }
+        ret->push_back(grid);
+    }
+    return ret;
+}
 
 
 GridBase::Ptr
