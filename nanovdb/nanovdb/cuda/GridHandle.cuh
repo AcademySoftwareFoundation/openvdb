@@ -178,9 +178,11 @@ inline void orderAfterRetainedStream(const BufferT& buf, cudaStream_t stream, cu
 ///        readback and one synchronization of @c stream cover all grids, so
 ///        every copy issued on @c stream before the call has completed when
 ///        it returns.
-/// @param dirty device scratch of at least dst.size() flags
+/// @param storage a buffer over the resource that allocates the per-grid
+///        changed flags (the output storage, so no other resource is used)
+template<typename BufferT>
 inline void rewriteGridCounts(const std::vector<GridData*>& dst, const std::vector<uint32_t>& gridIndex,
-                              uint32_t gridCount, bool* dirty, cudaStream_t stream)
+                              uint32_t gridCount, const BufferT& storage, cudaStream_t stream)
 {
     const size_t n = dst.size();
     if (gridIndex.size() != n)
@@ -189,12 +191,14 @@ inline void rewriteGridCounts(const std::vector<GridData*>& dst, const std::vect
         if (gridIndex[i] >= gridCount)
             throw std::invalid_argument("rewriteGridCounts: grid index out of range of the grid count");
     }
+    using DirtyT = Buffer<bool, typename BufferT::ResourceType>;
+    DirtyT dirty = makeMetaScratch<DirtyT>(storage, n, stream);
     for (size_t i = 0; i < n; ++i) {
-        updateGridCount<<<1, 1, 0, stream>>>(dst[i], gridIndex[i], gridCount, dirty + i);
+        updateGridCount<<<1, 1, 0, stream>>>(dst[i], gridIndex[i], gridCount, dirty.data() + i);
         cudaCheckError();
     }
     std::unique_ptr<bool[]> hostDirty(new bool[n]);
-    cudaCheck(cudaMemcpyAsync(hostDirty.get(), dirty, n * sizeof(bool), cudaMemcpyDeviceToHost, stream));
+    cudaCheck(cudaMemcpyAsync(hostDirty.get(), dirty.data(), n * sizeof(bool), cudaMemcpyDeviceToHost, stream));
     cudaCheck(cudaStreamSynchronize(stream));
     for (size_t i = 0; i < n; ++i) {
         if (hostDirty[i]) tools::cuda::updateChecksum(dst[i], CheckMode::Partial, stream);
@@ -337,11 +341,7 @@ splitGridHandles(const GridHandle<BufferT> &handle, cudaStream_t stream, const B
         dst.push_back(reinterpret_cast<GridData*>(detail::deviceStorageData(buffers.back())));
         cudaCheck(cudaMemcpyAsync(dst.back(), util::PtrAdd(src, meta[n].offset), meta[n].size, cudaMemcpyDeviceToDevice, stream));
     }
-    using DirtyT = Buffer<bool, typename BufferT::ResourceType>;
-    {
-        DirtyT dirty = detail::makeMetaScratch<DirtyT>(buffers.front(), gridCount, stream);
-        detail::rewriteGridCounts(dst, std::vector<uint32_t>(gridCount, 0u), 1u, dirty.data(), stream);
-    }
+    detail::rewriteGridCounts(dst, std::vector<uint32_t>(gridCount, 0u), 1u, buffers.front(), stream);
     if constexpr (!is_async_resource<typename BufferT::ResourceType>::value) cudaCheck(cudaStreamSynchronize(stream));
 
     handles.reserve(gridCount);
@@ -413,11 +413,7 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, cudaStream_t strea
             cudaCheck(cudaMemcpyAsync(dst.back(), util::PtrAdd(src, m.offset), m.size, cudaMemcpyDeviceToDevice, stream));
         }
     }
-    using DirtyT = Buffer<bool, typename BufferT::ResourceType>;
-    {
-        DirtyT dirty = detail::makeMetaScratch<DirtyT>(buffer, gridCount, stream);
-        detail::rewriteGridCounts(dst, gridIndex, gridCount, dirty.data(), stream);
-    }
+    detail::rewriteGridCounts(dst, gridIndex, gridCount, buffer, stream);
     if constexpr (!is_async_resource<typename BufferT::ResourceType>::value) cudaCheck(cudaStreamSynchronize(stream));
     return detail::HandleFactory::make(std::move(buffer), std::move(meta));
 }// cuda::mergeGridHandles
