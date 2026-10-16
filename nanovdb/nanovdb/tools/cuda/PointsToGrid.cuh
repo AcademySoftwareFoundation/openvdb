@@ -133,6 +133,46 @@ voxelsToGrid(std::vector<std::tuple<const PtrT, size_t, double>> pointSet,
              const BufferT &buffer = BufferT(),
              cudaStream_t stream = 0);
 
+//-------------------------------------------------------------------------------------------------------
+
+/// @brief Resource form of voxelsToGrid: the output and all internal scratch
+///        allocate through @c resource, on @c stream. Passing a stream selects
+///        this form; the prototype-buffer form above is unchanged.
+/// @tparam ResourceT stream-ordered memory resource, held by value; pass a
+///         cuda::ResourceRef<R> to allocate through a borrowed instance
+/// @return a handle over cuda::Buffer<std::byte, ResourceT> on the device
+template<typename BuildT, typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
+GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>
+voxelsToGrid(const PtrT dGridVoxels,
+             size_t voxelCount,
+             double voxelSize,
+             cudaStream_t stream,
+             ResourceT resource = ResourceT());
+
+/// @brief Resource form of pointsToGrid for a fixed voxel size; see the
+///        resource form of voxelsToGrid.
+template<typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
+GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>
+pointsToGrid(const PtrT dWorldPoints,
+             int pointCount,
+             double voxelSize,
+             PointType type,
+             cudaStream_t stream,
+             ResourceT resource = ResourceT());
+
+/// @brief Resource form of pointsToGrid targeting a maximum point density;
+///        see the resource form of voxelsToGrid.
+template<typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
+GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>
+pointsToGrid(const PtrT dWorldPoints,
+             int pointCount,
+             int maxPointsPerVoxel,
+             int tolerance,
+             int maxIterations,
+             PointType type,
+             cudaStream_t stream,
+             ResourceT resource = ResourceT());
+
 }// namespace tools::cuda ========================================================================
 
 /// @brief Example class of a fancy pointer that can optionally be used as a template for writing
@@ -1455,6 +1495,42 @@ voxelsToGrid(std::vector<std::tuple<const PtrT,size_t,double>> vec, const Buffer
     std::vector<GridHandle<BufferT>> handles;
     for (auto &p : vec) handles.push_back(voxelsToGrid<BuildT, PtrT, BufferT, ResourceT>(std::get<0>(p), std::get<1>(p), std::get<2>(p), buffer, stream));
     return mergeDeviceGrids(handles, stream);
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename BuildT, typename PtrT, typename ResourceT>
+GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>
+voxelsToGrid(const PtrT d_ijk, size_t voxelCount, double voxelSize, cudaStream_t stream, ResourceT resource)
+{
+    using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
+    PointsToGrid<BuildT, ResourceT> converter(voxelSize, Vec3d(0.0), stream, resource);
+    return converter.getHandle(d_ijk, voxelCount, BufferT(stream, resource, 0, nanovdb::cuda::noInit));
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename PtrT, typename ResourceT>
+GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>
+pointsToGrid(const PtrT d_xyz, int pointCount, double voxelSize, PointType type, cudaStream_t stream, ResourceT resource)
+{
+    using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
+    PointsToGrid<Point, ResourceT> converter(voxelSize, Vec3d(0.0), stream, resource);
+    converter.setPointType(type);
+    return converter.getHandle(d_xyz, pointCount, BufferT(stream, resource, 0, nanovdb::cuda::noInit));
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename PtrT, typename ResourceT>
+GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>
+pointsToGrid(const PtrT d_xyz, int pointCount, int maxPointsPerVoxel, int tolerance, int maxIterations, PointType type,
+             cudaStream_t stream, ResourceT resource)
+{
+    using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
+    PointsToGrid<Point, ResourceT> converter(maxPointsPerVoxel, tolerance, maxIterations, stream, resource);
+    converter.setPointType(type);
+    return converter.getHandle(d_xyz, pointCount, BufferT(stream, resource, 0, nanovdb::cuda::noInit));
 }
 
 }// namespace tools::cuda ======================================================================================================================================

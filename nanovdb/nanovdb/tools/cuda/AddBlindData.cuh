@@ -46,16 +46,20 @@ namespace tools::cuda {// ============================================
 /// @param pool optional pool used for allocation
 /// @param stream optional CUDA stream (defaults to CUDA stream 0)
 /// @return GridHandle with blind data appended
-template<typename BuildT, typename BlindDataT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+namespace detail {
+
+/// @brief Shared body of both addBlindData forms; @c resource allocates the scratch.
+template<typename BuildT, typename BlindDataT, typename BufferT, typename ResourceT>
 GridHandle<BufferT>
 addBlindData(const NanoGrid<BuildT> *d_grid,
              const BlindDataT *d_blindData,
              uint64_t valueCount,
-             GridBlindDataClass blindClass   = GridBlindDataClass::Unknown,
-             GridBlindDataSemantic semantics = GridBlindDataSemantic::Unknown,
-             const char *name = "",
-             const BufferT &pool = BufferT(),
-             cudaStream_t stream = 0)
+             GridBlindDataClass blindClass,
+             GridBlindDataSemantic semantics,
+             const char *name,
+             const BufferT &pool,
+             cudaStream_t stream,
+             ResourceT &resource)
 {
     // In:  |-----------|--------- |-----------|
     //        old grid    old meta   old data
@@ -68,7 +72,6 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
     // extract byte sizes of the grid, blind meta data and blind data
     enum {GRID=0, META=1, DATA=2, CHECKSUM=3};
     using ScratchT = nanovdb::cuda::Buffer<uint64_t, nanovdb::cuda::ResourceRef<ResourceT>>;
-    auto &resource = nanovdb::cuda::default_resource<ResourceT>();
     uint64_t tmp[4];
     ScratchT tmpBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 4, nanovdb::cuda::noInit);
     uint64_t *d_tmp = tmpBuf.data();
@@ -133,7 +136,45 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
 
     nanovdb::cuda::detail::orderBeforeHandleConstruction<BufferT>(stream);
     return GridHandle<BufferT>(std::move(buffer));
-}// cudaAddBlindData
+}// detail::addBlindData
+
+}// namespace detail
+
+template<typename BuildT, typename BlindDataT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+GridHandle<BufferT>
+addBlindData(const NanoGrid<BuildT> *d_grid,
+             const BlindDataT *d_blindData,
+             uint64_t valueCount,
+             GridBlindDataClass blindClass   = GridBlindDataClass::Unknown,
+             GridBlindDataSemantic semantics = GridBlindDataSemantic::Unknown,
+             const char *name = "",
+             const BufferT &pool = BufferT(),
+             cudaStream_t stream = 0)
+{
+    return detail::addBlindData(d_grid, d_blindData, valueCount, blindClass, semantics, name, pool, stream,
+                                nanovdb::cuda::default_resource<ResourceT>());
+}// addBlindData
+
+/// @brief Resource form of addBlindData: the output and the scratch allocate
+///        through @c resource, on @c stream. Passing a stream selects this
+///        form; the prototype-buffer form above is unchanged.
+/// @tparam ResourceT stream-ordered memory resource, held by value; pass a
+///         cuda::ResourceRef<R> to allocate through a borrowed instance
+template<typename BuildT, typename BlindDataT, typename ResourceT = nanovdb::cuda::DeviceResource>
+GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>
+addBlindData(const NanoGrid<BuildT> *d_grid,
+             const BlindDataT *d_blindData,
+             uint64_t valueCount,
+             GridBlindDataClass blindClass,
+             GridBlindDataSemantic semantics,
+             const char *name,
+             cudaStream_t stream,
+             ResourceT resource = ResourceT())
+{
+    using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
+    return detail::addBlindData(d_grid, d_blindData, valueCount, blindClass, semantics, name,
+                                BufferT(stream, resource, 0, nanovdb::cuda::noInit), stream, resource);
+}// addBlindData (resource form)
 
 }// namespace tools::cuda
 
