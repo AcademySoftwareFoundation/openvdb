@@ -628,16 +628,22 @@ endif()
 
 if(OPENVDB_CORE_STATIC)
   target_include_directories(openvdb_static
-    PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/openvdb
+    PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/openvdb>
+      $<INSTALL_INTERFACE:${OPENVDB_INSTALL_INCLUDEDIR}>
     PRIVATE .
   )
 
   if(NOT USE_IMATH_HALF)
-    target_include_directories(openvdb_static SYSTEM PUBLIC ${CMAKE_SOURCE_DIR}/ext/imath)
+    target_include_directories(openvdb_static SYSTEM PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/ext/imath>)
   endif()
 
   if(USE_VCL)
-    target_include_directories(openvdb_static SYSTEM PUBLIC ${CMAKE_SOURCE_DIR}/ext/vcl)
+    target_include_directories(openvdb_static SYSTEM PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/ext/vcl>)
   endif()
 
   target_include_directories(openvdb_static PRIVATE
@@ -674,16 +680,22 @@ endif()
 
 if(OPENVDB_CORE_SHARED)
   target_include_directories(openvdb_shared
-    PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/openvdb
+    PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/openvdb>
+      $<INSTALL_INTERFACE:${OPENVDB_INSTALL_INCLUDEDIR}>
     PRIVATE .
   )
 
   if(NOT USE_IMATH_HALF)
-    target_include_directories(openvdb_shared SYSTEM PUBLIC ${CMAKE_SOURCE_DIR}/ext/imath)
+    target_include_directories(openvdb_shared SYSTEM PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/ext/imath>)
   endif()
 
   if(USE_VCL)
-    target_include_directories(openvdb_shared SYSTEM PUBLIC ${CMAKE_SOURCE_DIR}/ext/vcl)
+    target_include_directories(openvdb_shared SYSTEM PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/ext/vcl>)
   endif()
 
   target_include_directories(openvdb_shared PRIVATE
@@ -731,6 +743,7 @@ endif()
 
 if(OPENVDB_CORE_STATIC)
   install(TARGETS openvdb_static
+    EXPORT OpenVDBTargets
     RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR}
     LIBRARY DESTINATION ${OPENVDB_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${OPENVDB_INSTALL_LIBDIR}
@@ -739,6 +752,7 @@ endif()
 
 if(OPENVDB_CORE_SHARED)
   install(TARGETS openvdb_shared
+    EXPORT OpenVDBTargets
     RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR}
     LIBRARY DESTINATION ${OPENVDB_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${OPENVDB_INSTALL_LIBDIR}
@@ -763,3 +777,43 @@ install(FILES ${OPENVDB_LIBRARY_SIMD_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTAL
 if(USE_VCL)
   install(DIRECTORY ${CMAKE_SOURCE_DIR}/ext/vcl/openvdb DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR})
 endif()
+
+##########################################################################
+
+# CMake package config (find_package(OpenVDB CONFIG))
+
+include(CMakePackageConfigHelpers)
+
+set(OPENVDB_CMAKE_INSTALL_DIR ${OPENVDB_INSTALL_LIBDIR}/cmake/OpenVDB)
+
+# The static library exports the zstd target it was linked against. When that
+# is an alias, the exported name is the aliased target.
+if(USE_ZSTD)
+  get_target_property(OPENVDB_EXPORTED_ZSTD_TARGET Zstd::zstd ALIASED_TARGET)
+  if(NOT OPENVDB_EXPORTED_ZSTD_TARGET)
+    set(OPENVDB_EXPORTED_ZSTD_TARGET Zstd::zstd)
+  endif()
+endif()
+
+install(EXPORT OpenVDBTargets
+  NAMESPACE OpenVDB::
+  DESTINATION ${OPENVDB_CMAKE_INSTALL_DIR}
+)
+
+configure_package_config_file(
+  ${CMAKE_SOURCE_DIR}/cmake/config/OpenVDBConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/OpenVDBConfig.cmake
+  INSTALL_DESTINATION ${OPENVDB_CMAKE_INSTALL_DIR}
+)
+
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/OpenVDBConfigVersion.cmake
+  VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+  ${CMAKE_CURRENT_BINARY_DIR}/OpenVDBConfig.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/OpenVDBConfigVersion.cmake
+  DESTINATION ${OPENVDB_CMAKE_INSTALL_DIR}
+)
