@@ -104,9 +104,9 @@ public:
     )
         : mStream(stream), mTimer(stream), mBuilder(stream, resource), mDevicePoints(devicePoints), mPointCount(pointCount),
          mDeviceTriangles(deviceTriangles), mTriangleCount(triangleCount), mMap(map), mTempDevicePool(resource),
-         mXformedTriangles(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit),
-         mBoxTrianglePairsBuffer(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit),
-         mUniqueRootOriginsBuffer(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
+         mXformedTriangles(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource, nanovdb::cuda::detail::internalRef), 0, nanovdb::cuda::noInit),
+         mBoxTrianglePairsBuffer(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource, nanovdb::cuda::detail::internalRef), 0, nanovdb::cuda::noInit),
+         mUniqueRootOriginsBuffer(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource, nanovdb::cuda::detail::internalRef), 0, nanovdb::cuda::noInit)
     {}
 
     /// @brief Toggle on and off verbose mode

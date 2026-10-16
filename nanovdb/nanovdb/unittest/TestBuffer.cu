@@ -72,6 +72,9 @@ struct CountingResource
         if (p) { ++counters->deallocs; counters->deallocBytes = bytes; }
         nanovdb::cuda::DeviceResource{}.deallocate(p, bytes, alignment);
     }
+    // instances sharing counters are interchangeable
+    friend bool operator==(const CountingResource& a, const CountingResource& b) { return a.counters == b.counters; }
+    friend bool operator!=(const CountingResource& a, const CountingResource& b) { return !(a == b); }
 };
 
 /// @brief Streams recorded by all copies of a StreamRecordingResource.
@@ -105,6 +108,9 @@ struct StreamRecordingResource
         if (p) log->deallocStreams.push_back(cudaStream_t(0));
         nanovdb::cuda::DeviceResource{}.deallocate(p, bytes, alignment);
     }
+    // instances sharing a log are interchangeable
+    friend bool operator==(const StreamRecordingResource& a, const StreamRecordingResource& b) { return a.log == b.log; }
+    friend bool operator!=(const StreamRecordingResource& a, const StreamRecordingResource& b) { return !(a == b); }
 };
 
 //======================================================================
@@ -120,6 +126,9 @@ struct DualResource
     void deallocate(void*, size_t, size_t) {}
     void* allocate_async(size_t, size_t, cudaStream_t) { return nullptr; }
     void deallocate_async(void*, size_t, size_t, cudaStream_t) {}
+    // stateless
+    friend bool operator==(const DualResource&, const DualResource&) { return true; }
+    friend bool operator!=(const DualResource&, const DualResource&) { return false; }
 };
 
 // PinnedResource is synchronous-only: allocate/deallocate without a stream.
@@ -326,6 +335,9 @@ struct MixinResource : nanovdb::cuda::SyncFromAsync<MixinResource>
         if (p) { ++counters->deallocs; counters->deallocBytes = bytes; }
         nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
     }
+    // instances sharing counters are interchangeable
+    friend bool operator==(const MixinResource& a, const MixinResource& b) { return a.counters == b.counters; }
+    friend bool operator!=(const MixinResource& a, const MixinResource& b) { return !(a == b); }
 };
 
 // The mixin supplies the synchronous half, so both concepts are satisfied.
@@ -371,6 +383,9 @@ struct StatefulInlineResource : nanovdb::cuda::SyncFromAsync<StatefulInlineResou
     void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream) {
         ++deallocs; nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
     }
+    // state is inline, so only the same instance keeps one account
+    friend bool operator==(const StatefulInlineResource& a, const StatefulInlineResource& b) { return &a == &b; }
+    friend bool operator!=(const StatefulInlineResource& a, const StatefulInlineResource& b) { return !(a == b); }
 };
 
 // A ref over an async resource models both tiers; over a synchronous-only
@@ -399,15 +414,21 @@ TEST(TestBuffer, ResourceRefSharesTheUnderlyingResource)
     EXPECT_EQ(res.deallocs, 1);
 }
 
-TEST(TestBuffer, ResourceRefWithoutResourceEqualityFallsBackToIdentity)
+/// @brief A resource without operator==, which 13.2 deprecates and 14.0
+///        rejects. Never constructed through ResourceRef or Buffer here, which
+///        would trip the deprecation; TestNanoVDB.cu covers the runtime
+///        identity fallback under its file-wide suppression.
+struct NoEqualityResource : nanovdb::cuda::SyncFromAsync<NoEqualityResource>
 {
-    // StatefulInlineResource has no operator==, so identity is the only way
-    // to know memory from one ref may be freed through another.
-    StatefulInlineResource a, b;
-    nanovdb::cuda::ResourceRef<StatefulInlineResource> ra(a), raAgain(a), rb(b);
-    EXPECT_TRUE(ra == raAgain);   // same underlying resource
-    EXPECT_TRUE(ra != rb);        // different underlying resources
-}
+    static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream) {
+        return nanovdb::cuda::DeviceResource{}.allocate_async(bytes, alignment, stream);
+    }
+    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream) {
+        nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
+    }
+};
+
 
 TEST(TestBuffer, DestroyIsTheSpellingClearDelegatesTo)
 {
@@ -608,7 +629,7 @@ static_assert(IsEqualityComparable<nanovdb::cuda::PinnedResource>::value, "Pinne
 static_assert(IsEqualityComparable<nanovdb::cuda::ManagedResource>::value, "ManagedResource needs ==");
 static_assert(IsEqualityComparable<nanovdb::cuda::AsyncFromSync<nanovdb::cuda::MallocResource>>::value, "AsyncFromSync needs ==");
 // The adapter is only as comparable as what it wraps.
-static_assert(!IsEqualityComparable<nanovdb::cuda::AsyncFromSync<StatefulInlineResource>>::value,
+static_assert(!IsEqualityComparable<nanovdb::cuda::AsyncFromSync<NoEqualityResource>>::value,
               "AsyncFromSync over a resource without == must not claim equality");
 
 TEST(TestBuffer, BuiltInResourcesCompareEqual)

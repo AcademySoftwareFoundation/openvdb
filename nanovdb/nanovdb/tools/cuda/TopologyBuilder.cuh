@@ -150,7 +150,7 @@ public:
     void uploadProcessedRoot(cudaStream_t stream)
     {
         if (mDeviceRoot.size() < mHostRoot.size())
-            mDeviceRoot = ScratchT(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResource), mHostRoot.size(), nanovdb::cuda::noInit);
+            mDeviceRoot = ScratchT(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResource, nanovdb::cuda::detail::internalRef), mHostRoot.size(), nanovdb::cuda::noInit);
         cudaCheck(cudaMemcpyAsync(mDeviceRoot.data(), mHostRoot.data(), mHostRoot.size(), cudaMemcpyHostToDevice, stream));
     }
 
@@ -159,7 +159,7 @@ public:
     void uploadData(cudaStream_t stream)
     {
         if (mDeviceData.empty())
-            mDeviceData = BufT<Data>(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResource), 1, nanovdb::cuda::noInit);
+            mDeviceData = BufT<Data>(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResource, nanovdb::cuda::detail::internalRef), 1, nanovdb::cuda::noInit);
         cudaCheck(cudaMemcpyAsync(mDeviceData.data(), &mHostData, mDeviceData.size_bytes(), cudaMemcpyHostToDevice, stream));
     }
     Mask<5>* deviceUpperMasks() { return mUpperMasks.data(); }
@@ -176,7 +176,7 @@ public:
     //@}
     /// @brief A borrowing reference to the builder's resource, for consumers
     ///        allocating sibling scratch from the same instance.
-    nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource); }
+    nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource, nanovdb::cuda::detail::internalRef); }
 
     Data* data()             { return &mHostData; }
     Data* deviceData()       { return mDeviceData.data(); }

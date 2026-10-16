@@ -307,16 +307,16 @@ public:
         , mResource(&resource)
         , mTimer(stream)
         , mPointType(util::is_same<BuildT,Point>::value ? PointType::Default : PointType::Disable)
-        , mDeviceDataBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 1, nanovdb::cuda::noInit)
-        , mKeysBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
-        , mTileKeysBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
-        , mLeafKeysBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
-        , mLowerKeysBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
-        , mIndxBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
-        , mPointsPerVoxelBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
-        , mPointsPerVoxelPrefixBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
-        , mPointsPerLeafBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
-        , mPointsPerLeafPrefixBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
+        , mDeviceDataBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource, nanovdb::cuda::detail::internalRef), 1, nanovdb::cuda::noInit)
+        , mKeysBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource, nanovdb::cuda::detail::internalRef), 0, nanovdb::cuda::noInit)
+        , mTileKeysBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource, nanovdb::cuda::detail::internalRef), 0, nanovdb::cuda::noInit)
+        , mLeafKeysBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource, nanovdb::cuda::detail::internalRef), 0, nanovdb::cuda::noInit)
+        , mLowerKeysBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource, nanovdb::cuda::detail::internalRef), 0, nanovdb::cuda::noInit)
+        , mIndxBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource, nanovdb::cuda::detail::internalRef), 0, nanovdb::cuda::noInit)
+        , mPointsPerVoxelBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource, nanovdb::cuda::detail::internalRef), 0, nanovdb::cuda::noInit)
+        , mPointsPerVoxelPrefixBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource, nanovdb::cuda::detail::internalRef), 0, nanovdb::cuda::noInit)
+        , mPointsPerLeafBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource, nanovdb::cuda::detail::internalRef), 0, nanovdb::cuda::noInit)
+        , mPointsPerLeafPrefixBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource, nanovdb::cuda::detail::internalRef), 0, nanovdb::cuda::noInit)
         , mTempDevicePool(resource)
     {
         mData.map = map;
@@ -407,7 +407,7 @@ private:
 
     template<typename T>
     using BufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ResourceRef<ResourceT>>;
-    nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource); }
+    nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource, nanovdb::cuda::detail::internalRef); }
 
     cudaStream_t             mStream{0};
     ResourceT*               mResource;// non-owning; all device allocations (mDeviceData + scratch) route through this resource instance

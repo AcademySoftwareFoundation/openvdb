@@ -39,7 +39,7 @@ public:
     /// @param resource resource instance to allocate from; must outlive this pool.
     explicit TempPool(Resource& resource)
         : mResource(&resource)
-        , mBuffer(cudaStream_t{0}, ResourceRef<Resource>(resource), 0, noInit)
+        , mBuffer(cudaStream_t{0}, ResourceRef<Resource>(resource, nanovdb::cuda::detail::internalRef), 0, noInit)
     {
     }
 
@@ -67,7 +67,7 @@ public:
     void reallocate(cudaStream_t stream) {
         if (mBuffer.empty() || mRequestedSize > mSize) {
             mBuffer.destroy(stream);// free the outgrown block on this stream
-            mBuffer = BufferT(stream, ResourceRef<Resource>(*mResource), mRequestedSize, noInit);
+            mBuffer = BufferT(stream, ResourceRef<Resource>(*mResource, nanovdb::cuda::detail::internalRef), mRequestedSize, noInit);
             mSize = mBuffer.size();
         } else {
             mBuffer.set_stream(stream);// retained so the d-tor frees on the most-recently-used stream

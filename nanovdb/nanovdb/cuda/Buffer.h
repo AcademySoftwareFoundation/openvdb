@@ -379,6 +379,7 @@ private:
     ///        stream-ordered form and ignored by the synchronous one
     void allocate(size_t count, cudaStream_t stream)
     {
+        detail::checkResourceEquality<R>();
         if (count) {
             if constexpr (IsAsync)
                 mData = static_cast<T*>(mResource.allocate_async(checkedBytes(count), R::DEFAULT_ALIGNMENT, stream));

@@ -178,9 +178,10 @@ struct is_resource<R, std::void_t<
 
 /// @brief Detection trait: @c is_equality_comparable_resource<R>::value is
 ///        true iff @c R models a resource concept and provides operator== and
-///        operator!=, which cuda::mr's
-///        resource concepts require: two resources compare equal when memory
-///        allocated through one may be deallocated through the other.
+///        operator!=: two resources compare equal when memory allocated
+///        through one may be deallocated through the other. cuda::mr's
+///        resource concepts require them; using a resource without them is
+///        deprecated, and 14.0 makes them part of NanoVDB's concepts too.
 template <class R, class = void>
 struct is_equality_comparable_resource : std::false_type {};
 
@@ -190,6 +191,33 @@ struct is_equality_comparable_resource<R, std::void_t<
     decltype(bool(std::declval<const R&>() == std::declval<const R&>())),
     decltype(bool(std::declval<const R&>() != std::declval<const R&>()))>>
     : std::true_type {};
+
+namespace detail {
+
+/// @brief Reached only through a resource without operator==, so the
+///        deprecation names the resource type at the point of use.
+template<class R>
+[[deprecated("this memory resource has no operator== / operator!=, which NanoVDB 14.0 requires (as cuda::mr does): "
+             "add friend bool operator==(const R&, const R&), true when memory allocated through one may be "
+             "deallocated through the other (always, for a stateless resource), and the matching operator!=")]]
+inline void resourceWithoutEquality() {}
+
+/// @brief Warns, through the deprecation above, when @c R lacks the equality
+///        that 14.0 makes part of the resource concepts. Instantiated once per
+///        resource type, so a misuse warns once however often it recurs.
+template<class R>
+inline void checkResourceEquality()
+{
+    if constexpr (!is_equality_comparable_resource<R>::value) resourceWithoutEquality<R>();
+}
+
+/// @brief Tag for the ResourceRef constructor NanoVDB's own components use:
+///        it checks equality through checkResourceEquality, so a resource
+///        handed to a builder warns once rather than at every internal ref.
+struct InternalRef {};
+inline constexpr InternalRef internalRef{};
+
+}// namespace detail
 
 /// @brief CRTP base supplying the synchronous half of the resource concept in
 ///        terms of the stream-ordered half, so a custom stream-ordered resource
@@ -358,6 +386,18 @@ struct ResourceRef
 
     /// @brief Constructs a ref borrowing @c resource.
     /// @param resource resource to allocate from; must outlive this ref
+    template<class S = R, std::enable_if_t<is_equality_comparable_resource<S>::value, int> = 0>
+    ResourceRef(R& resource) : mResource(&resource) {}
+
+    /// @brief Constructs a ref for NanoVDB's own components; see detail::InternalRef.
+    ResourceRef(R& resource, detail::InternalRef) : mResource(&resource) { detail::checkResourceEquality<R>(); }
+
+    /// @brief Constructs a ref borrowing a resource without operator==.
+    /// @deprecated 14.0 requires operator== on every resource.
+    template<class S = R, std::enable_if_t<!is_equality_comparable_resource<S>::value, int> = 0>
+    [[deprecated("this memory resource has no operator== / operator!=, which NanoVDB 14.0 requires (as cuda::mr does): "
+                 "add friend bool operator==(const R&, const R&), true when memory allocated through one may be "
+                 "deallocated through the other (always, for a stateless resource), and the matching operator!=")]]
     ResourceRef(R& resource) : mResource(&resource) {}
 
     /// @{

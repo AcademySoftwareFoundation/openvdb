@@ -990,6 +990,28 @@ TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
 }//  mergeSplitDeviceGrids
 
 // make -j 4 testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*Cuda*" --gtest_break_on_failure
+// A resource without operator== is deprecated (14.0 requires it); until then
+// ResourceRef falls back to identity. The deprecation fires at the ref's
+// construction below, under this file's suppression.
+struct NoEqualityResource : nanovdb::cuda::SyncFromAsync<NoEqualityResource>
+{
+    static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream) {
+        return nanovdb::cuda::DeviceResource{}.allocate_async(bytes, alignment, stream);
+    }
+    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream) {
+        nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
+    }
+};
+
+TEST(TestNanoVDBCUDA, ResourceRefWithoutResourceEqualityFallsBackToIdentity)
+{
+    NoEqualityResource a, b;
+    nanovdb::cuda::ResourceRef<NoEqualityResource> ra(a), raAgain(a), rb(b);
+    EXPECT_TRUE(ra == raAgain);   // same underlying resource
+    EXPECT_TRUE(ra != rb);        // different underlying resources
+}// ResourceRefWithoutResourceEqualityFallsBackToIdentity
+
 TEST(TestNanoVDBCUDA, CudaIndexGridToGrid_basic)
 {
     using BufferT = nanovdb::cuda::DeviceBuffer;

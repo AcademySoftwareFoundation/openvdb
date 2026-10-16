@@ -7,3 +7,4 @@ NanoVDB:
   API Changes:
   - nanovdb::cuda::ResourceRef<R>::operator== now also compares the referenced resources when R provides operator==, as cuda::mr::resource_ref does; previously it compared only their addresses. Refs to two distinct instances of a stateless resource now compare equal, since memory allocated through either may be deallocated through the other.
   - nanovdb::cuda::Buffer::resize(count, stream) is deprecated in favor of resize(stream, count), and will be removed in 14.0.
+  - Using a CUDA memory resource without operator== / operator!= is deprecated: constructing a ResourceRef over it, or a cuda::Buffer, TempPool or GPU builder that allocates through it, warns once per resource type with the fix. 14.0 makes equality part of the resource concepts, as CCCL's cuda::mr concepts do. A stateless resource adds friend bool operator==(const R&, const R&) { return true; } and the matching operator!=.
