@@ -800,6 +800,14 @@ inline nanovdb::Half CreateNanoGridValueCast<nanovdb::Half, float>(const float v
     return ret;
 }
 
+template <>
+inline nanovdb::Half CreateNanoGridValueCast<nanovdb::Half, double>(const double val)
+{
+    nanovdb::Half ret;
+    ret.raw = math::FloatToHalf(float(val));
+    return ret;
+}
+
 //================================================================================================
 
 template <typename SrcGridT>
