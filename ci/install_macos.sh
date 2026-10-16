@@ -22,6 +22,7 @@ brew install nanobind # also installs the dependent python version
 brew install robin-map # required for nanobind
 brew install numpy # only for python tests
 brew install zlib
+brew install zstd
 brew install jemalloc
 
 # Alias python version installed by nanobind to path
