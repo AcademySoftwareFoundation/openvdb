@@ -219,7 +219,8 @@ public:
     ///        prefix copy, and the free of the old block — is ordered on
     ///        @c stream, which becomes the retained stream: the prefix copy is
     ///        the old block's last use, so that is the stream its free must be
-    ///        ordered on. Parameter order follows cuda::buffer: (stream, count).
+    ///        ordered on. Stream-first, like the (stream, resource, count,
+    ///        noInit) constructor and cuda::buffer's constructors.
     /// @param stream cuda stream the reallocation is ordered on
     /// @param count number of elements
     /// @warning The caller is responsible for ordering @c stream after any
@@ -255,10 +256,13 @@ public:
     }
 
     /// @brief Resizes the buffer to @c count elements on @c stream.
-    /// @deprecated Use resize(stream, count), the cuda::buffer argument order.
-    template<typename S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
-    [[deprecated("use resize(stream, count), the cuda::buffer argument order")]]
-    void resize(size_t count, cudaStream_t stream) { this->resize(stream, count); }
+    /// @deprecated Use resize(stream, count), the stream-first order.
+    /// @note The count is a template so a call with two literal zeros, which
+    ///       convert equally well to either parameter, is not ambiguous.
+    template<typename CountT, typename S = R,
+             std::enable_if_t<std::is_integral<CountT>::value && is_async_resource<S>::value, int> = 0>
+    [[deprecated("use resize(stream, count), the stream-first order")]]
+    void resize(CountT count, cudaStream_t stream) { this->resize(stream, size_t(count)); }
 
     /// @brief Resizes the buffer to @c count elements through the synchronous
     ///        resource, preserving the leading min(old, new) elements.

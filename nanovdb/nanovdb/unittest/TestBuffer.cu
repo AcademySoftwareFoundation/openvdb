@@ -563,6 +563,7 @@ TEST(TestBuffer, ResizePreservesPrefixAndRetainsNewStream)
 #if defined(__CUDACC__)
 #pragma nv_diagnostic push
 #pragma nv_diag_suppress 1444
+#pragma nv_diag_suppress 20199
 #endif
 TEST(TestBuffer, ResizeDeprecatedArgumentOrderForwards)
 {
@@ -575,6 +576,9 @@ TEST(TestBuffer, ResizeDeprecatedArgumentOrderForwards)
         EXPECT_EQ(buf.size(), 16u);
         EXPECT_EQ(buf.stream(), c);
         EXPECT_EQ(log.allocStreams.back(), c);
+        buf.resize(0, 0); // two literal zeros: count 0 on the default stream in either order
+        EXPECT_TRUE(buf.empty());
+        EXPECT_EQ(buf.stream(), cudaStream_t(0));
     }
     ASSERT_EQ(cudaStreamSynchronize(c), cudaSuccess);
     ASSERT_EQ(cudaStreamDestroy(c), cudaSuccess);
@@ -593,18 +597,17 @@ TEST(TestBuffer, ResizeDeprecatedArgumentOrderForwards)
 // Resource equality, as cuda::mr's resource concepts require
 //======================================================================
 
-template<typename R, typename = void>
-struct IsEqualityComparable : std::false_type {};
 template<typename R>
-struct IsEqualityComparable<R, std::void_t<decltype(std::declval<const R&>() == std::declval<const R&>()),
-                                           decltype(std::declval<const R&>() != std::declval<const R&>())>>
-    : std::true_type {};
+using IsEqualityComparable = nanovdb::cuda::is_equality_comparable_resource<R>;
 
 static_assert(IsEqualityComparable<nanovdb::cuda::DeviceResource>::value, "DeviceResource needs ==");
 static_assert(IsEqualityComparable<nanovdb::cuda::MallocResource>::value, "MallocResource needs ==");
 static_assert(IsEqualityComparable<nanovdb::cuda::PinnedResource>::value, "PinnedResource needs ==");
 static_assert(IsEqualityComparable<nanovdb::cuda::ManagedResource>::value, "ManagedResource needs ==");
 static_assert(IsEqualityComparable<nanovdb::cuda::AsyncFromSync<nanovdb::cuda::MallocResource>>::value, "AsyncFromSync needs ==");
+// The adapter is only as comparable as what it wraps.
+static_assert(!IsEqualityComparable<nanovdb::cuda::AsyncFromSync<StatefulInlineResource>>::value,
+              "AsyncFromSync over a resource without == must not claim equality");
 
 TEST(TestBuffer, BuiltInResourcesCompareEqual)
 {
@@ -614,13 +617,14 @@ TEST(TestBuffer, BuiltInResourcesCompareEqual)
     EXPECT_TRUE(nanovdb::cuda::MallocResource{} == nanovdb::cuda::MallocResource{});
     EXPECT_TRUE(nanovdb::cuda::PinnedResource{} == nanovdb::cuda::PinnedResource{});
     EXPECT_TRUE(nanovdb::cuda::ManagedResource{} == nanovdb::cuda::ManagedResource{});
-    // The adapter compares its wrapped resources.
-    using Adapted = nanovdb::cuda::AsyncFromSync<nanovdb::cuda::ResourceRef<nanovdb::cuda::MallocResource>>;
+    // A ref compares the referenced resources, as cuda::mr::resource_ref does:
+    // refs to two distinct stateless instances are interchangeable, so equal.
+    using RefT = nanovdb::cuda::ResourceRef<nanovdb::cuda::MallocResource>;
     nanovdb::cuda::MallocResource ma, mb;
-    EXPECT_TRUE((Adapted{nanovdb::cuda::ResourceRef<nanovdb::cuda::MallocResource>(ma)} ==
-                 Adapted{nanovdb::cuda::ResourceRef<nanovdb::cuda::MallocResource>(ma)}));
-    EXPECT_TRUE((Adapted{nanovdb::cuda::ResourceRef<nanovdb::cuda::MallocResource>(ma)} !=
-                 Adapted{nanovdb::cuda::ResourceRef<nanovdb::cuda::MallocResource>(mb)}));
+    EXPECT_TRUE(RefT(ma) == RefT(mb));
+    // The adapter compares its wrapped resources.
+    using Adapted = nanovdb::cuda::AsyncFromSync<RefT>;
+    EXPECT_TRUE((Adapted{RefT(ma)} == Adapted{RefT(mb)}));
 }
 
 //======================================================================

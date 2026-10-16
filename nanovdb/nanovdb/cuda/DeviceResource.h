@@ -176,6 +176,19 @@ struct is_resource<R, std::void_t<
     decltype(std::declval<R&>().deallocate(std::declval<void*>(), size_t{0}, size_t{0}))>>
     : std::true_type {};
 
+/// @brief Detection trait: @c is_equality_comparable_resource<R>::value is
+///        true iff @c R provides operator== and operator!=, which cuda::mr's
+///        resource concepts require: two resources compare equal when memory
+///        allocated through one may be deallocated through the other.
+template <class R, class = void>
+struct is_equality_comparable_resource : std::false_type {};
+
+template <class R>
+struct is_equality_comparable_resource<R, std::void_t<
+    decltype(bool(std::declval<const R&>() == std::declval<const R&>())),
+    decltype(bool(std::declval<const R&>() != std::declval<const R&>()))>>
+    : std::true_type {};
+
 /// @brief CRTP base supplying the synchronous half of the resource concept in
 ///        terms of the stream-ordered half, so a custom stream-ordered resource
 ///        only has to write allocate_async and deallocate_async.
@@ -194,6 +207,9 @@ struct is_resource<R, std::void_t<
 ///     static constexpr size_t DEFAULT_ALIGNMENT = 256;
 ///     void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream);
 ///     void  deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream);
+///     // equality, as cuda::mr requires: stateless, so every instance is interchangeable
+///     friend bool operator==(const MyResource&, const MyResource&) { return true; }
+///     friend bool operator!=(const MyResource&, const MyResource&) { return false; }
 /// };
 /// @endcode
 template <class Derived>
@@ -305,9 +321,12 @@ struct AsyncFromSync
     void* allocate(size_t bytes, size_t alignment) { return resource.allocate(bytes, alignment); }
     void  deallocate(void* p, size_t bytes, size_t alignment) { resource.deallocate(p, bytes, alignment); }
 
-    /// @brief Two adapters compare equal iff their wrapped resources do.
+    /// @brief Two adapters compare equal iff their wrapped resources do;
+    ///        present only when @c R itself is equality-comparable.
+    template<class S = R, std::enable_if_t<is_equality_comparable_resource<S>::value, int> = 0>
     friend bool operator==(const AsyncFromSync& lhs, const AsyncFromSync& rhs) { return lhs.resource == rhs.resource; }
-    friend bool operator!=(const AsyncFromSync& lhs, const AsyncFromSync& rhs) { return !(lhs == rhs); }
+    template<class S = R, std::enable_if_t<is_equality_comparable_resource<S>::value, int> = 0>
+    friend bool operator!=(const AsyncFromSync& lhs, const AsyncFromSync& rhs) { return !(lhs.resource == rhs.resource); }
 };// AsyncFromSync<R>
 
 /// @brief Non-owning reference to a memory resource that is itself a resource:
@@ -358,10 +377,18 @@ struct ResourceRef
     void* allocate(size_t bytes, size_t alignment) { return mResource->allocate(bytes, alignment); }
     void  deallocate(void* p, size_t bytes, size_t alignment) { mResource->deallocate(p, bytes, alignment); }
 
-    /// @brief Two refs compare equal iff they reference the same resource, i.e.
-    ///        memory allocated through one may be deallocated through the other.
-    friend bool operator==(ResourceRef lhs, ResourceRef rhs) { return lhs.mResource == rhs.mResource; }
-    friend bool operator!=(ResourceRef lhs, ResourceRef rhs) { return lhs.mResource != rhs.mResource; }
+    /// @brief Two refs compare equal iff memory allocated through one may be
+    ///        deallocated through the other: they reference the same resource,
+    ///        or resources that compare equal. As cuda::mr::resource_ref does,
+    ///        this compares the referenced resources when @c R provides
+    ///        operator==; otherwise only identity can establish it.
+    friend bool operator==(ResourceRef lhs, ResourceRef rhs)
+    {
+        if (lhs.mResource == rhs.mResource) return true;
+        if constexpr (is_equality_comparable_resource<R>::value) return *lhs.mResource == *rhs.mResource;
+        else return false;
+    }
+    friend bool operator!=(ResourceRef lhs, ResourceRef rhs) { return !(lhs == rhs); }
 
 private:
     R* mResource;
