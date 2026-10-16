@@ -182,8 +182,12 @@ class ValueOnIndex{};
 /// @brief Dummy type for a voxel whose value equals its binary active state
 class ValueMask{};
 
-/// @brief Dummy type for a 16 bit floating point values (placeholder for IEEE 754 Half)
-class Half{};
+/// @brief Type containing raw 16 bits for half precision floating point values (IEEE 754 Half)
+class Half
+{
+    public:
+    uint16_t raw;
+};
 
 /// @brief Dummy type for a 4bit quantization of float point values
 class Fp4{};
@@ -225,7 +229,7 @@ enum class GridType : uint32_t { Unknown = 0, //  unknown value type - should ra
                                  Vec3f = 6, //  single precision floating 3D vector
                                  Vec3d = 7, //  double precision floating 3D vector
                                  Mask = 8, //  no value, just the active state
-                                 Half = 9, //  half precision floating point value (placeholder for IEEE 754 Half)
+                                 Half = 9, //  half precision floating point value (IEEE 754 Half)
                                  UInt32 = 10, // single precision unsigned integer value
                                  Boolean = 11, // boolean value, encoded in bit array
                                  RGBA8 = 12, // RGBA packed into 32bit word in reverse-order, i.e. R is lowest byte.
@@ -547,13 +551,6 @@ struct BuildToValueMap<ValueMask>
 {
     using Type = bool;
     using type = bool;
-};
-
-template<>
-struct BuildToValueMap<Half>
-{
-    using Type = float;
-    using type = float;
 };
 
 template<>
