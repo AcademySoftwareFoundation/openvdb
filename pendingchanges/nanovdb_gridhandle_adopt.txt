@@ -1,0 +1,5 @@
+NanoVDB:
+  API changes:
+  - Added nanovdb::GridHandle::adopt(buffer, metadata) and GridHandle::metaData(), the public way to construct a handle over bytes whose layout the caller already knows (a copy of another handle's grids, or grids the caller laid out itself). No grid header is read, so a device buffer is wrapped without a parse kernel. adopt checks only the layout arithmetic: grids contiguous from offset zero, each starting at a multiple of NANOVDB_DATA_ALIGNMENT, each at least a header, all within the buffer. cuda::copyTo and GridHandle::copy use it.
+  - nanovdb::cuda::detail::HandleFactory is deprecated and forwards to GridHandle::adopt and GridHandle::metaData. It will be removed in a future release.
+  - nanovdb::mergeGrids and nanovdb::splitGrids accept host-accessible single-space handles, e.g. GridHandle<cuda::Buffer<std::byte, cuda::PinnedResource>>. Without a pool, the output allocates through a default-constructed resource.
