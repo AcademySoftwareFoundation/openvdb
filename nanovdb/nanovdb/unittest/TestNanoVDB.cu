@@ -29,6 +29,8 @@
 #include <nanovdb/util/Timer.h>
 #include <nanovdb/io/IO.h>
 #include <nanovdb/cuda/Buffer.h>
+#include <nanovdb/cuda/PinnedResource.h>
+#include <nanovdb/cuda/HandleStorage.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/cuda/DeviceStreamMap.h>
 #include <nanovdb/cuda/DeviceMesh.h>
@@ -988,6 +990,41 @@ TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
     }
     //timer.stop();
 }//  mergeSplitDeviceGrids
+
+TEST(TestNanoVDBCUDA, mergeSplitPinnedGrids)
+{
+    // Host-accessible single-space handles merge and split on the host, with
+    // or without a pool, and match the HostBuffer result byte for byte.
+    using PinBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::PinnedResource>;
+    std::vector<nanovdb::GridHandle<>> hosts;
+    std::vector<nanovdb::GridHandle<PinBufT>> pinned;
+    for (int radius = 100; radius < 130; radius += 10) {
+        hosts.push_back(nanovdb::tools::createLevelSetSphere(radius, nanovdb::Vec3d(0), 1, 3, nanovdb::Vec3d(0), "sphere_" + std::to_string(radius)));
+        pinned.push_back(hosts.back().copy<PinBufT>());// host-to-host deep copy into pinned storage
+    }
+    auto hostMerged = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(hosts);
+    ASSERT_EQ(3u, hostMerged.gridCount());
+
+    auto merged = nanovdb::mergeGrids<PinBufT, std::vector>(pinned);// no pool: a default-constructed PinnedResource
+    ASSERT_EQ(3u, merged.gridCount());
+    ASSERT_EQ(hostMerged.bufferSize(), merged.bufferSize());
+    EXPECT_EQ(0, std::memcmp(merged.data(), hostMerged.data(), hostMerged.bufferSize()));
+    EXPECT_NE(merged.grid<float>(2), nullptr);
+    EXPECT_TRUE(nanovdb::tools::validateChecksum(merged.gridData(2), nanovdb::CheckMode::Default));
+
+    PinBufT pool(16, nanovdb::cuda::noInit);
+    auto merged2 = nanovdb::mergeGrids<PinBufT, std::vector>(pinned, &pool);
+    ASSERT_EQ(hostMerged.bufferSize(), merged2.bufferSize());
+    EXPECT_EQ(0, std::memcmp(merged2.data(), hostMerged.data(), hostMerged.bufferSize()));
+
+    auto parts = nanovdb::splitGrids<PinBufT, std::vector>(merged);
+    ASSERT_EQ(3u, parts.size());
+    for (size_t i = 0; i < parts.size(); ++i) {
+        ASSERT_EQ(hosts[i].bufferSize(), parts[i].bufferSize());
+        EXPECT_EQ(0, std::memcmp(parts[i].data(), hosts[i].data(), hosts[i].bufferSize()));
+        EXPECT_NE(parts[i].grid<float>(), nullptr);
+    }
+}//  mergeSplitPinnedGrids
 
 // make -j 4 testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*Cuda*" --gtest_break_on_failure
 TEST(TestNanoVDBCUDA, CudaIndexGridToGrid_basic)
