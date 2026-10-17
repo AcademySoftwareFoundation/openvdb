@@ -147,26 +147,24 @@ inline DstBufferT makeTransferStorage(uint64_t bytes, cudaStream_t stream, const
     }
 }
 
-
-/// @brief The one gateway for constructing a GridHandle from a buffer plus
-///        metadata that is already known to be valid -- adopted from another
-///        handle, whose own construction from raw bytes did the validation.
-struct HandleFactory
+/// @deprecated Use GridHandle::adopt and GridHandle::metaData.
+struct [[deprecated("use GridHandle::adopt(buffer, meta) and GridHandle::metaData()")]] HandleFactory
 {
     template<typename BufferT>
     static GridHandle<BufferT> make(BufferT&& buffer, std::vector<GridHandleMetaData> meta)
     {
-        return GridHandle<BufferT>(std::move(buffer), std::move(meta));
+        return GridHandle<BufferT>::adopt(std::move(buffer), std::move(meta));
     }
 
     template<typename BufferT>
     static const std::vector<GridHandleMetaData>& meta(const GridHandle<BufferT>& handle)
     {
-        return handle.mMetaData;
+        return handle.metaData();
     }
 };
 
 }// namespace detail
+
 /// @brief Deep-copies a grid handle into a different address space: the
 ///        explicit, stream-carrying transfer between single-space device
 ///        handles and host-readable handles (HostBuffer or a host-accessible
@@ -233,7 +231,7 @@ inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, cudaStre
     // validated when that handle was constructed from raw bytes -- no kernel
     // runs here, which is what keeps this header host-includable. A device
     // destination is stream-ordered: use it on @a stream, or synchronize.
-    return detail::HandleFactory::make(std::move(dst), detail::HandleFactory::meta(src));
+    return GridHandle<DstBufferT>::adopt(std::move(dst), src.metaData());
 }// cuda::copyTo
 
 /// @brief Convenience overload issuing the copy on the source buffer's

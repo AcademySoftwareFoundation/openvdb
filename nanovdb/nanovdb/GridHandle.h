@@ -34,13 +34,6 @@ namespace nanovdb {
 
 struct GridHandleMetaData {uint64_t offset, size; GridType gridType;};
 
-namespace cuda { namespace detail {
-// Defined in nanovdb/cuda/HandleStorage.h: the one gateway to constructing a
-// handle from a buffer plus already-validated metadata (handle-to-handle
-// transfers), so the trust boundary stays visible in a single place.
-struct HandleFactory;
-}}// namespace cuda::detail
-
 namespace detail {
 
 /// @brief Allocates @c bytes of host-readable storage for a GridHandle:
@@ -58,6 +51,49 @@ inline BufferT createHostStorage(uint64_t bytes, const BufferT& pool)
         return BufferT(pool.resource(), bytes, {});
     } else {
         return BufferT::create(bytes, &pool);
+    }
+}
+
+/// @brief Pointer-taking form for callers whose pool is optional: a null pool
+///        default-constructs the buffer type as the prototype, which for a
+///        single-space buffer means a default-constructed resource.
+template<typename BufferT>
+inline BufferT createHostStorage(uint64_t bytes, const BufferT* pool)
+{
+    if constexpr (!BufferHasHostSingle<BufferT>::value) {
+        return BufferT::create(bytes, pool);
+    } else if constexpr (BufferIsDefaultConstructible<BufferT>::value) {
+        return pool ? createHostStorage(bytes, *pool) : createHostStorage(bytes, BufferT());
+    } else {
+        if (!pool) throw std::runtime_error("GridHandle: a host-accessible buffer over a non-default-constructible "
+                                            "resource requires a pool buffer to take the resource from");
+        return createHostStorage(bytes, *pool);
+    }
+}
+
+/// @brief Checks that @a meta describes grids laid out back to back from
+///        offset zero inside @a bytes of storage, each starting at a multiple
+///        of NANOVDB_DATA_ALIGNMENT. This is all the validation a
+///        handle adopting caller-supplied metadata performs: no header is read.
+///        No grids at all is accepted only over an empty buffer (an empty handle).
+inline void validateGridLayout(const std::vector<GridHandleMetaData>& meta, uint64_t bytes)
+{
+    if (meta.empty()) {
+        if (bytes == 0) return;
+        throw std::runtime_error("GridHandle::adopt: the metadata describes no grids but the buffer is not empty");
+    }
+    uint64_t offset = 0;
+    for (size_t i = 0; i < meta.size(); ++i) {
+        auto where = [&] { return " (grid " + std::to_string(i) + " of " + std::to_string(meta.size()) + ")"; };
+        if (meta[i].offset != offset)
+            throw std::runtime_error("GridHandle::adopt: grids must be contiguous from offset zero" + where());
+        if (offset % NANOVDB_DATA_ALIGNMENT != 0)
+            throw std::runtime_error("GridHandle::adopt: grid offset is not a multiple of NANOVDB_DATA_ALIGNMENT" + where());
+        if (meta[i].size < sizeof(GridData))
+            throw std::runtime_error("GridHandle::adopt: grid size is smaller than a grid header" + where());
+        if (meta[i].size > bytes - offset)
+            throw std::runtime_error("GridHandle::adopt: grid exceeds the buffer" + where());
+        offset += meta[i].size;
     }
 }
 
@@ -129,17 +165,33 @@ class GridHandle
         return util::PtrAdd<NanoGrid<ValueT>>(base, mMetaData[n].offset);
     }
 
-    /// @brief Adopts a buffer whose metadata is already known, so a deep copy
-    ///        does not re-parse and a non-default-constructible buffer (e.g.
-    ///        over a ResourceRef) never needs default construction.
     GridHandle(BufferT&& buffer, std::vector<GridHandleMetaData> meta)
         : mMetaData(std::move(meta))
         , mBuffer(std::move(buffer)) {}
 
-    friend struct cuda::detail::HandleFactory;
-
 public:
     using BufferType = BufferT;
+
+    /// @brief Constructs a handle over @a buffer from metadata the caller
+    ///        already knows to describe its contents, because the bytes were
+    ///        copied from another handle (see metaData()) or laid out by the
+    ///        caller. No grid header is read, so this wraps device bytes
+    ///        without a parse kernel and works for buffers that are not
+    ///        default-constructible. Only the layout arithmetic is checked:
+    ///        the grids must be contiguous from offset zero, start aligned to
+    ///        NANOVDB_DATA_ALIGNMENT and fit the buffer,
+    ///        and an empty layout is accepted only over an empty buffer.
+    /// @throw std::runtime_error when the layout does not fit @a buffer
+    static GridHandle adopt(BufferT&& buffer, std::vector<GridHandleMetaData> meta)
+    {
+        detail::validateGridLayout(meta, buffer.size());
+        return GridHandle(std::move(buffer), std::move(meta));
+    }
+
+    /// @brief The layout of the grids in this handle's buffer: offset, size
+    ///        and grid type of each. Valid input to adopt() over a buffer
+    ///        holding a byte-for-byte copy of the grids.
+    const std::vector<GridHandleMetaData>& metaData() const { return mMetaData; }
 
     /// @brief  Move constructor from a dual host-device buffer
     /// @param buffer buffer containing one or more NanoGrids that will be moved into this GridHandle
@@ -532,7 +584,7 @@ inline GridHandle<OtherBufferT> GridHandle<BufferT>::copy() const
         // ordered on the source's retained stream, so synchronize that stream
         // before reading the result. Metadata is host-resident, so the copy
         // adopts it directly with no device re-parse.
-        return GridHandle(mBuffer.copy(), mMetaData);
+        return GridHandle::adopt(mBuffer.copy(), mMetaData);
     } else {
         static_assert(BufferIsDefaultConstructible<OtherBufferT>::value,
                       "GridHandle::copy() without arguments default-constructs the target pool buffer: "
@@ -634,18 +686,19 @@ void GridHandle<BufferT>::read(std::istream& is, const std::string &gridName, co
 // --------------------------> free-standing functions <------------------------------------
 
 /// @brief Split all grids in a single GridHandle into a vector of multiple GridHandles each with a single grid
-/// @tparam BufferT Type of the input and output grid buffers
-/// @param handle GridHandle with grids that will be slip into individual GridHandles
+/// @tparam BufferT Type of the input and output grid buffers: HostBuffer, a
+///         dual-space buffer, or a host-accessible single-space buffer such as
+///         cuda::Buffer<std::byte, cuda::PinnedResource>. Device handles use
+///         cuda::splitGridHandles.
+/// @param handle GridHandle with grids that will be split into individual GridHandles
 /// @param other optional pool used for allocation of output GridHandle
 /// @return Vector of GridHandles each containing a single grid
 template<typename BufferT, template <class, class...> class VectorT = std::vector>
 inline VectorT<GridHandle<BufferT>>
 splitGrids(const GridHandle<BufferT> &handle, const BufferT* other = nullptr)
 {
-    static_assert(!(BufferIsDeviceOnly<BufferT>::value),
-                  "splitGrids requires a buffer type providing create(): cuda::copyTo a HostBuffer handle first");
-    static_assert(!BufferHasHostSingle<BufferT>::value,
-                  "splitGrids requires a buffer type providing create(): copy the handle to a HostBuffer first");
+    static_assert(!BufferHasDeviceSingle<BufferT>::value,
+                  "splitGrids copies grids on the host: use cuda::splitGridHandles for a device handle");
     using HandleT = GridHandle<BufferT>;
     const void *ptr = handle.data();
     if (ptr == nullptr) return VectorT<HandleT>();
@@ -653,7 +706,7 @@ splitGrids(const GridHandle<BufferT> &handle, const BufferT* other = nullptr)
     for (auto &h : handles) {
         const GridData *src = reinterpret_cast<const GridData*>(ptr);
         NANOVDB_ASSERT(src->isValid());
-        auto buffer = BufferT::create(src->mGridSize, other);
+        auto buffer = detail::createHostStorage<BufferT>(src->mGridSize, other);
         GridData *dst = reinterpret_cast<GridData*>(buffer.data());
         std::memcpy(dst, src, src->mGridSize);
         tools::updateGridCount(dst, 0u, 1u);
@@ -664,7 +717,10 @@ splitGrids(const GridHandle<BufferT> &handle, const BufferT* other = nullptr)
 }// splitGrids
 
 /// @brief Combines (or merges) multiple GridHandles into a single GridHandle containing all grids
-/// @tparam BufferT Type of the input and output grid buffers
+/// @tparam BufferT Type of the input and output grid buffers: HostBuffer, a
+///         dual-space buffer, or a host-accessible single-space buffer such as
+///         cuda::Buffer<std::byte, cuda::PinnedResource>. Device handles use
+///         cuda::mergeGridHandles.
 /// @param handles Vector of GridHandles to be combined
 /// @param pool optional pool used for allocation of output GridHandle
 /// @return single GridHandle containing all input grids
@@ -673,16 +729,14 @@ inline GridHandle<BufferT>
 mergeGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* pool = nullptr)
 {
     static_assert(!BufferHasDeviceSingle<BufferT>::value,
-                  "mergeGrids requires a buffer type providing create(): cuda::copyTo HostBuffer handles first");
-    static_assert(!BufferHasHostSingle<BufferT>::value,
-                  "mergeGrids requires a buffer type providing create(): copy the handles to HostBuffer first");
+                  "mergeGrids copies grids on the host: use cuda::mergeGridHandles for device handles");
     uint64_t size = 0u;
     uint32_t counter = 0u, gridCount = 0u;
     for (auto &h : handles) {
         gridCount += h.gridCount();
         for (uint32_t n=0; n<h.gridCount(); ++n) size += h.gridSize(n);
     }
-    auto buffer = BufferT::create(size, pool);
+    auto buffer = detail::createHostStorage<BufferT>(size, pool);
     void *dst = buffer.data();
     for (auto &h : handles) {
         const void *src = h.data();
