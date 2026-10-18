@@ -235,6 +235,99 @@ TestFile::testStreamMetadataAfterRead()
 TEST_F(TestFile, testStreamMetadataAfterRead) { testStreamMetadataAfterRead(); }
 
 
+TEST_F(TestFile, testMixedGridClassesAndHalfFloat)
+{
+    using namespace openvdb;
+
+    const char* filename = "something.vdb2";
+    SharedPtr<const char> scopedFile(filename, ::remove);
+
+    FloatGrid::Ptr levelSet = createLevelSet<FloatGrid>();
+    unittest_util::makeSphere(/*dim=*/Coord(100), /*ctr=*/Vec3f(50, 50, 50), /*r=*/20.0,
+        *levelSet, unittest_util::SPHERE_SPARSE_NARROW_BAND);
+    levelSet->setName("levelSet");
+
+    FloatGrid::Ptr fog = levelSet->deepCopy();
+    tools::sdfToFogVolume(*fog);
+    fog->setName("fog");
+
+    // Unknown class, with inactive voxels that hold non-zero values.
+    FloatGrid::Ptr unknown = FloatGrid::create(0.0f);
+    unknown->setName("unknown");
+    unknown->tree().setValueOff(Coord(1, 2, 3), 7.0f);
+    unknown->tree().setValue(Coord(4, 5, 6), 9.0f);
+
+    // Half float next to full float. The values are exact in 16 bit floats.
+    FloatGrid::Ptr half = FloatGrid::create(0.0f);
+    half->setName("half");
+    half->setSaveFloatAsHalf(true);
+    half->tree().setValueOff(Coord(1, 2, 3), 3.0f);
+    half->tree().setValue(Coord(4, 5, 6), 5.0f);
+
+    FloatGrid::Ptr full = FloatGrid::create(0.0f);
+    full->setName("full");
+    full->tree().setValueOff(Coord(1, 2, 3), 3.0f);
+    full->tree().setValue(Coord(4, 5, 6), 5.0f);
+
+    GridPtrVec grids{levelSet, fog, unknown, half, full};
+    {
+        io::File file(filename);
+        file.write(grids);
+    }
+
+    auto check = [&](const GridPtrVec& read) {
+        ASSERT_EQ(grids.size(), read.size());
+        // File::getGrids() does not return grids in the order they were written,
+        // so match them up by name.
+        for (const GridBase::Ptr& expectedBase : grids) {
+            GridBase::Ptr actualBase;
+            for (const GridBase::Ptr& candidate : read) {
+                if (candidate->getName() == expectedBase->getName()) actualBase = candidate;
+            }
+            ASSERT_TRUE(actualBase) << expectedBase->getName();
+            ASSERT_TRUE(actualBase->isType<FloatGrid>());
+            const FloatGrid& expected = static_cast<const FloatGrid&>(*expectedBase);
+            const FloatGrid& actual = static_cast<const FloatGrid&>(*actualBase);
+            EXPECT_EQ(int(expected.getGridClass()), int(actual.getGridClass()));
+            EXPECT_EQ(expected.saveFloatAsHalf(), actual.saveFloatAsHalf());
+            EXPECT_EQ(expected.activeVoxelCount(), actual.activeVoxelCount());
+            EXPECT_EQ(expected.background(), actual.background());
+            // Compare every voxel, including inactive ones.
+            for (auto iter = expected.tree().cbeginLeaf(); iter; ++iter) {
+                for (auto voxel = iter->cbeginValueAll(); voxel; ++voxel) {
+                    EXPECT_EQ(*voxel, actual.tree().getValue(voxel.getCoord()));
+                }
+            }
+        }
+    };
+
+    // File::getGrids()
+    {
+        io::File file(filename);
+        file.open();
+        check(*file.getGrids());
+        file.close();
+    }
+    // File::readGrid() by name
+    {
+        io::File file(filename);
+        file.open();
+        GridPtrVec read;
+        for (const GridBase::Ptr& grid : grids) read.push_back(file.readGrid(grid->getName()));
+        check(read);
+        file.close();
+    }
+    // Stream
+    {
+        std::ostringstream ostr(std::ios_base::binary);
+        io::Stream(ostr).write(grids);
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        io::Stream stream(istr);
+        check(*stream.getGrids());
+    }
+}
+
+
 TEST_F(TestFile, testStreamMetadataScope)
 {
     using namespace openvdb;

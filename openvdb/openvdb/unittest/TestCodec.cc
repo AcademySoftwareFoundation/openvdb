@@ -11,6 +11,7 @@
 #include <gtest/gtest.h>
 #include <cstdio> // for remove()
 #include <fstream>
+#include <sstream>
 
 class TestCodec: public ::testing::Test
 {
@@ -533,6 +534,78 @@ TEST_F(TestCodec, testVec3FallsBackWithWarningNoGridOffsets)
     }
 
     std::remove(path.c_str());
+}
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
+
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
+// Grids with no codec use the tree I/O path, which keeps its own per-grid stream metadata.
+// Several grids and repeated reads from one open file catch a stale stream metadata pointer.
+TEST_F(TestCodec, testNoCodecMultipleGridsRepeatedReads)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    CodecRegistry::clear();
+    ASSERT_FALSE(CodecRegistry::isRegistered(FloatGrid::gridType()));
+
+    FloatGrid::Ptr floatGrid = FloatGrid::create(0.0f);
+    floatGrid->setName("float_grid");
+    floatGrid->tree().setValue(Coord(1, 2, 3), 1.0f);
+
+    Int32Grid::Ptr intGrid = Int32Grid::create(0);
+    intGrid->setName("int_grid");
+    intGrid->tree().setValue(Coord(4, 5, 6), 7);
+
+    FloatGrid::Ptr halfGrid = FloatGrid::create(0.0f);
+    halfGrid->setName("half_grid");
+    halfGrid->setSaveFloatAsHalf(true);
+    halfGrid->tree().setValue(Coord(7, 8, 9), 3.0f);
+
+    const GridPtrVec grids{floatGrid, intGrid, halfGrid};
+
+    auto check = [&](const GridPtrVec& read) {
+        ASSERT_EQ(size_t(3), read.size());
+        for (const GridBase::Ptr& grid : read) {
+            if (grid->getName() == "float_grid") {
+                EXPECT_EQ(1.0f, gridPtrCast<FloatGrid>(grid)->tree().getValue(Coord(1, 2, 3)));
+            } else if (grid->getName() == "int_grid") {
+                EXPECT_EQ(7, gridPtrCast<Int32Grid>(grid)->tree().getValue(Coord(4, 5, 6)));
+            } else {
+                EXPECT_EQ("half_grid", grid->getName());
+                EXPECT_EQ(3.0f, gridPtrCast<FloatGrid>(grid)->tree().getValue(Coord(7, 8, 9)));
+            }
+        }
+    };
+
+    // File with grid offsets: read every way, more than once, on one open file.
+    const std::string path = "test_no_codec_multiple_grids.vdb";
+    {
+        io::File file(path);
+        file.write(grids);
+    }
+    {
+        io::File file(path);
+        file.open();
+        for (int repeat = 0; repeat < 2; ++repeat) {
+            check(*file.getGrids());
+            GridPtrVec byName;
+            for (const GridBase::Ptr& grid : grids) byName.push_back(file.readGrid(grid->getName()));
+            check(byName);
+        }
+        file.close();
+    }
+    std::remove(path.c_str());
+
+    // Stream (no grid offsets): write and read several grids.
+    {
+        std::ostringstream ostr(std::ios_base::binary);
+        io::Stream(ostr).write(grids);
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        io::Stream stream(istr);
+        check(*stream.getGrids());
+    }
 }
 
 #endif // OPENVDB_ABI_VERSION_NUMBER < 14

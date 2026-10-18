@@ -972,15 +972,6 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
     // so that downstream functions can reference them.
     readGridCompression(is);
 
-    // Restore the file-level stream metadata on exit.
-    struct OnExit {
-        OnExit(std::ios_base& strm_): strm(&strm_), ptr(strm_.pword(GetSteamState().metadata)) {}
-        ~OnExit() { strm->pword(GetSteamState().metadata) = ptr; }
-        std::ios_base* strm;
-        void* ptr;
-    };
-    OnExit restore(is);
-
     // Find the codec for the grid type and options.
     io::Codec* codec = findCodec(gd.gridType(), readOptions);
 
@@ -1002,19 +993,24 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
     }
     grid->setSaveFloatAsHalf(gd.saveFloatAsHalf());
 
-    // Stream metadata varies per grid, and it needs to persist
-    // in case delayed load is in effect.
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+    // Codecs take per-grid values from the grid and CodecData, so they use the
+    // file-level stream metadata as it is. Legacy tree I/O stores per-pass state on
+    // the stream metadata, so grids without a codec get their own copy. It stays
+    // installed until this function returns.
     io::StreamMetadata::Ptr streamMetadata;
-    if (io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is)) {
-        // Make a grid-level copy of the file-level stream metadata.
-        streamMetadata.reset(new StreamMetadata(*meta));
-    } else {
-        streamMetadata.reset(new StreamMetadata);
+    std::unique_ptr<io::StreamMetadataScope> streamMetadataScope;
+    if (!codec) {
+        if (io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is)) {
+            streamMetadata.reset(new StreamMetadata(*meta));
+        } else {
+            streamMetadata.reset(new StreamMetadata);
+        }
+        streamMetadata->setHalfFloat(grid->saveFloatAsHalf());
+        streamMetadataScope.reset(new io::StreamMetadataScope(is, streamMetadata));
+        io::setGridClass(is, GRID_UNKNOWN);
     }
-    streamMetadata->setHalfFloat(grid->saveFloatAsHalf());
-    io::setStreamMetadataPtr(is, streamMetadata, /*transfer=*/false);
-
-    io::setGridClass(is, GRID_UNKNOWN);
+#endif
     io::setGridBackgroundValuePtr(is, nullptr);
 
     grid->readMeta(is);
@@ -1024,9 +1020,12 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
         grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
     }
 
-    streamMetadata->gridMetadata() = static_cast<MetaMap&>(*grid);
-    const GridClass gridClass = grid->getGridClass();
-    io::setGridClass(is, gridClass);
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+    if (streamMetadata) {
+        streamMetadata->gridMetadata() = static_cast<MetaMap&>(*grid);
+        io::setGridClass(is, grid->getGridClass());
+    }
+#endif
 
     grid->readTransform(is);
     const bool readTopology = readOptions.readMode != io::ReadMode::MetadataOnly && !gd.isInstance();
@@ -1204,28 +1203,26 @@ void
 Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     std::ostream& os, bool seekable, const io::WriteOptions& writeOptions) const
 {
-    // Restore file-level stream metadata on exit.
-    struct OnExit {
-        OnExit(std::ios_base& strm_): strm(&strm_), ptr(strm_.pword(GetSteamState().metadata)) {}
-        ~OnExit() { strm->pword(GetSteamState().metadata) = ptr; }
-        std::ios_base* strm;
-        void* ptr;
-    };
-    OnExit restore(os);
-
     // Find the codec for the grid type and options.
     io::Codec* codec = findCodec(gd.gridType());
 
-    // Stream metadata varies per grid, so make a copy of the file-level stream metadata.
-    io::StreamMetadata::Ptr streamMetadata;
-    if (io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(os)) {
-        streamMetadata.reset(new StreamMetadata(*meta));
-    } else {
-        streamMetadata.reset(new StreamMetadata);
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+    // Codecs use the file-level stream metadata as it is. Legacy tree I/O stores
+    // per-pass state on the stream metadata, so a grid with no codec gets its own
+    // copy, installed until the grid is fully written.
+    std::unique_ptr<io::StreamMetadataScope> gridMetadataScope;
+    if (!codec) {
+        io::StreamMetadata::Ptr gridMetadata;
+        if (io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(os)) {
+            gridMetadata.reset(new StreamMetadata(*meta));
+        } else {
+            gridMetadata.reset(new StreamMetadata);
+        }
+        gridMetadata->setHalfFloat(grid->saveFloatAsHalf());
+        gridMetadata->gridMetadata() = static_cast<const MetaMap&>(*grid);
+        gridMetadataScope.reset(new io::StreamMetadataScope(os, gridMetadata));
     }
-    streamMetadata->setHalfFloat(grid->saveFloatAsHalf());
-    streamMetadata->gridMetadata() = static_cast<const MetaMap&>(*grid);
-    io::setStreamMetadataPtr(os, streamMetadata, /*transfer=*/false);
+#endif
 
     // Write out the Descriptor's header information (grid name and type)
     gd.writeHeader(os);
