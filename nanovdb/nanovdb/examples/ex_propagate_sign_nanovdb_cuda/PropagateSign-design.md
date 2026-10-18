@@ -444,3 +444,109 @@ Smaller items, first noted against `668691585` and re-checked against `700ebd682
   - No unit test. A GPU regression test from the earlier draft exists
     (`examples/propagate_sign_test/propagate_sign_test.cu` in commit `4e2e13a41` on `sifakis/mesh-to-sdf`).
   - No example yet; this directory is reserved for it (needs a `nanovdb_example(NAME ...)` entry).
+
+## Update 2026-10-18: `Mask2D` adopted, review findings addressed
+
+### Code changes
+
+- **`Mask2D` and the 2D `MaskShift`** are in `util/MorphologyHelpers.h` as in the proposal above, in
+  `nanovdb::util::morphology` (next to the existing `MaskShift`) rather than `nanovdb::util`, with
+  `detail::yBits` and `detail::zShiftBits`. `MaskShift` is overloaded, not renamed.
+- **Warp layer: one function.** `util/cuda/MorphologyHelpers.cuh` adds a 3D
+  `MaskShift<di, dj, dk, combine>` on `Mask2D` slices held by a warp, one node per warp: lane x holds
+  x-slice x, and lanes x >= Dim hold empty slices. The x part is a `__shfl_up_sync` / `__shfl_down_sync`
+  by `di` lanes; a lane whose source lies outside the node, or that has no slice, takes zeros (a shuffle
+  from outside the warp returns the caller's own value, so this guard is needed). y and z use the 2D
+  `MaskShift` within the lane. The two votes stay inline in `BitFloodFunctor`, since each is one line:
+  `__any_sync` to stop, and an OR of the face sets over the 32 lanes by xor-shuffles
+  (`__reduce_or_sync` would need sm_80).
+- **`PropagateSign.cuh`.** `repeatBits` and `WarpSlicedMask` are gone. `BitFloodFunctor` fills a node
+  with six unit `MaskShift`s per sweep. Leaf seeds come from `leafSeedSlice(leaf, signs)` (the former
+  `fromSlots`, leaf only): each `__ballot_sync` tests 32 consecutive voxels, half of one slice, and the
+  lane holding that slice keeps the answers. The edge probe and the x faces are one function,
+  `facesWithOnSlots(slice, x)`, which returns a set of `Face` bits directly.
+- **`probeChildlessSlot` -> `probeTerminalSlot`,** which returns a `TerminalSlot {level, nodeID, slot}`:
+  the slot that holds the coordinate's value. `level` is the `LEVEL` of the node holding it
+  (`NanoLeaf`/`NanoLower`/`NanoUpper<BuildT>::LEVEL`, or `NanoRoot`'s for an absent root-tile position)
+  instead of the literals 0-3.
+- **Root value tiles** (precondition 4(b)) now trip a `NANOVDB_ASSERT` in both places that meet them,
+  `probeTerminalSlot` and `RootWallFunctor`, so a debug build catches any such tile inside the root-tile
+  array. Release behavior is unchanged: such a tile is neither seeded nor a wall (see the open point
+  above).
+- **Sweep bounds as asserts.** Every fill still loops until a sweep changes nothing (at most
+  `SlotCount + 1` sweeps for a node, `total + 1` for the root array), so release builds converge on any
+  input. A `NANOVDB_ASSERT` after the loop checks the bound that holds under preconditions 1 and 2:
+  22, 45 and 93 sweeps for leaf, lower and upper nodes, and (W - 1) + (H - 1) + (D - 1) for a W x H x D
+  root-tile array (argument below).
+- **Root fill.** Jacobi sweeps over two byte arrays (read one, write the other), with
+  `__syncthreads_or` as the stopping vote, so it no longer reads and writes the same bytes in one sweep.
+- **Scratch release.** `propagate()` destroys the root-tile array (`mRootMask`) before returning, ordered
+  on the stream, so a returned operator holds no device memory and the resource only has to outlive the
+  returned buffers, as ConnectedComponents now does.
+- **Launches** use `util::cuda::blocksPerGrid(count * 32, MaxThreadsPerBlock)`; `NodesPerBlock` stays 4.
+  Blocks have no meaning in these kernels (no shared memory, no `__syncthreads`), only for scheduling: on
+  the meshes below, 1 node per block was 25% slower in the leaf stage (median), 2 and 4 the same, and 8
+  and 16 up to 6% and 13% slower on the largest cases.
+- **Docs.** The class `@details` lists preconditions 1-4 briefly, and a todo to handle inputs that break
+  them (e.g. root value tiles from OpenVDB level sets converted to NanoVDB). `deviceSigns`: -1 inside,
+  any other value (including 0) outside. The stage comment no longer weighs a scanline fill. The root
+  comments say that seeds come from leaf, lower and upper faces (each kernel seeds every coarser level),
+  and use one term for a cell of the root array: a root-tile position, absent if the root has no tile
+  there.
+
+Verified: the masks are identical to those of the `700ebd682` fill and of the earlier byte-per-slot fill
+on 29 MeshToSDF cases (10 meshes at 512, 1024, 2048; hairball at 512 and 1024), in release and in debug
+builds, with no assert; the regression test passes 14/14 in release. In a debug build its robustness
+cases, which break precondition 2 on purpose, trip the new sweep assert. Speed at the leaf stage and for
+`propagate()` is the same as `700ebd682` (median ratio 1.01, measured before the root changes, which do
+not touch the node fills).
+
+### Sweep bound under preconditions 1 and 2 (closes "Sweep counts at the coarser levels")
+
+Take an inside open slot v and the nearest wall to it: in a leaf the nearest active voxel, in a lower or
+upper node the nearest child slot, at the root the nearest position with an upper child. One exists by
+precondition 1. On a straight (Manhattan-shortest) walk from v to that wall, every slot before the wall
+is open (a wall there would be nearer) and inside (open slots connected to v share its label). So the
+walk ends on a seed:
+
+- in a leaf, the wall itself: an active voxel next to an inactive inside voxel has sign -1 by 2(b);
+- in a lower or upper node, or the root array, the slot just before the wall: it is inside and touches
+  the child, so by the inside-faces lemma the child's face toward it is all inside and seeds it.
+
+No wall forces a detour, so the fill reaches v after its Manhattan distance to that seed: at most
+3 * (Dim - 1) = 21 sweeps turn voxels on in a leaf and one fewer in a lower or upper node (44, 92),
+plus one sweep that changes nothing: 22, 45, 93. For the root array the same count gives
+(W - 1) + (H - 1) + (D - 1). The open point above expected detours around children; with 2(b) they
+cannot happen. Measured on the regression test inputs: leaves with a single active voxel in a corner
+take exactly 22 sweeps, and a lower node with a single leaf child exactly 45; the robustness cases that
+break 2(b) take up to 27 (leaf) and 46 (lower). To be confirmed.
+
+### Not done from the proposal, and why
+
+- **Packing several nodes per warp** (4 leaves or 2 lower nodes, shuffles with `width = Dim`, so no lane
+  sits idle) was implemented and measured, and was about 8% slower in the leaf stage (median over the 29
+  cases). One node per warp is simpler and as fast as `700ebd682`, so it stays. Lower and upper fills take
+  about 0.01 ms either way. A likely cause, not verified: the packed seed gather reads 4 runs of 8
+  voxels per ballot instead of 32 consecutive voxels. The packed version's higher register count was
+  ruled out as the cause.
+- **A shared slice builder with ConnectedComponents.** Not done: there the leaf mask fill runs one block
+  of 512 threads per leaf and writes each warp's ballot into a `Mask<3>` in shared memory, while here
+  one warp holds a node as slices in registers. The common part is a single ballot, so the builder is a
+  leaf-only function in `PropagateSign.cuh`, its only user.
+- **Votes as warp-layer functions:** kept inline (see above).
+- **A separate small PR for `Mask2D`:** not split out; it is part of 2361 for now.
+- **CPU unit test for `Mask2D` and the 2D `MaskShift`, and a GPU test of the 3D `MaskShift`:** only
+  outside the repo so far; to be added with the PropagateSign unit test.
+- **DilateGrid's `Mask<4>` `MaskShift` through the same pieces:** not done.
+
+### Still open
+
+- Review findings above: "Not compiled anywhere" and "Packaging" (install list, unit test, example);
+  todos for the mask naming and `signs` -> `signSidecar`.
+- Formal races: the seeds that `seedAcrossFace` writes into the root-tile array are plain byte stores
+  from many warps (all store 1), unlike the atomic bit sets in lower and upper masks.
+- Inputs that break the preconditions, e.g. root value tiles in OpenVDB level sets converted to NanoVDB
+  (`signedFloodFill` and `pruneLevelSet` can add inside tiles at the root for large objects).
+- The future unit test should include, as ConnectedComponents' does, a run on a non-blocking stream, a
+  check that the outputs stay valid after the operator is destroyed, and an injected resource that sees
+  every allocation.
