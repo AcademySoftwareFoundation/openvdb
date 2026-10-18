@@ -1418,6 +1418,48 @@ TEST(TestBuffer, SingleSpaceMergeSplitSynchronousResource)
     ASSERT_EQ(cudaSuccess, cudaStreamDestroy(stream));
 }
 
+TEST(TestBuffer, SingleSpaceMergeSplitBatchBoundary)
+{
+    // More grids than one renumbering launch covers. Every 7th grid has no
+    // checksum, and the renumbering must leave it empty.
+    constexpr uint32_t N = 300;
+    using BufT = nanovdb::cuda::Buffer<std::byte>;
+    std::vector<nanovdb::GridHandle<BufT>> sources;
+    for (uint32_t i = 0; i < N; ++i) {
+        const auto cMode = i % 7 == 0 ? nanovdb::CheckMode::Disable : nanovdb::CheckMode::Full;
+        auto host = nanovdb::tools::createLevelSetSphere<float>(3.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0),
+                                                                "g" + std::to_string(i), nanovdb::tools::StatsMode::Default, cMode);
+        sources.push_back(nanovdb::cuda::copyTo<BufT>(host, cudaStream_t(0)));
+    }
+    auto merged = nanovdb::cuda::mergeGridHandles<BufT, std::vector>(sources, cudaStream_t(0));
+    sources.clear();
+    auto mergedHost = toHost(merged, cudaStream_t(0));
+    ASSERT_EQ(N, mergedHost.gridCount());
+    for (uint32_t i = 0; i < N; ++i) {
+        const nanovdb::GridData* data = mergedHost.gridData(i);
+        EXPECT_EQ(i, data->mGridIndex);
+        EXPECT_EQ(N, data->mGridCount);
+        EXPECT_EQ(i % 7 == 0, data->mChecksum.isEmpty());
+        EXPECT_TRUE(nanovdb::tools::validateChecksum(data, nanovdb::CheckMode::Full));
+    }
+    EXPECT_STREQ("g299", mergedHost.gridData(N - 1)->mGridName);
+
+    auto parts = nanovdb::cuda::splitGridHandles<BufT, std::vector>(merged, cudaStream_t(0));
+    merged.reset();
+    ASSERT_EQ(N, parts.size());
+    for (uint32_t i = 0; i < N; i += 37) {
+        auto partHost = toHost(parts[i], cudaStream_t(0));
+        const nanovdb::GridData* data = partHost.gridData();
+        EXPECT_EQ(0u, data->mGridIndex);
+        EXPECT_EQ(1u, data->mGridCount);
+        EXPECT_EQ(i % 7 == 0, data->mChecksum.isEmpty());
+        EXPECT_TRUE(nanovdb::tools::validateChecksum(data, nanovdb::CheckMode::Full));
+    }
+    auto lastHost = toHost(parts[N - 1], cudaStream_t(0));
+    EXPECT_EQ(0u, lastHost.gridData()->mGridIndex);
+    EXPECT_STREQ("g299", lastHost.gridData()->mGridName);
+}
+
 TEST(TestBuffer, SingleSpacePointSetEntryPoints)
 {
     // The point-set overloads build one grid per set and merge them.
