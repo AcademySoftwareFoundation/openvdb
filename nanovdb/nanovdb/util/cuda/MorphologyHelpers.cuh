@@ -119,6 +119,37 @@ void MaskShift( const nanovdb::Mask<4>& inMaskQ, nanovdb::Mask<4>& outMaskQ )
         outMask[1][ii][jj] = hiWord; }
 }
 
+// A warp can hold one Mask<Log2Dim> (Log2Dim 3-5) as Mask2D slices: lane x holds x-slice x, and lanes
+// x >= Dim hold empty slices. The function below exchanges slices across lanes, so all 32 lanes of the
+// warp call it together.
+
+/// @brief out(x, y, z) |= in(x + di, y + dj, z + dk), or = if !combine, with zeros from outside the mask:
+///        the 3D MaskShift on a mask held by a warp as Mask2D slices. Each lane passes its own slice;
+///        @a in and @a out may be the same slice.
+template<int di, int dj, int dk, bool combine = true, int Log2Dim>
+__device__ void MaskShift(const Mask2D<Log2Dim>& in, Mask2D<Log2Dim>& out)
+{
+    constexpr int Dim = Mask2D<Log2Dim>::Dim, WordCount = Mask2D<Log2Dim>::WordCount;
+    static_assert(di > -Dim && di < Dim, "the shift must stay within the mask");
+
+    // x: slice x + di, held by lane x + di. Lanes whose source is outside the mask take zeros, and so do
+    // lanes x >= Dim, whose slices stay empty.
+    Mask2D<Log2Dim> t = in;
+    if constexpr (di != 0) {
+        const int  x         = threadIdx.x & 31;
+        const bool hasSource = x < Dim && unsigned(x + di) < unsigned(Dim);
+        for (int j = 0; j < WordCount; ++j) {
+            uint64_t w;
+            if constexpr (di > 0) w = __shfl_down_sync(0xffffffff, in.words[j],  di);
+            else                  w = __shfl_up_sync  (0xffffffff, in.words[j], -di);
+            t.words[j] = hasSource ? w : 0;
+        }
+    }
+
+    // y and z: within the slice.
+    morphology::MaskShift<dj, dk, combine>(t, out);
+}
+
 } // namespace cuda
 
 } // namespace morphology
