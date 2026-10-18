@@ -661,7 +661,7 @@ __hostdev__ inline bool isIndex(GridType gridType)
 __hostdev__ inline bool isValid(GridType gridType, GridClass gridClass)
 {
     if (gridClass == GridClass::LevelSet || gridClass == GridClass::FogVolume) {
-        return isFloatingPoint(gridType);
+        return isFloatingPoint(gridType) || gridType == GridType::Half;
     } else if (gridClass == GridClass::Staggered) {
         return isFloatingPointVector(gridType);
     } else if (gridClass == GridClass::PointIndex || gridClass == GridClass::PointData) {
@@ -674,7 +674,7 @@ __hostdev__ inline bool isValid(GridType gridType, GridClass gridClass)
         return gridType == GridType::RGBA8 || gridType == GridType::Float ||
                gridType == GridType::Double || gridType == GridType::Vec3f ||
                gridType == GridType::Vec3d || gridType == GridType::UInt32 ||
-               gridType == GridType::UInt8;
+               gridType == GridType::UInt8 || gridType == GridType::Half;
     }
     return gridClass < GridClass::End && gridType < GridType::End; // any valid combination
 }
@@ -4789,6 +4789,7 @@ using MaskTree = NanoTree<ValueMask>;
 using BoolTree = NanoTree<bool>;
 using IndexTree = NanoTree<ValueIndex>;
 using OnIndexTree = NanoTree<ValueOnIndex>;
+using HalfTree = NanoTree<Half>;
 
 using FloatGrid = Grid<FloatTree>;
 using Fp4Grid = Grid<Fp4Tree>;
@@ -4809,6 +4810,7 @@ using BoolGrid = Grid<BoolTree>;
 using PointGrid = Grid<Point>;
 using IndexGrid = Grid<IndexTree>;
 using OnIndexGrid = Grid<OnIndexTree>;
+using HalfGrid = Grid<HalfTree>;
 
 // --------------------------> callNanoGrid <------------------------------------
 
@@ -4884,6 +4886,8 @@ auto callNanoGrid(GridDataT *gridData, ArgsT&&... args)
             return OpT::template known<Vec4d>(gridData, args...);
         case GridType::UInt8:
             return OpT::template known<uint8_t>(gridData, args...);
+        case GridType::Half:
+            return OpT::template known<Half>(gridData, args...);
         default:
             return OpT::unknown(gridData, args...);
     }

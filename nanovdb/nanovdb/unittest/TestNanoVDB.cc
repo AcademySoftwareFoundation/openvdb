@@ -4238,6 +4238,19 @@ TEST_F(TestNanoVDB, GridBuilder_Half)
         EXPECT_TRUE(nanoGrid);
 
         nanovdb::util::forEach(nanoGrid->indexBBox(), kernel);
+
+        // verify conversion back to float from half works
+        auto handleFloat2 = nanovdb::tools::createNanoGrid<nanovdb::HalfGrid, float>(*nanoGrid);
+        auto *nanoGrid2 = handleFloat2.grid<float>();
+
+        auto kernel2 = [&](const nanovdb::CoordBBox& bbox) {
+            auto nanoAcc2 = nanoGrid2->getAccessor();
+            for (auto it = bbox.begin(); it; ++it) {
+                const nanovdb::Coord p = *it;
+                EXPECT_NEAR(nanoAcc2.getValue(p), sphere(p), tolerance);
+            }
+        };
+        nanovdb::util::forEach(nanoGrid2->indexBBox(), kernel2);
     }
 } // GridBuilder_Half
 

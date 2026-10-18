@@ -799,13 +799,22 @@ inline nanovdb::Half CreateNanoGridValueCast<nanovdb::Half, float>(const float v
     ret.raw = math::FloatToHalf(val);
     return ret;
 }
-
 template <>
 inline nanovdb::Half CreateNanoGridValueCast<nanovdb::Half, double>(const double val)
 {
     nanovdb::Half ret;
     ret.raw = math::FloatToHalf(float(val));
     return ret;
+}
+template <>
+inline float CreateNanoGridValueCast<float, nanovdb::Half>(const nanovdb::Half val)
+{
+    return math::HalfToFloat(val.raw);
+}
+template <>
+inline double CreateNanoGridValueCast<double, nanovdb::Half>(const nanovdb::Half val)
+{
+    return double(math::HalfToFloat(val.raw));
 }
 
 //================================================================================================
