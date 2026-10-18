@@ -975,6 +975,16 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
     // Find the codec for the grid type and options.
     io::Codec* codec = findCodec(gd.gridType(), readOptions);
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 14
+    if (!codec) {
+        OPENVDB_THROW(IoError,
+            "No I/O codec found for " << gd.gridType() << ", "
+            "register the codec for this grid type "
+            "(either explicitly or via openvdb::initialize()). "
+            "Note: Tree I/O is disabled for ABI=14.");
+    }
+#endif
+
     GridBase::Ptr grid;
     io::CodecData::Ptr codecData;
 
@@ -1105,6 +1115,20 @@ void
 Archive::write(std::ostream& os, const GridCPtrVec& grids, bool seekable,
     const MetaMap& metadata, const io::WriteOptions& writeOptions) const
 {
+#if OPENVDB_ABI_VERSION_NUMBER >= 14
+    // Fail before anything is written, so a missing codec cannot leave a grid
+    // without topology and buffers.
+    for (const GridBase::ConstPtr& grid : grids) {
+        if (grid && !findCodec(grid->type(), io::ReadOptions{})) {
+            OPENVDB_THROW(IoError,
+                "No I/O codec found for " << grid->type() << ", "
+                "register the codec for this grid type "
+                "(either explicitly or via openvdb::initialize()). "
+                "Note: Tree I/O is disabled for ABI=14.");
+        }
+    }
+#endif
+
     // Set stream flags so that downstream functions can reference them.
     // If there is no stream metadata attached to this stream, then create
     // one only for the duration of this function.

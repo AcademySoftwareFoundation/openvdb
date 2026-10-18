@@ -610,6 +610,50 @@ TEST_F(TestCodec, testNoCodecMultipleGridsRepeatedReads)
 
 #endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 14
+
+// Without a codec there is no tree I/O to fall back on, so reading and writing must fail
+// instead of producing a grid with no topology or buffers.
+TEST_F(TestCodec, testMissingCodecThrows)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    CodecRegistry::clear();
+    io::internal::initialize();
+
+    FloatGrid::Ptr grid = FloatGrid::create(0.0f);
+    grid->setName("density");
+    grid->fill(CoordBBox(Coord(0), Coord(7)), 1.0f, true);
+
+    const std::string path = "test_missing_codec.vdb";
+    {
+        io::File file(path);
+        file.write(GridPtrVec{grid});
+    }
+
+    CodecRegistry::clear();
+
+    // Reading
+    {
+        io::File file(path);
+        file.open();
+        EXPECT_THROW(file.readGrid("density"), IoError);
+        file.close();
+    }
+
+    // Writing, which must fail before anything is written
+    {
+        std::ostringstream stream(std::ios_base::binary);
+        EXPECT_THROW(io::Stream(stream).write(GridPtrVec{grid}), IoError);
+        EXPECT_EQ(std::string::size_type(0), stream.str().size());
+    }
+
+    std::remove(path.c_str());
+}
+
+#endif // OPENVDB_ABI_VERSION_NUMBER >= 14
+
 TEST_F(TestCodec, testOffsetsAndNoOffsetsParity)
 {
     using namespace openvdb;
