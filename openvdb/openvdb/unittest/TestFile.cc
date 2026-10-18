@@ -54,6 +54,7 @@ public:
     void testEmptyGridIO();
     void testOpen();
     void testNonVdbOpen();
+    void testStreamMetadataAfterRead();
 };
 
 
@@ -188,6 +189,79 @@ TestFile::testWriteGrid()
     remove("something.vdb2");
 }
 TEST_F(TestFile, testWriteGrid) { testWriteGrid(); }
+
+
+void
+TestFile::testStreamMetadataAfterRead()
+{
+    using namespace openvdb;
+
+    const char* filename = "something.vdb2";
+    SharedPtr<const char> scopedFile(filename, ::remove);
+
+    GridPtrVec grids;
+    for (const char* name : {"a", "b", "c"}) {
+        FloatGrid::Ptr grid = FloatGrid::create(0.0f);
+        grid->setName(name);
+        grid->tree().setValue(Coord(1, 2, 3), 1.0f);
+        grids.push_back(grid);
+    }
+    {
+        io::File file(filename);
+        file.write(grids);
+    }
+
+    io::File file(filename);
+    file.open();
+    const io::StreamMetadata::Ptr fileMetadata = io::getStreamMetadataPtr(file.inputStream());
+    ASSERT_TRUE(bool(fileMetadata));
+
+    // Each read must leave the stream pointing at the file-level metadata.
+    file.readGrid("a");
+    EXPECT_EQ(fileMetadata.get(), io::getStreamMetadataPtr(file.inputStream()).get());
+    file.readGrid("b");
+    EXPECT_EQ(fileMetadata.get(), io::getStreamMetadataPtr(file.inputStream()).get());
+    file.readGrids("c");
+    EXPECT_EQ(fileMetadata.get(), io::getStreamMetadataPtr(file.inputStream()).get());
+    file.readGridMetadata("a");
+    EXPECT_EQ(fileMetadata.get(), io::getStreamMetadataPtr(file.inputStream()).get());
+    file.readAllGridMetadata();
+    EXPECT_EQ(fileMetadata.get(), io::getStreamMetadataPtr(file.inputStream()).get());
+    file.getGrids();
+    EXPECT_EQ(fileMetadata.get(), io::getStreamMetadataPtr(file.inputStream()).get());
+    file.close();
+}
+
+TEST_F(TestFile, testStreamMetadataAfterRead) { testStreamMetadataAfterRead(); }
+
+
+TEST_F(TestFile, testStreamMetadataScope)
+{
+    using namespace openvdb;
+
+    std::ostringstream stream;
+    EXPECT_TRUE(!io::getStreamMetadataPtr(stream));
+
+    io::StreamMetadata::Ptr outer(new io::StreamMetadata);
+    io::setStreamMetadataPtr(stream, outer, /*transfer=*/false);
+
+    {
+        io::StreamMetadata::Ptr inner(new io::StreamMetadata);
+        io::StreamMetadataScope scope(stream, inner);
+        EXPECT_EQ(inner.get(), io::getStreamMetadataPtr(stream).get());
+    }
+
+    // The previous metadata is back once the scope has ended.
+    EXPECT_EQ(outer.get(), io::getStreamMetadataPtr(stream).get());
+
+    // A scope on a stream with no metadata clears it again on exit.
+    io::clearStreamMetadataPtr(stream);
+    {
+        io::StreamMetadataScope scope(stream, io::StreamMetadata::Ptr(new io::StreamMetadata));
+        EXPECT_TRUE(bool(io::getStreamMetadataPtr(stream)));
+    }
+    EXPECT_TRUE(!io::getStreamMetadataPtr(stream));
+}
 
 
 void

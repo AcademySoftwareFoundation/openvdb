@@ -736,6 +736,21 @@ clearStreamMetadataPtr(std::ios_base& strm)
 }
 
 
+StreamMetadataScope::StreamMetadataScope(std::ios_base& strm, StreamMetadata::Ptr meta)
+    : mStream(strm)
+    , mMetadata(std::move(meta))
+    , mPrevious(strm.pword(GetSteamState().metadata))
+{
+    strm.pword(GetSteamState().metadata) = &mMetadata;
+}
+
+
+StreamMetadataScope::~StreamMetadataScope()
+{
+    mStream.pword(GetSteamState().metadata) = mPrevious;
+}
+
+
 ////////////////////////////////////////
 
 
@@ -1092,10 +1107,11 @@ Archive::write(std::ostream& os, const GridCPtrVec& grids, bool seekable,
     const MetaMap& metadata, const io::WriteOptions& writeOptions) const
 {
     // Set stream flags so that downstream functions can reference them.
-    io::StreamMetadata::Ptr streamMetadata = io::getStreamMetadataPtr(os);
-    if (!streamMetadata) {
-        streamMetadata.reset(new StreamMetadata);
-        io::setStreamMetadataPtr(os, streamMetadata, /*transfer=*/false);
+    // If there is no stream metadata attached to this stream, then create
+    // one only for the duration of this function.
+    std::unique_ptr<io::StreamMetadataScope> fileMetadataScope;
+    if (!io::getStreamMetadataPtr(os)) {
+        fileMetadataScope.reset(new io::StreamMetadataScope(os, io::StreamMetadata::Ptr(new StreamMetadata)));
     }
     io::setDataCompression(os, compression());
     io::setWriteGridStatsMetadata(os, isGridStatsMetadataEnabled());

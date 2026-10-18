@@ -12,6 +12,7 @@
 
 #include "Codec.h"
 #include "Compression.h" // for COMPRESS_ZIP, etc.
+#include "io.h" // for StreamMetadata
 
 #include <cstdint>
 #include <iosfwd>
