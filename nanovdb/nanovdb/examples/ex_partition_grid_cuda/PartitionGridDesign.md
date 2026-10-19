@@ -317,3 +317,67 @@ machinery does not need re-verifying at this layer.
    surface partition, so the carve never runs today. The large counts on record (dragon 40, hairball
    333,703) are from the *pruned* CC, a different labelling that does not drive the carve. The
    straggler distribution of §7d is expected but, so far, unmeasured.
+
+## Update 2026-10-19: binary implemented
+
+### Empty outputs (§6, §8.1): an upstream bug, fixed upstream
+
+The experiment of §6 ran `PruneGrid` on a non-empty source with an all-off retain mask. On
+develop/nanovdb before #2336 it failed with an illegal memory access in `TopologyBuilder::processUpperNodes`; all-on and partial masks were fine,
+and an empty source is not affected.
+
+Cause: the builder starts from a root table holding every source root tile (`pruneRoot` copies them
+all and lets later stages drop the unused ones), so with no voxel retained the table still has tiles
+while the output has no upper node. `getBuffer` hands the device the table that maps each of those
+tiles to its output upper node only when the output has one, but `processUpperNodes` decided whether to
+run from the table's tile count, launched anyway, and read the missing map. `processLowerNodes` uses
+the same tile-count test but reads the map directly, which is all zeros then, so it does no harm.
+
+Fixed upstream by #2336 (batch-capable `TopologyBuilder`): `getBuffer` now hands that map to every
+grid, whether or not it has an upper node. `PruneGrid` returns a valid empty grid (no nodes, no active
+voxel, empty bbox), and so does an empty side of `PartitionGrid`. This settles §8.1: an empty output is
+a valid empty grid. `TestNanoVDBCUDA.PartitionGrid_ValueOnIndex` covers it with its all-on and all-off
+masks, each of which leaves one output empty.
+
+### Binary `PartitionGrid`
+
+- `tools/cuda/PartitionGrid.cuh`: `PartitionGrid<BuildT, ResourceT>(srcGrid, retainMask, stream,
+  resource)`, the same constructor as `PruneGrid`, and `getHandles<BufferT>()` returning
+  `std::array<GridHandle<BufferT>, 2>` (§2b). `BufferT` defaults to the single-space
+  `cuda::Buffer<std::byte, cuda::DeviceResource>`.
+- Two `TopologyBuilder`s, run through `PruneGrid`'s stages. The source root table is read and sorted
+  once on the host and copied into each builder (§4a). Each builder owns its own copy, so §4b's
+  conclusion holds; its rationale is out of date, since the builder now keeps the root in pinned host
+  staging plus a device copy (`allocateProcessedRootTiles` / `uploadProcessedRoot`) instead of a
+  `DeviceBuffer` it frees mid-pipeline.
+- The two mask-dependent kernels each read a source leaf once and write both outputs (§4c):
+  `PartitionInternalNodesFunctor` and `PartitionLeafMasksFunctor`, next to their `PruneGrid`
+  counterparts in `util/cuda/Morphology.cuh`.
+- Validation as in §5: `TestNanoVDBCUDA.PartitionGrid_ValueOnIndex` checks that output 0 is
+  byte-identical to `PruneGrid(m)` and output 1 to `PruneGrid(~m)`, and that their active counts add up
+  to the source's, for a mixed mask and for all-on and all-off masks.
+
+### Measured payoff (§4d)
+
+Sphere-shell index grids (|r - R| < 3, centered at the origin, so 8 root tiles), R = 64 to 1024 (0.3M to
+79M voxels), with a half-space mask (most leaves on one side), a checkerboard mask (every leaf split) and
+an all-on mask. One `PartitionGrid` takes 0.68 to 0.90 of the time of `PruneGrid(m)` plus
+`PruneGrid(~m)`, about 0.79 in most cases; the outputs are byte-identical in every case.
+
+As §4d expected, the gain is a fraction. Only the host root table and the reads of the source leaves are
+shared; the builder's other work is per output, and much of it scales with the number of root tiles
+rather than voxels (the dense lower-node masks take 16 MB per root tile per builder to allocate and
+clear, plus node counting and the lower-node kernel), which is why one `PruneGrid` costs about the same
+from 0.3M to 20M voxels. With the checkerboard mask every source leaf appears in both outputs, so the
+output-proportional stages cost about twice the source, and the ratio is worst (0.90 at R = 1024); the
+half-space mask gains most (0.68 at R = 1024). Cutting the per-output fixed cost would mean changing
+`TopologyBuilder` itself, which every topology operator shares.
+
+The scratch memory is about twice `PruneGrid`'s, for the same reason (two sets of dense masks); the
+class documents it.
+
+### Not done yet
+
+- The n-ary entry point (§7), including the predicate-templated binary core (§7f): deferred until the
+  open items of §8.2 to §8.4 are settled.
+- The example in this directory.
