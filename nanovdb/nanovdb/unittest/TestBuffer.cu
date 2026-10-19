@@ -18,6 +18,12 @@
 #include <nanovdb/cuda/DeviceBuffer.h> // the prototype forms' default buffer, compared against
 #include <nanovdb/tools/cuda/AddBlindData.cuh>
 #include <nanovdb/tools/cuda/IndexToGrid.cuh>
+#include <nanovdb/tools/cuda/CoarsenGrid.cuh>
+#include <nanovdb/tools/cuda/DilateGrid.cuh>
+#include <nanovdb/tools/cuda/MergeGrids.cuh>
+#include <nanovdb/tools/cuda/MeshToGrid.cuh>
+#include <nanovdb/tools/cuda/PruneGrid.cuh>
+#include <nanovdb/tools/cuda/RefineGrid.cuh>
 
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
@@ -1476,6 +1482,91 @@ TEST(TestBuffer, ResourceFormsOfTheGpuTools)
     ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
     EXPECT_EQ(counters.allocs, counters.deallocs);
     ASSERT_EQ(cudaSuccess, cudaStreamDestroy(stream));
+}
+
+TEST(TestBuffer, BuilderBuildAllocatesThroughTheBuilderResource)
+{
+    // build() is getHandle with the output drawn from the builder's own
+    // resource: same grid, and every allocation through that one resource.
+    using BuildT = nanovdb::ValueOnIndex;
+    using RefT = nanovdb::cuda::ResourceRef<CountingResource>;
+    using OutT = nanovdb::cuda::Buffer<std::byte, RefT>;
+    const std::vector<nanovdb::Coord> coords = {nanovdb::Coord(1,2,3), nanovdb::Coord(10,20,8), nanovdb::Coord(-5,0,7), nanovdb::Coord(300,0,0)};
+    nanovdb::cuda::Buffer<nanovdb::Coord> d_coords(cudaStream_t(0), coords.size(), nanovdb::cuda::noInit);
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_coords.data(), coords.data(), coords.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+
+    Counters counters;
+    CountingResource res{&counters};
+    {
+        nanovdb::tools::cuda::PointsToGrid<BuildT, CountingResource> p2g(1.0, nanovdb::Vec3d(0), cudaStream_t(0), res);
+        auto input = p2g.build(d_coords.data(), coords.size());
+        static_assert(std::is_same<decltype(input), nanovdb::GridHandle<OutT>>::value, "build borrows the builder resource");
+        auto inputProto = nanovdb::tools::cuda::PointsToGrid<BuildT>().getHandle(d_coords.data(), coords.size());
+        expectSameBytes(deviceToHost(input), inputProto);
+        const nanovdb::NanoGrid<BuildT>* d_grid = input.deviceGrid<BuildT>();
+
+        auto check = [&](auto& op, auto& opProto) {
+            const int before = counters.allocs;
+            auto out = op.build();
+            static_assert(std::is_same<decltype(out), nanovdb::GridHandle<OutT>>::value, "build borrows the builder resource");
+            EXPECT_GT(counters.allocs, before); // the output, at least
+            auto proto = opProto.getHandle();
+            expectSameBytes(deviceToHost(out), proto);
+        };
+        { nanovdb::tools::cuda::DilateGrid<BuildT, CountingResource> op(d_grid, cudaStream_t(0), res);
+          nanovdb::tools::cuda::DilateGrid<BuildT> ref(d_grid); check(op, ref); }
+        { nanovdb::tools::cuda::MergeGrids<BuildT, CountingResource> op(d_grid, d_grid, cudaStream_t(0), res);
+          nanovdb::tools::cuda::MergeGrids<BuildT> ref(d_grid, d_grid); check(op, ref); }
+        { nanovdb::tools::cuda::RefineGrid<BuildT, CountingResource> op(d_grid, cudaStream_t(0), res);
+          nanovdb::tools::cuda::RefineGrid<BuildT> ref(d_grid); check(op, ref); }
+        { nanovdb::tools::cuda::CoarsenGrid<BuildT, CountingResource> op(d_grid, cudaStream_t(0), res);
+          nanovdb::tools::cuda::CoarsenGrid<BuildT> ref(d_grid); check(op, ref); }
+        {
+            const uint32_t leafCount = deviceToHost(input).grid<BuildT>()->tree().nodeCount(0);
+            std::vector<nanovdb::Mask<3>> masks(leafCount, nanovdb::Mask<3>(true));
+            nanovdb::cuda::Buffer<nanovdb::Mask<3>> d_masks(cudaStream_t(0), leafCount, nanovdb::cuda::noInit);
+            ASSERT_EQ(cudaSuccess, cudaMemcpy(d_masks.data(), masks.data(), leafCount * sizeof(nanovdb::Mask<3>), cudaMemcpyHostToDevice));
+            nanovdb::tools::cuda::PruneGrid<BuildT, CountingResource> op(d_grid, d_masks.data(), cudaStream_t(0), res);
+            nanovdb::tools::cuda::PruneGrid<BuildT> ref(d_grid, d_masks.data());
+            check(op, ref);
+        }
+        {
+            const uint64_t valueCount = deviceToHost(input).grid<BuildT>()->valueCount();
+            std::vector<float> values(valueCount, 2.5f);
+            nanovdb::cuda::Buffer<float> d_values(cudaStream_t(0), valueCount, nanovdb::cuda::noInit);
+            ASSERT_EQ(cudaSuccess, cudaMemcpy(d_values.data(), values.data(), valueCount * sizeof(float), cudaMemcpyHostToDevice));
+            nanovdb::tools::cuda::IndexToGrid<BuildT, CountingResource> op(d_grid, cudaStream_t(0), res);
+            auto out = op.build<float>(d_values.data());
+            static_assert(std::is_same<decltype(out), nanovdb::GridHandle<OutT>>::value, "build borrows the builder resource");
+            auto proto = nanovdb::tools::cuda::IndexToGrid<BuildT>(d_grid).getHandle<float>(d_values.data());
+            expectSameBytes(deviceToHost(out), proto);
+        }
+        {
+            const std::vector<nanovdb::Vec3f> points = {{0.f,0.f,0.f}, {1.f,0.f,0.f}, {0.f,1.f,0.f}, {0.f,0.f,1.f}};
+            const std::vector<nanovdb::Vec3i> triangles = {{0,1,2}, {0,2,3}, {0,3,1}, {1,2,3}};
+            nanovdb::cuda::Buffer<nanovdb::Vec3f> d_points(cudaStream_t(0), points.size(), nanovdb::cuda::noInit);
+            nanovdb::cuda::Buffer<nanovdb::Vec3i> d_tris(cudaStream_t(0), triangles.size(), nanovdb::cuda::noInit);
+            ASSERT_EQ(cudaSuccess, cudaMemcpy(d_points.data(), points.data(), points.size() * sizeof(nanovdb::Vec3f), cudaMemcpyHostToDevice));
+            ASSERT_EQ(cudaSuccess, cudaMemcpy(d_tris.data(), triangles.data(), triangles.size() * sizeof(nanovdb::Vec3i), cudaMemcpyHostToDevice));
+            nanovdb::Map map;
+            map.set(0.1, nanovdb::Vec3d(0.0));
+            nanovdb::tools::cuda::MeshToGrid<BuildT, CountingResource> op(d_points.data(), 4u, d_tris.data(), 4u, map, cudaStream_t(0), res);
+            nanovdb::tools::cuda::MeshToGrid<BuildT> ref(d_points.data(), 4u, d_tris.data(), 4u, map);
+            check(op, ref);
+            nanovdb::tools::cuda::MeshToGrid<BuildT, CountingResource> op2(d_points.data(), 4u, d_tris.data(), 4u, map, cudaStream_t(0), res);
+            auto withUdf = op2.buildWithUDF();
+            auto refUdf = nanovdb::tools::cuda::MeshToGrid<BuildT>(d_points.data(), 4u, d_tris.data(), 4u, map).getHandleAndUDF();
+            expectSameBytes(deviceToHost(withUdf.first), refUdf.first);
+            ASSERT_EQ(refUdf.second.size(), withUdf.second.size_bytes());
+            std::vector<std::byte> a(withUdf.second.size_bytes()), b(refUdf.second.size());
+            ASSERT_EQ(cudaSuccess, cudaMemcpy(a.data(), withUdf.second.data(), a.size(), cudaMemcpyDeviceToHost));
+            ASSERT_EQ(cudaSuccess, cudaMemcpy(b.data(), refUdf.second.deviceData(), b.size(), cudaMemcpyDeviceToHost));
+            EXPECT_EQ(0, std::memcmp(a.data(), b.data(), a.size()));
+        }
+    }
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+    EXPECT_GT(counters.allocs, 0);
+    EXPECT_EQ(counters.allocs, counters.deallocs);
 }
 
 } // namespace nanovdb_test

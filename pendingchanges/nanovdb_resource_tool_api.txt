@@ -1,0 +1,8 @@
+NanoVDB:
+
+  New Features:
+  - The GPU tools gain resource forms beside their prototype-buffer forms, which are unchanged (CUDA). voxelsToGrid, both single-set pointsToGrid overloads, indexToGrid and addBlindData take (..., stream, resource): one memory resource, held by value (pass a cuda::ResourceRef to borrow), allocates both the scratch and the output, which is a GridHandle<cuda::Buffer<std::byte, R>>. Passing a stream selects the resource form, so existing calls resolve as before.
+  - The builder classes PointsToGrid, DilateGrid, MergeGrids, PruneGrid, RefineGrid, CoarsenGrid, MeshToGrid and IndexToGrid gain build() beside getHandle(buffer) (and MeshToGrid buildWithUDF() beside getHandleAndUDF()): the output allocates through the builder's own resource, on its stream, as a handle over cuda::Buffer<std::byte, ResourceRef<R>> that borrows it.
+
+  Bug Fixes:
+  - addBlindData drew its scratch only from the default instance of its resource type, so a resource without a default constructor, such as a ResourceRef, could not drive it.

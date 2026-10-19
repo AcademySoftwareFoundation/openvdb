@@ -94,6 +94,18 @@ public:
     template<typename DstBuildT, typename BufferT = nanovdb::cuda::DualDeviceBuffer>
     GridHandle<BufferT> getHandle(const typename BuildToValueMap<DstBuildT>::type *srcValues, const BufferT &buffer = BufferT());
 
+    /// @brief Resource form of getHandle: the grid allocates through this
+    ///        builder's resource, the one its scratch uses, on its stream.
+    /// @return a handle over cuda::Buffer<std::byte, ResourceRef<ResourceT>>,
+    ///         which borrows the resource: it must outlive the handle
+    /// @param srcValues pointer to values that will be inserted into the output grid
+    template<typename DstBuildT>
+    GridHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>> build(const typename BuildToValueMap<DstBuildT>::type *srcValues)
+    {
+        using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
+        return this->template getHandle<DstBuildT>(srcValues, BufferT(mStream, this->ref(), 0, nanovdb::cuda::noInit));
+    }
+
 private:
     cudaStream_t      mStream{0};
     util::cuda::Timer mTimer;

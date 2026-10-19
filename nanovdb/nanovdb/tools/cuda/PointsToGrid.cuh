@@ -411,6 +411,19 @@ public:
                                   size_t pointCount,
                                   const BufferT &buffer = BufferT());
 
+    /// @brief Resource form of getHandle: the grid allocates through this
+    ///        builder's resource, the one its scratch uses, on its stream.
+    /// @return a handle over cuda::Buffer<std::byte, ResourceRef<ResourceT>>,
+    ///         which borrows the resource: it must outlive the handle
+    /// @param points device point to an array of points in world space
+    /// @param pointCount number of input points or voxels
+    template<typename PtrT>
+    GridHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>> build(const PtrT points, size_t pointCount)
+    {
+        using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
+        return this->getHandle(points, pointCount, BufferT(mStream, this->ref(), 0, nanovdb::cuda::noInit));
+    }
+
     template<typename PtrT>
     void countNodes(const PtrT points, size_t pointCount);
 

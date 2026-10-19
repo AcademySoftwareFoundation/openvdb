@@ -139,6 +139,16 @@ public:
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
 
+    /// @brief Resource form of getHandle: the grid allocates through this
+    ///        builder's resource, the one its scratch uses, on its stream.
+    /// @return a handle over cuda::Buffer<std::byte, ResourceRef<ResourceT>>,
+    ///         which borrows the resource: it must outlive the handle
+    GridHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>> build()
+    {
+        using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
+        return this->getHandle(BufferT(mStream, this->ref(), 0, nanovdb::cuda::noInit));
+    }
+
     /// @brief Creates a grid handle and a device sidecar buffer containing the
     ///        per-active-voxel unsigned distance field values.
     ///
@@ -157,6 +167,18 @@ public:
     std::pair<GridHandle<GridBufferT>, SidecarBufferT>
     getHandleAndUDF(const GridBufferT&    buffer        = GridBufferT(),
                     const SidecarBufferT& sidecarBuffer = SidecarBufferT());
+
+    /// @brief Resource form of getHandleAndUDF: the grid and its UDF sidecar
+    ///        allocate through this builder's resource, on its stream.
+    /// @return the grid handle and the sidecar, both over buffers that borrow
+    ///         the resource: it must outlive them
+    std::pair<GridHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>>, nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>>
+    buildWithUDF()
+    {
+        using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
+        return this->getHandleAndUDF(BufferT(mStream, this->ref(), 0, nanovdb::cuda::noInit),
+                                     BufferT(mStream, this->ref(), 0, nanovdb::cuda::noInit));
+    }
 
 private:
     void transformTriangles();
