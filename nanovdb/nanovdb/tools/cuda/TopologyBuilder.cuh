@@ -499,7 +499,7 @@ inline void TopologyBuilder<BuildT, ResourceT>::processUpperNodes(cudaStream_t s
     // Also fill in any necessary part of the preamble (in InternalData) of upper nodes
     auto processedTileCount = hostProcessedRoot()->tileCount();
 
-    if (processedTileCount) { // Unless output grid is empty
+    if (data()->nodeCount[2]) { // Unless output grid is empty
         util::cuda::lambdaKernel<<<numBlocks(processedTileCount), mNumThreads, 0, stream>>>(
             processedTileCount, topology::detail::BuildUpperNodesFunctor<BuildT>(), deviceData(), deviceProcessedRoot());
         cudaCheckError();

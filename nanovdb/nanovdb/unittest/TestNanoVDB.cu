@@ -3841,6 +3841,44 @@ TEST(TestNanoVDBCUDA, DilateInjectPrune_ValueOnIndex)
     EXPECT_EQ(inputHandle.grid<BuildT>()->mChecksum.full(), prunedHandle.grid<BuildT>()->mChecksum.full());
 }// DilateInjectPrune_ValueOnIndex
 
+// Regression test: pruning a non-empty grid down to nothing must return a valid empty grid. The builder
+// keeps every source root tile until it has counted the output nodes, so with no voxel retained it has
+// root tiles but no upper nodes; connecting the upper nodes previously still ran and failed.
+TEST(TestNanoVDBCUDA, PruneToEmpty_ValueOnIndex)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+
+    // Voxels in two root tiles (a root tile spans 4096 voxels per axis)
+    const std::vector<nanovdb::Coord> inputPoints{{0,0,0}, {1,2,3}, {200,5,5}, {4100,0,0}};
+    nanovdb::cuda::Buffer<nanovdb::Coord> pointBuffer(cudaStream_t(0), inputPoints.size(), nanovdb::cuda::noInit);
+    cudaCheck(cudaMemcpy(pointBuffer.data(), inputPoints.data(), inputPoints.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    nanovdb::tools::cuda::PointsToGrid<BuildT> converter;
+    auto inputHandle = converter.getHandle(pointBuffer.data(), inputPoints.size());
+    auto inputGrid = inputHandle.deviceGrid<BuildT>();
+    EXPECT_TRUE(inputGrid);
+    auto inputTreeData = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(inputGrid);
+    EXPECT_EQ(inputTreeData.mNodeCount[2], 2);
+
+    // A retain mask with every bit off
+    nanovdb::cuda::Buffer<nanovdb::Mask<3>> maskBuffer(cudaStream_t(0), inputTreeData.mNodeCount[0], nanovdb::cuda::noInit);
+    cudaCheck(cudaMemset(maskBuffer.data(), 0, maskBuffer.size_bytes()));
+
+    nanovdb::tools::cuda::PruneGrid<BuildT> pruner(inputGrid, maskBuffer.data());
+    auto prunedHandle = pruner.getHandle();
+    cudaCheck(cudaDeviceSynchronize());
+    EXPECT_TRUE(prunedHandle.deviceGrid<BuildT>());
+
+    prunedHandle.deviceDownload();
+    auto prunedGrid = prunedHandle.grid<BuildT>();
+    EXPECT_TRUE(prunedGrid);
+    EXPECT_EQ(prunedGrid->tree().nodeCount(0), 0u);
+    EXPECT_EQ(prunedGrid->tree().nodeCount(1), 0u);
+    EXPECT_EQ(prunedGrid->tree().nodeCount(2), 0u);
+    EXPECT_EQ(prunedGrid->tree().root().tileCount(), 0u);
+    EXPECT_EQ(prunedGrid->activeVoxelCount(), 0u);
+    EXPECT_TRUE(prunedGrid->indexBBox().empty());
+}// PruneToEmpty_ValueOnIndex
+
 // Busy-wait on whatever stream it is launched on; used to occupy the default
 // stream so that a kernel mistakenly launched there (instead of the caller's
 // stream) is reordered relative to the rest of the operation.
