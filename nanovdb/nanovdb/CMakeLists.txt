@@ -258,6 +258,7 @@ set(NANOVDB_INCLUDE_TOOLS_CUDA_FILES
   tools/cuda/TopologyBuilder.cuh
   tools/cuda/RefineGrid.cuh
   tools/cuda/PruneGrid.cuh
+  tools/cuda/PartitionGrid.cuh
   tools/cuda/DistributedPointsToGrid.cuh
   tools/cuda/DilateGrid.cuh
   tools/cuda/CoarsenGrid.cuh

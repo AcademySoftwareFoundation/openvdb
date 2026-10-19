@@ -388,6 +388,47 @@ struct PruneInternalNodesFunctor
     }
 };
 
+/// @brief The two-output counterpart of PruneInternalNodesFunctor, for PartitionGrid: marks the upper and lower
+///        node masks that each source leaf needs in output 0 (its active voxels with the retain bit on) and in
+///        output 1 (the rest). Both outputs share the processed root, so a leaf has the same tile in each.
+template <typename BuildT>
+struct PartitionInternalNodesFunctor
+{
+    // Intended to be called via nanovdb::util::cuda::lambdaKernel
+    __device__
+    void operator()(
+        size_t srcLeafID,
+        const NanoGrid<BuildT>* srcGrid,
+        const NanoRoot<BuildT>* processedRoot,
+        const Mask<3>* srcLeafMask,
+        Mask<5> *upperMasks0,
+        Mask<4> (*lowerMasks0)[Mask<5>::SIZE],
+        Mask<5> *upperMasks1,
+        Mask<4> (*lowerMasks1)[Mask<5>::SIZE])
+    {
+        const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
+        const auto& leafMask = srcLeafMask[srcLeafID];
+        bool retain0 = false, retain1 = false;
+        for (uint32_t w = 0; w < Mask<3>::WORD_COUNT; w++) {
+            const uint64_t active = srcLeaf.valueMask().words()[w];
+            const uint64_t kept   = active & leafMask.words()[w];
+            retain0 |= kept != 0;
+            retain1 |= (active ^ kept) != 0; }
+        if (!retain0 && !retain1) return;
+
+        const auto upperChildIndex = NanoUpper<BuildT>::CoordToOffset(srcLeaf.origin());
+        const auto lowerChildIndex = NanoLower<BuildT>::CoordToOffset(srcLeaf.origin());
+        const auto tileIndex = util::PtrDiff(processedRoot->probeTile(srcLeaf.origin()), processedRoot->tile(0))
+                               / sizeof(typename NanoRoot<BuildT>::Tile);
+        if (retain0) {
+            upperMasks0[tileIndex].setOnAtomic(upperChildIndex);
+            lowerMasks0[tileIndex][upperChildIndex].setOnAtomic(lowerChildIndex); }
+        if (retain1) {
+            upperMasks1[tileIndex].setOnAtomic(upperChildIndex);
+            lowerMasks1[tileIndex][upperChildIndex].setOnAtomic(lowerChildIndex); }
+    }
+};
+
 template <typename BuildT>
 struct RefineInternalNodesFunctor
 {
@@ -792,6 +833,33 @@ struct PruneLeafMasksFunctor
         if (leafPtr) {
             const_cast<Mask<3>&>(leafPtr->valueMask()) = srcLeaf.valueMask();
             const_cast<Mask<3>&>(leafPtr->valueMask()) &= srcLeafMask[srcLeafID]; }
+    }
+};
+
+/// @brief The two-output counterpart of PruneLeafMasksFunctor, for PartitionGrid: sets the value mask of the
+///        source leaf's copy in output 0 to its active voxels with the retain bit on, and in output 1 to the rest.
+///        A copy is missing from an output that keeps none of the leaf's voxels.
+template <typename BuildT>
+struct PartitionLeafMasksFunctor
+{
+    // Intended to be called via nanovdb::util::cuda::lambdaKernel
+    __device__
+    void operator()(
+        size_t srcLeafID,
+        const NanoGrid<BuildT>* srcGrid,
+        NanoGrid<BuildT>* dstGrid0,
+        NanoGrid<BuildT>* dstGrid1,
+        const Mask<3>* srcLeafMask)
+    {
+        const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
+        const auto& leafMask = srcLeafMask[srcLeafID];
+        auto leafPtr0 = dstGrid0->tree().root().probeLeaf(srcLeaf.origin());
+        auto leafPtr1 = dstGrid1->tree().root().probeLeaf(srcLeaf.origin());
+        for (uint32_t w = 0; w < Mask<3>::WORD_COUNT; w++) {
+            const uint64_t active = srcLeaf.valueMask().words()[w];
+            const uint64_t kept   = active & leafMask.words()[w];
+            if (leafPtr0) const_cast<Mask<3>&>(leafPtr0->valueMask()).words()[w] = kept;
+            if (leafPtr1) const_cast<Mask<3>&>(leafPtr1->valueMask()).words()[w] = active ^ kept; }
     }
 };
 
