@@ -27,6 +27,7 @@
 #include <cstddef> // for std::byte
 #include <stdexcept> // for std::invalid_argument
 #include <type_traits> // for the stream-argument check
+#include <utility> // for std::move
 
 #include <cstring> // for std::strcpy, std::strlen
 #include <nanovdb/cuda/HandleStorage.h>
@@ -60,6 +61,13 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
     static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
                   "addBlindData allocates stream-ordered scratch and requires an AsyncResource");
 
+    // the pointer and name arguments are checked before the first launch reads the grid
+    if (name == nullptr) throw std::invalid_argument("addBlindData: null name (pass \"\" for none)");
+    if (std::strlen(name) >= GridBlindMetaData::MaxNameSize)
+        throw std::invalid_argument("addBlindData: name longer than GridBlindMetaData::MaxNameSize - 1 characters");
+    if (d_grid == nullptr) throw std::invalid_argument("addBlindData: null device grid");
+    if (d_blindData == nullptr && valueCount > 0) throw std::invalid_argument("addBlindData: null blind data with a nonzero value count");
+
     // extract byte sizes of the grid, blind meta data and blind data
     enum {GRID=0, META=1, DATA=2, CHECKSUM=3};
     using ScratchT = nanovdb::cuda::Buffer<uint64_t, nanovdb::cuda::ResourceRef<ResourceT>>;
@@ -82,11 +90,6 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
     GridBlindMetaData metaData{int64_t(sizeof(GridBlindMetaData) + tmp[DATA]), valueCount,
                                sizeof(BlindDataT), semantics, blindClass, toGridType<BlindDataT>()};
     if (!metaData.isValid()) throw std::runtime_error("cudaAddBlindData: invalid combination of blind meta data");
-    if (name == nullptr) throw std::invalid_argument("addBlindData: null name (pass \"\" for none)");
-    if (std::strlen(name) >= GridBlindMetaData::MaxNameSize)
-        throw std::invalid_argument("addBlindData: name longer than GridBlindMetaData::MaxNameSize - 1 characters");
-    if (d_grid == nullptr) throw std::invalid_argument("addBlindData: null device grid");
-    if (d_blindData == nullptr && valueCount > 0) throw std::invalid_argument("addBlindData: null blind data with a nonzero value count");
     std::strcpy(metaData.mName, name);
     auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(tmp[GRID] + tmp[META] + sizeof(GridBlindMetaData) + tmp[DATA] + metaData.blindDataSize(),
                                                               &pool, util::cuda::currentDevice(), stream);
@@ -170,11 +173,12 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
 /// @brief Resource form of addBlindData: the output and the scratch allocate
 ///        through @c resource, on @c stream. Passing a cudaStream_t selects
 ///        this form (a literal 0 does not: write cudaStream_t(0)); the
-///        prototype-buffer form above keeps its signature and behaviour.
+///        prototype-buffer form above keeps its call shape, and both forms
+///        validate their arguments.
 /// @tparam ResourceT stream-ordered memory resource, held by value; pass a
 ///         cuda::ResourceRef<R> to allocate through a borrowed instance
 template<typename BuildT, typename BlindDataT, typename ResourceT = nanovdb::cuda::DeviceResource>
-typename util::enable_if<nanovdb::cuda::is_async_resource<ResourceT>::value, GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
 addBlindData(const NanoGrid<BuildT> *d_grid,
              const BlindDataT *d_blindData,
              uint64_t valueCount,

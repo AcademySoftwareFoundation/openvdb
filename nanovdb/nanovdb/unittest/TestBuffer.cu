@@ -1449,6 +1449,11 @@ TEST(TestBuffer, ResourceFormsOfTheGpuTools)
         auto pFixed = nanovdb::tools::cuda::pointsToGrid(d_points.data(), int(points.size()), 1.0, nanovdb::PointType::Default, stream, RefT(res));
         static_assert(std::is_same<decltype(pFixed), nanovdb::GridHandle<OutT>>::value, "resource form");
         EXPECT_EQ(int(points.size()), int(deviceToHost(pFixed).grid<nanovdb::Point>()->pointCount()));
+        auto pFixedProto = nanovdb::tools::cuda::pointsToGrid(d_points.data(), int(points.size()), 1.0);
+        expectSameBytes(deviceToHost(pFixed), pFixedProto);
+        // the prototype forms validate their arguments the same way
+        EXPECT_THROW((nanovdb::tools::cuda::voxelsToGrid<float>(d_coords.data(), coords.size(), -1.0)), std::invalid_argument);
+        EXPECT_THROW((nanovdb::tools::cuda::pointsToGrid(d_points.data(), -1, 1.0)), std::invalid_argument);
         auto pDense = nanovdb::tools::cuda::pointsToGrid(d_points.data(), int(points.size()), 2, 1, 10, nanovdb::PointType::Default, stream, RefT(res));
         auto pDenseProto = nanovdb::tools::cuda::pointsToGrid(d_points.data(), int(points.size()), 2, 1, 10);
         expectSameBytes(deviceToHost(pDense), pDenseProto);
@@ -1487,6 +1492,10 @@ TEST(TestBuffer, ResourceFormsOfTheGpuTools)
         };
         EXPECT_THROW(addNamed(nullptr), std::invalid_argument);
         EXPECT_THROW(addNamed(longName.c_str()), std::invalid_argument);
+        EXPECT_THROW((nanovdb::tools::cuda::addBlindData(static_cast<const nanovdb::NanoGrid<float>*>(nullptr), d_values.data(), coords.size(),
+                                                         nanovdb::GridBlindDataClass::AttributeArray, nanovdb::GridBlindDataSemantic::Unknown,
+                                                         "w", stream, RefT(res))), std::invalid_argument);
+        ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(stream)); // the null grid was never launched on
         EXPECT_NO_THROW(addNamed(longName.substr(1).c_str())); // the longest name that fits
         EXPECT_THROW((nanovdb::tools::cuda::voxelsToGrid<float>(d_coords.data(), coords.size(), 0.0, stream)), std::invalid_argument);
         EXPECT_THROW((nanovdb::tools::cuda::pointsToGrid(d_points.data(), -1, 1.0, nanovdb::PointType::Default, stream)), std::invalid_argument);

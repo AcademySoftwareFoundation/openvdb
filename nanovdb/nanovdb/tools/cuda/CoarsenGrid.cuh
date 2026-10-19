@@ -25,6 +25,9 @@
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
 #include <cstddef> // for std::byte
+#include <map>
+#include <stdexcept>
+#include <utility>
 
 
 namespace nanovdb {
