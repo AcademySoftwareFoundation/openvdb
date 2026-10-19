@@ -133,7 +133,7 @@ public:
 
     /// @brief Creates a handle to the output grid
     /// @tparam BufferT Buffer type used for allocation of the grid handle
-    /// @param buffer optional buffer (currently ignored)
+    /// @param buffer prototype buffer whose resource (or create() pool) allocates the output
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
     template<typename BufferT = nanovdb::cuda::DualDeviceBuffer>
     GridHandle<BufferT>
@@ -159,8 +159,8 @@ public:
     ///
     /// @tparam GridBufferT    Buffer type for the output grid handle
     /// @tparam SidecarBufferT Buffer type for the UDF sidecar (defaults to DeviceBuffer)
-    /// @param buffer          optional allocator for the grid handle (currently ignored)
-    /// @param sidecarBuffer   optional allocator for the UDF sidecar (currently ignored)
+    /// @param buffer          prototype buffer whose resource (or create() pool) allocates the grid
+    /// @param sidecarBuffer   prototype buffer whose resource (or create() pool) allocates the sidecar
     /// @return std::pair of grid handle and UDF sidecar buffer
     template<typename GridBufferT    = nanovdb::cuda::DualDeviceBuffer,
              typename SidecarBufferT = nanovdb::cuda::DualDeviceBuffer>

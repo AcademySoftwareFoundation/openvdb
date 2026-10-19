@@ -23,6 +23,9 @@
 #include <tuple>
 #include <cinttypes>
 #include <algorithm>
+#include <cstddef> // for std::byte
+#include <stdexcept> // for std::invalid_argument
+#include <type_traits> // for the stream-argument check
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/cuda/DeviceBuffer.h>
@@ -56,7 +59,7 @@ namespace tools::cuda {// ======================================================
 /// @return Returns a handle with a grid of type NanoGrid<Point> where point information, e.g. coordinates,
 ///         are represented as blind data defined by @c type.
 template<typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
-GridHandle<BufferT>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
 pointsToGrid(const PtrT dWorldPoints,
              int pointCount,
              double voxelSize,
@@ -85,7 +88,7 @@ pointsToGrid(const PtrT dWorldPoints,
 /// @return Returns a handle with a grid of type NanoGrid<Point> where point information, e.g. coordinates,
 ///         are represented as blind data defined by @c type.
 template<typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
-GridHandle<BufferT>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
 pointsToGrid(const PtrT dWorldPoints,
              int pointCount,
              int maxPointPerVoxel,
@@ -118,7 +121,7 @@ pointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> pointSe
 /// @param buffer Instance of the device buffer used for memory allocation
 /// @return Returns a handle with the grid of type NanoGrid<BuildT>
 template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
-GridHandle<BufferT>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
 voxelsToGrid(const PtrT dGridVoxels,
              size_t voxelCount,
              double voxelSize = 1.0,
@@ -136,13 +139,14 @@ voxelsToGrid(std::vector<std::tuple<const PtrT, size_t, double>> pointSet,
 //-------------------------------------------------------------------------------------------------------
 
 /// @brief Resource form of voxelsToGrid: the output and all internal scratch
-///        allocate through @c resource, on @c stream. Passing a stream selects
-///        this form; the prototype-buffer form above is unchanged.
+///        allocate through @c resource, on @c stream. Passing a cudaStream_t
+///        selects this form (a literal 0 does not: write cudaStream_t(0)); the
+///        prototype-buffer form above is unchanged.
 /// @tparam ResourceT stream-ordered memory resource, held by value; pass a
 ///         cuda::ResourceRef<R> to allocate through a borrowed instance
 /// @return a handle over cuda::Buffer<std::byte, ResourceT> on the device
 template<typename BuildT, typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
-GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>
+typename util::enable_if<nanovdb::cuda::is_async_resource<ResourceT>::value, GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
 voxelsToGrid(const PtrT dGridVoxels,
              size_t voxelCount,
              double voxelSize,
@@ -152,7 +156,7 @@ voxelsToGrid(const PtrT dGridVoxels,
 /// @brief Resource form of pointsToGrid for a fixed voxel size; see the
 ///        resource form of voxelsToGrid.
 template<typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
-GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>
+typename util::enable_if<nanovdb::cuda::is_async_resource<ResourceT>::value, GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
 pointsToGrid(const PtrT dWorldPoints,
              int pointCount,
              double voxelSize,
@@ -163,7 +167,7 @@ pointsToGrid(const PtrT dWorldPoints,
 /// @brief Resource form of pointsToGrid targeting a maximum point density;
 ///        see the resource form of voxelsToGrid.
 template<typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
-GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>
+typename util::enable_if<nanovdb::cuda::is_async_resource<ResourceT>::value, GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
 pointsToGrid(const PtrT dWorldPoints,
              int pointCount,
              int maxPointsPerVoxel,
@@ -404,7 +408,7 @@ public:
     /// @tparam BufferT Buffer type used for allocation of the grid handle
     /// @param points device point to an array of points in world space
     /// @param pointCount number of input points or voxels
-    /// @param buffer optional buffer (currently ignored)
+    /// @param buffer prototype buffer whose resource (or create() pool) allocates the output
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
     template<typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer>
     GridHandle<BufferT> getHandle(const PtrT points,
@@ -1470,9 +1474,11 @@ inline void PointsToGrid<BuildT, ResourceT>::processBBox()
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT, typename PtrT, typename BufferT, typename ResourceT>
-GridHandle<BufferT>// Grid<BuildT>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>// Grid<BuildT>
 voxelsToGrid(const PtrT d_ijk, size_t voxelCount, double voxelSize, const BufferT &buffer, cudaStream_t stream)
 {
+    static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
+                  "voxelsToGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
     PointsToGrid<BuildT, ResourceT> converter(voxelSize, Vec3d(0.0), stream);
     return converter.getHandle(d_ijk, voxelCount, buffer);
 }
@@ -1480,9 +1486,11 @@ voxelsToGrid(const PtrT d_ijk, size_t voxelCount, double voxelSize, const Buffer
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename PtrT, typename BufferT, typename ResourceT>
-GridHandle<BufferT>// Grid<Point> with PointType coordinates as blind data
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>// Grid<Point> with PointType coordinates as blind data
 pointsToGrid(const PtrT d_xyz, int pointCount, int maxPointsPerVoxel, int tolerance, int maxIterations, PointType type, const BufferT &buffer, cudaStream_t stream)
 {
+    static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
+                  "pointsToGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
     PointsToGrid<Point, ResourceT> converter(maxPointsPerVoxel, tolerance, maxIterations, stream);
     converter.setPointType(type);
     return converter.getHandle(d_xyz, pointCount, buffer);
@@ -1513,9 +1521,10 @@ voxelsToGrid(std::vector<std::tuple<const PtrT,size_t,double>> vec, const Buffer
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT, typename PtrT, typename ResourceT>
-GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>
+typename util::enable_if<nanovdb::cuda::is_async_resource<ResourceT>::value, GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
 voxelsToGrid(const PtrT d_ijk, size_t voxelCount, double voxelSize, cudaStream_t stream, ResourceT resource)
 {
+    if (!(voxelSize > 0.0)) throw std::invalid_argument("voxelsToGrid: voxel size must be positive");
     using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
     PointsToGrid<BuildT, ResourceT> converter(voxelSize, Vec3d(0.0), stream, resource);
     return converter.getHandle(d_ijk, voxelCount, BufferT(stream, resource, 0, nanovdb::cuda::noInit));
@@ -1524,9 +1533,11 @@ voxelsToGrid(const PtrT d_ijk, size_t voxelCount, double voxelSize, cudaStream_t
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename PtrT, typename ResourceT>
-GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>
+typename util::enable_if<nanovdb::cuda::is_async_resource<ResourceT>::value, GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
 pointsToGrid(const PtrT d_xyz, int pointCount, double voxelSize, PointType type, cudaStream_t stream, ResourceT resource)
 {
+    if (pointCount < 0) throw std::invalid_argument("pointsToGrid: negative point count");
+    if (!(voxelSize > 0.0)) throw std::invalid_argument("pointsToGrid: voxel size must be positive");
     using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
     PointsToGrid<Point, ResourceT> converter(voxelSize, Vec3d(0.0), stream, resource);
     converter.setPointType(type);
@@ -1536,10 +1547,12 @@ pointsToGrid(const PtrT d_xyz, int pointCount, double voxelSize, PointType type,
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename PtrT, typename ResourceT>
-GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>
+typename util::enable_if<nanovdb::cuda::is_async_resource<ResourceT>::value, GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
 pointsToGrid(const PtrT d_xyz, int pointCount, int maxPointsPerVoxel, int tolerance, int maxIterations, PointType type,
              cudaStream_t stream, ResourceT resource)
 {
+    if (pointCount < 0) throw std::invalid_argument("pointsToGrid: negative point count");
+    if (maxPointsPerVoxel <= 0) throw std::invalid_argument("pointsToGrid: maximum points per voxel must be positive");
     using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
     PointsToGrid<Point, ResourceT> converter(maxPointsPerVoxel, tolerance, maxIterations, stream, resource);
     converter.setPointType(type);

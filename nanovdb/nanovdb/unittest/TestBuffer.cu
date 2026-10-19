@@ -1477,6 +1477,20 @@ TEST(TestBuffer, ResourceFormsOfTheGpuTools)
         auto withBlindProto = nanovdb::tools::cuda::addBlindData(proto.deviceGrid<float>(), d_values.data(), coords.size(),
                                                                  nanovdb::GridBlindDataClass::AttributeArray, nanovdb::GridBlindDataSemantic::Unknown, "w");
         expectSameBytes(deviceToHost(withBlind), withBlindProto);
+
+        // invalid arguments throw instead of overflowing or dereferencing null
+        const std::string longName(nanovdb::GridBlindMetaData::MaxNameSize, 'x');
+        auto addNamed = [&](const char* name) {
+            return nanovdb::tools::cuda::addBlindData(viaRes.deviceGrid<float>(), d_values.data(), coords.size(),
+                                                      nanovdb::GridBlindDataClass::AttributeArray, nanovdb::GridBlindDataSemantic::Unknown,
+                                                      name, stream, RefT(res));
+        };
+        EXPECT_THROW(addNamed(nullptr), std::invalid_argument);
+        EXPECT_THROW(addNamed(longName.c_str()), std::invalid_argument);
+        EXPECT_NO_THROW(addNamed(longName.substr(1).c_str())); // the longest name that fits
+        EXPECT_THROW((nanovdb::tools::cuda::voxelsToGrid<float>(d_coords.data(), coords.size(), 0.0, stream)), std::invalid_argument);
+        EXPECT_THROW((nanovdb::tools::cuda::pointsToGrid(d_points.data(), -1, 1.0, nanovdb::PointType::Default, stream)), std::invalid_argument);
+        EXPECT_THROW((nanovdb::tools::cuda::indexToGrid<float, nanovdb::ValueOnIndex>(nullptr, d_values.data(), stream)), std::invalid_argument);
     }
     ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(stream));
     ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));

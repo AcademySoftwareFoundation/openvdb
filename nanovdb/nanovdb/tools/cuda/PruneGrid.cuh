@@ -24,6 +24,7 @@
 #include <nanovdb/util/cuda/Morphology.cuh>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
+#include <cstddef> // for std::byte
 
 
 namespace nanovdb {
@@ -63,7 +64,7 @@ public:
 
     /// @brief Creates a handle to the pruned grid
     /// @tparam BufferT Buffer type used for allocation of the grid handle
-    /// @param buffer optional buffer (currently ignored)
+    /// @param buffer prototype buffer whose resource (or create() pool) allocates the output
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
     template<typename BufferT = nanovdb::cuda::DualDeviceBuffer>
     GridHandle<BufferT>

@@ -29,7 +29,7 @@
 #include <vector> // for the adopted metadata
 
 #include <stdexcept> // for std::runtime_error
-#include <type_traits> // for std::is_default_constructible
+#include <type_traits> // for std::is_default_constructible, std::enable_if, std::is_same
 
 namespace nanovdb {
 
@@ -87,6 +87,15 @@ inline void* deviceStorageData(BufferT& buffer)
     if constexpr (BufferHasDeviceSingle<BufferT>::value) return buffer.data();
     else return buffer.deviceData();
 }
+
+/// @brief Return type of a tool's prototype-buffer form: @c T, except when
+///        @c BufferT deduced as cudaStream_t, i.e. the call passed a stream
+///        where the prototype goes, which is the resource form's signature.
+///        Removing the prototype form there leaves the resource form as the
+///        only candidate rather than relying on partial ordering, which
+///        compilers resolve differently for these overloads.
+template<typename BufferT, typename T>
+using PrototypeFormResult = typename std::enable_if<!std::is_same<BufferT, cudaStream_t>::value, T>::type;
 
 /// @brief Orders the host after @c stream where a handle is about to be
 ///        constructed from bytes still being written on it: a single-space

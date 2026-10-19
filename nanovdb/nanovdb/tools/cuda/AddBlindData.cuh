@@ -24,31 +24,22 @@
 #include <nanovdb/util/cuda/Util.h>
 #include <nanovdb/tools/GridChecksum.h>
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
+#include <cstddef> // for std::byte
+#include <stdexcept> // for std::invalid_argument
+#include <type_traits> // for the stream-argument check
 
-#include <cstring> // for std::strcpy
+#include <cstring> // for std::strcpy, std::strlen
 #include <nanovdb/cuda/HandleStorage.h>
 
 namespace nanovdb {// ================================================
 
 namespace tools::cuda {// ============================================
 
-/// @brief This function appends blind data to and existing NanoGrid
-/// @tparam BuildT Build type of the grid
-/// @tparam BlindDataT Type of the blind data
-/// @tparam BufferT Type of the buffer used for allocation
-/// @tparam ResourceT Template type of optional resource used for internal temporary memory
-/// @param d_grid Pointer to device grid
-/// @param d_blindData Pointer to device blind data
-/// @param valueCount number of values in the blind data
-/// @param blindClass class of the blind data
-/// @param semantics semantics of the blind data
-/// @param name optional name of the blind data
-/// @param pool optional pool used for allocation
-/// @param stream optional CUDA stream (defaults to CUDA stream 0)
-/// @return GridHandle with blind data appended
 namespace detail {
 
-/// @brief Shared body of both addBlindData forms; @c resource allocates the scratch.
+/// @brief Shared body of both addBlindData forms.
+/// @param pool prototype buffer whose resource (or create() pool) allocates the output
+/// @param resource resource the scratch allocates through
 template<typename BuildT, typename BlindDataT, typename BufferT, typename ResourceT>
 GridHandle<BufferT>
 addBlindData(const NanoGrid<BuildT> *d_grid,
@@ -91,6 +82,11 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
     GridBlindMetaData metaData{int64_t(sizeof(GridBlindMetaData) + tmp[DATA]), valueCount,
                                sizeof(BlindDataT), semantics, blindClass, toGridType<BlindDataT>()};
     if (!metaData.isValid()) throw std::runtime_error("cudaAddBlindData: invalid combination of blind meta data");
+    if (name == nullptr) throw std::invalid_argument("addBlindData: null name (pass \"\" for none)");
+    if (std::strlen(name) >= GridBlindMetaData::MaxNameSize)
+        throw std::invalid_argument("addBlindData: name longer than GridBlindMetaData::MaxNameSize - 1 characters");
+    if (d_grid == nullptr) throw std::invalid_argument("addBlindData: null device grid");
+    if (d_blindData == nullptr && valueCount > 0) throw std::invalid_argument("addBlindData: null blind data with a nonzero value count");
     std::strcpy(metaData.mName, name);
     auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(tmp[GRID] + tmp[META] + sizeof(GridBlindMetaData) + tmp[DATA] + metaData.blindDataSize(),
                                                               &pool, util::cuda::currentDevice(), stream);
@@ -140,8 +136,22 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
 
 }// namespace detail
 
+/// @brief This function appends blind data to and existing NanoGrid
+/// @tparam BuildT Build type of the grid
+/// @tparam BlindDataT Type of the blind data
+/// @tparam BufferT Type of the buffer used for allocation
+/// @tparam ResourceT Template type of optional resource used for internal temporary memory
+/// @param d_grid Pointer to device grid
+/// @param d_blindData Pointer to device blind data
+/// @param valueCount number of values in the blind data
+/// @param blindClass class of the blind data
+/// @param semantics semantics of the blind data
+/// @param name optional name of the blind data
+/// @param pool prototype buffer whose resource (or create() pool) allocates the output
+/// @param stream optional CUDA stream (defaults to CUDA stream 0)
+/// @return GridHandle with blind data appended
 template<typename BuildT, typename BlindDataT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
-GridHandle<BufferT>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
 addBlindData(const NanoGrid<BuildT> *d_grid,
              const BlindDataT *d_blindData,
              uint64_t valueCount,
@@ -151,17 +161,20 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
              const BufferT &pool = BufferT(),
              cudaStream_t stream = 0)
 {
+    static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
+                  "addBlindData: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
     return detail::addBlindData(d_grid, d_blindData, valueCount, blindClass, semantics, name, pool, stream,
                                 nanovdb::cuda::default_resource<ResourceT>());
 }// addBlindData
 
 /// @brief Resource form of addBlindData: the output and the scratch allocate
-///        through @c resource, on @c stream. Passing a stream selects this
-///        form; the prototype-buffer form above is unchanged.
+///        through @c resource, on @c stream. Passing a cudaStream_t selects
+///        this form (a literal 0 does not: write cudaStream_t(0)); the
+///        prototype-buffer form above keeps its signature and behaviour.
 /// @tparam ResourceT stream-ordered memory resource, held by value; pass a
 ///         cuda::ResourceRef<R> to allocate through a borrowed instance
 template<typename BuildT, typename BlindDataT, typename ResourceT = nanovdb::cuda::DeviceResource>
-GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>
+typename util::enable_if<nanovdb::cuda::is_async_resource<ResourceT>::value, GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
 addBlindData(const NanoGrid<BuildT> *d_grid,
              const BlindDataT *d_blindData,
              uint64_t valueCount,
