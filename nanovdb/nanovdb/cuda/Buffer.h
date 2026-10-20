@@ -360,8 +360,9 @@ public:
 
 private:
     /// @brief Returns @c count * sizeof(T), throwing std::runtime_error if the
-    ///        byte size would overflow size_t instead of silently wrapping into
-    ///        a tiny allocation.
+    ///        byte size would exceed PTRDIFF_MAX, which also rejects a byte size
+    ///        that would overflow size_t and a negative count converted to
+    ///        size_t.
     /// @param count number of elements
     static size_t checkedBytes(size_t count)
     {
