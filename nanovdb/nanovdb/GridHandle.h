@@ -34,7 +34,11 @@ namespace nanovdb {
 
 struct GridHandleMetaData {uint64_t offset, size; GridType gridType;};
 
+template<typename BufferT> class GridHandle;
+
 namespace detail {
+
+struct LayoutCopy;
 
 /// @brief Allocates @c bytes of host-readable storage for a GridHandle:
 ///        through @c BufferT::create for buffers that provide it, and through
@@ -73,9 +77,10 @@ inline BufferT createHostStorage(uint64_t bytes, const BufferT* pool)
 
 /// @brief Checks that @a meta describes grids laid out back to back from
 ///        offset zero inside @a bytes of storage, each starting at a multiple
-///        of NANOVDB_DATA_ALIGNMENT. This is all the validation a
-///        handle adopting caller-supplied metadata performs: no header is read.
-///        No grids at all is accepted only over an empty buffer (an empty handle).
+///        of NANOVDB_DATA_ALIGNMENT and naming a grid type below GridType::End.
+///        This is all the validation a handle adopting caller-supplied
+///        metadata performs: no header is read. No grids at all is accepted
+///        only over an empty buffer (an empty handle).
 inline void validateGridLayout(const std::vector<GridHandleMetaData>& meta, uint64_t bytes)
 {
     if (meta.empty()) {
@@ -93,6 +98,8 @@ inline void validateGridLayout(const std::vector<GridHandleMetaData>& meta, uint
             throw std::runtime_error("GridHandle::adopt: grid size is smaller than a grid header" + where());
         if (meta[i].size > bytes - offset)
             throw std::runtime_error("GridHandle::adopt: grid exceeds the buffer" + where());
+        if (!(meta[i].gridType < GridType::End))
+            throw std::runtime_error("GridHandle::adopt: invalid grid type" + where());
         offset += meta[i].size;
     }
 }
@@ -102,8 +109,8 @@ inline void validateGridLayout(const std::vector<GridHandleMetaData>& meta, uint
 ///        must be valid, carry its expected index and the chain's total count,
 ///        and fit inside the buffer, so a truncated buffer or a forged header
 ///        is rejected before its metadata is trusted. This is the host
-///        counterpart of the device-side chain parse, and it is what makes a
-///        handle's metadata safe to adopt without re-validation (cuda::copyTo).
+///        counterpart of the device-side chain parse. Like it, this does not
+///        require grid offsets to be aligned, unlike GridHandle::adopt.
 inline void parseHostGridChain(const GridData* head, uint64_t bytes, std::vector<GridHandleMetaData>& meta)
 {
     if (bytes < sizeof(GridData))
@@ -169,6 +176,8 @@ class GridHandle
         : mMetaData(std::move(meta))
         , mBuffer(std::move(buffer)) {}
 
+    friend struct detail::LayoutCopy;
+
 public:
     using BufferType = BufferT;
 
@@ -181,6 +190,8 @@ public:
     ///        the grids must be contiguous from offset zero, start aligned to
     ///        NANOVDB_DATA_ALIGNMENT and fit the buffer,
     ///        and an empty layout is accepted only over an empty buffer.
+    ///        Each grid type is trusted as given, so a wrong type makes grid()
+    ///        reinterpret the grid's values; only GridType::End is rejected.
     /// @throw std::runtime_error when the layout does not fit @a buffer
     static GridHandle adopt(BufferT&& buffer, std::vector<GridHandleMetaData> meta)
     {
@@ -526,6 +537,26 @@ public:
     }
 }; // GridHandle
 
+namespace detail {
+
+/// @brief Wraps a byte-for-byte copy of a handle's buffer in a handle with
+///        that handle's layout. The layout already passed a header parse or
+///        GridHandle::adopt when the source was made, so it is not checked
+///        again. This also carries grids at unaligned offsets, which the
+///        constructors accept and GridHandle::adopt rejects. Used by cuda::copyTo.
+struct LayoutCopy
+{
+    template<typename DstBufferT, typename SrcBufferT>
+    static GridHandle<DstBufferT> make(DstBufferT&& buffer, const GridHandle<SrcBufferT>& src)
+    {
+        if (buffer.size() != src.bufferSize())
+            throw std::runtime_error("GridHandle: a copied buffer must match the size of its source");
+        return GridHandle<DstBufferT>(std::move(buffer), src.metaData());
+    }
+};
+
+}// namespace detail
+
 // --------------------------> Implementation of private methods in GridHandle <------------------------------------
 
 template<typename BufferT>
@@ -583,8 +614,8 @@ inline GridHandle<OtherBufferT> GridHandle<BufferT>::copy() const
         // Device-to-device deep copy; for a stream-ordered resource it is
         // ordered on the source's retained stream, so synchronize that stream
         // before reading the result. Metadata is host-resident, so the copy
-        // adopts it directly with no device re-parse.
-        return GridHandle::adopt(mBuffer.copy(), mMetaData);
+        // reuses it directly with no device re-parse.
+        return GridHandle(mBuffer.copy(), mMetaData);
     } else {
         static_assert(BufferIsDefaultConstructible<OtherBufferT>::value,
                       "GridHandle::copy() without arguments default-constructs the target pool buffer: "
@@ -693,6 +724,10 @@ void GridHandle<BufferT>::read(std::istream& is, const std::string &gridName, co
 /// @param handle GridHandle with grids that will be split into individual GridHandles
 /// @param other optional pool used for allocation of output GridHandle
 /// @return Vector of GridHandles each containing a single grid
+/// @throw std::runtime_error if a grid header's size disagrees with the handle's metadata
+/// @note Grids are copied on the host without synchronizing any stream. For a
+///       buffer over a stream-ordered resource, synchronize the source's and
+///       the pool's streams first.
 template<typename BufferT, template <class, class...> class VectorT = std::vector>
 inline VectorT<GridHandle<BufferT>>
 splitGrids(const GridHandle<BufferT> &handle, const BufferT* other = nullptr)
@@ -700,18 +735,20 @@ splitGrids(const GridHandle<BufferT> &handle, const BufferT* other = nullptr)
     static_assert(!BufferHasDeviceSingle<BufferT>::value,
                   "splitGrids copies grids on the host: use cuda::splitGridHandles for a device handle");
     using HandleT = GridHandle<BufferT>;
-    const void *ptr = handle.data();
-    if (ptr == nullptr) return VectorT<HandleT>();
-    VectorT<HandleT> handles(handle.gridCount());
-    for (auto &h : handles) {
-        const GridData *src = reinterpret_cast<const GridData*>(ptr);
+    VectorT<HandleT> handles;
+    if (handle.data() == nullptr) return handles;
+    handles.reserve(handle.gridCount());// push_back, since BufferT may not be default-constructible
+    for (uint32_t n = 0; n < handle.gridCount(); ++n) {
+        const uint64_t size = handle.gridSize(n);
+        const GridData *src = handle.gridData(n);
         NANOVDB_ASSERT(src->isValid());
-        auto buffer = detail::createHostStorage<BufferT>(src->mGridSize, other);
+        if (src->mGridSize != size)
+            throw std::runtime_error("splitGrids: grid header size disagrees with the handle's metadata (grid " + std::to_string(n) + ")");
+        auto buffer = detail::createHostStorage<BufferT>(size, other);
         GridData *dst = reinterpret_cast<GridData*>(buffer.data());
-        std::memcpy(dst, src, src->mGridSize);
+        std::memcpy(dst, src, size);
         tools::updateGridCount(dst, 0u, 1u);
-        h = HandleT(std::move(buffer));
-        ptr = util::PtrAdd(ptr, src->mGridSize);
+        handles.push_back(HandleT(std::move(buffer)));
     }
     return handles;
 }// splitGrids
@@ -724,6 +761,10 @@ splitGrids(const GridHandle<BufferT> &handle, const BufferT* other = nullptr)
 /// @param handles Vector of GridHandles to be combined
 /// @param pool optional pool used for allocation of output GridHandle
 /// @return single GridHandle containing all input grids
+/// @throw std::runtime_error if a grid header's size disagrees with its handle's metadata
+/// @note Grids are copied on the host without synchronizing any stream. For a
+///       buffer over a stream-ordered resource, synchronize the sources' and
+///       the pool's streams first.
 template<typename BufferT, template <class, class...> class VectorT>
 inline GridHandle<BufferT>
 mergeGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* pool = nullptr)
@@ -734,19 +775,21 @@ mergeGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* pool = nu
     uint32_t counter = 0u, gridCount = 0u;
     for (auto &h : handles) {
         gridCount += h.gridCount();
-        for (uint32_t n=0; n<h.gridCount(); ++n) size += h.gridSize(n);
+        for (uint32_t n=0; n<h.gridCount(); ++n) {
+            if (h.gridData(n)->mGridSize != h.gridSize(n))
+                throw std::runtime_error("mergeGrids: grid header size disagrees with its handle's metadata (grid " + std::to_string(n) + ")");
+            size += h.gridSize(n);
+        }
     }
     auto buffer = detail::createHostStorage<BufferT>(size, pool);
     void *dst = buffer.data();
     for (auto &h : handles) {
-        const void *src = h.data();
         for (uint32_t n=0; n<h.gridCount(); ++n) {
-            std::memcpy(dst, src, h.gridSize(n));
+            std::memcpy(dst, h.gridData(n), h.gridSize(n));
             GridData *data = reinterpret_cast<GridData*>(dst);
             NANOVDB_ASSERT(data->isValid());
             tools::updateGridCount(data, counter++, gridCount);
-            dst = util::PtrAdd(dst, data->mGridSize);
-            src = util::PtrAdd(src, data->mGridSize);
+            dst = util::PtrAdd(dst, h.gridSize(n));
         }
     }
     return GridHandle<BufferT>(std::move(buffer));

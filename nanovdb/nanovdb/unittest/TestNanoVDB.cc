@@ -8481,6 +8481,25 @@ TEST_F(TestNanoVDB, mergeSplitGrids)
     //timer.stop();
 }//  mergeSplitGrids
 
+TEST_F(TestNanoVDB, mergeSplitRejectMismatchedMetaData)
+{
+    // adopt reads no header, so metadata can claim a smaller grid than its header does.
+    // Merge and split must throw on that mismatch instead of walking past their buffers.
+    auto sphere = nanovdb::tools::createLevelSetSphere<float>(20.0);
+    const uint64_t bytes = sphere.bufferSize();
+    const uint64_t half = nanovdb::math::AlignUp<NANOVDB_DATA_ALIGNMENT>(bytes / 2u);
+    auto buffer = nanovdb::HostBuffer::create(bytes);
+    std::memcpy(buffer.data(), sphere.data(), bytes);
+    auto adopted = nanovdb::GridHandle<>::adopt(std::move(buffer), {nanovdb::GridHandleMetaData{0u, half, nanovdb::GridType::Float}});
+    ASSERT_EQ(half, adopted.gridSize());
+
+    EXPECT_THROW(nanovdb::splitGrids(adopted), std::runtime_error);
+    std::vector<nanovdb::GridHandle<>> handles;
+    handles.push_back(std::move(adopted));
+    handles.push_back(nanovdb::tools::createLevelSetSphere<float>(10.0));
+    EXPECT_THROW((nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles)), std::runtime_error);
+}//  mergeSplitRejectMismatchedMetaData
+
 TEST_F(TestNanoVDB, writeReadGridBuffer)
 {
     const nanovdb::Coord ijk(101,0,0);

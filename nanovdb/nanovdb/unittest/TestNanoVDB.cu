@@ -30,7 +30,6 @@
 #include <nanovdb/io/IO.h>
 #include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/PinnedResource.h>
-#include <nanovdb/cuda/HandleStorage.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/cuda/DeviceStreamMap.h>
 #include <nanovdb/cuda/DeviceMesh.h>
@@ -1076,6 +1075,27 @@ TEST(TestNanoVDBCUDA, mergeSplitPinnedGrids)
         ASSERT_EQ(hosts[i].bufferSize(), parts[i].bufferSize());
         EXPECT_EQ(0, std::memcmp(parts[i].data(), hosts[i].data(), hosts[i].bufferSize()));
         EXPECT_NE(parts[i].grid<float>(), nullptr);
+    }
+
+    // a buffer over a ResourceRef is not default-constructible, so merge and split must allocate through the pool
+    using RefT = nanovdb::cuda::ResourceRef<nanovdb::cuda::PinnedResource>;
+    using RefBufT = nanovdb::cuda::Buffer<std::byte, RefT>;
+    nanovdb::cuda::PinnedResource resource;
+    RefBufT refPool(RefT(resource), 16, nanovdb::cuda::noInit);
+    std::vector<nanovdb::GridHandle<RefBufT>> refs;
+    for (auto& h : hosts) {
+        RefBufT buffer(RefT(resource), h.bufferSize(), nanovdb::cuda::noInit);
+        std::memcpy(buffer.data(), h.data(), h.bufferSize());
+        refs.emplace_back(std::move(buffer));
+    }
+    auto refMerged = nanovdb::mergeGrids<RefBufT, std::vector>(refs, &refPool);
+    ASSERT_EQ(hostMerged.bufferSize(), refMerged.bufferSize());
+    EXPECT_EQ(0, std::memcmp(refMerged.data(), hostMerged.data(), hostMerged.bufferSize()));
+    auto refParts = nanovdb::splitGrids<RefBufT, std::vector>(refMerged, &refPool);
+    ASSERT_EQ(3u, refParts.size());
+    for (size_t i = 0; i < refParts.size(); ++i) {
+        ASSERT_EQ(hosts[i].bufferSize(), refParts[i].bufferSize());
+        EXPECT_EQ(0, std::memcmp(refParts[i].data(), hosts[i].data(), hosts[i].bufferSize()));
     }
 }//  mergeSplitPinnedGrids
 

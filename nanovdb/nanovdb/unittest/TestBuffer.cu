@@ -2309,14 +2309,9 @@ TEST(TestBuffer, BuilderBuildAllocatesThroughTheBuilderResource)
 // GridHandle::adopt
 //======================================================================
 
-inline nanovdb::GridHandle<nanovdb::HostBuffer> makeSphere(double radius, const std::string& name, nanovdb::CheckMode mode = nanovdb::CheckMode::Full)
-{
-    return nanovdb::tools::createLevelSetSphere<float>(radius, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), name, nanovdb::tools::StatsMode::Default, mode);
-}
-
 TEST(TestBuffer, GridHandleAdoptRejectsBadMeta)
 {
-    auto host = makeSphere(20.0, "sphere");
+    auto host = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
     using DevBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
     auto dev = nanovdb::cuda::copyTo<DevBufT>(host, cudaStream_t(0));
     const uint64_t bytes = dev.bufferSize();
@@ -2342,6 +2337,7 @@ TEST(TestBuffer, GridHandleAdoptRejectsBadMeta)
     EXPECT_THROW((tryAdopt({Meta{0u, half + 8u, Float}, Meta{half + 8u, bytes - half - 8u, Float}})), std::runtime_error);// misaligned
     EXPECT_NO_THROW((tryAdopt({Meta{0u, half, Float}, Meta{half, bytes - half, Float}})));// contiguous
     EXPECT_NO_THROW((tryAdopt({Meta{0u, half, Float}})));// padded buffer
+    EXPECT_THROW((tryAdopt({Meta{0u, bytes, nanovdb::GridType::End}})), std::runtime_error);// invalid grid type
 
     // the real use: a byte-for-byte copy adopts the source's layout and reads back identical
     DevBufT copy(cudaStream_t(0), bytes, nanovdb::cuda::noInit);
@@ -2353,6 +2349,41 @@ TEST(TestBuffer, GridHandleAdoptRejectsBadMeta)
     EXPECT_NE(twin.deviceGrid<float>(0), nullptr);
     auto back = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(twin, cudaStream_t(0));
     EXPECT_EQ(0, std::memcmp(back.data(), host.data(), bytes));
+}
+
+TEST(TestBuffer, CopyToKeepsUnalignedGrids)
+{
+    // Two grids where the first grid's size is not a multiple of NANOVDB_DATA_ALIGNMENT,
+    // as in Point grids written before their payload was padded. The constructors accept
+    // this layout, so copyTo and copy() must carry it, while public adopt rejects it.
+    auto a = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "a");
+    auto b = nanovdb::tools::createLevelSetSphere<float>(10.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "b");
+    const uint64_t sizeA = a.bufferSize() + 8u, bytes = sizeA + b.bufferSize();
+    auto buffer = nanovdb::HostBuffer::create(bytes);
+    std::memset(buffer.data(), 0, bytes);
+    std::memcpy(buffer.data(), a.data(), a.bufferSize());
+    std::memcpy(nanovdb::util::PtrAdd(buffer.data(), sizeA), b.data(), b.bufferSize());
+    auto *first = reinterpret_cast<nanovdb::GridData*>(buffer.data());
+    first->mGridSize = sizeA;
+    nanovdb::tools::updateGridCount(first, 0u, 2u);
+    nanovdb::tools::updateGridCount(nanovdb::util::PtrAdd<nanovdb::GridData>(buffer.data(), sizeA), 1u, 2u);
+    nanovdb::GridHandle<nanovdb::HostBuffer> host(std::move(buffer));
+    ASSERT_EQ(2u, host.gridCount());
+    ASSERT_EQ(sizeA, host.metaData()[1].offset);
+
+    using DevBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
+    nanovdb::GridHandle<DevBufT> dev;
+    ASSERT_NO_THROW(dev = nanovdb::cuda::copyTo<DevBufT>(host, cudaStream_t(0)));
+    nanovdb::GridHandle<DevBufT> twin;
+    ASSERT_NO_THROW(twin = dev.copy<DevBufT>());
+    auto back = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(twin, cudaStream_t(0));
+    ASSERT_EQ(bytes, back.bufferSize());
+    EXPECT_EQ(sizeA, back.metaData()[1].offset);
+    EXPECT_EQ(0, std::memcmp(back.data(), host.data(), bytes));
+
+    auto copy = nanovdb::HostBuffer::create(bytes);
+    std::memcpy(copy.data(), host.data(), bytes);
+    EXPECT_THROW(nanovdb::GridHandle<nanovdb::HostBuffer>::adopt(std::move(copy), host.metaData()), std::runtime_error);
 }
 
 } // namespace nanovdb_test

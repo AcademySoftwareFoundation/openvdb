@@ -195,10 +195,10 @@ struct [[deprecated("use GridHandle::adopt(buffer, meta) and GridHandle::metaDat
 ///          both-space managed buffer -- synchronizes @c stream before
 ///          returning, so its host accessors are immediately valid; a
 ///          device-only destination is stream-ordered, so use its
-///          contents on @c stream or synchronize first. The metadata is
-///          adopted from the source handle -- it was validated when that
-///          handle was constructed from raw bytes -- so no kernel runs and
-///          this function is callable from host-only translation units. A
+///          contents on @c stream or synchronize first. The destination
+///          reuses the source handle's metadata, which was checked when the
+///          source was made, so no kernel runs and this function is
+///          callable from host-only translation units. A
 ///          pageable host source or destination (HostBuffer) degrades the
 ///          copy to synchronous behavior; pinned single-space handles keep
 ///          it asynchronous.
@@ -227,11 +227,10 @@ inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, cudaStre
     cudaCheck(cudaMemcpyAsync(dst.data(), srcPtr, bytes, cudaMemcpyDefault, stream));
     if constexpr (!dstDev || BufferHasHostSingle<DstBufferT>::value)
         cudaCheck(cudaStreamSynchronize(stream)); // the host-readable result is the postcondition; covers the both-space (managed) destination, whose handle exposes host accessors immediately
-    // A handle-to-handle copy adopts the source's metadata, which was
-    // validated when that handle was constructed from raw bytes -- no kernel
-    // runs here, which is what keeps this header host-includable. A device
-    // destination is stream-ordered: use it on @a stream, or synchronize.
-    return GridHandle<DstBufferT>::adopt(std::move(dst), src.metaData());
+    // The copy reuses the source's layout unchecked, so no kernel runs here,
+    // which keeps this header host-includable. A device destination is
+    // stream-ordered: use it on @a stream, or synchronize.
+    return nanovdb::detail::LayoutCopy::make(std::move(dst), src);
 }// cuda::copyTo
 
 /// @brief Convenience overload issuing the copy on the source buffer's
