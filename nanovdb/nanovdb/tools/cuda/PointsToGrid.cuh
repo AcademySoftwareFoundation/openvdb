@@ -856,7 +856,9 @@ inline BufferT PointsToGrid<BuildT, ResourceT>::getBuffer(const PtrT, size_t poi
     mData.leaf  = mData.lower + NanoLower<BuildT>::memUsage()*mData.nodeCount[1]; // lower internal nodes ends and leaf nodes begin
     mData.meta  = mData.leaf  + NanoLeaf<BuildT>::DataType::memUsage()*mData.nodeCount[0];// leaf nodes end and blind meta data begins
     mData.blind = mData.meta  + sizeof(GridBlindMetaData)*int( mPointType!=PointType::Disable ); // meta data ends and blind data begins
-    mData.size  = mData.blind + pointCount*sizeofPoint();// end of buffer
+    // padded like GridBlindMetaData::blindDataSize, so the grid size stays a multiple of
+    // NANOVDB_DATA_ALIGNMENT and the next grid in a multi-grid buffer starts aligned
+    mData.size  = mData.blind + math::AlignUp<NANOVDB_DATA_ALIGNMENT>(pointCount*sizeofPoint());// end of buffer
 
     int device = 0;
     cudaGetDevice(&device);

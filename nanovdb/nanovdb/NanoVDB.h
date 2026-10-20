@@ -182,8 +182,12 @@ class ValueOnIndex{};
 /// @brief Dummy type for a voxel whose value equals its binary active state
 class ValueMask{};
 
-/// @brief Dummy type for a 16 bit floating point values (placeholder for IEEE 754 Half)
-class Half{};
+/// @brief Type containing raw 16 bits for half precision floating point values (IEEE 754 Half)
+class Half
+{
+    public:
+    uint16_t raw;
+};
 
 /// @brief Dummy type for a 4bit quantization of float point values
 class Fp4{};
@@ -225,7 +229,7 @@ enum class GridType : uint32_t { Unknown = 0, //  unknown value type - should ra
                                  Vec3f = 6, //  single precision floating 3D vector
                                  Vec3d = 7, //  double precision floating 3D vector
                                  Mask = 8, //  no value, just the active state
-                                 Half = 9, //  half precision floating point value (placeholder for IEEE 754 Half)
+                                 Half = 9, //  half precision floating point value (IEEE 754 Half)
                                  UInt32 = 10, // single precision unsigned integer value
                                  Boolean = 11, // boolean value, encoded in bit array
                                  RGBA8 = 12, // RGBA packed into 32bit word in reverse-order, i.e. R is lowest byte.
@@ -550,13 +554,6 @@ struct BuildToValueMap<ValueMask>
 };
 
 template<>
-struct BuildToValueMap<Half>
-{
-    using Type = float;
-    using type = float;
-};
-
-template<>
 struct BuildToValueMap<Fp4>
 {
     using Type = float;
@@ -664,7 +661,7 @@ __hostdev__ inline bool isIndex(GridType gridType)
 __hostdev__ inline bool isValid(GridType gridType, GridClass gridClass)
 {
     if (gridClass == GridClass::LevelSet || gridClass == GridClass::FogVolume) {
-        return isFloatingPoint(gridType);
+        return isFloatingPoint(gridType) || gridType == GridType::Half;
     } else if (gridClass == GridClass::Staggered) {
         return isFloatingPointVector(gridType);
     } else if (gridClass == GridClass::PointIndex || gridClass == GridClass::PointData) {
@@ -677,7 +674,7 @@ __hostdev__ inline bool isValid(GridType gridType, GridClass gridClass)
         return gridType == GridType::RGBA8 || gridType == GridType::Float ||
                gridType == GridType::Double || gridType == GridType::Vec3f ||
                gridType == GridType::Vec3d || gridType == GridType::UInt32 ||
-               gridType == GridType::UInt8;
+               gridType == GridType::UInt8 || gridType == GridType::Half;
     }
     return gridClass < GridClass::End && gridType < GridType::End; // any valid combination
 }
@@ -4792,6 +4789,7 @@ using MaskTree = NanoTree<ValueMask>;
 using BoolTree = NanoTree<bool>;
 using IndexTree = NanoTree<ValueIndex>;
 using OnIndexTree = NanoTree<ValueOnIndex>;
+using HalfTree = NanoTree<Half>;
 
 using FloatGrid = Grid<FloatTree>;
 using Fp4Grid = Grid<Fp4Tree>;
@@ -4812,6 +4810,7 @@ using BoolGrid = Grid<BoolTree>;
 using PointGrid = Grid<Point>;
 using IndexGrid = Grid<IndexTree>;
 using OnIndexGrid = Grid<OnIndexTree>;
+using HalfGrid = Grid<HalfTree>;
 
 // --------------------------> callNanoGrid <------------------------------------
 
@@ -4887,6 +4886,8 @@ auto callNanoGrid(GridDataT *gridData, ArgsT&&... args)
             return OpT::template known<Vec4d>(gridData, args...);
         case GridType::UInt8:
             return OpT::template known<uint8_t>(gridData, args...);
+        case GridType::Half:
+            return OpT::template known<Half>(gridData, args...);
         default:
             return OpT::unknown(gridData, args...);
     }

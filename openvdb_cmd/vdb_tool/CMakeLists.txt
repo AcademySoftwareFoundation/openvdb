@@ -260,5 +260,9 @@ if(OPENVDB_BUILD_VDB_TOOL_UNITTESTS)
   # GTest::gtest. Listing gmock / *_main as well pulls gtest/gmock onto the link
   # line multiple times, which the macOS linker flags as "ignoring duplicate libraries".
   target_link_libraries(vdb_tool_test PRIVATE vdb_tool_common GTest::gtest)
+  target_compile_definitions(vdb_tool_test PRIVATE
+    "VDB_TOOL_TEST_EXECUTABLE=\"$<TARGET_FILE:vdb_tool>\"")
+  add_dependencies(vdb_tool_test vdb_tool)
   add_test(vdb_tool_unit_test vdb_tool_test)
+  set_tests_properties(vdb_tool_unit_test PROPERTIES TIMEOUT 180)
 endif()

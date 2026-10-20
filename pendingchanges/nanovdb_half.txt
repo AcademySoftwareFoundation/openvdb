@@ -1,0 +1,3 @@
+NanoVDB:
+  New features:
+  - Implemented Half grid type, no longer placeholder. Working CreateNanoGrid conversion.
