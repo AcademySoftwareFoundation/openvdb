@@ -128,7 +128,7 @@ createNodeManager(const NanoGrid<BuildT> *d_grid,
 {
     using RefT    = ResourceRef<ResourceT>;
     using BufferT = Buffer<std::byte, RefT>;
-    RefT ref(resource);
+    RefT ref = detail::borrowInternal(resource);
     auto buffer = detail::makeNodeManagerStorage<BufferT>(stream, ref, sizeof(NodeManagerData));
     auto *d_data = reinterpret_cast<NodeManagerData*>(buffer.data());
     auto sizeBuf = detail::makeNodeManagerStorage<Buffer<size_t, RefT>>(stream, ref, 1);

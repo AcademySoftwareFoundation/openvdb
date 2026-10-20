@@ -72,7 +72,7 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
     enum {GRID=0, META=1, DATA=2, CHECKSUM=3};
     using ScratchT = nanovdb::cuda::Buffer<uint64_t, nanovdb::cuda::ResourceRef<ResourceT>>;
     uint64_t tmp[4];
-    ScratchT tmpBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 4, nanovdb::cuda::noInit);
+    ScratchT tmpBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 4, nanovdb::cuda::noInit);
     uint64_t *d_tmp = tmpBuf.data();
     util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__(size_t) {
         if (auto count  = d_grid->blindDataCount()) {

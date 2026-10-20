@@ -54,6 +54,12 @@ public:
         (void)alignment;
         cudaCheck(cudaFreeHost(p));
     }
+
+    /// @brief Stateless: memory allocated through one instance may be
+    ///        deallocated through any other, so every two instances compare
+    ///        equal (the equality cuda::mr's resource concepts require).
+    friend bool operator==(const PinnedResource&, const PinnedResource&) { return true; }
+    friend bool operator!=(const PinnedResource&, const PinnedResource&) { return false; }
 };
 
 }

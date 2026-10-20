@@ -31,6 +31,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint> // for PTRDIFF_MAX
 #include <cstring>
 #include <sstream>// for the pinned-handle write/read round trip
 #include <limits>
@@ -83,6 +84,9 @@ struct CountingResource
         if (p) { ++counters->deallocs; counters->deallocBytes = bytes; }
         nanovdb::cuda::DeviceResource{}.deallocate(p, bytes, alignment);
     }
+    // instances sharing counters are interchangeable
+    friend bool operator==(const CountingResource& a, const CountingResource& b) { return a.counters == b.counters; }
+    friend bool operator!=(const CountingResource& a, const CountingResource& b) { return !(a == b); }
 };
 
 /// @brief Streams recorded by all copies of a StreamRecordingResource.
@@ -116,6 +120,9 @@ struct StreamRecordingResource
         if (p) log->deallocStreams.push_back(cudaStream_t(0));
         nanovdb::cuda::DeviceResource{}.deallocate(p, bytes, alignment);
     }
+    // instances sharing a log are interchangeable
+    friend bool operator==(const StreamRecordingResource& a, const StreamRecordingResource& b) { return a.log == b.log; }
+    friend bool operator!=(const StreamRecordingResource& a, const StreamRecordingResource& b) { return !(a == b); }
 };
 
 //======================================================================
@@ -131,6 +138,9 @@ struct DualResource
     void deallocate(void*, size_t, size_t) {}
     void* allocate_async(size_t, size_t, cudaStream_t) { return nullptr; }
     void deallocate_async(void*, size_t, size_t, cudaStream_t) {}
+    // stateless
+    friend bool operator==(const DualResource&, const DualResource&) { return true; }
+    friend bool operator!=(const DualResource&, const DualResource&) { return false; }
 };
 
 // PinnedResource is synchronous-only: allocate/deallocate without a stream.
@@ -292,15 +302,20 @@ TEST(TestBuffer, CountConstructionRequiresNoInit)
 
 TEST(TestBuffer, OversizedCountThrows)
 {
-    // An element count whose byte size overflows size_t must be rejected up
-    // front rather than silently wrapping into a tiny allocation.
-    const size_t oversized = std::numeric_limits<size_t>::max() / sizeof(int) + 1;
+    // An element count whose byte size exceeds PTRDIFF_MAX is rejected before
+    // anything is allocated.
+    const size_t oversized = size_t(PTRDIFF_MAX) / sizeof(int) + 1;
     EXPECT_THROW((nanovdb::cuda::Buffer<int>(0, oversized, nanovdb::cuda::noInit)), std::runtime_error);
     EXPECT_THROW((nanovdb::cuda::Buffer<int, nanovdb::cuda::PinnedResource>(oversized, nanovdb::cuda::noInit)), std::runtime_error);
+    {
+        nanovdb::cuda::Buffer<int, nanovdb::cuda::PinnedResource> pinned(8, nanovdb::cuda::noInit);
+        EXPECT_THROW(pinned.resize(oversized), std::runtime_error);
+        EXPECT_EQ(pinned.size(), 8u);
+    }
     nanovdb::cuda::Buffer<int> buf(0, 8, nanovdb::cuda::noInit);
     cudaStream_t other = nullptr;
     ASSERT_EQ(cudaStreamCreate(&other), cudaSuccess);
-    EXPECT_THROW(buf.resize(oversized, other), std::runtime_error);
+    EXPECT_THROW(buf.resize(other, oversized), std::runtime_error);
     EXPECT_EQ(buf.size(), 8u);                // failed resize leaves the buffer untouched --
     EXPECT_EQ(buf.stream(), cudaStream_t(0)); // including its retained stream
     ASSERT_EQ(cudaStreamDestroy(other), cudaSuccess);
@@ -337,6 +352,9 @@ struct MixinResource : nanovdb::cuda::SyncFromAsync<MixinResource>
         if (p) { ++counters->deallocs; counters->deallocBytes = bytes; }
         nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
     }
+    // instances sharing counters are interchangeable
+    friend bool operator==(const MixinResource& a, const MixinResource& b) { return a.counters == b.counters; }
+    friend bool operator!=(const MixinResource& a, const MixinResource& b) { return !(a == b); }
 };
 
 // The mixin supplies the synchronous half, so both concepts are satisfied.
@@ -382,6 +400,9 @@ struct StatefulInlineResource : nanovdb::cuda::SyncFromAsync<StatefulInlineResou
     void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream) {
         ++deallocs; nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
     }
+    // state is inline, so only the same instance keeps one account
+    friend bool operator==(const StatefulInlineResource& a, const StatefulInlineResource& b) { return &a == &b; }
+    friend bool operator!=(const StatefulInlineResource& a, const StatefulInlineResource& b) { return !(a == b); }
 };
 
 // A ref over an async resource models both tiers; over a synchronous-only
@@ -410,13 +431,19 @@ TEST(TestBuffer, ResourceRefSharesTheUnderlyingResource)
     EXPECT_EQ(res.deallocs, 1);
 }
 
-TEST(TestBuffer, ResourceRefEqualityIsIdentity)
+/// @brief A resource without operator==, which 13.2 deprecates and 14.0
+///        rejects. Constructed only under the deprecated-interface suppression below; trait probes elsewhere do not warn.
+struct NoEqualityResource : nanovdb::cuda::SyncFromAsync<NoEqualityResource>
 {
-    StatefulInlineResource a, b;
-    nanovdb::cuda::ResourceRef<StatefulInlineResource> ra(a), raAgain(a), rb(b);
-    EXPECT_TRUE(ra == raAgain);   // same underlying resource
-    EXPECT_TRUE(ra != rb);        // different underlying resources
-}
+    static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream) {
+        return nanovdb::cuda::DeviceResource{}.allocate_async(bytes, alignment, stream);
+    }
+    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream) {
+        nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
+    }
+};
+
 
 TEST(TestBuffer, DestroyIsTheSpellingClearDelegatesTo)
 {
@@ -531,7 +558,7 @@ TEST(TestBuffer, ResizePreservesPrefixAndRetainsNewStream)
         ASSERT_EQ(cudaMemcpyAsync(buf.data(), pattern.data(), n * sizeof(int), cudaMemcpyHostToDevice, a), cudaSuccess);
         ASSERT_EQ(cudaStreamSynchronize(a), cudaSuccess);
 
-        buf.resize(m, c); // grow on stream c
+        buf.resize(c, m); // grow on stream c
         EXPECT_EQ(buf.size(), m);
         EXPECT_EQ(buf.stream(), c);
         ASSERT_EQ(log.allocStreams.size(), 2u);
@@ -548,7 +575,7 @@ TEST(TestBuffer, ResizePreservesPrefixAndRetainsNewStream)
         for (size_t i = 0; i < n; ++i)
             ASSERT_EQ(readback[i], pattern[i]) << "prefix element " << i << " lost across resize";
 
-        buf.resize(n / 2, c); // shrink: keeps the min(old,new) prefix
+        buf.resize(c, n / 2); // shrink: keeps the min(old,new) prefix
         std::vector<int> shrunk(n / 2, -1);
         ASSERT_EQ(cudaMemcpyAsync(shrunk.data(), buf.data(), (n / 2) * sizeof(int), cudaMemcpyDeviceToHost, c), cudaSuccess);
         ASSERT_EQ(cudaStreamSynchronize(c), cudaSuccess);
@@ -561,6 +588,159 @@ TEST(TestBuffer, ResizePreservesPrefixAndRetainsNewStream)
     ASSERT_EQ(cudaStreamDestroy(a), cudaSuccess);
     ASSERT_EQ(cudaStreamDestroy(c), cudaSuccess);
 }
+
+
+//======================================================================
+// Resource equality, as cuda::mr's resource concepts require
+//======================================================================
+
+template<typename R>
+using IsEqualityComparable = nanovdb::cuda::is_equality_comparable_resource<R>;
+
+static_assert(IsEqualityComparable<nanovdb::cuda::DeviceResource>::value, "DeviceResource needs ==");
+static_assert(IsEqualityComparable<nanovdb::cuda::MallocResource>::value, "MallocResource needs ==");
+static_assert(IsEqualityComparable<nanovdb::cuda::PinnedResource>::value, "PinnedResource needs ==");
+static_assert(IsEqualityComparable<nanovdb::cuda::ManagedResource>::value, "ManagedResource needs ==");
+static_assert(IsEqualityComparable<nanovdb::cuda::AsyncFromSync<nanovdb::cuda::MallocResource>>::value, "AsyncFromSync needs ==");
+// The adapter is only as comparable as what it wraps.
+static_assert(!IsEqualityComparable<nanovdb::cuda::AsyncFromSync<NoEqualityResource>>::value,
+              "AsyncFromSync over a resource without == must not claim equality");
+
+TEST(TestBuffer, BuiltInResourcesCompareEqual)
+{
+    // Stateless resources: memory from any instance may be freed through any other.
+    EXPECT_TRUE(nanovdb::cuda::DeviceResource{} == nanovdb::cuda::DeviceResource{});
+    EXPECT_FALSE(nanovdb::cuda::DeviceResource{} != nanovdb::cuda::DeviceResource{});
+    EXPECT_TRUE(nanovdb::cuda::MallocResource{} == nanovdb::cuda::MallocResource{});
+    EXPECT_TRUE(nanovdb::cuda::PinnedResource{} == nanovdb::cuda::PinnedResource{});
+    EXPECT_TRUE(nanovdb::cuda::ManagedResource{} == nanovdb::cuda::ManagedResource{});
+    // A ref compares the referenced resources, as cuda::mr::resource_ref does:
+    // refs to two distinct stateless instances are interchangeable, so equal.
+    using RefT = nanovdb::cuda::ResourceRef<nanovdb::cuda::MallocResource>;
+    nanovdb::cuda::MallocResource ma, mb;
+    EXPECT_TRUE(RefT(ma) == RefT(mb));
+    // The adapter compares its wrapped resources.
+    using Adapted = nanovdb::cuda::AsyncFromSync<RefT>;
+    EXPECT_TRUE((Adapted{RefT(ma)} == Adapted{RefT(mb)}));
+}
+
+/// @brief Stateful resource whose instances are interchangeable only when
+///        they share a pool id, the case where value equality decides.
+struct PoolIdResource : nanovdb::cuda::SyncFromAsync<PoolIdResource>
+{
+    static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
+    int id = 0;
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream) {
+        return nanovdb::cuda::DeviceResource{}.allocate_async(bytes, alignment, stream);
+    }
+    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream) {
+        nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
+    }
+    friend bool operator==(const PoolIdResource& a, const PoolIdResource& b) { return a.id == b.id; }
+    friend bool operator!=(const PoolIdResource& a, const PoolIdResource& b) { return a.id != b.id; }
+};
+
+TEST(TestBuffer, ResourceRefComparesReferencedResources)
+{
+    PoolIdResource p1{{}, 1}, p1Too{{}, 1}, p2{{}, 2};
+    using RefT = nanovdb::cuda::ResourceRef<PoolIdResource>;
+    EXPECT_TRUE(RefT(p1) == RefT(p1Too));   // distinct instances, same pool
+    EXPECT_TRUE(RefT(p1) != RefT(p2));      // different pools
+    EXPECT_FALSE(RefT(p1) == RefT(p2));
+}
+
+static_assert(!nanovdb::cuda::is_equality_comparable_resource<int>::value,
+              "the trait reports only resources");
+
+/// @brief A resource with operator== alone, which cuda::mr accepts under C++20.
+struct EqualityOnlyResource : nanovdb::cuda::SyncFromAsync<EqualityOnlyResource>
+{
+    static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream) {
+        return nanovdb::cuda::DeviceResource{}.allocate_async(bytes, alignment, stream);
+    }
+    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream) {
+        nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
+    }
+    friend bool operator==(const EqualityOnlyResource&, const EqualityOnlyResource&) { return true; }
+};
+static_assert(IsEqualityComparable<EqualityOnlyResource>::value, "operator== alone suffices");
+
+//======================================================================
+// Deprecated interfaces, supported until 14.0 removes them
+//======================================================================
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+#if defined(__CUDACC__)
+#pragma nv_diagnostic push
+#pragma nv_diag_suppress 1444
+#pragma nv_diag_suppress 20199
+#endif
+
+TEST(TestBuffer, ResizeDeprecatedArgumentOrderForwards)
+{
+    StreamLog log;
+    cudaStream_t c = nullptr;
+    ASSERT_EQ(cudaStreamCreate(&c), cudaSuccess);
+    {
+        nanovdb::cuda::Buffer<int, StreamRecordingResource> buf(0, StreamRecordingResource{&log}, 8, nanovdb::cuda::noInit);
+        buf.resize(size_t(16), c);
+        EXPECT_EQ(buf.size(), 16u);
+        EXPECT_EQ(buf.stream(), c);
+        EXPECT_EQ(log.allocStreams.back(), c);
+        buf.resize(0, 0); // two literal zeros: count 0 on the default stream in either order
+        EXPECT_TRUE(buf.empty());
+        EXPECT_EQ(buf.stream(), cudaStream_t(0));
+    }
+    ASSERT_EQ(cudaStreamSynchronize(c), cudaSuccess);
+    ASSERT_EQ(cudaStreamDestroy(c), cudaSuccess);
+}
+
+TEST(TestBuffer, ResizeRejectsNegativeCountInEitherOrder)
+{
+    nanovdb::cuda::Buffer<std::byte> buf(cudaStream_t(0), 8, nanovdb::cuda::noInit);
+    EXPECT_THROW(buf.resize(-1, cudaStream_t(0)), std::runtime_error);
+    EXPECT_THROW(buf.resize(cudaStream_t(0), size_t(-1)), std::runtime_error);
+    EXPECT_EQ(8u, buf.size()); // untouched
+}
+
+TEST(TestBuffer, ResizeDeprecatedOrderAcceptsBoolCount)
+{
+    nanovdb::cuda::Buffer<int> buf(cudaStream_t(0), 8, nanovdb::cuda::noInit);
+    buf.resize(true, cudaStream_t(0)); // converted to size_t, as the old signature did
+    EXPECT_EQ(1u, buf.size());
+    buf.resize({4}, cudaStream_t(0));   // a braced count, as the old size_t parameter accepted
+    EXPECT_EQ(4u, buf.size());
+    buf.resize(2.0, cudaStream_t(0));
+    EXPECT_EQ(2u, buf.size());
+    EXPECT_THROW(buf.resize(-1.5, cudaStream_t(0)), std::runtime_error);
+    EXPECT_EQ(2u, buf.size());
+}
+
+TEST(TestBuffer, ResourceRefWithoutResourceEqualityFallsBackToIdentity)
+{
+    NoEqualityResource a, b;
+    nanovdb::cuda::ResourceRef<NoEqualityResource> ra(a), raAgain(a), rb(b);
+    EXPECT_TRUE(ra == raAgain); // same underlying resource
+    EXPECT_TRUE(ra != rb);      // different underlying resources
+}
+
+#if defined(__CUDACC__)
+#pragma nv_diagnostic pop
+#endif
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 //======================================================================
 // Move semantics (Buffer is move-only) and explicit deep copy
