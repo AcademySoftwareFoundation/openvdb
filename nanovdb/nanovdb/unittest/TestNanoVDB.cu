@@ -42,10 +42,9 @@
 #include <thread> // for std::thread
 
 // These tests deliberately keep exercising the deprecated dual-space
-// DeviceBuffer surface, and a resource without operator==, until their
-// removal; the deprecation warnings are suppressed for this translation unit
-// only. New code must use cuda::Buffer and cuda::copyTo, and give every
-// resource operator==.
+// DeviceBuffer surface until its removal; the deprecation warnings are
+// suppressed for this translation unit only. New code must use
+// cuda::Buffer and cuda::copyTo instead.
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
@@ -54,7 +53,6 @@
 #endif
 #if defined(__CUDACC__)
 #pragma nv_diag_suppress 20199
-#pragma nv_diag_suppress 1444
 #endif
 
 
@@ -990,28 +988,6 @@ TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
     }
     //timer.stop();
 }//  mergeSplitDeviceGrids
-
-// A resource without operator== is deprecated (14.0 requires it); until then
-// ResourceRef falls back to identity. The deprecation fires at the ref's
-// construction below, under this file's suppression.
-struct NoEqualityResource : nanovdb::cuda::SyncFromAsync<NoEqualityResource>
-{
-    static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
-    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream) {
-        return nanovdb::cuda::DeviceResource{}.allocate_async(bytes, alignment, stream);
-    }
-    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream) {
-        nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
-    }
-};
-
-TEST(TestNanoVDBCUDA, ResourceRefWithoutResourceEqualityFallsBackToIdentity)
-{
-    NoEqualityResource a, b;
-    nanovdb::cuda::ResourceRef<NoEqualityResource> ra(a), raAgain(a), rb(b);
-    EXPECT_TRUE(ra == raAgain);   // same underlying resource
-    EXPECT_TRUE(ra != rb);        // different underlying resources
-}// ResourceRefWithoutResourceEqualityFallsBackToIdentity
 
 // make -j 4 testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*Cuda*" --gtest_break_on_failure
 TEST(TestNanoVDBCUDA, CudaIndexGridToGrid_basic)

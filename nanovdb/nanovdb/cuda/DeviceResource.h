@@ -177,28 +177,37 @@ struct is_resource<R, std::void_t<
     : std::true_type {};
 
 /// @brief Detection trait: @c is_equality_comparable_resource<R>::value is
-///        true iff @c R models a resource concept and provides operator== and
-///        operator!=: two resources compare equal when memory allocated
-///        through one may be deallocated through the other. cuda::mr's
-///        resource concepts require them; using a resource without them is
-///        deprecated, and 14.0 makes them part of NanoVDB's concepts too.
+///        true iff @c R models a resource concept and provides operator==:
+///        two resources compare equal when memory allocated through one may
+///        be deallocated through the other. cuda::mr's resource concepts
+///        require it; using a resource without it is deprecated, and 14.0
+///        makes it part of NanoVDB's concepts too.
 template <class R, class = void>
 struct is_equality_comparable_resource : std::false_type {};
 
 template <class R>
 struct is_equality_comparable_resource<R, std::void_t<
     std::enable_if_t<is_resource<R>::value || is_async_resource<R>::value>,
-    decltype(bool(std::declval<const R&>() == std::declval<const R&>())),
-    decltype(bool(std::declval<const R&>() != std::declval<const R&>()))>>
+    decltype(bool(std::declval<const R&>() == std::declval<const R&>()))>>
     : std::true_type {};
 
 /// @brief The deprecation every use of a resource without operator== reports.
 #define NANOVDB_DEPRECATED_RESOURCE_WITHOUT_EQUALITY \
-    [[deprecated("this memory resource has no operator== / operator!=, which NanoVDB 14.0 requires (as cuda::mr does): " \
+    [[deprecated("this memory resource has no operator==, which NanoVDB 14.0 requires (as cuda::mr does): " \
                  "add friend bool operator==(const R&, const R&), true when memory allocated through one may be " \
-                 "deallocated through the other (always, for a stateless resource), and the matching operator!=")]]
+                 "deallocated through the other (always, for a stateless resource)")]]
+
+template <class R>
+struct ResourceRef;
 
 namespace detail {
+
+/// @brief The resource a buffer's memory comes from: @c R itself, or the
+///        resource a ResourceRef<R> refers to.
+template<class R>
+struct ReferencedResource { using type = R; };
+template<class R>
+struct ReferencedResource<ResourceRef<R>> { using type = R; };
 
 /// @brief Reached only through a resource without operator==, so the
 ///        deprecation names the resource type at the point of use.
@@ -214,14 +223,17 @@ inline void resourceWithoutEquality() {}
 ///        that 14.0 makes part of the resource concepts. Instantiated once per
 ///        resource type, so a misuse warns once however often it recurs.
 template<class R>
-inline void checkResourceEquality()
+inline void checkReferencedEquality()
 {
     if constexpr (!is_equality_comparable_resource<R>::value) resourceWithoutEquality<R>();
 }
 
-/// @brief Tag for the ResourceRef constructor NanoVDB's own components use:
-///        it checks equality through checkResourceEquality, so a resource
-///        handed to a builder warns once rather than at every internal ref.
+/// @brief Checks the resource behind @c R (see ReferencedResource), so a
+///        resource and a ResourceRef to it share one check.
+template<class R>
+inline void checkResourceEquality() { checkReferencedEquality<typename ReferencedResource<R>::type>(); }
+
+/// @brief Tag for the ResourceRef constructor behind borrowInternal.
 struct InternalRef {};
 inline constexpr InternalRef internalRef{};
 
@@ -380,8 +392,8 @@ struct AsyncFromSync
 ///          must allocate through *that* instance rather than a copy of it.
 /// @warning The referenced resource must outlive every use of this ref and of
 ///          all copies of it, including any container holding one.
-/// @deprecated A referenced resource without operator== / operator!= is
-///             deprecated; 14.0 requires them.
+/// @deprecated A referenced resource without operator== is deprecated;
+///             14.0 requires it.
 template <class R>
 struct ResourceRef
 {
@@ -399,8 +411,8 @@ struct ResourceRef
     template<class S = R, std::enable_if_t<is_equality_comparable_resource<S>::value, int> = 0>
     ResourceRef(R& resource) : mResource(&resource) {}
 
-    /// @brief Constructs a ref for NanoVDB's own components; see detail::InternalRef.
-    ResourceRef(R& resource, detail::InternalRef) : mResource(&resource) { detail::checkResourceEquality<R>(); }
+    /// @brief Constructs a ref for NanoVDB's own components; see detail::borrowInternal.
+    ResourceRef(R& resource, detail::InternalRef) : mResource(&resource) {}
 
     /// @brief Constructs a ref borrowing a resource without operator==.
     /// @deprecated 14.0 requires operator== on every resource.
@@ -443,6 +455,17 @@ struct ResourceRef
 private:
     R* mResource;
 };// ResourceRef<R>
+
+namespace detail {
+
+/// @brief The ResourceRef NanoVDB's own components allocate through. It
+///        bypasses ResourceRef's deprecated constructor; the equality check
+///        runs instead when a cuda::Buffer over the ref is destroyed, once per
+///        resource type.
+template<class R>
+ResourceRef<R> borrowInternal(R& resource) { return ResourceRef<R>(resource, internalRef); }
+
+}// namespace detail
 
 }
 
