@@ -86,7 +86,9 @@ public:
     /// Return (in a newly created MetaMap) the file-level metadata.
     MetaMap::Ptr getMetadata() const;
 
-    /// Read the entire contents of the file and return a list of grid pointers.
+    /// @brief Read the entire contents of the file and return a list of grid pointers.
+    /// @details Instances share trees, except when clipping a file that has grid offsets,
+    /// where each grid is clipped independently.
     GridPtrVecPtr getGrids(const io::ReadOptions& readOptions = io::ReadOptions{}) const;
 
     /// @brief Read just the grid metadata and transforms from the file and return a list
@@ -106,7 +108,17 @@ public:
     /// intersects the given world-space bounding box.
     GridBase::Ptr readGrid(const Name&, const BBoxd&);
 
-    /// @todo GridPtrVec readAllGrids(const Name&)
+    /// @brief Read all grids whose grid name is exactly @a name, in file order.
+    /// @details Grids have a name, such as "density", which may not be unique in a file.
+    /// When more than one grid share the same name, these names are made unique by adding
+    /// a [N] suffix. For example, the first "density" grid becomes "density[0]", the second
+    /// becomes "density[1]", etc. This method ignores the unique name and returns all grids
+    /// whose grid name exactly matches the given name.
+    /// Instances share trees as they do with getGrids(), except that a clip on a file
+    /// with grid offsets does a clip on each grid independently.
+    /// @return An empty list if no grid has this name.
+    /// @throw IoError if this file is not open for reading.
+    GridPtrVecPtr readGrids(const Name& name, const io::ReadOptions& readOptions = io::ReadOptions{});
 
     /// @brief Write the grids in the given container to the file whose name
     /// was given in the constructor.
@@ -149,8 +161,21 @@ public:
 
 private:
     /// @brief Return an iterator to the descriptor for the grid with the given name.
-    /// If the name is non-unique, return an iterator to the first matching descriptor.
+    /// @details If "density" is searched and there is more than one "density" grid,
+    /// returns an iterator to the first matching grid. If "density[1]" is searched,
+    /// it is tested against the unique name, so it matches the second "density" grid.
     NameMapCIter findDescriptor(const Name&) const;
+
+    /// @brief Return an iterator to the descriptor whose unique name is exactly the given name,
+    /// or the end iterator if there is none.
+    /// @details Only the unique name is searched. "density" does not match a grid that was
+    /// made unique as "density[1]", "density[1]" must be used instead.
+    NameMapCIter findDescriptorByUniqueName(const Name&) const;
+
+    /// @brief Read the grid for the given descriptor, including its instance parent's tree.
+    /// @note This method should not be called for files that don't contain grid offsets.
+    /// @throw KeyError if the grid is an instance and its parent is missing.
+    GridBase::Ptr readGridFromDescriptor(const GridDescriptor&, const io::ReadOptions&) const;
 
     /// @brief Retrieve a grid from @c mNamedGrids.  Return a null pointer
     /// if @c mNamedGrids was not populated (because this file is random-access).
@@ -162,6 +187,11 @@ private:
     /// unchanged when no option applies.
     GridBase::Ptr resolveCachedGrid(const GridBase::Ptr& cachedGrid,
         const io::ReadOptions& readOptions, ReadDiagnostics& diagnostics) const;
+
+    /// @brief Resolve each of @a cachedGrids as resolveCachedGrid() does. Grids that
+    /// share a source tree share the resolved tree when instancing is enabled.
+    GridPtrVecPtr resolveCachedGrids(const GridPtrVec& cachedGrids,
+        const io::ReadOptions& readOptions) const;
 
     void writeGrids(const GridCPtrVec&, const MetaMap&, const io::WriteOptions&) const;
 
