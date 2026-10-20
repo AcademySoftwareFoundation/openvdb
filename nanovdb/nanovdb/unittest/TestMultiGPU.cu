@@ -5,6 +5,9 @@
 #include <nanovdb/tools/cuda/DistributedPointsToGrid.cuh>
 #include <nanovdb/util/Timer.h>
 #include <nanovdb/cuda/DeviceMesh.h>
+#include <nanovdb/cuda/GridHandle.cuh> // for cuda::mergeGridHandles
+#include <nanovdb/tools/CreatePrimitives.h>
+#include <nanovdb/tools/GridChecksum.h> // for validateChecksum
 
 #include <cuda.h>
 #include <cuda_runtime_api.h>
@@ -17,6 +20,49 @@
 #include <thrust/fill.h>
 #include <thrust/universal_vector.h>
 #include <thrust/execution_policy.h>
+
+/// @brief A merge source whose retained stream belongs to another GPU than the current one.
+TEST(TestNanoVDBMultiGPU, MergeGridHandlesFromAnotherDevice)
+{
+    int deviceCount = 0;
+    ASSERT_EQ(cudaSuccess, cudaGetDeviceCount(&deviceCount));
+    if (deviceCount < 2) GTEST_SKIP() << "needs two devices";
+    nanovdb::cuda::detail::DeviceGuard guard;
+    int current = 0;
+    ASSERT_EQ(cudaSuccess, cudaGetDevice(&current));
+    const int other = (current + 1) % deviceCount;
+
+    using BufT = nanovdb::cuda::Buffer<std::byte>;
+    auto host = nanovdb::tools::createLevelSetSphere<float>(10.0);
+    cudaStream_t remote, local;
+    ASSERT_EQ(cudaSuccess, cudaSetDevice(other));
+    ASSERT_EQ(cudaSuccess, cudaStreamCreateWithFlags(&remote, cudaStreamNonBlocking));
+    std::vector<nanovdb::GridHandle<BufT>> sources;
+    sources.push_back(nanovdb::cuda::copyTo<BufT>(host, remote));
+    ASSERT_EQ(cudaSuccess, cudaSetDevice(current));
+    ASSERT_EQ(cudaSuccess, cudaStreamCreateWithFlags(&local, cudaStreamNonBlocking));
+    sources.push_back(nanovdb::cuda::copyTo<BufT>(host, local));
+    {
+        auto merged = nanovdb::cuda::mergeGridHandles<BufT, std::vector>(sources, local);
+        ASSERT_EQ(2u, merged.gridCount());
+        auto mergedHost = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(merged, local);
+        for (uint32_t i = 0; i < 2; ++i) {
+            const nanovdb::GridData* data = mergedHost.gridData(i);
+            ASSERT_NE(nullptr, data);
+            EXPECT_EQ(i, data->mGridIndex);
+            EXPECT_EQ(2u, data->mGridCount);
+            EXPECT_EQ(host.gridSize(), mergedHost.gridSize(i));
+            EXPECT_TRUE(nanovdb::tools::validateChecksum(data, nanovdb::CheckMode::Full));
+        }
+    }
+    sources.pop_back();// freed on its own device
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(local));
+    ASSERT_EQ(cudaSuccess, cudaStreamDestroy(local));
+    ASSERT_EQ(cudaSuccess, cudaSetDevice(other));
+    sources.clear();
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(remote));
+    ASSERT_EQ(cudaSuccess, cudaStreamDestroy(remote));
+}
 
 /// @brief Tests the correctness of multi-GPU radix sort
 TEST(TestNanoVDBMultiGPU, RadixSort)
