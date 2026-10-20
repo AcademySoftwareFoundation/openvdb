@@ -190,6 +190,7 @@ else()
     TestTypes.cc
     TestUtil.cc
     TestValueAccessor.cc
+    TestVectorFromScalar.cc
     TestVec2Metadata.cc
     TestVec3Metadata.cc
     TestVolumeRayIntersector.cc
