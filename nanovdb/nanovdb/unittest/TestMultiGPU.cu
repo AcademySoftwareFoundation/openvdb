@@ -5,7 +5,9 @@
 #include <nanovdb/tools/cuda/DistributedPointsToGrid.cuh>
 #include <nanovdb/util/Timer.h>
 #include <nanovdb/cuda/DeviceMesh.h>
+#include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/GridHandle.cuh> // for cuda::mergeGridHandles
+#include <nanovdb/cuda/ManagedResource.h>
 #include <nanovdb/tools/CreatePrimitives.h>
 #include <nanovdb/tools/GridChecksum.h> // for validateChecksum
 
@@ -14,6 +16,7 @@
 #include <gtest/gtest.h>
 #include <thread> // for std::thread
 #include <algorithm> // for std::sort, std::unique
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 

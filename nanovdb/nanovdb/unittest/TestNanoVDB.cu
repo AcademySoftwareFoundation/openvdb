@@ -42,10 +42,10 @@
 #include <iomanip> // for std::setw, std::setfill
 #include <thread> // for std::thread
 
-// These tests deliberately keep exercising the deprecated dual-space
-// DeviceBuffer surface until its removal; the deprecation warnings are
-// suppressed for this translation unit only. New code must use
-// cuda::Buffer and cuda::copyTo instead.
+// The tests of the dual-space buffers deliberately keep exercising the
+// deprecated DeviceBuffer surface until its removal; the deprecation warnings
+// are suppressed for this translation unit only. The GPU-builder tests use
+// cuda::Buffer and cuda::copyTo, as new code must.
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
@@ -1636,7 +1636,7 @@ TEST(TestNanoVDBCUDA, Random_CudaPointsToGrid_World64)
     auto handle = converter.getHandle(d_points, pointCount, SingleBufT());
     //timer.stop();
     cudaCheck(cudaFree(d_points));
-    //std::cerr << "Grid size: " << (handle.size() >> 20) << " MB" << std::endl;
+    //std::cerr << "Grid size: " << (handle.bufferSize() >> 20) << " MB" << std::endl;
 
     const uint32_t maxPointsPerVoxel = converter.maxPointsPerVoxel();
     const uint32_t maxPointsPerLeaf  = converter.maxPointsPerLeaf();
@@ -1748,7 +1748,7 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_World64)
     auto handle = converter.getHandle(d_points, pointCount, SingleBufT());
     //timer.stop();
     cudaCheck(cudaFree(d_points));
-    //std::cerr << "Grid size: " << (handle.size() >> 20) << " MB" << std::endl;
+    //std::cerr << "Grid size: " << (handle.bufferSize() >> 20) << " MB" << std::endl;
 
     const uint32_t maxPointsPerVoxel = converter.maxPointsPerVoxel();
     const uint32_t maxPointsPerLeaf  = converter.maxPointsPerLeaf();
@@ -1864,7 +1864,7 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_World64_density)
     auto handle = converter.getHandle(d_points, pointCount, SingleBufT());
     //timer.stop();
     cudaCheck(cudaFree(d_points));
-    //std::cerr << "Grid size: " << (handle.size() >> 20) << " MB" << std::endl;
+    //std::cerr << "Grid size: " << (handle.bufferSize() >> 20) << " MB" << std::endl;
 
     const uint32_t maxPointsPerVoxel = converter.maxPointsPerVoxel();
     const uint32_t maxPointsPerLeaf  = converter.maxPointsPerLeaf();
@@ -1984,7 +1984,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_World32)
     auto handle = converter.getHandle(d_points, pointCount, SingleBufT());
     //timer.stop();
     cudaCheck(cudaFree(d_points));
-    //std::cerr << "Grid size: " << (handle.size() >> 20) << " MB" << std::endl;
+    //std::cerr << "Grid size: " << (handle.bufferSize() >> 20) << " MB" << std::endl;
 
     const uint32_t maxPointsPerVoxel = converter.maxPointsPerVoxel();
     const uint32_t maxPointsPerLeaf  = converter.maxPointsPerLeaf();
@@ -2107,7 +2107,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel32)
     /////////////////////////////////////////////////////////////////////////
     //timer.stop();
     cudaCheck(cudaFree(d_points));
-    //std::cerr << "Grid size: " << (handle.size() >> 20) << " MB" << std::endl;
+    //std::cerr << "Grid size: " << (handle.bufferSize() >> 20) << " MB" << std::endl;
 
     const uint32_t maxPointsPerVoxel = converter.maxPointsPerVoxel();
     const uint32_t maxPointsPerLeaf  = converter.maxPointsPerLeaf();
@@ -2237,7 +2237,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel16)
     /////////////////////////////////////////////////////////////////////////
     //timer.stop();
     cudaCheck(cudaFree(d_points));
-    //std::cerr << "Grid size: " << (handle.size() >> 20) << " MB" << std::endl;
+    //std::cerr << "Grid size: " << (handle.bufferSize() >> 20) << " MB" << std::endl;
 
     const uint32_t maxPointsPerVoxel = converter.maxPointsPerVoxel();
     const uint32_t maxPointsPerLeaf  = converter.maxPointsPerLeaf();
@@ -2362,7 +2362,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel8)
     /////////////////////////////////////////////////////////////////////////
     //timer.stop();
     cudaCheck(cudaFree(d_points));
-    //std::cerr << "Grid size: " << (handle.size() >> 20) << " MB" << std::endl;
+    //std::cerr << "Grid size: " << (handle.bufferSize() >> 20) << " MB" << std::endl;
 
     const uint32_t maxPointsPerVoxel = converter.maxPointsPerVoxel();
     const uint32_t maxPointsPerLeaf  = converter.maxPointsPerLeaf();
@@ -2487,7 +2487,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_PointID)
     /////////////////////////////////////////////////////////////////////////
     //timer.stop();
     cudaCheck(cudaFree(d_points));
-    //std::cerr << "Grid size: " << (handle.size() >> 20) << " MB" << std::endl;
+    //std::cerr << "Grid size: " << (handle.bufferSize() >> 20) << " MB" << std::endl;
 
     const uint32_t maxPointsPerVoxel = converter.maxPointsPerVoxel();
     const uint32_t maxPointsPerLeaf  = converter.maxPointsPerLeaf();
@@ -2688,7 +2688,7 @@ TEST(TestNanoVDBCUDA, cudaAddBlindData)
 TEST(TestNanoVDBCUDA, cudaAddBlindDataFromMultiGridSource)
 {
     using BufferT = nanovdb::HostBuffer;
-    // two grids merged into one device buffer give source grids whose headers
+    // two grids merged on the host and copied into one device buffer give source grids whose headers
     // carry a non-trivial grid index/count, which the output must not inherit
     std::vector<nanovdb::GridHandle<BufferT>> handles;
     handles.emplace_back(nanovdb::tools::createLevelSetSphere<float, BufferT>(20, nanovdb::Vec3d(0), 1, 3, nanovdb::Vec3d(0), "a"));
@@ -3017,7 +3017,7 @@ TEST(TestNanoVDBCUDA, CudaGridChecksum)
     auto devHandle = nanovdb::cuda::copyTo<SingleBufT>(handle, cudaStream_t(0));
     EXPECT_TRUE(devHandle.deviceData());
 #if 0// entire grid or just GridData+TreeData+RootData
-    const size_t size = handle.size();
+    const size_t size = handle.bufferSize();
 #else
     //const uint64_t size = grid->memUsage() + grid->tree().memUsage() + grid->tree().root().memUsage() - 16;
     const uint64_t size = grid->memUsage() + grid->tree().memUsage() - 16;
@@ -4421,7 +4421,7 @@ TEST(TestNanoVDBCUDA, MeshToGrid_UnitTetrahedron)
     nanovdb::tools::cuda::MeshToGrid<BuildT> converter(dPoints, nPoints, dTriangles, nTriangles, map);
     converter.setVerbose(0);
     converter.setChecksum(nanovdb::CheckMode::Full);
-    auto [handle, sidecarBuf] = converter.getHandleAndUDF(SingleBufT());
+    auto [handle, sidecarBuf] = converter.getHandleAndUDF(SingleBufT(), SingleBufT());
 
     auto hostHandle = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(handle, cudaStream_t(0));
     const auto* grid = hostHandle.grid<BuildT>();
@@ -4429,7 +4429,7 @@ TEST(TestNanoVDBCUDA, MeshToGrid_UnitTetrahedron)
 
     const uint64_t sidecarCount = sidecarBuf.size() / sizeof(float);
     std::vector<float> hostSidecar(sidecarCount);
-    cudaCheck(cudaMemcpy(hostSidecar.data(), sidecarBuf.deviceData(),
+    cudaCheck(cudaMemcpy(hostSidecar.data(), sidecarBuf.data(),
                          sidecarBuf.size(), cudaMemcpyDeviceToHost));
 
     // Per-voxel UDF correctness: every active voxel must lie inside the narrow band

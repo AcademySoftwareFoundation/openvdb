@@ -36,6 +36,9 @@ void defineDeviceGridHandle(nb::module_& m)
              nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<math::Rgba8>),
              "n"_a = 0,
              nb::rv_policy::reference_internal)
+        // The Python DeviceGridHandle keeps its upload/download API, which has no
+        // single-space Python replacement yet, so these call the buffer directly
+        // instead of the deprecated GridHandle members.
         .def(
             "deviceUpload", [](GridHandle<BufferT>& handle, bool sync) { handle.buffer().deviceUpload(cudaStream_t(0), sync); }, "sync"_a = true)
         .def(

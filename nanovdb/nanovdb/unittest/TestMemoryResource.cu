@@ -28,7 +28,7 @@
 
 #include <vector>
 
-// These tests deliberately keep exercising the deprecated dual-space
+// Most of these tests deliberately keep exercising the deprecated dual-space
 // DeviceBuffer surface until its removal; the deprecation warnings are
 // suppressed for this translation unit only. New code must use
 // cuda::Buffer and cuda::copyTo instead.
@@ -326,7 +326,7 @@ TEST(TestMemoryResource, PointsToGrid_PointEncodedWithCustomResource)
     const double voxelSize = 8.0;
     CountingResource res;
     nanovdb::tools::cuda::PointsToGrid<BuildT, CountingResource> converter(voxelSize, nanovdb::Vec3d(0.0), 0, res);
-    auto handle = converter.getHandle(d_points, pointCount, nanovdb::cuda::Buffer<std::byte>());
+    auto handle = converter.build(d_points, pointCount);// output allocates through res too
     ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
     ASSERT_EQ(cudaFree(d_points), cudaSuccess);
 
