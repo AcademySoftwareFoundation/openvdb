@@ -224,8 +224,7 @@ public:
     ///        prefix copy, and the free of the old block — is ordered on
     ///        @c stream, which becomes the retained stream: the prefix copy is
     ///        the old block's last use, so that is the stream its free must be
-    ///        ordered on. Stream-first, like the (stream, resource, count,
-    ///        noInit) constructor and cuda::buffer's constructors.
+    ///        ordered on.
     /// @param stream cuda stream the reallocation is ordered on
     /// @param count number of elements
     /// @warning The caller is responsible for ordering @c stream after any
@@ -261,7 +260,7 @@ public:
     }
 
     /// @brief Resizes the buffer to @c count elements on @c stream.
-    /// @deprecated Use resize(stream, count), the stream-first order.
+    /// @deprecated Use resize(stream, count).
     /// @note The count is a template so a call with two literal zeros, which
     ///       convert equally well to either parameter, is not ambiguous. It
     ///       accepts whatever converted to the old size_t parameter, except
@@ -270,7 +269,7 @@ public:
     template<typename CountT, typename S = R,
              std::enable_if_t<std::is_convertible<CountT, size_t>::value && !std::is_same<CountT, bool>::value
                               && is_async_resource<S>::value, int> = 0>
-    [[deprecated("use resize(stream, count), the stream-first order")]]
+    [[deprecated("use resize(stream, count)")]]
     void resize(CountT count, cudaStream_t stream)
     {
         if constexpr (std::is_arithmetic<CountT>::value && std::is_signed<CountT>::value) {
