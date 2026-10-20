@@ -48,8 +48,8 @@ struct StreamHolder<true> { cudaStream_t mStream = 0; };
 /// @tparam R memory resource, either stream-ordered (AsyncResource concept,
 ///         see is_async_resource) or synchronous (Resource concept, see
 ///         is_resource). When @c R provides both interfaces the stream-ordered
-///         one is used. A resource without operator== / operator!= is
-///         deprecated; 14.0 requires them.
+///         one is used. A resource without operator== is deprecated; 14.0
+///         requires it.
 /// @details With a stream-ordered resource the Buffer retains the stream of
 ///          the most recent allocation (or the one supplied via set_stream)
 ///          and orders its deallocation on that stream. Buffer is move-only.
@@ -200,7 +200,7 @@ public:
     ///        a synchronous resource frees immediately.
     ~Buffer()
     {
-        detail::checkResourceEquality<R>(); // every Buffer<T, R> destructs, whatever allocated it
+        detail::checkResourceEquality<R>(); // sees through ResourceRef, so NanoVDB's internal refs are checked here
         this->destroy();
     }
 
@@ -261,20 +261,14 @@ public:
 
     /// @brief Resizes the buffer to @c count elements on @c stream.
     /// @deprecated Use resize(stream, count).
-    /// @note The count is a template so a call with two literal zeros, which
-    ///       convert equally well to either parameter, is not ambiguous. It
-    ///       accepts whatever converted to the old size_t parameter, except
-    ///       bool, and rejects a negative count rather than wrapping it.
-    /// @throw std::invalid_argument if @c count is negative
+    /// @note Accepts every count the size_t parameter of the old signature
+    ///       accepted, converted the same way. resize(0, 0) resolves to this
+    ///       overload; resize(cudaStream_t(0), 0) is the stream-first spelling.
     template<typename CountT, typename S = R,
-             std::enable_if_t<std::is_convertible<CountT, size_t>::value && !std::is_same<CountT, bool>::value
-                              && is_async_resource<S>::value, int> = 0>
+             std::enable_if_t<std::is_convertible<CountT, size_t>::value && is_async_resource<S>::value, int> = 0>
     [[deprecated("use resize(stream, count)")]]
     void resize(CountT count, cudaStream_t stream)
     {
-        if constexpr (std::is_arithmetic<CountT>::value && std::is_signed<CountT>::value) {
-            if (count < 0) throw std::invalid_argument("nanovdb::cuda::Buffer::resize: negative count");
-        }
         this->resize(stream, static_cast<size_t>(count));
     }
 
@@ -371,8 +365,8 @@ private:
     /// @param count number of elements
     static size_t checkedBytes(size_t count)
     {
-        if (count > std::numeric_limits<size_t>::max() / sizeof(T))
-            throw std::runtime_error("nanovdb::cuda::Buffer: element count overflows the byte size");
+        if (count > size_t(std::numeric_limits<std::ptrdiff_t>::max()) / sizeof(T))
+            throw std::runtime_error("nanovdb::cuda::Buffer: element count exceeds the maximum buffer size");
         return count * sizeof(T);
     }
 

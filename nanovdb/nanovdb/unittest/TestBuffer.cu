@@ -415,9 +415,7 @@ TEST(TestBuffer, ResourceRefSharesTheUnderlyingResource)
 }
 
 /// @brief A resource without operator==, which 13.2 deprecates and 14.0
-///        rejects. Never constructed through ResourceRef or Buffer here, which
-///        would trip the deprecation; TestNanoVDB.cu covers the runtime
-///        identity fallback under its file-wide suppression.
+///        rejects. Used only under the deprecated-interface suppression below.
 struct NoEqualityResource : nanovdb::cuda::SyncFromAsync<NoEqualityResource>
 {
     static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
@@ -574,47 +572,6 @@ TEST(TestBuffer, ResizePreservesPrefixAndRetainsNewStream)
     ASSERT_EQ(cudaStreamDestroy(c), cudaSuccess);
 }
 
-// The deprecated (count, stream) order still resizes until its removal.
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-#if defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable : 4996)
-#endif
-#if defined(__CUDACC__)
-#pragma nv_diagnostic push
-#pragma nv_diag_suppress 1444
-#pragma nv_diag_suppress 20199
-#endif
-TEST(TestBuffer, ResizeDeprecatedArgumentOrderForwards)
-{
-    StreamLog log;
-    cudaStream_t c = nullptr;
-    ASSERT_EQ(cudaStreamCreate(&c), cudaSuccess);
-    {
-        nanovdb::cuda::Buffer<int, StreamRecordingResource> buf(0, StreamRecordingResource{&log}, 8, nanovdb::cuda::noInit);
-        buf.resize(size_t(16), c);
-        EXPECT_EQ(buf.size(), 16u);
-        EXPECT_EQ(buf.stream(), c);
-        EXPECT_EQ(log.allocStreams.back(), c);
-        buf.resize(0, 0); // two literal zeros: count 0 on the default stream in either order
-        EXPECT_TRUE(buf.empty());
-        EXPECT_EQ(buf.stream(), cudaStream_t(0));
-    }
-    ASSERT_EQ(cudaStreamSynchronize(c), cudaSuccess);
-    ASSERT_EQ(cudaStreamDestroy(c), cudaSuccess);
-}
-#if defined(__CUDACC__)
-#pragma nv_diagnostic pop
-#endif
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
 
 //======================================================================
 // Resource equality, as cuda::mr's resource concepts require
@@ -678,6 +635,24 @@ TEST(TestBuffer, ResourceRefComparesReferencedResources)
 static_assert(!nanovdb::cuda::is_equality_comparable_resource<int>::value,
               "the trait reports only resources");
 
+/// @brief A resource with operator== alone, which cuda::mr accepts under C++20.
+struct EqualityOnlyResource : nanovdb::cuda::SyncFromAsync<EqualityOnlyResource>
+{
+    static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream) {
+        return nanovdb::cuda::DeviceResource{}.allocate_async(bytes, alignment, stream);
+    }
+    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream) {
+        nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
+    }
+    friend bool operator==(const EqualityOnlyResource&, const EqualityOnlyResource&) { return true; }
+};
+static_assert(IsEqualityComparable<EqualityOnlyResource>::value, "operator== alone suffices");
+
+//======================================================================
+// Deprecated interfaces, supported until 14.0 removes them
+//======================================================================
+
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
@@ -691,12 +666,49 @@ static_assert(!nanovdb::cuda::is_equality_comparable_resource<int>::value,
 #pragma nv_diag_suppress 1444
 #pragma nv_diag_suppress 20199
 #endif
-TEST(TestBuffer, ResizeDeprecatedOrderRejectsNegativeCount)
+
+TEST(TestBuffer, ResizeDeprecatedArgumentOrderForwards)
+{
+    StreamLog log;
+    cudaStream_t c = nullptr;
+    ASSERT_EQ(cudaStreamCreate(&c), cudaSuccess);
+    {
+        nanovdb::cuda::Buffer<int, StreamRecordingResource> buf(0, StreamRecordingResource{&log}, 8, nanovdb::cuda::noInit);
+        buf.resize(size_t(16), c);
+        EXPECT_EQ(buf.size(), 16u);
+        EXPECT_EQ(buf.stream(), c);
+        EXPECT_EQ(log.allocStreams.back(), c);
+        buf.resize(0, 0); // two literal zeros: count 0 on the default stream in either order
+        EXPECT_TRUE(buf.empty());
+        EXPECT_EQ(buf.stream(), cudaStream_t(0));
+    }
+    ASSERT_EQ(cudaStreamSynchronize(c), cudaSuccess);
+    ASSERT_EQ(cudaStreamDestroy(c), cudaSuccess);
+}
+
+TEST(TestBuffer, ResizeRejectsNegativeCountInEitherOrder)
 {
     nanovdb::cuda::Buffer<std::byte> buf(cudaStream_t(0), 8, nanovdb::cuda::noInit);
-    EXPECT_THROW(buf.resize(-1, cudaStream_t(0)), std::invalid_argument);
+    EXPECT_THROW(buf.resize(-1, cudaStream_t(0)), std::runtime_error);
+    EXPECT_THROW(buf.resize(cudaStream_t(0), size_t(-1)), std::runtime_error);
     EXPECT_EQ(8u, buf.size()); // untouched
 }
+
+TEST(TestBuffer, ResizeDeprecatedOrderAcceptsBoolCount)
+{
+    nanovdb::cuda::Buffer<int> buf(cudaStream_t(0), 8, nanovdb::cuda::noInit);
+    buf.resize(true, cudaStream_t(0)); // converted to size_t, as the old signature did
+    EXPECT_EQ(1u, buf.size());
+}
+
+TEST(TestBuffer, ResourceRefWithoutResourceEqualityFallsBackToIdentity)
+{
+    NoEqualityResource a, b;
+    nanovdb::cuda::ResourceRef<NoEqualityResource> ra(a), raAgain(a), rb(b);
+    EXPECT_TRUE(ra == raAgain); // same underlying resource
+    EXPECT_TRUE(ra != rb);      // different underlying resources
+}
+
 #if defined(__CUDACC__)
 #pragma nv_diagnostic pop
 #endif
