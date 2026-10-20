@@ -58,6 +58,8 @@ template<typename DstBuildT, typename SrcBuildT, typename BufferT = nanovdb::cud
 nanovdb::cuda::detail::PrototypeFormResult<BufferT, typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type>
 createNanoGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues, const BufferT &pool = BufferT(), cudaStream_t stream = 0)
 {
+    static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
+                  "createNanoGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
     return indexToGrid<DstBuildT, SrcBuildT, BufferT, ResourceT>(d_srcGrid, d_srcValues, pool, stream);
 }
 
@@ -350,11 +352,10 @@ __global__ void cpyNodeCountKernel(const NanoGrid<SrcBuildT> *srcGrid,
 
 template <typename SrcBuildT, typename ResourceT>
 IndexToGrid<SrcBuildT, ResourceT>::IndexToGrid(const SrcGridT *d_srcGrid, cudaStream_t stream, ResourceT& resource)
-    : mStream(stream), mTimer(stream), mResource(&resource),
+    : mStream((d_srcGrid ? void() : throw std::invalid_argument("IndexToGrid: null source grid"), stream)), mTimer(stream), mResource(&resource),
       mDevNodeAccBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 1, nanovdb::cuda::noInit),
       mGridNameBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
 {
-    if (d_srcGrid == nullptr) throw std::invalid_argument("IndexToGrid: null source grid");
     mDevNodeAcc = mDevNodeAccBuf.data();
     cpyNodeCountKernel<SrcBuildT><<<1, 1, 0, mStream>>>(d_srcGrid, mDevNodeAcc);
     cudaCheckError();

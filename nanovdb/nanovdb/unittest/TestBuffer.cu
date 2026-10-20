@@ -1517,14 +1517,21 @@ TEST(TestBuffer, ResourceFormsOfTheGpuTools)
 
 TEST(TestBuffer, BuilderConstructorsValidateArguments)
 {
-    // The builder classes check their arguments, so getHandle() and build()
-    // reject what the free functions reject, before anything is launched.
+    // Each builder constructor rejects its arguments before allocating or launching.
     const cudaStream_t stream = 0;
     EXPECT_THROW((nanovdb::tools::cuda::IndexToGrid<nanovdb::ValueOnIndex>(nullptr, stream)), std::invalid_argument);
     EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<float>(-1.0)), std::invalid_argument);
     EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<float>(0.0)), std::invalid_argument);
+    EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<float>(std::numeric_limits<double>::infinity())), std::invalid_argument);
+    EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<float>(nanovdb::Map(0.0))), std::invalid_argument);
     EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<nanovdb::Point>(0)), std::invalid_argument); // maximum points per voxel
     EXPECT_NO_THROW((nanovdb::tools::cuda::PointsToGrid<float>(0.5)));
+    Counters counters;
+    CountingResource res{&counters};
+    EXPECT_THROW((nanovdb::tools::cuda::IndexToGrid<nanovdb::ValueOnIndex, CountingResource>(nullptr, stream, res)), std::invalid_argument);
+    EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<float, CountingResource>(nanovdb::Map(0.0), stream, res)), std::invalid_argument);
+    EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<nanovdb::Point, CountingResource>(0, 1, 10, stream, res)), std::invalid_argument);
+    EXPECT_EQ(0, counters.allocs);
     ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(stream));
     ASSERT_EQ(cudaSuccess, cudaGetLastError());
 }
