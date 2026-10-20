@@ -24,6 +24,10 @@
 #include <nanovdb/util/cuda/Morphology.cuh>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
+#include <cstddef> // for std::byte
+#include <map>
+#include <stdexcept>
+#include <utility>
 
 
 namespace nanovdb {
@@ -62,11 +66,21 @@ public:
 
     /// @brief Creates a handle to the coarsened grid
     /// @tparam BufferT Buffer type used for allocation of the grid handle
-    /// @param buffer optional buffer (currently ignored)
+    /// @param buffer prototype buffer whose resource (or create() pool) allocates the output
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
     template<typename BufferT = nanovdb::cuda::DualDeviceBuffer>
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
+
+    /// @brief Resource form of getHandle: the grid allocates through this
+    ///        builder's resource, the one its scratch uses, on its stream.
+    /// @return a handle over cuda::Buffer<std::byte, ResourceRef<ResourceT>>,
+    ///         which borrows the resource: it must outlive the handle
+    GridHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>> build()
+    {
+        using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
+        return this->getHandle(BufferT(mStream, mBuilder.ref(), 0, nanovdb::cuda::noInit));
+    }
 
 private:
     void coarsenRoot();

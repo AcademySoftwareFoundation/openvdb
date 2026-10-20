@@ -24,6 +24,11 @@
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
 #include <nanovdb/cuda/HandleStorage.h>
+#include <cstddef> // for std::byte
+#include <stdexcept> // for std::invalid_argument
+#include <type_traits> // for the stream-argument check
+#include <string> // for std::string
+#include <utility> // for std::move
 
 namespace nanovdb {// ================================================================
 
@@ -45,14 +50,16 @@ namespace tools::cuda {// ======================================================
 ///       in which case average and standard-deviation is undefined in the output grid.
 /// @return returns handle to grid that combined IndexGrid and values
 template<typename DstBuildT, typename SrcBuildT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
-typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type>
 indexToGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues, const BufferT &pool = BufferT(), cudaStream_t stream = 0);
 
 
 template<typename DstBuildT, typename SrcBuildT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
-typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type>
 createNanoGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues, const BufferT &pool = BufferT(), cudaStream_t stream = 0)
 {
+    static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
+                  "createNanoGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
     return indexToGrid<DstBuildT, SrcBuildT, BufferT, ResourceT>(d_srcGrid, d_srcValues, pool, stream);
 }
 
@@ -74,6 +81,7 @@ public:
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
     /// @param resource resource instance all device scratch is allocated from;
     ///        must outlive this instance (defaults to the per-type default resource)
+    /// @throw std::invalid_argument if @c d_srcGrid is null
     IndexToGrid(const SrcGridT *d_srcGrid, cudaStream_t stream = 0,
                 ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>());
 
@@ -89,10 +97,22 @@ public:
     /// @tparam DstBuildT Template parameter of the destination grid and value type
     /// @tparam BufferT Template parameter of the memory allocator
     /// @param srcValues pointer to values that will be inserted into the output grid
-    /// @param buffer optional buffer used for memory allocation
+    /// @param buffer prototype buffer whose resource (or create() pool) allocates the output
     /// @return A new GridHandle with the grid of type @c DstBuildT
     template<typename DstBuildT, typename BufferT = nanovdb::cuda::DualDeviceBuffer>
     GridHandle<BufferT> getHandle(const typename BuildToValueMap<DstBuildT>::type *srcValues, const BufferT &buffer = BufferT());
+
+    /// @brief Resource form of getHandle: the grid allocates through this
+    ///        builder's resource, the one its scratch uses, on its stream.
+    /// @return a handle over cuda::Buffer<std::byte, ResourceRef<ResourceT>>,
+    ///         which borrows the resource: it must outlive the handle
+    /// @param srcValues pointer to values that will be inserted into the output grid
+    template<typename DstBuildT>
+    GridHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>> build(const typename BuildToValueMap<DstBuildT>::type *srcValues)
+    {
+        using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
+        return this->template getHandle<DstBuildT>(srcValues, BufferT(mStream, this->ref(), 0, nanovdb::cuda::noInit));
+    }
 
 private:
     cudaStream_t      mStream{0};
@@ -332,11 +352,10 @@ __global__ void cpyNodeCountKernel(const NanoGrid<SrcBuildT> *srcGrid,
 
 template <typename SrcBuildT, typename ResourceT>
 IndexToGrid<SrcBuildT, ResourceT>::IndexToGrid(const SrcGridT *d_srcGrid, cudaStream_t stream, ResourceT& resource)
-    : mStream(stream), mTimer(stream), mResource(&resource),
+    : mStream((d_srcGrid ? void() : throw std::invalid_argument("IndexToGrid: null source grid"), stream)), mTimer(stream), mResource(&resource),
       mDevNodeAccBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 1, nanovdb::cuda::noInit),
       mGridNameBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
 {
-    NANOVDB_ASSERT(d_srcGrid);
     mDevNodeAcc = mDevNodeAccBuf.data();
     cpyNodeCountKernel<SrcBuildT><<<1, 1, 0, mStream>>>(d_srcGrid, mDevNodeAcc);
     cudaCheckError();
@@ -428,11 +447,45 @@ inline BufferT IndexToGrid<SrcBuildT, ResourceT>::getBuffer(const BufferT &pool)
 //================================================================================================
 
 template<typename DstBuildT, typename SrcBuildT, typename BufferT, typename ResourceT>
-typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type>
 indexToGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues, const BufferT &pool, cudaStream_t stream)
 {
+    static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
+                  "indexToGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
     IndexToGrid<SrcBuildT, ResourceT> converter(d_srcGrid, stream);
     return converter.template getHandle<DstBuildT>(d_srcValues, pool);
+}
+
+//================================================================================================
+
+/// @brief Resource form of indexToGrid: the output and all internal scratch
+///        allocate through @c resource, on @c stream. Passing a cudaStream_t
+///        selects this form (a literal 0 does not: write cudaStream_t(0)); the
+///        prototype-buffer form above keeps its call shape.
+/// @tparam ResourceT stream-ordered memory resource, held by value (a copy of
+///         default_resource<ResourceT>() when omitted); pass a
+///         cuda::ResourceRef<R> to allocate through a borrowed instance
+template<typename DstBuildT, typename SrcBuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
+typename util::enable_if<BuildTraits<SrcBuildT>::is_index && (nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value),
+                         GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+indexToGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues,
+            cudaStream_t stream, ResourceT resource = nanovdb::cuda::default_resource<ResourceT>())
+{
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "the GPU tools allocate stream-ordered scratch: pass an AsyncResource, or wrap a synchronous one in cuda::AsyncFromSync");
+    using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
+    IndexToGrid<SrcBuildT, ResourceT> converter(d_srcGrid, stream, resource);
+    return converter.template getHandle<DstBuildT>(d_srcValues, BufferT(stream, resource, 0, nanovdb::cuda::noInit));
+}
+
+/// @brief Resource form of createNanoGrid, which forwards to the resource form of indexToGrid
+template<typename DstBuildT, typename SrcBuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
+typename util::enable_if<BuildTraits<SrcBuildT>::is_index && (nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value),
+                         GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+createNanoGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues,
+               cudaStream_t stream, ResourceT resource = nanovdb::cuda::default_resource<ResourceT>())
+{
+    return indexToGrid<DstBuildT, SrcBuildT, ResourceT>(d_srcGrid, d_srcValues, stream, std::move(resource));
 }
 
 }// namespace tools::cuda  =============================================================

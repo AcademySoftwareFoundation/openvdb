@@ -17,7 +17,7 @@
 #include <nanovdb/cuda/GridHandle.cuh> // for cuda::mergeGridHandles / splitGridHandles
 #include <nanovdb/cuda/ManagedResource.h>
 #include <nanovdb/tools/cuda/VoxelBlockManager.cuh> // for the single-space entry-point test
-#include <nanovdb/cuda/DeviceBuffer.h> // the dual-space reference the single-space builds are compared with
+#include <nanovdb/cuda/DeviceBuffer.h> // the dual-space default of the prototype forms, compared against
 #include <nanovdb/tools/cuda/AddBlindData.cuh>
 #include <nanovdb/tools/cuda/CoarsenGrid.cuh>
 #include <nanovdb/tools/cuda/DilateGrid.cuh>
@@ -2076,6 +2076,233 @@ TEST(TestBuffer, TypedEvalChecksumMatchesGridDataForm)
         EXPECT_TRUE(typed == onHost);
         EXPECT_FALSE(typed.isEmpty());
     }
+}
+
+
+//======================================================================
+// Resource forms of the GPU tools: output and scratch allocate through the
+// caller's resource, beside the unchanged prototype forms
+//======================================================================
+
+namespace {
+
+nanovdb::GridHandle<nanovdb::HostBuffer> deviceToHost(const nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<CountingResource>>>& h)
+{
+    return nanovdb::cuda::copyTo<nanovdb::HostBuffer>(h, cudaStream_t(0));
+}
+
+} // namespace
+
+TEST(TestBuffer, ResourceFormsOfTheGpuTools)
+{
+    using RefT = nanovdb::cuda::ResourceRef<CountingResource>;
+    using OutT = nanovdb::cuda::Buffer<std::byte, RefT>;
+    const std::vector<nanovdb::Coord> coords = {nanovdb::Coord(1,2,3), nanovdb::Coord(10,20,8), nanovdb::Coord(-5,0,7), nanovdb::Coord(300,0,0)};
+    const std::vector<nanovdb::Vec3f> points = {nanovdb::Vec3f(0.5f), nanovdb::Vec3f(4.25f,-1.0f,2.0f), nanovdb::Vec3f(0.6f), nanovdb::Vec3f(9.0f)};
+    nanovdb::cuda::Buffer<nanovdb::Coord> d_coords(cudaStream_t(0), coords.size(), nanovdb::cuda::noInit);
+    nanovdb::cuda::Buffer<nanovdb::Vec3f> d_points(cudaStream_t(0), points.size(), nanovdb::cuda::noInit);
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_coords.data(), coords.data(), coords.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_points.data(), points.data(), points.size() * sizeof(nanovdb::Vec3f), cudaMemcpyHostToDevice));
+    cudaStream_t stream;
+    ASSERT_EQ(cudaSuccess, cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+
+    Counters counters;
+    CountingResource res{&counters};
+    {
+        // voxelsToGrid: the resource form matches the prototype form, and every
+        // allocation (scratch and output) goes through the caller's resource.
+        auto proto = nanovdb::tools::cuda::voxelsToGrid<float>(d_coords.data(), coords.size(), 1.0);
+        static_assert(std::is_same<decltype(proto), nanovdb::GridHandle<nanovdb::cuda::DualDeviceBuffer>>::value,
+                      "a call without a stream keeps selecting the prototype form");
+        auto viaRes = nanovdb::tools::cuda::voxelsToGrid<float>(d_coords.data(), coords.size(), 1.0, stream, RefT(res));
+        static_assert(std::is_same<decltype(viaRes), nanovdb::GridHandle<OutT>>::value, "the resource form returns a buffer over that resource");
+        EXPECT_EQ(stream, viaRes.buffer().stream());
+        const int afterVoxels = counters.allocs;
+        EXPECT_GT(afterVoxels, 1); // scratch and output
+        auto host = deviceToHost(viaRes);
+        expectSameBytes(host, hostImage(proto));
+
+        // default resource: no resource argument at all
+        auto viaDefault = nanovdb::tools::cuda::voxelsToGrid<float>(d_coords.data(), coords.size(), 1.0, stream);
+        static_assert(std::is_same<decltype(viaDefault), nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>>>::value,
+                      "the resource form defaults to DeviceResource");
+        expectSameBytes(host, hostImage(viaDefault));
+        EXPECT_EQ(afterVoxels, counters.allocs); // the default resource is not the counting one
+
+        // pointsToGrid, fixed voxel size and maximum density
+        auto pFixed = nanovdb::tools::cuda::pointsToGrid(d_points.data(), int(points.size()), 1.0, nanovdb::PointType::Default, stream, RefT(res));
+        static_assert(std::is_same<decltype(pFixed), nanovdb::GridHandle<OutT>>::value, "resource form");
+        EXPECT_EQ(int(points.size()), int(deviceToHost(pFixed).grid<nanovdb::Point>()->pointCount()));
+        auto pFixedProto = nanovdb::tools::cuda::pointsToGrid(d_points.data(), int(points.size()), 1.0);
+        expectSameBytes(deviceToHost(pFixed), hostImage(pFixedProto));
+        // the prototype forms validate their arguments the same way
+        EXPECT_THROW((nanovdb::tools::cuda::voxelsToGrid<float>(d_coords.data(), coords.size(), -1.0)), std::invalid_argument);
+        EXPECT_THROW((nanovdb::tools::cuda::pointsToGrid(d_points.data(), -1, 1.0)), std::invalid_argument);
+        auto pDense = nanovdb::tools::cuda::pointsToGrid(d_points.data(), int(points.size()), 2, 1, 10, nanovdb::PointType::Default, stream, RefT(res));
+        auto pDenseProto = nanovdb::tools::cuda::pointsToGrid(d_points.data(), int(points.size()), 2, 1, 10);
+        expectSameBytes(deviceToHost(pDense), hostImage(pDenseProto));
+
+        // indexToGrid over a resource form index grid
+        auto idx = nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex>(d_coords.data(), coords.size(), 1.0, stream, RefT(res));
+        const uint64_t valueCount = deviceToHost(idx).grid<nanovdb::ValueOnIndex>()->valueCount();
+        std::vector<float> values(valueCount);
+        for (uint64_t i = 0; i < valueCount; ++i) values[i] = 0.25f * float(i);
+        nanovdb::cuda::Buffer<float> d_values(cudaStream_t(0), valueCount, nanovdb::cuda::noInit);
+        ASSERT_EQ(cudaSuccess, cudaMemcpy(d_values.data(), values.data(), valueCount * sizeof(float), cudaMemcpyHostToDevice));
+        auto floats = nanovdb::tools::cuda::indexToGrid<float>(idx.deviceGrid<nanovdb::ValueOnIndex>(), d_values.data(), stream, RefT(res));
+        static_assert(std::is_same<decltype(floats), nanovdb::GridHandle<OutT>>::value, "resource form");
+        auto floatsProto = nanovdb::tools::cuda::indexToGrid<float>(idx.deviceGrid<nanovdb::ValueOnIndex>(), d_values.data());
+        expectSameBytes(deviceToHost(floats), hostImage(floatsProto));
+        // createNanoGrid forwards to indexToGrid in both forms
+        auto created = nanovdb::tools::cuda::createNanoGrid<float>(idx.deviceGrid<nanovdb::ValueOnIndex>(), d_values.data(), stream, RefT(res));
+        static_assert(std::is_same<decltype(created), nanovdb::GridHandle<OutT>>::value, "resource form");
+        expectSameBytes(deviceToHost(created), hostImage(floatsProto));
+        auto createdDefault = nanovdb::tools::cuda::createNanoGrid<float>(idx.deviceGrid<nanovdb::ValueOnIndex>(), d_values.data(), stream);
+        static_assert(std::is_same<decltype(createdDefault), nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>>>::value,
+                      "a stream selects the resource form, as for indexToGrid");
+        expectSameBytes(deviceToHost(created), hostImage(createdDefault));
+
+        // addBlindData: its scratch used to come from the default resource only,
+        // so a non-default-constructible resource could not drive it at all.
+        const int beforeBlind = counters.allocs;
+        auto withBlind = nanovdb::tools::cuda::addBlindData(viaRes.deviceGrid<float>(), d_values.data(), coords.size(),
+                                                            nanovdb::GridBlindDataClass::AttributeArray, nanovdb::GridBlindDataSemantic::Unknown,
+                                                            "w", stream, RefT(res));
+        static_assert(std::is_same<decltype(withBlind), nanovdb::GridHandle<OutT>>::value, "resource form");
+        EXPECT_GE(counters.allocs, beforeBlind + 2); // scratch and output
+        EXPECT_EQ(1u, deviceToHost(withBlind).gridData()->mBlindMetadataCount);
+        auto withBlindProto = nanovdb::tools::cuda::addBlindData(proto.deviceGrid<float>(), d_values.data(), coords.size(),
+                                                                 nanovdb::GridBlindDataClass::AttributeArray, nanovdb::GridBlindDataSemantic::Unknown, "w");
+        expectSameBytes(deviceToHost(withBlind), hostImage(withBlindProto));
+
+        // invalid arguments throw instead of overflowing or dereferencing null
+        const std::string longName(nanovdb::GridBlindMetaData::MaxNameSize, 'x');
+        auto addNamed = [&](const char* name) {
+            return nanovdb::tools::cuda::addBlindData(viaRes.deviceGrid<float>(), d_values.data(), coords.size(),
+                                                      nanovdb::GridBlindDataClass::AttributeArray, nanovdb::GridBlindDataSemantic::Unknown,
+                                                      name, stream, RefT(res));
+        };
+        EXPECT_THROW(addNamed(nullptr), std::invalid_argument);
+        EXPECT_THROW(addNamed(longName.c_str()), std::invalid_argument);
+        EXPECT_THROW((nanovdb::tools::cuda::addBlindData(static_cast<const nanovdb::NanoGrid<float>*>(nullptr), d_values.data(), coords.size(),
+                                                         nanovdb::GridBlindDataClass::AttributeArray, nanovdb::GridBlindDataSemantic::Unknown,
+                                                         "w", stream, RefT(res))), std::invalid_argument);
+        ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(stream)); // the null grid was never launched on
+        EXPECT_NO_THROW(addNamed(longName.substr(1).c_str())); // the longest name that fits
+        EXPECT_THROW((nanovdb::tools::cuda::voxelsToGrid<float>(d_coords.data(), coords.size(), 0.0, stream)), std::invalid_argument);
+        EXPECT_THROW((nanovdb::tools::cuda::pointsToGrid(d_points.data(), -1, 1.0, nanovdb::PointType::Default, stream)), std::invalid_argument);
+        EXPECT_THROW((nanovdb::tools::cuda::indexToGrid<float, nanovdb::ValueOnIndex>(nullptr, d_values.data(), stream)), std::invalid_argument);
+    }
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(stream));
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+    EXPECT_EQ(counters.allocs, counters.deallocs);
+    ASSERT_EQ(cudaSuccess, cudaStreamDestroy(stream));
+}
+
+TEST(TestBuffer, BuilderConstructorsValidateArguments)
+{
+    // Each builder constructor rejects its arguments before allocating or launching.
+    const cudaStream_t stream = 0;
+    EXPECT_THROW((nanovdb::tools::cuda::IndexToGrid<nanovdb::ValueOnIndex>(nullptr, stream)), std::invalid_argument);
+    EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<float>(-1.0)), std::invalid_argument);
+    EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<float>(0.0)), std::invalid_argument);
+    EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<float>(std::numeric_limits<double>::infinity())), std::invalid_argument);
+    EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<float>(nanovdb::Map(0.0))), std::invalid_argument);
+    EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<nanovdb::Point>(0)), std::invalid_argument); // maximum points per voxel
+    EXPECT_NO_THROW((nanovdb::tools::cuda::PointsToGrid<float>(0.5)));
+    Counters counters;
+    CountingResource res{&counters};
+    EXPECT_THROW((nanovdb::tools::cuda::IndexToGrid<nanovdb::ValueOnIndex, CountingResource>(nullptr, stream, res)), std::invalid_argument);
+    EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<float, CountingResource>(nanovdb::Map(0.0), stream, res)), std::invalid_argument);
+    EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<nanovdb::Point, CountingResource>(0, 1, 10, stream, res)), std::invalid_argument);
+    EXPECT_EQ(0, counters.allocs);
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(stream));
+    ASSERT_EQ(cudaSuccess, cudaGetLastError());
+}
+
+TEST(TestBuffer, BuilderBuildAllocatesThroughTheBuilderResource)
+{
+    // build() is getHandle with the output drawn from the builder's own
+    // resource: same grid, and every allocation through that one resource.
+    using BuildT = nanovdb::ValueOnIndex;
+    using RefT = nanovdb::cuda::ResourceRef<CountingResource>;
+    using OutT = nanovdb::cuda::Buffer<std::byte, RefT>;
+    const std::vector<nanovdb::Coord> coords = {nanovdb::Coord(1,2,3), nanovdb::Coord(10,20,8), nanovdb::Coord(-5,0,7), nanovdb::Coord(300,0,0)};
+    nanovdb::cuda::Buffer<nanovdb::Coord> d_coords(cudaStream_t(0), coords.size(), nanovdb::cuda::noInit);
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_coords.data(), coords.data(), coords.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+
+    Counters counters;
+    CountingResource res{&counters};
+    {
+        nanovdb::tools::cuda::PointsToGrid<BuildT, CountingResource> p2g(1.0, nanovdb::Vec3d(0), cudaStream_t(0), res);
+        auto input = p2g.build(d_coords.data(), coords.size());
+        static_assert(std::is_same<decltype(input), nanovdb::GridHandle<OutT>>::value, "build borrows the builder resource");
+        auto inputProto = nanovdb::tools::cuda::PointsToGrid<BuildT>().getHandle(d_coords.data(), coords.size());
+        expectSameBytes(deviceToHost(input), hostImage(inputProto));
+        const nanovdb::NanoGrid<BuildT>* d_grid = input.deviceGrid<BuildT>();
+
+        auto check = [&](auto& op, auto& opProto) {
+            const int before = counters.allocs;
+            auto out = op.build();
+            static_assert(std::is_same<decltype(out), nanovdb::GridHandle<OutT>>::value, "build borrows the builder resource");
+            EXPECT_GT(counters.allocs, before); // the output, at least
+            auto proto = opProto.getHandle();
+            expectSameBytes(deviceToHost(out), hostImage(proto));
+        };
+        { nanovdb::tools::cuda::DilateGrid<BuildT, CountingResource> op(d_grid, cudaStream_t(0), res);
+          nanovdb::tools::cuda::DilateGrid<BuildT> ref(d_grid); check(op, ref); }
+        { nanovdb::tools::cuda::MergeGrids<BuildT, CountingResource> op(d_grid, d_grid, cudaStream_t(0), res);
+          nanovdb::tools::cuda::MergeGrids<BuildT> ref(d_grid, d_grid); check(op, ref); }
+        { nanovdb::tools::cuda::RefineGrid<BuildT, CountingResource> op(d_grid, cudaStream_t(0), res);
+          nanovdb::tools::cuda::RefineGrid<BuildT> ref(d_grid); check(op, ref); }
+        { nanovdb::tools::cuda::CoarsenGrid<BuildT, CountingResource> op(d_grid, cudaStream_t(0), res);
+          nanovdb::tools::cuda::CoarsenGrid<BuildT> ref(d_grid); check(op, ref); }
+        {
+            const uint32_t leafCount = deviceToHost(input).grid<BuildT>()->tree().nodeCount(0);
+            std::vector<nanovdb::Mask<3>> masks(leafCount, nanovdb::Mask<3>(true));
+            nanovdb::cuda::Buffer<nanovdb::Mask<3>> d_masks(cudaStream_t(0), leafCount, nanovdb::cuda::noInit);
+            ASSERT_EQ(cudaSuccess, cudaMemcpy(d_masks.data(), masks.data(), leafCount * sizeof(nanovdb::Mask<3>), cudaMemcpyHostToDevice));
+            nanovdb::tools::cuda::PruneGrid<BuildT, CountingResource> op(d_grid, d_masks.data(), cudaStream_t(0), res);
+            nanovdb::tools::cuda::PruneGrid<BuildT> ref(d_grid, d_masks.data());
+            check(op, ref);
+        }
+        {
+            const uint64_t valueCount = deviceToHost(input).grid<BuildT>()->valueCount();
+            std::vector<float> values(valueCount, 2.5f);
+            nanovdb::cuda::Buffer<float> d_values(cudaStream_t(0), valueCount, nanovdb::cuda::noInit);
+            ASSERT_EQ(cudaSuccess, cudaMemcpy(d_values.data(), values.data(), valueCount * sizeof(float), cudaMemcpyHostToDevice));
+            nanovdb::tools::cuda::IndexToGrid<BuildT, CountingResource> op(d_grid, cudaStream_t(0), res);
+            auto out = op.build<float>(d_values.data());
+            static_assert(std::is_same<decltype(out), nanovdb::GridHandle<OutT>>::value, "build borrows the builder resource");
+            auto proto = nanovdb::tools::cuda::IndexToGrid<BuildT>(d_grid).getHandle<float>(d_values.data());
+            expectSameBytes(deviceToHost(out), hostImage(proto));
+        }
+        {
+            const std::vector<nanovdb::Vec3f> points = {{0.f,0.f,0.f}, {1.f,0.f,0.f}, {0.f,1.f,0.f}, {0.f,0.f,1.f}};
+            const std::vector<nanovdb::Vec3i> triangles = {{0,1,2}, {0,2,3}, {0,3,1}, {1,2,3}};
+            nanovdb::cuda::Buffer<nanovdb::Vec3f> d_points(cudaStream_t(0), points.size(), nanovdb::cuda::noInit);
+            nanovdb::cuda::Buffer<nanovdb::Vec3i> d_tris(cudaStream_t(0), triangles.size(), nanovdb::cuda::noInit);
+            ASSERT_EQ(cudaSuccess, cudaMemcpy(d_points.data(), points.data(), points.size() * sizeof(nanovdb::Vec3f), cudaMemcpyHostToDevice));
+            ASSERT_EQ(cudaSuccess, cudaMemcpy(d_tris.data(), triangles.data(), triangles.size() * sizeof(nanovdb::Vec3i), cudaMemcpyHostToDevice));
+            nanovdb::Map map;
+            map.set(0.1, nanovdb::Vec3d(0.0));
+            nanovdb::tools::cuda::MeshToGrid<BuildT, CountingResource> op(d_points.data(), 4u, d_tris.data(), 4u, map, cudaStream_t(0), res);
+            nanovdb::tools::cuda::MeshToGrid<BuildT> ref(d_points.data(), 4u, d_tris.data(), 4u, map);
+            check(op, ref);
+            nanovdb::tools::cuda::MeshToGrid<BuildT, CountingResource> op2(d_points.data(), 4u, d_tris.data(), 4u, map, cudaStream_t(0), res);
+            auto withUdf = op2.buildWithUDF();
+            auto refUdf = nanovdb::tools::cuda::MeshToGrid<BuildT>(d_points.data(), 4u, d_tris.data(), 4u, map).getHandleAndUDF();
+            expectSameBytes(deviceToHost(withUdf.first), hostImage(refUdf.first));
+            ASSERT_EQ(refUdf.second.size(), withUdf.second.size_bytes());
+            std::vector<std::byte> a(withUdf.second.size_bytes()), b(refUdf.second.size());
+            ASSERT_EQ(cudaSuccess, cudaMemcpy(a.data(), withUdf.second.data(), a.size(), cudaMemcpyDeviceToHost));
+            ASSERT_EQ(cudaSuccess, cudaMemcpy(b.data(), refUdf.second.deviceData(), b.size(), cudaMemcpyDeviceToHost));
+            EXPECT_EQ(0, std::memcmp(a.data(), b.data(), a.size()));
+        }
+    }
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+    EXPECT_GT(counters.allocs, 0);
+    EXPECT_EQ(counters.allocs, counters.deallocs);
 }
 
 } // namespace nanovdb_test
