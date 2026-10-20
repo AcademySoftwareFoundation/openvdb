@@ -175,7 +175,8 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
 ///        this form (a literal 0 does not: write cudaStream_t(0)); the
 ///        prototype-buffer form above keeps its call shape, and both forms
 ///        validate their arguments.
-/// @tparam ResourceT stream-ordered memory resource, held by value; pass a
+/// @tparam ResourceT stream-ordered memory resource, held by value (a copy of
+///         default_resource<ResourceT>() when omitted); pass a
 ///         cuda::ResourceRef<R> to allocate through a borrowed instance
 template<typename BuildT, typename BlindDataT, typename ResourceT = nanovdb::cuda::DeviceResource>
 typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
@@ -186,8 +187,10 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
              GridBlindDataSemantic semantics,
              const char *name,
              cudaStream_t stream,
-             ResourceT resource = ResourceT())
+             ResourceT resource = nanovdb::cuda::default_resource<ResourceT>())
 {
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "the GPU tools allocate stream-ordered scratch: pass an AsyncResource, or wrap a synchronous one in cuda::AsyncFromSync");
     using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
     return detail::addBlindData(d_grid, d_blindData, valueCount, blindClass, semantics, name,
                                 BufferT(stream, resource, 0, nanovdb::cuda::noInit), stream, resource);

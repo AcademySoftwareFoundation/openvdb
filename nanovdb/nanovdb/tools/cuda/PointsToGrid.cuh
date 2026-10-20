@@ -146,7 +146,8 @@ voxelsToGrid(std::vector<std::tuple<const PtrT, size_t, double>> pointSet,
 ///        allocate through @c resource, on @c stream. Passing a cudaStream_t
 ///        selects this form (a literal 0 does not: write cudaStream_t(0)); the
 ///        prototype-buffer form above keeps its call shape.
-/// @tparam ResourceT stream-ordered memory resource, held by value; pass a
+/// @tparam ResourceT stream-ordered memory resource, held by value (a copy of
+///         default_resource<ResourceT>() when omitted); pass a
 ///         cuda::ResourceRef<R> to allocate through a borrowed instance
 /// @return a handle over cuda::Buffer<std::byte, ResourceT> on the device
 template<typename BuildT, typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
@@ -155,7 +156,7 @@ voxelsToGrid(const PtrT dGridVoxels,
              size_t voxelCount,
              double voxelSize,
              cudaStream_t stream,
-             ResourceT resource = ResourceT());
+             ResourceT resource = nanovdb::cuda::default_resource<ResourceT>());
 
 /// @brief Resource form of pointsToGrid for a fixed voxel size; see the
 ///        resource form of voxelsToGrid.
@@ -166,7 +167,7 @@ pointsToGrid(const PtrT dWorldPoints,
              double voxelSize,
              PointType type,
              cudaStream_t stream,
-             ResourceT resource = ResourceT());
+             ResourceT resource = nanovdb::cuda::default_resource<ResourceT>());
 
 /// @brief Resource form of pointsToGrid targeting a maximum point density;
 ///        see the resource form of voxelsToGrid.
@@ -179,7 +180,7 @@ pointsToGrid(const PtrT dWorldPoints,
              int maxIterations,
              PointType type,
              cudaStream_t stream,
-             ResourceT resource = ResourceT());
+             ResourceT resource = nanovdb::cuda::default_resource<ResourceT>());
 
 }// namespace tools::cuda ========================================================================
 
@@ -341,6 +342,25 @@ struct PointsToGridData {
 };// PointsToGridData
 
 
+namespace detail {
+
+/// @brief Argument checks shared by the PointsToGrid constructors and the free functions.
+inline double checkVoxelSize(double voxelSize, const char* tool)
+{
+    if (!(voxelSize > 0.0)) throw std::invalid_argument(std::string(tool) + ": voxel size must be positive");
+    return voxelSize;
+}
+inline void checkPointCount(int pointCount, const char* tool)
+{
+    if (pointCount < 0) throw std::invalid_argument(std::string(tool) + ": negative point count");
+}
+inline void checkMaxPointsPerVoxel(int maxPointsPerVoxel, const char* tool)
+{
+    if (maxPointsPerVoxel <= 0) throw std::invalid_argument(std::string(tool) + ": maximum points per voxel must be positive");
+}
+
+}// namespace detail
+
 template<typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class PointsToGrid
 {
@@ -375,15 +395,18 @@ public:
     /// @param scale Voxel size in world units
     /// @param trans Translation of origin in world units
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
+    /// @throw std::invalid_argument if @c scale is not positive
     PointsToGrid(const double scale = 1.0, const Vec3d &trans = Vec3d(0.0), cudaStream_t stream = 0, ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
-        : PointsToGrid(Map(scale, trans), stream, resource){}
+        : PointsToGrid(Map(detail::checkVoxelSize(scale, "PointsToGrid"), trans), stream, resource){}
 
     /// @brief Constructor from a target maximum number of particles per voxel. Calls the Map constructor defined above
     /// @param maxPointsPerVoxel Maximum number of points oer voxel
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
+    /// @throw std::invalid_argument if @c maxPointsPerVoxel is not positive
     PointsToGrid(int maxPointsPerVoxel, int tolerance = 1, int maxIterations = 10, cudaStream_t stream = 0, ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
         : PointsToGrid(Map(1.0), stream, resource)
     {
+        detail::checkMaxPointsPerVoxel(maxPointsPerVoxel, "PointsToGrid");
         mMaxPointsPerVoxel = maxPointsPerVoxel;
         mTolerance = tolerance;
         mMaxIterations = maxIterations;
@@ -1477,33 +1500,12 @@ inline void PointsToGrid<BuildT, ResourceT>::processBBox()
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-namespace detail {
-
-/// @brief Argument checks shared by the prototype and resource forms.
-inline void checkVoxelSize(double voxelSize, const char* tool)
-{
-    if (!(voxelSize > 0.0)) throw std::invalid_argument(std::string(tool) + ": voxel size must be positive");
-}
-inline void checkPointCount(int pointCount, const char* tool)
-{
-    if (pointCount < 0) throw std::invalid_argument(std::string(tool) + ": negative point count");
-}
-inline void checkMaxPointsPerVoxel(int maxPointsPerVoxel, const char* tool)
-{
-    if (maxPointsPerVoxel <= 0) throw std::invalid_argument(std::string(tool) + ": maximum points per voxel must be positive");
-}
-
-}// namespace detail
-
-//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
 template<typename BuildT, typename PtrT, typename BufferT, typename ResourceT>
 nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>// Grid<BuildT>
 voxelsToGrid(const PtrT d_ijk, size_t voxelCount, double voxelSize, const BufferT &buffer, cudaStream_t stream)
 {
     static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
                   "voxelsToGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
-    detail::checkVoxelSize(voxelSize, "voxelsToGrid");
     PointsToGrid<BuildT, ResourceT> converter(voxelSize, Vec3d(0.0), stream);
     return converter.getHandle(d_ijk, voxelCount, buffer);
 }
@@ -1517,7 +1519,6 @@ pointsToGrid(const PtrT d_xyz, int pointCount, double voxelSize, PointType type,
     static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
                   "pointsToGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
     detail::checkPointCount(pointCount, "pointsToGrid");
-    detail::checkVoxelSize(voxelSize, "pointsToGrid");
     PointsToGrid<Point, ResourceT> converter(voxelSize, Vec3d(0.0), stream);
     converter.setPointType(type);
     return converter.getHandle(d_xyz, pointCount, buffer);
@@ -1532,7 +1533,6 @@ pointsToGrid(const PtrT d_xyz, int pointCount, int maxPointsPerVoxel, int tolera
     static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
                   "pointsToGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
     detail::checkPointCount(pointCount, "pointsToGrid");
-    detail::checkMaxPointsPerVoxel(maxPointsPerVoxel, "pointsToGrid");
     PointsToGrid<Point, ResourceT> converter(maxPointsPerVoxel, tolerance, maxIterations, stream);
     converter.setPointType(type);
     return converter.getHandle(d_xyz, pointCount, buffer);
@@ -1568,7 +1568,6 @@ voxelsToGrid(const PtrT d_ijk, size_t voxelCount, double voxelSize, cudaStream_t
 {
     static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
                   "the GPU tools allocate stream-ordered scratch: pass an AsyncResource, or wrap a synchronous one in cuda::AsyncFromSync");
-    detail::checkVoxelSize(voxelSize, "voxelsToGrid");
     using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
     PointsToGrid<BuildT, ResourceT> converter(voxelSize, Vec3d(0.0), stream, resource);
     return converter.getHandle(d_ijk, voxelCount, BufferT(stream, resource, 0, nanovdb::cuda::noInit));
@@ -1583,7 +1582,6 @@ pointsToGrid(const PtrT d_xyz, int pointCount, double voxelSize, PointType type,
     static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
                   "the GPU tools allocate stream-ordered scratch: pass an AsyncResource, or wrap a synchronous one in cuda::AsyncFromSync");
     detail::checkPointCount(pointCount, "pointsToGrid");
-    detail::checkVoxelSize(voxelSize, "pointsToGrid");
     using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
     PointsToGrid<Point, ResourceT> converter(voxelSize, Vec3d(0.0), stream, resource);
     converter.setPointType(type);
@@ -1600,7 +1598,6 @@ pointsToGrid(const PtrT d_xyz, int pointCount, int maxPointsPerVoxel, int tolera
     static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
                   "the GPU tools allocate stream-ordered scratch: pass an AsyncResource, or wrap a synchronous one in cuda::AsyncFromSync");
     detail::checkPointCount(pointCount, "pointsToGrid");
-    detail::checkMaxPointsPerVoxel(maxPointsPerVoxel, "pointsToGrid");
     using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
     PointsToGrid<Point, ResourceT> converter(maxPointsPerVoxel, tolerance, maxIterations, stream, resource);
     converter.setPointType(type);

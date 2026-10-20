@@ -1469,6 +1469,14 @@ TEST(TestBuffer, ResourceFormsOfTheGpuTools)
         static_assert(std::is_same<decltype(floats), nanovdb::GridHandle<OutT>>::value, "resource form");
         auto floatsProto = nanovdb::tools::cuda::indexToGrid<float>(idx.deviceGrid<nanovdb::ValueOnIndex>(), d_values.data());
         expectSameBytes(deviceToHost(floats), floatsProto);
+        // createNanoGrid forwards to indexToGrid in both forms
+        auto created = nanovdb::tools::cuda::createNanoGrid<float>(idx.deviceGrid<nanovdb::ValueOnIndex>(), d_values.data(), stream, RefT(res));
+        static_assert(std::is_same<decltype(created), nanovdb::GridHandle<OutT>>::value, "resource form");
+        expectSameBytes(deviceToHost(created), floatsProto);
+        auto createdDefault = nanovdb::tools::cuda::createNanoGrid<float>(idx.deviceGrid<nanovdb::ValueOnIndex>(), d_values.data(), stream);
+        static_assert(std::is_same<decltype(createdDefault), nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>>>::value,
+                      "a stream selects the resource form, as for indexToGrid");
+        expectSameBytes(deviceToHost(created), createdDefault);
 
         // addBlindData: its scratch used to come from the default resource only,
         // so a non-default-constructible resource could not drive it at all.
@@ -1505,6 +1513,20 @@ TEST(TestBuffer, ResourceFormsOfTheGpuTools)
     ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
     EXPECT_EQ(counters.allocs, counters.deallocs);
     ASSERT_EQ(cudaSuccess, cudaStreamDestroy(stream));
+}
+
+TEST(TestBuffer, BuilderConstructorsValidateArguments)
+{
+    // The builder classes check their arguments, so getHandle() and build()
+    // reject what the free functions reject, before anything is launched.
+    const cudaStream_t stream = 0;
+    EXPECT_THROW((nanovdb::tools::cuda::IndexToGrid<nanovdb::ValueOnIndex>(nullptr, stream)), std::invalid_argument);
+    EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<float>(-1.0)), std::invalid_argument);
+    EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<float>(0.0)), std::invalid_argument);
+    EXPECT_THROW((nanovdb::tools::cuda::PointsToGrid<nanovdb::Point>(0)), std::invalid_argument); // maximum points per voxel
+    EXPECT_NO_THROW((nanovdb::tools::cuda::PointsToGrid<float>(0.5)));
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(stream));
+    ASSERT_EQ(cudaSuccess, cudaGetLastError());
 }
 
 TEST(TestBuffer, BuilderBuildAllocatesThroughTheBuilderResource)
