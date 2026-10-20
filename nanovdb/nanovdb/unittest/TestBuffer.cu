@@ -20,6 +20,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint> // for PTRDIFF_MAX
 #include <cstring>
 #include <sstream>// for the pinned-handle write/read round trip
 #include <limits>
@@ -290,11 +291,16 @@ TEST(TestBuffer, CountConstructionRequiresNoInit)
 
 TEST(TestBuffer, OversizedCountThrows)
 {
-    // An element count whose byte size overflows size_t must be rejected up
-    // front rather than silently wrapping into a tiny allocation.
-    const size_t oversized = std::numeric_limits<size_t>::max() / sizeof(int) + 1;
+    // An element count whose byte size exceeds PTRDIFF_MAX is rejected before
+    // anything is allocated.
+    const size_t oversized = size_t(PTRDIFF_MAX) / sizeof(int) + 1;
     EXPECT_THROW((nanovdb::cuda::Buffer<int>(0, oversized, nanovdb::cuda::noInit)), std::runtime_error);
     EXPECT_THROW((nanovdb::cuda::Buffer<int, nanovdb::cuda::PinnedResource>(oversized, nanovdb::cuda::noInit)), std::runtime_error);
+    {
+        nanovdb::cuda::Buffer<int, nanovdb::cuda::PinnedResource> pinned(8, nanovdb::cuda::noInit);
+        EXPECT_THROW(pinned.resize(oversized), std::runtime_error);
+        EXPECT_EQ(pinned.size(), 8u);
+    }
     nanovdb::cuda::Buffer<int> buf(0, 8, nanovdb::cuda::noInit);
     cudaStream_t other = nullptr;
     ASSERT_EQ(cudaStreamCreate(&other), cudaSuccess);
@@ -415,7 +421,7 @@ TEST(TestBuffer, ResourceRefSharesTheUnderlyingResource)
 }
 
 /// @brief A resource without operator==, which 13.2 deprecates and 14.0
-///        rejects. Used only under the deprecated-interface suppression below.
+///        rejects. Constructed only under the deprecated-interface suppression below; trait probes elsewhere do not warn.
 struct NoEqualityResource : nanovdb::cuda::SyncFromAsync<NoEqualityResource>
 {
     static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
@@ -699,6 +705,12 @@ TEST(TestBuffer, ResizeDeprecatedOrderAcceptsBoolCount)
     nanovdb::cuda::Buffer<int> buf(cudaStream_t(0), 8, nanovdb::cuda::noInit);
     buf.resize(true, cudaStream_t(0)); // converted to size_t, as the old signature did
     EXPECT_EQ(1u, buf.size());
+    buf.resize({4}, cudaStream_t(0));   // a braced count, as the old size_t parameter accepted
+    EXPECT_EQ(4u, buf.size());
+    buf.resize(2.0, cudaStream_t(0));
+    EXPECT_EQ(2u, buf.size());
+    EXPECT_THROW(buf.resize(-1.5, cudaStream_t(0)), std::runtime_error);
+    EXPECT_EQ(2u, buf.size());
 }
 
 TEST(TestBuffer, ResourceRefWithoutResourceEqualityFallsBackToIdentity)

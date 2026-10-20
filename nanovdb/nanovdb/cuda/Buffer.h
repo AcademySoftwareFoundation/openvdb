@@ -200,7 +200,7 @@ public:
     ///        a synchronous resource frees immediately.
     ~Buffer()
     {
-        detail::checkResourceEquality<R>(); // sees through ResourceRef, so NanoVDB's internal refs are checked here
+        detail::checkResourceEquality<R>();
         this->destroy();
     }
 
@@ -264,11 +264,16 @@ public:
     /// @note Accepts every count the size_t parameter of the old signature
     ///       accepted, converted the same way. resize(0, 0) resolves to this
     ///       overload; resize(cudaStream_t(0), 0) is the stream-first spelling.
-    template<typename CountT, typename S = R,
+    /// @throw std::runtime_error if a floating-point @c count is negative or exceeds size_t
+    template<typename CountT = size_t, typename S = R,
              std::enable_if_t<std::is_convertible<CountT, size_t>::value && is_async_resource<S>::value, int> = 0>
     [[deprecated("use resize(stream, count)")]]
     void resize(CountT count, cudaStream_t stream)
     {
+        if constexpr (std::is_floating_point<CountT>::value) {
+            if (!(count >= CountT(0) && double(count) < 18446744073709551616.0))
+                throw std::runtime_error("Buffer::resize: count out of range");
+        }
         this->resize(stream, static_cast<size_t>(count));
     }
 
