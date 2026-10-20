@@ -989,7 +989,6 @@ TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
     //timer.stop();
 }//  mergeSplitDeviceGrids
 
-// make -j 4 testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*Cuda*" --gtest_break_on_failure
 TEST(TestNanoVDBCUDA, voxelSetsToDeviceGrids)
 {
     using BufferT = nanovdb::cuda::DeviceBuffer;
@@ -1007,6 +1006,7 @@ TEST(TestNanoVDBCUDA, voxelSetsToDeviceGrids)
     ASSERT_EQ(cudaSuccess, cudaFree(d_coords));
 }// voxelSetsToDeviceGrids
 
+// make -j 4 testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*Cuda*" --gtest_break_on_failure
 TEST(TestNanoVDBCUDA, CudaIndexGridToGrid_basic)
 {
     using BufferT = nanovdb::cuda::DeviceBuffer;

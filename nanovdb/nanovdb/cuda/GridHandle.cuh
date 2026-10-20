@@ -23,7 +23,7 @@
 #include <nanovdb/tools/cuda/GridChecksum.cuh>// for cuda::updateChecksum
 #include <nanovdb/GridHandle.h>
 
-#include <algorithm>// for std::copy_n and std::min in rewriteGridCounts
+#include <algorithm>// for std::copy_n and std::min in rewriteGridCounts, std::find in RetainedStreamOrdering
 #include <limits>// for the grid-count bound in cuda::mergeGridHandles
 #include <stdexcept>// for std::runtime_error
 #include <string>// for the grid index in chain-validation error messages
@@ -158,20 +158,36 @@ inline ScratchT makeMetaScratch(const BufferT& buf, uint64_t count, cudaStream_t
     else { (void)stream; return ScratchT(buf.resource(), count, noInit); }
 }
 
-/// @brief Orders @c stream after all work already issued on @c buf's
-///        retained stream, using @c event; a no-op for a buffer that retains
-///        no stream or retains @c stream itself.
+/// @brief Orders a stream after all work already issued on the retained
+///        streams of the buffers passed to after(): one wait per distinct
+///        retained stream, and no event at all when no wait is needed (a
+///        buffer that retains no stream, or retains the target stream).
 template<typename BufferT>
-inline void orderAfterRetainedStream(const BufferT& buf, cudaStream_t stream, cudaEvent_t event)
+class RetainedStreamOrdering
 {
-    if constexpr (BufferHasStream<BufferT>::value) {
-        if (buf.stream() == stream) return;
-        cudaCheck(cudaEventRecord(event, buf.stream()));
-        cudaCheck(cudaStreamWaitEvent(stream, event, 0));
-    } else {
-        (void)buf; (void)stream; (void)event;
+    cudaStream_t              mStream;
+    cudaEvent_t               mEvent = nullptr;
+    std::vector<cudaStream_t> mWaited;
+public:
+    explicit RetainedStreamOrdering(cudaStream_t stream) : mStream(stream) {}
+    RetainedStreamOrdering(const RetainedStreamOrdering&) = delete;
+    RetainedStreamOrdering& operator=(const RetainedStreamOrdering&) = delete;
+    ~RetainedStreamOrdering() { if (mEvent) cudaEventDestroy(mEvent); }
+
+    void after(const BufferT& buf)
+    {
+        if constexpr (BufferHasStream<BufferT>::value) {
+            const cudaStream_t s = buf.stream();
+            if (s == mStream || std::find(mWaited.begin(), mWaited.end(), s) != mWaited.end()) return;
+            if (!mEvent) cudaCheck(cudaEventCreateWithFlags(&mEvent, cudaEventDisableTiming));
+            cudaCheck(cudaEventRecord(mEvent, s));
+            cudaCheck(cudaStreamWaitEvent(mStream, mEvent, 0));
+            mWaited.push_back(s);
+        } else {
+            (void)buf;
+        }
     }
-}
+};
 
 /// @brief Up to Size grid headers addressed by one launch of
 ///        rewriteGridCountBatch. The pointers travel by value in kernel
@@ -329,10 +345,7 @@ splitGridHandles(const GridHandle<BufferT> &handle, cudaStream_t stream, const B
     if (gridCount == 0u) return handles;
     const auto &meta = detail::HandleFactory::meta(handle);
 
-    cudaEvent_t event;
-    cudaCheck(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
-    detail::orderAfterRetainedStream(handle.buffer(), stream, event);
-    cudaCheck(cudaEventDestroy(event));
+    detail::RetainedStreamOrdering<BufferT>(stream).after(handle.buffer());
 
     const int device = util::cuda::currentDevice();
     std::vector<BufferT> buffers;
@@ -393,13 +406,13 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, cudaStream_t strea
         }
     }
 
-    cudaEvent_t event;
-    cudaCheck(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
-    for (auto &h : handles) detail::orderAfterRetainedStream(h.buffer(), stream, event);
-    cudaCheck(cudaEventDestroy(event));
-
     if (meta.size() > std::numeric_limits<uint32_t>::max())
         throw std::runtime_error("cuda::mergeGridHandles: the merged handle would exceed the maximum grid count");
+
+    {
+        detail::RetainedStreamOrdering<BufferT> ordering(stream);
+        for (auto &h : handles) ordering.after(h.buffer());
+    }
     const uint32_t gridCount = static_cast<uint32_t>(meta.size());
     BufferT buffer = detail::createDeviceStorage<BufferT>(size, proto, util::cuda::currentDevice(), stream);
     std::vector<GridData*> dst;
