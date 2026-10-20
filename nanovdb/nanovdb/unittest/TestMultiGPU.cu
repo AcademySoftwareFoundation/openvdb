@@ -350,6 +350,9 @@ struct CountingResource : nanovdb::cuda::SyncFromAsync<CountingResource>
         if (p) ++deallocs;
         nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
     }
+    // state is inline, so only the same instance keeps one account
+    friend bool operator==(const CountingResource& a, const CountingResource& b) { return &a == &b; }
+    friend bool operator!=(const CountingResource& a, const CountingResource& b) { return !(a == b); }
 };
 
 /// @brief Tests that DistributedPointsToGrid routes its device-local allocations (CUB
