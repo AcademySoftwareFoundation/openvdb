@@ -550,14 +550,14 @@ TEST(TestNanoVDBMultiGPU, FewTiles_DistributedCudaPointsToGrid)
             voxels[i] = nanovdb::Coord(op(), op(), op());
     }
 
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
     nanovdb::cuda::DeviceMesh deviceMesh;
     nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
-    auto handle = converter.getHandle(voxels, voxelCount);
+    auto handle = converter.getHandle(voxels, voxelCount, BufferT());
 
     EXPECT_TRUE(handle.deviceData());
     EXPECT_TRUE(handle.deviceGrid<BuildT>());
-    handle.deviceDownload();
-    auto *grid = handle.grid<BuildT>();
+    auto *grid = handle.grid<BuildT>();// managed storage: the host reads the grid in place
     EXPECT_TRUE(grid);
     EXPECT_TRUE(grid->valueCount() > 0);
     EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
@@ -601,14 +601,14 @@ TEST(TestNanoVDBMultiGPU, ManyTiles_DistributedCudaPointsToGrid)
             voxels[i] = nanovdb::Coord(op(), op(), op());
     }
 
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
     nanovdb::cuda::DeviceMesh deviceMesh;
     nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
-    auto handle = converter.getHandle(voxels, voxelCount);
+    auto handle = converter.getHandle(voxels, voxelCount, BufferT());
 
     EXPECT_TRUE(handle.deviceData());
     EXPECT_TRUE(handle.deviceGrid<BuildT>());
-    handle.deviceDownload();
-    auto *grid = handle.grid<BuildT>();
+    auto *grid = handle.grid<BuildT>();// managed storage: the host reads the grid in place
     EXPECT_TRUE(grid);
     EXPECT_TRUE(grid->valueCount() > 0);
     EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());

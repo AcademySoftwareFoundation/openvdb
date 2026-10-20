@@ -1813,8 +1813,9 @@ template<typename BufT>
 nanovdb::GridHandle<nanovdb::HostBuffer> hostImage(nanovdb::GridHandle<BufT>& handle)
 {
     if constexpr (nanovdb::BufferTraits<BufT>::hasDeviceDual) {
-        handle.deviceDownload();
-        return handle.template copy<nanovdb::HostBuffer>();
+        auto host = nanovdb::HostBuffer::create(handle.bufferSize());
+        EXPECT_EQ(cudaSuccess, cudaMemcpy(host.data(), handle.deviceData(), handle.bufferSize(), cudaMemcpyDeviceToHost));
+        return nanovdb::GridHandle<nanovdb::HostBuffer>(std::move(host));
     } else {
         return nanovdb::cuda::copyTo<nanovdb::HostBuffer>(handle, cudaStream_t(0));
     }

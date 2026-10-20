@@ -37,9 +37,9 @@ void defineDeviceGridHandle(nb::module_& m)
              "n"_a = 0,
              nb::rv_policy::reference_internal)
         .def(
-            "deviceUpload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceUpload(nullptr, sync); }, "sync"_a = true)
+            "deviceUpload", [](GridHandle<BufferT>& handle, bool sync) { handle.buffer().deviceUpload(cudaStream_t(0), sync); }, "sync"_a = true)
         .def(
-            "deviceDownload", [](GridHandle<BufferT>& handle, bool sync) { handle.deviceDownload(nullptr, sync); }, "sync"_a = true);
+            "deviceDownload", [](GridHandle<BufferT>& handle, bool sync) { handle.buffer().deviceDownload(cudaStream_t(0), sync); }, "sync"_a = true);
 }
 
 } // namespace pynanovdb

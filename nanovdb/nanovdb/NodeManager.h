@@ -169,6 +169,7 @@ public:
     ///
     /// @note This method is only available if the buffer supports devices
     template<typename U = BufferT>
+    [[deprecated("node-manager storage is moving to cuda::Buffer<std::byte>: build the node manager on the device with cuda::createNodeManager")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
     deviceUpload(void* deviceGrid, void* stream = nullptr, bool sync = true)
     {
@@ -184,6 +185,7 @@ public:
     ///
     /// @note This method is only available if the buffer supports devices
     template<typename U = BufferT>
+    [[deprecated("node-manager storage is moving to cuda::Buffer<std::byte>: build the node manager on the host with createNodeManager")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
     deviceDownload(void* stream = nullptr, bool sync = true)
     {

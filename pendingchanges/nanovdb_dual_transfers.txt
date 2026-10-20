@@ -1,0 +1,4 @@
+NanoVDB:
+
+  API Changes:
+  - GridHandle::deviceUpload, GridHandle::deviceDownload and GridHandle::deviceData(int device), and NodeManagerHandle::deviceUpload and NodeManagerHandle::deviceDownload, are deprecated, to be removed together with the dual-space buffers. In 14.0 the GPU tools build into GridHandle<cuda::Buffer<std::byte>> by default, which holds the grids on the device only, so code that relies on the current default buffer and downloads or uploads the grids stops compiling; these warnings reach that code even when it never names a buffer type. Use cuda::copyTo to move a handle between host and device storage, build node managers with cuda::createNodeManager on the device, and use one device handle per GPU (or a cuda::Buffer<std::byte, cuda::ManagedResource>) in place of per-device dual buffers.

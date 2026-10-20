@@ -231,12 +231,14 @@ public:
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, const void*>::type
     deviceData() const { return mBuffer.deviceData(); }
     template<typename U = BufferT>
+    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: use one device handle per GPU, or a cuda::Buffer<std::byte, cuda::ManagedResource>")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, const void*>::type
     deviceData(int device) const { return mBuffer.deviceData(device); }
     template<typename U = BufferT>
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void*>::type
     deviceData() { return mBuffer.deviceData(); }
     template<typename U = BufferT>
+    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: use one device handle per GPU, or a cuda::Buffer<std::byte, cuda::ManagedResource>")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void*>::type
     deviceData(int device) { return mBuffer.deviceData(device); }
 
@@ -314,6 +316,7 @@ public:
     /// @brief Upload the grid to the device, e.g. from CPU to GPU
     /// @note This method is only available if the buffer supports devices
     template<typename U = BufferT>
+    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: build a host handle and cuda::copyTo a device handle (cuda/HandleStorage.h)")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
     deviceUpload(void* stream, bool sync = true) { mBuffer.deviceUpload(stream, sync); }
 
@@ -322,16 +325,19 @@ public:
     /// @param stream cuda stream
     /// @param sync if false the memory copy is asynchronous
     template<typename U = BufferT>
+    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: build a host handle and cuda::copyTo a device handle (cuda/HandleStorage.h)")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
     deviceUpload(int device = 0, void* stream = nullptr, bool sync = true) { mBuffer.deviceUpload(device, stream, sync); }
 
     /// @brief Download the grid to from the device, e.g. from GPU to CPU
     /// @note This method is only available if the buffer supports devices
     template<typename U = BufferT>
+    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: cuda::copyTo a host handle to read the grids on the host (cuda/HandleStorage.h)")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
     deviceDownload(void* stream, bool sync = true) { mBuffer.deviceDownload(stream, sync); }
 
     template<typename U = BufferT>
+    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: cuda::copyTo a host handle to read the grids on the host (cuda/HandleStorage.h)")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
     deviceDownload(int device = 0, void* stream = nullptr, bool sync = true) { mBuffer.deviceDownload(device, stream, sync); }
 

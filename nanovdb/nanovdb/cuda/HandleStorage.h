@@ -172,8 +172,8 @@ struct HandleFactory
 ///        handles and host-readable handles (HostBuffer or a host-accessible
 ///        single-space buffer such as a pinned-resource cuda::Buffer).
 /// @tparam DstBufferT destination buffer type (specify explicitly)
-/// @param src the handle to copy; must not be dual-space (use
-///        deviceUpload/deviceDownload on those)
+/// @param src the handle to copy; must not use a deprecated dual-space
+///        buffer
 /// @param stream stream the copy is issued on; a device destination buffer
 ///        with a stream-ordered resource retains it
 /// @warning Passing a stream other than the source buffer's retained stream
@@ -210,7 +210,7 @@ inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, cudaStre
     constexpr bool srcDev = BufferHasDeviceSingle<SrcBufferT>::value;
     constexpr bool dstDev = BufferHasDeviceSingle<DstBufferT>::value;
     static_assert(!BufferTraits<SrcBufferT>::hasDeviceDual && !BufferTraits<DstBufferT>::hasDeviceDual,
-                  "cuda::copyTo does not support dual-space buffers: use deviceUpload/deviceDownload on the handle");
+                  "cuda::copyTo does not support the deprecated dual-space buffers: use cuda::Buffer<std::byte> for device handles");
     static_assert(srcDev || dstDev,
                   "cuda::copyTo is for cross-space transfers involving a device buffer: use GridHandle::copy for host-to-host");
     const uint64_t bytes = src.bufferSize();
