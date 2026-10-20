@@ -23,12 +23,12 @@
 #include <nanovdb/tools/cuda/GridChecksum.cuh>// for cuda::updateChecksum
 #include <nanovdb/GridHandle.h>
 
-#include <algorithm>// for std::copy_n and std::min in rewriteGridCounts, std::find in RetainedStreamOrdering
+#include <algorithm>// for std::copy_n and std::min in rewriteGridCounts
 #include <limits>// for the grid-count bound in cuda::mergeGridHandles
 #include <stdexcept>// for std::runtime_error
 #include <string>// for the grid index in chain-validation error messages
 #include <type_traits>// for std::is_default_constructible in cuda::mergeGridHandles
-#include <utility>// for std::move
+#include <utility>// for std::move, std::pair
 #include <vector>// for the per-grid destinations and metadata
 
 namespace nanovdb {
@@ -158,31 +158,58 @@ inline ScratchT makeMetaScratch(const BufferT& buf, uint64_t count, cudaStream_t
     else { (void)stream; return ScratchT(buf.resource(), count, noInit); }
 }
 
+/// @brief The device a retained stream belongs to: queried from the stream
+///        where CUDA supports it, otherwise the device holding @c data
+///        (the current device for unregistered host memory).
+inline int retainedStreamDevice(cudaStream_t stream, const void* data)
+{
+    const int current = util::cuda::currentDevice();
+#if CUDART_VERSION >= 12080
+    if (stream != 0 && stream != cudaStreamLegacy && stream != cudaStreamPerThread) {
+        int device = current;
+        cudaCheck(cudaStreamGetDevice(stream, &device));
+        return device;
+    }
+#endif
+    cudaPointerAttributes attr;
+    if (cudaPointerGetAttributes(&attr, data) != cudaSuccess) {
+        (void)cudaGetLastError();
+        return current;
+    }
+    return attr.device >= 0 ? attr.device : current;
+}
+
 /// @brief Orders a stream after all work already issued on the retained
-///        streams of the buffers passed to after(): one wait per distinct
-///        retained stream, and no event at all when no wait is needed (a
-///        buffer that retains no stream, or retains the target stream).
+///        streams of the buffers passed to after(), once per distinct
+///        (device, retained stream). Empty buffers are skipped, and so is a
+///        buffer that retains the target stream on the current device.
 template<typename BufferT>
 class RetainedStreamOrdering
 {
-    cudaStream_t              mStream;
-    cudaEvent_t               mEvent = nullptr;
-    std::vector<cudaStream_t> mWaited;
+    cudaStream_t                             mStream;
+    std::vector<std::pair<int, cudaStream_t>> mWaited;
 public:
     explicit RetainedStreamOrdering(cudaStream_t stream) : mStream(stream) {}
-    RetainedStreamOrdering(const RetainedStreamOrdering&) = delete;
-    RetainedStreamOrdering& operator=(const RetainedStreamOrdering&) = delete;
-    ~RetainedStreamOrdering() { if (mEvent) cudaEventDestroy(mEvent); }
 
     void after(const BufferT& buf)
     {
         if constexpr (BufferHasStream<BufferT>::value) {
+            if (buf.size() == 0) return;
             const cudaStream_t s = buf.stream();
-            if (s == mStream || std::find(mWaited.begin(), mWaited.end(), s) != mWaited.end()) return;
-            if (!mEvent) cudaCheck(cudaEventCreateWithFlags(&mEvent, cudaEventDisableTiming));
-            cudaCheck(cudaEventRecord(mEvent, s));
-            cudaCheck(cudaStreamWaitEvent(mStream, mEvent, 0));
-            mWaited.push_back(s);
+            const int current = util::cuda::currentDevice();
+            const int device = retainedStreamDevice(s, buf.data());
+            if (device == current && s == mStream) return;
+            for (const auto &w : mWaited) if (w.first == device && w.second == s) return;
+            // The event must be created and recorded on the retained stream's
+            // device; cudaStreamWaitEvent accepts an event from any device.
+            cudaEvent_t event;
+            if (device != current) cudaCheck(cudaSetDevice(device));
+            cudaCheck(cudaEventCreateWithFlags(&event, cudaEventDisableTiming));
+            cudaCheck(cudaEventRecord(event, s));
+            if (device != current) cudaCheck(cudaSetDevice(current));
+            cudaCheck(cudaStreamWaitEvent(mStream, event, 0));
+            cudaCheck(cudaEventDestroy(event));
+            mWaited.emplace_back(device, s);
         } else {
             (void)buf;
         }
@@ -328,6 +355,8 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, const BufferT* oth
 ///          resource) is not ordered by this call: work that produced its
 ///          contents on another stream must be ordered before @a stream by
 ///          the caller, e.g. with cudaStreamWaitEvent or a synchronization.
+/// @warning Before CUDA 12.8 a source's retained stream is assumed to belong
+///          to the device that holds its storage.
 /// @param proto optional buffer whose resource allocates each output buffer;
 ///        without it the resource is default-constructed
 /// @return one handle per grid, each with grid index 0 and grid count 1
@@ -377,6 +406,8 @@ splitGridHandles(const GridHandle<BufferT> &handle, cudaStream_t stream, const B
 ///          resource) is not ordered by this call: work that produced its
 ///          contents on another stream must be ordered before @a stream by
 ///          the caller, e.g. with cudaStreamWaitEvent or a synchronization.
+/// @warning Before CUDA 12.8 a source's retained stream is assumed to belong
+///          to the device that holds its storage.
 /// @param proto optional buffer whose resource allocates the output buffer;
 ///        without it the resource is default-constructed
 /// @return a handle whose grids carry their merged index and total count

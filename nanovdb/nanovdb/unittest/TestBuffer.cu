@@ -1388,6 +1388,43 @@ TEST(TestBuffer, SingleSpaceMergeSplitGridHandles)
     ASSERT_EQ(cudaSuccess, cudaStreamDestroy(srcStream));
 }
 
+TEST(TestBuffer, SingleSpaceMergeSkipsEmptyHandles)
+{
+    // Empty sources contribute no grids and are not waited on: a reset handle
+    // that still retains a stream destroyed since, a moved-from handle that
+    // retains a live stream, and a default handle. A non-empty source on
+    // another live stream still gets its wait.
+    using BufT = nanovdb::cuda::Buffer<std::byte>;
+    auto host = nanovdb::tools::createLevelSetSphere<float>(10.0);
+    cudaStream_t gone, live, mergeStream;
+    ASSERT_EQ(cudaSuccess, cudaStreamCreateWithFlags(&gone, cudaStreamNonBlocking));
+    ASSERT_EQ(cudaSuccess, cudaStreamCreateWithFlags(&live, cudaStreamNonBlocking));
+    ASSERT_EQ(cudaSuccess, cudaStreamCreateWithFlags(&mergeStream, cudaStreamNonBlocking));
+    std::vector<nanovdb::GridHandle<BufT>> sources;
+    sources.push_back(nanovdb::cuda::copyTo<BufT>(host, gone));
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(gone));
+    sources.back().reset();
+    EXPECT_EQ(gone, sources.back().buffer().stream());
+    ASSERT_EQ(cudaSuccess, cudaStreamDestroy(gone));
+    auto movedFrom = nanovdb::cuda::copyTo<BufT>(host, live);
+    auto source = std::move(movedFrom);
+    sources.push_back(std::move(movedFrom));
+    sources.emplace_back();
+    sources.push_back(std::move(source));// non-empty, on live
+
+    auto merged = nanovdb::cuda::mergeGridHandles<BufT, std::vector>(sources, mergeStream);
+    ASSERT_EQ(1u, merged.gridCount());
+    auto mergedHost = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(merged, mergeStream);
+    EXPECT_EQ(0, std::memcmp(host.data(), mergedHost.data(), host.bufferSize()));
+    ASSERT_EQ(cudaSuccess, cudaGetLastError());
+    sources.clear();
+    merged.reset();
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(live));
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(mergeStream));
+    ASSERT_EQ(cudaSuccess, cudaStreamDestroy(live));
+    ASSERT_EQ(cudaSuccess, cudaStreamDestroy(mergeStream));
+}
+
 TEST(TestBuffer, SingleSpaceMergeSplitSynchronousResource)
 {
     // A synchronous resource retains no stream, so the results are complete
