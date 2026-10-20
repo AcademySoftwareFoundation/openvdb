@@ -29,6 +29,7 @@
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/cuda/HandleStorage.h>
+#include <nanovdb/cuda/GridHandle.cuh> // for merging the per-set grids in the point-set overloads
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
@@ -855,7 +856,9 @@ inline BufferT PointsToGrid<BuildT, ResourceT>::getBuffer(const PtrT, size_t poi
     mData.leaf  = mData.lower + NanoLower<BuildT>::memUsage()*mData.nodeCount[1]; // lower internal nodes ends and leaf nodes begin
     mData.meta  = mData.leaf  + NanoLeaf<BuildT>::DataType::memUsage()*mData.nodeCount[0];// leaf nodes end and blind meta data begins
     mData.blind = mData.meta  + sizeof(GridBlindMetaData)*int( mPointType!=PointType::Disable ); // meta data ends and blind data begins
-    mData.size  = mData.blind + pointCount*sizeofPoint();// end of buffer
+    // padded like GridBlindMetaData::blindDataSize, so the grid size stays a multiple of
+    // NANOVDB_DATA_ALIGNMENT and the next grid in a multi-grid buffer starts aligned
+    mData.size  = mData.blind + math::AlignUp<NANOVDB_DATA_ALIGNMENT>(pointCount*sizeofPoint());// end of buffer
 
     int device = 0;
     cudaGetDevice(&device);
@@ -1416,12 +1419,41 @@ inline void PointsToGrid<BuildT, ResourceT>::processBBox()
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+namespace detail {
+
+/// @brief Merges the per-set handles built by the point-set overloads,
+///        allocating the result through @c buffer for either buffer family.
+template<typename BufferT>
+GridHandle<BufferT> mergeBuiltHandles(const std::vector<GridHandle<BufferT>> &handles, const BufferT &buffer, cudaStream_t stream)
+{
+    static_assert(BufferHasDeviceSingle<BufferT>::value || BufferTraits<BufferT>::hasDeviceDual,
+                  "the point-set overloads build into a device buffer");
+    // explicit template arguments: MSVC cannot deduce the template-template VectorT
+    if constexpr (BufferHasDeviceSingle<BufferT>::value) return nanovdb::cuda::mergeGridHandles<BufferT, std::vector>(handles, stream, &buffer);
+    else return nanovdb::cuda::detail::mergeDualGridHandles<BufferT, std::vector>(handles, &buffer, stream);
+}
+
+}// namespace detail
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 template<typename BuildT, typename PtrT, typename BufferT, typename ResourceT>
 GridHandle<BufferT>// Grid<BuildT>
 voxelsToGrid(const PtrT d_ijk, size_t voxelCount, double voxelSize, const BufferT &buffer, cudaStream_t stream)
 {
     PointsToGrid<BuildT, ResourceT> converter(voxelSize, Vec3d(0.0), stream);
     return converter.getHandle(d_ijk, voxelCount, buffer);
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename PtrT, typename BufferT, typename ResourceT>
+GridHandle<BufferT>// Grid<Point> with PointType coordinates as blind data
+pointsToGrid(const PtrT d_xyz, int pointCount, double voxelSize, PointType type, const BufferT &buffer, cudaStream_t stream)
+{
+    PointsToGrid<Point, ResourceT> converter(voxelSize, Vec3d(0.0), stream);
+    converter.setPointType(type);
+    return converter.getHandle(d_xyz, pointCount, buffer);
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1441,9 +1473,14 @@ template<typename BuildT, typename PtrT, typename BufferT, typename ResourceT>
 GridHandle<BufferT>
 pointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> vec, const BufferT &buffer, cudaStream_t stream)
 {
+    static_assert(util::is_same<BuildT, Point>::value, "pointsToGrid over a point set builds NanoGrid<Point>");
     std::vector<GridHandle<BufferT>> handles;
-    for (auto &p : vec) handles.push_back(pointsToGrid<BuildT, PtrT, BufferT, ResourceT>(std::get<0>(p), std::get<1>(p), std::get<2>(p), std::get<3>(p), buffer, stream));
-    return mergeDeviceGrids(handles, stream);
+    for (auto &p : vec) {
+        PointsToGrid<Point, ResourceT> converter(std::get<2>(p), Vec3d(0.0), stream);
+        converter.setPointType(std::get<3>(p));
+        handles.push_back(converter.getHandle(std::get<0>(p), std::get<1>(p), buffer));
+    }
+    return detail::mergeBuiltHandles(handles, buffer, stream);
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1454,7 +1491,7 @@ voxelsToGrid(std::vector<std::tuple<const PtrT,size_t,double>> vec, const Buffer
 {
     std::vector<GridHandle<BufferT>> handles;
     for (auto &p : vec) handles.push_back(voxelsToGrid<BuildT, PtrT, BufferT, ResourceT>(std::get<0>(p), std::get<1>(p), std::get<2>(p), buffer, stream));
-    return mergeDeviceGrids(handles, stream);
+    return detail::mergeBuiltHandles(handles, buffer, stream);
 }
 
 }// namespace tools::cuda ======================================================================================================================================

@@ -16,6 +16,7 @@
 #define NANOVDB_TOOLS_GRIDSTATS_H_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>
+#include <nanovdb/math/HalfLite.h>
 
 #ifdef NANOVDB_USE_TBB
 #include <memory>
@@ -226,6 +227,72 @@ public:
         node.setMax(this->max());
     }
 }; // Extrema<T, 1>
+
+/// @brief Template specialization of Extrema on scalar Half precision value types, i.e. rank = 0
+template<>
+class Extrema<nanovdb::Half, 0>
+{
+    using ValueT = nanovdb::Half;
+protected:
+    ValueT mMin, mMax;
+
+public:
+    using ValueType = ValueT;
+    __hostdev__ Extrema()
+    {
+        mMin.raw = 0x7BFF;
+        mMax.raw = 0xFBFF;
+    }
+    __hostdev__ Extrema(const ValueT& v)
+        : mMin(v)
+        , mMax(v)
+    {
+    }
+    __hostdev__ Extrema(const ValueT& a, const ValueT& b)
+        : mMin(a)
+        , mMax(b)
+    {
+    }
+    __hostdev__ Extrema& min(const ValueT& v)
+    {
+        if (math::HalfToFloat(v.raw) < math::HalfToFloat(mMin.raw)) mMin = v;
+        return *this;
+    }
+    __hostdev__ Extrema& max(const ValueT& v)
+    {
+        if (math::HalfToFloat(v.raw) > math::HalfToFloat(mMax.raw)) mMax = v;
+        return *this;
+    }
+    __hostdev__ Extrema& add(const ValueT& v)
+    {
+        this->min(v);
+        this->max(v);
+        return *this;
+    }
+    __hostdev__ Extrema& add(const ValueT& v, uint64_t) { return this->add(v); }
+    __hostdev__ Extrema& add(const Extrema& other)
+    {
+        this->min(other.mMin);
+        this->max(other.mMax);
+        return *this;
+    }
+    __hostdev__ const ValueT& min() const { return mMin; }
+    __hostdev__ const ValueT& max() const { return mMax; }
+    __hostdev__ operator bool() const { return math::HalfToFloat(mMin.raw) <= math::HalfToFloat(mMax.raw); }
+    __hostdev__ static constexpr bool hasMinMax() { return !util::is_same<bool, ValueT>::value; }
+    __hostdev__ static constexpr bool hasAverage() { return false; }
+    __hostdev__ static constexpr bool hasStdDeviation() { return false; }
+    __hostdev__ static constexpr bool hasStats() { return !util::is_same<bool, ValueT>::value; }
+    __hostdev__ static constexpr size_t size() { return 0; }
+
+    template <typename NodeT>
+    __hostdev__ void setStats(NodeT &node) const
+    {
+        node.setMin(this->min());
+        node.setMax(this->max());
+    }
+}; // Extrema<T, 0>
+
 
 //================================================================================================
 
@@ -441,6 +508,119 @@ public:
     }
 }; // end Stats<T, 1>
 
+/// @brief This class computes statistics (minimum value, maximum
+/// value, mean, variance and standard deviation) of a population
+/// of half precision floating-point values.
+///
+/// @details variance = Mean[ (X-Mean[X])^2 ] = Mean[X^2] - Mean[X]^2,
+///          standard deviation = sqrt(variance)
+///
+/// @note This class employs incremental computation and double precision.
+template<>
+class Stats<nanovdb::Half, 0> : public Extrema<nanovdb::Half, 0>
+{
+    using ValueT = nanovdb::Half;
+protected:
+    using BaseT = Extrema<ValueT, 0>;
+    using RealT = double; // for accuracy the internal precission must be 64 bit floats
+    size_t mSize;
+    double mAvg, mAux;
+
+public:
+    using ValueType = ValueT;
+    __hostdev__ double raw_to_double(const ValueT& v)
+    {
+        float vf = math::HalfToFloat(v.raw);
+        return double(vf);
+    }
+    __hostdev__ Stats()
+        : BaseT()
+        , mSize(0)
+        , mAvg(0.0)
+        , mAux(0.0)
+    {
+    }
+    __hostdev__ Stats(const ValueT& val)
+        : BaseT(val)
+        , mSize(1)
+        , mAvg(RealT(raw_to_double(val)))
+        , mAux(0.0)
+    {
+    }
+    /// @brief Add a single sample
+    __hostdev__ Stats& add(const ValueT& val)
+    {
+        BaseT::add(val);
+        mSize += 1;
+        const double delta = raw_to_double(val) - mAvg;
+        mAvg += delta / double(mSize);
+        mAux += delta * (raw_to_double(val) - mAvg);
+        return *this;
+    }
+    /// @brief Add @a n samples with constant value @a val.
+    __hostdev__ Stats& add(const ValueT& val, uint64_t n)
+    {
+        const double denom = 1.0 / double(mSize + n);
+        const double delta = raw_to_double(val) - mAvg;
+        mAvg += denom * delta * double(n);
+        mAux += denom * delta * delta * double(mSize) * double(n);
+        BaseT::add(val);
+        mSize += n;
+        return *this;
+    }
+
+    /// Add the samples from the other Stats instance.
+    __hostdev__ Stats& add(const Stats& other)
+    {
+        if (other.mSize > 0) {
+            const double denom = 1.0 / double(mSize + other.mSize);
+            const double delta = other.mAvg - mAvg;
+            mAvg += denom * delta * double(other.mSize);
+            mAux += other.mAux + denom * delta * delta * double(mSize) * double(other.mSize);
+            BaseT::add(other);
+            mSize += other.mSize;
+        }
+        return *this;
+    }
+
+    __hostdev__ static constexpr bool hasMinMax() { return !util::is_same<bool, ValueT>::value; }
+    __hostdev__ static constexpr bool hasAverage() { return !util::is_same<bool, ValueT>::value; }
+    __hostdev__ static constexpr bool hasStdDeviation() { return !util::is_same<bool, ValueT>::value; }
+    __hostdev__ static constexpr bool hasStats() { return !util::is_same<bool, ValueT>::value; }
+
+    __hostdev__ size_t size() const { return mSize; }
+
+    //@{
+    /// Return the  arithmetic mean, i.e. average, value.
+    __hostdev__ double avg() const { return mAvg; }
+    __hostdev__ double mean() const { return mAvg; }
+    //@}
+
+    //@{
+    /// @brief Return the population variance.
+    ///
+    /// @note The unbiased sample variance = population variance * num/(num-1)
+    __hostdev__ double var() const { return mSize < 2 ? 0.0 : mAux / double(mSize); }
+    __hostdev__ double variance() const { return this->var(); }
+    //@}
+
+    //@{
+    /// @brief Return the standard deviation (=Sqrt(variance)) as
+    ///        defined from the (biased) population variance.
+    __hostdev__ double std() const { return sqrt(this->var()); }
+    __hostdev__ double stdDev() const { return this->std(); }
+    //@}
+
+    template <typename NodeT>
+    __hostdev__ void setStats(NodeT &node) const
+    {
+        node.setMin(this->min());
+        node.setMax(this->max());
+        node.setAvg(this->avg());
+        node.setDev(this->std());
+    }
+}; // end Stats<T, 0>
+
 /// @brief No-op Stats class
 template<typename ValueT>
 struct NoopStats
@@ -504,7 +684,7 @@ class GridStats
 public:
     GridStats() = default;
 
-    void update(GridT& grid, ValueT delta = ValueT(0));
+    void update(GridT& grid, ValueT delta = ValueT());
 
 }; // GridStats
 

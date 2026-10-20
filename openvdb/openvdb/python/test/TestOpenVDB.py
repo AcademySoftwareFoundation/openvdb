@@ -242,6 +242,35 @@ class TestOpenVDB(unittest.TestCase):
         self.assertEqual(0, meta["file_voxel_count"])
 
 
+    def testReadGrids(self):
+        import tempfile
+        names = ['density', 'density', 'density[1]', 'other', '', 'pair', 'pair']
+        grids = []
+        for index, name in enumerate(names):
+            grid = openvdb.FloatGrid()
+            grid.name = name
+            grid['index'] = index
+            grid.fill((0, 0, 0), (1, 1, 1), float(index), active=True)
+            grids.append(grid)
+
+        with tempfile.TemporaryDirectory() as directory:
+            filename = os.path.join(directory, 'testReadGrids.vdb')
+            openvdb.write(filename, grids)
+
+            def indices(name):
+                return [grid.metadata['index'] for grid in openvdb.readGrids(filename, name)]
+
+            self.assertEqual(indices('density'), [0, 1])
+            self.assertEqual(indices('density[1]'), [2])
+            self.assertEqual(indices('other'), [3])
+            self.assertEqual(indices(''), [4])
+            self.assertEqual(indices('pair'), [5, 6])
+            self.assertEqual(indices('missing'), [])
+
+            grid = openvdb.readGrids(filename, 'other')[0]
+            self.assertEqual(grid.getAccessor().getValue((0, 0, 0)), 3.0)
+
+
     def testGridFill(self):
         grid = openvdb.FloatGrid()
         acc = grid.getAccessor()

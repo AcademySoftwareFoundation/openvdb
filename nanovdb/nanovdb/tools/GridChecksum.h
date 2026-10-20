@@ -404,7 +404,7 @@ void updateChecksum(NanoGrid<ValueT> &grid, CheckMode mode){updateChecksum(&grid
 /// @param data Pointer to grid data
 /// @param gridIndex New value of the index
 /// @param gridCount New value of the grid count
-inline void updateGridCount(GridData *data, uint32_t gridIndex, uint32_t gridCount)
+inline __hostdev__ void updateGridCount(GridData *data, uint32_t gridIndex, uint32_t gridCount)
 {
     NANOVDB_ASSERT(data && gridIndex < gridCount);
     if (data->mGridIndex != gridIndex || data->mGridCount != gridCount) {

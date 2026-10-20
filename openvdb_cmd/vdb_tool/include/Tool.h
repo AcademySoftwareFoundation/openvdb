@@ -146,11 +146,11 @@ public:
     Tool& operator=(Tool&&) = delete;      ///< Move assignment is disabled.
 
     /// @brief Execute every action that was registered during construction, in order.
-    /// @note  On a fatal exception inside an action this method writes the message to
-    ///        std::cerr and calls std::exit(EXIT_FAILURE) rather than propagating.
-    void run();
+    /// @return true if every action succeeded, false if any action was skipped after an error.
+    /// @throw std::exception on a fatal action error (including control-flow failures).
+    bool run();
 
-    /// @brief Redirect std::clog/std::cerr/std::cout to a log file for the remainder of this Tool's lifetime.
+    /// @brief Redirect std::clog/std::cerr to a log file, leaving binary stdout untouched.
     /// @param logFile Path of the log file. If empty, a timestamped name is generated.
     /// @param append  If true, append to the existing file; otherwise truncate it (default).
     /// @param tee     If true (default), output is also written to the original terminal stream so the
@@ -160,18 +160,15 @@ public:
     /// @note Subsequent calls are no-ops while a redirection is already active.
     void startLog(std::string logFile, bool append = false, bool tee = true);
 
-    /// @brief Restore std::clog/std::cerr/std::cout to their original buffers and close the log file (if any).
+    /// @brief Restore diagnostic streams to their original buffers and close the log file (if any).
     void endLog() {
       if (mOldClogBuffer) std::clog.rdbuf(mOldClogBuffer);
       if (mOldCerrBuffer) std::cerr.rdbuf(mOldCerrBuffer);
-      if (mOldCoutBuffer) std::cout.rdbuf(mOldCoutBuffer);
       if (mLogFile.is_open()) mLogFile.close();
       mOldClogBuffer = nullptr;
       mOldCerrBuffer = nullptr;
-      mOldCoutBuffer = nullptr;
       mClogTee.reset();
       mCerrTee.reset();
-      mCoutTee.reset();
     }
 
     /// @brief Print a summary of the current VDB-grid and Geometry stacks to @a os.
@@ -192,7 +189,7 @@ public:
 private:
 
     static const int sMajor = 10; ///< Major version: incremented on incompatible option/file changes.
-    static const int sMinor =  8; ///< Minor version: incremented on backwards-compatible new features.
+    static const int sMinor =  9; ///< Minor version: incremented on backwards-compatible new features.
     static const int sPatch =  0; ///< Patch version: incremented on backwards-compatible bug fixes.
 
     using GridT   = FloatGrid;                                       ///< Scalar grid type used by most level-set operations.
@@ -210,10 +207,8 @@ private:
     std::ofstream            mLogFile;        ///< Backing file used by startLog/endLog when active.
     std::streambuf          *mOldClogBuffer;  ///< Cached std::clog buffer for restoring after logging.
     std::streambuf          *mOldCerrBuffer;  ///< Cached std::cerr buffer for restoring after logging.
-    std::streambuf          *mOldCoutBuffer;  ///< Cached std::cout buffer for restoring after logging.
     std::unique_ptr<TeeBuf>  mClogTee;        ///< Tee streambuf for std::clog (terminal + log file) when -log tee=true.
     std::unique_ptr<TeeBuf>  mCerrTee;        ///< Tee streambuf for std::cerr.
-    std::unique_ptr<TeeBuf>  mCoutTee;        ///< Tee streambuf for std::cout.
 
     /// @brief Delete all queued Geometry, VDB grids, and local variables.
     void clear();
@@ -402,10 +397,10 @@ private:
 
     /// @brief Return an iterator to the VDB grid at stack age @a age (0 = most recent).
     /// @throw std::invalid_argument if @a age exceeds the current stack depth.
-    inline std::list<GridBase::Ptr>::const_reverse_iterator getGrid(size_t age) const;
+    inline auto getGrid(size_t age) const;
     /// @brief Return an iterator to the Geometry at stack age @a age (0 = most recent).
     /// @throw std::invalid_argument if @a age exceeds the current stack depth.
-    inline std::list<Geometry::Ptr>::const_reverse_iterator getGeom(size_t age) const;
+    inline auto getGeom(size_t age) const;
 
     /// @brief Translate one "vdb"/"geo" option value, replacing any non-numeric (name)
     ///        token with the stack age of the entry carrying that exact name.
@@ -456,7 +451,6 @@ inline Tool::Tool(int argc, char *argv[])
     , mLogFile()
     , mOldClogBuffer(nullptr)
     , mOldCerrBuffer(nullptr)
-    , mOldCoutBuffer(nullptr)
 {
     openvdb::initialize();
     this->init();// fast: less than 1 ms
@@ -496,12 +490,10 @@ inline void Tool::startLog(std::string logFile, bool append, bool tee)
     // block buffer to flush. The help text recommends this workflow.
     mLogFile.setf(std::ios::unitbuf);
 
-    // Redirect all three text streams so warnings/errors (cerr) and any
-    // stdout-bound output also land in the log — not just clog.
+    // Only diagnostics belong in the log. stdout carries binary grid data.
     mOldClogBuffer = std::clog.rdbuf();
     mOldCerrBuffer = std::cerr.rdbuf();
-    mOldCoutBuffer = std::cout.rdbuf();
-    if (mOldClogBuffer == nullptr || mOldCerrBuffer == nullptr || mOldCoutBuffer == nullptr) {
+    if (mOldClogBuffer == nullptr || mOldCerrBuffer == nullptr) {
         throw std::invalid_argument("startLog: failed to cache standard stream buffers");
     }
     if (tee) {
@@ -509,15 +501,12 @@ inline void Tool::startLog(std::string logFile, bool append, bool tee)
         // the user keeps live console feedback while the log accumulates.
         mClogTee = std::make_unique<TeeBuf>(mOldClogBuffer, mLogFile.rdbuf());
         mCerrTee = std::make_unique<TeeBuf>(mOldCerrBuffer, mLogFile.rdbuf());
-        mCoutTee = std::make_unique<TeeBuf>(mOldCoutBuffer, mLogFile.rdbuf());
         std::clog.rdbuf(mClogTee.get());
         std::cerr.rdbuf(mCerrTee.get());
-        std::cout.rdbuf(mCoutTee.get());
     } else {
-        // Exclusive log mode (tee=false): nothing goes to the terminal.
+        // Exclusive log mode (tee=false): diagnostics only go to the log.
         std::clog.rdbuf(mLogFile.rdbuf());
         std::cerr.rdbuf(mLogFile.rdbuf());
-        std::cout.rdbuf(mLogFile.rdbuf());
     }
 
     // Self-describing log header — timestamp, vdb_tool version, and the full
@@ -534,7 +523,7 @@ inline void Tool::startLog(std::string logFile, bool append, bool tee)
 
 // ==============================================================================================================
 
-inline std::list<GridBase::Ptr>::const_reverse_iterator Tool::getGrid(size_t age) const
+inline auto Tool::getGrid(size_t age) const
 {
     if (age>=mGrid.size()) {
       throw std::invalid_argument("-"+mParser.getAction().names[0]+" called getGrid("+std::to_string(age)+"), but grid count = "+std::to_string(mGrid.size()));
@@ -546,7 +535,7 @@ inline std::list<GridBase::Ptr>::const_reverse_iterator Tool::getGrid(size_t age
 
 // ==============================================================================================================
 
-inline std::list<Geometry::Ptr>::const_reverse_iterator Tool::getGeom(size_t age) const
+inline auto Tool::getGeom(size_t age) const
 {
     if (age>=mGeom.size()) {
       throw std::invalid_argument("-"+mParser.getAction().names[0]+" called getGeom("+std::to_string(age)+"), but geometry count = "+std::to_string(mGeom.size()));
@@ -609,14 +598,16 @@ inline std::string Tool::resolveStackOption(const std::string &optName, const st
 
 // ==============================================================================================================
 
-inline void Tool::run()
+inline bool Tool::run()
 {
     if (mParser.verbose>1) this->print_args();
     try {
-        mParser.run();
+        return mParser.run();
     } catch (const std::exception& e) {
-        std::cerr << "Fatal error in Tool::run: " << e.what() << std::endl;
-        std::exit(EXIT_FAILURE);
+        // The destructor closes the log before main() reports the error, so record it
+        // here. Writing to the file directly avoids printing it twice when tee=true.
+        if (mLogFile.is_open()) mLogFile << "Fatal error in " << mCmdName << ":\n\t" << e.what() << std::endl;
+        throw;
     }
 }// Tool::run
 
@@ -640,7 +631,7 @@ struct Tool::Header {
     /// @brief Construct a header for the current tool version.
     Header() : mMagic("vdb_tool"), mMajor(sMajor), mMinor(sMinor), mPatch(sPatch) {}
     /// @brief Parse a header from the first line of a config file.
-    /// @param line First line of the config file, e.g. "vdb_tool 10.8.0".
+    /// @param line First line of the config file, e.g. "vdb_tool 10.9.0".
     /// @throw std::invalid_argument if @a line does not match "vdb_tool MAJOR.MINOR.PATCH".
     Header(const std::string &line) : mMagic("vdb_tool") {
       const VecS header = tokenize(line, " .");
@@ -720,7 +711,7 @@ inline void Tool::init()
      {"vdb", "*", "0,1,...", "list of VDB grids to write (defaults to \"*\", i.e. all available grids)."},
      {"keep", "", "1|0|true|false", "toggle wether to preserved or deleted geometry and grids after they have been written."},
      {"codec", "", "none|zip|blosc|active", "compression codec for the file or stream"},
-     {"bits", "32", "32|16|8|4|N", "bit-width of floating point numbers during quantization of VDB and NanoVDB grids, i.e. 32 is full, 16, is half (defaults to 32). NanoVDB also supports 8, 4 and N which is adaptive bit-width"},// VDB: 32, 16 + for NVDB 8, 4 or N
+     {"bits", "", "32|16|8|4|N", "bit-width of floating point numbers during quantization of VDB and NanoVDB grids, i.e. 32 is full, 16, is half. By default VDB grids keep their current precision (e.g. half grids that were read from a file) and NanoVDB grids use 32. NanoVDB also supports 8, 4 and N which is adaptive bit-width"},// VDB: 32, 16 + for NVDB 8, 4 or N
      {"dither", "false", "1|0|true|false", "toggle dithering of quantized NanoVDB grids (disabled by default)"},
      {"absolute", "true", "1|0|true|false", "toggle absolute or relative error tolerance during quantization of NanoVDBs. Only used if bits=N. Defaults to absolute"},// absolute or relative error for N bits in NVDB
      {"tolerance", "-1", "1.0", "absolute or relative error tolerance used during quantization of NanoVDBs. Only used if bits=N."},// error tolerance for N bits in NVDB
@@ -807,8 +798,8 @@ inline void Tool::init()
   mParser.addAction(
      {"sdf2udf"}, "Converts a signed distance field into an unsigned distance field, i.e. performs the Abs of all values and changes GridClass to UNKNOWN.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
-     {"vdb", "0", "0|0,1", "age(s) (i.e. stack index) of grid(s) to be processed. Defaults to 0, i.e. most recently inserted VDB. Accepts a comma-separated list to use multiple grids in the kernel: the FIRST grid is written (iterated), the rest are read-only inputs. Length must match use=."},
-     {"name", "sphere", "sphere", "name assigned to the output volume"}},
+     {"vdb", "0", "0", "age (i.e. stack index) of the level set to be converted. Defaults to 0, i.e. most recently inserted VDB."},
+     {"name", "", "udf", "name assigned to the output volume. Defaults to \"sdf2udf_\" followed by the name of the input volume"}},
      [&](){mParser.setDefaults();}, [&](){this->sdf2udf();});
 
   mParser.addAction(
@@ -2175,35 +2166,32 @@ inline void Tool::config()
             if (!getline (file,line)) throw std::invalid_argument("readConf: empty file \""+fileName+"\"");
             Header header(line);
             if (!header.isCompatible()) throw std::invalid_argument("readConf: incompatible version \""+line+"\"");
-            std::vector<char*> args({&header.mMagic[0]});//parser is expecting first argument to the name of the executable
+            std::vector<std::string> tokens{header.mMagic};// argv[0] is the executable name
             std::string accum;
             while (getline(file, line)) {
-                const size_t start = line.find_first_not_of(" \t"), stop = line.find_first_of("#%");
                 // A blank or comment-only line is skipped without touching accum, so a
                 // comment line in the middle of a backslash continuation is transparently
                 // absorbed rather than breaking (or being appended to) the continued line.
-                if (start >= stop) continue;// line is empty or starts with a comment
-                line = line.substr(start, stop - start);// remove leading whitespaces and tailing comments
-                line = line.substr(0, line.find_last_not_of(" \t") + 1);// remove tailing whitespaces
+                const size_t start = line.find_first_not_of(" \t\r");
+                if (start == std::string::npos || line[start] == '#' || line[start] == '%') continue;
+                line = trim(stripConfigComment(accum + line), " \t\r");
+                accum.clear();
                 if (!line.empty() && line.back() == '\\') {
-                    accum += line.substr(0, line.size() - 1);// strip \ and accumulate
+                    accum = line.substr(0, line.size() - 1);// strip \ and accumulate
                     accum += ' ';// separate this line's tokens from the next line's
                     continue;
                 }
-                line = accum + line;
-                accum.clear();
-                VecS tmp = vdb_tool::tokenize(line, " ");
+                VecS tmp = vdb_tool::tokenize(line, " \t\r");
+                if (tmp.empty()) continue;
                 tmp[0].insert (0, 1, '-');// first token is an action
-                std::transform(tmp.begin(), tmp.end(), std::back_inserter(args), [](const std::string &s){
-                    char *c = new char[s.size()+1];
-                    std::strcpy(c, s.c_str());
-                    return c;
-                });
+                tokens.insert(tokens.end(), tmp.begin(), tmp.end());
             }
             if (!accum.empty()) {
                 throw std::invalid_argument("readConf: unterminated line continuation at end of file \""+fileName+"\"");
             }
             file.close();
+            std::vector<char*> args;
+            for (auto &token : tokens) args.push_back(token.data());
             mParser.parse(static_cast<int>(args.size()), args.data());
             if (mParser.verbose) mTimer.stop();
         }
@@ -2246,22 +2234,17 @@ inline void Tool::writeVDB(const std::string &fileName)
     const std::string age = mParser.get<std::string>("vdb");
     const bool keep = mParser.get<bool>("keep");
     const std::string codec = toLowerCase(mParser.get<std::string>("codec"));
-    bool half;
-    switch (mParser.get<int>("bits")) {
-      case 16:
-        half = true; break;
-      case 32:
-        half = false; break;
-      default:
-        throw std::invalid_argument("writeVDB: bits should either be 32 or 16, not "+mParser.get<std::string>("bits"));
+    // An empty bits option preserves each grid's own half-float setting, so
+    // e.g. half grids read from a file are written back as half grids.
+    const std::string bits = mParser.get<std::string>("bits");
+    if (!bits.empty() && bits != "16" && bits != "32") {
+        throw std::invalid_argument("writeVDB: bits should either be 32 or 16, not "+bits);
     }
     GridPtrVec grids;// vector of grids to be written and possibly removed from mGrid
     if (age == "*") {
       for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it) grids.push_back(*it);
-      if (!keep) mGrid.clear();
     } else {
       for (int a : vectorize<int>(age, ",")) grids.push_back(*this->getGrid(a));
-      if (!keep) for (auto &g : grids) mGrid.remove(g);
     }
 
     if (grids.empty()) throw std::invalid_argument("no vdb grids to write");
@@ -2279,21 +2262,29 @@ inline void Tool::writeVDB(const std::string &fileName)
         throw std::invalid_argument("writeVDB: unsupported codec \""+codec+"\"");
       }
     };
-    for (size_t i=0; half && i<grids.size(); ++i) grids[i]->setSaveFloatAsHalf(true);
+    // Copy metadata while sharing the trees, so serialization settings never
+    // modify the inputs, even if opening or writing the output fails.
+    GridPtrVec output;
+    for (const auto &grid : grids) {
+      output.push_back(grid->copyGrid());
+      if (!bits.empty()) output.back()->setSaveFloatAsHalf(bits == "16");
+    }
     if (fileName=="stdout.vdb") {
       if (isatty(fileno(stdout)))  throw std::invalid_argument("writeVDB: stdout is not connected to the terminal");
       if (mParser.verbose) mTimer.start("Streaming VDB grid(s) to output stream");
       io::Stream stream(std::cout);
       setCodec(stream);
-      stream.write(grids);
+      stream.write(output);
+      std::cout.flush();
+      if (!std::cout) throw std::runtime_error("failed to write VDB to stdout");
     } else {
       if (mParser.verbose) mTimer.start("Writing VDB grid(s) to file named \""+fileName+"\"");
       io::File file(fileName);
       setCodec(file);
-      file.write(grids);
+      file.write(output);
       file.close();
     }
-    for (size_t i=0; half && i<grids.size(); ++i) grids[i]->setSaveFloatAsHalf(false);
+    if (!keep) for (const auto &grid : grids) mGrid.remove(grid);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
     throw std::invalid_argument(std::string("writeVDB: ") + e.what());// catch in Tool::write
@@ -2369,10 +2360,8 @@ inline void Tool::writeNVDB(const std::string &fileName)
     GridPtrVec grids;// vector of grids to be written and possibly removed from mGrid
     if (age == "*") {
       for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it) grids.push_back(*it);
-      if (!keep) mGrid.clear();
     } else {
       for (int a : vectorize<int>(age, ",")) grids.push_back(*this->getGrid(a));
-      if (!keep) for (auto &g : grids) mGrid.remove(g);
     }
 
     if (grids.empty()) throw std::invalid_argument(action_name+": no vdb grids to write");
@@ -2406,14 +2395,20 @@ inline void Tool::writeNVDB(const std::string &fileName)
         auto handle = openToNano(grid);
         nanovdb::io::writeGrid(std::cout, handle, codec);
       }
+      std::cout.flush();
+      if (!std::cout) throw std::runtime_error("failed to write NanoVDB to stdout");
     } else {
       if (mParser.verbose) mTimer.start("Writing NanoVDB to file");
-      std::ofstream os(fileName, std::ios::out | std::ios::binary);
+      std::ofstream os;
+      os.exceptions(std::ios::failbit | std::ios::badbit);
+      os.open(fileName, std::ios::out | std::ios::binary);
       for (auto grid: grids) {
         auto handle = openToNano(grid);
         nanovdb::io::writeGrid(os, handle, codec);
       }
+      os.close();
     }
+    if (!keep) for (const auto &grid : grids) mGrid.remove(grid);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
     throw std::invalid_argument(action_name+": "+e.what());
@@ -3307,6 +3302,7 @@ inline void Tool::csg()
   if (!gridB || gridB->getGridClass() != GRID_LEVEL_SET) {
     throw std::invalid_argument(action_name + ": no level set with age " + std::to_string(ij[1]));
   }
+  const std::string resultName = action_name + "_" + gridA->getName();
   if (gridA->transform() != gridB->transform()) {
     if (gridA->voxelSize()[0]<gridB->voxelSize()[0]) {// use the smallest voxel size
       const float halfWidth = static_cast<float>(gridA->background()/gridA->voxelSize()[0]);
@@ -3324,41 +3320,45 @@ inline void Tool::csg()
     if (keep) {
       GridT::Ptr grid = tools::csgUnionCopy(*gridA, *gridB);
       if (rebuild) grid = tools::sdfToSdf(*grid);
-      grid->setName("union_"+gridA->getName());
+      grid->setName(resultName);
       mGrid.push_back(grid);// A and B are unchanged!
     } else {
       tools::csgUnion(*gridA, *gridB, prune);// overwrites A and cannibalizes B
       if (rebuild) gridA = tools::sdfToSdf(*gridA);
-      gridA->setName("union_"+gridA->getName());
+      gridA->setName(resultName);
     }
   } else if (action_name == "intersection") {
     if (mParser.verbose) mTimer.start("Intersection");
     if (keep) {
       GridT::Ptr grid = tools::csgIntersectionCopy(*gridA, *gridB);
       if (rebuild) grid = tools::sdfToSdf(*grid);
-      grid->setName("intersection_"+gridA->getName());
+      grid->setName(resultName);
       mGrid.push_back(grid);// A and B are unchanged!
     } else {
       tools::csgIntersection(*gridA, *gridB, prune);// overwrites A and cannibalizes B
       if (rebuild) gridA = tools::sdfToSdf(*gridA);
-      gridA->setName("intersection_"+gridA->getName());
+      gridA->setName(resultName);
     }
   } else if (action_name == "difference") {
     if (mParser.verbose) mTimer.start("Difference");
     if (keep) {
       GridT::Ptr grid = tools::csgDifferenceCopy(*gridA, *gridB);
       if (rebuild) grid = tools::sdfToSdf(*grid);
-      grid->setName("difference_"+gridA->getName());
+      grid->setName(resultName);
       mGrid.push_back(grid);// A and B are unchanged!
     } else {
       tools::csgDifference(*gridA, *gridB, prune);// overwrites A and deletes B
       if (rebuild) gridA = tools::sdfToSdf(*gridA);
-      gridA->setName("difference_"+gridA->getName());
+      gridA->setName(resultName);
     }
   } else {
     throw std::invalid_argument("csg: invalid type");
   }
-  if (!keep) mGrid.erase(std::next(itB).base());// remove B since it was corrupted
+  if (!keep) {
+    // Rebuilding can replace gridA, so commit the resulting pointer to its stack slot.
+    *std::next(mGrid.rbegin(), ij[0]) = gridA;
+    mGrid.erase(std::next(itB).base());// remove B since it was corrupted
+  }
   if (mParser.verbose) mTimer.stop();
 }// Tool::csg
 
@@ -3495,14 +3495,7 @@ inline void Tool::forValues()
     calc.compile(kernel);// throws on syntax error / unknown op
   }
 
-  // NOW SAFE TO MODIFY STACK AND NAMES: compilation and binding have succeeded.
-  if (keep) {
-    GridT::Ptr tmp = grid->deepCopy();
-    mGrid.push_back(tmp);
-    grid = tmp;
-  }
   if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
-  grid->setName(grid_name);
 
   if (mParser.verbose) mTimer.start(action_name);
   if (!kernel.empty()) {
@@ -3595,11 +3588,17 @@ inline void Tool::forValues()
         base[i] = strTo<float>(mem.get(name));
     }
 
+    // All kernel variables have now been validated. Keep copies private until
+    // execution succeeds, and defer renaming the input until then as well.
+    if (keep) grid = grid->deepCopy();
+
     // Snapshot the OUTPUT grid if the kernel reads non-zero offsets from it
     // (directly or via any alias): otherwise parallel writes to the iterator's
     // grid would race with neighbor reads from the same grid. Check pointer
-    // identity to catch all aliases, not just the primary gridIdx == 0.
-    const GridT::ConstPtr outputGridPtr = grids[0].grid;
+    // identity to catch all aliases, not just the primary gridIdx == 0. With
+    // keep=true the output is a private copy, so neighbor reads use the
+    // untouched input and no snapshot is needed.
+    const GridT::ConstPtr outputGridPtr = grid;
     const bool needSnapshot = std::any_of(neighbors.begin(), neighbors.end(),
         [outputGridPtr, &grids](const NeighborBinding &n) {
             return grids[n.gridIdx].grid.get() == outputGridPtr.get() &&
@@ -3667,6 +3666,7 @@ inline void Tool::forValues()
       break;
     }
   }
+  if (kernel.empty() && keep) grid = grid->deepCopy();
   if (int n = findMatch(cls, {"ls", "fog", "unknown"})) {
     auto class_tag = n==1 ? GRID_LEVEL_SET : n==2 ? GRID_FOG_VOLUME : GRID_UNKNOWN;
     grid->setGridClass(class_tag);
@@ -3676,6 +3676,8 @@ inline void Tool::forValues()
   } else if (back.size()==2) {
     tools::changeAsymmetricLevelSetBackground(grid->tree(), back[0], back[1]);// outside, inside
   }
+  grid->setName(grid_name);
+  if (keep) mGrid.push_back(grid);
   if (mParser.verbose) mTimer.stop();
 }// Tool::forValues
 
@@ -3685,36 +3687,29 @@ inline void Tool::sdf2udf()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(findMatch(action_name, {"sdf2udf"}));// mode = 0 for no match
-  try {
-    const int age = mParser.get<int>("vdb");
-    const bool keep = mParser.get<bool>("keep");
-    std::string grid_name = mParser.get<std::string>("name");
+  // Errors propagate to Parser::run, which reports them and sets the exit status.
+  const int age = mParser.get<int>("vdb");
+  const bool keep = mParser.get<bool>("keep");
+  std::string grid_name = mParser.get<std::string>("name");
 
-    /// get the relevant grid to be processed
-    auto it = this->getGrid(age);// will throw if grid doesn't exist
-    GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid) throw std::invalid_argument("no FloatGrid with age " + std::to_string(age));
-    if (keep) {
-      GridT::Ptr tmp = grid->deepCopy();
-      mGrid.push_back(tmp);
-      grid = tmp;
-    }
-    if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
-    grid->setName(grid_name);
-    if (grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("no level set with age "+std::to_string(age));
-    grid->setGridClass(GRID_UNKNOWN);// GRID_LEVEL_SET -> GRID_UNKNOW
-
-    if (mParser.verbose) mTimer.start(action_name);
-    tools::foreach(grid->beginValueAll(), [](auto &it){it.setValue(math::Abs(*it));});
-    if (mParser.verbose) mTimer.stop();
-
-  } catch (const std::exception& e) {
-    if (mErrorOnWarning) {
-      throw std::invalid_argument(action_name+": "+e.what());
-    } else {
-      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
-    }
+  /// get the relevant grid to be processed
+  auto it = this->getGrid(age);// will throw if grid doesn't exist
+  GridT::Ptr grid = gridPtrCast<GridT>(*it);
+  if (!grid) throw std::invalid_argument("no FloatGrid with age " + std::to_string(age));
+  // validate before copying or renaming, so a failure leaves the grid stack unchanged
+  if (grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("no level set with age "+std::to_string(age));
+  if (keep) {
+    GridT::Ptr tmp = grid->deepCopy();
+    mGrid.push_back(tmp);
+    grid = tmp;
   }
+  if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
+  grid->setName(grid_name);
+  grid->setGridClass(GRID_UNKNOWN);// GRID_LEVEL_SET -> GRID_UNKNOW
+
+  if (mParser.verbose) mTimer.start(action_name);
+  tools::foreach(grid->beginValueAll(), [](auto &it){it.setValue(math::Abs(*it));});
+  if (mParser.verbose) mTimer.stop();
 }// Tool::sdf2udf
 
 // ==============================================================================================================
