@@ -2355,7 +2355,8 @@ TEST(TestBuffer, CopyToKeepsUnalignedGrids)
 {
     // Two grids where the first grid's size is not a multiple of NANOVDB_DATA_ALIGNMENT,
     // as in Point grids written before their payload was padded. The constructors accept
-    // this layout, so copyTo and copy() must carry it, while public adopt rejects it.
+    // this layout, so copyTo, copy() and splitGridHandles must carry it. Public adopt rejects
+    // it, and so does mergeGridHandles, whose output would hold a misaligned device grid.
     auto a = nanovdb::tools::createLevelSetSphere<float>(20.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "a");
     auto b = nanovdb::tools::createLevelSetSphere<float>(10.0, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "b");
     const uint64_t sizeA = a.bufferSize() + 8u, bytes = sizeA + b.bufferSize();
@@ -2384,6 +2385,14 @@ TEST(TestBuffer, CopyToKeepsUnalignedGrids)
     auto copy = nanovdb::HostBuffer::create(bytes);
     std::memcpy(copy.data(), host.data(), bytes);
     EXPECT_THROW(nanovdb::GridHandle<nanovdb::HostBuffer>::adopt(std::move(copy), host.metaData()), std::runtime_error);
+
+    auto parts = nanovdb::cuda::splitGridHandles<DevBufT, std::vector>(dev, cudaStream_t(0));
+    ASSERT_EQ(2u, parts.size());
+    EXPECT_EQ(sizeA, parts[0].bufferSize());
+    EXPECT_EQ(b.bufferSize(), parts[1].bufferSize());
+    std::vector<nanovdb::GridHandle<DevBufT>> devs;
+    devs.push_back(std::move(dev));
+    EXPECT_THROW((nanovdb::cuda::mergeGridHandles<DevBufT, std::vector>(devs, cudaStream_t(0))), std::runtime_error);
 }
 
 } // namespace nanovdb_test
