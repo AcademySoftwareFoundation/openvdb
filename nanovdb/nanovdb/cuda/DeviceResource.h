@@ -76,6 +76,12 @@ public:
     static void deallocateAsync(void *p, size_t bytes, size_t alignment, cudaStream_t stream) {
         DeviceResource().deallocate_async(p, bytes, alignment, stream);
     }
+
+    /// @brief Stateless: memory allocated through one instance may be
+    ///        deallocated through any other, so every two instances compare
+    ///        equal (the equality cuda::mr's resource concepts require).
+    friend bool operator==(const DeviceResource&, const DeviceResource&) { return true; }
+    friend bool operator!=(const DeviceResource&, const DeviceResource&) { return false; }
 };
 
 /// @brief Returns a program-lifetime, address-stable reference to a default
@@ -170,6 +176,69 @@ struct is_resource<R, std::void_t<
     decltype(std::declval<R&>().deallocate(std::declval<void*>(), size_t{0}, size_t{0}))>>
     : std::true_type {};
 
+/// @brief Detection trait: @c is_equality_comparable_resource<R>::value is
+///        true iff @c R models a resource concept and provides operator==:
+///        two resources compare equal when memory allocated through one may
+///        be deallocated through the other. cuda::mr's resource concepts
+///        require it; using a resource without it is deprecated, and 14.0
+///        makes it part of NanoVDB's concepts too.
+template <class R, class = void>
+struct is_equality_comparable_resource : std::false_type {};
+
+template <class R>
+struct is_equality_comparable_resource<R, std::void_t<
+    std::enable_if_t<is_resource<R>::value || is_async_resource<R>::value>,
+    decltype(bool(std::declval<const R&>() == std::declval<const R&>()))>>
+    : std::true_type {};
+
+/// @brief The deprecation every use of a resource without operator== reports.
+#define NANOVDB_DEPRECATED_RESOURCE_WITHOUT_EQUALITY \
+    [[deprecated("this memory resource has no operator==, which NanoVDB 14.0 requires: " \
+                 "add friend bool operator==(const R&, const R&), true when memory allocated through one may be " \
+                 "deallocated through the other (always, for a stateless resource), and operator!= for cuda::mr under C++17")]]
+
+template <class R>
+struct ResourceRef;
+
+namespace detail {
+
+/// @brief The resource a buffer's memory comes from: @c R itself, or the
+///        resource a ResourceRef<R> refers to.
+template<class R>
+struct ReferencedResource { using type = R; };
+template<class R>
+struct ReferencedResource<ResourceRef<R>> { using type = R; };
+
+/// @brief Reached only through a resource without operator==, so the
+///        deprecation names the resource type at the point of use.
+/// @note A warning raised here is located in this header, so a compiler
+///       that silences warnings from system headers drops it when NanoVDB is
+///       included as one; ResourceRef(R&) in user code warns on the user's
+///       own line regardless.
+template<class R>
+NANOVDB_DEPRECATED_RESOURCE_WITHOUT_EQUALITY
+inline void resourceWithoutEquality() {}
+
+/// @brief Warns, through the deprecation above, when @c R lacks the equality
+///        that 14.0 makes part of the resource concepts. Instantiated once per
+///        resource type, so a misuse warns once however often it recurs.
+template<class R>
+inline void checkReferencedEquality()
+{
+    if constexpr (!is_equality_comparable_resource<R>::value) resourceWithoutEquality<R>();
+}
+
+/// @brief Checks the resource behind @c R (see ReferencedResource), so a
+///        resource and a ResourceRef to it share one check.
+template<class R>
+inline void checkResourceEquality() { checkReferencedEquality<typename ReferencedResource<R>::type>(); }
+
+/// @brief Tag for the ResourceRef constructor behind borrowInternal.
+struct InternalRef {};
+inline constexpr InternalRef internalRef{};
+
+}// namespace detail
+
 /// @brief CRTP base supplying the synchronous half of the resource concept in
 ///        terms of the stream-ordered half, so a custom stream-ordered resource
 ///        only has to write allocate_async and deallocate_async.
@@ -188,6 +257,9 @@ struct is_resource<R, std::void_t<
 ///     static constexpr size_t DEFAULT_ALIGNMENT = 256;
 ///     void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream);
 ///     void  deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream);
+///     // equality, as cuda::mr requires: stateless, so every instance is interchangeable
+///     friend bool operator==(const MyResource&, const MyResource&) { return true; }
+///     friend bool operator!=(const MyResource&, const MyResource&) { return false; }
 /// };
 /// @endcode
 template <class Derived>
@@ -242,6 +314,12 @@ public:
     /// @brief Frees @c p with cudaFree; the caller guarantees that device work
     ///        touching the memory has completed.
     void deallocate(void* p, size_t, size_t) { cudaCheck(cudaFree(p)); }
+
+    /// @brief Stateless: memory allocated through one instance may be
+    ///        deallocated through any other, so every two instances compare
+    ///        equal (the equality cuda::mr's resource concepts require).
+    friend bool operator==(const MallocResource&, const MallocResource&) { return true; }
+    friend bool operator!=(const MallocResource&, const MallocResource&) { return false; }
 };// MallocResource
 
 /// @brief Wrapper presenting a synchronous resource as a stream-ordered one,
@@ -292,6 +370,13 @@ struct AsyncFromSync
     /// @brief Synchronous pair, forwarding to the wrapped resource.
     void* allocate(size_t bytes, size_t alignment) { return resource.allocate(bytes, alignment); }
     void  deallocate(void* p, size_t bytes, size_t alignment) { resource.deallocate(p, bytes, alignment); }
+
+    /// @brief Two adapters compare equal iff their wrapped resources do;
+    ///        present only when @c R itself is equality-comparable.
+    template<class S = R, std::enable_if_t<is_equality_comparable_resource<S>::value, int> = 0>
+    friend bool operator==(const AsyncFromSync& lhs, const AsyncFromSync& rhs) { return lhs.resource == rhs.resource; }
+    template<class S = R, std::enable_if_t<is_equality_comparable_resource<S>::value, int> = 0>
+    friend bool operator!=(const AsyncFromSync& lhs, const AsyncFromSync& rhs) { return !(lhs.resource == rhs.resource); }
 };// AsyncFromSync<R>
 
 /// @brief Non-owning reference to a memory resource that is itself a resource:
@@ -307,6 +392,8 @@ struct AsyncFromSync
 ///          must allocate through *that* instance rather than a copy of it.
 /// @warning The referenced resource must outlive every use of this ref and of
 ///          all copies of it, including any container holding one.
+/// @deprecated A referenced resource without operator== is deprecated;
+///             14.0 requires it.
 template <class R>
 struct ResourceRef
 {
@@ -321,6 +408,16 @@ struct ResourceRef
 
     /// @brief Constructs a ref borrowing @c resource.
     /// @param resource resource to allocate from; must outlive this ref
+    template<class S = R, std::enable_if_t<is_equality_comparable_resource<S>::value, int> = 0>
+    ResourceRef(R& resource) : mResource(&resource) {}
+
+    /// @brief Constructs a ref for NanoVDB's own components; see detail::borrowInternal.
+    ResourceRef(R& resource, detail::InternalRef) : mResource(&resource) {}
+
+    /// @brief Constructs a ref borrowing a resource without operator==.
+    /// @deprecated 14.0 requires operator== on every resource.
+    template<class S = R, std::enable_if_t<!is_equality_comparable_resource<S>::value, int> = 0>
+    NANOVDB_DEPRECATED_RESOURCE_WITHOUT_EQUALITY
     ResourceRef(R& resource) : mResource(&resource) {}
 
     /// @{
@@ -342,17 +439,36 @@ struct ResourceRef
     void* allocate(size_t bytes, size_t alignment) { return mResource->allocate(bytes, alignment); }
     void  deallocate(void* p, size_t bytes, size_t alignment) { mResource->deallocate(p, bytes, alignment); }
 
-    /// @brief Two refs compare equal iff they reference the same resource, i.e.
-    ///        memory allocated through one may be deallocated through the other.
-    friend bool operator==(ResourceRef lhs, ResourceRef rhs) { return lhs.mResource == rhs.mResource; }
-    friend bool operator!=(ResourceRef lhs, ResourceRef rhs) { return lhs.mResource != rhs.mResource; }
+    /// @brief Two refs compare equal iff memory allocated through one may be
+    ///        deallocated through the other: they reference the same resource,
+    ///        or resources that compare equal. As cuda::mr::resource_ref does,
+    ///        this compares the referenced resources when @c R provides
+    ///        operator==; otherwise only identity can establish it.
+    friend bool operator==(ResourceRef lhs, ResourceRef rhs)
+    {
+        if (lhs.mResource == rhs.mResource) return true;
+        if constexpr (is_equality_comparable_resource<R>::value) return *lhs.mResource == *rhs.mResource;
+        else return false;
+    }
+    friend bool operator!=(ResourceRef lhs, ResourceRef rhs) { return !(lhs == rhs); }
 
 private:
     R* mResource;
 };// ResourceRef<R>
 
+namespace detail {
+
+/// @brief Returns a ResourceRef to @c resource for NanoVDB's own components;
+///        constructing it does not warn.
+template<class R>
+ResourceRef<R> borrowInternal(R& resource) { return ResourceRef<R>(resource, internalRef); }
+
+}// namespace detail
+
 }
 
 } // namespace nanovdb::cuda
+
+#undef NANOVDB_DEPRECATED_RESOURCE_WITHOUT_EQUALITY
 
 #endif // end of NANOVDB_CUDA_DEVICERESOURCE_H_HAS_BEEN_INCLUDED

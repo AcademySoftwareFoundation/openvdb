@@ -48,7 +48,8 @@ struct StreamHolder<true> { cudaStream_t mStream = 0; };
 /// @tparam R memory resource, either stream-ordered (AsyncResource concept,
 ///         see is_async_resource) or synchronous (Resource concept, see
 ///         is_resource). When @c R provides both interfaces the stream-ordered
-///         one is used.
+///         one is used. A resource without operator== is deprecated; 14.0
+///         requires it.
 /// @details With a stream-ordered resource the Buffer retains the stream of
 ///          the most recent allocation (or the one supplied via set_stream)
 ///          and orders its deallocation on that stream. Buffer is move-only.
@@ -197,7 +198,11 @@ public:
 
     /// @brief D-tor. A stream-ordered resource frees on the retained stream;
     ///        a synchronous resource frees immediately.
-    ~Buffer() { this->destroy(); }
+    ~Buffer()
+    {
+        detail::checkResourceEquality<R>();
+        this->destroy();
+    }
 
     /// @brief Returns the retained stream, i.e. the stream the buffer's memory
     ///        will be freed on.
@@ -220,13 +225,13 @@ public:
     ///        @c stream, which becomes the retained stream: the prefix copy is
     ///        the old block's last use, so that is the stream its free must be
     ///        ordered on.
-    /// @param count number of elements
     /// @param stream cuda stream the reallocation is ordered on
+    /// @param count number of elements
     /// @warning The caller is responsible for ordering @c stream after any
     ///          in-flight work on the previously retained stream that uses the
     ///          buffer's memory.
     template<typename S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
-    void resize(size_t count, cudaStream_t stream)
+    void resize(cudaStream_t stream, size_t count)
     {
         if (count != mSize) {
             // No member is mutated until every throwing operation has
@@ -252,6 +257,24 @@ public:
         else {
             this->mStream = stream; // no reallocation: set_stream semantics
         }
+    }
+
+    /// @brief Resizes the buffer to @c count elements on @c stream.
+    /// @deprecated Use resize(stream, count).
+    /// @note Accepts every count the size_t parameter of the old signature
+    ///       accepted, converted the same way. resize(0, 0) resolves to this
+    ///       overload; resize(cudaStream_t(0), 0) is the stream-first spelling.
+    /// @throw std::runtime_error if a floating-point @c count is negative or exceeds size_t
+    template<typename CountT = size_t, typename S = R,
+             std::enable_if_t<std::is_convertible<CountT, size_t>::value && is_async_resource<S>::value, int> = 0>
+    [[deprecated("use resize(stream, count)")]]
+    void resize(CountT count, cudaStream_t stream)
+    {
+        if constexpr (std::is_floating_point<CountT>::value) {
+            if (!(count >= CountT(0) && double(count) < 18446744073709551616.0))
+                throw std::runtime_error("Buffer::resize: count out of range");
+        }
+        this->resize(stream, static_cast<size_t>(count));
     }
 
     /// @brief Resizes the buffer to @c count elements through the synchronous
@@ -342,13 +365,14 @@ public:
 
 private:
     /// @brief Returns @c count * sizeof(T), throwing std::runtime_error if the
-    ///        byte size would overflow size_t instead of silently wrapping into
-    ///        a tiny allocation.
+    ///        byte size would exceed PTRDIFF_MAX, which also rejects a byte size
+    ///        that would overflow size_t and a negative count converted to
+    ///        size_t.
     /// @param count number of elements
     static size_t checkedBytes(size_t count)
     {
-        if (count > std::numeric_limits<size_t>::max() / sizeof(T))
-            throw std::runtime_error("nanovdb::cuda::Buffer: element count overflows the byte size");
+        if (count > size_t(std::numeric_limits<std::ptrdiff_t>::max()) / sizeof(T))
+            throw std::runtime_error("nanovdb::cuda::Buffer: element count exceeds the maximum buffer size");
         return count * sizeof(T);
     }
 

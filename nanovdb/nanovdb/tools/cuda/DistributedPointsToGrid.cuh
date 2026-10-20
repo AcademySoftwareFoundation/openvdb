@@ -815,7 +815,7 @@ void DistributedPointsToGrid<BuildT, ResourceT>::countNodes(const PtrT coords, s
             // Only this device's stream touches the offsets, so they come from the per-device
             // resource, stream-ordered, and are freed on the same stream at scope exit (the
             // synchronous cudaFree this replaces stalled the whole device mid-pipeline).
-            DeviceBufT<uint32_t> tileOffsetsBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResources[deviceId]), numDeviceTiles + 1, nanovdb::cuda::noInit);
+            DeviceBufT<uint32_t> tileOffsetsBuf(stream, nanovdb::cuda::detail::borrowInternal(*mResources[deviceId]), numDeviceTiles + 1, nanovdb::cuda::noInit);
             uint32_t* d_tile_offsets = tileOffsetsBuf.data();
             cudaCheck(cudaMemsetAsync(d_tile_offsets, 0, sizeof(uint32_t), stream));
             CUB_LAUNCH(DeviceScan::InclusiveSum, mTempDevicePools[deviceId], stream, devicePointsPerTile, d_tile_offsets + 1, numDeviceTiles);

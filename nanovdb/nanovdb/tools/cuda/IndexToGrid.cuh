@@ -102,7 +102,7 @@ private:
     ResourceT*        mResource;// non-owning; all device scratch routes through this resource instance
     template<typename T>
     using BufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ResourceRef<ResourceT>>;
-    nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource); }
+    nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::detail::borrowInternal(*mResource); }
     NodeAccessor      mNodeAcc;
     BufT<NodeAccessor> mDevNodeAccBuf;
     NodeAccessor      *mDevNodeAcc{nullptr};// view of mDevNodeAccBuf
@@ -333,8 +333,8 @@ __global__ void cpyNodeCountKernel(const NanoGrid<SrcBuildT> *srcGrid,
 template <typename SrcBuildT, typename ResourceT>
 IndexToGrid<SrcBuildT, ResourceT>::IndexToGrid(const SrcGridT *d_srcGrid, cudaStream_t stream, ResourceT& resource)
     : mStream(stream), mTimer(stream), mResource(&resource),
-      mDevNodeAccBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 1, nanovdb::cuda::noInit),
-      mGridNameBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
+      mDevNodeAccBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 1, nanovdb::cuda::noInit),
+      mGridNameBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
 {
     NANOVDB_ASSERT(d_srcGrid);
     mDevNodeAcc = mDevNodeAccBuf.data();

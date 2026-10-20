@@ -68,6 +68,9 @@ struct CountingResource : nanovdb::cuda::SyncFromAsync<CountingResource>
         if (p) ++deallocs;
         nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
     }
+    // state is inline, so only the same instance keeps one account
+    friend bool operator==(const CountingResource& a, const CountingResource& b) { return &a == &b; }
+    friend bool operator!=(const CountingResource& a, const CountingResource& b) { return !(a == b); }
 };
 
 /// @brief Resource that records the stream of every allocation/deallocation,
@@ -86,6 +89,9 @@ struct StreamRecordingResource : nanovdb::cuda::SyncFromAsync<StreamRecordingRes
         if (p) deallocStreams.push_back(stream);
         nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
     }
+    // state is inline, so only the same instance keeps one account
+    friend bool operator==(const StreamRecordingResource& a, const StreamRecordingResource& b) { return &a == &b; }
+    friend bool operator!=(const StreamRecordingResource& a, const StreamRecordingResource& b) { return !(a == b); }
 };
 
 //======================================================================
@@ -179,6 +185,9 @@ struct SyncCountingResource
         if (p) ++deallocs;
         nanovdb::cuda::MallocResource{}.deallocate(p, bytes, alignment);
     }
+    // state is inline, so only the same instance keeps one account
+    friend bool operator==(const SyncCountingResource& a, const SyncCountingResource& b) { return &a == &b; }
+    friend bool operator!=(const SyncCountingResource& a, const SyncCountingResource& b) { return !(a == b); }
 };
 
 static_assert(nanovdb::cuda::is_resource<nanovdb::cuda::MallocResource>::value,
