@@ -14,6 +14,10 @@
 #ifndef NANOVDB_UTIL_MORPHOLOGY_CUDA_MORPHOLOGYHELPERS_CUH_HAS_BEEN_INCLUDED
 #define NANOVDB_UTIL_MORPHOLOGY_CUDA_MORPHOLOGYHELPERS_CUH_HAS_BEEN_INCLUDED
 
+#include <nanovdb/NanoVDB.h> // for Mask
+
+#include <stdint.h> // for uint64_t
+
 namespace nanovdb::util {
 
 namespace morphology {

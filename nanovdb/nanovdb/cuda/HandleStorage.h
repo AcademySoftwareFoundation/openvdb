@@ -19,6 +19,7 @@
 
 #ifndef NANOVDB_CUDA_HANDLESTORAGE_H_HAS_BEEN_INCLUDED
 #define NANOVDB_CUDA_HANDLESTORAGE_H_HAS_BEEN_INCLUDED
+#define NANOVDB_CUDA_HANDLESTORAGE_DEFERS_GRIDHANDLE_CUH // see the end of nanovdb/GridHandle.h
 
 #include <nanovdb/GridHandle.h> // for the handle cuda::copyTo transfers
 #include <nanovdb/HostBuffer.h> // for the BufferTraits detectors
@@ -251,5 +252,10 @@ inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, const Ds
 }// namespace cuda
 
 }// namespace nanovdb
+
+#undef NANOVDB_CUDA_HANDLESTORAGE_DEFERS_GRIDHANDLE_CUH
+#if defined(__CUDACC__) && !defined(NANOVDB_TOOLS_CUDA_GRIDCHECKSUM_DEFERS_GRIDHANDLE_CUH)
+#include <nanovdb/cuda/GridHandle.cuh>
+#endif
 
 #endif // NANOVDB_CUDA_HANDLESTORAGE_H_HAS_BEEN_INCLUDED
