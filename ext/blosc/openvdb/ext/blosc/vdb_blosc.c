@@ -59,7 +59,26 @@
 /* Split mode used for blocks.  Kept internal; there is only one mode. */
 #define BLOSC_FORWARD_COMPAT_SPLIT 4
 
-#include "vdb_blosc.h"
+/* The three blosc functions that are exposed must be prefixed either "openvdb_" or "nanovdb_" */
+#ifndef VDB_BLOSC_SYMBOL_PREFIX
+#error VDB_BLOSC_SYMBOL_PREFIX must be defined to avoid symbol clashes with other blosc builds
+#endif
+
+#define VDB_BLOSC_CONCAT_(a, b) a##_##b
+#define VDB_BLOSC_CONCAT(a, b) VDB_BLOSC_CONCAT_(a, b)
+#define blosc_compress_ctx    VDB_BLOSC_CONCAT(VDB_BLOSC_SYMBOL_PREFIX, blosc_compress_ctx)
+#define blosc_decompress_ctx  VDB_BLOSC_CONCAT(VDB_BLOSC_SYMBOL_PREFIX, blosc_decompress_ctx)
+#define blosc_cbuffer_sizes   VDB_BLOSC_CONCAT(VDB_BLOSC_SYMBOL_PREFIX, blosc_cbuffer_sizes)
+
+#if defined(OPENVDB_BLOSC_H)
+#define BLOSC_MAX_OVERHEAD OPENVDB_BLOSC_MAX_OVERHEAD
+#define BLOSC_MAX_BUFFERSIZE OPENVDB_BLOSC_MAX_BUFFERSIZE
+#elif defined(NANOVDB_BLOSC_H)
+#define BLOSC_MAX_OVERHEAD NANOVDB_BLOSC_MAX_OVERHEAD
+#define BLOSC_MAX_BUFFERSIZE NANOVDB_BLOSC_MAX_BUFFERSIZE
+#else
+#error Include openvdb_blosc.h or nanovdb_blosc.h before vdb_blosc.h
+#endif
 
 /* lz4 is compiled directly into this translation unit so that its symbols
    stay hidden rather than appearing in the shared library's export table -
