@@ -309,12 +309,18 @@ _A_&nbsp;+&nbsp;(1&nbsp;&minus;&nbsp;_A_)&nbsp;&times;&nbsp;_B_:\n\
 \n\
 SDF Union:\n\
     Generate the union of signed distance fields _A_ and _B_.\n\
+NOTE:\n\
+    SDF Union falls back to a Minimum operation for non floating point volumes.\n\
 \n\
 SDF Intersection:\n\
     Generate the intersection of signed distance fields _A_ and _B_.\n\
+NOTE:\n\
+    SDF Intersection falls back to a Maximum operation for non floating point volumes.\n\
 \n\
 SDF Difference:\n\
     Remove signed distance field _B_ from signed distance field _A_.\n\
+NOTE:\n\
+    SDF Difference falls back to a Max(a, -b) operation for non floating point volumes.\n\
 \n\
 Replace _A_ with Active _B_:\n\
     Copy the active voxels of _B_ into _A_.\n\
@@ -1282,29 +1288,53 @@ struct SOP_OpenVDB_Combine::CombineOp
             }
 
             case OP_UNION:
-                if constexpr (openvdb::RealGridTypes::Contains<GridT>) {
-                    MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
-                    MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
+                // For CSG Union on non level set compatible grids, fall back
+                // to composite min (well defined for vector types, works on)
+                // magnitude)
+                MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
+                MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
+                if constexpr (openvdb::RealGridTypes::Contains<GridT>)
+                {
                     openvdb::tools::csgUnion(*resultGrid, *tempGrid, /*prune*/true,
                         /*prunedgen*/self->evalInt("prunedegenerate", 0, self->getTime()));
+                }
+                else
+                {
+                    openvdb::tools::compMin(*resultGrid, *tempGrid);
                 }
                 break;
 
             case OP_INTERSECTION:
-                if constexpr (openvdb::RealGridTypes::Contains<GridT>) {
-                    MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
-                    MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
+                // For CSG Union on non level set compatible grids, fall back
+                // to composite max (well defined for vector types, works on)
+                // magnitude)
+                MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
+                MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
+                if constexpr (openvdb::RealGridTypes::Contains<GridT>)
+                {
                     openvdb::tools::csgIntersection(*resultGrid, *tempGrid, /*prune*/true,
                         /*prunedgen*/self->evalInt("prunedegenerate", 0, self->getTime()));
+                }
+                else
+                {
+                    openvdb::tools::compMax(*resultGrid, *tempGrid);
                 }
                 break;
 
             case OP_DIFFERENCE:
+                // For CSG Union on non level set compatible grids, fall back
+                // to composite max(a, -b) (well defined for vector types, works
+                // on magnitude)
+                MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
                 if constexpr (openvdb::RealGridTypes::Contains<GridT>) {
-                    MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
                     MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
                     openvdb::tools::csgDifference(*resultGrid, *tempGrid, /*prune*/true,
                         /*prunedgen*/self->evalInt("prunedegenerate", 0, self->getTime()));
+                }
+                else
+                {
+                    MulAdd<GridT>(-bMult).process(*bGrid, tempGrid); // note negated bMult
+                    openvdb::tools::compMax(*resultGrid, *tempGrid);
                 }
                 break;
 
@@ -1331,6 +1361,7 @@ struct SOP_OpenVDB_Combine::CombineOp
                 break;
         }
 
+        UT_ASSERT(resultGrid);
         outGrid = this->postprocess<GridT>(resultGrid);
     }
 
