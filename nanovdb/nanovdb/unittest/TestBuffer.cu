@@ -16,6 +16,8 @@
 #include <nanovdb/tools/cuda/PointsToGrid.cuh> // voxelsToGrid / pointsToGrid, and inputs for the builder equivalence tests
 #include <nanovdb/cuda/GridHandle.cuh> // for cuda::mergeGridHandles / splitGridHandles
 #include <nanovdb/cuda/ManagedResource.h>
+#include <nanovdb/cuda/NodeManager.cuh> // for the dual-space node-manager transfers
+#include <nanovdb/cuda/UnifiedBuffer.h> // for the dual-space unified transfers
 #include <nanovdb/tools/cuda/VoxelBlockManager.cuh> // for the single-space entry-point test
 #include <nanovdb/cuda/DeviceBuffer.h> // the dual-space default of the prototype forms, compared against
 #include <nanovdb/tools/cuda/AddBlindData.cuh>
@@ -1813,8 +1815,9 @@ template<typename BufT>
 nanovdb::GridHandle<nanovdb::HostBuffer> hostImage(nanovdb::GridHandle<BufT>& handle)
 {
     if constexpr (nanovdb::BufferTraits<BufT>::hasDeviceDual) {
-        handle.deviceDownload();
-        return handle.template copy<nanovdb::HostBuffer>();
+        auto host = nanovdb::HostBuffer::create(handle.bufferSize());
+        cudaCheck(cudaMemcpy(host.data(), handle.deviceData(), handle.bufferSize(), cudaMemcpyDeviceToHost));
+        return nanovdb::GridHandle<nanovdb::HostBuffer>(std::move(host));
     } else {
         return nanovdb::cuda::copyTo<nanovdb::HostBuffer>(handle, cudaStream_t(0));
     }
@@ -2393,6 +2396,31 @@ TEST(TestBuffer, CopyToKeepsUnalignedGrids)
     std::vector<nanovdb::GridHandle<DevBufT>> devs;
     devs.push_back(std::move(dev));
     EXPECT_THROW((nanovdb::cuda::mergeGridHandles<DevBufT, std::vector>(devs, cudaStream_t(0))), std::runtime_error);
+TEST(TestBuffer, DeprecatedDualTransfersWarnOnlyAtTheCall)
+{
+    // This file builds with warnings as errors and no file-wide suppression:
+    // the deprecated dual-space transfers, called inside the suppression
+    // macros, must not warn from within the NanoVDB headers that forward them.
+    auto host = nanovdb::tools::createLevelSetSphere<float>(20);
+    NANOVDB_SUPPRESS_DEPRECATION_BEGIN
+    auto dual = host.copy<nanovdb::cuda::DualDeviceBuffer>();
+    dual.deviceUpload();
+    EXPECT_TRUE(dual.deviceGrid<float>());
+    dual.deviceDownload();
+    dual.buffer().deviceUpload(0, cudaStream_t(0), true);
+    auto mgr = nanovdb::createNodeManager<float, nanovdb::cuda::DualDeviceBuffer>(*dual.grid<float>());
+    mgr.deviceUpload(dual.deviceGrid<float>());
+    EXPECT_TRUE(mgr.deviceMgr<float>());
+    mgr.deviceDownload();
+    EXPECT_TRUE(mgr.mgr<float>());
+
+    auto unified = host.copy<nanovdb::cuda::DualUnifiedBuffer>();
+    unified.deviceUpload();
+    unified.deviceDownload();
+    NANOVDB_SUPPRESS_DEPRECATION_END
+    unified.buffer().prefetch(0, 0, 0);// the public prefetch keeps its call shapes
+    ASSERT_EQ(cudaSuccess, cudaDeviceSynchronize());
+    EXPECT_EQ(host.gridData()->mChecksum.full(), unified.gridData()->mChecksum.full());
 }
 
 } // namespace nanovdb_test

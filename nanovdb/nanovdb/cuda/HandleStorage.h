@@ -19,6 +19,7 @@
 
 #ifndef NANOVDB_CUDA_HANDLESTORAGE_H_HAS_BEEN_INCLUDED
 #define NANOVDB_CUDA_HANDLESTORAGE_H_HAS_BEEN_INCLUDED
+#define NANOVDB_CUDA_HANDLESTORAGE_DEFERS_GRIDHANDLE_CUH // see the end of nanovdb/GridHandle.h
 
 #include <nanovdb/GridHandle.h> // for the handle cuda::copyTo transfers
 #include <nanovdb/HostBuffer.h> // for the BufferTraits detectors
@@ -170,8 +171,8 @@ struct [[deprecated("use GridHandle::adopt(buffer, meta) and GridHandle::metaDat
 ///        handles and host-readable handles (HostBuffer or a host-accessible
 ///        single-space buffer such as a pinned-resource cuda::Buffer).
 /// @tparam DstBufferT destination buffer type (specify explicitly)
-/// @param src the handle to copy; must not be dual-space (use
-///        deviceUpload/deviceDownload on those)
+/// @param src the handle to copy; must not use a deprecated dual-space
+///        buffer (build device handles into cuda::Buffer<std::byte> instead)
 /// @param stream stream the copy is issued on; a device destination buffer
 ///        with a stream-ordered resource retains it
 /// @warning Passing a stream other than the source buffer's retained stream
@@ -208,7 +209,7 @@ inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, cudaStre
     constexpr bool srcDev = BufferHasDeviceSingle<SrcBufferT>::value;
     constexpr bool dstDev = BufferHasDeviceSingle<DstBufferT>::value;
     static_assert(!BufferTraits<SrcBufferT>::hasDeviceDual && !BufferTraits<DstBufferT>::hasDeviceDual,
-                  "cuda::copyTo does not support dual-space buffers: use deviceUpload/deviceDownload on the handle");
+                  "cuda::copyTo does not support the deprecated dual-space buffers: build device handles into cuda::Buffer<std::byte> by passing a cuda::Buffer<std::byte>() prototype to the GPU tool");
     static_assert(srcDev || dstDev,
                   "cuda::copyTo is for cross-space transfers involving a device buffer: use GridHandle::copy for host-to-host");
     const uint64_t bytes = src.bufferSize();
@@ -248,5 +249,10 @@ inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, const Ds
 }// namespace cuda
 
 }// namespace nanovdb
+
+#undef NANOVDB_CUDA_HANDLESTORAGE_DEFERS_GRIDHANDLE_CUH
+#if defined(__CUDACC__) && !defined(NANOVDB_TOOLS_CUDA_GRIDCHECKSUM_DEFERS_GRIDHANDLE_CUH)
+#include <nanovdb/cuda/GridHandle.cuh>
+#endif
 
 #endif // NANOVDB_CUDA_HANDLESTORAGE_H_HAS_BEEN_INCLUDED

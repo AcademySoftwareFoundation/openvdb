@@ -23,6 +23,7 @@
 #include <string> // for std::to_string
 #include <vector>
 #include <initializer_list>
+#include <utility> // for std::move
 
 #include <nanovdb/NanoVDB.h>// for toGridType
 #include <nanovdb/HostBuffer.h>
@@ -293,13 +294,17 @@ public:
     template<typename U = BufferT>
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, const void*>::type
     deviceData() const { return mBuffer.deviceData(); }
+    /// @deprecated Use one single-space device handle per GPU, or a managed cuda::Buffer.
     template<typename U = BufferT>
+    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: use one device handle per GPU, or a cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/Buffer.h, cuda/ManagedResource.h)")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, const void*>::type
     deviceData(int device) const { return mBuffer.deviceData(device); }
     template<typename U = BufferT>
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void*>::type
     deviceData() { return mBuffer.deviceData(); }
+    /// @deprecated Use one single-space device handle per GPU, or a managed cuda::Buffer.
     template<typename U = BufferT>
+    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: use one device handle per GPU, or a cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/Buffer.h, cuda/ManagedResource.h)")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void*>::type
     deviceData(int device) { return mBuffer.deviceData(device); }
 
@@ -376,27 +381,39 @@ public:
 
     /// @brief Upload the grid to the device, e.g. from CPU to GPU
     /// @note This method is only available if the buffer supports devices
+    /// @deprecated Build a host handle and cuda::copyTo a device handle; for a multi-GPU
+    ///             handle, use cuda::Buffer<std::byte, cuda::ManagedResource>.
     template<typename U = BufferT>
+    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: build a host handle and cuda::copyTo a device handle (cuda/HandleStorage.h); for a multi-GPU handle, use cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/ManagedResource.h)")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
-    deviceUpload(void* stream, bool sync = true) { mBuffer.deviceUpload(stream, sync); }
+    deviceUpload(void* stream, bool sync = true) { NANOVDB_SUPPRESS_DEPRECATION_BEGIN mBuffer.deviceUpload(stream, sync); NANOVDB_SUPPRESS_DEPRECATION_END }
 
-    /// @brief Upload the host buffer to a specific device buffer. It device buffer doesn't exist it's created first
+    /// @brief Upload the host buffer to a specific device buffer. If the device buffer doesn't exist it's created first
     /// @param device Device to upload host data to
     /// @param stream cuda stream
     /// @param sync if false the memory copy is asynchronous
+    /// @deprecated Build a host handle and cuda::copyTo a device handle; for a multi-GPU
+    ///             handle, use cuda::Buffer<std::byte, cuda::ManagedResource>.
     template<typename U = BufferT>
+    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: build a host handle and cuda::copyTo a device handle (cuda/HandleStorage.h); for a multi-GPU handle, use cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/ManagedResource.h)")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
-    deviceUpload(int device = 0, void* stream = nullptr, bool sync = true) { mBuffer.deviceUpload(device, stream, sync); }
+    deviceUpload(int device = 0, void* stream = nullptr, bool sync = true) { NANOVDB_SUPPRESS_DEPRECATION_BEGIN mBuffer.deviceUpload(device, stream, sync); NANOVDB_SUPPRESS_DEPRECATION_END }
 
     /// @brief Download the grid to from the device, e.g. from GPU to CPU
     /// @note This method is only available if the buffer supports devices
+    /// @deprecated cuda::copyTo a host handle to read the grids on the host; for a multi-GPU
+    ///             handle, use cuda::Buffer<std::byte, cuda::ManagedResource>.
     template<typename U = BufferT>
+    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: cuda::copyTo a host handle to read the grids on the host (cuda/HandleStorage.h); for a multi-GPU handle, use cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/ManagedResource.h)")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
-    deviceDownload(void* stream, bool sync = true) { mBuffer.deviceDownload(stream, sync); }
+    deviceDownload(void* stream, bool sync = true) { NANOVDB_SUPPRESS_DEPRECATION_BEGIN mBuffer.deviceDownload(stream, sync); NANOVDB_SUPPRESS_DEPRECATION_END }
 
+    /// @deprecated cuda::copyTo a host handle to read the grids on the host; for a multi-GPU
+    ///             handle, use cuda::Buffer<std::byte, cuda::ManagedResource>.
     template<typename U = BufferT>
+    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: cuda::copyTo a host handle to read the grids on the host (cuda/HandleStorage.h); for a multi-GPU handle, use cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/ManagedResource.h)")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
-    deviceDownload(int device = 0, void* stream = nullptr, bool sync = true) { mBuffer.deviceDownload(device, stream, sync); }
+    deviceDownload(int device = 0, void* stream = nullptr, bool sync = true) { NANOVDB_SUPPRESS_DEPRECATION_BEGIN mBuffer.deviceDownload(device, stream, sync); NANOVDB_SUPPRESS_DEPRECATION_END }
 
     /// @brief Check if the buffer is this handle has any padding, i.e. if the buffer is larger than the combined size of all its grids
     /// @return true is the combined size of all grid is smaller than the buffer size
@@ -797,7 +814,11 @@ mergeGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* pool = nu
 
 } // namespace nanovdb
 
-#if defined(__CUDACC__)
+// cuda/HandleStorage.h and tools/cuda/GridChecksum.cuh, which cuda/GridHandle.cuh
+// depends on, include this header before their own definitions; while either is
+// being parsed it defers cuda/GridHandle.cuh to its own end.
+#if defined(__CUDACC__) && !defined(NANOVDB_CUDA_HANDLESTORAGE_DEFERS_GRIDHANDLE_CUH) \
+    && !defined(NANOVDB_TOOLS_CUDA_GRIDCHECKSUM_DEFERS_GRIDHANDLE_CUH)
 #include <nanovdb/cuda/GridHandle.cuh>
 #endif// defined(__CUDACC__)
 

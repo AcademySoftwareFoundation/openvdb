@@ -28,7 +28,8 @@ both host and device with identical code).
 #include <nanovdb/math/SampleFromVoxels.h> // sampling
 
 // GPU
-#include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/cuda/Buffer.h>               // device storage: cuda::Buffer<std::byte>
+#include <nanovdb/cuda/HandleStorage.h>        // cuda::copyTo host <-> device
 #include <nanovdb/cuda/GridHandle.cuh>
 #include <nanovdb/cuda/NodeManager.cuh>
 
@@ -166,9 +167,11 @@ GPU. Pass the device-side `NodeManager*` to the kernel and index leaves by
 block, voxels within a leaf by thread:
 
 ```cpp no-compile
+#include <nanovdb/cuda/DeviceResource.h>
 #include <nanovdb/cuda/NodeManager.cuh>
 
-auto dnmh = nanovdb::cuda::createNodeManager<float>(dGrid);
+nanovdb::cuda::DeviceResource resource;          // must outlive dnmh, which borrows it
+auto dnmh = nanovdb::cuda::createNodeManager<float>(dGrid, resource, /*stream=*/0);
 const auto* dmgr = dnmh.template deviceMgr<float>();   // device pointer
 
 // One block per leaf; 64 threads cover the 512 voxels in each leaf.
@@ -253,10 +256,10 @@ auto acc = grid->getAccessor();
 nanovdb::math::Ray<float> wRay({0,0,-5}, {0,0,1});
 auto iRay = wRay.worldToIndexF(*grid);
 
-// High-level: ZeroCrossing drives an HDDA and stops at the first sign change.
+// High-level: zeroCrossing drives an HDDA and stops at the first sign change.
 nanovdb::Coord ijk;
 float v, t;
-if (nanovdb::math::ZeroCrossing(iRay, acc, ijk, v, t)) { /* hit at ijk */ }
+if (nanovdb::math::zeroCrossing(iRay, acc, ijk, v, t)) { /* hit at ijk */ }
 
 // Low-level: HDDA ctor takes the ray AND the start dimension from getDim.
 nanovdb::Coord start(0, 0, 0);
@@ -271,12 +274,15 @@ while (hdda.step()) {
 ## GPU: transfer + kernel
 
 ```cpp
-#include <nanovdb/cuda/DeviceBuffer.h>
-#include <nanovdb/cuda/GridHandle.cuh>
+#include <nanovdb/GridHandle.h>
+#include <nanovdb/cuda/Buffer.h>
+#include <nanovdb/cuda/HandleStorage.h>
 
-auto devH = hostH.copy<nanovdb::cuda::DeviceBuffer>();
-devH.deviceUpload();                       // REQUIRED: push to device, else deviceGrid()==nullptr
+cudaStream_t stream = 0;
+auto devH = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(hostH, stream);   // device-only copy
 const auto* dGrid = devH.deviceGrid<float>();
+// ... kernels ...
+auto back = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(devH, stream);   // to read results on the CPU
 
 __global__ void k(const nanovdb::NanoGrid<float>* g,
                   const nanovdb::Coord* coords, float* out, int N) {
@@ -293,10 +299,19 @@ k<<<(N+127)/128, 128>>>(dGrid, dCoords, dOut, N);
 
 ## GPU builders
 
+Pass `nanovdb::cuda::Buffer<std::byte>()` as the output buffer to get a
+device handle. (OpenVDB 13.x still defaults to the deprecated dual buffer;
+OpenVDB 14.0 makes `cuda::Buffer<std::byte>` the default.) Or use a free
+function's resource form, which takes a stream instead of a buffer, e.g.
+`voxelsToGrid<float>(dCoords, n, 1.0, cudaStream_t(0))`, or a builder's
+`build()`, whose handle borrows the builder's resource (keep it alive).
+
 ```cpp
+using DevBuf = nanovdb::cuda::Buffer<std::byte>;
+
 // Points → grid (builder-pattern class, not a free function)
 nanovdb::tools::cuda::PointsToGrid<nanovdb::Point> p2g(/*voxelSize=*/0.05);
-auto ptsH = p2g.getHandle(dPoints, nPts);
+auto ptsH = p2g.getHandle(dPoints, nPts, DevBuf());
 const auto* ptsGrid = ptsH.deviceGrid<nanovdb::Point>();
 
 // Mesh → OnIndexGrid (narrow-band). Verts are Vec3f, triangles Vec3i.
@@ -305,11 +320,11 @@ const nanovdb::Vec3i* dTris;  size_t triN;
 nanovdb::tools::cuda::MeshToGrid<nanovdb::ValueOnIndex> m2g(
     dVerts, vertN, dTris, triN, nanovdb::Map(voxelSize));
 m2g.setNarrowBandWidth(3.f);
-auto meshH = m2g.getHandle();
+auto meshH = m2g.getHandle(DevBuf());
 const auto* meshGrid = meshH.deviceGrid<nanovdb::ValueOnIndex>();
 
 // MeshToGrid + per-active-voxel UDF sidecar
-auto [gridH, udfBuf] = m2g.getHandleAndUDF();
+auto [gridH, udfBuf] = m2g.getHandleAndUDF(DevBuf(), DevBuf());
 ```
 
 ## CPU builder
@@ -338,16 +353,17 @@ auto h = nanovdb::tools::createLevelSetSphere<float>(
 
 ```cpp
 // Builder classes (NOT free functions); ValueOnIndex grids only. Construct
-// from a device grid pointer, getHandle() returns a new GridHandle.
-using OnIdx = nanovdb::ValueOnIndex;
+// from a device grid pointer, getHandle(DevBuf()) returns a new device GridHandle.
+using OnIdx  = nanovdb::ValueOnIndex;
+using DevBuf = nanovdb::cuda::Buffer<std::byte>;
 auto* g = devH.deviceGrid<OnIdx>();
 
-auto dilatedH = nanovdb::tools::cuda::DilateGrid<OnIdx>(g).getHandle();
-auto coarseH  = nanovdb::tools::cuda::CoarsenGrid<OnIdx>(g).getHandle();
-auto fineH    = nanovdb::tools::cuda::RefineGrid<OnIdx>(g).getHandle();
+auto dilatedH = nanovdb::tools::cuda::DilateGrid<OnIdx>(g).getHandle(DevBuf());
+auto coarseH  = nanovdb::tools::cuda::CoarsenGrid<OnIdx>(g).getHandle(DevBuf());
+auto fineH    = nanovdb::tools::cuda::RefineGrid<OnIdx>(g).getHandle(DevBuf());
 const nanovdb::Mask<3>* leafMask = nullptr;   // PruneGrid needs a per-leaf mask
-auto prunedH  = nanovdb::tools::cuda::PruneGrid<OnIdx>(g, leafMask).getHandle();
-auto mergedH  = nanovdb::tools::cuda::MergeGrids<OnIdx>(g, g).getHandle();
+auto prunedH  = nanovdb::tools::cuda::PruneGrid<OnIdx>(g, leafMask).getHandle(DevBuf());
+auto mergedH  = nanovdb::tools::cuda::MergeGrids<OnIdx>(g, g).getHandle(DevBuf());
 
 // signedFloodFill is the exception: a free function, in place, on a scalar
 // SDF grid (not OnIndex).
@@ -380,8 +396,8 @@ nanovdb::util::cuda::operatorKernel<
 
 // Per-leaf overlap mask (new voxels = dstMask & ~overlap):
 auto dstLeaves = nanovdb::util::cuda::DeviceGridTraits<OnIdx>::getTreeData(dstGrid).mNodeCount[0];
-auto maskBuf = nanovdb::cuda::DeviceBuffer::create(dstLeaves*sizeof(nanovdb::Mask<3>), nullptr, false);
-auto* overlap = static_cast<nanovdb::Mask<3>*>(maskBuf.deviceData());
+nanovdb::cuda::Buffer<nanovdb::Mask<3>> maskBuf(cudaStream_t(0), dstLeaves, nanovdb::cuda::noInit);
+nanovdb::Mask<3>* overlap = maskBuf.data();          // device memory
 unsigned nt = 128, nb = (dstLeaves + nt - 1) / nt;
 nanovdb::util::cuda::lambdaKernel<<<nb, nt>>>(dstLeaves,
     nanovdb::util::cuda::InjectGridMaskFunctor<OnIdx>(), srcGrid, dstGrid, overlap);
@@ -440,7 +456,7 @@ auto h = nanovdb::tools::createNanoGrid<openvdb::FloatGrid,
 
 // Or from a mesh on the GPU (already returns OnIndexGrid)
 nanovdb::tools::cuda::MeshToGrid<nanovdb::ValueOnIndex> mesher(dV, vN, dT, tN, nanovdb::Map(vs));
-auto devH = mesher.getHandle();
+auto devH = mesher.getHandle(nanovdb::cuda::Buffer<std::byte>());
 const auto* g = devH.deviceGrid<nanovdb::ValueOnIndex>();
 
 // External attribute array — same length as active voxel count
@@ -476,10 +492,11 @@ needed by value-typed tools like `signedFloodFill`):
 
 ```cpp
 #include <nanovdb/tools/cuda/IndexToGrid.cuh>
+#include <nanovdb/cuda/Buffer.h>
 
 const auto* idxGrid = devH.deviceGrid<nanovdb::ValueOnIndex>();
 const float* dValues = nullptr;                       // per-active-voxel sidecar
-auto floatH = nanovdb::tools::cuda::indexToGrid<float>(idxGrid, dValues);
+auto floatH = nanovdb::tools::cuda::indexToGrid<float>(idxGrid, dValues, nanovdb::cuda::Buffer<std::byte>());
 const auto* floatGrid = floatH.deviceGrid<float>();   // values now in-grid
 ```
 
@@ -521,12 +538,14 @@ checksum):
 
 ```cpp
 #include <nanovdb/tools/cuda/AddBlindData.cuh>
+#include <nanovdb/cuda/Buffer.h>
 
 const float* dChannel = nullptr; uint64_t valueCount = 0;
 auto h = nanovdb::tools::cuda::addBlindData(
     dGrid, dChannel, valueCount,
     nanovdb::GridBlindDataClass::ChannelArray,
-    nanovdb::GridBlindDataSemantic::Unknown, "my_channel");
+    nanovdb::GridBlindDataSemantic::Unknown, "my_channel",
+    nanovdb::cuda::Buffer<std::byte>());
 const auto* g = h.deviceGrid<float>();
 ```
 
@@ -563,10 +582,12 @@ nanovdb::io::writeGrid("sphere.nvdb", h);
 - **Type mismatch returns nullptr.** Always check `handle.grid<T>()`.
 - **Accessors are not thread-safe.** One per thread/warp.
 - **Accessors don't cross CPU/GPU.** Build inside the kernel.
+- **A device handle has no host grid.** `GridHandle<cuda::Buffer<std::byte>>`
+  offers `deviceGrid<T>()` only; `cuda::copyTo` a host handle to read it on the CPU.
 - **Topology is frozen.** To "add a voxel" you must rebuild the grid.
 - **32-byte alignment.** Don't allocate the buffer yourself with
-  `new char[N]` — use `HostBuffer` or `DeviceBuffer`, which guarantee
-  alignment.
+  `new char[N]` — use `HostBuffer` or `cuda::Buffer<std::byte>`, which
+  guarantee alignment.
 - **No runtime `std::` in `__hostdev__` code.** Containers, iostreams,
   allocators, `std::sort` etc. won't work on device. For type traits and
   compile-time helpers, NanoVDB uses its own `nanovdb::util::is_same` /

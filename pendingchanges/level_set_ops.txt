@@ -1,0 +1,14 @@
+OpenVDB:
+
+    Improvements:
+     - The Fast Sweeping methods, tools::maskSdf and corresponding
+       FastSweeping::initMask, now only attempt to perform an interior mask
+       operation on floating point level set grids.
+
+Houdini:
+ - The OpenVDB Combine SOP now falls back to composite methods for non floating
+   point grids if the mode is set to a CSG operation. The operation is equivalent
+   (i.e minimum for Union, maximum for Intersection and Max(a, -b) for difference)
+   however is also well defined for vector grids (magnitude based) and skips
+   the various level set logic that is otherwise undefined on non floating point
+   grid types.

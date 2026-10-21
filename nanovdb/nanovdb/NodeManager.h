@@ -168,7 +168,9 @@ public:
     /// @brief Upload the NodeManager to the device, e.g. from CPU to GPU
     ///
     /// @note This method is only available if the buffer supports devices
+    /// @deprecated Build the node manager on the device with cuda::createNodeManager(deviceGrid, resource).
     template<typename U = BufferT>
+    [[deprecated("node-manager storage is moving to cuda::Buffer<std::byte>: build the node manager on the device with cuda::createNodeManager(deviceGrid, resource) (cuda/NodeManager.cuh)")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
     deviceUpload(void* deviceGrid, void* stream = nullptr, bool sync = true)
     {
@@ -176,20 +178,26 @@ public:
         auto *data = reinterpret_cast<NodeManagerData*>(mBuffer.data());
         void *tmp = data->mGrid;
         data->mGrid = deviceGrid;
+        NANOVDB_SUPPRESS_DEPRECATION_BEGIN
         mBuffer.deviceUpload(stream, sync);
+        NANOVDB_SUPPRESS_DEPRECATION_END
         data->mGrid = tmp;
     }
 
     /// @brief Download the NodeManager to from the device, e.g. from GPU to CPU
     ///
     /// @note This method is only available if the buffer supports devices
+    /// @deprecated Build the node manager on the host with createNodeManager.
     template<typename U = BufferT>
+    [[deprecated("node-manager storage is moving to cuda::Buffer<std::byte>: build the node manager on the host with createNodeManager (NodeManager.h)")]]
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
     deviceDownload(void* stream = nullptr, bool sync = true)
     {
         auto *data = reinterpret_cast<NodeManagerData*>(mBuffer.data());
         void *tmp = data->mGrid;
+        NANOVDB_SUPPRESS_DEPRECATION_BEGIN
         mBuffer.deviceDownload(stream, sync);
+        NANOVDB_SUPPRESS_DEPRECATION_END
         data->mGrid = tmp;
     }
 };// NodeManagerHandle
