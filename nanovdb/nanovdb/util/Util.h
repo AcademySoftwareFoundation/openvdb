@@ -135,7 +135,10 @@ typedef unsigned long long uint64_t;
 /// @brief Brackets code that calls deprecated NanoVDB API on purpose, e.g. a
 ///        deprecated member that forwards to another deprecated member, so that
 ///        the warning is reported only at the user's call.
-#if defined(__NVCC__)
+#if defined(__NVCC__) && defined(_MSC_VER)// with an MSVC host, nvcc mismatches nv_diagnostic push/pop, so restore the defaults as CCCL does
+#define NANOVDB_SUPPRESS_DEPRECATION_NVCC_BEGIN __pragma("nv_diag_suppress 1444") __pragma("nv_diag_suppress 20199")
+#define NANOVDB_SUPPRESS_DEPRECATION_NVCC_END __pragma("nv_diag_default 1444") __pragma("nv_diag_default 20199")
+#elif defined(__NVCC__)
 #define NANOVDB_SUPPRESS_DEPRECATION_NVCC_BEGIN _Pragma("nv_diagnostic push") _Pragma("nv_diag_suppress 1444") _Pragma("nv_diag_suppress 20199")
 #define NANOVDB_SUPPRESS_DEPRECATION_NVCC_END _Pragma("nv_diagnostic pop")
 #else
