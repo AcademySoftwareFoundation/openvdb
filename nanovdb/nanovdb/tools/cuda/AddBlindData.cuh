@@ -171,8 +171,8 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
 }// addBlindData
 
 /// @brief Resource form of addBlindData: the output and the scratch allocate
-///        through @c resource, on @c stream. Passing a cudaStream_t selects
-///        this form (a literal 0 does not: write cudaStream_t(0)); the
+///        through @c resource, on @c stream. Passing a cudaStream_t, or a non-buffer type
+///        that converts to one, selects this form (a literal 0 does not: write cudaStream_t(0)); the
 ///        prototype-buffer form above keeps its call shape, and both forms
 ///        validate their arguments.
 /// @tparam ResourceT stream-ordered memory resource, held by value (a copy of

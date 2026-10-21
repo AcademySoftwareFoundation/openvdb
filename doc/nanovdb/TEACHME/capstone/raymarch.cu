@@ -10,12 +10,13 @@
 // View:   python3 ppm2png.py sphere.ppm sphere.png   (then open sphere.png)
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/tools/CreatePrimitives.h>
-#include <nanovdb/cuda/DeviceBuffer.h>
-#include <nanovdb/cuda/GridHandle.cuh>
+#include <nanovdb/cuda/Buffer.h>
+#include <nanovdb/cuda/HandleStorage.h>
 #include <nanovdb/math/Ray.h>
-#include <nanovdb/math/HDDA.h>        // nanovdb::math::ZeroCrossing
+#include <nanovdb/math/HDDA.h>        // nanovdb::math::zeroCrossing
 #include <nanovdb/math/Stencils.h>   // nanovdb::math::GradStencil
 
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
@@ -79,11 +80,9 @@ int main(int argc, char** argv)
         /*radius=*/100.0, /*center=*/nanovdb::Vec3d(0.0),
         /*voxelSize=*/1.0, /*halfWidth=*/3.0);
 
-    // Move to the device. copy<DeviceBuffer>() fills the HOST side of the dual
-    // buffer; deviceUpload() pushes it to the GPU — skip it and deviceGrid()
-    // returns nullptr.
-    auto devHandle = handle.copy<nanovdb::cuda::DeviceBuffer>();
-    devHandle.deviceUpload();
+    // Copy to the device. The device handle holds its bytes only in device
+    // memory: deviceGrid() is the pointer to pass to the kernel.
+    auto devHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle, cudaStream_t(0));
     const GridT* dGrid = devHandle.deviceGrid<float>();
     if (!dGrid) { std::printf("no device grid\n"); return 1; }
 

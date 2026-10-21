@@ -30,7 +30,7 @@
 #include <vector> // for the adopted metadata
 
 #include <stdexcept> // for std::runtime_error
-#include <type_traits> // for std::is_default_constructible, std::enable_if, std::is_same
+#include <type_traits> // for std::is_default_constructible, std::enable_if, std::is_same, std::is_convertible, std::is_null_pointer
 
 namespace nanovdb {
 
@@ -89,14 +89,26 @@ inline void* deviceStorageData(BufferT& buffer)
     else return buffer.deviceData();
 }
 
+/// @brief True when @c BufferT is a stream rather than a buffer: cudaStream_t, or
+///        another non-buffer type that converts to it. nullptr is not a stream here.
+template<typename BufferT>
+struct IsStreamArgument
+{
+    static constexpr bool value = std::is_convertible<BufferT, cudaStream_t>::value && !std::is_null_pointer<BufferT>::value
+                                  && !BufferTraits<BufferT>::hasDeviceDual && !BufferHasDeviceSingle<BufferT>::value
+                                  && !BufferHasHostSingle<BufferT>::value;
+};
 /// @brief Return type of a tool's prototype-buffer form: @c T, except when
-///        @c BufferT deduced as cudaStream_t, i.e. the call passed a stream
-///        where the prototype goes, which is the resource form's signature.
+///        @c BufferT deduced as a stream (cudaStream_t, or any other type that
+///        converts to it and is not a buffer, such as a stream wrapper), i.e.
+///        the call passed a stream where the prototype goes, which is the
+///        resource form's signature. A literal 0 or nullptr keeps the prototype
+///        form, whose static_assert asks for cudaStream_t(0).
 ///        Removing the prototype form there leaves the resource form as the
 ///        only candidate rather than relying on partial ordering, which
 ///        compilers resolve differently for these overloads.
 template<typename BufferT, typename T>
-using PrototypeFormResult = typename std::enable_if<!std::is_same<BufferT, cudaStream_t>::value, T>::type;
+using PrototypeFormResult = typename std::enable_if<!IsStreamArgument<BufferT>::value, T>::type;
 
 /// @brief Orders the host after @c stream where a handle is about to be
 ///        constructed from bytes still being written on it: a single-space
@@ -173,8 +185,8 @@ struct HandleFactory
 ///        handles and host-readable handles (HostBuffer or a host-accessible
 ///        single-space buffer such as a pinned-resource cuda::Buffer).
 /// @tparam DstBufferT destination buffer type (specify explicitly)
-/// @param src the handle to copy; must not be dual-space (use
-///        deviceUpload/deviceDownload on those)
+/// @param src the handle to copy; must not use a deprecated dual-space
+///        buffer (build device handles into cuda::Buffer<std::byte> instead)
 /// @param stream stream the copy is issued on; a device destination buffer
 ///        with a stream-ordered resource retains it
 /// @warning Passing a stream other than the source buffer's retained stream
@@ -193,7 +205,11 @@ struct HandleFactory
 /// @param proto optional buffer whose resource (or pool, for buffers
 ///        providing create()) allocates the destination storage; without it
 ///        the destination resource is default-constructed
-/// @return a handle of the destination buffer type with equal contents
+/// @return a handle of the destination buffer type with equal contents; an
+///         empty @a src yields an empty handle, over @a proto's resource for
+///         a single-space destination when given
+/// @throw std::runtime_error if @a src is empty and DstBufferT is not
+///        default-constructible, unless it is single-space and @a proto is given
 /// @details A host-readable destination -- HostBuffer, pinned, or a
 ///          both-space managed buffer -- synchronizes @c stream before
 ///          returning, so its host accessors are immediately valid; a
@@ -211,16 +227,19 @@ inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, cudaStre
     constexpr bool srcDev = BufferHasDeviceSingle<SrcBufferT>::value;
     constexpr bool dstDev = BufferHasDeviceSingle<DstBufferT>::value;
     static_assert(!BufferTraits<SrcBufferT>::hasDeviceDual && !BufferTraits<DstBufferT>::hasDeviceDual,
-                  "cuda::copyTo does not support dual-space buffers: use deviceUpload/deviceDownload on the handle");
+                  "cuda::copyTo does not support the deprecated dual-space buffers: build device handles into cuda::Buffer<std::byte> by passing a cuda::Buffer<std::byte>() prototype to the GPU tool");
     static_assert(srcDev || dstDev,
                   "cuda::copyTo is for cross-space transfers involving a device buffer: use GridHandle::copy for host-to-host");
     const uint64_t bytes = src.bufferSize();
-    if (bytes == 0u) {
+    if (bytes == 0u) {// an empty handle copies to an empty handle, over the prototype's resource where given
+        if constexpr (BufferHasDeviceSingle<DstBufferT>::value || BufferHasHostSingle<DstBufferT>::value) {
+            if (proto) return detail::HandleFactory::make(detail::makeTransferStorage<DstBufferT>(0, stream, proto), {});
+        }
         if constexpr (std::is_default_constructible<DstBufferT>::value) {
             return GridHandle<DstBufferT>();
         } else {
-            throw std::runtime_error("cuda::copyTo: an empty handle cannot be copied to a buffer type "
-                                     "that is not default-constructible");
+            throw std::runtime_error("cuda::copyTo: copying an empty handle into a buffer type that is not "
+                                     "default-constructible requires a single-space buffer type and a prototype buffer");
         }
     }
     DstBufferT dst = detail::makeTransferStorage<DstBufferT>(bytes, stream, proto);
