@@ -8,11 +8,11 @@
 
     \date May 1, 2020
 
-    \brief Implements I/O for NanoVDB grids. Features optional BLOSC and ZIP
+    \brief Implements I/O for NanoVDB grids. Features BLOSC and optional ZIP
            file compression, support for multiple grids per file as well as
            multiple grid types.
 
-    \note  This file does NOT depend on OpenVDB, but optionally on ZIP and BLOSC
+    \note  This file does NOT depend on OpenVDB, but optionally on ZIP
 
     \details NanoVDB files take on one of the two following formats:
              1) multiple segments each with multiple grids (segments have easy to access metadata about its grids)

@@ -54,8 +54,8 @@ SPDX-License-Identifier: BSD-3-Clause
   Blosc Development Team.
   https://github.com/Blosc/c-blosc
 
-  OpenVDB includes a simplified copy of Blosc (LZ4-only, no SIMD, no thread
-  pool) for reading and writing blosc-compressed grid data.
+  OpenVDB includes a simplified copy of Blosc (LZ4-only, SSE2 shuffle
+  only, no thread pool) for reading and writing blosc-compressed grid data.
 
 Redistribution and use in source and binary forms, with or without modification,
 are permitted provided that the following conditions are met:
@@ -91,7 +91,7 @@ SPDX-License-Identifier: BSD-2-Clause
   https://github.com/lz4/lz4
 
   OpenVDB includes a copy of LZ4, the compressor used internally by Blosc.
-  It is compiled directly into blosc.c as part of the vendored Blosc copy
+  It is compiled directly into vdb_blosc.c as part of the vendored Blosc copy
   rather than as an independent translation unit, with its symbols hidden.
 
 Redistribution and use in source and binary forms, with or without modification,
