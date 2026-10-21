@@ -1,0 +1,5 @@
+Improvements:
+  - points::rasterizeTrilinear now supports integer and arbitrary sized openvdb 
+    vector and matrix attributes (for collocated transfers).
+  - Vectorized points::rasterizeTrilinear, improving performance upwards of
+    2x on x86 with VCL, and 1.5x otherwise.

@@ -5,9 +5,10 @@
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
-#include <openvdb/points/PointScatter.h>
 #include <openvdb/points/PointRasterizeTrilinear.h>
 #include <openvdb/util/Assert.h>
+
+#include "PointBuilder.h"
 
 #include <gtest/gtest.h>
 
@@ -20,484 +21,455 @@ public:
     void TearDown() override { openvdb::uninitialize(); }
 }; // class TestPointRasterize
 
-struct DefaultTransfer
+template <bool S, typename V>
+using RasterizeTrilinearT =
+    decltype(points::rasterizeTrilinear<S, V, points::NullFilter, points::PointDataTree>(
+        std::declval<const points::PointDataTree&>(),
+        std::declval<const std::string&>(),
+        std::declval<const points::NullFilter&>()));
+
+// Assert some expected tree types from invoking rasterizeTrilinear
+static_assert(std::is_same_v<RasterizeTrilinearT<false, int32_t>, FloatTree::Ptr>);
+static_assert(std::is_same_v<RasterizeTrilinearT<true,  int32_t>, Vec3fTree::Ptr>);
+static_assert(std::is_same_v<RasterizeTrilinearT<false, int64_t>, DoubleTree::Ptr>);
+static_assert(std::is_same_v<RasterizeTrilinearT<true,  int64_t>, Vec3dTree::Ptr>);
+static_assert(std::is_same_v<RasterizeTrilinearT<false, uint32_t>, FloatTree::Ptr>);
+static_assert(std::is_same_v<RasterizeTrilinearT<true,  uint32_t>, Vec3fTree::Ptr>);
+static_assert(std::is_same_v<RasterizeTrilinearT<false, uint64_t>, DoubleTree::Ptr>);
+static_assert(std::is_same_v<RasterizeTrilinearT<true,  uint64_t>, Vec3dTree::Ptr>);
+static_assert(std::is_same_v<RasterizeTrilinearT<false, float>, FloatTree::Ptr>);
+static_assert(std::is_same_v<RasterizeTrilinearT<true,  float>, Vec3fTree::Ptr>);
+static_assert(std::is_same_v<RasterizeTrilinearT<false, double>, DoubleTree::Ptr>);
+static_assert(std::is_same_v<RasterizeTrilinearT<true,  double>, Vec3dTree::Ptr>);
+static_assert(std::is_same_v<RasterizeTrilinearT<false, Vec3f>, Vec3fTree::Ptr>);
+static_assert(std::is_same_v<RasterizeTrilinearT<true,  Vec3f>, Vec3fTree::Ptr>);
+static_assert(std::is_same_v<RasterizeTrilinearT<false, Vec3d>, Vec3dTree::Ptr>);
+static_assert(std::is_same_v<RasterizeTrilinearT<true,  Vec3d>, Vec3dTree::Ptr>);
+
+inline double kweight(const Vec3d& dist)
 {
-    inline bool startPointLeaf(const points::PointDataTree::LeafNodeType&) { return true; }
-    inline bool endPointLeaf(const points::PointDataTree::LeafNodeType&) { return true; }
-    inline bool finalize(const Coord&, size_t) { return true; }
-};
-
-template <typename T, bool Staggered>
-inline void testTrilinear(const T& v)
-{
-    static constexpr bool IsVec = ValueTraits<T>::IsVec;
-    using VecT = typename std::conditional<IsVec, T, math::Vec3<T>>::type;
-    using ResultValueT = typename std::conditional<Staggered && !IsVec, VecT, T>::type;
-    using ResultTreeT = typename points::PointDataTree::ValueConverter<ResultValueT>::Type;
-
-    std::vector<Vec3f> positions;
-    positions.emplace_back(Vec3f(0.0f));
-
-    const double voxelSize = 0.1;
-    math::Transform::Ptr transform =
-        math::Transform::createLinearTransform(voxelSize);
-
-    points::PointDataGrid::Ptr points =
-        points::createPointDataGrid<points::NullCodec,
-            points::PointDataGrid, Vec3f>(positions, *transform);
-
-    points::appendAttribute<T>(points->tree(), "test", v);
-    TreeBase::Ptr tree =
-        points::rasterizeTrilinear<Staggered, T>(points->tree(), "test");
-
-    EXPECT_TRUE(tree);
-    typename ResultTreeT::Ptr typed = DynamicPtrCast<ResultTreeT>(tree);
-    EXPECT_TRUE(typed);
-
-    const ResultValueT result = typed->getValue(Coord(0,0,0));
-
-    // convert both to vecs even if they are scalars to avoid having
-    // to specialise this method
-    const VecT expected(v);
-    const VecT vec(result);
-    EXPECT_NEAR(expected[0], vec[0], 1e-6);
-    EXPECT_NEAR(expected[1], vec[1], 1e-6);
-    EXPECT_NEAR(expected[2], vec[2], 1e-6);
+    return
+        points::rasterize_trilinear_internal::value(dist[0]) *
+        points::rasterize_trilinear_internal::value(dist[1]) *
+        points::rasterize_trilinear_internal::value(dist[2]);
 }
 
-TEST_F(TestPointRasterize, testTrilinearRasterizeFloat)
+template <typename T>
+inline void TestTrilinearScalar()
 {
-    testTrilinear<float, false>(111.0f);
-    testTrilinear<float, true>(111.0f);
-}
+    using ElemT = typename ValueTraits<T>::ElementType;
+    using FltT = typename types_internal::flt_t<sizeof(ElemT)*CHAR_BIT>::type;
 
-TEST_F(TestPointRasterize, testTrilinearRasterizeDouble)
-{
-    testTrilinear<double, false>(222.0);
-    testTrilinear<double, true>(222.0);
-}
-
-TEST_F(TestPointRasterize, testTrilinearRasterizeVec3f)
-{
-    testTrilinear<Vec3f, false>(Vec3f(111.0f,222.0f,333.0f));
-    testTrilinear<Vec3f, true>(Vec3f(111.0f,222.0f,333.0f));
-}
-
-TEST_F(TestPointRasterize, testTrilinearRasterizeVec3d)
-{
-    testTrilinear<Vec3d, false>(Vec3d(444.0,555.0,666.0));
-    testTrilinear<Vec3d, true>(Vec3d(444.0,555.0,666.0));
-}
-
-TEST_F(TestPointRasterize, testRasterizeWithFilter)
-{
-    struct CountPointsTransferScheme
-        : public DefaultTransfer
-        , public points::VolumeTransfer<Int32Tree>
-        , public points::FilteredTransfer<points::GroupFilter>
+    // Test single point at the origin (center of a voxel)
+    auto points = PointBuilder({Vec3f(0)}).attribute(T(111.0), "test").get();
     {
-        using FilterT = points::FilteredTransfer<points::GroupFilter>;
-        using FilterT::startPointLeaf;
-
-        CountPointsTransferScheme(Int32Tree& tree, const points::GroupFilter& filter)
-            : points::VolumeTransfer<Int32Tree>(&tree)
-            , points::FilteredTransfer<points::GroupFilter>(filter) {}
-
-        inline void initialize(const Coord& origin, const size_t idx, const CoordBBox& bounds)
-        {
-            points::VolumeTransfer<Int32Tree>::initialize(origin, idx, bounds);
-            points::FilteredTransfer<points::GroupFilter>::initialize(origin, idx, bounds);
+        auto tree = points::rasterizeTrilinear<false, T>(points->tree(), "test");
+        static_assert(
+            (sizeof(T) == 4 && std::is_same_v<FloatTree::Ptr, decltype(tree)>) ||
+            (sizeof(T) == 8 && std::is_same_v<DoubleTree::Ptr, decltype(tree)>));
+        EXPECT_EQ(Index64(8), tree->leafCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index64(27), tree->activeVoxelCount()); // should probably by 8 but we don't deactivate
+        for (auto iter = tree->cbeginValueAll(); iter; ++iter) {
+            // we're at the origin, expect either full weight or no weight
+            if (iter.getCoord() == Coord(0,0,0)) EXPECT_NEAR(FltT(111.0), *iter, 1e-6f);
+            else                                 EXPECT_EQ(FltT(0.0), *iter);
         }
-
-        inline Int32 range(const Coord&, size_t) const { return 0; }
-
-        inline void rasterizePoint(const Coord& ijk,
-                        const Index id,
-                        const CoordBBox&)
-        {
-            if (!this->FilterT::filter(id)) return;
-            const Index offset = points::PointDataTree::LeafNodeType::coordToOffset(ijk);
-            auto* const data = this->template buffer<0>();
-            data[offset] += 1;
-        }
-    };
-
-    std::vector<Vec3f> positions;
-    positions.emplace_back(Vec3f(0.0f, 0.0f, 0.0f));
-    positions.emplace_back(Vec3f(0.0f, 0.0f, 0.0f));
-    positions.emplace_back(Vec3f(0.0f, 0.0f, 0.0f));
-    positions.emplace_back(Vec3f(0.0f, 0.0f, 0.0f));
-
-    const double voxelSize = 0.1;
-    math::Transform::Ptr transform =
-        math::Transform::createLinearTransform(voxelSize);
-
-    points::PointDataGrid::Ptr points =
-        points::createPointDataGrid<points::NullCodec,
-            points::PointDataGrid>(positions, *transform);
-
-    points::PointDataTree& tree = points->tree();
-    points::appendGroup(tree, "test");
-
-    auto groupHandle = tree.beginLeaf()->groupWriteHandle("test");
-    groupHandle.set(0, true);
-    groupHandle.set(1, false);
-    groupHandle.set(2, true);
-    groupHandle.set(3, false);
-
-    Int32Tree::Ptr intTree(new Int32Tree);
-    intTree->setValueOn(Coord(0,0,0));
-
-    points::GroupFilter filter("test", tree.cbeginLeaf()->attributeSet());
-    CountPointsTransferScheme transfer(*intTree, filter);
-
-    points::rasterize(*points, transfer);
-    const int count = intTree->getValue(Coord(0,0,0));
-    EXPECT_EQ(2, count);
-}
-
-TEST_F(TestPointRasterize, testRasterizeWithInitializeAndFinalize)
-{
-    struct LinearFunctionPointCountTransferScheme
-        : public DefaultTransfer
-        , public points::VolumeTransfer<Int32Tree>
+    }
     {
-        LinearFunctionPointCountTransferScheme(Int32Tree& tree) :
-            points::VolumeTransfer<Int32Tree>(&tree) {}
+        auto tree = points::rasterizeTrilinear<true, T>(points->tree(), "test");
+        static_assert(
+            (sizeof(T) == 4 && std::is_same_v<Vec3fTree::Ptr, decltype(tree)>) ||
+            (sizeof(T) == 8 && std::is_same_v<Vec3dTree::Ptr, decltype(tree)>));
+        EXPECT_EQ(Index64(8), tree->leafCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index64(27), tree->activeVoxelCount());
+        for (auto iter = tree->cbeginValueOn(); iter; ++iter) {
+            const Vec3d dx = iter.getCoord().asVec3d() - Vec3d(0.5,0,0);
+            const Vec3d dy = iter.getCoord().asVec3d() - Vec3d(0,0.5,0);
+            const Vec3d dz = iter.getCoord().asVec3d() - Vec3d(0,0,0.5);
+            // we know we're at the origin, so we expect a |hat| function
+            // here, where the weight is either exactly zero or one
+            EXPECT_NEAR(kweight(dx) > 0 ? FltT(111.0) : 0.0f, (*iter)[0], 1e-6f);
+            EXPECT_NEAR(kweight(dy) > 0 ? FltT(111.0) : 0.0f, (*iter)[1], 1e-6f);
+            EXPECT_NEAR(kweight(dz) > 0 ? FltT(111.0) : 0.0f, (*iter)[2], 1e-6f);
+        }
+        for (auto iter = tree->cbeginValueOff(); iter; ++iter) EXPECT_EQ(iter->zero(), *iter);
+    }
 
-        inline Int32 range(const Coord&, size_t) const { return 0; }
+    // Test eight point at the origin (all overlapping). Result should be evenly weighted
+    auto positions = getBoxPoints(/*scale*/0.0f); // 8 positions
+    const std::vector<T> values { T(-1.0), T(0.0), T(2.3), T(5.4), T(8.4), T(-9.1), T(0.0), T(0.1) };
+    const FltT expected = [&]() {
+        FltT r = 0;
+        for (auto& v : values) r += FltT(v);
+        return r / FltT(8);
+    }();
 
-        inline void initialize(const Coord& c, size_t i, const CoordBBox& b)
-        {
-            this->points::VolumeTransfer<Int32Tree>::initialize(c,i,b);
-            auto* const data = this->template buffer<0>();
-            const auto& mask = *(this->template mask<0>());
-            for (auto iter = mask.beginOn(); iter; ++iter) {
-                data[iter.pos()] += 10;
+    points = PointBuilder(positions).attribute(values, "test").get();
+    {
+        auto tree = points::rasterizeTrilinear<false, T>(points->tree(), "test");
+        static_assert(
+            (sizeof(T) == 4 && std::is_same_v<FloatTree::Ptr, decltype(tree)>) ||
+            (sizeof(T) == 8 && std::is_same_v<DoubleTree::Ptr, decltype(tree)>));
+        EXPECT_EQ(Index64(8), tree->leafCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index64(27), tree->activeVoxelCount());
+        for (auto iter = tree->cbeginValueAll(); iter; ++iter) {
+            // we're at the origin, expect either full weight or no weight
+            if (iter.getCoord() == Coord(0,0,0)) EXPECT_NEAR(expected, *iter, 1e-6f);
+            else                                 EXPECT_EQ(FltT(0.0), *iter);
+        }
+    }
+    {
+        auto tree = points::rasterizeTrilinear<true, T>(points->tree(), "test");
+        static_assert(
+            (sizeof(T) == 4 && std::is_same_v<Vec3fTree::Ptr, decltype(tree)>) ||
+            (sizeof(T) == 8 && std::is_same_v<Vec3dTree::Ptr, decltype(tree)>));
+        EXPECT_EQ(Index64(8), tree->leafCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index64(27), tree->activeVoxelCount());
+
+        for (auto iter = tree->cbeginValueOn(); iter; ++iter) {
+            const Vec3d dx = iter.getCoord().asVec3d() - Vec3d(0.5,0,0);
+            const Vec3d dy = iter.getCoord().asVec3d() - Vec3d(0,0.5,0);
+            const Vec3d dz = iter.getCoord().asVec3d() - Vec3d(0,0,0.5);
+            // we know we're at the origin, so we expect a |hat| function
+            // here, where the weight is either exactly zero or one
+            EXPECT_NEAR(kweight(dx) > 0 ? expected : 0.0f, (*iter)[0], 1e-6f);
+            EXPECT_NEAR(kweight(dy) > 0 ? expected : 0.0f, (*iter)[1], 1e-6f);
+            EXPECT_NEAR(kweight(dz) > 0 ? expected : 0.0f, (*iter)[2], 1e-6f);
+        }
+        for (auto iter = tree->cbeginValueOff(); iter; ++iter) EXPECT_EQ(iter->zero(), *iter);
+    }
+
+    // Test eight points
+    positions = getBoxPoints(); // 8 positions
+    points = PointBuilder(positions).attribute(values, "test").get();
+    // positions to index space for the test check
+    for (auto& p : positions) p = Vec3f(points->transform().worldToIndex(p));
+    {
+        auto tree = points::rasterizeTrilinear<false, T>(points->tree(), "test");
+        static_assert(
+            (sizeof(T) == 4 && std::is_same_v<FloatTree::Ptr, decltype(tree)>) ||
+            (sizeof(T) == 8 && std::is_same_v<DoubleTree::Ptr, decltype(tree)>));
+        EXPECT_EQ(Index64(8), tree->leafCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index64(216), tree->activeVoxelCount());
+        for (auto iter = tree->cbeginValueOn(); iter; ++iter) {
+            FltT expected(0.0), weight(0.0);
+            for (size_t i = 0; i < 8; ++i) {
+                FltT w = FltT(kweight(positions[i] - iter.getCoord().asVec3d()));
+                weight += w;
+                expected += FltT(values[i]) * w;
             }
+            EXPECT_GE(weight, 0.0);
+            if (bool(weight)) expected /= weight;
+            EXPECT_NEAR(FltT(expected), *iter, 1e-6f);
         }
-
-        inline bool finalize(const Coord&, size_t)
-        {
-            auto* const data = this->template buffer<0>();
-            const auto& mask = *(this->template mask<0>());
-            for (auto iter = mask.beginOn(); iter; ++iter) {
-                data[iter.pos()] *= 2;
-            }
-            return true;
-        }
-
-        inline void rasterizePoint(const Coord& ijk, const Index, const CoordBBox&)
-        {
-            const Index offset = points::PointDataTree::LeafNodeType::coordToOffset(ijk);
-            auto* const data = this->template buffer<0>();
-            data[offset] += 1;
-        }
-    };
-
-    std::vector<Vec3f> positions;
-    positions.emplace_back(Vec3f(0.0f, 0.0f, 0.0f));
-    positions.emplace_back(Vec3f(0.0f, 0.0f, 0.0f));
-    positions.emplace_back(Vec3f(0.0f, 0.0f, 0.0f));
-    positions.emplace_back(Vec3f(0.0f, 0.0f, 0.0f));
-
-    const double voxelSize = 0.1;
-    math::Transform::Ptr transform =
-        math::Transform::createLinearTransform(voxelSize);
-
-    points::PointDataGrid::Ptr points =
-        points::createPointDataGrid<points::NullCodec,
-            points::PointDataGrid>(positions, *transform);
-
-    Int32Tree::Ptr intTree(new Int32Tree);
-    intTree->setValueOn(Coord(0,0,0));
-
-    LinearFunctionPointCountTransferScheme transfer(*intTree);
-    points::rasterize(*points, transfer);
-
-    const int value = intTree->getValue(Coord(0,0,0));
-    EXPECT_EQ(/*(10+4)*2*/28, value);
-}
-
-TEST_F(TestPointRasterize, tetsSingleTreeRasterize)
-{
-    struct CountPoints27TransferScheme
-        : public DefaultTransfer
-        , public points::VolumeTransfer<Int32Tree>
+        for (auto iter = tree->cbeginValueOff(); iter; ++iter) EXPECT_EQ(T(0), *iter);
+    }
     {
-        CountPoints27TransferScheme(Int32Tree& tree)
-            : points::VolumeTransfer<Int32Tree>(&tree) {}
-
-        /// @brief  The maximum lookup range of this transfer scheme in voxels.
-        inline Int32 range(const Coord&, size_t) const { return 1; }
-
-        /// @brief  The point stamp function. Each point which contributes to the
-        ///         current leaf that the thread has access to will call this function
-        ///         exactly once.
-        /// @param ijk     The current voxel containing the point being rasterized. May
-        ///                not be inside the destination leaf nodes.
-        /// @param id      The point index being rasterized
-        /// @param bounds  The active bounds of the leaf node(s) being written to.
-        void rasterizePoint(const Coord& ijk, const Index, const CoordBBox& bounds)
-        {
-            static const Index DIM = Int32Tree::LeafNodeType::DIM;
-            static const Index LOG2DIM = Int32Tree::LeafNodeType::LOG2DIM;
-
-            CoordBBox intersectBox(ijk.offsetBy(-1), ijk.offsetBy(1));
-            intersectBox.intersect(bounds);
-            if (intersectBox.empty()) return;
-            auto* const data = this->template buffer<0>();
-            const auto& mask = *(this->template mask<0>());
-
-            // loop over voxels in this leaf which are affected by this point
-
-            const Coord& a(intersectBox.min());
-            const Coord& b(intersectBox.max());
-            for (Coord c = a; c.x() <= b.x(); ++c.x()) {
-                const Index i = ((c.x() & (DIM-1u)) << 2*LOG2DIM);
-                for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
-                    const Index j = ((c.y() & (DIM-1u)) << LOG2DIM);
-                    for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
-                        OPENVDB_ASSERT(bounds.isInside(c));
-                        const Index offset = i + j + /*k*/(c.z() & (DIM-1u));
-                        if (!mask.isOn(offset)) continue;
-                        data[offset] += 1;
-
-                    }
+        auto tree = points::rasterizeTrilinear<true, T>(points->tree(), "test");
+        static_assert(
+            (sizeof(T) == 4 && std::is_same_v<Vec3fTree::Ptr, decltype(tree)>) ||
+            (sizeof(T) == 8 && std::is_same_v<Vec3dTree::Ptr, decltype(tree)>));
+        EXPECT_EQ(Index64(8), tree->leafCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index64(216), tree->activeVoxelCount());
+        for (auto iter = tree->cbeginValueOn(); iter; ++iter) {
+            const Vec3d ijk = iter.getCoord().asVec3d();
+            math::Vec3<FltT> expected(0.0f), weight(0.0f);
+            for (size_t i = 0; i < 8; ++i) {
+                for (size_t j = 0; j < 3; ++j) {
+                    Vec3d offset(0.0);
+                    offset[j] = 0.5;
+                    FltT w = FltT(kweight(positions[i] - (ijk - offset)));
+                    weight[j] += w;
+                    expected[j] += FltT(values[i]) * w;
                 }
             }
+            for (size_t j = 0; j < 3; ++j) {
+                EXPECT_GE(weight[j], FltT(0.0)) << j;
+                if (bool(weight[j])) expected[j] /= weight[j];
+            }
+            EXPECT_NEAR(expected[0], (*iter)[0], 1e-6f);
+            EXPECT_NEAR(expected[1], (*iter)[1], 1e-6f);
+            EXPECT_NEAR(expected[2], (*iter)[2], 1e-6f);
         }
-    };
-
-    std::vector<Vec3f> positions;
-    positions.emplace_back(Vec3f(0.0f, 0.0f, 0.0f));
-    positions.emplace_back(Vec3f(0.1f, 0.1f, 0.1f));
-    positions.emplace_back(Vec3f(0.2f, 0.2f, 0.2f));
-    positions.emplace_back(Vec3f(-0.1f,-0.1f,-0.1f));
-
-    const double voxelSize = 0.1;
-    math::Transform::Ptr transform =
-        math::Transform::createLinearTransform(voxelSize);
-
-    points::PointDataGrid::Ptr points =
-        points::createPointDataGrid<points::NullCodec,
-            points::PointDataGrid>(positions, *transform);
-
-    Int32Tree::Ptr intTree(new Int32Tree);
-    intTree->setValueOn(Coord(0,0,0));
-    intTree->setValueOn(Coord(1,1,1));
-    intTree->setValueOn(Coord(-1,-1,-1));
-
-    CountPoints27TransferScheme transfer(*intTree);
-    points::rasterize(*points, transfer);
-
-    int count = intTree->getValue(Coord(0,0,0));
-    EXPECT_EQ(3, count);
-    count = intTree->getValue(Coord(1,1,1));
-    EXPECT_EQ(3, count);
-    count = intTree->getValue(Coord(-1,-1,-1));
-    EXPECT_EQ(2, count);
+        for (auto iter = tree->cbeginValueOff(); iter; ++iter) EXPECT_EQ(iter->zero(), *iter);
+    }
 }
 
-TEST_F(TestPointRasterize, testMultiTreeRasterize)
+TEST_F(TestPointRasterize, testTrilinearRasterizeScalar)
 {
-    /// @brief  An example multi tree transfer scheme which rasterizes a vector
-    ///         attribute into an int grid using length, and an int attribute
-    ///         into a vector grid. Based on a 27 lookup stencil.
-    ///
-    struct MultiTransferScheme
-        : public DefaultTransfer
-        , public points::VolumeTransfer<Int32Tree, Vec3DTree>
+    TestTrilinearScalar<float>();
+    TestTrilinearScalar<double>();
+    TestTrilinearScalar<int32_t>();
+    TestTrilinearScalar<int64_t>();
+}
+
+
+template <typename Vec3T>
+inline void TestTrilinearVec()
+{
+    using ElemT = typename Vec3T::ValueType;
+    using FltT = typename types_internal::flt_t<sizeof(ElemT)*CHAR_BIT>::type;
+    using TreeT = typename openvdb::points::PointDataGrid::ValueConverter<math::Vec3<FltT>>::Type::TreeType;
+
+    // Test single point at the origin (center of a voxel)
+    auto points = PointBuilder({Vec3T(0)}).attribute(Vec3T(1.0, 2.0, 3.0), "test").get();
     {
-        using BaseT = points::VolumeTransfer<Int32Tree, Vec3DTree>;
-
-        MultiTransferScheme(const size_t vIdx,const size_t iIdx,
-                            Int32Tree& t1, Vec3DTree& t2)
-            : BaseT(t1, t2)
-            , mVIdx(vIdx), mIIdx(iIdx)
-            , mVHandle(), mIHandle() {}
-
-        MultiTransferScheme(const MultiTransferScheme& other)
-            : BaseT(other), mVIdx(other.mVIdx), mIIdx(other.mIIdx)
-            , mVHandle(), mIHandle() {}
-
-        inline Int32 range(const Coord&, size_t) const { return 1; }
-
-        inline bool startPointLeaf(const points::PointDataTree::LeafNodeType& leaf)
-        {
-            mVHandle = points::AttributeHandle<Vec3d>::create(leaf.constAttributeArray(mVIdx));
-            mIHandle = points::AttributeHandle<int>::create(leaf.constAttributeArray(mIIdx));
-            return true;
-        }
-
-        void rasterizePoint(const Coord& ijk, const Index id, const CoordBBox& bounds)
-        {
-            static const Index DIM = Int32Tree::LeafNodeType::DIM;
-            static const Index LOG2DIM = Int32Tree::LeafNodeType::LOG2DIM;
-
-            CoordBBox intersectBox(ijk.offsetBy(-1), ijk.offsetBy(1));
-            intersectBox.intersect(bounds);
-            if (intersectBox.empty()) return;
-
-            auto* const data1 = this->template buffer<0>();
-            auto* const data2 = this->template buffer<1>();
-            const auto& mask = *(this->template mask<0>());
-
-            // loop over voxels in this leaf which are affected by this point
-            const Vec3d& vec = mVHandle->get(id);
-            const int integer = mIHandle->get(id);
-
-            const Coord& a(intersectBox.min());
-            const Coord& b(intersectBox.max());
-            for (Coord c = a; c.x() <= b.x(); ++c.x()) {
-                const Index i = ((c.x() & (DIM-1u)) << 2*LOG2DIM);
-                for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
-                    const Index j = ((c.y() & (DIM-1u)) << LOG2DIM);
-                    for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
-                        OPENVDB_ASSERT(bounds.isInside(c));
-                        const Index offset = i + j + /*k*/(c.z() & (DIM-1u));
-                        if (!mask.isOn(offset)) continue;
-                        data1[offset] += static_cast<int>(vec.length());
-                        data2[offset] += Vec3d(integer);
-                    }
-                }
+        auto tree = points::rasterizeTrilinear<false, Vec3T>(points->tree(), "test");
+        static_assert(std::is_same_v<typename TreeT::Ptr, decltype(tree)>);
+        EXPECT_EQ(Index64(8), tree->leafCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index64(27), tree->activeVoxelCount()); // should probably by 8 but we don't deactivate
+        for (auto iter = tree->cbeginValueAll(); iter; ++iter) {
+            // we're at the origin, expect either full weight or no weight
+            if (iter.getCoord() == Coord(0,0,0)) {
+                EXPECT_NEAR(1.0f, (*iter)[0], 1e-6f);
+                EXPECT_NEAR(2.0f, (*iter)[1], 1e-6f);
+                EXPECT_NEAR(3.0f, (*iter)[2], 1e-6f);
+            }
+            else {
+                EXPECT_EQ(iter->zero(), *iter);
             }
         }
-
-    private:
-        const size_t mVIdx;
-        const size_t mIIdx;
-        points::AttributeHandle<Vec3d>::Ptr mVHandle;
-        points::AttributeHandle<int>::Ptr mIHandle;
-    };
-
-    std::vector<Vec3f> positions;
-    positions.emplace_back(Vec3f(0.0f, 0.0f, 0.0f));
-
-    const double voxelSize = 0.1;
-    math::Transform::Ptr transform =
-        math::Transform::createLinearTransform(voxelSize);
-
-    points::PointDataGrid::Ptr points =
-        points::createPointDataGrid<points::NullCodec,
-            points::PointDataGrid>(positions, *transform);
-
-    points::PointDataTree& tree = points->tree();
-
-    const Vec3d vectorValue(444.0f,555.0f,666.0f);
-    points::appendAttribute<Vec3d>(tree, "testVec3d", vectorValue);
-    points::appendAttribute<int>(tree, "testInt", 7);
-
-    Vec3DTree::Ptr vecTree(new Vec3DTree);
-    Int32Tree::Ptr intTree(new Int32Tree);
-    vecTree->topologyUnion(tree);
-    intTree->topologyUnion(tree);
-
-    const points::PointDataTree::LeafNodeType& leaf = *(tree.cbeginLeaf());
-    const size_t vidx = leaf.attributeSet().descriptor().find("testVec3d");
-    const size_t iidx = leaf.attributeSet().descriptor().find("testInt");
-
-    MultiTransferScheme transfer(vidx, iidx, *intTree, *vecTree);
-    points::rasterize(*points, transfer);
-
-    const Vec3d vecResult = vecTree->getValue(Coord(0,0,0));
-    const int intResult = intTree->getValue(Coord(0,0,0));
-
-    EXPECT_EQ(7.0, vecResult[0]);
-    EXPECT_EQ(7.0, vecResult[1]);
-    EXPECT_EQ(7.0, vecResult[2]);
-    const int expected = static_cast<int>(vectorValue.length());
-    EXPECT_EQ(expected, intResult);
-}
-
-TEST_F(TestPointRasterize, testMultiTreeRasterizeWithMask)
-{
-    struct CountPointsMaskTransferScheme
-        : public DefaultTransfer
-        , public points::VolumeTransfer<BoolTree, Int32Tree>
+    }
     {
-        using BaseT = points::VolumeTransfer<BoolTree, Int32Tree>;
-        CountPointsMaskTransferScheme(BoolTree& t1, Int32Tree& t2)
-            : BaseT(t1, t2) {}
-
-        inline Int32 range(const Coord&, size_t) const { return 0; }
-        inline void rasterizePoint(const Coord& ijk, const Index, const CoordBBox&)
-        {
-            auto* const data = this->template buffer<1>();
-            const Index offset = points::PointDataTree::LeafNodeType::coordToOffset(ijk);
-            data[offset] += 1;
+        auto tree = points::rasterizeTrilinear<true, Vec3T>(points->tree(), "test");
+        static_assert(std::is_same_v<typename TreeT::Ptr, decltype(tree)>);
+        EXPECT_EQ(Index64(8), tree->leafCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index64(27), tree->activeVoxelCount());
+        for (auto iter = tree->cbeginValueOn(); iter; ++iter) {
+            const Vec3d dx = iter.getCoord().asVec3d() - Vec3d(0.5,0,0);
+            const Vec3d dy = iter.getCoord().asVec3d() - Vec3d(0,0.5,0);
+            const Vec3d dz = iter.getCoord().asVec3d() - Vec3d(0,0,0.5);
+            // we know we're at the origin, so we expect a |hat| function
+            // here, where the weight is either exactly zero or one
+            EXPECT_NEAR(kweight(dx) > 0 ? 1.0f : 0.0f, (*iter)[0], 1e-6f) << iter.getCoord();
+            EXPECT_NEAR(kweight(dy) > 0 ? 2.0f : 0.0f, (*iter)[1], 1e-6f) << iter.getCoord();
+            EXPECT_NEAR(kweight(dz) > 0 ? 3.0f : 0.0f, (*iter)[2], 1e-6f) << iter.getCoord();
         }
+        for (auto iter = tree->cbeginValueOff(); iter; ++iter) EXPECT_EQ(iter->zero(), *iter);
+    }
+
+    // Test eight point at the origin (all overlapping). Result should be evenly weighted
+    auto positions = getBoxPoints(/*scale*/0.0f); // 8 positions
+    const std::vector<Vec3T> values {
+        Vec3T(ElemT(-1.0f), ElemT(0.0f), ElemT(2.3f)),
+        Vec3T(ElemT(5.4f),  ElemT(8.4f), ElemT(-9.1f)),
+        Vec3T(ElemT(0.0f),  ElemT(0.1f), ElemT(0.0f)),
+        Vec3T(ElemT(8.2f),  ElemT(3.1f), ElemT(0.0f)),
+        Vec3T(ElemT(0.0f),  ElemT(0.0f), ElemT(0.0f)),
+        Vec3T(ElemT(-9.0f), ElemT(0.0f), ElemT(-3.0f)),
+        Vec3T(ElemT(0.5f),  ElemT(0.5f), ElemT(0.5f)),
+        Vec3T(ElemT(0.0f),  ElemT(0.1f), ElemT(0.0f))
     };
+    const math::Vec3<FltT> expected = [&]() {
+        math::Vec3<FltT> r(0.0f);
+        for (auto& v : values) r += math::Vec3<FltT>(v);
+        return r / float(8);
+    }();
 
-    // Setup test data
-    std::vector<Vec3f> positions;
-    positions.emplace_back(Vec3f(0.0f, 0.0f, 0.0f));
-    positions.emplace_back(Vec3f(1.0f, 1.0f, 1.0f));
+    points = PointBuilder(positions).attribute(values, "test").get();
+    {
+        auto tree = points::rasterizeTrilinear<false, Vec3T>(points->tree(), "test");
+        static_assert(std::is_same_v<typename TreeT::Ptr, decltype(tree)>);
+        EXPECT_EQ(Index64(8), tree->leafCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index64(27), tree->activeVoxelCount());
+        for (auto iter = tree->cbeginValueAll(); iter; ++iter) {
+            // we're at the origin, expect either full weight or no weight
+            if (iter.getCoord() == Coord(0,0,0)) {
+                EXPECT_NEAR(expected[0], (*iter)[0], 1e-6f);
+                EXPECT_NEAR(expected[1], (*iter)[1], 1e-6f);
+                EXPECT_NEAR(expected[2], (*iter)[2], 1e-6f);
+            }
+            else {
+                EXPECT_EQ(iter->zero(), *iter);
+            }
+        }
+    }
+    {
+        auto tree = points::rasterizeTrilinear<true, Vec3T>(points->tree(), "test");
+        static_assert(std::is_same_v<typename TreeT::Ptr, decltype(tree)>);
+        EXPECT_EQ(Index64(8), tree->leafCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index64(27), tree->activeVoxelCount());
 
-    const double voxelSize = 0.1;
-    math::Transform::Ptr transform =
-        math::Transform::createLinearTransform(voxelSize);
+        for (auto iter = tree->cbeginValueOn(); iter; ++iter) {
+            const Vec3d dx = iter.getCoord().asVec3d() - Vec3d(0.5,0,0);
+            const Vec3d dy = iter.getCoord().asVec3d() - Vec3d(0,0.5,0);
+            const Vec3d dz = iter.getCoord().asVec3d() - Vec3d(0,0,0.5);
+            // we know we're at the origin, so we expect a |hat| function
+            // here, where the weight is either exactly zero or one
+            EXPECT_NEAR(kweight(dx) > 0 ? expected[0] : 0.0f, (*iter)[0], 1e-6f) << iter.getCoord();
+            EXPECT_NEAR(kweight(dy) > 0 ? expected[1] : 0.0f, (*iter)[1], 1e-6f) << iter.getCoord();
+            EXPECT_NEAR(kweight(dz) > 0 ? expected[2] : 0.0f, (*iter)[2], 1e-6f) << iter.getCoord();
+        }
+        for (auto iter = tree->cbeginValueOff(); iter; ++iter) EXPECT_EQ(iter->zero(), *iter);
+    }
 
-    points::PointDataGrid::Ptr points =
-        points::createPointDataGrid<points::NullCodec,
-            points::PointDataGrid>(positions, *transform);
-
-    Int32Tree::Ptr intTree(new Int32Tree);
-    BoolTree::Ptr topology(new BoolTree);
-    intTree->topologyUnion(points->tree());
-    topology->setValueOn(Coord(0,0,0));
-
-    EXPECT_TRUE(intTree->isValueOn(Coord(10,10,10)));
-
-    CountPointsMaskTransferScheme transfer(*topology, *intTree);
-    points::rasterize(*points, transfer);
-
-    int count = intTree->getValue(Coord(0,0,0));
-    EXPECT_EQ(1, count);
-    count = intTree->getValue(Coord(10,10,10));
-    EXPECT_EQ(0, count);
+    // Test eight points
+    positions = getBoxPoints(); // 8 positions
+    points = PointBuilder(positions).attribute(values, "test").get();
+    // positions to index space for the test check
+    for (auto& p : positions) p = Vec3f(points->transform().worldToIndex(p));
+    {
+        auto tree = points::rasterizeTrilinear<false, Vec3T>(points->tree(), "test");
+        static_assert(std::is_same_v<typename TreeT::Ptr, decltype(tree)>);
+        EXPECT_EQ(Index64(8), tree->leafCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index64(216), tree->activeVoxelCount());
+        for (auto iter = tree->cbeginValueOn(); iter; ++iter) {
+            math::Vec3<FltT> expected(0.0f);
+            FltT weight = 0.0f;
+            for (size_t i = 0; i < 8; ++i) {
+                FltT w = FltT(kweight(positions[i] - iter.getCoord().asVec3d()));
+                weight += w;
+                expected += values[i] * w;
+            }
+            EXPECT_GE(weight, 0.0f);
+            if (bool(weight)) expected /= weight;
+            EXPECT_NEAR(expected[0], (*iter)[0], 1e-6f);
+            EXPECT_NEAR(expected[1], (*iter)[1], 1e-6f);
+            EXPECT_NEAR(expected[2], (*iter)[2], 1e-6f);
+        }
+        for (auto iter = tree->cbeginValueOff(); iter; ++iter) EXPECT_EQ(iter->zero(), *iter);
+    }
+    {
+        auto tree = points::rasterizeTrilinear<true, Vec3T>(points->tree(), "test");
+        static_assert(std::is_same_v<typename TreeT::Ptr, decltype(tree)>);
+        EXPECT_EQ(Index64(8), tree->leafCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index64(216), tree->activeVoxelCount());
+        for (auto iter = tree->cbeginValueOn(); iter; ++iter) {
+            const Vec3d ijk = iter.getCoord().asVec3d();
+            math::Vec3<FltT> expected(0.0f), weight(0.0f);
+            for (size_t i = 0; i < 8; ++i) {
+                for (size_t j = 0; j < 3; ++j) {
+                    Vec3d offset(0.0);
+                    offset[j] = 0.5;
+                    FltT w = FltT(kweight(positions[i] - (ijk - offset)));
+                    weight[j] += w;
+                    expected[j] += FltT(values[i][j]) * w;
+                }
+            }
+            for (size_t j = 0; j < 3; ++j) {
+                EXPECT_GE(weight[j], 0.0f) << j;
+                if (bool(weight[j])) expected[j] /= weight[j];
+            }
+            EXPECT_NEAR(expected[0], (*iter)[0], 1e-6f);
+            EXPECT_NEAR(expected[1], (*iter)[1], 1e-6f);
+            EXPECT_NEAR(expected[2], (*iter)[2], 1e-6f);
+        }
+        for (auto iter = tree->cbeginValueOff(); iter; ++iter) EXPECT_EQ(iter->zero(), *iter);
+    }
 }
 
-// void
-// TestPointRasterize::testMultiTreeRasterizeConstTopology()
-// {
-//     // Test const-ness is respected and works at compile time through
-//     // the points::rasterize function (transfer function signatures should
-//     // respect the const flag of the topology mask leaf nodes)
 
-//     struct CountPointsConstMaskTransferScheme
-//         : public DefaultTransfer,
-//         : public points::VolumeTransfer<const BoolTree, Int32Tree>
-//     {
-//         using VolumeTransferT =
-//             points::rasterize_tree_containers::MultiTreeRasterizer
-//                 <const BoolTree, Int32Tree>;
+TEST_F(TestPointRasterize, testTrilinearRasterizeVec)
+{
+    TestTrilinearVec<Vec3f>();
+    TestTrilinearVec<Vec3i>();
+    TestTrilinearVec<Vec3d>();
+}
 
-//         using BufferT = VolumeTransferT::BufferT;
-//         using NodeMaskT = VolumeTransferT::NodeMaskT;
 
-//         static_assert(std::is_const<NodeMaskT>::value,
-//             "Node mask should be const");
-//         static_assert(std::is_const<VolumeTransferT::TopologyTreeT>::value,
-//             "TopologyTreeT should be const");
+TEST_F(TestPointRasterize, testTrilinearRasterizeMat)
+{
+    using FltT = float;
+    using Mat3sTree = tree::Tree4<Mat3s, 5, 4, 3>::Type;
 
-//         inline Int32 range() const { return 0; }
-//         inline void initialize(BufferT, NodeMaskT&, const Coord&) {}
-//         inline void initLeaf(const points::PointDataTree::LeafNodeType&) {}
-//         inline void finalize(BufferT, NodeMaskT&, const Coord&) {}
-//         inline void rasterizePoint(const Coord&,
-//                         const Index,
-//                         const CoordBBox&,
-//                         BufferT,
-//                         NodeMaskT&) {}
-//     };
+    // Test single point at the origin (center of a voxel)
+    auto points = PointBuilder({Vec3f(0)}).attribute(Mat3s(
+        1.0f, 2.0f, 3.0f,
+        4.0f, 5.0f, 6.0f,
+        7.0f, 8.0f, 9.0f), "test").get();
+    {
+        auto tree = points::rasterizeTrilinear<false, Mat3s>(points->tree(), "test");
+        static_assert(std::is_same_v<Mat3sTree::Ptr, decltype(tree)>);
+        EXPECT_EQ(Index64(8), tree->leafCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index64(27), tree->activeVoxelCount()); // should probably by 8 but we don't deactivate
+        for (auto iter = tree->cbeginValueAll(); iter; ++iter) {
+            // we're at the origin, expect either full weight or no weight
+            if (iter.getCoord() == Coord(0,0,0)) {
+                for (size_t i = 0; i < 9; ++i) EXPECT_NEAR(float(i+1), (*iter).asPointer()[i], 1e-6f);
+            }
+            else {
+                EXPECT_EQ(Mat3s::zero(), *iter);
+            }
+        }
+    }
+    // Test eight point at the origin (all overlapping). Result should be evenly weighted
+    auto positions = getBoxPoints(/*scale*/0.0f); // 8 positions
+    const std::vector<Mat3s> values {
+        Mat3s(-1.0f, 0.0f, 2.3f,  5.4f, 0.0f, -14.0f,  0.24f, 0.2f, 1.0f),
+        Mat3s(5.4f, 8.4f, -9.1f,  0.5f, 0.5f, 0.5f,    0.5f, 0.5f, 0.5f),
+        Mat3s::zero(),
+        Mat3s(8.2f, 3.1f, 0.0f,  -1.0f, 0.0f, 2.3f,    1.0f, 1.0f, 1.0f),
+        Mat3s(0.0f, 0.0f, 0.0f,   5.1f, 7.2f, 9.0f,    0.0f, 0.0f, 0.0f),
+        Mat3s::identity(),
+        Mat3s(0.5f, 0.5f, 0.5f,   0.5f, 0.5f, 0.5f,    0.5f, 0.5f, 0.5f),
+        Mat3s::zero(),
+    };
+    const Mat3s expected = [&]() {
+        Mat3s r = Mat3s::zero();
+        for (auto& v : values) r += v;
+        for (size_t i = 0; i < 9; ++i) r.asPointer()[i] /= float(8);
+        return r;
+    }();
 
-//     points::PointDataTree tree;
-//     Int32Tree::Ptr intTree(new Int32Tree);
-//     BoolTree::Ptr topology(new BoolTree);
-
-//     CountPointsConstMaskTransferScheme transfer;
-//     CountPointsConstMaskTransferScheme::VolumeTransferT::TreeArrayT array = {intTree};
-//     CountPointsConstMaskTransferScheme::VolumeTransferT container(*topology, array);
-//     points::rasterize(tree, transfer, container);
-// }
+    points = PointBuilder(positions).attribute(values, "test").get();
+    {
+        auto tree = points::rasterizeTrilinear<false, Mat3s>(points->tree(), "test");
+        static_assert(std::is_same_v<Mat3sTree::Ptr, decltype(tree)>);
+        EXPECT_EQ(Index64(8), tree->leafCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index64(27), tree->activeVoxelCount());
+        for (auto iter = tree->cbeginValueAll(); iter; ++iter) {
+            // we're at the origin, expect either full weight or no weight
+            if (iter.getCoord() == Coord(0,0,0)) {
+                for (size_t i = 0; i < 9; ++i) {
+                    EXPECT_NEAR(expected.asPointer()[i], (*iter).asPointer()[i], 1e-6f);
+                }
+            }
+            else {
+                EXPECT_EQ(Mat3s::zero(), *iter);
+            }
+        }
+    }
+    // Test eight points
+    positions = getBoxPoints(); // 8 positions
+    points = PointBuilder(positions).attribute(values, "test").get();
+    // positions to index space for the test check
+    for (auto& p : positions) p = Vec3f(points->transform().worldToIndex(p));
+    {
+        auto tree = points::rasterizeTrilinear<false, Mat3s>(points->tree(), "test");
+        static_assert(std::is_same_v<Mat3sTree::Ptr, decltype(tree)>);
+        EXPECT_EQ(Index64(8), tree->leafCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index64(216), tree->activeVoxelCount());
+        for (auto iter = tree->cbeginValueOn(); iter; ++iter) {
+            Mat3s expected = Mat3s::zero();
+            float weight = 0.0f;
+            for (size_t i = 0; i < 8; ++i) {
+                FltT w = FltT(kweight(positions[i] - iter.getCoord().asVec3d()));
+                weight += w;
+                expected += values[i] * w;
+            }
+            EXPECT_GE(weight, 0.0f);
+            if (bool(weight)) {
+                for (size_t i = 0; i < 9; ++i) expected.asPointer()[i] /= weight;
+            }
+            for (size_t i = 0; i < 9; ++i) {
+                EXPECT_NEAR(expected.asPointer()[i], (*iter).asPointer()[i], 1e-6f);
+            }
+        }
+        for (auto iter = tree->cbeginValueOff(); iter; ++iter) EXPECT_EQ(Mat3s::zero(), *iter);
+    }
+}
