@@ -173,6 +173,10 @@ if(NOT TARGET nanovdb_blosc)
   target_include_directories(nanovdb_blosc SYSTEM INTERFACE
     ${CMAKE_CURRENT_LIST_DIR}/../../ext/blosc/openvdb/ext/blosc
   )
+  # The archive may be linked into shared libraries
+  set_target_properties(nanovdb_blosc PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  # nanovdb/io/IO.h calls into this archive, so installed headers need it
+  install(TARGETS nanovdb_blosc ARCHIVE DESTINATION ${NANOVDB_INSTALL_LIBDIR})
 endif()
 
 if(NANOVDB_USE_ZLIB AND NOT TARGET ZLIB::ZLIB)

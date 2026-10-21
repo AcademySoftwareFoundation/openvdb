@@ -14,4 +14,6 @@ NanoVDB:
   Build:
   - Removed the NANOVDB_USE_BLOSC and OPENVDB_TOOL_NANO_USE_BLOSC options. NanoVDB
     always builds its own copy of the vendored Blosc as the nanovdb_blosc target.
-  - nanovdb_blosc.h is now installed alongside NanoVDB.h.
+  - nanovdb_blosc.h is now installed alongside NanoVDB.h, and the static library
+    libnanovdb_blosc.a is installed to the NanoVDB library directory. Code that
+    includes nanovdb/io/IO.h must link it.

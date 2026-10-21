@@ -15,21 +15,11 @@
 extern "C" {
 #endif
 
-// Decorates symbols exported by a shared library build
-#if defined(OPENVDB_BLOSC_SHARED_LIBRARY)
-  #if defined(_MSC_VER)
-    #define OPENVDB_BLOSC_EXPORT __declspec(dllexport)
-  #elif (defined(__GNUC__) && __GNUC__ >= 4) || defined(__clang__)
-    #if defined(_WIN32) || defined(__CYGWIN__) || defined(__MINGW32__)
-      #define OPENVDB_BLOSC_EXPORT __attribute__((dllexport))
-    #else
-      #define OPENVDB_BLOSC_EXPORT __attribute__((visibility("default")))
-    #endif
-  #else
-    #error Cannot determine how to define OPENVDB_BLOSC_EXPORT for this compiler.
-  #endif
+// Built into libopenvdb and only called from within it, so never exported
+#if defined(__GNUC__) || defined(__clang__)
+  #define OPENVDB_BLOSC_HIDDEN __attribute__((visibility("hidden")))
 #else
-  #define OPENVDB_BLOSC_EXPORT
+  #define OPENVDB_BLOSC_HIDDEN
 #endif
 
 /* Minimum header length */
@@ -61,10 +51,10 @@ extern "C" {
   Returns the compressed size, 0 if the data could not be compressed into
   `destsize` bytes, or a negative value on internal error.
 */
-OPENVDB_BLOSC_EXPORT int openvdb_blosc_compress_ctx(int clevel, int doshuffle, size_t typesize,
-                                         size_t nbytes, const void* src, void* dest,
-                                         size_t destsize, const char* compressor,
-                                         size_t blocksize, int numinternalthreads);
+OPENVDB_BLOSC_HIDDEN int openvdb_blosc_compress_ctx(int clevel, int doshuffle, size_t typesize,
+                                                    size_t nbytes, const void* src, void* dest,
+                                                    size_t destsize, const char* compressor,
+                                                    size_t blocksize, int numinternalthreads);
 
 /**
   Decompress `src` into `dest`. Use openvdb_blosc_cbuffer_sizes to determine the
@@ -72,8 +62,8 @@ OPENVDB_BLOSC_EXPORT int openvdb_blosc_compress_ctx(int clevel, int doshuffle, s
 
   Returns the decompressed size, or 0 or a negative value on error.
 */
-OPENVDB_BLOSC_EXPORT int openvdb_blosc_decompress_ctx(const void* src, void* dest,
-                                           size_t destsize, int numinternalthreads);
+OPENVDB_BLOSC_HIDDEN int openvdb_blosc_decompress_ctx(const void* src, void* dest,
+                                                      size_t destsize, int numinternalthreads);
 
 /**
   Return the uncompressed size (`nbytes`), compressed size (`cbytes`) and
@@ -81,8 +71,8 @@ OPENVDB_BLOSC_EXPORT int openvdb_blosc_decompress_ctx(const void* src, void* des
   bytes of the buffer are read. All outputs are zero if the format is not
   supported.
 */
-OPENVDB_BLOSC_EXPORT void openvdb_blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
-                                           size_t* cbytes, size_t* blocksize);
+OPENVDB_BLOSC_HIDDEN void openvdb_blosc_cbuffer_sizes(const void* cbuffer, size_t* nbytes,
+                                                      size_t* cbytes, size_t* blocksize);
 
 #ifdef __cplusplus
 }
