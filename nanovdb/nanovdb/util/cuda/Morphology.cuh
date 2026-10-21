@@ -546,6 +546,22 @@ struct ProcessLowerNodesFunctor
                 d.upperBase, d.lowerBase, d.leafBase, lowerParents, leafParents);
     }
 
+    /// @brief Single-grid form: @a dstGrid is the only grid, so its node bases are 0
+    void __device__
+    operator()(
+        const Mask<5> *upperMasks,
+        const Mask<4> (*lowerMasks)[Mask<5>::SIZE],
+        const uint32_t *upperOffsets,
+        const uint32_t (*lowerOffsets)[Mask<5>::SIZE],
+        const uint32_t (*leafOffsets)[Mask<5>::SIZE],
+        NanoGrid<BuildT> *dstGrid,
+        uint32_t *lowerParents,
+        uint32_t *leafParents)
+    {
+        process(upperMasks, lowerMasks, upperOffsets, lowerOffsets, leafOffsets, dstGrid,
+                0, 0, 0, lowerParents, leafParents);
+    }
+
 private:
     static void __device__
     process(

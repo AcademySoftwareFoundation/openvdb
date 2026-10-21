@@ -36,6 +36,7 @@
 #include <cstring> // for std::memset
 #include <map> // for the processed tile maps
 #include <stdexcept> // for std::runtime_error
+#include <utility> // for std::exchange, std::swap
 #include <vector> // for the tile counts handed to allocateProcessedRoots and the per-grid byte offsets
 
 namespace nanovdb {
@@ -74,11 +75,9 @@ using util::morphology::cuda::gridOfIndex;// batch-wide index -> owning grid, by
 ///        the stored one for the tile itself.
 __hostdev__ inline uint64_t tileSortKey(const Coord &ijk)
 {
-    // Note: int32_t has a range of -2^31 to 2^31 - 1 whereas uint32_t has a range of 0 to 2^32 - 1
-    static constexpr int64_t kOffset = int64_t(1) << 31;
-    return (uint64_t(uint32_t(int64_t(ijk[2]) + kOffset) >> 12)      ) | // z is the lower 21 bits
-           (uint64_t(uint32_t(int64_t(ijk[1]) + kOffset) >> 12) << 21) | // y is the middle 21 bits
-           (uint64_t(uint32_t(int64_t(ijk[0]) + kOffset) >> 12) << 42);  // x is the upper 21 bits
+    const Coord t = ijk >> 12; // root-tile index, floored: [-2^19, 2^19)
+    auto field = [](int32_t i) { return uint64_t(i + (1 << 19)); }; // biased into [0, 2^20), negatives first
+    return field(t[0]) << 42 | field(t[1]) << 21 | field(t[2]); // x high, y middle, z low
 }
 
 /// @brief Speculative root tiles in canonical order, keyed by tileSortKey
@@ -114,6 +113,22 @@ inline void packProcessedRoot(const ProcessedTileMap<RootT> &tiles, RootT *root)
     uint32_t t = 0;
     for (const auto &[key, tile] : tiles) *root->tile(t++) = tile;
 }
+
+/// @brief Owns a CUDA event without timing; movable, not copyable
+class Event
+{
+    cudaEvent_t mEvent{nullptr};
+public:
+    Event() { cudaCheck(cudaEventCreateWithFlags(&mEvent, cudaEventDisableTiming)); }
+    Event(Event &&other) noexcept : mEvent(std::exchange(other.mEvent, nullptr)) {}
+    Event& operator=(Event &&other) noexcept { std::swap(mEvent, other.mEvent); return *this; }
+    Event(const Event&) = delete;
+    Event& operator=(const Event&) = delete;
+    ~Event() { if (mEvent) cudaEventDestroy(mEvent); }
+
+    void record(cudaStream_t stream) { cudaCheck(cudaEventRecord(mEvent, stream)); }
+    void synchronize() const { cudaCheck(cudaEventSynchronize(mEvent)); }
+};
 
 }// namespace topology::detail
 
@@ -155,6 +170,9 @@ inline void packProcessedRoot(const ProcessedTileMap<RootT> &tiles, RootT *root)
 /// the node counts and node bases of data(g); every other field is the caller's to set until
 /// getBuffer uploads data(g). The processed roots and mask buffers are released by
 /// processLowerNodes; deviceProcessedRoot() and the mask pointers are invalid after it.
+/// data(g) exists from allocateProcessedRoot(s) on. Every copy into or out of the pinned
+/// host staging records the same event, and allocateProcessedRoot(s) waits on it before
+/// reusing the block, so the next build may start before the previous one has drained.
 template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class TopologyBuilder
 {
@@ -206,13 +224,12 @@ public:
         , mResource(&resource)
         , mTempDevicePool(resource)
     {
-        cudaCheck(cudaEventCreateWithFlags(&mNodeCountsReady, cudaEventDisableTiming));
     }
-
-    ~TopologyBuilder() { cudaEventDestroy(mNodeCountsReady); }
 
     TopologyBuilder(const TopologyBuilder&) = delete;
     TopologyBuilder& operator=(const TopologyBuilder&) = delete;
+    TopologyBuilder(TopologyBuilder&&) = default;
+    TopologyBuilder& operator=(TopologyBuilder&&) = default;
 
     /// @brief Allocates and zeroes the densified upper and lower child masks for every processed
     ///        tile in the batch; the consumer's *InternalNodesFunctor fills them
@@ -224,7 +241,7 @@ public:
     void countNodes(cudaStream_t stream);
 
     /// @brief Blocks the host until the node counts countNodes enqueued have landed in data(g)
-    void waitForNodeCounts() { cudaCheck(cudaEventSynchronize(mNodeCountsReady)); }
+    void waitForNodeCounts() { mStagingDone.synchronize(); }
 
     /// @brief Waits for the node counts countNodes produced, allocates one device buffer for all
     ///        grids sized from them on the host, lays the grids out back to back and uploads data(g)
@@ -250,7 +267,8 @@ public:
     /// @brief Propagates bounding boxes leaf -> lower -> upper -> root and sets each grid's world bbox
     void processBBox(cudaStream_t stream);
 
-    /// @brief Finishes each grid's voxel count and (optionally) checksum
+    /// @brief Finishes each grid's voxel count and (optionally) checksum. Checksums are
+    ///        computed one grid at a time, each with its own lookup table and host round trip.
     void postProcessGridTree(cudaStream_t stream);
 
     HostStagingT                 mHostStaging; // one pinned block, so every transfer is asynchronous and one cudaMallocHost serves a build: the processed roots back to back, then the per-grid parameters, then the tile bases; grown on demand by allocateProcessedRoot(s), never shrunk
@@ -268,7 +286,7 @@ public:
     BufT<uint32_t>               mLowerParents;
     BufT<uint32_t>               mLeafParents;
     BufT<Data>                   mDeviceData; // device copy of the per-grid parameters, made by uploadData
-    cudaEvent_t                  mNodeCountsReady; // recorded by countNodes once the node counts are in data(g)
+    topology::detail::Event      mStagingDone; // recorded after every copy into or out of mHostStaging; once it completes, the node counts are in data(g) and the block may be reused
     CheckMode                    mChecksum{CheckMode::Disable};
 
     /// @brief Number of grids in the batch: 0 until allocateProcessedRoot(s), 1 after
@@ -318,6 +336,7 @@ public:
         if (mDeviceRoot.size() < mRootBytes)
             mDeviceRoot = ScratchT(stream, nanovdb::cuda::detail::borrowInternal(*mResource), mRootBytes, nanovdb::cuda::noInit);
         cudaCheck(cudaMemcpyAsync(mDeviceRoot.data(), mHostStaging.data(), mRootBytes, cudaMemcpyHostToDevice, stream));
+        mStagingDone.record(stream);
     }
 
     /// @brief Copies the builder parameters of every grid to the device, allocating through
@@ -327,6 +346,7 @@ public:
         if (mDeviceData.size() != gridCount())
             mDeviceData = BufT<Data>(stream, nanovdb::cuda::detail::borrowInternal(*mResource), gridCount(), nanovdb::cuda::noInit);
         cudaCheck(cudaMemcpyAsync(mDeviceData.data(), data(0), gridCount() * sizeof(Data), cudaMemcpyHostToDevice, stream));
+        mStagingDone.record(stream);
     }
     Mask<5>* deviceUpperMasks() { return mUpperMasks.data(); }
     /// @brief The densified lower masks: one row of Mask<5>::SIZE Mask<4> per upper node,
@@ -344,9 +364,10 @@ public:
     ///        allocating sibling scratch from the same instance.
     nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::detail::borrowInternal(*mResource); }
 
-    /// @brief Builder parameters of grid @a g (grid 0 by default, the whole grid for single-grid builds)
-    Data* data(uint32_t g = 0)             { return util::PtrAdd<Data>(mHostStaging.data(), mHostDataOffset) + g; }
-    const Data* data(uint32_t g = 0) const { return util::PtrAdd<const Data>(mHostStaging.data(), mHostDataOffset) + g; }
+    /// @brief Builder parameters of grid @a g (grid 0 by default, the whole grid for single-grid builds);
+    ///        valid from allocateProcessedRoot(s) on
+    Data* data(uint32_t g = 0)             { NANOVDB_ASSERT(g < mGridCount); return util::PtrAdd<Data>(mHostStaging.data(), mHostDataOffset) + g; }
+    const Data* data(uint32_t g = 0) const { NANOVDB_ASSERT(g < mGridCount); return util::PtrAdd<const Data>(mHostStaging.data(), mHostDataOffset) + g; }
     /// @brief Device copy of the parameters of every grid, gridCount() entries
     Data* deviceData()          { return mDeviceData.data(); }
 
@@ -364,9 +385,11 @@ private:
 
     /// @brief Lays out the pinned staging block for @a count grids with @a rootBytes of
     ///        processed roots, growing it when the current block is too small, and resets the
-    ///        per-grid parameters: zeroed, numbered, no tiles yet
+    ///        per-grid parameters: zeroed, numbered, no tiles yet. Waits first for the previous
+    ///        build's copies out of the block.
     void allocateHostStaging(uint32_t count, uint64_t rootBytes)
     {
+        mStagingDone.synchronize();
         constexpr uint64_t A = NANOVDB_DATA_ALIGNMENT;
         mRootBytes       = rootBytes;
         mHostDataOffset  = (rootBytes + A - 1) & ~(A - 1);
@@ -481,7 +504,7 @@ void TopologyBuilder<BuildT, ResourceT>::countNodes(cudaStream_t stream)
             d->nodeCount[0] = d->nodeCount[1] = d->nodeCount[2] = 0;
             d->upperBase = d->lowerBase = d->leafBase = 0;
         }
-        cudaCheck(cudaEventRecord(mNodeCountsReady, stream));
+        mStagingDone.record(stream);
         return;
     }
 
@@ -552,7 +575,7 @@ void TopologyBuilder<BuildT, ResourceT>::countNodes(cudaStream_t stream)
     cudaCheckError();
     constexpr std::size_t rowBytes = Data::CountFieldCount * sizeof(uint32_t);
     cudaCheck(cudaMemcpy2DAsync(data(0)->nodeCount, sizeof(Data), counts.data(), rowBytes, rowBytes, gridCount(), cudaMemcpyDeviceToHost, stream));
-    cudaCheck(cudaEventRecord(mNodeCountsReady, stream));
+    mStagingDone.record(stream);
 }// TopologyBuilder<BuildT, ResourceT>::countNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
