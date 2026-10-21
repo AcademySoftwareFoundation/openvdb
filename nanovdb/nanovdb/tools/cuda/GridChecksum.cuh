@@ -551,7 +551,7 @@ void updateChecksum(NanoGrid<ValueT> *d_grid, CheckMode mode, cudaStream_t strea
 }// namespace nanovdb // ====================================================
 
 #undef NANOVDB_TOOLS_CUDA_GRIDCHECKSUM_DEFERS_GRIDHANDLE_CUH
-#if !defined(NANOVDB_CUDA_HANDLESTORAGE_DEFERS_GRIDHANDLE_CUH)
+#if defined(__CUDACC__) && !defined(NANOVDB_CUDA_HANDLESTORAGE_DEFERS_GRIDHANDLE_CUH)
 #include <nanovdb/cuda/GridHandle.cuh>
 #endif
 
