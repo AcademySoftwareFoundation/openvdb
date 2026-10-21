@@ -8,17 +8,12 @@
 #include <openvdb/util/Assert.h>
 #include <map>
 #include <vector>
-#ifdef OPENVDB_USE_BLOSC
-#include <blosc.h>
-#endif
+#include <openvdb_blosc.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace compression {
-
-
-#ifdef OPENVDB_USE_BLOSC
 
 
 bool
@@ -32,7 +27,7 @@ size_t
 bloscUncompressedSize(const char* buffer)
 {
     size_t bytes, _1, _2;
-    blosc_cbuffer_sizes(buffer, &bytes, &_1, &_2);
+    openvdb_blosc_cbuffer_sizes(buffer, &bytes, &_1, &_2);
     return bytes;
 }
 
@@ -41,27 +36,27 @@ void
 bloscCompress(char* compressedBuffer, size_t& compressedBytes, const size_t bufferBytes,
     const char* uncompressedBuffer, const size_t uncompressedBytes)
 {
-    if (bufferBytes > BLOSC_MAX_BUFFERSIZE) {
+    if (bufferBytes > OPENVDB_BLOSC_MAX_BUFFERSIZE) {
         OPENVDB_LOG_DEBUG("Blosc compress failed due to exceeding maximum buffer size.");
         compressedBytes = 0;
         compressedBuffer = nullptr;
         return;
     }
-    if (bufferBytes < uncompressedBytes + BLOSC_MAX_OVERHEAD) {
+    if (bufferBytes < uncompressedBytes + OPENVDB_BLOSC_MAX_OVERHEAD) {
         OPENVDB_LOG_DEBUG("Blosc compress failed due to insufficient space in compressed buffer.");
         compressedBytes = 0;
         compressedBuffer = nullptr;
         return;
     }
 
-    if (uncompressedBytes <= BLOSC_MINIMUM_BYTES) {
+    if (uncompressedBytes <= OPENVDB_BLOSC_MINIMUM_BYTES) {
         // no Blosc compression performed below this limit
         compressedBytes = 0;
         compressedBuffer = nullptr;
         return;
     }
 
-    if (uncompressedBytes < BLOSC_PAD_BYTES && bufferBytes < BLOSC_PAD_BYTES + BLOSC_MAX_OVERHEAD) {
+    if (uncompressedBytes < OPENVDB_BLOSC_PAD_BYTES && bufferBytes < OPENVDB_BLOSC_PAD_BYTES + OPENVDB_BLOSC_MAX_OVERHEAD) {
         OPENVDB_LOG_DEBUG(
             "Blosc compress failed due to insufficient space in compressed buffer for padding.");
         compressedBytes = 0;
@@ -74,18 +69,18 @@ bloscCompress(char* compressedBuffer, size_t& compressedBytes, const size_t buff
     const char* buffer = uncompressedBuffer;
 
     std::unique_ptr<char[]> paddedBuffer;
-    if (uncompressedBytes < BLOSC_PAD_BYTES) {
+    if (uncompressedBytes < OPENVDB_BLOSC_PAD_BYTES) {
         // input array padded with zeros below this limit to improve compression
-        paddedBuffer.reset(new char[BLOSC_PAD_BYTES]);
+        paddedBuffer.reset(new char[OPENVDB_BLOSC_PAD_BYTES]);
         std::memcpy(paddedBuffer.get(), buffer, uncompressedBytes);
-        for (int i = static_cast<int>(uncompressedBytes); i < BLOSC_PAD_BYTES; i++) {
+        for (int i = static_cast<int>(uncompressedBytes); i < OPENVDB_BLOSC_PAD_BYTES; i++) {
             paddedBuffer.get()[i] = 0;
         }
         buffer = paddedBuffer.get();
-        inputBytes = BLOSC_PAD_BYTES;
+        inputBytes = OPENVDB_BLOSC_PAD_BYTES;
     }
 
-    int _compressedBytes = blosc_compress_ctx(
+    int _compressedBytes = openvdb_blosc_compress_ctx(
         /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
         /*doshuffle=*/true,
         /*typesize=*/sizeof(float), // hard-coded to 4-bytes for better compression
@@ -93,7 +88,7 @@ bloscCompress(char* compressedBuffer, size_t& compressedBytes, const size_t buff
         /*src=*/buffer,
         /*dest=*/compressedBuffer,
         /*destsize=*/bufferBytes,
-        BLOSC_LZ4_COMPNAME,
+        OPENVDB_BLOSC_LZ4_COMPNAME,
         /*blocksize=*/inputBytes,
         /*numthreads=*/1);
 
@@ -122,12 +117,12 @@ bloscCompress(const char* buffer, const size_t uncompressedBytes, size_t& compre
 {
     size_t tempBytes = uncompressedBytes;
     // increase temporary buffer for padding if necessary
-    if (tempBytes >= BLOSC_MINIMUM_BYTES && tempBytes < BLOSC_PAD_BYTES) {
-        tempBytes += BLOSC_PAD_BYTES;
+    if (tempBytes >= OPENVDB_BLOSC_MINIMUM_BYTES && tempBytes < OPENVDB_BLOSC_PAD_BYTES) {
+        tempBytes += OPENVDB_BLOSC_PAD_BYTES;
     }
     // increase by Blosc max overhead
-    tempBytes += BLOSC_MAX_OVERHEAD;
-    const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
+    tempBytes += OPENVDB_BLOSC_MAX_OVERHEAD;
+    const bool outOfRange = tempBytes > OPENVDB_BLOSC_MAX_BUFFERSIZE;
     std::unique_ptr<char[]> outBuffer(outOfRange ? new char[1] : new char[tempBytes]);
 
     bloscCompress(outBuffer.get(), compressedBytes, tempBytes, buffer, uncompressedBytes);
@@ -164,16 +159,16 @@ bloscDecompress(char* uncompressedBuffer, const size_t expectedBytes,
 {
     size_t uncompressedBytes = bloscUncompressedSize(compressedBuffer);
 
-    if (bufferBytes > BLOSC_MAX_BUFFERSIZE) {
+    if (bufferBytes > OPENVDB_BLOSC_MAX_BUFFERSIZE) {
         OPENVDB_THROW(RuntimeError,
             "Blosc decompress failed due to exceeding maximum buffer size.");
     }
-    if (bufferBytes < uncompressedBytes + BLOSC_MAX_OVERHEAD) {
+    if (bufferBytes < uncompressedBytes + OPENVDB_BLOSC_MAX_OVERHEAD) {
         OPENVDB_THROW(RuntimeError,
             "Blosc decompress failed due to insufficient space in uncompressed buffer.");
     }
 
-    uncompressedBytes = blosc_decompress_ctx(   /*src=*/compressedBuffer,
+    uncompressedBytes = openvdb_blosc_decompress_ctx(   /*src=*/compressedBuffer,
                                                 /*dest=*/uncompressedBuffer,
                                                 bufferBytes,
                                                 /*numthreads=*/1);
@@ -182,7 +177,7 @@ bloscDecompress(char* uncompressedBuffer, const size_t expectedBytes,
         OPENVDB_THROW(RuntimeError, "Blosc decompress returned error code " << uncompressedBytes);
     }
 
-    if (uncompressedBytes == BLOSC_PAD_BYTES && expectedBytes <= BLOSC_PAD_BYTES) {
+    if (uncompressedBytes == OPENVDB_BLOSC_PAD_BYTES && expectedBytes <= OPENVDB_BLOSC_PAD_BYTES) {
         // padded array to improve compression
     }
     else if (uncompressedBytes != expectedBytes) {
@@ -197,8 +192,8 @@ std::unique_ptr<char[]>
 bloscDecompress(const char* buffer, const size_t expectedBytes, const bool resize)
 {
     size_t uncompressedBytes = bloscUncompressedSize(buffer);
-    size_t tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
-    const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
+    size_t tempBytes = uncompressedBytes + OPENVDB_BLOSC_MAX_OVERHEAD;
+    const bool outOfRange = tempBytes > OPENVDB_BLOSC_MAX_BUFFERSIZE;
     if (outOfRange)     tempBytes = 1;
     std::unique_ptr<char[]> outBuffer(new char[tempBytes]);
 
@@ -215,66 +210,6 @@ bloscDecompress(const char* buffer, const size_t expectedBytes, const bool resiz
 
     return outBuffer;
 }
-
-
-#else
-
-
-bool
-bloscCanCompress()
-{
-    OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
-    return false;
-}
-
-
-size_t
-bloscUncompressedSize(const char*)
-{
-    OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
-}
-
-
-void
-bloscCompress(char*, size_t& compressedBytes, const size_t, const char*, const size_t)
-{
-    OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
-    compressedBytes = 0;
-}
-
-
-std::unique_ptr<char[]>
-bloscCompress(const char*, const size_t, size_t& compressedBytes, const bool)
-{
-    OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
-    compressedBytes = 0;
-    return nullptr;
-}
-
-
-size_t
-bloscCompressedSize(const char*, const size_t)
-{
-    OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
-    return 0;
-}
-
-
-void
-bloscDecompress(char*, const size_t, const size_t, const char*)
-{
-    OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
-}
-
-
-std::unique_ptr<char[]>
-bloscDecompress(const char*, const size_t, const bool)
-{
-    OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
-}
-
-
-#endif // OPENVDB_USE_BLOSC
 
 
 ////////////////////////////////////////
@@ -373,9 +308,7 @@ Page::decompress(const std::unique_ptr<char[]>& temp)
 {
     size_t uncompressedBytes = bloscUncompressedSize(temp.get());
     size_t tempBytes = uncompressedBytes;
-#ifdef OPENVDB_USE_BLOSC
     tempBytes += uncompressedBytes;
-#endif
     mData.reset(new char[tempBytes]);
 
     bloscDecompress(mData.get(), uncompressedBytes, tempBytes, temp.get());
@@ -482,18 +415,14 @@ PagedInputStream::skip(PageHandle::Ptr& pageHandle, std::streamsize n)
 
 PagedOutputStream::PagedOutputStream()
 {
-#ifdef OPENVDB_USE_BLOSC
-    mCompressedData.reset(new char[PageSize + BLOSC_MAX_OVERHEAD]);
-#endif
+    mCompressedData.reset(new char[PageSize + OPENVDB_BLOSC_MAX_OVERHEAD]);
 }
 
 
 PagedOutputStream::PagedOutputStream(std::ostream& os)
     : mOs(&os)
 {
-#ifdef OPENVDB_USE_BLOSC
-    mCompressedData.reset(new char[PageSize + BLOSC_MAX_OVERHEAD]);
-#endif
+    mCompressedData.reset(new char[PageSize + OPENVDB_BLOSC_MAX_OVERHEAD]);
 }
 
 
@@ -539,14 +468,10 @@ PagedOutputStream::compressAndWrite(const char* buffer, size_t size)
 
     size_t compressedBytes(0);
     if (mSizeOnly) {
-#ifdef OPENVDB_USE_BLOSC
         compressedBytes = bloscCompressedSize(buffer, size);
-#endif
     }
     else {
-#ifdef OPENVDB_USE_BLOSC
-        bloscCompress(mCompressedData.get(), compressedBytes, mCapacity + BLOSC_MAX_OVERHEAD, buffer, size);
-#endif
+        bloscCompress(mCompressedData.get(), compressedBytes, mCapacity + OPENVDB_BLOSC_MAX_OVERHEAD, buffer, size);
     }
 
     if (compressedBytes == 0) {
@@ -564,11 +489,7 @@ PagedOutputStream::compressAndWrite(const char* buffer, size_t size)
             mOs->write(reinterpret_cast<const char*>(&size), sizeof(int));
         }
         else {
-#ifdef OPENVDB_USE_BLOSC
             mOs->write(mCompressedData.get(), compressedBytes);
-#else
-            OPENVDB_THROW(RuntimeError, "Cannot write out compressed data without Blosc.");
-#endif
         }
     }
 }
@@ -579,15 +500,13 @@ PagedOutputStream::resize(size_t size)
 {
     // grow the capacity if not sufficient space
     size_t requiredSize = size;
-    if (size < BLOSC_PAD_BYTES && size >= BLOSC_MINIMUM_BYTES) {
-        requiredSize = BLOSC_PAD_BYTES;
+    if (size < OPENVDB_BLOSC_PAD_BYTES && size >= OPENVDB_BLOSC_MINIMUM_BYTES) {
+        requiredSize = OPENVDB_BLOSC_PAD_BYTES;
     }
     if (requiredSize > mCapacity) {
         mCapacity = requiredSize;
         mData.reset(new char[mCapacity]);
-#ifdef OPENVDB_USE_BLOSC
-        mCompressedData.reset(new char[mCapacity + BLOSC_MAX_OVERHEAD]);
-#endif
+        mCompressedData.reset(new char[mCapacity + OPENVDB_BLOSC_MAX_OVERHEAD]);
     }
 }
 

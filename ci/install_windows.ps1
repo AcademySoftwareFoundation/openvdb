@@ -10,7 +10,6 @@ $vcpkgPackages = @(
     "tbb",
     "gtest",
     "cppunit",
-    "blosc",
     "glfw3",
     "glew",
     "python3",
