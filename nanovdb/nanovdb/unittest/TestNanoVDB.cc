@@ -8695,6 +8695,32 @@ TEST_F(TestNanoVDB, CustomStreamGridHandleIO)
     }
 }// CustomStreamGridHandleIO
 
+// make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*ReadGridSizeOverflow"
+TEST_F(TestNanoVDB, ReadGridSizeOverflow)
+{
+    // one segment of four grids whose sizes sum to 2^64 + 512, followed by filler bytes
+    std::ostringstream os(std::ios_base::out | std::ios_base::binary);
+    nanovdb::io::Segment seg;
+    seg.header.gridCount = 4;
+    os.write(reinterpret_cast<const char*>(&seg.header), sizeof(nanovdb::io::FileHeader));
+    for (int i = 0; i < 4; ++i) {
+        nanovdb::io::FileMetaData meta;
+        std::memset(&meta, 0, sizeof(meta));
+        meta.gridSize = 0x4000000000000080ull;
+        meta.fileSize = 128;
+        meta.nameSize = 1;
+        os.write(reinterpret_cast<const char*>(&meta), sizeof(meta));
+        os.put('\0');
+    }
+    os << std::string(8192, 'A');
+    const std::string bytes = os.str();
+
+    std::istringstream is0(bytes, std::ios_base::in | std::ios_base::binary);
+    EXPECT_THROW(nanovdb::io::readGrids<nanovdb::HostBuffer>(is0), std::runtime_error);
+    std::istringstream is1(bytes, std::ios_base::in | std::ios_base::binary);
+    EXPECT_THROW(nanovdb::io::readGrid<nanovdb::HostBuffer>(is1, -1, nanovdb::HostBuffer()), std::runtime_error);
+}// ReadGridSizeOverflow
+
 // make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*GridHandleReadMultiGridRawBuffer"
 TEST_F(TestNanoVDB, GridHandleReadMultiGridRawBuffer)
 {
