@@ -410,7 +410,11 @@ splitGridHandles(const GridHandle<BufferT> &handle, cudaStream_t stream, const B
 ///          to the device that holds its storage.
 /// @param proto optional buffer whose resource allocates the output buffer;
 ///        without it the resource is default-constructed
-/// @return a handle whose grids carry their merged index and total count
+/// @return a handle whose grids carry their merged index and total count;
+///         no grids to merge yield an empty handle, over @a proto's resource
+///         when given
+/// @throw std::runtime_error if there are no grids to merge, @a proto is null
+///        and BufferT is not default-constructible
 /// @details The copies have completed when this returns, so the caller may
 ///          release @a handles immediately. The output adopts the metadata
 ///          of its source grids at their merged offsets, so no device chain
@@ -428,12 +432,13 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, cudaStream_t strea
             size += m.size;
         }
     }
-    if (size == 0u) {
+    if (size == 0u) {// nothing to merge: an empty handle, over the prototype's resource where given
+        if (proto) return GridHandle<BufferT>(detail::createDeviceStorage<BufferT>(0, proto, util::cuda::currentDevice(), stream));
         if constexpr (std::is_default_constructible<BufferT>::value) {
             return GridHandle<BufferT>();
         } else {
-            throw std::runtime_error("cuda::mergeGridHandles: merging empty handles requires a "
-                                     "default-constructible buffer type");
+            throw std::runtime_error("cuda::mergeGridHandles: merging empty handles into a buffer type that is not "
+                                     "default-constructible requires a prototype buffer");
         }
     }
 

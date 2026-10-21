@@ -459,8 +459,8 @@ indexToGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap
 //================================================================================================
 
 /// @brief Resource form of indexToGrid: the output and all internal scratch
-///        allocate through @c resource, on @c stream. Passing a cudaStream_t
-///        selects this form (a literal 0 does not: write cudaStream_t(0)); the
+///        allocate through @c resource, on @c stream. Passing a cudaStream_t, or a
+///        non-buffer type that converts to one, selects this form (a literal 0 does not: write cudaStream_t(0)); the
 ///        prototype-buffer form above keeps its call shape.
 /// @tparam ResourceT stream-ordered memory resource, held by value (a copy of
 ///         default_resource<ResourceT>() when omitted); pass a
