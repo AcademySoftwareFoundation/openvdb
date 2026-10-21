@@ -19,7 +19,6 @@
 
 #define VDB_BLOSC_CONCAT_(a, b) a##_##b
 #define VDB_BLOSC_CONCAT(a, b) VDB_BLOSC_CONCAT_(a, b)
-#define blosc_init            VDB_BLOSC_CONCAT(VDB_BLOSC_SYMBOL_PREFIX, blosc_init)
 #define blosc_compress_ctx    VDB_BLOSC_CONCAT(VDB_BLOSC_SYMBOL_PREFIX, blosc_compress_ctx)
 #define blosc_decompress_ctx  VDB_BLOSC_CONCAT(VDB_BLOSC_SYMBOL_PREFIX, blosc_decompress_ctx)
 #define blosc_cbuffer_sizes   VDB_BLOSC_CONCAT(VDB_BLOSC_SYMBOL_PREFIX, blosc_cbuffer_sizes)

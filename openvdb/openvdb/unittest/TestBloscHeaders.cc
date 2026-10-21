@@ -26,8 +26,6 @@ extern "C" int blosc_compress_ctx(int, int, size_t, size_t, const void*, void*,
 
 // decltype is not evaluated, so this checks the declarations without needing
 // either library to export or link the functions.
-static_assert(std::is_same<decltype(&nanovdb_blosc_init),
-    decltype(&openvdb_blosc_init)>::value, "blosc declarations differ");
 static_assert(std::is_same<decltype(&nanovdb_blosc_compress_ctx),
     decltype(&openvdb_blosc_compress_ctx)>::value, "blosc declarations differ");
 static_assert(std::is_same<decltype(&nanovdb_blosc_decompress_ctx),

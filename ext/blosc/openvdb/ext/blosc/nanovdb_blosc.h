@@ -45,12 +45,6 @@ extern "C" {
 #define NANOVDB_BLOSC_LZ4_COMPNAME "lz4"
 
 /**
-  Initialize the Blosc library environment. Not needed when only the
-  context functions below are used.
-*/
-NANOVDB_BLOSC_EXPORT void nanovdb_blosc_init(void);
-
-/**
   Compress `nbytes` from `src` into `dest`.
 
   `clevel`: compression level, 0 to 9.
