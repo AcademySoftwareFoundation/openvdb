@@ -475,11 +475,8 @@ mergeDeviceGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* oth
 { return cuda::detail::mergeDualGridHandles<BufferT, VectorT>(handles, other, stream); }
 
 template<typename BufferT>
-template<typename T, typename util::enable_if<BufferTraits<T>::hasDeviceDual, int>::type>
-GridHandle<BufferT>::GridHandle(T&& buffer)
-    : mBuffer(std::move(buffer))
+void GridHandle<BufferT>::parseDualBuffer()
 {
-    static_assert(util::is_same<T,BufferT>::value, "Expected U==BufferT");
     if (auto *data = reinterpret_cast<const GridData*>(mBuffer.data())) {
         detail::parseHostGridChain(data, mBuffer.size(), mMetaData);
     } else {
@@ -491,17 +488,14 @@ GridHandle<BufferT>::GridHandle(T&& buffer)
             cuda::detail::parseGridChain(d_data, mBuffer.size(), count, scratch, mMetaData, cudaStream_t(0));
         }
     }
-}// GridHandle(T&& buffer)
+}// GridHandle::parseDualBuffer
 
 // move constructor from a single-space device buffer: all device work runs on
 // the buffer's retained stream (or the default stream for a synchronous
 // resource), and the metadata scratch allocates through the buffer's resource.
 template<typename BufferT>
-template<typename T, typename util::enable_if<BufferHasDeviceSingle<T>::value, int>::type, typename>
-GridHandle<BufferT>::GridHandle(T&& buffer)
-    : mBuffer(std::move(buffer))
+void GridHandle<BufferT>::parseSingleBuffer()
 {
-    static_assert(util::is_same<T,BufferT>::value, "Expected U==BufferT");
     using ResourceT = typename BufferT::ResourceType;
     if (const GridData *d_data = reinterpret_cast<const GridData*>(mBuffer.data())) {
         const cudaStream_t stream = cuda::detail::retainedStreamOrDefault(mBuffer);
@@ -510,14 +504,12 @@ GridHandle<BufferT>::GridHandle(T&& buffer)
         ScratchT scratch = cuda::detail::makeMetaScratch<ScratchT>(mBuffer, cuda::detail::chainScratchSize(count), stream);
         cuda::detail::parseGridChain(d_data, mBuffer.size_bytes(), count, scratch, mMetaData, stream);
     }
-}// GridHandle(T&& buffer) for single-space device buffers
+}// GridHandle::parseSingleBuffer
 
-// Emit the dual-buffer move constructor from every CUDA translation unit, so
+// Emit the dual-buffer parse function from every CUDA translation unit, so
 // host-only translation units that construct GridHandle<cuda::DualDeviceBuffer>
-// (they see only the declaration) always find the symbol at link time. An
-// unused private function is not enough: the optimizer may drop the
-// complete-object constructor it instantiates.
-template GridHandle<cuda::DualDeviceBuffer>::GridHandle(cuda::DualDeviceBuffer&&);
+// (they see only the declaration) always find the symbol at link time.
+template void GridHandle<cuda::DualDeviceBuffer>::parseDualBuffer();
 
 } // namespace nanovdb
 
