@@ -1,15 +1,16 @@
 // Capstone: GPU level-set ray-march renderer.
 // Build an SDF sphere -> move to device -> one thread per pixel ->
-// ZeroCrossing to find the surface -> Lambertian shade via SDF gradient
+// zeroCrossing to find the surface -> Lambertian shade via SDF gradient
 // normal -> write PPM.
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/tools/CreatePrimitives.h>
-#include <nanovdb/cuda/DeviceBuffer.h>
-#include <nanovdb/cuda/GridHandle.cuh>
+#include <nanovdb/cuda/Buffer.h>
+#include <nanovdb/cuda/HandleStorage.h>
 #include <nanovdb/math/Ray.h>
-#include <nanovdb/math/HDDA.h>        // ZeroCrossing lives here
+#include <nanovdb/math/HDDA.h>        // zeroCrossing lives here
 #include <nanovdb/math/Stencils.h>   // GradStencil
 
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
@@ -42,7 +43,7 @@ __global__ void render(const GridT* grid, unsigned char* img, int W, int H,
     float t = 0.f, val = 0.f;
 
     unsigned char shade = 0;                        // background (black)
-    if (nanovdb::math::ZeroCrossing(iRay, acc, ijk, val, t)) {
+    if (nanovdb::math::zeroCrossing(iRay, acc, ijk, val, t)) {
         nanovdb::math::GradStencil<GridT> stencil(*grid);
         stencil.moveTo(ijk);
         nanovdb::Vec3f n = stencil.gradient();      // SDF gradient = outward normal
@@ -71,11 +72,9 @@ int main(int argc, char** argv)
         /*radius=*/100.0, /*center=*/nanovdb::Vec3d(0.0),
         /*voxelSize=*/1.0, /*halfWidth=*/3.0);
 
-    // 2. Move it to the device. copy<DeviceBuffer>() fills the HOST side of the
-    //    dual buffer; deviceUpload() pushes the bytes to the device. Only then
-    //    is deviceGrid() non-null.
-    auto devHandle = handle.copy<nanovdb::cuda::DeviceBuffer>();
-    devHandle.deviceUpload();
+    // 2. Copy it into device memory. The device handle holds the only copy of
+    //    its bytes there: deviceGrid() is the pointer to pass to the kernel.
+    auto devHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle, cudaStream_t(0));
     const GridT* dGrid = devHandle.deviceGrid<float>();
     if (!dGrid) { std::printf("no device grid\n"); return 1; }
 

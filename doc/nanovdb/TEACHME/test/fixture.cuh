@@ -25,7 +25,9 @@
 #include <nanovdb/math/HDDA.h>
 #include <nanovdb/math/SampleFromVoxels.h>
 #include <nanovdb/math/Stencils.h>
-#include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/cuda/Buffer.h>
+#include <nanovdb/cuda/DeviceResource.h>
+#include <nanovdb/cuda/HandleStorage.h>
 #include <nanovdb/cuda/GridHandle.cuh>
 #include <nanovdb/cuda/NodeManager.cuh>
 // Commonly-assumed "tools" headers — ambient so terse fragments compile
@@ -56,8 +58,8 @@
 // Handles
 extern nanovdb::GridHandle<nanovdb::HostBuffer>        handle;
 extern nanovdb::GridHandle<nanovdb::HostBuffer>        hostH;
-extern nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer> devH;
-extern nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer> devHandle;
+extern nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>> devH;
+extern nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>> devHandle;
 extern std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> handles;
 
 // Grids (host + device pointers into a float grid)
