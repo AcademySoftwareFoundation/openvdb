@@ -4323,7 +4323,8 @@ static_assert(std::is_move_constructible_v<nanovdb::tools::cuda::MergeGrids<nano
 // batch API) and checks every member against RefineGrid on that member alone. The batch is
 // built twice on one builder without draining the stream in between, on a non-blocking
 // stream, so the second build relies on getBuffer's own wait for the node counts and on the
-// builder ordering its reuse of the host staging after the first build's copies.
+// builder ordering its reuse of the host staging after the first build's copies. The second
+// build also computes full checksums.
 TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
 {
     using BuildT  = nanovdb::ValueOnIndex;
@@ -4430,7 +4431,8 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
     };
 
     // One batched refinement; returns the output buffer without draining the stream
-    auto buildBatch = [&](nanovdb::tools::cuda::TopologyBuilder<BuildT> &builder, bool waitForNodeCounts) {
+    auto buildBatch = [&](nanovdb::tools::cuda::TopologyBuilder<BuildT> &builder, bool waitForNodeCounts, nanovdb::CheckMode checksum) {
+        builder.mChecksum = checksum;
         builder.allocateProcessedRoots(tileCounts);
         for (uint32_t g = 0; g < gridCount; ++g) topo::packProcessedRoot(tiles[g], builder.hostProcessedRoot(g));
         builder.uploadProcessedRoot(stream);
@@ -4480,9 +4482,10 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
     };
 
     nanovdb::tools::cuda::TopologyBuilder<BuildT> builder(stream);
+    const std::vector<nanovdb::CheckMode> checksums = {nanovdb::CheckMode::Disable, nanovdb::CheckMode::Full};
     std::vector<DevBufT> buffers;
-    buffers.push_back(buildBatch(builder, true));
-    buffers.push_back(buildBatch(builder, false));
+    buffers.push_back(buildBatch(builder, true, checksums[0]));
+    buffers.push_back(buildBatch(builder, false, checksums[1]));
     cudaCheck(cudaStreamSynchronize(stream));
 
     for (size_t build = 0; build < buffers.size(); ++build) {
@@ -4501,6 +4504,11 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
             auto *header = reinterpret_cast<nanovdb::GridData*>(expected.data());
             header->mGridIndex = g;
             header->mGridCount = gridCount;
+            if (checksums[build] == nanovdb::CheckMode::Full) {// the head checksum covers mGridIndex and mGridCount, so check it on its own
+                EXPECT_TRUE(batch.gridData(g)->mChecksum.isFull()) << "grid " << g;
+                EXPECT_TRUE(nanovdb::tools::validateChecksum(batch.gridData(g), nanovdb::CheckMode::Full)) << "grid " << g;
+                header->mChecksum = batch.gridData(g)->mChecksum;
+            }
             EXPECT_EQ(0, std::memcmp(batch.gridData(g), expected.data(), expected.size())) << "grid " << g << " differs from its single-grid refinement";
             EXPECT_EQ(batch.gridData(g)->mGridIndex, g);
             EXPECT_EQ(batch.gridData(g)->mGridCount, gridCount);

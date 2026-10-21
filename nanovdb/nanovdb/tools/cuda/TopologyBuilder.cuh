@@ -267,8 +267,8 @@ public:
     /// @brief Propagates bounding boxes leaf -> lower -> upper -> root and sets each grid's world bbox
     void processBBox(cudaStream_t stream);
 
-    /// @brief Finishes each grid's voxel count and (optionally) checksum. Checksums are
-    ///        computed one grid at a time, each with its own lookup table and host round trip.
+    /// @brief Finishes each grid's voxel count and (optionally) checksum; the checksums of the
+    ///        whole batch share one lookup table and need no host round trip
     void postProcessGridTree(cudaStream_t stream);
 
     HostStagingT                 mHostStaging; // one pinned block, so every transfer is asynchronous and one cudaMallocHost serves a build: the processed roots back to back, then the per-grid parameters, then the tile bases; grown on demand by allocateProcessedRoot(s), never shrunk
@@ -1038,8 +1038,16 @@ inline void TopologyBuilder<BuildT, ResourceT>::postProcessGridTree(cudaStream_t
     cudaCheckError();
     mVoxelOffsets.destroy(stream);
 
-    for (uint32_t g = 0; g < gridCount(); ++g)
-        tools::cuda::updateChecksum((GridData*)data(g)->d_bufferPtr, mChecksum, stream);
+    // The same checksums tools::cuda::updateChecksum computes, from one lookup table for the
+    // whole batch. Each grid's size is known on the host, so no header is read back.
+    if (mChecksum == CheckMode::Disable) return;
+    auto d_lut = util::cuda::createCrc32Lut(0, stream);
+    for (uint32_t g = 0; g < gridCount(); ++g) {
+        auto *d_grid = (uint8_t*)data(g)->d_bufferPtr;
+        tools::cuda::crc32Head((GridData*)d_grid, d_lut.get(), (uint32_t*)d_grid + 2, stream);
+        if (mChecksum != CheckMode::Half)
+            util::cuda::blockedCRC32(d_grid + sizeof(GridData) + sizeof(TreeData), d_grid + data(g)->size, d_lut.get(), (uint32_t*)d_grid + 3, stream);
+    }
 }// TopologyBuilder<BuildT, ResourceT>::postProcessGridTree
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
