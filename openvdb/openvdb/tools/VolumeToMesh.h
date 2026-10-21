@@ -145,6 +145,12 @@ public:
     inline bool trimQuads(const size_t n, bool reallocate = false);
     inline bool trimTriangles(const size_t n, bool reallocate = false);
 
+    OPENVDB_DEPRECATED_MESSAGE("Use trimTriangles() instead.")
+    inline bool trimTrinagles(const size_t n, bool reallocate = false)
+    {
+        return this->trimTriangles(n, reallocate);
+    }
+
 private:
     // disallow copy by assignment
     void operator=(const PolygonPool&) {}
