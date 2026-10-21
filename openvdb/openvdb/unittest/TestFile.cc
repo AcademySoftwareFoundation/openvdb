@@ -48,6 +48,7 @@ public:
     void TearDown() override { openvdb::uninitialize(); }
 
     void testHeader();
+    void testHeaderVersionLimit();
     void testWriteGrid();
     void testWriteMultipleGrids();
     void testReadGridDescriptors();
@@ -100,6 +101,39 @@ TestFile::testHeader()
     remove("something.vdb2");
 }
 TEST_F(TestFile, testHeader) { testHeader(); }
+
+
+// Versions up to the current one are read. Newer ones are read with a warning until
+// OPENVDB_UNSUPPORTED_FILE_VERSION. That version and later ones are refused.
+void
+TestFile::testHeaderVersionLimit()
+{
+    using namespace openvdb;
+
+    // Rewrite the version field of a real header, which follows the 8 byte magic number.
+    std::ostringstream ostr(std::ios_base::binary);
+    io::Stream(ostr).write(GridPtrVec());
+    const std::string bytes = ostr.str();
+
+    auto readHeaderWithVersion = [&](uint32_t version) {
+        std::string changed = bytes;
+        std::memcpy(&changed[sizeof(int64_t)], &version, sizeof(uint32_t));
+        std::istringstream istr(changed, std::ios_base::binary);
+        io::Archive archive;
+        archive.readHeader(istr);
+        return archive.fileVersion();
+    };
+
+    EXPECT_EQ(uint32_t(OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX),
+        readHeaderWithVersion(OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX));
+    EXPECT_EQ(uint32_t(OPENVDB_FILE_VERSION), readHeaderWithVersion(OPENVDB_FILE_VERSION));
+    EXPECT_EQ(uint32_t(OPENVDB_FILE_VERSION + 1), readHeaderWithVersion(OPENVDB_FILE_VERSION + 1));
+    EXPECT_EQ(OPENVDB_UNSUPPORTED_FILE_VERSION - 1,
+        readHeaderWithVersion(OPENVDB_UNSUPPORTED_FILE_VERSION - 1));
+    EXPECT_THROW(readHeaderWithVersion(OPENVDB_UNSUPPORTED_FILE_VERSION), IoError);
+    EXPECT_THROW(readHeaderWithVersion(OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX - 1), IoError);
+}
+TEST_F(TestFile, testHeaderVersionLimit) { testHeaderVersionLimit(); }
 
 
 void

@@ -767,7 +767,11 @@ Archive::readHeader(std::istream& is)
 
     // 2) Read the file format version number.
     is.read(reinterpret_cast<char*>(&mFileVersion), sizeof(uint32_t));
-    if (mFileVersion > OPENVDB_FILE_VERSION) {
+    if (mFileVersion >= OPENVDB_UNSUPPORTED_FILE_VERSION) {
+        OPENVDB_THROW(IoError, "unsupported VDB file format (expected version "
+            << OPENVDB_FILE_VERSION << " or earlier, got version " << mFileVersion
+            << "), the file was written by a newer version of OpenVDB");
+    } else if (mFileVersion > OPENVDB_FILE_VERSION) {
         OPENVDB_LOG_WARN("unsupported VDB file format (expected version "
             << OPENVDB_FILE_VERSION << " or earlier, got version " << mFileVersion << ")");
     } else if (mFileVersion < OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX) {
