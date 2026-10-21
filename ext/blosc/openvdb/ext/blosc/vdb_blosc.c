@@ -105,8 +105,6 @@ struct blosc_context {
   int clevel;                     /* Compression level (1-9) */
 };
 
-static int32_t g_initlib = 0;
-
 
 /* A portable malloc wrapper */
 static uint8_t *my_malloc(size_t size)
@@ -1003,12 +1001,4 @@ void blosc_cbuffer_sizes(const void *cbuffer, size_t *nbytes,
   *nbytes = (size_t)sw32_(_src + 4);       /* uncompressed buffer size */
   *blocksize = (size_t)sw32_(_src + 8);    /* block size */
   *cbytes = (size_t)sw32_(_src + 12);      /* compressed buffer size */
-}
-
-void blosc_init(void)
-{
-  /* Return if we are already initialized */
-  if (g_initlib) return;
-
-  g_initlib = 1;
 }
