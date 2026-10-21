@@ -1,0 +1,5 @@
+OpenVDB:
+  Build:
+  - Zlib is now a private dependency of the OpenVDB core library. No installed header
+    includes zlib.h, so downstream projects no longer need zlib at compile time. On Linux
+    the shared library no longer re-exports statically linked zlib symbols.
