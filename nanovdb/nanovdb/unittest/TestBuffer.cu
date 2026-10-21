@@ -2396,6 +2396,8 @@ TEST(TestBuffer, CopyToKeepsUnalignedGrids)
     std::vector<nanovdb::GridHandle<DevBufT>> devs;
     devs.push_back(std::move(dev));
     EXPECT_THROW((nanovdb::cuda::mergeGridHandles<DevBufT, std::vector>(devs, cudaStream_t(0))), std::runtime_error);
+}
+
 TEST(TestBuffer, DeprecatedDualTransfersWarnOnlyAtTheCall)
 {
     // This file builds with warnings as errors and no file-wide suppression:
