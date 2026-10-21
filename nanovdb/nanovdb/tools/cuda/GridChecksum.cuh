@@ -28,6 +28,9 @@
 #include <nanovdb/tools/GridChecksum.h>
 #include <nanovdb/GridHandle.h>
 
+#include <memory> // for std::unique_ptr
+#include <stdexcept> // for std::runtime_error
+
 namespace nanovdb {// =======================================================================
 
 namespace tools::cuda {// ===================================================================
@@ -202,6 +205,10 @@ inline void blockedCRC32(const void *d_data, size_t size, const uint32_t *d_lut,
     NANOVDB_ASSERT(d_data && d_lut && d_crc);
     static constexpr unsigned int threadsPerBlock = 128;// seems faster than the old value of 256!
     const uint64_t checksumCount = size >> NANOVDB_CRC32_LOG2_BLOCK_SIZE;// 4 KB (4096 byte)
+    if (checksumCount == 0) {// as on the host: ~0 for no bytes, else the CRC of an empty block-checksum array, 0
+        cudaCheck(cudaMemsetAsync(d_crc, size == 0 ? 0xFF : 0, sizeof(uint32_t), stream));
+        return;
+    }
     unique_ptr<uint32_t> buffer(checksumCount, stream);// for checksums of 4 KB blocks
     uint32_t *d_checksums = buffer.get();
     crc32SlicedKernel<<<blocksPerGrid(checksumCount, threadsPerBlock), threadsPerBlock, 0, stream>>>(
@@ -292,25 +299,35 @@ void crc32TailOld(const NanoGrid<ValueT> *d_grid, const GridData *gridData, cons
     auto *d_nodeMgr = nodeMgrHandle.template deviceMgr<ValueT>();
     NANOVDB_ASSERT(isAligned(d_nodeMgr));
     const uint32_t nodeCount[3]={gridData->template nodeCount<0>(), gridData->template nodeCount<1>(), gridData->template nodeCount<2>()};
+    if (nodeCount[0] + nodeCount[1] + nodeCount[2] == 0) {// an empty grid: the CRC of zero bytes is 0
+        cudaCheck(cudaMemsetAsync(d_crc, 0, sizeof(uint32_t), stream));
+        return;
+    }
     util::cuda::unique_ptr<uint32_t> d_checksumsUP(nodeCount[0]+nodeCount[1]+nodeCount[2]);
     uint32_t *d_checksums = d_checksumsUP.get(), *d_ptr = d_checksums;
 
-    util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(nodeCount[2], threadsPerBlock), threadsPerBlock, 0, stream>>>(nodeCount[2], [=] __device__(size_t tid) {
-        auto &node = d_nodeMgr->upper(uint32_t(tid));
-        d_ptr[tid] = util::crc32((const uint8_t*)&node, node.memUsage(), d_lut);
-    }); cudaCheckError();
+    if (nodeCount[2]) {
+        util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(nodeCount[2], threadsPerBlock), threadsPerBlock, 0, stream>>>(nodeCount[2], [=] __device__(size_t tid) {
+            auto &node = d_nodeMgr->upper(uint32_t(tid));
+            d_ptr[tid] = util::crc32((const uint8_t*)&node, node.memUsage(), d_lut);
+        }); cudaCheckError();
+    }
 
     d_ptr += nodeCount[2];
-    util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(nodeCount[1], threadsPerBlock), threadsPerBlock, 0, stream>>>(nodeCount[1], [=] __device__(size_t tid) {
-        auto &node = d_nodeMgr->lower(uint32_t(tid));
-        d_ptr[tid] = util::crc32((const uint8_t*)&node, node.memUsage(), d_lut);
-    }); cudaCheckError();
+    if (nodeCount[1]) {
+        util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(nodeCount[1], threadsPerBlock), threadsPerBlock, 0, stream>>>(nodeCount[1], [=] __device__(size_t tid) {
+            auto &node = d_nodeMgr->lower(uint32_t(tid));
+            d_ptr[tid] = util::crc32((const uint8_t*)&node, node.memUsage(), d_lut);
+        }); cudaCheckError();
+    }
 
     d_ptr += nodeCount[1];
-    util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(nodeCount[0], threadsPerBlock), threadsPerBlock, 0, stream>>>(nodeCount[0], [=] __device__(size_t tid) {
-        auto &node = d_nodeMgr->leaf(uint32_t(tid));
-        d_ptr[tid] = util::crc32((const uint8_t*)&node, node.memUsage(), d_lut);
-    }); cudaCheckError();
+    if (nodeCount[0]) {
+        util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(nodeCount[0], threadsPerBlock), threadsPerBlock, 0, stream>>>(nodeCount[0], [=] __device__(size_t tid) {
+            auto &node = d_nodeMgr->leaf(uint32_t(tid));
+            d_ptr[tid] = util::crc32((const uint8_t*)&node, node.memUsage(), d_lut);
+        }); cudaCheckError();
+    }
 
     util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__(size_t) {
         *d_crc = util::crc32(d_checksums, d_nodeMgr->tree().totalNodeCount()*sizeof(uint32_t), d_lut);

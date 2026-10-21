@@ -21,6 +21,7 @@
 #include <nanovdb/tools/cuda/AddBlindData.cuh>
 #include <nanovdb/tools/cuda/CoarsenGrid.cuh>
 #include <nanovdb/tools/cuda/DilateGrid.cuh>
+#include <nanovdb/tools/GridValidator.h> // for isValid on the empty grids
 #include <nanovdb/tools/GridChecksum.h> // host checksums: the reference for the device overloads, and validateChecksum on merged headers
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
 #include <nanovdb/tools/cuda/IndexToGrid.cuh>
@@ -1283,7 +1284,9 @@ TEST(TestBuffer, GridHandleCopyToProtoResource)
         EXPECT_NE(dev.deviceGrid<float>(), nullptr);
 
         nanovdb::GridHandle<nanovdb::HostBuffer> empty;
-        EXPECT_THROW((nanovdb::cuda::copyTo<DevBufT>(empty, cudaStream_t(0), &proto)), std::runtime_error);// no empty handle over a non-default-constructible buffer
+        auto emptyDev = nanovdb::cuda::copyTo<DevBufT>(empty, cudaStream_t(0), &proto);// empty in, empty out, over the prototype's resource
+        EXPECT_EQ(0u, emptyDev.gridCount());
+        EXPECT_EQ(0u, emptyDev.bufferSize());
     }
     ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
     EXPECT_EQ(counters.allocs, counters.deallocs);
@@ -2244,15 +2247,129 @@ TEST(TestBuffer, ResourceFormsOfThePointSetOverloads)
         EXPECT_EQ(3u, host.grid<nanovdb::Point>(0)->pointCount());
         EXPECT_EQ(1u, host.grid<nanovdb::Point>(1)->pointCount());
 
-        // empty sets and invalid voxel sizes are rejected in either form
-        EXPECT_THROW((nanovdb::tools::cuda::voxelsToGrid<float, const nanovdb::Coord*>(std::vector<VoxelSet>{}, stream, RefT(res))), std::invalid_argument);
-        EXPECT_THROW((nanovdb::tools::cuda::voxelsToGrid<float, const nanovdb::Coord*>(std::vector<VoxelSet>{}, SingleBufT(), stream)), std::invalid_argument);
-        EXPECT_THROW((nanovdb::tools::cuda::pointsToGrid<nanovdb::Point, const nanovdb::Vec3f*>(std::vector<PointSet>{}, stream, RefT(res))), std::invalid_argument);
-        EXPECT_THROW((nanovdb::tools::cuda::voxelsToGrid<float, const nanovdb::Coord*>(std::vector<VoxelSet>{{d_coords.data(), 1, 0.0}}, stream, RefT(res))), std::invalid_argument);
+        // no sets give an empty handle, a set without points an empty grid, in every form;
+        // invalid voxel sizes and point types are rejected
+        using nanovdb::tools::cuda::voxelsToGrid;
+        using nanovdb::tools::cuda::pointsToGrid;
+        using Voxels = std::vector<VoxelSet>;
+        using Points = std::vector<PointSet>;
+        EXPECT_EQ(0u, (voxelsToGrid<float, const nanovdb::Coord*>(Voxels{}, stream, RefT(res))).gridCount());
+        EXPECT_EQ(0u, (voxelsToGrid<float, const nanovdb::Coord*>(Voxels{}, SingleBufT(), stream)).gridCount());
+        EXPECT_EQ(0u, (pointsToGrid<nanovdb::Point, const nanovdb::Vec3f*>(Points{}, stream, RefT(res))).gridCount());
+        EXPECT_EQ(0u, (pointsToGrid<nanovdb::Point, const nanovdb::Vec3f*>(Points{}, SingleBufT(), stream)).gridCount());
+        {
+            auto mixed = voxelsToGrid<float, const nanovdb::Coord*>(Voxels{{d_coords.data(), 2, 1.0}, {d_coords.data(), 0, 1.0}}, SingleBufT(), stream);
+            ASSERT_EQ(2u, mixed.gridCount());// one grid per set, the second one empty
+            auto host = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(mixed, stream);
+            EXPECT_GT(host.grid<float>(0)->activeVoxelCount(), 0u);
+            EXPECT_EQ(0u, host.grid<float>(1)->activeVoxelCount());
+            EXPECT_EQ(1u, host.gridData(1)->mGridIndex);
+        }
+        EXPECT_EQ(2u, (pointsToGrid<nanovdb::Point, const nanovdb::Vec3f*>(Points{{d_points.data(), 0, 1.0, nanovdb::PointType::Default}, {d_points.data(), 3, 1.0, nanovdb::PointType::Default}}, stream, RefT(res))).gridCount());
+        EXPECT_THROW((voxelsToGrid<float, const nanovdb::Coord*>(Voxels{{d_coords.data(), 1, 0.0}}, stream, RefT(res))), std::invalid_argument);
+        EXPECT_THROW((voxelsToGrid<float, const nanovdb::Coord*>(Voxels{{d_coords.data(), 1, 0.0}}, SingleBufT(), stream)), std::invalid_argument);
+        EXPECT_THROW((pointsToGrid<nanovdb::Point, const nanovdb::Vec3f*>(Points{{d_points.data(), 1, 0.0, nanovdb::PointType::Default}}, stream, RefT(res))), std::invalid_argument);
+        EXPECT_THROW((pointsToGrid<nanovdb::Point, const nanovdb::Vec3f*>(Points{{d_points.data(), 1, 0.0, nanovdb::PointType::Default}}, SingleBufT(), stream)), std::invalid_argument);
+        EXPECT_THROW((pointsToGrid<nanovdb::Point, const nanovdb::Vec3f*>(Points{{d_points.data(), 3, 1.0, nanovdb::PointType::Disable}}, stream, RefT(res))), std::invalid_argument);
+        EXPECT_THROW((nanovdb::tools::cuda::pointsToGrid(d_points.data(), 3, 1.0, nanovdb::PointType::Disable, SingleBufT(), stream)), std::invalid_argument);
     }
     ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(stream));
     EXPECT_EQ(counters.allocs, counters.deallocs);
     ASSERT_EQ(cudaSuccess, cudaStreamDestroy(stream));
+}
+
+namespace {
+/// @brief Host copy of a single-grid handle that must hold a valid grid with no active voxels.
+template<typename BuildT, typename BufT>
+nanovdb::GridHandle<nanovdb::HostBuffer> expectEmptyGrid(const nanovdb::GridHandle<BufT>& handle)
+{
+    EXPECT_EQ(1u, handle.gridCount());
+    auto host = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(handle, cudaStream_t(0));
+    const auto* grid = host.template grid<BuildT>();
+    EXPECT_NE(nullptr, grid);
+    if (grid) {
+        EXPECT_EQ(0u, grid->activeVoxelCount());
+        EXPECT_EQ(0u, grid->tree().nodeCount(0));
+        EXPECT_TRUE(nanovdb::tools::isValid(grid, nanovdb::CheckMode::Full));
+    }
+    return host;
+}
+} // namespace
+
+TEST(TestBuffer, ZeroPointsBuildAnEmptyGrid)
+{
+    // No points in, a valid empty grid out, in every form.
+    nanovdb::cuda::Buffer<nanovdb::Coord> d_coords(cudaStream_t(0), 1, nanovdb::cuda::noInit);
+    nanovdb::cuda::Buffer<nanovdb::Vec3f> d_points(cudaStream_t(0), 1, nanovdb::cuda::noInit);
+    const cudaStream_t stream = 0;
+    expectEmptyGrid<float>(nanovdb::tools::cuda::voxelsToGrid<float>(d_coords.data(), 0, 1.0, SingleBufT()));
+    expectEmptyGrid<float>(nanovdb::tools::cuda::voxelsToGrid<float>(d_coords.data(), 0, 1.0, stream));
+    auto index = expectEmptyGrid<nanovdb::ValueOnIndex>(nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex>(d_coords.data(), 0, 1.0, stream));
+    EXPECT_EQ(1u, index.grid<nanovdb::ValueOnIndex>()->valueCount());// the background value only
+    {
+        auto host = expectEmptyGrid<nanovdb::Point>(nanovdb::tools::cuda::pointsToGrid(d_points.data(), 0, 1.0, nanovdb::PointType::Default, stream));
+        EXPECT_EQ(0u, host.grid<nanovdb::Point>()->pointCount());
+        EXPECT_EQ(nanovdb::GridClass::PointData, host.grid<nanovdb::Point>()->gridClass());
+    }
+    expectEmptyGrid<nanovdb::Point>(nanovdb::tools::cuda::pointsToGrid(d_points.data(), 0, 1.0, nanovdb::PointType::Default, SingleBufT()));
+    nanovdb::tools::cuda::PointsToGrid<float> converter(1.0);
+    converter.setChecksum(nanovdb::CheckMode::Full);
+    expectEmptyGrid<float>(converter.getHandle(d_coords.data(), 0, SingleBufT()));
+    expectEmptyGrid<float>(converter.build(d_coords.data(), 0));
+    EXPECT_THROW((nanovdb::tools::cuda::pointsToGrid(d_points.data(), -1, 1.0, nanovdb::PointType::Default, stream)), std::invalid_argument);
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(stream));
+    ASSERT_EQ(cudaSuccess, cudaGetLastError());
+}
+
+TEST(TestBuffer, EmptyHandlesMergeAndCopyForEveryBufferType)
+{
+    // Empty in, empty out also for buffers over a resource that cannot be default-constructed.
+    using RefT = nanovdb::cuda::ResourceRef<CountingResource>;
+    using RefBufT = nanovdb::cuda::Buffer<std::byte, RefT>;
+    Counters counters;
+    CountingResource res{&counters};
+    {
+        const RefBufT proto(cudaStream_t(0), RefT(res), 0, nanovdb::cuda::noInit);
+        auto merged = nanovdb::cuda::mergeGridHandles<RefBufT, std::vector>(std::vector<nanovdb::GridHandle<RefBufT>>(), cudaStream_t(0), &proto);
+        EXPECT_EQ(0u, merged.gridCount());
+        EXPECT_EQ(0u, merged.bufferSize());
+        auto copied = nanovdb::cuda::copyTo<RefBufT>(nanovdb::GridHandle<nanovdb::HostBuffer>(), cudaStream_t(0), &proto);
+        EXPECT_EQ(0u, copied.gridCount());
+        using PinBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::PinnedResource>;
+        const PinBufT pinnedProto(0, nanovdb::cuda::noInit);
+        auto pinned = nanovdb::cuda::copyTo<PinBufT>(merged, cudaStream_t(0), &pinnedProto);// host-single destination
+        EXPECT_EQ(0u, pinned.gridCount());
+    }
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+    EXPECT_EQ(counters.allocs, counters.deallocs);
+}
+
+namespace {
+/// @brief A stream type that converts to cudaStream_t, like a framework's stream wrapper.
+struct StreamWrapper
+{
+    cudaStream_t stream;
+    operator cudaStream_t() const { return stream; }
+};
+} // namespace
+
+TEST(TestBuffer, StreamWrapperSelectsTheResourceForm)
+{
+    using nanovdb::cuda::detail::IsStreamArgument;
+    static_assert(IsStreamArgument<cudaStream_t>::value && IsStreamArgument<StreamWrapper>::value, "streams select the resource form");
+    static_assert(!IsStreamArgument<std::nullptr_t>::value && !IsStreamArgument<int>::value, "0 and nullptr reach the prototype form's static_assert");
+    static_assert(!IsStreamArgument<SingleBufT>::value && !IsStreamArgument<nanovdb::cuda::DualDeviceBuffer>::value, "buffers stay prototypes");
+    const std::vector<nanovdb::Coord> coords = {nanovdb::Coord(1,2,3), nanovdb::Coord(-5,0,7)};
+    auto d_coords = toDevice(coords);
+    const StreamWrapper wrapped{cudaStream_t(0)};
+    auto single = nanovdb::tools::cuda::voxelsToGrid<float>(d_coords.data(), coords.size(), 1.0, wrapped);
+    static_assert(std::is_same<decltype(single), nanovdb::GridHandle<SingleBufT>>::value, "a stream wrapper selects the resource form");
+    EXPECT_EQ(1u, single.gridCount());
+    using VoxelSet = std::tuple<const nanovdb::Coord* const, size_t, double>;
+    const std::vector<VoxelSet> sets{{d_coords.data(), 1, 1.0}, {d_coords.data() + 1, 1, 0.5}};
+    auto merged = nanovdb::tools::cuda::voxelsToGrid<float, const nanovdb::Coord*>(sets, wrapped);
+    static_assert(std::is_same<decltype(merged), nanovdb::GridHandle<SingleBufT>>::value, "a stream wrapper selects the set resource form");
+    EXPECT_EQ(2u, merged.gridCount());
 }
 
 TEST(TestBuffer, BuilderConstructorsValidateArguments)

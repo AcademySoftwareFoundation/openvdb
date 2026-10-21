@@ -5,6 +5,7 @@
 #include <nanovdb/tools/cuda/DistributedPointsToGrid.cuh>
 #include <nanovdb/util/Timer.h>
 #include <nanovdb/cuda/DeviceMesh.h>
+#include <nanovdb/tools/GridValidator.h> // for isValid
 #include <nanovdb/cuda/GridHandle.cuh> // for cuda::mergeGridHandles
 #include <nanovdb/tools/CreatePrimitives.h>
 #include <nanovdb/tools/GridChecksum.h> // for validateChecksum
@@ -62,6 +63,28 @@ TEST(TestNanoVDBMultiGPU, MergeGridHandlesFromAnotherDevice)
     sources.clear();
     ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(remote));
     ASSERT_EQ(cudaSuccess, cudaStreamDestroy(remote));
+}
+
+/// @brief No points build a valid empty grid, as in PointsToGrid.
+TEST(TestNanoVDBMultiGPU, ZeroPoints_DistributedCudaPointsToGrid)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
+    int current = 0;
+    cudaCheck(cudaGetDevice(&current));
+    nanovdb::Coord* voxels = nullptr;
+    cudaCheck(cudaMallocManaged(&voxels, sizeof(nanovdb::Coord)));
+    nanovdb::cuda::DeviceMesh deviceMesh;
+    nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
+    auto handle = converter.getHandle(voxels, 0, BufferT());
+    ASSERT_EQ(1u, handle.gridCount());
+    const auto *grid = handle.grid<BuildT>();// managed storage: the host reads the grid in place
+    ASSERT_TRUE(grid);
+    EXPECT_EQ(0u, grid->activeVoxelCount());
+    EXPECT_EQ(1u, grid->valueCount());
+    EXPECT_TRUE(nanovdb::tools::isValid(grid, nanovdb::CheckMode::Disable));// no checksum is computed here
+    cudaCheck(cudaFree(voxels));
+    cudaSetDevice(current);
 }
 
 /// @brief Tests the correctness of multi-GPU radix sort
