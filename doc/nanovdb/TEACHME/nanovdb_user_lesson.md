@@ -599,7 +599,10 @@ pointer at all, so a kernel can't be handed a host `mgr<T>()` by
 accident. To inspect device-built data on the CPU, `cuda::copyTo` it into
 a host handle (Module 6). With managed memory both accessors return the
 same bytes — convenient, but every host touch can migrate pages, so keep
-kernel paths on `deviceMgr`.
+kernel paths on `deviceMgr`. The node manager stores a pointer to the grid
+it was built from, so `mgr<T>()` is usable on the host only if that grid is
+managed too: a manager built over a device-only grid points into device
+memory, and traversing it on the host faults.
 
 <!-- teachme:stale-ok — the renamed and deprecated names below are shown deliberately as counter-examples -->
 > Heads up: older docs and examples reference

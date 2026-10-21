@@ -13,6 +13,14 @@ using namespace nanovdb;
 
 namespace pynanovdb {
 
+// The Python DeviceGridHandle keeps its upload/download API, which has no
+// single-space Python replacement yet, so these use the deprecated dual-space
+// buffer transfers until it moves to single-space storage.
+NANOVDB_SUPPRESS_DEPRECATION_BEGIN
+static void deviceUpload(GridHandle<nanovdb::cuda::DualDeviceBuffer>& handle, bool sync) { handle.buffer().deviceUpload(cudaStream_t(0), sync); }
+static void deviceDownload(GridHandle<nanovdb::cuda::DualDeviceBuffer>& handle, bool sync) { handle.buffer().deviceDownload(cudaStream_t(0), sync); }
+NANOVDB_SUPPRESS_DEPRECATION_END
+
 void defineDeviceGridHandle(nb::module_& m)
 {
     using BufferT = nanovdb::cuda::DualDeviceBuffer;
@@ -36,13 +44,8 @@ void defineDeviceGridHandle(nb::module_& m)
              nb::overload_cast<uint32_t>(&GridHandle<BufferT>::template deviceGrid<math::Rgba8>),
              "n"_a = 0,
              nb::rv_policy::reference_internal)
-        // The Python DeviceGridHandle keeps its upload/download API, which has no
-        // single-space Python replacement yet, so these call the buffer directly
-        // instead of the deprecated GridHandle members.
-        .def(
-            "deviceUpload", [](GridHandle<BufferT>& handle, bool sync) { handle.buffer().deviceUpload(cudaStream_t(0), sync); }, "sync"_a = true)
-        .def(
-            "deviceDownload", [](GridHandle<BufferT>& handle, bool sync) { handle.buffer().deviceDownload(cudaStream_t(0), sync); }, "sync"_a = true);
+        .def("deviceUpload", &deviceUpload, "sync"_a = true)
+        .def("deviceDownload", &deviceDownload, "sync"_a = true);
 }
 
 } // namespace pynanovdb

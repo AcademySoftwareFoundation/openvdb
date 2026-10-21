@@ -8,6 +8,7 @@
 #include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/GridHandle.cuh> // for cuda::mergeGridHandles
 #include <nanovdb/cuda/ManagedResource.h>
+#include <nanovdb/cuda/UnifiedBuffer.h> // the default buffer of DistributedPointsToGrid::getHandle
 #include <nanovdb/tools/CreatePrimitives.h>
 #include <nanovdb/tools/GridChecksum.h> // for validateChecksum
 
@@ -18,6 +19,7 @@
 #include <algorithm> // for std::sort, std::unique
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
 #include <vector>
 
 #include <thrust/fill.h>
@@ -553,14 +555,15 @@ TEST(TestNanoVDBMultiGPU, FewTiles_DistributedCudaPointsToGrid)
             voxels[i] = nanovdb::Coord(op(), op(), op());
     }
 
-    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
     nanovdb::cuda::DeviceMesh deviceMesh;
     nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
-    auto handle = converter.getHandle(voxels, voxelCount, BufferT());
+    auto handle = converter.getHandle(voxels, voxelCount);// the default buffer, DualUnifiedBuffer in 13.x
+    static_assert(std::is_same<decltype(handle), nanovdb::GridHandle<nanovdb::cuda::DualUnifiedBuffer>>::value,
+                  "getHandle without a buffer builds into the dual-space unified buffer");
 
     EXPECT_TRUE(handle.deviceData());
     EXPECT_TRUE(handle.deviceGrid<BuildT>());
-    auto *grid = handle.grid<BuildT>();// managed storage: the host reads the grid in place
+    auto *grid = handle.grid<BuildT>();// unified memory: the host reads the grid in place
     EXPECT_TRUE(grid);
     EXPECT_TRUE(grid->valueCount() > 0);
     EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());

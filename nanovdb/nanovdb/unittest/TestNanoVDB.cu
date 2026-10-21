@@ -41,6 +41,7 @@
 #include <unordered_set>
 #include <iomanip> // for std::setw, std::setfill
 #include <thread> // for std::thread
+#include <type_traits>
 
 // The tests of the dual-space buffers deliberately keep exercising the
 // deprecated DeviceBuffer surface until its removal; the deprecation warnings
@@ -3146,7 +3147,36 @@ TEST(TestNanoVDBCUDA, NodeManager)
         EXPECT_TRUE(d_mgr);
         EXPECT_EQ(count, countActiveVoxels(d_mgr));
     }
+    {// the dual-space overload, still the default in 13.x
+        auto dualHandle = nanovdb::tools::createLevelSetSphere<float, nanovdb::cuda::DualDeviceBuffer>(100);
+        dualHandle.deviceUpload();
+        auto handle2 = nanovdb::cuda::createNodeManager(dualHandle.deviceGrid<float>());
+        static_assert(std::is_same<decltype(handle2), nanovdb::NodeManagerHandle<nanovdb::cuda::DualDeviceBuffer>>::value,
+                      "the overload without a resource builds into the dual-space buffer");
+        auto *d_mgr = handle2.deviceMgr<float>();
+        EXPECT_TRUE(d_mgr);
+        EXPECT_EQ(count, countActiveVoxels(d_mgr));
+    }
 }// NodeManager
+
+TEST(TestNanoVDBCUDA, DualDeviceBufferUploadBookkeeping)
+{
+    // The dual-space buffer, still the default in 13.x, holds the host copy
+    // first and gains a device copy on upload.
+    using BufferT = nanovdb::cuda::DualDeviceBuffer;
+    auto floatHdl = nanovdb::tools::createLevelSetSphere<float>(20);
+    auto idxHdl = nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, nanovdb::ValueIndex, BufferT>(*floatHdl.grid<float>(), 0u, false, false, 1);
+    EXPECT_EQ(1u, idxHdl.buffer().bufferCount());
+    EXPECT_TRUE(idxHdl.buffer().data(0, cudaCpuDeviceId));
+    EXPECT_FALSE(idxHdl.buffer().data(0, 0));
+    EXPECT_FALSE(idxHdl.deviceGrid<nanovdb::ValueIndex>());
+    idxHdl.deviceUpload();
+    EXPECT_TRUE(idxHdl.deviceGrid<nanovdb::ValueIndex>());
+    EXPECT_EQ(2u, idxHdl.buffer().bufferCount());
+    EXPECT_TRUE(idxHdl.buffer().data(0, cudaCpuDeviceId));
+    EXPECT_TRUE(idxHdl.buffer().data(0, 0));
+    EXPECT_FALSE(idxHdl.deviceGrid<float>());
+}// DualDeviceBufferUploadBookkeeping
 
 
 TEST(TestNanoVDBCUDA, GridStats_UnifiedBuffer)

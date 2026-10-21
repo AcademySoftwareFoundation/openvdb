@@ -36,8 +36,9 @@ namespace cuda {// =============================================================
 /// @note  This is the implementation behind the deprecated DeviceBuffer alias
 ///        below, renamed so the [[deprecated]] attribute reaches only code
 ///        that spells the public name: the GPU tools' signature defaults
-///        reference this implementation, so default-using callers stay
-///        warning-free until the defaults change at removal. Transitional --
+///        reference this implementation, so code that only reaches the type
+///        through those defaults is warning-free, while calling the
+///        deprecated transfer members warns. Transitional --
 ///        do not adopt this name; it is deleted together with the alias. The
 ///        header keeps its long-standing name and include path for the same
 ///        reason: renaming a header breaks existing includes outright, and
@@ -56,6 +57,12 @@ class DualDeviceBuffer
     /// @note All existing buffers are first cleared
     /// @warning size is expected to be non-zero. Use clear() clear buffer!
     void init(uint64_t size, int device, cudaStream_t stream);
+
+    /// @brief Copies the host buffer to @c device, allocating the device buffer if needed.
+    void upload(int device, cudaStream_t stream, bool sync);
+
+    /// @brief Copies the buffer on @c device to the host, allocating the host buffer if needed.
+    void download(int device, cudaStream_t stream, bool sync);
 
     /// @brief Free every managed device allocation, each ordered after all tracked uses of the
     ///        buffer, and destroy the tracking events.
@@ -343,9 +350,11 @@ public:
     /// @param stream cuda stream
     /// @param sync if false the memory copy is asynchronous.
     /// @warning Assumes that the host buffer already exists!
-    /// @note determine the current device with cudaGetDevice
-    void deviceUpload(int device = 0, cudaStream_t stream = 0, bool sync = true);
-    void deviceUpload(int device, void* stream, bool sync){this->deviceUpload(device, cudaStream_t(stream), sync);}
+    /// @deprecated Build device grids into cuda::Buffer<std::byte> and move them with cuda::copyTo.
+    [[deprecated("the dual-space device buffers are removed in 14.0: build device grids into cuda::Buffer<std::byte> and move them with cuda::copyTo (cuda/HandleStorage.h)")]]
+    void deviceUpload(int device = 0, cudaStream_t stream = 0, bool sync = true) { this->upload(device, stream, sync); }
+    [[deprecated("the dual-space device buffers are removed in 14.0: build device grids into cuda::Buffer<std::byte> and move them with cuda::copyTo (cuda/HandleStorage.h)")]]
+    void deviceUpload(int device, void* stream, bool sync) { this->upload(device, cudaStream_t(stream), sync); }
 
     /// @brief Upload buffer from the host to ALL the existing devices, i.e. CPU -> GPU.
     ///        If no device buffers exist one is created for the current device (typically 0)
@@ -353,8 +362,12 @@ public:
     /// @param stream CUDA stream.
     /// @param sync if false the memory copy is asynchronous.
     /// @warning Assumes that the host buffer already exists!
-    void deviceUpload(cudaStream_t stream, bool sync);
-    void deviceUpload(void* stream, bool sync) {this->deviceUpload(cudaStream_t(stream), sync);}
+    /// @note Uploads to the current device, as reported by util::cuda::currentDevice.
+    /// @deprecated Build device grids into cuda::Buffer<std::byte> and move them with cuda::copyTo.
+    [[deprecated("the dual-space device buffers are removed in 14.0: build device grids into cuda::Buffer<std::byte> and move them with cuda::copyTo (cuda/HandleStorage.h)")]]
+    void deviceUpload(cudaStream_t stream, bool sync) { this->upload(util::cuda::currentDevice(), stream, sync); }
+    [[deprecated("the dual-space device buffers are removed in 14.0: build device grids into cuda::Buffer<std::byte> and move them with cuda::copyTo (cuda/HandleStorage.h)")]]
+    void deviceUpload(void* stream, bool sync) { this->upload(util::cuda::currentDevice(), cudaStream_t(stream), sync); }
 
     ///////////////////////////////////////////////////////////////////////
 
@@ -363,8 +376,11 @@ public:
     /// @param stream cuda stream
     /// @param sync if false the memory copy is asynchronous.
     /// @warning Assumes that the specifed device buffer already exists!
-    void deviceDownload(int device = 0, cudaStream_t stream = 0, bool sync = true);
-    void deviceDownload(int device, void* stream , bool sync) {this->deviceDownload(device, cudaStream_t(stream), sync);}
+    /// @deprecated Build device grids into cuda::Buffer<std::byte> and move them with cuda::copyTo.
+    [[deprecated("the dual-space device buffers are removed in 14.0: build device grids into cuda::Buffer<std::byte> and move them with cuda::copyTo (cuda/HandleStorage.h)")]]
+    void deviceDownload(int device = 0, cudaStream_t stream = 0, bool sync = true) { this->download(device, stream, sync); }
+    [[deprecated("the dual-space device buffers are removed in 14.0: build device grids into cuda::Buffer<std::byte> and move them with cuda::copyTo (cuda/HandleStorage.h)")]]
+    void deviceDownload(int device, void* stream , bool sync) { this->download(device, cudaStream_t(stream), sync); }
 
     /// @brief Download the buffer from the current device to the host, i.e. GPU -> CPU.
     ///        If the host buffer des not exist it will first be allocated
@@ -372,7 +388,10 @@ public:
     /// @param sync if false the memory copy is asynchronous
     /// @note If the host/CPU buffer does not exist it is first allocated
     /// @warning Assumes that the device/GPU buffer already exists
-    void deviceDownload(void* stream, bool sync);
+    /// @note Downloads from the current device, as reported by util::cuda::currentDevice.
+    /// @deprecated Build device grids into cuda::Buffer<std::byte> and move them with cuda::copyTo.
+    [[deprecated("the dual-space device buffers are removed in 14.0: build device grids into cuda::Buffer<std::byte> and move them with cuda::copyTo (cuda/HandleStorage.h)")]]
+    void deviceDownload(void* stream, bool sync) { this->download(util::cuda::currentDevice(), cudaStream_t(stream), sync); }
 
     ///////////////////////////////////////////////////////////////////////
 
@@ -462,7 +481,7 @@ inline void DualDeviceBuffer::init(uint64_t size, int device, cudaStream_t strea
     mManaged = 1;// i.e. this instance is responsible for allocating and delete memory
 } // DualDeviceBuffer::init
 
-inline void DualDeviceBuffer::deviceUpload(int device, cudaStream_t stream, bool sync)
+inline void DualDeviceBuffer::upload(int device, cudaStream_t stream, bool sync)
 {
     NANOVDB_ASSERT(device >= 0 && device < mDeviceCount);// should be device and not the host
     checkPtr(mCpuData, "uninitialized cpu source data");
@@ -477,16 +496,9 @@ inline void DualDeviceBuffer::deviceUpload(int device, cudaStream_t stream, bool
     cudaCheck(cudaMemcpyAsync(mGpuData[device], mCpuData, mSize, cudaMemcpyHostToDevice, stream));
     this->recordUse(device, stream);
     if (sync) cudaCheck(cudaStreamSynchronize(stream));
-} // DualDeviceBuffer::deviceUpload
+} // DualDeviceBuffer::upload
 
-inline void DualDeviceBuffer::deviceUpload(cudaStream_t stream, bool sync)
-{
-    int device = 0;
-    cudaGetDevice(&device);
-    this->deviceUpload(device, stream, sync);
-} // DualDeviceBuffer::deviceUpload
-
-inline void DualDeviceBuffer::deviceDownload(int device, cudaStream_t stream, bool sync)
+inline void DualDeviceBuffer::download(int device, cudaStream_t stream, bool sync)
 {
     NANOVDB_ASSERT(device >= 0 && device < mDeviceCount);
     checkPtr(mGpuData[device], "uninitialized gpu source data");// no source data on the specified device
@@ -499,14 +511,7 @@ inline void DualDeviceBuffer::deviceDownload(int device, cudaStream_t stream, bo
     cudaCheck(cudaMemcpyAsync(mCpuData, mGpuData[device], mSize, cudaMemcpyDeviceToHost, stream));
     this->recordUse(device, stream);
     if (sync) cudaCheck(cudaStreamSynchronize(stream));
-} // DualDeviceBuffer::deviceDownload
-
-inline void DualDeviceBuffer::deviceDownload(void* stream, bool sync)
-{
-    int device = 0;
-    cudaCheck(cudaGetDevice(&device));
-    this->deviceDownload(device, cudaStream_t(stream), sync);
-} // DualDeviceBuffer::deviceDownload
+} // DualDeviceBuffer::download
 
 inline void DualDeviceBuffer::clear(cudaStream_t stream)
 {

@@ -178,7 +178,9 @@ public:
         auto *data = reinterpret_cast<NodeManagerData*>(mBuffer.data());
         void *tmp = data->mGrid;
         data->mGrid = deviceGrid;
+        NANOVDB_SUPPRESS_DEPRECATION_BEGIN
         mBuffer.deviceUpload(stream, sync);
+        NANOVDB_SUPPRESS_DEPRECATION_END
         data->mGrid = tmp;
     }
 
@@ -193,7 +195,9 @@ public:
     {
         auto *data = reinterpret_cast<NodeManagerData*>(mBuffer.data());
         void *tmp = data->mGrid;
+        NANOVDB_SUPPRESS_DEPRECATION_BEGIN
         mBuffer.deviceDownload(stream, sync);
+        NANOVDB_SUPPRESS_DEPRECATION_END
         data->mGrid = tmp;
     }
 };// NodeManagerHandle
