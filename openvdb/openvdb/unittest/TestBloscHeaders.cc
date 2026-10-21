@@ -1,12 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
-// The vendored blosc headers must be includable together, in any order, and
-// alongside an external blosc.h. Include order is nanovdb first, then an
-// external-style blosc.h guard and macros, then openvdb. Only the OpenVDB copy
-// is linked into the unit tests and the functions are not exported from the
-// shared library, so this test never calls them. Compression round trips are
-// covered by TestStreamCompression.
+// This test validates that including the vendored nanovdb_blosc and vendored
+// openvdb_blosc while also defining a symbol from an external blosc together
+// in the same translation unit does not result in any symbol clashes or
+// undefined symbols. Compression round trips are covered by
+// TestStreamCompression.
 
 #include <nanovdb_blosc.h>
 
