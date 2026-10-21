@@ -23,6 +23,7 @@
 #include <string> // for std::to_string
 #include <vector>
 #include <initializer_list>
+#include <utility> // for std::move
 
 #include <nanovdb/NanoVDB.h>// for toGridType
 #include <nanovdb/HostBuffer.h>
@@ -700,7 +701,11 @@ mergeGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* pool = nu
 
 } // namespace nanovdb
 
-#if defined(__CUDACC__)
+// cuda/HandleStorage.h and tools/cuda/GridChecksum.cuh, which cuda/GridHandle.cuh
+// depends on, include this header before their own definitions; while either is
+// being parsed it defers cuda/GridHandle.cuh to its own end.
+#if defined(__CUDACC__) && !defined(NANOVDB_CUDA_HANDLESTORAGE_DEFERS_GRIDHANDLE_CUH) \
+    && !defined(NANOVDB_TOOLS_CUDA_GRIDCHECKSUM_DEFERS_GRIDHANDLE_CUH)
 #include <nanovdb/cuda/GridHandle.cuh>
 #endif// defined(__CUDACC__)
 

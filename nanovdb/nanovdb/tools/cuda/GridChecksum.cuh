@@ -21,12 +21,16 @@
 
 #ifndef NANOVDB_TOOLS_CUDA_GRIDCHECKSUM_CUH_HAS_BEEN_INCLUDED
 #define NANOVDB_TOOLS_CUDA_GRIDCHECKSUM_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_TOOLS_CUDA_GRIDCHECKSUM_DEFERS_GRIDHANDLE_CUH // see the end of nanovdb/GridHandle.h
 
 #include <nanovdb/util/cuda/Util.h>
 #include <nanovdb/cuda/DeviceBuffer.h>// required for instantiation of move c-tor of GridHandle
 #include <nanovdb/cuda/NodeManager.cuh>
 #include <nanovdb/tools/GridChecksum.h>
 #include <nanovdb/GridHandle.h>
+
+#include <memory> // for std::unique_ptr
+#include <stdexcept> // for std::runtime_error
 
 namespace nanovdb {// =======================================================================
 
@@ -545,5 +549,10 @@ void updateChecksum(NanoGrid<ValueT> *d_grid, CheckMode mode, cudaStream_t strea
 }// namespace tools::cuda // ================================================
 
 }// namespace nanovdb // ====================================================
+
+#undef NANOVDB_TOOLS_CUDA_GRIDCHECKSUM_DEFERS_GRIDHANDLE_CUH
+#if !defined(NANOVDB_CUDA_HANDLESTORAGE_DEFERS_GRIDHANDLE_CUH)
+#include <nanovdb/cuda/GridHandle.cuh>
+#endif
 
 #endif // NANOVDB_TOOLS_CUDA_GRIDCHECKSUM_CUH_HAS_BEEN_INCLUDED

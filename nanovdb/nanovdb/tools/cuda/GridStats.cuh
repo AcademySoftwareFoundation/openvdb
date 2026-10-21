@@ -17,9 +17,12 @@
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/cuda/Buffer.h>
+#include <nanovdb/cuda/NodeManager.cuh> // for cuda::createNodeManager
 #include <nanovdb/tools/GridStats.h>
 
 #include <cub/util_type.cuh>// for cub::Uninitialized
+
+#include <stdexcept> // for std::runtime_error
 
 namespace nanovdb {
 
