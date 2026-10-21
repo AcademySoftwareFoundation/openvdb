@@ -3,5 +3,3 @@ NanoVDB:
   Improvements:
   - Added batched CUDA topology construction through tools::cuda::TopologyBuilder, allowing multiple independent grids to share one allocation and one set of build passes while preserving existing single-grid behavior.
 
-  Bug Fixes:
-  - nanovdb::tools::cuda::updateChecksum with CheckMode::Full failed on a grid whose data after the tree header is shorter than 4 KB, such as an empty grid, so the CUDA topology tools (RefineGrid, CoarsenGrid, DilateGrid, PruneGrid, MergeGrids, MeshToGrid) failed on an empty output with setChecksum(CheckMode::Full). The device checksum of such a grid now matches the host one.
