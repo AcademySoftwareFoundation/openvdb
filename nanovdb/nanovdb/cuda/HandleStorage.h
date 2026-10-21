@@ -231,7 +231,7 @@ inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, cudaStre
     const uint64_t bytes = src.bufferSize();
     if (bytes == 0u) {// an empty handle copies to an empty handle, over the prototype's resource where given
         if constexpr (BufferHasDeviceSingle<DstBufferT>::value || BufferHasHostSingle<DstBufferT>::value) {
-            if (proto) return detail::HandleFactory::make(detail::makeTransferStorage<DstBufferT>(0, stream, proto), {});
+            if (proto) return GridHandle<DstBufferT>::adopt(detail::makeTransferStorage<DstBufferT>(0, stream, proto), {});
         }
         if constexpr (std::is_default_constructible<DstBufferT>::value) {
             return GridHandle<DstBufferT>();
