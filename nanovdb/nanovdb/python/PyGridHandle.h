@@ -8,6 +8,8 @@
 
 #include <nanovdb/GridHandle.h>
 
+#include <string>
+
 namespace nb = nanobind;
 
 namespace pynanovdb {
@@ -21,7 +23,7 @@ template<typename BufferT> nb::class_<nanovdb::GridHandle<BufferT>> defineGridHa
         .def("isEmpty", &nanovdb::GridHandle<BufferT>::isEmpty)
         .def("empty", &nanovdb::GridHandle<BufferT>::empty)
         .def(
-            "__bool__", [](const nanovdb::GridHandle<BufferT>& handle) { handle.empty(); }, nb::is_operator())
+            "__bool__", [](const nanovdb::GridHandle<BufferT>& handle) { return !handle.empty(); }, nb::is_operator())
         .def("floatGrid", nb::overload_cast<uint32_t>(&nanovdb::GridHandle<BufferT>::template grid<float>), nb::arg("n") = 0, nb::rv_policy::reference_internal)
         .def("doubleGrid",
              nb::overload_cast<uint32_t>(&nanovdb::GridHandle<BufferT>::template grid<double>),

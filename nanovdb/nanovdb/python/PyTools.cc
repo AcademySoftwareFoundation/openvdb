@@ -4,9 +4,6 @@
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/HostBuffer.h>
-#ifdef NANOVDB_USE_CUDA
-#include <nanovdb/cuda/DeviceBuffer.h>
-#endif
 
 #include "PyGridStats.h"
 #include "PyCreateNanoGrid.h"
@@ -47,9 +44,9 @@ void defineToolsModule(nb::module_& m)
     nb::module_ cudaModule = m.def_submodule("cuda");
     cudaModule.doc() = "A submodule that implements CUDA-accelerated tools";
 
-    defineValidateGrids<cuda::DualDeviceBuffer>(m);
+    defineDeviceValidateGrids(m);
 
-    definePrimitives<cuda::DualDeviceBuffer>(cudaModule);
+    defineDevicePrimitives(cudaModule);
 
     defineSignedFloodFill<float>(cudaModule, "signedFloodFill");
     defineSignedFloodFill<double>(cudaModule, "signedFloodFill");

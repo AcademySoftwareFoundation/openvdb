@@ -6,7 +6,7 @@
 
 #include <nanovdb/tools/CreatePrimitives.h>
 #ifdef NANOVDB_USE_CUDA
-#include <nanovdb/cuda/DeviceBuffer.h>
+#include "cuda/PyDeviceGridHandle.h"
 #endif
 
 namespace nb = nanobind;
@@ -197,8 +197,79 @@ template<typename BufferT> void definePrimitives(nb::module_& m)
 }
 
 template void definePrimitives<HostBuffer>(nb::module_&);
+
 #ifdef NANOVDB_USE_CUDA
-template void definePrimitives<cuda::DualDeviceBuffer>(nb::module_&);
+// The grids are built on the host and copied into the handle's pinned host side.
+void defineDevicePrimitives(nb::module_& m)
+{
+    m.def(
+        "createLevelSetSphere",
+        [](GridType gridType, double radius, const Vec3d& center, double voxelSize, double halfWidth, const Vec3d& origin, const std::string& name,
+           tools::StatsMode sMode, CheckMode cMode) {
+            return DeviceGridHandle(createLevelSetSphere<HostBuffer>(gridType, radius, center, voxelSize, halfWidth, origin, name, sMode, cMode, HostBuffer()));
+        },
+        "gridType"_a = GridType::Float,
+        "radius"_a = 100.0,
+        "center"_a = Vec3d(0.0),
+        "voxelSize"_a = 1.0,
+        "halfWidth"_a = 3.0,
+        "origin"_a = Vec3d(0.0),
+        "name"_a = "sphere_ls",
+        "sMode"_a = tools::StatsMode::Default,
+        "cMode"_a = CheckMode::Default);
+
+    m.def(
+        "createLevelSetTorus",
+        [](GridType gridType, double majorRadius, double minorRadius, const Vec3d& center, double voxelSize, double halfWidth, const Vec3d& origin,
+           const std::string& name, tools::StatsMode sMode, CheckMode cMode) {
+            return DeviceGridHandle(
+                createLevelSetTorus<HostBuffer>(gridType, majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode, HostBuffer()));
+        },
+        "gridType"_a = GridType::Float,
+        "majorRadius"_a = 100.0,
+        "minorRadius"_a = 50.0,
+        "center"_a = Vec3d(0.0),
+        "voxelSize"_a = 1.0,
+        "halfWidth"_a = 3.0,
+        "origin"_a = Vec3d(0.0),
+        "name"_a = "torus_ls",
+        "sMode"_a = tools::StatsMode::Default,
+        "cMode"_a = CheckMode::Default);
+
+    m.def(
+        "createFogVolumeSphere",
+        [](GridType gridType, double radius, const Vec3d& center, double voxelSize, double halfWidth, const Vec3d& origin, const std::string& name,
+           tools::StatsMode sMode, CheckMode cMode) {
+            return DeviceGridHandle(createFogVolumeSphere<HostBuffer>(gridType, radius, center, voxelSize, halfWidth, origin, name, sMode, cMode, HostBuffer()));
+        },
+        "gridType"_a = GridType::Float,
+        "radius"_a = 100.0,
+        "center"_a = Vec3d(0.0),
+        "voxelSize"_a = 1.0,
+        "halfWidth"_a = 3.0,
+        "origin"_a = Vec3d(0.0),
+        "name"_a = "sphere_fog",
+        "sMode"_a = tools::StatsMode::Default,
+        "cMode"_a = CheckMode::Default);
+
+    m.def(
+        "createFogVolumeTorus",
+        [](GridType gridType, double majorRadius, double minorRadius, const Vec3d& center, double voxelSize, double halfWidth, const Vec3d& origin,
+           const std::string& name, tools::StatsMode sMode, CheckMode cMode) {
+            return DeviceGridHandle(
+                createFogVolumeTorus<HostBuffer>(gridType, majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode, HostBuffer()));
+        },
+        "gridType"_a = GridType::Float,
+        "majorRadius"_a = 100.0,
+        "minorRadius"_a = 50.0,
+        "center"_a = Vec3d(0.0),
+        "voxelSize"_a = 1.0,
+        "halfWidth"_a = 3.0,
+        "origin"_a = Vec3d(0.0),
+        "name"_a = "torus_fog",
+        "sMode"_a = tools::StatsMode::Default,
+        "cMode"_a = CheckMode::Default);
+}
 #endif
 
 } // namespace pynanovdb

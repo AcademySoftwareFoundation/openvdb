@@ -1,0 +1,12 @@
+NanoVDB:
+
+  Improvements:
+  - The Python nanovdb.DeviceGridHandle no longer uses the deprecated dual-space buffers. It holds its grids in a pinned host buffer and a device buffer (cuda::Buffer), so it is ready for their removal in 14.0. Its Python API is otherwise unchanged: deviceUpload(sync=False) and deviceDownload(sync=False) are still asynchronous, except the first deviceDownload of grids built on the device, which allocates the host copy and synchronizes; grids already returned to Python stay valid across transfers; and a handle constructed from a pair of host and device arrays still views them, now keeping them alive. The device copy stays on the device where the grids were built or first uploaded, rather than following the current device at each call.
+
+  Bug Fixes:
+  - bool() of a nanovdb.GridHandle or nanovdb.DeviceGridHandle raised TypeError; it is now True when the handle holds grids.
+  - nanovdb.DeviceGridHandle.deviceUpload on a handle without grids, and deviceDownload before any upload, exited the Python process; they now raise RuntimeError. So do writing, validating and reading gridData of a handle whose grids are only on the device.
+  - The nanovdb.DeviceGridHandle(cpu_t, cuda_t) constructor now raises ValueError when the arrays differ in size, are empty or are not 32-byte aligned, and rejects non-contiguous arrays; it asserted on a size mismatch and accepted the rest. gridSize, gridType and gridData raise IndexError for an index past the last grid.
+
+  API Changes:
+  - The Python nanovdb.DeviceBuffer class, which had no constructor or methods, is removed, along with the buffer arguments of nanovdb.tools.cuda.createLevelSetSphere, createLevelSetTorus, createFogVolumeSphere, createFogVolumeTorus and nanovdb.io.deviceReadGrid and deviceReadGrids that only it could fill.
