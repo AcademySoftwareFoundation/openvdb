@@ -1075,8 +1075,9 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
     if (readBuffers) {
         // read buffers
         if (codec) {
-            OPENVDB_ASSERT(gd.getEndPos() >= gd.getGridPos());
-            const Index64 size = static_cast<Index64>(gd.getEndPos() - gd.getGridPos());
+            // Size is of the buffer region only. Streams that cannot seek use -1 for size.
+            const bool sizeKnown = gd.getBlockPos() > 0 && gd.getEndPos() >= gd.getBlockPos();
+            const int64_t size = sizeKnown ? gd.getEndPos() - gd.getBlockPos() : -1;
             codec->readBuffers(is, size, *codecData, readOptions, diagnostics);
         } else {
 #if OPENVDB_ABI_VERSION_NUMBER < 14

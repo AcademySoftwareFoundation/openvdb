@@ -654,6 +654,83 @@ TEST_F(TestCodec, testMissingCodecThrows)
 
 #endif // OPENVDB_ABI_VERSION_NUMBER >= 14
 
+namespace {
+
+// Writes the same bytes as the scalar codec and records the section size that
+// readBuffers() is given.
+struct SizeRecordingCodec final : public openvdb::codecs::TopologyCodec<openvdb::FloatGrid>
+{
+    static int64_t lastSize;
+    static int64_t sectionSize;
+
+    void readBuffers(std::istream& is, int64_t size, openvdb::io::CodecData& data,
+        const openvdb::io::ReadOptions& options, openvdb::io::ReadDiagnostics&) const override
+    {
+        using namespace openvdb;
+        lastSize = size;
+        auto& topologyData = static_cast<codecs::TopologyCodecData<float>&>(data);
+        codecs::internal::scalarCodecReadBuffers<FloatGrid, FloatGrid>(
+            static_cast<FloatGrid&>(*data.grid), is, options, &topologyData.storageBackground);
+    }
+
+    void writeBuffers(std::ostream& os, const openvdb::GridBase& grid,
+        const openvdb::io::WriteOptions&) const override
+    {
+        const std::streampos start = os.tellp();
+        openvdb::codecs::internal::scalarCodecWriteBuffers(
+            static_cast<const openvdb::FloatGrid&>(grid), os);
+        sectionSize = int64_t(os.tellp() - start);
+    }
+};
+
+int64_t SizeRecordingCodec::lastSize = -2;
+int64_t SizeRecordingCodec::sectionSize = -2;
+
+} // anonymous namespace
+
+
+// The size given to readBuffers() is the byte count of the buffer section alone, and -1
+// when the size is not known.
+TEST_F(TestCodec, testReadBuffersSize)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    CodecRegistry::clear();
+    CodecRegistry::registerCodecByName(openvdb::FloatGrid::gridType(), std::make_unique<SizeRecordingCodec>());
+
+    FloatGrid::Ptr grid = FloatGrid::create(0.0f);
+    grid->setName("density");
+    // Not aligned to a leaf, so the voxels are stored in leaf buffers and not as a tile.
+    grid->fill(CoordBBox(Coord(1), Coord(10)), 1.0f, true);
+
+    const std::string path = "test_read_buffers_size.vdb";
+    {
+        io::File file(path);
+        file.write(GridPtrVec{grid});
+    }
+    ASSERT_GT(SizeRecordingCodec::sectionSize, 0);
+
+    SizeRecordingCodec::lastSize = -2;
+    {
+        io::File file(path);
+        file.open();
+        file.readGrid("density");
+        file.close();
+    }
+    EXPECT_EQ(SizeRecordingCodec::sectionSize, SizeRecordingCodec::lastSize);
+
+    // A stream has no positions, so the size is not known.
+    std::ostringstream output(std::ios_base::binary);
+    io::Stream(output).write(GridPtrVec{grid});
+    SizeRecordingCodec::lastSize = -2;
+    std::istringstream input(output.str(), std::ios_base::binary);
+    io::Stream(input).getGrids();
+    EXPECT_EQ(int64_t(-1), SizeRecordingCodec::lastSize);
+
+    std::remove(path.c_str());
+}
+
 TEST_F(TestCodec, testOffsetsAndNoOffsetsParity)
 {
     using namespace openvdb;
