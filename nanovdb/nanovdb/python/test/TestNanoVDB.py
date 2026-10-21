@@ -17,6 +17,7 @@ if 'add_dll_directory' in dir(os):
 
 import nanovdb
 import unittest
+import gc
 import tempfile
 
 
@@ -612,8 +613,7 @@ class TestDeviceGridHandle(unittest.TestCase):
             import numpy as np
             import torch
         except ImportError:
-            print("PyTorch or NumPy not found. Skipping...")
-            return
+            self.skipTest("PyTorch or NumPy not found")
         source = nanovdb.tools.createLevelSetSphere(nanovdb.GridType.Float, 20)
         data = np.frombuffer(source.gridData(), dtype=np.uint32)
         # grids must be 32-byte aligned
@@ -636,6 +636,62 @@ class TestDeviceGridHandle(unittest.TestCase):
         self.assertRaises(ValueError, nanovdb.DeviceGridHandle, cpu, gpu[:-1])
         self.assertRaises(ValueError, nanovdb.DeviceGridHandle, raw[start + 1 : start + 1 + data.size], gpu)
         self.assertRaises(TypeError, nanovdb.DeviceGridHandle, raw[start : start + 2 * data.size : 2], gpu)
+        zeros = raw[start : start + data.size]
+        zeros[:] = 0
+        self.assertRaises(ValueError, nanovdb.DeviceGridHandle, zeros, gpu)
+
+    def test_reset_and_read(self):
+        handle = nanovdb.tools.cuda.createLevelSetSphere(nanovdb.GridType.Float, 20, name="first")
+        handle.deviceUpload()
+        handle.reset()
+        self.assertFalse(handle)
+        self.assertIsNone(handle.deviceFloatGrid())
+
+        source = nanovdb.tools.createLevelSetSphere(nanovdb.GridType.Float, 20, name="second")
+        with tempfile.TemporaryDirectory() as tmp:
+            fileName = os.path.join(tmp, "sphere.raw")
+            source.write(fileName)
+            handle.read(fileName)
+        self.assertEqual(handle.floatGrid().gridName(), "second")
+        self.assertIsNone(handle.deviceFloatGrid())
+        handle.deviceUpload()
+        self.assertIsNotNone(handle.deviceFloatGrid())
+
+    def test_release_with_a_pending_transfer(self):
+        # A transfer issued with sync=False completes before its storage is released.
+        for release in ("reset", "replace", "delete"):
+            handle = nanovdb.tools.cuda.createLevelSetSphere(nanovdb.GridType.Float, 20)
+            handle.deviceUpload()
+            handle.deviceDownload(sync=False)
+            if release == "reset":
+                handle.reset()
+            elif release == "replace":
+                handle = nanovdb.tools.cuda.createLevelSetSphere(nanovdb.GridType.Float, 10)
+                self.assertTrue(handle)
+            else:
+                del handle
+                gc.collect()
+
+    def test_device_only_handle(self):
+        try:
+            import torch
+        except ImportError:
+            self.skipTest("PyTorch not found")
+        tensor = torch.tensor([[1, 2, 3]], dtype=torch.int32, device=torch.device("cuda", 0))
+        handle = nanovdb.tools.cuda.pointsToRGBA8Grid(tensor)
+        self.assertEqual(handle.gridCount(), 1)
+        self.assertIsNone(handle.rgba8Grid())
+        with tempfile.TemporaryDirectory() as tmp:
+            fileName = os.path.join(tmp, "points.nvdb")
+            self.assertRaises(RuntimeError, handle.write, fileName)
+            self.assertRaises(RuntimeError, nanovdb.io.deviceWriteGrid, fileName, handle)
+            self.assertRaises(RuntimeError, nanovdb.io.deviceWriteGrids, fileName, [handle])
+            self.assertFalse(os.path.exists(fileName))
+            handle.deviceDownload(sync=False)
+            handle.deviceDownload()
+            self.assertIsNotNone(handle.rgba8Grid())
+            nanovdb.io.deviceWriteGrids(fileName, [handle])
+            self.assertTrue(os.path.exists(fileName))
 
 
 @unittest.skipIf(

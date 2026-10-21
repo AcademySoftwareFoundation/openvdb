@@ -74,7 +74,7 @@ void defineDeviceGridHandle(nb::module_& m)
             [](HandleT& handle, const std::string& fileName) {
                 GridHandle<HostBuffer> host;
                 host.read(fileName);
-                handle = HandleT(host);
+                handle = HandleT(std::move(host));
             },
             "fileName"_a)
         .def(
@@ -82,7 +82,7 @@ void defineDeviceGridHandle(nb::module_& m)
             [](HandleT& handle, const std::string& fileName, uint32_t n) {
                 GridHandle<HostBuffer> host;
                 host.read(fileName, n);
-                handle = HandleT(host);
+                handle = HandleT(std::move(host));
             },
             "fileName"_a,
             "n"_a)
@@ -91,7 +91,7 @@ void defineDeviceGridHandle(nb::module_& m)
             [](HandleT& handle, const std::string& fileName, const std::string& gridName) {
                 GridHandle<HostBuffer> host;
                 host.read(fileName, gridName);
-                handle = HandleT(host);
+                handle = HandleT(std::move(host));
             },
             "fileName"_a,
             "gridName"_a)

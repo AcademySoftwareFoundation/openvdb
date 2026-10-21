@@ -10,58 +10,70 @@
 #include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/DeviceResource.h>
 #include <nanovdb/cuda/HandleStorage.h> // for cuda::copyTo
-#include <nanovdb/cuda/PinnedResource.h>
-#include <nanovdb/util/cuda/Util.h> // for cudaCheck
 
 #include <cuda_runtime_api.h>
 
 #include <cstddef> // for std::byte, size_t
 #include <cstdint> // for uint32_t, uint64_t
+#include <cstdio> // for std::fprintf
+#include <exception> // for std::exception
 #include <stdexcept> // for std::invalid_argument, std::out_of_range, std::runtime_error
 #include <string>
-#include <utility> // for std::exchange, std::move
+#include <utility> // for std::move, std::swap
 
 namespace pynanovdb {
 
 /// @brief The C++ object behind the Python DeviceGridHandle. It holds the same
-///        grids on two sides, each possibly empty: a host side in pinned
-///        memory, so transfers with sync=False stay asynchronous, and a device
-///        side on the device that was current when it was first filled.
-///        deviceUpload and deviceDownload copy between them. A handle
-///        constructed from a caller's pair of arrays views them instead and
-///        owns neither.
-/// @details Once a side exists, later transfers copy into its storage rather
-///          than reallocating it, so grids already handed to Python stay valid.
-///          Every call that takes a host path is compiled by the host compiler,
-///          so this header uses only host-callable NanoVDB API.
+///        grids on two sides, each possibly empty: a host side in ordinary
+///        host memory, and a device side on one device. deviceUpload and
+///        deviceDownload copy between them. A handle constructed from a
+///        caller's pair of arrays views them instead and owns neither.
+/// @details
+///   - The host side is pinned in place (cudaHostRegister) at its first
+///     transfer, so transfers with sync=False are asynchronous, and a handle
+///     that never transfers never calls CUDA.
+///   - The device side lives on the device where the grids were built or
+///     first uploaded (for viewed arrays, the device of the device array).
+///     Every copy and synchronization runs on that device's default stream,
+///     whatever device is current.
+///   - Once a side exists, later transfers copy into its storage rather than
+///     reallocating it, so grids already handed to Python stay valid.
+///   - A transfer left running by sync=False finishes before its storage is
+///     released or replaced.
+///   - CUDA errors raise std::runtime_error, except while releasing storage,
+///     where they are reported on stderr.
+///   - Translation units compiled by the host compiler include this header,
+///     so it uses only host-callable NanoVDB API.
 class DeviceGridHandle
 {
 public:
-    using HostBufferT   = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::PinnedResource>;
     using DeviceBufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
     using ViewT         = nanovdb::cuda::BufferView<std::byte>;
 
     DeviceGridHandle() = default;
 
-    /// @brief Takes grids built or read on the host; they are copied into pinned memory.
-    explicit DeviceGridHandle(const nanovdb::GridHandle<nanovdb::HostBuffer>& host)
-        : mHost(host.template copy<HostBufferT>(HostBufferT()))
+    /// @brief Takes grids built or read on the host.
+    explicit DeviceGridHandle(nanovdb::GridHandle<nanovdb::HostBuffer>&& host)
+        : mHost(std::move(host))
     {
     }
 
     /// @brief Takes grids built on the device; the host side stays empty until deviceDownload.
     explicit DeviceGridHandle(nanovdb::GridHandle<DeviceBufferT>&& device)
         : mDevice(std::move(device))
+        , mDeviceId(mDevice.empty() ? -1 : deviceOf(mDevice.deviceData()))
     {
     }
 
     /// @brief Views a caller's host and device arrays of @a bytes each; the host
     ///        array must hold valid grids, and both must outlive the handle.
-    /// @throw std::invalid_argument if @a bytes is zero or either array is not
-    ///        aligned to NANOVDB_DATA_ALIGNMENT
+    /// @throw std::invalid_argument if @a bytes is zero, either array is not
+    ///        aligned to NANOVDB_DATA_ALIGNMENT, the host array does not hold
+    ///        valid grids, or the device array is not device memory
     DeviceGridHandle(void* hostData, void* deviceData, size_t bytes)
-        : mExternalHost(externalView(hostData, bytes, "cpu_t"))
+        : mExternalHost(externalHost(hostData, bytes))
         , mExternalDevice(externalView(deviceData, bytes, "cuda_t"))
+        , mDeviceId(externalDevice(deviceData))
         , mExternal(true)
     {
     }
@@ -69,66 +81,25 @@ public:
     DeviceGridHandle(const DeviceGridHandle&) = delete;
     DeviceGridHandle& operator=(const DeviceGridHandle&) = delete;
 
-    DeviceGridHandle(DeviceGridHandle&& other) noexcept
-        : mHost(std::move(other.mHost))
-        , mDevice(std::move(other.mDevice))
-        , mExternalHost(std::move(other.mExternalHost))
-        , mExternalDevice(std::exchange(other.mExternalDevice, ViewT()))
-        , mExternal(std::exchange(other.mExternal, false))
-        , mInFlight(std::exchange(other.mInFlight, false))
-    {
-    }
+    DeviceGridHandle(DeviceGridHandle&& other) noexcept { this->swap(other); }
 
-    DeviceGridHandle& operator=(DeviceGridHandle&& other)
+    DeviceGridHandle& operator=(DeviceGridHandle&& other) noexcept
     {
-        if (this != &other) {
-            this->settle();
-            mHost = std::move(other.mHost);
-            mDevice = std::move(other.mDevice);
-            mExternalHost = std::move(other.mExternalHost);
-            mExternalDevice = std::exchange(other.mExternalDevice, ViewT());
-            mExternal = std::exchange(other.mExternal, false);
-            mInFlight = std::exchange(other.mInFlight, false);
-        }
+        DeviceGridHandle released(std::move(other));
+        this->swap(released);
         return *this;
     }
 
-    ~DeviceGridHandle() { this->settle(); }
+    ~DeviceGridHandle() { this->release(); }
 
+    /// @throw std::runtime_error if a pending sync=False transfer failed
     void reset()
     {
-        this->settle();
-        mHost.reset();
-        mDevice.reset();
-        mExternalHost.reset();
-        mExternalDevice = ViewT();
-        mExternal = false;
+        this->synchronize("reset");
+        this->release();
     }
 
 private:
-    static ViewT externalView(void* data, size_t bytes, const char* name)
-    {
-        if (bytes == 0) throw std::invalid_argument(std::string("DeviceGridHandle: ") + name + " is empty");
-        if (!nanovdb::isAligned(data)) {
-            throw std::invalid_argument(std::string("DeviceGridHandle: ") + name + " must be aligned to " +
-                                        std::to_string(NANOVDB_DATA_ALIGNMENT) + " bytes");
-        }
-        return ViewT(static_cast<std::byte*>(data), bytes);
-    }
-
-    // A transfer issued with sync=False may still be reading or writing the
-    // storage, so wait for it before that storage is released or replaced.
-    void finish(cudaStream_t stream, bool sync)
-    {
-        if (sync) cudaCheck(cudaStreamSynchronize(stream));
-        mInFlight = !sync;
-    }
-    void settle()
-    {
-        if (mInFlight) cudaCheck(cudaStreamSynchronize(0));
-        mInFlight = false;
-    }
-
     // Metadata is the same on both sides; read it from whichever side exists.
     template<typename F>
     auto meta(F&& f) const
@@ -181,7 +152,7 @@ public:
         return reinterpret_cast<nanovdb::NanoGrid<ValueT>*>(mExternalDevice.data() + offset);
     }
 
-    /// @brief The host-side handle, for the readers and writers of host grids.
+    /// @brief Calls @a f with the host-side handle, for the readers and writers of host grids.
     /// @throw std::runtime_error if there is no host copy
     template<typename F>
     auto withHost(const char* caller, F&& f) const
@@ -194,49 +165,174 @@ public:
         return f(mHost);
     }
 
-    /// @brief Copies the host side to the device side on the default stream,
-    ///        allocating the device side on the current device the first time.
-    /// @throw std::runtime_error if there is no host copy to upload
+    /// @brief Copies the host side to the device side, allocating the device
+    ///        side on the current device the first time.
+    /// @throw std::runtime_error if there is no host copy to upload, or on a CUDA error
     void upload(bool sync)
     {
-        const cudaStream_t stream = 0;
+        if (!mExternal && mHost.empty()) throw std::runtime_error("DeviceGridHandle.deviceUpload: the handle has no host grids to upload");
+        if (mDeviceId < 0) check(cudaGetDevice(&mDeviceId), "deviceUpload");
+        DeviceGuard guard(mDeviceId, "deviceUpload");
         if (mExternal) {
-            cudaCheck(cudaMemcpyAsync(mExternalDevice.data(), mExternalHost.data(), mExternalHost.bufferSize(), cudaMemcpyDefault, stream));
-        } else if (mHost.empty()) {
-            throw std::runtime_error("DeviceGridHandle.deviceUpload: the handle has no host grids to upload");
-        } else if (mDevice.bufferSize() == mHost.bufferSize()) {
-            cudaCheck(cudaMemcpyAsync(mDevice.deviceData(), mHost.data(), mHost.bufferSize(), cudaMemcpyDefault, stream));
+            check(cudaMemcpyAsync(mExternalDevice.data(), mExternalHost.data(), mExternalHost.bufferSize(), cudaMemcpyDefault, 0), "deviceUpload");
         } else {
-            mDevice = nanovdb::cuda::copyTo<DeviceBufferT>(mHost, stream);
+            this->pin("deviceUpload");
+            if (mDevice.empty()) {
+                mDevice = nanovdb::cuda::copyTo<DeviceBufferT>(mHost, cudaStream_t(0));
+            } else {
+                check(cudaMemcpyAsync(mDevice.deviceData(), mHost.data(), mHost.bufferSize(), cudaMemcpyDefault, 0), "deviceUpload");
+            }
         }
-        this->finish(stream, sync);
+        this->finish(sync, "deviceUpload");
     }
 
-    /// @brief Copies the device side to the host side on the default stream,
-    ///        allocating the host side the first time, which synchronizes.
-    /// @throw std::runtime_error if there is no device copy to download
+    /// @brief Copies the device side to the host side, allocating the host
+    ///        side the first time, which synchronizes.
+    /// @throw std::runtime_error if there is no device copy to download, or on a CUDA error
     void download(bool sync)
     {
-        const cudaStream_t stream = 0;
-        if (mExternal) {
-            cudaCheck(cudaMemcpyAsync(mExternalHost.data(), mExternalDevice.data(), mExternalHost.bufferSize(), cudaMemcpyDefault, stream));
-        } else if (mDevice.empty()) {
+        if (!mExternal && mDevice.empty()) {
             throw std::runtime_error("DeviceGridHandle.deviceDownload: the handle has no device grids to download; call deviceUpload() first");
-        } else if (mHost.bufferSize() == mDevice.bufferSize()) {
-            cudaCheck(cudaMemcpyAsync(mHost.data(), mDevice.deviceData(), mDevice.bufferSize(), cudaMemcpyDefault, stream));
-        } else {
-            mHost = nanovdb::cuda::copyTo<HostBufferT>(mDevice, stream);
         }
-        this->finish(stream, sync);
+        DeviceGuard guard(mDeviceId, "deviceDownload");
+        if (mExternal) {
+            check(cudaMemcpyAsync(mExternalHost.data(), mExternalDevice.data(), mExternalHost.bufferSize(), cudaMemcpyDefault, 0), "deviceDownload");
+        } else if (mHost.empty()) {
+            mHost = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(mDevice, cudaStream_t(0));
+        } else {
+            this->pin("deviceDownload");
+            check(cudaMemcpyAsync(mHost.data(), mDevice.deviceData(), mDevice.bufferSize(), cudaMemcpyDefault, 0), "deviceDownload");
+        }
+        this->finish(sync, "deviceDownload");
     }
 
 private:
-    nanovdb::GridHandle<HostBufferT>   mHost;
-    nanovdb::GridHandle<DeviceBufferT> mDevice;
-    nanovdb::GridHandle<ViewT>         mExternalHost;
-    ViewT                              mExternalDevice;
-    bool                               mExternal = false;
-    bool                               mInFlight = false;// a sync=False transfer was issued on the default stream
+    /// @brief Makes @a device current for its lifetime, restoring the previous one.
+    class DeviceGuard
+    {
+        int mPrevious = -1;
+
+    public:
+        DeviceGuard(int device, const char* caller)
+        {
+            if (device < 0) return;
+            check(cudaGetDevice(&mPrevious), caller);
+            if (mPrevious != device) check(cudaSetDevice(device), caller);
+        }
+        ~DeviceGuard()
+        {
+            if (mPrevious >= 0) cudaSetDevice(mPrevious);
+        }
+        DeviceGuard(const DeviceGuard&) = delete;
+        DeviceGuard& operator=(const DeviceGuard&) = delete;
+    };
+
+    static void check(cudaError_t err, const char* caller)
+    {
+        if (err == cudaSuccess) return;
+        cudaGetLastError(); // clear a non-sticky error so later calls are not blamed for it
+        throw std::runtime_error(std::string("DeviceGridHandle.") + caller + ": " + cudaGetErrorString(err));
+    }
+
+    static cudaPointerAttributes attributesOf(const void* ptr)
+    {
+        cudaPointerAttributes attributes{};
+        check(cudaPointerGetAttributes(&attributes, ptr), "DeviceGridHandle");
+        return attributes;
+    }
+
+    static int deviceOf(const void* ptr) { return attributesOf(ptr).device; }
+
+    static ViewT externalView(void* data, size_t bytes, const char* name)
+    {
+        if (bytes == 0) throw std::invalid_argument(std::string("DeviceGridHandle: ") + name + " is empty");
+        if (!nanovdb::isAligned(data)) {
+            throw std::invalid_argument(std::string("DeviceGridHandle: ") + name + " must be aligned to " +
+                                        std::to_string(NANOVDB_DATA_ALIGNMENT) + " bytes");
+        }
+        return ViewT(static_cast<std::byte*>(data), bytes);
+    }
+
+    static nanovdb::GridHandle<ViewT> externalHost(void* data, size_t bytes)
+    {
+        auto view = externalView(data, bytes, "cpu_t");
+        try {
+            return nanovdb::GridHandle<ViewT>(std::move(view));
+        } catch (const std::runtime_error& e) {
+            throw std::invalid_argument(std::string("DeviceGridHandle: cpu_t does not hold valid grids: ") + e.what());
+        }
+    }
+
+    static int externalDevice(const void* data)
+    {
+        const auto attributes = attributesOf(data);
+        if (attributes.type != cudaMemoryTypeDevice && attributes.type != cudaMemoryTypeManaged)
+            throw std::invalid_argument("DeviceGridHandle: cuda_t is not device memory");
+        return attributes.device;
+    }
+
+    // Pins the host side in place, once, so that copies from and to it are asynchronous.
+    void pin(const char* caller)
+    {
+        if (mPinned || mHost.empty()) return;
+        check(cudaHostRegister(mHost.data(), mHost.bufferSize(), cudaHostRegisterDefault), caller);
+        mPinned = true;
+    }
+
+    // Called on the transfer's device, after the copy is issued on its default stream.
+    void finish(bool sync, const char* caller)
+    {
+        mInFlight = !sync;
+        if (sync) check(cudaStreamSynchronize(0), caller);
+    }
+
+    // Waits for a transfer left running by sync=False.
+    void synchronize(const char* caller)
+    {
+        if (!mInFlight) return;
+        mInFlight = false;
+        DeviceGuard guard(mDeviceId, caller);
+        check(cudaStreamSynchronize(0), caller);
+    }
+
+    void swap(DeviceGridHandle& other) noexcept
+    {
+        std::swap(mHost, other.mHost);
+        std::swap(mDevice, other.mDevice);
+        std::swap(mExternalHost, other.mExternalHost);
+        std::swap(mExternalDevice, other.mExternalDevice);
+        std::swap(mDeviceId, other.mDeviceId);
+        std::swap(mExternal, other.mExternal);
+        std::swap(mPinned, other.mPinned);
+        std::swap(mInFlight, other.mInFlight);
+    }
+
+    // Waits for any pending transfer, then frees both sides on the device that owns them.
+    void release() noexcept
+    {
+        try {
+            DeviceGuard guard(mDeviceId, "release");
+            if (mInFlight) check(cudaStreamSynchronize(0), "release");
+            if (mPinned) check(cudaHostUnregister(mHost.data()), "release");
+            mHost.reset();
+            mDevice.reset();
+        } catch (const std::exception& e) {
+            std::fprintf(stderr, "%s\n", e.what());
+        }
+        mInFlight = mPinned = mExternal = false;
+        mDeviceId = -1;
+        mExternalHost.reset();
+        mExternalDevice = ViewT();
+    }
+
+    nanovdb::GridHandle<nanovdb::HostBuffer> mHost;
+    nanovdb::GridHandle<DeviceBufferT>       mDevice;
+    nanovdb::GridHandle<ViewT>               mExternalHost;
+    ViewT                                    mExternalDevice;
+    int                                      mDeviceId = -1; // device of the device side, -1 before it exists
+    bool                                     mExternal = false;
+    bool                                     mPinned = false; // mHost is registered with cudaHostRegister
+    bool                                     mInFlight = false; // a sync=False transfer was issued on mDeviceId's default stream
 };
 
 } // namespace pynanovdb

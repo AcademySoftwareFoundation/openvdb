@@ -28,7 +28,7 @@ void defineToolsModule(nb::module_& m)
 
     defineStatsMode(m);
 
-    definePrimitives<HostBuffer>(m);
+    definePrimitives(m);
 
     defineCreateNanoGrid<float>(m, "createFloatGrid");
     defineCreateNanoGrid<double>(m, "createDoubleGrid");

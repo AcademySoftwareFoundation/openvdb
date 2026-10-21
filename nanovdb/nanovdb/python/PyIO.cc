@@ -11,6 +11,9 @@
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/bind_vector.h>
 
+#include <utility> // for std::forward, std::move
+#include <vector>
+
 namespace nb = nanobind;
 using namespace nb::literals;
 using namespace nanovdb;
@@ -67,14 +70,32 @@ template<typename BufferT> nb::list readGrids(const std::string& fileName, int v
     return handleList;
 }
 
-template<typename BufferT> void writeGrids(const std::string& fileName, nb::list handles, io::Codec codec, int verbose)
+// Calls f with the handle holding the host copy of the grids.
+template<typename F> void withHostHandle(const GridHandle<HostBuffer>& handle, const char*, F&& f)
 {
+    f(handle);
+}
+#ifdef NANOVDB_USE_CUDA
+template<typename F> void withHostHandle(const DeviceGridHandle& handle, const char* caller, F&& f)
+{
+    handle.withHost(caller, std::forward<F>(f));
+}
+#endif
+
+template<typename HandleT> void writeGrids(const std::string& fileName, nb::list handles, io::Codec codec, int verbose)
+{
+    // check every handle before truncating the file
+    std::vector<const HandleT*> hostHandles;
+    for (size_t i = 0; i < handles.size(); ++i) {
+        hostHandles.push_back(&nb::cast<const HandleT&>(handles[i]));
+        withHostHandle(*hostHandles.back(), "writeGrids", [](const auto&) {});
+    }
     std::ofstream os(fileName, std::ios::out | std::ios::binary | std::ios::trunc);
     if (!os.is_open()) {
         throw std::ios_base::failure("Unable to open file named \"" + fileName + "\" for output");
     }
-    for (size_t i = 0; i < handles.size(); ++i) {
-        nanovdb::io::writeGrid(os, nb::cast<const GridHandle<BufferT>&>(handles[i]), codec);
+    for (const HandleT* handle : hostHandles) {
+        withHostHandle(*handle, "writeGrids", [&](const auto& h) { nanovdb::io::writeGrid(os, h, codec); });
     }
     if (verbose) {
         std::cout << "Wrote " << handles.size() << " nanovdb::Grid(s) to file named \"" << fileName << "\"" << std::endl;
@@ -92,7 +113,7 @@ void defineHostReadWriteGrid(nb::module_& m)
           "handle"_a,
           "codec"_a = io::Codec::NONE,
           "verbose"_a = 0);
-    m.def("writeGrids", &writeGrids<BufferT>, "fileName"_a, "handles"_a, "codec"_a = io::Codec::NONE, "verbose"_a = 0);
+    m.def("writeGrids", &writeGrids<GridHandle<BufferT>>, "fileName"_a, "handles"_a, "codec"_a = io::Codec::NONE, "verbose"_a = 0);
     m.def("readGrid",
           nb::overload_cast<const std::string&, int, int, const BufferT&>(&io::template readGrid<BufferT>),
           "fileName"_a,
@@ -114,37 +135,19 @@ void writeDeviceGrid(const std::string& fileName, const DeviceGridHandle& handle
     handle.withHost("writeGrid", [&](const auto& h) { io::writeGrid(fileName, h, codec, verbose); });
 }
 
-void writeDeviceGrids(const std::string& fileName, nb::list handles, io::Codec codec, int verbose)
-{
-    // check every handle before truncating the file
-    for (size_t i = 0; i < handles.size(); ++i) {
-        nb::cast<const DeviceGridHandle&>(handles[i]).withHost("writeGrids", [](const auto&) {});
-    }
-    std::ofstream os(fileName, std::ios::out | std::ios::binary | std::ios::trunc);
-    if (!os.is_open()) {
-        throw std::ios_base::failure("Unable to open file named \"" + fileName + "\" for output");
-    }
-    for (size_t i = 0; i < handles.size(); ++i) {
-        nb::cast<const DeviceGridHandle&>(handles[i]).withHost("writeGrids", [&](const auto& h) { io::writeGrid(os, h, codec); });
-    }
-    if (verbose) {
-        std::cout << "Wrote " << handles.size() << " nanovdb::Grid(s) to file named \"" << fileName << "\"" << std::endl;
-    }
-}
-
 nb::list readDeviceGrids(const std::string& fileName, int verbose)
 {
     auto     handles = io::readGrids<HostBuffer>(fileName, verbose);
     nb::list handleList;
-    for (auto& h : handles) handleList.append(DeviceGridHandle(h));
+    for (auto& h : handles) handleList.append(DeviceGridHandle(std::move(h)));
     return handleList;
 }
 
-// The grids are read on the host and copied into the handle's pinned host side.
+// The grids are read into the handle's host side.
 void defineDeviceReadWriteGrid(nb::module_& m)
 {
     m.def("deviceWriteGrid", &writeDeviceGrid, "fileName"_a, "handle"_a, "codec"_a = io::Codec::NONE, "verbose"_a = 0);
-    m.def("deviceWriteGrids", &writeDeviceGrids, "fileName"_a, "handles"_a, "codec"_a = io::Codec::NONE, "verbose"_a = 0);
+    m.def("deviceWriteGrids", &writeGrids<DeviceGridHandle>, "fileName"_a, "handles"_a, "codec"_a = io::Codec::NONE, "verbose"_a = 0);
     m.def(
         "deviceReadGrid",
         [](const std::string& fileName, int n, int verbose) { return DeviceGridHandle(io::readGrid<HostBuffer>(fileName, n, verbose)); },
