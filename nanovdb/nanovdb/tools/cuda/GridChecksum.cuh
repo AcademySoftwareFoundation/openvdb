@@ -206,6 +206,10 @@ inline void blockedCRC32(const void *d_data, size_t size, const uint32_t *d_lut,
     NANOVDB_ASSERT(d_data && d_lut && d_crc);
     static constexpr unsigned int threadsPerBlock = 128;// seems faster than the old value of 256!
     const uint64_t checksumCount = size >> NANOVDB_CRC32_LOG2_BLOCK_SIZE;// 4 KB (4096 byte)
+    if (checksumCount == 0) {// no full block to hash: the CRC of zero bytes (0), or ~0 for empty data, as util::blockedCrc32 returns
+        cudaCheck(cudaMemsetAsync(d_crc, size ? 0x00 : 0xFF, sizeof(uint32_t), stream));
+        return;
+    }
     unique_ptr<uint32_t> buffer(checksumCount, stream);// for checksums of 4 KB blocks
     uint32_t *d_checksums = buffer.get();
     crc32SlicedKernel<<<blocksPerGrid(checksumCount, threadsPerBlock), threadsPerBlock, 0, stream>>>(

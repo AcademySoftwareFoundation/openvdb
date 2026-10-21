@@ -3168,6 +3168,21 @@ TEST(TestNanoVDBCUDA, CudaGridChecksum)
     cudaCheck(cudaFree(d_checksum));
 }// CudaGridChecksum
 
+// An empty grid's tail is shorter than one 4 KB checksum block
+TEST(TestNanoVDBCUDA, CudaGridChecksum_EmptyGrid)
+{
+    nanovdb::tools::build::Grid<float> buildGrid(0.0f);
+    auto handle = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<float>, nanovdb::ValueOnIndex, nanovdb::cuda::DeviceBuffer>(buildGrid);
+    ASSERT_LT(handle.gridSize() - sizeof(nanovdb::GridData) - sizeof(nanovdb::TreeData), size_t(1) << NANOVDB_CRC32_LOG2_BLOCK_SIZE);
+    handle.deviceUpload();
+    nanovdb::tools::cuda::updateChecksum(handle.deviceGrid<nanovdb::ValueOnIndex>(), nanovdb::CheckMode::Full);
+    handle.deviceDownload();
+    auto *grid = handle.grid<nanovdb::ValueOnIndex>();
+    ASSERT_TRUE(grid);
+    EXPECT_TRUE(grid->checksum().isFull());
+    EXPECT_EQ(grid->checksum(), nanovdb::tools::evalChecksum(grid, nanovdb::CheckMode::Full));
+}// CudaGridChecksum_EmptyGrid
+
 template <typename BuildT>
 size_t countActiveVoxels(const nanovdb::NodeManager<BuildT> *d_mgr)
 {
