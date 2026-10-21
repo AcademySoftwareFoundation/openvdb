@@ -21,13 +21,14 @@
 #include <nanovdb/tools/cuda/SignedFloodFill.cuh>
 #include <nanovdb/tools/cuda/AddBlindData.cuh>
 #include <nanovdb/tools/cuda/GridStats.cuh>
+#include <nanovdb/cuda/HandleStorage.h> // for cuda::copyTo
 
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
 
 #include <vector>
 
-// These tests deliberately keep exercising the deprecated dual-space
+// Most of these tests deliberately keep exercising the deprecated dual-space
 // DeviceBuffer surface until its removal; the deprecation warnings are
 // suppressed for this translation unit only. New code must use
 // cuda::Buffer and cuda::copyTo instead.
@@ -325,15 +326,15 @@ TEST(TestMemoryResource, PointsToGrid_PointEncodedWithCustomResource)
     const double voxelSize = 8.0;
     CountingResource res;
     nanovdb::tools::cuda::PointsToGrid<BuildT, CountingResource> converter(voxelSize, nanovdb::Vec3d(0.0), 0, res);
-    auto handle = converter.getHandle(d_points, pointCount);
+    auto handle = converter.build(d_points, pointCount);// output allocates through res too
     ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
     ASSERT_EQ(cudaFree(d_points), cudaSuccess);
 
     EXPECT_TRUE(handle.deviceData());
     EXPECT_TRUE(handle.deviceGrid<BuildT>());
 
-    handle.deviceDownload();
-    auto* grid = handle.grid<BuildT>();
+    auto hostHandle = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(handle, cudaStream_t(0));
+    auto* grid = hostHandle.grid<BuildT>();
     ASSERT_TRUE(grid);
     EXPECT_EQ(pointCount, grid->pointCount());
 
