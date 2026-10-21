@@ -53,7 +53,7 @@ jobs:
     env:
       CXX: g++
     container:
-      image: aswf/ci-openvdb:2026
+      image: aswf/ci-openvdb:2027
     steps:
     - uses: actions/checkout@v4
     - name: install_doxygen
@@ -125,7 +125,7 @@ jobs:
       github.event.inputs.deploy == 'coverage'
     runs-on: ubuntu-latest
     container:
-      image: aswf/ci-openvdb:2025-clang19.1
+      image: aswf/ci-openvdb:2027
     env:
       CXX: g++
     steps:
