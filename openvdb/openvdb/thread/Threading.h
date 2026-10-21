@@ -8,11 +8,6 @@
 
 #include <openvdb/version.h>
 
-#ifndef __TBB_show_deprecation_message_task_H
-    #define __TBB_show_deprecation_message_task_H
-    #define OPENVDB_THREAD_THREADING_RESTORE_DEPRECATION_MESSAGE_TASK
-#endif
-
 #include <tbb/version.h>
 #include <tbb/task_group.h>
 #include <tbb/blocked_range.h>
@@ -38,11 +33,5 @@ inline OPENVDB_UBSAN_SUPPRESS("vptr") bool isGroupExecutionCancelled()
 } // namespace thread
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
-
-#ifdef OPENVDB_THREAD_THREADING_RESTORE_DEPRECATION_MESSAGE_TASK
-    #undef __TBB_show_deprecation_message_task_H
-    #undef OPENVDB_THREAD_THREADING_RESTORE_DEPRECATION_MESSAGE_TASK
-#endif
-
 
 #endif // OPENVDB_THREAD_THREADING_HAS_BEEN_INCLUDED
