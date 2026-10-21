@@ -107,7 +107,7 @@ pointsToGrid(const PtrT dWorldPoints,
 //-----------------------------------------------------------------------------------------------------
 
 template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
-GridHandle<BufferT>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
 pointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> pointSet,
             const BufferT &buffer = BufferT(),
             cudaStream_t stream = 0);
@@ -137,7 +137,7 @@ voxelsToGrid(const PtrT dGridVoxels,
 //-------------------------------------------------------------------------------------------------------
 
 template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
-GridHandle<BufferT>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
 voxelsToGrid(std::vector<std::tuple<const PtrT, size_t, double>> pointSet,
              const BufferT &buffer = BufferT(),
              cudaStream_t stream = 0);
@@ -181,6 +181,26 @@ pointsToGrid(const PtrT dWorldPoints,
              int tolerance,
              int maxIterations,
              PointType type,
+             cudaStream_t stream,
+             ResourceT resource = nanovdb::cuda::default_resource<ResourceT>());
+
+/// @brief Resource form of pointsToGrid over a point set: one grid per set,
+///        merged into one handle; see the single-set resource form of
+///        voxelsToGrid above.
+/// @throw std::invalid_argument if @c pointSet is empty
+template<typename BuildT, typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
+typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+pointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> pointSet,
+             cudaStream_t stream,
+             ResourceT resource = nanovdb::cuda::default_resource<ResourceT>());
+
+/// @brief Resource form of voxelsToGrid over a voxel set: one grid per set,
+///        merged into one handle; see the single-set resource form of
+///        voxelsToGrid above.
+/// @throw std::invalid_argument if @c pointSet is empty
+template<typename BuildT, typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
+typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+voxelsToGrid(std::vector<std::tuple<const PtrT, size_t, double>> pointSet,
              cudaStream_t stream,
              ResourceT resource = nanovdb::cuda::default_resource<ResourceT>());
 
@@ -1406,7 +1426,7 @@ inline void PointsToGrid<BuildT, ResourceT>::encodePoints(const PtrT points, siz
         break;
     case PointType::Default:
         util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
-            d_data->template getPoint<typename pointer_traits<PtrT>::element_type>(tid) = points[d_data->d_indx[tid]];
+            d_data->template getPoint<typename util::remove_const<typename pointer_traits<PtrT>::element_type>::type>(tid) = points[d_data->d_indx[tid]];
         }, mDeviceData); cudaCheckError();
         break;
     default:
@@ -1572,10 +1592,13 @@ pointsToGrid(const PtrT d_xyz, int pointCount, int maxPointsPerVoxel, int tolera
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT, typename PtrT, typename BufferT, typename ResourceT>
-GridHandle<BufferT>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
 pointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> vec, const BufferT &buffer, cudaStream_t stream)
 {
+    static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
+                  "pointsToGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
     static_assert(util::is_same<BuildT, Point>::value, "pointsToGrid over a point set builds NanoGrid<Point>");
+    if (vec.empty()) throw std::invalid_argument("pointsToGrid: empty point set");
     std::vector<GridHandle<BufferT>> handles;
     for (auto &p : vec) {
         PointsToGrid<Point, ResourceT> converter(std::get<2>(p), Vec3d(0.0), stream);
@@ -1588,9 +1611,12 @@ pointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> vec, co
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT, typename PtrT, typename BufferT, typename ResourceT>
-GridHandle<BufferT>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
 voxelsToGrid(std::vector<std::tuple<const PtrT,size_t,double>> vec, const BufferT &buffer, cudaStream_t stream)
 {
+    static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
+                  "voxelsToGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
+    if (vec.empty()) throw std::invalid_argument("voxelsToGrid: empty voxel set");
     std::vector<GridHandle<BufferT>> handles;
     for (auto &p : vec) handles.push_back(voxelsToGrid<BuildT, PtrT, BufferT, ResourceT>(std::get<0>(p), std::get<1>(p), std::get<2>(p), buffer, stream));
     return detail::mergeBuiltHandles(handles, buffer, stream);
@@ -1638,6 +1664,46 @@ pointsToGrid(const PtrT d_xyz, int pointCount, int maxPointsPerVoxel, int tolera
     PointsToGrid<Point, ResourceT> converter(maxPointsPerVoxel, tolerance, maxIterations, stream, resource);
     converter.setPointType(type);
     return converter.getHandle(d_xyz, pointCount, BufferT(stream, resource, 0, nanovdb::cuda::noInit));
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename BuildT, typename PtrT, typename ResourceT>
+typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+pointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> vec, cudaStream_t stream, ResourceT resource)
+{
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "the GPU tools allocate stream-ordered scratch: pass an AsyncResource, or wrap a synchronous one in cuda::AsyncFromSync");
+    static_assert(util::is_same<BuildT, Point>::value, "pointsToGrid over a point set builds NanoGrid<Point>");
+    if (vec.empty()) throw std::invalid_argument("pointsToGrid: empty point set");
+    using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
+    const BufferT proto(stream, resource, 0, nanovdb::cuda::noInit);
+    std::vector<GridHandle<BufferT>> handles;
+    for (auto &p : vec) {
+        PointsToGrid<Point, ResourceT> converter(std::get<2>(p), Vec3d(0.0), stream, resource);
+        converter.setPointType(std::get<3>(p));
+        handles.push_back(converter.getHandle(std::get<0>(p), std::get<1>(p), proto));
+    }
+    return detail::mergeBuiltHandles(handles, proto, stream);
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename BuildT, typename PtrT, typename ResourceT>
+typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+voxelsToGrid(std::vector<std::tuple<const PtrT,size_t,double>> vec, cudaStream_t stream, ResourceT resource)
+{
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "the GPU tools allocate stream-ordered scratch: pass an AsyncResource, or wrap a synchronous one in cuda::AsyncFromSync");
+    if (vec.empty()) throw std::invalid_argument("voxelsToGrid: empty voxel set");
+    using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
+    const BufferT proto(stream, resource, 0, nanovdb::cuda::noInit);
+    std::vector<GridHandle<BufferT>> handles;
+    for (auto &p : vec) {
+        PointsToGrid<BuildT, ResourceT> converter(std::get<2>(p), Vec3d(0.0), stream, resource);
+        handles.push_back(converter.getHandle(std::get<0>(p), std::get<1>(p), proto));
+    }
+    return detail::mergeBuiltHandles(handles, proto, stream);
 }
 
 }// namespace tools::cuda ======================================================================================================================================

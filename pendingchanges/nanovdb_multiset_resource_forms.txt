@@ -1,0 +1,7 @@
+NanoVDB:
+
+  New Features:
+  - The point-set overloads of nanovdb::tools::cuda::pointsToGrid and voxelsToGrid have resource forms, (sets, stream, resource), like the single-set overloads: each set's grid, the merged result and all internal scratch allocate through the given resource, on the given stream, and the result is a GridHandle<cuda::Buffer<std::byte, ResourceT>> (DeviceResource by default). As for the single-set overloads, a cudaStream_t argument selects the resource form, and a literal 0 in that position fails to compile with a message saying to write cudaStream_t(0). All the point-set overloads now reject an empty set with std::invalid_argument.
+
+  Bug Fixes:
+  - nanovdb::tools::cuda::pointsToGrid with PointType::Default failed to compile for pointer-to-const point coordinates, e.g. const Vec3f*.

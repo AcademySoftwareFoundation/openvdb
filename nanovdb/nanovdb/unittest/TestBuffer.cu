@@ -39,6 +39,7 @@
 #include <sstream>// for the pinned-handle write/read round trip
 #include <limits>
 #include <stdexcept>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -2195,6 +2196,61 @@ TEST(TestBuffer, ResourceFormsOfTheGpuTools)
     }
     ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(stream));
     ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
+    EXPECT_EQ(counters.allocs, counters.deallocs);
+    ASSERT_EQ(cudaSuccess, cudaStreamDestroy(stream));
+}
+
+TEST(TestBuffer, ResourceFormsOfThePointSetOverloads)
+{
+    // One grid per set, merged into one handle: the resource form matches the
+    // prototype form, and its allocations go through the caller's resource and
+    // are all released.
+    using RefT = nanovdb::cuda::ResourceRef<CountingResource>;
+    using OutT = nanovdb::cuda::Buffer<std::byte, RefT>;
+    const std::vector<nanovdb::Coord> coords = {nanovdb::Coord(1,2,3), nanovdb::Coord(10,20,8), nanovdb::Coord(-5,0,7)};
+    const std::vector<nanovdb::Vec3f> points = {nanovdb::Vec3f(0.5f), nanovdb::Vec3f(4.25f,-1.0f,2.0f), nanovdb::Vec3f(0.6f), nanovdb::Vec3f(9.0f)};
+    auto d_coords = toDevice(coords);
+    auto d_points = toDevice(points);
+    cudaStream_t stream;
+    ASSERT_EQ(cudaSuccess, cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+    using VoxelSet = std::tuple<const nanovdb::Coord* const, size_t, double>;
+    using PointSet = std::tuple<const nanovdb::Vec3f* const, size_t, double, nanovdb::PointType>;
+    const std::vector<VoxelSet> voxelSets{{d_coords.data(), 2, 1.0}, {d_coords.data() + 2, 1, 0.5}};
+    const std::vector<PointSet> pointSets{{d_points.data(), 3, 1.0, nanovdb::PointType::Default},
+                                          {d_points.data() + 3, 1, 0.5, nanovdb::PointType::Default}};
+
+    Counters counters;
+    CountingResource res{&counters};
+    {
+        auto voxels = nanovdb::tools::cuda::voxelsToGrid<float, const nanovdb::Coord*>(voxelSets, stream, RefT(res));
+        static_assert(std::is_same<decltype(voxels), nanovdb::GridHandle<OutT>>::value, "the resource form returns a buffer over that resource");
+        EXPECT_EQ(2u, voxels.gridCount());
+        EXPECT_EQ(stream, voxels.buffer().stream());
+        EXPECT_GT(counters.allocs, 2); // scratch, per-set outputs and the merged output
+        auto voxelsProto = nanovdb::tools::cuda::voxelsToGrid<float, const nanovdb::Coord*>(voxelSets, SingleBufT(), stream);
+        expectSameBytes(deviceToHost(voxels), hostImage(voxelsProto));
+        auto voxelsDefault = nanovdb::tools::cuda::voxelsToGrid<float, const nanovdb::Coord*>(voxelSets, stream);
+        static_assert(std::is_same<decltype(voxelsDefault), nanovdb::GridHandle<SingleBufT>>::value, "the resource form defaults to DeviceResource");
+        expectSameBytes(deviceToHost(voxels), hostImage(voxelsDefault));
+
+        const int beforePoints = counters.allocs;
+        auto pts = nanovdb::tools::cuda::pointsToGrid<nanovdb::Point, const nanovdb::Vec3f*>(pointSets, stream, RefT(res));
+        static_assert(std::is_same<decltype(pts), nanovdb::GridHandle<OutT>>::value, "resource form");
+        EXPECT_EQ(2u, pts.gridCount());
+        EXPECT_GT(counters.allocs, beforePoints);
+        auto ptsProto = nanovdb::tools::cuda::pointsToGrid<nanovdb::Point, const nanovdb::Vec3f*>(pointSets, SingleBufT(), stream);
+        auto host = deviceToHost(pts);
+        expectSameBytes(host, hostImage(ptsProto));
+        EXPECT_EQ(3u, host.grid<nanovdb::Point>(0)->pointCount());
+        EXPECT_EQ(1u, host.grid<nanovdb::Point>(1)->pointCount());
+
+        // empty sets and invalid voxel sizes are rejected in either form
+        EXPECT_THROW((nanovdb::tools::cuda::voxelsToGrid<float, const nanovdb::Coord*>(std::vector<VoxelSet>{}, stream, RefT(res))), std::invalid_argument);
+        EXPECT_THROW((nanovdb::tools::cuda::voxelsToGrid<float, const nanovdb::Coord*>(std::vector<VoxelSet>{}, SingleBufT(), stream)), std::invalid_argument);
+        EXPECT_THROW((nanovdb::tools::cuda::pointsToGrid<nanovdb::Point, const nanovdb::Vec3f*>(std::vector<PointSet>{}, stream, RefT(res))), std::invalid_argument);
+        EXPECT_THROW((nanovdb::tools::cuda::voxelsToGrid<float, const nanovdb::Coord*>(std::vector<VoxelSet>{{d_coords.data(), 1, 0.0}}, stream, RefT(res))), std::invalid_argument);
+    }
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(stream));
     EXPECT_EQ(counters.allocs, counters.deallocs);
     ASSERT_EQ(cudaSuccess, cudaStreamDestroy(stream));
 }
