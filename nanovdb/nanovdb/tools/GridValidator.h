@@ -21,6 +21,7 @@
 #define NANOVDB_TOOLS_GRID_VALIDATOR_H_HAS_BEEN_INCLUDED
 
 #include <iostream> // for std::cerr
+#include <memory> // for std::unique_ptr
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/tools/GridChecksum.h>
@@ -120,7 +121,7 @@ __hostdev__ char* checkGrid(const NanoGrid<ValueT> *grid, char *error, CheckMode
     auto *n0 = tree.template getFirstNode<0>();
     auto *n1 = tree.template getFirstNode<1>();
     auto *n2 = tree.template getFirstNode<2>();
-    const void *bounds[3][2] = {{n0, util::PtrAdd(n0, grid->gridSize())}, {n1, n0}, {n2, n1}};
+    const void *bounds[3][2] = {{n0, util::PtrAdd(grid, grid->gridSize())}, {n1, n0}, {n2, n1}};
 
     auto check = [&](const void *ptr, int level) -> bool {
         if (ptr==nullptr) {
