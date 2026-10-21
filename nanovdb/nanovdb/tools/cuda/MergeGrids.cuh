@@ -125,10 +125,9 @@ MergeGrids<BuildT, ResourceT>::getHandle(const BufferT &pool)
         throw std::runtime_error("MergeGrids: no input grids");
 
     // Copy TreeData from GPU -> CPU for every input grid
-    cudaStreamSynchronize(mStream);
     mSrcTreeData.resize(mDeviceSrcGrids.size());
     for (size_t i = 0; i < mDeviceSrcGrids.size(); ++i)
-        mSrcTreeData[i] = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrids[i]);
+        mSrcTreeData[i] = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrids[i], mStream);
 
     // Ensure that no input grid contains tile values
     for (const auto& td : mSrcTreeData)
