@@ -342,17 +342,6 @@ if(OPENVDB_BUILD_SOP_OpenVDB_AX)
   endif()
 endif()
 
-# These defines are in Platform.h when building against 8.1 and later
-if(OpenVDB_VERSION VERSION_LESS 8.1.0)
-  # This is only required for the OpenVDB Write SOP which enables a compression menu
-  # option if zlib is supported.
-  if(USE_ZLIB OR OpenVDB_USES_ZLIB)
-    if(TARGET SOP_OpenVDB_Write)
-      target_compile_definitions(SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_ZLIB")
-    endif()
-  endif()
-endif()
-
 #
 
 ##########
