@@ -1042,6 +1042,9 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
 #endif
 
     grid->readTransform(is);
+    if (codec && !gd.isInstance()) {
+        codec->beginRead(*codecData, readOptions, diagnostics);
+    }
     const bool readTopology = readOptions.readMode != io::ReadMode::MetadataOnly && !gd.isInstance();
     const bool readBuffers  = readTopology && readOptions.readMode != io::ReadMode::TopologyOnly;
     if (readTopology) {
@@ -1091,6 +1094,10 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
             }
 #endif // OPENVDB_ABI_VERSION_NUMBER < 14
         }
+    }
+
+    if (codec && !gd.isInstance()) {
+        codec->finishRead(*codecData, readOptions, diagnostics);
     }
 
     return grid;

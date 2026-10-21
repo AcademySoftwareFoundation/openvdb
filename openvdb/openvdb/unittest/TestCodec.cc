@@ -731,6 +731,247 @@ TEST_F(TestCodec, testReadBuffersSize)
     std::remove(path.c_str());
 }
 
+namespace {
+
+// Writes the same bytes as the scalar codec and records the calls to beginRead() and finishRead().
+struct FinishReadRecordingCodec final : public openvdb::codecs::TopologyCodec<openvdb::FloatGrid>
+{
+    static int beginReadCalls;
+    static int finishReadCalls;
+    static bool throwInBeginRead;
+    static bool throwInFinishRead;
+    // 'B' for each beginRead() call, 'b' for each readBuffers() call and 'f' for each
+    // finishRead() call, in order.
+    static std::string events;
+
+    static void reset()
+    {
+        beginReadCalls = 0;
+        finishReadCalls = 0;
+        throwInBeginRead = false;
+        throwInFinishRead = false;
+        events.clear();
+    }
+
+    void readBuffers(std::istream& is, int64_t, openvdb::io::CodecData& data,
+        const openvdb::io::ReadOptions& options, openvdb::io::ReadDiagnostics&) const override
+    {
+        using namespace openvdb;
+        events += 'b';
+        auto& topologyData = static_cast<codecs::TopologyCodecData<float>&>(data);
+        codecs::internal::scalarCodecReadBuffers<FloatGrid, FloatGrid>(
+            static_cast<FloatGrid&>(*data.grid), is, options, &topologyData.storageBackground);
+    }
+
+    void beginRead(openvdb::io::CodecData&, const openvdb::io::ReadOptions&,
+        openvdb::io::ReadDiagnostics&) const override
+    {
+        ++beginReadCalls;
+        events += 'B';
+        if (throwInBeginRead) OPENVDB_THROW(openvdb::IoError, "beginRead failed");
+    }
+
+    void finishRead(openvdb::io::CodecData&, const openvdb::io::ReadOptions&,
+        openvdb::io::ReadDiagnostics&) const override
+    {
+        ++finishReadCalls;
+        events += 'f';
+        if (throwInFinishRead) OPENVDB_THROW(openvdb::IoError, "finishRead failed");
+    }
+
+    void writeBuffers(std::ostream& os, const openvdb::GridBase& grid,
+        const openvdb::io::WriteOptions&) const override
+    {
+        openvdb::codecs::internal::scalarCodecWriteBuffers(
+            static_cast<const openvdb::FloatGrid&>(grid), os);
+    }
+};
+
+int FinishReadRecordingCodec::beginReadCalls = 0;
+int FinishReadRecordingCodec::finishReadCalls = 0;
+bool FinishReadRecordingCodec::throwInBeginRead = false;
+bool FinishReadRecordingCodec::throwInFinishRead = false;
+std::string FinishReadRecordingCodec::events;
+
+} // anonymous namespace
+
+
+// beginRead() and finishRead() are called once for each grid that has sections, for every way
+// of reading and every read mode, and never for an instance.
+TEST_F(TestCodec, testFinishReadIsCalledOncePerGrid)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    CodecRegistry::clear();
+    CodecRegistry::registerCodecByName(FloatGrid::gridType(),
+        std::make_unique<FinishReadRecordingCodec>());
+
+    FloatGrid::Ptr apple = FloatGrid::create(0.0f);
+    apple->setName("apple");
+    apple->fill(CoordBBox(Coord(1), Coord(10)), 1.0f, true);
+    // A shallow copy shares the tree, so it is written as an instance of apple.
+    GridBase::Ptr mango = apple->copyGrid();
+    mango->setName("mango");
+    const GridPtrVec grids{apple, mango};
+
+    const std::string path = "test_finish_read_once.vdb";
+    {
+        io::File file(path);
+        file.write(grids);
+    }
+    std::ostringstream output(std::ios_base::binary);
+    io::Stream(output).write(grids);
+
+    ReadOptions topologyOnly;
+    topologyOnly.readMode = ReadMode::TopologyOnly;
+    ReadOptions metadataOnly;
+    metadataOnly.readMode = ReadMode::MetadataOnly;
+    ReadOptions clipped;
+    clipped.clipBBox = BBoxd(Vec3d(0.0), Vec3d(3.0));
+
+    auto expectCalls = [](int expected, const char* what) {
+        EXPECT_EQ(expected, FinishReadRecordingCodec::beginReadCalls) << what;
+        EXPECT_EQ(expected, FinishReadRecordingCodec::finishReadCalls) << what;
+        FinishReadRecordingCodec::reset();
+    };
+
+    FinishReadRecordingCodec::reset();
+    {
+        io::File file(path);
+        file.open();
+        file.readGrid("apple");
+        expectCalls(1, "readGrid");
+        file.readGrid("apple", topologyOnly);
+        expectCalls(1, "readGrid, topology only");
+        file.readGrid("apple", metadataOnly);
+        expectCalls(1, "readGrid, metadata only");
+        file.readGrid("apple", clipped);
+        expectCalls(1, "readGrid, clipped");
+        // An instance has no phases of its own, so only its parent is finished.
+        file.readGrid("mango");
+        expectCalls(1, "readGrid, instance");
+        file.readGrids("apple");
+        expectCalls(1, "readGrids");
+        file.readGridMetadata("apple");
+        expectCalls(1, "readGridMetadata");
+        file.readAllGridMetadata();
+        expectCalls(1, "readAllGridMetadata");
+        file.getGrids();
+        expectCalls(1, "getGrids");
+        file.getGrids(topologyOnly);
+        expectCalls(1, "getGrids, topology only");
+        file.getGrids(metadataOnly);
+        expectCalls(1, "getGrids, metadata only");
+
+        // beginRead() comes before the buffers of the grid are read and finishRead() after.
+        file.getGrids();
+        EXPECT_EQ(std::string("Bbf"), FinishReadRecordingCodec::events);
+        FinishReadRecordingCodec::reset();
+        // Metadata only reads no buffers, but is still begun and finished.
+        file.getGrids(metadataOnly);
+        EXPECT_EQ(std::string("Bf"), FinishReadRecordingCodec::events);
+        FinishReadRecordingCodec::reset();
+        file.close();
+    }
+
+    {
+        std::istringstream input(output.str(), std::ios_base::binary);
+        io::Stream stream(input);
+        expectCalls(1, "stream");
+    }
+
+    std::remove(path.c_str());
+}
+
+
+// An error from beginRead() is thrown to the caller and no other phase is called.
+TEST_F(TestCodec, testBeginReadError)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    CodecRegistry::clear();
+    CodecRegistry::registerCodecByName(FloatGrid::gridType(),
+        std::make_unique<FinishReadRecordingCodec>());
+
+    FloatGrid::Ptr apple = FloatGrid::create(0.0f);
+    apple->setName("apple");
+    apple->fill(CoordBBox(Coord(1), Coord(10)), 1.0f, true);
+
+    const std::string path = "test_begin_read_error.vdb";
+    {
+        io::File file(path);
+        file.write(GridPtrVec{apple});
+    }
+    std::ostringstream output(std::ios_base::binary);
+    io::Stream(output).write(GridPtrVec{apple});
+
+    FinishReadRecordingCodec::reset();
+    FinishReadRecordingCodec::throwInBeginRead = true;
+    {
+        io::File file(path);
+        file.open();
+        EXPECT_THROW(file.readGrid("apple"), IoError);
+        // No other phase runs after beginRead() throws.
+        EXPECT_EQ(std::string("B"), FinishReadRecordingCodec::events);
+        EXPECT_EQ(0, FinishReadRecordingCodec::finishReadCalls);
+        EXPECT_THROW(file.readGrids("apple"), IoError);
+        EXPECT_THROW(file.getGrids(), IoError);
+        file.close();
+    }
+    {
+        std::istringstream input(output.str(), std::ios_base::binary);
+        EXPECT_THROW(io::Stream{input}, IoError);
+    }
+    FinishReadRecordingCodec::reset();
+
+    std::remove(path.c_str());
+}
+
+
+// An error from finishRead() is thrown to the caller and no grid is returned.
+TEST_F(TestCodec, testFinishReadError)
+{
+    using namespace openvdb;
+    using namespace openvdb::io;
+
+    CodecRegistry::clear();
+    CodecRegistry::registerCodecByName(FloatGrid::gridType(),
+        std::make_unique<FinishReadRecordingCodec>());
+
+    FloatGrid::Ptr apple = FloatGrid::create(0.0f);
+    apple->setName("apple");
+    apple->fill(CoordBBox(Coord(1), Coord(10)), 1.0f, true);
+
+    const std::string path = "test_finish_read_error.vdb";
+    {
+        io::File file(path);
+        file.write(GridPtrVec{apple});
+    }
+    std::ostringstream output(std::ios_base::binary);
+    io::Stream(output).write(GridPtrVec{apple});
+
+    FinishReadRecordingCodec::reset();
+    FinishReadRecordingCodec::throwInFinishRead = true;
+    {
+        io::File file(path);
+        file.open();
+        EXPECT_THROW(file.readGrid("apple"), IoError);
+        EXPECT_THROW(file.readGrids("apple"), IoError);
+        EXPECT_THROW(file.getGrids(), IoError);
+        file.close();
+    }
+    {
+        std::istringstream input(output.str(), std::ios_base::binary);
+        EXPECT_THROW(io::Stream{input}, IoError);
+    }
+    FinishReadRecordingCodec::reset();
+
+    std::remove(path.c_str());
+}
+
+
 TEST_F(TestCodec, testOffsetsAndNoOffsetsParity)
 {
     using namespace openvdb;
