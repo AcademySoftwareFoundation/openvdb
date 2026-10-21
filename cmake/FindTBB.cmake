@@ -223,6 +223,30 @@ find_path(Tbb_INCLUDE_DIR oneapi/tbb/version.h
   PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
 )
+
+# TBB 2020 and earlier have no oneapi/tbb/version.h. Fail with a clear message
+# rather than a confusing version or library error later on.
+if(Tbb_INCLUDE_DIR)
+  set(_tbb_legacy_dir ${Tbb_INCLUDE_DIR})
+else()
+  find_path(_tbb_legacy_dir tbb/tbb_stddef.h
+    ${_FIND_TBB_ADDITIONAL_OPTIONS}
+    PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
+    PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
+  )
+endif()
+if(_tbb_legacy_dir AND
+   EXISTS "${_tbb_legacy_dir}/tbb/tbb_stddef.h" AND
+   NOT EXISTS "${_tbb_legacy_dir}/oneapi/tbb/version.h")
+  message(FATAL_ERROR "Found a legacy TBB (2020 or earlier) in "
+    "${_tbb_legacy_dir}, which is not supported. OpenVDB requires oneTBB "
+    "${TBB_FIND_VERSION} or newer (it must provide oneapi/tbb/version.h). "
+    "Set TBB_ROOT to a newer installation. If you have already configured, "
+    "also remove Tbb_INCLUDE_DIR and the Tbb_*_LIBRARY_* entries from the "
+    "CMake cache.")
+endif()
+unset(_tbb_legacy_dir CACHE)
+unset(_tbb_legacy_dir)
 unset(_TBB_INCLUDE_SEARCH_DIRS)
 
 set(_tbb_version_file "${Tbb_INCLUDE_DIR}/oneapi/tbb/version.h")
