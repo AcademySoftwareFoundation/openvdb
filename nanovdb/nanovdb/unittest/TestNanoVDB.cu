@@ -4664,6 +4664,109 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
     }
 }// TopologyBuilderBatch_ValueOnIndex
 
+// RefineGrid and DilateGrid enumerate their speculative root tiles with insertProcessedTiles.
+// This checks it against the per-tile loops and offset-shifted key it replaced, for upper-node
+// bboxes with every face on an octant or tile boundary, in tiles on both sides of the origin
+// and far from it.
+TEST(TestNanoVDBCUDA, TopologyBuilder_ProcessedTileEnumeration)
+{
+    using RootT = nanovdb::NanoRoot<nanovdb::ValueOnIndex>;
+    using TileT = typename RootT::DataType::Tile;
+    using nanovdb::Coord;
+    using nanovdb::CoordBBox;
+    namespace topo = nanovdb::tools::cuda::topology::detail;
+    static constexpr int32_t kDim = 4096;// root tile width
+
+    auto coordToKey = [](const Coord &ijk)->uint64_t{// the consumers' former sort key
+        static constexpr int64_t kOffset = 1 << 31;
+        return (uint64_t(uint32_t(int64_t(ijk[2]) + kOffset) >> 12)      ) |
+               (uint64_t(uint32_t(int64_t(ijk[1]) + kOffset) >> 12) << 21) |
+               (uint64_t(uint32_t(int64_t(ijk[0]) + kOffset) >> 12) << 42);
+    };
+    auto insertOld = [&](topo::ProcessedTileMap<RootT> &tiles, const Coord &origin) {
+        tiles.emplace(coordToKey(origin), TileT{RootT::CoordToKey(origin)});
+    };
+    auto sameTiles = [](const topo::ProcessedTileMap<RootT> &a, const topo::ProcessedTileMap<RootT> &b) {
+        return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(),
+            [](const auto &x, const auto &y) { return x.first == y.first && x.second.key == y.second.key; });
+    };
+
+    const int32_t origins[] = {-(1 << 30), -kDim, 0};
+    const int32_t offsets[] = {0, 1, kDim/2 - 1, kDim/2, kDim - 1};// octant and tile faces within a tile
+    uint32_t bboxCount = 0;
+    for (int32_t ox : origins) for (int32_t oy : origins) for (int32_t oz : origins) {
+        const Coord origin(ox, oy, oz);
+        for (int n = 0; n < 15625; ++n) {// every (min, max) pair of offsets on each axis
+            Coord lo, hi;
+            for (int a = 0, m = n; a < 3; ++a, m /= 25) { lo[a] = offsets[m % 5]; hi[a] = offsets[m / 5 % 5]; }
+            if (lo[0] > hi[0] || lo[1] > hi[1] || lo[2] > hi[2]) continue;
+            const CoordBBox bbox(origin + lo, origin + hi);// an upper node's bbox
+            ++bboxCount;
+
+            // Refinement: one tile per 2048^3 octant of the source tile that the bbox overlaps
+            topo::ProcessedTileMap<RootT> oldRefine, newRefine;
+            for (int di = 0; di <= kDim/2; di += kDim/2)
+            for (int dj = 0; dj <= kDim/2; dj += kDim/2)
+            for (int dk = 0; dk <= kDim/2; dk += kDim/2) {
+                const auto octant = CoordBBox::createCube(origin.offsetBy(di, dj, dk), kDim/2);
+                if (bbox.hasOverlap(octant)) insertOld(oldRefine, octant.min() + octant.min());
+            }
+            topo::insertProcessedTiles<RootT>(newRefine, CoordBBox(nanovdb::util::morphology::refineCoord(bbox.min()),
+                                                                   nanovdb::util::morphology::refineCoord(bbox.max()).offsetBy(1)));
+            EXPECT_TRUE(sameTiles(oldRefine, newRefine)) << "refine: origin " << ox << ',' << oy << ',' << oz << ", case " << n;
+
+            // Dilation: every tile in the 27-neighborhood that the bbox, grown by one voxel, overlaps
+            topo::ProcessedTileMap<RootT> oldDilate, newDilate;
+            const auto dilated = bbox.expandBy(1);
+            for (int di = -kDim; di <= kDim; di += kDim)
+            for (int dj = -kDim; dj <= kDim; dj += kDim)
+            for (int dk = -kDim; dk <= kDim; dk += kDim) {
+                const auto neighbor = CoordBBox::createCube(origin.offsetBy(di, dj, dk), kDim);
+                if (neighbor.hasOverlap(dilated)) insertOld(oldDilate, neighbor.min());
+            }
+            topo::insertProcessedTiles<RootT>(newDilate, dilated);
+            EXPECT_TRUE(sameTiles(oldDilate, newDilate)) << "dilate: origin " << ox << ',' << oy << ',' << oz << ", case " << n;
+        }
+    }
+    EXPECT_EQ(bboxCount, 27u * 15u * 15u * 15u);
+
+    // An empty bbox (a node whose bbox was never computed) adds no tiles, including after dilation.
+    // RefineGrid skips empty bboxes itself because refineCoord overflows on the sentinel min/max.
+    const CoordBBox emptyBBox;
+    ASSERT_TRUE(emptyBBox.empty());
+    topo::ProcessedTileMap<RootT> emptyTiles, emptyDilate;
+    topo::insertProcessedTiles<RootT>(emptyTiles, emptyBBox);
+    topo::insertProcessedTiles<RootT>(emptyDilate, emptyBBox.expandBy(1));
+    EXPECT_TRUE(emptyTiles.empty());
+    EXPECT_TRUE(emptyDilate.empty());
+}// TopologyBuilder_ProcessedTileEnumeration
+
+TEST(TestNanoVDBCUDA, TopologyBuilder_ProcessedRootAllocation)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    using RootT  = nanovdb::NanoRoot<BuildT>;
+    cudaStream_t stream;
+    cudaCheck(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+    std::unique_ptr<CUstream_st, decltype(&cudaStreamDestroy)> streamGuard(stream, &cudaStreamDestroy);
+    nanovdb::tools::cuda::TopologyBuilder<BuildT> builder(stream);
+
+    // The tile-count form sets mTableSize, for zero tiles too
+    for (uint32_t tileCount : {5u, 0u}) {
+        RootT *root = builder.allocateProcessedRootTiles(tileCount);
+        ASSERT_NE(root, nullptr);
+        EXPECT_EQ(root, builder.hostProcessedRoot(0));
+        EXPECT_EQ(builder.gridCount(), 1u);
+        EXPECT_EQ(root->mTableSize, tileCount);
+    }
+
+    // The deprecated byte form recovers the tile count and resets a batch to one grid
+    builder.allocateProcessedRoots({2, 3});
+    EXPECT_EQ(builder.gridCount(), 2u);
+    RootT *root = builder.allocateProcessedRoot(RootT::memUsage(3));
+    EXPECT_EQ(builder.gridCount(), 1u);
+    EXPECT_EQ(root->mTableSize, 3u);
+}// TopologyBuilder_ProcessedRootAllocation
+
 TEST(TestNanoVDBCUDA, MergeGrids_ValueOnIndex)
 {
     using BuildT = nanovdb::ValueOnIndex;
