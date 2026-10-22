@@ -870,9 +870,7 @@ void MeshToGrid<BuildT, ResourceT>::buildRasterizedRoot()
     // Build the root node on CPU: one tile per unique root origin.
     // Only the NanoVDB tile key is set here; child pointers and values are
     // filled by TopologyBuilder's subsequent pipeline stages.
-    uint64_t rootSize = RootT::memUsage(tileCount);
-    auto *rootPtr = mBuilder.allocateProcessedRoot(rootSize);
-    rootPtr->mTableSize = tileCount;
+    auto *rootPtr = mBuilder.allocateProcessedRootTiles(tileCount);
     rootPtr->mBackground = typename RootT::ValueType{};
 
     if (tileCount) {

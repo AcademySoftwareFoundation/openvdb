@@ -201,7 +201,7 @@ void RefineGrid<BuildT, ResourceT>::refineRoot()
     }
 
     // Package the new root topology into a RootNode plus Tile list; upload to the GPU
-    auto rootPtr = mBuilder.allocateProcessedRoot(RootT::memUsage(tiles.size()));
+    auto rootPtr = mBuilder.allocateProcessedRootTiles(static_cast<uint32_t>(tiles.size()));
     topology::detail::packProcessedRoot(tiles, rootPtr);
     mBuilder.uploadProcessedRoot(mStream);
 }// RefineGrid<BuildT, ResourceT>::refineRoot

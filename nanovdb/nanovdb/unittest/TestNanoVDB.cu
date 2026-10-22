@@ -4669,6 +4669,32 @@ TEST(TestNanoVDBCUDA, TopologyBuilder_ProcessedTileEnumeration)
     EXPECT_TRUE(emptyDilate.empty());
 }// TopologyBuilder_ProcessedTileEnumeration
 
+TEST(TestNanoVDBCUDA, TopologyBuilder_ProcessedRootAllocation)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    using RootT  = nanovdb::NanoRoot<BuildT>;
+    cudaStream_t stream;
+    cudaCheck(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+    std::unique_ptr<CUstream_st, decltype(&cudaStreamDestroy)> streamGuard(stream, &cudaStreamDestroy);
+    nanovdb::tools::cuda::TopologyBuilder<BuildT> builder(stream);
+
+    // The tile-count form sets mTableSize, for zero tiles too
+    for (uint32_t tileCount : {5u, 0u}) {
+        RootT *root = builder.allocateProcessedRootTiles(tileCount);
+        ASSERT_NE(root, nullptr);
+        EXPECT_EQ(root, builder.hostProcessedRoot(0));
+        EXPECT_EQ(builder.gridCount(), 1u);
+        EXPECT_EQ(root->mTableSize, tileCount);
+    }
+
+    // The deprecated byte form recovers the tile count and resets a batch to one grid
+    builder.allocateProcessedRoots({2, 3});
+    EXPECT_EQ(builder.gridCount(), 2u);
+    RootT *root = builder.allocateProcessedRoot(RootT::memUsage(3));
+    EXPECT_EQ(builder.gridCount(), 1u);
+    EXPECT_EQ(root->mTableSize, 3u);
+}// TopologyBuilder_ProcessedRootAllocation
+
 TEST(TestNanoVDBCUDA, MergeGrids_ValueOnIndex)
 {
     using BuildT = nanovdb::ValueOnIndex;

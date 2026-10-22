@@ -2,3 +2,6 @@ NanoVDB:
 
   Improvements:
   - tools::cuda::RefineGrid, CoarsenGrid, DilateGrid, PruneGrid and MergeGrids now build their root tiles with the shared TopologyBuilder helpers, and they and MeshToGrid no longer synchronize the stream between counting nodes and allocating the output.
+
+  API Changes:
+  - Added tools::cuda::TopologyBuilder::allocateProcessedRootTiles(tileCount), the single-grid form of allocateProcessedRoots: it takes a tile count and sets the root's mTableSize. The byte form allocateProcessedRoot(bytes) is deprecated and forwards to it.
