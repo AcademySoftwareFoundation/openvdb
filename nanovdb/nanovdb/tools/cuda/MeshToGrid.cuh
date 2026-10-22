@@ -1167,7 +1167,7 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
     const float voxelSize = (float)mMap.getVoxelSize()[0];
 
     const uint64_t activeVoxelCount = util::cuda::DeviceGridTraits<BuildT>::getActiveVoxelCount(
-        handle.template deviceGrid<BuildT>());
+        handle.template deviceGrid<BuildT>(), mStream);
 
     auto sidecarBuffer = nanovdb::cuda::detail::createDeviceStorage<SidecarBufferT>(
         (activeVoxelCount + 1) * sizeof(float), &sidecarProto, device, mStream);
