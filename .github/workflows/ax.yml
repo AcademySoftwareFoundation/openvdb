@@ -124,12 +124,9 @@ jobs:
       matrix:
         config:
           - { runner: 'macos-15', cxx: 'clang++', build: 'Release', llvm: '21' }
-          - { runner: 'macos-14', cxx: 'clang++', build: 'Release', llvm: '21' }
-          - { runner: 'macos-14', cxx: 'clang++', build: 'Release', llvm: '20' }
-          - { runner: 'macos-14', cxx: 'clang++', build: 'Release', llvm: '19' }
-          - { runner: 'macos-14', cxx: 'clang++', build: 'Release', llvm: '18' }
-          - { runner: 'macos-14', cxx: 'clang++', build: 'Release', llvm: '17' }
-          - { runner: 'macos-14', cxx: 'clang++', build: 'Release', llvm: '16' }
+          - { runner: 'macos-15', cxx: 'clang++', build: 'Release', llvm: '20' }
+          - { runner: 'macos-15', cxx: 'clang++', build: 'Release', llvm: '19' }
+          - { runner: 'macos-15', cxx: 'clang++', build: 'Release', llvm: '18' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
