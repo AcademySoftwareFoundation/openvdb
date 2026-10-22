@@ -18,7 +18,8 @@
 
 #include <fstream> // for std::ifstream
 #include <iostream> // for std::cerr/cout
-#include <cstring> // for std::memcpy
+#include <cstring> // for std::memcpy, std::memchr
+#include <type_traits> // for std::is_unsigned
 #include <stdexcept> // for std::runtime_error
 #include <string> // for std::to_string
 #include <vector>
@@ -102,6 +103,29 @@ inline void validateGridLayout(const std::vector<GridHandleMetaData>& meta, uint
         if (!(meta[i].gridType < GridType::End))
             throw std::runtime_error("GridHandle::adopt: invalid grid type" + where());
         offset += meta[i].size;
+    }
+}
+
+/// @brief Throw unless the last read of a raw grid header succeeded and its size covers the header
+inline void checkRawGridSize(const std::istream& is, const GridData& data)
+{
+    if (!is) throw std::runtime_error("GridHandle::read: failed to read a raw grid header");
+    if (data.mGridSize < sizeof(GridData))
+        throw std::runtime_error("GridHandle::read: grid size is smaller than a grid header");
+}
+
+/// @brief Throw unless the header span that tools::updateGridCount checksums lies
+///        inside the first @a bytes of the grid at @a data
+inline void checkGridHead(const GridData* data, uint64_t bytes)
+{
+    if (bytes < sizeof(GridData) + sizeof(TreeData))
+        throw std::runtime_error("Grid is smaller than its grid and tree headers");
+
+    // up to v32.6.0 the checksummed head ends at the first upper node, whose offset is grid data
+    if (!data->mChecksum.isEmpty() && data->mVersion <= Version(32,6,0)) {
+        const int64_t offset = reinterpret_cast<const TreeData*>(data->treePtr())->mNodeOffset[2];
+        if (offset <= 0 || uint64_t(offset) > bytes - sizeof(GridData))
+            throw std::runtime_error("Grid head checksum extends past the grid");
     }
 }
 
@@ -663,15 +687,22 @@ void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
     GridData data;
     is.read((char*)&data, sizeof(GridData));
     if (data.isValid()) {
-        uint64_t size = data.mGridSize, sum = 0u;
-        while(data.mGridIndex + 1u < data.mGridCount) {// loop over remaining raw grids in stream
+        static_assert(std::is_unsigned<decltype(GridData::mGridSize)>::value,
+                      "GridHandle::read relies on unsigned wrap-around to detect overflow");
+        uint64_t size = 0u;
+        while (true) {// loop over raw grids in stream
+            detail::checkRawGridSize(is, data);
+            const uint64_t sum = size + data.mGridSize;// unsigned wrap-around is well defined
+            if (sum < size) throw std::runtime_error("GridHandle::read: grid sizes in stream overflow a 64-bit byte count");
+            size = sum;
+            if (data.mGridIndex + 1u >= data.mGridCount) break;
             is.seekg(data.mGridSize - sizeof(GridData), std::ios::cur);// skip grid
             is.read((char*)&data, sizeof(GridData));
-            sum += data.mGridSize;
         }
-        auto buffer = detail::createHostStorage(size + sum, pool);
+        auto buffer = detail::createHostStorage(size, pool);
         is.seekg(start);// rewind to the start of the raw buffer
-        is.read((char*)(buffer.data()), buffer.size());
+        if (!is.read((char*)(buffer.data()), buffer.size()))
+            throw std::runtime_error("GridHandle::read: stream is shorter than its raw grid sizes");
         *this = GridHandle(std::move(buffer));
     } else {
         is.seekg(-sizeof(GridData), std::ios::cur);// rewind
@@ -688,13 +719,16 @@ void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool
     is.read((char*)&data, sizeof(GridData));
     if (data.isValid()) {
         if (n>=data.mGridCount) throw std::runtime_error("stream does not contain a #" + std::to_string(n) + " grid");
+        detail::checkRawGridSize(is, data);
         while(data.mGridIndex != n) {
             is.seekg(data.mGridSize - sizeof(GridData), std::ios::cur);// skip grid
             is.read((char*)&data, sizeof(GridData));
+            detail::checkRawGridSize(is, data);
         }
         auto buffer = detail::createHostStorage(data.mGridSize, pool);
         is.seekg(-sizeof(GridData), std::ios::cur);// rewind
         is.read((char*)(buffer.data()), data.mGridSize);
+        detail::checkGridHead((GridData*)buffer.data(), data.mGridSize);
         tools::updateGridCount((GridData*)buffer.data(), 0u, 1u);
         *this = GridHandle(std::move(buffer));
     } else {
@@ -714,14 +748,21 @@ void GridHandle<BufferT>::read(std::istream& is, const std::string &gridName, co
     is.seekg(-byteSize, std::ios::cur);// rewind
     if (data.isValid()) {
         uint32_t n = 0;
-        while(data.mGridName != gridName && n++ < data.mGridCount) {
+        auto nameIs = [&]{// the name comes from the stream, so bound it before comparing
+            const void* end = std::memchr(data.mGridName, '\0', GridData::MaxNameSize);
+            return end && gridName == data.mGridName;
+        };
+        while(!nameIs() && n++ < data.mGridCount) {
+            detail::checkRawGridSize(is, data);
             is.seekg(data.mGridSize, std::ios::cur);// skip grid
-            is.read((char*)&data, byteSize);// read sizeof(GridData) bytes
+            if (!is.read((char*)&data, byteSize)) break;// read sizeof(GridData) bytes
             is.seekg(-byteSize, std::ios::cur);// rewind
         }
-        if (n>data.mGridCount) throw std::runtime_error("No raw grid named \""+gridName+"\"");
+        if (n>data.mGridCount || !is) throw std::runtime_error("No raw grid named \""+gridName+"\"");
+        detail::checkRawGridSize(is, data);
         auto buffer = detail::createHostStorage(data.mGridSize, pool);
         is.read((char*)(buffer.data()), data.mGridSize);
+        detail::checkGridHead((GridData*)buffer.data(), data.mGridSize);
         tools::updateGridCount((GridData*)buffer.data(), 0u, 1u);
         *this = GridHandle(std::move(buffer));
     } else {

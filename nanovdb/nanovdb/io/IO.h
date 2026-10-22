@@ -296,9 +296,9 @@ void Internal::read(std::istream& is, char* data, fileSize_t residual, Codec cod
     case Codec::ZIP: {
 #ifdef NANOVDB_USE_ZIP
         fileSize_t size;
-        is.read(reinterpret_cast<char*>(&size), sizeof(fileSize_t));
+        if (!is.read(reinterpret_cast<char*>(&size), sizeof(fileSize_t))) break;
         std::unique_ptr<Bytef[]> tmp(new Bytef[size]);// temp buffer for compressed data
-        is.read(reinterpret_cast<char*>(tmp.get()), size);
+        if (!is.read(reinterpret_cast<char*>(tmp.get()), size)) break;
         uLongf numBytes = static_cast<uLongf>(residual);
         int status = uncompress(reinterpret_cast<Bytef*>(data), &numBytes, tmp.get(), static_cast<uLongf>(size));
         if (status != Z_OK) throw std::runtime_error("Internal read error in ZIP");
@@ -312,10 +312,16 @@ void Internal::read(std::istream& is, char* data, fileSize_t residual, Codec cod
 #ifdef NANOVDB_USE_BLOSC
         do {
             fileSize_t size;
-            is.read(reinterpret_cast<char*>(&size), sizeof(fileSize_t));
+            if (!is.read(reinterpret_cast<char*>(&size), sizeof(fileSize_t))) break;
+            if (size < BLOSC_MIN_HEADER_LENGTH) throw std::runtime_error("BLOSC chunk is smaller than its header");
             std::unique_ptr<char[]> tmp(new char[size]);// temp buffer for compressed data
-            is.read(reinterpret_cast<char*>(tmp.get()), size);
+            if (!is.read(reinterpret_cast<char*>(tmp.get()), size)) break;
             const fileSize_t chunk = residual < MAX_SIZE ? residual : MAX_SIZE;
+
+            // blosc trusts the chunk header, so check it against the bytes read and the output size
+            size_t nbytes = 0, cbytes = 0, blocksize = 0;
+            blosc_cbuffer_sizes(tmp.get(), &nbytes, &cbytes, &blocksize);
+            if (cbytes > size || nbytes != chunk) throw std::runtime_error("BLOSC chunk header does not match the stream");
             const int        count = blosc_decompress_ctx(tmp.get(), data, size_t(chunk), 1); //fails with more threads :(
             if (count < 1) throw std::runtime_error("Internal read error in BLOSC");
             if (count != int(chunk)) throw std::runtime_error("BLOSC failed on byte size");
@@ -374,11 +380,27 @@ inline void FileGridMetaData::write(std::ostream& os) const
 
 inline void FileGridMetaData::read(std::istream& is)
 {
-    is.read(reinterpret_cast<char*>(this), sizeof(FileMetaData));
+    if (!is.read(reinterpret_cast<char*>(this), sizeof(FileMetaData)))
+        throw std::runtime_error("Failed reading FileGridMetaData");
+
+    // Largest compressed byte size accepted for one grid (128 TB). With at most 2^16 grids
+    // per segment, summing these sizes for a seek cannot overflow a std::streamoff.
+    static constexpr uint64_t maxFileSize = uint64_t(1) << 47;
+
+    // these fields size allocations and seeks, so reject values no writer produces
+    if (gridSize < sizeof(GridData))
+        throw std::runtime_error("FileGridMetaData: grid size is smaller than a grid header");
+    if (fileSize > maxFileSize)
+        throw std::runtime_error("FileGridMetaData: file size of grid is too large");
+    if (nameSize == 0)
+        throw std::runtime_error("FileGridMetaData: grid name is missing its NULL termination");
+
     std::unique_ptr<char[]> tmp(new char[nameSize]);
-    is.read(reinterpret_cast<char*>(tmp.get()), nameSize);
+    if (!is.read(reinterpret_cast<char*>(tmp.get()), nameSize))
+        throw std::runtime_error("Failed reading FileGridMetaData");
+    if (tmp[nameSize - 1] != '\0')
+        throw std::runtime_error("FileGridMetaData: grid name is missing its NULL termination");
     gridName.assign(tmp.get());
-    if (!is) throw std::runtime_error("Failed reading FileGridMetaData");
 }// FileGridMetaData::read
 
 // --------------------------> Implementations for Segment <------------------------------------
@@ -532,7 +554,10 @@ GridHandle<BufferT> readGrid(std::istream& is, int n, const BufferT& pool)
             is.seekg(start);// rewind
             while (seg.read(is)) {
                 for (auto& m : seg.meta) {
+                    if (m.gridSize > bufferSize - uint64_t(ptr - (char*)buffer.data()))
+                        throw std::runtime_error("Grid sizes in stream changed between passes");
                     Internal::read(is, ptr, m.gridSize, seg.header.codec);
+                    detail::checkGridHead((GridData*)ptr, m.gridSize);
                     tools::updateGridCount((GridData*)ptr, gridIndex++, gridCount);
                     ptr += m.gridSize;
                 }// loop over grids in segment
@@ -552,6 +577,7 @@ GridHandle<BufferT> readGrid(std::istream& is, int n, const BufferT& pool)
                     if (++counter == n) {
                         auto buffer = BufferT::create(m.gridSize, &pool);
                         Internal::read(is, buffer, seg.header.codec);
+                        detail::checkGridHead((GridData*)buffer.data(), m.gridSize);
                         tools::updateGridCount((GridData*)buffer.data(), 0u, 1u);
                         return GridHandle<BufferT>(std::move(buffer));
                     } else {
@@ -607,6 +633,7 @@ GridHandle<BufferT> readGrid(std::istream& is, const std::string& gridName, cons
                     auto buffer = BufferT::create(m.gridSize, &pool);
                     is.seekg(seek, std::ios_base::cur); // rewind
                     Internal::read(is, buffer, seg.header.codec);
+                    detail::checkGridHead((GridData*)buffer.data(), m.gridSize);
                     tools::updateGridCount((GridData*)buffer.data(), 0u, 1u);
                     return GridHandle<BufferT>(std::move(buffer));
                 } else {
@@ -656,6 +683,7 @@ VecT<GridHandle<BufferT>> readGrids(std::istream& is, const BufferT& pool = Buff
             for (uint16_t i = 0; i < seg.header.gridCount; ++i) {
                 auto *data = util::PtrAdd<GridData>(buffer.data(), bufferOffset);
                 Internal::read(is, (char*)data, seg.meta[i].gridSize, seg.header.codec);
+                detail::checkGridHead(data, seg.meta[i].gridSize);
                 tools::updateGridCount(data, uint32_t(i), uint32_t(seg.header.gridCount));
                 bufferOffset += seg.meta[i].gridSize;
             }// loop over grids in segment
