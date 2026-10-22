@@ -4657,6 +4657,16 @@ TEST(TestNanoVDBCUDA, TopologyBuilder_ProcessedTileEnumeration)
         }
     }
     EXPECT_EQ(bboxCount, 27u * 15u * 15u * 15u);
+
+    // An empty bbox (a node whose bbox was never computed) adds no tiles, including after dilation.
+    // RefineGrid skips empty bboxes itself because refineCoord overflows on the sentinel min/max.
+    const CoordBBox emptyBBox;
+    ASSERT_TRUE(emptyBBox.empty());
+    topo::ProcessedTileMap<RootT> emptyTiles, emptyDilate;
+    topo::insertProcessedTiles<RootT>(emptyTiles, emptyBBox);
+    topo::insertProcessedTiles<RootT>(emptyDilate, emptyBBox.expandBy(1));
+    EXPECT_TRUE(emptyTiles.empty());
+    EXPECT_TRUE(emptyDilate.empty());
 }// TopologyBuilder_ProcessedTileEnumeration
 
 TEST(TestNanoVDBCUDA, MergeGrids_ValueOnIndex)

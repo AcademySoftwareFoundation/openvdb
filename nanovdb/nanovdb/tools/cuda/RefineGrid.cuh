@@ -193,6 +193,7 @@ void RefineGrid<BuildT, ResourceT>::refineRoot()
         for (uint32_t t = 0; t < srcRootAndUpper->tileCount(); t++) {
             auto srcUpper = srcRootAndUpper->getChild(srcRootAndUpper->tile(t));
             const auto tileBBox = srcUpper->bbox();
+            if (tileBBox.empty()) continue; // refineCoord overflows on an empty bbox's sentinel min/max
             const CoordBBox refinedBBox(util::morphology::refineCoord(tileBBox.min()),
                                         util::morphology::refineCoord(tileBBox.max()).offsetBy(1));
             topology::detail::insertProcessedTiles<RootT>(tiles, refinedBBox);

@@ -176,7 +176,7 @@ template<typename BuildT, typename ResourceT>
 void PruneGrid<BuildT, ResourceT>::pruneRoot()
 {
     // This method conservatively (and trivially) prunes the root tile table.
-    // For this simple approximation, it is assumed that all root tiles currently present will presist,
+    // For this simple approximation, it is assumed that all root tiles currently present will persist,
     // and they will be pruned at a later stage if deemed empty.
 
     topology::detail::ProcessedTileMap<RootT> tiles;
