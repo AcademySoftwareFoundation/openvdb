@@ -133,8 +133,6 @@ RefineGrid<BuildT, ResourceT>::getHandle(const BufferT &pool)
     if (mVerbose==1) mTimer.restart("Count refined tree nodes");
     mBuilder.countNodes(mStream);
 
-    cudaStreamSynchronize(mStream);
-
     // Allocate new device grid buffer for refined result
     if (mVerbose==1) mTimer.restart("Allocating refined grid buffer");
     auto buffer = mBuilder.getBuffer(pool, mStream);
@@ -176,24 +174,12 @@ void RefineGrid<BuildT, ResourceT>::refineRoot()
 {
     // This method conservatively and speculatively refines the root tiles, to accommodate
     // any new root nodes that might be introduced by the upsampling operation.
-    // The index-space bounding box of each tile is examined, and if it overlaps any of the 2048^3-sized octants
-    // of the tile, a corresponding new tile is preemptively introduced into the root topology.
-    // Root tiles that were preemptively introduced, but end up having no active contents will
-    // be pruned in later stages of processing.
+    // The index-space bounding box of each upper node is refined, and every root tile it
+    // overlaps is preemptively introduced into the root topology (each 2048^3 octant of the
+    // source tile maps onto one refined tile). Root tiles that were preemptively introduced,
+    // but end up having no active contents will be pruned in later stages of processing.
 
-    int device = 0;
-    cudaGetDevice(&device);
-
-    std::map<uint64_t, typename RootT::DataType::Tile> refinedTiles;
-
-    // This encoding scheme mirrors the one used in PointsToGrid; note that it is different from Tile::key
-    auto coordToKey = [](const Coord &ijk)->uint64_t{
-        // Note: int32_t has a range of -2^31 to 2^31 - 1 whereas uint32_t has a range of 0 to 2^32 - 1
-        static constexpr int64_t kOffset = 1 << 31;
-        return (uint64_t(uint32_t(int64_t(ijk[2]) + kOffset) >> 12)      ) | // z is the lower 21 bits
-            (uint64_t(uint32_t(int64_t(ijk[1]) + kOffset) >> 12) << 21) | // y is the middle 21 bits
-            (uint64_t(uint32_t(int64_t(ijk[0]) + kOffset) >> 12) << 42); //  x is the upper 21 bits
-    };// coordToKey lambda functor
+    topology::detail::ProcessedTileMap<RootT> tiles;
 
     if (mSrcTreeData.mVoxelCount) { // If the input grid is not empty
         // Make a host copy of the source topology RootNode *and* the Upper Nodes (needed for BBox'es)
@@ -204,32 +190,18 @@ void RefineGrid<BuildT, ResourceT>::refineRoot()
         cudaCheck(cudaMemcpyAsync(srcRootAndUpperBuffer.data(), deviceSrcRoot, rootAndUpperSize, cudaMemcpyDeviceToHost, mStream));
         auto srcRootAndUpper = static_cast<RootT*>(srcRootAndUpperBuffer.data());
 
-        // For each original root tile, consider adding those tiles in its 26-connected neighborhood
         for (uint32_t t = 0; t < srcRootAndUpper->tileCount(); t++) {
             auto srcUpper = srcRootAndUpper->getChild(srcRootAndUpper->tile(t));
             const auto tileBBox = srcUpper->bbox();
-            for (int di = 0; di <= 2048; di += 2048)
-            for (int dj = 0; dj <= 2048; dj += 2048)
-            for (int dk = 0; dk <= 2048; dk += 2048) {
-                const auto octantBBox = nanovdb::CoordBBox::createCube(srcUpper->origin().offsetBy(di,dj,dk), 2048);
-                if (tileBBox.hasOverlap(octantBBox)) {
-                    auto refinedOrigin = octantBBox.min()+octantBBox.min();
-                    auto sortKey = coordToKey(refinedOrigin); // key used in the radix sort, in accordance with PointsToGrid
-                    auto tileKey = RootT::CoordToKey(refinedOrigin); // encoding used in the NanoVDB tile
-                    typename RootT::Tile refinedTile{tileKey}; // Only the key value is needed; child pointer & value will be unused
-                    refinedTiles.emplace(sortKey, refinedTile);
-               }
-            }
+            const CoordBBox refinedBBox(util::morphology::refineCoord(tileBBox.min()),
+                                        util::morphology::refineCoord(tileBBox.max()).offsetBy(1));
+            topology::detail::insertProcessedTiles<RootT>(tiles, refinedBBox);
         }
     }
 
     // Package the new root topology into a RootNode plus Tile list; upload to the GPU
-    uint64_t rootSize = RootT::memUsage(refinedTiles.size());
-    auto refinedRootPtr = mBuilder.allocateProcessedRoot(rootSize);
-    refinedRootPtr->mTableSize = refinedTiles.size();
-    uint32_t t = 0;
-    for (const auto& [key, tile] : refinedTiles)
-        *refinedRootPtr->tile(t++) = tile;
+    auto rootPtr = mBuilder.allocateProcessedRoot(RootT::memUsage(tiles.size()));
+    topology::detail::packProcessedRoot(tiles, rootPtr);
     mBuilder.uploadProcessedRoot(mStream);
 }// RefineGrid<BuildT, ResourceT>::refineRoot
 
