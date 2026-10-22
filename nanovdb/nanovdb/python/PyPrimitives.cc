@@ -4,6 +4,8 @@
 
 #include <nanobind/stl/string.h>
 
+#include <type_traits>
+
 #include <nanovdb/tools/CreatePrimitives.h>
 #ifdef NANOVDB_USE_CUDA
 #include "cuda/PyDeviceGridHandle.h"
@@ -121,6 +123,7 @@ GridHandle<BufferT> createFogVolumeTorus(GridType           gridType,
 // the GridHandle<BufferT> they are built into.
 template<typename BufferT, typename OutT> void definePrimitives(nb::module_& m)
 {
+    static_assert(std::is_constructible<OutT, GridHandle<BufferT>&&>::value, "OutT must be constructible from the built GridHandle<BufferT>");
     m.def(
         "createLevelSetSphere",
         [](GridType gridType, double radius, const Vec3d& center, double voxelSize, double halfWidth, const Vec3d& origin, const std::string& name,

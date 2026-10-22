@@ -17,6 +17,7 @@
 #include <cstdint> // for uint32_t, uint64_t
 #include <cstdio> // for std::fprintf
 #include <exception> // for std::exception
+#include <optional>
 #include <stdexcept> // for std::invalid_argument, std::out_of_range, std::runtime_error
 #include <string>
 #include <utility> // for std::move, std::swap
@@ -31,7 +32,7 @@ namespace pynanovdb {
 /// @details
 ///   - The host side is pinned in place (cudaHostRegister) at its first
 ///     transfer, so transfers with sync=False are asynchronous, and a handle
-///     that never transfers never calls CUDA.
+///     built or read on the host that never transfers never calls CUDA.
 ///   - The device side lives on the device where the grids were built or
 ///     first uploaded (for viewed arrays, the device of the device array).
 ///     Every copy and synchronization runs on that device's default stream,
@@ -40,8 +41,10 @@ namespace pynanovdb {
 ///     reallocating it, so grids already handed to Python stay valid.
 ///   - A transfer left running by sync=False finishes before its storage is
 ///     released or replaced.
-///   - CUDA errors raise std::runtime_error, except while releasing storage,
-///     where they are reported on stderr.
+///   - CUDA errors in the handle's own calls raise std::runtime_error, except
+///     while releasing storage, where they are reported on stderr. Allocating
+///     a side for the first time, the first copy into it, and freeing device
+///     memory go through NanoVDB's cudaCheck, which exits on a CUDA error.
 ///   - Translation units compiled by the host compiler include this header,
 ///     so it uses only host-callable NanoVDB API.
 class DeviceGridHandle
@@ -171,14 +174,16 @@ public:
     void upload(bool sync)
     {
         if (!mExternal && mHost.empty()) throw std::runtime_error("DeviceGridHandle.deviceUpload: the handle has no host grids to upload");
-        if (mDeviceId < 0) check(cudaGetDevice(&mDeviceId), "deviceUpload");
-        DeviceGuard guard(mDeviceId, "deviceUpload");
+        int device = mDeviceId;
+        if (device < 0) check(cudaGetDevice(&device), "deviceUpload");
+        DeviceGuard guard(device, "deviceUpload");
         if (mExternal) {
             check(cudaMemcpyAsync(mExternalDevice.data(), mExternalHost.data(), mExternalHost.bufferSize(), cudaMemcpyDefault, 0), "deviceUpload");
         } else {
             this->pin("deviceUpload");
             if (mDevice.empty()) {
                 mDevice = nanovdb::cuda::copyTo<DeviceBufferT>(mHost, cudaStream_t(0));
+                mDeviceId = device;
             } else {
                 check(cudaMemcpyAsync(mDevice.deviceData(), mHost.data(), mHost.bufferSize(), cudaMemcpyDefault, 0), "deviceUpload");
             }
@@ -307,18 +312,28 @@ private:
         std::swap(mInFlight, other.mInFlight);
     }
 
-    // Waits for any pending transfer, then frees both sides on the device that owns them.
+    static void report(cudaError_t err)
+    {
+        if (err == cudaSuccess) return;
+        cudaGetLastError();
+        std::fprintf(stderr, "DeviceGridHandle: releasing storage: %s\n", cudaGetErrorString(err));
+    }
+
+    // Waits for any pending transfer, then frees both sides on the device that
+    // owns them. Each step runs even if an earlier one fails.
     void release() noexcept
     {
+        std::optional<DeviceGuard> guard;
         try {
-            DeviceGuard guard(mDeviceId, "release");
-            if (mInFlight) check(cudaStreamSynchronize(0), "release");
-            if (mPinned) check(cudaHostUnregister(mHost.data()), "release");
-            mHost.reset();
-            mDevice.reset();
+            guard.emplace(mDeviceId, "release");
         } catch (const std::exception& e) {
             std::fprintf(stderr, "%s\n", e.what());
         }
+        if (mInFlight) report(cudaStreamSynchronize(0));
+        if (mPinned) report(cudaHostUnregister(mHost.data()));
+        mHost.reset();
+        mDevice.reset();
+        guard.reset();
         mInFlight = mPinned = mExternal = false;
         mDeviceId = -1;
         mExternalHost.reset();

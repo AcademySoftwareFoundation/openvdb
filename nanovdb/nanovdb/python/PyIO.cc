@@ -11,6 +11,7 @@
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/bind_vector.h>
 
+#include <stdexcept> // for std::runtime_error
 #include <utility> // for std::forward, std::move
 #include <vector>
 
@@ -88,7 +89,9 @@ template<typename HandleT> void writeGrids(const std::string& fileName, nb::list
     std::vector<const HandleT*> hostHandles;
     for (size_t i = 0; i < handles.size(); ++i) {
         hostHandles.push_back(&nb::cast<const HandleT&>(handles[i]));
-        withHostHandle(*hostHandles.back(), "writeGrids", [](const auto&) {});
+        withHostHandle(*hostHandles.back(), "writeGrids", [](const auto& h) {
+            if (h.gridCount() == 0) throw std::runtime_error("writeGrids: a handle holds no grids");
+        });
     }
     std::ofstream os(fileName, std::ios::out | std::ios::binary | std::ios::trunc);
     if (!os.is_open()) {

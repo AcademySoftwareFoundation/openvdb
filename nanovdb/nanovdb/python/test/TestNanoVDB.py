@@ -657,6 +657,22 @@ class TestDeviceGridHandle(unittest.TestCase):
         handle.deviceUpload()
         self.assertIsNotNone(handle.deviceFloatGrid())
 
+    def test_small_handles_sharing_pages(self):
+        # Small host buffers share pages; each is pinned separately.
+        empty = nanovdb.tools.createFloatGrid(
+            0.0, "empty", nanovdb.GridClass.Unknown, lambda ijk: 1.0, nanovdb.math.CoordBBox()
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            fileName = os.path.join(tmp, "empty.nvdb")
+            nanovdb.io.writeGrid(fileName, empty)
+            handles = [nanovdb.io.deviceReadGrid(fileName) for _ in range(16)]
+        for handle in handles:
+            handle.deviceUpload(sync=False)
+        for handle in handles:
+            handle.deviceDownload()
+            self.assertIsNotNone(handle.deviceFloatGrid())
+            self.assertEqual(handle.floatGrid().gridName(), "empty")
+
     def test_release_with_a_pending_transfer(self):
         # A transfer issued with sync=False completes before its storage is released.
         for release in ("reset", "replace", "delete"):

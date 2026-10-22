@@ -5,7 +5,7 @@ NanoVDB:
 
   Bug Fixes:
   - bool() of a nanovdb.GridHandle or nanovdb.DeviceGridHandle raised TypeError; it is now True when the handle holds grids.
-  - nanovdb.DeviceGridHandle.deviceUpload on a handle without grids, deviceDownload before any upload, and a CUDA error in either, exited the Python process; they now raise RuntimeError. So do writing, validating and reading gridData of a handle whose grids are only on the device.
+  - nanovdb.DeviceGridHandle.deviceUpload on a handle without grids and deviceDownload before any upload exited the Python process; they now raise RuntimeError, as do CUDA errors in the handle's own copies and synchronizations. So do writing, validating and reading gridData of a handle whose grids are only on the device.
   - The nanovdb.DeviceGridHandle(cpu_t, cuda_t) constructor now raises ValueError when the arrays differ in size, are empty or are not 32-byte aligned, or when cpu_t does not hold valid grids, and rejects non-contiguous arrays; it asserted on a size mismatch and accepted the rest. gridSize, gridType and gridData raise IndexError for an index past the last grid.
 
   API Changes:
