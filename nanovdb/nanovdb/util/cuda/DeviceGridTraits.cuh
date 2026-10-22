@@ -16,6 +16,7 @@
 #define NANOVDB_UTIL_CUDA_DEVICEGRIDTRAITS_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>
+#include <nanovdb/util/cuda/Util.h> // for cudaCheck
 
 namespace nanovdb::util {
 
