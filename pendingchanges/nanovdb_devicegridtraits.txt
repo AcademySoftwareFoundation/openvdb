@@ -1,8 +1,11 @@
 NanoVDB:
   Improvements:
-  - nanovdb::util::cuda::DeviceGridTraits getters take an optional CUDA stream (default 0) and read the
-    device grid in order on it. DilateGrid, MergeGrids, PruneGrid, RefineGrid, CoarsenGrid and MeshToGrid
-    pass their own stream, so reading a source grid's header no longer waits on work in other blocking streams.
+  - nanovdb::util::cuda::DeviceGridTraits getters take an optional CUDA stream (default 0): the read is
+    issued on that stream, which is synchronized before the getter returns. DilateGrid, MergeGrids,
+    PruneGrid, RefineGrid, CoarsenGrid and MeshToGrid pass their own stream, so reading a source grid's
+    header no longer waits on work in other blocking streams. It also no longer implicitly waits for a
+    grid produced on a different stream: callers must order such a producer before the tool's stream
+    (e.g. with an event), as the tool's kernels already required.
   Fixes:
   - tools::cuda::buildVoxelBlockManager read the grid's tree header without ordering it after prior work on
     its stream; the read is now issued on that stream.

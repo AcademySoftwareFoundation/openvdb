@@ -36,7 +36,7 @@ struct DeviceGridTraits
 
     static TreeDataT getTreeData(const GridT *d_grid, cudaStream_t stream = 0)
     {
-        TreeDataT treeData;
+        TreeDataT treeData{};
         std::size_t offset = GridT::memUsage();
         cudaCheck(cudaMemcpyAsync(&treeData, util::PtrAdd(d_grid, offset), sizeof(TreeDataT), cudaMemcpyDeviceToHost, stream));
         cudaCheck(cudaStreamSynchronize(stream));
@@ -81,7 +81,7 @@ struct DeviceGridTraits
 
     static uint32_t getRootTableSize(const GridT *d_grid, const TreeDataT &h_treeData, cudaStream_t stream = 0)
     {
-        uint32_t tableSize;
+        uint32_t tableSize = 0;
         std::size_t offset = GridT::memUsage() + h_treeData.mNodeOffset[3] + offsetof(RootT, mTableSize);
         cudaCheck(cudaMemcpyAsync(&tableSize, util::PtrAdd(d_grid, offset), sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
         cudaCheck(cudaStreamSynchronize(stream));

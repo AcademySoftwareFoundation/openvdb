@@ -4046,16 +4046,28 @@ TEST(TestNanoVDBCUDA, NonBlockingStreamSignedFloodFill)
 // cudaMemcpy is not ordered after work on a non-blocking stream, so a grid still being uploaded on
 // that stream would be read before it arrives. Each getter below is called while the grid's upload
 // is queued behind a busy-wait on a non-blocking stream, into a device buffer zeroed beforehand;
-// a read that is not ordered on that stream sees the zeros.
+// a read that is not ordered on that stream sees the zeros. The grid is an OnIndex grid, so that
+// every value read (including the value count) differs from what the zeroed buffer holds.
 TEST(TestNanoVDBCUDA, NonBlockingStreamDeviceGridTraits)
 {
-    using GridT   = nanovdb::NanoGrid<float>;
-    using TraitsT = nanovdb::util::cuda::DeviceGridTraits<float>;
-    auto hostHandle = nanovdb::tools::createLevelSetSphere<float>(100);
-    const GridT* hostGrid = hostHandle.grid<float>();
+    using BuildT  = nanovdb::ValueOnIndex;
+    using GridT   = nanovdb::NanoGrid<BuildT>;
+    using TraitsT = nanovdb::util::cuda::DeviceGridTraits<BuildT>;
+    auto sphereHandle = nanovdb::tools::createLevelSetSphere<float>(100);
+    auto hostHandle = nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, BuildT>(*sphereHandle.grid<float>(), 0u, false, false);// no channels, stats or tiles
+    const GridT* hostGrid = hostHandle.grid<BuildT>();
     ASSERT_TRUE(hostGrid);
     const auto& hostTreeData = *hostGrid->tree().data();
     const size_t gridBytes = hostHandle.bufferSize();
+
+    // A check can only fail if its expected value differs from a read of the zeroed buffer.
+    ASSERT_NE(0u, hostTreeData.mNodeCount[0]);
+    ASSERT_NE(0u, hostTreeData.mVoxelCount);
+    ASSERT_NE(0u, hostGrid->activeVoxelCount());
+    ASSERT_NE(0u, hostGrid->data()->mData1);
+    ASSERT_NE(0u, hostGrid->gridSize());
+    ASSERT_TRUE(hostGrid->tree().root().bbox()[0] != nanovdb::Coord(0) || hostGrid->tree().root().bbox()[1] != nanovdb::Coord(0));
+    ASSERT_NE(0u, hostGrid->tree().root().tileCount());
 
     void* pinned = nullptr;// pinned, so the upload below is truly asynchronous
     cudaCheck(cudaMallocHost(&pinned, gridBytes));
@@ -4070,8 +4082,8 @@ TEST(TestNanoVDBCUDA, NonBlockingStreamDeviceGridTraits)
     cudaCheck(cudaGetDevice(&dev));
     cudaCheck(cudaDeviceGetAttribute(&clockKHz, cudaDevAttrClockRate, dev));
     auto queueUpload = [&]() {// zero the device grid, then queue its upload behind ~20 ms of work on nb
-        cudaCheck(cudaMemset(d_bytes, 0, gridBytes));
-        cudaCheck(cudaDeviceSynchronize());
+        cudaCheck(cudaMemsetAsync(d_bytes, 0, gridBytes, nb));// on nb: ordered after the previous upload
+        cudaCheck(cudaStreamSynchronize(nb));
         streamBusyWaitKernel<<<1, 1, 0, nb>>>(static_cast<unsigned long long>(clockKHz) * 20ull);
         cudaCheck(cudaGetLastError());
         cudaCheck(cudaMemcpyAsync(d_bytes, pinned, gridBytes, cudaMemcpyHostToDevice, nb));
@@ -4095,6 +4107,7 @@ TEST(TestNanoVDBCUDA, NonBlockingStreamDeviceGridTraits)
     queueUpload();
     EXPECT_EQ(hostGrid->tree().root().tileCount(), TraitsT::getRootTableSize(d_grid, hostTreeData, nb));
 
+    cudaCheck(cudaStreamSynchronize(nb));// no upload may still be reading the pinned buffer below
     cudaCheck(cudaStreamDestroy(nb));
     cudaCheck(cudaFree(d_bytes));
     cudaCheck(cudaFreeHost(pinned));
