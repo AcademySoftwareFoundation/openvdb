@@ -8,12 +8,11 @@
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/io/IO.h> // for __repr__
 #ifdef NANOVDB_USE_CUDA
-#include <nanovdb/cuda/DeviceBuffer.h>
+#include <cuda_runtime_api.h> // for cudaGetDeviceCount
 #endif
 
 #include <sstream>
 
-#include "cuda/PyDeviceBuffer.h"
 #include "PyGridHandle.h"
 #include "PyHostBuffer.h"
 #include "PyIO.h"
@@ -413,7 +412,6 @@ NB_MODULE(nanovdb, m)
     defineChecksum(m);
 
 #ifdef NANOVDB_USE_CUDA
-    defineDeviceBuffer(m);
     defineDeviceGridHandle(m);
 #endif
 
