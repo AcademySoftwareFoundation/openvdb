@@ -22,6 +22,7 @@ NanoVDB:
   - cuda::detail::HandleFactory is deprecated in favor of GridHandle::adopt/metaData. It previously applied no checks; a layout adopt rejects, such as a grid at a non-NANOVDB_DATA_ALIGNMENT offset, now throws std::runtime_error.
 
   API Changes:
+  - NanoVDB version is now 32.10.0. The grid ABI and file format are unchanged; the minor version reflects the API changes below.
   - The Python nanovdb.DeviceBuffer class, which had no constructor or methods, is removed. nanovdb.tools.cuda.createLevelSet*/createFogVolume* take a nanovdb.HostBuffer like their nanovdb.tools counterparts, and nanovdb.io.deviceReadGrid/deviceReadGrids no longer take a buffer.
   - The GPU tools validate arguments before allocating or launching, throwing std::invalid_argument for a null grid, a null or over-long blind-data name, a negative point count, a non-positive voxel size or density target, or a singular or non-finite map. PointsToGrid::setPointType rejects PointType::Disable the same way instead of throwing std::runtime_error after allocation.
   - cuda::Buffer throws std::runtime_error for an element count whose byte size exceeds PTRDIFF_MAX.

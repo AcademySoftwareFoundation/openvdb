@@ -144,8 +144,8 @@
 #define NANOVDB_USE_NEW_MAGIC_NUMBERS// enables use of the new magic numbers described above
 
 #define NANOVDB_MAJOR_VERSION_NUMBER 32 // reflects changes to the ABI and hence also the file format
-#define NANOVDB_MINOR_VERSION_NUMBER  9 // reflects changes to the API but not ABI
-#define NANOVDB_PATCH_VERSION_NUMBER  2 // reflects changes that do not affect the ABI or API
+#define NANOVDB_MINOR_VERSION_NUMBER 10 // reflects changes to the API but not ABI
+#define NANOVDB_PATCH_VERSION_NUMBER  0 // reflects changes that do not affect the ABI or API
 
 #define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
 
