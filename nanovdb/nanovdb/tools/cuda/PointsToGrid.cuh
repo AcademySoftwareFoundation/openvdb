@@ -18,6 +18,7 @@
 #include <cub/cub.cuh>
 #include <thrust/binary_search.h>
 #include <thrust/execution_policy.h>
+#include <thrust/iterator/counting_iterator.h>
 #include <thrust/iterator/transform_iterator.h>
 #include <vector>
 #include <tuple>
@@ -687,31 +688,38 @@ struct ShiftRight
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+namespace detail {
+
+/// @brief Key of the root tile containing @a ijk: 21 bits per axis, offset so negative coordinates sort first
+__hostdev__ inline uint64_t tileKey(const Coord &ijk)
+{
+    // Note: int32_t has a range of -2^31 to 2^31 - 1 whereas uint32_t has a range of 0 to 2^32 - 1
+    static constexpr int64_t kOffset = 1 << 31;
+    return (uint64_t(uint32_t(int64_t(ijk[2]) + kOffset) >> 12)      ) | // z is the lower 21 bits
+           (uint64_t(uint32_t(int64_t(ijk[1]) + kOffset) >> 12) << 21) | // y is the middle 21 bits
+           (uint64_t(uint32_t(int64_t(ijk[0]) + kOffset) >> 12) << 42);  // x is the upper 21 bits
+}
+
+}// namespace detail
+
 template<typename BuildT, typename PtrT>
 struct TileKeyFunctor {
     using Vec3T = typename util::remove_const<typename pointer_traits<PtrT>::element_type>::type;
 
     __device__
     void operator()(size_t tid, const PointsToGridData<BuildT> *d_data, const PtrT points, uint64_t* d_keys, uint32_t* d_indx) {
-        auto coordToKey = [](const Coord &ijk)->uint64_t{
-            // Note: int32_t has a range of -2^31 to 2^31 - 1 whereas uint32_t has a range of 0 to 2^32 - 1
-            static constexpr int64_t kOffset = 1 << 31;
-            return (uint64_t(uint32_t(int64_t(ijk[2]) + kOffset) >> 12)      ) | // z is the lower 21 bits
-                   (uint64_t(uint32_t(int64_t(ijk[1]) + kOffset) >> 12) << 21) | // y is the middle 21 bits
-                   (uint64_t(uint32_t(int64_t(ijk[0]) + kOffset) >> 12) << 42); //  x is the upper 21 bits
-        };// coordToKey lambda functor
         d_indx[tid] = uint32_t(tid);
         uint64_t &key = d_keys[tid];
         if constexpr(util::is_same<BuildT, Point>::value) {// points are in world space
             if constexpr(util::is_same<Vec3T, Vec3f>::value) {
-                key = coordToKey(d_data->map.applyInverseMapF(points[tid]).round());
+                key = detail::tileKey(d_data->map.applyInverseMapF(points[tid]).round());
             } else {// points are Vec3d
-                key = coordToKey(d_data->map.applyInverseMap(points[tid]).round());
+                key = detail::tileKey(d_data->map.applyInverseMap(points[tid]).round());
             }
         } else if constexpr(util::is_same<Vec3T, Coord>::value) {// points Coord are in index space
-            key = coordToKey(points[tid]);
+            key = detail::tileKey(points[tid]);
         } else {// points are Vec3f or Vec3d in index space
-            key = coordToKey(points[tid].round());
+            key = detail::tileKey(points[tid].round());
         }
     }
 };
@@ -753,6 +761,86 @@ struct BulkVoxelKeyFunctor {
     }
 };
 
+namespace detail {
+
+/// @brief Index-space voxel of point @a i, mapped from world space first when BuildT is Point
+template<typename BuildT, typename PtrT>
+__device__ inline Coord pointToVoxel(const PointsToGridData<BuildT> *d_data, const PtrT points, size_t i)
+{
+    using Vec3T = typename util::remove_const<typename pointer_traits<PtrT>::element_type>::type;
+    Vec3T p = points[i];
+    if constexpr(util::is_same<BuildT, Point>::value) p = util::is_same<Vec3T, Vec3f>::value ? d_data->map.applyInverseMapF(p) : d_data->map.applyInverseMap(p);
+    return p.round();
+}
+
+/// @brief Offset of @a ijk within its root tile: upper (15 bits), lower (12) and leaf (9) offsets
+template<typename BuildT>
+__hostdev__ inline uint64_t tileOffsetKey(const Coord &ijk)
+{
+    return uint64_t(NanoUpper<BuildT>::CoordToOffset(ijk)) << 21 |
+           uint64_t(NanoLower<BuildT>::CoordToOffset(ijk)) <<  9 |
+           uint64_t(NanoLeaf< BuildT>::CoordToOffset(ijk));
+}
+
+/// @brief Writes each point's in-tile offset key and the identity permutation
+template<typename BuildT, typename PtrT>
+struct TileOffsetKeyFunctor {
+    __device__
+    void operator()(size_t tid, const PointsToGridData<BuildT> *d_data, const PtrT points, uint64_t *d_keys, uint32_t *d_indx) {
+        d_indx[tid] = uint32_t(tid);
+        d_keys[tid] = tileOffsetKey<BuildT>(pointToVoxel(d_data, points, tid));
+    }
+};
+
+/// @brief Writes the tile key of each point, taken in the order of @a d_indx
+template<typename BuildT, typename PtrT>
+struct PermutedTileKeyFunctor {
+    __device__
+    void operator()(size_t tid, const PointsToGridData<BuildT> *d_data, const PtrT points, const uint32_t *d_indx, uint64_t *d_keys) {
+        d_keys[tid] = tileKey(pointToVoxel(d_data, points, d_indx[tid]));
+    }
+};
+
+/// @brief 1 where a sorted key differs from its predecessor, else 0
+struct TileStartFlag {
+    const uint64_t *keys;
+    __hostdev__ uint32_t operator()(uint32_t i) const { return i == 0 || keys[i] != keys[i - 1]; }
+};
+
+/// @brief Replaces each point's sorted tile key with its voxel key, the tile index (28 bits)
+///        above the in-tile offset (36 bits), and gathers each tile's key at its index.
+///        @a d_tileRank is the inclusive scan of TileStartFlag, so it is one past the tile index.
+template<typename BuildT, typename PtrT>
+struct RankedVoxelKeyFunctor {
+    __device__
+    void operator()(size_t tid, const PointsToGridData<BuildT> *d_data, const PtrT points, const uint32_t *d_indx,
+                    const uint32_t *d_tileRank, uint64_t *d_keys, uint64_t *d_tileKeys) {
+        const uint32_t tile = d_tileRank[tid] - 1u;
+        if (tid == 0 || d_tileRank[tid - 1] != d_tileRank[tid]) d_tileKeys[tile] = d_keys[tid];
+        d_keys[tid] = uint64_t(tile) << 36 | tileOffsetKey<BuildT>(pointToVoxel(d_data, points, d_indx[tid]));
+    }
+};
+
+/// @brief Counts of leaf, lower and upper nodes and of voxels
+struct NodeCounts { uint32_t leaf, lower, upper, voxel; };
+
+/// @brief Nodes and voxels that begin at sorted voxel key @a i
+struct NodeStarts {
+    const uint64_t *keys;
+    __hostdev__ NodeCounts operator()(uint32_t i) const {
+        const uint64_t diff = i == 0 ? ~uint64_t(0) : keys[i] ^ keys[i - 1];// bits above a level's offset differ iff a node of that level starts here
+        return {uint32_t(diff >> 9 != 0), uint32_t(diff >> 21 != 0), uint32_t(diff >> 36 != 0), uint32_t(diff != 0)};
+    }
+};
+
+struct SumNodeCounts {
+    __hostdev__ NodeCounts operator()(const NodeCounts &a, const NodeCounts &b) const {
+        return {a.leaf + b.leaf, a.lower + b.lower, a.upper + b.upper, a.voxel + b.voxel};
+    }
+};
+
+}// namespace detail
+
 template<typename BuildT, typename ResourceT>
 template<typename PtrT>
 void PointsToGrid<BuildT, ResourceT>::countNodes(const PtrT points, size_t pointCount)
@@ -778,24 +866,18 @@ void PointsToGrid<BuildT, ResourceT>::countNodes(const PtrT points, size_t point
         bool operator<(const Foo &rhs) const {return density < rhs.density || (density == rhs.density && dx < rhs.dx);}
     } min{0.0, 1}, max{0.0, 0};// min: as dx -> 0 density -> 1 point per voxel, max: density is 0 i.e. undefined
 
-    // Declared ahead of the search loop below: d_keys and d_node_count carry
-    // results past it, and the event is recorded and re-used across iterations
-    // (previously it was re-created per iteration, leaking the prior handle).
+    // Points are sorted by their offset within a root tile, then stably by tile, which leaves
+    // them in voxel order without the host knowing the tile count. Every node and voxel count
+    // is then computed on the device and read back in one copy, which sizes the per-level
+    // arrays exactly. Point grids also read back their densities, for the voxel-size search
+    // and the points-per-leaf limit.
     BufT<uint64_t> keysScratch(mStream, this->ref(), 0, nanovdb::cuda::noInit);
     BufT<uint32_t> indxScratch(mStream, this->ref(), 0, nanovdb::cuda::noInit);
-    BufT<uint32_t> nodeCountScratch(mStream, this->ref(), 0, nanovdb::cuda::noInit);
+    BufT<detail::NodeCounts> countsScratch(mStream, this->ref(), 1, nanovdb::cuda::noInit);
+    BufT<uint32_t> runCountScratch(mStream, this->ref(), 1, nanovdb::cuda::noInit);// run counts the host already has
     uint64_t *d_keys = nullptr;
-    uint32_t *d_indx = nullptr, *d_points_per_tile = nullptr, *d_node_count = nullptr;
-    // Owns the copy event so the too-many-points-per-leaf throw below cannot
-    // leak the handle.
-    struct EventGuard {
-        cudaEvent_t event;
-        EventGuard() { cudaCheck(cudaEventCreate(&event)); }
-        ~EventGuard() { cudaCheck(cudaEventDestroy(event)); }
-        EventGuard(const EventGuard&) = delete;
-        EventGuard& operator=(const EventGuard&) = delete;
-    } eventGuard;
-    cudaEvent_t copyEvent = eventGuard.event;
+    uint32_t *d_indx = nullptr;
+    const auto pointIndex = thrust::make_counting_iterator<uint32_t>(0);
 
     // Bisection search for the voxel size dx that yields the target point
     // density: each iteration builds tile and voxel keys at the current dx,
@@ -814,81 +896,55 @@ void PointsToGrid<BuildT, ResourceT>::countNodes(const PtrT points, size_t point
         d_keys = keysScratch.data();
         d_indx = indxScratch.data();
 
+        if (mVerbose==2) mTimer.restart("Generate in-tile offset keys");
+        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, detail::TileOffsetKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_keys, d_indx);
+        cudaCheckError();
+        if (mVerbose==2) mTimer.restart("DeviceRadixSort of "+std::to_string(pointCount)+" in-tile offset keys");
+        CALL_CUBS(DeviceRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, pointCount, 0, 36);// 15+12+9 bits
+
         if (mVerbose==2) mTimer.restart("Generate tile keys");
-        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, TileKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_keys, d_indx);
+        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, detail::PermutedTileKeyFunctor<BuildT, PtrT>(), mDeviceData, points, mData.d_indx, d_keys);
         cudaCheckError();
         if (mVerbose==2) mTimer.restart("DeviceRadixSort of "+std::to_string(pointCount)+" tile keys");
-        CALL_CUBS(DeviceRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, pointCount, 0, 63);// 21 bits per coord
-        mIndxBuf.swap(indxScratch);// the sorted indices' owner is now indxScratch
-        d_indx = indxScratch.data();// sorted indices
-        mData.d_indx = mIndxBuf.data();// receives the voxel-sorted indices below
+        CALL_CUBS(DeviceRadixSort::SortPairs, d_keys, mData.d_keys, mData.d_indx, d_indx, pointCount, 0, 63);// 21 bits per coord; stable, so each tile stays in voxel order
+        mIndxBuf.swap(indxScratch);// mIndxBuf now owns the voxel-sorted indices
+        mData.d_indx = mIndxBuf.data();
+        d_indx = indxScratch.data();// free: receives the tile ranks
 
-        if (mVerbose==2) mTimer.restart("Allocate runs");
-        BufT<uint32_t> pointsPerTileScratch(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
-        d_points_per_tile = pointsPerTileScratch.data();
-        nodeCountScratch = BufT<uint32_t>(mStream, this->ref(), 3, nanovdb::cuda::noInit);
-        d_node_count = nodeCountScratch.data();
+        if (mVerbose==2) mTimer.restart("Generate voxel keys");
+        CALL_CUBS(DeviceScan::InclusiveSum, thrust::make_transform_iterator(pointIndex, detail::TileStartFlag{mData.d_keys}), d_indx, pointCount);
+        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, detail::RankedVoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, mData.d_indx, d_indx, mData.d_keys, d_keys);
+        cudaCheckError();
+        indxScratch.destroy(); d_indx = nullptr;
 
-        if (mVerbose==2) mTimer.restart("DeviceRunLengthEncode tile keys");
-        CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, d_points_per_tile, d_node_count+2, pointCount);
-        cudaCheck(cudaMemcpyAsync(mData.nodeCount+2, d_node_count+2, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
+        if (mVerbose==2) mTimer.restart("Count nodes and voxels");
+        CALL_CUBS(DeviceReduce::Reduce, thrust::make_transform_iterator(pointIndex, detail::NodeStarts{mData.d_keys}), countsScratch.data(), pointCount, detail::SumNodeCounts(), detail::NodeCounts{0u, 0u, 0u, 0u});
+        detail::NodeCounts counts;
+        cudaCheck(cudaMemcpyAsync(&counts, countsScratch.data(), sizeof(counts), cudaMemcpyDeviceToHost, mStream));
         cudaCheck(cudaStreamSynchronize(mStream));
+        mData.nodeCount[0] = counts.leaf;
+        mData.nodeCount[1] = counts.lower;
+        mData.nodeCount[2] = counts.upper;
+        mData.voxelCount   = counts.voxel;
+
         mTileKeysBuf = BufT<uint64_t>(mStream, this->ref(), mData.nodeCount[2], nanovdb::cuda::noInit);
         mData.d_tile_keys = mTileKeysBuf.data();
         cudaCheck(cudaMemcpyAsync(mData.d_tile_keys, d_keys, mData.nodeCount[2]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
 
-        static constexpr uint32_t SEGMENTED_SORT_TILE_THRESHOLD = 32;
-        if (mData.nodeCount[2] >= SEGMENTED_SORT_TILE_THRESHOLD) {
-            // Bulk segmented sort: one kernel launch + one segmented radix sort (faster for many tiles)
-            if (mVerbose==2) mTimer.restart("Segmented radix sort of " + std::to_string(pointCount) + " voxel keys in " + std::to_string(mData.nodeCount[2]) + " tiles");
-            BufT<uint32_t> tileOffsetsScratch(mStream, this->ref(), mData.nodeCount[2]+1, nanovdb::cuda::noInit);
-            auto *d_tile_offsets = tileOffsetsScratch.data();
-            cudaCheck(cudaMemsetAsync(d_tile_offsets, 0, sizeof(uint32_t), mStream));
-            CALL_CUBS(DeviceScan::InclusiveSum, d_points_per_tile, d_tile_offsets + 1, mData.nodeCount[2]);
-            pointsPerTileScratch.destroy(); d_points_per_tile = nullptr;
-
-            util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, BulkVoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_tile_offsets, mData.nodeCount[2], d_keys, d_indx, uint32_t(0));
-            cudaCheckError();
-            CALL_CUBS(DeviceSegmentedRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, (int)pointCount, (int)mData.nodeCount[2], d_tile_offsets, d_tile_offsets + 1, 0, 36);
-        } else {
-            // Serial per-tile sort: individual kernel + sort per tile (lower overhead for few tiles)
-            if (mVerbose==2) mTimer.restart("DeviceRadixSort of " + std::to_string(pointCount) + " voxel keys in " + std::to_string(mData.nodeCount[2]) + " tiles");
-            uint32_t *points_per_tile = new uint32_t[mData.nodeCount[2]];
-            cudaCheck(cudaMemcpyAsync(points_per_tile, d_points_per_tile, mData.nodeCount[2]*sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-            pointsPerTileScratch.destroy(); d_points_per_tile = nullptr;
-            for (uint32_t id = 0, offset = 0; id < mData.nodeCount[2]; ++id) {
-                const uint32_t count = points_per_tile[id];
-                util::cuda::offsetLambdaKernel<<<numBlocks(count), mNumThreads, 0, mStream>>>(count, offset, VoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, id, d_keys, d_indx);
-                cudaCheckError();
-                CALL_CUBS(DeviceRadixSort::SortPairs, d_keys + offset, mData.d_keys + offset, d_indx + offset, mData.d_indx + offset, count, 0, 36);
-                offset += count;
-            }
-            delete [] points_per_tile;
-        }
-        indxScratch.destroy(); d_indx = nullptr;// tile-order copy, superseded by the voxel sort
-
         if (mVerbose==2) mTimer.restart("Count points per voxel");
-
-        mPointsPerVoxelBuf = BufT<uint32_t>(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
+        mPointsPerVoxelBuf = BufT<uint32_t>(mStream, this->ref(), mData.voxelCount, nanovdb::cuda::noInit);
         mData.pointsPerVoxel = mPointsPerVoxelBuf.data();
-        BufT<uint32_t> voxelCountScratch(mStream, this->ref(), 1, nanovdb::cuda::noInit);
-        uint32_t *d_voxel_count = voxelCountScratch.data();
-        CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, mData.pointsPerVoxel, d_voxel_count, pointCount);
-        cudaCheck(cudaMemcpyAsync(&mData.voxelCount, d_voxel_count, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-        cudaCheck(cudaEventRecord(copyEvent, mStream));
-        voxelCountScratch.destroy(); d_voxel_count = nullptr;
+        CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, mData.pointsPerVoxel, runCountScratch.data(), pointCount);
 
         if (util::is_same<BuildT, Point>::value) {
             if (mVerbose==2) mTimer.restart("Count max points per voxel");
             BufT<uint32_t> maxPointsPerVoxelScratch(mStream, this->ref(), 1, nanovdb::cuda::noInit);
             uint32_t *d_maxPointsPerVoxel = maxPointsPerVoxelScratch.data(), maxPointsPerVoxel;
-            cudaCheck(cudaEventSynchronize(copyEvent));
             CALL_CUBS(DeviceReduce::Max, mData.pointsPerVoxel, d_maxPointsPerVoxel, mData.voxelCount);
             cudaCheck(cudaMemcpyAsync(&maxPointsPerVoxel, d_maxPointsPerVoxel, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-            cudaCheck(cudaEventRecord(copyEvent, mStream));
+            cudaCheck(cudaStreamSynchronize(mStream));
             maxPointsPerVoxelScratch.destroy(); d_maxPointsPerVoxel = nullptr;
             double dx = mData.map.getVoxelSize()[0];
-            cudaCheck(cudaEventSynchronize(copyEvent));
             if (++iterCounter >= mMaxIterations || pointCount == 1u || math::Abs((int)maxPointsPerVoxel - (int)mMaxPointsPerVoxel) <= mTolerance) {
                 mMaxPointsPerVoxel = maxPointsPerVoxel;
             } else {
@@ -913,7 +969,6 @@ void PointsToGrid<BuildT, ResourceT>::countNodes(const PtrT points, size_t point
                 mIndxBuf.destroy();          mData.d_indx = nullptr;
                 keysScratch.destroy();       d_keys = nullptr;
                 mTileKeysBuf.destroy();      mData.d_tile_keys = nullptr;
-                nodeCountScratch.destroy();  d_node_count = nullptr;
                 mPointsPerVoxelBuf.destroy();mData.pointsPerVoxel = nullptr;
                 continue;
             }
@@ -923,45 +978,35 @@ void PointsToGrid<BuildT, ResourceT>::countNodes(const PtrT points, size_t point
     if (iterCounter>1 && mVerbose) std::cerr << "Used " << iterCounter << " attempts to determine dx that produces a target dpoint denisty\n\n";
 
     if (mVerbose==2) mTimer.restart("Compute prefix sum of points per voxel");
-    cudaCheck(cudaEventSynchronize(copyEvent));
     mPointsPerVoxelPrefixBuf = BufT<uint32_t>(mStream, this->ref(), mData.voxelCount, nanovdb::cuda::noInit);
     mData.pointsPerVoxelPrefix = mPointsPerVoxelPrefixBuf.data();
     CALL_CUBS(DeviceScan::ExclusiveSum, mData.pointsPerVoxel, mData.pointsPerVoxelPrefix, mData.voxelCount);
 
-    mPointsPerLeafBuf = BufT<uint32_t>(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
+    mPointsPerLeafBuf = BufT<uint32_t>(mStream, this->ref(), mData.nodeCount[0], nanovdb::cuda::noInit);
     mData.pointsPerLeaf = mPointsPerLeafBuf.data();
-    CALL_CUBS(DeviceRunLengthEncode::Encode, thrust::make_transform_iterator(mData.d_keys, ShiftRight<9>()), d_keys, mData.pointsPerLeaf, d_node_count, pointCount);
-    cudaCheck(cudaMemcpyAsync(mData.nodeCount, d_node_count, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-    cudaCheck(cudaEventRecord(copyEvent, mStream));
+    mLeafKeysBuf = BufT<uint64_t>(mStream, this->ref(), mData.nodeCount[0], nanovdb::cuda::noInit);
+    mData.d_leaf_keys = mLeafKeysBuf.data();
+    CALL_CUBS(DeviceRunLengthEncode::Encode, thrust::make_transform_iterator(mData.d_keys, ShiftRight<9>()), mData.d_leaf_keys, mData.pointsPerLeaf, runCountScratch.data(), pointCount);
 
     if constexpr(util::is_same<BuildT, Point>::value) {
         BufT<uint32_t> maxPointsPerLeafScratch(mStream, this->ref(), 1, nanovdb::cuda::noInit);
         uint32_t *d_maxPointsPerLeaf = maxPointsPerLeafScratch.data();
-        cudaCheck(cudaEventSynchronize(copyEvent));
         CALL_CUBS(DeviceReduce::Max, mData.pointsPerLeaf, d_maxPointsPerLeaf, mData.nodeCount[0]);
         cudaCheck(cudaMemcpyAsync(&mMaxPointsPerLeaf, d_maxPointsPerLeaf, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
+        cudaCheck(cudaStreamSynchronize(mStream));
         //printf("\n Leaf count = %u, max points per leaf = %u\n", mData.nodeCount[0], mMaxPointsPerLeaf);
         if (mMaxPointsPerLeaf > std::numeric_limits<uint16_t>::max()) {
             throw std::runtime_error("Too many points per leaf: "+std::to_string(mMaxPointsPerLeaf));
         }
     }
 
-    cudaCheck(cudaEventSynchronize(copyEvent));
     mPointsPerLeafPrefixBuf = BufT<uint32_t>(mStream, this->ref(), mData.nodeCount[0], nanovdb::cuda::noInit);
     mData.pointsPerLeafPrefix = mPointsPerLeafPrefixBuf.data();
     CALL_CUBS(DeviceScan::ExclusiveSum, mData.pointsPerLeaf, mData.pointsPerLeafPrefix, mData.nodeCount[0]);
 
-    cudaCheck(cudaStreamSynchronize(mStream));
-    mLeafKeysBuf = BufT<uint64_t>(mStream, this->ref(), mData.nodeCount[0], nanovdb::cuda::noInit);
-    mData.d_leaf_keys = mLeafKeysBuf.data();
-    cudaCheck(cudaMemcpyAsync(mData.d_leaf_keys, d_keys, mData.nodeCount[0]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
-
-    CALL_CUBS(DeviceSelect::Unique, thrust::make_transform_iterator(mData.d_leaf_keys, ShiftRight<12>()), d_keys, d_node_count+1, mData.nodeCount[0]);// count lower nodes
-    cudaCheck(cudaMemcpyAsync(mData.nodeCount+1, d_node_count+1, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-    cudaCheck(cudaStreamSynchronize(mStream));
     mLowerKeysBuf = BufT<uint64_t>(mStream, this->ref(), mData.nodeCount[1], nanovdb::cuda::noInit);
     mData.d_lower_keys = mLowerKeysBuf.data();
-    cudaCheck(cudaMemcpyAsync(mData.d_lower_keys, d_keys, mData.nodeCount[1]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
+    CALL_CUBS(DeviceSelect::Unique, thrust::make_transform_iterator(mData.d_leaf_keys, ShiftRight<12>()), mData.d_lower_keys, runCountScratch.data(), mData.nodeCount[0]);// lower nodes
 
     if (mVerbose==2) mTimer.stop();
 
