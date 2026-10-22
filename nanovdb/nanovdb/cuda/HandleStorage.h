@@ -160,26 +160,24 @@ inline DstBufferT makeTransferStorage(uint64_t bytes, cudaStream_t stream, const
     }
 }
 
-
-/// @brief The one gateway for constructing a GridHandle from a buffer plus
-///        metadata that is already known to be valid -- adopted from another
-///        handle, whose own construction from raw bytes did the validation.
-struct HandleFactory
+/// @deprecated Use GridHandle::adopt and GridHandle::metaData.
+struct [[deprecated("use GridHandle::adopt(buffer, meta) and GridHandle::metaData()")]] HandleFactory
 {
     template<typename BufferT>
     static GridHandle<BufferT> make(BufferT&& buffer, std::vector<GridHandleMetaData> meta)
     {
-        return GridHandle<BufferT>(std::move(buffer), std::move(meta));
+        return GridHandle<BufferT>::adopt(std::move(buffer), std::move(meta));
     }
 
     template<typename BufferT>
     static const std::vector<GridHandleMetaData>& meta(const GridHandle<BufferT>& handle)
     {
-        return handle.mMetaData;
+        return handle.metaData();
     }
 };
 
 }// namespace detail
+
 /// @brief Deep-copies a grid handle into a different address space: the
 ///        explicit, stream-carrying transfer between single-space device
 ///        handles and host-readable handles (HostBuffer or a host-accessible
@@ -214,10 +212,10 @@ struct HandleFactory
 ///          both-space managed buffer -- synchronizes @c stream before
 ///          returning, so its host accessors are immediately valid; a
 ///          device-only destination is stream-ordered, so use its
-///          contents on @c stream or synchronize first. The metadata is
-///          adopted from the source handle -- it was validated when that
-///          handle was constructed from raw bytes -- so no kernel runs and
-///          this function is callable from host-only translation units. A
+///          contents on @c stream or synchronize first. The destination
+///          reuses the source handle's metadata, which was checked when the
+///          source was made, so no kernel runs and this function is
+///          callable from host-only translation units. A
 ///          pageable host source or destination (HostBuffer) degrades the
 ///          copy to synchronous behavior; pinned single-space handles keep
 ///          it asynchronous.
@@ -233,7 +231,7 @@ inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, cudaStre
     const uint64_t bytes = src.bufferSize();
     if (bytes == 0u) {// an empty handle copies to an empty handle, over the prototype's resource where given
         if constexpr (BufferHasDeviceSingle<DstBufferT>::value || BufferHasHostSingle<DstBufferT>::value) {
-            if (proto) return detail::HandleFactory::make(detail::makeTransferStorage<DstBufferT>(0, stream, proto), {});
+            if (proto) return GridHandle<DstBufferT>::adopt(detail::makeTransferStorage<DstBufferT>(0, stream, proto), {});
         }
         if constexpr (std::is_default_constructible<DstBufferT>::value) {
             return GridHandle<DstBufferT>();
@@ -249,11 +247,10 @@ inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, cudaStre
     cudaCheck(cudaMemcpyAsync(dst.data(), srcPtr, bytes, cudaMemcpyDefault, stream));
     if constexpr (!dstDev || BufferHasHostSingle<DstBufferT>::value)
         cudaCheck(cudaStreamSynchronize(stream)); // the host-readable result is the postcondition; covers the both-space (managed) destination, whose handle exposes host accessors immediately
-    // A handle-to-handle copy adopts the source's metadata, which was
-    // validated when that handle was constructed from raw bytes -- no kernel
-    // runs here, which is what keeps this header host-includable. A device
-    // destination is stream-ordered: use it on @a stream, or synchronize.
-    return detail::HandleFactory::make(std::move(dst), detail::HandleFactory::meta(src));
+    // The copy reuses the source's layout unchecked, so no kernel runs here,
+    // which keeps this header host-includable. A device destination is
+    // stream-ordered: use it on @a stream, or synchronize.
+    return nanovdb::detail::LayoutCopy::make(std::move(dst), src);
 }// cuda::copyTo
 
 /// @brief Convenience overload issuing the copy on the source buffer's

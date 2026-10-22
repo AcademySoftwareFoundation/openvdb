@@ -372,7 +372,7 @@ splitGridHandles(const GridHandle<BufferT> &handle, cudaStream_t stream, const B
     VectorT<GridHandle<BufferT>> handles;
     const uint32_t gridCount = handle.gridCount();
     if (gridCount == 0u) return handles;
-    const auto &meta = detail::HandleFactory::meta(handle);
+    const auto &meta = handle.metaData();
 
     detail::RetainedStreamOrdering<BufferT>(stream).after(handle.buffer());
 
@@ -392,7 +392,7 @@ splitGridHandles(const GridHandle<BufferT> &handle, cudaStream_t stream, const B
     handles.reserve(gridCount);
     for (uint32_t n = 0; n < gridCount; ++n) {
         std::vector<GridHandleMetaData> gridMeta{GridHandleMetaData{0u, meta[n].size, meta[n].gridType}};
-        handles.push_back(detail::HandleFactory::make(std::move(buffers[n]), std::move(gridMeta)));
+        handles.push_back(GridHandle<BufferT>::adopt(std::move(buffers[n]), std::move(gridMeta)));
     }
     return handles;
 }// cuda::splitGridHandles
@@ -413,6 +413,9 @@ splitGridHandles(const GridHandle<BufferT> &handle, cudaStream_t stream, const B
 /// @return a handle whose grids carry their merged index and total count;
 ///         no grids to merge yield an empty handle, over @a proto's resource
 ///         when given
+/// @throw std::runtime_error before any allocation if a grid other than the
+///        last has a size that is not a multiple of NANOVDB_DATA_ALIGNMENT,
+///        since the next grid would start misaligned on the device
 /// @throw std::runtime_error if there are no grids to merge, @a proto is null
 ///        and BufferT is not default-constructible
 /// @details The copies have completed when this returns, so the caller may
@@ -427,7 +430,10 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, cudaStream_t strea
     std::vector<GridHandleMetaData> meta;
     uint64_t size = 0u;
     for (auto &h : handles) {
-        for (auto &m : detail::HandleFactory::meta(h)) {
+        for (auto &m : h.metaData()) {
+            if (size % NANOVDB_DATA_ALIGNMENT != 0)
+                throw std::runtime_error("cuda::mergeGridHandles: every grid but the last must have a size "
+                                         "that is a multiple of NANOVDB_DATA_ALIGNMENT");
             meta.push_back(GridHandleMetaData{size, m.size, m.gridType});
             size += m.size;
         }
@@ -456,13 +462,13 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, cudaStream_t strea
     uint32_t counter = 0u;
     for (auto &h : handles) {
         const void *src = h.deviceData();
-        for (auto &m : detail::HandleFactory::meta(h)) {
+        for (auto &m : h.metaData()) {
             dst.push_back(util::PtrAdd<GridData>(detail::deviceStorageData(buffer), meta[counter++].offset));
             cudaCheck(cudaMemcpyAsync(dst.back(), util::PtrAdd(src, m.offset), m.size, cudaMemcpyDeviceToDevice, stream));
         }
     }
     detail::rewriteGridCounts(dst, 1u, gridCount, stream);
-    return detail::HandleFactory::make(std::move(buffer), std::move(meta));
+    return GridHandle<BufferT>::adopt(std::move(buffer), std::move(meta));
 }// cuda::mergeGridHandles
 
 }// namespace cuda
