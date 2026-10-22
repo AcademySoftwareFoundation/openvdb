@@ -1,0 +1,4 @@
+NanoVDB:
+
+  Improvements:
+  - tools::cuda::PointsToGrid and voxelsToGrid now read their node and voxel counts back to the host once per build instead of once per tree level, and sort voxel keys with two global radix sorts instead of a per-tile or segmented sort. Output grids are unchanged.
