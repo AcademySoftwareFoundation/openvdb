@@ -22,8 +22,7 @@ namespace cuda {
 ///       Resource concept (as in CCCL's cuda::mr): the instance methods
 ///       provide both the stream-ordered allocate_async / deallocate_async
 ///       and the synchronous allocate / deallocate. The type is stateless,
-///       so a default-constructed instance adds no overhead. The static
-///       allocateAsync / deallocateAsync methods are deprecated.
+///       so a default-constructed instance adds no overhead.
 class DeviceResource
 {
 public:
@@ -65,16 +64,6 @@ public:
     /// @param alignment alignment of the allocation in bytes
     void deallocate(void* p, size_t bytes, size_t alignment) {
         this->deallocate_async(p, bytes, alignment, cudaStream_t(0));
-    }
-
-    [[deprecated("use the instance method allocate_async")]]
-    static void* allocateAsync(size_t bytes, size_t alignment, cudaStream_t stream) {
-        return DeviceResource().allocate_async(bytes, alignment, stream);
-    }
-
-    [[deprecated("use the instance method deallocate_async")]]
-    static void deallocateAsync(void *p, size_t bytes, size_t alignment, cudaStream_t stream) {
-        DeviceResource().deallocate_async(p, bytes, alignment, stream);
     }
 
     /// @brief Stateless: memory allocated through one instance may be
@@ -179,9 +168,9 @@ struct is_resource<R, std::void_t<
 /// @brief Detection trait: @c is_equality_comparable_resource<R>::value is
 ///        true iff @c R models a resource concept and provides operator==:
 ///        two resources compare equal when memory allocated through one may
-///        be deallocated through the other. cuda::mr's resource concepts
-///        require it; using a resource without it is deprecated, and 14.0
-///        makes it part of NanoVDB's concepts too.
+///        be deallocated through the other. cuda::Buffer and
+///        cuda::ResourceRef static_assert it, as cuda::mr's resource concepts
+///        require it.
 template <class R, class = void>
 struct is_equality_comparable_resource : std::false_type {};
 
@@ -190,54 +179,6 @@ struct is_equality_comparable_resource<R, std::void_t<
     std::enable_if_t<is_resource<R>::value || is_async_resource<R>::value>,
     decltype(bool(std::declval<const R&>() == std::declval<const R&>()))>>
     : std::true_type {};
-
-/// @brief The deprecation every use of a resource without operator== reports.
-#define NANOVDB_DEPRECATED_RESOURCE_WITHOUT_EQUALITY \
-    [[deprecated("this memory resource has no operator==, which NanoVDB 14.0 requires: " \
-                 "add friend bool operator==(const R&, const R&), true when memory allocated through one may be " \
-                 "deallocated through the other (always, for a stateless resource), and operator!= for cuda::mr under C++17")]]
-
-template <class R>
-struct ResourceRef;
-
-namespace detail {
-
-/// @brief The resource a buffer's memory comes from: @c R itself, or the
-///        resource a ResourceRef<R> refers to.
-template<class R>
-struct ReferencedResource { using type = R; };
-template<class R>
-struct ReferencedResource<ResourceRef<R>> { using type = R; };
-
-/// @brief Reached only through a resource without operator==, so the
-///        deprecation names the resource type at the point of use.
-/// @note A warning raised here is located in this header, so a compiler
-///       that silences warnings from system headers drops it when NanoVDB is
-///       included as one; ResourceRef(R&) in user code warns on the user's
-///       own line regardless.
-template<class R>
-NANOVDB_DEPRECATED_RESOURCE_WITHOUT_EQUALITY
-inline void resourceWithoutEquality() {}
-
-/// @brief Warns, through the deprecation above, when @c R lacks the equality
-///        that 14.0 makes part of the resource concepts. Instantiated once per
-///        resource type, so a misuse warns once however often it recurs.
-template<class R>
-inline void checkReferencedEquality()
-{
-    if constexpr (!is_equality_comparable_resource<R>::value) resourceWithoutEquality<R>();
-}
-
-/// @brief Checks the resource behind @c R (see ReferencedResource), so a
-///        resource and a ResourceRef to it share one check.
-template<class R>
-inline void checkResourceEquality() { checkReferencedEquality<typename ReferencedResource<R>::type>(); }
-
-/// @brief Tag for the ResourceRef constructor behind borrowInternal.
-struct InternalRef {};
-inline constexpr InternalRef internalRef{};
-
-}// namespace detail
 
 /// @brief CRTP base supplying the synchronous half of the resource concept in
 ///        terms of the stream-ordered half, so a custom stream-ordered resource
@@ -392,13 +333,15 @@ struct AsyncFromSync
 ///          must allocate through *that* instance rather than a copy of it.
 /// @warning The referenced resource must outlive every use of this ref and of
 ///          all copies of it, including any container holding one.
-/// @deprecated A referenced resource without operator== is deprecated;
-///             14.0 requires it.
 template <class R>
 struct ResourceRef
 {
     static_assert(is_async_resource<R>::value || is_resource<R>::value,
                   "ResourceRef requires R to model the AsyncResource or the Resource concept");
+    static_assert(is_equality_comparable_resource<R>::value,
+                  "a memory resource needs operator==: add friend bool operator==(const R&, const R&), true when memory "
+                  "allocated through one may be deallocated through the other (always, for a stateless resource), "
+                  "and operator!= for cuda::mr under C++17");
 
     static constexpr size_t DEFAULT_ALIGNMENT = R::DEFAULT_ALIGNMENT;
 
@@ -408,16 +351,6 @@ struct ResourceRef
 
     /// @brief Constructs a ref borrowing @c resource.
     /// @param resource resource to allocate from; must outlive this ref
-    template<class S = R, std::enable_if_t<is_equality_comparable_resource<S>::value, int> = 0>
-    ResourceRef(R& resource) : mResource(&resource) {}
-
-    /// @brief Constructs a ref for NanoVDB's own components; see detail::borrowInternal.
-    ResourceRef(R& resource, detail::InternalRef) : mResource(&resource) {}
-
-    /// @brief Constructs a ref borrowing a resource without operator==.
-    /// @deprecated 14.0 requires operator== on every resource.
-    template<class S = R, std::enable_if_t<!is_equality_comparable_resource<S>::value, int> = 0>
-    NANOVDB_DEPRECATED_RESOURCE_WITHOUT_EQUALITY
     ResourceRef(R& resource) : mResource(&resource) {}
 
     /// @{
@@ -441,14 +374,10 @@ struct ResourceRef
 
     /// @brief Two refs compare equal iff memory allocated through one may be
     ///        deallocated through the other: they reference the same resource,
-    ///        or resources that compare equal. As cuda::mr::resource_ref does,
-    ///        this compares the referenced resources when @c R provides
-    ///        operator==; otherwise only identity can establish it.
+    ///        or resources that compare equal, as cuda::mr::resource_ref does.
     friend bool operator==(ResourceRef lhs, ResourceRef rhs)
     {
-        if (lhs.mResource == rhs.mResource) return true;
-        if constexpr (is_equality_comparable_resource<R>::value) return *lhs.mResource == *rhs.mResource;
-        else return false;
+        return lhs.mResource == rhs.mResource || *lhs.mResource == *rhs.mResource;
     }
     friend bool operator!=(ResourceRef lhs, ResourceRef rhs) { return !(lhs == rhs); }
 
@@ -458,10 +387,10 @@ private:
 
 namespace detail {
 
-/// @brief Returns a ResourceRef to @c resource for NanoVDB's own components;
-///        constructing it does not warn.
+/// @brief Returns a ResourceRef to @c resource: the one spelling NanoVDB's
+///        own components use to borrow a caller's resource.
 template<class R>
-ResourceRef<R> borrowInternal(R& resource) { return ResourceRef<R>(resource, internalRef); }
+ResourceRef<R> borrowInternal(R& resource) { return ResourceRef<R>(resource); }
 
 }// namespace detail
 
@@ -469,6 +398,5 @@ ResourceRef<R> borrowInternal(R& resource) { return ResourceRef<R>(resource, int
 
 } // namespace nanovdb::cuda
 
-#undef NANOVDB_DEPRECATED_RESOURCE_WITHOUT_EQUALITY
 
 #endif // end of NANOVDB_CUDA_DEVICERESOURCE_H_HAS_BEEN_INCLUDED

@@ -89,8 +89,8 @@ namespace tools {
 ///        the per-block firstLeafID array (uint32_t[blockCount]) and the per-block
 ///        jumpMap array (uint64_t[blockCount * JumpMapLength]).
 /// @tparam BufferT Buffer type that owns a contiguous allocation.  Must satisfy the
-///         NanoVDB BufferTraits concept: provide data(), clear(), and — when device
-///         memory is needed — deviceData() (gated by BufferTraits<BufferT>::hasDeviceDual).
+///         NanoVDB BufferTraits concept: provide data() and destroy() or clear(); a
+///         single-space device buffer (e.g. cuda::Buffer<std::byte>) holds device memory.
 template<typename BufferT>
 class VoxelBlockManagerHandle
 {
@@ -152,34 +152,6 @@ public:
         }
         mBlockCount = 0;
     }
-
-    /// @brief Returns a non-const pointer to the firstLeafID device-hosted data
-    ///
-    /// @warning Note that the return pointer can be NULL if the VoxelBlockManagerHandle was not initialized
-    template<typename U = BufferT>
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, uint32_t*>::type
-    deviceFirstLeafID() { return static_cast<uint32_t*>(mFirstLeafID.deviceData()); }
-
-    /// @brief Returns a const pointer to the firstLeafID device-hosted data
-    ///
-    /// @warning Note that the return pointer can be NULL if the VoxelBlockManagerHandle was not initialized
-    template<typename U = BufferT>
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, const uint32_t*>::type
-    deviceFirstLeafID() const { return static_cast<const uint32_t*>(mFirstLeafID.deviceData()); }
-
-    /// @brief Returns a non-const pointer to the jumpMap device-hosted data
-    ///
-    /// @warning Note that the return pointer can be NULL if the VoxelBlockManagerHandle was not initialized
-    template<typename U = BufferT>
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, uint64_t*>::type
-    deviceJumpMap() { return static_cast<uint64_t*>(mJumpMap.deviceData()); }
-
-    /// @brief Returns a const pointer to the jumpMap device-hosted data
-    ///
-    /// @warning Note that the return pointer can be NULL if the VoxelBlockManagerHandle was not initialized
-    template<typename U = BufferT>
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, const uint64_t*>::type
-    deviceJumpMap() const { return static_cast<const uint64_t*>(mJumpMap.deviceData()); }
 
     //@{
     /// @brief For a single-space buffer the device data is the buffer itself.

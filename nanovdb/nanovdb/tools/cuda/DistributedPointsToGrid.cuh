@@ -22,10 +22,10 @@
 #include <nanovdb/cuda/ManagedResource.h>
 #include <nanovdb/cuda/PinnedResource.h>
 #include <nanovdb/cuda/TempPool.h>
-#include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 #include <nanovdb/util/cuda/Util.h>
 #include <algorithm>
+#include <cstddef> // for std::byte
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -449,15 +449,15 @@ public:
     /// @tparam BuildT Build type of the output grid, i.e NanoGrid<BuildT>
     /// @tparam PtrT Template type to a raw or fancy-pointer of point coordinates in world or index space.
     /// @tparam BufferT Template type of buffer used for memory allocation on the device. Must hold storage
-    ///         that every device in the mesh and the host can address, i.e. managed memory: the legacy
-    ///         UnifiedBuffer or a cuda::Buffer over a host- and device-accessible resource such as
+    ///         that every device in the mesh and the host can address, i.e. managed memory: a
+    ///         cuda::Buffer over a host- and device-accessible resource such as
     ///         cuda::Buffer<std::byte, cuda::ManagedResource>.
     /// @param points device pointer to an array of points or voxels
     /// @param pointCount number of input points or voxels
     /// @param buffer Optional buffer to guide the allocation
     /// @return returns a handle with a grid of type NanoGrid<BuildT> in unified memory
     /// @note An empty input (@c pointCount == 0) yields a valid empty grid, built on device 0.
-    template <typename PtrT, typename BufferT = nanovdb::cuda::DualUnifiedBuffer>
+    template <typename PtrT, typename BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>>
     GridHandle<BufferT> getHandle(const PtrT points,
                                   size_t pointCount,
                                   const BufferT &buffer = BufferT());
@@ -465,7 +465,7 @@ public:
     template <typename PtrT>
     void countNodes(const PtrT coords, size_t coordCount);
 
-    template <typename PtrT, typename BufferT = nanovdb::cuda::DualUnifiedBuffer>
+    template <typename PtrT, typename BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>>
     BufferT getBuffer(const PtrT, size_t pointCount, const BufferT &buffer);
 
     template <typename PtrT>
@@ -1005,10 +1005,7 @@ inline BufferT DistributedPointsToGrid<BuildT, ResourceT>::getBuffer(const PtrT,
     mData->blind = mData->meta  + sizeof(GridBlindMetaData)*int( mPointType!=PointType::Disable ); // meta data ends and blind data begins
     mData->size  = mData->blind + pointCount*sizeofPoint();// end of buffer
 
-    // cudaCpuDeviceId keeps the legacy create(size, pool) behavior for the dual/managed
-    // family: pages start host-preferred and migrate to each writing device on first touch.
-    // Single-space buffers allocate through their resource and ignore the device argument.
-    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(mData->size, &pool, cudaCpuDeviceId, mDeviceMesh[0].stream);
+    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(mData->size, &pool, mDeviceMesh[0].stream);
     mData->d_bufferPtr = nanovdb::cuda::detail::deviceStorageData(buffer);
     if (!mData->d_bufferPtr)
         throw std::runtime_error("The grid buffer type produced no device-accessible memory");

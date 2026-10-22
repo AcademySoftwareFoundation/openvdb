@@ -299,9 +299,9 @@ k<<<(N+127)/128, 128>>>(dGrid, dCoords, dOut, N);
 
 ## GPU builders
 
-Pass `nanovdb::cuda::Buffer<std::byte>()` as the output buffer to get a
-device handle. (OpenVDB 13.x still defaults to the deprecated dual buffer;
-OpenVDB 14.0 makes `cuda::Buffer<std::byte>` the default.) Or use a free
+The builders return a device handle over `nanovdb::cuda::Buffer<std::byte>`
+by default; pass another `cuda::Buffer` as the output buffer to allocate
+elsewhere. Or use a free
 function's resource form, which takes a stream instead of a buffer, e.g.
 `voxelsToGrid<float>(dCoords, n, 1.0, cudaStream_t(0))`, or a builder's
 `build()`, whose handle borrows the builder's resource (keep it alive).

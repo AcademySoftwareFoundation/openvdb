@@ -7907,6 +7907,15 @@ TEST_F(TestNanoVDB, HostBuffer)
         ASSERT_THROW(nanovdb::HostBuffer::createPool(0, nanovdb::alignPtr(data)), std::runtime_error);
         std::free(data);
     }
+    {// reading one grid into a HostBuffer pool larger than the grid
+        auto pool = nanovdb::HostBuffer::createPool(1 << 27);
+        auto handle = nanovdb::io::readGrid("data/multi1.nvdb", 0, 0, pool);
+        ASSERT_TRUE(handle);
+        EXPECT_LT(handle.bufferSize(), pool.poolSize());
+        ASSERT_TRUE(handle.grid<int>());
+        EXPECT_EQ(std::string("Int32 grid"), handle.grid<int>()->gridName());
+        EXPECT_TRUE(nanovdb::tools::validateChecksum(handle.grid<int>()));
+    }
     try {// reading multiple grids into a HostBuffer with external memory
         const size_t poolSize = 1 << 27;// 128 MB
         std::unique_ptr<uint8_t[]> array(new uint8_t[poolSize + NANOVDB_DATA_ALIGNMENT]);// scoped buffer
