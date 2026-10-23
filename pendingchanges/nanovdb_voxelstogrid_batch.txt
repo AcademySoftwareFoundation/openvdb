@@ -1,0 +1,7 @@
+NanoVDB:
+
+  New features:
+  - tools::cuda::voxelsToGrid has a batched overload that builds one grid per segment of a single device voxel list, given device offsets, into one buffer. The whole batch blocks the host twice, however many grids it builds.
+
+  Improvements:
+  - The voxel-set overloads of tools::cuda::voxelsToGrid build all sets in one pass instead of building each set and merging the results. Output grids are unchanged.
