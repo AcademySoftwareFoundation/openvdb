@@ -135,13 +135,14 @@ public:
     ///            frees itself on the stream it was allocated on. Only that free needs the
     ///            resource, which by default has program lifetime.
     ///          - componentCount: the number of connected components N.
-    /// @note The returned contents are complete: the stream is synchronized before returning.
-    /// @warning The source grid must already be complete on the device when this is called: its
-    ///          tree header is read synchronously on the host, not in stream order. All NanoVDB CUDA
-    ///          tools guarantee this when they return a grid; after an asynchronous upload
-    ///          (e.g. deviceUpload with sync=false), synchronize before calling.
+    /// @note The source grid is read in order on the operator's stream, so it may still be in flight
+    ///       there (e.g. after an asynchronous upload on that stream). The returned contents are
+    ///       complete: the stream is synchronized before returning.
     std::pair<BufT<ComponentLabelT>, ComponentLabelT> getVoxelLabelsAndCount()
     {
+        // The source's tree header is read once, in stream order; every stage sizes its work from it.
+        mSrcTreeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid, mStream);
+
         // Each scratch buffer is released right after its last use, to cut peak memory. The
         // frees are ordered on mStream behind the kernels that read them, so no host sync.
         processLeafConnectedComponents();
@@ -193,6 +194,7 @@ private:
     util::cuda::Timer            mTimer;
     int                          mVerbose{0};
     const GridT                 *mDeviceSrcGrid;
+    typename TreeT::DataType     mSrcTreeData{};              // host copy of the source's tree header, read by getVoxelLabelsAndCount()
     ResourceT                   *mResource;                   // non-owning; all device scratch routes through this instance
     nanovdb::cuda::TempPool<ResourceT> mTempDevicePool;
 
@@ -498,8 +500,7 @@ struct UpcastCountsFunctor {
 template <typename BuildT, typename ResourceT>
 void ConnectedComponents<BuildT, ResourceT>::processLeafConnectedComponents()
 {
-    const uint32_t leafCount =
-        util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid).mNodeCount[0];
+    const uint32_t leafCount = mSrcTreeData.mNodeCount[0];
 
     // Allocate one component-count per leaf (device-only). At most 256 components per 8^3
     // leaf (6-connected worst case), so uint16_t is sufficient.
@@ -723,8 +724,7 @@ struct CrossLeafEdgeScatterFunctor
 template <typename BuildT, typename ResourceT>
 void ConnectedComponents<BuildT, ResourceT>::collectCrossLeafEdges()
 {
-    const uint32_t leafCount =
-        util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid).mNodeCount[0];
+    const uint32_t leafCount = mSrcTreeData.mNodeCount[0];
     mCrossLeafEdgeCount = 0;
     if (leafCount == 0) return;
 
@@ -917,10 +917,8 @@ struct VoxelLabelScatterFunctor
 template <typename BuildT, typename ResourceT>
 void ConnectedComponents<BuildT, ResourceT>::processVoxelLabels()
 {
-    const uint32_t leafCount =
-        util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid).mNodeCount[0];
-    const uint64_t activeCount =
-        util::cuda::DeviceGridTraits<BuildT>::getActiveVoxelCount(mDeviceSrcGrid);
+    const uint32_t leafCount = mSrcTreeData.mNodeCount[0];
+    const uint64_t activeCount = mSrcTreeData.mVoxelCount;
 
     // Per-active-voxel dense-label sidecar (indexed by leaf.getValue(n); slot 0 = background).
     mVoxelLabel = BufT<ComponentLabelT>(mStream, this->ref(), activeCount + 1, nanovdb::cuda::noInit);

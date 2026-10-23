@@ -5139,3 +5139,48 @@ TEST(TestNanoVDBCUDA, ConnectedComponents_VoxelLabels)
         checkedComponentCount(coords);// the labels are checked against the CPU partition
     }
 }// ConnectedComponents_VoxelLabels
+
+// Regression test: ConnectedComponents must read the source grid in order on its stream, so that a
+// grid still being uploaded on that stream is read only after it arrives. As in
+// NonBlockingStreamDeviceGridTraits, the upload is queued behind a busy-wait on a non-blocking stream,
+// into a device buffer zeroed beforehand, and the operator runs on that stream right away; a header
+// read that is not ordered on the stream sees an empty tree.
+TEST(TestNanoVDBCUDA, ConnectedComponents_InFlightGrid)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    using GridT  = nanovdb::NanoGrid<BuildT>;
+    auto sphereHandle = nanovdb::tools::createLevelSetSphere<float>(30);
+    auto hostHandle = nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, BuildT>(*sphereHandle.grid<float>(), 0u, false, false);// no channels, stats or tiles
+    const GridT* hostGrid = hostHandle.grid<BuildT>();
+    ASSERT_TRUE(hostGrid);
+    ASSERT_NE(0u, hostGrid->tree().nodeCount(0));
+    const size_t gridBytes = hostHandle.bufferSize();
+
+    void* pinned = nullptr;// pinned, so the upload below is truly asynchronous
+    cudaCheck(cudaMallocHost(&pinned, gridBytes));
+    std::memcpy(pinned, hostHandle.data(), gridBytes);
+    void* d_bytes = nullptr;
+    cudaCheck(cudaMalloc(&d_bytes, gridBytes));
+    cudaStream_t nb = nullptr;
+    cudaCheck(cudaStreamCreateWithFlags(&nb, cudaStreamNonBlocking));
+    cudaCheck(cudaMemsetAsync(d_bytes, 0, gridBytes, nb));
+    cudaCheck(cudaStreamSynchronize(nb));
+    int clockKHz = 0, dev = 0;
+    cudaCheck(cudaGetDevice(&dev));
+    cudaCheck(cudaDeviceGetAttribute(&clockKHz, cudaDevAttrClockRate, dev));
+    streamBusyWaitKernel<<<1, 1, 0, nb>>>(static_cast<unsigned long long>(clockKHz) * 20ull);// ~20 ms
+    cudaCheck(cudaGetLastError());
+    cudaCheck(cudaMemcpyAsync(d_bytes, pinned, gridBytes, cudaMemcpyHostToDevice, nb));
+    {
+        nanovdb::tools::cuda::ConnectedComponents<BuildT> cc(static_cast<const GridT*>(d_bytes), nb);
+        auto [labels, N] = cc.getVoxelLabelsAndCount();// the contents are complete on return
+        std::vector<uint32_t> hostLabels(labels.size());
+        cudaCheck(cudaMemcpy(hostLabels.data(), labels.data(), hostLabels.size() * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+        EXPECT_EQ(1u, N);// the sphere's narrow band is a single shell
+        checkConnectedComponentLabels(*hostGrid, hostLabels, N);
+    }// the labels are freed on nb here, before the grid's memory below
+    cudaCheck(cudaStreamSynchronize(nb));
+    cudaCheck(cudaStreamDestroy(nb));
+    cudaCheck(cudaFree(d_bytes));
+    cudaCheck(cudaFreeHost(pinned));
+}// ConnectedComponents_InFlightGrid
