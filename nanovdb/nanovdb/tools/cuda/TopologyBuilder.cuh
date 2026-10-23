@@ -20,8 +20,8 @@
              to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NVIDIA_TOOLS_CUDA_TOPOLOGYBUILDER_CUH_HAS_BEEN_INCLUDED
-#define NVIDIA_TOOLS_CUDA_TOPOLOGYBUILDER_CUH_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_TOOLS_CUDA_TOPOLOGYBUILDER_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_TOOLS_CUDA_TOPOLOGYBUILDER_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/cuda/TempPool.h>
@@ -1056,4 +1056,4 @@ inline void TopologyBuilder<BuildT, ResourceT>::postProcessGridTree(cudaStream_t
 
 }// namespace nanovdb
 
-#endif // NVIDIA_TOOLS_CUDA_TOPOLOGYBUILDER_CUH_HAS_BEEN_INCLUDED
+#endif // NANOVDB_TOOLS_CUDA_TOPOLOGYBUILDER_CUH_HAS_BEEN_INCLUDED

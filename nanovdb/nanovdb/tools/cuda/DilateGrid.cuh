@@ -12,8 +12,8 @@
              to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NVIDIA_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
-#define NVIDIA_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <cub/cub.cuh>
 
@@ -311,4 +311,4 @@ void DilateGrid<BuildT, ResourceT>::dilateLeafNodes()
 
 }// namespace nanovdb
 
-#endif // NVIDIA_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
+#endif // NANOVDB_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
