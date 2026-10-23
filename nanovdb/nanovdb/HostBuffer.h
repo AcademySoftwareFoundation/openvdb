@@ -99,15 +99,14 @@ namespace nanovdb {
 template<typename BufferT>
 struct BufferTraits
 {
-    static constexpr bool hasDeviceDual   = false;
     static constexpr bool hasDeviceSingle = false;
 };
 
 /// @brief Detects whether @c BufferTraits<BufferT> defines @c hasDeviceSingle,
 ///        i.e. whether the buffer manages a single device-resident allocation.
-/// @details Defaults to false when the trait member is absent, so pre-existing
-///          BufferTraits specializations (in or out of tree) that only define
-///          hasDeviceDual keep compiling unchanged.
+/// @details Defaults to false when the trait member is absent, so
+///          BufferTraits specializations (in or out of tree) that do not
+///          define it keep compiling unchanged.
 template<typename BufferT, typename = void>
 struct BufferHasDeviceSingle { static constexpr bool value = false; };
 template<typename BufferT>

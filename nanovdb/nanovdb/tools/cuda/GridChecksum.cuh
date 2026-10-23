@@ -24,7 +24,8 @@
 #define NANOVDB_TOOLS_CUDA_GRIDCHECKSUM_DEFERS_GRIDHANDLE_CUH // see the end of nanovdb/GridHandle.h
 
 #include <nanovdb/util/cuda/Util.h>
-#include <nanovdb/cuda/DeviceBuffer.h>// required for instantiation of move c-tor of GridHandle
+#include <nanovdb/cuda/Buffer.h>
+#include <nanovdb/cuda/DeviceResource.h>
 #include <nanovdb/cuda/NodeManager.cuh>
 #include <nanovdb/tools/GridChecksum.h>
 #include <nanovdb/GridHandle.h>
@@ -296,7 +297,8 @@ template <typename ValueT>
 void crc32TailOld(const NanoGrid<ValueT> *d_grid, const GridData *gridData, const uint32_t *d_lut, uint32_t *d_crc, cudaStream_t stream)
 {
     static constexpr unsigned int threadsPerBlock = 128;// seems faster than the old value of 256!
-    auto nodeMgrHandle = nanovdb::cuda::createNodeManager<ValueT, nanovdb::cuda::DualDeviceBuffer>(d_grid, nanovdb::cuda::DualDeviceBuffer(), stream);
+    nanovdb::cuda::DeviceResource resource;
+    auto nodeMgrHandle = nanovdb::cuda::createNodeManager<ValueT>(d_grid, resource, stream);
     auto *d_nodeMgr = nodeMgrHandle.template deviceMgr<ValueT>();
     NANOVDB_ASSERT(isAligned(d_nodeMgr));
     const uint32_t nodeCount[3]={gridData->template nodeCount<0>(), gridData->template nodeCount<1>(), gridData->template nodeCount<2>()};
