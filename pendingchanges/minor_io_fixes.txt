@@ -1,0 +1,17 @@
+OpenVDB:
+
+    Bug Fixes:
+     - Fix a long-standing bug where the stream could be left with a dangling
+       StreamMetadata pointer when a File or Stream in used for multiple reads
+       or writes.
+
+    Improvements:
+     - Per-grid StreamMetadata is no longer used for ABI=14+ when Tree I/O is
+       disabled.
+     - An IoError is now thrown when a grid type has no codec for ABI=14+.
+     - A new forwards-compatible unsupported file check is added. Any file
+       version above this version will now produce an error instead of a
+       warning when attempted to be read by an older reader.
+     - Non-seekable streams now pass -1 as the size of the buffer to the Codec.
+     - The Codec API has been extended to add beginRead() and finishRead(),
+       these new methods are useful for managing asynchronous compute tasks.
