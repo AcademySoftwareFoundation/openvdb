@@ -31,6 +31,7 @@
 #include <nanovdb/util/cuda/Util.h> // for operatorKernel
 
 #include <cub/cub.cuh>
+#include <cuda/atomic> // cuda::atomic_ref
 
 #include <utility>      // std::pair
 #include <limits>       // std::numeric_limits
@@ -788,15 +789,23 @@ namespace components::detail {
 // a synchronous round would need a grid-wide barrier (a kernel launch plus a host convergence check
 // per round). An asynchronous lock-free union-find (one thread per edge, CAS root-to-root links)
 // reaches the same answer in a single pass.
+//
+// Every access to the parent array that can overlap a write in the same pass (the loads in find(),
+// the link in unite(), the store in flatten) is a device-scope atomic access, so the passes are free
+// of data races. Relaxed ordering suffices: each entry only ever decreases, from its own slot to its
+// class's minimum slot, and nothing else is published through it, so the per-entry modification
+// order is all the algorithm relies on.
+using ParentRef = ::cuda::atomic_ref<uint64_t, ::cuda::thread_scope_device>;
 
 /// @brief Walk parent pointers to the root of x. Links always point larger->smaller slot, so the
 ///        forest is acyclic and this terminates; the root is the minimum slot in x's class.
 ///        No path compression: the walk length is the tree depth, which is data-dependent and
 ///        diverges across a warp. Trees are shallow in practice, but long chains of components
-///        united in an unlucky order can deepen them; path halving here would be the remedy.
-__device__ inline uint64_t find(const uint64_t* parent, uint64_t x)
+///        united in an unlucky order can deepen them. Path halving in unite()'s finds was tried,
+///        and measured slower on an elongated grid.
+__device__ inline uint64_t find(uint64_t* parent, uint64_t x)
 {
-    while (parent[x] != x) x = parent[x];
+    for (uint64_t p; (p = ParentRef(parent[x]).load(::cuda::std::memory_order_relaxed)) != x; ) x = p;
     return x;
 }
 
@@ -811,15 +820,14 @@ __device__ inline void unite(uint64_t* parent, uint64_t a, uint64_t b)
         if (ra == rb) return;
         const uint64_t hi = (ra > rb) ? ra : rb;
         const uint64_t lo = (ra < rb) ? ra : rb;
-        const unsigned long long old = atomicCAS(
-            reinterpret_cast<unsigned long long*>(&parent[hi]),
-            static_cast<unsigned long long>(hi),
-            static_cast<unsigned long long>(lo));
-        if (old == static_cast<unsigned long long>(hi)) return;  // linked; else hi moved -> retry
+        uint64_t expected = hi;
+        if (ParentRef(parent[hi]).compare_exchange_strong(expected, lo, ::cuda::std::memory_order_relaxed))
+            return;  // linked; else hi moved -> retry
     }
 }
 
-// Union-find init: every component is its own root.
+// Union-find init: every component is its own root. A plain store: each thread writes only its own
+// entry, and nothing else reads the array during this pass.
 struct LabelInitFunctor {
     __device__ void operator()(size_t s, uint64_t* p) const { p[s] = uint64_t(s); }
 };
@@ -835,7 +843,9 @@ struct LabelUniteFunctor {
 
 // Union-find flatten: point every component directly at its representative (class minimum slot).
 struct LabelFlattenFunctor {
-    __device__ void operator()(size_t s, uint64_t* p) const { p[s] = find(p, uint64_t(s)); }
+    __device__ void operator()(size_t s, uint64_t* p) const {
+        ParentRef(p[s]).store(find(p, uint64_t(s)), ::cuda::std::memory_order_relaxed);
+    }
 };
 
 // flag[s] = 1 if component s is a self-root (parent[s]==s), else 0. An inclusive scan of these flags
