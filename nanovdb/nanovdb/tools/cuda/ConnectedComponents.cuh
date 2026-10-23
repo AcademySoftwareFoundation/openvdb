@@ -6,7 +6,7 @@
 
     \authors Efty Sifakis and JaeHyun Lee
 
-    \brief Connected-components labeling of NanoVDB indexGrids on the device.
+    \brief Connected-components labeling of NanoVDB ValueOnIndex grids on the device.
 
            Identifies connected components of active voxels in a ValueOnIndex grid: two
            active voxels share a component label iff they are connected through a path of
@@ -87,6 +87,8 @@ struct ConnectedComponentsBase
 template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class ConnectedComponents : public ConnectedComponentsBase
 {
+    static_assert(nanovdb::BuildTraits<BuildT>::is_onindex,
+                  "ConnectedComponents labels the active voxels of a ValueOnIndex grid");
     static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
                   "ConnectedComponents allocates stream-ordered scratch and requires an AsyncResource");
     static_assert(ResourceT::DEFAULT_ALIGNMENT >= alignof(uint64_t),
@@ -103,7 +105,7 @@ class ConnectedComponents : public ConnectedComponentsBase
 public:
 
     /// @brief Constructor
-    /// @param d_srcGrid source device indexGrid whose active voxels are to be labeled
+    /// @param d_srcGrid source device ValueOnIndex grid whose active voxels are to be labeled
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
     /// @param resource resource instance all device scratch is allocated from;
     ///        must outlive this operator (defaults to the per-type default resource)
