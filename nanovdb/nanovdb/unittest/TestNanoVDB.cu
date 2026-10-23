@@ -45,6 +45,7 @@
 #include <cstring> // for std::memcpy
 #include <unordered_set>
 #include <iomanip> // for std::setw, std::setfill
+#include <random> // for std::mt19937, std::bernoulli_distribution
 #include <thread> // for std::thread
 #include <type_traits>
 
@@ -4986,27 +4987,78 @@ TEST(TestNanoVDBCUDA, MeshToGrid_UnitTetrahedron)
     EXPECT_EQ(grid->mChecksum.full(), topoChecksum);
 }// MeshToGrid_UnitTetrahedron
 
-TEST(TestNanoVDBCUDA, ConnectedComponents_MultiSphere)
+// Checks a ConnectedComponents result against a CPU union-find over the 6-connected active voxels of
+// a host copy of the grid. The labels of the active voxels must induce exactly the CPU partition,
+// using every id in [0, N), and every other entry of the value-indexed label buffer, including slot 0
+// (the background), must hold the all-ones sentinel.
+static void checkConnectedComponentLabels(const nanovdb::NanoGrid<nanovdb::ValueOnIndex>& grid,
+                                          const std::vector<uint32_t>& labels, uint32_t N)
+{
+    ASSERT_EQ(grid.valueCount(), labels.size());
+    std::vector<uint64_t> parent(labels.size());// CPU union-find over value indices
+    for (uint64_t i = 0; i < parent.size(); ++i) parent[i] = i;
+    auto find = [&parent](uint64_t x) { while (parent[x] != x) x = parent[x] = parent[parent[x]]; return x; };
+    std::vector<bool> isVoxel(labels.size(), false);
+    auto acc = grid.getAccessor();
+    const auto* leaves = grid.tree().getFirstNode<0>();
+    for (uint32_t l = 0; l < grid.tree().nodeCount(0); ++l) {
+        for (uint32_t n = 0; n < 512u; ++n) {
+            if (!leaves[l].isActive(n)) continue;
+            const uint64_t i = leaves[l].getValue(n);
+            isVoxel[i] = true;
+            const nanovdb::Coord ijk = leaves[l].offsetToGlobalCoord(n);
+            for (int axis = 0; axis < 3; ++axis) {// the +x, +y, +z faces cover every 6-adjacency once
+                nanovdb::Coord nbr = ijk;
+                nbr[axis] += 1;
+                if (!acc.isActive(nbr)) continue;
+                const uint64_t ri = find(i), rj = find(acc.getValue(nbr));
+                if (ri != rj) parent[std::max(ri, rj)] = std::min(ri, rj);
+            }
+        }
+    }
+    std::vector<uint32_t> rootToLabel(labels.size(), ~0u);
+    std::vector<uint64_t> labelToRoot(N, ~uint64_t(0));
+    uint64_t sentinelErrors = 0, rangeErrors = 0, splitErrors = 0, mergeErrors = 0, usedLabels = 0;
+    for (uint64_t i = 0; i < labels.size(); ++i) {
+        if (!isVoxel[i]) { sentinelErrors += (labels[i] != ~0u); continue; }
+        const uint32_t label = labels[i];
+        if (label >= N) { ++rangeErrors; continue; }
+        const uint64_t root = find(i);
+        if (rootToLabel[root] == ~0u) rootToLabel[root] = label;
+        else splitErrors += (rootToLabel[root] != label);// one CPU component, several labels
+        if (labelToRoot[label] == ~uint64_t(0)) { labelToRoot[label] = root; ++usedLabels; }
+        else mergeErrors += (labelToRoot[label] != root);// one label, several CPU components
+    }
+    EXPECT_EQ(0u, sentinelErrors);
+    EXPECT_EQ(0u, rangeErrors);
+    EXPECT_EQ(0u, splitErrors);
+    EXPECT_EQ(0u, mergeErrors);
+    EXPECT_EQ(uint64_t(N), usedLabels);
+}// checkConnectedComponentLabels
+
+// Runs the full ConnectedComponents pipeline on a device grid with the given active voxels, checks the
+// returned labels with checkConnectedComponentLabels, and returns the component count N.
+static uint32_t checkedComponentCount(const std::vector<nanovdb::Coord>& coords)
 {
     using BuildT = nanovdb::ValueOnIndex;
+    nanovdb::Coord* d_coords = nullptr;
+    cudaCheck(cudaMalloc(&d_coords, coords.size() * sizeof(nanovdb::Coord)));
+    cudaCheck(cudaMemcpy(d_coords, coords.data(), coords.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_coords, coords.size(), 1.0, SingleBufT());
+    cudaCheck(cudaFree(d_coords));
 
-    // Run the full CC pipeline on a set of active voxels; return the number of distinct global
-    // components via the public contract (getVoxelLabelsAndCount()).
-    auto globalComponents = [](const std::vector<nanovdb::Coord>& coords) -> uint64_t {
-        nanovdb::Coord* d_coords = nullptr;
-        cudaCheck(cudaMalloc(&d_coords, coords.size() * sizeof(nanovdb::Coord)));
-        cudaCheck(cudaMemcpy(d_coords, coords.data(), coords.size() * sizeof(nanovdb::Coord),
-                             cudaMemcpyHostToDevice));
-        auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_coords, coords.size());
-        cudaCheck(cudaFree(d_coords));
-        const auto* d_grid = handle.template deviceGrid<BuildT>();
+    nanovdb::tools::cuda::ConnectedComponents<BuildT> cc(handle.deviceGrid<BuildT>());
+    auto [labels, N] = cc.getVoxelLabelsAndCount();// the contents are complete on return
+    std::vector<uint32_t> hostLabels(labels.size());
+    cudaCheck(cudaMemcpy(hostLabels.data(), labels.data(), hostLabels.size() * sizeof(uint32_t), cudaMemcpyDeviceToHost));
 
-        nanovdb::tools::cuda::ConnectedComponents<BuildT> cc(d_grid);
-        const uint64_t n = cc.getVoxelLabelsAndCount().second;   // full pipeline; returns component count N
-        cudaCheck(cudaDeviceSynchronize());
-        return n;
-    };
+    auto hostHandle = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(handle, cudaStream_t(0));// for the CPU reference
+    checkConnectedComponentLabels(*hostHandle.grid<BuildT>(), hostLabels, N);
+    return N;
+}// checkedComponentCount
 
+TEST(TestNanoVDBCUDA, ConnectedComponents_MultiSphere)
+{
     // Reproduce the connected-components pipeline's CC input: the rasterized *narrow band* of a
     // closed surface with the surface shell removed. The example prunes voxels whose unsigned
     // distance to the surface is within sqrt(3)/2 voxels (the barrier), leaving, for a solid sphere,
@@ -5031,9 +5083,9 @@ TEST(TestNanoVDBCUDA, ConnectedComponents_MultiSphere)
         return coords;
     };
 
-    EXPECT_EQ(globalComponents(sphereShells(1, 8.f, 30)), 2u);  // inner shell + outer shell
-    EXPECT_EQ(globalComponents(sphereShells(2, 8.f, 30)), 4u);  // 2 disjoint spheres -> 2*2
-    EXPECT_EQ(globalComponents(sphereShells(3, 8.f, 30)), 6u);  // 3 disjoint spheres -> 2*3
+    EXPECT_EQ(checkedComponentCount(sphereShells(1, 8.f, 30)), 2u);  // inner shell + outer shell
+    EXPECT_EQ(checkedComponentCount(sphereShells(2, 8.f, 30)), 4u);  // 2 disjoint spheres -> 2*2
+    EXPECT_EQ(checkedComponentCount(sphereShells(3, 8.f, 30)), 6u);  // 3 disjoint spheres -> 2*3
 
     // Two heavily-overlapping spheres are a single connected solid (a "peanut") with one boundary
     // surface, so the pruned narrow band of its union is one inner shell + one outer shell => 2.
@@ -5055,6 +5107,35 @@ TEST(TestNanoVDBCUDA, ConnectedComponents_MultiSphere)
                     const float a    = std::fabs(std::min(sdfA, sdfB));  // |union SDF|
                     if (a > shell && a <= band) coords.emplace_back(x, y, z);
                 }
-        EXPECT_EQ(globalComponents(coords), 2u);  // overlap merges -> inner shell + outer shell
+        EXPECT_EQ(checkedComponentCount(coords), 2u);  // overlap merges -> inner shell + outer shell
     }
 }// ConnectedComponents_MultiSphere
+
+// Checks the per-voxel labels on inputs that the sphere shells above do not produce: a few hand-placed
+// components with a known count, and a random fill whose leaves each hold many components and merge
+// with their neighbors across all six faces.
+TEST(TestNanoVDBCUDA, ConnectedComponents_VoxelLabels)
+{
+    {// known components
+        std::vector<nanovdb::Coord> coords;
+        for (int x = -4; x <= 20; ++x) coords.emplace_back(x, 0, 0);// a line through four leaves
+        for (int i = 28; i <= 30; ++i)
+            for (int j = 28; j <= 30; ++j)
+                for (int k = -10; k <= -8; ++k) coords.emplace_back(i, j, k);// a 3^3 block across a leaf face
+        coords.emplace_back(50, 50, 50);// two voxels sharing only an edge:
+        coords.emplace_back(51, 51, 50);// two separate 6-connected components
+        coords.emplace_back(100, -100, 100);// an isolated voxel
+        EXPECT_EQ(5u, checkedComponentCount(coords));// the line, the block, the two edge-touching voxels and the isolated voxel
+    }
+    {// random fill of 64^3 voxels across 9^3 leaves, near the site-percolation threshold (~0.31), so
+     // the clusters range from single voxels to ones spanning many leaves
+        std::mt19937 rng(2261);
+        std::bernoulli_distribution isActive(0.3);
+        std::vector<nanovdb::Coord> coords;
+        for (int x = -20; x < 44; ++x)
+            for (int y = -20; y < 44; ++y)
+                for (int z = -20; z < 44; ++z)
+                    if (isActive(rng)) coords.emplace_back(x, y, z);
+        checkedComponentCount(coords);// the labels are checked against the CPU partition
+    }
+}// ConnectedComponents_VoxelLabels
