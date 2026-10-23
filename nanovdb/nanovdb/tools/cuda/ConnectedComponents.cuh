@@ -11,7 +11,8 @@
            Identifies connected components of active voxels in a ValueOnIndex grid: two
            active voxels share a component label iff they are connected through a path of
            adjacent active voxels. As with the other topology operators, grids with active
-           tiles are rejected.
+           tiles are rejected; the grid must also index exactly its active voxels (no stats),
+           as NanoVDB's CUDA builders produce.
 
     \warning The header file contains cuda device code so be sure
              to only include it in .cu files (or other .cuh files)
@@ -107,7 +108,8 @@ public:
 
     /// @brief Constructor
     /// @param d_srcGrid source device ValueOnIndex grid whose active voxels are to be labeled; it must
-    ///        have no active tiles
+    ///        have no active tiles, and must index exactly its active voxels (no stats), which is
+    ///        checked in debug builds
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
     /// @param resource resource instance all device scratch is allocated from;
     ///        must outlive this operator (defaults to the per-type default resource)
@@ -130,10 +132,11 @@ public:
     void setVerbose(int level = 1) { mVerbose = level; }
 
     /// @brief Run the connected-components pipeline and return { labels, componentCount }:
-    ///          - labels: an owning per-voxel label sidecar. Each active voxel holds its
-    ///            component's dense id in [0, N), so two active voxels share a value iff they are
-    ///            in the same connected component; slot 0, the background, holds the all-ones
-    ///            sentinel. Ownership passes to the caller: the buffer outlives this operator and
+    ///          - labels: an owning label sidecar indexed like the grid's values (one entry per value
+    ///            index, i.e. the grid's value count). Each active voxel holds its component's dense
+    ///            id in [0, N), so two active voxels share a value iff they are in the same connected
+    ///            component; every other entry, including slot 0 (the background), holds the
+    ///            all-ones sentinel. Ownership passes to the caller: the buffer outlives this operator and
     ///            frees itself on the stream it was allocated on. Only that free needs the
     ///            resource, which by default has program lifetime.
     ///          - componentCount: the number of connected components N.
@@ -223,7 +226,7 @@ private:
 
     BufT<uint64_t>               mComponentParent;          // K x uint64_t: per-component global representative
 
-    BufT<ComponentLabelT>        mVoxelLabel;               // (activeVoxelCount+1) x ComponentLabelT: per-active-voxel dense component id in [0,N) (index by leaf.getValue(n); slot 0 = background)
+    BufT<ComponentLabelT>        mVoxelLabel;               // valueCount x ComponentLabelT: dense component id in [0,N) per active voxel (index by leaf.getValue(n)); all other entries, incl. slot 0, = sentinel
     ComponentLabelT              mGlobalComponentCount{0};  // number of connected components N (distinct representatives)
 
 }; // tools::cuda::ConnectedComponents<BuildT, ResourceT>
@@ -925,10 +928,15 @@ template <typename BuildT, typename ResourceT>
 void ConnectedComponents<BuildT, ResourceT>::processVoxelLabels()
 {
     const uint32_t leafCount = mSrcTreeData.mNodeCount[0];
-    const uint64_t activeCount = mSrcTreeData.mVoxelCount;
+    const uint64_t valueCount =
+        util::cuda::DeviceGridTraits<BuildT>::getValueCount(mDeviceSrcGrid, mStream);
+    // Supported grids index exactly their active voxels (no stats), as NanoVDB's CUDA builders
+    // produce: a placeholder check, pending a decision on which index layouts to support.
+    NANOVDB_ASSERT(valueCount == mSrcTreeData.mVoxelCount + 1);
 
-    // Per-active-voxel dense-label sidecar (indexed by leaf.getValue(n); slot 0 = background).
-    mVoxelLabel = BufT<ComponentLabelT>(mStream, this->ref(), activeCount + 1, nanovdb::cuda::noInit);
+    // Dense-label sidecar over the grid's value indices (indexed by leaf.getValue(n)); entries that
+    // are not active voxels, including slot 0 (the background), keep the all-ones sentinel.
+    mVoxelLabel = BufT<ComponentLabelT>(mStream, this->ref(), valueCount, nanovdb::cuda::noInit);
     cudaCheck(cudaMemsetAsync(mVoxelLabel.data(), 0xFF, mVoxelLabel.size_bytes(), mStream)); // background = 0xFFFFFFFF
 
     mGlobalComponentCount = 0;

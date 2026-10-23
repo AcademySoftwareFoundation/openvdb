@@ -80,7 +80,7 @@ inline int64_t encodeCoord(const nanovdb::Coord& c)
 // verify the GPU result (a) has the same component count and (b) induces the same partition (two
 // voxels share a GPU label iff the oracle puts them in the same component). Returns true on PASS.
 bool validateAgainstOracle(const GridHandleT& derivedHandle, uint32_t leafCount, uint64_t active,
-                           const uint32_t* d_labels, uint64_t gpuCount)
+                           const uint32_t* d_labels, uint64_t labelCount, uint64_t gpuCount)
 {
     // Download the derived grid blob + the per-voxel labels to the host.
     std::vector<char> blob(derivedHandle.bufferSize());
@@ -92,8 +92,8 @@ bool validateAgainstOracle(const GridHandleT& derivedHandle, uint32_t leafCount,
         return gpuCount == 0;
     }
 
-    std::vector<uint32_t> labels(active + 1);
-    cudaCheck(cudaMemcpy(labels.data(), d_labels, (active + 1) * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+    std::vector<uint32_t> labels(labelCount);// one entry per value index of the grid
+    cudaCheck(cudaMemcpy(labels.data(), d_labels, labelCount * sizeof(uint32_t), cudaMemcpyDeviceToHost));
 
     // Gather active voxels: dense id -> {coord, gpu label}, plus a coord->id lookup for neighbours.
     std::unordered_map<int64_t, uint32_t> coordToId;
@@ -226,7 +226,7 @@ uint64_t connectedComponentsFromMesh(const std::vector<nanovdb::Vec3f>& points,
     std::cout << (discardSurfaceVoxels ? "Derived (barrier-removed) grid: " : "Full narrow-band grid: ")
               << ccActive << " active voxels, " << ccLeaves << " leaves.\n";
 
-    validateAgainstOracle(ccHandle, ccLeaves, ccActive, d_labels, numComponents);
+    validateAgainstOracle(ccHandle, ccLeaves, ccActive, d_labels, labels.size(), numComponents);
 
     return numComponents;
 }
