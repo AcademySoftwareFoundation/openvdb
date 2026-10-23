@@ -247,8 +247,8 @@ namespace components::detail {
 //
 // They are double-buffered (Jacobi): read "cur", write "nxt", then swap -- identically in every
 // thread, so the per-thread pointer copies stay in sync. Every thread must call each of them, as
-// each contains __syncthreads(). Their `changed` flag is a caller-owned __shared__ int; concurrent
-// raisers write the same value, so no atomic is needed.
+// each contains __syncthreads(). Their optional `changed` flag is the calling thread's own, so no
+// flag is shared and none races; solve() ORs the threads' flags with __syncthreads_or().
 struct LeafUnionFind
 {
     static constexpr int INACTIVE = -1;  // parent sentinel for inactive voxels
@@ -272,13 +272,13 @@ struct LeafUnionFind
 
     // Union-find hook: if the smallest parent m among v's active neighbors is below v's own parent
     // p, lower the parent of p toward m via atomicMin (many vertices can target the same slot p).
-    // Sets *changed -- the caller's block-shared flag, when non-null -- iff some slot was lowered.
+    // Sets *changed -- the calling thread's flag, when non-null -- if this thread lowered a slot.
     //
     // @param rootsOnly picks which of Liu & Tarjan's connect operations this performs:
     //        parent-connect when false, parent-root-connect when true, which hooks only through
     //        parents that are themselves roots. That restriction cannot move a subtree between
     //        trees, making the algorithm monotone -- the property their O(lg n) bound rests on.
-    __device__ static void hook(int*& cur, int*& nxt, int n, int* changed, bool rootsOnly = false)
+    __device__ static void hook(int*& cur, int*& nxt, int n, bool* changed, bool rootsOnly = false)
     {
         const int pn = cur[n];
         nxt[n] = pn;                                  // seed nxt = cur (own slot, no race)
@@ -287,7 +287,7 @@ struct LeafUnionFind
             const int m = neighborMin(cur, n);
             if (m < pn) {                             // root slot is data-dependent -> atomicMin
                 const int old = atomicMin_block(&nxt[pn], m);  // block scope: nxt[] is shared
-                if (changed && old > m) *changed = 1;
+                if (changed && old > m) *changed = true;
             }
         }
         __syncthreads();
@@ -296,14 +296,14 @@ struct LeafUnionFind
 
     // Union-find compress: parent[v] <- parent[parent[v]], one round of pointer jumping applied to
     // every node at once, halving tree depth per call. This is shortcut in Liu & Tarjan.
-    // Sets *changed -- the caller's block-shared flag, when non-null -- iff some entry moved.
-    __device__ static void compress(int*& cur, int*& nxt, int n, int* changed)
+    // Sets *changed -- the calling thread's flag, when non-null -- if this thread's entry moved.
+    __device__ static void compress(int*& cur, int*& nxt, int n, bool* changed)
     {
         const int pn = cur[n];
         int v = INACTIVE;
         if (pn != INACTIVE) {                         // n is active
             v = cur[pn];                              // n's grandparent (parents are always active)
-            if (changed && v != pn) *changed = 1;
+            if (changed && v != pn) *changed = true;
         }
         nxt[n] = v;                                   // own slot, no race
         __syncthreads();
@@ -318,9 +318,8 @@ struct LeafUnionFind
     static constexpr int SwitchToRootAfter = 8;
 
     // Run the full schedule to convergence. On return cur[n] holds n's component root, and each
-    // component's root is the minimum voxel offset it contains. `changed` points at a block-shared
-    // int, which this resets between rounds.
-    __device__ static void solve(int*& cur, int*& nxt, int n, int* changed)
+    // component's root is the minimum voxel offset it contains.
+    __device__ static void solve(int*& cur, int*& nxt, int n)
     {
         // Unconditional warm-up: one hook, then enough compresses to flatten the forest rather
         // than merely halve its depth (a leaf is DIM=8 across). Flatness keeps the
@@ -338,13 +337,10 @@ struct LeafUnionFind
         // step bound, so only a bug could exhaust it.
         constexpr int MaxConvergenceIters = 64;
         for (int it = 0; it < MaxConvergenceIters; ++it) {
-            if (n == 0) *changed = 0;
-            __syncthreads();
-            hook    (cur, nxt, n, changed, it >= SwitchToRootAfter);
-            compress(cur, nxt, n, changed);
-            __syncthreads();
-            if (*changed == 0) return;
-            __syncthreads();  // all threads have read *changed; safe for thread 0 to reset it next iteration
+            bool changed = false;
+            hook    (cur, nxt, n, &changed, it >= SwitchToRootAfter);
+            compress(cur, nxt, n, &changed);
+            if (!__syncthreads_or(changed)) return;  // converged: no thread changed anything
         }
         NANOVDB_ASSERT(false);  // exhausted the backstop: algorithm R's bound was not met
     }
@@ -363,7 +359,6 @@ struct LeafComponentCountFunctor
     {
         __shared__ int bufA[NanoLeaf<BuildT>::SIZE];
         __shared__ int bufB[NanoLeaf<BuildT>::SIZE];
-        __shared__ int changed;
         __shared__ int compCount;
 
         const int   leafID = blockIdx.x;
@@ -377,7 +372,7 @@ struct LeafComponentCountFunctor
         cur[tID] = leaf.isActive(uint32_t(tID)) ? tID : LeafUnionFind::INACTIVE;
         __syncthreads();
 
-        LeafUnionFind::solve(cur, nxt, tID, &changed);
+        LeafUnionFind::solve(cur, nxt, tID);
 
         // Component count = number of surviving roots (cur[tID] == tID; inactive entries are -1).
         if (tID == 0) compCount = 0;
@@ -407,7 +402,6 @@ struct LeafComponentMaskFunctor
         __shared__ int   bufA[NanoLeaf<BuildT>::SIZE];
         __shared__ int   bufB[NanoLeaf<BuildT>::SIZE];
         __shared__ typename cub::BlockReduce<uint32_t, NanoLeaf<BuildT>::SIZE>::TempStorage reduceTmp;
-        __shared__ int      changed;
         __shared__ uint32_t sMinLabel;
         // Ballot words (u32/warp) aliased to the Mask<3> u64 words. NAMED union: an anonymous
         // __shared__ union compiled to per-thread local storage, breaking cross-warp sharing.
@@ -426,7 +420,7 @@ struct LeafComponentMaskFunctor
         cur[tID] = leaf.isActive(uint32_t(tID)) ? tID : LeafUnionFind::INACTIVE;
         __syncthreads();
 
-        LeafUnionFind::solve(cur, nxt, tID, &changed);
+        LeafUnionFind::solve(cur, nxt, tID);
 
         // Mask-fill: iterate over leaf-local components in ascending root-label order.
         //
