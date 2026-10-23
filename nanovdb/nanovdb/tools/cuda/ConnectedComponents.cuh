@@ -10,7 +10,8 @@
 
            Identifies connected components of active voxels in a ValueOnIndex grid: two
            active voxels share a component label iff they are connected through a path of
-           adjacent active voxels.
+           adjacent active voxels. As with the other topology operators, grids with active
+           tiles are rejected.
 
     \warning The header file contains cuda device code so be sure
              to only include it in .cu files (or other .cuh files)
@@ -105,7 +106,8 @@ class ConnectedComponents : public ConnectedComponentsBase
 public:
 
     /// @brief Constructor
-    /// @param d_srcGrid source device ValueOnIndex grid whose active voxels are to be labeled
+    /// @param d_srcGrid source device ValueOnIndex grid whose active voxels are to be labeled; it must
+    ///        have no active tiles
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
     /// @param resource resource instance all device scratch is allocated from;
     ///        must outlive this operator (defaults to the per-type default resource)
@@ -138,10 +140,15 @@ public:
     /// @note The source grid is read in order on the operator's stream, so it may still be in flight
     ///       there (e.g. after an asynchronous upload on that stream). The returned contents are
     ///       complete: the stream is synchronized before returning.
+    /// @throw std::runtime_error if the grid has active tiles.
     std::pair<BufT<ComponentLabelT>, ComponentLabelT> getVoxelLabelsAndCount()
     {
         // The source's tree header is read once, in stream order; every stage sizes its work from it.
         mSrcTreeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid, mStream);
+
+        // Only leaf voxels are labeled, so reject active tiles, as the other topology operators do.
+        if (mSrcTreeData.mTileCount[0] || mSrcTreeData.mTileCount[1] || mSrcTreeData.mTileCount[2])
+            throw std::runtime_error("Topological operations not supported on grids with value tiles");
 
         // Each scratch buffer is released right after its last use, to cut peak memory. The
         // frees are ordered on mStream behind the kernels that read them, so no host sync.
