@@ -15,6 +15,7 @@
 #include <nanovdb/tools/cuda/SignedFloodFill.cuh>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 #include <nanovdb/tools/cuda/IndexToGrid.cuh>
+#include <nanovdb/tools/cuda/ConnectedComponents.cuh>
 #include <nanovdb/tools/cuda/AddBlindData.cuh>
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
 #include <nanovdb/tools/cuda/GridValidator.cuh>
@@ -44,6 +45,7 @@
 #include <cstring> // for std::memcpy
 #include <unordered_set>
 #include <iomanip> // for std::setw, std::setfill
+#include <random> // for std::mt19937, std::bernoulli_distribution
 #include <thread> // for std::thread
 #include <type_traits>
 
@@ -4984,3 +4986,201 @@ TEST(TestNanoVDBCUDA, MeshToGrid_UnitTetrahedron)
     // getHandle() and getHandleAndUDF() must produce identical grids.
     EXPECT_EQ(grid->mChecksum.full(), topoChecksum);
 }// MeshToGrid_UnitTetrahedron
+
+// Checks a ConnectedComponents result against a CPU union-find over the 6-connected active voxels of
+// a host copy of the grid. The labels of the active voxels must induce exactly the CPU partition,
+// using every id in [0, N), and every other entry of the value-indexed label buffer, including slot 0
+// (the background), must hold the all-ones sentinel.
+static void checkConnectedComponentLabels(const nanovdb::NanoGrid<nanovdb::ValueOnIndex>& grid,
+                                          const std::vector<uint32_t>& labels, uint32_t N)
+{
+    ASSERT_EQ(grid.valueCount(), labels.size());
+    std::vector<uint64_t> parent(labels.size());// CPU union-find over value indices
+    for (uint64_t i = 0; i < parent.size(); ++i) parent[i] = i;
+    auto find = [&parent](uint64_t x) { while (parent[x] != x) x = parent[x] = parent[parent[x]]; return x; };
+    std::vector<bool> isVoxel(labels.size(), false);
+    auto acc = grid.getAccessor();
+    const auto* leaves = grid.tree().getFirstNode<0>();
+    for (uint32_t l = 0; l < grid.tree().nodeCount(0); ++l) {
+        for (uint32_t n = 0; n < 512u; ++n) {
+            if (!leaves[l].isActive(n)) continue;
+            const uint64_t i = leaves[l].getValue(n);
+            isVoxel[i] = true;
+            const nanovdb::Coord ijk = leaves[l].offsetToGlobalCoord(n);
+            for (int axis = 0; axis < 3; ++axis) {// the +x, +y, +z faces cover every 6-adjacency once
+                nanovdb::Coord nbr = ijk;
+                nbr[axis] += 1;
+                if (!acc.isActive(nbr)) continue;
+                const uint64_t ri = find(i), rj = find(acc.getValue(nbr));
+                if (ri != rj) parent[std::max(ri, rj)] = std::min(ri, rj);
+            }
+        }
+    }
+    std::vector<uint32_t> rootToLabel(labels.size(), ~0u);
+    std::vector<uint64_t> labelToRoot(N, ~uint64_t(0));
+    uint64_t sentinelErrors = 0, rangeErrors = 0, splitErrors = 0, mergeErrors = 0, usedLabels = 0;
+    for (uint64_t i = 0; i < labels.size(); ++i) {
+        if (!isVoxel[i]) { sentinelErrors += (labels[i] != ~0u); continue; }
+        const uint32_t label = labels[i];
+        if (label >= N) { ++rangeErrors; continue; }
+        const uint64_t root = find(i);
+        if (rootToLabel[root] == ~0u) rootToLabel[root] = label;
+        else splitErrors += (rootToLabel[root] != label);// one CPU component, several labels
+        if (labelToRoot[label] == ~uint64_t(0)) { labelToRoot[label] = root; ++usedLabels; }
+        else mergeErrors += (labelToRoot[label] != root);// one label, several CPU components
+    }
+    EXPECT_EQ(0u, sentinelErrors);
+    EXPECT_EQ(0u, rangeErrors);
+    EXPECT_EQ(0u, splitErrors);
+    EXPECT_EQ(0u, mergeErrors);
+    EXPECT_EQ(uint64_t(N), usedLabels);
+}// checkConnectedComponentLabels
+
+// Runs the full ConnectedComponents pipeline on a device grid with the given active voxels, checks the
+// returned labels with checkConnectedComponentLabels, and returns the component count N.
+static uint32_t checkedComponentCount(const std::vector<nanovdb::Coord>& coords)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    nanovdb::Coord* d_coords = nullptr;
+    cudaCheck(cudaMalloc(&d_coords, coords.size() * sizeof(nanovdb::Coord)));
+    cudaCheck(cudaMemcpy(d_coords, coords.data(), coords.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_coords, coords.size(), 1.0, SingleBufT());
+    cudaCheck(cudaFree(d_coords));
+
+    nanovdb::tools::cuda::ConnectedComponents<BuildT> cc(handle.deviceGrid<BuildT>());
+    auto [labels, N] = cc.getVoxelLabelsAndCount();// the contents are complete on return
+    std::vector<uint32_t> hostLabels(labels.size());
+    cudaCheck(cudaMemcpy(hostLabels.data(), labels.data(), hostLabels.size() * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+
+    auto hostHandle = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(handle, cudaStream_t(0));// for the CPU reference
+    checkConnectedComponentLabels(*hostHandle.grid<BuildT>(), hostLabels, N);
+    return N;
+}// checkedComponentCount
+
+TEST(TestNanoVDBCUDA, ConnectedComponents_MultiSphere)
+{
+    // Reproduce the connected-components pipeline's CC input: the rasterized *narrow band* of a
+    // closed surface with the surface shell removed. The example prunes voxels whose unsigned
+    // distance to the surface is within sqrt(3)/2 voxels (the barrier), leaving, for a solid sphere,
+    // two disjoint concentric shells (inner + outer) => 2 components. N well-separated spheres each
+    // contribute their own two shells (their narrow bands never touch) => 2N.
+    const float band  = 3.0f;        // narrow-band half-width (voxels), matches the default bandWidth
+    const float shell = 0.8660254f;  // sqrt(3)/2: the barrier shell the example removes
+
+    auto sphereShells = [&](int N, float R, int spacing) {
+        const int margin = int(band) + 2;
+        const int x0 = -int(R) - margin, x1 = (N - 1) * spacing + int(R) + margin;
+        const int yz = int(R) + margin;
+        std::vector<nanovdb::Coord> coords;
+        for (int x = x0; x <= x1; ++x)
+            for (int y = -yz; y <= yz; ++y)
+                for (int z = -yz; z <= yz; ++z)
+                    for (int i = 0; i < N; ++i) {  // a separated voxel is in <=1 sphere's band
+                        const float dx = float(x - i * spacing), dy = float(y), dz = float(z);
+                        const float dd = std::fabs(std::sqrt(dx * dx + dy * dy + dz * dz) - R);
+                        if (dd > shell && dd <= band) { coords.emplace_back(x, y, z); break; }
+                    }
+        return coords;
+    };
+
+    EXPECT_EQ(checkedComponentCount(sphereShells(1, 8.f, 30)), 2u);  // inner shell + outer shell
+    EXPECT_EQ(checkedComponentCount(sphereShells(2, 8.f, 30)), 4u);  // 2 disjoint spheres -> 2*2
+    EXPECT_EQ(checkedComponentCount(sphereShells(3, 8.f, 30)), 6u);  // 3 disjoint spheres -> 2*3
+
+    // Two heavily-overlapping spheres are a single connected solid (a "peanut") with one boundary
+    // surface, so the pruned narrow band of its union is one inner shell + one outer shell => 2.
+    // The overlap merges what would be 4 (two separated spheres) down to 2. The narrow band follows
+    // the *union* surface, i.e. the union SDF min(sdfA,sdfB); a small center separation (D = R) keeps
+    // the neck fat so the inner shell does not pinch.
+    {
+        const float R = 8.f, D = 8.f;  // D < 2R => overlap
+        const int   margin = int(band) + 2;
+        const int   x0 = -int(R) - margin, x1 = int(D) + int(R) + margin;
+        const int   yz = int(R) + margin;
+        std::vector<nanovdb::Coord> coords;
+        for (int x = x0; x <= x1; ++x)
+            for (int y = -yz; y <= yz; ++y)
+                for (int z = -yz; z <= yz; ++z) {
+                    const float dxA = float(x), dxB = float(x) - D, fy = float(y), fz = float(z);
+                    const float sdfA = std::sqrt(dxA*dxA + fy*fy + fz*fz) - R;
+                    const float sdfB = std::sqrt(dxB*dxB + fy*fy + fz*fz) - R;
+                    const float a    = std::fabs(std::min(sdfA, sdfB));  // |union SDF|
+                    if (a > shell && a <= band) coords.emplace_back(x, y, z);
+                }
+        EXPECT_EQ(checkedComponentCount(coords), 2u);  // overlap merges -> inner shell + outer shell
+    }
+}// ConnectedComponents_MultiSphere
+
+// Checks the per-voxel labels on inputs that the sphere shells above do not produce: a few hand-placed
+// components with a known count, and a random fill whose leaves each hold many components and merge
+// with their neighbors across all six faces.
+TEST(TestNanoVDBCUDA, ConnectedComponents_VoxelLabels)
+{
+    {// known components
+        std::vector<nanovdb::Coord> coords;
+        for (int x = -4; x <= 20; ++x) coords.emplace_back(x, 0, 0);// a line through four leaves
+        for (int i = 28; i <= 30; ++i)
+            for (int j = 28; j <= 30; ++j)
+                for (int k = -10; k <= -8; ++k) coords.emplace_back(i, j, k);// a 3^3 block across a leaf face
+        coords.emplace_back(50, 50, 50);// two voxels sharing only an edge:
+        coords.emplace_back(51, 51, 50);// two separate 6-connected components
+        coords.emplace_back(100, -100, 100);// an isolated voxel
+        EXPECT_EQ(5u, checkedComponentCount(coords));// the line, the block, the two edge-touching voxels and the isolated voxel
+    }
+    {// random fill of 64^3 voxels across 9^3 leaves, near the site-percolation threshold (~0.31), so
+     // the clusters range from single voxels to ones spanning many leaves
+        std::mt19937 rng(2261);
+        std::bernoulli_distribution isActive(0.3);
+        std::vector<nanovdb::Coord> coords;
+        for (int x = -20; x < 44; ++x)
+            for (int y = -20; y < 44; ++y)
+                for (int z = -20; z < 44; ++z)
+                    if (isActive(rng)) coords.emplace_back(x, y, z);
+        checkedComponentCount(coords);// the labels are checked against the CPU partition
+    }
+}// ConnectedComponents_VoxelLabels
+
+// Regression test: ConnectedComponents must read the source grid in order on its stream, so that a
+// grid still being uploaded on that stream is read only after it arrives. As in
+// NonBlockingStreamDeviceGridTraits, the upload is queued behind a busy-wait on a non-blocking stream,
+// into a device buffer zeroed beforehand, and the operator runs on that stream right away; a header
+// read that is not ordered on the stream sees an empty tree.
+TEST(TestNanoVDBCUDA, ConnectedComponents_InFlightGrid)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    using GridT  = nanovdb::NanoGrid<BuildT>;
+    auto sphereHandle = nanovdb::tools::createLevelSetSphere<float>(30);
+    auto hostHandle = nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, BuildT>(*sphereHandle.grid<float>(), 0u, false, false);// no channels, stats or tiles
+    const GridT* hostGrid = hostHandle.grid<BuildT>();
+    ASSERT_TRUE(hostGrid);
+    ASSERT_NE(0u, hostGrid->tree().nodeCount(0));
+    const size_t gridBytes = hostHandle.bufferSize();
+
+    void* pinned = nullptr;// pinned, so the upload below is truly asynchronous
+    cudaCheck(cudaMallocHost(&pinned, gridBytes));
+    std::memcpy(pinned, hostHandle.data(), gridBytes);
+    void* d_bytes = nullptr;
+    cudaCheck(cudaMalloc(&d_bytes, gridBytes));
+    cudaStream_t nb = nullptr;
+    cudaCheck(cudaStreamCreateWithFlags(&nb, cudaStreamNonBlocking));
+    cudaCheck(cudaMemsetAsync(d_bytes, 0, gridBytes, nb));
+    cudaCheck(cudaStreamSynchronize(nb));
+    int clockKHz = 0, dev = 0;
+    cudaCheck(cudaGetDevice(&dev));
+    cudaCheck(cudaDeviceGetAttribute(&clockKHz, cudaDevAttrClockRate, dev));
+    streamBusyWaitKernel<<<1, 1, 0, nb>>>(static_cast<unsigned long long>(clockKHz) * 20ull);// ~20 ms
+    cudaCheck(cudaGetLastError());
+    cudaCheck(cudaMemcpyAsync(d_bytes, pinned, gridBytes, cudaMemcpyHostToDevice, nb));
+    {
+        nanovdb::tools::cuda::ConnectedComponents<BuildT> cc(static_cast<const GridT*>(d_bytes), nb);
+        auto [labels, N] = cc.getVoxelLabelsAndCount();// the contents are complete on return
+        std::vector<uint32_t> hostLabels(labels.size());
+        cudaCheck(cudaMemcpy(hostLabels.data(), labels.data(), hostLabels.size() * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+        EXPECT_EQ(1u, N);// the sphere's narrow band is a single shell
+        checkConnectedComponentLabels(*hostGrid, hostLabels, N);
+    }// the labels are freed on nb here, before the grid's memory below
+    cudaCheck(cudaStreamSynchronize(nb));
+    cudaCheck(cudaStreamDestroy(nb));
+    cudaCheck(cudaFree(d_bytes));
+    cudaCheck(cudaFreeHost(pinned));
+}// ConnectedComponents_InFlightGrid
