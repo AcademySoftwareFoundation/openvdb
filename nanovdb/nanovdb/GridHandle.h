@@ -177,6 +177,12 @@ class GridHandle
         : mMetaData(std::move(meta))
         , mBuffer(std::move(buffer)) {}
 
+    /// @brief Parse the grid metadata of mBuffer, defined in nanovdb/cuda/GridHandle.cuh
+    //@{
+    void parseDualBuffer();
+    void parseSingleBuffer();
+    //@}
+
     friend struct detail::LayoutCopy;
 
 public:
@@ -205,26 +211,25 @@ public:
     ///        holding a byte-for-byte copy of the grids.
     const std::vector<GridHandleMetaData>& metaData() const { return mMetaData; }
 
-    /// @brief  Move constructor from a dual host-device buffer
+    /// @brief  Move constructor from a buffer of any kind: host, dual host-device or single-space device
     /// @param buffer buffer containing one or more NanoGrids that will be moved into this GridHandle
     /// @throw Will throw and error with the buffer does not contain a valid NanoGrid!
-    /// @note The implementation of this template specialization is in nanovdb/cuda/GridHandle.cuh since it requires CUDA
-    template<typename T = BufferT, typename util::enable_if<BufferTraits<T>::hasDeviceDual, int>::type = 0>
-    GridHandle(T&& buffer);
-
-    /// @brief  Move constructor from a host buffer
-    /// @param buffer buffer containing one or more NanoGrids that will be moved into this GridHandle
-    /// @throw Will throw and error with the buffer does not contain a valid NanoGrid!
-    template<typename T = BufferT, typename util::disable_if<BufferTraits<T>::hasDeviceDual || BufferHasDeviceSingle<T>::value, int>::type = 0>
-    GridHandle(T&& buffer);
-
-    /// @brief  Move constructor from a single-space device buffer: the grid
-    ///         metadata is read through the device on the buffer's stream.
-    /// @param buffer buffer containing one or more NanoGrids that will be moved into this GridHandle
-    /// @throw Will throw an error if the buffer does not contain a valid NanoGrid
-    /// @note The implementation of this template specialization is in nanovdb/cuda/GridHandle.cuh since it requires CUDA
-    template<typename T = BufferT, typename util::enable_if<BufferHasDeviceSingle<T>::value, int>::type = 0, typename = void>
-    GridHandle(T&& buffer);
+    /// @note The device variants are implemented in nanovdb/cuda/GridHandle.cuh since they require CUDA.
+    ///       This is deliberately not a template, since the mangled name of a SFINAE constructor differs
+    ///       between clang and g++, which breaks a clang build linked against nvcc with a g++ host compiler.
+    GridHandle(BufferT&& buffer)
+        : mBuffer(std::move(buffer))
+    {
+        if constexpr (BufferTraits<BufferT>::hasDeviceDual) {
+            this->parseDualBuffer();
+        } else if constexpr (BufferHasDeviceSingle<BufferT>::value) {
+            this->parseSingleBuffer();
+        } else {
+            if (auto *data = reinterpret_cast<const GridData*>(mBuffer.data())) {
+                detail::parseHostGridChain(data, mBuffer.size(), mMetaData);
+            }
+        }
+    }
 
     /// @brief Constructs an empty GridHandle
     GridHandle() = default;
@@ -593,18 +598,6 @@ inline const GridMetaData* GridHandle<BufferT>::gridMetaData(uint32_t n) const
     if (data == nullptr || n >= mMetaData.size()) return nullptr;
     return util::PtrAdd<GridMetaData>(data, mMetaData[n].offset);
 }// const GridMetaData* GridHandle<BufferT>::gridMetaData(uint32_t n) const
-
-// template specialization of move constructor from a host buffer
-template<typename BufferT>
-template<typename T, typename util::disable_if<BufferTraits<T>::hasDeviceDual || BufferHasDeviceSingle<T>::value, int>::type>
-GridHandle<BufferT>::GridHandle(T&& buffer)
-    : mBuffer(std::move(buffer))
-{
-    static_assert(util::is_same<T,BufferT>::value, "Expected U==BufferT");
-    if (auto *data = reinterpret_cast<const GridData*>(mBuffer.data())) {
-        detail::parseHostGridChain(data, mBuffer.size(), mMetaData);
-    }
-}// GridHandle<BufferT>::GridHandle(T&& buffer)
 
 template<typename BufferT>
 template <typename OtherBufferT>
