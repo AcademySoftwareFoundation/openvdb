@@ -102,13 +102,7 @@ find_library(found_LLVM LLVM HINTS ${LLVM_LIBRARY_DIRS})
 
 if(found_LLVM)
   set(LLVM_LIBS "LLVM")
-elseif(LLVM_PACKAGE_VERSION VERSION_LESS 16)
-  # Builds against LLVM 15 and earlier use MCJIT
-  llvm_map_components_to_libnames(_llvm_libs
-    native core executionengine support mcjit passes)
-  set(LLVM_LIBS "${_llvm_libs}")
 else()
-  # Builds against LLVM 16 and later use LLJIT/ORC
   llvm_map_components_to_libnames(_llvm_libs
     native core executionengine support orcjit orcshared orctargetprocess passes)
   set(LLVM_LIBS "${_llvm_libs}")

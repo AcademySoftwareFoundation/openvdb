@@ -41,14 +41,6 @@ else()
 endif()
 
 if(OPENVDB_PYTHON_USE_AX)
-  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    get_property(OPENVDB_LLVM_VERSION_MAJOR GLOBAL PROPERTY "OPENVDB_LLVM_VERSION_MAJOR")
-    if(OPENVDB_LLVM_VERSION_MAJOR VERSION_EQUAL 17)
-      message(FATAL_ERROR "LLVM version 17.X, used with OpenVDB AX, is incompatible "
-        "with the OpenVDB python plugin. Use any version of LLVM 18+")
-    endif()
-  endif()
-
   # Link the python module against openvdb_ax
   if(NOT OPENVDB_BUILD_AX)
     find_package(OpenVDB REQUIRED openvdb_ax)

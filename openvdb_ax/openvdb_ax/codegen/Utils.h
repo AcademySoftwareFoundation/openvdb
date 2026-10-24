@@ -40,22 +40,6 @@ using CastFunction = std::function<llvm::Value*
 using BinaryFunction = std::function<llvm::Value*
     (llvm::IRBuilder<>&, llvm::Value*, llvm::Value*)>;
 
-inline bool AssertOpaquePtrs([[maybe_unused]]llvm::Value* opaque, [[maybe_unused]]llvm::Type* type)
-{
-#if LLVM_VERSION_MAJOR <= 15
-    if (opaque->getType()->getPointerElementType() != type) {
-#ifdef OPENVDB_ENABLE_ASSERTS
-        llvm::errs() << "Opaque ptr check failed:\n";
-        llvm::errs() << "Input Value: "; opaque->print(llvm::errs()); llvm::errs() << "\n";
-        llvm::errs() << "Input Ptr Type: "; opaque->getType()->getPointerElementType()->print(llvm::errs()); llvm::errs() << "\n";
-        llvm::errs() << "Type: "; type->print(llvm::errs()); llvm::errs() << "\n";
-#endif
-        return false;
-    }
-#endif
-    return true;
-}
-
 /// @brief  Populate a vector of llvm Types from a vector of llvm values
 ///
 /// @param  values  A vector of llvm values to retrieve types from
@@ -266,7 +250,6 @@ llvmArithmeticConversion(const llvm::Type* const sourceType,
         Twine)
 #endif
 
-#if LLVM_VERSION_MAJOR >= 18
 // For Zext, assume argument is never negative (last flag)
 #define BIND_ARITHMETIC_CAST_OP_ZEXT(Function, Twine) \
     std::bind(&Function, \
@@ -275,14 +258,6 @@ llvmArithmeticConversion(const llvm::Type* const sourceType,
         std::placeholders::_3, \
         Twine, \
         false) // IsNonNeg
-#else
-#define BIND_ARITHMETIC_CAST_OP_ZEXT(Function, Twine) \
-    std::bind(&Function, \
-        std::placeholders::_1, \
-        std::placeholders::_2, \
-        std::placeholders::_3, \
-        Twine)
-#endif
 
 #if LLVM_VERSION_MAJOR >= 20
 #define BIND_ARITHMETIC_CAST_OP_FP(Function, Twine) \

@@ -7,7 +7,6 @@
 
 #include <gtest/gtest.h>
 
-#include <llvm/Config/llvm-config.h>
 
 #include <memory>
 #include <string>
@@ -130,244 +129,6 @@ TEST_F(TestFunctionGroup, testFunctionGroup)
     ASSERT_EQ(decl3, group->list()[2]);
 }
 
-#if LLVM_VERSION_MAJOR <= 15
-TEST_F(TestFunctionGroup, testMatch)
-{
-    using openvdb::ax::codegen::LLVMType;
-    using openvdb::ax::codegen::Function;
-    using openvdb::ax::codegen::FunctionGroup;
-
-    unittest_util::LLVMState state;
-    llvm::LLVMContext& C = state.context();
-    std::vector<llvm::Type*> types;
-    Function::SignatureMatch match;
-    const Function* result;
-
-    //
-
-    FunctionGroup::Ptr group = axtestscalar(C);
-    const std::vector<Function::Ptr>* list = &group->list();
-
-    // test explicit matching
-
-    types.resize(1);
-    types[0] = llvm::Type::getInt1Ty(C);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Explicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[5].get()), result);
-
-    //
-
-    types[0] = llvm::Type::getInt16Ty(C);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Explicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[4].get()), result);
-
-    //
-
-    types[0] = llvm::Type::getInt32Ty(C);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Explicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[3].get()), result);
-
-    //
-
-    types[0] = llvm::Type::getInt64Ty(C);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Explicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[2].get()), result);
-
-    //
-
-    types[0] = llvm::Type::getFloatTy(C);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Explicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[1].get()), result);
-
-    //
-
-    types[0] = llvm::Type::getDoubleTy(C);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Explicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[0].get()), result);
-
-    // test unsigned integers automatic type creation - these are not supported in the
-    // language however can be constructed from the API. The function framework does
-    // not differentiate between signed and unsigned integers
-
-    types[0] = LLVMType<uint64_t>::get(C);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Explicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[2].get()), result);
-
-    // test implicit matching - types should match to the first available castable signature
-    // which is always the void(double) "tsfd" function for all provided scalars
-
-    types[0] = llvm::Type::getInt8Ty(C);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Implicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[0].get()), result);
-
-    types.clear();
-
-    // test invalid matching - Size matching returns the first function which matched
-    // the size
-
-    result = group->match(types, C, &match);
-    ASSERT_EQ(Function::SignatureMatch::None, match);
-    ASSERT_TRUE(!result);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::None == match);
-    ASSERT_TRUE(!result);
-
-    //
-
-    types.emplace_back(llvm::Type::getInt1Ty(C)->getPointerTo());
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Size == match);
-    ASSERT_TRUE(!result);
-
-    //
-
-    types[0] = llvm::ArrayType::get(llvm::Type::getInt1Ty(C), 1);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Size == match);
-    ASSERT_TRUE(!result);
-
-    //
-
-    types[0] = llvm::Type::getInt1Ty(C);
-    types.emplace_back(llvm::Type::getInt1Ty(C));
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::None == match);
-    ASSERT_TRUE(!result);
-
-    //
-    // Test varying argument size function
-    // test explicit matching
-
-    group = axtestsize(C);
-    list = &group->list();
-
-    types.resize(2);
-    types[0] = llvm::Type::getDoubleTy(C);
-    types[1] = llvm::Type::getDoubleTy(C);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Explicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[2].get()), result);
-
-    //
-
-    types.resize(1);
-    types[0] = llvm::Type::getDoubleTy(C);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Explicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[1].get()), result);
-
-    //
-
-    types.clear();
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Explicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[0].get()), result);
-
-    // Test implicit matching
-
-    types.resize(2);
-
-    types[0] = llvm::Type::getFloatTy(C);
-    types[1] = llvm::Type::getInt32Ty(C);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Implicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[2].get()), result);
-
-    // Test non matching
-
-    types.resize(3);
-
-    types[0] = llvm::Type::getDoubleTy(C);
-    types[1] = llvm::Type::getDoubleTy(C);
-    types[2] = llvm::Type::getDoubleTy(C);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::None == match);
-    ASSERT_TRUE(!result);
-
-    //
-    // Test multi function
-
-    group = axtestmulti(C);
-    list = &group->list();
-
-    // test explicit/implicit matching
-
-    types.clear();
-
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Explicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[0].get()), result);
-
-    //
-
-    types.resize(2);
-    types[0] = llvm::Type::getDoubleTy(C);
-    types[1] = llvm::Type::getDoubleTy(C);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Explicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[2].get()), result);
-
-    //
-
-    types[0] = llvm::Type::getInt32Ty(C);
-    types[1] = llvm::Type::getDoubleTy(C);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Explicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[3].get()), result);
-
-    //
-
-    types[0] = llvm::Type::getInt32Ty(C);
-    types[1] = llvm::Type::getInt32Ty(C);
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Implicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[2].get()), result);
-
-    //
-
-    types.resize(1);
-
-    types[0] = llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 1)->getPointerTo();
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Explicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[5].get()), result);
-
-    //
-
-    types[0] = llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 2)->getPointerTo();
-    result = group->match(types, C, &match);
-    ASSERT_TRUE(Function::SignatureMatch::Explicit == match);
-    ASSERT_TRUE(result);
-    ASSERT_EQ(const_cast<const Function*>((*list)[6].get()), result);
-}
-
-#else
-
 TEST_F(TestFunctionGroup, testMatch)
 {
     using openvdb::ax::codegen::LLVMType;
@@ -445,11 +206,7 @@ TEST_F(TestFunctionGroup, testMatch)
     // which is always the void(double) "tsfd" function for all provided scalars
 
     result = group->match({int8t}, C);
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_TRUE(Function::SignatureMatch::Implicit == result.second);
-#else
     ASSERT_TRUE(Function::SignatureMatch::Ambiguous == result.second);
-#endif
     ASSERT_TRUE(result.first);
     ASSERT_EQ(const_cast<const Function*>((*list)[0].get()), result.first);
 
@@ -550,11 +307,7 @@ TEST_F(TestFunctionGroup, testMatch)
     //
 
     result = group->match({int32t, int32t}, C);
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_TRUE(Function::SignatureMatch::Implicit == result.second);
-#else
     ASSERT_TRUE(Function::SignatureMatch::Ambiguous == result.second);
-#endif
     ASSERT_TRUE(result.first);
     ASSERT_EQ(const_cast<const Function*>((*list)[2].get()), result.first);
 
@@ -572,7 +325,6 @@ TEST_F(TestFunctionGroup, testMatch)
     ASSERT_TRUE(result.first);
     ASSERT_EQ(const_cast<const Function*>((*list)[6].get()), result.first);
 }
-#endif
 
 TEST_F(TestFunctionGroup, testExecute)
 {
@@ -585,18 +337,6 @@ TEST_F(TestFunctionGroup, testExecute)
     llvm::LLVMContext& C = state.context();
     llvm::IRBuilder<> B(state.scratchBlock());
 
-#if LLVM_VERSION_MAJOR <= 15
-    auto get_args = [](const std::vector<llvm::Value*>& values) { return values; };
-    auto get_called_fn = [](llvm::Value* value)
-    {
-        EXPECT_TRUE(llvm::isa<llvm::CallInst>(value));
-        auto call = llvm::cast<llvm::CallInst>(value);
-        EXPECT_TRUE(call);
-        auto target = call->getCalledFunction();
-        EXPECT_TRUE(target);
-        return target;
-    };
-#else
     auto get_args = [](const std::vector<llvm::Value*>& values)
     {
         NativeArguments args;
@@ -620,26 +360,11 @@ TEST_F(TestFunctionGroup, testExecute)
         EXPECT_TRUE(target);
         return target;
     };
-#endif
 
     // test execution
     // test invalid arguments throws
 
     FunctionGroup::Ptr group(new FunctionGroup("empty", "", {}));
-#if LLVM_VERSION_MAJOR <= 15
-    llvm::Value* output = nullptr;
-
-    ASSERT_TRUE(!group->execute(/*args*/{}, B, output));
-
-    group = axtestscalar(C);
-    const std::vector<Function::Ptr>* list = &group->list();
-
-    ASSERT_TRUE(!group->execute({}, B, output));
-    ASSERT_TRUE(!group->execute({
-            B.getTrue(),
-            B.getTrue()
-        }, B, output));
-#else
     // @note  Calling execute with invalid Arguments{} is UB. Only defined
     //   with NativeArguments{}
     ASSERT_TRUE(!group->execute(NativeArguments{}, B));
@@ -652,7 +377,6 @@ TEST_F(TestFunctionGroup, testExecute)
             B.getTrue(),
             B.getTrue()
         }), B));
-#endif
 
     // test llvm function calls - execute and get the called function.
     // check this is already inserted into the module and is expected

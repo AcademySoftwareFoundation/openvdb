@@ -49,11 +49,6 @@ TEST_F(TestCodecs, testRegisteredCodecs)
     // enforced as part of the API but the majority of the setup code is internal.
 
     llvm::LLVMContext C;
-#if LLVM_VERSION_MAJOR == 15
-    // This will not work from LLVM 16
-    // https://llvm.org/docs/OpaquePointers.html
-    C.setOpaquePointers(false);
-#endif
 
     // Get all unique registered codecs
     std::set<const Codec*> codecs;
