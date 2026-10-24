@@ -172,15 +172,15 @@ endif()
 
 list(APPEND OPENVDB_CORE_DEPENDENT_LIBS TBB::tbb)
 
-# @todo zlib should be hidden (privately linked in):
-# See FindOpenVDB.cmake
+# Zlib is a private dependency. No installed header includes zlib.h, so
+# downstream projects do not need it at compile time.
 # @warning If building against Houdini these should be picked up from the
 # Houdini installation. If a custom version of EXR is in use, be careful
 # that zlib headers/libs are not also in the same location e.g.
 # /usr/local
-
+set(OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS "")
 if(USE_ZLIB)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS ZLIB::ZLIB)
+  list(APPEND OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS ZLIB::ZLIB)
 endif()
 
 if(UNIX)
@@ -641,6 +641,7 @@ if(OPENVDB_CORE_STATIC)
 
   target_link_libraries(openvdb_static
     PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
+    PRIVATE ${OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS}
   )
 
   set_target_properties(openvdb_static
@@ -686,7 +687,15 @@ if(OPENVDB_CORE_SHARED)
 
   target_link_libraries(openvdb_shared
     PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
+    PRIVATE ${OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS}
   )
+
+  # If zlib is linked statically, stop its symbols being
+  # re-exported from the shared library, where they could clash with another
+  # copy loaded in the same process. Windows DLLs only export marked symbols.
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(openvdb_shared PRIVATE "LINKER:--exclude-libs,ALL")
+  endif()
 
   set_target_properties(openvdb_shared
     PROPERTIES
