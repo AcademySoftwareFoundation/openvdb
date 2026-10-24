@@ -516,6 +516,8 @@ endif()
 # to manually identify the requirements of OpenVDB builds if they know them.
 set(OpenVDB_USES_BLOSC ${USE_BLOSC})
 set(OpenVDB_USES_ZLIB ${USE_ZLIB})
+# Zstd support is only recorded in version.h, older installs never use it
+set(OpenVDB_USES_ZSTD OFF)
 set(OpenVDB_USES_IMATH_HALF ${USE_IMATH_HALF})
 set(OpenVDB_DEFINITIONS)
 
@@ -549,6 +551,7 @@ if(_OPENVDB_HAS_NEW_VERSION_HEADER)
   OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_IMATH_HALF" OpenVDB_USES_IMATH_HALF)
   OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_BLOSC" OpenVDB_USES_BLOSC)
   OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_ZLIB" OpenVDB_USES_ZLIB)
+  OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_ZSTD" OpenVDB_USES_ZSTD)
 elseif(NOT OPENVDB_USE_STATIC_LIBS)
   # Use GetPrerequisites to see which libraries this OpenVDB lib has linked to
   # which we can query for optional deps. This basically runs ldd/otoll/objdump
@@ -603,6 +606,10 @@ if(OpenVDB_USES_ZLIB)
   find_package(ZLIB REQUIRED)
 endif()
 
+if(OpenVDB_USES_ZSTD)
+  find_package(Zstd REQUIRED)
+endif()
+
 if(OpenVDB_USES_IMATH_HALF)
   find_package(Imath REQUIRED CONFIG)
 endif()
@@ -639,6 +646,15 @@ if(NOT OPENVDB_USE_STATIC_LIBS)
   endif()
   if(OpenVDB_USES_ZLIB)
     list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES ZLIB::ZLIB)
+  endif()
+  if(OpenVDB_USES_ZSTD)
+    list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES Zstd::zstd)
+  endif()
+else()
+  # A static archive does not carry its own dependencies, so these must be
+  # linked by the consumer.
+  if(OpenVDB_USES_ZSTD)
+    list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES Zstd::zstd)
   endif()
 endif()
 
