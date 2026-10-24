@@ -12,19 +12,10 @@
 #include <GU/GU_Detail.h>
 #include <UT/UT_String.h>
 #include <UT/UT_Version.h>
-#ifdef OPENVDB_USE_LOG4CPLUS
 #include <openvdb/util/logging.h>
-#include <UT/UT_ErrorManager.h>
-#include <CHOP/CHOP_Error.h> // for CHOP_ERROR_MESSAGE
-#include <DOP/DOP_Error.h> // for DOP_MESSAGE
-#if UT_VERSION_INT < 0x11050000 // earlier than 17.5.0
-#include <POP/POP_Error.h> // for POP_MESSAGE
-#endif
-#include <ROP/ROP_Error.h> // for ROP_MESSAGE
-#include <VOP/VOP_Error.h> // for VOP_MESSAGE
-#include <VOPNET/VOPNET_Error.h> // for VOPNET_MESSAGE
+#include <UT/UT_StringHolder.h>
+#include <UT/UT_UniversalLogGenericSource.h>
 #include <string>
-#endif
 
 
 namespace openvdb_houdini {
@@ -251,150 +242,78 @@ makeCoordBBox(const UT_BoundingBox& b, const openvdb::math::Transform& t)
 ////////////////////////////////////////
 
 
-#ifndef OPENVDB_USE_LOG4CPLUS
-
-void startLogForwarding(OP_OpTypeId) {}
-void stopLogForwarding(OP_OpTypeId) {}
-bool isLogForwarding(OP_OpTypeId) { return false; }
-
-#else
-
 namespace {
 
-namespace l4c = log4cplus;
+const char* const sLogSourceName = "OpenVDB";
+const char* const sSinkName = "HOUDINI";
 
-/// @brief log4cplus appender that directs log messages to UT_ErrorManager
-class HoudiniAppender: public l4c::Appender
+
+/// @brief Sink that directs log messages to the Houdini Universal Log
+class HoudiniSink: public openvdb::logging::Sink
 {
 public:
-    /// @param opType  SOP_OPTYPE_NAME, ROP_OPTYPE_NAME, etc. (see OP_Node.h)
-    /// @param code    SOP_MESSAGE, SOP_VEX_ERROR, ROP_MESSAGE, etc.
-    ///                (see SOP_Error.h, ROP_Error.h, etc.)
-    HoudiniAppender(const char* opType, int code): mOpType(opType), mCode(code) {}
+    HoudiniSink(): Sink(sSinkName, openvdb::logging::Level::Info) {}
 
-    ~HoudiniAppender() override
+    void append(openvdb::logging::Level level, const std::string& message,
+        const char* file, int line) override
     {
-        close();
-        destructorImpl(); // must be called by Appender subclasses
-    }
+        // Entries are dropped unless a log viewer is connected to the source.
+        const UT_StringHolder sourceName(sLogSourceName);
+        if (!UTlogSourceExists(sourceName)) return;
 
-    void append(const l4c::spi::InternalLoggingEvent& event) override
-    {
-        if (mClosed) return;
-
-        auto* errMgr = UTgetErrorManager();
-        if (!errMgr || errMgr->isDisabled()) return;
-
-        const l4c::LogLevel level = event.getLogLevel();
-        const std::string& msg = event.getMessage();
-        const std::string& file = event.getFile();
-        const int line = event.getLine();
-
-        const UT_SourceLocation
-            loc{file.c_str(), line},
-            *locPtr = (file.empty() ? nullptr : &loc);
-
-        UT_ErrorSeverity severity = UT_ERROR_NONE;
+        // Error and Fatal are reported as warnings. A log call cannot abort a
+        // cook, only a thrown exception can. The original level is kept in
+        // the text.
+        UT_ErrorSeverity severity = UT_ERROR_MESSAGE;
+        const char* prefix = "";
         switch (level) {
-            case l4c::DEBUG_LOG_LEVEL: severity = UT_ERROR_MESSAGE; break;
-            case l4c::INFO_LOG_LEVEL: severity = UT_ERROR_MESSAGE; break;
-            case l4c::WARN_LOG_LEVEL: severity = UT_ERROR_WARNING; break;
-            case l4c::ERROR_LOG_LEVEL: severity = UT_ERROR_ABORT; break;
-            case l4c::FATAL_LOG_LEVEL: severity = UT_ERROR_FATAL; break;
+            case openvdb::logging::Level::Debug: break;
+            case openvdb::logging::Level::Info:  break;
+            case openvdb::logging::Level::Warn:  severity = UT_ERROR_WARNING; break;
+            case openvdb::logging::Level::Error:
+                severity = UT_ERROR_WARNING;
+                prefix = "Error: ";
+                break;
+            case openvdb::logging::Level::Fatal:
+                severity = UT_ERROR_WARNING;
+                prefix = "Fatal: ";
+                break;
         }
-        errMgr->addGeneric(mOpType.c_str(), mCode, msg.c_str(), severity, locPtr);
+
+        const UT_SourceLocation location(
+            (file && *file) ? file : "", line);
+        const UT_StringHolder text(prefix + message);
+        UTlogEntry(UT_UniversalLogEntry(
+            sourceName, text, UT_StringHolder::theEmptyString, severity, 0, location),
+            sourceName);
     }
-
-    void close() override { mClosed = true; }
-
-private:
-    std::string mOpType = INVALID_OPTYPE_NAME;
-    int mCode = 0;
-    bool mClosed = false;
 };
-
-
-inline l4c::tstring
-getAppenderName(const OP_TypeInfo& opInfo)
-{
-    return LOG4CPLUS_STRING_TO_TSTRING(
-        std::string{"HOUDINI_"} + static_cast<const char*>(opInfo.myOptypeName));
-}
-
-
-/// @brief Return the error code for user-supplied messages in operators of the given type.
-inline int
-getGenericMessageCode(OP_OpTypeId opId)
-{
-    switch (opId) {
-        case CHOP_OPTYPE_ID:   return CHOP_ERROR_MESSAGE;
-        case DOP_OPTYPE_ID:    return DOP_MESSAGE;
-#if UT_VERSION_INT < 0x11050000 // earlier than 17.5.0
-        case POP_OPTYPE_ID:    return POP_MESSAGE;
-#endif
-        case ROP_OPTYPE_ID:    return ROP_MESSAGE;
-        case SOP_OPTYPE_ID:    return SOP_MESSAGE;
-        case VOP_OPTYPE_ID:    return VOP_MESSAGE;
-        case VOPNET_OPTYPE_ID: return VOPNET_MESSAGE;
-        default: break;
-    }
-    return 0;
-}
-
-
-inline void
-setLogForwarding(OP_OpTypeId opId, bool enable)
-{
-    const auto* opInfo = OP_Node::getOpInfoFromOpTypeID(opId);
-    if (!opInfo) return;
-
-    const auto appenderName = getAppenderName(*opInfo);
-
-    auto logger = openvdb::logging::internal::getLogger();
-    auto appender = logger.getAppender(appenderName);
-
-    if (appender && !enable) {
-        // If an appender for the given operator type exists, remove it.
-        logger.removeAppender(appender);
-    } else if (!appender && enable) {
-        // If an appender for the given operator type doesn't already exist, create one.
-        // Otherwise, do nothing: operators of the same type can share a single appender.
-        appender = log4cplus::SharedAppenderPtr{
-            new HoudiniAppender{opInfo->myOptypeName, getGenericMessageCode(opId)}};
-        appender->setName(appenderName);
-        // Don't forward debug or lower-level messages.
-        appender->setThreshold(log4cplus::INFO_LOG_LEVEL);
-        logger.addAppender(appender);
-    }
-}
 
 } // anonymous namespace
 
 
 void
-startLogForwarding(OP_OpTypeId opId)
+startLogForwarding()
 {
-    setLogForwarding(opId, true);
+    // Register the source now, so log viewers can list it before the first message.
+    UTlogSourceExists(UT_StringHolder(sLogSourceName));
+    if (!openvdb::logging::findSink(sSinkName)) {
+        openvdb::logging::addSink(std::make_shared<HoudiniSink>());
+    }
 }
 
 
 void
-stopLogForwarding(OP_OpTypeId opId)
+stopLogForwarding()
 {
-    setLogForwarding(opId, false);
+    openvdb::logging::removeSink(sSinkName);
 }
 
 
 bool
-isLogForwarding(OP_OpTypeId opId)
+isLogForwarding()
 {
-    if (const auto* opInfo = OP_Node::getOpInfoFromOpTypeID(opId)) {
-        return openvdb::logging::internal::getLogger().getAppender(
-            getAppenderName(*opInfo));
-    }
-    return false;
+    return openvdb::logging::findSink(sSinkName) != nullptr;
 }
-
-#endif // OPENVDB_USE_LOG4CPLUS
 
 } // namespace openvdb_houdini

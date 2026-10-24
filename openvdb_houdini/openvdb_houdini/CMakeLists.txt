@@ -53,6 +53,9 @@ houdini_get_default_install_dir():
 If OFF, CMAKE_INSTALL_PREFIX is used.]=] ON)
 option(OPENVDB_INSTALL_HOUDINI_PYTHONRC [=[Install a Houdini startup script that sets
 the visibilty of OpenVDB nodes and their native equivalents.]=] OFF)
+option(OPENVDB_HOUDINI_LOG_FORWARDING [=[Forward OpenVDB log messages to the
+Houdini error manager for all SOPs. Messages can land on an unrelated node, so this is
+off by default.]=] OFF)
 
 set(_OPENVDB_HOUDINI_OPHIDE_POLICY_OPTIONS none aswf native)
 if(NOT OPENVDB_HOUDINI_OPHIDE_POLICY)
@@ -199,6 +202,9 @@ target_link_libraries(openvdb_houdini PUBLIC
 )
 
 target_compile_definitions(openvdb_houdini PRIVATE "-DOPENVDB_HOUDINI_PRIVATE")
+if(OPENVDB_HOUDINI_LOG_FORWARDING)
+  target_compile_definitions(openvdb_houdini PRIVATE "-DOPENVDB_HOUDINI_LOG_FORWARDING")
+endif()
 
 set_target_properties(openvdb_houdini
   PROPERTIES

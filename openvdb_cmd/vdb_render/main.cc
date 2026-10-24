@@ -202,6 +202,8 @@ usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
 "    -v                verbose (print timing and diagnostics)\n" <<
 "    -version          print version information and exit\n" <<
 "    -h, -help         print this usage message and exit\n" <<
+"    -debug|-info|-warn|-error|-fatal\n" <<
+"                      set the diagnostic message threshold (default: warn)\n" <<
 "\n" <<
 "Level set options:\n" <<
 "    -color S          name of a vec3s volume to be used to set material colors\n" <<
