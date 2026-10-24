@@ -71,13 +71,7 @@ inline FunctionGroup::UniquePtr axstringalloc(const FunctionOptions& op)
         B.CreateCondBr(neq, then, post);
         B.SetInsertPoint(then);
         {
-#if LLVM_VERSION_MAJOR < 18
-            llvm::Instruction* inst = llvm::CallInst::CreateFree(cptr_load, B.GetInsertBlock());
-            OPENVDB_ASSERT(inst);
-            B.Insert(inst);
-#else
             B.CreateFree(cptr_load);
-#endif
             B.CreateBr(post);
         }
 
@@ -91,16 +85,6 @@ inline FunctionGroup::UniquePtr axstringalloc(const FunctionOptions& op)
         B.CreateCondBr(gt.GetValue(), then, el);
         B.SetInsertPoint(then);
         {
-#if LLVM_VERSION_MAJOR < 18
-            llvm::Instruction* inst = llvm::CallInst::CreateMalloc(B.GetInsertBlock(), // location
-                    B.getInt64Ty(), // int ptr type
-                    B.getInt8Ty(),  // return type
-                    B.CreateAdd(size.GetValue(), B.getInt64(1)), // size
-                    nullptr,
-                    nullptr);
-            OPENVDB_ASSERT(inst);
-            B.Insert(inst);
-#else
             llvm::Instruction* inst = B.CreateMalloc(
                     B.getInt64Ty(), // int ptr type
                     B.getInt8Ty(),  // return type
@@ -108,7 +92,6 @@ inline FunctionGroup::UniquePtr axstringalloc(const FunctionOptions& op)
                     nullptr,
                     nullptr);
             OPENVDB_ASSERT(inst);
-#endif
             B.CreateStore(inst, cptr);
             B.CreateBr(post);
         }
@@ -173,14 +156,8 @@ inline FunctionGroup::UniquePtr axstring(const FunctionOptions& op)
         axstringalloc(op)->execute(NativeArguments{str, slen}, B);
 
         llvm::Value* cptr_load = B.CreateLoad(strType->getTypeAtIndex(0u), cptr); // char*
-#if LLVM_VERSION_MAJOR >= 10
         B.CreateMemCpy(cptr_load, /*dest-align*/llvm::MaybeAlign(0),
             carr, /*src-align*/llvm::MaybeAlign(0), slen.GetValue());
-#elif LLVM_VERSION_MAJOR > 6
-        B.CreateMemCpy(cptr_load, /*dest-align*/0, carr, /*src-align*/0, slen.GetValue());
-#else
-        B.CreateMemCpy(cptr_load, carr, slen.GetValue(), /*align*/0);
-#endif
         return Value::Invalid();
     };
 
@@ -231,14 +208,8 @@ inline FunctionGroup::UniquePtr axstringassign(const FunctionOptions& op)
 
         llvm::Value* cptr0_load = B.CreateLoad(strType->getTypeAtIndex(0u), cptr0);
         llvm::Value* cptr1_load = B.CreateLoad(strType->getTypeAtIndex(0u), cptr1);
-#if LLVM_VERSION_MAJOR >= 10
         B.CreateMemCpy(cptr0_load, /*dest-align*/llvm::MaybeAlign(0),
             cptr1_load, /*src-align*/llvm::MaybeAlign(0), len);
-#elif LLVM_VERSION_MAJOR > 6
-        B.CreateMemCpy(cptr0_load, /*dest-align*/0, cptr1_load, /*src-align*/0, len);
-#else
-        B.CreateMemCpy(cptr0_load, cptr1_load, len, /*align*/0);
-#endif
         return Value::Invalid();
     };
 
@@ -284,25 +255,13 @@ inline FunctionGroup::UniquePtr axstringadd(const FunctionOptions& op)
         llvm::Value* src1 = B.CreateLoad(strType->getTypeAtIndex(0u), B.CreateStructGEP(strType, str1, 0)); //char*
 
         // cpy first
-#if LLVM_VERSION_MAJOR >= 10
         B.CreateMemCpy(dst, /*dest-align*/llvm::MaybeAlign(0),
             src0, /*src-align*/llvm::MaybeAlign(0), len0);
-#elif LLVM_VERSION_MAJOR > 6
-        B.CreateMemCpy(dst, /*dest-align*/0, src0, /*src-align*/0, len0);
-#else
-        B.CreateMemCpy(dst, src0, len0, /*align*/0);
-#endif
 
         // cpy second
         dst = B.CreateGEP(LLVMType<char>::get(B.getContext()), dst, len0);
-#if LLVM_VERSION_MAJOR >= 10
         B.CreateMemCpy(dst, /*dest-align*/llvm::MaybeAlign(0),
             src1, /*src-align*/llvm::MaybeAlign(0), len1);
-#elif LLVM_VERSION_MAJOR > 6
-        B.CreateMemCpy(dst, /*dest-align*/0, src1, /*src-align*/0, len1);
-#else
-        B.CreateMemCpy(dst, src1, len1, /*align*/0);
-#endif
         return Value::Invalid();
     };
 

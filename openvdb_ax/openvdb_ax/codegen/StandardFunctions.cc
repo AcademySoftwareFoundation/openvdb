@@ -164,21 +164,12 @@ inline FunctionGroup::UniquePtr axmalloc(const FunctionOptions& op)
         ///  i8* in Types.h.
         /// @todo should probably remove this alias and use i8* explicitly
         llvm::Instruction* inst =
-#if LLVM_VERSION_MAJOR < 18
-        llvm::CallInst::CreateMalloc(B.GetInsertBlock(), // location
-                B.getInt64Ty(), // int ptr type
-                B.getInt8Ty(),  // return type
-                args[0], // size
-                nullptr,
-                nullptr);
-#else
         B.CreateMalloc(
             B.getInt64Ty(), // int ptr type
             B.getInt8Ty(),  // return type
             args[0], // size
             nullptr,
             nullptr);
-#endif
         OPENVDB_ASSERT(inst);
         B.Insert(inst);
         return Value(inst, B.getVoidTy());
@@ -200,12 +191,7 @@ inline FunctionGroup::UniquePtr axfree(const FunctionOptions& op)
         [](const Arguments& args,
            llvm::IRBuilder<>& B) -> Value
     {
-        llvm::Instruction* inst =
-#if LLVM_VERSION_MAJOR < 18
-        llvm::CallInst::CreateFree(args[0], B.GetInsertBlock());
-#else
-        B.CreateFree(args[0]);
-#endif
+        llvm::Instruction* inst = B.CreateFree(args[0]);
         OPENVDB_ASSERT(inst);
         B.Insert(inst);
         return Value::Invalid();
@@ -2643,9 +2629,6 @@ inline FunctionGroup::UniquePtr axprint(const FunctionOptions& op)
         .addSignature<void(int64_t)>((void(*)(int64_t))(print))
         .addSignature<void(int32_t)>((void(*)(int32_t))(print))
             .setArgumentNames({"n"})
-#if LLVM_VERSION_MAJOR <= 15
-            .addFunctionAttribute(llvm::Attribute::ReadOnly)
-#endif
             .addFunctionAttribute(llvm::Attribute::NoRecurse)
             .addFunctionAttribute(llvm::Attribute::AlwaysInline)
             .setConstantFold(false /*never cf*/)
@@ -2665,9 +2648,6 @@ inline FunctionGroup::UniquePtr axprint(const FunctionOptions& op)
         .addSignature<void(openvdb::math::Mat4<double>*)>((void(*)(openvdb::math::Mat4<double>*))(printv))
             .addParameterAttribute(0, llvm::Attribute::ReadOnly)
             .setArgumentNames({"n"})
-#if LLVM_VERSION_MAJOR <= 15
-            .addFunctionAttribute(llvm::Attribute::ReadOnly)
-#endif
             .addFunctionAttribute(llvm::Attribute::NoRecurse)
             .addFunctionAttribute(llvm::Attribute::AlwaysInline)
             .setConstantFold(false /*never cf*/)
@@ -3113,9 +3093,6 @@ inline FunctionGroup::UniquePtr axexternal(const FunctionOptions& op)
         .setArgumentNames({"str"})
         .addDependency("_external")
         .addParameterAttribute(0, llvm::Attribute::ReadOnly)
-#if LLVM_VERSION_MAJOR <= 15
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-#endif
         .addFunctionAttribute(llvm::Attribute::NoRecurse)
         .setConstantFold(false)
         .setEmbedIR(true) // always embed as we pass through function param "custom_data"

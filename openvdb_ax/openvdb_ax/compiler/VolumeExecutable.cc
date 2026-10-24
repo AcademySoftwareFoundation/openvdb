@@ -27,7 +27,6 @@
 #include <tbb/task_group.h>
 #include <tbb/concurrent_vector.h>
 
-#include <llvm/Config/llvm-config.h>
 
 #include <memory>
 
@@ -1240,30 +1239,17 @@ inline void run(GridCache& cache,
 } // anonymous namespace
 
 VolumeExecutable::VolumeExecutable(
-#if LLVM_VERSION_MAJOR <= 15
-        const std::shared_ptr<const llvm::LLVMContext>& context,
-        const std::shared_ptr<const llvm::ExecutionEngine>& engine,
-#else
         const std::shared_ptr<const llvm::orc::LLJIT>& engine,
-#endif
         const AttributeRegistry::ConstPtr& accessRegistry,
         const CustomData::ConstPtr& customData,
         const std::unordered_map<std::string, uint64_t>& functionAddresses,
         const ast::Tree& ast)
-#if LLVM_VERSION_MAJOR <= 15
-    : mContext(context)
-    , mExecutionEngine(engine)
-#else
     : mExecutionEngine(engine)
-#endif
     , mAttributeRegistry(accessRegistry)
     , mCustomData(customData)
     , mFunctionAddresses(functionAddresses)
     , mSettings(new Settings<false>)
 {
-#if LLVM_VERSION_MAJOR <= 15
-    OPENVDB_ASSERT(mContext);
-#endif
     OPENVDB_ASSERT(mExecutionEngine);
     OPENVDB_ASSERT(mAttributeRegistry);
 
@@ -1298,12 +1284,7 @@ VolumeExecutable::VolumeExecutable(
 }
 
 VolumeExecutable::VolumeExecutable(const VolumeExecutable& other)
-#if LLVM_VERSION_MAJOR <= 15
-    : mContext(other.mContext)
-    , mExecutionEngine(other.mExecutionEngine)
-#else
     : mExecutionEngine(other.mExecutionEngine)
-#endif
     , mAttributeRegistry(other.mAttributeRegistry)
     , mCustomData(other.mCustomData)
     , mFunctionAddresses(other.mFunctionAddresses)

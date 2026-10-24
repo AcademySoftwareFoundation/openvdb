@@ -86,23 +86,7 @@ struct LLVMType
             return llvm::Type::getInt1Ty(C);
         }
 
-#if LLVM_VERSION_MAJOR > 6
         return llvm::Type::getScalarTy<T>(C);
-#else
-        int bits = sizeof(T) * CHAR_BIT;
-        if (std::is_integral<T>::value) {
-            return llvm::Type::getIntNTy(C, bits);
-        }
-        else if (std::is_floating_point<T>::value) {
-            switch (bits) {
-                case 16: return llvm::Type::getHalfTy(C);
-                case 32: return llvm::Type::getFloatTy(C);
-                case 64: return llvm::Type::getDoubleTy(C);
-            }
-        }
-        OPENVDB_THROW(AXCodeGenError, "LLVMType called with an unsupported type \"" +
-            std::string(typeNameAsString<T>()) + "\".");
-#endif
     }
 
     /// @brief  Return an LLVM constant Value which represents T value

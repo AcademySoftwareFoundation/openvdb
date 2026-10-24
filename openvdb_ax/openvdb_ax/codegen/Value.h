@@ -142,7 +142,6 @@ public:
         if (type == strtype) {
             llvm::Value* cptr = B.CreateStructGEP(strtype, result, 0); // char**
             llvm::Value* sso = B.CreateStructGEP(strtype, result, 1); // char[]*
-            OPENVDB_ASSERT(AssertOpaquePtrs(sso, strtype->getTypeAtIndex(1)));
             llvm::Value* sso_load = B.CreateConstInBoundsGEP2_64(strtype->getTypeAtIndex(1), sso, 0, 0); // char[]
             llvm::Value* len = B.CreateStructGEP(strtype, result, 2);
             B.CreateStore(sso_load, cptr); // this->ptr = this->SSO;
