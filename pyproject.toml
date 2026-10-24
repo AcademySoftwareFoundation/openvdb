@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "openvdb"
-version = "13.1.1"
+version = "13.2.0"
 description= "Python bindings for OpenVDB: sparse volume data structure and tools."
 dependencies = [
     "numpy",
