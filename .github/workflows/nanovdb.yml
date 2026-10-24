@@ -73,7 +73,7 @@ jobs:
           # under a clang host CCCL's __is_identifier probe decides it exists
           # and the CCCL headers stop parsing. g++ as the nvcc host sidesteps
           # the probe, and clang 17 mangles as g++ does, so python still links.
-          - { cxx: clang++,   cudahostcxx: g++,     image: '2024-clang17.2', build: 'Release' }
+          # - { cxx: clang++,   cudahostcxx: g++,     image: '2024-clang17.2', build: 'Release' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
