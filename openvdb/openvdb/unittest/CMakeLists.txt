@@ -125,6 +125,7 @@ else()
     TestLevelSetTubes.cc
     TestLevelSetUtil.cc
     TestLinearInterp.cc
+    TestLogging.cc
     TestMaps.cc
     TestMat4Metadata.cc
     TestMath.cc
