@@ -1764,7 +1764,7 @@ TypedAttributeArray<ValueType_, Codec_>::writePagedBuffers(compression::PagedOut
 {
     if (!outputTransient && this->isTransient())    return;
 
-    // paged compression only available when Blosc is enabled
+    // paged compression only applies when Blosc compression is requested
     bool bloscCompression = io::getDataCompression(os.getOutputStream()) & io::COMPRESS_BLOSC;
     if (!bloscCompression) {
         if (!os.sizeOnly())   this->writeBuffers(os.getOutputStream(), outputTransient);

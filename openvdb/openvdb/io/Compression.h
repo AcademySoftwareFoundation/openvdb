@@ -235,8 +235,6 @@ OPENVDB_API void bloscFromStream(std::istream&, char* data, size_t numBytes);
 /// @param count        the number of elements to read in
 /// @param compression  whether and how the data is compressed (either COMPRESS_NONE,
 ///                     COMPRESS_ZIP, COMPRESS_ACTIVE_MASK or COMPRESS_BLOSC)
-/// @throw IoError if @a compression is COMPRESS_BLOSC but OpenVDB was compiled
-/// without Blosc support.
 /// @details This default implementation is instantiated only for types
 /// whose size can be determined by the sizeof() operator.
 template<typename T>
@@ -342,8 +340,6 @@ writeDataSize<std::string>(const std::string* data, Index count,
 /// @param count        the number of elements to write out
 /// @param compression  whether and how to compress the data (either COMPRESS_NONE,
 ///                     COMPRESS_ZIP, COMPRESS_ACTIVE_MASK or COMPRESS_BLOSC)
-/// @throw IoError if @a compression is COMPRESS_BLOSC but OpenVDB was compiled
-/// without Blosc support.
 /// @details This default implementation is instantiated only for types
 /// whose size can be determined by the sizeof() operator.
 template<typename T>
