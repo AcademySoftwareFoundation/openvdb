@@ -198,8 +198,8 @@ endif()
 
 list(APPEND OPENVDB_CORE_DEPENDENT_LIBS TBB::tbb)
 
-# @todo blosc and zlib should be hidden (privately linked in):
-# See FindOpenVDB.cmake
+# Blosc and zlib are hidden dependencies (not exposed in headers). Blosc is
+# still linked publicly, see FindOpenVDB.cmake. Zlib is linked privately.
 # @warning If building against Houdini these should be picked up from the
 # Houdini installation. If a custom version of EXR is in use, be careful
 # that zlib/blosc headers/libs are not also in the same location e.g.
@@ -209,8 +209,9 @@ if(USE_BLOSC)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Blosc::blosc)
 endif()
 
+set(OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS "")
 if(USE_BLOSC OR USE_ZLIB)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS ZLIB::ZLIB)
+  list(APPEND OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS ZLIB::ZLIB)
 endif()
 
 if(UNIX)
@@ -666,6 +667,7 @@ if(OPENVDB_CORE_STATIC)
 
   target_link_libraries(openvdb_static
     PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
+    PRIVATE ${OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS}
   )
 
   set_target_properties(openvdb_static
@@ -707,7 +709,15 @@ if(OPENVDB_CORE_SHARED)
 
   target_link_libraries(openvdb_shared
     PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
+    PRIVATE ${OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS}
   )
+
+  # If zlib is linked statically, stop its symbols being
+  # re-exported from the shared library, where they could clash with another
+  # copy loaded in the same process. Windows DLLs only export marked symbols.
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(openvdb_shared PRIVATE "LINKER:--exclude-libs,ALL")
+  endif()
 
   set_target_properties(openvdb_shared
     PROPERTIES
