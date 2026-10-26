@@ -96,21 +96,6 @@ GridDescriptor::readStreamPos(std::istream &is)
     is.read(reinterpret_cast<char*>(&mEndPos), sizeof(int64_t));
 }
 
-GridBase::Ptr
-GridDescriptor::read(std::istream &is)
-{
-    readHeader(is);
-    readStreamPos(is);
-
-    if (!GridBase::isRegistered(mGridType)) {
-        OPENVDB_THROW(LookupError, "Cannot read grid." <<
-            " Grid type " << mGridType << " is not registered.");
-    }
-    GridBase::Ptr grid = GridBase::createGrid(mGridType);
-    if (grid) grid->setSaveFloatAsHalf(mSaveFloatAsHalf);
-    return grid;
-}
-
 void
 GridDescriptor::seekToGrid(std::istream &is) const
 {
