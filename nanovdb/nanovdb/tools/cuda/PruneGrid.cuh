@@ -12,8 +12,8 @@
              to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NVIDIA_TOOLS_CUDA_PRUNEGRID_CUH_HAS_BEEN_INCLUDED
-#define NVIDIA_TOOLS_CUDA_PRUNEGRID_CUH_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_TOOLS_CUDA_PRUNEGRID_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_TOOLS_CUDA_PRUNEGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <cub/cub.cuh>
 
@@ -270,4 +270,4 @@ void PruneGrid<BuildT, ResourceT>::pruneLeafNodes()
 
 }// namespace nanovdb
 
-#endif // NVIDIA_TOOLS_CUDA_PRUNEGRID_CUH_HAS_BEEN_INCLUDED
+#endif // NANOVDB_TOOLS_CUDA_PRUNEGRID_CUH_HAS_BEEN_INCLUDED

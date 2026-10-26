@@ -13,8 +13,8 @@
              to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NVIDIA_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
-#define NVIDIA_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <cub/cub.cuh>
 #include <algorithm>
@@ -1219,4 +1219,4 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
 
 } // namespace nanovdb
 
-#endif // NVIDIA_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
+#endif // NANOVDB_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
