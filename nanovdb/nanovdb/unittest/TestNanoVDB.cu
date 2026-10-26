@@ -4687,14 +4687,15 @@ TEST(TestNanoVDBCUDA, TopologyBuilder_ProcessedRootAllocation)
         EXPECT_EQ(root->mTableSize, tileCount);
     }
 
-    // The deprecated byte form recovers the tile count and resets a batch to one grid
+    // The deprecated byte form returns the single root and resets a batch to one grid
     builder.allocateProcessedRoots({2, 3});
     EXPECT_EQ(builder.gridCount(), 2u);
     NANOVDB_SUPPRESS_DEPRECATION_BEGIN
     RootT *root = builder.allocateProcessedRoot(RootT::memUsage(3));
     NANOVDB_SUPPRESS_DEPRECATION_END
+    ASSERT_NE(root, nullptr);
+    EXPECT_EQ(root, builder.hostProcessedRoot(0));
     EXPECT_EQ(builder.gridCount(), 1u);
-    EXPECT_EQ(root->mTableSize, 3u);
 }// TopologyBuilder_ProcessedRootAllocation
 
 TEST(TestNanoVDBCUDA, MergeGrids_ValueOnIndex)

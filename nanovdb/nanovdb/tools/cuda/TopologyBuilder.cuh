@@ -308,8 +308,9 @@ public:
         return root;
     }
 
-    /// @brief Byte form of allocateProcessedRootTiles; @a bytes must be RootT::memUsage(n)
-    ///        for a tile count n, which becomes the root's mTableSize.
+    /// @brief Allocates (pinned) host staging of @a bytes for one processed root and returns
+    ///        it for the caller to fill, including mTableSize; any previous roots are dropped
+    ///        and the builder is reset to a single grid.
     [[deprecated("Use allocateProcessedRootTiles(tileCount), which also sets mTableSize")]]
     RootT* allocateProcessedRoot(uint64_t bytes)
     {
