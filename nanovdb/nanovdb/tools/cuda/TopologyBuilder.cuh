@@ -313,9 +313,8 @@ public:
     [[deprecated("Use allocateProcessedRootTiles(tileCount), which also sets mTableSize")]]
     RootT* allocateProcessedRoot(uint64_t bytes)
     {
-        const uint64_t tileCount = (bytes - RootT::memUsage(0)) / sizeof(typename RootT::Tile);
-        NANOVDB_ASSERT(bytes >= RootT::memUsage(0) && RootT::memUsage(uint32_t(tileCount)) == bytes);
-        return allocateProcessedRootTiles(uint32_t(tileCount));
+        allocateHostStaging(1, bytes);
+        return hostProcessedRoot(0);
     }
 
     /// @brief Allocates (pinned) host staging for the processed roots of a batch, one root
