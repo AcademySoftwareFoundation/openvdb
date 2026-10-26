@@ -11,8 +11,8 @@
     \warning This header contains CUDA device code and must be included from a .cu or .cuh file.
 */
 
-#ifndef NVIDIA_TOOLS_CUDA_PROPAGATESIGN_CUH_HAS_BEEN_INCLUDED
-#define NVIDIA_TOOLS_CUDA_PROPAGATESIGN_CUH_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_TOOLS_CUDA_PROPAGATESIGN_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_TOOLS_CUDA_PROPAGATESIGN_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/cuda/Buffer.h>
@@ -189,11 +189,8 @@ private:
 template <typename BuildT, typename ResourceT>
 void PropagateSign<BuildT, ResourceT>::initializeMasks()
 {
-    // Inputs are expected to be ready in mStream order, but the caller's work that writes them may still be
-    // queued on mStream. DeviceGridTraits reads the grid with a blocking cudaMemcpy on the default stream,
-    // which does not wait for mStream in general (e.g. for a non-blocking stream), so wait for it here.
-    cudaCheck(cudaStreamSynchronize(mStream));
-    const auto treeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceGrid);
+    // Inputs are ready in mStream order, so read the grid's tree header on mStream (the read blocks).
+    const auto treeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceGrid, mStream);
     const auto& [leafCount, lowerCount, upperCount] = treeData.mNodeCount;
 
     //Initialize Leaf and internal node masks
@@ -206,7 +203,7 @@ void PropagateSign<BuildT, ResourceT>::initializeMasks()
     // Unlike node masks, root propagation must also cover absent root-tile positions, which the grid does not
     // store. An absent position can only be interior if active voxels enclose it, so it lies inside the bbox
     // of the active voxels: allocate one byte per root-tile position in that bbox (see mRootMask).
-    const auto activeIndexBBox = util::cuda::DeviceGridTraits<BuildT>::getIndexBBox(mDeviceGrid, treeData);
+    const auto activeIndexBBox = util::cuda::DeviceGridTraits<BuildT>::getIndexBBox(mDeviceGrid, treeData, mStream);
 
     // Voxel bbox -> bbox of the root tiles containing it. The arithmetic shift rounds down, so negative
     // coordinates land in the right tile (e.g. voxel x = -100 is in root tile x = -1).
@@ -633,4 +630,4 @@ void PropagateSign<BuildT, ResourceT>::fillRootInteriorMasks()
 
 } // namespace nanovdb
 
-#endif // NVIDIA_TOOLS_CUDA_PROPAGATESIGN_CUH_HAS_BEEN_INCLUDED
+#endif // NANOVDB_TOOLS_CUDA_PROPAGATESIGN_CUH_HAS_BEEN_INCLUDED
