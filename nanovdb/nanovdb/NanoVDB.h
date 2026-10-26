@@ -182,8 +182,12 @@ class ValueOnIndex{};
 /// @brief Dummy type for a voxel whose value equals its binary active state
 class ValueMask{};
 
-/// @brief Dummy type for a 16 bit floating point values (placeholder for IEEE 754 Half)
-class Half{};
+/// @brief Type containing raw 16 bits for half precision floating point values (IEEE 754 Half)
+class Half
+{
+    public:
+    uint16_t raw;
+};
 
 /// @brief Dummy type for a 4bit quantization of float point values
 class Fp4{};
@@ -225,7 +229,7 @@ enum class GridType : uint32_t { Unknown = 0, //  unknown value type - should ra
                                  Vec3f = 6, //  single precision floating 3D vector
                                  Vec3d = 7, //  double precision floating 3D vector
                                  Mask = 8, //  no value, just the active state
-                                 Half = 9, //  half precision floating point value (placeholder for IEEE 754 Half)
+                                 Half = 9, //  half precision floating point value (IEEE 754 Half)
                                  UInt32 = 10, // single precision unsigned integer value
                                  Boolean = 11, // boolean value, encoded in bit array
                                  RGBA8 = 12, // RGBA packed into 32bit word in reverse-order, i.e. R is lowest byte.
@@ -550,13 +554,6 @@ struct BuildToValueMap<ValueMask>
 };
 
 template<>
-struct BuildToValueMap<Half>
-{
-    using Type = float;
-    using type = float;
-};
-
-template<>
 struct BuildToValueMap<Fp4>
 {
     using Type = float;
@@ -664,7 +661,7 @@ __hostdev__ inline bool isIndex(GridType gridType)
 __hostdev__ inline bool isValid(GridType gridType, GridClass gridClass)
 {
     if (gridClass == GridClass::LevelSet || gridClass == GridClass::FogVolume) {
-        return isFloatingPoint(gridType);
+        return isFloatingPoint(gridType) || gridType == GridType::Half;
     } else if (gridClass == GridClass::Staggered) {
         return isFloatingPointVector(gridType);
     } else if (gridClass == GridClass::PointIndex || gridClass == GridClass::PointData) {
@@ -677,7 +674,7 @@ __hostdev__ inline bool isValid(GridType gridType, GridClass gridClass)
         return gridType == GridType::RGBA8 || gridType == GridType::Float ||
                gridType == GridType::Double || gridType == GridType::Vec3f ||
                gridType == GridType::Vec3d || gridType == GridType::UInt32 ||
-               gridType == GridType::UInt8;
+               gridType == GridType::UInt8 || gridType == GridType::Half;
     }
     return gridClass < GridClass::End && gridType < GridType::End; // any valid combination
 }
@@ -1423,7 +1420,7 @@ struct Map
     double mTaperD; // 8B, placeholder for taper value
 
     /// @brief Default constructor for the identity map
-    __hostdev__ Map()
+    __hostdev__ constexpr Map()
         : mMatF{   1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f}
         , mInvMatF{1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f}
         , mVecF{0.0f, 0.0f, 0.0f}
@@ -1434,7 +1431,7 @@ struct Map
         , mTaperD{1.0}
     {
     }
-    __hostdev__ Map(double s, const Vec3d& t = Vec3d(0.0, 0.0, 0.0))
+    __hostdev__ constexpr Map(double s, const Vec3d& t = Vec3d(0.0, 0.0, 0.0))
         : mMatF{float(s), 0.0f, 0.0f, 0.0f, float(s), 0.0f, 0.0f, 0.0f, float(s)}
         , mInvMatF{1.0f / float(s), 0.0f, 0.0f, 0.0f, 1.0f / float(s), 0.0f, 0.0f, 0.0f, 1.0f / float(s)}
         , mVecF{float(t[0]), float(t[1]), float(t[2])}
@@ -1466,7 +1463,7 @@ struct Map
     /// @param ijk 3D vector to be mapped - typically floating point index coordinates
     /// @return Forward mapping for affine transformation, i.e. (mat x ijk) + translation
     template<typename Vec3T>
-    __hostdev__ Vec3T applyMap(const Vec3T& ijk) const { return math::matMult(mMatD, mVecD, ijk); }
+    __hostdev__ constexpr Vec3T applyMap(const Vec3T& ijk) const { return math::matMult(mMatD, mVecD, ijk); }
 
     /// @brief Apply the forward affine transformation to a vector using 32bit floating point arithmetics.
     /// @note Typically this operation is used for the scale, rotation and translation of index -> world mapping
@@ -1474,7 +1471,7 @@ struct Map
     /// @param ijk 3D vector to be mapped - typically floating point index coordinates
     /// @return Forward mapping for affine transformation, i.e. (mat x ijk) + translation
     template<typename Vec3T>
-    __hostdev__ Vec3T applyMapF(const Vec3T& ijk) const { return math::matMult(mMatF, mVecF, ijk); }
+    __hostdev__ constexpr Vec3T applyMapF(const Vec3T& ijk) const { return math::matMult(mMatF, mVecF, ijk); }
 
     /// @brief Apply the linear forward 3x3 transformation to an input 3d vector using 64bit floating point arithmetics,
     ///        e.g. scale and rotation WITHOUT translation.
@@ -1483,7 +1480,7 @@ struct Map
     /// @param ijk 3D vector to be mapped - typically floating point index coordinates
     /// @return linear forward 3x3 mapping of the input vector
     template<typename Vec3T>
-    __hostdev__ Vec3T applyJacobian(const Vec3T& ijk) const { return math::matMult(mMatD, ijk); }
+    __hostdev__ constexpr Vec3T applyJacobian(const Vec3T& ijk) const { return math::matMult(mMatD, ijk); }
 
     /// @brief Apply the linear forward 3x3 transformation to an input 3d vector using 32bit floating point arithmetics,
     ///        e.g. scale and rotation WITHOUT translation.
@@ -1492,7 +1489,7 @@ struct Map
     /// @param ijk 3D vector to be mapped - typically floating point index coordinates
     /// @return linear forward 3x3 mapping of the input vector
     template<typename Vec3T>
-    __hostdev__ Vec3T applyJacobianF(const Vec3T& ijk) const { return math::matMult(mMatF, ijk); }
+    __hostdev__ constexpr Vec3T applyJacobianF(const Vec3T& ijk) const { return math::matMult(mMatF, ijk); }
 
     /// @brief Apply the inverse affine mapping to a vector using 64bit floating point arithmetics.
     /// @note Typically this operation is used for the world -> index mapping
@@ -1500,7 +1497,7 @@ struct Map
     /// @param xyz 3D vector to be mapped - typically floating point world coordinates
     /// @return Inverse affine mapping of the input @c xyz i.e. (xyz - translation) x mat^-1
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseMap(const Vec3T& xyz) const
+    __hostdev__ constexpr Vec3T applyInverseMap(const Vec3T& xyz) const
     {
         return math::matMult(mInvMatD, Vec3T(xyz[0] - mVecD[0], xyz[1] - mVecD[1], xyz[2] - mVecD[2]));
     }
@@ -1511,7 +1508,7 @@ struct Map
     /// @param xyz 3D vector to be mapped - typically floating point world coordinates
     /// @return Inverse affine mapping of the input @c xyz i.e. (xyz - translation) x mat^-1
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseMapF(const Vec3T& xyz) const
+    __hostdev__ constexpr Vec3T applyInverseMapF(const Vec3T& xyz) const
     {
         return math::matMult(mInvMatF, Vec3T(xyz[0] - mVecF[0], xyz[1] - mVecF[1], xyz[2] - mVecF[2]));
     }
@@ -1523,7 +1520,7 @@ struct Map
     /// @param xyz 3D vector to be mapped - typically floating point index coordinates
     /// @return linear inverse 3x3 mapping of the input vector i.e. xyz x mat^-1
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseJacobian(const Vec3T& xyz) const { return math::matMult(mInvMatD, xyz); }
+    __hostdev__ constexpr Vec3T applyInverseJacobian(const Vec3T& xyz) const { return math::matMult(mInvMatD, xyz); }
 
     /// @brief Apply the linear inverse 3x3 transformation to an input 3d vector using 32bit floating point arithmetics,
     ///        e.g. inverse scale and inverse rotation WITHOUT translation.
@@ -1532,7 +1529,7 @@ struct Map
     /// @param xyz 3D vector to be mapped - typically floating point index coordinates
     /// @return linear inverse 3x3 mapping of the input vector i.e. xyz x mat^-1
     template<typename Vec3T>
-    __hostdev__ Vec3T applyInverseJacobianF(const Vec3T& xyz) const { return math::matMult(mInvMatF, xyz); }
+    __hostdev__ constexpr Vec3T applyInverseJacobianF(const Vec3T& xyz) const { return math::matMult(mInvMatF, xyz); }
 
     /// @brief Apply the transposed inverse 3x3 transformation to an input 3d vector using 64bit floating point arithmetics,
     ///        e.g. inverse scale and inverse rotation WITHOUT translation.
@@ -1541,12 +1538,12 @@ struct Map
     /// @param xyz 3D vector to be mapped - typically floating point index coordinates
     /// @return linear inverse 3x3 mapping of the input vector i.e. xyz x mat^-1
     template<typename Vec3T>
-    __hostdev__ Vec3T applyIJT(const Vec3T& xyz) const { return math::matMultT(mInvMatD, xyz); }
+    __hostdev__ constexpr Vec3T applyIJT(const Vec3T& xyz) const { return math::matMultT(mInvMatD, xyz); }
     template<typename Vec3T>
-    __hostdev__ Vec3T applyIJTF(const Vec3T& xyz) const { return math::matMultT(mInvMatF, xyz); }
+    __hostdev__ constexpr Vec3T applyIJTF(const Vec3T& xyz) const { return math::matMultT(mInvMatF, xyz); }
 
     /// @brief Return a voxels size in each coordinate direction, measured at the origin
-    __hostdev__ Vec3d getVoxelSize() const { return this->applyMap(Vec3d(1)) - this->applyMap(Vec3d(0)); }
+    __hostdev__ constexpr Vec3d getVoxelSize() const { return this->applyMap(Vec3d(1)) - this->applyMap(Vec3d(0)); }
 }; // Map
 
 template<typename MatT, typename Vec3T>
@@ -4792,6 +4789,7 @@ using MaskTree = NanoTree<ValueMask>;
 using BoolTree = NanoTree<bool>;
 using IndexTree = NanoTree<ValueIndex>;
 using OnIndexTree = NanoTree<ValueOnIndex>;
+using HalfTree = NanoTree<Half>;
 
 using FloatGrid = Grid<FloatTree>;
 using Fp4Grid = Grid<Fp4Tree>;
@@ -4812,6 +4810,7 @@ using BoolGrid = Grid<BoolTree>;
 using PointGrid = Grid<Point>;
 using IndexGrid = Grid<IndexTree>;
 using OnIndexGrid = Grid<OnIndexTree>;
+using HalfGrid = Grid<HalfTree>;
 
 // --------------------------> callNanoGrid <------------------------------------
 
@@ -4887,6 +4886,8 @@ auto callNanoGrid(GridDataT *gridData, ArgsT&&... args)
             return OpT::template known<Vec4d>(gridData, args...);
         case GridType::UInt8:
             return OpT::template known<uint8_t>(gridData, args...);
+        case GridType::Half:
+            return OpT::template known<Half>(gridData, args...);
         default:
             return OpT::unknown(gridData, args...);
     }

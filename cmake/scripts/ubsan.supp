@@ -1,7 +1,7 @@
 #################################################################################
 ## This file is loaded by the Undefined Behaviour Sanitizer build for the unit ##
 ## tests. It can be used to ignore various errors reported by the sanitizer.   ##
-## This is especially useful with upstream issues (e.g. boost/tbb). For help   ##
+## This is especially useful with upstream issues (e.g. tbb). For help         ##
 ## defining suppression rules, see:                                            ##
 ##   https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html               ##
 ## The build is configured with CMAKE_BUILD_TYPE=ubsan.                        ##

@@ -424,22 +424,25 @@ public:
     ///        routing device-local allocations through the default instance of @c ResourceT on every device
     /// @param deviceMesh DeviceMesh on which to run/distribute the operation
     /// @param map Map to be used for the output grid
+    /// @throw std::invalid_argument if the map is singular or not finite
     DistributedPointsToGrid(const nanovdb::cuda::DeviceMesh& deviceMesh, const Map &map);
     /// @brief Constructor that also supplies the per-device memory resources
     /// @param deviceMesh DeviceMesh on which to run/distribute the operation
     /// @param map Map to be used for the output grid
     /// @param resources one non-null resource-instance pointer per device in the mesh,
     ///        indexed by device id; each instance allocates on its device and must outlive this class
-    /// @throw std::invalid_argument if the resource count differs from the mesh's device count
-    ///        or any entry is null
+    /// @throw std::invalid_argument if the map is singular or not finite, the resource count differs
+    ///        from the mesh's device count, or any entry is null
     DistributedPointsToGrid(const nanovdb::cuda::DeviceMesh& deviceMesh, const Map &map, const std::vector<ResourceT*>& resources);
     /// @brief Constructor that specifies the devices on which to execute and the scale and translation used to create the map for the output grid
     /// @param deviceMesh DeviceMesh on which to run/distribute the operation
     /// @param scale optional scale factor
     /// @param trans optional translation
+    /// @throw std::invalid_argument if @c scale is zero or not finite
     DistributedPointsToGrid(const nanovdb::cuda::DeviceMesh& deviceMesh, const double scale = 1.0, const Vec3d &trans = Vec3d(0.0));
     /// @brief Constructor that specifies the map as a scale and translation, and supplies the per-device
     ///        memory resources; see the map-taking overload for the contract on @c resources
+    /// @throw std::invalid_argument as for the map-taking overload with resources
     DistributedPointsToGrid(const nanovdb::cuda::DeviceMesh& deviceMesh, const double scale, const Vec3d &trans, const std::vector<ResourceT*>& resources);
 
     /// @brief Creates a handle to a grid with the specified build type from a list of points in index or world space
@@ -453,6 +456,7 @@ public:
     /// @param pointCount number of input points or voxels
     /// @param buffer Optional buffer to guide the allocation
     /// @return returns a handle with a grid of type NanoGrid<BuildT> in unified memory
+    /// @note An empty input (@c pointCount == 0) yields a valid empty grid, built on device 0.
     template <typename PtrT, typename BufferT = nanovdb::cuda::DualUnifiedBuffer>
     GridHandle<BufferT> getHandle(const PtrT points,
                                   size_t pointCount,
@@ -558,6 +562,7 @@ DistributedPointsToGrid<BuildT, ResourceT>::DistributedPointsToGrid(const nanovd
 template <typename BuildT, typename ResourceT>
 void DistributedPointsToGrid<BuildT, ResourceT>::init(const Map &map)
 {
+    detail::checkMap(map, "DistributedPointsToGrid");
     mTempDevicePools.reserve(mDeviceMesh.deviceCount());
     for (const auto& [deviceId, stream] : mDeviceMesh) {
         mTempDevicePools.emplace_back(*mResources[deviceId]);
@@ -600,6 +605,14 @@ template<typename PtrT, typename BufferT>
 inline GridHandle<BufferT>
 DistributedPointsToGrid<BuildT, ResourceT>::getHandle(const PtrT points, size_t pointCount, const BufferT &pool)
 {
+    if (pointCount == 0) {// no points: an empty grid, which one device builds
+        const int deviceId = 0;
+        cudaCheck(cudaSetDevice(deviceId));
+        PointsToGrid<BuildT, ResourceT> converter(mData->map, mDeviceMesh[deviceId].stream, *mResources[deviceId]);
+        converter.setGridName(mGridName);
+        converter.setChecksum(mChecksum);
+        return converter.getHandle(points, 0, pool);
+    }
     this->countNodes(points, pointCount);
 
     auto buffer = this->getBuffer<PtrT, BufferT>(points, pointCount, pool);
@@ -815,7 +828,7 @@ void DistributedPointsToGrid<BuildT, ResourceT>::countNodes(const PtrT coords, s
             // Only this device's stream touches the offsets, so they come from the per-device
             // resource, stream-ordered, and are freed on the same stream at scope exit (the
             // synchronous cudaFree this replaces stalled the whole device mid-pipeline).
-            DeviceBufT<uint32_t> tileOffsetsBuf(stream, nanovdb::cuda::ResourceRef<ResourceT>(*mResources[deviceId]), numDeviceTiles + 1, nanovdb::cuda::noInit);
+            DeviceBufT<uint32_t> tileOffsetsBuf(stream, nanovdb::cuda::detail::borrowInternal(*mResources[deviceId]), numDeviceTiles + 1, nanovdb::cuda::noInit);
             uint32_t* d_tile_offsets = tileOffsetsBuf.data();
             cudaCheck(cudaMemsetAsync(d_tile_offsets, 0, sizeof(uint32_t), stream));
             CUB_LAUNCH(DeviceScan::InclusiveSum, mTempDevicePools[deviceId], stream, devicePointsPerTile, d_tile_offsets + 1, numDeviceTiles);

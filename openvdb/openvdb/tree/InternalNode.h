@@ -82,6 +82,10 @@ public:
     /// @param active    State assigned to all the tiles
     InternalNode(const Coord& origin, const ValueType& fillValue, bool active = false);
 
+    /// @brief Construct a node without allocating child memory. Children are
+    /// left unallocated and must be populated single-threaded, or with external
+    /// synchronization. The valid advanced pattern is: create all nodes
+    /// single-threaded, then allocate leaf buffers in parallel across distinct leaves.
     InternalNode(PartialCreate, const Coord&, const ValueType& fillValue, bool active = false);
 
     /// @brief Deep copy constructor
@@ -454,6 +458,7 @@ public:
     /// Mark all values (both tiles and voxels) as active.
     void setValuesOn();
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     //
     // I/O
     //
@@ -462,7 +467,7 @@ public:
     void writeBuffers(std::ostream&, bool toHalf = false) const;
     void readBuffers(std::istream&, bool fromHalf = false);
     void readBuffers(std::istream&, const CoordBBox&, bool fromHalf = false);
-
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     //
     // Unsafe methods
@@ -984,7 +989,9 @@ struct InternalNode<ChildT, Log2Dim>::DeepCopy
     void operator()(const tbb::blocked_range<Index> &r) const {
         for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
             if (s->mChildMask.isOff(i)) {
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
                 t->mNodes[i].setValue(ValueType(s->mNodes[i].getValue()));
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_END
             } else {
                 t->mNodes[i].setChild(new ChildNodeType(*(s->mNodes[i].getChild())));
             }
@@ -2388,6 +2395,8 @@ InternalNode<ChildT, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense)
 ////////////////////////////////////////
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::writeTopology(std::ostream& os, bool toHalf) const
@@ -2456,6 +2465,8 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         child->readTopology(is, fromHalf);
     }
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
 ////////////////////////////////////////
@@ -3212,6 +3223,8 @@ InternalNode<ChildT, Log2Dim>::combine2(const InternalNode& other, const OtherVa
 ////////////////////////////////////////
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
@@ -3252,6 +3265,8 @@ InternalNode<ChildT, Log2Dim>::readBuffers(std::istream& is,
     }
     this->clip(clipBBox, background);
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
 ////////////////////////////////////////

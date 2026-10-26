@@ -87,10 +87,6 @@ struct TestSimdOperators
             for (size_t i = 0; i < 128; ++i) {
                 tmp[i] = std::abs(std::sin(double(i)) * 10.0);
             }
-            // flip the sign of every second value in the second set
-            for (size_t i = 64; i < 128; i+=2) {
-                tmp[i] = -tmp[i];
-            }
             return tmp;
         }();
         return data;
@@ -99,6 +95,11 @@ struct TestSimdOperators
     template <typename T, size_t Size>
     static void makeUnique(std::array<T, Size>& a, std::array<T, Size>& b)
     {
+        if constexpr (std::is_signed_v<T>) {
+            // flip the sign of every second value in the second set
+            for (size_t i = 0; i < b.size(); i+=2) b[i] = T(-b[i]);
+        }
+
         std::unordered_set<T> seen;
         auto op = [&](std::array<T, Size>& data) {
             for (size_t i = 0; i < Size; ++i) {

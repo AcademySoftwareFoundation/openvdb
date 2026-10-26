@@ -5,18 +5,92 @@
 #include <nanovdb/tools/cuda/DistributedPointsToGrid.cuh>
 #include <nanovdb/util/Timer.h>
 #include <nanovdb/cuda/DeviceMesh.h>
+#include <nanovdb/tools/GridValidator.h> // for isValid
+#include <nanovdb/cuda/Buffer.h>
+#include <nanovdb/cuda/GridHandle.cuh> // for cuda::mergeGridHandles
+#include <nanovdb/cuda/ManagedResource.h>
+#include <nanovdb/cuda/UnifiedBuffer.h> // the default buffer of DistributedPointsToGrid::getHandle
+#include <nanovdb/tools/CreatePrimitives.h>
+#include <nanovdb/tools/GridChecksum.h> // for validateChecksum
 
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
 #include <thread> // for std::thread
 #include <algorithm> // for std::sort, std::unique
+#include <cstddef>
 #include <cstdint>
+#include <type_traits>
 #include <vector>
 
 #include <thrust/fill.h>
 #include <thrust/universal_vector.h>
 #include <thrust/execution_policy.h>
+
+/// @brief A merge source whose retained stream belongs to another GPU than the current one.
+TEST(TestNanoVDBMultiGPU, MergeGridHandlesFromAnotherDevice)
+{
+    int deviceCount = 0;
+    ASSERT_EQ(cudaSuccess, cudaGetDeviceCount(&deviceCount));
+    if (deviceCount < 2) GTEST_SKIP() << "needs two devices";
+    nanovdb::cuda::detail::DeviceGuard guard;
+    int current = 0;
+    ASSERT_EQ(cudaSuccess, cudaGetDevice(&current));
+    const int other = (current + 1) % deviceCount;
+
+    using BufT = nanovdb::cuda::Buffer<std::byte>;
+    auto host = nanovdb::tools::createLevelSetSphere<float>(10.0);
+    cudaStream_t remote, local;
+    ASSERT_EQ(cudaSuccess, cudaSetDevice(other));
+    ASSERT_EQ(cudaSuccess, cudaStreamCreateWithFlags(&remote, cudaStreamNonBlocking));
+    std::vector<nanovdb::GridHandle<BufT>> sources;
+    sources.push_back(nanovdb::cuda::copyTo<BufT>(host, remote));
+    ASSERT_EQ(cudaSuccess, cudaSetDevice(current));
+    ASSERT_EQ(cudaSuccess, cudaStreamCreateWithFlags(&local, cudaStreamNonBlocking));
+    sources.push_back(nanovdb::cuda::copyTo<BufT>(host, local));
+    {
+        auto merged = nanovdb::cuda::mergeGridHandles<BufT, std::vector>(sources, local);
+        ASSERT_EQ(2u, merged.gridCount());
+        auto mergedHost = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(merged, local);
+        for (uint32_t i = 0; i < 2; ++i) {
+            const nanovdb::GridData* data = mergedHost.gridData(i);
+            ASSERT_NE(nullptr, data);
+            EXPECT_EQ(i, data->mGridIndex);
+            EXPECT_EQ(2u, data->mGridCount);
+            EXPECT_EQ(host.gridSize(), mergedHost.gridSize(i));
+            EXPECT_TRUE(nanovdb::tools::validateChecksum(data, nanovdb::CheckMode::Full));
+        }
+    }
+    sources.pop_back();// freed on its own device
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(local));
+    ASSERT_EQ(cudaSuccess, cudaStreamDestroy(local));
+    ASSERT_EQ(cudaSuccess, cudaSetDevice(other));
+    sources.clear();
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(remote));
+    ASSERT_EQ(cudaSuccess, cudaStreamDestroy(remote));
+}
+
+/// @brief No points build a valid empty grid, as in PointsToGrid.
+TEST(TestNanoVDBMultiGPU, ZeroPoints_DistributedCudaPointsToGrid)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
+    int current = 0;
+    cudaCheck(cudaGetDevice(&current));
+    nanovdb::Coord* voxels = nullptr;
+    cudaCheck(cudaMallocManaged(&voxels, sizeof(nanovdb::Coord)));
+    nanovdb::cuda::DeviceMesh deviceMesh;
+    nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
+    auto handle = converter.getHandle(voxels, 0, BufferT());
+    ASSERT_EQ(1u, handle.gridCount());
+    const auto *grid = handle.grid<BuildT>();// managed storage: the host reads the grid in place
+    ASSERT_TRUE(grid);
+    EXPECT_EQ(0u, grid->activeVoxelCount());
+    EXPECT_EQ(1u, grid->valueCount());
+    EXPECT_TRUE(nanovdb::tools::isValid(grid, nanovdb::CheckMode::Disable));// no checksum is computed here
+    cudaCheck(cudaFree(voxels));
+    cudaSetDevice(current);
+}
 
 /// @brief Tests the correctness of multi-GPU radix sort
 TEST(TestNanoVDBMultiGPU, RadixSort)
@@ -304,6 +378,9 @@ struct CountingResource : nanovdb::cuda::SyncFromAsync<CountingResource>
         if (p) ++deallocs;
         nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
     }
+    // state is inline, so only the same instance keeps one account
+    friend bool operator==(const CountingResource& a, const CountingResource& b) { return &a == &b; }
+    friend bool operator!=(const CountingResource& a, const CountingResource& b) { return !(a == b); }
 };
 
 /// @brief Tests that DistributedPointsToGrid routes its device-local allocations (CUB
@@ -503,12 +580,13 @@ TEST(TestNanoVDBMultiGPU, FewTiles_DistributedCudaPointsToGrid)
 
     nanovdb::cuda::DeviceMesh deviceMesh;
     nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
-    auto handle = converter.getHandle(voxels, voxelCount);
+    auto handle = converter.getHandle(voxels, voxelCount);// the default buffer, DualUnifiedBuffer in 13.x
+    static_assert(std::is_same<decltype(handle), nanovdb::GridHandle<nanovdb::cuda::DualUnifiedBuffer>>::value,
+                  "getHandle without a buffer builds into the dual-space unified buffer");
 
     EXPECT_TRUE(handle.deviceData());
     EXPECT_TRUE(handle.deviceGrid<BuildT>());
-    handle.deviceDownload();
-    auto *grid = handle.grid<BuildT>();
+    auto *grid = handle.grid<BuildT>();// unified memory: the host reads the grid in place
     EXPECT_TRUE(grid);
     EXPECT_TRUE(grid->valueCount() > 0);
     EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
@@ -552,14 +630,14 @@ TEST(TestNanoVDBMultiGPU, ManyTiles_DistributedCudaPointsToGrid)
             voxels[i] = nanovdb::Coord(op(), op(), op());
     }
 
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
     nanovdb::cuda::DeviceMesh deviceMesh;
     nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
-    auto handle = converter.getHandle(voxels, voxelCount);
+    auto handle = converter.getHandle(voxels, voxelCount, BufferT());
 
     EXPECT_TRUE(handle.deviceData());
     EXPECT_TRUE(handle.deviceGrid<BuildT>());
-    handle.deviceDownload();
-    auto *grid = handle.grid<BuildT>();
+    auto *grid = handle.grid<BuildT>();// managed storage: the host reads the grid in place
     EXPECT_TRUE(grid);
     EXPECT_TRUE(grid->valueCount() > 0);
     EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());

@@ -33,28 +33,6 @@ if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_CXX_STANDARD)
   endif()
 endif()
 
-# Configure MS Runtime
-
-if(WIN32 AND CMAKE_MSVC_RUNTIME_LIBRARY)
-  message(STATUS "CMAKE_MSVC_RUNTIME_LIBRARY set to target ${CMAKE_MSVC_RUNTIME_LIBRARY}")
-
-  # Configure Boost library varient on Windows
-  if(NOT Boost_USE_STATIC_RUNTIME)
-    set(Boost_USE_STATIC_RUNTIME OFF)
-    if(CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreaded OR
-       CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebug)
-      set(Boost_USE_STATIC_RUNTIME ON)
-    endif()
-  endif()
-  if(NOT Boost_USE_DEBUG_RUNTIME)
-    set(Boost_USE_DEBUG_RUNTIME OFF)
-    if(CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebugDLL OR
-       CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebug)
-      set(Boost_USE_DEBUG_RUNTIME ON)
-    endif()
-  endif()
-endif()
-
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 

@@ -13,8 +13,8 @@
              to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NVIDIA_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
-#define NVIDIA_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <cub/cub.cuh>
 #include <algorithm>
@@ -104,9 +104,9 @@ public:
     )
         : mStream(stream), mTimer(stream), mBuilder(stream, resource), mDevicePoints(devicePoints), mPointCount(pointCount),
          mDeviceTriangles(deviceTriangles), mTriangleCount(triangleCount), mMap(map), mTempDevicePool(resource),
-         mXformedTriangles(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit),
-         mBoxTrianglePairsBuffer(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit),
-         mUniqueRootOriginsBuffer(stream, nanovdb::cuda::ResourceRef<ResourceT>(resource), 0, nanovdb::cuda::noInit)
+         mXformedTriangles(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit),
+         mBoxTrianglePairsBuffer(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit),
+         mUniqueRootOriginsBuffer(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
     {}
 
     /// @brief Toggle on and off verbose mode
@@ -133,11 +133,21 @@ public:
 
     /// @brief Creates a handle to the output grid
     /// @tparam BufferT Buffer type used for allocation of the grid handle
-    /// @param buffer optional buffer (currently ignored)
+    /// @param buffer prototype buffer whose resource (or create() pool) allocates the output
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
     template<typename BufferT = nanovdb::cuda::DualDeviceBuffer>
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
+
+    /// @brief Resource form of getHandle: the grid allocates through this
+    ///        builder's resource, the one its scratch uses, on its stream.
+    /// @return a handle over cuda::Buffer<std::byte, ResourceRef<ResourceT>>,
+    ///         which borrows the resource: it must outlive the handle
+    GridHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>> build()
+    {
+        using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
+        return this->getHandle(BufferT(mStream, this->ref(), 0, nanovdb::cuda::noInit));
+    }
 
     /// @brief Creates a grid handle and a device sidecar buffer containing the
     ///        per-active-voxel unsigned distance field values.
@@ -149,14 +159,26 @@ public:
     ///
     /// @tparam GridBufferT    Buffer type for the output grid handle
     /// @tparam SidecarBufferT Buffer type for the UDF sidecar (defaults to DeviceBuffer)
-    /// @param buffer          optional allocator for the grid handle (currently ignored)
-    /// @param sidecarBuffer   optional allocator for the UDF sidecar (currently ignored)
+    /// @param buffer          prototype buffer whose resource (or create() pool) allocates the grid
+    /// @param sidecarBuffer   prototype buffer whose resource (or create() pool) allocates the sidecar
     /// @return std::pair of grid handle and UDF sidecar buffer
     template<typename GridBufferT    = nanovdb::cuda::DualDeviceBuffer,
              typename SidecarBufferT = nanovdb::cuda::DualDeviceBuffer>
     std::pair<GridHandle<GridBufferT>, SidecarBufferT>
     getHandleAndUDF(const GridBufferT&    buffer        = GridBufferT(),
                     const SidecarBufferT& sidecarBuffer = SidecarBufferT());
+
+    /// @brief Resource form of getHandleAndUDF: the grid and its UDF sidecar
+    ///        allocate through this builder's resource, on its stream.
+    /// @return the grid handle and the sidecar, both over buffers that borrow
+    ///         the resource: it must outlive them
+    std::pair<GridHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>>, nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>>
+    buildWithUDF()
+    {
+        using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
+        return this->getHandleAndUDF(BufferT(mStream, this->ref(), 0, nanovdb::cuda::noInit),
+                                     BufferT(mStream, this->ref(), 0, nanovdb::cuda::noInit));
+    }
 
 private:
     void transformTriangles();
@@ -269,7 +291,7 @@ GridHandle<BufferT> MeshToGrid<BuildT, ResourceT>::getHandle(const BufferT &buff
     // Count nodes at all levels from the filled masks
     if (mVerbose==1) mTimer.start("Counting nodes");
     mBuilder.countNodes(mStream);
-    cudaStreamSynchronize(mStream); // node counts written async; sync before reading or passing to getBuffer
+    cudaStreamSynchronize(mStream); // not needed by getBuffer, which waits for the node counts itself
     if (mVerbose==1) mTimer.stop();
 
     // Allocate output grid buffer
@@ -1145,7 +1167,7 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
     const float voxelSize = (float)mMap.getVoxelSize()[0];
 
     const uint64_t activeVoxelCount = util::cuda::DeviceGridTraits<BuildT>::getActiveVoxelCount(
-        handle.template deviceGrid<BuildT>());
+        handle.template deviceGrid<BuildT>(), mStream);
 
     auto sidecarBuffer = nanovdb::cuda::detail::createDeviceStorage<SidecarBufferT>(
         (activeVoxelCount + 1) * sizeof(float), &sidecarProto, device, mStream);
@@ -1197,4 +1219,4 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
 
 } // namespace nanovdb
 
-#endif // NVIDIA_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
+#endif // NANOVDB_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED

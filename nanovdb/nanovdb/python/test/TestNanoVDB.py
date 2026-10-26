@@ -17,6 +17,7 @@ if 'add_dll_directory' in dir(os):
 
 import nanovdb
 import unittest
+import gc
 import tempfile
 
 
@@ -333,6 +334,12 @@ class TestGrid(unittest.TestCase):
             self.assertEqual(checksum, updatedChecksum)
 
 
+class TestGridHandle(unittest.TestCase):
+    def test_bool(self):
+        self.assertFalse(nanovdb.GridHandle())
+        self.assertTrue(nanovdb.tools.createLevelSetSphere(nanovdb.GridType.Float, 20))
+
+
 class TestGridHandleExchange(unittest.TestCase):
     def test_list_to_vector(self):
         handle = nanovdb.tools.createLevelSetTorus(nanovdb.GridType.Double)
@@ -536,6 +543,171 @@ class TestDeviceReadWriteGrids(unittest.TestCase):
         for readHandle in readHandles:
             self.assertEqual(readHandle.gridCount(), 1)
             self.assertEqual(readHandle.gridType(0), nanovdb.GridType.Float)
+
+
+@unittest.skipIf(
+    not nanovdb.isCudaAvailable(), "nanovdb module was compiled without CUDA support"
+)
+@unittest.skipIf(
+    not nanovdb.isGpuAvailable(), "No CUDA-capable GPU available"
+)
+class TestDeviceGridHandle(unittest.TestCase):
+    def test_empty_handle(self):
+        handle = nanovdb.DeviceGridHandle()
+        self.assertFalse(handle)
+        self.assertTrue(handle.empty())
+        self.assertEqual(handle.gridCount(), 0)
+        self.assertIsNone(handle.floatGrid())
+        self.assertIsNone(handle.deviceFloatGrid())
+        self.assertRaises(RuntimeError, handle.deviceUpload)
+        self.assertRaises(RuntimeError, handle.deviceDownload)
+        self.assertRaises(RuntimeError, nanovdb.tools.validateGrids, handle, nanovdb.CheckMode.Full, False)
+        self.assertRaises(IndexError, handle.gridSize)
+        self.assertRaises(IndexError, handle.gridData)
+
+    def test_download_before_upload_raises(self):
+        handle = nanovdb.tools.cuda.createLevelSetSphere(nanovdb.GridType.Float, 20)
+        self.assertTrue(handle)
+        self.assertIsNone(handle.deviceFloatGrid())
+        self.assertRaises(RuntimeError, handle.deviceDownload)
+
+    def test_grids_stay_valid_across_transfers(self):
+        handle = nanovdb.tools.cuda.createLevelSetSphere(nanovdb.GridType.Float, 20)
+        accessor = handle.floatGrid().getAccessor()
+        ijk = nanovdb.math.Coord(20, 0, 0)
+        accessor.setVoxel(ijk, 7.0)
+        handle.deviceUpload(sync=False)
+        handle.deviceDownload(sync=True)
+        self.assertEqual(accessor(ijk), 7.0)
+        deviceGrid = handle.deviceFloatGrid()
+        self.assertIsNotNone(deviceGrid)
+
+        # Later transfers copy into the existing storage, so grids already
+        # returned to Python keep pointing at the current data.
+        handle.deviceUpload()
+        accessor.setVoxel(ijk, 1.0)
+        handle.deviceDownload()
+        self.assertEqual(accessor(ijk), 7.0)
+        nanovdb.tools.cuda.signedFloodFill(deviceGrid)
+
+    def test_validate_grids(self):
+        handle = nanovdb.tools.cuda.createLevelSetSphere(nanovdb.GridType.Float, 20)
+        self.assertTrue(nanovdb.tools.validateGrids(handle, nanovdb.CheckMode.Full, False))
+
+    def test_primitives(self):
+        cuda = nanovdb.tools.cuda
+        cases = [
+            (cuda.createLevelSetTorus, nanovdb.GridClass.LevelSet),
+            (cuda.createFogVolumeSphere, nanovdb.GridClass.FogVolume),
+            (cuda.createFogVolumeTorus, nanovdb.GridClass.FogVolume),
+        ]
+        for create, gridClass in cases:
+            handle = create(nanovdb.GridType.Float)
+            self.assertEqual(handle.gridCount(), 1)
+            self.assertEqual(handle.floatGrid().gridClass(), gridClass)
+            handle.deviceUpload()
+            self.assertIsNotNone(handle.deviceFloatGrid())
+
+    def test_external_arrays(self):
+        try:
+            import numpy as np
+            import torch
+        except ImportError:
+            self.skipTest("PyTorch or NumPy not found")
+        source = nanovdb.tools.createLevelSetSphere(nanovdb.GridType.Float, 20)
+        data = np.frombuffer(source.gridData(), dtype=np.uint32)
+        # grids must be 32-byte aligned
+        raw = np.empty(2 * data.size + 8, dtype=np.uint32)
+        start = (-raw.ctypes.data % 32) // 4
+        cpu = raw[start : start + data.size]
+        cpu[:] = data
+        gpu = torch.zeros(data.size, dtype=torch.uint32, device=torch.device("cuda", 0))
+
+        handle = nanovdb.DeviceGridHandle(cpu, gpu)
+        self.assertEqual(handle.gridCount(), 1)
+        self.assertIsNotNone(handle.floatGrid())
+        self.assertIsNotNone(handle.deviceFloatGrid())
+        handle.deviceUpload()
+        self.assertTrue(np.array_equal(gpu.cpu().numpy(), data))
+        cpu[:] = 0
+        handle.deviceDownload()
+        self.assertTrue(np.array_equal(cpu, data))
+
+        self.assertRaises(ValueError, nanovdb.DeviceGridHandle, cpu, gpu[:-1])
+        self.assertRaises(ValueError, nanovdb.DeviceGridHandle, raw[start + 1 : start + 1 + data.size], gpu)
+        self.assertRaises(TypeError, nanovdb.DeviceGridHandle, raw[start : start + 2 * data.size : 2], gpu)
+        zeros = raw[start : start + data.size]
+        zeros[:] = 0
+        self.assertRaises(ValueError, nanovdb.DeviceGridHandle, zeros, gpu)
+
+    def test_reset_and_read(self):
+        handle = nanovdb.tools.cuda.createLevelSetSphere(nanovdb.GridType.Float, 20, name="first")
+        handle.deviceUpload()
+        handle.reset()
+        self.assertFalse(handle)
+        self.assertIsNone(handle.deviceFloatGrid())
+
+        source = nanovdb.tools.createLevelSetSphere(nanovdb.GridType.Float, 20, name="second")
+        with tempfile.TemporaryDirectory() as tmp:
+            fileName = os.path.join(tmp, "sphere.raw")
+            source.write(fileName)
+            handle.read(fileName)
+        self.assertEqual(handle.floatGrid().gridName(), "second")
+        self.assertIsNone(handle.deviceFloatGrid())
+        handle.deviceUpload()
+        self.assertIsNotNone(handle.deviceFloatGrid())
+
+    def test_small_handles_sharing_pages(self):
+        # Small host buffers share pages; each is pinned separately.
+        empty = nanovdb.tools.createFloatGrid(
+            0.0, "empty", nanovdb.GridClass.Unknown, lambda ijk: 1.0, nanovdb.math.CoordBBox()
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            fileName = os.path.join(tmp, "empty.nvdb")
+            nanovdb.io.writeGrid(fileName, empty)
+            handles = [nanovdb.io.deviceReadGrid(fileName) for _ in range(16)]
+        for handle in handles:
+            handle.deviceUpload(sync=False)
+        for handle in handles:
+            handle.deviceDownload()
+            self.assertIsNotNone(handle.deviceFloatGrid())
+            self.assertEqual(handle.floatGrid().gridName(), "empty")
+
+    def test_release_with_a_pending_transfer(self):
+        # A transfer issued with sync=False completes before its storage is released.
+        for release in ("reset", "replace", "delete"):
+            handle = nanovdb.tools.cuda.createLevelSetSphere(nanovdb.GridType.Float, 20)
+            handle.deviceUpload()
+            handle.deviceDownload(sync=False)
+            if release == "reset":
+                handle.reset()
+            elif release == "replace":
+                handle = nanovdb.tools.cuda.createLevelSetSphere(nanovdb.GridType.Float, 10)
+                self.assertTrue(handle)
+            else:
+                del handle
+                gc.collect()
+
+    def test_device_only_handle(self):
+        try:
+            import torch
+        except ImportError:
+            self.skipTest("PyTorch not found")
+        tensor = torch.tensor([[1, 2, 3]], dtype=torch.int32, device=torch.device("cuda", 0))
+        handle = nanovdb.tools.cuda.pointsToRGBA8Grid(tensor)
+        self.assertEqual(handle.gridCount(), 1)
+        self.assertIsNone(handle.rgba8Grid())
+        with tempfile.TemporaryDirectory() as tmp:
+            fileName = os.path.join(tmp, "points.nvdb")
+            self.assertRaises(RuntimeError, handle.write, fileName)
+            self.assertRaises(RuntimeError, nanovdb.io.deviceWriteGrid, fileName, handle)
+            self.assertRaises(RuntimeError, nanovdb.io.deviceWriteGrids, fileName, [handle])
+            self.assertFalse(os.path.exists(fileName))
+            handle.deviceDownload(sync=False)
+            handle.deviceDownload()
+            self.assertIsNotNone(handle.rgba8Grid())
+            nanovdb.io.deviceWriteGrids(fileName, [handle])
+            self.assertTrue(os.path.exists(fileName))
 
 
 @unittest.skipIf(

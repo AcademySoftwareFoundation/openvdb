@@ -33,8 +33,9 @@ namespace cuda {// =============================================================
 /// @note  This is the implementation behind the deprecated UnifiedBuffer alias
 ///        below, renamed so the [[deprecated]] attribute reaches only code
 ///        that spells the public name: DistributedPointsToGrid's signature
-///        defaults reference this implementation, so default-using callers
-///        stay warning-free until the defaults change at removal. The Dual
+///        defaults reference this implementation, so code that only reaches
+///        the type through those defaults is warning-free, while calling the
+///        deprecated transfer members warns. The Dual
 ///        prefix marks the deprecated dual-accessor buffer family (this
 ///        buffer satisfies that concept from a single managed allocation).
 ///        Transitional -- do not adopt this name; it is deleted together
@@ -246,41 +247,51 @@ public:
     /// @param stream cuda stream
     /// @param sync if false the memory copy is asynchronous
     /// @note Legacy method included for compatibility with DeviceBuffer
-    void deviceUpload(int device = 0, cudaStream_t stream = cudaStreamPerThread, bool sync = false) const
-    {
-        cudaCheck(util::cuda::memPrefetchAsync(mPtr, mSize, device, stream));
-        if (sync) cudaCheck(cudaStreamSynchronize(stream));
-    }
-    void deviceUpload(int device, void* stream, bool sync) const{this->deviceUpload(device, cudaStream_t(stream));}
+    /// @deprecated Use cuda::Buffer<std::byte, cuda::ManagedResource>, which the host and every device read in place.
+    [[deprecated("the dual-space unified buffers are removed in 14.0: use cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/Buffer.h, cuda/ManagedResource.h), which the host and every device read in place")]]
+    void deviceUpload(int device = 0, cudaStream_t stream = cudaStreamPerThread, bool sync = false) const { this->prefetchAll(device, stream, sync); }
+    /// @note Ignores @c sync and stays asynchronous, as it always has.
+    [[deprecated("the dual-space unified buffers are removed in 14.0: use cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/Buffer.h, cuda/ManagedResource.h), which the host and every device read in place")]]
+    void deviceUpload(int device, void* stream, bool sync) const { this->prefetchAll(device, cudaStream_t(stream), false); }
 
     /// @brief Prefetches all data to the current device, as given by cudaGetDevice
     /// @param stream cuda stream
     /// @param sync if false the memory copy is asynchronous
     /// @note Legacy method included for compatibility with DeviceBuffer
-    void deviceUpload(void* stream, bool sync) const{
-        int device = 0;
-        cudaCheck(cudaGetDevice(&device));
-        this->deviceUpload(device, cudaStream_t(stream), sync);
-    }
+    /// @deprecated Use cuda::Buffer<std::byte, cuda::ManagedResource>, which the host and every device read in place.
+    [[deprecated("the dual-space unified buffers are removed in 14.0: use cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/Buffer.h, cuda/ManagedResource.h), which the host and every device read in place")]]
+    void deviceUpload(void* stream, bool sync) const { this->prefetchAll(util::cuda::currentDevice(), cudaStream_t(stream), sync); }
 
     ///////////////////////////////////////////////////////////////////////
 
     /// @brief Prefetches all data to the host
     /// @param stream cuda stream
     /// @param sync if false the memory copy is asynchronous
-    void deviceDownload(cudaStream_t stream = 0, bool sync = false) const
-    {
-        cudaCheck(util::cuda::memPrefetchAsync(mPtr, mSize, cudaCpuDeviceId, stream));
-        if (sync) cudaCheck(cudaStreamSynchronize(stream));
-    }
+    /// @deprecated Use cuda::Buffer<std::byte, cuda::ManagedResource>, which the host and every device read in place.
+    [[deprecated("the dual-space unified buffers are removed in 14.0: use cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/Buffer.h, cuda/ManagedResource.h), which the host and every device read in place")]]
+    void deviceDownload(cudaStream_t stream = 0, bool sync = false) const { this->prefetchAll(cudaCpuDeviceId, stream, sync); }
 
     /// @brief Legacy
     /// @param stream
     /// @param sync
-    void deviceDownload(void* stream, bool sync) const{this->deviceDownload(cudaStream_t(stream), sync);}
+    /// @deprecated Use cuda::Buffer<std::byte, cuda::ManagedResource>, which the host and every device read in place.
+    [[deprecated("the dual-space unified buffers are removed in 14.0: use cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/Buffer.h, cuda/ManagedResource.h), which the host and every device read in place")]]
+    void deviceDownload(void* stream, bool sync) const { this->prefetchAll(cudaCpuDeviceId, cudaStream_t(stream), sync); }
 
     // used by GridHandle
-    void deviceDownload(int dummmy, void* stream, bool sync) const{this->deviceDownload(cudaStream_t(stream), sync);}
+    /// @deprecated Use cuda::Buffer<std::byte, cuda::ManagedResource>, which the host and every device read in place.
+    [[deprecated("the dual-space unified buffers are removed in 14.0: use cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/Buffer.h, cuda/ManagedResource.h), which the host and every device read in place")]]
+    void deviceDownload(int dummmy, void* stream, bool sync) const { this->prefetchAll(cudaCpuDeviceId, cudaStream_t(stream), sync); }
+
+private:
+    /// @brief Prefetches all data to @c device (cudaCpuDeviceId for the host).
+    void prefetchAll(int device, cudaStream_t stream, bool sync) const
+    {
+        cudaCheck(util::cuda::memPrefetchAsync(mPtr, mSize, device, stream));
+        if (sync) cudaCheck(cudaStreamSynchronize(stream));
+    }
+
+public:
 
     ///////////////////////////////////////////////////////////////////////
 

@@ -4,9 +4,11 @@
 
 #include <nanobind/stl/string.h>
 
+#include <type_traits>
+
 #include <nanovdb/tools/CreatePrimitives.h>
 #ifdef NANOVDB_USE_CUDA
-#include <nanovdb/cuda/DeviceBuffer.h>
+#include "cuda/PyDeviceGridHandle.h"
 #endif
 
 namespace nb = nanobind;
@@ -117,88 +119,93 @@ GridHandle<BufferT> createFogVolumeTorus(GridType           gridType,
 
 } // namespace
 
-template<typename BufferT> void definePrimitives(nb::module_& m)
+// OutT is the Python handle type the grids are returned in, constructed from
+// the GridHandle<BufferT> they are built into.
+template<typename BufferT, typename OutT> void definePrimitives(nb::module_& m)
 {
-    m.def("createLevelSetSphere",
-          nb::overload_cast<GridType, double, const Vec3d&, double, double, const Vec3d&, const std::string&, tools::StatsMode, CheckMode, const BufferT&>(
-              &createLevelSetSphere<BufferT>),
-          "gridType"_a = GridType::Float,
-          "radius"_a = 100.0,
-          "center"_a = Vec3d(0.0),
-          "voxelSize"_a = 1.0,
-          "halfWidth"_a = 3.0,
-          "origin"_a = Vec3d(0.0),
-          "name"_a = "sphere_ls",
-          "sMode"_a = tools::StatsMode::Default,
-          "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT());
+    static_assert(std::is_constructible<OutT, GridHandle<BufferT>&&>::value, "OutT must be constructible from the built GridHandle<BufferT>");
+    m.def(
+        "createLevelSetSphere",
+        [](GridType gridType, double radius, const Vec3d& center, double voxelSize, double halfWidth, const Vec3d& origin, const std::string& name,
+           tools::StatsMode sMode, CheckMode cMode, const BufferT& buffer) {
+            return OutT(createLevelSetSphere<BufferT>(gridType, radius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer));
+        },
+        "gridType"_a = GridType::Float,
+        "radius"_a = 100.0,
+        "center"_a = Vec3d(0.0),
+        "voxelSize"_a = 1.0,
+        "halfWidth"_a = 3.0,
+        "origin"_a = Vec3d(0.0),
+        "name"_a = "sphere_ls",
+        "sMode"_a = tools::StatsMode::Default,
+        "cMode"_a = CheckMode::Default,
+        "buffer"_a = BufferT());
 
-    m.def("createLevelSetTorus",
-          nb::overload_cast<GridType,
-                            double,
-                            double,
-                            const Vec3d&,
-                            double,
-                            double,
-                            const Vec3d&,
-                            const std::string&,
-                            tools::StatsMode,
-                            CheckMode,
-                            const BufferT&>(&createLevelSetTorus<BufferT>),
-          "gridType"_a = GridType::Float,
-          "majorRadius"_a = 100.0,
-          "minorRadius"_a = 50.0,
-          "center"_a = Vec3d(0.0),
-          "voxelSize"_a = 1.0,
-          "halfWidth"_a = 3.0,
-          "origin"_a = Vec3d(0.0),
-          "name"_a = "torus_ls",
-          "sMode"_a = tools::StatsMode::Default,
-          "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT());
+    m.def(
+        "createLevelSetTorus",
+        [](GridType gridType, double majorRadius, double minorRadius, const Vec3d& center, double voxelSize, double halfWidth, const Vec3d& origin,
+           const std::string& name, tools::StatsMode sMode, CheckMode cMode, const BufferT& buffer) {
+            return OutT(createLevelSetTorus<BufferT>(gridType, majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer));
+        },
+        "gridType"_a = GridType::Float,
+        "majorRadius"_a = 100.0,
+        "minorRadius"_a = 50.0,
+        "center"_a = Vec3d(0.0),
+        "voxelSize"_a = 1.0,
+        "halfWidth"_a = 3.0,
+        "origin"_a = Vec3d(0.0),
+        "name"_a = "torus_ls",
+        "sMode"_a = tools::StatsMode::Default,
+        "cMode"_a = CheckMode::Default,
+        "buffer"_a = BufferT());
 
-    m.def("createFogVolumeSphere",
-          nb::overload_cast<GridType, double, const Vec3d&, double, double, const Vec3d&, const std::string&, tools::StatsMode, CheckMode, const BufferT&>(
-              &createFogVolumeSphere<BufferT>),
-          "gridType"_a = GridType::Float,
-          "radius"_a = 100.0,
-          "center"_a = Vec3d(0.0),
-          "voxelSize"_a = 1.0,
-          "halfWidth"_a = 3.0,
-          "origin"_a = Vec3d(0.0),
-          "name"_a = "sphere_fog",
-          "sMode"_a = tools::StatsMode::Default,
-          "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT());
+    m.def(
+        "createFogVolumeSphere",
+        [](GridType gridType, double radius, const Vec3d& center, double voxelSize, double halfWidth, const Vec3d& origin, const std::string& name,
+           tools::StatsMode sMode, CheckMode cMode, const BufferT& buffer) {
+            return OutT(createFogVolumeSphere<BufferT>(gridType, radius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer));
+        },
+        "gridType"_a = GridType::Float,
+        "radius"_a = 100.0,
+        "center"_a = Vec3d(0.0),
+        "voxelSize"_a = 1.0,
+        "halfWidth"_a = 3.0,
+        "origin"_a = Vec3d(0.0),
+        "name"_a = "sphere_fog",
+        "sMode"_a = tools::StatsMode::Default,
+        "cMode"_a = CheckMode::Default,
+        "buffer"_a = BufferT());
 
-    m.def("createFogVolumeTorus",
-          nb::overload_cast<GridType,
-                            double,
-                            double,
-                            const Vec3d&,
-                            double,
-                            double,
-                            const Vec3d&,
-                            const std::string&,
-                            tools::StatsMode,
-                            CheckMode,
-                            const BufferT&>(&createFogVolumeTorus<BufferT>),
-          "gridType"_a = GridType::Float,
-          "majorRadius"_a = 100.0,
-          "minorRadius"_a = 50.0,
-          "center"_a = Vec3d(0.0),
-          "voxelSize"_a = 1.0,
-          "halfWidth"_a = 3.0,
-          "origin"_a = Vec3d(0.0),
-          "name"_a = "torus_fog",
-          "sMode"_a = tools::StatsMode::Default,
-          "cMode"_a = CheckMode::Default,
-          "buffer"_a = BufferT());
+    m.def(
+        "createFogVolumeTorus",
+        [](GridType gridType, double majorRadius, double minorRadius, const Vec3d& center, double voxelSize, double halfWidth, const Vec3d& origin,
+           const std::string& name, tools::StatsMode sMode, CheckMode cMode, const BufferT& buffer) {
+            return OutT(createFogVolumeTorus<BufferT>(gridType, majorRadius, minorRadius, center, voxelSize, halfWidth, origin, name, sMode, cMode, buffer));
+        },
+        "gridType"_a = GridType::Float,
+        "majorRadius"_a = 100.0,
+        "minorRadius"_a = 50.0,
+        "center"_a = Vec3d(0.0),
+        "voxelSize"_a = 1.0,
+        "halfWidth"_a = 3.0,
+        "origin"_a = Vec3d(0.0),
+        "name"_a = "torus_fog",
+        "sMode"_a = tools::StatsMode::Default,
+        "cMode"_a = CheckMode::Default,
+        "buffer"_a = BufferT());
 }
 
-template void definePrimitives<HostBuffer>(nb::module_&);
+void definePrimitives(nb::module_& m)
+{
+    definePrimitives<HostBuffer, GridHandle<HostBuffer>>(m);
+}
+
 #ifdef NANOVDB_USE_CUDA
-template void definePrimitives<cuda::DualDeviceBuffer>(nb::module_&);
+// The grids are built on the host into the device handle's host side.
+void defineDevicePrimitives(nb::module_& m)
+{
+    definePrimitives<HostBuffer, DeviceGridHandle>(m);
+}
 #endif
 
 } // namespace pynanovdb

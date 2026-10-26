@@ -143,7 +143,13 @@ public:
     // be smaller than the current container size.
 
     inline bool trimQuads(const size_t n, bool reallocate = false);
-    inline bool trimTrinagles(const size_t n, bool reallocate = false);
+    inline bool trimTriangles(const size_t n, bool reallocate = false);
+
+    OPENVDB_DEPRECATED_MESSAGE("Use trimTriangles() instead.")
+    inline bool trimTrinagles(const size_t n, bool reallocate = false)
+    {
+        return this->trimTriangles(n, reallocate);
+    }
 
 private:
     // disallow copy by assignment
@@ -616,8 +622,8 @@ template<>
 inline bool isInsideValue<bool>(bool value, bool /*isovalue*/) { return value; }
 
 
-/// @brief  Minor wrapper around the Leaf API to avoid atomic access with
-///   delayed loading.
+/// @brief  Minor wrapper around the Leaf API. This was originally added to avoid
+// atomic access with delayed loading, however delayed loading is no longer supported.
 template <typename LeafT,
     bool IsBool = std::is_same<typename LeafT::ValueType, bool>::value>
 struct LeafBufferAccessor
@@ -2442,7 +2448,7 @@ struct AdaptivePrimBuilder
     void done()
     {
         mPolygonPool->trimQuads(mQuadIdx, /*reallocate=*/true);
-        mPolygonPool->trimTrinagles(mTriangleIdx, /*reallocate=*/true);
+        mPolygonPool->trimTriangles(mTriangleIdx, /*reallocate=*/true);
     }
 
 private:
@@ -4784,7 +4790,7 @@ PolygonPool::trimQuads(const size_t n, bool reallocate)
 
 
 inline bool
-PolygonPool::trimTrinagles(const size_t n, bool reallocate)
+PolygonPool::trimTriangles(const size_t n, bool reallocate)
 {
     if (!(n < mNumTriangles)) return false;
 

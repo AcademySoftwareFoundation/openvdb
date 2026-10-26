@@ -10,6 +10,9 @@ namespace nb = nanobind;
 namespace pynanovdb {
 
 template<typename BufferT> void defineValidateGrids(nb::module_& m);
+#ifdef NANOVDB_USE_CUDA
+void defineDeviceValidateGrids(nb::module_& m);
+#endif
 
 } // namespace pynanovdb
 
