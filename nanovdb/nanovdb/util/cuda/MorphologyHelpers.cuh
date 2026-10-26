@@ -15,6 +15,7 @@
 #define NANOVDB_UTIL_MORPHOLOGY_CUDA_MORPHOLOGYHELPERS_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h> // for Mask
+#include <nanovdb/util/MorphologyHelpers.h> // for Mask2D; it includes this header back at its end, which the guard skips
 
 #include <stdint.h> // for uint64_t
 
