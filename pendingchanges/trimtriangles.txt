@@ -1,3 +1,0 @@
-OpenVDB:
-  API changes:
-  - Renamed tools::PolygonPool::trimTrinagles() to trimTriangles(). The old name is deprecated and will be removed.
