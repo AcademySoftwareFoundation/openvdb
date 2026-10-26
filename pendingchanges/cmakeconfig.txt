@@ -1,0 +1,9 @@
+OpenVDB:
+  Build:
+  - Added an OpenVDB CMake Config-file, so downstream projects can use
+    find_package(OpenVDB CONFIG) and link against OpenVDB::openvdb. The existing
+    FindOpenVDB.cmake module is still installed and is still required for the
+    openvdb_ax, nanovdb and Houdini components.
+  - Include directories of the core library targets now use build and install
+    interface generator expressions, so installed targets no longer reference
+    paths in the source or build tree.
