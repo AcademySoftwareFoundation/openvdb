@@ -253,7 +253,7 @@ __device__ util::morphology::Mask2D<3> leafSeedSlice(const NanoLeaf<BuildT>& lea
     for (uint32_t first = 0; first < NanoLeaf<BuildT>::SIZE; first += 32) {
         const uint32_t n      = first + uint32_t(lane);
         const uint32_t ballot = __ballot_sync(0xFFFFFFFFu, leaf.isActive(n) && signs[leaf.getValue(n)] == int8_t(-1));
-        if (lane == int(first / 64)) s.words[0] |= uint64_t(ballot) << (first % 64);
+        if (lane == int(first / 64)) s.mWords[0] |= uint64_t(ballot) << (first % 64);
     }
     return s;
 }
@@ -265,25 +265,24 @@ enum Face : int { minusX, plusX, minusY, plusY, minusZ, plusZ, faceCount };
 ///        it is the first or last slice and not empty, and minusY, plusY, minusZ and plusZ if it has an on slot
 ///        with y = 0, y = Dim - 1, z = 0 or z = Dim - 1. The z edges are the slots a unit z shift zero-fills:
 ///        z = 0 has no source under dk = -1, and z = Dim - 1 none under dk = +1.
-template <int Log2Dim>
-__hostdev__ uint32_t facesWithOnSlots(const util::morphology::Mask2D<Log2Dim>& s, int x)
+template <int LOG2DIM>
+__hostdev__ uint32_t facesWithOnSlots(const util::morphology::Mask2D<LOG2DIM>& s, int x)
 {
-    constexpr int      Dim       = util::morphology::Mask2D<Log2Dim>::Dim;
-    constexpr int      WordCount = util::morphology::Mask2D<Log2Dim>::WordCount;
-    constexpr uint64_t YBits     = util::morphology::detail::yBits<Log2Dim>;
-    constexpr uint64_t FirstY    = YBits;                                              // y = 0: the low Dim bits of the first word
-    constexpr uint64_t LastY     = YBits << (64 - Dim);                                // y = Dim - 1: the high Dim bits of the last word
-    constexpr uint64_t FirstZ    = ~util::morphology::detail::zShiftBits<Log2Dim, -1>; // z = 0, in every y of a word
-    constexpr uint64_t LastZ     = ~util::morphology::detail::zShiftBits<Log2Dim, +1>; // z = Dim - 1, in every y of a word
+    constexpr int      Dim       = util::morphology::Mask2D<LOG2DIM>::DIM;
+    constexpr int      WordCount = util::morphology::Mask2D<LOG2DIM>::WORD_COUNT;
+    constexpr uint64_t FirstY    = util::morphology::detail::firstWordOfY0<LOG2DIM>;   // y = 0: the low Dim bits of the first word
+    constexpr uint64_t LastY     = FirstY << (64 - Dim);                               // y = Dim - 1: the high Dim bits of the last word
+    constexpr uint64_t FirstZ    = ~util::morphology::detail::zShiftBits<LOG2DIM, -1>; // z = 0, in every y of a word
+    constexpr uint64_t LastZ     = ~util::morphology::detail::zShiftBits<LOG2DIM, +1>; // z = Dim - 1, in every y of a word
     uint64_t firstZ = 0, lastZ = 0;
-    for (int j = 0; j < WordCount; ++j) { firstZ |= s.words[j] & FirstZ; lastZ |= s.words[j] & LastZ; }
+    for (int j = 0; j < WordCount; ++j) { firstZ |= s.mWords[j] & FirstZ; lastZ |= s.mWords[j] & LastZ; }
     const bool nonEmpty = !s.isOff();
-    return uint32_t(x == 0 && nonEmpty)                     << minusX |
-           uint32_t(x == Dim - 1 && nonEmpty)               << plusX  |
-           uint32_t((s.words[0] & FirstY) != 0)             << minusY |
-           uint32_t((s.words[WordCount - 1] & LastY) != 0) << plusY  |
-           uint32_t(firstZ != 0)                            << minusZ |
-           uint32_t(lastZ != 0)                             << plusZ;
+    return uint32_t(x == 0 && nonEmpty)                      << minusX |
+           uint32_t(x == Dim - 1 && nonEmpty)                << plusX  |
+           uint32_t((s.mWords[0] & FirstY) != 0)             << minusY |
+           uint32_t((s.mWords[WordCount - 1] & LastY) != 0) << plusY  |
+           uint32_t(firstZ != 0)                             << minusZ |
+           uint32_t(lastZ != 0)                              << plusZ;
 }
 
 // Seeding coarser levels across node faces.
@@ -395,7 +394,7 @@ struct BitFloodFunctor
     using MaskT  = nanovdb::Mask<NodeT::LOG2DIM>;
     using SliceT = util::morphology::Mask2D<NodeT::LOG2DIM>;
 
-    static constexpr int      Dim                        = SliceT::Dim;
+    static constexpr int      Dim                        = SliceT::DIM;
     static constexpr int      SlotCount                  = Dim * Dim * Dim;
     static constexpr int      MaxSweeps                  = Level == 0 ? 3 * (Dim - 1) + 1 : 3 * (Dim - 1);
     static constexpr int      NodesPerBlock              = 4;           // best in practice
