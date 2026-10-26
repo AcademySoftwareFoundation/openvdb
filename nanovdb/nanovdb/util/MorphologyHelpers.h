@@ -115,98 +115,99 @@ refineCoord(const Coord& coord)
     return result;
 }
 
-/// @brief One x-slice of a Mask<Log2Dim>: the Dim x Dim plane of slots (x, y, z) with x fixed, in the
-///        mask's own layout. Slot (y, z) is bit y * Dim + z of the slice, so the Dim slots of one y are
-///        contiguous bits, and every 64-bit word holds whole y's. A plain aggregate with no notion of
-///        threads: Mask2D m{} is all off.
-template<int Log2Dim>
+/// @brief One x-slice of a Mask<LOG2DIM>: the DIM x DIM plane of slots (x, y, z) with x fixed, in the
+///        mask's own layout. Slot (y, z) is bit y * DIM + z of the slice, so the DIM slots of one y are
+///        contiguous bits, and every 64-bit word holds whole y's. A plain aggregate: Mask2D m{} is all off.
+template<int LOG2DIM>
 struct Mask2D
 {
-    static_assert(Log2Dim >= 3 && Log2Dim <= 5, "every 64-bit word must hold whole y's of the slice");
-    static constexpr int Dim       = 1 << Log2Dim;   // slots per axis: 8, 16, 32
-    static constexpr int WordCount = Dim * Dim / 64; // 1, 4, 16
+    static_assert(LOG2DIM >= 3 && LOG2DIM <= 5,
+                  "Mask2D supports only LOG2DIM 3, 4 and 5, the sizes of NanoVDB's leaf, lower and upper node masks");
+    static constexpr int DIM        = 1 << LOG2DIM; // slots per axis: 8, 16, 32
+    static constexpr int SIZE       = DIM * DIM;    // slots in the slice: 64, 256, 1024
+    static constexpr int WORD_COUNT = SIZE >> 6;    // 64-bit words: 1, 4, 16
 
-    uint64_t words[WordCount];
+    uint64_t mWords[WORD_COUNT];
 
     /// @brief Slice @a x of @a mask, and its inverse.
-    __hostdev__ static Mask2D load(const Mask<Log2Dim>& mask, int x)
+    __hostdev__ static Mask2D load(const Mask<LOG2DIM>& mask, int x)
     {
         Mask2D s;
-        for (int j = 0; j < WordCount; ++j) s.words[j] = mask.words()[x * WordCount + j];
+        for (int j = 0; j < WORD_COUNT; ++j) s.mWords[j] = mask.words()[x * WORD_COUNT + j];
         return s;
     }
-    __hostdev__ void store(Mask<Log2Dim>& mask, int x) const
+    __hostdev__ void store(Mask<LOG2DIM>& mask, int x) const
     {
-        for (int j = 0; j < WordCount; ++j) mask.words()[x * WordCount + j] = words[j];
+        for (int j = 0; j < WORD_COUNT; ++j) mask.words()[x * WORD_COUNT + j] = mWords[j];
     }
 
     // Whole-slice queries and updates, named as in Mask.
-    __hostdev__ bool isOn() const  { uint64_t a = ~uint64_t(0); for (int j = 0; j < WordCount; ++j) a &= words[j]; return a == ~uint64_t(0); }
-    __hostdev__ bool isOff() const { uint64_t a = 0; for (int j = 0; j < WordCount; ++j) a |= words[j]; return a == 0; }
-    __hostdev__ void setOn()       { for (int j = 0; j < WordCount; ++j) words[j] = ~uint64_t(0); }
-    __hostdev__ void setOff()      { for (int j = 0; j < WordCount; ++j) words[j] = 0; }
-    __hostdev__ void toggle()      { for (int j = 0; j < WordCount; ++j) words[j] = ~words[j]; }
+    __hostdev__ bool isOn() const  { uint64_t a = ~uint64_t(0); for (int j = 0; j < WORD_COUNT; ++j) a &= mWords[j]; return a == ~uint64_t(0); }
+    __hostdev__ bool isOff() const { uint64_t a = 0; for (int j = 0; j < WORD_COUNT; ++j) a |= mWords[j]; return a == 0; }
+    __hostdev__ void setOn()       { for (int j = 0; j < WORD_COUNT; ++j) mWords[j] = ~uint64_t(0); }
+    __hostdev__ void setOff()      { for (int j = 0; j < WORD_COUNT; ++j) mWords[j] = 0; }
+    __hostdev__ void toggle()      { for (int j = 0; j < WORD_COUNT; ++j) mWords[j] = ~mWords[j]; }
 
-    __hostdev__ bool operator==(const Mask2D& o) const { bool eq = true; for (int j = 0; j < WordCount; ++j) eq &= words[j] == o.words[j]; return eq; }
+    __hostdev__ bool operator==(const Mask2D& o) const { bool eq = true; for (int j = 0; j < WORD_COUNT; ++j) eq &= mWords[j] == o.mWords[j]; return eq; }
     __hostdev__ bool operator!=(const Mask2D& o) const { return !(*this == o); }
-    __hostdev__ Mask2D& operator&=(const Mask2D& o)    { for (int j = 0; j < WordCount; ++j) words[j] &= o.words[j]; return *this; }
-    __hostdev__ Mask2D& operator|=(const Mask2D& o)    { for (int j = 0; j < WordCount; ++j) words[j] |= o.words[j]; return *this; }
+    __hostdev__ Mask2D& operator&=(const Mask2D& o)    { for (int j = 0; j < WORD_COUNT; ++j) mWords[j] &= o.mWords[j]; return *this; }
+    __hostdev__ Mask2D& operator|=(const Mask2D& o)    { for (int j = 0; j < WORD_COUNT; ++j) mWords[j] |= o.mWords[j]; return *this; }
 
     // Value-returning forms, for slices held in registers (Mask has only the compound forms).
     __hostdev__ Mask2D operator&(const Mask2D& o) const { Mask2D r = *this; return r &= o; }
     __hostdev__ Mask2D operator|(const Mask2D& o) const { Mask2D r = *this; return r |= o; }
-}; // Mask2D<Log2Dim>
+}; // Mask2D<LOG2DIM>
 
 namespace detail {
 
-/// @brief The bits of one y of a Mask2D<Log2Dim> word (its Dim low bits).
-template<int Log2Dim>
-inline constexpr uint64_t yBits = (uint64_t(1) << (1 << Log2Dim)) - 1;
+/// @brief Take the Mask2D<LOG2DIM> whose on slots are those with y == 0, and keep just its first word:
+///        the DIM low bits (0xFF, 0xFFFF or 0xFFFFFFFF).
+template<int LOG2DIM>
+inline constexpr uint64_t firstWordOfY0 = (uint64_t(1) << (1 << LOG2DIM)) - 1;
 
-/// @brief The bits of a Mask2D<Log2Dim> word, in every y of the word, whose slot z has a source under
-///        a z shift by dk, i.e. 0 <= z + dk < Dim: the slots that MaskShift<dj, dk> does not zero-fill.
-template<int Log2Dim, int dk>
+/// @brief MaskShift<0, dk, false> of the all-on Mask2D<LOG2DIM>, restricted to its first word.
+template<int LOG2DIM, int dk>
 inline constexpr uint64_t zShiftBits =
-    ((yBits<Log2Dim> >> (dk > 0 ? dk : 0)) & (yBits<Log2Dim> << (dk < 0 ? -dk : 0))) // one y: z in [-dk, Dim - dk)
-    * (~uint64_t(0) / yBits<Log2Dim>);                                               // repeated for every y
+    ((firstWordOfY0<LOG2DIM> >> (dk > 0 ? dk : 0)) & (firstWordOfY0<LOG2DIM> << (dk < 0 ? -dk : 0))) // one y: z in [-dk, DIM - dk)
+    * (~uint64_t(0) / firstWordOfY0<LOG2DIM>);                                                       // copied into every y
 
 } // namespace detail
 
 /// @brief out(y, z) |= in(y + dj, z + dk), or = if !combine, with zeros from outside the slice: the 2D,
 ///        per-thread counterpart of util::morphology::cuda::MaskShift. @a in and @a out may be the same slice.
-template<int dj, int dk, bool combine = true, int Log2Dim>
-__hostdev__ void MaskShift(const Mask2D<Log2Dim>& in, Mask2D<Log2Dim>& out)
+template<int dj, int dk, bool combine = true, int LOG2DIM>
+__hostdev__ void MaskShift(const Mask2D<LOG2DIM>& in, Mask2D<LOG2DIM>& out)
 {
-    using SliceT = Mask2D<Log2Dim>;
-    constexpr int Dim = SliceT::Dim, WordCount = SliceT::WordCount;
-    static_assert(dj > -Dim && dj < Dim && dk > -Dim && dk < Dim, "the shift must stay within the slice");
+    using SliceT = Mask2D<LOG2DIM>;
+    constexpr int DIM = SliceT::DIM, WORD_COUNT = SliceT::WORD_COUNT;
+    static_assert(dj > -DIM && dj < DIM && dk > -DIM && dk < DIM, "the shift must stay within the slice");
 
     // z: shift every word, then clear the slots whose source lies outside the slice (they received bits
     // from the neighboring y instead).
-    uint64_t t[WordCount];
-    for (int j = 0; j < WordCount; ++j) {
-        if constexpr (dk > 0)      t[j] = (in.words[j] >>  dk) & detail::zShiftBits<Log2Dim, dk>;
-        else if constexpr (dk < 0) t[j] = (in.words[j] << -dk) & detail::zShiftBits<Log2Dim, dk>;
-        else                       t[j] = in.words[j];
+    uint64_t t[WORD_COUNT];
+    for (int j = 0; j < WORD_COUNT; ++j) {
+        if constexpr (dk > 0)      t[j] = (in.mWords[j] >>  dk) & detail::zShiftBits<LOG2DIM, dk>;
+        else if constexpr (dk < 0) t[j] = (in.mWords[j] << -dk) & detail::zShiftBits<LOG2DIM, dk>;
+        else                       t[j] = in.mWords[j];
     }
 
-    // y: whole y's, so the slice moves as one (64 * WordCount)-bit integer by |dj| * Dim bits,
+    // y: whole y's, so the slice moves as one (64 * WORD_COUNT)-bit integer by |dj| * DIM bits,
     // i.e. Q whole words plus R bits carried in from the next word over.
-    constexpr int Q = (dj < 0 ? -dj : dj) * Dim / 64;
-    constexpr int R = (dj < 0 ? -dj : dj) * Dim % 64;
+    constexpr int Q = (dj < 0 ? -dj : dj) * DIM / 64;
+    constexpr int R = (dj < 0 ? -dj : dj) * DIM % 64;
     SliceT r;
-    for (int i = 0; i < WordCount; ++i) {
+    for (int i = 0; i < WORD_COUNT; ++i) {
         uint64_t w = 0;
-        if constexpr (dj >= 0) { // toward lower bits: out bit b = t bit b + |dj| * Dim
-            if (i + Q < WordCount) w = t[i + Q] >> R;
-            if constexpr (R != 0) { if (i + Q + 1 < WordCount) w |= t[i + Q + 1] << (64 - R); }
-        } else {                 // toward higher bits: out bit b = t bit b - |dj| * Dim
+        if constexpr (dj >= 0) { // toward lower bits: out bit b = t bit b + |dj| * DIM
+            if (i + Q < WORD_COUNT) w = t[i + Q] >> R;
+            if constexpr (R != 0) { if (i + Q + 1 < WORD_COUNT) w |= t[i + Q + 1] << (64 - R); }
+        } else {                 // toward higher bits: out bit b = t bit b - |dj| * DIM
             if (i - Q >= 0) w = t[i - Q] << R;
             if constexpr (R != 0) { if (i - Q - 1 >= 0) w |= t[i - Q - 1] >> (64 - R); }
         }
-        r.words[i] = w;
+        r.mWords[i] = w;
     }
-    for (int i = 0; i < WordCount; ++i) out.words[i] = combine ? (out.words[i] | r.words[i]) : r.words[i];
+    for (int i = 0; i < WORD_COUNT; ++i) out.mWords[i] = combine ? (out.mWords[i] | r.mWords[i]) : r.mWords[i];
 }
 
 } // namespace morphology
