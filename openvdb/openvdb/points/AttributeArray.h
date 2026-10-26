@@ -15,7 +15,7 @@
 #include <openvdb/util/Name.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/util/Assert.h>
-#include <openvdb/io/io.h> // MappedFile
+#include <openvdb/io/io.h>
 #include <openvdb/io/Compression.h> // COMPRESS_BLOSC
 
 #include "IndexIterator.h"

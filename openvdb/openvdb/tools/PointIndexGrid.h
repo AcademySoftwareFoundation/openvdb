@@ -1491,8 +1491,6 @@ public:
 
 
     Index64 memUsage() const;
-    OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    Index64 memUsageIfLoaded() const { return memUsage(); }
 
 
     ////////////////////////////////////////

@@ -54,8 +54,6 @@ public:
     /// Destructor
     inline ~LeafBuffer();
 
-    OPENVDB_DEPRECATED_MESSAGE("Always returns false. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    bool isOutOfCore() const { return false; }
     /// Return @c true if memory for this buffer has not yet been allocated.
     bool empty() const { return !mData; }
     /// Allocate memory for this buffer if it has not already been allocated.
@@ -86,8 +84,6 @@ public:
 
     /// Return the memory footprint of this buffer in bytes.
     inline Index memUsage() const;
-    OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    inline Index memUsageIfLoaded() const { return memUsage(); }
     /// Return the number of values contained in this buffer.
     static Index size() { return SIZE; }
 
@@ -325,8 +321,6 @@ public:
     void swap(LeafBuffer& other) { if (&other != this) std::swap(mData, other.mData); }
 
     Index memUsage() const { return sizeof(*this); }
-    OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    Index memUsageIfLoaded() const { return memUsage(); }
     static Index size() { return SIZE; }
 
     /// @brief Return a pointer to the C-style array of words encoding the bits.
