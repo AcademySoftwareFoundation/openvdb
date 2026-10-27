@@ -24,7 +24,7 @@ CHANGES                                                     @kmuseth @apradhana 
 /openvdb_ax/                                                @idclip @richhones
 
 # NanoVDB
-/nanovdb/                                                   @kmuseth
+/nanovdb/                                                   @AcademySoftwareFoundation/openvdb-nanovdb-maintainers
 
 # OpenVDB Houdini - Default
 /openvdb_houdini/                                           @kmuseth
