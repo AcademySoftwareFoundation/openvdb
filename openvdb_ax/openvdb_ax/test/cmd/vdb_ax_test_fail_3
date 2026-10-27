@@ -3,6 +3,8 @@ usage: vdb_ax [command] [--help|-h] [-v] [<args>]
 
 CLI utility for processing OpenVDB data using AX.
 Available [command] modes are: [execute|analyze|functions] (Default: execute).
+    -debug|-info|-warn|-error|-fatal
+        set the diagnostic message threshold (default: warn)
     -h, --help, -help         print help and exit (use [command] --help for more information)
     -v, --verbose             verbose (print timing and diagnostics)
 

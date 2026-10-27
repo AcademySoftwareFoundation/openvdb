@@ -259,6 +259,27 @@ OPENVDB_API void setStreamMetadataPtr(std::ios_base&,
 /// and return a shared pointer to the object.
 OPENVDB_API SharedPtr<StreamMetadata> clearStreamMetadataPtr(std::ios_base&);
 
+/// @brief Replaces any StreamMetadata shared pointer associated with the stream
+/// with the given one for the lifetime of this object. When the destructor of this
+/// object is called, the StreamMetadata shared pointer is replaced with the prior one
+/// again.
+/// @details The stream only stores the address of the shared pointer, so this object
+/// owns it and cannot be copied or moved. The stream must outlive this object.
+class OPENVDB_API StreamMetadataScope
+{
+public:
+    StreamMetadataScope(std::ios_base&, SharedPtr<StreamMetadata>);
+    ~StreamMetadataScope();
+
+    StreamMetadataScope(const StreamMetadataScope&) = delete;
+    StreamMetadataScope& operator=(const StreamMetadataScope&) = delete;
+
+private:
+    std::ios_base& mStream;
+    SharedPtr<StreamMetadata> mMetadata;
+    void* mPrevious;
+}; // class StreamMetadataScope
+
 } // namespace io
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

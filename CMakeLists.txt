@@ -120,9 +120,12 @@ option(USE_ZLIB [=[
 Use zlib while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
 openvdb build configuration to decide on zlib support. ZLib can only be disabled if Blosc is also disabled. ]=] ON)
 option(USE_LOG4CPLUS [=[
-Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
-located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
-to be used if you know it to be required.]=] OFF)
+Deprecated, has no effect. OpenVDB no longer depends on log4cplus. See openvdb::logging::Sink
+for the replacement API.]=] OFF)
+if(USE_LOG4CPLUS)
+  message(DEPRECATION "The USE_LOG4CPLUS option has no effect. OpenVDB no longer depends on "
+    "log4cplus. See openvdb::logging::Sink for the replacement API.")
+endif()
 option(USE_EXR [=[
 Use OpenEXR while building openvdb components. If enabled, this also switches USE_IMATH_HALF to ON unless
 it too was provided and set to OFF.]=] OFF)
@@ -331,7 +334,6 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
   set(OPENVDB_CMAKE_MODULES
     cmake/FindBlosc.cmake
     cmake/FindJemalloc.cmake
-    cmake/FindLog4cplus.cmake
     cmake/FindOpenEXR.cmake
     cmake/FindOpenVDB.cmake
     cmake/FindTBB.cmake
@@ -445,7 +447,6 @@ if(USE_STATIC_DEPENDENCIES)
   set(BLOSC_USE_STATIC_LIBS ON)
   set(OPENEXR_USE_STATIC_LIBS ON)
   set(TBB_USE_STATIC_LIBS ON)
-  set(LOG4CPLUS_USE_STATIC_LIBS ON)
   set(JEMALLOC_USE_STATIC_LIBS ON)
   set(GTEST_USE_STATIC_LIBS ON)
   # @todo  glfw needs custom support.
@@ -504,17 +505,26 @@ if(OPENVDB_BUILD_PYTHON_MODULE OR (OPENVDB_BUILD_NANOVDB AND NANOVDB_BUILD_PYTHO
   find_package(Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Development Interpreter)
   if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_PYTHON_VERSION)
     if(Python_VERSION VERSION_LESS ${FUTURE_MINIMUM_PYTHON_VERSION})
-      message(DEPRECATION "Support for Python versions < ${FUTURE_MINIMUM_GLFW_VERSION} "
+      message(DEPRECATION "Support for Python versions < ${FUTURE_MINIMUM_PYTHON_VERSION} "
         "is deprecated and will be removed.")
     endif()
   endif()
 
+  # nanobind's config file only accepts the same major version as requested,
+  # so the minimum is checked below rather than passed to find_package.
   find_package(nanobind REQUIRED CONFIG)
   include(FindPackageHandleStandardArgs)
   find_package_handle_standard_args(nanobind
     FOUND_VAR nanobind_FOUND
     REQUIRED_VARS NB_DIR
     VERSION_VAR nanobind_VERSION)
+
+  if(MINIMUM_NANOBIND_VERSION)
+    if(nanobind_VERSION VERSION_LESS ${MINIMUM_NANOBIND_VERSION})
+      message(FATAL_ERROR "nanobind version ${nanobind_VERSION} is too old, "
+        "version ${MINIMUM_NANOBIND_VERSION} or newer is required.")
+    endif()
+  endif()
 
   if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_NANOBIND_VERSION)
     if(nanobind_VERSION VERSION_LESS ${FUTURE_MINIMUM_NANOBIND_VERSION})

@@ -9,17 +9,8 @@
 
 #include <openvdb/util/Assert.h>
 
-#include <llvm/Config/llvm-config.h> // version numbers
-
-#if LLVM_VERSION_MAJOR <= 15
-#include <llvm/InitializePasses.h>
-#include <llvm/PassRegistry.h>
-#endif
 #include <llvm/Support/TargetSelect.h> // InitializeNativeTarget
 #include <llvm/Support/ManagedStatic.h> // llvm_shutdown
-#if LLVM_VERSION_MAJOR <= 15
-#include <llvm/ExecutionEngine/MCJIT.h> // LLVMLinkInMCJIT
-#endif
 
 #include <mutex>
 
@@ -148,42 +139,6 @@ void initialize()
         OPENVDB_THROW(AXCompilerError,
             "Failed to initialize LLVM target for JIT");
     }
-
-    // ORC/New pass manager in use when using LLVM >= 16 in AX
-#if LLVM_VERSION_MAJOR <= 15
-    // required on some systems
-    LLVMLinkInMCJIT();
-
-    // Initialize passes
-    /// @note This is not strictly necessary as LLVM passes are initialized
-    ///   thread-safe on-demand into a static registry. ax::initialise should
-    ///   perform as much static set-up as possible so that the first run of
-    ///   Compiler::compiler has no extra overhead. The default pass pipeline
-    ///   is constantly changing and, as a result, explicitly registering certain
-    ///   passes here can cause annoying compiler failures between LLVM versions.
-    ///   The below passes are wrappers around pass categories whose API should
-    ///   change less frequently and include 99% of used passed.
-    ///
-    ///   Note that, as well as the llvm::PassManagerBuilder, the majority of
-    ///   passes are initialized through llvm::TargetMachine::adjustPassManager
-    ///   and llvm::TargetMachine::addPassesToEmitMC (called through the EE).
-    ///   To track passes, use llvm::PassRegistry::addRegistrationListener.
-    llvm::PassRegistry& registry = *llvm::PassRegistry::getPassRegistry();
-    llvm::initializeCore(registry);
-    llvm::initializeScalarOpts(registry);
-    llvm::initializeVectorization(registry);
-    llvm::initializeIPO(registry);
-    llvm::initializeAnalysis(registry);
-    llvm::initializeTransformUtils(registry);
-    llvm::initializeInstCombine(registry);
-#if LLVM_VERSION_MAJOR > 6
-    llvm::initializeAggressiveInstCombine(registry);
-#endif
-    llvm::initializeInstrumentation(registry);
-    llvm::initializeGlobalISel(registry);
-    llvm::initializeTarget(registry);
-    llvm::initializeCodeGen(registry);
-#endif
 
     sIsInitialized = true;
 }

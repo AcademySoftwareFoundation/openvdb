@@ -113,9 +113,6 @@ inline FunctionGroup::UniquePtr ax_ingroup(const FunctionOptions& op)
         .addParameterAttribute(3, llvm::Attribute::NoAlias)
         .addParameterAttribute(4, llvm::Attribute::ReadOnly)
         .addParameterAttribute(4, llvm::Attribute::NoAlias)
-#if LLVM_VERSION_MAJOR <= 15
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-#endif
         .addFunctionAttribute(llvm::Attribute::NoRecurse)
         // @note  handle->get can throw, so no unwind. Maybe use getUnsafe?
         .setConstantFold(false)

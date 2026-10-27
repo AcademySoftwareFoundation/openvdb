@@ -112,7 +112,7 @@ endif()
 
 find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
 if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_TBB_VERSION)
-  if(${TBB_VERSION} VERSION_LESS FUTURE_MINIMUM_TBB_VERSION)
+  if(TBB_VERSION VERSION_LESS ${FUTURE_MINIMUM_TBB_VERSION})
     message(DEPRECATION "Support for TBB versions < ${FUTURE_MINIMUM_TBB_VERSION} "
       "is deprecated and will be removed.")
   endif()
@@ -127,17 +127,6 @@ if(USE_IMATH_HALF)
   if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_IMATH_VERSION)
     if(${Imath_VERSION} VERSION_LESS FUTURE_MINIMUM_IMATH_VERSION)
       message(DEPRECATION "Support for Imath versions < ${FUTURE_MINIMUM_IMATH_VERSION} "
-        "is deprecated and will be removed.")
-    endif()
-  endif()
-endif()
-
-if(USE_LOG4CPLUS)
-  # Find Log4CPlus libraries
-  find_package(Log4cplus ${MINIMUM_LOG4CPLUS_VERSION} REQUIRED)
-  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_LOG4CPLUS_VERSION)
-    if(${Log4cplus_VERSION} VERSION_LESS FUTURE_MINIMUM_LOG4CPLUS_VERSION)
-      message(DEPRECATION "Support for Log4cplus versions < ${FUTURE_MINIMUM_LOG4CPLUS_VERSION} "
         "is deprecated and will be removed.")
     endif()
   endif()
@@ -208,10 +197,6 @@ endif()
 # shipped with Houdini).
 
 list(APPEND OPENVDB_CORE_DEPENDENT_LIBS TBB::tbb)
-
-if(USE_LOG4CPLUS)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Log4cplus::log4cplus)
-endif()
 
 # @todo blosc and zlib should be hidden (privately linked in):
 # See FindOpenVDB.cmake
@@ -355,6 +340,7 @@ set(OPENVDB_LIBRARY_SOURCE_FILES
   points/points.cc
   util/Assert.cc
   util/Formats.cc
+  util/logging.cc
 )
 
 set(OPENVDB_LIBRARY_INCLUDE_FILES
@@ -653,10 +639,6 @@ list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_PRIVATE)
 
 if(MINGW)
   list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -D_USE_MATH_DEFINES)
-endif()
-
-if(USE_LOG4CPLUS)
-  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_USE_LOG4CPLUS)
 endif()
 
 ##########################################################################

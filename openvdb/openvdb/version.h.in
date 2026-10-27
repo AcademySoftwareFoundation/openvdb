@@ -311,9 +311,13 @@ const uint32_t OPENVDB_LIBRARY_VERSION = OPENVDB_LIBRARY_VERSION_NUMBER;
 const uint32_t OPENVDB_ABI_VERSION = OPENVDB_ABI_VERSION_NUMBER;
 
 /// @brief The current version number of the VDB file format
-/// @details  This can be used to enable various backwards compatibility switches
-/// or to reject files that cannot be read.
+/// @details  This can be used to enable various backwards compatibility switches.
 const uint32_t OPENVDB_FILE_VERSION = 225;
+
+/// @brief The oldest version number of the VDB file format that a reader rejects
+/// @details  Files with a version above OPENVDB_FILE_VERSION and below this version are
+/// read with a warning. Files with this version or a newer one are rejected.
+const uint32_t OPENVDB_UNSUPPORTED_FILE_VERSION = 300;
 
 /// Notable file format version numbers
 enum {

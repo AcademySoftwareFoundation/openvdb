@@ -382,15 +382,12 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, cudaStream_t strea
 
 }// namespace cuda
 
-// move constructor from a single-space device buffer: all device work runs on
+// metadata parse for a single-space device buffer: all device work runs on
 // the buffer's retained stream (or the default stream for a synchronous
 // resource), and the metadata scratch allocates through the buffer's resource.
 template<typename BufferT>
-template<typename T, typename util::enable_if<BufferHasDeviceSingle<T>::value, int>::type, typename>
-GridHandle<BufferT>::GridHandle(T&& buffer)
-    : mBuffer(std::move(buffer))
+void GridHandle<BufferT>::parseSingleBuffer()
 {
-    static_assert(util::is_same<T,BufferT>::value, "Expected U==BufferT");
     using ResourceT = typename BufferT::ResourceType;
     if (const GridData *d_data = reinterpret_cast<const GridData*>(mBuffer.data())) {
         const cudaStream_t stream = cuda::detail::retainedStreamOrDefault(mBuffer);
@@ -399,7 +396,7 @@ GridHandle<BufferT>::GridHandle(T&& buffer)
         ScratchT scratch = cuda::detail::makeMetaScratch<ScratchT>(mBuffer, cuda::detail::chainScratchSize(count), stream);
         cuda::detail::parseGridChain(d_data, mBuffer.size_bytes(), count, scratch, mMetaData, stream);
     }
-}// GridHandle(T&& buffer) for single-space device buffers
+}// GridHandle::parseSingleBuffer
 
 } // namespace nanovdb
 
