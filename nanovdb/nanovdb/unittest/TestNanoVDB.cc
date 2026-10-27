@@ -9798,6 +9798,40 @@ TEST_F(TestNanoVDB, ReadMalformedFile)
         std::istringstream is(bytes, std::ios_base::in | std::ios_base::binary);
         EXPECT_THROW(io::hasGrid(is, "missing"), std::runtime_error);
     }
+    {// empty stream
+        EXPECT_TRUE(readMeta("").empty());
+        EXPECT_TRUE(readAll("").empty());
+        EXPECT_FALSE(readOne("", -1));
+        EXPECT_THROW(readOne("", 0), std::runtime_error);
+        EXPECT_THROW(readNamed("", "a"), std::runtime_error);
+    }
+    for (const std::string bytes : {std::string(4, '\0'), std::string("not a nanovdb file")}) {// shorter than a file header, or not NanoVDB
+        EXPECT_THROW(readMeta(bytes), std::runtime_error);
+        EXPECT_THROW(readAll(bytes), std::runtime_error);
+        EXPECT_THROW(readOne(bytes, -1), std::runtime_error);
+        EXPECT_THROW(readOne(bytes, 0), std::runtime_error);
+        EXPECT_THROW(readNamed(bytes, "a"), std::runtime_error);
+    }
+#if defined(NANOVDB_USE_ZIP) || defined(NANOVDB_USE_BLOSC)
+    {// valid compressed file shorter than GridData, so the raw-buffer probe reads past its end
+#if defined(NANOVDB_USE_ZIP)
+        const io::Codec codec = io::Codec::ZIP;
+#else
+        const io::Codec codec = io::Codec::BLOSC;
+#endif
+        tools::build::Grid<float> src(0.0f, "tiny");
+        auto handle = tools::createNanoGrid(src);
+        std::ostringstream os(std::ios_base::out | std::ios_base::binary);
+        io::writeGrid(os, handle, codec);
+        const std::string bytes = os.str();
+        ASSERT_LT(bytes.size(), sizeof(GridData));
+        EXPECT_EQ(1u, readMeta(bytes).size());
+        EXPECT_EQ(1u, readAll(bytes).size());
+        EXPECT_EQ(1u, readOne(bytes, -1).gridCount());
+        EXPECT_EQ(1u, readOne(bytes, 0).gridCount());
+        EXPECT_EQ(1u, readNamed(bytes, "tiny").gridCount());
+    }
+#endif
 }// ReadMalformedFile
 
 // make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*ReadMalformedRawBuffer"

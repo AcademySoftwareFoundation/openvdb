@@ -685,8 +685,7 @@ void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
                   "GridHandle::read requires a host-accessible buffer: read into a host-readable handle, then cuda::copyTo");
     const std::streampos start = is.tellg();// remember where the raw buffer begins
     GridData data;
-    is.read((char*)&data, sizeof(GridData));
-    if (data.isValid()) {
+    if (is.read((char*)&data, sizeof(GridData)) && data.isValid()) {
         static_assert(std::is_unsigned<decltype(GridData::mGridSize)>::value,
                       "GridHandle::read relies on unsigned wrap-around to detect overflow");
         uint64_t size = 0u;
@@ -705,7 +704,8 @@ void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
             throw std::runtime_error("GridHandle::read: stream is shorter than its raw grid sizes");
         *this = GridHandle(std::move(buffer));
     } else {
-        is.seekg(-sizeof(GridData), std::ios::cur);// rewind
+        is.clear();// a stream shorter than GridData is left failed, which would block the rewind
+        is.seekg(start);
         throw std::logic_error("This stream does not contain a valid raw grid buffer");
     }
 }// void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
@@ -715,9 +715,9 @@ void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool
 {
     static_assert(!(BufferIsDeviceOnly<BufferT>::value),
                   "GridHandle::read requires a host-accessible buffer: read into a host-readable handle, then cuda::copyTo");
+    const std::streampos start = is.tellg();
     GridData data;
-    is.read((char*)&data, sizeof(GridData));
-    if (data.isValid()) {
+    if (is.read((char*)&data, sizeof(GridData)) && data.isValid()) {
         if (n>=data.mGridCount) throw std::runtime_error("stream does not contain a #" + std::to_string(n) + " grid");
         detail::checkRawGridSize(is, data);
         while(data.mGridIndex != n) {
@@ -732,7 +732,8 @@ void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool
         tools::updateGridCount((GridData*)buffer.data(), 0u, 1u);
         *this = GridHandle(std::move(buffer));
     } else {
-        is.seekg(-sizeof(GridData), std::ios::cur);// rewind sizeof(GridData) bytes to undo initial read
+        is.clear();// a stream shorter than GridData is left failed, which would block the rewind
+        is.seekg(start);
         throw std::logic_error("This file does not contain a valid raw buffer");
     }
 }// void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool)
@@ -743,10 +744,12 @@ void GridHandle<BufferT>::read(std::istream& is, const std::string &gridName, co
     static_assert(!(BufferIsDeviceOnly<BufferT>::value),
                   "GridHandle::read requires a host-accessible buffer: read into a host-readable handle, then cuda::copyTo");
     static const std::streamsize byteSize = sizeof(GridData);
+    const std::streampos start = is.tellg();
     GridData data;
-    is.read((char*)&data, byteSize);
-    is.seekg(-byteSize, std::ios::cur);// rewind
-    if (data.isValid()) {
+    const bool isRaw = is.read((char*)&data, byteSize) && data.isValid();
+    is.clear();// a stream shorter than GridData is left failed, which would block the rewind
+    is.seekg(start);
+    if (isRaw) {
         uint32_t n = 0;
         auto nameIs = [&]{// the name comes from the stream, so bound it before comparing
             const void* end = std::memchr(data.mGridName, '\0', GridData::MaxNameSize);

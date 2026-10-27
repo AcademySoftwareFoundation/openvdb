@@ -528,7 +528,7 @@ inline HostBuffer::HostBuffer(uint64_t size) : mPool(nullptr), mSize(size), mDat
 
 inline HostBuffer::HostBuffer(HostBuffer&& other) : mPool(other.mPool), mSize(other.mSize), mData(other.mData)
 {
-    if (mPool && mSize != 0) {
+    if (mPool) {// Pool::add registers zero-size buffers too
         mPool->replace(&other, this);
     }
     other.mPool.reset();
@@ -558,7 +558,7 @@ inline HostBuffer& HostBuffer::operator=(HostBuffer&& other)
     mPool = other.mPool;
     mSize = other.mSize;
     mData = other.mData;
-    if (mPool && mSize != 0) {
+    if (mPool) {// Pool::add registers zero-size buffers too
         mPool->replace(&other, this);
     }
     other.mPool.reset();
