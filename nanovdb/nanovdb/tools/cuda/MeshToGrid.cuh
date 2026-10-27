@@ -291,7 +291,6 @@ GridHandle<BufferT> MeshToGrid<BuildT, ResourceT>::getHandle(const BufferT &buff
     // Count nodes at all levels from the filled masks
     if (mVerbose==1) mTimer.start("Counting nodes");
     mBuilder.countNodes(mStream);
-    cudaStreamSynchronize(mStream); // not needed by getBuffer, which waits for the node counts itself
     if (mVerbose==1) mTimer.stop();
 
     // Allocate output grid buffer
@@ -871,9 +870,7 @@ void MeshToGrid<BuildT, ResourceT>::buildRasterizedRoot()
     // Build the root node on CPU: one tile per unique root origin.
     // Only the NanoVDB tile key is set here; child pointers and values are
     // filled by TopologyBuilder's subsequent pipeline stages.
-    uint64_t rootSize = RootT::memUsage(tileCount);
-    auto *rootPtr = mBuilder.allocateProcessedRoot(rootSize);
-    rootPtr->mTableSize = tileCount;
+    auto *rootPtr = mBuilder.allocateProcessedRootTiles(tileCount);
     rootPtr->mBackground = typename RootT::ValueType{};
 
     if (tileCount) {
@@ -1110,7 +1107,6 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
 
     if (mVerbose==1) mTimer.start("Counting nodes");
     mBuilder.countNodes(mStream);
-    cudaStreamSynchronize(mStream);
     if (mVerbose==1) mTimer.stop();
 
     if (mVerbose==1) mTimer.start("Allocating grid buffer");

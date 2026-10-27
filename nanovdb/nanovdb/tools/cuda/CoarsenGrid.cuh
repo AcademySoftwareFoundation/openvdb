@@ -132,8 +132,6 @@ CoarsenGrid<BuildT, ResourceT>::getHandle(const BufferT &pool)
     if (mVerbose==1) mTimer.restart("Count coarsened tree nodes");
     mBuilder.countNodes(mStream);
 
-    cudaStreamSynchronize(mStream);
-
     // Allocate new device grid buffer for coarsened result
     if (mVerbose==1) mTimer.restart("Allocating coarsened grid buffer");
     auto buffer = mBuilder.getBuffer(pool, mStream);
@@ -175,22 +173,10 @@ void CoarsenGrid<BuildT, ResourceT>::coarsenRoot()
 {
     // This method coarsens the root tiles, to accommodate for the overall downsamping operation.
 
-    int device = 0;
-    cudaGetDevice(&device);
-
-    std::map<uint64_t, typename RootT::DataType::Tile> coarsenedTiles;
-
-    // This encoding scheme mirrors the one used in PointsToGrid; note that it is different from Tile::key
-    auto coordToKey = [](const Coord &ijk)->uint64_t{
-        // Note: int32_t has a range of -2^31 to 2^31 - 1 whereas uint32_t has a range of 0 to 2^32 - 1
-        static constexpr int64_t kOffset = 1 << 31;
-        return (uint64_t(uint32_t(int64_t(ijk[2]) + kOffset) >> 12)      ) | // z is the lower 21 bits
-            (uint64_t(uint32_t(int64_t(ijk[1]) + kOffset) >> 12) << 21) | // y is the middle 21 bits
-            (uint64_t(uint32_t(int64_t(ijk[0]) + kOffset) >> 12) << 42); //  x is the upper 21 bits
-    };// coordToKey lambda functor
+    topology::detail::ProcessedTileMap<RootT> tiles;
 
     if (mSrcTreeData.mVoxelCount) { // If the input grid is not empty
-        // Make a host copy of the Root topology
+        // Make a host copy of the source topology RootNode
         auto deviceSrcRoot = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid, GridT::memUsage() + mSrcTreeData.mNodeOffset[3]));
         uint64_t rootSize = mSrcTreeData.mNodeOffset[2] - mSrcTreeData.mNodeOffset[3];
         auto srcRootBuffer = nanovdb::HostBuffer::create(rootSize);
@@ -198,22 +184,13 @@ void CoarsenGrid<BuildT, ResourceT>::coarsenRoot()
         auto srcRoot = static_cast<RootT*>(srcRootBuffer.data());
 
         // Add all root tiles, reordering if necessary
-        for (uint32_t t = 0; t < srcRoot->tileCount(); t++) {
-            auto coarsenedOrigin = util::morphology::coarsenCoord(srcRoot->tile(t)->origin());
-            auto sortKey = coordToKey(coarsenedOrigin); // key used in the radix sort, in accordance with PointsToGrid
-            auto tileKey = RootT::CoordToKey(coarsenedOrigin); // encoding used in the NanoVDB tile
-            typename RootT::Tile coarsenedTile{tileKey}; // Only the key value is needed; child pointer & value will be unused
-            coarsenedTiles.emplace(sortKey, coarsenedTile);
-        }
+        for (uint32_t t = 0; t < srcRoot->tileCount(); t++)
+            topology::detail::insertProcessedTile<RootT>(tiles, util::morphology::coarsenCoord(srcRoot->tile(t)->origin()));
     }
 
     // Package the new root topology into a RootNode plus Tile list; upload to the GPU
-    uint64_t rootSize = RootT::memUsage(coarsenedTiles.size());
-    auto coarsenedRootPtr = mBuilder.allocateProcessedRoot(rootSize);
-    coarsenedRootPtr->mTableSize = coarsenedTiles.size();
-    uint32_t t = 0;
-    for (const auto& [key, tile] : coarsenedTiles)
-        *coarsenedRootPtr->tile(t++) = tile;
+    auto rootPtr = mBuilder.allocateProcessedRootTiles(static_cast<uint32_t>(tiles.size()));
+    topology::detail::packProcessedRoot(tiles, rootPtr);
     mBuilder.uploadProcessedRoot(mStream);
 }// CoarsenGrid<BuildT, ResourceT>::coarsenRoot
 

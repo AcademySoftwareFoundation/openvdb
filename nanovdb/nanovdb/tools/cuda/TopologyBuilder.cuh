@@ -105,7 +105,7 @@ inline void insertProcessedTiles(ProcessedTileMap<RootT> &tiles, const CoordBBox
         insertProcessedTile<RootT>(tiles, Coord(i, j, k) << kLog2Dim);
 }
 
-/// @brief Writes the tile table of a processed root allocated with RootT::memUsage(tiles.size())
+/// @brief Writes the tile table of a processed root allocated for tiles.size() tiles
 template <typename RootT>
 inline void packProcessedRoot(const ProcessedTileMap<RootT> &tiles, RootT *root)
 {
@@ -141,7 +141,7 @@ public:
 /// @code
 ///   TopologyBuilder<BuildT, ResourceT> builder(stream, resource);
 ///   // 1. speculative roots on the host, one per grid, tiles in tileSortKey order
-///   builder.allocateProcessedRoots(tileCounts);            // or allocateProcessedRoot(bytes) for one grid
+///   builder.allocateProcessedRoots(tileCounts);            // or allocateProcessedRootTiles(tileCount) for one grid
 ///   for (g...) topology::detail::packProcessedRoot(tiles[g], builder.hostProcessedRoot(g));
 ///   builder.uploadProcessedRoot(stream);
 ///   // 2. densified child masks, filled by the consumer's *InternalNodesFunctor
@@ -170,8 +170,8 @@ public:
 /// the node counts and node bases of data(g); every other field is the caller's to set until
 /// getBuffer uploads data(g). The processed roots and mask buffers are released by
 /// processLowerNodes; deviceProcessedRoot() and the mask pointers are invalid after it.
-/// data(g) exists from allocateProcessedRoot(s) on. Every copy into or out of the pinned
-/// host staging records the same event, and allocateProcessedRoot(s) waits on it before
+/// data(g) exists once the processed roots are allocated. Every copy into or out of the
+/// pinned host staging records the same event, and the root allocation waits on it before
 /// reusing the block, so the next build may start before the previous one has drained.
 template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class TopologyBuilder
@@ -271,11 +271,11 @@ public:
     ///        whole batch share one lookup table and need no host round trip
     void postProcessGridTree(cudaStream_t stream);
 
-    HostStagingT                 mHostStaging; // one pinned block, so every transfer is asynchronous and one cudaMallocHost serves a build: the processed roots back to back, then the per-grid parameters, then the tile bases; grown on demand by allocateProcessedRoot(s), never shrunk
-    uint64_t                     mRootBytes{0}; // bytes of processed roots at the start of mHostStaging; 0 before allocateProcessedRoot(s) and after processLowerNodes releases them
+    HostStagingT                 mHostStaging; // one pinned block, so every transfer is asynchronous and one cudaMallocHost serves a build: the processed roots back to back, then the per-grid parameters, then the tile bases; grown on demand by the root allocation, never shrunk
+    uint64_t                     mRootBytes{0}; // bytes of processed roots at the start of mHostStaging; 0 before the roots are allocated and after processLowerNodes releases them
     uint64_t                     mHostDataOffset{0}; // byte offset of the per-grid parameters in mHostStaging
     uint64_t                     mTileBasesOffset{0}; // byte offset of the gridCount()+1 tile bases countNodes uploads
-    uint32_t                     mGridCount{0}; // grids in the batch; 0 until allocateProcessedRoot(s)
+    uint32_t                     mGridCount{0}; // grids in the batch; 0 until the roots are allocated
     ScratchT                     mDeviceRoot; // device copy, made by uploadProcessedRoot
     UpperMaskBufT                mUpperMasks;
     LowerMaskBufT                mLowerMasks;
@@ -289,16 +289,29 @@ public:
     topology::detail::Event      mStagingDone; // recorded after every copy into or out of mHostStaging; once it completes, the node counts are in data(g) and the block may be reused
     CheckMode                    mChecksum{CheckMode::Disable};
 
-    /// @brief Number of grids in the batch: 0 until allocateProcessedRoot(s), 1 after
-    ///        allocateProcessedRoot, the batch size after allocateProcessedRoots
+    /// @brief Number of grids in the batch: 0 until the roots are allocated, 1 after
+    ///        allocateProcessedRootTiles, the batch size after allocateProcessedRoots
     uint32_t gridCount() const { return mGridCount; }
 
     RootT* deviceProcessedRoot(uint32_t g = 0) { return mDeviceRoot.empty() ? nullptr : util::PtrAdd<RootT>(mDeviceRoot.data(), data(g)->processedRootOffset); }
     RootT* hostProcessedRoot(uint32_t g = 0)   { return mRootBytes == 0    ? nullptr : util::PtrAdd<RootT>(mHostStaging.data(), data(g)->processedRootOffset); }
 
-    /// @brief Allocates (pinned) host staging for one processed root of @a bytes and returns it
-    ///        for the caller to fill (including mTableSize); any previous roots are dropped and
-    ///        the builder is reset to a single grid.
+    /// @brief Allocates (pinned) host staging for one processed root of @a tileCount tiles,
+    ///        sets its mTableSize and returns it for the caller to fill the tiles, in
+    ///        tileSortKey order; any previous roots are dropped and the builder is reset to
+    ///        a single grid.
+    RootT* allocateProcessedRootTiles(uint32_t tileCount)
+    {
+        allocateHostStaging(1, RootT::memUsage(tileCount));
+        RootT *root = hostProcessedRoot(0);
+        root->mTableSize = tileCount;
+        return root;
+    }
+
+    /// @brief Allocates (pinned) host staging of @a bytes for one processed root and returns
+    ///        it for the caller to fill, including mTableSize; any previous roots are dropped
+    ///        and the builder is reset to a single grid.
+    [[deprecated("Use allocateProcessedRootTiles(tileCount), which also sets mTableSize")]]
     RootT* allocateProcessedRoot(uint64_t bytes)
     {
         allocateHostStaging(1, bytes);
@@ -365,7 +378,7 @@ public:
     nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::detail::borrowInternal(*mResource); }
 
     /// @brief Builder parameters of grid @a g (grid 0 by default, the whole grid for single-grid builds);
-    ///        valid from allocateProcessedRoot(s) on
+    ///        valid once the roots are allocated
     Data* data(uint32_t g = 0)             { NANOVDB_ASSERT(g < mGridCount); return util::PtrAdd<Data>(mHostStaging.data(), mHostDataOffset) + g; }
     const Data* data(uint32_t g = 0) const { NANOVDB_ASSERT(g < mGridCount); return util::PtrAdd<const Data>(mHostStaging.data(), mHostDataOffset) + g; }
     /// @brief Device copy of the parameters of every grid, gridCount() entries

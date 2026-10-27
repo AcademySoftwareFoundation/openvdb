@@ -150,8 +150,6 @@ MergeGrids<BuildT, ResourceT>::getHandle(const BufferT &pool)
     if (mVerbose==1) mTimer.restart("Count merged tree nodes");
     mBuilder.countNodes(mStream);
 
-    cudaStreamSynchronize(mStream);
-
     // Allocate new device grid buffer for merged result
     if (mVerbose==1) mTimer.restart("Allocating merged grid buffer");
     auto buffer = mBuilder.getBuffer(pool, mStream);
@@ -191,27 +189,12 @@ MergeGrids<BuildT, ResourceT>::getHandle(const BufferT &pool)
 template<typename BuildT, typename ResourceT>
 void MergeGrids<BuildT, ResourceT>::mergeRoot()
 {
-    // Creates a new merged tree root with the merged tiles of the two input root topologies
+    // Creates a new merged tree root with the merged tiles of the input root topologies
 
-    int device = 0;
-    cudaGetDevice(&device);
-
-    std::map<uint64_t, typename RootT::DataType::Tile> mergedTiles;
-
-    // This encoding scheme mirrors the one used in PointsToGrid; note that it is different from Tile::key
-    auto coordToKey = [](const Coord &ijk)->uint64_t{
-        // Note: int32_t has a range of -2^31 to 2^31 - 1 whereas uint32_t has a range of 0 to 2^32 - 1
-        static constexpr int64_t kOffset = 1 << 31;
-        return (uint64_t(uint32_t(int64_t(ijk[2]) + kOffset) >> 12)      ) | // z is the lower 21 bits
-            (uint64_t(uint32_t(int64_t(ijk[1]) + kOffset) >> 12) << 21) | // y is the middle 21 bits
-            (uint64_t(uint32_t(int64_t(ijk[0]) + kOffset) >> 12) << 42); //  x is the upper 21 bits
-    };// coordToKey lambda functor
-
-    // Make a host copy of the source root topology RootNode for both inputs
-    // Then, merge tiles of two sources in a sorted container
+    topology::detail::ProcessedTileMap<RootT> tiles;
 
     // Union the root tiles of every (non-null) input into a sorted container.
-    // emplace dedups by spatial key, so any number of inputs combine naturally.
+    // Insertion dedups by spatial key, so any number of inputs combine naturally.
     for (size_t i = 0; i < mDeviceSrcGrids.size(); ++i) {
         if (!mSrcTreeData[i].mVoxelCount) continue; // skip null grids
         // Make a host copy of this input's Root topology. The HostBuffer is
@@ -224,19 +207,13 @@ void MergeGrids<BuildT, ResourceT>::mergeRoot()
         auto srcRoot = static_cast<RootT*>(srcRootBuffer.data());
 
         // Add all root tiles, reordering if necessary
-        for (uint32_t t = 0; t < srcRoot->tileCount(); t++) {
-            auto tile = srcRoot->tile(t);
-            mergedTiles.emplace(coordToKey(tile->origin()), *tile);
-        }
+        for (uint32_t t = 0; t < srcRoot->tileCount(); t++)
+            topology::detail::insertProcessedTile<RootT>(tiles, srcRoot->tile(t)->origin());
     }
 
-    // Package the new root topology into a RootNode plus Tile list; upload to the GPU
-    uint64_t rootSize = RootT::memUsage(mergedTiles.size());
-    auto mergedRootPtr = mBuilder.allocateProcessedRoot(rootSize);
-    mergedRootPtr->mTableSize = mergedTiles.size();
-    uint32_t t = 0;
-    for (const auto& [key, tile] : mergedTiles)
-        *mergedRootPtr->tile(t++) = tile;
+    // Package the merged root topology into a RootNode plus Tile list; upload to the GPU
+    auto rootPtr = mBuilder.allocateProcessedRootTiles(static_cast<uint32_t>(tiles.size()));
+    topology::detail::packProcessedRoot(tiles, rootPtr);
     mBuilder.uploadProcessedRoot(mStream);
 }// MergeGrids<BuildT, ResourceT>::mergeRoot
 
