@@ -15,7 +15,7 @@
 #define NANOVDB_UTIL_MORPHOLOGY_CUDA_MORPHOLOGYHELPERS_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h> // for Mask
-#include <nanovdb/util/MorphologyHelpers.h> // for Mask2D; it includes this header back at its end, which the guard skips
+#include <nanovdb/util/MorphologyHelpers.h> // for Mask2D
 
 #include <stdint.h> // for uint64_t
 
@@ -124,13 +124,11 @@ void MaskShift( const nanovdb::Mask<4>& inMaskQ, nanovdb::Mask<4>& outMaskQ )
         outMask[1][ii][jj] = hiWord; }
 }
 
-// A warp can hold one Mask<LOG2DIM> (LOG2DIM 3-5) as Mask2D slices: lane x holds x-slice x, and lanes
-// x >= DIM hold empty slices. The function below exchanges slices across lanes, so all 32 lanes of the
-// warp call it together.
-
 /// @brief out(x, y, z) |= in(x + di, y + dj, z + dk), or = if !combine, with zeros from outside the mask:
-///        the 3D MaskShift on a mask held by a warp as Mask2D slices. Each lane passes its own slice;
-///        @a in and @a out may be the same slice.
+///        the 3D MaskShift on a Mask<LOG2DIM> held by a warp as Mask2D slices.
+/// @note  Warp-cooperative: lane x holds x-slice x of the 3D Mask<LOG2DIM> (lanes x >= DIM hold empty slices),
+///        and all 32 lanes must call this together, each passing its own slice. @a in and @a out may be the
+///        same slice.
 template<int di, int dj, int dk, bool combine = true, int LOG2DIM>
 __device__ void MaskShift(const Mask2D<LOG2DIM>& in, Mask2D<LOG2DIM>& out)
 {
